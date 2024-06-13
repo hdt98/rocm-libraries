@@ -21,7 +21,12 @@ enum struct WmmaInstr
     // gfx12
     wmma_f32_16x16x16_f16_gfx12,
     wmma_f32_16x16x16_bf16_gfx12,
+    wmma_f16_16x16x16_f16_gfx12,
+    wmma_bf16_16x16x16_bf16_gfx12,
     wmma_i32_16x16x16_iu8_gfx12,
+
+    // gfx13
+    
 };
 
 /*
@@ -360,6 +365,78 @@ struct wmma_type<WmmaInstr::wmma_f32_16x16x16_bf16_gfx12,
 };
 
 template <index_t WaveSize>
+struct wmma_type<WmmaInstr::wmma_f16_16x16x16_f16_gfx12,
+                 WaveSize,
+                 typename std::enable_if_t<WaveSize == 32 || WaveSize == 64>>
+{
+    // Absolute fixing property
+    // * Data Pixel
+    static constexpr index_t m_per_wmma = 16;
+    static constexpr index_t n_per_wmma = 16;
+    static constexpr index_t k_per_wmma = 16;
+    // static constexpr index_t src_a_data_size = 2;
+    // static constexpr index_t src_b_data_size = 2;
+    // static constexpr index_t acc_data_size   = 4;
+    // * Thread mapping inside wave, num_thread_per_subgroups always alone N direction
+    static constexpr index_t acc_data_size            = 4;
+    static constexpr index_t acc_pack_number          = 1;
+    static constexpr index_t num_thread_per_subgroups = n_per_wmma;
+
+    // Wave mode dependent propety
+    static constexpr index_t wave_size = Number<WaveSize>{};
+    // * Fixed in Navi3x, Will be wave mode dependent on Navi4x
+    // static constexpr index_t num_src_a_vgprs_per_wave = k_per_wmma / 2 * src_a_data_size / 4;
+    // static constexpr index_t num_src_b_vgprs_per_wave = k_per_wmma / 2 * src_b_data_size / 4;
+    // * num_acc_vgprs_per_wave alone M direction
+    // * num_subgroups alone M direction
+    static constexpr index_t num_acc_vgprs_per_wave = m_per_wmma * n_per_wmma / wave_size;
+    static constexpr index_t num_subgroups          = wave_size / num_thread_per_subgroups;
+
+    template <index_t MPerWmma, index_t NPerWmma, class FloatA, class FloatB, class FloatC>
+    __device__ void run(const FloatA& a, const FloatB& b, FloatC& reg_c) const
+    {
+        static_assert(wave_size == 32, "only support wave32 for gfx12 wmma");
+        if constexpr(wave_size == 32)
+        {
+            intrin_wmma_f16_16x16x16_f16_w32_gfx12<MPerWmma, NPerWmma>::Run(a, b, reg_c);
+        }
+    }
+};
+
+template <index_t WaveSize>
+struct wmma_type<WmmaInstr::wmma_bf16_16x16x16_bf16_gfx12,
+                 WaveSize,
+                 typename std::enable_if_t<WaveSize == 32 || WaveSize == 64>>
+{
+    // Absolute fixing property
+    static constexpr index_t m_per_wmma = 16;
+    static constexpr index_t n_per_wmma = 16;
+    static constexpr index_t k_per_wmma = 16;
+    // static constexpr index_t src_a_data_size          = 2;
+    // static constexpr index_t src_b_data_size          = 2;
+    static constexpr index_t acc_data_size            = 4;
+    static constexpr index_t acc_pack_number          = 1;
+    static constexpr index_t num_thread_per_subgroups = n_per_wmma;
+
+    // Wave mode dependent propety
+    static constexpr index_t wave_size = Number<WaveSize>{};
+    // static constexpr index_t num_src_a_vgprs_per_wave = m_per_wmma * src_a_data_size / 4;
+    // static constexpr index_t num_src_b_vgprs_per_wave = n_per_wmma * src_b_data_size / 4;
+    static constexpr index_t num_acc_vgprs_per_wave = m_per_wmma * n_per_wmma / wave_size;
+    static constexpr index_t num_subgroups          = wave_size / num_thread_per_subgroups;
+
+    template <index_t MPerWmma, index_t NPerWmma, class FloatA, class FloatB, class FloatC>
+    __device__ void run(const FloatA& a, const FloatB& b, FloatC& reg_c) const
+    {
+        static_assert(wave_size == 32, "only support wave32 for gfx12 wmma");
+        if constexpr(wave_size == 32)
+        {
+            intrin_wmma_bf16_16x16x16_bf16_w32_gfx12<MPerWmma, NPerWmma>::Run(a, b, reg_c);
+        }
+    }
+};
+
+template <index_t WaveSize>
 struct wmma_type<WmmaInstr::wmma_i32_16x16x16_iu8_gfx12,
                  WaveSize,
                  typename std::enable_if_t<WaveSize == 32 || WaveSize == 64>>
@@ -417,7 +494,7 @@ struct WmmaSelector
     template <>
     constexpr auto GetWmma<half_t, half_t, float, 16, 16>()
     {
-#ifdef __gfx12__
+#if (defined(__gfx12__) || defined(__gfx13__))
         return WmmaInstr::wmma_f32_16x16x16_f16_gfx12;
 #else
         return WmmaInstr::wmma_f32_16x16x16_f16;
@@ -427,7 +504,7 @@ struct WmmaSelector
     template <>
     constexpr auto GetWmma<bhalf_t, bhalf_t, float, 16, 16>()
     {
-#ifdef __gfx12__
+#if (defined(__gfx12__) || defined(__gfx13__))
         return WmmaInstr::wmma_f32_16x16x16_bf16_gfx12;
 #else
         return WmmaInstr::wmma_f32_16x16x16_bf16;
@@ -449,7 +526,7 @@ struct WmmaSelector
     template <>
     constexpr auto GetWmma<int8_t, int8_t, int, 16, 16>()
     {
-#ifdef __gfx12__
+#if (defined(__gfx12__) || defined(__gfx13__))
         return WmmaInstr::wmma_i32_16x16x16_iu8_gfx12;
 #else
         return WmmaInstr::wmma_i32_16x16x16_iu8;
@@ -653,7 +730,7 @@ struct WmmaGemm
 
     __host__ __device__ static auto CalculateAThreadOriginDataIndex()
     {
-#ifdef __gfx12__
+#if (defined(__gfx12__) || defined(__gfx13__))
         return GetLaneIdUnderSubGroup();
 #else
         return TransposeC ? GetLaneIdUnderSubGroup() : GetSwizzledLaneIdLow();
@@ -662,7 +739,7 @@ struct WmmaGemm
 
     __host__ __device__ static auto CalculateBThreadOriginDataIndex()
     {
-#ifdef __gfx12__
+#if (defined(__gfx12__) || defined(__gfx13__))
         return GetLaneIdUnderSubGroup();
 #else
         return TransposeC ? GetSwizzledLaneIdLow() : GetLaneIdUnderSubGroup();

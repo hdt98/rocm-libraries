@@ -52,7 +52,7 @@ __global__ void
 {
 #if(!defined(__HIP_DEVICE_COMPILE__) || defined(__gfx906__) || defined(__gfx908__) ||         \
     defined(__gfx90a__) || defined(__gfx94__) || defined(__gfx103__) || defined(__gfx11__) || \
-    defined(__gfx12__))
+    defined(__gfx12__) || defined(__gfx13__))
 
     constexpr index_t shared_block_size =
         GridwiseGemm::GetSharedMemoryNumberOfByte() / sizeof(ABDataType);

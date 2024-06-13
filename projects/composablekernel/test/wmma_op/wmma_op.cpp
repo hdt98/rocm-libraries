@@ -53,13 +53,20 @@ bool run_test()
 int main(int, char*[])
 {
     bool pass = true;
+
+
+#if defined(__gfx12__) || defined(__gfx13__)
+    constexpr ck::index_t HalfAccNum = 8;
+#else
+    constexpr ck::index_t HalfAccNum = 16;
+#endif
     // clang-format off
     //              |SrcType     |DstType     |GPUAccType  |CPUAccType |AccNum
-    pass &= run_test<ck::half_t,  ck::half_t,  float,       float,      8     >();
-    pass &= run_test<ck::bhalf_t, ck::bhalf_t, float,       float,      8     >();
-    pass &= run_test<ck::half_t,  ck::half_t,  ck::half_t,  ck::half_t, 16    >();
-    pass &= run_test<ck::bhalf_t, ck::bhalf_t, ck::bhalf_t, float,      16    >();
-    pass &= run_test<int8_t,      int8_t,      int32_t,     int32_t,    8     >();
+    pass &= run_test<ck::half_t,  ck::half_t,  float,       float,      8          >();
+    pass &= run_test<ck::bhalf_t, ck::bhalf_t, float,       float,      8          >();
+    pass &= run_test<ck::half_t,  ck::half_t,  ck::half_t,  ck::half_t, HalfAccNum >();
+    pass &= run_test<ck::bhalf_t, ck::bhalf_t, ck::bhalf_t, float,      HalfAccNum >();
+    pass &= run_test<int8_t,      int8_t,      int32_t,     int32_t,    8          >();
     // clang-format on
 
     std::cout << "TestGemm ..... " << (pass ? "SUCCESS" : "FAILURE") << std::endl;
