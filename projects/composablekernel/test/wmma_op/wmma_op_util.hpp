@@ -100,6 +100,18 @@ builtin_wmma_naive_selector<int4x16_t,
 
 template <>
 __device__ void
+builtin_wmma_naive_selector<half8_t,
+                            StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr, float, 1, 8, true>>(
+    const half8_t& reg_a,
+    const half8_t& reg_b,
+    StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr, float, 1, 8, true>& reg_c)
+{
+    intrin_wmma_f32_16x16x16_f16_w32_gfx12<16, 16>::Run(
+        reg_a, reg_b, reg_c.GetVectorTypeReference(Number<0>{}));
+}
+
+template <>
+__device__ void
 builtin_wmma_naive_selector<bhalf8_t,
                             StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr, float, 1, 8, true>>(
     const bhalf8_t& reg_a,
@@ -221,7 +233,7 @@ __global__ void matmul(const src_t* a, const src_t* b, dst_t* c)
     __syncthreads();
     // wait for results, similar to mma_sync
     static_for<0, 8, 1>{}([&](auto ele) {
-        const int r = ele * 2 + (lIdx / 16);
+        const int r = ele + (lIdx / 16) * 8;
         // store results from unpacked c_thread_buf_ output
         c[16 * r + lane] = ck::type_convert<dst_t>(c_thread_buf_[Number<ele * acc_num / 8>{}]);
     });
@@ -259,11 +271,7 @@ __global__ void matmul_swizzle_a(const src_t* a, const src_t* b, dst_t* c)
 
     // Colum major -> Row major
     static_for<0, 8, 1>{}([&](auto ele) {
-        //const int blk = lIdx / 16;
-        //const int r   = ele;
-        //c[16 * 8 * blk + 16 * r + lane] =
-        //    ck::type_convert<dst_t>(c_thread_buf_[Number<ele * acc_num / 8>{}]);
-        const int r = ele * 2 + (lIdx / 16);
+        const int r = ele + (lIdx / 16) * 8;
         // store results from unpacked c_thread_buf_ output
         c[16 * r + lane] = ck::type_convert<dst_t>(c_thread_buf_[Number<ele * acc_num / 8>{}]);
     });
@@ -496,6 +504,22 @@ struct TestWmma
 
         return std::make_tuple(a_m_k, b_n_k, c_m_n_host_result, c_m_n_device_result);
     }
+    template <typename DataType>
+    void DumpTensor(Tensor<DataType> mat)
+    {
+        std::cout << "mat [ " << std::endl;
+        for (uint32_t i = 0; i < 16; i++)
+        {
+            std::cout << "    [";
+            for (uint32_t j = 0; j < 16; j++)
+            {
+                std::vector<std::size_t> idx({i, j});
+                std::cout << ck::type_convert<float>(mat(idx)) << ", ";
+            }
+            std::cout << "]" << std::endl;
+        }
+        std::cout << "]" << std::endl;
+    }
 
     auto operator()(const DeviceWmma& wmma_kernel)
     {
@@ -536,6 +560,11 @@ struct TestWmma
         // Act
         bool is_supported = ck::is_gfx11_supported() &&
                             ck::wmma_op_util::RunDeviceGEMM(wmma_kernel, a, b, c_device);
+
+        //DumpTensor(a);
+        //DumpTensor(b);
+        //DumpTensor(c_device);
+        //DumpTensor(c_host);
 
         if(is_supported)
         {
