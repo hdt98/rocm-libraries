@@ -1791,8 +1791,8 @@ struct NumericUtils<f8_t>
 {
     static constexpr int exp  = 4;
     static constexpr int mant = 3;
-    static constexpr int bias = 8; // negative zero nan mode
-    // static constexpr int bias = 7; // ieee mode
+    //static constexpr int bias = 8; // negative zero nan mode
+    static constexpr int bias = 7; // ieee mode
 };
 
 template <>
@@ -1800,8 +1800,8 @@ struct NumericUtils<bf8_t>
 {
     static constexpr int exp  = 5;
     static constexpr int mant = 2;
-    static constexpr int bias = 16; // negative zero nan mode
-    // static constexpr int bias = 15; // ieee mode
+    //static constexpr int bias = 16; // negative zero nan mode
+    static constexpr int bias = 15; // ieee mode
 };
 
 template <>

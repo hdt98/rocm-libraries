@@ -78,8 +78,7 @@ __host__ __device__ Y run_cast_to_f8(X x, uint32_t rng)
     // RNE, no need to add rng. Then probably need to check whether there is carry and adjust
     // exponent and mantissa again3
 
-    // For IEEE bias mode, the bias is 2^(k-1)-1 where k is the width of exponent bits
-    const int out_bias                  = (1 << (out_exp - 1)) - 1 + (negative_zero_nan ? 1 : 0);
+    const int out_bias = NumericUtils<Y>::bias;
     const int out_denormal_act_exponent = 1 - out_bias; // actual exponent of f8 denormal
     // act_exponent is the actual exponent of fp32/fp16 (after subtracting bias)
     // out_exponent is the converted f8 exponent with bias encoding
@@ -189,6 +188,7 @@ __host__ __device__ Y run_cast_from_f8(X x)
     // fp8/bf8 exponent/mantissa layout
     constexpr int in_exp  = NumericUtils<X>::exp;
     constexpr int in_mant = NumericUtils<X>::mant;
+    constexpr int in_bias = NumericUtils<X>::bias;
 
     // resulting type exponent/mantissa layout
     constexpr int out_exp  = NumericUtils<Y>::exp;
@@ -218,7 +218,7 @@ __host__ __device__ Y run_cast_from_f8(X x)
     int exponent      = (x & 0x7F) >> in_mant;
 
     constexpr int exp_low_cutoff =
-        (1 << (out_exp - 1)) - (1 << (in_exp - 1)) + 1 - (negative_zero_nan ? 1 : 0);
+        (1 << (out_exp - 1)) - in_bias;
     T_bitwise retval;
 
     if constexpr(negative_zero_nan)
