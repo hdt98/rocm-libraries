@@ -203,7 +203,7 @@ add_subdirectory(conv_tensor_rearrange)
 add_subdirectory(transpose)
 add_subdirectory(permute_scale)
 add_subdirectory(wrapper)
-if(SUPPORTED_GPU_TARGETS MATCHES "gfx11" or SUPPORTED_GPU_TARGETS MATCHES "gfx12" or SUPPORTED_GPU_TARGETS MATCHES "gfx13")
+if(SUPPORTED_GPU_TARGETS MATCHES "gfx11" OR SUPPORTED_GPU_TARGETS MATCHES "gfx12" OR SUPPORTED_GPU_TARGETS MATCHES "gfx13")
     add_subdirectory(wmma_op)
 endif()
 if(SUPPORTED_GPU_TARGETS MATCHES "gfx942" AND CK_HIP_VERSION_MAJOR GREATER_EQUAL 6 AND CK_HIP_VERSION_MINOR GREATER_EQUAL 2) # smfmac needs ROCm6.2
