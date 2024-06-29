@@ -72,7 +72,7 @@ CK_DECLARE_ENV_VAR_BOOL(CK_LOGGING)
 #if defined(__gfx1200__) || defined(__gfx1201__)
 #define __gfx12__
 #endif
-#if defined(__gfx1300__)
+#if defined(__gfx1300__) || defined(__gfx1301__) || defined(__gfx1302__)
 #define __gfx13__
 #endif
 
