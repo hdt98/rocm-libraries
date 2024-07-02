@@ -158,7 +158,7 @@ builtin_wmma_naive_selector<int8x8_t,
         reg_a, reg_b, reg_c.GetVectorTypeReference(Number<0>{}));
 }
 
-#if defined(__gfx12__) || defined(__gfx13__)
+#if defined(__gfx12__)
 template <typename src_t, typename dst_t, typename acc_t, index_t acc_num>
 __global__ void matmul(const src_t* a, const src_t* b, dst_t* c)
 {
@@ -276,7 +276,122 @@ __global__ void matmul_swizzle_a(const src_t* a, const src_t* b, dst_t* c)
         c[16 * r + lane] = ck::type_convert<dst_t>(c_thread_buf_[Number<ele * acc_num / 8>{}]);
     });
 }
+#elif defined(__gfx13__)
+template <typename src_t, typename dst_t, typename acc_t, index_t acc_num>
+__global__ void matmul(const src_t* a, const src_t* b, dst_t* c)
+{
+    __shared__ src_t p_shared[16 * 16 * 2];
+    const int lIdx = threadIdx.x;
 
+    using src_vec  = typename vector_type<src_t, 8>::type;
+    src_vec a_frag = {};
+    src_vec b_frag = {};
+
+    src_vec a_temp = {};
+    src_vec b_temp = {};
+    // initialize c fragment to 0
+    using acc_vec = StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr, acc_t, 1, acc_num, true>;
+    acc_vec c_thread_buf_;
+
+    const int lane = lIdx % 2;
+    const int blk  = lIdx / 2;
+
+    for(int ele = 0; ele < 8; ++ele)
+    {
+        a_temp[ele] = a[16 * blk + 8 * lane + ele];
+    }
+    
+    for(int ele = 0; ele < 8; ++ele)
+    {
+        b_temp[ele] = b[16 * blk + 8 * lane + ele];
+    }
+
+    __syncthreads();
+
+    for(int ele = 0; ele < 8; ++ele)
+    {
+        p_shared[8 * lIdx + ele] = a_temp[ele];
+    }
+
+    for(int ele = 0; ele < 8; ++ele)
+    {
+        p_shared[8 * lIdx + ele + 16 * 16] = b_temp[ele];
+    }
+
+    asm volatile("\
+    s_wait_dscnt 0x0 \n \
+    s_barrier_signal -1 \n \
+    s_barrier_wait -1 \
+    " ::);
+
+    int start_idx = ((lIdx >> 1) << 4) + ((lIdx & 1) << 1);
+    for(int ele = 0; ele < 8; ++ele)
+    {
+        int index = start_idx + ((ele & 6) << 1) + (ele & 1);
+        b_frag[ele] = p_shared[index + 16 * 16];
+    }
+    // follow origin design
+    for(int ele = 0; ele < 8; ++ele)
+    {
+        int index = start_idx + ((ele & 6) << 1) + (ele & 1);
+        a_frag[ele] = p_shared[index];
+    }
+
+    asm volatile("\
+    s_wait_dscnt 0x0 \n \
+    s_barrier_signal -1 \n \
+    s_barrier_wait -1 \
+    " ::);
+
+    // sync threads, similar to mma_sync
+    // __syncthreads();
+    builtin_wmma_naive_selector<src_vec, acc_vec>(a_frag, b_frag, c_thread_buf_);
+    __syncthreads();
+    // wait for results, similar to mma_sync
+    static_for<0, 8, 1>{}([&](auto ele) {
+        const int col = lIdx >> 1;
+        const int row = ((ele & 6) << 1) + (ele & 1) + ((lIdx & 1) << 1);
+        // store results from unpacked c_thread_buf_ output
+        c[16 * row + col] = ck::type_convert<dst_t>(c_thread_buf_[Number<ele * acc_num / 8>{}]);
+    });
+}
+
+template <typename src_t, typename dst_t, typename acc_t, index_t acc_num>
+__global__ void matmul_swizzle_a(const src_t* a, const src_t* b, dst_t* c)
+{
+    const int lIdx = threadIdx.x;
+
+    using src_vec  = typename vector_type<src_t, 8>::type;
+    src_vec a_frag = {};
+    src_vec b_frag = {};
+    using acc_vec  = StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr, acc_t, 1, acc_num, true>;
+    acc_vec c_thread_buf_;
+    
+    int start_idx = ((lIdx >> 1) << 4) + ((lIdx & 1) << 1);
+    for(int ele = 0; ele < 8; ++ele)
+    {
+        int index = start_idx + ((ele & 6) << 1) + (ele & 1);
+        b_frag[ele] = b[index];
+    }
+
+    for(int ele = 0; ele < 8; ++ele)
+    {
+        int index = start_idx + ((ele & 6) << 1) + (ele & 1);
+        a_frag[ele] = a[index];
+    }
+
+    __syncthreads();
+    builtin_wmma_naive_selector<src_vec, acc_vec>(a_frag, b_frag, c_thread_buf_);
+    __syncthreads();
+
+    // Colum major -> Row major
+    static_for<0, 8, 1>{}([&](auto ele) {
+        const int col = lIdx >> 1;
+        const int row = ((ele & 6) << 1) + (ele & 1) + ((lIdx & 1) << 1);
+        // store results from unpacked c_thread_buf_ output
+        c[16 * row + col] = ck::type_convert<dst_t>(c_thread_buf_[Number<ele * acc_num / 8>{}]);
+    });
+}
 #else
 template <typename src_t, typename dst_t, typename acc_t, index_t acc_num>
 __global__ void matmul(const src_t* a, const src_t* b, dst_t* c)
