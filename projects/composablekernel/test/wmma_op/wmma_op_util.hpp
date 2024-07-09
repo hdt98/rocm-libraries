@@ -327,6 +327,15 @@ __global__ void matmul(const src_t* a, const src_t* b, dst_t* c)
     int start_idx = ((lIdx >> 1) << 4) + ((lIdx & 1) << 1);
     for(int ele = 0; ele < 8; ++ele)
     {
+        /*
+        gfx13's A, B layout for fp16 
+        use thread 0 as example,
+        VGPR 0 get from column 0,  1
+        VGPR 1 get from column 4,  5
+        VGPR 2 get from column 8,  9
+        VGPR 3 get from column 12, 13
+        so the below address swizzle is based on this layout
+        */
         int index = start_idx + ((ele & 6) << 1) + (ele & 1);
         b_frag[ele] = p_shared[index + 16 * 16];
     }
