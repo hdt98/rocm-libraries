@@ -1585,6 +1585,1252 @@ struct vector_type<T, 64, typename std::enable_if_t<!is_native_type<T>()>>
     }
 };
 
+template <typename T>
+struct vector_type<T, 3>
+{
+    using d1_t = T;
+    typedef T d3_t __attribute__((ext_vector_type(3)));
+
+    using type = d3_t;
+
+    union
+    {
+        d3_t d3_;
+        StaticallyIndexedArray<d1_t, 3> d1x3_;
+        StaticallyIndexedArray<d3_t, 1> d3x1_;
+    } data_;
+
+    __host__ __device__ constexpr vector_type() : data_{type{0}} {}
+
+    __host__ __device__ constexpr vector_type(type v) : data_{v} {}
+
+    template <typename X>
+    __host__ __device__ constexpr const auto& AsType() const
+    {
+        static_assert(is_same<X, d1_t>::value || is_same<X, d3_t>::value, "wrong!");
+
+        if constexpr(is_same<X, d1_t>::value)
+        {
+            return data_.d1x3_;
+        }
+        else if constexpr(is_same<X, d3_t>::value)
+        {
+            return data_.d3x1_;
+        }
+        else
+        {
+            return err;
+        }
+    }
+
+    template <typename X>
+    __host__ __device__ constexpr auto& AsType()
+    {
+        static_assert(is_same<X, d1_t>::value || is_same<X, d3_t>::value, "wrong!");
+
+        if constexpr(is_same<X, d1_t>::value)
+        {
+            return data_.d1x3_;
+        }
+        else if constexpr(is_same<X, d3_t>::value)
+        {
+            return data_.d3x1_;
+        }
+        else
+        {
+            return err;
+        }
+    }
+};
+
+template <typename T>
+struct vector_type<T, 6>
+{
+    using d1_t = T;
+    typedef T d2_t __attribute__((ext_vector_type(2)));
+    typedef T d3_t __attribute__((ext_vector_type(3)));
+    typedef T d6_t __attribute__((ext_vector_type(6)));
+
+    using type = d6_t;
+
+    union
+    {
+        d6_t d6_;
+        StaticallyIndexedArray<d1_t, 6> d1x6_;
+        StaticallyIndexedArray<d2_t, 3> d2x3_;
+        StaticallyIndexedArray<d3_t, 2> d3x2_;
+        StaticallyIndexedArray<d6_t, 1> d6x1_;
+    } data_;
+
+    __host__ __device__ constexpr vector_type() : data_{type{0}} {}
+
+    __host__ __device__ constexpr vector_type(type v) : data_{v} {}
+
+    template <typename X>
+    __host__ __device__ constexpr const auto& AsType() const
+    {
+        static_assert(is_same<X, d1_t>::value || is_same<X, d2_t>::value ||
+                          is_same<X, d3_t>::value || is_same<X, d6_t>::value,
+                      "wrong!");
+
+        if constexpr(is_same<X, d1_t>::value)
+        {
+            return data_.d1x6_;
+        }
+        else if constexpr(is_same<X, d2_t>::value)
+        {
+            return data_.d2x3_;
+        }
+        else if constexpr(is_same<X, d3_t>::value)
+        {
+            return data_.d3x2_;
+        }
+        else if constexpr(is_same<X, d6_t>::value)
+        {
+            return data_.d6x1_;
+        }
+        else
+        {
+            return err;
+        }
+    }
+
+    template <typename X>
+    __host__ __device__ constexpr auto& AsType()
+    {
+        static_assert(is_same<X, d1_t>::value || is_same<X, d2_t>::value ||
+                          is_same<X, d3_t>::value || is_same<X, d6_t>::value,
+                      "wrong!");
+
+        if constexpr(is_same<X, d1_t>::value)
+        {
+            return data_.d1x6_;
+        }
+        else if constexpr(is_same<X, d2_t>::value)
+        {
+            return data_.d2x3_;
+        }
+        else if constexpr(is_same<X, d3_t>::value)
+        {
+            return data_.d3x2_;
+        }
+        else if constexpr(is_same<X, d6_t>::value)
+        {
+            return data_.d6x1_;
+        }
+        else
+        {
+            return err;
+        }
+    }
+};
+
+
+template <typename T>
+struct vector_type<T, 12>
+{
+    using d1_t = T;
+    typedef T d2_t __attribute__((ext_vector_type(2)));
+    typedef T d3_t __attribute__((ext_vector_type(3)));
+    typedef T d4_t __attribute__((ext_vector_type(4)));
+    typedef T d6_t __attribute__((ext_vector_type(6)));
+    typedef T d12_t __attribute__((ext_vector_type(12)));
+    using type = d12_t;
+
+    union
+    {
+        d12_t d12_;
+        StaticallyIndexedArray<d1_t, 12> d1x12_;
+        StaticallyIndexedArray<d2_t, 6> d2x6_;
+        StaticallyIndexedArray<d3_t, 4> d3x4_;
+        StaticallyIndexedArray<d4_t, 3> d4x3_;
+        StaticallyIndexedArray<d6_t, 2> d6x2_;
+        StaticallyIndexedArray<d12_t, 1> d12x1_;
+    } data_;
+
+    __host__ __device__ constexpr vector_type() : data_{type{0}} {}
+
+    __host__ __device__ constexpr vector_type(type v) : data_{v} {}
+
+    template <typename X>
+    __host__ __device__ constexpr const auto& AsType() const
+    {
+        static_assert(is_same<X, d1_t>::value || is_same<X, d2_t>::value ||
+                          is_same<X, d3_t>::value || is_same<X, d4_t>::value ||
+                          is_same<X, d6_t>::value || is_same<X, d12_t>::value,
+                      "wrong!");
+
+        if constexpr(is_same<X, d1_t>::value)
+        {
+            return data_.d1x12_;
+        }
+        else if constexpr(is_same<X, d2_t>::value)
+        {
+            return data_.d2x6_;
+        }
+        else if constexpr(is_same<X, d3_t>::value)
+        {
+            return data_.d3x4_;
+        }
+        else if constexpr(is_same<X, d4_t>::value)
+        {
+            return data_.d4x3_;
+        }
+        else if constexpr(is_same<X, d6_t>::value)
+        {
+            return data_.d6x2_;
+        }
+        else if constexpr(is_same<X, d12_t>::value)
+        {
+            return data_.d12x1_;
+        }
+        else
+        {
+            return err;
+        }
+    }
+
+    template <typename X>
+    __host__ __device__ constexpr auto& AsType()
+    {
+        static_assert(is_same<X, d1_t>::value || is_same<X, d2_t>::value ||
+                          is_same<X, d3_t>::value || is_same<X, d4_t>::value ||
+                          is_same<X, d6_t>::value || is_same<X, d12_t>::value,
+                      "wrong!");
+
+        if constexpr(is_same<X, d1_t>::value)
+        {
+            return data_.d1x12_;
+        }
+        else if constexpr(is_same<X, d2_t>::value)
+        {
+            return data_.d2x6_;
+        }
+        else if constexpr(is_same<X, d3_t>::value)
+        {
+            return data_.d3x4_;
+        }
+        else if constexpr(is_same<X, d4_t>::value)
+        {
+            return data_.d4x3_;
+        }
+        else if constexpr(is_same<X, d6_t>::value)
+        {
+            return data_.d6x2_;
+        }
+        else if constexpr(is_same<X, d12_t>::value)
+        {
+            return data_.d12x1_;
+        }
+        else
+        {
+            return err;
+        }
+    }
+};
+
+template <typename T>
+struct vector_type<T, 18>
+{
+    using d1_t = T;
+    typedef T d2_t __attribute__((ext_vector_type(2)));
+    typedef T d3_t __attribute__((ext_vector_type(3)));
+    typedef T d6_t __attribute__((ext_vector_type(6)));
+    typedef T d9_t __attribute__((ext_vector_type(9)));
+    typedef T d18_t __attribute__((ext_vector_type(18)));
+
+    using type = d18_t;
+
+    union
+    {
+        d18_t d18_;
+        StaticallyIndexedArray<d1_t, 18> d1x18_;
+        StaticallyIndexedArray<d2_t, 9> d2x9_;
+        StaticallyIndexedArray<d3_t, 6> d3x6_;
+        StaticallyIndexedArray<d6_t, 3> d6x3_;
+        StaticallyIndexedArray<d9_t, 2> d9x2_;
+        StaticallyIndexedArray<d18_t, 1> d18x1_;
+    } data_;
+
+    __host__ __device__ constexpr vector_type() : data_{type{0}} {}
+
+    __host__ __device__ constexpr vector_type(type v) : data_{v} {}
+
+    template <typename X>
+    __host__ __device__ constexpr const auto& AsType() const
+    {
+        static_assert(is_same<X, d1_t>::value || is_same<X, d2_t>::value ||
+                          is_same<X, d3_t>::value || is_same<X, d6_t>::value ||
+                          is_same<X, d9_t>::value || is_same<X, d18_t>::value,
+                      "wrong!");
+
+        if constexpr(is_same<X, d1_t>::value)
+        {
+            return data_.d1x18_;
+        }
+        else if constexpr(is_same<X, d2_t>::value)
+        {
+            return data_.d2x9_;
+        }
+        else if constexpr(is_same<X, d3_t>::value)
+        {
+            return data_.d3x6_;
+        }
+        else if constexpr(is_same<X, d6_t>::value)
+        {
+            return data_.d6x3_;
+        }
+        else if constexpr(is_same<X, d9_t>::value)
+        {
+            return data_.d9x2_;
+        }
+        else if constexpr(is_same<X, d18_t>::value)
+        {
+            return data_.d18x1_;
+        }
+        else
+        {
+            return err;
+        }
+    }
+
+    template <typename X>
+    __host__ __device__ constexpr auto& AsType()
+    {
+        static_assert(is_same<X, d1_t>::value || is_same<X, d2_t>::value ||
+                          is_same<X, d3_t>::value || is_same<X, d6_t>::value ||
+                          is_same<X, d9_t>::value || is_same<X, d18_t>::value,
+                      "wrong!");
+
+        if constexpr(is_same<X, d1_t>::value)
+        {
+            return data_.d1x18_;
+        }
+        else if constexpr(is_same<X, d2_t>::value)
+        {
+            return data_.d2x9_;
+        }
+        else if constexpr(is_same<X, d3_t>::value)
+        {
+            return data_.d3x6_;
+        }
+        else if constexpr(is_same<X, d6_t>::value)
+        {
+            return data_.d6x3_;
+        }
+        else if constexpr(is_same<X, d9_t>::value)
+        {
+            return data_.d9x2_;
+        }
+        else if constexpr(is_same<X, d18_t>::value)
+        {
+            return data_.d18x1_;
+        }
+        else
+        {
+            return err;
+        }
+    }
+};
+
+template <typename T>
+struct vector_type<T, 24>
+{
+    using d1_t = T;
+    typedef T d2_t __attribute__((ext_vector_type(2)));
+    typedef T d3_t __attribute__((ext_vector_type(3)));
+    typedef T d4_t __attribute__((ext_vector_type(4)));
+    typedef T d6_t __attribute__((ext_vector_type(6)));
+    typedef T d8_t __attribute__((ext_vector_type(8)));
+    typedef T d12_t __attribute__((ext_vector_type(12)));
+    typedef T d24_t __attribute__((ext_vector_type(242)));
+    using type = d24_t;
+
+    union
+    {
+        d24_t d24_;
+        StaticallyIndexedArray<d1_t, 24> d1x24_;
+        StaticallyIndexedArray<d2_t, 12> d2x12_;
+        StaticallyIndexedArray<d3_t, 8> d3x8_;
+        StaticallyIndexedArray<d4_t, 6> d4x6_;
+        StaticallyIndexedArray<d6_t, 4> d6x4_;
+        StaticallyIndexedArray<d8_t, 3> d8x3_;
+        StaticallyIndexedArray<d12_t, 2> d12x2_;
+        StaticallyIndexedArray<d24_t, 1> d24x12_;
+    } data_;
+
+    __host__ __device__ constexpr vector_type() : data_{type{0}} {}
+
+    __host__ __device__ constexpr vector_type(type v) : data_{v} {}
+
+    template <typename X>
+    __host__ __device__ constexpr const auto& AsType() const
+    {
+        static_assert(is_same<X, d1_t>::value || is_same<X, d2_t>::value ||
+                          is_same<X, d3_t>::value || is_same<X, d4_t>::value ||
+                          is_same<X, d6_t>::value || is_same<X, d8_t>::value ||
+                          is_same<X, d12_t>::value || is_same<X, d24_t>::value,
+                      "wrong!");
+
+        if constexpr(is_same<X, d1_t>::value)
+        {
+            return data_.d1x24_;
+        }
+        else if constexpr(is_same<X, d2_t>::value)
+        {
+            return data_.d2x12_;
+        }
+        else if constexpr(is_same<X, d3_t>::value)
+        {
+            return data_.d3x8_;
+        }
+        else if constexpr(is_same<X, d4_t>::value)
+        {
+            return data_.d4x6_;
+        }
+        else if constexpr(is_same<X, d6_t>::value)
+        {
+            return data_.d6x4_;
+        }
+        else if constexpr(is_same<X, d8_t>::value)
+        {
+            return data_.d8x3_;
+        }
+        else if constexpr(is_same<X, d12_t>::value)
+        {
+            return data_.d12x2_;
+        }
+        else if constexpr(is_same<X, d24_t>::value)
+        {
+            return data_.d24x1_;
+        }
+        else
+        {
+            return err;
+        }
+    }
+
+    template <typename X>
+    __host__ __device__ constexpr auto& AsType()
+    {
+        static_assert(is_same<X, d1_t>::value || is_same<X, d2_t>::value ||
+                          is_same<X, d3_t>::value || is_same<X, d4_t>::value ||
+                          is_same<X, d6_t>::value || is_same<X, d8_t>::value ||
+                          is_same<X, d12_t>::value || is_same<X, d24_t>::value,
+                      "wrong!");
+
+        if constexpr(is_same<X, d1_t>::value)
+        {
+            return data_.d1x24_;
+        }
+        else if constexpr(is_same<X, d2_t>::value)
+        {
+            return data_.d2x12_;
+        }
+        else if constexpr(is_same<X, d3_t>::value)
+        {
+            return data_.d3x8_;
+        }
+        else if constexpr(is_same<X, d4_t>::value)
+        {
+            return data_.d4x6_;
+        }
+        else if constexpr(is_same<X, d6_t>::value)
+        {
+            return data_.d6x4_;
+        }
+        else if constexpr(is_same<X, d8_t>::value)
+        {
+            return data_.d8x3_;
+        }
+        else if constexpr(is_same<X, d12_t>::value)
+        {
+            return data_.d12x2_;
+        }
+        else if constexpr(is_same<X, d24_t>::value)
+        {
+            return data_.d24x1_;
+        }
+        else
+        {
+            return err;
+        }
+    }
+};
+
+template <typename T>
+struct vector_type<T, 36>
+{
+    using d1_t = T;
+    typedef T d2_t __attribute__((ext_vector_type(2)));
+    typedef T d3_t __attribute__((ext_vector_type(3)));
+    typedef T d4_t __attribute__((ext_vector_type(4)));
+    typedef T d6_t __attribute__((ext_vector_type(6)));
+    typedef T d9_t __attribute__((ext_vector_type(9)));
+    typedef T d12_t __attribute__((ext_vector_type(12)));
+    typedef T d18_t __attribute__((ext_vector_type(18)));
+    typedef T d36_t __attribute__((ext_vector_type(36)));
+    using type = d36_t;
+
+    union
+    {
+        d36_t d36_;
+        StaticallyIndexedArray<d1_t, 36> d1x36_;
+        StaticallyIndexedArray<d2_t, 18> d2x18_;
+        StaticallyIndexedArray<d3_t, 12> d3x12_;
+        StaticallyIndexedArray<d4_t, 9> d4x9_;
+        StaticallyIndexedArray<d6_t, 6> d6x6_;
+        StaticallyIndexedArray<d9_t, 4> d9x4_;
+        StaticallyIndexedArray<d12_t, 3> d12x3_;
+        StaticallyIndexedArray<d18_t, 2> d18x2_;
+        StaticallyIndexedArray<d36_t, 1> d36x1_;
+    } data_;
+
+    __host__ __device__ constexpr vector_type() : data_{type{0}} {}
+
+    __host__ __device__ constexpr vector_type(type v) : data_{v} {}
+
+    template <typename X>
+    __host__ __device__ constexpr const auto& AsType() const
+    {
+        static_assert(
+            is_same<X, d1_t>::value || is_same<X, d2_t>::value || is_same<X, d3_t>::value ||
+                is_same<X, d4_t>::value || is_same<X, d6_t>::value || is_same<X, d9_t>::value ||
+                is_same<X, d12_t>::value || is_same<X, d18_t>::value || is_same<X, d36_t>::value,
+            "wrong!");
+
+        if constexpr(is_same<X, d1_t>::value)
+        {
+            return data_.d1x36_;
+        }
+        else if constexpr(is_same<X, d2_t>::value)
+        {
+            return data_.d2x18_;
+        }
+        else if constexpr(is_same<X, d3_t>::value)
+        {
+            return data_.d3x12_;
+        }
+        else if constexpr(is_same<X, d4_t>::value)
+        {
+            return data_.d4x9_;
+        }
+        else if constexpr(is_same<X, d6_t>::value)
+        {
+            return data_.d6x6_;
+        }
+        else if constexpr(is_same<X, d9_t>::value)
+        {
+            return data_.d9x4_;
+        }
+        else if constexpr(is_same<X, d12_t>::value)
+        {
+            return data_.d12x3_;
+        }
+        else if constexpr(is_same<X, d18_t>::value)
+        {
+            return data_.d18x2_;
+        }
+        else if constexpr(is_same<X, d36_t>::value)
+        {
+            return data_.d36x1_;
+        }
+        else
+        {
+            return err;
+        }
+    }
+
+    template <typename X>
+    __host__ __device__ constexpr auto& AsType()
+    {
+        static_assert(
+            is_same<X, d1_t>::value || is_same<X, d2_t>::value || is_same<X, d3_t>::value ||
+                is_same<X, d4_t>::value || is_same<X, d6_t>::value || is_same<X, d9_t>::value ||
+                is_same<X, d12_t>::value || is_same<X, d18_t>::value || is_same<X, d36_t>::value,
+            "wrong!");
+
+        if constexpr(is_same<X, d1_t>::value)
+        {
+            return data_.d1x36_;
+        }
+        else if constexpr(is_same<X, d2_t>::value)
+        {
+            return data_.d2x18_;
+        }
+        else if constexpr(is_same<X, d3_t>::value)
+        {
+            return data_.d3x12_;
+        }
+        else if constexpr(is_same<X, d4_t>::value)
+        {
+            return data_.d4x9_;
+        }
+        else if constexpr(is_same<X, d6_t>::value)
+        {
+            return data_.d6x6_;
+        }
+        else if constexpr(is_same<X, d9_t>::value)
+        {
+            return data_.d9x4_;
+        }
+        else if constexpr(is_same<X, d12_t>::value)
+        {
+            return data_.d12x3_;
+        }
+        else if constexpr(is_same<X, d18_t>::value)
+        {
+            return data_.d18x2_;
+        }
+        else if constexpr(is_same<X, d36_t>::value)
+        {
+            return data_.d36x1_;
+        }
+        else
+        {
+            return err;
+        }
+    }
+};
+
+
+template <typename T>
+struct vector_type<T, 72>
+{
+    using d1_t = T;
+    typedef T d2_t __attribute__((ext_vector_type(2)));
+    typedef T d3_t __attribute__((ext_vector_type(3)));
+    typedef T d4_t __attribute__((ext_vector_type(4)));
+    typedef T d6_t __attribute__((ext_vector_type(6)));
+    typedef T d9_t __attribute__((ext_vector_type(9)));
+    typedef T d12_t __attribute__((ext_vector_type(12)));
+    typedef T d18_t __attribute__((ext_vector_type(18)));
+    typedef T d24_t __attribute__((ext_vector_type(24)));
+    typedef T d36_t __attribute__((ext_vector_type(36)));
+    typedef T d72_t __attribute__((ext_vector_type(72)));
+    using type = d72_t;
+
+    union
+    {
+        d72_t d72_;
+        StaticallyIndexedArray<d1_t, 72> d1x72_;
+        StaticallyIndexedArray<d2_t, 36> d2x36_;
+        StaticallyIndexedArray<d3_t, 24> d3x24_;
+        StaticallyIndexedArray<d4_t, 18> d4x18_;
+        StaticallyIndexedArray<d6_t, 12> d6x12_;
+        StaticallyIndexedArray<d9_t, 8> d9x8_;
+        StaticallyIndexedArray<d12_t, 6> d12x6_;
+        StaticallyIndexedArray<d18_t, 4> d18x4_;
+        StaticallyIndexedArray<d24_t, 3> d24x3_;
+        StaticallyIndexedArray<d36_t, 2> d36x2_;
+        StaticallyIndexedArray<d72_t, 1> d72x1_;
+    } data_;
+
+    __host__ __device__ constexpr vector_type() : data_{type{0}} {}
+
+    __host__ __device__ constexpr vector_type(type v) : data_{v} {}
+
+    template <typename X>
+    __host__ __device__ constexpr const auto& AsType() const
+    {
+        static_assert(
+            is_same<X, d1_t>::value || is_same<X, d2_t>::value || is_same<X, d3_t>::value ||
+                is_same<X, d4_t>::value || is_same<X, d6_t>::value || is_same<X, d9_t>::value ||
+                is_same<X, d12_t>::value || is_same<X, d18_t>::value || is_same<X, d24_t>::value ||
+                is_same<X, d36_t>::value || is_same<X, d72_t>::value,
+            "wrong!");
+
+        if constexpr(is_same<X, d1_t>::value)
+        {
+            return data_.d1x72_;
+        }
+        else if constexpr(is_same<X, d2_t>::value)
+        {
+            return data_.d2x36_;
+        }
+        else if constexpr(is_same<X, d3_t>::value)
+        {
+            return data_.d3x24_;
+        }
+        else if constexpr(is_same<X, d4_t>::value)
+        {
+            return data_.d4x18_;
+        }
+        else if constexpr(is_same<X, d6_t>::value)
+        {
+            return data_.d6x12_;
+        }
+        else if constexpr(is_same<X, d9_t>::value)
+        {
+            return data_.d9x8_;
+        }
+        else if constexpr(is_same<X, d12_t>::value)
+        {
+            return data_.d12x6_;
+        }
+        else if constexpr(is_same<X, d18_t>::value)
+        {
+            return data_.d18x4_;
+        }
+        else if constexpr(is_same<X, d24_t>::value)
+        {
+            return data_.d24x3_;
+        }
+        else if constexpr(is_same<X, d36_t>::value)
+        {
+            return data_.d36x2_;
+        }
+        else if constexpr(is_same<X, d72_t>::value)
+        {
+            return data_.d72x1_;
+        }
+        else
+        {
+            return err;
+        }
+    }
+
+    template <typename X>
+    __host__ __device__ constexpr auto& AsType()
+    {
+        static_assert(
+            is_same<X, d1_t>::value || is_same<X, d2_t>::value || is_same<X, d3_t>::value ||
+                is_same<X, d4_t>::value || is_same<X, d6_t>::value || is_same<X, d9_t>::value ||
+                is_same<X, d12_t>::value || is_same<X, d18_t>::value || is_same<X, d24_t>::value ||
+                is_same<X, d36_t>::value || is_same<X, d72_t>::value,
+            "wrong!");
+
+        if constexpr(is_same<X, d1_t>::value)
+        {
+            return data_.d1x72_;
+        }
+        else if constexpr(is_same<X, d2_t>::value)
+        {
+            return data_.d2x36_;
+        }
+        else if constexpr(is_same<X, d3_t>::value)
+        {
+            return data_.d3x24_;
+        }
+        else if constexpr(is_same<X, d4_t>::value)
+        {
+            return data_.d4x18_;
+        }
+        else if constexpr(is_same<X, d6_t>::value)
+        {
+            return data_.d6x12_;
+        }
+        else if constexpr(is_same<X, d9_t>::value)
+        {
+            return data_.d9x8_;
+        }
+        else if constexpr(is_same<X, d12_t>::value)
+        {
+            return data_.d12x6_;
+        }
+        else if constexpr(is_same<X, d18_t>::value)
+        {
+            return data_.d18x4_;
+        }
+        else if constexpr(is_same<X, d24_t>::value)
+        {
+            return data_.d24x3_;
+        }
+        else if constexpr(is_same<X, d36_t>::value)
+        {
+            return data_.d36x2_;
+        }
+        else if constexpr(is_same<X, d72_t>::value)
+        {
+            return data_.d72x1_;
+        }
+        else
+        {
+            return err;
+        }
+    }
+};
+
+
+template <typename T>
+struct vector_type<T, 144>
+{
+    using d1_t = T;
+    typedef T d2_t __attribute__((ext_vector_type(2)));
+    typedef T d3_t __attribute__((ext_vector_type(3)));
+    typedef T d4_t __attribute__((ext_vector_type(4)));
+    typedef T d6_t __attribute__((ext_vector_type(6)));
+    typedef T d9_t __attribute__((ext_vector_type(9)));
+    typedef T d12_t __attribute__((ext_vector_type(12)));
+    typedef T d18_t __attribute__((ext_vector_type(18)));
+    typedef T d36_t __attribute__((ext_vector_type(36)));
+    typedef T d48_t __attribute__((ext_vector_type(48)));
+    typedef T d72_t __attribute__((ext_vector_type(72)));
+    typedef T d144_t __attribute__((ext_vector_type(144)));
+    using type = d144_t;
+
+    union
+    {
+        d144_t d144_;
+        StaticallyIndexedArray<d1_t, 144> d1x144_;
+        StaticallyIndexedArray<d2_t, 72> d2x72_;
+        StaticallyIndexedArray<d3_t, 48> d3x48_;
+        StaticallyIndexedArray<d4_t, 36> d4x36_;
+        StaticallyIndexedArray<d6_t, 24> d6x24_;
+        StaticallyIndexedArray<d9_t, 16> d9x16_;
+        StaticallyIndexedArray<d12_t, 12> d12x12_;
+        StaticallyIndexedArray<d18_t, 8> d18x8_;
+        StaticallyIndexedArray<d36_t, 4> d36x4_;
+        StaticallyIndexedArray<d48_t, 4> d48x3_;
+        StaticallyIndexedArray<d72_t, 2> d72x2_;
+        StaticallyIndexedArray<d144_t, 1> d144x1_;
+    } data_;
+
+    __host__ __device__ constexpr vector_type() : data_{type{0}} {}
+
+    __host__ __device__ constexpr vector_type(type v) : data_{v} {}
+
+    template <typename X>
+    __host__ __device__ constexpr const auto& AsType() const
+    {
+        static_assert(
+            is_same<X, d1_t>::value || is_same<X, d2_t>::value || is_same<X, d3_t>::value ||
+                is_same<X, d4_t>::value || is_same<X, d6_t>::value || is_same<X, d9_t>::value ||
+                is_same<X, d12_t>::value || is_same<X, d18_t>::value || is_same<X, d36_t>::value ||
+                is_same<X, d48_t>::value || is_same<X, d72_t>::value || is_same<X, d144_t>::value,
+            "wrong!");
+
+        if constexpr(is_same<X, d1_t>::value)
+        {
+            return data_.d1x144_;
+        }
+        else if constexpr(is_same<X, d2_t>::value)
+        {
+            return data_.d2x72_;
+        }
+        else if constexpr(is_same<X, d3_t>::value)
+        {
+            return data_.d3x482_;
+        }
+        else if constexpr(is_same<X, d4_t>::value)
+        {
+            return data_.d4x36_;
+        }
+        else if constexpr(is_same<X, d6_t>::value)
+        {
+            return data_.d6x24_;
+        }
+        else if constexpr(is_same<X, d9_t>::value)
+        {
+            return data_.d9x16_;
+        }
+        else if constexpr(is_same<X, d12_t>::value)
+        {
+            return data_.d12x12_;
+        }
+        else if constexpr(is_same<X, d18_t>::value)
+        {
+            return data_.d18x8_;
+        }
+        else if constexpr(is_same<X, d36_t>::value)
+        {
+            return data_.d36x4_;
+        }
+        else if constexpr(is_same<X, d48_t>::value)
+        {
+            return data_.d48x3_;
+        }
+        else if constexpr(is_same<X, d72_t>::value)
+        {
+            return data_.d72x2_;
+        }
+        else if constexpr(is_same<X, d144_t>::value)
+        {
+            return data_.d144x1_;
+        }
+        else
+        {
+            return err;
+        }
+    }
+
+    template <typename X>
+    __host__ __device__ constexpr auto& AsType()
+    {
+        static_assert(
+            is_same<X, d1_t>::value || is_same<X, d2_t>::value || is_same<X, d3_t>::value ||
+                is_same<X, d4_t>::value || is_same<X, d6_t>::value || is_same<X, d9_t>::value ||
+                is_same<X, d12_t>::value || is_same<X, d18_t>::value || is_same<X, d36_t>::value ||
+                is_same<X, d48_t>::value || is_same<X, d72_t>::value || is_same<X, d144_t>::value,
+            "wrong!");
+
+        if constexpr(is_same<X, d1_t>::value)
+        {
+            return data_.d1x144_;
+        }
+        else if constexpr(is_same<X, d2_t>::value)
+        {
+            return data_.d2x72_;
+        }
+        else if constexpr(is_same<X, d3_t>::value)
+        {
+            return data_.d3x482_;
+        }
+        else if constexpr(is_same<X, d4_t>::value)
+        {
+            return data_.d4x36_;
+        }
+        else if constexpr(is_same<X, d6_t>::value)
+        {
+            return data_.d6x24_;
+        }
+        else if constexpr(is_same<X, d9_t>::value)
+        {
+            return data_.d9x16_;
+        }
+        else if constexpr(is_same<X, d12_t>::value)
+        {
+            return data_.d12x12_;
+        }
+        else if constexpr(is_same<X, d18_t>::value)
+        {
+            return data_.d18x8_;
+        }
+        else if constexpr(is_same<X, d36_t>::value)
+        {
+            return data_.d36x4_;
+        }
+        else if constexpr(is_same<X, d48_t>::value)
+        {
+            return data_.d48x3_;
+        }
+        else if constexpr(is_same<X, d72_t>::value)
+        {
+            return data_.d72x2_;
+        }
+        else if constexpr(is_same<X, d144_t>::value)
+        {
+            return data_.d144x1_;
+        }
+        else
+        {
+            return err;
+        }
+    }
+};
+
+template <typename T>
+struct vector_type<T, 5>
+{
+    using d1_t = T;
+    typedef T d5_t __attribute__((ext_vector_type(5)));
+    using type = d5_t;
+
+    union
+    {
+        d5_t d5_;
+        StaticallyIndexedArray<d1_t, 5> d1x5_;
+        StaticallyIndexedArray<d5_t, 1> d5x1_;
+    } data_;
+
+    __host__ __device__ constexpr vector_type() : data_{type{0}} {}
+
+    __host__ __device__ constexpr vector_type(type v) : data_{v} {}
+
+    template <typename X>
+    __host__ __device__ constexpr const auto& AsType() const
+    {
+        static_assert(
+            is_same<X, d1_t>::value || is_same<X, d5_t>::value,
+            "wrong!");
+
+        if constexpr(is_same<X, d1_t>::value)
+        {
+            return data_.d1x5_;
+        }
+        else if constexpr(is_same<X, d5_t>::value)
+        {
+            return data_.d5x1_;
+        }
+        else
+        {
+            return err;
+        }
+    }
+
+    template <typename X>
+    __host__ __device__ constexpr auto& AsType()
+    {
+        static_assert(is_same<X, d1_t>::value || is_same<X, d5_t>::value, "wrong!");
+
+        if constexpr(is_same<X, d1_t>::value)
+        {
+            return data_.d1x5_;
+        }
+        else if constexpr(is_same<X, d5_t>::value)
+        {
+            return data_.d5x1_;
+        }
+        else
+        {
+            return err;
+        }
+    }
+};
+
+template <typename T>
+struct vector_type<T, 10>
+{
+    using d1_t = T;
+    typedef T d2_t __attribute__((ext_vector_type(2)));
+    typedef T d5_t __attribute__((ext_vector_type(5)));
+    typedef T d10_t __attribute__((ext_vector_type(10)));
+    using type = d10_t;
+
+    union
+    {
+        d10_t d10_;
+        StaticallyIndexedArray<d1_t, 10> d1x10_;
+        StaticallyIndexedArray<d2_t, 5> d2x5_;
+        StaticallyIndexedArray<d5_t, 2> d5x2_;
+        StaticallyIndexedArray<d10_t, 1> d10x1_;
+    } data_;
+
+    __host__ __device__ constexpr vector_type() : data_{type{0}} {}
+
+    __host__ __device__ constexpr vector_type(type v) : data_{v} {}
+
+    template <typename X>
+    __host__ __device__ constexpr const auto& AsType() const
+    {
+        static_assert(is_same<X, d1_t>::value || is_same<X, d2_t>::value ||
+                          is_same<X, d5_t>::value || is_same<X, d10_t>::value,
+                      "wrong!");
+
+        if constexpr(is_same<X, d1_t>::value)
+        {
+            return data_.d1x10_;
+        }
+        else if constexpr(is_same<X, d2_t>::value)
+        {
+            return data_.d2x5_;
+        }
+        else if constexpr(is_same<X, d5_t>::value)
+        {
+            return data_.d5x2_;
+        }
+        else if constexpr(is_same<X, d10_t>::value)
+        {
+            return data_.d10x1_;
+        }
+        else
+        {
+            return err;
+        }
+    }
+
+    template <typename X>
+    __host__ __device__ constexpr auto& AsType()
+    {
+        static_assert(is_same<X, d1_t>::value || is_same<X, d2_t>::value ||
+                          is_same<X, d5_t>::value || is_same<X, d10_t>::value,
+                      "wrong!");
+
+        if constexpr(is_same<X, d1_t>::value)
+        {
+            return data_.d1x10_;
+        }
+        else if constexpr(is_same<X, d2_t>::value)
+        {
+            return data_.d2x5_;
+        }
+        else if constexpr(is_same<X, d5_t>::value)
+        {
+            return data_.d5x2_;
+        }
+        else if constexpr(is_same<X, d10_t>::value)
+        {
+            return data_.d10x1_;
+        }
+        else
+        {
+            return err;
+        }
+    }
+};
+
+
+template <typename T>
+struct vector_type<T, 20>
+{
+    using d1_t = T;
+    typedef T d2_t __attribute__((ext_vector_type(2)));
+    typedef T d4_t __attribute__((ext_vector_type(4)));
+    typedef T d5_t __attribute__((ext_vector_type(5)));
+    typedef T d10_t __attribute__((ext_vector_type(10)));
+    typedef T d20_t __attribute__((ext_vector_type(20)));
+    using type = d20_t;
+
+    union
+    {
+        d20_t d20_;
+        StaticallyIndexedArray<d1_t, 20> d1x20_;
+        StaticallyIndexedArray<d2_t, 10> d2x10_;
+        StaticallyIndexedArray<d4_t, 5> d4x5_;
+        StaticallyIndexedArray<d5_t, 4> d5x4_;
+        StaticallyIndexedArray<d10_t, 2> d10x2_;
+        StaticallyIndexedArray<d20_t, 1> d20x1_;
+    } data_;
+
+    __host__ __device__ constexpr vector_type() : data_{type{0}} {}
+
+    __host__ __device__ constexpr vector_type(type v) : data_{v} {}
+
+    template <typename X>
+    __host__ __device__ constexpr const auto& AsType() const
+    {
+        static_assert(is_same<X, d1_t>::value || is_same<X, d2_t>::value ||
+                          is_same<X, d4_t>::value || is_same<X, d5_t>::value ||
+                          is_same<X, d10_t>::value || is_same<X, d20_t>::value,
+                      "wrong!");
+
+        if constexpr(is_same<X, d1_t>::value)
+        {
+            return data_.d1x20_;
+        }
+        else if constexpr(is_same<X, d2_t>::value)
+        {
+            return data_.d2x10_;
+        }
+        else if constexpr(is_same<X, d4_t>::value)
+        {
+            return data_.d4x5_;
+        }
+        else if constexpr(is_same<X, d5_t>::value)
+        {
+            return data_.d5x4_;
+        }
+        else if constexpr(is_same<X, d10_t>::value)
+        {
+            return data_.d10x2_;
+        }
+        else if constexpr(is_same<X, d20_t>::value)
+        {
+            return data_.d20x1_;
+        }
+        else
+        {
+            return err;
+        }
+    }
+
+    template <typename X>
+    __host__ __device__ constexpr auto& AsType()
+    {
+        static_assert(is_same<X, d1_t>::value || is_same<X, d2_t>::value ||
+                          is_same<X, d4_t>::value || is_same<X, d5_t>::value ||
+                          is_same<X, d10_t>::value || is_same<X, d20_t>::value,
+                      "wrong!");
+
+        if constexpr(is_same<X, d1_t>::value)
+        {
+            return data_.d1x20_;
+        }
+        else if constexpr(is_same<X, d2_t>::value)
+        {
+            return data_.d2x10_;
+        }
+        else if constexpr(is_same<X, d4_t>::value)
+        {
+            return data_.d4x5_;
+        }
+        else if constexpr(is_same<X, d5_t>::value)
+        {
+            return data_.d5x4_;
+        }
+        else if constexpr(is_same<X, d10_t>::value)
+        {
+            return data_.d10x2_;
+        }
+        else if constexpr(is_same<X, d20_t>::value)
+        {
+            return data_.d20x1_;
+        }
+        else
+        {
+            return err;
+        }
+    }
+};
+
+template <typename T>
+struct vector_type<T, 9>
+{
+    using d1_t = T;
+    typedef T d3_t __attribute__((ext_vector_type(3)));
+    typedef T d9_t __attribute__((ext_vector_type(9)));
+    using type = d9_t;
+
+    union
+    {
+        d9_t d9_;
+        StaticallyIndexedArray<d1_t, 9> d1x9_;
+        StaticallyIndexedArray<d3_t, 3> d3x3_;
+        StaticallyIndexedArray<d9_t, 1> d9x1_;
+    } data_;
+
+    __host__ __device__ constexpr vector_type() : data_{type{0}} {}
+
+    __host__ __device__ constexpr vector_type(type v) : data_{v} {}
+
+    template <typename X>
+    __host__ __device__ constexpr const auto& AsType() const
+    {
+        static_assert(is_same<X, d1_t>::value || is_same<X, d3_t>::value || is_same<X, d9_t>::value,
+                      "wrong!");
+
+        if constexpr(is_same<X, d1_t>::value)
+        {
+            return data_.d1x9_;
+        }
+        else if constexpr(is_same<X, d3_t>::value)
+        {
+            return data_.d3x3_;
+        }
+        else if constexpr(is_same<X, d9_t>::value)
+        {
+            return data_.d9x1_;
+        }
+        else
+        {
+            return err;
+        }
+    }
+
+    template <typename X>
+    __host__ __device__ constexpr auto& AsType()
+    {
+        static_assert(is_same<X, d1_t>::value || is_same<X, d3_t>::value || is_same<X, d9_t>::value,
+                      "wrong!");
+
+        if constexpr(is_same<X, d1_t>::value)
+        {
+            return data_.d1x9_;
+        }
+        else if constexpr(is_same<X, d3_t>::value)
+        {
+            return data_.d3x3_;
+        }
+        else if constexpr(is_same<X, d9_t>::value)
+        {
+            return data_.d9x1_;
+        }
+        else
+        {
+            return err;
+        }
+    }
+};
 using int64_t = long;
 
 // fp64
@@ -1607,6 +2853,14 @@ using half16_t = typename vector_type<half_t, 16>::type;
 using half32_t = typename vector_type<half_t, 32>::type;
 using half64_t = typename vector_type<half_t, 64>::type;
 
+using half3_t  = typename vector_type<half_t, 3>::type;
+using half6_t  = typename vector_type<half_t, 6>::type;
+using half9_t = typename vector_type<half_t, 9>::type;
+using half18_t = typename vector_type<half_t, 18>::type;
+using half36_t = typename vector_type<half_t, 36>::type;
+using half5_t = typename vector_type<half_t, 5>::type;
+using half10_t = typename vector_type<half_t, 10>::type;
+
 // bfp16
 using bhalf2_t  = typename vector_type<bhalf_t, 2>::type;
 using bhalf4_t  = typename vector_type<bhalf_t, 4>::type;
@@ -1614,6 +2868,14 @@ using bhalf8_t  = typename vector_type<bhalf_t, 8>::type;
 using bhalf16_t = typename vector_type<bhalf_t, 16>::type;
 using bhalf32_t = typename vector_type<bhalf_t, 32>::type;
 using bhalf64_t = typename vector_type<bhalf_t, 64>::type;
+
+using bhalf3_t  = typename vector_type<bhalf_t, 3>::type;
+using bhalf6_t  = typename vector_type<bhalf_t, 6>::type;
+using bhalf9_t = typename vector_type<bhalf_t, 9>::type;
+using bhalf18_t = typename vector_type<bhalf_t, 18>::type;
+using bhalf36_t = typename vector_type<bhalf_t, 36>::type;
+using bhalf5_t = typename vector_type<bhalf_t, 5>::type;
+using bhalf10_t = typename vector_type<bhalf_t, 10>::type;
 
 // i32
 using int32x2_t  = typename vector_type<int32_t, 2>::type;
@@ -1623,6 +2885,11 @@ using int32x16_t = typename vector_type<int32_t, 16>::type;
 using int32x32_t = typename vector_type<int32_t, 32>::type;
 using int32x64_t = typename vector_type<int32_t, 64>::type;
 
+using int32x3_t  = typename vector_type<int32_t, 3>::type;
+using int32x5_t  = typename vector_type<int32_t, 5>::type;
+using int32x9_t  = typename vector_type<int32_t, 9>::type;
+using int32x18_t = typename vector_type<int32_t, 18>::type;
+
 // i8
 using int8x2_t  = typename vector_type<int8_t, 2>::type;
 using int8x4_t  = typename vector_type<int8_t, 4>::type;
@@ -1631,13 +2898,39 @@ using int8x16_t = typename vector_type<int8_t, 16>::type;
 using int8x32_t = typename vector_type<int8_t, 32>::type;
 using int8x64_t = typename vector_type<int8_t, 64>::type;
 
+using int8x3_t  = typename vector_type<int8_t, 3>::type;
+using int8x6_t  = typename vector_type<int8_t, 6>::type;
+using int8x9_t = typename vector_type<int8_t, 9>::type;
+using int8x12_t = typename vector_type<int8_t, 12>::type;
+using int8x18_t = typename vector_type<int8_t, 18>::type;
+using int8x24_t = typename vector_type<int8_t, 24>::type;
+using int8x36_t = typename vector_type<int8_t, 36>::type;
+using int8x72_t = typename vector_type<int8_t, 72>::type;
+using int8x5_t = typename vector_type<int8_t, 5>::type;
+using int8x10_t = typename vector_type<int8_t, 10>::type;
+using int8x20_t = typename vector_type<int8_t, 20>::type;
+
 // f8
 using f8x2_t  = typename vector_type<f8_t, 2>::type;
 using f8x4_t  = typename vector_type<f8_t, 4>::type;
 using f8x8_t  = typename vector_type<f8_t, 8>::type;
+using f8x12_t  = typename vector_type<f8_t, 12>::type;
 using f8x16_t = typename vector_type<f8_t, 16>::type;
+using f8x24_t  = typename vector_type<f8_t, 24>::type;
 using f8x32_t = typename vector_type<f8_t, 32>::type;
 using f8x64_t = typename vector_type<f8_t, 64>::type;
+
+using f8x3_t  = typename vector_type<f8_t, 3>::type;
+using f8x6_t  = typename vector_type<f8_t, 6>::type;
+using f8x9_t = typename vector_type<f8_t, 9>::type;
+using f8x12_t = typename vector_type<f8_t, 12>::type;
+using f8x18_t = typename vector_type<f8_t, 18>::type;
+using f8x24_t = typename vector_type<f8_t, 24>::type;
+using f8x36_t = typename vector_type<f8_t, 36>::type;
+using f8x72_t = typename vector_type<f8_t, 72>::type;
+using f8x5_t = typename vector_type<f8_t, 5>::type;
+using f8x10_t = typename vector_type<f8_t, 10>::type;
+using f8x20_t = typename vector_type<f8_t, 20>::type;
 
 // bf8
 using bf8x2_t  = typename vector_type<bf8_t, 2>::type;
@@ -1647,6 +2940,17 @@ using bf8x16_t = typename vector_type<bf8_t, 16>::type;
 using bf8x32_t = typename vector_type<bf8_t, 32>::type;
 using bf8x64_t = typename vector_type<bf8_t, 64>::type;
 
+using bf8x3_t  = typename vector_type<bf8_t, 3>::type;
+using bf8x6_t  = typename vector_type<bf8_t, 6>::type;
+using bf8x9_t = typename vector_type<bf8_t, 9>::type;
+using bf8x12_t = typename vector_type<bf8_t, 12>::type;
+using bf8x18_t = typename vector_type<bf8_t, 18>::type;
+using bf8x24_t = typename vector_type<bf8_t, 24>::type;
+using bf8x36_t = typename vector_type<bf8_t, 36>::type;
+using bf8x72_t = typename vector_type<bf8_t, 72>::type;
+using bf8x5_t = typename vector_type<bf8_t, 5>::type;
+using bf8x10_t = typename vector_type<bf8_t, 10>::type;
+using bf8x20_t = typename vector_type<bf8_t, 20>::type;
 // u8
 using uint8x2_t  = typename vector_type<uint8_t, 2>::type;
 using uint8x4_t  = typename vector_type<uint8_t, 4>::type;
@@ -1654,6 +2958,30 @@ using uint8x8_t  = typename vector_type<uint8_t, 8>::type;
 using uint8x16_t = typename vector_type<uint8_t, 16>::type;
 using uint8x32_t = typename vector_type<uint8_t, 32>::type;
 using uint8x64_t = typename vector_type<uint8_t, 64>::type;
+
+using uint8x3_t  = typename vector_type<uint8_t, 3>::type;
+using uint8x6_t  = typename vector_type<uint8_t, 6>::type;
+using uint8x9_t = typename vector_type<uint8_t, 9>::type;
+using uint8x12_t = typename vector_type<uint8_t, 12>::type;
+using uint8x18_t = typename vector_type<uint8_t, 18>::type;
+using uint8x24_t = typename vector_type<uint8_t, 24>::type;
+using uint8x36_t = typename vector_type<uint8_t, 36>::type;
+using uint8x72_t = typename vector_type<uint8_t, 72>::type;
+using uint8x5_t = typename vector_type<uint8_t, 5>::type;
+using uint8x10_t = typename vector_type<uint8_t, 10>::type;
+using uint8x20_t = typename vector_type<uint8_t, 20>::type;
+
+#if CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
+using int4x8_t  = typename vector_type<int8_t, 4>::type;
+using int4x16_t = typename vector_type<int8_t, 8>::type;
+using int4x32_t = typename vector_type<int8_t, 16>::type;
+
+using int4x24_t = typename vector_type<int8_t, 12>::type;
+using int4x48_t = typename vector_type<int8_t, 24>::type;
+using int4x72_t = typename vector_type<int8_t, 36>::type;
+using int4x144_t = typename vector_type<int8_t, 72>::type;
+using int4x40_t = typename vector_type<int8_t, 20>::type;
+#endif
 
 template <typename T>
 struct NumericLimits
