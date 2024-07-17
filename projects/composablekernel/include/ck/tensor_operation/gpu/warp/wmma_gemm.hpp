@@ -326,7 +326,7 @@ struct wmma_type<WmmaInstr::wmma_f32_16x16x16_f16_gfx12,
         static_assert(wave_size == 32, "only support wave32 for gfx12 wmma");
         if constexpr(wave_size == 32)
         {
-            intrin_wmma_f32_16x16x16_f16_w32_gfx12<MPerWmma, NPerWmma>::Run(a, b, reg_c);
+            intrin_wmma_f32_16x16x16_f16_w32<MPerWmma, NPerWmma>::Run(a, b, reg_c);
         }
     }
 };
@@ -359,7 +359,7 @@ struct wmma_type<WmmaInstr::wmma_f32_16x16x16_bf16_gfx12,
         static_assert(wave_size == 32, "only support wave32 for gfx12 wmma");
         if constexpr(wave_size == 32)
         {
-            intrin_wmma_f32_16x16x16_bf16_w32_gfx12<MPerWmma, NPerWmma>::Run(a, b, reg_c);
+            intrin_wmma_f32_16x16x16_bf16_w32<MPerWmma, NPerWmma>::Run(a, b, reg_c);
         }
     }
 };
@@ -398,7 +398,7 @@ struct wmma_type<WmmaInstr::wmma_f16_16x16x16_f16_gfx12,
         static_assert(wave_size == 32, "only support wave32 for gfx12 wmma");
         if constexpr(wave_size == 32)
         {
-            intrin_wmma_f16_16x16x16_f16_w32_gfx12<MPerWmma, NPerWmma>::Run(a, b, reg_c);
+            intrin_wmma_f16_16x16x16_f16_w32<MPerWmma, NPerWmma, 0>::Run(a, b, reg_c);
         }
     }
 };
@@ -431,7 +431,7 @@ struct wmma_type<WmmaInstr::wmma_bf16_16x16x16_bf16_gfx12,
         static_assert(wave_size == 32, "only support wave32 for gfx12 wmma");
         if constexpr(wave_size == 32)
         {
-            intrin_wmma_bf16_16x16x16_bf16_w32_gfx12<MPerWmma, NPerWmma>::Run(a, b, reg_c);
+            intrin_wmma_bf16_16x16x16_bf16_w32<MPerWmma, NPerWmma, 0>::Run(a, b, reg_c);
         }
     }
 };
@@ -471,7 +471,7 @@ struct wmma_type<WmmaInstr::wmma_i32_16x16x16_iu8_gfx12,
         static_assert(wave_size == 32, "only support wave32 for gfx12 wmma");
         if constexpr(wave_size == 32)
         {
-            intrin_wmma_i32_16x16x16_iu8_w32_gfx12<MPerWmma, NPerWmma, neg_a, neg_b, clamp>::Run(
+            intrin_wmma_i32_16x16x16_iu8_w32<MPerWmma, NPerWmma, neg_a, neg_b, clamp>::Run(
                 a, b, reg_c);
         }
     }
