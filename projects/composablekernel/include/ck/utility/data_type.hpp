@@ -2202,6 +2202,7 @@ struct vector_type<T, 72>
     typedef T d3_t __attribute__((ext_vector_type(3)));
     typedef T d4_t __attribute__((ext_vector_type(4)));
     typedef T d6_t __attribute__((ext_vector_type(6)));
+    typedef T d8_t __attribute__((ext_vector_type(8)));
     typedef T d9_t __attribute__((ext_vector_type(9)));
     typedef T d12_t __attribute__((ext_vector_type(12)));
     typedef T d18_t __attribute__((ext_vector_type(18)));
@@ -2218,6 +2219,7 @@ struct vector_type<T, 72>
         StaticallyIndexedArray<d3_t, 24> d3x24_;
         StaticallyIndexedArray<d4_t, 18> d4x18_;
         StaticallyIndexedArray<d6_t, 12> d6x12_;
+        StaticallyIndexedArray<d8_t, 9> d8x9_;
         StaticallyIndexedArray<d9_t, 8> d9x8_;
         StaticallyIndexedArray<d12_t, 6> d12x6_;
         StaticallyIndexedArray<d18_t, 4> d18x4_;
@@ -2235,7 +2237,8 @@ struct vector_type<T, 72>
     {
         static_assert(
             is_same<X, d1_t>::value || is_same<X, d2_t>::value || is_same<X, d3_t>::value ||
-                is_same<X, d4_t>::value || is_same<X, d6_t>::value || is_same<X, d9_t>::value ||
+                is_same<X, d4_t>::value || is_same<X, d6_t>::value || is_same<X, d8_t>::value ||
+                is_same<X, d9_t>::value ||
                 is_same<X, d12_t>::value || is_same<X, d18_t>::value || is_same<X, d24_t>::value ||
                 is_same<X, d36_t>::value || is_same<X, d72_t>::value,
             "wrong!");
@@ -2259,6 +2262,10 @@ struct vector_type<T, 72>
         else if constexpr(is_same<X, d6_t>::value)
         {
             return data_.d6x12_;
+        }
+        else if constexpr(is_same<X, d8_t>::value)
+        {
+            return data_.d8x9_;
         }
         else if constexpr(is_same<X, d9_t>::value)
         {
@@ -2295,7 +2302,8 @@ struct vector_type<T, 72>
     {
         static_assert(
             is_same<X, d1_t>::value || is_same<X, d2_t>::value || is_same<X, d3_t>::value ||
-                is_same<X, d4_t>::value || is_same<X, d6_t>::value || is_same<X, d9_t>::value ||
+                is_same<X, d4_t>::value || is_same<X, d6_t>::value || is_same<X, d8_t>::value ||
+                is_same<X, d9_t>::value ||
                 is_same<X, d12_t>::value || is_same<X, d18_t>::value || is_same<X, d24_t>::value ||
                 is_same<X, d36_t>::value || is_same<X, d72_t>::value,
             "wrong!");
@@ -2319,6 +2327,10 @@ struct vector_type<T, 72>
         else if constexpr(is_same<X, d6_t>::value)
         {
             return data_.d6x12_;
+        }
+        else if constexpr(is_same<X, d8_t>::value)
+        {
+            return data_.d8x9_;
         }
         else if constexpr(is_same<X, d9_t>::value)
         {
@@ -2877,6 +2889,20 @@ using bhalf36_t = typename vector_type<bhalf_t, 36>::type;
 using bhalf5_t = typename vector_type<bhalf_t, 5>::type;
 using bhalf10_t = typename vector_type<bhalf_t, 10>::type;
 
+using bf16x2_t  = typename vector_type<__bf16, 2>::type;
+using bf16x4_t  = typename vector_type<__bf16, 4>::type;
+using bf16x8_t  = typename vector_type<__bf16, 8>::type;
+using bf16x16_t = typename vector_type<__bf16, 16>::type;
+using bf16x32_t = typename vector_type<__bf16, 32>::type;
+using bf16x64_t = typename vector_type<__bf16, 64>::type;
+
+using bf16x3_t  = typename vector_type<__bf16, 3>::type;
+using bf16x6_t  = typename vector_type<__bf16, 6>::type;
+using bf16x9_t  = typename vector_type<__bf16, 9>::type;
+using bf16x18_t = typename vector_type<__bf16, 18>::type;
+using bf16x36_t = typename vector_type<__bf16, 36>::type;
+using bf16x5_t  = typename vector_type<__bf16, 5>::type;
+using bf16x10_t = typename vector_type<__bf16, 10>::type;
 // i32
 using int32x2_t  = typename vector_type<int32_t, 2>::type;
 using int32x4_t  = typename vector_type<int32_t, 4>::type;

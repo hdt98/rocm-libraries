@@ -34,8 +34,8 @@ struct wconv_type
     wconv_type() { static_assert(false, "never called"); }
 };
 
-#define WCONV_TYPE_CONSTS(                                                                 \
-    input_chans, output_chans, weight_component, data_component, acc_component, data_tile) \
+#define WCONV_TYPE_CONSTS( \
+    input_chans, output_chans, weight_component, data_component, acc_component, data_tile)
 
 // dst: f32 or i32
 template <>
@@ -688,6 +688,7 @@ struct WconvConv
         return std::is_same<int4_t, ScalarType>::value ? 4 : sizeof(ScalarType) * 8;
     }
 
+    // WCNN input channel and output channel info
     static constexpr index_t GetNumInputChannels()
     {
         return (HPerWconv == 4) && (WPerWconv == 2) ? 128 / SizeOfBits<KernelInDataType>()
@@ -707,12 +708,12 @@ struct WconvConv
 
     static constexpr index_t GetUnpackedNumOutputChannels() { return GetNumOutputChannels(); }
 
+    // WCNN weight info
     static constexpr index_t GetWeightRegSize()
     {
         constexpr index_t WeightBitsPerLane = GetNumInputChannels() * GetNumOutputChannels() *
                                               SizeOfBits<KernelWeightDataType>() / WaveSize *
-                                              FilterSize *
-                                              FilterSize;
+                                              FilterSize * FilterSize;
 
         // Round bits to Reg size (uint32_t)
         return (WeightBitsPerLane + 31) / 32;
@@ -723,22 +724,48 @@ struct WconvConv
         return GetWeightRegSize() * 32 / SizeOfBits<KernelWeightDataType>();
     }
 
+    static constexpr index_t GetNumSubTilesPerWeightTape()
+    {
+        return ((HPerWconv == 4) && (WPerWconv == 2)) ? 2 : 1;
+    }
+
+    static constexpr index_t GetNumWeightCompPerTile()
+    {
+        return GetNumWeightComponents() / GetWeightRegSize();
+    }
+
+    static constexpr index_t GetNumWeightCompPerTape()
+    {
+        return GetNumSubTilesPerWeightTape() * GetNumWeightCompPerTile();
+    }
+
+    static constexpr index_t GetNumWeightTape()
+    {
+        if constexpr (FilterSize == 1)
+        {
+            return 1;
+        }
+        else if constexpr (FilterSize == 3)
+        {
+            return (HPerWconv == 8) && (WPerWconv == 4) ? 5 : 9;
+        }
+    }
+
+    static constexpr index_t GetNumWeightTapePerWave()
+    {
+        return (HPerWconv == 8) && (WPerWconv == 4) ? 2 : 1;
+    }
+
+    // WCNN data info
     static constexpr index_t GetDataRegSizePerTile()
     {
         return HPerWconv * WPerWconv * GetNumInputChannels() * SizeOfBits<KernelInDataType>() /
-               WaveSize /
-               32;
-    }
-
-    static constexpr index_t GetAccumRegSize()
-    {
-        return HPerWconv * WPerWconv * GetNumOutputChannels() * SizeOfBits<AccDataType>() /
                WaveSize / 32;
     }
 
-    static constexpr index_t GetNumAccumComponents()
+    static constexpr index_t GetNumDataCompPerTile()
     {
-        return GetAccumRegSize() * 32 / SizeOfBits<AccDataType>();
+        return GetNumDataComponents() / GetNumImageSubTilesInVertical();
     }
 
     static constexpr index_t GetNumSubTilesPerImageTile()
@@ -768,6 +795,47 @@ struct WconvConv
         return GetDataRegSize() * 32 / SizeOfBits<KernelInDataType>();
     }
 
+    // Accum info
+    static constexpr index_t GetAccumRegSize()
+    {
+        return HPerWconv * WPerWconv * GetNumOutputChannels() * SizeOfBits<AccDataType>() /
+               WaveSize / 32;
+    }
+
+    static constexpr index_t GetNumAccumComponents()
+    {
+        return GetAccumRegSize() * 32 / SizeOfBits<AccDataType>();
+    }
+
+    // Helper functions of origin data index per thread
+    static constexpr auto CalculateWeiDataThreadOriginDataIndex()
+    {
+        auto laneId                      = get_thread_local_1d_id() & (WaveSize - 1);
+        constexpr index_t NumCompPerTile = GetNumWeightCompPerTile();
+        if constexpr((HPerWconv == 8) && (WPerWconv == 4))
+        {
+            return make_tuple(laneId / 16,
+                              (laneId / 2) & (GetNumOutputChannels() - 1),
+                              0,
+                              (laneId % 2) * NumCompPerTile);
+        }
+        else
+        {
+            return make_tuple(0, (laneId / 2), 0, (laneId % 2) * NumCompPerTile);
+        }
+    }
+
+    static constexpr auto CalculateInDataThreadOriginDataIndex()
+    {
+        auto laneId                      = get_thread_local_1d_id() & (WaveSize - 1);
+        constexpr index_t NumCompPerTile = GetNumDataCompPerTile();
+        const index_t SubC               = (laneId * NumCompPerTile) % GetNumInputChannels();
+        const index_t PixelOffset        = laneId * NumCompPerTile / GetNumInputChannels();
+
+        return make_tuple(PixelOffset / WPerWconv, PixelOffset % WPerWconv, SubC);
+    }
+
+    // Pre-defined types
     using KernelWeightDataType = typename std::
         conditional<std::is_same<int4_t, WeiDataType>::value, int8_t, WeiDataType>::type;
     using KernelInDataType = typename std::
@@ -779,13 +847,14 @@ struct WconvConv
 
     using AccDataTileVec =
         vector_type<AccDataType, GetNumAccumComponents() / GetNumSubTilesPerImageTile()>;
-    using WeiDataTileVec =
-        vector_type<KernelWeightDataType, GetNumWeightComponents() / GetWeightRegSize()>;
-    using InDataTileVec =
-        vector_type<KernelInDataType, GetNumDataComponents() / GetNumImageSubTilesInVertical()>;
+    using WeiDataTileVec = vector_type<KernelWeightDataType, GetNumWeightCompPerTile()>;
+    using InDataTileVec  = vector_type<KernelInDataType, GetNumDataCompPerTile()>;
+
+    using WeiDataTapeVec = vector_type<KernelWeightDataType, GetNumWeightCompPerTape()>;
 
     static_assert(GetNumImageSubTilesInVertical() == GetDataRegSize(), "");
 
+    // WCNN intrinsic
     static constexpr auto wconv =
         WconvSelector<WeiDataType, InDataType, AccDataType, HPerWconv, WPerWconv, FilterSize>{};
     static constexpr auto wconv_instr = wconv.selected_wconv;
