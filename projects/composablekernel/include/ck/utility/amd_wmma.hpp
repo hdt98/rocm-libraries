@@ -120,7 +120,7 @@ struct intrin_wmma_f32_16x16x16_bf16_w32<16, 16>
 #if defined(__gfx13__)
         reg_c.template AsType<float8_t>()(Number<0>{}) =
             __builtin_amdgcn_wmma_f32_16x16x16_bf16_clamp(
-                reg_a, reg_b, reg_c.template AsType<float8_t>()[Number<0>{}]);
+                reg_a, reg_b, reg_c.template AsType<float8_t>()[Number<0>{}], 0);
 #else
         ignore = reg_a;
         ignore = reg_b;
@@ -172,7 +172,7 @@ struct intrin_wmma_f16_16x16x16_f16_w32<16, 16, Opsel>
 #if defined(__gfx13__)
         reg_c.template AsType<half8_t>()(Number<0>{}) =
             __builtin_amdgcn_wmma_f16_16x16x16_f16_clamp(
-                reg_a, reg_b, reg_c.template AsType<half8_t>()[Number<0>{}]);
+                reg_a, reg_b, reg_c.template AsType<half8_t>()[Number<0>{}], 0);
 #else
         ignore = reg_a;
         ignore = reg_b;
@@ -225,7 +225,7 @@ struct intrin_wmma_bf16_16x16x16_bf16_w32<16, 16, Opsel>
 #if defined(__gfx13__)
         reg_c.template AsType<bhalf8_t>()(Number<0>{}) =
             __builtin_amdgcn_wmma_bf16_16x16x16_bf16_clamp(
-                reg_a, reg_b, reg_c.template AsType<bhalf8_t>()[Number<0>{}]);
+                reg_a, reg_b, reg_c.template AsType<bhalf8_t>()[Number<0>{}], 0);
 #else
         ignore = reg_a;
         ignore = reg_b;

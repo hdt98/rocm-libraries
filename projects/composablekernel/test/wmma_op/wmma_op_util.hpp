@@ -176,6 +176,58 @@ builtin_wmma_naive_selector<half8_t,
         reg_a, reg_b, reg_c.GetVectorTypeReference(Number<0>{}), k_multiplier);
 }
 
+template <>
+__device__ void
+builtin_wmma_naive_selector<bhalf8_t,
+    StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr, float, 1, 8, true>>(
+        const bhalf8_t& reg_a,
+        const bhalf8_t& reg_b,
+        StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr, float, 1, 8, true>& reg_c,
+        const int& k_multiplier)
+{
+    intrin_wmma_f32_16x16x16_bf16_w32<16, 16>::Run(
+        reg_a, reg_b, reg_c.GetVectorTypeReference(Number<0>{}), k_multiplier);
+}
+
+template <>
+__device__ void
+builtin_wmma_naive_selector<half8_t,
+    StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr, half_t, 1, 8, true>>(
+        const half8_t& reg_a,
+        const half8_t& reg_b,
+        StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr, half_t, 1, 8, true>& reg_c,
+        const int& k_multiplier)
+{
+    intrin_wmma_f16_16x16x16_f16_w32<16, 16, 0>::Run(
+        reg_a, reg_b, reg_c.GetVectorTypeReference(Number<0>{}), k_multiplier);
+}
+
+template <>
+__device__ void
+builtin_wmma_naive_selector<bhalf8_t,
+    StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr, bhalf_t, 1, 8, true>>(
+        const bhalf8_t& reg_a,
+        const bhalf8_t& reg_b,
+        StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr, bhalf_t, 1, 8, true>& reg_c,
+        const int& k_multiplier)
+{
+    intrin_wmma_bf16_16x16x16_bf16_w32<16, 16, 0>::Run(
+        reg_a, reg_b, reg_c.GetVectorTypeReference(Number<0>{}), k_multiplier);
+}
+
+template <>
+__device__ void
+builtin_wmma_naive_selector<int8x8_t,
+    StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr, int32_t, 1, 8, true>>(
+        const int8x8_t& reg_a,
+        const int8x8_t& reg_b,
+        StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr, int32_t, 1, 8, true>& reg_c,
+        const int& k_multiplier)
+{
+    intrin_wmma_i32_16x16x16_iu8_w32<16, 16, true, true, false>::Run(
+        reg_a, reg_b, reg_c.GetVectorTypeReference(Number<0>{}), k_multiplier);
+}
+
 #if defined(__gfx12__)
 template <typename src_t, typename dst_t, typename acc_t, index_t acc_num>
 __global__ void matmul(const src_t* a, const src_t* b, dst_t* c)
@@ -364,17 +416,6 @@ __global__ void matmul(const src_t* a, const src_t* b, dst_t* c)
         a_frag[ele] = p_shared[index];
     }
 
-    //workaround for llvm compiling issue, will delete after llvm fix
-    auto& c_reg_buffer = c_thread_buf_.GetVectorTypeReference(Number<0>{});
-    c_reg_buffer.template AsType<acc_t>()(Number<0>{}) = 1;
-    c_reg_buffer.template AsType<acc_t>()(Number<1>{}) = 1;
-    c_reg_buffer.template AsType<acc_t>()(Number<2>{}) = 1;
-    c_reg_buffer.template AsType<acc_t>()(Number<3>{}) = 1;
-    c_reg_buffer.template AsType<acc_t>()(Number<4>{}) = 0;
-    c_reg_buffer.template AsType<acc_t>()(Number<5>{}) = 0;
-    c_reg_buffer.template AsType<acc_t>()(Number<6>{}) = 0;
-    c_reg_buffer.template AsType<acc_t>()(Number<7>{}) = 0;
-
     asm volatile("\
     s_wait_dscnt 0x0 \n \
     s_barrier_signal -1 \n \
@@ -394,9 +435,9 @@ __global__ void matmul(const src_t* a, const src_t* b, dst_t* c)
         });
 }
 
-// function overload for int8 because of A, B, C's layout is different from 16bit in gfx13
-template <typename dst_t, typename acc_t, index_t acc_num>
-__global__ void matmul(const int8_t* a, const int8_t* b, dst_t* c)
+// template specialization for int8 because of A, B, C's layout is different from 16bit in gfx13
+template <>
+__global__ void matmul<int8_t, int8_t, int32_t, 8>(const int8_t* a, const int8_t* b, int8_t* c)
 {
     __shared__ int8_t p_shared[16 * 16 * 2];
     const int lIdx = threadIdx.x;
@@ -408,7 +449,7 @@ __global__ void matmul(const int8_t* a, const int8_t* b, dst_t* c)
     src_vec a_temp = {};
     src_vec b_temp = {};
     // initialize c fragment to 0
-    using acc_vec = StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr, acc_t, 1, 8, true>;
+    using acc_vec = StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr, int32_t, 1, 8, true>;
     acc_vec c_thread_buf_;
 
     const int lane = lIdx % 2;
@@ -435,17 +476,6 @@ __global__ void matmul(const int8_t* a, const int8_t* b, dst_t* c)
     {
         p_shared[8 * lIdx + ele + 16 * 16] = b_temp[ele];
     }
-
-    //workaround for llvm compiling issue, will delete after llvm fix
-    auto& c_reg_buffer = c_thread_buf_.GetVectorTypeReference(Number<0>{});
-    c_reg_buffer.template AsType<acc_t>()(Number<0>{}) = 1;
-    c_reg_buffer.template AsType<acc_t>()(Number<1>{}) = 1;
-    c_reg_buffer.template AsType<acc_t>()(Number<2>{}) = 1;
-    c_reg_buffer.template AsType<acc_t>()(Number<3>{}) = 1;
-    c_reg_buffer.template AsType<acc_t>()(Number<4>{}) = 0;
-    c_reg_buffer.template AsType<acc_t>()(Number<5>{}) = 0;
-    c_reg_buffer.template AsType<acc_t>()(Number<6>{}) = 0;
-    c_reg_buffer.template AsType<acc_t>()(Number<7>{}) = 0;
 
     asm volatile("\
     s_wait_dscnt 0x0 \n \
@@ -486,9 +516,9 @@ __global__ void matmul(const int8_t* a, const int8_t* b, dst_t* c)
     // wait for results, similar to mma_sync
     static_for<0, 8, 1>{}([&](auto ele) {
         const int col = lIdx >> 1;
-        const int row = ((ele & 4) << 1) + (ele & 3);
+        const int row = ((ele & 4) << 1) + (ele & 3) + ((lIdx & 1) << 2);
         // store results from unpacked c_thread_buf_ output
-        c[16 * row + col] = ck::type_convert<dst_t>(c_thread_buf_[Number<ele * acc_num / 8>{}]);
+        c[16 * row + col] = ck::type_convert<int8_t>(c_thread_buf_[Number<ele>{}]);
         });
 }
 
@@ -516,17 +546,6 @@ __global__ void matmul_swizzle_a(const src_t* a, const src_t* b, dst_t* c)
         a_frag[ele] = a[index];
     }
 
-    //workaround for llvm compiling issue, will delete after llvm fix
-    auto& c_reg_buffer = c_thread_buf_.GetVectorTypeReference(Number<0>{});
-    c_reg_buffer.template AsType<acc_t>()(Number<0>{}) = 1;
-    c_reg_buffer.template AsType<acc_t>()(Number<1>{}) = 1;
-    c_reg_buffer.template AsType<acc_t>()(Number<2>{}) = 1;
-    c_reg_buffer.template AsType<acc_t>()(Number<3>{}) = 1;
-    c_reg_buffer.template AsType<acc_t>()(Number<4>{}) = 0;
-    c_reg_buffer.template AsType<acc_t>()(Number<5>{}) = 0;
-    c_reg_buffer.template AsType<acc_t>()(Number<6>{}) = 0;
-    c_reg_buffer.template AsType<acc_t>()(Number<7>{}) = 0;
-
     __syncthreads();
     builtin_wmma_naive_selector<src_vec, acc_vec>(a_frag, b_frag, c_thread_buf_, 1);
     __syncthreads();
@@ -540,16 +559,15 @@ __global__ void matmul_swizzle_a(const src_t* a, const src_t* b, dst_t* c)
     });
 }
 
-//function overload for int8_t because of layout difference
-template <typename dst_t, typename acc_t, index_t acc_num>
-__global__ void matmul_swizzle_a(const int8_t* a, const int8_t* b, dst_t* c)
+template <>
+__global__ void matmul_swizzle_a<int8_t, int8_t, int32_t, 8>(const int8_t* a, const int8_t* b, int8_t* c)
 {
     const int lIdx = threadIdx.x;
 
     using src_vec = typename vector_type<int8_t, 8>::type;
     src_vec a_frag = {};
     src_vec b_frag = {};
-    using acc_vec = StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr, acc_t, 1, acc_num, true>;
+    using acc_vec = StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr, int32_t, 1, 8, true>;
     acc_vec c_thread_buf_;
 
     int start_idx = ((lIdx >> 1) << 4) + ((lIdx & 1) << 2);
@@ -565,17 +583,6 @@ __global__ void matmul_swizzle_a(const int8_t* a, const int8_t* b, dst_t* c)
         a_frag[ele] = a[index];
     }
 
-    //workaround for llvm compiling issue, will delete after llvm fix
-    auto& c_reg_buffer = c_thread_buf_.GetVectorTypeReference(Number<0>{});
-    c_reg_buffer.template AsType<acc_t>()(Number<0>{}) = 1;
-    c_reg_buffer.template AsType<acc_t>()(Number<1>{}) = 1;
-    c_reg_buffer.template AsType<acc_t>()(Number<2>{}) = 1;
-    c_reg_buffer.template AsType<acc_t>()(Number<3>{}) = 1;
-    c_reg_buffer.template AsType<acc_t>()(Number<4>{}) = 1;
-    c_reg_buffer.template AsType<acc_t>()(Number<5>{}) = 1;
-    c_reg_buffer.template AsType<acc_t>()(Number<6>{}) = 1;
-    c_reg_buffer.template AsType<acc_t>()(Number<7>{}) = 1;
-
     __syncthreads();
     builtin_wmma_naive_selector<src_vec, acc_vec>(a_frag, b_frag, c_thread_buf_, 1);
     __syncthreads();
@@ -583,9 +590,9 @@ __global__ void matmul_swizzle_a(const int8_t* a, const int8_t* b, dst_t* c)
     // Colum major -> Row major
     static_for<0, 8, 1>{}([&](auto ele) {
         const int col = lIdx >> 1;
-        const int row = ((ele & 4) << 1) + (ele & 3);
+        const int row = ((ele & 4) << 1) + (ele & 3) + ((lIdx & 1) << 2);
         // store results from unpacked c_thread_buf_ output
-        c[16 * row + col] = ck::type_convert<dst_t>(c_thread_buf_[Number<ele * acc_num / 8>{}]);
+        c[16 * row + col] = ck::type_convert<int8_t>(c_thread_buf_[Number<ele>{}]);
         });
 }
 #else
@@ -872,10 +879,10 @@ struct TestWmma
         bool is_supported = ck::is_gfx11_supported() &&
                             ck::wmma_op_util::RunDeviceGEMM(wmma_kernel, a, b, c_device);
 
-        //DumpTensor(a);
-        //DumpTensor(b);
-        //DumpTensor(c_device);
-        //DumpTensor(c_host);
+        DumpTensor(a);
+        DumpTensor(b);
+        DumpTensor(c_device);
+        DumpTensor(c_host);
 
         if(is_supported)
         {
