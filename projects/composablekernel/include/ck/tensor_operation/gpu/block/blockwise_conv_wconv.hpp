@@ -117,7 +117,6 @@ struct BlockwiseConvWconv
 
             return make_tuple(waveId_k * KRepeat,
                               0,
-                              0,
                               wconv_wei_idx[I0],
                               wconv_wei_idx[I1],
                               wconv_wei_idx[I2],
@@ -264,10 +263,10 @@ struct BlockwiseConvWconv
                         if constexpr(FilterSize == 1)
                         {
                             weight_thread_copy_.Run(weight_block_desc_,
-                                                    make_tuple(k1, c1, I0, I0, I0, I0, I0),
+                                                    make_tuple(k1, c1, I0, I0, I0, I0),
                                                     weight_block_buf,
                                                     weight_thread_desc_,
-                                                    make_tuple(I0, I0, I0, I0, I0, I0, I0),
+                                                    make_tuple(I0, I0, I0, I0, I0, I0),
                                                     weight_thread_buf);
                             weight_thread_vec.template AsType<WeiDataVec>()(I0) =
                                 *reinterpret_cast<const WeiDataVec*>(&(weight_thread_buf[I0]));
@@ -298,14 +297,13 @@ struct BlockwiseConvWconv
                                     make_tuple(
                                         k1,
                                         c1,
-                                        I0,
                                         Number<wconv_conv.GetNumWeightTapePerWave() * tape_idx>{},
                                         I0,
                                         I0,
                                         I0),
                                     weight_block_buf,
                                     weight_thread_desc_,
-                                    make_tuple(I0, I0, I0, I0, I0, I0, I0),
+                                    make_tuple(I0, I0, I0, I0, I0, I0),
                                     weight_thread_buf);
 
                                 weight_thread_vec.template AsType<WeiDataTapeVec>()(
@@ -360,7 +358,7 @@ protected:
     static constexpr auto NumWeightSubTiles    = wconv_conv.GetNumSubTilesPerWeightTape();
     static constexpr auto NumWeightCompPerTile = wconv_conv.GetNumWeightCompPerTile();
     static constexpr auto weight_thread_desc_  = make_naive_tensor_descriptor_packed(make_tuple(
-        I1, I1, I1, I1, I1, Number<NumWeightSubTiles>{}, Number<NumWeightCompPerTile>{}));
+        I1, I1, I1, I1, Number<NumWeightSubTiles>{}, Number<NumWeightCompPerTile>{}));
 
     static constexpr auto NumDataSubTiles    = wconv_conv.GetNumSubTilesPerImageTile();
     static constexpr auto NumDataCompPerTile = wconv_conv.GetNumDataCompPerTile();
@@ -392,9 +390,9 @@ protected:
             WeiDataType,
             decltype(weight_block_desc_),
             decltype(weight_thread_desc_),
-            Sequence<1, 1, 1, 1, 1, NumWeightSubTiles, NumWeightCompPerTile>,
-            Sequence<0, 1, 2, 3, 4, 5, 6>,
-            6,
+            Sequence<1, 1, 1, 1, NumWeightSubTiles, NumWeightCompPerTile>,
+            Sequence<0, 1, 2, 3, 4, 5>,
+            5,
             NumWeightCompPerTile,
             NumWeightCompPerTile>;
     };

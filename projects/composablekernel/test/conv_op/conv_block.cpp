@@ -117,7 +117,7 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
     static_assert(InDataBlockSize + WeiDataBlockSize * C_BlockTile < LDS_SIZE, "");
 
     constexpr auto WeiDataBlockDesc = make_naive_tensor_descriptor_packed(make_tuple(
-        Number<FilterSize>{}, Number<FilterSize>{}, Number<KPerBlock>{}, Number<CPerBlock>{}));
+        Number<FilterSize * FilterSize>{}, Number<KPerBlock>{}, Number<CPerBlock>{}));
 
     static constexpr index_t CPerWconv = wconv_conv.GetNumInputChannels();
     static constexpr index_t KPerWconv = wconv_conv.GetNumOutputChannels();
@@ -126,20 +126,19 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
     constexpr auto InDataBlockDesc = make_naive_tensor_descriptor_packed(
         make_tuple(Number<HPerBlockIn>{}, Number<WPerBlockIn>{}, Number<CPerBlock>{}));
 
-    // YXKC -> K0 x C0 x Y x X x K1 x C2 x C1
+    // YXKC -> K0 x C0 x YX x K1 x C2 x C1
     constexpr auto NumSubTilesPerWeightTape = wconv_conv.GetNumSubTilesPerWeightTape();
     constexpr auto WeiDataWaveDesc          = transform_tensor_descriptor(
         WeiDataBlockDesc,
         make_tuple(
-            make_pass_through_transform(Number<FilterSize>{}),
-            make_pass_through_transform(Number<FilterSize>{}),
+            make_pass_through_transform(Number<FilterSize * FilterSize>{}),
             make_unmerge_transform(
                 make_tuple(Number<KPerBlock / KPerWconv>{}, Number<KPerWconv>{})),
             make_unmerge_transform(make_tuple(Number<CPerBlock / CPerWconv>{},
                                               Number<NumSubTilesPerWeightTape>{},
                                               Number<CPerWconv / NumSubTilesPerWeightTape>{}))),
-        make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}, Sequence<3>{}),
-        make_tuple(Sequence<2>{}, Sequence<3>{}, Sequence<0, 4>{}, Sequence<1, 5, 6>{}));
+        make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}),
+        make_tuple(Sequence<2>{}, Sequence<0, 3>{}, Sequence<1, 4, 5>{}));
 
     // HWC -> H0 x W0 x C0 x H2 x H1 x W1 x C1
     constexpr auto NumSubTilePerImage = wconv_conv.GetNumSubTilesPerImageTile();
