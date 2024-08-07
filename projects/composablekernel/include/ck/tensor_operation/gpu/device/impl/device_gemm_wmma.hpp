@@ -62,6 +62,7 @@ template <typename ALayout,
           index_t CShuffleNRepeatPerShuffle,
           typename CShuffleBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock,
           index_t CShuffleBlockTransferScalarPerVector_NPerBlock,
+          ck::index_t KPerWmma = 16,
           ck::LoopScheduler LoopSched     = make_default_loop_scheduler(),
           ck::PipelineVersion PipelineVer = ck::PipelineVersion::v1>
 struct DeviceGemmWmma_CShuffle : public DeviceGemm<ALayout,
@@ -286,6 +287,7 @@ struct DeviceGemmWmma_CShuffle : public DeviceGemm<ALayout,
                           CShuffleNRepeatPerShuffle,
                           CShuffleBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock,
                           CShuffleBlockTransferScalarPerVector_NPerBlock,
+                          KPerWmma,
                           NumPrefetch,
                           LoopSched,
                           PipelineVer>;
@@ -450,7 +452,7 @@ struct DeviceGemmWmma_CShuffle : public DeviceGemm<ALayout,
 
     static bool IsSupportedArgument(const Argument& arg)
     {
-        if(ck::is_gfx11_supported() || ck::is_gfx12_supported())
+        if(ck::is_gfx11_supported() || ck::is_gfx12_supported() || ck::is_gfx13_supported())
         {
             if constexpr(!(is_same_v<AccDataType, float> || is_same_v<AccDataType, ck::half_t> ||
                            is_same_v<AccDataType, int32_t>))

@@ -26,7 +26,11 @@ enum struct WmmaInstr
     wmma_i32_16x16x16_iu8_gfx12,
 
     // gfx13
-    
+    wmma_f32_16x16x16_f16_gfx13,
+    wmma_f32_16x16x16_bf16_gfx13,
+    wmma_f16_16x16x16_f16_gfx13,
+    wmma_bf16_16x16x16_bf16_gfx13,
+    wmma_i32_16x16x16_iu8_gfx13,
 };
 
 /*
@@ -477,6 +481,199 @@ struct wmma_type<WmmaInstr::wmma_i32_16x16x16_iu8_gfx12,
     }
 };
 
+// gfx13
+template <index_t WaveSize>
+struct wmma_type<WmmaInstr::wmma_f32_16x16x16_f16_gfx13,
+                 WaveSize,
+                 typename std::enable_if_t<WaveSize == 32>>
+{
+    // Absolute fixing property
+    // * Data Pixel
+    static constexpr index_t m_per_wmma = 16;
+    static constexpr index_t n_per_wmma = 16;
+    static constexpr index_t k_per_wmma = 16;
+    // static constexpr index_t src_a_data_size = 2;
+    // static constexpr index_t src_b_data_size = 2;
+    // static constexpr index_t acc_data_size   = 4;
+    // * Thread mapping inside wave, num_thread_per_subgroups always alone N direction
+    static constexpr index_t acc_data_size            = 4;
+    static constexpr index_t acc_pack_number          = 1;
+    static constexpr index_t num_thread_per_subgroups = n_per_wmma;
+
+    // Wave mode dependent propety
+    static constexpr index_t wave_size = Number<WaveSize>{};
+    // * Fixed in Navi3x, Will be wave mode dependent on Navi4x
+    // static constexpr index_t num_src_a_vgprs_per_wave = k_per_wmma / 2 * src_a_data_size / 4;
+    // static constexpr index_t num_src_b_vgprs_per_wave = k_per_wmma / 2 * src_b_data_size / 4;
+    // * num_acc_vgprs_per_wave alone M direction
+    // * num_subgroups alone M direction
+    static constexpr index_t num_acc_vgprs_per_wave = m_per_wmma * n_per_wmma / wave_size;
+    static constexpr index_t num_subgroups          = wave_size / num_thread_per_subgroups;
+    // * num_consecutive_vgprs means how many vgprs in consecutive
+    static constexpr index_t num_acc_per_thread     =  m_per_wmma * n_per_wmma / wave_size;
+    static constexpr index_t num_consecutive_acc    =  2;
+    static constexpr index_t loop_of_consecutive    =  num_acc_per_thread / num_consecutive_acc;
+
+    template <index_t MPerWmma, index_t NPerWmma, class FloatA, class FloatB, class FloatC>
+    __device__ void run(const FloatA& a, const FloatB& b, FloatC& reg_c) const
+    {
+        static_assert(wave_size == 32, "only support wave32 for gfx13 wmma");
+        if constexpr(wave_size == 32)
+        {
+            intrin_wmma_f32_16x16x16_f16_w32<MPerWmma, NPerWmma>::Run(a, b, reg_c, 1);
+        }
+    }
+};
+
+template <index_t WaveSize>
+struct wmma_type<WmmaInstr::wmma_f32_16x16x16_bf16_gfx13,
+                 WaveSize,
+                 typename std::enable_if_t<WaveSize == 32>>
+{
+    // Absolute fixing property
+    static constexpr index_t m_per_wmma = 16;
+    static constexpr index_t n_per_wmma = 16;
+    static constexpr index_t k_per_wmma = 16;
+    // static constexpr index_t src_a_data_size          = 2;
+    // static constexpr index_t src_b_data_size          = 2;
+    static constexpr index_t acc_data_size            = 4;
+    static constexpr index_t acc_pack_number          = 1;
+    static constexpr index_t num_thread_per_subgroups = n_per_wmma;
+
+    // Wave mode dependent propety
+    static constexpr index_t wave_size = Number<WaveSize>{};
+    // static constexpr index_t num_src_a_vgprs_per_wave = m_per_wmma * src_a_data_size / 4;
+    // static constexpr index_t num_src_b_vgprs_per_wave = n_per_wmma * src_b_data_size / 4;
+    static constexpr index_t num_acc_vgprs_per_wave = m_per_wmma * n_per_wmma / wave_size;
+    static constexpr index_t num_subgroups          = wave_size / num_thread_per_subgroups;
+
+    template <index_t MPerWmma, index_t NPerWmma, class FloatA, class FloatB, class FloatC>
+    __device__ void run(const FloatA& a, const FloatB& b, FloatC& reg_c) const
+    {
+        static_assert(wave_size == 32, "only support wave32 for gfx13 wmma");
+        if constexpr(wave_size == 32)
+        {
+            intrin_wmma_f32_16x16x16_bf16_w32<MPerWmma, NPerWmma>::Run(a, b, reg_c, 1);
+        }
+    }
+};
+
+template <index_t WaveSize>
+struct wmma_type<WmmaInstr::wmma_f16_16x16x16_f16_gfx13,
+                 WaveSize,
+                 typename std::enable_if_t<WaveSize == 32>>
+{
+    // Absolute fixing property
+    // * Data Pixel
+    static constexpr index_t m_per_wmma = 16;
+    static constexpr index_t n_per_wmma = 16;
+    static constexpr index_t k_per_wmma = 16;
+    // static constexpr index_t src_a_data_size = 2;
+    // static constexpr index_t src_b_data_size = 2;
+    // static constexpr index_t acc_data_size   = 4;
+    // * Thread mapping inside wave, num_thread_per_subgroups always alone N direction
+    static constexpr index_t acc_data_size            = 2;
+    static constexpr index_t acc_pack_number          = 1;
+    static constexpr index_t num_thread_per_subgroups = n_per_wmma;
+
+    // Wave mode dependent propety
+    static constexpr index_t wave_size = Number<WaveSize>{};
+    // * Fixed in Navi3x, Will be wave mode dependent on Navi4x
+    // static constexpr index_t num_src_a_vgprs_per_wave = k_per_wmma / 2 * src_a_data_size / 4;
+    // static constexpr index_t num_src_b_vgprs_per_wave = k_per_wmma / 2 * src_b_data_size / 4;
+    // * num_acc_vgprs_per_wave alone M direction
+    // * num_subgroups alone M direction
+    static constexpr index_t num_acc_vgprs_per_wave = m_per_wmma * n_per_wmma / wave_size / acc_data_size;
+    static constexpr index_t num_subgroups          = wave_size / num_thread_per_subgroups;
+
+    template <index_t MPerWmma, index_t NPerWmma, class FloatA, class FloatB, class FloatC>
+    __device__ void run(const FloatA& a, const FloatB& b, FloatC& reg_c) const
+    {
+        static_assert(wave_size == 32, "only support wave32 for gfx13 wmma");
+        if constexpr(wave_size == 32)
+        {
+            intrin_wmma_f16_16x16x16_f16_w32<MPerWmma, NPerWmma, 0>::Run(a, b, reg_c, 1);
+        }
+    }
+};
+
+template <index_t WaveSize>
+struct wmma_type<WmmaInstr::wmma_bf16_16x16x16_bf16_gfx13,
+                 WaveSize,
+                 typename std::enable_if_t<WaveSize == 32>>
+{
+    // Absolute fixing property
+    static constexpr index_t m_per_wmma = 16;
+    static constexpr index_t n_per_wmma = 16;
+    static constexpr index_t k_per_wmma = 16;
+    // static constexpr index_t src_a_data_size          = 2;
+    // static constexpr index_t src_b_data_size          = 2;
+    static constexpr index_t acc_data_size            = 4;
+    static constexpr index_t acc_pack_number          = 1;
+    static constexpr index_t num_thread_per_subgroups = n_per_wmma;
+
+    // Wave mode dependent propety
+    static constexpr index_t wave_size = Number<WaveSize>{};
+    // static constexpr index_t num_src_a_vgprs_per_wave = m_per_wmma * src_a_data_size / 4;
+    // static constexpr index_t num_src_b_vgprs_per_wave = n_per_wmma * src_b_data_size / 4;
+    static constexpr index_t num_acc_vgprs_per_wave = m_per_wmma * n_per_wmma / wave_size;
+    static constexpr index_t num_subgroups          = wave_size / num_thread_per_subgroups;
+
+    template <index_t MPerWmma, index_t NPerWmma, class FloatA, class FloatB, class FloatC>
+    __device__ void run(const FloatA& a, const FloatB& b, FloatC& reg_c) const
+    {
+        static_assert(wave_size == 32, "only support wave32 for gfx13 wmma");
+        if constexpr(wave_size == 32)
+        {
+            intrin_wmma_bf16_16x16x16_bf16_w32<MPerWmma, NPerWmma, 0>::Run(a, b, reg_c, 1);
+        }
+    }
+};
+
+template <index_t WaveSize>
+struct wmma_type<WmmaInstr::wmma_i32_16x16x16_iu8_gfx13,
+                 WaveSize,
+                 typename std::enable_if_t<WaveSize == 32>>
+{
+    // Absolute fixing property
+    static constexpr index_t m_per_wmma = 16;
+    static constexpr index_t n_per_wmma = 16;
+    static constexpr index_t k_per_wmma = 16;
+    // static constexpr index_t src_a_data_size          = 2;
+    // static constexpr index_t src_b_data_size          = 2;
+    static constexpr index_t acc_data_size            = 4;
+    static constexpr index_t acc_pack_number          = 1;
+    static constexpr index_t num_thread_per_subgroups = n_per_wmma;
+
+    // Wave mode dependent propety
+    static constexpr index_t wave_size = Number<WaveSize>{};
+    // static constexpr index_t num_src_a_vgprs_per_wave = m_per_wmma * src_a_data_size / 4;
+    // static constexpr index_t num_src_b_vgprs_per_wave = n_per_wmma * src_b_data_size / 4;
+    static constexpr index_t num_acc_vgprs_per_wave = m_per_wmma * n_per_wmma / wave_size;
+    static constexpr index_t num_subgroups          = wave_size / num_thread_per_subgroups;
+    // * num_consecutive_vgprs means how many vgprs in consecutive
+    static constexpr index_t num_acc_per_thread     =  m_per_wmma * n_per_wmma / wave_size;
+    static constexpr index_t num_consecutive_acc    =  2;
+    static constexpr index_t loop_of_consecutive    =  num_acc_per_thread / num_consecutive_acc;
+    template <index_t MPerWmma,
+              index_t NPerWmma,
+              class FloatA,
+              class FloatB,
+              class FloatC,
+              bool neg_a = false,
+              bool neg_b = false,
+              bool clamp = false>
+    __device__ void run(const FloatA& a, const FloatB& b, FloatC& reg_c) const
+    {
+        static_assert(wave_size == 32, "only support wave32 for gfx13 wmma");
+        if constexpr(wave_size == 32)
+        {
+            intrin_wmma_i32_16x16x16_iu8_w32<MPerWmma, NPerWmma, neg_a, neg_b, clamp>::Run(
+                a, b, reg_c, 1);
+        }
+    }
+};
+
 template <typename src_type_a,
           typename src_type_b,
           typename dst_type,
@@ -564,6 +761,78 @@ template <typename src_type_a,
           typename dst_type,
           index_t MPerWmma,
           index_t NPerWmma,
+          index_t KPerWmma>
+struct WmmaSelector_Gfx13
+{
+    template <typename src_type_a_,
+              typename src_type_b_,
+              typename dst_type_,
+              index_t MPerWmma_,
+              index_t NPerWmma_,
+              index_t KPerWmma_>
+    static constexpr auto GetWmma();
+
+    template <>
+    static constexpr auto GetWmma<half_t, half_t, float, 16, 16, 16>()
+    {
+        return WmmaInstr::wmma_f32_16x16x16_f16_gfx13;
+    }
+
+    template <>
+    static constexpr auto GetWmma<bhalf_t, bhalf_t, float, 16, 16, 16>()
+    {
+        return WmmaInstr::wmma_f32_16x16x16_bf16_gfx13;
+    }
+
+    template <>
+    static constexpr auto GetWmma<half_t, half_t, half_t, 16, 16, 16>()
+    {
+        return WmmaInstr::wmma_f16_16x16x16_f16_gfx13;
+    }
+
+    template <>
+    static constexpr auto GetWmma<bhalf_t, bhalf_t, bhalf_t, 16, 16, 16>()
+    {
+        return WmmaInstr::wmma_bf16_16x16x16_bf16_gfx13;
+    }
+
+    template <>
+    static constexpr auto GetWmma<int8_t, int8_t, int, 16, 16, 16>()
+    {
+        return WmmaInstr::wmma_i32_16x16x16_iu8_gfx13;
+    }
+
+#ifdef CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
+    template <>
+    static constexpr auto GetWmma<int4_t, int4_t, int, 16, 16>()
+    {
+        return WmmaInstr::wmma_i32_16x16x16_iu4;
+    }
+#endif
+    // get_warp_size do not return the correct wavesize, hardcode to 32 as workaround
+    static constexpr auto selected_wmma =
+        wmma_type<GetWmma<src_type_a, src_type_b, dst_type, MPerWmma, NPerWmma, KPerWmma>(), Number<32>{}>{};
+
+    __host__ __device__ constexpr WmmaSelector_Gfx13()
+    {
+        static_assert(selected_wmma.m_per_wmma == 16, "WRONG! WMMA_M must equal to 16");
+
+        static_assert(selected_wmma.n_per_wmma == 16, "WRONG! WMMA_N must equal to 16");
+
+        static_assert((selected_wmma.k_per_wmma % 16) == 0, "WRONG! WMMA_K in Gfx13 must mod(16) = 0");
+
+        static_assert(selected_wmma.wave_size * selected_wmma.num_acc_vgprs_per_wave *
+                              selected_wmma.acc_data_size * selected_wmma.acc_pack_number ==
+                          selected_wmma.m_per_wmma * selected_wmma.n_per_wmma * 4,
+                      "WRONG! Invalid Number of Accumulator Register");
+    }
+};
+
+template <typename src_type_a,
+          typename src_type_b,
+          typename dst_type,
+          index_t MPerWmma,
+          index_t NPerWmma,
           index_t KPack,
           bool TransposeC      = false,
           bool AssemblyBackend = false>
@@ -604,7 +873,35 @@ struct WmmaGemm
             c_desc_mblockxrepeat_mwave_mperwmma_nblockxrepeat_nwave_nperwmma.GetLength(I1);
         const auto NWave =
             c_desc_mblockxrepeat_mwave_mperwmma_nblockxrepeat_nwave_nperwmma.GetLength(I4);
-
+#if defined(__gfx13__)
+        // for gfx13 the layout for MPerWMMA is divided to 3 components because of layout change.
+        // the 3 components are: consecutive accumulators-> how many consecutive accumulators ->
+        // number of subgroups; because in C's layout there have some stride between one subgroup's
+        // consecutive accumulators.
+        return transform_tensor_descriptor(
+            c_desc_mblockxrepeat_mwave_mperwmma_nblockxrepeat_nwave_nperwmma,
+            make_tuple(
+                make_pass_through_transform(MBlockxRepeat),
+                make_pass_through_transform(MWave),
+                make_unmerge_transform(make_tuple(Number<wmma_instr.num_subgroups>{},
+                                                  Number<wmma_instr.loop_of_consecutive>{},
+                                                  Number<wmma_instr.num_consecutive_acc>{})),
+                make_pass_through_transform(NBlockxRepeat),
+                make_pass_through_transform(NWave),
+                make_pass_through_transform(Number<wmma_instr.num_thread_per_subgroups>{})),
+            make_tuple(Sequence<0>{},
+                       Sequence<1>{},
+                       Sequence<2>{},
+                       Sequence<3>{},
+                       Sequence<4>{},
+                       Sequence<5>{}),
+            make_tuple(Sequence<0>{},
+                       Sequence<1>{},
+                       Sequence<2, 6, 7>{},
+                       Sequence<3>{},
+                       Sequence<4>{},
+                       Sequence<5>{}));
+#else
         return transform_tensor_descriptor(
             c_desc_mblockxrepeat_mwave_mperwmma_nblockxrepeat_nwave_nperwmma,
             make_tuple(
@@ -627,6 +924,7 @@ struct WmmaGemm
                        Sequence<3>{},
                        Sequence<4>{},
                        Sequence<5>{}));
+#endif
     }
 
     // Transposed WMMA Output C' = B' * A'
@@ -713,10 +1011,16 @@ struct WmmaGemm
 
     __device__ static auto GetSubGroupId()
     {
+#if (defined(__gfx13__))
+        // subgroup in gfx13. each row needs 2 threads to load and the layout between these two threads
+        // will use this function to get
+        return GetLaneId() & 1;
+#else
         static_assert(wmma_instr.num_thread_per_subgroups * wmma_instr.num_subgroups ==
                           wmma_instr.wave_size,
                       "");
         return (GetLaneId() / wmma_instr.num_thread_per_subgroups) % wmma_instr.num_subgroups;
+#endif
     }
 
     __device__ static auto GetLaneIdUnderSubGroup()
@@ -730,8 +1034,12 @@ struct WmmaGemm
 
     __host__ __device__ static auto CalculateAThreadOriginDataIndex()
     {
-#if (defined(__gfx12__) || defined(__gfx13__))
+#if (defined(__gfx12__))
         return GetLaneIdUnderSubGroup();
+#elif (defined(__gfx13__))
+        // the M dimension in gfx13; where each row needs to 2 threads to load
+        // this function is used to map lane id to row id
+        return GetLaneId() >> 1;
 #else
         return TransposeC ? GetLaneIdUnderSubGroup() : GetSwizzledLaneIdLow();
 #endif
@@ -739,8 +1047,12 @@ struct WmmaGemm
 
     __host__ __device__ static auto CalculateBThreadOriginDataIndex()
     {
-#if (defined(__gfx12__) || defined(__gfx13__))
+#if (defined(__gfx12__))
         return GetLaneIdUnderSubGroup();
+#elif (defined(__gfx13__))
+        // the N dimension in gfx13; where each row needs to 2 threads to load
+        // this function is used to map lane id to row id
+        return GetLaneId() >> 1;
 #else
         return TransposeC ? GetSwizzledLaneIdLow() : GetLaneIdUnderSubGroup();
 #endif
@@ -748,9 +1060,15 @@ struct WmmaGemm
 
     __device__ static CIndex GetBeginOfThreadBlk()
     {
+#if (defined(__gfx13__))
+        // the M, N offset in C matrix in gfx13; one column in gfx13 needs 2 threads to load
+        // in row dimension needs 16 threads to load. details check gfx13 shader programming guide
+        index_t n_offset = GetLaneId() / wmma_instr.num_subgroups;
+        index_t m_offset = (GetLaneId() % wmma_instr.num_subgroups) * wmma_instr.num_consecutive_acc;
+#else
         index_t n_offset = GetLaneIdUnderSubGroup();
         index_t m_offset = GetSubGroupId() * wmma_instr.num_acc_vgprs_per_wave;
-
+#endif
         return TransposeC ? CIndex{n_offset, m_offset} : CIndex{m_offset, n_offset};
     }
 
@@ -761,18 +1079,31 @@ struct WmmaGemm
 
         return TransposeC ? CIndex3D{n_offset, m_offset, I0} : CIndex3D{m_offset, n_offset, I0};
     }
-
+#if defined(__gfx13__)
+    // need to add one parameter K for gfx13
+    static constexpr auto wmma =
+        WmmaSelector_Gfx13<src_type_a, src_type_b, dst_type, MPerWmma, NPerWmma, KPack>{};
+#else
     static constexpr auto wmma =
         WmmaSelector<src_type_a, src_type_b, dst_type, MPerWmma, NPerWmma>{};
+#endif
     static constexpr auto wmma_instr = wmma.selected_wmma;
 
     __host__ __device__ static constexpr auto
     GetCMSubGroupNThreadPerSubGroupMAccVgprsThreadBlkLengths()
     {
+#if defined(__gfx13__)
+        // Loop | Concecutive | AccStride
+        return make_tuple(I1,
+                          Number<wmma_instr.loop_of_consecutive>{},
+                          Number<wmma_instr.num_consecutive_acc>{},
+                          Number<wmma_instr.acc_pack_number>{});
+#else
         return make_tuple(I1,
                           I1,
                           Number<wmma_instr.num_acc_vgprs_per_wave>{},
                           Number<wmma_instr.acc_pack_number>{});
+#endif   
     }
 };
 

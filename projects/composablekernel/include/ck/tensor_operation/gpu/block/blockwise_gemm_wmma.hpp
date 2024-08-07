@@ -13,7 +13,7 @@
 
 namespace ck {
 
-#if  defined(__gfx12__) || defined(__gfx13__)
+#if defined(__gfx12__) || defined(__gfx13__)
 template <index_t BlockSize,
           typename FloatA,
           typename FloatB,
@@ -109,8 +109,8 @@ struct BlockwiseGemmWMMA
             const auto waveId_m   = wave_idx[I0];
             const auto WMMA_a_idx = wmma_gemm.CalculateAThreadOriginDataIndex();
 
-            //  |KRepeat   |MRepeat|MWave    |KRow  |MLane  |KPack
-            return make_tuple(0, 0, waveId_m, wmma_gemm.GetSubGroupId(), WMMA_a_idx, 0);
+            //               |KRepeat   |MRepeat|MWave    |KRow                       |MLane     |KPack
+            return make_tuple(0,         0,      waveId_m, wmma_gemm.GetSubGroupId(), WMMA_a_idx, 0);
         }
         else
         {
@@ -209,9 +209,30 @@ struct BlockwiseGemmWMMA
     }
 
     // Thread level, register decriptor. Vector-write
+
     __host__ __device__ static constexpr auto
     GetCThreadDescriptor_MRepeat_MWave_MSubGroup_NRepeat_NWave_NThreadPerSubGroup_MAccVgprs()
     {
+#if defined(__gfx13__)
+        constexpr auto c_msubgroup_nthreadpersubgroup_maccvgprs_tblk_lens =
+            wmma_gemm.GetCMSubGroupNThreadPerSubGroupMAccVgprsThreadBlkLengths();
+        constexpr auto MLoopAcc  = c_msubgroup_nthreadpersubgroup_maccvgprs_tblk_lens[I1];
+        constexpr auto MAccVgprs = c_msubgroup_nthreadpersubgroup_maccvgprs_tblk_lens[I2];
+        constexpr auto AccStride = c_msubgroup_nthreadpersubgroup_maccvgprs_tblk_lens[I3];
+        return make_naive_tensor_descriptor(
+        // |  MRepeat  |  MWave  |  MLoopAcc  | MSubGroup  |  NRepeat  | 
+        // |  NWave  |  NThreadPerSubGroup  |  MLoopAcc  |
+
+            make_tuple(Number<MRepeat>{}, I1, MLoopAcc, I1, Number<NRepeat>{}, I1, I1, MAccVgprs),
+            make_tuple(Number<NRepeat>{} * MLoopAcc * MAccVgprs * AccStride,
+                       Number<NRepeat>{} * MLoopAcc * MAccVgprs * AccStride,
+                       MAccVgprs * AccStride,
+                       Number<NRepeat>{} * MLoopAcc * MAccVgprs * AccStride,
+                       MLoopAcc * MAccVgprs * AccStride,
+                       MLoopAcc * MAccVgprs * AccStride,
+                       MLoopAcc * MAccVgprs * AccStride,
+                       AccStride));
+#else
         constexpr auto c_msubgroup_nthreadpersubgroup_maccvgprs_tblk_lens =
             wmma_gemm.GetCMSubGroupNThreadPerSubGroupMAccVgprsThreadBlkLengths();
 
@@ -228,6 +249,7 @@ struct BlockwiseGemmWMMA
                        MAccVgprs * AccStride,
                        MAccVgprs * AccStride,
                        AccStride));
+#endif
     }
 
     template <typename CGridDesc_M_N>
@@ -605,8 +627,8 @@ struct BlockwiseGemmWMMA
             const auto waveId_m   = wave_idx[I0];
             const auto WMMA_a_idx = wmma_gemm.CalculateAThreadOriginDataIndex();
 
-            //  |KRepeat   |MRepeat|MWave    |KRow  |MLane  |KPack
-            return make_tuple(0, 0, waveId_m, 0, WMMA_a_idx, 0);
+            //                |KRepeat  |MRepeat |MWave    |KRow  |MLane      |KPack
+            return make_tuple(0,        0,        waveId_m, 0,     WMMA_a_idx, 0);
         }
         else
         {
