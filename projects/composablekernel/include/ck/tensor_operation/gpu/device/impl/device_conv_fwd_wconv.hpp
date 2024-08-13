@@ -53,13 +53,16 @@ template <index_t NDimSpatial,
           typename InBlockTransferThreadClusterLengths,
           index_t InBlockTransferSrcScalarPerVector,
           index_t InBlockTransferDstScalarPerVector,
+          bool InEnableLds,
           bool InBlockLdsAddExtraM,
           typename WeiBlockTransferThreadClusterLengths,
           index_t WeiBlockTransferSrcScalarPerVector,
           index_t WeiBlockTransferDstScalarPerVector,
+          bool WeiEnableLds,
           bool WeiBlockLdsAddExtraM,
           typename AccBlockTransferClusterLengths,
           index_t AccBlockTransferScalarPerVector,
+          bool AccEnableLds,
           ck::LoopScheduler LoopSched     = make_default_loop_scheduler(),
           ck::PipelineVersion PipelineVer = ck::PipelineVersion::v1
           >
@@ -83,9 +86,6 @@ struct DeviceConvWconv : public DeviceConvFwd<NDimSpatial,
     static constexpr auto I4 = Number<4>{};
     static constexpr auto I5 = Number<5>{};
     static constexpr auto I6 = Number<6>{};
-
-    static constexpr auto InEnableLds = true;
-    static constexpr auto WeiEnableLds = true;
 
     // Describe how data read from Global memory
     template <typename InLayout>
@@ -162,7 +162,6 @@ struct DeviceConvWconv : public DeviceConvFwd<NDimSpatial,
         const auto in_data_desc = PadTensorDescriptor(in_data_raw_desc,
                                                       make_tuple(HPerBlock, WPerBlock, CPerBlock),
                                                       Sequence<true, true, true>{});
-        static_assert(InEnableLds, "");
         return in_data_desc;
     }
 
@@ -193,7 +192,6 @@ struct DeviceConvWconv : public DeviceConvFwd<NDimSpatial,
         const auto wei_data_desc     = PadTensorDescriptor(wei_data_raw_desc,
                                                        make_tuple(KPerBlock, 1, CPerBlock),
                                                        Sequence<true, false, true>{});
-        static_assert(WeiEnableLds, "");
         return wei_data_desc;
     }
 
@@ -273,6 +271,7 @@ struct DeviceConvWconv : public DeviceConvFwd<NDimSpatial,
                                             WeiBlockLdsAddExtraM,
                                             AccBlockTransferClusterLengths,
                                             AccBlockTransferScalarPerVector,
+                                            AccEnableLds,
                                             NumPrefetch,
                                             LoopSched,
                                             PipelineVer>;
@@ -314,7 +313,6 @@ struct DeviceConvWconv : public DeviceConvFwd<NDimSpatial,
                                                                      input_right_pads)},
               wei_grid_desc_{DeviceOp::MakeWeiGridDescriptor<WeiLayout>(b_g_k_c_xs_lengths,
                                                                         b_g_k_c_xs_strides)},
-              acc_grid_desc_block_{},
               block_2_etile_map_{
                   GridwiseConv::MakeDefaultBlock2CTileMap(acc_grid_desc_, 1, 1)},
               compute_ptr_offset_of_batch_{},
@@ -336,9 +334,6 @@ struct DeviceConvWconv : public DeviceConvFwd<NDimSpatial,
             compute_ptr_offset_of_batch_.BatchStrideA_ = a_g_n_c_wis_strides[0];
             compute_ptr_offset_of_batch_.BatchStrideB_ = b_g_k_c_xs_strides[0];
             compute_ptr_offset_of_batch_.BatchStrideE_ = e_g_n_k_wos_strides[0];
-
-            // populate desc for E
-            acc_grid_desc_block_ = GridwiseConv::MakeAccGridDescriptor_Block(acc_grid_desc_);
         }
 
         void Print() const
@@ -361,8 +356,6 @@ struct DeviceConvWconv : public DeviceConvFwd<NDimSpatial,
         // tensor descriptors for block/thread-wise copy
         InGridDesc in_grid_desc_;
         WeiGridDesc wei_grid_desc_;
-        typename GridwiseConv::AccGridDescriptor_Block
-            acc_grid_desc_block_;
 
         // block-to-e-tile map
         typename GridwiseConv::DefaultBlock2CTileMap block_2_etile_map_;
@@ -416,7 +409,7 @@ struct DeviceConvWconv : public DeviceConvFwd<NDimSpatial,
                     AccElementwiseOperation,
                     DeviceOp::InGridDesc,
                     DeviceOp::WeiGridDesc,
-                    typename GridwiseConv::AccGridDescriptor_Block,
+                    DeviceOp::AccGridDesc,
                     remove_reference_t<typename GridwiseConv::DefaultBlock2CTileMap>,
                     ComputePtrOffsetOfStridedBatch<I1, I1, I1>,
                     has_main_loop>;
@@ -435,10 +428,11 @@ struct DeviceConvWconv : public DeviceConvFwd<NDimSpatial,
                                               arg.a_g_n_c_wis_lengths_[0], // Group count
                                               arg.in_grid_desc_,
                                               arg.wei_grid_desc_,
-                                              arg.acc_grid_desc_block_,
+                                              arg.acc_grid_desc_,
                                               arg.block_2_etile_map_,
                                               arg.compute_ptr_offset_of_batch_);
             };
+
             const auto C = arg.in_grid_desc_.GetLength(I2);
 
             if(GridwiseConv::CalculateHasMainBlockLoop(C))
@@ -523,7 +517,6 @@ struct DeviceConvWconv : public DeviceConvFwd<NDimSpatial,
         {
             return false;
         }
-
 
         // check vector access of InData
         // FIXME: layout
@@ -693,7 +686,6 @@ struct DeviceConvWconv : public DeviceConvFwd<NDimSpatial,
     {
         return std::make_unique<BaseArgument>();
     }
-
 
     // polymorphic
     std::unique_ptr<BaseInvoker> MakeInvokerPointer() override

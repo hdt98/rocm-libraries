@@ -9,6 +9,7 @@
 #include "ck/tensor_operation/gpu/grid/gridwise_gemm_pipeline_v1.hpp"
 #include "ck/tensor_operation/gpu/grid/gridwise_gemm_pipeline_v2.hpp"
 #include "ck/tensor_operation/gpu/grid/gridwise_gemm_pipeline_v4_direct_load.hpp"
+#include "ck/tensor_operation/gpu/grid/gridwise_conv_pipeline.hpp"
 
 namespace ck {
 
@@ -55,6 +56,16 @@ constexpr auto GridwiseGemmPipeline_Selector()
     {
         std::cerr << "GridwiseGemmPipeline configuration is not available" << std::endl;
     }
+}
+
+template <PipelineVersion PipelineVer,
+          index_t NumPrefetch     = 1,
+          LoopScheduler LoopSched = LoopScheduler::Default,
+          bool InDataEnableLds         = true,
+          bool WeiDataEnableLds         = true>
+constexpr auto GridwiseConvPipeline_Selector()
+{
+    return GridwiseConvPipeline_v1<NumPrefetch, InDataEnableLds, WeiDataEnableLds>{};
 }
 
 } // namespace ck

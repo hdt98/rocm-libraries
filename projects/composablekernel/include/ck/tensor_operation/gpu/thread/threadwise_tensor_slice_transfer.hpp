@@ -1245,7 +1245,7 @@ struct ThreadwiseTensorSliceTransfer_StaticToStatic
                         const SrcBuffer& src_buf,
                         const DstDesc&,
                         const DstSliceOriginIdx&,
-                        DstBuffer& dst_buf)
+                        DstBuffer& dst_buf) const
     {
         static_assert(SrcDesc::IsKnownAtCompileTime() && DstDesc::IsKnownAtCompileTime(),
                       "wrong! Desc need to known at compile-time");

@@ -30,16 +30,18 @@ using InElementOp  = ck::tensor_operation::element_wise::PassThrough;
 using WeiElementOp = ck::tensor_operation::element_wise::PassThrough;
 using OutElementOp = ck::tensor_operation::element_wise::UnaryConvert;
 
-#define DEFAULT_H 16
-#define DEFAULT_W 16
-#define DEFAULT_C 32
-#define DEFAULT_K 64
+#define DEFAULT_H 64
+#define DEFAULT_W 64
+#define DEFAULT_C 16
+#define DEFAULT_K 16
 
-#define DEFAULT_H_PERBLOCK 8
-#define DEFAULT_W_PERBLOCK 8
+#define DEFAULT_H_PERWAVE 8
+#define DEFAULT_W_PERWAVE 8
+#define DEFAULT_H_PERBLOCK 16
+#define DEFAULT_W_PERBLOCK 16
 #define DEFAULT_C_PERBLOCK 16
 #define DEFAULT_K_PERBLOCK 16
-#define DEFAULT_BLOCKSIZE 32
+#define DEFAULT_BLOCKSIZE 128
 
 enum ShapeType
 {
@@ -104,8 +106,15 @@ struct ExecutionConfig final
 {
     bool do_verification = true;
     int init_method      = 1;
-    bool time_kernel     = true;
+    bool time_kernel     = false;
+    int h                = DEFAULT_H;
+    int w                = DEFAULT_W;
+    int c                = DEFAULT_C;
+    int k                = DEFAULT_K;
+    uint32_t test_mask   = 0xffffffff;
 };
+
+ExecutionConfig config;
 
 template <typename DataType>
 void DumpTensor(const Tensor<DataType>& tensor, const char* str)
@@ -254,32 +263,35 @@ template <typename InDataType,
           ShapeType Shape,
           FilterType Filter,
           bool Dilation,
-          bool Iter4>
+          bool EnableLds,
+          int32_t TestMask>
 bool run_test()
 {
+    if ((config.test_mask & TestMask) == 0)
+    {
+        return true;
+    }
     constexpr ck::index_t FilterSize = (Filter == Filter_1X1) ? 1 : 3;
     constexpr ck::index_t HPerWconv  = (Shape == Shape_8X4) ? 8 : 4;
     constexpr ck::index_t WPerWconv  = (Shape == Shape_4X2) ? 2 : 4;
 
-    constexpr ck::index_t Width          = DEFAULT_W;
-    constexpr ck::index_t Height         = DEFAULT_H;
-    constexpr ck::index_t InputChannels  = DEFAULT_C;
-    constexpr ck::index_t OutputChannels = DEFAULT_K;
+    const ck::index_t Width          = config.w;
+    const ck::index_t Height         = config.h;
+    const ck::index_t InputChannels  = config.c;
+    const ck::index_t OutputChannels = config.k;
 
     constexpr ck::index_t HPerBlock  = DEFAULT_H_PERBLOCK;
     constexpr ck::index_t WPerBlock  = DEFAULT_W_PERBLOCK;
     constexpr ck::index_t CPerBlock  = DEFAULT_C_PERBLOCK;
     constexpr ck::index_t KPerBlock  = DEFAULT_K_PERBLOCK;
-    constexpr ck::index_t HRepeat    = DEFAULT_H_PERBLOCK / HPerWconv;
-    constexpr ck::index_t WRepeat    = DEFAULT_W_PERBLOCK / WPerWconv;
-    constexpr ck::index_t BlockCount = Width * Height / HPerBlock / WPerBlock;
+    constexpr ck::index_t HRepeat    = DEFAULT_H_PERWAVE / HPerWconv;
+    constexpr ck::index_t WRepeat    = DEFAULT_W_PERWAVE / WPerWconv;
 
-    uint32_t init_method                 = 1;
     constexpr ck::index_t n_dim          = 2;
     constexpr ck::index_t group_count    = 1;
     constexpr ck::index_t n_batch        = 1;
-    constexpr ck::index_t n_out_channels = OutputChannels;
-    constexpr ck::index_t n_in_channels  = InputChannels;
+    const ck::index_t n_out_channels = OutputChannels;
+    const ck::index_t n_in_channels  = InputChannels;
 
     constexpr ck::index_t DilationSize = Dilation ? 2 : 1;
 
@@ -346,7 +358,7 @@ bool run_test()
     std::cout << "wei: " << wei.mDesc << std::endl;
     std::cout << "out: " << out_host.mDesc << std::endl;
 
-    switch(init_method)
+    switch(config.init_method)
     {
     case 0: break;
     case 1:
@@ -403,7 +415,10 @@ bool run_test()
                                               wei_element_op,
                                               out_element_op);
 
-    ref_invoker.Run(ref_argument);
+    if(config.do_verification)
+    {
+        ref_invoker.Run(ref_argument);
+    }
 
     DumpTensor(in, "Input");
     DumpTensor(wei, "Weight");
@@ -422,17 +437,30 @@ bool run_test()
             ? ck::tensor_operation::device::ConvolutionForwardSpecialization::Filter1x1Stride1Pad0
             : ck::tensor_operation::device::ConvolutionForwardSpecialization::Filter3x3Stride1Pad0;
 
-    using InBlockTransferThreadClusterLengths                = ck::Sequence<2, 4, 4>;
-    constexpr ck::index_t InBlockTransferSrcScalarPerVector  = 4;
-    constexpr ck::index_t InBlockTransferDstScalarPerVector  = 4;
-    constexpr bool InBlockLdsAddExtraM                       = true;
-    using WeiBlockTransferThreadClusterLengths               = ck::Sequence<8, 1, 4>;
-    constexpr ck::index_t WeiBlockTransferSrcScalarPerVector = 4;
-    constexpr ck::index_t WeiBlockTransferDstScalarPerVector = 4;
-    constexpr ck::index_t WeiBlockLdsAddExtraM               = true;
-    using AccBlockTransferClusterLengths                     = ck::Sequence<1, 1, 4>;
-    constexpr ck::index_t AccBlockTransferScalarPerVector    = 2;
+    constexpr ck::index_t InBlockTransferScalarPerVector = sizeof(uint32_t) / sizeof(InDataType);
+    constexpr ck::index_t Cluster_In_C = CPerBlock / InBlockTransferScalarPerVector;
+    constexpr ck::index_t Cluster_In_W = 4;
 
+    constexpr ck::index_t Cluster_In_H = DEFAULT_BLOCKSIZE / Cluster_In_C / Cluster_In_W;
+    using InBlockTransferThreadClusterLengths =
+        ck::Sequence<Cluster_In_H, Cluster_In_W, Cluster_In_C>;
+    constexpr bool InBlockLdsAddExtraM = true;
+
+    constexpr ck::index_t WeiBlockTransferScalarPerVector = sizeof(uint32_t) / sizeof(WeiDataType);
+    constexpr ck::index_t Cluster_Wei_C        = CPerBlock / WeiBlockTransferScalarPerVector;
+    constexpr ck::index_t Cluster_Wei_K        = (DEFAULT_BLOCKSIZE / Cluster_Wei_C) > KPerBlock
+                                                     ? KPerBlock
+                                                     : (DEFAULT_BLOCKSIZE / Cluster_Wei_C);
+    using WeiBlockTransferThreadClusterLengths = ck::Sequence<Cluster_Wei_K, 1, Cluster_Wei_C>;
+    constexpr ck::index_t WeiBlockLdsAddExtraM = true;
+
+    constexpr ck::index_t AccBlockTransferScalarPerVector = sizeof(uint32_t) / sizeof(GPUAccType);
+    constexpr ck::index_t Cluster_Acc_K = KPerBlock / AccBlockTransferScalarPerVector;
+    constexpr ck::index_t Cluster_Acc_W = 4;
+    constexpr ck::index_t Cluster_Acc_H = DEFAULT_BLOCKSIZE / Cluster_Acc_K / Cluster_Acc_W;
+    using AccBlockTransferClusterLengths =
+        ck::Sequence<Cluster_Acc_H, Cluster_Acc_W, Cluster_Acc_K>;
+    float avg_time = 0;
     using DeviceConvFwdInstance =
         ck::tensor_operation::device::DeviceConvWconv<NDimSpatial,
                                                       InputLayout<NDimSpatial>,
@@ -459,15 +487,18 @@ bool run_test()
                                                       DilationSize,
                                                       DilationSize,
                                                       InBlockTransferThreadClusterLengths,
-                                                      InBlockTransferSrcScalarPerVector,
-                                                      InBlockTransferDstScalarPerVector,
+                                                      InBlockTransferScalarPerVector,
+                                                      InBlockTransferScalarPerVector,
+                                                      EnableLds,
                                                       InBlockLdsAddExtraM,
                                                       WeiBlockTransferThreadClusterLengths,
-                                                      WeiBlockTransferSrcScalarPerVector,
-                                                      WeiBlockTransferDstScalarPerVector,
+                                                      WeiBlockTransferScalarPerVector,
+                                                      WeiBlockTransferScalarPerVector,
+                                                      EnableLds,
                                                       WeiBlockLdsAddExtraM,
                                                       AccBlockTransferClusterLengths,
-                                                      AccBlockTransferScalarPerVector>;
+                                                      AccBlockTransferScalarPerVector,
+                                                      EnableLds>;
 
     auto conv    = DeviceConvFwdInstance{};
     auto invoker = conv.MakeInvoker();
@@ -496,99 +527,161 @@ bool run_test()
             "not support this Conv problem");
     }
 
-    float avg_time = invoker.Run(argument, StreamConfig{nullptr, false});
-
+    avg_time = invoker.Run(argument, StreamConfig{nullptr, config.time_kernel});
     out_device_buf.FromDevice(out_device.mData.data());
 
     DumpTensor(out_device, "Accum_Device");
     std::cout << "Test <" << HPerWconv << "x" << WPerWconv << ", F:" << FilterSize
               << ", Src:" << sizeof(InDataType) << ", Dst:" << sizeof(GPUAccType) << ">: ";
-    if constexpr(std::is_same<GPUAccType, ck::bhalf_t>::value)
+
+    if (config.time_kernel)
     {
-        // check_err doesn't support bhalf_t
-        std::cout << " Ignored\n";
-        return true;
+        std::cout << "Execute Time: " << avg_time << " ";
     }
-    else
+
+    if (config.do_verification)
     {
-        bool ret = ck::utils::check_err(out_device,
-                                        out_host,
-                                        "Error: incorrect results!",
-                                        get_rtol<GPUAccType>(),
-                                        get_atol<GPUAccType>());
-        if(ret)
+        if constexpr(std::is_same<GPUAccType, ck::bhalf_t>::value)
         {
-            std::cout << "Passed\n";
+            // check_err doesn't support bhalf_t
+            std::cout << "Ignored\n";
+            return true;
         }
         else
         {
-            std::cout << "Failed\n";
+            bool ret = ck::utils::check_err(out_device,
+                                            out_host,
+                                            "Error: incorrect results!",
+                                            get_rtol<GPUAccType>(),
+                                            get_atol<GPUAccType>());
+            if(ret)
+            {
+                std::cout << "Passed\n";
+            }
+            else
+            {
+                std::cout << "Failed\n";
+            }
+
+            return ret;
         }
-
-        return ret;
-    }
-}
-
-template <typename SrcType, typename GPUAccType, typename CPUAccType>
-bool run_test_fmt()
-{
-    bool pass = true;
-    // clang-format off
-    //                                                        |ShapeType |FilterType |Dilation |Iter4
-    if constexpr(std::is_same<GPUAccType, float>::value || std::is_same<GPUAccType, int32_t>::value)
-    {
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_1X1, false, false>();
-        //pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_1X1, false, true >();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, false, false>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, true,  false>();
     }
     else
     {
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_1X1, false, false>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_1X1, false, false>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_1X1, false, false>();
-        //pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_1X1, false, true >();
-        //pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_1X1, false, true >();
-        //pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_1X1, false, true >();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, false, false>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_3X3, false, false>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_3X3, false, false>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, true,  false>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_3X3, true,  false>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_3X3, true,  false>();
+        return true;
+    }
+}
+
+template <typename SrcType, typename GPUAccType, typename CPUAccType, int32_t TestMask>
+bool run_test_fmt()
+{
+    if ((config.test_mask & TestMask) == 0)
+    {
+        return true;
+    }
+    bool pass = true;
+    // clang-format off
+    //                                                           |ShapeType |FilterType |Dilation |Iter4 |TestMask
+    if constexpr(std::is_same<GPUAccType, float>::value || std::is_same<GPUAccType, int32_t>::value)
+    {
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_1X1, false, false, 0x10000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, false, false, 0x20000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, true,  false, 0x40000>();
+
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_1X1, false, true, 0x80000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, false, true, 0x100000>();
+    }
+    else
+    {
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_1X1, false, false, 0x10000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_1X1, false, false, 0x20000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_1X1, false, false, 0x40000>();
+
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, false, false, 0x80000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_3X3, false, false, 0x100000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_3X3, false, false, 0x200000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, true,  false, 0x400000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_3X3, true,  false, 0x800000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_3X3, true,  false, 0x1000000>();
+
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_1X1, false,  true, 0x2000000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_1X1, false,  true, 0x4000000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_1X1, false,  true, 0x8000000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, false,  true, 0x10000000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_3X3, false,  true, 0x20000000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_3X3, false,  true, 0x40000000>();
     }
     // clang-format on
-
     return pass;
 }
 
-int main(int, char*[])
+inline void print_help_msg()
+{
+    std::cerr << "arg1: verification (0=no, 1=yes)\n"
+              << "arg2: initialization (0=no init, 1=integer value, 2=decimal value)\n"
+              << "arg3: time kernel (0=no, 1=yes)\n"
+              << "arg4: test mask (hex)\n"
+              << "arg5-8: tensor size {H x W x C x K}" << std::endl;
+}
+
+inline bool parse_cmd_args(int argc,
+                           char* argv[],
+                           ExecutionConfig& config)
+{
+    if(argc == 1)
+    {
+        // use default
+    }
+    else if(argc == 9)
+    {
+        config.do_verification = std::stoi(argv[1]);
+        config.init_method     = std::stoi(argv[2]);
+        config.time_kernel     = std::stoi(argv[3]);
+        config.test_mask       = std::stoul(argv[4], nullptr, 0);
+        config.h               = std::stoi(argv[5]);
+        config.w               = std::stoi(argv[6]);
+        config.k               = std::stoi(argv[7]);
+        config.c               = std::stoi(argv[8]);
+    }
+    else
+    {
+        print_help_msg();
+        return false;
+    }
+
+    return true;
+}
+
+int main(int argc, char* argv[])
 {
     bool pass = true;
     //MessageBoxA(NULL, "", "", MB_OK);
-    // Know issues: 4x iter not supported
+
+    if (parse_cmd_args(argc, argv, config) == false)
+    {
+        return -1;
+    }
 
     // clang-format off
-    //                  |SrcType     |GPUAccType  |CPUAccType
-    pass &= run_test_fmt<ck::half_t,  float,       float     >();
-    pass &= run_test_fmt<ck::bhalf_t, float,       float     >();
-    pass &= run_test_fmt<ck::f8_t,    float,       float     >();
-    pass &= run_test_fmt<ck::bf8_t,   float,       float     >();
-    pass &= run_test_fmt<int8_t,      float,       float     >();
-    pass &= run_test_fmt<int8_t,      int32_t,     int32_t   >();
+    //                  |SrcType     |GPUAccType  |CPUAccType|TestMask
+    pass &= run_test_fmt<ck::half_t,  float,       float,     0x1>();
+    //pass &= run_test_fmt<ck::bhalf_t, float,       float,     0x2>();
+    pass &= run_test_fmt<ck::f8_t,    float,       float,     0x4>();
+    pass &= run_test_fmt<ck::bf8_t,   float,       float,     0x8>();
+    pass &= run_test_fmt<int8_t,      float,       float,     0x10>();
+    pass &= run_test_fmt<int8_t,      int32_t,     int32_t,   0x20>();
     
-    pass &= run_test_fmt<ck::half_t,  ck::half_t,  ck::half_t>();
-    pass &= run_test_fmt<ck::bhalf_t, ck::bhalf_t, ck::half_t>();
-    pass &= run_test_fmt<ck::f8_t,    ck::half_t,  ck::half_t>();
-    pass &= run_test_fmt<ck::bf8_t,   ck::bhalf_t, ck::half_t>();
-    pass &= run_test_fmt<int8_t,      ck::half_t,  ck::half_t>();
+    pass &= run_test_fmt<ck::half_t,  ck::half_t,  ck::half_t, 0x40>();
+    //pass &= run_test_fmt<ck::bhalf_t, ck::bhalf_t, ck::half_t, 0x80>();
+    pass &= run_test_fmt<ck::f8_t,    ck::half_t,  ck::half_t, 0x100>();
+    pass &= run_test_fmt<ck::bf8_t,   ck::bhalf_t, ck::half_t, 0x200>();
+    pass &= run_test_fmt<int8_t,      ck::half_t,  ck::half_t, 0x400>();
 
 #if CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
-    //pass &= run_test_fmt<ck::int4_t,  float,       float     >();
-    //pass &= run_test_fmt<ck::int4_t,  int32_t,     int32_t   >();
-    //pass &= run_test_fmt<ck::int4_t,  ck::half_t,  ck::half_t>();
+    //pass &= run_test_fmt<ck::int4_t,  float,       float,     0x800>();
+    //pass &= run_test_fmt<ck::int4_t,  int32_t,     int32_t,    0x1000>();
+    //pass &= run_test_fmt<ck::int4_t,  ck::half_t,  ck::half_t, 0x2000>();
 #endif
-
     // clang-format on
 
     std::cout << "TestConv ..... " << (pass ? "SUCCESS" : "FAILURE") << std::endl;

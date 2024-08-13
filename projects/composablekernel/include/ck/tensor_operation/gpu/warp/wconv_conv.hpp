@@ -679,6 +679,7 @@ template <typename WeiDataType,
 struct WconvConv
 {
     static constexpr index_t WaveSize = 32;
+    static constexpr index_t ACO      = 0; // TODO: support ACO
 
     __host__ __device__ constexpr WconvConv(){};
 
@@ -754,6 +755,49 @@ struct WconvConv
     static constexpr index_t GetNumWeightTapePerWave()
     {
         return (HPerWconv == 8) && (WPerWconv == 4) ? 2 : 1;
+    }
+
+    __host__ __device__ static constexpr auto GetWeight3RemapTable()
+    {
+        return Sequence<2, 1, 8, 3, 0, 7, 4, 5, 6>{};
+    }
+
+    __host__ __device__ static constexpr auto GetWeightRemapTable()
+    {
+        if constexpr(FilterSize == 1)
+        {
+            return Sequence<0>{};
+        }
+        else
+        {
+            if constexpr(GetNumWeightTape() == 9)
+            {
+                return GetWeight3RemapTable();
+            }
+            else
+            {
+                return Sequence<1, 4, 0, 2, 3>{};
+            }
+        }
+    }
+
+    __host__ __device__ static constexpr auto GetWeightSecondTapeMapTable()
+    {
+        if constexpr(FilterSize == 1)
+        {
+            return Sequence<0>{};
+        }
+        else
+        {
+            if constexpr(GetNumWeightTape() == 9)
+            {
+                return Sequence<0, 0, 0, 0, 0, 0, 0, 0, 0>{};
+            }
+            else
+            {
+                return Sequence<3, 0, -3, 1, -3>{};
+            }
+        }
     }
 
     // WCNN data info
@@ -833,6 +877,29 @@ struct WconvConv
         const index_t PixelOffset        = laneId * NumCompPerTile / GetNumInputChannels();
 
         return make_tuple(PixelOffset / WPerWconv, PixelOffset % WPerWconv, SubC);
+    }
+
+    static constexpr auto CalculateAccThreadOriginDataIndex()
+    {
+        auto laneId = get_thread_local_1d_id() & (WaveSize - 1);
+        const index_t accCompIdx =
+            laneId * GetNumAccumComponents() / GetNumSubTilesPerImageTile();
+        const index_t subW       = (accCompIdx / GetNumOutputChannels()) % WPerWconv;
+        const index_t subH       = (accCompIdx / GetNumOutputChannels()) / WPerWconv;
+        const index_t subK       = accCompIdx % GetNumOutputChannels();
+        // TODO: modify it if ACO = 1
+        constexpr index_t SwizzleComp = 4;
+        const index_t subK_8 = (laneId & 1) *  SwizzleComp;
+
+        static_assert(ACO == 0, "");
+        if constexpr(GetNumAccumComponents() == 4)
+        {
+            return make_tuple(0, subH, subW, 0, subK);
+        }
+        else
+        {
+            return make_tuple(0, subH, subW, 0, subK_8);
+        }
     }
 
     // Pre-defined types

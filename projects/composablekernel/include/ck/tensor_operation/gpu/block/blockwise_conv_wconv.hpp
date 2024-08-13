@@ -15,6 +15,31 @@ struct Debug;
 namespace ck {
 
 template <index_t BlockSize,
+          index_t HPerBlock,
+          index_t WPerBlock,
+          index_t HRepeat,
+          index_t WRepeat,
+          index_t HPerWconv,
+          index_t WPerWconv,
+          index_t WaveSize>
+__device__ static auto GetWconvWaveIdx()
+{
+    using ThisThreadBlock    = ThisThreadBlock<BlockSize>;
+    constexpr index_t HWaves = HPerBlock / (HRepeat * HPerWconv);
+    constexpr index_t WWaves = WPerBlock / (WRepeat * WPerWconv);
+    constexpr index_t KWaves = BlockSize / WaveSize / HWaves / WWaves;
+
+    const index_t thread_id = ThisThreadBlock::GetThreadId();
+
+    constexpr auto threadid_to_wave_idx_adaptor = make_single_stage_tensor_adaptor(
+        make_tuple(make_merge_transform(make_tuple(HWaves, WWaves, KWaves, WaveSize))),
+        make_tuple(Sequence<0, 1, 2, 3>{}),
+        make_tuple(Sequence<0>{}));
+
+    return threadid_to_wave_idx_adaptor.CalculateBottomIndex(make_multi_index(thread_id));
+}
+
+template <index_t BlockSize,
           typename WeiDataType,
           typename InDataType,
           typename AccDataType,
@@ -77,6 +102,7 @@ struct BlockwiseConvWconv
 
     static constexpr index_t KRepeat = KPerBlock / KWaves / KPerWconv;
     static constexpr index_t CRepeat = CPerBlock / CPerWconv;
+    static constexpr index_t ACO     = 0; // TODO: support ACO
 
     static_assert(HPerBlock % (HRepeat * HPerWconv) == 0, "");
     static_assert(WPerBlock % (WRepeat * WPerWconv) == 0, "");
@@ -124,8 +150,7 @@ struct BlockwiseConvWconv
         }
         else
         {
-            // TODO: Not implemented
-            return make_tuple(0, 0, 0, 0, 0, 0);
+            return tensor_operation::element_wise::PassThrough{};
         }
     }
 
@@ -148,68 +173,77 @@ struct BlockwiseConvWconv
         }
         else
         {
-            // TODO: Not implemented
-            return make_tuple(0, 0, 0, 0, 0, 0);
+            // The constructor of ThreadwiseTensorSliceTransfer_StaticToStatic is different with
+            // ThreadwiseTensorSliceTransfer_v4, it only needs an element operation.
+            return tensor_operation::element_wise::PassThrough{};
         }
     }
 
-    template <index_t h0, index_t w0, index_t k0>
-    __device__ static auto CalculateAccumThreadOriginDataIndex(Number<h0>, Number<w0>, Number<k0>)
+    static constexpr auto NumAccComp = wconv_conv.GetNumAccumComponents();
+    static constexpr auto NumAccImageSubTiles = wconv_conv.GetNumSubTilesPerImageTile();
+    static constexpr auto NumAccCompPerTile   = NumAccComp / NumAccImageSubTiles;
+    static constexpr auto NumAccSwizzleComp   = ACO ? 2 : 4;
+    static constexpr auto NumAccCompSubTile =
+        NumAccCompPerTile > NumAccSwizzleComp ? NumAccCompPerTile / NumAccSwizzleComp : 1;
+    // Thread level, register descriptor. Vector-write
+    __host__ __device__ static constexpr auto
+    GetAccThreadDescriptor()
     {
-        const auto wave_idx = GetWaveIdx();
+        static_assert(NumAccComp == 4 || NumAccComp == 8, "");
+        static_assert(NumAccCompPerTile % NumAccCompSubTile == 0, "");
 
-        const auto waveId_k = wave_idx[I0];
-        const auto waveId_w = wave_idx[I1];
-        const auto waveId_h = wave_idx[I2];
-
-        const auto blk_idx = wconv_conv.GetBeginOfThreadBlk();
-
-        constexpr auto hrepeat_hwave_hperWconv_to_h_adaptor = make_single_stage_tensor_adaptor(
-            make_tuple(make_unmerge_transform(make_tuple(HRepeat, HWaves, HPerWconv))),
-            make_tuple(Sequence<0>{}),
-            make_tuple(Sequence<0, 1, 2>{}));
-
-        constexpr auto wrepeat_wwave_wperWconv_to_w_adaptor = make_single_stage_tensor_adaptor(
-            make_tuple(make_unmerge_transform(make_tuple(WRepeat, WWaves, WPerWconv))),
-            make_tuple(Sequence<0>{}),
-            make_tuple(Sequence<0, 1, 2>{}));
-
-        constexpr auto krepeat_kwave_kperWconv_to_k_adaptor = make_single_stage_tensor_adaptor(
-            make_tuple(make_unmerge_transform(make_tuple(KRepeat, KWaves, KPerWconv))),
-            make_tuple(Sequence<0>{}),
-            make_tuple(Sequence<0, 1, 2>{}));
-
-        const index_t c_thread_h = hrepeat_hwave_hperWconv_to_h_adaptor.CalculateBottomIndex(
-            make_tuple(h0, waveId_h, blk_idx[I0]))[I0];
-        const index_t c_thread_w = wrepeat_wwave_wperWconv_to_w_adaptor.CalculateBottomIndex(
-            make_tuple(w0, waveId_w, blk_idx[I1]))[I1];
-        const index_t c_thread_k = krepeat_kwave_kperWconv_to_k_adaptor.CalculateBottomIndex(
-            make_tuple(k0, waveId_k, blk_idx[I2]))[I2];
-
-        return make_tuple(c_thread_h, c_thread_w, c_thread_k);
+        // HRepeat x WRepeat x KRepeat x H1 x H2 x W1 x K1 x K2
+        return make_naive_tensor_descriptor_packed(
+            make_tuple(Number<HRepeat>{},
+                       Number<WRepeat>{},
+                       Number<KRepeat>{},
+                       Number<NumAccImageSubTiles>{},
+                       I1,
+                       I1,
+                       Number<NumAccCompSubTile>{},
+                       Number<NumAccCompPerTile / NumAccCompSubTile>{}));
     }
 
-    template <index_t h0, index_t w0, index_t k0>
-    __device__ static auto CalculateCThreadOriginDataIndex10D(Number<h0>, Number<w0>, Number<k0>)
+    __host__ __device__ static constexpr auto GetAccThreadDescLength()
+    {
+        return Sequence<HRepeat, WRepeat, KRepeat, NumAccImageSubTiles, I1, I1, NumAccCompSubTile,
+               NumAccCompPerTile / NumAccCompSubTile >{};
+    }
+
+    template <typename AccBlockDesc_>
+    __host__ __device__ static constexpr auto GetAccBlockWaveDescriptor(const AccBlockDesc_&)
+    {
+        return transform_tensor_descriptor(
+            AccBlockDesc_{},
+            make_tuple(
+                make_unmerge_transform(make_tuple(Number<HPerBlock / HPerWconv>{},
+                                                  Number<NumAccImageSubTiles>{},
+                                                  Number<HPerWconv / NumAccImageSubTiles>{})),
+                make_unmerge_transform(
+                    make_tuple(Number<WPerBlock / WPerWconv>{}, Number<WPerWconv>{})),
+                make_unmerge_transform(make_tuple(Number<KPerBlock / KPerWconv>{},
+                                                  Number<NumAccCompSubTile>{},
+                                                  Number<KPerWconv / NumAccCompSubTile>{}))),
+            make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}),
+            make_tuple(Sequence<0, 3, 4>{}, Sequence<1, 5>{}, Sequence<2, 6, 7>{}));
+    }
+
+    __device__ static auto CalculateAccThreadOriginDataIndex()
     {
         const auto wave_idx = GetWaveIdx();
-
-        const auto waveId_k = wave_idx[I0];
+        const auto wconv_in_data_idx = wconv_conv.CalculateAccThreadOriginDataIndex();
+        const auto waveId_h = wave_idx[I0];
         const auto waveId_w = wave_idx[I1];
-        const auto waveId_h = wave_idx[I2];
+        const auto waveId_k = wave_idx[I2];
 
-        const auto blk_idx = wconv_conv.GetBeginOfThreadBlk4D();
-
-        return make_tuple(Number<h0>{},
-                          waveId_h,
-                          blk_idx[I0],
-                          Number<w0>{},
-                          waveId_w,
-                          blk_idx[I1],
-                          Number<k0>{},
-                          waveId_k,
-                          blk_idx[I2],
-                          blk_idx[I3]);
+        return make_tuple(waveId_h * HRepeat,
+                          waveId_w * WRepeat,
+                          waveId_k * KRepeat,
+                          wconv_in_data_idx[I0],
+                          wconv_in_data_idx[I1],
+                          wconv_in_data_idx[I2],
+                          wconv_in_data_idx[I3],
+                          wconv_in_data_idx[I4]);
     }
 
     using TupleWeiData = decltype(CalculateWeiDataThreadOriginDataIndex());
@@ -232,6 +266,15 @@ struct BlockwiseConvWconv
                       "wrong!");
     }
 
+    __host__ __device__ static constexpr auto GetWeightRemapTable()
+    {
+        return wconv_conv.GetWeightRemapTable();
+    }
+
+    __host__ __device__ static constexpr auto GetWeightSecondTapeMapTable()
+    {
+        return wconv_conv.GetWeightSecondTapeMapTable();
+    }
     // Describe how data allocated in thread copy src buffer
     static constexpr WeiDataBlockDesc weight_block_desc_;
     static constexpr InDataBlockDesc indata_block_desc_;
@@ -271,7 +314,7 @@ struct BlockwiseConvWconv
                             weight_thread_vec.template AsType<WeiDataVec>()(I0) =
                                 *reinterpret_cast<const WeiDataVec*>(&(weight_thread_buf[I0]));
 
-                            //  read tensor
+                            // read tensor
                             indata_thread_copy_.Run(indata_block_desc_,
                                                     make_tuple(h1, w1, c1, I0, I0, I0, I0),
                                                     indata_block_buf,
@@ -291,16 +334,13 @@ struct BlockwiseConvWconv
                         }
                         else if constexpr(FilterSize == 3)
                         {
+                            constexpr index_t WeightTapePerWave =
+                                WeiDataEnableLds ? wconv_conv.GetNumWeightTapePerWave() : 1;
                             static_for<0, wconv_conv.GetNumWeightTape(), 1>{}([&](auto tape_idx) {
                                 weight_thread_copy_.Run(
                                     weight_block_desc_,
                                     make_tuple(
-                                        k1,
-                                        c1,
-                                        Number<wconv_conv.GetNumWeightTapePerWave() * tape_idx>{},
-                                        I0,
-                                        I0,
-                                        I0),
+                                        k1, c1, Number<WeightTapePerWave * tape_idx>{}, I0, I0, I0),
                                     weight_block_buf,
                                     weight_thread_desc_,
                                     make_tuple(I0, I0, I0, I0, I0, I0),
@@ -312,6 +352,8 @@ struct BlockwiseConvWconv
                                         &weight_thread_buf[I0]);
                             });
 
+                            InDataVec indata_thread_vec[FilterSize];
+
                             //  read tensor
                             indata_thread_copy_.Run(indata_block_desc_,
                                                     make_tuple(h1, w1, c1, I0, I0, I0, I0),
@@ -319,8 +361,6 @@ struct BlockwiseConvWconv
                                                     indata_thread_desc_,
                                                     make_tuple(I0, I0, I0, I0, I0, I0, I0),
                                                     indata_thread_buf);
-
-                            InDataVec indata_thread_vec[FilterSize];
 
                             typename decltype(wconv_conv)::InDataVec indata_tmp;
                             constexpr index_t NumDataCompPerTile =
@@ -354,11 +394,11 @@ struct BlockwiseConvWconv
         });
     }
 
-protected:
+    protected:
     static constexpr auto NumWeightSubTiles    = wconv_conv.GetNumSubTilesPerWeightTape();
     static constexpr auto NumWeightCompPerTile = wconv_conv.GetNumWeightCompPerTile();
-    static constexpr auto weight_thread_desc_  = make_naive_tensor_descriptor_packed(make_tuple(
-        I1, I1, I1, I1, Number<NumWeightSubTiles>{}, Number<NumWeightCompPerTile>{}));
+    static constexpr auto weight_thread_desc_  = make_naive_tensor_descriptor_packed(
+        make_tuple(I1, I1, I1, I1, Number<NumWeightSubTiles>{}, Number<NumWeightCompPerTile>{}));
 
     static constexpr auto NumDataSubTiles    = wconv_conv.GetNumSubTilesPerImageTile();
     static constexpr auto NumDataCompPerTile = wconv_conv.GetNumDataCompPerTile();
@@ -406,10 +446,10 @@ protected:
             decltype(weight_block_desc_),
             decltype(weight_thread_desc_),
             tensor_operation::element_wise::PassThrough,
-            Sequence<1, 1, 1, 1, 1, 1, 1>,
-            Sequence<0, 1, 2, 3, 4, 5, 6>,
-            6,
-            2>;
+            Sequence<1, 1, 1, 1, NumWeightSubTiles, NumWeightCompPerTile>,
+            Sequence<0, 1, 2, 3, 4, 5>,
+            5,
+            NumWeightCompPerTile>;
     };
 
     template <bool EnableLds>
@@ -439,10 +479,10 @@ protected:
             decltype(indata_block_desc_),
             decltype(indata_thread_desc_),
             tensor_operation::element_wise::PassThrough,
-            Sequence<1, 1, 1, 1, 1, 1, 1>,
+            Sequence<NumDataTiles, FilterSize, 1, NumDataSubTiles, 1, 1, NumDataCompPerTile>,
             Sequence<0, 1, 2, 3, 4, 5, 6>,
             6,
-            2>;
+            NumDataCompPerTile>;
     };
 
     typename WeightThreadCopySelector<WeiDataEnableLds>::type weight_thread_copy_;
