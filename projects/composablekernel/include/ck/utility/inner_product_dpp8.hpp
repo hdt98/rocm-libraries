@@ -124,44 +124,51 @@ __device__ void intrinsic_fdot2(const half2_t& a, const half2_t& b, float& c)
     }
 }
 
-
 template <>
-__device__ void inline_v_mov_dpp8_instr<0>(const half2_t& a, half2_t& b){  
+__device__ void inline_v_mov_dpp8_instr<0>(const half2_t& a, half2_t& b)
+{
     asm volatile("\n v_mov_b32_dpp %0, %1 dpp8:[0, 0, 0, 0, 0, 0, 0, 0]" : "=v"(b) : "v"(a));
 }
 
 template <>
-__device__ void inline_v_mov_dpp8_instr<1>(const half2_t& a, half2_t& b){  
+__device__ void inline_v_mov_dpp8_instr<1>(const half2_t& a, half2_t& b)
+{
     asm volatile("\n v_mov_b32_dpp %0, %1 dpp8:[1, 1, 1, 1, 1, 1, 1, 1]" : "=v"(b) : "v"(a));
 }
 
 template <>
-__device__ void inline_v_mov_dpp8_instr<2>(const half2_t& a, half2_t& b){  
+__device__ void inline_v_mov_dpp8_instr<2>(const half2_t& a, half2_t& b)
+{
     asm volatile("\n v_mov_b32_dpp %0, %1 dpp8:[2, 2, 2, 2, 2, 2, 2, 2]" : "=v"(b) : "v"(a));
 }
 
 template <>
-__device__ void inline_v_mov_dpp8_instr<3>(const half2_t& a, half2_t& b){  
+__device__ void inline_v_mov_dpp8_instr<3>(const half2_t& a, half2_t& b)
+{
     asm volatile("\n v_mov_b32_dpp %0, %1 dpp8:[3, 3, 3, 3, 3, 3, 3, 3]" : "=v"(b) : "v"(a));
 }
 
 template <>
-__device__ void inline_v_mov_dpp8_instr<4>(const half2_t& a, half2_t& b){  
+__device__ void inline_v_mov_dpp8_instr<4>(const half2_t& a, half2_t& b)
+{
     asm volatile("\n v_mov_b32_dpp %0, %1 dpp8:[4, 4, 4, 4, 4, 4, 4, 4]" : "=v"(b) : "v"(a));
 }
 
 template <>
-__device__ void inline_v_mov_dpp8_instr<5>(const half2_t& a, half2_t& b){  
+__device__ void inline_v_mov_dpp8_instr<5>(const half2_t& a, half2_t& b)
+{
     asm volatile("\n v_mov_b32_dpp %0, %1 dpp8:[5, 5, 5, 5, 5, 5, 5, 5]" : "=v"(b) : "v"(a));
 }
 
 template <>
-__device__ void inline_v_mov_dpp8_instr<6>(const half2_t& a, half2_t& b){  
+__device__ void inline_v_mov_dpp8_instr<6>(const half2_t& a, half2_t& b)
+{
     asm volatile("\n v_mov_b32_dpp %0, %1 dpp8:[6, 6, 6, 6, 6, 6, 6, 6]" : "=v"(b) : "v"(a));
 }
 
 template <>
-__device__ void inline_v_mov_dpp8_instr<7>(const half2_t& a, half2_t& b){  
+__device__ void inline_v_mov_dpp8_instr<7>(const half2_t& a, half2_t& b)
+{
     asm volatile("\n v_mov_b32_dpp %0, %1 dpp8:[7, 7, 7, 7, 7, 7, 7, 7]" : "=v"(b) : "v"(a));
 }
 

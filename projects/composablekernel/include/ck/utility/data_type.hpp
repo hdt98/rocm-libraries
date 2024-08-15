@@ -1725,7 +1725,6 @@ struct vector_type<T, 6>
     }
 };
 
-
 template <typename T>
 struct vector_type<T, 12>
 {
@@ -2193,7 +2192,6 @@ struct vector_type<T, 36>
     }
 };
 
-
 template <typename T>
 struct vector_type<T, 72>
 {
@@ -2238,9 +2236,8 @@ struct vector_type<T, 72>
         static_assert(
             is_same<X, d1_t>::value || is_same<X, d2_t>::value || is_same<X, d3_t>::value ||
                 is_same<X, d4_t>::value || is_same<X, d6_t>::value || is_same<X, d8_t>::value ||
-                is_same<X, d9_t>::value ||
-                is_same<X, d12_t>::value || is_same<X, d18_t>::value || is_same<X, d24_t>::value ||
-                is_same<X, d36_t>::value || is_same<X, d72_t>::value,
+                is_same<X, d9_t>::value || is_same<X, d12_t>::value || is_same<X, d18_t>::value ||
+                is_same<X, d24_t>::value || is_same<X, d36_t>::value || is_same<X, d72_t>::value,
             "wrong!");
 
         if constexpr(is_same<X, d1_t>::value)
@@ -2303,9 +2300,8 @@ struct vector_type<T, 72>
         static_assert(
             is_same<X, d1_t>::value || is_same<X, d2_t>::value || is_same<X, d3_t>::value ||
                 is_same<X, d4_t>::value || is_same<X, d6_t>::value || is_same<X, d8_t>::value ||
-                is_same<X, d9_t>::value ||
-                is_same<X, d12_t>::value || is_same<X, d18_t>::value || is_same<X, d24_t>::value ||
-                is_same<X, d36_t>::value || is_same<X, d72_t>::value,
+                is_same<X, d9_t>::value || is_same<X, d12_t>::value || is_same<X, d18_t>::value ||
+                is_same<X, d24_t>::value || is_same<X, d36_t>::value || is_same<X, d72_t>::value,
             "wrong!");
 
         if constexpr(is_same<X, d1_t>::value)
@@ -2362,7 +2358,6 @@ struct vector_type<T, 72>
         }
     }
 };
-
 
 template <typename T>
 struct vector_type<T, 144>
@@ -2552,9 +2547,7 @@ struct vector_type<T, 5>
     template <typename X>
     __host__ __device__ constexpr const auto& AsType() const
     {
-        static_assert(
-            is_same<X, d1_t>::value || is_same<X, d5_t>::value,
-            "wrong!");
+        static_assert(is_same<X, d1_t>::value || is_same<X, d5_t>::value, "wrong!");
 
         if constexpr(is_same<X, d1_t>::value)
         {
@@ -2670,7 +2663,6 @@ struct vector_type<T, 10>
         }
     }
 };
-
 
 template <typename T>
 struct vector_type<T, 20>
@@ -2867,10 +2859,10 @@ using half64_t = typename vector_type<half_t, 64>::type;
 
 using half3_t  = typename vector_type<half_t, 3>::type;
 using half6_t  = typename vector_type<half_t, 6>::type;
-using half9_t = typename vector_type<half_t, 9>::type;
+using half9_t  = typename vector_type<half_t, 9>::type;
 using half18_t = typename vector_type<half_t, 18>::type;
 using half36_t = typename vector_type<half_t, 36>::type;
-using half5_t = typename vector_type<half_t, 5>::type;
+using half5_t  = typename vector_type<half_t, 5>::type;
 using half10_t = typename vector_type<half_t, 10>::type;
 
 // bfp16
@@ -2883,10 +2875,10 @@ using bhalf64_t = typename vector_type<bhalf_t, 64>::type;
 
 using bhalf3_t  = typename vector_type<bhalf_t, 3>::type;
 using bhalf6_t  = typename vector_type<bhalf_t, 6>::type;
-using bhalf9_t = typename vector_type<bhalf_t, 9>::type;
+using bhalf9_t  = typename vector_type<bhalf_t, 9>::type;
 using bhalf18_t = typename vector_type<bhalf_t, 18>::type;
 using bhalf36_t = typename vector_type<bhalf_t, 36>::type;
-using bhalf5_t = typename vector_type<bhalf_t, 5>::type;
+using bhalf5_t  = typename vector_type<bhalf_t, 5>::type;
 using bhalf10_t = typename vector_type<bhalf_t, 10>::type;
 
 using bf16x2_t  = typename vector_type<__bf16, 2>::type;
@@ -2926,13 +2918,13 @@ using int8x64_t = typename vector_type<int8_t, 64>::type;
 
 using int8x3_t  = typename vector_type<int8_t, 3>::type;
 using int8x6_t  = typename vector_type<int8_t, 6>::type;
-using int8x9_t = typename vector_type<int8_t, 9>::type;
+using int8x9_t  = typename vector_type<int8_t, 9>::type;
 using int8x12_t = typename vector_type<int8_t, 12>::type;
 using int8x18_t = typename vector_type<int8_t, 18>::type;
 using int8x24_t = typename vector_type<int8_t, 24>::type;
 using int8x36_t = typename vector_type<int8_t, 36>::type;
 using int8x72_t = typename vector_type<int8_t, 72>::type;
-using int8x5_t = typename vector_type<int8_t, 5>::type;
+using int8x5_t  = typename vector_type<int8_t, 5>::type;
 using int8x10_t = typename vector_type<int8_t, 10>::type;
 using int8x20_t = typename vector_type<int8_t, 20>::type;
 
@@ -2940,21 +2932,21 @@ using int8x20_t = typename vector_type<int8_t, 20>::type;
 using f8x2_t  = typename vector_type<f8_t, 2>::type;
 using f8x4_t  = typename vector_type<f8_t, 4>::type;
 using f8x8_t  = typename vector_type<f8_t, 8>::type;
-using f8x12_t  = typename vector_type<f8_t, 12>::type;
+using f8x12_t = typename vector_type<f8_t, 12>::type;
 using f8x16_t = typename vector_type<f8_t, 16>::type;
-using f8x24_t  = typename vector_type<f8_t, 24>::type;
+using f8x24_t = typename vector_type<f8_t, 24>::type;
 using f8x32_t = typename vector_type<f8_t, 32>::type;
 using f8x64_t = typename vector_type<f8_t, 64>::type;
 
 using f8x3_t  = typename vector_type<f8_t, 3>::type;
 using f8x6_t  = typename vector_type<f8_t, 6>::type;
-using f8x9_t = typename vector_type<f8_t, 9>::type;
+using f8x9_t  = typename vector_type<f8_t, 9>::type;
 using f8x12_t = typename vector_type<f8_t, 12>::type;
 using f8x18_t = typename vector_type<f8_t, 18>::type;
 using f8x24_t = typename vector_type<f8_t, 24>::type;
 using f8x36_t = typename vector_type<f8_t, 36>::type;
 using f8x72_t = typename vector_type<f8_t, 72>::type;
-using f8x5_t = typename vector_type<f8_t, 5>::type;
+using f8x5_t  = typename vector_type<f8_t, 5>::type;
 using f8x10_t = typename vector_type<f8_t, 10>::type;
 using f8x20_t = typename vector_type<f8_t, 20>::type;
 
@@ -2968,13 +2960,13 @@ using bf8x64_t = typename vector_type<bf8_t, 64>::type;
 
 using bf8x3_t  = typename vector_type<bf8_t, 3>::type;
 using bf8x6_t  = typename vector_type<bf8_t, 6>::type;
-using bf8x9_t = typename vector_type<bf8_t, 9>::type;
+using bf8x9_t  = typename vector_type<bf8_t, 9>::type;
 using bf8x12_t = typename vector_type<bf8_t, 12>::type;
 using bf8x18_t = typename vector_type<bf8_t, 18>::type;
 using bf8x24_t = typename vector_type<bf8_t, 24>::type;
 using bf8x36_t = typename vector_type<bf8_t, 36>::type;
 using bf8x72_t = typename vector_type<bf8_t, 72>::type;
-using bf8x5_t = typename vector_type<bf8_t, 5>::type;
+using bf8x5_t  = typename vector_type<bf8_t, 5>::type;
 using bf8x10_t = typename vector_type<bf8_t, 10>::type;
 using bf8x20_t = typename vector_type<bf8_t, 20>::type;
 // u8
@@ -2987,13 +2979,13 @@ using uint8x64_t = typename vector_type<uint8_t, 64>::type;
 
 using uint8x3_t  = typename vector_type<uint8_t, 3>::type;
 using uint8x6_t  = typename vector_type<uint8_t, 6>::type;
-using uint8x9_t = typename vector_type<uint8_t, 9>::type;
+using uint8x9_t  = typename vector_type<uint8_t, 9>::type;
 using uint8x12_t = typename vector_type<uint8_t, 12>::type;
 using uint8x18_t = typename vector_type<uint8_t, 18>::type;
 using uint8x24_t = typename vector_type<uint8_t, 24>::type;
 using uint8x36_t = typename vector_type<uint8_t, 36>::type;
 using uint8x72_t = typename vector_type<uint8_t, 72>::type;
-using uint8x5_t = typename vector_type<uint8_t, 5>::type;
+using uint8x5_t  = typename vector_type<uint8_t, 5>::type;
 using uint8x10_t = typename vector_type<uint8_t, 10>::type;
 using uint8x20_t = typename vector_type<uint8_t, 20>::type;
 
@@ -3002,11 +2994,11 @@ using int4x8_t  = typename vector_type<int8_t, 4>::type;
 using int4x16_t = typename vector_type<int8_t, 8>::type;
 using int4x32_t = typename vector_type<int8_t, 16>::type;
 
-using int4x24_t = typename vector_type<int8_t, 12>::type;
-using int4x48_t = typename vector_type<int8_t, 24>::type;
-using int4x72_t = typename vector_type<int8_t, 36>::type;
+using int4x24_t  = typename vector_type<int8_t, 12>::type;
+using int4x48_t  = typename vector_type<int8_t, 24>::type;
+using int4x72_t  = typename vector_type<int8_t, 36>::type;
 using int4x144_t = typename vector_type<int8_t, 72>::type;
-using int4x40_t = typename vector_type<int8_t, 20>::type;
+using int4x40_t  = typename vector_type<int8_t, 20>::type;
 #endif
 
 template <typename T>
@@ -3145,7 +3137,7 @@ struct NumericUtils<f8_t>
 {
     static constexpr int exp  = 4;
     static constexpr int mant = 3;
-    //static constexpr int bias = 8; // negative zero nan mode
+    // static constexpr int bias = 8; // negative zero nan mode
     static constexpr int bias = 7; // ieee mode
 };
 
@@ -3154,7 +3146,7 @@ struct NumericUtils<bf8_t>
 {
     static constexpr int exp  = 5;
     static constexpr int mant = 2;
-    //static constexpr int bias = 16; // negative zero nan mode
+    // static constexpr int bias = 16; // negative zero nan mode
     static constexpr int bias = 15; // ieee mode
 };
 
