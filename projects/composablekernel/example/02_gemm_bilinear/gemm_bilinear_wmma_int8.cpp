@@ -86,7 +86,7 @@ using DeviceOpInstance = ck::tensor_operation::device::DeviceGemmMultipleD_Wmma_
     128, // MPerBlock
     64,  // NPerBlock
     64,  // KPerBlock
-    8,   // K1
+    4,   // K1
     16,  // MPerWmma
     16,  // NPerWmma
     4,   // M-Repeat // M-PerWmma / M-Repeat = M-Wave
@@ -95,15 +95,15 @@ using DeviceOpInstance = ck::tensor_operation::device::DeviceGemmMultipleD_Wmma_
     S<1, 0, 2>,
     S<1, 0, 2>,
     2,
-    8,
-    8,
+    4,
+    4,
     true,
     S<4, 32, 1>,
     S<1, 0, 2>,
     S<1, 0, 2>,
     2,
-    8,
-    8,
+    4,
+    4,
     true,
     1, // C shuffle (M Repeat) Per store
     1, // C shuffle (N Repeat) Per store
@@ -117,14 +117,14 @@ int main(int argc, char* argv[])
     bool time_kernel     = true;
 
     // GEMM shape
-    ck::index_t M = 3840;
-    ck::index_t N = 4096;
-    ck::index_t K = 4096;
+    ck::index_t M = 256;
+    ck::index_t N = 256;
+    ck::index_t K = 256;
 
-    ck::index_t StrideA = 4096;
-    ck::index_t StrideB = 4096;
-    ck::index_t StrideD = 4096;
-    ck::index_t StrideE = 4096;
+    ck::index_t StrideA = 256;
+    ck::index_t StrideB = 256;
+    ck::index_t StrideD = 256;
+    ck::index_t StrideE = 256;
 
     int alpha = 1;
     int beta  = 1;
