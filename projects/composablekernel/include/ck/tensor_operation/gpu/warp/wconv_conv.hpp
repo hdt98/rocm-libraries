@@ -742,11 +742,11 @@ struct WconvConv
 
     static constexpr index_t GetNumWeightTape()
     {
-        if constexpr (FilterSize == 1)
+        if constexpr(FilterSize == 1)
         {
             return 1;
         }
-        else if constexpr (FilterSize == 3)
+        else if constexpr(FilterSize == 3)
         {
             return (HPerWconv == 8) && (WPerWconv == 4) ? 5 : 9;
         }
@@ -881,15 +881,14 @@ struct WconvConv
 
     static constexpr auto CalculateAccThreadOriginDataIndex()
     {
-        auto laneId = get_thread_local_1d_id() & (WaveSize - 1);
-        const index_t accCompIdx =
-            laneId * GetNumAccumComponents() / GetNumSubTilesPerImageTile();
+        auto laneId              = get_thread_local_1d_id() & (WaveSize - 1);
+        const index_t accCompIdx = laneId * GetNumAccumComponents() / GetNumSubTilesPerImageTile();
         const index_t subW       = (accCompIdx / GetNumOutputChannels()) % WPerWconv;
         const index_t subH       = (accCompIdx / GetNumOutputChannels()) / WPerWconv;
         const index_t subK       = accCompIdx % GetNumOutputChannels();
         // TODO: modify it if ACO = 1
         constexpr index_t SwizzleComp = 4;
-        const index_t subK_8 = (laneId & 1) *  SwizzleComp;
+        const index_t subK_8          = (laneId & 1) * SwizzleComp;
 
         static_assert(ACO == 0, "");
         if constexpr(GetNumAccumComponents() == 4)

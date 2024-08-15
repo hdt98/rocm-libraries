@@ -62,7 +62,7 @@ template <typename ALayout,
           index_t CShuffleNRepeatPerShuffle,
           typename CShuffleBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock,
           index_t CShuffleBlockTransferScalarPerVector_NPerBlock,
-          ck::index_t KPerWmma = 16,
+          ck::index_t KPerWmma            = 16,
           ck::LoopScheduler LoopSched     = make_default_loop_scheduler(),
           ck::PipelineVersion PipelineVer = ck::PipelineVersion::v1>
 struct DeviceGemmWmma_CShuffle : public DeviceGemm<ALayout,

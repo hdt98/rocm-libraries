@@ -109,8 +109,8 @@ struct BlockwiseGemmWMMA
             const auto waveId_m   = wave_idx[I0];
             const auto WMMA_a_idx = wmma_gemm.CalculateAThreadOriginDataIndex();
 
-            //               |KRepeat   |MRepeat|MWave    |KRow                       |MLane     |KPack
-            return make_tuple(0,         0,      waveId_m, wmma_gemm.GetSubGroupId(), WMMA_a_idx, 0);
+            //               |KRepeat   |MRepeat|MWave    |KRow                       |MLane |KPack
+            return make_tuple(0, 0, waveId_m, wmma_gemm.GetSubGroupId(), WMMA_a_idx, 0);
         }
         else
         {
@@ -220,8 +220,8 @@ struct BlockwiseGemmWMMA
         constexpr auto MAccVgprs = c_msubgroup_nthreadpersubgroup_maccvgprs_tblk_lens[I2];
         constexpr auto AccStride = c_msubgroup_nthreadpersubgroup_maccvgprs_tblk_lens[I3];
         return make_naive_tensor_descriptor(
-        // |  MRepeat  |  MWave  |  MLoopAcc  | MSubGroup  |  NRepeat  | 
-        // |  NWave  |  NThreadPerSubGroup  |  MLoopAcc  |
+            // |  MRepeat  |  MWave  |  MLoopAcc  | MSubGroup  |  NRepeat  |
+            // |  NWave  |  NThreadPerSubGroup  |  MLoopAcc  |
 
             make_tuple(Number<MRepeat>{}, I1, MLoopAcc, I1, Number<NRepeat>{}, I1, I1, MAccVgprs),
             make_tuple(Number<NRepeat>{} * MLoopAcc * MAccVgprs * AccStride,
@@ -628,7 +628,7 @@ struct BlockwiseGemmWMMA
             const auto WMMA_a_idx = wmma_gemm.CalculateAThreadOriginDataIndex();
 
             //                |KRepeat  |MRepeat |MWave    |KRow  |MLane      |KPack
-            return make_tuple(0,        0,        waveId_m, 0,     WMMA_a_idx, 0);
+            return make_tuple(0, 0, waveId_m, 0, WMMA_a_idx, 0);
         }
         else
         {

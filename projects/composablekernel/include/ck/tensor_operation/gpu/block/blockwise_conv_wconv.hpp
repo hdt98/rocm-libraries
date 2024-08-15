@@ -179,15 +179,14 @@ struct BlockwiseConvWconv
         }
     }
 
-    static constexpr auto NumAccComp = wconv_conv.GetNumAccumComponents();
+    static constexpr auto NumAccComp          = wconv_conv.GetNumAccumComponents();
     static constexpr auto NumAccImageSubTiles = wconv_conv.GetNumSubTilesPerImageTile();
     static constexpr auto NumAccCompPerTile   = NumAccComp / NumAccImageSubTiles;
     static constexpr auto NumAccSwizzleComp   = ACO ? 2 : 4;
     static constexpr auto NumAccCompSubTile =
         NumAccCompPerTile > NumAccSwizzleComp ? NumAccCompPerTile / NumAccSwizzleComp : 1;
     // Thread level, register descriptor. Vector-write
-    __host__ __device__ static constexpr auto
-    GetAccThreadDescriptor()
+    __host__ __device__ static constexpr auto GetAccThreadDescriptor()
     {
         static_assert(NumAccComp == 4 || NumAccComp == 8, "");
         static_assert(NumAccCompPerTile % NumAccCompSubTile == 0, "");
@@ -206,8 +205,14 @@ struct BlockwiseConvWconv
 
     __host__ __device__ static constexpr auto GetAccThreadDescLength()
     {
-        return Sequence<HRepeat, WRepeat, KRepeat, NumAccImageSubTiles, I1, I1, NumAccCompSubTile,
-               NumAccCompPerTile / NumAccCompSubTile >{};
+        return Sequence<HRepeat,
+                        WRepeat,
+                        KRepeat,
+                        NumAccImageSubTiles,
+                        I1,
+                        I1,
+                        NumAccCompSubTile,
+                        NumAccCompPerTile / NumAccCompSubTile>{};
     }
 
     template <typename AccBlockDesc_>
@@ -230,11 +235,11 @@ struct BlockwiseConvWconv
 
     __device__ static auto CalculateAccThreadOriginDataIndex()
     {
-        const auto wave_idx = GetWaveIdx();
+        const auto wave_idx          = GetWaveIdx();
         const auto wconv_in_data_idx = wconv_conv.CalculateAccThreadOriginDataIndex();
-        const auto waveId_h = wave_idx[I0];
-        const auto waveId_w = wave_idx[I1];
-        const auto waveId_k = wave_idx[I2];
+        const auto waveId_h          = wave_idx[I0];
+        const auto waveId_w          = wave_idx[I1];
+        const auto waveId_k          = wave_idx[I2];
 
         return make_tuple(waveId_h * HRepeat,
                           waveId_w * WRepeat,

@@ -510,9 +510,9 @@ struct wmma_type<WmmaInstr::wmma_f32_16x16x16_f16_gfx13,
     static constexpr index_t num_acc_vgprs_per_wave = m_per_wmma * n_per_wmma / wave_size;
     static constexpr index_t num_subgroups          = wave_size / num_thread_per_subgroups;
     // * num_consecutive_vgprs means how many vgprs in consecutive
-    static constexpr index_t num_acc_per_thread     =  m_per_wmma * n_per_wmma / wave_size;
-    static constexpr index_t num_consecutive_acc    =  2;
-    static constexpr index_t loop_of_consecutive    =  num_acc_per_thread / num_consecutive_acc;
+    static constexpr index_t num_acc_per_thread  = m_per_wmma * n_per_wmma / wave_size;
+    static constexpr index_t num_consecutive_acc = 2;
+    static constexpr index_t loop_of_consecutive = num_acc_per_thread / num_consecutive_acc;
 
     template <index_t MPerWmma, index_t NPerWmma, class FloatA, class FloatB, class FloatC>
     __device__ void run(const FloatA& a, const FloatB& b, FloatC& reg_c) const
@@ -583,8 +583,9 @@ struct wmma_type<WmmaInstr::wmma_f16_16x16x16_f16_gfx13,
     // static constexpr index_t num_src_b_vgprs_per_wave = k_per_wmma / 2 * src_b_data_size / 4;
     // * num_acc_vgprs_per_wave alone M direction
     // * num_subgroups alone M direction
-    static constexpr index_t num_acc_vgprs_per_wave = m_per_wmma * n_per_wmma / wave_size / acc_data_size;
-    static constexpr index_t num_subgroups          = wave_size / num_thread_per_subgroups;
+    static constexpr index_t num_acc_vgprs_per_wave =
+        m_per_wmma * n_per_wmma / wave_size / acc_data_size;
+    static constexpr index_t num_subgroups = wave_size / num_thread_per_subgroups;
 
     template <index_t MPerWmma, index_t NPerWmma, class FloatA, class FloatB, class FloatC>
     __device__ void run(const FloatA& a, const FloatB& b, FloatC& reg_c) const
@@ -652,9 +653,9 @@ struct wmma_type<WmmaInstr::wmma_i32_16x16x16_iu8_gfx13,
     static constexpr index_t num_acc_vgprs_per_wave = m_per_wmma * n_per_wmma / wave_size;
     static constexpr index_t num_subgroups          = wave_size / num_thread_per_subgroups;
     // * num_consecutive_vgprs means how many vgprs in consecutive
-    static constexpr index_t num_acc_per_thread     =  m_per_wmma * n_per_wmma / wave_size;
-    static constexpr index_t num_consecutive_acc    =  4;
-    static constexpr index_t loop_of_consecutive    =  num_acc_per_thread / num_consecutive_acc;
+    static constexpr index_t num_acc_per_thread  = m_per_wmma * n_per_wmma / wave_size;
+    static constexpr index_t num_consecutive_acc = 4;
+    static constexpr index_t loop_of_consecutive = num_acc_per_thread / num_consecutive_acc;
     template <index_t MPerWmma,
               index_t NPerWmma,
               class FloatA,
@@ -691,7 +692,7 @@ struct WmmaSelector
     template <>
     constexpr auto GetWmma<half_t, half_t, float, 16, 16>()
     {
-#if (defined(__gfx12__) || defined(__gfx13__))
+#if(defined(__gfx12__) || defined(__gfx13__))
         return WmmaInstr::wmma_f32_16x16x16_f16_gfx12;
 #else
         return WmmaInstr::wmma_f32_16x16x16_f16;
@@ -701,7 +702,7 @@ struct WmmaSelector
     template <>
     constexpr auto GetWmma<bhalf_t, bhalf_t, float, 16, 16>()
     {
-#if (defined(__gfx12__) || defined(__gfx13__))
+#if(defined(__gfx12__) || defined(__gfx13__))
         return WmmaInstr::wmma_f32_16x16x16_bf16_gfx12;
 #else
         return WmmaInstr::wmma_f32_16x16x16_bf16;
@@ -723,7 +724,7 @@ struct WmmaSelector
     template <>
     constexpr auto GetWmma<int8_t, int8_t, int, 16, 16>()
     {
-#if (defined(__gfx12__) || defined(__gfx13__))
+#if(defined(__gfx12__) || defined(__gfx13__))
         return WmmaInstr::wmma_i32_16x16x16_iu8_gfx12;
 #else
         return WmmaInstr::wmma_i32_16x16x16_iu8;
@@ -811,7 +812,8 @@ struct WmmaSelector_Gfx13
 #endif
     // get_warp_size do not return the correct wavesize, hardcode to 32 as workaround
     static constexpr auto selected_wmma =
-        wmma_type<GetWmma<src_type_a, src_type_b, dst_type, MPerWmma, NPerWmma, KPerWmma>(), Number<32>{}>{};
+        wmma_type<GetWmma<src_type_a, src_type_b, dst_type, MPerWmma, NPerWmma, KPerWmma>(),
+                  Number<32>{}>{};
 
     __host__ __device__ constexpr WmmaSelector_Gfx13()
     {
@@ -819,7 +821,8 @@ struct WmmaSelector_Gfx13
 
         static_assert(selected_wmma.n_per_wmma == 16, "WRONG! WMMA_N must equal to 16");
 
-        static_assert((selected_wmma.k_per_wmma % 16) == 0, "WRONG! WMMA_K in Gfx13 must mod(16) = 0");
+        static_assert((selected_wmma.k_per_wmma % 16) == 0,
+                      "WRONG! WMMA_K in Gfx13 must mod(16) = 0");
 
         static_assert(selected_wmma.wave_size * selected_wmma.num_acc_vgprs_per_wave *
                               selected_wmma.acc_data_size * selected_wmma.acc_pack_number ==
@@ -880,15 +883,14 @@ struct WmmaGemm
         // consecutive accumulators.
         return transform_tensor_descriptor(
             c_desc_mblockxrepeat_mwave_mperwmma_nblockxrepeat_nwave_nperwmma,
-            make_tuple(
-                make_pass_through_transform(MBlockxRepeat),
-                make_pass_through_transform(MWave),
-                make_unmerge_transform(make_tuple(Number<wmma_instr.num_subgroups>{},
-                                                  Number<wmma_instr.loop_of_consecutive>{},
-                                                  Number<wmma_instr.num_consecutive_acc>{})),
-                make_pass_through_transform(NBlockxRepeat),
-                make_pass_through_transform(NWave),
-                make_pass_through_transform(Number<wmma_instr.num_thread_per_subgroups>{})),
+            make_tuple(make_pass_through_transform(MBlockxRepeat),
+                       make_pass_through_transform(MWave),
+                       make_unmerge_transform(make_tuple(Number<wmma_instr.num_subgroups>{},
+                                                         Number<wmma_instr.loop_of_consecutive>{},
+                                                         Number<wmma_instr.num_consecutive_acc>{})),
+                       make_pass_through_transform(NBlockxRepeat),
+                       make_pass_through_transform(NWave),
+                       make_pass_through_transform(Number<wmma_instr.num_thread_per_subgroups>{})),
             make_tuple(Sequence<0>{},
                        Sequence<1>{},
                        Sequence<2>{},
@@ -1011,9 +1013,9 @@ struct WmmaGemm
 
     __device__ static auto GetSubGroupId()
     {
-#if (defined(__gfx13__))
-        // subgroup in gfx13. each row needs 2 threads to load and the layout between these two threads
-        // will use this function to get
+#if(defined(__gfx13__))
+        // subgroup in gfx13. each row needs 2 threads to load and the layout between these two
+        // threads will use this function to get
         return GetLaneId() & 1;
 #else
         static_assert(wmma_instr.num_thread_per_subgroups * wmma_instr.num_subgroups ==
@@ -1034,9 +1036,9 @@ struct WmmaGemm
 
     __host__ __device__ static auto CalculateAThreadOriginDataIndex()
     {
-#if (defined(__gfx12__))
+#if(defined(__gfx12__))
         return GetLaneIdUnderSubGroup();
-#elif (defined(__gfx13__))
+#elif(defined(__gfx13__))
         // the M dimension in gfx13; where each row needs to 2 threads to load
         // this function is used to map lane id to row id
         return GetLaneId() >> 1;
@@ -1047,9 +1049,9 @@ struct WmmaGemm
 
     __host__ __device__ static auto CalculateBThreadOriginDataIndex()
     {
-#if (defined(__gfx12__))
+#if(defined(__gfx12__))
         return GetLaneIdUnderSubGroup();
-#elif (defined(__gfx13__))
+#elif(defined(__gfx13__))
         // the N dimension in gfx13; where each row needs to 2 threads to load
         // this function is used to map lane id to row id
         return GetLaneId() >> 1;
@@ -1060,11 +1062,12 @@ struct WmmaGemm
 
     __device__ static CIndex GetBeginOfThreadBlk()
     {
-#if (defined(__gfx13__))
+#if(defined(__gfx13__))
         // the M, N offset in C matrix in gfx13; one column in gfx13 needs 2 threads to load
         // in row dimension needs 16 threads to load. details check gfx13 shader programming guide
         index_t n_offset = GetLaneId() / wmma_instr.num_subgroups;
-        index_t m_offset = (GetLaneId() % wmma_instr.num_subgroups) * wmma_instr.num_consecutive_acc;
+        index_t m_offset =
+            (GetLaneId() % wmma_instr.num_subgroups) * wmma_instr.num_consecutive_acc;
 #else
         index_t n_offset = GetLaneIdUnderSubGroup();
         index_t m_offset = GetSubGroupId() * wmma_instr.num_acc_vgprs_per_wave;
@@ -1103,7 +1106,7 @@ struct WmmaGemm
                           I1,
                           Number<wmma_instr.num_acc_vgprs_per_wave>{},
                           Number<wmma_instr.acc_pack_number>{});
-#endif   
+#endif
     }
 };
 

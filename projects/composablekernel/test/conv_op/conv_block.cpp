@@ -116,8 +116,8 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
 
     static_assert(InDataBlockSize + WeiDataBlockSize * C_BlockTile < LDS_SIZE, "");
 
-    constexpr auto WeiDataBlockDesc = make_naive_tensor_descriptor_packed(make_tuple(
-        Number<FilterSize * FilterSize>{}, Number<KPerBlock>{}, Number<CPerBlock>{}));
+    constexpr auto WeiDataBlockDesc = make_naive_tensor_descriptor_packed(
+        make_tuple(Number<FilterSize * FilterSize>{}, Number<KPerBlock>{}, Number<CPerBlock>{}));
 
     static constexpr index_t CPerWconv = wconv_conv.GetNumInputChannels();
     static constexpr index_t KPerWconv = wconv_conv.GetNumOutputChannels();

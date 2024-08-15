@@ -61,8 +61,8 @@ constexpr auto GridwiseGemmPipeline_Selector()
 template <PipelineVersion PipelineVer,
           index_t NumPrefetch     = 1,
           LoopScheduler LoopSched = LoopScheduler::Default,
-          bool InDataEnableLds         = true,
-          bool WeiDataEnableLds         = true>
+          bool InDataEnableLds    = true,
+          bool WeiDataEnableLds   = true>
 constexpr auto GridwiseConvPipeline_Selector()
 {
     return GridwiseConvPipeline_v1<NumPrefetch, InDataEnableLds, WeiDataEnableLds>{};

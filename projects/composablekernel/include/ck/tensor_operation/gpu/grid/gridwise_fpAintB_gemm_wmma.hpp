@@ -34,24 +34,24 @@ template <typename GridwiseGemm,
           bool HasMainKBlockLoop>
 __global__ void
 #if CK_USE_LAUNCH_BOUNDS
-__launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
+    __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
 #endif
-    kernel_fpAintB_gemm_wmma(const ADataType* __restrict__ p_a_grid,
-                             const BDataType* __restrict__ p_b_grid,
-                             const ScaleDataType* __restrict__ p_scale_grid,
-                             CDataType* __restrict__ p_c_grid,
-                             const AGridDesc a_grid_desc,
-                             const BGridDesc b_grid_desc,
-                             const ScaleGridDesc scale_grid_desc,
-                             const CGridDescriptor_MBlock_MPerBlock_NBlock_NPerBlock
-                                 c_grid_desc_mblock_mperblock_nblock_nperblock,
-                             const AElementwiseOperation a_element_op,
-                             const BElementwiseOperation b_element_op,
-                             const CElementwiseOperation c_element_op,
-                             const Block2CTileMap block_2_ctile_map)
+        kernel_fpAintB_gemm_wmma(const ADataType* __restrict__ p_a_grid,
+                                 const BDataType* __restrict__ p_b_grid,
+                                 const ScaleDataType* __restrict__ p_scale_grid,
+                                 CDataType* __restrict__ p_c_grid,
+                                 const AGridDesc a_grid_desc,
+                                 const BGridDesc b_grid_desc,
+                                 const ScaleGridDesc scale_grid_desc,
+                                 const CGridDescriptor_MBlock_MPerBlock_NBlock_NPerBlock
+                                     c_grid_desc_mblock_mperblock_nblock_nperblock,
+                                 const AElementwiseOperation a_element_op,
+                                 const BElementwiseOperation b_element_op,
+                                 const CElementwiseOperation c_element_op,
+                                 const Block2CTileMap block_2_ctile_map)
 {
-#if (!defined(__HIP_DEVICE_COMPILE__) || defined(__gfx11__) || defined(__gfx12__) || \
-     defined(__gfx13__))
+#if(!defined(__HIP_DEVICE_COMPILE__) || defined(__gfx11__) || defined(__gfx12__) || \
+    defined(__gfx13__))
     __shared__ char p_shared[GridwiseGemm::SharedMemTrait::lds_size];
 
     GridwiseGemm::template Run<HasMainKBlockLoop>(p_a_grid,
@@ -305,7 +305,7 @@ struct GridwiseFpAintBGemm_Wmma
                 // AK0_M_AK1 -> AK0_MRepeat_Mwaves_AKRow_MPerWmma_AK1
                 constexpr auto A_K0 = ABlockDesc_{}.GetLength(I0);
                 constexpr auto A_K1 = ABlockDesc_{}.GetLength(I2);
-#if (defined(__gfx12__) || defined(__gfx13__))
+#if(defined(__gfx12__) || defined(__gfx13__))
                 constexpr auto A_KRow = I2;
 #else
                 constexpr auto A_KRow = I1;
@@ -367,7 +367,7 @@ struct GridwiseFpAintBGemm_Wmma
                 // BK0_N_BK1 -> BK0_NRepeat_Nwaves_NPerWmma_BK1
                 constexpr auto B_K0 = BBlockDesc_{}.GetLength(I0);
                 constexpr auto B_K1 = BBlockDesc_{}.GetLength(I2);
-#if (defined(__gfx12__) || defined(__gfx13__))
+#if(defined(__gfx12__) || defined(__gfx13__))
                 constexpr auto B_KRow = I2;
 #else
                 constexpr auto B_KRow = I1;

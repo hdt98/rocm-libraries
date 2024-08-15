@@ -59,7 +59,6 @@ enum FilterType
 template <typename T>
 struct Debug;
 
-
 using PassThrough = ck::tensor_operation::element_wise::PassThrough;
 
 template <typename InputLay, typename WeightLay, typename OutputLay>
@@ -267,7 +266,7 @@ template <typename InDataType,
           int32_t TestMask>
 bool run_test()
 {
-    if ((config.test_mask & TestMask) == 0)
+    if((config.test_mask & TestMask) == 0)
     {
         return true;
     }
@@ -280,18 +279,18 @@ bool run_test()
     const ck::index_t InputChannels  = config.c;
     const ck::index_t OutputChannels = config.k;
 
-    constexpr ck::index_t HPerBlock  = DEFAULT_H_PERBLOCK;
-    constexpr ck::index_t WPerBlock  = DEFAULT_W_PERBLOCK;
-    constexpr ck::index_t CPerBlock  = DEFAULT_C_PERBLOCK;
-    constexpr ck::index_t KPerBlock  = DEFAULT_K_PERBLOCK;
-    constexpr ck::index_t HRepeat    = DEFAULT_H_PERWAVE / HPerWconv;
-    constexpr ck::index_t WRepeat    = DEFAULT_W_PERWAVE / WPerWconv;
+    constexpr ck::index_t HPerBlock = DEFAULT_H_PERBLOCK;
+    constexpr ck::index_t WPerBlock = DEFAULT_W_PERBLOCK;
+    constexpr ck::index_t CPerBlock = DEFAULT_C_PERBLOCK;
+    constexpr ck::index_t KPerBlock = DEFAULT_K_PERBLOCK;
+    constexpr ck::index_t HRepeat   = DEFAULT_H_PERWAVE / HPerWconv;
+    constexpr ck::index_t WRepeat   = DEFAULT_W_PERWAVE / WPerWconv;
 
-    constexpr ck::index_t n_dim          = 2;
-    constexpr ck::index_t group_count    = 1;
-    constexpr ck::index_t n_batch        = 1;
-    const ck::index_t n_out_channels = OutputChannels;
-    const ck::index_t n_in_channels  = InputChannels;
+    constexpr ck::index_t n_dim       = 2;
+    constexpr ck::index_t group_count = 1;
+    constexpr ck::index_t n_batch     = 1;
+    const ck::index_t n_out_channels  = OutputChannels;
+    const ck::index_t n_in_channels   = InputChannels;
 
     constexpr ck::index_t DilationSize = Dilation ? 2 : 1;
 
@@ -500,25 +499,24 @@ bool run_test()
                                                       AccBlockTransferScalarPerVector,
                                                       EnableLds>;
 
-    auto conv    = DeviceConvFwdInstance{};
-    auto invoker = conv.MakeInvoker();
-    auto argument =
-        conv.MakeArgument(in_device_buf.GetDeviceBuffer(),
-                          wei_device_buf.GetDeviceBuffer(),
-                          out_device_buf.GetDeviceBuffer(),
-                          a_g_n_c_wis_lengths,
-                          a_g_n_c_wis_strides,
-                          b_g_k_c_xs_lengths,
-                          b_g_k_c_xs_strides,
-                          e_g_n_k_wos_lengths,
-                          e_g_n_k_wos_strides,
-                          conv_filter_strides,
-                          conv_filter_dilations,
-                          input_left_pads,
-                          input_right_pads,
-                          InElementOp{},
-                          WeiElementOp{},
-                          OutElementOp{});
+    auto conv     = DeviceConvFwdInstance{};
+    auto invoker  = conv.MakeInvoker();
+    auto argument = conv.MakeArgument(in_device_buf.GetDeviceBuffer(),
+                                      wei_device_buf.GetDeviceBuffer(),
+                                      out_device_buf.GetDeviceBuffer(),
+                                      a_g_n_c_wis_lengths,
+                                      a_g_n_c_wis_strides,
+                                      b_g_k_c_xs_lengths,
+                                      b_g_k_c_xs_strides,
+                                      e_g_n_k_wos_lengths,
+                                      e_g_n_k_wos_strides,
+                                      conv_filter_strides,
+                                      conv_filter_dilations,
+                                      input_left_pads,
+                                      input_right_pads,
+                                      InElementOp{},
+                                      WeiElementOp{},
+                                      OutElementOp{});
 
     if(!conv.IsSupportedArgument(argument))
     {
@@ -534,12 +532,12 @@ bool run_test()
     std::cout << "Test <" << HPerWconv << "x" << WPerWconv << ", F:" << FilterSize
               << ", Src:" << sizeof(InDataType) << ", Dst:" << sizeof(GPUAccType) << ">: ";
 
-    if (config.time_kernel)
+    if(config.time_kernel)
     {
         std::cout << "Execute Time: " << avg_time << " ";
     }
 
-    if (config.do_verification)
+    if(config.do_verification)
     {
         if constexpr(std::is_same<GPUAccType, ck::bhalf_t>::value)
         {
@@ -575,7 +573,7 @@ bool run_test()
 template <typename SrcType, typename GPUAccType, typename CPUAccType, int32_t TestMask>
 bool run_test_fmt()
 {
-    if ((config.test_mask & TestMask) == 0)
+    if((config.test_mask & TestMask) == 0)
     {
         return true;
     }
@@ -624,9 +622,7 @@ inline void print_help_msg()
               << "arg5-8: tensor size {H x W x C x K}" << std::endl;
 }
 
-inline bool parse_cmd_args(int argc,
-                           char* argv[],
-                           ExecutionConfig& config)
+inline bool parse_cmd_args(int argc, char* argv[], ExecutionConfig& config)
 {
     if(argc == 1)
     {
@@ -655,9 +651,9 @@ inline bool parse_cmd_args(int argc,
 int main(int argc, char* argv[])
 {
     bool pass = true;
-    //MessageBoxA(NULL, "", "", MB_OK);
+    // MessageBoxA(NULL, "", "", MB_OK);
 
-    if (parse_cmd_args(argc, argv, config) == false)
+    if(parse_cmd_args(argc, argv, config) == false)
     {
         return -1;
     }

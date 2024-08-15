@@ -620,7 +620,7 @@ CK_TILE_DEVICE void buffer_load_fence(index_t cnt = 0)
 {
 #if defined(__gfx13__)
     asm volatile("s_wait_loadcnt %0" : : "n"(cnt) : "memory");
-#else    
+#else
     asm volatile("s_waitcnt vmcnt(%0)" : : "n"(cnt) : "memory");
 #endif
 }

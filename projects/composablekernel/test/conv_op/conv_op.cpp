@@ -78,7 +78,7 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
     constexpr auto wconvConv =
         ck::WconvConv<WeiDataType, InDataType, AccDataType, HPerWconv, WPerWconv, FilterSize>();
 
-    auto in = reinterpret_cast<const typename decltype(wconvConv)::KernelInDataType*>(in_);
+    auto in  = reinterpret_cast<const typename decltype(wconvConv)::KernelInDataType*>(in_);
     auto wei = reinterpret_cast<const typename decltype(wconvConv)::KernelWeightDataType*>(wei_);
 
     static_assert(Width % WPerWconv == 0, "");
@@ -245,8 +245,8 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
                 weiDataTmp.template AsType<WeiDataTileVec>()(Number<0>{}) =
                     *(const WeiDataTileVec*)(wei + offsetBase);
 
-                weiDataTmp.template AsType<WeiDataTileVec>()(Number<1>{}) = *(
-                    const WeiDataTileVec*)(wei + offsetBase + wconvConv.GetNumWeightComponents());
+                weiDataTmp.template AsType<WeiDataTileVec>()(Number<1>{}) =
+                    *(const WeiDataTileVec*)(wei + offsetBase + wconvConv.GetNumWeightComponents());
 
                 weiData[tileOffset] = weiDataTmp.template AsType<WeiDataVec>()(Number<0>{});
             }
@@ -318,8 +318,8 @@ template <typename InDataType,
           index_t Height,
           index_t UnpackedInputChannels,
           index_t UnpackedOutputChannels>
-__global__ void  __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
-conv3_fwd(const InDataType* in_, const WeiDataType* wei_, AccDataType* c)
+__global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
+    conv3_fwd(const InDataType* in_, const WeiDataType* wei_, AccDataType* c)
 {
     constexpr index_t DataTileHeight = 4;
 

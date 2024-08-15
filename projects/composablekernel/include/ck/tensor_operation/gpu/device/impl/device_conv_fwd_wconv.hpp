@@ -64,8 +64,7 @@ template <index_t NDimSpatial,
           index_t AccBlockTransferScalarPerVector,
           bool AccEnableLds,
           ck::LoopScheduler LoopSched     = make_default_loop_scheduler(),
-          ck::PipelineVersion PipelineVer = ck::PipelineVersion::v1
-          >
+          ck::PipelineVersion PipelineVer = ck::PipelineVersion::v1>
 struct DeviceConvWconv : public DeviceConvFwd<NDimSpatial,
                                               InLayout,
                                               WeiLayout,
@@ -89,18 +88,20 @@ struct DeviceConvWconv : public DeviceConvFwd<NDimSpatial,
 
     // Describe how data read from Global memory
     template <typename InLayout>
-    static auto MakeInGridDescriptor(const std::array<index_t, NDimSpatial + 3>& a_g_n_c_wis_lengths,
-                                    const std::array<index_t, NDimSpatial + 3>& a_g_n_c_wis_strides,
-                                    const std::array<index_t, NDimSpatial + 3>& b_g_k_c_xs_lengths,
-                                    const std::array<index_t, NDimSpatial + 3>& b_g_k_c_xs_strides,
-                                    const std::array<index_t, NDimSpatial + 3>& e_g_n_k_wos_lengths,
-                                    const std::array<index_t, NDimSpatial + 3>& e_g_n_k_wos_strides,
-                                    const std::array<index_t, NDimSpatial>& conv_filter_strides,
-                                    const std::array<index_t, NDimSpatial>& conv_filter_dilations,
-                                    const std::array<index_t, NDimSpatial>& input_left_pads,
-                                    const std::array<index_t, NDimSpatial>& input_right_pads)
+    static auto
+    MakeInGridDescriptor(const std::array<index_t, NDimSpatial + 3>& a_g_n_c_wis_lengths,
+                         const std::array<index_t, NDimSpatial + 3>& a_g_n_c_wis_strides,
+                         const std::array<index_t, NDimSpatial + 3>& b_g_k_c_xs_lengths,
+                         const std::array<index_t, NDimSpatial + 3>& b_g_k_c_xs_strides,
+                         const std::array<index_t, NDimSpatial + 3>& e_g_n_k_wos_lengths,
+                         const std::array<index_t, NDimSpatial + 3>& e_g_n_k_wos_strides,
+                         const std::array<index_t, NDimSpatial>& conv_filter_strides,
+                         const std::array<index_t, NDimSpatial>& conv_filter_dilations,
+                         const std::array<index_t, NDimSpatial>& input_left_pads,
+                         const std::array<index_t, NDimSpatial>& input_right_pads)
     {
-        // Todo: move it to conv_tensor_transformer to support all convolution layouts, like TransformConvFwdToGemm
+        // Todo: move it to conv_tensor_transformer to support all convolution layouts, like
+        // TransformConvFwdToGemm
         static_assert(NDimSpatial == 2 && is_same_v<InLayout, tensor_layout::convolution::G_NHW_C>,
                       "");
 
@@ -135,8 +136,8 @@ struct DeviceConvWconv : public DeviceConvFwd<NDimSpatial,
                 return make_naive_tensor_descriptor(make_tuple(NHo, Wo, C),
                                                     make_tuple(HiStride, WiStride, CStride));
             }
-            else if constexpr (ConvForwardSpecialization ==
-                device::ConvolutionForwardSpecialization::Filter3x3Stride1Pad0)
+            else if constexpr(ConvForwardSpecialization ==
+                              device::ConvolutionForwardSpecialization::Filter3x3Stride1Pad0)
             {
                 // TODO: Add padding size per slice
                 const index_t NHo = N * ck::accumulate_n<index_t>(e_g_n_k_wos_lengths.begin() + 3,
@@ -166,13 +167,14 @@ struct DeviceConvWconv : public DeviceConvFwd<NDimSpatial,
     }
 
     template <typename WeiLayout>
-    static auto MakeWeiGridDescriptor(const std::array<index_t, NDimSpatial + 3>& b_g_k_c_xs_lengths,
-                                    const std::array<index_t, NDimSpatial + 3>& b_g_k_c_xs_strides)
+    static auto
+    MakeWeiGridDescriptor(const std::array<index_t, NDimSpatial + 3>& b_g_k_c_xs_lengths,
+                          const std::array<index_t, NDimSpatial + 3>& b_g_k_c_xs_strides)
     {
-        static_assert(NDimSpatial == 2 && is_same_v<WeiLayout, tensor_layout::convolution::G_K_YX_C>,
-                      "");
+        static_assert(
+            NDimSpatial == 2 && is_same_v<WeiLayout, tensor_layout::convolution::G_K_YX_C>, "");
 
-         const auto wei_data_raw_desc = [&]() {
+        const auto wei_data_raw_desc = [&]() {
             const index_t K = b_g_k_c_xs_lengths[1];
             const index_t C = b_g_k_c_xs_lengths[2];
 
@@ -189,23 +191,22 @@ struct DeviceConvWconv : public DeviceConvFwd<NDimSpatial,
             return wei_k_yx_c_desc;
         }();
 
-        const auto wei_data_desc     = PadTensorDescriptor(wei_data_raw_desc,
-                                                       make_tuple(KPerBlock, 1, CPerBlock),
-                                                       Sequence<true, false, true>{});
+        const auto wei_data_desc = PadTensorDescriptor(
+            wei_data_raw_desc, make_tuple(KPerBlock, 1, CPerBlock), Sequence<true, false, true>{});
         return wei_data_desc;
     }
 
     template <typename AccLayout>
     static auto
     MakeAccGridDescriptor(const std::array<index_t, NDimSpatial + 3>& e_g_n_k_wos_lengths,
-                            const std::array<index_t, NDimSpatial + 3>& e_g_n_k_wos_strides)
+                          const std::array<index_t, NDimSpatial + 3>& e_g_n_k_wos_strides)
     {
         static_assert(NDimSpatial == 2 && is_same_v<AccLayout, tensor_layout::convolution::G_NHW_K>,
                       "");
 
         auto conv_in_transformer = [&]() {
-            const index_t N = e_g_n_k_wos_lengths[1];
-            const index_t K = e_g_n_k_wos_lengths[2];
+            const index_t N  = e_g_n_k_wos_lengths[1];
+            const index_t K  = e_g_n_k_wos_lengths[2];
             const index_t Wo = e_g_n_k_wos_lengths[4];
 
             const auto KStride     = I1;
@@ -313,8 +314,7 @@ struct DeviceConvWconv : public DeviceConvFwd<NDimSpatial,
                                                                      input_right_pads)},
               wei_grid_desc_{DeviceOp::MakeWeiGridDescriptor<WeiLayout>(b_g_k_c_xs_lengths,
                                                                         b_g_k_c_xs_strides)},
-              block_2_etile_map_{
-                  GridwiseConv::MakeDefaultBlock2CTileMap(acc_grid_desc_, 1, 1)},
+              block_2_etile_map_{GridwiseConv::MakeDefaultBlock2CTileMap(acc_grid_desc_, 1, 1)},
               compute_ptr_offset_of_batch_{},
               in_element_op_{in_element_op},
               wei_element_op_{wei_element_op},
@@ -462,11 +462,10 @@ struct DeviceConvWconv : public DeviceConvFwd<NDimSpatial,
     {
         namespace ctc = ck::tensor_layout::convolution;
 
-        if (1)//ck::is_gfx13_supported())
+        if(1) // ck::is_gfx13_supported())
         {
             if constexpr(!(is_same_v<AccDataType, float> || is_same_v<AccDataType, ck::half_t> ||
-                           is_same_v<AccDataType, ck::bhalf_t> ||
-                           is_same_v<AccDataType, int32_t>))
+                           is_same_v<AccDataType, ck::bhalf_t> || is_same_v<AccDataType, int32_t>))
             {
                 printf("DeviceOp err: AccDataType");
                 return false;
@@ -497,7 +496,7 @@ struct DeviceConvWconv : public DeviceConvFwd<NDimSpatial,
             }
         }
         else if constexpr(ConvForwardSpecialization ==
-                         ConvolutionForwardSpecialization::Filter3x3Stride1Pad0)
+                          ConvolutionForwardSpecialization::Filter3x3Stride1Pad0)
         {
             for(index_t i = 0; i < NDimSpatial; ++i)
             {
@@ -527,7 +526,7 @@ struct DeviceConvWconv : public DeviceConvFwd<NDimSpatial,
                      is_same_v<InLayout, ctc::NDHWGC>)
         {
             const index_t C = arg.a_g_n_c_wis_lengths_[2];
-            
+
             if(!(C % InBlockTransferSrcScalarPerVector == 0))
             {
                 return false;
@@ -548,7 +547,7 @@ struct DeviceConvWconv : public DeviceConvFwd<NDimSpatial,
 
         {
             const index_t C = arg.b_g_k_c_xs_lengths_[2];
-            
+
             if(!(C % WeiBlockTransferSrcScalarPerVector == 0))
             {
                 return false;
@@ -567,7 +566,7 @@ struct DeviceConvWconv : public DeviceConvFwd<NDimSpatial,
                      is_same_v<AccLayout, ctc::NDHWGK>)
         {
             const index_t K = arg.e_g_n_k_wos_lengths_[2];
-            
+
             if(!(K % AccBlockTransferScalarPerVector == 0))
             {
                 return false;
@@ -590,23 +589,22 @@ struct DeviceConvWconv : public DeviceConvFwd<NDimSpatial,
         return IsSupportedArgument(*dynamic_cast<const Argument*>(p_arg));
     }
 
-    static auto MakeArgument(
-        const void* p_in,
-        const void* p_wei,
-        void* p_acc,
-        const std::array<index_t, NDimSpatial + 3>& a_g_n_c_wis_lengths,
-        const std::array<index_t, NDimSpatial + 3>& a_g_n_c_wis_strides,
-        const std::array<index_t, NDimSpatial + 3>& b_g_k_c_xs_lengths,
-        const std::array<index_t, NDimSpatial + 3>& b_g_k_c_xs_strides,
-        const std::array<index_t, NDimSpatial + 3>& e_g_n_k_wos_lengths,
-        const std::array<index_t, NDimSpatial + 3>& e_g_n_k_wos_strides,
-        const std::array<index_t, NDimSpatial>& conv_filter_strides,
-        const std::array<index_t, NDimSpatial>& conv_filter_dilations,
-        const std::array<index_t, NDimSpatial>& input_left_pads,
-        const std::array<index_t, NDimSpatial>& input_right_pads,
-        const InElementwiseOperation& in_element_op,
-        const WeiElementwiseOperation& wei_element_op,
-        const AccElementwiseOperation& acc_element_op)
+    static auto MakeArgument(const void* p_in,
+                             const void* p_wei,
+                             void* p_acc,
+                             const std::array<index_t, NDimSpatial + 3>& a_g_n_c_wis_lengths,
+                             const std::array<index_t, NDimSpatial + 3>& a_g_n_c_wis_strides,
+                             const std::array<index_t, NDimSpatial + 3>& b_g_k_c_xs_lengths,
+                             const std::array<index_t, NDimSpatial + 3>& b_g_k_c_xs_strides,
+                             const std::array<index_t, NDimSpatial + 3>& e_g_n_k_wos_lengths,
+                             const std::array<index_t, NDimSpatial + 3>& e_g_n_k_wos_strides,
+                             const std::array<index_t, NDimSpatial>& conv_filter_strides,
+                             const std::array<index_t, NDimSpatial>& conv_filter_dilations,
+                             const std::array<index_t, NDimSpatial>& input_left_pads,
+                             const std::array<index_t, NDimSpatial>& input_right_pads,
+                             const InElementwiseOperation& in_element_op,
+                             const WeiElementwiseOperation& wei_element_op,
+                             const AccElementwiseOperation& acc_element_op)
     {
         return Argument{p_in,
                         p_wei,
@@ -629,23 +627,23 @@ struct DeviceConvWconv : public DeviceConvFwd<NDimSpatial,
     static auto MakeInvoker() { return Invoker{}; }
 
     // polymorphic
-    std::unique_ptr<BaseArgument> MakeArgumentPointer(
-        const void* p_in,
-        const void* p_wei,
-        void* p_acc,
-        const std::array<index_t, NDimSpatial + 3>& a_g_n_c_wis_lengths,
-        const std::array<index_t, NDimSpatial + 3>& a_g_n_c_wis_strides,
-        const std::array<index_t, NDimSpatial + 3>& b_g_k_c_xs_lengths,
-        const std::array<index_t, NDimSpatial + 3>& b_g_k_c_xs_strides,
-        const std::array<index_t, NDimSpatial + 3>& e_g_n_k_wos_lengths,
-        const std::array<index_t, NDimSpatial + 3>& e_g_n_k_wos_strides,
-        const std::array<index_t, NDimSpatial>& conv_filter_strides,
-        const std::array<index_t, NDimSpatial>& conv_filter_dilations,
-        const std::array<index_t, NDimSpatial>& input_left_pads,
-        const std::array<index_t, NDimSpatial>& input_right_pads,
-        const InElementwiseOperation& in_element_op,
-        const WeiElementwiseOperation& wei_element_op,
-        const AccElementwiseOperation& acc_element_op)
+    std::unique_ptr<BaseArgument>
+    MakeArgumentPointer(const void* p_in,
+                        const void* p_wei,
+                        void* p_acc,
+                        const std::array<index_t, NDimSpatial + 3>& a_g_n_c_wis_lengths,
+                        const std::array<index_t, NDimSpatial + 3>& a_g_n_c_wis_strides,
+                        const std::array<index_t, NDimSpatial + 3>& b_g_k_c_xs_lengths,
+                        const std::array<index_t, NDimSpatial + 3>& b_g_k_c_xs_strides,
+                        const std::array<index_t, NDimSpatial + 3>& e_g_n_k_wos_lengths,
+                        const std::array<index_t, NDimSpatial + 3>& e_g_n_k_wos_strides,
+                        const std::array<index_t, NDimSpatial>& conv_filter_strides,
+                        const std::array<index_t, NDimSpatial>& conv_filter_dilations,
+                        const std::array<index_t, NDimSpatial>& input_left_pads,
+                        const std::array<index_t, NDimSpatial>& input_right_pads,
+                        const InElementwiseOperation& in_element_op,
+                        const WeiElementwiseOperation& wei_element_op,
+                        const AccElementwiseOperation& acc_element_op)
     {
         return std::make_unique<Argument>(p_in,
                                           p_wei,
@@ -667,22 +665,22 @@ struct DeviceConvWconv : public DeviceConvFwd<NDimSpatial,
                                           acc_element_op);
     }
     virtual std::unique_ptr<BaseArgument>
-        MakeArgumentPointer(const void* p_in,
-            const void* p_wei,
-            void* p_out,
-            ck::index_t N,
-            ck::index_t K,
-            ck::index_t C,
-            std::vector<ck::index_t> input_spatial_lengths,
-            std::vector<ck::index_t> filter_spatial_lengths,
-            std::vector<ck::index_t> output_spatial_lengths,
-            std::vector<ck::index_t> conv_filter_strides,
-            std::vector<ck::index_t> conv_filter_dilations,
-            std::vector<ck::index_t> input_left_pads,
-            std::vector<ck::index_t> input_right_pads,
-            InElementwiseOperation in_element_op,
-            WeiElementwiseOperation wei_element_op,
-            AccElementwiseOperation out_element_op) override
+    MakeArgumentPointer(const void* p_in,
+                        const void* p_wei,
+                        void* p_out,
+                        ck::index_t N,
+                        ck::index_t K,
+                        ck::index_t C,
+                        std::vector<ck::index_t> input_spatial_lengths,
+                        std::vector<ck::index_t> filter_spatial_lengths,
+                        std::vector<ck::index_t> output_spatial_lengths,
+                        std::vector<ck::index_t> conv_filter_strides,
+                        std::vector<ck::index_t> conv_filter_dilations,
+                        std::vector<ck::index_t> input_left_pads,
+                        std::vector<ck::index_t> input_right_pads,
+                        InElementwiseOperation in_element_op,
+                        WeiElementwiseOperation wei_element_op,
+                        AccElementwiseOperation out_element_op) override
     {
         return std::make_unique<BaseArgument>();
     }

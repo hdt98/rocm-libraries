@@ -103,12 +103,12 @@ struct intrin_wconv_f32_f16<4, 2, 1, 1, 1>
     template <class FloatC>
     __device__ static void Run(const half4_t& reg_wei, const half2_t& reg_data, FloatC& reg_c)
     {
-        reg_c.template AsType<float4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f32_f16_4x2(
-            reg_c.template AsType<float4_t>()[Number<0>{}],
-            reg_wei,
-            reg_data,
-            GetFilterSizeMod<1>(),
-            0);
+        reg_c.template AsType<float4_t>()(Number<0>{}) =
+            __builtin_amdgcn_convolve_f32_f16_4x2(reg_c.template AsType<float4_t>()[Number<0>{}],
+                                                  reg_wei,
+                                                  reg_data,
+                                                  GetFilterSizeMod<1>(),
+                                                  0);
     }
 };
 
@@ -122,12 +122,12 @@ struct intrin_wconv_f32_bf16<4, 2, 1, 1, 1>
     template <class FloatC>
     __device__ static void Run(const bhalf4_t& reg_wei, const bhalf2_t& reg_data, FloatC& reg_c)
     {
-        reg_c.template AsType<float4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f32_bf16_4x2(
-            reg_c.template AsType<float4_t>()[Number<0>{}],
-            bit_cast<bf16x4_t>(reg_wei),
-            bit_cast<bf16x2_t>(reg_data),
-            GetFilterSizeMod<1>(),
-            0);
+        reg_c.template AsType<float4_t>()(Number<0>{}) =
+            __builtin_amdgcn_convolve_f32_bf16_4x2(reg_c.template AsType<float4_t>()[Number<0>{}],
+                                                   bit_cast<bf16x4_t>(reg_wei),
+                                                   bit_cast<bf16x2_t>(reg_data),
+                                                   GetFilterSizeMod<1>(),
+                                                   0);
     }
 };
 
@@ -141,12 +141,12 @@ struct intrin_wconv_f32_f8<4, 2, 1, 1, 1>
     template <class FloatC>
     __device__ static void Run(const f8x8_t& reg_wei, const f8x4_t& reg_data, FloatC& reg_c)
     {
-        reg_c.template AsType<float4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f32_fp8_4x2(
-            reg_c.template AsType<float4_t>()[Number<0>{}],
-            bit_cast<int32x2_t>(reg_wei),
-            bit_cast<int32_t>(reg_data),
-            GetFilterSizeMod<1>(),
-            0);
+        reg_c.template AsType<float4_t>()(Number<0>{}) =
+            __builtin_amdgcn_convolve_f32_fp8_4x2(reg_c.template AsType<float4_t>()[Number<0>{}],
+                                                  bit_cast<int32x2_t>(reg_wei),
+                                                  bit_cast<int32_t>(reg_data),
+                                                  GetFilterSizeMod<1>(),
+                                                  0);
     }
 };
 
@@ -160,12 +160,12 @@ struct intrin_wconv_f32_bf8<4, 2, 1, 1, 1>
     template <class FloatC>
     __device__ static void Run(const bf8x8_t& reg_wei, const bf8x4_t& reg_data, FloatC& reg_c)
     {
-        reg_c.template AsType<float4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f32_bf8_4x2(
-            reg_c.template AsType<float4_t>()[Number<0>{}],
-            bit_cast<int32x2_t>(reg_wei),
-            bit_cast<int32_t>(reg_data),
-            GetFilterSizeMod<1>(),
-            0);
+        reg_c.template AsType<float4_t>()(Number<0>{}) =
+            __builtin_amdgcn_convolve_f32_bf8_4x2(reg_c.template AsType<float4_t>()[Number<0>{}],
+                                                  bit_cast<int32x2_t>(reg_wei),
+                                                  bit_cast<int32_t>(reg_data),
+                                                  GetFilterSizeMod<1>(),
+                                                  0);
     }
 };
 
@@ -259,10 +259,10 @@ struct intrin_wconv_f16_f16<4, 2, 1, 1, 1>
     {
         reg_c.template AsType<half4_t>()(Number<0>{}) =
             __builtin_amdgcn_convolve_f16_f16_4x2(reg_c.template AsType<half4_t>()[Number<0>{}],
-                                                      reg_wei,
-                                                      reg_data,
-                                                      GetFilterSizeMod<1>(),
-                                                      0);
+                                                  reg_wei,
+                                                  reg_data,
+                                                  GetFilterSizeMod<1>(),
+                                                  0);
     }
 };
 
@@ -272,12 +272,12 @@ struct intrin_wconv_f16_f16<4, 4, 1, 1, 1>
     template <class FloatC>
     __device__ static void Run(const half2_t& reg_wei, const half2_t& reg_data, FloatC& reg_c)
     {
-        reg_c.template AsType<half8_t>()(Number<0>{}) = 
+        reg_c.template AsType<half8_t>()(Number<0>{}) =
             __builtin_amdgcn_convolve_f16_f16_4x4(reg_c.template AsType<half8_t>()[Number<0>{}],
-                                                      reg_wei,
-                                                      reg_data,
-                                                      GetFilterSizeMod<1>(),
-                                                      0);
+                                                  reg_wei,
+                                                  reg_data,
+                                                  GetFilterSizeMod<1>(),
+                                                  0);
     }
 };
 
@@ -289,10 +289,10 @@ struct intrin_wconv_f16_f16<8, 4, 1, 1, 1>
     {
         reg_c.template AsType<half8_t>()(Number<0>{}) =
             __builtin_amdgcn_convolve_f16_f16_8x4(reg_c.template AsType<half8_t>()[Number<0>{}],
-                                                      reg_wei,
-                                                      reg_data,
-                                                      GetFilterSizeMod<1>(),
-                                                      0);
+                                                  reg_wei,
+                                                  reg_data,
+                                                  GetFilterSizeMod<1>(),
+                                                  0);
     }
 };
 
@@ -412,10 +412,10 @@ struct intrin_wconv_f16_f8<4, 2, 1, 1, 1>
     {
         reg_c.template AsType<half4_t>()(Number<0>{}) =
             __builtin_amdgcn_convolve_f16_fp8_4x2(reg_c.template AsType<half4_t>()[Number<0>{}],
-                                                      bit_cast<int32x2_t>(reg_wei),
-                                                      bit_cast<int32_t>(reg_data),
-                                                      GetFilterSizeMod<1>(),
-                                                      0);
+                                                  bit_cast<int32x2_t>(reg_wei),
+                                                  bit_cast<int32_t>(reg_data),
+                                                  GetFilterSizeMod<1>(),
+                                                  0);
     }
 };
 
@@ -427,10 +427,10 @@ struct intrin_wconv_f16_f8<4, 4, 1, 1, 1>
     {
         reg_c.template AsType<half8_t>()(Number<0>{}) =
             __builtin_amdgcn_convolve_f16_fp8_4x4(reg_c.template AsType<half8_t>()[Number<0>{}],
-                                                      bit_cast<int32_t>(reg_wei),
-                                                      bit_cast<int32_t>(reg_data),
-                                                      GetFilterSizeMod<1>(),
-                                                      0);
+                                                  bit_cast<int32_t>(reg_wei),
+                                                  bit_cast<int32_t>(reg_data),
+                                                  GetFilterSizeMod<1>(),
+                                                  0);
     }
 };
 
@@ -442,10 +442,10 @@ struct intrin_wconv_f16_f8<8, 4, 1, 1, 1>
     {
         reg_c.template AsType<half8_t>()(Number<0>{}) =
             __builtin_amdgcn_convolve_f16_fp8_8x4(reg_c.template AsType<half8_t>()[Number<0>{}],
-                                                      bit_cast<int32_t>(reg_wei),
-                                                      bit_cast<int32x2_t>(reg_data),
-                                                      GetFilterSizeMod<1>(),
-                                                      0);
+                                                  bit_cast<int32_t>(reg_wei),
+                                                  bit_cast<int32x2_t>(reg_data),
+                                                  GetFilterSizeMod<1>(),
+                                                  0);
     }
 };
 
@@ -709,14 +709,14 @@ struct intrin_wconv_f16_f16<4, 2, 3, DilationX, DilationY>
     template <class FloatC>
     __device__ static void Run(const half36_t& reg_wei, const half6_t reg_data[3], FloatC& reg_c)
     {
-        reg_c.template AsType<half4_t>()(Number<0>{}) =
-            __builtin_amdgcn_convolve_f16_f16_4x2(reg_c.template AsType<half4_t>()[Number<0>{}],
-                                                      reg_wei,
-                                                      reg_data[0],
-                                                      reg_data[1],
-                                                      reg_data[2],
+        reg_c.template AsType<half4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f16_f16_4x2(
+            reg_c.template AsType<half4_t>()[Number<0>{}],
+            reg_wei,
+            reg_data[0],
+            reg_data[1],
+            reg_data[2],
             GetDilationMod<DilationX, DilationY>() | GetFilterSizeMod<3>(),
-                                                      0);
+            0);
     }
 };
 
@@ -726,14 +726,14 @@ struct intrin_wconv_f16_f16<4, 4, 3, DilationX, DilationY>
     template <class FloatC>
     __device__ static void Run(const half18_t& reg_wei, const half6_t reg_data[3], FloatC& reg_c)
     {
-        reg_c.template AsType<half8_t>()(Number<0>{}) =
-            __builtin_amdgcn_convolve_f16_f16_4x4(reg_c.template AsType<half8_t>()[Number<0>{}],
-                                                      reg_wei,
-                                                      reg_data[0],
-                                                      reg_data[1],
-                                                      reg_data[2],
+        reg_c.template AsType<half8_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f16_f16_4x4(
+            reg_c.template AsType<half8_t>()[Number<0>{}],
+            reg_wei,
+            reg_data[0],
+            reg_data[1],
+            reg_data[2],
             GetDilationMod<DilationX, DilationY>() | GetFilterSizeMod<3>(),
-                                                      0);
+            0);
     }
 };
 
@@ -743,14 +743,14 @@ struct intrin_wconv_f16_f16<8, 4, 3, DilationX, DilationY>
     template <class FloatC>
     __device__ static void Run(const half10_t& reg_wei, const half8_t reg_data[3], FloatC& reg_c)
     {
-        reg_c.template AsType<half8_t>()(Number<0>{}) =
-            __builtin_amdgcn_convolve_f16_f16_8x4(reg_c.template AsType<half8_t>()[Number<0>{}],
-                                                      reg_wei,
-                                                      reg_data[0],
-                                                      reg_data[1],
-                                                      reg_data[2],
+        reg_c.template AsType<half8_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f16_f16_8x4(
+            reg_c.template AsType<half8_t>()[Number<0>{}],
+            reg_wei,
+            reg_data[0],
+            reg_data[1],
+            reg_data[2],
             GetDilationMod<DilationX, DilationY>() | GetFilterSizeMod<3>(),
-                                                      0);
+            0);
     }
 };
 
@@ -871,14 +871,14 @@ struct intrin_wconv_f16_f8<4, 2, 3, DilationX, DilationY>
     template <class FloatC>
     __device__ static void Run(const f8x72_t& reg_wei, const f8x12_t reg_data[3], FloatC& reg_c)
     {
-        reg_c.template AsType<half4_t>()(Number<0>{}) =
-            __builtin_amdgcn_convolve_f16_fp8_4x2(reg_c.template AsType<half4_t>()[Number<0>{}],
-                                                      bit_cast<int32x18_t>(reg_wei),
-                                                      bit_cast<int32x3_t>(reg_data[0]),
-                                                      bit_cast<int32x3_t>(reg_data[1]),
-                                                      bit_cast<int32x3_t>(reg_data[2]),
+        reg_c.template AsType<half4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f16_fp8_4x2(
+            reg_c.template AsType<half4_t>()[Number<0>{}],
+            bit_cast<int32x18_t>(reg_wei),
+            bit_cast<int32x3_t>(reg_data[0]),
+            bit_cast<int32x3_t>(reg_data[1]),
+            bit_cast<int32x3_t>(reg_data[2]),
             GetDilationMod<DilationX, DilationY>() | GetFilterSizeMod<3>(),
-                                                      0);
+            0);
     }
 };
 
@@ -888,14 +888,14 @@ struct intrin_wconv_f16_f8<4, 4, 3, DilationX, DilationY>
     template <class FloatC>
     __device__ static void Run(const f8x36_t& reg_wei, const f8x12_t reg_data[3], FloatC& reg_c)
     {
-        reg_c.template AsType<half8_t>()(Number<0>{}) =
-            __builtin_amdgcn_convolve_f16_fp8_4x4(reg_c.template AsType<half8_t>()[Number<0>{}],
-                                                      bit_cast<int32x9_t>(reg_wei),
-                                                      bit_cast<int32x3_t>(reg_data[0]),
-                                                      bit_cast<int32x3_t>(reg_data[1]),
-                                                      bit_cast<int32x3_t>(reg_data[2]),
+        reg_c.template AsType<half8_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f16_fp8_4x4(
+            reg_c.template AsType<half8_t>()[Number<0>{}],
+            bit_cast<int32x9_t>(reg_wei),
+            bit_cast<int32x3_t>(reg_data[0]),
+            bit_cast<int32x3_t>(reg_data[1]),
+            bit_cast<int32x3_t>(reg_data[2]),
             GetDilationMod<DilationX, DilationY>() | GetFilterSizeMod<3>(),
-                                                      0);
+            0);
     }
 };
 
@@ -905,14 +905,14 @@ struct intrin_wconv_f16_f8<8, 4, 3, DilationX, DilationY>
     template <class FloatC>
     __device__ static void Run(const f8x20_t& reg_wei, const f8x16_t reg_data[3], FloatC& reg_c)
     {
-        reg_c.template AsType<half8_t>()(Number<0>{}) =
-            __builtin_amdgcn_convolve_f16_fp8_8x4(reg_c.template AsType<half8_t>()[Number<0>{}],
-                                                      bit_cast<int32x5_t>(reg_wei),
-                                                      bit_cast<int32x4_t>(reg_data[0]),
-                                                      bit_cast<int32x4_t>(reg_data[1]),
-                                                      bit_cast<int32x4_t>(reg_data[2]),
+        reg_c.template AsType<half8_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f16_fp8_8x4(
+            reg_c.template AsType<half8_t>()[Number<0>{}],
+            bit_cast<int32x5_t>(reg_wei),
+            bit_cast<int32x4_t>(reg_data[0]),
+            bit_cast<int32x4_t>(reg_data[1]),
+            bit_cast<int32x4_t>(reg_data[2]),
             GetDilationMod<DilationX, DilationY>() | GetFilterSizeMod<3>(),
-                                                      0);
+            0);
     }
 };
 

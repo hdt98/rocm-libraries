@@ -61,8 +61,8 @@ CK_TILE_DEVICE index_t get_block_id() { return blockIdx.x; }
 CK_TILE_DEVICE void block_sync_lds()
 {
 #if CK_TILE_EXPERIMENTAL_BLOCK_SYNC_LDS_WITHOUT_SYNC_VMEM
- #if defined(__gfx13__)
-   asm volatile("\
+#if defined(__gfx13__)
+    asm volatile("\
     s_wait_kmcnt 0x0 \n \
     s_barrier_wait -1 \
     " ::);

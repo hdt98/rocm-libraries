@@ -61,7 +61,8 @@ struct GridwiseConvPipeline_v1<1, true, true>
                                index_t num_loop)
     {
         constexpr index_t NumTape = wei_blockwise_copy.Size();
-        using WeiDataBlockTransfer0 = std::remove_const_t<remove_cvref_t<decltype(wei_blockwise_copy[I0])>>;
+        using WeiDataBlockTransfer0 =
+            std::remove_const_t<remove_cvref_t<decltype(wei_blockwise_copy[I0])>>;
 
         // preload data into LDS
         static_for<0, NumTape, 1>{}([&](auto i) {
@@ -105,7 +106,7 @@ struct GridwiseConvPipeline_v1<1, true, true>
 
                 block_sync_lds();
 
-                 static_for<0, NumTape, 1>{}([&](auto i) {
+                static_for<0, NumTape, 1>{}([&](auto i) {
                     const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[i])
                         .MoveSrcSliceWindow(wei_grid_desc, wei_block_copy_step);
                 });
@@ -176,9 +177,9 @@ struct GridwiseConvPipeline_v1<1, false, true>
                                AccumThreadBuffer& accum_thread_buf,
                                index_t num_loop)
     {
-        constexpr index_t NumTape = wei_blockwise_copy.Size();
+        constexpr index_t NumTape          = wei_blockwise_copy.Size();
         constexpr auto in_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0);
-        auto in_block_buf_switch = in_block_buf;
+        auto in_block_buf_switch           = in_block_buf;
 
         using WeiDataBlockTransfer0 =
             std::remove_const_t<remove_cvref_t<decltype(wei_blockwise_copy[I0])>>;
@@ -211,8 +212,11 @@ struct GridwiseConvPipeline_v1<1, false, true>
             index_t i = 0;
             do
             {
-                in_blockwise_copy.Run(
-                    in_grid_desc, in_grid_buf, in_block_desc, in_block_origin_idx, in_block_buf_switch);
+                in_blockwise_copy.Run(in_grid_desc,
+                                      in_grid_buf,
+                                      in_block_desc,
+                                      in_block_origin_idx,
+                                      in_block_buf_switch);
 
                 block_sync_lds();
 
@@ -306,7 +310,7 @@ struct GridwiseConvPipeline_v1<1, false, false>
 
         // preload data into LDS
         static_for<0, NumTape, 1>{}([&](auto i) {
-        const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[i])
+            const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[i])
                 .Run(wei_grid_desc,
                      wei_grid_buf,
                      wei_block_desc,
@@ -314,7 +318,8 @@ struct GridwiseConvPipeline_v1<1, false, false>
                      wei_block_buf);
         });
 
-        in_blockwise_copy.Run(in_grid_desc, in_grid_buf, in_block_desc, in_block_origin_idx, in_block_buf);
+        in_blockwise_copy.Run(
+            in_grid_desc, in_grid_buf, in_block_desc, in_block_origin_idx, in_block_buf);
 
         static_for<0, NumTape, 1>{}([&](auto i) {
             const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[i])
@@ -358,7 +363,7 @@ struct GridwiseConvPipeline_v1<1, false, false>
 
                 in_blockwise_copy.MoveSrcSliceWindow(in_grid_desc, in_block_copy_step);
 
-                in_block_buf = in_block_buf_switch;
+                in_block_buf  = in_block_buf_switch;
                 wei_block_buf = wei_block_buf_switch;
                 ++i;
             } while(i < (num_loop - 1));

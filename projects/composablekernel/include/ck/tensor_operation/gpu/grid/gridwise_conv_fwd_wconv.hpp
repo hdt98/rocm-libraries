@@ -34,20 +34,20 @@ template <typename GridwiseOp,
           bool HasMainBlockLoop>
 __global__ void
 #if CK_USE_LAUNCH_BOUNDS
-__launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
+    __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
 #endif
-    kernel_grouped_conv_wconv(const InDataType* __restrict__ p_in_grid,
-                              const WeiDataType* __restrict__ p_wei_grid,
-                              AccDataType* __restrict__ p_acc_grid,
-                              const InElementwiseOperation in_element_op,
-                              const WeiElementwiseOperation wei_element_op,
-                              const AccElementwiseOperation acc_element_op,
-                              const index_t batch_count,
-                              const InGridDesc in_grid_desc,
-                              const WeiGridDesc wei_grid_desc,
-                              const AccGridDesc acc_grid_desc,
-                              const Block2CTileMap block_2_ctile_map,
-                              const ComputePtrOffsetOfBatch compute_ptr_offset_of_batch)
+        kernel_grouped_conv_wconv(const InDataType* __restrict__ p_in_grid,
+                                  const WeiDataType* __restrict__ p_wei_grid,
+                                  AccDataType* __restrict__ p_acc_grid,
+                                  const InElementwiseOperation in_element_op,
+                                  const WeiElementwiseOperation wei_element_op,
+                                  const AccElementwiseOperation acc_element_op,
+                                  const index_t batch_count,
+                                  const InGridDesc in_grid_desc,
+                                  const WeiGridDesc wei_grid_desc,
+                                  const AccGridDesc acc_grid_desc,
+                                  const Block2CTileMap block_2_ctile_map,
+                                  const ComputePtrOffsetOfBatch compute_ptr_offset_of_batch)
 {
 #if(!defined(__HIP_DEVICE_COMPILE__) || defined(__gfx11__) || defined(__gfx12__) || \
     defined(__gfx13__))
@@ -386,8 +386,7 @@ struct GridwiseConv_Wconv
         return wei_wave_desc;
     }
 
-    __host__ __device__ static constexpr auto
-    GetAccBlockDescriptor()
+    __host__ __device__ static constexpr auto GetAccBlockDescriptor()
     {
         constexpr auto acc_block_desc = make_naive_tensor_descriptor_packed(
             make_tuple(Number<HPerBlock>{}, Number<WPerBlock>{}, Number<KPerBlock>{}));
@@ -450,15 +449,14 @@ struct GridwiseConv_Wconv
         static_assert(WPerBlock % (WRepeat * WPerWconv) == 0, "");
 
         const auto GetInProblemsize = [&]() {
-            return make_tuple(in_grid_desc.GetLength(I0),
-                                in_grid_desc.GetLength(I1),
-                                in_grid_desc.GetLength(I2));
+            return make_tuple(
+                in_grid_desc.GetLength(I0), in_grid_desc.GetLength(I1), in_grid_desc.GetLength(I2));
         };
 
         const auto GetWeiProblemsize = [&]() {
             return make_tuple(wei_grid_desc.GetLength(I0),
-                                wei_grid_desc.GetLength(I1),
-                                wei_grid_desc.GetLength(I2));
+                              wei_grid_desc.GetLength(I1),
+                              wei_grid_desc.GetLength(I2));
         };
 
         const auto H = GetInProblemsize()[I0];
@@ -581,7 +579,7 @@ struct GridwiseConv_Wconv
                           wei_block_space_size_aligned * sizeof(WeiDataType));
     };
 
-    //Debug<Number<SharedMemTrait::lds_size>> ddddd;
+    // Debug<Number<SharedMemTrait::lds_size>> ddddd;
     using AccGridDescriptor_Block =
         remove_cvref_t<decltype(MakeAccGridDescriptor_Block(AccGridDesc{}))>;
     using DefaultBlock2CTileMap =
@@ -773,8 +771,9 @@ struct GridwiseConv_Wconv
                             make_multi_index(k_block_data_idx_on_grid, I, 0),
                             wei_element_op,
                             wei_block_desc,
-                            (FilterSize == 3) ? make_multi_index(0, wconv_conv.GetWeight3RemapTable()[I], 0)
-                                              : make_multi_index(0, 0, 0),
+                            (FilterSize == 3)
+                                ? make_multi_index(0, wconv_conv.GetWeight3RemapTable()[I], 0)
+                                : make_multi_index(0, 0, 0),
                             ck::tensor_operation::element_wise::PassThrough{});
                     },
                     NumberYX{});
@@ -1007,9 +1006,9 @@ struct GridwiseConv_Wconv
                 InMemoryDataOperationEnum::Set,            // DstInMemOp,
                 Sequence<HPerBlock, WPerBlock, KPerBlock>, // BlockSliceLengths,
                 AccBlockTransferClusterLengths,
-                Sequence<0, 1, 2>,                         // typename ThreadClusterArrangeOrder,
-                AccDataType,                               // typename SrcData,
-                AccDataType,                               // typename DstData,
+                Sequence<0, 1, 2>, // typename ThreadClusterArrangeOrder,
+                AccDataType,       // typename SrcData,
+                AccDataType,       // typename DstData,
                 decltype(acc_block_desc),
                 decltype(acc_grid_desc),
                 Sequence<0, 1, 2>,               // typename DimAccessOrder,

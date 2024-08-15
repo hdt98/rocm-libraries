@@ -61,7 +61,8 @@ __global__ void
                                           bool output_permute)
 {
     ignore = alpha;
-#if(!defined(__HIP_DEVICE_COMPILE__) || defined(__gfx11__) || defined(__gfx12__) || defined(__gfx13__))
+#if(!defined(__HIP_DEVICE_COMPILE__) || defined(__gfx11__) || defined(__gfx12__) || \
+    defined(__gfx13__))
 
     // clang-format off
 // ***************************************************
