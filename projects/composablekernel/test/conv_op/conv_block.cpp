@@ -84,8 +84,14 @@ template <typename InDataType,
 __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
     conv_block_fwd(const InDataType* in, const WeiDataType* wei, AccDataType* c)
 {
-    constexpr auto wconv_conv =
-        ck::WconvConv<WeiDataType, InDataType, AccDataType, HPerWconv, WPerWconv, FilterSize>();
+    constexpr auto wconv_conv = ck::WconvConv<WeiDataType,
+                                              InDataType,
+                                              AccDataType,
+                                              HPerWconv,
+                                              WPerWconv,
+                                              FilterSize,
+                                              DilationX,
+                                              DilationY>();
 
     constexpr index_t LDS_SIZE  = 32 * 1024;
     constexpr index_t BlockSize = DEFAULT_BLOCKSIZE;

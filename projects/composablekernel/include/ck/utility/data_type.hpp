@@ -10,6 +10,7 @@ namespace ck {
 using bhalf_t = ushort;
 using half_t  = _Float16;
 using int4_t  = _BitInt(4);
+using uint4_t = unsigned _BitInt(4);
 using f8_t    = _BitInt(8);
 using bf8_t   = unsigned _BitInt(8);
 

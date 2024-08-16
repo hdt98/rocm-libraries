@@ -28,548 +28,398 @@ enum struct WconvInstr
     wconv_f16_iu4
 };
 
-template <WconvInstr Instr, index_t H, index_t W, index_t FilterSize>
+template <WconvInstr Instr,
+          index_t H,
+          index_t W,
+          index_t FilterSize,
+          index_t DilationX,
+          index_t DilationY,
+          index_t Iters = 1,
+          bool Aco      = false,
+          bool Signed   = false>
 struct wconv_type
 {
     wconv_type() { static_assert(false, "never called"); }
 };
 
-#define WCONV_TYPE_CONSTS( \
-    input_chans, output_chans, weight_component, data_component, acc_component, data_tile)
-
 // dst: f32 or i32
-template <>
-struct wconv_type<WconvInstr::wconv_f32_f16, 4, 2, 1>
+template <index_t H,
+          index_t W,
+          index_t FilterSize,
+          index_t DilationX,
+          index_t DilationY,
+          index_t Iters,
+          bool Aco,
+          bool Signed>
+struct wconv_type<WconvInstr::wconv_f32_f16,
+                  H,
+                  W,
+                  FilterSize,
+                  DilationX,
+                  DilationY,
+                  Iters,
+                  Aco,
+                  Signed>
 {
-    template <class FloatC, index_t DilationX, index_t DilationY>
-    __device__ void run(const half4_t& reg_wei, const half2_t& reg_data, FloatC& reg_c) const
+    template <class FloatA, class FloatB, class FloatC>
+    __device__ void run(const FloatA& reg_wei, const FloatB reg_data, FloatC& reg_c) const
     {
-        intrin_wconv_f32_f16<4, 2, 1, 1, 1>::Run(reg_wei, reg_data, reg_c);
+        intrin_wconv_f32_f16<H, W, FilterSize, DilationX, DilationY, Iters, Aco, Signed>::Run(
+            reg_wei, reg_data, reg_c);
     }
 };
 
-template <>
-struct wconv_type<WconvInstr::wconv_f32_bf16, 4, 2, 1>
+template <index_t H,
+          index_t W,
+          index_t FilterSize,
+          index_t DilationX,
+          index_t DilationY,
+          index_t Iters,
+          bool Aco,
+          bool Signed>
+struct wconv_type<WconvInstr::wconv_f32_bf16,
+                  H,
+                  W,
+                  FilterSize,
+                  DilationX,
+                  DilationY,
+                  Iters,
+                  Aco,
+                  Signed>
 {
-    template <class FloatC, index_t DilationX, index_t DilationY>
-    __device__ void run(const bhalf4_t& reg_wei, const bhalf2_t& reg_data, FloatC& reg_c) const
+    template <class FloatA, class FloatB, class FloatC>
+    __device__ void run(const FloatA& reg_wei, const FloatB reg_data, FloatC& reg_c) const
     {
-        intrin_wconv_f32_bf16<4, 2, 1, 1, 1>::Run(reg_wei, reg_data, reg_c);
+        intrin_wconv_f32_bf16<H, W, FilterSize, DilationX, DilationY, Iters, Aco, Signed>::Run(
+            reg_wei, reg_data, reg_c);
     }
 };
 
-template <>
-struct wconv_type<WconvInstr::wconv_f32_f8, 4, 2, 1>
+template <index_t H,
+          index_t W,
+          index_t FilterSize,
+          index_t DilationX,
+          index_t DilationY,
+          index_t Iters,
+          bool Aco,
+          bool Signed>
+struct wconv_type<WconvInstr::wconv_f32_f8,
+                  H,
+                  W,
+                  FilterSize,
+                  DilationX,
+                  DilationY,
+                  Iters,
+                  Aco,
+                  Signed>
 {
-    template <class FloatC, index_t DilationX, index_t DilationY>
-    __device__ void run(const f8x8_t& reg_wei, const f8x4_t& reg_data, FloatC& reg_c) const
+    template <class FloatA, class FloatB, class FloatC>
+    __device__ void run(const FloatA& reg_wei, const FloatB reg_data, FloatC& reg_c) const
     {
-        intrin_wconv_f32_f8<4, 2, 1, 1, 1>::Run(reg_wei, reg_data, reg_c);
+        intrin_wconv_f32_f8<H, W, FilterSize, DilationX, DilationY, Iters, Aco, Signed>::Run(
+            reg_wei, reg_data, reg_c);
     }
 };
 
-template <>
-struct wconv_type<WconvInstr::wconv_f32_bf8, 4, 2, 1>
+template <index_t H,
+          index_t W,
+          index_t FilterSize,
+          index_t DilationX,
+          index_t DilationY,
+          index_t Iters,
+          bool Aco,
+          bool Signed>
+struct wconv_type<WconvInstr::wconv_f32_bf8,
+                  H,
+                  W,
+                  FilterSize,
+                  DilationX,
+                  DilationY,
+                  Iters,
+                  Aco,
+                  Signed>
 {
-    template <class FloatC, index_t DilationX, index_t DilationY>
-    __device__ void run(const bf8x8_t& reg_wei, const bf8x4_t& reg_data, FloatC& reg_c) const
+    template <class FloatA, class FloatB, class FloatC>
+    __device__ void run(const FloatA& reg_wei, const FloatB reg_data, FloatC& reg_c) const
     {
-        intrin_wconv_f32_bf8<4, 2, 1, 1, 1>::Run(reg_wei, reg_data, reg_c);
+        intrin_wconv_f32_bf8<H, W, FilterSize, DilationX, DilationY, Iters, Aco, Signed>::Run(
+            reg_wei, reg_data, reg_c);
     }
 };
 
-template <>
-struct wconv_type<WconvInstr::wconv_f32_iu8, 4, 2, 1>
+template <index_t H,
+          index_t W,
+          index_t FilterSize,
+          index_t DilationX,
+          index_t DilationY,
+          index_t Iters,
+          bool Aco,
+          bool Signed>
+struct wconv_type<WconvInstr::wconv_f32_iu8,
+                  H,
+                  W,
+                  FilterSize,
+                  DilationX,
+                  DilationY,
+                  Iters,
+                  Aco,
+                  Signed>
 {
-    template <class FloatC, index_t DilationX, index_t DilationY>
-    __device__ void run(const int8x8_t& reg_wei, const int8x4_t& reg_data, FloatC& reg_c) const
+    template <class FloatA, class FloatB, class FloatC>
+    __device__ void run(const FloatA& reg_wei, const FloatB reg_data, FloatC& reg_c) const
     {
-        intrin_wconv_f32_iu8<4, 2, 1, 1, 1>::Run(reg_wei, reg_data, reg_c);
+        intrin_wconv_f32_iu8<H, W, FilterSize, DilationX, DilationY, Iters, Aco, Signed>::Run(
+            reg_wei, reg_data, reg_c);
     }
 };
 
-template <>
-struct wconv_type<WconvInstr::wconv_i32_iu8, 4, 2, 1>
+template <index_t H,
+          index_t W,
+          index_t FilterSize,
+          index_t DilationX,
+          index_t DilationY,
+          index_t Iters,
+          bool Aco,
+          bool Signed>
+struct wconv_type<WconvInstr::wconv_i32_iu8,
+                  H,
+                  W,
+                  FilterSize,
+                  DilationX,
+                  DilationY,
+                  Iters,
+                  Aco,
+                  Signed>
 {
-    template <class FloatC, index_t DilationX, index_t DilationY>
-    __device__ void run(const int8x8_t& reg_wei, const int8x4_t& reg_data, FloatC& reg_c) const
+    template <class FloatA, class FloatB, class FloatC>
+    __device__ void run(const FloatA& reg_wei, const FloatB reg_data, FloatC& reg_c) const
     {
-        intrin_wconv_i32_iu8<4, 2, 1, 1, 1>::Run(reg_wei, reg_data, reg_c);
+        intrin_wconv_i32_iu8<H, W, FilterSize, DilationX, DilationY, Iters, Aco, Signed>::Run(
+            reg_wei, reg_data, reg_c);
     }
 };
 
 #if CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
-template <>
-struct wconv_type<WconvInstr::wconv_f32_iu4, 4, 2, 1>
+template <index_t H,
+          index_t W,
+          index_t FilterSize,
+          index_t DilationX,
+          index_t DilationY,
+          index_t Iters,
+          bool Aco,
+          bool Signed>
+struct wconv_type<WconvInstr::wconv_f32_iu4,
+                  H,
+                  W,
+                  FilterSize,
+                  DilationX,
+                  DilationY,
+                  Iters,
+                  Aco,
+                  Signed>
 {
-    template <class FloatC, index_t DilationX, index_t DilationY>
-    __device__ void run(const int4x16_t& reg_wei, const int4x8_t& reg_data, FloatC& reg_c) const
+    template <class FloatA, class FloatB, class FloatC>
+    __device__ void run(const FloatA& reg_wei, const FloatB reg_data, FloatC& reg_c) const
     {
-        intrin_wconv_f32_iu4<4, 2, 1, 1, 1>::Run(reg_wei, reg_data, reg_c);
+        intrin_wconv_f32_iu4<H, W, FilterSize, DilationX, DilationY, Iters, Aco, Signed>::Run(
+            reg_wei, reg_data, reg_c);
     }
 };
 
-template <>
-struct wconv_type<WconvInstr::wconv_i32_iu4, 4, 2, 1>
+template <index_t H,
+          index_t W,
+          index_t FilterSize,
+          index_t DilationX,
+          index_t DilationY,
+          index_t Iters,
+          bool Aco,
+          bool Signed>
+struct wconv_type<WconvInstr::wconv_i32_iu4,
+                  H,
+                  W,
+                  FilterSize,
+                  DilationX,
+                  DilationY,
+                  Iters,
+                  Aco,
+                  Signed>
 {
-    template <class FloatC, index_t DilationX, index_t DilationY>
-    __device__ void run(const int4x16_t& reg_wei, const int4x8_t& reg_data, FloatC& reg_c) const
+    template <class FloatA, class FloatB, class FloatC>
+    __device__ void run(const FloatA& reg_wei, const FloatB reg_data, FloatC& reg_c) const
     {
-        intrin_wconv_i32_iu4<4, 2, 1, 1, 1>::Run(reg_wei, reg_data, reg_c);
-    }
-};
-template <>
-struct wconv_type<WconvInstr::wconv_f16_iu4, 4, 2, 1>
-{
-    template <class FloatC, index_t DilationX, index_t DilationY>
-    __device__ void run(const int4x16_t& reg_wei, const int4x8_t& reg_data, FloatC& reg_c) const
-    {
-        intrin_wconv_f16_iu4<4, 2, 1, 1, 1>::Run(reg_wei, reg_data, reg_c);
-    }
-};
-
-template <>
-struct wconv_type<WconvInstr::wconv_f16_iu4, 4, 4, 1>
-{
-    template <class FloatC, index_t DilationX, index_t DilationY>
-    __device__ void run(const int4x8_t& reg_wei, const int4x8_t& reg_data, FloatC& reg_c) const
-    {
-        intrin_wconv_f16_iu4<4, 4, 1, 1, 1>::Run(reg_wei, reg_data, reg_c);
+        intrin_wconv_i32_iu4<H, W, FilterSize, DilationX, DilationY, Iters, Aco, Signed>::Run(
+            reg_wei, reg_data, reg_c);
     }
 };
 
-template <>
-struct wconv_type<WconvInstr::wconv_f16_iu4, 8, 4, 1>
+template <index_t H,
+          index_t W,
+          index_t FilterSize,
+          index_t DilationX,
+          index_t DilationY,
+          index_t Iters,
+          bool Aco,
+          bool Signed>
+struct wconv_type<WconvInstr::wconv_f16_iu4,
+                  H,
+                  W,
+                  FilterSize,
+                  DilationX,
+                  DilationY,
+                  Iters,
+                  Aco,
+                  Signed>
 {
-    template <class FloatC, index_t DilationX, index_t DilationY>
-    __device__ void run(const int4x8_t& reg_wei, const int4x16_t& reg_data, FloatC& reg_c) const
+    template <class FloatA, class FloatB, class FloatC>
+    __device__ void run(const FloatA& reg_wei, const FloatB reg_data, FloatC& reg_c) const
     {
-        intrin_wconv_f16_iu4<8, 4, 1, 1, 1>::Run(reg_wei, reg_data, reg_c);
+        intrin_wconv_f16_iu4<H, W, FilterSize, DilationX, DilationY, Iters, Aco, Signed>::Run(
+            reg_wei, reg_data, reg_c);
     }
 };
 #endif
 
 // dst: f16 or bf16
-template <>
-struct wconv_type<WconvInstr::wconv_f16_f16, 4, 2, 1>
+template <index_t H,
+          index_t W,
+          index_t FilterSize,
+          index_t DilationX,
+          index_t DilationY,
+          index_t Iters,
+          bool Aco,
+          bool Signed>
+struct wconv_type<WconvInstr::wconv_f16_f16,
+                  H,
+                  W,
+                  FilterSize,
+                  DilationX,
+                  DilationY,
+                  Iters,
+                  Aco,
+                  Signed>
 {
-    template <class FloatC, index_t DilationX, index_t DilationY>
-    __device__ void run(const half4_t& reg_wei, const half2_t& reg_data, FloatC& reg_c) const
+    template <class FloatA, class FloatB, class FloatC>
+    __device__ void run(const FloatA& reg_wei, const FloatB reg_data, FloatC& reg_c) const
     {
-        intrin_wconv_f16_f16<4, 2, 1, 1, 1>::Run(reg_wei, reg_data, reg_c);
+        intrin_wconv_f16_f16<H, W, FilterSize, DilationX, DilationY, Iters, Aco, Signed>::Run(
+            reg_wei, reg_data, reg_c);
     }
 };
 
-template <>
-struct wconv_type<WconvInstr::wconv_f16_f16, 4, 4, 1>
+template <index_t H,
+          index_t W,
+          index_t FilterSize,
+          index_t DilationX,
+          index_t DilationY,
+          index_t Iters,
+          bool Aco,
+          bool Signed>
+struct wconv_type<WconvInstr::wconv_bf16_bf16,
+                  H,
+                  W,
+                  FilterSize,
+                  DilationX,
+                  DilationY,
+                  Iters,
+                  Aco,
+                  Signed>
 {
-    template <class FloatC, index_t DilationX, index_t DilationY>
-    __device__ void run(const half2_t& reg_wei, const half2_t& reg_data, FloatC& reg_c) const
+    template <class FloatA, class FloatB, class FloatC>
+    __device__ void run(const FloatA& reg_wei, const FloatB reg_data, FloatC& reg_c) const
     {
-        intrin_wconv_f16_f16<4, 4, 1, 1, 1>::Run(reg_wei, reg_data, reg_c);
+        intrin_wconv_bf16_bf16<H, W, FilterSize, DilationX, DilationY, Iters, Aco, Signed>::Run(
+            reg_wei, reg_data, reg_c);
     }
 };
 
-template <>
-struct wconv_type<WconvInstr::wconv_f16_f16, 8, 4, 1>
+template <index_t H,
+          index_t W,
+          index_t FilterSize,
+          index_t DilationX,
+          index_t DilationY,
+          index_t Iters,
+          bool Aco,
+          bool Signed>
+struct wconv_type<WconvInstr::wconv_f16_f8,
+                  H,
+                  W,
+                  FilterSize,
+                  DilationX,
+                  DilationY,
+                  Iters,
+                  Aco,
+                  Signed>
 {
-    template <class FloatC, index_t DilationX, index_t DilationY>
-    __device__ void run(const half2_t& reg_wei, const half4_t& reg_data, FloatC& reg_c) const
+    template <class FloatA, class FloatB, class FloatC>
+    __device__ void run(const FloatA& reg_wei, const FloatB reg_data, FloatC& reg_c) const
     {
-        intrin_wconv_f16_f16<8, 4, 1, 1, 1>::Run(reg_wei, reg_data, reg_c);
+        intrin_wconv_f16_f8<H, W, FilterSize, DilationX, DilationY, Iters, Aco, Signed>::Run(
+            reg_wei, reg_data, reg_c);
     }
 };
 
-template <>
-struct wconv_type<WconvInstr::wconv_bf16_bf16, 4, 2, 1>
+template <index_t H,
+          index_t W,
+          index_t FilterSize,
+          index_t DilationX,
+          index_t DilationY,
+          index_t Iters,
+          bool Aco,
+          bool Signed>
+struct wconv_type<WconvInstr::wconv_bf16_bf8,
+                  H,
+                  W,
+                  FilterSize,
+                  DilationX,
+                  DilationY,
+                  Iters,
+                  Aco,
+                  Signed>
 {
-    template <class FloatC, index_t DilationX, index_t DilationY>
-    __device__ void run(const bhalf4_t& reg_wei, const bhalf2_t& reg_data, FloatC& reg_c) const
+    template <class FloatA, class FloatB, class FloatC>
+    __device__ void run(const FloatA& reg_wei, const FloatB reg_data, FloatC& reg_c) const
     {
-        intrin_wconv_bf16_bf16<4, 2, 1, 1, 1>::Run(reg_wei, reg_data, reg_c);
+        intrin_wconv_bf16_bf8<H, W, FilterSize, DilationX, DilationY, Iters, Aco, Signed>::Run(
+            reg_wei, reg_data, reg_c);
     }
 };
 
-template <>
-struct wconv_type<WconvInstr::wconv_bf16_bf16, 4, 4, 1>
+template <index_t H,
+          index_t W,
+          index_t FilterSize,
+          index_t DilationX,
+          index_t DilationY,
+          index_t Iters,
+          bool Aco,
+          bool Signed>
+struct wconv_type<WconvInstr::wconv_f16_iu8,
+                  H,
+                  W,
+                  FilterSize,
+                  DilationX,
+                  DilationY,
+                  Iters,
+                  Aco,
+                  Signed>
 {
-    template <class FloatC, index_t DilationX, index_t DilationY>
-    __device__ void run(const bhalf2_t& reg_wei, const bhalf2_t& reg_data, FloatC& reg_c) const
+    template <class FloatA, class FloatB, class FloatC>
+    __device__ void run(const FloatA& reg_wei, const FloatB reg_data, FloatC& reg_c) const
     {
-        intrin_wconv_bf16_bf16<4, 4, 1, 1, 1>::Run(reg_wei, reg_data, reg_c);
+        intrin_wconv_f16_iu8<H, W, FilterSize, DilationX, DilationY, Iters, Aco, Signed>::Run(
+            reg_wei, reg_data, reg_c);
     }
 };
 
-template <>
-struct wconv_type<WconvInstr::wconv_bf16_bf16, 8, 4, 1>
-{
-    template <class FloatC, index_t DilationX, index_t DilationY>
-    __device__ void run(const bhalf2_t& reg_wei, const bhalf4_t& reg_data, FloatC& reg_c) const
-    {
-        intrin_wconv_bf16_bf16<8, 4, 1, 1, 1>::Run(reg_wei, reg_data, reg_c);
-    }
-};
-
-template <>
-struct wconv_type<WconvInstr::wconv_f16_f8, 4, 2, 1>
-{
-    template <class FloatC, index_t DilationX, index_t DilationY>
-    __device__ void run(const f8x8_t& reg_wei, const f8x4_t& reg_data, FloatC& reg_c) const
-    {
-        intrin_wconv_f16_f8<4, 2, 1, 1, 1>::Run(reg_wei, reg_data, reg_c);
-    }
-};
-
-template <>
-struct wconv_type<WconvInstr::wconv_f16_f8, 4, 4, 1>
-{
-    template <class FloatC, index_t DilationX, index_t DilationY>
-    __device__ void run(const f8x4_t& reg_wei, const f8x4_t& reg_data, FloatC& reg_c) const
-    {
-        intrin_wconv_f16_f8<4, 4, 1, 1, 1>::Run(reg_wei, reg_data, reg_c);
-    }
-};
-
-template <>
-struct wconv_type<WconvInstr::wconv_f16_f8, 8, 4, 1>
-{
-    template <class FloatC, index_t DilationX, index_t DilationY>
-    __device__ void run(const f8x4_t& reg_wei, const f8x8_t& reg_data, FloatC& reg_c) const
-    {
-        intrin_wconv_f16_f8<8, 4, 1, 1, 1>::Run(reg_wei, reg_data, reg_c);
-    }
-};
-
-template <>
-struct wconv_type<WconvInstr::wconv_bf16_bf8, 4, 2, 1>
-{
-    template <class FloatC, index_t DilationX, index_t DilationY>
-    __device__ void run(const bf8x8_t& reg_wei, const bf8x4_t& reg_data, FloatC& reg_c) const
-    {
-        intrin_wconv_bf16_bf8<4, 2, 1, 1, 1>::Run(reg_wei, reg_data, reg_c);
-    }
-};
-
-template <>
-struct wconv_type<WconvInstr::wconv_bf16_bf8, 4, 4, 1>
-{
-    template <class FloatC, index_t DilationX, index_t DilationY>
-    __device__ void run(const bf8x4_t& reg_wei, const bf8x4_t& reg_data, FloatC& reg_c) const
-    {
-        intrin_wconv_bf16_bf8<4, 4, 1, 1, 1>::Run(reg_wei, reg_data, reg_c);
-    }
-};
-
-template <>
-struct wconv_type<WconvInstr::wconv_bf16_bf8, 8, 4, 1>
-{
-    template <class FloatC, index_t DilationX, index_t DilationY>
-    __device__ void run(const bf8x4_t& reg_wei, const bf8x8_t& reg_data, FloatC& reg_c) const
-    {
-        intrin_wconv_bf16_bf8<8, 4, 1, 1, 1>::Run(reg_wei, reg_data, reg_c);
-    }
-};
-
-template <>
-struct wconv_type<WconvInstr::wconv_f16_iu8, 4, 2, 1>
-{
-    template <class FloatC, index_t DilationX, index_t DilationY>
-    __device__ void run(const int8x8_t& reg_wei, const int8x4_t& reg_data, FloatC& reg_c) const
-    {
-        intrin_wconv_f16_iu8<4, 2, 1, 1, 1>::Run(reg_wei, reg_data, reg_c);
-    }
-};
-
-template <>
-struct wconv_type<WconvInstr::wconv_f16_iu8, 4, 4, 1>
-{
-    template <class FloatC, index_t DilationX, index_t DilationY>
-    __device__ void run(const int8x4_t& reg_wei, const int8x4_t& reg_data, FloatC& reg_c) const
-    {
-        intrin_wconv_f16_iu8<4, 4, 1, 1, 1>::Run(reg_wei, reg_data, reg_c);
-    }
-};
-
-template <>
-struct wconv_type<WconvInstr::wconv_f16_iu8, 8, 4, 1>
-{
-    template <class FloatC, index_t DilationX, index_t DilationY>
-    __device__ void run(const int8x4_t& reg_wei, const int8x8_t& reg_data, FloatC& reg_c) const
-    {
-        intrin_wconv_f16_iu8<8, 4, 1, 1, 1>::Run(reg_wei, reg_data, reg_c);
-    }
-};
-
-// Filter size = 3x3
-// dst: f32 or i32
-template <>
-struct wconv_type<WconvInstr::wconv_f32_f16, 4, 2, 3>
-{
-    template <class FloatC, index_t DilationX, index_t DilationY>
-    __device__ void run(const half36_t reg_wei, const half6_t reg_data[3], FloatC& reg_c) const
-    {
-        intrin_wconv_f32_f16<4, 2, 3, DilationX, DilationY>::Run(reg_wei, reg_data, reg_c);
-    }
-};
-
-template <>
-struct wconv_type<WconvInstr::wconv_f32_bf16, 4, 2, 3>
-{
-    template <class FloatC, index_t DilationX, index_t DilationY>
-    __device__ void run(const bhalf36_t& reg_wei, const bhalf6_t reg_data[3], FloatC& reg_c) const
-    {
-        intrin_wconv_f32_bf16<4, 2, 3, DilationX, DilationY>::Run(reg_wei, reg_data, reg_c);
-    }
-};
-
-template <>
-struct wconv_type<WconvInstr::wconv_f32_f8, 4, 2, 3>
-{
-    template <class FloatC, index_t DilationX, index_t DilationY>
-    __device__ void run(const f8x72_t& reg_wei, const f8x12_t reg_data[3], FloatC& reg_c) const
-    {
-        intrin_wconv_f32_f8<4, 2, 3, DilationX, DilationY>::Run(reg_wei, reg_data, reg_c);
-    }
-};
-
-template <>
-struct wconv_type<WconvInstr::wconv_f32_bf8, 4, 2, 3>
-{
-    template <class FloatC, index_t DilationX, index_t DilationY>
-    __device__ void run(const bf8x72_t& reg_wei, const bf8x12_t reg_data[3], FloatC& reg_c) const
-    {
-        intrin_wconv_f32_bf8<4, 2, 3, DilationX, DilationY>::Run(reg_wei, reg_data, reg_c);
-    }
-};
-
-template <>
-struct wconv_type<WconvInstr::wconv_f32_iu8, 4, 2, 3>
-{
-    template <class FloatC, index_t DilationX, index_t DilationY>
-    __device__ void run(const int8x72_t& reg_wei, const int8x12_t reg_data[3], FloatC& reg_c) const
-    {
-        intrin_wconv_f32_iu8<4, 2, 3, DilationX, DilationY>::Run(reg_wei, reg_data, reg_c);
-    }
-};
-
-template <>
-struct wconv_type<WconvInstr::wconv_i32_iu8, 4, 2, 3>
-{
-    template <class FloatC, index_t DilationX, index_t DilationY>
-    __device__ void run(const int8x72_t& reg_wei, const int8x12_t reg_data[3], FloatC& reg_c) const
-    {
-        intrin_wconv_i32_iu8<4, 2, 3, DilationX, DilationY>::Run(reg_wei, reg_data, reg_c);
-    }
-};
-
-// dst: f16 or bf16
-template <>
-struct wconv_type<WconvInstr::wconv_f16_f16, 4, 2, 3>
-{
-    template <class FloatC, index_t DilationX, index_t DilationY>
-    __device__ void run(const half36_t& reg_wei, const half6_t reg_data[3], FloatC& reg_c) const
-    {
-        intrin_wconv_f16_f16<4, 2, 3, DilationX, DilationY>::Run(reg_wei, reg_data, reg_c);
-    }
-};
-
-template <>
-struct wconv_type<WconvInstr::wconv_f16_f16, 4, 4, 3>
-{
-    template <class FloatC, index_t DilationX, index_t DilationY>
-    __device__ void run(const half18_t& reg_wei, const half6_t reg_data[3], FloatC& reg_c) const
-    {
-        intrin_wconv_f16_f16<4, 4, 3, DilationX, DilationY>::Run(reg_wei, reg_data, reg_c);
-    }
-};
-
-template <>
-struct wconv_type<WconvInstr::wconv_f16_f16, 8, 4, 3>
-{
-    template <class FloatC, index_t DilationX, index_t DilationY>
-    __device__ void run(const half10_t& reg_wei, const half8_t reg_data[3], FloatC& reg_c) const
-    {
-        intrin_wconv_f16_f16<8, 4, 3, DilationX, DilationY>::Run(reg_wei, reg_data, reg_c);
-    }
-};
-
-template <>
-struct wconv_type<WconvInstr::wconv_bf16_bf16, 4, 2, 3>
-{
-    template <class FloatC, index_t DilationX, index_t DilationY>
-    __device__ void run(const bhalf36_t& reg_wei, const bhalf6_t reg_data[3], FloatC& reg_c) const
-    {
-        intrin_wconv_bf16_bf16<4, 2, 3, DilationX, DilationY>::Run(reg_wei, reg_data, reg_c);
-    }
-};
-
-template <>
-struct wconv_type<WconvInstr::wconv_bf16_bf16, 4, 4, 3>
-{
-    template <class FloatC, index_t DilationX, index_t DilationY>
-    __device__ void run(const bhalf18_t& reg_wei, const bhalf6_t reg_data[3], FloatC& reg_c) const
-    {
-        intrin_wconv_bf16_bf16<4, 4, 3, DilationX, DilationY>::Run(reg_wei, reg_data, reg_c);
-    }
-};
-
-template <>
-struct wconv_type<WconvInstr::wconv_bf16_bf16, 8, 4, 3>
-{
-    template <class FloatC, index_t DilationX, index_t DilationY>
-    __device__ void run(const bhalf10_t& reg_wei, const bhalf8_t reg_data[3], FloatC& reg_c) const
-    {
-        intrin_wconv_bf16_bf16<8, 4, 3, DilationX, DilationY>::Run(reg_wei, reg_data, reg_c);
-    }
-};
-
-template <>
-struct wconv_type<WconvInstr::wconv_f16_f8, 4, 2, 3>
-{
-    template <class FloatC, index_t DilationX, index_t DilationY>
-    __device__ void run(const f8x72_t& reg_wei, const f8x12_t reg_data[3], FloatC& reg_c) const
-    {
-        intrin_wconv_f16_f8<4, 2, 3, DilationX, DilationY>::Run(reg_wei, reg_data, reg_c);
-    }
-};
-
-template <>
-struct wconv_type<WconvInstr::wconv_f16_f8, 4, 4, 3>
-{
-    template <class FloatC, index_t DilationX, index_t DilationY>
-    __device__ void run(const f8x36_t& reg_wei, const f8x12_t reg_data[3], FloatC& reg_c) const
-    {
-        intrin_wconv_f16_f8<4, 4, 3, DilationX, DilationY>::Run(reg_wei, reg_data, reg_c);
-    }
-};
-
-template <>
-struct wconv_type<WconvInstr::wconv_f16_f8, 8, 4, 3>
-{
-    template <class FloatC, index_t DilationX, index_t DilationY>
-    __device__ void run(const f8x20_t& reg_wei, const f8x16_t reg_data[3], FloatC& reg_c) const
-    {
-        intrin_wconv_f16_f8<8, 4, 3, DilationX, DilationY>::Run(reg_wei, reg_data, reg_c);
-    }
-};
-
-template <>
-struct wconv_type<WconvInstr::wconv_bf16_bf8, 4, 2, 3>
-{
-    template <class FloatC, index_t DilationX, index_t DilationY>
-    __device__ void run(const bf8x72_t& reg_wei, const bf8x12_t reg_data[3], FloatC& reg_c) const
-    {
-        intrin_wconv_bf16_bf8<4, 2, 3, DilationX, DilationY>::Run(reg_wei, reg_data, reg_c);
-    }
-};
-
-template <>
-struct wconv_type<WconvInstr::wconv_bf16_bf8, 4, 4, 3>
-{
-    template <class FloatC, index_t DilationX, index_t DilationY>
-    __device__ void run(const bf8x36_t& reg_wei, const bf8x12_t reg_data[3], FloatC& reg_c) const
-    {
-        intrin_wconv_bf16_bf8<4, 4, 3, DilationX, DilationY>::Run(reg_wei, reg_data, reg_c);
-    }
-};
-
-template <>
-struct wconv_type<WconvInstr::wconv_bf16_bf8, 8, 4, 3>
-{
-    template <class FloatC, index_t DilationX, index_t DilationY>
-    __device__ void run(const bf8x20_t& reg_wei, const bf8x16_t reg_data[3], FloatC& reg_c) const
-    {
-        intrin_wconv_bf16_bf8<8, 4, 3, DilationX, DilationY>::Run(reg_wei, reg_data, reg_c);
-    }
-};
-
-template <>
-struct wconv_type<WconvInstr::wconv_f16_iu8, 4, 2, 3>
-{
-    template <class FloatC, index_t DilationX, index_t DilationY>
-    __device__ void run(const int8x72_t& reg_wei, const int8x12_t reg_data[3], FloatC& reg_c) const
-    {
-        intrin_wconv_f16_iu8<4, 2, 3, DilationX, DilationY>::Run(reg_wei, reg_data, reg_c);
-    }
-};
-
-template <>
-struct wconv_type<WconvInstr::wconv_f16_iu8, 4, 4, 3>
-{
-    template <class FloatC, index_t DilationX, index_t DilationY>
-    __device__ void run(const int8x36_t& reg_wei, const int8x12_t reg_data[3], FloatC& reg_c) const
-    {
-        intrin_wconv_f16_iu8<4, 4, 3, DilationX, DilationY>::Run(reg_wei, reg_data, reg_c);
-    }
-};
-
-template <>
-struct wconv_type<WconvInstr::wconv_f16_iu8, 8, 4, 3>
-{
-    template <class FloatC, index_t DilationX, index_t DilationY>
-    __device__ void run(const int8x20_t& reg_wei, const int8x16_t reg_data[3], FloatC& reg_c) const
-    {
-        intrin_wconv_f16_iu8<8, 4, 3, DilationX, DilationY>::Run(reg_wei, reg_data, reg_c);
-    }
-};
-
-#if CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
-template <>
-struct wconv_type<WconvInstr::wconv_f32_iu4, 4, 2, 3>
-{
-    template <class FloatC, index_t DilationX, index_t DilationY>
-    __device__ void run(const int4x144_t& reg_wei, const int4x24_t reg_data[3], FloatC& reg_c) const
-    {
-        intrin_wconv_f32_iu4<4, 2, 3, DilationX, DilationY>::Run(reg_wei, reg_data, reg_c);
-    }
-};
-
-template <>
-struct wconv_type<WconvInstr::wconv_i32_iu4, 4, 2, 3>
-{
-    template <class FloatC, index_t DilationX, index_t DilationY>
-    __device__ void run(const int4x144_t& reg_wei, const int4x24_t reg_data[3], FloatC& reg_c) const
-    {
-        intrin_wconv_i32_iu4<4, 2, 3, DilationX, DilationY>::Run(reg_wei, reg_data, reg_c);
-    }
-};
-
-template <>
-struct wconv_type<WconvInstr::wconv_f16_iu4, 4, 2, 3>
-{
-    template <class FloatC, index_t DilationX, index_t DilationY>
-    __device__ void run(const int4x144_t& reg_wei, const int4x24_t reg_data[3], FloatC& reg_c) const
-    {
-        intrin_wconv_f16_iu4<4, 2, 3, DilationX, DilationY>::Run(reg_wei, reg_data, reg_c);
-    }
-};
-
-template <>
-struct wconv_type<WconvInstr::wconv_f16_iu4, 4, 4, 3>
-{
-    template <class FloatC, index_t DilationX, index_t DilationY>
-    __device__ void run(const int4x72_t& reg_wei, const int4x24_t reg_data[3], FloatC& reg_c) const
-    {
-        intrin_wconv_f16_iu4<4, 4, 3, DilationX, DilationY>::Run(reg_wei, reg_data, reg_c);
-    }
-};
-
-template <>
-struct wconv_type<WconvInstr::wconv_f16_iu4, 8, 4, 3>
-{
-    template <class FloatC, index_t DilationX, index_t DilationY>
-    __device__ void run(const int4x40_t& reg_wei, const int4x32_t reg_data[3], FloatC& reg_c) const
-    {
-        intrin_wconv_f16_iu4<8, 4, 3, DilationX, DilationY>::Run(reg_wei, reg_data, reg_c);
-    }
-};
-#endif
 template <typename WeiDataType,
           typename InDataType,
           typename AccDataType,
           index_t HPerWconv,
           index_t WPerWconv,
-          index_t FilterSize>
+          index_t FilterSize,
+          index_t DilationX,
+          index_t DilationY,
+          index_t Iters,
+          bool Aco>
 struct WconvSelector
 {
     template <typename WeiDataType_, typename InDataType_, typename AccDataType_>
@@ -605,7 +455,19 @@ struct WconvSelector
     }
 
     template <>
+    static constexpr auto GetWconv<uint8_t, uint8_t, float_t>()
+    {
+        return WconvInstr::wconv_f32_iu8;
+    }
+
+    template <>
     static constexpr auto GetWconv<int4_t, int4_t, float_t>()
+    {
+        return WconvInstr::wconv_f32_iu4;
+    }
+
+    template <>
+    static constexpr auto GetWconv<uint4_t, uint4_t, float_t>()
     {
         return WconvInstr::wconv_f32_iu4;
     }
@@ -617,7 +479,19 @@ struct WconvSelector
     }
 
     template <>
+    static constexpr auto GetWconv<uint8_t, uint8_t, int32_t>()
+    {
+        return WconvInstr::wconv_i32_iu8;
+    }
+
+    template <>
     static constexpr auto GetWconv<int4_t, int4_t, int32_t>()
+    {
+        return WconvInstr::wconv_i32_iu4;
+    }
+
+    template <>
+    static constexpr auto GetWconv<uint4_t, uint4_t, int32_t>()
     {
         return WconvInstr::wconv_i32_iu4;
     }
@@ -653,16 +527,38 @@ struct WconvSelector
     }
 
     template <>
+    static constexpr auto GetWconv<uint8_t, uint8_t, half_t>()
+    {
+        return WconvInstr::wconv_f16_iu8;
+    }
+
+    template <>
     static constexpr auto GetWconv<int4_t, int4_t, half_t>()
     {
         return WconvInstr::wconv_f16_iu4;
+    }
+
+    template <>
+    static constexpr auto GetWconv<uint4_t, uint4_t, half_t>()
+    {
+        return WconvInstr::wconv_f16_iu4;
+    }
+
+    static constexpr auto Signed()
+    {
+        return std::is_same<InDataType, int4_t>::value || std::is_same<InDataType, int8_t>::value;
     }
 
     static constexpr auto selected_wconv =
         wconv_type<GetWconv<WeiDataType, InDataType, AccDataType>(),
                    HPerWconv,
                    WPerWconv,
-                   FilterSize>{};
+                   FilterSize,
+                   DilationX,
+                   DilationY,
+                   Iters,
+                   Aco,
+                   Signed()>{};
 
     __host__ __device__ constexpr WconvSelector()
     {
@@ -675,11 +571,14 @@ template <typename WeiDataType,
           typename AccDataType,
           index_t HPerWconv,
           index_t WPerWconv,
-          index_t FilterSize>
+          index_t FilterSize,
+          index_t DilationX,
+          index_t DilationY,
+          index_t Iters = 1,
+          bool Aco      = false>
 struct WconvConv
 {
     static constexpr index_t WaveSize = 32;
-    static constexpr index_t ACO      = 0; // TODO: support ACO
 
     __host__ __device__ constexpr WconvConv(){};
 
@@ -714,7 +613,7 @@ struct WconvConv
     {
         constexpr index_t WeightBitsPerLane = GetNumInputChannels() * GetNumOutputChannels() *
                                               SizeOfBits<KernelWeightDataType>() / WaveSize *
-                                              FilterSize * FilterSize;
+                                              FilterSize * FilterSize * Iters;
 
         // Round bits to Reg size (uint32_t)
         return (WeightBitsPerLane + 31) / 32;
@@ -890,7 +789,7 @@ struct WconvConv
         constexpr index_t SwizzleComp = 4;
         const index_t subK_8          = (laneId & 1) * SwizzleComp;
 
-        static_assert(ACO == 0, "");
+        static_assert(Aco == 0, "");
         if constexpr(GetNumAccumComponents() == 4)
         {
             return make_tuple(0, subH, subW, 0, subK);
@@ -921,8 +820,16 @@ struct WconvConv
     static_assert(GetNumImageSubTilesInVertical() == GetDataRegSize(), "");
 
     // WCNN intrinsic
-    static constexpr auto wconv =
-        WconvSelector<WeiDataType, InDataType, AccDataType, HPerWconv, WPerWconv, FilterSize>{};
+    static constexpr auto wconv       = WconvSelector<WeiDataType,
+                                                InDataType,
+                                                AccDataType,
+                                                HPerWconv,
+                                                WPerWconv,
+                                                FilterSize,
+                                                DilationX,
+                                                DilationY,
+                                                Iters,
+                                                Aco>{};
     static constexpr auto wconv_instr = wconv.selected_wconv;
 };
 

@@ -585,7 +585,7 @@ bool run_test_fmt()
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_1X1, false, false, 0x10000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, false, false, 0x20000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, true,  false, 0x40000>();
-
+        
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_1X1, false, true, 0x80000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, false, true, 0x100000>();
     }
@@ -666,7 +666,7 @@ int main(int argc, char* argv[])
     pass &= run_test_fmt<ck::bf8_t,   float,       float,     0x8>();
     pass &= run_test_fmt<int8_t,      float,       float,     0x10>();
     pass &= run_test_fmt<int8_t,      int32_t,     int32_t,   0x20>();
-    
+
     pass &= run_test_fmt<ck::half_t,  ck::half_t,  ck::half_t, 0x40>();
     //pass &= run_test_fmt<ck::bhalf_t, ck::bhalf_t, ck::half_t, 0x80>();
     pass &= run_test_fmt<ck::f8_t,    ck::half_t,  ck::half_t, 0x100>();

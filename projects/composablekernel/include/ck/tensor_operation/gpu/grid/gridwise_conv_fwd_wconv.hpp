@@ -144,8 +144,14 @@ struct GridwiseConv_Wconv
     static constexpr index_t YX = FilterSize * FilterSize;
     using NumberYX              = Number<FilterSize * FilterSize>;
 
-    static constexpr auto wconv_conv =
-        WconvConv<WeiDataType, InDataType, AccDataType, HPerWconv, WPerWconv, FilterSize>{};
+    static constexpr auto wconv_conv = WconvConv<WeiDataType,
+                                                 InDataType,
+                                                 AccDataType,
+                                                 HPerWconv,
+                                                 WPerWconv,
+                                                 FilterSize,
+                                                 DilationX,
+                                                 DilationY>{};
 
     using GridwiseConvPipe =
         GridwiseConvPipeline_v1<NumConvCPrefetchStage, InEnableLds, WeiEnableLds>;
@@ -782,6 +788,14 @@ struct GridwiseConv_Wconv
             }
             else
             {
+                constexpr index_t Iters = GetFilterIters<WeiDataType,
+                                                         InDataType,
+                                                         AccDataType,
+                                                         CPerBlock,
+                                                         HPerWconv,
+                                                         WPerWconv,
+                                                         FilterSize>();
+
                 auto wei_block_buf = make_static_buffer<AddressSpaceEnum::Vgpr, WeiDataType>(
                     wei_block_desc.GetElementSpaceSize());
                 auto wei_slice_origin_idx = wconv_conv.CalculateWeiDataThreadOriginDataIndex();
@@ -807,16 +821,31 @@ struct GridwiseConv_Wconv
 
                 auto wei_blockwise_copy = generate_tuple(
                     [&](auto I) {
-                        return WeiThreadGroupTensorSliceTransfer(
-                            wei_grid_pad_desc,
-                            make_multi_index(k0,
-                                             0,
-                                             I * wconv_conv.GetNumWeightTapePerWave() +
-                                                 wei_slice_origin_idx[I0] *
-                                                     wconv_conv.GetWeightSecondTapeMapTable()[I],
-                                             wei_slice_origin_idx[I1],
-                                             wei_slice_origin_idx[I2],
-                                             wei_slice_origin_idx[I3]));
+                        if constexpr(Iters > 1)
+                        {
+                            return WeiThreadGroupTensorSliceTransfer(
+                                wei_grid_pad_desc,
+                                make_multi_index(k0,
+                                                 wei_slice_origin_idx[I0],
+                                                 0,
+                                                 wei_slice_origin_idx[I1],
+                                                 wei_slice_origin_idx[I2],
+                                                 wei_slice_origin_idx[I3]));
+                        }
+                        else
+                        {
+                            return WeiThreadGroupTensorSliceTransfer(
+                                wei_grid_pad_desc,
+                                make_multi_index(
+                                    k0,
+                                    0,
+                                    I * wconv_conv.GetNumWeightTapePerWave() +
+                                        wei_slice_origin_idx[I0] *
+                                            wconv_conv.GetWeightSecondTapeMapTable()[I],
+                                    wei_slice_origin_idx[I1],
+                                    wei_slice_origin_idx[I2],
+                                    wei_slice_origin_idx[I3]));
+                        }
                     },
                     Number<NumWeightTape>{});
                 return make_tuple(wei_block_buf, wei_blockwise_copy);

@@ -75,8 +75,14 @@ template <typename InDataType,
 __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
     conv_fwd(const InDataType* in_, const WeiDataType* wei_, AccDataType* c)
 {
-    constexpr auto wconvConv =
-        ck::WconvConv<WeiDataType, InDataType, AccDataType, HPerWconv, WPerWconv, FilterSize>();
+    constexpr auto wconvConv = ck::WconvConv<WeiDataType,
+                                             InDataType,
+                                             AccDataType,
+                                             HPerWconv,
+                                             WPerWconv,
+                                             FilterSize,
+                                             DilationX,
+                                             DilationY>();
 
     auto in  = reinterpret_cast<const typename decltype(wconvConv)::KernelInDataType*>(in_);
     auto wei = reinterpret_cast<const typename decltype(wconvConv)::KernelWeightDataType*>(wei_);
@@ -279,8 +285,7 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
 #else
                     InDataVec& in_tile_data = inData[h * WRepeat * CRepeat + w * CRepeat + c];
 #endif
-                    wconvConv.wconv_instr.template run<AccDataVec, DilationX, DilationY>(
-                        weiData[k * CRepeat + c], in_tile_data, c_vec);
+                    wconvConv.wconv_instr.run(weiData[k * CRepeat + c], in_tile_data, c_vec);
                 });
 #if LOAD_DATA_PER_TILE
                 store_acc_data(h, w, k, c_vec);
@@ -324,8 +329,14 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
     constexpr index_t DataTileHeight = 4;
 
     // conv3 always LOAD_DATA_PER_TILE. so marco LOAD_DATA_PER_TILE is ignored.
-    constexpr auto wconvConv =
-        ck::WconvConv<WeiDataType, InDataType, AccDataType, HPerWconv, WPerWconv, FilterSize>();
+    constexpr auto wconvConv = ck::WconvConv<WeiDataType,
+                                             InDataType,
+                                             AccDataType,
+                                             HPerWconv,
+                                             WPerWconv,
+                                             FilterSize,
+                                             DilationX,
+                                             DilationY>();
 
     auto in  = reinterpret_cast<const typename decltype(wconvConv)::KernelInDataType*>(in_);
     auto wei = reinterpret_cast<const typename decltype(wconvConv)::KernelWeightDataType*>(wei_);
@@ -549,8 +560,7 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
                     inData[1] = load_in_data(h, w, c, -1);
                     inData[0] = load_in_data(h, w, c, 0);
                     inData[2] = load_in_data(h, w, c, 1);
-                    wconvConv.wconv_instr.template run<AccDataVec, DilationX, DilationY>(
-                        weiData[c], inData, c_vec);
+                    wconvConv.wconv_instr.run(weiData[c], inData, c_vec);
                 });
                 store_acc_data(h, w, k, c_vec);
             });
@@ -711,12 +721,19 @@ template <typename InDataType,
           bool Iter4>
 bool run_test()
 {
-    constexpr ck::index_t FilterSize = (Filter == Filter_1X1) ? 1 : 3;
-    constexpr ck::index_t HPerWconv  = (Shape == Shape_8X4) ? 8 : 4;
-    constexpr ck::index_t WPerWconv  = (Shape == Shape_4X2) ? 2 : 4;
+    constexpr ck::index_t FilterSize   = (Filter == Filter_1X1) ? 1 : 3;
+    constexpr ck::index_t HPerWconv    = (Shape == Shape_8X4) ? 8 : 4;
+    constexpr ck::index_t WPerWconv    = (Shape == Shape_4X2) ? 2 : 4;
+    constexpr ck::index_t DilationSize = Dilation ? 2 : 1;
 
-    constexpr auto wconvConv =
-        ck::WconvConv<WeiDataType, InDataType, GPUAccType, HPerWconv, WPerWconv, FilterSize>();
+    constexpr auto wconvConv = ck::WconvConv<WeiDataType,
+                                             InDataType,
+                                             GPUAccType,
+                                             HPerWconv,
+                                             WPerWconv,
+                                             FilterSize,
+                                             DilationSize,
+                                             DilationSize>();
 
 #if USE_ABSOLUTE_SIZE
     constexpr ck::index_t Width          = DEFAULT_W;
@@ -737,8 +754,6 @@ bool run_test()
     constexpr ck::index_t n_batch        = 1;
     constexpr ck::index_t n_out_channels = OutputChannels;
     constexpr ck::index_t n_in_channels  = InputChannels;
-
-    constexpr ck::index_t DilationSize = Dilation ? 2 : 1;
 
     const std::vector<ck::index_t> filters_1x1{1, 1};
     const std::vector<ck::index_t> filters_3x3{3, 3};
