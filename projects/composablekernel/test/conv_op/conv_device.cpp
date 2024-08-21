@@ -53,7 +53,8 @@ enum ShapeType
 enum FilterType
 {
     Filter_1X1,
-    Filter_3X3
+    Filter_3X3,
+    Filter_2X2,
 };
 
 template <typename T>
@@ -270,20 +271,24 @@ bool run_test()
     {
         return true;
     }
-    constexpr ck::index_t FilterSize = (Filter == Filter_1X1) ? 1 : 3;
-    constexpr ck::index_t HPerWconv  = (Shape == Shape_8X4) ? 8 : 4;
-    constexpr ck::index_t WPerWconv  = (Shape == Shape_4X2) ? 2 : 4;
+    constexpr ck::index_t FilterSize =
+        (Filter == Filter_1X1) ? 1 : ((Filter == Filter_2X2) ? 2 : 3);
+    constexpr ck::index_t HPerWconv = (Shape == Shape_8X4) ? 8 : 4;
+    constexpr ck::index_t WPerWconv = (Shape == Shape_4X2) ? 2 : 4;
 
     const ck::index_t Width          = config.w;
     const ck::index_t Height         = config.h;
     const ck::index_t InputChannels  = config.c;
     const ck::index_t OutputChannels = config.k;
 
-    constexpr ck::index_t HPerBlock = DEFAULT_H_PERBLOCK;
+    constexpr ck::index_t DefaultHScale =
+        (Filter == Filter_2X2 && Shape == Shape_8X4 && DEFAULT_H_PERWAVE < 16) ? 2 : 1;
+
+    constexpr ck::index_t HPerBlock = DEFAULT_H_PERBLOCK * DefaultHScale;
     constexpr ck::index_t WPerBlock = DEFAULT_W_PERBLOCK;
     constexpr ck::index_t CPerBlock = DEFAULT_C_PERBLOCK;
     constexpr ck::index_t KPerBlock = DEFAULT_K_PERBLOCK;
-    constexpr ck::index_t HRepeat   = DEFAULT_H_PERWAVE / HPerWconv;
+    constexpr ck::index_t HRepeat   = DEFAULT_H_PERWAVE * DefaultHScale / HPerWconv;
     constexpr ck::index_t WRepeat   = DEFAULT_W_PERWAVE / WPerWconv;
 
     constexpr ck::index_t n_dim       = 2;
@@ -295,6 +300,7 @@ bool run_test()
     constexpr ck::index_t DilationSize = Dilation ? 2 : 1;
 
     const std::vector<ck::index_t> filters_1x1{1, 1};
+    const std::vector<ck::index_t> filters_2x2{2, 2};
     const std::vector<ck::index_t> filters_3x3{3, 3};
     const std::vector<ck::index_t> dilations_1{1, 1};
     const std::vector<ck::index_t> dilations_2{2, 2};
@@ -302,17 +308,18 @@ bool run_test()
     const std::vector<ck::index_t> pads_1{1, 1};
     const std::vector<ck::index_t> pads_2{2, 2};
 
-    const std::vector<ck::index_t>& filters_len =
-        (Filter == Filter_1X1) ? filters_1x1 : filters_3x3;
-    const std::vector<ck::index_t> input_len = {Height, Width};
-    const std::vector<ck::index_t> strides{1, 1};
-    const std::vector<ck::index_t>& dilations  = Dilation ? dilations_2 : dilations_1;
-    const std::vector<ck::index_t>& left_pads  = (Filter == Filter_1X1) ? pads_0
-                                                 : Dilation             ? pads_2
-                                                                        : pads_1;
-    const std::vector<ck::index_t>& right_pads = (Filter == Filter_1X1) ? pads_0
-                                                 : Dilation             ? pads_2
-                                                                        : pads_1;
+    const std::vector<ck::index_t>& filters_len = (Filter == Filter_1X1)   ? filters_1x1
+                                                  : (Filter == Filter_2X2) ? filters_2x2
+                                                                           : filters_3x3;
+    const std::vector<ck::index_t> input_len    = {Height, Width};
+    const std::vector<ck::index_t> strides_1{1, 1};
+    const std::vector<ck::index_t> strides_2{2, 2};
+    const std::vector<ck::index_t>& strides   = (Filter == Filter_2X2) ? strides_2 : strides_1;
+    const std::vector<ck::index_t>& dilations = Dilation ? dilations_2 : dilations_1;
+    const std::vector<ck::index_t>& left_pads =
+        (Filter == Filter_3X3) ? (Dilation ? pads_2 : pads_1) : pads_0;
+    const std::vector<ck::index_t>& right_pads =
+        (Filter == Filter_3X3) ? (Dilation ? pads_2 : pads_1) : pads_0;
 
     ck::utils::conv::ConvParam conv_param{n_dim,
                                           group_count,
@@ -434,6 +441,8 @@ bool run_test()
     static constexpr auto ConvSpec =
         FilterSize == 1
             ? ck::tensor_operation::device::ConvolutionForwardSpecialization::Filter1x1Stride1Pad0
+        : FilterSize == 2
+            ? ck::tensor_operation::device::ConvolutionForwardSpecialization::Filter2x2Stride2Pad0
             : ck::tensor_operation::device::ConvolutionForwardSpecialization::Filter3x3Stride1Pad0;
 
     constexpr ck::index_t InBlockTransferScalarPerVector = sizeof(uint32_t) / sizeof(InDataType);
@@ -524,7 +533,6 @@ bool run_test()
             "wrong! device_conv with the specified compilation parameters does "
             "not support this Conv problem");
     }
-
     avg_time = invoker.Run(argument, StreamConfig{nullptr, config.time_kernel});
     out_device_buf.FromDevice(out_device.mData.data());
 
@@ -578,6 +586,12 @@ bool run_test_fmt()
         return true;
     }
     bool pass = true;
+    // known issues:
+    // scratch memory + src_private_base
+    // HPerBlock: 32, WPerBlock: 16, HPerWave: 16, WPerWave: 8
+    // pass &= run_test<ck::half_t, ck::half_t, ck::half_t,  ck::half_t, Shape_4X4, Filter_3X3,
+    // false, false, 0x100000>();
+
     // clang-format off
     //                                                           |ShapeType |FilterType |Dilation |Iter4 |TestMask
     if constexpr(std::is_same<GPUAccType, float>::value || std::is_same<GPUAccType, int32_t>::value)
@@ -585,29 +599,39 @@ bool run_test_fmt()
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_1X1, false, false, 0x10000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, false, false, 0x20000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, true,  false, 0x40000>();
-        
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_1X1, false, true, 0x80000>();
+
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, false, true, 0x100000>();
+
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_2X2, false, false, 0x10000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_2X2, false, true, 0x80000>();
     }
     else
     {
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_1X1, false, false, 0x10000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_1X1, false, false, 0x20000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_1X1, false, false, 0x40000>();
-
+        //
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, false, false, 0x80000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_3X3, false, false, 0x100000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_3X3, false, false, 0x200000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, true,  false, 0x400000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_3X3, true,  false, 0x800000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_3X3, true,  false, 0x1000000>();
-
+        
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_1X1, false,  true, 0x2000000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_1X1, false,  true, 0x4000000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_1X1, false,  true, 0x8000000>();
+        
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, false,  true, 0x10000000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_3X3, false,  true, 0x20000000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_3X3, false,  true, 0x40000000>();
+
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_2X2, false, false, 0x10000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_2X2, false, false, 0x20000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_2X2, false, false, 0x40000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_2X2, false,  true, 0x2000000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_2X2, false,  true, 0x4000000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_2X2, false,  true, 0x8000000>();
     }
     // clang-format on
     return pass;
@@ -628,16 +652,40 @@ inline bool parse_cmd_args(int argc, char* argv[], ExecutionConfig& config)
     {
         // use default
     }
-    else if(argc == 9)
+    else if(argc <= 9)
     {
-        config.do_verification = std::stoi(argv[1]);
-        config.init_method     = std::stoi(argv[2]);
-        config.time_kernel     = std::stoi(argv[3]);
-        config.test_mask       = std::stoul(argv[4], nullptr, 0);
-        config.h               = std::stoi(argv[5]);
-        config.w               = std::stoi(argv[6]);
-        config.k               = std::stoi(argv[7]);
-        config.c               = std::stoi(argv[8]);
+        if(argc > 1)
+        {
+            config.do_verification = std::stoi(argv[1]);
+        }
+        if(argc > 2)
+        {
+            config.init_method = std::stoi(argv[2]);
+        }
+        if(argc > 3)
+        {
+            config.time_kernel = std::stoi(argv[3]);
+        }
+        if(argc > 4)
+        {
+            config.test_mask = std::stoul(argv[4], nullptr, 0);
+        }
+        if(argc > 5)
+        {
+            config.h = std::stoi(argv[5]);
+        }
+        if(argc > 6)
+        {
+            config.w = std::stoi(argv[6]);
+        }
+        if(argc > 7)
+        {
+            config.k = std::stoi(argv[7]);
+        }
+        if(argc > 8)
+        {
+            config.c = std::stoi(argv[8]);
+        }
     }
     else
     {
@@ -666,7 +714,7 @@ int main(int argc, char* argv[])
     pass &= run_test_fmt<ck::bf8_t,   float,       float,     0x8>();
     pass &= run_test_fmt<int8_t,      float,       float,     0x10>();
     pass &= run_test_fmt<int8_t,      int32_t,     int32_t,   0x20>();
-
+    
     pass &= run_test_fmt<ck::half_t,  ck::half_t,  ck::half_t, 0x40>();
     //pass &= run_test_fmt<ck::bhalf_t, ck::bhalf_t, ck::half_t, 0x80>();
     pass &= run_test_fmt<ck::f8_t,    ck::half_t,  ck::half_t, 0x100>();

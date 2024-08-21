@@ -62,10 +62,16 @@ struct wconv_type<WconvInstr::wconv_f32_f16,
                   Signed>
 {
     template <class FloatA, class FloatB, class FloatC>
-    __device__ void run(const FloatA& reg_wei, const FloatB reg_data, FloatC& reg_c) const
+    __device__ void Run(const FloatA& reg_wei, const FloatB reg_data, FloatC& reg_c) const
     {
+#if defined(__gfx13__)
         intrin_wconv_f32_f16<H, W, FilterSize, DilationX, DilationY, Iters, Aco, Signed>::Run(
             reg_wei, reg_data, reg_c);
+#else
+        ignore = reg_wei;
+        ignore = reg_data;
+        ignore = reg_c;
+#endif
     }
 };
 
@@ -88,10 +94,16 @@ struct wconv_type<WconvInstr::wconv_f32_bf16,
                   Signed>
 {
     template <class FloatA, class FloatB, class FloatC>
-    __device__ void run(const FloatA& reg_wei, const FloatB reg_data, FloatC& reg_c) const
+    __device__ void Run(const FloatA& reg_wei, const FloatB reg_data, FloatC& reg_c) const
     {
+#if defined(__gfx13__)
         intrin_wconv_f32_bf16<H, W, FilterSize, DilationX, DilationY, Iters, Aco, Signed>::Run(
             reg_wei, reg_data, reg_c);
+#else
+        ignore = reg_wei;
+        ignore = reg_data;
+        ignore = reg_c;
+#endif
     }
 };
 
@@ -114,10 +126,16 @@ struct wconv_type<WconvInstr::wconv_f32_f8,
                   Signed>
 {
     template <class FloatA, class FloatB, class FloatC>
-    __device__ void run(const FloatA& reg_wei, const FloatB reg_data, FloatC& reg_c) const
+    __device__ void Run(const FloatA& reg_wei, const FloatB reg_data, FloatC& reg_c) const
     {
+#if defined(__gfx13__)
         intrin_wconv_f32_f8<H, W, FilterSize, DilationX, DilationY, Iters, Aco, Signed>::Run(
             reg_wei, reg_data, reg_c);
+#else
+        ignore = reg_wei;
+        ignore = reg_data;
+        ignore = reg_c;
+#endif
     }
 };
 
@@ -140,10 +158,16 @@ struct wconv_type<WconvInstr::wconv_f32_bf8,
                   Signed>
 {
     template <class FloatA, class FloatB, class FloatC>
-    __device__ void run(const FloatA& reg_wei, const FloatB reg_data, FloatC& reg_c) const
+    __device__ void Run(const FloatA& reg_wei, const FloatB reg_data, FloatC& reg_c) const
     {
+#if defined(__gfx13__)
         intrin_wconv_f32_bf8<H, W, FilterSize, DilationX, DilationY, Iters, Aco, Signed>::Run(
             reg_wei, reg_data, reg_c);
+#else
+        ignore = reg_wei;
+        ignore = reg_data;
+        ignore = reg_c;
+#endif
     }
 };
 
@@ -166,10 +190,16 @@ struct wconv_type<WconvInstr::wconv_f32_iu8,
                   Signed>
 {
     template <class FloatA, class FloatB, class FloatC>
-    __device__ void run(const FloatA& reg_wei, const FloatB reg_data, FloatC& reg_c) const
+    __device__ void Run(const FloatA& reg_wei, const FloatB reg_data, FloatC& reg_c) const
     {
+#if defined(__gfx13__)
         intrin_wconv_f32_iu8<H, W, FilterSize, DilationX, DilationY, Iters, Aco, Signed>::Run(
             reg_wei, reg_data, reg_c);
+#else
+        ignore = reg_wei;
+        ignore = reg_data;
+        ignore = reg_c;
+#endif
     }
 };
 
@@ -192,10 +222,16 @@ struct wconv_type<WconvInstr::wconv_i32_iu8,
                   Signed>
 {
     template <class FloatA, class FloatB, class FloatC>
-    __device__ void run(const FloatA& reg_wei, const FloatB reg_data, FloatC& reg_c) const
+    __device__ void Run(const FloatA& reg_wei, const FloatB reg_data, FloatC& reg_c) const
     {
+#if defined(__gfx13__)
         intrin_wconv_i32_iu8<H, W, FilterSize, DilationX, DilationY, Iters, Aco, Signed>::Run(
             reg_wei, reg_data, reg_c);
+#else
+        ignore = reg_wei;
+        ignore = reg_data;
+        ignore = reg_c;
+#endif
     }
 };
 
@@ -219,10 +255,16 @@ struct wconv_type<WconvInstr::wconv_f32_iu4,
                   Signed>
 {
     template <class FloatA, class FloatB, class FloatC>
-    __device__ void run(const FloatA& reg_wei, const FloatB reg_data, FloatC& reg_c) const
+    __device__ void Run(const FloatA& reg_wei, const FloatB reg_data, FloatC& reg_c) const
     {
+#if defined(__gfx13__)
         intrin_wconv_f32_iu4<H, W, FilterSize, DilationX, DilationY, Iters, Aco, Signed>::Run(
             reg_wei, reg_data, reg_c);
+#else
+        ignore = reg_wei;
+        ignore = reg_data;
+        ignore = reg_c;
+#endif
     }
 };
 
@@ -245,10 +287,16 @@ struct wconv_type<WconvInstr::wconv_i32_iu4,
                   Signed>
 {
     template <class FloatA, class FloatB, class FloatC>
-    __device__ void run(const FloatA& reg_wei, const FloatB reg_data, FloatC& reg_c) const
+    __device__ void Run(const FloatA& reg_wei, const FloatB reg_data, FloatC& reg_c) const
     {
+#if defined(__gfx13__)
         intrin_wconv_i32_iu4<H, W, FilterSize, DilationX, DilationY, Iters, Aco, Signed>::Run(
             reg_wei, reg_data, reg_c);
+#else
+        ignore = reg_wei;
+        ignore = reg_data;
+        ignore = reg_c;
+#endif
     }
 };
 
@@ -271,10 +319,16 @@ struct wconv_type<WconvInstr::wconv_f16_iu4,
                   Signed>
 {
     template <class FloatA, class FloatB, class FloatC>
-    __device__ void run(const FloatA& reg_wei, const FloatB reg_data, FloatC& reg_c) const
+    __device__ void Run(const FloatA& reg_wei, const FloatB reg_data, FloatC& reg_c) const
     {
+#if defined(__gfx13__)
         intrin_wconv_f16_iu4<H, W, FilterSize, DilationX, DilationY, Iters, Aco, Signed>::Run(
             reg_wei, reg_data, reg_c);
+#else
+        ignore = reg_wei;
+        ignore = reg_data;
+        ignore = reg_c;
+#endif
     }
 };
 #endif
@@ -299,10 +353,16 @@ struct wconv_type<WconvInstr::wconv_f16_f16,
                   Signed>
 {
     template <class FloatA, class FloatB, class FloatC>
-    __device__ void run(const FloatA& reg_wei, const FloatB reg_data, FloatC& reg_c) const
+    __device__ void Run(const FloatA& reg_wei, const FloatB reg_data, FloatC& reg_c) const
     {
+#if defined(__gfx13__)
         intrin_wconv_f16_f16<H, W, FilterSize, DilationX, DilationY, Iters, Aco, Signed>::Run(
             reg_wei, reg_data, reg_c);
+#else
+        ignore = reg_wei;
+        ignore = reg_data;
+        ignore = reg_c;
+#endif
     }
 };
 
@@ -325,10 +385,16 @@ struct wconv_type<WconvInstr::wconv_bf16_bf16,
                   Signed>
 {
     template <class FloatA, class FloatB, class FloatC>
-    __device__ void run(const FloatA& reg_wei, const FloatB reg_data, FloatC& reg_c) const
+    __device__ void Run(const FloatA& reg_wei, const FloatB reg_data, FloatC& reg_c) const
     {
+#if defined(__gfx13__)
         intrin_wconv_bf16_bf16<H, W, FilterSize, DilationX, DilationY, Iters, Aco, Signed>::Run(
             reg_wei, reg_data, reg_c);
+#else
+        ignore = reg_wei;
+        ignore = reg_data;
+        ignore = reg_c;
+#endif
     }
 };
 
@@ -351,10 +417,16 @@ struct wconv_type<WconvInstr::wconv_f16_f8,
                   Signed>
 {
     template <class FloatA, class FloatB, class FloatC>
-    __device__ void run(const FloatA& reg_wei, const FloatB reg_data, FloatC& reg_c) const
+    __device__ void Run(const FloatA& reg_wei, const FloatB reg_data, FloatC& reg_c) const
     {
+#if defined(__gfx13__)
         intrin_wconv_f16_f8<H, W, FilterSize, DilationX, DilationY, Iters, Aco, Signed>::Run(
             reg_wei, reg_data, reg_c);
+#else
+        ignore = reg_wei;
+        ignore = reg_data;
+        ignore = reg_c;
+#endif
     }
 };
 
@@ -377,10 +449,16 @@ struct wconv_type<WconvInstr::wconv_bf16_bf8,
                   Signed>
 {
     template <class FloatA, class FloatB, class FloatC>
-    __device__ void run(const FloatA& reg_wei, const FloatB reg_data, FloatC& reg_c) const
+    __device__ void Run(const FloatA& reg_wei, const FloatB reg_data, FloatC& reg_c) const
     {
+#if defined(__gfx13__)
         intrin_wconv_bf16_bf8<H, W, FilterSize, DilationX, DilationY, Iters, Aco, Signed>::Run(
             reg_wei, reg_data, reg_c);
+#else
+        ignore = reg_wei;
+        ignore = reg_data;
+        ignore = reg_c;
+#endif
     }
 };
 
@@ -403,10 +481,16 @@ struct wconv_type<WconvInstr::wconv_f16_iu8,
                   Signed>
 {
     template <class FloatA, class FloatB, class FloatC>
-    __device__ void run(const FloatA& reg_wei, const FloatB reg_data, FloatC& reg_c) const
+    __device__ void Run(const FloatA& reg_wei, const FloatB reg_data, FloatC& reg_c) const
     {
+#if defined(__gfx13__)
         intrin_wconv_f16_iu8<H, W, FilterSize, DilationX, DilationY, Iters, Aco, Signed>::Run(
             reg_wei, reg_data, reg_c);
+#else
+        ignore = reg_wei;
+        ignore = reg_data;
+        ignore = reg_c;
+#endif
     }
 };
 
@@ -426,120 +510,120 @@ struct WconvSelector
     static constexpr auto GetWconv();
 
     template <>
-    static constexpr auto GetWconv<half_t, half_t, float_t>()
+    constexpr auto GetWconv<half_t, half_t, float_t>()
     {
         return WconvInstr::wconv_f32_f16;
     }
     template <>
-    static constexpr auto GetWconv<bhalf_t, bhalf_t, float_t>()
+    constexpr auto GetWconv<bhalf_t, bhalf_t, float_t>()
     {
         return WconvInstr::wconv_f32_bf16;
     }
 
     template <>
-    static constexpr auto GetWconv<f8_t, f8_t, float_t>()
+    constexpr auto GetWconv<f8_t, f8_t, float_t>()
     {
         return WconvInstr::wconv_f32_f8;
     }
 
     template <>
-    static constexpr auto GetWconv<bf8_t, bf8_t, float_t>()
+    constexpr auto GetWconv<bf8_t, bf8_t, float_t>()
     {
         return WconvInstr::wconv_f32_bf8;
     }
 
     template <>
-    static constexpr auto GetWconv<int8_t, int8_t, float_t>()
+    constexpr auto GetWconv<int8_t, int8_t, float_t>()
     {
         return WconvInstr::wconv_f32_iu8;
     }
 
     template <>
-    static constexpr auto GetWconv<uint8_t, uint8_t, float_t>()
+    constexpr auto GetWconv<uint8_t, uint8_t, float_t>()
     {
         return WconvInstr::wconv_f32_iu8;
     }
 
     template <>
-    static constexpr auto GetWconv<int4_t, int4_t, float_t>()
+    constexpr auto GetWconv<int4_t, int4_t, float_t>()
     {
         return WconvInstr::wconv_f32_iu4;
     }
 
     template <>
-    static constexpr auto GetWconv<uint4_t, uint4_t, float_t>()
+    constexpr auto GetWconv<uint4_t, uint4_t, float_t>()
     {
         return WconvInstr::wconv_f32_iu4;
     }
 
     template <>
-    static constexpr auto GetWconv<int8_t, int8_t, int32_t>()
+    constexpr auto GetWconv<int8_t, int8_t, int32_t>()
     {
         return WconvInstr::wconv_i32_iu8;
     }
 
     template <>
-    static constexpr auto GetWconv<uint8_t, uint8_t, int32_t>()
+    constexpr auto GetWconv<uint8_t, uint8_t, int32_t>()
     {
         return WconvInstr::wconv_i32_iu8;
     }
 
     template <>
-    static constexpr auto GetWconv<int4_t, int4_t, int32_t>()
+    constexpr auto GetWconv<int4_t, int4_t, int32_t>()
     {
         return WconvInstr::wconv_i32_iu4;
     }
 
     template <>
-    static constexpr auto GetWconv<uint4_t, uint4_t, int32_t>()
+    constexpr auto GetWconv<uint4_t, uint4_t, int32_t>()
     {
         return WconvInstr::wconv_i32_iu4;
     }
 
     template <>
-    static constexpr auto GetWconv<half_t, half_t, half_t>()
+    constexpr auto GetWconv<half_t, half_t, half_t>()
     {
         return WconvInstr::wconv_f16_f16;
     }
 
     template <>
-    static constexpr auto GetWconv<bhalf_t, bhalf_t, bhalf_t>()
+    constexpr auto GetWconv<bhalf_t, bhalf_t, bhalf_t>()
     {
         return WconvInstr::wconv_bf16_bf16;
     }
 
     template <>
-    static constexpr auto GetWconv<f8_t, f8_t, half_t>()
+    constexpr auto GetWconv<f8_t, f8_t, half_t>()
     {
         return WconvInstr::wconv_f16_f8;
     }
 
     template <>
-    static constexpr auto GetWconv<bf8_t, bf8_t, bhalf_t>()
+    constexpr auto GetWconv<bf8_t, bf8_t, bhalf_t>()
     {
         return WconvInstr::wconv_bf16_bf8;
     }
 
     template <>
-    static constexpr auto GetWconv<int8_t, int8_t, half_t>()
+    constexpr auto GetWconv<int8_t, int8_t, half_t>()
     {
         return WconvInstr::wconv_f16_iu8;
     }
 
     template <>
-    static constexpr auto GetWconv<uint8_t, uint8_t, half_t>()
+    constexpr auto GetWconv<uint8_t, uint8_t, half_t>()
     {
         return WconvInstr::wconv_f16_iu8;
     }
 
     template <>
-    static constexpr auto GetWconv<int4_t, int4_t, half_t>()
+    constexpr auto GetWconv<int4_t, int4_t, half_t>()
     {
         return WconvInstr::wconv_f16_iu4;
     }
 
     template <>
-    static constexpr auto GetWconv<uint4_t, uint4_t, half_t>()
+    constexpr auto GetWconv<uint4_t, uint4_t, half_t>()
     {
         return WconvInstr::wconv_f16_iu4;
     }
@@ -624,7 +708,7 @@ struct WconvConv
         return GetWeightRegSize() * 32 / SizeOfBits<KernelWeightDataType>();
     }
 
-    static constexpr index_t GetNumSubTilesPerWeightTape()
+    static constexpr index_t GetNumSubTilesPerWeightTap()
     {
         return ((HPerWconv == 4) && (WPerWconv == 2)) ? 2 : 1;
     }
@@ -634,12 +718,12 @@ struct WconvConv
         return GetNumWeightComponents() / GetWeightRegSize();
     }
 
-    static constexpr index_t GetNumWeightCompPerTape()
+    static constexpr index_t GetNumWeightCompPerTap()
     {
-        return GetNumSubTilesPerWeightTape() * GetNumWeightCompPerTile();
+        return GetNumSubTilesPerWeightTap() * GetNumWeightCompPerTile();
     }
 
-    static constexpr index_t GetNumWeightTape()
+    static constexpr index_t GetNumWeightTap()
     {
         if constexpr(FilterSize == 1)
         {
@@ -651,11 +735,20 @@ struct WconvConv
         }
     }
 
-    static constexpr index_t GetNumWeightTapePerWave()
+    static constexpr index_t GetNumWeightTapPerWave()
     {
         return (HPerWconv == 8) && (WPerWconv == 4) ? 2 : 1;
     }
 
+    // GFX13 3X3 Filter tap order
+    //    -------------
+    //    | 2 | 1 | 8 |
+    //    -------------
+    //    | 3 | 0 | 7 |
+    //    -------------
+    //    | 4 | 5 | 6 |
+    //    -------------
+    // The offset of remap table should be applied to the destination of weight data transfer.
     __host__ __device__ static constexpr auto GetWeight3RemapTable()
     {
         return Sequence<2, 1, 8, 3, 0, 7, 4, 5, 6>{};
@@ -669,18 +762,26 @@ struct WconvConv
         }
         else
         {
-            if constexpr(GetNumWeightTape() == 9)
+            if constexpr(GetNumWeightTap() == 9)
             {
                 return GetWeight3RemapTable();
             }
             else
             {
+                // When pixel shape is 8X4, each VGPR contains two taps. we only need include the
+                // even elements with half value from original table. i.e.
+                // tap[i] = tap_orig[2*i] / 2
                 return Sequence<1, 4, 0, 2, 3>{};
             }
         }
     }
 
-    __host__ __device__ static constexpr auto GetWeightSecondTapeMapTable()
+    // Get additional tap order adjustment for second tap in source.
+    // When pixel shape is 8X4, each VGPR contains two taps, and these two taps are not continuous.
+    // When transfer 3x3 filter from global to LDS, we needn't consider it.
+    // when transfer 3x3 filter from global to VGPR, we have to use this function to adjust the src
+    // tap offset in lane 16-31.
+    __host__ __device__ static constexpr auto GetWeightSecondTapMapTable()
     {
         if constexpr(FilterSize == 1)
         {
@@ -688,12 +789,17 @@ struct WconvConv
         }
         else
         {
-            if constexpr(GetNumWeightTape() == 9)
+            if constexpr(GetNumWeightTap() == 9)
             {
                 return Sequence<0, 0, 0, 0, 0, 0, 0, 0, 0>{};
             }
             else
             {
+                // original order:   0,    1,    2,    3,        4,    5,    6,    7,    8
+                // vgpr order:       1_lo, 0_hi, 4_lo, 1_hi,     0_lo, 3_hi, 2_lo, 2_hi, 3_lo
+                // adjusted order:   0,    3,    2,    2,        4,    1,    6,    7,    8,    5
+                // final vgpr order: 1_lo, 1_hi, 4_lo, (unused), 0_lo, 0_hi, 2_lo, 2_hi, 3_lo, 3_hi
+                // map table value = odd tap - even tap in adjusted table
                 return Sequence<3, 0, -3, 1, -3>{};
             }
         }
@@ -751,6 +857,7 @@ struct WconvConv
     }
 
     // Helper functions of origin data index per thread
+    // {tap_offset x k1 x c1 x c2}
     static constexpr auto CalculateWeiDataThreadOriginDataIndex()
     {
         auto laneId                      = get_thread_local_1d_id() & (WaveSize - 1);
@@ -768,6 +875,7 @@ struct WconvConv
         }
     }
 
+    // {h1 x w1 x c1}
     static constexpr auto CalculateInDataThreadOriginDataIndex()
     {
         auto laneId                      = get_thread_local_1d_id() & (WaveSize - 1);
@@ -778,6 +886,7 @@ struct WconvConv
         return make_tuple(PixelOffset / WPerWconv, PixelOffset % WPerWconv, SubC);
     }
 
+    // {h1 x h2 x w1 x k1 x k2}
     static constexpr auto CalculateAccThreadOriginDataIndex()
     {
         auto laneId              = get_thread_local_1d_id() & (WaveSize - 1);
@@ -815,7 +924,7 @@ struct WconvConv
     using WeiDataTileVec = vector_type<KernelWeightDataType, GetNumWeightCompPerTile()>;
     using InDataTileVec  = vector_type<KernelInDataType, GetNumDataCompPerTile()>;
 
-    using WeiDataTapeVec = vector_type<KernelWeightDataType, GetNumWeightCompPerTape()>;
+    using WeiDataTapVec = vector_type<KernelWeightDataType, GetNumWeightCompPerTap()>;
 
     static_assert(GetNumImageSubTilesInVertical() == GetDataRegSize(), "");
 

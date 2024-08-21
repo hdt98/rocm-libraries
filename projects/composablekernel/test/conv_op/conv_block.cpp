@@ -103,7 +103,6 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
 
     __shared__ char p_shared[LDS_SIZE];
     constexpr index_t W_BlockTile = Width / WPerBlock;
-    constexpr index_t H_BlockTile = Height / HPerBlock;
     constexpr index_t C_BlockTile = InputChannels / CPerBlock;
     constexpr index_t K_BlockTile = OutputChannels / KPerBlock;
     const index_t lIdx            = threadIdx.x;
@@ -133,16 +132,16 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
         make_tuple(Number<HPerBlockIn>{}, Number<WPerBlockIn>{}, Number<CPerBlock>{}));
 
     // YXKC -> K0 x C0 x YX x K1 x C2 x C1
-    constexpr auto NumSubTilesPerWeightTape = wconv_conv.GetNumSubTilesPerWeightTape();
-    constexpr auto WeiDataWaveDesc          = transform_tensor_descriptor(
+    constexpr auto NumSubTilesPerWeightTap = wconv_conv.GetNumSubTilesPerWeightTap();
+    constexpr auto WeiDataWaveDesc         = transform_tensor_descriptor(
         WeiDataBlockDesc,
         make_tuple(
             make_pass_through_transform(Number<FilterSize * FilterSize>{}),
             make_unmerge_transform(
                 make_tuple(Number<KPerBlock / KPerWconv>{}, Number<KPerWconv>{})),
             make_unmerge_transform(make_tuple(Number<CPerBlock / CPerWconv>{},
-                                              Number<NumSubTilesPerWeightTape>{},
-                                              Number<CPerWconv / NumSubTilesPerWeightTape>{}))),
+                                              Number<NumSubTilesPerWeightTap>{},
+                                              Number<CPerWconv / NumSubTilesPerWeightTap>{}))),
         make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}),
         make_tuple(Sequence<2>{}, Sequence<0, 3>{}, Sequence<1, 4, 5>{}));
 
@@ -200,7 +199,7 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
         WeiDataType* p_block_buf = reinterpret_cast<WeiDataType*>(&p_shared[InDataBlockSize]);
         constexpr index_t CompCountPerBlock  = KPerBlock * CPerBlock;
         constexpr index_t CompCountPerIter   = CompCountPerBlock * C_BlockTile;
-        constexpr index_t CompCountPerVector = wconv_conv.GetNumWeightCompPerTape();
+        constexpr index_t CompCountPerVector = wconv_conv.GetNumWeightCompPerTap();
         constexpr index_t CompCountPerThread =
             (CompCountPerIter / BlockSize + CompCountPerVector - 1) / CompCountPerVector *
             CompCountPerVector;
@@ -226,13 +225,12 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
 
     auto update_weight_block_buf3 = [&](index_t k) {
         // 0, 1, 2, 3, 4, 5, 6, 7, 8
-        constexpr index_t TapeMap[]    = {4, 1, 0, 3, 6, 7, 8, 5, 2};
-        constexpr index_t TapeMapRev[] = {2, 1, 8, 3, 0, 7, 4, 5, 6};
+        constexpr index_t TapMapRev[] = {2, 1, 8, 3, 0, 7, 4, 5, 6};
         static_for<0, C_BlockTile, 1>{}([&](auto c0) {
             static_for<0, FilterSize, 1>{}([&](auto y0) {
                 static_for<0, FilterSize, 1>{}([&](auto x0) {
                     constexpr index_t CompCountPerBlock  = KPerBlock * CPerBlock;
-                    constexpr index_t CompCountPerVector = wconv_conv.GetNumWeightCompPerTape();
+                    constexpr index_t CompCountPerVector = wconv_conv.GetNumWeightCompPerTap();
                     constexpr index_t CompCountPerThread =
                         (CompCountPerBlock / BlockSize + CompCountPerVector - 1) /
                         CompCountPerVector * CompCountPerVector;
@@ -243,7 +241,7 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
                     WeiDataType* p_block_buf =
                         reinterpret_cast<WeiDataType*>(
                             &p_shared[InDataBlockSize + c0 * WeiDataBlockSize]) +
-                        TapeMapRev[y0 * FilterSize + x0] * CompCountPerBlock;
+                        TapMapRev[y0 * FilterSize + x0] * CompCountPerBlock;
 
                     static_assert(CompCountPerThread % CompCountPerVector == 0, "");
 

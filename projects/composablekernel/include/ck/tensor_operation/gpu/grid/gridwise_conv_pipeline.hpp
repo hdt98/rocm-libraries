@@ -60,19 +60,19 @@ struct GridwiseConvPipeline_v1<1, true, true>
                                AccumThreadBuffer& accum_thread_buf,
                                index_t num_loop)
     {
-        constexpr index_t NumTape = wei_blockwise_copy.Size();
+        constexpr index_t NumTap = wei_blockwise_copy.Size();
         using WeiDataBlockTransfer0 =
             std::remove_const_t<remove_cvref_t<decltype(wei_blockwise_copy[I0])>>;
 
         // preload data into LDS
-        static_for<0, NumTape, 1>{}([&](auto i) {
+        static_for<0, NumTap, 1>{}([&](auto i) {
             const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[i])
                 .RunRead(wei_grid_desc, wei_grid_buf);
         });
 
         in_blockwise_copy.RunRead(in_grid_desc, in_grid_buf);
 
-        static_for<0, NumTape, 1>{}([&](auto i) {
+        static_for<0, NumTap, 1>{}([&](auto i) {
             const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[i])
                 .MoveSrcSliceWindow(wei_grid_desc, wei_block_copy_step);
         });
@@ -80,7 +80,7 @@ struct GridwiseConvPipeline_v1<1, true, true>
 
         // Initialize C
         accum_thread_buf.Clear();
-        static_for<0, NumTape, 1>{}([&](auto i) {
+        static_for<0, NumTap, 1>{}([&](auto i) {
             const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[i])
                 .RunWrite(wei_block_desc, wei_block_buf);
         });
@@ -93,7 +93,7 @@ struct GridwiseConvPipeline_v1<1, true, true>
             index_t i = 0;
             do
             {
-                static_for<0, NumTape, 1>{}([&](auto i) {
+                static_for<0, NumTap, 1>{}([&](auto i) {
                     const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[i])
                         .RunRead(wei_grid_desc, wei_grid_buf);
                 });
@@ -106,14 +106,14 @@ struct GridwiseConvPipeline_v1<1, true, true>
 
                 block_sync_lds();
 
-                static_for<0, NumTape, 1>{}([&](auto i) {
+                static_for<0, NumTap, 1>{}([&](auto i) {
                     const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[i])
                         .MoveSrcSliceWindow(wei_grid_desc, wei_block_copy_step);
                 });
 
                 in_blockwise_copy.MoveSrcSliceWindow(in_grid_desc, in_block_copy_step);
 
-                static_for<0, NumTape, 1>{}([&](auto i) {
+                static_for<0, NumTap, 1>{}([&](auto i) {
                     const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[i])
                         .RunWrite(wei_block_desc, wei_block_buf);
                 });
@@ -177,7 +177,7 @@ struct GridwiseConvPipeline_v1<1, false, true>
                                AccumThreadBuffer& accum_thread_buf,
                                index_t num_loop)
     {
-        constexpr index_t NumTape          = wei_blockwise_copy.Size();
+        constexpr index_t NumTap           = wei_blockwise_copy.Size();
         constexpr auto in_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0);
         auto in_block_buf_switch           = in_block_buf;
 
@@ -185,7 +185,7 @@ struct GridwiseConvPipeline_v1<1, false, true>
             std::remove_const_t<remove_cvref_t<decltype(wei_blockwise_copy[I0])>>;
 
         // preload data into LDS
-        static_for<0, NumTape, 1>{}([&](auto i) {
+        static_for<0, NumTap, 1>{}([&](auto i) {
             const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[i])
                 .RunRead(wei_grid_desc, wei_grid_buf);
         });
@@ -193,7 +193,7 @@ struct GridwiseConvPipeline_v1<1, false, true>
         in_blockwise_copy.Run(
             in_grid_desc, in_grid_buf, in_block_desc, in_block_origin_idx, in_block_buf);
 
-        static_for<0, NumTape, 1>{}([&](auto i) {
+        static_for<0, NumTap, 1>{}([&](auto i) {
             const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[i])
                 .MoveSrcSliceWindow(wei_grid_desc, wei_block_copy_step);
         });
@@ -201,7 +201,7 @@ struct GridwiseConvPipeline_v1<1, false, true>
 
         // Initialize C
         accum_thread_buf.Clear();
-        static_for<0, NumTape, 1>{}([&](auto i) {
+        static_for<0, NumTap, 1>{}([&](auto i) {
             const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[i])
                 .RunWrite(wei_block_desc, wei_block_buf);
         });
@@ -220,7 +220,7 @@ struct GridwiseConvPipeline_v1<1, false, true>
 
                 block_sync_lds();
 
-                static_for<0, NumTape, 1>{}([&](auto i) {
+                static_for<0, NumTap, 1>{}([&](auto i) {
                     const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[i])
                         .RunRead(wei_grid_desc, wei_grid_buf);
                 });
@@ -229,14 +229,14 @@ struct GridwiseConvPipeline_v1<1, false, true>
 
                 block_sync_lds();
 
-                static_for<0, NumTape, 1>{}([&](auto i) {
+                static_for<0, NumTap, 1>{}([&](auto i) {
                     const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[i])
                         .MoveSrcSliceWindow(wei_grid_desc, wei_block_copy_step);
                 });
 
                 in_blockwise_copy.MoveSrcSliceWindow(in_grid_desc, in_block_copy_step);
 
-                static_for<0, NumTape, 1>{}([&](auto i) {
+                static_for<0, NumTap, 1>{}([&](auto i) {
                     const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[i])
                         .RunWrite(wei_block_desc, wei_block_buf);
                 });
@@ -299,7 +299,7 @@ struct GridwiseConvPipeline_v1<1, false, false>
                                AccumThreadBuffer& accum_thread_buf,
                                index_t num_loop)
     {
-        constexpr index_t NumTape          = wei_blockwise_copy.Size();
+        constexpr index_t NumTap           = wei_blockwise_copy.Size();
         constexpr auto in_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0);
         auto in_block_buf_switch           = in_block_buf;
         auto wei_block_buf_switch          = wei_block_buf;
@@ -309,7 +309,7 @@ struct GridwiseConvPipeline_v1<1, false, false>
             std::remove_const_t<remove_cvref_t<decltype(wei_blockwise_copy[I0])>>;
 
         // preload data into LDS
-        static_for<0, NumTape, 1>{}([&](auto i) {
+        static_for<0, NumTap, 1>{}([&](auto i) {
             const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[i])
                 .Run(wei_grid_desc,
                      wei_grid_buf,
@@ -321,7 +321,7 @@ struct GridwiseConvPipeline_v1<1, false, false>
         in_blockwise_copy.Run(
             in_grid_desc, in_grid_buf, in_block_desc, in_block_origin_idx, in_block_buf);
 
-        static_for<0, NumTape, 1>{}([&](auto i) {
+        static_for<0, NumTap, 1>{}([&](auto i) {
             const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[i])
                 .MoveSrcSliceWindow(wei_grid_desc, wei_block_copy_step);
         });
@@ -336,7 +336,7 @@ struct GridwiseConvPipeline_v1<1, false, false>
             index_t i = 0;
             do
             {
-                static_for<0, NumTape, 1>{}([&](auto i) {
+                static_for<0, NumTap, 1>{}([&](auto i) {
                     const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[i])
                         .Run(wei_grid_desc,
                              wei_grid_buf,
@@ -356,7 +356,7 @@ struct GridwiseConvPipeline_v1<1, false, false>
 
                 block_sync_lds();
 
-                static_for<0, NumTape, 1>{}([&](auto i) {
+                static_for<0, NumTap, 1>{}([&](auto i) {
                     const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[i])
                         .MoveSrcSliceWindow(wei_grid_desc, wei_block_copy_step);
                 });
@@ -422,7 +422,7 @@ struct GridwiseConvPipeline_v1<1, true, false>
                                AccumThreadBuffer& accum_thread_buf,
                                index_t num_loop)
     {
-        constexpr index_t NumTape      = wei_blockwise_copy.Size();
+        constexpr index_t NumTap       = wei_blockwise_copy.Size();
         constexpr auto wei_remap_table = blockwise_conv.GetWeightRemapTable();
         auto wei_block_buf_switch      = wei_block_buf;
 
@@ -430,7 +430,7 @@ struct GridwiseConvPipeline_v1<1, true, false>
             std::remove_const_t<remove_cvref_t<decltype(wei_blockwise_copy[I0])>>;
 
         // preload data into LDS
-        static_for<0, NumTape, 1>{}([&](auto i) {
+        static_for<0, NumTap, 1>{}([&](auto i) {
             const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[i])
                 .Run(wei_grid_desc,
                      wei_grid_buf,
@@ -441,7 +441,7 @@ struct GridwiseConvPipeline_v1<1, true, false>
 
         in_blockwise_copy.RunRead(in_grid_desc, in_grid_buf);
 
-        static_for<0, NumTape, 1>{}([&](auto i) {
+        static_for<0, NumTap, 1>{}([&](auto i) {
             const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[i])
                 .MoveSrcSliceWindow(wei_grid_desc, wei_block_copy_step);
         });
@@ -458,7 +458,7 @@ struct GridwiseConvPipeline_v1<1, true, false>
             index_t i = 0;
             do
             {
-                static_for<0, NumTape, 1>{}([&](auto i) {
+                static_for<0, NumTap, 1>{}([&](auto i) {
                     const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[i])
                         .Run(wei_grid_desc,
                              wei_grid_buf,
@@ -475,7 +475,7 @@ struct GridwiseConvPipeline_v1<1, true, false>
 
                 block_sync_lds();
 
-                static_for<0, NumTape, 1>{}([&](auto i) {
+                static_for<0, NumTap, 1>{}([&](auto i) {
                     const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[i])
                         .MoveSrcSliceWindow(wei_grid_desc, wei_block_copy_step);
                 });

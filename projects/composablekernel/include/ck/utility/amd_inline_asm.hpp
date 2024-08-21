@@ -52,6 +52,12 @@ amd_assembly_outer_product_1x2(half2_t a, half2_t b0, half2_t b1, float& c0, flo
             "
                  : "=v"(c0), "=v"(c1)
                  : "v"(a), "v"(b0), "v"(b1), "0"(c0), "1"(c1));
+#else
+    ignore = a;
+    ignore = b0;
+    ignore = b1;
+    ignore = c0;
+    ignore = c1;
 #endif
 }
 
@@ -81,6 +87,12 @@ amd_assembly_outer_product_1x2(half4_t a, half4_t b0, half4_t b1, float& c0, flo
                    "v"(p_b1_half2[1]),
                    "0"(c0),
                    "1"(c1));
+#else
+    ignore = p_a_half2;
+    ignore = p_b0_half2;
+    ignore = p_b1_half2;
+    ignore = c0;
+    ignore = c1;
 #endif
 }
 
@@ -107,6 +119,16 @@ __device__ void amd_assembly_outer_product_1x4(half2_t a,
             "
                  : "=v"(c0), "=v"(c1), "=v"(c2), "=v"(c3)
                  : "v"(a), "v"(b0), "v"(b1), "v"(b2), "v"(b3), "0"(c0), "1"(c1), "2"(c2), "3"(c3));
+#else
+    ignore = a;
+    ignore = b0;
+    ignore = b1;
+    ignore = b2;
+    ignore = b3;
+    ignore = c0;
+    ignore = c1;
+    ignore = c2;
+    ignore = c3;
 #endif
 }
 
@@ -157,6 +179,16 @@ __device__ void amd_assembly_outer_product_1x4(half4_t a,
                    "1"(c1),
                    "2"(c2),
                    "3"(c3));
+#else
+    ignore = p_a_half2;
+    ignore = p_b0_half2;
+    ignore = p_b1_half2;
+    ignore = p_b2_half2;
+    ignore = p_b3_half2;
+    ignore = c0;
+    ignore = c1;
+    ignore = c2;
+    ignore = c3;
 #endif
 }
 

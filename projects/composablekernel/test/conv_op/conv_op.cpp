@@ -285,7 +285,7 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
 #else
                     InDataVec& in_tile_data = inData[h * WRepeat * CRepeat + w * CRepeat + c];
 #endif
-                    wconvConv.wconv_instr.run(weiData[k * CRepeat + c], in_tile_data, c_vec);
+                    wconvConv.wconv_instr.Run(weiData[k * CRepeat + c], in_tile_data, c_vec);
                 });
 #if LOAD_DATA_PER_TILE
                 store_acc_data(h, w, k, c_vec);
@@ -560,7 +560,7 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
                     inData[1] = load_in_data(h, w, c, -1);
                     inData[0] = load_in_data(h, w, c, 0);
                     inData[2] = load_in_data(h, w, c, 1);
-                    wconvConv.wconv_instr.run(weiData[c], inData, c_vec);
+                    wconvConv.wconv_instr.Run(weiData[c], inData, c_vec);
                 });
                 store_acc_data(h, w, k, c_vec);
             });

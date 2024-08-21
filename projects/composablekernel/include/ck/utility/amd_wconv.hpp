@@ -12,6 +12,7 @@ namespace ck {
 #define __gfx13__
 #endif
 
+#if defined(__gfx13__)
 // Helper functions to translate convolution parameters to MOD flags
 // __builtin_amdgcn_convolve* merged 3 MOD flags into single aux_data
 // aux_data bit 0  ~ 5:  MOD0
@@ -356,6 +357,42 @@ struct intrin_wconv_f32_iu8<4, 2, 1, 1, 1, 1, Aco, Signed>
             bit_cast<int32_t>(reg_data),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
                 GetAccumChannelOrderMod<Aco>(),
+            0);
+    }
+};
+
+template <bool Aco, bool Signed>
+struct intrin_wconv_f32_iu8<4, 2, 1, 1, 1, 2, Aco, Signed>
+{
+    template <class FloatC>
+    __device__ static void Run(const int8x16_t& reg_wei, const int8x4_t reg_data[2], FloatC& reg_c)
+    {
+        reg_c.template AsType<float4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f32_iu8_4x2(
+            reg_c.template AsType<float4_t>()[Number<0>{}],
+            bit_cast<int32x4_t>(reg_wei),
+            bit_cast<int32_t>(reg_data[0]),
+            bit_cast<int32_t>(reg_data[1]),
+            GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
+                GetAccumChannelOrderMod<Aco>() | GetItersMod<2>(),
+            0);
+    }
+};
+
+template <bool Aco, bool Signed>
+struct intrin_wconv_f32_iu8<4, 2, 1, 1, 1, 4, Aco, Signed>
+{
+    template <class FloatC>
+    __device__ static void Run(const int8x32_t& reg_wei, const int8x4_t reg_data[4], FloatC& reg_c)
+    {
+        reg_c.template AsType<float4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f32_iu8_4x2(
+            reg_c.template AsType<float4_t>()[Number<0>{}],
+            bit_cast<int32x8_t>(reg_wei),
+            bit_cast<int32_t>(reg_data[0]),
+            bit_cast<int32_t>(reg_data[1]),
+            bit_cast<int32_t>(reg_data[2]),
+            bit_cast<int32_t>(reg_data[3]),
+            GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
+                GetAccumChannelOrderMod<Aco>() | GetItersMod<4>(),
             0);
     }
 };
@@ -2046,6 +2083,8 @@ struct intrin_wconv_f16_iu4<8, 4, 3, DilationX, DilationY, 1, Aco, Signed>
             0);
     }
 };
+#endif
+
 #endif
 
 } // namespace ck

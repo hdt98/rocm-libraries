@@ -49,8 +49,7 @@ __global__ void
                                   const Block2CTileMap block_2_ctile_map,
                                   const ComputePtrOffsetOfBatch compute_ptr_offset_of_batch)
 {
-#if(!defined(__HIP_DEVICE_COMPILE__) || defined(__gfx11__) || defined(__gfx12__) || \
-    defined(__gfx13__))
+#if(!defined(__HIP_DEVICE_COMPILE__) || defined(__gfx13__))
     // offset base pointer for each work-group
     const index_t num_blocks_per_batch =
         __builtin_amdgcn_readfirstlane(get_grid_size() / batch_count);
@@ -81,7 +80,7 @@ __global__ void
     ignore = p_wei_grid;
     ignore = p_acc_grid;
     ignore = in_grid_desc;
-    ignore = we_grid_desc;
+    ignore = wei_grid_desc;
     ignore = acc_grid_desc;
     ignore = in_element_op;
     ignore = wei_element_op;
@@ -156,18 +155,18 @@ struct GridwiseConv_Wconv
     using GridwiseConvPipe =
         GridwiseConvPipeline_v1<NumConvCPrefetchStage, InEnableLds, WeiEnableLds>;
 
-    static constexpr index_t CPerWconv                = wconv_conv.GetNumInputChannels();
-    static constexpr index_t KPerWconv                = wconv_conv.GetNumOutputChannels();
-    static constexpr index_t NumWeightTape            = wconv_conv.GetNumWeightTape();
-    static constexpr index_t NumSubTilesPerWeightTape = wconv_conv.GetNumSubTilesPerWeightTape();
-    static constexpr index_t NumWeightCompPerTile     = wconv_conv.GetNumWeightCompPerTile();
-    static constexpr index_t NumSubTilePerImage       = wconv_conv.GetNumSubTilesPerImageTile();
-    static constexpr index_t NumDataCompPerTile       = wconv_conv.GetNumDataCompPerTile();
-    static constexpr index_t DataTileHeight           = 4;
-    static constexpr index_t H_Pad                    = (FilterSize == 3) ? DataTileHeight : 0;
-    static constexpr index_t W_Pad                    = (FilterSize == 3) ? WPerWconv : 0;
-    static constexpr index_t HPerBlockIn              = HPerBlock + H_Pad * 2;
-    static constexpr index_t WPerBlockIn              = WPerBlock + W_Pad * 2;
+    static constexpr index_t CPerWconv               = wconv_conv.GetNumInputChannels();
+    static constexpr index_t KPerWconv               = wconv_conv.GetNumOutputChannels();
+    static constexpr index_t NumWeightTap            = wconv_conv.GetNumWeightTap();
+    static constexpr index_t NumSubTilesPerWeightTap = wconv_conv.GetNumSubTilesPerWeightTap();
+    static constexpr index_t NumWeightCompPerTile    = wconv_conv.GetNumWeightCompPerTile();
+    static constexpr index_t NumSubTilePerImage      = wconv_conv.GetNumSubTilesPerImageTile();
+    static constexpr index_t NumDataCompPerTile      = wconv_conv.GetNumDataCompPerTile();
+    static constexpr index_t DataTileHeight          = 4;
+    static constexpr index_t H_Pad                   = (FilterSize == 3) ? DataTileHeight : 0;
+    static constexpr index_t W_Pad                   = (FilterSize == 3) ? WPerWconv : 0;
+    static constexpr index_t HPerBlockIn             = HPerBlock + H_Pad * 2;
+    static constexpr index_t WPerBlockIn             = WPerBlock + W_Pad * 2;
 
     static constexpr index_t HPerWave   = HRepeat * HPerWconv;
     static constexpr index_t WPerWave   = WRepeat * WPerWconv;
@@ -178,6 +177,7 @@ struct GridwiseConv_Wconv
     static_assert(HPerWaveIn % HPerWconv == 0, "");
     static_assert(WPerWaveIn % WPerWconv == 0, "");
 
+    // Pad input and weight data grid description according to grid level options
     __host__ __device__ static constexpr auto
     MakeInGridPadDescriptor(const InGridDesc& in_grid_desc)
     {
@@ -243,8 +243,8 @@ struct GridwiseConv_Wconv
                            make_pass_through_transform(Number<FilterSize * FilterSize>{}),
                            make_unmerge_transform(
                                make_tuple(C / CPerWconv,
-                                          Number<NumSubTilesPerWeightTape>{},
-                                          Number<CPerWconv / NumSubTilesPerWeightTape>{}))),
+                                          Number<NumSubTilesPerWeightTap>{},
+                                          Number<CPerWconv / NumSubTilesPerWeightTap>{}))),
                 make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}),
                 make_tuple(Sequence<0, 3>{}, Sequence<2>{}, Sequence<1, 4, 5>{}));
         }
@@ -292,9 +292,9 @@ struct GridwiseConv_Wconv
                 return make_naive_tensor_descriptor_packed(
                     make_tuple(Number<KPerWave / KPerWconv>{},
                                Number<CPerWave / CPerWconv>{},
-                               Number<NumWeightTape>{},
+                               Number<NumWeightTap>{},
                                I1,
-                               Number<NumSubTilesPerWeightTape>{},
+                               Number<NumSubTilesPerWeightTap>{},
                                Number<NumWeightCompPerTile>{}));
             }
         }();
@@ -334,7 +334,7 @@ struct GridwiseConv_Wconv
         return wei_block_copy_step;
     }
 
-    // Describe how data read from (LDS/VGPR) buffer
+    // Describe how data read from (LDS/VGPR) buffer, used by Block level classes
     template <typename InBlockDesc_>
     __host__ __device__ static constexpr auto MakeInWaveDescriptor(const InBlockDesc_&)
     {
@@ -378,8 +378,8 @@ struct GridwiseConv_Wconv
                                make_pass_through_transform(Number<FilterSize * FilterSize>{}),
                                make_unmerge_transform(
                                    make_tuple(Number<CPerBlock / CPerWconv>{},
-                                              Number<NumSubTilesPerWeightTape>{},
-                                              Number<CPerWconv / NumSubTilesPerWeightTape>{}))),
+                                              Number<NumSubTilesPerWeightTap>{},
+                                              Number<CPerWconv / NumSubTilesPerWeightTap>{}))),
                     make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}),
                     make_tuple(Sequence<0, 3>{}, Sequence<2>{}, Sequence<1, 4, 5>{}));
             }
@@ -392,6 +392,7 @@ struct GridwiseConv_Wconv
         return wei_wave_desc;
     }
 
+    // Describe how data store to LDS buffer
     __host__ __device__ static constexpr auto GetAccBlockDescriptor()
     {
         constexpr auto acc_block_desc = make_naive_tensor_descriptor_packed(
@@ -400,57 +401,12 @@ struct GridwiseConv_Wconv
         return acc_block_desc;
     }
 
-    // block_id to matrix tile idx (m0, n0) mapping are controlled by {M01, N01}
     template <typename Block2CTileMap>
     __host__ __device__ static constexpr bool CheckValidity(const InGridDesc& in_grid_desc,
                                                             const WeiGridDesc& wei_grid_desc,
                                                             const AccGridDesc& acc_grid_desc,
                                                             const Block2CTileMap& block_2_ctile_map)
     {
-        // static_assert(is_known_at_compile_time<remove_cv_t<decltype(K1)>>::value,
-        //               "wrong! K1 need to be known at compile-time");
-        //
-        // static_assert((MPerBlock % (MPerWmma * MRepeat) == 0) &&
-        //                   (NPerBlock % (NRepeat * NPerWmma)) == 0,
-        //               "Invalid tuning param!");
-#if 0
-        Debug<Number<WeiBlockDesc_{}.GetLength(I2)>> BDIM2;
-        Debug<Number<WeiBlockDesc_{}.GetLength(I1)>> BDIM1;
-        Debug<Number<WeiBlockDesc_{}.GetLength(I0)>> BDIM0;
-        constexpr index_t Bstride0 = WeiBlockDesc_{}.CalculateOffset(make_tuple(I1, I0, I0));
-        constexpr index_t Bstride1 = WeiBlockDesc_{}.CalculateOffset(make_tuple(I0, I1, I0));
-        constexpr index_t Bstride2 = WeiBlockDesc_{}.CalculateOffset(make_tuple(I0, I0, I1));
-        Debug<Number<Bstride0>> BSTR0;
-        Debug<Number<Bstride1>> BSTR1;
-        Debug<Number<Bstride2>> BSTR2;
-
-
-        Debug<Number<wei_wave_desc.GetLength(I5)>> DIM5;
-        Debug<Number<wei_wave_desc.GetLength(I4)>> DIM4;
-        Debug<Number<wei_wave_desc.GetLength(I3)>> DIM3;
-        Debug<Number<wei_wave_desc.GetLength(I2)>> DIM2;
-        Debug<Number<wei_wave_desc.GetLength(I1)>> DIM1;
-        Debug<Number<wei_wave_desc.GetLength(I0)>> DIM0;
-
-        constexpr index_t stride0 =
-            wei_wave_desc.CalculateOffset(make_tuple(I1, I0, I0, I0, I0, I0));
-        constexpr index_t stride1 =
-            wei_wave_desc.CalculateOffset(make_tuple(I0, I1, I0, I0, I0, I0));
-        constexpr index_t stride2 =
-            wei_wave_desc.CalculateOffset(make_tuple(I0, I0, I1, I0, I0, I0));
-        constexpr index_t stride3 =
-            wei_wave_desc.CalculateOffset(make_tuple(I0, I0, I0, I1, I0, I0));
-        constexpr index_t stride4 =
-            wei_wave_desc.CalculateOffset(make_tuple(I0, I0, I0, I0, I1, I0));
-        constexpr index_t stride5 =
-            wei_wave_desc.CalculateOffset(make_tuple(I0, I0, I0, I0, I0, I1));
-        Debug<Number<stride0>> STR0;
-        Debug<Number<stride1>> STR1;
-        Debug<Number<stride2>> STR2;
-        Debug<Number<stride3>> STR3;
-        Debug<Number<stride4>> STR4;
-        Debug<Number<stride5>> STR5;
-#endif
         static_assert(HPerBlock % (HRepeat * HPerWconv) == 0, "");
         static_assert(WPerBlock % (WRepeat * WPerWconv) == 0, "");
 
@@ -465,12 +421,14 @@ struct GridwiseConv_Wconv
                               wei_grid_desc.GetLength(I2));
         };
 
-        const auto H = GetInProblemsize()[I0];
-        const auto W = GetInProblemsize()[I1];
-        const auto C = GetInProblemsize()[I2];
-        const auto K = GetWeiProblemsize()[I0];
+        const auto Ho = (FilterSize == 2) ? GetInProblemsize()[I0] / 2 : GetInProblemsize()[I0];
+        const auto Wo = (FilterSize == 2) ? GetInProblemsize()[I1] / 2 : GetInProblemsize()[I1];
+        const auto H  = (FilterSize == 2) ? GetInProblemsize()[I0] / 2 : GetInProblemsize()[I0];
+        const auto W  = (FilterSize == 2) ? GetInProblemsize()[I1] / 2 : GetInProblemsize()[I1];
+        const auto C  = GetInProblemsize()[I2];
+        const auto K  = GetWeiProblemsize()[I0];
 
-        if(!(H == acc_grid_desc.GetLength(I0) && W == acc_grid_desc.GetLength(I1) &&
+        if(!(Ho == acc_grid_desc.GetLength(I0) && Wo == acc_grid_desc.GetLength(I1) &&
              K == acc_grid_desc.GetLength(I2)) ||
            !(C == GetWeiProblemsize()[I2]))
         {
@@ -528,28 +486,7 @@ struct GridwiseConv_Wconv
         return GridwiseConvPipe::CalculateHasMainLoop(num_loop);
     }
 
-    __host__ __device__ static constexpr auto
-    MakeAccGridDescriptor_Block(const AccGridDesc& acc_grid_desc)
-    {
-        const auto H = acc_grid_desc.GetLength(I0);
-        const auto W = acc_grid_desc.GetLength(I1);
-        const auto K = acc_grid_desc.GetLength(I2);
-
-        const auto HBlock              = H / HPerBlock;
-        const auto WBlock              = W / WPerBlock;
-        const auto KBlock              = K / KPerBlock;
-        const auto acc_grid_desc_block = transform_tensor_descriptor(
-            acc_grid_desc,
-            make_tuple(make_unmerge_transform(make_tuple(HBlock, Number<HPerBlock>{})),
-                       make_unmerge_transform(make_tuple(WBlock, Number<WPerBlock>{})),
-                       make_unmerge_transform(make_tuple(KBlock, Number<KPerBlock>{}))),
-            make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}),
-            make_tuple(Sequence<0, 3>{}, Sequence<1, 4>{}, Sequence<2, 5>{}));
-
-        return acc_grid_desc_block;
-    }
-
-    // return block_id to Acc tensor tile idx (k0, w0, h0) mapping
+    // Return block_id to Acc tensor tile idx (k0, w0, h0) mapping
     __host__ __device__ static constexpr auto
     MakeDefaultBlock2CTileMap(const AccGridDesc& c_grid_desc_m_n, index_t M01, index_t /* N01 */)
     {
@@ -585,9 +522,6 @@ struct GridwiseConv_Wconv
                           wei_block_space_size_aligned * sizeof(WeiDataType));
     };
 
-    // Debug<Number<SharedMemTrait::lds_size>> ddddd;
-    using AccGridDescriptor_Block =
-        remove_cvref_t<decltype(MakeAccGridDescriptor_Block(AccGridDesc{}))>;
     using DefaultBlock2CTileMap =
         remove_cvref_t<decltype(MakeDefaultBlock2CTileMap(AccGridDesc{}, 1, 1))>;
 
@@ -632,9 +566,10 @@ struct GridwiseConv_Wconv
         const index_t k_block_data_idx_on_grid =
             __builtin_amdgcn_readfirstlane(block_work_idx[I0] * KPerBlock);
         const index_t h_block_data_idx_on_grid =
-            __builtin_amdgcn_readfirstlane(block_work_idx[I1] * HPerBlock);
+            __builtin_amdgcn_readfirstlane(block_work_idx[I2] * HPerBlock);
         const index_t w_block_data_idx_on_grid =
-            __builtin_amdgcn_readfirstlane(block_work_idx[I2] * WPerBlock);
+            __builtin_amdgcn_readfirstlane(block_work_idx[I1] * WPerBlock);
+
         /*******************************************************************************/
         // BlockLevel, Tensor and filter ThreadMapping in WCNN Source buffer, As Destinaion of
         // BlockWise_Copy
@@ -811,7 +746,7 @@ struct GridwiseConv_Wconv
                                                               CPerWave / CPerWconv,
                                                               1,
                                                               1,
-                                                              NumSubTilesPerWeightTape,
+                                                              NumSubTilesPerWeightTap,
                                                               NumWeightCompPerTile>,
                                                      Sequence<0, 1, 2, 3, 4, 5>,
                                                      5,
@@ -836,18 +771,17 @@ struct GridwiseConv_Wconv
                         {
                             return WeiThreadGroupTensorSliceTransfer(
                                 wei_grid_pad_desc,
-                                make_multi_index(
-                                    k0,
-                                    0,
-                                    I * wconv_conv.GetNumWeightTapePerWave() +
-                                        wei_slice_origin_idx[I0] *
-                                            wconv_conv.GetWeightSecondTapeMapTable()[I],
-                                    wei_slice_origin_idx[I1],
-                                    wei_slice_origin_idx[I2],
-                                    wei_slice_origin_idx[I3]));
+                                make_multi_index(k0,
+                                                 0,
+                                                 I * wconv_conv.GetNumWeightTapPerWave() +
+                                                     wei_slice_origin_idx[I0] *
+                                                         wconv_conv.GetWeightSecondTapMapTable()[I],
+                                                 wei_slice_origin_idx[I1],
+                                                 wei_slice_origin_idx[I2],
+                                                 wei_slice_origin_idx[I3]));
                         }
                     },
-                    Number<NumWeightTape>{});
+                    Number<NumWeightTap>{});
                 return make_tuple(wei_block_buf, wei_blockwise_copy);
             }
         };
@@ -857,6 +791,7 @@ struct GridwiseConv_Wconv
 
         auto wei_block_buf      = wei_block_trait()[I0];
         auto wei_blockwise_copy = wei_block_trait()[I1];
+
         /*******************************************************************************/
         // CONV
         auto blockwise_conv = BlockwiseConvWconv<BlockSize,
@@ -880,7 +815,7 @@ struct GridwiseConv_Wconv
                                                  InEnableLds>{};
 
         // Prepare Register for Accum
-        auto acc_thread_buf = blockwise_conv.GetAccumThreadBuffer();
+        auto& acc_thread_buf = blockwise_conv.GetAccumThreadBuffer();
 
         /*******************************************************************************/
         // Shift Per CPerBlock
@@ -919,7 +854,6 @@ struct GridwiseConv_Wconv
 
                 const index_t acc_H_stride = acc_grid_desc.CalculateOffset(make_tuple(I1, I0, I0));
                 const index_t acc_W_stride = acc_grid_desc.CalculateOffset(make_tuple(I0, I1, I0));
-                const index_t acc_K_stride = acc_grid_desc.CalculateOffset(make_tuple(I0, I0, I1));
 
                 const index_t subW = (accCompIdx / wconv_conv.GetNumOutputChannels()) % WPerWconv;
                 const index_t subH = (accCompIdx / wconv_conv.GetNumOutputChannels()) / WPerWconv;
@@ -1028,29 +962,30 @@ struct GridwiseConv_Wconv
                     acc_thread_mtx_on_block,
                     ck::tensor_operation::element_wise::PassThrough{}};
 
-            // shuffle: blockwise copy C from LDS to global
-            auto acc_block_copy_lds_to_global = ThreadGroupTensorSliceTransfer_v6r1<
-                ThisThreadBlock,                           // ThreadGroup
-                AccElementwiseOperation,                   // ElementwiseOperation,
-                InMemoryDataOperationEnum::Set,            // DstInMemOp,
-                Sequence<HPerBlock, WPerBlock, KPerBlock>, // BlockSliceLengths,
-                AccBlockTransferClusterLengths,
-                Sequence<0, 1, 2>, // typename ThreadClusterArrangeOrder,
-                AccDataType,       // typename SrcData,
-                AccDataType,       // typename DstData,
-                decltype(acc_block_desc),
-                decltype(acc_grid_desc),
-                Sequence<0, 1, 2>,               // typename DimAccessOrder,
-                2,                               // index_t VectorDim,
-                AccBlockTransferScalarPerVector, // index_t ScalarPerVector,
-                true,                            // bool ThreadTransferSrcResetCoordinateAfterRun,
-                false>                           // bool ThreadTransferDstResetCoordinateAfterRun>
-                {acc_block_desc,
-                 make_multi_index(0, 0, 0),
-                 acc_grid_desc,
-                 make_multi_index(
-                     h_block_data_idx_on_grid, w_block_data_idx_on_grid, k_block_data_idx_on_grid),
-                 acc_element_op};
+            // blockwise copy C from LDS to global
+            auto acc_block_copy_lds_to_global =
+                ThreadGroupTensorSliceTransfer_v6r1<ThisThreadBlock,
+                                                    AccElementwiseOperation,
+                                                    InMemoryDataOperationEnum::Set,
+                                                    Sequence<HPerBlock, WPerBlock, KPerBlock>,
+                                                    AccBlockTransferClusterLengths,
+                                                    Sequence<0, 1, 2>,
+                                                    AccDataType,
+                                                    AccDataType,
+                                                    decltype(acc_block_desc),
+                                                    decltype(acc_grid_desc),
+                                                    Sequence<0, 1, 2>,
+                                                    2,
+                                                    AccBlockTransferScalarPerVector,
+                                                    true,
+                                                    false>{
+                    acc_block_desc,
+                    make_multi_index(0, 0, 0),
+                    acc_grid_desc,
+                    make_multi_index(h_block_data_idx_on_grid,
+                                     w_block_data_idx_on_grid,
+                                     k_block_data_idx_on_grid),
+                    acc_element_op};
 
             // make sure it's safe to write to LDS
             block_sync_lds();
