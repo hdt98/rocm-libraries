@@ -486,12 +486,12 @@ struct GridwiseConv_Wconv
         return GridwiseConvPipe::CalculateHasMainLoop(num_loop);
     }
 
-    // Return block_id to Acc tensor tile idx (k0, w0, h0) mapping
+    // Return block_id to Acc tensor tile idx (k0, h0, w0) mapping
     __host__ __device__ static constexpr auto
-    MakeDefaultBlock2CTileMap(const AccGridDesc& c_grid_desc_m_n, index_t M01, index_t /* N01 */)
+    MakeDefaultBlock2CTileMap(const AccGridDesc& c_grid_desc_h_w_k, index_t M01, index_t /* N01 */)
     {
-        return BlockToCTileMap_KSplit_M00_N0_M01Adapt<WPerBlock, HPerBlock, AccGridDesc>(
-            c_grid_desc_m_n, M01, c_grid_desc_m_n.GetLength(I2) / KPerBlock);
+        return BlockToCTileMap_KSplit_M00_N0_M01Adapt<HPerBlock, WPerBlock, AccGridDesc>(
+            c_grid_desc_h_w_k, M01, c_grid_desc_h_w_k.GetLength(I2) / KPerBlock);
     }
 
     struct SharedMemTrait
@@ -565,10 +565,10 @@ struct GridwiseConv_Wconv
         // Store BlockId into SGPR
         const index_t k_block_data_idx_on_grid =
             __builtin_amdgcn_readfirstlane(block_work_idx[I0] * KPerBlock);
-        const index_t h_block_data_idx_on_grid =
-            __builtin_amdgcn_readfirstlane(block_work_idx[I2] * HPerBlock);
         const index_t w_block_data_idx_on_grid =
-            __builtin_amdgcn_readfirstlane(block_work_idx[I1] * WPerBlock);
+            __builtin_amdgcn_readfirstlane(block_work_idx[I2] * WPerBlock);
+        const index_t h_block_data_idx_on_grid =
+            __builtin_amdgcn_readfirstlane(block_work_idx[I1] * HPerBlock);
 
         /*******************************************************************************/
         // BlockLevel, Tensor and filter ThreadMapping in WCNN Source buffer, As Destinaion of

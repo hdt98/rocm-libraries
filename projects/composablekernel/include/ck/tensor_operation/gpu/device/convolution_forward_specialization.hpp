@@ -17,7 +17,9 @@ enum struct ConvolutionForwardSpecialization
     OddC,
     Filter3x3,
     Filter3x3Stride1Pad0,
-    Filter2x2Stride2Pad0
+    Filter3x3Stride1MultiLayerPad0,
+    Filter2x2Stride2Pad0,
+    Filter2x2Stride2OddHWPad0,
 };
 
 inline std::string getConvForwardSpecializationString(const ConvolutionForwardSpecialization& s)

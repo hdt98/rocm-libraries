@@ -267,6 +267,12 @@ amd_assembly_outer_product_1x2(int8x4_t a, int8x4_t b0, int8x4_t b1, int32_t& c0
         __builtin_amdgcn_sudot4(true, bit_cast<int32_t>(a), true, bit_cast<int32_t>(b0), c0, false);
     c1 =
         __builtin_amdgcn_sudot4(true, bit_cast<int32_t>(a), true, bit_cast<int32_t>(b1), c1, false);
+#else
+    ignore = a;
+    ignore = b0;
+    ignore = b1;
+    ignore = c0;
+    ignore = c1;
 #endif
 }
 
@@ -317,6 +323,16 @@ __device__ void amd_assembly_outer_product_1x4(int8x4_t a,
         __builtin_amdgcn_sudot4(true, bit_cast<int32_t>(a), true, bit_cast<int32_t>(b2), c2, false);
     c3 =
         __builtin_amdgcn_sudot4(true, bit_cast<int32_t>(a), true, bit_cast<int32_t>(b3), c3, false);
+#else
+    ignore = a;
+    ignore = b0;
+    ignore = b1;
+    ignore = b2;
+    ignore = b3;
+    ignore = c0;
+    ignore = c1;
+    ignore = c2;
+    ignore = c3;
 #endif
 }
 

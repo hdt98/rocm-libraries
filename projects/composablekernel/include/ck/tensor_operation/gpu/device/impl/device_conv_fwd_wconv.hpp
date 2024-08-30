@@ -15,6 +15,7 @@
 #include "ck/tensor_operation/gpu/device/matrix_padder.hpp"
 #include "ck/tensor_operation/gpu/device/impl/device_grouped_conv_utils.hpp"
 #include "ck/tensor_operation/gpu/grid/gridwise_conv_fwd_wconv.hpp"
+#include "ck/tensor_operation/operator_transform/transform_conv_fwd_to_wconv.hpp"
 #include "ck/host_utility/device_prop.hpp"
 #include "ck/host_utility/kernel_launch.hpp"
 #include "ck/utility/loop_scheduler.hpp"
@@ -77,6 +78,8 @@ struct DeviceConvWconv : public DeviceGroupedConvFwd<NDimSpatial,
                                                      AccElementwiseOperation>
 {
     using DeviceOp = DeviceConvWconv;
+    static constexpr auto conv_to_wconv_transformer =
+        TransformConvFwdToWconv<NDimSpatial, ConvForwardSpecialization>{};
 
     static constexpr auto I0 = Number<0>{};
     static constexpr auto I1 = Number<1>{};
@@ -97,99 +100,27 @@ struct DeviceConvWconv : public DeviceGroupedConvFwd<NDimSpatial,
     static auto
     MakeInGridDescriptor(const std::array<index_t, NDimSpatial + 3>& a_g_n_c_wis_lengths,
                          const std::array<index_t, NDimSpatial + 3>& a_g_n_c_wis_strides,
-                         const std::array<index_t, NDimSpatial + 3>&,
-                         const std::array<index_t, NDimSpatial + 3>&,
+                         const std::array<index_t, NDimSpatial + 3>& b_g_k_c_xs_lengths,
+                         const std::array<index_t, NDimSpatial + 3>& b_g_k_c_xs_strides,
                          const std::array<index_t, NDimSpatial + 3>& e_g_n_k_wos_lengths,
-                         const std::array<index_t, NDimSpatial + 3>&,
-                         const std::array<index_t, NDimSpatial>&,
-                         const std::array<index_t, NDimSpatial>&,
-                         const std::array<index_t, NDimSpatial>&,
-                         const std::array<index_t, NDimSpatial>&)
+                         const std::array<index_t, NDimSpatial + 3>& e_g_n_k_wos_strides,
+                         const std::array<index_t, NDimSpatial>& conv_filter_strides,
+                         const std::array<index_t, NDimSpatial>& conv_filter_dilations,
+                         const std::array<index_t, NDimSpatial>& input_left_pads,
+                         const std::array<index_t, NDimSpatial>& input_right_pads)
     {
-        // Todo: move it to conv_tensor_transformer to support all convolution layouts, like
-        // TransformConvFwdToGemm
-        static_assert(NDimSpatial == 2 && is_same_v<InLayout, tensor_layout::convolution::G_NHW_C>,
-                      "");
-
         // H W C
-        const auto in_data_raw_desc = [&]() {
-            const index_t N  = a_g_n_c_wis_lengths[1];
-            const index_t C  = a_g_n_c_wis_lengths[2];
-            const index_t Wi = a_g_n_c_wis_lengths[4];
-
-            const index_t Wo = e_g_n_k_wos_lengths[4];
-
-            if constexpr(ConvForwardSpecialization ==
-                         device::ConvolutionForwardSpecialization::Filter1x1Stride1Pad0)
-            {
-                // + 3, skip dimension g, n, k
-                const index_t NHo = N * ck::accumulate_n<index_t>(e_g_n_k_wos_lengths.begin() + 3,
-                                                                  NDimSpatial - 1,
-                                                                  1,
-                                                                  std::multiplies<>());
-
-                // This is different
-                const index_t WiStride = a_g_n_c_wis_strides[3 + NDimSpatial - 1];
-                const index_t HiStride = a_g_n_c_wis_strides[3 + NDimSpatial - 2];
-                const auto CStride     = I1;
-
-                return make_naive_tensor_descriptor(make_tuple(NHo, Wo, C),
-                                                    make_tuple(HiStride, WiStride, CStride));
-            }
-            else if constexpr(ConvForwardSpecialization ==
-                              device::ConvolutionForwardSpecialization::Filter3x3Stride1Pad0)
-            {
-                // TODO: Add padding size per slice
-                const index_t NHo = N * ck::accumulate_n<index_t>(e_g_n_k_wos_lengths.begin() + 3,
-                                                                  NDimSpatial - 1,
-                                                                  1,
-                                                                  std::multiplies<>());
-
-                // This is different
-                const index_t WiStride = a_g_n_c_wis_strides[3 + NDimSpatial - 1];
-                const index_t HiStride = a_g_n_c_wis_strides[3 + NDimSpatial - 2];
-                const auto CStride     = I1;
-
-                return make_naive_tensor_descriptor(make_tuple(NHo, Wo, C),
-                                                    make_tuple(HiStride, WiStride, CStride));
-            }
-            else if constexpr(ConvForwardSpecialization ==
-                              device::ConvolutionForwardSpecialization::Filter2x2Stride2Pad0)
-            {
-                // + 3, skip dimension g, n, k
-                const index_t NHi = N * ck::accumulate_n<index_t>(a_g_n_c_wis_lengths.begin() + 3,
-                                                                  NDimSpatial - 1,
-                                                                  1,
-                                                                  std::multiplies<>());
-
-                // This is different
-                const index_t WiStride = a_g_n_c_wis_strides[3 + NDimSpatial - 1];
-                const index_t HiStride = a_g_n_c_wis_strides[3 + NDimSpatial - 2];
-                const auto CStride     = I1;
-
-                const auto in_data_desc0 = make_naive_tensor_descriptor(
-                    make_tuple(NHi, Wi, C), make_tuple(HiStride, WiStride, CStride));
-                const auto in_data_desc1 = transform_tensor_descriptor(
-                    in_data_desc0,
-                    make_tuple(make_unmerge_transform(make_tuple(NHi / 2, Number<2>{})),
-                               make_unmerge_transform(make_tuple(Wi / 2, Number<2>{})),
-                               make_pass_through_transform(C)),
-                    make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}),
-                    make_tuple(Sequence<0, 2>{}, Sequence<1, 3>{}, Sequence<4>{}));
-
-                return transform_tensor_descriptor(
-                    in_data_desc1,
-                    make_tuple(make_pass_through_transform(NHi / 2),
-                               make_pass_through_transform(Wi / 2),
-                               make_merge_transform(make_tuple(Number<2>{}, Number<2>{}, C))),
-                    make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2, 3, 4>{}),
-                    make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}));
-            }
-            else
-            {
-                static_assert(false, "not implemented!");
-            }
-        }();
+        const auto in_data_raw_desc =
+            conv_to_wconv_transformer.template MakeADescriptor_H_W_C<InLayout>(a_g_n_c_wis_lengths,
+                                                                  a_g_n_c_wis_strides,
+                                                                  b_g_k_c_xs_lengths,
+                                                                  b_g_k_c_xs_strides,
+                                                                  e_g_n_k_wos_lengths,
+                                                                  e_g_n_k_wos_strides,
+                                                                  conv_filter_strides,
+                                                                  conv_filter_dilations,
+                                                                  input_left_pads,
+                                                                  input_right_pads);
 
         // H W C with pad
         const auto in_data_desc =
@@ -203,40 +134,8 @@ struct DeviceConvWconv : public DeviceGroupedConvFwd<NDimSpatial,
     MakeWeiGridDescriptor(const std::array<index_t, NDimSpatial + 3>& b_g_k_c_xs_lengths,
                           const std::array<index_t, NDimSpatial + 3>& b_g_k_c_xs_strides)
     {
-        static_assert(
-            NDimSpatial == 2 && is_same_v<WeiLayout, tensor_layout::convolution::G_K_YX_C>, "");
-
-        const auto wei_data_raw_desc = [&]() {
-            const index_t K = b_g_k_c_xs_lengths[1];
-            const index_t C = b_g_k_c_xs_lengths[2];
-
-            const index_t YX = ck::accumulate_n<index_t>(
-                b_g_k_c_xs_lengths.begin() + 3, NDimSpatial, 1, std::multiplies<>());
-
-            const index_t KStride = b_g_k_c_xs_strides[1];
-            const index_t XStride = b_g_k_c_xs_strides[2 + NDimSpatial];
-            const auto CStride    = I1;
-
-            if constexpr(ConvForwardSpecialization ==
-                         device::ConvolutionForwardSpecialization::Filter2x2Stride2Pad0)
-            {
-                const auto wei_k_yx_c_desc = make_naive_tensor_descriptor(
-                    make_tuple(K, Number<4>{}, C), make_tuple(KStride, XStride, CStride));
-                return transform_tensor_descriptor(
-                    wei_k_yx_c_desc,
-                    make_tuple(make_pass_through_transform(K),
-                               make_insert_transform(I0),
-                               make_merge_transform(make_tuple(Number<4>{}, C))),
-                    make_tuple(Sequence<0>{}, Sequence<>{}, Sequence<1, 2>{}),
-                    make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}));
-            }
-            else
-            {
-                const auto wei_k_yx_c_desc = make_naive_tensor_descriptor(
-                    make_tuple(K, YX, C), make_tuple(KStride, XStride, CStride));
-                return wei_k_yx_c_desc;
-            }
-        }();
+        const auto wei_data_raw_desc = conv_to_wconv_transformer.template MakeBDescriptor_K_YX_C<WeiLayout>(
+            b_g_k_c_xs_lengths, b_g_k_c_xs_strides);
 
         const auto wei_data_desc = PadTensorDescriptor(wei_data_raw_desc,
                                                        make_tuple(KPerBlock, 1, GridCPerBlock),
@@ -248,29 +147,8 @@ struct DeviceConvWconv : public DeviceGroupedConvFwd<NDimSpatial,
     MakeAccGridDescriptor(const std::array<index_t, NDimSpatial + 3>& e_g_n_k_wos_lengths,
                           const std::array<index_t, NDimSpatial + 3>& e_g_n_k_wos_strides)
     {
-        static_assert(NDimSpatial == 2 && is_same_v<AccLayout, tensor_layout::convolution::G_NHW_K>,
-                      "");
-
-        auto conv_in_transformer = [&]() {
-            const index_t N  = e_g_n_k_wos_lengths[1];
-            const index_t K  = e_g_n_k_wos_lengths[2];
-            const index_t Wo = e_g_n_k_wos_lengths[4];
-
-            const auto KStride     = I1;
-            const index_t WoStride = e_g_n_k_wos_strides[NDimSpatial + 2];
-            const index_t HoStride = e_g_n_k_wos_strides[NDimSpatial + 1];
-
-            const index_t NHo =
-                N * ck::accumulate_n<index_t>(
-                        e_g_n_k_wos_lengths.begin() + 3, NDimSpatial - 1, 1, std::multiplies<>());
-
-            const auto acc_desc = make_naive_tensor_descriptor(
-                make_tuple(NHo, Wo, K), make_tuple(HoStride, WoStride, KStride));
-
-            return acc_desc;
-        };
-
-        const auto acc_data_raw_desc = conv_in_transformer();
+        const auto acc_data_raw_desc = conv_to_wconv_transformer.template MakeCDescriptor_H_W_K<AccLayout>(
+            e_g_n_k_wos_lengths, e_g_n_k_wos_strides);
 
         const auto acc_data_desc =
             PadTensorDescriptor(acc_data_raw_desc,
@@ -542,8 +420,10 @@ struct DeviceConvWconv : public DeviceGroupedConvFwd<NDimSpatial,
                 }
             }
         }
-        else if constexpr(ConvForwardSpecialization ==
-                          ConvolutionForwardSpecialization::Filter2x2Stride2Pad0)
+        else if constexpr((ConvForwardSpecialization ==
+                           ConvolutionForwardSpecialization::Filter2x2Stride2Pad0) ||
+                          (ConvForwardSpecialization ==
+                           ConvolutionForwardSpecialization::Filter2x2Stride2OddHWPad0))
         {
             // check if it's 1x1, stride=1 conv
             for(index_t i = 0; i < NDimSpatial; ++i)
@@ -559,8 +439,10 @@ struct DeviceConvWconv : public DeviceGroupedConvFwd<NDimSpatial,
                 }
             }
         }
-        else if constexpr(ConvForwardSpecialization ==
+        else if constexpr((ConvForwardSpecialization ==
                           ConvolutionForwardSpecialization::Filter3x3Stride1Pad0)
+            || (ConvForwardSpecialization ==
+                ConvolutionForwardSpecialization::Filter3x3Stride1MultiLayerPad0))
         {
             for(index_t i = 0; i < NDimSpatial; ++i)
             {
