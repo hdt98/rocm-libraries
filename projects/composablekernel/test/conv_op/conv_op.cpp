@@ -8,7 +8,7 @@
 #include <tuple>
 #include <vector>
 
-//#define CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4 1
+#define CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4 1
 
 #include "ck/ck.hpp"
 #include "ck/tensor_operation/gpu/device/tensor_layout.hpp"
@@ -28,7 +28,7 @@ using InElementOp  = ck::tensor_operation::element_wise::PassThrough;
 using WeiElementOp = ck::tensor_operation::element_wise::PassThrough;
 using OutElementOp = ck::tensor_operation::element_wise::UnaryConvert;
 
-// #define USE_ABSOLUTE_SIZE 1
+#define USE_ABSOLUTE_SIZE 1
 #if USE_ABSOLUTE_SIZE
 #define DEFAULT_K 16
 #define DEFAULT_C 32
@@ -885,8 +885,33 @@ bool run_test()
     DeviceMem wei_device_buf(sizeof(WeiDataType) * wei.mDesc.GetElementSpaceSize());
     DeviceMem out_device_buf(sizeof(GPUAccType) * out_device.mDesc.GetElementSpaceSize());
 
-    in_device_buf.ToDevice(in.mData.data());
-    wei_device_buf.ToDevice(wei.mData.data());
+    if constexpr(std::is_same<ck::int4_t, InDataType>::value)
+    {
+        std::vector<uint8_t> in_packed;
+        std::vector<uint8_t> wei_packed;
+        in_packed.resize(in.mData.size());
+        wei_packed.resize(wei.mData.size());
+        for (size_t i = 0; i < in.mData.size(); i += 2)
+        {
+            uint8_t val0 = (in.mData[i] & 0xf);
+            uint8_t val1 = (in.mData[i + 1] & 0xf);
+
+            in_packed[i / 2] = val0 | (val1 << 4);
+        }
+        for(size_t i = 0; i < wei.mData.size(); i += 2)
+        {
+            uint8_t val0 = (wei.mData[i] & 0xf);
+            uint8_t val1 = (wei.mData[i + 1] & 0xf);
+            wei_packed[i / 2] = val0 | (val1 << 4);
+        }
+        in_device_buf.ToDevice(in_packed.data());
+        wei_device_buf.ToDevice(wei_packed.data());
+    }
+    else
+    {
+        in_device_buf.ToDevice(in.mData.data());
+        wei_device_buf.ToDevice(wei.mData.data());
+    }
 
     if constexpr(FilterSize == 1)
     {

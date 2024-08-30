@@ -2994,6 +2994,7 @@ using uint8x20_t = typename vector_type<uint8_t, 20>::type;
 using int4x8_t  = typename vector_type<int8_t, 4>::type;
 using int4x16_t = typename vector_type<int8_t, 8>::type;
 using int4x32_t = typename vector_type<int8_t, 16>::type;
+using int4x64_t = typename vector_type<int8_t, 32>::type;
 
 using int4x24_t  = typename vector_type<int8_t, 12>::type;
 using int4x48_t  = typename vector_type<int8_t, 24>::type;

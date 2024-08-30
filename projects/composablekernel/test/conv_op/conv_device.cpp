@@ -444,6 +444,8 @@ bool run_test()
         : FilterSize == 2
             ? ck::tensor_operation::device::ConvolutionForwardSpecialization::Filter2x2Stride2Pad0
             : ck::tensor_operation::device::ConvolutionForwardSpecialization::Filter3x3Stride1Pad0;
+    //? ck::tensor_operation::device::ConvolutionForwardSpecialization::Filter2x2Stride2OddHWPad0
+    //: ck::tensor_operation::device::ConvolutionForwardSpecialization::Filter3x3Stride1MultiLayerPad0;
 
     constexpr ck::index_t InBlockTransferScalarPerVector = sizeof(uint32_t) / sizeof(InDataType);
     constexpr ck::index_t Cluster_In_C = CPerBlock / InBlockTransferScalarPerVector;
@@ -529,9 +531,10 @@ bool run_test()
 
     if(!conv.IsSupportedArgument(argument))
     {
-        throw std::runtime_error(
-            "wrong! device_conv with the specified compilation parameters does "
-            "not support this Conv problem");
+        std::cout << "wrong! device_conv with the specified compilation parameters does "
+                     "not support this Conv problem"
+                  << std::endl;
+        return false;
     }
     avg_time = invoker.Run(argument, StreamConfig{nullptr, config.time_kernel});
     out_device_buf.FromDevice(out_device.mData.data());
@@ -610,18 +613,18 @@ bool run_test_fmt()
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_1X1, false, false, 0x10000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_1X1, false, false, 0x20000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_1X1, false, false, 0x40000>();
-        //
+
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, false, false, 0x80000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_3X3, false, false, 0x100000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_3X3, false, false, 0x200000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, true,  false, 0x400000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_3X3, true,  false, 0x800000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_3X3, true,  false, 0x1000000>();
-        
+
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_1X1, false,  true, 0x2000000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_1X1, false,  true, 0x4000000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_1X1, false,  true, 0x8000000>();
-        
+
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, false,  true, 0x10000000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_3X3, false,  true, 0x20000000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_3X3, false,  true, 0x40000000>();
@@ -699,7 +702,7 @@ inline bool parse_cmd_args(int argc, char* argv[], ExecutionConfig& config)
 int main(int argc, char* argv[])
 {
     bool pass = true;
-    // MessageBoxA(NULL, "", "", MB_OK);
+    //MessageBoxA(NULL, "", "", MB_OK);
 
     if(parse_cmd_args(argc, argv, config) == false)
     {
@@ -714,7 +717,7 @@ int main(int argc, char* argv[])
     pass &= run_test_fmt<ck::bf8_t,   float,       float,     0x8>();
     pass &= run_test_fmt<int8_t,      float,       float,     0x10>();
     pass &= run_test_fmt<int8_t,      int32_t,     int32_t,   0x20>();
-    
+
     pass &= run_test_fmt<ck::half_t,  ck::half_t,  ck::half_t, 0x40>();
     //pass &= run_test_fmt<ck::bhalf_t, ck::bhalf_t, ck::half_t, 0x80>();
     pass &= run_test_fmt<ck::f8_t,    ck::half_t,  ck::half_t, 0x100>();

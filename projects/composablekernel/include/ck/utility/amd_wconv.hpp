@@ -501,7 +501,6 @@ struct intrin_wconv_f32_iu4<4, 2, 1, 1, 1, 2, Aco, Signed>
             bit_cast<int32_t>(reg_data[1]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
                 GetAccumChannelOrderMod<Aco>() | GetItersMod<2>(),
-            ,
             0);
     }
 };
@@ -565,7 +564,6 @@ struct intrin_wconv_i32_iu4<4, 2, 1, 1, 1, 2, Aco, Signed>
             bit_cast<int32_t>(reg_data[1]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
                 GetAccumChannelOrderMod<Aco>() | GetItersMod<2>(),
-            ,
             0);
     }
 };
@@ -1448,7 +1446,6 @@ struct intrin_wconv_f16_iu4<4, 2, 1, 1, 1, 2, Aco, Signed>
             bit_cast<int32_t>(reg_data[1]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
                 GetAccumChannelOrderMod<Aco>() | GetItersMod<2>(),
-            ,
             0);
     }
 };
@@ -1501,7 +1498,6 @@ struct intrin_wconv_f16_iu4<4, 4, 1, 1, 1, 2, Aco, Signed>
             bit_cast<int32_t>(reg_data[1]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
                 GetAccumChannelOrderMod<Aco>() | GetItersMod<2>(),
-            ,
             0);
     }
 };
@@ -1554,7 +1550,6 @@ struct intrin_wconv_f16_iu4<8, 4, 1, 1, 1, 2, Aco, Signed>
             bit_cast<int32x2_t>(reg_data[1]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
                 GetAccumChannelOrderMod<Aco>() | GetItersMod<2>(),
-            ,
             0);
     }
 };
