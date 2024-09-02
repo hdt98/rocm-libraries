@@ -1,0 +1,2 @@
+add_test_executable(test_conv_sba_uba conv_sba_uba.cpp)
+target_link_libraries(test_conv_sba_uba PRIVATE utility)
