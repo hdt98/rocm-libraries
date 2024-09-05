@@ -64,8 +64,7 @@ template <index_t NDimSpatial,
           typename AccBlockTransferClusterLengths,
           index_t AccBlockTransferScalarPerVector,
           bool AccEnableLds,
-          ck::LoopScheduler LoopSched     = make_default_loop_scheduler(),
-          ck::PipelineVersion PipelineVer = ck::PipelineVersion::v1>
+          bool EnableWaveGroup>
 struct DeviceConvWconv : public DeviceGroupedConvFwd<NDimSpatial,
                                                      InLayout,
                                                      WeiLayout,
@@ -111,16 +110,17 @@ struct DeviceConvWconv : public DeviceGroupedConvFwd<NDimSpatial,
     {
         // H W C
         const auto in_data_raw_desc =
-            conv_to_wconv_transformer.template MakeADescriptor_H_W_C<InLayout>(a_g_n_c_wis_lengths,
-                                                                  a_g_n_c_wis_strides,
-                                                                  b_g_k_c_xs_lengths,
-                                                                  b_g_k_c_xs_strides,
-                                                                  e_g_n_k_wos_lengths,
-                                                                  e_g_n_k_wos_strides,
-                                                                  conv_filter_strides,
-                                                                  conv_filter_dilations,
-                                                                  input_left_pads,
-                                                                  input_right_pads);
+            conv_to_wconv_transformer.template MakeADescriptor_H_W_C<InLayout>(
+                a_g_n_c_wis_lengths,
+                a_g_n_c_wis_strides,
+                b_g_k_c_xs_lengths,
+                b_g_k_c_xs_strides,
+                e_g_n_k_wos_lengths,
+                e_g_n_k_wos_strides,
+                conv_filter_strides,
+                conv_filter_dilations,
+                input_left_pads,
+                input_right_pads);
 
         // H W C with pad
         const auto in_data_desc =
@@ -134,8 +134,9 @@ struct DeviceConvWconv : public DeviceGroupedConvFwd<NDimSpatial,
     MakeWeiGridDescriptor(const std::array<index_t, NDimSpatial + 3>& b_g_k_c_xs_lengths,
                           const std::array<index_t, NDimSpatial + 3>& b_g_k_c_xs_strides)
     {
-        const auto wei_data_raw_desc = conv_to_wconv_transformer.template MakeBDescriptor_K_YX_C<WeiLayout>(
-            b_g_k_c_xs_lengths, b_g_k_c_xs_strides);
+        const auto wei_data_raw_desc =
+            conv_to_wconv_transformer.template MakeBDescriptor_K_YX_C<WeiLayout>(
+                b_g_k_c_xs_lengths, b_g_k_c_xs_strides);
 
         const auto wei_data_desc = PadTensorDescriptor(wei_data_raw_desc,
                                                        make_tuple(KPerBlock, 1, GridCPerBlock),
@@ -147,8 +148,9 @@ struct DeviceConvWconv : public DeviceGroupedConvFwd<NDimSpatial,
     MakeAccGridDescriptor(const std::array<index_t, NDimSpatial + 3>& e_g_n_k_wos_lengths,
                           const std::array<index_t, NDimSpatial + 3>& e_g_n_k_wos_strides)
     {
-        const auto acc_data_raw_desc = conv_to_wconv_transformer.template MakeCDescriptor_H_W_K<AccLayout>(
-            e_g_n_k_wos_lengths, e_g_n_k_wos_strides);
+        const auto acc_data_raw_desc =
+            conv_to_wconv_transformer.template MakeCDescriptor_H_W_K<AccLayout>(
+                e_g_n_k_wos_lengths, e_g_n_k_wos_strides);
 
         const auto acc_data_desc =
             PadTensorDescriptor(acc_data_raw_desc,
@@ -200,8 +202,7 @@ struct DeviceConvWconv : public DeviceGroupedConvFwd<NDimSpatial,
                                             AccBlockTransferScalarPerVector,
                                             AccEnableLds,
                                             NumPrefetch,
-                                            LoopSched,
-                                            PipelineVer>;
+                                            EnableWaveGroup>;
 
     // Argument
     struct Argument : public BaseArgument
@@ -324,38 +325,76 @@ struct DeviceConvWconv : public DeviceGroupedConvFwd<NDimSpatial,
             auto launch_kernel = [&](auto has_main_block_loop) {
                 constexpr bool has_main_loop = has_main_block_loop.value;
 
-                const auto kernel = kernel_grouped_conv_wconv<
-                    GridwiseConv,
-                    InDataType,
-                    WeiDataType,
-                    AccDataType,
-                    InElementwiseOperation,
-                    WeiElementwiseOperation,
-                    AccElementwiseOperation,
-                    DeviceOp::InGridDesc,
-                    DeviceOp::WeiGridDesc,
-                    DeviceOp::AccGridDesc,
-                    remove_reference_t<typename GridwiseConv::DefaultBlock2CTileMap>,
-                    ComputePtrOffsetOfStridedBatch<I1, I1, I1>,
-                    has_main_loop>;
+                if constexpr(EnableWaveGroup)
+                {
+                    const auto kernel = kernel_grouped_conv_wconv_wavegroup<
+                        GridwiseConv,
+                        InDataType,
+                        WeiDataType,
+                        AccDataType,
+                        InElementwiseOperation,
+                        WeiElementwiseOperation,
+                        AccElementwiseOperation,
+                        DeviceOp::InGridDesc,
+                        DeviceOp::WeiGridDesc,
+                        DeviceOp::AccGridDesc,
+                        remove_reference_t<typename GridwiseConv::DefaultBlock2CTileMap>,
+                        ComputePtrOffsetOfStridedBatch<I1, I1, I1>,
+                        has_main_loop>;
 
-                return launch_and_time_kernel(stream_config,
-                                              kernel,
-                                              dim3(grid_size),
-                                              dim3(BlockSize),
-                                              0,
-                                              arg.p_in_grid_,
-                                              arg.p_wei_grid_,
-                                              arg.p_acc_grid_,
-                                              arg.in_element_op_,
-                                              arg.wei_element_op_,
-                                              arg.acc_element_op_,
-                                              arg.a_g_n_c_wis_lengths_[0], // Group count
-                                              arg.in_grid_desc_,
-                                              arg.wei_grid_desc_,
-                                              arg.acc_grid_desc_,
-                                              arg.block_2_etile_map_,
-                                              arg.compute_ptr_offset_of_batch_);
+                    return launch_and_time_kernel(stream_config,
+                                                  kernel,
+                                                  dim3(grid_size),
+                                                  dim3(BlockSize),
+                                                  0,
+                                                  arg.p_in_grid_,
+                                                  arg.p_wei_grid_,
+                                                  arg.p_acc_grid_,
+                                                  arg.in_element_op_,
+                                                  arg.wei_element_op_,
+                                                  arg.acc_element_op_,
+                                                  arg.a_g_n_c_wis_lengths_[0], // Group count
+                                                  arg.in_grid_desc_,
+                                                  arg.wei_grid_desc_,
+                                                  arg.acc_grid_desc_,
+                                                  arg.block_2_etile_map_,
+                                                  arg.compute_ptr_offset_of_batch_);
+                }
+                else
+                {
+                    const auto kernel = kernel_grouped_conv_wconv<
+                        GridwiseConv,
+                        InDataType,
+                        WeiDataType,
+                        AccDataType,
+                        InElementwiseOperation,
+                        WeiElementwiseOperation,
+                        AccElementwiseOperation,
+                        DeviceOp::InGridDesc,
+                        DeviceOp::WeiGridDesc,
+                        DeviceOp::AccGridDesc,
+                        remove_reference_t<typename GridwiseConv::DefaultBlock2CTileMap>,
+                        ComputePtrOffsetOfStridedBatch<I1, I1, I1>,
+                        has_main_loop>;
+
+                    return launch_and_time_kernel(stream_config,
+                                                  kernel,
+                                                  dim3(grid_size),
+                                                  dim3(BlockSize),
+                                                  0,
+                                                  arg.p_in_grid_,
+                                                  arg.p_wei_grid_,
+                                                  arg.p_acc_grid_,
+                                                  arg.in_element_op_,
+                                                  arg.wei_element_op_,
+                                                  arg.acc_element_op_,
+                                                  arg.a_g_n_c_wis_lengths_[0], // Group count
+                                                  arg.in_grid_desc_,
+                                                  arg.wei_grid_desc_,
+                                                  arg.acc_grid_desc_,
+                                                  arg.block_2_etile_map_,
+                                                  arg.compute_ptr_offset_of_batch_);
+                }
             };
 
             const auto C = arg.in_grid_desc_.GetLength(I2);
@@ -440,9 +479,9 @@ struct DeviceConvWconv : public DeviceGroupedConvFwd<NDimSpatial,
             }
         }
         else if constexpr((ConvForwardSpecialization ==
-                          ConvolutionForwardSpecialization::Filter3x3Stride1Pad0)
-            || (ConvForwardSpecialization ==
-                ConvolutionForwardSpecialization::Filter3x3Stride1MultiLayerPad0))
+                           ConvolutionForwardSpecialization::Filter3x3Stride1Pad0) ||
+                          (ConvForwardSpecialization ==
+                           ConvolutionForwardSpecialization::Filter3x3Stride1MultiLayerPad0))
         {
             for(index_t i = 0; i < NDimSpatial; ++i)
             {
@@ -647,10 +686,8 @@ struct DeviceConvWconv : public DeviceGroupedConvFwd<NDimSpatial,
             << WeiEnableLds << ", "
             << "NumPrefetch: "
             << NumPrefetch << ", "
-            << "LoopScheduler: "
-            << LoopSchedToString[LoopSched] << ", "
-            << "PipelineVersion: "
-            << PipelineVersionToString[PipelineVer];
+            << "EnableWaveGroup: "
+            << EnableWaveGroup;
         // clang-format on
 
         return str.str();

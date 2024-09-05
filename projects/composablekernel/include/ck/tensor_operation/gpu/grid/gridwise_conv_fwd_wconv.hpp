@@ -90,6 +90,74 @@ __global__ void
 #endif
 }
 
+template <typename GridwiseOp,
+          typename InDataType,
+          typename WeiDataType,
+          typename AccDataType,
+          typename InElementwiseOperation,
+          typename WeiElementwiseOperation,
+          typename AccElementwiseOperation,
+          typename InGridDesc,
+          typename WeiGridDesc,
+          typename AccGridDesc,
+          typename Block2CTileMap,
+          typename ComputePtrOffsetOfBatch,
+          bool HasMainBlockLoop>
+__global__ void __exp_amd_wavegroup_kernel(4, 32, 256, 1, 1)
+    kernel_grouped_conv_wconv_wavegroup(const InDataType* __restrict__ p_in_grid,
+                                        const WeiDataType* __restrict__ p_wei_grid,
+                                        AccDataType* __restrict__ p_acc_grid,
+                                        const InElementwiseOperation in_element_op,
+                                        const WeiElementwiseOperation wei_element_op,
+                                        const AccElementwiseOperation acc_element_op,
+                                        const index_t batch_count,
+                                        const InGridDesc in_grid_desc,
+                                        const WeiGridDesc wei_grid_desc,
+                                        const AccGridDesc acc_grid_desc,
+                                        const Block2CTileMap block_2_ctile_map,
+                                        const ComputePtrOffsetOfBatch compute_ptr_offset_of_batch)
+{
+#if(!defined(__HIP_DEVICE_COMPILE__) || defined(__gfx13__))
+    // offset base pointer for each work-group
+    const index_t num_blocks_per_batch =
+        __builtin_amdgcn_readfirstlane(get_grid_size() / batch_count);
+    const index_t g_idx = __builtin_amdgcn_readfirstlane(get_block_1d_id() / num_blocks_per_batch);
+
+    const long_index_t in_batch_offset = __builtin_amdgcn_readfirstlane(
+        static_cast<long_index_t>(compute_ptr_offset_of_batch.GetAPtrOffset(g_idx)));
+    const long_index_t wei_batch_offset = __builtin_amdgcn_readfirstlane(
+        static_cast<long_index_t>(compute_ptr_offset_of_batch.GetBPtrOffset(g_idx)));
+    const long_index_t acc_batch_offset = __builtin_amdgcn_readfirstlane(
+        static_cast<long_index_t>(compute_ptr_offset_of_batch.GetEPtrOffset(g_idx)));
+
+    __shared__ char p_shared[GridwiseOp::SharedMemTrait::lds_size];
+
+    GridwiseOp::template Run<HasMainBlockLoop>(p_in_grid + in_batch_offset,
+                                               p_wei_grid + wei_batch_offset,
+                                               p_acc_grid + acc_batch_offset,
+                                               p_shared,
+                                               in_grid_desc,
+                                               wei_grid_desc,
+                                               acc_grid_desc,
+                                               in_element_op,
+                                               wei_element_op,
+                                               acc_element_op,
+                                               block_2_ctile_map);
+#else
+    ignore = p_in_grid;
+    ignore = p_wei_grid;
+    ignore = p_acc_grid;
+    ignore = in_grid_desc;
+    ignore = wei_grid_desc;
+    ignore = acc_grid_desc;
+    ignore = in_element_op;
+    ignore = wei_element_op;
+    ignore = acc_element_op;
+    ignore = compute_ptr_offset_of_batch;
+    ignore = block_2_ctile_map;
+#endif
+}
+
 template <index_t BlockSize,
           typename InDataType,
           typename WeiDataType,
@@ -124,9 +192,8 @@ template <index_t BlockSize,
           typename AccBlockTransferClusterLengths,
           index_t AccBlockTransferScalarPerVector,
           bool AccEnableLds,
-          index_t NumConvCPrefetchStage = 1,
-          LoopScheduler LoopSched       = make_default_loop_scheduler(),
-          PipelineVersion PipelineVer   = PipelineVersion::v1>
+          index_t NumConvCPrefetchStage,
+          bool EnableWaveGroup>
 struct GridwiseConv_Wconv
 {
     static constexpr auto I0 = Number<0>{};
@@ -138,7 +205,15 @@ struct GridwiseConv_Wconv
     static constexpr auto I6 = Number<6>{};
     static constexpr auto I7 = Number<7>{};
 
-    using ThisThreadBlock = ThisThreadBlock<BlockSize>;
+    static constexpr index_t WaveSize     = 32;
+    static constexpr index_t NumWaveGroup = EnableWaveGroup ? 4 : 0;
+
+    static_assert((EnableWaveGroup == false) || (BlockSize % (WaveSize * 4) == 0), "");
+
+    using ThisThreadBlock =
+        typename std::conditional<EnableWaveGroup,
+                                  ThisThreadBlockWaveGroup<BlockSize, WaveSize, NumWaveGroup>,
+                                  ThisThreadBlock<BlockSize>>::type;
 
     static constexpr index_t YX = FilterSize * FilterSize;
     using NumberYX              = Number<FilterSize * FilterSize>;
@@ -153,7 +228,10 @@ struct GridwiseConv_Wconv
                                                  DilationY>{};
 
     using GridwiseConvPipe =
-        GridwiseConvPipeline_v1<NumConvCPrefetchStage, InEnableLds, WeiEnableLds>;
+        remove_cvref_t<decltype(GridwiseConvPipeline_Selector<NumConvCPrefetchStage,
+                                                              InEnableLds,
+                                                              WeiEnableLds,
+                                                              EnableWaveGroup>())>;
 
     static constexpr index_t CPerWconv               = wconv_conv.GetNumInputChannels();
     static constexpr index_t KPerWconv               = wconv_conv.GetNumOutputChannels();
@@ -577,14 +655,13 @@ struct GridwiseConv_Wconv
 
         constexpr auto in_block_desc  = MakeInBlockDescriptor();
         constexpr auto wei_block_desc = MakeWeiBlockDescriptor();
-        auto wave_idx                 = GetWconvWaveIdx<BlockSize,
+        auto wave_idx                 = GetWconvWaveIdx<ThisThreadBlock,
                                         HPerBlock,
                                         WPerBlock,
                                         HRepeat,
                                         WRepeat,
                                         HPerWconv,
-                                        WPerWconv,
-                                        32>();
+                                        WPerWconv>();
 
         auto in_block_trait = [&]() {
             // input data blockwise copy
@@ -786,15 +863,9 @@ struct GridwiseConv_Wconv
             }
         };
 
-        auto in_block_buf      = in_block_trait()[I0];
-        auto in_blockwise_copy = in_block_trait()[I1];
-
-        auto wei_block_buf      = wei_block_trait()[I0];
-        auto wei_blockwise_copy = wei_block_trait()[I1];
-
         /*******************************************************************************/
         // CONV
-        auto blockwise_conv = BlockwiseConvWconv<BlockSize,
+        auto blockwise_conv = BlockwiseConvWconv<ThisThreadBlock,
                                                  WeiDataType,
                                                  InDataType,
                                                  AccDataType,
@@ -824,27 +895,59 @@ struct GridwiseConv_Wconv
 
         // Gridwise conv pipeline
         const index_t CBlockMainLoop = __builtin_amdgcn_readfirstlane(C / CPerBlock);
-        GridwiseConvPipe::template Run<HasMainBlockLoop>(in_grid_pad_desc,
-                                                         in_block_desc,
-                                                         in_blockwise_copy,
-                                                         in_grid_buf,
-                                                         in_block_buf,
-                                                         in_block_slice_copy_step,
-                                                         wei_grid_pad_desc,
-                                                         wei_block_desc,
-                                                         wei_blockwise_copy,
-                                                         wei_grid_buf,
-                                                         wei_block_buf,
-                                                         wei_block_slice_copy_step,
-                                                         blockwise_conv,
-                                                         acc_thread_buf,
-                                                         CBlockMainLoop);
+
+        if constexpr(EnableWaveGroup)
+        {
+            auto in_block_buf      = in_block_trait()[I0];
+            auto in_blockwise_copy = in_block_trait()[I1];
+
+            auto wei_block_buf      = wei_block_trait()[I0];
+            auto wei_blockwise_copy = wei_block_trait()[I1];
+            GridwiseConvPipe::template Run<HasMainBlockLoop>(in_grid_pad_desc,
+                                                             in_block_desc,
+                                                             in_blockwise_copy,
+                                                             in_grid_buf,
+                                                             in_block_buf,
+                                                             in_block_slice_copy_step,
+                                                             wei_grid_pad_desc,
+                                                             wei_block_desc,
+                                                             wei_blockwise_copy,
+                                                             wei_grid_buf,
+                                                             wei_block_buf,
+                                                             wei_block_slice_copy_step,
+                                                             blockwise_conv,
+                                                             acc_thread_buf,
+                                                             CBlockMainLoop);
+        }
+        else
+        {
+            auto in_block_buf      = in_block_trait()[I0];
+            auto in_blockwise_copy = in_block_trait()[I1];
+
+            auto wei_block_buf      = wei_block_trait()[I0];
+            auto wei_blockwise_copy = wei_block_trait()[I1];
+            GridwiseConvPipe::template Run<HasMainBlockLoop>(in_grid_pad_desc,
+                                                             in_block_desc,
+                                                             in_blockwise_copy,
+                                                             in_grid_buf,
+                                                             in_block_buf,
+                                                             in_block_slice_copy_step,
+                                                             wei_grid_pad_desc,
+                                                             wei_block_desc,
+                                                             wei_blockwise_copy,
+                                                             wei_grid_buf,
+                                                             wei_block_buf,
+                                                             wei_block_slice_copy_step,
+                                                             blockwise_conv,
+                                                             acc_thread_buf,
+                                                             CBlockMainLoop);
+        }
         /*******************************************************************************/
         // Store accum buffer
         // Todo: replace it with ThreadwiseTensorSliceTransfer
         if constexpr(AccEnableLds == false)
         {
-            const index_t laneId     = threadIdx.x % 32;
+            const index_t laneId     = ThisThreadBlock::GetThreadId() & (WaveSize - 1);
             const index_t accCompIdx = laneId * wconv_conv.GetNumAccumComponents() /
                                        wconv_conv.GetNumSubTilesPerImageTile();
             auto store_accum_buf = [&](index_t h0, index_t w0, index_t k0) {
@@ -920,8 +1023,20 @@ struct GridwiseConv_Wconv
                 });
             };
 
-            store_accum_buf(
-                h_block_data_idx_on_grid, w_block_data_idx_on_grid, k_block_data_idx_on_grid);
+            if constexpr(EnableWaveGroup)
+            {
+                if(get_wave_id_in_wavegroup() == 1)
+                {
+                    store_accum_buf(h_block_data_idx_on_grid,
+                                    w_block_data_idx_on_grid,
+                                    k_block_data_idx_on_grid);
+                }
+            }
+            else
+            {
+                store_accum_buf(
+                    h_block_data_idx_on_grid, w_block_data_idx_on_grid, k_block_data_idx_on_grid);
+            }
         }
         else
         {

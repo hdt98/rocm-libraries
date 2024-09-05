@@ -159,7 +159,8 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
         make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}),
         make_tuple(Sequence<0, 3, 4>{}, Sequence<1, 5>{}, Sequence<2, 6>{}));
 
-    auto blockwise_conv    = BlockwiseConvWconv<BlockSize,
+    using ThisThreadBlock  = ThisThreadBlock<BlockSize>;
+    auto blockwise_conv    = BlockwiseConvWconv<ThisThreadBlock,
                                              WeiDataType,
                                              InDataType,
                                              AccDataType,

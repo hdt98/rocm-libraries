@@ -25,4 +25,10 @@ __device__ index_t get_grid_size() { return gridDim.x; }
 
 __device__ index_t get_block_size() { return blockDim.x; }
 
+__device__ index_t get_wavegroup_id() { return __builtin_amdgcn_wavegroup_id(); }
+
+__device__ index_t get_wave_id_in_wavegroup() { return __builtin_amdgcn_wave_id_in_wavegroup(); }
+
+__device__ index_t get_lane_id() { return __builtin_amdgcn_mbcnt_lo(-1, 0); }
+
 } // namespace ck

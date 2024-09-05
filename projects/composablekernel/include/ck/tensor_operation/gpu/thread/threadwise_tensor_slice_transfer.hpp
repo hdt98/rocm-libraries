@@ -290,24 +290,35 @@ struct ThreadwiseTensorSliceTransfer_v2
                 src_buf.template Get<src_vector_t>(src_coord_.GetOffset(), is_src_valid);
 
             // copy data from src_vector into dst_buf
-            static_for<0, SrcScalarPerVector, 1>{}([&](auto i) {
+            if constexpr(InvalidElementAsNaN == false && std::is_same<SrcData, DstData>::value)
+            {
                 constexpr index_t dst_offset =
-                    dst_desc.CalculateOffset(to_multi_index(dst_slice_origin_idx) + src_data_idx +
-                                             i * src_scalar_step_in_vector);
+                    dst_desc.CalculateOffset(to_multi_index(dst_slice_origin_idx) + src_data_idx);
+                src_vector_t* dst_buf_ptr =
+                    reinterpret_cast<src_vector_t*>(&dst_buf(Number<dst_offset>{}));
+                *dst_buf_ptr = src_vector.template AsType<src_vector_t>()[Number<0>{}];
+            }
+            else
+            {
+                static_for<0, SrcScalarPerVector, 1>{}([&](auto i) {
+                    constexpr index_t dst_offset =
+                        dst_desc.CalculateOffset(to_multi_index(dst_slice_origin_idx) +
+                                                 src_data_idx + i * src_scalar_step_in_vector);
 
-                if constexpr(InvalidElementAsNaN)
-                {
-                    dst_buf(Number<dst_offset>{}) =
-                        is_src_valid
-                            ? type_convert<DstData>(src_vector.template AsType<SrcData>()[i])
-                            : NumericLimits<DstData>::QuietNaN();
-                }
-                else
-                {
-                    dst_buf(Number<dst_offset>{}) =
-                        type_convert<DstData>(src_vector.template AsType<SrcData>()[i]);
-                }
-            });
+                    if constexpr(InvalidElementAsNaN)
+                    {
+                        dst_buf(Number<dst_offset>{}) =
+                            is_src_valid
+                                ? type_convert<DstData>(src_vector.template AsType<SrcData>()[i])
+                                : NumericLimits<DstData>::QuietNaN();
+                    }
+                    else
+                    {
+                        dst_buf(Number<dst_offset>{}) =
+                            type_convert<DstData>(src_vector.template AsType<SrcData>()[i]);
+                    }
+                });
+            }
 
             if constexpr(idx_1d.value != num_access - 1)
             {
@@ -1283,21 +1294,40 @@ struct ThreadwiseTensorSliceTransfer_StaticToStatic
             constexpr auto idx_md = SpaceFillingCurve::GetIndex(idx_1d);
 
             // copy data from src_buf into dst_vector
-            static_for<0, DstScalarPerVector, 1>{}([&](auto i) {
-                constexpr index_t src_offset = src_desc.CalculateOffset(
-                    src_slice_origin_idx + idx_md + i * dst_scalar_step_in_vector);
+            if constexpr(std::is_same<SrcData, DstData>::value)
+            {
+                using src_vector_t =
+                    typename vector_type_maker<SrcData, DstScalarPerVector>::type::type;
 
-                constexpr index_t dst_offset = dst_desc.CalculateOffset(
-                    dst_slice_origin_idx + idx_md + i * dst_scalar_step_in_vector);
+                constexpr index_t src_offset =
+                    src_desc.CalculateOffset(src_slice_origin_idx + idx_md);
 
-                DstData v;
+                constexpr index_t dst_offset =
+                    dst_desc.CalculateOffset(dst_slice_origin_idx + idx_md);
+                src_vector_t* dst_buf_ptr =
+                    reinterpret_cast<src_vector_t*>(&dst_buf(Number<dst_offset>{}));
+                const src_vector_t* src_buf_ptr =
+                    reinterpret_cast<const src_vector_t*>(&src_buf[Number<src_offset>{}]);
+                *dst_buf_ptr = *src_buf_ptr;
+            }
+            else
+            {
+                static_for<0, DstScalarPerVector, 1>{}([&](auto i) {
+                    constexpr index_t src_offset = src_desc.CalculateOffset(
+                        src_slice_origin_idx + idx_md + i * dst_scalar_step_in_vector);
 
-                // apply element-wise operation
-                element_op_(v, src_buf[Number<src_offset>{}]);
+                    constexpr index_t dst_offset = dst_desc.CalculateOffset(
+                        dst_slice_origin_idx + idx_md + i * dst_scalar_step_in_vector);
 
-                // apply type convert
-                dst_buf(Number<dst_offset>{}) = v;
-            });
+                    DstData v;
+
+                    // apply element-wise operation
+                    element_op_(v, src_buf[Number<src_offset>{}]);
+
+                    // apply type convert
+                    dst_buf(Number<dst_offset>{}) = v;
+                });
+            }
         });
     }
 

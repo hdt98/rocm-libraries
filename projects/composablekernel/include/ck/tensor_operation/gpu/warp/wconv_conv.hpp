@@ -658,8 +658,9 @@ template <typename WeiDataType,
           index_t FilterSize,
           index_t DilationX,
           index_t DilationY,
-          index_t Iters = 1,
-          bool Aco      = false>
+          index_t Iters  = 1,
+          bool WaveGroup = false,
+          bool Aco       = false>
 struct WconvConv
 {
     static constexpr index_t WaveSize = 32;
@@ -670,6 +671,18 @@ struct WconvConv
     static constexpr index_t SizeOfBits()
     {
         return std::is_same<int4_t, ScalarType>::value ? 4 : sizeof(ScalarType) * 8;
+    }
+
+    static __device__ index_t GetLaneId()
+    {
+        if constexpr(WaveGroup)
+        {
+            return get_thread_local_1d_id() & (WaveSize - 1);
+        }
+        else
+        {
+            return get_lane_id();
+        }
     }
 
     // WCNN input channel and output channel info
@@ -860,7 +873,7 @@ struct WconvConv
     // {tap_offset x k1 x c1 x c2}
     static constexpr auto CalculateWeiDataThreadOriginDataIndex()
     {
-        auto laneId                      = get_thread_local_1d_id() & (WaveSize - 1);
+        auto laneId                      = GetLaneId();
         constexpr index_t NumCompPerTile = GetNumWeightCompPerTile();
         if constexpr((HPerWconv == 8) && (WPerWconv == 4))
         {
@@ -878,7 +891,7 @@ struct WconvConv
     // {h1 x w1 x c1}
     static constexpr auto CalculateInDataThreadOriginDataIndex()
     {
-        auto laneId                      = get_thread_local_1d_id() & (WaveSize - 1);
+        auto laneId                      = GetLaneId();
         constexpr index_t NumCompPerTile = GetNumDataCompPerTile();
         const index_t SubC               = (laneId * NumCompPerTile) % GetNumInputChannels();
         const index_t PixelOffset        = laneId * NumCompPerTile / GetNumInputChannels();
@@ -889,7 +902,7 @@ struct WconvConv
     // {h1 x h2 x w1 x k1 x k2}
     static constexpr auto CalculateAccThreadOriginDataIndex()
     {
-        auto laneId              = get_thread_local_1d_id() & (WaveSize - 1);
+        auto laneId              = GetLaneId();
         const index_t accCompIdx = laneId * GetNumAccumComponents() / GetNumSubTilesPerImageTile();
         const index_t subW       = (accCompIdx / GetNumOutputChannels()) % WPerWconv;
         const index_t subH       = (accCompIdx / GetNumOutputChannels()) / WPerWconv;

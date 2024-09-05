@@ -245,6 +245,11 @@ CK_DECLARE_ENV_VAR_BOOL(CK_LOGGING)
 // set flag to 1 to build deprecated instances
 #define CK_BUILD_DEPRECATED 1
 
+#define __exp_amd_wavegroup_kernel(num_wavegroups, wave_size, block_x, block_y, block_z) \
+    __attribute__((amdgpu_wavegroup_kernel(num_wavegroups, wave_size, block_x, block_y, block_z)))
+
+#define __exp_amd_laneshared__ __attribute__((exp_amd_laneshared))
+
 namespace ck {
 
 enum struct InMemoryDataOperationEnum

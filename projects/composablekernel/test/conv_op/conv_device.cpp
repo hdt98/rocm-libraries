@@ -42,6 +42,7 @@ using OutElementOp = ck::tensor_operation::element_wise::UnaryConvert;
 #define DEFAULT_C_PERBLOCK 16
 #define DEFAULT_K_PERBLOCK 16
 #define DEFAULT_BLOCKSIZE 128
+#define DEFAULT_WAVEGROUP_BLOCKSIZE 256
 
 enum ShapeType
 {
@@ -264,6 +265,7 @@ template <typename InDataType,
           FilterType Filter,
           bool Dilation,
           bool EnableLds,
+          bool EnableWaveGroup,
           int32_t TestMask>
 bool run_test()
 {
@@ -280,16 +282,22 @@ bool run_test()
     const ck::index_t Height         = config.h;
     const ck::index_t InputChannels  = config.c;
     const ck::index_t OutputChannels = config.k;
+    constexpr ck::index_t BlockSize =
+        EnableWaveGroup ? DEFAULT_WAVEGROUP_BLOCKSIZE : DEFAULT_BLOCKSIZE;
+
+    // on gfx13, the wavegroup count is fixed to 4. so, HPerWave/WPerWave is fixed too.
+    constexpr ck::index_t HPerWave = EnableWaveGroup ? DEFAULT_H_PERBLOCK / 2 : DEFAULT_H_PERWAVE;
+    constexpr ck::index_t WPerWave = EnableWaveGroup ? DEFAULT_W_PERBLOCK / 2 : DEFAULT_W_PERWAVE;
 
     constexpr ck::index_t DefaultHScale =
-        (Filter == Filter_2X2 && Shape == Shape_8X4 && DEFAULT_H_PERWAVE < 16) ? 2 : 1;
+        (Filter == Filter_2X2 && Shape == Shape_8X4 && HPerWave < 16) ? 2 : 1;
 
     constexpr ck::index_t HPerBlock = DEFAULT_H_PERBLOCK * DefaultHScale;
     constexpr ck::index_t WPerBlock = DEFAULT_W_PERBLOCK;
     constexpr ck::index_t CPerBlock = DEFAULT_C_PERBLOCK;
     constexpr ck::index_t KPerBlock = DEFAULT_K_PERBLOCK;
-    constexpr ck::index_t HRepeat   = DEFAULT_H_PERWAVE * DefaultHScale / HPerWconv;
-    constexpr ck::index_t WRepeat   = DEFAULT_W_PERWAVE / WPerWconv;
+    constexpr ck::index_t HRepeat   = HPerWave * DefaultHScale / HPerWconv;
+    constexpr ck::index_t WRepeat   = WPerWave / WPerWconv;
 
     constexpr ck::index_t n_dim       = 2;
     constexpr ck::index_t group_count = 1;
@@ -451,23 +459,22 @@ bool run_test()
     constexpr ck::index_t Cluster_In_C = CPerBlock / InBlockTransferScalarPerVector;
     constexpr ck::index_t Cluster_In_W = 4;
 
-    constexpr ck::index_t Cluster_In_H = DEFAULT_BLOCKSIZE / Cluster_In_C / Cluster_In_W;
+    constexpr ck::index_t Cluster_In_H = BlockSize / Cluster_In_C / Cluster_In_W;
     using InBlockTransferThreadClusterLengths =
         ck::Sequence<Cluster_In_H, Cluster_In_W, Cluster_In_C>;
     constexpr bool InBlockLdsAddExtraM = true;
 
     constexpr ck::index_t WeiBlockTransferScalarPerVector = sizeof(uint32_t) / sizeof(WeiDataType);
-    constexpr ck::index_t Cluster_Wei_C        = CPerBlock / WeiBlockTransferScalarPerVector;
-    constexpr ck::index_t Cluster_Wei_K        = (DEFAULT_BLOCKSIZE / Cluster_Wei_C) > KPerBlock
-                                                     ? KPerBlock
-                                                     : (DEFAULT_BLOCKSIZE / Cluster_Wei_C);
+    constexpr ck::index_t Cluster_Wei_C = CPerBlock / WeiBlockTransferScalarPerVector;
+    constexpr ck::index_t Cluster_Wei_K =
+        (BlockSize / Cluster_Wei_C) > KPerBlock ? KPerBlock : (BlockSize / Cluster_Wei_C);
     using WeiBlockTransferThreadClusterLengths = ck::Sequence<Cluster_Wei_K, 1, Cluster_Wei_C>;
     constexpr ck::index_t WeiBlockLdsAddExtraM = true;
 
     constexpr ck::index_t AccBlockTransferScalarPerVector = sizeof(uint32_t) / sizeof(GPUAccType);
     constexpr ck::index_t Cluster_Acc_K = KPerBlock / AccBlockTransferScalarPerVector;
     constexpr ck::index_t Cluster_Acc_W = 4;
-    constexpr ck::index_t Cluster_Acc_H = DEFAULT_BLOCKSIZE / Cluster_Acc_K / Cluster_Acc_W;
+    constexpr ck::index_t Cluster_Acc_H = BlockSize / Cluster_Acc_K / Cluster_Acc_W;
     using AccBlockTransferClusterLengths =
         ck::Sequence<Cluster_Acc_H, Cluster_Acc_W, Cluster_Acc_K>;
     float avg_time = 0;
@@ -484,7 +491,7 @@ bool run_test()
                                                       OutElementOp,
                                                       ConvSpec,
                                                       1,
-                                                      DEFAULT_BLOCKSIZE,
+                                                      BlockSize,
                                                       HPerBlock,
                                                       WPerBlock,
                                                       CPerBlock,
@@ -508,7 +515,8 @@ bool run_test()
                                                       WeiBlockLdsAddExtraM,
                                                       AccBlockTransferClusterLengths,
                                                       AccBlockTransferScalarPerVector,
-                                                      EnableLds>;
+                                                      EnableLds,
+                                                      EnableWaveGroup>;
 
     auto conv     = DeviceConvFwdInstance{};
     auto invoker  = conv.MakeInvoker();
@@ -589,52 +597,55 @@ bool run_test_fmt()
         return true;
     }
     bool pass = true;
-    // known issues:
-    // scratch memory + src_private_base
-    // HPerBlock: 32, WPerBlock: 16, HPerWave: 16, WPerWave: 8
-    // pass &= run_test<ck::half_t, ck::half_t, ck::half_t,  ck::half_t, Shape_4X4, Filter_3X3,
-    // false, false, 0x100000>();
 
     // clang-format off
     //                                                           |ShapeType |FilterType |Dilation |Iter4 |TestMask
     if constexpr(std::is_same<GPUAccType, float>::value || std::is_same<GPUAccType, int32_t>::value)
     {
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_1X1, false, false, 0x10000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, false, false, 0x20000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, true,  false, 0x40000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_1X1, false, false, false, 0x10000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, false, false, false, 0x20000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, true,  false, false, 0x40000>();
 
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, false, true, 0x100000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, false, true,  false, 0x100000>();
 
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_2X2, false, false, 0x10000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_2X2, false, true, 0x80000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_2X2, false, false, false, 0x10000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_2X2, false, true,  false, 0x80000>();
     }
     else
     {
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_1X1, false, false, 0x10000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_1X1, false, false, 0x20000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_1X1, false, false, 0x40000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_1X1, false, false, false, 0x10000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_1X1, false, false, false, 0x20000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_1X1, false, false, false, 0x40000>();
 
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, false, false, 0x80000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_3X3, false, false, 0x100000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_3X3, false, false, 0x200000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, true,  false, 0x400000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_3X3, true,  false, 0x800000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_3X3, true,  false, 0x1000000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, false, false, false, 0x80000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_3X3, false, false, false, 0x100000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_3X3, false, false, false, 0x200000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, true,  false, false, 0x400000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_3X3, true,  false, false, 0x800000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_3X3, true,  false, false, 0x1000000>();
 
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_1X1, false,  true, 0x2000000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_1X1, false,  true, 0x4000000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_1X1, false,  true, 0x8000000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_1X1, false,  true, false, 0x2000000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_1X1, false,  true, false, 0x4000000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_1X1, false,  true, false, 0x8000000>();
 
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, false,  true, 0x10000000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_3X3, false,  true, 0x20000000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_3X3, false,  true, 0x40000000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, false,  true, false, 0x10000000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_3X3, false,  true, false, 0x20000000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_3X3, false,  true, false, 0x40000000>();
 
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_2X2, false, false, 0x10000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_2X2, false, false, 0x20000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_2X2, false, false, 0x40000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_2X2, false,  true, 0x2000000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_2X2, false,  true, 0x4000000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_2X2, false,  true, 0x8000000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_2X2, false, false, false, 0x10000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_2X2, false, false, false, 0x20000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_2X2, false, false, false, 0x40000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_2X2, false,  true, false, 0x2000000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_2X2, false,  true, false, 0x4000000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_2X2, false,  true, false, 0x8000000>();
+
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_1X1, false, false, true, 0x10000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_1X1, false, false, true, 0x20000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_1X1, false, false, true, 0x40000>();
+
+        //pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, false, false, true, 0x80000>();
+        //pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_3X3, false, false, true, 0x100000>();
+        //pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_3X3, false, false, true, 0x200000>();
     }
     // clang-format on
     return pass;
@@ -702,7 +713,7 @@ inline bool parse_cmd_args(int argc, char* argv[], ExecutionConfig& config)
 int main(int argc, char* argv[])
 {
     bool pass = true;
-    //MessageBoxA(NULL, "", "", MB_OK);
+    // MessageBoxA(NULL, "", "", MB_OK);
 
     if(parse_cmd_args(argc, argv, config) == false)
     {

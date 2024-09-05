@@ -242,7 +242,6 @@ struct TransformConvFwdToWconv
                            make_pass_through_transform(C)),
                 make_tuple(Sequence<0, 1>{}, Sequence<2>{}, Sequence<3>{}),
                 make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}));
-
         }
         else if constexpr(ConvForwardSpecialization ==
                           device::ConvolutionForwardSpecialization::Filter2x2Stride2Pad0)
@@ -678,7 +677,6 @@ struct TransformConvFwdToWconv
                                make_pass_through_transform(K)),
                     make_tuple(Sequence<0, 1>{}, Sequence<2>{}, Sequence<3>{}),
                     make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}));
-
             }
             else if constexpr(NDimSpatial == 3)
             {

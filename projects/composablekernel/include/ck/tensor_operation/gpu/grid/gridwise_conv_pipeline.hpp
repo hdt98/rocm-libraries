@@ -484,6 +484,7 @@ struct GridwiseConvPipeline_v1<1, true, false>
 
                 in_blockwise_copy.RunWrite(in_block_desc, in_block_buf);
 
+                wei_block_buf = wei_block_buf_switch;
                 ++i;
             } while(i < (num_loop - 1));
         }
@@ -496,4 +497,19 @@ struct GridwiseConvPipeline_v1<1, true, false>
         }
     }
 };
+
+// TODO: deprecate as GridwiseGemmPipeline_Selector covers the functionality
+template <index_t NumPrefetch, LoopScheduler LoopSched>
+constexpr auto GridwiseGemmPipeline_Selector()
+{
+    if constexpr(LoopSched == LoopScheduler::Default)
+    {
+        return GridwiseGemmPipeline_v1<NumPrefetch, true, true>{};
+    }
+    else if constexpr(LoopSched == LoopScheduler::Interwave)
+    {
+        return GridwiseGemmPipelineInterwave_v1<NumPrefetch>{};
+    }
+}
+
 } // namespace ck

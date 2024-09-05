@@ -891,7 +891,7 @@ bool run_test()
         std::vector<uint8_t> wei_packed;
         in_packed.resize(in.mData.size());
         wei_packed.resize(wei.mData.size());
-        for (size_t i = 0; i < in.mData.size(); i += 2)
+        for(size_t i = 0; i < in.mData.size(); i += 2)
         {
             uint8_t val0 = (in.mData[i] & 0xf);
             uint8_t val1 = (in.mData[i + 1] & 0xf);
@@ -900,8 +900,8 @@ bool run_test()
         }
         for(size_t i = 0; i < wei.mData.size(); i += 2)
         {
-            uint8_t val0 = (wei.mData[i] & 0xf);
-            uint8_t val1 = (wei.mData[i + 1] & 0xf);
+            uint8_t val0      = (wei.mData[i] & 0xf);
+            uint8_t val1      = (wei.mData[i + 1] & 0xf);
             wei_packed[i / 2] = val0 | (val1 << 4);
         }
         in_device_buf.ToDevice(in_packed.data());
