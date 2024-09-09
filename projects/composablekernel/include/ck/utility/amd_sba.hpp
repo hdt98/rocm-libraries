@@ -99,7 +99,7 @@ struct intrin_sba_half<auxdata, 0, 1>
     __device__ static void Run(const FloatAcc& inAcc, const float& ssrc, FloatAcc& outAcc)
     {
         outAcc.template AsType<half8_t>()(Number<0>{}) =
-            __builtin_amdgcn_uniform_scale_activate_bf16(
+            __builtin_amdgcn_uniform_scale_activate_f16(
                 inAcc.template AsType<half8_t>()[Number<0>{}], ssrc, auxdata, true);
     }
 };
