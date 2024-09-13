@@ -8,8 +8,6 @@
 #include <tuple>
 #include <vector>
 
-// #define CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4 1
-
 #include "ck/ck.hpp"
 #include "ck/tensor_operation/gpu/device/tensor_layout.hpp"
 #include "ck/tensor_operation/gpu/element/element_wise_operation.hpp"
@@ -51,7 +49,8 @@ enum ShapeType
 enum FilterType
 {
     Filter_1X1,
-    Filter_3X3
+    Filter_3X3,
+    Filter_2X2,
 };
 
 template <typename T>
@@ -405,9 +404,20 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
 }; // namespace conv_op_util
 }; // namespace ck
 
+struct ExecutionConfig final
+{
+    uint32_t test_mask   = 0xffffffff;
+    int init_method      = 1;
+    bool do_verification = true;
+    bool dump_tensor     = true;
+};
+ExecutionConfig config;
+
 template <typename DataType>
 void DumpTensor(const Tensor<DataType>& tensor, const char* str)
 {
+    if(config.dump_tensor == false)
+        return;
     assert(tensor.GetNumOfDimension() == 5);
     auto lengths = tensor.GetLengths();
     std::cout << str << "  [ " << std::endl;
@@ -545,6 +555,87 @@ inline constexpr double get_atol()
     }
 }
 
+template <typename Type>
+const char* get_string()
+{
+    if constexpr(std::is_same<Type, ck::half_t>::value)
+    {
+        return "half_t";
+    }
+
+    if constexpr(std::is_same<Type, float>::value)
+    {
+        return "float";
+    }
+
+    if constexpr(std::is_same<Type, ck::bhalf_t>::value)
+    {
+        return "bhalf_t";
+    }
+
+    if constexpr(std::is_same<Type, ck::f8_t>::value)
+    {
+        return "f8_t";
+    }
+
+    if constexpr(std::is_same<Type, ck::bf8_t>::value)
+    {
+        return "bf8_t";
+    }
+
+    if constexpr(std::is_same<Type, int8_t>::value)
+    {
+        return "int8_t";
+    }
+
+    if constexpr(std::is_same<Type, int32_t>::value)
+    {
+        return "int32_t";
+    }
+
+    if constexpr(std::is_same<Type, uint8_t>::value)
+    {
+        return "uint8_t";
+    }
+
+    if constexpr(std::is_same<Type, uint32_t>::value)
+    {
+        return "uint32_t";
+    }
+
+#if CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
+    if constexpr(std::is_same<Type, ck::int4_t>::value)
+    {
+        return "int4_t";
+    }
+
+    if constexpr(std::is_same<Type, ck::uint4_t>::value)
+    {
+        return "uint4_t";
+    }
+#endif
+}
+
+const char* get_string(ShapeType type)
+{
+    switch(type)
+    {
+    case Shape_4X2: return "Shape_4x2";
+    case Shape_4X4: return "Shape_4x4";
+    case Shape_8X4: return "Shape_8x4";
+    }
+}
+
+const char* get_string(FilterType filter)
+{
+    switch(filter)
+    {
+    case Filter_1X1: return "Filter_1X1";
+    case Filter_3X3: return "Filter_3X3";
+    case Filter_2X2: return "Filter_2X2";
+    }
+}
+
 template <typename InDataType,
           typename WeiDataType,
           typename GPUAccType,
@@ -552,9 +643,13 @@ template <typename InDataType,
           ShapeType Shape,
           FilterType Filter,
           bool Dilation,
-          bool Iter4>
+          int32_t TestMask>
 bool run_test()
 {
+    if((config.test_mask & 0xFFFF0000 & TestMask) == 0)
+    {
+        return true;
+    }
     constexpr ck::index_t FilterSize = (Filter == Filter_1X1) ? 1 : 3;
     constexpr ck::index_t HPerWconv  = (Shape == Shape_8X4) ? 8 : 4;
     constexpr ck::index_t WPerWconv  = (Shape == Shape_4X2) ? 2 : 4;
@@ -572,7 +667,6 @@ bool run_test()
     constexpr ck::index_t WRepeat    = DEFAULT_W_PERBLOCK / WPerWconv;
     constexpr ck::index_t BlockCount = Width * Height / HPerBlock / WPerBlock;
 
-    uint32_t init_method                 = 1;
     constexpr ck::index_t n_dim          = 2;
     constexpr ck::index_t group_count    = 1;
     constexpr ck::index_t n_batch        = 1;
@@ -644,7 +738,7 @@ bool run_test()
     std::cout << "wei: " << wei.mDesc << std::endl;
     std::cout << "out: " << out_host.mDesc << std::endl;
 
-    switch(init_method)
+    switch(config.init_method)
     {
     case 0: break;
     case 1:
@@ -701,7 +795,10 @@ bool run_test()
                                               wei_element_op,
                                               out_element_op);
 
-    ref_invoker.Run(ref_argument);
+    if(config.do_verification)
+    {
+        ref_invoker.Run(ref_argument);
+    }
 
     DumpTensor(in, "Input");
     DumpTensor(wei, "Weight");
@@ -740,96 +837,143 @@ bool run_test()
     out_device_buf.FromDevice(out_device.mData.data());
 
     DumpTensor(out_device, "Accum_Device");
-    std::cout << "Test <" << HPerWconv << "x" << WPerWconv << ", F:" << FilterSize
-              << ", Src:" << sizeof(InDataType) << ", Dst:" << sizeof(GPUAccType) << ">: ";
-    if constexpr(std::is_same<GPUAccType, ck::bhalf_t>::value)
+    std::cout << "conv_block<In/Wei:" << get_string<InDataType>()
+              << ", Out:" << get_string<GPUAccType>() << ", " << get_string(Shape) << ", "
+              << get_string(Filter) << ", Dilation:" << DilationSize << ", Id:0x" << std::hex
+              << TestMask << ">: Status: ";
+
+    if(config.do_verification)
     {
-        // check_err doesn't support bhalf_t
-        std::cout << " Ignored\n";
-        return true;
-    }
-    else
-    {
-        bool ret = ck::utils::check_err(out_device,
-                                        out_host,
-                                        "Error: incorrect results!",
-                                        get_rtol<GPUAccType>(),
-                                        get_atol<GPUAccType>());
-        if(ret)
+        if constexpr(std::is_same<GPUAccType, ck::bhalf_t>::value)
         {
-            std::cout << "Passed\n";
+            // check_err doesn't support bhalf_t
+            std::cout << " Ignored\n";
+            return true;
         }
         else
         {
-            std::cout << "Failed\n";
+            bool ret = ck::utils::check_err(out_device,
+                                            out_host,
+                                            "Error: incorrect results!",
+                                            get_rtol<GPUAccType>(),
+                                            get_atol<GPUAccType>());
+            if(ret)
+            {
+                std::cout << "Passed\n";
+            }
+            else
+            {
+                std::cout << "Failed\n";
+            }
+
+            return ret;
         }
-
-        return ret;
-    }
-}
-
-template <typename SrcType, typename GPUAccType, typename CPUAccType>
-bool run_test_fmt()
-{
-    bool pass = true;
-    // clang-format off
-    //                                                        |ShapeType |FilterType |Dilation |Iter4
-    if constexpr(std::is_same<GPUAccType, float>::value || std::is_same<GPUAccType, int32_t>::value)
-    {
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_1X1, false, false>();
-        //pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_1X1, false, true >();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, false, false>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, true,  false>();
     }
     else
     {
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_1X1, false, false>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_1X1, false, false>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_1X1, false, false>();
-        //pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_1X1, false, true >();
-        //pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_1X1, false, true >();
-        //pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_1X1, false, true >();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, false, false>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_3X3, false, false>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_3X3, false, false>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, true,  false>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_3X3, true,  false>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_3X3, true,  false>();
+        return true;
+    }
+}
+
+template <typename SrcType, typename GPUAccType, typename CPUAccType, int32_t TestMask>
+bool run_test_fmt()
+{
+    if((config.test_mask & TestMask) == 0)
+    {
+        return true;
+    }
+    bool pass = true;
+    // clang-format off
+    //                                                        |ShapeType |FilterType |Dilation |TestMask
+    if constexpr(std::is_same<GPUAccType, float>::value || std::is_same<GPUAccType, int32_t>::value)
+    {
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_1X1, false, TestMask | 0x10000  >();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, false, TestMask | 0x20000  >();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, true,  TestMask | 0x40000  >();
+    }
+    else
+    {
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_1X1, false, TestMask | 0x80000  >();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_1X1, false, TestMask | 0x100000 >();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_1X1, false, TestMask | 0x200000 >();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, false, TestMask | 0x400000 >();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_3X3, false, TestMask | 0x800000 >();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_3X3, false, TestMask | 0x1000000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, true,  TestMask | 0x2000000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_3X3, true,  TestMask | 0x4000000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_3X3, true,  TestMask | 0x8000000>();
     }
     // clang-format on
 
     return pass;
 }
 
-int main(int, char*[])
+inline void print_help_msg()
+{
+    std::cerr << "arg1: test mask (hex)\n"
+              << "arg2: verification (0=no, 1=yes)\n"
+              << "arg3: dump tensor (0=no, 1=yes)\n"
+              << "arg4: initialization (0=no init, 1=integer value, 2=decimal value)\n";
+}
+
+inline bool parse_cmd_args(int argc, char* argv[], ExecutionConfig& config)
+{
+    if(argc == 1)
+    {
+        // use default
+    }
+    else if(argc <= 5)
+    {
+        if(argc > 1)
+        {
+            config.test_mask = std::stoul(argv[1], nullptr, 0);
+        }
+        if(argc > 2)
+        {
+            config.do_verification = std::stoi(argv[2]);
+        }
+        if(argc > 3)
+        {
+            config.dump_tensor = std::stoi(argv[3]);
+        }
+        if(argc > 4)
+        {
+            config.init_method = std::stoi(argv[4]);
+        }
+    }
+    else
+    {
+        print_help_msg();
+        return false;
+    }
+
+    return true;
+}
+
+int main(int argc, char* argv[])
 {
     bool pass = true;
-    // MessageBoxA(NULL, "", "", MB_OK);
-    // Know issues: 4x iter not supported
+    if(parse_cmd_args(argc, argv, config) == false)
+    {
+        return -1;
+    }
 
     // clang-format off
-    //                  |SrcType     |GPUAccType  |CPUAccType
-    pass &= run_test_fmt<ck::half_t,  float,       float     >();
-    pass &= run_test_fmt<ck::bhalf_t, float,       float     >();
-    pass &= run_test_fmt<ck::f8_t,    float,       float     >();
-    pass &= run_test_fmt<ck::bf8_t,   float,       float     >();
-    pass &= run_test_fmt<int8_t,      float,       float     >();
-    pass &= run_test_fmt<int8_t,      int32_t,     int32_t   >();
-    //////
-    pass &= run_test_fmt<ck::half_t,  ck::half_t,  ck::half_t>();
-    pass &= run_test_fmt<ck::bhalf_t, ck::bhalf_t, ck::half_t>();
-    pass &= run_test_fmt<ck::f8_t,    ck::half_t,  ck::half_t>();
-    pass &= run_test_fmt<ck::bf8_t,   ck::bhalf_t, ck::half_t>();
-    pass &= run_test_fmt<int8_t,      ck::half_t,  ck::half_t>();
+    //                   |SrcType    |GPUAccType  |CPUAccType| TestMask
+    pass &= run_test_fmt<ck::half_t,  float,       float,      0x1   >();
+    pass &= run_test_fmt<ck::bhalf_t, float,       float,      0x2   >();
+    pass &= run_test_fmt<ck::f8_t,    float,       float,      0x4   >();
+    pass &= run_test_fmt<ck::bf8_t,   float,       float,      0x8   >();
+    pass &= run_test_fmt<int8_t,      float,       float,      0x10  >();
+    pass &= run_test_fmt<int8_t,      int32_t,     int32_t,    0x20  >();
 
-#if CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
-    //pass &= run_test_fmt<ck::int4_t,  float,       float     >();
-    //pass &= run_test_fmt<ck::int4_t,  int32_t,     int32_t   >();
-    //pass &= run_test_fmt<ck::int4_t,  ck::half_t,  ck::half_t>();
-#endif
-
+    pass &= run_test_fmt<ck::half_t,  ck::half_t,  ck::half_t, 0x40  >();
+    pass &= run_test_fmt<ck::bhalf_t, ck::bhalf_t, ck::half_t, 0x80  >();
+    pass &= run_test_fmt<ck::f8_t,    ck::half_t,  ck::half_t, 0x100 >();
+    pass &= run_test_fmt<ck::bf8_t,   ck::bhalf_t, ck::half_t, 0x200 >();
+    pass &= run_test_fmt<int8_t,      ck::half_t,  ck::half_t, 0x400 >();
     // clang-format on
 
-    std::cout << "TestConv ..... " << (pass ? "SUCCESS" : "FAILURE") << std::endl;
+    std::cout << "conv_block: ..... " << (pass ? "SUCCESS" : "FAILURE") << std::endl;
     return pass ? 0 : 1;
 }

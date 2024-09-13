@@ -1571,6 +1571,6 @@ int main(int argc, char* argv[])
 
     // clang-format on
 
-    std::cout << "TestConv ..... " << (pass ? "SUCCESS" : "FAILURE") << std::endl;
+    std::cout << "conv_sba_uba ..... " << (pass ? "SUCCESS" : "FAILURE") << std::endl;
     return pass ? 0 : 1;
 }

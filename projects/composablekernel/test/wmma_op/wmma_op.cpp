@@ -53,7 +53,6 @@ bool run_test()
 int main(int, char*[])
 {
     bool pass = true;
-
 #if defined(__gfx12__) || defined(__gfx13__)
     constexpr ck::index_t HalfAccNum = 8;
 #else

@@ -8,8 +8,6 @@
 #include <tuple>
 #include <vector>
 
-// #define CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4 1
-
 #include "ck/ck.hpp"
 #include "ck/tensor_operation/gpu/device/tensor_layout.hpp"
 #include "ck/tensor_operation/gpu/element/element_wise_operation.hpp"
@@ -105,14 +103,15 @@ using OutputLayout = typename CommonLayoutSettingSelector<NDimSpatial>::OutputLa
 
 struct ExecutionConfig final
 {
-    bool do_verification = true;
+    uint32_t test_mask   = 0xffffffff;
     int init_method      = 1;
+    bool do_verification = true;
+    bool dump_tensor     = true;
     bool time_kernel     = false;
     int h                = DEFAULT_H;
     int w                = DEFAULT_W;
     int c                = DEFAULT_C;
     int k                = DEFAULT_K;
-    uint32_t test_mask   = 0xffffffff;
 };
 
 ExecutionConfig config;
@@ -120,6 +119,8 @@ ExecutionConfig config;
 template <typename DataType>
 void DumpTensor(const Tensor<DataType>& tensor, const char* str)
 {
+    if(config.dump_tensor == false)
+        return;
     assert(tensor.GetNumOfDimension() == 5);
     auto lengths = tensor.GetLengths();
     std::cout << str << "  [ " << std::endl;
@@ -257,6 +258,87 @@ inline constexpr double get_atol()
     }
 }
 
+template <typename Type>
+const char* get_string()
+{
+    if constexpr(std::is_same<Type, ck::half_t>::value)
+    {
+        return "half_t";
+    }
+
+    if constexpr(std::is_same<Type, float>::value)
+    {
+        return "float";
+    }
+
+    if constexpr(std::is_same<Type, ck::bhalf_t>::value)
+    {
+        return "bhalf_t";
+    }
+
+    if constexpr(std::is_same<Type, ck::f8_t>::value)
+    {
+        return "f8_t";
+    }
+
+    if constexpr(std::is_same<Type, ck::bf8_t>::value)
+    {
+        return "bf8_t";
+    }
+
+    if constexpr(std::is_same<Type, int8_t>::value)
+    {
+        return "int8_t";
+    }
+
+    if constexpr(std::is_same<Type, int32_t>::value)
+    {
+        return "int32_t";
+    }
+
+    if constexpr(std::is_same<Type, uint8_t>::value)
+    {
+        return "uint8_t";
+    }
+
+    if constexpr(std::is_same<Type, uint32_t>::value)
+    {
+        return "uint32_t";
+    }
+
+#if CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
+    if constexpr(std::is_same<Type, ck::int4_t>::value)
+    {
+        return "int4_t";
+    }
+
+    if constexpr(std::is_same<Type, ck::uint4_t>::value)
+    {
+        return "uint4_t";
+    }
+#endif
+}
+
+const char* get_string(ShapeType type)
+{
+    switch(type)
+    {
+    case Shape_4X2: return "Shape_4x2";
+    case Shape_4X4: return "Shape_4x4";
+    case Shape_8X4: return "Shape_8x4";
+    }
+}
+
+const char* get_string(FilterType filter)
+{
+    switch(filter)
+    {
+    case Filter_1X1: return "Filter_1X1";
+    case Filter_3X3: return "Filter_3X3";
+    case Filter_2X2: return "Filter_2X2";
+    }
+}
+
 template <typename InDataType,
           typename WeiDataType,
           typename GPUAccType,
@@ -269,7 +351,7 @@ template <typename InDataType,
           int32_t TestMask>
 bool run_test()
 {
-    if((config.test_mask & TestMask) == 0)
+    if((config.test_mask & 0xFFFF0000 & TestMask) == 0)
     {
         return true;
     }
@@ -548,8 +630,12 @@ bool run_test()
     out_device_buf.FromDevice(out_device.mData.data());
 
     DumpTensor(out_device, "Accum_Device");
-    std::cout << "Test <" << HPerWconv << "x" << WPerWconv << ", F:" << FilterSize
-              << ", Src:" << sizeof(InDataType) << ", Dst:" << sizeof(GPUAccType) << ">: ";
+
+    std::cout << "conv_device<In/Wei:" << get_string<InDataType>()
+              << ", Out:" << get_string<GPUAccType>() << ", " << get_string(Shape) << ", "
+              << get_string(Filter) << ", Dilation:" << DilationSize << ", Lds:" << EnableLds
+              << ", WaveGroup:" << EnableWaveGroup << ", Id : 0x " << std::hex << TestMask
+              << ">: Status: ";
 
     if(config.time_kernel)
     {
@@ -599,53 +685,53 @@ bool run_test_fmt()
     bool pass = true;
 
     // clang-format off
-    //                                                           |ShapeType |FilterType |Dilation |Iter4 |TestMask
+    //                                                           |ShapeType  |FilterType |Dilation |Lds |WaveGroup |TestMask
     if constexpr(std::is_same<GPUAccType, float>::value || std::is_same<GPUAccType, int32_t>::value)
     {
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_1X1, false, false, false, 0x10000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, false, false, false, 0x20000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, true,  false, false, 0x40000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_1X1, false, false, false, TestMask | 0x10000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, false, false, false, TestMask | 0x20000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, true,  false, false, TestMask | 0x40000>();
 
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, false, true,  false, 0x100000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, false, true,  false, TestMask | 0x100000>();
 
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_2X2, false, false, false, 0x10000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_2X2, false, true,  false, 0x80000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_2X2, false, false, false, TestMask | 0x10000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_2X2, false, true,  false, TestMask | 0x80000>();
     }
     else
     {
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_1X1, false, false, false, 0x10000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_1X1, false, false, false, 0x20000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_1X1, false, false, false, 0x40000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_1X1, false, false, false, TestMask | 0x10000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_1X1, false, false, false, TestMask | 0x20000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_1X1, false, false, false, TestMask | 0x40000>();
 
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, false, false, false, 0x80000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_3X3, false, false, false, 0x100000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_3X3, false, false, false, 0x200000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, true,  false, false, 0x400000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_3X3, true,  false, false, 0x800000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_3X3, true,  false, false, 0x1000000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, false, false, false, TestMask | 0x80000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_3X3, false, false, false, TestMask | 0x100000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_3X3, false, false, false, TestMask | 0x200000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, true,  false, false, TestMask | 0x400000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_3X3, true,  false, false, TestMask | 0x800000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_3X3, true,  false, false, TestMask | 0x1000000>();
 
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_1X1, false,  true, false, 0x2000000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_1X1, false,  true, false, 0x4000000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_1X1, false,  true, false, 0x8000000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_1X1, false,  true, false, TestMask | 0x2000000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_1X1, false,  true, false, TestMask | 0x4000000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_1X1, false,  true, false, TestMask | 0x8000000>();
 
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, false,  true, false, 0x10000000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_3X3, false,  true, false, 0x20000000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_3X3, false,  true, false, 0x40000000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, false,  true, false, TestMask | 0x10000000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_3X3, false,  true, false, TestMask | 0x20000000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_3X3, false,  true, false, TestMask | 0x40000000>();
 
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_2X2, false, false, false, 0x10000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_2X2, false, false, false, 0x20000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_2X2, false, false, false, 0x40000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_2X2, false,  true, false, 0x2000000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_2X2, false,  true, false, 0x4000000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_2X2, false,  true, false, 0x8000000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_2X2, false, false, false, TestMask | 0x10000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_2X2, false, false, false, TestMask | 0x20000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_2X2, false, false, false, TestMask | 0x40000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_2X2, false,  true, false, TestMask | 0x2000000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_2X2, false,  true, false, TestMask | 0x4000000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_2X2, false,  true, false, TestMask | 0x8000000>();
 
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_1X1, false, false, true, 0x10000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_1X1, false, false, true, 0x20000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_1X1, false, false, true, 0x40000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_1X1, false, false, true,  TestMask | 0x10000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_1X1, false, false, true,  TestMask | 0x20000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_1X1, false, false, true,  TestMask | 0x40000>();
 
-        //pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, false, false, true, 0x80000>();
-        //pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_3X3, false, false, true, 0x100000>();
-        //pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_3X3, false, false, true, 0x200000>();
+        //pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, false, false, true, TestMask | 0x80000>();
+        //pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_3X3, false, false, true, TestMask | 0x100000>();
+        //pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_3X3, false, false, true, TestMask | 0x200000>();
     }
     // clang-format on
     return pass;
@@ -653,11 +739,12 @@ bool run_test_fmt()
 
 inline void print_help_msg()
 {
-    std::cerr << "arg1: verification (0=no, 1=yes)\n"
-              << "arg2: initialization (0=no init, 1=integer value, 2=decimal value)\n"
-              << "arg3: time kernel (0=no, 1=yes)\n"
-              << "arg4: test mask (hex)\n"
-              << "arg5-8: tensor size {H x W x C x K}" << std::endl;
+    std::cerr << "arg1: test mask (hex)\n"
+              << "arg2: verification (0=no, 1=yes)\n"
+              << "arg3: dump tensor (0=no, 1=yes)\n"
+              << "arg4: initialization (0=no init, 1=integer value, 2=decimal value)\n"
+              << "arg5: time kernel (0=no, 1=yes)\n"
+              << "arg6-9: tensor size {H x W x C x K}" << std::endl;
 }
 
 inline bool parse_cmd_args(int argc, char* argv[], ExecutionConfig& config)
@@ -666,39 +753,43 @@ inline bool parse_cmd_args(int argc, char* argv[], ExecutionConfig& config)
     {
         // use default
     }
-    else if(argc <= 9)
+    else if(argc <= 10)
     {
         if(argc > 1)
         {
-            config.do_verification = std::stoi(argv[1]);
+            config.test_mask = std::stoul(argv[1], nullptr, 0);
         }
         if(argc > 2)
         {
-            config.init_method = std::stoi(argv[2]);
+            config.do_verification = std::stoi(argv[2]);
         }
         if(argc > 3)
         {
-            config.time_kernel = std::stoi(argv[3]);
+            config.dump_tensor = std::stoi(argv[3]);
         }
         if(argc > 4)
         {
-            config.test_mask = std::stoul(argv[4], nullptr, 0);
+            config.init_method = std::stoi(argv[4]);
         }
         if(argc > 5)
         {
-            config.h = std::stoi(argv[5]);
+            config.time_kernel = std::stoi(argv[5]);
         }
         if(argc > 6)
         {
-            config.w = std::stoi(argv[6]);
+            config.h = std::stoi(argv[6]);
         }
         if(argc > 7)
         {
-            config.k = std::stoi(argv[7]);
+            config.w = std::stoi(argv[7]);
         }
         if(argc > 8)
         {
-            config.c = std::stoi(argv[8]);
+            config.k = std::stoi(argv[8]);
+        }
+        if(argc > 9)
+        {
+            config.c = std::stoi(argv[9]);
         }
     }
     else
@@ -713,7 +804,6 @@ inline bool parse_cmd_args(int argc, char* argv[], ExecutionConfig& config)
 int main(int argc, char* argv[])
 {
     bool pass = true;
-    // MessageBoxA(NULL, "", "", MB_OK);
 
     if(parse_cmd_args(argc, argv, config) == false)
     {
@@ -734,14 +824,8 @@ int main(int argc, char* argv[])
     pass &= run_test_fmt<ck::f8_t,    ck::half_t,  ck::half_t, 0x100>();
     pass &= run_test_fmt<ck::bf8_t,   ck::bhalf_t, ck::half_t, 0x200>();
     pass &= run_test_fmt<int8_t,      ck::half_t,  ck::half_t, 0x400>();
-
-#if CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
-    //pass &= run_test_fmt<ck::int4_t,  float,       float,     0x800>();
-    //pass &= run_test_fmt<ck::int4_t,  int32_t,     int32_t,    0x1000>();
-    //pass &= run_test_fmt<ck::int4_t,  ck::half_t,  ck::half_t, 0x2000>();
-#endif
     // clang-format on
 
-    std::cout << "TestConv ..... " << (pass ? "SUCCESS" : "FAILURE") << std::endl;
+    std::cout << "conv_device: ..... " << (pass ? "SUCCESS" : "FAILURE") << std::endl;
     return pass ? 0 : 1;
 }
