@@ -60,8 +60,7 @@ struct ReferenceGemm : public device::BaseOperator
         float Run(const Argument& arg)
         {
             auto f_mk_kn_mn = [&](auto m, auto n) {
-                const int K = arg.a_m_k_.mDesc.GetLengths()[1];
-
+                const int K       = arg.a_m_k_.mDesc.GetLengths()[1];
                 AccDataType v_acc = 0;
                 ComputeTypeA v_a  = 0;
                 ComputeTypeB v_b  = 0;

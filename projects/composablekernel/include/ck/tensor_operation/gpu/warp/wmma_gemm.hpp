@@ -804,11 +804,11 @@ struct WmmaSelector_Gfx13
     }
 
 #ifdef CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
-    template <>
-    static constexpr auto GetWmma<int4_t, int4_t, int, 16, 16>()
-    {
-        return WmmaInstr::wmma_i32_16x16x16_iu4;
-    }
+    // template <>
+    // static constexpr auto GetWmma<int4_t, int4_t, int, 16, 16>()
+    //{
+    //     return WmmaInstr::wmma_i32_16x16x16_iu4;
+    // }
 #endif
     // get_warp_size do not return the correct wavesize, hardcode to 32 as workaround
     static constexpr auto selected_wmma =

@@ -304,6 +304,769 @@ struct intrin_wmma_i32_16x16x16_iu8_w32<16, 16, neg_a, neg_b, clamp>
     }
 };
 
+/**********************************GFX13***************************************************/
+// for gfx13 usage
+template <index_t MPerWave, index_t NPerWave, bool clamp, index_t kMultiplier>
+struct intrin_wmma_f32_16x16_f16f16_w32;
+
+template <bool clamp, index_t kMultiplier>
+struct intrin_wmma_f32_16x16_f16f16_w32<16, 16, clamp, kMultiplier>
+{
+    template <class FloatC>
+    __device__ static void Run(const half8_t& reg_a, const half8_t& reg_b, FloatC& reg_c)
+    {
+#if defined(__gfx13__)
+        static_assert(kMultiplier == 1, "gfx13 this opcode only support kMultiplier = 1.");
+        reg_c.template AsType<float8_t>()(Number<0>{}) =
+            __builtin_amdgcn_wmma_f32_16x16x16_f16_clamp(
+                reg_a, reg_b, reg_c.template AsType<float8_t>()[Number<0>{}], clamp);
+#else
+        ignore = reg_a;
+        ignore = reg_b;
+        ignore = reg_c;
+#endif
+    }
+};
+
+// src: bf16, dst: fp32
+template <index_t MPerWave, index_t NPerWave, bool clamp, index_t kMultiplier>
+struct intrin_wmma_f32_16x16_bf16bf16_w32;
+
+template <bool clamp, index_t kMultiplier>
+struct intrin_wmma_f32_16x16_bf16bf16_w32<16, 16, clamp, kMultiplier>
+{
+    template <class FloatC>
+    __device__ static void Run(const bhalf8_t& reg_a, const bhalf8_t& reg_b, FloatC& reg_c)
+    {
+#if defined(__gfx13__)
+        static_assert(kMultiplier == 1, "gfx13 this opcode only support kMultiplier = 1.");
+        reg_c.template AsType<float8_t>()(Number<0>{}) =
+            __builtin_amdgcn_wmma_f32_16x16x16_bf16_clamp(
+                reg_a, reg_b, reg_c.template AsType<float8_t>()[Number<0>{}], clamp);
+#else
+        ignore = reg_a;
+        ignore = reg_b;
+        ignore = reg_c;
+#endif
+    }
+};
+
+template <index_t MPerWave, index_t NPerWave, bool clamp, index_t kMultiplier>
+struct intrin_wmma_f16_16x16_f16f16_w32;
+
+template <bool clamp, index_t kMultiplier>
+struct intrin_wmma_f16_16x16_f16f16_w32<16, 16, clamp, kMultiplier>
+{
+    template <class FloatC>
+    __device__ static void Run(const half8_t& reg_a, const half8_t& reg_b, FloatC& reg_c)
+    {
+#if defined(__gfx13__)
+        static_assert(kMultiplier == 1, "gfx13 this opcode only support kMultiplier = 1.");
+        reg_c.template AsType<half8_t>()(Number<0>{}) =
+            __builtin_amdgcn_wmma_f16_16x16x16_f16_clamp(
+                reg_a, reg_b, reg_c.template AsType<half8_t>()[Number<0>{}], clamp);
+#else
+        ignore = reg_a;
+        ignore = reg_b;
+        ignore = reg_c;
+#endif
+    }
+};
+
+template <index_t MPerWave, index_t NPerWave, bool clamp, index_t kMultiplier>
+struct intrin_wmma_bf16_16x16_bf16bf16_w32;
+
+template <bool clamp, index_t kMultiplier>
+struct intrin_wmma_bf16_16x16_bf16bf16_w32<16, 16, clamp, kMultiplier>
+{
+    template <class FloatC>
+    __device__ static void Run(const bhalf8_t& reg_a, const bhalf8_t& reg_b, FloatC& reg_c)
+    {
+#if defined(__gfx13__)
+        static_assert(kMultiplier == 1, "gfx13 this opcode only support kMultiplier = 1.");
+        reg_c.template AsType<bhalf8_t>()(Number<0>{}) =
+            __builtin_amdgcn_wmma_bf16_16x16x16_bf16_clamp(
+                reg_a, reg_b, reg_c.template AsType<bhalf8_t>()[Number<0>{}], clamp);
+#else
+        ignore = reg_a;
+        ignore = reg_b;
+        ignore = reg_c;
+#endif
+    }
+};
+
+template <index_t MPerWave,
+          index_t NPerWave,
+          bool neg_a,
+          bool neg_b,
+          bool clamp,
+          index_t kMultiplier>
+struct intrin_wmma_i32_16x16_iu8iu8_w32;
+
+template <bool neg_a, bool neg_b, bool clamp, index_t kMultiplier>
+struct intrin_wmma_i32_16x16_iu8iu8_w32<16, 16, neg_a, neg_b, clamp, kMultiplier>
+{
+    template <class FloatC>
+    __device__ static void Run(const int8x8_t& reg_a, const int8x8_t& reg_b, FloatC& reg_c)
+    {
+#if defined(__gfx13__)
+        static_assert(kMultiplier == 1 || kMultiplier == 2,
+                      "gfx13 this opcode only support kMultiplier = 1 or 2.");
+        reg_c.template AsType<int32x8_t>()(Number<0>{}) =
+            __builtin_amdgcn_wmma_i32_16x16x16_iu8_clamp(
+                neg_a,
+                bit_cast<int32x2_t>(reg_a),
+                neg_b,
+                bit_cast<int32x2_t>(reg_b),
+                reg_c.template AsType<int32x8_t>()[Number<0>{}],
+                clamp);
+#else
+        ignore = reg_a;
+        ignore = reg_b;
+        ignore = reg_c;
+#endif
+    }
+};
+
+template <bool neg_a, bool neg_b, bool clamp>
+struct intrin_wmma_i32_16x16_iu8iu8_w32<16, 16, neg_a, neg_b, clamp, 2>
+{
+    template <class FloatC>
+    __device__ static void Run(const int8x16_t& reg_a, const int8x16_t& reg_b, FloatC& reg_c)
+    {
+#if defined(__gfx13__)
+        reg_c.template AsType<int32x8_t>()(Number<0>{}) =
+            __builtin_amdgcn_wmma_i32_16x16x32_iu8_clamp(
+                neg_a,
+                bit_cast<int32x4_t>(reg_a),
+                neg_b,
+                bit_cast<int32x4_t>(reg_b),
+                reg_c.template AsType<int32x8_t>()[Number<0>{}],
+                clamp);
+#else
+        ignore = reg_a;
+        ignore = reg_b;
+        ignore = reg_c;
+#endif
+    }
+};
+
+template <index_t MPerWave,
+          index_t NPerWave,
+          bool neg_a,
+          bool neg_b,
+          bool clamp,
+          index_t kMultiplier>
+struct intrin_wmma_f32_16x16_iu8iu8_w32;
+
+template <bool neg_a, bool neg_b, bool clamp, index_t kMultiplier>
+struct intrin_wmma_f32_16x16_iu8iu8_w32<16, 16, neg_a, neg_b, clamp, kMultiplier>
+{
+    template <class FloatC>
+    __device__ static void Run(const int8x8_t& reg_a, const int8x8_t& reg_b, FloatC& reg_c)
+    {
+#if defined(__gfx13__)
+        reg_c.template AsType<float8_t>()(Number<0>{}) =
+            __builtin_amdgcn_wmma_f32_16x16x16_iu8_clamp(
+                neg_a,
+                bit_cast<int32x2_t>(reg_a),
+                neg_b,
+                bit_cast<int32x2_t>(reg_b),
+                reg_c.template AsType<float8_t>()[Number<0>{}],
+                clamp);
+#else
+        ignore = reg_a;
+        ignore = reg_b;
+        ignore = reg_c;
+#endif
+    }
+};
+
+template <bool neg_a, bool neg_b, bool clamp>
+struct intrin_wmma_f32_16x16_iu8iu8_w32<16, 16, neg_a, neg_b, clamp, 2>
+{
+    template <class FloatC>
+    __device__ static void Run(const int8x16_t& reg_a, const int8x16_t& reg_b, FloatC& reg_c)
+    {
+#if defined(__gfx13__)
+        reg_c.template AsType<float8_t>()(Number<0>{}) =
+            __builtin_amdgcn_wmma_f32_16x16x32_iu8_clamp(
+                neg_a,
+                bit_cast<int32x4_t>(reg_a),
+                neg_b,
+                bit_cast<int32x4_t>(reg_b),
+                reg_c.template AsType<float8_t>()[Number<0>{}],
+                clamp);
+#else
+        ignore = reg_a;
+        ignore = reg_b;
+        ignore = reg_c;
+#endif
+    }
+};
+
+template <index_t MPerWave, index_t NPerWave, bool clamp, index_t kMultiplier>
+struct intrin_wmma_f32_16x16_f8f8_w32;
+
+template <bool clamp, index_t kMultiplier>
+struct intrin_wmma_f32_16x16_f8f8_w32<16, 16, clamp, kMultiplier>
+{
+    template <class FloatC>
+    __device__ static void Run(const f8x8_t& reg_a, const f8x8_t& reg_b, FloatC& reg_c)
+    {
+#if defined(__gfx13__)
+        static_assert(kMultiplier == 1,
+                      "gfx13 this opcode for this A, B type only support kMultiplier = 1.");
+        reg_c.template AsType<float8_t>()(Number<0>{}) =
+            __builtin_amdgcn_wmma_f32_16x16x16_fp8_fp8_clamp(
+                reg_a, reg_b, reg_c.template AsType<float8_t>()[Number<0>{}], clamp);
+#else
+        ignore = reg_a;
+        ignore = reg_b;
+        ignore = reg_c;
+#endif
+    }
+};
+
+template <bool clamp>
+struct intrin_wmma_f32_16x16_f8f8_w32<16, 16, clamp, 2>
+{
+    template <class FloatC>
+    __device__ static void Run(const f8x16_t& reg_a, const f8x16_t& reg_b, FloatC& reg_c)
+    {
+#if defined(__gfx13__)
+        reg_c.template AsType<float8_t>()(Number<0>{}) =
+            __builtin_amdgcn_wmma_f32_16x16x32_fp8_fp8_clamp(
+                reg_a, reg_b, reg_c.template AsType<float8_t>()[Number<0>{}], clamp);
+#else
+        ignore = reg_a;
+        ignore = reg_b;
+        ignore = reg_c;
+#endif
+    }
+};
+
+template <index_t MPerWave, index_t NPerWave, bool clamp, index_t kMultiplier>
+struct intrin_wmma_f32_16x16_f8bf8_w32;
+
+template <bool clamp, index_t kMultiplier>
+struct intrin_wmma_f32_16x16_f8bf8_w32<16, 16, clamp, kMultiplier>
+{
+    template <class FloatC>
+    __device__ static void Run(const f8x8_t& reg_a, const bf8x8_t& reg_b, FloatC& reg_c)
+    {
+#if defined(__gfx13__)
+        static_assert(kMultiplier == 1,
+                      "gfx13 this opcode for this A, B type only support kMultiplier = 1.");
+        reg_c.template AsType<float8_t>()(Number<0>{}) =
+            __builtin_amdgcn_wmma_f32_16x16x16_fp8_bf8_clamp(
+                reg_a, reg_b, reg_c.template AsType<float8_t>()[Number<0>{}], clamp);
+#else
+        ignore = reg_a;
+        ignore = reg_b;
+        ignore = reg_c;
+#endif
+    }
+};
+
+template <bool clamp>
+struct intrin_wmma_f32_16x16_f8bf8_w32<16, 16, clamp, 2>
+{
+    template <class FloatC>
+    __device__ static void Run(const f8x16_t& reg_a, const bf8x16_t& reg_b, FloatC& reg_c)
+    {
+#if defined(__gfx13__)
+        reg_c.template AsType<float8_t>()(Number<0>{}) =
+            __builtin_amdgcn_wmma_f32_16x16x32_fp8_bf8_clamp(
+                reg_a, reg_b, reg_c.template AsType<float8_t>()[Number<0>{}], clamp);
+#else
+        ignore = reg_a;
+        ignore = reg_b;
+        ignore = reg_c;
+#endif
+    }
+};
+
+template <index_t MPerWave, index_t NPerWave, bool clamp, index_t kMultiplier>
+struct intrin_wmma_f32_16x16_bf8f8_w32;
+
+template <bool clamp, index_t kMultiplier>
+struct intrin_wmma_f32_16x16_bf8f8_w32<16, 16, clamp, kMultiplier>
+{
+    template <class FloatC>
+    __device__ static void Run(const bf8x8_t& reg_a, const f8x8_t& reg_b, FloatC& reg_c)
+    {
+#if defined(__gfx13__)
+        static_assert(kMultiplier == 1,
+                      "gfx13 this opcode for this A, B type only support kMultiplier = 1.");
+        reg_c.template AsType<float8_t>()(Number<0>{}) =
+            __builtin_amdgcn_wmma_f32_16x16x16_bf8_fp8_clamp(
+                reg_a, reg_b, reg_c.template AsType<float8_t>()[Number<0>{}], clamp);
+#else
+        ignore = reg_a;
+        ignore = reg_b;
+        ignore = reg_c;
+#endif
+    }
+};
+
+template <bool clamp>
+struct intrin_wmma_f32_16x16_bf8f8_w32<16, 16, clamp, 2>
+{
+    template <class FloatC>
+    __device__ static void Run(const bf8x16_t& reg_a, const f8x16_t& reg_b, FloatC& reg_c)
+    {
+#if defined(__gfx13__)
+        reg_c.template AsType<float8_t>()(Number<0>{}) =
+            __builtin_amdgcn_wmma_f32_16x16x32_bf8_fp8_clamp(
+                reg_a, reg_b, reg_c.template AsType<float8_t>()[Number<0>{}], clamp);
+#else
+        ignore = reg_a;
+        ignore = reg_b;
+        ignore = reg_c;
+#endif
+    }
+};
+
+template <index_t MPerWave, index_t NPerWave, bool clamp, index_t kMultiplier>
+struct intrin_wmma_f32_16x16_bf8bf8_w32;
+
+template <bool clamp, index_t kMultiplier>
+struct intrin_wmma_f32_16x16_bf8bf8_w32<16, 16, clamp, kMultiplier>
+{
+    template <class FloatC>
+    __device__ static void Run(const bf8x8_t& reg_a, const bf8x8_t& reg_b, FloatC& reg_c)
+    {
+#if defined(__gfx13__)
+        static_assert(kMultiplier == 1,
+                      "gfx13 this opcode for this A, B type only support kMultiplier = 1.");
+        reg_c.template AsType<float8_t>()(Number<0>{}) =
+            __builtin_amdgcn_wmma_f32_16x16x16_bf8_bf8_clamp(
+                reg_a, reg_b, reg_c.template AsType<float8_t>()[Number<0>{}], clamp);
+#else
+        ignore = reg_a;
+        ignore = reg_b;
+        ignore = reg_c;
+#endif
+    }
+};
+
+template <bool clamp>
+struct intrin_wmma_f32_16x16_bf8bf8_w32<16, 16, clamp, 2>
+{
+    template <class FloatC>
+    __device__ static void Run(const bf8x16_t& reg_a, const bf8x16_t& reg_b, FloatC& reg_c)
+    {
+#if defined(__gfx13__)
+        reg_c.template AsType<float8_t>()(Number<0>{}) =
+            __builtin_amdgcn_wmma_f32_16x16x32_bf8_bf8_clamp(
+                reg_a, reg_b, reg_c.template AsType<float8_t>()[Number<0>{}], clamp);
+#else
+        ignore = reg_a;
+        ignore = reg_b;
+        ignore = reg_c;
+#endif
+    }
+};
+
+template <index_t MPerWave, index_t NPerWave, bool clamp, index_t kMultiplier>
+struct intrin_wmma_f16_16x16_f8bf8_w32;
+
+template <bool clamp, index_t kMultiplier>
+struct intrin_wmma_f16_16x16_f8bf8_w32<16, 16, clamp, kMultiplier>
+{
+    template <class FloatC>
+    __device__ static void Run(const f8x8_t& reg_a, const bf8x8_t& reg_b, FloatC& reg_c)
+    {
+#if defined(__gfx13__)
+        static_assert(kMultiplier == 1,
+                      "gfx13 this opcode for this A, B type only support kMultiplier = 1.");
+        reg_c.template AsType<half8_t>()(Number<0>{}) =
+            __builtin_amdgcn_wmma_f16_16x16x16_fp8_bf8_clamp(
+                reg_a, reg_b, reg_c.template AsType<half8_t>()[Number<0>{}], clamp);
+#else
+        ignore = reg_a;
+        ignore = reg_b;
+        ignore = reg_c;
+#endif
+    }
+};
+
+template <bool clamp>
+struct intrin_wmma_f16_16x16_f8bf8_w32<16, 16, clamp, 2>
+{
+    template <class FloatC>
+    __device__ static void Run(const f8x16_t& reg_a, const bf8x16_t& reg_b, FloatC& reg_c)
+    {
+#if defined(__gfx13__)
+        reg_c.template AsType<half8_t>()(Number<0>{}) =
+            __builtin_amdgcn_wmma_f16_16x16x32_fp8_bf8_clamp(
+                reg_a, reg_b, reg_c.template AsType<half8_t>()[Number<0>{}], clamp);
+#else
+        ignore = reg_a;
+        ignore = reg_b;
+        ignore = reg_c;
+#endif
+    }
+};
+
+template <index_t MPerWave, index_t NPerWave, bool clamp, index_t kMultiplier>
+struct intrin_wmma_f16_16x16_bf8f8_w32;
+
+template <bool clamp, index_t kMultiplier>
+struct intrin_wmma_f16_16x16_bf8f8_w32<16, 16, clamp, kMultiplier>
+{
+    template <class FloatC>
+    __device__ static void Run(const bf8x8_t& reg_a, const f8x8_t& reg_b, FloatC& reg_c)
+    {
+#if defined(__gfx13__)
+        static_assert(kMultiplier == 1,
+                      "gfx13 this opcode for this A, B type only support kMultiplier = 1.");
+        reg_c.template AsType<half8_t>()(Number<0>{}) =
+            __builtin_amdgcn_wmma_f16_16x16x16_bf8_fp8_clamp(
+                reg_a, reg_b, reg_c.template AsType<half8_t>()[Number<0>{}], clamp);
+#else
+        ignore = reg_a;
+        ignore = reg_b;
+        ignore = reg_c;
+#endif
+    }
+};
+
+template <bool clamp>
+struct intrin_wmma_f16_16x16_bf8f8_w32<16, 16, clamp, 2>
+{
+    template <class FloatC>
+    __device__ static void Run(const bf8x16_t& reg_a, const f8x16_t& reg_b, FloatC& reg_c)
+    {
+#if defined(__gfx13__)
+        reg_c.template AsType<half8_t>()(Number<0>{}) =
+            __builtin_amdgcn_wmma_f16_16x16x32_bf8_fp8_clamp(
+                reg_a, reg_b, reg_c.template AsType<half8_t>()[Number<0>{}], clamp);
+#else
+        ignore = reg_a;
+        ignore = reg_b;
+        ignore = reg_c;
+#endif
+    }
+};
+
+template <index_t MPerWave, index_t NPerWave, bool clamp, index_t kMultiplier>
+struct intrin_wmma_f16_16x16_bf8bf8_w32;
+
+template <bool clamp, index_t kMultiplier>
+struct intrin_wmma_f16_16x16_bf8bf8_w32<16, 16, clamp, kMultiplier>
+{
+    template <class FloatC>
+    __device__ static void Run(const bf8x8_t& reg_a, const bf8x8_t& reg_b, FloatC& reg_c)
+    {
+#if defined(__gfx13__)
+        static_assert(kMultiplier == 1,
+                      "gfx13 this opcode for this A, B type only support kMultiplier = 1.");
+        reg_c.template AsType<half8_t>()(Number<0>{}) =
+            __builtin_amdgcn_wmma_f16_16x16x16_bf8_bf8_clamp(
+                reg_a, reg_b, reg_c.template AsType<half8_t>()[Number<0>{}], clamp);
+#else
+        ignore = reg_a;
+        ignore = reg_b;
+        ignore = reg_c;
+#endif
+    }
+};
+
+template <bool clamp>
+struct intrin_wmma_f16_16x16_bf8bf8_w32<16, 16, clamp, 2>
+{
+    template <class FloatC>
+    __device__ static void Run(const bf8x16_t& reg_a, const bf8x16_t& reg_b, FloatC& reg_c)
+    {
+#if defined(__gfx13__)
+        reg_c.template AsType<half8_t>()(Number<0>{}) =
+            __builtin_amdgcn_wmma_f16_16x16x32_bf8_bf8_clamp(
+                reg_a, reg_b, reg_c.template AsType<half8_t>()[Number<0>{}], clamp);
+#else
+        ignore = reg_a;
+        ignore = reg_b;
+        ignore = reg_c;
+#endif
+    }
+};
+
+template <index_t MPerWave, index_t NPerWave, bool clamp, index_t kMultiplier>
+struct intrin_wmma_f16_16x16_f8f8_w32;
+
+template <bool clamp, index_t kMultiplier>
+struct intrin_wmma_f16_16x16_f8f8_w32<16, 16, clamp, kMultiplier>
+{
+    template <class FloatC>
+    __device__ static void Run(const f8x8_t& reg_a, const f8x8_t& reg_b, FloatC& reg_c)
+    {
+#if defined(__gfx13__)
+        static_assert(kMultiplier == 1,
+                      "gfx13 this opcode for this A, B type only support kMultiplier = 1.");
+        reg_c.template AsType<half8_t>()(Number<0>{}) =
+            __builtin_amdgcn_wmma_f16_16x16x16_fp8_fp8_clamp(
+                reg_a, reg_b, reg_c.template AsType<half8_t>()[Number<0>{}], clamp);
+#else
+        ignore = reg_a;
+        ignore = reg_b;
+        ignore = reg_c;
+#endif
+    }
+};
+
+template <bool clamp>
+struct intrin_wmma_f16_16x16_f8f8_w32<16, 16, clamp, 2>
+{
+    template <class FloatC>
+    __device__ static void Run(const f8x16_t& reg_a, const f8x16_t& reg_b, FloatC& reg_c)
+    {
+#if defined(__gfx13__)
+        reg_c.template AsType<half8_t>()(Number<0>{}) =
+            __builtin_amdgcn_wmma_f16_16x16x32_fp8_fp8_clamp(
+                reg_a, reg_b, reg_c.template AsType<half8_t>()[Number<0>{}], clamp);
+#else
+        ignore = reg_a;
+        ignore = reg_b;
+        ignore = reg_c;
+#endif
+    }
+};
+
+template <index_t MPerWave,
+          index_t NPerWave,
+          bool neg_a,
+          bool neg_b,
+          bool clamp,
+          index_t kMultiplier>
+struct intrin_wmma_i32_16x16_iu4iu4_w32;
+
+template <bool neg_a, bool neg_b, bool clamp, index_t kMultiplier>
+struct intrin_wmma_i32_16x16_iu4iu4_w32<16, 16, neg_a, neg_b, clamp, kMultiplier>
+{
+    template <class FloatC>
+    __device__ static void Run(const int32_t& reg_a, const int32_t& reg_b, FloatC& reg_c)
+    {
+#if defined(__gfx13__)
+        reg_c.template AsType<int32x8_t>()(Number<0>{}) =
+            __builtin_amdgcn_wmma_i32_16x16x16_iu4_clamp(
+                neg_a, reg_a, neg_b, reg_b, reg_c.template AsType<int32x8_t>()[Number<0>{}], clamp);
+#else
+        ignore = reg_a;
+        ignore = reg_b;
+        ignore = reg_c;
+#endif
+    }
+};
+
+template <bool neg_a, bool neg_b, bool clamp>
+struct intrin_wmma_i32_16x16_iu4iu4_w32<16, 16, neg_a, neg_b, clamp, 2>
+{
+    template <class FloatC>
+    __device__ static void Run(const int32x2_t& reg_a, const int32x2_t& reg_b, FloatC& reg_c)
+    {
+#if defined(__gfx13__)
+        reg_c.template AsType<int32x8_t>()(Number<0>{}) =
+            __builtin_amdgcn_wmma_i32_16x16x32_iu4_clamp(
+                neg_a, reg_a, neg_b, reg_b, reg_c.template AsType<int32x8_t>()[Number<0>{}], clamp);
+#else
+        ignore = reg_a;
+        ignore = reg_b;
+        ignore = reg_c;
+#endif
+    }
+};
+
+template <bool neg_a, bool neg_b, bool clamp>
+struct intrin_wmma_i32_16x16_iu4iu4_w32<16, 16, neg_a, neg_b, clamp, 4>
+{
+    template <class FloatC>
+    __device__ static void Run(const int32x4_t& reg_a, const int32x4_t& reg_b, FloatC& reg_c)
+    {
+#if defined(__gfx13__)
+        reg_c.template AsType<int32x8_t>()(Number<0>{}) =
+            __builtin_amdgcn_wmma_i32_16x16x64_iu4_clamp(
+                neg_a, reg_a, neg_b, reg_b, reg_c.template AsType<int32x8_t>()[Number<0>{}], clamp);
+#else
+        ignore = reg_a;
+        ignore = reg_b;
+        ignore = reg_c;
+#endif
+    }
+};
+
+template <index_t MPerWave,
+          index_t NPerWave,
+          bool neg_a,
+          bool neg_b,
+          bool clamp,
+          index_t kMultiplier>
+struct intrin_wmma_f32_16x16_iu4iu4_w32;
+
+template <bool neg_a, bool neg_b, bool clamp, index_t kMultiplier>
+struct intrin_wmma_f32_16x16_iu4iu4_w32<16, 16, neg_a, neg_b, clamp, kMultiplier>
+{
+    template <class FloatC>
+    __device__ static void Run(const int32_t& reg_a, const int32_t& reg_b, FloatC& reg_c)
+    {
+#if defined(__gfx13__)
+        reg_c.template AsType<float8_t>()(Number<0>{}) =
+            __builtin_amdgcn_wmma_f32_16x16x16_iu4_clamp(
+                neg_a, reg_a, neg_b, reg_b, reg_c.template AsType<float8_t>()[Number<0>{}], clamp);
+#else
+        ignore = reg_a;
+        ignore = reg_b;
+        ignore = reg_c;
+#endif
+    }
+};
+
+template <bool neg_a, bool neg_b, bool clamp>
+struct intrin_wmma_f32_16x16_iu4iu4_w32<16, 16, neg_a, neg_b, clamp, 2>
+{
+    template <class FloatC>
+    __device__ static void Run(const int32x2_t& reg_a, const int32x2_t& reg_b, FloatC& reg_c)
+    {
+#if defined(__gfx13__)
+        reg_c.template AsType<float8_t>()(Number<0>{}) =
+            __builtin_amdgcn_wmma_f32_16x16x32_iu4_clamp(
+                neg_a, reg_a, neg_b, reg_b, reg_c.template AsType<float8_t>()[Number<0>{}], clamp);
+#else
+        ignore = reg_a;
+        ignore = reg_b;
+        ignore = reg_c;
+#endif
+    }
+};
+
+template <bool neg_a, bool neg_b, bool clamp>
+struct intrin_wmma_f32_16x16_iu4iu4_w32<16, 16, neg_a, neg_b, clamp, 4>
+{
+    template <class FloatC>
+    __device__ static void Run(const int32x4_t& reg_a, const int32x4_t& reg_b, FloatC& reg_c)
+    {
+#if defined(__gfx13__)
+        reg_c.template AsType<float8_t>()(Number<0>{}) =
+            __builtin_amdgcn_wmma_f32_16x16x64_iu4_clamp(
+                neg_a, reg_a, neg_b, reg_b, reg_c.template AsType<float8_t>()[Number<0>{}], clamp);
+#else
+        ignore = reg_a;
+        ignore = reg_b;
+        ignore = reg_c;
+#endif
+    }
+};
+
+template <index_t MPerWave,
+          index_t NPerWave,
+          bool neg_a,
+          bool neg_b,
+          bool clamp,
+          index_t kMultiplier>
+struct intrin_wmma_f32i32_16x16_iu8iu8_w32;
+
+template <bool neg_a, bool neg_b, bool clamp, index_t kMultiplier>
+struct intrin_wmma_f32i32_16x16_iu8iu8_w32<16, 16, neg_a, neg_b, clamp, kMultiplier>
+{
+    template <class FloatC, class FloatD>
+    __device__ static void
+    Run(const int8x8_t& reg_a, const int8x8_t& reg_b, const FloatC& reg_c, FloatD& reg_d)
+    {
+#if defined(__gfx13__)
+        reg_d.template AsType<float8_t>()(Number<0>{}) =
+            __builtin_amdgcn_wmma_f32i32_16x16x16_iu8_clamp(
+                neg_a, reg_a, neg_b, reg_b, reg_c.template AsType<int32x8_t>()[Number<0>{}], clamp);
+#else
+        ignore = reg_a;
+        ignore = reg_b;
+        ignore = reg_c;
+#endif
+    }
+};
+
+template <bool neg_a, bool neg_b, bool clamp>
+struct intrin_wmma_f32i32_16x16_iu8iu8_w32<16, 16, neg_a, neg_b, clamp, 2>
+{
+    template <class FloatC, class FloatD>
+    __device__ static void
+    Run(const int8x16_t& reg_a, const int8x16_t& reg_b, const FloatC& reg_c, FloatD& reg_d)
+    {
+#if defined(__gfx13__)
+        reg_d.template AsType<float8_t>()(Number<0>{}) =
+            __builtin_amdgcn_wmma_f32i32_16x16x32_iu8_clamp(
+                neg_a, reg_a, neg_b, reg_b, reg_c.template AsType<int32x8_t>()[Number<0>{}], clamp);
+#else
+        ignore = reg_a;
+        ignore = reg_b;
+        ignore = reg_c;
+#endif
+    }
+};
+
+template <index_t MPerWave,
+          index_t NPerWave,
+          bool neg_a,
+          bool neg_b,
+          bool clamp,
+          index_t kMultiplier>
+struct intrin_wmma_f32i32_16x16_iu4iu4_w32;
+
+template <bool neg_a, bool neg_b, bool clamp, index_t kMultiplier>
+struct intrin_wmma_f32i32_16x16_iu4iu4_w32<16, 16, neg_a, neg_b, clamp, kMultiplier>
+{
+    template <class FloatC, class FloatD>
+    __device__ static void
+    Run(const int32_t& reg_a, const int32_t& reg_b, const FloatC& reg_c, FloatD& reg_d)
+    {
+#if defined(__gfx13__)
+        reg_d.template AsType<float8_t>()(Number<0>{}) =
+            __builtin_amdgcn_wmma_f32i32_16x16x16_iu4_clamp(
+                neg_a, reg_a, neg_b, reg_b, reg_c.template AsType<int32x8_t>()[Number<0>{}], clamp);
+#else
+        ignore = reg_a;
+        ignore = reg_b;
+        ignore = reg_c;
+#endif
+    }
+};
+
+template <bool neg_a, bool neg_b, bool clamp>
+struct intrin_wmma_f32i32_16x16_iu4iu4_w32<16, 16, neg_a, neg_b, clamp, 2>
+{
+    template <class FloatC, class FloatD>
+    __device__ static void
+    Run(const int32x2_t& reg_a, const int32x2_t& reg_b, const FloatC& reg_c, FloatD& reg_d)
+    {
+#if defined(__gfx13__)
+        reg_d.template AsType<float8_t>()(Number<0>{}) =
+            __builtin_amdgcn_wmma_f32i32_16x16x32_iu4_clamp(
+                neg_a, reg_a, neg_b, reg_b, reg_c.template AsType<int32x8_t>()[Number<0>{}], clamp);
+#else
+        ignore = reg_a;
+        ignore = reg_b;
+        ignore = reg_c;
+#endif
+    }
+};
+
+template <bool neg_a, bool neg_b, bool clamp>
+struct intrin_wmma_f32i32_16x16_iu4iu4_w32<16, 16, neg_a, neg_b, clamp, 4>
+{
+    template <class FloatC, class FloatD>
+    __device__ static void
+    Run(const int32x4_t& reg_a, const int32x4_t& reg_b, const FloatC& reg_c, FloatD& reg_d)
+    {
+#if defined(__gfx13__)
+        reg_d.template AsType<float8_t>()(Number<0>{}) =
+            __builtin_amdgcn_wmma_f32i32_16x16x64_iu4_clamp(
+                neg_a, reg_a, neg_b, reg_b, reg_c.template AsType<int32x8_t>()[Number<0>{}], clamp);
+#else
+        ignore = reg_a;
+        ignore = reg_b;
+        ignore = reg_c;
+#endif
+    }
+};
 /********************************WAVE64 MODE***********************************************/
 
 template <index_t MPerWave, index_t NPerWave>
