@@ -9,6 +9,7 @@
 #include "ck/tensor_operation/gpu/grid/gridwise_gemm_pipeline_v1.hpp"
 #include "ck/tensor_operation/gpu/grid/gridwise_gemm_pipeline_v2.hpp"
 #include "ck/tensor_operation/gpu/grid/gridwise_gemm_pipeline_v4_direct_load.hpp"
+#include "ck/tensor_operation/gpu/grid/gridwise_gemm_pipeline_v5.hpp"
 #include "ck/tensor_operation/gpu/grid/gridwise_conv_pipeline.hpp"
 #include "ck/tensor_operation/gpu/grid/gridwise_conv_pipeline_v2.hpp"
 
@@ -20,6 +21,7 @@ enum struct PipelineVersion
     v2,
     // v3 is only used in the Stream-K implementation.
     v4,
+    v5, // this is added for gfx13 for asynchronous memory copy
     weight_only,
 };
 
@@ -48,6 +50,10 @@ constexpr auto GridwiseGemmPipeline_Selector()
     else if constexpr(PipelineVer == PipelineVersion::v4)
     {
         return GridwiseGemmPipeline_v4<NumPrefetch>{};
+    }
+    else if constexpr(PipelineVer == PipelineVersion::v5)
+    {
+        return GridwiseGemmPipeline_v5<NumPrefetch>{};
     }
     else if constexpr(PipelineVer == PipelineVersion::weight_only)
     {

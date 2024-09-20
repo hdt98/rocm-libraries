@@ -3000,7 +3000,7 @@ using uint8x5_t  = typename vector_type<uint8_t, 5>::type;
 using uint8x10_t = typename vector_type<uint8_t, 10>::type;
 using uint8x20_t = typename vector_type<uint8_t, 20>::type;
 
-#if CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
+#ifdef CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
 using int4x8_t  = typename vector_type<int8_t, 4>::type;
 using int4x16_t = typename vector_type<int8_t, 8>::type;
 using int4x32_t = typename vector_type<int8_t, 16>::type;
