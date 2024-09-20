@@ -458,6 +458,22 @@ __global__ void matmul_swizzle_a(const srcA_t* a, const srcB_t* b, dst_t* c)
     ignore = b;
     ignore = c;
 }
+template <typename src0_t,
+          typename src1_t,
+          ck::index_t AScaleSel,
+          ck::index_t BScaleSel,
+          typename dst_t,
+          typename acc_t>
+__global__ void matmul_mixedfp(const typename src0_t::type_t* a,
+                               const typename src1_t::type_t* b,
+                               const int32_t* a_block_scale,
+                               const int32_t* b_block_scale,
+                               dst_t* c)
+{
+    ignore = a;
+    ignore = b;
+    ignore = c;
+}
 #elif defined(__gfx13__)
 template <typename srcA_t, typename srcB_t, typename dst_t, typename acc_t, index_t kMultiplier>
 __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
@@ -616,12 +632,7 @@ __global__ void matmul_swizzle_a(const srcA_t* a, const srcB_t* b, dst_t* c)
         a_frag.template AsType<srcA_cast_type>()(ele) = vgpr_a_ptr[index];
         b_frag.template AsType<srcB_cast_type>()(ele) = vgpr_b_ptr[index];
     });
-    /*
-        builtin_wmma_naive_selector<srcA_t, srcB_t, acc_t, kMultiplier>(
-            a_frag.template AsType<typename srcA_vec::type>()(I0),
-            b_frag.template AsType<typename srcB_vec::type>()(I0),
-            c_thread_buf_);
-            */
+
     builtin_wmma_naive_selector<srcA_t, srcB_t, acc_t, dst_t, kMultiplier>(
         a_frag.template AsType<typename srcA_vec::type>()(I0),
         b_frag.template AsType<typename srcB_vec::type>()(I0),
@@ -665,8 +676,60 @@ __global__ void matmul_swizzle_a(const src_t* a, const src_t* b, dst_t* c)
     ignore = c;
 }
 
-#else
+template <typename src0_t,
+          typename src1_t,
+          ck::index_t AScaleSel,
+          ck::index_t BScaleSel,
+          typename dst_t,
+          typename acc_t>
+__global__ void matmul_mixedfp(const typename src0_t::type_t* a,
+                               const typename src1_t::type_t* b,
+                               const int32_t* a_block_scale,
+                               const int32_t* b_block_scale,
+                               dst_t* c)
+{
+    const int lIdx = threadIdx.x;
 
+    using src0_vec  = typename src0_t::vec_t;
+    using src1_vec  = typename src1_t::vec_t;
+    src0_vec a_frag = {};
+    src1_vec b_frag = {};
+    using acc_vec   = StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr, acc_t, 1, 8, true>;
+    acc_vec c_thread_buf_;
+    // cast to int32
+    const int32_t* vgpr_a_ptr = (const int32_t*)(a);
+    const int32_t* vgpr_b_ptr = (const int32_t*)(b);
+    int a_start_idx =
+        ((lIdx >> 1) * src0_t::dwords_per_wmmak) + (lIdx & 1); // this is int32_t's offset
+    for(int ele = 0; ele < src0_t::vec_size; ele++)
+    {
+        int index   = a_start_idx + (ele << 1);
+        a_frag[ele] = vgpr_a_ptr[index];
+    }
+    int b_start_idx =
+        ((lIdx >> 1) * src1_t::dwords_per_wmmak) + (lIdx & 1); // this is int32_t's offset
+    for(int ele = 0; ele < src1_t::vec_size; ele++)
+    {
+        int index   = b_start_idx + (ele << 1);
+        b_frag[ele] = vgpr_b_ptr[index];
+    }
+    const int32_t a_scale = a_block_scale[lIdx];
+    const int32_t b_scale = b_block_scale[lIdx];
+
+    __syncthreads();
+    intrin_wmma_f32_16x16_f8f6f4_w32<16, 16, src0_t, src1_t, AScaleSel, BScaleSel, false>::Run(
+        a_frag, b_frag, a_scale, b_scale, c_thread_buf_.GetVectorTypeReference(Number<0>{}));
+    __syncthreads();
+    //// Colum major -> Row major
+    static_for<0, 8, 1>{}([&](auto ele) {
+        const int col = lIdx >> 1;
+        const int row = ((ele & 4) << 1) + (ele & 3) + ((lIdx & 1) << 2);
+        // store results from unpacked c_thread_buf_ output
+        c[16 * row + col] = ck::type_convert<dst_t>(c_thread_buf_[Number<ele>{}]);
+    });
+}
+
+#else
 template <typename AccType>
 struct WMMA_ACCNumber_traits
 {
@@ -821,11 +884,42 @@ __global__ void matmul_swizzle_a(const srcA_t* a, const srcB_t* b, dst_t* c)
     ignore = c;
 }
 
+template <typename src0_t,
+          typename src1_t,
+          ck::index_t AScaleSel,
+          ck::index_t BScaleSel,
+          typename dst_t,
+          typename acc_t>
+__global__ void matmul_mixedfp(const typename src0_t::type_t* a,
+                               const typename src1_t::type_t* b,
+                               const int32_t* a_block_scale,
+                               const int32_t* b_block_scale,
+                               dst_t* c)
+{
+}
+
 #endif
 struct GemmParams
 {
     GemmParams() : M(16), N(16), K(16), StrideA(16), StrideB(16), StrideC(16), alpha(1), beta(0) {}
-
+    GemmParams(ck::index_t m_,
+               ck::index_t n_,
+               ck::index_t k_,
+               ck::index_t strideA_,
+               ck::index_t strideB_,
+               ck::index_t strideC_,
+               float alpha_,
+               float beta_)
+        : M(m_),
+          N(n_),
+          K(k_),
+          StrideA(strideA_),
+          StrideB(strideB_),
+          StrideC(strideC_),
+          alpha(alpha_),
+          beta(beta_)
+    {
+    }
     ck::index_t M;
     ck::index_t N;
     ck::index_t K;
@@ -855,6 +949,30 @@ void RunHostGEMM(const Tensor<ADataType>& A,
     auto ref_gemm     = GemmInstance{};
     auto ref_invoker  = ref_gemm.MakeInvoker();
     auto ref_argument = ref_gemm.MakeArgument(A, B, C, a_element_op, b_element_op, c_element_op);
+
+    ref_invoker.Run(ref_argument);
+}
+
+template <typename GemmInstance,
+          typename ADataType,
+          typename BDataType,
+          typename CDataType,
+          typename AElementwiseOperation,
+          typename BElementwiseOperation,
+          typename CElementwiseOperation>
+void RunHostMixedTypeGEMM(const Tensor<ADataType>& A,
+                          const Tensor<BDataType>& B,
+                          const Tensor<int32_t>& a_block_scale,
+                          const Tensor<int32_t>& b_block_scale,
+                          Tensor<CDataType>& C,
+                          AElementwiseOperation a_element_op,
+                          BElementwiseOperation b_element_op,
+                          CElementwiseOperation c_element_op)
+{
+    auto ref_gemm     = GemmInstance{};
+    auto ref_invoker  = ref_gemm.MakeInvoker();
+    auto ref_argument = ref_gemm.MakeArgument(
+        A, B, a_block_scale, b_block_scale, C, a_element_op, b_element_op, c_element_op);
 
     ref_invoker.Run(ref_argument);
 }
@@ -898,6 +1016,46 @@ bool RunDeviceGEMM(KernelType kernel,
     kernel<<<1, 32>>>(static_cast<const ADataType*>(a_m_k_device_buf.GetDeviceBuffer()),
                       static_cast<const BDataType*>(b_n_k_device_buf.GetDeviceBuffer()),
                       static_cast<CDataType*>(c_m_n_device_buf.GetDeviceBuffer()));
+    c_m_n_device_buf.FromDevice(C.mData.data());
+
+    return true;
+}
+
+template <typename KernelType,
+          typename ADataType,
+          typename BDataType,
+          typename DeviceAType,
+          typename DeviceBType,
+          typename CDataType>
+bool RunMixedTypeDeviceGEMM(KernelType kernel,
+                            const Tensor<ADataType>& A,
+                            const Tensor<BDataType>& B,
+                            const Tensor<int32_t>& a_block_scale,
+                            const Tensor<int32_t>& b_block_scale,
+                            Tensor<CDataType>& C,
+                            DeviceAType aType,
+                            DeviceBType bType)
+{
+    DeviceMem a_m_k_device_buf(sizeof(typename DeviceAType::type_t) *
+                               A.mDesc.GetElementSpaceSize());
+    DeviceMem b_n_k_device_buf(sizeof(typename DeviceBType::type_t) *
+                               B.mDesc.GetElementSpaceSize());
+    DeviceMem c_m_n_device_buf(sizeof(CDataType) * C.mDesc.GetElementSpaceSize());
+    DeviceMem a_block_scale_device_buf(sizeof(int32_t) * a_block_scale.mDesc.GetElementSpaceSize());
+    DeviceMem b_block_scale_device_buf(sizeof(int32_t) * b_block_scale.mDesc.GetElementSpaceSize());
+
+    auto converted_a_vec = ck::convert_utils<DeviceAType>(A.mData);
+    auto converted_b_vec = ck::convert_utils<DeviceBType>(B.mData);
+    a_m_k_device_buf.ToDevice(converted_a_vec.data());
+    b_n_k_device_buf.ToDevice(converted_b_vec.data());
+    a_block_scale_device_buf.ToDevice(a_block_scale.data());
+    b_block_scale_device_buf.ToDevice(b_block_scale.data());
+    kernel<<<1, 32>>>(
+        static_cast<const typename DeviceAType::type_t*>(a_m_k_device_buf.GetDeviceBuffer()),
+        static_cast<const typename DeviceBType::type_t*>(b_n_k_device_buf.GetDeviceBuffer()),
+        static_cast<int32_t*>(a_block_scale_device_buf.GetDeviceBuffer()),
+        static_cast<int32_t*>(b_block_scale_device_buf.GetDeviceBuffer()),
+        static_cast<CDataType*>(c_m_n_device_buf.GetDeviceBuffer()));
     c_m_n_device_buf.FromDevice(C.mData.data());
 
     return true;
@@ -1013,10 +1171,204 @@ struct TestWmma
         bool is_supported = ck::is_gfx11_supported() &&
                             ck::wmma_op_util::RunDeviceGEMM(wmma_kernel, a, b, c_device);
 
-        DumpTensor(a);
-        DumpTensor(b);
-        DumpTensor(c_device);
-        DumpTensor(c_host);
+        // DumpTensor(a);
+        // DumpTensor(b);
+        // DumpTensor(c_device);
+        // DumpTensor(c_host);
+
+        if(is_supported)
+        {
+            // Assert
+            bool res = false;
+            if(std::is_same<CDataType, float>::value)
+            {
+                res = ck::utils::check_err(c_device.mData, c_host.mData);
+                std::cout << (res ? "SUCCESS" : "FAILURE") << std::endl;
+            }
+            else if(std::is_same<CDataType, ck::half_t>::value)
+            {
+                res = ck::utils::check_err(c_device.mData, c_host.mData);
+                std::cout << (res ? "SUCCESS" : "FAILURE") << std::endl;
+            }
+            else if(std::is_same<CDataType, ck::bhalf_t>::value)
+            {
+                // 0.5 Pixel Error Tolerance is introduced by Accumulator difference.
+                // BF16 WMMA Accumulator is in BF16 Type while On Host-side Accumulator is
+                // Float.
+                res = ck::utils::check_err(
+                    c_device.mData, c_host.mData, "Error: Incorrect results!", 0, 1.0);
+                std::cout << (res ? "SUCCESS" : "FAILURE") << std::endl;
+            }
+            else if(std::is_same<CDataType, int8_t>::value)
+            {
+                res = ck::utils::check_err(c_device.mData, c_host.mData);
+                std::cout << (res ? "SUCCESS" : "FAILURE") << std::endl;
+            }
+            else if(std::is_same<CDataType, double>::value)
+            {
+                res = ck::utils::check_err(c_device.mData, c_host.mData);
+                std::cout << (res ? "SUCCESS" : "FAILURE") << std::endl;
+            }
+            else if(std::is_same<CDataType, int32_t>::value)
+            {
+                res = ck::utils::check_err(c_device.mData, c_host.mData);
+                std::cout << (res ? "SUCCESS" : "FAILURE") << std::endl;
+            }
+            else
+            {
+                std::cout << "UNSUPPORTED CDataType" << std::endl;
+            }
+
+            return res;
+        }
+        else
+        {
+            return true;
+        }
+    }
+};
+
+template <typename DeviceWmma,
+          typename AGPUDataType,
+          typename BGPUDataType,
+          typename ACPUDataType,
+          typename BCPUDataType,
+          typename CDataType,
+          typename GPUAccDataType,
+          typename CPUAccDataType,
+          typename ALayout,
+          typename BLayout,
+          typename CLayout,
+          typename AElementwiseOperation,
+          typename BElementwiseOperation,
+          typename CElementwiseOperation,
+          ck::index_t AScaleSel,
+          ck::index_t BScaleSel>
+struct TestMixedFPWmma
+{
+    auto PrepareGemmTensor(const ck::wmma_op_util::GemmParams& params)
+    {
+        auto f_host_tensor_descriptor =
+            [](std::size_t row, std::size_t col, std::size_t stride, auto layout) {
+                if(std::is_same<decltype(layout), ck::tensor_layout::gemm::RowMajor>::value)
+                {
+                    return HostTensorDescriptor(std::vector<std::size_t>({row, col}),
+                                                std::vector<std::size_t>({stride, 1}));
+                }
+                else
+                {
+                    return HostTensorDescriptor(std::vector<std::size_t>({row, col}),
+                                                std::vector<std::size_t>({1, stride}));
+                }
+            };
+        Tensor<ACPUDataType> a_m_k(
+            f_host_tensor_descriptor(params.M, params.K, params.StrideA, ALayout{}));
+        Tensor<BCPUDataType> b_n_k(
+            f_host_tensor_descriptor(params.K, params.N, params.StrideB, BLayout{}));
+        Tensor<CDataType> c_m_n_host_result(
+            f_host_tensor_descriptor(params.M, params.N, params.StrideC, CLayout{}));
+        Tensor<CDataType> c_m_n_device_result(
+            f_host_tensor_descriptor(params.M, params.N, params.StrideC, CLayout{}));
+
+        Tensor<int32_t> a_matrix_scale(
+            f_host_tensor_descriptor(32, 1, 1, ck::tensor_layout::gemm::RowMajor{}));
+
+        Tensor<int32_t> b_matrix_scale(
+            f_host_tensor_descriptor(32, 1, 1, ck::tensor_layout::gemm::RowMajor{}));
+
+        auto f_generate_tensor_value = [](auto& tensor, auto type) {
+            using dataType = decltype(type);
+
+            tensor.GenerateTensorValue(GeneratorTensor_2<dataType>{-5, 5});
+        };
+
+        auto f_generate_scale_value = [](auto& tensor) {
+            tensor.GenerateTensorValue(GeneratorTensor_2<int32_t>{0x7f80816f, 0x7f808170});
+        };
+
+        f_generate_tensor_value(a_m_k, ACPUDataType{});
+        f_generate_tensor_value(b_n_k, BCPUDataType{});
+        f_generate_scale_value(a_matrix_scale);
+        f_generate_scale_value(b_matrix_scale);
+
+        return std::make_tuple(
+            a_m_k, b_n_k, a_matrix_scale, b_matrix_scale, c_m_n_host_result, c_m_n_device_result);
+    }
+    template <typename DataType>
+    void DumpTensor(Tensor<DataType> mat)
+    {
+        size_t row = mat.GetLengths()[0];
+        size_t col = mat.GetLengths()[1];
+        std::cout << "mat [ " << std::endl;
+        for(uint32_t i = 0; i < row; i++)
+        {
+            std::cout << "    [";
+            for(uint32_t j = 0; j < col; j++)
+            {
+                std::vector<std::size_t> idx({i, j});
+                std::cout << ck::type_convert<float>(mat(idx)) << ", ";
+            }
+            std::cout << "]" << std::endl;
+        }
+        std::cout << "]" << std::endl;
+    }
+
+    auto operator()(const DeviceWmma& wmma_kernel,
+                    ck::wmma_op_util::GemmParams params = GemmParams{})
+    {
+        std::cout << "ALayout = " << ALayout{}.name << ", BLayout = " << BLayout{}.name
+                  << ", CLayout = " << CLayout{}.name << std::endl;
+        // Arrange
+        // ck::wmma_op_util::GemmParams params;
+        // params.M       = 16;
+        // params.N       = 16;
+        // params.K       = 16;
+        // params.StrideA = 16;
+        // params.StrideB = 16;
+        // params.StrideC = 16;
+
+        auto host_tensors = PrepareGemmTensor(params);
+
+        const Tensor<ACPUDataType>& a        = std::get<0>(host_tensors);
+        const Tensor<BCPUDataType>& b        = std::get<1>(host_tensors);
+        const Tensor<int32_t>& a_block_scale = std::get<2>(host_tensors);
+        const Tensor<int32_t>& b_block_scale = std::get<3>(host_tensors);
+        Tensor<CDataType>& c_host            = std::get<4>(host_tensors);
+        Tensor<CDataType>& c_device          = std::get<5>(host_tensors);
+
+        auto a_element_op = AElementwiseOperation{};
+        auto b_element_op = BElementwiseOperation{};
+        auto c_element_op = CElementwiseOperation{};
+
+        using ReferenceGemmInstance =
+            ck::tensor_operation::host::ReferenceScaleBlockGemm<ACPUDataType,
+                                                                BCPUDataType,
+                                                                AGPUDataType,
+                                                                BGPUDataType,
+                                                                AScaleSel,
+                                                                BScaleSel,
+                                                                CDataType,
+                                                                CPUAccDataType,
+                                                                AElementwiseOperation,
+                                                                BElementwiseOperation,
+                                                                CElementwiseOperation>;
+        ck::wmma_op_util::RunHostMixedTypeGEMM<ReferenceGemmInstance>(
+            a, b, a_block_scale, b_block_scale, c_host, a_element_op, b_element_op, c_element_op);
+
+        // Act
+        bool is_supported = ck::wmma_op_util::RunMixedTypeDeviceGEMM(wmma_kernel,
+                                                                     a,
+                                                                     b,
+                                                                     a_block_scale,
+                                                                     b_block_scale,
+                                                                     c_device,
+                                                                     AGPUDataType{},
+                                                                     BGPUDataType{});
+
+        // DumpTensor(a);
+        // DumpTensor(b);
+        // DumpTensor(c_device);
+        // DumpTensor(c_host);
 
         if(is_supported)
         {
@@ -1046,11 +1398,6 @@ struct TestWmma
                 std::cout << (res ? "SUCCESS" : "FAILURE") << std::endl;
             }
             else if(std::is_same<CDataType, double>::value)
-            {
-                res = ck::utils::check_err(c_device.mData, c_host.mData);
-                std::cout << (res ? "SUCCESS" : "FAILURE") << std::endl;
-            }
-            else if(std::is_same<CDataType, int32_t>::value)
             {
                 res = ck::utils::check_err(c_device.mData, c_host.mData);
                 std::cout << (res ? "SUCCESS" : "FAILURE") << std::endl;

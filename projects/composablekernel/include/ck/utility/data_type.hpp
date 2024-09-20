@@ -4,7 +4,7 @@
 #pragma once
 
 #include "ck/utility/statically_indexed_array.hpp"
-
+#include <vector>
 namespace ck {
 
 using bhalf_t = ushort;
@@ -13,6 +13,16 @@ using int4_t  = _BitInt(4);
 using uint4_t = unsigned _BitInt(4);
 using f8_t    = _BitInt(8);
 using bf8_t   = unsigned _BitInt(8);
+
+enum class MTX_FMT
+{
+    MTX_FMT_FP8_E4M3, // FP8
+    MTX_FMT_FP8_E5M2, // BF8
+    MTX_FMT_FP6_E2M3, // FP6
+    MTX_FMT_FP6_E3M2, // BF6
+    MTX_FMT_FP4_E2M1, // FP4
+    MTX_FMT_DEFAULT,
+};
 
 inline constexpr auto next_pow2(uint32_t x)
 {
@@ -3003,6 +3013,109 @@ using int4x144_t = typename vector_type<int8_t, 72>::type;
 using int4x40_t  = typename vector_type<int8_t, 20>::type;
 #endif
 
+template <MTX_FMT MX_TYPE = MTX_FMT::MTX_FMT_DEFAULT>
+struct MxType_t
+{
+    using type_t = unsigned _BitInt(8);
+    using vec_t  = int32x8_t; // used for wmma
+    MxType_t()   = default;
+    MxType_t(type_t data) { m_data = data; }
+    MxType_t(const MxType_t& other) { m_data = other.m_data; }
+    type_t m_data;
+};
+
+template <>
+struct MxType_t<MTX_FMT::MTX_FMT_FP4_E2M1> : public MxType_t<MTX_FMT::MTX_FMT_DEFAULT>
+{
+    using parent = MxType_t<MTX_FMT::MTX_FMT_DEFAULT>;
+    using parent::parent;
+    static constexpr MTX_FMT RawType              = MTX_FMT::MTX_FMT_FP4_E2M1;
+    static constexpr std::size_t vec_size         = 4;
+    static constexpr std::size_t dwords_per_wmmak = 8;
+    // the below function is used for data preparation in host side; not used in device side
+    static std::vector<type_t> compact_to_raw(const std::vector<type_t>& in)
+    {
+        std::vector<type_t> in_packed;
+        std::size_t vec_size = in.size();
+        in_packed.reserve(vec_size);
+        for(std::size_t i = 0; i < vec_size; i += 2)
+        {
+            type_t val0       = in[i];
+            type_t val1       = in[i + 1];
+            in_packed[i >> 1] = val0 | (val1 << 4);
+        }
+
+        return in_packed;
+    }
+};
+
+template <>
+struct MxType_t<MTX_FMT::MTX_FMT_FP6_E3M2> : public MxType_t<MTX_FMT::MTX_FMT_DEFAULT>
+{
+    using parent = MxType_t<MTX_FMT::MTX_FMT_DEFAULT>;
+    using parent::parent;
+    static constexpr MTX_FMT RawType = MTX_FMT::MTX_FMT_FP6_E3M2;
+    // this is used per K-dimension how many int32_t need to load; used in wmma_op shader
+    static constexpr std::size_t vec_size         = 6;
+    static constexpr std::size_t dwords_per_wmmak = 12;
+    static std::vector<type_t> compact_to_raw(const std::vector<type_t>& in)
+    {
+        std::vector<type_t> in_packed;
+        std::size_t vec_size = in.size();
+        in_packed.reserve(vec_size);
+        std::size_t index = 0;
+        for(std::size_t i = 0; i < vec_size; i += 4)
+        {
+            type_t val0        = in[i];
+            type_t val1        = in[i + 1];
+            type_t val2        = in[i + 2];
+            type_t val3        = in[i + 3];
+            in_packed[index++] = val0 | (val1 & 0x3) << 6;
+            in_packed[index++] = (val1 & 0x3C) >> 2 | (val2 & 0xf) << 4;
+            in_packed[index++] = (val2 & 0x3C) >> 4 | (val3 & 0x3f) << 2;
+        }
+        return in_packed;
+    }
+};
+
+template <>
+struct MxType_t<MTX_FMT::MTX_FMT_FP6_E2M3> : public MxType_t<MTX_FMT::MTX_FMT_DEFAULT>
+{
+    using parent = MxType_t<MTX_FMT::MTX_FMT_DEFAULT>;
+    using parent::parent;
+    static constexpr std::size_t vec_size         = 6;
+    static constexpr std::size_t dwords_per_wmmak = 12;
+    static constexpr MTX_FMT RawType              = MTX_FMT::MTX_FMT_FP6_E2M3;
+    static std::vector<type_t> compact_to_raw(const std::vector<type_t>& in)
+    {
+        return MxType_t<MTX_FMT::MTX_FMT_FP6_E3M2>::compact_to_raw(in);
+    }
+};
+
+template <>
+struct MxType_t<MTX_FMT::MTX_FMT_FP8_E4M3> : public MxType_t<MTX_FMT::MTX_FMT_DEFAULT>
+{
+    using parent = MxType_t<MTX_FMT::MTX_FMT_DEFAULT>;
+    using parent::parent;
+    using type_t                                  = f8_t;
+    static constexpr std::size_t vec_size         = 8;
+    static constexpr std::size_t dwords_per_wmmak = 16;
+    static constexpr MTX_FMT RawType              = MTX_FMT::MTX_FMT_FP8_E4M3;
+    static std::vector<type_t> compact_to_raw(const std::vector<type_t>& in) { return in; }
+};
+
+template <>
+struct MxType_t<MTX_FMT::MTX_FMT_FP8_E5M2> : public MxType_t<MTX_FMT::MTX_FMT_DEFAULT>
+{
+    using parent = MxType_t<MTX_FMT::MTX_FMT_DEFAULT>;
+    using parent::parent;
+    using type_t                                  = bf8_t;
+    static constexpr std::size_t vec_size         = 8;
+    static constexpr std::size_t dwords_per_wmmak = 16;
+    static constexpr MTX_FMT RawType              = MTX_FMT::MTX_FMT_FP8_E5M2;
+    static std::vector<type_t> compact_to_raw(const std::vector<type_t>& in) { return in; }
+};
+
 template <typename T>
 struct NumericLimits
 {
@@ -3159,5 +3272,33 @@ struct NumericUtils<bhalf_t>
     static constexpr int mant = 7;
     static constexpr int bias = 128; // negative zero nan mode
     // static constexpr int bias = 127; // ieee mode
+};
+
+// the below is used for MX data format
+template <>
+struct NumericUtils<MxType_t<MTX_FMT::MTX_FMT_FP4_E2M1>>
+{
+    static constexpr int exp              = 2;
+    static constexpr int mant             = 1;
+    static constexpr float absmin_nonzero = 0.5;
+    static constexpr float absmax         = 6.f;
+};
+
+template <>
+struct NumericUtils<MxType_t<MTX_FMT::MTX_FMT_FP6_E3M2>>
+{
+    static constexpr int exp              = 3;
+    static constexpr int mant             = 2;
+    static constexpr float absmin_nonzero = 0.0625;
+    static constexpr float absmax         = 28.f;
+};
+
+template <>
+struct NumericUtils<MxType_t<MTX_FMT::MTX_FMT_FP6_E2M3>>
+{
+    static constexpr int exp              = 2;
+    static constexpr int mant             = 3;
+    static constexpr float absmin_nonzero = 0.125;
+    static constexpr float absmax         = 7.5;
 };
 } // namespace ck

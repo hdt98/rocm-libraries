@@ -482,6 +482,61 @@ struct intrin_wmma_f32_16x16_iu8iu8_w32<16, 16, neg_a, neg_b, clamp, kMultiplier
     }
 };
 
+constexpr index_t VOP5M_MOD1_OFFSET = 6;
+// this field in mod1
+template <typename SrcAType, typename SrcBType>
+constexpr int32_t get_f8f6f4_data_format()
+{
+    int32_t srcAType = static_cast<int32_t>(SrcAType::RawType);
+    int32_t srcBType = static_cast<int32_t>(SrcBType::RawType);
+    return (srcAType | (srcBType << 3)) << VOP5M_MOD1_OFFSET;
+}
+
+// this field in mod1
+template <index_t ABlockSel, index_t BBlockSel>
+constexpr int32_t scale_select()
+{
+    return ((ABlockSel) | (BBlockSel << 2)) << (VOP5M_MOD1_OFFSET + 8);
+}
+
+// src: f8f6f4, dst: fp32
+template <index_t MPerWave,
+          index_t NPerWave,
+          typename SrcAType,
+          typename SrcBType,
+          index_t ABlockSel,
+          index_t BBlockSel,
+          bool clamp>
+struct intrin_wmma_f32_16x16_f8f6f4_w32;
+
+template <typename SrcAType, typename SrcBType, index_t ABlockSel, index_t BBlockSel, bool clamp>
+struct intrin_wmma_f32_16x16_f8f6f4_w32<16, 16, SrcAType, SrcBType, ABlockSel, BBlockSel, clamp>
+{
+    template <class FloatC>
+    __device__ static void Run(const typename SrcAType::vec_t& reg_a,
+                               const typename SrcBType::vec_t& reg_b,
+                               const int32_t& a_scale,
+                               const int32_t& b_scale,
+                               FloatC& reg_c)
+    {
+#if defined(__gfx13__)
+        reg_c.template AsType<float8_t>()(Number<0>{}) =
+            __builtin_amdgcn_wmma_f32_16x16x64_f8f6f4_clamp(
+                reg_a,
+                reg_b,
+                reg_c.template AsType<float8_t>()[Number<0>{}],
+                a_scale,
+                b_scale,
+                get_f8f6f4_data_format<SrcAType, SrcBType>() | scale_select<ABlockSel, BBlockSel>(),
+                clamp);
+#else
+        ignore = reg_a;
+        ignore = reg_b;
+        ignore = reg_c;
+#endif
+    }
+};
+
 template <bool neg_a, bool neg_b, bool clamp>
 struct intrin_wmma_f32_16x16_iu8iu8_w32<16, 16, neg_a, neg_b, clamp, 2>
 {

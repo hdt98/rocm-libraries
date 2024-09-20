@@ -90,6 +90,54 @@ bool run_test()
 
     return pass ? 1 : 0;
 }
+
+template <typename GPUSrc0Type,
+          typename GPUSrc1Type,
+          typename CPUSrc0Type,
+          typename CPUSrc1Type,
+          typename DstType,
+          typename GPUAccType,
+          typename CPUAccType,
+          ck::index_t AScaleSel,
+          ck::index_t BScaleSel>
+bool run_mixedfp_test()
+{
+    using Row         = ck::tensor_layout::gemm::RowMajor;
+    using Col         = ck::tensor_layout::gemm::ColumnMajor;
+    using PassThrough = ck::tensor_operation::element_wise::PassThrough;
+    bool pass         = true;
+    if(!ck::is_gfx13_supported())
+        return true;
+    // will change to mixed format
+    const auto matmul_default = ck::wmma_op_util::
+        matmul_mixedfp<GPUSrc0Type, GPUSrc1Type, AScaleSel, BScaleSel, DstType, GPUAccType>;
+
+    const auto wmma_kernel_container = std::make_tuple(matmul_default);
+    ck::wmma_op_util::GemmParams gemmParams{16, 16, 64, 64, 64, 16, 1.f, 0.f};
+
+    ck::static_for<0, 1, 1>{}([&](auto i) {
+        pass &= ck::wmma_op_util::TestMixedFPWmma<
+            decltype(std::get<ck::Number<i>{}>(wmma_kernel_container)),
+            GPUSrc0Type,
+            GPUSrc1Type,
+            CPUSrc0Type,
+            CPUSrc1Type,
+            DstType,
+            GPUAccType,
+            CPUAccType,
+            decltype(Row{}),
+            decltype(Col{}),
+            decltype(Row{}),
+            PassThrough,
+            PassThrough,
+            PassThrough,
+            AScaleSel,
+            BScaleSel>{}(std::get<ck::Number<i>{}>(wmma_kernel_container), gemmParams);
+    });
+
+    return pass ? 1 : 0;
+}
+
 int main(int, char*[])
 {
     bool pass = true;
@@ -139,6 +187,45 @@ int main(int, char*[])
     pass &= run_test<ck::int4_t,  ck::int4_t,   float,       int32_t,     int32_t,          2>();
     pass &= run_test<ck::int4_t,  ck::int4_t,   float,       int32_t,     int32_t,          4>();
     #endif
+    pass &= run_mixedfp_test</*DeviceAType*/ck::MxType_t<ck::MTX_FMT::MTX_FMT_FP8_E4M3>,
+                             /*DeviceBType*/ck::MxType_t<ck::MTX_FMT::MTX_FMT_FP8_E5M2>,
+                             /*HostAType*/  float,
+                             /*HostBType*/  float,
+                             /*DstType*/    float,
+                             /*GPUAccType*/ float,
+                             /*CPUAccType*/ float,
+                             /*AScaleSel*/  0,
+                             /*BScaleSel*/  0>();
+
+    pass &= run_mixedfp_test</*DeviceAType*/ck::MxType_t<ck::MTX_FMT::MTX_FMT_FP8_E5M2>,
+                             /*DeviceBType*/ck::MxType_t<ck::MTX_FMT::MTX_FMT_FP8_E4M3>,
+                             /*HostAType*/  float,
+                             /*HostBType*/  float,
+                             /*DstType*/    float,
+                             /*GPUAccType*/ float,
+                             /*CPUAccType*/ float,
+                             /*AScaleSel*/  0,
+                             /*BScaleSel*/  1>();
+
+    pass &= run_mixedfp_test</*DeviceAType*/ck::MxType_t<ck::MTX_FMT::MTX_FMT_FP8_E4M3>,
+                             /*DeviceBType*/ck::MxType_t<ck::MTX_FMT::MTX_FMT_FP8_E4M3>,
+                             /*HostAType*/  float,
+                             /*HostBType*/  float,
+                             /*DstType*/    float,
+                             /*GPUAccType*/ float,
+                             /*CPUAccType*/ float,
+                             /*AScaleSel*/  1,
+                             /*BScaleSel*/  1>();
+    
+    pass &= run_mixedfp_test</*DeviceAType*/ck::MxType_t<ck::MTX_FMT::MTX_FMT_FP8_E4M3>,
+                             /*DeviceBType*/ck::MxType_t<ck::MTX_FMT::MTX_FMT_FP8_E4M3>,
+                             /*HostAType*/  float,
+                             /*HostBType*/  float,
+                             /*DstType*/    float,
+                             /*GPUAccType*/ float,
+                             /*CPUAccType*/ float,
+                             /*AScaleSel*/  1,
+                             /*BScaleSel*/  0>();
     // clang-format on
 
     std::cout << "TestGemm ..... " << (pass ? "SUCCESS" : "FAILURE") << std::endl;

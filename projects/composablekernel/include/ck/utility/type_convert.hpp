@@ -576,4 +576,123 @@ inline __host__ __device__ constexpr bhalf_t bf16_convert_rtn<bhalf_t, half_t>(h
 
     return bf16_convert_rtn<bhalf_t>(x_fp32);
 }
+
+// the below is used to convert from fp32 to mx format
+template <typename DstT>
+static inline __host__ __device__ typename DstT::type_t convertFromFp32(float x)
+{
+    constexpr int32_t exponent_nbits_dst = ck::NumericUtils<DstT>::exp;
+    constexpr int32_t mantissa_nbits_dst = ck::NumericUtils<DstT>::mant;
+    constexpr int32_t exp_bias_dst       = (1 << (exponent_nbits_dst - 1)) - 1;
+
+    constexpr int32_t exponent_nbits_fp32 = 8;
+    constexpr int32_t mantissa_nbits_fp32 = 23;
+    constexpr int32_t exp_bias_fp32       = (1 << (exponent_nbits_fp32 - 1)) - 1;
+
+    float absmin_nonzero_dst = ck::NumericUtils<DstT>::absmin_nonzero;
+    float absmax_dst         = ck::NumericUtils<DstT>::absmax;
+    float abs_x              = abs(x);
+    float nearest_abs_x;
+    // for nonzero and less than absmin_nonzero_dst or greater than absmax_dst, round to nearest dst
+    // value
+    if(abs_x != 0 && abs_x < absmin_nonzero_dst)
+    {
+        nearest_abs_x = abs_x < (absmin_nonzero_dst / 2.0) ? 0 : absmin_nonzero_dst;
+    }
+    else if(abs_x > absmax_dst)
+    {
+        nearest_abs_x = absmax_dst;
+    }
+    else
+    {
+        nearest_abs_x = abs_x;
+    }
+    float nearest_x        = x > 0 ? nearest_abs_x : -nearest_abs_x;
+    int32_t source_promote = *(int32_t*)&nearest_x;
+    int sign_bit           = source_promote >> 31;
+    int exp_bit            = (source_promote & 0x7fffffff) >> mantissa_nbits_fp32;
+    int mant_bit           = source_promote & ((1 << mantissa_nbits_fp32) - 1);
+    int new_exp_bit;
+    int new_mant_bit;
+    if(exp_bit == 0)
+    {
+        // subnormal fp32 number, too small for dst type
+        new_exp_bit  = 0;
+        new_mant_bit = 0;
+    }
+    else
+    {
+        new_mant_bit = mant_bit >> (mantissa_nbits_fp32 - mantissa_nbits_dst);
+        new_exp_bit  = exp_bit - exp_bias_fp32 + exp_bias_dst;
+
+        // Deal with subnormal dst values.
+        int target_exp_val  = exp_bit - exp_bias_fp32;
+        int min_dst_exp_val = -exp_bias_dst + 1;
+        bool subnormal_dst  = target_exp_val < min_dst_exp_val;
+        if(subnormal_dst)
+        {
+            new_exp_bit = 0;
+            new_mant_bit =
+                (new_mant_bit | (1 << mantissa_nbits_dst)) >> (min_dst_exp_val - target_exp_val);
+        }
+    }
+    typename DstT::type_t res = sign_bit << (exponent_nbits_dst + mantissa_nbits_dst) |
+                                (new_exp_bit << mantissa_nbits_dst) | new_mant_bit;
+    return res;
+}
+// convert fp32 to fp6(E3M2)
+template <>
+inline __host__ __device__ MxType_t<MTX_FMT::MTX_FMT_FP6_E3M2>
+type_convert<MxType_t<MTX_FMT::MTX_FMT_FP6_E3M2>, float>(float x)
+{
+    return convertFromFp32<MxType_t<MTX_FMT::MTX_FMT_FP6_E3M2>>(x);
+}
+
+// convert fp32 to fp6(E2M3)
+template <>
+inline __host__ __device__ MxType_t<MTX_FMT::MTX_FMT_FP6_E2M3>
+type_convert<MxType_t<MTX_FMT::MTX_FMT_FP6_E2M3>, float>(float x)
+{
+    return convertFromFp32<MxType_t<MTX_FMT::MTX_FMT_FP6_E2M3>>(x);
+}
+
+// convert fp32 to fp4(E2M1)
+template <>
+inline __host__ __device__ MxType_t<MTX_FMT::MTX_FMT_FP4_E2M1>
+type_convert<MxType_t<MTX_FMT::MTX_FMT_FP4_E2M1>, float>(float x)
+{
+    return convertFromFp32<MxType_t<MTX_FMT::MTX_FMT_FP4_E2M1>>(x);
+}
+
+// convert fp32 to fp8(E4M3); now this format is using fp8
+template <>
+inline __host__ __device__ MxType_t<MTX_FMT::MTX_FMT_FP8_E4M3>
+type_convert<MxType_t<MTX_FMT::MTX_FMT_FP8_E4M3>, float>(float x)
+{
+    return type_convert<f8_t>(x);
+}
+
+// convert fp32 to fp8(E5M2); now this format is using bf8
+template <>
+inline __host__ __device__ MxType_t<MTX_FMT::MTX_FMT_FP8_E5M2>
+type_convert<MxType_t<MTX_FMT::MTX_FMT_FP8_E5M2>, float>(float x)
+{
+    return type_convert<bf8_t>(x);
+}
+
+// currently this function only supported call from host; convert to MX format
+template <typename DstT, typename SrcT>
+__host__ const std::vector<typename DstT::type_t> convert_utils(const std::vector<SrcT>& src_vec)
+{
+    std::vector<typename DstT::type_t> dst_vec;
+    std::size_t vec_size = src_vec.size();
+    for(std::size_t i = 0; i < vec_size; i++)
+    {
+        float tmp = type_convert<float>(src_vec[i]); // only support convert from float; currently
+                                                     // most of time src_vec's data type is float.
+        dst_vec.push_back(type_convert<DstT>(tmp).m_data);
+    }
+
+    return DstT::compact_to_raw(dst_vec);
+}
 } // namespace ck
