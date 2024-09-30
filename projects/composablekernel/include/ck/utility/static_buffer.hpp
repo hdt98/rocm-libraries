@@ -11,13 +11,16 @@ namespace ck {
 template <AddressSpaceEnum AddressSpace,
           typename T,
           index_t N,
-          bool InvalidElementUseNumericalZeroValue> // TODO remove this bool, no longer needed
-struct StaticBuffer : public StaticallyIndexedArray<T, N>
+          bool InvalidElementUseNumericalZeroValue, // TODO remove this bool, no longer needed
+          typename StaticBufferBaseArray = StaticallyIndexedArray<T, N>>
+struct StaticBuffer : public StaticBufferBaseArray
 {
     using type = T;
-    using base = StaticallyIndexedArray<T, N>;
+    using base = StaticBufferBaseArray;
 
     __host__ __device__ constexpr StaticBuffer() : base{} {}
+
+    __host__ __device__ constexpr StaticBuffer(T* p) : base(p) {}
 
     template <typename... Ys>
     __host__ __device__ constexpr StaticBuffer& operator=(const Tuple<Ys...>& y)
@@ -190,6 +193,18 @@ template <AddressSpaceEnum AddressSpace, typename T, long_index_t N>
 __host__ __device__ constexpr auto make_static_buffer(LongNumber<N>)
 {
     return StaticBuffer<AddressSpace, T, N, true>{};
+}
+
+template <AddressSpaceEnum AddressSpace, typename T, index_t N>
+__host__ __device__ constexpr auto make_static_buffer_v3(Number<N>, T* data)
+{
+    return StaticBuffer<AddressSpace, T, N, true, StaticallyIndexedArray_v3<T, N>>(data);
+}
+
+template <AddressSpaceEnum AddressSpace, typename T, long_index_t N>
+__host__ __device__ constexpr auto make_static_buffer_v3(LongNumber<N>, T* data)
+{
+    return StaticBuffer<AddressSpace, T, N, true, StaticallyIndexedArray_v3<T, N>>(data);
 }
 
 } // namespace ck

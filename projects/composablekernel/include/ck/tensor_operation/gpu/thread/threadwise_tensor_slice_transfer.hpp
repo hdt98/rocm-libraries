@@ -45,9 +45,9 @@ struct ThreadwiseTensorSliceTransfer_v1r3
 
     using DstCoordStep = decltype(make_tensor_coordinate_step(DstDesc{}, Index{}));
 
-    __device__ constexpr ThreadwiseTensorSliceTransfer_v1r3(const DstDesc& dst_desc,
-                                                            const Index& dst_slice_origin_idx,
-                                                            const ElementwiseOperation& element_op)
+    constexpr ThreadwiseTensorSliceTransfer_v1r3(const DstDesc& dst_desc,
+                                                 const Index& dst_slice_origin_idx,
+                                                 const ElementwiseOperation& element_op)
         : dst_coord_(make_tensor_coordinate(dst_desc, dst_slice_origin_idx)),
           element_op_{element_op}
     {
@@ -63,11 +63,11 @@ struct ThreadwiseTensorSliceTransfer_v1r3
     }
 
     template <typename SrcSliceOriginIdx, typename SrcBuffer, typename DstBuffer>
-    __device__ void Run(const SrcDesc&,
-                        const SrcSliceOriginIdx&,
-                        const SrcBuffer& src_buf,
-                        const DstDesc& dst_desc,
-                        DstBuffer& dst_buf)
+    __device__ __host__ void Run(const SrcDesc&,
+                                 const SrcSliceOriginIdx&,
+                                 const SrcBuffer& src_buf,
+                                 const DstDesc& dst_desc,
+                                 DstBuffer& dst_buf)
     {
         static_assert(SrcDesc::IsKnownAtCompileTime(),
                       "wrong! SrcDesc need to known at compile-time");
@@ -111,7 +111,6 @@ struct ThreadwiseTensorSliceTransfer_v1r3
                     src_slice_origin_idx + idx_md + i * dst_scalar_step_in_vector);
 
                 DstData v;
-
                 // apply element-wise operation
                 element_op_(v, src_buf[Number<src_offset>{}]);
 
@@ -121,11 +120,13 @@ struct ThreadwiseTensorSliceTransfer_v1r3
             const bool is_dst_valid =
                 coordinate_has_valid_offset_assuming_visible_index_is_valid(dst_desc, dst_coord_);
 
+#ifdef __HIP_DEVICE_COMPILE__
             // copy data from dst_vector into dst_buf
             dst_buf.template Update<DstInMemOp, dst_vector_t>(
                 dst_coord_.GetOffset(),
                 is_dst_valid,
                 dst_vector.template AsType<dst_vector_t>()[Number<0>{}]);
+#endif
 
             if constexpr(idx_1d.value != num_access - 1)
             {
@@ -146,7 +147,7 @@ struct ThreadwiseTensorSliceTransfer_v1r3
         }
     }
 
-    __device__ static constexpr auto GetDstCoordinateResetStep()
+    __device__ __host__ static constexpr auto GetDstCoordinateResetStep()
     {
         constexpr auto dst_scalar_per_access = generate_sequence(
             detail::lambda_scalar_per_access<DstVectorDim, DstScalarPerVector>{}, Number<nDim>{});
@@ -276,18 +277,12 @@ struct ThreadwiseTensorSliceTransfer_v2
         constexpr auto num_access = SpaceFillingCurve::GetNumOfAccess();
 
         static_for<0, num_access, 1>{}([&](auto idx_1d) {
-            typename vector_type_maker<SrcData, SrcScalarPerVector>::type src_vector;
-
             using src_vector_t =
                 typename vector_type_maker<SrcData, SrcScalarPerVector>::type::type;
             constexpr auto src_data_idx = SpaceFillingCurve::GetIndex(idx_1d);
 
             const bool is_src_valid =
                 coordinate_has_valid_offset_assuming_visible_index_is_valid(src_desc, src_coord_);
-
-            // copy data from src_buf into src_vector
-            src_vector.template AsType<src_vector_t>()(Number<0>{}) =
-                src_buf.template Get<src_vector_t>(src_coord_.GetOffset(), is_src_valid);
 
             // copy data from src_vector into dst_buf
             if constexpr(InvalidElementAsNaN == false && std::is_same<SrcData, DstData>::value)
@@ -296,10 +291,19 @@ struct ThreadwiseTensorSliceTransfer_v2
                     dst_desc.CalculateOffset(to_multi_index(dst_slice_origin_idx) + src_data_idx);
                 src_vector_t* dst_buf_ptr =
                     reinterpret_cast<src_vector_t*>(&dst_buf(Number<dst_offset>{}));
-                *dst_buf_ptr = src_vector.template AsType<src_vector_t>()[Number<0>{}];
+                *dst_buf_ptr =
+                    src_buf.template Get<src_vector_t>(src_coord_.GetOffset(), is_src_valid);
+                // src_buf.template Read<src_vector_t>(src_coord_.GetOffset(), is_src_valid,
+                // dst_buf_ptr);
             }
             else
             {
+                typename vector_type_maker<SrcData, SrcScalarPerVector>::type src_vector;
+
+                // copy data from src_buf into src_vector
+                src_vector.template AsType<src_vector_t>()(Number<0>{}) =
+                    src_buf.template Get<src_vector_t>(src_coord_.GetOffset(), is_src_valid);
+
                 static_for<0, SrcScalarPerVector, 1>{}([&](auto i) {
                     constexpr index_t dst_offset =
                         dst_desc.CalculateOffset(to_multi_index(dst_slice_origin_idx) +
@@ -1018,7 +1022,7 @@ struct ThreadwiseTensorSliceTransfer_v4
 
     using SrcCoordStep = decltype(make_tensor_coordinate_step(SrcDesc{}, Index{}));
 
-    __device__ constexpr ThreadwiseTensorSliceTransfer_v4(const Index& src_ref_idx)
+    __device__ __host__ constexpr ThreadwiseTensorSliceTransfer_v4(const Index& src_ref_idx)
         : src_ref_coord_(make_tensor_coordinate(SrcDesc{}, src_ref_idx))
     {
         static_assert(SrcDesc::IsKnownAtCompileTime() && DstDesc::IsKnownAtCompileTime(),
@@ -1236,7 +1240,7 @@ struct ThreadwiseTensorSliceTransfer_StaticToStatic
 
     using Index = MultiIndex<nDim>;
 
-    __device__ constexpr ThreadwiseTensorSliceTransfer_StaticToStatic(
+    __host__ __device__ constexpr ThreadwiseTensorSliceTransfer_StaticToStatic(
         const ElementwiseOperation& element_op)
         : element_op_{element_op}
     {

@@ -190,10 +190,11 @@ struct BlockwiseConvWconv
     }
 
     // Default, Block buffer in LDS, thread level offset enabled
-    __device__ static auto CalculateWeiDataThreadOriginDataIndex()
+    __device__ __host__ static auto CalculateWeiDataThreadOriginDataIndex()
     {
         if constexpr(WeiDataEnableLds)
         {
+#ifdef __HIP_DEVICE_COMPILE__
             const auto wave_idx      = GetWaveIdx();
             const auto waveId_k      = wave_idx[I2];
             const auto wconv_wei_idx = wconv_conv.CalculateWeiDataThreadOriginDataIndex();
@@ -216,6 +217,9 @@ struct BlockwiseConvWconv
                                   wconv_wei_idx[I2],
                                   wconv_wei_idx[I3]);
             }
+#else
+            return make_tuple(0, 0, 0, 0, 0, 0);
+#endif
         }
         else
         {
@@ -223,10 +227,11 @@ struct BlockwiseConvWconv
         }
     }
 
-    __device__ static auto CalculateInDataThreadOriginDataIndex()
+    __device__ __host__ static auto CalculateInDataThreadOriginDataIndex()
     {
         if constexpr(InDataEnableLds)
         {
+#ifdef __HIP_DEVICE_COMPILE__
             const auto wave_idx          = GetWaveIdx();
             const auto waveId_h          = wave_idx[I0];
             const auto waveId_w          = wave_idx[I1];
@@ -239,6 +244,9 @@ struct BlockwiseConvWconv
                               wconv_in_data_idx[I0],
                               wconv_in_data_idx[I1],
                               wconv_in_data_idx[I2]);
+#else
+            return make_tuple(0, 0, 0, 0, 0, 0, 0);
+#endif
         }
         else
         {
@@ -286,10 +294,11 @@ struct BlockwiseConvWconv
     }
 
     template <typename AccBlockDesc_>
-    __host__ __device__ static constexpr auto GetAccBlockWaveDescriptor(const AccBlockDesc_&)
+    __host__ __device__ static constexpr auto
+    GetAccBlockWaveDescriptor(const AccBlockDesc_& accDesc)
     {
         return transform_tensor_descriptor(
-            AccBlockDesc_{},
+            accDesc,
             make_tuple(
                 make_unmerge_transform(make_tuple(Number<HPerBlock / HPerWconv>{},
                                                   Number<NumAccImageSubTiles>{},
@@ -303,8 +312,9 @@ struct BlockwiseConvWconv
             make_tuple(Sequence<0, 3, 4>{}, Sequence<1, 5>{}, Sequence<2, 6, 7>{}));
     }
 
-    __device__ static auto CalculateAccThreadOriginDataIndex()
+    __device__ __host__ static auto CalculateAccThreadOriginDataIndex()
     {
+#ifdef __HIP_DEVICE_COMPILE__
         const auto wave_idx          = GetWaveIdx();
         const auto wconv_in_data_idx = wconv_conv.CalculateAccThreadOriginDataIndex();
         const auto waveId_h          = wave_idx[I0];
@@ -319,6 +329,9 @@ struct BlockwiseConvWconv
                           wconv_in_data_idx[I2],
                           wconv_in_data_idx[I3],
                           wconv_in_data_idx[I4]);
+#else
+        return make_tuple(0, 0, 0, 0, 0, 0, 0, 0);
+#endif
     }
 
     using TupleWeiData = decltype(CalculateWeiDataThreadOriginDataIndex());

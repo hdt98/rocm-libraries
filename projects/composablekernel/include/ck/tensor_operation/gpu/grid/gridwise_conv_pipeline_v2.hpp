@@ -5,7 +5,10 @@
 
 #include "ck/utility/common_header.hpp"
 #include "ck/utility/loop_scheduler.hpp"
+#include "ck/utility/amd_semaphore.hpp"
 #include "ck/tensor_operation/gpu/thread/threadwise_tensor_slice_transfer.hpp"
+
+//#define ENABLE_WAVEGROUP_SEMAPHORE  1
 
 namespace ck {
 
@@ -47,21 +50,23 @@ struct GridwiseConvPipeline_v2<1, false, false>
                                const InDataBlockDesc& in_block_desc,
                                InDataBlockTransfer& in_blockwise_copy,
                                const InDataGridBuffer& in_grid_buf,
-                               InDataBlockBuffer&,
+                               InDataBlockBuffer& in_block_buf,
                                const InDataBlockTransferStep& in_block_copy_step,
                                const WeiDataGridDesc& wei_grid_desc,
                                const WeiDataBlockDesc& wei_block_desc,
                                WeiDataBlockTransfer& wei_blockwise_copy,
                                const WeiDataGridBuffer& wei_grid_buf,
-                               WeiDataBlockBuffer&,
+                               WeiDataBlockBuffer& wei_block_buf,
                                const WeiDataBlockTransferStep& wei_block_copy_step,
                                const BlockwiseConv& blockwise_conv,
                                AccumThreadBuffer& accum_thread_buf,
                                index_t num_loop)
     {
-
-        static __exp_amd_laneshared__ InDataBlockBuffer in_block_buf;
-        static __exp_amd_laneshared__ WeiDataBlockBuffer wei_block_buf;
+#if ENABLE_WAVEGROUP_SEMAPHORE
+        // sync between data load wave (0) and conv wave (1)
+        WavegroupSemaphore<1, 1> semaLoad;
+        WavegroupSemaphore<0, 1> semaRun;
+#endif
 
         constexpr index_t NumTap           = wei_blockwise_copy.Size();
         constexpr auto in_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0);
@@ -75,6 +80,13 @@ struct GridwiseConvPipeline_v2<1, false, false>
             // Initialize C
             accum_thread_buf.Clear();
         }
+#if ENABLE_WAVEGROUP_SEMAPHORE
+        semaLoad.init();
+        semaRun.init(1, 1, true);
+        // wait semaphor init
+        __syncthreads();
+
+#endif
 
         // main body
         if constexpr(HasMainLoop)
@@ -84,6 +96,9 @@ struct GridwiseConvPipeline_v2<1, false, false>
             {
                 if(get_wave_id_in_wavegroup() == 0)
                 {
+#if ENABLE_WAVEGROUP_SEMAPHORE
+                    semaRun.wait();
+#endif
                     static_for<0, NumTap, 1>{}([&](auto i) {
                         const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[i])
                             .Run(wei_grid_desc,
@@ -103,14 +118,27 @@ struct GridwiseConvPipeline_v2<1, false, false>
                             .MoveSrcSliceWindow(wei_grid_desc, wei_block_copy_step);
                     });
                     in_blockwise_copy.MoveSrcSliceWindow(in_grid_desc, in_block_copy_step);
+#if ENABLE_WAVEGROUP_SEMAPHORE
+                    semaLoad.signal();
                 }
-                __syncthreads();
 
                 if(get_wave_id_in_wavegroup() == 1)
                 {
-                    blockwise_conv.Run(wei_block_buf, in_block_buf, accum_thread_buf);
+                    semaLoad.wait();
+#else
                 }
                 __syncthreads();
+                if(get_wave_id_in_wavegroup() == 1)
+                {
+#endif
+                    blockwise_conv.Run(wei_block_buf, in_block_buf, accum_thread_buf);
+#if ENABLE_WAVEGROUP_SEMAPHORE
+                    semaRun.signal();
+                }
+#else
+                }
+                __syncthreads();
+#endif
                 ++i;
             } while(i < (num_loop - 1));
         }
@@ -119,6 +147,9 @@ struct GridwiseConvPipeline_v2<1, false, false>
         {
             if(get_wave_id_in_wavegroup() == 0)
             {
+#if ENABLE_WAVEGROUP_SEMAPHORE
+                semaRun.wait();
+#endif
                 static_for<0, NumTap, 1>{}([&](auto i) {
                     const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[i])
                         .Run(wei_grid_desc,
@@ -136,11 +167,19 @@ struct GridwiseConvPipeline_v2<1, false, false>
                         .MoveSrcSliceWindow(wei_grid_desc, wei_block_copy_step);
                 });
                 in_blockwise_copy.MoveSrcSliceWindow(in_grid_desc, in_block_copy_step);
+#if ENABLE_WAVEGROUP_SEMAPHORE
+                semaLoad.signal();
             }
-            __syncthreads();
 
             if(get_wave_id_in_wavegroup() == 1)
             {
+                semaLoad.wait();
+#else
+            }
+            __syncthreads();
+            if(get_wave_id_in_wavegroup() == 1)
+            {
+#endif
                 blockwise_conv.Run(wei_block_buf, in_block_buf, accum_thread_buf);
             }
         }

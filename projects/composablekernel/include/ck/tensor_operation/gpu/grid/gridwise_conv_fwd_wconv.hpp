@@ -68,6 +68,7 @@ __global__ void
                                                p_wei_grid + wei_batch_offset,
                                                p_acc_grid + acc_batch_offset,
                                                p_shared,
+                                               nullptr,
                                                in_grid_desc,
                                                wei_grid_desc,
                                                acc_grid_desc,
@@ -131,11 +132,14 @@ __global__ void __exp_amd_wavegroup_kernel(4, 32, 256, 1, 1)
         static_cast<long_index_t>(compute_ptr_offset_of_batch.GetEPtrOffset(g_idx)));
 
     __shared__ char p_shared[GridwiseOp::SharedMemTrait::lds_size];
+    static __exp_amd_laneshared__ char
+        p_lane_shared[GridwiseOp::LaneSharedMemTrait::lane_shared_size];
 
     GridwiseOp::template Run<HasMainBlockLoop>(p_in_grid + in_batch_offset,
                                                p_wei_grid + wei_batch_offset,
                                                p_acc_grid + acc_batch_offset,
                                                p_shared,
+                                               p_lane_shared,
                                                in_grid_desc,
                                                wei_grid_desc,
                                                acc_grid_desc,
@@ -225,7 +229,9 @@ struct GridwiseConv_Wconv
                                                  WPerWconv,
                                                  FilterSize,
                                                  DilationX,
-                                                 DilationY>{};
+                                                 DilationY,
+                                                 1,
+                                                 EnableWaveGroup>{};
 
     using GridwiseConvPipe =
         remove_cvref_t<decltype(GridwiseConvPipeline_Selector<NumConvCPrefetchStage,
@@ -554,6 +560,23 @@ struct GridwiseConv_Wconv
         {
             return false;
         }
+
+#if 0
+        // Tensor & transform debugging code
+        BlockwiseConv blockwise_conv = {};
+        auto& acc_thread_buf = blockwise_conv.GetAccumThreadBuffer();
+        const AccElementwiseOperation acc_element_op;
+        StoreAccData(acc_grid_desc,
+            nullptr,
+            acc_thread_buf,
+            blockwise_conv,
+            acc_element_op,
+            nullptr,
+            nullptr,
+            0,
+            0,
+            0);
+#endif
         return true;
     }
 
@@ -600,14 +623,59 @@ struct GridwiseConv_Wconv
                           wei_block_space_size_aligned * sizeof(WeiDataType));
     };
 
+    struct LaneSharedMemTrait
+    {
+        static constexpr auto max_lane_shared_align = 4;
+
+        static constexpr auto in_block_space_size_aligned =
+            EnableWaveGroup
+                ? math::integer_least_multiple(MakeInBlockDescriptor().GetElementSpaceSize(),
+                                               max_lane_shared_align)
+                : 0;
+        static constexpr auto wei_block_space_size_aligned =
+            EnableWaveGroup
+                ? math::integer_least_multiple(MakeWeiBlockDescriptor().GetElementSpaceSize(),
+                                               max_lane_shared_align)
+                : 0;
+
+        static constexpr auto in_block_space_offset  = 0;
+        static constexpr auto wei_block_space_offset = in_block_space_size_aligned;
+
+        static constexpr auto lane_shared_size = in_block_space_size_aligned * sizeof(InDataType) +
+                                                 wei_block_space_size_aligned * sizeof(WeiDataType);
+    };
+
     using DefaultBlock2CTileMap =
         remove_cvref_t<decltype(MakeDefaultBlock2CTileMap(AccGridDesc{}, 1, 1))>;
+
+    static constexpr auto in_block_desc  = MakeInBlockDescriptor();
+    static constexpr auto wei_block_desc = MakeWeiBlockDescriptor();
+    using BlockwiseConv                  = BlockwiseConvWconv<ThisThreadBlock,
+                                             WeiDataType,
+                                             InDataType,
+                                             AccDataType,
+                                             decltype(MakeWeiWaveDescriptor(wei_block_desc)),
+                                             decltype(MakeInWaveDescriptor(in_block_desc)),
+                                             HPerBlock,
+                                             WPerBlock,
+                                             CPerBlock,
+                                             KPerBlock,
+                                             HRepeat,
+                                             WRepeat,
+                                             HPerWconv,
+                                             WPerWconv,
+                                             FilterSize,
+                                             DilationX,
+                                             DilationY,
+                                             WeiEnableLds,
+                                             InEnableLds>;
 
     template <bool HasMainBlockLoop, typename Block2CTileMap = DefaultBlock2CTileMap>
     __device__ static void Run(const InDataType* __restrict__ p_in_grid,
                                const WeiDataType* __restrict__ p_wei_grid,
                                AccDataType* __restrict__ p_acc_grid,
                                void* __restrict__ p_shared,
+                               void* __restrict__ p_lane_shared,
                                const InGridDesc& in_grid_desc,
                                const WeiGridDesc& wei_grid_desc,
                                const AccGridDesc& acc_grid_desc,
@@ -622,8 +690,6 @@ struct GridwiseConv_Wconv
             p_in_grid, in_grid_desc.GetElementSpaceSize());
         const auto wei_grid_buf = make_dynamic_buffer<AddressSpaceEnum::Global>(
             p_wei_grid, wei_grid_desc.GetElementSpaceSize());
-        auto acc_grid_buf = make_dynamic_buffer<AddressSpaceEnum::Global>(
-            p_acc_grid, acc_grid_desc.GetElementSpaceSize());
 
         const auto in_grid_pad_desc  = MakeInGridPadDescriptor(in_grid_desc);
         const auto wei_grid_pad_desc = MakeWeiGridPadDescriptor(wei_grid_desc);
@@ -653,9 +719,7 @@ struct GridwiseConv_Wconv
         // BlockWise_Copy
         const auto C = in_grid_desc.GetLength(I2);
 
-        constexpr auto in_block_desc  = MakeInBlockDescriptor();
-        constexpr auto wei_block_desc = MakeWeiBlockDescriptor();
-        auto wave_idx                 = GetWconvWaveIdx<ThisThreadBlock,
+        auto wave_idx = GetWconvWaveIdx<ThisThreadBlock,
                                         HPerBlock,
                                         WPerBlock,
                                         HRepeat,
@@ -710,9 +774,6 @@ struct GridwiseConv_Wconv
             {
                 // Thread-wise copy
                 // H0 x W0 x C0 x H1 x H2 x W1 x C1
-                auto in_block_buf = make_static_buffer<AddressSpaceEnum::Vgpr, InDataType>(
-                    in_block_desc.GetElementSpaceSize());
-
                 auto indata_slice_origin_idx = wconv_conv.CalculateInDataThreadOriginDataIndex();
                 auto h0 = (h_block_data_idx_on_grid + wave_idx[I0] * HPerWave) / HPerWconv;
                 auto w0 = (w_block_data_idx_on_grid + wave_idx[I1] * WPerWave) / WPerWconv;
@@ -743,7 +804,22 @@ struct GridwiseConv_Wconv
                                          indata_slice_origin_idx[I0],
                                          indata_slice_origin_idx[I1],
                                          indata_slice_origin_idx[I2]));
-                return make_tuple(in_block_buf, in_blockwise_copy);
+
+                if constexpr(EnableWaveGroup)
+                {
+                    static_assert(LaneSharedMemTrait::in_block_space_offset == 0, "");
+                    return make_tuple(make_static_buffer_v3<AddressSpaceEnum::Vgpr, InDataType>(
+                                          in_block_desc.GetElementSpaceSize(),
+                                          static_cast<InDataType*>(p_lane_shared) +
+                                              LaneSharedMemTrait::in_block_space_offset),
+                                      in_blockwise_copy);
+                }
+                else
+                {
+                    return make_tuple(make_static_buffer<AddressSpaceEnum::Vgpr, InDataType>(
+                                          in_block_desc.GetElementSpaceSize()),
+                                      in_blockwise_copy);
+                }
             }
         };
 
@@ -808,8 +884,6 @@ struct GridwiseConv_Wconv
                                                          WPerWconv,
                                                          FilterSize>();
 
-                auto wei_block_buf = make_static_buffer<AddressSpaceEnum::Vgpr, WeiDataType>(
-                    wei_block_desc.GetElementSpaceSize());
                 auto wei_slice_origin_idx = wconv_conv.CalculateWeiDataThreadOriginDataIndex();
                 auto k0 = (k_block_data_idx_on_grid + wave_idx[I2] * KPerWave) / KPerWconv;
 
@@ -859,31 +933,27 @@ struct GridwiseConv_Wconv
                         }
                     },
                     Number<NumWeightTap>{});
-                return make_tuple(wei_block_buf, wei_blockwise_copy);
+
+                if constexpr(EnableWaveGroup)
+                {
+                    return make_tuple(make_static_buffer_v3<AddressSpaceEnum::Vgpr, WeiDataType>(
+                                          wei_block_desc.GetElementSpaceSize(),
+                                          static_cast<WeiDataType*>(p_lane_shared) +
+                                              LaneSharedMemTrait::wei_block_space_offset),
+                                      wei_blockwise_copy);
+                }
+                else
+                {
+                    return make_tuple(make_static_buffer<AddressSpaceEnum::Vgpr, WeiDataType>(
+                                          wei_block_desc.GetElementSpaceSize()),
+                                      wei_blockwise_copy);
+                }
             }
         };
 
         /*******************************************************************************/
         // CONV
-        auto blockwise_conv = BlockwiseConvWconv<ThisThreadBlock,
-                                                 WeiDataType,
-                                                 InDataType,
-                                                 AccDataType,
-                                                 decltype(MakeWeiWaveDescriptor(wei_block_desc)),
-                                                 decltype(MakeInWaveDescriptor(in_block_desc)),
-                                                 HPerBlock,
-                                                 WPerBlock,
-                                                 CPerBlock,
-                                                 KPerBlock,
-                                                 HRepeat,
-                                                 WRepeat,
-                                                 HPerWconv,
-                                                 WPerWconv,
-                                                 FilterSize,
-                                                 DilationX,
-                                                 DilationY,
-                                                 WeiEnableLds,
-                                                 InEnableLds>{};
+        BlockwiseConv blockwise_conv = {};
 
         // Prepare Register for Accum
         auto& acc_thread_buf = blockwise_conv.GetAccumThreadBuffer();
@@ -896,228 +966,151 @@ struct GridwiseConv_Wconv
         // Gridwise conv pipeline
         const index_t CBlockMainLoop = __builtin_amdgcn_readfirstlane(C / CPerBlock);
 
-        if constexpr(EnableWaveGroup)
-        {
-            auto in_block_buf      = in_block_trait()[I0];
-            auto in_blockwise_copy = in_block_trait()[I1];
+        auto in_block_buf      = in_block_trait()[I0];
+        auto in_blockwise_copy = in_block_trait()[I1];
 
-            auto wei_block_buf      = wei_block_trait()[I0];
-            auto wei_blockwise_copy = wei_block_trait()[I1];
-            GridwiseConvPipe::template Run<HasMainBlockLoop>(in_grid_pad_desc,
-                                                             in_block_desc,
-                                                             in_blockwise_copy,
-                                                             in_grid_buf,
-                                                             in_block_buf,
-                                                             in_block_slice_copy_step,
-                                                             wei_grid_pad_desc,
-                                                             wei_block_desc,
-                                                             wei_blockwise_copy,
-                                                             wei_grid_buf,
-                                                             wei_block_buf,
-                                                             wei_block_slice_copy_step,
-                                                             blockwise_conv,
-                                                             acc_thread_buf,
-                                                             CBlockMainLoop);
-        }
-        else
-        {
-            auto in_block_buf      = in_block_trait()[I0];
-            auto in_blockwise_copy = in_block_trait()[I1];
+        auto wei_block_buf      = wei_block_trait()[I0];
+        auto wei_blockwise_copy = wei_block_trait()[I1];
+        GridwiseConvPipe::template Run<HasMainBlockLoop>(in_grid_pad_desc,
+                                                         in_block_desc,
+                                                         in_blockwise_copy,
+                                                         in_grid_buf,
+                                                         in_block_buf,
+                                                         in_block_slice_copy_step,
+                                                         wei_grid_pad_desc,
+                                                         wei_block_desc,
+                                                         wei_blockwise_copy,
+                                                         wei_grid_buf,
+                                                         wei_block_buf,
+                                                         wei_block_slice_copy_step,
+                                                         blockwise_conv,
+                                                         acc_thread_buf,
+                                                         CBlockMainLoop);
 
-            auto wei_block_buf      = wei_block_trait()[I0];
-            auto wei_blockwise_copy = wei_block_trait()[I1];
-            GridwiseConvPipe::template Run<HasMainBlockLoop>(in_grid_pad_desc,
-                                                             in_block_desc,
-                                                             in_blockwise_copy,
-                                                             in_grid_buf,
-                                                             in_block_buf,
-                                                             in_block_slice_copy_step,
-                                                             wei_grid_pad_desc,
-                                                             wei_block_desc,
-                                                             wei_blockwise_copy,
-                                                             wei_grid_buf,
-                                                             wei_block_buf,
-                                                             wei_block_slice_copy_step,
-                                                             blockwise_conv,
-                                                             acc_thread_buf,
-                                                             CBlockMainLoop);
-        }
         /*******************************************************************************/
         // Store accum buffer
-        // Todo: replace it with ThreadwiseTensorSliceTransfer
-        if constexpr(AccEnableLds == false)
+        if((EnableWaveGroup == false) || (get_wave_id_in_wavegroup() == 1))
         {
-            const index_t laneId     = ThisThreadBlock::GetThreadId() & (WaveSize - 1);
-            const index_t accCompIdx = laneId * wconv_conv.GetNumAccumComponents() /
-                                       wconv_conv.GetNumSubTilesPerImageTile();
-            auto store_accum_buf = [&](index_t h0, index_t w0, index_t k0) {
-                static constexpr auto I0 = Number<0>{};
-                static constexpr auto I1 = Number<1>{};
-                static constexpr auto I2 = Number<2>{};
+            auto acc_grid_buf = make_dynamic_buffer<AddressSpaceEnum::Global>(
+                p_acc_grid, acc_grid_desc.GetElementSpaceSize());
 
-                const index_t acc_H_stride = acc_grid_desc.CalculateOffset(make_tuple(I1, I0, I0));
-                const index_t acc_W_stride = acc_grid_desc.CalculateOffset(make_tuple(I0, I1, I0));
-
-                const index_t subW = (accCompIdx / wconv_conv.GetNumOutputChannels()) % WPerWconv;
-                const index_t subH = (accCompIdx / wconv_conv.GetNumOutputChannels()) / WPerWconv;
-                using AccDataVec   = typename decltype(wconv_conv)::AccDataVec;
-                constexpr auto KRepeat = blockwise_conv.KRepeat;
-                const auto waveId      = blockwise_conv.GetWaveIdx();
-                static_for<0, HRepeat, 1>{}([&](auto h1) {
-                    static_for<0, WRepeat, 1>{}([&](auto w1) {
-                        static_for<0, KRepeat, 1>{}([&](auto k1) {
-                            constexpr auto accum_offset =
-                                (h1 * WRepeat * KRepeat + w1 * KRepeat + k1) *
-                                wconv_conv.GetNumAccumComponents();
-                            auto& c_vec =
-                                acc_thread_buf.GetVectorTypeReference(Number<accum_offset>{});
-                            if constexpr(wconv_conv.GetNumAccumComponents() == 4)
-                            {
-                                const index_t subK = accCompIdx % wconv_conv.GetNumOutputChannels();
-
-                                const index_t offset =
-                                    (h0 + waveId[I0] * HRepeat * HPerWconv + h1 * HPerWconv +
-                                     subH) *
-                                        acc_H_stride +
-                                    (w0 + waveId[I1] * WRepeat * WPerWconv + w1 * WPerWconv +
-                                     subW) *
-                                        acc_W_stride +
-                                    (k0 + waveId[I2] * KRepeat * KPerWconv + k1 * KPerWconv + subK);
-                                *(typename AccDataVec::type*)(p_acc_grid + offset) =
-                                    c_vec.template AsType<typename AccDataVec::type>()(Number<0>{});
-                            }
-                            else
-                            {
-                                static_assert(wconv_conv.GetNumAccumComponents() == 8,
-                                              "unexpected value");
-                                // ACO = 0, do swizzle after 4 channels.
-                                using AccSwizzleVec = typename vector_type<AccDataType, 4>::type;
-                                const index_t subK  = accCompIdx %
-                                                     wconv_conv.GetNumOutputChannels() /
-                                                     (wconv_conv.GetNumAccumComponents() * 2) *
-                                                     (wconv_conv.GetNumAccumComponents() * 2);
-                                const index_t offset =
-                                    (h0 + waveId[I0] * HRepeat * HPerWconv + h1 * HPerWconv +
-                                     subH) *
-                                        acc_H_stride +
-                                    (w0 + waveId[I1] * WRepeat * WPerWconv + w1 * WPerWconv +
-                                     subW) *
-                                        acc_W_stride +
-                                    (k0 + waveId[I2] * KRepeat * KPerWconv + k1 * KPerWconv + subK);
-
-                                index_t secOffset = 8;
-                                if constexpr(wconv_conv.GetNumSubTilesPerImageTile() > 1)
-                                {
-                                    secOffset = HPerWconv /
-                                                wconv_conv.GetNumSubTilesPerImageTile() *
-                                                acc_H_stride;
-                                }
-                                const index_t swizzleOffset = (laneId & 1) * 4;
-                                *(AccSwizzleVec*)(p_acc_grid + offset + swizzleOffset) =
-                                    c_vec.template AsType<AccSwizzleVec>()(Number<0>{});
-                                *(AccSwizzleVec*)(p_acc_grid + offset + swizzleOffset + secOffset) =
-                                    c_vec.template AsType<AccSwizzleVec>()(Number<1>{});
-                            }
-                        });
-                    });
-                });
-            };
-
-            if constexpr(EnableWaveGroup)
-            {
-                if(get_wave_id_in_wavegroup() == 1)
-                {
-                    store_accum_buf(h_block_data_idx_on_grid,
-                                    w_block_data_idx_on_grid,
-                                    k_block_data_idx_on_grid);
-                }
-            }
-            else
-            {
-                store_accum_buf(
-                    h_block_data_idx_on_grid, w_block_data_idx_on_grid, k_block_data_idx_on_grid);
-            }
-        }
-        else
-        {
             // C mapping in single thread.
             constexpr auto acc_thread_desc   = blockwise_conv.GetAccThreadDescriptor();
             constexpr auto acc_thread_length = blockwise_conv.GetAccThreadDescLength();
 
-            // C mapping in single block
-            // LDS descriptor, shuffle and write out in HRepeat x WRepeat x KRepeat times
-            constexpr auto acc_block_desc = GetAccBlockDescriptor();
-            constexpr auto acc_block_wave_desc =
-                blockwise_conv.GetAccBlockWaveDescriptor(acc_block_desc);
-
-            auto acc_block_buf = make_dynamic_buffer<AddressSpaceEnum::Lds>(
-                static_cast<AccDataType*>(p_shared) + SharedMemTrait::acc_block_space_offset,
-                SharedMemTrait::acc_block_space_size);
-
             // calculate origin of thread output tensor on global memory
-
             // blockwise conv acc starting index
             const auto acc_thread_mtx_on_block = blockwise_conv.CalculateAccThreadOriginDataIndex();
 
-            // Threadwise copy C from VGPR to LDS
-            auto acc_thread_copy_vgpr_to_lds =
-                ThreadwiseTensorSliceTransfer_v1r3<AccDataType,
-                                                   AccDataType,
-                                                   decltype(acc_thread_desc),
-                                                   decltype(acc_block_wave_desc),
-                                                   ck::tensor_operation::element_wise::PassThrough,
-                                                   decltype(acc_thread_length),
-                                                   Sequence<0, 1, 2, 3, 4, 5, 6, 7>,
-                                                   7,
-                                                   acc_thread_length[I7], // vector write pixel
-                                                   InMemoryDataOperationEnum::Set,
-                                                   1,
-                                                   true>{
-                    acc_block_wave_desc,
-                    acc_thread_mtx_on_block,
-                    ck::tensor_operation::element_wise::PassThrough{}};
+            if constexpr(AccEnableLds == false)
+            {
+                const auto acc_grid_wave_desc =
+                    blockwise_conv.GetAccBlockWaveDescriptor(acc_grid_desc);
 
-            // blockwise copy C from LDS to global
-            auto acc_block_copy_lds_to_global =
-                ThreadGroupTensorSliceTransfer_v6r1<ThisThreadBlock,
-                                                    AccElementwiseOperation,
-                                                    InMemoryDataOperationEnum::Set,
-                                                    Sequence<HPerBlock, WPerBlock, KPerBlock>,
-                                                    AccBlockTransferClusterLengths,
-                                                    Sequence<0, 1, 2>,
-                                                    AccDataType,
-                                                    AccDataType,
-                                                    decltype(acc_block_desc),
-                                                    decltype(acc_grid_desc),
-                                                    Sequence<0, 1, 2>,
-                                                    2,
-                                                    AccBlockTransferScalarPerVector,
-                                                    true,
-                                                    false>{
-                    acc_block_desc,
-                    make_multi_index(0, 0, 0),
-                    acc_grid_desc,
-                    make_multi_index(h_block_data_idx_on_grid,
-                                     w_block_data_idx_on_grid,
-                                     k_block_data_idx_on_grid),
-                    acc_element_op};
+                // Threadwise copy C from VGPR to global memory
+                auto acc_thread_copy_vgpr_to_global =
+                    ThreadwiseTensorSliceTransfer_v1r3<AccDataType,
+                                                       AccDataType,
+                                                       decltype(acc_thread_desc),
+                                                       decltype(acc_grid_wave_desc),
+                                                       AccElementwiseOperation,
+                                                       decltype(acc_thread_length),
+                                                       Sequence<0, 1, 2, 3, 4, 5, 6, 7>,
+                                                       7,
+                                                       acc_thread_length[I7], // vector write pixel
+                                                       InMemoryDataOperationEnum::Set,
+                                                       1,
+                                                       true>{
+                        acc_grid_wave_desc,
+                        acc_thread_mtx_on_block +
+                            make_multi_index(h_block_data_idx_on_grid / HPerWconv,
+                                             w_block_data_idx_on_grid / WPerWconv,
+                                             k_block_data_idx_on_grid / KPerWconv,
+                                             I0,
+                                             I0,
+                                             I0,
+                                             I0,
+                                             I0),
+                        acc_element_op};
 
-            // make sure it's safe to write to LDS
-            block_sync_lds();
+                // each thread write its data from VGPR to global
+                acc_thread_copy_vgpr_to_global.Run(acc_thread_desc,
+                                                   make_tuple(I0, I0, I0, I0, I0, I0, I0, I0),
+                                                   acc_thread_buf,
+                                                   acc_grid_wave_desc,
+                                                   acc_grid_buf);
+            }
+            else
+            {
+                // C mapping in single block
+                // LDS descriptor, shuffle and write out in HRepeat x WRepeat x KRepeat times
+                constexpr auto acc_block_desc = GetAccBlockDescriptor();
+                constexpr auto acc_block_wave_desc =
+                    blockwise_conv.GetAccBlockWaveDescriptor(acc_block_desc);
 
-            // each thread write its data from VGPR to LDS
-            acc_thread_copy_vgpr_to_lds.Run(acc_thread_desc,
-                                            make_tuple(I0, I0, I0, I0, I0, I0, I0, I0),
-                                            acc_thread_buf,
-                                            acc_block_wave_desc,
-                                            acc_block_buf);
+                auto acc_block_buf = make_dynamic_buffer<AddressSpaceEnum::Lds>(
+                    static_cast<AccDataType*>(p_shared) + SharedMemTrait::acc_block_space_offset,
+                    SharedMemTrait::acc_block_space_size);
 
-            // make sure it's safe to read from LDS
-            block_sync_lds();
+                // Threadwise copy C from VGPR to LDS
+                auto acc_thread_copy_vgpr_to_lds = ThreadwiseTensorSliceTransfer_v1r3<
+                    AccDataType,
+                    AccDataType,
+                    decltype(acc_thread_desc),
+                    decltype(acc_block_wave_desc),
+                    ck::tensor_operation::element_wise::PassThrough,
+                    decltype(acc_thread_length),
+                    Sequence<0, 1, 2, 3, 4, 5, 6, 7>,
+                    7,
+                    acc_thread_length[I7], // vector write pixel
+                    InMemoryDataOperationEnum::Set,
+                    1,
+                    true>{acc_block_wave_desc,
+                          acc_thread_mtx_on_block,
+                          ck::tensor_operation::element_wise::PassThrough{}};
 
-            // each block copy its data from LDS to global
-            acc_block_copy_lds_to_global.Run(
-                acc_block_desc, acc_block_buf, acc_grid_desc, acc_grid_buf);
+                // blockwise copy C from LDS to global
+                auto acc_block_copy_lds_to_global =
+                    ThreadGroupTensorSliceTransfer_v6r1<ThisThreadBlock,
+                                                        AccElementwiseOperation,
+                                                        InMemoryDataOperationEnum::Set,
+                                                        Sequence<HPerBlock, WPerBlock, KPerBlock>,
+                                                        AccBlockTransferClusterLengths,
+                                                        Sequence<0, 1, 2>,
+                                                        AccDataType,
+                                                        AccDataType,
+                                                        decltype(acc_block_desc),
+                                                        decltype(acc_grid_desc),
+                                                        Sequence<0, 1, 2>,
+                                                        2,
+                                                        AccBlockTransferScalarPerVector,
+                                                        true,
+                                                        false>{
+                        acc_block_desc,
+                        make_multi_index(0, 0, 0),
+                        acc_grid_desc,
+                        make_multi_index(h_block_data_idx_on_grid,
+                                         w_block_data_idx_on_grid,
+                                         k_block_data_idx_on_grid),
+                        acc_element_op};
+
+                // make sure it's safe to write to LDS
+                block_sync_lds();
+
+                // each thread write its data from VGPR to LDS
+                acc_thread_copy_vgpr_to_lds.Run(acc_thread_desc,
+                                                make_tuple(I0, I0, I0, I0, I0, I0, I0, I0),
+                                                acc_thread_buf,
+                                                acc_block_wave_desc,
+                                                acc_block_buf);
+
+                // make sure it's safe to read from LDS
+                block_sync_lds();
+
+                // each block copy its data from LDS to global
+                acc_block_copy_lds_to_global.Run(
+                    acc_block_desc, acc_block_buf, acc_grid_desc, acc_grid_buf);
+            }
         }
     }
 };

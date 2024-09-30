@@ -675,7 +675,7 @@ struct WconvConv
 
     static __device__ index_t GetLaneId()
     {
-        if constexpr(WaveGroup)
+        if constexpr(WaveGroup == false)
         {
             return get_thread_local_1d_id() & (WaveSize - 1);
         }
