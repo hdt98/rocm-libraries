@@ -64,6 +64,7 @@ template <index_t NDimSpatial,
           typename AccBlockTransferClusterLengths,
           index_t AccBlockTransferScalarPerVector,
           bool AccEnableLds,
+          bool EnableAsync,
           bool EnableWaveGroup>
 struct DeviceConvWconv : public DeviceGroupedConvFwd<NDimSpatial,
                                                      InLayout,
@@ -201,6 +202,7 @@ struct DeviceConvWconv : public DeviceGroupedConvFwd<NDimSpatial,
                                             AccBlockTransferClusterLengths,
                                             AccBlockTransferScalarPerVector,
                                             AccEnableLds,
+                                            EnableAsync,
                                             NumPrefetch,
                                             EnableWaveGroup>;
 
@@ -658,12 +660,6 @@ struct DeviceConvWconv : public DeviceGroupedConvFwd<NDimSpatial,
     std::string GetTypeString() const override
     {
         auto str = std::stringstream();
-
-        std::map<LoopScheduler, std::string> LoopSchedToString{
-            {LoopScheduler::Default, "Default"}, {LoopScheduler::Interwave, "Interwave"}};
-
-        std::map<PipelineVersion, std::string> PipelineVersionToString{{PipelineVersion::v1, "v1"},
-                                                                       {PipelineVersion::v2, "v2"}};
 
         // clang-format off
         str << "DeviceConvWconv"

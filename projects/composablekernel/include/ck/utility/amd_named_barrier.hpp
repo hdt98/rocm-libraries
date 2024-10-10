@@ -14,10 +14,10 @@ template <unsigned NameId>
 class NamedBarrier
 {
     public:
-    __device__ void init(unsigned count)
+    __device__ void init(unsigned fakeId, unsigned count)
     {
 #if defined(__gfx13__)
-        __builtin_amdgcn_s_barrier_init(NameId, count);
+        __builtin_amdgcn_s_barrier_init(fakeId + NameId, count);
 #endif
     }
     __device__ void join()
@@ -36,6 +36,24 @@ class NamedBarrier
     {
 #if defined(__gfx13__)
         __builtin_amdgcn_s_barrier_signal_var(NameId);
+#endif
+    }
+
+    template <bool async>
+    __device__ void sync_lds()
+    {
+#if defined(__gfx13__)
+        if constexpr(async)
+        {
+            asm volatile("s_wait_asynccnt 0x0 " ::);
+        }
+        else
+        {
+            asm volatile("s_wait_dscnt 0x0 " ::);
+        }
+
+        signal();
+        wait();
 #endif
     }
 };

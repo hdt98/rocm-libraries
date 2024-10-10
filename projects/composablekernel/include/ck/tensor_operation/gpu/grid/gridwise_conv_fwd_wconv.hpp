@@ -8,12 +8,11 @@
 #include "ck/tensor_description/tensor_descriptor.hpp"
 #include "ck/tensor_description/tensor_descriptor_helper.hpp"
 #include "ck/tensor_operation/gpu/grid/block_to_ctile_map.hpp"
-#include "ck/tensor_operation/gpu/grid/gridwise_gemm_pipeline_selector.hpp"
 #include "ck/tensor_operation/gpu/grid/gridwise_conv_pipeline.hpp"
 #include "ck/tensor_operation/gpu/block/blockwise_conv_wconv.hpp"
 #include "ck/tensor_operation/gpu/block/thread_group_tensor_slice_transfer_v4r1.hpp"
-#include "ck/tensor_operation/gpu/block/thread_group_tensor_slice_transfer_v4r2.hpp"
 #include "ck/tensor_operation/gpu/block/thread_group_tensor_slice_transfer_v6r1.hpp"
+#include "ck/tensor_operation/gpu/block/thread_group_tensor_slice_transfer_async_load.hpp"
 #include "ck/tensor_operation/gpu/thread/threadwise_tensor_slice_transfer.hpp"
 #include "ck/tensor_operation/gpu/element/element_wise_operation.hpp"
 
@@ -133,7 +132,10 @@ __global__ void __exp_amd_wavegroup_kernel(4, 32, 256, 1, 1)
 
     __shared__ char p_shared[GridwiseOp::SharedMemTrait::lds_size];
     static __exp_amd_laneshared__ char
-        p_lane_shared[GridwiseOp::LaneSharedMemTrait::lane_shared_size];
+        p_lane_shared[GridwiseOp::LaneSharedMemTrait::lane_shared_size *
+                      GridwiseOp::template GetLaneSharedMemCount<HasMainBlockLoop>()];
+
+    static_assert(GridwiseOp::LaneSharedMemTrait::lane_shared_size <= 512 * 4, "");
 
     GridwiseOp::template Run<HasMainBlockLoop>(p_in_grid + in_batch_offset,
                                                p_wei_grid + wei_batch_offset,
@@ -196,6 +198,7 @@ template <index_t BlockSize,
           typename AccBlockTransferClusterLengths,
           index_t AccBlockTransferScalarPerVector,
           bool AccEnableLds,
+          bool EnableAsync,
           index_t NumConvCPrefetchStage,
           bool EnableWaveGroup>
 struct GridwiseConv_Wconv
@@ -237,6 +240,7 @@ struct GridwiseConv_Wconv
         remove_cvref_t<decltype(GridwiseConvPipeline_Selector<NumConvCPrefetchStage,
                                                               InEnableLds,
                                                               WeiEnableLds,
+                                                              EnableAsync,
                                                               EnableWaveGroup>())>;
 
     static constexpr index_t CPerWconv               = wconv_conv.GetNumInputChannels();
@@ -628,12 +632,12 @@ struct GridwiseConv_Wconv
         static constexpr auto max_lane_shared_align = 4;
 
         static constexpr auto in_block_space_size_aligned =
-            EnableWaveGroup
+            EnableWaveGroup && (InEnableLds == false)
                 ? math::integer_least_multiple(MakeInBlockDescriptor().GetElementSpaceSize(),
                                                max_lane_shared_align)
                 : 0;
         static constexpr auto wei_block_space_size_aligned =
-            EnableWaveGroup
+            EnableWaveGroup && (WeiEnableLds == false)
                 ? math::integer_least_multiple(MakeWeiBlockDescriptor().GetElementSpaceSize(),
                                                max_lane_shared_align)
                 : 0;
@@ -644,6 +648,12 @@ struct GridwiseConv_Wconv
         static constexpr auto lane_shared_size = in_block_space_size_aligned * sizeof(InDataType) +
                                                  wei_block_space_size_aligned * sizeof(WeiDataType);
     };
+
+    template <bool HasMainLoop>
+    static constexpr index_t GetLaneSharedMemCount()
+    {
+        return HasMainLoop ? 2 : 1;
+    }
 
     using DefaultBlock2CTileMap =
         remove_cvref_t<decltype(MakeDefaultBlock2CTileMap(AccGridDesc{}, 1, 1))>;
@@ -738,37 +748,59 @@ struct GridwiseConv_Wconv
                 using InBlockTransferAccessOrder               = Sequence<0, 1, 2>;
                 constexpr index_t InBlockTransferVectorDim     = 2;
 
-                auto in_blockwise_copy = ThreadGroupTensorSliceTransfer_v4r1<
-                    ThisThreadBlock,
-                    InElementwiseOperation,
-                    ck::tensor_operation::element_wise::PassThrough,
-                    InMemoryDataOperationEnum::Set,
-                    Sequence<HPerBlockIn, WPerBlockIn, CPerBlock>,
-                    InBlockTransferThreadClusterLengths,
-                    InBlockTransferThreadClusterArrangeOrder,
-                    InDataType,
-                    InDataType,
-                    decltype(in_grid_pad_desc),
-                    decltype(in_block_desc),
-                    InBlockTransferAccessOrder,
-                    InBlockTransferAccessOrder,
-                    InBlockTransferVectorDim,
-                    InBlockTransferVectorDim,
-                    InBlockTransferSrcScalarPerVector,
-                    InBlockTransferDstScalarPerVector,
-                    1,
-                    1,
-                    false,
-                    true,
-                    NumConvCPrefetchStage>(
-                    in_grid_pad_desc,
-                    make_multi_index(h_block_data_idx_on_grid, w_block_data_idx_on_grid, 0),
-                    in_element_op,
-                    in_block_desc,
-                    make_multi_index(0, 0, 0),
-                    ck::tensor_operation::element_wise::PassThrough{});
-
-                return make_tuple(in_block_buf, in_blockwise_copy);
+                if constexpr(EnableAsync)
+                {
+                    auto in_blockwise_copy = ThreadGroupTensorSliceTransfer_AsyncLoad<
+                        ThisThreadBlock,
+                        Sequence<HPerBlockIn, WPerBlockIn, CPerBlock>,
+                        InBlockTransferThreadClusterLengths,
+                        InBlockTransferThreadClusterArrangeOrder,
+                        InDataType,
+                        InDataType,
+                        decltype(in_grid_pad_desc),
+                        decltype(in_block_desc),
+                        InBlockTransferVectorDim,
+                        InBlockTransferVectorDim,
+                        InBlockTransferDstScalarPerVector>(
+                        in_grid_pad_desc,
+                        make_multi_index(h_block_data_idx_on_grid, w_block_data_idx_on_grid, 0),
+                        in_block_desc,
+                        make_multi_index(0, 0, 0));
+                    return make_tuple(in_block_buf, in_blockwise_copy);
+                }
+                else
+                {
+                    auto in_blockwise_copy = ThreadGroupTensorSliceTransfer_v4r1<
+                        ThisThreadBlock,
+                        InElementwiseOperation,
+                        ck::tensor_operation::element_wise::PassThrough,
+                        InMemoryDataOperationEnum::Set,
+                        Sequence<HPerBlockIn, WPerBlockIn, CPerBlock>,
+                        InBlockTransferThreadClusterLengths,
+                        InBlockTransferThreadClusterArrangeOrder,
+                        InDataType,
+                        InDataType,
+                        decltype(in_grid_pad_desc),
+                        decltype(in_block_desc),
+                        InBlockTransferAccessOrder,
+                        InBlockTransferAccessOrder,
+                        InBlockTransferVectorDim,
+                        InBlockTransferVectorDim,
+                        InBlockTransferSrcScalarPerVector,
+                        InBlockTransferDstScalarPerVector,
+                        1,
+                        1,
+                        false,
+                        true,
+                        NumConvCPrefetchStage>(
+                        in_grid_pad_desc,
+                        make_multi_index(h_block_data_idx_on_grid, w_block_data_idx_on_grid, 0),
+                        in_element_op,
+                        in_block_desc,
+                        make_multi_index(0, 0, 0),
+                        ck::tensor_operation::element_wise::PassThrough{});
+                    return make_tuple(in_block_buf, in_blockwise_copy);
+                }
             }
             else
             {
@@ -808,10 +840,11 @@ struct GridwiseConv_Wconv
                 if constexpr(EnableWaveGroup)
                 {
                     static_assert(LaneSharedMemTrait::in_block_space_offset == 0, "");
-                    return make_tuple(make_static_buffer_v3<AddressSpaceEnum::Vgpr, InDataType>(
+                    return make_tuple(make_static_buffer_v4<AddressSpaceEnum::Vgpr, InDataType>(
                                           in_block_desc.GetElementSpaceSize(),
                                           static_cast<InDataType*>(p_lane_shared) +
-                                              LaneSharedMemTrait::in_block_space_offset),
+                                              LaneSharedMemTrait::in_block_space_offset *
+                                                  GetLaneSharedMemCount<HasMainBlockLoop>()),
                                       in_blockwise_copy);
                 }
                 else
@@ -834,45 +867,77 @@ struct GridwiseConv_Wconv
                 using WeiBlockTransferAccessOrder               = Sequence<0, 1, 2>;
                 constexpr index_t WeiBlockTransferVectorDim     = 2;
 
-                using WeiThreadGroupTensorSliceTransfer = ThreadGroupTensorSliceTransfer_v4r1<
-                    ThisThreadBlock,
-                    WeiElementwiseOperation,
-                    ck::tensor_operation::element_wise::PassThrough,
-                    InMemoryDataOperationEnum::Set,
-                    Sequence<KPerBlock, 1, CPerBlock>,
-                    WeiBlockTransferThreadClusterLengths,
-                    WeiBlockTransferThreadClusterArrangeOrder,
-                    WeiDataType,
-                    WeiDataType,
-                    decltype(wei_grid_desc),
-                    decltype(wei_block_desc),
-                    WeiBlockTransferAccessOrder,
-                    WeiBlockTransferAccessOrder,
-                    WeiBlockTransferVectorDim,
-                    WeiBlockTransferVectorDim,
-                    WeiBlockTransferSrcScalarPerVector,
-                    WeiBlockTransferDstScalarPerVector,
-                    1,
-                    1,
-                    false,
-                    true,
-                    NumConvCPrefetchStage>;
+                if constexpr(EnableAsync)
+                {
+                    using WeiThreadGroupTensorSliceTransfer =
+                        ThreadGroupTensorSliceTransfer_AsyncLoad<
+                            ThisThreadBlock,
+                            Sequence<KPerBlock, 1, CPerBlock>,
+                            WeiBlockTransferThreadClusterLengths,
+                            WeiBlockTransferThreadClusterArrangeOrder,
+                            WeiDataType,
+                            WeiDataType,
+                            decltype(wei_grid_desc),
+                            decltype(wei_block_desc),
+                            WeiBlockTransferVectorDim,
+                            WeiBlockTransferVectorDim,
+                            WeiBlockTransferSrcScalarPerVector>;
 
-                auto wei_blockwise_copy = generate_tuple(
-                    [&](auto I) {
-                        return WeiThreadGroupTensorSliceTransfer(
-                            wei_grid_desc,
-                            make_multi_index(k_block_data_idx_on_grid, I, 0),
-                            wei_element_op,
-                            wei_block_desc,
-                            (FilterSize == 3)
-                                ? make_multi_index(0, wconv_conv.GetWeight3RemapTable()[I], 0)
-                                : make_multi_index(0, 0, 0),
-                            ck::tensor_operation::element_wise::PassThrough{});
-                    },
-                    NumberYX{});
+                    auto wei_blockwise_copy = generate_tuple(
+                        [&](auto I) {
+                            return WeiThreadGroupTensorSliceTransfer(
+                                wei_grid_desc,
+                                make_multi_index(k_block_data_idx_on_grid, I, 0),
+                                wei_block_desc,
+                                (FilterSize == 3)
+                                    ? make_multi_index(0, wconv_conv.GetWeight3RemapTable()[I], 0)
+                                    : make_multi_index(0, 0, 0));
+                        },
+                        NumberYX{});
 
-                return make_tuple(wei_block_buf, wei_blockwise_copy);
+                    return make_tuple(wei_block_buf, wei_blockwise_copy);
+                }
+                else
+                {
+                    using WeiThreadGroupTensorSliceTransfer = ThreadGroupTensorSliceTransfer_v4r1<
+                        ThisThreadBlock,
+                        WeiElementwiseOperation,
+                        ck::tensor_operation::element_wise::PassThrough,
+                        InMemoryDataOperationEnum::Set,
+                        Sequence<KPerBlock, 1, CPerBlock>,
+                        WeiBlockTransferThreadClusterLengths,
+                        WeiBlockTransferThreadClusterArrangeOrder,
+                        WeiDataType,
+                        WeiDataType,
+                        decltype(wei_grid_desc),
+                        decltype(wei_block_desc),
+                        WeiBlockTransferAccessOrder,
+                        WeiBlockTransferAccessOrder,
+                        WeiBlockTransferVectorDim,
+                        WeiBlockTransferVectorDim,
+                        WeiBlockTransferSrcScalarPerVector,
+                        WeiBlockTransferDstScalarPerVector,
+                        1,
+                        1,
+                        false,
+                        true,
+                        NumConvCPrefetchStage>;
+
+                    auto wei_blockwise_copy = generate_tuple(
+                        [&](auto I) {
+                            return WeiThreadGroupTensorSliceTransfer(
+                                wei_grid_desc,
+                                make_multi_index(k_block_data_idx_on_grid, I, 0),
+                                wei_element_op,
+                                wei_block_desc,
+                                (FilterSize == 3)
+                                    ? make_multi_index(0, wconv_conv.GetWeight3RemapTable()[I], 0)
+                                    : make_multi_index(0, 0, 0),
+                                ck::tensor_operation::element_wise::PassThrough{});
+                        },
+                        NumberYX{});
+                    return make_tuple(wei_block_buf, wei_blockwise_copy);
+                }
             }
             else
             {
@@ -936,10 +1001,11 @@ struct GridwiseConv_Wconv
 
                 if constexpr(EnableWaveGroup)
                 {
-                    return make_tuple(make_static_buffer_v3<AddressSpaceEnum::Vgpr, WeiDataType>(
+                    return make_tuple(make_static_buffer_v4<AddressSpaceEnum::Vgpr, WeiDataType>(
                                           wei_block_desc.GetElementSpaceSize(),
                                           static_cast<WeiDataType*>(p_lane_shared) +
-                                              LaneSharedMemTrait::wei_block_space_offset),
+                                              LaneSharedMemTrait::wei_block_space_offset *
+                                                  GetLaneSharedMemCount<HasMainBlockLoop>()),
                                       wei_blockwise_copy);
                 }
                 else

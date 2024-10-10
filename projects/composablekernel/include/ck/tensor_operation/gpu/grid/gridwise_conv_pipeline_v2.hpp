@@ -6,20 +6,17 @@
 #include "ck/utility/common_header.hpp"
 #include "ck/utility/loop_scheduler.hpp"
 #include "ck/utility/amd_semaphore.hpp"
+#include "ck/utility/amd_named_barrier.hpp"
+
 #include "ck/tensor_operation/gpu/thread/threadwise_tensor_slice_transfer.hpp"
 
-//#define ENABLE_WAVEGROUP_SEMAPHORE  1
-
 namespace ck {
-
-template <index_t NumPrefetch, bool InDataEnableLds, bool WeiDataEnableLds>
-struct GridwiseConvPipeline_v2;
-
-template <typename T>
-struct Debug;
-
-template <>
-struct GridwiseConvPipeline_v2<1, false, false>
+// Gridwise convolution pipeline with wavegroup enabled
+// wave 0: load data
+// wave 1: do convolution
+// NOTE: Prefetch doesn't supported when LDS is enabled.
+template <index_t NumPrefetch, bool InDataEnableLds, bool WeiDataEnableLds, bool EnableAsync>
+struct GridwiseConvPipeline_v2
 {
     static constexpr auto I0 = Number<0>{};
     static constexpr auto I1 = Number<1>{};
@@ -62,11 +59,14 @@ struct GridwiseConvPipeline_v2<1, false, false>
                                AccumThreadBuffer& accum_thread_buf,
                                index_t num_loop)
     {
-#if ENABLE_WAVEGROUP_SEMAPHORE
+
         // sync between data load wave (0) and conv wave (1)
-        WavegroupSemaphore<1, 1> semaLoad;
+        WavegroupSemaphore<1, 1> semaLoadIn;
+        WavegroupSemaphore<1, 2> semaLoadWei;
         WavegroupSemaphore<0, 1> semaRun;
-#endif
+
+        // sync for all wave with id = 0 in a group
+        NamedBarrier<1> barrierLds;
 
         constexpr index_t NumTap           = wei_blockwise_copy.Size();
         constexpr auto in_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0);
@@ -80,13 +80,55 @@ struct GridwiseConvPipeline_v2<1, false, false>
             // Initialize C
             accum_thread_buf.Clear();
         }
-#if ENABLE_WAVEGROUP_SEMAPHORE
-        semaLoad.init();
+
+        barrierLds.init(get_wave_id_in_wavegroup(), 4);
+        if(get_wave_id_in_wavegroup() == 0)
+        {
+            barrierLds.join();
+        }
+
+        semaLoadIn.init();
+        semaLoadWei.init();
         semaRun.init(1, 1, true);
-        // wait semaphor init
+        // wait semaphore, named-barrier init
         __syncthreads();
 
-#endif
+        // pre-fetch data
+        if(get_wave_id_in_wavegroup() == 0)
+        {
+            if constexpr(WeiDataEnableLds == false)
+            {
+                static_for<0, NumTap, 1>{}([&](auto i) {
+                    const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[i])
+                        .Run(wei_grid_desc,
+                             wei_grid_buf,
+                             wei_block_desc,
+                             make_tuple(I0, I0, wei_remap_table[i], I0, I0, I0),
+                             wei_block_buf);
+                });
+                if constexpr(HasMainLoop)
+                {
+                    static_for<0, NumTap, 1>{}([&](auto i) {
+                        const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[i])
+                            .MoveSrcSliceWindow(wei_grid_desc, wei_block_copy_step);
+                    });
+                    wei_block_buf.SwitchBuffer();
+                }
+                semaLoadWei.signal();
+            }
+
+            if constexpr(InDataEnableLds == false)
+            {
+                in_blockwise_copy.Run(
+                    in_grid_desc, in_grid_buf, in_block_desc, in_block_origin_idx, in_block_buf);
+                if constexpr(HasMainLoop)
+                {
+                    in_blockwise_copy.MoveSrcSliceWindow(in_grid_desc, in_block_copy_step);
+                    in_block_buf.SwitchBuffer();
+                }
+                semaLoadIn.signal();
+            }
+        }
 
         // main body
         if constexpr(HasMainLoop)
@@ -96,49 +138,96 @@ struct GridwiseConvPipeline_v2<1, false, false>
             {
                 if(get_wave_id_in_wavegroup() == 0)
                 {
-#if ENABLE_WAVEGROUP_SEMAPHORE
-                    semaRun.wait();
-#endif
-                    static_for<0, NumTap, 1>{}([&](auto i) {
-                        const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[i])
-                            .Run(wei_grid_desc,
-                                 wei_grid_buf,
-                                 wei_block_desc,
-                                 make_tuple(I0, I0, wei_remap_table[i], I0, I0, I0),
-                                 wei_block_buf);
-                    });
-                    in_blockwise_copy.Run(in_grid_desc,
-                                          in_grid_buf,
-                                          in_block_desc,
-                                          in_block_origin_idx,
-                                          in_block_buf);
+                    semaRun.wait();      // sync within wavegroup
+                    barrierLds.signal(); // sync in workgroup
+                    barrierLds.wait();
+                    if constexpr(WeiDataEnableLds)
+                    {
+                        if constexpr(EnableAsync)
+                        {
+                            static_for<0, NumTap, 1>{}([&](auto i) {
+                                const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[i])
+                                    .Run(
+                                        wei_grid_desc, wei_grid_buf, wei_block_desc, wei_block_buf);
+                            });
+                        }
+                        else
+                        {
+                            static_for<0, NumTap, 1>{}([&](auto i) {
+                                const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[i])
+                                    .RunRead(wei_grid_desc, wei_grid_buf);
+                            });
+                            static_for<0, NumTap, 1>{}([&](auto i) {
+                                const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[i])
+                                    .RunWrite(wei_block_desc, wei_block_buf);
+                            });
+                        }
+                    }
+                    else
+                    {
+                        static_for<0, NumTap, 1>{}([&](auto i) {
+                            const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[i])
+                                .Run(wei_grid_desc,
+                                     wei_grid_buf,
+                                     wei_block_desc,
+                                     make_tuple(I0, I0, wei_remap_table[i], I0, I0, I0),
+                                     wei_block_buf);
+                        });
+                        wei_block_buf.SwitchBuffer();
+                    }
+
+                    if constexpr(InDataEnableLds)
+                    {
+                        if constexpr(EnableAsync)
+                        {
+                            in_blockwise_copy.Run(
+                                in_grid_desc, in_grid_buf, in_block_desc, in_block_buf);
+                        }
+                        else
+                        {
+                            in_blockwise_copy.RunRead(in_grid_desc, in_grid_buf);
+                            in_blockwise_copy.RunWrite(in_block_desc, in_block_buf);
+                        }
+                    }
+                    else
+                    {
+                        in_blockwise_copy.Run(in_grid_desc,
+                                              in_grid_buf,
+                                              in_block_desc,
+                                              in_block_origin_idx,
+                                              in_block_buf);
+                        in_block_buf.SwitchBuffer();
+                    }
 
                     static_for<0, NumTap, 1>{}([&](auto i) {
                         const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[i])
                             .MoveSrcSliceWindow(wei_grid_desc, wei_block_copy_step);
                     });
                     in_blockwise_copy.MoveSrcSliceWindow(in_grid_desc, in_block_copy_step);
-#if ENABLE_WAVEGROUP_SEMAPHORE
-                    semaLoad.signal();
+
+                    barrierLds.sync_lds<EnableAsync>();
+
+                    semaLoadIn.signal();
+                    semaLoadWei.signal();
                 }
 
                 if(get_wave_id_in_wavegroup() == 1)
                 {
-                    semaLoad.wait();
-#else
-                }
-                __syncthreads();
-                if(get_wave_id_in_wavegroup() == 1)
-                {
-#endif
+                    semaLoadIn.wait();
+                    semaLoadWei.wait();
                     blockwise_conv.Run(wei_block_buf, in_block_buf, accum_thread_buf);
-#if ENABLE_WAVEGROUP_SEMAPHORE
+                    if constexpr(InDataEnableLds == false)
+                    {
+                        in_block_buf.SwitchBuffer();
+                    }
+                    if constexpr(WeiDataEnableLds == false)
+                    {
+                        wei_block_buf.SwitchBuffer();
+                    }
+
                     semaRun.signal();
                 }
-#else
-                }
-                __syncthreads();
-#endif
+
                 ++i;
             } while(i < (num_loop - 1));
         }
@@ -147,39 +236,403 @@ struct GridwiseConvPipeline_v2<1, false, false>
         {
             if(get_wave_id_in_wavegroup() == 0)
             {
-#if ENABLE_WAVEGROUP_SEMAPHORE
                 semaRun.wait();
-#endif
+                if constexpr(WeiDataEnableLds)
+                {
+                    if constexpr(EnableAsync)
+                    {
+                        static_for<0, NumTap, 1>{}([&](auto i) {
+                            const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[i])
+                                .Run(wei_grid_desc, wei_grid_buf, wei_block_desc, wei_block_buf);
+                        });
+                    }
+                    else
+                    {
+                        static_for<0, NumTap, 1>{}([&](auto i) {
+                            const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[i])
+                                .RunRead(wei_grid_desc, wei_grid_buf);
+                        });
+                        static_for<0, NumTap, 1>{}([&](auto i) {
+                            const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[i])
+                                .RunWrite(wei_block_desc, wei_block_buf);
+                        });
+                    }
+                }
+
+                if constexpr(InDataEnableLds)
+                {
+                    if constexpr(EnableAsync)
+                    {
+                        in_blockwise_copy.Run(
+                            in_grid_desc, in_grid_buf, in_block_desc, in_block_buf);
+                    }
+                    else
+                    {
+                        in_blockwise_copy.RunRead(in_grid_desc, in_grid_buf);
+                        in_blockwise_copy.RunWrite(in_block_desc, in_block_buf);
+                    }
+                }
+
+                barrierLds.sync_lds<EnableAsync>();
+                if constexpr(InDataEnableLds)
+                {
+                    semaLoadIn.signal();
+                }
+
+                if constexpr(WeiDataEnableLds)
+                {
+                    semaLoadWei.signal();
+                }
+            }
+
+            if(get_wave_id_in_wavegroup() == 1)
+            {
+                semaLoadIn.wait();
+                semaLoadWei.wait();
+                blockwise_conv.Run(wei_block_buf, in_block_buf, accum_thread_buf);
+            }
+        }
+    }
+};
+
+template <bool EnableAsync>
+struct GridwiseConvPipeline_v2<1, false, false, EnableAsync>
+{
+    static constexpr auto I0 = Number<0>{};
+    static constexpr auto I1 = Number<1>{};
+
+    __host__ __device__ static constexpr bool IsSupported(index_t /* num_loop */) { return true; }
+
+    __host__ __device__ static constexpr bool CalculateHasMainLoop(index_t num_loop)
+    {
+        return num_loop > 1;
+    }
+
+    template <bool HasMainLoop,
+              typename InDataGridDesc,
+              typename InDataBlockDesc,
+              typename InDataBlockTransfer,
+              typename InDataGridBuffer,
+              typename InDataBlockBuffer,
+              typename InDataBlockTransferStep,
+              typename WeiDataGridDesc,
+              typename WeiDataBlockDesc,
+              typename WeiDataBlockTransfer,
+              typename WeiDataGridBuffer,
+              typename WeiDataBlockBuffer,
+              typename WeiDataBlockTransferStep,
+              typename BlockwiseConv,
+              typename AccumThreadBuffer>
+    __device__ static void Run(const InDataGridDesc& in_grid_desc,
+                               const InDataBlockDesc& in_block_desc,
+                               InDataBlockTransfer& in_blockwise_copy,
+                               const InDataGridBuffer& in_grid_buf,
+                               InDataBlockBuffer& in_block_buf,
+                               const InDataBlockTransferStep& in_block_copy_step,
+                               const WeiDataGridDesc& wei_grid_desc,
+                               const WeiDataBlockDesc& wei_block_desc,
+                               WeiDataBlockTransfer& wei_blockwise_copy,
+                               const WeiDataGridBuffer& wei_grid_buf,
+                               WeiDataBlockBuffer& wei_block_buf,
+                               const WeiDataBlockTransferStep& wei_block_copy_step,
+                               const BlockwiseConv& blockwise_conv,
+                               AccumThreadBuffer& accum_thread_buf,
+                               index_t num_loop)
+    {
+        // sync between data load wave (0) and conv wave (1)
+        WavegroupSemaphore<1, 1> semaLoad;
+        WavegroupSemaphore<0, 1> semaRun;
+
+        constexpr index_t NumTap           = wei_blockwise_copy.Size();
+        constexpr auto in_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0);
+        constexpr auto wei_remap_table     = blockwise_conv.GetWeightRemapTable();
+
+        using WeiDataBlockTransfer0 =
+            std::remove_const_t<remove_cvref_t<decltype(wei_blockwise_copy[I0])>>;
+
+        if(get_wave_id_in_wavegroup() == 1)
+        {
+            // Initialize C
+            accum_thread_buf.Clear();
+        }
+
+        semaLoad.init();
+        semaRun.init(1, 1, true);
+        // wait semaphore init
+        __syncthreads();
+
+        // pre-fetch data
+        if(get_wave_id_in_wavegroup() == 0)
+        {
+            static_for<0, NumTap, 1>{}([&](auto i) {
+                const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[i])
+                    .Run(wei_grid_desc,
+                         wei_grid_buf,
+                         wei_block_desc,
+                         make_tuple(I0, I0, wei_remap_table[i], I0, I0, I0),
+                         wei_block_buf);
+            });
+
+            in_blockwise_copy.Run(
+                in_grid_desc, in_grid_buf, in_block_desc, in_block_origin_idx, in_block_buf);
+
+            if constexpr(HasMainLoop)
+            {
                 static_for<0, NumTap, 1>{}([&](auto i) {
                     const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[i])
-                        .Run(wei_grid_desc,
-                             wei_grid_buf,
-                             wei_block_desc,
-                             make_tuple(I0, I0, wei_remap_table[i], I0, I0, I0),
-                             wei_block_buf);
+                        .MoveSrcSliceWindow(wei_grid_desc, wei_block_copy_step);
                 });
+                in_blockwise_copy.MoveSrcSliceWindow(in_grid_desc, in_block_copy_step);
+                in_block_buf.SwitchBuffer();
+                wei_block_buf.SwitchBuffer();
+            }
 
-                in_blockwise_copy.Run(
-                    in_grid_desc, in_grid_buf, in_block_desc, in_block_origin_idx, in_block_buf);
+            semaLoad.signal();
+        }
+
+        // main body
+        if constexpr(HasMainLoop)
+        {
+            index_t i = 0;
+            do
+            {
+                if(get_wave_id_in_wavegroup() == 0)
+                {
+                    semaRun.wait();
+                    static_for<0, NumTap, 1>{}([&](auto i) {
+                        const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[i])
+                            .Run(wei_grid_desc,
+                                 wei_grid_buf,
+                                 wei_block_desc,
+                                 make_tuple(I0, I0, wei_remap_table[i], I0, I0, I0),
+                                 wei_block_buf);
+                    });
+                    wei_block_buf.SwitchBuffer();
+
+                    in_blockwise_copy.Run(in_grid_desc,
+                                          in_grid_buf,
+                                          in_block_desc,
+                                          in_block_origin_idx,
+                                          in_block_buf);
+                    in_block_buf.SwitchBuffer();
+
+                    static_for<0, NumTap, 1>{}([&](auto i) {
+                        const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[i])
+                            .MoveSrcSliceWindow(wei_grid_desc, wei_block_copy_step);
+                    });
+                    in_blockwise_copy.MoveSrcSliceWindow(in_grid_desc, in_block_copy_step);
+
+                    semaLoad.signal();
+                }
+
+                if(get_wave_id_in_wavegroup() == 1)
+                {
+                    semaLoad.wait();
+                    blockwise_conv.Run(wei_block_buf, in_block_buf, accum_thread_buf);
+                    in_block_buf.SwitchBuffer();
+                    wei_block_buf.SwitchBuffer();
+                    semaRun.signal();
+                }
+
+                ++i;
+            } while(i < (num_loop - 1));
+        }
+
+        // tail
+        {
+            if(get_wave_id_in_wavegroup() == 1)
+            {
+                semaLoad.wait();
+                blockwise_conv.Run(wei_block_buf, in_block_buf, accum_thread_buf);
+            }
+        }
+    }
+};
+
+template <bool EnableAsync>
+struct GridwiseConvPipeline_v2<1, true, true, EnableAsync>
+{
+    static constexpr auto I0 = Number<0>{};
+    static constexpr auto I1 = Number<1>{};
+
+    __host__ __device__ static constexpr bool IsSupported(index_t /* num_loop */) { return true; }
+
+    __host__ __device__ static constexpr bool CalculateHasMainLoop(index_t num_loop)
+    {
+        return num_loop > 1;
+    }
+
+    template <bool HasMainLoop,
+              typename InDataGridDesc,
+              typename InDataBlockDesc,
+              typename InDataBlockTransfer,
+              typename InDataGridBuffer,
+              typename InDataBlockBuffer,
+              typename InDataBlockTransferStep,
+              typename WeiDataGridDesc,
+              typename WeiDataBlockDesc,
+              typename WeiDataBlockTransfer,
+              typename WeiDataGridBuffer,
+              typename WeiDataBlockBuffer,
+              typename WeiDataBlockTransferStep,
+              typename BlockwiseConv,
+              typename AccumThreadBuffer>
+    __device__ static void Run(const InDataGridDesc& in_grid_desc,
+                               const InDataBlockDesc& in_block_desc,
+                               InDataBlockTransfer& in_blockwise_copy,
+                               const InDataGridBuffer& in_grid_buf,
+                               InDataBlockBuffer& in_block_buf,
+                               const InDataBlockTransferStep& in_block_copy_step,
+                               const WeiDataGridDesc& wei_grid_desc,
+                               const WeiDataBlockDesc& wei_block_desc,
+                               WeiDataBlockTransfer& wei_blockwise_copy,
+                               const WeiDataGridBuffer& wei_grid_buf,
+                               WeiDataBlockBuffer& wei_block_buf,
+                               const WeiDataBlockTransferStep& wei_block_copy_step,
+                               const BlockwiseConv& blockwise_conv,
+                               AccumThreadBuffer& accum_thread_buf,
+                               index_t num_loop)
+    {
+        // sync between data load wave (0) and conv wave (1)
+        WavegroupSemaphore<1, 1> semaLoad;
+        WavegroupSemaphore<0, 1> semaRun;
+        NamedBarrier<1> barrierLds;
+
+        constexpr index_t NumTap           = wei_blockwise_copy.Size();
+        constexpr auto in_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0);
+        constexpr auto wei_remap_table     = blockwise_conv.GetWeightRemapTable();
+
+        using WeiDataBlockTransfer0 =
+            std::remove_const_t<remove_cvref_t<decltype(wei_blockwise_copy[I0])>>;
+
+        if(get_wave_id_in_wavegroup() == 1)
+        {
+            // Initialize C
+            accum_thread_buf.Clear();
+        }
+
+        barrierLds.init(get_wave_id_in_wavegroup(), 4);
+        if(get_wave_id_in_wavegroup() == 0)
+        {
+            barrierLds.join();
+        }
+
+        semaLoad.init();
+        semaRun.init(1, 1, true);
+        // wait semaphore init
+        __syncthreads();
+
+        // main body
+        if constexpr(HasMainLoop)
+        {
+            index_t i = 0;
+            do
+            {
+                if(get_wave_id_in_wavegroup() == 0)
+                {
+                    semaRun.wait();
+                    barrierLds.signal();
+                    barrierLds.wait();
+                    if constexpr(EnableAsync)
+                    {
+                        static_for<0, NumTap, 1>{}([&](auto i) {
+                            const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[i])
+                                .Run(wei_grid_desc, wei_grid_buf, wei_block_desc, wei_block_buf);
+                        });
+                    }
+                    else
+                    {
+                        static_for<0, NumTap, 1>{}([&](auto i) {
+                            const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[i])
+                                .RunRead(wei_grid_desc, wei_grid_buf);
+                        });
+                        static_for<0, NumTap, 1>{}([&](auto i) {
+                            const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[i])
+                                .RunWrite(wei_block_desc, wei_block_buf);
+                        });
+                    }
+
+                    if constexpr(EnableAsync)
+                    {
+                        in_blockwise_copy.Run(
+                            in_grid_desc, in_grid_buf, in_block_desc, in_block_buf);
+                    }
+                    else
+                    {
+                        in_blockwise_copy.RunRead(in_grid_desc, in_grid_buf);
+                        in_blockwise_copy.RunWrite(in_block_desc, in_block_buf);
+                    }
+
+                    static_for<0, NumTap, 1>{}([&](auto i) {
+                        const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[i])
+                            .MoveSrcSliceWindow(wei_grid_desc, wei_block_copy_step);
+                    });
+                    in_blockwise_copy.MoveSrcSliceWindow(in_grid_desc, in_block_copy_step);
+                    barrierLds.sync_lds<EnableAsync>();
+
+                    semaLoad.signal();
+                }
+
+                if(get_wave_id_in_wavegroup() == 1)
+                {
+                    semaLoad.wait();
+                    blockwise_conv.Run(wei_block_buf, in_block_buf, accum_thread_buf);
+                    semaRun.signal();
+                }
+                ++i;
+            } while(i < (num_loop - 1));
+        }
+
+        // tail
+        {
+            if(get_wave_id_in_wavegroup() == 0)
+            {
+                semaRun.wait();
+                barrierLds.signal();
+                barrierLds.wait();
+                if constexpr(EnableAsync)
+                {
+                    static_for<0, NumTap, 1>{}([&](auto i) {
+                        const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[i])
+                            .Run(wei_grid_desc, wei_grid_buf, wei_block_desc, wei_block_buf);
+                    });
+                }
+                else
+                {
+                    static_for<0, NumTap, 1>{}([&](auto i) {
+                        const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[i])
+                            .RunRead(wei_grid_desc, wei_grid_buf);
+                    });
+                    static_for<0, NumTap, 1>{}([&](auto i) {
+                        const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[i])
+                            .RunWrite(wei_block_desc, wei_block_buf);
+                    });
+                }
+
+                if constexpr(EnableAsync)
+                {
+                    in_blockwise_copy.Run(in_grid_desc, in_grid_buf, in_block_desc, in_block_buf);
+                }
+                else
+                {
+                    in_blockwise_copy.RunRead(in_grid_desc, in_grid_buf);
+                    in_blockwise_copy.RunWrite(in_block_desc, in_block_buf);
+                }
 
                 static_for<0, NumTap, 1>{}([&](auto i) {
                     const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[i])
                         .MoveSrcSliceWindow(wei_grid_desc, wei_block_copy_step);
                 });
                 in_blockwise_copy.MoveSrcSliceWindow(in_grid_desc, in_block_copy_step);
-#if ENABLE_WAVEGROUP_SEMAPHORE
+
+                barrierLds.sync_lds<EnableAsync>();
+
                 semaLoad.signal();
             }
 
             if(get_wave_id_in_wavegroup() == 1)
             {
                 semaLoad.wait();
-#else
-            }
-            __syncthreads();
-            if(get_wave_id_in_wavegroup() == 1)
-            {
-#endif
                 blockwise_conv.Run(wei_block_buf, in_block_buf, accum_thread_buf);
             }
         }

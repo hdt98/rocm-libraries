@@ -36,6 +36,8 @@ using OutElementOp = ck::tensor_operation::element_wise::UnaryConvert;
 #define DEFAULT_C 32
 #define DEFAULT_W 8
 #define DEFAULT_H 16
+#define DEFAULT_W_1K 48
+#define DEFAULT_H_1K 32
 #else
 #define DEFAULT_C_REPEAT 1
 #define DEFAULT_K_REPEAT 1
@@ -75,7 +77,7 @@ template <typename InDataType,
           index_t Height,
           index_t UnpackedInputChannels,
           index_t UnpackedOutputChannels>
-__global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
+__global__ void __launch_bounds__(64, 1)
     conv_fwd(const InDataType* in_, const WeiDataType* wei_, AccDataType* c)
 {
     constexpr auto wconvConv = ck::WconvConv<WeiDataType,
@@ -826,8 +828,9 @@ bool run_test()
     constexpr ck::index_t DilationSize = Dilation ? 2 : 1;
 
 #if USE_ABSOLUTE_SIZE
-    constexpr ck::index_t Width          = DEFAULT_W;
-    constexpr ck::index_t Height         = DEFAULT_H;
+    constexpr bool CheckVgpr1024         = (TestMask & 0xC000) != 0;
+    constexpr ck::index_t Width          = CheckVgpr1024 ? DEFAULT_W_1K : DEFAULT_W;
+    constexpr ck::index_t Height         = CheckVgpr1024 ? DEFAULT_H_1K : DEFAULT_H;
     constexpr ck::index_t InputChannels  = DEFAULT_C;
     constexpr ck::index_t OutputChannels = DEFAULT_K;
 #else
@@ -1189,6 +1192,8 @@ int main(int argc, char* argv[])
     pass &= run_test_fmt<ck::bf8_t,   ck::bhalf_t, ck::half_t, 0x200 >();
     pass &= run_test_fmt<int8_t,      ck::half_t,  ck::half_t, 0x400 >();
 
+    pass &= run_test_fmt<ck::half_t,  float,       float,      0x4000>();
+    pass &= run_test_fmt<ck::half_t,  ck::half_t,  ck::half_t, 0x8000>();
 #if CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
     pass &= run_test_fmt<ck::int4_t,  float,       float     , 0x800 >();
     pass &= run_test_fmt<ck::int4_t,  int32_t,     int32_t   , 0x1000>();

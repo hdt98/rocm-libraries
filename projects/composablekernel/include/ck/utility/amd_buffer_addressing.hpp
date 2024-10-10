@@ -1130,14 +1130,23 @@ __device__ void amd_async_load_global_to_lds(const T* global_base_ptr,
                                              const bool is_valid,
                                              const index_t src_element_space_size)
 {
-    const index_t in_global_offset = is_valid ? global_offset : 0x80000000;
-    __attribute__((address_space(1))) const T* global_ptr =
-        reinterpret_cast<__attribute__((address_space(1))) T*>(
-            reinterpret_cast<uintptr_t>(global_base_ptr + in_global_offset));
-    __attribute__((address_space(3))) T* lds_ptr =
-        reinterpret_cast<__attribute__((address_space(3))) T*>(
-            reinterpret_cast<uintptr_t>(lds_base_ptr + lds_offset));
-    amd_async_copy_to_lds_impl<T, NumElemsPerThread, coherence>(global_ptr, lds_ptr);
+    if(is_valid)
+    {
+        const index_t in_global_offset = global_offset;
+        __attribute__((address_space(1))) const T* global_ptr =
+            reinterpret_cast<__attribute__((address_space(1))) T*>(
+                reinterpret_cast<uintptr_t>(global_base_ptr + in_global_offset));
+        __attribute__((address_space(3))) T* lds_ptr =
+            reinterpret_cast<__attribute__((address_space(3))) T*>(
+                reinterpret_cast<uintptr_t>(lds_base_ptr + lds_offset));
+        amd_async_copy_to_lds_impl<T, NumElemsPerThread, coherence>(global_ptr, lds_ptr);
+    }
+    else
+    {
+        using DstVecType    = typename vector_type_maker<T, NumElemsPerThread>::type;
+        DstVecType* lds_ptr = reinterpret_cast<DstVecType*>(lds_base_ptr + lds_offset);
+        *lds_ptr            = {};
+    }
 }
 
 } // namespace ck
