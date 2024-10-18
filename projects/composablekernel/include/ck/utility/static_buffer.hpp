@@ -196,6 +196,18 @@ __host__ __device__ constexpr auto make_static_buffer(LongNumber<N>)
 }
 
 template <AddressSpaceEnum AddressSpace, typename T, index_t N>
+__host__ __device__ constexpr auto make_static_buffer_v2(Number<N>)
+{
+    return StaticBuffer<AddressSpace, T, N, true, StaticallyIndexedArray_v2<T, N>>{};
+}
+
+template <AddressSpaceEnum AddressSpace, typename T, long_index_t N>
+__host__ __device__ constexpr auto make_static_buffer_v2(LongNumber<N>)
+{
+    return StaticBuffer<AddressSpace, T, N, true, StaticallyIndexedArray_v2<T, N>>{};
+}
+
+template <AddressSpaceEnum AddressSpace, typename T, index_t N>
 __host__ __device__ constexpr auto make_static_buffer_v3(Number<N>, T* data)
 {
     return StaticBuffer<AddressSpace, T, N, true, StaticallyIndexedArray_v3<T, N>>(data);

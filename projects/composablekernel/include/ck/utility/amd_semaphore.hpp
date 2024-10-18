@@ -27,6 +27,10 @@ class WavegroupSemaphore
             __builtin_amdgcn_s_setreg(SemaHwReg | (HwRegOffset << 6) | (HwRegBits << 11),
                                       count | (limit << 16) | (done << 28));
         }
+#else
+        ignore = count;
+        ignore = limit;
+        ignore = done;
 #endif
     }
 

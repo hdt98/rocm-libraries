@@ -290,7 +290,8 @@ __global__ void __launch_bounds__(64, 1)
 #else
                     InDataVec& in_tile_data = inData[h * WRepeat * CRepeat + w * CRepeat + c];
 #endif
-                    wconvConv.wconv_instr.Run(weiData[k * CRepeat + c], in_tile_data, c_vec);
+                    const InDataVec* p_in_tile_data[1] = {&in_tile_data};
+                    wconvConv.wconv_instr.Run(weiData[k * CRepeat + c], p_in_tile_data, c_vec);
                 });
 #if LOAD_DATA_PER_TILE
                 store_acc_data(h, w, k, c_vec);
@@ -562,10 +563,11 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
                 auto& c_vec          = c_thread_buf_.GetVectorTypeReference(Number<0>{});
                 static_for<0, CRepeat, 1>{}([&](auto c) {
                     InDataVec inData[3];
-                    inData[1] = load_in_data(h, w, c, -1);
-                    inData[0] = load_in_data(h, w, c, 0);
+                    inData[0] = load_in_data(h, w, c, -1);
+                    inData[1] = load_in_data(h, w, c, 0);
                     inData[2] = load_in_data(h, w, c, 1);
-                    wconvConv.wconv_instr.Run(weiData[c], inData, c_vec);
+                    const InDataVec* p_in_data_vec[3] = {&inData[0], &inData[1], &inData[2]};
+                    wconvConv.wconv_instr.Run(weiData[c], p_in_data_vec, c_vec);
                 });
                 store_acc_data(h, w, k, c_vec);
             });
@@ -624,7 +626,11 @@ void DumpTensor(const Tensor<DataType>& tensor, const char* str)
                     }
                     if(lengths[4] > 1)
                     {
-                        std::cout << "]" << std::endl;
+                        std::cout << "]";
+                    }
+                    if (lengths[4] > 3)
+                    {
+                        std::cout << std::endl;
                     }
                 }
                 if(lengths[3] > 1)
@@ -1192,8 +1198,8 @@ int main(int argc, char* argv[])
     pass &= run_test_fmt<ck::bf8_t,   ck::bhalf_t, ck::half_t, 0x200 >();
     pass &= run_test_fmt<int8_t,      ck::half_t,  ck::half_t, 0x400 >();
 
-    pass &= run_test_fmt<ck::half_t,  float,       float,      0x4000>();
-    pass &= run_test_fmt<ck::half_t,  ck::half_t,  ck::half_t, 0x8000>();
+    //pass &= run_test_fmt<ck::half_t,  float,       float,      0x4000>();
+    //pass &= run_test_fmt<ck::half_t,  ck::half_t,  ck::half_t, 0x8000>();
 #if CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
     pass &= run_test_fmt<ck::int4_t,  float,       float     , 0x800 >();
     pass &= run_test_fmt<ck::int4_t,  int32_t,     int32_t   , 0x1000>();

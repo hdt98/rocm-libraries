@@ -156,7 +156,7 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
                    make_unmerge_transform(
                        make_tuple(Number<CPerBlock / CPerWconv>{}, Number<CPerWconv>{}))),
         make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}),
-        make_tuple(Sequence<0, 3, 4>{}, Sequence<1, 5>{}, Sequence<2, 6>{}));
+        make_tuple(Sequence<2, 3, 4>{}, Sequence<0, 5>{}, Sequence<1, 6>{}));
 
     using ThisThreadBlock  = ThisThreadBlock<BlockSize>;
     auto blockwise_conv    = BlockwiseConvWconv<ThisThreadBlock,
@@ -452,7 +452,11 @@ void DumpTensor(const Tensor<DataType>& tensor, const char* str)
                     }
                     if(lengths[4] > 1)
                     {
-                        std::cout << "]" << std::endl;
+                        std::cout << "]";
+                    }
+                    if (lengths[4] > 3)
+                    {
+                        std::cout << std::endl;
                     }
                 }
                 if(lengths[3] > 1)

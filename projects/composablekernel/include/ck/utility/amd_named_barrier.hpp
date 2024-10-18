@@ -14,10 +14,12 @@ template <unsigned NameId>
 class NamedBarrier
 {
     public:
-    __device__ void init(unsigned fakeId, unsigned count)
+    __device__ void init(unsigned count)
     {
 #if defined(__gfx13__)
-        __builtin_amdgcn_s_barrier_init(fakeId + NameId, count);
+        __builtin_amdgcn_s_barrier_init(NameId, count);
+#else
+        ignore = count;
 #endif
     }
     __device__ void join()

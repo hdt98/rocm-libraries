@@ -50,17 +50,19 @@ struct GridwiseConvPipeline_v1<1, true, true, false>
                                InDataBlockTransfer& in_blockwise_copy,
                                const InDataGridBuffer& in_grid_buf,
                                InDataBlockBuffer& in_block_buf,
-                               const InDataBlockTransferStep& in_block_copy_step,
+                               const InDataBlockTransferStep&,
                                const WeiDataGridDesc& wei_grid_desc,
                                const WeiDataBlockDesc& wei_block_desc,
                                WeiDataBlockTransfer& wei_blockwise_copy,
                                const WeiDataGridBuffer& wei_grid_buf,
                                WeiDataBlockBuffer& wei_block_buf,
-                               const WeiDataBlockTransferStep& wei_block_copy_step,
+                               const WeiDataBlockTransferStep&,
                                const BlockwiseConv& blockwise_conv,
                                AccumThreadBuffer& accum_thread_buf,
                                index_t num_loop)
     {
+        constexpr auto wei_block_copy_step = to_multi_index(WeiDataBlockTransferStep{});
+        constexpr auto in_block_copy_step = to_multi_index(InDataBlockTransferStep{});
         constexpr index_t NumTap = wei_blockwise_copy.Size();
         using WeiDataBlockTransfer0 =
             std::remove_const_t<remove_cvref_t<decltype(wei_blockwise_copy[I0])>>;
@@ -167,17 +169,19 @@ struct GridwiseConvPipeline_v1<1, false, true, false>
                                InDataBlockTransfer& in_blockwise_copy,
                                const InDataGridBuffer& in_grid_buf,
                                InDataBlockBuffer& in_block_buf,
-                               const InDataBlockTransferStep& in_block_copy_step,
+                               const InDataBlockTransferStep&,
                                const WeiDataGridDesc& wei_grid_desc,
                                const WeiDataBlockDesc& wei_block_desc,
                                WeiDataBlockTransfer& wei_blockwise_copy,
                                const WeiDataGridBuffer& wei_grid_buf,
                                WeiDataBlockBuffer& wei_block_buf,
-                               const WeiDataBlockTransferStep& wei_block_copy_step,
+                               const WeiDataBlockTransferStep&,
                                const BlockwiseConv& blockwise_conv,
                                AccumThreadBuffer& accum_thread_buf,
                                index_t num_loop)
     {
+        constexpr auto wei_block_copy_step = to_multi_index(WeiDataBlockTransferStep{});
+        constexpr auto in_block_copy_step = to_multi_index(InDataBlockTransferStep{});
         constexpr index_t NumTap           = wei_blockwise_copy.Size();
         constexpr auto in_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0);
         auto in_block_buf_switch           = in_block_buf;
@@ -289,17 +293,19 @@ struct GridwiseConvPipeline_v1<1, false, false, EnableAsync>
                                InDataBlockTransfer& in_blockwise_copy,
                                const InDataGridBuffer& in_grid_buf,
                                InDataBlockBuffer& in_block_buf,
-                               const InDataBlockTransferStep& in_block_copy_step,
+                               const InDataBlockTransferStep&,
                                const WeiDataGridDesc& wei_grid_desc,
                                const WeiDataBlockDesc& wei_block_desc,
                                WeiDataBlockTransfer& wei_blockwise_copy,
                                const WeiDataGridBuffer& wei_grid_buf,
                                WeiDataBlockBuffer& wei_block_buf,
-                               const WeiDataBlockTransferStep& wei_block_copy_step,
+                               const WeiDataBlockTransferStep&,
                                const BlockwiseConv& blockwise_conv,
                                AccumThreadBuffer& accum_thread_buf,
                                index_t num_loop)
     {
+        constexpr auto wei_block_copy_step = to_multi_index(WeiDataBlockTransferStep{});
+        constexpr auto in_block_copy_step = to_multi_index(InDataBlockTransferStep{});
         constexpr index_t NumTap           = wei_blockwise_copy.Size();
         constexpr auto in_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0);
         auto in_block_buf_switch           = in_block_buf;
@@ -351,11 +357,7 @@ struct GridwiseConvPipeline_v1<1, false, false, EnableAsync>
                                       in_block_origin_idx,
                                       in_block_buf_switch);
 
-                block_sync_lds();
-
                 blockwise_conv.Run(wei_block_buf, in_block_buf, accum_thread_buf);
-
-                block_sync_lds();
 
                 static_for<0, NumTap, 1>{}([&](auto i) {
                     const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[i])
@@ -372,8 +374,6 @@ struct GridwiseConvPipeline_v1<1, false, false, EnableAsync>
 
         // tail
         {
-            block_sync_lds();
-
             blockwise_conv.Run(wei_block_buf, in_block_buf, accum_thread_buf);
         }
     }
@@ -412,17 +412,20 @@ struct GridwiseConvPipeline_v1<1, true, false, false>
                                InDataBlockTransfer& in_blockwise_copy,
                                const InDataGridBuffer& in_grid_buf,
                                InDataBlockBuffer& in_block_buf,
-                               const InDataBlockTransferStep& in_block_copy_step,
+                               const InDataBlockTransferStep&,
                                const WeiDataGridDesc& wei_grid_desc,
                                const WeiDataBlockDesc& wei_block_desc,
                                WeiDataBlockTransfer& wei_blockwise_copy,
                                const WeiDataGridBuffer& wei_grid_buf,
                                WeiDataBlockBuffer& wei_block_buf,
-                               const WeiDataBlockTransferStep& wei_block_copy_step,
+                               const WeiDataBlockTransferStep&,
                                const BlockwiseConv& blockwise_conv,
                                AccumThreadBuffer& accum_thread_buf,
                                index_t num_loop)
     {
+        constexpr auto wei_block_copy_step = to_multi_index(WeiDataBlockTransferStep{});
+        constexpr auto in_block_copy_step = to_multi_index(InDataBlockTransferStep{});
+
         constexpr index_t NumTap       = wei_blockwise_copy.Size();
         constexpr auto wei_remap_table = blockwise_conv.GetWeightRemapTable();
         auto wei_block_buf_switch      = wei_block_buf;
@@ -534,17 +537,19 @@ struct GridwiseConvPipeline_v1<1, true, true, true>
                                InDataBlockTransfer& in_blockwise_copy,
                                const InDataGridBuffer& in_grid_buf,
                                InDataBlockBuffer& in_block_buf,
-                               const InDataBlockTransferStep& in_block_copy_step,
+                               const InDataBlockTransferStep&,
                                const WeiDataGridDesc& wei_grid_desc,
                                const WeiDataBlockDesc& wei_block_desc,
                                WeiDataBlockTransfer& wei_blockwise_copy,
                                const WeiDataGridBuffer& wei_grid_buf,
                                WeiDataBlockBuffer& wei_block_buf,
-                               const WeiDataBlockTransferStep& wei_block_copy_step,
+                               const WeiDataBlockTransferStep&,
                                const BlockwiseConv& blockwise_conv,
                                AccumThreadBuffer& accum_thread_buf,
                                index_t num_loop)
     {
+        constexpr auto wei_block_copy_step = to_multi_index(WeiDataBlockTransferStep{});
+        constexpr auto in_block_copy_step = to_multi_index(InDataBlockTransferStep{});
         constexpr index_t NumTap = wei_blockwise_copy.Size();
         using WeiDataBlockTransfer0 =
             std::remove_const_t<remove_cvref_t<decltype(wei_blockwise_copy[I0])>>;
@@ -640,17 +645,19 @@ struct GridwiseConvPipeline_v1<1, false, true, true>
                                InDataBlockTransfer& in_blockwise_copy,
                                const InDataGridBuffer& in_grid_buf,
                                InDataBlockBuffer& in_block_buf,
-                               const InDataBlockTransferStep& in_block_copy_step,
+                               const InDataBlockTransferStep&,
                                const WeiDataGridDesc& wei_grid_desc,
                                const WeiDataBlockDesc& wei_block_desc,
                                WeiDataBlockTransfer& wei_blockwise_copy,
                                const WeiDataGridBuffer& wei_grid_buf,
                                WeiDataBlockBuffer& wei_block_buf,
-                               const WeiDataBlockTransferStep& wei_block_copy_step,
+                               const WeiDataBlockTransferStep&,
                                const BlockwiseConv& blockwise_conv,
                                AccumThreadBuffer& accum_thread_buf,
                                index_t num_loop)
     {
+        constexpr auto wei_block_copy_step = to_multi_index(WeiDataBlockTransferStep{});
+        constexpr auto in_block_copy_step = to_multi_index(InDataBlockTransferStep{});
         constexpr index_t NumTap           = wei_blockwise_copy.Size();
         constexpr auto in_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0);
         auto in_block_buf_switch           = in_block_buf;
@@ -753,17 +760,19 @@ struct GridwiseConvPipeline_v1<1, true, false, true>
                                InDataBlockTransfer& in_blockwise_copy,
                                const InDataGridBuffer& in_grid_buf,
                                InDataBlockBuffer& in_block_buf,
-                               const InDataBlockTransferStep& in_block_copy_step,
+                               const InDataBlockTransferStep&,
                                const WeiDataGridDesc& wei_grid_desc,
                                const WeiDataBlockDesc& wei_block_desc,
                                WeiDataBlockTransfer& wei_blockwise_copy,
                                const WeiDataGridBuffer& wei_grid_buf,
                                WeiDataBlockBuffer& wei_block_buf,
-                               const WeiDataBlockTransferStep& wei_block_copy_step,
+                               const WeiDataBlockTransferStep&,
                                const BlockwiseConv& blockwise_conv,
                                AccumThreadBuffer& accum_thread_buf,
                                index_t num_loop)
     {
+        constexpr auto wei_block_copy_step = to_multi_index(WeiDataBlockTransferStep{});
+        constexpr auto in_block_copy_step = to_multi_index(InDataBlockTransferStep{});
         constexpr index_t NumTap       = wei_blockwise_copy.Size();
         constexpr auto wei_remap_table = blockwise_conv.GetWeightRemapTable();
         auto wei_block_buf_switch      = wei_block_buf;

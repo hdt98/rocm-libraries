@@ -53,7 +53,7 @@ static constexpr index_t GetFilterIters()
     }
     else
     {
-        // Enable iters if CPerBlock is mulitple of CPerWconv
+        // Enable Iters if CPerBlock is multiple of CPerWconv
         constexpr index_t CPerWconv = WconvConv<WeiDataType,
                                                 InDataType,
                                                 AccDataType,
@@ -97,6 +97,7 @@ template <typename ThisThreadBlock,
           index_t DilationY,
           bool WeiDataEnableLds = false,
           bool InDataEnableLds  = false,
+          bool ConvertToTensor  = false,
           bool Aco              = false>
 /* Option: Read from LDS, big buffer hold all threads required data
  * Source
@@ -110,7 +111,7 @@ template <typename ThisThreadBlock,
  * Option: Read from VGPR, small buffer hold each thread own required data (Skip LDS)
  * Source:
  * Weight(if skip LDS): KRepeat x CRepeat x WeightVgprs
- * InData(if skip LDS): HRepeat x WRepeat x CRepeat x InDataVgprs
+ * InData(if skip LDS): WRepeat x CRepeat x HRepeat x InDataVgprs
  * Destination
  * Accum
  * block level: HWave x WWave x KWave x HRepeat x WRepeat x KRepeat x AccVgprs
@@ -192,68 +193,52 @@ struct BlockwiseConvWconv
     // Default, Block buffer in LDS, thread level offset enabled
     __device__ __host__ static auto CalculateWeiDataThreadOriginDataIndex()
     {
-        if constexpr(WeiDataEnableLds)
-        {
 #ifdef __HIP_DEVICE_COMPILE__
-            const auto wave_idx      = GetWaveIdx();
-            const auto waveId_k      = wave_idx[I2];
-            const auto wconv_wei_idx = wconv_conv.CalculateWeiDataThreadOriginDataIndex();
+        const auto wave_idx      = GetWaveIdx();
+        const auto waveId_k      = wave_idx[I2];
+        const auto wconv_wei_idx = wconv_conv.CalculateWeiDataThreadOriginDataIndex();
 
-            if constexpr(Iters > 1)
-            {
-                return make_tuple(waveId_k * KRepeat,
-                                  wconv_wei_idx[I0],
-                                  0,
-                                  wconv_wei_idx[I1],
-                                  wconv_wei_idx[I2],
-                                  wconv_wei_idx[I3]);
-            }
-            else
-            {
-                return make_tuple(waveId_k * KRepeat,
-                                  0,
-                                  wconv_wei_idx[I0],
-                                  wconv_wei_idx[I1],
-                                  wconv_wei_idx[I2],
-                                  wconv_wei_idx[I3]);
-            }
-#else
-            return make_tuple(0, 0, 0, 0, 0, 0);
-#endif
+        if constexpr(Iters > 1)
+        {
+            return make_tuple(waveId_k * KRepeat,
+                              wconv_wei_idx[I0],
+                              0,
+                              wconv_wei_idx[I1],
+                              wconv_wei_idx[I2],
+                              wconv_wei_idx[I3]);
         }
         else
         {
-            return tensor_operation::element_wise::PassThrough{};
+            return make_tuple(waveId_k * KRepeat,
+                              0,
+                              wconv_wei_idx[I0],
+                              wconv_wei_idx[I1],
+                              wconv_wei_idx[I2],
+                              wconv_wei_idx[I3]);
         }
+#else
+        return make_tuple(0, 0, 0, 0, 0, 0);
+#endif
     }
 
     __device__ __host__ static auto CalculateInDataThreadOriginDataIndex()
     {
-        if constexpr(InDataEnableLds)
-        {
 #ifdef __HIP_DEVICE_COMPILE__
-            const auto wave_idx          = GetWaveIdx();
-            const auto waveId_h          = wave_idx[I0];
-            const auto waveId_w          = wave_idx[I1];
-            const auto wconv_in_data_idx = wconv_conv.CalculateInDataThreadOriginDataIndex();
-
-            return make_tuple(waveId_h * HRepeat,
-                              waveId_w * WRepeat,
-                              0,
-                              0,
-                              wconv_in_data_idx[I0],
-                              wconv_in_data_idx[I1],
-                              wconv_in_data_idx[I2]);
+        const auto wave_idx          = GetWaveIdx();
+        const auto waveId_h          = wave_idx[I0];
+        const auto waveId_w          = wave_idx[I1];
+        const auto wconv_in_data_idx = wconv_conv.CalculateInDataThreadOriginDataIndex();
+        // W0 x C0 x H0 x H1 x H2 x W1 x C1
+        return make_tuple(waveId_w * WRepeat,
+                          0,
+                          waveId_h * HRepeat,
+                          0,
+                          wconv_in_data_idx[I0],
+                          wconv_in_data_idx[I1],
+                          wconv_in_data_idx[I2]);
 #else
-            return make_tuple(0, 0, 0, 0, 0, 0, 0);
+        return make_tuple(0, 0, 0, 0, 0, 0, 0);
 #endif
-        }
-        else
-        {
-            // The constructor of ThreadwiseTensorSliceTransfer_StaticToStatic is different with
-            // ThreadwiseTensorSliceTransfer_v4, it only needs an element operation.
-            return tensor_operation::element_wise::PassThrough{};
-        }
     }
 
     // Accum descriptor info, used by grid level classes
@@ -263,72 +248,148 @@ struct BlockwiseConvWconv
     static constexpr auto NumAccSwizzleComp   = Aco ? 2 : 4;
     static constexpr auto NumAccCompSubTile =
         NumAccCompPerTile > NumAccSwizzleComp ? NumAccCompPerTile / NumAccSwizzleComp : 1;
+
+    static constexpr auto NumDataCompPerTile = wconv_conv.GetNumDataCompPerTile();
+    // static constexpr index_t NumSubTilePerImage = wconv_conv.GetNumSubTilesPerImageTile();
     // Thread level, register descriptor. Vector-write
     __host__ __device__ static constexpr auto GetAccThreadDescriptor()
     {
-        static_assert(NumAccComp == 4 || NumAccComp == 8, "");
-        static_assert(NumAccCompPerTile % NumAccCompSubTile == 0, "");
+        if constexpr(ConvertToTensor)
+        {
+            // HRepeat x WRepeat x CRepeat x I1 x H1 x H2 x W1 x C1
+            return make_naive_tensor_descriptor_packed(make_tuple(Number<HRepeat>{},
+                                                                  Number<WRepeat>{},
+                                                                  Number<CRepeat>{},
+                                                                  I1,
+                                                                  Number<NumAccImageSubTiles>{},
+                                                                  I1,
+                                                                  I1,
+                                                                  Number<NumDataCompPerTile>{}));
+        }
+        else
+        {
+            static_assert(NumAccComp == 4 || NumAccComp == 8, "");
+            static_assert(NumAccCompPerTile % NumAccCompSubTile == 0, "");
 
-        // HRepeat x WRepeat x KRepeat x H1 x H2 x W1 x K1 x K2
-        return make_naive_tensor_descriptor_packed(
-            make_tuple(Number<HRepeat>{},
-                       Number<WRepeat>{},
-                       Number<KRepeat>{},
-                       Number<NumAccImageSubTiles>{},
-                       I1,
-                       I1,
-                       Number<NumAccCompSubTile>{},
-                       Number<NumAccCompPerTile / NumAccCompSubTile>{}));
+            // HRepeat x WRepeat x KRepeat x H1 x H2 x W1 x K1 x K2
+            return make_naive_tensor_descriptor_packed(
+                make_tuple(Number<HRepeat>{},
+                           Number<WRepeat>{},
+                           Number<KRepeat>{},
+                           Number<NumAccImageSubTiles>{},
+                           I1,
+                           I1,
+                           Number<NumAccCompSubTile>{},
+                           Number<NumAccCompPerTile / NumAccCompSubTile>{}));
+        }
     }
 
     __host__ __device__ static constexpr auto GetAccThreadDescLength()
     {
-        return Sequence<HRepeat,
-                        WRepeat,
-                        KRepeat,
-                        NumAccImageSubTiles,
-                        I1,
-                        I1,
-                        NumAccCompSubTile,
-                        NumAccCompPerTile / NumAccCompSubTile>{};
+        if constexpr(ConvertToTensor)
+        {
+            return Sequence<HRepeat,
+                            WRepeat,
+                            CRepeat,
+                            I1,
+                            NumAccImageSubTiles,
+                            I1,
+                            I1,
+                            NumDataCompPerTile>{};
+        }
+        else
+        {
+            return Sequence<HRepeat,
+                            WRepeat,
+                            KRepeat,
+                            NumAccImageSubTiles,
+                            I1,
+                            I1,
+                            NumAccCompSubTile,
+                            NumAccCompPerTile / NumAccCompSubTile>{};
+        }
     }
 
     template <typename AccBlockDesc_>
     __host__ __device__ static constexpr auto
     GetAccBlockWaveDescriptor(const AccBlockDesc_& accDesc)
     {
-        return transform_tensor_descriptor(
-            accDesc,
-            make_tuple(
-                make_unmerge_transform(make_tuple(Number<HPerBlock / HPerWconv>{},
-                                                  Number<NumAccImageSubTiles>{},
-                                                  Number<HPerWconv / NumAccImageSubTiles>{})),
-                make_unmerge_transform(
-                    make_tuple(Number<WPerBlock / WPerWconv>{}, Number<WPerWconv>{})),
-                make_unmerge_transform(make_tuple(Number<KPerBlock / KPerWconv>{},
-                                                  Number<NumAccCompSubTile>{},
-                                                  Number<KPerWconv / NumAccCompSubTile>{}))),
-            make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}),
-            make_tuple(Sequence<0, 3, 4>{}, Sequence<1, 5>{}, Sequence<2, 6, 7>{}));
+        if constexpr(ConvertToTensor)
+        {
+            static_assert(KPerBlock == CPerBlock, "");
+            // H x W x C -> H0 x W0 x C0 x I0 x H1 x H2 x W1 x C1
+            return transform_tensor_descriptor(
+                accDesc,
+                make_tuple(
+                    make_unmerge_transform(make_tuple(Number<HPerBlock / HPerWconv>{},
+                                                      Number<NumAccImageSubTiles>{},
+                                                      Number<HPerWconv / NumAccImageSubTiles>{})),
+                    make_unmerge_transform(
+                        make_tuple(Number<WPerBlock / WPerWconv>{}, Number<WPerWconv>{})),
+                    // TODO: replace with KPerBlock and KPerWconv
+                    make_unmerge_transform(
+                        make_tuple(Number<CPerBlock / CPerWconv>{}, Number<CPerWconv>{})),
+                    make_insert_transform(I0)),
+                make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}, Sequence<>{}),
+                make_tuple(Sequence<0, 4, 5>{}, Sequence<1, 6>{}, Sequence<2, 7>{}, Sequence<3>{}));
+        }
+        else
+        {
+            // H x W x K -> H0 x W0 x K0 x H1 x H2 x W1 x K1 x K2
+            return transform_tensor_descriptor(
+                accDesc,
+                make_tuple(
+                    make_unmerge_transform(make_tuple(Number<HPerBlock / HPerWconv>{},
+                                                      Number<NumAccImageSubTiles>{},
+                                                      Number<HPerWconv / NumAccImageSubTiles>{})),
+                    make_unmerge_transform(
+                        make_tuple(Number<WPerBlock / WPerWconv>{}, Number<WPerWconv>{})),
+                    make_unmerge_transform(make_tuple(Number<KPerBlock / KPerWconv>{},
+                                                      Number<NumAccCompSubTile>{},
+                                                      Number<KPerWconv / NumAccCompSubTile>{}))),
+                make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}),
+                make_tuple(Sequence<0, 3, 4>{}, Sequence<1, 5>{}, Sequence<2, 6, 7>{}));
+        }
     }
 
     __device__ __host__ static auto CalculateAccThreadOriginDataIndex()
     {
 #ifdef __HIP_DEVICE_COMPILE__
-        const auto wave_idx          = GetWaveIdx();
-        const auto wconv_in_data_idx = wconv_conv.CalculateAccThreadOriginDataIndex();
-        const auto waveId_h          = wave_idx[I0];
-        const auto waveId_w          = wave_idx[I1];
-        const auto waveId_k          = wave_idx[I2];
+        if constexpr(ConvertToTensor)
+        {
 
-        return make_tuple(waveId_h * HRepeat,
-                          waveId_w * WRepeat,
-                          waveId_k * KRepeat,
-                          wconv_in_data_idx[I0],
-                          wconv_in_data_idx[I1],
-                          wconv_in_data_idx[I2],
-                          wconv_in_data_idx[I3],
-                          wconv_in_data_idx[I4]);
+            const auto wave_idx          = GetWaveIdx();
+            const auto waveId_h          = wave_idx[I0];
+            const auto waveId_w          = wave_idx[I1];
+            const auto waveId_k          = wave_idx[I2];
+            const auto wconv_in_data_idx = wconv_conv.CalculateInDataThreadOriginDataIndex();
+            // H0 x W0 x C0 x I0 x H1 x H2 x W1 x C1
+            return make_tuple(waveId_h * HRepeat,
+                              waveId_w * WRepeat,
+                              waveId_k * KRepeat,
+                              0,
+                              0,
+                              wconv_in_data_idx[I0],
+                              wconv_in_data_idx[I1],
+                              wconv_in_data_idx[I2]);
+        }
+        else
+        {
+            const auto wave_idx          = GetWaveIdx();
+            const auto wconv_in_data_idx = wconv_conv.CalculateAccThreadOriginDataIndex();
+            const auto waveId_h          = wave_idx[I0];
+            const auto waveId_w          = wave_idx[I1];
+            const auto waveId_k          = wave_idx[I2];
+
+            return make_tuple(waveId_h * HRepeat,
+                              waveId_w * WRepeat,
+                              waveId_k * KRepeat,
+                              wconv_in_data_idx[I0],
+                              wconv_in_data_idx[I1],
+                              wconv_in_data_idx[I2],
+                              wconv_in_data_idx[I3],
+                              wconv_in_data_idx[I4]);
+        }
 #else
         return make_tuple(0, 0, 0, 0, 0, 0, 0, 0);
 #endif
@@ -374,140 +435,177 @@ struct BlockwiseConvWconv
     {
         auto weight_thread_buf = make_static_buffer<AddressSpaceEnum::Vgpr, WeiDataType>(
             weight_thread_desc_.GetElementSpaceSize());
-        auto indata_thread_buf = make_static_buffer<AddressSpaceEnum::Vgpr, InDataType>(
-            indata_thread_desc_.GetElementSpaceSize());
-
         using WeiDataVec    = typename decltype(wconv_conv)::WeiDataVec::type;
         using WeiDataTapVec = typename decltype(wconv_conv)::WeiDataTapVec::type;
         using InDataVec     = typename decltype(wconv_conv)::InDataVec::type;
 
+        if constexpr(ConvertToTensor)
+        {
+            static_assert(KRepeat * KPerWconv == CRepeat * CPerWconv, "");
+            static_assert(FilterSize == 1, "");
+            static_assert(InDataEnableLds == false, "");
+            static_assert(std::is_same<AccDataType, InDataType>::value, "");
+            constexpr index_t KCRepeat = KPerWconv / CPerWconv;
+            static_for<0, HRepeat, 1>{}([&](auto h0) {
+                static_for<0, WRepeat, 1>{}([&](auto w0) {
+                    static_for<0, KRepeat, 1>{}([&](auto k0) {
+                        constexpr index_t accum_offset =
+                            accum_thread_desc_.CalculateOffset(make_tuple(h0, w0, k0, I0));
+                        auto& accum_vec =
+                            accum_thread_buf.GetVectorTypeReference(Number<accum_offset>{});
+                        static_for<0, KCRepeat, 1>{}([&](auto c0) {
+                            constexpr index_t indata_offset = indata_block_desc_.CalculateOffset(
+                                make_tuple(w0, c0 + k0 * Number<KCRepeat>{}, h0, I0, I0, I0, I0));
+                            accum_vec.template AsType<InDataVec>()(c0) =
+                                *reinterpret_cast<const InDataVec*>(
+                                    &indata_block_buf[Number<indata_offset>{}]);
+                        });
+                    });
+                });
+            });
+            return;
+        }
+
+        const InDataVec* indata_thread_vec_ptr[4];
+        static_assert(Iters <= 4 && FilterSize < 4, "");
+
         static_for<0, KRepeat, 1>{}([&](auto k0) {
             static_for<0, CRepeat, Iters>{}([&](auto c0) {
+                const WeiDataVec* weight_thread_vec_ptr;
                 typename decltype(wconv_conv)::WeiDataVec weight_thread_vec;
                 // Load weights
-                if constexpr(FilterSize == 1)
+                if constexpr(WeiDataEnableLds)
                 {
-                    constexpr auto WeightCPerIter = wconv_conv.GetNumWeightTapPerWave();
-                    static_for<0, Iters, WeightCPerIter>{}([&](auto iter_idx) {
-                        weight_thread_copy_.Run(weight_block_desc_,
-                                                make_tuple(k0, c0 + iter_idx, I0, I0, I0, I0),
-                                                weight_block_buf,
-                                                weight_thread_desc_,
-                                                make_tuple(I0, I0, I0, I0, I0, I0),
-                                                weight_thread_buf);
-                        weight_thread_vec.template AsType<WeiDataTapVec>()(
-                            iter_idx / Number<WeightCPerIter>{}) =
-                            *reinterpret_cast<const WeiDataTapVec*>(&(weight_thread_buf[I0]));
-                    });
-                }
-                else if constexpr(FilterSize == 3)
-                {
-                    static_assert(Iters == 1, "");
-                    constexpr index_t WeightTapPerWave =
-                        WeiDataEnableLds ? wconv_conv.GetNumWeightTapPerWave() : 1;
-                    static_for<0, wconv_conv.GetNumWeightTap(), 1>{}([&](auto tape_idx) {
-                        weight_thread_copy_.Run(
-                            weight_block_desc_,
-                            make_tuple(k0, c0, Number<WeightTapPerWave * tape_idx>{}, I0, I0, I0),
-                            weight_block_buf,
-                            weight_thread_desc_,
-                            make_tuple(I0, I0, I0, I0, I0, I0),
-                            weight_thread_buf);
+                    if constexpr(FilterSize == 1)
+                    {
+                        constexpr auto WeightCPerIter = wconv_conv.GetNumWeightTapPerWave();
+                        static_for<0, Iters, WeightCPerIter>{}([&](auto iter_idx) {
+                            weight_thread_copy_.Run(weight_block_desc_,
+                                                    make_tuple(k0, c0 + iter_idx, I0, I0, I0, I0),
+                                                    weight_block_buf,
+                                                    weight_thread_desc_,
+                                                    make_tuple(I0, I0, I0, I0, I0, I0),
+                                                    weight_thread_buf);
+                            weight_thread_vec.template AsType<WeiDataTapVec>()(
+                                iter_idx / Number<WeightCPerIter>{}) =
+                                *reinterpret_cast<const WeiDataTapVec*>(&(weight_thread_buf[I0]));
+                        });
+                    }
+                    else if constexpr(FilterSize == 3)
+                    {
+                        static_assert(Iters == 1, "");
+                        constexpr index_t WeightTapPerWave = wconv_conv.GetNumWeightTapPerWave();
+                        static_for<0, wconv_conv.GetNumWeightTap(), 1>{}([&](auto tape_idx) {
+                            weight_thread_copy_.Run(
+                                weight_block_desc_,
+                                make_tuple(
+                                    k0, c0, Number<WeightTapPerWave * tape_idx>{}, I0, I0, I0),
+                                weight_block_buf,
+                                weight_thread_desc_,
+                                make_tuple(I0, I0, I0, I0, I0, I0),
+                                weight_thread_buf);
 
-                        weight_thread_vec.template AsType<WeiDataTapVec>()(Number<tape_idx>{}) =
-                            *reinterpret_cast<const WeiDataTapVec*>(&weight_thread_buf[I0]);
-                    });
+                            weight_thread_vec.template AsType<WeiDataTapVec>()(Number<tape_idx>{}) =
+                                *reinterpret_cast<const WeiDataTapVec*>(&weight_thread_buf[I0]);
+                        });
+                    }
+                    weight_thread_vec_ptr = &weight_thread_vec.template AsType<WeiDataVec>()[I0];
                 }
+                else
+                {
+                    constexpr index_t wei_offset =
+                        weight_block_desc_.CalculateOffset(make_tuple(k0, c0, I0, I0, I0, I0));
+                    if constexpr ((Iters == 4) && (wconv_conv.GetNumWeightTapPerWave() == 2))
+                    {
+                        constexpr index_t wei_offset2 =
+                            weight_block_desc_.CalculateOffset(make_tuple(k0, c0 + I2, I0, I0, I0, I0));
+                        weight_thread_vec.template AsType<WeiDataTapVec>()(I0) =
+                            *reinterpret_cast<const WeiDataTapVec*>(
+                                &weight_block_buf[Number<wei_offset>{}]);
+                        weight_thread_vec.template AsType<WeiDataTapVec>()(I1) =
+                            *reinterpret_cast<const WeiDataTapVec*>(
+                                &weight_block_buf[Number<wei_offset2>{}]);
+                        weight_thread_vec_ptr = &weight_thread_vec.template AsType<WeiDataVec>()[I0];
+                    }
+                    else
+                    {
+                        weight_thread_vec_ptr = reinterpret_cast<const WeiDataVec*>(
+                            &weight_block_buf[Number<wei_offset>{}]);
+                    }
+                }
+
+                InDataVec indata_thread_vec[4];
                 static_for<0, HRepeat, 1>{}([&](auto h0) {
                     static_for<0, WRepeat, 1>{}([&](auto w0) {
                         constexpr index_t accum_offset =
                             accum_thread_desc_.CalculateOffset(make_tuple(h0, w0, k0, I0));
-
-                        // Load input tensor data
-                        if constexpr(FilterSize == 1)
+                        if constexpr(InDataEnableLds)
                         {
-                            if constexpr(Iters == 1)
+                            // Load input tensor data
+                            if constexpr(FilterSize == 1)
                             {
-                                indata_thread_copy_.Run(indata_block_desc_,
-                                                        make_tuple(h0, w0, c0, I0, I0, I0, I0),
-                                                        indata_block_buf,
-                                                        indata_thread_desc_,
-                                                        make_tuple(I0, I0, I0, I0, I0, I0, I0),
-                                                        indata_thread_buf);
-
-                                InDataVec indata_thread_vec;
-
-                                indata_thread_vec =
-                                    *reinterpret_cast<const InDataVec*>(&(indata_thread_buf[I0]));
-
-                                wconv_conv.wconv_instr.Run(
-                                    weight_thread_vec.template AsType<WeiDataVec>()(I0),
-                                    indata_thread_vec,
-                                    accum_thread_buf.GetVectorTypeReference(
-                                        Number<accum_offset>{}));
-                            }
-                            else
-                            {
-                                InDataVec indata_thread_vec[Iters];
-
                                 static_for<0, Iters, 1>{}([&](auto iter_idx) {
+                                    auto indata_thread_buf =
+                                        make_static_buffer_v3<AddressSpaceEnum::Vgpr, InDataType>(
+                                            indata_thread_desc_.GetElementSpaceSize(), (InDataType*)(&indata_thread_vec[iter_idx]));
                                     indata_thread_copy_.Run(
                                         indata_block_desc_,
-                                        make_tuple(h0, w0, c0 + iter_idx, I0, I0, I0, I0),
+                                        make_tuple(w0, c0 + iter_idx, h0, I0, I0, I0, I0),
                                         indata_block_buf,
                                         indata_thread_desc_,
                                         make_tuple(I0, I0, I0, I0, I0, I0, I0),
                                         indata_thread_buf);
-                                    indata_thread_vec[iter_idx] =
-                                        *reinterpret_cast<const InDataVec*>(
-                                            &(indata_thread_buf[I0]));
+                                    indata_thread_vec_ptr[iter_idx] = &indata_thread_vec[iter_idx];
                                 });
-
-                                wconv_conv.wconv_instr.Run(
-                                    weight_thread_vec.template AsType<WeiDataVec>()(I0),
-                                    indata_thread_vec,
-                                    accum_thread_buf.GetVectorTypeReference(
-                                        Number<accum_offset>{}));
+                            }
+                            else if constexpr(FilterSize == 3)
+                            {
+                                //  read tensor
+                                static_for<0, FilterSize, 1>{}([&](auto array_idx) {
+                                    auto indata_thread_buf =
+                                        make_static_buffer_v3<AddressSpaceEnum::Vgpr, InDataType>(
+                                            indata_thread_desc_.GetElementSpaceSize(), (InDataType*)(&indata_thread_vec[array_idx]));
+                                    indata_thread_copy_.Run(
+                                        indata_block_desc_,
+                                        make_tuple(w0 + array_idx, c0, h0, I0, I0, I0, I0),
+                                        indata_block_buf,
+                                        indata_thread_desc_,
+                                        make_tuple(I0, I0, I0, I0, I0, I0, I0),
+                                        indata_thread_buf);
+                                    indata_thread_vec_ptr[array_idx] = &indata_thread_vec[array_idx];
+                                });
                             }
                         }
-                        else if constexpr(FilterSize == 3)
+                        else
                         {
-                            InDataVec indata_thread_vec[FilterSize];
-
-                            //  read tensor
-                            indata_thread_copy_.Run(indata_block_desc_,
-                                                    make_tuple(h0, w0, c0, I0, I0, I0, I0),
-                                                    indata_block_buf,
-                                                    indata_thread_desc_,
-                                                    make_tuple(I0, I0, I0, I0, I0, I0, I0),
-                                                    indata_thread_buf);
-
-                            typename decltype(wconv_conv)::InDataVec indata_tmp;
-                            constexpr index_t NumDataCompPerTile =
-                                wconv_conv.GetNumDataComponents() / NumDataTiles;
-
-                            // 0: Center buffer, 1: Left buffer, 2: Right buffer
-                            constexpr index_t InDataRemap[FilterSize] = {1, 0, 2};
-                            static_for<0, FilterSize, 1>{}([&](auto array_idx) {
-                                using InDataTileVec =
-                                    typename vector_type<InDataType, NumDataCompPerTile>::type;
-                                static_for<0, NumDataTiles, 1>{}([&](auto tile_idx) {
-                                    indata_tmp.template AsType<InDataTileVec>()(
-                                        Number<tile_idx>{}) =
-                                        *reinterpret_cast<const InDataTileVec*>(
-                                            &indata_thread_buf
-                                                [Number<tile_idx * FilterSize * NumDataCompPerTile +
-                                                        array_idx * NumDataCompPerTile>{}]);
+                            // Load input tensor data
+                            if constexpr(FilterSize == 1)
+                            {
+                                static_for<0, Iters, 1>{}([&](auto iter_idx) {
+                                    constexpr index_t indata_offset =
+                                        indata_block_desc_.CalculateOffset(
+                                            make_tuple(w0, c0 + iter_idx, h0, I0, I0, I0, I0));
+                                    indata_thread_vec_ptr[iter_idx] =
+                                        reinterpret_cast<const InDataVec*>(
+                                            &indata_block_buf[Number<indata_offset>{}]);
                                 });
-                                indata_thread_vec[InDataRemap[array_idx]] =
-                                    indata_tmp.template AsType<InDataVec>()(I0);
-                            });
-
-                            wconv_conv.wconv_instr.Run(
-                                weight_thread_vec.template AsType<WeiDataVec>()(I0),
-                                indata_thread_vec,
-                                accum_thread_buf.GetVectorTypeReference(Number<accum_offset>{}));
+                            }
+                            else if constexpr(FilterSize == 3)
+                            {
+                                static_for<0, FilterSize, 1>{}([&](auto array_idx) {
+                                    constexpr index_t indata_offset =
+                                        indata_block_desc_.CalculateOffset(
+                                            make_tuple(w0 + array_idx, c0, h0, I0, I0, I0, I0));
+                                    indata_thread_vec_ptr[array_idx] =
+                                        reinterpret_cast<const InDataVec*>(
+                                            &indata_block_buf[Number<indata_offset>{}]);
+                                });
+                            }
                         }
+                        wconv_conv.wconv_instr.Run(
+                            *weight_thread_vec_ptr,
+                            indata_thread_vec_ptr,
+                            accum_thread_buf.GetVectorTypeReference(Number<accum_offset>{}));
                     });
                 });
             });
@@ -521,13 +619,12 @@ struct BlockwiseConvWconv
     static constexpr auto weight_thread_desc_  = make_naive_tensor_descriptor_packed(
         make_tuple(I1, I1, I1, I1, Number<NumWeightSubTiles>{}, Number<NumWeightCompPerTile>{}));
 
-    static constexpr auto NumDataSubTiles    = wconv_conv.GetNumSubTilesPerImageTile();
-    static constexpr auto NumDataCompPerTile = wconv_conv.GetNumDataCompPerTile();
-    static constexpr auto NumDataTiles       = wconv_conv.GetNumImageTilesInVertical();
+    static constexpr auto NumDataSubTiles = wconv_conv.GetNumSubTilesPerImageTile();
+    static constexpr auto NumDataTiles    = wconv_conv.GetNumImageTilesInVertical();
     static constexpr auto indata_thread_desc_ =
-        make_naive_tensor_descriptor_packed(make_tuple(Number<NumDataTiles>{},
-                                                       Number<FilterSize>{},
+        make_naive_tensor_descriptor_packed(make_tuple(I1,
                                                        I1,
+                                                       Number<NumDataTiles>{},
                                                        Number<NumDataSubTiles>{},
                                                        I1,
                                                        I1,
@@ -541,73 +638,29 @@ struct BlockwiseConvWconv
                    Number<wconv_conv.GetNumAccumComponents()>{}));
 
     // Initialize thread copy classes
-    template <bool EnableLds>
-    struct WeightThreadCopySelector;
+    using WeiDataThreadLdsCopy = ThreadwiseTensorSliceTransfer_v4<
+        WeiDataType,
+        WeiDataType,
+        decltype(weight_block_desc_),
+        decltype(weight_thread_desc_),
+        Sequence<1, 1, 1, 1, NumWeightSubTiles, NumWeightCompPerTile>,
+        Sequence<0, 1, 2, 3, 4, 5>,
+        5,
+        NumWeightCompPerTile,
+        NumWeightCompPerTile>;
 
-    template <>
-    struct WeightThreadCopySelector<true>
-    {
-        using type = ThreadwiseTensorSliceTransfer_v4<
-            WeiDataType,
-            WeiDataType,
-            decltype(weight_block_desc_),
-            decltype(weight_thread_desc_),
-            Sequence<1, 1, 1, 1, NumWeightSubTiles, NumWeightCompPerTile>,
-            Sequence<0, 1, 2, 3, 4, 5>,
-            5,
-            NumWeightCompPerTile,
-            NumWeightCompPerTile>;
-    };
+    WeiDataThreadLdsCopy weight_thread_copy_;
 
-    template <>
-    struct WeightThreadCopySelector<false>
-    {
-        using type = ThreadwiseTensorSliceTransfer_StaticToStatic<
-            WeiDataType,
-            WeiDataType,
-            decltype(weight_block_desc_),
-            decltype(weight_thread_desc_),
-            tensor_operation::element_wise::PassThrough,
-            Sequence<1, 1, 1, 1, NumWeightSubTiles, NumWeightCompPerTile>,
-            Sequence<0, 1, 2, 3, 4, 5>,
-            5,
-            NumWeightCompPerTile>;
-    };
-
-    template <bool EnableLds>
-    struct InDataThreadCopySelector;
-
-    template <>
-    struct InDataThreadCopySelector<true>
-    {
-        using type = ThreadwiseTensorSliceTransfer_v4<
-            InDataType,
-            InDataType,
-            decltype(indata_block_desc_),
-            decltype(indata_thread_desc_),
-            Sequence<NumDataTiles, FilterSize, 1, NumDataSubTiles, 1, 1, NumDataCompPerTile>,
-            Sequence<0, 1, 2, 3, 4, 5, 6>,
-            6,
-            NumDataCompPerTile,
-            NumDataCompPerTile>;
-    };
-
-    template <>
-    struct InDataThreadCopySelector<false>
-    {
-        using type = ThreadwiseTensorSliceTransfer_StaticToStatic<
-            InDataType,
-            InDataType,
-            decltype(indata_block_desc_),
-            decltype(indata_thread_desc_),
-            tensor_operation::element_wise::PassThrough,
-            Sequence<NumDataTiles, FilterSize, 1, NumDataSubTiles, 1, 1, NumDataCompPerTile>,
-            Sequence<0, 1, 2, 3, 4, 5, 6>,
-            6,
-            NumDataCompPerTile>;
-    };
-
-    typename WeightThreadCopySelector<WeiDataEnableLds>::type weight_thread_copy_;
-    typename InDataThreadCopySelector<InDataEnableLds>::type indata_thread_copy_;
+    using InDataThreadLdsCopy = ThreadwiseTensorSliceTransfer_v4<
+        InDataType,
+        InDataType,
+        decltype(indata_block_desc_),
+        decltype(indata_thread_desc_),
+        Sequence<1, 1, NumDataTiles, NumDataSubTiles, 1, 1, NumDataCompPerTile>,
+        Sequence<0, 1, 2, 3, 4, 5, 6>,
+        6,
+        NumDataCompPerTile,
+        NumDataCompPerTile>;
+    InDataThreadLdsCopy indata_thread_copy_;
 };
 } // namespace ck

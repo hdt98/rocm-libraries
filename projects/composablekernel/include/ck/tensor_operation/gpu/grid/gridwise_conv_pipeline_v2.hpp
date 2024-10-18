@@ -48,17 +48,19 @@ struct GridwiseConvPipeline_v2
                                InDataBlockTransfer& in_blockwise_copy,
                                const InDataGridBuffer& in_grid_buf,
                                InDataBlockBuffer& in_block_buf,
-                               const InDataBlockTransferStep& in_block_copy_step,
+                               const InDataBlockTransferStep&,
                                const WeiDataGridDesc& wei_grid_desc,
                                const WeiDataBlockDesc& wei_block_desc,
                                WeiDataBlockTransfer& wei_blockwise_copy,
                                const WeiDataGridBuffer& wei_grid_buf,
                                WeiDataBlockBuffer& wei_block_buf,
-                               const WeiDataBlockTransferStep& wei_block_copy_step,
+                               const WeiDataBlockTransferStep&,
                                const BlockwiseConv& blockwise_conv,
                                AccumThreadBuffer& accum_thread_buf,
                                index_t num_loop)
     {
+        constexpr auto wei_block_copy_step = to_multi_index(WeiDataBlockTransferStep{});
+        constexpr auto in_block_copy_step = to_multi_index(InDataBlockTransferStep{});
 
         // sync between data load wave (0) and conv wave (1)
         WavegroupSemaphore<1, 1> semaLoadIn;
@@ -81,9 +83,9 @@ struct GridwiseConvPipeline_v2
             accum_thread_buf.Clear();
         }
 
-        barrierLds.init(get_wave_id_in_wavegroup(), 4);
         if(get_wave_id_in_wavegroup() == 0)
         {
+            barrierLds.init(4);
             barrierLds.join();
         }
 
@@ -328,17 +330,20 @@ struct GridwiseConvPipeline_v2<1, false, false, EnableAsync>
                                InDataBlockTransfer& in_blockwise_copy,
                                const InDataGridBuffer& in_grid_buf,
                                InDataBlockBuffer& in_block_buf,
-                               const InDataBlockTransferStep& in_block_copy_step,
+                               const InDataBlockTransferStep&,
                                const WeiDataGridDesc& wei_grid_desc,
                                const WeiDataBlockDesc& wei_block_desc,
                                WeiDataBlockTransfer& wei_blockwise_copy,
                                const WeiDataGridBuffer& wei_grid_buf,
                                WeiDataBlockBuffer& wei_block_buf,
-                               const WeiDataBlockTransferStep& wei_block_copy_step,
+                               const WeiDataBlockTransferStep&,
                                const BlockwiseConv& blockwise_conv,
                                AccumThreadBuffer& accum_thread_buf,
                                index_t num_loop)
     {
+        constexpr auto wei_block_copy_step = to_multi_index(WeiDataBlockTransferStep{});
+        constexpr auto in_block_copy_step = to_multi_index(InDataBlockTransferStep{});
+
         // sync between data load wave (0) and conv wave (1)
         WavegroupSemaphore<1, 1> semaLoad;
         WavegroupSemaphore<0, 1> semaRun;
@@ -482,25 +487,26 @@ struct GridwiseConvPipeline_v2<1, true, true, EnableAsync>
                                InDataBlockTransfer& in_blockwise_copy,
                                const InDataGridBuffer& in_grid_buf,
                                InDataBlockBuffer& in_block_buf,
-                               const InDataBlockTransferStep& in_block_copy_step,
+                               const InDataBlockTransferStep&,
                                const WeiDataGridDesc& wei_grid_desc,
                                const WeiDataBlockDesc& wei_block_desc,
                                WeiDataBlockTransfer& wei_blockwise_copy,
                                const WeiDataGridBuffer& wei_grid_buf,
                                WeiDataBlockBuffer& wei_block_buf,
-                               const WeiDataBlockTransferStep& wei_block_copy_step,
+                               const WeiDataBlockTransferStep&,
                                const BlockwiseConv& blockwise_conv,
                                AccumThreadBuffer& accum_thread_buf,
                                index_t num_loop)
     {
+        constexpr auto wei_block_copy_step = to_multi_index(WeiDataBlockTransferStep{});
+        constexpr auto in_block_copy_step = to_multi_index(InDataBlockTransferStep{});
+
         // sync between data load wave (0) and conv wave (1)
         WavegroupSemaphore<1, 1> semaLoad;
         WavegroupSemaphore<0, 1> semaRun;
         NamedBarrier<1> barrierLds;
 
         constexpr index_t NumTap           = wei_blockwise_copy.Size();
-        constexpr auto in_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0);
-        constexpr auto wei_remap_table     = blockwise_conv.GetWeightRemapTable();
 
         using WeiDataBlockTransfer0 =
             std::remove_const_t<remove_cvref_t<decltype(wei_blockwise_copy[I0])>>;
@@ -511,9 +517,9 @@ struct GridwiseConvPipeline_v2<1, true, true, EnableAsync>
             accum_thread_buf.Clear();
         }
 
-        barrierLds.init(get_wave_id_in_wavegroup(), 4);
         if(get_wave_id_in_wavegroup() == 0)
         {
+            barrierLds.init(4);
             barrierLds.join();
         }
 
