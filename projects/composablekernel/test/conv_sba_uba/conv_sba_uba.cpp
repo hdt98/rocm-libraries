@@ -389,28 +389,8 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
 
 #if !LOAD_DATA_PER_TILE
     // Output accum data
-    auto GetAuxData = [&]() {
-        // int 8X4X8  = 0;
-        // int 4X4X8  = 1;
-        // int 4X4X16 = 2;
-        // int 4X2X16 = 3;
-        if((HPerWconv == 8) && (WPerWconv == 4))
-            return 0 | (activateFunc << 8) | (scaleBiasPacked << 26);
-        else if((HPerWconv == 4) && (WPerWconv == 4))
-            return 1 | (activateFunc << 8) | (scaleBiasPacked << 26);
-        else if((HPerWconv == 4) && (WPerWconv == 2))
-            return 3 | (activateFunc << 8) | (scaleBiasPacked << 26);
-        static_assert("unsupport shape.");
-    };
-
-    constexpr index_t auxData     = GetAuxData();
-    constexpr auto accSbaInstance = ck::AccSba<AccDataType,
-                                               HPerWconv,
-                                               WPerWconv,
-                                               activateFunc,
-                                               auxData,
-                                               scaleBiasPacked,
-                                               uniformScale>();
+    constexpr auto accSbaInstance = ck::
+        AccSba<AccDataType, HPerWconv, WPerWconv, activateFunc, scaleBiasPacked, uniformScale>();
     using SbaOutVec               = StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr,
                                                 AccDataType,
                                                 AccVectorCount,
@@ -785,14 +765,8 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
         static_assert("unsupport shape.");
     };
 
-    constexpr index_t auxData     = GetAuxData();
-    constexpr auto accSbaInstance = ck::AccSba<AccDataType,
-                                               HPerWconv,
-                                               WPerWconv,
-                                               activateFunc,
-                                               auxData,
-                                               scaleBiasPacked,
-                                               uniformScale>();
+    constexpr auto accSbaInstance = ck::
+        AccSba<AccDataType, HPerWconv, WPerWconv, activateFunc, scaleBiasPacked, uniformScale>();
 
     using SbaOutVec         = StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr,
                                                 AccDataType,
@@ -831,19 +805,15 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
                 {
                     const vector_type<AccDataType, 2>& bias_data16bit_v =
                         bias_16bit_data[tileOffset];
-                    accSbaInstance.sba_instr.Run(c_vec,
-                                                 type_convert<float>(scale_),
-                                                 bit_cast<half2_t>(bias_data16bit_v),
-                                                 d_vec);
+                    accSbaInstance.sba_instr.Run(
+                        c_vec, scale_, bit_cast<half2_t>(bias_data16bit_v), d_vec);
                 }
                 else if constexpr(std::is_same<bhalf_t, AccDataType>::value)
                 {
                     const vector_type<AccDataType, 2>& bias_data16bit_v =
                         bias_16bit_data[tileOffset];
-                    accSbaInstance.sba_instr.Run(c_vec,
-                                                 type_convert<float>(scale_),
-                                                 bit_cast<bhalf2_t>(bias_data16bit_v),
-                                                 d_vec);
+                    accSbaInstance.sba_instr.Run(
+                        c_vec, scale_, bit_cast<bhalf2_t>(bias_data16bit_v), d_vec);
                 }
 
                 store_acc_data(h, w, k, d_vec);

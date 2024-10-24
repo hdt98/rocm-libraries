@@ -74,7 +74,7 @@ struct intrin_sba_half<auxdata, 0, 0>
 {
     template <class FloatAcc>
     __device__ static void
-    Run(const FloatAcc& inAcc, const float& ssrc, const half2_t& bias, FloatAcc& outAcc)
+    Run(const FloatAcc& inAcc, const half_t& ssrc, const half2_t& bias, FloatAcc& outAcc)
     {
         outAcc.template AsType<half8_t>()(Number<0>{}) = __builtin_amdgcn_scale_bias_activate_f16(
             inAcc.template AsType<half8_t>()[Number<0>{}], ssrc, bias, auxdata, true);
@@ -96,11 +96,70 @@ template <index_t auxdata>
 struct intrin_sba_half<auxdata, 0, 1>
 {
     template <class FloatAcc>
-    __device__ static void Run(const FloatAcc& inAcc, const float& ssrc, FloatAcc& outAcc)
+    __device__ static void Run(const FloatAcc& inAcc, const half_t& ssrc, FloatAcc& outAcc)
     {
         outAcc.template AsType<half8_t>()(Number<0>{}) =
             __builtin_amdgcn_uniform_scale_activate_f16(
                 inAcc.template AsType<half8_t>()[Number<0>{}], ssrc, auxdata, true);
+    }
+};
+
+template <index_t auxdata, bool scalebiasPacked, bool uniformScale>
+struct intrin_sba_scatter2_half;
+
+template <index_t auxdata>
+struct intrin_sba_scatter2_half<auxdata, 0, 0>
+{
+    template <class FloatAcc>
+    __device__ static void Run(const FloatAcc& inAcc,
+                               const half_t& ssrc,
+                               const half2_t& bias,
+                               half2_t& outAcc0,
+                               half2_t& outAcc1)
+    {
+        __builtin_amdgcn_scale_bias_activate_scatter2_f16(
+            (fp16x2_t*)&outAcc0,
+            (fp16x2_t*)&outAcc1,
+            inAcc.template AsType<half4_t>()[Number<0>{}],
+            ssrc,
+            bias,
+            auxdata,
+            true);
+    }
+};
+
+template <index_t auxdata>
+struct intrin_sba_scatter2_half<auxdata, 1, 0>
+{
+    template <class FloatAcc>
+    __device__ static void
+    Run(const FloatAcc& inAcc, const half2_t& scale_bias, half2_t& outAcc0, half2_t& outAcc1)
+    {
+        __builtin_amdgcn_scale_bias_activate_scatter2_f16(
+            (fp16x2_t*)&outAcc0,
+            (fp16x2_t*)&outAcc1,
+            inAcc.template AsType<half4_t>()[Number<0>{}],
+            0,
+            scale_bias,
+            auxdata,
+            true);
+    }
+};
+
+template <index_t auxdata>
+struct intrin_sba_scatter2_half<auxdata, 0, 1>
+{
+    template <class FloatAcc>
+    __device__ static void
+    Run(const FloatAcc& inAcc, const half_t& ssrc, half2_t& outAcc0, half2_t& outAcc1)
+    {
+        __builtin_amdgcn_uniform_scale_activate_scatter2_f16(
+            (fp16x2_t*)&outAcc0,
+            (fp16x2_t*)&outAcc1,
+            inAcc.template AsType<half4_t>()[Number<0>{}],
+            ssrc,
+            auxdata,
+            true);
     }
 };
 
@@ -112,7 +171,7 @@ struct intrin_sba_bhalf<auxdata, 0, 0>
 {
     template <class FloatAcc>
     __device__ static void
-    Run(const FloatAcc& inAcc, const float& ssrc, const bhalf2_t& bias, FloatAcc& outAcc)
+    Run(const FloatAcc& inAcc, const bhalf_t& ssrc, const bhalf2_t& bias, FloatAcc& outAcc)
     {
         outAcc.template AsType<bhalf8_t>()(Number<0>{}) = __builtin_amdgcn_scale_bias_activate_bf16(
             inAcc.template AsType<bhalf8_t>()[Number<0>{}], ssrc, bias, auxdata, true);
@@ -134,11 +193,70 @@ template <index_t auxdata>
 struct intrin_sba_bhalf<auxdata, 0, 1>
 {
     template <class FloatAcc>
-    __device__ static void Run(const FloatAcc& inAcc, const float& ssrc, FloatAcc& outAcc)
+    __device__ static void Run(const FloatAcc& inAcc, const bhalf_t& ssrc, FloatAcc& outAcc)
     {
         outAcc.template AsType<bhalf8_t>()(Number<0>{}) =
             __builtin_amdgcn_uniform_scale_activate_bf16(
                 inAcc.template AsType<bhalf8_t>()[Number<0>{}], ssrc, auxdata, true);
+    }
+};
+
+template <index_t auxdata, bool scalebiasPacked, bool uniformScale>
+struct intrin_sba_scatter2_bhalf;
+
+template <index_t auxdata>
+struct intrin_sba_scatter2_bhalf<auxdata, 0, 0>
+{
+    template <class FloatAcc>
+    __device__ static void Run(const FloatAcc& inAcc,
+                               const bhalf_t& ssrc,
+                               const bhalf2_t& bias,
+                               bhalf2_t& outAcc0,
+                               bhalf2_t& outAcc1)
+    {
+        __builtin_amdgcn_scale_bias_activate_scatter2_bf16(
+            (bf16x2_t*)&outAcc0,
+            (bf16x2_t*)&outAcc1,
+            inAcc.template AsType<bhalf4_t>()[Number<0>{}],
+            ssrc,
+            bias,
+            auxdata,
+            true);
+    }
+};
+
+template <index_t auxdata>
+struct intrin_sba_scatter2_bhalf<auxdata, 1, 0>
+{
+    template <class FloatAcc>
+    __device__ static void
+    Run(const FloatAcc& inAcc, const bhalf2_t& scale_bias, bhalf2_t& outAcc0, bhalf2_t& outAcc1)
+    {
+        __builtin_amdgcn_scale_bias_activate_scatter2_bf16(
+            (bf16x2_t*)&outAcc0,
+            (bf16x2_t*)&outAcc1,
+            inAcc.template AsType<bhalf4_t>()[Number<0>{}],
+            0,
+            scale_bias,
+            auxdata,
+            true);
+    }
+};
+
+template <index_t auxdata>
+struct intrin_sba_scatter2_bhalf<auxdata, 0, 1>
+{
+    template <class FloatAcc>
+    __device__ static void
+    Run(const FloatAcc& inAcc, const bhalf_t& ssrc, bhalf2_t& outAcc0, bhalf2_t& outAcc1)
+    {
+        __builtin_amdgcn_uniform_scale_activate_scatter2_bf16(
+            (bf16x2_t*)&outAcc0,
+            (bf16x2_t*)&outAcc1,
+            inAcc.template AsType<bhalf4_t>()[Number<0>{}],
+            ssrc,
+            auxdata,
+            true);
     }
 };
 

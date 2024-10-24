@@ -91,7 +91,7 @@ struct sba_type<SbaInstr::sba_half, auxdata, 0, 0>
 {
     template <class FloatAcc>
     __device__ void
-    Run(const FloatAcc& inAcc, const float& scale, const half2_t& bias, FloatAcc& outSba) const
+    Run(const FloatAcc& inAcc, const half& scale, const half2_t& bias, FloatAcc& outSba) const
     {
 #if defined(__gfx13__)
         intrin_sba_half<auxdata, 0, 0>::Run(inAcc, scale, bias, outSba);
@@ -110,7 +110,7 @@ struct sba_type<SbaInstr::sba_half, auxdata, 0, 1>
 {
     template <class FloatAcc>
     __device__ void Run(const FloatAcc& inAcc,
-                        const float& scale,
+                        const half& scale,
                         const half2_t& bias, // unused
                         FloatAcc& outSba) const
     {
@@ -130,7 +130,7 @@ struct sba_type<SbaInstr::sba_half, auxdata, 1, 0>
 {
     template <class FloatAcc>
     __device__ void Run(const FloatAcc& inAcc,
-                        const float& scale, // unused
+                        const half& scale, // unused
                         const half2_t& bias,
                         FloatAcc& outSba) const
     {
@@ -150,7 +150,7 @@ struct sba_type<SbaInstr::sba_bf16, auxdata, 0, 0>
 {
     template <class FloatAcc>
     __device__ void
-    Run(const FloatAcc& inAcc, const float& scale, const bhalf2_t& bias, FloatAcc& outSba) const
+    Run(const FloatAcc& inAcc, const bhalf_t& scale, const bhalf2_t& bias, FloatAcc& outSba) const
     {
 #if defined(__gfx13__)
         intrin_sba_bhalf<auxdata, 0, 0>::Run(inAcc, scale, bias, outSba);
@@ -169,7 +169,7 @@ struct sba_type<SbaInstr::sba_bf16, auxdata, 0, 1>
 {
     template <class FloatAcc>
     __device__ void Run(const FloatAcc& inAcc,
-                        const float& scale,
+                        const bhalf_t& scale,
                         const bhalf2_t& bias, // unused
                         FloatAcc& outSba) const
     {
@@ -190,7 +190,7 @@ struct sba_type<SbaInstr::sba_bf16, auxdata, 1, 0>
 {
     template <class FloatAcc>
     __device__ void Run(const FloatAcc& inAcc,
-                        const float& scale, // unused
+                        const bhalf_t& scale, // unused
                         const bhalf2_t& bias,
                         FloatAcc& outSba) const
     {
@@ -204,7 +204,146 @@ struct sba_type<SbaInstr::sba_bf16, auxdata, 1, 0>
     }
 };
 
-template <typename AccDataType, index_t auxdata, bool scaleBiasPacked, bool uniformScale>
+// scatter=2 scaleBiasPacked = 0, uniformScale = 0
+template <index_t auxdata>
+struct sba_type<SbaInstr::sba_scatter2_half, auxdata, 0, 0>
+{
+    template <class FloatAcc>
+    __device__ void Run(const FloatAcc& inAcc,
+                        const half& scale,
+                        const half2_t& bias,
+                        half2_t& outSba_0,
+                        half2_t& outSba_1) const
+    {
+#if defined(__gfx13__)
+        intrin_sba_scatter2_half<auxdata, 0, 0>::Run(inAcc, scale, bias, outSba_0, outSba_1);
+#else
+        ignore = inAcc;
+        ignore = scale;
+        ignore = bias;
+        ignore = outSba_0;
+        ignore = outSba_1;
+#endif
+    }
+};
+
+template <index_t auxdata>
+struct sba_type<SbaInstr::sba_scatter2_half, auxdata, 0, 1>
+{
+    template <class FloatAcc>
+    __device__ void Run(const FloatAcc& inAcc,
+                        const half& scale,
+                        const half2_t& bias, // unused
+                        half2_t& outSba_0,
+                        half2_t& outSba_1) const
+    {
+#if defined(__gfx13__)
+        intrin_sba_scatter2_half<auxdata, 0, 1>::Run(inAcc, scale, outSba_0, outSba_1);
+#else
+        ignore = inAcc;
+        ignore = scale;
+        ignore = bias;
+        ignore = outSba_0;
+        ignore = outSba_1;
+#endif
+    }
+};
+
+template <index_t auxdata>
+struct sba_type<SbaInstr::sba_scatter2_half, auxdata, 1, 0>
+{
+    template <class FloatAcc>
+    __device__ void Run(const FloatAcc& inAcc,
+                        const half& scale, // unused
+                        const half2_t& bias,
+                        half2_t& outSba_0,
+                        half2_t& outSba_1) const
+    {
+#if defined(__gfx13__)
+        intrin_sba_scatter2_half<auxdata, 1, 0>::Run(inAcc, bias, outSba_0, outSba_1);
+#else
+        ignore = inAcc;
+        ignore = scale;
+        ignore = bias;
+        ignore = outSba_0;
+        ignore = outSba_1;
+#endif
+    }
+};
+
+// scatter=2 scaleBiasPacked = 0, uniformScale = 0
+template <index_t auxdata>
+struct sba_type<SbaInstr::sba_scatter2_bf16, auxdata, 0, 0>
+{
+    template <class FloatAcc>
+    __device__ void Run(const FloatAcc& inAcc,
+                        const bhalf_t& scale,
+                        const bhalf2_t& bias,
+                        bhalf2_t& outSba_0,
+                        bhalf2_t& outSba_1) const
+    {
+#if defined(__gfx13__)
+        intrin_sba_scatter2_bhalf<auxdata, 0, 0>::Run(inAcc, scale, bias, outSba_0, outSba_1);
+#else
+        ignore = inAcc;
+        ignore = scale;
+        ignore = bias;
+        ignore = outSba_0;
+        ignore = outSba_1;
+#endif
+    }
+};
+
+template <index_t auxdata>
+struct sba_type<SbaInstr::sba_scatter2_bf16, auxdata, 0, 1>
+{
+    template <class FloatAcc>
+    __device__ void Run(const FloatAcc& inAcc,
+                        const bhalf_t& scale,
+                        const bhalf2_t& bias, // unused
+                        bhalf2_t& outSba_0,
+                        bhalf2_t& outSba_1) const
+    {
+#if defined(__gfx13__)
+        intrin_sba_scatter2_bhalf<auxdata, 0, 1>::Run(inAcc, scale, outSba_0, outSba_1);
+#else
+        ignore = inAcc;
+        ignore = scale;
+        ignore = bias;
+        ignore = outSba_0;
+        ignore = outSba_1;
+#endif
+    }
+};
+
+template <index_t auxdata>
+struct sba_type<SbaInstr::sba_scatter2_bf16, auxdata, 1, 0>
+{
+    template <class FloatAcc>
+    __device__ void Run(const FloatAcc& inAcc,
+                        const bhalf_t& scale, // unused
+                        const bhalf2_t& bias,
+                        bhalf2_t& outSba_0,
+                        bhalf2_t& outSba_1) const
+    {
+#if defined(__gfx13__)
+        intrin_sba_scatter2_bhalf<auxdata, 1, 0>::Run(inAcc, bias, outSba_0, outSba_1);
+#else
+        ignore = inAcc;
+        ignore = scale;
+        ignore = bias;
+        ignore = outSba_0;
+        ignore = outSba_1;
+#endif
+    }
+};
+
+template <typename AccDataType,
+          index_t HPerWconv,
+          index_t WPerWconv,
+          index_t auxdata,
+          bool scaleBiasPacked,
+          bool uniformScale>
 struct SbaSelector
 {
     template <typename AccDataType_>
@@ -218,12 +357,26 @@ struct SbaSelector
     template <>
     static constexpr auto GetSba<half_t>()
     {
-        return SbaInstr::sba_half;
+        if(HPerWconv == 4 && WPerWconv == 2)
+        {
+            return SbaInstr::sba_scatter2_half;
+        }
+        else
+        {
+            return SbaInstr::sba_half;
+        }
     }
     template <>
     static constexpr auto GetSba<bhalf_t>()
     {
-        return SbaInstr::sba_bf16;
+        if(HPerWconv == 4 && WPerWconv == 2)
+        {
+            return SbaInstr::sba_scatter2_bf16;
+        }
+        else
+        {
+            return SbaInstr::sba_bf16;
+        }
     }
     // To do for scatter
 
@@ -237,19 +390,143 @@ template <typename AccDataType,
           index_t HPerWconv,
           index_t WPerWconv,
           index_t activeFun,
-          index_t auxdata,
           bool scaleBiasPacked,
           bool uniformScale>
 struct AccSba
 {
     __host__ __device__ constexpr AccSba(){};
 
+    static constexpr index_t WaveSize = 32;
+
     static constexpr index_t GetNumSbaOutComponents()
     {
         return std::is_same<float_t, AccDataType>::value ? 4 : 8;
     }
 
-    static constexpr auto sba = SbaSelector<AccDataType, auxdata, scaleBiasPacked, uniformScale>{};
+    static constexpr index_t GetNumBiasComponents()
+    {
+        if constexpr(!scaleBiasPacked)
+        {
+            if(std::is_same<ck::half_t, AccDataType>::value ||
+               std::is_same<ck::bhalf_t, AccDataType>::value)
+            {
+                return 2;
+            }
+        }
+        return 1;
+    }
+
+    static constexpr index_t GetNumScaleComponents()
+    {
+        // Keep consistent with bias even it hasn't been used in non-pack cases
+        if constexpr(!scaleBiasPacked)
+        {
+            if(std::is_same<ck::half_t, AccDataType>::value ||
+               std::is_same<ck::bhalf_t, AccDataType>::value)
+            {
+                return 2;
+            }
+        }
+        return 1;
+    }
+
+    static constexpr index_t GetWaveMaxBiasNumber()
+    {
+        if constexpr(scaleBiasPacked)
+        {
+            if constexpr(std::is_same<ck::half_t, AccDataType>::value ||
+                         std::is_same<ck::bhalf_t, AccDataType>::value)
+            {
+                return 32;
+            }
+            else if constexpr(std::is_same<float, AccDataType>::value)
+            {
+                return 16;
+            }
+            else
+            {
+                static_assert("Never called\n");
+            }
+        }
+        else
+        {
+            if constexpr(std::is_same<ck::half_t, AccDataType>::value ||
+                         std::is_same<ck::bhalf_t, AccDataType>::value)
+            {
+                return 64;
+            }
+            else if constexpr(std::is_same<float, AccDataType>::value)
+            {
+                return 32;
+            }
+            else
+            {
+                static_assert("Never called\n");
+            }
+        }
+    }
+
+    using BiasVec      = vector_type<AccDataType, GetNumBiasComponents()>;
+    using ScaleVec     = vector_type<AccDataType, GetNumScaleComponents()>;
+    using BiasScaleVec = vector_type<AccDataType, 2>;
+
+    // k0:repeat_number KPerWconv:k_number per instruction
+    static constexpr auto CalculateDsThreadOriginDataIndex(ck::index_t KPerWconv)
+    {
+        // ToDo for VGPR split
+        index_t K_offset            = 0;
+        ck::index_t perThreadNumber = 0;
+        auto laneId                 = get_thread_local_1d_id() & (WaveSize - 1);
+        if constexpr(scaleBiasPacked)
+        {
+            perThreadNumber = 1;
+            if(std::is_same<ck::half_t, AccDataType>::value ||
+               std::is_same<ck::bhalf_t, AccDataType>::value)
+            {
+                K_offset = laneId % (KPerWconv / perThreadNumber);
+            }
+            else if(std::is_same<float, AccDataType>::value)
+            {
+                // 32bit:0.5element perThread
+                K_offset = (laneId % (KPerWconv * 2 / perThreadNumber)) / 2;
+            }
+            return make_tuple(K_offset, 0);
+        }
+        else
+        {
+            if(std::is_same<ck::half_t, AccDataType>::value ||
+               std::is_same<ck::bhalf_t, AccDataType>::value)
+            {
+                perThreadNumber = 2;
+            }
+            else if(std::is_same<float, AccDataType>::value)
+            {
+                perThreadNumber = 1;
+            }
+            index_t K_offset = laneId % (KPerWconv / perThreadNumber);
+            return make_tuple(K_offset, 0);
+        }
+    }
+
+    static constexpr auto GetAuxData()
+    {
+        // int 8X4X8  = 0;
+        // int 4X4X8  = 1;
+        // int 4X4X16 = 2;
+        // int 4X2X16 = 3;
+        if constexpr((HPerWconv == 8) && (WPerWconv == 4))
+            return 0 | (activeFun << 8) | (scaleBiasPacked << 26);
+        else if constexpr((HPerWconv == 4) && (WPerWconv == 4))
+            return 1 | (activeFun << 8) | (scaleBiasPacked << 26);
+        else if constexpr((HPerWconv == 4) && (WPerWconv == 2))
+            return 3 | (activeFun << 8) | (scaleBiasPacked << 26);
+        static_assert("unsupport shape.");
+    };
+
+    static constexpr auto auxdata = GetAuxData();
+
+    static constexpr auto sba =
+        SbaSelector<AccDataType, HPerWconv, WPerWconv, auxdata, scaleBiasPacked, uniformScale>{};
     static constexpr auto sba_instr = sba.selected_sba;
 };
 

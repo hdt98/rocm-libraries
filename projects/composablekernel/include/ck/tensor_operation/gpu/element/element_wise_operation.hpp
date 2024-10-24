@@ -266,6 +266,16 @@ struct MultiplyAdd
         const float y = (c * d0) + d1;
         e             = y;
     }
+
+    template <>
+    __host__ __device__ void operator()<half_t, half_t, bhalf_t, bhalf_t>(half_t& e,
+                                                                          const half_t& c,
+                                                                          const bhalf_t& d0,
+                                                                          const bhalf_t& d1) const
+    {
+        const half_t y = c * type_convert<half_t>(d0) + type_convert<half_t>(d1);
+        e              = y;
+    }
 };
 
 struct MultiplyMultiply
@@ -373,6 +383,18 @@ struct MultiplyAddRelu
 
         e = type_convert<bhalf_t>(result);
     }
+
+    template <>
+    __host__ __device__ constexpr void operator()<half_t, half_t, bhalf_t, bhalf_t>(
+        half_t& e, const half_t& c, const bhalf_t& d0, const bhalf_t& d1) const
+    {
+        const half_t x = c * type_convert<half_t>(d0) + type_convert<half_t>(d1);
+
+        half_t result = 0;
+        Relu{}.template operator()<half_t>(result, x);
+
+        e = type_convert<half_t>(result);
+    }
 };
 
 struct MultiplyAddTanh
@@ -408,6 +430,15 @@ struct MultiplyAddTanh
         const float x = type_convert<float>(c) * type_convert<float>(d0) + type_convert<float>(d1);
 
         e = type_convert<bhalf_t>(std::fmin((float)1.0, std::fmax((float)-1.0, x)));
+    }
+
+    template <>
+    __host__ __device__ constexpr void operator()<half_t, half_t, bhalf_t, bhalf_t>(
+        half_t& e, const half_t& c, const bhalf_t& d0, const bhalf_t& d1) const
+    {
+        const half_t x = c * type_convert<half_t>(d0) + type_convert<half_t>(d1);
+
+        e = type_convert<half_t>(std::fmin((float)1.0, std::fmax((float)-1.0, x)));
     }
 };
 
