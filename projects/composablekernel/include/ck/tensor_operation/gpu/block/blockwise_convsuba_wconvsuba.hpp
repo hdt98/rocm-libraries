@@ -653,7 +653,8 @@ struct BlockwiseSubaConvWconv
                         wconv_conv.wconv_instr.Run(
                             *weight_thread_vec_ptr,
                             indata_thread_vec_ptr,
-                            accum_thread_buf.GetVectorTypeReference(Number<accum_offset>{}));
+                            accum_thread_buf.GetVectorTypeReference(Number<accum_offset>{}),
+                            I0);
                     });
                 });
             });

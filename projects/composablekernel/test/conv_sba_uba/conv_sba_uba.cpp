@@ -375,8 +375,9 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
 #else
                     InDataVec& in_tile_data = inData[h * WRepeat * CRepeat + w * CRepeat + c];
 #endif
-                    const InDataVec* p_in_tile_data[1] = { &in_tile_data };
-                    wconvConv.wconv_instr.Run(weiData[k * CRepeat + c], p_in_tile_data, c_vec);
+                    const InDataVec* p_in_tile_data[1] = {&in_tile_data};
+                    wconvConv.wconv_instr.Run(
+                        weiData[k * CRepeat + c], p_in_tile_data, c_vec, Number<0>{});
                 });
 #if LOAD_DATA_PER_TILE
                 store_acc_data(h, w, k, c_vec);
@@ -391,12 +392,12 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
     // Output accum data
     constexpr auto accSbaInstance = ck::
         AccSba<AccDataType, HPerWconv, WPerWconv, activateFunc, scaleBiasPacked, uniformScale>();
-    using SbaOutVec               = StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr,
+    using SbaOutVec         = StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr,
                                                 AccDataType,
                                                 AccVectorCount,
                                                 accSbaInstance.GetNumSbaOutComponents(),
                                                 true>;
-    SbaOutVec d_thread_buf_       = {};
+    SbaOutVec d_thread_buf_ = {};
 
     static_for<0, HRepeat, 1>{}([&](auto h) {
         static_for<0, WRepeat, 1>{}([&](auto w) {
@@ -784,11 +785,11 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
                 auto& c_vec          = c_thread_buf_.GetVectorTypeReference(Number<0>{});
                 static_for<0, CRepeat, 1>{}([&](auto c) {
                     InDataVec inData[3];
-                    inData[0] = load_in_data(h, w, c, -1);
-                    inData[1] = load_in_data(h, w, c, 0);
-                    inData[2] = load_in_data(h, w, c, 1);
-                    const InDataVec* p_in_data_vec[3] = { &inData[0], &inData[1], &inData[2] };
-                    wconvConv.wconv_instr.Run(weiData[c], inData, c_vec);
+                    inData[0]                         = load_in_data(h, w, c, -1);
+                    inData[1]                         = load_in_data(h, w, c, 0);
+                    inData[2]                         = load_in_data(h, w, c, 1);
+                    const InDataVec* p_in_data_vec[3] = {&inData[0], &inData[1], &inData[2]};
+                    wconvConv.wconv_instr.Run(weiData[c], inData, c_vec, Number<0>{});
                 });
 
                 constexpr index_t tileOffset = h * WRepeat * KRepeat + w * KRepeat + k;
@@ -875,7 +876,7 @@ void DumpTensor(const Tensor<DataType>& tensor, const char* str)
                     {
                         std::cout << "]";
                     }
-                    if (lengths[4] > 3)
+                    if(lengths[4] > 3)
                     {
                         std::cout << std::endl;
                     }

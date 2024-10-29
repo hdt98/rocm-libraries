@@ -37,7 +37,7 @@ template <bool StartLane16>
 constexpr int32_t GetStartLaneMod()
 {
     // MOD2[2]
-    return StartLane16 ? (1 << (2 + ConvolutionAuxData_Mod2)) : 0;
+    return StartLane16 ? (1 << (2 + ConvolutionAuxData_Mod1)) : 0;
 }
 
 template <bool Signed>
@@ -102,11 +102,12 @@ template <index_t H,
           index_t DilationY,
           index_t Iters = 1,
           bool Aco      = false,
-          bool Signed   = false>
+          bool Signed   = false,
+          bool HighLane = false>
 struct intrin_wconv_f32_f16;
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_f32_f16<4, 2, 1, 1, 1, 1, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f32_f16<4, 2, 1, 1, 1, 1, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const half4_t& reg_wei, const half2_t* reg_data[1], FloatC& reg_c)
@@ -115,13 +116,13 @@ struct intrin_wconv_f32_f16<4, 2, 1, 1, 1, 1, Aco, Signed>
             reg_c.template AsType<float4_t>()[Number<0>{}],
             reg_wei,
             *reg_data[0],
-            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>(),
+            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_f32_f16<4, 2, 1, 1, 1, 2, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f32_f16<4, 2, 1, 1, 1, 2, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const half8_t& reg_wei, const half2_t* reg_data[2], FloatC& reg_c)
@@ -131,13 +132,14 @@ struct intrin_wconv_f32_f16<4, 2, 1, 1, 1, 2, Aco, Signed>
             reg_wei,
             *reg_data[0],
             *reg_data[1],
-            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetItersMod<2>(),
+            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() |
+                GetItersMod<2>(),
             0);
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_f32_f16<4, 2, 1, 1, 1, 4, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f32_f16<4, 2, 1, 1, 1, 4, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const half16_t& reg_wei, const half2_t* reg_data[4], FloatC& reg_c)
@@ -149,7 +151,8 @@ struct intrin_wconv_f32_f16<4, 2, 1, 1, 1, 4, Aco, Signed>
             *reg_data[1],
             *reg_data[2],
             *reg_data[3],
-            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetItersMod<4>(),
+            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() |
+                GetItersMod<4>(),
             0);
     }
 };
@@ -162,11 +165,12 @@ template <index_t H,
           index_t DilationY,
           index_t Iters = 1,
           bool Aco      = false,
-          bool Signed   = false>
+          bool Signed   = false,
+          bool HighLane = false>
 struct intrin_wconv_f32_bf16;
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_f32_bf16<4, 2, 1, 1, 1, 1, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f32_bf16<4, 2, 1, 1, 1, 1, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const bhalf4_t& reg_wei, const bhalf2_t* reg_data[1], FloatC& reg_c)
@@ -175,13 +179,13 @@ struct intrin_wconv_f32_bf16<4, 2, 1, 1, 1, 1, Aco, Signed>
             reg_c.template AsType<float4_t>()[Number<0>{}],
             bit_cast<bf16x4_t>(reg_wei),
             *reinterpret_cast<const bf16x2_t*>(reg_data[0]),
-            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>(),
+            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_f32_bf16<4, 2, 1, 1, 1, 2, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f32_bf16<4, 2, 1, 1, 1, 2, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const bhalf8_t& reg_wei, const bhalf2_t* reg_data[2], FloatC& reg_c)
@@ -191,13 +195,14 @@ struct intrin_wconv_f32_bf16<4, 2, 1, 1, 1, 2, Aco, Signed>
             bit_cast<bf16x8_t>(reg_wei),
             *reinterpret_cast<const bf16x2_t*>(reg_data[0]),
             *reinterpret_cast<const bf16x2_t*>(reg_data[1]),
-            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetItersMod<2>(),
+            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() |
+                GetItersMod<2>(),
             0);
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_f32_bf16<4, 2, 1, 1, 1, 4, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f32_bf16<4, 2, 1, 1, 1, 4, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const bhalf16_t& reg_wei, const bhalf2_t* reg_data[4], FloatC& reg_c)
@@ -209,7 +214,8 @@ struct intrin_wconv_f32_bf16<4, 2, 1, 1, 1, 4, Aco, Signed>
             *reinterpret_cast<const bf16x2_t*>(reg_data[1]),
             *reinterpret_cast<const bf16x2_t*>(reg_data[2]),
             *reinterpret_cast<const bf16x2_t*>(reg_data[3]),
-            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetItersMod<4>(),
+            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() |
+                GetItersMod<4>(),
             0);
     }
 };
@@ -222,11 +228,12 @@ template <index_t H,
           index_t DilationY,
           index_t Iters = 1,
           bool Aco      = false,
-          bool Signed   = false>
+          bool Signed   = false,
+          bool HighLane = false>
 struct intrin_wconv_f32_f8;
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_f32_f8<4, 2, 1, 1, 1, 1, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f32_f8<4, 2, 1, 1, 1, 1, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const f8x8_t& reg_wei, const f8x4_t* reg_data[1], FloatC& reg_c)
@@ -235,13 +242,13 @@ struct intrin_wconv_f32_f8<4, 2, 1, 1, 1, 1, Aco, Signed>
             reg_c.template AsType<float4_t>()[Number<0>{}],
             bit_cast<int32x2_t>(reg_wei),
             *reinterpret_cast<const int32_t*>(reg_data[0]),
-            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>(),
+            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_f32_f8<4, 2, 1, 1, 1, 2, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f32_f8<4, 2, 1, 1, 1, 2, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const f8x16_t& reg_wei, const f8x4_t* reg_data[2], FloatC& reg_c)
@@ -251,13 +258,14 @@ struct intrin_wconv_f32_f8<4, 2, 1, 1, 1, 2, Aco, Signed>
             bit_cast<int32x4_t>(reg_wei),
             *reinterpret_cast<const int32_t*>(reg_data[0]),
             *reinterpret_cast<const int32_t*>(reg_data[1]),
-            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetItersMod<2>(),
+            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() |
+                GetItersMod<2>(),
             0);
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_f32_f8<4, 2, 1, 1, 1, 4, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f32_f8<4, 2, 1, 1, 1, 4, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const f8x32_t& reg_wei, const f8x4_t* reg_data[4], FloatC& reg_c)
@@ -269,7 +277,8 @@ struct intrin_wconv_f32_f8<4, 2, 1, 1, 1, 4, Aco, Signed>
             *reinterpret_cast<const int32_t*>(reg_data[1]),
             *reinterpret_cast<const int32_t*>(reg_data[2]),
             *reinterpret_cast<const int32_t*>(reg_data[3]),
-            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetItersMod<4>(),
+            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() |
+                GetItersMod<4>(),
             0);
     }
 };
@@ -282,11 +291,12 @@ template <index_t H,
           index_t DilationY,
           index_t Iters = 1,
           bool Aco      = false,
-          bool Signed   = false>
+          bool Signed   = false,
+          bool HighLane = false>
 struct intrin_wconv_f32_bf8;
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_f32_bf8<4, 2, 1, 1, 1, 1, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f32_bf8<4, 2, 1, 1, 1, 1, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const bf8x8_t& reg_wei, const bf8x4_t* reg_data[1], FloatC& reg_c)
@@ -295,13 +305,13 @@ struct intrin_wconv_f32_bf8<4, 2, 1, 1, 1, 1, Aco, Signed>
             reg_c.template AsType<float4_t>()[Number<0>{}],
             bit_cast<int32x2_t>(reg_wei),
             *reinterpret_cast<const int32_t*>(reg_data[0]),
-            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>(),
+            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_f32_bf8<4, 2, 1, 1, 1, 2, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f32_bf8<4, 2, 1, 1, 1, 2, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const bf8x16_t& reg_wei, const bf8x4_t* reg_data[2], FloatC& reg_c)
@@ -311,13 +321,14 @@ struct intrin_wconv_f32_bf8<4, 2, 1, 1, 1, 2, Aco, Signed>
             bit_cast<int32x4_t>(reg_wei),
             *reinterpret_cast<const int32_t*>(reg_data[0]),
             *reinterpret_cast<const int32_t*>(reg_data[1]),
-            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetItersMod<2>(),
+            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() |
+                GetItersMod<2>(),
             0);
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_f32_bf8<4, 2, 1, 1, 1, 4, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f32_bf8<4, 2, 1, 1, 1, 4, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const bf8x32_t& reg_wei, const bf8x4_t* reg_data[4], FloatC& reg_c)
@@ -329,7 +340,8 @@ struct intrin_wconv_f32_bf8<4, 2, 1, 1, 1, 4, Aco, Signed>
             *reinterpret_cast<const int32_t*>(reg_data[1]),
             *reinterpret_cast<const int32_t*>(reg_data[2]),
             *reinterpret_cast<const int32_t*>(reg_data[3]),
-            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetItersMod<4>(),
+            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() |
+                GetItersMod<4>(),
             0);
     }
 };
@@ -342,11 +354,12 @@ template <index_t H,
           index_t DilationY,
           index_t Iters = 1,
           bool Aco      = false,
-          bool Signed   = false>
+          bool Signed   = false,
+          bool HighLane = false>
 struct intrin_wconv_f32_iu8;
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_f32_iu8<4, 2, 1, 1, 1, 1, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f32_iu8<4, 2, 1, 1, 1, 1, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const int8x8_t& reg_wei, const int8x4_t* reg_data[1], FloatC& reg_c)
@@ -356,13 +369,13 @@ struct intrin_wconv_f32_iu8<4, 2, 1, 1, 1, 1, Aco, Signed>
             bit_cast<int32x2_t>(reg_wei),
             *reinterpret_cast<const int32_t*>(reg_data[0]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
-                GetAccumChannelOrderMod<Aco>(),
+                GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_f32_iu8<4, 2, 1, 1, 1, 2, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f32_iu8<4, 2, 1, 1, 1, 2, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const int8x16_t& reg_wei, const int8x4_t* reg_data[2], FloatC& reg_c)
@@ -373,13 +386,13 @@ struct intrin_wconv_f32_iu8<4, 2, 1, 1, 1, 2, Aco, Signed>
             *reinterpret_cast<const int32_t*>(reg_data[0]),
             *reinterpret_cast<const int32_t*>(reg_data[1]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
-                GetAccumChannelOrderMod<Aco>() | GetItersMod<2>(),
+                GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() | GetItersMod<2>(),
             0);
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_f32_iu8<4, 2, 1, 1, 1, 4, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f32_iu8<4, 2, 1, 1, 1, 4, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const int8x32_t& reg_wei, const int8x4_t* reg_data[4], FloatC& reg_c)
@@ -392,7 +405,7 @@ struct intrin_wconv_f32_iu8<4, 2, 1, 1, 1, 4, Aco, Signed>
             *reinterpret_cast<const int32_t*>(reg_data[2]),
             *reinterpret_cast<const int32_t*>(reg_data[3]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
-                GetAccumChannelOrderMod<Aco>() | GetItersMod<4>(),
+                GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() | GetItersMod<4>(),
             0);
     }
 };
@@ -405,11 +418,12 @@ template <index_t H,
           index_t DilationY,
           index_t Iters = 1,
           bool Aco      = false,
-          bool Signed   = false>
+          bool Signed   = false,
+          bool HighLane = false>
 struct intrin_wconv_i32_iu8;
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_i32_iu8<4, 2, 1, 1, 1, 1, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_i32_iu8<4, 2, 1, 1, 1, 1, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const int8x8_t& reg_wei, const int8x4_t* reg_data[1], FloatC& reg_c)
@@ -419,13 +433,13 @@ struct intrin_wconv_i32_iu8<4, 2, 1, 1, 1, 1, Aco, Signed>
             bit_cast<int32x2_t>(reg_wei),
             *reinterpret_cast<const int32_t*>(reg_data[0]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
-                GetAccumChannelOrderMod<Aco>(),
+                GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_i32_iu8<4, 2, 1, 1, 1, 2, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_i32_iu8<4, 2, 1, 1, 1, 2, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const int8x16_t& reg_wei, const int8x4_t* reg_data[2], FloatC& reg_c)
@@ -436,13 +450,13 @@ struct intrin_wconv_i32_iu8<4, 2, 1, 1, 1, 2, Aco, Signed>
             *reinterpret_cast<const int32_t*>(reg_data[0]),
             *reinterpret_cast<const int32_t*>(reg_data[1]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
-                GetAccumChannelOrderMod<Aco>() | GetItersMod<2>(),
+                GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() | GetItersMod<2>(),
             0);
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_i32_iu8<4, 2, 1, 1, 1, 4, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_i32_iu8<4, 2, 1, 1, 1, 4, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const int8x32_t& reg_wei, const int8x4_t* reg_data[4], FloatC& reg_c)
@@ -455,7 +469,7 @@ struct intrin_wconv_i32_iu8<4, 2, 1, 1, 1, 4, Aco, Signed>
             *reinterpret_cast<const int32_t*>(reg_data[2]),
             *reinterpret_cast<const int32_t*>(reg_data[3]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
-                GetAccumChannelOrderMod<Aco>() | GetItersMod<4>(),
+                GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() | GetItersMod<4>(),
             0);
     }
 };
@@ -469,11 +483,12 @@ template <index_t H,
           index_t DilationY,
           index_t Iters = 1,
           bool Aco      = false,
-          bool Signed   = false>
+          bool Signed   = false,
+          bool HighLane = false>
 struct intrin_wconv_f32_iu4;
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_f32_iu4<4, 2, 1, 1, 1, 1, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f32_iu4<4, 2, 1, 1, 1, 1, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const int4x16_t& reg_wei, const int4x8_t* reg_data[1], FloatC& reg_c)
@@ -483,13 +498,13 @@ struct intrin_wconv_f32_iu4<4, 2, 1, 1, 1, 1, Aco, Signed>
             bit_cast<int32x2_t>(reg_wei),
             *reinterpret_cast<const int32_t*>(reg_data[0]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
-                GetAccumChannelOrderMod<Aco>(),
+                GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_f32_iu4<4, 2, 1, 1, 1, 2, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f32_iu4<4, 2, 1, 1, 1, 2, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const int4x32_t& reg_wei, const int4x8_t* reg_data[2], FloatC& reg_c)
@@ -500,13 +515,13 @@ struct intrin_wconv_f32_iu4<4, 2, 1, 1, 1, 2, Aco, Signed>
             *reinterpret_cast<const int32_t*>(reg_data[0]),
             *reinterpret_cast<const int32_t*>(reg_data[1]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
-                GetAccumChannelOrderMod<Aco>() | GetItersMod<2>(),
+                GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() | GetItersMod<2>(),
             0);
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_f32_iu4<4, 2, 1, 1, 1, 4, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f32_iu4<4, 2, 1, 1, 1, 4, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const int4x64_t& reg_wei, const int4x8_t* reg_data[4], FloatC& reg_c)
@@ -519,7 +534,7 @@ struct intrin_wconv_f32_iu4<4, 2, 1, 1, 1, 4, Aco, Signed>
             *reinterpret_cast<const int32_t*>(reg_data[2]),
             *reinterpret_cast<const int32_t*>(reg_data[3]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
-                GetAccumChannelOrderMod<Aco>() | GetItersMod<4>(),
+                GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() | GetItersMod<4>(),
             0);
     }
 };
@@ -532,11 +547,12 @@ template <index_t H,
           index_t DilationY,
           index_t Iters = 1,
           bool Aco      = false,
-          bool Signed   = false>
+          bool Signed   = false,
+          bool HighLane = false>
 struct intrin_wconv_i32_iu4;
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_i32_iu4<4, 2, 1, 1, 1, 1, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_i32_iu4<4, 2, 1, 1, 1, 1, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const int4x16_t& reg_wei, const int4x8_t* reg_data[1], FloatC& reg_c)
@@ -546,13 +562,13 @@ struct intrin_wconv_i32_iu4<4, 2, 1, 1, 1, 1, Aco, Signed>
             bit_cast<int32x2_t>(reg_wei),
             *reinterpret_cast<const int32_t*>(reg_data[0]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
-                GetAccumChannelOrderMod<Aco>(),
+                GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_i32_iu4<4, 2, 1, 1, 1, 2, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_i32_iu4<4, 2, 1, 1, 1, 2, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const int4x32_t& reg_wei, const int4x8_t* reg_data[2], FloatC& reg_c)
@@ -563,13 +579,13 @@ struct intrin_wconv_i32_iu4<4, 2, 1, 1, 1, 2, Aco, Signed>
             *reinterpret_cast<const int32_t*>(reg_data[0]),
             *reinterpret_cast<const int32_t*>(reg_data[1]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
-                GetAccumChannelOrderMod<Aco>() | GetItersMod<2>(),
+                GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() | GetItersMod<2>(),
             0);
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_i32_iu4<4, 2, 1, 1, 1, 4, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_i32_iu4<4, 2, 1, 1, 1, 4, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const int4x64_t& reg_wei, const int4x8_t* reg_data[4], FloatC& reg_c)
@@ -582,7 +598,7 @@ struct intrin_wconv_i32_iu4<4, 2, 1, 1, 1, 4, Aco, Signed>
             *reinterpret_cast<const int32_t*>(reg_data[2]),
             *reinterpret_cast<const int32_t*>(reg_data[3]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
-                GetAccumChannelOrderMod<Aco>() | GetItersMod<4>(),
+                GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() | GetItersMod<4>(),
             0);
     }
 };
@@ -596,11 +612,12 @@ template <index_t H,
           index_t DilationY,
           index_t Iters = 1,
           bool Aco      = false,
-          bool Signed   = false>
+          bool Signed   = false,
+          bool HighLane = false>
 struct intrin_wconv_f16_f16;
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_f16_f16<4, 2, 1, 1, 1, 1, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f16_f16<4, 2, 1, 1, 1, 1, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const half4_t& reg_wei, const half2_t* reg_data[1], FloatC& reg_c)
@@ -609,13 +626,13 @@ struct intrin_wconv_f16_f16<4, 2, 1, 1, 1, 1, Aco, Signed>
             reg_c.template AsType<half4_t>()[Number<0>{}],
             reg_wei,
             *reg_data[0],
-            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>(),
+            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_f16_f16<4, 2, 1, 1, 1, 2, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f16_f16<4, 2, 1, 1, 1, 2, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const half8_t& reg_wei, const half2_t* reg_data[2], FloatC& reg_c)
@@ -625,13 +642,14 @@ struct intrin_wconv_f16_f16<4, 2, 1, 1, 1, 2, Aco, Signed>
             reg_wei,
             *reg_data[0],
             *reg_data[1],
-            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetItersMod<2>(),
+            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() |
+                GetItersMod<2>(),
             0);
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_f16_f16<4, 2, 1, 1, 1, 4, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f16_f16<4, 2, 1, 1, 1, 4, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const half16_t& reg_wei, const half2_t* reg_data[4], FloatC& reg_c)
@@ -643,13 +661,14 @@ struct intrin_wconv_f16_f16<4, 2, 1, 1, 1, 4, Aco, Signed>
             *reg_data[1],
             *reg_data[2],
             *reg_data[3],
-            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetItersMod<4>(),
+            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() |
+                GetItersMod<4>(),
             0);
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_f16_f16<4, 4, 1, 1, 1, 1, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f16_f16<4, 4, 1, 1, 1, 1, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const half2_t& reg_wei, const half2_t* reg_data[1], FloatC& reg_c)
@@ -658,13 +677,13 @@ struct intrin_wconv_f16_f16<4, 4, 1, 1, 1, 1, Aco, Signed>
             reg_c.template AsType<half8_t>()[Number<0>{}],
             reg_wei,
             *reg_data[0],
-            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>(),
+            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_f16_f16<4, 4, 1, 1, 1, 2, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f16_f16<4, 4, 1, 1, 1, 2, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const half4_t& reg_wei, const half2_t* reg_data[2], FloatC& reg_c)
@@ -674,13 +693,14 @@ struct intrin_wconv_f16_f16<4, 4, 1, 1, 1, 2, Aco, Signed>
             reg_wei,
             *reg_data[0],
             *reg_data[1],
-            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetItersMod<2>(),
+            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() |
+                GetItersMod<2>(),
             0);
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_f16_f16<4, 4, 1, 1, 1, 4, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f16_f16<4, 4, 1, 1, 1, 4, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const half8_t& reg_wei, const half2_t* reg_data[4], FloatC& reg_c)
@@ -692,13 +712,14 @@ struct intrin_wconv_f16_f16<4, 4, 1, 1, 1, 4, Aco, Signed>
             *reg_data[1],
             *reg_data[2],
             *reg_data[3],
-            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetItersMod<4>(),
+            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() |
+                GetItersMod<4>(),
             0);
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_f16_f16<8, 4, 1, 1, 1, 1, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f16_f16<8, 4, 1, 1, 1, 1, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const half2_t& reg_wei, const half4_t* reg_data[1], FloatC& reg_c)
@@ -707,13 +728,13 @@ struct intrin_wconv_f16_f16<8, 4, 1, 1, 1, 1, Aco, Signed>
             reg_c.template AsType<half8_t>()[Number<0>{}],
             reg_wei,
             *reg_data[0],
-            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>(),
+            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_f16_f16<8, 4, 1, 1, 1, 2, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f16_f16<8, 4, 1, 1, 1, 2, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const half2_t& reg_wei, const half4_t* reg_data[2], FloatC& reg_c)
@@ -723,13 +744,14 @@ struct intrin_wconv_f16_f16<8, 4, 1, 1, 1, 2, Aco, Signed>
             reg_wei,
             *reg_data[0],
             *reg_data[1],
-            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetItersMod<2>(),
+            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() |
+                GetItersMod<2>(),
             0);
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_f16_f16<8, 4, 1, 1, 1, 4, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f16_f16<8, 4, 1, 1, 1, 4, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const half4_t& reg_wei, const half4_t* reg_data[4], FloatC& reg_c)
@@ -741,7 +763,8 @@ struct intrin_wconv_f16_f16<8, 4, 1, 1, 1, 4, Aco, Signed>
             *reg_data[1],
             *reg_data[2],
             *reg_data[3],
-            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetItersMod<4>(),
+            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() |
+                GetItersMod<4>(),
             0);
     }
 };
@@ -754,11 +777,12 @@ template <index_t H,
           index_t DilationY,
           index_t Iters = 1,
           bool Aco      = false,
-          bool Signed   = false>
+          bool Signed   = false,
+          bool HighLane = false>
 struct intrin_wconv_bf16_bf16;
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_bf16_bf16<4, 2, 1, 1, 1, 1, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_bf16_bf16<4, 2, 1, 1, 1, 1, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const bhalf4_t& reg_wei, const bhalf2_t* reg_data[1], FloatC& reg_c)
@@ -768,13 +792,14 @@ struct intrin_wconv_bf16_bf16<4, 2, 1, 1, 1, 1, Aco, Signed>
                 bit_cast<bf16x4_t>(reg_c.template AsType<bhalf4_t>()[Number<0>{}]),
                 bit_cast<bf16x4_t>(reg_wei),
                 *reinterpret_cast<const bf16x2_t*>(reg_data[0]),
-                GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>(),
+                GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() |
+                    GetStartLaneMod<HighLane>(),
                 0));
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_bf16_bf16<4, 2, 1, 1, 1, 2, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_bf16_bf16<4, 2, 1, 1, 1, 2, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const bhalf8_t& reg_wei, const bhalf2_t* reg_data[2], FloatC& reg_c)
@@ -785,13 +810,14 @@ struct intrin_wconv_bf16_bf16<4, 2, 1, 1, 1, 2, Aco, Signed>
                 bit_cast<bf16x8_t>(reg_wei),
                 *reinterpret_cast<const bf16x2_t*>(reg_data[0]),
                 *reinterpret_cast<const bf16x2_t*>(reg_data[1]),
-                GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetItersMod<2>(),
+                GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() |
+                    GetStartLaneMod<HighLane>() | GetItersMod<2>(),
                 0));
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_bf16_bf16<4, 2, 1, 1, 1, 4, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_bf16_bf16<4, 2, 1, 1, 1, 4, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const bhalf16_t& reg_wei, const bhalf2_t* reg_data[4], FloatC& reg_c)
@@ -804,13 +830,14 @@ struct intrin_wconv_bf16_bf16<4, 2, 1, 1, 1, 4, Aco, Signed>
                 *reinterpret_cast<const bf16x2_t*>(reg_data[1]),
                 *reinterpret_cast<const bf16x2_t*>(reg_data[2]),
                 *reinterpret_cast<const bf16x2_t*>(reg_data[3]),
-                GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetItersMod<4>(),
+                GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() |
+                    GetStartLaneMod<HighLane>() | GetItersMod<4>(),
                 0));
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_bf16_bf16<4, 4, 1, 1, 1, 1, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_bf16_bf16<4, 4, 1, 1, 1, 1, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const bhalf2_t& reg_wei, const bhalf2_t* reg_data[1], FloatC& reg_c)
@@ -820,13 +847,14 @@ struct intrin_wconv_bf16_bf16<4, 4, 1, 1, 1, 1, Aco, Signed>
                 bit_cast<bf16x8_t>(reg_c.template AsType<bhalf8_t>()[Number<0>{}]),
                 bit_cast<bf16x2_t>(reg_wei),
                 *reinterpret_cast<const bf16x2_t*>(reg_data[0]),
-                GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>(),
+                GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() |
+                    GetStartLaneMod<HighLane>(),
                 0));
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_bf16_bf16<4, 4, 1, 1, 1, 2, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_bf16_bf16<4, 4, 1, 1, 1, 2, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const bhalf4_t& reg_wei, const bhalf2_t* reg_data[2], FloatC& reg_c)
@@ -837,13 +865,14 @@ struct intrin_wconv_bf16_bf16<4, 4, 1, 1, 1, 2, Aco, Signed>
                 bit_cast<bf16x4_t>(reg_wei),
                 *reinterpret_cast<const bf16x2_t*>(reg_data[0]),
                 *reinterpret_cast<const bf16x2_t*>(reg_data[1]),
-                GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetItersMod<2>(),
+                GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() |
+                    GetStartLaneMod<HighLane>() | GetItersMod<2>(),
                 0));
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_bf16_bf16<4, 4, 1, 1, 1, 4, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_bf16_bf16<4, 4, 1, 1, 1, 4, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const bhalf8_t& reg_wei, const bhalf2_t* reg_data[4], FloatC& reg_c)
@@ -856,13 +885,14 @@ struct intrin_wconv_bf16_bf16<4, 4, 1, 1, 1, 4, Aco, Signed>
                 *reinterpret_cast<const bf16x2_t*>(reg_data[1]),
                 *reinterpret_cast<const bf16x2_t*>(reg_data[2]),
                 *reinterpret_cast<const bf16x2_t*>(reg_data[3]),
-                GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetItersMod<4>(),
+                GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() |
+                    GetStartLaneMod<HighLane>() | GetItersMod<4>(),
                 0));
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_bf16_bf16<8, 4, 1, 1, 1, 1, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_bf16_bf16<8, 4, 1, 1, 1, 1, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const bhalf2_t& reg_wei, const bhalf4_t* reg_data[1], FloatC& reg_c)
@@ -872,13 +902,14 @@ struct intrin_wconv_bf16_bf16<8, 4, 1, 1, 1, 1, Aco, Signed>
                 bit_cast<bf16x8_t>(reg_c.template AsType<bhalf8_t>()[Number<0>{}]),
                 bit_cast<bf16x2_t>(reg_wei),
                 *reinterpret_cast<const bf16x4_t*>(reg_data[0]),
-                GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>(),
+                GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() |
+                    GetStartLaneMod<HighLane>(),
                 0));
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_bf16_bf16<8, 4, 1, 1, 1, 2, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_bf16_bf16<8, 4, 1, 1, 1, 2, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const bhalf2_t& reg_wei, const bhalf4_t* reg_data[2], FloatC& reg_c)
@@ -889,13 +920,14 @@ struct intrin_wconv_bf16_bf16<8, 4, 1, 1, 1, 2, Aco, Signed>
                 bit_cast<bf16x2_t>(reg_wei),
                 *reinterpret_cast<const bf16x4_t*>(reg_data[0]),
                 *reinterpret_cast<const bf16x4_t*>(reg_data[1]),
-                GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetItersMod<2>(),
+                GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() |
+                    GetStartLaneMod<HighLane>() | GetItersMod<2>(),
                 0));
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_bf16_bf16<8, 4, 1, 1, 1, 4, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_bf16_bf16<8, 4, 1, 1, 1, 4, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const bhalf4_t& reg_wei, const bhalf4_t* reg_data[4], FloatC& reg_c)
@@ -908,7 +940,8 @@ struct intrin_wconv_bf16_bf16<8, 4, 1, 1, 1, 4, Aco, Signed>
                 *reinterpret_cast<const bf16x4_t*>(reg_data[1]),
                 *reinterpret_cast<const bf16x4_t*>(reg_data[2]),
                 *reinterpret_cast<const bf16x4_t*>(reg_data[3]),
-                GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetItersMod<4>(),
+                GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() |
+                    GetStartLaneMod<HighLane>() | GetItersMod<4>(),
                 0));
     }
 };
@@ -921,11 +954,12 @@ template <index_t H,
           index_t DilationY,
           index_t Iters = 1,
           bool Aco      = false,
-          bool Signed   = false>
+          bool Signed   = false,
+          bool HighLane = false>
 struct intrin_wconv_bf16_bf8;
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_bf16_bf8<4, 2, 1, 1, 1, 1, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_bf16_bf8<4, 2, 1, 1, 1, 1, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const bf8x8_t& reg_wei, const bf8x4_t* reg_data[1], FloatC& reg_c)
@@ -935,13 +969,14 @@ struct intrin_wconv_bf16_bf8<4, 2, 1, 1, 1, 1, Aco, Signed>
                 bit_cast<bf16x4_t>(reg_c.template AsType<bhalf4_t>()[Number<0>{}]),
                 bit_cast<int32x2_t>(reg_wei),
                 *reinterpret_cast<const int32_t*>(reg_data[0]),
-                GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>(),
+                GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() |
+                    GetStartLaneMod<HighLane>(),
                 0));
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_bf16_bf8<4, 2, 1, 1, 1, 2, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_bf16_bf8<4, 2, 1, 1, 1, 2, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const bf8x16_t& reg_wei, const bf8x4_t* reg_data[2], FloatC& reg_c)
@@ -952,13 +987,14 @@ struct intrin_wconv_bf16_bf8<4, 2, 1, 1, 1, 2, Aco, Signed>
                 bit_cast<int32x4_t>(reg_wei),
                 *reinterpret_cast<const int32_t*>(reg_data[0]),
                 *reinterpret_cast<const int32_t*>(reg_data[1]),
-                GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetItersMod<2>(),
+                GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() |
+                    GetStartLaneMod<HighLane>() | GetItersMod<2>(),
                 0));
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_bf16_bf8<4, 2, 1, 1, 1, 4, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_bf16_bf8<4, 2, 1, 1, 1, 4, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const bf8x32_t& reg_wei, const bf8x4_t* reg_data[4], FloatC& reg_c)
@@ -971,13 +1007,14 @@ struct intrin_wconv_bf16_bf8<4, 2, 1, 1, 1, 4, Aco, Signed>
                 *reinterpret_cast<const int32_t*>(reg_data[1]),
                 *reinterpret_cast<const int32_t*>(reg_data[2]),
                 *reinterpret_cast<const int32_t*>(reg_data[3]),
-                GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetItersMod<4>(),
+                GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() |
+                    GetStartLaneMod<HighLane>() | GetItersMod<4>(),
                 0));
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_bf16_bf8<4, 4, 1, 1, 1, 1, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_bf16_bf8<4, 4, 1, 1, 1, 1, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const bf8x4_t& reg_wei, const bf8x4_t* reg_data[1], FloatC& reg_c)
@@ -987,13 +1024,14 @@ struct intrin_wconv_bf16_bf8<4, 4, 1, 1, 1, 1, Aco, Signed>
                 bit_cast<bf16x8_t>(reg_c.template AsType<bhalf8_t>()[Number<0>{}]),
                 bit_cast<int32_t>(reg_wei),
                 *reinterpret_cast<const int32_t*>(reg_data[0]),
-                GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>(),
+                GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() |
+                    GetStartLaneMod<HighLane>(),
                 0));
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_bf16_bf8<4, 4, 1, 1, 1, 2, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_bf16_bf8<4, 4, 1, 1, 1, 2, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const bf8x8_t& reg_wei, const bf8x4_t* reg_data[2], FloatC& reg_c)
@@ -1004,13 +1042,14 @@ struct intrin_wconv_bf16_bf8<4, 4, 1, 1, 1, 2, Aco, Signed>
                 bit_cast<int32x2_t>(reg_wei),
                 *reinterpret_cast<const int32_t*>(reg_data[0]),
                 *reinterpret_cast<const int32_t*>(reg_data[1]),
-                GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetItersMod<2>(),
+                GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() |
+                    GetStartLaneMod<HighLane>() | GetItersMod<2>(),
                 0));
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_bf16_bf8<4, 4, 1, 1, 1, 4, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_bf16_bf8<4, 4, 1, 1, 1, 4, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const bf8x16_t& reg_wei, const bf8x4_t* reg_data[4], FloatC& reg_c)
@@ -1023,13 +1062,14 @@ struct intrin_wconv_bf16_bf8<4, 4, 1, 1, 1, 4, Aco, Signed>
                 *reinterpret_cast<const int32_t*>(reg_data[1]),
                 *reinterpret_cast<const int32_t*>(reg_data[2]),
                 *reinterpret_cast<const int32_t*>(reg_data[3]),
-                GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetItersMod<4>(),
+                GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() |
+                    GetStartLaneMod<HighLane>() | GetItersMod<4>(),
                 0));
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_bf16_bf8<8, 4, 1, 1, 1, 1, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_bf16_bf8<8, 4, 1, 1, 1, 1, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const bf8x4_t& reg_wei, const bf8x8_t* reg_data[1], FloatC& reg_c)
@@ -1039,13 +1079,14 @@ struct intrin_wconv_bf16_bf8<8, 4, 1, 1, 1, 1, Aco, Signed>
                 bit_cast<bf16x8_t>(reg_c.template AsType<bhalf8_t>()[Number<0>{}]),
                 bit_cast<int32_t>(reg_wei),
                 *reinterpret_cast<const int32x2_t*>(reg_data[0]),
-                GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>(),
+                GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() |
+                    GetStartLaneMod<HighLane>(),
                 0));
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_bf16_bf8<8, 4, 1, 1, 1, 2, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_bf16_bf8<8, 4, 1, 1, 1, 2, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const bf8x4_t& reg_wei, const bf8x8_t* reg_data[2], FloatC& reg_c)
@@ -1056,13 +1097,14 @@ struct intrin_wconv_bf16_bf8<8, 4, 1, 1, 1, 2, Aco, Signed>
                 bit_cast<int32_t>(reg_wei),
                 *reinterpret_cast<const int32x2_t*>(reg_data[0]),
                 *reinterpret_cast<const int32x2_t*>(reg_data[1]),
-                GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetItersMod<2>(),
+                GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() |
+                    GetStartLaneMod<HighLane>() | GetItersMod<2>(),
                 0));
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_bf16_bf8<8, 4, 1, 1, 1, 4, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_bf16_bf8<8, 4, 1, 1, 1, 4, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const bf8x8_t& reg_wei, const bf8x8_t* reg_data[4], FloatC& reg_c)
@@ -1075,7 +1117,8 @@ struct intrin_wconv_bf16_bf8<8, 4, 1, 1, 1, 4, Aco, Signed>
                 *reinterpret_cast<const int32x2_t*>(reg_data[1]),
                 *reinterpret_cast<const int32x2_t*>(reg_data[2]),
                 *reinterpret_cast<const int32x2_t*>(reg_data[3]),
-                GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetItersMod<4>(),
+                GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() |
+                    GetStartLaneMod<HighLane>() | GetItersMod<4>(),
                 0));
     }
 };
@@ -1088,11 +1131,12 @@ template <index_t H,
           index_t DilationY,
           index_t Iters = 1,
           bool Aco      = false,
-          bool Signed   = false>
+          bool Signed   = false,
+          bool HighLane = false>
 struct intrin_wconv_f16_f8;
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_f16_f8<4, 2, 1, 1, 1, 1, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f16_f8<4, 2, 1, 1, 1, 1, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const f8x8_t& reg_wei, const f8x4_t* reg_data[1], FloatC& reg_c)
@@ -1101,13 +1145,13 @@ struct intrin_wconv_f16_f8<4, 2, 1, 1, 1, 1, Aco, Signed>
             reg_c.template AsType<half4_t>()[Number<0>{}],
             bit_cast<int32x2_t>(reg_wei),
             *reinterpret_cast<const int32_t*>(reg_data[0]),
-            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>(),
+            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_f16_f8<4, 2, 1, 1, 1, 2, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f16_f8<4, 2, 1, 1, 1, 2, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const f8x16_t& reg_wei, const f8x4_t* reg_data[2], FloatC& reg_c)
@@ -1117,13 +1161,14 @@ struct intrin_wconv_f16_f8<4, 2, 1, 1, 1, 2, Aco, Signed>
             bit_cast<int32x4_t>(reg_wei),
             *reinterpret_cast<const int32_t*>(reg_data[0]),
             *reinterpret_cast<const int32_t*>(reg_data[1]),
-            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetItersMod<2>(),
+            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() |
+                GetItersMod<2>(),
             0);
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_f16_f8<4, 2, 1, 1, 1, 4, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f16_f8<4, 2, 1, 1, 1, 4, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const f8x32_t& reg_wei, const f8x4_t* reg_data[4], FloatC& reg_c)
@@ -1135,13 +1180,14 @@ struct intrin_wconv_f16_f8<4, 2, 1, 1, 1, 4, Aco, Signed>
             *reinterpret_cast<const int32_t*>(reg_data[1]),
             *reinterpret_cast<const int32_t*>(reg_data[2]),
             *reinterpret_cast<const int32_t*>(reg_data[3]),
-            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetItersMod<4>(),
+            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() |
+                GetItersMod<4>(),
             0);
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_f16_f8<4, 4, 1, 1, 1, 1, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f16_f8<4, 4, 1, 1, 1, 1, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const f8x4_t& reg_wei, const f8x4_t* reg_data[1], FloatC& reg_c)
@@ -1150,13 +1196,13 @@ struct intrin_wconv_f16_f8<4, 4, 1, 1, 1, 1, Aco, Signed>
             reg_c.template AsType<half8_t>()[Number<0>{}],
             bit_cast<int32_t>(reg_wei),
             *reinterpret_cast<const int32_t*>(reg_data[0]),
-            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>(),
+            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_f16_f8<4, 4, 1, 1, 1, 2, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f16_f8<4, 4, 1, 1, 1, 2, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const f8x8_t& reg_wei, const f8x4_t* reg_data[2], FloatC& reg_c)
@@ -1166,13 +1212,14 @@ struct intrin_wconv_f16_f8<4, 4, 1, 1, 1, 2, Aco, Signed>
             bit_cast<int32x2_t>(reg_wei),
             *reinterpret_cast<const int32_t*>(reg_data[0]),
             *reinterpret_cast<const int32_t*>(reg_data[1]),
-            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetItersMod<2>(),
+            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() |
+                GetItersMod<2>(),
             0);
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_f16_f8<4, 4, 1, 1, 1, 4, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f16_f8<4, 4, 1, 1, 1, 4, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const f8x16_t& reg_wei, const f8x4_t* reg_data[4], FloatC& reg_c)
@@ -1184,13 +1231,14 @@ struct intrin_wconv_f16_f8<4, 4, 1, 1, 1, 4, Aco, Signed>
             *reinterpret_cast<const int32_t*>(reg_data[1]),
             *reinterpret_cast<const int32_t*>(reg_data[2]),
             *reinterpret_cast<const int32_t*>(reg_data[3]),
-            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetItersMod<4>(),
+            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() |
+                GetItersMod<4>(),
             0);
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_f16_f8<8, 4, 1, 1, 1, 1, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f16_f8<8, 4, 1, 1, 1, 1, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const f8x4_t& reg_wei, const f8x8_t* reg_data[1], FloatC& reg_c)
@@ -1199,13 +1247,13 @@ struct intrin_wconv_f16_f8<8, 4, 1, 1, 1, 1, Aco, Signed>
             reg_c.template AsType<half8_t>()[Number<0>{}],
             bit_cast<int32_t>(reg_wei),
             *reinterpret_cast<const int32x2_t*>(reg_data[0]),
-            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>(),
+            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_f16_f8<8, 4, 1, 1, 1, 2, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f16_f8<8, 4, 1, 1, 1, 2, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const f8x4_t& reg_wei, const f8x8_t* reg_data[2], FloatC& reg_c)
@@ -1215,13 +1263,14 @@ struct intrin_wconv_f16_f8<8, 4, 1, 1, 1, 2, Aco, Signed>
             bit_cast<int32_t>(reg_wei),
             *reinterpret_cast<const int32x2_t*>(reg_data[0]),
             *reinterpret_cast<const int32x2_t*>(reg_data[1]),
-            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetItersMod<2>(),
+            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() |
+                GetItersMod<2>(),
             0);
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_f16_f8<8, 4, 1, 1, 1, 4, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f16_f8<8, 4, 1, 1, 1, 4, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const f8x8_t& reg_wei, const f8x8_t* reg_data[4], FloatC& reg_c)
@@ -1233,7 +1282,8 @@ struct intrin_wconv_f16_f8<8, 4, 1, 1, 1, 4, Aco, Signed>
             *reinterpret_cast<const int32x2_t*>(reg_data[1]),
             *reinterpret_cast<const int32x2_t*>(reg_data[2]),
             *reinterpret_cast<const int32x2_t*>(reg_data[3]),
-            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetItersMod<4>(),
+            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() |
+                GetItersMod<4>(),
             0);
     }
 };
@@ -1246,11 +1296,12 @@ template <index_t H,
           index_t DilationY,
           index_t Iters = 1,
           bool Aco      = false,
-          bool Signed   = false>
+          bool Signed   = false,
+          bool HighLane = false>
 struct intrin_wconv_f16_iu8;
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_f16_iu8<4, 2, 1, 1, 1, 1, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f16_iu8<4, 2, 1, 1, 1, 1, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const int8x8_t& reg_wei, const int8x4_t* reg_data[1], FloatC& reg_c)
@@ -1260,13 +1311,13 @@ struct intrin_wconv_f16_iu8<4, 2, 1, 1, 1, 1, Aco, Signed>
             bit_cast<int32x2_t>(reg_wei),
             *reinterpret_cast<const int32_t*>(reg_data[0]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
-                GetAccumChannelOrderMod<Aco>(),
+                GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_f16_iu8<4, 2, 1, 1, 1, 2, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f16_iu8<4, 2, 1, 1, 1, 2, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const int8x16_t& reg_wei, const int8x4_t* reg_data[2], FloatC& reg_c)
@@ -1277,13 +1328,13 @@ struct intrin_wconv_f16_iu8<4, 2, 1, 1, 1, 2, Aco, Signed>
             *reinterpret_cast<const int32_t*>(reg_data[0]),
             *reinterpret_cast<const int32_t*>(reg_data[1]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
-                GetAccumChannelOrderMod<Aco>() | GetItersMod<2>(),
+                GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() | GetItersMod<2>(),
             0);
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_f16_iu8<4, 2, 1, 1, 1, 4, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f16_iu8<4, 2, 1, 1, 1, 4, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const int8x32_t& reg_wei, const int8x4_t* reg_data[4], FloatC& reg_c)
@@ -1296,13 +1347,13 @@ struct intrin_wconv_f16_iu8<4, 2, 1, 1, 1, 4, Aco, Signed>
             *reinterpret_cast<const int32_t*>(reg_data[2]),
             *reinterpret_cast<const int32_t*>(reg_data[3]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
-                GetAccumChannelOrderMod<Aco>() | GetItersMod<4>(),
+                GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() | GetItersMod<4>(),
             0);
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_f16_iu8<4, 4, 1, 1, 1, 1, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f16_iu8<4, 4, 1, 1, 1, 1, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const int8x4_t& reg_wei, const int8x4_t* reg_data[1], FloatC& reg_c)
@@ -1312,13 +1363,13 @@ struct intrin_wconv_f16_iu8<4, 4, 1, 1, 1, 1, Aco, Signed>
             bit_cast<int32_t>(reg_wei),
             *reinterpret_cast<const int32_t*>(reg_data[0]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
-                GetAccumChannelOrderMod<Aco>(),
+                GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_f16_iu8<4, 4, 1, 1, 1, 2, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f16_iu8<4, 4, 1, 1, 1, 2, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const int8x8_t& reg_wei, const int8x4_t* reg_data[2], FloatC& reg_c)
@@ -1329,13 +1380,13 @@ struct intrin_wconv_f16_iu8<4, 4, 1, 1, 1, 2, Aco, Signed>
             *reinterpret_cast<const int32_t*>(reg_data[0]),
             *reinterpret_cast<const int32_t*>(reg_data[1]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
-                GetAccumChannelOrderMod<Aco>() | GetItersMod<2>(),
+                GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() | GetItersMod<2>(),
             0);
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_f16_iu8<4, 4, 1, 1, 1, 4, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f16_iu8<4, 4, 1, 1, 1, 4, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const int8x16_t& reg_wei, const int8x4_t* reg_data[4], FloatC& reg_c)
@@ -1348,13 +1399,13 @@ struct intrin_wconv_f16_iu8<4, 4, 1, 1, 1, 4, Aco, Signed>
             *reinterpret_cast<const int32_t*>(reg_data[2]),
             *reinterpret_cast<const int32_t*>(reg_data[3]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
-                GetAccumChannelOrderMod<Aco>() | GetItersMod<4>(),
+                GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() | GetItersMod<4>(),
             0);
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_f16_iu8<8, 4, 1, 1, 1, 1, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f16_iu8<8, 4, 1, 1, 1, 1, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const int8x4_t& reg_wei, const int8x8_t* reg_data[1], FloatC& reg_c)
@@ -1364,13 +1415,13 @@ struct intrin_wconv_f16_iu8<8, 4, 1, 1, 1, 1, Aco, Signed>
             bit_cast<int32_t>(reg_wei),
             *reinterpret_cast<const int32x2_t*>(reg_data[0]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
-                GetAccumChannelOrderMod<Aco>(),
+                GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_f16_iu8<8, 4, 1, 1, 1, 2, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f16_iu8<8, 4, 1, 1, 1, 2, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const int8x4_t& reg_wei, const int8x8_t* reg_data[2], FloatC& reg_c)
@@ -1381,13 +1432,13 @@ struct intrin_wconv_f16_iu8<8, 4, 1, 1, 1, 2, Aco, Signed>
             *reinterpret_cast<const int32x2_t*>(reg_data[0]),
             *reinterpret_cast<const int32x2_t*>(reg_data[1]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
-                GetAccumChannelOrderMod<Aco>() | GetItersMod<2>(),
+                GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() | GetItersMod<2>(),
             0);
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_f16_iu8<8, 4, 1, 1, 1, 4, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f16_iu8<8, 4, 1, 1, 1, 4, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const int8x8_t& reg_wei, const int8x8_t* reg_data[4], FloatC& reg_c)
@@ -1400,7 +1451,7 @@ struct intrin_wconv_f16_iu8<8, 4, 1, 1, 1, 4, Aco, Signed>
             *reinterpret_cast<const int32x2_t*>(reg_data[2]),
             *reinterpret_cast<const int32x2_t*>(reg_data[3]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
-                GetAccumChannelOrderMod<Aco>() | GetItersMod<4>(),
+                GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() | GetItersMod<4>(),
             0);
     }
 };
@@ -1414,11 +1465,12 @@ template <index_t H,
           index_t DilationY,
           index_t Iters = 1,
           bool Aco      = false,
-          bool Signed   = false>
+          bool Signed   = false,
+          bool HighLane = false>
 struct intrin_wconv_f16_iu4;
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_f16_iu4<4, 2, 1, 1, 1, 1, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f16_iu4<4, 2, 1, 1, 1, 1, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const int4x16_t& reg_wei, const int4x8_t* reg_data[1], FloatC& reg_c)
@@ -1428,13 +1480,13 @@ struct intrin_wconv_f16_iu4<4, 2, 1, 1, 1, 1, Aco, Signed>
             bit_cast<int32x2_t>(reg_wei),
             *reinterpret_cast<const int32_t*>(reg_data[0]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
-                GetAccumChannelOrderMod<Aco>(),
+                GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_f16_iu4<4, 2, 1, 1, 1, 2, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f16_iu4<4, 2, 1, 1, 1, 2, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const int4x32_t& reg_wei, const int4x8_t* reg_data[2], FloatC& reg_c)
@@ -1445,13 +1497,13 @@ struct intrin_wconv_f16_iu4<4, 2, 1, 1, 1, 2, Aco, Signed>
             *reinterpret_cast<const int32_t*>(reg_data[0]),
             *reinterpret_cast<const int32_t*>(reg_data[1]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
-                GetAccumChannelOrderMod<Aco>() | GetItersMod<2>(),
+                GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() | GetItersMod<2>(),
             0);
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_f16_iu4<4, 2, 1, 1, 1, 4, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f16_iu4<4, 2, 1, 1, 1, 4, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const int4x64_t& reg_wei, const int4x8_t* reg_data[4], FloatC& reg_c)
@@ -1464,13 +1516,13 @@ struct intrin_wconv_f16_iu4<4, 2, 1, 1, 1, 4, Aco, Signed>
             *reinterpret_cast<const int32_t*>(reg_data[2]),
             *reinterpret_cast<const int32_t*>(reg_data[3]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
-                GetAccumChannelOrderMod<Aco>() | GetItersMod<4>(),
+                GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() | GetItersMod<4>(),
             0);
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_f16_iu4<4, 4, 1, 1, 1, 1, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f16_iu4<4, 4, 1, 1, 1, 1, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const int4x8_t& reg_wei, const int4x8_t* reg_data[1], FloatC& reg_c)
@@ -1480,13 +1532,13 @@ struct intrin_wconv_f16_iu4<4, 4, 1, 1, 1, 1, Aco, Signed>
             bit_cast<int32_t>(reg_wei),
             *reinterpret_cast<const int32_t*>(reg_data[0]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
-                GetAccumChannelOrderMod<Aco>(),
+                GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_f16_iu4<4, 4, 1, 1, 1, 2, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f16_iu4<4, 4, 1, 1, 1, 2, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const int4x16_t& reg_wei, const int4x8_t* reg_data[2], FloatC& reg_c)
@@ -1497,13 +1549,13 @@ struct intrin_wconv_f16_iu4<4, 4, 1, 1, 1, 2, Aco, Signed>
             *reinterpret_cast<const int32_t*>(reg_data[0]),
             *reinterpret_cast<const int32_t*>(reg_data[1]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
-                GetAccumChannelOrderMod<Aco>() | GetItersMod<2>(),
+                GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() | GetItersMod<2>(),
             0);
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_f16_iu4<4, 4, 1, 1, 1, 4, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f16_iu4<4, 4, 1, 1, 1, 4, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const int4x32_t& reg_wei, const int4x8_t* reg_data[4], FloatC& reg_c)
@@ -1516,13 +1568,13 @@ struct intrin_wconv_f16_iu4<4, 4, 1, 1, 1, 4, Aco, Signed>
             *reinterpret_cast<const int32_t*>(reg_data[2]),
             *reinterpret_cast<const int32_t*>(reg_data[3]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
-                GetAccumChannelOrderMod<Aco>() | GetItersMod<4>(),
+                GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() | GetItersMod<4>(),
             0);
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_f16_iu4<8, 4, 1, 1, 1, 1, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f16_iu4<8, 4, 1, 1, 1, 1, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const int4x8_t& reg_wei, const int4x16_t* reg_data[1], FloatC& reg_c)
@@ -1532,13 +1584,13 @@ struct intrin_wconv_f16_iu4<8, 4, 1, 1, 1, 1, Aco, Signed>
             bit_cast<int32_t>(reg_wei),
             *reinterpret_cast<const int32x2_t*>(reg_data[0]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
-                GetAccumChannelOrderMod<Aco>(),
+                GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_f16_iu4<8, 4, 1, 1, 1, 2, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f16_iu4<8, 4, 1, 1, 1, 2, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const int4x8_t& reg_wei, const int4x16_t* reg_data[2], FloatC& reg_c)
@@ -1549,13 +1601,13 @@ struct intrin_wconv_f16_iu4<8, 4, 1, 1, 1, 2, Aco, Signed>
             *reinterpret_cast<const int32x2_t*>(reg_data[0]),
             *reinterpret_cast<const int32x2_t*>(reg_data[1]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
-                GetAccumChannelOrderMod<Aco>() | GetItersMod<2>(),
+                GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() | GetItersMod<2>(),
             0);
     }
 };
 
-template <bool Aco, bool Signed>
-struct intrin_wconv_f16_iu4<8, 4, 1, 1, 1, 4, Aco, Signed>
+template <bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f16_iu4<8, 4, 1, 1, 1, 4, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const int4x8_t& reg_wei, const int4x16_t* reg_data[4], FloatC& reg_c)
@@ -1568,7 +1620,7 @@ struct intrin_wconv_f16_iu4<8, 4, 1, 1, 1, 4, Aco, Signed>
             *reinterpret_cast<const int32x2_t*>(reg_data[2]),
             *reinterpret_cast<const int32x2_t*>(reg_data[3]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
-                GetAccumChannelOrderMod<Aco>() | GetItersMod<4>(),
+                GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() | GetItersMod<4>(),
             0);
     }
 };
@@ -1576,8 +1628,8 @@ struct intrin_wconv_f16_iu4<8, 4, 1, 1, 1, 4, Aco, Signed>
 
 // FilterSize = 3x3
 // src: fp16, dst: fp32
-template <index_t DilationX, index_t DilationY, bool Aco, bool Signed>
-struct intrin_wconv_f32_f16<4, 2, 3, DilationX, DilationY, 1, Aco, Signed>
+template <index_t DilationX, index_t DilationY, bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f32_f16<4, 2, 3, DilationX, DilationY, 1, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const half36_t& reg_wei, const half6_t* reg_data[3], FloatC& reg_c)
@@ -1589,14 +1641,14 @@ struct intrin_wconv_f32_f16<4, 2, 3, DilationX, DilationY, 1, Aco, Signed>
             *(reg_data[0]),
             *(reg_data[2]),
             GetDilationMod<DilationX, DilationY>() | GetFilterSizeMod<3>() |
-                GetAccumChannelOrderMod<Aco>(),
+                GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
     }
 };
 
 // src: bf16, dst: fp32
-template <index_t DilationX, index_t DilationY, bool Aco, bool Signed>
-struct intrin_wconv_f32_bf16<4, 2, 3, DilationX, DilationY, 1, Aco, Signed>
+template <index_t DilationX, index_t DilationY, bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f32_bf16<4, 2, 3, DilationX, DilationY, 1, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const bhalf36_t& reg_wei, const bhalf6_t* reg_data[3], FloatC& reg_c)
@@ -1608,14 +1660,14 @@ struct intrin_wconv_f32_bf16<4, 2, 3, DilationX, DilationY, 1, Aco, Signed>
             *reinterpret_cast<const bf16x6_t*>(reg_data[0]),
             *reinterpret_cast<const bf16x6_t*>(reg_data[2]),
             GetDilationMod<DilationX, DilationY>() | GetFilterSizeMod<3>() |
-                GetAccumChannelOrderMod<Aco>(),
+                GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
     }
 };
 
 // src: f8, dst: fp32
-template <index_t DilationX, index_t DilationY, bool Aco, bool Signed>
-struct intrin_wconv_f32_f8<4, 2, 3, DilationX, DilationY, 1, Aco, Signed>
+template <index_t DilationX, index_t DilationY, bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f32_f8<4, 2, 3, DilationX, DilationY, 1, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const f8x72_t& reg_wei, const f8x12_t* reg_data[3], FloatC& reg_c)
@@ -1627,14 +1679,14 @@ struct intrin_wconv_f32_f8<4, 2, 3, DilationX, DilationY, 1, Aco, Signed>
             *reinterpret_cast<const int32x3_t*>(reg_data[0]),
             *reinterpret_cast<const int32x3_t*>(reg_data[2]),
             GetDilationMod<DilationX, DilationY>() | GetFilterSizeMod<3>() |
-                GetAccumChannelOrderMod<Aco>(),
+                GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
     }
 };
 
 // src: bf8, dst: fp32
-template <index_t DilationX, index_t DilationY, bool Aco, bool Signed>
-struct intrin_wconv_f32_bf8<4, 2, 3, DilationX, DilationY, 1, Aco, Signed>
+template <index_t DilationX, index_t DilationY, bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f32_bf8<4, 2, 3, DilationX, DilationY, 1, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const bf8x72_t& reg_wei, const bf8x12_t* reg_data[3], FloatC& reg_c)
@@ -1646,14 +1698,14 @@ struct intrin_wconv_f32_bf8<4, 2, 3, DilationX, DilationY, 1, Aco, Signed>
             *reinterpret_cast<const int32x3_t*>(reg_data[0]),
             *reinterpret_cast<const int32x3_t*>(reg_data[2]),
             GetDilationMod<DilationX, DilationY>() | GetFilterSizeMod<3>() |
-                GetAccumChannelOrderMod<Aco>(),
+                GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
     }
 };
 
 // src: iu8, dst: fp32
-template <index_t DilationX, index_t DilationY, bool Aco, bool Signed>
-struct intrin_wconv_f32_iu8<4, 2, 3, DilationX, DilationY, 1, Aco, Signed>
+template <index_t DilationX, index_t DilationY, bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f32_iu8<4, 2, 3, DilationX, DilationY, 1, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void
@@ -1667,14 +1719,14 @@ struct intrin_wconv_f32_iu8<4, 2, 3, DilationX, DilationY, 1, Aco, Signed>
             *reinterpret_cast<const int32x3_t*>(reg_data[2]),
             GetDilationMod<DilationX, DilationY>() | GetTensorSignedMod<Signed>() |
                 GetWeightSignedMod<Signed>() | GetFilterSizeMod<3>() |
-                GetAccumChannelOrderMod<Aco>(),
+                GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
     }
 };
 
 // src: iu8, dst: i32
-template <index_t DilationX, index_t DilationY, bool Aco, bool Signed>
-struct intrin_wconv_i32_iu8<4, 2, 3, DilationX, DilationY, 1, Aco, Signed>
+template <index_t DilationX, index_t DilationY, bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_i32_iu8<4, 2, 3, DilationX, DilationY, 1, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void
@@ -1688,15 +1740,15 @@ struct intrin_wconv_i32_iu8<4, 2, 3, DilationX, DilationY, 1, Aco, Signed>
             *reinterpret_cast<const int32x3_t*>(reg_data[2]),
             GetDilationMod<DilationX, DilationY>() | GetTensorSignedMod<Signed>() |
                 GetWeightSignedMod<Signed>() | GetFilterSizeMod<3>() |
-                GetAccumChannelOrderMod<Aco>(),
+                GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
     }
 };
 
 #if CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
 // src: iu4, dst: f32
-template <index_t DilationX, index_t DilationY, bool Aco, bool Signed>
-struct intrin_wconv_f32_iu4<4, 2, 3, DilationX, DilationY, 1, Aco, Signed>
+template <index_t DilationX, index_t DilationY, bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f32_iu4<4, 2, 3, DilationX, DilationY, 1, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void
@@ -1710,14 +1762,14 @@ struct intrin_wconv_f32_iu4<4, 2, 3, DilationX, DilationY, 1, Aco, Signed>
             *reinterpret_cast<const int32x3_t*>(reg_data[2]),
             GetDilationMod<DilationX, DilationY>() | GetTensorSignedMod<Signed>() |
                 GetWeightSignedMod<Signed>() | GetFilterSizeMod<3>() |
-                GetAccumChannelOrderMod<Aco>(),
+                GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
     }
 };
 
 // src: iu4, dst: i32
-template <index_t DilationX, index_t DilationY, bool Aco, bool Signed>
-struct intrin_wconv_i32_iu4<4, 2, 3, DilationX, DilationY, 1, Aco, Signed>
+template <index_t DilationX, index_t DilationY, bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_i32_iu4<4, 2, 3, DilationX, DilationY, 1, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void
@@ -1731,15 +1783,15 @@ struct intrin_wconv_i32_iu4<4, 2, 3, DilationX, DilationY, 1, Aco, Signed>
             *reinterpret_cast<const int32x3_t*>(reg_data[2]),
             GetDilationMod<DilationX, DilationY>() | GetTensorSignedMod<Signed>() |
                 GetWeightSignedMod<Signed>() | GetFilterSizeMod<3>() |
-                GetAccumChannelOrderMod<Aco>(),
+                GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
     }
 };
 #endif
 
 // src: f16, dst: f16
-template <index_t DilationX, index_t DilationY, bool Aco, bool Signed>
-struct intrin_wconv_f16_f16<4, 2, 3, DilationX, DilationY, 1, Aco, Signed>
+template <index_t DilationX, index_t DilationY, bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f16_f16<4, 2, 3, DilationX, DilationY, 1, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const half36_t& reg_wei, const half6_t* reg_data[3], FloatC& reg_c)
@@ -1751,13 +1803,13 @@ struct intrin_wconv_f16_f16<4, 2, 3, DilationX, DilationY, 1, Aco, Signed>
             *reg_data[0],
             *reg_data[2],
             GetDilationMod<DilationX, DilationY>() | GetFilterSizeMod<3>() |
-                GetAccumChannelOrderMod<Aco>(),
+                GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
     }
 };
 
-template <index_t DilationX, index_t DilationY, bool Aco, bool Signed>
-struct intrin_wconv_f16_f16<4, 4, 3, DilationX, DilationY, 1, Aco, Signed>
+template <index_t DilationX, index_t DilationY, bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f16_f16<4, 4, 3, DilationX, DilationY, 1, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const half18_t& reg_wei, const half6_t* reg_data[3], FloatC& reg_c)
@@ -1769,13 +1821,13 @@ struct intrin_wconv_f16_f16<4, 4, 3, DilationX, DilationY, 1, Aco, Signed>
             *reg_data[0],
             *reg_data[2],
             GetDilationMod<DilationX, DilationY>() | GetFilterSizeMod<3>() |
-                GetAccumChannelOrderMod<Aco>(),
+                GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
     }
 };
 
-template <index_t DilationX, index_t DilationY, bool Aco, bool Signed>
-struct intrin_wconv_f16_f16<8, 4, 3, DilationX, DilationY, 1, Aco, Signed>
+template <index_t DilationX, index_t DilationY, bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f16_f16<8, 4, 3, DilationX, DilationY, 1, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const half10_t& reg_wei, const half8_t* reg_data[3], FloatC& reg_c)
@@ -1787,14 +1839,14 @@ struct intrin_wconv_f16_f16<8, 4, 3, DilationX, DilationY, 1, Aco, Signed>
             *reg_data[0],
             *reg_data[2],
             GetDilationMod<DilationX, DilationY>() | GetFilterSizeMod<3>() |
-                GetAccumChannelOrderMod<Aco>(),
+                GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
     }
 };
 
 // src: bf16, dst: bf16
-template <index_t DilationX, index_t DilationY, bool Aco, bool Signed>
-struct intrin_wconv_bf16_bf16<4, 2, 3, DilationX, DilationY, 1, Aco, Signed>
+template <index_t DilationX, index_t DilationY, bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_bf16_bf16<4, 2, 3, DilationX, DilationY, 1, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const bhalf36_t& reg_wei, const bhalf6_t* reg_data[3], FloatC& reg_c)
@@ -1807,13 +1859,13 @@ struct intrin_wconv_bf16_bf16<4, 2, 3, DilationX, DilationY, 1, Aco, Signed>
                 *reinterpret_cast<const bf16x6_t*>(reg_data[0]),
                 *reinterpret_cast<const bf16x6_t*>(reg_data[2]),
                 GetDilationMod<DilationX, DilationY>() | GetFilterSizeMod<3>() |
-                    GetAccumChannelOrderMod<Aco>(),
+                    GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
                 0));
     }
 };
 
-template <index_t DilationX, index_t DilationY, bool Aco, bool Signed>
-struct intrin_wconv_bf16_bf16<4, 4, 3, DilationX, DilationY, 1, Aco, Signed>
+template <index_t DilationX, index_t DilationY, bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_bf16_bf16<4, 4, 3, DilationX, DilationY, 1, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const bhalf18_t& reg_wei, const bhalf6_t* reg_data[3], FloatC& reg_c)
@@ -1826,13 +1878,13 @@ struct intrin_wconv_bf16_bf16<4, 4, 3, DilationX, DilationY, 1, Aco, Signed>
                 *reinterpret_cast<const bf16x6_t*>(reg_data[0]),
                 *reinterpret_cast<const bf16x6_t*>(reg_data[2]),
                 GetDilationMod<DilationX, DilationY>() | GetFilterSizeMod<3>() |
-                    GetAccumChannelOrderMod<Aco>(),
+                    GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
                 0));
     }
 };
 
-template <index_t DilationX, index_t DilationY, bool Aco, bool Signed>
-struct intrin_wconv_bf16_bf16<8, 4, 3, DilationX, DilationY, 1, Aco, Signed>
+template <index_t DilationX, index_t DilationY, bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_bf16_bf16<8, 4, 3, DilationX, DilationY, 1, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const bhalf10_t& reg_wei, const bhalf8_t* reg_data[3], FloatC& reg_c)
@@ -1845,14 +1897,14 @@ struct intrin_wconv_bf16_bf16<8, 4, 3, DilationX, DilationY, 1, Aco, Signed>
                 *reinterpret_cast<const bf16x8_t*>(reg_data[0]),
                 *reinterpret_cast<const bf16x8_t*>(reg_data[2]),
                 GetDilationMod<DilationX, DilationY>() | GetFilterSizeMod<3>() |
-                    GetAccumChannelOrderMod<Aco>(),
+                    GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
                 0));
     }
 };
 
 // src: bf8, dst: bf16
-template <index_t DilationX, index_t DilationY, bool Aco, bool Signed>
-struct intrin_wconv_bf16_bf8<4, 2, 3, DilationX, DilationY, 1, Aco, Signed>
+template <index_t DilationX, index_t DilationY, bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_bf16_bf8<4, 2, 3, DilationX, DilationY, 1, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const bf8x72_t& reg_wei, const bf8x12_t* reg_data[3], FloatC& reg_c)
@@ -1865,13 +1917,13 @@ struct intrin_wconv_bf16_bf8<4, 2, 3, DilationX, DilationY, 1, Aco, Signed>
                 *reinterpret_cast<const int32x3_t*>(reg_data[0]),
                 *reinterpret_cast<const int32x3_t*>(reg_data[2]),
                 GetDilationMod<DilationX, DilationY>() | GetFilterSizeMod<3>() |
-                    GetAccumChannelOrderMod<Aco>(),
+                    GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
                 0));
     }
 };
 
-template <index_t DilationX, index_t DilationY, bool Aco, bool Signed>
-struct intrin_wconv_bf16_bf8<4, 4, 3, DilationX, DilationY, 1, Aco, Signed>
+template <index_t DilationX, index_t DilationY, bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_bf16_bf8<4, 4, 3, DilationX, DilationY, 1, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const bf8x36_t& reg_wei, const bf8x12_t* reg_data[3], FloatC& reg_c)
@@ -1884,13 +1936,13 @@ struct intrin_wconv_bf16_bf8<4, 4, 3, DilationX, DilationY, 1, Aco, Signed>
                 *reinterpret_cast<const int32x3_t*>(reg_data[0]),
                 *reinterpret_cast<const int32x3_t*>(reg_data[2]),
                 GetDilationMod<DilationX, DilationY>() | GetFilterSizeMod<3>() |
-                    GetAccumChannelOrderMod<Aco>(),
+                    GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
                 0));
     }
 };
 
-template <index_t DilationX, index_t DilationY, bool Aco, bool Signed>
-struct intrin_wconv_bf16_bf8<8, 4, 3, DilationX, DilationY, 1, Aco, Signed>
+template <index_t DilationX, index_t DilationY, bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_bf16_bf8<8, 4, 3, DilationX, DilationY, 1, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const bf8x20_t& reg_wei, const bf8x16_t* reg_data[3], FloatC& reg_c)
@@ -1903,14 +1955,14 @@ struct intrin_wconv_bf16_bf8<8, 4, 3, DilationX, DilationY, 1, Aco, Signed>
                 *reinterpret_cast<const int32x4_t*>(reg_data[0]),
                 *reinterpret_cast<const int32x4_t*>(reg_data[2]),
                 GetDilationMod<DilationX, DilationY>() | GetFilterSizeMod<3>() |
-                    GetAccumChannelOrderMod<Aco>(),
+                    GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
                 0));
     }
 };
 
 // src: f8, dst: f16
-template <index_t DilationX, index_t DilationY, bool Aco, bool Signed>
-struct intrin_wconv_f16_f8<4, 2, 3, DilationX, DilationY, 1, Aco, Signed>
+template <index_t DilationX, index_t DilationY, bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f16_f8<4, 2, 3, DilationX, DilationY, 1, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const f8x72_t& reg_wei, const f8x12_t* reg_data[3], FloatC& reg_c)
@@ -1922,13 +1974,13 @@ struct intrin_wconv_f16_f8<4, 2, 3, DilationX, DilationY, 1, Aco, Signed>
             *reinterpret_cast<const int32x3_t*>(reg_data[0]),
             *reinterpret_cast<const int32x3_t*>(reg_data[2]),
             GetDilationMod<DilationX, DilationY>() | GetFilterSizeMod<3>() |
-                GetAccumChannelOrderMod<Aco>(),
+                GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
     }
 };
 
-template <index_t DilationX, index_t DilationY, bool Aco, bool Signed>
-struct intrin_wconv_f16_f8<4, 4, 3, DilationX, DilationY, 1, Aco, Signed>
+template <index_t DilationX, index_t DilationY, bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f16_f8<4, 4, 3, DilationX, DilationY, 1, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const f8x36_t& reg_wei, const f8x12_t* reg_data[3], FloatC& reg_c)
@@ -1940,13 +1992,13 @@ struct intrin_wconv_f16_f8<4, 4, 3, DilationX, DilationY, 1, Aco, Signed>
             *reinterpret_cast<const int32x3_t*>(reg_data[0]),
             *reinterpret_cast<const int32x3_t*>(reg_data[2]),
             GetDilationMod<DilationX, DilationY>() | GetFilterSizeMod<3>() |
-                GetAccumChannelOrderMod<Aco>(),
+                GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
     }
 };
 
-template <index_t DilationX, index_t DilationY, bool Aco, bool Signed>
-struct intrin_wconv_f16_f8<8, 4, 3, DilationX, DilationY, 1, Aco, Signed>
+template <index_t DilationX, index_t DilationY, bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f16_f8<8, 4, 3, DilationX, DilationY, 1, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const f8x20_t& reg_wei, const f8x16_t* reg_data[3], FloatC& reg_c)
@@ -1958,14 +2010,14 @@ struct intrin_wconv_f16_f8<8, 4, 3, DilationX, DilationY, 1, Aco, Signed>
             *reinterpret_cast<const int32x4_t*>(reg_data[0]),
             *reinterpret_cast<const int32x4_t*>(reg_data[2]),
             GetDilationMod<DilationX, DilationY>() | GetFilterSizeMod<3>() |
-                GetAccumChannelOrderMod<Aco>(),
+                GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
     }
 };
 
 // src: iu8, dst: f16
-template <index_t DilationX, index_t DilationY, bool Aco, bool Signed>
-struct intrin_wconv_f16_iu8<4, 2, 3, DilationX, DilationY, 1, Aco, Signed>
+template <index_t DilationX, index_t DilationY, bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f16_iu8<4, 2, 3, DilationX, DilationY, 1, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void
@@ -1979,13 +2031,13 @@ struct intrin_wconv_f16_iu8<4, 2, 3, DilationX, DilationY, 1, Aco, Signed>
             *reinterpret_cast<const int32x3_t*>(reg_data[2]),
             GetDilationMod<DilationX, DilationY>() | GetTensorSignedMod<Signed>() |
                 GetWeightSignedMod<Signed>() | GetFilterSizeMod<3>() |
-                GetAccumChannelOrderMod<Aco>(),
+                GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
     }
 };
 
-template <index_t DilationX, index_t DilationY, bool Aco, bool Signed>
-struct intrin_wconv_f16_iu8<4, 4, 3, DilationX, DilationY, 1, Aco, Signed>
+template <index_t DilationX, index_t DilationY, bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f16_iu8<4, 4, 3, DilationX, DilationY, 1, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void
@@ -1999,13 +2051,13 @@ struct intrin_wconv_f16_iu8<4, 4, 3, DilationX, DilationY, 1, Aco, Signed>
             *reinterpret_cast<const int32x3_t*>(reg_data[2]),
             GetDilationMod<DilationX, DilationY>() | GetTensorSignedMod<Signed>() |
                 GetWeightSignedMod<Signed>() | GetFilterSizeMod<3>() |
-                GetAccumChannelOrderMod<Aco>(),
+                GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
     }
 };
 
-template <index_t DilationX, index_t DilationY, bool Aco, bool Signed>
-struct intrin_wconv_f16_iu8<8, 4, 3, DilationX, DilationY, 1, Aco, Signed>
+template <index_t DilationX, index_t DilationY, bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f16_iu8<8, 4, 3, DilationX, DilationY, 1, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void
@@ -2019,15 +2071,15 @@ struct intrin_wconv_f16_iu8<8, 4, 3, DilationX, DilationY, 1, Aco, Signed>
             *reinterpret_cast<const int32x4_t*>(reg_data[2]),
             GetDilationMod<DilationX, DilationY>() | GetTensorSignedMod<Signed>() |
                 GetWeightSignedMod<Signed>() | GetFilterSizeMod<3>() |
-                GetAccumChannelOrderMod<Aco>(),
+                GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
     }
 };
 
 #if CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
 // src: iu4, dst: f16
-template <index_t DilationX, index_t DilationY, bool Aco, bool Signed>
-struct intrin_wconv_f16_iu4<4, 2, 3, DilationX, DilationY, 1, Aco, Signed>
+template <index_t DilationX, index_t DilationY, bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f16_iu4<4, 2, 3, DilationX, DilationY, 1, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void
@@ -2041,13 +2093,13 @@ struct intrin_wconv_f16_iu4<4, 2, 3, DilationX, DilationY, 1, Aco, Signed>
             *reinterpret_cast<const int32x3_t*>(reg_data[2]),
             GetDilationMod<DilationX, DilationY>() | GetTensorSignedMod<Signed>() |
                 GetWeightSignedMod<Signed>() | GetFilterSizeMod<3>() |
-                GetAccumChannelOrderMod<Aco>(),
+                GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
     }
 };
 
-template <index_t DilationX, index_t DilationY, bool Aco, bool Signed>
-struct intrin_wconv_f16_iu4<4, 4, 3, DilationX, DilationY, 1, Aco, Signed>
+template <index_t DilationX, index_t DilationY, bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f16_iu4<4, 4, 3, DilationX, DilationY, 1, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void
@@ -2061,13 +2113,13 @@ struct intrin_wconv_f16_iu4<4, 4, 3, DilationX, DilationY, 1, Aco, Signed>
             *reinterpret_cast<const int32x3_t*>(reg_data[2]),
             GetDilationMod<DilationX, DilationY>() | GetTensorSignedMod<Signed>() |
                 GetWeightSignedMod<Signed>() | GetFilterSizeMod<3>() |
-                GetAccumChannelOrderMod<Aco>(),
+                GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
     }
 };
 
-template <index_t DilationX, index_t DilationY, bool Aco, bool Signed>
-struct intrin_wconv_f16_iu4<8, 4, 3, DilationX, DilationY, 1, Aco, Signed>
+template <index_t DilationX, index_t DilationY, bool Aco, bool Signed, bool HighLane>
+struct intrin_wconv_f16_iu4<8, 4, 3, DilationX, DilationY, 1, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void
@@ -2081,7 +2133,7 @@ struct intrin_wconv_f16_iu4<8, 4, 3, DilationX, DilationY, 1, Aco, Signed>
             *reinterpret_cast<const int32x4_t*>(reg_data[2]),
             GetDilationMod<DilationX, DilationY>() | GetTensorSignedMod<Signed>() |
                 GetWeightSignedMod<Signed>() | GetFilterSizeMod<3>() |
-                GetAccumChannelOrderMod<Aco>(),
+                GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
     }
 };

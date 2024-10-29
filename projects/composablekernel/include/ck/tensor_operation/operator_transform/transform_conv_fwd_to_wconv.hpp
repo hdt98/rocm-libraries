@@ -14,7 +14,10 @@
 namespace ck {
 namespace tensor_operation {
 
-template <index_t NDimSpatial, device::ConvolutionForwardSpecialization ConvForwardSpecialization>
+template <index_t NDimSpatial,
+          bool ShuffleOnLoad,
+          bool Transposed,
+          device::ConvolutionForwardSpecialization ConvForwardSpecialization>
 struct TransformConvFwdToWconv
 {
     static constexpr auto I0                = Number<0>{};
@@ -103,6 +106,7 @@ struct TransformConvFwdToWconv
                           (ConvForwardSpecialization ==
                            device::ConvolutionForwardSpecialization::Filter2x2Stride2OddHWPad0))
         {
+            static_assert(ShuffleOnLoad && Transposed == false, "");
             // This is different
             const index_t WiStride = a_g_n_c_wis_strides[3 + NDimSpatial - 1];
             const index_t NStride  = a_g_n_c_wis_strides[1];
@@ -164,6 +168,29 @@ struct TransformConvFwdToWconv
         }
     }
 
+#if defined(ENABLE_CONST_LAYOUT)
+    template <typename ALayout,
+              typename std::enable_if<
+                  NDimSpatial == 2 && is_same_v<ALayout, tensor_layout::convolution::CONST_GNHWC>,
+                  bool>::type = false>
+    static auto
+    MakeADescriptor_H_W_C(const std::array<index_t, NDimSpatial + 3>& /* a_g_n_c_wis_lengths */,
+                          const std::array<index_t, NDimSpatial + 3>& /* a_g_n_c_wis_strides */,
+                          const std::array<index_t, NDimSpatial + 3>& /* b_g_k_c_xs_lengths */,
+                          const std::array<index_t, NDimSpatial + 3>& /* b_g_k_c_xs_strides */,
+                          const std::array<index_t, NDimSpatial + 3>& /* c_g_n_k_wos_lengths */,
+                          const std::array<index_t, NDimSpatial + 3>& /* c_g_n_k_wos_strides */,
+                          const std::array<index_t, NDimSpatial>& /* conv_filter_strides */,
+                          const std::array<index_t, NDimSpatial>& /* conv_filter_dilations */,
+                          const std::array<index_t, NDimSpatial>& /* input_left_pads */,
+                          const std::array<index_t, NDimSpatial>& /* input_right_pads */)
+    {
+        static_assert(ShuffleOnLoad == false, "");
+        return make_naive_tensor_descriptor_packed(
+            make_tuple(ALayout::N * ALayout::H, ALayout::W, ALayout::C));
+    }
+#endif
+
     template <typename ALayout,
               typename std::enable_if<
                   NDimSpatial == 2 && (is_same_v<ALayout, tensor_layout::convolution::G_NHW_C> ||
@@ -204,11 +231,11 @@ struct TransformConvFwdToWconv
                      device::ConvolutionForwardSpecialization::Filter1x1Stride1Pad0)
         {
             // skip dimension g, n, k
-            const index_t NHo =
+            const index_t NHi =
                 N * ck::accumulate_n<index_t>(
-                        c_g_n_k_wos_lengths.begin() + 3, NDimSpatial - 1, 1, std::multiplies<>());
+                        a_g_n_c_wis_lengths.begin() + 3, NDimSpatial - 1, 1, std::multiplies<>());
 
-            return make_naive_tensor_descriptor(make_tuple(NHo, Wo, C),
+            return make_naive_tensor_descriptor(make_tuple(NHi, Wi, C),
                                                 make_tuple(HiStride, WiStride, CStride));
         }
         else if constexpr(ConvForwardSpecialization ==
@@ -246,73 +273,130 @@ struct TransformConvFwdToWconv
         else if constexpr(ConvForwardSpecialization ==
                           device::ConvolutionForwardSpecialization::Filter2x2Stride2Pad0)
         {
-            // skip dimension g, n, k
-            const index_t NHi =
-                N * ck::accumulate_n<index_t>(
-                        a_g_n_c_wis_lengths.begin() + 3, NDimSpatial - 1, 1, std::multiplies<>());
+            if constexpr(Transposed || (ShuffleOnLoad == false))
+            {
+                // same with conv1, skip dimension g, n, k
+                const index_t NHi = N * ck::accumulate_n<index_t>(a_g_n_c_wis_lengths.begin() + 3,
+                                                                  NDimSpatial - 1,
+                                                                  1,
+                                                                  std::multiplies<>());
 
-            // This is different
-            const index_t WiStride = a_g_n_c_wis_strides[3 + NDimSpatial - 1];
-            const index_t HiStride = a_g_n_c_wis_strides[3 + NDimSpatial - 2];
-            const auto CStride     = I1;
+                return make_naive_tensor_descriptor(make_tuple(NHi, Wi, C),
+                                                    make_tuple(HiStride, WiStride, CStride));
+            }
+            else // Transposed == false && ShuffleOnLoad
+            {
+                // skip dimension g, n, k
+                const index_t NHi = N * ck::accumulate_n<index_t>(a_g_n_c_wis_lengths.begin() + 3,
+                                                                  NDimSpatial - 1,
+                                                                  1,
+                                                                  std::multiplies<>());
 
-            const auto in_nhi_wi_c_desc = make_naive_tensor_descriptor(
-                make_tuple(NHi, Wi, C), make_tuple(HiStride, WiStride, CStride));
-            const auto in_nhi_wi_c_unmerge_desc = transform_tensor_descriptor(
-                in_nhi_wi_c_desc,
-                make_tuple(make_unmerge_transform(make_tuple(NHi / 2, Number<2>{})),
-                           make_unmerge_transform(make_tuple(Wi / 2, Number<2>{})),
-                           make_pass_through_transform(C)),
-                make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}),
-                make_tuple(Sequence<0, 2>{}, Sequence<1, 3>{}, Sequence<4>{}));
+                // This is different
+                const index_t WiStride = a_g_n_c_wis_strides[3 + NDimSpatial - 1];
+                const index_t HiStride = a_g_n_c_wis_strides[3 + NDimSpatial - 2];
+                const auto CStride     = I1;
 
-            return transform_tensor_descriptor(
-                in_nhi_wi_c_unmerge_desc,
-                make_tuple(make_pass_through_transform(NHi / 2),
-                           make_pass_through_transform(Wi / 2),
-                           make_merge_transform(make_tuple(Number<2>{}, Number<2>{}, C))),
-                make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2, 3, 4>{}),
-                make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}));
+                const auto in_nhi_wi_c_desc = make_naive_tensor_descriptor(
+                    make_tuple(NHi, Wi, C), make_tuple(HiStride, WiStride, CStride));
+                const auto in_nhi_wi_c_unmerge_desc = transform_tensor_descriptor(
+                    in_nhi_wi_c_desc,
+                    make_tuple(make_unmerge_transform(make_tuple(NHi / 2, Number<2>{})),
+                               make_unmerge_transform(make_tuple(Wi / 2, Number<2>{})),
+                               make_pass_through_transform(C)),
+                    make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}),
+                    make_tuple(Sequence<0, 2>{}, Sequence<1, 3>{}, Sequence<4>{}));
+
+                return transform_tensor_descriptor(
+                    in_nhi_wi_c_unmerge_desc,
+                    make_tuple(make_pass_through_transform(NHi / 2),
+                               make_pass_through_transform(Wi / 2),
+                               make_merge_transform(make_tuple(Number<2>{}, Number<2>{}, C))),
+                    make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2, 3, 4>{}),
+                    make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}));
+            }
         }
         else if constexpr(ConvForwardSpecialization ==
                           device::ConvolutionForwardSpecialization::Filter2x2Stride2OddHWPad0)
         {
-            // This is different
-            const index_t NStride  = a_g_n_c_wis_strides[1];
-            const index_t WiStride = a_g_n_c_wis_strides[3 + NDimSpatial - 1];
-            const index_t HiStride = a_g_n_c_wis_strides[3 + NDimSpatial - 2];
-            const auto CStride     = I1;
+            if constexpr(Transposed)
+            {
+                // same with conv1, skip dimension g, n, k
+                const index_t NHi = N * ck::accumulate_n<index_t>(a_g_n_c_wis_lengths.begin() + 3,
+                                                                  NDimSpatial - 1,
+                                                                  1,
+                                                                  std::multiplies<>());
 
-            const auto in_n_hi_wi_c_desc = make_naive_tensor_descriptor(
-                make_tuple(N, Hi, Wi, C), make_tuple(NStride, HiStride, WiStride, CStride));
+                return make_naive_tensor_descriptor(make_tuple(NHi, Wi, C),
+                                                    make_tuple(HiStride, WiStride, CStride));
+            }
+            else if constexpr(ShuffleOnLoad == false)
+            {
+                // Pad height to even before merge N
+                const index_t NStride  = a_g_n_c_wis_strides[1];
+                const index_t WiStride = a_g_n_c_wis_strides[3 + NDimSpatial - 1];
+                const index_t HiStride = a_g_n_c_wis_strides[3 + NDimSpatial - 2];
+                const auto CStride     = I1;
 
-            const auto in_n_hip_wip_c_desc = transform_tensor_descriptor(
-                in_n_hi_wi_c_desc,
-                make_tuple(make_pass_through_transform(N),
-                           make_pad_transform(Hi, 0, Hi & 2),
-                           make_pad_transform(Wi, 0, Wi & 2),
-                           make_pass_through_transform(C)),
-                make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}, Sequence<3>{}),
-                make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}, Sequence<3>{}));
+                const auto in_n_hi_wi_c_desc = make_naive_tensor_descriptor(
+                    make_tuple(N, Hi, Wi, C), make_tuple(NStride, HiStride, WiStride, CStride));
 
-            const index_t HiP                      = Hi + (Hi & 2);
-            const index_t WiP                      = Wi + (Wi & 2);
-            const auto in_n_hip_wip_c_unmerge_desc = transform_tensor_descriptor(
-                in_n_hip_wip_c_desc,
-                make_tuple(make_pass_through_transform(N),
-                           make_unmerge_transform(make_tuple(HiP / 2, Number<2>{})),
-                           make_unmerge_transform(make_tuple(WiP / 2, Number<2>{})),
-                           make_pass_through_transform(C)),
-                make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}, Sequence<3>{}),
-                make_tuple(Sequence<0>{}, Sequence<1, 3>{}, Sequence<2, 4>{}, Sequence<5>{}));
+                const auto in_n_hip_wi_c_desc = transform_tensor_descriptor(
+                    in_n_hi_wi_c_desc,
+                    make_tuple(make_pass_through_transform(N),
+                               make_pad_transform(Hi, 0, Hi & 2),
+                               make_pass_through_transform(Wi),
+                               make_pass_through_transform(C)),
+                    make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}, Sequence<3>{}),
+                    make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}, Sequence<3>{}));
+                const index_t HiP = Hi + (Hi & 2);
+                return transform_tensor_descriptor(
+                    in_n_hip_wi_c_desc,
+                    make_tuple(make_merge_transform(make_tuple(N, HiP)),
+                               make_pass_through_transform(Wi),
+                               make_pass_through_transform(C)),
+                    make_tuple(Sequence<0, 1>{}, Sequence<2>{}, Sequence<3>{}),
+                    make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}));
+            }
+            else // transposed = false && shuffleOnLoad == true
+            {
+                // This is different
+                const index_t NStride  = a_g_n_c_wis_strides[1];
+                const index_t WiStride = a_g_n_c_wis_strides[3 + NDimSpatial - 1];
+                const index_t HiStride = a_g_n_c_wis_strides[3 + NDimSpatial - 2];
+                const auto CStride     = I1;
 
-            return transform_tensor_descriptor(
-                in_n_hip_wip_c_unmerge_desc,
-                make_tuple(make_merge_transform(make_tuple(N, HiP / 2)),
-                           make_pass_through_transform(WiP / 2),
-                           make_merge_transform(make_tuple(Number<2>{}, Number<2>{}, C))),
-                make_tuple(Sequence<0, 1>{}, Sequence<2>{}, Sequence<3, 4, 5>{}),
-                make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}));
+                const auto in_n_hi_wi_c_desc = make_naive_tensor_descriptor(
+                    make_tuple(N, Hi, Wi, C), make_tuple(NStride, HiStride, WiStride, CStride));
+
+                const auto in_n_hip_wip_c_desc = transform_tensor_descriptor(
+                    in_n_hi_wi_c_desc,
+                    make_tuple(make_pass_through_transform(N),
+                               make_pad_transform(Hi, 0, Hi & 2),
+                               make_pad_transform(Wi, 0, Wi & 2),
+                               make_pass_through_transform(C)),
+                    make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}, Sequence<3>{}),
+                    make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}, Sequence<3>{}));
+
+                const index_t HiP                      = Hi + (Hi & 2);
+                const index_t WiP                      = Wi + (Wi & 2);
+                const auto in_n_hip_wip_c_unmerge_desc = transform_tensor_descriptor(
+                    in_n_hip_wip_c_desc,
+                    make_tuple(make_pass_through_transform(N),
+                               make_unmerge_transform(make_tuple(HiP / 2, Number<2>{})),
+                               make_unmerge_transform(make_tuple(WiP / 2, Number<2>{})),
+                               make_pass_through_transform(C)),
+                    make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}, Sequence<3>{}),
+                    make_tuple(Sequence<0>{}, Sequence<1, 3>{}, Sequence<2, 4>{}, Sequence<5>{}));
+
+                return transform_tensor_descriptor(
+                    in_n_hip_wip_c_unmerge_desc,
+                    make_tuple(make_merge_transform(make_tuple(N, HiP / 2)),
+                               make_pass_through_transform(WiP / 2),
+                               make_merge_transform(make_tuple(Number<2>{}, Number<2>{}, C))),
+                    make_tuple(Sequence<0, 1>{}, Sequence<2>{}, Sequence<3, 4, 5>{}),
+                    make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}));
+            }
         }
         else if constexpr(ConvForwardSpecialization ==
                           device::ConvolutionForwardSpecialization::Filter1x1Pad0)
@@ -430,6 +514,7 @@ struct TransformConvFwdToWconv
         else if constexpr(ConvForwardSpecialization ==
                           device::ConvolutionForwardSpecialization::Filter2x2Stride2Pad0)
         {
+            static_assert(ShuffleOnLoad && Transposed == false, "");
             // skip dimension g, n, k
             const index_t NDiHi =
                 N * ck::accumulate_n<index_t>(
@@ -456,6 +541,7 @@ struct TransformConvFwdToWconv
         else if constexpr(ConvForwardSpecialization ==
                           device::ConvolutionForwardSpecialization::Filter2x2Stride2OddHWPad0)
         {
+            static_assert(ShuffleOnLoad && Transposed == false, "");
             const auto in_n_di_hi_wi_c_desc = make_naive_tensor_descriptor(
                 make_tuple(N, Di, Hi, Wi, C),
                 make_tuple(NStride, DiStride, HiStride, WiStride, CStride));
@@ -530,6 +616,35 @@ struct TransformConvFwdToWconv
         }
     }
 
+#if defined(ENABLE_CONST_LAYOUT)
+    template <
+        typename BLayout,
+        typename std::enable_if<is_same_v<BLayout, tensor_layout::convolution::CONST_GKYXC<1>> ||
+                                    is_same_v<BLayout, tensor_layout::convolution::CONST_GKYXC<3>>,
+                                bool>::type = false>
+    static auto
+    MakeBDescriptor_K_YX_C(const std::array<index_t, NDimSpatial + 3>& /* b_g_k_c_xs_lengths */,
+                           const std::array<index_t, NDimSpatial + 3>& /* b_g_k_c_xs_strides */)
+    {
+        static_assert(ShuffleOnLoad == false, "");
+        return make_naive_tensor_descriptor_packed(
+            make_tuple(BLayout::K, BLayout::X * BLayout::Y, BLayout::C));
+    }
+
+    template <
+        typename BLayout,
+        typename std::enable_if<is_same_v<BLayout, tensor_layout::convolution::CONST_GKYXC<2>>,
+                                bool>::type = false>
+    static auto
+    MakeBDescriptor_K_YX_C(const std::array<index_t, NDimSpatial + 3>& /* b_g_k_c_xs_lengths */,
+                           const std::array<index_t, NDimSpatial + 3>& /* b_g_k_c_xs_strides */)
+    {
+        static_assert(ShuffleOnLoad == false, "");
+        return make_naive_tensor_descriptor_packed(
+            make_tuple(BLayout::K, Number<1>{}, BLayout::X * BLayout::Y * BLayout::C));
+    }
+#endif
+
     template <typename BLayout,
               typename std::enable_if<is_same_v<BLayout, tensor_layout::convolution::GKXC> ||
                                           is_same_v<BLayout, tensor_layout::convolution::GKYXC> ||
@@ -539,16 +654,16 @@ struct TransformConvFwdToWconv
     MakeBDescriptor_K_YX_C(const std::array<index_t, NDimSpatial + 3>& b_g_k_c_xs_lengths,
                            const std::array<index_t, NDimSpatial + 3>& /* b_g_k_c_xs_strides */)
     {
+        static_assert(ShuffleOnLoad == false, "");
         const index_t K = b_g_k_c_xs_lengths[1];
         const index_t C = b_g_k_c_xs_lengths[2];
 
         const index_t YX = ck::accumulate_n<index_t>(
             b_g_k_c_xs_lengths.begin() + 3, NDimSpatial, 1, std::multiplies<>());
 
-        const auto wei_gemmn_gemmk_desc =
-            make_naive_tensor_descriptor_packed(make_tuple(K, YX * C));
+        const auto wei_k_yx_c_desc = make_naive_tensor_descriptor_packed(make_tuple(K, YX, C));
 
-        return wei_gemmn_gemmk_desc;
+        return wei_k_yx_c_desc;
     }
 
     template <
@@ -580,15 +695,37 @@ struct TransformConvFwdToWconv
                       device::ConvolutionForwardSpecialization::Filter2x2Stride2OddHWPad0))
 
         {
-            const auto wei_k_yx_c_desc = make_naive_tensor_descriptor(
-                make_tuple(K, Number<4>{}, C), make_tuple(KStride, XStride, CStride));
-            return transform_tensor_descriptor(
-                wei_k_yx_c_desc,
-                make_tuple(make_pass_through_transform(K),
-                           make_insert_transform(I0),
-                           make_merge_transform(make_tuple(Number<4>{}, C))),
-                make_tuple(Sequence<0>{}, Sequence<>{}, Sequence<1, 2>{}),
-                make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}));
+            constexpr auto NumYX = Number<4>{};
+            if constexpr(ShuffleOnLoad == false)
+            {
+                const auto wei_k_yx_c_desc = make_naive_tensor_descriptor(
+                    make_tuple(K, NumYX, C), make_tuple(KStride, XStride, CStride));
+                return wei_k_yx_c_desc;
+            }
+            else if constexpr(Transposed == false)
+            {
+                const auto wei_k_yx_c_desc = make_naive_tensor_descriptor(
+                    make_tuple(K, NumYX, C), make_tuple(KStride, XStride, CStride));
+                return transform_tensor_descriptor(
+                    wei_k_yx_c_desc,
+                    make_tuple(make_pass_through_transform(K),
+                               make_insert_transform(I0),
+                               make_merge_transform(make_tuple(NumYX, C))),
+                    make_tuple(Sequence<0>{}, Sequence<>{}, Sequence<1, 2>{}),
+                    make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}));
+            }
+            else
+            {
+                const auto wei_k_yx_c_desc = make_naive_tensor_descriptor(
+                    make_tuple(K, NumYX, C), make_tuple(KStride, XStride, CStride));
+                return transform_tensor_descriptor(
+                    wei_k_yx_c_desc,
+                    make_tuple(make_merge_transform(make_tuple(NumYX, K)),
+                               make_insert_transform(I0),
+                               make_pass_through_transform(C)),
+                    make_tuple(Sequence<1, 0>{}, Sequence<>{}, Sequence<2>{}),
+                    make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}));
+            }
         }
         else
         {
@@ -597,6 +734,20 @@ struct TransformConvFwdToWconv
             return wei_k_yx_c_desc;
         }
     }
+
+#if defined(ENABLE_CONST_LAYOUT)
+    template <typename CLayout,
+              typename std::enable_if<is_same_v<CLayout, tensor_layout::convolution::CONST_GNHWK>,
+                                      bool>::type = false>
+    static auto
+    MakeCDescriptor_H_W_K(const std::array<index_t, NDimSpatial + 3>& /* c_g_n_k_wos_lengths */,
+                          const std::array<index_t, NDimSpatial + 3>& /* c_g_n_k_wos_strides */)
+    {
+        static_assert(ShuffleOnLoad == false, "");
+        return make_naive_tensor_descriptor_packed(
+            make_tuple(CLayout::N * CLayout::H, CLayout::W, CLayout::K));
+    }
+#endif
 
     template <
         typename CLayout,
@@ -706,14 +857,38 @@ struct TransformConvFwdToWconv
         }
         else
         {
-            if constexpr(isNativePacked)
+            if constexpr(ShuffleOnLoad && Transposed)
             {
-                return make_naive_tensor_descriptor_packed(make_tuple(NHo, Wo, K));
+                auto out_nho_wo_k_desc = make_naive_tensor_descriptor(
+                    make_tuple(NHo, Wo, K), make_tuple(HoStride, WoStride, KStride));
+
+                const auto out_nho_wo_k_unmerge_desc = transform_tensor_descriptor(
+                    out_nho_wo_k_desc,
+                    make_tuple(make_unmerge_transform(make_tuple(NHo / 2, Number<2>{})),
+                               make_unmerge_transform(make_tuple(Wo / 2, Number<2>{})),
+                               make_pass_through_transform(K)),
+                    make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}),
+                    make_tuple(Sequence<0, 2>{}, Sequence<1, 3>{}, Sequence<4>{}));
+
+                return transform_tensor_descriptor(
+                    out_nho_wo_k_unmerge_desc,
+                    make_tuple(make_pass_through_transform(NHo / 2),
+                               make_pass_through_transform(Wo / 2),
+                               make_merge_transform(make_tuple(Number<2>{}, Number<2>{}, K))),
+                    make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2, 3, 4>{}),
+                    make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}));
             }
             else
             {
-                return make_naive_tensor_descriptor(make_tuple(NHo, Wo, K),
-                                                    make_tuple(HoStride, WoStride, KStride));
+                if constexpr(isNativePacked)
+                {
+                    return make_naive_tensor_descriptor_packed(make_tuple(NHo, Wo, K));
+                }
+                else
+                {
+                    return make_naive_tensor_descriptor(make_tuple(NHo, Wo, K),
+                                                        make_tuple(HoStride, WoStride, KStride));
+                }
             }
         }
     }

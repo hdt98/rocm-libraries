@@ -291,7 +291,8 @@ __global__ void __launch_bounds__(64, 1)
                     InDataVec& in_tile_data = inData[h * WRepeat * CRepeat + w * CRepeat + c];
 #endif
                     const InDataVec* p_in_tile_data[1] = {&in_tile_data};
-                    wconvConv.wconv_instr.Run(weiData[k * CRepeat + c], p_in_tile_data, c_vec);
+                    wconvConv.wconv_instr.Run(
+                        weiData[k * CRepeat + c], p_in_tile_data, c_vec, Number<0>{});
                 });
 #if LOAD_DATA_PER_TILE
                 store_acc_data(h, w, k, c_vec);
@@ -563,11 +564,11 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
                 auto& c_vec          = c_thread_buf_.GetVectorTypeReference(Number<0>{});
                 static_for<0, CRepeat, 1>{}([&](auto c) {
                     InDataVec inData[3];
-                    inData[0] = load_in_data(h, w, c, -1);
-                    inData[1] = load_in_data(h, w, c, 0);
-                    inData[2] = load_in_data(h, w, c, 1);
+                    inData[0]                         = load_in_data(h, w, c, -1);
+                    inData[1]                         = load_in_data(h, w, c, 0);
+                    inData[2]                         = load_in_data(h, w, c, 1);
                     const InDataVec* p_in_data_vec[3] = {&inData[0], &inData[1], &inData[2]};
-                    wconvConv.wconv_instr.Run(weiData[c], p_in_data_vec, c_vec);
+                    wconvConv.wconv_instr.Run(weiData[c], p_in_data_vec, c_vec, Number<0>{});
                 });
                 store_acc_data(h, w, k, c_vec);
             });
@@ -628,7 +629,7 @@ void DumpTensor(const Tensor<DataType>& tensor, const char* str)
                     {
                         std::cout << "]";
                     }
-                    if (lengths[4] > 3)
+                    if(lengths[4] > 3)
                     {
                         std::cout << std::endl;
                     }

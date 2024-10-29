@@ -143,6 +143,7 @@ struct StaticallyIndexedArray_v3
 
     __host__ __device__ static constexpr bool IsStaticBuffer() { return true; }
 
+    __host__ __device__ void SwitchBuffer() {}
     T* data_;
 };
 

@@ -59,12 +59,14 @@ struct GridwiseConvPipeline_v2
                                AccumThreadBuffer& accum_thread_buf,
                                index_t num_loop)
     {
+        static_assert(InDataEnableLds ^ WeiDataEnableLds, "");
+
         constexpr auto wei_block_copy_step = to_multi_index(WeiDataBlockTransferStep{});
-        constexpr auto in_block_copy_step = to_multi_index(InDataBlockTransferStep{});
+        constexpr auto in_block_copy_step  = to_multi_index(InDataBlockTransferStep{});
 
         // sync between data load wave (0) and conv wave (1)
-        WavegroupSemaphore<1, 1> semaLoadIn;
-        WavegroupSemaphore<1, 2> semaLoadWei;
+        WavegroupSemaphore<1, 1> semaLoad;
+        WavegroupSemaphore<1, 2> semaLds;
         WavegroupSemaphore<0, 1> semaRun;
 
         // sync for all wave with id = 0 in a group
@@ -89,8 +91,8 @@ struct GridwiseConvPipeline_v2
             barrierLds.join();
         }
 
-        semaLoadIn.init();
-        semaLoadWei.init();
+        semaLoad.init();
+        semaLds.init();
         semaRun.init(1, 1, true);
         // wait semaphore, named-barrier init
         __syncthreads();
@@ -116,7 +118,6 @@ struct GridwiseConvPipeline_v2
                     });
                     wei_block_buf.SwitchBuffer();
                 }
-                semaLoadWei.signal();
             }
 
             if constexpr(InDataEnableLds == false)
@@ -128,8 +129,9 @@ struct GridwiseConvPipeline_v2
                     in_blockwise_copy.MoveSrcSliceWindow(in_grid_desc, in_block_copy_step);
                     in_block_buf.SwitchBuffer();
                 }
-                semaLoadIn.signal();
             }
+
+            semaLoad.template signal<SemaphoreAddressSpaceGlobal>();
         }
 
         // main body
@@ -140,8 +142,8 @@ struct GridwiseConvPipeline_v2
             {
                 if(get_wave_id_in_wavegroup() == 0)
                 {
-                    semaRun.wait();      // sync within wavegroup
-                    barrierLds.signal(); // sync in workgroup
+                    semaRun.template wait<0>(); // sync within wavegroup
+                    barrierLds.signal();        // sync in workgroup
                     barrierLds.wait();
                     if constexpr(WeiDataEnableLds)
                     {
@@ -208,16 +210,15 @@ struct GridwiseConvPipeline_v2
                     in_blockwise_copy.MoveSrcSliceWindow(in_grid_desc, in_block_copy_step);
 
                     barrierLds.sync_lds<EnableAsync>();
-
-                    semaLoadIn.signal();
-                    semaLoadWei.signal();
+                    semaLds.template signal<0>();
+                    semaLoad.template signal<SemaphoreAddressSpaceGlobal>();
                 }
 
                 if(get_wave_id_in_wavegroup() == 1)
                 {
-                    semaLoadIn.wait();
-                    semaLoadWei.wait();
-                    blockwise_conv.Run(wei_block_buf, in_block_buf, accum_thread_buf);
+                    semaLds.template wait<0>();
+                    semaLoad.template wait<0>();
+                    blockwise_conv.Run(wei_block_buf, in_block_buf, accum_thread_buf, false);
                     if constexpr(InDataEnableLds == false)
                     {
                         in_block_buf.SwitchBuffer();
@@ -227,7 +228,7 @@ struct GridwiseConvPipeline_v2
                         wei_block_buf.SwitchBuffer();
                     }
 
-                    semaRun.signal();
+                    semaRun.template signal<0>();
                 }
 
                 ++i;
@@ -238,7 +239,7 @@ struct GridwiseConvPipeline_v2
         {
             if(get_wave_id_in_wavegroup() == 0)
             {
-                semaRun.wait();
+                semaRun.template wait<0>();
                 if constexpr(WeiDataEnableLds)
                 {
                     if constexpr(EnableAsync)
@@ -276,22 +277,14 @@ struct GridwiseConvPipeline_v2
                 }
 
                 barrierLds.sync_lds<EnableAsync>();
-                if constexpr(InDataEnableLds)
-                {
-                    semaLoadIn.signal();
-                }
-
-                if constexpr(WeiDataEnableLds)
-                {
-                    semaLoadWei.signal();
-                }
+                semaLds.template signal<0>();
             }
 
             if(get_wave_id_in_wavegroup() == 1)
             {
-                semaLoadIn.wait();
-                semaLoadWei.wait();
-                blockwise_conv.Run(wei_block_buf, in_block_buf, accum_thread_buf);
+                semaLds.template wait<0>();
+                semaLoad.template wait<0>();
+                blockwise_conv.Run(wei_block_buf, in_block_buf, accum_thread_buf, true);
             }
         }
     }
@@ -342,7 +335,7 @@ struct GridwiseConvPipeline_v2<1, false, false, EnableAsync>
                                index_t num_loop)
     {
         constexpr auto wei_block_copy_step = to_multi_index(WeiDataBlockTransferStep{});
-        constexpr auto in_block_copy_step = to_multi_index(InDataBlockTransferStep{});
+        constexpr auto in_block_copy_step  = to_multi_index(InDataBlockTransferStep{});
 
         // sync between data load wave (0) and conv wave (1)
         WavegroupSemaphore<1, 1> semaLoad;
@@ -392,7 +385,7 @@ struct GridwiseConvPipeline_v2<1, false, false, EnableAsync>
                 wei_block_buf.SwitchBuffer();
             }
 
-            semaLoad.signal();
+            semaLoad.template signal<SemaphoreAddressSpaceGlobal>();
         }
 
         // main body
@@ -403,7 +396,7 @@ struct GridwiseConvPipeline_v2<1, false, false, EnableAsync>
             {
                 if(get_wave_id_in_wavegroup() == 0)
                 {
-                    semaRun.wait();
+                    semaRun.template wait<0>();
                     static_for<0, NumTap, 1>{}([&](auto i) {
                         const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[i])
                             .Run(wei_grid_desc,
@@ -427,16 +420,17 @@ struct GridwiseConvPipeline_v2<1, false, false, EnableAsync>
                     });
                     in_blockwise_copy.MoveSrcSliceWindow(in_grid_desc, in_block_copy_step);
 
-                    semaLoad.signal();
+                    semaLoad.template signal<SemaphoreAddressSpaceGlobal>();
                 }
 
                 if(get_wave_id_in_wavegroup() == 1)
                 {
-                    semaLoad.wait();
-                    blockwise_conv.Run(wei_block_buf, in_block_buf, accum_thread_buf);
+                    semaLoad.template wait<0>();
+
+                    blockwise_conv.Run(wei_block_buf, in_block_buf, accum_thread_buf, false);
                     in_block_buf.SwitchBuffer();
                     wei_block_buf.SwitchBuffer();
-                    semaRun.signal();
+                    semaRun.template signal<0>();
                 }
 
                 ++i;
@@ -447,8 +441,9 @@ struct GridwiseConvPipeline_v2<1, false, false, EnableAsync>
         {
             if(get_wave_id_in_wavegroup() == 1)
             {
-                semaLoad.wait();
-                blockwise_conv.Run(wei_block_buf, in_block_buf, accum_thread_buf);
+                semaLoad.template wait<0>();
+                __builtin_amdgcn_fence(__ATOMIC_ACQUIRE, "workgroup", "global");
+                blockwise_conv.Run(wei_block_buf, in_block_buf, accum_thread_buf, true);
             }
         }
     }
@@ -499,14 +494,14 @@ struct GridwiseConvPipeline_v2<1, true, true, EnableAsync>
                                index_t num_loop)
     {
         constexpr auto wei_block_copy_step = to_multi_index(WeiDataBlockTransferStep{});
-        constexpr auto in_block_copy_step = to_multi_index(InDataBlockTransferStep{});
+        constexpr auto in_block_copy_step  = to_multi_index(InDataBlockTransferStep{});
 
         // sync between data load wave (0) and conv wave (1)
-        WavegroupSemaphore<1, 1> semaLoad;
+        WavegroupSemaphore<1, 1> semaLds;
         WavegroupSemaphore<0, 1> semaRun;
         NamedBarrier<1> barrierLds;
 
-        constexpr index_t NumTap           = wei_blockwise_copy.Size();
+        constexpr index_t NumTap = wei_blockwise_copy.Size();
 
         using WeiDataBlockTransfer0 =
             std::remove_const_t<remove_cvref_t<decltype(wei_blockwise_copy[I0])>>;
@@ -523,7 +518,7 @@ struct GridwiseConvPipeline_v2<1, true, true, EnableAsync>
             barrierLds.join();
         }
 
-        semaLoad.init();
+        semaLds.init();
         semaRun.init(1, 1, true);
         // wait semaphore init
         __syncthreads();
@@ -536,7 +531,7 @@ struct GridwiseConvPipeline_v2<1, true, true, EnableAsync>
             {
                 if(get_wave_id_in_wavegroup() == 0)
                 {
-                    semaRun.wait();
+                    semaRun.template wait<0>();
                     barrierLds.signal();
                     barrierLds.wait();
                     if constexpr(EnableAsync)
@@ -576,14 +571,14 @@ struct GridwiseConvPipeline_v2<1, true, true, EnableAsync>
                     in_blockwise_copy.MoveSrcSliceWindow(in_grid_desc, in_block_copy_step);
                     barrierLds.sync_lds<EnableAsync>();
 
-                    semaLoad.signal();
+                    semaLds.template signal<0>();
                 }
 
                 if(get_wave_id_in_wavegroup() == 1)
                 {
-                    semaLoad.wait();
-                    blockwise_conv.Run(wei_block_buf, in_block_buf, accum_thread_buf);
-                    semaRun.signal();
+                    semaLds.template wait<0>();
+                    blockwise_conv.Run(wei_block_buf, in_block_buf, accum_thread_buf, false);
+                    semaRun.template signal<0>();
                 }
                 ++i;
             } while(i < (num_loop - 1));
@@ -593,7 +588,7 @@ struct GridwiseConvPipeline_v2<1, true, true, EnableAsync>
         {
             if(get_wave_id_in_wavegroup() == 0)
             {
-                semaRun.wait();
+                semaRun.template wait<0>();
                 barrierLds.signal();
                 barrierLds.wait();
                 if constexpr(EnableAsync)
@@ -633,13 +628,13 @@ struct GridwiseConvPipeline_v2<1, true, true, EnableAsync>
 
                 barrierLds.sync_lds<EnableAsync>();
 
-                semaLoad.signal();
+                semaLds.template signal<0>();
             }
 
             if(get_wave_id_in_wavegroup() == 1)
             {
-                semaLoad.wait();
-                blockwise_conv.Run(wei_block_buf, in_block_buf, accum_thread_buf);
+                semaLds.template wait<0>();
+                blockwise_conv.Run(wei_block_buf, in_block_buf, accum_thread_buf, true);
             }
         }
     }

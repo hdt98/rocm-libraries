@@ -91,7 +91,7 @@ struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
 {
     using DeviceOp = DeviceConvSubaWconv;
     static constexpr auto conv_to_wconv_transformer =
-        TransformConvFwdToWconv<NDimSpatial, ConvForwardSpecialization>{};
+        TransformConvFwdToWconv<NDimSpatial, false, false, ConvForwardSpecialization>{};
 
     static constexpr auto I0 = Number<0>{};
     static constexpr auto I1 = Number<1>{};

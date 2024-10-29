@@ -120,8 +120,9 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
 
     static_assert(InDataBlockSize + WeiDataBlockSize * C_BlockTile < LDS_SIZE, "");
 
-    constexpr auto WeiDataBlockDesc = make_naive_tensor_descriptor_packed(
-        make_tuple(Number<FilterSize * FilterSize>{}, Number<KPerBlock>{}, Number<CPerBlock>{}));
+    constexpr auto WeiDataBlockDesc = make_naive_tensor_descriptor(
+        make_tuple(Number<KPerBlock>{}, Number<FilterSize * FilterSize>{}, Number<CPerBlock>{}),
+        make_tuple(Number<CPerBlock>{}, Number<KPerBlock * CPerBlock>{}, Number<1>{}));
 
     static constexpr index_t CPerWconv = wconv_conv.GetNumInputChannels();
     static constexpr index_t KPerWconv = wconv_conv.GetNumOutputChannels();
@@ -132,39 +133,17 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
 
     // YXKC -> K0 x C0 x YX x K1 x C2 x C1
     constexpr auto NumSubTilesPerWeightTap = wconv_conv.GetNumSubTilesPerWeightTap();
-    constexpr auto WeiDataWaveDesc         = transform_tensor_descriptor(
-        WeiDataBlockDesc,
-        make_tuple(
-            make_pass_through_transform(Number<FilterSize * FilterSize>{}),
-            make_unmerge_transform(
-                make_tuple(Number<KPerBlock / KPerWconv>{}, Number<KPerWconv>{})),
-            make_unmerge_transform(make_tuple(Number<CPerBlock / CPerWconv>{},
-                                              Number<NumSubTilesPerWeightTap>{},
-                                              Number<CPerWconv / NumSubTilesPerWeightTap>{}))),
-        make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}),
-        make_tuple(Sequence<2>{}, Sequence<0, 3>{}, Sequence<1, 4, 5>{}));
 
     // HWC -> H0 x W0 x C0 x H2 x H1 x W1 x C1
     constexpr auto NumSubTilePerImage = wconv_conv.GetNumSubTilesPerImageTile();
-    constexpr auto InDataWaveDesc     = transform_tensor_descriptor(
-        InDataBlockDesc,
-        make_tuple(make_unmerge_transform(make_tuple(Number<HPerBlock / HPerWconv>{},
-                                                     Number<NumSubTilePerImage>{},
-                                                     Number<HPerWconv / NumSubTilePerImage>{})),
-                   make_unmerge_transform(
-                       make_tuple(Number<WPerBlock / WPerWconv>{}, Number<WPerWconv>{})),
-                   make_unmerge_transform(
-                       make_tuple(Number<CPerBlock / CPerWconv>{}, Number<CPerWconv>{}))),
-        make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}),
-        make_tuple(Sequence<2, 3, 4>{}, Sequence<0, 5>{}, Sequence<1, 6>{}));
 
     using ThisThreadBlock  = ThisThreadBlock<BlockSize>;
     auto blockwise_conv    = BlockwiseConvWconv<ThisThreadBlock,
                                              WeiDataType,
                                              InDataType,
                                              AccDataType,
-                                             decltype(WeiDataWaveDesc),
-                                             decltype(InDataWaveDesc),
+                                             decltype(WeiDataBlockDesc),
+                                             decltype(InDataBlockDesc),
                                              HPerBlock,
                                              WPerBlock,
                                              CPerBlock,
@@ -395,7 +374,7 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
             auto weight_block_buf = make_dynamic_buffer<AddressSpaceEnum::Lds>(
                 reinterpret_cast<WeiDataType*>(&p_shared[InDataBlockSize + c * WeiDataBlockSize]),
                 WeiDataBlockSize);
-            blockwise_conv.Run(weight_block_buf, indata_block_buf, accum_thread_buf);
+            blockwise_conv.Run(weight_block_buf, indata_block_buf, accum_thread_buf, true);
         });
         store_accum_buf(k);
     });
@@ -454,7 +433,7 @@ void DumpTensor(const Tensor<DataType>& tensor, const char* str)
                     {
                         std::cout << "]";
                     }
-                    if (lengths[4] > 3)
+                    if(lengths[4] > 3)
                     {
                         std::cout << std::endl;
                     }

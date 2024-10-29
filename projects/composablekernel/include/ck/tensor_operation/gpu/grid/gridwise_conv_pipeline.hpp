@@ -62,8 +62,8 @@ struct GridwiseConvPipeline_v1<1, true, true, false>
                                index_t num_loop)
     {
         constexpr auto wei_block_copy_step = to_multi_index(WeiDataBlockTransferStep{});
-        constexpr auto in_block_copy_step = to_multi_index(InDataBlockTransferStep{});
-        constexpr index_t NumTap = wei_blockwise_copy.Size();
+        constexpr auto in_block_copy_step  = to_multi_index(InDataBlockTransferStep{});
+        constexpr index_t NumTap           = wei_blockwise_copy.Size();
         using WeiDataBlockTransfer0 =
             std::remove_const_t<remove_cvref_t<decltype(wei_blockwise_copy[I0])>>;
 
@@ -105,7 +105,7 @@ struct GridwiseConvPipeline_v1<1, true, true, false>
 
                 in_blockwise_copy.RunRead(in_grid_desc, in_grid_buf);
 
-                blockwise_conv.Run(wei_block_buf, in_block_buf, accum_thread_buf);
+                blockwise_conv.Run(wei_block_buf, in_block_buf, accum_thread_buf, false);
 
                 block_sync_lds();
 
@@ -131,7 +131,7 @@ struct GridwiseConvPipeline_v1<1, true, true, false>
         {
             block_sync_lds();
 
-            blockwise_conv.Run(wei_block_buf, in_block_buf, accum_thread_buf);
+            blockwise_conv.Run(wei_block_buf, in_block_buf, accum_thread_buf, true);
         }
     }
 };
@@ -181,7 +181,7 @@ struct GridwiseConvPipeline_v1<1, false, true, false>
                                index_t num_loop)
     {
         constexpr auto wei_block_copy_step = to_multi_index(WeiDataBlockTransferStep{});
-        constexpr auto in_block_copy_step = to_multi_index(InDataBlockTransferStep{});
+        constexpr auto in_block_copy_step  = to_multi_index(InDataBlockTransferStep{});
         constexpr index_t NumTap           = wei_blockwise_copy.Size();
         constexpr auto in_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0);
         auto in_block_buf_switch           = in_block_buf;
@@ -230,7 +230,7 @@ struct GridwiseConvPipeline_v1<1, false, true, false>
                         .RunRead(wei_grid_desc, wei_grid_buf);
                 });
 
-                blockwise_conv.Run(wei_block_buf, in_block_buf, accum_thread_buf);
+                blockwise_conv.Run(wei_block_buf, in_block_buf, accum_thread_buf, false);
 
                 block_sync_lds();
 
@@ -255,7 +255,7 @@ struct GridwiseConvPipeline_v1<1, false, true, false>
         {
             block_sync_lds();
 
-            blockwise_conv.Run(wei_block_buf, in_block_buf, accum_thread_buf);
+            blockwise_conv.Run(wei_block_buf, in_block_buf, accum_thread_buf, true);
         }
     }
 };
@@ -305,7 +305,7 @@ struct GridwiseConvPipeline_v1<1, false, false, EnableAsync>
                                index_t num_loop)
     {
         constexpr auto wei_block_copy_step = to_multi_index(WeiDataBlockTransferStep{});
-        constexpr auto in_block_copy_step = to_multi_index(InDataBlockTransferStep{});
+        constexpr auto in_block_copy_step  = to_multi_index(InDataBlockTransferStep{});
         constexpr index_t NumTap           = wei_blockwise_copy.Size();
         constexpr auto in_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0);
         auto in_block_buf_switch           = in_block_buf;
@@ -357,7 +357,7 @@ struct GridwiseConvPipeline_v1<1, false, false, EnableAsync>
                                       in_block_origin_idx,
                                       in_block_buf_switch);
 
-                blockwise_conv.Run(wei_block_buf, in_block_buf, accum_thread_buf);
+                blockwise_conv.Run(wei_block_buf, in_block_buf, accum_thread_buf, false);
 
                 static_for<0, NumTap, 1>{}([&](auto i) {
                     const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[i])
@@ -374,7 +374,7 @@ struct GridwiseConvPipeline_v1<1, false, false, EnableAsync>
 
         // tail
         {
-            blockwise_conv.Run(wei_block_buf, in_block_buf, accum_thread_buf);
+            blockwise_conv.Run(wei_block_buf, in_block_buf, accum_thread_buf, true);
         }
     }
 };
@@ -424,7 +424,7 @@ struct GridwiseConvPipeline_v1<1, true, false, false>
                                index_t num_loop)
     {
         constexpr auto wei_block_copy_step = to_multi_index(WeiDataBlockTransferStep{});
-        constexpr auto in_block_copy_step = to_multi_index(InDataBlockTransferStep{});
+        constexpr auto in_block_copy_step  = to_multi_index(InDataBlockTransferStep{});
 
         constexpr index_t NumTap       = wei_blockwise_copy.Size();
         constexpr auto wei_remap_table = blockwise_conv.GetWeightRemapTable();
@@ -475,7 +475,7 @@ struct GridwiseConvPipeline_v1<1, true, false, false>
 
                 in_blockwise_copy.RunRead(in_grid_desc, in_grid_buf);
 
-                blockwise_conv.Run(wei_block_buf, in_block_buf, accum_thread_buf);
+                blockwise_conv.Run(wei_block_buf, in_block_buf, accum_thread_buf, false);
 
                 block_sync_lds();
 
@@ -497,7 +497,7 @@ struct GridwiseConvPipeline_v1<1, true, false, false>
         {
             block_sync_lds();
 
-            blockwise_conv.Run(wei_block_buf, in_block_buf, accum_thread_buf);
+            blockwise_conv.Run(wei_block_buf, in_block_buf, accum_thread_buf, true);
         }
     }
 };
@@ -549,8 +549,8 @@ struct GridwiseConvPipeline_v1<1, true, true, true>
                                index_t num_loop)
     {
         constexpr auto wei_block_copy_step = to_multi_index(WeiDataBlockTransferStep{});
-        constexpr auto in_block_copy_step = to_multi_index(InDataBlockTransferStep{});
-        constexpr index_t NumTap = wei_blockwise_copy.Size();
+        constexpr auto in_block_copy_step  = to_multi_index(InDataBlockTransferStep{});
+        constexpr index_t NumTap           = wei_blockwise_copy.Size();
         using WeiDataBlockTransfer0 =
             std::remove_const_t<remove_cvref_t<decltype(wei_blockwise_copy[I0])>>;
 
@@ -580,7 +580,7 @@ struct GridwiseConvPipeline_v1<1, true, true, true>
                 // do convolution
                 block_sync_lds_async_load();
 
-                blockwise_conv.Run(wei_block_buf, in_block_buf, accum_thread_buf);
+                blockwise_conv.Run(wei_block_buf, in_block_buf, accum_thread_buf, false);
 
                 block_sync_lds();
 
@@ -607,7 +607,7 @@ struct GridwiseConvPipeline_v1<1, true, true, true>
         {
             block_sync_lds_async_load();
 
-            blockwise_conv.Run(wei_block_buf, in_block_buf, accum_thread_buf);
+            blockwise_conv.Run(wei_block_buf, in_block_buf, accum_thread_buf, true);
         }
     }
 };
@@ -657,7 +657,7 @@ struct GridwiseConvPipeline_v1<1, false, true, true>
                                index_t num_loop)
     {
         constexpr auto wei_block_copy_step = to_multi_index(WeiDataBlockTransferStep{});
-        constexpr auto in_block_copy_step = to_multi_index(InDataBlockTransferStep{});
+        constexpr auto in_block_copy_step  = to_multi_index(InDataBlockTransferStep{});
         constexpr index_t NumTap           = wei_blockwise_copy.Size();
         constexpr auto in_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0);
         auto in_block_buf_switch           = in_block_buf;
@@ -698,7 +698,7 @@ struct GridwiseConvPipeline_v1<1, false, true, true>
                                       in_block_buf_switch);
                 in_blockwise_copy.MoveSrcSliceWindow(in_grid_desc, in_block_copy_step);
 
-                blockwise_conv.Run(wei_block_buf, in_block_buf, accum_thread_buf);
+                blockwise_conv.Run(wei_block_buf, in_block_buf, accum_thread_buf, false);
 
                 block_sync_lds();
 
@@ -722,7 +722,7 @@ struct GridwiseConvPipeline_v1<1, false, true, true>
         {
             block_sync_lds_async_load();
 
-            blockwise_conv.Run(wei_block_buf, in_block_buf, accum_thread_buf);
+            blockwise_conv.Run(wei_block_buf, in_block_buf, accum_thread_buf, true);
         }
     }
 };
@@ -772,10 +772,10 @@ struct GridwiseConvPipeline_v1<1, true, false, true>
                                index_t num_loop)
     {
         constexpr auto wei_block_copy_step = to_multi_index(WeiDataBlockTransferStep{});
-        constexpr auto in_block_copy_step = to_multi_index(InDataBlockTransferStep{});
-        constexpr index_t NumTap       = wei_blockwise_copy.Size();
-        constexpr auto wei_remap_table = blockwise_conv.GetWeightRemapTable();
-        auto wei_block_buf_switch      = wei_block_buf;
+        constexpr auto in_block_copy_step  = to_multi_index(InDataBlockTransferStep{});
+        constexpr index_t NumTap           = wei_blockwise_copy.Size();
+        constexpr auto wei_remap_table     = blockwise_conv.GetWeightRemapTable();
+        auto wei_block_buf_switch          = wei_block_buf;
 
         using WeiDataBlockTransfer0 =
             std::remove_const_t<remove_cvref_t<decltype(wei_blockwise_copy[I0])>>;
@@ -822,7 +822,7 @@ struct GridwiseConvPipeline_v1<1, true, false, true>
                         .MoveSrcSliceWindow(wei_grid_desc, wei_block_copy_step);
                 });
 
-                blockwise_conv.Run(wei_block_buf, in_block_buf, accum_thread_buf);
+                blockwise_conv.Run(wei_block_buf, in_block_buf, accum_thread_buf, false);
 
                 wei_block_buf = wei_block_buf_switch;
 
@@ -840,7 +840,7 @@ struct GridwiseConvPipeline_v1<1, true, false, true>
         {
             block_sync_lds();
 
-            blockwise_conv.Run(wei_block_buf, in_block_buf, accum_thread_buf);
+            blockwise_conv.Run(wei_block_buf, in_block_buf, accum_thread_buf, true);
         }
     }
 };
