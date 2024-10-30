@@ -34,6 +34,25 @@ struct DeviceGemm : public BaseOperator
                         BElementwiseOperation b_element_op,
                         CElementwiseOperation c_element_op) = 0;
 
+#ifdef CK_EXTENSION_MX_TYPE
+    virtual std::unique_ptr<BaseArgument> MakeArgumentPointer(const void* p_a,
+                                                              const void* p_b,
+                                                              const int32_t* p_a_scale,
+                                                              const int32_t* p_b_scale,
+                                                              void* p_c,
+                                                              ck::index_t M,
+                                                              ck::index_t N,
+                                                              ck::index_t K,
+                                                              ck::index_t StrideA,
+                                                              ck::index_t StrideB,
+                                                              ck::index_t StrideC,
+                                                              AElementwiseOperation a_element_op,
+                                                              BElementwiseOperation b_element_op,
+                                                              CElementwiseOperation c_element_op)
+    {
+        return nullptr;
+    }
+#endif
     virtual std::unique_ptr<BaseInvoker> MakeInvokerPointer() = 0;
 };
 

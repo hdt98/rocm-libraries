@@ -532,6 +532,588 @@ struct BlockwiseGemmWMMA
     typename AThreadCopySelector<AEnableLds>::type a_thread_copy_;
     typename BThreadCopySelector<BEnableLds>::type b_thread_copy_;
 };
+
+#ifdef CK_EXTENSION_MX_TYPE
+template <index_t BlockSize,
+          typename FloatA,
+          typename FloatB,
+          typename FloatAcc,
+          typename ABlockDesc,
+          typename BBlockDesc,
+          typename AScaleBlockDesc,
+          typename BScaleBlockDesc,
+          index_t MPerBlock,
+          index_t NPerBlock,
+          index_t KPerBlock,
+          index_t MPerWMMA,
+          index_t NPerWMMA,
+          index_t MRepeat,
+          index_t NRepeat,
+          index_t KPack,
+          bool AEnableLds = true,
+          bool BEnableLds = true,
+          bool TransposeC = false>
+struct BlockwiseMXGemmWMMA : public BlockwiseGemmWMMA<BlockSize,
+                                                      FloatA,
+                                                      FloatB,
+                                                      FloatAcc,
+                                                      ABlockDesc,
+                                                      BBlockDesc,
+                                                      MPerBlock,
+                                                      NPerBlock,
+                                                      KPerBlock,
+                                                      MPerWMMA,
+                                                      NPerWMMA,
+                                                      MRepeat,
+                                                      NRepeat,
+                                                      KPack,
+                                                      AEnableLds,
+                                                      BEnableLds,
+                                                      TransposeC>
+{
+    using PARENT = BlockwiseGemmWMMA<BlockSize,
+                                     FloatA,
+                                     FloatB,
+                                     FloatAcc,
+                                     ABlockDesc,
+                                     BBlockDesc,
+                                     MPerBlock,
+                                     NPerBlock,
+                                     KPerBlock,
+                                     MPerWMMA,
+                                     NPerWMMA,
+                                     MRepeat,
+                                     NRepeat,
+                                     KPack,
+                                     AEnableLds,
+                                     BEnableLds,
+                                     TransposeC>;
+
+    static constexpr auto ScaleK0PerBlock = math::integer_divide_ceil(KPerBlock, 256);
+
+    static constexpr auto AKPack = []() {
+        if constexpr(is_mx_type_t_v<FloatA>)
+        {
+            return FloatA::dwords_per_wmmak;
+        }
+        else
+        {
+            return KPack;
+        }
+    }();
+    static constexpr auto BKPack = []() {
+        if constexpr(is_mx_type_t_v<FloatB>)
+        {
+            return FloatB::dwords_per_wmmak;
+        }
+        else
+        {
+            return KPack;
+        }
+    }();
+
+    __device__ static auto CalculateAScaleThreadOriginDataIndex()
+    {
+        if constexpr(AEnableLds)
+        {
+            const auto wave_idx   = PARENT::GetWaveIdx();
+            const auto waveId_m   = wave_idx[PARENT::I0];
+            const auto WMMA_a_idx = PARENT::wmma_gemm.CalculateAThreadOriginDataIndex();
+            const auto k1_value   = PARENT::wmma_gemm.GetSubGroupId();
+            const auto k0_value   = get_thread_local_1d_id() / (64 * 4);
+            //   |KRepeat   |MRepeat|MWave  |MLane  |KPack
+            return make_tuple(k0_value, 0, waveId_m, WMMA_a_idx, k1_value);
+        }
+        else
+        {
+            return make_tuple(0, 0, 0, 0, 0);
+        }
+    }
+
+    __device__ static auto CalculateBScaleThreadOriginDataIndex()
+    {
+        if constexpr(BEnableLds)
+        {
+            const auto wave_idx   = PARENT::GetWaveIdx();
+            const auto waveId_n   = wave_idx[PARENT::I1];
+            const auto WMMA_b_idx = PARENT::wmma_gemm.CalculateBThreadOriginDataIndex();
+            const auto k1_value   = PARENT::wmma_gemm.GetSubGroupId();
+            const auto k0_value   = get_thread_local_1d_id() / (64 * 4);
+            //  |KRepeat   |NRepeat|Nwave  |NLane  |KPack
+            return make_tuple(k0_value, 0, waveId_n, WMMA_b_idx, k1_value);
+        }
+        else
+        {
+            return make_tuple(0, 0, 0, 0, 0);
+        }
+    }
+
+    using Tuple5 = decltype(CalculateAScaleThreadOriginDataIndex());
+    __host__ __device__
+    BlockwiseMXGemmWMMA(Tuple5 a_scale_origin = CalculateAScaleThreadOriginDataIndex(),
+                        Tuple5 b_scale_origin = CalculateBScaleThreadOriginDataIndex())
+        : BlockwiseGemmWMMA<BlockSize,
+                            FloatA,
+                            FloatB,
+                            FloatAcc,
+                            ABlockDesc,
+                            BBlockDesc,
+                            MPerBlock,
+                            NPerBlock,
+                            KPerBlock,
+                            MPerWMMA,
+                            NPerWMMA,
+                            MRepeat,
+                            NRepeat,
+                            KPack,
+                            AEnableLds,
+                            BEnableLds,
+                            TransposeC>{},
+          a_thread_copy_(PARENT::CalculateAThreadOriginDataIndex()),
+          b_thread_copy_(PARENT::CalculateBThreadOriginDataIndex()),
+          a_scale_thread_copy_(a_scale_origin),
+          b_scale_thread_copy_(b_scale_origin)
+    {
+    }
+
+    static constexpr AScaleBlockDesc a_scale_block_desc_k0_m0_m1_m2_k1;
+    static constexpr BScaleBlockDesc b_scale_block_desc_k0_n0_n1_n2_k1;
+
+    template <typename ABlockBuffer,
+              typename BBlockBuffer,
+              typename AScaleBlockBuffer,
+              typename BScaleBlockBuffer,
+              typename CThreadBuffer>
+    __device__ void Run(const ABlockBuffer& a_block_buf,
+                        const BBlockBuffer& b_block_buf,
+                        const AScaleBlockBuffer& a_scale_block_buf,
+                        const BScaleBlockBuffer& b_scale_block_buf,
+                        CThreadBuffer& c_thread_buf) const
+    {
+
+        // for mx data type use int32 data type
+        auto a_thread_buf = make_static_buffer<AddressSpaceEnum::Vgpr, int32_t>(
+            a_thread_desc_.GetElementSpaceSize());
+        auto b_thread_buf = make_static_buffer<AddressSpaceEnum::Vgpr, int32_t>(
+            b_thread_desc_.GetElementSpaceSize());
+
+        auto a_scale_thread_buf = make_static_buffer<AddressSpaceEnum::Vgpr, int32_t>(
+            a_scale_thread_desc_.GetElementSpaceSize());
+
+        auto b_scale_thread_buf = make_static_buffer<AddressSpaceEnum::Vgpr, int32_t>(
+            b_scale_thread_desc_.GetElementSpaceSize());
+
+        static_for<0, ScaleK0PerBlock, 1>{}([&](auto k0) {
+            static_for<0, MRepeat, 1>{}([&](auto m0) {
+                a_scale_thread_copy_.Run(a_scale_block_desc_k0_m0_m1_m2_k1,
+                                         make_tuple(k0, m0, PARENT::I0, PARENT::I0, PARENT::I0),
+                                         a_scale_block_buf,
+                                         a_scale_thread_desc_,
+                                         make_tuple(k0, m0, PARENT::I0, PARENT::I0, PARENT::I0),
+                                         a_scale_thread_buf);
+            });
+
+            static_for<0, NRepeat, 1>{}([&](auto n0) {
+                b_scale_thread_copy_.Run(b_scale_block_desc_k0_n0_n1_n2_k1,
+                                         make_tuple(k0, n0, PARENT::I0, PARENT::I0, PARENT::I0),
+                                         b_scale_block_buf,
+                                         b_scale_thread_desc_,
+                                         make_tuple(k0, n0, PARENT::I0, PARENT::I0, PARENT::I0),
+                                         b_scale_thread_buf);
+            });
+        });
+
+        if constexpr(MRepeat < NRepeat)
+        {
+            static_for<0, KPerBlock / KPack, 1>{}([&](auto k) { // k=0,1,2 instead of
+                                                                // k=0,kpack*1, ...
+                constexpr index_t scale_select_idx = k & 3;
+                constexpr index_t k_idx            = k >> 2;
+                static_for<0, MRepeat, 1>{}([&](auto m0) {
+                    // read A
+                    a_thread_copy_.Run(
+                        PARENT::a_block_desc_k0_m0_m1_m2_k1,
+                        make_tuple(Number<k * AKPack / PARENT::A_K1 / PARENT::A_KRow>{},
+                                   m0,
+                                   PARENT::I0,
+                                   PARENT::I0,
+                                   PARENT::I0,
+                                   PARENT::I0),
+                        a_block_buf,
+                        a_thread_desc_,
+                        make_tuple(PARENT::I0, m0, PARENT::I0, PARENT::I0, PARENT::I0, PARENT::I0),
+                        a_thread_buf);
+
+                    static_for<0, NRepeat, 1>{}([&](auto n0) {
+                        // read B
+                        b_thread_copy_.Run(
+                            PARENT::b_block_desc_k0_n0_n1_n2_k1,
+                            make_tuple(Number<k * BKPack / PARENT::B_K1 / PARENT::B_KRow>{},
+                                       n0,
+                                       PARENT::I0,
+                                       PARENT::I0,
+                                       PARENT::I0,
+                                       PARENT::I0),
+                            b_block_buf,
+                            b_thread_desc_,
+                            make_tuple(
+                                PARENT::I0, n0, PARENT::I0, PARENT::I0, PARENT::I0, PARENT::I0),
+                            b_thread_buf);
+
+                        vector_type<int32_t, 8> a_thread_vec{};
+                        vector_type<int32_t, 8> b_thread_vec{};
+
+                        uint32_t a_scale_value =
+                            a_scale_thread_buf[Number<a_scale_thread_desc_.CalculateOffset(
+                                make_tuple(k_idx, m0, PARENT::I0, PARENT::I0, PARENT::I0))>{}];
+                        uint32_t b_scale_value =
+                            b_scale_thread_buf[Number<b_scale_thread_desc_.CalculateOffset(
+                                make_tuple(k_idx, n0, PARENT::I0, PARENT::I0, PARENT::I0))>{}];
+
+                        static_for<0, AKPack / PARENT::A_KRow, 1>{}([&](auto i) {
+                            a_thread_vec.template AsType<int32_t>()(i) =
+                                a_thread_buf[Number<a_thread_desc_.CalculateOffset(make_tuple(
+                                    i / PARENT::A_K1, m0, 0, 0, 0, i % PARENT::A_K1))>{}];
+                        });
+
+                        static_for<0, BKPack / PARENT::B_KRow, 1>{}([&](auto i) {
+                            b_thread_vec.template AsType<int32_t>()(i) =
+                                b_thread_buf[Number<b_thread_desc_.CalculateOffset(make_tuple(
+                                    i / PARENT::B_K1, n0, 0, 0, 0, i % PARENT::B_K1))>{}];
+                        });
+
+                        using wmma_input_type_a = typename vector_type<int32_t, 8>::type;
+                        using wmma_input_type_b = typename vector_type<int32_t, 8>::type;
+
+                        constexpr index_t c_offset =
+                            PARENT::c_thread_desc_.CalculateOffset(make_tuple(m0, n0, 0));
+
+                        if constexpr(scale_select_idx == 0)
+                        {
+                            PARENT::wmma_gemm.template Run<0, 0>(
+                                a_thread_vec.template AsType<wmma_input_type_a>(),
+                                b_thread_vec.template AsType<wmma_input_type_b>(),
+                                a_scale_value,
+                                b_scale_value,
+                                c_thread_buf.GetVectorTypeReference(Number<c_offset>{}));
+                        }
+                        else if constexpr(scale_select_idx == 1)
+                        {
+                            PARENT::wmma_gemm.template Run<1, 1>(
+                                a_thread_vec.template AsType<wmma_input_type_a>(),
+                                b_thread_vec.template AsType<wmma_input_type_b>(),
+                                a_scale_value,
+                                b_scale_value,
+                                c_thread_buf.GetVectorTypeReference(Number<c_offset>{}));
+                        }
+                        else if constexpr(scale_select_idx == 2)
+                        {
+                            PARENT::wmma_gemm.template Run<2, 2>(
+                                a_thread_vec.template AsType<wmma_input_type_a>(),
+                                b_thread_vec.template AsType<wmma_input_type_b>(),
+                                a_scale_value,
+                                b_scale_value,
+                                c_thread_buf.GetVectorTypeReference(Number<c_offset>{}));
+                        }
+                        else
+                        {
+                            PARENT::wmma_gemm.template Run<3, 3>(
+                                a_thread_vec.template AsType<wmma_input_type_a>(),
+                                b_thread_vec.template AsType<wmma_input_type_b>(),
+                                a_scale_value,
+                                b_scale_value,
+                                c_thread_buf.GetVectorTypeReference(Number<c_offset>{}));
+                        }
+                    });
+                });
+            });
+        }
+        else
+        {
+            static_for<0, NRepeat, 1>{}([&](auto n0) {
+                static_for<0, MRepeat, 1>{}([&](auto m0) {
+                    static_for<0, KPerBlock / KPack, 1>{}([&](auto k) { // k=0,1,2 instead of
+                                                                        // k=0,kpack*1, ..
+                        constexpr index_t k_idx            = k >> 2;
+                        constexpr index_t scale_select_idx = k & 0x3;
+                        // read B
+                        b_thread_copy_.Run(
+                            PARENT::b_block_desc_k0_n0_n1_n2_k1,
+                            make_tuple(Number<k * BKPack / PARENT::B_K1 / PARENT::B_KRow>{},
+                                       n0,
+                                       PARENT::I0,
+                                       PARENT::I0,
+                                       PARENT::I0,
+                                       PARENT::I0),
+                            b_block_buf,
+                            b_thread_desc_,
+                            make_tuple(
+                                PARENT::I0, n0, PARENT::I0, PARENT::I0, PARENT::I0, PARENT::I0),
+                            b_thread_buf);
+                        // read A
+                        a_thread_copy_.Run(
+                            PARENT::a_block_desc_k0_m0_m1_m2_k1,
+                            make_tuple(Number<k * AKPack / PARENT::A_K1 / PARENT::A_KRow>{},
+                                       m0,
+                                       PARENT::I0,
+                                       PARENT::I0,
+                                       PARENT::I0,
+                                       PARENT::I0),
+                            a_block_buf,
+                            a_thread_desc_,
+                            make_tuple(
+                                PARENT::I0, m0, PARENT::I0, PARENT::I0, PARENT::I0, PARENT::I0),
+                            a_thread_buf);
+
+                        vector_type<int32_t, 8> a_thread_vec{};
+                        vector_type<int32_t, 8> b_thread_vec{};
+
+                        static_for<0, AKPack / PARENT::A_KRow, 1>{}([&](auto i) {
+                            a_thread_vec.template AsType<int32_t>()(i) =
+                                a_thread_buf[Number<a_thread_desc_.CalculateOffset(make_tuple(
+                                    i / PARENT::A_K1, m0, 0, 0, 0, i % PARENT::A_K1))>{}];
+                        });
+
+                        static_for<0, BKPack / PARENT::B_KRow, 1>{}([&](auto i) {
+                            b_thread_vec.template AsType<int32_t>()(i) =
+                                b_thread_buf[Number<b_thread_desc_.CalculateOffset(make_tuple(
+                                    i / PARENT::B_K1, n0, 0, 0, 0, i % PARENT::B_K1))>{}];
+                        });
+
+                        uint32_t a_scale_value =
+                            a_scale_thread_buf[Number<a_scale_thread_desc_.CalculateOffset(
+                                make_tuple(k_idx, m0, PARENT::I0, PARENT::I0, PARENT::I0))>{}];
+                        uint32_t b_scale_value =
+                            b_scale_thread_buf[Number<b_scale_thread_desc_.CalculateOffset(
+                                make_tuple(k_idx, n0, PARENT::I0, PARENT::I0, PARENT::I0))>{}];
+
+                        using wmma_input_type_a = typename vector_type<int32_t, 8>::type;
+                        using wmma_input_type_b = typename vector_type<int32_t, 8>::type;
+
+                        constexpr index_t c_offset =
+                            PARENT::c_thread_desc_.CalculateOffset(make_tuple(m0, n0, 0));
+
+                        if constexpr(scale_select_idx == 0)
+                        {
+                            PARENT::wmma_gemm.template Run<0, 0>(
+                                a_thread_vec.template AsType<wmma_input_type_a>(),
+                                b_thread_vec.template AsType<wmma_input_type_b>(),
+                                a_scale_value,
+                                b_scale_value,
+                                c_thread_buf.GetVectorTypeReference(Number<c_offset>{}));
+                        }
+                        else if constexpr(scale_select_idx == 1)
+                        {
+                            PARENT::wmma_gemm.template Run<1, 1>(
+                                a_thread_vec.template AsType<wmma_input_type_a>(),
+                                b_thread_vec.template AsType<wmma_input_type_b>(),
+                                a_scale_value,
+                                b_scale_value,
+                                c_thread_buf.GetVectorTypeReference(Number<c_offset>{}));
+                        }
+                        else if constexpr(scale_select_idx == 2)
+                        {
+                            PARENT::wmma_gemm.template Run<2, 2>(
+                                a_thread_vec.template AsType<wmma_input_type_a>(),
+                                b_thread_vec.template AsType<wmma_input_type_b>(),
+                                a_scale_value,
+                                b_scale_value,
+                                c_thread_buf.GetVectorTypeReference(Number<c_offset>{}));
+                        }
+                        else
+                        {
+                            PARENT::wmma_gemm.template Run<3, 3>(
+                                a_thread_vec.template AsType<wmma_input_type_a>(),
+                                b_thread_vec.template AsType<wmma_input_type_b>(),
+                                a_scale_value,
+                                b_scale_value,
+                                c_thread_buf.GetVectorTypeReference(Number<c_offset>{}));
+                        }
+                    });
+                });
+            });
+        }
+    }
+
+    protected:
+    static constexpr auto a_thread_desc_ =
+        make_naive_tensor_descriptor(make_tuple(Number<AKPack / PARENT::A_K1 / PARENT::A_KRow>{},
+                                                Number<MRepeat>{},
+                                                PARENT::I1,
+                                                PARENT::I1,
+                                                PARENT::I1,
+                                                Number<PARENT::A_K1>{}),
+                                     make_tuple(Number<PARENT::A_K1>{},
+                                                Number<AKPack / PARENT::A_KRow>{},
+                                                Number<PARENT::A_K1>{},
+                                                Number<PARENT::A_K1>{},
+                                                Number<PARENT::A_K1>{},
+                                                Number<1>{}));
+
+    static constexpr auto b_thread_desc_ =
+        make_naive_tensor_descriptor(make_tuple(Number<BKPack / PARENT::B_K1 / PARENT::B_KRow>{},
+                                                Number<NRepeat>{},
+                                                PARENT::I1,
+                                                PARENT::I1,
+                                                PARENT::I1,
+                                                Number<PARENT::B_K1>{}),
+                                     make_tuple(Number<PARENT::B_K1>{},
+                                                Number<BKPack / PARENT::B_KRow>{},
+                                                Number<PARENT::B_K1>{},
+                                                Number<PARENT::B_K1>{},
+                                                Number<PARENT::B_K1>{},
+                                                Number<1>{}));
+
+    static constexpr auto a_scale_thread_desc_ = make_naive_tensor_descriptor(
+        make_tuple(
+            Number<ScaleK0PerBlock>{}, Number<MRepeat>{}, PARENT::I1, PARENT::I1, PARENT::I1),
+        make_tuple(PARENT::I1, Number<ScaleK0PerBlock>{}, PARENT::I1, PARENT::I1, PARENT::I1));
+    static constexpr auto b_scale_thread_desc_ = make_naive_tensor_descriptor(
+        make_tuple(
+            Number<ScaleK0PerBlock>{}, Number<NRepeat>{}, PARENT::I1, PARENT::I1, PARENT::I1),
+        make_tuple(PARENT::I1, Number<ScaleK0PerBlock>{}, PARENT::I1, PARENT::I1, PARENT::I1));
+
+    template <bool EnableLds>
+    struct AThreadCopySelector;
+
+    template <>
+    struct AThreadCopySelector<true>
+    {
+        using type = ThreadwiseTensorSliceTransfer_v4<
+            int32_t,
+            int32_t,
+            decltype(PARENT::a_block_desc_k0_m0_m1_m2_k1),
+            decltype(a_thread_desc_),
+            Sequence<AKPack / PARENT::A_K1 / PARENT::A_KRow, 1, 1, 1, 1, PARENT::A_K1>,
+            Sequence<0, 1, 2, 3, 4, 5>,
+            5,
+            PARENT::A_K1,
+            PARENT::A_K1>;
+    };
+
+    template <>
+    struct AThreadCopySelector<false>
+    {
+        using type = ThreadwiseTensorSliceTransfer_StaticToStatic_IntraRow<
+            int32_t,
+            int32_t,
+            decltype(PARENT::a_block_desc_k0_m0_m1_m2_k1),
+            decltype(a_thread_desc_),
+            tensor_operation::element_wise::PassThrough,
+            Sequence<AKPack / PARENT::A_K1 / PARENT::A_KRow, 1, 1, 1, 1, PARENT::A_K1>,
+            Sequence<0, 1, 2, 3, 4, 5>,
+            5,
+            PARENT::A_K1,
+            false>;
+    };
+
+    template <bool EnableLds>
+    struct BThreadCopySelector;
+
+    template <>
+    struct BThreadCopySelector<true>
+    {
+        using type = ThreadwiseTensorSliceTransfer_v4<
+            int32_t,
+            int32_t,
+            decltype(PARENT::b_block_desc_k0_n0_n1_n2_k1),
+            decltype(b_thread_desc_),
+            Sequence<BKPack / PARENT::B_K1 / PARENT::B_KRow, 1, 1, 1, 1, PARENT::B_K1>,
+            Sequence<0, 1, 2, 3, 4, 5>,
+            5,
+            PARENT::B_K1,
+            PARENT::B_K1>;
+    };
+
+    template <>
+    struct BThreadCopySelector<false>
+    {
+        using type = ThreadwiseTensorSliceTransfer_StaticToStatic_IntraRow<
+            int32_t,
+            int32_t,
+            decltype(PARENT::b_block_desc_k0_n0_n1_n2_k1),
+            decltype(b_thread_desc_),
+            tensor_operation::element_wise::PassThrough,
+            Sequence<BKPack / PARENT::B_K1 / PARENT::B_KRow, 1, 1, 1, 1, PARENT::B_K1>,
+            Sequence<0, 1, 2, 3, 4, 5>,
+            5,
+            PARENT::B_K1,
+            false>;
+    };
+
+    typename AThreadCopySelector<AEnableLds>::type a_thread_copy_;
+    typename BThreadCopySelector<BEnableLds>::type b_thread_copy_;
+
+    template <bool EnableLds>
+    struct AScaleThreadCopySelector;
+
+    template <>
+    struct AScaleThreadCopySelector<true>
+    {
+        using type = ThreadwiseTensorSliceTransfer_v4<int32_t,
+                                                      int32_t,
+                                                      decltype(a_scale_block_desc_k0_m0_m1_m2_k1),
+                                                      decltype(a_scale_thread_desc_),
+                                                      Sequence<1, 1, 1, 1, 1>,
+                                                      Sequence<0, 1, 2, 3, 4>,
+                                                      4,
+                                                      1,
+                                                      1>;
+    };
+
+    template <>
+    struct AScaleThreadCopySelector<false>
+    {
+        using type = ThreadwiseTensorSliceTransfer_StaticToStatic_IntraRow<
+            int32_t,
+            int32_t,
+            decltype(a_scale_block_desc_k0_m0_m1_m2_k1),
+            decltype(a_scale_thread_desc_),
+            tensor_operation::element_wise::PassThrough,
+            Sequence<1, 1, 1, 1, 1>,
+            Sequence<0, 1, 2, 3, 4>,
+            4,
+            1,
+            false>;
+    };
+
+    template <bool EnableLds>
+    struct BScaleThreadCopySelector;
+
+    template <>
+    struct BScaleThreadCopySelector<true>
+    {
+        using type = ThreadwiseTensorSliceTransfer_v4<int32_t,
+                                                      int32_t,
+                                                      decltype(b_scale_block_desc_k0_n0_n1_n2_k1),
+                                                      decltype(b_scale_thread_desc_),
+                                                      Sequence<1, 1, 1, 1, 1>,
+                                                      Sequence<0, 1, 2, 3, 4>,
+                                                      4,
+                                                      1,
+                                                      1>;
+    };
+
+    template <>
+    struct BScaleThreadCopySelector<false>
+    {
+        using type = ThreadwiseTensorSliceTransfer_StaticToStatic_IntraRow<
+            int32_t,
+            int32_t,
+            decltype(b_scale_block_desc_k0_n0_n1_n2_k1),
+            decltype(b_scale_thread_desc_),
+            tensor_operation::element_wise::PassThrough,
+            Sequence<1, 1, 1, 1, 1>,
+            Sequence<0, 1, 2, 3, 4>,
+            4,
+            1,
+            false>;
+    };
+
+    typename AScaleThreadCopySelector<AEnableLds>::type a_scale_thread_copy_;
+    typename BScaleThreadCopySelector<BEnableLds>::type b_scale_thread_copy_;
+};
+#endif
 #else
 template <index_t BlockSize,
           typename FloatA,
@@ -557,8 +1139,8 @@ template <index_t BlockSize,
  * Destination
  * C, non-transpose
  * thread level: MRepeat x NRepeat x MAccVgprs
- * block  level: MRepeat x MWave x MSubGroup x NRepeat x NWave x NThreadPerSubGroup x MAccVgprs
- * KPACK == WMMA_K = 16
+ * block  level: MRepeat x MWave x MSubGroup x NRepeat x NWave x NThreadPerSubGroup x
+ * MAccVgprs KPACK == WMMA_K = 16
  *
  * Option: Read from VMEM, small buffer hold each thread own required data (Skip LDS)
  * Source:
@@ -566,7 +1148,8 @@ template <index_t BlockSize,
  * B(if skip LDS): NRepeat x KPack
  * Destination
  * C, non-transpose
- * block level: MRepeat x MWave x MSubGroup x NRepeat x NWave x NThreadPerSubGroup x MAccVgprs
+ * block level: MRepeat x MWave x MSubGroup x NRepeat x NWave x NThreadPerSubGroup x
+ * MAccVgprs
  */
 struct BlockwiseGemmWMMA
 {
@@ -580,12 +1163,13 @@ struct BlockwiseGemmWMMA
 
     using ThisThreadBlock = ThisThreadBlock<BlockSize>;
 
-    // Hardcode of WaveSize, since current HIP Runtime(5.4.0-10984) could not return correct one.
+    // Hardcode of WaveSize, since current HIP Runtime(5.4.0-10984) could not return correct
+    // one.
     static constexpr index_t WaveSize = 32;
 
     // When use LDS, each Row(16 consecutive lanes) read whole data from source buffer
-    // When not use LDS, each Row read half of whole data from source buffer, exchange the data via
-    // permutation
+    // When not use LDS, each Row read half of whole data from source buffer, exchange the data
+    // via permutation
     static constexpr index_t A_KRow = AEnableLds ? 1 : 2;
     static constexpr index_t B_KRow = BEnableLds ? 1 : 2;
     static constexpr index_t A_K1   = ABlockDesc{}.GetLength(I5);
@@ -808,6 +1392,26 @@ struct BlockwiseGemmWMMA
     // M0_M1_M2 = MRepeat_MWave_MPerWmma, N0_N1_N2 = NRepeat_NWave_NPerWmma
     static constexpr ABlockDesc a_block_desc_k0_m0_m1_m2_k1;
     static constexpr BBlockDesc b_block_desc_k0_n0_n1_n2_k1;
+
+#ifdef CK_EXTENSION_MX_TYPE
+    template <typename ABlockBuffer,
+              typename BBlockBuffer,
+              typename AScaleBlockBuffer,
+              typename BScaleBlockBuffer,
+              typename CThreadBuffer>
+    __device__ void Run(const ABlockBuffer& a_block_buf,
+                        const BBlockBuffer& b_block_buf,
+                        const AScaleBlockBuffer& a_scale_block_buf,
+                        const BScaleBlockBuffer& b_scale_block_buf,
+                        CThreadBuffer& c_thread_buf) const
+    {
+        ignore = a_block_buf;
+        ignore = b_block_buf;
+        ignore = a_scale_block_buf;
+        ignore = b_scale_block_buf;
+        ignore = c_thread_buf;
+    }
+#endif
 
     template <typename ABlockBuffer, typename BBlockBuffer, typename CThreadBuffer>
     __device__ void Run(const ABlockBuffer& a_block_buf,
@@ -1047,6 +1651,64 @@ struct BlockwiseGemmWMMA
     typename AThreadCopySelector<AEnableLds>::type a_thread_copy_;
     typename BThreadCopySelector<BEnableLds>::type b_thread_copy_;
 };
+#ifdef CK_EXTENSION_MX_TYPE
+// dummy class to fix compiling error
+template <index_t BlockSize,
+          typename FloatA,
+          typename FloatB,
+          typename FloatAcc,
+          typename ABlockDesc,
+          typename BBlockDesc,
+          typename AScaleBlockDesc,
+          typename BScaleBlockDesc,
+          index_t MPerBlock,
+          index_t NPerBlock,
+          index_t KPerBlock,
+          index_t MPerWMMA,
+          index_t NPerWMMA,
+          index_t MRepeat,
+          index_t NRepeat,
+          index_t KPack,
+          bool AEnableLds = true,
+          bool BEnableLds = true,
+          bool TransposeC = false>
+struct BlockwiseMXGemmWMMA : public BlockwiseGemmWMMA<BlockSize,
+                                                      FloatA,
+                                                      FloatB,
+                                                      FloatAcc,
+                                                      ABlockDesc,
+                                                      BBlockDesc,
+                                                      MPerBlock,
+                                                      NPerBlock,
+                                                      KPerBlock,
+                                                      MPerWMMA,
+                                                      NPerWMMA,
+                                                      MRepeat,
+                                                      NRepeat,
+                                                      KPack,
+                                                      AEnableLds,
+                                                      BEnableLds,
+                                                      TransposeC>
+{
+    template <typename ABlockBuffer,
+              typename BBlockBuffer,
+              typename AScaleBlockBuffer,
+              typename BScaleBlockBuffer,
+              typename CThreadBuffer>
+    __device__ void Run(const ABlockBuffer& a_block_buf,
+                        const BBlockBuffer& b_block_buf,
+                        const AScaleBlockBuffer& a_scale_block_buf,
+                        const BScaleBlockBuffer& b_scale_block_buf,
+                        CThreadBuffer& c_thread_buf) const
+    {
+        ignore = a_block_buf;
+        ignore = b_block_buf;
+        ignore = a_scale_block_buf;
+        ignore = b_scale_block_buf;
+        ignore = c_thread_buf;
+    }
+};
+#endif
 #endif
 
 } // namespace ck

@@ -78,11 +78,9 @@ struct GridwiseGemmPipeline_v1<1, true, true>
             do
             {
                 a_blockwise_copy.RunRead(a_grid_desc, a_grid_buf);
-
                 block_sync_lds();
 
                 b_blockwise_copy.RunRead(b_grid_desc, b_grid_buf);
-
                 blockwise_gemm.Run(a_block_buf, b_block_buf, c_thread_buf);
 
                 block_sync_lds();
@@ -92,7 +90,6 @@ struct GridwiseGemmPipeline_v1<1, true, true>
 
                 a_blockwise_copy.RunWrite(a_block_desc, a_block_buf);
                 b_blockwise_copy.RunWrite(b_block_desc, b_block_buf);
-
                 ++i;
             } while(i < (num_loop - 1));
         }
@@ -100,10 +97,130 @@ struct GridwiseGemmPipeline_v1<1, true, true>
         // tail
         {
             block_sync_lds();
-
             blockwise_gemm.Run(a_block_buf, b_block_buf, c_thread_buf);
         }
     }
+
+#ifdef CK_EXTENSION_MX_TYPE
+    template <bool HasMainLoop,
+              typename AGridDesc,
+              typename ABlockDesc,
+              typename ABlockTransfer,
+              typename AGridBuffer,
+              typename ABlockBuffer,
+              typename ABlockTransferStep,
+              typename BGridDesc,
+              typename BBlockDesc,
+              typename BBlockTransfer,
+              typename BGridBuffer,
+              typename BBlockBuffer,
+              typename BBlockTransferStep,
+              typename BlockwiseGemm,
+              typename CThreadBuffer,
+              typename AScaleGridDesc,
+              typename AScaleGridBuffer,
+              typename AScaleBlockDesc,
+              typename AScaleBlockBuffer,
+              typename AScaleBlockTransfer,
+              typename AScaleBlockTransferStep,
+              typename BScaleGridDesc,
+              typename BScaleGridBuffer,
+              typename BScaleBlockDesc,
+              typename BScaleBlockBuffer,
+              typename BScaleBlockTransfer,
+              typename BScaleBlockTransferStep>
+    __device__ static void Run(const AGridDesc& a_grid_desc,
+                               const ABlockDesc& a_block_desc,
+                               ABlockTransfer& a_blockwise_copy,
+                               const AGridBuffer& a_grid_buf,
+                               ABlockBuffer& a_block_buf,
+                               const ABlockTransferStep& a_block_copy_step,
+                               const BGridDesc& b_grid_desc,
+                               const BBlockDesc& b_block_desc,
+                               BBlockTransfer& b_blockwise_copy,
+                               const BGridBuffer& b_grid_buf,
+                               BBlockBuffer& b_block_buf,
+                               const BBlockTransferStep& b_block_copy_step,
+                               const BlockwiseGemm& blockwise_gemm,
+                               CThreadBuffer& c_thread_buf,
+                               index_t num_loop,
+                               const AScaleGridDesc& a_scale_grid_desc,
+                               const AScaleGridBuffer& a_scale_grid_buf,
+                               const AScaleBlockDesc& a_scale_block_desc,
+                               AScaleBlockBuffer& a_scale_block_buf,
+                               AScaleBlockTransfer& a_scale_blockwise_copy,
+                               const AScaleBlockTransferStep& a_scale_block_copy_step,
+                               const BScaleGridDesc& b_scale_grid_desc,
+                               const BScaleGridBuffer& b_scale_grid_buf,
+                               const BScaleBlockDesc& b_scale_block_desc,
+                               BScaleBlockBuffer& b_scale_block_buf,
+                               BScaleBlockTransfer& b_scale_blockwise_copy,
+                               const BScaleBlockTransferStep& b_scale_block_copy_step)
+    {
+        // preload data into LDS
+        a_blockwise_copy.RunRead(a_grid_desc, a_grid_buf);
+        b_blockwise_copy.RunRead(b_grid_desc, b_grid_buf);
+
+        a_scale_blockwise_copy.RunRead(a_scale_grid_desc, a_scale_grid_buf);
+        b_scale_blockwise_copy.RunRead(b_scale_grid_desc, b_scale_grid_buf);
+
+        a_scale_blockwise_copy.MoveSrcSliceWindow(a_scale_grid_desc, a_scale_block_copy_step);
+        b_scale_blockwise_copy.MoveSrcSliceWindow(b_scale_grid_desc, b_scale_block_copy_step);
+
+        a_blockwise_copy.MoveSrcSliceWindow(a_grid_desc, a_block_copy_step);
+        b_blockwise_copy.MoveSrcSliceWindow(b_grid_desc, b_block_copy_step);
+
+        // Initialize C
+        c_thread_buf.Clear();
+
+        a_blockwise_copy.RunWrite(a_block_desc, a_block_buf);
+        b_blockwise_copy.RunWrite(b_block_desc, b_block_buf);
+
+        a_scale_blockwise_copy.RunWrite(a_scale_block_desc, a_scale_block_buf);
+        b_scale_blockwise_copy.RunWrite(b_scale_block_desc, b_scale_block_buf);
+
+        // main body
+        if constexpr(HasMainLoop)
+        {
+            index_t i = 0;
+
+            do
+            {
+                a_blockwise_copy.RunRead(a_grid_desc, a_grid_buf);
+                a_scale_blockwise_copy.RunRead(a_scale_grid_desc, a_scale_grid_buf);
+                block_sync_lds();
+
+                b_blockwise_copy.RunRead(b_grid_desc, b_grid_buf);
+                b_scale_blockwise_copy.RunRead(b_scale_grid_desc, b_scale_grid_buf);
+
+                blockwise_gemm.Run(
+                    a_block_buf, b_block_buf, a_scale_block_buf, b_scale_block_buf, c_thread_buf);
+                block_sync_lds();
+
+                a_blockwise_copy.MoveSrcSliceWindow(a_grid_desc, a_block_copy_step);
+                b_blockwise_copy.MoveSrcSliceWindow(b_grid_desc, b_block_copy_step);
+
+                a_blockwise_copy.RunWrite(a_block_desc, a_block_buf);
+                b_blockwise_copy.RunWrite(b_block_desc, b_block_buf);
+                a_scale_blockwise_copy.MoveSrcSliceWindow(a_scale_grid_desc,
+                                                          a_scale_block_copy_step);
+                b_scale_blockwise_copy.MoveSrcSliceWindow(b_scale_grid_desc,
+                                                          b_scale_block_copy_step);
+
+                a_scale_blockwise_copy.RunWrite(a_scale_block_desc, a_scale_block_buf);
+                b_scale_blockwise_copy.RunWrite(b_scale_block_desc, b_scale_block_buf);
+                ++i;
+            } while(i < (num_loop - 1));
+        }
+
+        // tail
+        {
+            block_sync_lds();
+            blockwise_gemm.Run(
+                a_block_buf, b_block_buf, a_scale_block_buf, b_scale_block_buf, c_thread_buf);
+        }
+    }
+#endif
 };
 
 // 2-stage prefetch
@@ -549,6 +666,150 @@ struct GridwiseGemmPipeline_v1<1, false, false>
             block_sync_lds();
         }
     }
+
+#ifdef CK_EXTENSION_MX_TYPE
+    template <bool HasMainLoop,
+              typename AGridDesc,
+              typename ABlockDesc,
+              typename ABlockTransfer,
+              typename AGridBuffer,
+              typename ABlockBuffer,
+              typename ABlockTransferStep,
+              typename BGridDesc,
+              typename BBlockDesc,
+              typename BBlockTransfer,
+              typename BGridBuffer,
+              typename BBlockBuffer,
+              typename BBlockTransferStep,
+              typename BlockwiseGemm,
+              typename CThreadBuffer,
+              typename AScaleGridDesc,
+              typename AScaleGridBuffer,
+              typename AScaleBlockDesc,
+              typename AScaleBlockBuffer,
+              typename AScaleBlockTransfer,
+              typename AScaleBlockTransferStep,
+              typename BScaleGridDesc,
+              typename BScaleGridBuffer,
+              typename BScaleBlockDesc,
+              typename BScaleBlockBuffer,
+              typename BScaleBlockTransfer,
+              typename BScaleBlockTransferStep>
+    __device__ static void Run(const AGridDesc& a_grid_desc,
+                               const ABlockDesc& a_block_desc,
+                               ABlockTransfer& a_blockwise_copy,
+                               const AGridBuffer& a_grid_buf,
+                               ABlockBuffer& a_block_buf,
+                               const ABlockTransferStep& a_block_copy_step,
+                               const BGridDesc& b_grid_desc,
+                               const BBlockDesc& b_block_desc,
+                               BBlockTransfer& b_blockwise_copy,
+                               const BGridBuffer& b_grid_buf,
+                               BBlockBuffer& b_block_buf,
+                               const BBlockTransferStep& b_block_copy_step,
+                               const BlockwiseGemm& blockwise_gemm,
+                               CThreadBuffer& c_thread_buf,
+                               index_t num_loop,
+                               const AScaleGridDesc& a_scale_grid_desc,
+                               const AScaleGridBuffer& a_scale_grid_buf,
+                               const AScaleBlockDesc& a_scale_block_desc,
+                               AScaleBlockBuffer& a_scale_block_buf,
+                               AScaleBlockTransfer& a_scale_blockwise_copy,
+                               const AScaleBlockTransferStep& a_scale_block_copy_step,
+                               const BScaleGridDesc& b_scale_grid_desc,
+                               const BScaleGridBuffer& b_scale_grid_buf,
+                               const BScaleBlockDesc& b_scale_block_desc,
+                               BScaleBlockBuffer& b_scale_block_buf,
+                               BScaleBlockTransfer& b_scale_blockwise_copy,
+                               const BScaleBlockTransferStep& b_scale_block_copy_step)
+    {
+        constexpr auto b_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0);
+        constexpr auto a_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0);
+        auto b_block_buf_switch           = b_block_buf;
+        auto a_block_buf_switch           = a_block_buf;
+
+        constexpr auto b_scale_block_origin_idx = make_tuple(I0, I0, I0, I0, I0);
+        constexpr auto a_scale_block_origin_idx = make_tuple(I0, I0, I0, I0, I0);
+        auto b_scale_block_buf_switch           = b_scale_block_buf;
+        auto a_scale_block_buf_switch           = a_scale_block_buf;
+
+        // preload data into LDS
+        a_blockwise_copy.Run(
+            a_grid_desc, a_grid_buf, a_block_desc, a_block_origin_idx, a_block_buf);
+        b_blockwise_copy.Run(
+            b_grid_desc, b_grid_buf, b_block_desc, b_block_origin_idx, b_block_buf);
+        a_scale_blockwise_copy.Run(a_scale_grid_desc,
+                                   a_scale_grid_buf,
+                                   a_scale_block_desc,
+                                   a_scale_block_origin_idx,
+                                   a_scale_block_buf);
+        b_scale_blockwise_copy.Run(b_scale_grid_desc,
+                                   b_scale_grid_buf,
+                                   b_scale_block_desc,
+                                   b_scale_block_origin_idx,
+                                   b_scale_block_buf);
+
+        a_blockwise_copy.MoveSrcSliceWindow(a_grid_desc, a_block_copy_step);
+        b_blockwise_copy.MoveSrcSliceWindow(b_grid_desc, b_block_copy_step);
+        a_scale_blockwise_copy.MoveSrcSliceWindow(a_scale_grid_desc, a_scale_block_copy_step);
+        b_scale_blockwise_copy.MoveSrcSliceWindow(b_scale_grid_desc, b_scale_block_copy_step);
+        // Initialize C
+        c_thread_buf.Clear();
+
+        // main body
+        if constexpr(HasMainLoop)
+        {
+            index_t i = 0;
+
+            do
+            {
+                a_blockwise_copy.Run(
+                    a_grid_desc, a_grid_buf, a_block_desc, a_block_origin_idx, a_block_buf_switch);
+                b_blockwise_copy.Run(
+                    b_grid_desc, b_grid_buf, b_block_desc, b_block_origin_idx, b_block_buf_switch);
+                a_scale_blockwise_copy.Run(a_scale_grid_desc,
+                                           a_scale_grid_buf,
+                                           a_scale_block_desc,
+                                           a_scale_block_origin_idx,
+                                           a_scale_block_buf_switch);
+                b_scale_blockwise_copy.Run(b_scale_grid_desc,
+                                           b_scale_grid_buf,
+                                           b_scale_block_desc,
+                                           b_scale_block_origin_idx,
+                                           b_scale_block_buf_switch);
+                block_sync_lds();
+
+                blockwise_gemm.Run(
+                    a_block_buf, b_block_buf, a_scale_block_buf, b_scale_block_buf, c_thread_buf);
+
+                block_sync_lds();
+
+                a_blockwise_copy.MoveSrcSliceWindow(a_grid_desc, a_block_copy_step);
+                b_blockwise_copy.MoveSrcSliceWindow(b_grid_desc, b_block_copy_step);
+                a_scale_blockwise_copy.MoveSrcSliceWindow(a_scale_grid_desc,
+                                                          a_scale_block_copy_step);
+                b_scale_blockwise_copy.MoveSrcSliceWindow(b_scale_grid_desc,
+                                                          b_scale_block_copy_step);
+                a_block_buf = a_block_buf_switch;
+                b_block_buf = b_block_buf_switch;
+
+                a_scale_block_buf = a_scale_block_buf_switch;
+                b_scale_block_buf = b_scale_block_buf_switch;
+                ++i;
+            } while(i < (num_loop - 1));
+        }
+
+        // tail
+        {
+            block_sync_lds();
+
+            blockwise_gemm.Run(
+                a_block_buf, b_block_buf, a_scale_block_buf, b_scale_block_buf, c_thread_buf);
+
+            block_sync_lds();
+        }
+    }
+#endif
 };
 
 template <index_t NumPrefetch, bool AEnableLds, bool BEnableLds>

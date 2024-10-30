@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2018-2023, Advanced Micro Devices, Inc. All rights reserved.
-
+#ifdef CK_EXTENSION_MX_TYPE
 #include "common.hpp"
 
 #include "ck/tensor_operation/gpu/device/impl/device_gemm_wmma_gfx13.hpp"
 
-using ADataType        = ck::half_t;
-using BDataType        = ck::half_t;
+using ADataType        = ck::MxType_t<ck::MTX_FMT::MTX_FMT_FP8_E4M3>;
+using BDataType        = ck::MxType_t<ck::MTX_FMT::MTX_FMT_FP8_E4M3>;
 using AccDataType      = float;
 using CShuffleDataType = float;
 using CDataType        = ck::half_t;
@@ -39,40 +39,46 @@ using DeviceGemmInstance = ck::tensor_operation::device::DeviceGemmWmma_GFX13
            128,          // BlockSize
            64,           // MPerBlock
            128,          // NPerBlock
-           64,           // KPerBlock
-           2,            // K1
+           256,           // KPerBlock
+           1,            // K1
            16,           // MPerWmma
            16,           // NPerWmma
-           16,           // KPerWmma
+           64,           // KPerWmma
            2,            // M-Repeat // M-PerWmma / M-Repeat = M-Wave
            4,            // N-Repeat // N-PerWmma / N-Repeat = N-Wave
            S<32, 4, 1>,  // M-K0-K1
            S<0, 1, 2>,
            S<0, 1, 2>,
            2,
-           8,
-           8,
+           4,
+           4,
            false,
-           true,
+           false,
            S<32, 4, 1>,
            S<0, 1, 2>,
            S<0, 1, 2>,
            2,
-           8,
-           8,
+           4,
+           4,
            false,
-           true,
+           false,
            1,           // C shuffle (M Repeat) Per store
            1,           // C shuffle (N Repeat) Per store
            S<1, 32, 1, 4>,
-           2,
+           4,
            ck::LoopScheduler::Default,
-           ck::PipelineVersion::v5>;
+           ck::PipelineVersion::v1>;
 // clang-format on
 
-using ReferenceGemmInstance = ck::tensor_operation::host::
-    ReferenceGemm<ADataType, BDataType, CDataType, AccDataType, AElementOp, BElementOp, CElementOp>;
+using ReferenceGemmInstance = ck::tensor_operation::host::ReferenceGemm<typename ADataType::type_t,
+                                                                        typename BDataType::type_t,
+                                                                        CDataType,
+                                                                        AccDataType,
+                                                                        AElementOp,
+                                                                        BElementOp,
+                                                                        CElementOp>;
 
-#include "run_gemm_example.inc"
+#include "run_gemm_example_v3.inc"
 
 int main(int argc, char* argv[]) { return !run_gemm_example(argc, argv); }
+#endif

@@ -3035,9 +3035,10 @@ struct MxType_t<MTX_FMT::MTX_FMT_FP4_E2M1> : public MxType_t<MTX_FMT::MTX_FMT_DE
 {
     using parent = MxType_t<MTX_FMT::MTX_FMT_DEFAULT>;
     using parent::parent;
-    static constexpr MTX_FMT RawType              = MTX_FMT::MTX_FMT_FP4_E2M1;
-    static constexpr std::size_t vec_size         = 4;
-    static constexpr std::size_t dwords_per_wmmak = 8;
+    static constexpr MTX_FMT RawType          = MTX_FMT::MTX_FMT_FP4_E2M1;
+    static constexpr index_t vec_size         = 4;
+    static constexpr index_t dwords_per_wmmak = 8;
+    static constexpr index_t BITS             = 4;
     // the below function is used for data preparation in host side; not used in device side
     static std::vector<type_t> compact_to_raw(const std::vector<type_t>& in)
     {
@@ -3062,8 +3063,9 @@ struct MxType_t<MTX_FMT::MTX_FMT_FP6_E3M2> : public MxType_t<MTX_FMT::MTX_FMT_DE
     using parent::parent;
     static constexpr MTX_FMT RawType = MTX_FMT::MTX_FMT_FP6_E3M2;
     // this is used per K-dimension how many int32_t need to load; used in wmma_op shader
-    static constexpr std::size_t vec_size         = 6;
-    static constexpr std::size_t dwords_per_wmmak = 12;
+    static constexpr index_t vec_size         = 6;
+    static constexpr index_t dwords_per_wmmak = 12;
+    static constexpr index_t BITS             = 6;
     static std::vector<type_t> compact_to_raw(const std::vector<type_t>& in)
     {
         std::vector<type_t> in_packed;
@@ -3089,9 +3091,10 @@ struct MxType_t<MTX_FMT::MTX_FMT_FP6_E2M3> : public MxType_t<MTX_FMT::MTX_FMT_DE
 {
     using parent = MxType_t<MTX_FMT::MTX_FMT_DEFAULT>;
     using parent::parent;
-    static constexpr std::size_t vec_size         = 6;
-    static constexpr std::size_t dwords_per_wmmak = 12;
-    static constexpr MTX_FMT RawType              = MTX_FMT::MTX_FMT_FP6_E2M3;
+    static constexpr MTX_FMT RawType          = MTX_FMT::MTX_FMT_FP6_E2M3;
+    static constexpr index_t vec_size         = 6;
+    static constexpr index_t dwords_per_wmmak = 12;
+    static constexpr index_t BITS             = 6;
     static std::vector<type_t> compact_to_raw(const std::vector<type_t>& in)
     {
         return MxType_t<MTX_FMT::MTX_FMT_FP6_E3M2>::compact_to_raw(in);
@@ -3103,10 +3106,11 @@ struct MxType_t<MTX_FMT::MTX_FMT_FP8_E4M3> : public MxType_t<MTX_FMT::MTX_FMT_DE
 {
     using parent = MxType_t<MTX_FMT::MTX_FMT_DEFAULT>;
     using parent::parent;
-    using type_t                                  = f8_t;
-    static constexpr std::size_t vec_size         = 8;
-    static constexpr std::size_t dwords_per_wmmak = 16;
-    static constexpr MTX_FMT RawType              = MTX_FMT::MTX_FMT_FP8_E4M3;
+    using type_t                              = f8_t;
+    static constexpr MTX_FMT RawType          = MTX_FMT::MTX_FMT_FP8_E4M3;
+    static constexpr index_t vec_size         = 8;
+    static constexpr index_t dwords_per_wmmak = 16;
+    static constexpr index_t BITS             = 8;
     static std::vector<type_t> compact_to_raw(const std::vector<type_t>& in) { return in; }
 };
 
@@ -3115,12 +3119,48 @@ struct MxType_t<MTX_FMT::MTX_FMT_FP8_E5M2> : public MxType_t<MTX_FMT::MTX_FMT_DE
 {
     using parent = MxType_t<MTX_FMT::MTX_FMT_DEFAULT>;
     using parent::parent;
-    using type_t                                  = bf8_t;
-    static constexpr std::size_t vec_size         = 8;
-    static constexpr std::size_t dwords_per_wmmak = 16;
-    static constexpr MTX_FMT RawType              = MTX_FMT::MTX_FMT_FP8_E5M2;
+    using type_t                              = bf8_t;
+    static constexpr MTX_FMT RawType          = MTX_FMT::MTX_FMT_FP8_E5M2;
+    static constexpr index_t vec_size         = 8;
+    static constexpr index_t dwords_per_wmmak = 16;
+    static constexpr index_t BITS             = 8;
     static std::vector<type_t> compact_to_raw(const std::vector<type_t>& in) { return in; }
 };
+
+template <typename T>
+struct is_mx_type_t : std::false_type
+{
+};
+
+// Specialize the template for ck::MxType_t
+template <MTX_FMT MX_TYPE>
+struct is_mx_type_t<MxType_t<MX_TYPE>> : std::true_type
+{
+};
+
+// Helper variable template
+template <typename T>
+inline constexpr bool is_mx_type_t_v = is_mx_type_t<T>::value;
+
+template <typename T, typename = void>
+struct view_type
+{
+    using srcType  = T;
+    using viewType = T;
+};
+
+template <typename T>
+struct view_type<T, enable_if_t<is_mx_type_t<T>::value>>
+{
+    using srcType  = T::type_t;
+    using viewType = int32_t;
+};
+
+template <typename T>
+using src_type_t = typename view_type<T>::srcType;
+
+template <typename T>
+using view_type_t = typename view_type<T>::viewType;
 
 template <typename T>
 struct NumericLimits
