@@ -1062,18 +1062,16 @@ struct WmmaGemm
                 ,
             "base type couple must be (half, float), (bhalf, float), (half, half), (bhalf, bhalf), "
             "(int8, int32) or (int4, int32)!");
-        static_for<0, KPerWmma / wmma_instr.k_per_wmma, 1>{}([&](auto k) {
-            if constexpr(!TransposeC)
-            {
-                wmma_instr.template run<MPerWmma, NPerWmma, KPerWmma>(
-                    p_a_wave[k], p_b_wave[k], p_c_thread);
-            }
-            else
-            {
-                wmma_instr.template run<MPerWmma, NPerWmma, KPerWmma>(
-                    p_b_wave[k], p_a_wave[k], p_c_thread);
-            }
-        });
+        if constexpr(!TransposeC)
+        {
+            wmma_instr.template run<MPerWmma, NPerWmma, KPerWmma>(
+                p_a_wave[I0], p_b_wave[I0], p_c_thread);
+        }
+        else
+        {
+            wmma_instr.template run<MPerWmma, NPerWmma, KPerWmma>(
+                p_b_wave[I0], p_a_wave[I0], p_c_thread);
+        }
     }
 
 #ifdef CK_EXTENSION_MX_TYPE

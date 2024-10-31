@@ -3152,7 +3152,7 @@ struct view_type
 template <typename T>
 struct view_type<T, enable_if_t<is_mx_type_t<T>::value>>
 {
-    using srcType  = T::type_t;
+    using srcType  = typename T::type_t;
     using viewType = int32_t;
 };
 

@@ -110,8 +110,8 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
     // If true, LDS is used unconditionally
     // if enable lds async load, should always enable lds
     // TODO : manually set lds enable
-    static constexpr auto AEnableLds_manu = false;
-    static constexpr auto BEnableLds_manu = false;
+    static constexpr auto AEnableLds_manu = ABlockLdsAsyncCopy;
+    static constexpr auto BEnableLds_manu = BBlockLdsAsyncCopy;
 
     static constexpr auto AEnableLds = AEnableLds_auto || AEnableLds_manu || (NumPrefetch > 1);
     static constexpr auto BEnableLds = BEnableLds_auto || BEnableLds_manu || (NumPrefetch > 1);
