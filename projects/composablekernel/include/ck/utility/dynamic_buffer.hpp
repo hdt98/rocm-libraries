@@ -197,7 +197,8 @@ struct DynamicBuffer
     __host__ __device__ void AsyncCopyToLds(DstBuffer& dst_buf,
                                             index_t src_offset,
                                             index_t dst_offset,
-                                            bool is_valid_element) const
+                                            bool is_src_valid,
+                                            bool is_dst_valid) const
     {
         // Copy data from global to LDS memory using direct loads.
         static_assert(GetAddressSpace() == AddressSpaceEnum::Global,
@@ -206,12 +207,24 @@ struct DynamicBuffer
                       "Destination data must be stored in an LDS memory buffer.");
 
         amd_async_load_global_to_lds<remove_cvref_t<T>, NumElemsPerThread, coherence>(
-            p_data_,
-            src_offset,
-            dst_buf.p_data_,
-            dst_offset,
-            is_valid_element,
-            element_space_size_);
+            p_data_, src_offset, dst_buf.p_data_, dst_offset, is_src_valid, is_dst_valid);
+    }
+
+    template <typename DstBuffer, index_t NumElemsPerThread>
+    __host__ __device__ void AsyncStoreToGlobal(DstBuffer& dst_buf,
+                                                index_t src_offset,
+                                                index_t dst_offset,
+                                                bool is_src_valid,
+                                                bool is_dst_valid) const
+    {
+        // Copy data from global to LDS memory using direct loads.
+        static_assert(GetAddressSpace() == AddressSpaceEnum::Lds,
+                      "Source data must come from a LDS memory buffer.");
+        static_assert(DstBuffer::GetAddressSpace() == AddressSpaceEnum::Global,
+                      "Destination data must be stored in a global memory buffer.");
+
+        amd_async_store_lds_to_global<remove_cvref_t<T>, NumElemsPerThread, coherence>(
+            p_data_, src_offset, dst_buf.p_data_, dst_offset, is_src_valid, is_dst_valid);
     }
 
     template <typename X,

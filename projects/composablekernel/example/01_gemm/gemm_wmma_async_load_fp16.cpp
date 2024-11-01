@@ -9,7 +9,7 @@ using ADataType        = ck::half_t;
 using BDataType        = ck::half_t;
 using AccDataType      = float;
 using CShuffleDataType = float;
-using CDataType        = ck::half_t;
+using CDataType        = float;
 
 using ALayout = Row;
 using BLayout = Col;
@@ -66,6 +66,7 @@ using DeviceGemmInstance = ck::tensor_operation::device::DeviceGemmWmma_GFX13
            1,           // C shuffle (N Repeat) Per store
            S<1, 32, 1, 4>,
            2,
+           true,
            ck::LoopScheduler::Default,
            ck::PipelineVersion::v5>;
 // clang-format on

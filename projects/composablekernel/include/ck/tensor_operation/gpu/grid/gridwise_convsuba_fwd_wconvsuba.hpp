@@ -12,7 +12,7 @@
 #include "ck/tensor_operation/gpu/block/blockwise_convsuba_wconvsuba.hpp"
 #include "ck/tensor_operation/gpu/block/thread_group_tensor_slice_transfer_v4r1.hpp"
 #include "ck/tensor_operation/gpu/block/thread_group_tensor_slice_transfer_v6r1.hpp"
-#include "ck/tensor_operation/gpu/block/thread_group_tensor_slice_transfer_async_load.hpp"
+#include "ck/tensor_operation/gpu/block/thread_group_tensor_slice_transfer_async.hpp"
 #include "ck/tensor_operation/gpu/thread/threadwise_tensor_slice_transfer.hpp"
 #include "ck/tensor_operation/gpu/element/element_wise_operation.hpp"
 
@@ -1096,7 +1096,7 @@ struct GridwiseConvSuba_Wconvsuba
 
                 if constexpr(EnableAsync)
                 {
-                    auto in_blockwise_copy = ThreadGroupTensorSliceTransfer_AsyncLoad<
+                    auto in_blockwise_copy = ThreadGroupTensorSliceTransferAsync<
                         ThisThreadBlock,
                         Sequence<HPerBlockIn, WPerBlockIn, CPerBlock>,
                         InBlockTransferThreadClusterLengths,
@@ -1107,7 +1107,9 @@ struct GridwiseConvSuba_Wconvsuba
                         decltype(in_block_desc),
                         InBlockTransferVectorDim,
                         InBlockTransferVectorDim,
-                        InBlockTransferDstScalarPerVector>(
+                        InBlockTransferDstScalarPerVector,
+                        false,
+                        true>(
                         in_grid_pad_desc,
                         make_multi_index(h_block_data_idx_on_grid, w_block_data_idx_on_grid, 0),
                         in_block_desc,
@@ -1215,19 +1217,20 @@ struct GridwiseConvSuba_Wconvsuba
 
                 if constexpr(EnableAsync)
                 {
-                    using WeiThreadGroupTensorSliceTransfer =
-                        ThreadGroupTensorSliceTransfer_AsyncLoad<
-                            ThisThreadBlock,
-                            Sequence<KPerBlock, 1, CPerBlock>,
-                            WeiBlockTransferThreadClusterLengths,
-                            WeiBlockTransferThreadClusterArrangeOrder,
-                            WeiDataType,
-                            WeiDataType,
-                            decltype(wei_grid_desc),
-                            decltype(wei_block_desc),
-                            WeiBlockTransferVectorDim,
-                            WeiBlockTransferVectorDim,
-                            WeiBlockTransferSrcScalarPerVector>;
+                    using WeiThreadGroupTensorSliceTransfer = ThreadGroupTensorSliceTransferAsync<
+                        ThisThreadBlock,
+                        Sequence<KPerBlock, 1, CPerBlock>,
+                        WeiBlockTransferThreadClusterLengths,
+                        WeiBlockTransferThreadClusterArrangeOrder,
+                        WeiDataType,
+                        WeiDataType,
+                        decltype(wei_grid_desc),
+                        decltype(wei_block_desc),
+                        WeiBlockTransferVectorDim,
+                        WeiBlockTransferVectorDim,
+                        WeiBlockTransferSrcScalarPerVector,
+                        false,
+                        true>;
 
                     auto wei_blockwise_copy = generate_tuple(
                         [&](auto I) {
@@ -1385,7 +1388,7 @@ struct GridwiseConvSuba_Wconvsuba
                     auto ds_blockwise_copy = generate_tuple(
                         [&](auto i) {
                             using DsThreadGroupTensorSliceTransfer =
-                                ThreadGroupTensorSliceTransfer_AsyncLoad<
+                                ThreadGroupTensorSliceTransferAsync<
                                     DsThreadBlock,
                                     Sequence<KPerBlock>,
                                     DsBlockTransferThreadClusterLengths,
@@ -1396,7 +1399,9 @@ struct GridwiseConvSuba_Wconvsuba
                                     remove_cvref_t<decltype(ds_block_desc[Number<i>{}])>,
                                     DsBlockTransferVectorDim,
                                     DsBlockTransferVectorDim,
-                                    DsBlockTransferDstScalarPerVector>;
+                                    DsBlockTransferDstScalarPerVector,
+                                    false,
+                                    true>;
                             return DsThreadGroupTensorSliceTransfer(
                                 ds_grid_pad_desc[Number<i>{}],
                                 make_multi_index(k_block_data_idx_on_grid),

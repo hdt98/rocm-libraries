@@ -12,7 +12,7 @@
 #include "ck/tensor_operation/gpu/block/blockwise_conv_wconv.hpp"
 #include "ck/tensor_operation/gpu/block/thread_group_tensor_slice_transfer_v4r1.hpp"
 #include "ck/tensor_operation/gpu/block/thread_group_tensor_slice_transfer_v6r1.hpp"
-#include "ck/tensor_operation/gpu/block/thread_group_tensor_slice_transfer_async_load.hpp"
+#include "ck/tensor_operation/gpu/block/thread_group_tensor_slice_transfer_async.hpp"
 #include "ck/tensor_operation/gpu/thread/threadwise_tensor_slice_transfer.hpp"
 #include "ck/tensor_operation/gpu/element/element_wise_operation.hpp"
 
@@ -706,7 +706,7 @@ struct GridwiseConv_Wconv
                 constexpr index_t InBlockTransferVectorDim     = 2;
                 if constexpr(EnableAsync)
                 {
-                    auto in_blockwise_copy = ThreadGroupTensorSliceTransfer_AsyncLoad<
+                    auto in_blockwise_copy = ThreadGroupTensorSliceTransferAsync<
                         ThisThreadBlock,
                         Sequence<HPerBlockIn, WPerBlockIn, CPerBlock>,
                         InBlockTransferThreadClusterLengths,
@@ -717,7 +717,9 @@ struct GridwiseConv_Wconv
                         decltype(in_block_desc),
                         InBlockTransferVectorDim,
                         InBlockTransferVectorDim,
-                        InBlockTransferDstScalarPerVector>(
+                        InBlockTransferDstScalarPerVector,
+                        false,
+                        true>(
                         in_grid_block_desc,
                         make_multi_index(h_block_data_idx_on_grid, w_block_data_idx_on_grid, 0),
                         in_block_desc,
@@ -824,19 +826,20 @@ struct GridwiseConv_Wconv
                 constexpr auto NumWeiCopy                       = (FilterSize == 3) ? YX : 1;
                 if constexpr(EnableAsync)
                 {
-                    using WeiThreadGroupTensorSliceTransfer =
-                        ThreadGroupTensorSliceTransfer_AsyncLoad<
-                            ThisThreadBlock,
-                            Sequence<KPerBlock, NumTapPerCopy, CPerBlock>,
-                            WeiBlockTransferThreadClusterLengths,
-                            WeiBlockTransferThreadClusterArrangeOrder,
-                            WeiDataType,
-                            WeiDataType,
-                            decltype(wei_grid_desc),
-                            decltype(wei_block_desc),
-                            WeiBlockTransferVectorDim,
-                            WeiBlockTransferVectorDim,
-                            WeiBlockTransferSrcScalarPerVector>;
+                    using WeiThreadGroupTensorSliceTransfer = ThreadGroupTensorSliceTransferAsync<
+                        ThisThreadBlock,
+                        Sequence<KPerBlock, NumTapPerCopy, CPerBlock>,
+                        WeiBlockTransferThreadClusterLengths,
+                        WeiBlockTransferThreadClusterArrangeOrder,
+                        WeiDataType,
+                        WeiDataType,
+                        decltype(wei_grid_desc),
+                        decltype(wei_block_desc),
+                        WeiBlockTransferVectorDim,
+                        WeiBlockTransferVectorDim,
+                        WeiBlockTransferSrcScalarPerVector,
+                        false,
+                        true>;
 
                     auto wei_blockwise_copy = generate_tuple(
                         [&](auto I) {

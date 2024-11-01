@@ -18,8 +18,10 @@ template <typename ThreadGroup,
           typename DstDesc,
           index_t SrcVectorDim,
           index_t DstVectorDim,
-          index_t ScalarPerVector>
-struct ThreadGroupTensorSliceTransfer_AsyncLoad
+          index_t ScalarPerVector,
+          bool SrcResetCoordinateAfterRun,
+          bool DstResetCoordinateAfterRun>
+struct ThreadGroupTensorSliceTransferAsync
 {
     static constexpr index_t nDim = remove_reference_t<SrcDesc>::GetNumOfDimension();
     using Index                   = MultiIndex<nDim>;
@@ -41,11 +43,10 @@ struct ThreadGroupTensorSliceTransfer_AsyncLoad
     static constexpr auto thread_steps         = thread_cluster_lengths * thread_single_load_size;
     static constexpr auto thread_slice_lengths = block_slice_lengths / thread_steps;
 
-    __device__ constexpr ThreadGroupTensorSliceTransfer_AsyncLoad(
-        const SrcDesc& src_desc,
-        const Index& src_block_slice_origin,
-        const DstDesc& dst_desc,
-        const Index& dst_block_slice_origin)
+    __device__ constexpr ThreadGroupTensorSliceTransferAsync(const SrcDesc& src_desc,
+                                                             const Index& src_block_slice_origin,
+                                                             const DstDesc& dst_desc,
+                                                             const Index& dst_block_slice_origin)
 
     {
         static_assert(ck::is_same_v<SrcData, DstData>,
@@ -90,6 +91,11 @@ struct ThreadGroupTensorSliceTransfer_AsyncLoad
         dst_slice_origin_ = dst_slice_origin_idx;
     }
 
+    __device__ void ResetSrcSliceWindow(const SrcDesc& src_desc)
+    {
+        src_coord_ = make_tensor_coordinate(src_desc, src_slice_origin_);
+    }
+
     __device__ void ResetDstSliceWindow(const DstDesc& dst_desc)
     {
         dst_coord_ = make_tensor_coordinate(dst_desc, dst_slice_origin_);
@@ -101,11 +107,14 @@ struct ThreadGroupTensorSliceTransfer_AsyncLoad
                         const DstDesc& dst_desc,
                         DstBuffer& dst_buf)
     {
-        static_assert(SrcBuffer::GetAddressSpace() == AddressSpaceEnum::Global,
-                      "Source data must come from a global memory buffer.");
-        static_assert(DstBuffer::GetAddressSpace() == AddressSpaceEnum::Lds,
-                      "Destination data must be stored in an LDS memory buffer.");
+        static_assert(((SrcBuffer::GetAddressSpace() == AddressSpaceEnum::Global) &&
+                       (DstBuffer::GetAddressSpace() == AddressSpaceEnum::Lds)) ||
+                          ((SrcBuffer::GetAddressSpace() == AddressSpaceEnum::Lds) &&
+                           (DstBuffer::GetAddressSpace() == AddressSpaceEnum::Global)),
+                      "Source data must come from a global memory buffer or a LDS memory buffer.");
 
+        constexpr bool isRead = (SrcBuffer::GetAddressSpace() == AddressSpaceEnum::Global) &&
+                                (DstBuffer::GetAddressSpace() == AddressSpaceEnum::Lds);
         static_assert(
             ck::is_same_v<remove_cvref_t<typename SrcBuffer::type>, remove_cvref_t<SrcData>>,
             "SrcBuffer and SrcData data types must be consistent.");
@@ -126,11 +135,29 @@ struct ThreadGroupTensorSliceTransfer_AsyncLoad
             const auto dst_offset = dst_coord_.GetOffset();
 
             // Check if src data is not in the logic padding area.
-            const bool is_src_valid =
-                coordinate_has_valid_offset_assuming_visible_index_is_valid(src_desc, src_coord_);
-
-            src_buf.template AsyncCopyToLds<remove_cvref_t<decltype(dst_buf)>, ScalarPerVector>(
-                dst_buf, src_offset, dst_offset, is_src_valid);
+            if constexpr(isRead)
+            {
+                const bool is_src_valid =
+                    coordinate_has_valid_offset_assuming_visible_index_is_valid(src_desc,
+                                                                                src_coord_);
+                const bool is_dst_valid =
+                    coordinate_has_valid_offset_assuming_visible_index_is_valid(dst_desc,
+                                                                                dst_coord_);
+                src_buf.template AsyncCopyToLds<remove_cvref_t<decltype(dst_buf)>, ScalarPerVector>(
+                    dst_buf, src_offset, dst_offset, is_src_valid, is_dst_valid);
+            }
+            else
+            {
+                const bool is_src_valid =
+                    coordinate_has_valid_offset_assuming_visible_index_is_valid(src_desc,
+                                                                                src_coord_);
+                const bool is_dst_valid =
+                    coordinate_has_valid_offset_assuming_visible_index_is_valid(dst_desc,
+                                                                                dst_coord_);
+                src_buf.template AsyncStoreToGlobal<remove_cvref_t<decltype(dst_buf)>,
+                                                    ScalarPerVector>(
+                    dst_buf, src_offset, dst_offset, is_src_valid, is_dst_valid);
+            }
             constexpr auto move_on_dim = [&]() constexpr
             {
                 StaticallyIndexedArray<bool, nDim> move_on_dim_;
@@ -184,13 +211,27 @@ struct ThreadGroupTensorSliceTransfer_AsyncLoad
         });
 
         // Reset the destination slice since the entire buffer has been already filled.
-        ResetDstSliceWindow(dst_desc);
+        if constexpr(SrcResetCoordinateAfterRun)
+        {
+            ResetSrcSliceWindow(src_desc);
+        }
+
+        if constexpr(DstResetCoordinateAfterRun)
+        {
+            ResetDstSliceWindow(dst_desc);
+        }
     }
 
     __device__ void MoveSrcSliceWindow(const SrcDesc& src_desc, const Index& step)
     {
         src_slice_origin_ = src_slice_origin_ + step;
         src_coord_        = make_tensor_coordinate(src_desc, src_slice_origin_);
+    }
+
+    __device__ void MoveDstSliceWindow(const DstDesc& dst_desc, const Index& step)
+    {
+        dst_slice_origin_ = dst_slice_origin_ + step;
+        dst_coord_        = make_tensor_coordinate(dst_desc, dst_slice_origin_);
     }
 
     template <typename DescType>
