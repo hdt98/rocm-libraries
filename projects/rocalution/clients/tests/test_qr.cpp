@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2022 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2022-2024 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -25,12 +25,56 @@
 #include "utility.hpp"
 
 #include <gtest/gtest.h>
+#include <vector>
 
 typedef std::tuple<int, unsigned int, std::string> qr_tuple;
 
-int          qr_size[]        = {7, 16, 21};
-unsigned int qr_format[]      = {1, 2, 3, 4, 5, 6, 7};
-std::string  qr_matrix_type[] = {"Laplacian2D", "PermutedIdentity"};
+std::vector<int>          qr_size        = {7, 16, 21};
+std::vector<unsigned int> qr_format      = {1, 2, 3, 4, 5, 6, 7};
+std::vector<std::string>  qr_matrix_type = {"Laplacian2D", "PermutedIdentity"};
+
+// Function to update tests if environment variable is set
+void update_qr()
+{
+    if(is_any_env_var_set({"ROCALUTION_EMULATION_SMOKE",
+                           "ROCALUTION_EMULATION_REGRESSION",
+                           "ROCALUTION_EMULATION_EXTENDED"}))
+    {
+        qr_size.clear();
+        qr_format.clear();
+        qr_matrix_type.clear();
+    }
+
+    if(is_env_var_set("ROCALUTION_EMULATION_SMOKE"))
+    {
+        qr_size.push_back(16);
+        qr_format.push_back(2);
+        qr_matrix_type.push_back("Laplacian2D");
+    }
+    else if(is_env_var_set("ROCALUTION_EMULATION_REGRESSION"))
+    {
+        qr_size.insert(qr_size.end(), {7, 16});
+        qr_format.insert(qr_format.end(), {1, 3});
+        qr_matrix_type.insert(qr_matrix_type.end(), {"Laplacian2D", "PermutedIdentity"});
+    }
+    else if(is_env_var_set("ROCALUTION_EMULATION_EXTENDED"))
+    {
+        qr_size.insert(qr_size.end(), {16, 21});
+        qr_format.insert(qr_format.end(), {4, 5, 6, 7});
+        qr_matrix_type.insert(qr_matrix_type.end(), {"Laplacian2D", "PermutedIdentity"});
+    }
+}
+
+struct QRInitializer
+{
+    QRInitializer()
+    {
+        update_qr();
+    }
+};
+
+// Create a global instance of the initializer, so the environment is checked and updated before tests.
+QRInitializer qr_initializer;
 
 class parameterized_qr : public testing::TestWithParam<qr_tuple>
 {

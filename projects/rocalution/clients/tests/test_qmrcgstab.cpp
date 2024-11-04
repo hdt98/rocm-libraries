@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2018-2023 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2018-2024 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -25,12 +25,57 @@
 #include "utility.hpp"
 
 #include <gtest/gtest.h>
+#include <vector>
 
 typedef std::tuple<int, std::string, unsigned int> qmrcgstab_tuple;
 
-int          qmrcgstab_size[]    = {7, 63};
-std::string  qmrcgstab_precond[] = {"None", "Chebyshev", "SPAI", "Jacobi", "GS", "ILU", "ItILU0"};
-unsigned int qmrcgstab_format[]  = {1, 2, 3, 7};
+std::vector<int>         qmrcgstab_size = {7, 63};
+std::vector<std::string> qmrcgstab_precond
+    = {"None", "Chebyshev", "SPAI", "Jacobi", "GS", "ILU", "ItILU0"};
+std::vector<unsigned int> qmrcgstab_format = {1, 2, 3, 7};
+
+// Function to update tests if environment variable is set
+void update_qmrcgstab()
+{
+    if(is_any_env_var_set({"ROCALUTION_EMULATION_SMOKE",
+                           "ROCALUTION_EMULATION_REGRESSION",
+                           "ROCALUTION_EMULATION_EXTENDED"}))
+    {
+        qmrcgstab_size.clear();
+        qmrcgstab_precond.clear();
+        qmrcgstab_format.clear();
+    }
+
+    if(is_env_var_set("ROCALUTION_EMULATION_SMOKE"))
+    {
+        qmrcgstab_size.push_back(63);
+        qmrcgstab_precond.insert(qmrcgstab_precond.end(), {"None", "GS"});
+        qmrcgstab_format.push_back(7);
+    }
+    else if(is_env_var_set("ROCALUTION_EMULATION_REGRESSION"))
+    {
+        qmrcgstab_size.insert(qmrcgstab_size.end(), {7, 63});
+        qmrcgstab_precond.insert(qmrcgstab_precond.end(), {"Chebyshev", "ItILU0"});
+        qmrcgstab_format.insert(qmrcgstab_format.end(), {1, 2});
+    }
+    else if(is_env_var_set("ROCALUTION_EMULATION_EXTENDED"))
+    {
+        qmrcgstab_size.insert(qmrcgstab_size.end(), {7, 63});
+        qmrcgstab_precond.insert(qmrcgstab_precond.end(), {"SPAI", "ILU"});
+        qmrcgstab_format.insert(qmrcgstab_format.end(), {1, 3});
+    }
+}
+
+struct QMRCGStabInitializer
+{
+    QMRCGStabInitializer()
+    {
+        update_qmrcgstab();
+    }
+};
+
+// Create a global instance of the initializer, so the environment is checked and updated before tests.
+QMRCGStabInitializer qmrcgstab_initializer;
 
 class parameterized_qmrcgstab : public testing::TestWithParam<qmrcgstab_tuple>
 {

@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2018-2022 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2018-2024 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -25,12 +25,56 @@
 #include "utility.hpp"
 
 #include <gtest/gtest.h>
+#include <vector>
 
 typedef std::tuple<int, std::string, unsigned int> cg_tuple;
 
-int          cg_size[]    = {7, 63};
-std::string  cg_precond[] = {"None", "FSAI", "SPAI", "TNS", "Jacobi", "IC", "MCSGS"};
-unsigned int cg_format[]  = {1, 3, 4, 6};
+std::vector<int>          cg_size    = {7, 63};
+std::vector<std::string>  cg_precond = {"None", "FSAI", "SPAI", "TNS", "Jacobi", "IC", "MCSGS"};
+std::vector<unsigned int> cg_format  = {1, 3, 4, 6};
+
+// Function to update tests if environment variable is set
+void update_cg()
+{
+    if(is_any_env_var_set({"ROCALUTION_EMULATION_SMOKE",
+                           "ROCALUTION_EMULATION_REGRESSION",
+                           "ROCALUTION_EMULATION_EXTENDED"}))
+    {
+        cg_size.clear();
+        cg_precond.clear();
+        cg_format.clear();
+    }
+
+    if(is_env_var_set("ROCALUTION_EMULATION_SMOKE"))
+    {
+        cg_size.push_back(63);
+        cg_precond.insert(cg_precond.end(), {"None", "FSAI"});
+        cg_format.push_back(3);
+    }
+    else if(is_env_var_set("ROCALUTION_EMULATION_REGRESSION"))
+    {
+        cg_size.insert(cg_size.end(), {7, 63});
+        cg_precond.insert(cg_precond.end(), {"SPAI", "TNS"});
+        cg_format.push_back(1);
+    }
+    else if(is_env_var_set("ROCALUTION_EMULATION_EXTENDED"))
+    {
+        cg_size.insert(cg_size.end(), {7, 63});
+        cg_precond.insert(cg_precond.end(), {"Jacobi", "IC", "MCSGS"});
+        cg_format.insert(cg_format.end(), {4, 6});
+    }
+}
+
+struct CGInitializer
+{
+    CGInitializer()
+    {
+        update_cg();
+    }
+};
+
+// Create a global instance of the initializer, so the environment is checked and updated before tests.
+CGInitializer cg_initializer;
 
 class parameterized_cg : public testing::TestWithParam<cg_tuple>
 {

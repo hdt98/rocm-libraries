@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2023 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2023-2024 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -39,7 +39,15 @@ class parameterized_local_matrix_itlusolve
 protected:
     parameterized_local_matrix_itlusolve() {}
     virtual ~parameterized_local_matrix_itlusolve() {}
-    virtual void SetUp() {}
+    virtual void SetUp() override
+    {
+        if(is_any_env_var_set({"ROCALUTION_EMULATION_SMOKE",
+                               "ROCALUTION_EMULATION_REGRESSION",
+                               "ROCALUTION_EMULATION_EXTENDED"}))
+        {
+            GTEST_SKIP();
+        }
+    }
     virtual void TearDown() {}
 };
 
@@ -49,7 +57,15 @@ class parameterized_local_matrix_itllsolve
 protected:
     parameterized_local_matrix_itllsolve() {}
     virtual ~parameterized_local_matrix_itllsolve() {}
-    virtual void SetUp() {}
+    virtual void SetUp() override
+    {
+        if(is_any_env_var_set({"ROCALUTION_EMULATION_SMOKE",
+                               "ROCALUTION_EMULATION_REGRESSION",
+                               "ROCALUTION_EMULATION_EXTENDED"}))
+        {
+            GTEST_SKIP();
+        }
+    }
     virtual void TearDown() {}
 };
 
@@ -59,7 +75,15 @@ class parameterized_local_matrix_itlsolve
 protected:
     parameterized_local_matrix_itlsolve() {}
     virtual ~parameterized_local_matrix_itlsolve() {}
-    virtual void SetUp() {}
+    virtual void SetUp() override
+    {
+        if(is_any_env_var_set({"ROCALUTION_EMULATION_SMOKE",
+                               "ROCALUTION_EMULATION_REGRESSION",
+                               "ROCALUTION_EMULATION_EXTENDED"}))
+        {
+            GTEST_SKIP();
+        }
+    }
     virtual void TearDown() {}
 };
 
@@ -69,7 +93,15 @@ class parameterized_local_matrix_itusolve
 protected:
     parameterized_local_matrix_itusolve() {}
     virtual ~parameterized_local_matrix_itusolve() {}
-    virtual void SetUp() {}
+    virtual void SetUp() override
+    {
+        if(is_any_env_var_set({"ROCALUTION_EMULATION_SMOKE",
+                               "ROCALUTION_EMULATION_REGRESSION",
+                               "ROCALUTION_EMULATION_EXTENDED"}))
+        {
+            GTEST_SKIP();
+        }
+    }
     virtual void TearDown() {}
 };
 

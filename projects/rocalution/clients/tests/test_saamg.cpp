@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2018-2022 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2018-2024 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -25,21 +25,89 @@
 #include "utility.hpp"
 
 #include <gtest/gtest.h>
+#include <vector>
 
 typedef std::
     tuple<int, int, int, std::string, std::string, std::string, unsigned int, int, int, int>
         saamg_tuple;
 
-int          saamg_size[]             = {22, 63, 134, 207};
-int          saamg_pre_iter[]         = {2};
-int          saamg_post_iter[]        = {2};
-std::string  saamg_smoother[]         = {"FSAI", "SPAI"};
-std::string  saamg_coarsening_strat[] = {"Greedy", "PMIS"};
-std::string  saamg_matrix_type[]      = {"Laplacian2D"};
-unsigned int saamg_format[]           = {1, 6};
-int          saamg_cycle[]            = {2};
-int          saamg_scaling[]          = {1};
-int          saamg_rebuildnumeric[]   = {0, 1};
+std::vector<int>          saamg_size             = {22, 63, 134, 207};
+std::vector<int>          saamg_pre_iter         = {2};
+std::vector<int>          saamg_post_iter        = {2};
+std::vector<std::string>  saamg_smoother         = {"FSAI", "SPAI"};
+std::vector<std::string>  saamg_coarsening_strat = {"Greedy", "PMIS"};
+std::vector<std::string>  saamg_matrix_type      = {"Laplacian2D"};
+std::vector<unsigned int> saamg_format           = {1, 6};
+std::vector<int>          saamg_cycle            = {2};
+std::vector<int>          saamg_scaling          = {1};
+std::vector<int>          saamg_rebuildnumeric   = {0, 1};
+
+// Function to update tests if environment variable is set
+void update_saamg()
+{
+    if(is_any_env_var_set({"ROCALUTION_EMULATION_SMOKE",
+                           "ROCALUTION_EMULATION_REGRESSION",
+                           "ROCALUTION_EMULATION_EXTENDED"}))
+    {
+        saamg_size.clear();
+        saamg_smoother.clear();
+        saamg_format.clear();
+        saamg_pre_iter.clear();
+        saamg_post_iter.clear();
+        saamg_cycle.clear();
+        saamg_scaling.clear();
+        saamg_rebuildnumeric.clear();
+        saamg_coarsening_strat.clear();
+    }
+
+    if(is_env_var_set("ROCALUTION_EMULATION_SMOKE"))
+    {
+        saamg_size.push_back(63);
+        saamg_smoother.push_back("FSAI");
+        saamg_format.push_back(6);
+        saamg_pre_iter.push_back(2);
+        saamg_post_iter.push_back(2);
+        saamg_cycle.push_back(2);
+        saamg_scaling.push_back(1);
+        saamg_rebuildnumeric.push_back(0);
+        saamg_coarsening_strat.insert(saamg_coarsening_strat.end(), {"Greedy", "PMIS"});
+    }
+    else if(is_env_var_set("ROCALUTION_EMULATION_REGRESSION"))
+    {
+        saamg_size.push_back(63);
+        saamg_smoother.push_back("SPAI");
+        saamg_format.push_back(1);
+        saamg_pre_iter.push_back(1);
+        saamg_post_iter.push_back(1);
+        saamg_cycle.push_back(2);
+        saamg_scaling.push_back(1);
+        saamg_rebuildnumeric.push_back(1);
+        saamg_coarsening_strat.insert(saamg_coarsening_strat.end(), {"Greedy", "PMIS"});
+    }
+    else if(is_env_var_set("ROCALUTION_EMULATION_EXTENDED"))
+    {
+        saamg_size.push_back(134);
+        saamg_smoother.push_back("FSAI");
+        saamg_format.push_back(1);
+        saamg_pre_iter.push_back(1);
+        saamg_post_iter.push_back(2);
+        saamg_cycle.push_back(0);
+        saamg_scaling.push_back(0);
+        saamg_rebuildnumeric.push_back(0);
+        saamg_coarsening_strat.insert(saamg_coarsening_strat.end(), {"Greedy", "PMIS"});
+    }
+}
+
+struct SAAMGInitializer
+{
+    SAAMGInitializer()
+    {
+        update_saamg();
+    }
+};
+
+// Create a global instance of the initializer, so the environment is checked and updated before tests.
+SAAMGInitializer saamg_initializer;
 
 class parameterized_saamg : public testing::TestWithParam<saamg_tuple>
 {

@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2018-2023 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2018-2024 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -25,13 +25,57 @@
 #include "utility.hpp"
 
 #include <gtest/gtest.h>
+#include <vector>
 
 typedef std::tuple<int, std::string, unsigned int> cr_tuple;
 
-int         cr_size[] = {7, 63};
-std::string cr_precond[]
+std::vector<int>         cr_size = {7, 63};
+std::vector<std::string> cr_precond
     = {"None", "Chebyshev", "FSAI", "Jacobi", "SGS", "ILU", "ItILU0", "IC", "MCSGS"};
-unsigned int cr_format[] = {2, 4, 7};
+std::vector<unsigned int> cr_format = {2, 4, 7};
+
+// Function to update tests if environment variable is set
+void update_cr()
+{
+    if(is_any_env_var_set({"ROCALUTION_EMULATION_SMOKE",
+                           "ROCALUTION_EMULATION_REGRESSION",
+                           "ROCALUTION_EMULATION_EXTENDED"}))
+    {
+        cr_size.clear();
+        cr_precond.clear();
+        cr_format.clear();
+    }
+
+    if(is_env_var_set("ROCALUTION_EMULATION_SMOKE"))
+    {
+        cr_size.push_back(63);
+        cr_precond.insert(cr_precond.end(), {"None", "SGS"});
+        cr_format.push_back(4);
+    }
+    else if(is_env_var_set("ROCALUTION_EMULATION_REGRESSION"))
+    {
+        cr_size.insert(cr_size.end(), {7, 63});
+        cr_precond.insert(cr_precond.end(), {"Chebyshev", "FSAI", "Jacobi"});
+        cr_format.push_back(2);
+    }
+    else if(is_env_var_set("ROCALUTION_EMULATION_EXTENDED"))
+    {
+        cr_size.insert(cr_size.end(), {7, 63});
+        cr_precond.insert(cr_precond.end(), {"ILU", "ItILU0", "IC", "MCSGS"});
+        cr_format.push_back(7);
+    }
+}
+
+struct CRInitializer
+{
+    CRInitializer()
+    {
+        update_cr();
+    }
+};
+
+// Create a global instance of the initializer, so the environment is checked and updated before tests.
+CRInitializer cr_initializer;
 
 class parameterized_cr : public testing::TestWithParam<cr_tuple>
 {

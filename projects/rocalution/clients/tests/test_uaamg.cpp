@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2018-2023 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2018-2024 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -25,21 +25,89 @@
 #include "utility.hpp"
 
 #include <gtest/gtest.h>
+#include <vector>
 
 typedef std::
     tuple<int, int, int, std::string, std::string, std::string, unsigned int, int, int, int>
         uaamg_tuple;
 
-int          uaamg_size[]             = {22, 63, 134, 157};
-int          uaamg_pre_iter[]         = {2};
-int          uaamg_post_iter[]        = {2};
-std::string  uaamg_smoother[]         = {"FSAI" /*, "ILU"*/};
-std::string  uaamg_coarsening_strat[] = {"Greedy", "PMIS"};
-std::string  uaamg_matrix_type[]      = {"Laplacian2D", "Laplacian3D"};
-unsigned int uaamg_format[]           = {1, 6};
-int          uaamg_cycle[]            = {2};
-int          uaamg_scaling[]          = {1};
-int          uaamg_rebuildnumeric[]   = {0, 1};
+std::vector<int>          uaamg_size             = {22, 63, 134, 157};
+std::vector<int>          uaamg_pre_iter         = {2};
+std::vector<int>          uaamg_post_iter        = {2};
+std::vector<std::string>  uaamg_smoother         = {"FSAI" /*, "ILU"*/};
+std::vector<std::string>  uaamg_coarsening_strat = {"Greedy", "PMIS"};
+std::vector<std::string>  uaamg_matrix_type      = {"Laplacian2D", "Laplacian3D"};
+std::vector<unsigned int> uaamg_format           = {1, 6};
+std::vector<int>          uaamg_cycle            = {2};
+std::vector<int>          uaamg_scaling          = {1};
+std::vector<int>          uaamg_rebuildnumeric   = {0, 1};
+
+// Function to update tests if environment variable is set
+void update_uaamg()
+{
+    if(is_any_env_var_set({"ROCALUTION_EMULATION_SMOKE",
+                           "ROCALUTION_EMULATION_REGRESSION",
+                           "ROCALUTION_EMULATION_EXTENDED"}))
+    {
+        uaamg_size.clear();
+        uaamg_smoother.clear();
+        uaamg_format.clear();
+        uaamg_pre_iter.clear();
+        uaamg_post_iter.clear();
+        uaamg_cycle.clear();
+        uaamg_scaling.clear();
+        uaamg_rebuildnumeric.clear();
+        uaamg_coarsening_strat.clear();
+    }
+
+    if(is_env_var_set("ROCALUTION_EMULATION_SMOKE"))
+    {
+        uaamg_size.push_back(63);
+        uaamg_smoother.push_back("FSAI");
+        uaamg_format.push_back(1);
+        uaamg_pre_iter.push_back(2);
+        uaamg_post_iter.push_back(2);
+        uaamg_cycle.push_back(0);
+        uaamg_scaling.push_back(0);
+        uaamg_rebuildnumeric.push_back(0);
+        uaamg_coarsening_strat.insert(uaamg_coarsening_strat.end(), {"Greedy", "PMIS"});
+    }
+    else if(is_env_var_set("ROCALUTION_EMULATION_REGRESSION"))
+    {
+        uaamg_size.push_back(134);
+        uaamg_smoother.push_back("FSAI");
+        uaamg_format.push_back(6);
+        uaamg_pre_iter.push_back(2);
+        uaamg_post_iter.push_back(2);
+        uaamg_cycle.push_back(2);
+        uaamg_scaling.push_back(1);
+        uaamg_rebuildnumeric.push_back(1);
+        uaamg_coarsening_strat.insert(uaamg_coarsening_strat.end(), {"Greedy", "PMIS"});
+    }
+    else if(is_env_var_set("ROCALUTION_EMULATION_EXTENDED"))
+    {
+        uaamg_size.push_back(157);
+        uaamg_smoother.push_back("FSAI");
+        uaamg_format.push_back(6);
+        uaamg_pre_iter.push_back(2);
+        uaamg_post_iter.push_back(2);
+        uaamg_cycle.push_back(2);
+        uaamg_scaling.push_back(1);
+        uaamg_rebuildnumeric.push_back(0);
+        uaamg_coarsening_strat.insert(uaamg_coarsening_strat.end(), {"Greedy", "PMIS"});
+    }
+}
+
+struct UAAMGInitializer
+{
+    UAAMGInitializer()
+    {
+        update_uaamg();
+    }
+};
+
+// Create a global instance of the initializer, so the environment is checked and updated before tests.
+UAAMGInitializer uaamg_initializer;
 
 class parameterized_uaamg : public testing::TestWithParam<uaamg_tuple>
 {

@@ -278,6 +278,36 @@ int gen_random(int m, int n, int max_nnz_per_row, int** rowptr, int** col, T** v
 }
 
 /* ============================================================================================ */
+/*! \brief  Check for environment variable to be set */
+static bool is_env_var_set(const char* var, const std::string& value = "1")
+{
+    const char* env_var = std::getenv(var);
+
+    if(env_var && env_var == value)
+    {
+        return true;
+    }
+
+    return false;
+}
+
+/* ============================================================================================ */
+/*! \brief  Check for environment variables to be set */
+static bool is_any_env_var_set(const std::initializer_list<const char*>& vars,
+                               const std::string&                        value = "1")
+{
+    for(const char* var : vars)
+    {
+        if(is_env_var_set(var, value))
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/* ============================================================================================ */
 
 /*! \brief Class used to parse command arguments in both client & gtest   */
 

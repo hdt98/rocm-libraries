@@ -11,4 +11,13 @@
     <test sets="custom">
         <run name="custom_filter">{COMMAND}:output_custom.xml --gtest_filter={GTEST_FILTER}</run>
     </test>
+    <test sets="smoke">
+        <run name="smoke_test">ROCALUTION_EMULATION_SMOKE=1 GTEST_LISTENER=NO_PASS_LINE_IN_LOG {COMMAND}:output_smoke.xml</run>
+    </test>
+    <test sets="regression">
+        <run name="regression_test">ROCALUTION_EMULATION_REGRESSION=1 GTEST_LISTENER=NO_PASS_LINE_IN_LOG {COMMAND}:output_regression.xml</run>
+    </test>
+    <test sets="extended">
+        <run name="extended_test">ROCALUTION_EMULATION_EXTENDED=1 GTEST_LISTENER=NO_PASS_LINE_IN_LOG {COMMAND}:output_extended.xml</run>
+    </test>
 </testset>

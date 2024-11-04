@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2018-2023 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2018-2024 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -25,13 +25,57 @@
 #include "utility.hpp"
 
 #include <gtest/gtest.h>
+#include <vector>
 
 typedef std::tuple<int, std::string, unsigned int> bicgstab_tuple;
 
-int         bicgstab_size[] = {7, 63};
-std::string bicgstab_precond[]
+std::vector<int>         bicgstab_size = {7, 63};
+std::vector<std::string> bicgstab_precond
     = {"None", "Chebyshev", "TNS", "Jacobi", "ItILU0", "ILUT", "MCGS", "MCILU"};
-unsigned int bicgstab_format[] = {1, 2, 4, 6};
+std::vector<unsigned int> bicgstab_format = {1, 2, 4, 6};
+
+// Function to update tests if environment variable is set
+void update_bicgstab()
+{
+    if(is_any_env_var_set({"ROCALUTION_EMULATION_SMOKE",
+                           "ROCALUTION_EMULATION_REGRESSION",
+                           "ROCALUTION_EMULATION_EXTENDED"}))
+    {
+        bicgstab_size.clear();
+        bicgstab_precond.clear();
+        bicgstab_format.clear();
+    }
+
+    if(is_env_var_set("ROCALUTION_EMULATION_SMOKE"))
+    {
+        bicgstab_size.push_back(63);
+        bicgstab_precond.insert(bicgstab_precond.end(), {"None", "Chebyshev"});
+        bicgstab_format.push_back(2);
+    }
+    else if(is_env_var_set("ROCALUTION_EMULATION_REGRESSION"))
+    {
+        bicgstab_size.insert(bicgstab_size.end(), {7, 63});
+        bicgstab_precond.insert(bicgstab_precond.end(), {"TNS", "MCILU"});
+        bicgstab_format.insert(bicgstab_format.end(), {1, 4});
+    }
+    else if(is_env_var_set("ROCALUTION_EMULATION_EXTENDED"))
+    {
+        bicgstab_size.insert(bicgstab_size.end(), {7, 63});
+        bicgstab_precond.insert(bicgstab_precond.end(), {"ItILU0", "ILUT"});
+        bicgstab_format.push_back(6);
+    }
+}
+
+struct BiCGStabInitializer
+{
+    BiCGStabInitializer()
+    {
+        update_bicgstab();
+    }
+};
+
+// Create a global instance of the initializer, so the environment is checked and updated before tests.
+BiCGStabInitializer bicgstab_initializer;
 
 class parameterized_bicgstab : public testing::TestWithParam<bicgstab_tuple>
 {

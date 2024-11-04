@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2018-2022 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2018-2024 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -42,7 +42,16 @@ class parameterized_local_matrix_conversions
 protected:
     parameterized_local_matrix_conversions() {}
     virtual ~parameterized_local_matrix_conversions() {}
-    virtual void SetUp() {}
+    virtual void SetUp() override
+    {
+        if(is_any_env_var_set({"ROCALUTION_EMULATION_SMOKE",
+                               "ROCALUTION_EMULATION_REGRESSION",
+                               "ROCALUTION_EMULATION_EXTENDED"}))
+        {
+            GTEST_SKIP();
+        }
+    }
+
     virtual void TearDown() {}
 };
 
@@ -61,7 +70,16 @@ class parameterized_local_matrix_allocations
 protected:
     parameterized_local_matrix_allocations() {}
     virtual ~parameterized_local_matrix_allocations() {}
-    virtual void SetUp() {}
+    virtual void SetUp() override
+    {
+        if(is_any_env_var_set({"ROCALUTION_EMULATION_SMOKE",
+                               "ROCALUTION_EMULATION_REGRESSION",
+                               "ROCALUTION_EMULATION_EXTENDED"}))
+        {
+            GTEST_SKIP();
+        }
+    }
+
     virtual void TearDown() {}
 };
 
@@ -75,6 +93,13 @@ Arguments setup_local_matrix_allocations_arguments(local_matrix_allocations_tupl
 
 TEST(local_matrix_bad_args, local_matrix)
 {
+    if(is_any_env_var_set({"ROCALUTION_EMULATION_SMOKE",
+                           "ROCALUTION_EMULATION_REGRESSION",
+                           "ROCALUTION_EMULATION_EXTENDED"}))
+    {
+        GTEST_SKIP();
+    }
+
     testing_local_matrix_bad_args<float>();
 }
 

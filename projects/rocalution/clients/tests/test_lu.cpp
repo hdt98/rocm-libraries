@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2022 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2022-2024 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -25,12 +25,55 @@
 #include "utility.hpp"
 
 #include <gtest/gtest.h>
+#include <vector>
 
 typedef std::tuple<int, unsigned int, std::string> lu_tuple;
 
-int          lu_size[]        = {7, 16, 21};
-unsigned int lu_format[]      = {1, 2, 3, 4, 5, 6, 7};
-std::string  lu_matrix_type[] = {"Laplacian2D"};
+std::vector<int>          lu_size        = {7, 16, 21};
+std::vector<unsigned int> lu_format      = {1, 2, 3, 4, 5, 6, 7};
+std::vector<std::string>  lu_matrix_type = {"Laplacian2D"};
+
+// Function to update tests if environment variable is set
+void update_lu()
+{
+    if(is_any_env_var_set({"ROCALUTION_EMULATION_SMOKE",
+                           "ROCALUTION_EMULATION_REGRESSION",
+                           "ROCALUTION_EMULATION_EXTENDED"}))
+    {
+        lu_size.clear();
+        lu_format.clear();
+
+        lu_size.push_back(16);
+        lu_format.push_back(2);
+    }
+
+    if(is_env_var_set("ROCALUTION_EMULATION_SMOKE"))
+    {
+        lu_size.push_back(16);
+        lu_format.push_back(2);
+    }
+    else if(is_env_var_set("ROCALUTION_EMULATION_REGRESSION"))
+    {
+        lu_size.insert(lu_size.end(), {7, 16});
+        lu_format.insert(lu_format.end(), {1, 3});
+    }
+    else if(is_env_var_set("ROCALUTION_EMULATION_EXTENDED"))
+    {
+        lu_size.insert(lu_size.end(), {16, 21});
+        lu_format.insert(lu_format.end(), {4, 5, 6, 7});
+    }
+}
+
+struct LUInitializer
+{
+    LUInitializer()
+    {
+        update_lu();
+    }
+};
+
+// Create a global instance of the initializer, so the environment is checked and updated before tests.
+LUInitializer lu_initializer;
 
 class parameterized_lu : public testing::TestWithParam<lu_tuple>
 {

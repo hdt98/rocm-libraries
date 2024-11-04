@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2018-2023 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2018-2024 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -25,14 +25,62 @@
 #include "utility.hpp"
 
 #include <gtest/gtest.h>
+#include <vector>
 
 typedef std::tuple<int, std::string, unsigned int, int> bicgstabl_tuple;
 
-int         bicgstabl_size[] = {7, 63};
-std::string bicgstabl_precond[]
+std::vector<int>         bicgstabl_size = {7, 63};
+std::vector<std::string> bicgstabl_precond
     = {"None", "SPAI", "TNS", "Jacobi", "GS", "ILU", "ItILU0", "ILUT", "IC", "MCGS", "MCILU"};
-unsigned int bicgstabl_format[] = {1, 4, 5, 6, 7};
-int          bicgstabl_level[]  = {1, 2, 4};
+std::vector<unsigned int> bicgstabl_format = {1, 4, 5, 6, 7};
+std::vector<int>          bicgstabl_level  = {1, 2, 4};
+
+// Function to update tests if environment variable is set
+void update_bicgstabl()
+{
+    if(is_any_env_var_set({"ROCALUTION_EMULATION_SMOKE",
+                           "ROCALUTION_EMULATION_REGRESSION",
+                           "ROCALUTION_EMULATION_EXTENDED"}))
+    {
+        bicgstabl_size.clear();
+        bicgstabl_precond.clear();
+        bicgstabl_format.clear();
+        bicgstabl_level.clear();
+    }
+
+    if(is_env_var_set("ROCALUTION_EMULATION_SMOKE"))
+    {
+        bicgstabl_size.push_back(63);
+        bicgstabl_precond.insert(bicgstabl_precond.end(), {"None", "Jacobi"});
+        bicgstabl_format.push_back(1);
+        bicgstabl_level.push_back(4);
+    }
+    else if(is_env_var_set("ROCALUTION_EMULATION_REGRESSION"))
+    {
+        bicgstabl_size.insert(bicgstabl_size.end(), {7, 63});
+        bicgstabl_precond.insert(bicgstabl_precond.end(), {"SPAI", "TNS"});
+        bicgstabl_format.insert(bicgstabl_format.end(), {4, 5});
+        bicgstabl_level.insert(bicgstabl_level.end(), {1, 2});
+    }
+    else if(is_env_var_set("ROCALUTION_EMULATION_EXTENDED"))
+    {
+        bicgstabl_size.insert(bicgstabl_size.end(), {7, 63});
+        bicgstabl_precond.insert(bicgstabl_precond.end(), {"ILU", "IC"});
+        bicgstabl_format.insert(bicgstabl_format.end(), {6, 7});
+        bicgstabl_level.insert(bicgstabl_level.end(), {2, 4});
+    }
+}
+
+struct BiCGStabLInitializer
+{
+    BiCGStabLInitializer()
+    {
+        update_bicgstabl();
+    }
+};
+
+// Create a global instance of the initializer, so the environment is checked and updated before tests.
+BiCGStabLInitializer bicgstabl_initializer;
 
 class parameterized_bicgstabl : public testing::TestWithParam<bicgstabl_tuple>
 {

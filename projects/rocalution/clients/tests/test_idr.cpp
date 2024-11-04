@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2018-2023 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2018-2024 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -25,13 +25,61 @@
 #include "utility.hpp"
 
 #include <gtest/gtest.h>
+#include <vector>
 
 typedef std::tuple<int, std::string, unsigned int, int> idr_tuple;
 
-int          idr_size[]    = {7, 63};
-std::string  idr_precond[] = {"None", "SPAI", "GS", "ILU", "MCILU"};
-unsigned int idr_format[]  = {1, 4, 5, 6};
-int          idr_level[]   = {1, 2};
+std::vector<int>          idr_size    = {7, 63};
+std::vector<std::string>  idr_precond = {"None", "SPAI", "GS", "ILU", "MCILU"};
+std::vector<unsigned int> idr_format  = {1, 4, 5, 6};
+std::vector<int>          idr_level   = {1, 2};
+
+// Function to update tests if environment variable is set
+void update_idr()
+{
+    if(is_any_env_var_set({"ROCALUTION_EMULATION_SMOKE",
+                           "ROCALUTION_EMULATION_REGRESSION",
+                           "ROCALUTION_EMULATION_EXTENDED"}))
+    {
+        idr_size.clear();
+        idr_precond.clear();
+        idr_format.clear();
+        idr_level.clear();
+    }
+
+    if(is_env_var_set("ROCALUTION_EMULATION_SMOKE"))
+    {
+        idr_size.push_back(63);
+        idr_precond.insert(idr_precond.end(), {"None", "MCILU"});
+        idr_format.push_back(6);
+        idr_level.push_back(2);
+    }
+    else if(is_env_var_set("ROCALUTION_EMULATION_REGRESSION"))
+    {
+        idr_size.insert(idr_size.end(), {7, 63});
+        idr_precond.insert(idr_precond.end(), {"MCILU"});
+        idr_format.push_back(1);
+        idr_level.push_back(2);
+    }
+    else if(is_env_var_set("ROCALUTION_EMULATION_EXTENDED"))
+    {
+        idr_size.insert(idr_size.end(), {7, 63});
+        idr_precond.insert(idr_precond.end(), {"SPAI", "GS", "ILU"});
+        idr_format.insert(idr_format.end(), {4, 5});
+        idr_level.insert(idr_level.end(), {1, 2});
+    }
+}
+
+struct IDRInitializer
+{
+    IDRInitializer()
+    {
+        update_idr();
+    }
+};
+
+// Create a global instance of the initializer, so the environment is checked and updated before tests.
+IDRInitializer idr_initializer;
 
 class parameterized_idr : public testing::TestWithParam<idr_tuple>
 {

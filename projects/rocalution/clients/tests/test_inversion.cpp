@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2022 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2018-2024 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -25,12 +25,58 @@
 #include "utility.hpp"
 
 #include <gtest/gtest.h>
+#include <vector>
 
 typedef std::tuple<int, unsigned int, std::string> inversion_tuple;
 
-int          inversion_size[]        = {7, 16, 21};
-unsigned int inversion_format[]      = {1, 2, 3, 4, 5, 6, 7};
-std::string  inversion_matrix_type[] = {"Laplacian2D", "PermutedIdentity"};
+std::vector<int>          inversion_size        = {7, 16, 21};
+std::vector<unsigned int> inversion_format      = {1, 2, 3, 4, 5, 6, 7};
+std::vector<std::string>  inversion_matrix_type = {"Laplacian2D", "PermutedIdentity"};
+
+// Function to update tests if environment variable is set
+void update_inversion()
+{
+    if(is_any_env_var_set({"ROCALUTION_EMULATION_SMOKE",
+                           "ROCALUTION_EMULATION_REGRESSION",
+                           "ROCALUTION_EMULATION_EXTENDED"}))
+    {
+        inversion_size.clear();
+        inversion_format.clear();
+        inversion_matrix_type.clear();
+    }
+
+    if(is_env_var_set("ROCALUTION_EMULATION_SMOKE"))
+    {
+        inversion_size.push_back(16);
+        inversion_format.push_back(1);
+        inversion_matrix_type.push_back("Laplacian2D");
+    }
+    else if(is_env_var_set("ROCALUTION_EMULATION_REGRESSION"))
+    {
+        inversion_size.insert(inversion_size.end(), {7, 16});
+        inversion_format.insert(inversion_format.end(), {2, 3});
+        inversion_matrix_type.insert(inversion_matrix_type.end(),
+                                     {"Laplacian2D", "PermutedIdentity"});
+    }
+    else if(is_env_var_set("ROCALUTION_EMULATION_EXTENDED"))
+    {
+        inversion_size.insert(inversion_size.end(), {21});
+        inversion_format.insert(inversion_format.end(), {4, 5, 6, 7});
+        inversion_matrix_type.insert(inversion_matrix_type.end(),
+                                     {"Laplacian2D", "PermutedIdentity"});
+    }
+}
+
+struct InversionInitializer
+{
+    InversionInitializer()
+    {
+        update_inversion();
+    }
+};
+
+// Create a global instance of the initializer, so the environment is checked and updated before tests.
+InversionInitializer inversion_initializer;
 
 class parameterized_inversion : public testing::TestWithParam<inversion_tuple>
 {

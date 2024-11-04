@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2018-2020 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2018-2024 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -41,7 +41,16 @@ class parameterized_backend : public testing::TestWithParam<backend_tuple>
 protected:
     parameterized_backend() {}
     virtual ~parameterized_backend() {}
-    virtual void SetUp() {}
+    virtual void SetUp() override
+    {
+        if(is_any_env_var_set({"ROCALUTION_EMULATION_SMOKE",
+                               "ROCALUTION_EMULATION_REGRESSION",
+                               "ROCALUTION_EMULATION_EXTENDED"}))
+        {
+            GTEST_SKIP();
+        }
+    }
+
     virtual void TearDown() {}
 };
 
@@ -60,6 +69,13 @@ Arguments setup_backend_arguments(backend_tuple tup)
 
 TEST(backend_init_order, backend)
 {
+    if(is_any_env_var_set({"ROCALUTION_EMULATION_SMOKE",
+                           "ROCALUTION_EMULATION_REGRESSION",
+                           "ROCALUTION_EMULATION_EXTENDED"}))
+    {
+        GTEST_SKIP();
+    }
+
     testing_backend_init_order();
 }
 
