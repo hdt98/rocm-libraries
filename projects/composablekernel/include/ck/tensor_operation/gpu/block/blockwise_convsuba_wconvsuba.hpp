@@ -463,7 +463,8 @@ struct BlockwiseSubaConvWconv
     __device__ void Run(const WeightBlockBuffer& weight_block_buf,
                         const InDataBlockBuffer& indata_block_buf,
                         const DsBlockBuffer& ds_block_buf,
-                        AccumThreadBuffer& accum_thread_buf) const
+                        AccumThreadBuffer& accum_thread_buf,
+                        bool isLast) const
     {
         auto weight_thread_buf = make_static_buffer<AddressSpaceEnum::Vgpr, WeiDataType>(
             weight_thread_desc_.GetElementSpaceSize());
@@ -482,33 +483,6 @@ struct BlockwiseSubaConvWconv
         using BiasVec       = typename decltype(acc_sba)::BiasVec::type;
         using ScaleVec      = typename decltype(acc_sba)::ScaleVec::type;
         using BiasScaleVec  = typename decltype(acc_sba)::BiasScaleVec::type;
-
-        if constexpr(ConvertToTensor)
-        {
-            static_assert(KRepeat * KPerWconv == CRepeat * CPerWconv, "");
-            static_assert(FilterSize == 1, "");
-            static_assert(InDataEnableLds == false, "");
-            static_assert(std::is_same<AccDataType, InDataType>::value, "");
-            constexpr index_t KCRepeat = KPerWconv / CPerWconv;
-            static_for<0, HRepeat, 1>{}([&](auto h0) {
-                static_for<0, WRepeat, 1>{}([&](auto w0) {
-                    static_for<0, KRepeat, 1>{}([&](auto k0) {
-                        constexpr index_t accum_offset =
-                            accum_thread_desc_.CalculateOffset(make_tuple(h0, w0, k0, I0));
-                        auto& accum_vec =
-                            accum_thread_buf.GetVectorTypeReference(Number<accum_offset>{});
-                        static_for<0, KCRepeat, 1>{}([&](auto c0) {
-                            constexpr index_t indata_offset = indata_block_desc_.CalculateOffset(
-                                make_tuple(w0, c0 + k0 * Number<KCRepeat>{}, h0, I0, I0, I0, I0));
-                            accum_vec.template AsType<InDataVec>()(c0) =
-                                *reinterpret_cast<const InDataVec*>(
-                                    &indata_block_buf[Number<indata_offset>{}]);
-                        });
-                    });
-                });
-            });
-            return;
-        }
 
         const InDataVec* indata_thread_vec_ptr[4];
         static_assert(Iters <= 4 && FilterSize < 4, "");
@@ -670,117 +644,123 @@ struct BlockwiseSubaConvWconv
             });
 
             // run sba/uba
-            constexpr auto accSbaInstance = ck::AccSba<AccDataType,
-                                                       HPerWconv,
-                                                       WPerWconv,
-                                                       activeFun,
-                                                       scaleBiasPacked,
-                                                       uniformScale>();
-            static_for<0, HRepeat, 1>{}([&](auto h0) {
-                static_for<0, WRepeat, 1>{}([&](auto w0) {
-                    constexpr index_t accum_offset =
-                        accum_thread_desc_.CalculateOffset(make_tuple(h0, w0, k0, I0));
-                    constexpr index_t bias_offset =
-                        ds_thread_desc_[I0].CalculateOffset(make_tuple(I0, I0, I0));
-                    constexpr index_t scale_offset =
-                        ds_thread_desc_[I1].CalculateOffset(make_tuple(I0, I0, I0));
+            if(isLast)
+            {
+                constexpr auto accSbaInstance = ck::AccSba<AccDataType,
+                                                           HPerWconv,
+                                                           WPerWconv,
+                                                           activeFun,
+                                                           scaleBiasPacked,
+                                                           uniformScale>();
+                static_for<0, HRepeat, 1>{}([&](auto h0) {
+                    static_for<0, WRepeat, 1>{}([&](auto w0) {
+                        constexpr index_t accum_offset =
+                            accum_thread_desc_.CalculateOffset(make_tuple(h0, w0, k0, I0));
+                        constexpr index_t bias_offset =
+                            ds_thread_desc_[I0].CalculateOffset(make_tuple(I0, I0, I0));
+                        constexpr index_t scale_offset =
+                            ds_thread_desc_[I1].CalculateOffset(make_tuple(I0, I0, I0));
 
-                    BiasVec bias_ = *reinterpret_cast<const BiasVec*>(
-                        &(ds_thread_buf(I0)[Number<bias_offset>{}]));
-                    ScaleVec scale_ = *reinterpret_cast<const ScaleVec*>(
-                        &(ds_thread_buf(I1)[Number<scale_offset>{}]));
-                    BiasScaleVec bias_scale_;
+                        BiasVec bias_ = *reinterpret_cast<const BiasVec*>(
+                            &(ds_thread_buf(I0)[Number<bias_offset>{}]));
+                        ScaleVec scale_ = *reinterpret_cast<const ScaleVec*>(
+                            &(ds_thread_buf(I1)[Number<scale_offset>{}]));
+                        BiasScaleVec bias_scale_;
 
-                    if(std::is_same<float, AccDataType>::value)
-                    {
-                        if constexpr(scaleBiasPacked)
+                        if(std::is_same<float, AccDataType>::value)
                         {
-                            auto laneId = get_thread_local_1d_id() & (WaveSize - 1);
-                            if(laneId % 2)
+                            if constexpr(scaleBiasPacked)
                             {
-                                bias_ = *reinterpret_cast<const BiasVec*>(
+                                auto laneId = get_thread_local_1d_id() & (WaveSize - 1);
+                                if(laneId % 2)
+                                {
+                                    bias_ = *reinterpret_cast<const BiasVec*>(
+                                        &(ds_thread_buf(I1)[Number<scale_offset>{}]));
+                                }
+                                else
+                                {
+                                    bias_ = *reinterpret_cast<const BiasVec*>(
+                                        &(ds_thread_buf(I0)[Number<bias_offset>{}]));
+                                }
+                            }
+                        }
+                        else if(std::is_same<ck::half_t, AccDataType>::value ||
+                                std::is_same<ck::bhalf_t, AccDataType>::value)
+                        {
+                            if constexpr(scaleBiasPacked)
+                            {
+                                bias_scale_[0] = *reinterpret_cast<const AccDataType*>(
+                                    &(ds_thread_buf(I1)[Number<bias_offset>{}]));
+                                bias_scale_[1] = *reinterpret_cast<const AccDataType*>(
                                     &(ds_thread_buf(I1)[Number<scale_offset>{}]));
                             }
                             else
                             {
-                                bias_ = *reinterpret_cast<const BiasVec*>(
-                                    &(ds_thread_buf(I0)[Number<bias_offset>{}]));
+                                bias_scale_ = bias_;
                             }
                         }
-                    }
-                    else if(std::is_same<ck::half_t, AccDataType>::value ||
-                            std::is_same<ck::bhalf_t, AccDataType>::value)
-                    {
-                        if constexpr(scaleBiasPacked)
-                        {
-                            bias_scale_[0] = *reinterpret_cast<const AccDataType*>(
-                                &(ds_thread_buf(I1)[Number<bias_offset>{}]));
-                            bias_scale_[1] = *reinterpret_cast<const AccDataType*>(
-                                &(ds_thread_buf(I1)[Number<scale_offset>{}]));
-                        }
-                        else
-                        {
-                            bias_scale_ = bias_;
-                        }
-                    }
 
-                    if constexpr(std::is_same<float, AccDataType>::value)
-                    {
-                        accSbaInstance.sba_instr.Run(
-                            accum_thread_buf.GetVectorTypeReference(Number<accum_offset>{}),
-                            scale_,
-                            bias_,
-                            accum_thread_buf.GetVectorTypeReference(Number<accum_offset>{}));
-                    }
-                    else if constexpr(std::is_same<half_t, AccDataType>::value ||
-                                      std::is_same<bhalf_t, AccDataType>::value)
-                    {
-                        AccDataType halfScale_ = *reinterpret_cast<const AccDataType*>(
-                            &(ds_thread_buf(I1)[Number<scale_offset>{}]));
-                        if constexpr((HPerWconv == 4) && (WPerWconv == 2))
-                        {
-                            // 4xhalf for output of convolve
-                            // 4xhalf for input of sba/uba
-                            auto& c_vec =
-                                accum_thread_buf.GetVectorTypeReference(Number<accum_offset>{});
-                            if constexpr(std::is_same<half_t, AccDataType>::value)
-                            {
-                                half2_t& sba_uba_output0 =
-                                    c_vec.template AsType<half2_t>()(Number<0>{});
-                                half2_t& sba_uba_output1 =
-                                    c_vec.template AsType<half2_t>()(Number<1>{});
-                                accSbaInstance.sba_instr.Run(
-                                    accum_thread_buf.GetVectorTypeReference(Number<accum_offset>{}),
-                                    halfScale_,
-                                    bias_scale_,
-                                    sba_uba_output0,
-                                    sba_uba_output1);
-                            }
-                            else
-                            {
-                                bhalf2_t& sba_uba_output0 =
-                                    c_vec.template AsType<bhalf2_t>()(Number<0>{});
-                                bhalf2_t& sba_uba_output1 =
-                                    c_vec.template AsType<bhalf2_t>()(Number<1>{});
-                                accSbaInstance.sba_instr.Run(
-                                    accum_thread_buf.GetVectorTypeReference(Number<accum_offset>{}),
-                                    halfScale_,
-                                    bias_scale_,
-                                    sba_uba_output0,
-                                    sba_uba_output1);
-                            }
-                        }
-                        else
+                        if constexpr(std::is_same<float, AccDataType>::value)
                         {
                             accSbaInstance.sba_instr.Run(
                                 accum_thread_buf.GetVectorTypeReference(Number<accum_offset>{}),
-                                halfScale_,
-                                bias_scale_,
+                                scale_,
+                                bias_,
                                 accum_thread_buf.GetVectorTypeReference(Number<accum_offset>{}));
                         }
-                    }
+                        else if constexpr(std::is_same<half_t, AccDataType>::value ||
+                                          std::is_same<bhalf_t, AccDataType>::value)
+                        {
+                            AccDataType halfScale_ = *reinterpret_cast<const AccDataType*>(
+                                &(ds_thread_buf(I1)[Number<scale_offset>{}]));
+                            if constexpr((HPerWconv == 4) && (WPerWconv == 2))
+                            {
+                                // 4xhalf for output of convolve
+                                // 4xhalf for input of sba/uba
+                                auto& c_vec =
+                                    accum_thread_buf.GetVectorTypeReference(Number<accum_offset>{});
+                                if constexpr(std::is_same<half_t, AccDataType>::value)
+                                {
+                                    half2_t& sba_uba_output0 =
+                                        c_vec.template AsType<half2_t>()(Number<0>{});
+                                    half2_t& sba_uba_output1 =
+                                        c_vec.template AsType<half2_t>()(Number<1>{});
+                                    accSbaInstance.sba_instr.Run(
+                                        accum_thread_buf.GetVectorTypeReference(
+                                            Number<accum_offset>{}),
+                                        halfScale_,
+                                        bias_scale_,
+                                        sba_uba_output0,
+                                        sba_uba_output1);
+                                }
+                                else
+                                {
+                                    bhalf2_t& sba_uba_output0 =
+                                        c_vec.template AsType<bhalf2_t>()(Number<0>{});
+                                    bhalf2_t& sba_uba_output1 =
+                                        c_vec.template AsType<bhalf2_t>()(Number<1>{});
+                                    accSbaInstance.sba_instr.Run(
+                                        accum_thread_buf.GetVectorTypeReference(
+                                            Number<accum_offset>{}),
+                                        halfScale_,
+                                        bias_scale_,
+                                        sba_uba_output0,
+                                        sba_uba_output1);
+                                }
+                            }
+                            else
+                            {
+                                accSbaInstance.sba_instr.Run(
+                                    accum_thread_buf.GetVectorTypeReference(Number<accum_offset>{}),
+                                    halfScale_,
+                                    bias_scale_,
+                                    accum_thread_buf.GetVectorTypeReference(
+                                        Number<accum_offset>{}));
+                            }
+                        }
+                    });
                 });
-            });
+            }
         });
     };
 

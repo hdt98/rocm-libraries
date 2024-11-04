@@ -136,7 +136,8 @@ struct GridwiseConvPipeline_v1<1, true, true, true, false>
 
                 in_blockwise_copy.RunRead(in_grid_desc, in_grid_buf);
 
-                blockwise_conv.Run(wei_block_buf, in_block_buf, ds_block_buf, accum_thread_buf);
+                blockwise_conv.Run(
+                    wei_block_buf, in_block_buf, ds_block_buf, accum_thread_buf, false);
 
                 block_sync_lds();
 
@@ -162,7 +163,7 @@ struct GridwiseConvPipeline_v1<1, true, true, true, false>
         {
             block_sync_lds();
 
-            blockwise_conv.Run(wei_block_buf, in_block_buf, ds_block_buf, accum_thread_buf);
+            blockwise_conv.Run(wei_block_buf, in_block_buf, ds_block_buf, accum_thread_buf, true);
         }
     }
 };
@@ -286,7 +287,8 @@ struct GridwiseConvPipeline_v1<1, false, true, false, false>
                         .RunRead(wei_grid_desc, wei_grid_buf);
                 });
 
-                blockwise_conv.Run(wei_block_buf, in_block_buf, ds_block_buf, accum_thread_buf);
+                blockwise_conv.Run(
+                    wei_block_buf, in_block_buf, ds_block_buf, accum_thread_buf, false);
 
                 block_sync_lds();
 
@@ -311,7 +313,7 @@ struct GridwiseConvPipeline_v1<1, false, true, false, false>
         {
             block_sync_lds();
 
-            blockwise_conv.Run(wei_block_buf, in_block_buf, ds_block_buf, accum_thread_buf);
+            blockwise_conv.Run(wei_block_buf, in_block_buf, ds_block_buf, accum_thread_buf, true);
         }
     }
 };
@@ -437,7 +439,8 @@ struct GridwiseConvPipeline_v1<1, false, false, false, EnableAsync>
                                       in_block_origin_idx,
                                       in_block_buf_switch);
 
-                blockwise_conv.Run(wei_block_buf, in_block_buf, ds_block_buf, accum_thread_buf);
+                blockwise_conv.Run(
+                    wei_block_buf, in_block_buf, ds_block_buf, accum_thread_buf, false);
 
                 static_for<0, NumTap, 1>{}([&](auto i) {
                     const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[i])
@@ -454,7 +457,7 @@ struct GridwiseConvPipeline_v1<1, false, false, false, EnableAsync>
 
         // tail
         {
-            blockwise_conv.Run(wei_block_buf, in_block_buf, ds_block_buf, accum_thread_buf);
+            blockwise_conv.Run(wei_block_buf, in_block_buf, ds_block_buf, accum_thread_buf, true);
         }
     }
 };
@@ -579,7 +582,8 @@ struct GridwiseConvPipeline_v1<1, true, false, true, false>
 
                 in_blockwise_copy.RunRead(in_grid_desc, in_grid_buf);
 
-                blockwise_conv.Run(wei_block_buf, in_block_buf, ds_block_buf, accum_thread_buf);
+                blockwise_conv.Run(
+                    wei_block_buf, in_block_buf, ds_block_buf, accum_thread_buf, false);
 
                 block_sync_lds();
 
@@ -601,7 +605,7 @@ struct GridwiseConvPipeline_v1<1, true, false, true, false>
         {
             block_sync_lds();
 
-            blockwise_conv.Run(wei_block_buf, in_block_buf, ds_block_buf, accum_thread_buf);
+            blockwise_conv.Run(wei_block_buf, in_block_buf, ds_block_buf, accum_thread_buf, true);
         }
     }
 };
@@ -706,7 +710,8 @@ struct GridwiseConvPipeline_v1<1, true, true, true, true>
                 // do convolution
                 block_sync_lds_async_load();
 
-                blockwise_conv.Run(wei_block_buf, in_block_buf, ds_block_buf, accum_thread_buf);
+                blockwise_conv.Run(
+                    wei_block_buf, in_block_buf, ds_block_buf, accum_thread_buf, false);
 
                 block_sync_lds();
 
@@ -733,7 +738,7 @@ struct GridwiseConvPipeline_v1<1, true, true, true, true>
         {
             block_sync_lds_async_load();
 
-            blockwise_conv.Run(wei_block_buf, in_block_buf, ds_block_buf, accum_thread_buf);
+            blockwise_conv.Run(wei_block_buf, in_block_buf, ds_block_buf, accum_thread_buf, true);
         }
     }
 };
@@ -847,7 +852,8 @@ struct GridwiseConvPipeline_v1<1, false, true, false, true>
                                       in_block_buf_switch);
                 in_blockwise_copy.MoveSrcSliceWindow(in_grid_desc, in_block_copy_step);
 
-                blockwise_conv.Run(wei_block_buf, in_block_buf, ds_block_buf, accum_thread_buf);
+                blockwise_conv.Run(
+                    wei_block_buf, in_block_buf, ds_block_buf, accum_thread_buf, false);
 
                 block_sync_lds();
 
@@ -871,7 +877,7 @@ struct GridwiseConvPipeline_v1<1, false, true, false, true>
         {
             block_sync_lds_async_load();
 
-            blockwise_conv.Run(wei_block_buf, in_block_buf, ds_block_buf, accum_thread_buf);
+            blockwise_conv.Run(wei_block_buf, in_block_buf, ds_block_buf, accum_thread_buf, true);
         }
     }
 };
@@ -992,7 +998,8 @@ struct GridwiseConvPipeline_v1<1, true, false, true, true>
                         .MoveSrcSliceWindow(wei_grid_desc, wei_block_copy_step);
                 });
 
-                blockwise_conv.Run(wei_block_buf, in_block_buf, ds_block_buf, accum_thread_buf);
+                blockwise_conv.Run(
+                    wei_block_buf, in_block_buf, ds_block_buf, accum_thread_buf, false);
 
                 wei_block_buf = wei_block_buf_switch;
 
@@ -1010,7 +1017,7 @@ struct GridwiseConvPipeline_v1<1, true, false, true, true>
         {
             block_sync_lds();
 
-            blockwise_conv.Run(wei_block_buf, in_block_buf, ds_block_buf, accum_thread_buf);
+            blockwise_conv.Run(wei_block_buf, in_block_buf, ds_block_buf, accum_thread_buf, true);
         }
     }
 };

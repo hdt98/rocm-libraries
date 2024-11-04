@@ -357,7 +357,7 @@ struct MultiplyAddRelu
     {
         const float x = c * d0 + d1;
 
-        Relu{}.template operator()<float>(e, x);
+        Relu{}.operator()(e, x);
     }
 
     template <>
@@ -367,7 +367,7 @@ struct MultiplyAddRelu
         const float x = type_convert<float>(c) * type_convert<float>(d0) + type_convert<float>(d1);
 
         float result = 0;
-        Relu{}.template operator()<float>(result, x);
+        Relu{}.operator()(result, x);
 
         e = type_convert<half_t>(result);
     }
@@ -379,7 +379,7 @@ struct MultiplyAddRelu
         const float x = type_convert<float>(c) * type_convert<float>(d0) + type_convert<float>(d1);
 
         float result = 0;
-        Relu{}.template operator()<float>(result, x);
+        Relu{}.operator()(result, x);
 
         e = type_convert<bhalf_t>(result);
     }
@@ -391,7 +391,7 @@ struct MultiplyAddRelu
         const half_t x = c * type_convert<half_t>(d0) + type_convert<half_t>(d1);
 
         half_t result = 0;
-        Relu{}.template operator()<half_t>(result, x);
+        Relu{}.operator()(result, x);
 
         e = type_convert<half_t>(result);
     }

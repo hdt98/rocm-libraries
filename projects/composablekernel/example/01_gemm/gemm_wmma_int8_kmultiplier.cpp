@@ -74,6 +74,17 @@ using DeviceGemmInstance = ck::tensor_operation::device::DeviceGemmWmma_GFX13
 using ReferenceGemmInstance = ck::tensor_operation::host::
     ReferenceGemm<ADataType, BDataType, CDataType, AccDataType, AElementOp, BElementOp, CElementOp>;
 
+using ReferenceGemmInstanceGPU = ck::tensor_operation::device::ReferenceGemm<ALayout,
+                                                                             BLayout,
+                                                                             CLayout,
+                                                                             ADataType,
+                                                                             BDataType,
+                                                                             CDataType,
+                                                                             AccDataType,
+                                                                             AElementOp,
+                                                                             BElementOp,
+                                                                             CElementOp>;
+
 #include "run_gemm_example.inc"
 
 int main(int argc, char* argv[]) { return !run_gemm_example(argc, argv); }

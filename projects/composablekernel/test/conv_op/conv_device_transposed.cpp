@@ -476,7 +476,7 @@ bool run_test()
     constexpr bool AccEnableLds = LdsMode & 4 ? true : false;
     constexpr bool EnableAsync  = LdsMode & 8 ? true : false;
 
-    ck::utils::conv::ConvParam conv_param{n_dim,
+    ck::utils::conv::ConvParam conv_param(n_dim,
                                           group_count,
                                           n_batch,
                                           n_out_channels,
@@ -487,7 +487,7 @@ bool run_test()
                                           dilations,
                                           left_pads,
                                           right_pads,
-                                          true};
+                                          true);
 
     constexpr auto NDimSpatial = ck::Number<n_dim>{};
     const auto in_element_op   = InElementOp{};

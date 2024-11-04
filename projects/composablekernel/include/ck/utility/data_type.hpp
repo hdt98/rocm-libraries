@@ -37,7 +37,7 @@ inline constexpr bool is_native_type()
     return is_same<T, double>::value || is_same<T, float>::value || is_same<T, half_t>::value ||
            is_same<T, bhalf_t>::value || is_same<T, int32_t>::value || is_same<T, int8_t>::value ||
            is_same<T, uint8_t>::value || is_same<T, f8_t>::value || is_same<T, bf8_t>::value ||
-           is_same<T, bool>::value;
+           is_same<T, bool>::value || is_same<T, __bf16>::value || is_same<T, __fp16>::value;
 }
 
 // vector_type

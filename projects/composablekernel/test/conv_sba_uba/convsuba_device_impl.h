@@ -762,9 +762,9 @@ bool run_test()
 
     std::cout <<
 #if ENABLE_WAVEGROUP
-        "conv_device_wavegroup<In/Wei:"
+        "conv_sba_uba_device_wavegroup<In/Wei:"
 #else
-        "conv_device<In/Wei:"
+        "conv_sba_uba_device<In/Wei:"
 #endif
               << get_string<InDataType>() << ", Out:" << get_string<GPUAccType>() << ", "
               << get_string(Shape) << ", " << get_string(Filter) << ", Dilation:" << DilationSize
@@ -842,20 +842,6 @@ bool run_test_fmt()
 #endif
 
     // clang-format off
-    // fail cases
-    /*
-    conv_device<In/Wei:half_t, Out:float, Shape_4x2, Filter_3X3, Dilation:1, LdsMod:0, WaveGroup:0, Id : 0x20001 Size: { 40x40x40x10 }>: Status: Failed
-    conv_device < In / Wei : half_t, Out : float, Shape_4x2, Filter_3X3, Dilation : 2, LdsMod : 0, WaveGroup : 0, Id : 0x40001 Size : { 40x40x40x10 } > : Status: Failed
-    conv_device < In / Wei : bhalf_t, Out : float, Shape_4x2, Filter_3X3, Dilation : 1, LdsMod : 0, WaveGroup : 0, Id : 0x20002 Size : { 40x40x40x10 } > : Status: Failed
-    conv_device < In / Wei : bhalf_t, Out : float, Shape_4x2, Filter_3X3, Dilation : 2, LdsMod : 0, WaveGroup : 0, Id : 0x40002 Size : { 40x40x40x10 } > : Status: Failed
-    conv_device < In / Wei : int8_t, Out : half_t, Shape_8x4, Filter_3X3, Dilation : 1, LdsMod : 9, WaveGroup : 0, Id : 0x40000400 Size : { 40x40x40x10 } > : Status: Failed
-    conv_device_wavegroup < In / Wei : half_t, Out : float, Shape_4x2, Filter_3X3, Dilation : 1, LdsMod : 0, WaveGroup : 1, Id : 0x20001 Size : { 40x40x10x10 } > : Status: Failed
-    conv_device_wavegroup < In / Wei : half_t, Out : float, Shape_4x2, Filter_3X3, Dilation : 2, LdsMod : 0, WaveGroup : 1, Id : 0x40001 Size : { 40x40x10x10 } > : Status: Failed
-    conv_device_wavegroup < In / Wei : bhalf_t, Out : float, Shape_4x2, Filter_3X3, Dilation : 1, LdsMod : 0, WaveGroup : 1, Id : 0x20002 Size : { 40x40x10x10 } > : Status: Failed
-    conv_device_wavegroup < In / Wei : bhalf_t, Out : float, Shape_4x2, Filter_3X3, Dilation : 2, LdsMod : 0, WaveGroup : 1, Id : 0x40002 Size : { 40x40x10x10 } > : Status: Failed
-    conv_device_wavegroup < In / Wei : half_t, Out : half_t, Shape_4x2, Filter_3X3, Dilation : 1, LdsMod : 0, WaveGroup : 1, Id : 0x80040 Size : { 40x40x10x10 } > : Status: Failed
-    conv_device_wavegroup < In / Wei : half_t, Out : half_t, Shape_4x2, Filter_3X3, Dilation : 2, LdsMod : 0, WaveGroup : 1, Id : 0x400040 Size : { 40x40x10x10 } > : Status: Failed
-    */
     //                                                           |ShapeType  |FilterType |Dilation |Lds |WaveGroup |activeFun | AccElementOp | scaleBiasPacked | uniformScale | TestMask
     if constexpr(std::is_same<GPUAccType, float>::value)
     {

@@ -246,7 +246,8 @@ struct GridwiseConvPipeline_v2
                 {
                     semaLds.template wait<0>();
                     semaLoad.template wait<0>();
-                    blockwise_conv.Run(wei_block_buf, in_block_buf, ds_block_buf, accum_thread_buf);
+                    blockwise_conv.Run(
+                        wei_block_buf, in_block_buf, ds_block_buf, accum_thread_buf, false);
                     if constexpr(InDataEnableLds == false)
                     {
                         in_block_buf.SwitchBuffer();
@@ -312,7 +313,8 @@ struct GridwiseConvPipeline_v2
             {
                 semaLds.template wait<0>();
                 semaLoad.template wait<0>();
-                blockwise_conv.Run(wei_block_buf, in_block_buf, ds_block_buf, accum_thread_buf);
+                blockwise_conv.Run(
+                    wei_block_buf, in_block_buf, ds_block_buf, accum_thread_buf, true);
             }
         }
     }
@@ -476,7 +478,8 @@ struct GridwiseConvPipeline_v2<1, false, false, false, EnableAsync>
                 if(get_wave_id_in_wavegroup() == 1)
                 {
                     semaLoad.template wait<0>();
-                    blockwise_conv.Run(wei_block_buf, in_block_buf, ds_block_buf, accum_thread_buf);
+                    blockwise_conv.Run(
+                        wei_block_buf, in_block_buf, ds_block_buf, accum_thread_buf, false);
                     in_block_buf.SwitchBuffer();
                     wei_block_buf.SwitchBuffer();
                     semaRun.template signal<0>();
@@ -492,7 +495,8 @@ struct GridwiseConvPipeline_v2<1, false, false, false, EnableAsync>
             {
                 semaLoad.template wait<0>();
                 __builtin_amdgcn_fence(__ATOMIC_ACQUIRE, "workgroup", "global");
-                blockwise_conv.Run(wei_block_buf, in_block_buf, ds_block_buf, accum_thread_buf);
+                blockwise_conv.Run(
+                    wei_block_buf, in_block_buf, ds_block_buf, accum_thread_buf, true);
             }
         }
     }
@@ -636,7 +640,8 @@ struct GridwiseConvPipeline_v2<1, true, true, true, EnableAsync>
                 if(get_wave_id_in_wavegroup() == 1)
                 {
                     semaLds.template wait<0>();
-                    blockwise_conv.Run(wei_block_buf, in_block_buf, ds_block_buf, accum_thread_buf);
+                    blockwise_conv.Run(
+                        wei_block_buf, in_block_buf, ds_block_buf, accum_thread_buf, false);
                     semaRun.template signal<0>();
                 }
                 ++i;
@@ -718,7 +723,8 @@ struct GridwiseConvPipeline_v2<1, true, true, true, EnableAsync>
             if(get_wave_id_in_wavegroup() == 1)
             {
                 semaLds.template wait<0>();
-                blockwise_conv.Run(wei_block_buf, in_block_buf, ds_block_buf, accum_thread_buf);
+                blockwise_conv.Run(
+                    wei_block_buf, in_block_buf, ds_block_buf, accum_thread_buf, true);
             }
         }
     }
