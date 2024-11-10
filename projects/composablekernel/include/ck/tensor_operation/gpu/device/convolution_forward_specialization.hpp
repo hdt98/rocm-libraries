@@ -33,6 +33,10 @@ inline std::string getConvForwardSpecializationString(const ConvolutionForwardSp
     case ConvolutionForwardSpecialization::Filter3x3: return "Filter3x3";
     case ConvolutionForwardSpecialization::Filter3x3Stride1Pad0: return "Filter3x3Stride1Pad0";
     case ConvolutionForwardSpecialization::Filter2x2Stride2Pad0: return "Filter2x2Stride2Pad0";
+    case ConvolutionForwardSpecialization::Filter3x3Stride1MultiLayerPad0:
+        return "Filter3x3Stride1MultiLayerPad0";
+    case ConvolutionForwardSpecialization::Filter2x2Stride2OddHWPad0:
+        return "Filter2x2Stride2OddHWPad0";
     default: return "Unrecognized specialization!";
     }
 }

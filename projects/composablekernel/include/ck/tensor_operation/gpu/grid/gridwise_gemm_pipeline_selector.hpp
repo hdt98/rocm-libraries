@@ -72,6 +72,7 @@ inline std::ostream& operator<<(std::ostream& os, const ck::PipelineVersion& p)
     case ck::PipelineVersion::v1: os << "PipelineVersion::v1"; break;
     case ck::PipelineVersion::v2: os << "PipelineVersion::v2"; break;
     case ck::PipelineVersion::v4: os << "PipelineVersion::v4"; break;
+    case ck::PipelineVersion::v5: os << "PipelineVersion::v5"; break;
     case ck::PipelineVersion::weight_only: os << "PipelineVersion::weight_only"; break;
     default: os << "";
     }

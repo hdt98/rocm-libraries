@@ -595,7 +595,7 @@ static inline __host__ __device__ typename DstT::type_t convertFromFp32(float x)
     float nearest_abs_x;
     // for nonzero and less than absmin_nonzero_dst or greater than absmax_dst, round to nearest dst
     // value
-    if(abs_x != 0 && abs_x < absmin_nonzero_dst)
+    if(abs_x > 0 && abs_x < absmin_nonzero_dst)
     {
         nearest_abs_x = abs_x < (absmin_nonzero_dst / 2.0) ? 0 : absmin_nonzero_dst;
     }
@@ -608,7 +608,7 @@ static inline __host__ __device__ typename DstT::type_t convertFromFp32(float x)
         nearest_abs_x = abs_x;
     }
     float nearest_x        = x > 0 ? nearest_abs_x : -nearest_abs_x;
-    int32_t source_promote = *(int32_t*)&nearest_x;
+    int32_t source_promote = bit_cast<int32_t>(nearest_x);
     int sign_bit           = source_promote >> 31;
     int exp_bit            = (source_promote & 0x7fffffff) >> mantissa_nbits_fp32;
     int mant_bit           = source_promote & ((1 << mantissa_nbits_fp32) - 1);

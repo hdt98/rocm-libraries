@@ -3043,9 +3043,9 @@ struct MxType_t<MTX_FMT::MTX_FMT_FP4_E2M1> : public MxType_t<MTX_FMT::MTX_FMT_DE
     static std::vector<type_t> compact_to_raw(const std::vector<type_t>& in)
     {
         std::vector<type_t> in_packed;
-        std::size_t vec_size = in.size();
-        in_packed.reserve(vec_size);
-        for(std::size_t i = 0; i < vec_size; i += 2)
+        std::size_t in_vec_size = in.size();
+        in_packed.reserve(in_vec_size);
+        for(std::size_t i = 0; i < in_vec_size; i += 2)
         {
             type_t val0       = in[i];
             type_t val1       = in[i + 1];
@@ -3069,10 +3069,10 @@ struct MxType_t<MTX_FMT::MTX_FMT_FP6_E3M2> : public MxType_t<MTX_FMT::MTX_FMT_DE
     static std::vector<type_t> compact_to_raw(const std::vector<type_t>& in)
     {
         std::vector<type_t> in_packed;
-        std::size_t vec_size = in.size();
-        in_packed.reserve(vec_size);
+        std::size_t in_vec_size = in.size();
+        in_packed.reserve(in_vec_size);
         std::size_t index = 0;
-        for(std::size_t i = 0; i < vec_size; i += 4)
+        for(std::size_t i = 0; i < in_vec_size; i += 4)
         {
             type_t val0        = in[i];
             type_t val1        = in[i + 1];

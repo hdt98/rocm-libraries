@@ -63,7 +63,8 @@ if(WIN32)
             -Wno-suggest-destructor-override
             -Wno-suggest-override
             -Wno-nonportable-system-include-path
-            -Wno-language-extension-token)
+            -Wno-language-extension-token
+            -DGTEST_HAS_SEH=0)
 endif()
 
 target_compile_options(gtest PRIVATE ${GTEST_CXX_FLAGS})

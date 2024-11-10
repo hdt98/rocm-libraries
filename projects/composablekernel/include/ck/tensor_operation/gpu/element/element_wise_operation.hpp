@@ -411,7 +411,7 @@ struct MultiplyAddTanh
     {
         const float x = c * d0 + d1;
 
-        e = std::fmin((float)1.0, std::fmax((float)-1.0, x));
+        e = std::fmin(1.0f, std::fmax(-1.0f, x));
     }
 
     template <>
@@ -420,7 +420,7 @@ struct MultiplyAddTanh
     {
         const float x = type_convert<float>(c) * type_convert<float>(d0) + type_convert<float>(d1);
 
-        e = type_convert<half_t>(std::fmin((float)1.0, std::fmax((float)-1.0, x)));
+        e = type_convert<half_t>(std::fmin(1.0f, std::fmax(-1.0f, x)));
     }
 
     template <>
@@ -429,7 +429,7 @@ struct MultiplyAddTanh
     {
         const float x = type_convert<float>(c) * type_convert<float>(d0) + type_convert<float>(d1);
 
-        e = type_convert<bhalf_t>(std::fmin((float)1.0, std::fmax((float)-1.0, x)));
+        e = type_convert<bhalf_t>(std::fmin(1.0f, std::fmax(-1.0f, x)));
     }
 
     template <>
@@ -438,7 +438,7 @@ struct MultiplyAddTanh
     {
         const half_t x = c * type_convert<half_t>(d0) + type_convert<half_t>(d1);
 
-        e = type_convert<half_t>(std::fmin((float)1.0, std::fmax((float)-1.0, x)));
+        e = type_convert<half_t>(std::fmin(1.0f, std::fmax(-1.0f, x)));
     }
 };
 

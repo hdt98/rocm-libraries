@@ -97,7 +97,6 @@ struct ThreadwiseTensorSliceTransfer_v1r3
         static_assert(DstScalarPerVector == SpaceFillingCurve::ScalarPerVector,
                       "wrong!DstScalarPerVector != SpaceFillingCurve::ScalarPerVector");
         typename vector_type_maker<DstData, DstScalarPerVector>::type dst_vector;
-        using dst_vector_t = typename vector_type_maker<DstData, DstScalarPerVector>::type::type;
 
         constexpr auto num_access = SpaceFillingCurve::GetNumOfAccess();
 
@@ -117,14 +116,13 @@ struct ThreadwiseTensorSliceTransfer_v1r3
                 dst_vector.template AsType<DstData>()(i) = v;
             });
 
-            const bool is_dst_valid =
-                coordinate_has_valid_offset_assuming_visible_index_is_valid(dst_desc, dst_coord_);
-
 #ifdef __HIP_DEVICE_COMPILE__
+            using dst_vector_t =
+                typename vector_type_maker<DstData, DstScalarPerVector>::type::type;
             // copy data from dst_vector into dst_buf
             dst_buf.template Update<DstInMemOp, dst_vector_t>(
                 dst_coord_.GetOffset(),
-                is_dst_valid,
+                coordinate_has_valid_offset_assuming_visible_index_is_valid(dst_desc, dst_coord_),
                 dst_vector.template AsType<dst_vector_t>()[Number<0>{}]);
 #endif
 

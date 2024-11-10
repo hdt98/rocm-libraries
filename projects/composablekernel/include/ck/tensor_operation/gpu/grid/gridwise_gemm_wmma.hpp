@@ -1488,8 +1488,7 @@ struct GridwiseGemm_Wmma_GFX13
         constexpr auto a_block_desc = [&]() {
             if constexpr(AEnableLds)
             {
-                constexpr auto K0PerBlock    = AKPerBlock / ABlockTransferSrcScalarPerVector;
-                constexpr auto max_lds_align = ABlockTransferSrcScalarPerVector;
+                constexpr auto K0PerBlock = AKPerBlock / ABlockTransferSrcScalarPerVector;
                 // WARNING: gfx13 has changed to M->K0->K1{ABlockTransferSrcScalarPerVector} Per
                 // Block; which means first go K dimension, then M dimension
                 if constexpr(ABlockLdsExtraM)
@@ -1541,8 +1540,7 @@ struct GridwiseGemm_Wmma_GFX13
             if constexpr(BEnableLds)
             {
                 // WARNING: gfx13 has changed to N->K0->K1 Per Block
-                constexpr auto K0PerBlock    = BKPerBlock / BBlockTransferSrcScalarPerVector;
-                constexpr auto max_lds_align = BBlockTransferSrcScalarPerVector;
+                constexpr auto K0PerBlock = BKPerBlock / BBlockTransferSrcScalarPerVector;
                 if constexpr(BBlockLdsExtraN)
                 {
                     return make_naive_tensor_descriptor(
@@ -1591,8 +1589,7 @@ struct GridwiseGemm_Wmma_GFX13
         constexpr auto a_block_desc = [&]() {
             if constexpr(AEnableLds)
             {
-                constexpr auto K0PerBlock    = AKPerBlock / K1Value;
-                constexpr auto max_lds_align = K1Value;
+                constexpr auto K0PerBlock = AKPerBlock / K1Value;
                 // WARNING: gfx13 has changed to M->K0->K1{ABlockTransferSrcScalarPerVector} Per
                 // Block; which means first go K dimension, then M dimension
                 if constexpr(ABlockLdsExtraM)
@@ -1642,8 +1639,7 @@ struct GridwiseGemm_Wmma_GFX13
             if constexpr(BEnableLds)
             {
                 // WARNING: gfx13 has changed to N->K0->K1 Per Block
-                constexpr auto K0PerBlock    = BKPerBlock / K1Value;
-                constexpr auto max_lds_align = K1Value;
+                constexpr auto K0PerBlock = BKPerBlock / K1Value;
                 if constexpr(BBlockLdsExtraN)
                 {
                     return make_naive_tensor_descriptor(

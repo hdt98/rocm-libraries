@@ -492,9 +492,9 @@ __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
     using srcB_vec_type = srcB_vec::type;
 
     // cast to int32_t
-    const srcA_cast_type* a_ptr = (const srcA_cast_type*)a;
+    const srcA_cast_type* a_ptr = reinterpret_cast<const srcA_cast_type*>(a);
     // cast to same type as A because of the data type of lds
-    const srcA_cast_type* b_ptr = (const srcA_cast_type*)b;
+    const srcA_cast_type* b_ptr = reinterpret_cast<const srcA_cast_type*>(b);
 
     // ToIntDim is used to check how many elements to merge into one int32_t type
     constexpr int ToIntDim    = WMMAVecType<srcA_t, kMultiplier>::ToIntDim;
@@ -550,7 +550,8 @@ __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
     " ::);
     static constexpr auto I0          = Number<0>{};
     const srcA_cast_type* local_a_ptr = p_shared;
-    const srcB_cast_type* local_b_ptr = (const srcB_cast_type*)(p_shared + LDS_B_START);
+    const srcB_cast_type* local_b_ptr =
+        reinterpret_cast<const srcB_cast_type*>(p_shared + LDS_B_START);
     int start_idx = ((lIdx >> 1) * ROW_SIZE) + (lIdx & 1); // this is int32_t's offset
     static_for<0, SRC_DIM, 1>{}([&](auto ele) {
         int index                                     = start_idx + (ele << 1);
@@ -622,8 +623,8 @@ __global__ void matmul_swizzle_a(const srcA_t* a, const srcB_t* b, dst_t* c)
     using dst_vec = StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr, dst_t, 1, 8, true>;
     dst_vec dst_thread_buf_;
 
-    const srcA_cast_type* vgpr_a_ptr = (const srcA_cast_type*)(a);
-    const srcB_cast_type* vgpr_b_ptr = (const srcB_cast_type*)(b);
+    const srcA_cast_type* vgpr_a_ptr = reinterpret_cast<const srcA_cast_type*>(a);
+    const srcB_cast_type* vgpr_b_ptr = reinterpret_cast<const srcB_cast_type*>(b);
 
     int start_idx = ((lIdx >> 1) * SRC_DIM_STRIDE) + (lIdx & 1); // this is int32_t's offset
 
@@ -697,8 +698,8 @@ __global__ void matmul_mixedfp(const typename src0_t::type_t* a,
     using acc_vec   = StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr, acc_t, 1, 8, true>;
     acc_vec c_thread_buf_;
     // cast to int32
-    const int32_t* vgpr_a_ptr = (const int32_t*)(a);
-    const int32_t* vgpr_b_ptr = (const int32_t*)(b);
+    const int32_t* vgpr_a_ptr = reinterpret_cast<const int32_t*>(a);
+    const int32_t* vgpr_b_ptr = reinterpret_cast<const int32_t*>(b);
     int a_start_idx =
         ((lIdx >> 1) * src0_t::dwords_per_wmmak) + (lIdx & 1); // this is int32_t's offset
     for(int ele = 0; ele < src0_t::vec_size; ele++)

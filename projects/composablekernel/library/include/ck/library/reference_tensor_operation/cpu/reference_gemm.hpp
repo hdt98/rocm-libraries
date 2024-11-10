@@ -230,7 +230,7 @@ struct ReferenceScaleBlockGemm : public device::BaseOperator
                 default: break;
                 }
 
-                uint32_t vgpr_data = (uint32_t)(v_scale[lane]);
+                uint32_t vgpr_data = static_cast<uint32_t>(v_scale[lane]);
                 scales[0]          = powf(2, int32_t((vgpr_data >> bit_offset) & 0xff) - 127);
                 scales[1]          = powf(2, int32_t((vgpr_data >> (bit_offset + 8)) & 0xff) - 127);
                 return scales;
