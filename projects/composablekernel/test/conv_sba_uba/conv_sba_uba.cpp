@@ -34,7 +34,7 @@ using OutElementTanhOp = ck::tensor_operation::element_wise::MultiplyAddTanh;
 //#define ENABLE_FULL_TEST 1
 //
 // #define USE_ABSOLUTE_SIZE 1
-#if USE_ABSOLUTE_SIZE
+#ifdef USE_ABSOLUTE_SIZE
 #define DEFAULT_K 16
 #define DEFAULT_C 32
 #define DEFAULT_W 8
@@ -65,7 +65,8 @@ namespace ck {
 namespace conv_op_util {
 
 #define LOAD_DATA_PER_TILE 0
-
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wundefined-reinterpret-cast"
 template <typename InDataType,
           typename WeiDataType,
           typename AccDataType,
@@ -84,7 +85,7 @@ template <typename InDataType,
 __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
     conv_fwd(const InDataType* in_,
              const WeiDataType* wei_,
-             AccDataType* c,
+             AccDataType* c_,
              AccDataType* scale_,
              AccDataType* bias_)
 {
@@ -115,7 +116,7 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
     constexpr index_t WRepeat = Width / WPerWconv;
     constexpr index_t CRepeat = UnpackedInputChannels / wconvConv.GetUnpackedNumInputChannels();
     constexpr index_t KRepeat = UnpackedOutputChannels / wconvConv.GetUnpackedNumOutputChannels();
-#if LOAD_DATA_PER_TILE
+#ifdef LOAD_DATA_PER_TILE
     constexpr index_t AccVectorCount = 1;
 #else
     constexpr index_t AccVectorCount = HRepeat * WRepeat * KRepeat;
@@ -133,7 +134,7 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
                                              true>;
 
     const int lIdx = threadIdx.x;
-#if !LOAD_DATA_PER_TILE
+#if !defined(LOAD_DATA_PER_TILE)
     InDataVec inData[HRepeat * WRepeat * CRepeat] = {};
     AccVec c_thread_buf_                          = {};
 #endif
@@ -173,13 +174,14 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
 
             static_for<0, wconvConv.GetNumImageSubTilesInVertical(), 1>{}([&](auto tileId) {
                 inData.template AsType<InDataTileVec>()(Number<tileId>{}) =
-                    *(const InDataTileVec*)(in + offset + tileId * DataTileHeight * data_H_stride);
+                    *reinterpret_cast<const InDataTileVec*>(
+                        in + offset + tileId * DataTileHeight * data_H_stride);
             });
             return inData.template AsType<InDataVec>()(Number<0>{});
         }
         else
         {
-            return *(const InDataVec*)(in + offset);
+            return *reinterpret_cast<const InDataVec*>(in + offset);
         }
     };
 
@@ -193,7 +195,7 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
             const index_t offset = (h * HPerWconv + subH) * acc_H_stride +
                                    (w * WPerWconv + subW) * acc_W_stride +
                                    (k * acc_K_stride + subK);
-            *(typename AccDataVec::type*)(c + offset) =
+            *reinterpret_cast<typename AccDataVec::type*>(c_ + offset) =
                 c_vec.template AsType<typename AccDataVec::type>()(Number<0>{});
         }
         else
@@ -213,14 +215,14 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
                 secOffset = HPerWconv / wconvConv.GetNumSubTilesPerImageTile() * acc_H_stride;
             }
             const index_t swizzleOffset = (lIdx & 1) * 4;
-            *(AccSwizzleVec*)(c + offset + swizzleOffset) =
+            *reinterpret_cast<AccSwizzleVec*>(c_ + offset + swizzleOffset) =
                 c_vec.template AsType<AccSwizzleVec>()(Number<0>{});
-            *(AccSwizzleVec*)(c + offset + swizzleOffset + secOffset) =
+            *reinterpret_cast<AccSwizzleVec*>(c_ + offset + swizzleOffset + secOffset) =
                 c_vec.template AsType<AccSwizzleVec>()(Number<1>{});
         }
     };
 
-#if !LOAD_DATA_PER_TILE
+#if !defined(LOAD_DATA_PER_TILE)
     static_for<0, HRepeat, 1>{}([&](auto h) {
         static_for<0, WRepeat, 1>{}([&](auto w) {
             static_for<0, CRepeat, 1>{}([&](auto c) {
@@ -251,7 +253,7 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
                 static_assert(HPerWconv == 8 && WPerWconv == 4, "unexpected shape!");
                 if(weiCompIdx < wconvConv.GetNumInputChannels() * wconvConv.GetNumOutputChannels())
                 {
-                    weiData[tileOffset] = *(const WeiDataVec*)(wei + offset);
+                    weiData[tileOffset] = *reinterpret_cast<const WeiDataVec*>(wei + offset);
                 }
             }
             else if constexpr(numWeightTile == 2)
@@ -262,10 +264,11 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
                 const index_t offsetBase =
                     offset + (lIdx % 2) * wconvConv.GetNumWeightComponents() / 2;
                 weiDataTmp.template AsType<WeiDataTileVec>()(Number<0>{}) =
-                    *(const WeiDataTileVec*)(wei + offsetBase);
+                    *reinterpret_cast<const WeiDataTileVec*>(wei + offsetBase);
 
                 weiDataTmp.template AsType<WeiDataTileVec>()(Number<1>{}) =
-                    *(const WeiDataTileVec*)(wei + offsetBase + wconvConv.GetNumWeightComponents());
+                    *reinterpret_cast<const WeiDataTileVec*>(wei + offsetBase +
+                                                             wconvConv.GetNumWeightComponents());
 
                 weiData[tileOffset] = weiDataTmp.template AsType<WeiDataVec>()(Number<0>{});
             }
@@ -273,7 +276,7 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
             {
                 // shape 4x4
                 static_assert(numWeightTile == 1, "");
-                weiData[tileOffset] = *(const WeiDataVec*)(wei + offset);
+                weiData[tileOffset] = *reinterpret_cast<const WeiDataVec*>(wei + offset);
             }
         });
     });
@@ -288,17 +291,17 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
                 offset = lIdx / 2;
                 if(lIdx % 2)
                 {
-                    return *(const AccDataType*)(scale_ + offset);
+                    return *reinterpret_cast<const AccDataType*>(scale_ + offset);
                 }
                 else
                 {
-                    return *(const AccDataType*)(bias_ + offset);
+                    return *reinterpret_cast<const AccDataType*>(bias_ + offset);
                 }
             }
             else
             {
                 offset = lIdx;
-                return *(const AccDataType*)(bias_ + offset);
+                return *reinterpret_cast<const AccDataType*>(bias_ + offset);
             }
         }
     };
@@ -312,8 +315,8 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
             {
                 // workaround for load_16bit is incorrect in ffm currently.
                 index_t offset         = lIdx;
-                int scale_data         = *(const int*)(scale_ + offset);
-                int bias_data          = *(const int*)(bias_ + offset);
+                int scale_data         = *reinterpret_cast<const int*>(scale_ + offset);
+                int bias_data          = *reinterpret_cast<const int*>(bias_ + offset);
                 int scale_bias         = (((scale_data & 0xffff) << 16) | (bias_data & 0xffff));
                 bias_16bit_unpack_data = bit_cast<vector_type<AccDataType, 2>>(scale_bias);
             }
@@ -321,9 +324,9 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
             {
                 index_t offset = lIdx * 2;
                 bias_16bit_unpack_data.template AsType<AccDataType>()(Number<0>{}) =
-                    *(const AccDataType*)(bias_ + offset);
+                    *reinterpret_cast<const AccDataType*>(bias_ + offset);
                 bias_16bit_unpack_data.template AsType<AccDataType>()(Number<1>{}) =
-                    *(const AccDataType*)(bias_ + offset + 1);
+                    *reinterpret_cast<const AccDataType*>(bias_ + offset + 1);
             }
         }
         return bias_16bit_unpack_data;
@@ -344,14 +347,14 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
             // workaround for 16bit by load_global_b32 and bitOp
             bias_16bit_data[tileOffset] = load_bias_16bit_data();
             // uniform scale
-            scale_data[tileOffset] =
-                bit_cast<AccDataType>(type_convert<ushort>((*(const int*)(scale_)&0xffff)));
+            scale_data[tileOffset] = bit_cast<AccDataType>(
+                type_convert<ushort>((*reinterpret_cast<const int*>(scale_) & 0xffff)));
         }
         else if constexpr(std::is_same<float, AccDataType>::value)
         {
             bias_32bit_data[tileOffset] = load_bias_32bit_data();
             // uniform scale
-            scale_data[tileOffset] = *(const AccDataType*)(scale_);
+            scale_data[tileOffset] = *reinterpret_cast<const AccDataType*>(scale_);
         }
     });
 
@@ -361,7 +364,7 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
     static_for<0, KRepeat, 1>{}([&](auto k) {
         static_for<0, HRepeat, 1>{}([&](auto h) {
             static_for<0, WRepeat, 1>{}([&](auto w) {
-#if LOAD_DATA_PER_TILE
+#ifdef LOAD_DATA_PER_TILE
                 AccVec c_thread_buf_ = {};
                 auto& c_vec          = c_thread_buf_.GetVectorTypeReference(Number<0>{});
 #else
@@ -370,7 +373,7 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
                     Number<tileOffset * wconvConv.GetNumAccumComponents()>{});
 #endif
                 static_for<0, CRepeat, 1>{}([&](auto c) {
-#if LOAD_DATA_PER_TILE
+#ifdef LOAD_DATA_PER_TILE
                     InDataVec in_tile_data = load_in_data(h, w, c);
 #else
                     InDataVec& in_tile_data = inData[h * WRepeat * CRepeat + w * CRepeat + c];
@@ -379,7 +382,7 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
                     wconvConv.wconv_instr.Run(
                         weiData[k * CRepeat + c], p_in_tile_data, c_vec, Number<0>{});
                 });
-#if LOAD_DATA_PER_TILE
+#ifdef LOAD_DATA_PER_TILE
                 store_acc_data(h, w, k, c_vec);
 #endif
             });
@@ -388,7 +391,7 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
 
     __syncthreads();
 
-#if !LOAD_DATA_PER_TILE
+#if !defined(LOAD_DATA_PER_TILE)
     // Output accum data
     constexpr auto accSbaInstance = ck::
         AccSba<AccDataType, HPerWconv, WPerWconv, activateFunc, scaleBiasPacked, uniformScale>();
@@ -457,7 +460,7 @@ template <typename InDataType,
 __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
     conv3_fwd(const InDataType* in_,
               const WeiDataType* wei_,
-              AccDataType* c,
+              AccDataType* c_,
               AccDataType* scale_,
               AccDataType* bias_)
 {
@@ -542,7 +545,8 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
                (tileW + WPerWconv <= Width))
             {
                 inData.template AsType<InDataTileVec>()(Number<tileId>{}) =
-                    *(const InDataTileVec*)(in + offset + tileId * DataTileHeight * data_H_stride);
+                    *reinterpret_cast<const InDataTileVec*>(
+                        in + offset + tileId * DataTileHeight * data_H_stride);
             }
             else
             {
@@ -564,7 +568,7 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
             const index_t offset = (h * HPerWconv + subH) * acc_H_stride +
                                    (w * WPerWconv + subW) * acc_W_stride +
                                    (k * acc_K_stride + subK);
-            *(typename AccDataVec::type*)(c + offset) =
+            *reinterpret_cast<typename AccDataVec::type*>(c + offset) =
                 c_vec.template AsType<typename AccDataVec::type>()(Number<0>{});
         }
         else
@@ -581,9 +585,9 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
             constexpr index_t secOffset =
                 (num_acc_tile > 1) ? HPerWconv / num_acc_tile * acc_H_stride : 8;
             const index_t swizzleOffset = (lIdx % 2) * 4;
-            *(acc_swizzle_vec*)(c + offset + swizzleOffset) =
+            *reinterpret_cast<acc_swizzle_vec*>(c + offset + swizzleOffset) =
                 c_vec.template AsType<acc_swizzle_vec>()(Number<0>{});
-            *(acc_swizzle_vec*)(c + offset + swizzleOffset + secOffset) =
+            *reinterpret_cast<acc_swizzle_vec*>(c + offset + swizzleOffset + secOffset) =
                 c_vec.template AsType<acc_swizzle_vec>()(Number<1>{});
         }
     };
@@ -615,7 +619,7 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
                         c * wconvConv.GetNumInputChannels();
 
                     weiData.template AsType<WeiDataTileVec>()(Number<tapeId / 2>{}) =
-                        *(const WeiDataTileVec*)(wei + offset);
+                        *reinterpret_cast<const WeiDataTileVec*>(wei + offset);
                 });
             }
             else
@@ -630,7 +634,7 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
                         c * wconvConv.GetNumInputChannels();
 
                     weiData.template AsType<WeiDataTileVec>()(Number<tapeId / 2>{}) =
-                        *(const WeiDataTileVec*)(wei + offset);
+                        *reinterpret_cast<const WeiDataTileVec*>(wei + offset);
                 });
             }
         }
@@ -652,10 +656,10 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
                     (lIdx % 2) * wconvConv.GetNumWeightComponents() / 9 / 2;
 
                 weiData.template AsType<WeiDataTileVec>()(Number<tapeId * 2>{}) =
-                    *(const WeiDataTileVec*)(wei + offset);
-                weiData.template AsType<WeiDataTileVec>()(Number<tapeId * 2 + 1>{}) = *(
-                    const WeiDataTileVec*)(wei + offset +
-                                           wconvConv.GetNumWeightComponents() / numWeightTile * 2);
+                    *reinterpret_cast<const WeiDataTileVec*>(wei + offset);
+                weiData.template AsType<WeiDataTileVec>()(Number<tapeId * 2 + 1>{}) =
+                    *reinterpret_cast<const WeiDataTileVec*>(
+                        wei + offset + wconvConv.GetNumWeightComponents() / numWeightTile * 2);
             });
         }
         else
@@ -673,7 +677,7 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
                     c * wconvConv.GetNumInputChannels();
 
                 weiData.template AsType<WeiDataTileVec>()(Number<tapeId>{}) =
-                    *(const WeiDataTileVec*)(wei + offset);
+                    *reinterpret_cast<const WeiDataTileVec*>(wei + offset);
             });
         }
 
@@ -690,17 +694,17 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
                 offset = lIdx / 2;
                 if(lIdx % 2)
                 {
-                    return *(const AccDataType*)(scale_ + offset);
+                    return *reinterpret_cast<const AccDataType*>(scale_ + offset);
                 }
                 else
                 {
-                    return *(const AccDataType*)(bias_ + offset);
+                    return *reinterpret_cast<const AccDataType*>(bias_ + offset);
                 }
             }
             else
             {
                 offset = lIdx;
-                return *(const AccDataType*)(bias_ + offset);
+                return *reinterpret_cast<const AccDataType*>(bias_ + offset);
             }
         }
     };
@@ -713,8 +717,8 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
             if constexpr(scaleBiasPacked)
             {
                 index_t offset         = lIdx;
-                int scale_data         = *(const int*)(scale_ + offset);
-                int bias_data          = *(const int*)(bias_ + offset);
+                int scale_data         = *reinterpret_cast<const int*>(scale_ + offset);
+                int bias_data          = *reinterpret_cast<const int*>(bias_ + offset);
                 int scale_bias         = (((scale_data & 0xffff) << 16) | (bias_data & 0xffff));
                 bias_16bit_unpack_data = bit_cast<vector_type<AccDataType, 2>>(scale_bias);
             }
@@ -722,9 +726,9 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
             {
                 index_t offset = lIdx * 2;
                 bias_16bit_unpack_data.template AsType<AccDataType>()(Number<0>{}) =
-                    *(const AccDataType*)(bias_ + offset);
+                    *reinterpret_cast<const AccDataType*>(bias_ + offset);
                 bias_16bit_unpack_data.template AsType<AccDataType>()(Number<1>{}) =
-                    *(const AccDataType*)(bias_ + offset + 1);
+                    *reinterpret_cast<const AccDataType*>(bias_ + offset + 1);
             }
         }
         return bias_16bit_unpack_data;
@@ -746,7 +750,8 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
             bias_32bit_data[tileOffset] = load_bias_32bit_data();
         }
 
-        scale_data[tileOffset] = *(const AccDataType*)(scale_); // uniform scale in SGPR
+        scale_data[tileOffset] =
+            *reinterpret_cast<const AccDataType*>(scale_); // uniform scale in SGPR
     });
 
     __syncthreads();
@@ -822,6 +827,7 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
         });
     });
 }
+#pragma clang diagnostic pop
 
 }; // namespace conv_op_util
 }; // namespace ck
@@ -833,7 +839,7 @@ struct ExecutionConfig final
     bool do_verification = true;
     bool dump_tensor     = true;
 };
-ExecutionConfig config;
+static ExecutionConfig config;
 
 template <typename DataType>
 void DumpTensor(const Tensor<DataType>& tensor, const char* str)
@@ -1029,7 +1035,7 @@ const char* get_string()
         return "uint32_t";
     }
 
-#if CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
+#ifdef CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
     if constexpr(std::is_same<Type, ck::int4_t>::value)
     {
         return "int4_t";
@@ -1094,7 +1100,7 @@ bool run_test()
                                              DilationSize,
                                              DilationSize>();
 
-#if USE_ABSOLUTE_SIZE
+#ifdef USE_ABSOLUTE_SIZE
     constexpr ck::index_t Width          = DEFAULT_W;
     constexpr ck::index_t Height         = DEFAULT_H;
     constexpr ck::index_t InputChannels  = DEFAULT_C;
@@ -1398,17 +1404,17 @@ bool run_test_fmt()
     if constexpr(std::is_same<GPUAccType, float>::value || std::is_same<GPUAccType, int32_t>::value)
     {
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_1X1, false, 0, OutElementNoneOp, scaleBiasPacked, uniformScale, TestMask | 0x10000  >();
-#if ENABLE_FULL_TEST
+#ifdef ENABLE_FULL_TEST
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, false, 0, OutElementNoneOp, scaleBiasPacked, uniformScale, TestMask | 0x10000  >();
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, true,  0, OutElementNoneOp, scaleBiasPacked, uniformScale, TestMask | 0x10000  >();
 #endif
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_1X1, false, 1, OutElementReluOp, scaleBiasPacked, uniformScale, TestMask | 0x20000  >();
-#if ENABLE_FULL_TEST
+#ifdef ENABLE_FULL_TEST
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, false, 1, OutElementReluOp, scaleBiasPacked, uniformScale, TestMask | 0x20000  >();
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, true,  1, OutElementReluOp, scaleBiasPacked, uniformScale, TestMask | 0x20000  >();
 #endif
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_1X1, false, 2, OutElementTanhOp, scaleBiasPacked, uniformScale, TestMask | 0x40000  >();
-#if ENABLE_FULL_TEST
+#ifdef ENABLE_FULL_TEST
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, false, 2, OutElementTanhOp, scaleBiasPacked, uniformScale, TestMask | 0x40000  >();
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, true,  2, OutElementTanhOp, scaleBiasPacked, uniformScale, TestMask | 0x40000  >();
 #endif
@@ -1416,17 +1422,17 @@ bool run_test_fmt()
     else
     {
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_1X1, false, 0, OutElementNoneOp, scaleBiasPacked, uniformScale, TestMask | 0x80000  >();
-#if ENABLE_FULL_TEST
+#ifdef ENABLE_FULL_TEST
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_3X3, false, 0, OutElementNoneOp, scaleBiasPacked, uniformScale, TestMask | 0x80000  >();
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_3X3, true,  0, OutElementNoneOp, scaleBiasPacked, uniformScale, TestMask | 0x80000  >();
 #endif
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_1X1, false, 1, OutElementReluOp, scaleBiasPacked, uniformScale, TestMask | 0x100000 >();
-#if ENABLE_FULL_TEST
+#ifdef ENABLE_FULL_TEST
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_3X3, false, 1, OutElementReluOp, scaleBiasPacked, uniformScale, TestMask | 0x100000 >();
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_3X3, true,  1, OutElementReluOp, scaleBiasPacked, uniformScale, TestMask | 0x100000 >();
 #endif
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_1X1, false, 2, OutElementTanhOp, scaleBiasPacked, uniformScale, TestMask | 0x200000 >();
-#if ENABLE_FULL_TEST
+#ifdef ENABLE_FULL_TEST
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_3X3, false, 2, OutElementTanhOp, scaleBiasPacked, uniformScale, TestMask | 0x200000 >();
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_3X3, true,  2, OutElementTanhOp, scaleBiasPacked, uniformScale, TestMask | 0x200000 >();
 #endif
@@ -1467,7 +1473,7 @@ inline void print_help_msg()
               << "arg4: initialization (0=no init, 1=integer value, 2=decimal value)\n";
 }
 
-inline bool parse_cmd_args(int argc, char* argv[], ExecutionConfig& config)
+inline bool parse_cmd_args(int argc, char* argv[], ExecutionConfig& cfg)
 {
     if(argc == 1)
     {
@@ -1477,19 +1483,19 @@ inline bool parse_cmd_args(int argc, char* argv[], ExecutionConfig& config)
     {
         if(argc > 1)
         {
-            config.test_mask = std::stoul(argv[1], nullptr, 0);
+            cfg.test_mask = std::stoul(argv[1], nullptr, 0);
         }
         if(argc > 2)
         {
-            config.do_verification = std::stoi(argv[2]);
+            cfg.do_verification = std::stoi(argv[2]);
         }
         if(argc > 3)
         {
-            config.dump_tensor = std::stoi(argv[3]);
+            cfg.dump_tensor = std::stoi(argv[3]);
         }
         if(argc > 4)
         {
-            config.init_method = std::stoi(argv[4]);
+            cfg.init_method = std::stoi(argv[4]);
         }
     }
     else
@@ -1513,7 +1519,7 @@ int main(int argc, char* argv[])
     pass &= run_test_fmt<ck::half_t,  float,       float,       0, 0, 0x1  >();
     pass &= run_test_fmt<ck::half_t,  float,       float,       1, 0, 0x2  >();
     pass &= run_test_fmt<ck::half_t,  float,       float,       0, 1, 0x4  >();
-#if ENABLE_FULL_TEST
+#ifdef ENABLE_FULL_TEST
     pass &= run_test_fmt<ck::bhalf_t, float,       float,       0, 0, 0x1  >();
     pass &= run_test_fmt<ck::bhalf_t, float,       float,       1, 0, 0x2  >();
     pass &= run_test_fmt<ck::bhalf_t, float,       float,       0, 1, 0x4  >();

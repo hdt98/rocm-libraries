@@ -59,9 +59,8 @@ struct Debug;
 namespace ck {
 
 namespace conv_op_util {
-
-#define LOAD_DATA_PER_TILE 0
-
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wundefined-reinterpret-cast"
 template <typename InDataType,
           typename WeiDataType,
           typename AccDataType,
@@ -124,18 +123,11 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
         make_tuple(Number<KPerBlock>{}, Number<FilterSize * FilterSize>{}, Number<CPerBlock>{}),
         make_tuple(Number<CPerBlock>{}, Number<KPerBlock * CPerBlock>{}, Number<1>{}));
 
-    static constexpr index_t CPerWconv = wconv_conv.GetNumInputChannels();
     static constexpr index_t KPerWconv = wconv_conv.GetNumOutputChannels();
 
     // HWC
     constexpr auto InDataBlockDesc = make_naive_tensor_descriptor_packed(
         make_tuple(Number<HPerBlockIn>{}, Number<WPerBlockIn>{}, Number<CPerBlock>{}));
-
-    // YXKC -> K0 x C0 x YX x K1 x C2 x C1
-    constexpr auto NumSubTilesPerWeightTap = wconv_conv.GetNumSubTilesPerWeightTap();
-
-    // HWC -> H0 x W0 x C0 x H2 x H1 x W1 x C1
-    constexpr auto NumSubTilePerImage = wconv_conv.GetNumSubTilesPerImageTile();
 
     using ThisThreadBlock  = ThisThreadBlock<BlockSize>;
     auto blockwise_conv    = BlockwiseConvWconv<ThisThreadBlock,
@@ -188,13 +180,13 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
         static_for<0, CompCountPerThread, CompCountPerVector>{}([&](auto i) {
             const index_t totalIdx = lIdx * CompCountPerThread + i;
             const index_t idx      = totalIdx % CompCountPerBlock;
-            const index_t c        = totalIdx / CompCountPerBlock;
+            const index_t c0       = totalIdx / CompCountPerBlock;
             const index_t c_offset = idx % CPerBlock;
             const index_t k_offset = idx / CPerBlock;
             const WeiDataVec* pIn  = reinterpret_cast<const WeiDataVec*>(
-                p_weight_block + k_offset * weight_K_stride + c_offset + c * CPerBlock);
+                p_weight_block + k_offset * weight_K_stride + c_offset + c0 * CPerBlock);
             WeiDataVec* pOut =
-                reinterpret_cast<WeiDataVec*>(p_block_buf + c * CompCountPerBlock + idx);
+                reinterpret_cast<WeiDataVec*>(p_block_buf + c0 * CompCountPerBlock + idx);
             if(totalIdx < CompCountPerIter)
             {
                 *pOut = *pIn;
@@ -244,8 +236,8 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
     };
 
     // HWC
-    auto update_indata_block_buf = [&](index_t c) {
-        const InDataType* p_indata_block     = in + c * CPerBlock;
+    auto update_indata_block_buf = [&](index_t c0) {
+        const InDataType* p_indata_block     = in + c0 * CPerBlock;
         InDataType* p_block_buf              = reinterpret_cast<InDataType*>(&p_shared[0]);
         constexpr index_t CompCountPerBlock  = WPerBlockIn * HPerBlockIn * CPerBlock;
         constexpr index_t CompCountPerThread = CompCountPerBlock / BlockSize;
@@ -316,7 +308,7 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
                                                    acc_W_stride +
                                                (k * KPerBlock + waveId[I2] * KRepeat * KPerWconv +
                                                 k1 * KPerWconv + subK);
-                        *(typename AccDataVec::type*)(c + offset) =
+                        *reinterpret_cast<typename AccDataVec::type*>(c + offset) =
                             c_vec.template AsType<typename AccDataVec::type>()(Number<0>{});
                     }
                     else
@@ -343,9 +335,9 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
                                 HPerWconv / wconv_conv.GetNumSubTilesPerImageTile() * acc_H_stride;
                         }
                         const index_t swizzleOffset = (lIdx & 1) * 4;
-                        *(AccSwizzleVec*)(c + offset + swizzleOffset) =
+                        *reinterpret_cast<AccSwizzleVec*>(c + offset + swizzleOffset) =
                             c_vec.template AsType<AccSwizzleVec>()(Number<0>{});
-                        *(AccSwizzleVec*)(c + offset + swizzleOffset + secOffset) =
+                        *reinterpret_cast<AccSwizzleVec*>(c + offset + swizzleOffset + secOffset) =
                             c_vec.template AsType<AccSwizzleVec>()(Number<1>{});
                     }
                 });
@@ -365,20 +357,21 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
             update_weight_block_buf(k);
         }
 
-        static_for<0, C_BlockTile, 1>{}([&](auto c) {
+        static_for<0, C_BlockTile, 1>{}([&](auto c0) {
             __syncthreads();
-            update_indata_block_buf(c);
+            update_indata_block_buf(c0);
             __syncthreads();
             auto indata_block_buf = make_dynamic_buffer<AddressSpaceEnum::Lds>(
                 reinterpret_cast<InDataType*>(&p_shared[0]), InDataBlockSize);
             auto weight_block_buf = make_dynamic_buffer<AddressSpaceEnum::Lds>(
-                reinterpret_cast<WeiDataType*>(&p_shared[InDataBlockSize + c * WeiDataBlockSize]),
+                reinterpret_cast<WeiDataType*>(&p_shared[InDataBlockSize + c0 * WeiDataBlockSize]),
                 WeiDataBlockSize);
             blockwise_conv.Run(weight_block_buf, indata_block_buf, accum_thread_buf, true);
         });
         store_accum_buf(k);
     });
 }
+#pragma clang diagnostic pop
 
 }; // namespace conv_op_util
 }; // namespace ck
@@ -390,7 +383,7 @@ struct ExecutionConfig final
     bool do_verification = true;
     bool dump_tensor     = true;
 };
-ExecutionConfig config;
+static ExecutionConfig config;
 
 template <typename DataType>
 void DumpTensor(const Tensor<DataType>& tensor, const char* str)
@@ -586,7 +579,7 @@ const char* get_string()
         return "uint32_t";
     }
 
-#if CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
+#ifdef CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
     if constexpr(std::is_same<Type, ck::int4_t>::value)
     {
         return "int4_t";
@@ -899,7 +892,7 @@ inline void print_help_msg()
               << "arg4: initialization (0=no init, 1=integer value, 2=decimal value)\n";
 }
 
-inline bool parse_cmd_args(int argc, char* argv[], ExecutionConfig& config)
+inline bool parse_cmd_args(int argc, char* argv[], ExecutionConfig& cfg)
 {
     if(argc == 1)
     {
@@ -909,19 +902,19 @@ inline bool parse_cmd_args(int argc, char* argv[], ExecutionConfig& config)
     {
         if(argc > 1)
         {
-            config.test_mask = std::stoul(argv[1], nullptr, 0);
+            cfg.test_mask = std::stoul(argv[1], nullptr, 0);
         }
         if(argc > 2)
         {
-            config.do_verification = std::stoi(argv[2]);
+            cfg.do_verification = std::stoi(argv[2]);
         }
         if(argc > 3)
         {
-            config.dump_tensor = std::stoi(argv[3]);
+            cfg.dump_tensor = std::stoi(argv[3]);
         }
         if(argc > 4)
         {
-            config.init_method = std::stoi(argv[4]);
+            cfg.init_method = std::stoi(argv[4]);
         }
     }
     else

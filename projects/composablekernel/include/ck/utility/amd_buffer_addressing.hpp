@@ -4,6 +4,10 @@
 #pragma once
 #include "data_type.hpp"
 
+#if defined(__gfx1300__) || defined(__gfx1301__) || defined(__gfx1302__)
+#define __gfx13__
+#endif
+
 namespace ck {
 
 template <typename T>
@@ -1049,6 +1053,7 @@ template <typename T,
 __device__ void amd_async_copy_to_lds_impl_raw(__attribute__((address_space(1))) const T* src_ptr,
                                                __attribute__((address_space(3))) T* dst_ptr)
 {
+#if defined(__gfx13__)
     if constexpr(N == 1)
     {
         __attribute__((address_space(1))) char* global_ptr =
@@ -1096,6 +1101,10 @@ __device__ void amd_async_copy_to_lds_impl_raw(__attribute__((address_space(1)))
             global_ptr, lds_ptr, 0, static_cast<index_t>(coherence));
         return;
     }
+#else
+    ignore = src_ptr;
+    ignore = dst_ptr;
+#endif
 }
 
 template <typename T,
@@ -1105,6 +1114,7 @@ __device__ void amd_async_store_to_global_impl_raw(__attribute__((address_space(
                                                    const T* src_ptr,
                                                    __attribute__((address_space(1))) T* dst_ptr)
 {
+#if defined(__gfx13__)
     if constexpr(N == 1)
     {
         __attribute__((address_space(3))) char* lds_ptr =
@@ -1152,6 +1162,10 @@ __device__ void amd_async_store_to_global_impl_raw(__attribute__((address_space(
             global_ptr, lds_ptr, 0, static_cast<index_t>(coherence));
         return;
     }
+#else
+    ignore = src_ptr;
+    ignore = dst_ptr;
+#endif
 }
 
 template <typename T,

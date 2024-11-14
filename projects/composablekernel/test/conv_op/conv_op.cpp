@@ -31,7 +31,7 @@ using WeiElementOp = ck::tensor_operation::element_wise::PassThrough;
 using OutElementOp = ck::tensor_operation::element_wise::UnaryConvert;
 
 #define USE_ABSOLUTE_SIZE 1
-#if USE_ABSOLUTE_SIZE
+#ifdef USE_ABSOLUTE_SIZE
 #define DEFAULT_K 16
 #define DEFAULT_C 32
 #define DEFAULT_W 8
@@ -65,6 +65,8 @@ namespace conv_op_util {
 
 #define LOAD_DATA_PER_TILE 0
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wundefined-reinterpret-cast"
 template <typename InDataType,
           typename WeiDataType,
           typename AccDataType,
@@ -78,7 +80,7 @@ template <typename InDataType,
           index_t UnpackedInputChannels,
           index_t UnpackedOutputChannels>
 __global__ void __launch_bounds__(64, 1)
-    conv_fwd(const InDataType* in_, const WeiDataType* wei_, AccDataType* c)
+    conv_fwd(const InDataType* in_, const WeiDataType* wei_, AccDataType* c_)
 {
     constexpr auto wconvConv = ck::WconvConv<WeiDataType,
                                              InDataType,
@@ -107,7 +109,7 @@ __global__ void __launch_bounds__(64, 1)
     constexpr index_t WRepeat = Width / WPerWconv;
     constexpr index_t CRepeat = UnpackedInputChannels / wconvConv.GetUnpackedNumInputChannels();
     constexpr index_t KRepeat = UnpackedOutputChannels / wconvConv.GetUnpackedNumOutputChannels();
-#if LOAD_DATA_PER_TILE
+#ifdef LOAD_DATA_PER_TILE
     constexpr index_t AccVectorCount = 1;
 #else
     constexpr index_t AccVectorCount = HRepeat * WRepeat * KRepeat;
@@ -125,7 +127,7 @@ __global__ void __launch_bounds__(64, 1)
                                              true>;
 
     const int lIdx = threadIdx.x;
-#if !LOAD_DATA_PER_TILE
+#if !defined(LOAD_DATA_PER_TILE)
     InDataVec inData[HRepeat * WRepeat * CRepeat] = {};
     AccVec c_thread_buf_                          = {};
 #endif
@@ -161,17 +163,18 @@ __global__ void __launch_bounds__(64, 1)
         if constexpr(wconvConv.GetNumImageSubTilesInVertical() > 1)
         {
             // shape 8x4
-            typename decltype(wconvConv)::InDataVec inData;
+            typename decltype(wconvConv)::InDataVec inDataVec;
 
             static_for<0, wconvConv.GetNumImageSubTilesInVertical(), 1>{}([&](auto tileId) {
-                inData.template AsType<InDataTileVec>()(Number<tileId>{}) =
-                    *(const InDataTileVec*)(in + offset + tileId * DataTileHeight * data_H_stride);
+                inDataVec.template AsType<InDataTileVec>()(Number<tileId>{}) =
+                    *reinterpret_cast<const InDataTileVec*>(
+                        in + offset + tileId * DataTileHeight * data_H_stride);
             });
-            return inData.template AsType<InDataVec>()(Number<0>{});
+            return inDataVec.template AsType<InDataVec>()(Number<0>{});
         }
         else
         {
-            return *(const InDataVec*)(in + offset);
+            return *reinterpret_cast<const InDataVec*>(in + offset);
         }
     };
 
@@ -185,7 +188,7 @@ __global__ void __launch_bounds__(64, 1)
             const index_t offset = (h * HPerWconv + subH) * acc_H_stride +
                                    (w * WPerWconv + subW) * acc_W_stride +
                                    (k * acc_K_stride + subK);
-            *(typename AccDataVec::type*)(c + offset) =
+            *reinterpret_cast<typename AccDataVec::type*>(c_ + offset) =
                 c_vec.template AsType<typename AccDataVec::type>()(Number<0>{});
         }
         else
@@ -205,14 +208,14 @@ __global__ void __launch_bounds__(64, 1)
                 secOffset = HPerWconv / wconvConv.GetNumSubTilesPerImageTile() * acc_H_stride;
             }
             const index_t swizzleOffset = (lIdx & 1) * 4;
-            *(AccSwizzleVec*)(c + offset + swizzleOffset) =
+            *reinterpret_cast<AccSwizzleVec*>(c_ + offset + swizzleOffset) =
                 c_vec.template AsType<AccSwizzleVec>()(Number<0>{});
-            *(AccSwizzleVec*)(c + offset + swizzleOffset + secOffset) =
+            *reinterpret_cast<AccSwizzleVec*>(c_ + offset + swizzleOffset + secOffset) =
                 c_vec.template AsType<AccSwizzleVec>()(Number<1>{});
         }
     };
 
-#if !LOAD_DATA_PER_TILE
+#if !defined(LOAD_DATA_PER_TILE)
     static_for<0, HRepeat, 1>{}([&](auto h) {
         static_for<0, WRepeat, 1>{}([&](auto w) {
             static_for<0, CRepeat, 1>{}([&](auto c) {
@@ -243,7 +246,7 @@ __global__ void __launch_bounds__(64, 1)
                 static_assert(HPerWconv == 8 && WPerWconv == 4, "unexpected shape!");
                 if(weiCompIdx < wconvConv.GetNumInputChannels() * wconvConv.GetNumOutputChannels())
                 {
-                    weiData[tileOffset] = *(const WeiDataVec*)(wei + offset);
+                    weiData[tileOffset] = *reinterpret_cast<const WeiDataVec*>(wei + offset);
                 }
             }
             else if constexpr(numWeightTile == 2)
@@ -254,10 +257,11 @@ __global__ void __launch_bounds__(64, 1)
                 const index_t offsetBase =
                     offset + (lIdx % 2) * wconvConv.GetNumWeightComponents() / 2;
                 weiDataTmp.template AsType<WeiDataTileVec>()(Number<0>{}) =
-                    *(const WeiDataTileVec*)(wei + offsetBase);
+                    *reinterpret_cast<const WeiDataTileVec*>(wei + offsetBase);
 
                 weiDataTmp.template AsType<WeiDataTileVec>()(Number<1>{}) =
-                    *(const WeiDataTileVec*)(wei + offsetBase + wconvConv.GetNumWeightComponents());
+                    *reinterpret_cast<const WeiDataTileVec*>(wei + offsetBase +
+                                                             wconvConv.GetNumWeightComponents());
 
                 weiData[tileOffset] = weiDataTmp.template AsType<WeiDataVec>()(Number<0>{});
             }
@@ -265,7 +269,7 @@ __global__ void __launch_bounds__(64, 1)
             {
                 // shape 4x4
                 static_assert(numWeightTile == 1, "");
-                weiData[tileOffset] = *(const WeiDataVec*)(wei + offset);
+                weiData[tileOffset] = *reinterpret_cast<const WeiDataVec*>(wei + offset);
             }
         });
     });
@@ -276,7 +280,7 @@ __global__ void __launch_bounds__(64, 1)
     static_for<0, KRepeat, 1>{}([&](auto k) {
         static_for<0, HRepeat, 1>{}([&](auto h) {
             static_for<0, WRepeat, 1>{}([&](auto w) {
-#if LOAD_DATA_PER_TILE
+#ifdef LOAD_DATA_PER_TILE
                 AccVec c_thread_buf_ = {};
                 auto& c_vec          = c_thread_buf_.GetVectorTypeReference(Number<0>{});
 #else
@@ -285,7 +289,7 @@ __global__ void __launch_bounds__(64, 1)
                     Number<tileOffset * wconvConv.GetNumAccumComponents()>{});
 #endif
                 static_for<0, CRepeat, 1>{}([&](auto c) {
-#if LOAD_DATA_PER_TILE
+#ifdef LOAD_DATA_PER_TILE
                     InDataVec in_tile_data = load_in_data(h, w, c);
 #else
                     InDataVec& in_tile_data = inData[h * WRepeat * CRepeat + w * CRepeat + c];
@@ -294,7 +298,7 @@ __global__ void __launch_bounds__(64, 1)
                     wconvConv.wconv_instr.Run(
                         weiData[k * CRepeat + c], p_in_tile_data, c_vec, Number<0>{});
                 });
-#if LOAD_DATA_PER_TILE
+#ifdef LOAD_DATA_PER_TILE
                 store_acc_data(h, w, k, c_vec);
 #endif
             });
@@ -303,7 +307,7 @@ __global__ void __launch_bounds__(64, 1)
 
     __syncthreads();
 
-#if !LOAD_DATA_PER_TILE
+#if !defined(LOAD_DATA_PER_TILE)
     // Output accum data
     static_for<0, HRepeat, 1>{}([&](auto h) {
         static_for<0, WRepeat, 1>{}([&](auto w) {
@@ -331,7 +335,7 @@ template <typename InDataType,
           index_t UnpackedInputChannels,
           index_t UnpackedOutputChannels>
 __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
-    conv3_fwd(const InDataType* in_, const WeiDataType* wei_, AccDataType* c)
+    conv3_fwd(const InDataType* in_, const WeiDataType* wei_, AccDataType* c_)
 {
     constexpr index_t DataTileHeight = 4;
 
@@ -414,7 +418,8 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
                (tileW + WPerWconv <= Width))
             {
                 inData.template AsType<InDataTileVec>()(Number<tileId>{}) =
-                    *(const InDataTileVec*)(in + offset + tileId * DataTileHeight * data_H_stride);
+                    *reinterpret_cast<const InDataTileVec*>(
+                        in + offset + tileId * DataTileHeight * data_H_stride);
             }
             else
             {
@@ -436,7 +441,7 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
             const index_t offset = (h * HPerWconv + subH) * acc_H_stride +
                                    (w * WPerWconv + subW) * acc_W_stride +
                                    (k * acc_K_stride + subK);
-            *(typename AccDataVec::type*)(c + offset) =
+            *reinterpret_cast<typename AccDataVec::type*>(c_ + offset) =
                 c_vec.template AsType<typename AccDataVec::type>()(Number<0>{});
         }
         else
@@ -453,9 +458,9 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
             constexpr index_t secOffset =
                 (num_acc_tile > 1) ? HPerWconv / num_acc_tile * acc_H_stride : 8;
             const index_t swizzleOffset = (lIdx % 2) * 4;
-            *(acc_swizzle_vec*)(c + offset + swizzleOffset) =
+            *reinterpret_cast<acc_swizzle_vec*>(c_ + offset + swizzleOffset) =
                 c_vec.template AsType<acc_swizzle_vec>()(Number<0>{});
-            *(acc_swizzle_vec*)(c + offset + swizzleOffset + secOffset) =
+            *reinterpret_cast<acc_swizzle_vec*>(c_ + offset + swizzleOffset + secOffset) =
                 c_vec.template AsType<acc_swizzle_vec>()(Number<1>{});
         }
     };
@@ -487,7 +492,7 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
                         c * wconvConv.GetNumInputChannels();
 
                     weiData.template AsType<WeiDataTileVec>()(Number<tapeId / 2>{}) =
-                        *(const WeiDataTileVec*)(wei + offset);
+                        *reinterpret_cast<const WeiDataTileVec*>(wei + offset);
                 });
             }
             else
@@ -502,7 +507,7 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
                         c * wconvConv.GetNumInputChannels();
 
                     weiData.template AsType<WeiDataTileVec>()(Number<tapeId / 2>{}) =
-                        *(const WeiDataTileVec*)(wei + offset);
+                        *reinterpret_cast<const WeiDataTileVec*>(wei + offset);
                 });
             }
         }
@@ -524,10 +529,10 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
                     (lIdx % 2) * wconvConv.GetNumWeightComponents() / 9 / 2;
 
                 weiData.template AsType<WeiDataTileVec>()(Number<tapeId * 2>{}) =
-                    *(const WeiDataTileVec*)(wei + offset);
-                weiData.template AsType<WeiDataTileVec>()(Number<tapeId * 2 + 1>{}) = *(
-                    const WeiDataTileVec*)(wei + offset +
-                                           wconvConv.GetNumWeightComponents() / numWeightTile * 2);
+                    *reinterpret_cast<const WeiDataTileVec*>(wei + offset);
+                weiData.template AsType<WeiDataTileVec>()(Number<tapeId * 2 + 1>{}) =
+                    *reinterpret_cast<const WeiDataTileVec*>(
+                        wei + offset + wconvConv.GetNumWeightComponents() / numWeightTile * 2);
             });
         }
         else
@@ -545,7 +550,7 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
                     c * wconvConv.GetNumInputChannels();
 
                 weiData.template AsType<WeiDataTileVec>()(Number<tapeId>{}) =
-                    *(const WeiDataTileVec*)(wei + offset);
+                    *reinterpret_cast<const WeiDataTileVec*>(wei + offset);
             });
         }
 
@@ -575,7 +580,7 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
         });
     });
 }
-
+#pragma clang diagnostic pop
 }; // namespace conv_op_util
 }; // namespace ck
 
@@ -586,7 +591,7 @@ struct ExecutionConfig final
     bool do_verification = true;
     bool dump_tensor     = true;
 };
-ExecutionConfig config;
+static ExecutionConfig config;
 
 template <typename DataType>
 void DumpTensor(const Tensor<DataType>& tensor, const char* str)
@@ -782,7 +787,7 @@ const char* get_string()
         return "uint32_t";
     }
 
-#if CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
+#ifdef CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
     if constexpr(std::is_same<Type, ck::int4_t>::value)
     {
         return "int4_t";
@@ -834,7 +839,7 @@ bool run_test()
     constexpr ck::index_t WPerWconv    = (Shape == Shape_4X2) ? 2 : 4;
     constexpr ck::index_t DilationSize = Dilation ? 2 : 1;
 
-#if USE_ABSOLUTE_SIZE
+#ifdef USE_ABSOLUTE_SIZE
     constexpr bool CheckVgpr1024         = (TestMask & 0xC000) != 0;
     constexpr ck::index_t Width          = CheckVgpr1024 ? DEFAULT_W_1K : DEFAULT_W;
     constexpr ck::index_t Height         = CheckVgpr1024 ? DEFAULT_H_1K : DEFAULT_H;
@@ -1142,7 +1147,7 @@ inline void print_help_msg()
               << "arg4: initialization (0=no init, 1=integer value, 2=decimal value)\n";
 }
 
-inline bool parse_cmd_args(int argc, char* argv[], ExecutionConfig& config)
+inline bool parse_cmd_args(int argc, char* argv[], ExecutionConfig& cfg)
 {
     if(argc == 1)
     {
@@ -1152,19 +1157,19 @@ inline bool parse_cmd_args(int argc, char* argv[], ExecutionConfig& config)
     {
         if(argc > 1)
         {
-            config.test_mask = std::stoul(argv[1], nullptr, 0);
+            cfg.test_mask = std::stoul(argv[1], nullptr, 0);
         }
         if(argc > 2)
         {
-            config.do_verification = std::stoi(argv[2]);
+            cfg.do_verification = std::stoi(argv[2]);
         }
         if(argc > 3)
         {
-            config.dump_tensor = std::stoi(argv[3]);
+            cfg.dump_tensor = std::stoi(argv[3]);
         }
         if(argc > 4)
         {
-            config.init_method = std::stoi(argv[4]);
+            cfg.init_method = std::stoi(argv[4]);
         }
     }
     else
@@ -1201,7 +1206,7 @@ int main(int argc, char* argv[])
 
     //pass &= run_test_fmt<ck::half_t,  float,       float,      0x4000>();
     //pass &= run_test_fmt<ck::half_t,  ck::half_t,  ck::half_t, 0x8000>();
-#if CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
+#ifdef CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
     pass &= run_test_fmt<ck::int4_t,  float,       float     , 0x800 >();
     pass &= run_test_fmt<ck::int4_t,  int32_t,     int32_t   , 0x1000>();
     pass &= run_test_fmt<ck::int4_t,  ck::half_t,  ck::half_t, 0x2000>();

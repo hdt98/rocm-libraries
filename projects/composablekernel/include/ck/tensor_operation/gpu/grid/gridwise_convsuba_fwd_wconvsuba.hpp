@@ -420,53 +420,43 @@ struct GridwiseConvSuba_Wconvsuba
     // Describe how data store to (LDS/VGPR) buffer from Global memory
     __host__ __device__ static constexpr auto MakeInBlockDescriptor()
     {
-        constexpr auto in_block_desc = [&]() {
-            if constexpr(InEnableLds)
-            {
-                // H x W x C Per Block
-                return make_naive_tensor_descriptor_packed(
-                    make_tuple(Number<HPerBlockIn>{}, Number<WPerBlockIn>{}, Number<CPerBlock>{}));
-            }
-            else
-            {
-                // W0 x C0 x H0 x H1 x H2 x W1 x C1
-                return make_naive_tensor_descriptor_packed(
-                    make_tuple(Number<WPerWaveIn / WPerWconv>{},
-                               Number<CPerWave / CPerWconv>{},
-                               Number<HPerWaveIn / HPerWconv>{},
-                               Number<NumSubTilePerImage>{},
-                               I1,
-                               I1,
-                               Number<NumDataCompPerTile>{}));
-            }
-        }();
-
-        return in_block_desc;
+        if constexpr(InEnableLds)
+        {
+            // H x W x C Per Block
+            return make_naive_tensor_descriptor_packed(
+                make_tuple(Number<HPerBlockIn>{}, Number<WPerBlockIn>{}, Number<CPerBlock>{}));
+        }
+        else
+        {
+            // W0 x C0 x H0 x H1 x H2 x W1 x C1
+            return make_naive_tensor_descriptor_packed(make_tuple(Number<WPerWaveIn / WPerWconv>{},
+                                                                  Number<CPerWave / CPerWconv>{},
+                                                                  Number<HPerWaveIn / HPerWconv>{},
+                                                                  Number<NumSubTilePerImage>{},
+                                                                  I1,
+                                                                  I1,
+                                                                  Number<NumDataCompPerTile>{}));
+        }
     }
 
     __host__ __device__ static constexpr auto MakeWeiBlockDescriptor()
     {
-        constexpr auto wei_block_desc = [&]() {
-            if constexpr(WeiEnableLds)
-            {
-                // K x YX x C per block
-                return make_naive_tensor_descriptor_packed(make_tuple(
-                    Number<KPerBlock>{}, Number<FilterSize * FilterSize>{}, Number<CPerBlock>{}));
-            }
-            else
-            {
-                // K0 x C0 x YX x K1 x C1 x C2
-                return make_naive_tensor_descriptor_packed(
-                    make_tuple(Number<KPerWave / KPerWconv>{},
-                               Number<CPerWave / CPerWconv>{},
-                               Number<NumWeightTap>{},
-                               I1,
-                               Number<NumSubTilesPerWeightTap>{},
-                               Number<NumWeightCompPerTile>{}));
-            }
-        }();
-
-        return wei_block_desc;
+        if constexpr(WeiEnableLds)
+        {
+            // K x YX x C per block
+            return make_naive_tensor_descriptor_packed(make_tuple(
+                Number<KPerBlock>{}, Number<FilterSize * FilterSize>{}, Number<CPerBlock>{}));
+        }
+        else
+        {
+            // K0 x C0 x YX x K1 x C1 x C2
+            return make_naive_tensor_descriptor_packed(make_tuple(Number<KPerWave / KPerWconv>{},
+                                                                  Number<CPerWave / CPerWconv>{},
+                                                                  Number<NumWeightTap>{},
+                                                                  I1,
+                                                                  Number<NumSubTilesPerWeightTap>{},
+                                                                  Number<NumWeightCompPerTile>{}));
+        }
     }
 
     // Describe how data store to LDS buffer
@@ -481,31 +471,29 @@ struct GridwiseConvSuba_Wconvsuba
     // Ds desc for source in blockwise copy
     __host__ __device__ static constexpr auto MakeDsBlockDescriptor()
     {
-        constexpr auto ds_block_desc = [&]() {
-            if constexpr(DsEnableLds)
-            {
-                return generate_tuple(
-                    [&](auto i) {
-                        return make_naive_tensor_descriptor_packed(make_tuple(Number<KPerBlock>{}));
-                    },
-                    Number<NumDTensor>{});
-            }
-            else
-            {
-                // KRepeat x K1 x K2
-                constexpr auto DsPerThread = acc_sba.GetNumBiasComponents();
-                return generate_tuple(
-                    [&](auto i) {
-                        return make_naive_tensor_descriptor_packed(
-                            make_tuple(Number<KPerWave / KPerWconv>{},
-                                       Number<KPerWconv / DsPerThread>{},
-                                       Number<DsPerThread>{}));
-                    },
-                    Number<NumDTensor>{});
-            }
-        }();
-
-        return ds_block_desc;
+        if constexpr(DsEnableLds)
+        {
+            return generate_tuple(
+                [&](auto i) {
+                    ignore = i;
+                    return make_naive_tensor_descriptor_packed(make_tuple(Number<KPerBlock>{}));
+                },
+                Number<NumDTensor>{});
+        }
+        else
+        {
+            // KRepeat x K1 x K2
+            constexpr auto DsPerThread = acc_sba.GetNumBiasComponents();
+            return generate_tuple(
+                [&](auto i) {
+                    ignore = i;
+                    return make_naive_tensor_descriptor_packed(
+                        make_tuple(Number<KPerWave / KPerWconv>{},
+                                   Number<KPerWconv / DsPerThread>{},
+                                   Number<DsPerThread>{}));
+                },
+                Number<NumDTensor>{});
+        }
     }
 
     __host__ __device__ static constexpr auto MakeInBlockSliceCopyStep()
@@ -986,7 +974,7 @@ struct GridwiseConvSuba_Wconvsuba
     static constexpr auto in_block_desc  = MakeInBlockDescriptor();
     static constexpr auto wei_block_desc = MakeWeiBlockDescriptor();
     static constexpr auto ds_block_desc  = MakeDsBlockDescriptor();
-#if FORCE_CONVERT_TO_TENSOR
+#ifdef FORCE_CONVERT_TO_TENSOR
     static constexpr bool ConvertToTensor = true;
 #else
     static constexpr bool ConvertToTensor = false;

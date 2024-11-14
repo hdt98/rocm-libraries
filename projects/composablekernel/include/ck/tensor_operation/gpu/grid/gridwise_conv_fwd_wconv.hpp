@@ -90,6 +90,8 @@ __global__ void
 #endif
 }
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wzero-length-array"
 template <typename GridwiseOp,
           typename InDataType,
           typename WeiDataType,
@@ -124,11 +126,11 @@ __global__ void __exp_amd_wavegroup_kernel(4, 32, 256, 1, 1)
     const index_t g_idx = __builtin_amdgcn_readfirstlane(get_block_1d_id() / num_blocks_per_batch);
 
     const long_index_t in_batch_offset = __builtin_amdgcn_readfirstlane(
-        static_cast<long_index_t>(compute_ptr_offset_of_batch.GetAPtrOffset(g_idx)));
+        static_cast<int64_t>(compute_ptr_offset_of_batch.GetAPtrOffset(g_idx)));
     const long_index_t wei_batch_offset = __builtin_amdgcn_readfirstlane(
-        static_cast<long_index_t>(compute_ptr_offset_of_batch.GetBPtrOffset(g_idx)));
+        static_cast<int64_t>(compute_ptr_offset_of_batch.GetBPtrOffset(g_idx)));
     const long_index_t acc_batch_offset = __builtin_amdgcn_readfirstlane(
-        static_cast<long_index_t>(compute_ptr_offset_of_batch.GetEPtrOffset(g_idx)));
+        static_cast<int64_t>(compute_ptr_offset_of_batch.GetEPtrOffset(g_idx)));
 
     __shared__ char p_shared[GridwiseOp::BlockwiseConv::SharedMemTrait::lds_size];
     static __exp_amd_laneshared__ char p_lane_shared
@@ -163,6 +165,7 @@ __global__ void __exp_amd_wavegroup_kernel(4, 32, 256, 1, 1)
     ignore                                = block_2_ctile_map;
 #endif
 }
+#pragma clang diagnostic pop
 
 template <index_t BlockSize,
           typename InDataType,
@@ -262,7 +265,7 @@ struct GridwiseConv_Wconv
                                                               EnableAsync,
                                                               EnableWaveGroup>())>;
 
-#if FORCE_CONVERT_TO_TENSOR
+#ifdef FORCE_CONVERT_TO_TENSOR
     static constexpr bool ConvertToTensor = true;
 #else
     static constexpr bool ConvertToTensor = false;
@@ -271,56 +274,45 @@ struct GridwiseConv_Wconv
     // Describe the layout of InData in block level (LDS or VGPR)
     __host__ __device__ static constexpr auto MakeInBlockDescriptor()
     {
-        constexpr auto in_block_desc = [&]() {
-            if constexpr(InEnableLds)
-            {
-                // H x W x C Per Block
-                return make_naive_tensor_descriptor_packed(
-                    make_tuple(Number<HPerBlockIn>{}, Number<WPerBlockIn>{}, Number<CPerBlock>{}));
-            }
-            else
-            {
-                // W0 x C0 x H0 x H1 x H2 x W1 x C1
-                return make_naive_tensor_descriptor_packed(
-                    make_tuple(Number<WPerWaveIn / WPerWconv>{},
-                               Number<CPerWave / CPerWconv>{},
-                               Number<HPerWaveIn / HPerWconv>{},
-                               Number<NumSubTilePerImage>{},
-                               I1,
-                               I1,
-                               Number<NumDataCompPerTile>{}));
-            }
-        }();
-
-        return in_block_desc;
+        if constexpr(InEnableLds)
+        {
+            // H x W x C Per Block
+            return make_naive_tensor_descriptor_packed(
+                make_tuple(Number<HPerBlockIn>{}, Number<WPerBlockIn>{}, Number<CPerBlock>{}));
+        }
+        else
+        {
+            // W0 x C0 x H0 x H1 x H2 x W1 x C1
+            return make_naive_tensor_descriptor_packed(make_tuple(Number<WPerWaveIn / WPerWconv>{},
+                                                                  Number<CPerWave / CPerWconv>{},
+                                                                  Number<HPerWaveIn / HPerWconv>{},
+                                                                  Number<NumSubTilePerImage>{},
+                                                                  I1,
+                                                                  I1,
+                                                                  Number<NumDataCompPerTile>{}));
+        }
     }
 
     // Describe the layout of WeiData in block level (LDS or VGPR)
     __host__ __device__ static constexpr auto MakeWeiBlockDescriptor()
     {
-        constexpr auto wei_block_desc = [&]() {
-            if constexpr(WeiEnableLds)
-            {
-                // K x YX x C per block
-                return make_naive_tensor_descriptor_packed(make_tuple(
-                    Number<KPerBlock>{}, Number<FilterSize * FilterSize>{}, Number<CPerBlock>{}));
-            }
-            else
-            {
-                // K0 x C0 x YX x K1 x C1 x C2
-                constexpr index_t NumXY =
-                    (FilterSize == 3) ? NumWeightTap : FilterSize * FilterSize;
-                return make_naive_tensor_descriptor_packed(
-                    make_tuple(Number<KPerWave / KPerWconv>{},
-                               Number<CPerWave / CPerWconv>{},
-                               Number<NumXY>{},
-                               I1,
-                               Number<NumSubTilesPerWeightTap>{},
-                               Number<NumWeightCompPerTile>{}));
-            }
-        }();
-
-        return wei_block_desc;
+        if constexpr(WeiEnableLds)
+        {
+            // K x YX x C per block
+            return make_naive_tensor_descriptor_packed(make_tuple(
+                Number<KPerBlock>{}, Number<FilterSize * FilterSize>{}, Number<CPerBlock>{}));
+        }
+        else
+        {
+            // K0 x C0 x YX x K1 x C1 x C2
+            constexpr index_t NumXY = (FilterSize == 3) ? NumWeightTap : FilterSize * FilterSize;
+            return make_naive_tensor_descriptor_packed(make_tuple(Number<KPerWave / KPerWconv>{},
+                                                                  Number<CPerWave / CPerWconv>{},
+                                                                  Number<NumXY>{},
+                                                                  I1,
+                                                                  Number<NumSubTilesPerWeightTap>{},
+                                                                  Number<NumWeightCompPerTile>{}));
+        }
     }
 
     using BlockwiseConv = BlockwiseConvWconv<ThisThreadBlock,
@@ -899,7 +891,6 @@ struct GridwiseConv_Wconv
             }
             else
             {
-                constexpr index_t Iters   = BlockwiseConv::Iters;
                 auto wei_slice_origin_idx = wconv_conv.CalculateWeiDataThreadOriginDataIndex();
                 auto k0 = (k_block_data_idx_on_grid + wave_idx[I2] * KPerWave) / KPerWconv;
 

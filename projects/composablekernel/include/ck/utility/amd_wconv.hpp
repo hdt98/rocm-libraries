@@ -178,7 +178,7 @@ struct intrin_wconv_f32_bf16<4, 2, 1, 1, 1, 1, Aco, Signed, HighLane>
         reg_c.template AsType<float4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f32_bf16_4x2(
             reg_c.template AsType<float4_t>()[Number<0>{}],
             bit_cast<bf16x4_t>(reg_wei),
-            *reinterpret_cast<const bf16x2_t*>(reg_data[0]),
+            bit_cast<bf16x2_t>(*reg_data[0]),
             GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
     }
@@ -193,8 +193,8 @@ struct intrin_wconv_f32_bf16<4, 2, 1, 1, 1, 2, Aco, Signed, HighLane>
         reg_c.template AsType<float4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f32_bf16_4x2(
             reg_c.template AsType<float4_t>()[Number<0>{}],
             bit_cast<bf16x8_t>(reg_wei),
-            *reinterpret_cast<const bf16x2_t*>(reg_data[0]),
-            *reinterpret_cast<const bf16x2_t*>(reg_data[1]),
+            bit_cast<bf16x2_t>(*reg_data[0]),
+            bit_cast<bf16x2_t>(*reg_data[1]),
             GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() |
                 GetItersMod<2>(),
             0);
@@ -210,10 +210,10 @@ struct intrin_wconv_f32_bf16<4, 2, 1, 1, 1, 4, Aco, Signed, HighLane>
         reg_c.template AsType<float4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f32_bf16_4x2(
             reg_c.template AsType<float4_t>()[Number<0>{}],
             bit_cast<bf16x16_t>(reg_wei),
-            *reinterpret_cast<const bf16x2_t*>(reg_data[0]),
-            *reinterpret_cast<const bf16x2_t*>(reg_data[1]),
-            *reinterpret_cast<const bf16x2_t*>(reg_data[2]),
-            *reinterpret_cast<const bf16x2_t*>(reg_data[3]),
+            bit_cast<bf16x2_t>(*reg_data[0]),
+            bit_cast<bf16x2_t>(*reg_data[1]),
+            bit_cast<bf16x2_t>(*reg_data[2]),
+            bit_cast<bf16x2_t>(*reg_data[3]),
             GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() |
                 GetItersMod<4>(),
             0);
@@ -241,7 +241,7 @@ struct intrin_wconv_f32_f8<4, 2, 1, 1, 1, 1, Aco, Signed, HighLane>
         reg_c.template AsType<float4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f32_fp8_4x2(
             reg_c.template AsType<float4_t>()[Number<0>{}],
             bit_cast<int32x2_t>(reg_wei),
-            *reinterpret_cast<const int32_t*>(reg_data[0]),
+            bit_cast<int32_t>(*reg_data[0]),
             GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
     }
@@ -256,8 +256,8 @@ struct intrin_wconv_f32_f8<4, 2, 1, 1, 1, 2, Aco, Signed, HighLane>
         reg_c.template AsType<float4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f32_fp8_4x2(
             reg_c.template AsType<float4_t>()[Number<0>{}],
             bit_cast<int32x4_t>(reg_wei),
-            *reinterpret_cast<const int32_t*>(reg_data[0]),
-            *reinterpret_cast<const int32_t*>(reg_data[1]),
+            bit_cast<int32_t>(*reg_data[0]),
+            bit_cast<int32_t>(*reg_data[1]),
             GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() |
                 GetItersMod<2>(),
             0);
@@ -273,10 +273,10 @@ struct intrin_wconv_f32_f8<4, 2, 1, 1, 1, 4, Aco, Signed, HighLane>
         reg_c.template AsType<float4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f32_fp8_4x2(
             reg_c.template AsType<float4_t>()[Number<0>{}],
             bit_cast<int32x8_t>(reg_wei),
-            *reinterpret_cast<const int32_t*>(reg_data[0]),
-            *reinterpret_cast<const int32_t*>(reg_data[1]),
-            *reinterpret_cast<const int32_t*>(reg_data[2]),
-            *reinterpret_cast<const int32_t*>(reg_data[3]),
+            bit_cast<int32_t>(*reg_data[0]),
+            bit_cast<int32_t>(*reg_data[1]),
+            bit_cast<int32_t>(*reg_data[2]),
+            bit_cast<int32_t>(*reg_data[3]),
             GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() |
                 GetItersMod<4>(),
             0);
@@ -304,7 +304,7 @@ struct intrin_wconv_f32_bf8<4, 2, 1, 1, 1, 1, Aco, Signed, HighLane>
         reg_c.template AsType<float4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f32_bf8_4x2(
             reg_c.template AsType<float4_t>()[Number<0>{}],
             bit_cast<int32x2_t>(reg_wei),
-            *reinterpret_cast<const int32_t*>(reg_data[0]),
+            bit_cast<int32_t>(*reg_data[0]),
             GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
     }
@@ -319,8 +319,8 @@ struct intrin_wconv_f32_bf8<4, 2, 1, 1, 1, 2, Aco, Signed, HighLane>
         reg_c.template AsType<float4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f32_bf8_4x2(
             reg_c.template AsType<float4_t>()[Number<0>{}],
             bit_cast<int32x4_t>(reg_wei),
-            *reinterpret_cast<const int32_t*>(reg_data[0]),
-            *reinterpret_cast<const int32_t*>(reg_data[1]),
+            bit_cast<int32_t>(*reg_data[0]),
+            bit_cast<int32_t>(*reg_data[1]),
             GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() |
                 GetItersMod<2>(),
             0);
@@ -336,10 +336,10 @@ struct intrin_wconv_f32_bf8<4, 2, 1, 1, 1, 4, Aco, Signed, HighLane>
         reg_c.template AsType<float4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f32_bf8_4x2(
             reg_c.template AsType<float4_t>()[Number<0>{}],
             bit_cast<int32x8_t>(reg_wei),
-            *reinterpret_cast<const int32_t*>(reg_data[0]),
-            *reinterpret_cast<const int32_t*>(reg_data[1]),
-            *reinterpret_cast<const int32_t*>(reg_data[2]),
-            *reinterpret_cast<const int32_t*>(reg_data[3]),
+            bit_cast<int32_t>(*reg_data[0]),
+            bit_cast<int32_t>(*reg_data[1]),
+            bit_cast<int32_t>(*reg_data[2]),
+            bit_cast<int32_t>(*reg_data[3]),
             GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() |
                 GetItersMod<4>(),
             0);
@@ -367,7 +367,7 @@ struct intrin_wconv_f32_iu8<4, 2, 1, 1, 1, 1, Aco, Signed, HighLane>
         reg_c.template AsType<float4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f32_iu8_4x2(
             reg_c.template AsType<float4_t>()[Number<0>{}],
             bit_cast<int32x2_t>(reg_wei),
-            *reinterpret_cast<const int32_t*>(reg_data[0]),
+            bit_cast<int32_t>(*reg_data[0]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
                 GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
@@ -383,8 +383,8 @@ struct intrin_wconv_f32_iu8<4, 2, 1, 1, 1, 2, Aco, Signed, HighLane>
         reg_c.template AsType<float4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f32_iu8_4x2(
             reg_c.template AsType<float4_t>()[Number<0>{}],
             bit_cast<int32x4_t>(reg_wei),
-            *reinterpret_cast<const int32_t*>(reg_data[0]),
-            *reinterpret_cast<const int32_t*>(reg_data[1]),
+            bit_cast<int32_t>(*reg_data[0]),
+            bit_cast<int32_t>(*reg_data[1]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
                 GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() | GetItersMod<2>(),
             0);
@@ -400,10 +400,10 @@ struct intrin_wconv_f32_iu8<4, 2, 1, 1, 1, 4, Aco, Signed, HighLane>
         reg_c.template AsType<float4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f32_iu8_4x2(
             reg_c.template AsType<float4_t>()[Number<0>{}],
             bit_cast<int32x8_t>(reg_wei),
-            *reinterpret_cast<const int32_t*>(reg_data[0]),
-            *reinterpret_cast<const int32_t*>(reg_data[1]),
-            *reinterpret_cast<const int32_t*>(reg_data[2]),
-            *reinterpret_cast<const int32_t*>(reg_data[3]),
+            bit_cast<int32_t>(*reg_data[0]),
+            bit_cast<int32_t>(*reg_data[1]),
+            bit_cast<int32_t>(*reg_data[2]),
+            bit_cast<int32_t>(*reg_data[3]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
                 GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() | GetItersMod<4>(),
             0);
@@ -431,7 +431,7 @@ struct intrin_wconv_i32_iu8<4, 2, 1, 1, 1, 1, Aco, Signed, HighLane>
         reg_c.template AsType<int32x4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_i32_iu8_4x2(
             reg_c.template AsType<int32x4_t>()[Number<0>{}],
             bit_cast<int32x2_t>(reg_wei),
-            *reinterpret_cast<const int32_t*>(reg_data[0]),
+            bit_cast<int32_t>(*reg_data[0]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
                 GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
@@ -447,8 +447,8 @@ struct intrin_wconv_i32_iu8<4, 2, 1, 1, 1, 2, Aco, Signed, HighLane>
         reg_c.template AsType<int32x4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_i32_iu8_4x2(
             reg_c.template AsType<int32x4_t>()[Number<0>{}],
             bit_cast<int32x4_t>(reg_wei),
-            *reinterpret_cast<const int32_t*>(reg_data[0]),
-            *reinterpret_cast<const int32_t*>(reg_data[1]),
+            bit_cast<int32_t>(*reg_data[0]),
+            bit_cast<int32_t>(*reg_data[1]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
                 GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() | GetItersMod<2>(),
             0);
@@ -464,17 +464,17 @@ struct intrin_wconv_i32_iu8<4, 2, 1, 1, 1, 4, Aco, Signed, HighLane>
         reg_c.template AsType<int32x4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_i32_iu8_4x2(
             reg_c.template AsType<int32x4_t>()[Number<0>{}],
             bit_cast<int32x8_t>(reg_wei),
-            *reinterpret_cast<const int32_t*>(reg_data[0]),
-            *reinterpret_cast<const int32_t*>(reg_data[1]),
-            *reinterpret_cast<const int32_t*>(reg_data[2]),
-            *reinterpret_cast<const int32_t*>(reg_data[3]),
+            bit_cast<int32_t>(*reg_data[0]),
+            bit_cast<int32_t>(*reg_data[1]),
+            bit_cast<int32_t>(*reg_data[2]),
+            bit_cast<int32_t>(*reg_data[3]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
                 GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() | GetItersMod<4>(),
             0);
     }
 };
 
-#if CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
+#ifdef CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
 // src: iu4, dst: f32
 template <index_t H,
           index_t W,
@@ -496,7 +496,7 @@ struct intrin_wconv_f32_iu4<4, 2, 1, 1, 1, 1, Aco, Signed, HighLane>
         reg_c.template AsType<float4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f32_iu4_4x2(
             reg_c.template AsType<float4_t>()[Number<0>{}],
             bit_cast<int32x2_t>(reg_wei),
-            *reinterpret_cast<const int32_t*>(reg_data[0]),
+            bit_cast<int32_t>(*reg_data[0]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
                 GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
@@ -512,8 +512,8 @@ struct intrin_wconv_f32_iu4<4, 2, 1, 1, 1, 2, Aco, Signed, HighLane>
         reg_c.template AsType<float4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f32_iu4_4x2(
             reg_c.template AsType<float4_t>()[Number<0>{}],
             bit_cast<int32x4_t>(reg_wei),
-            *reinterpret_cast<const int32_t*>(reg_data[0]),
-            *reinterpret_cast<const int32_t*>(reg_data[1]),
+            bit_cast<int32_t>(*reg_data[0]),
+            bit_cast<int32_t>(*reg_data[1]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
                 GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() | GetItersMod<2>(),
             0);
@@ -529,10 +529,10 @@ struct intrin_wconv_f32_iu4<4, 2, 1, 1, 1, 4, Aco, Signed, HighLane>
         reg_c.template AsType<float4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f32_iu4_4x2(
             reg_c.template AsType<float4_t>()[Number<0>{}],
             bit_cast<int32x8_t>(reg_wei),
-            *reinterpret_cast<const int32_t*>(reg_data[0]),
-            *reinterpret_cast<const int32_t*>(reg_data[1]),
-            *reinterpret_cast<const int32_t*>(reg_data[2]),
-            *reinterpret_cast<const int32_t*>(reg_data[3]),
+            bit_cast<int32_t>(*reg_data[0]),
+            bit_cast<int32_t>(*reg_data[1]),
+            bit_cast<int32_t>(*reg_data[2]),
+            bit_cast<int32_t>(*reg_data[3]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
                 GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() | GetItersMod<4>(),
             0);
@@ -560,7 +560,7 @@ struct intrin_wconv_i32_iu4<4, 2, 1, 1, 1, 1, Aco, Signed, HighLane>
         reg_c.template AsType<int32x4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_i32_iu4_4x2(
             reg_c.template AsType<int32x4_t>()[Number<0>{}],
             bit_cast<int32x2_t>(reg_wei),
-            *reinterpret_cast<const int32_t*>(reg_data[0]),
+            bit_cast<int32_t>(*reg_data[0]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
                 GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
@@ -576,8 +576,8 @@ struct intrin_wconv_i32_iu4<4, 2, 1, 1, 1, 2, Aco, Signed, HighLane>
         reg_c.template AsType<int32x4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_i32_iu4_4x2(
             reg_c.template AsType<int32x4_t>()[Number<0>{}],
             bit_cast<int32x4_t>(reg_wei),
-            *reinterpret_cast<const int32_t*>(reg_data[0]),
-            *reinterpret_cast<const int32_t*>(reg_data[1]),
+            bit_cast<int32_t>(*reg_data[0]),
+            bit_cast<int32_t>(*reg_data[1]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
                 GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() | GetItersMod<2>(),
             0);
@@ -593,10 +593,10 @@ struct intrin_wconv_i32_iu4<4, 2, 1, 1, 1, 4, Aco, Signed, HighLane>
         reg_c.template AsType<int32x4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_i32_iu4_4x2(
             reg_c.template AsType<int32x4_t>()[Number<0>{}],
             bit_cast<int32x8_t>(reg_wei),
-            *reinterpret_cast<const int32_t*>(reg_data[0]),
-            *reinterpret_cast<const int32_t*>(reg_data[1]),
-            *reinterpret_cast<const int32_t*>(reg_data[2]),
-            *reinterpret_cast<const int32_t*>(reg_data[3]),
+            bit_cast<int32_t>(*reg_data[0]),
+            bit_cast<int32_t>(*reg_data[1]),
+            bit_cast<int32_t>(*reg_data[2]),
+            bit_cast<int32_t>(*reg_data[3]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
                 GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() | GetItersMod<4>(),
             0);
@@ -791,7 +791,7 @@ struct intrin_wconv_bf16_bf16<4, 2, 1, 1, 1, 1, Aco, Signed, HighLane>
             bit_cast<bhalf4_t>(__builtin_amdgcn_convolve_bf16_bf16_4x2(
                 bit_cast<bf16x4_t>(reg_c.template AsType<bhalf4_t>()[Number<0>{}]),
                 bit_cast<bf16x4_t>(reg_wei),
-                *reinterpret_cast<const bf16x2_t*>(reg_data[0]),
+                bit_cast<bf16x2_t>(*reg_data[0]),
                 GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() |
                     GetStartLaneMod<HighLane>(),
                 0));
@@ -808,8 +808,8 @@ struct intrin_wconv_bf16_bf16<4, 2, 1, 1, 1, 2, Aco, Signed, HighLane>
             bit_cast<bhalf4_t>(__builtin_amdgcn_convolve_bf16_bf16_4x2(
                 bit_cast<bf16x4_t>(reg_c.template AsType<bhalf4_t>()[Number<0>{}]),
                 bit_cast<bf16x8_t>(reg_wei),
-                *reinterpret_cast<const bf16x2_t*>(reg_data[0]),
-                *reinterpret_cast<const bf16x2_t*>(reg_data[1]),
+                bit_cast<bf16x2_t>(*reg_data[0]),
+                bit_cast<bf16x2_t>(*reg_data[1]),
                 GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() |
                     GetStartLaneMod<HighLane>() | GetItersMod<2>(),
                 0));
@@ -826,10 +826,10 @@ struct intrin_wconv_bf16_bf16<4, 2, 1, 1, 1, 4, Aco, Signed, HighLane>
             bit_cast<bhalf4_t>(__builtin_amdgcn_convolve_bf16_bf16_4x2(
                 bit_cast<bf16x4_t>(reg_c.template AsType<bhalf4_t>()[Number<0>{}]),
                 bit_cast<bf16x16_t>(reg_wei),
-                *reinterpret_cast<const bf16x2_t*>(reg_data[0]),
-                *reinterpret_cast<const bf16x2_t*>(reg_data[1]),
-                *reinterpret_cast<const bf16x2_t*>(reg_data[2]),
-                *reinterpret_cast<const bf16x2_t*>(reg_data[3]),
+                bit_cast<bf16x2_t>(*reg_data[0]),
+                bit_cast<bf16x2_t>(*reg_data[1]),
+                bit_cast<bf16x2_t>(*reg_data[2]),
+                bit_cast<bf16x2_t>(*reg_data[3]),
                 GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() |
                     GetStartLaneMod<HighLane>() | GetItersMod<4>(),
                 0));
@@ -846,7 +846,7 @@ struct intrin_wconv_bf16_bf16<4, 4, 1, 1, 1, 1, Aco, Signed, HighLane>
             bit_cast<bhalf8_t>(__builtin_amdgcn_convolve_bf16_bf16_4x4(
                 bit_cast<bf16x8_t>(reg_c.template AsType<bhalf8_t>()[Number<0>{}]),
                 bit_cast<bf16x2_t>(reg_wei),
-                *reinterpret_cast<const bf16x2_t*>(reg_data[0]),
+                bit_cast<bf16x2_t>(*reg_data[0]),
                 GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() |
                     GetStartLaneMod<HighLane>(),
                 0));
@@ -863,8 +863,8 @@ struct intrin_wconv_bf16_bf16<4, 4, 1, 1, 1, 2, Aco, Signed, HighLane>
             bit_cast<bhalf8_t>(__builtin_amdgcn_convolve_bf16_bf16_4x4(
                 bit_cast<bf16x8_t>(reg_c.template AsType<bhalf8_t>()[Number<0>{}]),
                 bit_cast<bf16x4_t>(reg_wei),
-                *reinterpret_cast<const bf16x2_t*>(reg_data[0]),
-                *reinterpret_cast<const bf16x2_t*>(reg_data[1]),
+                bit_cast<bf16x2_t>(*reg_data[0]),
+                bit_cast<bf16x2_t>(*reg_data[1]),
                 GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() |
                     GetStartLaneMod<HighLane>() | GetItersMod<2>(),
                 0));
@@ -881,10 +881,10 @@ struct intrin_wconv_bf16_bf16<4, 4, 1, 1, 1, 4, Aco, Signed, HighLane>
             bit_cast<bhalf8_t>(__builtin_amdgcn_convolve_bf16_bf16_4x4(
                 bit_cast<bf16x8_t>(reg_c.template AsType<bhalf8_t>()[Number<0>{}]),
                 bit_cast<bf16x8_t>(reg_wei),
-                *reinterpret_cast<const bf16x2_t*>(reg_data[0]),
-                *reinterpret_cast<const bf16x2_t*>(reg_data[1]),
-                *reinterpret_cast<const bf16x2_t*>(reg_data[2]),
-                *reinterpret_cast<const bf16x2_t*>(reg_data[3]),
+                bit_cast<bf16x2_t>(*reg_data[0]),
+                bit_cast<bf16x2_t>(*reg_data[1]),
+                bit_cast<bf16x2_t>(*reg_data[2]),
+                bit_cast<bf16x2_t>(*reg_data[3]),
                 GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() |
                     GetStartLaneMod<HighLane>() | GetItersMod<4>(),
                 0));
@@ -901,7 +901,7 @@ struct intrin_wconv_bf16_bf16<8, 4, 1, 1, 1, 1, Aco, Signed, HighLane>
             bit_cast<bhalf8_t>(__builtin_amdgcn_convolve_bf16_bf16_8x4(
                 bit_cast<bf16x8_t>(reg_c.template AsType<bhalf8_t>()[Number<0>{}]),
                 bit_cast<bf16x2_t>(reg_wei),
-                *reinterpret_cast<const bf16x4_t*>(reg_data[0]),
+                bit_cast<bf16x4_t>(*reg_data[0]),
                 GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() |
                     GetStartLaneMod<HighLane>(),
                 0));
@@ -918,8 +918,8 @@ struct intrin_wconv_bf16_bf16<8, 4, 1, 1, 1, 2, Aco, Signed, HighLane>
             bit_cast<bhalf8_t>(__builtin_amdgcn_convolve_bf16_bf16_8x4(
                 bit_cast<bf16x8_t>(reg_c.template AsType<bhalf8_t>()[Number<0>{}]),
                 bit_cast<bf16x2_t>(reg_wei),
-                *reinterpret_cast<const bf16x4_t*>(reg_data[0]),
-                *reinterpret_cast<const bf16x4_t*>(reg_data[1]),
+                bit_cast<bf16x4_t>(*reg_data[0]),
+                bit_cast<bf16x4_t>(*reg_data[1]),
                 GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() |
                     GetStartLaneMod<HighLane>() | GetItersMod<2>(),
                 0));
@@ -936,10 +936,10 @@ struct intrin_wconv_bf16_bf16<8, 4, 1, 1, 1, 4, Aco, Signed, HighLane>
             bit_cast<bhalf8_t>(__builtin_amdgcn_convolve_bf16_bf16_8x4(
                 bit_cast<bf16x8_t>(reg_c.template AsType<bhalf8_t>()[Number<0>{}]),
                 bit_cast<bf16x4_t>(reg_wei),
-                *reinterpret_cast<const bf16x4_t*>(reg_data[0]),
-                *reinterpret_cast<const bf16x4_t*>(reg_data[1]),
-                *reinterpret_cast<const bf16x4_t*>(reg_data[2]),
-                *reinterpret_cast<const bf16x4_t*>(reg_data[3]),
+                bit_cast<bf16x4_t>(*reg_data[0]),
+                bit_cast<bf16x4_t>(*reg_data[1]),
+                bit_cast<bf16x4_t>(*reg_data[2]),
+                bit_cast<bf16x4_t>(*reg_data[3]),
                 GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() |
                     GetStartLaneMod<HighLane>() | GetItersMod<4>(),
                 0));
@@ -968,7 +968,7 @@ struct intrin_wconv_bf16_bf8<4, 2, 1, 1, 1, 1, Aco, Signed, HighLane>
             bit_cast<bhalf4_t>(__builtin_amdgcn_convolve_bf16_bf8_4x2(
                 bit_cast<bf16x4_t>(reg_c.template AsType<bhalf4_t>()[Number<0>{}]),
                 bit_cast<int32x2_t>(reg_wei),
-                *reinterpret_cast<const int32_t*>(reg_data[0]),
+                bit_cast<int32_t>(*reg_data[0]),
                 GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() |
                     GetStartLaneMod<HighLane>(),
                 0));
@@ -985,8 +985,8 @@ struct intrin_wconv_bf16_bf8<4, 2, 1, 1, 1, 2, Aco, Signed, HighLane>
             bit_cast<bhalf4_t>(__builtin_amdgcn_convolve_bf16_bf8_4x2(
                 bit_cast<bf16x4_t>(reg_c.template AsType<bhalf4_t>()[Number<0>{}]),
                 bit_cast<int32x4_t>(reg_wei),
-                *reinterpret_cast<const int32_t*>(reg_data[0]),
-                *reinterpret_cast<const int32_t*>(reg_data[1]),
+                bit_cast<int32_t>(*reg_data[0]),
+                bit_cast<int32_t>(*reg_data[1]),
                 GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() |
                     GetStartLaneMod<HighLane>() | GetItersMod<2>(),
                 0));
@@ -1003,10 +1003,10 @@ struct intrin_wconv_bf16_bf8<4, 2, 1, 1, 1, 4, Aco, Signed, HighLane>
             bit_cast<bhalf4_t>(__builtin_amdgcn_convolve_bf16_bf8_4x2(
                 bit_cast<bf16x4_t>(reg_c.template AsType<bhalf4_t>()[Number<0>{}]),
                 bit_cast<int32x8_t>(reg_wei),
-                *reinterpret_cast<const int32_t*>(reg_data[0]),
-                *reinterpret_cast<const int32_t*>(reg_data[1]),
-                *reinterpret_cast<const int32_t*>(reg_data[2]),
-                *reinterpret_cast<const int32_t*>(reg_data[3]),
+                bit_cast<int32_t>(*reg_data[0]),
+                bit_cast<int32_t>(*reg_data[1]),
+                bit_cast<int32_t>(*reg_data[2]),
+                bit_cast<int32_t>(*reg_data[3]),
                 GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() |
                     GetStartLaneMod<HighLane>() | GetItersMod<4>(),
                 0));
@@ -1023,7 +1023,7 @@ struct intrin_wconv_bf16_bf8<4, 4, 1, 1, 1, 1, Aco, Signed, HighLane>
             bit_cast<bhalf8_t>(__builtin_amdgcn_convolve_bf16_bf8_4x4(
                 bit_cast<bf16x8_t>(reg_c.template AsType<bhalf8_t>()[Number<0>{}]),
                 bit_cast<int32_t>(reg_wei),
-                *reinterpret_cast<const int32_t*>(reg_data[0]),
+                bit_cast<int32_t>(*reg_data[0]),
                 GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() |
                     GetStartLaneMod<HighLane>(),
                 0));
@@ -1040,8 +1040,8 @@ struct intrin_wconv_bf16_bf8<4, 4, 1, 1, 1, 2, Aco, Signed, HighLane>
             bit_cast<bhalf8_t>(__builtin_amdgcn_convolve_bf16_bf8_4x4(
                 bit_cast<bf16x8_t>(reg_c.template AsType<bhalf8_t>()[Number<0>{}]),
                 bit_cast<int32x2_t>(reg_wei),
-                *reinterpret_cast<const int32_t*>(reg_data[0]),
-                *reinterpret_cast<const int32_t*>(reg_data[1]),
+                bit_cast<int32_t>(*reg_data[0]),
+                bit_cast<int32_t>(*reg_data[1]),
                 GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() |
                     GetStartLaneMod<HighLane>() | GetItersMod<2>(),
                 0));
@@ -1058,10 +1058,10 @@ struct intrin_wconv_bf16_bf8<4, 4, 1, 1, 1, 4, Aco, Signed, HighLane>
             bit_cast<bhalf8_t>(__builtin_amdgcn_convolve_bf16_bf8_4x4(
                 bit_cast<bf16x8_t>(reg_c.template AsType<bhalf8_t>()[Number<0>{}]),
                 bit_cast<int32x4_t>(reg_wei),
-                *reinterpret_cast<const int32_t*>(reg_data[0]),
-                *reinterpret_cast<const int32_t*>(reg_data[1]),
-                *reinterpret_cast<const int32_t*>(reg_data[2]),
-                *reinterpret_cast<const int32_t*>(reg_data[3]),
+                bit_cast<int32_t>(*reg_data[0]),
+                bit_cast<int32_t>(*reg_data[1]),
+                bit_cast<int32_t>(*reg_data[2]),
+                bit_cast<int32_t>(*reg_data[3]),
                 GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() |
                     GetStartLaneMod<HighLane>() | GetItersMod<4>(),
                 0));
@@ -1078,7 +1078,7 @@ struct intrin_wconv_bf16_bf8<8, 4, 1, 1, 1, 1, Aco, Signed, HighLane>
             bit_cast<bhalf8_t>(__builtin_amdgcn_convolve_bf16_bf8_8x4(
                 bit_cast<bf16x8_t>(reg_c.template AsType<bhalf8_t>()[Number<0>{}]),
                 bit_cast<int32_t>(reg_wei),
-                *reinterpret_cast<const int32x2_t*>(reg_data[0]),
+                bit_cast<int32x2_t>(*reg_data[0]),
                 GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() |
                     GetStartLaneMod<HighLane>(),
                 0));
@@ -1095,8 +1095,8 @@ struct intrin_wconv_bf16_bf8<8, 4, 1, 1, 1, 2, Aco, Signed, HighLane>
             bit_cast<bhalf8_t>(__builtin_amdgcn_convolve_bf16_bf8_8x4(
                 bit_cast<bf16x8_t>(reg_c.template AsType<bhalf8_t>()[Number<0>{}]),
                 bit_cast<int32_t>(reg_wei),
-                *reinterpret_cast<const int32x2_t*>(reg_data[0]),
-                *reinterpret_cast<const int32x2_t*>(reg_data[1]),
+                bit_cast<int32x2_t>(*reg_data[0]),
+                bit_cast<int32x2_t>(*reg_data[1]),
                 GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() |
                     GetStartLaneMod<HighLane>() | GetItersMod<2>(),
                 0));
@@ -1113,10 +1113,10 @@ struct intrin_wconv_bf16_bf8<8, 4, 1, 1, 1, 4, Aco, Signed, HighLane>
             bit_cast<bhalf8_t>(__builtin_amdgcn_convolve_bf16_bf8_8x4(
                 bit_cast<bf16x8_t>(reg_c.template AsType<bhalf8_t>()[Number<0>{}]),
                 bit_cast<int32x2_t>(reg_wei),
-                *reinterpret_cast<const int32x2_t*>(reg_data[0]),
-                *reinterpret_cast<const int32x2_t*>(reg_data[1]),
-                *reinterpret_cast<const int32x2_t*>(reg_data[2]),
-                *reinterpret_cast<const int32x2_t*>(reg_data[3]),
+                bit_cast<int32x2_t>(*reg_data[0]),
+                bit_cast<int32x2_t>(*reg_data[1]),
+                bit_cast<int32x2_t>(*reg_data[2]),
+                bit_cast<int32x2_t>(*reg_data[3]),
                 GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() |
                     GetStartLaneMod<HighLane>() | GetItersMod<4>(),
                 0));
@@ -1144,7 +1144,7 @@ struct intrin_wconv_f16_f8<4, 2, 1, 1, 1, 1, Aco, Signed, HighLane>
         reg_c.template AsType<half4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f16_fp8_4x2(
             reg_c.template AsType<half4_t>()[Number<0>{}],
             bit_cast<int32x2_t>(reg_wei),
-            *reinterpret_cast<const int32_t*>(reg_data[0]),
+            bit_cast<int32_t>(*reg_data[0]),
             GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
     }
@@ -1159,8 +1159,8 @@ struct intrin_wconv_f16_f8<4, 2, 1, 1, 1, 2, Aco, Signed, HighLane>
         reg_c.template AsType<half4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f16_fp8_4x2(
             reg_c.template AsType<half4_t>()[Number<0>{}],
             bit_cast<int32x4_t>(reg_wei),
-            *reinterpret_cast<const int32_t*>(reg_data[0]),
-            *reinterpret_cast<const int32_t*>(reg_data[1]),
+            bit_cast<int32_t>(*reg_data[0]),
+            bit_cast<int32_t>(*reg_data[1]),
             GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() |
                 GetItersMod<2>(),
             0);
@@ -1176,10 +1176,10 @@ struct intrin_wconv_f16_f8<4, 2, 1, 1, 1, 4, Aco, Signed, HighLane>
         reg_c.template AsType<half4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f16_fp8_4x2(
             reg_c.template AsType<half4_t>()[Number<0>{}],
             bit_cast<int32x8_t>(reg_wei),
-            *reinterpret_cast<const int32_t*>(reg_data[0]),
-            *reinterpret_cast<const int32_t*>(reg_data[1]),
-            *reinterpret_cast<const int32_t*>(reg_data[2]),
-            *reinterpret_cast<const int32_t*>(reg_data[3]),
+            bit_cast<int32_t>(*reg_data[0]),
+            bit_cast<int32_t>(*reg_data[1]),
+            bit_cast<int32_t>(*reg_data[2]),
+            bit_cast<int32_t>(*reg_data[3]),
             GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() |
                 GetItersMod<4>(),
             0);
@@ -1195,7 +1195,7 @@ struct intrin_wconv_f16_f8<4, 4, 1, 1, 1, 1, Aco, Signed, HighLane>
         reg_c.template AsType<half8_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f16_fp8_4x4(
             reg_c.template AsType<half8_t>()[Number<0>{}],
             bit_cast<int32_t>(reg_wei),
-            *reinterpret_cast<const int32_t*>(reg_data[0]),
+            bit_cast<int32_t>(*reg_data[0]),
             GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
     }
@@ -1210,8 +1210,8 @@ struct intrin_wconv_f16_f8<4, 4, 1, 1, 1, 2, Aco, Signed, HighLane>
         reg_c.template AsType<half8_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f16_fp8_4x4(
             reg_c.template AsType<half8_t>()[Number<0>{}],
             bit_cast<int32x2_t>(reg_wei),
-            *reinterpret_cast<const int32_t*>(reg_data[0]),
-            *reinterpret_cast<const int32_t*>(reg_data[1]),
+            bit_cast<int32_t>(*reg_data[0]),
+            bit_cast<int32_t>(*reg_data[1]),
             GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() |
                 GetItersMod<2>(),
             0);
@@ -1227,10 +1227,10 @@ struct intrin_wconv_f16_f8<4, 4, 1, 1, 1, 4, Aco, Signed, HighLane>
         reg_c.template AsType<half8_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f16_fp8_4x4(
             reg_c.template AsType<half8_t>()[Number<0>{}],
             bit_cast<int32x4_t>(reg_wei),
-            *reinterpret_cast<const int32_t*>(reg_data[0]),
-            *reinterpret_cast<const int32_t*>(reg_data[1]),
-            *reinterpret_cast<const int32_t*>(reg_data[2]),
-            *reinterpret_cast<const int32_t*>(reg_data[3]),
+            bit_cast<int32_t>(*reg_data[0]),
+            bit_cast<int32_t>(*reg_data[1]),
+            bit_cast<int32_t>(*reg_data[2]),
+            bit_cast<int32_t>(*reg_data[3]),
             GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() |
                 GetItersMod<4>(),
             0);
@@ -1246,7 +1246,7 @@ struct intrin_wconv_f16_f8<8, 4, 1, 1, 1, 1, Aco, Signed, HighLane>
         reg_c.template AsType<half8_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f16_fp8_8x4(
             reg_c.template AsType<half8_t>()[Number<0>{}],
             bit_cast<int32_t>(reg_wei),
-            *reinterpret_cast<const int32x2_t*>(reg_data[0]),
+            bit_cast<int32x2_t>(*reg_data[0]),
             GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
     }
@@ -1261,8 +1261,8 @@ struct intrin_wconv_f16_f8<8, 4, 1, 1, 1, 2, Aco, Signed, HighLane>
         reg_c.template AsType<half8_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f16_fp8_8x4(
             reg_c.template AsType<half8_t>()[Number<0>{}],
             bit_cast<int32_t>(reg_wei),
-            *reinterpret_cast<const int32x2_t*>(reg_data[0]),
-            *reinterpret_cast<const int32x2_t*>(reg_data[1]),
+            bit_cast<int32x2_t>(*reg_data[0]),
+            bit_cast<int32x2_t>(*reg_data[1]),
             GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() |
                 GetItersMod<2>(),
             0);
@@ -1278,10 +1278,10 @@ struct intrin_wconv_f16_f8<8, 4, 1, 1, 1, 4, Aco, Signed, HighLane>
         reg_c.template AsType<half8_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f16_fp8_8x4(
             reg_c.template AsType<half8_t>()[Number<0>{}],
             bit_cast<int32x2_t>(reg_wei),
-            *reinterpret_cast<const int32x2_t*>(reg_data[0]),
-            *reinterpret_cast<const int32x2_t*>(reg_data[1]),
-            *reinterpret_cast<const int32x2_t*>(reg_data[2]),
-            *reinterpret_cast<const int32x2_t*>(reg_data[3]),
+            bit_cast<int32x2_t>(*reg_data[0]),
+            bit_cast<int32x2_t>(*reg_data[1]),
+            bit_cast<int32x2_t>(*reg_data[2]),
+            bit_cast<int32x2_t>(*reg_data[3]),
             GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() |
                 GetItersMod<4>(),
             0);
@@ -1309,7 +1309,7 @@ struct intrin_wconv_f16_iu8<4, 2, 1, 1, 1, 1, Aco, Signed, HighLane>
         reg_c.template AsType<half4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f16_iu8_4x2(
             reg_c.template AsType<half4_t>()[Number<0>{}],
             bit_cast<int32x2_t>(reg_wei),
-            *reinterpret_cast<const int32_t*>(reg_data[0]),
+            bit_cast<int32_t>(*reg_data[0]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
                 GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
@@ -1325,8 +1325,8 @@ struct intrin_wconv_f16_iu8<4, 2, 1, 1, 1, 2, Aco, Signed, HighLane>
         reg_c.template AsType<half4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f16_iu8_4x2(
             reg_c.template AsType<half4_t>()[Number<0>{}],
             bit_cast<int32x4_t>(reg_wei),
-            *reinterpret_cast<const int32_t*>(reg_data[0]),
-            *reinterpret_cast<const int32_t*>(reg_data[1]),
+            bit_cast<int32_t>(*reg_data[0]),
+            bit_cast<int32_t>(*reg_data[1]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
                 GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() | GetItersMod<2>(),
             0);
@@ -1342,10 +1342,10 @@ struct intrin_wconv_f16_iu8<4, 2, 1, 1, 1, 4, Aco, Signed, HighLane>
         reg_c.template AsType<half4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f16_iu8_4x2(
             reg_c.template AsType<half4_t>()[Number<0>{}],
             bit_cast<int32x8_t>(reg_wei),
-            *reinterpret_cast<const int32_t*>(reg_data[0]),
-            *reinterpret_cast<const int32_t*>(reg_data[1]),
-            *reinterpret_cast<const int32_t*>(reg_data[2]),
-            *reinterpret_cast<const int32_t*>(reg_data[3]),
+            bit_cast<int32_t>(*reg_data[0]),
+            bit_cast<int32_t>(*reg_data[1]),
+            bit_cast<int32_t>(*reg_data[2]),
+            bit_cast<int32_t>(*reg_data[3]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
                 GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() | GetItersMod<4>(),
             0);
@@ -1361,7 +1361,7 @@ struct intrin_wconv_f16_iu8<4, 4, 1, 1, 1, 1, Aco, Signed, HighLane>
         reg_c.template AsType<half8_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f16_iu8_4x4(
             reg_c.template AsType<half8_t>()[Number<0>{}],
             bit_cast<int32_t>(reg_wei),
-            *reinterpret_cast<const int32_t*>(reg_data[0]),
+            bit_cast<int32_t>(*reg_data[0]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
                 GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
@@ -1377,8 +1377,8 @@ struct intrin_wconv_f16_iu8<4, 4, 1, 1, 1, 2, Aco, Signed, HighLane>
         reg_c.template AsType<half8_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f16_iu8_4x4(
             reg_c.template AsType<half8_t>()[Number<0>{}],
             bit_cast<int32x2_t>(reg_wei),
-            *reinterpret_cast<const int32_t*>(reg_data[0]),
-            *reinterpret_cast<const int32_t*>(reg_data[1]),
+            bit_cast<int32_t>(*reg_data[0]),
+            bit_cast<int32_t>(*reg_data[1]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
                 GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() | GetItersMod<2>(),
             0);
@@ -1394,10 +1394,10 @@ struct intrin_wconv_f16_iu8<4, 4, 1, 1, 1, 4, Aco, Signed, HighLane>
         reg_c.template AsType<half8_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f16_iu8_4x4(
             reg_c.template AsType<half8_t>()[Number<0>{}],
             bit_cast<int32x4_t>(reg_wei),
-            *reinterpret_cast<const int32_t*>(reg_data[0]),
-            *reinterpret_cast<const int32_t*>(reg_data[1]),
-            *reinterpret_cast<const int32_t*>(reg_data[2]),
-            *reinterpret_cast<const int32_t*>(reg_data[3]),
+            bit_cast<int32_t>(*reg_data[0]),
+            bit_cast<int32_t>(*reg_data[1]),
+            bit_cast<int32_t>(*reg_data[2]),
+            bit_cast<int32_t>(*reg_data[3]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
                 GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() | GetItersMod<4>(),
             0);
@@ -1413,7 +1413,7 @@ struct intrin_wconv_f16_iu8<8, 4, 1, 1, 1, 1, Aco, Signed, HighLane>
         reg_c.template AsType<half8_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f16_iu8_8x4(
             reg_c.template AsType<half8_t>()[Number<0>{}],
             bit_cast<int32_t>(reg_wei),
-            *reinterpret_cast<const int32x2_t*>(reg_data[0]),
+            bit_cast<int32x2_t>(*reg_data[0]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
                 GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
@@ -1429,8 +1429,8 @@ struct intrin_wconv_f16_iu8<8, 4, 1, 1, 1, 2, Aco, Signed, HighLane>
         reg_c.template AsType<half8_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f16_iu8_8x4(
             reg_c.template AsType<half8_t>()[Number<0>{}],
             bit_cast<int32_t>(reg_wei),
-            *reinterpret_cast<const int32x2_t*>(reg_data[0]),
-            *reinterpret_cast<const int32x2_t*>(reg_data[1]),
+            bit_cast<int32x2_t>(*reg_data[0]),
+            bit_cast<int32x2_t>(*reg_data[1]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
                 GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() | GetItersMod<2>(),
             0);
@@ -1446,17 +1446,17 @@ struct intrin_wconv_f16_iu8<8, 4, 1, 1, 1, 4, Aco, Signed, HighLane>
         reg_c.template AsType<half8_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f16_iu8_8x4(
             reg_c.template AsType<half8_t>()[Number<0>{}],
             bit_cast<int32x2_t>(reg_wei),
-            *reinterpret_cast<const int32x2_t*>(reg_data[0]),
-            *reinterpret_cast<const int32x2_t*>(reg_data[1]),
-            *reinterpret_cast<const int32x2_t*>(reg_data[2]),
-            *reinterpret_cast<const int32x2_t*>(reg_data[3]),
+            bit_cast<int32x2_t>(*reg_data[0]),
+            bit_cast<int32x2_t>(*reg_data[1]),
+            bit_cast<int32x2_t>(*reg_data[2]),
+            bit_cast<int32x2_t>(*reg_data[3]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
                 GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() | GetItersMod<4>(),
             0);
     }
 };
 
-#if CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
+#ifdef CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
 // src: iu4, dst: f16
 template <index_t H,
           index_t W,
@@ -1478,7 +1478,7 @@ struct intrin_wconv_f16_iu4<4, 2, 1, 1, 1, 1, Aco, Signed, HighLane>
         reg_c.template AsType<half4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f16_iu4_4x2(
             reg_c.template AsType<half4_t>()[Number<0>{}],
             bit_cast<int32x2_t>(reg_wei),
-            *reinterpret_cast<const int32_t*>(reg_data[0]),
+            bit_cast<int32_t>(*reg_data[0]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
                 GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
@@ -1494,8 +1494,8 @@ struct intrin_wconv_f16_iu4<4, 2, 1, 1, 1, 2, Aco, Signed, HighLane>
         reg_c.template AsType<half4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f16_iu4_4x2(
             reg_c.template AsType<half4_t>()[Number<0>{}],
             bit_cast<int32x4_t>(reg_wei),
-            *reinterpret_cast<const int32_t*>(reg_data[0]),
-            *reinterpret_cast<const int32_t*>(reg_data[1]),
+            bit_cast<int32_t>(*reg_data[0]),
+            bit_cast<int32_t>(*reg_data[1]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
                 GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() | GetItersMod<2>(),
             0);
@@ -1511,10 +1511,10 @@ struct intrin_wconv_f16_iu4<4, 2, 1, 1, 1, 4, Aco, Signed, HighLane>
         reg_c.template AsType<half4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f16_iu4_4x2(
             reg_c.template AsType<half4_t>()[Number<0>{}],
             bit_cast<int32x8_t>(reg_wei),
-            *reinterpret_cast<const int32_t*>(reg_data[0]),
-            *reinterpret_cast<const int32_t*>(reg_data[1]),
-            *reinterpret_cast<const int32_t*>(reg_data[2]),
-            *reinterpret_cast<const int32_t*>(reg_data[3]),
+            bit_cast<int32_t>(*reg_data[0]),
+            bit_cast<int32_t>(*reg_data[1]),
+            bit_cast<int32_t>(*reg_data[2]),
+            bit_cast<int32_t>(*reg_data[3]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
                 GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() | GetItersMod<4>(),
             0);
@@ -1530,7 +1530,7 @@ struct intrin_wconv_f16_iu4<4, 4, 1, 1, 1, 1, Aco, Signed, HighLane>
         reg_c.template AsType<half8_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f16_iu4_4x4(
             reg_c.template AsType<half8_t>()[Number<0>{}],
             bit_cast<int32_t>(reg_wei),
-            *reinterpret_cast<const int32_t*>(reg_data[0]),
+            bit_cast<int32_t>(*reg_data[0]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
                 GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
@@ -1546,8 +1546,8 @@ struct intrin_wconv_f16_iu4<4, 4, 1, 1, 1, 2, Aco, Signed, HighLane>
         reg_c.template AsType<half8_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f16_iu4_4x4(
             reg_c.template AsType<half8_t>()[Number<0>{}],
             bit_cast<int32x2_t>(reg_wei),
-            *reinterpret_cast<const int32_t*>(reg_data[0]),
-            *reinterpret_cast<const int32_t*>(reg_data[1]),
+            bit_cast<int32_t>(*reg_data[0]),
+            bit_cast<int32_t>(*reg_data[1]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
                 GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() | GetItersMod<2>(),
             0);
@@ -1563,10 +1563,10 @@ struct intrin_wconv_f16_iu4<4, 4, 1, 1, 1, 4, Aco, Signed, HighLane>
         reg_c.template AsType<half8_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f16_iu4_4x4(
             reg_c.template AsType<half8_t>()[Number<0>{}],
             bit_cast<int32x4_t>(reg_wei),
-            *reinterpret_cast<const int32_t*>(reg_data[0]),
-            *reinterpret_cast<const int32_t*>(reg_data[1]),
-            *reinterpret_cast<const int32_t*>(reg_data[2]),
-            *reinterpret_cast<const int32_t*>(reg_data[3]),
+            bit_cast<int32_t>(*reg_data[0]),
+            bit_cast<int32_t>(*reg_data[1]),
+            bit_cast<int32_t>(*reg_data[2]),
+            bit_cast<int32_t>(*reg_data[3]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
                 GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() | GetItersMod<4>(),
             0);
@@ -1582,7 +1582,7 @@ struct intrin_wconv_f16_iu4<8, 4, 1, 1, 1, 1, Aco, Signed, HighLane>
         reg_c.template AsType<half8_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f16_iu4_8x4(
             reg_c.template AsType<half8_t>()[Number<0>{}],
             bit_cast<int32_t>(reg_wei),
-            *reinterpret_cast<const int32x2_t*>(reg_data[0]),
+            bit_cast<int32x2_t>(*reg_data[0]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
                 GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
@@ -1598,8 +1598,8 @@ struct intrin_wconv_f16_iu4<8, 4, 1, 1, 1, 2, Aco, Signed, HighLane>
         reg_c.template AsType<half8_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f16_iu4_8x4(
             reg_c.template AsType<half8_t>()[Number<0>{}],
             bit_cast<int32_t>(reg_wei),
-            *reinterpret_cast<const int32x2_t*>(reg_data[0]),
-            *reinterpret_cast<const int32x2_t*>(reg_data[1]),
+            bit_cast<int32x2_t>(*reg_data[0]),
+            bit_cast<int32x2_t>(*reg_data[1]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
                 GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() | GetItersMod<2>(),
             0);
@@ -1615,10 +1615,10 @@ struct intrin_wconv_f16_iu4<8, 4, 1, 1, 1, 4, Aco, Signed, HighLane>
         reg_c.template AsType<half8_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f16_iu4_8x4(
             reg_c.template AsType<half8_t>()[Number<0>{}],
             bit_cast<int32x2_t>(reg_wei),
-            *reinterpret_cast<const int32x2_t*>(reg_data[0]),
-            *reinterpret_cast<const int32x2_t*>(reg_data[1]),
-            *reinterpret_cast<const int32x2_t*>(reg_data[2]),
-            *reinterpret_cast<const int32x2_t*>(reg_data[3]),
+            bit_cast<int32x2_t>(*reg_data[0]),
+            bit_cast<int32x2_t>(*reg_data[1]),
+            bit_cast<int32x2_t>(*reg_data[2]),
+            bit_cast<int32x2_t>(*reg_data[3]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
                 GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() | GetItersMod<4>(),
             0);
@@ -1656,9 +1656,9 @@ struct intrin_wconv_f32_bf16<4, 2, 3, DilationX, DilationY, 1, Aco, Signed, High
         reg_c.template AsType<float4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f32_bf16_4x2(
             reg_c.template AsType<float4_t>()[Number<0>{}],
             bit_cast<bf16x36_t>(reg_wei),
-            *reinterpret_cast<const bf16x6_t*>(reg_data[1]),
-            *reinterpret_cast<const bf16x6_t*>(reg_data[0]),
-            *reinterpret_cast<const bf16x6_t*>(reg_data[2]),
+            bit_cast<bf16x6_t>(*reg_data[1]),
+            bit_cast<bf16x6_t>(*reg_data[0]),
+            bit_cast<bf16x6_t>(*reg_data[2]),
             GetDilationMod<DilationX, DilationY>() | GetFilterSizeMod<3>() |
                 GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
@@ -1675,9 +1675,9 @@ struct intrin_wconv_f32_f8<4, 2, 3, DilationX, DilationY, 1, Aco, Signed, HighLa
         reg_c.template AsType<float4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f32_fp8_4x2(
             reg_c.template AsType<float4_t>()[Number<0>{}],
             bit_cast<int32x18_t>(reg_wei),
-            *reinterpret_cast<const int32x3_t*>(reg_data[1]),
-            *reinterpret_cast<const int32x3_t*>(reg_data[0]),
-            *reinterpret_cast<const int32x3_t*>(reg_data[2]),
+            bit_cast<int32x3_t>(*reg_data[1]),
+            bit_cast<int32x3_t>(*reg_data[0]),
+            bit_cast<int32x3_t>(*reg_data[2]),
             GetDilationMod<DilationX, DilationY>() | GetFilterSizeMod<3>() |
                 GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
@@ -1694,9 +1694,9 @@ struct intrin_wconv_f32_bf8<4, 2, 3, DilationX, DilationY, 1, Aco, Signed, HighL
         reg_c.template AsType<float4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f32_bf8_4x2(
             reg_c.template AsType<float4_t>()[Number<0>{}],
             bit_cast<int32x18_t>(reg_wei),
-            *reinterpret_cast<const int32x3_t*>(reg_data[1]),
-            *reinterpret_cast<const int32x3_t*>(reg_data[0]),
-            *reinterpret_cast<const int32x3_t*>(reg_data[2]),
+            bit_cast<int32x3_t>(*reg_data[1]),
+            bit_cast<int32x3_t>(*reg_data[0]),
+            bit_cast<int32x3_t>(*reg_data[2]),
             GetDilationMod<DilationX, DilationY>() | GetFilterSizeMod<3>() |
                 GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
@@ -1714,9 +1714,9 @@ struct intrin_wconv_f32_iu8<4, 2, 3, DilationX, DilationY, 1, Aco, Signed, HighL
         reg_c.template AsType<float4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f32_iu8_4x2(
             reg_c.template AsType<float4_t>()[Number<0>{}],
             bit_cast<int32x18_t>(reg_wei),
-            *reinterpret_cast<const int32x3_t*>(reg_data[1]),
-            *reinterpret_cast<const int32x3_t*>(reg_data[0]),
-            *reinterpret_cast<const int32x3_t*>(reg_data[2]),
+            bit_cast<int32x3_t>(*reg_data[1]),
+            bit_cast<int32x3_t>(*reg_data[0]),
+            bit_cast<int32x3_t>(*reg_data[2]),
             GetDilationMod<DilationX, DilationY>() | GetTensorSignedMod<Signed>() |
                 GetWeightSignedMod<Signed>() | GetFilterSizeMod<3>() |
                 GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
@@ -1735,9 +1735,9 @@ struct intrin_wconv_i32_iu8<4, 2, 3, DilationX, DilationY, 1, Aco, Signed, HighL
         reg_c.template AsType<int32x4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_i32_iu8_4x2(
             reg_c.template AsType<int32x4_t>()[Number<0>{}],
             bit_cast<int32x18_t>(reg_wei),
-            *reinterpret_cast<const int32x3_t*>(reg_data[1]),
-            *reinterpret_cast<const int32x3_t*>(reg_data[0]),
-            *reinterpret_cast<const int32x3_t*>(reg_data[2]),
+            bit_cast<int32x3_t>(*reg_data[1]),
+            bit_cast<int32x3_t>(*reg_data[0]),
+            bit_cast<int32x3_t>(*reg_data[2]),
             GetDilationMod<DilationX, DilationY>() | GetTensorSignedMod<Signed>() |
                 GetWeightSignedMod<Signed>() | GetFilterSizeMod<3>() |
                 GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
@@ -1745,7 +1745,7 @@ struct intrin_wconv_i32_iu8<4, 2, 3, DilationX, DilationY, 1, Aco, Signed, HighL
     }
 };
 
-#if CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
+#ifdef CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
 // src: iu4, dst: f32
 template <index_t DilationX, index_t DilationY, bool Aco, bool Signed, bool HighLane>
 struct intrin_wconv_f32_iu4<4, 2, 3, DilationX, DilationY, 1, Aco, Signed, HighLane>
@@ -1757,9 +1757,9 @@ struct intrin_wconv_f32_iu4<4, 2, 3, DilationX, DilationY, 1, Aco, Signed, HighL
         reg_c.template AsType<float4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f32_iu4_4x2(
             reg_c.template AsType<float4_t>()[Number<0>{}],
             bit_cast<int32x18_t>(reg_wei),
-            *reinterpret_cast<const int32x3_t*>(reg_data[1]),
-            *reinterpret_cast<const int32x3_t*>(reg_data[0]),
-            *reinterpret_cast<const int32x3_t*>(reg_data[2]),
+            bit_cast<int32x3_t>(*reg_data[1]),
+            bit_cast<int32x3_t>(*reg_data[0]),
+            bit_cast<int32x3_t>(*reg_data[2]),
             GetDilationMod<DilationX, DilationY>() | GetTensorSignedMod<Signed>() |
                 GetWeightSignedMod<Signed>() | GetFilterSizeMod<3>() |
                 GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
@@ -1778,9 +1778,9 @@ struct intrin_wconv_i32_iu4<4, 2, 3, DilationX, DilationY, 1, Aco, Signed, HighL
         reg_c.template AsType<int32x4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_i32_iu4_4x2(
             reg_c.template AsType<int32x4_t>()[Number<0>{}],
             bit_cast<int32x18_t>(reg_wei),
-            *reinterpret_cast<const int32x3_t*>(reg_data[1]),
-            *reinterpret_cast<const int32x3_t*>(reg_data[0]),
-            *reinterpret_cast<const int32x3_t*>(reg_data[2]),
+            bit_cast<int32x3_t>(*reg_data[1]),
+            bit_cast<int32x3_t>(*reg_data[0]),
+            bit_cast<int32x3_t>(*reg_data[2]),
             GetDilationMod<DilationX, DilationY>() | GetTensorSignedMod<Signed>() |
                 GetWeightSignedMod<Signed>() | GetFilterSizeMod<3>() |
                 GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
@@ -1855,9 +1855,9 @@ struct intrin_wconv_bf16_bf16<4, 2, 3, DilationX, DilationY, 1, Aco, Signed, Hig
             bit_cast<bhalf4_t>(__builtin_amdgcn_convolve_bf16_bf16_4x2(
                 bit_cast<bf16x4_t>(reg_c.template AsType<bhalf4_t>()[Number<0>{}]),
                 bit_cast<bf16x36_t>(reg_wei),
-                *reinterpret_cast<const bf16x6_t*>(reg_data[1]),
-                *reinterpret_cast<const bf16x6_t*>(reg_data[0]),
-                *reinterpret_cast<const bf16x6_t*>(reg_data[2]),
+                bit_cast<bf16x6_t>(*reg_data[1]),
+                bit_cast<bf16x6_t>(*reg_data[0]),
+                bit_cast<bf16x6_t>(*reg_data[2]),
                 GetDilationMod<DilationX, DilationY>() | GetFilterSizeMod<3>() |
                     GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
                 0));
@@ -1874,9 +1874,9 @@ struct intrin_wconv_bf16_bf16<4, 4, 3, DilationX, DilationY, 1, Aco, Signed, Hig
             bit_cast<bhalf8_t>(__builtin_amdgcn_convolve_bf16_bf16_4x4(
                 bit_cast<bf16x8_t>(reg_c.template AsType<bhalf8_t>()[Number<0>{}]),
                 bit_cast<bf16x18_t>(reg_wei),
-                *reinterpret_cast<const bf16x6_t*>(reg_data[1]),
-                *reinterpret_cast<const bf16x6_t*>(reg_data[0]),
-                *reinterpret_cast<const bf16x6_t*>(reg_data[2]),
+                bit_cast<bf16x6_t>(*reg_data[1]),
+                bit_cast<bf16x6_t>(*reg_data[0]),
+                bit_cast<bf16x6_t>(*reg_data[2]),
                 GetDilationMod<DilationX, DilationY>() | GetFilterSizeMod<3>() |
                     GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
                 0));
@@ -1893,9 +1893,9 @@ struct intrin_wconv_bf16_bf16<8, 4, 3, DilationX, DilationY, 1, Aco, Signed, Hig
             bit_cast<bhalf8_t>(__builtin_amdgcn_convolve_bf16_bf16_8x4(
                 bit_cast<bf16x8_t>(reg_c.template AsType<bhalf8_t>()[Number<0>{}]),
                 bit_cast<bf16x10_t>(reg_wei),
-                *reinterpret_cast<const bf16x8_t*>(reg_data[1]),
-                *reinterpret_cast<const bf16x8_t*>(reg_data[0]),
-                *reinterpret_cast<const bf16x8_t*>(reg_data[2]),
+                bit_cast<bf16x8_t>(*reg_data[1]),
+                bit_cast<bf16x8_t>(*reg_data[0]),
+                bit_cast<bf16x8_t>(*reg_data[2]),
                 GetDilationMod<DilationX, DilationY>() | GetFilterSizeMod<3>() |
                     GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
                 0));
@@ -1913,9 +1913,9 @@ struct intrin_wconv_bf16_bf8<4, 2, 3, DilationX, DilationY, 1, Aco, Signed, High
             bit_cast<bhalf4_t>(__builtin_amdgcn_convolve_bf16_bf8_4x2(
                 bit_cast<bf16x4_t>(reg_c.template AsType<bhalf4_t>()[Number<0>{}]),
                 bit_cast<int32x18_t>(reg_wei),
-                *reinterpret_cast<const int32x3_t*>(reg_data[1]),
-                *reinterpret_cast<const int32x3_t*>(reg_data[0]),
-                *reinterpret_cast<const int32x3_t*>(reg_data[2]),
+                bit_cast<int32x3_t>(*reg_data[1]),
+                bit_cast<int32x3_t>(*reg_data[0]),
+                bit_cast<int32x3_t>(*reg_data[2]),
                 GetDilationMod<DilationX, DilationY>() | GetFilterSizeMod<3>() |
                     GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
                 0));
@@ -1932,9 +1932,9 @@ struct intrin_wconv_bf16_bf8<4, 4, 3, DilationX, DilationY, 1, Aco, Signed, High
             bit_cast<bhalf8_t>(__builtin_amdgcn_convolve_bf16_bf8_4x4(
                 bit_cast<bf16x8_t>(reg_c.template AsType<bhalf8_t>()[Number<0>{}]),
                 bit_cast<int32x9_t>(reg_wei),
-                *reinterpret_cast<const int32x3_t*>(reg_data[1]),
-                *reinterpret_cast<const int32x3_t*>(reg_data[0]),
-                *reinterpret_cast<const int32x3_t*>(reg_data[2]),
+                bit_cast<int32x3_t>(*reg_data[1]),
+                bit_cast<int32x3_t>(*reg_data[0]),
+                bit_cast<int32x3_t>(*reg_data[2]),
                 GetDilationMod<DilationX, DilationY>() | GetFilterSizeMod<3>() |
                     GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
                 0));
@@ -1951,9 +1951,9 @@ struct intrin_wconv_bf16_bf8<8, 4, 3, DilationX, DilationY, 1, Aco, Signed, High
             bit_cast<bhalf8_t>(__builtin_amdgcn_convolve_bf16_bf8_8x4(
                 bit_cast<bf16x8_t>(reg_c.template AsType<bhalf8_t>()[Number<0>{}]),
                 bit_cast<int32x5_t>(reg_wei),
-                *reinterpret_cast<const int32x4_t*>(reg_data[1]),
-                *reinterpret_cast<const int32x4_t*>(reg_data[0]),
-                *reinterpret_cast<const int32x4_t*>(reg_data[2]),
+                bit_cast<int32x4_t>(*reg_data[1]),
+                bit_cast<int32x4_t>(*reg_data[0]),
+                bit_cast<int32x4_t>(*reg_data[2]),
                 GetDilationMod<DilationX, DilationY>() | GetFilterSizeMod<3>() |
                     GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
                 0));
@@ -1970,9 +1970,9 @@ struct intrin_wconv_f16_f8<4, 2, 3, DilationX, DilationY, 1, Aco, Signed, HighLa
         reg_c.template AsType<half4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f16_fp8_4x2(
             reg_c.template AsType<half4_t>()[Number<0>{}],
             bit_cast<int32x18_t>(reg_wei),
-            *reinterpret_cast<const int32x3_t*>(reg_data[1]),
-            *reinterpret_cast<const int32x3_t*>(reg_data[0]),
-            *reinterpret_cast<const int32x3_t*>(reg_data[2]),
+            bit_cast<int32x3_t>(*reg_data[1]),
+            bit_cast<int32x3_t>(*reg_data[0]),
+            bit_cast<int32x3_t>(*reg_data[2]),
             GetDilationMod<DilationX, DilationY>() | GetFilterSizeMod<3>() |
                 GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
@@ -1988,9 +1988,9 @@ struct intrin_wconv_f16_f8<4, 4, 3, DilationX, DilationY, 1, Aco, Signed, HighLa
         reg_c.template AsType<half8_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f16_fp8_4x4(
             reg_c.template AsType<half8_t>()[Number<0>{}],
             bit_cast<int32x9_t>(reg_wei),
-            *reinterpret_cast<const int32x3_t*>(reg_data[1]),
-            *reinterpret_cast<const int32x3_t*>(reg_data[0]),
-            *reinterpret_cast<const int32x3_t*>(reg_data[2]),
+            bit_cast<int32x3_t>(*reg_data[1]),
+            bit_cast<int32x3_t>(*reg_data[0]),
+            bit_cast<int32x3_t>(*reg_data[2]),
             GetDilationMod<DilationX, DilationY>() | GetFilterSizeMod<3>() |
                 GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
@@ -2006,9 +2006,9 @@ struct intrin_wconv_f16_f8<8, 4, 3, DilationX, DilationY, 1, Aco, Signed, HighLa
         reg_c.template AsType<half8_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f16_fp8_8x4(
             reg_c.template AsType<half8_t>()[Number<0>{}],
             bit_cast<int32x5_t>(reg_wei),
-            *reinterpret_cast<const int32x4_t*>(reg_data[1]),
-            *reinterpret_cast<const int32x4_t*>(reg_data[0]),
-            *reinterpret_cast<const int32x4_t*>(reg_data[2]),
+            bit_cast<int32x4_t>(*reg_data[1]),
+            bit_cast<int32x4_t>(*reg_data[0]),
+            bit_cast<int32x4_t>(*reg_data[2]),
             GetDilationMod<DilationX, DilationY>() | GetFilterSizeMod<3>() |
                 GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
@@ -2026,9 +2026,9 @@ struct intrin_wconv_f16_iu8<4, 2, 3, DilationX, DilationY, 1, Aco, Signed, HighL
         reg_c.template AsType<half4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f16_iu8_4x2(
             reg_c.template AsType<half4_t>()[Number<0>{}],
             bit_cast<int32x18_t>(reg_wei),
-            *reinterpret_cast<const int32x3_t*>(reg_data[1]),
-            *reinterpret_cast<const int32x3_t*>(reg_data[0]),
-            *reinterpret_cast<const int32x3_t*>(reg_data[2]),
+            bit_cast<int32x3_t>(*reg_data[1]),
+            bit_cast<int32x3_t>(*reg_data[0]),
+            bit_cast<int32x3_t>(*reg_data[2]),
             GetDilationMod<DilationX, DilationY>() | GetTensorSignedMod<Signed>() |
                 GetWeightSignedMod<Signed>() | GetFilterSizeMod<3>() |
                 GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
@@ -2046,9 +2046,9 @@ struct intrin_wconv_f16_iu8<4, 4, 3, DilationX, DilationY, 1, Aco, Signed, HighL
         reg_c.template AsType<half8_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f16_iu8_4x4(
             reg_c.template AsType<half8_t>()[Number<0>{}],
             bit_cast<int32x9_t>(reg_wei),
-            *reinterpret_cast<const int32x3_t*>(reg_data[1]),
-            *reinterpret_cast<const int32x3_t*>(reg_data[0]),
-            *reinterpret_cast<const int32x3_t*>(reg_data[2]),
+            bit_cast<int32x3_t>(*reg_data[1]),
+            bit_cast<int32x3_t>(*reg_data[0]),
+            bit_cast<int32x3_t>(*reg_data[2]),
             GetDilationMod<DilationX, DilationY>() | GetTensorSignedMod<Signed>() |
                 GetWeightSignedMod<Signed>() | GetFilterSizeMod<3>() |
                 GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
@@ -2066,9 +2066,9 @@ struct intrin_wconv_f16_iu8<8, 4, 3, DilationX, DilationY, 1, Aco, Signed, HighL
         reg_c.template AsType<half8_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f16_iu8_8x4(
             reg_c.template AsType<half8_t>()[Number<0>{}],
             bit_cast<int32x5_t>(reg_wei),
-            *reinterpret_cast<const int32x4_t*>(reg_data[1]),
-            *reinterpret_cast<const int32x4_t*>(reg_data[0]),
-            *reinterpret_cast<const int32x4_t*>(reg_data[2]),
+            bit_cast<int32x4_t>(*reg_data[1]),
+            bit_cast<int32x4_t>(*reg_data[0]),
+            bit_cast<int32x4_t>(*reg_data[2]),
             GetDilationMod<DilationX, DilationY>() | GetTensorSignedMod<Signed>() |
                 GetWeightSignedMod<Signed>() | GetFilterSizeMod<3>() |
                 GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
@@ -2076,7 +2076,7 @@ struct intrin_wconv_f16_iu8<8, 4, 3, DilationX, DilationY, 1, Aco, Signed, HighL
     }
 };
 
-#if CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
+#ifdef CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
 // src: iu4, dst: f16
 template <index_t DilationX, index_t DilationY, bool Aco, bool Signed, bool HighLane>
 struct intrin_wconv_f16_iu4<4, 2, 3, DilationX, DilationY, 1, Aco, Signed, HighLane>
@@ -2088,9 +2088,9 @@ struct intrin_wconv_f16_iu4<4, 2, 3, DilationX, DilationY, 1, Aco, Signed, HighL
         reg_c.template AsType<half4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f16_iu4_4x2(
             reg_c.template AsType<half4_t>()[Number<0>{}],
             bit_cast<int32x18_t>(reg_wei),
-            *reinterpret_cast<const int32x3_t*>(reg_data[1]),
-            *reinterpret_cast<const int32x3_t*>(reg_data[0]),
-            *reinterpret_cast<const int32x3_t*>(reg_data[2]),
+            bit_cast<int32x3_t>(*reg_data[1]),
+            bit_cast<int32x3_t>(*reg_data[0]),
+            bit_cast<int32x3_t>(*reg_data[2]),
             GetDilationMod<DilationX, DilationY>() | GetTensorSignedMod<Signed>() |
                 GetWeightSignedMod<Signed>() | GetFilterSizeMod<3>() |
                 GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
@@ -2108,9 +2108,9 @@ struct intrin_wconv_f16_iu4<4, 4, 3, DilationX, DilationY, 1, Aco, Signed, HighL
         reg_c.template AsType<half8_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f16_iu4_4x4(
             reg_c.template AsType<half8_t>()[Number<0>{}],
             bit_cast<int32x9_t>(reg_wei),
-            *reinterpret_cast<const int32x3_t*>(reg_data[1]),
-            *reinterpret_cast<const int32x3_t*>(reg_data[0]),
-            *reinterpret_cast<const int32x3_t*>(reg_data[2]),
+            bit_cast<int32x3_t>(*reg_data[1]),
+            bit_cast<int32x3_t>(*reg_data[0]),
+            bit_cast<int32x3_t>(*reg_data[2]),
             GetDilationMod<DilationX, DilationY>() | GetTensorSignedMod<Signed>() |
                 GetWeightSignedMod<Signed>() | GetFilterSizeMod<3>() |
                 GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
@@ -2128,9 +2128,9 @@ struct intrin_wconv_f16_iu4<8, 4, 3, DilationX, DilationY, 1, Aco, Signed, HighL
         reg_c.template AsType<half8_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f16_iu4_8x4(
             reg_c.template AsType<half8_t>()[Number<0>{}],
             bit_cast<int32x5_t>(reg_wei),
-            *reinterpret_cast<const int32x4_t*>(reg_data[1]),
-            *reinterpret_cast<const int32x4_t*>(reg_data[0]),
-            *reinterpret_cast<const int32x4_t*>(reg_data[2]),
+            bit_cast<int32x4_t>(*reg_data[1]),
+            bit_cast<int32x4_t>(*reg_data[0]),
+            bit_cast<int32x4_t>(*reg_data[2]),
             GetDilationMod<DilationX, DilationY>() | GetTensorSignedMod<Signed>() |
                 GetWeightSignedMod<Signed>() | GetFilterSizeMod<3>() |
                 GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),

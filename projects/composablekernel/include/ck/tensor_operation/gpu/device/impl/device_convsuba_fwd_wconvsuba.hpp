@@ -176,7 +176,7 @@ struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
 
     static auto
     MakeSingleDsGridDescriptor(const std::array<index_t, NDimSpatial + 3>& ds_g_n_k_wos_lengths,
-                               const std::array<index_t, NDimSpatial + 3>& ds_g_n_k_wos_strides)
+                               const std::array<index_t, NDimSpatial + 3>&)
     {
         auto conv_in_transformer = [&]() {
             const index_t K = ds_g_n_k_wos_lengths[2];

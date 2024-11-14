@@ -140,7 +140,7 @@ if(GPU_TARGETS)
 else()
     set(USER_GPU_TARGETS 0)
 endif()
-find_package(hip)
+find_package(hip REQUIRED)
 # No assumption that HIP kernels are launched with uniform block size for backward compatibility
 # SWDEV-413293 and https://reviews.llvm.org/D155213
 math(EXPR hip_VERSION_FLAT "(${hip_VERSION_MAJOR} * 1000 + ${hip_VERSION_MINOR}) * 100000 + ${hip_VERSION_PATCH}")
@@ -159,21 +159,6 @@ if(NOT ENABLE_ASAN_PACKAGING)
     else()
         set(CK_GPU_TARGETS "gfx908;gfx90a;gfx940;gfx941;gfx942;gfx1030;gfx1100;gfx1101;gfx1102;gfx1200;gfx1201;gfx1300;gfx1301;gfx1302;gfx950")
     endif()
-    if(GPU_ARCH MATCHES "gfx90")
-        rocm_check_target_ids(DEFAULT_GPU_TARGETS TARGETS "gfx908;gfx90a")
-    elseif(GPU_ARCH MATCHES "gfx94")
-        rocm_check_target_ids(DEFAULT_GPU_TARGETS TARGETS "gfx940;gfx941;gfx942")
-    elseif(GPU_ARCH MATCHES "gfx10")
-        rocm_check_target_ids(DEFAULT_GPU_TARGETS TARGETS "gfx1030")
-    elseif(GPU_ARCH MATCHES "gfx11")
-        rocm_check_target_ids(DEFAULT_GPU_TARGETS TARGETS "gfx1100;gfx1101;gfx1102")
-    elseif(GPU_ARCH MATCHES "gfx12")
-        rocm_check_target_ids(DEFAULT_GPU_TARGETS TARGETS "gfx1200;gfx1201")
-    elseif(GPU_ARCH MATCHES "gfx13")
-        rocm_check_target_ids(DEFAULT_GPU_TARGETS TARGETS "gfx1300;gfx1301;gfx1302")
-    else()
-        message(FATAL_ERROR "For PROFILE_ONLY build, please specify GPU_ARCH as gfx90, gfx94, gfx10, gfx11 or gfx12 or gfx13")
-    endif()
 else()
     #build CK only for xnack-supported targets when using ASAN
     set(CK_GPU_TARGETS "gfx908:xnack+;gfx90a:xnack+;gfx940:xnack+;gfx941:xnack+;gfx942:xnack+")
@@ -188,7 +173,10 @@ else()
         set(CK_GPU_TARGETS ${GPU_TARGETS})
     endif()
 endif()
-
+#if the user did not set GPU_TARGETS, delete whatever was set by HIP package
+if(NOT USER_GPU_TARGETS)
+    set(GPU_TARGETS "")
+endif()
 #make sure all the targets on the list are actually supported by the current compiler
 rocm_check_target_ids(SUPPORTED_GPU_TARGETS
         TARGETS ${CK_GPU_TARGETS})
@@ -287,6 +275,7 @@ endif()
 
 if(USE_OPT_GFX13)
     add_compile_options(-mno-wavefrontsize64)
+    add_compile_options(-save-temps=obj -Wno-gnu-line-marker)
     message("CK compiled with USE_OPT_GFX13 set to ${USE_OPT_GFX13}")
 endif()
 
@@ -339,7 +328,6 @@ link_libraries(${OpenMP_gomp_LIBRARY})
 link_libraries(${OpenMP_pthread_LIBRARY})
 
 ## HIP
-find_package(HIP REQUIRED)
 # Override HIP version in config.h, if necessary.
 # The variables set by find_package() can't be overwritten,
 # therefore let's use intermediate variables.

@@ -455,7 +455,8 @@ struct BlockwiseSubaConvWconv
     static constexpr WeiDataBlockDesc weight_block_desc_;
     static constexpr InDataBlockDesc indata_block_desc_;
     static constexpr DsBlockDesc ds_block_desc_;
-
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wundefined-reinterpret-cast"
     template <typename WeightBlockBuffer,
               typename InDataBlockBuffer,
               typename DsBlockBuffer,
@@ -567,7 +568,8 @@ struct BlockwiseSubaConvWconv
                                     auto indata_thread_buf =
                                         make_static_buffer_v3<AddressSpaceEnum::Vgpr, InDataType>(
                                             indata_thread_desc_.GetElementSpaceSize(),
-                                            (InDataType*)(&indata_thread_vec[iter_idx]));
+                                            reinterpret_cast<InDataType*>(
+                                                &indata_thread_vec[iter_idx]));
                                     indata_thread_copy_.Run(
                                         indata_block_desc_,
                                         make_tuple(w0, c0 + iter_idx, h0, I0, I0, I0, I0),
@@ -585,7 +587,8 @@ struct BlockwiseSubaConvWconv
                                     auto indata_thread_buf =
                                         make_static_buffer_v3<AddressSpaceEnum::Vgpr, InDataType>(
                                             indata_thread_desc_.GetElementSpaceSize(),
-                                            (InDataType*)(&indata_thread_vec[array_idx]));
+                                            reinterpret_cast<InDataType*>(
+                                                &indata_thread_vec[array_idx]));
                                     indata_thread_copy_.Run(
                                         indata_block_desc_,
                                         make_tuple(w0 + array_idx, c0, h0, I0, I0, I0, I0),
@@ -763,6 +766,7 @@ struct BlockwiseSubaConvWconv
             }
         });
     };
+#pragma clang diagnostic pop
 
     protected:
     // Thread descriptor for weight and input data

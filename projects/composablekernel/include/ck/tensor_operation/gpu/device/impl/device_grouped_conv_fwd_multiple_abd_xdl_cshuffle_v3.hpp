@@ -88,12 +88,12 @@ __global__ void
     const index_t g_idx = __builtin_amdgcn_readfirstlane(blockIdx.y / num_blocks_per_batch);
     const index_t n_idx = __builtin_amdgcn_readfirstlane(blockIdx.y / num_blocks_per_n);
 
-    const long_index_t a_batch_offset =
-        amd_wave_read_first_lane(compute_ptr_offset_of_groups.GetAPtrOffset(g_idx));
-    const long_index_t b_batch_offset =
-        amd_wave_read_first_lane(compute_ptr_offset_of_groups.GetBPtrOffset(g_idx));
-    const long_index_t e_batch_offset =
-        amd_wave_read_first_lane(compute_ptr_offset_of_groups.GetEPtrOffset(g_idx));
+    const long_index_t a_batch_offset = amd_wave_read_first_lane(
+        static_cast<int64_t>(compute_ptr_offset_of_groups.GetAPtrOffset(g_idx)));
+    const long_index_t b_batch_offset = amd_wave_read_first_lane(
+        static_cast<int64_t>(compute_ptr_offset_of_groups.GetBPtrOffset(g_idx)));
+    const long_index_t e_batch_offset = amd_wave_read_first_lane(
+        static_cast<int64_t>(compute_ptr_offset_of_groups.GetEPtrOffset(g_idx)));
 
     const long_index_t a_n_offset =
         amd_wave_read_first_lane(compute_ptr_offset_of_n.GetAPtrOffset(n_idx));
@@ -150,12 +150,12 @@ __global__ void
     const index_t g_idx = __builtin_amdgcn_readfirstlane(blockIdx.y / num_blocks_per_batch);
     const index_t n_idx = __builtin_amdgcn_readfirstlane(blockIdx.y / num_blocks_per_n);
 
-    const long_index_t a_batch_offset =
-        amd_wave_read_first_lane(compute_ptr_offset_of_groups.GetAPtrOffset(g_idx));
-    const long_index_t b_batch_offset =
-        amd_wave_read_first_lane(compute_ptr_offset_of_groups.GetBPtrOffset(g_idx));
-    const long_index_t e_batch_offset =
-        amd_wave_read_first_lane(compute_ptr_offset_of_groups.GetEPtrOffset(g_idx));
+    const long_index_t a_batch_offset = amd_wave_read_first_lane(
+        static_cast<long_index_t>(compute_ptr_offset_of_groups.GetAPtrOffset(g_idx)));
+    const long_index_t b_batch_offset = amd_wave_read_first_lane(
+        static_cast<long_index_t>(compute_ptr_offset_of_groups.GetBPtrOffset(g_idx)));
+    const long_index_t e_batch_offset = amd_wave_read_first_lane(
+        static_cast<long_index_t>(compute_ptr_offset_of_groups.GetEPtrOffset(g_idx)));
 
     const long_index_t a_n_offset =
         amd_wave_read_first_lane(compute_ptr_offset_of_n.GetAPtrOffset(n_idx));

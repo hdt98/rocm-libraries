@@ -283,7 +283,7 @@ struct wconv_type<WconvInstr::wconv_i32_iu8,
     }
 };
 
-#if CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
+#ifdef CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
 template <index_t H,
           index_t W,
           index_t FilterSize,
@@ -1074,8 +1074,10 @@ struct WconvConv
                                                 Aco>{};
     static constexpr auto wconv_instr = wconv.selected_wconv;
 
-    static __device__ void UnshuffleStridedConv2Data(const typename InDataVec::type inputQuad[4],
-                                                     typename InDataVec::type unshuffleQuad[4])
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wundefined-reinterpret-cast"
+    static __device__ void UnshuffleStridedConv2Data(const InDataVec inputQuad[4],
+                                                     InDataVec unshuffleQuad[4])
     {
         uint32_t tmp0, tmp1, tmp2, tmp3;
         const uint32_t* pIn = reinterpret_cast<const uint32_t*>(inputQuad);
@@ -1083,7 +1085,7 @@ struct WconvConv
 
         if constexpr(HPerWconv == 4 && WPerWconv == 4)
         {
-            static_assert(sizeof(typename InDataVec::type) == 4, "");
+            static_assert(sizeof(InDataVec) == 4, "");
             // Unshuffle via permutes - stage 1: horizontal, pat_size=1 pat_num=3
             tmp0 = __builtin_amdgcn_permute_pair_2src_interleave_b64(&tmp1, pIn[0], pIn[1], 0xb);
             tmp2 = __builtin_amdgcn_permute_pair_2src_interleave_b64(&tmp3, pIn[2], pIn[3], 0xb);
@@ -1093,7 +1095,7 @@ struct WconvConv
         }
         else if constexpr(HPerWconv == 4 && WPerWconv == 2)
         {
-            static_assert(sizeof(typename InDataVec::type) == 4, "");
+            static_assert(sizeof(InDataVec) == 4, "");
             // Unshuffle via permutes - stage 1: horizontal, pat_size=1 pat_num=1
             tmp0 = __builtin_amdgcn_permute_pair_2src_interleave_b64(&tmp1, pIn[0], pIn[1], 0x9);
             tmp2 = __builtin_amdgcn_permute_pair_2src_interleave_b64(&tmp3, pIn[2], pIn[3], 0x9);
@@ -1103,7 +1105,7 @@ struct WconvConv
         }
         else
         {
-            static_assert(sizeof(typename InDataVec::type) == 8, "");
+            static_assert(sizeof(InDataVec) == 8, "");
             // unshuffle for sub-tile 0
             tmp0    = __builtin_amdgcn_permute_pair_2src_interleave_b64(&tmp1, pIn[0], pIn[2], 0xb);
             tmp2    = __builtin_amdgcn_permute_pair_2src_interleave_b64(&tmp3, pIn[1], pIn[3], 0xb);
@@ -1176,6 +1178,7 @@ struct WconvConv
             }
         });
     }
+#pragma clang diagnostic pop
 };
 
 } // namespace ck

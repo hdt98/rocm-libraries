@@ -722,6 +722,49 @@ struct BlockwiseConvWconv
     // Describe how data allocated in thread copy src buffer
     static constexpr WeiDataWaveDesc weight_wave_desc_;
     static constexpr InDataWaveDesc indata_wave_desc_;
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wundefined-reinterpret-cast"
+    template <typename VectorType, typename StaticBuffer>
+    static constexpr void CopyVector(VectorType& x, const StaticBuffer& y)
+    {
+        using ScalarType = typename StaticBuffer::type;
+        if constexpr(sizeof(StaticBuffer) == sizeof(VectorType))
+        {
+            x = bit_cast<VectorType>(y);
+        }
+        else
+        {
+            static_for<0, y.Size(), 1>{}(
+                [&](auto i) { x.template AsType<ScalarType>()(i) = y[i]; });
+        }
+    }
+
+    template <typename VectorType,
+              typename StaticBuffer,
+              typename NumDstOffset,
+              typename NumSrcOffset,
+              typename NumCount>
+    static constexpr void
+    CopySubVector(VectorType& x, const StaticBuffer& y, NumDstOffset, NumSrcOffset, NumCount)
+    {
+        using ScalarType = typename StaticBuffer::type;
+#if 1
+        static_assert(sizeof(ScalarType) * NumCount{} % sizeof(uint32_t) == 0);
+        static_assert(sizeof(ScalarType) * NumDstOffset{} % sizeof(uint32_t) == 0);
+        static_assert(sizeof(ScalarType) * NumSrcOffset{} % sizeof(uint32_t) == 0);
+        constexpr index_t dwCount     = sizeof(ScalarType) * NumCount{} / sizeof(uint32_t);
+        constexpr index_t dwSrcOffset = sizeof(ScalarType) * NumSrcOffset{} / sizeof(uint32_t);
+        constexpr index_t dwDstOffset = sizeof(ScalarType) * NumDstOffset{} / sizeof(uint32_t);
+        uint32_t* pDst                = reinterpret_cast<uint32_t*>(&x);
+        const uint32_t* pSrc          = reinterpret_cast<const uint32_t*>(&y[I0]);
+        static_for<0, dwCount, 1>{}([&](auto i) { pDst[i + dwDstOffset] = pSrc[i + dwSrcOffset]; });
+#else
+        // LLVM crash
+        static_for<0, NumCount{}, 1>{}([&](auto i) {
+            x.template AsType<ScalarType>()(i + NumDstOffset{}) = y[i + NumSrcOffset{}];
+        });
+#endif
+    }
 
     template <typename WeightBlockBuffer, typename InDataBlockBuffer, typename AccumThreadBuffer>
     __device__ void RunEmulateConv2(const WeightBlockBuffer& weight_block_buf,
@@ -731,11 +774,11 @@ struct BlockwiseConvWconv
     {
         auto weight_thread_buf = make_static_buffer<AddressSpaceEnum::Vgpr, WeiDataType>(
             weight_thread_desc_.GetElementSpaceSize());
-        using WeiDataVec    = typename decltype(wconv_conv)::WeiDataVec::type;
-        using WeiDataTapVec = typename decltype(wconv_conv)::WeiDataTapVec::type;
-        using InDataVec     = typename decltype(wconv_conv)::InDataVec::type;
+        using WeiDataVec    = typename decltype(wconv_conv)::WeiDataVec;
+        using WeiDataTapVec = typename decltype(wconv_conv)::WeiDataTapVec;
+        using InDataVec     = typename decltype(wconv_conv)::InDataVec;
 
-        const InDataVec* indata_thread_vec_ptr[4];
+        const typename InDataVec::type* indata_thread_vec_ptr[4];
         static_assert(Iters <= 4 && FilterSize == 2, "");
 
         constexpr auto NumYX          = FilterSize * FilterSize;
@@ -748,8 +791,8 @@ struct BlockwiseConvWconv
         static_for<0, KRepeat, 1>{}([&](auto k0) {
             static_for<0, CRepeat, CStep>{}([&](auto c0) {
                 constexpr auto TapPerIter = wconv_conv.GetNumWeightTapPerWave();
-                const WeiDataVec* weight_thread_vec_ptr[4];
-                typename decltype(wconv_conv)::WeiDataVec weight_thread_vec[4];
+                const typename WeiDataVec::type* weight_thread_vec_ptr[4];
+                WeiDataVec weight_thread_vec[4];
                 // Load weights
                 if constexpr(WeiDataEnableLds)
                 {
@@ -762,19 +805,24 @@ struct BlockwiseConvWconv
                                                 weight_thread_buf);
                         if constexpr(Transposed)
                         {
-                            weight_thread_vec[i / TapPerIter].template AsType<WeiDataVec>()(I0) =
-                                *reinterpret_cast<const WeiDataVec*>(&(weight_thread_buf[I0]));
+                            CopyVector(weight_thread_vec[i / TapPerIter], weight_thread_buf);
                             weight_thread_vec_ptr[i / TapPerIter] =
                                 &weight_thread_vec[i / TapPerIter]
-                                     .template AsType<WeiDataVec>()[I0];
+                                     .template AsType<typename WeiDataVec::type>()[I0];
                         }
                         else
                         {
-                            weight_thread_vec[0].template AsType<WeiDataTapVec>()(
-                                i / Number<TapPerIter>{}) =
-                                *reinterpret_cast<const WeiDataTapVec*>(&(weight_thread_buf[I0]));
+                            static_assert(sizeof(WeiDataTapVec) % sizeof(WeiDataType) == 0, "");
+                            constexpr auto CompCount  = sizeof(WeiDataTapVec) / sizeof(WeiDataType);
+                            constexpr auto CompOffset = i * CompCount / TapPerIter;
+                            CopySubVector(weight_thread_vec[0],
+                                          weight_thread_buf,
+                                          Number<CompOffset>{},
+                                          I0,
+                                          Number<CompCount>{});
                             weight_thread_vec_ptr[0] =
-                                &weight_thread_vec[0].template AsType<WeiDataVec>()[I0];
+                                &weight_thread_vec[0]
+                                     .template AsType<typename WeiDataVec::type>()[I0];
                         }
                     });
                 }
@@ -786,7 +834,7 @@ struct BlockwiseConvWconv
                             constexpr index_t wei_offset = weight_wave_desc_.CalculateOffset(
                                 make_tuple(k0, c0, i, I0, I0, I0));
                             weight_thread_vec_ptr[i / TapPerIter] =
-                                reinterpret_cast<const WeiDataVec*>(
+                                reinterpret_cast<const typename WeiDataVec::type*>(
                                     &weight_block_buf[Number<wei_offset>{}]);
                         });
                     }
@@ -798,19 +846,27 @@ struct BlockwiseConvWconv
                         {
                             constexpr index_t wei_offset2 = weight_wave_desc_.CalculateOffset(
                                 make_tuple(k0, c0, I2, I0, I0, I0));
-                            weight_thread_vec[0].template AsType<WeiDataTapVec>()(I0) =
-                                *reinterpret_cast<const WeiDataTapVec*>(
-                                    &weight_block_buf[Number<wei_offset>{}]);
-                            weight_thread_vec[0].template AsType<WeiDataTapVec>()(I1) =
-                                *reinterpret_cast<const WeiDataTapVec*>(
-                                    &weight_block_buf[Number<wei_offset2>{}]);
+                            static_assert(sizeof(WeiDataTapVec) % sizeof(WeiDataType) == 0, "");
+                            constexpr auto CompCount = sizeof(WeiDataTapVec) / sizeof(WeiDataType);
+                            CopySubVector(weight_thread_vec[0],
+                                          weight_block_buf,
+                                          I0,
+                                          Number<wei_offset>{},
+                                          Number<CompCount>{});
+                            CopySubVector(weight_thread_vec[0],
+                                          weight_block_buf,
+                                          Number<CompCount>{},
+                                          Number<wei_offset2>{},
+                                          Number<CompCount>{});
                             weight_thread_vec_ptr[0] =
-                                &weight_thread_vec[0].template AsType<WeiDataVec>()[I0];
+                                &weight_thread_vec[0]
+                                     .template AsType<typename WeiDataVec::type>()[I0];
                         }
                         else
                         {
-                            weight_thread_vec_ptr[0] = reinterpret_cast<const WeiDataVec*>(
-                                &weight_block_buf[Number<wei_offset>{}]);
+                            weight_thread_vec_ptr[0] =
+                                reinterpret_cast<const typename WeiDataVec::type*>(
+                                    &weight_block_buf[Number<wei_offset>{}]);
                         }
                     }
                 }
@@ -829,7 +885,8 @@ struct BlockwiseConvWconv
                                     auto indata_thread_buf =
                                         make_static_buffer_v3<AddressSpaceEnum::Vgpr, InDataType>(
                                             indata_thread_desc_.GetElementSpaceSize(),
-                                            (InDataType*)(&indata_thread_vec_tmp[i]));
+                                            &indata_thread_vec_tmp[i].template AsType<InDataType>()(
+                                                I0));
                                     indata_thread_copy_.Run(indata_wave_desc_,
                                                             make_tuple(Number<w0 + x_offset[i]>{},
                                                                        c0,
@@ -842,7 +899,9 @@ struct BlockwiseConvWconv
                                                             indata_thread_desc_,
                                                             make_tuple(I0, I0, I0, I0, I0, I0, I0),
                                                             indata_thread_buf);
-                                    indata_thread_vec_ptr[i] = &indata_thread_vec[i];
+                                    indata_thread_vec_ptr[i] =
+                                        &indata_thread_vec[i]
+                                             .template AsType<typename InDataVec::type>()[I0];
                                 });
                                 wconv_conv.UnshuffleStridedConv2Data(indata_thread_vec_tmp,
                                                                      indata_thread_vec);
@@ -852,14 +911,16 @@ struct BlockwiseConvWconv
                                 auto indata_thread_buf =
                                     make_static_buffer_v3<AddressSpaceEnum::Vgpr, InDataType>(
                                         indata_thread_desc_.GetElementSpaceSize(),
-                                        (InDataType*)(&indata_thread_vec[I0]));
+                                        &indata_thread_vec[I0].template AsType<InDataType>()(I0));
                                 indata_thread_copy_.Run(indata_wave_desc_,
                                                         make_tuple(w0, c0, h0, I0, I0, I0, I0),
                                                         indata_block_buf,
                                                         indata_thread_desc_,
                                                         make_tuple(I0, I0, I0, I0, I0, I0, I0),
                                                         indata_thread_buf);
-                                indata_thread_vec_ptr[I0] = &indata_thread_vec[I0];
+                                indata_thread_vec_ptr[I0] =
+                                    &indata_thread_vec[I0]
+                                         .template AsType<typename InDataVec::type>()[I0];
                             }
                         }
                         else
@@ -868,6 +929,7 @@ struct BlockwiseConvWconv
                             if constexpr(Transposed == false)
                             {
                                 InDataVec indata_thread_vec_tmp[4];
+                                constexpr auto CompCount = sizeof(InDataVec) / sizeof(InDataType);
                                 static_for<0, NumYX, 1>{}([&](auto i) {
                                     constexpr index_t indata_offset =
                                         indata_wave_desc_.CalculateOffset(
@@ -878,9 +940,14 @@ struct BlockwiseConvWconv
                                                        I0,
                                                        I0,
                                                        I0));
-                                    indata_thread_vec_tmp[i] = *reinterpret_cast<const InDataVec*>(
-                                        &indata_block_buf[Number<indata_offset>{}]);
-                                    indata_thread_vec_ptr[i] = &indata_thread_vec[i];
+                                    CopySubVector(indata_thread_vec_tmp[i],
+                                                  indata_block_buf,
+                                                  I0,
+                                                  Number<indata_offset>{},
+                                                  Number<CompCount>{});
+                                    indata_thread_vec_ptr[i] =
+                                        &indata_thread_vec[i]
+                                             .template AsType<typename InDataVec::type>()[I0];
                                 });
                                 wconv_conv.UnshuffleStridedConv2Data(indata_thread_vec_tmp,
                                                                      indata_thread_vec);
@@ -889,8 +956,9 @@ struct BlockwiseConvWconv
                             {
                                 constexpr index_t indata_offset = indata_wave_desc_.CalculateOffset(
                                     make_tuple(w0, c0, h0, I0, I0, I0, I0));
-                                indata_thread_vec_ptr[I0] = reinterpret_cast<const InDataVec*>(
-                                    &indata_block_buf[Number<indata_offset>{}]);
+                                indata_thread_vec_ptr[I0] =
+                                    reinterpret_cast<const typename InDataVec::type*>(
+                                        &indata_block_buf[Number<indata_offset>{}]);
                             }
                         }
 
@@ -968,9 +1036,9 @@ struct BlockwiseConvWconv
     {
         auto weight_thread_buf = make_static_buffer<AddressSpaceEnum::Vgpr, WeiDataType>(
             weight_thread_desc_.GetElementSpaceSize());
-        using WeiDataVec    = typename decltype(wconv_conv)::WeiDataVec::type;
-        using WeiDataTapVec = typename decltype(wconv_conv)::WeiDataTapVec::type;
-        using InDataVec     = typename decltype(wconv_conv)::InDataVec::type;
+        using WeiDataVec    = typename decltype(wconv_conv)::WeiDataVec;
+        using WeiDataTapVec = typename decltype(wconv_conv)::WeiDataTapVec;
+        using InDataVec     = typename decltype(wconv_conv)::InDataVec;
 
         if constexpr(ConvertToTensor)
         {
@@ -989,8 +1057,8 @@ struct BlockwiseConvWconv
                         static_for<0, KCRepeat, 1>{}([&](auto c0) {
                             constexpr index_t indata_offset = indata_wave_desc_.CalculateOffset(
                                 make_tuple(w0, c0 + k0 * Number<KCRepeat>{}, h0, I0, I0, I0, I0));
-                            accum_vec.template AsType<InDataVec>()(c0) =
-                                *reinterpret_cast<const InDataVec*>(
+                            accum_vec.template AsType<typename InDataVec::type>()(c0) =
+                                *reinterpret_cast<const typename InDataVec::type*>(
                                     &indata_block_buf[Number<indata_offset>{}]);
                         });
                     });
@@ -999,14 +1067,14 @@ struct BlockwiseConvWconv
             return;
         }
 
-        const InDataVec* indata_thread_vec_ptr[4];
+        const typename InDataVec::type* indata_thread_vec_ptr[4];
         static_assert(Iters <= 4 && FilterSize < 4, "");
         constexpr index_t CStep = Iters;
 
         static_for<0, KRepeat, 1>{}([&](auto k0) {
             static_for<0, CRepeat, CStep>{}([&](auto c0) {
-                const WeiDataVec* weight_thread_vec_ptr;
-                typename decltype(wconv_conv)::WeiDataVec weight_thread_vec;
+                const typename WeiDataVec::type* weight_thread_vec_ptr;
+                WeiDataVec weight_thread_vec;
                 // Load weights
                 if constexpr(WeiDataEnableLds)
                 {
@@ -1021,12 +1089,16 @@ struct BlockwiseConvWconv
                                 weight_thread_desc_,
                                 make_tuple(I0, I0, I0, I0, I0, I0),
                                 weight_thread_buf);
-                            weight_thread_vec.template AsType<WeiDataTapVec>()(
-                                i / Number<TapPerIter>{}) =
-                                *reinterpret_cast<const WeiDataTapVec*>(&(weight_thread_buf[I0]));
+                            constexpr auto CompCount  = sizeof(WeiDataTapVec) / sizeof(WeiDataType);
+                            constexpr auto CompOffset = i * CompCount / TapPerIter;
+                            CopySubVector(weight_thread_vec,
+                                          weight_thread_buf,
+                                          Number<CompOffset>{},
+                                          I0,
+                                          Number<CompCount>{});
                         });
                         weight_thread_vec_ptr =
-                            &weight_thread_vec.template AsType<WeiDataVec>()[I0];
+                            &weight_thread_vec.template AsType<typename WeiDataVec::type>()[I0];
                     }
                     else if constexpr(FilterSize == 3)
                     {
@@ -1042,11 +1114,16 @@ struct BlockwiseConvWconv
                                 make_tuple(I0, I0, I0, I0, I0, I0),
                                 weight_thread_buf);
 
-                            weight_thread_vec.template AsType<WeiDataTapVec>()(Number<tape_idx>{}) =
-                                *reinterpret_cast<const WeiDataTapVec*>(&weight_thread_buf[I0]);
+                            constexpr auto CompCount  = sizeof(WeiDataTapVec) / sizeof(WeiDataType);
+                            constexpr auto CompOffset = tape_idx * CompCount;
+                            CopySubVector(weight_thread_vec,
+                                          weight_thread_buf,
+                                          Number<CompOffset>{},
+                                          I0,
+                                          Number<CompCount>{});
                         });
                         weight_thread_vec_ptr =
-                            &weight_thread_vec.template AsType<WeiDataVec>()[I0];
+                            &weight_thread_vec.template AsType<typename WeiDataVec::type>()[I0];
                     }
                 }
                 else
@@ -1055,21 +1132,25 @@ struct BlockwiseConvWconv
                         weight_wave_desc_.CalculateOffset(make_tuple(k0, c0, I0, I0, I0, I0));
                     if constexpr((Iters == 4) && (wconv_conv.GetNumWeightTapPerWave() == 2))
                     {
-
+                        constexpr auto CompCount      = sizeof(WeiDataTapVec) / sizeof(WeiDataType);
                         constexpr index_t wei_offset2 = weight_wave_desc_.CalculateOffset(
                             make_tuple(k0, c0 + I2, I0, I0, I0, I0));
-                        weight_thread_vec.template AsType<WeiDataTapVec>()(I0) =
-                            *reinterpret_cast<const WeiDataTapVec*>(
-                                &weight_block_buf[Number<wei_offset>{}]);
-                        weight_thread_vec.template AsType<WeiDataTapVec>()(I1) =
-                            *reinterpret_cast<const WeiDataTapVec*>(
-                                &weight_block_buf[Number<wei_offset2>{}]);
+                        CopySubVector(weight_thread_vec,
+                                      weight_block_buf,
+                                      I0,
+                                      Number<wei_offset>{},
+                                      Number<CompCount>{});
+                        CopySubVector(weight_thread_vec,
+                                      weight_block_buf,
+                                      Number<CompCount>{},
+                                      Number<wei_offset2>{},
+                                      Number<CompCount>{});
                         weight_thread_vec_ptr =
-                            &weight_thread_vec.template AsType<WeiDataVec>()[I0];
+                            &weight_thread_vec.template AsType<typename WeiDataVec::type>()[I0];
                     }
                     else
                     {
-                        weight_thread_vec_ptr = reinterpret_cast<const WeiDataVec*>(
+                        weight_thread_vec_ptr = reinterpret_cast<const typename WeiDataVec::type*>(
                             &weight_block_buf[Number<wei_offset>{}]);
                     }
                 }
@@ -1086,7 +1167,8 @@ struct BlockwiseConvWconv
                                     auto indata_thread_buf =
                                         make_static_buffer_v3<AddressSpaceEnum::Vgpr, InDataType>(
                                             indata_thread_desc_.GetElementSpaceSize(),
-                                            (InDataType*)(&indata_thread_vec[iter_idx]));
+                                            &indata_thread_vec[iter_idx]
+                                                 .template AsType<InDataType>()(I0));
                                     indata_thread_copy_.Run(
                                         indata_wave_desc_,
                                         make_tuple(w0, c0 + iter_idx, h0, I0, I0, I0, I0),
@@ -1094,7 +1176,9 @@ struct BlockwiseConvWconv
                                         indata_thread_desc_,
                                         make_tuple(I0, I0, I0, I0, I0, I0, I0),
                                         indata_thread_buf);
-                                    indata_thread_vec_ptr[iter_idx] = &indata_thread_vec[iter_idx];
+                                    indata_thread_vec_ptr[iter_idx] =
+                                        &indata_thread_vec[iter_idx]
+                                             .template AsType<typename InDataVec::type>()[I0];
                                 });
                             }
                             else if constexpr(FilterSize == 3)
@@ -1104,7 +1188,8 @@ struct BlockwiseConvWconv
                                     auto indata_thread_buf =
                                         make_static_buffer_v3<AddressSpaceEnum::Vgpr, InDataType>(
                                             indata_thread_desc_.GetElementSpaceSize(),
-                                            (InDataType*)(&indata_thread_vec[array_idx]));
+                                            &indata_thread_vec[array_idx]
+                                                 .template AsType<InDataType>()(I0));
                                     indata_thread_copy_.Run(
                                         indata_wave_desc_,
                                         make_tuple(w0 + array_idx, c0, h0, I0, I0, I0, I0),
@@ -1113,7 +1198,8 @@ struct BlockwiseConvWconv
                                         make_tuple(I0, I0, I0, I0, I0, I0, I0),
                                         indata_thread_buf);
                                     indata_thread_vec_ptr[array_idx] =
-                                        &indata_thread_vec[array_idx];
+                                        &indata_thread_vec[array_idx]
+                                             .template AsType<typename InDataVec::type>()[I0];
                                 });
                             }
                         }
@@ -1127,11 +1213,10 @@ struct BlockwiseConvWconv
                                         indata_wave_desc_.CalculateOffset(
                                             make_tuple(w0, c0 + iter_idx, h0, I0, I0, I0, I0));
                                     indata_thread_vec_ptr[iter_idx] =
-                                        reinterpret_cast<const InDataVec*>(
+                                        reinterpret_cast<const typename InDataVec::type*>(
                                             &indata_block_buf[Number<indata_offset>{}]);
                                 });
                             }
-
                             else if constexpr(FilterSize == 3)
                             {
                                 static_for<0, FilterSize, 1>{}([&](auto array_idx) {
@@ -1139,7 +1224,7 @@ struct BlockwiseConvWconv
                                         indata_wave_desc_.CalculateOffset(
                                             make_tuple(w0 + array_idx, c0, h0, I0, I0, I0, I0));
                                     indata_thread_vec_ptr[array_idx] =
-                                        reinterpret_cast<const InDataVec*>(
+                                        reinterpret_cast<const typename InDataVec::type*>(
                                             &indata_block_buf[Number<indata_offset>{}]);
                                 });
                             }
@@ -1157,6 +1242,7 @@ struct BlockwiseConvWconv
             });
         });
     }
+#pragma clang diagnostic pop
 
     template <typename WeightBlockBuffer, typename InDataBlockBuffer, typename AccumThreadBuffer>
     __device__ void Run(const WeightBlockBuffer& weight_block_buf,

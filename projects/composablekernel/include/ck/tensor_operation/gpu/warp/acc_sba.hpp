@@ -350,12 +350,12 @@ struct SbaSelector
     static constexpr auto GetSba();
 
     template <>
-    static constexpr auto GetSba<float_t>()
+    constexpr auto GetSba<float_t>()
     {
         return SbaInstr::sba_f32;
     }
     template <>
-    static constexpr auto GetSba<half_t>()
+    constexpr auto GetSba<half_t>()
     {
         if(HPerWconv == 4 && WPerWconv == 2)
         {
@@ -367,7 +367,7 @@ struct SbaSelector
         }
     }
     template <>
-    static constexpr auto GetSba<bhalf_t>()
+    constexpr auto GetSba<bhalf_t>()
     {
         if(HPerWconv == 4 && WPerWconv == 2)
         {
@@ -503,7 +503,7 @@ struct AccSba
             {
                 perThreadNumber = 1;
             }
-            index_t K_offset = laneId % (KPerWconv / perThreadNumber);
+            K_offset = laneId % (KPerWconv / perThreadNumber);
             return make_tuple(K_offset, 0);
         }
     }

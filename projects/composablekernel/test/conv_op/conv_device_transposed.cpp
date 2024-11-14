@@ -1,8 +1,5 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2018-2024, Advanced Micro Devices, Inc. All rights reserved.
-
-#pragma once
-
 #include <algorithm>
 #include <cstdlib>
 #include <iostream>
@@ -172,7 +169,7 @@ struct ExecutionConfig final
     int k                = DEFAULT_K;
 };
 
-extern ExecutionConfig config;
+static ExecutionConfig config;
 
 template <typename DataType>
 void DumpTensor(const Tensor<DataType>& tensor, const char* str)
@@ -368,7 +365,7 @@ const char* get_string()
         return "uint32_t";
     }
 
-#if CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
+#ifdef CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
     if constexpr(std::is_same<Type, ck::int4_t>::value)
     {
         return "int4_t";
@@ -624,7 +621,7 @@ bool run_test()
     float avg_time = 0;
     using DeviceConvFwdInstance =
         ck::tensor_operation::device::DeviceConvWconv<NDimSpatial,
-#if ENABLE_CONST_LAYOUT
+#ifdef ENABLE_CONST_LAYOUT
                                                       ConstInputLayout<FilterSize>,
                                                       ConstWeightLayout<FilterSize>,
                                                       ConstOutputLayout<FilterSize>,
@@ -732,7 +729,7 @@ bool run_test()
         }
         else
         {
-#if FORCE_CONVERT_TO_TENSOR
+#ifdef FORCE_CONVERT_TO_TENSOR
             bool ret = ck::utils::check_err(out_device,
                                             in,
                                             "Error: incorrect results!",
@@ -772,7 +769,7 @@ bool run_test_fmt()
     }
     bool pass = true;
 
-#if ENABLE_WAVEGROUP
+#ifdef ENABLE_WAVEGROUP
     constexpr bool WaveGroup = true;
 #else
     constexpr bool WaveGroup = false;
@@ -820,7 +817,7 @@ inline void print_help_msg()
               << "arg6-9: tensor size {H x W x C x K}" << std::endl;
 }
 
-inline bool parse_cmd_args(int argc, char* argv[], ExecutionConfig& config)
+inline bool parse_cmd_args(int argc, char* argv[], ExecutionConfig& cfg)
 {
     if(argc == 1)
     {
@@ -830,15 +827,15 @@ inline bool parse_cmd_args(int argc, char* argv[], ExecutionConfig& config)
     {
         if(argc > 1)
         {
-            config.test_mask = std::stoul(argv[1], nullptr, 0);
+            cfg.test_mask = std::stoul(argv[1], nullptr, 0);
         }
         if(argc > 2)
         {
-            config.do_verification = std::stoi(argv[2]);
+            cfg.do_verification = std::stoi(argv[2]);
         }
         if(argc > 3)
         {
-            config.dump_tensor = std::stoi(argv[3]);
+            cfg.dump_tensor = std::stoi(argv[3]);
         }
         if(argc > 4)
         {
@@ -846,23 +843,23 @@ inline bool parse_cmd_args(int argc, char* argv[], ExecutionConfig& config)
         }
         if(argc > 5)
         {
-            config.time_kernel = std::stoi(argv[5]);
+            cfg.time_kernel = std::stoi(argv[5]);
         }
         if(argc > 6)
         {
-            config.h = std::stoi(argv[6]);
+            cfg.h = std::stoi(argv[6]);
         }
         if(argc > 7)
         {
-            config.w = std::stoi(argv[7]);
+            cfg.w = std::stoi(argv[7]);
         }
         if(argc > 8)
         {
-            config.c = std::stoi(argv[8]);
+            cfg.c = std::stoi(argv[8]);
         }
         if(argc > 9)
         {
-            config.k = std::stoi(argv[9]);
+            cfg.k = std::stoi(argv[9]);
         }
     }
     else
@@ -878,8 +875,6 @@ using half_t  = ck::half_t;
 using bhalf_t = ck::bhalf_t;
 using f8_t    = ck::f8_t;
 using bf8_t   = ck::bf8_t;
-
-ExecutionConfig config;
 
 int main(int argc, char* argv[])
 {

@@ -293,10 +293,6 @@ struct TransformConvFwdToWconv
                                                                   std::multiplies<>());
 
                 // This is different
-                const index_t WiStride = a_g_n_c_wis_strides[3 + NDimSpatial - 1];
-                const index_t HiStride = a_g_n_c_wis_strides[3 + NDimSpatial - 2];
-                const auto CStride     = I1;
-
                 const auto in_nhi_wi_c_desc = make_naive_tensor_descriptor(
                     make_tuple(NHi, Wi, C), make_tuple(HiStride, WiStride, CStride));
                 const auto in_nhi_wi_c_unmerge_desc = transform_tensor_descriptor(
@@ -333,11 +329,6 @@ struct TransformConvFwdToWconv
             else if constexpr(ShuffleOnLoad == false)
             {
                 // Pad height to even before merge N
-                const index_t NStride  = a_g_n_c_wis_strides[1];
-                const index_t WiStride = a_g_n_c_wis_strides[3 + NDimSpatial - 1];
-                const index_t HiStride = a_g_n_c_wis_strides[3 + NDimSpatial - 2];
-                const auto CStride     = I1;
-
                 const auto in_n_hi_wi_c_desc = make_naive_tensor_descriptor(
                     make_tuple(N, Hi, Wi, C), make_tuple(NStride, HiStride, WiStride, CStride));
 
@@ -361,11 +352,6 @@ struct TransformConvFwdToWconv
             else // transposed = false && shuffleOnLoad == true
             {
                 // This is different
-                const index_t NStride  = a_g_n_c_wis_strides[1];
-                const index_t WiStride = a_g_n_c_wis_strides[3 + NDimSpatial - 1];
-                const index_t HiStride = a_g_n_c_wis_strides[3 + NDimSpatial - 2];
-                const auto CStride     = I1;
-
                 const auto in_n_hi_wi_c_desc = make_naive_tensor_descriptor(
                     make_tuple(N, Hi, Wi, C), make_tuple(NStride, HiStride, WiStride, CStride));
 
@@ -402,11 +388,6 @@ struct TransformConvFwdToWconv
                           device::ConvolutionForwardSpecialization::Filter1x1Pad0)
         {
             // This is different
-            const index_t NStride  = a_g_n_c_wis_strides[1];
-            const index_t HiStride = a_g_n_c_wis_strides[3];
-            const index_t WiStride = a_g_n_c_wis_strides[4];
-            const auto CStride     = I1;
-
             const auto in_n_hi_wi_c_desc = make_naive_tensor_descriptor(
                 make_tuple(N, Hi, Wi, C), make_tuple(NStride, HiStride, WiStride, CStride));
 
