@@ -126,6 +126,7 @@ struct DeviceBatchedContractionMultipleD_Wmma_CShuffle
     static constexpr auto I4 = Number<4>{};
     static constexpr auto I5 = Number<5>{};
     static constexpr auto I6 = Number<6>{};
+    static constexpr auto I7 = Number<7>{};
     // K1 = Max Vector Access Pixels
     static constexpr auto K1Number = Number<K1>{};
 
@@ -236,10 +237,10 @@ struct DeviceBatchedContractionMultipleD_Wmma_CShuffle
                 a_grid_desc_m_k,
                 make_tuple(make_unmerge_transform(make_tuple(
                                A_KWmma, Number<A_K0PerWmma>{}, Number<A_KRow>{}, K1Number)),
-                           make_unmerge_transform(
-                               make_tuple(M0 * MRepeat, Number<MWaves>{}, Number<MPerWmma>{}))),
+                           make_unmerge_transform(make_tuple(
+                               M0, Number<MRepeat>{}, Number<MWaves>{}, Number<MPerWmma>{}))),
                 make_tuple(Sequence<1>{}, Sequence<0>{}),
-                make_tuple(Sequence<0, 3, 4, 6>{}, Sequence<1, 2, 5>{}));
+                make_tuple(Sequence<0, 4, 5, 7>{}, Sequence<1, 2, 3, 6>{}));
         }
     }
 
@@ -328,10 +329,10 @@ struct DeviceBatchedContractionMultipleD_Wmma_CShuffle
                 b_grid_desc_n_k,
                 make_tuple(make_unmerge_transform(make_tuple(
                                B_KWmma, Number<B_K0PerWmma>{}, Number<B_KRow>{}, K1Number)),
-                           make_unmerge_transform(
-                               make_tuple(N0 * NRepeat, Number<NWaves>{}, Number<NPerWmma>{}))),
+                           make_unmerge_transform(make_tuple(
+                               N0, Number<NRepeat>{}, Number<NWaves>{}, Number<NPerWmma>{}))),
                 make_tuple(Sequence<1>{}, Sequence<0>{}),
-                make_tuple(Sequence<0, 3, 4, 6>{}, Sequence<1, 2, 5>{}));
+                make_tuple(Sequence<0, 4, 5, 7>{}, Sequence<1, 2, 3, 6>{}));
         }
     }
 
@@ -762,8 +763,8 @@ struct DeviceBatchedContractionMultipleD_Wmma_CShuffle
                 }
                 else
                 {
-                    return arg.a_grid_desc_.GetLength(I0) * arg.a_grid_desc_.GetLength(I3) *
-                           arg.a_grid_desc_.GetLength(I4) * arg.a_grid_desc_.GetLength(I6);
+                    return arg.a_grid_desc_.GetLength(I0) * arg.a_grid_desc_.GetLength(I4) *
+                           arg.a_grid_desc_.GetLength(I5) * arg.a_grid_desc_.GetLength(I7);
                 }
             }();
 
@@ -876,8 +877,15 @@ struct DeviceBatchedContractionMultipleD_Wmma_CShuffle
         {
             if(!(arg.a_kz_stride_ == 1))
             {
-                index_t LastK =
-                    AEnableLds ? arg.a_grid_desc_.GetLength(I2) : arg.a_grid_desc_.GetLength(I6);
+                index_t LastK;
+                if constexpr(AEnableLds)
+                {
+                    LastK = arg.a_grid_desc_.GetLength(I2);
+                }
+                else
+                {
+                    LastK = arg.a_grid_desc_.GetLength(I7);
+                }
                 if(LastK % ABlockTransferSrcScalarPerVector == 0)
                 {
                     printf("DeviceOp: Vector Access A-k check failure\n");
@@ -898,11 +906,22 @@ struct DeviceBatchedContractionMultipleD_Wmma_CShuffle
         }
         else
         {
-            if(!(arg.b_kz_stride_ == 1 &&
-                 arg.b_grid_desc_.GetLength(I2) % BBlockTransferSrcScalarPerVector == 0))
+            if(!(arg.b_kz_stride_ == 1))
             {
-                printf("DeviceOp: Vector Access B-k check failure\n");
-                return false;
+                index_t LastK;
+                if constexpr(BEnableLds)
+                {
+                    LastK = arg.b_grid_desc_.GetLength(I2);
+                }
+                else
+                {
+                    LastK = arg.b_grid_desc_.GetLength(I7);
+                }
+                if(LastK % ABlockTransferSrcScalarPerVector == 0)
+                {
+                    printf("DeviceOp: Vector Access B-k check failure\n");
+                    return false;
+                }
             }
         }
 

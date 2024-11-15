@@ -3,7 +3,7 @@
 
 #pragma once
 #include "data_type.hpp"
-
+#include "amd_address_space.hpp"
 #if defined(__gfx1300__) || defined(__gfx1301__) || defined(__gfx1302__)
 #define __gfx13__
 #endif
@@ -1268,6 +1268,33 @@ __device__ void amd_async_store_lds_to_global(const T* lds_base_ptr,
                 reinterpret_cast<uintptr_t>(global_base_ptr + global_offset));
         amd_async_store_to_global_impl<T, NumElemsPerThread, coherence>(lds_ptr, global_ptr);
     }
+}
+
+template <typename T, index_t N, AddressSpaceEnum BufferAddressSpace>
+__device__ auto amd_tr_load_to_vgpr(const T* in_ptr, bool is_src_valid)
+{
+    using vector_t = typename vector_type_maker<T, N>::type::type;
+#if defined(__gfx13__)
+    if constexpr(is_same_v<remove_cvref_t<T>, ck::half_t>)
+    {
+        if(is_src_valid)
+        {
+            typedef __attribute__((__vector_size__(8 * sizeof(__fp16)))) __fp16 llvm_fp16x8_t;
+            __attribute__((address_space(1))) llvm_fp16x8_t* global_ptr =
+                reinterpret_cast<__attribute__((address_space(1))) llvm_fp16x8_t*>(
+                    reinterpret_cast<uintptr_t>(in_ptr));
+            return bit_cast<vector_t>(__builtin_amdgcn_global_load_tr16_b128_v8f16(global_ptr));
+        }
+        else
+        {
+            return vector_t{0};
+        }
+    }
+#else
+    ignore = in_ptr;
+    ignore = is_src_valid;
+    return vector_t{0};
+#endif
 }
 
 } // namespace ck

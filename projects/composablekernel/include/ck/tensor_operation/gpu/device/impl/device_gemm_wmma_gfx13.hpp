@@ -53,6 +53,7 @@ template <typename ALayout,
           ck::index_t ABlockTransferDstScalarPerVector_K1,
           bool ABlockLdsAddExtraM,
           bool ABlockLdsAsyncCopy,
+          bool AEnableGlobalTRLoad,
           typename BBlockTransferThreadClusterLengths_N_K0_K1,
           typename BBlockTransferThreadClusterArrangeOrder,
           typename BBlockTransferSrcAccessOrder,
@@ -61,6 +62,7 @@ template <typename ALayout,
           ck::index_t BBlockTransferDstScalarPerVector_K1,
           bool BBlockLdsAddExtraN,
           bool BBlockLdsAsyncCopy,
+          bool BEnableGlobalTRLoad,
           index_t CShuffleMRepeatPerShuffle,
           index_t CShuffleNRepeatPerShuffle,
           typename CShuffleBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock,
@@ -85,6 +87,7 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
     static constexpr auto I4 = Number<4>{};
     static constexpr auto I5 = Number<5>{};
     static constexpr auto I6 = Number<6>{};
+    static constexpr auto I7 = Number<7>{};
     // K1 in gfx13 is used for wmma layout
     static constexpr auto K1Number = Number<K1>{};
     // AVecAccessNumber/BVecAccessNumber is Vector Access Number for A/B
@@ -101,12 +104,12 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
     static constexpr auto AEnableLds_auto = (NWaves == 1 && (MaxVectorLoadA || MRepeat == 1) &&
                                              is_same<tensor_layout::gemm::RowMajor, ALayout>::value)
                                                 ? false
-                                                : true;
+                                                : (AEnableGlobalTRLoad ? false : true);
     static constexpr auto BEnableLds_auto =
         (MWaves == 1 && (MaxVectorLoadB || NRepeat == 1) &&
          is_same<tensor_layout::gemm::ColumnMajor, BLayout>::value)
             ? false
-            : true;
+            : (BEnableGlobalTRLoad ? false : true);
 
     // If true, LDS is used unconditionally
     // if enable lds async load, should always enable lds
@@ -116,6 +119,11 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
 
     static constexpr auto AEnableLds = AEnableLds_auto || AEnableLds_manu || (NumPrefetch > 1);
     static constexpr auto BEnableLds = BEnableLds_auto || BEnableLds_manu || (NumPrefetch > 1);
+
+    static constexpr auto AEnableTRLoadFromGlobal =
+        !AEnableLds && AEnableGlobalTRLoad && is_same_v<tensor_layout::gemm::ColumnMajor, ALayout>;
+    static constexpr auto BEnableTRLoadFromGlobal =
+        !BEnableLds && BEnableGlobalTRLoad && is_same_v<tensor_layout::gemm::RowMajor, BLayout>;
 
     static constexpr auto matrix_padder =
         MatrixPadder<GemmSpec, index_t, index_t, index_t>{MPerBlock, NPerBlock, KPerBlock};
@@ -216,8 +224,7 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
                     const auto a_grid_desc_mraw_kraw = make_naive_tensor_descriptor(
                         make_tuple(MRaw, KRaw * ADataType::BITS / 32),
                         make_tuple(StrideA * ADataType::BITS / 32, I1));
-
-                    // return matrix_padder.PadADescriptor_M_K(a_grid_desc_mraw_kraw);
+                    // for mx data type, no need to pad which assume data always aligned
                     return a_grid_desc_mraw_kraw;
                 }
                 else
@@ -225,8 +232,7 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
                     const auto a_grid_desc_mraw_kraw = make_naive_tensor_descriptor(
                         make_tuple(MRaw, KRaw), make_tuple(StrideA, I1));
 
-                    // return matrix_padder.PadADescriptor_M_K(a_grid_desc_mraw_kraw);
-                    return a_grid_desc_mraw_kraw;
+                    return matrix_padder.PadADescriptor_M_K(a_grid_desc_mraw_kraw);
                 }
             }
             else if constexpr(is_same<tensor_layout::gemm::ColumnMajor, ALayout>::value)
@@ -238,7 +244,6 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
                         make_tuple(MRaw * ADataType::BITS / 32, KRaw),
                         make_tuple(I1, StrideA * ADataType::BITS / 32));
 
-                    // return matrix_padder.PadADescriptor_M_K(a_grid_desc_mraw_kraw);
                     return a_grid_desc_mraw_kraw;
                 }
                 else
@@ -246,8 +251,7 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
                     const auto a_grid_desc_mraw_kraw = make_naive_tensor_descriptor(
                         make_tuple(MRaw, KRaw), make_tuple(I1, StrideA));
 
-                    // return matrix_padder.PadADescriptor_M_K(a_grid_desc_mraw_kraw);
-                    return a_grid_desc_mraw_kraw;
+                    return matrix_padder.PadADescriptor_M_K(a_grid_desc_mraw_kraw);
                 }
             }
         }();
@@ -268,23 +272,42 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
         }
         else
         {
-            // TODO, the logic not changed
-            constexpr auto A_KRow      = 2;
-            constexpr auto A_K0PerWmma = AKPerWmma / A_KRow / K1Number;
-            const auto A_KWmma         = K / AKPerWmma;
+            if constexpr(AEnableTRLoadFromGlobal)
+            {
+                constexpr auto M1        = 8; // this value is based on SPG
+                const auto A_KWmma       = K / AKPerWmma;
+                const auto M0            = M / MPerBlock;
+                constexpr auto M1PerWmma = MPerWmma / M1;
+                return transform_tensor_descriptor(
+                    a_grid_desc_m_k,
+                    make_tuple(
+                        make_unmerge_transform(make_tuple(M0, MRepeat, MWaves, M1PerWmma, M1)),
+                        make_unmerge_transform(make_tuple(A_KWmma, AKPerWmma, I1))),
+                    // this I1 is used to match the dimension in other branch where no TR
+                    // load; no real meaning, many codes use 7 dimensions
+                    make_tuple(Sequence<0>{}, Sequence<1>{}),
+                    make_tuple(Sequence<1, 2, 3, 4, 7>{}, Sequence<0, 5, 6>{}));
+            }
+            else
+            {
+                // TODO, the logic not changed
+                constexpr auto A_KRow      = 2;
+                constexpr auto A_K0PerWmma = AKPerWmma / A_KRow / K1Number;
+                const auto A_KWmma         = K / AKPerWmma;
 
-            const auto M0 = M / MPerBlock;
-            // 0   1     0         1                2        3             4        5 6 M -
-            // K <-> A_KWmma - MBlock*MRepeat - MWaves - A_K0PerWmma - A_KRow - MPerWmma -
-            // A_K1
-            return transform_tensor_descriptor(
-                a_grid_desc_m_k,
-                make_tuple(make_unmerge_transform(make_tuple(
-                               A_KWmma, Number<A_K0PerWmma>{}, Number<A_KRow>{}, K1Number)),
-                           make_unmerge_transform(
-                               make_tuple(M0 * MRepeat, Number<MWaves>{}, Number<MPerWmma>{}))),
-                make_tuple(Sequence<1>{}, Sequence<0>{}),
-                make_tuple(Sequence<0, 3, 4, 6>{}, Sequence<1, 2, 5>{}));
+                const auto M0 = M / MPerBlock;
+                // 0   1     0         1                2        3             4        5 6
+                // M - K <-> A_KWmma - MBlock*MRepeat - MWaves - A_K0PerWmma - A_KRow -
+                // MPerWmma - A_K1
+                return transform_tensor_descriptor(
+                    a_grid_desc_m_k,
+                    make_tuple(make_unmerge_transform(make_tuple(
+                                   A_KWmma, Number<A_K0PerWmma>{}, Number<A_KRow>{}, K1Number)),
+                               make_unmerge_transform(make_tuple(
+                                   M0, Number<MRepeat>{}, Number<MWaves>{}, Number<MPerWmma>{}))),
+                    make_tuple(Sequence<1>{}, Sequence<0>{}),
+                    make_tuple(Sequence<0, 4, 5, 7>{}, Sequence<1, 2, 3, 6>{}));
+            }
         }
     }
 
@@ -301,7 +324,7 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
                         make_tuple(NRaw * BDataType::BITS / 32, KRaw),
                         make_tuple(I1, StrideB * BDataType::BITS / 32));
 
-                    return matrix_padder.PadBDescriptor_N_K(b_grid_desc_nraw_kraw);
+                    return b_grid_desc_nraw_kraw;
                 }
                 else
                 {
@@ -320,7 +343,6 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
                         make_tuple(NRaw, KRaw * BDataType::BITS / 32),
                         make_tuple(StrideB * BDataType::BITS / 32, I1));
 
-                    // return matrix_padder.PadBDescriptor_N_K(b_grid_desc_nraw_kraw);
                     return b_grid_desc_nraw_kraw;
                 }
                 else
@@ -349,23 +371,40 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
         }
         else
         {
-            // TODO, not changed
-            constexpr auto B_KRow      = 2;
-            constexpr auto B_K0PerWmma = BKPerWmma / B_KRow / K1Number;
-            const auto B_KWmma         = K / BKPerWmma;
+            if constexpr(BEnableTRLoadFromGlobal)
+            {
+                constexpr auto N1        = 8;
+                const auto B_KWmma       = K / BKPerWmma;
+                const auto N0            = N / NPerBlock;
+                constexpr auto N1PerWmma = NPerWmma / N1;
+                return transform_tensor_descriptor(
+                    b_grid_desc_n_k,
+                    make_tuple(
+                        make_unmerge_transform(make_tuple(N0, NRepeat, NWaves, N1PerWmma, N1)),
+                        make_unmerge_transform(make_tuple(B_KWmma, BKPerWmma, I1))),
+                    make_tuple(Sequence<0>{}, Sequence<1>{}),
+                    make_tuple(Sequence<1, 2, 3, 4, 7>{}, Sequence<0, 5, 6>{}));
+            }
+            else
+            {
+                // TODO, not changed
+                constexpr auto B_KRow      = 2;
+                constexpr auto B_K0PerWmma = BKPerWmma / B_KRow / K1Number;
+                const auto B_KWmma         = K / BKPerWmma;
 
-            const auto N0 = N / NPerBlock;
-            // 0   1     0         1                2        3             4 5 6 M -
-            // K <-> A_KWmma - MBlock*MRepeat - MWaves - A_K0PerWmma - A_KRow -
-            // MPerWmma - A_K1
-            return transform_tensor_descriptor(
-                b_grid_desc_n_k,
-                make_tuple(make_unmerge_transform(make_tuple(
-                               B_KWmma, Number<B_K0PerWmma>{}, Number<B_KRow>{}, K1Number)),
-                           make_unmerge_transform(
-                               make_tuple(N0 * NRepeat, Number<NWaves>{}, Number<NPerWmma>{}))),
-                make_tuple(Sequence<1>{}, Sequence<0>{}),
-                make_tuple(Sequence<0, 3, 4, 6>{}, Sequence<1, 2, 5>{}));
+                const auto N0 = N / NPerBlock;
+                // 0   1     0         1                2        3             4 5 6 M -
+                // K <-> A_KWmma - MBlock*MRepeat - MWaves - A_K0PerWmma - A_KRow -
+                // MPerWmma - A_K1
+                return transform_tensor_descriptor(
+                    b_grid_desc_n_k,
+                    make_tuple(make_unmerge_transform(make_tuple(
+                                   B_KWmma, Number<B_K0PerWmma>{}, Number<B_KRow>{}, K1Number)),
+                               make_unmerge_transform(make_tuple(
+                                   N0, Number<NRepeat>{}, Number<NWaves>{}, Number<NPerWmma>{}))),
+                    make_tuple(Sequence<1>{}, Sequence<0>{}),
+                    make_tuple(Sequence<0, 4, 5, 7>{}, Sequence<1, 2, 3, 6>{}));
+            }
         }
     }
 
@@ -433,6 +472,7 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
         AEnableLds,
         ABlockLdsAddExtraM,
         ABlockLdsAsyncCopy,
+        AEnableTRLoadFromGlobal,
         BBlockTransferThreadClusterLengths_N_K0_K1,
         BBlockTransferThreadClusterArrangeOrder,
         BBlockTransferSrcAccessOrder,
@@ -443,6 +483,7 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
         BEnableLds,
         BBlockLdsAddExtraN,
         BBlockLdsAsyncCopy,
+        BEnableTRLoadFromGlobal,
         CShuffleMRepeatPerShuffle,
         CShuffleNRepeatPerShuffle,
         CShuffleBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock,
@@ -610,8 +651,16 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
                 }
                 else
                 {
-                    return arg.a_grid_desc_.GetLength(I0) * arg.a_grid_desc_.GetLength(I3) *
-                           arg.a_grid_desc_.GetLength(I4) * arg.a_grid_desc_.GetLength(I6);
+                    if constexpr(AEnableTRLoadFromGlobal)
+                    {
+                        return arg.a_grid_desc_.GetLength(I0) * arg.a_grid_desc_.GetLength(I5) *
+                               arg.a_grid_desc_.GetLength(I6);
+                    }
+                    else
+                    {
+                        return arg.a_grid_desc_.GetLength(I0) * arg.a_grid_desc_.GetLength(I3) *
+                               arg.a_grid_desc_.GetLength(I4) * arg.a_grid_desc_.GetLength(I6);
+                    }
                 }
             }();
             auto launch_kernel = [&](auto has_main_k_block_loop) {
@@ -753,7 +802,8 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
                     return false;
                 }
             }
-            else if constexpr(is_same_v<ALayout, Col> && ABlockTransferSrcVectorDim == 1)
+            // because change to gfx13, the layout changes to M->K0->K1
+            else if constexpr(is_same_v<ALayout, Col> && ABlockTransferSrcVectorDim == 0)
             {
                 // FIXME: not rigorous
                 if(arg.MRaw_ % ABlockTransferSrcScalarPerVector != 0)
@@ -774,7 +824,7 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
                     return false;
                 }
             }
-            else if constexpr(is_same_v<BLayout, Row> && BBlockTransferSrcVectorDim == 1)
+            else if constexpr(is_same_v<BLayout, Row> && BBlockTransferSrcVectorDim == 0)
             {
                 // FIXME: not rigorous
                 if(arg.NRaw_ % BBlockTransferSrcScalarPerVector != 0)
@@ -976,6 +1026,10 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
             << AEnableLds << ", "
             << "BEnableLds: "
             << BEnableLds << ", "
+            << "AEnableTRload: "
+            << AEnableTRLoadFromGlobal << ", "
+            << "BEnableTRload: "
+            << BEnableTRLoadFromGlobal << ", "
             << "NumPrefetch: "
             << NumPrefetch << ", "
             << "LoopScheduler: "

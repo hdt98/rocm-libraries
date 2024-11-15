@@ -335,20 +335,20 @@ struct BlockwiseGemmWMMA
                         // read A
                         a_thread_copy_.Run(
                             a_block_desc_k0_m0_m1_m2_k1,
-                            make_tuple(Number<k * KPack / A_K1 / A_KRow>{}, m0, I0, I0, I0, I0),
+                            make_tuple(m0, Number<k * KPack / A_K1 / A_KRow>{}, I0, I0, I0, I0),
                             a_block_buf,
                             a_thread_desc_,
-                            make_tuple(I0, m0, I0, I0, I0, I0),
+                            make_tuple(m0, I0, I0, I0, I0, I0),
                             a_thread_buf);
 
                         static_for<0, NRepeat, 1>{}([&](auto n0) {
                             // read B
                             b_thread_copy_.Run(
                                 b_block_desc_k0_n0_n1_n2_k1,
-                                make_tuple(Number<k * KPack / B_K1 / B_KRow>{}, n0, I0, I0, I0, I0),
+                                make_tuple(n0, Number<k * KPack / B_K1 / B_KRow>{}, I0, I0, I0, I0),
                                 b_block_buf,
                                 b_thread_desc_,
-                                make_tuple(I0, n0, I0, I0, I0, I0),
+                                make_tuple(n0, I0, I0, I0, I0, I0),
                                 b_thread_buf);
 
                             vector_type<FloatA, KPack / A_KRow> a_thread_vec;
@@ -357,13 +357,13 @@ struct BlockwiseGemmWMMA
                             static_for<0, KPack / A_KRow, 1>{}([&](auto i) {
                                 a_thread_vec.template AsType<FloatA>()(i) =
                                     a_thread_buf[Number<a_thread_desc_.CalculateOffset(
-                                        make_tuple(i / A_K1, m0, 0, 0, 0, i % A_K1))>{}];
+                                        make_tuple(m0, i / A_K1, 0, 0, 0, i % A_K1))>{}];
                             });
 
                             static_for<0, KPack / B_KRow, 1>{}([&](auto i) {
                                 b_thread_vec.template AsType<FloatB>()(i) =
                                     b_thread_buf[Number<b_thread_desc_.CalculateOffset(
-                                        make_tuple(i / B_K1, n0, 0, 0, 0, i % B_K1))>{}];
+                                        make_tuple(n0, i / B_K1, 0, 0, 0, i % B_K1))>{}];
                             });
 
                             using wmma_input_type_a =
@@ -391,18 +391,18 @@ struct BlockwiseGemmWMMA
                         // read B
                         b_thread_copy_.Run(
                             b_block_desc_k0_n0_n1_n2_k1,
-                            make_tuple(Number<k * KPack / B_K1 / B_KRow>{}, n0, I0, I0, I0, I0),
+                            make_tuple(n0, Number<k * KPack / B_K1 / B_KRow>{}, I0, I0, I0, I0),
                             b_block_buf,
                             b_thread_desc_,
-                            make_tuple(I0, n0, I0, I0, I0, I0),
+                            make_tuple(n0, I0, I0, I0, I0, I0),
                             b_thread_buf);
                         // read A
                         a_thread_copy_.Run(
                             a_block_desc_k0_m0_m1_m2_k1,
-                            make_tuple(Number<k * KPack / A_K1 / A_KRow>{}, m0, I0, I0, I0, I0),
+                            make_tuple(m0, Number<k * KPack / A_K1 / A_KRow>{}, I0, I0, I0, I0),
                             a_block_buf,
                             a_thread_desc_,
-                            make_tuple(I0, m0, I0, I0, I0, I0),
+                            make_tuple(m0, I0, I0, I0, I0, I0),
                             a_thread_buf);
 
                         vector_type<FloatA, KPack / A_KRow> a_thread_vec;
@@ -411,13 +411,13 @@ struct BlockwiseGemmWMMA
                         static_for<0, KPack / A_KRow, 1>{}([&](auto i) {
                             a_thread_vec.template AsType<FloatA>()(i) =
                                 a_thread_buf[Number<a_thread_desc_.CalculateOffset(
-                                    make_tuple(i / A_K1, m0, 0, 0, 0, i % A_K1))>{}];
+                                    make_tuple(m0, i / A_K1, 0, 0, 0, i % A_K1))>{}];
                         });
 
                         static_for<0, KPack / B_KRow, 1>{}([&](auto i) {
                             b_thread_vec.template AsType<FloatB>()(i) =
                                 b_thread_buf[Number<b_thread_desc_.CalculateOffset(
-                                    make_tuple(i / B_K1, n0, 0, 0, 0, i % B_K1))>{}];
+                                    make_tuple(n0, i / B_K1, 0, 0, 0, i % B_K1))>{}];
                         });
 
                         using wmma_input_type_a =
@@ -440,18 +440,18 @@ struct BlockwiseGemmWMMA
 
     protected:
     static constexpr auto a_thread_desc_ = make_naive_tensor_descriptor(
-        make_tuple(Number<KPack / A_K1 / A_KRow>{}, Number<MRepeat>{}, I1, I1, I1, Number<A_K1>{}),
-        make_tuple(Number<A_K1>{},
-                   Number<KPack / A_KRow>{},
+        make_tuple(Number<MRepeat>{}, Number<KPack / A_K1 / A_KRow>{}, I1, I1, I1, Number<A_K1>{}),
+        make_tuple(Number<KPack / A_KRow>{},
+                   Number<A_K1>{},
                    Number<A_K1>{},
                    Number<A_K1>{},
                    Number<A_K1>{},
                    Number<1>{}));
 
     static constexpr auto b_thread_desc_ = make_naive_tensor_descriptor(
-        make_tuple(Number<KPack / B_K1 / B_KRow>{}, Number<NRepeat>{}, I1, I1, I1, Number<B_K1>{}),
-        make_tuple(Number<B_K1>{},
-                   Number<KPack / B_KRow>{},
+        make_tuple(Number<NRepeat>{}, Number<KPack / B_K1 / B_KRow>{}, I1, I1, I1, Number<B_K1>{}),
+        make_tuple(Number<KPack / B_KRow>{},
+                   Number<B_K1>{},
                    Number<B_K1>{},
                    Number<B_K1>{},
                    Number<B_K1>{},
@@ -472,7 +472,7 @@ struct BlockwiseGemmWMMA
                                              FloatA,
                                              decltype(a_block_desc_k0_m0_m1_m2_k1),
                                              decltype(a_thread_desc_),
-                                             Sequence<KPack / A_K1 / A_KRow, 1, 1, 1, 1, A_K1>,
+                                             Sequence<1, KPack / A_K1 / A_KRow, 1, 1, 1, A_K1>,
                                              Sequence<0, 1, 2, 3, 4, 5>,
                                              5,
                                              A_K1,
@@ -488,7 +488,7 @@ struct BlockwiseGemmWMMA
             decltype(a_block_desc_k0_m0_m1_m2_k1),
             decltype(a_thread_desc_),
             tensor_operation::element_wise::PassThrough,
-            Sequence<KPack / A_K1 / A_KRow, 1, 1, 1, 1, A_K1>,
+            Sequence<1, KPack / A_K1 / A_KRow, 1, 1, 1, A_K1>,
             Sequence<0, 1, 2, 3, 4, 5>,
             5,
             A_K1,
@@ -506,7 +506,7 @@ struct BlockwiseGemmWMMA
                                              FloatB,
                                              decltype(b_block_desc_k0_n0_n1_n2_k1),
                                              decltype(b_thread_desc_),
-                                             Sequence<KPack / B_K1 / B_KRow, 1, 1, 1, 1, B_K1>,
+                                             Sequence<1, KPack / B_K1 / B_KRow, 1, 1, 1, B_K1>,
                                              Sequence<0, 1, 2, 3, 4, 5>,
                                              5,
                                              B_K1,
@@ -522,7 +522,7 @@ struct BlockwiseGemmWMMA
             decltype(b_block_desc_k0_n0_n1_n2_k1),
             decltype(b_thread_desc_),
             tensor_operation::element_wise::PassThrough,
-            Sequence<KPack / B_K1 / B_KRow, 1, 1, 1, 1, B_K1>,
+            Sequence<1, KPack / B_K1 / B_KRow, 1, 1, 1, B_K1>,
             Sequence<0, 1, 2, 3, 4, 5>,
             5,
             B_K1,
@@ -733,23 +733,23 @@ struct BlockwiseMXGemmWMMA : public BlockwiseGemmWMMA<BlockSize,
                     // read A
                     a_thread_copy_.Run(
                         PARENT::a_block_desc_k0_m0_m1_m2_k1,
-                        make_tuple(Number<k * AKPack / PARENT::A_K1 / PARENT::A_KRow>{},
-                                   m0,
+                        make_tuple(m0,
+                                   Number<k * AKPack / PARENT::A_K1 / PARENT::A_KRow>{},
                                    PARENT::I0,
                                    PARENT::I0,
                                    PARENT::I0,
                                    PARENT::I0),
                         a_block_buf,
                         a_thread_desc_,
-                        make_tuple(PARENT::I0, m0, PARENT::I0, PARENT::I0, PARENT::I0, PARENT::I0),
+                        make_tuple(m0, PARENT::I0, PARENT::I0, PARENT::I0, PARENT::I0, PARENT::I0),
                         a_thread_buf);
 
                     static_for<0, NRepeat, 1>{}([&](auto n0) {
                         // read B
                         b_thread_copy_.Run(
                             PARENT::b_block_desc_k0_n0_n1_n2_k1,
-                            make_tuple(Number<k * BKPack / PARENT::B_K1 / PARENT::B_KRow>{},
-                                       n0,
+                            make_tuple(n0,
+                                       Number<k * BKPack / PARENT::B_K1 / PARENT::B_KRow>{},
                                        PARENT::I0,
                                        PARENT::I0,
                                        PARENT::I0,
@@ -757,7 +757,7 @@ struct BlockwiseMXGemmWMMA : public BlockwiseGemmWMMA<BlockSize,
                             b_block_buf,
                             b_thread_desc_,
                             make_tuple(
-                                PARENT::I0, n0, PARENT::I0, PARENT::I0, PARENT::I0, PARENT::I0),
+                                n0, PARENT::I0, PARENT::I0, PARENT::I0, PARENT::I0, PARENT::I0),
                             b_thread_buf);
 
                         vector_type<int32_t, 8> a_thread_vec{};
@@ -773,13 +773,13 @@ struct BlockwiseMXGemmWMMA : public BlockwiseGemmWMMA<BlockSize,
                         static_for<0, AKPack / PARENT::A_KRow, 1>{}([&](auto i) {
                             a_thread_vec.template AsType<int32_t>()(i) =
                                 a_thread_buf[Number<a_thread_desc_.CalculateOffset(make_tuple(
-                                    i / PARENT::A_K1, m0, 0, 0, 0, i % PARENT::A_K1))>{}];
+                                    m0, i / PARENT::A_K1, 0, 0, 0, i % PARENT::A_K1))>{}];
                         });
 
                         static_for<0, BKPack / PARENT::B_KRow, 1>{}([&](auto i) {
                             b_thread_vec.template AsType<int32_t>()(i) =
                                 b_thread_buf[Number<b_thread_desc_.CalculateOffset(make_tuple(
-                                    i / PARENT::B_K1, n0, 0, 0, 0, i % PARENT::B_K1))>{}];
+                                    n0, i / PARENT::B_K1, 0, 0, 0, i % PARENT::B_K1))>{}];
                         });
 
                         using wmma_input_type_a = typename vector_type<int32_t, 8>::type;
@@ -839,8 +839,8 @@ struct BlockwiseMXGemmWMMA : public BlockwiseGemmWMMA<BlockSize,
                         // read B
                         b_thread_copy_.Run(
                             PARENT::b_block_desc_k0_n0_n1_n2_k1,
-                            make_tuple(Number<k * BKPack / PARENT::B_K1 / PARENT::B_KRow>{},
-                                       n0,
+                            make_tuple(n0,
+                                       Number<k * BKPack / PARENT::B_K1 / PARENT::B_KRow>{},
                                        PARENT::I0,
                                        PARENT::I0,
                                        PARENT::I0,
@@ -848,13 +848,13 @@ struct BlockwiseMXGemmWMMA : public BlockwiseGemmWMMA<BlockSize,
                             b_block_buf,
                             b_thread_desc_,
                             make_tuple(
-                                PARENT::I0, n0, PARENT::I0, PARENT::I0, PARENT::I0, PARENT::I0),
+                                n0, PARENT::I0, PARENT::I0, PARENT::I0, PARENT::I0, PARENT::I0),
                             b_thread_buf);
                         // read A
                         a_thread_copy_.Run(
                             PARENT::a_block_desc_k0_m0_m1_m2_k1,
-                            make_tuple(Number<k * AKPack / PARENT::A_K1 / PARENT::A_KRow>{},
-                                       m0,
+                            make_tuple(m0,
+                                       Number<k * AKPack / PARENT::A_K1 / PARENT::A_KRow>{},
                                        PARENT::I0,
                                        PARENT::I0,
                                        PARENT::I0,
@@ -862,7 +862,7 @@ struct BlockwiseMXGemmWMMA : public BlockwiseGemmWMMA<BlockSize,
                             a_block_buf,
                             a_thread_desc_,
                             make_tuple(
-                                PARENT::I0, m0, PARENT::I0, PARENT::I0, PARENT::I0, PARENT::I0),
+                                m0, PARENT::I0, PARENT::I0, PARENT::I0, PARENT::I0, PARENT::I0),
                             a_thread_buf);
 
                         vector_type<int32_t, 8> a_thread_vec{};
@@ -871,13 +871,13 @@ struct BlockwiseMXGemmWMMA : public BlockwiseGemmWMMA<BlockSize,
                         static_for<0, AKPack / PARENT::A_KRow, 1>{}([&](auto i) {
                             a_thread_vec.template AsType<int32_t>()(i) =
                                 a_thread_buf[Number<a_thread_desc_.CalculateOffset(make_tuple(
-                                    i / PARENT::A_K1, m0, 0, 0, 0, i % PARENT::A_K1))>{}];
+                                    m0, i / PARENT::A_K1, 0, 0, 0, i % PARENT::A_K1))>{}];
                         });
 
                         static_for<0, BKPack / PARENT::B_KRow, 1>{}([&](auto i) {
                             b_thread_vec.template AsType<int32_t>()(i) =
                                 b_thread_buf[Number<b_thread_desc_.CalculateOffset(make_tuple(
-                                    i / PARENT::B_K1, n0, 0, 0, 0, i % PARENT::B_K1))>{}];
+                                    n0, i / PARENT::B_K1, 0, 0, 0, i % PARENT::B_K1))>{}];
                         });
 
                         uint32_t a_scale_value =
@@ -937,28 +937,28 @@ struct BlockwiseMXGemmWMMA : public BlockwiseGemmWMMA<BlockSize,
 
     protected:
     static constexpr auto a_thread_desc_ =
-        make_naive_tensor_descriptor(make_tuple(Number<AKPack / PARENT::A_K1 / PARENT::A_KRow>{},
-                                                Number<MRepeat>{},
+        make_naive_tensor_descriptor(make_tuple(Number<MRepeat>{},
+                                                Number<AKPack / PARENT::A_K1 / PARENT::A_KRow>{},
                                                 PARENT::I1,
                                                 PARENT::I1,
                                                 PARENT::I1,
                                                 Number<PARENT::A_K1>{}),
-                                     make_tuple(Number<PARENT::A_K1>{},
-                                                Number<AKPack / PARENT::A_KRow>{},
+                                     make_tuple(Number<AKPack / PARENT::A_KRow>{},
+                                                Number<PARENT::A_K1>{},
                                                 Number<PARENT::A_K1>{},
                                                 Number<PARENT::A_K1>{},
                                                 Number<PARENT::A_K1>{},
                                                 Number<1>{}));
 
     static constexpr auto b_thread_desc_ =
-        make_naive_tensor_descriptor(make_tuple(Number<BKPack / PARENT::B_K1 / PARENT::B_KRow>{},
-                                                Number<NRepeat>{},
+        make_naive_tensor_descriptor(make_tuple(Number<NRepeat>{},
+                                                Number<BKPack / PARENT::B_K1 / PARENT::B_KRow>{},
                                                 PARENT::I1,
                                                 PARENT::I1,
                                                 PARENT::I1,
                                                 Number<PARENT::B_K1>{}),
-                                     make_tuple(Number<PARENT::B_K1>{},
-                                                Number<BKPack / PARENT::B_KRow>{},
+                                     make_tuple(Number<BKPack / PARENT::B_KRow>{},
+                                                Number<PARENT::B_K1>{},
                                                 Number<PARENT::B_K1>{},
                                                 Number<PARENT::B_K1>{},
                                                 Number<PARENT::B_K1>{},
@@ -984,7 +984,7 @@ struct BlockwiseMXGemmWMMA : public BlockwiseGemmWMMA<BlockSize,
             int32_t,
             decltype(PARENT::a_block_desc_k0_m0_m1_m2_k1),
             decltype(a_thread_desc_),
-            Sequence<AKPack / PARENT::A_K1 / PARENT::A_KRow, 1, 1, 1, 1, PARENT::A_K1>,
+            Sequence<1, AKPack / PARENT::A_K1 / PARENT::A_KRow, 1, 1, 1, PARENT::A_K1>,
             Sequence<0, 1, 2, 3, 4, 5>,
             5,
             PARENT::A_K1,
@@ -1000,7 +1000,7 @@ struct BlockwiseMXGemmWMMA : public BlockwiseGemmWMMA<BlockSize,
             decltype(PARENT::a_block_desc_k0_m0_m1_m2_k1),
             decltype(a_thread_desc_),
             tensor_operation::element_wise::PassThrough,
-            Sequence<AKPack / PARENT::A_K1 / PARENT::A_KRow, 1, 1, 1, 1, PARENT::A_K1>,
+            Sequence<1, AKPack / PARENT::A_K1 / PARENT::A_KRow, 1, 1, 1, PARENT::A_K1>,
             Sequence<0, 1, 2, 3, 4, 5>,
             5,
             PARENT::A_K1,
@@ -1018,7 +1018,7 @@ struct BlockwiseMXGemmWMMA : public BlockwiseGemmWMMA<BlockSize,
             int32_t,
             decltype(PARENT::b_block_desc_k0_n0_n1_n2_k1),
             decltype(b_thread_desc_),
-            Sequence<BKPack / PARENT::B_K1 / PARENT::B_KRow, 1, 1, 1, 1, PARENT::B_K1>,
+            Sequence<1, BKPack / PARENT::B_K1 / PARENT::B_KRow, 1, 1, 1, PARENT::B_K1>,
             Sequence<0, 1, 2, 3, 4, 5>,
             5,
             PARENT::B_K1,
@@ -1034,7 +1034,7 @@ struct BlockwiseMXGemmWMMA : public BlockwiseGemmWMMA<BlockSize,
             decltype(PARENT::b_block_desc_k0_n0_n1_n2_k1),
             decltype(b_thread_desc_),
             tensor_operation::element_wise::PassThrough,
-            Sequence<BKPack / PARENT::B_K1 / PARENT::B_KRow, 1, 1, 1, 1, PARENT::B_K1>,
+            Sequence<1, BKPack / PARENT::B_K1 / PARENT::B_KRow, 1, 1, 1, PARENT::B_K1>,
             Sequence<0, 1, 2, 3, 4, 5>,
             5,
             PARENT::B_K1,
@@ -1432,7 +1432,7 @@ struct BlockwiseGemmWMMA
                         // read A
                         a_thread_copy_.Run(
                             a_block_desc_k0_m0_m1_m2_k1,
-                            make_tuple(Number<k * KPack / A_K1 / A_KRow>{}, m0, I0, I0, I0, I0),
+                            make_tuple(m0, Number<k * KPack / A_K1 / A_KRow>{}, I0, I0, I0, I0),
                             a_block_buf,
                             a_thread_desc_,
                             make_tuple(I0, m0, I0, I0, I0, I0),
@@ -1442,7 +1442,7 @@ struct BlockwiseGemmWMMA
                             // read B
                             b_thread_copy_.Run(
                                 b_block_desc_k0_n0_n1_n2_k1,
-                                make_tuple(Number<k * KPack / B_K1 / B_KRow>{}, n0, I0, I0, I0, I0),
+                                make_tuple(n0, Number<k * KPack / B_K1 / B_KRow>{}, I0, I0, I0, I0),
                                 b_block_buf,
                                 b_thread_desc_,
                                 make_tuple(I0, n0, I0, I0, I0, I0),
@@ -1454,16 +1454,16 @@ struct BlockwiseGemmWMMA
                             static_for<0, KPack, 1>{}([&](auto i) {
                                 a_thread_vec.template AsType<FloatA>()(i) =
                                     a_thread_buf[Number<a_thread_desc_.CalculateOffset(
-                                        make_tuple(i / A_K1 / A_KRow,
-                                                   m0,
+                                        make_tuple(m0,
+                                                   i / A_K1 / A_KRow,
                                                    0,
                                                    (i / A_K1) % A_KRow,
                                                    0,
                                                    i % A_K1))>{}];
                                 b_thread_vec.template AsType<FloatB>()(i) =
                                     b_thread_buf[Number<b_thread_desc_.CalculateOffset(
-                                        make_tuple(i / B_K1 / B_KRow,
-                                                   n0,
+                                        make_tuple(n0,
+                                                   i / B_K1 / B_KRow,
                                                    0,
                                                    (i / B_K1) % B_KRow,
                                                    0,
@@ -1492,18 +1492,18 @@ struct BlockwiseGemmWMMA
                         // read B
                         b_thread_copy_.Run(
                             b_block_desc_k0_n0_n1_n2_k1,
-                            make_tuple(Number<k * KPack / B_K1 / B_KRow>{}, n0, I0, I0, I0, I0),
+                            make_tuple(n0, Number<k * KPack / B_K1 / B_KRow>{}, I0, I0, I0, I0),
                             b_block_buf,
                             b_thread_desc_,
-                            make_tuple(I0, n0, I0, I0, I0, I0),
+                            make_tuple(n0, I0, I0, I0, I0, I0),
                             b_thread_buf);
                         // read A
                         a_thread_copy_.Run(
                             a_block_desc_k0_m0_m1_m2_k1,
-                            make_tuple(Number<k * KPack / A_K1 / A_KRow>{}, m0, I0, I0, I0, I0),
+                            make_tuple(m0, Number<k * KPack / A_K1 / A_KRow>{}, I0, I0, I0, I0),
                             a_block_buf,
                             a_thread_desc_,
-                            make_tuple(I0, m0, I0, I0, I0, I0),
+                            make_tuple(m0, I0, I0, I0, I0, I0),
                             a_thread_buf);
 
                         vector_type<FloatA, KPack> a_thread_vec;
@@ -1512,16 +1512,16 @@ struct BlockwiseGemmWMMA
                         static_for<0, KPack, 1>{}([&](auto i) {
                             b_thread_vec.template AsType<FloatB>()(i) =
                                 b_thread_buf[Number<b_thread_desc_.CalculateOffset(
-                                    make_tuple(i / B_K1 / B_KRow,
-                                               n0,
+                                    make_tuple(n0,
+                                               i / B_K1 / B_KRow,
                                                0,
                                                (i / B_K1) % B_KRow,
                                                0,
                                                i % B_K1))>{}];
                             a_thread_vec.template AsType<FloatA>()(i) =
                                 a_thread_buf[Number<a_thread_desc_.CalculateOffset(
-                                    make_tuple(i / A_K1 / A_KRow,
-                                               m0,
+                                    make_tuple(m0,
+                                               i / A_K1 / A_KRow,
                                                0,
                                                (i / A_K1) % A_KRow,
                                                0,
@@ -1545,28 +1545,28 @@ struct BlockwiseGemmWMMA
 
     protected:
     static constexpr auto a_thread_desc_ =
-        make_naive_tensor_descriptor(make_tuple(Number<KPack / A_K1 / A_KRow>{},
-                                                Number<MRepeat>{},
+        make_naive_tensor_descriptor(make_tuple(Number<MRepeat>{},
+                                                Number<KPack / A_K1 / A_KRow>{},
                                                 I1,
                                                 Number<A_KRow>{},
                                                 I1,
                                                 Number<A_K1>{}),
-                                     make_tuple(Number<A_K1 * A_KRow>{},
-                                                Number<KPack>{},
+                                     make_tuple(Number<KPack>{},
+                                                Number<A_K1 * A_KRow>{},
                                                 Number<A_K1 * A_KRow>{},
                                                 Number<A_K1>{},
                                                 Number<A_K1>{},
                                                 Number<1>{}));
 
     static constexpr auto b_thread_desc_ =
-        make_naive_tensor_descriptor(make_tuple(Number<KPack / B_K1 / B_KRow>{},
-                                                Number<NRepeat>{},
+        make_naive_tensor_descriptor(make_tuple(Number<NRepeat>{},
+                                                Number<KPack / B_K1 / B_KRow>{},
                                                 I1,
                                                 Number<B_KRow>{},
                                                 I1,
                                                 Number<B_K1>{}),
-                                     make_tuple(Number<B_K1 * B_KRow>{},
-                                                Number<KPack>{},
+                                     make_tuple(Number<KPack>{},
+                                                Number<B_K1 * B_KRow>{},
                                                 Number<B_K1 * B_KRow>{},
                                                 Number<B_K1>{},
                                                 Number<B_K1>{},
@@ -1587,7 +1587,7 @@ struct BlockwiseGemmWMMA
                                              FloatA,
                                              decltype(a_block_desc_k0_m0_m1_m2_k1),
                                              decltype(a_thread_desc_),
-                                             Sequence<KPack / A_K1 / A_KRow, 1, 1, A_KRow, 1, A_K1>,
+                                             Sequence<1, KPack / A_K1 / A_KRow, 1, A_KRow, 1, A_K1>,
                                              Sequence<0, 1, 2, 3, 4, 5>,
                                              5,
                                              A_K1,
@@ -1603,7 +1603,7 @@ struct BlockwiseGemmWMMA
             decltype(a_block_desc_k0_m0_m1_m2_k1),
             decltype(a_thread_desc_),
             tensor_operation::element_wise::PassThrough,
-            Sequence<KPack / A_K1 / A_KRow, 1, 1, 1, 1, A_K1>,
+            Sequence<1, KPack / A_K1 / A_KRow, 1, 1, 1, A_K1>,
             Sequence<0, 1, 2, 3, 4, 5>,
             5,
             A_K1,
@@ -1623,7 +1623,7 @@ struct BlockwiseGemmWMMA
                                              FloatB,
                                              decltype(b_block_desc_k0_n0_n1_n2_k1),
                                              decltype(b_thread_desc_),
-                                             Sequence<KPack / B_K1 / B_KRow, 1, 1, B_KRow, 1, B_K1>,
+                                             Sequence<1, KPack / B_K1 / B_KRow, 1, B_KRow, 1, B_K1>,
                                              Sequence<0, 1, 2, 3, 4, 5>,
                                              5,
                                              B_K1,
@@ -1639,7 +1639,7 @@ struct BlockwiseGemmWMMA
             decltype(b_block_desc_k0_n0_n1_n2_k1),
             decltype(b_thread_desc_),
             tensor_operation::element_wise::PassThrough,
-            Sequence<KPack / B_K1 / B_KRow, 1, 1, 1, 1, B_K1>,
+            Sequence<1, KPack / B_K1 / B_KRow, 1, 1, 1, B_K1>,
             Sequence<0, 1, 2, 3, 4, 5>,
             5,
             B_K1,

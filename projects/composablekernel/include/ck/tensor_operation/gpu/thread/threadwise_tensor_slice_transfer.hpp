@@ -208,6 +208,7 @@ template <typename SrcData,
           index_t SrcScalarStrideInVector,
           bool SrcResetCoordinateAfterRun,
           bool InvalidElementAsNaN                                        = false,
+          bool UseTrLoad                                                  = false,
           typename enable_if<DstDesc::IsKnownAtCompileTime(), bool>::type = false>
 struct ThreadwiseTensorSliceTransfer_v2
 {
@@ -231,6 +232,12 @@ struct ThreadwiseTensorSliceTransfer_v2
                       "wrong! SrcDesc need to known at compile-time");
         static_assert(SliceLengths::At(Number<SrcVectorDim>{}) % SrcScalarPerVector == 0,
                       "wrong! Not divisible");
+        if constexpr(UseTrLoad)
+        {
+            static_assert(ck::is_same_v<SrcData, DstData>,
+                          "tr load does not support datatypes conversion. Source and "
+                          "destination data types must be the same.");
+        }
     }
 
     __device__ void SetSrcSliceOrigin(const SrcDesc& src_desc, const Index& src_slice_origin_idx)
@@ -289,8 +296,16 @@ struct ThreadwiseTensorSliceTransfer_v2
                     dst_desc.CalculateOffset(to_multi_index(dst_slice_origin_idx) + src_data_idx);
                 src_vector_t* dst_buf_ptr =
                     reinterpret_cast<src_vector_t*>(&dst_buf(Number<dst_offset>{}));
-                *dst_buf_ptr =
-                    src_buf.template Get<src_vector_t>(src_coord_.GetOffset(), is_src_valid);
+                if constexpr(UseTrLoad)
+                {
+                    *dst_buf_ptr =
+                        src_buf.template trLoad<src_vector_t>(src_coord_.GetOffset(), is_src_valid);
+                }
+                else
+                {
+                    *dst_buf_ptr =
+                        src_buf.template Get<src_vector_t>(src_coord_.GetOffset(), is_src_valid);
+                }
                 // src_buf.template Read<src_vector_t>(src_coord_.GetOffset(), is_src_valid,
                 // dst_buf_ptr);
             }
@@ -299,9 +314,16 @@ struct ThreadwiseTensorSliceTransfer_v2
                 typename vector_type_maker<SrcData, SrcScalarPerVector>::type src_vector;
 
                 // copy data from src_buf into src_vector
-                src_vector.template AsType<src_vector_t>()(Number<0>{}) =
-                    src_buf.template Get<src_vector_t>(src_coord_.GetOffset(), is_src_valid);
-
+                if constexpr(UseTrLoad)
+                {
+                    src_vector.template AsType<src_vector_t>()(Number<0>{}) =
+                        src_buf.template trLoad<src_vector_t>(src_coord_.GetOffset(), is_src_valid);
+                }
+                else
+                {
+                    src_vector.template AsType<src_vector_t>()(Number<0>{}) =
+                        src_buf.template Get<src_vector_t>(src_coord_.GetOffset(), is_src_valid);
+                }
                 static_for<0, SrcScalarPerVector, 1>{}([&](auto i) {
                     constexpr index_t dst_offset =
                         dst_desc.CalculateOffset(to_multi_index(dst_slice_origin_idx) +
@@ -1577,5 +1599,4 @@ struct ThreadwiseTensorSliceTransfer_StaticToStatic_IntraRow
     }
     ElementwiseOperation element_op_{};
 };
-
 } // namespace ck

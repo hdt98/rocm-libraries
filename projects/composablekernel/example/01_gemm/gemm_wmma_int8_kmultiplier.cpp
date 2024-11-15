@@ -54,6 +54,7 @@ using DeviceGemmInstance = ck::tensor_operation::device::DeviceGemmWmma_GFX13
            8,
            false,
            true,
+           false,
            S<32, 4, 1>,
            S<0, 1, 2>,
            S<0, 1, 2>,
@@ -62,6 +63,7 @@ using DeviceGemmInstance = ck::tensor_operation::device::DeviceGemmWmma_GFX13
            8,
            false,
            true,
+           false,
            1,           // C shuffle (M Repeat) Per store
            1,           // C shuffle (N Repeat) Per store
            S<1, 32, 1, 4>,

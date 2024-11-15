@@ -415,7 +415,7 @@ struct GridwiseGemmPipeline_v1<1, false, true>
                                CThreadBuffer& c_thread_buf,
                                index_t num_loop)
     {
-        constexpr auto a_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0);
+        constexpr auto a_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0, I0);
         auto a_block_buf_switch           = a_block_buf;
 
         // preload data into LDS
@@ -514,7 +514,7 @@ struct GridwiseGemmPipeline_v1<1, true, false>
                                CThreadBuffer& c_thread_buf,
                                index_t num_loop)
     {
-        constexpr auto b_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0);
+        constexpr auto b_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0, I0);
         auto b_block_buf_switch           = b_block_buf;
 
         // preload data into LDS
@@ -613,8 +613,8 @@ struct GridwiseGemmPipeline_v1<1, false, false>
                                CThreadBuffer& c_thread_buf,
                                index_t num_loop)
     {
-        constexpr auto b_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0);
-        constexpr auto a_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0);
+        constexpr auto b_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0, I0);
+        constexpr auto a_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0, I0);
         auto b_block_buf_switch           = b_block_buf;
         auto a_block_buf_switch           = a_block_buf;
 
@@ -723,8 +723,8 @@ struct GridwiseGemmPipeline_v1<1, false, false>
                                BScaleBlockTransfer& b_scale_blockwise_copy,
                                const BScaleBlockTransferStep& b_scale_block_copy_step)
     {
-        constexpr auto b_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0);
-        constexpr auto a_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0);
+        constexpr auto b_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0, I0);
+        constexpr auto a_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0, I0);
         auto b_block_buf_switch           = b_block_buf;
         auto a_block_buf_switch           = a_block_buf;
 
