@@ -37,3 +37,6 @@ target_compile_definitions(test_conv_device_wavegroup PRIVATE ENABLE_WAVEGROUP=1
 
 add_test_executable(test_conv_device_transposed conv_device_transposed.cpp)
 target_link_libraries(test_conv_device_transposed PRIVATE utility)
+
+add_test_executable(test_conv_fma conv_fma.cpp)
+target_link_libraries(test_conv_fma PRIVATE utility)

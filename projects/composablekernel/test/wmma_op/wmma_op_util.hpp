@@ -897,6 +897,11 @@ __global__ void matmul_mixedfp(const typename src0_t::type_t* a,
                                const int32_t* b_block_scale,
                                dst_t* c)
 {
+    ignore = a;
+    ignore = b;
+    ignore = a_block_scale;
+    ignore = b_block_scale;
+    ignore = c;
 }
 
 #endif
@@ -1034,8 +1039,8 @@ bool RunMixedTypeDeviceGEMM(KernelType kernel,
                             const Tensor<int32_t>& a_block_scale,
                             const Tensor<int32_t>& b_block_scale,
                             Tensor<CDataType>& C,
-                            DeviceAType aType,
-                            DeviceBType bType)
+                            DeviceAType,
+                            DeviceBType)
 {
     DeviceMem a_m_k_device_buf(sizeof(typename DeviceAType::type_t) *
                                A.mDesc.GetElementSpaceSize());

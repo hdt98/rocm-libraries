@@ -3007,16 +3007,21 @@ using fp16x8_t  = typename vector_type<__fp16, 8>::type;
 using fp16x16_t = typename vector_type<__fp16, 16>::type;
 
 #ifdef CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
-using int4x8_t  = typename vector_type<int8_t, 4>::type;
-using int4x16_t = typename vector_type<int8_t, 8>::type;
-using int4x32_t = typename vector_type<int8_t, 16>::type;
-using int4x64_t = typename vector_type<int8_t, 32>::type;
+using int4x8_t  = typename vector_type<int32_t, 1>::type;
+using int4x16_t = typename vector_type<int32_t, 2>::type;
+using int4x32_t = typename vector_type<int32_t, 4>::type;
+using int4x64_t = typename vector_type<int32_t, 8>::type;
 
-using int4x24_t  = typename vector_type<int8_t, 12>::type;
-using int4x48_t  = typename vector_type<int8_t, 24>::type;
-using int4x72_t  = typename vector_type<int8_t, 36>::type;
-using int4x144_t = typename vector_type<int8_t, 72>::type;
-using int4x40_t  = typename vector_type<int8_t, 20>::type;
+using int4x24_t  = typename vector_type<int32_t, 3>::type;
+using int4x48_t  = typename vector_type<int32_t, 6>::type;
+using int4x72_t  = typename vector_type<int32_t, 9>::type;
+using int4x144_t = typename vector_type<int32_t, 18>::type;
+using int4x40_t  = typename vector_type<int32_t, 5>::type;
+
+using uint4x8_t  = typename vector_type<uint32_t, 1>::type;
+using uint4x16_t = typename vector_type<uint32_t, 2>::type;
+using uint4x32_t = typename vector_type<uint32_t, 4>::type;
+using uint4x64_t = typename vector_type<uint32_t, 8>::type;
 #endif
 
 template <MTX_FMT MX_TYPE = MTX_FMT::MTX_FMT_DEFAULT>

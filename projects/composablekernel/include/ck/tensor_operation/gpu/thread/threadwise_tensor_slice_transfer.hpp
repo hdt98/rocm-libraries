@@ -124,6 +124,8 @@ struct ThreadwiseTensorSliceTransfer_v1r3
                 dst_coord_.GetOffset(),
                 coordinate_has_valid_offset_assuming_visible_index_is_valid(dst_desc, dst_coord_),
                 dst_vector.template AsType<dst_vector_t>()[Number<0>{}]);
+#else
+            ignore = dst_buf;
 #endif
 
             if constexpr(idx_1d.value != num_access - 1)

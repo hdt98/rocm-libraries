@@ -130,15 +130,19 @@ __global__ void
 #else
     ignore                      = p_a_grid;
     ignore                      = p_b_grid;
+    ignore                      = p_a_scale;
+    ignore                      = p_b_scale;
     ignore                      = p_c_grid;
     ignore                      = a_grid_desc;
     ignore                      = b_grid_desc;
+    ignore                      = a_scale_grid_desc;
+    ignore                      = b_scale_grid_desc;
     ignore                      = c_grid_desc_mblock_mperblock_nblock_nperblock;
     ignore                      = a_element_op;
     ignore                      = b_element_op;
     ignore                      = c_element_op;
     ignore                      = block_2_ctile_map;
-#endif // end of if (defined(__gfx11__))
+#endif // end of if (defined(__gfx13__))
 }
 
 template <index_t BlockSize,
@@ -3423,6 +3427,14 @@ struct GridwiseGemm_Wmma_GFX13
                     c_grid_desc_mblock_mperblock_nblock_nperblock, c_global_step);
             }
         });
+#else
+        ignore = blockwise_gemm;
+        ignore = c_grid_desc_mblock_mperblock_nblock_nperblock;
+        ignore = block_work_idx;
+        ignore = c_element_op;
+        ignore = c_thread_buf;
+        ignore = p_shared;
+        ignore = c_grid_buf;
 #endif
     }
 };

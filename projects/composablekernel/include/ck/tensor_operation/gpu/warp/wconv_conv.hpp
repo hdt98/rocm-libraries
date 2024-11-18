@@ -25,7 +25,8 @@ enum struct WconvInstr
     wconv_f16_iu8,
     wconv_f32_iu4,
     wconv_i32_iu4,
-    wconv_f16_iu4
+    wconv_f16_iu4,
+    wconv_bf16_iu4
 };
 
 template <WconvInstr Instr,
@@ -403,6 +404,36 @@ struct wconv_type<WconvInstr::wconv_f16_iu4,
 #endif
     }
 };
+
+template <index_t H,
+          index_t W,
+          index_t FilterSize,
+          index_t DilationX,
+          index_t DilationY,
+          index_t Iters,
+          bool Aco,
+          bool Signed>
+struct wconv_type<WconvInstr::wconv_bf16_iu4,
+                  H,
+                  W,
+                  FilterSize,
+                  DilationX,
+                  DilationY,
+                  Iters,
+                  Aco,
+                  Signed>
+{
+    template <class FloatA, class FloatB, class FloatC, class Mod>
+    __device__ void Run(const FloatA& reg_wei, const FloatB reg_data, FloatC& reg_c, Mod) const
+    {
+#if defined(__gfx13__)
+        // TODO
+        ignore = reg_wei;
+        ignore = reg_data;
+        ignore = reg_c;
+#endif
+    }
+};
 #endif
 
 // dst: f16 or bf16
@@ -740,6 +771,18 @@ struct WconvSelector
         return WconvInstr::wconv_f16_iu4;
     }
 
+    template <>
+    constexpr auto GetWconv<int4_t, int4_t, bhalf_t>()
+    {
+        return WconvInstr::wconv_bf16_iu4;
+    }
+
+    template <>
+    constexpr auto GetWconv<uint4_t, uint4_t, bhalf_t>()
+    {
+        return WconvInstr::wconv_bf16_iu4;
+    }
+
     static constexpr auto Signed()
     {
         return std::is_same<InDataType, int4_t>::value || std::is_same<InDataType, int8_t>::value;
@@ -1041,12 +1084,26 @@ struct WconvConv
             return make_tuple(0, subH, subW, 0, subK_8);
         }
     }
+    template <typename DataType_>
+    static auto GetKernelDataType()
+    {
+        if constexpr(std::is_same<int4_t, DataType_>::value)
+        {
+            return int32_t();
+        }
+        else if constexpr(std::is_same<uint4_t, DataType_>::value)
+        {
+            return uint32_t();
+        }
+        else
+        {
+            return DataType_();
+        }
+    }
 
     // Pre-defined types
-    using KernelWeightDataType = typename std::
-        conditional<std::is_same<int4_t, WeiDataType>::value, int8_t, WeiDataType>::type;
-    using KernelInDataType = typename std::
-        conditional<std::is_same<int4_t, InDataType>::value, int8_t, InDataType>::type;
+    using KernelWeightDataType = decltype(GetKernelDataType<WeiDataType>());
+    using KernelInDataType     = decltype(GetKernelDataType<InDataType>());
 
     using AccDataVec = vector_type<AccDataType, GetNumAccumComponents()>;
     using WeiDataVec = vector_type<KernelWeightDataType, GetNumWeightComponents()>;

@@ -77,6 +77,7 @@ struct intrin_wmma_f32_16x16x16_f16_w32<16, 16>
         ignore = reg_b;
         ignore = reg_c;
 #endif
+        ignore = k_multiplier;
     }
 };
 
@@ -128,6 +129,7 @@ struct intrin_wmma_f32_16x16x16_bf16_w32<16, 16>
         ignore = reg_b;
         ignore = reg_c;
 #endif
+        ignore = k_multiplier;
     }
 };
 
@@ -181,6 +183,7 @@ struct intrin_wmma_f16_16x16x16_f16_w32<16, 16, Opsel>
         ignore = reg_b;
         ignore = reg_c;
 #endif
+        ignore = k_multiplier;
     }
 };
 
@@ -235,6 +238,7 @@ struct intrin_wmma_bf16_16x16x16_bf16_w32<16, 16, Opsel>
         ignore = reg_b;
         ignore = reg_c;
 #endif
+        ignore = k_multiplier;
     }
 };
 
@@ -301,6 +305,7 @@ struct intrin_wmma_i32_16x16x16_iu8_w32<16, 16, neg_a, neg_b, clamp>
         ignore = reg_b;
         ignore = reg_c;
 #endif
+        ignore = k_multiplier;
     }
 };
 
@@ -533,6 +538,8 @@ struct intrin_wmma_f32_16x16_f8f6f4_w32<16, 16, SrcAType, SrcBType, ABlockSel, B
         ignore = reg_a;
         ignore = reg_b;
         ignore = reg_c;
+        ignore = a_scale;
+        ignore = b_scale;
 #endif
     }
 };
@@ -1035,6 +1042,7 @@ struct intrin_wmma_f32i32_16x16_iu8iu8_w32<16, 16, neg_a, neg_b, clamp, kMultipl
         ignore = reg_a;
         ignore = reg_b;
         ignore = reg_c;
+        ignore = reg_d;
 #endif
     }
 };
@@ -1054,6 +1062,7 @@ struct intrin_wmma_f32i32_16x16_iu8iu8_w32<16, 16, neg_a, neg_b, clamp, 2>
         ignore = reg_a;
         ignore = reg_b;
         ignore = reg_c;
+        ignore = reg_d;
 #endif
     }
 };
@@ -1081,6 +1090,7 @@ struct intrin_wmma_f32i32_16x16_iu4iu4_w32<16, 16, neg_a, neg_b, clamp, kMultipl
         ignore = reg_a;
         ignore = reg_b;
         ignore = reg_c;
+        ignore = reg_d;
 #endif
     }
 };
@@ -1100,6 +1110,7 @@ struct intrin_wmma_f32i32_16x16_iu4iu4_w32<16, 16, neg_a, neg_b, clamp, 2>
         ignore = reg_a;
         ignore = reg_b;
         ignore = reg_c;
+        ignore = reg_d;
 #endif
     }
 };
@@ -1119,6 +1130,7 @@ struct intrin_wmma_f32i32_16x16_iu4iu4_w32<16, 16, neg_a, neg_b, clamp, 4>
         ignore = reg_a;
         ignore = reg_b;
         ignore = reg_c;
+        ignore = reg_d;
 #endif
     }
 };
