@@ -1435,7 +1435,7 @@ struct BlockwiseGemmWMMA
                             make_tuple(m0, Number<k * KPack / A_K1 / A_KRow>{}, I0, I0, I0, I0),
                             a_block_buf,
                             a_thread_desc_,
-                            make_tuple(I0, m0, I0, I0, I0, I0),
+                            make_tuple(m0, I0, I0, I0, I0, I0),
                             a_thread_buf);
 
                         static_for<0, NRepeat, 1>{}([&](auto n0) {
@@ -1445,7 +1445,7 @@ struct BlockwiseGemmWMMA
                                 make_tuple(n0, Number<k * KPack / B_K1 / B_KRow>{}, I0, I0, I0, I0),
                                 b_block_buf,
                                 b_thread_desc_,
-                                make_tuple(I0, n0, I0, I0, I0, I0),
+                                make_tuple(n0, I0, I0, I0, I0, I0),
                                 b_thread_buf);
 
                             vector_type<FloatA, KPack> a_thread_vec;
