@@ -68,7 +68,7 @@ __global__ void
 
     const auto ds_batch_offset = compute_ptr_offset_of_batch.GetDsPtrOffset(g_idx);
 
-    __shared__ char p_shared[GridwiseOp::SharedMemTrait::lds_size];
+    __shared__ char p_shared[GridwiseOp::BlockwiseConv::SharedMemTrait::lds_size];
 
     DsPointer p_ds_grid_grp;
     static_for<0, NumDTensor, 1>{}(
@@ -105,6 +105,8 @@ __global__ void
 #endif
 }
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wzero-length-array"
 template <typename GridwiseOp,
           typename InDataType,
           typename WeiDataType,
@@ -144,11 +146,11 @@ __global__ void __exp_amd_wavegroup_kernel(4, 32, 256, 1, 1)
     const index_t g_idx = __builtin_amdgcn_readfirstlane(get_block_1d_id() / num_blocks_per_batch);
 
     const long_index_t in_batch_offset = __builtin_amdgcn_readfirstlane(
-        static_cast<long_index_t>(compute_ptr_offset_of_batch.GetAPtrOffset(g_idx)));
+        static_cast<int64_t>(compute_ptr_offset_of_batch.GetAPtrOffset(g_idx)));
     const long_index_t wei_batch_offset = __builtin_amdgcn_readfirstlane(
-        static_cast<long_index_t>(compute_ptr_offset_of_batch.GetBPtrOffset(g_idx)));
+        static_cast<int64_t>(compute_ptr_offset_of_batch.GetBPtrOffset(g_idx)));
     const long_index_t acc_batch_offset = __builtin_amdgcn_readfirstlane(
-        static_cast<long_index_t>(compute_ptr_offset_of_batch.GetEPtrOffset(g_idx)));
+        static_cast<int64_t>(compute_ptr_offset_of_batch.GetEPtrOffset(g_idx)));
 
     const long_index_t ds_batch_offset = compute_ptr_offset_of_batch.GetDsPtrOffset(g_idx);
     DsPointer p_ds_grid_grp;
@@ -156,12 +158,12 @@ __global__ void __exp_amd_wavegroup_kernel(4, 32, 256, 1, 1)
     static_for<0, NumDTensor, 1>{}(
         [&](auto i) { p_ds_grid_grp(i) = p_ds_grid[i] + ds_batch_offset[i]; });
 
-    __shared__ char p_shared[GridwiseOp::SharedMemTrait::lds_size];
-    static __exp_amd_laneshared__ char
-        p_lane_shared[GridwiseOp::LaneSharedMemTrait::lane_shared_size *
-                      GridwiseOp::template GetLaneSharedMemCount<HasMainBlockLoop>()];
+    __shared__ char p_shared[GridwiseOp::BlockwiseConv::SharedMemTrait::lds_size];
+    static __exp_amd_laneshared__ char p_lane_shared
+        [GridwiseOp::BlockwiseConv::LaneSharedMemTrait::lane_shared_size *
+         GridwiseOp::BlockwiseConv::template GetLaneSharedMemCount<HasMainBlockLoop>()];
 
-    static_assert(GridwiseOp::LaneSharedMemTrait::lane_shared_size <= 512 * 4, "");
+    static_assert(GridwiseOp::BlockwiseConv::LaneSharedMemTrait::lane_shared_size <= 512 * 4, "");
 
     GridwiseOp::template Run<HasMainBlockLoop>(p_in_grid + in_batch_offset,
                                                p_wei_grid + wei_batch_offset,
@@ -193,6 +195,7 @@ __global__ void __exp_amd_wavegroup_kernel(4, 32, 256, 1, 1)
     ignore                                = block_2_ctile_map;
 #endif
 }
+#pragma clang diagnostic pop
 
 template <index_t BlockSize,
           typename InDataType,
@@ -203,9 +206,11 @@ template <index_t BlockSize,
           typename WeiGridDesc,
           typename DsGridDesc,
           typename AccGridDesc,
+          typename DsLayout,
           typename InElementwiseOperation,
           typename WeiElementwiseOperation,
           typename AccElementwiseOperation,
+          typename AccBlockwiseOperation,
           index_t HPerBlock,
           index_t WPerBlock,
           index_t CPerBlock,
@@ -217,9 +222,6 @@ template <index_t BlockSize,
           index_t FilterSize,
           index_t DilationX,
           index_t DilationY,
-          index_t activeFun,
-          bool scaleBiasPacked,
-          bool uniformScale,
           typename InBlockTransferThreadClusterLengths,
           index_t InBlockTransferSrcScalarPerVector,
           index_t InBlockTransferDstScalarPerVector,
@@ -231,8 +233,8 @@ template <index_t BlockSize,
           bool WeiEnableLds,
           bool WeiBlockLdsAddExtraM,
           typename DsBlockTransferThreadClusterLengths,
-          index_t DsBlockTransferSrcScalarPerVector,
-          index_t DsBlockTransferDstScalarPerVector,
+          typename DsBlockTransferSrcScalarPerVector,
+          typename DsBlockTransferDstScalarPerVector,
           bool DsEnableLds,
           bool DsBlockLdsAddExtraM,
           typename AccBlockTransferClusterLengths,
@@ -240,7 +242,8 @@ template <index_t BlockSize,
           bool AccEnableLds,
           bool EnableAsync,
           index_t NumConvCPrefetchStage,
-          bool EnableWaveGroup>
+          bool EnableWaveGroup,
+          bool Transposed>
 struct GridwiseConvSuba_Wconvsuba
 {
     static constexpr auto I0 = Number<0>{};
@@ -255,18 +258,11 @@ struct GridwiseConvSuba_Wconvsuba
     static constexpr index_t WaveSize     = 32;
     static constexpr index_t NumWaveGroup = EnableWaveGroup ? 4 : 0;
 
-    static constexpr index_t DsBlockSize = KPerBlock / DsBlockTransferSrcScalarPerVector;
-
     static constexpr index_t NumDTensor = DsDataType::Size();
 
     static_assert((EnableWaveGroup == false) || (BlockSize % (WaveSize * 4) == 0), "");
 
-    using DsThreadBlock =
-        typename std::conditional<EnableWaveGroup,
-                                  ThisThreadBlockWaveGroup<DsBlockSize, WaveSize, NumWaveGroup>,
-                                  ThisThreadBlock<DsBlockSize>>::type;
-
-    using ThisThreadBlock =
+    using ThisThreadBlockGrid =
         typename std::conditional<EnableWaveGroup,
                                   ThisThreadBlockWaveGroup<BlockSize, WaveSize, NumWaveGroup>,
                                   ThisThreadBlock<BlockSize>>::type;
@@ -274,19 +270,17 @@ struct GridwiseConvSuba_Wconvsuba
     static constexpr index_t YX = FilterSize * FilterSize;
     using NumberYX              = Number<FilterSize * FilterSize>;
 
-    static constexpr auto wconv_conv = WconvConv<WeiDataType,
+    static constexpr index_t WaveFilterSize = (FilterSize == 2) ? 1 : FilterSize;
+    static constexpr auto wconv_conv        = WconvConv<WeiDataType,
                                                  InDataType,
                                                  AccDataType,
                                                  HPerWconv,
                                                  WPerWconv,
-                                                 FilterSize,
+                                                 WaveFilterSize,
                                                  DilationX,
                                                  DilationY,
                                                  1,
                                                  EnableWaveGroup>{};
-
-    static constexpr auto acc_sba =
-        AccSba<AccDataType, HPerWconv, WPerWconv, activeFun, scaleBiasPacked, uniformScale>{};
 
     using GridwiseConvPipe =
         remove_cvref_t<decltype(GridwiseConvPipeline_Selector<NumConvCPrefetchStage,
@@ -303,121 +297,26 @@ struct GridwiseConvSuba_Wconvsuba
     static constexpr index_t NumWeightCompPerTile    = wconv_conv.GetNumWeightCompPerTile();
     static constexpr index_t NumSubTilePerImage      = wconv_conv.GetNumSubTilesPerImageTile();
     static constexpr index_t NumDataCompPerTile      = wconv_conv.GetNumDataCompPerTile();
-    static constexpr index_t DataTileHeight          = 4;
-    static constexpr index_t H_Pad                   = (FilterSize == 3) ? DataTileHeight : 0;
-    static constexpr index_t W_Pad                   = (FilterSize == 3) ? WPerWconv : 0;
-    static constexpr index_t HPerBlockIn             = HPerBlock + H_Pad * 2;
-    static constexpr index_t WPerBlockIn             = WPerBlock + W_Pad * 2;
 
-    static constexpr index_t HPerWave   = HRepeat * HPerWconv;
-    static constexpr index_t WPerWave   = WRepeat * WPerWconv;
-    static constexpr index_t CPerWave   = CPerBlock;
-    static constexpr index_t KPerWave   = KPerBlock;
-    static constexpr index_t HPerWaveIn = HPerWave + H_Pad * 2;
-    static constexpr index_t WPerWaveIn = WPerWave + W_Pad * 2;
-    static_assert(HPerWaveIn % HPerWconv == 0, "");
-    static_assert(WPerWaveIn % WPerWconv == 0, "");
+    static constexpr index_t DataTileHeight = 4;
+    static constexpr index_t H_Pad          = (FilterSize == 3) ? DataTileHeight : 0;
+    static constexpr index_t W_Pad          = (FilterSize == 3) ? WPerWconv : 0;
+    static constexpr index_t HPerBlockIn    = HPerBlock + H_Pad * 2;
+    static constexpr index_t WPerBlockIn    = WPerBlock + W_Pad * 2;
+    static constexpr index_t HPerWave       = HRepeat * HPerWconv;
+    static constexpr index_t WPerWave       = WRepeat * WPerWconv;
+    static constexpr index_t CPerWave       = CPerBlock;
+    static constexpr index_t KPerWave       = KPerBlock;
+    static constexpr index_t HPerWaveIn     = HPerWave + H_Pad * 2;
+    static constexpr index_t WPerWaveIn     = WPerWave + W_Pad * 2;
 
-    // Pad input and weight data grid description according to grid level options
-    __host__ __device__ static constexpr auto
-    MakeInGridPadDescriptor(const InGridDesc& in_grid_desc)
-    {
-        const auto in_grid_pad_desc = [&]() {
-            if constexpr(FilterSize == 3)
-            {
-                const auto Hi = in_grid_desc.GetLength(I0);
-                const auto Wi = in_grid_desc.GetLength(I1);
-                const auto Ci = in_grid_desc.GetLength(I2);
+#ifdef FORCE_CONVERT_TO_TENSOR
+    static constexpr bool ConvertToTensor = true;
+#else
+    static constexpr bool ConvertToTensor = false;
+#endif
 
-                return transform_tensor_descriptor(
-                    in_grid_desc,
-                    make_tuple(make_pad_transform(Hi, H_Pad, H_Pad),
-                               make_pad_transform(Wi, W_Pad, W_Pad),
-                               make_pass_through_transform(Ci)),
-                    make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}),
-                    make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}));
-            }
-            else
-            {
-                return in_grid_desc;
-            }
-        }();
-
-        if constexpr(InEnableLds)
-        {
-            return in_grid_pad_desc;
-        }
-        else
-        {
-            // H x W x C -> W0 x C0 x H0 x H1 x H2 x W1 x C1
-            const auto H = in_grid_pad_desc.GetLength(I0);
-            const auto W = in_grid_pad_desc.GetLength(I1);
-            const auto C = in_grid_pad_desc.GetLength(I2);
-            return transform_tensor_descriptor(
-                in_grid_pad_desc,
-                make_tuple(
-                    make_unmerge_transform(make_tuple(H / HPerWconv,
-                                                      Number<NumSubTilePerImage>{},
-                                                      Number<HPerWconv / NumSubTilePerImage>{})),
-                    make_unmerge_transform(make_tuple(W / WPerWconv, Number<WPerWconv>{})),
-                    make_unmerge_transform(make_tuple(C / CPerWconv, Number<CPerWconv>{}))),
-                make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}),
-                make_tuple(Sequence<2, 3, 4>{}, Sequence<0, 5>{}, Sequence<1, 6>{}));
-        }
-    }
-
-    __host__ __device__ static constexpr auto
-    MakeWeiGridPadDescriptor(const WeiGridDesc& wei_grid_desc)
-    {
-        if constexpr(WeiEnableLds)
-        {
-            return wei_grid_desc;
-        }
-        else
-        {
-            // K x YX x C -> K0 x C0 x YX x K1 x C1 x C2
-            const auto K = wei_grid_desc.GetLength(I0);
-            const auto C = wei_grid_desc.GetLength(I2);
-            return transform_tensor_descriptor(
-                wei_grid_desc,
-                make_tuple(make_unmerge_transform(make_tuple(K / KPerWconv, Number<KPerWconv>{})),
-                           make_pass_through_transform(Number<FilterSize * FilterSize>{}),
-                           make_unmerge_transform(
-                               make_tuple(C / CPerWconv,
-                                          Number<NumSubTilesPerWeightTap>{},
-                                          Number<CPerWconv / NumSubTilesPerWeightTap>{}))),
-                make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}),
-                make_tuple(Sequence<0, 3>{}, Sequence<2>{}, Sequence<1, 4, 5>{}));
-        }
-    }
-
-    __host__ __device__ static constexpr auto
-    MakeDsGridPadDescriptor(const DsGridDesc& ds_grid_desc)
-    {
-        if constexpr(DsEnableLds)
-        {
-            return ds_grid_desc;
-        }
-        else
-        {
-            // K0 x K1 X K2
-            constexpr auto DsPerThread = acc_sba.GetNumBiasComponents();
-            return generate_tuple(
-                [&](auto i) {
-                    const auto K = ds_grid_desc[i].GetLength(I0);
-                    return transform_tensor_descriptor(ds_grid_desc[i],
-                                                       make_tuple(make_unmerge_transform(make_tuple(
-                                                           K / KPerWconv,
-                                                           Number<KPerWconv / DsPerThread>{},
-                                                           Number<DsPerThread>{}))),
-                                                       make_tuple(Sequence<0>{}),
-                                                       make_tuple(Sequence<0, 1, 2>{}));
-                },
-                Number<NumDTensor>{});
-        }
-    }
-
-    // Describe how data store to (LDS/VGPR) buffer from Global memory
+    // Describe the layout of InData in block level (LDS or VGPR)
     __host__ __device__ static constexpr auto MakeInBlockDescriptor()
     {
         if constexpr(InEnableLds)
@@ -439,6 +338,7 @@ struct GridwiseConvSuba_Wconvsuba
         }
     }
 
+    // Describe the layout of WeiData in block level (LDS or VGPR)
     __host__ __device__ static constexpr auto MakeWeiBlockDescriptor()
     {
         if constexpr(WeiEnableLds)
@@ -450,170 +350,93 @@ struct GridwiseConvSuba_Wconvsuba
         else
         {
             // K0 x C0 x YX x K1 x C1 x C2
+            constexpr index_t NumXY = (FilterSize == 3) ? NumWeightTap : FilterSize * FilterSize;
             return make_naive_tensor_descriptor_packed(make_tuple(Number<KPerWave / KPerWconv>{},
                                                                   Number<CPerWave / CPerWconv>{},
-                                                                  Number<NumWeightTap>{},
+                                                                  Number<NumXY>{},
                                                                   I1,
                                                                   Number<NumSubTilesPerWeightTap>{},
                                                                   Number<NumWeightCompPerTile>{}));
         }
     }
 
-    // Describe how data store to LDS buffer
-    __host__ __device__ static constexpr auto GetAccBlockDescriptor()
+    template <typename DLayout>
+    __host__ __device__ static constexpr auto MakeSingleDBlockDescriptor()
     {
-        constexpr auto acc_block_desc = make_naive_tensor_descriptor_packed(
-            make_tuple(Number<HPerBlock>{}, Number<WPerBlock>{}, Number<KPerBlock>{}));
-
-        return acc_block_desc;
+        // TODO: need a rule for per-wave layout when lds isn't enabled
+        if constexpr(std::is_same_v<DLayout, tensor_layout::convolution::G_K>)
+        {
+            return make_naive_tensor_descriptor_packed(make_tuple(Number<KPerBlock>{}));
+        }
+        else
+        {
+            // H x W x K Per Block
+            return make_naive_tensor_descriptor_packed(
+                make_tuple(Number<HPerBlock>{}, Number<WPerBlock>{}, Number<KPerBlock>{}));
+        }
     }
 
     // Ds desc for source in blockwise copy
     __host__ __device__ static constexpr auto MakeDsBlockDescriptor()
     {
-        if constexpr(DsEnableLds)
+        return generate_tuple(
+            [&](auto i) {
+                using DLayout = remove_cvref_t<tuple_element_t<i.value, DsLayout>>;
+                return MakeSingleDBlockDescriptor<DLayout>();
+            },
+            Number<NumDTensor>{});
+    }
+
+    static constexpr auto ds_block_desc = MakeDsBlockDescriptor();
+
+    using BlockwiseConv = BlockwiseSubaConvWconv<ThisThreadBlockGrid,
+                                                 WeiDataType,
+                                                 InDataType,
+                                                 DsDataType,
+                                                 AccDataType,
+                                                 AccBlockwiseOperation,
+                                                 decltype(MakeWeiBlockDescriptor()),
+                                                 decltype(MakeInBlockDescriptor()),
+                                                 decltype(MakeDsBlockDescriptor()),
+                                                 HPerBlock,
+                                                 WPerBlock,
+                                                 CPerBlock,
+                                                 KPerBlock,
+                                                 HRepeat,
+                                                 WRepeat,
+                                                 HPerWconv,
+                                                 WPerWconv,
+                                                 FilterSize,
+                                                 DilationX,
+                                                 DilationY,
+                                                 WeiEnableLds,
+                                                 InEnableLds,
+                                                 DsEnableLds,
+                                                 ConvertToTensor,
+                                                 Transposed>;
+
+    // Pad input and weight data grid description according to Filter size
+    __host__ __device__ static constexpr auto
+    MakeInGridPadDescriptor(const InGridDesc& in_grid_desc)
+    {
+        if constexpr(H_Pad > 0 || W_Pad > 0)
         {
-            return generate_tuple(
-                [&](auto i) {
-                    ignore = i;
-                    return make_naive_tensor_descriptor_packed(make_tuple(Number<KPerBlock>{}));
-                },
-                Number<NumDTensor>{});
+            const auto Hi = in_grid_desc.GetLength(I0);
+            const auto Wi = in_grid_desc.GetLength(I1);
+            const auto Ci = in_grid_desc.GetLength(I2);
+
+            return transform_tensor_descriptor(
+                in_grid_desc,
+                make_tuple(make_pad_transform(Hi, H_Pad, H_Pad),
+                           make_pad_transform(Wi, W_Pad, W_Pad),
+                           make_pass_through_transform(Ci)),
+                make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}),
+                make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}));
         }
         else
         {
-            // KRepeat x K1 x K2
-            constexpr auto DsPerThread = acc_sba.GetNumBiasComponents();
-            return generate_tuple(
-                [&](auto i) {
-                    ignore = i;
-                    return make_naive_tensor_descriptor_packed(
-                        make_tuple(Number<KPerWave / KPerWconv>{},
-                                   Number<KPerWconv / DsPerThread>{},
-                                   Number<DsPerThread>{}));
-                },
-                Number<NumDTensor>{});
+            return in_grid_desc;
         }
-    }
-
-    __host__ __device__ static constexpr auto MakeInBlockSliceCopyStep()
-    {
-        constexpr auto in_block_copy_step = [&]() {
-            if constexpr(InEnableLds)
-            {
-                return Sequence<I0, I0, Number<CPerBlock>{}>{};
-            }
-            else
-            {
-                return Sequence<I0, Number<CPerBlock / CPerWconv>{}, I0, I0, I0, I0, I0>{};
-            }
-        }();
-
-        return in_block_copy_step;
-    }
-
-    __host__ __device__ static constexpr auto MakeWeiBlockSliceCopyStep()
-    {
-        constexpr auto wei_block_copy_step = [&]() {
-            if constexpr(WeiEnableLds)
-            {
-                return Sequence<I0, I0, Number<CPerBlock>{}>{};
-            }
-            else
-            {
-                return Sequence<I0, Number<CPerBlock / CPerWconv>{}, I0, I0, I0, I0>{};
-            }
-        }();
-
-        return wei_block_copy_step;
-    }
-
-    // Describe how data read from (LDS/VGPR) buffer, used by Block level classes
-    template <typename InBlockDesc_>
-    __host__ __device__ static constexpr auto MakeInWaveDescriptor(const InBlockDesc_&)
-    {
-        constexpr auto in_wave_desc = [&]() {
-            if constexpr(InEnableLds)
-            {
-                // H x W x C -> W0 x C0 x H0 x H1 x H2 x W1 x C1
-                return transform_tensor_descriptor(
-                    InBlockDesc_{},
-                    make_tuple(make_unmerge_transform(
-                                   make_tuple(Number<HPerBlockIn / HPerWconv>{},
-                                              Number<NumSubTilePerImage>{},
-                                              Number<HPerWconv / NumSubTilePerImage>{})),
-                               make_unmerge_transform(make_tuple(Number<WPerBlockIn / WPerWconv>{},
-                                                                 Number<WPerWconv>{})),
-                               make_unmerge_transform(make_tuple(Number<CPerBlock / CPerWconv>{},
-                                                                 Number<CPerWconv>{}))),
-                    make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}),
-                    make_tuple(Sequence<2, 3, 4>{}, Sequence<0, 5>{}, Sequence<1, 6>{}));
-            }
-            else
-            {
-                return InBlockDesc_{};
-            }
-        }();
-
-        return in_wave_desc;
-    }
-
-    template <typename WeiBlockDesc_>
-    __host__ __device__ static constexpr auto MakeWeiWaveDescriptor(const WeiBlockDesc_&)
-    {
-        constexpr auto wei_wave_desc = [&]() {
-            if constexpr(WeiEnableLds)
-            {
-                // K x YX x C -> K0 x C0 x YX x K1 x C1 x C2
-                return transform_tensor_descriptor(
-                    WeiBlockDesc_{},
-                    make_tuple(make_unmerge_transform(make_tuple(Number<KPerBlock / KPerWconv>{},
-                                                                 Number<KPerWconv>{})),
-                               make_pass_through_transform(Number<FilterSize * FilterSize>{}),
-                               make_unmerge_transform(
-                                   make_tuple(Number<CPerBlock / CPerWconv>{},
-                                              Number<NumSubTilesPerWeightTap>{},
-                                              Number<CPerWconv / NumSubTilesPerWeightTap>{}))),
-                    make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}),
-                    make_tuple(Sequence<0, 3>{}, Sequence<2>{}, Sequence<1, 4, 5>{}));
-            }
-            else
-            {
-                return WeiBlockDesc_{};
-            }
-        }();
-
-        return wei_wave_desc;
-    }
-
-    // Describe how data read from (LDS/VGPR) buffer, used by Block level classes
-    template <typename DsBlockDesc_>
-    __host__ __device__ static constexpr auto MakeDsWaveDescriptor(const DsBlockDesc_&)
-    {
-        constexpr auto DsPerThread  = acc_sba.GetNumBiasComponents();
-        constexpr auto ds_wave_desc = [&]() {
-            if constexpr(DsEnableLds)
-            {
-                return generate_tuple(
-                    [&](auto i) {
-                        return transform_tensor_descriptor(
-                            DsBlockDesc_{}[Number<i>{}],
-                            make_tuple(
-                                make_unmerge_transform(make_tuple(Number<KPerBlock / KPerWconv>{},
-                                                                  Number<KPerWconv / DsPerThread>{},
-                                                                  Number<DsPerThread>{}))),
-                            make_tuple(Sequence<0>{}),
-                            make_tuple(Sequence<0, 1, 2>{}));
-                    },
-                    Number<NumDTensor>{});
-            }
-            else
-            {
-                return DsBlockDesc_{};
-            }
-        }();
-
-        return ds_wave_desc;
     }
 
     template <typename AccGridDec, typename AccThreadBuffer, typename BlockWiseConv>
@@ -641,7 +464,7 @@ struct GridwiseConvSuba_Wconvsuba
 
         if constexpr(AccEnableLds == false)
         {
-            const auto acc_grid_wave_desc = blockwise_conv.GetAccBlockWaveDescriptor(acc_grid_desc);
+            const auto acc_grid_wave_desc = blockwise_conv.GetAccWaveDescriptor(acc_grid_desc);
 
             // Threadwise copy C from VGPR to global memory
             auto acc_thread_copy_vgpr_to_global =
@@ -679,13 +502,14 @@ struct GridwiseConvSuba_Wconvsuba
         {
             // C mapping in single block
             // LDS descriptor, shuffle and write out in HRepeat x WRepeat x KRepeat times
-            constexpr auto acc_block_desc = GetAccBlockDescriptor();
+            constexpr auto acc_block_desc = blockwise_conv.GetAccBlockDescriptor();
             constexpr auto acc_block_wave_desc =
-                blockwise_conv.GetAccBlockWaveDescriptor(acc_block_desc);
+                blockwise_conv.GetAccWaveDescriptor(acc_block_desc);
 
             auto acc_block_buf = make_dynamic_buffer<AddressSpaceEnum::Lds>(
-                static_cast<AccDataType*>(p_shared) + SharedMemTrait::acc_block_space_offset,
-                SharedMemTrait::acc_block_space_size);
+                static_cast<AccDataType*>(p_shared) +
+                    BlockwiseConv::SharedMemTrait::acc_block_space_offset,
+                BlockwiseConv::SharedMemTrait::acc_block_space_size);
 
             // Threadwise copy C from VGPR to LDS
             auto acc_thread_copy_vgpr_to_lds =
@@ -706,29 +530,28 @@ struct GridwiseConvSuba_Wconvsuba
                     ck::tensor_operation::element_wise::PassThrough{}};
 
             // blockwise copy C from LDS to global
-            auto acc_block_copy_lds_to_global =
-                ThreadGroupTensorSliceTransfer_v6r1<ThisThreadBlock,
-                                                    AccElementwiseOperation,
-                                                    InMemoryDataOperationEnum::Set,
-                                                    Sequence<HPerBlock, WPerBlock, KPerBlock>,
-                                                    AccBlockTransferClusterLengths,
-                                                    Sequence<0, 1, 2>,
-                                                    AccDataType,
-                                                    AccDataType,
-                                                    decltype(acc_block_desc),
-                                                    decltype(acc_grid_desc),
-                                                    Sequence<0, 1, 2>,
-                                                    2,
-                                                    AccBlockTransferScalarPerVector,
-                                                    true,
-                                                    false>{
-                    acc_block_desc,
-                    make_multi_index(0, 0, 0),
-                    acc_grid_desc,
-                    make_multi_index(h_block_data_idx_on_grid,
-                                     w_block_data_idx_on_grid,
-                                     k_block_data_idx_on_grid),
-                    acc_element_op};
+            auto acc_block_copy_lds_to_global = ThreadGroupTensorSliceTransfer_v6r1<
+                ThisThreadBlockGrid,
+                AccElementwiseOperation,
+                InMemoryDataOperationEnum::Set,
+                Sequence<BlockwiseConv::HPerBlockOut, BlockwiseConv::WPerBlockOut, KPerBlock>,
+                AccBlockTransferClusterLengths,
+                Sequence<0, 1, 2>,
+                AccDataType,
+                AccDataType,
+                decltype(acc_block_desc),
+                decltype(acc_grid_desc),
+                Sequence<0, 1, 2>,
+                2,
+                AccBlockTransferScalarPerVector,
+                true,
+                false>{acc_block_desc,
+                       make_multi_index(0, 0, 0),
+                       acc_grid_desc,
+                       make_multi_index(h_block_data_idx_on_grid,
+                                        w_block_data_idx_on_grid,
+                                        k_block_data_idx_on_grid),
+                       acc_element_op};
 
             // make sure it's safe to write to LDS
             block_sync_lds();
@@ -763,6 +586,225 @@ struct GridwiseConvSuba_Wconvsuba
 
     using DsGridPointer = decltype(MakeDsGridPointer());
 
+    template <typename DLayout,
+              typename DDataType,
+              typename DGridBlockDesc,
+              typename DBlockDesc,
+              typename DThreadCoord,
+              typename DWaveDescLength>
+    __host__ __device__ static constexpr auto
+    MakeSignleDThreadwiseTransfer(const DLayout&,
+                                  const DDataType&,
+                                  const DGridBlockDesc& ds_grid_block_desc,
+                                  const DBlockDesc&,
+                                  const DThreadCoord& thread_origin_coord,
+                                  const DWaveDescLength&,
+                                  index_t h_block_data_idx_on_grid,
+                                  index_t w_block_data_idx_on_grid,
+                                  index_t k_block_data_idx_on_grid)
+    {
+        auto wave_idx = GetWconvWaveIdx<ThisThreadBlockGrid,
+                                        HPerBlock,
+                                        WPerBlock,
+                                        HRepeat,
+                                        WRepeat,
+                                        HPerWconv,
+                                        WPerWconv>();
+
+        constexpr auto CoordDim = DThreadCoord::Size();
+
+        auto h0 = (h_block_data_idx_on_grid + wave_idx[I0] * HPerWave) / HPerWconv;
+        auto w0 = (w_block_data_idx_on_grid + wave_idx[I1] * WPerWave) / WPerWconv;
+        auto k0 = (k_block_data_idx_on_grid + wave_idx[I2] * KPerWave) / KPerWconv;
+
+        if constexpr(std::is_same_v<DLayout, tensor_layout::convolution::G_K>)
+        {
+            constexpr auto NumComp = DWaveDescLength{}[I2];
+            return ThreadwiseTensorSliceTransfer_v2<DDataType,
+                                                    DDataType,
+                                                    DGridBlockDesc,
+                                                    DBlockDesc,
+                                                    DWaveDescLength,
+                                                    Sequence<0, 1, 2>,
+                                                    2,
+                                                    NumComp,
+                                                    1,
+                                                    false>(
+                ds_grid_block_desc,
+                make_multi_index(k0,
+                                 thread_origin_coord[Number<CoordDim - 2>{}],
+                                 thread_origin_coord[Number<CoordDim - 1>{}]));
+        }
+        else
+        {
+            // Thread-wise copy
+            // W0 x C0 x H0 x H1 x H2 x W1 x C1
+            constexpr auto NumComp = DWaveDescLength{}[I6];
+            static_assert(NumComp == NumDataCompPerTile);
+            return ThreadwiseTensorSliceTransfer_v2<DDataType,
+                                                    DDataType,
+                                                    DGridBlockDesc,
+                                                    DBlockDesc,
+                                                    DWaveDescLength,
+                                                    Sequence<0, 1, 2, 3, 4, 5, 6>,
+                                                    6,
+                                                    NumComp,
+                                                    1,
+                                                    false>(
+                ds_grid_block_desc,
+                make_multi_index(w0,
+                                 k0,
+                                 h0,
+                                 0,
+                                 thread_origin_coord[Number<CoordDim - 3>{}],
+                                 thread_origin_coord[Number<CoordDim - 2>{}],
+                                 thread_origin_coord[Number<CoordDim - 1>{}]));
+        }
+    }
+
+    template <typename DIndex, typename DGridBlockDesc, typename DBlockDesc>
+    __host__ __device__ static constexpr auto
+    MakeSignleDThreadgroupTransfer(const DIndex&,
+                                   const DGridBlockDesc& d_grid_block_desc,
+                                   const DBlockDesc&,
+                                   index_t h_block_data_idx_on_grid,
+                                   index_t w_block_data_idx_on_grid,
+                                   index_t k_block_data_idx_on_grid)
+    {
+        using DLayout   = remove_cvref_t<tuple_element_t<DIndex{}.value, DsLayout>>;
+        using DDataType = remove_cvref_t<tuple_element_t<DIndex{}.value, DsDataType>>;
+        using DBlockTransferThreadClusterLengths =
+            tuple_element_t<DIndex{}.value, DsBlockTransferThreadClusterLengths>;
+        constexpr auto DBlockTransferDstScalarPerVector =
+            DsBlockTransferDstScalarPerVector{}[DIndex{}];
+        constexpr auto DBlockTransferSrcScalarPerVector =
+            DsBlockTransferSrcScalarPerVector{}[DIndex{}];
+
+        if constexpr(std::is_same_v<DLayout, tensor_layout::convolution::G_K>)
+        {
+            using DBlockTransferThreadClusterArrangeOrder = Sequence<0>;
+            using DBlockTransferAccessOrder               = Sequence<0>;
+
+            constexpr index_t DBlockTransferVectorDim = 0;
+            static_assert(DBlockDesc{}.GetLength(I0) == KPerBlock);
+            if constexpr(EnableAsync)
+            {
+                return ThreadGroupTensorSliceTransferAsync<ThisThreadBlockGrid,
+                                                           Sequence<KPerBlock>,
+                                                           DBlockTransferThreadClusterLengths,
+                                                           DBlockTransferThreadClusterArrangeOrder,
+                                                           DDataType,
+                                                           DDataType,
+                                                           DGridBlockDesc,
+                                                           DBlockDesc,
+                                                           DBlockTransferVectorDim,
+                                                           DBlockTransferVectorDim,
+                                                           DBlockTransferDstScalarPerVector,
+                                                           false,
+                                                           true>(
+                    d_grid_block_desc,
+                    make_multi_index(k_block_data_idx_on_grid),
+                    DBlockDesc{},
+                    make_multi_index(0));
+            }
+            else
+            {
+                return ThreadGroupTensorSliceTransfer_v4r1<
+                    ThisThreadBlockGrid,
+                    ck::tensor_operation::element_wise::PassThrough,
+                    ck::tensor_operation::element_wise::PassThrough,
+                    InMemoryDataOperationEnum::Set,
+                    Sequence<KPerBlock>,
+                    DBlockTransferThreadClusterLengths,
+                    DBlockTransferThreadClusterArrangeOrder,
+                    DDataType,
+                    DDataType,
+                    DGridBlockDesc,
+                    DBlockDesc,
+                    DBlockTransferAccessOrder,
+                    DBlockTransferAccessOrder,
+                    DBlockTransferVectorDim,
+                    DBlockTransferVectorDim,
+                    DBlockTransferSrcScalarPerVector,
+                    DBlockTransferDstScalarPerVector,
+                    1,
+                    1,
+                    false,
+                    true,
+                    NumConvCPrefetchStage>(d_grid_block_desc,
+                                           make_multi_index(k_block_data_idx_on_grid),
+                                           ck::tensor_operation::element_wise::PassThrough{},
+                                           DBlockDesc{},
+                                           make_multi_index(0),
+                                           ck::tensor_operation::element_wise::PassThrough{});
+            }
+        }
+        else
+        {
+            using DBlockTransferThreadClusterArrangeOrder = Sequence<0, 1, 2>;
+            using DBlockTransferAccessOrder               = Sequence<0, 1, 2>;
+            constexpr index_t DBlockTransferVectorDim     = 2;
+            static_assert(DBlockDesc{}.GetLength(I0) == HPerBlock);
+            static_assert(DBlockDesc{}.GetLength(I1) == WPerBlock);
+            static_assert(DBlockDesc{}.GetLength(I2) == KPerBlock);
+            if constexpr(EnableAsync)
+            {
+                return ThreadGroupTensorSliceTransferAsync<
+                    ThisThreadBlockGrid,
+                    Sequence<HPerBlock, WPerBlock, KPerBlock>,
+                    DBlockTransferThreadClusterLengths,
+                    DBlockTransferThreadClusterArrangeOrder,
+                    DDataType,
+                    DDataType,
+                    DGridBlockDesc,
+                    DBlockDesc,
+                    DBlockTransferVectorDim,
+                    DBlockTransferVectorDim,
+                    DBlockTransferDstScalarPerVector,
+                    false,
+                    true>(d_grid_block_desc,
+                          make_multi_index(h_block_data_idx_on_grid,
+                                           w_block_data_idx_on_grid,
+                                           k_block_data_idx_on_grid),
+                          DBlockDesc{},
+                          make_multi_index(0, 0, 0));
+            }
+            else
+            {
+                return ThreadGroupTensorSliceTransfer_v4r1<
+                    ThisThreadBlockGrid,
+                    ck::tensor_operation::element_wise::PassThrough,
+                    ck::tensor_operation::element_wise::PassThrough,
+                    InMemoryDataOperationEnum::Set,
+                    Sequence<HPerBlock, WPerBlock, KPerBlock>,
+                    DBlockTransferThreadClusterLengths,
+                    DBlockTransferThreadClusterArrangeOrder,
+                    DDataType,
+                    DDataType,
+                    DGridBlockDesc,
+                    DBlockDesc,
+                    DBlockTransferAccessOrder,
+                    DBlockTransferAccessOrder,
+                    DBlockTransferVectorDim,
+                    DBlockTransferVectorDim,
+                    DBlockTransferSrcScalarPerVector,
+                    DBlockTransferDstScalarPerVector,
+                    1,
+                    1,
+                    false,
+                    true,
+                    NumConvCPrefetchStage>(d_grid_block_desc,
+                                           make_multi_index(h_block_data_idx_on_grid,
+                                                            w_block_data_idx_on_grid,
+                                                            k_block_data_idx_on_grid),
+                                           ck::tensor_operation::element_wise::PassThrough{},
+                                           DBlockDesc{},
+                                           make_multi_index(0, 0, 0),
+                                           ck::tensor_operation::element_wise::PassThrough{});
+            }
+        }
+    }
+
     template <typename Block2CTileMap>
     __host__ __device__ static constexpr bool CheckValidity(const InGridDesc& in_grid_desc,
                                                             const WeiGridDesc& wei_grid_desc,
@@ -784,16 +826,38 @@ struct GridwiseConvSuba_Wconvsuba
                               wei_grid_desc.GetLength(I2));
         };
 
-        const auto Ho = (FilterSize == 2) ? GetInProblemsize()[I0] / 2 : GetInProblemsize()[I0];
-        const auto Wo = (FilterSize == 2) ? GetInProblemsize()[I1] / 2 : GetInProblemsize()[I1];
-        const auto H  = (FilterSize == 2) ? GetInProblemsize()[I0] / 2 : GetInProblemsize()[I0];
-        const auto W  = (FilterSize == 2) ? GetInProblemsize()[I1] / 2 : GetInProblemsize()[I1];
+        const auto GetOutSize = [&](auto i) {
+            if constexpr(FilterSize == 2)
+            {
+                return Transposed ? i * 2 : i / 2;
+            }
+            else
+            {
+                return i;
+            }
+        };
+
+        const auto Ho = GetOutSize(GetInProblemsize()[I0]);
+        const auto Wo = GetOutSize(GetInProblemsize()[I1]);
+        const auto H  = GetInProblemsize()[I0];
+        const auto W  = GetInProblemsize()[I1];
         const auto C  = GetInProblemsize()[I2];
         const auto K  = GetWeiProblemsize()[I0];
 
         bool valid = true;
-        static_for<0, NumDTensor, 1>{}(
-            [&](auto i) { valid = valid && (K == ds_grid_desc[i].GetLength(I0)); });
+        static_for<0, NumDTensor, 1>{}([&](auto i) {
+            using DLayout = remove_cvref_t<tuple_element_t<i.value, DsLayout>>;
+            if constexpr(std::is_same_v<DLayout, tensor_layout::convolution::G_K>)
+            {
+                valid = valid && (K == ds_grid_desc[i].GetLength(I0));
+            }
+            else
+            {
+                valid = valid && (Ho == ds_grid_desc[i].GetLength(I0));
+                valid = valid && (Wo == ds_grid_desc[i].GetLength(I1));
+                valid = valid && (K == ds_grid_desc[i].GetLength(I2));
+            }
+        });
         if(!valid)
         {
             printf("GridwiseOp: D descriptor dimension check failure\n");
@@ -879,93 +943,10 @@ struct GridwiseConvSuba_Wconvsuba
     __host__ __device__ static constexpr auto
     MakeDefaultBlock2CTileMap(const AccGridDesc& c_grid_desc_h_w_k, index_t M01, index_t /* N01 */)
     {
-        return BlockToCTileMap_KSplit_M00_N0_M01Adapt<HPerBlock, WPerBlock, AccGridDesc>(
+        return BlockToCTileMap_KSplit_M00_N0_M01Adapt<BlockwiseConv::HPerBlockOut,
+                                                      BlockwiseConv::WPerBlockOut,
+                                                      AccGridDesc>(
             c_grid_desc_h_w_k, M01, c_grid_desc_h_w_k.GetLength(I2) / KPerBlock);
-    }
-
-    struct SharedMemTrait
-    {
-        // LDS allocation for A and B: be careful of alignment
-        static constexpr auto max_lds_align = 8;
-
-        static constexpr auto in_block_space_size_aligned =
-            InEnableLds ? math::integer_least_multiple(
-                              MakeInBlockDescriptor().GetElementSpaceSize(), max_lds_align)
-                        : 0;
-        static constexpr auto wei_block_space_size_aligned =
-            WeiEnableLds ? math::integer_least_multiple(
-                               MakeWeiBlockDescriptor().GetElementSpaceSize(), max_lds_align)
-                         : 0;
-
-        static constexpr auto bias_block_space_size_aligned =
-            DsEnableLds
-                ? math::integer_least_multiple(
-                      MakeDsBlockDescriptor()[Number<0>{}].GetElementSpaceSize(), max_lds_align)
-                : 0;
-
-        static constexpr auto scale_block_space_size_aligned =
-            DsEnableLds
-                ? math::integer_least_multiple(
-                      MakeDsBlockDescriptor()[Number<1>{}].GetElementSpaceSize(), max_lds_align)
-                : 0;
-        static constexpr auto ds_block_space_size_aligned =
-            make_tuple(bias_block_space_size_aligned, scale_block_space_size_aligned);
-
-        static constexpr auto in_block_space_offset = 0;
-        static constexpr auto wei_block_space_offset =
-            (in_block_space_offset + in_block_space_size_aligned) * sizeof(InDataType) /
-            sizeof(WeiDataType);
-
-        // LDS allocation for Ds in LDS
-        static constexpr auto bias_block_space_offset =
-            (wei_block_space_offset + wei_block_space_size_aligned) * sizeof(WeiDataType) /
-            sizeof(AccDataType);
-        static constexpr auto scale_block_space_offset =
-            (bias_block_space_offset + bias_block_space_size_aligned) * sizeof(AccDataType) /
-            sizeof(AccDataType);
-
-        static constexpr auto ds_block_space_offset =
-            make_tuple(bias_block_space_offset, scale_block_space_offset);
-
-        // LDS allocation for C shuffle in LDS
-        static constexpr auto acc_block_space_size = GetAccBlockDescriptor().GetElementSpaceSize();
-
-        static constexpr auto acc_block_space_offset = 0;
-
-        static constexpr auto lds_size =
-            math::max(acc_block_space_size * sizeof(AccDataType),
-                      in_block_space_size_aligned * sizeof(InDataType) +
-                          wei_block_space_size_aligned * sizeof(WeiDataType) +
-                          bias_block_space_size_aligned * sizeof(AccDataType) +
-                          scale_block_space_size_aligned * sizeof(AccDataType));
-    };
-
-    struct LaneSharedMemTrait
-    {
-        static constexpr auto max_lane_shared_align = 4;
-
-        static constexpr auto in_block_space_size_aligned =
-            EnableWaveGroup && (InEnableLds == false)
-                ? math::integer_least_multiple(MakeInBlockDescriptor().GetElementSpaceSize(),
-                                               max_lane_shared_align)
-                : 0;
-        static constexpr auto wei_block_space_size_aligned =
-            EnableWaveGroup && (WeiEnableLds == false)
-                ? math::integer_least_multiple(MakeWeiBlockDescriptor().GetElementSpaceSize(),
-                                               max_lane_shared_align)
-                : 0;
-
-        static constexpr auto in_block_space_offset  = 0;
-        static constexpr auto wei_block_space_offset = in_block_space_size_aligned;
-
-        static constexpr auto lane_shared_size = in_block_space_size_aligned * sizeof(InDataType) +
-                                                 wei_block_space_size_aligned * sizeof(WeiDataType);
-    };
-
-    template <bool HasMainLoop>
-    static constexpr index_t GetLaneSharedMemCount()
-    {
-        return HasMainLoop ? 2 : 1;
     }
 
     using DefaultBlock2CTileMap =
@@ -973,38 +954,7 @@ struct GridwiseConvSuba_Wconvsuba
 
     static constexpr auto in_block_desc  = MakeInBlockDescriptor();
     static constexpr auto wei_block_desc = MakeWeiBlockDescriptor();
-    static constexpr auto ds_block_desc  = MakeDsBlockDescriptor();
-#ifdef FORCE_CONVERT_TO_TENSOR
-    static constexpr bool ConvertToTensor = true;
-#else
-    static constexpr bool ConvertToTensor = false;
-#endif
-    using BlockwiseConv = BlockwiseSubaConvWconv<ThisThreadBlock,
-                                                 WeiDataType,
-                                                 InDataType,
-                                                 DsDataType,
-                                                 AccDataType,
-                                                 decltype(MakeWeiWaveDescriptor(wei_block_desc)),
-                                                 decltype(MakeInWaveDescriptor(in_block_desc)),
-                                                 decltype(MakeDsWaveDescriptor(ds_block_desc)),
-                                                 HPerBlock,
-                                                 WPerBlock,
-                                                 CPerBlock,
-                                                 KPerBlock,
-                                                 HRepeat,
-                                                 WRepeat,
-                                                 HPerWconv,
-                                                 WPerWconv,
-                                                 FilterSize,
-                                                 DilationX,
-                                                 DilationY,
-                                                 activeFun,
-                                                 scaleBiasPacked,
-                                                 uniformScale,
-                                                 WeiEnableLds,
-                                                 InEnableLds,
-                                                 DsEnableLds,
-                                                 ConvertToTensor>;
+
     template <bool HasMainBlockLoop, typename Block2CTileMap = DefaultBlock2CTileMap>
     __device__ static void Run(const InDataType* __restrict__ p_in_grid,
                                const WeiDataType* __restrict__ p_wei_grid,
@@ -1033,10 +983,11 @@ struct GridwiseConvSuba_Wconvsuba
                     p_ds_grid[i], ds_grid_desc[i].GetElementSpaceSize());
             },
             Number<NumDTensor>{});
+        const auto in_grid_block_desc =
+            BlockwiseConv::MakeInGridBlockDescriptor(MakeInGridPadDescriptor(in_grid_desc));
+        const auto wei_grid_block_desc = BlockwiseConv::MakeWeiGridBlockDescriptor(wei_grid_desc);
 
-        const auto in_grid_pad_desc  = MakeInGridPadDescriptor(in_grid_desc);
-        const auto wei_grid_pad_desc = MakeWeiGridPadDescriptor(wei_grid_desc);
-        const auto ds_grid_pad_desc  = MakeDsGridPadDescriptor(ds_grid_desc);
+        const auto ds_grid_block_desc = BlockwiseConv::MakeDsGridBlockDescriptor(ds_grid_desc);
 
         /*******************************************************************************/
         // BlockIdx.x -> [BlockId.k, BlockId.h, BlockId.w]
@@ -1058,12 +1009,17 @@ struct GridwiseConvSuba_Wconvsuba
         const index_t h_block_data_idx_on_grid =
             __builtin_amdgcn_readfirstlane(block_work_idx[I1] * HPerBlock);
 
+        const index_t w_out_block_data_idx_on_grid =
+            __builtin_amdgcn_readfirstlane(block_work_idx[I2] * BlockwiseConv::WPerBlockOut);
+        const index_t h_out_block_data_idx_on_grid =
+            __builtin_amdgcn_readfirstlane(block_work_idx[I1] * BlockwiseConv::HPerBlockOut);
+
         /*******************************************************************************/
         // BlockLevel, Tensor and filter ThreadMapping in WCNN Source buffer, As Destinaion of
         // BlockWise_Copy
         const auto C = in_grid_desc.GetLength(I2);
 
-        auto wave_idx = GetWconvWaveIdx<ThisThreadBlock,
+        auto wave_idx = GetWconvWaveIdx<ThisThreadBlockGrid,
                                         HPerBlock,
                                         WPerBlock,
                                         HRepeat,
@@ -1077,7 +1033,7 @@ struct GridwiseConvSuba_Wconvsuba
             {
                 auto in_block_buf = make_dynamic_buffer<AddressSpaceEnum::Lds>(
                     static_cast<InDataType*>(p_shared),
-                    SharedMemTrait::in_block_space_size_aligned);
+                    BlockwiseConv::SharedMemTrait::in_block_space_size_aligned);
                 using InBlockTransferThreadClusterArrangeOrder = Sequence<0, 1, 2>;
                 using InBlockTransferAccessOrder               = Sequence<0, 1, 2>;
                 constexpr index_t InBlockTransferVectorDim     = 2;
@@ -1085,20 +1041,20 @@ struct GridwiseConvSuba_Wconvsuba
                 if constexpr(EnableAsync)
                 {
                     auto in_blockwise_copy = ThreadGroupTensorSliceTransferAsync<
-                        ThisThreadBlock,
+                        ThisThreadBlockGrid,
                         Sequence<HPerBlockIn, WPerBlockIn, CPerBlock>,
                         InBlockTransferThreadClusterLengths,
                         InBlockTransferThreadClusterArrangeOrder,
                         InDataType,
                         InDataType,
-                        decltype(in_grid_pad_desc),
+                        decltype(in_grid_block_desc),
                         decltype(in_block_desc),
                         InBlockTransferVectorDim,
                         InBlockTransferVectorDim,
                         InBlockTransferDstScalarPerVector,
                         false,
                         true>(
-                        in_grid_pad_desc,
+                        in_grid_block_desc,
                         make_multi_index(h_block_data_idx_on_grid, w_block_data_idx_on_grid, 0),
                         in_block_desc,
                         make_multi_index(0, 0, 0));
@@ -1107,7 +1063,7 @@ struct GridwiseConvSuba_Wconvsuba
                 else
                 {
                     auto in_blockwise_copy = ThreadGroupTensorSliceTransfer_v4r1<
-                        ThisThreadBlock,
+                        ThisThreadBlockGrid,
                         InElementwiseOperation,
                         ck::tensor_operation::element_wise::PassThrough,
                         InMemoryDataOperationEnum::Set,
@@ -1116,7 +1072,7 @@ struct GridwiseConvSuba_Wconvsuba
                         InBlockTransferThreadClusterArrangeOrder,
                         InDataType,
                         InDataType,
-                        decltype(in_grid_pad_desc),
+                        decltype(in_grid_block_desc),
                         decltype(in_block_desc),
                         InBlockTransferAccessOrder,
                         InBlockTransferAccessOrder,
@@ -1129,7 +1085,7 @@ struct GridwiseConvSuba_Wconvsuba
                         false,
                         true,
                         NumConvCPrefetchStage>(
-                        in_grid_pad_desc,
+                        in_grid_block_desc,
                         make_multi_index(h_block_data_idx_on_grid, w_block_data_idx_on_grid, 0),
                         in_element_op,
                         in_block_desc,
@@ -1150,21 +1106,15 @@ struct GridwiseConvSuba_Wconvsuba
                 auto in_blockwise_copy =
                     ThreadwiseTensorSliceTransfer_v2<InDataType,
                                                      InDataType,
-                                                     decltype(in_grid_pad_desc),
+                                                     decltype(in_grid_block_desc),
                                                      decltype(in_block_desc),
-                                                     Sequence<WPerWaveIn / WPerWconv,
-                                                              CPerWave / CPerWconv,
-                                                              HPerWaveIn / HPerWconv,
-                                                              NumSubTilePerImage,
-                                                              1,
-                                                              1,
-                                                              NumDataCompPerTile>,
+                                                     decltype(BlockwiseConv::GetInWaveDescLength()),
                                                      Sequence<0, 1, 2, 3, 4, 5, 6>,
                                                      6,
                                                      NumDataCompPerTile,
                                                      1,
                                                      false>(
-                        in_grid_pad_desc,
+                        in_grid_block_desc,
                         make_multi_index(w0,
                                          0,
                                          h0,
@@ -1175,13 +1125,16 @@ struct GridwiseConvSuba_Wconvsuba
 
                 if constexpr(EnableWaveGroup)
                 {
-                    static_assert(LaneSharedMemTrait::in_block_space_offset == 0, "");
-                    return make_tuple(make_static_buffer_v4<AddressSpaceEnum::Vgpr, InDataType>(
-                                          in_block_desc.GetElementSpaceSize(),
-                                          static_cast<InDataType*>(p_lane_shared) +
-                                              LaneSharedMemTrait::in_block_space_offset *
-                                                  GetLaneSharedMemCount<HasMainBlockLoop>()),
-                                      in_blockwise_copy);
+                    static_assert(BlockwiseConv::LaneSharedMemTrait::in_block_space_offset == 0,
+                                  "");
+                    return make_tuple(
+                        make_static_buffer_v4<AddressSpaceEnum::Vgpr, InDataType>(
+                            in_block_desc.GetElementSpaceSize(),
+                            static_cast<InDataType*>(p_lane_shared) +
+                                BlockwiseConv::LaneSharedMemTrait::in_block_space_offset *
+                                    BlockwiseConv::template GetLaneSharedMemCount<
+                                        HasMainBlockLoop>()),
+                        in_blockwise_copy);
                 }
                 else
                 {
@@ -1196,18 +1149,20 @@ struct GridwiseConvSuba_Wconvsuba
             if constexpr(WeiEnableLds)
             {
                 auto wei_block_buf = make_dynamic_buffer<AddressSpaceEnum::Lds>(
-                    static_cast<WeiDataType*>(p_shared) + SharedMemTrait::wei_block_space_offset,
-                    SharedMemTrait::wei_block_space_size_aligned);
+                    static_cast<WeiDataType*>(p_shared) +
+                        BlockwiseConv::SharedMemTrait::wei_block_space_offset,
+                    BlockwiseConv::SharedMemTrait::wei_block_space_size_aligned);
 
                 using WeiBlockTransferThreadClusterArrangeOrder = Sequence<0, 1, 2>;
                 using WeiBlockTransferAccessOrder               = Sequence<0, 1, 2>;
                 constexpr index_t WeiBlockTransferVectorDim     = 2;
-
+                constexpr index_t NumTapPerCopy                 = (FilterSize == 3) ? 1 : YX;
+                constexpr auto NumWeiCopy                       = (FilterSize == 3) ? YX : 1;
                 if constexpr(EnableAsync)
                 {
                     using WeiThreadGroupTensorSliceTransfer = ThreadGroupTensorSliceTransferAsync<
-                        ThisThreadBlock,
-                        Sequence<KPerBlock, 1, CPerBlock>,
+                        ThisThreadBlockGrid,
+                        Sequence<KPerBlock, NumTapPerCopy, CPerBlock>,
                         WeiBlockTransferThreadClusterLengths,
                         WeiBlockTransferThreadClusterArrangeOrder,
                         WeiDataType,
@@ -1230,23 +1185,23 @@ struct GridwiseConvSuba_Wconvsuba
                                     ? make_multi_index(0, wconv_conv.GetWeight3RemapTable()[I], 0)
                                     : make_multi_index(0, 0, 0));
                         },
-                        NumberYX{});
+                        Number<NumWeiCopy>{});
 
                     return make_tuple(wei_block_buf, wei_blockwise_copy);
                 }
                 else
                 {
                     using WeiThreadGroupTensorSliceTransfer = ThreadGroupTensorSliceTransfer_v4r1<
-                        ThisThreadBlock,
+                        ThisThreadBlockGrid,
                         WeiElementwiseOperation,
                         ck::tensor_operation::element_wise::PassThrough,
                         InMemoryDataOperationEnum::Set,
-                        Sequence<KPerBlock, 1, CPerBlock>,
+                        Sequence<KPerBlock, NumTapPerCopy, CPerBlock>,
                         WeiBlockTransferThreadClusterLengths,
                         WeiBlockTransferThreadClusterArrangeOrder,
                         WeiDataType,
                         WeiDataType,
-                        decltype(wei_grid_desc),
+                        decltype(wei_grid_block_desc),
                         decltype(wei_block_desc),
                         WeiBlockTransferAccessOrder,
                         WeiBlockTransferAccessOrder,
@@ -1272,58 +1227,62 @@ struct GridwiseConvSuba_Wconvsuba
                                     : make_multi_index(0, 0, 0),
                                 ck::tensor_operation::element_wise::PassThrough{});
                         },
-                        NumberYX{});
+                        Number<NumWeiCopy>{});
                     return make_tuple(wei_block_buf, wei_blockwise_copy);
                 }
             }
             else
             {
-                constexpr index_t Iters = GetFilterIters<WeiDataType,
-                                                         InDataType,
-                                                         AccDataType,
-                                                         CPerBlock,
-                                                         HPerWconv,
-                                                         WPerWconv,
-                                                         FilterSize>();
-
                 auto wei_slice_origin_idx = wconv_conv.CalculateWeiDataThreadOriginDataIndex();
                 auto k0 = (k_block_data_idx_on_grid + wave_idx[I2] * KPerWave) / KPerWconv;
 
                 // Limitation: NumDim of Src and Dst descriptor should be identical
-                using WeiThreadGroupTensorSliceTransfer =
-                    ThreadwiseTensorSliceTransfer_v2<WeiDataType,
-                                                     WeiDataType,
-                                                     decltype(wei_grid_pad_desc),
-                                                     decltype(wei_block_desc),
-                                                     Sequence<KPerWave / KPerWconv,
-                                                              CPerWave / CPerWconv,
-                                                              1,
-                                                              1,
-                                                              NumSubTilesPerWeightTap,
-                                                              NumWeightCompPerTile>,
-                                                     Sequence<0, 1, 2, 3, 4, 5>,
-                                                     5,
-                                                     NumWeightCompPerTile,
-                                                     1,
-                                                     false>;
+                using WeiThreadGroupTensorSliceTransfer = ThreadwiseTensorSliceTransfer_v2<
+                    WeiDataType,
+                    WeiDataType,
+                    decltype(wei_grid_block_desc),
+                    decltype(wei_block_desc),
+                    decltype(BlockwiseConv::GetWeiWaveDescLength()),
+                    Sequence<0, 1, 2, 3, 4, 5>,
+                    5,
+                    NumWeightCompPerTile,
+                    1,
+                    false>;
 
                 auto wei_blockwise_copy = generate_tuple(
                     [&](auto I) {
-                        if constexpr(Iters > 1)
+                        if constexpr(FilterSize != 3)
                         {
-                            return WeiThreadGroupTensorSliceTransfer(
-                                wei_grid_pad_desc,
-                                make_multi_index(k0,
-                                                 wei_slice_origin_idx[I0],
-                                                 0,
-                                                 wei_slice_origin_idx[I1],
-                                                 wei_slice_origin_idx[I2],
-                                                 wei_slice_origin_idx[I3]));
+                            static_assert(NumWeightTap == 1, "");
+                            if(FilterSize == 2)
+                            {
+                                // Use tap index in dim YX
+                                return WeiThreadGroupTensorSliceTransfer(
+                                    wei_grid_block_desc,
+                                    make_multi_index(k0,
+                                                     0,
+                                                     wei_slice_origin_idx[I0],
+                                                     wei_slice_origin_idx[I1],
+                                                     wei_slice_origin_idx[I2],
+                                                     wei_slice_origin_idx[I3]));
+                            }
+                            else
+                            {
+                                // Use tap index in dim C0
+                                return WeiThreadGroupTensorSliceTransfer(
+                                    wei_grid_block_desc,
+                                    make_multi_index(k0,
+                                                     wei_slice_origin_idx[I0],
+                                                     0,
+                                                     wei_slice_origin_idx[I1],
+                                                     wei_slice_origin_idx[I2],
+                                                     wei_slice_origin_idx[I3]));
+                            }
                         }
                         else
                         {
                             return WeiThreadGroupTensorSliceTransfer(
-                                wei_grid_pad_desc,
+                                wei_grid_block_desc,
                                 make_multi_index(k0,
                                                  0,
                                                  I * wconv_conv.GetNumWeightTapPerWave() +
@@ -1338,12 +1297,14 @@ struct GridwiseConvSuba_Wconvsuba
 
                 if constexpr(EnableWaveGroup)
                 {
-                    return make_tuple(make_static_buffer_v4<AddressSpaceEnum::Vgpr, WeiDataType>(
-                                          wei_block_desc.GetElementSpaceSize(),
-                                          static_cast<WeiDataType*>(p_lane_shared) +
-                                              LaneSharedMemTrait::wei_block_space_offset *
-                                                  GetLaneSharedMemCount<HasMainBlockLoop>()),
-                                      wei_blockwise_copy);
+                    return make_tuple(
+                        make_static_buffer_v4<AddressSpaceEnum::Vgpr, WeiDataType>(
+                            wei_block_desc.GetElementSpaceSize(),
+                            static_cast<WeiDataType*>(p_lane_shared) +
+                                BlockwiseConv::LaneSharedMemTrait::wei_block_space_offset *
+                                    BlockwiseConv::template GetLaneSharedMemCount<
+                                        HasMainBlockLoop>()),
+                        wei_blockwise_copy);
                 }
                 else
                 {
@@ -1359,127 +1320,60 @@ struct GridwiseConvSuba_Wconvsuba
             {
                 auto ds_array_block_buf = generate_tuple(
                     [&](auto i) {
+                        using DDataType = remove_cvref_t<tuple_element_t<i.value, DsDataType>>;
+                        static_assert(sizeof(AccDataType) % sizeof(DDataType) == 0);
+                        constexpr auto DDataSizeScale = sizeof(AccDataType) / sizeof(DDataType);
                         return make_dynamic_buffer<AddressSpaceEnum::Lds>(
-                            static_cast<AccDataType*>(p_shared) +
-                                SharedMemTrait::ds_block_space_offset[Number<i>{}],
-                            SharedMemTrait::ds_block_space_size_aligned[Number<i>{}]);
+                            static_cast<DDataType*>(p_shared) +
+                                BlockwiseConv::SharedMemTrait::ds_block_space_offset[i] *
+                                    DDataSizeScale,
+                            BlockwiseConv::SharedMemTrait::ds_block_space_size_aligned[i] *
+                                DDataSizeScale);
                     },
                     Number<NumDTensor>{});
-
-                using DsBlockTransferThreadClusterArrangeOrder = Sequence<0>;
-                using DsBlockTransferAccessOrder               = Sequence<0>;
-
-                constexpr index_t DsBlockTransferVectorDim = 0;
-
-                if constexpr(EnableAsync)
-                {
-                    auto ds_blockwise_copy = generate_tuple(
-                        [&](auto i) {
-                            using DsThreadGroupTensorSliceTransfer =
-                                ThreadGroupTensorSliceTransferAsync<
-                                    DsThreadBlock,
-                                    Sequence<KPerBlock>,
-                                    DsBlockTransferThreadClusterLengths,
-                                    DsBlockTransferThreadClusterArrangeOrder,
-                                    AccDataType,
-                                    AccDataType,
-                                    remove_cvref_t<decltype(ds_grid_pad_desc[Number<i>{}])>,
-                                    remove_cvref_t<decltype(ds_block_desc[Number<i>{}])>,
-                                    DsBlockTransferVectorDim,
-                                    DsBlockTransferVectorDim,
-                                    DsBlockTransferDstScalarPerVector,
-                                    false,
-                                    true>;
-                            return DsThreadGroupTensorSliceTransfer(
-                                ds_grid_pad_desc[Number<i>{}],
-                                make_multi_index(k_block_data_idx_on_grid),
-                                ds_block_desc[Number<i>{}],
-                                make_multi_index(0));
-                        },
-                        Number<NumDTensor>{});
-                    return make_tuple(ds_array_block_buf, ds_blockwise_copy);
-                }
-                else
-                {
-
-                    auto ds_blockwise_copy = generate_tuple(
-                        [&](auto i) {
-                            using DsThreadGroupTensorSliceTransfer =
-                                ThreadGroupTensorSliceTransfer_v4r1<
-                                    DsThreadBlock,
-                                    ck::tensor_operation::element_wise::PassThrough,
-                                    ck::tensor_operation::element_wise::PassThrough,
-                                    InMemoryDataOperationEnum::Set,
-                                    Sequence<KPerBlock>,
-                                    DsBlockTransferThreadClusterLengths,
-                                    DsBlockTransferThreadClusterArrangeOrder,
-                                    AccDataType,
-                                    AccDataType,
-                                    remove_cvref_t<decltype(ds_grid_pad_desc[Number<i>{}])>,
-                                    remove_cvref_t<decltype(ds_block_desc[Number<i>{}])>,
-                                    DsBlockTransferAccessOrder,
-                                    DsBlockTransferAccessOrder,
-                                    DsBlockTransferVectorDim,
-                                    DsBlockTransferVectorDim,
-                                    DsBlockTransferSrcScalarPerVector,
-                                    DsBlockTransferDstScalarPerVector,
-                                    1,
-                                    1,
-                                    false,
-                                    true,
-                                    NumConvCPrefetchStage>;
-                            return DsThreadGroupTensorSliceTransfer(
-                                ds_grid_pad_desc[Number<i>{}],
-                                make_multi_index(k_block_data_idx_on_grid),
-                                ck::tensor_operation::element_wise::PassThrough{},
-                                ds_block_desc[Number<i>{}],
-                                make_multi_index(0),
-                                ck::tensor_operation::element_wise::PassThrough{});
-                        },
-                        Number<NumDTensor>{});
-                    return make_tuple(ds_array_block_buf, ds_blockwise_copy);
-                }
-            }
-            else
-            {
-                using ds_count_vgpr_type =
-                    decltype(make_static_buffer<AddressSpaceEnum::Vgpr, AccDataType>(
-                        ds_block_desc[I0].GetElementSpaceSize()));
-                Array<ds_count_vgpr_type, NumDTensor> ds_array_block_buf;
-                static_for<0, NumDTensor, 1>{}([&](auto i) {
-                    ds_array_block_buf(i) = make_static_buffer<AddressSpaceEnum::Vgpr, AccDataType>(
-                        ds_block_desc[Number<i>{}].GetElementSpaceSize());
-                });
-
-                auto k0 = (k_block_data_idx_on_grid + wave_idx[I2] * KPerWave) / KPerWconv;
-
-                // Limitation: NumDim of Src and Dst descriptor should be identical
 
                 auto ds_blockwise_copy = generate_tuple(
                     [&](auto i) {
-                        constexpr index_t DsPerThread = acc_sba.GetNumBiasComponents();
-                        auto ds_slice_origin_idx =
-                            acc_sba.CalculateDsThreadOriginDataIndex(KPerWconv);
-                        using DsThreadGroupTensorSliceTransfer = ThreadwiseTensorSliceTransfer_v2<
-                            AccDataType,
-                            AccDataType,
-                            remove_cvref_t<decltype(ds_grid_pad_desc[Number<i>{}])>,
-                            remove_cvref_t<decltype(ds_block_desc[Number<i>{}])>,
-                            Sequence<Number<KPerWave / KPerWconv>{},
-                                     Number<KPerWconv / DsPerThread>{},
-                                     Number<DsPerThread>{}>,
-                            Sequence<0, 1, 2>,
-                            2,
-                            DsPerThread,
-                            1,
-                            false>;
-
-                        return DsThreadGroupTensorSliceTransfer(
-                            ds_grid_pad_desc[Number<i>{}],
-                            make_multi_index(k0, ds_slice_origin_idx[I0], ds_slice_origin_idx[I1]));
+                        return MakeSignleDThreadgroupTransfer(i,
+                                                              ds_grid_block_desc[Number<i>{}],
+                                                              ds_block_desc[Number<i>{}],
+                                                              h_block_data_idx_on_grid,
+                                                              w_block_data_idx_on_grid,
+                                                              k_block_data_idx_on_grid);
                     },
                     Number<NumDTensor>{});
-                return make_tuple(ds_array_block_buf, ds_blockwise_copy);
+                return make_tuple(ds_array_block_buf, ds_blockwise_copy, ds_block_desc);
+            }
+            else
+            {
+                auto thread_origin_data_idx = BlockwiseConv::CalculateThreadOriginDataIndex();
+                auto ds_wave_desc_length    = BlockwiseConv::GetDsWaveDescLength();
+                auto ds_wave_desc           = BlockwiseConv::GetDsWaveDesc();
+                auto ds_array_block_buf     = generate_tuple(
+                    [&](auto i) {
+                        using DDataType = remove_cvref_t<tuple_element_t<i.value, DsDataType>>;
+                        return make_static_buffer<AddressSpaceEnum::Vgpr, DDataType>(
+                            ds_wave_desc[Number<i>{}].GetElementSpaceSize());
+                    },
+                    Number<NumDTensor>{});
+
+                // Limitation: NumDim of Src and Dst descriptor should be identical
+                auto ds_blockwise_copy = generate_tuple(
+                    [&](auto i) {
+                        using DLayout   = remove_cvref_t<tuple_element_t<i.value, DsLayout>>;
+                        using DDataType = remove_cvref_t<tuple_element_t<i.value, DsDataType>>;
+                        return MakeSignleDThreadwiseTransfer(DLayout{},
+                                                             DDataType{},
+                                                             ds_grid_block_desc[Number<i>{}],
+                                                             ds_wave_desc[Number<i>{}],
+                                                             thread_origin_data_idx[Number<i>{}],
+                                                             ds_wave_desc_length[Number<i>{}],
+                                                             h_block_data_idx_on_grid,
+                                                             w_block_data_idx_on_grid,
+                                                             k_block_data_idx_on_grid);
+                    },
+                    Number<NumDTensor>{});
+                return make_tuple(ds_array_block_buf, ds_blockwise_copy, ds_wave_desc);
             }
         };
 
@@ -1492,8 +1386,8 @@ struct GridwiseConvSuba_Wconvsuba
 
         /*******************************************************************************/
         // Shift Per CPerBlock
-        constexpr auto in_block_slice_copy_step  = MakeInBlockSliceCopyStep();
-        constexpr auto wei_block_slice_copy_step = MakeWeiBlockSliceCopyStep();
+        constexpr auto in_block_slice_copy_step  = BlockwiseConv::MakeInBlockSliceCopyStep();
+        constexpr auto wei_block_slice_copy_step = BlockwiseConv::MakeWeiBlockSliceCopyStep();
 
         // Gridwise conv pipeline
         const index_t CBlockMainLoop = __builtin_amdgcn_readfirstlane(C / CPerBlock);
@@ -1504,23 +1398,24 @@ struct GridwiseConvSuba_Wconvsuba
         auto wei_block_buf      = wei_block_trait()[I0];
         auto wei_blockwise_copy = wei_block_trait()[I1];
 
-        auto ds_block_buf      = ds_block_trait()[I0];
-        auto ds_blockwise_copy = ds_block_trait()[I1];
+        auto ds_block_buf       = ds_block_trait()[I0];
+        auto ds_blockwise_copy  = ds_block_trait()[I1];
+        auto ds_copy_block_desc = ds_block_trait()[I2];
 
-        GridwiseConvPipe::template Run<HasMainBlockLoop>(in_grid_pad_desc,
+        GridwiseConvPipe::template Run<HasMainBlockLoop>(in_grid_block_desc,
                                                          in_block_desc,
                                                          in_blockwise_copy,
                                                          in_grid_buf,
                                                          in_block_buf,
                                                          in_block_slice_copy_step,
-                                                         wei_grid_pad_desc,
+                                                         wei_grid_block_desc,
                                                          wei_block_desc,
                                                          wei_blockwise_copy,
                                                          wei_grid_buf,
                                                          wei_block_buf,
                                                          wei_block_slice_copy_step,
-                                                         ds_grid_pad_desc,
-                                                         ds_block_desc,
+                                                         ds_grid_block_desc,
+                                                         ds_copy_block_desc,
                                                          ds_blockwise_copy,
                                                          ds_grid_buf,
                                                          ds_block_buf,
@@ -1538,8 +1433,8 @@ struct GridwiseConvSuba_Wconvsuba
                          acc_element_op,
                          p_shared,
                          p_lane_shared,
-                         h_block_data_idx_on_grid,
-                         w_block_data_idx_on_grid,
+                         h_out_block_data_idx_on_grid,
+                         w_out_block_data_idx_on_grid,
                          k_block_data_idx_on_grid);
         }
     }

@@ -64,7 +64,6 @@ namespace ck {
 
 namespace conv_op_util {
 
-#define LOAD_DATA_PER_TILE 0
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wundefined-reinterpret-cast"
 template <typename InDataType,
@@ -170,14 +169,14 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
         if constexpr(wconvConv.GetNumImageSubTilesInVertical() > 1)
         {
             // shape 8x4
-            typename decltype(wconvConv)::InDataVec inData;
+            typename decltype(wconvConv)::InDataVec inDataLocal;
 
             static_for<0, wconvConv.GetNumImageSubTilesInVertical(), 1>{}([&](auto tileId) {
-                inData.template AsType<InDataTileVec>()(Number<tileId>{}) =
+                inDataLocal.template AsType<InDataTileVec>()(Number<tileId>{}) =
                     *reinterpret_cast<const InDataTileVec*>(
                         in + offset + tileId * DataTileHeight * data_H_stride);
             });
-            return inData.template AsType<InDataVec>()(Number<0>{});
+            return inDataLocal.template AsType<InDataVec>()(Number<0>{});
         }
         else
         {
@@ -410,19 +409,19 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
                     Number<tileOffset * wconvConv.GetNumAccumComponents()>{});
                 auto& d_vec = d_thread_buf_.GetVectorTypeReference(
                     Number<tileOffset * accSbaInstance.GetNumSbaOutComponents()>{});
-                AccDataType& scale_ = scale_data[tileOffset];
+                AccDataType& scale_local = scale_data[tileOffset];
 
                 if constexpr(std::is_same<float, AccDataType>::value)
                 {
                     const AccDataType& bias_data32bit_v = bias_32bit_data[tileOffset];
-                    accSbaInstance.sba_instr.Run(c_vec, scale_, bias_data32bit_v, d_vec);
+                    accSbaInstance.sba_instr.Run(c_vec, scale_local, bias_data32bit_v, d_vec);
                 }
                 else if constexpr(std::is_same<half_t, AccDataType>::value)
                 {
                     const vector_type<AccDataType, 2>& bias_data16bit_v =
                         bias_16bit_data[tileOffset];
                     accSbaInstance.sba_instr.Run(c_vec,
-                                                 type_convert<float>(scale_),
+                                                 type_convert<float>(scale_local),
                                                  bit_cast<half2_t>(bias_data16bit_v),
                                                  d_vec);
                 }
@@ -431,7 +430,7 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
                     const vector_type<AccDataType, 2>& bias_data16bit_v =
                         bias_16bit_data[tileOffset];
                     accSbaInstance.sba_instr.Run(c_vec,
-                                                 type_convert<float>(scale_),
+                                                 type_convert<float>(scale_local),
                                                  bit_cast<bhalf2_t>(bias_data16bit_v),
                                                  d_vec);
                 }
@@ -568,7 +567,7 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
             const index_t offset = (h * HPerWconv + subH) * acc_H_stride +
                                    (w * WPerWconv + subW) * acc_W_stride +
                                    (k * acc_K_stride + subK);
-            *reinterpret_cast<typename AccDataVec::type*>(c + offset) =
+            *reinterpret_cast<typename AccDataVec::type*>(c_ + offset) =
                 c_vec.template AsType<typename AccDataVec::type>()(Number<0>{});
         }
         else
@@ -585,9 +584,9 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
             constexpr index_t secOffset =
                 (num_acc_tile > 1) ? HPerWconv / num_acc_tile * acc_H_stride : 8;
             const index_t swizzleOffset = (lIdx % 2) * 4;
-            *reinterpret_cast<acc_swizzle_vec*>(c + offset + swizzleOffset) =
+            *reinterpret_cast<acc_swizzle_vec*>(c_ + offset + swizzleOffset) =
                 c_vec.template AsType<acc_swizzle_vec>()(Number<0>{});
-            *reinterpret_cast<acc_swizzle_vec*>(c + offset + swizzleOffset + secOffset) =
+            *reinterpret_cast<acc_swizzle_vec*>(c_ + offset + swizzleOffset + secOffset) =
                 c_vec.template AsType<acc_swizzle_vec>()(Number<1>{});
         }
     };

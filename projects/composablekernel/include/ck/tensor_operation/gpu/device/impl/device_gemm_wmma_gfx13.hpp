@@ -493,6 +493,8 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
         LoopSched,
         PipelineVer>;
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wundefined-reinterpret-cast"
     // Argument
     struct Argument : public BaseArgument
     {
@@ -510,8 +512,8 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
                  AElementwiseOperation a_element_op,
                  BElementwiseOperation b_element_op,
                  CElementwiseOperation c_element_op)
-            : p_a_grid_{(const view_type_t<ADataType>*)(p_a_grid)},
-              p_b_grid_{(const view_type_t<BDataType>*)(p_b_grid)},
+            : p_a_grid_{reinterpret_cast<const view_type_t<ADataType>*>(p_a_grid)},
+              p_b_grid_{reinterpret_cast<const view_type_t<BDataType>*>(p_b_grid)},
               p_c_grid_{p_c_grid},
               a_grid_desc_{},
               b_grid_desc_k0_n_k1_{},
@@ -559,8 +561,8 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
                  AElementwiseOperation a_element_op,
                  BElementwiseOperation b_element_op,
                  CElementwiseOperation c_element_op)
-            : p_a_grid_{(const view_type_t<ADataType>*)(p_a_grid)}, // cast to int32
-              p_b_grid_{(const view_type_t<BDataType>*)(p_b_grid)},
+            : p_a_grid_{reinterpret_cast<const view_type_t<ADataType>*>(p_a_grid)}, // cast to int32
+              p_b_grid_{reinterpret_cast<const view_type_t<BDataType>*>(p_b_grid)},
               p_a_scale_{p_a_scale},
               p_b_scale_{p_b_scale},
               p_c_grid_{p_c_grid},
@@ -597,6 +599,8 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
             }
         }
 #endif
+#pragma clang diagnostic pop
+
         //  private:
         const view_type_t<ADataType>* p_a_grid_;
         const view_type_t<BDataType>* p_b_grid_;
@@ -664,7 +668,7 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
                 }
             }();
             auto launch_kernel = [&](auto has_main_k_block_loop) {
-                const auto kernel = [&]() {
+                const auto kernel_final = [&]() {
 #ifdef CK_EXTENSION_MX_TYPE
                     if constexpr(is_mx_type_t_v<ADataType>)
                     {
@@ -745,7 +749,7 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
                     }
                 };
 
-                return kernel();
+                return kernel_final();
             };
 
             if(GridwiseGemm::CalculateHasMainKBlockLoop(K))

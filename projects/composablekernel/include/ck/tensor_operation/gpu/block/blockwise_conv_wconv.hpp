@@ -107,8 +107,7 @@ template <typename ThisThreadBlock,
           bool WeiDataEnableLds = false,
           bool InDataEnableLds  = false,
           bool ConvertToTensor  = false,
-          bool Transposed       = false,
-          bool Aco              = false>
+          bool Transposed       = false>
 /* Option: Read from LDS, big buffer hold all threads required data
  * Source
  * Weight: NumYX x KPerBlock x  CPerBlock (YXKC)
@@ -142,7 +141,7 @@ struct BlockwiseConvWconv
     static constexpr bool EnableWaveGroup = ThisThreadBlock::InWaveGroup();
 
     static constexpr index_t WaveFilterSize = (FilterSize == 2) ? 1 : FilterSize;
-
+    static constexpr bool Aco               = sizeof(InDataType) > 1;
     // Wave properties
     static constexpr index_t Iters = GetFilterIters<WeiDataType,
                                                     InDataType,

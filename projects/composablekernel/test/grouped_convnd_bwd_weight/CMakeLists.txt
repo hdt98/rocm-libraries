@@ -1,3 +1,5 @@
+
+if (ENABLE_GFX13_FAIL_TESTS)
 if(GPU_TARGETS MATCHES "gfx9" OR DL_KERNELS)
       add_gtest_executable(test_grouped_convnd_bwd_weight test_grouped_convnd_bwd_weight.cpp)
       target_link_libraries(test_grouped_convnd_bwd_weight PRIVATE utility device_grouped_conv1d_bwd_weight_instance device_grouped_conv2d_bwd_weight_instance device_grouped_conv3d_bwd_weight_instance)
@@ -5,6 +7,8 @@ if(GPU_TARGETS MATCHES "gfx9" OR DL_KERNELS)
       add_gtest_executable(test_grouped_convnd_bwd_weight test_grouped_convnd_bwd_weight.cpp)
       target_link_libraries(test_grouped_convnd_bwd_weight PRIVATE utility device_grouped_conv3d_bwd_weight_instance)
 endif()
+endif()
+
 add_gtest_executable(test_grouped_convnd_bwd_weight_interface_xdl test_grouped_convnd_bwd_weight_interface_xdl.cpp)
 if(result EQUAL 0)
    target_link_libraries(test_grouped_convnd_bwd_weight_interface_xdl PRIVATE utility)

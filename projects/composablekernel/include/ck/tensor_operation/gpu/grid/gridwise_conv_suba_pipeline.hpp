@@ -82,13 +82,13 @@ struct GridwiseConvPipeline_v1<1, true, true, true, false>
             std::remove_const_t<remove_cvref_t<decltype(wei_blockwise_copy[I0])>>;
 
         constexpr index_t NumDs = ds_blockwise_copy.Size();
-        using DsDataBlockTransfer0 =
-            std::remove_const_t<remove_cvref_t<decltype(ds_blockwise_copy[I0])>>;
 
         // preload ds data into LDS
         static_for<0, NumDs, 1>{}([&](auto i) {
-            const_cast<DsDataBlockTransfer0&>(ds_blockwise_copy[i])
-                .RunRead(ds_grid_desc[Number<i>{}], ds_grid_buf[Number<i>{}]);
+            using DDataBlockTransfer =
+                std::remove_const_t<remove_cvref_t<decltype(ds_blockwise_copy[i])>>;
+            const_cast<DDataBlockTransfer&>(ds_blockwise_copy[i])
+                .RunRead(ds_grid_desc[i], ds_grid_buf[i]);
         });
 
         // preload data into LDS
@@ -117,8 +117,10 @@ struct GridwiseConvPipeline_v1<1, true, true, true, false>
         in_blockwise_copy.RunWrite(in_block_desc, in_block_buf);
 
         static_for<0, NumDs, 1>{}([&](auto i) {
-            const_cast<DsDataBlockTransfer0&>(ds_blockwise_copy[i])
-                .RunWrite(ds_block_desc[Number<i>{}], ds_block_buf(i));
+            using DDataBlockTransfer =
+                std::remove_const_t<remove_cvref_t<decltype(ds_blockwise_copy[i])>>;
+            const_cast<DDataBlockTransfer&>(ds_blockwise_copy[i])
+                .RunWrite(ds_block_desc[i], ds_block_buf(i));
         });
 
         // main body
@@ -238,15 +240,18 @@ struct GridwiseConvPipeline_v1<1, false, true, false, false>
         });
 
         constexpr index_t NumDs = ds_blockwise_copy.Size();
-        using DsDataBlockTransfer0 =
-            std::remove_const_t<remove_cvref_t<decltype(ds_blockwise_copy[I0])>>;
 
         static_for<0, NumDs, 1>{}([&](auto i) {
-            const_cast<DsDataBlockTransfer0&>(ds_blockwise_copy[i])
-                .Run(ds_grid_desc[Number<i>{}],
-                     ds_grid_buf[Number<i>{}],
-                     ds_block_desc[Number<i>{}],
-                     make_tuple(I0, I0, I0),
+            using DDataBlockTransfer =
+                std::remove_const_t<remove_cvref_t<decltype(ds_blockwise_copy[i])>>;
+            using DBlockDesc = remove_cvref_t<decltype(ds_block_desc[i])>;
+            auto d_block_origin_idx =
+                generate_tuple([&](auto) { return I0; }, Number<DBlockDesc::GetNumOfDimension()>{});
+            const_cast<DDataBlockTransfer&>(ds_blockwise_copy[i])
+                .Run(ds_grid_desc[i],
+                     ds_grid_buf[i],
+                     ds_block_desc[i],
+                     d_block_origin_idx,
                      ds_block_buf(i));
         });
 
@@ -394,15 +399,18 @@ struct GridwiseConvPipeline_v1<1, false, false, false, EnableAsync>
         });
 
         constexpr index_t NumDs = ds_blockwise_copy.Size();
-        using DsDataBlockTransfer0 =
-            std::remove_const_t<remove_cvref_t<decltype(ds_blockwise_copy[I0])>>;
 
         static_for<0, NumDs, 1>{}([&](auto i) {
-            const_cast<DsDataBlockTransfer0&>(ds_blockwise_copy[i])
-                .Run(ds_grid_desc[Number<i>{}],
-                     ds_grid_buf[Number<i>{}],
-                     ds_block_desc[Number<i>{}],
-                     make_tuple(I0, I0, I0),
+            using DDataBlockTransfer =
+                std::remove_const_t<remove_cvref_t<decltype(ds_blockwise_copy[i])>>;
+            using DBlockDesc = remove_cvref_t<decltype(ds_block_desc[i])>;
+            auto d_block_origin_idx =
+                generate_tuple([&](auto) { return I0; }, Number<DBlockDesc::GetNumOfDimension()>{});
+            const_cast<DDataBlockTransfer&>(ds_blockwise_copy[i])
+                .Run(ds_grid_desc[i],
+                     ds_grid_buf[i],
+                     ds_block_desc[i],
+                     d_block_origin_idx,
                      ds_block_buf(i));
         });
 
@@ -537,11 +545,11 @@ struct GridwiseConvPipeline_v1<1, true, false, true, false>
         });
 
         constexpr index_t NumDs = ds_blockwise_copy.Size();
-        using DsDataBlockTransfer0 =
-            std::remove_const_t<remove_cvref_t<decltype(ds_blockwise_copy[I0])>>;
         static_for<0, NumDs, 1>{}([&](auto i) {
-            const_cast<DsDataBlockTransfer0&>(ds_blockwise_copy[i])
-                .RunRead(ds_grid_desc[Number<i>{}], ds_grid_buf[Number<i>{}]);
+            using DDataBlockTransfer =
+                std::remove_const_t<remove_cvref_t<decltype(ds_blockwise_copy[i])>>;
+            const_cast<DDataBlockTransfer&>(ds_blockwise_copy[i])
+                .RunRead(ds_grid_desc[i], ds_grid_buf[i]);
         });
 
         in_blockwise_copy.RunRead(in_grid_desc, in_grid_buf);
@@ -559,8 +567,10 @@ struct GridwiseConvPipeline_v1<1, true, false, true, false>
         in_blockwise_copy.RunWrite(in_block_desc, in_block_buf);
 
         static_for<0, NumDs, 1>{}([&](auto i) {
-            const_cast<DsDataBlockTransfer0&>(ds_blockwise_copy[i])
-                .RunWrite(ds_block_desc[Number<i>{}], ds_block_buf(i));
+            using DDataBlockTransfer =
+                std::remove_const_t<remove_cvref_t<decltype(ds_blockwise_copy[i])>>;
+            const_cast<DDataBlockTransfer&>(ds_blockwise_copy[i])
+                .RunWrite(ds_block_desc[i], ds_block_buf(i));
         });
 
         // main body
@@ -690,15 +700,12 @@ struct GridwiseConvPipeline_v1<1, true, true, true, true>
         in_blockwise_copy.MoveSrcSliceWindow(in_grid_desc, in_block_copy_step);
 
         constexpr index_t NumDs = ds_blockwise_copy.Size();
-        using DsDataBlockTransfer0 =
-            std::remove_const_t<remove_cvref_t<decltype(ds_blockwise_copy[I0])>>;
 
         static_for<0, NumDs, 1>{}([&](auto i) {
-            const_cast<DsDataBlockTransfer0&>(ds_blockwise_copy[i])
-                .Run(ds_grid_desc[Number<i>{}],
-                     ds_grid_buf[Number<i>{}],
-                     ds_block_desc[Number<i>{}],
-                     ds_block_buf(i));
+            using DDataBlockTransfer =
+                std::remove_const_t<remove_cvref_t<decltype(ds_blockwise_copy[i])>>;
+            const_cast<DDataBlockTransfer&>(ds_blockwise_copy[i])
+                .Run(ds_grid_desc[i], ds_grid_buf[i], ds_block_desc[i], ds_block_buf(i));
         });
 
         // main body
@@ -825,15 +832,18 @@ struct GridwiseConvPipeline_v1<1, false, true, false, true>
         in_blockwise_copy.MoveSrcSliceWindow(in_grid_desc, in_block_copy_step);
 
         constexpr index_t NumDs = ds_blockwise_copy.Size();
-        using DsDataBlockTransfer0 =
-            std::remove_const_t<remove_cvref_t<decltype(ds_blockwise_copy[I0])>>;
 
         static_for<0, NumDs, 1>{}([&](auto i) {
-            const_cast<DsDataBlockTransfer0&>(ds_blockwise_copy[i])
-                .Run(ds_grid_desc[Number<i>{}],
-                     ds_grid_buf[Number<i>{}],
-                     ds_block_desc[Number<i>{}],
-                     make_tuple(I0, I0, I0),
+            using DDataBlockTransfer =
+                std::remove_const_t<remove_cvref_t<decltype(ds_blockwise_copy[i])>>;
+            using DBlockDesc = remove_cvref_t<decltype(ds_block_desc[i])>;
+            auto d_block_origin_idx =
+                generate_tuple([&](auto) { return I0; }, Number<DBlockDesc::GetNumOfDimension()>{});
+            const_cast<DDataBlockTransfer&>(ds_blockwise_copy[i])
+                .Run(ds_grid_desc[i],
+                     ds_grid_buf[i],
+                     ds_block_desc[i],
+                     d_block_origin_idx,
                      ds_block_buf(i));
         });
 
@@ -967,14 +977,12 @@ struct GridwiseConvPipeline_v1<1, true, false, true, true>
         in_blockwise_copy.MoveSrcSliceWindow(in_grid_desc, in_block_copy_step);
 
         constexpr index_t NumDs = ds_blockwise_copy.Size();
-        using DsDataBlockTransfer0 =
-            std::remove_const_t<remove_cvref_t<decltype(ds_blockwise_copy[I0])>>;
+
         static_for<0, NumDs, 1>{}([&](auto i) {
-            const_cast<DsDataBlockTransfer0&>(ds_blockwise_copy[i])
-                .Run(ds_grid_desc[Number<i>{}],
-                     ds_grid_buf[Number<i>{}],
-                     ds_block_desc[Number<i>{}],
-                     ds_block_buf(i));
+            using DDataBlockTransfer =
+                std::remove_const_t<remove_cvref_t<decltype(ds_blockwise_copy[i])>>;
+            const_cast<DDataBlockTransfer&>(ds_blockwise_copy[i])
+                .Run(ds_grid_desc[i], ds_grid_buf[i], ds_block_desc[i], ds_block_buf(i));
         });
 
         // main body

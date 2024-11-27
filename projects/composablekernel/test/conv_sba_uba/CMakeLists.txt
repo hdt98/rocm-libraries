@@ -3,3 +3,6 @@ target_link_libraries(test_conv_sba_uba PRIVATE utility)
 
 add_test_executable(test_conv_sba_uba_device convsuba_device.cpp)
 target_link_libraries(test_conv_sba_uba_device PRIVATE utility)
+
+add_test_executable(test_conv_device_fma conv_device_fma.cpp)
+target_link_libraries(test_conv_device_fma PRIVATE utility)

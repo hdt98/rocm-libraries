@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2018-2024, Advanced Micro Devices, Inc. All rights reserved.
 
-#ifndef CK_AMD_SBA_HPP
-#define CK_AMD_SBA_HPP
+#ifndef CK_AMD_FMA_FROM_TENSOR_HPP
+#define CK_AMD_FMA_FROM_TENSOR_HPP
 
 #include "data_type.hpp"
 namespace ck {
@@ -629,6 +629,7 @@ struct intrin_fma_from_tensor<4, 4, ChanOff>
         outAcc.template AsType<half4_t>()(Number<0>{}) =
             __builtin_amdgcn_fma_from_tensor_f16_f16_4x4(
                 inAcc1, residual1, residual2, scale, aux_data, clamp);
+        // TODO: permute scale
         outAcc.template AsType<half4_t>()(Number<1>{}) =
             __builtin_amdgcn_fma_from_tensor_f16_f16_4x4(
                 inAcc2, residual3, residual4, scale, aux_data, clamp);
@@ -659,6 +660,7 @@ struct intrin_fma_from_tensor<4, 4, ChanOff>
         outAcc.template AsType<bhalf4_t>()(Number<0>{}) =
             __builtin_amdgcn_fma_from_tensor_bf16_bf16_4x4(
                 inAcc1, residual1, residual2, scale, aux_data, clamp);
+        // TODO: permute scale
         outAcc.template AsType<bhalf4_t>()(Number<1>{}) =
             __builtin_amdgcn_fma_from_tensor_bf16_bf16_4x4(
                 inAcc2, residual3, residual4, scale, aux_data, clamp);
@@ -866,7 +868,7 @@ struct intrin_fma_from_tensor<8, 4, ChanOff>
                                                          scale,
                                                          aux_data,
                                                          clamp);
-
+        // TODO: permute scale
         // second 4x4 tile
         outAcc.template AsType<half4_t>()(Number<1>{}) =
             __builtin_amdgcn_fma_from_tensor_f16_f16_8x4(inAcc1,
@@ -910,6 +912,7 @@ struct intrin_fma_from_tensor<8, 4, ChanOff>
                                                            scale,
                                                            aux_data,
                                                            clamp);
+        // TODO: permute scale
         // second 4x4 tile
         outAcc.template AsType<bhalf4_t>()(Number<1>{}) =
             __builtin_amdgcn_fma_from_tensor_bf16_bf16_8x4(inAcc1,
@@ -922,4 +925,4 @@ struct intrin_fma_from_tensor<8, 4, ChanOff>
 };
 
 } // namespace ck
-#endif
+#endif // CK_AMD_FMA_FROM_TENSOR_HPP

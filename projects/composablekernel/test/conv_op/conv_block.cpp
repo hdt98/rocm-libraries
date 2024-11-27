@@ -290,16 +290,24 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
         using AccDataVec       = typename decltype(wconv_conv)::AccDataVec;
         constexpr auto KRepeat = blockwise_conv.KRepeat;
         const auto waveId      = blockwise_conv.GetWaveIdx();
+        constexpr bool Aco     = blockwise_conv.Aco;
         static_for<0, HRepeat, 1>{}([&](auto h1) {
             static_for<0, WRepeat, 1>{}([&](auto w1) {
                 static_for<0, KRepeat, 1>{}([&](auto k1) {
                     constexpr auto accum_offset = (h1 * WRepeat * KRepeat + w1 * KRepeat + k1) *
                                                   wconv_conv.GetNumAccumComponents();
                     auto& c_vec = accum_thread_buf.GetVectorTypeReference(Number<accum_offset>{});
-                    if constexpr(wconv_conv.GetNumAccumComponents() == 4)
+                    static_assert(wconv_conv.GetNumAccumComponents() >= 4);
+                    if constexpr(Aco)
                     {
-                        const index_t subK = accCompIdx % wconv_conv.GetNumOutputChannels();
+                        // Aco = 1, do swizzle after 2 channels.
+                        using AccSwizzleVec = typename vector_type<AccDataType, 2>::type;
+                        constexpr index_t NumLanePerPair =
+                            (WPerWconv == 2) && (HPerWconv == 4) ? 4 : 2;
 
+                        const index_t subK = accCompIdx % wconv_conv.GetNumOutputChannels() /
+                                             (wconv_conv.GetNumAccumComponents() * NumLanePerPair) *
+                                             (wconv_conv.GetNumAccumComponents() * NumLanePerPair);
                         const index_t offset = (h_block_start + waveId[I0] * HRepeat * HPerWconv +
                                                 h1 * HPerWconv + subH) *
                                                    acc_H_stride +
@@ -308,37 +316,79 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
                                                    acc_W_stride +
                                                (k * KPerBlock + waveId[I2] * KRepeat * KPerWconv +
                                                 k1 * KPerWconv + subK);
-                        *reinterpret_cast<typename AccDataVec::type*>(c + offset) =
-                            c_vec.template AsType<typename AccDataVec::type>()(Number<0>{});
-                    }
-                    else
-                    {
-                        static_assert(wconv_conv.GetNumAccumComponents() == 8, "unexpected value");
-                        // ACO = 0, do swizzle after 4 channels.
-                        using AccSwizzleVec = typename vector_type<AccDataType, 4>::type;
-                        const index_t subK  = accCompIdx % wconv_conv.GetNumOutputChannels() /
-                                             (wconv_conv.GetNumAccumComponents() * 2) *
-                                             (wconv_conv.GetNumAccumComponents() * 2);
-                        const index_t offset = (h_block_start + waveId[I0] * HRepeat * HPerWconv +
-                                                h1 * HPerWconv + subH) *
-                                                   acc_H_stride +
-                                               (w_block_start + waveId[I1] * WRepeat * WPerWconv +
-                                                w1 * WPerWconv + subW) *
-                                                   acc_W_stride +
-                                               (k * KPerBlock + waveId[I2] * KRepeat * KPerWconv +
-                                                k1 * KPerWconv + subK);
-
-                        index_t secOffset = 8;
-                        if constexpr(wconv_conv.GetNumSubTilesPerImageTile() > 1)
-                        {
-                            secOffset =
-                                HPerWconv / wconv_conv.GetNumSubTilesPerImageTile() * acc_H_stride;
-                        }
-                        const index_t swizzleOffset = (lIdx & 1) * 4;
+                        constexpr index_t secOffset =
+                            NumLanePerPair * 2; // 8 channel for 4x2 and 4 channel for others.
+                        const index_t swizzleOffset = (lIdx & (NumLanePerPair - 1)) * 2;
                         *reinterpret_cast<AccSwizzleVec*>(c + offset + swizzleOffset) =
                             c_vec.template AsType<AccSwizzleVec>()(Number<0>{});
                         *reinterpret_cast<AccSwizzleVec*>(c + offset + swizzleOffset + secOffset) =
                             c_vec.template AsType<AccSwizzleVec>()(Number<1>{});
+                        if constexpr(wconv_conv.GetNumAccumComponents() == 8)
+                        {
+                            constexpr index_t tileOffset =
+                                wconv_conv.GetNumSubTilesPerImageTile() == 2 // 8x4
+                                    ? HPerWconv / wconv_conv.GetNumSubTilesPerImageTile() *
+                                          acc_H_stride
+                                    : 8;
+
+                            *reinterpret_cast<AccSwizzleVec*>(c + offset + swizzleOffset +
+                                                              tileOffset) =
+                                c_vec.template AsType<AccSwizzleVec>()(Number<2>{});
+                            *reinterpret_cast<AccSwizzleVec*>(c + offset + swizzleOffset +
+                                                              secOffset + tileOffset) =
+                                c_vec.template AsType<AccSwizzleVec>()(Number<3>{});
+                        }
+                    }
+                    else
+                    {
+                        if constexpr(wconv_conv.GetNumAccumComponents() == 4)
+                        {
+                            const index_t subK = accCompIdx % wconv_conv.GetNumOutputChannels();
+
+                            const index_t offset =
+                                (h_block_start + waveId[I0] * HRepeat * HPerWconv + h1 * HPerWconv +
+                                 subH) *
+                                    acc_H_stride +
+                                (w_block_start + waveId[I1] * WRepeat * WPerWconv + w1 * WPerWconv +
+                                 subW) *
+                                    acc_W_stride +
+                                (k * KPerBlock + waveId[I2] * KRepeat * KPerWconv + k1 * KPerWconv +
+                                 subK);
+                            *reinterpret_cast<typename AccDataVec::type*>(c + offset) =
+                                c_vec.template AsType<typename AccDataVec::type>()(Number<0>{});
+                        }
+                        else
+                        {
+                            static_assert(wconv_conv.GetNumAccumComponents() == 8,
+                                          "unexpected value");
+                            // ACO = 0, do swizzle after 4 channels.
+                            using AccSwizzleVec = typename vector_type<AccDataType, 4>::type;
+                            const index_t subK  = accCompIdx % wconv_conv.GetNumOutputChannels() /
+                                                 (wconv_conv.GetNumAccumComponents() * 2) *
+                                                 (wconv_conv.GetNumAccumComponents() * 2);
+                            const index_t offset =
+                                (h_block_start + waveId[I0] * HRepeat * HPerWconv + h1 * HPerWconv +
+                                 subH) *
+                                    acc_H_stride +
+                                (w_block_start + waveId[I1] * WRepeat * WPerWconv + w1 * WPerWconv +
+                                 subW) *
+                                    acc_W_stride +
+                                (k * KPerBlock + waveId[I2] * KRepeat * KPerWconv + k1 * KPerWconv +
+                                 subK);
+
+                            index_t secOffset = 8;
+                            if constexpr(wconv_conv.GetNumSubTilesPerImageTile() > 1)
+                            {
+                                secOffset = HPerWconv / wconv_conv.GetNumSubTilesPerImageTile() *
+                                            acc_H_stride;
+                            }
+                            const index_t swizzleOffset = (lIdx & 1) * 4;
+                            *reinterpret_cast<AccSwizzleVec*>(c + offset + swizzleOffset) =
+                                c_vec.template AsType<AccSwizzleVec>()(Number<0>{});
+                            *reinterpret_cast<AccSwizzleVec*>(c + offset + swizzleOffset +
+                                                              secOffset) =
+                                c_vec.template AsType<AccSwizzleVec>()(Number<1>{});
+                        }
                     }
                 });
             });

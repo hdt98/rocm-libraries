@@ -82,9 +82,12 @@ class WavegroupSemaphore
 #if defined(CK_USE_AMD_SEMAPHORE_ASM)
         constexpr unsigned imm = SemId | (waveIdInWavegroup << 4) | (1 << 8);
         asm("s_sema_signal %0" : : "n"(imm) : "memory");
+        ignore = count;
 #else
         __builtin_amdgcn_s_sema_signal(&_sema, count);
 #endif
+#else
+        ignore = count;
 #endif
     }
 

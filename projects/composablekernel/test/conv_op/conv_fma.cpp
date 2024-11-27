@@ -35,8 +35,6 @@ using OutElementOp = ck::tensor_operation::element_wise::UnaryConvert;
 #define DEFAULT_C 32
 #define DEFAULT_W 8
 #define DEFAULT_H 16
-#define DEFAULT_W_1K 48
-#define DEFAULT_H_1K 32
 
 enum ShapeType
 {
@@ -70,7 +68,7 @@ __global__ void __launch_bounds__(64, 1) conv_fma(const InDataType* in_, AccData
 {
     constexpr auto wconvConv =
         ck::WconvConv<InDataType, InDataType, AccDataType, HPerWconv, WPerWconv, 1, 1, 1>();
-    constexpr ck::WconvFmaFromTensor<InDataType, AccDataType, HPerWconv, WPerWconv> wconvFma;
+    constexpr ck::WconvFmaFromTensor<InDataType, AccDataType, HPerWconv, WPerWconv> wconv_fma;
 
     auto in = reinterpret_cast<const typename decltype(wconvConv)::KernelInDataType*>(in_);
 
@@ -100,7 +98,7 @@ __global__ void __launch_bounds__(64, 1) conv_fma(const InDataType* in_, AccData
                                              AccVectorCount,
                                              wconvConv.GetNumAccumComponents(),
                                              true>;
-    using ScaleDataVec  = typename decltype(wconvFma)::ScaleDataVec::type;
+    using ScaleDataVec  = typename decltype(wconv_fma)::ScaleDataVec::type;
 
     const int lIdx = threadIdx.x;
 
@@ -145,15 +143,15 @@ __global__ void __launch_bounds__(64, 1) conv_fma(const InDataType* in_, AccData
             return *reinterpret_cast<const InDataVec*>(in + offset);
         }
     };
-    constexpr index_t ACO = wconvFma.GetAccumChannelOrder();
+    constexpr index_t Aco = wconv_fma.GetAccumChannelOrder();
     auto store_acc_data   = [&](index_t h, index_t w, index_t k, AccDataVec& c_vec) {
         const index_t subW = (accCompIdx / wconvConv.GetNumOutputChannels()) % WPerWconv;
         const index_t subH = (accCompIdx / wconvConv.GetNumOutputChannels()) / WPerWconv;
 
         static_assert(wconvConv.GetNumAccumComponents() >= 4);
-        if constexpr(ACO)
+        if constexpr(Aco)
         {
-            // ACO = 1, do swizzle after 2 channels.
+            // Aco = 1, do swizzle after 2 channels.
             using AccSwizzleVec              = typename vector_type<AccDataType, 2>::type;
             constexpr index_t NumLanePerPair = (WPerWconv == 2) && (HPerWconv == 4) ? 4 : 2;
 
@@ -198,7 +196,7 @@ __global__ void __launch_bounds__(64, 1) conv_fma(const InDataType* in_, AccData
             else
             {
                 static_assert(wconvConv.GetNumAccumComponents() == 8, "unexpected value");
-                // ACO = 0, do swizzle after 4 channels.
+                // Aco = 0, do swizzle after 4 channels.
                 using AccSwizzleVec = typename vector_type<AccDataType, 4>::type;
                 const index_t subK  = accCompIdx % wconvConv.GetNumOutputChannels() /
                                      (wconvConv.GetNumAccumComponents() * 2) *
@@ -221,17 +219,17 @@ __global__ void __launch_bounds__(64, 1) conv_fma(const InDataType* in_, AccData
     };
 
     __syncthreads();
-    constexpr index_t numAccum = wconvFma.GetNumAccum();
+    constexpr index_t numAccum = wconv_fma.GetNumAccum();
     static_assert(KRepeat % numAccum == 0);
     // Do conv fma
     static_for<0, HRepeat, 1>{}([&](auto h) {
         static_for<0, WRepeat, 1>{}([&](auto w) {
             static_for<0, KRepeat, numAccum>{}([&](auto k) {
-                AccVec c_thread_buf_   = {};
-                auto& c_vec            = c_thread_buf_.GetVectorTypeReference(Number<0>{});
-                AccDataVec::type accum = {};
-                ScaleDataVec scale     = {};
-                if constexpr(wconvFma.GetNumScaleComponents() == 1)
+                AccVec c_thread_buf_            = {};
+                auto& c_vec                     = c_thread_buf_.GetVectorTypeReference(Number<0>{});
+                typename AccDataVec::type accum = {};
+                ScaleDataVec scale              = {};
+                if constexpr(wconv_fma.GetNumScaleComponents() == 1)
                 {
                     scale = 1.0;
                 }
@@ -243,7 +241,7 @@ __global__ void __launch_bounds__(64, 1) conv_fma(const InDataType* in_, AccData
 
                 InDataVec in_tile_data1 = {};
                 InDataVec in_tile_data2 = {};
-                if constexpr(wconvFma.GetNumResidual() == 4)
+                if constexpr(wconv_fma.GetNumResidual() == 4)
                 {
                     InDataVec in_tile_data3 = {};
                     InDataVec in_tile_data4 = {};
@@ -253,27 +251,27 @@ __global__ void __launch_bounds__(64, 1) conv_fma(const InDataType* in_, AccData
                     in_tile_data2       = load_in_data(h, w, c + 1);
                     in_tile_data3       = load_in_data(h, w, c + 2);
                     in_tile_data4       = load_in_data(h, w, c + 3);
-                    wconvFma.fma_instr.Run(accum,
-                                           in_tile_data1,
-                                           in_tile_data2,
-                                           in_tile_data3,
-                                           in_tile_data4,
-                                           scale,
-                                           c_vec);
+                    wconv_fma.fma_instr.Run(accum,
+                                            in_tile_data1,
+                                            in_tile_data2,
+                                            in_tile_data3,
+                                            in_tile_data4,
+                                            scale,
+                                            c_vec);
                 }
-                else if constexpr(wconvFma.GetNumResidual() == 2)
+                else if constexpr(wconv_fma.GetNumResidual() == 2)
                 {
                     static_assert(CRepeat == 2 * KRepeat);
                     constexpr index_t c = k * 2;
                     in_tile_data1       = load_in_data(h, w, c);
                     in_tile_data2       = load_in_data(h, w, c + 1);
-                    wconvFma.fma_instr.Run(accum, in_tile_data1, in_tile_data2, scale, c_vec);
+                    wconv_fma.fma_instr.Run(accum, in_tile_data1, in_tile_data2, scale, c_vec);
                 }
-                else if constexpr(wconvFma.GetNumResidual() == 1)
+                else if constexpr(wconv_fma.GetNumResidual() == 1)
                 {
                     constexpr index_t c = k / numAccum;
                     in_tile_data1       = load_in_data(h, w, c);
-                    wconvFma.fma_instr.Run(accum, in_tile_data1, scale, c_vec);
+                    wconv_fma.fma_instr.Run(accum, in_tile_data1, scale, c_vec);
                 }
 
                 store_acc_data(h, w, k, c_vec);
@@ -543,10 +541,8 @@ bool run_test()
     {
         return true;
     }
-    constexpr ck::index_t FilterSize   = 1;
-    constexpr ck::index_t HPerWconv    = (Shape == Shape_8X4) ? 8 : 4;
-    constexpr ck::index_t WPerWconv    = (Shape == Shape_4X2) ? 2 : 4;
-    constexpr ck::index_t DilationSize = 1;
+    constexpr ck::index_t HPerWconv = (Shape == Shape_8X4) ? 8 : 4;
+    constexpr ck::index_t WPerWconv = (Shape == Shape_4X2) ? 2 : 4;
 
     constexpr ck::index_t Width          = DEFAULT_W;
     constexpr ck::index_t Height         = DEFAULT_H;
@@ -579,8 +575,6 @@ bool run_test()
                                           pads_0};
 
     constexpr auto NDimSpatial = ck::Number<n_dim>{};
-    const auto in_element_op   = InElementOp{};
-    const auto out_element_op  = OutElementOp{};
 
     namespace ctc   = ck::tensor_layout::convolution;
     auto in_layout  = ctc::GNHWC{};
@@ -609,8 +603,6 @@ bool run_test()
 
     std::array<ck::index_t, NDimSpatial + 3> a_g_n_c_wis_lengths{};
     std::array<ck::index_t, NDimSpatial + 3> a_g_n_c_wis_strides{};
-    std::array<ck::index_t, NDimSpatial + 3> b_g_k_c_xs_lengths{};
-    std::array<ck::index_t, NDimSpatial + 3> b_g_k_c_xs_strides{};
     std::array<ck::index_t, NDimSpatial + 3> e_g_n_k_wos_lengths{};
     std::array<ck::index_t, NDimSpatial + 3> e_g_n_k_wos_strides{};
     std::array<ck::index_t, NDimSpatial> conv_filter_strides{};
@@ -680,7 +672,7 @@ bool run_test()
         }
         else
         {
-            auto in2 = in.CopyAsType<GPUAccType>();
+            auto in2 = in.template CopyAsType<GPUAccType>();
             bool ret = ck::utils::check_err(out_device,
                                             in2,
                                             "Error: incorrect results!",
@@ -780,7 +772,6 @@ int main(int argc, char* argv[])
         return -1;
     }
 
-    getchar();
     // clang-format off
     //                  |SrcType     |GPUAccType  |CPUAccType
     pass &= run_test_fmt<ck::half_t,  float,       float,      0x1   >();

@@ -200,8 +200,10 @@ struct AddMultiply
 struct MultiplyAdd
 {
     template <typename E, typename C, typename D0, typename D1>
-    __host__ __device__ void operator()(E& e, const C& c, const D0& d0, const D1& d1) const;
-
+    __host__ __device__ void operator()(E& e, const C& c, const D0& d0, const D1& d1) const
+    {
+        e = type_convert<D0>(c) * d0 + d1;
+    }
     template <>
     __host__ __device__ void operator()<half_t, half_t, half_t, half_t>(half_t& e,
                                                                         const half_t& c,
@@ -241,6 +243,24 @@ struct MultiplyAdd
     template <>
     __host__ __device__ void operator()<half_t, float, float, float>(half_t& e,
                                                                      const float& c,
+                                                                     const float& d0,
+                                                                     const float& d1) const
+    {
+        const float y = c * d0 + d1;
+        e             = y;
+    }
+    template <>
+    __host__ __device__ void operator()<float, half_t, float, float>(float& e,
+                                                                     const half_t& c,
+                                                                     const float& d0,
+                                                                     const float& d1) const
+    {
+        const float y = c * d0 + d1;
+        e             = y;
+    }
+    template <>
+    __host__ __device__ void operator()<float, int8_t, float, float>(float& e,
+                                                                     const int8_t& c,
                                                                      const float& d0,
                                                                      const float& d1) const
     {

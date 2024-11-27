@@ -13,7 +13,8 @@ template <typename InDataType,
           typename AccDataType,
           index_t HPerWconv,
           index_t WPerWconv,
-          index_t ChanOff = 0>
+          index_t ChanOff = 0,
+          bool WaveGroup  = false>
 struct WconvFmaFromTensor
 {
     static constexpr index_t WaveSize = 32;
@@ -95,6 +96,26 @@ struct WconvFmaFromTensor
         {
             return 1;
         }
+    }
+
+    static __device__ index_t GetLaneId()
+    {
+        if constexpr(WaveGroup == false)
+        {
+            return get_thread_local_1d_id() & (WaveSize - 1);
+        }
+        else
+        {
+            return get_lane_id();
+        }
+    }
+
+    // k0:repeat_number KPerWconv:k_number per instruction
+    static constexpr auto CalculateScaleThreadOriginDataIndex(ck::index_t KPerWconv)
+    {
+        constexpr auto perThreadNumber = GetNumScaleComponents();
+        auto K_offset                  = GetLaneId() % (KPerWconv / perThreadNumber);
+        return make_tuple(K_offset, 0);
     }
 
     using ScaleDataVec = vector_type<AccDataType, GetNumScaleComponents()>;

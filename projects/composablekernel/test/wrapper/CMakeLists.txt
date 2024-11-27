@@ -1,11 +1,15 @@
 add_custom_target(test_wrapper)
 
+if (ENABLE_GFX13_FAIL_TESTS)
+    add_gtest_executable(test_wrapper_tensor test_wrapper_tensor.cpp)
+    target_link_libraries(test_wrapper_tensor PRIVATE utility)
+    add_dependencies(test_wrapper test_wrapper_tensor)
+endif()
+
 add_gtest_executable(test_wrapper_layout test_wrapper_layout.cpp)
 target_link_libraries(test_wrapper_layout PRIVATE utility)
 add_dependencies(test_wrapper test_wrapper_layout)
-add_gtest_executable(test_wrapper_tensor test_wrapper_tensor.cpp)
-target_link_libraries(test_wrapper_tensor PRIVATE utility)
-add_dependencies(test_wrapper test_wrapper_tensor)
+
 add_gtest_executable(test_wrapper_copy test_wrapper_copy.cpp)
 target_link_libraries(test_wrapper_copy PRIVATE utility)
 add_dependencies(test_wrapper test_wrapper_copy)

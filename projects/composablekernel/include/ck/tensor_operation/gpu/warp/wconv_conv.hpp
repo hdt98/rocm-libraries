@@ -1069,19 +1069,28 @@ struct WconvConv
         const index_t accCompIdx = laneId * GetNumAccumComponents() / GetNumSubTilesPerImageTile();
         const index_t subW       = (accCompIdx / GetNumOutputChannels()) % WPerWconv;
         const index_t subH       = (accCompIdx / GetNumOutputChannels()) / WPerWconv;
-        const index_t subK       = accCompIdx % GetNumOutputChannels();
-        // TODO: modify it if ACO = 1
-        constexpr index_t SwizzleComp = 4;
-        const index_t subK_8          = (laneId & 1) * SwizzleComp;
 
-        static_assert(Aco == 0, "");
-        if constexpr(GetNumAccumComponents() == 4)
+        if constexpr(Aco == 0)
         {
-            return make_tuple(0, subH, subW, 0, subK);
+            constexpr index_t SwizzleComp = 4;
+            const index_t subK            = accCompIdx % GetNumOutputChannels();
+            const index_t subK_8          = (laneId & 1) * SwizzleComp;
+
+            if constexpr(GetNumAccumComponents() == 4)
+            {
+                return make_tuple(0, subH, subW, 0, subK);
+            }
+            else
+            {
+                return make_tuple(0, subH, subW, 0, subK_8);
+            }
         }
         else
         {
-            return make_tuple(0, subH, subW, 0, subK_8);
+            constexpr index_t SwizzleComp    = 2;
+            constexpr index_t NumLanePerPair = (WPerWconv == 2) && (HPerWconv == 4) ? 4 : 2;
+            const index_t subK               = (laneId & (NumLanePerPair - 1)) * SwizzleComp;
+            return make_tuple(0, subH, subW, 0, subK);
         }
     }
     template <typename DataType_>

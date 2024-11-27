@@ -51,7 +51,7 @@ struct sba_type<SbaInstr::sba_f32, auxdata, 0, 1>
     template <class FloatAcc>
     __device__ void Run(const FloatAcc& inAcc,
                         const float& scale,
-                        const float& bias, // unused
+                        const float&, // unused
                         FloatAcc& outSba) const
     {
 #if defined(__gfx13__)
@@ -59,7 +59,6 @@ struct sba_type<SbaInstr::sba_f32, auxdata, 0, 1>
 #else
         ignore = inAcc;
         ignore = scale;
-        ignore = bias;
         ignore = outSba;
 #endif
     }
@@ -71,7 +70,7 @@ struct sba_type<SbaInstr::sba_f32, auxdata, 1, 0>
 {
     template <class FloatAcc>
     __device__ void Run(const FloatAcc& inAcc,
-                        const float& scale, // unused
+                        const float&, // unused
                         const float& scalebias,
                         FloatAcc& outSba) const
     {
@@ -111,7 +110,7 @@ struct sba_type<SbaInstr::sba_half, auxdata, 0, 1>
     template <class FloatAcc>
     __device__ void Run(const FloatAcc& inAcc,
                         const half& scale,
-                        const half2_t& bias, // unused
+                        const half2_t&, // unused
                         FloatAcc& outSba) const
     {
 #if defined(__gfx13__)
@@ -130,7 +129,7 @@ struct sba_type<SbaInstr::sba_half, auxdata, 1, 0>
 {
     template <class FloatAcc>
     __device__ void Run(const FloatAcc& inAcc,
-                        const half& scale, // unused
+                        const half&, // unused
                         const half2_t& bias,
                         FloatAcc& outSba) const
     {
@@ -170,7 +169,7 @@ struct sba_type<SbaInstr::sba_bf16, auxdata, 0, 1>
     template <class FloatAcc>
     __device__ void Run(const FloatAcc& inAcc,
                         const bhalf_t& scale,
-                        const bhalf2_t& bias, // unused
+                        const bhalf2_t&, // unused
                         FloatAcc& outSba) const
     {
 #if defined(__gfx13__)
@@ -178,7 +177,6 @@ struct sba_type<SbaInstr::sba_bf16, auxdata, 0, 1>
 #else
         ignore = inAcc;
         ignore = scale;
-        ignore = bias;
         ignore = outSba;
 #endif
     }
@@ -190,7 +188,7 @@ struct sba_type<SbaInstr::sba_bf16, auxdata, 1, 0>
 {
     template <class FloatAcc>
     __device__ void Run(const FloatAcc& inAcc,
-                        const bhalf_t& scale, // unused
+                        const bhalf_t&, // unused
                         const bhalf2_t& bias,
                         FloatAcc& outSba) const
     {
@@ -233,7 +231,7 @@ struct sba_type<SbaInstr::sba_scatter2_half, auxdata, 0, 1>
     template <class FloatAcc>
     __device__ void Run(const FloatAcc& inAcc,
                         const half& scale,
-                        const half2_t& bias, // unused
+                        const half2_t&, // unused
                         half2_t& outSba_0,
                         half2_t& outSba_1) const
     {
@@ -242,7 +240,6 @@ struct sba_type<SbaInstr::sba_scatter2_half, auxdata, 0, 1>
 #else
         ignore = inAcc;
         ignore = scale;
-        ignore = bias;
         ignore = outSba_0;
         ignore = outSba_1;
 #endif
@@ -254,7 +251,7 @@ struct sba_type<SbaInstr::sba_scatter2_half, auxdata, 1, 0>
 {
     template <class FloatAcc>
     __device__ void Run(const FloatAcc& inAcc,
-                        const half& scale, // unused
+                        const half&, // unused
                         const half2_t& bias,
                         half2_t& outSba_0,
                         half2_t& outSba_1) const
@@ -263,7 +260,6 @@ struct sba_type<SbaInstr::sba_scatter2_half, auxdata, 1, 0>
         intrin_sba_scatter2_half<auxdata, 1, 0>::Run(inAcc, bias, outSba_0, outSba_1);
 #else
         ignore = inAcc;
-        ignore = scale;
         ignore = bias;
         ignore = outSba_0;
         ignore = outSba_1;
@@ -300,7 +296,7 @@ struct sba_type<SbaInstr::sba_scatter2_bf16, auxdata, 0, 1>
     template <class FloatAcc>
     __device__ void Run(const FloatAcc& inAcc,
                         const bhalf_t& scale,
-                        const bhalf2_t& bias, // unused
+                        const bhalf2_t&, // unused
                         bhalf2_t& outSba_0,
                         bhalf2_t& outSba_1) const
     {
@@ -309,7 +305,6 @@ struct sba_type<SbaInstr::sba_scatter2_bf16, auxdata, 0, 1>
 #else
         ignore = inAcc;
         ignore = scale;
-        ignore = bias;
         ignore = outSba_0;
         ignore = outSba_1;
 #endif
@@ -321,7 +316,7 @@ struct sba_type<SbaInstr::sba_scatter2_bf16, auxdata, 1, 0>
 {
     template <class FloatAcc>
     __device__ void Run(const FloatAcc& inAcc,
-                        const bhalf_t& scale, // unused
+                        const bhalf_t&, // unused
                         const bhalf2_t& bias,
                         bhalf2_t& outSba_0,
                         bhalf2_t& outSba_1) const
@@ -330,7 +325,6 @@ struct sba_type<SbaInstr::sba_scatter2_bf16, auxdata, 1, 0>
         intrin_sba_scatter2_bhalf<auxdata, 1, 0>::Run(inAcc, bias, outSba_0, outSba_1);
 #else
         ignore = inAcc;
-        ignore = scale;
         ignore = bias;
         ignore = outSba_0;
         ignore = outSba_1;
@@ -391,7 +385,8 @@ template <typename AccDataType,
           index_t WPerWconv,
           index_t activeFun,
           bool scaleBiasPacked,
-          bool uniformScale>
+          bool uniformScale,
+          bool Aco = false>
 struct AccSba
 {
     __host__ __device__ constexpr AccSba(){};
@@ -514,12 +509,17 @@ struct AccSba
         // int 4X4X8  = 1;
         // int 4X4X16 = 2;
         // int 4X2X16 = 3;
+        // aux_data[ 5: 0] maps to instr[ 63: 58] for VOP2M-VOP6M (MOD0)
+        // aux_data[17: 6] maps to instr[ 87: 76] for VOP3M-VOP5M (MOD1)
+        // aux_data[13: 6] maps to instr[ 83: 76] for VOP6M       (MOD1)
+        // aux_data[25:18] maps to instr[127:120] for VOP5M-VOP6M (MOD2)
+        constexpr index_t AcoFlag = Aco ? (1 << (6 + 1)) : 0;
         if constexpr((HPerWconv == 8) && (WPerWconv == 4))
-            return 0 | (activeFun << 8) | (scaleBiasPacked << 26);
+            return 0 | (activeFun << 8) | (scaleBiasPacked << 26) | AcoFlag;
         else if constexpr((HPerWconv == 4) && (WPerWconv == 4))
-            return 1 | (activeFun << 8) | (scaleBiasPacked << 26);
+            return 1 | (activeFun << 8) | (scaleBiasPacked << 26) | AcoFlag;
         else if constexpr((HPerWconv == 4) && (WPerWconv == 2))
-            return 3 | (activeFun << 8) | (scaleBiasPacked << 26);
+            return 3 | (activeFun << 8) | (scaleBiasPacked << 26) | AcoFlag;
         static_assert("unsupport shape.");
     };
 

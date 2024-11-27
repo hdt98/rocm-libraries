@@ -39,6 +39,7 @@ template <index_t NDimSpatial,
           typename InElementwiseOperation,
           typename WeiElementwiseOperation,
           typename AccElementwiseOperation,
+          typename AccBlockwiseOperation,
           ConvolutionForwardSpecialization ConvForwardSpecialization,
           index_t NumPrefetch,
           index_t BlockSize,
@@ -53,9 +54,6 @@ template <index_t NDimSpatial,
           index_t FilterSize,
           index_t DilationX,
           index_t DilationY,
-          index_t activeFun,
-          bool scaleBiasPacked,
-          bool uniformScale,
           typename InBlockTransferThreadClusterLengths,
           index_t InBlockTransferSrcScalarPerVector,
           index_t InBlockTransferDstScalarPerVector,
@@ -67,15 +65,17 @@ template <index_t NDimSpatial,
           bool WeiEnableLds,
           bool WeiBlockLdsAddExtraM,
           typename DsBlockTransferThreadClusterLengths,
-          index_t DsBlockTransferSrcScalarPerVector,
-          index_t DsBlockTransferDstScalarPerVector,
+          typename DsBlockTransferSrcScalarPerVector,
+          typename DsBlockTransferDstScalarPerVector,
           bool DsEnableLds,
           bool DsBlockLdsAddExtraM,
           typename AccBlockTransferClusterLengths,
           index_t AccBlockTransferScalarPerVector,
           bool AccEnableLds,
           bool EnableAsync,
-          bool EnableWaveGroup>
+          bool EnableWaveGroup,
+          bool ShuffleOnLoad = false,
+          bool Transposed    = false>
 struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
                                                                     InLayout,
                                                                     WeiLayout,
@@ -91,7 +91,10 @@ struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
 {
     using DeviceOp = DeviceConvSubaWconv;
     static constexpr auto conv_to_wconv_transformer =
-        TransformConvFwdToWconv<NDimSpatial, false, false, ConvForwardSpecialization>{};
+        TransformConvFwdToWconv<NDimSpatial,
+                                ShuffleOnLoad,
+                                Transposed,
+                                ConvForwardSpecialization>{};
 
     static constexpr auto I0 = Number<0>{};
     static constexpr auto I1 = Number<1>{};
@@ -101,14 +104,20 @@ struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
     static constexpr auto I5 = Number<5>{};
     static constexpr auto I6 = Number<6>{};
 
-    static constexpr index_t NumDTensor = DsDataType::Size();
+    static constexpr index_t NumDTensor         = DsDataType::Size();
+    static constexpr bool ShuffleConv2          = ShuffleOnLoad && (Transposed == false);
+    static constexpr bool ShuffleTransposeConv2 = ShuffleOnLoad && Transposed;
 
-    static constexpr index_t GridFilterSize = (FilterSize == 2) ? 1 : FilterSize;
-    static constexpr index_t GridHPerBlock  = (FilterSize == 2) ? HPerBlock / 2 : HPerBlock;
-    static constexpr index_t GridWPerBlock  = (FilterSize == 2) ? WPerBlock / 2 : WPerBlock;
-    static constexpr index_t GridCPerBlock  = (FilterSize == 2) ? CPerBlock * 4 : CPerBlock;
-    static constexpr index_t GridHRepeat    = (FilterSize == 2) ? HRepeat / 2 : HRepeat;
-    static constexpr index_t GridWRepeat    = (FilterSize == 2) ? WRepeat / 2 : WRepeat;
+    static constexpr index_t GridFilterSize = ShuffleOnLoad ? 1 : FilterSize;
+    static constexpr index_t GridTransposed = ShuffleOnLoad ? false : Transposed;
+    static constexpr index_t GridHPerBlock  = ShuffleConv2 ? HPerBlock / 2 : HPerBlock;
+    static constexpr index_t GridWPerBlock  = ShuffleConv2 ? WPerBlock / 2 : WPerBlock;
+    static constexpr index_t GridCPerBlock  = ShuffleConv2 ? CPerBlock * 4 : CPerBlock;
+    static constexpr index_t GridHRepeat    = ShuffleConv2 ? HRepeat / 2 : HRepeat;
+    static constexpr index_t GridWRepeat    = ShuffleConv2 ? WRepeat / 2 : WRepeat;
+    static constexpr index_t HPerBlockOut   = ShuffleConv2 ? HPerBlock / 2 : HPerBlock;
+    static constexpr index_t WPerBlockOut   = ShuffleConv2 ? WPerBlock / 2 : WPerBlock;
+    static constexpr index_t GridKPerBlock  = ShuffleTransposeConv2 ? KPerBlock * 4 : KPerBlock;
 
     // Describe how data read from Global memory
     static auto
@@ -137,12 +146,21 @@ struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
                 input_left_pads,
                 input_right_pads);
 
+#ifdef ENABLE_CONST_LAYOUT
         // H W C with pad
-        const auto in_data_desc =
-            PadTensorDescriptor(in_data_raw_desc,
-                                make_tuple(GridHPerBlock, GridWPerBlock, GridCPerBlock),
-                                Sequence<true, true, true>{});
-        return in_data_desc;
+        if constexpr(is_same_v<InLayout, tensor_layout::convolution::CONST_GNHWC>)
+        {
+            return in_data_raw_desc;
+        }
+        else
+#endif
+        {
+            const auto in_data_desc =
+                PadTensorDescriptor(in_data_raw_desc,
+                                    Sequence<GridHPerBlock, GridWPerBlock, GridCPerBlock>{},
+                                    Sequence<true, true, true>{});
+            return in_data_desc;
+        }
     }
 
     static auto
@@ -152,48 +170,75 @@ struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
         const auto wei_data_raw_desc =
             conv_to_wconv_transformer.template MakeBDescriptor_K_YX_C<WeiLayout>(
                 b_g_k_c_xs_lengths, b_g_k_c_xs_strides);
-
-        const auto wei_data_desc = PadTensorDescriptor(wei_data_raw_desc,
-                                                       make_tuple(KPerBlock, 1, GridCPerBlock),
-                                                       Sequence<true, false, true>{});
-        return wei_data_desc;
+#ifdef ENABLE_CONST_LAYOUT
+        if constexpr(is_same_v<WeiLayout, tensor_layout::convolution::CONST_GKYXC<FilterSize>>)
+        {
+            return wei_data_raw_desc;
+        }
+        else
+#endif
+        {
+            const auto wei_data_desc = PadTensorDescriptor(wei_data_raw_desc,
+                                                           make_tuple(KPerBlock, 1, GridCPerBlock),
+                                                           Sequence<true, false, true>{});
+            return wei_data_desc;
+        }
     }
 
+    template <typename AccLayout_>
     static auto
     MakeAccGridDescriptor(const std::array<index_t, NDimSpatial + 3>& e_g_n_k_wos_lengths,
                           const std::array<index_t, NDimSpatial + 3>& e_g_n_k_wos_strides)
     {
         const auto acc_data_raw_desc =
-            conv_to_wconv_transformer.template MakeCDescriptor_H_W_K<AccLayout>(
+            conv_to_wconv_transformer.template MakeCDescriptor_H_W_K<AccLayout_>(
                 e_g_n_k_wos_lengths, e_g_n_k_wos_strides);
-        const auto acc_data_desc =
-            PadTensorDescriptor(acc_data_raw_desc,
-                                make_tuple(GridHPerBlock, GridWPerBlock, KPerBlock),
-                                Sequence<true, true, true>{});
+#ifdef ENABLE_CONST_LAYOUT
+        if constexpr(is_same_v<AccLayout_, tensor_layout::convolution::CONST_GNHWK>)
+        {
+            return acc_data_raw_desc;
+        }
+        else
+#endif
+        {
+            const auto acc_data_desc =
+                PadTensorDescriptor(acc_data_raw_desc,
+                                    make_tuple(HPerBlockOut, WPerBlockOut, KPerBlock),
+                                    Sequence<true, true, true>{});
 
-        return acc_data_desc;
+            return acc_data_desc;
+        }
     }
 
+    template <typename DLayout_>
     static auto
-    MakeSingleDsGridDescriptor(const std::array<index_t, NDimSpatial + 3>& ds_g_n_k_wos_lengths,
-                               const std::array<index_t, NDimSpatial + 3>&)
+    MakeSingleDGridDescriptor(const std::array<index_t, NDimSpatial + 3>& ds_g_n_k_wos_lengths,
+                              const std::array<index_t, NDimSpatial + 3>& ds_g_n_k_wos_strides)
     {
-        auto conv_in_transformer = [&]() {
-            const index_t K = ds_g_n_k_wos_lengths[2];
+        if constexpr(std::is_same_v<DLayout_, tensor_layout::convolution::G_K>)
+        {
+            auto conv_in_transformer = [&]() {
+                const index_t K = ds_g_n_k_wos_lengths[2];
 
-            const auto KStride = I1;
+                const auto KStride = I1;
 
-            const auto ds_desc = make_naive_tensor_descriptor(make_tuple(K), make_tuple(KStride));
+                const auto ds_desc =
+                    make_naive_tensor_descriptor(make_tuple(K), make_tuple(KStride));
 
-            return ds_desc;
-        };
+                return ds_desc;
+            };
 
-        const auto ds_data_raw_desc = conv_in_transformer();
+            const auto ds_data_raw_desc = conv_in_transformer();
 
-        const auto ds_data_desc =
-            PadTensorDescriptor(ds_data_raw_desc, make_tuple(KPerBlock), Sequence<true>{});
+            const auto ds_data_desc =
+                PadTensorDescriptor(ds_data_raw_desc, make_tuple(KPerBlock), Sequence<true>{});
 
-        return ds_data_desc;
+            return ds_data_desc;
+        }
+        else
+        {
+            return MakeAccGridDescriptor<DLayout_>(ds_g_n_k_wos_lengths, ds_g_n_k_wos_strides);
+        }
     }
 
     // Shape of Ds and E must be aligned. Strides can be different.
@@ -204,17 +249,18 @@ struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
     {
         return generate_tuple(
             [&](auto i) {
-                return MakeSingleDsGridDescriptor(ds_g_n_k_wos_lengths[i], ds_g_n_k_wos_strides[i]);
+                using DLayout = remove_cvref_t<tuple_element_t<i.value, DsLayout>>;
+                return MakeSingleDGridDescriptor<DLayout>(ds_g_n_k_wos_lengths[i],
+                                                          ds_g_n_k_wos_strides[i]);
             },
             Number<NumDTensor>{});
     }
 
     // desc for problem definition
-    using InGridDesc =
-        decltype(DeviceOp::MakeInGridDescriptor({}, {}, {}, {}, {}, {}, {}, {}, {}, {}));
-    using WeiGridDesc = decltype(DeviceOp::MakeWeiGridDescriptor({}, {}));
+    using InGridDesc  = decltype(MakeInGridDescriptor({}, {}, {}, {}, {}, {}, {}, {}, {}, {}));
+    using WeiGridDesc = decltype(MakeWeiGridDescriptor({}, {}));
     using DsGridDesc  = remove_cvref_t<decltype(MakeDsGridDescriptor({}, {}))>;
-    using AccGridDesc = remove_cvref_t<decltype(MakeAccGridDescriptor({}, {}))>;
+    using AccGridDesc = remove_cvref_t<decltype(MakeAccGridDescriptor<AccLayout>({}, {}))>;
 
     // GridwiseConv
     using GridwiseConv = GridwiseConvSuba_Wconvsuba<BlockSize,
@@ -226,9 +272,11 @@ struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
                                                     WeiGridDesc,
                                                     DsGridDesc,
                                                     AccGridDesc,
+                                                    DsLayout,
                                                     InElementwiseOperation,
                                                     WeiElementwiseOperation,
                                                     AccElementwiseOperation,
+                                                    AccBlockwiseOperation,
                                                     GridHPerBlock,
                                                     GridWPerBlock,
                                                     GridCPerBlock,
@@ -240,9 +288,6 @@ struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
                                                     GridFilterSize,
                                                     DilationX,
                                                     DilationY,
-                                                    activeFun,
-                                                    scaleBiasPacked,
-                                                    uniformScale,
                                                     InBlockTransferThreadClusterLengths,
                                                     InBlockTransferSrcScalarPerVector,
                                                     InBlockTransferDstScalarPerVector,
@@ -263,7 +308,8 @@ struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
                                                     AccEnableLds,
                                                     EnableAsync,
                                                     NumPrefetch,
-                                                    EnableWaveGroup>;
+                                                    EnableWaveGroup,
+                                                    GridTransposed>;
 
     // Argument
     struct Argument : public BaseArgument
@@ -295,7 +341,7 @@ struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
               p_acc_grid_{static_cast<AccDataType*>(p_acc)},
               num_group_{a_g_n_c_wis_lengths[0]},
               acc_grid_desc_{
-                  DeviceOp::MakeAccGridDescriptor(e_g_n_k_wos_lengths, e_g_n_k_wos_strides)},
+                  MakeAccGridDescriptor<AccLayout>(e_g_n_k_wos_lengths, e_g_n_k_wos_strides)},
               ds_grid_desc_{},
               in_grid_desc_{DeviceOp::MakeInGridDescriptor(a_g_n_c_wis_lengths,
                                                            a_g_n_c_wis_strides,
@@ -538,10 +584,19 @@ struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
             return false;
         }
 
+        static_assert((ShuffleOnLoad == false) || (FilterSize == 2),
+                      "ShuffleOnLoad only can be used in conv2");
+        static_assert((Transposed == false) || (FilterSize == 2),
+                      "Transposed conv only support conv2 for now.");
         // check ConvolutionForwardSpecialization
-        if constexpr(ConvForwardSpecialization ==
-                     ConvolutionForwardSpecialization::Filter1x1Stride1Pad0)
+        if constexpr(FilterSize == 1)
         {
+            static_assert(ConvForwardSpecialization ==
+                                  ConvolutionForwardSpecialization::Filter1x1Stride1Pad0 ||
+                              ConvForwardSpecialization ==
+                                  ConvolutionForwardSpecialization::Filter1x1Pad0,
+                          "");
+
             // check if it's 1x1, stride=1 conv
             for(index_t i = 0; i < NDimSpatial; ++i)
             {
@@ -556,12 +611,16 @@ struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
                 }
             }
         }
-        else if constexpr((ConvForwardSpecialization ==
-                           ConvolutionForwardSpecialization::Filter2x2Stride2Pad0) ||
-                          (ConvForwardSpecialization ==
-                           ConvolutionForwardSpecialization::Filter2x2Stride2OddHWPad0))
+        else if constexpr(FilterSize == 2)
         {
-            // check if it's 1x1, stride=1 conv
+            static_assert(ConvForwardSpecialization ==
+                                  ConvolutionForwardSpecialization::Filter2x2Stride2Pad0 ||
+                              ConvForwardSpecialization ==
+                                  ConvolutionForwardSpecialization::Filter2x2Stride2OddHWPad0,
+                          "");
+            static_assert(NDimSpatial == 2, "Only support 2d for conv2");
+
+            // check if it's 2x2, stride=2 conv
             for(index_t i = 0; i < NDimSpatial; ++i)
             {
                 const index_t X          = arg.b_g_k_c_xs_lengths_[i + 3];
@@ -575,11 +634,14 @@ struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
                 }
             }
         }
-        else if constexpr((ConvForwardSpecialization ==
-                           ConvolutionForwardSpecialization::Filter3x3Stride1Pad0) ||
-                          (ConvForwardSpecialization ==
-                           ConvolutionForwardSpecialization::Filter3x3Stride1MultiLayerPad0))
+        else if constexpr(FilterSize == 3)
         {
+            static_assert(ConvForwardSpecialization ==
+                                  ConvolutionForwardSpecialization::Filter3x3Stride1Pad0 ||
+                              ConvForwardSpecialization ==
+                                  ConvolutionForwardSpecialization::Filter3x3Stride1MultiLayerPad0,
+                          "");
+
             for(index_t i = 0; i < NDimSpatial; ++i)
             {
                 const index_t X          = arg.b_g_k_c_xs_lengths_[i + 3];
@@ -596,6 +658,7 @@ struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
         }
         else
         {
+            static_assert(0, "un-supported filter size");
             return false;
         }
 
@@ -647,18 +710,21 @@ struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
             using DLayout = remove_cvref_t<tuple_element_t<i.value, DsLayout>>;
 
             // FIXME: layout
-            if constexpr(is_same_v<DLayout, ctc::G_NW_K> || is_same_v<DLayout, ctc::G_NHW_K> ||
-                         is_same_v<DLayout, ctc::G_NDHW_K> || is_same_v<DLayout, ctc::GNWK> ||
-                         is_same_v<DLayout, ctc::GNHWK> || is_same_v<DLayout, ctc::GNDHWK> ||
-                         is_same_v<DLayout, ctc::NWGK> || is_same_v<DLayout, ctc::NHWGK> ||
-                         is_same_v<DLayout, ctc::NDHWGK> || is_same_v<DLayout, ctc::G_K>)
+            if constexpr(is_same_v<DLayout, ctc::NDHWGK> || is_same_v<DLayout, ctc::G_K>)
             {
                 const index_t K = arg.ds_g_n_k_wos_lengths_[i][2];
 
-                if(!(K % DsBlockTransferSrcScalarPerVector == 0))
+                if(!(K % DsBlockTransferSrcScalarPerVector{}[i] == 0))
                 {
                     valid = false;
                 }
+            }
+            else if constexpr(is_same_v<DLayout, ctc::G_NW_K> || is_same_v<DLayout, ctc::G_NHW_K> ||
+                              is_same_v<DLayout, ctc::G_NDHW_K> || is_same_v<DLayout, ctc::GNWK> ||
+                              is_same_v<DLayout, ctc::GNHWK> || is_same_v<DLayout, ctc::GNDHWK> ||
+                              is_same_v<DLayout, ctc::NWGK> || is_same_v<DLayout, ctc::NHWGK>)
+            {
+                // TODO: Validate output size.
             }
             else
             {
@@ -962,9 +1028,6 @@ struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
             << FilterSize << ", "
             << DilationX << ", "
             << DilationY << ", "
-            << activeFun << ", "
-            << scaleBiasPacked << ", "
-            << uniformScale << ">"
             << " InEnableLds: "
             << InEnableLds << ", "
             << "WeiEnableLds: "
@@ -974,7 +1037,11 @@ struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
             << "NumPrefetch: "
             << NumPrefetch << ", "
             << "EnableWaveGroup: "
-            << EnableWaveGroup;
+            << EnableWaveGroup << ", "
+            << "ShuffleOnLoad: "
+            << ShuffleOnLoad << ", "
+            << "Transpose: "
+            << Transposed << ">";
         // clang-format on
 
         return str.str();
