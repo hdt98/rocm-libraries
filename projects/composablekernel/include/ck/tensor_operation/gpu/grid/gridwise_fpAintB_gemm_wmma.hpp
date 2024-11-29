@@ -150,6 +150,8 @@ struct GridwiseFpAintBGemm_Wmma
     static constexpr auto NWaves = NPerBlock / (NRepeat * NPerWmma);
     static constexpr auto WmmaK  = K1 == 16 ? 32 : 16;
 
+    static constexpr auto KPerWmma = 16;
+
     using ThisThreadBlock = ThisThreadBlock<BlockSize>;
 
     using GridwiseGemmPipe =
@@ -834,6 +836,7 @@ struct GridwiseFpAintBGemm_Wmma
                               KPerBlock,
                               MPerWmma,
                               NPerWmma,
+                              KPerWmma,
                               MRepeat,
                               NRepeat,
                               KPack,

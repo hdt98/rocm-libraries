@@ -901,6 +901,7 @@ template <typename src_type_a,
           index_t MPerWmma,
           index_t NPerWmma,
           index_t KPerWmma,
+          index_t KPack,
           bool TransposeC      = false,
           bool AssemblyBackend = false>
 struct WmmaGemm
@@ -920,8 +921,7 @@ struct WmmaGemm
         static_assert(NPerWmma == 16 && MPerWmma == 16,
                       "Only support GemmNPerWmma == 16 and GemmMPerWmma == 16 for wmma");
 
-        static_assert(KPerWmma % wmma_instr.k_per_wmma == 0,
-                      "KPerWmma should be multiple of k_per_wmma");
+        static_assert(KPack % KPerWmma == 0, "KPack should be multiple of k_per_wmma");
     }
 
     // WMMA output supporting C = A * B
@@ -1062,16 +1062,18 @@ struct WmmaGemm
                 ,
             "base type couple must be (half, float), (bhalf, float), (half, half), (bhalf, bhalf), "
             "(int8, int32) or (int4, int32)!");
-        if constexpr(!TransposeC)
-        {
-            wmma_instr.template run<MPerWmma, NPerWmma, KPerWmma>(
-                p_a_wave[I0], p_b_wave[I0], p_c_thread);
-        }
-        else
-        {
-            wmma_instr.template run<MPerWmma, NPerWmma, KPerWmma>(
-                p_b_wave[I0], p_a_wave[I0], p_c_thread);
-        }
+        static_for<0, KPack / KPerWmma, 1>{}([&](auto k) {
+            if constexpr(!TransposeC)
+            {
+                wmma_instr.template run<MPerWmma, NPerWmma, KPerWmma>(
+                    p_a_wave[k], p_b_wave[k], p_c_thread);
+            }
+            else
+            {
+                wmma_instr.template run<MPerWmma, NPerWmma, KPerWmma>(
+                    p_b_wave[k], p_a_wave[k], p_c_thread);
+            }
+        });
     }
 
 #ifdef CK_EXTENSION_MX_TYPE
@@ -1082,18 +1084,20 @@ struct WmmaGemm
                         const int32_t& b_scale_value,
                         FloatC& p_c_thread) const
     {
-        if constexpr(!TransposeC)
-        {
-            wmma_instr
-                .template run<MPerWmma, NPerWmma, src_type_a, src_type_b, AScaleSel, BScaleSel>(
-                    p_a_wave[I0], p_b_wave[I0], a_scale_value, b_scale_value, p_c_thread);
-        }
-        else
-        {
-            wmma_instr
-                .template run<MPerWmma, NPerWmma, src_type_a, src_type_b, AScaleSel, BScaleSel>(
-                    p_b_wave[I0], p_a_wave[I0], a_scale_value, b_scale_value, p_c_thread);
-        }
+        static_for<0, KPack / KPerWmma, 1>{}([&](auto k) {
+            if constexpr(!TransposeC)
+            {
+                wmma_instr
+                    .template run<MPerWmma, NPerWmma, src_type_a, src_type_b, AScaleSel, BScaleSel>(
+                        p_a_wave[k], p_b_wave[k], a_scale_value, b_scale_value, p_c_thread);
+            }
+            else
+            {
+                wmma_instr
+                    .template run<MPerWmma, NPerWmma, src_type_a, src_type_b, AScaleSel, BScaleSel>(
+                        p_b_wave[k], p_a_wave[k], a_scale_value, b_scale_value, p_c_thread);
+            }
+        });
     }
 #endif
 

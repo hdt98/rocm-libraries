@@ -341,9 +341,10 @@ struct GridwiseGemmMultipleD_Wmma
     // K1 should be Number<...>
     static constexpr auto K1 = Number<K1Value>{};
 
-    static constexpr auto MWaves = MPerBlock / (MRepeat * MPerWmma);
-    static constexpr auto NWaves = NPerBlock / (NRepeat * NPerWmma);
-    static constexpr auto WmmaK  = 16;
+    static constexpr auto MWaves   = MPerBlock / (MRepeat * MPerWmma);
+    static constexpr auto NWaves   = NPerBlock / (NRepeat * NPerWmma);
+    static constexpr auto WmmaK    = K1 == 16 ? 32 : 16;
+    static constexpr auto KPerWmma = 16;
 
     using ThisThreadBlock = ThisThreadBlock<BlockSize>;
 
@@ -1159,6 +1160,7 @@ struct GridwiseGemmMultipleD_Wmma
                               KPerBlock,
                               MPerWmma,
                               NPerWmma,
+                              KPerWmma,
                               MRepeat,
                               NRepeat,
                               KPack,

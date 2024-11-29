@@ -109,11 +109,12 @@ struct GridwiseBatchedGemmSoftmaxGemm_Wmma
     static constexpr auto BL0        = Number<L0PerBlock>{};
     static constexpr auto BL1        = Number<L1Value>{};
 
-    static constexpr auto MWaves = MPerBlock / (MRepeat * MPerWmma);
-    static constexpr auto LWaves = LPerBlock / (LRepeat * LPerWmma);
-    static constexpr auto NWaves = NPerBlock / (NRepeat * NPerWmma);
-    static constexpr auto WmmaK  = 16;
-    static constexpr auto WmmaL  = 16;
+    static constexpr auto MWaves   = MPerBlock / (MRepeat * MPerWmma);
+    static constexpr auto LWaves   = LPerBlock / (LRepeat * LPerWmma);
+    static constexpr auto NWaves   = NPerBlock / (NRepeat * NPerWmma);
+    static constexpr auto WmmaK    = 16;
+    static constexpr auto WmmaL    = 16;
+    static constexpr auto KPerWmma = 16;
 
     using ThisThreadBlock = ThisThreadBlock<BlockSize>;
 
@@ -937,6 +938,7 @@ struct GridwiseBatchedGemmSoftmaxGemm_Wmma
             KPerBlock,
             MPerWmma,
             LPerWmma,
+            KPerWmma,
             MRepeat,
             LRepeat,
             KPack,
@@ -1184,6 +1186,7 @@ struct GridwiseBatchedGemmSoftmaxGemm_Wmma
                               LTilePerBlock,
                               MPerWmma,
                               NPerWmma,
+                              KPerWmma,
                               MRepeat,
                               NRepeat,
                               KPack,

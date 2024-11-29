@@ -25,6 +25,7 @@ template <index_t BlockSize,
           index_t KPerBlock,
           index_t MPerWMMA,
           index_t NPerWMMA,
+          index_t KPerWMMA,
           index_t MRepeat,
           index_t NRepeat,
           index_t KPack,
@@ -57,7 +58,7 @@ struct BlockwiseGemmWMMA
     static constexpr auto I3    = Number<3>{};
     static constexpr auto I4    = Number<4>{};
     static constexpr auto I5    = Number<5>{};
-    static constexpr auto WmmaK = Number<KPack>{};
+    static constexpr auto WmmaK = Number<KPerWMMA>{};
 
     using ThisThreadBlock = ThisThreadBlock<BlockSize>;
 
@@ -74,7 +75,7 @@ struct BlockwiseGemmWMMA
     static constexpr index_t B_K1 = BBlockDesc{}.GetLength(I5);
 
     static constexpr auto wmma_gemm =
-        WmmaGemm<FloatA, FloatB, FloatAcc, MPerWMMA, NPerWMMA, KPack, TransposeC>{};
+        WmmaGemm<FloatA, FloatB, FloatAcc, MPerWMMA, NPerWMMA, KPerWMMA, KPack, TransposeC>{};
 
     static constexpr index_t MWaves = MPerBlock / (MRepeat * MPerWMMA);
     static constexpr index_t NWaves = NPerBlock / (NRepeat * NPerWMMA);
@@ -547,6 +548,7 @@ template <index_t BlockSize,
           index_t KPerBlock,
           index_t MPerWMMA,
           index_t NPerWMMA,
+          index_t KPerWMMA,
           index_t MRepeat,
           index_t NRepeat,
           index_t KPack,
@@ -564,6 +566,7 @@ struct BlockwiseMXGemmWMMA : public BlockwiseGemmWMMA<BlockSize,
                                                       KPerBlock,
                                                       MPerWMMA,
                                                       NPerWMMA,
+                                                      KPerWMMA,
                                                       MRepeat,
                                                       NRepeat,
                                                       KPack,
@@ -582,6 +585,7 @@ struct BlockwiseMXGemmWMMA : public BlockwiseGemmWMMA<BlockSize,
                                      KPerBlock,
                                      MPerWMMA,
                                      NPerWMMA,
+                                     KPerWMMA,
                                      MRepeat,
                                      NRepeat,
                                      KPack,
@@ -663,6 +667,7 @@ struct BlockwiseMXGemmWMMA : public BlockwiseGemmWMMA<BlockSize,
                             KPerBlock,
                             MPerWMMA,
                             NPerWMMA,
+                            KPerWMMA,
                             MRepeat,
                             NRepeat,
                             KPack,
@@ -1126,6 +1131,7 @@ template <index_t BlockSize,
           index_t KPerBlock,
           index_t MPerWMMA,
           index_t NPerWMMA,
+          index_t KPerWMMA,
           index_t MRepeat,
           index_t NRepeat,
           index_t KPack,
@@ -1176,7 +1182,7 @@ struct BlockwiseGemmWMMA
     static constexpr index_t B_K1   = BBlockDesc{}.GetLength(I5);
 
     static constexpr auto wmma_gemm =
-        WmmaGemm<FloatA, FloatB, FloatAcc, MPerWMMA, NPerWMMA, KPack, TransposeC>{};
+        WmmaGemm<FloatA, FloatB, FloatAcc, MPerWMMA, NPerWMMA, KPerWMMA, KPack, TransposeC>{};
 
     static constexpr index_t MWaves = MPerBlock / (MRepeat * MPerWMMA);
     static constexpr index_t NWaves = NPerBlock / (NRepeat * NPerWMMA);
@@ -1666,6 +1672,7 @@ template <index_t BlockSize,
           index_t KPerBlock,
           index_t MPerWMMA,
           index_t NPerWMMA,
+          index_t KPerWMMA,
           index_t MRepeat,
           index_t NRepeat,
           index_t KPack,
@@ -1683,6 +1690,7 @@ struct BlockwiseMXGemmWMMA : public BlockwiseGemmWMMA<BlockSize,
                                                       KPerBlock,
                                                       MPerWMMA,
                                                       NPerWMMA,
+                                                      KPerWMMA,
                                                       MRepeat,
                                                       NRepeat,
                                                       KPack,

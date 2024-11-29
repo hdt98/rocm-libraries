@@ -62,16 +62,16 @@ __global__ void
                                                   c_element_op,
                                                   block_2_ctile_map);
 #else
-    ignore                      = p_a_grid;
-    ignore                      = p_b_grid;
-    ignore                      = p_c_grid;
-    ignore                      = a_grid_desc;
-    ignore                      = b_grid_desc;
-    ignore                      = c_grid_desc_mblock_mperblock_nblock_nperblock;
-    ignore                      = a_element_op;
-    ignore                      = b_element_op;
-    ignore                      = c_element_op;
-    ignore                      = block_2_ctile_map;
+    ignore = p_a_grid;
+    ignore = p_b_grid;
+    ignore = p_c_grid;
+    ignore = a_grid_desc;
+    ignore = b_grid_desc;
+    ignore = c_grid_desc_mblock_mperblock_nblock_nperblock;
+    ignore = a_element_op;
+    ignore = b_element_op;
+    ignore = c_element_op;
+    ignore = block_2_ctile_map;
 #endif
 }
 
@@ -128,20 +128,20 @@ __global__ void
                                                   c_element_op,
                                                   block_2_ctile_map);
 #else
-    ignore                      = p_a_grid;
-    ignore                      = p_b_grid;
-    ignore                      = p_a_scale;
-    ignore                      = p_b_scale;
-    ignore                      = p_c_grid;
-    ignore                      = a_grid_desc;
-    ignore                      = b_grid_desc;
-    ignore                      = a_scale_grid_desc;
-    ignore                      = b_scale_grid_desc;
-    ignore                      = c_grid_desc_mblock_mperblock_nblock_nperblock;
-    ignore                      = a_element_op;
-    ignore                      = b_element_op;
-    ignore                      = c_element_op;
-    ignore                      = block_2_ctile_map;
+    ignore = p_a_grid;
+    ignore = p_b_grid;
+    ignore = p_a_scale;
+    ignore = p_b_scale;
+    ignore = p_c_grid;
+    ignore = a_grid_desc;
+    ignore = b_grid_desc;
+    ignore = a_scale_grid_desc;
+    ignore = b_scale_grid_desc;
+    ignore = c_grid_desc_mblock_mperblock_nblock_nperblock;
+    ignore = a_element_op;
+    ignore = b_element_op;
+    ignore = c_element_op;
+    ignore = block_2_ctile_map;
 #endif // end of if (defined(__gfx13__))
 }
 
@@ -190,7 +190,6 @@ template <index_t BlockSize,
           index_t CShuffleBlockTransferScalarPerVector_NPerBlock,
           // for gfx13 because of K multiplier, KPerWmma can be changed; set here will not
           // influence other generations
-          index_t KPerWmma              = 16,
           index_t NumGemmKPrefetchStage = 1,
           LoopScheduler LoopSched       = make_default_loop_scheduler(),
           PipelineVersion PipelineVer   = PipelineVersion::v1>
@@ -208,14 +207,11 @@ struct GridwiseGemm_Wmma
     // FIX ME: To be deprecated
     static constexpr auto K1 = Number<K1Value>{};
 
-    static constexpr auto MWaves = MPerBlock / (MRepeat * MPerWmma);
-    static constexpr auto NWaves = NPerBlock / (NRepeat * NPerWmma);
-#if defined(__gfx13__)
-    // TODO: WmmaK can support different dimensions because of existence of K multiplier
-    static constexpr auto WmmaK = KPerWmma;
-#else
-    static constexpr auto WmmaK = K1 == 16 ? 32 : 16;
-#endif
+    static constexpr auto MWaves   = MPerBlock / (MRepeat * MPerWmma);
+    static constexpr auto NWaves   = NPerBlock / (NRepeat * NPerWmma);
+    static constexpr auto WmmaK    = K1 == 16 ? 32 : 16;
+    static constexpr auto KPerWmma = 16;
+
     using ThisThreadBlock = ThisThreadBlock<BlockSize>;
 
     using GridwiseGemmPipe =
@@ -918,6 +914,7 @@ struct GridwiseGemm_Wmma
                               KPerBlock,
                               MPerWmma,
                               NPerWmma,
+                              KPerWmma,
                               MRepeat,
                               NRepeat,
                               KPack,
@@ -2697,6 +2694,7 @@ struct GridwiseGemm_Wmma_GFX13
                                 KPerBlock,
                                 MPerWmma,
                                 NPerWmma,
+                                KPerWmma,
                                 MRepeat,
                                 NRepeat,
                                 KPack,
@@ -3134,6 +3132,7 @@ struct GridwiseGemm_Wmma_GFX13
                                                 KPerBlock,
                                                 MPerWmma,
                                                 NPerWmma,
+                                                KPerWmma,
                                                 MRepeat,
                                                 NRepeat,
                                                 KPack,
