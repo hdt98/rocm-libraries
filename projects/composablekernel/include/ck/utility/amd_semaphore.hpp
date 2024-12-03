@@ -6,7 +6,7 @@
 
 #include "amd_address_space.hpp"
 
-#define CK_USE_AMD_SEMAPHORE_ASM 1
+//#define CK_USE_AMD_SEMAPHORE_ASM 1
 
 namespace ck {
 
@@ -22,25 +22,29 @@ enum SemaphoreAddressSpaceMask : index_t
     SemaphoreAddressSpaceAsync      = 1 << 9,
 };
 
-template <unsigned waveIdInWavegroup, unsigned SemId>
+template <unsigned WaveIdInWavegroup
+#if defined(CK_USE_AMD_SEMAPHORE_ASM)
+          ,
+          unsigned SemId
+#endif
+          >
 class WavegroupSemaphore
 {
     public:
-    static_assert(SemId >= 1 && SemId <= 7, "GFX13 only support Sem 1-7");
-
     __device__ void init(unsigned count = 0, unsigned limit = 1, bool done = 0)
     {
 #if defined(__gfx13__)
-        if(__builtin_amdgcn_wave_id_in_wavegroup() == waveIdInWavegroup)
+        if(__builtin_amdgcn_wave_id_in_wavegroup() == WaveIdInWavegroup)
         {
 #if defined(CK_USE_AMD_SEMAPHORE_ASM)
+            static_assert(SemId >= 1 && SemId <= 7, "GFX13 only support Sem 1-7");
             constexpr uint32_t SemaHwReg   = 0x00000024UL + SemId - 1;
             constexpr uint32_t HwRegOffset = 0;
             constexpr uint32_t HwRegBits   = 31;
             __builtin_amdgcn_s_setreg(SemaHwReg | (HwRegOffset << 6) | (HwRegBits << 11),
                                       count | (limit << 16) | (done << 28));
 #else
-            __builtin_amdgcn_s_sema_set_state(&_sema, count | (limit << 16) | (done << 28));
+            __builtin_amdgcn_s_sema_set_state(_sema, count | (limit << 16) | (done << 28));
 #endif
         }
 #else
@@ -57,7 +61,7 @@ class WavegroupSemaphore
 #if defined(CK_USE_AMD_SEMAPHORE_ASM)
         asm("s_sema_wait %0" : : "n"(1 << (SemId - 1)) : "memory");
 #else
-        __builtin_amdgcn_s_sema_wait(&_sema);
+        __builtin_amdgcn_s_sema_wait(_sema);
 #endif
 #endif
         if constexpr(MemorySpaces & SemaphoreAddressSpaceGlobal)
@@ -80,11 +84,11 @@ class WavegroupSemaphore
 
 #if defined(__gfx13__)
 #if defined(CK_USE_AMD_SEMAPHORE_ASM)
-        constexpr unsigned imm = SemId | (waveIdInWavegroup << 4) | (1 << 8);
+        constexpr unsigned imm = SemId | (WaveIdInWavegroup << 4) | (1 << 8);
         asm("s_sema_signal %0" : : "n"(imm) : "memory");
         ignore = count;
 #else
-        __builtin_amdgcn_s_sema_signal(&_sema, count);
+        __builtin_amdgcn_s_sema_signal(_sema, count);
 #endif
 #else
         ignore = count;
@@ -92,7 +96,7 @@ class WavegroupSemaphore
     }
 
 #if !defined(CK_USE_AMD_SEMAPHORE_ASM)
-    template <unsigned waveIdInWavegroup>
+    template <unsigned WaveIdInWavegroup_>
     struct SemaphoreType;
 
     template <>
@@ -142,8 +146,12 @@ class WavegroupSemaphore
     {
         using Type = __amdgpu_semaphore7_t;
     };
+    using Type = SemaphoreType<WaveIdInWavegroup>::Type;
 
-    SemaphoreType<waveIdInWavegroup>::Type _sema;
+    __device__ WavegroupSemaphore(Type* sema) : _sema(sema) {}
+
+    private:
+    Type* _sema;
 #endif
 };
 } // namespace ck

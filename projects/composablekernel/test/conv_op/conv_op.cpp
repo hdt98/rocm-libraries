@@ -63,7 +63,7 @@ namespace ck {
 
 namespace conv_op_util {
 
-#define LOAD_DATA_PER_TILE 0
+//#define LOAD_DATA_PER_TILE 0
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wundefined-reinterpret-cast"
@@ -334,7 +334,7 @@ template <typename InDataType,
           index_t Height,
           index_t UnpackedInputChannels,
           index_t UnpackedOutputChannels>
-__global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
+__global__ void __launch_bounds__(64, 1)
     conv3_fwd(const InDataType* in_, const WeiDataType* wei_, AccDataType* c_)
 {
     constexpr index_t DataTileHeight = 4;
@@ -1204,8 +1204,8 @@ int main(int argc, char* argv[])
     pass &= run_test_fmt<ck::bf8_t,   ck::bhalf_t, ck::half_t, 0x200 >();
     pass &= run_test_fmt<int8_t,      ck::half_t,  ck::half_t, 0x400 >();
 
-    //pass &= run_test_fmt<ck::half_t,  float,       float,      0x4000>();
-    //pass &= run_test_fmt<ck::half_t,  ck::half_t,  ck::half_t, 0x8000>();
+    pass &= run_test_fmt<ck::half_t,  float,       float,      0x4000>();
+    pass &= run_test_fmt<ck::half_t,  ck::half_t,  ck::half_t, 0x8000>();
 #ifdef CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
     pass &= run_test_fmt<ck::int4_t,  float,       float     , 0x800 >();
     pass &= run_test_fmt<ck::int4_t,  int32_t,     int32_t   , 0x1000>();

@@ -59,12 +59,12 @@ __global__ void
         __builtin_amdgcn_readfirstlane(get_grid_size() / batch_count);
     const index_t g_idx = __builtin_amdgcn_readfirstlane(get_block_1d_id() / num_blocks_per_batch);
 
-    const long_index_t in_batch_offset = __builtin_amdgcn_readfirstlane(
-        static_cast<long_index_t>(compute_ptr_offset_of_batch.GetAPtrOffset(g_idx)));
-    const long_index_t wei_batch_offset = __builtin_amdgcn_readfirstlane(
-        static_cast<long_index_t>(compute_ptr_offset_of_batch.GetBPtrOffset(g_idx)));
-    const long_index_t acc_batch_offset = __builtin_amdgcn_readfirstlane(
-        static_cast<long_index_t>(compute_ptr_offset_of_batch.GetEPtrOffset(g_idx)));
+    const long_index_t in_batch_offset = amd_wave_read_first_lane(
+        static_cast<int64_t>(compute_ptr_offset_of_batch.GetAPtrOffset(g_idx)));
+    const long_index_t wei_batch_offset = amd_wave_read_first_lane(
+        static_cast<int64_t>(compute_ptr_offset_of_batch.GetBPtrOffset(g_idx)));
+    const long_index_t acc_batch_offset = amd_wave_read_first_lane(
+        static_cast<int64_t>(compute_ptr_offset_of_batch.GetEPtrOffset(g_idx)));
 
     const auto ds_batch_offset = compute_ptr_offset_of_batch.GetDsPtrOffset(g_idx);
 
@@ -145,11 +145,11 @@ __global__ void __exp_amd_wavegroup_kernel(4, 32, 256, 1, 1)
         __builtin_amdgcn_readfirstlane(get_grid_size() / batch_count);
     const index_t g_idx = __builtin_amdgcn_readfirstlane(get_block_1d_id() / num_blocks_per_batch);
 
-    const long_index_t in_batch_offset = __builtin_amdgcn_readfirstlane(
+    const long_index_t in_batch_offset = amd_wave_read_first_lane(
         static_cast<int64_t>(compute_ptr_offset_of_batch.GetAPtrOffset(g_idx)));
-    const long_index_t wei_batch_offset = __builtin_amdgcn_readfirstlane(
+    const long_index_t wei_batch_offset = amd_wave_read_first_lane(
         static_cast<int64_t>(compute_ptr_offset_of_batch.GetBPtrOffset(g_idx)));
-    const long_index_t acc_batch_offset = __builtin_amdgcn_readfirstlane(
+    const long_index_t acc_batch_offset = amd_wave_read_first_lane(
         static_cast<int64_t>(compute_ptr_offset_of_batch.GetEPtrOffset(g_idx)));
 
     const long_index_t ds_batch_offset = compute_ptr_offset_of_batch.GetDsPtrOffset(g_idx);

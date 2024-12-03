@@ -65,12 +65,21 @@ struct GridwiseConvPipeline_v2
         constexpr auto in_block_copy_step  = to_multi_index(InDataBlockTransferStep{});
 
         // sync between data load wave (0) and conv wave (1)
+#ifdef CK_USE_AMD_SEMAPHORE_ASM
         WavegroupSemaphore<1, 1> semaLoad;
         WavegroupSemaphore<1, 2> semaLds;
         WavegroupSemaphore<0, 1> semaRun;
+#else
+        __shared__ WavegroupSemaphore<1>::Type semaLoadVar;
+        __shared__ WavegroupSemaphore<1>::Type semaLdsVar;
+        __shared__ WavegroupSemaphore<0>::Type semaRunVar;
+        WavegroupSemaphore<1> semaLoad(&semaLoadVar);
+        WavegroupSemaphore<1> semaLds(&semaLdsVar);
+        WavegroupSemaphore<0> semaRun(&semaRunVar);
+#endif
 
         // sync for all wave with id = 0 in a group
-        NamedBarrier<1> barrierLds;
+        NamedBarrier<1, 4> barrierLds;
 
         constexpr index_t NumTap           = wei_blockwise_copy.Size();
         constexpr auto in_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0);
@@ -87,7 +96,7 @@ struct GridwiseConvPipeline_v2
 
         if(get_wave_id_in_wavegroup() == 0)
         {
-            barrierLds.init(4);
+            barrierLds.init();
             barrierLds.join();
         }
 
@@ -338,8 +347,15 @@ struct GridwiseConvPipeline_v2<1, false, false, EnableAsync>
         constexpr auto in_block_copy_step  = to_multi_index(InDataBlockTransferStep{});
 
         // sync between data load wave (0) and conv wave (1)
+#ifdef CK_USE_AMD_SEMAPHORE_ASM
         WavegroupSemaphore<1, 1> semaLoad;
         WavegroupSemaphore<0, 1> semaRun;
+#else
+        __shared__ WavegroupSemaphore<1>::Type semaLoadVar;
+        __shared__ WavegroupSemaphore<0>::Type semaRunVar;
+        WavegroupSemaphore<1> semaLoad(&semaLoadVar);
+        WavegroupSemaphore<0> semaRun(&semaRunVar);
+#endif
 
         constexpr index_t NumTap           = wei_blockwise_copy.Size();
         constexpr auto in_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0);
@@ -497,9 +513,16 @@ struct GridwiseConvPipeline_v2<1, true, true, EnableAsync>
         constexpr auto in_block_copy_step  = to_multi_index(InDataBlockTransferStep{});
 
         // sync between data load wave (0) and conv wave (1)
+#ifdef CK_USE_AMD_SEMAPHORE_ASM
         WavegroupSemaphore<1, 1> semaLds;
         WavegroupSemaphore<0, 1> semaRun;
-        NamedBarrier<1> barrierLds;
+#else
+        __shared__ WavegroupSemaphore<1>::Type semaLdsVar;
+        __shared__ WavegroupSemaphore<0>::Type semaRunVar;
+        WavegroupSemaphore<1> semaLds(&semaLdsVar);
+        WavegroupSemaphore<0> semaRun(&semaRunVar);
+#endif
+        NamedBarrier<1, 4> barrierLds;
 
         constexpr index_t NumTap = wei_blockwise_copy.Size();
 
@@ -514,7 +537,7 @@ struct GridwiseConvPipeline_v2<1, true, true, EnableAsync>
 
         if(get_wave_id_in_wavegroup() == 0)
         {
-            barrierLds.init(4);
+            barrierLds.init();
             barrierLds.join();
         }
 

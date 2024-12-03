@@ -67,10 +67,10 @@ __global__ void
     const long_index_t e_group_offset = amd_wave_read_first_lane(
         static_cast<int64_t>(compute_ptr_offset_of_groups.GetEPtrOffset(g_idx)));
 
-    const long_index_t a_n_offset =
-        amd_wave_read_first_lane(compute_ptr_offset_of_n.GetAPtrOffset(n_idx));
-    const long_index_t e_n_offset =
-        amd_wave_read_first_lane(compute_ptr_offset_of_n.GetEPtrOffset(n_idx));
+    const long_index_t a_n_offset = amd_wave_read_first_lane(
+        static_cast<int64_t>(compute_ptr_offset_of_n.GetAPtrOffset(n_idx)));
+    const long_index_t e_n_offset = amd_wave_read_first_lane(
+        static_cast<int64_t>(compute_ptr_offset_of_n.GetEPtrOffset(n_idx)));
 
     index_t left     = 0;
     index_t right    = gemms_count;
