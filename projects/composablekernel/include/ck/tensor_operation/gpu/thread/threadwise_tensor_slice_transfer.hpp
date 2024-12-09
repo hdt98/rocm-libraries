@@ -291,8 +291,26 @@ struct ThreadwiseTensorSliceTransfer_v2
             const bool is_src_valid =
                 coordinate_has_valid_offset_assuming_visible_index_is_valid(src_desc, src_coord_);
 
+            constexpr bool go_fast_copy = [&]() {
+                if constexpr(SrcScalarPerVector > 1)
+                {
+                    constexpr index_t dst_offset_0 = dst_desc.CalculateOffset(
+                        to_multi_index(dst_slice_origin_idx) + src_data_idx +
+                        Number<0>{} * src_scalar_step_in_vector);
+                    constexpr index_t dst_offset_1 = dst_desc.CalculateOffset(
+                        to_multi_index(dst_slice_origin_idx) + src_data_idx +
+                        Number<1>{} * src_scalar_step_in_vector);
+                    return (dst_offset_1 - dst_offset_0 == 1) ? true : false;
+                }
+                else
+                {
+                    return false;
+                }
+            }();
+
             // copy data from src_vector into dst_buf
-            if constexpr(InvalidElementAsNaN == false && std::is_same<SrcData, DstData>::value)
+            if constexpr(InvalidElementAsNaN == false && std::is_same<SrcData, DstData>::value &&
+                         go_fast_copy == true)
             {
                 constexpr index_t dst_offset =
                     dst_desc.CalculateOffset(to_multi_index(dst_slice_origin_idx) + src_data_idx);
