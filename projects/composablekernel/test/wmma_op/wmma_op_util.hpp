@@ -532,8 +532,6 @@ __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
             b_ptr[ROW_SIZE * blk + SRC_DIM * lane + ele];
     });
 
-    __syncthreads();
-
     static_for<0, SRC_DIM, 1>{}([&](auto ele) {
         p_shared[SRC_DIM * lIdx + ele] = a_temp.template AsType<srcA_cast_type>()(ele);
     });
@@ -570,7 +568,6 @@ __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
         b_frag.template AsType<srcB_vec_type>()(I0),
         acc_thread_buf_,
         dst_thread_buf_);
-    __syncthreads();
     if constexpr(WMMAVecType<srcA_t, kMultiplier>::layoutTransform)
     {
         static_for<0, 8, 1>{}([&](auto ele) {
@@ -639,7 +636,6 @@ __global__ void matmul_swizzle_a(const srcA_t* a, const srcB_t* b, dst_t* c)
         b_frag.template AsType<typename srcB_vec::type>()(I0),
         acc_thread_buf_,
         dst_thread_buf_);
-    __syncthreads();
 
     if constexpr(WMMAVecType<srcA_t, kMultiplier>::layoutTransform)
     {
@@ -717,10 +713,8 @@ __global__ void matmul_mixedfp(const typename src0_t::type_t* a,
     const int32_t a_scale = a_block_scale[lIdx];
     const int32_t b_scale = b_block_scale[lIdx];
 
-    __syncthreads();
     intrin_wmma_f32_16x16_f8f6f4_w32<16, 16, src0_t, src1_t, AScaleSel, BScaleSel, false>::Run(
         a_frag, b_frag, a_scale, b_scale, c_thread_buf_.GetVectorTypeReference(Number<0>{}));
-    __syncthreads();
     //// Colum major -> Row major
     static_for<0, 8, 1>{}([&](auto ele) {
         const int col = lIdx >> 1;
