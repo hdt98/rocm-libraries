@@ -134,8 +134,8 @@ __global__ void __exp_amd_wavegroup_kernel(4, 32, 256, 1, 1)
 
     __shared__ char p_shared[GridwiseOp::BlockwiseConv::SharedMemTrait::lds_size];
     static __exp_amd_laneshared__ char p_lane_shared
-        [GridwiseOp::BlockwiseConv::LaneSharedMemTrait::lane_shared_size *
-         GridwiseOp::BlockwiseConv::template GetLaneSharedMemCount<HasMainBlockLoop>()];
+        [4 + GridwiseOp::BlockwiseConv::LaneSharedMemTrait::lane_shared_size *
+                 GridwiseOp::BlockwiseConv::template GetLaneSharedMemCount<HasMainBlockLoop>()];
 
     static_assert(GridwiseOp::BlockwiseConv::LaneSharedMemTrait::lane_shared_size <= 512 * 4, "");
 
@@ -377,8 +377,8 @@ struct GridwiseConv_Wconv
             p_acc_grid, acc_grid_desc.GetElementSpaceSize());
 
         // C mapping in single thread.
-        constexpr auto acc_thread_desc   = blockwise_conv.GetAccThreadDescriptor();
-        constexpr auto acc_thread_length = blockwise_conv.GetAccThreadDescLength();
+        constexpr auto acc_thread_desc   = BlockWiseConv::GetAccThreadDescriptor();
+        constexpr auto acc_thread_length = BlockWiseConv::GetAccThreadDescLength();
 
         // calculate origin of thread output tensor on global memory
         // blockwise conv acc starting index
@@ -424,9 +424,9 @@ struct GridwiseConv_Wconv
         {
             // C mapping in single block
             // LDS descriptor, shuffle and write out in HRepeat x WRepeat x KRepeat times
-            constexpr auto acc_block_desc = blockwise_conv.GetAccBlockDescriptor();
+            constexpr auto acc_block_desc = BlockWiseConv::GetAccBlockDescriptor();
             constexpr auto acc_block_wave_desc =
-                blockwise_conv.GetAccWaveDescriptor(acc_block_desc);
+                BlockWiseConv::GetAccWaveDescriptor(acc_block_desc);
 
             auto acc_block_buf = make_dynamic_buffer<AddressSpaceEnum::Lds>(
                 static_cast<AccDataType*>(p_shared) +

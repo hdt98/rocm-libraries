@@ -177,4 +177,7 @@ if(DL_KERNELS)
   target_link_libraries(${PROFILER_EXECUTABLE} PRIVATE device_grouped_conv3d_bwd_weight_instance)
 endif()
 
+if (NOT WIN32)
+  target_link_libraries(${PROFILER_EXECUTABLE} PRIVATE gcc_eh)
+endif()
 rocm_install(TARGETS ${PROFILER_EXECUTABLE} COMPONENT profiler)

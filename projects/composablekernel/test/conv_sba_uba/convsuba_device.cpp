@@ -1,7 +1,6 @@
 ﻿// SPDX-License-Identifier: MIT
 // Copyriconv_device_impl.hght (c) 2018-2024, Advanced Micro Devices, Inc. All rights reserved.
 #include "convsuba_device_impl.h"
-#include "conv_device_124.cpp"
 
 // DsTensor ldsmode keep same with InTensor
 // clang-format off

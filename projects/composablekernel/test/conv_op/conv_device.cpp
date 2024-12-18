@@ -12,7 +12,7 @@ Extern_Test_Func(int8_t,  int32_t, int32_t, 0xe, 0x20);
 Extern_Test_Func(half_t,  half_t,  half_t,  0xf, 0x40);
 Extern_Test_Func(bhalf_t, bhalf_t, half_t,  0x7, 0x80);
 Extern_Test_Func(f8_t,    half_t,  half_t,  0x3, 0x100);
-Extern_Test_Func(bf8_t,   bhalf_t, half_t,  0xb, 0x200);
+Extern_Test_Func(bf8_t,   half_t,  half_t,  0xb, 0x200);
 Extern_Test_Func(int8_t,  half_t,  half_t,  0x9, 0x400);
 // clang-format on
 ExecutionConfig config;
@@ -37,7 +37,7 @@ int main(int argc, char* argv[])
     pass &= Call_Test_Func(half_t,  half_t,  half_t,  0xf, 0x40);
     pass &= Call_Test_Func(bhalf_t, bhalf_t, half_t,  0x7, 0x80);
     pass &= Call_Test_Func(f8_t,    half_t,  half_t,  0x3, 0x100);
-    pass &= Call_Test_Func(bf8_t,   bhalf_t, half_t,  0xb, 0x200);
+    pass &= Call_Test_Func(bf8_t,   half_t,  half_t,  0xb, 0x200);
     pass &= Call_Test_Func(int8_t,  half_t,  half_t,  0x9, 0x400);
     // clang-format on
 

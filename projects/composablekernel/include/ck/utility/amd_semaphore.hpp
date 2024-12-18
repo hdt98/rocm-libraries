@@ -146,7 +146,7 @@ class WavegroupSemaphore
     {
         using Type = __amdgpu_semaphore7_t;
     };
-    using Type = SemaphoreType<WaveIdInWavegroup>::Type;
+    using Type = typename SemaphoreType<WaveIdInWavegroup>::Type;
 
     __device__ WavegroupSemaphore(Type* sema) : _sema(sema) {}
 

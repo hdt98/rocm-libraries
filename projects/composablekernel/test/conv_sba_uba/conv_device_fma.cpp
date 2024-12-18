@@ -928,7 +928,7 @@ int main(int argc, char* argv[])
     pass &= run_test_fmt<half_t,  half_t,  half_t, 0x17, 0x40 >();
     pass &= run_test_fmt<bhalf_t, bhalf_t, half_t, 0x17, 0x80 >();
     pass &= run_test_fmt<f8_t,    half_t,  half_t, 0x17, 0x100>();
-    pass &= run_test_fmt<bf8_t,   bhalf_t, half_t, 0x17, 0x200>();
+    pass &= run_test_fmt<bf8_t,   half_t,  half_t, 0x17, 0x200>();
     pass &= run_test_fmt<int8_t,  half_t,  half_t, 0x17, 0x400>();
     //
     // clang-format on

@@ -92,9 +92,9 @@ struct GridwiseConvPipeline_v2
         // sync for all wave with id = 0 in a group
         NamedBarrier<1, 4> barrierLds;
 
-        constexpr index_t NumTap           = wei_blockwise_copy.Size();
+        constexpr index_t NumTap           = WeiDataBlockTransfer::Size();
         constexpr auto in_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0);
-        constexpr auto wei_remap_table     = blockwise_conv.GetWeightRemapTable();
+        constexpr auto wei_remap_table     = BlockwiseConv::GetWeightRemapTable();
 
         using WeiDataBlockTransfer0 =
             std::remove_const_t<remove_cvref_t<decltype(wei_blockwise_copy[I0])>>;
@@ -396,9 +396,9 @@ struct GridwiseConvPipeline_v2<1, false, false, false, EnableAsync>
         WavegroupSemaphore<0> semaRun(&semaRunVar);
 #endif
 
-        constexpr index_t NumTap           = wei_blockwise_copy.Size();
+        constexpr index_t NumTap           = WeiDataBlockTransfer::Size();
         constexpr auto in_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0);
-        constexpr auto wei_remap_table     = blockwise_conv.GetWeightRemapTable();
+        constexpr auto wei_remap_table     = BlockwiseConv::GetWeightRemapTable();
 
         using WeiDataBlockTransfer0 =
             std::remove_const_t<remove_cvref_t<decltype(wei_blockwise_copy[I0])>>;
@@ -586,7 +586,7 @@ struct GridwiseConvPipeline_v2<1, true, true, true, EnableAsync>
 #endif
         NamedBarrier<1, 4> barrierLds;
 
-        constexpr index_t NumTap = wei_blockwise_copy.Size();
+        constexpr index_t NumTap = WeiDataBlockTransfer::Size();
 
         using WeiDataBlockTransfer0 =
             std::remove_const_t<remove_cvref_t<decltype(wei_blockwise_copy[I0])>>;

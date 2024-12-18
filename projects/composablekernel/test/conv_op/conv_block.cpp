@@ -996,7 +996,7 @@ int main(int argc, char* argv[])
     pass &= run_test_fmt<ck::half_t,  ck::half_t,  ck::half_t, 0x40  >();
     pass &= run_test_fmt<ck::bhalf_t, ck::bhalf_t, ck::half_t, 0x80  >();
     pass &= run_test_fmt<ck::f8_t,    ck::half_t,  ck::half_t, 0x100 >();
-    pass &= run_test_fmt<ck::bf8_t,   ck::bhalf_t, ck::half_t, 0x200 >();
+    pass &= run_test_fmt<ck::bf8_t,   ck::half_t,  ck::half_t, 0x200 >();
     pass &= run_test_fmt<int8_t,      ck::half_t,  ck::half_t, 0x400 >();
     // clang-format on
 

@@ -3216,17 +3216,19 @@ struct NumericLimits<int4_t>
 template <>
 struct NumericLimits<f8_t>
 {
+#ifdef CK_ENABLE_F8_MODE
     // negative zero nan mode with exp bias = 8
     static constexpr uint8_t binary_min    = 0x08; // 0b00001000
     static constexpr uint8_t binary_max    = 0x7F; // 0b01111111
     static constexpr uint8_t binary_lowest = 0xFF; // 0b11111111
     static constexpr uint8_t binary_qnan   = 0x80; // 0b10000000
+#else
     // ieee mode with exp bias = 7
-    // static constexpr uint8_t binary_min    = 0x08; // 0b00001000
-    // static constexpr uint8_t binary_max    = 0x77; // 0b01110111
-    // static constexpr uint8_t binary_lowest = 0xF7; // 0b11110111
-    // static constexpr uint8_t binary_qnan   = 0x79; // any sign, exp=1111, mant!=0
-
+    static constexpr uint8_t binary_min    = 0x08; // 0b00001000
+    static constexpr uint8_t binary_max    = 0x7E; // 0b01111110
+    static constexpr uint8_t binary_lowest = 0xFE; // 0b11111110
+    static constexpr uint8_t binary_qnan   = 0x7F; // any sign, exp=1111, mant!=0
+#endif
     __host__ __device__ static constexpr f8_t Min() { return f8_t(binary_min); }
 
     __host__ __device__ static constexpr f8_t Max() { return f8_t(binary_max); }
@@ -3239,16 +3241,19 @@ struct NumericLimits<f8_t>
 template <>
 struct NumericLimits<bf8_t>
 {
+#ifdef CK_ENABLE_F8_MODE
     // negative zero nan mode with exp bias = 16
     static constexpr uint8_t binary_min    = 0x04; // 0b00000100
     static constexpr uint8_t binary_max    = 0x7F; // 0b01111111
     static constexpr uint8_t binary_lowest = 0xFF; // 0b11111111
     static constexpr uint8_t binary_qnan   = 0x80; // 0b10000000
+#else
     // ieee mode with exp bias = 15
-    // static constexpr uint8_t binary_min    = 0x04; // 0b00000100
-    // static constexpr uint8_t binary_max    = 0x7B; // 0b01111011
-    // static constexpr uint8_t binary_lowest = 0xFB; // 0b11111011
-    // static constexpr uint8_t binary_qnan   = 0x79; // any sign, exp=1111, mant!=
+    static constexpr uint8_t binary_min    = 0x04; // 0b00000100
+    static constexpr uint8_t binary_max    = 0x7B; // 0b01111011
+    static constexpr uint8_t binary_lowest = 0xFB; // 0b11111011
+    static constexpr uint8_t binary_qnan   = 0x7D; // any sign, exp=1111, mant!=
+#endif
 
     __host__ __device__ static constexpr bf8_t Min() { return bf8_t(binary_min); }
 
@@ -3303,8 +3308,11 @@ struct NumericUtils<f8_t>
 {
     static constexpr int exp  = 4;
     static constexpr int mant = 3;
-    // static constexpr int bias = 8; // negative zero nan mode
-    static constexpr int bias = 7; // ieee mode
+#ifdef CK_ENABLE_F8_MODE
+    static constexpr int bias = 8; // negative zero nan mode
+#else
+    static constexpr int bias              = 7;    // ieee mode
+#endif
 };
 
 template <>
@@ -3312,8 +3320,11 @@ struct NumericUtils<bf8_t>
 {
     static constexpr int exp  = 5;
     static constexpr int mant = 2;
-    // static constexpr int bias = 16; // negative zero nan mode
-    static constexpr int bias = 15; // ieee mode
+#ifdef CK_ENABLE_F8_MODE
+    static constexpr int bias = 16; // negative zero nan mode
+#else
+    static constexpr int bias              = 15;   // ieee mode
+#endif
 };
 
 template <>
@@ -3321,8 +3332,11 @@ struct NumericUtils<bhalf_t>
 {
     static constexpr int exp  = 8;
     static constexpr int mant = 7;
+#ifdef CK_ENABLE_F8_MODE
     static constexpr int bias = 128; // negative zero nan mode
-    // static constexpr int bias = 127; // ieee mode
+#else
+    static constexpr int bias              = 127;  // ieee mode
+#endif
 };
 
 // the below is used for MX data format

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2018-2024, Advanced Micro Devices, Inc. All rights reserved.
-#include "conv_device_impl.h"
+#include "convsuba_device_impl.h"
 
-Def_Test_Func(bf8_t, half_t, half_t, 0xb, 0x200);
+Def_Test_Func(half_t, float, float, 0x17, 0, 0, 0x1);

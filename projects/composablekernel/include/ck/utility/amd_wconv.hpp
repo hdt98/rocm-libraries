@@ -946,7 +946,7 @@ struct intrin_wconv_bf16_bf16<8, 4, 1, 1, 1, 4, Aco, Signed, HighLane>
     }
 };
 
-// src: bf8, dst: bf16
+// src: bf8, dst: f16
 template <index_t H,
           index_t W,
           index_t FilterSize,
@@ -956,17 +956,17 @@ template <index_t H,
           bool Aco      = false,
           bool Signed   = false,
           bool HighLane = false>
-struct intrin_wconv_bf16_bf8;
+struct intrin_wconv_f16_bf8;
 
 template <bool Aco, bool Signed, bool HighLane>
-struct intrin_wconv_bf16_bf8<4, 2, 1, 1, 1, 1, Aco, Signed, HighLane>
+struct intrin_wconv_f16_bf8<4, 2, 1, 1, 1, 1, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const bf8x8_t& reg_wei, const bf8x4_t* reg_data[1], FloatC& reg_c)
     {
-        reg_c.template AsType<bhalf4_t>()(Number<0>{}) =
-            bit_cast<bhalf4_t>(__builtin_amdgcn_convolve_bf16_bf8_4x2(
-                bit_cast<bf16x4_t>(reg_c.template AsType<bhalf4_t>()[Number<0>{}]),
+        reg_c.template AsType<half4_t>()(Number<0>{}) =
+            bit_cast<half4_t>(__builtin_amdgcn_convolve_f16_bf8_4x2(
+                bit_cast<half4_t>(reg_c.template AsType<half4_t>()[Number<0>{}]),
                 bit_cast<int32x2_t>(reg_wei),
                 bit_cast<int32_t>(*reg_data[0]),
                 GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() |
@@ -976,14 +976,14 @@ struct intrin_wconv_bf16_bf8<4, 2, 1, 1, 1, 1, Aco, Signed, HighLane>
 };
 
 template <bool Aco, bool Signed, bool HighLane>
-struct intrin_wconv_bf16_bf8<4, 2, 1, 1, 1, 2, Aco, Signed, HighLane>
+struct intrin_wconv_f16_bf8<4, 2, 1, 1, 1, 2, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const bf8x16_t& reg_wei, const bf8x4_t* reg_data[2], FloatC& reg_c)
     {
-        reg_c.template AsType<bhalf4_t>()(Number<0>{}) =
-            bit_cast<bhalf4_t>(__builtin_amdgcn_convolve_bf16_bf8_4x2(
-                bit_cast<bf16x4_t>(reg_c.template AsType<bhalf4_t>()[Number<0>{}]),
+        reg_c.template AsType<half4_t>()(Number<0>{}) =
+            bit_cast<half4_t>(__builtin_amdgcn_convolve_f16_bf8_4x2(
+                bit_cast<half4_t>(reg_c.template AsType<half4_t>()[Number<0>{}]),
                 bit_cast<int32x4_t>(reg_wei),
                 bit_cast<int32_t>(*reg_data[0]),
                 bit_cast<int32_t>(*reg_data[1]),
@@ -994,14 +994,14 @@ struct intrin_wconv_bf16_bf8<4, 2, 1, 1, 1, 2, Aco, Signed, HighLane>
 };
 
 template <bool Aco, bool Signed, bool HighLane>
-struct intrin_wconv_bf16_bf8<4, 2, 1, 1, 1, 4, Aco, Signed, HighLane>
+struct intrin_wconv_f16_bf8<4, 2, 1, 1, 1, 4, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const bf8x32_t& reg_wei, const bf8x4_t* reg_data[4], FloatC& reg_c)
     {
-        reg_c.template AsType<bhalf4_t>()(Number<0>{}) =
-            bit_cast<bhalf4_t>(__builtin_amdgcn_convolve_bf16_bf8_4x2(
-                bit_cast<bf16x4_t>(reg_c.template AsType<bhalf4_t>()[Number<0>{}]),
+        reg_c.template AsType<half4_t>()(Number<0>{}) =
+            bit_cast<half4_t>(__builtin_amdgcn_convolve_f16_bf8_4x2(
+                bit_cast<half4_t>(reg_c.template AsType<half4_t>()[Number<0>{}]),
                 bit_cast<int32x8_t>(reg_wei),
                 bit_cast<int32_t>(*reg_data[0]),
                 bit_cast<int32_t>(*reg_data[1]),
@@ -1014,14 +1014,14 @@ struct intrin_wconv_bf16_bf8<4, 2, 1, 1, 1, 4, Aco, Signed, HighLane>
 };
 
 template <bool Aco, bool Signed, bool HighLane>
-struct intrin_wconv_bf16_bf8<4, 4, 1, 1, 1, 1, Aco, Signed, HighLane>
+struct intrin_wconv_f16_bf8<4, 4, 1, 1, 1, 1, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const bf8x4_t& reg_wei, const bf8x4_t* reg_data[1], FloatC& reg_c)
     {
-        reg_c.template AsType<bhalf8_t>()(Number<0>{}) =
-            bit_cast<bhalf8_t>(__builtin_amdgcn_convolve_bf16_bf8_4x4(
-                bit_cast<bf16x8_t>(reg_c.template AsType<bhalf8_t>()[Number<0>{}]),
+        reg_c.template AsType<half8_t>()(Number<0>{}) =
+            bit_cast<half8_t>(__builtin_amdgcn_convolve_f16_bf8_4x4(
+                bit_cast<half8_t>(reg_c.template AsType<half8_t>()[Number<0>{}]),
                 bit_cast<int32_t>(reg_wei),
                 bit_cast<int32_t>(*reg_data[0]),
                 GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() |
@@ -1031,14 +1031,14 @@ struct intrin_wconv_bf16_bf8<4, 4, 1, 1, 1, 1, Aco, Signed, HighLane>
 };
 
 template <bool Aco, bool Signed, bool HighLane>
-struct intrin_wconv_bf16_bf8<4, 4, 1, 1, 1, 2, Aco, Signed, HighLane>
+struct intrin_wconv_f16_bf8<4, 4, 1, 1, 1, 2, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const bf8x8_t& reg_wei, const bf8x4_t* reg_data[2], FloatC& reg_c)
     {
-        reg_c.template AsType<bhalf8_t>()(Number<0>{}) =
-            bit_cast<bhalf8_t>(__builtin_amdgcn_convolve_bf16_bf8_4x4(
-                bit_cast<bf16x8_t>(reg_c.template AsType<bhalf8_t>()[Number<0>{}]),
+        reg_c.template AsType<half8_t>()(Number<0>{}) =
+            bit_cast<half8_t>(__builtin_amdgcn_convolve_f16_bf8_4x4(
+                bit_cast<half8_t>(reg_c.template AsType<half8_t>()[Number<0>{}]),
                 bit_cast<int32x2_t>(reg_wei),
                 bit_cast<int32_t>(*reg_data[0]),
                 bit_cast<int32_t>(*reg_data[1]),
@@ -1049,14 +1049,14 @@ struct intrin_wconv_bf16_bf8<4, 4, 1, 1, 1, 2, Aco, Signed, HighLane>
 };
 
 template <bool Aco, bool Signed, bool HighLane>
-struct intrin_wconv_bf16_bf8<4, 4, 1, 1, 1, 4, Aco, Signed, HighLane>
+struct intrin_wconv_f16_bf8<4, 4, 1, 1, 1, 4, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const bf8x16_t& reg_wei, const bf8x4_t* reg_data[4], FloatC& reg_c)
     {
-        reg_c.template AsType<bhalf8_t>()(Number<0>{}) =
-            bit_cast<bhalf8_t>(__builtin_amdgcn_convolve_bf16_bf8_4x4(
-                bit_cast<bf16x8_t>(reg_c.template AsType<bhalf8_t>()[Number<0>{}]),
+        reg_c.template AsType<half8_t>()(Number<0>{}) =
+            bit_cast<half8_t>(__builtin_amdgcn_convolve_f16_bf8_4x4(
+                bit_cast<half8_t>(reg_c.template AsType<half8_t>()[Number<0>{}]),
                 bit_cast<int32x4_t>(reg_wei),
                 bit_cast<int32_t>(*reg_data[0]),
                 bit_cast<int32_t>(*reg_data[1]),
@@ -1069,14 +1069,14 @@ struct intrin_wconv_bf16_bf8<4, 4, 1, 1, 1, 4, Aco, Signed, HighLane>
 };
 
 template <bool Aco, bool Signed, bool HighLane>
-struct intrin_wconv_bf16_bf8<8, 4, 1, 1, 1, 1, Aco, Signed, HighLane>
+struct intrin_wconv_f16_bf8<8, 4, 1, 1, 1, 1, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const bf8x4_t& reg_wei, const bf8x8_t* reg_data[1], FloatC& reg_c)
     {
-        reg_c.template AsType<bhalf8_t>()(Number<0>{}) =
-            bit_cast<bhalf8_t>(__builtin_amdgcn_convolve_bf16_bf8_8x4(
-                bit_cast<bf16x8_t>(reg_c.template AsType<bhalf8_t>()[Number<0>{}]),
+        reg_c.template AsType<half8_t>()(Number<0>{}) =
+            bit_cast<half8_t>(__builtin_amdgcn_convolve_f16_bf8_8x4(
+                bit_cast<half8_t>(reg_c.template AsType<half8_t>()[Number<0>{}]),
                 bit_cast<int32_t>(reg_wei),
                 bit_cast<int32x2_t>(*reg_data[0]),
                 GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() |
@@ -1086,14 +1086,14 @@ struct intrin_wconv_bf16_bf8<8, 4, 1, 1, 1, 1, Aco, Signed, HighLane>
 };
 
 template <bool Aco, bool Signed, bool HighLane>
-struct intrin_wconv_bf16_bf8<8, 4, 1, 1, 1, 2, Aco, Signed, HighLane>
+struct intrin_wconv_f16_bf8<8, 4, 1, 1, 1, 2, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const bf8x4_t& reg_wei, const bf8x8_t* reg_data[2], FloatC& reg_c)
     {
-        reg_c.template AsType<bhalf8_t>()(Number<0>{}) =
-            bit_cast<bhalf8_t>(__builtin_amdgcn_convolve_bf16_bf8_8x4(
-                bit_cast<bf16x8_t>(reg_c.template AsType<bhalf8_t>()[Number<0>{}]),
+        reg_c.template AsType<half8_t>()(Number<0>{}) =
+            bit_cast<half8_t>(__builtin_amdgcn_convolve_f16_bf8_8x4(
+                bit_cast<half8_t>(reg_c.template AsType<half8_t>()[Number<0>{}]),
                 bit_cast<int32_t>(reg_wei),
                 bit_cast<int32x2_t>(*reg_data[0]),
                 bit_cast<int32x2_t>(*reg_data[1]),
@@ -1104,14 +1104,14 @@ struct intrin_wconv_bf16_bf8<8, 4, 1, 1, 1, 2, Aco, Signed, HighLane>
 };
 
 template <bool Aco, bool Signed, bool HighLane>
-struct intrin_wconv_bf16_bf8<8, 4, 1, 1, 1, 4, Aco, Signed, HighLane>
+struct intrin_wconv_f16_bf8<8, 4, 1, 1, 1, 4, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const bf8x8_t& reg_wei, const bf8x8_t* reg_data[4], FloatC& reg_c)
     {
-        reg_c.template AsType<bhalf8_t>()(Number<0>{}) =
-            bit_cast<bhalf8_t>(__builtin_amdgcn_convolve_bf16_bf8_8x4(
-                bit_cast<bf16x8_t>(reg_c.template AsType<bhalf8_t>()[Number<0>{}]),
+        reg_c.template AsType<half8_t>()(Number<0>{}) =
+            bit_cast<half8_t>(__builtin_amdgcn_convolve_f16_bf8_8x4(
+                bit_cast<half8_t>(reg_c.template AsType<half8_t>()[Number<0>{}]),
                 bit_cast<int32x2_t>(reg_wei),
                 bit_cast<int32x2_t>(*reg_data[0]),
                 bit_cast<int32x2_t>(*reg_data[1]),
@@ -1610,7 +1610,8 @@ template <bool Aco, bool Signed, bool HighLane>
 struct intrin_wconv_f16_iu4<8, 4, 1, 1, 1, 4, Aco, Signed, HighLane>
 {
     template <class FloatC>
-    __device__ static void Run(const int4x8_t& reg_wei, const int4x16_t* reg_data[4], FloatC& reg_c)
+    __device__ static void
+    Run(const int4x16_t& reg_wei, const int4x16_t* reg_data[4], FloatC& reg_c)
     {
         reg_c.template AsType<half8_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f16_iu4_8x4(
             reg_c.template AsType<half8_t>()[Number<0>{}],
@@ -1902,16 +1903,16 @@ struct intrin_wconv_bf16_bf16<8, 4, 3, DilationX, DilationY, 1, Aco, Signed, Hig
     }
 };
 
-// src: bf8, dst: bf16
+// src: bf8, dst: f16
 template <index_t DilationX, index_t DilationY, bool Aco, bool Signed, bool HighLane>
-struct intrin_wconv_bf16_bf8<4, 2, 3, DilationX, DilationY, 1, Aco, Signed, HighLane>
+struct intrin_wconv_f16_bf8<4, 2, 3, DilationX, DilationY, 1, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const bf8x72_t& reg_wei, const bf8x12_t* reg_data[3], FloatC& reg_c)
     {
-        reg_c.template AsType<bhalf4_t>()(Number<0>{}) =
-            bit_cast<bhalf4_t>(__builtin_amdgcn_convolve_bf16_bf8_4x2(
-                bit_cast<bf16x4_t>(reg_c.template AsType<bhalf4_t>()[Number<0>{}]),
+        reg_c.template AsType<half4_t>()(Number<0>{}) =
+            bit_cast<half4_t>(__builtin_amdgcn_convolve_f16_bf8_4x2(
+                bit_cast<half4_t>(reg_c.template AsType<half4_t>()[Number<0>{}]),
                 bit_cast<int32x18_t>(reg_wei),
                 bit_cast<int32x3_t>(*reg_data[1]),
                 bit_cast<int32x3_t>(*reg_data[0]),
@@ -1923,14 +1924,14 @@ struct intrin_wconv_bf16_bf8<4, 2, 3, DilationX, DilationY, 1, Aco, Signed, High
 };
 
 template <index_t DilationX, index_t DilationY, bool Aco, bool Signed, bool HighLane>
-struct intrin_wconv_bf16_bf8<4, 4, 3, DilationX, DilationY, 1, Aco, Signed, HighLane>
+struct intrin_wconv_f16_bf8<4, 4, 3, DilationX, DilationY, 1, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const bf8x36_t& reg_wei, const bf8x12_t* reg_data[3], FloatC& reg_c)
     {
-        reg_c.template AsType<bhalf8_t>()(Number<0>{}) =
-            bit_cast<bhalf8_t>(__builtin_amdgcn_convolve_bf16_bf8_4x4(
-                bit_cast<bf16x8_t>(reg_c.template AsType<bhalf8_t>()[Number<0>{}]),
+        reg_c.template AsType<half8_t>()(Number<0>{}) =
+            bit_cast<half8_t>(__builtin_amdgcn_convolve_f16_bf8_4x4(
+                bit_cast<half8_t>(reg_c.template AsType<half8_t>()[Number<0>{}]),
                 bit_cast<int32x9_t>(reg_wei),
                 bit_cast<int32x3_t>(*reg_data[1]),
                 bit_cast<int32x3_t>(*reg_data[0]),
@@ -1942,14 +1943,14 @@ struct intrin_wconv_bf16_bf8<4, 4, 3, DilationX, DilationY, 1, Aco, Signed, High
 };
 
 template <index_t DilationX, index_t DilationY, bool Aco, bool Signed, bool HighLane>
-struct intrin_wconv_bf16_bf8<8, 4, 3, DilationX, DilationY, 1, Aco, Signed, HighLane>
+struct intrin_wconv_f16_bf8<8, 4, 3, DilationX, DilationY, 1, Aco, Signed, HighLane>
 {
     template <class FloatC>
     __device__ static void Run(const bf8x20_t& reg_wei, const bf8x16_t* reg_data[3], FloatC& reg_c)
     {
-        reg_c.template AsType<bhalf8_t>()(Number<0>{}) =
-            bit_cast<bhalf8_t>(__builtin_amdgcn_convolve_bf16_bf8_8x4(
-                bit_cast<bf16x8_t>(reg_c.template AsType<bhalf8_t>()[Number<0>{}]),
+        reg_c.template AsType<half8_t>()(Number<0>{}) =
+            bit_cast<half8_t>(__builtin_amdgcn_convolve_f16_bf8_8x4(
+                bit_cast<half8_t>(reg_c.template AsType<half8_t>()[Number<0>{}]),
                 bit_cast<int32x5_t>(reg_wei),
                 bit_cast<int32x4_t>(*reg_data[1]),
                 bit_cast<int32x4_t>(*reg_data[0]),

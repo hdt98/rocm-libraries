@@ -63,7 +63,7 @@ struct GridwiseConvPipeline_v1<1, true, true, false>
     {
         constexpr auto wei_block_copy_step = to_multi_index(WeiDataBlockTransferStep{});
         constexpr auto in_block_copy_step  = to_multi_index(InDataBlockTransferStep{});
-        constexpr index_t NumTap           = wei_blockwise_copy.Size();
+        constexpr index_t NumTap           = WeiDataBlockTransfer::Size();
         using WeiDataBlockTransfer0 =
             std::remove_const_t<remove_cvref_t<decltype(wei_blockwise_copy[I0])>>;
 
@@ -182,7 +182,7 @@ struct GridwiseConvPipeline_v1<1, false, true, false>
     {
         constexpr auto wei_block_copy_step = to_multi_index(WeiDataBlockTransferStep{});
         constexpr auto in_block_copy_step  = to_multi_index(InDataBlockTransferStep{});
-        constexpr index_t NumTap           = wei_blockwise_copy.Size();
+        constexpr index_t NumTap           = WeiDataBlockTransfer::Size();
         constexpr auto in_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0);
         auto in_block_buf_switch           = in_block_buf;
 
@@ -306,11 +306,11 @@ struct GridwiseConvPipeline_v1<1, false, false, EnableAsync>
     {
         constexpr auto wei_block_copy_step = to_multi_index(WeiDataBlockTransferStep{});
         constexpr auto in_block_copy_step  = to_multi_index(InDataBlockTransferStep{});
-        constexpr index_t NumTap           = wei_blockwise_copy.Size();
+        constexpr index_t NumTap           = WeiDataBlockTransfer::Size();
         constexpr auto in_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0);
         auto in_block_buf_switch           = in_block_buf;
         auto wei_block_buf_switch          = wei_block_buf;
-        constexpr auto wei_remap_table     = blockwise_conv.GetWeightRemapTable();
+        constexpr auto wei_remap_table     = BlockwiseConv::GetWeightRemapTable();
 
         using WeiDataBlockTransfer0 =
             std::remove_const_t<remove_cvref_t<decltype(wei_blockwise_copy[I0])>>;
@@ -426,8 +426,8 @@ struct GridwiseConvPipeline_v1<1, true, false, false>
         constexpr auto wei_block_copy_step = to_multi_index(WeiDataBlockTransferStep{});
         constexpr auto in_block_copy_step  = to_multi_index(InDataBlockTransferStep{});
 
-        constexpr index_t NumTap       = wei_blockwise_copy.Size();
-        constexpr auto wei_remap_table = blockwise_conv.GetWeightRemapTable();
+        constexpr index_t NumTap       = WeiDataBlockTransfer::Size();
+        constexpr auto wei_remap_table = BlockwiseConv::GetWeightRemapTable();
         auto wei_block_buf_switch      = wei_block_buf;
 
         using WeiDataBlockTransfer0 =
@@ -550,7 +550,7 @@ struct GridwiseConvPipeline_v1<1, true, true, true>
     {
         constexpr auto wei_block_copy_step = to_multi_index(WeiDataBlockTransferStep{});
         constexpr auto in_block_copy_step  = to_multi_index(InDataBlockTransferStep{});
-        constexpr index_t NumTap           = wei_blockwise_copy.Size();
+        constexpr index_t NumTap           = WeiDataBlockTransfer::Size();
         using WeiDataBlockTransfer0 =
             std::remove_const_t<remove_cvref_t<decltype(wei_blockwise_copy[I0])>>;
 
@@ -658,7 +658,7 @@ struct GridwiseConvPipeline_v1<1, false, true, true>
     {
         constexpr auto wei_block_copy_step = to_multi_index(WeiDataBlockTransferStep{});
         constexpr auto in_block_copy_step  = to_multi_index(InDataBlockTransferStep{});
-        constexpr index_t NumTap           = wei_blockwise_copy.Size();
+        constexpr index_t NumTap           = WeiDataBlockTransfer::Size();
         constexpr auto in_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0);
         auto in_block_buf_switch           = in_block_buf;
 
@@ -773,8 +773,8 @@ struct GridwiseConvPipeline_v1<1, true, false, true>
     {
         constexpr auto wei_block_copy_step = to_multi_index(WeiDataBlockTransferStep{});
         constexpr auto in_block_copy_step  = to_multi_index(InDataBlockTransferStep{});
-        constexpr index_t NumTap           = wei_blockwise_copy.Size();
-        constexpr auto wei_remap_table     = blockwise_conv.GetWeightRemapTable();
+        constexpr index_t NumTap           = WeiDataBlockTransfer::Size();
+        constexpr auto wei_remap_table     = BlockwiseConv::GetWeightRemapTable();
         auto wei_block_buf_switch          = wei_block_buf;
 
         using WeiDataBlockTransfer0 =

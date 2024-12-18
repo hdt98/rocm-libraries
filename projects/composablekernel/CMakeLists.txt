@@ -260,6 +260,7 @@ option(USE_BITINT_EXTENSION_INT4 "Whether to enable clang's BitInt extension to 
 option(USE_OPT_GFX11 "Whether to enable LDS cumode and Wavefront32 mode for GFX11 silicons." OFF)
 option(USE_OPT_GFX13 "Whether to force Wavefront32 mode for GFX13 silicons." ON)
 option(ENABLE_GFX13_FAIL_TESTS "Whether enable tests and examples which are failed on GFX13 build." OFF)
+option(SAVE_TEMPS "Whether save intermeidate result." OFF)
 
 if(USE_BITINT_EXTENSION_INT4)
     add_compile_definitions(CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4)
@@ -273,10 +274,13 @@ if(USE_OPT_GFX11)
     message("CK compiled with USE_OPT_GFX11 set to ${USE_OPT_GFX11}")
 endif()
 
-if(USE_OPT_GFX13)
+if(USE_OPT_GFX13 AND (SUPPORTED_GPU_TARGETS MATCHES "gfx13"))
     add_compile_options(-mno-wavefrontsize64)
-    add_compile_options(-save-temps=obj -Wno-gnu-line-marker)
     message("CK compiled with USE_OPT_GFX13 set to ${USE_OPT_GFX13}")
+endif()
+
+if(SAVE_TEMPS)
+    add_compile_options(-save-temps=obj -Wno-gnu-line-marker)
 endif()
 
 ## Threads

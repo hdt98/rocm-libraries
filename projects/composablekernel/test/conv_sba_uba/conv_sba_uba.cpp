@@ -799,26 +799,26 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
                 constexpr index_t tileOffset = h * WRepeat * KRepeat + w * KRepeat + k;
                 auto& d_vec                  = d_thread_buf_.GetVectorTypeReference(
                     Number<tileOffset * accSbaInstance.GetNumSbaOutComponents()>{});
-                AccDataType& scale_ = scale_data[tileOffset];
+                AccDataType& scale = scale_data[tileOffset];
 
                 if constexpr(std::is_same<float, AccDataType>::value)
                 {
                     const AccDataType& bias_data32bit_v = bias_32bit_data[tileOffset];
-                    accSbaInstance.sba_instr.Run(c_vec, scale_, bias_data32bit_v, d_vec);
+                    accSbaInstance.sba_instr.Run(c_vec, scale, bias_data32bit_v, d_vec);
                 }
                 else if constexpr(std::is_same<half_t, AccDataType>::value)
                 {
                     const vector_type<AccDataType, 2>& bias_data16bit_v =
                         bias_16bit_data[tileOffset];
                     accSbaInstance.sba_instr.Run(
-                        c_vec, scale_, bit_cast<half2_t>(bias_data16bit_v), d_vec);
+                        c_vec, scale, bit_cast<half2_t>(bias_data16bit_v), d_vec);
                 }
                 else if constexpr(std::is_same<bhalf_t, AccDataType>::value)
                 {
                     const vector_type<AccDataType, 2>& bias_data16bit_v =
                         bias_16bit_data[tileOffset];
                     accSbaInstance.sba_instr.Run(
-                        c_vec, scale_, bit_cast<bhalf2_t>(bias_data16bit_v), d_vec);
+                        c_vec, scale, bit_cast<bhalf2_t>(bias_data16bit_v), d_vec);
                 }
 
                 store_acc_data(h, w, k, d_vec);
@@ -1547,9 +1547,9 @@ int main(int argc, char* argv[])
    pass &= run_test_fmt<int8_t,      ck::half_t,  ck::half_t,  0, 0, 0x8  >();
    pass &= run_test_fmt<int8_t,      ck::half_t,  ck::half_t,  1, 0, 0x10 >();
    pass &= run_test_fmt<int8_t,      ck::half_t,  ck::half_t,  0, 1, 0x20 >();
-   pass &= run_test_fmt<ck::bf8_t,   ck::bhalf_t, ck::bhalf_t, 0, 0, 0x40 >();
-   pass &= run_test_fmt<ck::bf8_t,   ck::bhalf_t, ck::bhalf_t, 0, 1, 0x80 >();
-   pass &= run_test_fmt<ck::bf8_t,   ck::bhalf_t, ck::bhalf_t, 1, 0, 0x100>();
+   pass &= run_test_fmt<ck::bf8_t,   ck::half_t,  ck::half_t, 0, 0, 0x40 >();
+   pass &= run_test_fmt<ck::bf8_t,   ck::half_t,  ck::half_t, 0, 1, 0x80 >();
+   pass &= run_test_fmt<ck::bf8_t,   ck::half_t,  ck::half_t, 1, 0, 0x100>();
 
     // clang-format on
 

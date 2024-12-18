@@ -185,7 +185,11 @@ inline __host__ __device__ f8_t f8_convert_sr<f8_t, float>(float x)
     val.i32val = ival;
     return val.i8val[0]; // little endian
 #else
+#ifdef CK_ENABLE_F8_MODE
     constexpr bool negative_zero_nan = true;
+#else
+    constexpr bool negative_zero_nan = false;
+#endif
     constexpr bool clip              = true;
     constexpr f8_rounding_mode rm    = f8_rounding_mode::stochastic;
     return utils::
@@ -202,7 +206,11 @@ inline __host__ __device__ f8_t f8_convert_sr<f8_t, half_t>(half_t x)
     // convert to float and use native converion
     return f8_convert_sr<f8_t>(type_convert<float>(x));
 #else
+#ifdef CK_ENABLE_F8_MODE
     constexpr bool negative_zero_nan = true;
+#else
+    constexpr bool negative_zero_nan = false;
+#endif
     constexpr bool clip              = true;
     constexpr f8_rounding_mode rm    = f8_rounding_mode::stochastic;
     constexpr int seed               = 1254739;
@@ -237,7 +245,11 @@ inline __host__ __device__ bf8_t f8_convert_sr<bf8_t, float>(float x)
     val.i32val = ival;
     return val.i8val[0]; // little endian
 #else
+#ifdef CK_ENABLE_F8_MODE
     constexpr bool negative_zero_nan = true;
+#else
+    constexpr bool negative_zero_nan = false;
+#endif
     constexpr bool clip              = true;
     constexpr f8_rounding_mode rm    = f8_rounding_mode::stochastic;
     return utils::
@@ -254,7 +266,11 @@ inline __host__ __device__ bf8_t f8_convert_sr<bf8_t, half_t>(half_t x)
     // convert to float and use native converion
     return f8_convert_sr<bf8_t>(type_convert<float>(x));
 #else
+#ifdef CK_ENABLE_F8_MODE
     constexpr bool negative_zero_nan = true;
+#else
+    constexpr bool negative_zero_nan = false;
+#endif
     constexpr bool clip              = true;
     constexpr f8_rounding_mode rm    = f8_rounding_mode::stochastic;
     constexpr int seed               = 1254739;
@@ -291,7 +307,11 @@ inline __host__ __device__ f8_t f8_convert_rne<f8_t, float>(float x)
     val.i32val = ival;
     return val.i8val[0];
 #else
+#ifdef CK_ENABLE_F8_MODE
     constexpr bool negative_zero_nan = true;
+#else
+    constexpr bool negative_zero_nan = false;
+#endif
     constexpr bool clip              = true;
     constexpr f8_rounding_mode rm    = f8_rounding_mode::standard;
     constexpr uint32_t rng           = 0;
@@ -309,7 +329,11 @@ inline __host__ __device__ f8_t f8_convert_rne<f8_t, half_t>(half_t x)
     // convert to float and use native converion
     return f8_convert_rne<f8_t>(type_convert<float>(x));
 #else
+#ifdef CK_ENABLE_F8_MODE
     constexpr bool negative_zero_nan = true;
+#else
+    constexpr bool negative_zero_nan = false;
+#endif
     constexpr bool clip              = true;
     constexpr f8_rounding_mode rm    = f8_rounding_mode::standard;
     constexpr uint32_t rng           = 0;
@@ -341,7 +365,11 @@ inline __host__ __device__ bf8_t f8_convert_rne<bf8_t, float>(float x)
     val.i32val = ival;
     return val.i8val[0];
 #else
+#ifdef CK_ENABLE_F8_MODE
     constexpr bool negative_zero_nan = true;
+#else
+    constexpr bool negative_zero_nan = false;
+#endif
     constexpr bool clip              = true;
     constexpr f8_rounding_mode rm    = f8_rounding_mode::standard;
     constexpr uint32_t rng           = 0;
@@ -359,7 +387,11 @@ inline __host__ __device__ bf8_t f8_convert_rne<bf8_t, half_t>(half_t x)
     // convert to float and use native converion
     return f8_convert_rne<bf8_t>(type_convert<float>(x));
 #else
+#ifdef CK_ENABLE_F8_MODE
     constexpr bool negative_zero_nan = true;
+#else
+    constexpr bool negative_zero_nan = false;
+#endif
     constexpr bool clip              = true;
     constexpr f8_rounding_mode rm    = f8_rounding_mode::standard;
     constexpr uint32_t rng           = 0;
@@ -391,7 +423,11 @@ inline __host__ __device__ float type_convert<float, f8_t>(f8_t x)
     // asm volatile("v_cvt_f32_fp8 %0, %1 src0_sel:BYTE_0" : "=v"(fval) : "v"(i32val));
     return fval;
 #else
+#ifdef CK_ENABLE_F8_MODE
     constexpr bool negative_zero_nan = true;
+#else
+    constexpr bool negative_zero_nan = false;
+#endif
     return utils::cast_from_f8<f8_t, float, negative_zero_nan>(x);
 #endif
 }
@@ -403,7 +439,11 @@ inline __host__ __device__ float2_t type_convert<float2_t, f8x2_t>(f8x2_t x)
     const auto i16val = bit_cast<uint16_t>(x);
     return __builtin_amdgcn_cvt_pk_f32_fp8(i16val, 0);
 #else
+#ifdef CK_ENABLE_F8_MODE
     constexpr bool negative_zero_nan = true;
+#else
+    constexpr bool negative_zero_nan = false;
+#endif
     const auto f8x2_v                = vector_type<f8_t, 2>(x);
     vector_type<float, 2> f32x2_v;
     f32x2_v.template AsType<float>()(Number<0>{}) =
@@ -445,7 +485,11 @@ inline __host__ __device__ half_t type_convert<half_t, f8_t>(f8_t x)
     // use native conversion to float and convert to fp16
     return type_convert<half_t>(type_convert<float>(x));
 #else
+#ifdef CK_ENABLE_F8_MODE
     constexpr bool negative_zero_nan = true;
+#else
+    constexpr bool negative_zero_nan = false;
+#endif
     return utils::cast_from_f8<f8_t, half_t, negative_zero_nan>(x);
 #endif
 }
@@ -472,7 +516,11 @@ inline __host__ __device__ float type_convert<float, bf8_t>(bf8_t x)
     // asm volatile("v_cvt_f32_bf8 %0, %1 src0_sel:BYTE_0" : "=v"(fval) : "v"(i32val));
     return fval;
 #else
+#ifdef CK_ENABLE_F8_MODE
     constexpr bool negative_zero_nan = true;
+#else
+    constexpr bool negative_zero_nan = false;
+#endif
     return utils::cast_from_f8<bf8_t, float, negative_zero_nan>(x);
 #endif
 }
@@ -496,7 +544,11 @@ inline __host__ __device__ half_t type_convert<half_t, bf8_t>(bf8_t x)
     // use native conversion to float and convert to fp16
     return type_convert<half_t>(type_convert<float>(x));
 #else
+#ifdef CK_ENABLE_F8_MODE
     constexpr bool negative_zero_nan = true;
+#else
+    constexpr bool negative_zero_nan = false;
+#endif
     return utils::cast_from_f8<bf8_t, half_t, negative_zero_nan>(x);
 #endif
 }

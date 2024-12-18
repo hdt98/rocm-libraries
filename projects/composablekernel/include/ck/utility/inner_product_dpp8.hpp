@@ -15,11 +15,12 @@ namespace dpp8 {
 constexpr index_t lane_group_size = 8;
 
 template <int SrcLaneIdx>
-__device__ void inline_v_dot2c_dpp8_instr(const half2_t& a, const half2_t& b, float& c);
+__device__ void inline_v_dot2c_dpp8_instr(const half2_t&, const half2_t&, float&);
 
 template <int SrcLaneIdx>
-__device__ void inline_v_mov_dpp8_instr(const half2_t& a, half2_t& b);
+__device__ void inline_v_mov_dpp8_instr(const half2_t&, half2_t&);
 
+#if defined(CK_USE_AMD_V_DOT2_F32_F16)
 // clang-format off
 template <>
 __device__ void inline_v_dot2c_dpp8_instr<0>(const half2_t& a, const half2_t& b, float& c){
@@ -54,6 +55,7 @@ __device__ void inline_v_dot2c_dpp8_instr<7>(const half2_t& a, const half2_t& b,
     asm volatile("\n v_dot2c_f32_f16_dpp %0, %1, %2 dpp8:[7, 7, 7, 7, 7, 7, 7, 7]" : "=v"(c) : "v"(a), "v"(b), "0"(c));
 }
 // clang-format on
+#endif
 
 /**
  * Dot product of two vectors using `v_dot` instruction with DPP8 submitted as inline assembly.
@@ -61,6 +63,7 @@ __device__ void inline_v_dot2c_dpp8_instr<7>(const half2_t& a, const half2_t& b,
 template <int SrcLaneIdx, bool ShareA>
 __device__ void inline_v_dot2c_dpp8(const half2_t& a, const half2_t& b, float& c)
 {
+#if defined(CK_USE_AMD_V_DOT2_F32_F16)
     static_assert(SrcLaneIdx >= 0 && SrcLaneIdx < dpp8::lane_group_size,
                   "DPP8 src broadcast lane out of range <0, 7>.");
     if constexpr(ShareA)
@@ -71,6 +74,11 @@ __device__ void inline_v_dot2c_dpp8(const half2_t& a, const half2_t& b, float& c
     {
         inline_v_dot2c_dpp8_instr<SrcLaneIdx>(b, a, c);
     }
+#else
+    ignore = a;
+    ignore = b;
+    ignore = c;
+#endif
 }
 
 /**

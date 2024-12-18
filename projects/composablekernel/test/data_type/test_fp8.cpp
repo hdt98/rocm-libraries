@@ -11,13 +11,22 @@ using ck::f8_t;
 using ck::half_t;
 using ck::type_convert;
 
+#ifdef CK_ENABLE_F8_MODE
+constexpr int32_t F8NaN    = 0x80;
+constexpr int32_t F8Max    = 0x7F;
+constexpr int32_t F8Lowest = 0xFF;
+#else
+constexpr int32_t F8NaN    = 0x7F;
+constexpr int32_t F8Max    = 0x7E;
+constexpr int32_t F8Lowest = 0xFE;
+#endif
 TEST(FP8, NumericLimits)
 {
     // constants given for negative zero nan mode
     EXPECT_EQ(ck::NumericLimits<f8_t>::Min(), type_convert<f8_t>(0x08));
-    EXPECT_EQ(ck::NumericLimits<f8_t>::Max(), type_convert<f8_t>(0x7F));
-    EXPECT_EQ(ck::NumericLimits<f8_t>::Lowest(), type_convert<f8_t>(0xFF));
-    EXPECT_EQ(ck::NumericLimits<f8_t>::QuietNaN(), type_convert<f8_t>(0x80));
+    EXPECT_EQ(ck::NumericLimits<f8_t>::Max(), type_convert<f8_t>(F8Max));
+    EXPECT_EQ(ck::NumericLimits<f8_t>::Lowest(), type_convert<f8_t>(F8Lowest));
+    EXPECT_EQ(ck::NumericLimits<f8_t>::QuietNaN(), type_convert<f8_t>(F8NaN));
 }
 
 TEST(FP8, ConvertFP32Nearest)
@@ -40,7 +49,7 @@ TEST(FP8, ConvertFP32Nearest)
                 type_convert<float>(f8_convert_rne<f8_t>(std::numeric_limits<float>::max())),
                 abs_tol);
     // convert inf float to f8_t and check if it is qNan
-    ASSERT_NEAR(type_convert<f8_t>(0x80),
+    ASSERT_NEAR(type_convert<f8_t>(F8NaN),
                 f8_convert_rne<f8_t>(std::numeric_limits<float>::infinity()),
                 abs_tol);
     // positive norm float value to fp8 and back, check if holds
@@ -74,7 +83,7 @@ TEST(FP8, ConvertFP32Stochastic)
                 type_convert<float>(f8_convert_sr<f8_t>(std::numeric_limits<float>::max())),
                 abs_tol);
     // convert inf float to f8_t and check if it is qNan
-    ASSERT_NEAR(type_convert<f8_t>(0x80),
+    ASSERT_NEAR(type_convert<f8_t>(F8NaN),
                 f8_convert_sr<f8_t>(std::numeric_limits<float>::infinity()),
                 abs_tol);
     // positive norm float value to fp8 and back, check if holds
@@ -108,7 +117,7 @@ TEST(FP8, ConvertFP16Nearest)
                 type_convert<half_t>(f8_convert_rne<f8_t>(ck::NumericLimits<half_t>::Max())),
                 abs_tol);
     // convert QuietNaN fp16 to f8_t and check if it is QuietNaN
-    ASSERT_NEAR(type_convert<f8_t>(0x80),
+    ASSERT_NEAR(type_convert<f8_t>(F8NaN),
                 f8_convert_rne<f8_t>(ck::NumericLimits<half_t>::QuietNaN()),
                 abs_tol);
     // positive norm fp16 value to fp8 and back, check if holds
@@ -142,7 +151,7 @@ TEST(FP8, ConvertFP16Stochastic)
                 type_convert<half_t>(f8_convert_sr<f8_t>(ck::NumericLimits<half_t>::Max())),
                 abs_tol);
     // convert QuietNaN fp16 to f8_t and check if it is QuietNaN
-    ASSERT_NEAR(type_convert<f8_t>(0x80),
+    ASSERT_NEAR(type_convert<f8_t>(F8NaN),
                 f8_convert_sr<f8_t>(ck::NumericLimits<half_t>::QuietNaN()),
                 abs_tol);
     // positive norm fp16 value to fp8 and back, check if holds

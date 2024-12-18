@@ -21,7 +21,7 @@ enum struct WconvInstr
     wconv_f16_f16,
     wconv_bf16_bf16,
     wconv_f16_f8,
-    wconv_bf16_bf8,
+    wconv_f16_bf8,
     wconv_f16_iu8,
     wconv_f32_iu4,
     wconv_i32_iu4,
@@ -426,12 +426,10 @@ struct wconv_type<WconvInstr::wconv_bf16_iu4,
     template <class FloatA, class FloatB, class FloatC, class Mod>
     __device__ void Run(const FloatA& reg_wei, const FloatB reg_data, FloatC& reg_c, Mod) const
     {
-#if defined(__gfx13__)
         // TODO
         ignore = reg_wei;
         ignore = reg_data;
         ignore = reg_c;
-#endif
     }
 };
 #endif
@@ -565,7 +563,7 @@ template <index_t H,
           index_t Iters,
           bool Aco,
           bool Signed>
-struct wconv_type<WconvInstr::wconv_bf16_bf8,
+struct wconv_type<WconvInstr::wconv_f16_bf8,
                   H,
                   W,
                   FilterSize,
@@ -580,15 +578,15 @@ struct wconv_type<WconvInstr::wconv_bf16_bf8,
     {
 #if defined(__gfx13__)
         constexpr bool isHighLane = Mod{} & 1;
-        intrin_wconv_bf16_bf8<H,
-                              W,
-                              FilterSize,
-                              DilationX,
-                              DilationY,
-                              Iters,
-                              Aco,
-                              Signed,
-                              isHighLane>::Run(reg_wei, reg_data, reg_c);
+        intrin_wconv_f16_bf8<H,
+                             W,
+                             FilterSize,
+                             DilationX,
+                             DilationY,
+                             Iters,
+                             Aco,
+                             Signed,
+                             isHighLane>::Run(reg_wei, reg_data, reg_c);
 #else
         ignore = reg_wei;
         ignore = reg_data;
@@ -742,9 +740,9 @@ struct WconvSelector
     }
 
     template <>
-    constexpr auto GetWconv<bf8_t, bf8_t, bhalf_t>()
+    constexpr auto GetWconv<bf8_t, bf8_t, half_t>()
     {
-        return WconvInstr::wconv_bf16_bf8;
+        return WconvInstr::wconv_f16_bf8;
     }
 
     template <>
