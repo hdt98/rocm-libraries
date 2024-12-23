@@ -38,14 +38,17 @@ using f8_fnuz_t  = _BitInt(8);
 using bf8_fnuz_t = unsigned _BitInt(8);
 
 #if(defined(__gfx940__) || defined(__gfx941__) || defined(__gfx942__) || defined(__gfx1200__) || \
-    defined(__gfx1201__)) &&                                                                     \
+    defined(__gfx1201__) || defined(__gfx1300__) || defined(__gfx1301__) ||                      \
+    defined(__gfx1302__)) &&                                                                     \
     __HIP_DEVICE_COMPILE__
 #define CK_FP8_CVT_FAST_PATH 1
 #else
 #define CK_FP8_CVT_FAST_PATH 0
 #endif
 
-#if(defined(__gfx1200__) || defined(__gfx1201__)) && __HIP_DEVICE_COMPILE__
+#if(defined(__gfx1200__) || defined(__gfx1201__) || defined(__gfx1300__) || \
+    defined(__gfx1301__) || defined(__gfx1302__)) &&                        \
+    __HIP_DEVICE_COMPILE__
 #define CK_OCP_FP8_CVT_FAST_PATH 1
 #else
 #define CK_OCP_FP8_CVT_FAST_PATH 0
@@ -376,7 +379,8 @@ struct bf8_ocp_t
     __host__ explicit operator float() const
 #endif
     {
-#if defined(__gfx1200__) || defined(__gfx1201__)
+#if defined(__gfx1200__) || defined(__gfx1201__) || defined(__gfx1300__) || \
+    defined(__gfx1301__) || defined(__gfx1302__)
         return fp8_impl::cast_to_f32_from_f8<default_interpret>(this->data);
 #else
         return fp8_impl::cast_from_f8<float, wm, we, false>(
@@ -390,7 +394,8 @@ struct bf8_ocp_t
     __host__ explicit operator _Float16() const
 #endif
     {
-#if defined(__gfx1200__) || defined(__gfx1201__)
+#if defined(__gfx1200__) || defined(__gfx1201__) || defined(__gfx1300__) || \
+    defined(__gfx1301__) || defined(__gfx1302__)
         return static_cast<_Float16>(fp8_impl::cast_to_f32_from_f8<default_interpret>(this->data));
 #else
         return fp8_impl::cast_from_f8<_Float16, wm, we, false>(

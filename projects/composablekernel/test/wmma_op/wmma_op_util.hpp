@@ -184,9 +184,29 @@ struct WMMAVecType<T,
 };
 
 template <typename T, index_t kMultiplier>
-struct WMMAVecType<T,
-                   kMultiplier,
-                   ck::enable_if_t<ck::is_same_v<T, ck::f8_t> || ck::is_same_v<T, ck::bf8_t>>>
+struct WMMAVecType<
+    T,
+    kMultiplier,
+    ck::enable_if_t<ck::is_same_v<T, ck::f8_ocp_t> || ck::is_same_v<T, ck::bf8_ocp_t>>>
+{
+    static constexpr bool layoutTransform = true;
+    static constexpr int ToIntDim         = 4;
+
+    template <typename D>
+    constexpr static bool is_compatible()
+    {
+        return ck::is_same_v<D, ck::f8_t> || ck::is_same_v<D, ck::bf8_t>;
+    }
+
+    using VecT  = vector_type<typename T::data_type, kMultiplier * 8>;
+    using ViewT = vector_type<typename T::data_type, 4>;
+};
+
+template <typename T, index_t kMultiplier>
+struct WMMAVecType<
+    T,
+    kMultiplier,
+    ck::enable_if_t<ck::is_same_v<T, ck::f8_fnuz_t> || ck::is_same_v<T, ck::bf8_fnuz_t>>>
 {
     static constexpr bool layoutTransform = true;
     static constexpr int ToIntDim         = 4;
@@ -473,6 +493,8 @@ __global__ void matmul_mixedfp(const typename src0_t::type_t* a,
     ignore = a;
     ignore = b;
     ignore = c;
+    ignore = a_block_scale;
+    ignore = b_block_scale;
 }
 #elif defined(__gfx13__)
 template <typename srcA_t, typename srcB_t, typename dst_t, typename acc_t, index_t kMultiplier>

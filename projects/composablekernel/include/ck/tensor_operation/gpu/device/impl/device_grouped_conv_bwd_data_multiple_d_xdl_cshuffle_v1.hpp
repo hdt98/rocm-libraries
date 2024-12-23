@@ -102,10 +102,10 @@ __global__ void
 
     const auto ds_batch_offset = compute_ptr_offset_of_batch.GetDsPtrOffset(g_idx);
 
-    const long_index_t a_n_offset =
-        amd_wave_read_first_lane(compute_ptr_offset_of_n.GetAPtrOffset(n_idx));
-    const long_index_t e_n_offset =
-        amd_wave_read_first_lane(compute_ptr_offset_of_n.GetEPtrOffset(n_idx));
+    const long_index_t a_n_offset = amd_wave_read_first_lane(
+        static_cast<int64_t>(compute_ptr_offset_of_n.GetAPtrOffset(n_idx)));
+    const long_index_t e_n_offset = amd_wave_read_first_lane(
+        static_cast<int64_t>(compute_ptr_offset_of_n.GetEPtrOffset(n_idx)));
 
     __shared__ char p_shared[GridwiseGemm::GetSharedMemoryNumberOfByte()];
 

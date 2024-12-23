@@ -66,7 +66,7 @@ struct GroupedGemmKernel
 
     using Hargs = GroupedGemmHostArgs;
 
-    __host__ static constexpr auto GridSize(const std::vector<Hargs>& gemm_descs)
+    __host__ static auto GridSize(const std::vector<Hargs>& gemm_descs)
     {
         index_t grid_size = 0;
         for(const auto& it_desc : gemm_descs)
