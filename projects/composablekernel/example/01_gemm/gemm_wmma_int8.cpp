@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2023, Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (c) 2018-2024, Advanced Micro Devices, Inc. All rights reserved.
 
 #include "common.hpp"
 
 #include "ck/tensor_operation/gpu/device/impl/device_gemm_wmma.hpp"
 
-using ADataType        = std::int8_t;
-using BDataType        = std::int8_t;
-using AccDataType      = std::int32_t;
-using CShuffleDataType = std::int32_t;
-using CDataType        = std::int8_t;
+using ADataType        = int8_t;
+using BDataType        = int8_t;
+using AccDataType      = int32_t;
+using CShuffleDataType = int32_t;
+using CDataType        = int8_t;
 
 using ALayout = Row;
 using BLayout = Col;
@@ -36,33 +36,33 @@ using DeviceGemmInstance = ck::tensor_operation::device::DeviceGemmWmma_CShuffle
            CElementOp,
            GemmDefault,
            1,           // Prefetch stage
-           64,         // BlockSize
-           32,          // MPerBlock
-           16,         // NPerBlock
-           16,          // KPerBlock
-           4,           // K1
+           128,         // BlockSize
+           64,          // MPerBlock
+           128,         // NPerBlock
+           64,          // KPerBlock
+           2,           // K1
            16,          // MPerWmma
            16,          // NPerWmma
-           1,           // M-Repeat // M-PerWmma / M-Repeat = M-Wave
-           1,           // N-Repeat // N-PerWmma / N-Repeat = N-Wave
-           S<4, 16, 1>,
+           2,           // M-Repeat // M-PerWmma / M-Repeat = M-Wave
+           4,           // N-Repeat // N-PerWmma / N-Repeat = N-Wave
+           S<4, 32, 1>,
            S<1, 0, 2>,
            S<1, 0, 2>,
            2,
-           4,
-           4,
+           2,
+           2,
            true,
-           S<4, 16, 1>,
+           S<4, 32, 1>,
            S<1, 0, 2>,
            S<1, 0, 2>,
            2,
-           4,
-           4,
+           2,
+           2,
            true,
            1,           // C shuffle (M Repeat) Per store
            1,           // C shuffle (N Repeat) Per store
-           S<1, 16, 1, 4>,
-           4>;
+           S<1, 32, 1,  4>,
+           8>;
 // clang-format on
 
 using ReferenceGemmInstance = ck::tensor_operation::host::

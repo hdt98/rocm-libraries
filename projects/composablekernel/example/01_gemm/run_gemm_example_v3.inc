@@ -145,8 +145,8 @@ bool run_gemm(const ProblemType& problem_size, const ExecutionConfig& config)
     switch(config.init_method)
     {
     case 0:
-        ck::utils::FillConstant<ADataType::type_t>{static_cast<ADataType::type_t>(1.f)}(a_m_k);
-        ck::utils::FillConstant<BDataType::type_t>{static_cast<BDataType::type_t>(1.f)}(b_k_n);
+        ck::utils::FillConstant<ADataType::type_t>{ck::type_convert<ADataType::type_t, float>(1.f)}(a_m_k);
+        ck::utils::FillConstant<BDataType::type_t>{ck::type_convert<BDataType::type_t, float>(1.f)}(b_k_n);
         break;
     case 1:
         ck::utils::FillUniformDistributionIntegerValue<ADataType::type_t>{-5.f, 5.f}(a_m_k);

@@ -591,7 +591,10 @@ struct wmma_type<WmmaInstr::wmma_f32_16x16_bf16_gfx13,
     // static constexpr index_t num_src_b_vgprs_per_wave = n_per_wmma * src_b_data_size / 4;
     static constexpr index_t num_acc_vgprs_per_wave = m_per_wmma * n_per_wmma / wave_size;
     static constexpr index_t num_subgroups          = wave_size / num_thread_per_subgroups;
-
+    // * num_consecutive_vgprs means how many vgprs in consecutive
+    static constexpr index_t num_acc_per_thread  = m_per_wmma * n_per_wmma / wave_size;
+    static constexpr index_t num_consecutive_acc = 2;
+    static constexpr index_t loop_of_consecutive = num_acc_per_thread / num_consecutive_acc;
     template <index_t MPerWmma,
               index_t NPerWmma,
               index_t KPerWmma,

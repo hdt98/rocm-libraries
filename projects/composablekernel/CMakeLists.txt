@@ -148,20 +148,20 @@ message("hip_version_flat=${hip_VERSION_FLAT}")
 
 message("checking which targets are supported")
 #In order to build just the CK library (without tests and examples) for all supported GPU targets
-#use -D GPU_ARCHS="gfx908;gfx90a;gfx940;gfx941;gfx942;gfx1030;gfx1100;gfx1101;gfx1102;gfx1200;gfx1201" 
+#use -D GPU_ARCHS="gfx908;gfx90a;gfx942;gfx1030;gfx1100;gfx1101;gfx1102;gfx1200;gfx1201"
 #the GPU_TARGETS flag will be reset in this case in order to avoid conflicts.
 #
 #In order to build CK along with all tests and examples it should be OK to set GPU_TARGETS to just 1 or 2 similar architectures.
 if(NOT ENABLE_ASAN_PACKAGING)
     if(NOT WIN32 AND ${hip_VERSION_FLAT} LESS 600300000)
         # WORKAROUND: compiler does not yet fully support gfx12 targets, need to fix version above
-        set(CK_GPU_TARGETS "gfx908;gfx90a;gfx940;gfx941;gfx942;gfx1030;gfx1100;gfx1101;gfx1102;gfx950")
+        set(CK_GPU_TARGETS "gfx908;gfx90a;gfx942;gfx1030;gfx1100;gfx1101;gfx1102")
     else()
-        set(CK_GPU_TARGETS "gfx908;gfx90a;gfx940;gfx941;gfx942;gfx1030;gfx1100;gfx1101;gfx1102;gfx1200;gfx1201;gfx1300;gfx1301;gfx1302;gfx950")
+        set(CK_GPU_TARGETS "gfx908;gfx90a;gfx942;gfx1030;gfx1100;gfx1101;gfx1102;gfx1200;gfx1201;gfx1300;gfx1301;gfx1302")
     endif()
 else()
     #build CK only for xnack-supported targets when using ASAN
-    set(CK_GPU_TARGETS "gfx908:xnack+;gfx90a:xnack+;gfx940:xnack+;gfx941:xnack+;gfx942:xnack+")
+    set(CK_GPU_TARGETS "gfx908:xnack+;gfx90a:xnack+;gfx942:xnack+")
 endif()
 
 #if user set GPU_ARCHS on the cmake command line, overwrite default target list with user's list
@@ -193,6 +193,25 @@ if (SUPPORTED_GPU_TARGETS MATCHES "gfx11" OR SUPPORTED_GPU_TARGETS MATCHES "gfx1
     add_definitions(-DCK_USE_WMMA)
     set(CK_USE_WMMA "ON")
 endif()
+if (SUPPORTED_GPU_TARGETS MATCHES "gfx12" OR SUPPORTED_GPU_TARGETS MATCHES "gfx13")
+    add_definitions(-DCK_USE_OCP_FP8)
+    set(CK_USE_OCP_FP8 "ON")
+endif()
+if (SUPPORTED_GPU_TARGETS MATCHES "gfx90a" OR SUPPORTED_GPU_TARGETS MATCHES "gfx94")
+    add_definitions(-DCK_USE_FNUZ_FP8)
+    set(CK_USE_FNUZ_FP8 "ON")
+endif()
+
+if (SUPPORTED_GPU_TARGETS MATCHES "gfx13")
+    add_definitions(-DCK_EXTENSION_MX_TYPE)
+    set(ENABLE_MX_TYPE "ON")
+endif()
+
+option(CK_USE_FP8_ON_UNSUPPORTED_ARCH "Enable FP8 GEMM instances on older architectures" OFF)
+if(CK_USE_FP8_ON_UNSUPPORTED_ARCH AND (SUPPORTED_GPU_TARGETS MATCHES "gfx90a" OR SUPPORTED_GPU_TARGETS MATCHES "gfx908"))
+    add_definitions(-DCK_USE_FP8_ON_UNSUPPORTED_ARCH)
+    set(CK_USE_FP8_ON_UNSUPPORTED_ARCH "ON")
+endif()
 
 # CK config file to record supported datatypes, etc.
 configure_file(include/ck/config.h.in ${CMAKE_CURRENT_BINARY_DIR}/include/ck/config.h)
@@ -220,7 +239,7 @@ if(NOT WIN32 AND ${hip_VERSION_FLAT} GREATER 600140090)
 endif()
 set(check-coerce)
 check_cxx_compiler_flag(" -mllvm -amdgpu-coerce-illegal-types=1" check-coerce)
-if(NOT WIN32 AND check-coerce AND ${hip_VERSION_FLAT} GREATER 600241132 AND ${hip_VERSION_FLAT} LESS 600300000)
+if(NOT WIN32 AND check-coerce AND ${hip_VERSION_FLAT} GREATER 600241132)
    message("Adding the amdgpu-coerce-illegal-types=1")
    add_compile_options("SHELL: -mllvm -amdgpu-coerce-illegal-types=1")
 endif()
