@@ -500,6 +500,7 @@ bool run_test()
     Tensor<GPUAccType> scale(scale_g_n_k_wos_desc);
     Tensor<CPUAccType> out_host(out_g_n_k_wos_desc);
     Tensor<GPUAccType> out_device(out_g_n_k_wos_desc);
+    Tensor<InDataType> out_tensor_device(out_g_n_k_wos_desc);
 
     std::cout << "in: " << in.mDesc << std::endl;
     std::cout << "wei: " << wei.mDesc << std::endl;
@@ -534,6 +535,8 @@ bool run_test()
     std::array<ck::index_t, NDimSpatial + 3> d1_g_n_k_wos_strides{};
     std::array<ck::index_t, NDimSpatial + 3> e_g_n_k_wos_lengths{};
     std::array<ck::index_t, NDimSpatial + 3> e_g_n_k_wos_strides{};
+    std::array<ck::index_t, NDimSpatial + 3> cvt_e_g_n_k_wos_lengths{};
+    std::array<ck::index_t, NDimSpatial + 3> cvt_e_g_n_k_wos_strides{};
     std::array<ck::index_t, NDimSpatial> conv_filter_strides{};
     std::array<ck::index_t, NDimSpatial> conv_filter_dilations{};
     std::array<ck::index_t, NDimSpatial> input_left_pads{};
@@ -598,6 +601,8 @@ bool run_test()
     DeviceMem scale_device_buf(sizeof(GPUAccType) * scale.mDesc.GetElementSpaceSize());
     DeviceMem residual_device_buf(sizeof(ResidualDataType) * residual.mDesc.GetElementSpaceSize());
     DeviceMem out_device_buf(sizeof(GPUAccType) * out_device.mDesc.GetElementSpaceSize());
+    DeviceMem out_tensor_device_buf(sizeof(InDataType) *
+                                    out_tensor_device.mDesc.GetElementSpaceSize());
 
     in_device_buf.ToDevice(in.mData.data());
     wei_device_buf.ToDevice(wei.mData.data());
@@ -613,6 +618,7 @@ bool run_test()
             : ck::tensor_operation::device::ConvolutionForwardSpecialization::Filter3x3Stride1Pad0;
 
     using AccBlockwiseOperation = ck::convolution::BlockwiseElementOpFma<false>;
+    using AccBlockwiseNextOperation = ck::convolution::BlockwiseElementOpPassThrough;
 
     constexpr ck::index_t InBlockTransferScalarPerVector = sizeof(uint32_t) / sizeof(InDataType);
     constexpr ck::index_t Cluster_In_C = CPerBlock / InBlockTransferScalarPerVector;
@@ -657,6 +663,10 @@ bool run_test()
     constexpr ck::index_t DsBlockLdsAddExtraM = true;
 
     float avg_time                 = 0;
+    using AccDataType              = GPUAccType;
+    using DsDataType               = ck::Tuple<ResidualDataType, GPUAccType>;
+    using EDataType                = InDataType;
+
     using DeviceConvFwdFmaInstance = ck::tensor_operation::device::DeviceConvSubaWconv<
         NDimSpatial,
         InputLayout<NDimSpatial>,
@@ -665,12 +675,14 @@ bool run_test()
         OutputLayout<NDimSpatial>,
         InDataType,
         WeiDataType,
-        ck::Tuple<ResidualDataType, GPUAccType>,
-        GPUAccType,
+        DsDataType,
+        AccDataType,
+        EDataType,
         InElementOp,
         WeiElementOp,
         PassThroughOp,
         AccBlockwiseOperation,
+        AccBlockwiseNextOperation,
         ConvSpec,
         1,
         BlockSize,
@@ -714,6 +726,7 @@ bool run_test()
                           std::array<const void*, 2>{residual_device_buf.GetDeviceBuffer(),
                                                      scale_device_buf.GetDeviceBuffer()},
                           out_device_buf.GetDeviceBuffer(),
+                          out_tensor_device_buf.GetDeviceBuffer(),
                           a_g_n_c_wis_lengths,
                           a_g_n_c_wis_strides,
                           b_g_k_c_xs_lengths,
@@ -724,6 +737,8 @@ bool run_test()
                               {d0_g_n_k_wos_strides, d1_g_n_k_wos_strides}},
                           e_g_n_k_wos_lengths,
                           e_g_n_k_wos_strides,
+                          cvt_e_g_n_k_wos_lengths,
+                          cvt_e_g_n_k_wos_strides,
                           conv_filter_strides,
                           conv_filter_dilations,
                           input_left_pads,

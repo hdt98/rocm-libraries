@@ -6,6 +6,7 @@
 #include "ck/utility/amd_ck_fp8.hpp"
 #include "ck/utility/statically_indexed_array.hpp"
 #include <vector>
+#define CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4 1
 namespace ck {
 
 using bhalf_t = ushort;

@@ -36,10 +36,12 @@ template <index_t NDimSpatial,
           typename WeiDataType,
           typename DsDataType,
           typename AccDataType,
+          typename EDataType,
           typename InElementwiseOperation,
           typename WeiElementwiseOperation,
           typename AccElementwiseOperation,
           typename AccBlockwiseOperation,
+          typename AccBlockwiseNextOperation,
           ConvolutionForwardSpecialization ConvForwardSpecialization,
           index_t NumPrefetch,
           index_t BlockSize,
@@ -74,8 +76,9 @@ template <index_t NDimSpatial,
           bool AccEnableLds,
           bool EnableAsync,
           bool EnableWaveGroup,
-          bool ShuffleOnLoad = false,
-          bool Transposed    = false>
+          bool ShuffleOnLoad  = false,
+          bool Transposed     = false,
+          bool ConverToTensor = false>
 struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
                                                                     InLayout,
                                                                     WeiLayout,
@@ -268,6 +271,7 @@ struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
                                                     WeiDataType,
                                                     DsDataType,
                                                     AccDataType,
+                                                    EDataType,
                                                     InGridDesc,
                                                     WeiGridDesc,
                                                     DsGridDesc,
@@ -277,6 +281,7 @@ struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
                                                     WeiElementwiseOperation,
                                                     AccElementwiseOperation,
                                                     AccBlockwiseOperation,
+                                                    AccBlockwiseNextOperation,
                                                     GridHPerBlock,
                                                     GridWPerBlock,
                                                     GridCPerBlock,
@@ -309,7 +314,8 @@ struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
                                                     EnableAsync,
                                                     NumPrefetch,
                                                     EnableWaveGroup,
-                                                    GridTransposed>;
+                                                    GridTransposed,
+                                                    ConverToTensor>;
 
     // Argument
     struct Argument : public BaseArgument
@@ -318,6 +324,7 @@ struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
                  const void* p_wei,
                  const std::array<const void*, NumDTensor>& p_ds,
                  void* p_acc,
+                 void* p_out_tensor,
                  const std::array<index_t, NDimSpatial + 3>& a_g_n_c_wis_lengths,
                  const std::array<index_t, NDimSpatial + 3>& a_g_n_c_wis_strides,
                  const std::array<index_t, NDimSpatial + 3>& b_g_k_c_xs_lengths,
@@ -328,6 +335,8 @@ struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
                      ds_g_n_k_wos_strides,
                  const std::array<index_t, NDimSpatial + 3>& e_g_n_k_wos_lengths,
                  const std::array<index_t, NDimSpatial + 3>& e_g_n_k_wos_strides,
+                 const std::array<index_t, NDimSpatial + 3>& cvt_e_g_n_k_wos_lengths,
+                 const std::array<index_t, NDimSpatial + 3>& cvt_e_g_n_k_wos_strides,
                  const std::array<index_t, NDimSpatial>& conv_filter_strides,
                  const std::array<index_t, NDimSpatial>& conv_filter_dilations,
                  const std::array<index_t, NDimSpatial>& input_left_pads,
@@ -339,6 +348,7 @@ struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
               p_wei_grid_{static_cast<const WeiDataType*>(p_wei)},
               p_ds_grid_{},
               p_acc_grid_{static_cast<AccDataType*>(p_acc)},
+              p_outTensor_grid_{static_cast<EDataType*>(p_out_tensor)},
               num_group_{a_g_n_c_wis_lengths[0]},
               acc_grid_desc_{
                   MakeAccGridDescriptor<AccLayout>(e_g_n_k_wos_lengths, e_g_n_k_wos_strides)},
@@ -355,6 +365,16 @@ struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
                                                            input_right_pads)},
               wei_grid_desc_{
                   DeviceOp::MakeWeiGridDescriptor(b_g_k_c_xs_lengths, b_g_k_c_xs_strides)},
+              out_tensor_grid_desc_{DeviceOp::MakeInGridDescriptor(cvt_e_g_n_k_wos_lengths,
+                                                                   cvt_e_g_n_k_wos_strides,
+                                                                   b_g_k_c_xs_lengths,
+                                                                   b_g_k_c_xs_strides,
+                                                                   e_g_n_k_wos_lengths,
+                                                                   e_g_n_k_wos_strides,
+                                                                   conv_filter_strides,
+                                                                   conv_filter_dilations,
+                                                                   input_left_pads,
+                                                                   input_right_pads)},
               block_2_etile_map_{GridwiseConv::MakeDefaultBlock2CTileMap(acc_grid_desc_, 1, 1)},
               compute_ptr_offset_of_batch_{},
               in_element_op_{in_element_op},
@@ -368,6 +388,8 @@ struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
               ds_g_n_k_wos_strides_{ds_g_n_k_wos_strides},
               e_g_n_k_wos_lengths_{e_g_n_k_wos_lengths},
               e_g_n_k_wos_strides_{e_g_n_k_wos_strides},
+              cvt_e_g_n_k_wos_lengths_{cvt_e_g_n_k_wos_lengths},
+              cvt_e_g_n_k_wos_strides_{cvt_e_g_n_k_wos_strides},
               conv_filter_strides_{conv_filter_strides},
               conv_filter_dilations_{conv_filter_dilations},
               input_left_pads_{input_left_pads},
@@ -398,6 +420,7 @@ struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
             static_for<0, NumDTensor, 1>{}(
                 [&](auto i) { std::cout << "Ds[M, N]: " << ds_grid_desc_[i] << std::endl; });
             std::cout << "Acc: " << acc_grid_desc_ << std::endl;
+            std::cout << "OutTensor: " << out_tensor_grid_desc_ << std::endl;
         }
 
         // pointers
@@ -405,11 +428,13 @@ struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
         const WeiDataType* p_wei_grid_;
         typename GridwiseConv::DsGridPointer p_ds_grid_;
         AccDataType* p_acc_grid_;
+        EDataType* p_outTensor_grid_;
 
         // tensor descriptors for problem definiton
         index_t num_group_;
         AccGridDesc acc_grid_desc_;
         DsGridDesc ds_grid_desc_;
+        InGridDesc out_tensor_grid_desc_;
 
         // tensor descriptors for block/thread-wise copy
         InGridDesc in_grid_desc_;
@@ -435,6 +460,8 @@ struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
         std::array<std::array<index_t, NDimSpatial + 3>, NumDTensor> ds_g_n_k_wos_strides_;
         std::array<index_t, NDimSpatial + 3> e_g_n_k_wos_lengths_;
         std::array<index_t, NDimSpatial + 3> e_g_n_k_wos_strides_;
+        std::array<index_t, NDimSpatial + 3> cvt_e_g_n_k_wos_lengths_;
+        std::array<index_t, NDimSpatial + 3> cvt_e_g_n_k_wos_strides_;
         std::array<index_t, NDimSpatial> conv_filter_strides_;
         std::array<index_t, NDimSpatial> conv_filter_dilations_;
         std::array<index_t, NDimSpatial> input_left_pads_;
@@ -462,12 +489,13 @@ struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
 
                 if constexpr(EnableWaveGroup)
                 {
-                    const auto kernel = kernel_grouped_convsuba_wconvsuba_wavegroup<
+                    const auto kernel = kernel_grouped_convsuba_cvt_wconvsuba_wavegroup<
                         GridwiseConv,
                         InDataType,
                         WeiDataType,
                         typename GridwiseConv::DsGridPointer,
                         AccDataType,
+                        EDataType,
                         InElementwiseOperation,
                         WeiElementwiseOperation,
                         AccElementwiseOperation,
@@ -488,6 +516,7 @@ struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
                                                   arg.p_wei_grid_,
                                                   arg.p_ds_grid_,
                                                   arg.p_acc_grid_,
+                                                  arg.p_outTensor_grid_,
                                                   arg.in_element_op_,
                                                   arg.wei_element_op_,
                                                   arg.acc_element_op_,
@@ -496,17 +525,19 @@ struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
                                                   arg.wei_grid_desc_,
                                                   arg.ds_grid_desc_,
                                                   arg.acc_grid_desc_,
+                                                  arg.out_tensor_grid_desc_,
                                                   arg.block_2_etile_map_,
                                                   arg.compute_ptr_offset_of_batch_);
                 }
                 else
                 {
-                    const auto kernel = kernel_grouped_convsuba_wconvsuba<
+                    const auto kernel = kernel_grouped_convsuba_cvt_wconvsuba<
                         GridwiseConv,
                         InDataType,
                         WeiDataType,
                         typename GridwiseConv::DsGridPointer,
                         AccDataType,
+                        EDataType,
                         InElementwiseOperation,
                         WeiElementwiseOperation,
                         AccElementwiseOperation,
@@ -527,6 +558,7 @@ struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
                                                   arg.p_wei_grid_,
                                                   arg.p_ds_grid_,
                                                   arg.p_acc_grid_,
+                                                  arg.p_outTensor_grid_,
                                                   arg.in_element_op_,
                                                   arg.wei_element_op_,
                                                   arg.acc_element_op_,
@@ -535,6 +567,7 @@ struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
                                                   arg.wei_grid_desc_,
                                                   arg.ds_grid_desc_,
                                                   arg.acc_grid_desc_,
+                                                  arg.out_tensor_grid_desc_,
                                                   arg.block_2_etile_map_,
                                                   arg.compute_ptr_offset_of_batch_);
                 }
@@ -761,8 +794,8 @@ struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
                                            arg.wei_grid_desc_,
                                            arg.ds_grid_desc_,
                                            arg.acc_grid_desc_,
+                                           arg.out_tensor_grid_desc_,
                                            arg.block_2_etile_map_);
-        return true;
     }
 
     // polymorphic
@@ -776,6 +809,7 @@ struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
         const void* p_wei,
         const std::array<const void*, NumDTensor>& p_ds,
         void* p_acc,
+        void* p_out_tensor,
         const std::array<index_t, NDimSpatial + 3>& a_g_n_c_wis_lengths,
         const std::array<index_t, NDimSpatial + 3>& a_g_n_c_wis_strides,
         const std::array<index_t, NDimSpatial + 3>& b_g_k_c_xs_lengths,
@@ -784,6 +818,8 @@ struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
         const std::array<std::array<index_t, NDimSpatial + 3>, NumDTensor>& ds_g_n_k_wos_strides,
         const std::array<index_t, NDimSpatial + 3>& e_g_n_k_wos_lengths,
         const std::array<index_t, NDimSpatial + 3>& e_g_n_k_wos_strides,
+        const std::array<index_t, NDimSpatial + 3>& cvt_e_g_n_k_wos_lengths,
+        const std::array<index_t, NDimSpatial + 3>& cvt_e_g_n_k_wos_strides,
         const std::array<index_t, NDimSpatial>& conv_filter_strides,
         const std::array<index_t, NDimSpatial>& conv_filter_dilations,
         const std::array<index_t, NDimSpatial>& input_left_pads,
@@ -796,6 +832,7 @@ struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
                         p_wei,
                         p_ds,
                         p_acc,
+                        p_out_tensor,
                         a_g_n_c_wis_lengths,
                         a_g_n_c_wis_strides,
                         b_g_k_c_xs_lengths,
@@ -804,6 +841,8 @@ struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
                         ds_g_n_k_wos_strides,
                         e_g_n_k_wos_lengths,
                         e_g_n_k_wos_strides,
+                        cvt_e_g_n_k_wos_lengths,
+                        cvt_e_g_n_k_wos_strides,
                         conv_filter_strides,
                         conv_filter_dilations,
                         input_left_pads,
@@ -818,6 +857,7 @@ struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
                  const void* p_b,
                  const std::array<const void*, NumDTensor>& p_ds,
                  void* p_e,
+                 void* p_tensorOut,
                  const std::array<long_index_t, NDimSpatial + 3>& a_g_n_c_wis_lengths,
                  const std::array<long_index_t, NDimSpatial + 3>& a_g_n_c_wis_strides,
                  const std::array<long_index_t, NDimSpatial + 3>& b_g_k_c_xs_lengths,
@@ -828,6 +868,8 @@ struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
                      ds_g_n_k_wos_strides,
                  const std::array<long_index_t, NDimSpatial + 3>& e_g_n_k_wos_lengths,
                  const std::array<long_index_t, NDimSpatial + 3>& e_g_n_k_wos_strides,
+                 const std::array<long_index_t, NDimSpatial + 3>& cvt_e_g_n_k_wos_lengths,
+                 const std::array<long_index_t, NDimSpatial + 3>& cvt_e_g_n_k_wos_strides,
                  const std::array<long_index_t, NDimSpatial>& conv_filter_strides,
                  const std::array<long_index_t, NDimSpatial>& conv_filter_dilations,
                  const std::array<long_index_t, NDimSpatial>& input_left_pads,
@@ -844,6 +886,8 @@ struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
         std::array<std::array<index_t, NDimSpatial + 3>, NumDTensor> ds_g_n_k_wos_strides_i32;
         std::array<index_t, NDimSpatial + 3> e_g_n_k_wos_lengths_i32;
         std::array<index_t, NDimSpatial + 3> e_g_n_k_wos_strides_i32;
+        std::array<index_t, NDimSpatial + 3> cvt_e_g_n_k_wos_lengths_i32;
+        std::array<index_t, NDimSpatial + 3> cvt_e_g_n_k_wos_strides_i32;
         std::array<index_t, NDimSpatial> conv_filter_strides_i32;
         std::array<index_t, NDimSpatial> conv_filter_dilations_i32;
         std::array<index_t, NDimSpatial> input_left_pads_i32;
@@ -860,6 +904,8 @@ struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
         }
         array_convert(e_g_n_k_wos_lengths_i32, e_g_n_k_wos_lengths);
         array_convert(e_g_n_k_wos_strides_i32, e_g_n_k_wos_strides);
+        array_convert(cvt_e_g_n_k_wos_lengths_i32, cvt_e_g_n_k_wos_lengths);
+        array_convert(cvt_e_g_n_k_wos_strides_i32, cvt_e_g_n_k_wos_strides);
         array_convert(conv_filter_strides_i32, conv_filter_strides);
         array_convert(conv_filter_dilations_i32, conv_filter_dilations);
         array_convert(input_left_pads_i32, input_left_pads);
@@ -869,6 +915,7 @@ struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
                         p_b,
                         p_ds,
                         p_e,
+                        p_tensorOut,
                         a_g_n_c_wis_lengths_i32,
                         a_g_n_c_wis_strides_i32,
                         b_g_k_c_xs_lengths_i32,
@@ -913,6 +960,7 @@ struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
                                           p_wei,
                                           p_ds,
                                           p_acc,
+                                          p_acc,
                                           a_g_n_c_wis_lengths,
                                           a_g_n_c_wis_strides,
                                           b_g_k_c_xs_lengths,
@@ -921,6 +969,8 @@ struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
                                           ds_g_n_k_wos_strides,
                                           e_g_n_k_wos_lengths,
                                           e_g_n_k_wos_strides,
+                                          a_g_n_c_wis_lengths,
+                                          a_g_n_c_wis_strides,
                                           conv_filter_strides,
                                           conv_filter_dilations,
                                           input_left_pads,
@@ -986,6 +1036,7 @@ struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
                                           p_b,
                                           p_ds,
                                           p_e,
+                                          p_e,
                                           a_g_n_c_wis_lengths_i32,
                                           a_g_n_c_wis_strides_i32,
                                           b_g_k_c_xs_lengths_i32,
@@ -994,6 +1045,8 @@ struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
                                           ds_g_n_k_wos_strides_i32,
                                           e_g_n_k_wos_lengths_i32,
                                           e_g_n_k_wos_strides_i32,
+                                          a_g_n_c_wis_lengths_i32,
+                                          a_g_n_c_wis_strides_i32,
                                           conv_filter_strides_i32,
                                           conv_filter_dilations_i32,
                                           input_left_pads_i32,
@@ -1014,7 +1067,7 @@ struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
         auto str = std::stringstream();
 
         // clang-format off
-        str << "DeviceConvSubaWconv"
+        str << "DeviceConvSubaCvtWconv"
             << "<"
             << BlockSize << ", "
             << HPerBlock << ", "
@@ -1049,5 +1102,6 @@ struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
 };
 
 } // namespace device
+
 } // namespace tensor_operation
 } // namespace ck

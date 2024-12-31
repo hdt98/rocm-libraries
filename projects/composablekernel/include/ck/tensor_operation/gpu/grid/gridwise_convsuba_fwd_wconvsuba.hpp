@@ -23,6 +23,7 @@ template <typename GridwiseOp,
           typename WeiDataType,
           typename DsPointer,
           typename AccDataType,
+          typename EDataType,
           typename InElementwiseOperation,
           typename WeiElementwiseOperation,
           typename AccElementwiseOperation,
@@ -37,35 +38,37 @@ __global__ void
 #if CK_USE_LAUNCH_BOUNDS
     __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
 #endif
-        kernel_grouped_convsuba_wconvsuba(const InDataType* __restrict__ p_in_grid,
-                                          const WeiDataType* __restrict__ p_wei_grid,
-                                          DsPointer p_ds_grid,
-                                          AccDataType* __restrict__ p_acc_grid,
-                                          const InElementwiseOperation in_element_op,
-                                          const WeiElementwiseOperation wei_element_op,
-                                          const AccElementwiseOperation acc_element_op,
-                                          const index_t batch_count,
-                                          const InGridDesc in_grid_desc,
-                                          const WeiGridDesc wei_grid_desc,
-                                          const DsGridDesc ds_grid_desc,
-                                          const AccGridDesc acc_grid_desc,
-                                          const Block2CTileMap block_2_ctile_map,
-                                          const ComputePtrOffsetOfBatch compute_ptr_offset_of_batch)
+        kernel_grouped_convsuba_cvt_wconvsuba(
+            const InDataType* __restrict__ p_in_grid,
+            const WeiDataType* __restrict__ p_wei_grid,
+            DsPointer p_ds_grid,
+            AccDataType* __restrict__ p_acc_grid,
+            EDataType* __restrict__ p_out_tensor_grid,
+            const InElementwiseOperation in_element_op,
+            const WeiElementwiseOperation wei_element_op,
+            const AccElementwiseOperation acc_element_op,
+            const index_t batch_count,
+            const InGridDesc in_grid_desc,
+            const WeiGridDesc wei_grid_desc,
+            const DsGridDesc ds_grid_desc,
+            const AccGridDesc acc_grid_desc,
+            const InGridDesc out_tensor_grid_desc,
+            const Block2CTileMap block_2_ctile_map,
+            const ComputePtrOffsetOfBatch compute_ptr_offset_of_batch)
 {
 #if(!defined(__HIP_DEVICE_COMPILE__) || defined(__gfx13__))
     // offset base pointer for each work-group
     static constexpr index_t NumDTensor = 2;
     const index_t num_blocks_per_batch =
         __builtin_amdgcn_readfirstlane(get_grid_size() / batch_count);
-    const index_t g_idx = __builtin_amdgcn_readfirstlane(get_block_1d_id() / num_blocks_per_batch);
 
+    const index_t g_idx = __builtin_amdgcn_readfirstlane(get_block_1d_id() / num_blocks_per_batch);
     const long_index_t in_batch_offset = amd_wave_read_first_lane(
         static_cast<int64_t>(compute_ptr_offset_of_batch.GetAPtrOffset(g_idx)));
     const long_index_t wei_batch_offset = amd_wave_read_first_lane(
         static_cast<int64_t>(compute_ptr_offset_of_batch.GetBPtrOffset(g_idx)));
     const long_index_t acc_batch_offset = amd_wave_read_first_lane(
         static_cast<int64_t>(compute_ptr_offset_of_batch.GetEPtrOffset(g_idx)));
-
     const auto ds_batch_offset = compute_ptr_offset_of_batch.GetDsPtrOffset(g_idx);
 
     __shared__ char p_shared[GridwiseOp::BlockwiseConv::SharedMemTrait::lds_size];
@@ -78,12 +81,14 @@ __global__ void
                                                p_wei_grid + wei_batch_offset,
                                                p_ds_grid_grp,
                                                p_acc_grid + acc_batch_offset,
+                                               p_out_tensor_grid + acc_batch_offset,
                                                p_shared,
                                                nullptr,
                                                in_grid_desc,
                                                wei_grid_desc,
                                                ds_grid_desc,
                                                acc_grid_desc,
+                                               out_tensor_grid_desc,
                                                in_element_op,
                                                wei_element_op,
                                                acc_element_op,
@@ -93,6 +98,7 @@ __global__ void
     ignore                                = p_wei_grid;
     ignore                                = p_ds_grid_grp;
     ignore                                = p_acc_grid;
+    ignore                                = p_out_tensor_grid;
     ignore                                = in_grid_desc;
     ignore                                = wei_grid_desc;
     ignore                                = ds_grid_desc;
@@ -112,6 +118,7 @@ template <typename GridwiseOp,
           typename WeiDataType,
           typename DsPointer,
           typename AccDataType,
+          typename EDataType,
           typename InElementwiseOperation,
           typename WeiElementwiseOperation,
           typename AccElementwiseOperation,
@@ -123,11 +130,12 @@ template <typename GridwiseOp,
           typename ComputePtrOffsetOfBatch,
           bool HasMainBlockLoop>
 __global__ void __exp_amd_wavegroup_kernel(4, 32, 256, 1, 1)
-    kernel_grouped_convsuba_wconvsuba_wavegroup(
+    kernel_grouped_convsuba_cvt_wconvsuba_wavegroup(
         const InDataType* __restrict__ p_in_grid,
         const WeiDataType* __restrict__ p_wei_grid,
         DsPointer p_ds_grid,
         AccDataType* __restrict__ p_acc_grid,
+        EDataType* __restrict__ p_out_tensor_grid,
         const InElementwiseOperation in_element_op,
         const WeiElementwiseOperation wei_element_op,
         const AccElementwiseOperation acc_element_op,
@@ -151,8 +159,8 @@ __global__ void __exp_amd_wavegroup_kernel(4, 32, 256, 1, 1)
         static_cast<int64_t>(compute_ptr_offset_of_batch.GetBPtrOffset(g_idx)));
     const long_index_t acc_batch_offset = amd_wave_read_first_lane(
         static_cast<int64_t>(compute_ptr_offset_of_batch.GetEPtrOffset(g_idx)));
-
     const long_index_t ds_batch_offset = compute_ptr_offset_of_batch.GetDsPtrOffset(g_idx);
+
     DsPointer p_ds_grid_grp;
     static constexpr index_t NumDTensor = DsGridDesc::Size();
     static_for<0, NumDTensor, 1>{}(
@@ -169,6 +177,7 @@ __global__ void __exp_amd_wavegroup_kernel(4, 32, 256, 1, 1)
                                                p_wei_grid + wei_batch_offset,
                                                p_ds_grid_grp,
                                                p_acc_grid + acc_batch_offset,
+                                               p_out_tensor_grid + acc_batch_offset,
                                                p_shared,
                                                p_lane_shared,
                                                in_grid_desc,
@@ -184,6 +193,7 @@ __global__ void __exp_amd_wavegroup_kernel(4, 32, 256, 1, 1)
     ignore                                = p_wei_grid;
     ignore                                = p_ds_grid_grp;
     ignore                                = p_acc_grid;
+    ignore                                = p_out_tensor_grid;
     ignore                                = in_grid_desc;
     ignore                                = wei_grid_desc;
     ignore                                = ds_grid_desc;
@@ -202,6 +212,7 @@ template <index_t BlockSize,
           typename WeiDataType,
           typename DsDataType,
           typename AccDataType,
+          typename EDataType,
           typename InGridDesc,
           typename WeiGridDesc,
           typename DsGridDesc,
@@ -211,6 +222,7 @@ template <index_t BlockSize,
           typename WeiElementwiseOperation,
           typename AccElementwiseOperation,
           typename AccBlockwiseOperation,
+          typename AccBlockwiseNextOperation,
           index_t HPerBlock,
           index_t WPerBlock,
           index_t CPerBlock,
@@ -243,7 +255,8 @@ template <index_t BlockSize,
           bool EnableAsync,
           index_t NumConvCPrefetchStage,
           bool EnableWaveGroup,
-          bool Transposed>
+          bool Transposed,
+          bool ConverToTensor>
 struct GridwiseConvSuba_Wconvsuba
 {
     static constexpr auto I0 = Number<0>{};
@@ -394,7 +407,9 @@ struct GridwiseConvSuba_Wconvsuba
                                                  InDataType,
                                                  DsDataType,
                                                  AccDataType,
+                                                 EDataType,
                                                  AccBlockwiseOperation,
+                                                 AccBlockwiseNextOperation,
                                                  decltype(MakeWeiBlockDescriptor()),
                                                  decltype(MakeInBlockDescriptor()),
                                                  decltype(MakeDsBlockDescriptor()),
@@ -412,8 +427,8 @@ struct GridwiseConvSuba_Wconvsuba
                                                  WeiEnableLds,
                                                  InEnableLds,
                                                  DsEnableLds,
-                                                 ConvertToTensor,
-                                                 Transposed>;
+                                                 Transposed,
+                                                 ConverToTensor>;
 
     // Pad input and weight data grid description according to Filter size
     __host__ __device__ static constexpr auto
@@ -439,49 +454,54 @@ struct GridwiseConvSuba_Wconvsuba
         }
     }
 
-    template <typename AccGridDec, typename AccThreadBuffer, typename BlockWiseConv>
-    __host__ __device__ static void StoreAccData(const AccGridDec& acc_grid_desc,
-                                                 AccDataType* __restrict__ p_acc_grid,
-                                                 AccThreadBuffer& acc_thread_buf,
-                                                 BlockWiseConv& blockwise_conv,
-                                                 const AccElementwiseOperation& acc_element_op,
-                                                 void* __restrict__ p_shared,
-                                                 void* __restrict__,
-                                                 index_t h_block_data_idx_on_grid,
-                                                 index_t w_block_data_idx_on_grid,
-                                                 index_t k_block_data_idx_on_grid)
+    template <typename OutTensorGridDec,
+              typename OutTensorThreadBuffer,
+              typename OutTensorDataType,
+              typename BlockWiseConv>
+    __host__ __device__ static void
+    StoreOutTensorData(const OutTensorGridDec& out_grid_desc,
+                       OutTensorDataType* __restrict__ p_out_grid,
+                       OutTensorThreadBuffer& out_thread_buf,
+                       BlockWiseConv& blockwise_conv,
+                       const AccElementwiseOperation& out_element_op,
+                       void* __restrict__ p_shared,
+                       void* __restrict__,
+                       index_t h_block_data_idx_on_grid,
+                       index_t w_block_data_idx_on_grid,
+                       index_t k_block_data_idx_on_grid)
     {
-        auto acc_grid_buf = make_dynamic_buffer<AddressSpaceEnum::Global>(
-            p_acc_grid, acc_grid_desc.GetElementSpaceSize());
+        auto out_grid_buf = make_dynamic_buffer<AddressSpaceEnum::Global>(
+            p_out_grid, out_grid_desc.GetElementSpaceSize());
 
         // C mapping in single thread.
-        constexpr auto acc_thread_desc   = BlockWiseConv::GetAccThreadDescriptor();
-        constexpr auto acc_thread_length = BlockWiseConv::GetAccThreadDescLength();
+        constexpr auto out_tensor_thread_desc   = blockwise_conv.GetAccThreadDescriptor();
+        constexpr auto out_tensor_thread_length = blockwise_conv.GetAccThreadDescLength();
 
         // calculate origin of thread output tensor on global memory
-        // blockwise conv acc starting index
-        const auto acc_thread_mtx_on_block = blockwise_conv.CalculateAccThreadOriginDataIndex();
-
+        // blockwise conv out tensor starting index
+        const auto out_thread_mtx_on_block = blockwise_conv.CalculateAccThreadOriginDataIndex();
         if constexpr(AccEnableLds == false)
         {
-            const auto acc_grid_wave_desc = blockwise_conv.GetAccWaveDescriptor(acc_grid_desc);
+            const auto out_tensor_grid_wave_desc =
+                blockwise_conv.GetAccWaveDescriptor(out_grid_desc);
 
             // Threadwise copy C from VGPR to global memory
-            auto acc_thread_copy_vgpr_to_global =
-                ThreadwiseTensorSliceTransfer_v1r3<AccDataType,
-                                                   AccDataType,
-                                                   decltype(acc_thread_desc),
-                                                   decltype(acc_grid_wave_desc),
+            auto out_tensor_thread_copy_vgpr_to_global =
+                ThreadwiseTensorSliceTransfer_v1r3<OutTensorDataType,
+                                                   OutTensorDataType,
+                                                   decltype(out_tensor_thread_desc),
+                                                   decltype(out_tensor_grid_wave_desc),
                                                    AccElementwiseOperation,
-                                                   decltype(acc_thread_length),
+                                                   decltype(out_tensor_thread_length),
                                                    Sequence<0, 1, 2, 3, 4, 5, 6, 7>,
                                                    7,
-                                                   acc_thread_length[I7], // vector write pixel
+                                                   out_tensor_thread_length[I7], // vector write
+                                                                                 // pixel
                                                    InMemoryDataOperationEnum::Set,
                                                    1,
                                                    true>{
-                    acc_grid_wave_desc,
-                    acc_thread_mtx_on_block + make_multi_index(h_block_data_idx_on_grid / HPerWconv,
+                    out_tensor_grid_wave_desc,
+                    out_thread_mtx_on_block + make_multi_index(h_block_data_idx_on_grid / HPerWconv,
                                                                w_block_data_idx_on_grid / WPerWconv,
                                                                k_block_data_idx_on_grid / KPerWconv,
                                                                I0,
@@ -489,86 +509,86 @@ struct GridwiseConvSuba_Wconvsuba
                                                                I0,
                                                                I0,
                                                                I0),
-                    acc_element_op};
+                    out_element_op};
 
             // each thread write its data from VGPR to global
-            acc_thread_copy_vgpr_to_global.Run(acc_thread_desc,
-                                               make_tuple(I0, I0, I0, I0, I0, I0, I0, I0),
-                                               acc_thread_buf,
-                                               acc_grid_wave_desc,
-                                               acc_grid_buf);
+            out_tensor_thread_copy_vgpr_to_global.Run(out_tensor_thread_desc,
+                                                      make_tuple(I0, I0, I0, I0, I0, I0, I0, I0),
+                                                      out_thread_buf,
+                                                      out_tensor_grid_wave_desc,
+                                                      out_grid_buf);
         }
         else
         {
             // C mapping in single block
             // LDS descriptor, shuffle and write out in HRepeat x WRepeat x KRepeat times
-            constexpr auto acc_block_desc = BlockWiseConv::GetAccBlockDescriptor();
-            constexpr auto acc_block_wave_desc =
-                BlockWiseConv::GetAccWaveDescriptor(acc_block_desc);
+            constexpr auto out_tensor_block_desc = BlockWiseConv::GetAccBlockDescriptor();
+            constexpr auto out_tensor_block_wave_desc =
+                BlockWiseConv::GetAccWaveDescriptor(out_tensor_block_desc);
 
-            auto acc_block_buf = make_dynamic_buffer<AddressSpaceEnum::Lds>(
-                static_cast<AccDataType*>(p_shared) +
-                    BlockwiseConv::SharedMemTrait::acc_block_space_offset,
-                BlockwiseConv::SharedMemTrait::acc_block_space_size);
+            auto out_tensor_block_buf = make_dynamic_buffer<AddressSpaceEnum::Lds>(
+                static_cast<OutTensorDataType*>(p_shared) +
+                    BlockwiseConv::SharedMemTrait::out_tensor_block_space_offset,
+                BlockwiseConv::SharedMemTrait::out_tensor_block_space_size);
 
             // Threadwise copy C from VGPR to LDS
-            auto acc_thread_copy_vgpr_to_lds =
-                ThreadwiseTensorSliceTransfer_v1r3<AccDataType,
-                                                   AccDataType,
-                                                   decltype(acc_thread_desc),
-                                                   decltype(acc_block_wave_desc),
-                                                   ck::tensor_operation::element_wise::PassThrough,
-                                                   decltype(acc_thread_length),
-                                                   Sequence<0, 1, 2, 3, 4, 5, 6, 7>,
-                                                   7,
-                                                   acc_thread_length[I7], // vector write pixel
-                                                   InMemoryDataOperationEnum::Set,
-                                                   1,
-                                                   true>{
-                    acc_block_wave_desc,
-                    acc_thread_mtx_on_block,
-                    ck::tensor_operation::element_wise::PassThrough{}};
+            auto out_tensor_thread_copy_vgpr_to_lds = ThreadwiseTensorSliceTransfer_v1r3<
+                OutTensorDataType,
+                OutTensorDataType,
+                decltype(out_tensor_thread_desc),
+                decltype(out_tensor_block_wave_desc),
+                ck::tensor_operation::element_wise::PassThrough,
+                decltype(out_tensor_thread_length),
+                Sequence<0, 1, 2, 3, 4, 5, 6, 7>,
+                7,
+                out_tensor_thread_length[I7], // vector write pixel
+                InMemoryDataOperationEnum::Set,
+                1,
+                true>{out_tensor_block_wave_desc,
+                      out_thread_mtx_on_block,
+                      ck::tensor_operation::element_wise::PassThrough{}};
 
             // blockwise copy C from LDS to global
-            auto acc_block_copy_lds_to_global = ThreadGroupTensorSliceTransfer_v6r1<
-                ThisThreadBlockGrid,
-                AccElementwiseOperation,
-                InMemoryDataOperationEnum::Set,
-                Sequence<BlockwiseConv::HPerBlockOut, BlockwiseConv::WPerBlockOut, KPerBlock>,
-                AccBlockTransferClusterLengths,
-                Sequence<0, 1, 2>,
-                AccDataType,
-                AccDataType,
-                decltype(acc_block_desc),
-                decltype(acc_grid_desc),
-                Sequence<0, 1, 2>,
-                2,
-                AccBlockTransferScalarPerVector,
-                true,
-                false>{acc_block_desc,
-                       make_multi_index(0, 0, 0),
-                       acc_grid_desc,
-                       make_multi_index(h_block_data_idx_on_grid,
-                                        w_block_data_idx_on_grid,
-                                        k_block_data_idx_on_grid),
-                       acc_element_op};
+            auto out_tensor_block_copy_lds_to_global =
+                ThreadGroupTensorSliceTransfer_v6r1<ThisThreadBlockGrid,
+                                                    AccElementwiseOperation,
+                                                    InMemoryDataOperationEnum::Set,
+                                                    Sequence<HPerBlock, WPerBlock, KPerBlock>,
+                                                    AccBlockTransferClusterLengths,
+                                                    Sequence<0, 1, 2>,
+                                                    OutTensorDataType,
+                                                    OutTensorDataType,
+                                                    decltype(out_tensor_block_desc),
+                                                    decltype(out_grid_desc),
+                                                    Sequence<0, 1, 2>,
+                                                    2,
+                                                    AccBlockTransferScalarPerVector,
+                                                    true,
+                                                    false>{
+                    out_tensor_block_desc,
+                    make_multi_index(0, 0, 0),
+                    out_grid_desc,
+                    make_multi_index(h_block_data_idx_on_grid,
+                                     w_block_data_idx_on_grid,
+                                     k_block_data_idx_on_grid),
+                    out_element_op};
 
             // make sure it's safe to write to LDS
             block_sync_lds();
 
             // each thread write its data from VGPR to LDS
-            acc_thread_copy_vgpr_to_lds.Run(acc_thread_desc,
-                                            make_tuple(I0, I0, I0, I0, I0, I0, I0, I0),
-                                            acc_thread_buf,
-                                            acc_block_wave_desc,
-                                            acc_block_buf);
+            out_tensor_thread_copy_vgpr_to_lds.Run(out_tensor_thread_desc,
+                                                   make_tuple(I0, I0, I0, I0, I0, I0, I0, I0),
+                                                   out_thread_buf,
+                                                   out_tensor_block_wave_desc,
+                                                   out_tensor_block_buf);
 
             // make sure it's safe to read from LDS
             block_sync_lds();
 
             // each block copy its data from LDS to global
-            acc_block_copy_lds_to_global.Run(
-                acc_block_desc, acc_block_buf, acc_grid_desc, acc_grid_buf);
+            out_tensor_block_copy_lds_to_global.Run(
+                out_tensor_block_desc, out_tensor_block_buf, out_grid_desc, out_grid_buf);
         }
     }
 
@@ -810,6 +830,7 @@ struct GridwiseConvSuba_Wconvsuba
                                                             const WeiGridDesc& wei_grid_desc,
                                                             const DsGridDesc& ds_grid_desc,
                                                             const AccGridDesc& acc_grid_desc,
+                                                            const InGridDesc& out_grid_desc,
                                                             const Block2CTileMap& block_2_ctile_map)
     {
         static_assert(HPerBlock % (HRepeat * HPerWconv) == 0, "");
@@ -908,7 +929,8 @@ struct GridwiseConvSuba_Wconvsuba
         constexpr long_index_t TwoGB = (long_index_t{1} << 31);
 
         if(!(in_grid_desc.GetElementSpaceSize() * sizeof(InDataType) <= TwoGB &&
-             wei_grid_desc.GetElementSpaceSize() * sizeof(WeiDataType) <= TwoGB))
+             wei_grid_desc.GetElementSpaceSize() * sizeof(WeiDataType) <= TwoGB &&
+             out_grid_desc.GetElementSpaceSize() * sizeof(InDataType) <= TwoGB))
         {
             return false;
         }
@@ -918,7 +940,7 @@ struct GridwiseConvSuba_Wconvsuba
         BlockwiseConv blockwise_conv = {};
         auto& acc_thread_buf = blockwise_conv.GetAccumThreadBuffer();
         const AccElementwiseOperation acc_element_op;
-        StoreAccData(acc_grid_desc,
+        StoreOutTensorData(acc_grid_desc,
             nullptr,
             acc_thread_buf,
             blockwise_conv,
@@ -929,6 +951,7 @@ struct GridwiseConvSuba_Wconvsuba
             0,
             0);
 #endif
+
         return true;
     }
 
@@ -960,12 +983,14 @@ struct GridwiseConvSuba_Wconvsuba
                                const WeiDataType* __restrict__ p_wei_grid,
                                DsGridPointer p_ds_grid,
                                AccDataType* __restrict__ p_acc_grid,
+                               EDataType* __restrict__ p_out_tensor_grid,
                                void* __restrict__ p_shared,
                                void* __restrict__ p_lane_shared,
                                const InGridDesc& in_grid_desc,
                                const WeiGridDesc& wei_grid_desc,
                                const DsGridDesc& ds_grid_desc,
                                const AccGridDesc& acc_grid_desc,
+                               const InGridDesc& out_tensor_grid_desc,
                                const InElementwiseOperation& in_element_op,
                                const WeiElementwiseOperation& wei_element_op,
                                const AccElementwiseOperation& acc_element_op,
@@ -1383,6 +1408,7 @@ struct GridwiseConvSuba_Wconvsuba
 
         // Prepare Register for Accum
         auto& acc_thread_buf = blockwise_conv.GetAccumThreadBuffer();
+        auto& cvt_tensor_thread_buf = blockwise_conv.GetOutTensorThreadBuffer();
 
         /*******************************************************************************/
         // Shift Per CPerBlock
@@ -1421,21 +1447,40 @@ struct GridwiseConvSuba_Wconvsuba
                                                          ds_block_buf,
                                                          blockwise_conv,
                                                          acc_thread_buf,
+                                                         cvt_tensor_thread_buf,
                                                          CBlockMainLoop);
         /*******************************************************************************/
         // Store accum buffer
         if((EnableWaveGroup == false) || (get_wave_id_in_wavegroup() == 1))
         {
-            StoreAccData(acc_grid_desc,
-                         p_acc_grid,
-                         acc_thread_buf,
-                         blockwise_conv,
-                         acc_element_op,
-                         p_shared,
-                         p_lane_shared,
-                         h_out_block_data_idx_on_grid,
-                         w_out_block_data_idx_on_grid,
-                         k_block_data_idx_on_grid);
+            if constexpr(ConverToTensor)
+            {
+                // Store the result: AccElementOp(None/fma/sba/uba) + NextElementOp(cvt_tensor)
+                StoreOutTensorData(out_tensor_grid_desc,
+                                   p_out_tensor_grid,
+                                   cvt_tensor_thread_buf,
+                                   blockwise_conv,
+                                   acc_element_op,
+                                   p_shared,
+                                   p_lane_shared,
+                                   h_block_data_idx_on_grid,
+                                   w_block_data_idx_on_grid,
+                                   k_block_data_idx_on_grid);
+            }
+            else
+            {
+                // Store the result: AccElementOp(None/fma/sba/uba)
+                StoreOutTensorData(acc_grid_desc,
+                                   p_acc_grid,
+                                   acc_thread_buf,
+                                   blockwise_conv,
+                                   acc_element_op,
+                                   p_shared,
+                                   p_lane_shared,
+                                   h_block_data_idx_on_grid,
+                                   w_block_data_idx_on_grid,
+                                   k_block_data_idx_on_grid);
+            }
         }
     }
 };

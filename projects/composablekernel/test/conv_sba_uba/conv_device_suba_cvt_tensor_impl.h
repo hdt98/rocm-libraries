@@ -10,7 +10,6 @@
 #include <tuple>
 #include <vector>
 
-//#define FORCE_CONVERT_TO_TENSOR 1
 //#define ENABLE_WAVEGROUP 1
 
 #include "ck/ck.hpp"
@@ -26,15 +25,16 @@
 #include "ck/library/utility/convolution_host_tensor_descriptor_helper.hpp"
 #include "ck/library/reference_tensor_operation/cpu/reference_conv_fwd.hpp"
 #include "ck/tensor_operation/gpu/device/impl/device_convsuba_fwd_wconvsuba.hpp"
-#include "ck/tensor_operation/gpu/element/element_wise_operation.hpp"
 
-using InElementOp      = ck::tensor_operation::element_wise::PassThrough;
-using WeiElementOp     = ck::tensor_operation::element_wise::PassThrough;
-using PassThroughOp    = ck::tensor_operation::element_wise::PassThrough;
-using OutElementOp     = ck::tensor_operation::element_wise::MultiplyAdd;
-using OutElementNoneOp = ck::tensor_operation::element_wise::MultiplyAdd;
-using OutElementReluOp = ck::tensor_operation::element_wise::MultiplyAddRelu;
-using OutElementTanhOp = ck::tensor_operation::element_wise::MultiplyAddTanh;
+using InElementOp         = ck::tensor_operation::element_wise::PassThrough;
+using WeiElementOp        = ck::tensor_operation::element_wise::PassThrough;
+using PassThroughOp       = ck::tensor_operation::element_wise::PassThrough;
+using OutElementOp        = ck::tensor_operation::element_wise::MultiplyAdd;
+using OutElementNoneOp    = ck::tensor_operation::element_wise::MultiplyAdd;
+using OutElementReluOp    = ck::tensor_operation::element_wise::MultiplyAddRelu;
+using OutElementTanhOp    = ck::tensor_operation::element_wise::MultiplyAddTanh;
+using ActivationOp        = ck::tensor_operation::element_wise::PassThrough;
+using OutElementConvertOp = ck::tensor_operation::element_wise::Activation_Mul_Clamp<ActivationOp>;
 
 #define DEFAULT_H 64
 #define DEFAULT_W 64
@@ -367,6 +367,7 @@ template <typename InDataType,
           typename WeiDataType,
           typename GPUAccType,
           typename CPUAccType,
+          typename EDataType,
           ShapeType Shape,
           FilterType Filter,
           bool Dilation,
@@ -376,10 +377,10 @@ template <typename InDataType,
           typename OutElementOp,
           bool ScaleBiasPacked,
           bool UniformScale,
+          bool Convert_to_tensor,
           int32_t TestMask>
 bool run_test()
 {
-    // MessageBoxA(NULL, "", "", MB_OK);
     if((config.test_mask & 0xFFFFFFF8 & TestMask) == 0)
     {
         return true;
@@ -458,10 +459,11 @@ bool run_test()
                                           left_pads,
                                           right_pads};
 
-    constexpr auto NDimSpatial = ck::Number<n_dim>{};
-    const auto in_element_op   = InElementOp{};
-    const auto wei_element_op  = WeiElementOp{};
-    const auto pass_through_op = PassThroughOp{};
+    constexpr auto NDimSpatial       = ck::Number<n_dim>{};
+    const auto in_element_op         = InElementOp{};
+    const auto wei_element_op        = WeiElementOp{};
+    const auto pass_through_op       = PassThroughOp{};
+    const ck::index_t cvtTensorScale = 1; // Scale=1 to update
 
     namespace ctc   = ck::tensor_layout::convolution;
     auto in_layout  = ctc::GNHWC{};
@@ -487,18 +489,30 @@ bool run_test()
     const auto out_g_n_k_wos_desc =
         ck::utils::conv::make_output_host_tensor_descriptor_g_n_k_wos_packed<OutLayout>(conv_param);
 
+    ck::utils::conv::ConvParam update_conv_param = conv_param;
+    update_conv_param.C_                         = OutputChannels;
+    const auto cvt_out_g_n_c_wis_desc =
+        ck::utils::conv::make_input_host_tensor_descriptor_g_n_c_wis_packed<InLayout>(
+            update_conv_param);
+
     Tensor<InDataType> in(in_g_n_c_wis_desc);
     Tensor<WeiDataType> wei(wei_g_k_c_xs_desc);
     Tensor<GPUAccType> bias(bias_g_n_k_wos_desc);
     Tensor<GPUAccType> scale(scale_g_n_k_wos_desc);
     Tensor<CPUAccType> out_host(out_g_n_k_wos_desc);
+    Tensor<EDataType> cvt_out_host(cvt_out_g_n_c_wis_desc);
     Tensor<GPUAccType> out_device(out_g_n_k_wos_desc);
+    Tensor<EDataType> out_tensor_device(cvt_out_g_n_c_wis_desc);
 
     std::cout << "in: " << in.mDesc << std::endl;
     std::cout << "wei: " << wei.mDesc << std::endl;
     std::cout << "bias: " << bias.mDesc << std::endl;
     std::cout << "scale: " << scale.mDesc << std::endl;
     std::cout << "out: " << out_host.mDesc << std::endl;
+    if constexpr(Convert_to_tensor)
+    {
+        std::cout << "cvt_tensor_out: " << cvt_out_host.mDesc << std::endl;
+    }
 
     switch(config.init_method)
     {
@@ -513,7 +527,6 @@ bool run_test()
         else
         {
             bias.GenerateTensorValue(GeneratorTensor_2<GPUAccType>{-5, 5});
-            // bias.GenerateTensorValue(GeneratorTensor_1<GPUAccType>{3});
         }
         if constexpr(ScaleBiasPacked)
         {
@@ -556,6 +569,8 @@ bool run_test()
     std::array<ck::index_t, NDimSpatial + 3> d1_g_n_k_wos_strides{};
     std::array<ck::index_t, NDimSpatial + 3> e_g_n_k_wos_lengths{};
     std::array<ck::index_t, NDimSpatial + 3> e_g_n_k_wos_strides{};
+    std::array<ck::index_t, NDimSpatial + 3> cvt_e_g_n_k_wos_lengths{};
+    std::array<ck::index_t, NDimSpatial + 3> cvt_e_g_n_k_wos_strides{};
     std::array<ck::index_t, NDimSpatial> conv_filter_strides{};
     std::array<ck::index_t, NDimSpatial> conv_filter_dilations{};
     std::array<ck::index_t, NDimSpatial> input_left_pads{};
@@ -571,14 +586,21 @@ bool run_test()
     copy(bias_g_n_k_wos_desc.GetStrides(), d0_g_n_k_wos_strides);
     copy(scale_g_n_k_wos_desc.GetLengths(), d1_g_n_k_wos_lengths);
     copy(scale_g_n_k_wos_desc.GetStrides(), d1_g_n_k_wos_strides);
-    copy(out_g_n_k_wos_desc.GetLengths(), e_g_n_k_wos_lengths);
-    copy(out_g_n_k_wos_desc.GetStrides(), e_g_n_k_wos_strides);
     copy(conv_param.conv_filter_strides_, conv_filter_strides);
     copy(conv_param.conv_filter_dilations_, conv_filter_dilations);
     copy(conv_param.input_left_pads_, input_left_pads);
     copy(conv_param.input_right_pads_, input_right_pads);
+    copy(out_g_n_k_wos_desc.GetLengths(), e_g_n_k_wos_lengths);
+    copy(out_g_n_k_wos_desc.GetStrides(), e_g_n_k_wos_strides);
+
+    if constexpr(Convert_to_tensor)
+    {
+        copy(cvt_out_g_n_c_wis_desc.GetLengths(), cvt_e_g_n_k_wos_lengths);
+        copy(cvt_out_g_n_c_wis_desc.GetStrides(), cvt_e_g_n_k_wos_strides);
+    }
 
     Tensor<CPUAccType> c_host(out_g_n_k_wos_desc);
+    Tensor<CPUAccType> convert_c_host(cvt_out_g_n_c_wis_desc);
 
     auto ref_conv = ck::tensor_operation::host::ReferenceConvFwd<NDimSpatial,
                                                                  InDataType,
@@ -606,6 +628,15 @@ bool run_test()
         out_host.ForEach([&](auto&, auto idx) {
             OutElementOp{}(out_host(idx), c_host(idx), scale(idx), bias(idx));
         });
+
+        if constexpr(Convert_to_tensor)
+        {
+            const auto out_element_convert_op = OutElementConvertOp{
+                static_cast<float>(std::pow(2, cvtTensorScale)), ActivationOp{}};
+            out_host.ForEach([&](auto&, auto idx) { // out_host always smaller than cvt_out_host
+                out_element_convert_op(cvt_out_host(idx), out_host(idx));
+            });
+        }
     }
 
     DumpTensor(in, "Input");
@@ -613,6 +644,10 @@ bool run_test()
     DumpTensor(bias, "Bias");
     DumpTensor(scale, "Scale");
     DumpTensor(out_host, "Accum");
+    if constexpr(Convert_to_tensor)
+    {
+        DumpTensor(cvt_out_host, "AfterConvertToTensor");
+    }
 
     DeviceMem in_device_buf(sizeof(InDataType) *
                             in.mDesc.GetElementSpaceSize()); // ISSUE HAPPENS in latest CSIM
@@ -620,6 +655,8 @@ bool run_test()
     DeviceMem bias_device_buf(sizeof(GPUAccType) * bias.mDesc.GetElementSpaceSize());
     DeviceMem scale_device_buf(sizeof(GPUAccType) * scale.mDesc.GetElementSpaceSize());
     DeviceMem out_device_buf(sizeof(GPUAccType) * out_device.mDesc.GetElementSpaceSize());
+    DeviceMem out_tensor_device_buf(sizeof(EDataType) *
+                                    out_tensor_device.mDesc.GetElementSpaceSize());
 
     in_device_buf.ToDevice(in.mData.data());
     wei_device_buf.ToDevice(wei.mData.data());
@@ -633,11 +670,13 @@ bool run_test()
         : FilterSize == 2
             ? ck::tensor_operation::device::ConvolutionForwardSpecialization::Filter2x2Stride2Pad0
             : ck::tensor_operation::device::ConvolutionForwardSpecialization::Filter3x3Stride1Pad0;
-    //? ck::tensor_operation::device::ConvolutionForwardSpecialization::Filter2x2Stride2OddHWPad0
-    //: ck::tensor_operation::device::ConvolutionForwardSpecialization::Filter3x3Stride1MultiLayerPad0;
 
     using AccBlockwiseOperation =
         ck::convolution::BlockwiseElementOpScaleAndBias<ActiveFun, UniformScale, ScaleBiasPacked>;
+
+    using AccBlockwiseNextOperation =
+        ck::convolution::BlockwiseElementOpCvtTensor<Convert_to_tensor, ActiveFun, cvtTensorScale>;
+
     constexpr ck::index_t InBlockTransferScalarPerVector = sizeof(uint32_t) / sizeof(InDataType);
     constexpr ck::index_t Cluster_In_C = CPerBlock / InBlockTransferScalarPerVector;
     constexpr ck::index_t Cluster_In_W = 4;
@@ -671,8 +710,11 @@ bool run_test()
         ck::Tuple<ck::Sequence<Cluster_Ds_K>, ck::Sequence<Cluster_Ds_K>>;
     constexpr ck::index_t DsBlockLdsAddExtraM = true;
 
-    float avg_time                  = 0;
-    using DeviceSubaConvFwdInstance = ck::tensor_operation::device::DeviceConvSubaWconv<
+    float avg_time    = 0;
+    using AccDataType = GPUAccType;
+    using DsDataType  = ck::Tuple<GPUAccType, GPUAccType>;
+
+    using DeviceSubaCvtConvFwdInstance = ck::tensor_operation::device::DeviceConvSubaWconv<
         NDimSpatial,
         InputLayout<NDimSpatial>,
         WeightLayout<NDimSpatial>,
@@ -680,12 +722,14 @@ bool run_test()
         OutputLayout<NDimSpatial>,
         InDataType,
         WeiDataType,
-        ck::Tuple<GPUAccType, GPUAccType>,
-        GPUAccType,
+        DsDataType,
+        AccDataType,
+        EDataType,
         InElementOp,
         WeiElementOp,
         PassThroughOp,
         AccBlockwiseOperation,
+        AccBlockwiseNextOperation,
         ConvSpec,
         1,
         BlockSize,
@@ -719,9 +763,12 @@ bool run_test()
         AccBlockTransferScalarPerVector,
         AccEnableLds,
         EnableAsync,
-        EnableWaveGroup>;
+        EnableWaveGroup,
+        false, // shuffleOnLoad
+        false, // transpose
+        Convert_to_tensor>;
 
-    auto conv    = DeviceSubaConvFwdInstance{};
+    auto conv    = DeviceSubaCvtConvFwdInstance{};
     auto invoker = conv.MakeInvoker();
     auto argument =
         conv.MakeArgument(in_device_buf.GetDeviceBuffer(),
@@ -729,6 +776,7 @@ bool run_test()
                           std::array<const void*, 2>{bias_device_buf.GetDeviceBuffer(),
                                                      scale_device_buf.GetDeviceBuffer()},
                           out_device_buf.GetDeviceBuffer(),
+                          out_tensor_device_buf.GetDeviceBuffer(),
                           a_g_n_c_wis_lengths,
                           a_g_n_c_wis_strides,
                           b_g_k_c_xs_lengths,
@@ -739,6 +787,8 @@ bool run_test()
                               {d0_g_n_k_wos_strides, d1_g_n_k_wos_strides}},
                           e_g_n_k_wos_lengths,
                           e_g_n_k_wos_strides,
+                          cvt_e_g_n_k_wos_lengths,
+                          cvt_e_g_n_k_wos_strides,
                           conv_filter_strides,
                           conv_filter_dilations,
                           input_left_pads,
@@ -755,9 +805,17 @@ bool run_test()
         return false;
     }
     avg_time = invoker.Run(argument, StreamConfig{nullptr, config.time_kernel});
-    out_device_buf.FromDevice(out_device.mData.data());
 
-    DumpTensor(out_device, "Accum_Device");
+    if constexpr(Convert_to_tensor)
+    {
+        out_tensor_device_buf.FromDevice(out_tensor_device.mData.data());
+        DumpTensor(out_tensor_device, "out_tensor_Device");
+    }
+    else
+    {
+        out_device_buf.FromDevice(out_device.mData.data());
+        DumpTensor(out_device, "Accum_Device");
+    }
 
     std::cout <<
 #ifdef ENABLE_WAVEGROUP
@@ -769,9 +827,9 @@ bool run_test()
               << get_string(Shape) << ", " << get_string(Filter) << ", Dilation:" << DilationSize
               << ", LdsMod:" << LdsMode << ", ScaleBiasPacked:" << ScaleBiasPacked
               << ", UniformScale:" << UniformScale << ", ActiveFunc:" << ActiveFun
-              << ", WaveGroup:" << EnableWaveGroup << ", Id : 0x" << std::hex << TestMask
-              << " Size: { " << config.h << "x" << config.w << "x" << config.c << "x" << config.k
-              << " }>: Status: ";
+              << ", ConverToTensor:" << Convert_to_tensor << ", WaveGroup:" << EnableWaveGroup
+              << ", Id : 0x" << std::hex << TestMask << " Size: { " << config.h << "x" << config.w
+              << "x" << config.c << "x" << config.k << " }>: Status: ";
 
     if(config.time_kernel)
     {
@@ -780,7 +838,8 @@ bool run_test()
 
     if(config.do_verification)
     {
-        if constexpr(std::is_same<GPUAccType, ck::bhalf_t>::value)
+        if constexpr(std::is_same<GPUAccType, ck::bhalf_t>::value ||
+                     std::is_same_v<InDataType, ck::f8_t>)
         {
             // check_err doesn't support bhalf_t
             std::cout << "Ignored\n";
@@ -788,19 +847,24 @@ bool run_test()
         }
         else
         {
-#ifdef FORCE_CONVERT_TO_TENSOR
-            bool ret = ck::utils::check_err(out_device,
-                                            in,
-                                            "Error: incorrect results!",
-                                            get_rtol<GPUAccType>(),
-                                            get_atol<GPUAccType>());
-#else
-            bool ret = ck::utils::check_err(out_device,
-                                            out_host,
-                                            "Error: incorrect results!",
-                                            get_rtol<GPUAccType>(),
-                                            get_atol<GPUAccType>());
-#endif
+            bool ret = false;
+            if constexpr(Convert_to_tensor)
+            {
+                ret = ck::utils::check_err(out_tensor_device,
+                                           cvt_out_host,
+                                           "Error: incorrect results for cvt_tensor!",
+                                           get_rtol<EDataType>(),
+                                           get_atol<EDataType>());
+            }
+            else
+            {
+                ret = ck::utils::check_err(out_device,
+                                           out_host,
+                                           "Error: incorrect results!",
+                                           get_rtol<GPUAccType>(),
+                                           get_atol<GPUAccType>());
+            }
+
             if(ret)
             {
                 std::cout << "Passed\n";
@@ -817,153 +881,6 @@ bool run_test()
     {
         return true;
     }
-}
-
-template <typename SrcType,
-          typename GPUAccType,
-          typename CPUAccType,
-          int LdsMode,
-          bool ScaleBiasPacked,
-          bool UniformScale,
-          int32_t TestMask>
-bool run_test_fmt()
-{
-    if((config.test_mask & TestMask) == 0)
-    {
-        return true;
-    }
-    bool pass = true;
-
-#ifdef ENABLE_WAVEGROUP
-    constexpr bool WaveGroup = true;
-#else
-    constexpr bool WaveGroup = false;
-#endif
-
-    // clang-format off
-    //                                                           |ShapeType  |FilterType |Dilation |Lds |WaveGroup |activeFun | AccElementOp | scaleBiasPacked | uniformScale | TestMask
-    if constexpr(std::is_same<GPUAccType, float>::value)
-    {
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_1X1, false, 0, WaveGroup, 0, OutElementNoneOp, ScaleBiasPacked, UniformScale, TestMask | 0x10>(); 
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, false, 0, WaveGroup, 0, OutElementNoneOp, ScaleBiasPacked, UniformScale, TestMask | 0x10>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, true,  0, WaveGroup, 0, OutElementNoneOp, ScaleBiasPacked, UniformScale, TestMask | 0x10>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_2X2, false, 0, WaveGroup, 0, OutElementNoneOp, ScaleBiasPacked, UniformScale, TestMask | 0x10>(); // Test Fail
-        //pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_1X1, false, LdsMode, WaveGroup, 0, OutElementNoneOp, ScaleBiasPacked, UniformScale, TestMask | 0x20>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, false, LdsMode, WaveGroup, 0, OutElementNoneOp, ScaleBiasPacked, UniformScale, TestMask | 0x20>();
-        //pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_2X2, false, LdsMode, WaveGroup, 0, OutElementNoneOp, ScaleBiasPacked, UniformScale, TestMask | 0x20>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, false, 0, WaveGroup, 1, OutElementReluOp, ScaleBiasPacked, UniformScale, TestMask | 0x40>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, true,  0, WaveGroup, 1, OutElementReluOp, ScaleBiasPacked, UniformScale, TestMask | 0x40>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_2X2, false, 0, WaveGroup, 1, OutElementReluOp, ScaleBiasPacked, UniformScale, TestMask | 0x40>();                
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_1X1, false, 0, WaveGroup, 1, OutElementReluOp, ScaleBiasPacked, UniformScale, TestMask | 0x40>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_1X1, false, LdsMode, WaveGroup, 1, OutElementReluOp, ScaleBiasPacked, UniformScale, TestMask | 0x80>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, false, LdsMode, WaveGroup, 1, OutElementReluOp, ScaleBiasPacked, UniformScale, TestMask | 0x80>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_2X2, false, LdsMode, WaveGroup, 1, OutElementReluOp, ScaleBiasPacked, UniformScale, TestMask | 0x80>(); 
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_1X1, false, 0, WaveGroup, 2, OutElementTanhOp, ScaleBiasPacked, UniformScale, TestMask | 0x100>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, false, 0, WaveGroup, 2, OutElementTanhOp, ScaleBiasPacked, UniformScale, TestMask | 0x100>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, true,  0, WaveGroup, 2, OutElementTanhOp, ScaleBiasPacked, UniformScale, TestMask | 0x100>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_2X2, false, 0, WaveGroup, 2, OutElementTanhOp, ScaleBiasPacked, UniformScale, TestMask | 0x100>();        
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_1X1, false, LdsMode, WaveGroup, 2, OutElementTanhOp, ScaleBiasPacked, UniformScale, TestMask | 0x200>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, false, LdsMode, WaveGroup, 2, OutElementTanhOp, ScaleBiasPacked, UniformScale, TestMask | 0x200>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_2X2, false, LdsMode, WaveGroup, 2, OutElementTanhOp, ScaleBiasPacked, UniformScale, TestMask | 0x200>();    
-    }
-    else
-    {
-        //ActivativeFun: 0
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_1X1, false, 0, WaveGroup, 0, OutElementNoneOp, ScaleBiasPacked, UniformScale, TestMask | 0x400>();         
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_1X1, false, 0, WaveGroup, 0, OutElementNoneOp, ScaleBiasPacked, UniformScale, TestMask | 0x400>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_3X3, false, 0, WaveGroup, 0, OutElementNoneOp, ScaleBiasPacked, UniformScale, TestMask | 0x400>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_3X3, false, 0, WaveGroup, 0, OutElementNoneOp, ScaleBiasPacked, UniformScale, TestMask | 0x400>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_3X3, true,  0, WaveGroup, 0, OutElementNoneOp, ScaleBiasPacked, UniformScale, TestMask | 0x400>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_3X3, true,  0, WaveGroup, 0, OutElementNoneOp, ScaleBiasPacked, UniformScale, TestMask | 0x400>();
-        if constexpr (WaveGroup == false) // LLVM bug cause compile fail
-        {
-            pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_2X2, false, 0, WaveGroup, 0, OutElementNoneOp, ScaleBiasPacked, UniformScale, TestMask | 0x400>();
-        }
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_2X2, false, 0, WaveGroup, 0, OutElementNoneOp, ScaleBiasPacked, UniformScale, TestMask | 0x400>();
-
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_1X1, false, LdsMode, WaveGroup, 0, OutElementNoneOp, ScaleBiasPacked, UniformScale, TestMask | 0x800>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_3X3, false,  LdsMode, WaveGroup, 0, OutElementNoneOp, ScaleBiasPacked, UniformScale, TestMask | 0x800>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_1X1, false,  LdsMode, WaveGroup, 0, OutElementNoneOp, ScaleBiasPacked, UniformScale, TestMask | 0x800>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_3X3, false,  LdsMode, WaveGroup, 0, OutElementNoneOp, ScaleBiasPacked, UniformScale, TestMask | 0x800>();
-        if constexpr (WaveGroup == false)
-        {
-            pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_2X2, false,  LdsMode, WaveGroup, 0, OutElementNoneOp, ScaleBiasPacked, UniformScale, TestMask | 0x800>();
-        }
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_2X2, false,  LdsMode, WaveGroup, 0, OutElementNoneOp, ScaleBiasPacked, UniformScale, TestMask | 0x800>();
-
-        //ActivativeFun: 1
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_1X1, false, 0, WaveGroup, 1, OutElementReluOp, ScaleBiasPacked, UniformScale, TestMask | 0x1000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_1X1, false, 0, WaveGroup, 1, OutElementReluOp, ScaleBiasPacked, UniformScale, TestMask | 0x1000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_3X3, false, 0, WaveGroup, 1, OutElementReluOp, ScaleBiasPacked, UniformScale, TestMask | 0x1000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_3X3, false, 0, WaveGroup, 1, OutElementReluOp, ScaleBiasPacked, UniformScale, TestMask | 0x1000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_3X3, true,  0, WaveGroup, 1, OutElementReluOp, ScaleBiasPacked, UniformScale, TestMask | 0x1000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_3X3, true,  0, WaveGroup, 1, OutElementReluOp, ScaleBiasPacked, UniformScale, TestMask | 0x1000>();
-        if constexpr (WaveGroup == false) // LLVM bug cause compile fail
-        {
-            pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_2X2, false, 0, WaveGroup, 1, OutElementReluOp, ScaleBiasPacked, UniformScale, TestMask | 0x1000>();
-        }
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_2X2, false, 0, WaveGroup, 1, OutElementReluOp, ScaleBiasPacked, UniformScale, TestMask | 0x1000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_1X1, false,  LdsMode, WaveGroup, 1, OutElementReluOp, ScaleBiasPacked, UniformScale, TestMask | 0x2000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_1X1, false,  LdsMode, WaveGroup, 1, OutElementReluOp, ScaleBiasPacked, UniformScale, TestMask | 0x2000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_3X3, false,  LdsMode, WaveGroup, 1, OutElementReluOp, ScaleBiasPacked, UniformScale, TestMask | 0x2000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_3X3, false,  LdsMode, WaveGroup, 1, OutElementReluOp, ScaleBiasPacked, UniformScale, TestMask | 0x2000>();
-        if constexpr (WaveGroup == false)
-        {
-            pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_2X2, false,  LdsMode, WaveGroup, 1, OutElementReluOp, ScaleBiasPacked, UniformScale, TestMask | 0x2000>();
-        }
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_2X2, false,  LdsMode, WaveGroup, 1, OutElementReluOp, ScaleBiasPacked, UniformScale, TestMask | 0x2000>();
-
-        //ActivativeFun: 2
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_1X1, false, 0, WaveGroup, 2, OutElementTanhOp, ScaleBiasPacked, UniformScale, TestMask | 0x4000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_1X1, false, 0, WaveGroup, 2, OutElementTanhOp, ScaleBiasPacked, UniformScale, TestMask | 0x4000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_3X3, false, 0, WaveGroup, 2, OutElementTanhOp, ScaleBiasPacked, UniformScale, TestMask | 0x4000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_3X3, false, 0, WaveGroup, 2, OutElementTanhOp, ScaleBiasPacked, UniformScale, TestMask | 0x4000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_3X3, true,  0, WaveGroup, 2, OutElementTanhOp, ScaleBiasPacked, UniformScale, TestMask | 0x4000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_3X3, true,  0, WaveGroup, 2, OutElementTanhOp, ScaleBiasPacked, UniformScale, TestMask | 0x4000>();
-        if constexpr (WaveGroup == false) // LLVM bug cause compile fail
-        {
-            pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_2X2, false, 0, WaveGroup, 2, OutElementTanhOp, ScaleBiasPacked, UniformScale, TestMask | 0x4000>();
-        }
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_2X2, false, 0, WaveGroup, 2, OutElementTanhOp, ScaleBiasPacked, UniformScale, TestMask | 0x4000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_1X1, false, LdsMode, WaveGroup, 2, OutElementTanhOp, ScaleBiasPacked, UniformScale, TestMask | 0x8000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_1X1, false,  LdsMode, WaveGroup, 2, OutElementTanhOp, ScaleBiasPacked, UniformScale, TestMask | 0x8000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_3X3, false,  LdsMode, WaveGroup, 2, OutElementTanhOp, ScaleBiasPacked, UniformScale, TestMask | 0x8000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_3X3, false,  LdsMode, WaveGroup, 2, OutElementTanhOp, ScaleBiasPacked, UniformScale, TestMask | 0x8000>();
-        if constexpr (WaveGroup == false)
-        {
-            pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_2X2, false,  LdsMode, WaveGroup, 2, OutElementTanhOp, ScaleBiasPacked, UniformScale, TestMask | 0x8000>();
-        }
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_2X2, false,  LdsMode, WaveGroup, 2, OutElementTanhOp, ScaleBiasPacked, UniformScale, TestMask | 0x8000>();
-        // 4X2
-        //NoneActFun
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_1X1, false, 0, WaveGroup, 0, OutElementNoneOp, ScaleBiasPacked, UniformScale, TestMask | 0x10000>();   
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, false, 0, WaveGroup, 0, OutElementNoneOp, ScaleBiasPacked, UniformScale, TestMask | 0x10000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, true,  0, WaveGroup, 0, OutElementNoneOp, ScaleBiasPacked, UniformScale, TestMask | 0x10000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_2X2, false, 0, WaveGroup, 0, OutElementNoneOp, ScaleBiasPacked, UniformScale, TestMask | 0x10000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_1X1, false, LdsMode, WaveGroup, 0, OutElementNoneOp, ScaleBiasPacked, UniformScale, TestMask | 0x20000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, false,  LdsMode, WaveGroup, 0, OutElementNoneOp, ScaleBiasPacked, UniformScale, TestMask | 0x20000>(); 
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_2X2, false,  LdsMode, WaveGroup, 0, OutElementNoneOp, ScaleBiasPacked, UniformScale, TestMask | 0x20000>();
-       
-        //Relu
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_1X1, false, 0, WaveGroup, 1, OutElementReluOp, ScaleBiasPacked, UniformScale, TestMask | 0x40000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, false, 0, WaveGroup, 1, OutElementReluOp, ScaleBiasPacked, UniformScale, TestMask | 0x40000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, true,  0, WaveGroup, 1, OutElementReluOp, ScaleBiasPacked, UniformScale, TestMask | 0x40000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_2X2, false, 0, WaveGroup, 1, OutElementReluOp, ScaleBiasPacked, UniformScale, TestMask | 0x40000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_1X1, false, LdsMode, WaveGroup, 1, OutElementReluOp, ScaleBiasPacked, UniformScale, TestMask | 0x80000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, false,  LdsMode, WaveGroup, 1, OutElementReluOp, ScaleBiasPacked, UniformScale, TestMask | 0x80000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_2X2, false,  LdsMode, WaveGroup, 1, OutElementReluOp, ScaleBiasPacked, UniformScale, TestMask | 0x80000>();
-
-        //Tan
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_1X1, false, 0, WaveGroup, 2, OutElementTanhOp, ScaleBiasPacked, UniformScale, TestMask | 0x100000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, false, 0, WaveGroup, 2, OutElementTanhOp, ScaleBiasPacked, UniformScale, TestMask | 0x100000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, true,  0, WaveGroup, 2, OutElementTanhOp, ScaleBiasPacked, UniformScale, TestMask | 0x100000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_2X2, false, 0, WaveGroup, 2, OutElementTanhOp, ScaleBiasPacked, UniformScale, TestMask | 0x100000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_1X1, false, LdsMode, WaveGroup, 2, OutElementTanhOp, ScaleBiasPacked, UniformScale, TestMask | 0x200000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, false,  LdsMode, WaveGroup, 2, OutElementTanhOp, ScaleBiasPacked, UniformScale, TestMask | 0x200000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_2X2, false,  LdsMode, WaveGroup, 2, OutElementTanhOp, ScaleBiasPacked, UniformScale, TestMask | 0x200000>();    
-    }
-    // clang-format on
-    return pass;
 }
 
 inline void print_help_msg()
@@ -1034,26 +951,5 @@ using half_t  = ck::half_t;
 using bhalf_t = ck::bhalf_t;
 using f8_t    = ck::f8_t;
 using bf8_t   = ck::bf8_t;
-
-#define Extern_Test_Func(                                                              \
-    SrcType, GpuAccType, CpuAccType, LdsMode, scaleBiasPacked, uniformScale, TestMask) \
-    extern bool                                                                        \
-        run_test_fmt_##SrcType##_##GpuAccType##_##CpuAccType##_##LdsMode##_##scaleBiasPacked##_##uniformScale##_##TestMask();
-
-#define Call_Test_Func(                                                                \
-    SrcType, GpuAccType, CpuAccType, LdsMode, scaleBiasPacked, uniformScale, TestMask) \
-    run_test_fmt_##SrcType##_##GpuAccType##_##CpuAccType##_##LdsMode##_##scaleBiasPacked##_##uniformScale##_##TestMask()
-
-#define Def_Test_Func(                                                                                                       \
-    SrcType, GpuAccType, CpuAccType, LdsMode, scaleBiasPacked, uniformScale, TestMask)                                       \
-    bool                                                                                                                     \
-        run_test_fmt_##SrcType##_##GpuAccType##_##CpuAccType##_##LdsMode##_##scaleBiasPacked##_##uniformScale##_##TestMask() \
-    {                                                                                                                        \
-        return run_test_fmt<SrcType,                                                                                         \
-                            GpuAccType,                                                                                      \
-                            CpuAccType,                                                                                      \
-                            LdsMode,                                                                                         \
-                            scaleBiasPacked,                                                                                 \
-                            uniformScale,                                                                                    \
-                            TestMask>();                                                                                     \
-    }
+using int4_t  = ck::int4_t;
+using uint4_t = ck::uint4_t;
