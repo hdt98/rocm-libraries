@@ -10,6 +10,7 @@
 #include "ck/tensor_description/tensor_adaptor.hpp"
 #include "ck/tensor_operation/gpu/element/unary_element_wise_operation.hpp"
 #include "ck/tensor_operation/gpu/warp/acc_sba.hpp"
+#include "ck/tensor_operation/gpu/warp/acc_cvt_tensor.hpp"
 
 namespace ck {
 
@@ -37,12 +38,24 @@ struct BlockwiseElementOpFma : public BaseBlockwiseElementOp
     static constexpr bool IsFma       = true;
     static constexpr index_t uniform  = UniformScale;
 };
+
+template <bool convert_to_tensor, index_t ActiveFunc, index_t convertScale>
+struct BlockwiseElementOpCvtTensor : public BaseBlockwiseElementOp
+{
+    static constexpr const char* name   = "BlockwiseOp_cvt_tensor_";
+    static constexpr index_t activeFunc = ActiveFunc;
+    static constexpr index_t scale      = convertScale;
+    static constexpr bool cvt_to_tensor = convert_to_tensor;
+};
+
 struct BlockwiseElementOpPassThrough
 {
     static constexpr const char* name = "BlockwiseOp_passthrough";
     static constexpr bool IsSuba      = false;
     static constexpr bool IsFma       = false;
+    static constexpr bool cvt_to_tensor = false;
 };
+
 }; // namespace convolution
 
 template <typename ThisThreadBlock,
@@ -897,6 +910,86 @@ struct Blockwise_element_wconv_fma
     };
 };
 
+template <typename ThisThreadBlock,
+          typename OutTensorDataType,
+          typename AccDataType,
+          typename OutTensorBlockDesc,
+          typename AccBlockDesc,
+          index_t HPerBlock,
+          index_t WPerBlock,
+          index_t KPerBlock,
+          index_t HPerWconv,
+          index_t WPerWconv,
+          index_t KPerWconv,
+          index_t CPerWconv,
+          index_t HRepeat,
+          index_t WRepeat,
+          index_t KRepeat,
+          bool Aco,
+          typename BlockwiseNextElementOp>
+struct Blockwise_element_wconv_cvtTensor
+{
+    static constexpr auto I0            = Number<0>{};
+    static constexpr auto I1            = Number<1>{};
+    static constexpr auto I2            = Number<2>{};
+    static constexpr index_t WaveSize   = 32;
+    static constexpr index_t NumDTensor = 2;
+
+    static constexpr auto acc_cvt_tensor = AccCvtTensor<OutTensorDataType,
+                                                        AccDataType,
+                                                        HPerWconv,
+                                                        WPerWconv,
+                                                        BlockwiseNextElementOp::activeFunc>{};
+
+    __device__ static auto GetWaveIdx()
+    {
+        return GetWconvWaveIdx<ThisThreadBlock,
+                               HPerBlock,
+                               WPerBlock,
+                               HRepeat,
+                               WRepeat,
+                               HPerWconv,
+                               WPerWconv>();
+    }
+
+    static constexpr AccBlockDesc accum_thread_desc_;
+    static constexpr OutTensorBlockDesc out_tensor_thread_desc_;
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wundefined-reinterpret-cast"
+    template <typename AccumThreadBuffer,
+              typename OutTensorThreadBuffer,
+              typename NumberH0,
+              typename NumberW0,
+              typename NumberK0>
+    __device__ void Run(AccumThreadBuffer& accum_thread_buf,
+                        OutTensorThreadBuffer& out_tensor_thread_buf,
+                        NumberH0,
+                        NumberW0,
+                        NumberK0) const
+    {
+        constexpr NumberH0 h0;
+        constexpr NumberW0 w0;
+        constexpr NumberK0 k0;
+
+        constexpr auto accCvtInstance = ck::AccCvtTensor<OutTensorDataType,
+                                                         AccDataType,
+                                                         HPerWconv,
+                                                         WPerWconv,
+                                                         BlockwiseNextElementOp::activeFunc>();
+        constexpr index_t accum_offset =
+            accum_thread_desc_.CalculateOffset(make_tuple(h0, w0, k0, I0));
+
+        constexpr index_t indata_offset =
+            out_tensor_thread_desc_.CalculateOffset(make_tuple(h0, w0, k0, I0));
+        auto& outVec = out_tensor_thread_buf.GetVectorTypeReference(Number<indata_offset>{});
+        constexpr index_t convert_scale = BlockwiseNextElementOp::scale;
+        accCvtInstance.cvtTensor_instr.Run(
+            accum_thread_buf.GetVectorTypeReference(Number<accum_offset>{}), convert_scale, outVec);
+    }
+#pragma clang diagnostic pop
+};
+
 struct Blockwise_element_passthrough
 {
 };
@@ -906,7 +999,9 @@ template <typename ThisThreadBlock,
           typename InDataType,
           typename DsDataType,
           typename AccDataType,
+          typename EDataType,
           typename AccBlockwiseOperation,
+          typename AccBlockwiseNextOperation,
           typename WeiDataBlockDesc,
           typename InDataBlockDesc,
           typename DsBlockDesc,
@@ -924,8 +1019,8 @@ template <typename ThisThreadBlock,
           bool WeiDataEnableLds = false,
           bool InDataEnableLds  = false,
           bool DsEnableLds      = false,
-          bool ConvertToTensor  = false,
-          bool Transposed       = false>
+          bool Transposed       = false,
+          bool ConvertToTensor  = false>
 /* Option: Read from LDS, big buffer hold all threads required data
  * Source
  * Weight: NumYX x KPerBlock x  CPerBlock (YXKC)
@@ -1033,7 +1128,20 @@ struct BlockwiseSubaConvWconv
                               true>
         accum_thread_buf_;
 
+    using KernelEDataType = decltype(wconv_conv.GetKernelDataType<EDataType>());
+    StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr,
+                              KernelEDataType,
+                              HRepeat * WRepeat * KRepeat*(KPerWconv / CPerWconv),
+                              wconv_conv.GetNumOutTensorComponents(),
+                              true>
+        out_tensor_thread_buf_;
+
     __host__ __device__ constexpr auto& GetAccumThreadBuffer() { return accum_thread_buf_; }
+
+    __host__ __device__ constexpr auto& GetOutTensorThreadBuffer()
+    {
+        return out_tensor_thread_buf_;
+    }
 
     __device__ static auto GetWaveIdx()
     {
@@ -1283,60 +1391,31 @@ struct BlockwiseSubaConvWconv
     // Describe how to read data from accum_thread_buf_ (VGPR)
     __host__ __device__ static constexpr auto GetAccThreadDescriptor()
     {
-        if constexpr(ConvertToTensor)
-        {
-            // HRepeat x WRepeat x CRepeat x I1 x H1 x H2 x W1 x C1
-            return make_naive_tensor_descriptor_packed(make_tuple(Number<HRepeat>{},
-                                                                  Number<WRepeat>{},
-                                                                  Number<CRepeat>{},
-                                                                  I1,
-                                                                  Number<NumSubTilePerImage>{},
-                                                                  I1,
-                                                                  I1,
-                                                                  Number<NumDataCompPerTile>{}));
-        }
-        else
-        {
-            static_assert(NumAccComp == 4 || NumAccComp == 8, "");
-            static_assert(NumAccCompPerTile % NumAccCompSubTile == 0, "");
+        static_assert(NumAccComp == 4 || NumAccComp == 8, "");
+        static_assert(NumAccCompPerTile % NumAccCompSubTile == 0, "");
 
-            // HRepeat x WRepeat x KRepeat x H1 x H2 x W1 x K1 x K2
-            return make_naive_tensor_descriptor_packed(
-                make_tuple(Number<HRepeatOut>{},
-                           Number<WRepeatOut>{},
-                           Number<KRepeat>{},
-                           Number<NumSubTilePerImage>{},
-                           I1,
-                           I1,
-                           Number<NumAccCompSubTile>{},
-                           Number<NumAccCompPerTile / NumAccCompSubTile>{}));
-        }
+        // HRepeat x WRepeat x KRepeat x H1 x H2 x W1 x K1 x K2
+        return make_naive_tensor_descriptor_packed(
+            make_tuple(Number<HRepeatOut>{},
+                       Number<WRepeatOut>{},
+                       Number<KRepeat>{},
+                       Number<NumSubTilePerImage>{},
+                       I1,
+                       I1,
+                       Number<NumAccCompSubTile>{},
+                       Number<NumAccCompPerTile / NumAccCompSubTile>{}));
     }
 
     __host__ __device__ static constexpr auto GetAccThreadDescLength()
     {
-        if constexpr(ConvertToTensor)
-        {
-            return Sequence<HRepeat,
-                            WRepeat,
-                            CRepeat,
-                            I1,
-                            NumSubTilePerImage,
-                            I1,
-                            I1,
-                            NumDataCompPerTile>{};
-        }
-        else
-        {
-            return Sequence<HRepeatOut,
-                            WRepeatOut,
-                            KRepeat,
-                            NumSubTilePerImage,
-                            I1,
-                            I1,
-                            NumAccCompSubTile,
-                            NumAccCompPerTile / NumAccCompSubTile>{};
-        }
+        return Sequence<HRepeatOut,
+                        WRepeatOut,
+                        KRepeat,
+                        NumSubTilePerImage,
+                        I1,
+                        I1,
+                        NumAccCompSubTile,
+                        NumAccCompPerTile / NumAccCompSubTile>{};
     }
 
     // Describe how data store to LDS buffer
@@ -1351,82 +1430,38 @@ struct BlockwiseSubaConvWconv
     template <typename AccBlockDesc_>
     __host__ __device__ static constexpr auto GetAccWaveDescriptor(const AccBlockDesc_& accDesc)
     {
-        if constexpr(ConvertToTensor)
-        {
-            static_assert(KPerBlock == CPerBlock, "");
-            // H x W x C -> H0 x W0 x C0 x I0 x H1 x H2 x W1 x C1
-            return transform_tensor_descriptor(
-                accDesc,
-                make_tuple(
-                    make_unmerge_transform(make_tuple(Number<HPerBlock / HPerWconv>{},
-                                                      Number<NumSubTilePerImage>{},
-                                                      Number<HPerWconv / NumSubTilePerImage>{})),
-                    make_unmerge_transform(
-                        make_tuple(Number<WPerBlock / WPerWconv>{}, Number<WPerWconv>{})),
-                    // TODO: replace with KPerBlock and KPerWconv
-                    make_unmerge_transform(
-                        make_tuple(Number<CPerBlock / CPerWconv>{}, Number<CPerWconv>{})),
-                    make_insert_transform(I0)),
-                make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}, Sequence<>{}),
-                make_tuple(Sequence<0, 4, 5>{}, Sequence<1, 6>{}, Sequence<2, 7>{}, Sequence<3>{}));
-        }
-        else
-        {
-            // H x W x K -> H0 x W0 x K0 x H1 x H2 x W1 x K1 x K2
-            return transform_tensor_descriptor(
-                accDesc,
-                make_tuple(
-                    make_unmerge_transform(make_tuple(Number<HPerBlockOut / HPerWconv>{},
-                                                      Number<NumSubTilePerImage>{},
-                                                      Number<HPerWconv / NumSubTilePerImage>{})),
-                    make_unmerge_transform(
-                        make_tuple(Number<WPerBlockOut / WPerWconv>{}, Number<WPerWconv>{})),
-                    make_unmerge_transform(make_tuple(Number<KPerBlock / KPerWconv>{},
-                                                      Number<NumAccCompSubTile>{},
-                                                      Number<KPerWconv / NumAccCompSubTile>{}))),
-                make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}),
-                make_tuple(Sequence<0, 3, 4>{}, Sequence<1, 5>{}, Sequence<2, 6, 7>{}));
-        }
+        // H x W x K -> H0 x W0 x K0 x H1 x H2 x W1 x K1 x K2
+        return transform_tensor_descriptor(
+            accDesc,
+            make_tuple(make_unmerge_transform(make_tuple(Number<HPerBlockOut / HPerWconv>{},
+                                                         Number<NumSubTilePerImage>{},
+                                                         Number<HPerWconv / NumSubTilePerImage>{})),
+                       make_unmerge_transform(
+                           make_tuple(Number<WPerBlockOut / WPerWconv>{}, Number<WPerWconv>{})),
+                       make_unmerge_transform(make_tuple(Number<KPerBlock / KPerWconv>{},
+                                                         Number<NumAccCompSubTile>{},
+                                                         Number<KPerWconv / NumAccCompSubTile>{}))),
+            make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}),
+            make_tuple(Sequence<0, 3, 4>{}, Sequence<1, 5>{}, Sequence<2, 6, 7>{}));
     }
 
     __device__ __host__ static auto CalculateAccThreadOriginDataIndex()
     {
 #ifdef __HIP_DEVICE_COMPILE__
-        if constexpr(ConvertToTensor)
-        {
+        const auto wave_idx          = GetWaveIdx();
+        const auto wconv_in_data_idx = wconv_conv.CalculateAccThreadOriginDataIndex();
+        const auto waveId_h          = wave_idx[I0];
+        const auto waveId_w          = wave_idx[I1];
+        const auto waveId_k          = wave_idx[I2];
 
-            const auto wave_idx          = GetWaveIdx();
-            const auto waveId_h          = wave_idx[I0];
-            const auto waveId_w          = wave_idx[I1];
-            const auto waveId_k          = wave_idx[I2];
-            const auto wconv_in_data_idx = wconv_conv.CalculateInDataThreadOriginDataIndex();
-            // H0 x W0 x C0 x I0 x H1 x H2 x W1 x C1
-            return make_tuple(waveId_h * HRepeat,
-                              waveId_w * WRepeat,
-                              waveId_k * KRepeat,
-                              0,
-                              0,
-                              wconv_in_data_idx[I0],
-                              wconv_in_data_idx[I1],
-                              wconv_in_data_idx[I2]);
-        }
-        else
-        {
-            const auto wave_idx          = GetWaveIdx();
-            const auto wconv_in_data_idx = wconv_conv.CalculateAccThreadOriginDataIndex();
-            const auto waveId_h          = wave_idx[I0];
-            const auto waveId_w          = wave_idx[I1];
-            const auto waveId_k          = wave_idx[I2];
-
-            return make_tuple(waveId_h * HRepeatOut,
-                              waveId_w * WRepeatOut,
-                              waveId_k * KRepeat,
-                              wconv_in_data_idx[I0],
-                              wconv_in_data_idx[I1],
-                              wconv_in_data_idx[I2],
-                              wconv_in_data_idx[I3],
-                              wconv_in_data_idx[I4]);
-        }
+        return make_tuple(waveId_h * HRepeat,
+                          waveId_w * WRepeat,
+                          waveId_k * KRepeat,
+                          wconv_in_data_idx[I0],
+                          wconv_in_data_idx[I1],
+                          wconv_in_data_idx[I2],
+                          wconv_in_data_idx[I3],
+                          wconv_in_data_idx[I4]);
 #else
         return make_tuple(0, 0, 0, 0, 0, 0, 0, 0);
 #endif
@@ -1537,11 +1572,13 @@ struct BlockwiseSubaConvWconv
     template <typename WeightBlockBuffer,
               typename InDataBlockBuffer,
               typename DsBlockBuffer,
-              typename AccumThreadBuffer>
+              typename AccumThreadBuffer,
+              typename OutTensorThreadBuffer>
     __device__ void RunEmulateConv2(const WeightBlockBuffer& weight_block_buf,
                                     const InDataBlockBuffer& indata_block_buf,
                                     const DsBlockBuffer& ds_block_buf,
                                     AccumThreadBuffer& accum_thread_buf,
+                                    OutTensorThreadBuffer& out_tensor_thread_buf,
                                     bool isLast) const
     {
         auto weight_thread_buf = make_static_buffer<AddressSpaceEnum::Vgpr, WeiDataType>(
@@ -1806,6 +1843,12 @@ struct BlockwiseSubaConvWconv
                 static_for<0, HRepeat, 1>{}([&](auto h0) {
                     static_for<0, WRepeat, 1>{}([&](auto w0) {
                         element_op_.Run(ds_block_buf, accum_thread_buf, h0, w0, k0);
+
+                        if constexpr(ConvertToTensor)
+                        {
+                            element_next_op_.Run(
+                                accum_thread_buf, out_tensor_thread_buf, h0, w0, k0);
+                        }
                     });
                 });
             });
@@ -1815,11 +1858,13 @@ struct BlockwiseSubaConvWconv
     template <typename WeightBlockBuffer,
               typename InDataBlockBuffer,
               typename DsBlockBuffer,
-              typename AccumThreadBuffer>
+              typename AccumThreadBuffer,
+              typename OutTensorThreadBuffer>
     __device__ void RunConv(const WeightBlockBuffer& weight_block_buf,
                             const InDataBlockBuffer& indata_block_buf,
                             const DsBlockBuffer& ds_block_buf,
                             AccumThreadBuffer& accum_thread_buf,
+                            OutTensorThreadBuffer& out_tensor_thread_buf,
                             bool isLast) const
     {
         auto weight_thread_buf = make_static_buffer<AddressSpaceEnum::Vgpr, WeiDataType>(
@@ -2009,31 +2054,49 @@ struct BlockwiseSubaConvWconv
                 static_for<0, HRepeat, 1>{}([&](auto h0) {
                     static_for<0, WRepeat, 1>{}([&](auto w0) {
                         element_op_.Run(ds_block_buf, accum_thread_buf, h0, w0, k0);
+
+                        if constexpr(ConvertToTensor)
+                        {
+                            element_next_op_.Run(
+                                accum_thread_buf, out_tensor_thread_buf, h0, w0, k0);
+                        }
                     });
                 });
             }
         });
-    }
+    };
+
 #pragma clang diagnostic pop
 
     template <typename WeightBlockBuffer,
               typename InDataBlockBuffer,
               typename DsBlockBuffer,
-              typename AccumThreadBuffer>
+              typename AccumThreadBuffer,
+              typename OutTensorThreadBuffer>
     __device__ void Run(const WeightBlockBuffer& weight_block_buf,
                         const InDataBlockBuffer& indata_block_buf,
                         const DsBlockBuffer& ds_block_buf,
                         AccumThreadBuffer& accum_thread_buf,
+                        OutTensorThreadBuffer& out_tensor_thread_buf,
                         bool isLast) const
     {
         if constexpr(FilterSize == 2)
         {
-            RunEmulateConv2(
-                weight_block_buf, indata_block_buf, ds_block_buf, accum_thread_buf, isLast);
+            RunEmulateConv2(weight_block_buf,
+                            indata_block_buf,
+                            ds_block_buf,
+                            accum_thread_buf,
+                            out_tensor_thread_buf,
+                            isLast);
         }
         else
         {
-            RunConv(weight_block_buf, indata_block_buf, ds_block_buf, accum_thread_buf, isLast);
+            RunConv(weight_block_buf,
+                    indata_block_buf,
+                    ds_block_buf,
+                    accum_thread_buf,
+                    out_tensor_thread_buf,
+                    isLast);
         }
     }
 
@@ -2059,6 +2122,12 @@ struct BlockwiseSubaConvWconv
                    Number<WRepeatOut>{},
                    Number<KRepeat>{},
                    Number<wconv_conv.GetNumAccumComponents()>{}));
+
+    static constexpr auto out_tensor_thread_desc_ = make_naive_tensor_descriptor_packed(
+        make_tuple(Number<HRepeatOut>{},
+                   Number<WRepeatOut>{},
+                   Number<KRepeat>{},
+                   Number<wconv_conv.GetNumOutTensorComponents()>{}));
 
     // Initialize thread copy classes
     using WeiDataThreadLdsCopy = ThreadwiseTensorSliceTransfer_v4<
@@ -2137,6 +2206,37 @@ struct BlockwiseSubaConvWconv
                                         AccBlockwiseOperation::IsFma>::type;
     BlockwiseElementOpType element_op_;
 
+    template <bool shouldCvtToTensor>
+    struct BlockwiseNextElementSelect
+    {
+        using type = Blockwise_element_passthrough;
+    };
+    template <>
+    struct BlockwiseNextElementSelect<true>
+    {
+        using type = Blockwise_element_wconv_cvtTensor<ThisThreadBlock,
+                                                       EDataType,
+                                                       AccDataType,
+                                                       decltype(out_tensor_thread_desc_),
+                                                       decltype(accum_thread_desc_),
+                                                       HPerBlock,
+                                                       WPerBlock,
+                                                       KPerBlock,
+                                                       HPerWconv,
+                                                       WPerWconv,
+                                                       KPerWconv,
+                                                       CPerWconv,
+                                                       HRepeat,
+                                                       WRepeat,
+                                                       KRepeat,
+                                                       Aco,
+                                                       AccBlockwiseNextOperation>;
+    };
+    using BlockwiseElementNextOpType =
+        typename BlockwiseNextElementSelect<AccBlockwiseNextOperation::cvt_to_tensor>::type;
+
+    BlockwiseElementNextOpType element_next_op_;
+
     public:
     template <typename DsGridDesc>
     __host__ __device__ static constexpr auto
@@ -2199,6 +2299,10 @@ struct BlockwiseSubaConvWconv
                       in_block_space_size_aligned * sizeof(InDataType) +
                           wei_block_space_size_aligned * sizeof(WeiDataType) +
                           BlockwiseElementOpType::SharedMemTrait::lds_size);
+
+        static constexpr auto out_tensor_block_space_size =
+            GetAccBlockDescriptor().GetElementSpaceSize();
+        static constexpr auto out_tensor_block_space_offset = 0;
     };
 
     struct LaneSharedMemTrait

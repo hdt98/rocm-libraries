@@ -517,7 +517,7 @@ struct AccSba
         if constexpr((HPerWconv == 8) && (WPerWconv == 4))
             return 0 | (activeFun << 8) | (scaleBiasPacked << 26) | AcoFlag;
         else if constexpr((HPerWconv == 4) && (WPerWconv == 4))
-            return 1 | (activeFun << 8) | (scaleBiasPacked << 26) | AcoFlag;
+            return 2 | (activeFun << 8) | (scaleBiasPacked << 26) | AcoFlag;
         else if constexpr((HPerWconv == 4) && (WPerWconv == 2))
             return 3 | (activeFun << 8) | (scaleBiasPacked << 26) | AcoFlag;
         static_assert("unsupport shape.");

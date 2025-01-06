@@ -51,7 +51,8 @@ struct GridwiseConvPipeline_v2
               typename DsDataGridBuffer,
               typename DsDataBlockBuffer,
               typename BlockwiseConv,
-              typename AccumThreadBuffer>
+              typename AccumThreadBuffer,
+              typename OutTensorThreadBuffer>
     __device__ static void Run(const InDataGridDesc& in_grid_desc,
                                const InDataBlockDesc& in_block_desc,
                                InDataBlockTransfer& in_blockwise_copy,
@@ -71,6 +72,7 @@ struct GridwiseConvPipeline_v2
                                DsDataBlockBuffer& ds_block_buf,
                                const BlockwiseConv& blockwise_conv,
                                AccumThreadBuffer& accum_thread_buf,
+                               OutTensorThreadBuffer& out_tensor_thread_buf,
                                index_t num_loop)
     {
         constexpr auto wei_block_copy_step = to_multi_index(WeiDataBlockTransferStep{});
@@ -103,6 +105,7 @@ struct GridwiseConvPipeline_v2
         {
             // Initialize C
             accum_thread_buf.Clear();
+            out_tensor_thread_buf.Clear();
         }
 
         if(get_wave_id_in_wavegroup() == 0)
@@ -254,8 +257,12 @@ struct GridwiseConvPipeline_v2
                 {
                     semaLds.template wait<0>();
                     semaLoad.template wait<0>();
-                    blockwise_conv.Run(
-                        wei_block_buf, in_block_buf, ds_block_buf, accum_thread_buf, false);
+                    blockwise_conv.Run(wei_block_buf,
+                                       in_block_buf,
+                                       ds_block_buf,
+                                       accum_thread_buf,
+                                       out_tensor_thread_buf,
+                                       false);
                     if constexpr(InDataEnableLds == false)
                     {
                         in_block_buf.SwitchBuffer();
@@ -321,8 +328,12 @@ struct GridwiseConvPipeline_v2
             {
                 semaLds.template wait<0>();
                 semaLoad.template wait<0>();
-                blockwise_conv.Run(
-                    wei_block_buf, in_block_buf, ds_block_buf, accum_thread_buf, true);
+                blockwise_conv.Run(wei_block_buf,
+                                   in_block_buf,
+                                   ds_block_buf,
+                                   accum_thread_buf,
+                                   out_tensor_thread_buf,
+                                   true);
             }
         }
     }
@@ -360,7 +371,8 @@ struct GridwiseConvPipeline_v2<1, false, false, false, EnableAsync>
               typename DsDataGridBuffer,
               typename DsDataBlockBuffer,
               typename BlockwiseConv,
-              typename AccumThreadBuffer>
+              typename AccumThreadBuffer,
+              typename OutTensorThreadBuffer>
     __device__ static void Run(const InDataGridDesc& in_grid_desc,
                                const InDataBlockDesc& in_block_desc,
                                InDataBlockTransfer& in_blockwise_copy,
@@ -380,6 +392,7 @@ struct GridwiseConvPipeline_v2<1, false, false, false, EnableAsync>
                                DsDataBlockBuffer& ds_block_buf,
                                const BlockwiseConv& blockwise_conv,
                                AccumThreadBuffer& accum_thread_buf,
+                               OutTensorThreadBuffer& out_tensor_thread_buf,
                                index_t num_loop)
     {
         constexpr auto wei_block_copy_step = to_multi_index(WeiDataBlockTransferStep{});
@@ -407,6 +420,7 @@ struct GridwiseConvPipeline_v2<1, false, false, false, EnableAsync>
         {
             // Initialize C
             accum_thread_buf.Clear();
+            out_tensor_thread_buf.Clear();
         }
 
         semaLoad.init();
@@ -493,8 +507,12 @@ struct GridwiseConvPipeline_v2<1, false, false, false, EnableAsync>
                 if(get_wave_id_in_wavegroup() == 1)
                 {
                     semaLoad.template wait<0>();
-                    blockwise_conv.Run(
-                        wei_block_buf, in_block_buf, ds_block_buf, accum_thread_buf, false);
+                    blockwise_conv.Run(wei_block_buf,
+                                       in_block_buf,
+                                       ds_block_buf,
+                                       accum_thread_buf,
+                                       out_tensor_thread_buf,
+                                       false);
                     in_block_buf.SwitchBuffer();
                     wei_block_buf.SwitchBuffer();
                     semaRun.template signal<0>();
@@ -510,8 +528,12 @@ struct GridwiseConvPipeline_v2<1, false, false, false, EnableAsync>
             {
                 semaLoad.template wait<0>();
                 __builtin_amdgcn_fence(__ATOMIC_ACQUIRE, "workgroup", "global");
-                blockwise_conv.Run(
-                    wei_block_buf, in_block_buf, ds_block_buf, accum_thread_buf, true);
+                blockwise_conv.Run(wei_block_buf,
+                                   in_block_buf,
+                                   ds_block_buf,
+                                   accum_thread_buf,
+                                   out_tensor_thread_buf,
+                                   true);
             }
         }
     }
@@ -549,7 +571,8 @@ struct GridwiseConvPipeline_v2<1, true, true, true, EnableAsync>
               typename DsDataGridBuffer,
               typename DsDataBlockBuffer,
               typename BlockwiseConv,
-              typename AccumThreadBuffer>
+              typename AccumThreadBuffer,
+              typename OutTensorThreadBuffer>
     __device__ static void Run(const InDataGridDesc& in_grid_desc,
                                const InDataBlockDesc& in_block_desc,
                                InDataBlockTransfer& in_blockwise_copy,
@@ -569,6 +592,7 @@ struct GridwiseConvPipeline_v2<1, true, true, true, EnableAsync>
                                DsDataBlockBuffer& ds_block_buf,
                                const BlockwiseConv& blockwise_conv,
                                AccumThreadBuffer& accum_thread_buf,
+                               OutTensorThreadBuffer& out_tensor_thread_buf,
                                index_t num_loop)
     {
         constexpr auto wei_block_copy_step = to_multi_index(WeiDataBlockTransferStep{});
@@ -595,6 +619,7 @@ struct GridwiseConvPipeline_v2<1, true, true, true, EnableAsync>
         {
             // Initialize C
             accum_thread_buf.Clear();
+            out_tensor_thread_buf.Clear();
         }
 
         if(get_wave_id_in_wavegroup() == 0)
@@ -662,8 +687,12 @@ struct GridwiseConvPipeline_v2<1, true, true, true, EnableAsync>
                 if(get_wave_id_in_wavegroup() == 1)
                 {
                     semaLds.template wait<0>();
-                    blockwise_conv.Run(
-                        wei_block_buf, in_block_buf, ds_block_buf, accum_thread_buf, false);
+                    blockwise_conv.Run(wei_block_buf,
+                                       in_block_buf,
+                                       ds_block_buf,
+                                       accum_thread_buf,
+                                       out_tensor_thread_buf,
+                                       false);
                     semaRun.template signal<0>();
                 }
                 ++i;
@@ -745,8 +774,12 @@ struct GridwiseConvPipeline_v2<1, true, true, true, EnableAsync>
             if(get_wave_id_in_wavegroup() == 1)
             {
                 semaLds.template wait<0>();
-                blockwise_conv.Run(
-                    wei_block_buf, in_block_buf, ds_block_buf, accum_thread_buf, true);
+                blockwise_conv.Run(wei_block_buf,
+                                   in_block_buf,
+                                   ds_block_buf,
+                                   accum_thread_buf,
+                                   out_tensor_thread_buf,
+                                   true);
             }
         }
     }

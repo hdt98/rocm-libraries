@@ -5,7 +5,6 @@
 #define CK_AMD_WCONV_HPP
 
 #include "data_type.hpp"
-// TODO: Add arch limitation
 namespace ck {
 
 #if defined(__gfx1300__) || defined(__gfx1301__) || defined(__gfx1302__)

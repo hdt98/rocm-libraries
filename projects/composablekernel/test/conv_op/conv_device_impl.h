@@ -10,7 +10,6 @@
 #include <tuple>
 #include <vector>
 
-//#define FORCE_CONVERT_TO_TENSOR 1
 //#define ENABLE_WAVEGROUP 1
 //#define ENABLE_CONST_LAYOUT 1
 
@@ -735,19 +734,11 @@ bool run_test()
         }
         else
         {
-#ifdef FORCE_CONVERT_TO_TENSOR
-            bool ret = ck::utils::check_err(out_device,
-                                            in,
-                                            "Error: incorrect results!",
-                                            get_rtol<GPUAccType>(),
-                                            get_atol<GPUAccType>());
-#else
             bool ret = ck::utils::check_err(out_device,
                                             out_host,
                                             "Error: incorrect results!",
                                             get_rtol<GPUAccType>(),
                                             get_atol<GPUAccType>());
-#endif
             if(ret)
             {
                 std::cout << "Passed\n";

@@ -53,7 +53,8 @@ struct GridwiseConvPipeline_v1<1, true, true, true, false>
               typename DsDataGridBuffer,
               typename DsDataBlockBuffer,
               typename BlockwiseConv,
-              typename AccumThreadBuffer>
+              typename AccumThreadBuffer,
+              typename OutTensorThreadBuffer>
     __device__ static void Run(const InDataGridDesc& in_grid_desc,
                                const InDataBlockDesc& in_block_desc,
                                InDataBlockTransfer& in_blockwise_copy,
@@ -73,6 +74,7 @@ struct GridwiseConvPipeline_v1<1, true, true, true, false>
                                DsDataBlockBuffer& ds_block_buf,
                                const BlockwiseConv& blockwise_conv,
                                AccumThreadBuffer& accum_thread_buf,
+                               OutTensorThreadBuffer& out_tensor_thread_buf,
                                index_t num_loop)
     {
         constexpr auto wei_block_copy_step = to_multi_index(WeiDataBlockTransferStep{});
@@ -108,6 +110,7 @@ struct GridwiseConvPipeline_v1<1, true, true, true, false>
 
         // Initialize C
         accum_thread_buf.Clear();
+        out_tensor_thread_buf.Clear();
 
         static_for<0, NumTap, 1>{}([&](auto tapIdx) {
             const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[tapIdx])
@@ -138,8 +141,12 @@ struct GridwiseConvPipeline_v1<1, true, true, true, false>
 
                 in_blockwise_copy.RunRead(in_grid_desc, in_grid_buf);
 
-                blockwise_conv.Run(
-                    wei_block_buf, in_block_buf, ds_block_buf, accum_thread_buf, false);
+                blockwise_conv.Run(wei_block_buf,
+                                   in_block_buf,
+                                   ds_block_buf,
+                                   accum_thread_buf,
+                                   out_tensor_thread_buf,
+                                   false);
 
                 block_sync_lds();
 
@@ -165,7 +172,12 @@ struct GridwiseConvPipeline_v1<1, true, true, true, false>
         {
             block_sync_lds();
 
-            blockwise_conv.Run(wei_block_buf, in_block_buf, ds_block_buf, accum_thread_buf, true);
+            blockwise_conv.Run(wei_block_buf,
+                               in_block_buf,
+                               ds_block_buf,
+                               accum_thread_buf,
+                               out_tensor_thread_buf,
+                               true);
         }
     }
 };
@@ -202,7 +214,8 @@ struct GridwiseConvPipeline_v1<1, false, true, false, false>
               typename DsDataGridBuffer,
               typename DsDataBlockBuffer,
               typename BlockwiseConv,
-              typename AccumThreadBuffer>
+              typename AccumThreadBuffer,
+              typename OutTensorBuffer>
     __device__ static void Run(const InDataGridDesc& in_grid_desc,
                                const InDataBlockDesc& in_block_desc,
                                InDataBlockTransfer& in_blockwise_copy,
@@ -222,6 +235,7 @@ struct GridwiseConvPipeline_v1<1, false, true, false, false>
                                DsDataBlockBuffer& ds_block_buf,
                                const BlockwiseConv& blockwise_conv,
                                AccumThreadBuffer& accum_thread_buf,
+                               OutTensorBuffer& out_tensor_thread_buf,
                                index_t num_loop)
     {
         constexpr auto wei_block_copy_step = to_multi_index(WeiDataBlockTransferStep{});
@@ -267,6 +281,7 @@ struct GridwiseConvPipeline_v1<1, false, true, false, false>
 
         // Initialize C
         accum_thread_buf.Clear();
+        out_tensor_thread_buf.Clear();
 
         static_for<0, NumTap, 1>{}([&](auto tapIdx) {
             const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[tapIdx])
@@ -292,8 +307,12 @@ struct GridwiseConvPipeline_v1<1, false, true, false, false>
                         .RunRead(wei_grid_desc, wei_grid_buf);
                 });
 
-                blockwise_conv.Run(
-                    wei_block_buf, in_block_buf, ds_block_buf, accum_thread_buf, false);
+                blockwise_conv.Run(wei_block_buf,
+                                   in_block_buf,
+                                   ds_block_buf,
+                                   accum_thread_buf,
+                                   out_tensor_thread_buf,
+                                   false);
 
                 block_sync_lds();
 
@@ -318,7 +337,12 @@ struct GridwiseConvPipeline_v1<1, false, true, false, false>
         {
             block_sync_lds();
 
-            blockwise_conv.Run(wei_block_buf, in_block_buf, ds_block_buf, accum_thread_buf, true);
+            blockwise_conv.Run(wei_block_buf,
+                               in_block_buf,
+                               ds_block_buf,
+                               accum_thread_buf,
+                               out_tensor_thread_buf,
+                               true);
         }
     }
 };
@@ -355,7 +379,8 @@ struct GridwiseConvPipeline_v1<1, false, false, false, EnableAsync>
               typename DsDataGridBuffer,
               typename DsDataBlockBuffer,
               typename BlockwiseConv,
-              typename AccumThreadBuffer>
+              typename AccumThreadBuffer,
+              typename OutTensorThreadBuffer>
     __device__ static void Run(const InDataGridDesc& in_grid_desc,
                                const InDataBlockDesc& in_block_desc,
                                InDataBlockTransfer& in_blockwise_copy,
@@ -375,6 +400,7 @@ struct GridwiseConvPipeline_v1<1, false, false, false, EnableAsync>
                                DsDataBlockBuffer& ds_block_buf,
                                const BlockwiseConv& blockwise_conv,
                                AccumThreadBuffer& accum_thread_buf,
+                               OutTensorThreadBuffer& out_tensor_thread_buf,
                                index_t num_loop)
     {
         constexpr auto wei_block_copy_step = to_multi_index(WeiDataBlockTransferStep{});
@@ -426,6 +452,7 @@ struct GridwiseConvPipeline_v1<1, false, false, false, EnableAsync>
 
         // Initialize C
         accum_thread_buf.Clear();
+        out_tensor_thread_buf.Clear();
 
         // main body
         if constexpr(HasMainLoop)
@@ -447,8 +474,12 @@ struct GridwiseConvPipeline_v1<1, false, false, false, EnableAsync>
                                       in_block_origin_idx,
                                       in_block_buf_switch);
 
-                blockwise_conv.Run(
-                    wei_block_buf, in_block_buf, ds_block_buf, accum_thread_buf, false);
+                blockwise_conv.Run(wei_block_buf,
+                                   in_block_buf,
+                                   ds_block_buf,
+                                   accum_thread_buf,
+                                   out_tensor_thread_buf,
+                                   false);
 
                 static_for<0, NumTap, 1>{}([&](auto tapIdx) {
                     const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[tapIdx])
@@ -465,7 +496,12 @@ struct GridwiseConvPipeline_v1<1, false, false, false, EnableAsync>
 
         // tail
         {
-            blockwise_conv.Run(wei_block_buf, in_block_buf, ds_block_buf, accum_thread_buf, true);
+            blockwise_conv.Run(wei_block_buf,
+                               in_block_buf,
+                               ds_block_buf,
+                               accum_thread_buf,
+                               out_tensor_thread_buf,
+                               true);
         }
     }
 };
@@ -502,7 +538,8 @@ struct GridwiseConvPipeline_v1<1, true, false, true, false>
               typename DsDataGridBuffer,
               typename DsDataBlockBuffer,
               typename BlockwiseConv,
-              typename AccumThreadBuffer>
+              typename AccumThreadBuffer,
+              typename OutTensorThreadBuffer>
     __device__ static void Run(const InDataGridDesc& in_grid_desc,
                                const InDataBlockDesc& in_block_desc,
                                InDataBlockTransfer& in_blockwise_copy,
@@ -522,6 +559,7 @@ struct GridwiseConvPipeline_v1<1, true, false, true, false>
                                DsDataBlockBuffer& ds_block_buf,
                                const BlockwiseConv& blockwise_conv,
                                AccumThreadBuffer& accum_thread_buf,
+                               OutTensorThreadBuffer& out_tensor_thread_buf,
                                index_t num_loop)
     {
         constexpr auto wei_block_copy_step = to_multi_index(WeiDataBlockTransferStep{});
@@ -563,6 +601,7 @@ struct GridwiseConvPipeline_v1<1, true, false, true, false>
 
         // Initialize C
         accum_thread_buf.Clear();
+        out_tensor_thread_buf.Clear();
 
         in_blockwise_copy.RunWrite(in_block_desc, in_block_buf);
 
@@ -592,8 +631,12 @@ struct GridwiseConvPipeline_v1<1, true, false, true, false>
 
                 in_blockwise_copy.RunRead(in_grid_desc, in_grid_buf);
 
-                blockwise_conv.Run(
-                    wei_block_buf, in_block_buf, ds_block_buf, accum_thread_buf, false);
+                blockwise_conv.Run(wei_block_buf,
+                                   in_block_buf,
+                                   ds_block_buf,
+                                   accum_thread_buf,
+                                   out_tensor_thread_buf,
+                                   false);
 
                 block_sync_lds();
 
@@ -615,7 +658,12 @@ struct GridwiseConvPipeline_v1<1, true, false, true, false>
         {
             block_sync_lds();
 
-            blockwise_conv.Run(wei_block_buf, in_block_buf, ds_block_buf, accum_thread_buf, true);
+            blockwise_conv.Run(wei_block_buf,
+                               in_block_buf,
+                               ds_block_buf,
+                               accum_thread_buf,
+                               out_tensor_thread_buf,
+                               true);
         }
     }
 };
@@ -654,7 +702,8 @@ struct GridwiseConvPipeline_v1<1, true, true, true, true>
               typename DsDataGridBuffer,
               typename DsDataBlockBuffer,
               typename BlockwiseConv,
-              typename AccumThreadBuffer>
+              typename AccumThreadBuffer,
+              typename OutTensorThreadBuffer>
     __device__ static void Run(const InDataGridDesc& in_grid_desc,
                                const InDataBlockDesc& in_block_desc,
                                InDataBlockTransfer& in_blockwise_copy,
@@ -674,6 +723,7 @@ struct GridwiseConvPipeline_v1<1, true, true, true, true>
                                DsDataBlockBuffer& ds_block_buf,
                                const BlockwiseConv& blockwise_conv,
                                AccumThreadBuffer& accum_thread_buf,
+                               OutTensorThreadBuffer& out_tensor_thread_buf,
                                index_t num_loop)
     {
         constexpr auto wei_block_copy_step = to_multi_index(WeiDataBlockTransferStep{});
@@ -684,6 +734,7 @@ struct GridwiseConvPipeline_v1<1, true, true, true, true>
 
         // Initialize C
         accum_thread_buf.Clear();
+        out_tensor_thread_buf.Clear();
 
         // preload data into LDS
         static_for<0, NumTap, 1>{}([&](auto tapIdx) {
@@ -717,8 +768,12 @@ struct GridwiseConvPipeline_v1<1, true, true, true, true>
                 // do convolution
                 block_sync_lds_async_load();
 
-                blockwise_conv.Run(
-                    wei_block_buf, in_block_buf, ds_block_buf, accum_thread_buf, false);
+                blockwise_conv.Run(wei_block_buf,
+                                   in_block_buf,
+                                   ds_block_buf,
+                                   accum_thread_buf,
+                                   out_tensor_thread_buf,
+                                   false);
 
                 block_sync_lds();
 
@@ -745,7 +800,12 @@ struct GridwiseConvPipeline_v1<1, true, true, true, true>
         {
             block_sync_lds_async_load();
 
-            blockwise_conv.Run(wei_block_buf, in_block_buf, ds_block_buf, accum_thread_buf, true);
+            blockwise_conv.Run(wei_block_buf,
+                               in_block_buf,
+                               ds_block_buf,
+                               accum_thread_buf,
+                               out_tensor_thread_buf,
+                               true);
         }
     }
 };
@@ -782,7 +842,8 @@ struct GridwiseConvPipeline_v1<1, false, true, false, true>
               typename DsDataGridBuffer,
               typename DsDataBlockBuffer,
               typename BlockwiseConv,
-              typename AccumThreadBuffer>
+              typename AccumThreadBuffer,
+              typename OutTensorThreadBuffer>
     __device__ static void Run(const InDataGridDesc& in_grid_desc,
                                const InDataBlockDesc& in_block_desc,
                                InDataBlockTransfer& in_blockwise_copy,
@@ -802,6 +863,7 @@ struct GridwiseConvPipeline_v1<1, false, true, false, true>
                                DsDataBlockBuffer& ds_block_buf,
                                const BlockwiseConv& blockwise_conv,
                                AccumThreadBuffer& accum_thread_buf,
+                               OutTensorThreadBuffer& out_tensor_thread_buf,
                                index_t num_loop)
     {
         constexpr auto wei_block_copy_step = to_multi_index(WeiDataBlockTransferStep{});
@@ -815,6 +877,7 @@ struct GridwiseConvPipeline_v1<1, false, true, false, true>
 
         // Initialize C
         accum_thread_buf.Clear();
+        out_tensor_thread_buf.Clear();
 
         // Load data
         static_for<0, NumTap, 1>{}([&](auto tapIdx) {
@@ -862,8 +925,12 @@ struct GridwiseConvPipeline_v1<1, false, true, false, true>
                                       in_block_buf_switch);
                 in_blockwise_copy.MoveSrcSliceWindow(in_grid_desc, in_block_copy_step);
 
-                blockwise_conv.Run(
-                    wei_block_buf, in_block_buf, ds_block_buf, accum_thread_buf, false);
+                blockwise_conv.Run(wei_block_buf,
+                                   in_block_buf,
+                                   ds_block_buf,
+                                   accum_thread_buf,
+                                   out_tensor_thread_buf,
+                                   false);
 
                 block_sync_lds();
 
@@ -887,7 +954,12 @@ struct GridwiseConvPipeline_v1<1, false, true, false, true>
         {
             block_sync_lds_async_load();
 
-            blockwise_conv.Run(wei_block_buf, in_block_buf, ds_block_buf, accum_thread_buf, true);
+            blockwise_conv.Run(wei_block_buf,
+                               in_block_buf,
+                               ds_block_buf,
+                               accum_thread_buf,
+                               out_tensor_thread_buf,
+                               true);
         }
     }
 };
@@ -924,7 +996,8 @@ struct GridwiseConvPipeline_v1<1, true, false, true, true>
               typename DsDataGridBuffer,
               typename DsDataBlockBuffer,
               typename BlockwiseConv,
-              typename AccumThreadBuffer>
+              typename AccumThreadBuffer,
+              typename OutTensorThreadBuffer>
     __device__ static void Run(const InDataGridDesc& in_grid_desc,
                                const InDataBlockDesc& in_block_desc,
                                InDataBlockTransfer& in_blockwise_copy,
@@ -944,6 +1017,7 @@ struct GridwiseConvPipeline_v1<1, true, false, true, true>
                                DsDataBlockBuffer& ds_block_buf,
                                const BlockwiseConv& blockwise_conv,
                                AccumThreadBuffer& accum_thread_buf,
+                               OutTensorThreadBuffer& out_tensor_thread_buf,
                                index_t num_loop)
     {
         constexpr auto wei_block_copy_step = to_multi_index(WeiDataBlockTransferStep{});
@@ -957,6 +1031,7 @@ struct GridwiseConvPipeline_v1<1, true, false, true, true>
 
         // Initialize C
         accum_thread_buf.Clear();
+        out_tensor_thread_buf.Clear();
 
         // Load data
         static_for<0, NumTap, 1>{}([&](auto tapIdx) {
@@ -1006,8 +1081,12 @@ struct GridwiseConvPipeline_v1<1, true, false, true, true>
                         .MoveSrcSliceWindow(wei_grid_desc, wei_block_copy_step);
                 });
 
-                blockwise_conv.Run(
-                    wei_block_buf, in_block_buf, ds_block_buf, accum_thread_buf, false);
+                blockwise_conv.Run(wei_block_buf,
+                                   in_block_buf,
+                                   ds_block_buf,
+                                   accum_thread_buf,
+                                   out_tensor_thread_buf,
+                                   false);
 
                 wei_block_buf = wei_block_buf_switch;
 
@@ -1025,7 +1104,12 @@ struct GridwiseConvPipeline_v1<1, true, false, true, true>
         {
             block_sync_lds();
 
-            blockwise_conv.Run(wei_block_buf, in_block_buf, ds_block_buf, accum_thread_buf, true);
+            blockwise_conv.Run(wei_block_buf,
+                               in_block_buf,
+                               ds_block_buf,
+                               accum_thread_buf,
+                               out_tensor_thread_buf,
+                               true);
         }
     }
 };

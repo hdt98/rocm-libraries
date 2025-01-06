@@ -3,7 +3,6 @@
 
 #pragma once
 
-#include "ck/config.h"
 #include "ck/utility/env.hpp"
 
 #ifndef CK_DONT_USE_HIP_RUNTIME_HEADERS
