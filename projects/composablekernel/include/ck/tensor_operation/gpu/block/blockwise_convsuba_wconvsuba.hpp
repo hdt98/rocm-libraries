@@ -50,9 +50,9 @@ struct BlockwiseElementOpCvtTensor : public BaseBlockwiseElementOp
 
 struct BlockwiseElementOpPassThrough
 {
-    static constexpr const char* name = "BlockwiseOp_passthrough";
-    static constexpr bool IsSuba      = false;
-    static constexpr bool IsFma       = false;
+    static constexpr const char* name   = "BlockwiseOp_passthrough";
+    static constexpr bool IsSuba        = false;
+    static constexpr bool IsFma         = false;
     static constexpr bool cvt_to_tensor = false;
 };
 

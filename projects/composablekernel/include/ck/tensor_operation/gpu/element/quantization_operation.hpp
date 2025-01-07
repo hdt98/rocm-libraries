@@ -157,8 +157,8 @@ struct Activation_Mul_Clamp
         float y_fp32 = ck::type_convert<float>(x);
         activationOp_(y_fp32, y_fp32);
         y_fp32 = math::clamp(requantScale_ * y_fp32,
-                             type_convert<float>(ck::NumericLimits<bhalf_t>::Lowest()),
-                             type_convert<float>(ck::NumericLimits<bhalf_t>::Max()));
+                             std::numeric_limits<float>::lowest(),
+                             std::numeric_limits<float>::max());
         y      = ck::type_convert<bhalf_t>(y_fp32);
     }
 
@@ -167,8 +167,18 @@ struct Activation_Mul_Clamp
         float y_fp32 = x;
         activationOp_(y_fp32, y_fp32);
         y_fp32 = math::clamp(requantScale_ * y_fp32,
-                             type_convert<float>(ck::NumericLimits<bhalf_t>::Lowest()),
-                             type_convert<float>(ck::NumericLimits<bhalf_t>::Max()));
+                             std::numeric_limits<float>::lowest(),
+                             std::numeric_limits<float>::max());
+        y      = ck::type_convert<bhalf_t>(y_fp32);
+    }
+
+    __host__ __device__ constexpr void operator()(bhalf_t& y, const half_t& x) const
+    {
+        float y_fp32 = ck::type_convert<float>(x);
+        activationOp_(y_fp32, y_fp32);
+        y_fp32 = math::clamp(requantScale_ * y_fp32,
+                             std::numeric_limits<float>::lowest(),
+                             std::numeric_limits<float>::max());
         y      = ck::type_convert<bhalf_t>(y_fp32);
     }
 
@@ -177,8 +187,8 @@ struct Activation_Mul_Clamp
         float y_fp32 = ck::type_convert<float>(x);
         activationOp_(y_fp32, y_fp32);
         y_fp32 = math::clamp(requantScale_ * y_fp32,
-                             type_convert<float>(ck::NumericLimits<bhalf_t>::Lowest()),
-                             type_convert<float>(ck::NumericLimits<bhalf_t>::Max()));
+                             std::numeric_limits<float>::lowest(),
+                             std::numeric_limits<float>::max());
         y      = ck::type_convert<bhalf_t>(y_fp32);
     }
 

@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2018-2024, Advanced Micro Devices, Inc. All rights reserved.
 
-#pragma once
-
 #include <algorithm>
 #include <cstdlib>
 #include <iostream>
@@ -25,19 +23,17 @@
 #include "ck/library/utility/convolution_host_tensor_descriptor_helper.hpp"
 #include "ck/library/reference_tensor_operation/cpu/reference_conv_fwd.hpp"
 #include "ck/tensor_operation/gpu/device/impl/device_convsuba_fwd_wconvsuba.hpp"
+#include "ck/tensor_operation/gpu/element/element_wise_operation.hpp"
 
 using InElementOp         = ck::tensor_operation::element_wise::PassThrough;
 using WeiElementOp        = ck::tensor_operation::element_wise::PassThrough;
 using PassThroughOp       = ck::tensor_operation::element_wise::PassThrough;
 using OutElementOp        = ck::tensor_operation::element_wise::MultiplyAdd;
-using OutElementNoneOp    = ck::tensor_operation::element_wise::MultiplyAdd;
-using OutElementReluOp    = ck::tensor_operation::element_wise::MultiplyAddRelu;
-using OutElementTanhOp    = ck::tensor_operation::element_wise::MultiplyAddTanh;
 using ActivationOp        = ck::tensor_operation::element_wise::PassThrough;
 using OutElementConvertOp = ck::tensor_operation::element_wise::Activation_Mul_Clamp<ActivationOp>;
 
-#define DEFAULT_H 64
-#define DEFAULT_W 64
+#define DEFAULT_H 16
+#define DEFAULT_W 16
 #define DEFAULT_C 16
 #define DEFAULT_K 16
 
@@ -71,16 +67,16 @@ using PassThrough = ck::tensor_operation::element_wise::PassThrough;
 
 template <typename InputLay,
           typename WeightLay,
-          typename BiasLay,
+          typename ResidualLay,
           typename ScaleLay,
           typename OutputLay>
 struct CommonLayoutSetting
 {
-    using InputLayout  = InputLay;
-    using WeightLayout = WeightLay;
-    using BiasLayout   = BiasLay;
-    using ScaleLayout  = ScaleLay;
-    using OutputLayout = OutputLay;
+    using InputLayout    = InputLay;
+    using WeightLayout   = WeightLay;
+    using ResidualLayout = ResidualLay;
+    using ScaleLayout    = ScaleLay;
+    using OutputLayout   = OutputLay;
 };
 
 template <ck::index_t NDimSpatial>
@@ -90,19 +86,19 @@ namespace ctl = ck::tensor_layout::convolution;
 
 template <>
 struct CommonLayoutSettingSelector<1> final
-    : CommonLayoutSetting<ctl::G_NW_C, ctl::G_K_X_C, ctl::G_K, ctl::G_K, ctl::G_NW_K>
+    : CommonLayoutSetting<ctl::G_NW_C, ctl::G_K_X_C, ctl::G_NW_K, ctl::G_K, ctl::G_NW_K>
 {
 };
 
 template <>
 struct CommonLayoutSettingSelector<2> final
-    : CommonLayoutSetting<ctl::G_NHW_C, ctl::G_K_YX_C, ctl::G_K, ctl::G_K, ctl::G_NHW_K>
+    : CommonLayoutSetting<ctl::GNHWC, ctl::GKYXC, ctl::GNHWK, ctl::G_K, ctl::GNHWK>
 {
 };
 
 template <>
 struct CommonLayoutSettingSelector<3> final
-    : CommonLayoutSetting<ctl::G_NDHW_C, ctl::G_K_ZYX_C, ctl::G_K, ctl::G_K, ctl::G_NDHW_K>
+    : CommonLayoutSetting<ctl::G_NDHW_C, ctl::G_K_ZYX_C, ctl::G_NDHW_K, ctl::G_K, ctl::G_NDHW_K>
 {
 };
 
@@ -116,7 +112,7 @@ template <ck::index_t NDimSpatial>
 using OutputLayout = typename CommonLayoutSettingSelector<NDimSpatial>::OutputLayout;
 
 template <ck::index_t NDimSpatial>
-using BiasLayout = typename CommonLayoutSettingSelector<NDimSpatial>::BiasLayout;
+using ResidualLayout = typename CommonLayoutSettingSelector<NDimSpatial>::ResidualLayout;
 
 template <ck::index_t NDimSpatial>
 using ScaleLayout = typename CommonLayoutSettingSelector<NDimSpatial>::ScaleLayout;
@@ -143,6 +139,7 @@ void DumpTensor(const Tensor<DataType>& tensor, const char* str)
         return;
     assert(tensor.GetNumOfDimension() == 5);
     auto lengths = tensor.GetLengths();
+    auto strides = tensor.GetStrides();
     std::cout << str << "  [ " << std::endl;
     for(uint32_t i0 = 0; i0 < lengths[0]; i0++)
     {
@@ -150,11 +147,19 @@ void DumpTensor(const Tensor<DataType>& tensor, const char* str)
         {
             std::cout << "  [";
         }
+        if(i0 > 0 && strides[0] == 0)
+        {
+            continue;
+        }
         for(uint32_t i1 = 0; i1 < lengths[1]; i1++)
         {
             if(lengths[2] > 1)
             {
                 std::cout << "  [";
+            }
+            if(i1 > 0 && strides[1] == 0)
+            {
+                continue;
             }
             for(uint32_t i2 = 0; i2 < lengths[2]; i2++)
             {
@@ -162,14 +167,26 @@ void DumpTensor(const Tensor<DataType>& tensor, const char* str)
                 {
                     std::cout << "  [";
                 }
+                if(i2 > 0 && strides[2] == 0)
+                {
+                    continue;
+                }
                 for(uint32_t i3 = 0; i3 < lengths[3]; i3++)
                 {
                     if(lengths[4] > 1)
                     {
                         std::cout << "  [";
                     }
+                    if(i3 > 0 && strides[3] == 0)
+                    {
+                        continue;
+                    }
                     for(uint32_t i4 = 0; i4 < lengths[4]; i4++)
                     {
+                        if(i4 > 0 && strides[4] == 0)
+                        {
+                            continue;
+                        }
                         std::vector<std::size_t> idx({i0, i1, i2, i3, i4});
                         std::cout << ck::type_convert<float>(tensor(idx)) << ", ";
                     }
@@ -365,18 +382,14 @@ inline const char* get_string(FilterType filter)
 
 template <typename InDataType,
           typename WeiDataType,
+          typename ResidualDataType,
           typename GPUAccType,
           typename CPUAccType,
           typename EDataType,
           ShapeType Shape,
-          FilterType Filter,
-          bool Dilation,
           int LdsMode,
           bool EnableWaveGroup,
           ck::index_t ActiveFun,
-          typename OutElementOp,
-          bool ScaleBiasPacked,
-          bool UniformScale,
           bool Convert_to_tensor,
           int32_t TestMask>
 bool run_test()
@@ -385,6 +398,8 @@ bool run_test()
     {
         return true;
     }
+    constexpr FilterType Filter = Filter_1X1;
+    constexpr bool Dilation     = false;
     constexpr ck::index_t FilterSize =
         (Filter == Filter_1X1) ? 1 : ((Filter == Filter_2X2) ? 2 : 3);
     constexpr ck::index_t HPerWconv = (Shape == Shape_8X4) ? 8 : 4;
@@ -465,45 +480,42 @@ bool run_test()
     const auto pass_through_op       = PassThroughOp{};
     const ck::index_t cvtTensorScale = 1; // Scale=1 to update
 
-    namespace ctc   = ck::tensor_layout::convolution;
-    auto in_layout  = ctc::GNHWC{};
-    auto wei_layout = ctc::GKYXC{};
-    auto out_layout = ctc::GNHWK{};
-    using InLayout  = decltype(in_layout);
-    using WeiLayout = decltype(wei_layout);
-    using OutLayout = decltype(out_layout);
-
     const auto in_g_n_c_wis_desc =
-        ck::utils::conv::make_input_host_tensor_descriptor_g_n_c_wis_packed<InLayout>(conv_param);
+        ck::utils::conv::make_input_host_tensor_descriptor_g_n_c_wis_packed<
+            InputLayout<NDimSpatial>>(conv_param);
 
     const auto wei_g_k_c_xs_desc =
-        ck::utils::conv::make_weight_host_tensor_descriptor_g_k_c_xs_packed<WeiLayout>(conv_param);
+        ck::utils::conv::make_weight_host_tensor_descriptor_g_k_c_xs_packed<
+            WeightLayout<NDimSpatial>>(conv_param);
 
-    const auto bias_g_n_k_wos_desc =
-        ck::utils::conv::make_scalebias_host_tensor_descriptor<OutLayout>(conv_param,
-                                                                          OutputChannels);
     const auto scale_g_n_k_wos_desc =
-        ck::utils::conv::make_scalebias_host_tensor_descriptor<OutLayout>(conv_param,
-                                                                          OutputChannels);
+        ck::utils::conv::make_scalebias_host_tensor_descriptor<OutputLayout<NDimSpatial>>(
+            conv_param, OutputChannels);
 
     const auto out_g_n_k_wos_desc =
-        ck::utils::conv::make_output_host_tensor_descriptor_g_n_k_wos_packed<OutLayout>(conv_param);
+        ck::utils::conv::make_output_host_tensor_descriptor_g_n_k_wos_packed<
+            OutputLayout<NDimSpatial>>(conv_param);
+
+    const auto residual_g_n_k_wos_desc =
+        ck::utils::conv::make_output_host_tensor_descriptor_g_n_k_wos_packed<
+            ResidualLayout<NDimSpatial>>(conv_param);
 
     const auto cvt_out_g_n_c_wis_desc =
-        ck::utils::conv::make_output_host_tensor_descriptor_g_n_k_wos_packed<OutLayout>(conv_param);
+        ck::utils::conv::make_output_host_tensor_descriptor_g_n_k_wos_packed<
+            OutputLayout<NDimSpatial>>(conv_param);
 
     Tensor<InDataType> in(in_g_n_c_wis_desc);
     Tensor<WeiDataType> wei(wei_g_k_c_xs_desc);
-    Tensor<GPUAccType> bias(bias_g_n_k_wos_desc);
+    Tensor<ResidualDataType> residual(residual_g_n_k_wos_desc);
     Tensor<GPUAccType> scale(scale_g_n_k_wos_desc);
     Tensor<CPUAccType> out_host(out_g_n_k_wos_desc);
     Tensor<EDataType> cvt_out_host(cvt_out_g_n_c_wis_desc);
     Tensor<GPUAccType> out_device(out_g_n_k_wos_desc);
-    Tensor<EDataType> out_tensor_device(cvt_out_g_n_c_wis_desc);
+    Tensor<EDataType> out_tensor_device(out_g_n_k_wos_desc);
 
     std::cout << "in: " << in.mDesc << std::endl;
     std::cout << "wei: " << wei.mDesc << std::endl;
-    std::cout << "bias: " << bias.mDesc << std::endl;
+    std::cout << "residual: " << residual.mDesc << std::endl;
     std::cout << "scale: " << scale.mDesc << std::endl;
     std::cout << "out: " << out_host.mDesc << std::endl;
     if constexpr(Convert_to_tensor)
@@ -517,42 +529,14 @@ bool run_test()
     case 1:
         in.GenerateTensorValue(GeneratorTensor_2<InDataType>{-5, 5});
         wei.GenerateTensorValue(GeneratorTensor_2<WeiDataType>{-5, 5});
-        if constexpr(UniformScale)
-        {
-            bias.GenerateTensorValue(GeneratorTensor_0<GPUAccType>{});
-        }
-        else
-        {
-            bias.GenerateTensorValue(GeneratorTensor_2<GPUAccType>{-5, 5});
-        }
-        if constexpr(ScaleBiasPacked)
-        {
-            scale.GenerateTensorValue(GeneratorTensor_2<GPUAccType>{-5, 5});
-        }
-        else
-        {
-            scale.GenerateTensorValue(GeneratorTensor_1<GPUAccType>{1});
-        }
+        residual.GenerateTensorValue(GeneratorTensor_2<ResidualDataType>{-5, 5});
+        scale.GenerateTensorValue(GeneratorTensor_2<GPUAccType>{-5, 5});
         break;
     default:
         in.GenerateTensorValue(GeneratorTensor_3<InDataType>{0.0, 1.0});
         wei.GenerateTensorValue(GeneratorTensor_3<WeiDataType>{-0.5, 0.5});
-        if constexpr(UniformScale)
-        {
-            bias.GenerateTensorValue(GeneratorTensor_0<GPUAccType>{});
-        }
-        else
-        {
-            bias.GenerateTensorValue(GeneratorTensor_3<GPUAccType>{-0.5, 0.5});
-        }
-        if constexpr(ScaleBiasPacked)
-        {
-            scale.GenerateTensorValue(GeneratorTensor_2<GPUAccType>{-5, 5});
-        }
-        else
-        {
-            scale.GenerateTensorValue(GeneratorTensor_1<GPUAccType>{3});
-        }
+        residual.GenerateTensorValue(GeneratorTensor_3<InDataType>{0.0, 1.0});
+        scale.GenerateTensorValue(GeneratorTensor_2<GPUAccType>{-5, 5});
         break;
     }
 
@@ -579,16 +563,16 @@ bool run_test()
     copy(in_g_n_c_wis_desc.GetStrides(), a_g_n_c_wis_strides);
     copy(wei_g_k_c_xs_desc.GetLengths(), b_g_k_c_xs_lengths);
     copy(wei_g_k_c_xs_desc.GetStrides(), b_g_k_c_xs_strides);
-    copy(bias_g_n_k_wos_desc.GetLengths(), d0_g_n_k_wos_lengths);
-    copy(bias_g_n_k_wos_desc.GetStrides(), d0_g_n_k_wos_strides);
+    copy(residual_g_n_k_wos_desc.GetLengths(), d0_g_n_k_wos_lengths);
+    copy(residual_g_n_k_wos_desc.GetStrides(), d0_g_n_k_wos_strides);
     copy(scale_g_n_k_wos_desc.GetLengths(), d1_g_n_k_wos_lengths);
     copy(scale_g_n_k_wos_desc.GetStrides(), d1_g_n_k_wos_strides);
+    copy(out_g_n_k_wos_desc.GetLengths(), e_g_n_k_wos_lengths);
+    copy(out_g_n_k_wos_desc.GetStrides(), e_g_n_k_wos_strides);
     copy(conv_param.conv_filter_strides_, conv_filter_strides);
     copy(conv_param.conv_filter_dilations_, conv_filter_dilations);
     copy(conv_param.input_left_pads_, input_left_pads);
     copy(conv_param.input_right_pads_, input_right_pads);
-    copy(out_g_n_k_wos_desc.GetLengths(), e_g_n_k_wos_lengths);
-    copy(out_g_n_k_wos_desc.GetStrides(), e_g_n_k_wos_strides);
 
     if constexpr(Convert_to_tensor)
     {
@@ -623,7 +607,7 @@ bool run_test()
     {
         ref_invoker.Run(ref_argument);
         out_host.ForEach([&](auto&, auto idx) {
-            OutElementOp{}(out_host(idx), c_host(idx), scale(idx), bias(idx));
+            OutElementOp{}(out_host(idx), residual(idx), scale(idx), c_host(idx));
         });
 
         if constexpr(Convert_to_tensor)
@@ -638,8 +622,8 @@ bool run_test()
 
     DumpTensor(in, "Input");
     DumpTensor(wei, "Weight");
-    DumpTensor(bias, "Bias");
     DumpTensor(scale, "Scale");
+    DumpTensor(residual, "Residual");
     DumpTensor(out_host, "Accum");
     if constexpr(Convert_to_tensor)
     {
@@ -649,16 +633,16 @@ bool run_test()
     DeviceMem in_device_buf(sizeof(InDataType) *
                             in.mDesc.GetElementSpaceSize()); // ISSUE HAPPENS in latest CSIM
     DeviceMem wei_device_buf(sizeof(WeiDataType) * wei.mDesc.GetElementSpaceSize());
-    DeviceMem bias_device_buf(sizeof(GPUAccType) * bias.mDesc.GetElementSpaceSize());
     DeviceMem scale_device_buf(sizeof(GPUAccType) * scale.mDesc.GetElementSpaceSize());
+    DeviceMem residual_device_buf(sizeof(ResidualDataType) * residual.mDesc.GetElementSpaceSize());
     DeviceMem out_device_buf(sizeof(GPUAccType) * out_device.mDesc.GetElementSpaceSize());
-    DeviceMem out_tensor_device_buf(sizeof(EDataType) *
+    DeviceMem out_tensor_device_buf(sizeof(InDataType) *
                                     out_tensor_device.mDesc.GetElementSpaceSize());
 
     in_device_buf.ToDevice(in.mData.data());
     wei_device_buf.ToDevice(wei.mData.data());
-    bias_device_buf.ToDevice(bias.mData.data());
     scale_device_buf.ToDevice(scale.mData.data());
+    residual_device_buf.ToDevice(residual.mData.data());
 
     // do Conv
     static constexpr auto ConvSpec =
@@ -668,9 +652,7 @@ bool run_test()
             ? ck::tensor_operation::device::ConvolutionForwardSpecialization::Filter2x2Stride2Pad0
             : ck::tensor_operation::device::ConvolutionForwardSpecialization::Filter3x3Stride1Pad0;
 
-    using AccBlockwiseOperation =
-        ck::convolution::BlockwiseElementOpScaleAndBias<ActiveFun, UniformScale, ScaleBiasPacked>;
-
+    using AccBlockwiseOperation = ck::convolution::BlockwiseElementOpFma<false>;
     using AccBlockwiseNextOperation =
         ck::convolution::BlockwiseElementOpCvtTensor<Convert_to_tensor, ActiveFun, cvtTensorScale>;
 
@@ -699,23 +681,33 @@ bool run_test()
     using AccBlockTransferClusterLengths =
         ck::Sequence<Cluster_Acc_H, Cluster_Acc_W, Cluster_Acc_K>;
 
-    constexpr ck::index_t DBlockTransferScalarPerVector = sizeof(uint32_t) / sizeof(GPUAccType);
-    using DsBlockTransferScalarPerVector =
-        ck::Sequence<DBlockTransferScalarPerVector, DBlockTransferScalarPerVector>;
-    constexpr ck::index_t Cluster_Ds_K = KPerBlock / DBlockTransferScalarPerVector;
+    constexpr ck::index_t ScaleBlockTransferScalarPerVector = sizeof(uint32_t) / sizeof(GPUAccType);
+    constexpr ck::index_t Cluster_Scale_K = KPerBlock / ScaleBlockTransferScalarPerVector;
+
+    constexpr ck::index_t ResidualBlockTransferScalarPerVector =
+        sizeof(uint32_t) / sizeof(ResidualDataType);
+    constexpr ck::index_t Cluster_Residual_K = KPerBlock / ResidualBlockTransferScalarPerVector;
+    constexpr ck::index_t Cluster_Residual_W = 4;
+    constexpr ck::index_t Cluster_Residual_H =
+        ActiveBlockSize / Cluster_Residual_K / Cluster_Residual_W;
+
     using DsBlockTransferThreadClusterLengths =
-        ck::Tuple<ck::Sequence<Cluster_Ds_K>, ck::Sequence<Cluster_Ds_K>>;
+        ck::Tuple<ck::Sequence<Cluster_Residual_H, Cluster_Residual_W, Cluster_Residual_K>,
+                  ck::Sequence<Cluster_Scale_K>>;
+    using DsBlockTransferScalarPerVector =
+        ck::Sequence<ResidualBlockTransferScalarPerVector, ScaleBlockTransferScalarPerVector>;
     constexpr ck::index_t DsBlockLdsAddExtraM = true;
 
     float avg_time    = 0;
     using AccDataType = GPUAccType;
-    using DsDataType  = ck::Tuple<GPUAccType, GPUAccType>;
+    using DsDataType  = ck::Tuple<ResidualDataType, GPUAccType>;
+    using EDataType   = InDataType;
 
-    using DeviceSubaCvtConvFwdInstance = ck::tensor_operation::device::DeviceConvSubaWconv<
+    using DeviceConvFwdFmaInstance = ck::tensor_operation::device::DeviceConvSubaWconv<
         NDimSpatial,
         InputLayout<NDimSpatial>,
         WeightLayout<NDimSpatial>,
-        ck::Tuple<BiasLayout<NDimSpatial>, ScaleLayout<NDimSpatial>>,
+        ck::Tuple<ResidualLayout<NDimSpatial>, ScaleLayout<NDimSpatial>>,
         OutputLayout<NDimSpatial>,
         InDataType,
         WeiDataType,
@@ -765,12 +757,12 @@ bool run_test()
         false, // transpose
         Convert_to_tensor>;
 
-    auto conv    = DeviceSubaCvtConvFwdInstance{};
+    auto conv    = DeviceConvFwdFmaInstance{};
     auto invoker = conv.MakeInvoker();
     auto argument =
         conv.MakeArgument(in_device_buf.GetDeviceBuffer(),
                           wei_device_buf.GetDeviceBuffer(),
-                          std::array<const void*, 2>{bias_device_buf.GetDeviceBuffer(),
+                          std::array<const void*, 2>{residual_device_buf.GetDeviceBuffer(),
                                                      scale_device_buf.GetDeviceBuffer()},
                           out_device_buf.GetDeviceBuffer(),
                           out_tensor_device_buf.GetDeviceBuffer(),
@@ -816,17 +808,16 @@ bool run_test()
 
     std::cout <<
 #ifdef ENABLE_WAVEGROUP
-        "conv_sba_uba_device_wavegroup<In/Wei:"
+        "conv_device_fma_wavegroup<In/Wei:"
 #else
-        "conv_sba_uba_device<In/Wei:"
+        "conv_device_fma<In/Wei:"
 #endif
               << get_string<InDataType>() << ", Out:" << get_string<GPUAccType>() << ", "
               << get_string(Shape) << ", " << get_string(Filter) << ", Dilation:" << DilationSize
-              << ", LdsMod:" << LdsMode << ", ScaleBiasPacked:" << ScaleBiasPacked
-              << ", UniformScale:" << UniformScale << ", ActiveFunc:" << ActiveFun
-              << ", ConverToTensor:" << Convert_to_tensor << ", WaveGroup:" << EnableWaveGroup
-              << ", Id : 0x" << std::hex << TestMask << " Size: { " << config.h << "x" << config.w
-              << "x" << config.c << "x" << config.k << " }>: Status: ";
+              << ", LdsMod:" << LdsMode << ", ConverToTensor:" << Convert_to_tensor
+              << ", ActiveFunc:" << ActiveFun << ", WaveGroup:" << EnableWaveGroup << ", Id : 0x"
+              << std::hex << TestMask << " Size: { " << config.h << "x" << config.w << "x"
+              << config.c << "x" << config.k << " }>: Status: ";
 
     if(config.time_kernel)
     {
@@ -854,13 +845,12 @@ bool run_test()
             }
             else
             {
-                ret = ck::utils::check_err(out_device,
-                                           out_host,
-                                           "Error: incorrect results!",
-                                           get_rtol<GPUAccType>(),
-                                           get_atol<GPUAccType>());
+                ck::utils::check_err(out_device,
+                                     out_host,
+                                     "Error: incorrect results!",
+                                     get_rtol<GPUAccType>(),
+                                     get_atol<GPUAccType>());
             }
-
             if(ret)
             {
                 std::cout << "Passed\n";

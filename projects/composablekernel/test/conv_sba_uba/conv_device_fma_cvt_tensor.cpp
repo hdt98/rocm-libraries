@@ -3,11 +3,6 @@
 #include "conv_device_fma_cvt_tensor_impl.h"
 
 // clang-format on
-using half_t  = ck::half_t;
-using bhalf_t = ck::bhalf_t;
-using f8_t    = ck::f8_t;
-using bf8_t   = ck::bf8_t;
-
 ExecutionConfig config;
 
 template <typename SrcType, typename GPUAccType, typename CPUAccType, int LdsMode, int32_t TestMask>
@@ -26,27 +21,32 @@ bool run_test_fmt()
 #endif
 
     // clang-format off
-    //                                                                    |ShapeType |Lds |WaveGroup | ActiveFunc | convert_to_tensor | TestMask
+    //                                                                    |ShapeType |Lds |WaveGroup | activeFunc | convert_to_tensor | TestMask
     if constexpr(std::is_same<GPUAccType, float>::value)
     {
-        pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X2, 0,       WaveGroup, 0, 0, TestMask | 0x10000>();
-        pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X2, LdsMode, WaveGroup, 0, 0, TestMask | 0x20000>();
+        pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X2, 0,       WaveGroup, 0, 1, TestMask | 0x10000>();
+        pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X2, LdsMode, WaveGroup, 0, 1, TestMask | 0x20000>();
      }
     else
     {
-        pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X2, 0,       WaveGroup, 0, 0, TestMask | 0x10000>();
-        pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X2, LdsMode, WaveGroup, 0, 0, TestMask | 0x80000>();
+        pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X2, 0,       WaveGroup, 0, 1, TestMask | 0x10000>();
+        pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X2, LdsMode, WaveGroup, 0, 1, TestMask | 0x80000>();
         if constexpr (sizeof(SrcType) < 2) // layout encoding incorrect for 4x4 & 8x8
         {
-            pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X4, 0,       WaveGroup, 0, 0, TestMask | 0x20000>();
-            pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_8X4, 0,       WaveGroup, 0, 0, TestMask | 0x40000>();
-            pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X4, LdsMode, WaveGroup, 0, 0, TestMask | 0x100000>();
-            pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_8X4, LdsMode, WaveGroup, 0, 0, TestMask | 0x200000>();
+            pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X4, 0,       WaveGroup, 0, 1, TestMask | 0x20000>();
+            pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_8X4, 0,       WaveGroup, 0, 1, TestMask | 0x40000>();
+            pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X4, LdsMode, WaveGroup, 0, 1, TestMask | 0x100000>();
+            pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_8X4, LdsMode, WaveGroup, 0, 1, TestMask | 0x200000>();
         }
     }
     // clang-format on
     return pass;
 }
+
+using half_t  = ck::half_t;
+using bhalf_t = ck::bhalf_t;
+using f8_t    = ck::f8_t;
+using bf8_t   = ck::bf8_t;
 
 int main(int argc, char* argv[])
 {
