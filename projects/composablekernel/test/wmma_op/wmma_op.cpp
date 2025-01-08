@@ -228,6 +228,46 @@ int main(int, char*[])
                              /*CPUAccType*/ float,
                              /*AScaleSel*/  1,
                              /*BScaleSel*/  0>();
+
+    pass &= run_mixedfp_test</*DeviceAType*/ck::MxType_t<ck::MTX_FMT::MTX_FMT_FP6_E2M3>,
+                             /*DeviceBType*/ck::MxType_t<ck::MTX_FMT::MTX_FMT_FP6_E2M3>,
+                             /*HostAType*/  float,
+                             /*HostBType*/  float,
+                             /*DstType*/    float,
+                             /*GPUAccType*/ float,
+                             /*CPUAccType*/ float,
+                             /*AScaleSel*/  0,
+                             /*BScaleSel*/  0>();
+
+    pass &= run_mixedfp_test</*DeviceAType*/ck::MxType_t<ck::MTX_FMT::MTX_FMT_FP6_E3M2>,
+                             /*DeviceBType*/ck::MxType_t<ck::MTX_FMT::MTX_FMT_FP4_E2M1>,
+                             /*HostAType*/  float,
+                             /*HostBType*/  float,
+                             /*DstType*/    float,
+                             /*GPUAccType*/ float,
+                             /*CPUAccType*/ float,
+                             /*AScaleSel*/  0,
+                             /*BScaleSel*/  1>();
+
+    pass &= run_mixedfp_test</*DeviceAType*/ck::MxType_t<ck::MTX_FMT::MTX_FMT_FP4_E2M1>,
+                             /*DeviceBType*/ck::MxType_t<ck::MTX_FMT::MTX_FMT_FP4_E2M1>,
+                             /*HostAType*/  float,
+                             /*HostBType*/  float,
+                             /*DstType*/    float,
+                             /*GPUAccType*/ float,
+                             /*CPUAccType*/ float,
+                             /*AScaleSel*/  1,
+                             /*BScaleSel*/  1>();
+    
+    pass &= run_mixedfp_test</*DeviceAType*/ck::MxType_t<ck::MTX_FMT::MTX_FMT_FP4_E2M1>,
+                             /*DeviceBType*/ck::MxType_t<ck::MTX_FMT::MTX_FMT_FP6_E2M3>,
+                             /*HostAType*/  float,
+                             /*HostBType*/  float,
+                             /*DstType*/    float,
+                             /*GPUAccType*/ float,
+                             /*CPUAccType*/ float,
+                             /*AScaleSel*/  1,
+                             /*BScaleSel*/  0>();
     // clang-format on
 
     std::cout << "TestGemm ..... " << (pass ? "SUCCESS" : "FAILURE") << std::endl;

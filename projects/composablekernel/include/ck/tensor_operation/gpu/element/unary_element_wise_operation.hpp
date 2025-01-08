@@ -149,6 +149,30 @@ struct PassThrough final : public UnaryOpBase
     }
 
     template <>
+    __host__ __device__ void operator()<uint8_t, int32_t>(uint8_t& y, const int32_t& x) const
+    {
+        y = type_convert<uint8_t>(x);
+    }
+
+    template <>
+    __host__ __device__ void operator()<int32_t, uint8_t>(int32_t& y, const uint8_t& x) const
+    {
+        y = type_convert<int32_t>(x);
+    }
+
+    template <>
+    __host__ __device__ void operator()<uint8_t, float>(uint8_t& y, const float& x) const
+    {
+        y = type_convert<uint8_t>(x);
+    }
+
+    template <>
+    __host__ __device__ void operator()<float, uint8_t>(float& y, const uint8_t& x) const
+    {
+        y = type_convert<float>(x);
+    }
+
+    template <>
     __host__ __device__ void operator()<int8_t, float>(int8_t& y, const float& x) const
     {
         y = type_convert<int8_t>(x);

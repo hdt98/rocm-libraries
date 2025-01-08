@@ -208,9 +208,9 @@ struct TransformBatchedContractionContractionToBatchedGemmGemm_Wmma
             a_grid_desc_m_k,
             make_tuple(make_unmerge_transform(
                            make_tuple(AKWmma, Number<AK0PerWmma>{}, Number<AKRow>{}, AK1{})),
-                       make_unmerge_transform(make_tuple(M0 * MRepeat{}, MWaves{}, MPerWmma{}))),
+                       make_unmerge_transform(make_tuple(M0, MRepeat{}, MWaves{}, MPerWmma{}))),
             make_tuple(Sequence<1>{}, Sequence<0>{}),
-            make_tuple(Sequence<0, 3, 4, 6>{}, Sequence<1, 2, 5>{}));
+            make_tuple(Sequence<0, 4, 5, 7>{}, Sequence<1, 2, 3, 6>{}));
     }
 
     //
@@ -281,9 +281,9 @@ struct TransformBatchedContractionContractionToBatchedGemmGemm_Wmma
             b_grid_desc_l_k,
             make_tuple(make_unmerge_transform(
                            make_tuple(BKWmma, Number<BK0PerWmma>{}, Number<BKRow>{}, BK1{})),
-                       make_unmerge_transform(make_tuple(L0 * LRepeat{}, LWaves{}, LPerWmma{}))),
+                       make_unmerge_transform(make_tuple(L0, LRepeat{}, LWaves{}, LPerWmma{}))),
             make_tuple(Sequence<1>{}, Sequence<0>{}),
-            make_tuple(Sequence<0, 3, 4, 6>{}, Sequence<1, 2, 5>{}));
+            make_tuple(Sequence<0, 4, 5, 7>{}, Sequence<1, 2, 3, 6>{}));
     }
 
     //
@@ -355,9 +355,9 @@ struct TransformBatchedContractionContractionToBatchedGemmGemm_Wmma
             b_grid_desc_n_l,
             make_tuple(make_unmerge_transform(
                            make_tuple(BLWmma, Number<BL0PerWmma>{}, Number<BLRow>{}, BL1{})),
-                       make_unmerge_transform(make_tuple(N0 * NRepeat{}, NWaves{}, NPerWmma{}))),
+                       make_unmerge_transform(make_tuple(N0, NRepeat{}, NWaves{}, NPerWmma{}))),
             make_tuple(Sequence<1>{}, Sequence<0>{}),
-            make_tuple(Sequence<0, 3, 4, 6>{}, Sequence<1, 2, 5>{}));
+            make_tuple(Sequence<0, 4, 5, 7>{}, Sequence<1, 2, 3, 6>{}));
     }
 
     //

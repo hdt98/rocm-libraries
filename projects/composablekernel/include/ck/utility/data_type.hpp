@@ -4855,9 +4855,9 @@ struct MxType_t<MTX_FMT::MTX_FMT_FP4_E2M1> : public MxType_t<MTX_FMT::MTX_FMT_DE
         in_packed.reserve(in_vec_size);
         for(std::size_t i = 0; i < in_vec_size; i += 2)
         {
-            type_t val0       = in[i];
-            type_t val1       = in[i + 1];
-            in_packed[i >> 1] = val0 | (val1 << 4);
+            type_t val0 = in[i];
+            type_t val1 = in[i + 1];
+            in_packed.push_back((val0 & 0xf) | (val1 << 4));
         }
 
         return in_packed;
@@ -4879,16 +4879,15 @@ struct MxType_t<MTX_FMT::MTX_FMT_FP6_E3M2> : public MxType_t<MTX_FMT::MTX_FMT_DE
         std::vector<type_t> in_packed;
         std::size_t in_vec_size = in.size();
         in_packed.reserve(in_vec_size);
-        std::size_t index = 0;
         for(std::size_t i = 0; i < in_vec_size; i += 4)
         {
-            type_t val0        = in[i];
-            type_t val1        = in[i + 1];
-            type_t val2        = in[i + 2];
-            type_t val3        = in[i + 3];
-            in_packed[index++] = val0 | (val1 & 0x3) << 6;
-            in_packed[index++] = (val1 & 0x3C) >> 2 | (val2 & 0xf) << 4;
-            in_packed[index++] = (val2 & 0x3C) >> 4 | (val3 & 0x3f) << 2;
+            type_t val0 = in[i];
+            type_t val1 = in[i + 1];
+            type_t val2 = in[i + 2];
+            type_t val3 = in[i + 3];
+            in_packed.push_back((val0 & 0x3f) | ((val1 & 0x3) << 6));
+            in_packed.push_back((val1 & 0x3C) >> 2 | ((val2 & 0xf) << 4));
+            in_packed.push_back((val2 & 0x3C) >> 4 | ((val3 & 0x3f) << 2));
         }
         return in_packed;
     }
@@ -4905,7 +4904,20 @@ struct MxType_t<MTX_FMT::MTX_FMT_FP6_E2M3> : public MxType_t<MTX_FMT::MTX_FMT_DE
     static constexpr index_t BITS             = 6;
     static std::vector<type_t> compact_to_raw(const std::vector<type_t>& in)
     {
-        return MxType_t<MTX_FMT::MTX_FMT_FP6_E3M2>::compact_to_raw(in);
+        std::vector<type_t> in_packed;
+        std::size_t in_vec_size = in.size();
+        in_packed.reserve(in_vec_size);
+        for(std::size_t i = 0; i < in_vec_size; i += 4)
+        {
+            type_t val0 = in[i];
+            type_t val1 = in[i + 1];
+            type_t val2 = in[i + 2];
+            type_t val3 = in[i + 3];
+            in_packed.push_back((val0 & 0x3f) | ((val1 & 0x3) << 6));
+            in_packed.push_back((val1 & 0x3C) >> 2 | ((val2 & 0xf) << 4));
+            in_packed.push_back((val2 & 0x3C) >> 4 | ((val3 & 0x3f) << 2));
+        }
+        return in_packed;
     }
 };
 
@@ -4969,6 +4981,21 @@ using src_type_t = typename view_type<T>::srcType;
 
 template <typename T>
 using view_type_t = typename view_type<T>::viewType;
+
+template <typename T, typename = void>
+struct DataPerVGPR;
+
+template <typename T>
+struct DataPerVGPR<T, enable_if_t<is_same_v<T, half_t> || is_same_v<T, bhalf_t>>>
+{
+    static constexpr index_t value = 2;
+};
+
+template <typename T>
+struct DataPerVGPR<T, enable_if_t<is_same_v<T, f8_t> || is_same_v<T, bf8_t>>>
+{
+    static constexpr index_t value = 4;
+};
 
 template <typename T>
 struct NumericLimits

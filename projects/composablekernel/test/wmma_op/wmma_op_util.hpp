@@ -1300,8 +1300,8 @@ struct TestMixedFPWmma
 
         auto f_generate_tensor_value = [](auto& tensor, auto type) {
             using dataType = decltype(type);
-
-            tensor.GenerateTensorValue(GeneratorTensor_2<dataType>{-5, 5});
+            // because fp4 cannot generate the accurate value for (+/-)5.f; so the range is shrinked
+            tensor.GenerateTensorValue(GeneratorTensor_2<dataType>{-4, 4});
         };
 
         auto f_generate_scale_value = [](auto& tensor) {

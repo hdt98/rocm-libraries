@@ -1407,7 +1407,7 @@ struct GridwiseConvSuba_Wconvsuba
         BlockwiseConv blockwise_conv = {};
 
         // Prepare Register for Accum
-        auto& acc_thread_buf = blockwise_conv.GetAccumThreadBuffer();
+        auto& acc_thread_buf        = blockwise_conv.GetAccumThreadBuffer();
         auto& cvt_tensor_thread_buf = blockwise_conv.GetOutTensorThreadBuffer();
 
         /*******************************************************************************/

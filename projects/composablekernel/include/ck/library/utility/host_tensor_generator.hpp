@@ -90,6 +90,9 @@ struct GeneratorTensor_2
     template <typename... Is>
     T operator()(Is...)
     {
+        // static thread_local std::mt19937 generator(std::random_device{}());
+        // std::uniform_int_distribution<int> distribution(min_value, max_value - 1);
+        // return static_cast<T>(distribution(generator));
         return static_cast<T>((std::rand() % (max_value - min_value)) + min_value);
     }
 };

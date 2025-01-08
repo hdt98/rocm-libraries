@@ -1257,7 +1257,7 @@ bool run_test()
     constexpr ck::index_t WPerWconv    = (Shape == Shape_4X2) ? 2 : 4;
     constexpr ck::index_t DilationSize = Dilation ? 2 : 1;
     constexpr ck::index_t convertScale = 1;
-    constexpr auto wconvConv = ck::WconvConv<WeiDataType,
+    constexpr auto wconvConv           = ck::WconvConv<WeiDataType,
                                              InDataType,
                                              GPUAccType,
                                              HPerWconv,

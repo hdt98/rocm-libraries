@@ -31,6 +31,8 @@ template <index_t BlockSize,
           index_t KPack,
           bool AEnableLds = true,
           bool BEnableLds = true,
+          bool APermute   = false, // APermute and BPermute are used for gfx13
+          bool BPermute   = false,
           bool TransposeC = false>
 /* Option: Read from LDS, big buffer hold all threads required data
  * Source
@@ -173,9 +175,19 @@ struct BlockwiseGemmWMMA
         const auto waveId_n = wave_idx[I1];
 
         const auto blk_idx = wmma_gemm.GetBeginOfThreadBlk3D();
-
+#if defined(__gfx13__)
+        return make_tuple(Number<m0>{},
+                          waveId_m,
+                          blk_idx[I0],
+                          Number<n0>{},
+                          waveId_n,
+                          I0,
+                          blk_idx[I1],
+                          blk_idx[I2]);
+#else
         return make_tuple(
             Number<m0>{}, waveId_m, blk_idx[I0], Number<n0>{}, waveId_n, blk_idx[I1], blk_idx[I2]);
+#endif
     }
 
     using Tuple6 = decltype(CalculateAThreadOriginDataIndex());
@@ -200,13 +212,27 @@ struct BlockwiseGemmWMMA
     {
         constexpr auto c_msubgroup_nthreadpersubgroup_maccvgprs_tblk_lens =
             wmma_gemm.GetCMSubGroupNThreadPerSubGroupMAccVgprsThreadBlkLengths();
-
+#if defined(__gfx13__)
+        constexpr auto NAccVgprsLoops   = c_msubgroup_nthreadpersubgroup_maccvgprs_tblk_lens[I1];
+        constexpr auto NAccVgprsPerLoop = c_msubgroup_nthreadpersubgroup_maccvgprs_tblk_lens[I2];
+        return make_naive_tensor_descriptor_packed(
+            //        |MRepeat            |MWave |MSubGroup |NRepeat           |NWave
+            //        |NThreadPerSubGroup |MAccVgprs
+            make_tuple(Number<MRepeat>{},
+                       I1,
+                       I1,
+                       Number<NRepeat>{},
+                       I1,
+                       NAccVgprsLoops,
+                       I1,
+                       NAccVgprsPerLoop));
+#else
         constexpr auto NAccVgprs = c_msubgroup_nthreadpersubgroup_maccvgprs_tblk_lens[I2];
-
         return make_naive_tensor_descriptor_packed(
             //        |MRepeat            |MWave |MSubGroup |NRepeat           |NWave
             //        |NThreadPerSubGroup |MAccVgprs
             make_tuple(Number<MRepeat>{}, I1, I1, Number<NRepeat>{}, I1, I1, NAccVgprs));
+#endif
     }
 
     // Thread level, register decriptor. Vector-write
@@ -366,7 +392,53 @@ struct BlockwiseGemmWMMA
                                     b_thread_buf[Number<b_thread_desc_.CalculateOffset(
                                         make_tuple(n0, i / B_K1, 0, 0, 0, i % B_K1))>{}];
                             });
+#if defined(__gfx13__)
+                            if constexpr(APermute)
+                            {
+                                vector_type<FloatA, KPack / A_KRow> a_thread_vec_permuted;
+                                const uint32_t* pIn = reinterpret_cast<const uint32_t*>(
+                                    &(a_thread_vec.template AsType<FloatA>()));
+                                uint32_t* pOut = reinterpret_cast<uint32_t*>(
+                                    &(a_thread_vec_permuted.template AsType<FloatA>()));
+                                constexpr index_t dataInVgpr = DataPerVGPR<FloatA>::value;
+                                constexpr index_t sizeInVgpr = KPack / A_KRow / dataInVgpr;
+                                // currently only support less or equal to 4(sizeInVgpr)
+                                static_for<0, sizeInVgpr, 2>{}([&](auto i) {
+                                    uint32_t tmp;
+                                    pOut[(i >> 1)] = __builtin_amdgcn_permute_pack_tensor_2src_b64(
+                                        &tmp, pIn[i], pIn[i + 1], 0);
+                                    pOut[(i >> 1) + 2] = tmp;
+                                });
 
+                                static_for<0, KPack / A_KRow, 1>{}([&](auto i) {
+                                    a_thread_vec.template AsType<FloatA>()(i) =
+                                        a_thread_vec_permuted.template AsType<FloatA>()(i);
+                                });
+                            }
+
+                            if constexpr(BPermute)
+                            {
+                                vector_type<FloatB, KPack / B_KRow> b_thread_vec_permuted;
+                                const uint32_t* pIn = reinterpret_cast<const uint32_t*>(
+                                    &(b_thread_vec.template AsType<FloatB>()));
+                                uint32_t* pOut = reinterpret_cast<uint32_t*>(
+                                    &(b_thread_vec_permuted.template AsType<FloatB>()));
+                                constexpr index_t dataInVgpr = DataPerVGPR<FloatB>::value;
+                                constexpr index_t sizeInVgpr = KPack / B_KRow / dataInVgpr;
+                                // currently only support less or equal to 4(sizeInVgpr)
+                                static_for<0, sizeInVgpr, 2>{}([&](auto i) {
+                                    uint32_t tmp;
+                                    pOut[(i >> 1)] = __builtin_amdgcn_permute_pack_tensor_2src_b64(
+                                        &tmp, pIn[i], pIn[i + 1], 0);
+                                    pOut[(i >> 1) + 2] = tmp;
+                                });
+
+                                static_for<0, KPack / B_KRow, 1>{}([&](auto i) {
+                                    b_thread_vec.template AsType<FloatB>()(i) =
+                                        b_thread_vec_permuted.template AsType<FloatB>()(i);
+                                });
+                            }
+#endif
                             using wmma_input_type_a =
                                 typename vector_type<FloatA, WmmaK / A_KRow>::type;
                             using wmma_input_type_b =
@@ -420,6 +492,54 @@ struct BlockwiseGemmWMMA
                                 b_thread_buf[Number<b_thread_desc_.CalculateOffset(
                                     make_tuple(n0, i / B_K1, 0, 0, 0, i % B_K1))>{}];
                         });
+
+#if defined(__gfx13__)
+                        if constexpr(APermute)
+                        {
+                            vector_type<FloatA, KPack / A_KRow> a_thread_vec_permuted;
+                            const uint32_t* pIn = reinterpret_cast<const uint32_t*>(
+                                &(a_thread_vec.template AsType<FloatA>()));
+                            uint32_t* pOut = reinterpret_cast<uint32_t*>(
+                                &(a_thread_vec_permuted.template AsType<FloatA>()));
+                            constexpr index_t dataInVgpr = DataPerVGPR<FloatA>::value;
+                            constexpr index_t sizeInVgpr = KPack / A_KRow / dataInVgpr;
+                            // currently only support less or equal to 4(sizeInVgpr)
+                            static_for<0, sizeInVgpr, 2>{}([&](auto i) {
+                                uint32_t tmp;
+                                pOut[(i >> 1)] = __builtin_amdgcn_permute_pack_tensor_2src_b64(
+                                    &tmp, pIn[i], pIn[i + 1], 0);
+                                pOut[(i >> 1) + 2] = tmp;
+                            });
+
+                            static_for<0, KPack / A_KRow, 1>{}([&](auto i) {
+                                a_thread_vec.template AsType<FloatA>()(i) =
+                                    a_thread_vec_permuted.template AsType<FloatA>()(i);
+                            });
+                        }
+
+                        if constexpr(BPermute)
+                        {
+                            vector_type<FloatB, KPack / B_KRow> b_thread_vec_permuted;
+                            const uint32_t* pIn = reinterpret_cast<const uint32_t*>(
+                                &(b_thread_vec.template AsType<FloatB>()));
+                            uint32_t* pOut = reinterpret_cast<uint32_t*>(
+                                &(b_thread_vec_permuted.template AsType<FloatB>()));
+                            constexpr index_t dataInVgpr = DataPerVGPR<FloatB>::value;
+                            constexpr index_t sizeInVgpr = KPack / B_KRow / dataInVgpr;
+                            // currently only support less or equal to 4(sizeInVgpr)
+                            static_for<0, sizeInVgpr, 2>{}([&](auto i) {
+                                uint32_t tmp;
+                                pOut[(i >> 1)] = __builtin_amdgcn_permute_pack_tensor_2src_b64(
+                                    &tmp, pIn[i], pIn[i + 1], 0);
+                                pOut[(i >> 1) + 2] = tmp;
+                            });
+
+                            static_for<0, KPack / B_KRow, 1>{}([&](auto i) {
+                                b_thread_vec.template AsType<FloatB>()(i) =
+                                    b_thread_vec_permuted.template AsType<FloatB>()(i);
+                            });
+                        }
+#endif
 
                         using wmma_input_type_a =
                             typename vector_type<FloatA, WmmaK / A_KRow>::type;
@@ -572,6 +692,8 @@ struct BlockwiseMXGemmWMMA : public BlockwiseGemmWMMA<BlockSize,
                                                       KPack,
                                                       AEnableLds,
                                                       BEnableLds,
+                                                      false,
+                                                      false,
                                                       TransposeC>
 {
     using PARENT = BlockwiseGemmWMMA<BlockSize,
@@ -591,6 +713,8 @@ struct BlockwiseMXGemmWMMA : public BlockwiseGemmWMMA<BlockSize,
                                      KPack,
                                      AEnableLds,
                                      BEnableLds,
+                                     false,
+                                     false,
                                      TransposeC>;
 
     static constexpr auto ScaleK0PerBlock = math::integer_divide_ceil(KPerBlock, 256);
@@ -673,6 +797,8 @@ struct BlockwiseMXGemmWMMA : public BlockwiseGemmWMMA<BlockSize,
                             KPack,
                             AEnableLds,
                             BEnableLds,
+                            false,
+                            false,
                             TransposeC>{},
           a_thread_copy_(PARENT::CalculateAThreadOriginDataIndex()),
           b_thread_copy_(PARENT::CalculateBThreadOriginDataIndex()),
@@ -1137,6 +1263,8 @@ template <index_t BlockSize,
           index_t KPack,
           bool AEnableLds = true,
           bool BEnableLds = true,
+          bool APermute   = false,
+          bool BPermute   = false,
           bool TransposeC = false>
 /* Option: Read from LDS, big buffer hold all threads required data
  * Source
@@ -1696,6 +1824,8 @@ struct BlockwiseMXGemmWMMA : public BlockwiseGemmWMMA<BlockSize,
                                                       KPack,
                                                       AEnableLds,
                                                       BEnableLds,
+                                                      false,
+                                                      false,
                                                       TransposeC>
 {
     template <typename ABlockBuffer,
