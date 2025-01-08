@@ -42,9 +42,9 @@ bool run_test_fmt()
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X2, Filter_3X3, false, LdsMode, WaveGroup, 1, OutElementReluOp, ScaleBiasPacked, UniformScale, 1, TestMask | 0x200>();
     }
     else
-    {  
+    {
         // 1st issue@llvm: https://ontrack-internal.amd.com/browse/LWPSCGFX13-478 for v_scale_bias_activate_f16 which will impact the all the accType=half case which will impact 4x4
-        // 2nd issue@ffm: https://github.amd.com/GFX-Modeling/shader_complex_ffm/issues/960 impact on i8_f16 for 4X4 and 8x4   
+        // 2nd issue@ffm: https://github.amd.com/GFX-Modeling/shader_complex_ffm/issues/960 impact on i8_f16 for 4X4 and 8x4 
 // 4X4 issue      
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X4, Filter_1X1, false, 0, WaveGroup, 0, OutElementNoneOp, ScaleBiasPacked, UniformScale, 1, TestMask | 0x400>(); 
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X4, Filter_3X3, false, 0, WaveGroup, 0, OutElementNoneOp, ScaleBiasPacked, UniformScale, 1, TestMask | 0x400>();
@@ -86,11 +86,18 @@ bool run_test_fmt()
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X2, Filter_3X3, false, 0, WaveGroup, 1, OutElementReluOp, ScaleBiasPacked, UniformScale, 1, TestMask | 0x8000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X2, Filter_3X3, true,  0, WaveGroup, 1, OutElementReluOp, ScaleBiasPacked, UniformScale, 1, TestMask | 0x8000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X2, Filter_1X1, false, LdsMode, WaveGroup, 1, OutElementReluOp, ScaleBiasPacked, UniformScale, 1, TestMask | 0x8000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X2, Filter_3X3, false,  LdsMode, WaveGroup, 1, OutElementReluOp, ScaleBiasPacked, UniformScale, 1, TestMask | 0x8000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X2, Filter_3X3, false,  LdsMode, WaveGroup, 1, OutElementReluOp, ScaleBiasPacked, UniformScale, 1, TestMask | 0x8000>(); 
     }
     // clang-format on
     return pass;
 }
+
+using half_t  = ck::half_t;
+using bhalf_t = ck::bhalf_t;
+using f8_t    = ck::f8_t;
+using bf8_t   = ck::bf8_t;
+using int4_t  = ck::int4_t;
+using uint4_t = ck::uint4_t;
 
 int main(int argc, char* argv[])
 {
@@ -103,7 +110,7 @@ int main(int argc, char* argv[])
 
     // clang-format off
     // Ds keep same with acc currently
-    //                |SrcType |GPUAccType |CPUAccType |LdsMode |scaleBiasPacked |uniformScale |convert_to_tensor |TestMask
+    //                |SrcType |GPUAccType |CPUAccType |LdsMode |scaleBiasPacked |uniformScale |TestMask
     pass &= run_test_fmt<half_t,  float,   float,   0x17, 0, 0, 0x8>();
     pass &= run_test_fmt<int8_t,  float,   float,   0x17, 0, 0, 0x1>();
     pass &= run_test_fmt<int8_t,  half_t,  half_t,  0x17, 0, 0, 0x1>();
@@ -115,7 +122,6 @@ int main(int argc, char* argv[])
     pass &= run_test_fmt<half_t,  half_t,  half_t,  0x17, 0, 0, 0x8>();
     pass &= run_test_fmt<bhalf_t,  float,   float,   0x17, 0, 0, 0x10>();
     pass &= run_test_fmt<bhalf_t,  bhalf_t,  bhalf_t,  0x17, 0, 0, 0x10>();
-
     // clang-format on
     std::cout << "conv_device: ..... " << (pass ? "SUCCESS" : "FAILURE") << std::endl;
     return pass ? 0 : 1;

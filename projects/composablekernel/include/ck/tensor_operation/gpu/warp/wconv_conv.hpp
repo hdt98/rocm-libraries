@@ -1068,29 +1068,6 @@ struct WconvConv
     }
 
     // {h1 x h2 x w1 x k1 x k2}
-    static constexpr auto CalculateOutTensorDataThreadOriginDataIndex()
-    {
-        auto laneId              = GetLaneId();
-        const index_t accCompIdx = laneId * GetNumAccumComponents() / GetNumSubTilesPerImageTile();
-        const index_t subW       = (accCompIdx / GetNumOutputChannels()) % WPerWconv;
-        const index_t subH       = (accCompIdx / GetNumOutputChannels()) / WPerWconv;
-        const index_t subK       = accCompIdx % GetNumOutputChannels();
-        // TODO: modify it if ACO = 1
-        constexpr index_t SwizzleComp = 4;
-        const index_t subK_8          = (laneId & 1) * SwizzleComp;
-
-        static_assert(Aco == 0, "");
-        if constexpr(GetNumAccumComponents() == 4)
-        {
-            return make_tuple(0, subH, subW, 0, subK);
-        }
-        else
-        {
-            return make_tuple(0, subH, subW, 0, subK_8);
-        }
-    }
-
-    // {h1 x h2 x w1 x k1 x k2}
     static constexpr auto CalculateAccThreadOriginDataIndex()
     {
         auto laneId              = GetLaneId();
@@ -1143,9 +1120,9 @@ struct WconvConv
     using KernelWeightDataType = decltype(GetKernelDataType<WeiDataType>());
     using KernelInDataType     = decltype(GetKernelDataType<InDataType>());
 
-    using AccDataVec = vector_type<AccDataType, GetNumAccumComponents()>;
-    using WeiDataVec = vector_type<KernelWeightDataType, GetNumWeightComponents()>;
-    using InDataVec  = vector_type<KernelInDataType, GetNumDataComponents()>;
+    using AccDataVec           = vector_type<AccDataType, GetNumAccumComponents()>;
+    using WeiDataVec           = vector_type<KernelWeightDataType, GetNumWeightComponents()>;
+    using InDataVec            = vector_type<KernelInDataType, GetNumDataComponents()>;
     using outTensorDataVec     = vector_type<KernelInDataType, GetNumOutTensorComponents()>;
     using out4bitTensorDataVec = vector_type<KernelInDataType, GetNumOutTensorComponentsFor4bit()>;
 

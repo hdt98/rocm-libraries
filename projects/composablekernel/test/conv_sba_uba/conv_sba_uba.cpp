@@ -26,11 +26,11 @@
 #include <iostream>
 using namespace std;
 
-using InElementOp      = ck::tensor_operation::element_wise::PassThrough;
-using WeiElementOp     = ck::tensor_operation::element_wise::PassThrough;
-using OutElementNoneOp = ck::tensor_operation::element_wise::MultiplyAdd;
-using OutElementReluOp = ck::tensor_operation::element_wise::MultiplyAddRelu;
-using OutElementTanhOp = ck::tensor_operation::element_wise::MultiplyAddTanh;
+using InElementOp         = ck::tensor_operation::element_wise::PassThrough;
+using WeiElementOp        = ck::tensor_operation::element_wise::PassThrough;
+using OutElementNoneOp    = ck::tensor_operation::element_wise::MultiplyAdd;
+using OutElementReluOp    = ck::tensor_operation::element_wise::MultiplyAddRelu;
+using OutElementTanhOp    = ck::tensor_operation::element_wise::MultiplyAddTanh;
 using ActivationOp        = ck::tensor_operation::element_wise::PassThrough;
 using OutElementConvertOp = ck::tensor_operation::element_wise::Activation_Mul_Clamp<ActivationOp>;
 

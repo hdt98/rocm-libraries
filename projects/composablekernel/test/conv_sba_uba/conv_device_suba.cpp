@@ -27,9 +27,9 @@ bool run_test_fmt()
 #endif
 
     // clang-format off
-    //                                                           |ShapeType  |FilterType |Dilation |Lds |WaveGroup |activeFun | AccElementOp | scaleBiasPacked | uniformScale | TestMask
+    //                                                           |ShapeType  |FilterType |Dilation |Lds |WaveGroup |activeFun | AccElementOp | scaleBiasPacked | uniformScale | convert_to_tensor | TestMask
     if constexpr(std::is_same<GPUAccType, float>::value)
-    { 
+    {
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X2, Filter_1X1, false, 0, WaveGroup, 0, OutElementNoneOp, ScaleBiasPacked, UniformScale, 0, TestMask | 0x100>(); 
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X2, Filter_1X1, false, 0, WaveGroup, 0, OutElementNoneOp, ScaleBiasPacked, UniformScale, 0, TestMask | 0x100>(); 
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X2, Filter_3X3, false, 0, WaveGroup, 0, OutElementNoneOp, ScaleBiasPacked, UniformScale, 0, TestMask | 0x100>();
@@ -118,6 +118,13 @@ bool run_test_fmt()
     // clang-format on
     return pass;
 }
+
+using half_t  = ck::half_t;
+using bhalf_t = ck::bhalf_t;
+using f8_t    = ck::f8_t;
+using bf8_t   = ck::bf8_t;
+using int4_t  = ck::int4_t;
+using uint4_t = ck::uint4_t;
 
 int main(int argc, char* argv[])
 {
