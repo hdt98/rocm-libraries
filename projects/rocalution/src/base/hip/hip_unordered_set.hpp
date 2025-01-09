@@ -126,12 +126,14 @@ namespace rocalution
         // Loop
         while(true)
         {
-            if(this->keys_[hash] == key)
+            KeyType temp = this->keys_[hash];
+
+            if(temp == key)
             {
                 // Key is already inserted, done
                 return false;
             }
-            else if(this->keys_[hash] == EMPTY)
+            else if(temp == EMPTY)
             {
                 // If empty, add element with atomic
                 if(atomicCAS(&this->keys_[hash], EMPTY, key) == EMPTY)

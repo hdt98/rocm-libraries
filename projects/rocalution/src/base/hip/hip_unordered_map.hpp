@@ -162,12 +162,14 @@ namespace rocalution
         // Loop
         while(true)
         {
-            if(this->keys_[hash] == key)
+            KeyType temp = this->keys_[hash];
+
+            if(temp == key)
             {
                 // Key is already inserted, done
                 return false;
             }
-            else if(this->keys_[hash] == EMPTY)
+            else if(temp == EMPTY)
             {
                 // If empty, add element with atomic
                 if(atomicCAS(&this->keys_[hash], EMPTY, key) == EMPTY)
@@ -212,7 +214,9 @@ namespace rocalution
         // Loop
         while(true)
         {
-            if(this->keys_[hash] == key)
+            KeyType temp = this->keys_[hash];
+
+            if(temp == key)
             {
                 // Map contains the key
                 atomicAdd(&this->vals_[hash], val);
@@ -220,7 +224,7 @@ namespace rocalution
                 // val has been added to the map
                 return false;
             }
-            else if(this->keys_[hash] == EMPTY)
+            else if(temp == EMPTY)
             {
                 // If empty, add element with atomic
                 if(atomicCAS(&this->keys_[hash], EMPTY, key) == EMPTY)

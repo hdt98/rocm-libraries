@@ -2,6 +2,12 @@
 
 Full documentation forrocALUTION is available at [https://rocm.docs.amd.com/projects/rocALUTION/en/latest/](https://rocm.docs.amd.com/projects/rocALUTION/en/latest/).
 
+## (Unreleased) rocALUTION 3.2.3
+
+### Resolved issues
+
+* Fix for GPU hashing algorithm when not compiling with -O2/O3
+
 ## rocALUTION 3.2.2 for ROCm 6.4.0
 
 ### Changed
