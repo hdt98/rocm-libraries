@@ -421,7 +421,7 @@ struct GridwiseBatchedGemmSoftmaxGemm_Wmma
                                    Number<MRepeat>{}, Number<MWaves>{}, Number<MPerWmma>{})),
                                make_pass_through_transform(Number<A_K1>{})),
                     make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}),
-                    make_tuple(Sequence<0, 3>{}, Sequence<1, 2, 4>{}, Sequence<5>{}));
+                    make_tuple(Sequence<1, 3>{}, Sequence<0, 2, 4>{}, Sequence<5>{}));
 #endif
             }
             else
@@ -490,7 +490,7 @@ struct GridwiseBatchedGemmSoftmaxGemm_Wmma
                                    Number<LRepeat>{}, Number<LWaves>{}, Number<LPerWmma>{})),
                                make_pass_through_transform(Number<B_K1>{})),
                     make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}),
-                    make_tuple(Sequence<0, 3>{}, Sequence<1, 2, 4>{}, Sequence<5>{}));
+                    make_tuple(Sequence<1, 3>{}, Sequence<0, 2, 4>{}, Sequence<5>{}));
 #endif
             }
             else
@@ -580,7 +580,7 @@ struct GridwiseBatchedGemmSoftmaxGemm_Wmma
                                    Number<NRepeat>{}, Number<NWaves>{}, Number<NPerWmma>{})),
                                make_pass_through_transform(Number<B_L1>{})),
                     make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}),
-                    make_tuple(Sequence<0, 3>{}, Sequence<1, 2, 4>{}, Sequence<5>{}));
+                    make_tuple(Sequence<1, 3>{}, Sequence<0, 2, 4>{}, Sequence<5>{}));
 #endif
             }
             else
