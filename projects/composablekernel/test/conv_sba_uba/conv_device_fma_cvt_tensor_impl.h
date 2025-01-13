@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2018-2024, Advanced Micro Devices, Inc. All rights reserved.
 
+#pragma once
+
 #include <algorithm>
 #include <cstdlib>
 #include <iostream>
@@ -32,8 +34,8 @@ using OutElementOp        = ck::tensor_operation::element_wise::MultiplyAdd;
 using ActivationOp        = ck::tensor_operation::element_wise::PassThrough;
 using OutElementConvertOp = ck::tensor_operation::element_wise::Activation_Mul_Clamp<ActivationOp>;
 
-#define DEFAULT_H 16
-#define DEFAULT_W 16
+#define DEFAULT_H 64
+#define DEFAULT_W 64
 #define DEFAULT_C 16
 #define DEFAULT_K 16
 
@@ -44,7 +46,7 @@ using OutElementConvertOp = ck::tensor_operation::element_wise::Activation_Mul_C
 #define DEFAULT_C_PERBLOCK 16
 #define DEFAULT_K_PERBLOCK 16
 #define DEFAULT_BLOCKSIZE 128
-#define DEFAULT_WAVEGROUP_BLOCKSIZE 256
+#define DEFAULT_WAVEGROUP_BLOCKSIZE 512
 
 enum ShapeType
 {
@@ -86,19 +88,22 @@ namespace ctl = ck::tensor_layout::convolution;
 
 template <>
 struct CommonLayoutSettingSelector<1> final
-    : CommonLayoutSetting<ctl::G_NW_C, ctl::G_K_X_C, ctl::G_NW_K, ctl::G_K, ctl::G_NW_K>
+    : CommonLayoutSetting<ctl::G_NW_C, ctl::G_K_X_C, ctl::G_NW_K, ctl::G_NW_K, ctl::G_NW_K>
 {
 };
 
 template <>
 struct CommonLayoutSettingSelector<2> final
-    : CommonLayoutSetting<ctl::GNHWC, ctl::GKYXC, ctl::GNHWK, ctl::G_K, ctl::GNHWK>
+    : CommonLayoutSetting<ctl::GNHWC, ctl::GKYXC, ctl::GNHWK, ctl::GNHWK, ctl::GNHWK>
 {
 };
 
 template <>
-struct CommonLayoutSettingSelector<3> final
-    : CommonLayoutSetting<ctl::G_NDHW_C, ctl::G_K_ZYX_C, ctl::G_NDHW_K, ctl::G_K, ctl::G_NDHW_K>
+struct CommonLayoutSettingSelector<3> final : CommonLayoutSetting<ctl::G_NDHW_C,
+                                                                  ctl::G_K_ZYX_C,
+                                                                  ctl::G_NDHW_K,
+                                                                  ctl::G_NDHW_K,
+                                                                  ctl::G_NDHW_K>
 {
 };
 
@@ -412,6 +417,9 @@ bool run_test()
     constexpr ck::index_t BlockSize =
         EnableWaveGroup ? DEFAULT_WAVEGROUP_BLOCKSIZE : DEFAULT_BLOCKSIZE;
 
+    using GPUOutType = typename std::conditional<Convert_to_tensor, EDataType, GPUAccType>::type;
+    using CPUOutType = typename std::conditional<Convert_to_tensor, EDataType, CPUAccType>::type;
+
     // on gfx13, the wavegroup count is fixed to 4. so, HPerWave/WPerWave is fixed too.
     constexpr ck::index_t HPerWave = EnableWaveGroup ? DEFAULT_H_PERBLOCK / 2 : DEFAULT_H_PERWAVE;
     constexpr ck::index_t WPerWave = EnableWaveGroup ? DEFAULT_W_PERBLOCK / 2 : DEFAULT_W_PERWAVE;
@@ -489,8 +497,8 @@ bool run_test()
             WeightLayout<NDimSpatial>>(conv_param);
 
     const auto scale_g_n_k_wos_desc =
-        ck::utils::conv::make_scalebias_host_tensor_descriptor<OutputLayout<NDimSpatial>>(
-            conv_param, OutputChannels);
+        ck::utils::conv::make_output_host_tensor_descriptor_g_n_k_wos_packed<
+            OutputLayout<NDimSpatial>>(conv_param);
 
     const auto out_g_n_k_wos_desc =
         ck::utils::conv::make_output_host_tensor_descriptor_g_n_k_wos_packed<
@@ -500,28 +508,18 @@ bool run_test()
         ck::utils::conv::make_output_host_tensor_descriptor_g_n_k_wos_packed<
             ResidualLayout<NDimSpatial>>(conv_param);
 
-    const auto cvt_out_g_n_c_wis_desc =
-        ck::utils::conv::make_output_host_tensor_descriptor_g_n_k_wos_packed<
-            OutputLayout<NDimSpatial>>(conv_param);
-
     Tensor<InDataType> in(in_g_n_c_wis_desc);
     Tensor<WeiDataType> wei(wei_g_k_c_xs_desc);
     Tensor<ResidualDataType> residual(residual_g_n_k_wos_desc);
     Tensor<GPUAccType> scale(scale_g_n_k_wos_desc);
-    Tensor<CPUAccType> out_host(out_g_n_k_wos_desc);
-    Tensor<EDataType> cvt_out_host(cvt_out_g_n_c_wis_desc);
-    Tensor<GPUAccType> out_device(out_g_n_k_wos_desc);
-    Tensor<EDataType> out_tensor_device(out_g_n_k_wos_desc);
+    Tensor<CPUOutType> out_host(out_g_n_k_wos_desc);
+    Tensor<GPUOutType> out_device(out_g_n_k_wos_desc);
 
     std::cout << "in: " << in.mDesc << std::endl;
     std::cout << "wei: " << wei.mDesc << std::endl;
     std::cout << "residual: " << residual.mDesc << std::endl;
     std::cout << "scale: " << scale.mDesc << std::endl;
     std::cout << "out: " << out_host.mDesc << std::endl;
-    if constexpr(Convert_to_tensor)
-    {
-        std::cout << "cvt_tensor_out: " << cvt_out_host.mDesc << std::endl;
-    }
 
     switch(config.init_method)
     {
@@ -550,8 +548,6 @@ bool run_test()
     std::array<ck::index_t, NDimSpatial + 3> d1_g_n_k_wos_strides{};
     std::array<ck::index_t, NDimSpatial + 3> e_g_n_k_wos_lengths{};
     std::array<ck::index_t, NDimSpatial + 3> e_g_n_k_wos_strides{};
-    std::array<ck::index_t, NDimSpatial + 3> cvt_e_g_n_k_wos_lengths{};
-    std::array<ck::index_t, NDimSpatial + 3> cvt_e_g_n_k_wos_strides{};
     std::array<ck::index_t, NDimSpatial> conv_filter_strides{};
     std::array<ck::index_t, NDimSpatial> conv_filter_dilations{};
     std::array<ck::index_t, NDimSpatial> input_left_pads{};
@@ -574,14 +570,7 @@ bool run_test()
     copy(conv_param.input_left_pads_, input_left_pads);
     copy(conv_param.input_right_pads_, input_right_pads);
 
-    if constexpr(Convert_to_tensor)
-    {
-        copy(cvt_out_g_n_c_wis_desc.GetLengths(), cvt_e_g_n_k_wos_lengths);
-        copy(cvt_out_g_n_c_wis_desc.GetStrides(), cvt_e_g_n_k_wos_strides);
-    }
-
     Tensor<CPUAccType> c_host(out_g_n_k_wos_desc);
-    Tensor<CPUAccType> convert_c_host(cvt_out_g_n_c_wis_desc);
 
     auto ref_conv = ck::tensor_operation::host::ReferenceConvFwd<NDimSpatial,
                                                                  InDataType,
@@ -607,37 +596,33 @@ bool run_test()
     {
         ref_invoker.Run(ref_argument);
         out_host.ForEach([&](auto&, auto idx) {
-            OutElementOp{}(out_host(idx), residual(idx), scale(idx), c_host(idx));
+            if constexpr(Convert_to_tensor)
+            {
+                CPUAccType element_op_out = {};
+                OutElementOp{}(element_op_out, residual(idx), scale(idx), c_host(idx));
+                const auto out_element_convert_op = OutElementConvertOp{
+                    static_cast<float>(std::pow(2, cvtTensorScale)), ActivationOp{}};
+                out_element_convert_op(out_host(idx), element_op_out);
+            }
+            else
+            {
+                OutElementOp{}(out_host(idx), residual(idx), scale(idx), c_host(idx));
+            }
         });
-
-        if constexpr(Convert_to_tensor)
-        {
-            const auto out_element_convert_op = OutElementConvertOp{
-                static_cast<float>(std::pow(2, cvtTensorScale)), ActivationOp{}};
-            out_host.ForEach([&](auto&, auto idx) { // out_host always smaller than cvt_out_host
-                out_element_convert_op(cvt_out_host(idx), out_host(idx));
-            });
-        }
     }
 
     DumpTensor(in, "Input");
     DumpTensor(wei, "Weight");
     DumpTensor(scale, "Scale");
     DumpTensor(residual, "Residual");
-    DumpTensor(out_host, "Accum");
-    if constexpr(Convert_to_tensor)
-    {
-        DumpTensor(cvt_out_host, "AfterConvertToTensor");
-    }
+    DumpTensor(out_host, "Output");
 
     DeviceMem in_device_buf(sizeof(InDataType) *
                             in.mDesc.GetElementSpaceSize()); // ISSUE HAPPENS in latest CSIM
     DeviceMem wei_device_buf(sizeof(WeiDataType) * wei.mDesc.GetElementSpaceSize());
     DeviceMem scale_device_buf(sizeof(GPUAccType) * scale.mDesc.GetElementSpaceSize());
     DeviceMem residual_device_buf(sizeof(ResidualDataType) * residual.mDesc.GetElementSpaceSize());
-    DeviceMem out_device_buf(sizeof(GPUAccType) * out_device.mDesc.GetElementSpaceSize());
-    DeviceMem out_tensor_device_buf(sizeof(InDataType) *
-                                    out_tensor_device.mDesc.GetElementSpaceSize());
+    DeviceMem out_device_buf(sizeof(GPUOutType) * out_device.mDesc.GetElementSpaceSize());
 
     in_device_buf.ToDevice(in.mData.data());
     wei_device_buf.ToDevice(wei.mData.data());
@@ -683,6 +668,8 @@ bool run_test()
 
     constexpr ck::index_t ScaleBlockTransferScalarPerVector = sizeof(uint32_t) / sizeof(GPUAccType);
     constexpr ck::index_t Cluster_Scale_K = KPerBlock / ScaleBlockTransferScalarPerVector;
+    constexpr ck::index_t Cluster_Scale_W = 4;
+    constexpr ck::index_t Cluster_Scale_H = ActiveBlockSize / Cluster_Scale_K / Cluster_Scale_W;
 
     constexpr ck::index_t ResidualBlockTransferScalarPerVector =
         sizeof(uint32_t) / sizeof(ResidualDataType);
@@ -693,7 +680,7 @@ bool run_test()
 
     using DsBlockTransferThreadClusterLengths =
         ck::Tuple<ck::Sequence<Cluster_Residual_H, Cluster_Residual_W, Cluster_Residual_K>,
-                  ck::Sequence<Cluster_Scale_K>>;
+                  ck::Sequence<Cluster_Scale_H, Cluster_Scale_W, Cluster_Scale_K>>;
     using DsBlockTransferScalarPerVector =
         ck::Sequence<ResidualBlockTransferScalarPerVector, ScaleBlockTransferScalarPerVector>;
     constexpr ck::index_t DsBlockLdsAddExtraM = true;
@@ -701,7 +688,6 @@ bool run_test()
     float avg_time    = 0;
     using AccDataType = GPUAccType;
     using DsDataType  = ck::Tuple<ResidualDataType, GPUAccType>;
-    using EDataType   = InDataType;
 
     using DeviceConvFwdFmaInstance = ck::tensor_operation::device::DeviceConvSubaWconv<
         NDimSpatial,
@@ -713,7 +699,7 @@ bool run_test()
         WeiDataType,
         DsDataType,
         AccDataType,
-        EDataType,
+        GPUOutType,
         InElementOp,
         WeiElementOp,
         PassThroughOp,
@@ -765,7 +751,6 @@ bool run_test()
                           std::array<const void*, 2>{residual_device_buf.GetDeviceBuffer(),
                                                      scale_device_buf.GetDeviceBuffer()},
                           out_device_buf.GetDeviceBuffer(),
-                          out_tensor_device_buf.GetDeviceBuffer(),
                           a_g_n_c_wis_lengths,
                           a_g_n_c_wis_strides,
                           b_g_k_c_xs_lengths,
@@ -776,8 +761,6 @@ bool run_test()
                               {d0_g_n_k_wos_strides, d1_g_n_k_wos_strides}},
                           e_g_n_k_wos_lengths,
                           e_g_n_k_wos_strides,
-                          cvt_e_g_n_k_wos_lengths,
-                          cvt_e_g_n_k_wos_strides,
                           conv_filter_strides,
                           conv_filter_dilations,
                           input_left_pads,
@@ -795,16 +778,8 @@ bool run_test()
     }
     avg_time = invoker.Run(argument, StreamConfig{nullptr, config.time_kernel});
 
-    if constexpr(Convert_to_tensor)
-    {
-        out_tensor_device_buf.FromDevice(out_tensor_device.mData.data());
-        DumpTensor(out_tensor_device, "out_tensor_Device");
-    }
-    else
-    {
-        out_device_buf.FromDevice(out_device.mData.data());
-        DumpTensor(out_device, "Accum_Device");
-    }
+    out_device_buf.FromDevice(out_device.mData.data());
+    DumpTensor(out_device, "Out_Device");
 
     std::cout <<
 #ifdef ENABLE_WAVEGROUP
@@ -826,7 +801,7 @@ bool run_test()
 
     if(config.do_verification)
     {
-        if constexpr(std::is_same<GPUAccType, ck::bhalf_t>::value)
+        if constexpr(std::is_same<GPUOutType, ck::bhalf_t>::value)
         {
             // check_err doesn't support bhalf_t
             std::cout << "Ignored\n";
@@ -835,22 +810,12 @@ bool run_test()
         else
         {
             bool ret = false;
-            if constexpr(Convert_to_tensor)
-            {
-                ret = ck::utils::check_err(out_tensor_device,
-                                           cvt_out_host,
-                                           "Error: incorrect results for cvt_tensor!",
-                                           get_rtol<EDataType>(),
-                                           get_atol<EDataType>());
-            }
-            else
-            {
-                ck::utils::check_err(out_device,
-                                     out_host,
-                                     "Error: incorrect results!",
-                                     get_rtol<GPUAccType>(),
-                                     get_atol<GPUAccType>());
-            }
+            ret      = ck::utils::check_err(out_device,
+                                       out_host,
+                                       "Error: incorrect results!",
+                                       get_rtol<GPUOutType>(),
+                                       get_atol<GPUOutType>());
+
             if(ret)
             {
                 std::cout << "Passed\n";

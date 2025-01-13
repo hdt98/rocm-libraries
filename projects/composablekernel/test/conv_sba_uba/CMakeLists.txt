@@ -1,8 +1,8 @@
 add_test_executable(test_conv_suba_op conv_sba_uba.cpp)
 target_link_libraries(test_conv_suba_op PRIVATE utility)
 
-add_test_executable(test_device_conv_sba_uba conv_device_suba.cpp)
-target_link_libraries(test_device_conv_sba_uba PRIVATE utility)
+add_test_executable(test_conv_device_sba_uba conv_device_suba.cpp)
+target_link_libraries(test_conv_device_sba_uba PRIVATE utility)
 
 add_test_executable(test_conv_device_sba_uba_cvttensor conv_device_suba_cvt_tensor.cpp)
 target_link_libraries(test_conv_device_sba_uba_cvttensor PRIVATE utility)

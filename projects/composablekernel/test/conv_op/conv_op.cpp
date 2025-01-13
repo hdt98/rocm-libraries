@@ -8,8 +8,6 @@
 #include <tuple>
 #include <vector>
 
-#define CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4 1
-
 #include "ck/ck.hpp"
 #include "ck/tensor_operation/gpu/device/tensor_layout.hpp"
 #include "ck/tensor_operation/gpu/element/element_wise_operation.hpp"
@@ -23,8 +21,6 @@
 #include "ck/library/utility/convolution_host_tensor_descriptor_helper.hpp"
 #include "ck/library/reference_tensor_operation/cpu/reference_conv_fwd.hpp"
 #include "ck/tensor_operation/gpu/warp/wconv_conv.hpp"
-
-//#include "windows.h"
 
 using InElementOp  = ck::tensor_operation::element_wise::PassThrough;
 using WeiElementOp = ck::tensor_operation::element_wise::PassThrough;

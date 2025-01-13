@@ -72,18 +72,23 @@ template <AddressSpaceEnum AddressSpace,
           index_t NumOfVector,
           index_t ScalarPerVector,
           bool InvalidElementUseNumericalZeroValue, // TODO remove this bool, no longer needed,
+          typename BaseArray = StaticallyIndexedArray<vector_type<S, ScalarPerVector>, NumOfVector>,
           typename enable_if<is_scalar_type<S>::value, bool>::type = false>
-struct StaticBufferTupleOfVector
-    : public StaticallyIndexedArray<vector_type<S, ScalarPerVector>, NumOfVector>
+struct StaticBufferTupleOfVector : public BaseArray
 {
     using V    = typename vector_type<S, ScalarPerVector>::type;
-    using base = StaticallyIndexedArray<vector_type<S, ScalarPerVector>, NumOfVector>;
+    using base = BaseArray;
 
     static constexpr auto s_per_v   = Number<ScalarPerVector>{};
     static constexpr auto num_of_v_ = Number<NumOfVector>{};
     static constexpr auto s_per_buf = s_per_v * num_of_v_;
 
     __host__ __device__ constexpr StaticBufferTupleOfVector() : base{} {}
+
+    __host__ __device__ constexpr StaticBufferTupleOfVector(S* p)
+        : base(reinterpret_cast<vector_type<S, ScalarPerVector>*>(p))
+    {
+    }
 
     __host__ __device__ static constexpr AddressSpaceEnum GetAddressSpace() { return AddressSpace; }
 

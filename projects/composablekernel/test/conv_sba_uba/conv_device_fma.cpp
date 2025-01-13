@@ -36,14 +36,11 @@ bool run_test_fmt()
     {
         pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X2, 0,       WaveGroup, 0, 0, TestMask | 0x10000>();
         pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X2, LdsMode, WaveGroup, 0, 0, TestMask | 0x80000>();
-        if constexpr (sizeof(SrcType) < 2) // layout encoding incorrect for 4x4 & 8x8
-        {
-            pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X4, 0,       WaveGroup, 0, 0, TestMask | 0x20000>();
-            pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_8X4, 0,       WaveGroup, 0, 0, TestMask | 0x40000>();
-            pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X4, LdsMode, WaveGroup, 0, 0, TestMask | 0x100000>();
-            pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_8X4, LdsMode, WaveGroup, 0, 0, TestMask | 0x200000>();
-        }
-    }
+        pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X4, 0,       WaveGroup, 0, 0, TestMask | 0x20000>();
+        pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_8X4, 0,       WaveGroup, 0, 0, TestMask | 0x40000>();
+        pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X4, LdsMode, WaveGroup, 0, 0, TestMask | 0x100000>();
+        pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_8X4, LdsMode, WaveGroup, 0, 0, TestMask | 0x200000>();
+     }
     // clang-format on
     return pass;
 }
@@ -56,24 +53,22 @@ int main(int argc, char* argv[])
         return -1;
     }
 
-    // TODO: Fix failure when LdsMode = 0x1f, async load result incorrect for scale.
-
     // clang-format off
     // Ds keep same with acc currently
     //                |SrcType |GPUAccType |CPUAccType| LdsMode TestMask
     pass &= run_test_fmt<half_t,  float,   float,  0x17, 0x1  >();
-    pass &= run_test_fmt<bhalf_t, float,   float,  0x17, 0x2  >();
+    pass &= run_test_fmt<bhalf_t, float,   float,  0x1f, 0x2  >();
     pass &= run_test_fmt<f8_t,    float,   float,  0x17, 0x4  >();
-    pass &= run_test_fmt<bf8_t,   float,   float,  0x17, 0x8  >();
+    pass &= run_test_fmt<bf8_t,   float,   float,  0x1f, 0x8  >();
     pass &= run_test_fmt<int8_t,  float,   float,  0x17, 0x10 >();
-    
-    pass &= run_test_fmt<half_t,  half_t,  half_t, 0x17, 0x40 >();
+
+    pass &= run_test_fmt<half_t,  half_t,  half_t, 0x1f, 0x40 >();
     pass &= run_test_fmt<bhalf_t, bhalf_t, half_t, 0x17, 0x80 >();
-    pass &= run_test_fmt<f8_t,    half_t,  half_t, 0x17, 0x100>();
+    pass &= run_test_fmt<f8_t,    half_t,  half_t, 0x1f, 0x100>();
     pass &= run_test_fmt<bf8_t,   half_t,  half_t, 0x17, 0x200>();
-    pass &= run_test_fmt<int8_t,  half_t,  half_t, 0x17, 0x400>();
+    pass &= run_test_fmt<int8_t,  half_t,  half_t, 0x1f, 0x400>();
     //
     // clang-format on
-    std::cout << "conv_device: ..... " << (pass ? "SUCCESS" : "FAILURE") << std::endl;
+    std::cout << "conv_device_fma: ..... " << (pass ? "SUCCESS" : "FAILURE") << std::endl;
     return pass ? 0 : 1;
 }

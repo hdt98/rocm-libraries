@@ -1011,7 +1011,7 @@ struct GridwiseConv_Wconv
 
         /*******************************************************************************/
         // Store accum buffer
-        if((EnableWaveGroup == false) || (get_wave_id_in_wavegroup() == 1))
+        if((EnableWaveGroup == false) || (get_wave_id_in_wavegroup() == WaveIdRun))
         {
             StoreAccData(acc_grid_desc,
                          p_acc_grid,

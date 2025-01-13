@@ -27,7 +27,6 @@ struct WconvFmaFromTensor
     }
 
     static constexpr intrin_fma_from_tensor<HPerWconv, WPerWconv, ChanOff> fma_instr;
-    static constexpr index_t GetNumScaleComponents() { return sizeof(AccDataType) == 4 ? 1 : 2; }
     static constexpr index_t GetNumResidual()
     {
         constexpr index_t in_bits = SizeOfBits<InDataType>();
@@ -61,9 +60,14 @@ struct WconvFmaFromTensor
     }
     static constexpr index_t GetAccumChannelOrder()
     {
-        constexpr index_t in_bits = SizeOfBits<InDataType>();
+        constexpr index_t in_bits  = SizeOfBits<InDataType>();
+        constexpr index_t out_bits = SizeOfBits<AccDataType>();
         static_assert(in_bits <= 16);
-        if constexpr(in_bits == 16)
+        if constexpr(out_bits == 32)
+        {
+            return 1;
+        }
+        else if constexpr(in_bits == 16)
         {
             return 1;
         }
@@ -97,28 +101,6 @@ struct WconvFmaFromTensor
             return 1;
         }
     }
-
-    static __device__ index_t GetLaneId()
-    {
-        if constexpr(WaveGroup == false)
-        {
-            return get_thread_local_1d_id() & (WaveSize - 1);
-        }
-        else
-        {
-            return get_lane_id();
-        }
-    }
-
-    // k0:repeat_number KPerWconv:k_number per instruction
-    static constexpr auto CalculateScaleThreadOriginDataIndex(ck::index_t KPerWconv)
-    {
-        constexpr auto perThreadNumber = GetNumScaleComponents();
-        auto K_offset                  = GetLaneId() % (KPerWconv / perThreadNumber);
-        return make_tuple(K_offset, 0);
-    }
-
-    using ScaleDataVec = vector_type<AccDataType, GetNumScaleComponents()>;
 };
 
 } // namespace ck

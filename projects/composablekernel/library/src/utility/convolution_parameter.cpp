@@ -72,6 +72,13 @@ ConvParam::ConvParam(ck::index_t n_dim,
     {
         for(ck::index_t i = 0; i < num_dim_spatial_; ++i)
         {
+            filter_spatial_lengths_[i] = static_cast<ck::long_index_t>(filters_len[i]);
+            input_spatial_lengths_[i]  = static_cast<ck::long_index_t>(input_len[i]);
+            conv_filter_strides_[i]    = static_cast<ck::long_index_t>(strides[i]);
+            conv_filter_dilations_[i]  = static_cast<ck::long_index_t>(dilations[i]);
+            input_left_pads_[i]        = static_cast<ck::long_index_t>(left_pads[i]);
+            input_right_pads_[i]       = static_cast<ck::long_index_t>(right_pads[i]);
+
             assert(conv_filter_dilations_[i] == 1);
             assert(filter_spatial_lengths_[i] >= conv_filter_strides_[i]);
 

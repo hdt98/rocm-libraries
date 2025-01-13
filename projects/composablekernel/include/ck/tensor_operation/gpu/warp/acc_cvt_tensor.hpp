@@ -1105,145 +1105,145 @@ struct CvtTensorSelector
     static constexpr auto GetCvtTensor();
 
     template <>
-    static constexpr auto GetCvtTensor<int4_t, float_t>()
+    constexpr auto GetCvtTensor<int4_t, float_t>()
     {
         return CvtTensorInstr::cvt_tensor_i4_f32;
     }
 
     template <>
-    static constexpr auto GetCvtTensor<int4_t, half_t>()
+    constexpr auto GetCvtTensor<int4_t, half_t>()
     {
         return CvtTensorInstr::cvt_tensor_i4_fp16;
     }
 
     template <>
-    static constexpr auto GetCvtTensor<int4_t, bhalf_t>()
+    constexpr auto GetCvtTensor<int4_t, bhalf_t>()
     {
         return CvtTensorInstr::cvt_tensor_i4_bf16;
     }
 
     template <>
-    static constexpr auto GetCvtTensor<uint4_t, float_t>()
+    constexpr auto GetCvtTensor<uint4_t, float_t>()
     {
         return CvtTensorInstr::cvt_tensor_u4_f32;
     }
 
     template <>
-    static constexpr auto GetCvtTensor<uint4_t, half_t>()
+    constexpr auto GetCvtTensor<uint4_t, half_t>()
     {
         return CvtTensorInstr::cvt_tensor_u4_fp16;
     }
 
     template <>
-    static constexpr auto GetCvtTensor<int4_t, bhalf_t>()
+    constexpr auto GetCvtTensor<int4_t, bhalf_t>()
     {
         return CvtTensorInstr::cvt_tensor_u4_bf16;
     }
 
     template <>
-    static constexpr auto GetCvtTensor<int8_t, float_t>()
+    constexpr auto GetCvtTensor<int8_t, float_t>()
     {
         return CvtTensorInstr::cvt_tensor_i8_f32;
     }
 
     template <>
-    static constexpr auto GetCvtTensor<int8_t, half_t>()
+    constexpr auto GetCvtTensor<int8_t, half_t>()
     {
         return CvtTensorInstr::cvt_tensor_i8_fp16;
     }
 
     template <>
-    static constexpr auto GetCvtTensor<int8_t, bhalf_t>()
+    constexpr auto GetCvtTensor<int8_t, bhalf_t>()
     {
         return CvtTensorInstr::cvt_tensor_i8_bf16;
     }
 
     template <>
-    static constexpr auto GetCvtTensor<uint8_t, float_t>()
+    constexpr auto GetCvtTensor<uint8_t, float_t>()
     {
         return CvtTensorInstr::cvt_tensor_u8_f32;
     }
 
     template <>
-    static constexpr auto GetCvtTensor<uint8_t, half_t>()
+    constexpr auto GetCvtTensor<uint8_t, half_t>()
     {
         return CvtTensorInstr::cvt_tensor_u8_fp16;
     }
 
     template <>
-    static constexpr auto GetCvtTensor<uint8_t, bhalf_t>()
+    constexpr auto GetCvtTensor<uint8_t, bhalf_t>()
     {
         return CvtTensorInstr::cvt_tensor_u8_bf16;
     }
 
     template <>
-    static constexpr auto GetCvtTensor<f8_t, float_t>()
+    constexpr auto GetCvtTensor<f8_t, float_t>()
     {
         return CvtTensorInstr::cvt_tensor_fp8_f32;
     }
 
     template <>
-    static constexpr auto GetCvtTensor<f8_t, half_t>()
+    constexpr auto GetCvtTensor<f8_t, half_t>()
     {
         return CvtTensorInstr::cvt_tensor_fp8_fp16;
     }
 
     template <>
-    static constexpr auto GetCvtTensor<f8_t, bhalf_t>()
+    constexpr auto GetCvtTensor<f8_t, bhalf_t>()
     {
         return CvtTensorInstr::cvt_tensor_fp8_bf16;
     }
 
     template <>
-    static constexpr auto GetCvtTensor<bf8_t, float_t>()
+    constexpr auto GetCvtTensor<bf8_t, float_t>()
     {
         return CvtTensorInstr::cvt_tensor_bf8_f32;
     }
 
     template <>
-    static constexpr auto GetCvtTensor<bf8_t, half_t>()
+    constexpr auto GetCvtTensor<bf8_t, half_t>()
     {
         return CvtTensorInstr::cvt_tensor_bf8_half;
     }
 
     template <>
-    static constexpr auto GetCvtTensor<bf8_t, bhalf_t>()
+    constexpr auto GetCvtTensor<bf8_t, bhalf_t>()
     {
         return CvtTensorInstr::cvt_tensor_bf8_bhalf;
     }
 
     template <>
-    static constexpr auto GetCvtTensor<half_t, float_t>()
+    constexpr auto GetCvtTensor<half_t, float_t>()
     {
         return CvtTensorInstr::cvt_tensor_fp16_f32;
     }
 
     template <>
-    static constexpr auto GetCvtTensor<half_t, half_t>()
+    constexpr auto GetCvtTensor<half_t, half_t>()
     {
         return CvtTensorInstr::cvt_tensor_fp16_fp16;
     }
 
     template <>
-    static constexpr auto GetCvtTensor<half_t, bhalf_t>()
+    constexpr auto GetCvtTensor<half_t, bhalf_t>()
     {
         return CvtTensorInstr::cvt_tensor_fp16_bf16;
     }
 
     template <>
-    static constexpr auto GetCvtTensor<bhalf_t, float_t>()
+    constexpr auto GetCvtTensor<bhalf_t, float_t>()
     {
         return CvtTensorInstr::cvt_tensor_bf16_f32;
     }
 
     template <>
-    static constexpr auto GetCvtTensor<bhalf_t, half_t>()
+    constexpr auto GetCvtTensor<bhalf_t, half_t>()
     {
         return CvtTensorInstr::cvt_tensor_bf16_fp16;
     }
 
     template <>
-    static constexpr auto GetCvtTensor<bhalf_t, bhalf_t>()
+    constexpr auto GetCvtTensor<bhalf_t, bhalf_t>()
     {
         return CvtTensorInstr::cvt_tensor_bf16_bf16;
     }

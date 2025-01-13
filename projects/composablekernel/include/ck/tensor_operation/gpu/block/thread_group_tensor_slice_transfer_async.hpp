@@ -140,9 +140,7 @@ struct ThreadGroupTensorSliceTransferAsync
                 const bool is_src_valid =
                     coordinate_has_valid_offset_assuming_visible_index_is_valid(src_desc,
                                                                                 src_coord_);
-                const bool is_dst_valid =
-                    coordinate_has_valid_offset_assuming_visible_index_is_valid(dst_desc,
-                                                                                dst_coord_);
+                const bool is_dst_valid = coordinate_has_valid_offset(dst_desc, dst_coord_);
                 src_buf.template AsyncCopyToLds<remove_cvref_t<decltype(dst_buf)>, ScalarPerVector>(
                     dst_buf, src_offset, dst_offset, is_src_valid, is_dst_valid);
             }

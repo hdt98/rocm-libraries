@@ -22,6 +22,14 @@ enum SemaphoreAddressSpaceMask : index_t
     SemaphoreAddressSpaceAsync      = 1 << 9,
 };
 
+enum WaveUsageId : index_t
+{
+    WaveIdLoad    = 0,
+    WaveIdRun     = 1,
+    WaveIdPostRun = 2,
+    WaveIdOutput  = 3
+};
+
 template <unsigned WaveIdInWavegroup
 #if defined(CK_USE_AMD_SEMAPHORE_ASM)
           ,
@@ -44,7 +52,7 @@ class WavegroupSemaphore
             __builtin_amdgcn_s_setreg(SemaHwReg | (HwRegOffset << 6) | (HwRegBits << 11),
                                       count | (limit << 16) | (done << 28));
 #else
-            __builtin_amdgcn_s_sema_set_state(_sema, count | (limit << 16) | (done << 28));
+            __builtin_amdgcn_s_sema_set_state(&_sema, count | (limit << 16) | (done << 28));
 #endif
         }
 #else
@@ -61,7 +69,7 @@ class WavegroupSemaphore
 #if defined(CK_USE_AMD_SEMAPHORE_ASM)
         asm("s_sema_wait %0" : : "n"(1 << (SemId - 1)) : "memory");
 #else
-        __builtin_amdgcn_s_sema_wait(_sema);
+        __builtin_amdgcn_s_sema_wait(&_sema);
 #endif
 #endif
         if constexpr(MemorySpaces & SemaphoreAddressSpaceGlobal)
@@ -73,7 +81,7 @@ class WavegroupSemaphore
     }
 
     template <index_t MemorySpaces>
-    __device__ void signal(index_t count = 1)
+    __device__ void signal()
     {
         if constexpr(MemorySpaces & SemaphoreAddressSpaceGlobal)
             __builtin_amdgcn_fence(__ATOMIC_ACQUIRE, "workgroup", "global");
@@ -84,14 +92,11 @@ class WavegroupSemaphore
 
 #if defined(__gfx13__)
 #if defined(CK_USE_AMD_SEMAPHORE_ASM)
-        constexpr unsigned imm = SemId | (WaveIdInWavegroup << 4) | (1 << 8);
+        constexpr unsigned imm = SemId | (WaveIdInWavegroup << 4);
         asm("s_sema_signal %0" : : "n"(imm) : "memory");
-        ignore = count;
 #else
-        __builtin_amdgcn_s_sema_signal(_sema, count);
+        __builtin_amdgcn_s_sema_signal(&_sema);
 #endif
-#else
-        ignore = count;
 #endif
     }
 
@@ -148,10 +153,10 @@ class WavegroupSemaphore
     };
     using Type = typename SemaphoreType<WaveIdInWavegroup>::Type;
 
-    __device__ WavegroupSemaphore(Type* sema) : _sema(sema) {}
+    __device__ WavegroupSemaphore() {}
 
     private:
-    Type* _sema;
+    Type _sema;
 #endif
 };
 } // namespace ck

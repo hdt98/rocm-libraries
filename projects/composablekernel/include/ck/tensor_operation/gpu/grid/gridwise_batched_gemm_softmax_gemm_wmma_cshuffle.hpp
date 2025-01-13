@@ -1143,8 +1143,6 @@ struct GridwiseBatchedGemmSoftmaxGemm_Wmma
                        make_pass_through_transform(lconsacc)),
             make_tuple(Sequence<3, 4, 5, 6>{}, Sequence<0, 1, 2>{}, Sequence<7>{}),
             make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}));
-        //debug
-        constexpr auto laccvgprs = lnumofloop * lconsacc;
 #else
         constexpr auto lsubgroup          = acc0_thread_desc_mrepeat_mwave_mthreadpersubgroup_nrepeat_nwave_nsubgroup_naccvgprs.GetLength(I5);
         constexpr auto laccvgprs          = acc0_thread_desc_mrepeat_mwave_mthreadpersubgroup_nrepeat_nwave_nsubgroup_naccvgprs.GetLength(I6);

@@ -8,8 +8,6 @@
 #include <tuple>
 #include <vector>
 
-#define CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4 1
-
 #include "ck/ck.hpp"
 #include "ck/tensor_operation/gpu/device/tensor_layout.hpp"
 #include "ck/tensor_operation/gpu/element/element_wise_operation.hpp"
@@ -66,9 +64,19 @@ template <typename InDataType,
           index_t UnpackedOutputChannels>
 __global__ void __launch_bounds__(64, 1) conv_fma(const InDataType* in_, AccDataType* c_)
 {
-    constexpr auto wconvConv =
-        ck::WconvConv<InDataType, InDataType, AccDataType, HPerWconv, WPerWconv, 1, 1, 1>();
     constexpr ck::WconvFmaFromTensor<InDataType, AccDataType, HPerWconv, WPerWconv> wconv_fma;
+    constexpr index_t Aco    = wconv_fma.GetAccumChannelOrder();
+    constexpr auto wconvConv = ck::WconvConv<InDataType,
+                                             InDataType,
+                                             AccDataType,
+                                             HPerWconv,
+                                             WPerWconv,
+                                             1,
+                                             1,
+                                             1,
+                                             1,
+                                             false,
+                                             Aco>();
 
     auto in = reinterpret_cast<const typename decltype(wconvConv)::KernelInDataType*>(in_);
 
@@ -98,9 +106,7 @@ __global__ void __launch_bounds__(64, 1) conv_fma(const InDataType* in_, AccData
                                              AccVectorCount,
                                              wconvConv.GetNumAccumComponents(),
                                              true>;
-    using ScaleDataVec  = typename decltype(wconv_fma)::ScaleDataVec::type;
-
-    const int lIdx = threadIdx.x;
+    const int lIdx      = threadIdx.x;
 
     // Data layout: HWC, unit: InDataType
     constexpr index_t data_H_stride = Width * InputChannels;
@@ -143,8 +149,8 @@ __global__ void __launch_bounds__(64, 1) conv_fma(const InDataType* in_, AccData
             return *reinterpret_cast<const InDataVec*>(in + offset);
         }
     };
-    constexpr index_t Aco = wconv_fma.GetAccumChannelOrder();
-    auto store_acc_data   = [&](index_t h, index_t w, index_t k, AccDataVec& c_vec) {
+
+    auto store_acc_data = [&](index_t h, index_t w, index_t k, AccDataVec& c_vec) {
         const index_t subW = (accCompIdx / wconvConv.GetNumOutputChannels()) % WPerWconv;
         const index_t subH = (accCompIdx / wconvConv.GetNumOutputChannels()) / WPerWconv;
 
@@ -172,8 +178,8 @@ __global__ void __launch_bounds__(64, 1) conv_fma(const InDataType* in_, AccData
             {
                 constexpr index_t tileOffset =
                     wconvConv.GetNumSubTilesPerImageTile() == 2 // 8x4
-                          ? HPerWconv / wconvConv.GetNumSubTilesPerImageTile() * acc_H_stride
-                          : 8;
+                        ? HPerWconv / wconvConv.GetNumSubTilesPerImageTile() * acc_H_stride
+                        : 8;
 
                 *reinterpret_cast<AccSwizzleVec*>(c_ + offset + swizzleOffset + tileOffset) =
                     c_vec.template AsType<AccSwizzleVec>()(Number<2>{});
@@ -228,16 +234,9 @@ __global__ void __launch_bounds__(64, 1) conv_fma(const InDataType* in_, AccData
                 AccVec c_thread_buf_            = {};
                 auto& c_vec                     = c_thread_buf_.GetVectorTypeReference(Number<0>{});
                 typename AccDataVec::type accum = {};
-                ScaleDataVec scale              = {};
-                if constexpr(wconv_fma.GetNumScaleComponents() == 1)
-                {
-                    scale = 1.0;
-                }
-                else
-                {
-                    scale[0] = 1.0;
-                    scale[1] = 1.0;
-                }
+                typename AccDataVec::type scale = {};
+                static_for<0, wconvConv.GetNumAccumComponents(), 1>{}(
+                    [&](auto s) { scale[s.value] = 1.0; });
 
                 InDataVec in_tile_data1 = {};
                 InDataVec in_tile_data2 = {};
@@ -713,9 +712,13 @@ bool run_test_fmt()
     else
     {
         pass &= run_test<SrcType, GPUAccType, CPUAccType, Shape_4X2, TestMask | 0x80000  >();
-        pass &= run_test<SrcType, GPUAccType, CPUAccType, Shape_4X4, TestMask | 0x100000 >();
         // llvm issue
-        //pass &= run_test<SrcType, GPUAccType, CPUAccType, Shape_8X4, TestMask | 0x200000 >();
+        if constexpr (std::is_same<ck::int4_t, SrcType>::value == false)
+        {
+        pass &= run_test<SrcType, GPUAccType, CPUAccType, Shape_4X4, TestMask | 0x100000 >();
+        pass &= run_test<SrcType, GPUAccType, CPUAccType, Shape_8X4, TestMask | 0x200000 >();
+        }
+
     }
     // clang-format on
 

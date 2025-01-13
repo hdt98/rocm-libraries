@@ -34,7 +34,6 @@ using OutElementTanhOp    = ck::tensor_operation::element_wise::MultiplyAddTanh;
 using ActivationOp        = ck::tensor_operation::element_wise::PassThrough;
 using OutElementConvertOp = ck::tensor_operation::element_wise::Activation_Mul_Clamp<ActivationOp>;
 
-//#define CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4 1
 //#define ENABLE_FULL_TEST 1
 //
 // #define USE_ABSOLUTE_SIZE 1
@@ -408,7 +407,8 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
                                                 accSbaInstance.GetNumSbaOutComponents(),
                                                 true>;
     SbaOutVec d_thread_buf_ = {};
-
+    constexpr auto I0       = Number<0>{};
+    constexpr auto I1       = Number<1>{};
     static_for<0, HRepeat, 1>{}([&](auto h) {
         static_for<0, WRepeat, 1>{}([&](auto w) {
             static_for<0, KRepeat, 1>{}([&](auto k) {
@@ -428,19 +428,44 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
                 {
                     const vector_type<AccDataType, 2>& bias_data16bit_v =
                         bias_16bit_data[tileOffset];
-                    accSbaInstance.sba_instr.Run(c_vec,
-                                                 type_convert<float>(scale_local),
-                                                 bit_cast<half2_t>(bias_data16bit_v),
-                                                 d_vec);
+                    if constexpr(HPerWconv == 4 && WPerWconv == 2)
+                    {
+                        half2_t out0;
+                        half2_t out1;
+                        accSbaInstance.sba_instr.Run(
+                            c_vec, scale_local, bit_cast<half2_t>(bias_data16bit_v), out0, out1);
+                        d_vec.template AsType<half2_t>()(I0) = out0;
+                        d_vec.template AsType<half2_t>()(I1) = out1;
+                    }
+                    else
+                    {
+                        accSbaInstance.sba_instr.Run(c_vec,
+                                                     type_convert<float>(scale_local),
+                                                     bit_cast<half2_t>(bias_data16bit_v),
+                                                     d_vec);
+                    }
                 }
                 else if constexpr(std::is_same<bhalf_t, AccDataType>::value)
                 {
                     const vector_type<AccDataType, 2>& bias_data16bit_v =
                         bias_16bit_data[tileOffset];
-                    accSbaInstance.sba_instr.Run(c_vec,
-                                                 type_convert<float>(scale_local),
-                                                 bit_cast<bhalf2_t>(bias_data16bit_v),
-                                                 d_vec);
+                    if constexpr(HPerWconv == 4 && WPerWconv == 2)
+                    {
+                        bhalf2_t out0;
+                        bhalf2_t out1;
+                        accSbaInstance.sba_instr.Run(
+                            c_vec, scale_local, bit_cast<bhalf2_t>(bias_data16bit_v), out0, out1);
+                        d_vec.template AsType<half2_t>()(I0) = out0;
+                        d_vec.template AsType<half2_t>()(I1) = out1;
+                    }
+                    else
+                    {
+
+                        accSbaInstance.sba_instr.Run(c_vec,
+                                                     type_convert<float>(scale_local),
+                                                     bit_cast<bhalf2_t>(bias_data16bit_v),
+                                                     d_vec);
+                    }
                 }
 
                 if constexpr(!convert_to_tensor)
@@ -468,9 +493,9 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
                         accCvtInstance.cvtTensor_instr.Run(d_vec, convertScale, outVec);
 
                         using outTensorDataVec     = typename decltype(wconvConv)::outTensorDataVec;
-                        auto store_out_tensor_data = [&](index_t h,
-                                                         index_t w,
-                                                         index_t k,
+                        auto store_out_tensor_data = [&](index_t h0,
+                                                         index_t w0,
+                                                         index_t k0,
                                                          outTensorDataVec& cvt_out_vec) {
                             const index_t subW =
                                 (accCompIdx / wconvConv.GetNumOutputChannels()) % WPerWconv;
@@ -480,9 +505,9 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
                             if constexpr(wconvConv.GetNumAccumComponents() == 4)
                             {
                                 const index_t subK = accCompIdx % wconvConv.GetNumOutputChannels();
-                                const index_t offset = (h * HPerWconv + subH) * acc_H_stride +
-                                                       (w * WPerWconv + subW) * acc_W_stride +
-                                                       (k * acc_K_stride + subK);
+                                const index_t offset = (h0 * HPerWconv + subH) * acc_H_stride +
+                                                       (w0 * WPerWconv + subW) * acc_W_stride +
+                                                       (k0 * acc_K_stride + subK);
                                 *reinterpret_cast<typename outTensorDataVec::type*>(outTensor_ +
                                                                                     offset) =
                                     cvt_out_vec.template AsType<typename outTensorDataVec::type>()(
@@ -497,9 +522,9 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
                                 const index_t subK = accCompIdx % wconvConv.GetNumOutputChannels() /
                                                      (wconvConv.GetNumOutTensorComponents() * 2) *
                                                      (wconvConv.GetNumOutTensorComponents() * 2);
-                                const index_t offset = (h * HPerWconv + subH) * acc_H_stride +
-                                                       (w * WPerWconv + subW) * acc_W_stride +
-                                                       (k * acc_K_stride + subK);
+                                const index_t offset = (h0 * HPerWconv + subH) * acc_H_stride +
+                                                       (w0 * WPerWconv + subW) * acc_W_stride +
+                                                       (k0 * acc_K_stride + subK);
 
                                 index_t secOffset = 8;
                                 if constexpr(wconvConv.GetNumSubTilesPerImageTile() > 1)
@@ -526,7 +551,8 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
                     else
                     {
                         // int4_t
-                        using KernelEDataType = decltype(wconvConv.GetKernelDataType<EDataType>());
+                        using KernelEDataType =
+                            decltype(wconvConv.template GetKernelDataType<EDataType>());
                         using outTensorVecFor4bit =
                             StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr,
                                                       KernelEDataType,
@@ -540,24 +566,22 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
 
                         using out4bitTensorDataVec =
                             typename decltype(wconvConv)::out4bitTensorDataVec;
-                        auto store_out_tensor_4bit_data = [&](index_t h,
-                                                              index_t w,
-                                                              index_t k,
+                        auto store_out_tensor_4bit_data = [&](index_t h0,
+                                                              index_t w0,
+                                                              index_t k0,
                                                               out4bitTensorDataVec& cvt_out_vec) {
-                            auto outTensor =
-                                reinterpret_cast<typename decltype(wconvConv)::KernelEDataType*>(
-                                    outTensor_);
+                            auto outTensor = reinterpret_cast<KernelEDataType*>(outTensor_);
                             if constexpr((HPerWconv == 4 && WPerWconv == 2) ||
                                          (HPerWconv == 8 && WPerWconv == 4))
                             {
-                                if(lIdx % 4 & 0x2 == 0)
+                                if(((lIdx % 4) & 0x2) == 0)
                                 {
                                     const index_t subW   = (lIdx / 4) % WPerWconv;
                                     const index_t subH   = (lIdx / 4) / WPerWconv;
                                     const index_t subK   = lIdx & 1;
-                                    const index_t offset = (h * HPerWconv + subH) * acc_H_stride +
-                                                           (w * WPerWconv + subW) * acc_W_stride +
-                                                           (k * acc_K_stride + subK);
+                                    const index_t offset = (h0 * HPerWconv + subH) * acc_H_stride +
+                                                           (w0 * WPerWconv + subW) * acc_W_stride +
+                                                           (k0 * acc_K_stride + subK);
                                     *reinterpret_cast<typename out4bitTensorDataVec::type*>(
                                         outTensor + offset) =
                                         cvt_out_vec
@@ -570,9 +594,9 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
                                 const index_t subW   = (lIdx / 2) % WPerWconv;
                                 const index_t subH   = (lIdx / 2) / WPerWconv;
                                 const index_t subK   = lIdx % 2;
-                                const index_t offset = (h * HPerWconv + subH) * acc_H_stride +
-                                                       (w * WPerWconv + subW) * acc_W_stride +
-                                                       (k * acc_K_stride + subK);
+                                const index_t offset = (h0 * HPerWconv + subH) * acc_H_stride +
+                                                       (w0 * WPerWconv + subW) * acc_W_stride +
+                                                       (k0 * acc_K_stride + subK);
                                 *reinterpret_cast<typename out4bitTensorDataVec::type*>(outTensor +
                                                                                         offset) =
                                     cvt_out_vec
@@ -1658,13 +1682,13 @@ bool run_test_fmt()
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X2, Filter_3X3, false, 0, OutElementNoneOp, scaleBiasPacked, uniformScale, convert_to_tensor, TestMask | 0x10000  >();
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X2, Filter_3X3, true,  0, OutElementNoneOp, scaleBiasPacked, uniformScale, convert_to_tensor, TestMask | 0x10000  >();
 #endif
-        //pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X2, Filter_1X1, false, 1, OutElementReluOp, scaleBiasPacked, uniformScale, convert_to_tensor, TestMask | 0x20000  >();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X2, Filter_1X1, false, 1, OutElementReluOp, scaleBiasPacked, uniformScale, convert_to_tensor, TestMask | 0x20000  >();
 #ifdef ENABLE_FULL_TEST
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X2, Filter_3X3, false, 1, OutElementReluOp, scaleBiasPacked, uniformScale, convert_to_tensor, TestMask | 0x20000  >();
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X2, Filter_3X3, true,  1, OutElementReluOp, scaleBiasPacked, uniformScale, convert_to_tensor, TestMask | 0x20000  >();
 #endif
         // ActiveFunc:Tanh is not used for cvt_to_tensor
-        //pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X2, Filter_1X1, false, 2, OutElementTanhOp, scaleBiasPacked, uniformScale, 0, TestMask | 0x40000  >();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X2, Filter_1X1, false, 2, OutElementTanhOp, scaleBiasPacked, uniformScale, 0, TestMask | 0x40000  >();
 #ifdef ENABLE_FULL_TEST
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X2, Filter_3X3, false, 2, OutElementTanhOp, scaleBiasPacked, uniformScale, 0, TestMask | 0x40000  >();
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X2, Filter_3X3, true,  2, OutElementTanhOp, scaleBiasPacked, uniformScale, 0, TestMask | 0x40000  >();
@@ -1673,6 +1697,7 @@ bool run_test_fmt()
     else
     {
         // issue@llvm: https://ontrack-internal.amd.com/browse/LWPSCGFX13-478 for v_scale_bias_activate_f16 which will impact the all the accType=half case which will impact 4x4
+#if 0
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X4, Filter_1X1, false, 0, OutElementNoneOp, scaleBiasPacked, uniformScale, convert_to_tensor, TestMask | 0x80000  >();
 #ifdef ENABLE_FULL_TEST
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X4, Filter_3X3, false, 0, OutElementNoneOp, scaleBiasPacked, uniformScale, 0, TestMask | 0x80000  >();
@@ -1684,6 +1709,7 @@ bool run_test_fmt()
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X4, Filter_3X3, true,  1, OutElementReluOp, scaleBiasPacked, uniformScale, 0, TestMask | 0x100000 >();
 #endif
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X4, Filter_1X1, false, 2, OutElementTanhOp, scaleBiasPacked, uniformScale, 0, TestMask | 0x200000 >();
+#endif
 #ifdef ENABLE_FULL_TEST
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X4, Filter_3X3, false, 2, OutElementTanhOp, scaleBiasPacked, uniformScale, 0, TestMask | 0x200000 >();
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X4, Filter_3X3, true,  2, OutElementTanhOp, scaleBiasPacked, uniformScale, 0, TestMask | 0x200000 >();
@@ -1691,26 +1717,28 @@ bool run_test_fmt()
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_8X4, Filter_1X1, false, 0, OutElementNoneOp, scaleBiasPacked, uniformScale, convert_to_tensor, TestMask | 0x400000 >();
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_8X4, Filter_1X1, false, 1, OutElementReluOp, scaleBiasPacked, uniformScale, convert_to_tensor, TestMask | 0x800000 >();
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_8X4, Filter_1X1, false, 2, OutElementTanhOp, scaleBiasPacked, uniformScale, 0, TestMask | 0x1000000>();
-
-        // Some issues for these test cases
-#if 0
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X2, Filter_1X1, false, 0, OutElementNoneOps, scaleBiasPacked, uniformScale, convert_to_tensor>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X2, Filter_3X3, false, 0, OutElementNoneOps, scaleBiasPacked, uniformScale, 0>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X2, Filter_3X3, true,  0, OutElementNoneOps, scaleBiasPacked, uniformScale, 0>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X2, Filter_1X1, false, 1, OutElementReluOp, scaleBiasPacked, uniformScale, convert_to_tensor>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X2, Filter_3X3, false, 1, OutElementReluOp, scaleBiasPacked, uniformScale, 0>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X2, Filter_3X3, true,  1, OutElementReluOp, scaleBiasPacked, uniformScale, 0>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X2, Filter_1X1, false, 2, OutElementTanhOp, scaleBiasPacked, uniformScale, 0>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X2, Filter_3X3, false, 2, OutElementTanhOp, scaleBiasPacked, uniformScale, 0>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X2, Filter_3X3, true,  2, OutElementTanhOp, scaleBiasPacked, uniformScale, 0>();
-
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_8X4, Filter_3X3, false, 0, OutElementNoneOps, scaleBiasPacked, uniformScale, 0>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_8X4, Filter_3X3, true,  0, OutElementNoneOps, scaleBiasPacked, uniformScale, 0>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_8X4, Filter_3X3, false, 1, OutElementReluOp, scaleBiasPacked, uniformScale, 0>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_8X4, Filter_3X3, true,  1, OutElementReluOp, scaleBiasPacked, uniformScale, 0>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_8X4, Filter_3X3, false, 2, OutElementTanhOp, scaleBiasPacked, uniformScale, 0>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_8X4, Filter_3X3, true,  2, OutElementTanhOp, scaleBiasPacked, uniformScale, 0>();
+#ifdef ENABLE_FULL_TEST
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_8X4, Filter_3X3, false, 0, OutElementNoneOp, scaleBiasPacked, uniformScale, convert_to_tensor, TestMask | 0x400000 >();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_8X4, Filter_3X3, true,  0, OutElementNoneOp, scaleBiasPacked, uniformScale, convert_to_tensor, TestMask | 0x400000 >();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_8X4, Filter_3X3, false, 1, OutElementReluOp,  scaleBiasPacked, uniformScale, convert_to_tensor, TestMask | 0x800000 >();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_8X4, Filter_3X3, true,  1, OutElementReluOp,  scaleBiasPacked, uniformScale, convert_to_tensor, TestMask | 0x800000 >();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_8X4, Filter_3X3, false, 2, OutElementTanhOp,  scaleBiasPacked, uniformScale, 0, TestMask | 0x1000000 >();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_8X4, Filter_3X3, true,  2, OutElementTanhOp,  scaleBiasPacked, uniformScale, 0, TestMask | 0x1000000 >();
 #endif
+
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X2, Filter_1X1, false, 0, OutElementNoneOp, scaleBiasPacked, uniformScale, convert_to_tensor, TestMask | 0x2000000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X2, Filter_1X1, false, 1, OutElementReluOp,  scaleBiasPacked, uniformScale, convert_to_tensor, TestMask | 0x4000000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X2, Filter_1X1, false, 2, OutElementTanhOp,  scaleBiasPacked, uniformScale, 0,                 TestMask | 0x8000000>();
+#ifdef ENABLE_FULL_TEST
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X2, Filter_3X3, false, 0, OutElementNoneOp, scaleBiasPacked, uniformScale, convert_to_tensor, TestMask | 0x2000000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X2, Filter_3X3, true,  0, OutElementNoneOp, scaleBiasPacked, uniformScale, convert_to_tensor, TestMask | 0x2000000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X2, Filter_3X3, false, 1, OutElementReluOp, scaleBiasPacked, uniformScale, convert_to_tensor, TestMask | 0x4000000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X2, Filter_3X3, true,  1, OutElementReluOp, scaleBiasPacked, uniformScale, convert_to_tensor, TestMask | 0x4000000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X2, Filter_3X3, false, 2, OutElementTanhOp, scaleBiasPacked, uniformScale, 0, TestMask | 0x8000000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X2, Filter_3X3, true,  2, OutElementTanhOp, scaleBiasPacked, uniformScale, 0, TestMask | 0x8000000>();
+#endif
+
+
     }
     // clang-format on
 
@@ -1767,7 +1795,6 @@ int main(int argc, char* argv[])
         return -1;
     }
 
-#if 0
     // clang-format off
     //                  |SrcType     |GPUAccType  |CPUAccType  |scaleBiasPacked  |uniformScale | convert_to_tensor
     pass &= run_test_fmt<ck::half_t,  float,       float,       0, 0, 0, 0x1  >();
@@ -1802,9 +1829,10 @@ int main(int argc, char* argv[])
     pass &= run_test_fmt<int8_t,      ck::half_t,  ck::half_t,  0, 0, 0, 0x8  >();
     pass &= run_test_fmt<int8_t,      ck::half_t,  ck::half_t,  1, 0, 0, 0x10 >();
     pass &= run_test_fmt<int8_t,      ck::half_t,  ck::half_t,  0, 1, 0, 0x20 >();
-    pass &= run_test_fmt<ck::bf8_t,   ck::half_t,  ck::half_t, 0, 0, 0, 0x40 >();
-    pass &= run_test_fmt<ck::bf8_t,   ck::half_t,  ck::half_t, 0, 1, 0, 0x80 >();
-    pass &= run_test_fmt<ck::bf8_t,   ck::half_t,  ck::half_t, 1, 0, 0, 0x100>();
+    pass &= run_test_fmt<ck::bf8_t,   ck::half_t,  ck::half_t,  0, 0, 0, 0x40 >();
+    pass &= run_test_fmt<ck::bf8_t,   ck::half_t,  ck::half_t,  0, 1, 0, 0x80 >();
+    pass &= run_test_fmt<ck::bf8_t,   ck::half_t,  ck::half_t,  1, 0, 0, 0x100>();
+    // cvt to tensor
     pass &= run_test_fmt<ck::half_t,  float,       float,       0, 0, 1, 0x1  >();
     pass &= run_test_fmt<ck::bhalf_t, float,       float,       0, 0, 1, 0x1  >();
     pass &= run_test_fmt<ck::f8_t,    float,       float,       0, 0, 1, 0x1  >();
@@ -1815,9 +1843,8 @@ int main(int argc, char* argv[])
     pass &= run_test_fmt<ck::bf8_t,   ck::half_t,  ck::half_t,  0, 0, 1, 0x1  >();
     pass &= run_test_fmt<int8_t,      ck::half_t,  ck::half_t,  0, 0, 1, 0x1  >();
 #ifdef CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
-    pass &= run_test_fmt<ck::int4_t,  float,       float     , 0, 0, 1, 0x800 >();
+    pass &= run_test_fmt<ck::int4_t,  float,       float,      0, 0, 1, 0x800 >();
     pass &= run_test_fmt<ck::int4_t,  ck::half_t,  ck::half_t, 0, 0, 1, 0x2000>();
-#endif
 #endif
     // clang-format on
 

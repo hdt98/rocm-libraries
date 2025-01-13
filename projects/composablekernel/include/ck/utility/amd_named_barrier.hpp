@@ -4,7 +4,7 @@
 #ifndef CK_AMD_NAMED_BARRIER_HPP
 #define CK_AMD_NAMED_BARRIER_HPP
 
-#define CK_USE_AMD_NAMED_BARRIER_ASM 1
+//#define CK_USE_AMD_NAMED_BARRIER_ASM 1
 
 namespace ck {
 
@@ -58,11 +58,11 @@ template <unsigned Count>
 class NamedBarrier
 {
     public:
-    __device__ NamedBarrier(__amdgpu_named_workgroup_barrier_t* bar) : bar_(bar) {}
-    __device__ void init() { __builtin_amdgcn_s_barrier_init(bar_, Count); }
-    __device__ void join() { __builtin_amdgcn_s_barrier_join(bar_); }
+    __device__ NamedBarrier() {}
+    __device__ void init() { __builtin_amdgcn_s_barrier_init(&bar_, Count); }
+    __device__ void join() { __builtin_amdgcn_s_barrier_join(&bar_); }
     __device__ void wait() { __builtin_amdgcn_s_barrier_wait(bar_id_); }
-    __device__ void signal() { __builtin_amdgcn_s_barrier_signal_var(bar_); }
+    __device__ void signal() { __builtin_amdgcn_s_barrier_signal_var(&bar_, 0); }
     template <bool async>
     __device__ void sync_lds()
     {
@@ -80,7 +80,7 @@ class NamedBarrier
     }
 
     private:
-    __amdgpu_named_workgroup_barrier_t* bar_;
+    __amdgpu_named_workgroup_barrier_t bar_;
     static constexpr uint32_t bar_id_ = 1;
 };
 #endif

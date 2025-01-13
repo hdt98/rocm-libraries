@@ -351,7 +351,7 @@ struct SbaSelector
     template <>
     constexpr auto GetSba<half_t>()
     {
-        if(HPerWconv == 4 && WPerWconv == 2)
+        if constexpr(HPerWconv == 4 && WPerWconv == 2)
         {
             return SbaInstr::sba_scatter2_half;
         }
@@ -363,7 +363,7 @@ struct SbaSelector
     template <>
     constexpr auto GetSba<bhalf_t>()
     {
-        if(HPerWconv == 4 && WPerWconv == 2)
+        if constexpr(HPerWconv == 4 && WPerWconv == 2)
         {
             return SbaInstr::sba_scatter2_bf16;
         }
@@ -395,7 +395,14 @@ struct AccSba
 
     static constexpr index_t GetNumSbaOutComponents()
     {
-        return std::is_same<float_t, AccDataType>::value ? 4 : 8;
+        if constexpr(HPerWconv == 4 && WPerWconv == 2)
+        {
+            return 4;
+        }
+        else
+        {
+            return 8;
+        }
     }
 
     static constexpr index_t GetNumBiasComponents()

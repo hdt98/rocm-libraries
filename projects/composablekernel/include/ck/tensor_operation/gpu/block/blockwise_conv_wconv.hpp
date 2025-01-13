@@ -209,7 +209,7 @@ struct BlockwiseConvWconv
 
     StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr,
                               AccDataType,
-                              HRepeatOut * WPerBlockOut * KRepeat,
+                              HRepeatOut * WRepeatOut * KRepeat,
                               wconv_conv.GetNumAccumComponents(),
                               true>
         accum_thread_buf_;
@@ -961,7 +961,7 @@ struct BlockwiseConvWconv
                             }
                         }
 
-                        if(Transposed == false)
+                        if constexpr(Transposed == false)
                         {
                             constexpr index_t accum_offset = accum_thread_desc_.CalculateOffset(
                                 make_tuple(Number<h0 / HStep>{}, Number<w0 / WStep>{}, k0, I0));

@@ -52,7 +52,7 @@ struct GridwiseConvPipeline_v2
               typename DsDataBlockBuffer,
               typename BlockwiseConv,
               typename AccumThreadBuffer,
-              typename OutTensorThreadBuffer>
+              typename OutThreadBuffer>
     __device__ static void Run(const InDataGridDesc& in_grid_desc,
                                const InDataBlockDesc& in_block_desc,
                                InDataBlockTransfer& in_blockwise_copy,
@@ -72,7 +72,7 @@ struct GridwiseConvPipeline_v2
                                DsDataBlockBuffer& ds_block_buf,
                                const BlockwiseConv& blockwise_conv,
                                AccumThreadBuffer& accum_thread_buf,
-                               OutTensorThreadBuffer& out_tensor_thread_buf,
+                               OutThreadBuffer& out_thread_buf,
                                index_t num_loop)
     {
         constexpr auto wei_block_copy_step = to_multi_index(WeiDataBlockTransferStep{});
@@ -80,19 +80,24 @@ struct GridwiseConvPipeline_v2
 
         // sync between data load wave (0) and conv wave (1)
 #ifdef CK_USE_AMD_SEMAPHORE_ASM
-        WavegroupSemaphore<1, 1> semaLoad;
-        WavegroupSemaphore<1, 2> semaLds;
-        WavegroupSemaphore<0, 1> semaRun;
+        WavegroupSemaphore<WaveIdRun, 1> semaDataReady;
+        WavegroupSemaphore<WaveIdRun, 2> semaLdsReady;
+        WavegroupSemaphore<WaveIdLoad, 1> semaDataLdsFree;
+        WavegroupSemaphore<WaveIdRun, 3> semaAccumFree;
+        WavegroupSemaphore<WaveIdPostRun, 1> semaAccumReady;
 #else
-        __shared__ WavegroupSemaphore<1>::Type semaLoadVar;
-        __shared__ WavegroupSemaphore<1>::Type semaLdsVar;
-        __shared__ WavegroupSemaphore<0>::Type semaRunVar;
-        WavegroupSemaphore<1> semaLoad(&semaLoadVar);
-        WavegroupSemaphore<1> semaLds(&semaLdsVar);
-        WavegroupSemaphore<0> semaRun(&semaRunVar);
+        __shared__ WavegroupSemaphore<WaveIdRun> semaDataReady;
+        __shared__ WavegroupSemaphore<WaveIdRun> semaLdsReady;
+        __shared__ WavegroupSemaphore<WaveIdLoad> semaDataLdsFree;
+        __shared__ WavegroupSemaphore<WaveIdRun> semaAccumFree;
+        __shared__ WavegroupSemaphore<WaveIdPostRun> semaAccumReady;
 #endif
         // sync for all wave with id = 0 in a group
+#ifdef CK_USE_AMD_NAMED_BARRIER_ASM
         NamedBarrier<1, 4> barrierLds;
+#else
+        __shared__ NamedBarrier<4> barrierLds;
+#endif
 
         constexpr index_t NumTap           = WeiDataBlockTransfer::Size();
         constexpr auto in_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0);
@@ -101,27 +106,35 @@ struct GridwiseConvPipeline_v2
         using WeiDataBlockTransfer0 =
             std::remove_const_t<remove_cvref_t<decltype(wei_blockwise_copy[I0])>>;
 
-        if(get_wave_id_in_wavegroup() == 1)
+        if(get_wave_id_in_wavegroup() == WaveIdRun)
         {
             // Initialize C
-            accum_thread_buf.Clear();
-            out_tensor_thread_buf.Clear();
+            if constexpr(HasMainLoop)
+            {
+                accum_thread_buf.Clear();
+            }
+            out_thread_buf.Clear();
         }
 
-        if(get_wave_id_in_wavegroup() == 0)
+        if(get_wave_id_in_wavegroup() == WaveIdLoad)
         {
             barrierLds.init();
             barrierLds.join();
         }
 
-        semaLoad.init();
-        semaLds.init();
-        semaRun.init(1, 1, true);
+        semaDataReady.init();
+        semaLdsReady.init();
+        semaDataLdsFree.init(1, 1, true);
+        semaAccumReady.init();
+        semaAccumFree.init(1, 1, true);
+
+        auto semaAccums = make_tuple(&semaAccumReady, &semaAccumFree);
+
         // wait semaphore, named-barrier init
         __syncthreads();
 
         // pre-fetch data
-        if(get_wave_id_in_wavegroup() == 0)
+        if(get_wave_id_in_wavegroup() == WaveIdLoad)
         {
             if constexpr(WeiDataEnableLds == false)
             {
@@ -156,20 +169,22 @@ struct GridwiseConvPipeline_v2
 
             if constexpr(DsDataEnableLds == false)
             {
-                constexpr index_t NumDs = ds_blockwise_copy.Size();
-                using DsDataBlockTransfer0 =
-                    std::remove_const_t<remove_cvref_t<decltype(ds_blockwise_copy[I0])>>;
-
+                constexpr index_t NumDs = DsDataBlockTransfer::Size();
                 static_for<0, NumDs, 1>{}([&](auto i) {
-                    const_cast<DsDataBlockTransfer0&>(ds_blockwise_copy[i])
+                    using DDataBlockTransfer =
+                        std::remove_const_t<remove_cvref_t<decltype(ds_blockwise_copy[i])>>;
+                    using DBlockDesc        = remove_cvref_t<decltype(ds_block_desc[i])>;
+                    auto d_block_origin_idx = generate_tuple(
+                        [&](auto) { return I0; }, Number<DBlockDesc::GetNumOfDimension()>{});
+                    const_cast<DDataBlockTransfer&>(ds_blockwise_copy[i])
                         .Run(ds_grid_desc[Number<i>{}],
                              ds_grid_buf[Number<i>{}],
                              ds_block_desc[Number<i>{}],
-                             make_tuple(I0, I0, I0),
+                             d_block_origin_idx,
                              ds_block_buf(i));
                 });
             }
-            semaLoad.template signal<SemaphoreAddressSpaceGlobal>();
+            semaDataReady.template signal<SemaphoreAddressSpaceGlobal>();
         }
 
         // main body
@@ -178,10 +193,10 @@ struct GridwiseConvPipeline_v2
             index_t i = 0;
             do
             {
-                if(get_wave_id_in_wavegroup() == 0)
+                if(get_wave_id_in_wavegroup() == WaveIdLoad)
                 {
-                    semaRun.template wait<0>(); // sync within wavegroup
-                    barrierLds.signal();        // sync in workgroup
+                    semaDataLdsFree.template wait<0>(); // sync within wavegroup
+                    barrierLds.signal();                // sync in workgroup
                     barrierLds.wait();
                     if constexpr(WeiDataEnableLds)
                     {
@@ -249,20 +264,29 @@ struct GridwiseConvPipeline_v2
 
                     barrierLds.sync_lds<EnableAsync>();
 
-                    semaLds.template signal<0>();
-                    semaLoad.template signal<SemaphoreAddressSpaceGlobal>();
+                    semaLdsReady.template signal<0>();
+                    semaDataReady.template signal<SemaphoreAddressSpaceGlobal>();
                 }
 
-                if(get_wave_id_in_wavegroup() == 1)
+                if(get_wave_id_in_wavegroup() == WaveIdRun)
                 {
-                    semaLds.template wait<0>();
-                    semaLoad.template wait<0>();
+                    semaLdsReady.template wait<0>();
+                    semaDataReady.template wait<0>();
+                }
+                if(get_wave_id_in_wavegroup() == WaveIdRun ||
+                   get_wave_id_in_wavegroup() == WaveIdPostRun)
+                {
                     blockwise_conv.Run(wei_block_buf,
                                        in_block_buf,
                                        ds_block_buf,
                                        accum_thread_buf,
-                                       out_tensor_thread_buf,
-                                       false);
+                                       out_thread_buf,
+                                       semaAccums,
+                                       Number<HasMainLoop>{},
+                                       Number<false>{});
+                }
+                if(get_wave_id_in_wavegroup() == WaveIdRun)
+                {
                     if constexpr(InDataEnableLds == false)
                     {
                         in_block_buf.SwitchBuffer();
@@ -272,7 +296,7 @@ struct GridwiseConvPipeline_v2
                         wei_block_buf.SwitchBuffer();
                     }
 
-                    semaRun.template signal<0>();
+                    semaDataLdsFree.template signal<0>();
                 }
 
                 ++i;
@@ -281,9 +305,9 @@ struct GridwiseConvPipeline_v2
 
         // tail
         {
-            if(get_wave_id_in_wavegroup() == 0)
+            if(get_wave_id_in_wavegroup() == WaveIdLoad)
             {
-                semaRun.template wait<0>();
+                semaDataLdsFree.template wait<0>();
                 if constexpr(WeiDataEnableLds)
                 {
                     if constexpr(EnableAsync)
@@ -321,19 +345,25 @@ struct GridwiseConvPipeline_v2
                 }
 
                 barrierLds.sync_lds<EnableAsync>();
-                semaLds.template signal<0>();
+                semaLdsReady.template signal<0>();
             }
 
-            if(get_wave_id_in_wavegroup() == 1)
+            if(get_wave_id_in_wavegroup() == WaveIdRun)
             {
-                semaLds.template wait<0>();
-                semaLoad.template wait<0>();
+                semaLdsReady.template wait<0>();
+                semaDataReady.template wait<0>();
+            }
+            if(get_wave_id_in_wavegroup() == WaveIdRun ||
+               get_wave_id_in_wavegroup() == WaveIdPostRun)
+            {
                 blockwise_conv.Run(wei_block_buf,
                                    in_block_buf,
                                    ds_block_buf,
                                    accum_thread_buf,
-                                   out_tensor_thread_buf,
-                                   true);
+                                   out_thread_buf,
+                                   semaAccums,
+                                   Number<HasMainLoop>{},
+                                   Number<true>{});
             }
         }
     }
@@ -372,7 +402,7 @@ struct GridwiseConvPipeline_v2<1, false, false, false, EnableAsync>
               typename DsDataBlockBuffer,
               typename BlockwiseConv,
               typename AccumThreadBuffer,
-              typename OutTensorThreadBuffer>
+              typename OutThreadBuffer>
     __device__ static void Run(const InDataGridDesc& in_grid_desc,
                                const InDataBlockDesc& in_block_desc,
                                InDataBlockTransfer& in_blockwise_copy,
@@ -392,7 +422,7 @@ struct GridwiseConvPipeline_v2<1, false, false, false, EnableAsync>
                                DsDataBlockBuffer& ds_block_buf,
                                const BlockwiseConv& blockwise_conv,
                                AccumThreadBuffer& accum_thread_buf,
-                               OutTensorThreadBuffer& out_tensor_thread_buf,
+                               OutThreadBuffer& out_thread_buf,
                                index_t num_loop)
     {
         constexpr auto wei_block_copy_step = to_multi_index(WeiDataBlockTransferStep{});
@@ -400,13 +430,15 @@ struct GridwiseConvPipeline_v2<1, false, false, false, EnableAsync>
 
         // sync between data load wave (0) and conv wave (1)
 #ifdef CK_USE_AMD_SEMAPHORE_ASM
-        WavegroupSemaphore<1, 1> semaLoad;
-        WavegroupSemaphore<0, 1> semaRun;
+        WavegroupSemaphore<WaveIdRun, 1> semaDataReady;
+        WavegroupSemaphore<WaveIdLoad, 1> semaDataFree;
+        WavegroupSemaphore<WaveIdRun, 2> semaAccumFree;
+        WavegroupSemaphore<WaveIdPostRun, 1> semaAccumReady;
 #else
-        __shared__ WavegroupSemaphore<1>::Type semaLoadVar;
-        __shared__ WavegroupSemaphore<0>::Type semaRunVar;
-        WavegroupSemaphore<1> semaLoad(&semaLoadVar);
-        WavegroupSemaphore<0> semaRun(&semaRunVar);
+        __shared__ WavegroupSemaphore<WaveIdRun> semaDataReady;
+        __shared__ WavegroupSemaphore<WaveIdLoad> semaDataFree;
+        __shared__ WavegroupSemaphore<WaveIdRun> semaAccumFree;
+        __shared__ WavegroupSemaphore<WaveIdPostRun> semaAccumReady;
 #endif
 
         constexpr index_t NumTap           = WeiDataBlockTransfer::Size();
@@ -416,20 +448,27 @@ struct GridwiseConvPipeline_v2<1, false, false, false, EnableAsync>
         using WeiDataBlockTransfer0 =
             std::remove_const_t<remove_cvref_t<decltype(wei_blockwise_copy[I0])>>;
 
-        if(get_wave_id_in_wavegroup() == 1)
+        if(get_wave_id_in_wavegroup() == WaveIdRun)
         {
             // Initialize C
-            accum_thread_buf.Clear();
-            out_tensor_thread_buf.Clear();
+            if constexpr(HasMainLoop)
+            {
+                accum_thread_buf.Clear();
+            }
+            out_thread_buf.Clear();
         }
 
-        semaLoad.init();
-        semaRun.init(1, 1, true);
+        semaDataReady.init();
+        semaDataFree.init(1, 1, true);
+        semaAccumReady.init();
+        semaAccumFree.init(1, 1, true);
+
+        auto semaAccums = make_tuple(&semaAccumReady, &semaAccumFree);
         // wait semaphore init
         __syncthreads();
 
         // pre-fetch data
-        if(get_wave_id_in_wavegroup() == 0)
+        if(get_wave_id_in_wavegroup() == WaveIdLoad)
         {
             static_for<0, NumTap, 1>{}([&](auto tapIdx) {
                 const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[tapIdx])
@@ -443,15 +482,18 @@ struct GridwiseConvPipeline_v2<1, false, false, false, EnableAsync>
             in_blockwise_copy.Run(
                 in_grid_desc, in_grid_buf, in_block_desc, in_block_origin_idx, in_block_buf);
 
-            constexpr index_t NumDs = ds_blockwise_copy.Size();
-            using DsDataBlockTransfer0 =
-                std::remove_const_t<remove_cvref_t<decltype(ds_blockwise_copy[I0])>>;
+            constexpr index_t NumDs = DsDataBlockTransfer::Size();
             static_for<0, NumDs, 1>{}([&](auto i) {
-                const_cast<DsDataBlockTransfer0&>(ds_blockwise_copy[i])
+                using DDataBlockTransfer =
+                    std::remove_const_t<remove_cvref_t<decltype(ds_blockwise_copy[i])>>;
+                using DBlockDesc        = remove_cvref_t<decltype(ds_block_desc[i])>;
+                auto d_block_origin_idx = generate_tuple([&](auto) { return I0; },
+                                                         Number<DBlockDesc::GetNumOfDimension()>{});
+                const_cast<DDataBlockTransfer&>(ds_blockwise_copy[i])
                     .Run(ds_grid_desc[Number<i>{}],
                          ds_grid_buf[Number<i>{}],
                          ds_block_desc[Number<i>{}],
-                         make_tuple(I0, I0, I0),
+                         d_block_origin_idx,
                          ds_block_buf(i));
             });
 
@@ -466,7 +508,7 @@ struct GridwiseConvPipeline_v2<1, false, false, false, EnableAsync>
                 wei_block_buf.SwitchBuffer();
             }
 
-            semaLoad.template signal<SemaphoreAddressSpaceGlobal>();
+            semaDataReady.template signal<SemaphoreAddressSpaceGlobal>();
         }
 
         // main body
@@ -475,9 +517,9 @@ struct GridwiseConvPipeline_v2<1, false, false, false, EnableAsync>
             index_t i = 0;
             do
             {
-                if(get_wave_id_in_wavegroup() == 0)
+                if(get_wave_id_in_wavegroup() == WaveIdLoad)
                 {
-                    semaRun.template wait<0>();
+                    semaDataFree.template wait<0>();
                     static_for<0, NumTap, 1>{}([&](auto tapIdx) {
                         const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[tapIdx])
                             .Run(wei_grid_desc,
@@ -501,21 +543,30 @@ struct GridwiseConvPipeline_v2<1, false, false, false, EnableAsync>
                     });
                     in_blockwise_copy.MoveSrcSliceWindow(in_grid_desc, in_block_copy_step);
 
-                    semaLoad.template signal<SemaphoreAddressSpaceGlobal>();
+                    semaDataReady.template signal<SemaphoreAddressSpaceGlobal>();
                 }
 
-                if(get_wave_id_in_wavegroup() == 1)
+                if(get_wave_id_in_wavegroup() == WaveIdRun)
                 {
-                    semaLoad.template wait<0>();
+                    semaDataReady.template wait<0>();
+                }
+                if(get_wave_id_in_wavegroup() == WaveIdRun ||
+                   get_wave_id_in_wavegroup() == WaveIdPostRun)
+                {
                     blockwise_conv.Run(wei_block_buf,
                                        in_block_buf,
                                        ds_block_buf,
                                        accum_thread_buf,
-                                       out_tensor_thread_buf,
-                                       false);
+                                       out_thread_buf,
+                                       semaAccums,
+                                       Number<HasMainLoop>{},
+                                       Number<false>{});
+                }
+                if(get_wave_id_in_wavegroup() == WaveIdRun)
+                {
                     in_block_buf.SwitchBuffer();
                     wei_block_buf.SwitchBuffer();
-                    semaRun.template signal<0>();
+                    semaDataFree.template signal<0>();
                 }
 
                 ++i;
@@ -524,16 +575,21 @@ struct GridwiseConvPipeline_v2<1, false, false, false, EnableAsync>
 
         // tail
         {
-            if(get_wave_id_in_wavegroup() == 1)
+            if(get_wave_id_in_wavegroup() == WaveIdRun)
             {
-                semaLoad.template wait<0>();
-                __builtin_amdgcn_fence(__ATOMIC_ACQUIRE, "workgroup", "global");
+                semaDataReady.template wait<0>();
+            }
+            if(get_wave_id_in_wavegroup() == WaveIdRun ||
+               get_wave_id_in_wavegroup() == WaveIdPostRun)
+            {
                 blockwise_conv.Run(wei_block_buf,
                                    in_block_buf,
                                    ds_block_buf,
                                    accum_thread_buf,
-                                   out_tensor_thread_buf,
-                                   true);
+                                   out_thread_buf,
+                                   semaAccums,
+                                   Number<HasMainLoop>{},
+                                   Number<true>{});
             }
         }
     }
@@ -572,7 +628,7 @@ struct GridwiseConvPipeline_v2<1, true, true, true, EnableAsync>
               typename DsDataBlockBuffer,
               typename BlockwiseConv,
               typename AccumThreadBuffer,
-              typename OutTensorThreadBuffer>
+              typename OutThreadBuffer>
     __device__ static void Run(const InDataGridDesc& in_grid_desc,
                                const InDataBlockDesc& in_block_desc,
                                InDataBlockTransfer& in_blockwise_copy,
@@ -592,7 +648,7 @@ struct GridwiseConvPipeline_v2<1, true, true, true, EnableAsync>
                                DsDataBlockBuffer& ds_block_buf,
                                const BlockwiseConv& blockwise_conv,
                                AccumThreadBuffer& accum_thread_buf,
-                               OutTensorThreadBuffer& out_tensor_thread_buf,
+                               OutThreadBuffer& out_thread_buf,
                                index_t num_loop)
     {
         constexpr auto wei_block_copy_step = to_multi_index(WeiDataBlockTransferStep{});
@@ -600,36 +656,49 @@ struct GridwiseConvPipeline_v2<1, true, true, true, EnableAsync>
 
         // sync between data load wave (0) and conv wave (1)
 #ifdef CK_USE_AMD_SEMAPHORE_ASM
-        WavegroupSemaphore<1, 1> semaLds;
-        WavegroupSemaphore<0, 1> semaRun;
+        WavegroupSemaphore<WaveIdRun, 1> semaLdsReady;
+        WavegroupSemaphore<WaveIdLoad, 1> semaLdsFree;
+        WavegroupSemaphore<WaveIdRun, 2> semaAccumFree;
+        WavegroupSemaphore<WaveIdPostRun, 1> semaAccumReady;
 #else
-        __shared__ WavegroupSemaphore<1>::Type semaLdsVar;
-        __shared__ WavegroupSemaphore<0>::Type semaRunVar;
-        WavegroupSemaphore<1> semaLds(&semaLdsVar);
-        WavegroupSemaphore<0> semaRun(&semaRunVar);
+        __shared__ WavegroupSemaphore<WaveIdRun> semaLdsReady;
+        __shared__ WavegroupSemaphore<WaveIdLoad> semaLdsFree;
+        __shared__ WavegroupSemaphore<WaveIdRun> semaAccumFree;
+        __shared__ WavegroupSemaphore<WaveIdPostRun> semaAccumReady;
 #endif
+#ifdef CK_USE_AMD_NAMED_BARRIER_ASM
         NamedBarrier<1, 4> barrierLds;
+#else
+        __shared__ NamedBarrier<4> barrierLds;
+#endif
 
         constexpr index_t NumTap = WeiDataBlockTransfer::Size();
 
         using WeiDataBlockTransfer0 =
             std::remove_const_t<remove_cvref_t<decltype(wei_blockwise_copy[I0])>>;
 
-        if(get_wave_id_in_wavegroup() == 1)
+        if(get_wave_id_in_wavegroup() == WaveIdRun)
         {
             // Initialize C
-            accum_thread_buf.Clear();
-            out_tensor_thread_buf.Clear();
+            if constexpr(HasMainLoop)
+            {
+                accum_thread_buf.Clear();
+            }
+            out_thread_buf.Clear();
         }
 
-        if(get_wave_id_in_wavegroup() == 0)
+        if(get_wave_id_in_wavegroup() == WaveIdLoad)
         {
             barrierLds.init();
             barrierLds.join();
         }
 
-        semaLds.init();
-        semaRun.init(1, 1, true);
+        semaLdsReady.init();
+        semaLdsFree.init(1, 1, true);
+        semaAccumReady.init();
+        semaAccumFree.init(1, 1, true);
+
+        auto semaAccums = make_tuple(&semaAccumReady, &semaAccumFree);
         // wait semaphore init
         __syncthreads();
 
@@ -639,9 +708,9 @@ struct GridwiseConvPipeline_v2<1, true, true, true, EnableAsync>
             index_t i = 0;
             do
             {
-                if(get_wave_id_in_wavegroup() == 0)
+                if(get_wave_id_in_wavegroup() == WaveIdLoad)
                 {
-                    semaRun.template wait<0>();
+                    semaLdsFree.template wait<0>();
                     barrierLds.signal();
                     barrierLds.wait();
                     if constexpr(EnableAsync)
@@ -681,19 +750,28 @@ struct GridwiseConvPipeline_v2<1, true, true, true, EnableAsync>
                     in_blockwise_copy.MoveSrcSliceWindow(in_grid_desc, in_block_copy_step);
                     barrierLds.sync_lds<EnableAsync>();
 
-                    semaLds.template signal<0>();
+                    semaLdsReady.template signal<0>();
                 }
 
-                if(get_wave_id_in_wavegroup() == 1)
+                if(get_wave_id_in_wavegroup() == WaveIdRun)
                 {
-                    semaLds.template wait<0>();
+                    semaLdsReady.template wait<0>();
+                }
+                if(get_wave_id_in_wavegroup() == WaveIdRun ||
+                   get_wave_id_in_wavegroup() == WaveIdPostRun)
+                {
                     blockwise_conv.Run(wei_block_buf,
                                        in_block_buf,
                                        ds_block_buf,
                                        accum_thread_buf,
-                                       out_tensor_thread_buf,
-                                       false);
-                    semaRun.template signal<0>();
+                                       out_thread_buf,
+                                       semaAccums,
+                                       Number<HasMainLoop>{},
+                                       Number<false>{});
+                }
+                if(get_wave_id_in_wavegroup() == WaveIdRun)
+                {
+                    semaLdsFree.template signal<0>();
                 }
                 ++i;
             } while(i < (num_loop - 1));
@@ -701,9 +779,9 @@ struct GridwiseConvPipeline_v2<1, true, true, true, EnableAsync>
 
         // tail
         {
-            if(get_wave_id_in_wavegroup() == 0)
+            if(get_wave_id_in_wavegroup() == WaveIdLoad)
             {
-                semaRun.template wait<0>();
+                semaLdsFree.template wait<0>();
                 barrierLds.signal();
                 barrierLds.wait();
                 if constexpr(EnableAsync)
@@ -741,13 +819,13 @@ struct GridwiseConvPipeline_v2<1, true, true, true, EnableAsync>
                 });
                 in_blockwise_copy.MoveSrcSliceWindow(in_grid_desc, in_block_copy_step);
 
-                constexpr index_t NumDs = ds_blockwise_copy.Size();
-                using DsDataBlockTransfer0 =
-                    std::remove_const_t<remove_cvref_t<decltype(ds_blockwise_copy[I0])>>;
+                constexpr index_t NumDs = DsDataBlockTransfer::Size();
                 if constexpr(EnableAsync)
                 {
                     static_for<0, NumDs, 1>{}([&](auto i) {
-                        const_cast<DsDataBlockTransfer0&>(ds_blockwise_copy[i])
+                        using DDataBlockTransfer =
+                            std::remove_const_t<remove_cvref_t<decltype(ds_blockwise_copy[i])>>;
+                        const_cast<DDataBlockTransfer&>(ds_blockwise_copy[i])
                             .Run(ds_grid_desc[Number<i>{}],
                                  ds_grid_buf[Number<i>{}],
                                  ds_block_desc[Number<i>{}],
@@ -757,29 +835,39 @@ struct GridwiseConvPipeline_v2<1, true, true, true, EnableAsync>
                 else
                 {
                     static_for<0, NumDs, 1>{}([&](auto i) {
-                        const_cast<DsDataBlockTransfer0&>(ds_blockwise_copy[i])
+                        using DDataBlockTransfer =
+                            std::remove_const_t<remove_cvref_t<decltype(ds_blockwise_copy[i])>>;
+                        const_cast<DDataBlockTransfer&>(ds_blockwise_copy[i])
                             .RunRead(ds_grid_desc[Number<i>{}], ds_grid_buf[Number<i>{}]);
                     });
                     static_for<0, NumDs, 1>{}([&](auto i) {
-                        const_cast<DsDataBlockTransfer0&>(ds_blockwise_copy[i])
+                        using DDataBlockTransfer =
+                            std::remove_const_t<remove_cvref_t<decltype(ds_blockwise_copy[i])>>;
+                        const_cast<DDataBlockTransfer&>(ds_blockwise_copy[i])
                             .RunWrite(ds_block_desc[Number<i>{}], ds_block_buf(i));
                     });
                 }
 
                 barrierLds.sync_lds<EnableAsync>();
 
-                semaLds.template signal<0>();
+                semaLdsReady.template signal<0>();
             }
 
-            if(get_wave_id_in_wavegroup() == 1)
+            if(get_wave_id_in_wavegroup() == WaveIdRun)
             {
-                semaLds.template wait<0>();
+                semaLdsReady.template wait<0>();
+            }
+            if(get_wave_id_in_wavegroup() == WaveIdRun ||
+               get_wave_id_in_wavegroup() == WaveIdPostRun)
+            {
                 blockwise_conv.Run(wei_block_buf,
                                    in_block_buf,
                                    ds_block_buf,
                                    accum_thread_buf,
-                                   out_tensor_thread_buf,
-                                   true);
+                                   out_thread_buf,
+                                   semaAccums,
+                                   Number<HasMainLoop>{},
+                                   Number<true>{});
             }
         }
     }

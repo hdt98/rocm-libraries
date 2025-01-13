@@ -66,20 +66,21 @@ struct GridwiseConvPipeline_v2
 
         // sync between data load wave (0) and conv wave (1)
 #ifdef CK_USE_AMD_SEMAPHORE_ASM
-        WavegroupSemaphore<1, 1> semaLoad;
-        WavegroupSemaphore<1, 2> semaLds;
-        WavegroupSemaphore<0, 1> semaRun;
+        WavegroupSemaphore<WaveIdRun, 1> semaLoad;
+        WavegroupSemaphore<WaveIdRun, 2> semaLds;
+        WavegroupSemaphore<WaveIdLoad, 1> semaRun;
 #else
-        __shared__ WavegroupSemaphore<1>::Type semaLoadVar;
-        __shared__ WavegroupSemaphore<1>::Type semaLdsVar;
-        __shared__ WavegroupSemaphore<0>::Type semaRunVar;
-        WavegroupSemaphore<1> semaLoad(&semaLoadVar);
-        WavegroupSemaphore<1> semaLds(&semaLdsVar);
-        WavegroupSemaphore<0> semaRun(&semaRunVar);
+        __shared__ WavegroupSemaphore<WaveIdRun> semaLoad;
+        __shared__ WavegroupSemaphore<WaveIdRun> semaLds;
+        __shared__ WavegroupSemaphore<WaveIdLoad> semaRun;
 #endif
 
         // sync for all wave with id = 0 in a group
+#ifdef CK_USE_AMD_NAMED_BARRIER_ASM
         NamedBarrier<1, 4> barrierLds;
+#else
+        __shared__ NamedBarrier<4> barrierLds;
+#endif
 
         constexpr index_t NumTap           = WeiDataBlockTransfer::Size();
         constexpr auto in_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0);
@@ -88,13 +89,13 @@ struct GridwiseConvPipeline_v2
         using WeiDataBlockTransfer0 =
             std::remove_const_t<remove_cvref_t<decltype(wei_blockwise_copy[I0])>>;
 
-        if(get_wave_id_in_wavegroup() == 1)
+        if(get_wave_id_in_wavegroup() == WaveIdRun)
         {
             // Initialize C
             accum_thread_buf.Clear();
         }
 
-        if(get_wave_id_in_wavegroup() == 0)
+        if(get_wave_id_in_wavegroup() == WaveIdLoad)
         {
             barrierLds.init();
             barrierLds.join();
@@ -107,7 +108,7 @@ struct GridwiseConvPipeline_v2
         __syncthreads();
 
         // pre-fetch data
-        if(get_wave_id_in_wavegroup() == 0)
+        if(get_wave_id_in_wavegroup() == WaveIdLoad)
         {
             if constexpr(WeiDataEnableLds == false)
             {
@@ -149,7 +150,7 @@ struct GridwiseConvPipeline_v2
             index_t i = 0;
             do
             {
-                if(get_wave_id_in_wavegroup() == 0)
+                if(get_wave_id_in_wavegroup() == WaveIdLoad)
                 {
                     semaRun.template wait<0>(); // sync within wavegroup
                     barrierLds.signal();        // sync in workgroup
@@ -223,7 +224,7 @@ struct GridwiseConvPipeline_v2
                     semaLoad.template signal<SemaphoreAddressSpaceGlobal>();
                 }
 
-                if(get_wave_id_in_wavegroup() == 1)
+                if(get_wave_id_in_wavegroup() == WaveIdRun)
                 {
                     semaLds.template wait<0>();
                     semaLoad.template wait<0>();
@@ -246,7 +247,7 @@ struct GridwiseConvPipeline_v2
 
         // tail
         {
-            if(get_wave_id_in_wavegroup() == 0)
+            if(get_wave_id_in_wavegroup() == WaveIdLoad)
             {
                 semaRun.template wait<0>();
                 if constexpr(WeiDataEnableLds)
@@ -289,7 +290,7 @@ struct GridwiseConvPipeline_v2
                 semaLds.template signal<0>();
             }
 
-            if(get_wave_id_in_wavegroup() == 1)
+            if(get_wave_id_in_wavegroup() == WaveIdRun)
             {
                 semaLds.template wait<0>();
                 semaLoad.template wait<0>();
@@ -348,13 +349,11 @@ struct GridwiseConvPipeline_v2<1, false, false, EnableAsync>
 
         // sync between data load wave (0) and conv wave (1)
 #ifdef CK_USE_AMD_SEMAPHORE_ASM
-        WavegroupSemaphore<1, 1> semaLoad;
-        WavegroupSemaphore<0, 1> semaRun;
+        WavegroupSemaphore<WaveIdRun, 1> semaLoad;
+        WavegroupSemaphore<WaveIdLoad, 1> semaRun;
 #else
-        __shared__ WavegroupSemaphore<1>::Type semaLoadVar;
-        __shared__ WavegroupSemaphore<0>::Type semaRunVar;
-        WavegroupSemaphore<1> semaLoad(&semaLoadVar);
-        WavegroupSemaphore<0> semaRun(&semaRunVar);
+        __shared__ WavegroupSemaphore<WaveIdRun> semaLoad;
+        __shared__ WavegroupSemaphore<WaveIdLoad> semaRun;
 #endif
 
         constexpr index_t NumTap           = WeiDataBlockTransfer::Size();
@@ -364,7 +363,7 @@ struct GridwiseConvPipeline_v2<1, false, false, EnableAsync>
         using WeiDataBlockTransfer0 =
             std::remove_const_t<remove_cvref_t<decltype(wei_blockwise_copy[I0])>>;
 
-        if(get_wave_id_in_wavegroup() == 1)
+        if(get_wave_id_in_wavegroup() == WaveIdRun)
         {
             // Initialize C
             accum_thread_buf.Clear();
@@ -376,7 +375,7 @@ struct GridwiseConvPipeline_v2<1, false, false, EnableAsync>
         __syncthreads();
 
         // pre-fetch data
-        if(get_wave_id_in_wavegroup() == 0)
+        if(get_wave_id_in_wavegroup() == WaveIdLoad)
         {
             static_for<0, NumTap, 1>{}([&](auto tapIdx) {
                 const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[tapIdx])
@@ -410,7 +409,7 @@ struct GridwiseConvPipeline_v2<1, false, false, EnableAsync>
             index_t i = 0;
             do
             {
-                if(get_wave_id_in_wavegroup() == 0)
+                if(get_wave_id_in_wavegroup() == WaveIdLoad)
                 {
                     semaRun.template wait<0>();
                     static_for<0, NumTap, 1>{}([&](auto tapIdx) {
@@ -439,7 +438,7 @@ struct GridwiseConvPipeline_v2<1, false, false, EnableAsync>
                     semaLoad.template signal<SemaphoreAddressSpaceGlobal>();
                 }
 
-                if(get_wave_id_in_wavegroup() == 1)
+                if(get_wave_id_in_wavegroup() == WaveIdRun)
                 {
                     semaLoad.template wait<0>();
 
@@ -455,7 +454,7 @@ struct GridwiseConvPipeline_v2<1, false, false, EnableAsync>
 
         // tail
         {
-            if(get_wave_id_in_wavegroup() == 1)
+            if(get_wave_id_in_wavegroup() == WaveIdRun)
             {
                 semaLoad.template wait<0>();
                 __builtin_amdgcn_fence(__ATOMIC_ACQUIRE, "workgroup", "global");
@@ -514,28 +513,30 @@ struct GridwiseConvPipeline_v2<1, true, true, EnableAsync>
 
         // sync between data load wave (0) and conv wave (1)
 #ifdef CK_USE_AMD_SEMAPHORE_ASM
-        WavegroupSemaphore<1, 1> semaLds;
-        WavegroupSemaphore<0, 1> semaRun;
+        WavegroupSemaphore<WaveIdRun, 1> semaLds;
+        WavegroupSemaphore<WaveIdLoad, 1> semaRun;
 #else
-        __shared__ WavegroupSemaphore<1>::Type semaLdsVar;
-        __shared__ WavegroupSemaphore<0>::Type semaRunVar;
-        WavegroupSemaphore<1> semaLds(&semaLdsVar);
-        WavegroupSemaphore<0> semaRun(&semaRunVar);
+        __shared__ WavegroupSemaphore<WaveIdRun> semaLds;
+        __shared__ WavegroupSemaphore<WaveIdLoad> semaRun;
 #endif
+#ifdef CK_USE_AMD_NAMED_BARRIER_ASM
         NamedBarrier<1, 4> barrierLds;
+#else
+        __shared__ NamedBarrier<4> barrierLds;
+#endif
 
         constexpr index_t NumTap = WeiDataBlockTransfer::Size();
 
         using WeiDataBlockTransfer0 =
             std::remove_const_t<remove_cvref_t<decltype(wei_blockwise_copy[I0])>>;
 
-        if(get_wave_id_in_wavegroup() == 1)
+        if(get_wave_id_in_wavegroup() == WaveIdRun)
         {
             // Initialize C
             accum_thread_buf.Clear();
         }
 
-        if(get_wave_id_in_wavegroup() == 0)
+        if(get_wave_id_in_wavegroup() == WaveIdLoad)
         {
             barrierLds.init();
             barrierLds.join();
@@ -552,7 +553,7 @@ struct GridwiseConvPipeline_v2<1, true, true, EnableAsync>
             index_t i = 0;
             do
             {
-                if(get_wave_id_in_wavegroup() == 0)
+                if(get_wave_id_in_wavegroup() == WaveIdLoad)
                 {
                     semaRun.template wait<0>();
                     barrierLds.signal();
@@ -597,7 +598,7 @@ struct GridwiseConvPipeline_v2<1, true, true, EnableAsync>
                     semaLds.template signal<0>();
                 }
 
-                if(get_wave_id_in_wavegroup() == 1)
+                if(get_wave_id_in_wavegroup() == WaveIdRun)
                 {
                     semaLds.template wait<0>();
                     blockwise_conv.Run(wei_block_buf, in_block_buf, accum_thread_buf, false);
@@ -609,7 +610,7 @@ struct GridwiseConvPipeline_v2<1, true, true, EnableAsync>
 
         // tail
         {
-            if(get_wave_id_in_wavegroup() == 0)
+            if(get_wave_id_in_wavegroup() == WaveIdLoad)
             {
                 semaRun.template wait<0>();
                 barrierLds.signal();
@@ -654,7 +655,7 @@ struct GridwiseConvPipeline_v2<1, true, true, EnableAsync>
                 semaLds.template signal<0>();
             }
 
-            if(get_wave_id_in_wavegroup() == 1)
+            if(get_wave_id_in_wavegroup() == WaveIdRun)
             {
                 semaLds.template wait<0>();
                 blockwise_conv.Run(wei_block_buf, in_block_buf, accum_thread_buf, true);
