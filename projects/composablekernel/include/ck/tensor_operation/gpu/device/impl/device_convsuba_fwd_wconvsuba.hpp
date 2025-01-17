@@ -466,11 +466,51 @@ struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
                 arg.block_2_etile_map_.CalculateGridSize(arg.e_grid_desc_) * arg.num_group_;
 
             auto launch_kernel = [&](auto has_main_block_loop) {
-                constexpr bool has_main_loop = has_main_block_loop.value;
-
-                if constexpr(EnableWaveGroup)
+                constexpr bool has_main_loop    = has_main_block_loop.value;
+                constexpr bool EnableWaveGroup4 = EnableWaveGroup && (BlockSize == 512);
+                if constexpr(EnableWaveGroup4)
                 {
-                    const auto kernel = kernel_grouped_convsuba_cvt_wconvsuba_wavegroup<
+                    const auto kernel = kernel_grouped_convsuba_cvt_wconvsuba_wavegroup512<
+                        GridwiseConv,
+                        InDataType,
+                        WeiDataType,
+                        typename GridwiseConv::DsGridPointer,
+                        AccDataType,
+                        EDataType,
+                        InElementwiseOperation,
+                        WeiElementwiseOperation,
+                        AccElementwiseOperation,
+                        DeviceOp::InGridDesc,
+                        DeviceOp::WeiGridDesc,
+                        DeviceOp::DsGridDesc,
+                        DeviceOp::EGridDesc,
+                        remove_reference_t<typename GridwiseConv::DefaultBlock2CTileMap>,
+                        ComputePtrOffsetOfStridedBatch<I1, I1, Number<NumDTensor>{}>,
+                        has_main_loop>;
+
+                    return launch_and_time_kernel(stream_config,
+                                                  kernel,
+                                                  dim3(grid_size),
+                                                  dim3(BlockSize),
+                                                  0,
+                                                  arg.p_in_grid_,
+                                                  arg.p_wei_grid_,
+                                                  arg.p_ds_grid_,
+                                                  arg.p_e_grid_,
+                                                  arg.in_element_op_,
+                                                  arg.wei_element_op_,
+                                                  arg.acc_element_op_,
+                                                  arg.a_g_n_c_wis_lengths_[0], // Group count
+                                                  arg.in_grid_desc_,
+                                                  arg.wei_grid_desc_,
+                                                  arg.ds_grid_desc_,
+                                                  arg.e_grid_desc_,
+                                                  arg.block_2_etile_map_,
+                                                  arg.compute_ptr_offset_of_batch_);
+                }
+                else if constexpr(EnableWaveGroup)
+                {
+                    const auto kernel = kernel_grouped_convsuba_cvt_wconvsuba_wavegroup256<
                         GridwiseConv,
                         InDataType,
                         WeiDataType,

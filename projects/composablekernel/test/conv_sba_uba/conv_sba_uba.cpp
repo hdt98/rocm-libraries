@@ -321,9 +321,9 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
             {
                 // workaround for load_16bit is incorrect in ffm currently.
                 index_t offset         = lIdx;
-                int scale_data         = *reinterpret_cast<const int*>(scale_ + offset);
-                int bias_data          = *reinterpret_cast<const int*>(bias_ + offset);
-                int scale_bias         = (((scale_data & 0xffff) << 16) | (bias_data & 0xffff));
+                uint16_t scale_data    = *reinterpret_cast<const uint16_t*>(scale_ + offset);
+                uint16_t bias_data     = *reinterpret_cast<const uint16_t*>(bias_ + offset);
+                uint32_t scale_bias    = (((scale_data & 0xffff) << 16) | (bias_data & 0xffff));
                 bias_16bit_unpack_data = bit_cast<vector_type<AccDataType, 2>>(scale_bias);
             }
             else
@@ -896,9 +896,9 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
             if constexpr(scaleBiasPacked)
             {
                 index_t offset         = lIdx;
-                int scale_data         = *reinterpret_cast<const int*>(scale_ + offset);
-                int bias_data          = *reinterpret_cast<const int*>(bias_ + offset);
-                int scale_bias         = (((scale_data & 0xffff) << 16) | (bias_data & 0xffff));
+                uint16_t scale_data    = *reinterpret_cast<const uint16_t*>(scale_ + offset);
+                uint16_t bias_data     = *reinterpret_cast<const uint16_t*>(bias_ + offset);
+                uint32_t scale_bias    = (((scale_data & 0xffff) << 16) | (bias_data & 0xffff));
                 bias_16bit_unpack_data = bit_cast<vector_type<AccDataType, 2>>(scale_bias);
             }
             else

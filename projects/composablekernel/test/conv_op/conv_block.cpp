@@ -20,7 +20,8 @@
 #include "ck/library/utility/convolution_parameter.hpp"
 #include "ck/library/utility/convolution_host_tensor_descriptor_helper.hpp"
 #include "ck/library/reference_tensor_operation/cpu/reference_conv_fwd.hpp"
-#include "ck/tensor_operation/gpu/block/blockwise_conv_wconv.hpp"
+#include "ck/utility/amd_semaphore.hpp"
+#include "ck/tensor_operation/gpu/block/blockwise_convsuba_wconvsuba.hpp"
 
 //#include "windows.h"
 
@@ -128,29 +129,36 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
     // HWC
     constexpr auto InDataBlockDesc = make_naive_tensor_descriptor_packed(
         make_tuple(Number<HPerBlockIn>{}, Number<WPerBlockIn>{}, Number<CPerBlock>{}));
-
-    using ThisThreadBlock  = ThisThreadBlock<BlockSize>;
-    auto blockwise_conv    = BlockwiseConvWconv<ThisThreadBlock,
-                                             WeiDataType,
-                                             InDataType,
-                                             AccDataType,
-                                             decltype(WeiDataBlockDesc),
-                                             decltype(InDataBlockDesc),
-                                             HPerBlock,
-                                             WPerBlock,
-                                             CPerBlock,
-                                             KPerBlock,
-                                             HRepeat,
-                                             WRepeat,
-                                             HPerWconv,
-                                             WPerWconv,
-                                             FilterSize,
-                                             DilationX,
-                                             DilationY,
-                                             true,
-                                             true>{};
-    auto& accum_thread_buf = blockwise_conv.GetAccumThreadBuffer();
-
+    using EmptyTuple                = ck::Tuple<>;
+    using AccBlockwiseOperation     = ck::convolution::BlockwiseElementOpPassThrough;
+    using AccBlockwiseNextOperation = ck::convolution::BlockwiseElementOpPassThrough;
+    using ThisThreadBlock           = ThisThreadBlock<BlockSize>;
+    auto blockwise_conv             = BlockwiseSubaConvWconv<ThisThreadBlock,
+                                                 WeiDataType,
+                                                 InDataType,
+                                                 EmptyTuple,
+                                                 AccDataType,
+                                                 AccDataType,
+                                                 AccBlockwiseOperation,
+                                                 AccBlockwiseNextOperation,
+                                                 decltype(WeiDataBlockDesc),
+                                                 decltype(InDataBlockDesc),
+                                                 EmptyTuple,
+                                                 HPerBlock,
+                                                 WPerBlock,
+                                                 CPerBlock,
+                                                 KPerBlock,
+                                                 HRepeat,
+                                                 WRepeat,
+                                                 HPerWconv,
+                                                 WPerWconv,
+                                                 FilterSize,
+                                                 DilationX,
+                                                 DilationY,
+                                                 true,
+                                                 true>{};
+    auto accum_thread_buf           = blockwise_conv.template MakeAccumThreadBuffer<false>(c);
+    auto output_thread_buf          = blockwise_conv.MakeOutThreadBuffer(c);
     // Data layout: HWC, unit: InDataType
     constexpr index_t data_H_stride = Width * InputChannels;
     constexpr index_t data_W_stride = InputChannels;
@@ -296,7 +304,7 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
                 static_for<0, KRepeat, 1>{}([&](auto k1) {
                     constexpr auto accum_offset = (h1 * WRepeat * KRepeat + w1 * KRepeat + k1) *
                                                   wconv_conv.GetNumAccumComponents();
-                    auto& c_vec = accum_thread_buf.GetVectorTypeReference(Number<accum_offset>{});
+                    auto& c_vec = output_thread_buf.GetVectorTypeReference(Number<accum_offset>{});
                     static_assert(wconv_conv.GetNumAccumComponents() >= 4);
                     if constexpr(Aco)
                     {
@@ -397,7 +405,6 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
 
     // Main loop
     static_for<0, K_BlockTile, 1>{}([&](auto k) {
-        accum_thread_buf.Clear();
         if constexpr(FilterSize == 3)
         {
             update_weight_block_buf3(k);
@@ -406,6 +413,8 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
         {
             update_weight_block_buf(k);
         }
+        using EmptySemas = Tuple<>;
+        EmptySemas emptySemas;
 
         static_for<0, C_BlockTile, 1>{}([&](auto c0) {
             __syncthreads();
@@ -416,7 +425,14 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
             auto weight_block_buf = make_dynamic_buffer<AddressSpaceEnum::Lds>(
                 reinterpret_cast<WeiDataType*>(&p_shared[InDataBlockSize + c0 * WeiDataBlockSize]),
                 WeiDataBlockSize);
-            blockwise_conv.Run(weight_block_buf, indata_block_buf, accum_thread_buf, true);
+            blockwise_conv.Run(weight_block_buf,
+                               indata_block_buf,
+                               ck::Tuple<>{},
+                               accum_thread_buf,
+                               output_thread_buf,
+                               emptySemas,
+                               Number<0>{},
+                               Number<1>{});
         });
         store_accum_buf(k);
     });

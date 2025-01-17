@@ -99,11 +99,10 @@ bool run_test_fmt()
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X2, Filter_1X1, false, 0,       WaveGroup, 0, OutElementNoneOp, ScaleBiasPacked, UniformScale, 0, TestMask | 0x20000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X2, Filter_3X3, false, 0,       WaveGroup, 0, OutElementNoneOp, ScaleBiasPacked, UniformScale, 0, TestMask | 0x20000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X2, Filter_3X3, true,  0,       WaveGroup, 0, OutElementNoneOp, ScaleBiasPacked, UniformScale, 0, TestMask | 0x20000>();
-        // TODO: fail for unknown reason
-        //pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X2, Filter_2X2, false, 0,       WaveGroup, 0, OutElementNoneOp, ScaleBiasPacked, UniformScale, 0, TestMask | 0x20000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X2, Filter_2X2, false, 0,       WaveGroup, 0, OutElementNoneOp, ScaleBiasPacked, UniformScale, 0, TestMask | 0x20000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X2, Filter_1X1, false, LdsMode, WaveGroup, 0, OutElementNoneOp, ScaleBiasPacked, UniformScale, 0, TestMask | 0x20000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X2, Filter_3X3, false, LdsMode, WaveGroup, 0, OutElementNoneOp, ScaleBiasPacked, UniformScale, 0, TestMask | 0x20000>();
-   
+
         //Relu
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X2, Filter_1X1, false, 0,       WaveGroup, 1, OutElementReluOp, ScaleBiasPacked, UniformScale, 0, TestMask | 0x40000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X2, Filter_3X3, false, 0,       WaveGroup, 1, OutElementReluOp, ScaleBiasPacked, UniformScale, 0, TestMask | 0x40000>();

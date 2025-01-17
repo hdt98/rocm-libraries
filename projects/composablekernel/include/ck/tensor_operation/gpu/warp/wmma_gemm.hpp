@@ -290,11 +290,11 @@ struct wmma_type<WmmaInstr::wmma_i32_16x16x16_iu8,
     template <index_t MPerWmma,
               index_t NPerWmma,
               index_t KPerWmma,
+              bool neg_a,
+              bool neg_b,
               class FloatA,
               class FloatB,
               class FloatC,
-              bool neg_a = false,
-              bool neg_b = false,
               bool clamp = false>
     __device__ void run(const FloatA& a, const FloatB& b, FloatC& reg_c) const
     {
@@ -503,11 +503,11 @@ struct wmma_type<WmmaInstr::wmma_i32_16x16x16_iu8_gfx12,
     template <index_t MPerWmma,
               index_t NPerWmma,
               index_t KPerWmma,
+              bool neg_a,
+              bool neg_b,
               class FloatA,
               class FloatB,
               class FloatC,
-              bool neg_a = false,
-              bool neg_b = false,
               bool clamp = false>
     __device__ void run(const FloatA& a, const FloatB& b, FloatC& reg_c) const
     {
@@ -725,11 +725,11 @@ struct wmma_type<WmmaInstr::wmma_i32_16x16_iu8_gfx13,
     template <index_t MPerWmma,
               index_t NPerWmma,
               index_t KPerWmma,
+              bool neg_a,
+              bool neg_b,
               class FloatA,
               class FloatB,
               class FloatC,
-              bool neg_a = false,
-              bool neg_b = false,
               bool clamp = false>
     __device__ void run(const FloatA& a, const FloatB& b, FloatC& reg_c) const
     {
@@ -870,9 +870,27 @@ struct WmmaSelector
 #endif
     }
 
+    template <>
+    constexpr auto GetWmma<uint8_t, uint8_t, int, 16, 16>()
+    {
+#if defined(__gfx13__)
+        return WmmaInstr::wmma_i32_16x16_iu8_gfx13;
+#elif defined(__gfx12__)
+        return WmmaInstr::wmma_i32_16x16x16_iu8_gfx12;
+#else
+        return WmmaInstr::wmma_i32_16x16x16_iu8;
+#endif
+    }
+
 #ifdef CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
     template <>
     constexpr auto GetWmma<int4_t, int4_t, int, 16, 16>()
+    {
+        return WmmaInstr::wmma_i32_16x16x16_iu4;
+    }
+
+    template <>
+    constexpr auto GetWmma<uint4_t, uint4_t, int, 16, 16>()
     {
         return WmmaInstr::wmma_i32_16x16x16_iu4;
     }
@@ -1081,27 +1099,62 @@ struct WmmaGemm
                  is_same<dst_type, half_t>::value) ||
                 (is_same<src_type_a, bhalf_t>::value && is_same<src_type_b, bhalf_t>::value &&
                  is_same<dst_type, bhalf_t>::value) ||
-                (is_same<src_type_a, int8_t>::value && is_same<src_type_b, int8_t>::value &&
+                ((is_same<src_type_a, int8_t>::value || is_same<src_type_a, uint8_t>::value) &&
+                 (is_same<src_type_b, int8_t>::value || is_same<src_type_b, uint8_t>::value) &&
                  is_same<dst_type, int32_t>::value)
 #ifdef CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
-                || (is_same<src_type_a, int4_t>::value && is_same<src_type_b, int4_t>::value &&
+                || ((is_same<src_type_a, int4_t>::value || is_same<src_type_a, uint4_t>::value) &&
+                    (is_same<src_type_b, int4_t>::value || is_same<src_type_b, uint4_t>::value) &&
                     is_same<dst_type, int32_t>::value)
 #endif
                 ,
             "base type couple must be (half, float), (bhalf, float), (half, half), (bhalf, bhalf), "
             "(int8, int32) or (int4, int32)!");
-        static_for<0, KPack / KPerWmma, 1>{}([&](auto k) {
-            if constexpr(!TransposeC)
-            {
-                wmma_instr.template run<MPerWmma, NPerWmma, KPerWmma>(
-                    p_a_wave[k], p_b_wave[k], p_c_thread);
-            }
-            else
-            {
-                wmma_instr.template run<MPerWmma, NPerWmma, KPerWmma>(
-                    p_b_wave[k], p_a_wave[k], p_c_thread);
-            }
-        });
+        if constexpr(is_same<src_type_a, int8_t>::value || is_same<src_type_a, uint8_t>::value
+#ifdef CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
+                     || is_same<src_type_a, int4_t>::value || is_same<src_type_a, uint4_t>::value
+#endif
+        )
+        {
+            constexpr bool neg_a = is_same<src_type_a, int8_t>::value
+#ifdef CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
+                                   || is_same<src_type_a, int4_t>::value
+#endif
+                ;
+            constexpr bool neg_b = is_same<src_type_b, int8_t>::value
+#ifdef CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
+                                   || is_same<src_type_b, int4_t>::value
+#endif
+                ;
+            static_for<0, KPack / KPerWmma, 1>{}([&](auto k) {
+                if constexpr(!TransposeC)
+                {
+                    wmma_instr.template run<MPerWmma, NPerWmma, KPerWmma, neg_a, neg_b>(
+                        p_a_wave[k], p_b_wave[k], p_c_thread);
+                }
+                else
+                {
+                    wmma_instr.template run<MPerWmma, NPerWmma, KPerWmma, neg_b, neg_a>(
+                        p_b_wave[k], p_a_wave[k], p_c_thread);
+                }
+            });
+        }
+        else
+        {
+
+            static_for<0, KPack / KPerWmma, 1>{}([&](auto k) {
+                if constexpr(!TransposeC)
+                {
+                    wmma_instr.template run<MPerWmma, NPerWmma, KPerWmma>(
+                        p_a_wave[k], p_b_wave[k], p_c_thread);
+                }
+                else
+                {
+                    wmma_instr.template run<MPerWmma, NPerWmma, KPerWmma>(
+                        p_b_wave[k], p_a_wave[k], p_c_thread);
+                }
+            });
+        }
     }
 
 #ifdef CK_EXTENSION_MX_TYPE

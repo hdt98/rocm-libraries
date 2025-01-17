@@ -19,6 +19,8 @@ struct ThisThreadBlock
     static constexpr bool InWaveGroup() { return false; }
 
     __device__ static index_t GetThreadId() { return get_thread_local_1d_id(); }
+
+    static constexpr index_t GetNumWavePerGroup() { return 0; }
 };
 
 template <index_t ThreadPerBlock, index_t WaveSize, index_t NumWaveGroup>
@@ -42,6 +44,8 @@ struct ThisThreadBlockWaveGroup
     __device__ static index_t GetWaveGroupId() { return get_wavegroup_id(); }
 
     __device__ static index_t GetWaveIdInWaveGroup() { return get_wave_id_in_wavegroup(); }
+
+    static constexpr index_t GetNumWavePerGroup() { return kNumWavePerGroup_; }
 };
 
 } // namespace ck

@@ -32,6 +32,10 @@ inline __host__ __device__ constexpr double get_rtol()
     {
         return 1e-1;
     }
+    else if constexpr(std::is_same_v<DataType, uint8_t>)
+    {
+        return 1e-1;
+    }
     else if constexpr(std::is_same_v<DataType, ck::f8_t>)
     {
         return 2e-1;
@@ -70,6 +74,10 @@ inline __host__ __device__ constexpr double get_atol()
         return 1e-1;
     }
     else if constexpr(std::is_same_v<DataType, int8_t>)
+    {
+        return 1e-1;
+    }
+    else if constexpr(std::is_same_v<DataType, uint8_t>)
     {
         return 1e-1;
     }

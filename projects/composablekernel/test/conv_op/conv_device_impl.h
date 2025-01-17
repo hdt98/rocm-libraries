@@ -78,7 +78,7 @@ struct CONST_GNHWK : public BaseTensorLayout
 #include "ck/library/utility/convolution_parameter.hpp"
 #include "ck/library/utility/convolution_host_tensor_descriptor_helper.hpp"
 #include "ck/library/reference_tensor_operation/cpu/reference_conv_fwd.hpp"
-#include "ck/tensor_operation/gpu/device/impl/device_conv_fwd_wconv.hpp"
+#include "ck/tensor_operation/gpu/device/impl/device_convsuba_fwd_wconvsuba.hpp"
 
 //#include "windows.h"
 
@@ -628,63 +628,80 @@ bool run_test()
     constexpr ck::index_t Cluster_Acc_H = ActiveBlockSize / Cluster_Acc_K / Cluster_Acc_W;
     using AccBlockTransferClusterLengths =
         ck::Sequence<Cluster_Acc_H, Cluster_Acc_W, Cluster_Acc_K>;
-    float avg_time = 0;
+    using EmptyTuple                = ck::Tuple<>;
+    using AccBlockwiseOperation     = ck::convolution::BlockwiseElementOpPassThrough;
+    using AccBlockwiseNextOperation = ck::convolution::BlockwiseElementOpPassThrough;
+    float avg_time                  = 0;
     using DeviceConvFwdInstance =
-        ck::tensor_operation::device::DeviceConvWconv<NDimSpatial,
+        ck::tensor_operation::device::DeviceConvSubaWconv<NDimSpatial,
 #ifdef ENABLE_CONST_LAYOUT
-                                                      ConstInputLayout<FilterSize>,
-                                                      ConstWeightLayout<FilterSize>,
-                                                      ConstOutputLayout<FilterSize>,
+                                                          ConstInputLayout<FilterSize>,
+                                                          ConstWeightLayout<FilterSize>,
+                                                          EmptyTuple,
+                                                          ConstOutputLayout<FilterSize>,
 #else
-                                                      InputLayout<NDimSpatial>,
-                                                      WeightLayout<NDimSpatial>,
-                                                      OutputLayout<NDimSpatial>,
+                                                          InputLayout<NDimSpatial>,
+                                                          WeightLayout<NDimSpatial>,
+                                                          EmptyTuple,
+                                                          OutputLayout<NDimSpatial>,
 #endif
-                                                      InDataType,
-                                                      WeiDataType,
-                                                      GPUAccType,
-                                                      InElementOp,
-                                                      WeiElementOp,
-                                                      OutElementOp,
-                                                      ConvSpec,
-                                                      1,
-                                                      BlockSize,
-                                                      HPerBlock,
-                                                      WPerBlock,
-                                                      CPerBlock,
-                                                      KPerBlock,
-                                                      HRepeat,
-                                                      WRepeat,
-                                                      HPerWconv,
-                                                      WPerWconv,
-                                                      FilterSize,
-                                                      DilationSize,
-                                                      DilationSize,
-                                                      InBlockTransferThreadClusterLengths,
-                                                      InBlockTransferScalarPerVector,
-                                                      InBlockTransferScalarPerVector,
-                                                      InEnableLds,
-                                                      InBlockLdsAddExtraM,
-                                                      WeiBlockTransferThreadClusterLengths,
-                                                      WeiBlockTransferScalarPerVector,
-                                                      WeiBlockTransferScalarPerVector,
-                                                      WeiEnableLds,
-                                                      WeiBlockLdsAddExtraM,
-                                                      AccBlockTransferClusterLengths,
-                                                      AccBlockTransferScalarPerVector,
-                                                      AccEnableLds,
-                                                      EnableAsync,
-                                                      EnableWaveGroup>;
+                                                          InDataType,
+                                                          WeiDataType,
+                                                          EmptyTuple,
+                                                          GPUAccType,
+                                                          GPUAccType,
+                                                          InElementOp,
+                                                          WeiElementOp,
+                                                          OutElementOp,
+                                                          AccBlockwiseOperation,
+                                                          AccBlockwiseNextOperation,
+                                                          ConvSpec,
+                                                          1,
+                                                          BlockSize,
+                                                          HPerBlock,
+                                                          WPerBlock,
+                                                          CPerBlock,
+                                                          KPerBlock,
+                                                          HRepeat,
+                                                          WRepeat,
+                                                          HPerWconv,
+                                                          WPerWconv,
+                                                          FilterSize,
+                                                          DilationSize,
+                                                          DilationSize,
+                                                          InBlockTransferThreadClusterLengths,
+                                                          InBlockTransferScalarPerVector,
+                                                          InBlockTransferScalarPerVector,
+                                                          InEnableLds,
+                                                          InBlockLdsAddExtraM,
+                                                          WeiBlockTransferThreadClusterLengths,
+                                                          WeiBlockTransferScalarPerVector,
+                                                          WeiBlockTransferScalarPerVector,
+                                                          WeiEnableLds,
+                                                          WeiBlockLdsAddExtraM,
+                                                          EmptyTuple,
+                                                          ck::Sequence<>,
+                                                          ck::Sequence<>,
+                                                          false,
+                                                          true,
+                                                          AccBlockTransferClusterLengths,
+                                                          AccBlockTransferScalarPerVector,
+                                                          AccEnableLds,
+                                                          EnableAsync,
+                                                          EnableWaveGroup>;
 
     auto conv     = DeviceConvFwdInstance{};
     auto invoker  = conv.MakeInvoker();
     auto argument = conv.MakeArgument(in_device_buf.GetDeviceBuffer(),
                                       wei_device_buf.GetDeviceBuffer(),
+                                      std::array<const void*, 0>{},
                                       out_device_buf.GetDeviceBuffer(),
                                       a_g_n_c_wis_lengths,
                                       a_g_n_c_wis_strides,
                                       b_g_k_c_xs_lengths,
                                       b_g_k_c_xs_strides,
+                                      std::array<std::array<ck::index_t, NDimSpatial + 3>, 0>{},
+                                      std::array<std::array<ck::index_t, NDimSpatial + 3>, 0>{},
                                       e_g_n_k_wos_lengths,
                                       e_g_n_k_wos_strides,
                                       conv_filter_strides,

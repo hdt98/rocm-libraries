@@ -1068,6 +1068,45 @@ struct Blockwise_element_wconv_cvtTensor
 
 struct Blockwise_element_passthrough
 {
+    static constexpr auto ds_wave_desc_ = make_tuple();
+    __host__ __device__ Blockwise_element_passthrough() {}
+
+    template <typename DsGridDesc>
+    __host__ __device__ static constexpr auto
+    MakeDsGridBlockDescriptor(const DsGridDesc& ds_grid_desc)
+    {
+        return ds_grid_desc;
+    }
+
+    __host__ __device__ static auto CalculateThreadOriginDataIndex() { return make_tuple(); }
+
+    __host__ __device__ static constexpr auto GetDsWaveDescLength() { return make_tuple(); }
+
+    template <typename DsBlockBuffer,
+              typename AccDataVec,
+              typename NumberH0,
+              typename NumberW0,
+              typename NumberK0>
+    __device__ void Run(const DsBlockBuffer&, AccDataVec&, NumberH0, NumberW0, NumberK0) const
+    {
+    }
+
+    struct SharedMemTrait
+    {
+        static constexpr auto max_lds_align               = 8;
+        static constexpr auto ds_block_space_size_aligned = make_tuple(0, 0);
+
+        // LDS allocation for Ds in LDS
+        static constexpr auto ds_block_space_offset = make_tuple(0, 0);
+        static constexpr auto lds_size              = 0;
+    };
+
+    struct LaneSharedMemTrait
+    {
+        static constexpr auto max_lane_shared_align = 4;
+        static constexpr auto ds_block_space_offset = make_tuple(0, 0);
+        static constexpr auto lane_shared_size      = 0;
+    };
 };
 
 template <typename ThisThreadBlock,
@@ -1128,8 +1167,9 @@ struct BlockwiseSubaConvWconv
     // Hardcode of WaveSize, since GFX13 conv only support wave32 mode
     static constexpr index_t WaveSize = 32;
 
-    static constexpr auto NumOfThread     = ThisThreadBlock::GetNumOfThread();
-    static constexpr bool EnableWaveGroup = ThisThreadBlock::InWaveGroup();
+    static constexpr auto NumOfThread      = ThisThreadBlock::GetNumOfThread();
+    static constexpr bool EnableWaveGroup  = ThisThreadBlock::InWaveGroup();
+    static constexpr bool EnableWaveGroup4 = ThisThreadBlock::GetNumWavePerGroup() == 4;
 
     static constexpr index_t WaveFilterSize = (FilterSize == 2) ? 1 : FilterSize;
     static constexpr bool Aco               = [] {
@@ -1206,7 +1246,7 @@ struct BlockwiseSubaConvWconv
     template <bool HasMainLoop>
     __host__ __device__ constexpr auto MakeAccumThreadBuffer(AccDataType* data)
     {
-        if constexpr(EnableWaveGroup)
+        if constexpr(EnableWaveGroup4)
         {
             constexpr auto VectorCount =
                 HasMainLoop ? math::max(HRepeatOut * WRepeatOut * KRepeat,
@@ -1237,7 +1277,7 @@ struct BlockwiseSubaConvWconv
     using KernelEDataType = decltype(wconv_conv.template GetKernelDataType<EDataType>());
     __host__ __device__ constexpr auto MakeOutThreadBuffer(KernelEDataType* data)
     {
-        if constexpr(EnableWaveGroup)
+        if constexpr(EnableWaveGroup4)
         {
             return StaticBufferTupleOfVector<
                 AddressSpaceEnum::Vgpr,
@@ -1569,8 +1609,8 @@ struct BlockwiseSubaConvWconv
         const auto waveId_w          = wave_idx[I1];
         const auto waveId_k          = wave_idx[I2];
 
-        return make_tuple(waveId_h * HRepeat,
-                          waveId_w * WRepeat,
+        return make_tuple(waveId_h * HRepeatOut,
+                          waveId_w * WRepeatOut,
                           waveId_k * KRepeat,
                           wconv_in_data_idx[I0],
                           wconv_in_data_idx[I1],
@@ -1877,7 +1917,7 @@ struct BlockwiseSubaConvWconv
             // Load weights
             WeiDataVec weight_thread_vec[CRepeat / CStep][4];
             static_for<0, CRepeat, CStep>{}([&](auto c0) {
-                if constexpr(EnableWaveGroup)
+                if constexpr(EnableWaveGroup4)
                 {
                     if(ThisThreadBlock::GetWaveIdInWaveGroup() == WaveIdRun)
                     {
@@ -1897,7 +1937,7 @@ struct BlockwiseSubaConvWconv
             InDataVec indata_thread_vec[4];
             static_for<0, HRepeat, HStep>{}([&](auto h0) {
                 static_for<0, WRepeat, WStep>{}([&](auto w0) {
-                    if constexpr(EnableWaveGroup)
+                    if constexpr(EnableWaveGroup4)
                     {
                         auto semaAccumReady       = semaAccums[I0];
                         auto semaAccumFree        = semaAccums[I1];
@@ -1929,7 +1969,8 @@ struct BlockwiseSubaConvWconv
                                 if constexpr(IsLast{})
                                 {
                                     semaAccumFree->template wait<0>();
-                                    accum_thread_buf[Idx] = acc_vec;
+                                    accum_thread_buf.GetVectorTypeReference(
+                                        Number<Idx * NumAccComp>{}) = acc_vec;
                                     semaAccumReady->template signal<0>();
                                 }
                                 else
@@ -1947,7 +1988,8 @@ struct BlockwiseSubaConvWconv
                                             Number<h0 / HStep>{}, Number<w0 / WStep>{}, k0, I0));
 
                                     semaAccumReady->template wait<0>();
-                                    AccDataVec acc_vec = accum_thread_buf[Idx];
+                                    AccDataVec acc_vec = accum_thread_buf.GetVectorTypeReference(
+                                        Number<Idx * NumAccComp>{});
                                     element_op_.Run(ds_block_buf,
                                                     acc_vec,
                                                     Number<h0 / HStep>{},
@@ -2012,7 +2054,8 @@ struct BlockwiseSubaConvWconv
                                 {
                                     semaAccumFree->template wait<0>();
                                     static_for<0, NumYX, 1>{}([&](auto i) {
-                                        accum_thread_buf[NumYX * Idx + i] = acc_vec[i];
+                                        accum_thread_buf.GetVectorTypeReference(
+                                            Number<(NumYX * Idx + i) * NumAccComp>{}) = acc_vec[i];
                                     });
                                     semaAccumReady->template signal<0>();
                                 }
@@ -2039,7 +2082,8 @@ struct BlockwiseSubaConvWconv
                                     AccDataVec acc_vec[NumYX] = {};
                                     AccDataVec* accdata_thread_vec_ptr[NumYX];
                                     static_for<0, NumYX, 1>{}([&](auto i) {
-                                        acc_vec[i] = accum_thread_buf[NumYX * Idx + i];
+                                        acc_vec[i] = accum_thread_buf.GetVectorTypeReference(
+                                            Number<(NumYX * Idx + i) * NumAccComp>{});
                                         accdata_thread_vec_ptr[i] =
                                             acc_vec[i].template AsType<AccDataVec>()(Number<0>{});
                                     });
@@ -2121,7 +2165,7 @@ struct BlockwiseSubaConvWconv
                         else
                         {
                             AccDataVec acc_vec[NumYX] = {};
-                            AccDataVec* accdata_thread_vec_ptr[NumYX];
+                            typename AccDataVec::type* accdata_thread_vec_ptr[NumYX];
                             if constexpr(HasMainLoop{})
                             {
                                 static_for<0, NumYX, 1>{}([&](auto i) {
@@ -2148,7 +2192,8 @@ struct BlockwiseSubaConvWconv
                                             return I0;
                                     }();
                                     accdata_thread_vec_ptr[i] =
-                                        acc_vec[i].template AsType<AccDataVec>()(Number<0>{});
+                                        &acc_vec[i].template AsType<typename AccDataVec::type>()(
+                                            I0);
 
                                     wconv_conv.wconv_instr.Run(
                                         *weight_thread_vec_ptr[c0 / CStep][tapIdx],
@@ -2386,7 +2431,7 @@ struct BlockwiseSubaConvWconv
             const typename WeiDataVec::type* weight_thread_vec_ptr[CRepeat / CStep];
             static_for<0, CRepeat, CStep>{}([&](auto c0) {
                 // Load weights
-                if constexpr(EnableWaveGroup)
+                if constexpr(EnableWaveGroup4)
                 {
                     if(ThisThreadBlock::GetWaveIdInWaveGroup() == WaveIdRun)
                     {
@@ -2406,7 +2451,7 @@ struct BlockwiseSubaConvWconv
                     constexpr index_t accum_offset =
                         accum_thread_desc_.CalculateOffset(make_tuple(h0, w0, k0, I0));
 
-                    if constexpr(EnableWaveGroup)
+                    if constexpr(EnableWaveGroup4)
                     {
                         auto semaAccumReady   = semaAccums[I0];
                         auto semaAccumFree    = semaAccums[I1];
@@ -2778,11 +2823,6 @@ struct BlockwiseSubaConvWconv
             (FilterSize == 2 && Transposed) ? 2 * 4 * wconv_conv.GetNumAccumComponents()
                                             : 2 * wconv_conv.GetNumAccumComponents(),
             max_lane_shared_align);
-        static constexpr auto lane_shared_size =
-            in_block_space_size_aligned * sizeof(InDataType) +
-            wei_block_space_size_aligned * sizeof(WeiDataType) +
-            BlockwiseElementOpType::LaneSharedMemTrait::lane_shared_size +
-            out_block_space_aligned * sizeof(AccDataType);
     };
 };
 } // namespace ck

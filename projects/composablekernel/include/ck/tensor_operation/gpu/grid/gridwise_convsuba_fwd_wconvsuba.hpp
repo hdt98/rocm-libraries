@@ -56,7 +56,7 @@ __global__ void
 {
 #if(!defined(__HIP_DEVICE_COMPILE__) || defined(__gfx13__))
     // offset base pointer for each work-group
-    static constexpr index_t NumDTensor = 2;
+    static constexpr index_t NumDTensor = DsGridDesc::Size();
     const index_t num_blocks_per_batch =
         __builtin_amdgcn_readfirstlane(get_grid_size() / batch_count);
 
@@ -124,8 +124,8 @@ template <typename GridwiseOp,
           typename Block2CTileMap,
           typename ComputePtrOffsetOfBatch,
           bool HasMainBlockLoop>
-__global__ void __exp_amd_wavegroup_kernel(4, 32, 512, 1, 1)
-    kernel_grouped_convsuba_cvt_wconvsuba_wavegroup(
+__global__ void __exp_amd_wavegroup_kernel(4, 32, 256, 1, 1)
+    kernel_grouped_convsuba_cvt_wconvsuba_wavegroup256(
         const InDataType* __restrict__ p_in_grid,
         const WeiDataType* __restrict__ p_wei_grid,
         DsPointer p_ds_grid,
@@ -166,7 +166,97 @@ __global__ void __exp_amd_wavegroup_kernel(4, 32, 512, 1, 1)
     __shared__ char p_shared[GridwiseOp::BlockwiseConv::SharedMemTrait::lds_size + 4];
     static __exp_amd_laneshared__ char p_lane_shared[laneSharedMemTrait.lane_shared_size];
 
-    static_assert(GridwiseOp::BlockwiseConv::LaneSharedMemTrait::lane_shared_size <= 512 * 4, "");
+    static_assert(laneSharedMemTrait.lane_shared_size <= 512 * 4, "");
+
+    GridwiseOp::template Run<HasMainBlockLoop>(p_in_grid + in_batch_offset,
+                                               p_wei_grid + wei_batch_offset,
+                                               p_ds_grid_grp,
+                                               p_e_grid + e_batch_offset,
+                                               p_shared,
+                                               p_lane_shared,
+                                               in_grid_desc,
+                                               wei_grid_desc,
+                                               ds_grid_desc,
+                                               e_grid_desc,
+                                               in_element_op,
+                                               wei_element_op,
+                                               acc_element_op,
+                                               block_2_ctile_map);
+#else
+    ignore                                = p_in_grid;
+    ignore                                = p_wei_grid;
+    ignore                                = p_ds_grid_grp;
+    ignore                                = p_e_grid;
+    ignore                                = in_grid_desc;
+    ignore                                = wei_grid_desc;
+    ignore                                = ds_grid_desc;
+    ignore                                = e_grid_desc;
+    ignore                                = in_element_op;
+    ignore                                = wei_element_op;
+    ignore                                = acc_element_op;
+    ignore                                = compute_ptr_offset_of_batch;
+    ignore                                = block_2_ctile_map;
+#endif
+}
+template <typename GridwiseOp,
+          typename InDataType,
+          typename WeiDataType,
+          typename DsPointer,
+          typename AccDataType,
+          typename EDataType,
+          typename InElementwiseOperation,
+          typename WeiElementwiseOperation,
+          typename AccElementwiseOperation,
+          typename InGridDesc,
+          typename WeiGridDesc,
+          typename DsGridDesc,
+          typename EGridDesc,
+          typename Block2CTileMap,
+          typename ComputePtrOffsetOfBatch,
+          bool HasMainBlockLoop>
+__global__ void __exp_amd_wavegroup_kernel(4, 32, 512, 1, 1)
+    kernel_grouped_convsuba_cvt_wconvsuba_wavegroup512(
+        const InDataType* __restrict__ p_in_grid,
+        const WeiDataType* __restrict__ p_wei_grid,
+        DsPointer p_ds_grid,
+        EDataType* __restrict__ p_e_grid,
+        const InElementwiseOperation in_element_op,
+        const WeiElementwiseOperation wei_element_op,
+        const AccElementwiseOperation acc_element_op,
+        const index_t batch_count,
+        const InGridDesc in_grid_desc,
+        const WeiGridDesc wei_grid_desc,
+        const DsGridDesc ds_grid_desc,
+        const EGridDesc e_grid_desc,
+        const Block2CTileMap block_2_ctile_map,
+        const ComputePtrOffsetOfBatch compute_ptr_offset_of_batch)
+{
+#if(!defined(__HIP_DEVICE_COMPILE__) || defined(__gfx13__))
+    // offset base pointer for each work-group
+    const index_t num_blocks_per_batch =
+        __builtin_amdgcn_readfirstlane(get_grid_size() / batch_count);
+    const index_t g_idx = __builtin_amdgcn_readfirstlane(get_block_1d_id() / num_blocks_per_batch);
+
+    const long_index_t in_batch_offset = amd_wave_read_first_lane(
+        static_cast<int64_t>(compute_ptr_offset_of_batch.GetAPtrOffset(g_idx)));
+    const long_index_t wei_batch_offset = amd_wave_read_first_lane(
+        static_cast<int64_t>(compute_ptr_offset_of_batch.GetBPtrOffset(g_idx)));
+    const long_index_t e_batch_offset = amd_wave_read_first_lane(
+        static_cast<int64_t>(compute_ptr_offset_of_batch.GetEPtrOffset(g_idx)));
+
+    const auto ds_batch_offset = compute_ptr_offset_of_batch.GetDsPtrOffset(g_idx);
+    DsPointer p_ds_grid_grp;
+    static constexpr index_t NumDTensor = DsGridDesc::Size();
+    static_for<0, NumDTensor, 1>{}(
+        [&](auto i) { p_ds_grid_grp(i) = p_ds_grid[i] + ds_batch_offset[i]; });
+
+    constexpr auto laneSharedMemTrait =
+        GridwiseOp::template GetLaneSharedMemTrait<HasMainBlockLoop>();
+
+    __shared__ char p_shared[GridwiseOp::BlockwiseConv::SharedMemTrait::lds_size + 4];
+    static __exp_amd_laneshared__ char p_lane_shared[laneSharedMemTrait.lane_shared_size];
+
+    static_assert(laneSharedMemTrait.lane_shared_size <= 512 * 4, "");
 
     GridwiseOp::template Run<HasMainBlockLoop>(p_in_grid + in_batch_offset,
                                                p_wei_grid + wei_batch_offset,
@@ -261,8 +351,9 @@ struct GridwiseConvSuba_Wconvsuba
     static constexpr auto I6 = Number<6>{};
     static constexpr auto I7 = Number<7>{};
 
-    static constexpr index_t WaveSize     = 32;
-    static constexpr index_t NumWaveGroup = EnableWaveGroup ? 4 : 0;
+    static constexpr index_t WaveSize      = 32;
+    static constexpr index_t NumWaveGroup  = EnableWaveGroup ? 4 : 0;
+    static constexpr bool EnableWaveGroup4 = EnableWaveGroup && (BlockSize == 512);
 
     static constexpr index_t NumDTensor = DsDataType::Size();
 
@@ -540,29 +631,28 @@ struct GridwiseConvSuba_Wconvsuba
                       ck::tensor_operation::element_wise::PassThrough{}};
 
             // blockwise copy C from LDS to global
-            auto out_tensor_block_copy_lds_to_global =
-                ThreadGroupTensorSliceTransfer_v6r1<ThisThreadBlockGrid,
-                                                    AccElementwiseOperation,
-                                                    InMemoryDataOperationEnum::Set,
-                                                    Sequence<HPerBlock, WPerBlock, KPerBlock>,
-                                                    AccBlockTransferClusterLengths,
-                                                    Sequence<0, 1, 2>,
-                                                    OutTensorDataType,
-                                                    OutTensorDataType,
-                                                    decltype(out_tensor_block_desc),
-                                                    decltype(e_grid_desc),
-                                                    Sequence<0, 1, 2>,
-                                                    2,
-                                                    AccBlockTransferScalarPerVector,
-                                                    true,
-                                                    false>{
-                    out_tensor_block_desc,
-                    make_multi_index(0, 0, 0),
-                    e_grid_desc,
-                    make_multi_index(h_block_data_idx_on_grid,
-                                     w_block_data_idx_on_grid,
-                                     k_block_data_idx_on_grid),
-                    out_element_op};
+            auto out_tensor_block_copy_lds_to_global = ThreadGroupTensorSliceTransfer_v6r1<
+                ThisThreadBlockGrid,
+                AccElementwiseOperation,
+                InMemoryDataOperationEnum::Set,
+                Sequence<BlockwiseConv::HPerBlockOut, BlockwiseConv::WPerBlockOut, KPerBlock>,
+                AccBlockTransferClusterLengths,
+                Sequence<0, 1, 2>,
+                OutTensorDataType,
+                OutTensorDataType,
+                decltype(out_tensor_block_desc),
+                decltype(e_grid_desc),
+                Sequence<0, 1, 2>,
+                2,
+                AccBlockTransferScalarPerVector,
+                true,
+                false>{out_tensor_block_desc,
+                       make_multi_index(0, 0, 0),
+                       e_grid_desc,
+                       make_multi_index(h_block_data_idx_on_grid,
+                                        w_block_data_idx_on_grid,
+                                        k_block_data_idx_on_grid),
+                       out_element_op};
 
             // make sure it's safe to write to LDS
             block_sync_lds();
@@ -1494,7 +1584,7 @@ struct GridwiseConvSuba_Wconvsuba
         auto ds_copy_block_desc = ds_block_trait()[I2];
 
         __shared__ WavegroupSemaphore<WaveIdOutput> semaOutput;
-        if constexpr(EnableWaveGroup)
+        if constexpr(EnableWaveGroup4)
         {
             semaOutput.init();
         }
@@ -1522,7 +1612,7 @@ struct GridwiseConvSuba_Wconvsuba
                                                          CBlockMainLoop);
 
         // sync post-run wave and output wave
-        if constexpr(EnableWaveGroup)
+        if constexpr(EnableWaveGroup4)
         {
             if(get_wave_id_in_wavegroup() == WaveIdPostRun)
             {
@@ -1536,7 +1626,8 @@ struct GridwiseConvSuba_Wconvsuba
 
         /*******************************************************************************/
         // Store accum buffer
-        if((EnableWaveGroup == false) || (get_wave_id_in_wavegroup() == WaveIdOutput))
+        constexpr auto OutputWaveId = EnableWaveGroup4 ? WaveIdOutput : WaveIdRun;
+        if((EnableWaveGroup == false) || (get_wave_id_in_wavegroup() == OutputWaveId))
         {
             // Store the result: AccElementOp(None/fma/sba/uba) + NextElementOp(cvt_tensor)
             StoreOutTensorData(e_grid_desc,

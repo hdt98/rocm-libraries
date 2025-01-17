@@ -77,7 +77,15 @@ struct GridwiseConvPipeline_v1
             std::remove_const_t<remove_cvref_t<decltype(wei_blockwise_copy[I0])>>;
         using EmptySemas = Tuple<>;
         EmptySemas emptySemas;
-        constexpr index_t NumDs   = DsDataBlockTransfer::Size();
+        constexpr index_t NumDs = DsDataBlockTransfer::Size();
+
+        // Initialize C
+        if constexpr(HasMainLoop)
+        {
+            accum_thread_buf.Clear();
+        }
+        out_thread_buf.Clear();
+
         auto in_block_buf_switch  = in_block_buf;
         auto wei_block_buf_switch = wei_block_buf;
 
@@ -168,11 +176,6 @@ struct GridwiseConvPipeline_v1
         in_blockwise_copy.MoveSrcSliceWindow(in_grid_desc, in_block_copy_step);
         // TODO: move slice windows for DS
 
-        // Initialize C
-        if constexpr(HasMainLoop)
-        {
-            accum_thread_buf.Clear();
-        }
         if constexpr(WeiDataEnableLds && EnableAsync == false)
         {
             static_for<0, NumTap, 1>{}([&](auto tapIdx) {
@@ -241,7 +244,7 @@ struct GridwiseConvPipeline_v1
                                           in_block_origin_idx,
                                           in_block_buf_switch);
                 }
-                if(EnableAsync)
+                if constexpr(EnableAsync)
                 {
                     block_sync_lds_async_load();
                 }
@@ -259,13 +262,6 @@ struct GridwiseConvPipeline_v1
                                    Number<false>{});
 
                 block_sync_lds();
-
-                static_for<0, NumTap, 1>{}([&](auto tapIdx) {
-                    const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[tapIdx])
-                        .MoveSrcSliceWindow(wei_grid_desc, wei_block_copy_step);
-                });
-
-                in_blockwise_copy.MoveSrcSliceWindow(in_grid_desc, in_block_copy_step);
 
                 if constexpr(WeiDataEnableLds && EnableAsync == false)
                 {
@@ -290,7 +286,7 @@ struct GridwiseConvPipeline_v1
                 {
                     in_blockwise_copy.RunWrite(in_block_desc, in_block_buf);
                 }
-                else if constexpr(InDataEnableLds && EnableAsync == false)
+                else if constexpr(InDataEnableLds && EnableAsync)
                 {
                     in_blockwise_copy.Run(in_grid_desc, in_grid_buf, in_block_desc, in_block_buf);
                 }
@@ -298,6 +294,13 @@ struct GridwiseConvPipeline_v1
                 {
                     in_block_buf = in_block_buf_switch;
                 }
+
+                static_for<0, NumTap, 1>{}([&](auto tapIdx) {
+                    const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[tapIdx])
+                        .MoveSrcSliceWindow(wei_grid_desc, wei_block_copy_step);
+                });
+
+                in_blockwise_copy.MoveSrcSliceWindow(in_grid_desc, in_block_copy_step);
 
                 ++i;
             } while(i < (num_loop - 1));
