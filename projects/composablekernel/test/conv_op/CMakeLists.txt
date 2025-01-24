@@ -39,6 +39,11 @@ target_compile_options(test_conv_device_wavegroup PRIVATE -save-temps=obj -Wno-g
 add_test_executable(test_conv_device_transposed conv_device_transposed.cpp)
 target_link_libraries(test_conv_device_transposed PRIVATE utility)
 
+add_test_executable(test_conv_device_transposed_wavegroup conv_device_transposed.cpp)
+target_compile_definitions(test_conv_device_transposed_wavegroup PRIVATE ENABLE_WAVEGROUP=1)
+target_link_libraries(test_conv_device_transposed_wavegroup PRIVATE utility)
+target_compile_options(test_conv_device_transposed_wavegroup PRIVATE -save-temps=obj -Wno-gnu-line-marker)
+
 add_test_executable(test_conv_fma conv_fma.cpp)
 target_link_libraries(test_conv_fma PRIVATE utility)
 target_compile_options(test_conv_fma PRIVATE -save-temps=obj -Wno-gnu-line-marker)

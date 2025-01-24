@@ -399,10 +399,10 @@ template <typename InDataType,
           bool ScaleBiasPacked,
           bool UniformScale,
           bool Convert_to_tensor,
-          int32_t TestMask>
+          uint32_t TestMask>
 bool run_test()
 {
-    if((config.test_mask & 0xFFFFFFF8 & TestMask) == 0)
+    if((config.test_mask & 0xFFFFFF00 & TestMask) == 0)
     {
         return true;
     }
@@ -464,12 +464,13 @@ bool run_test()
         (Filter == Filter_3X3) ? (Dilation ? pads_2 : pads_1) : pads_0;
     const std::vector<ck::index_t>& right_pads =
         (Filter == Filter_3X3) ? (Dilation ? pads_2 : pads_1) : pads_0;
-
+    // LWPSCGFX13-500
+    constexpr bool ForceDsLds   = EnableWaveGroup && ScaleBiasPacked && (sizeof(GPUAccType) == 2);
     constexpr bool InEnableLds  = LdsMode & 1 ? true : false;
     constexpr bool WeiEnableLds = LdsMode & 2 ? true : false;
     constexpr bool AccEnableLds = LdsMode & 4 ? true : false;
     constexpr bool EnableAsync  = LdsMode & 8 ? true : false;
-    constexpr bool DsEnableLds  = LdsMode & 16 ? true : false;
+    constexpr bool DsEnableLds  = LdsMode & 16 ? true : ForceDsLds;
 
     ck::utils::conv::ConvParam conv_param{n_dim,
                                           group_count,
@@ -538,15 +539,15 @@ bool run_test()
         }
         else
         {
-            bias.GenerateTensorValue(GeneratorTensor_2<GPUAccType>{-5, 5});
+            bias.GenerateTensorValue(GeneratorTensor_2<GPUAccType>{-10, 10});
         }
         if constexpr(ScaleBiasPacked)
         {
-            scale.GenerateTensorValue(GeneratorTensor_2<GPUAccType>{-5, 5});
+            scale.GenerateTensorValue(GeneratorTensor_2<GPUAccType>{-3, 3});
         }
         else
         {
-            scale.GenerateTensorValue(GeneratorTensor_1<GPUAccType>{1});
+            scale.GenerateTensorValue(GeneratorTensor_1<GPUAccType>{2});
         }
         break;
     default:
@@ -558,11 +559,11 @@ bool run_test()
         }
         else
         {
-            bias.GenerateTensorValue(GeneratorTensor_3<GPUAccType>{-0.5, 0.5});
+            bias.GenerateTensorValue(GeneratorTensor_3<GPUAccType>{-0.3, 0.3});
         }
         if constexpr(ScaleBiasPacked)
         {
-            scale.GenerateTensorValue(GeneratorTensor_2<GPUAccType>{-5, 5});
+            scale.GenerateTensorValue(GeneratorTensor_2<GPUAccType>{-3, 3});
         }
         else
         {
@@ -694,7 +695,7 @@ bool run_test()
     using WeiBlockTransferThreadClusterLengths = ck::Sequence<Cluster_Wei_K, 1, Cluster_Wei_C>;
     constexpr ck::index_t WeiBlockLdsAddExtraM = true;
 
-    constexpr ck::index_t AccBlockTransferScalarPerVector = sizeof(uint32_t) / sizeof(GPUAccType);
+    constexpr ck::index_t AccBlockTransferScalarPerVector = sizeof(uint32_t) / sizeof(GPUOutType);
     constexpr ck::index_t Cluster_Acc_K = KPerBlock / AccBlockTransferScalarPerVector;
     constexpr ck::index_t Cluster_Acc_W = 4;
     constexpr ck::index_t Cluster_Acc_H = ActiveBlockSize / Cluster_Acc_K / Cluster_Acc_W;

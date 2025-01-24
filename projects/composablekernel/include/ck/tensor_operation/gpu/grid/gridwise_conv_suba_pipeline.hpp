@@ -84,7 +84,6 @@ struct GridwiseConvPipeline_v1
         {
             accum_thread_buf.Clear();
         }
-        out_thread_buf.Clear();
 
         auto in_block_buf_switch  = in_block_buf;
         auto wei_block_buf_switch = wei_block_buf;
@@ -101,7 +100,6 @@ struct GridwiseConvPipeline_v1
         }
         else if constexpr(DsDataEnableLds && EnableAsync)
         {
-            constexpr index_t NumDs = DsDataBlockTransfer::Size();
             static_for<0, NumDs, 1>{}([&](auto i) {
                 using DDataBlockTransfer =
                     std::remove_const_t<remove_cvref_t<decltype(ds_blockwise_copy[i])>>;
@@ -424,7 +422,6 @@ struct GridwiseConvPipeline_v1<1, true, true, true, false>
         {
             accum_thread_buf.Clear();
         }
-        out_thread_buf.Clear();
 
         static_for<0, NumTap, 1>{}([&](auto tapIdx) {
             const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[tapIdx])
@@ -604,7 +601,6 @@ struct GridwiseConvPipeline_v1<1, false, true, false, false>
         {
             accum_thread_buf.Clear();
         }
-        out_thread_buf.Clear();
 
         static_for<0, NumTap, 1>{}([&](auto tapIdx) {
             const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[tapIdx])
@@ -784,7 +780,6 @@ struct GridwiseConvPipeline_v1<1, false, false, false, EnableAsync>
         {
             accum_thread_buf.Clear();
         }
-        out_thread_buf.Clear();
 
         // main body
         if constexpr(HasMainLoop)
@@ -941,7 +936,6 @@ struct GridwiseConvPipeline_v1<1, true, false, true, false>
         {
             accum_thread_buf.Clear();
         }
-        out_thread_buf.Clear();
 
         in_blockwise_copy.RunWrite(in_block_desc, in_block_buf);
 
@@ -1082,7 +1076,6 @@ struct GridwiseConvPipeline_v1<1, true, true, true, true>
         {
             accum_thread_buf.Clear();
         }
-        out_thread_buf.Clear();
 
         // preload data into LDS
         static_for<0, NumTap, 1>{}([&](auto tapIdx) {
@@ -1234,7 +1227,6 @@ struct GridwiseConvPipeline_v1<1, false, true, false, true>
         {
             accum_thread_buf.Clear();
         }
-        out_thread_buf.Clear();
 
         // Load data
         static_for<0, NumTap, 1>{}([&](auto tapIdx) {
@@ -1396,7 +1388,6 @@ struct GridwiseConvPipeline_v1<1, true, false, true, true>
         {
             accum_thread_buf.Clear();
         }
-        out_thread_buf.Clear();
 
         // Load data
         static_for<0, NumTap, 1>{}([&](auto tapIdx) {

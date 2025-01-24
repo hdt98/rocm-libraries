@@ -396,10 +396,10 @@ template <typename InDataType,
           bool EnableWaveGroup,
           ck::index_t ActiveFun,
           bool Convert_to_tensor,
-          int32_t TestMask>
+          uint32_t TestMask>
 bool run_test()
 {
-    if((config.test_mask & 0xFFFFFFF8 & TestMask) == 0)
+    if((config.test_mask & 0xFFFF0000 & TestMask) == 0)
     {
         return true;
     }
@@ -527,8 +527,8 @@ bool run_test()
     case 1:
         in.GenerateTensorValue(GeneratorTensor_2<InDataType>{-5, 5});
         wei.GenerateTensorValue(GeneratorTensor_2<WeiDataType>{-5, 5});
-        residual.GenerateTensorValue(GeneratorTensor_2<ResidualDataType>{-5, 5});
-        scale.GenerateTensorValue(GeneratorTensor_2<GPUAccType>{-5, 5});
+        residual.GenerateTensorValue(GeneratorTensor_2<ResidualDataType>{-10, 10});
+        scale.GenerateTensorValue(GeneratorTensor_2<GPUAccType>{-3, 3});
         break;
     default:
         in.GenerateTensorValue(GeneratorTensor_3<InDataType>{0.0, 1.0});
@@ -659,7 +659,7 @@ bool run_test()
     using WeiBlockTransferThreadClusterLengths = ck::Sequence<Cluster_Wei_K, 1, Cluster_Wei_C>;
     constexpr ck::index_t WeiBlockLdsAddExtraM = true;
 
-    constexpr ck::index_t AccBlockTransferScalarPerVector = sizeof(uint32_t) / sizeof(GPUAccType);
+    constexpr ck::index_t AccBlockTransferScalarPerVector = sizeof(uint32_t) / sizeof(GPUOutType);
     constexpr ck::index_t Cluster_Acc_K = KPerBlock / AccBlockTransferScalarPerVector;
     constexpr ck::index_t Cluster_Acc_W = 4;
     constexpr ck::index_t Cluster_Acc_H = ActiveBlockSize / Cluster_Acc_K / Cluster_Acc_W;

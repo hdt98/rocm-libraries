@@ -235,4 +235,17 @@ __host__ __device__ constexpr auto make_static_buffer_v4(LongNumber<N>, T* data)
 {
     return StaticBuffer<AddressSpace, T, N, true, StaticallyIndexedArray_v4<T, N>>(data);
 }
+
+template <AddressSpaceEnum AddressSpace, typename T, index_t Offset, index_t N>
+__host__ __device__ constexpr auto make_static_buffer_v5(Number<N>, T* data)
+{
+    return StaticBuffer<AddressSpace, T, N, true, StaticallyIndexedArray_v5<T, N, Offset>>(data);
+}
+
+template <AddressSpaceEnum AddressSpace, typename T, index_t Offset, long_index_t N>
+__host__ __device__ constexpr auto make_static_buffer_v5(LongNumber<N>, T* data)
+{
+    return StaticBuffer<AddressSpace, T, N, true, StaticallyIndexedArray_v5<T, N, Offset>>(data);
+}
+
 } // namespace ck

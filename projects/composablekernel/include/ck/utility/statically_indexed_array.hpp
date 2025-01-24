@@ -199,5 +199,51 @@ struct StaticallyIndexedArray_v4
     index_t offset_;
 };
 
+// static index array with external buffer support, it is used by lane-shared variable
+template <typename T, index_t N, index_t Offset>
+struct StaticallyIndexedArray_v5
+{
+    __host__ __device__ constexpr StaticallyIndexedArray_v5(T* data) { data_ = data; };
+
+    __host__ __device__ static constexpr index_t Size() { return N; }
+
+    // read access
+    template <index_t I>
+    __host__ __device__ constexpr const auto& At(Number<I>) const
+    {
+        static_assert(I < N, "wrong! out of range");
+
+        return data_[I + Offset];
+    }
+
+    // write access
+    template <index_t I>
+    __host__ __device__ constexpr auto& At(Number<I>)
+    {
+        static_assert(I < N, "wrong! out of range");
+
+        return data_[I + Offset];
+    }
+
+    // read access
+    template <index_t I>
+    __host__ __device__ constexpr const auto& operator[](Number<I> i) const
+    {
+        return At(i);
+    }
+
+    // write access
+    template <index_t I>
+    __host__ __device__ constexpr auto& operator()(Number<I> i)
+    {
+        return At(i);
+    }
+
+    __host__ __device__ static constexpr bool IsStaticBuffer() { return true; }
+
+    __host__ __device__ void SwitchBuffer() {}
+    T* data_;
+};
+
 } // namespace ck
 #endif

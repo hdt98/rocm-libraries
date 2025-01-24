@@ -113,7 +113,6 @@ struct GridwiseConvPipeline_v2
             {
                 accum_thread_buf.Clear();
             }
-            out_thread_buf.Clear();
         }
 
         if(get_wave_id_in_wavegroup() == WaveIdLoad)
@@ -343,6 +342,37 @@ struct GridwiseConvPipeline_v2
                         in_blockwise_copy.RunWrite(in_block_desc, in_block_buf);
                     }
                 }
+                if constexpr(DsDataEnableLds)
+                {
+                    constexpr index_t NumDs = DsDataBlockTransfer::Size();
+                    if constexpr(EnableAsync)
+                    {
+                        static_for<0, NumDs, 1>{}([&](auto i) {
+                            using DDataBlockTransfer =
+                                std::remove_const_t<remove_cvref_t<decltype(ds_blockwise_copy[i])>>;
+                            const_cast<DDataBlockTransfer&>(ds_blockwise_copy[i])
+                                .Run(ds_grid_desc[Number<i>{}],
+                                     ds_grid_buf[Number<i>{}],
+                                     ds_block_desc[Number<i>{}],
+                                     ds_block_buf(i));
+                        });
+                    }
+                    else
+                    {
+                        static_for<0, NumDs, 1>{}([&](auto i) {
+                            using DDataBlockTransfer =
+                                std::remove_const_t<remove_cvref_t<decltype(ds_blockwise_copy[i])>>;
+                            const_cast<DDataBlockTransfer&>(ds_blockwise_copy[i])
+                                .RunRead(ds_grid_desc[Number<i>{}], ds_grid_buf[Number<i>{}]);
+                        });
+                        static_for<0, NumDs, 1>{}([&](auto i) {
+                            using DDataBlockTransfer =
+                                std::remove_const_t<remove_cvref_t<decltype(ds_blockwise_copy[i])>>;
+                            const_cast<DDataBlockTransfer&>(ds_blockwise_copy[i])
+                                .RunWrite(ds_block_desc[Number<i>{}], ds_block_buf(i));
+                        });
+                    }
+                }
 
                 barrierLds.sync_lds<EnableAsync>();
                 semaLdsReady.template signal<0>();
@@ -455,7 +485,6 @@ struct GridwiseConvPipeline_v2<1, false, false, false, EnableAsync>
             {
                 accum_thread_buf.Clear();
             }
-            out_thread_buf.Clear();
         }
 
         semaDataReady.init();
@@ -684,7 +713,6 @@ struct GridwiseConvPipeline_v2<1, true, true, true, EnableAsync>
             {
                 accum_thread_buf.Clear();
             }
-            out_thread_buf.Clear();
         }
 
         if(get_wave_id_in_wavegroup() == WaveIdLoad)

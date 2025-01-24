@@ -163,8 +163,11 @@ __global__ void __exp_amd_wavegroup_kernel(4, 32, 256, 1, 1)
     constexpr auto laneSharedMemTrait =
         GridwiseOp::template GetLaneSharedMemTrait<HasMainBlockLoop>();
 
-    __shared__ char p_shared[GridwiseOp::BlockwiseConv::SharedMemTrait::lds_size + 4];
-    static __exp_amd_laneshared__ char p_lane_shared[laneSharedMemTrait.lane_shared_size];
+    static constexpr index_t lds_size =
+        math::max(GridwiseOp::BlockwiseConv::SharedMemTrait::lds_size, 4);
+    static constexpr index_t lane_shared_size = math::max(laneSharedMemTrait.lane_shared_size, 4);
+    __shared__ char p_shared[lds_size];
+    static __exp_amd_laneshared__ char p_lane_shared[lane_shared_size];
 
     static_assert(laneSharedMemTrait.lane_shared_size <= 512 * 4, "");
 
@@ -541,6 +544,7 @@ struct GridwiseConvSuba_Wconvsuba
     template <typename OutTensorGridDec,
               typename OutTensorThreadBuffer,
               typename OutTensorDataType,
+              typename NamedBarrier,
               typename BlockWiseConv>
     __host__ __device__ static void
     StoreOutTensorData(const OutTensorGridDec& e_grid_desc,
@@ -549,6 +553,7 @@ struct GridwiseConvSuba_Wconvsuba
                        BlockWiseConv& blockwise_conv,
                        const AccElementwiseOperation& out_element_op,
                        void* __restrict__ p_shared,
+                       NamedBarrier& barrier_output,
                        index_t h_block_data_idx_on_grid,
                        index_t w_block_data_idx_on_grid,
                        index_t k_block_data_idx_on_grid)
@@ -559,6 +564,8 @@ struct GridwiseConvSuba_Wconvsuba
         // C mapping in single thread.
         constexpr auto out_tensor_thread_desc   = blockwise_conv.GetAccThreadDescriptor();
         constexpr auto out_tensor_thread_length = blockwise_conv.GetAccThreadDescLength();
+        constexpr bool ForceAlignToUint32 =
+            EnableWaveGroup4 && (sizeof(OutTensorDataType) < sizeof(uint32_t));
 
         // calculate origin of thread output tensor on global memory
         // blockwise conv out tensor starting index
@@ -568,6 +575,7 @@ struct GridwiseConvSuba_Wconvsuba
             const auto out_tensor_grid_wave_desc = blockwise_conv.GetAccWaveDescriptor(e_grid_desc);
 
             // Threadwise copy C from VGPR to global memory
+
             auto out_tensor_thread_copy_vgpr_to_global =
                 ThreadwiseTensorSliceTransfer_v1r3<OutTensorDataType,
                                                    OutTensorDataType,
@@ -581,7 +589,8 @@ struct GridwiseConvSuba_Wconvsuba
                                                                                  // pixel
                                                    InMemoryDataOperationEnum::Set,
                                                    1,
-                                                   true>{
+                                                   true,
+                                                   ForceAlignToUint32>{
                     out_tensor_grid_wave_desc,
                     out_thread_mtx_on_block + make_multi_index(h_block_data_idx_on_grid / HPerWconv,
                                                                w_block_data_idx_on_grid / WPerWconv,
@@ -626,9 +635,10 @@ struct GridwiseConvSuba_Wconvsuba
                 out_tensor_thread_length[I7], // vector write pixel
                 InMemoryDataOperationEnum::Set,
                 1,
-                true>{out_tensor_block_wave_desc,
-                      out_thread_mtx_on_block,
-                      ck::tensor_operation::element_wise::PassThrough{}};
+                true,
+                ForceAlignToUint32>{out_tensor_block_wave_desc,
+                                    out_thread_mtx_on_block,
+                                    ck::tensor_operation::element_wise::PassThrough{}};
 
             // blockwise copy C from LDS to global
             auto out_tensor_block_copy_lds_to_global = ThreadGroupTensorSliceTransfer_v6r1<
@@ -655,7 +665,15 @@ struct GridwiseConvSuba_Wconvsuba
                        out_element_op};
 
             // make sure it's safe to write to LDS
-            block_sync_lds();
+            if constexpr(EnableWaveGroup == false)
+            {
+                block_sync_lds();
+            }
+            else
+            {
+                barrier_output.signal();
+                barrier_output.wait();
+            }
 
             // each thread write its data from VGPR to LDS
             out_tensor_thread_copy_vgpr_to_lds.Run(out_tensor_thread_desc,
@@ -665,7 +683,14 @@ struct GridwiseConvSuba_Wconvsuba
                                                    out_tensor_block_buf);
 
             // make sure it's safe to read from LDS
-            block_sync_lds();
+            if constexpr(EnableWaveGroup == false)
+            {
+                block_sync_lds();
+            }
+            else
+            {
+                barrier_output.template sync_lds<false>();
+            }
 
             // each block copy its data from LDS to global
             out_tensor_block_copy_lds_to_global.Run(
@@ -721,6 +746,8 @@ struct GridwiseConvSuba_Wconvsuba
         if constexpr(std::is_same_v<DLayout, tensor_layout::convolution::G_K>)
         {
             constexpr auto NumComp = DWaveDescLength{}[I2];
+            constexpr bool ForceAlignToUint32 =
+                EnableWaveGroup && (sizeof(DDataType) * NumComp < sizeof(uint32_t));
             return ThreadwiseTensorSliceTransfer_v2<DDataType,
                                                     DDataType,
                                                     DGridBlockDesc,
@@ -730,7 +757,10 @@ struct GridwiseConvSuba_Wconvsuba
                                                     2,
                                                     NumComp,
                                                     1,
-                                                    false>(
+                                                    false,
+                                                    false,
+                                                    false,
+                                                    ForceAlignToUint32>(
                 ds_grid_block_desc,
                 make_multi_index(k0,
                                  thread_origin_coord[Number<CoordDim - 2>{}],
@@ -1078,28 +1108,26 @@ struct GridwiseConvSuba_Wconvsuba
         static constexpr index_t wei_block_space_offset =
             BlockwiseConv::LaneSharedMemTrait::in_block_space_size_aligned * mem_count;
         static constexpr index_t ds_base_offset =
-            (wei_block_space_offset +
-             BlockwiseConv::LaneSharedMemTrait::wei_block_space_size_aligned * mem_count) *
-            sizeof(WeiDataType) / sizeof(AccDataType);
+            wei_block_space_offset +
+            BlockwiseConv::LaneSharedMemTrait::wei_block_space_size_aligned * mem_count;
         static constexpr auto ds_block_space_offset = generate_tuple(
             [](auto i) {
-                return BlockwiseConv::LaneSharedMemTrait::ds_block_space_offset[i] * mem_count +
-                       ds_base_offset;
+                return BlockwiseConv::LaneSharedMemTrait::ds_block_space_offset[i] + ds_base_offset;
             },
             Number<NumDTensor>{});
 
         static constexpr auto acc_block_space_offset =
-            ds_base_offset +
-            BlockwiseConv::LaneSharedMemTrait::ds_block_space_size_aligned * mem_count;
+            ds_base_offset + BlockwiseConv::LaneSharedMemTrait::ds_block_space_size_aligned;
+
         static constexpr auto acc_block_space_size_aligned =
-            HasMainBlockLoop ? math::max(BlockwiseConv::LaneSharedMemTrait::out_block_space_aligned,
-                                         BlockwiseConv::LaneSharedMemTrait::acc_block_space_alinged)
-                             : BlockwiseConv::LaneSharedMemTrait::acc_block_space_alinged;
+            HasMainBlockLoop ? BlockwiseConv::LaneSharedMemTrait::acc_block_space_aligned
+                             : BlockwiseConv::LaneSharedMemTrait::acc_ring_block_space_aligned;
         static constexpr auto out_block_space_offset =
             acc_block_space_offset + acc_block_space_size_aligned;
         static constexpr auto lane_shared_size =
-            (out_block_space_offset + BlockwiseConv::LaneSharedMemTrait::out_block_space_aligned) *
-            sizeof(AccDataType);
+            EnableWaveGroup4 ? out_block_space_offset +
+                                   BlockwiseConv::LaneSharedMemTrait::out_block_space_aligned
+                             : acc_block_space_offset;
     };
 
     template <bool HasMainLoop>
@@ -1296,11 +1324,12 @@ struct GridwiseConvSuba_Wconvsuba
                 if constexpr(EnableWaveGroup)
                 {
                     static_assert(laneSharedMemTrait.in_block_space_offset == 0, "");
-                    return make_tuple(make_static_buffer_v4<AddressSpaceEnum::Vgpr, InDataType>(
-                                          in_block_desc.GetElementSpaceSize(),
-                                          static_cast<InDataType*>(p_lane_shared) +
-                                              laneSharedMemTrait.in_block_space_offset),
-                                      in_blockwise_copy);
+                    return make_tuple(
+                        make_static_buffer_v4<AddressSpaceEnum::Vgpr, InDataType>(
+                            in_block_desc.GetElementSpaceSize(),
+                            static_cast<InDataType*>(p_lane_shared) +
+                                laneSharedMemTrait.in_block_space_offset / sizeof(InDataType)),
+                        in_blockwise_copy);
                 }
                 else
                 {
@@ -1463,11 +1492,12 @@ struct GridwiseConvSuba_Wconvsuba
 
                 if constexpr(EnableWaveGroup)
                 {
-                    return make_tuple(make_static_buffer_v4<AddressSpaceEnum::Vgpr, WeiDataType>(
-                                          wei_block_desc.GetElementSpaceSize(),
-                                          static_cast<WeiDataType*>(p_lane_shared) +
-                                              laneSharedMemTrait.wei_block_space_offset),
-                                      wei_blockwise_copy);
+                    return make_tuple(
+                        make_static_buffer_v4<AddressSpaceEnum::Vgpr, WeiDataType>(
+                            wei_block_desc.GetElementSpaceSize(),
+                            static_cast<WeiDataType*>(p_lane_shared) +
+                                laneSharedMemTrait.wei_block_space_offset / sizeof(WeiDataType)),
+                        wei_blockwise_copy);
                 }
                 else
                 {
@@ -1517,12 +1547,12 @@ struct GridwiseConvSuba_Wconvsuba
                         using DDataType = remove_cvref_t<tuple_element_t<i.value, DsDataType>>;
                         if constexpr(EnableWaveGroup)
                         {
-                            return make_static_buffer_v4<AddressSpaceEnum::Vgpr, DDataType>(
+                            return make_static_buffer_v5<
+                                AddressSpaceEnum::Vgpr,
+                                DDataType,
+                                laneSharedMemTrait.ds_block_space_offset[i] / sizeof(DDataType)>(
                                 ds_wave_desc[Number<i>{}].GetElementSpaceSize(),
-                                static_cast<DDataType*>(p_lane_shared) +
-                                    BlockwiseConv::LaneSharedMemTrait::ds_block_space_offset[i] *
-                                        BlockwiseConv::template GetLaneSharedMemCount<
-                                            HasMainBlockLoop>());
+                                static_cast<DDataType*>(p_lane_shared));
                         }
                         else
                         {
@@ -1557,10 +1587,10 @@ struct GridwiseConvSuba_Wconvsuba
         BlockwiseConv blockwise_conv = {};
 
         // Prepare Register for Accum
-        auto pOutData =
-            static_cast<EDataType*>(p_lane_shared) + laneSharedMemTrait.out_block_space_offset;
-        auto pAccData =
-            static_cast<AccDataType*>(p_lane_shared) + laneSharedMemTrait.acc_block_space_offset;
+        auto pOutData = static_cast<EDataType*>(p_lane_shared) +
+                        laneSharedMemTrait.out_block_space_offset / sizeof(EDataType);
+        auto pAccData = static_cast<AccDataType*>(p_lane_shared) +
+                        laneSharedMemTrait.acc_block_space_offset / sizeof(AccDataType);
         auto acc_thread_buf =
             blockwise_conv.template MakeAccumThreadBuffer<HasMainBlockLoop>(pAccData);
         auto out_thread_buf = blockwise_conv.MakeOutThreadBuffer(pOutData);
@@ -1582,11 +1612,28 @@ struct GridwiseConvSuba_Wconvsuba
         auto ds_block_buf       = ds_block_trait()[I0];
         auto ds_blockwise_copy  = ds_block_trait()[I1];
         auto ds_copy_block_desc = ds_block_trait()[I2];
-
-        __shared__ WavegroupSemaphore<WaveIdOutput> semaOutput;
+#ifdef CK_USE_AMD_SEMAPHORE_ASM
+        WavegroupSemaphore<WaveIdOutput, 1> sema_output;
+#else
+        __shared__ WavegroupSemaphore<WaveIdOutput> sema_output;
+#endif
         if constexpr(EnableWaveGroup4)
         {
-            semaOutput.init();
+            sema_output.init();
+        }
+#ifdef CK_USE_AMD_NAMED_BARRIER_ASM
+        NamedBarrier<2, 4> barrier_output;
+#else
+        __shared__ NamedBarrier<4> barrier_output;
+#endif
+        constexpr auto OutputWaveId = EnableWaveGroup4 ? WaveIdOutput : WaveIdRun;
+        if constexpr(EnableWaveGroup && AccEnableLds)
+        {
+            if(get_wave_id_in_wavegroup() == OutputWaveId)
+            {
+                barrier_output.init();
+                barrier_output.join();
+            }
         }
 
         GridwiseConvPipe::template Run<HasMainBlockLoop>(in_grid_block_desc,
@@ -1616,17 +1663,17 @@ struct GridwiseConvSuba_Wconvsuba
         {
             if(get_wave_id_in_wavegroup() == WaveIdPostRun)
             {
-                semaOutput.signal<0>();
+                sema_output.template signal<0>();
             }
             if(get_wave_id_in_wavegroup() == WaveIdOutput)
             {
-                semaOutput.wait<0>();
+                sema_output.template wait<0>();
             }
         }
 
         /*******************************************************************************/
         // Store accum buffer
-        constexpr auto OutputWaveId = EnableWaveGroup4 ? WaveIdOutput : WaveIdRun;
+
         if((EnableWaveGroup == false) || (get_wave_id_in_wavegroup() == OutputWaveId))
         {
             // Store the result: AccElementOp(None/fma/sba/uba) + NextElementOp(cvt_tensor)
@@ -1636,6 +1683,7 @@ struct GridwiseConvSuba_Wconvsuba
                                blockwise_conv,
                                acc_element_op,
                                p_shared,
+                               barrier_output,
                                h_out_block_data_idx_on_grid,
                                w_out_block_data_idx_on_grid,
                                k_block_data_idx_on_grid);

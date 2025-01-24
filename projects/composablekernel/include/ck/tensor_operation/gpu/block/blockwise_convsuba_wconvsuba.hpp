@@ -358,7 +358,7 @@ struct Blockwise_element_wconv_suba
             if constexpr(BlockwiseElementOp::packed)
             {
                 bias_scale[0] =
-                    *reinterpret_cast<const AccDataType*>(getBufPtr(I1, Number<bias_offset>{}));
+                    *reinterpret_cast<const AccDataType*>(getBufPtr(I0, Number<bias_offset>{}));
                 bias_scale[1] =
                     *reinterpret_cast<const AccDataType*>(getBufPtr(I1, Number<scale_offset>{}));
             }
@@ -375,8 +375,16 @@ struct Blockwise_element_wconv_suba
         else if constexpr(std::is_same<half_t, AccDataType>::value ||
                           std::is_same<bhalf_t, AccDataType>::value)
         {
-            AccDataType halfScale =
-                *reinterpret_cast<const AccDataType*>(getBufPtr(I1, Number<scale_offset>{}));
+            AccDataType halfScale = {};
+            if constexpr(BlockwiseElementOp::packed == false)
+            {
+                static_assert(acc_sba.GetNumScaleComponents() == 2);
+                // TODO: lane shared variable doesn't access sub-dword, so we have to align the
+                // offset to even, and select high/low part manually.
+                ScaleVec dualScale =
+                    *reinterpret_cast<const ScaleVec*>(getBufPtr(I1, Number<scale_offset & ~1>{}));
+                halfScale = (scale_offset & 1) ? dualScale[1] : dualScale[0];
+            }
             if constexpr((HPerWconv == 4) && (WPerWconv == 2))
             {
                 // 4xhalf for output of convolve
@@ -457,26 +465,27 @@ struct Blockwise_element_wconv_suba
 
     struct LaneSharedMemTrait
     {
-        static constexpr auto max_lane_shared_align = 4;
+        static constexpr index_t max_lane_shared_align = 4;
 
-        static constexpr auto bias_block_space_size_aligned =
+        static constexpr index_t bias_block_space_size_aligned =
             EnableWaveGroup && (DsEnableLds == false)
-                ? math::integer_least_multiple(DsWaveDesc{}[I0].GetElementSpaceSize(),
+                ? math::integer_least_multiple(DsWaveDesc{}[I0].GetElementSpaceSize() *
+                                                   sizeof(AccDataType),
                                                max_lane_shared_align)
                 : 0;
-        static constexpr auto scale_block_space_size_aligned =
+        static constexpr index_t scale_block_space_size_aligned =
             EnableWaveGroup && (DsEnableLds == false)
-                ? math::integer_least_multiple(DsWaveDesc{}[I1].GetElementSpaceSize(),
+                ? math::integer_least_multiple(DsWaveDesc{}[I1].GetElementSpaceSize() *
+                                                   sizeof(AccDataType),
                                                max_lane_shared_align)
                 : 0;
 
-        static constexpr auto bias_block_space_offset  = 0;
-        static constexpr auto scale_block_space_offset = bias_block_space_size_aligned;
+        static constexpr index_t bias_block_space_offset  = 0;
+        static constexpr index_t scale_block_space_offset = bias_block_space_size_aligned;
         static constexpr auto ds_block_space_offset =
             make_tuple(bias_block_space_offset, scale_block_space_offset);
-        static constexpr auto lane_shared_size =
-            bias_block_space_size_aligned * sizeof(AccDataType) +
-            scale_block_space_size_aligned * sizeof(AccDataType);
+        static constexpr index_t lane_shared_size =
+            bias_block_space_size_aligned + scale_block_space_size_aligned;
     };
 };
 
@@ -964,29 +973,28 @@ struct Blockwise_element_wconv_fma
 
     struct LaneSharedMemTrait
     {
-        static constexpr auto max_lane_shared_align = 4;
+        static constexpr index_t max_lane_shared_align = 4;
 
-        static constexpr auto residual_block_space_size_aligned =
+        static constexpr index_t residual_block_space_size_aligned =
             EnableWaveGroup && (DsEnableLds == false)
                 ? math::integer_least_multiple(
                       ResidualWaveDesc{}.GetElementSpaceSize() *
-                          WconvFma::template SizeOfBits<ResidualDataType>() /
-                          WconvFma::template SizeOfBits<AccDataType>(),
+                          WconvFma::template SizeOfBits<ResidualDataType>() / 8,
                       max_lane_shared_align)
                 : 0;
-        static constexpr auto scale_block_space_size_aligned =
+        static constexpr index_t scale_block_space_size_aligned =
             EnableWaveGroup && (DsEnableLds == false)
-                ? math::integer_least_multiple(ScaleWaveDesc{}.GetElementSpaceSize(),
+                ? math::integer_least_multiple(ScaleWaveDesc{}.GetElementSpaceSize() *
+                                                   sizeof(ScaleDataType),
                                                max_lane_shared_align)
                 : 0;
 
-        static constexpr auto residual_block_space_offset = 0;
-        static constexpr auto scale_block_space_offset    = residual_block_space_size_aligned;
+        static constexpr index_t residual_block_space_offset = 0;
+        static constexpr index_t scale_block_space_offset    = residual_block_space_size_aligned;
         static constexpr auto ds_block_space_offset =
             make_tuple(residual_block_space_offset, scale_block_space_offset);
-        static constexpr auto lane_shared_size =
-            residual_block_space_size_aligned * sizeof(AccDataType) +
-            scale_block_space_size_aligned * sizeof(AccDataType);
+        static constexpr index_t lane_shared_size =
+            residual_block_space_size_aligned + scale_block_space_size_aligned;
     };
 };
 
@@ -1064,6 +1072,27 @@ struct Blockwise_element_wconv_cvtTensor
         accCvtInstance.cvtTensor_instr.Run(acc_vec, convert_scale, outVec);
     }
 #pragma clang diagnostic pop
+};
+
+template <typename AccBlockDesc>
+struct Blockwise_element_wconv_out_passthrough
+{
+    template <typename AccDataVec,
+              typename OutTensorThreadBuffer,
+              typename NumberH0,
+              typename NumberW0,
+              typename NumberK0>
+    __device__ void Run(const AccDataVec& acc_vec,
+                        OutTensorThreadBuffer& out_thread_buf,
+                        NumberH0,
+                        NumberW0,
+                        NumberK0) const
+    {
+        constexpr auto accum_offset = accum_thread_desc_.CalculateOffset(
+            make_tuple(NumberH0{}, NumberW0{}, NumberK0{}, Number<0>{}));
+        out_thread_buf.GetVectorTypeReference(Number<accum_offset>{}) = acc_vec;
+    }
+    static constexpr AccBlockDesc accum_thread_desc_;
 };
 
 struct Blockwise_element_passthrough
@@ -1248,12 +1277,13 @@ struct BlockwiseSubaConvWconv
     {
         if constexpr(EnableWaveGroup4)
         {
-            constexpr auto VectorCount =
-                HasMainLoop ? math::max(HRepeatOut * WRepeatOut * KRepeat,
-                                        LaneSharedMemTrait::acc_block_space_alinged /
-                                            wconv_conv.GetNumAccumComponents())
-                            : LaneSharedMemTrait::acc_block_space_alinged /
-                                  wconv_conv.GetNumAccumComponents();
+            constexpr index_t AccRingVectorCount =
+                LaneSharedMemTrait::acc_ring_block_space_aligned /
+                wconv_conv.GetNumAccumComponents() / sizeof(AccDataType);
+            constexpr auto VectorCount = HasMainLoop ? math::max(HRepeatOut * WRepeatOut * KRepeat,
+                                                                 LaneSharedMemTrait::acc_ring_size)
+                                                     : AccRingVectorCount;
+
             return StaticBufferTupleOfVector<
                 AddressSpaceEnum::Vgpr,
                 AccDataType,
@@ -1751,12 +1781,12 @@ struct BlockwiseSubaConvWconv
         const typename InDataVec::type* indata_thread_vec_ptr[4];
         static_assert(Iters <= 4 && FilterSize == 2, "");
 
-        constexpr auto NumYX          = FilterSize * FilterSize;
-        constexpr index_t x_offset[4] = {0, 1, 0, 1};
-        constexpr index_t y_offset[4] = {0, 0, 1, 1};
-        constexpr index_t CStep       = Transposed == false ? 1 : Iters;
-        constexpr index_t HStep       = Transposed == false ? 2 : 1;
-        constexpr index_t WStep       = Transposed == false ? 2 : 1;
+        static constexpr auto NumYX          = FilterSize * FilterSize;
+        static constexpr index_t x_offset[4] = {0, 1, 0, 1};
+        static constexpr index_t y_offset[4] = {0, 0, 1, 1};
+        static constexpr index_t CStep       = Transposed == false ? 1 : Iters;
+        static constexpr index_t HStep       = Transposed == false ? 2 : 1;
+        static constexpr index_t WStep       = Transposed == false ? 2 : 1;
 
         auto load_weight_data = [&](auto k0, auto c0, auto& tmp_buf, auto& weight_ptr) {
             constexpr auto TapPerIter = wconv_conv.GetNumWeightTapPerWave();
@@ -1911,46 +1941,61 @@ struct BlockwiseSubaConvWconv
             }
         };
 
-        static_for<0, KRepeat, 1>{}([&](auto k0) {
-            const typename WeiDataVec::type* weight_thread_vec_ptr[CRepeat / CStep][4];
+        constexpr auto get_accum_offset_transposed = [&](auto h0, auto w0, auto k0, auto i) {
+            if constexpr(HasMainLoop{} || (EnableWaveGroup4 == false))
+            {
+                return accum_thread_desc_.CalculateOffset(make_tuple(
+                    Number<h0 * 2 + y_offset[i]>{}, Number<w0 * 2 + x_offset[i]>{}, k0, I0));
+            }
+            else
+            {
+                constexpr index_t WStride = 1;
+                constexpr index_t HStride = WRepeat / WStep;
+                constexpr index_t Idx = (h0 / HStep * HStride + w0 / WStep * WStride) & 1 ? 1 : 0;
+                return (NumYX * Idx + i) * NumAccComp;
+            }
+        };
 
-            // Load weights
-            WeiDataVec weight_thread_vec[CRepeat / CStep][4];
-            static_for<0, CRepeat, CStep>{}([&](auto c0) {
-                if constexpr(EnableWaveGroup4)
+        constexpr auto get_accum_offset = [&](auto h0, auto w0, auto k0) {
+            if constexpr(HasMainLoop{} || (EnableWaveGroup4 == false))
+            {
+                return accum_thread_desc_.CalculateOffset(
+                    make_tuple(Number<h0 / HStep>{}, Number<w0 / WStep>{}, k0, I0));
+            }
+            else
+            {
+                constexpr index_t WStride = 1;
+                constexpr index_t HStride = WRepeat / WStep;
+                constexpr index_t Idx = (h0 / HStep * HStride + w0 / WStep * WStride) & 1 ? 1 : 0;
+                return Idx * NumAccComp;
+            }
+        };
+
+        if constexpr(EnableWaveGroup4)
+        {
+            static_for<0, KRepeat, 1>{}([&](auto k0) {
+                const typename WeiDataVec::type* weight_thread_vec_ptr[CRepeat / CStep][4];
+
+                // Load weights
+                WeiDataVec weight_thread_vec[CRepeat / CStep][4];
+                auto semaAccumReady = semaAccums[I0];
+                auto semaAccumFree  = semaAccums[I1];
+                if(ThisThreadBlock::GetWaveIdInWaveGroup() == WaveIdRun)
                 {
-                    if(ThisThreadBlock::GetWaveIdInWaveGroup() == WaveIdRun)
-                    {
+                    static_for<0, CRepeat, CStep>{}([&](auto c0) {
                         load_weight_data(k0,
                                          c0,
                                          weight_thread_vec[c0 / CStep],
                                          weight_thread_vec_ptr[c0 / CStep]);
-                    }
-                }
-                else
-                {
-                    load_weight_data(
-                        k0, c0, weight_thread_vec[c0 / CStep], weight_thread_vec_ptr[c0 / CStep]);
-                }
-            });
+                    });
 
-            InDataVec indata_thread_vec[4];
-            static_for<0, HRepeat, HStep>{}([&](auto h0) {
-                static_for<0, WRepeat, WStep>{}([&](auto w0) {
-                    if constexpr(EnableWaveGroup4)
-                    {
-                        auto semaAccumReady       = semaAccums[I0];
-                        auto semaAccumFree        = semaAccums[I1];
-                        constexpr index_t WStride = 1;
-                        constexpr index_t HStride = WRepeat / WStep;
-                        constexpr index_t Idx =
-                            (h0 / HStep * HStride + w0 / WStep * WStride) & 1 ? 1 : 0;
-                        if constexpr(Transposed == false)
-                        {
-                            if(ThisThreadBlock::GetWaveIdInWaveGroup() == WaveIdRun)
+                    InDataVec indata_thread_vec[4];
+                    static_for<0, HRepeat, HStep>{}([&](auto h0) {
+                        static_for<0, WRepeat, WStep>{}([&](auto w0) {
+                            if constexpr(Transposed == false)
                             {
-                                constexpr index_t accum_offset = accum_thread_desc_.CalculateOffset(
-                                    make_tuple(Number<h0 / HStep>{}, Number<w0 / WStep>{}, k0, I0));
+                                constexpr index_t accum_offset =
+                                    get_accum_offset(Number<h0>{}, Number<w0>{}, Number<k0>{});
                                 AccDataVec acc_vec = {};
                                 if constexpr(HasMainLoop{})
                                 {
@@ -1966,11 +2011,12 @@ struct BlockwiseSubaConvWconv
                                         acc_vec,
                                         I0);
                                 });
+
                                 if constexpr(IsLast{})
                                 {
                                     semaAccumFree->template wait<0>();
                                     accum_thread_buf.GetVectorTypeReference(
-                                        Number<Idx * NumAccComp>{}) = acc_vec;
+                                        Number<accum_offset>{}) = acc_vec;
                                     semaAccumReady->template signal<0>();
                                 }
                                 else
@@ -1979,50 +2025,17 @@ struct BlockwiseSubaConvWconv
                                         Number<accum_offset>{}) = acc_vec;
                                 }
                             }
-                            if(ThisThreadBlock::GetWaveIdInWaveGroup() == WaveIdPostRun)
-                            {
-                                if constexpr(IsLast{})
-                                {
-                                    constexpr index_t accum_offset =
-                                        accum_thread_desc_.CalculateOffset(make_tuple(
-                                            Number<h0 / HStep>{}, Number<w0 / WStep>{}, k0, I0));
-
-                                    semaAccumReady->template wait<0>();
-                                    AccDataVec acc_vec = accum_thread_buf.GetVectorTypeReference(
-                                        Number<Idx * NumAccComp>{});
-                                    element_op_.Run(ds_block_buf,
-                                                    acc_vec,
-                                                    Number<h0 / HStep>{},
-                                                    Number<w0 / WStep>{},
-                                                    k0);
-                                    if constexpr(ConvertToTensor)
-                                    {
-                                        element_next_op_.Run(acc_vec, out_thread_buf, h0, w0, k0);
-                                    }
-                                    else
-                                    {
-                                        out_thread_buf.GetVectorTypeReference(
-                                            Number<accum_offset>{}) = acc_vec;
-                                    }
-                                    semaAccumFree->template signal<0>();
-                                }
-                            }
-                        }
-                        else
-                        {
-                            if(ThisThreadBlock::GetWaveIdInWaveGroup() == WaveIdRun)
+                            else
                             {
                                 AccDataVec acc_vec[NumYX] = {};
-                                AccDataVec* accdata_thread_vec_ptr[NumYX];
                                 if constexpr(HasMainLoop{})
                                 {
                                     static_for<0, NumYX, 1>{}([&](auto i) {
                                         constexpr index_t accum_offset =
-                                            accum_thread_desc_.CalculateOffset(
-                                                make_tuple(Number<h0 * 2 + y_offset[i]>{},
-                                                           Number<w0 * 2 + x_offset[i]>{},
-                                                           k0,
-                                                           I0));
+                                            get_accum_offset_transposed(Number<h0>{},
+                                                                        Number<w0>{},
+                                                                        Number<k0>{},
+                                                                        Number<i>{});
                                         acc_vec[i] = accum_thread_buf.GetVectorTypeReference(
                                             Number<accum_offset>{});
                                     });
@@ -2054,8 +2067,13 @@ struct BlockwiseSubaConvWconv
                                 {
                                     semaAccumFree->template wait<0>();
                                     static_for<0, NumYX, 1>{}([&](auto i) {
+                                        constexpr index_t accum_offset =
+                                            get_accum_offset_transposed(Number<h0>{},
+                                                                        Number<w0>{},
+                                                                        Number<k0>{},
+                                                                        Number<i>{});
                                         accum_thread_buf.GetVectorTypeReference(
-                                            Number<(NumYX * Idx + i) * NumAccComp>{}) = acc_vec[i];
+                                            Number<accum_offset>{}) = acc_vec[i];
                                     });
                                     semaAccumReady->template signal<0>();
                                 }
@@ -2063,69 +2081,97 @@ struct BlockwiseSubaConvWconv
                                 {
                                     static_for<0, NumYX, 1>{}([&](auto i) {
                                         constexpr index_t accum_offset =
-                                            accum_thread_desc_.CalculateOffset(
-                                                make_tuple(Number<h0 * 2 + y_offset[i]>{},
-                                                           Number<w0 * 2 + x_offset[i]>{},
-                                                           k0,
-                                                           I0));
+                                            get_accum_offset_transposed(Number<h0>{},
+                                                                        Number<w0>{},
+                                                                        Number<k0>{},
+                                                                        Number<i>{});
                                         accum_thread_buf.GetVectorTypeReference(
                                             Number<accum_offset>{}) = acc_vec[i];
                                     });
                                 }
                             }
-
-                            if(ThisThreadBlock::GetWaveIdInWaveGroup() == WaveIdPostRun)
+                        });
+                    });
+                }
+                else if(IsLast{} && ThisThreadBlock::GetWaveIdInWaveGroup() == WaveIdPostRun)
+                {
+                    static_for<0, HRepeat, HStep>{}([&](auto h0) {
+                        static_for<0, WRepeat, WStep>{}([&](auto w0) {
+                            if constexpr(Transposed == false)
                             {
-                                if constexpr(IsLast{})
-                                {
-                                    semaAccumReady->template wait<0>();
-                                    AccDataVec acc_vec[NumYX] = {};
-                                    AccDataVec* accdata_thread_vec_ptr[NumYX];
-                                    static_for<0, NumYX, 1>{}([&](auto i) {
-                                        acc_vec[i] = accum_thread_buf.GetVectorTypeReference(
-                                            Number<(NumYX * Idx + i) * NumAccComp>{});
-                                        accdata_thread_vec_ptr[i] =
-                                            acc_vec[i].template AsType<AccDataVec>()(Number<0>{});
-                                    });
-                                    wconv_conv.ShuffleConv2TransposedData(accdata_thread_vec_ptr);
-                                    static_for<0, NumYX, 1>{}([&](auto i) {
-                                        element_op_.Run(ds_block_buf,
-                                                        acc_vec[i],
-                                                        Number<h0 * 2 + y_offset[i]>{},
-                                                        Number<w0 * 2 + x_offset[i]>{},
-                                                        k0);
-                                        if constexpr(ConvertToTensor)
-                                        {
-                                            element_next_op_.Run(acc_vec[i],
-                                                                 out_thread_buf,
-                                                                 Number<h0 * 2 + y_offset[i]>{},
-                                                                 Number<w0 * 2 + x_offset[i]>{},
-                                                                 k0);
-                                        }
-                                        else
-                                        {
-                                            constexpr index_t accum_offset =
-                                                accum_thread_desc_.CalculateOffset(
-                                                    make_tuple(Number<h0 * 2 + y_offset[i]>{},
-                                                               Number<w0 * 2 + x_offset[i]>{},
-                                                               k0,
-                                                               I0));
-                                            out_thread_buf.GetVectorTypeReference(
-                                                Number<accum_offset>{}) = acc_vec[i];
-                                        }
-                                    });
-                                    semaAccumFree->template signal<0>();
-                                }
-                            }
-                        }
-                    }
-                    else
-                    {
+                                constexpr index_t accum_offset =
+                                    get_accum_offset(Number<h0>{}, Number<w0>{}, Number<k0>{});
 
+                                semaAccumReady->template wait<0>();
+                                AccDataVec acc_vec =
+                                    accum_thread_buf.GetVectorTypeReference(Number<accum_offset>{});
+                                element_op_.Run(ds_block_buf,
+                                                acc_vec,
+                                                Number<h0 / HStep>{},
+                                                Number<w0 / WStep>{},
+                                                k0);
+
+                                element_next_op_.Run(acc_vec,
+                                                     out_thread_buf,
+                                                     Number<h0 / HStep>{},
+                                                     Number<w0 / WStep>{},
+                                                     k0);
+
+                                semaAccumFree->template signal<0>();
+                            }
+                            else
+                            {
+                                semaAccumReady->template wait<0>();
+                                AccDataVec acc_vec[NumYX] = {};
+                                typename AccDataVec::type* accdata_thread_vec_ptr[NumYX];
+                                static_for<0, NumYX, 1>{}([&](auto i) {
+                                    constexpr index_t accum_offset = get_accum_offset_transposed(
+                                        Number<h0>{}, Number<w0>{}, Number<k0>{}, Number<i>{});
+                                    acc_vec[i] = accum_thread_buf.GetVectorTypeReference(
+                                        Number<accum_offset>{});
+                                    accdata_thread_vec_ptr[i] =
+                                        &acc_vec[i].template AsType<typename AccDataVec::type>()(
+                                            Number<0>{});
+                                });
+                                wconv_conv.ShuffleConv2TransposedData(accdata_thread_vec_ptr);
+                                static_for<0, NumYX, 1>{}([&](auto i) {
+                                    element_op_.Run(ds_block_buf,
+                                                    acc_vec[i],
+                                                    Number<h0 * 2 + y_offset[i]>{},
+                                                    Number<w0 * 2 + x_offset[i]>{},
+                                                    k0);
+                                    element_next_op_.Run(acc_vec[i],
+                                                         out_thread_buf,
+                                                         Number<h0 * 2 + y_offset[i]>{},
+                                                         Number<w0 * 2 + x_offset[i]>{},
+                                                         k0);
+                                });
+                                semaAccumFree->template signal<0>();
+                            }
+                        });
+                    });
+                }
+            });
+        }
+        else
+        {
+            static_for<0, KRepeat, 1>{}([&](auto k0) {
+                const typename WeiDataVec::type* weight_thread_vec_ptr[CRepeat / CStep][4];
+
+                // Load weights
+                WeiDataVec weight_thread_vec[CRepeat / CStep][4];
+                static_for<0, CRepeat, CStep>{}([&](auto c0) {
+                    load_weight_data(
+                        k0, c0, weight_thread_vec[c0 / CStep], weight_thread_vec_ptr[c0 / CStep]);
+                });
+
+                InDataVec indata_thread_vec[4];
+                static_for<0, HRepeat, HStep>{}([&](auto h0) {
+                    static_for<0, WRepeat, WStep>{}([&](auto w0) {
                         if constexpr(Transposed == false)
                         {
-                            constexpr index_t accum_offset = accum_thread_desc_.CalculateOffset(
-                                make_tuple(Number<h0 / HStep>{}, Number<w0 / WStep>{}, k0, I0));
+                            constexpr index_t accum_offset =
+                                get_accum_offset(Number<h0>{}, Number<w0>{}, Number<k0>{});
                             AccDataVec acc_vec = {};
                             if constexpr(HasMainLoop{})
                             {
@@ -2146,15 +2192,11 @@ struct BlockwiseSubaConvWconv
                                                 Number<h0 / HStep>{},
                                                 Number<w0 / WStep>{},
                                                 k0);
-                                if constexpr(ConvertToTensor)
-                                {
-                                    element_next_op_.Run(acc_vec, out_thread_buf, h0, w0, k0);
-                                }
-                                else
-                                {
-                                    out_thread_buf.GetVectorTypeReference(Number<accum_offset>{}) =
-                                        acc_vec;
-                                }
+                                element_next_op_.Run(acc_vec,
+                                                     out_thread_buf,
+                                                     Number<h0 / HStep>{},
+                                                     Number<w0 / WStep>{},
+                                                     k0);
                             }
                             else
                             {
@@ -2169,12 +2211,8 @@ struct BlockwiseSubaConvWconv
                             if constexpr(HasMainLoop{})
                             {
                                 static_for<0, NumYX, 1>{}([&](auto i) {
-                                    constexpr index_t accum_offset =
-                                        accum_thread_desc_.CalculateOffset(
-                                            make_tuple(Number<h0 * 2 + y_offset[i]>{},
-                                                       Number<w0 * 2 + x_offset[i]>{},
-                                                       k0,
-                                                       I0));
+                                    constexpr index_t accum_offset = get_accum_offset_transposed(
+                                        Number<h0>{}, Number<w0>{}, Number<k0>{}, Number<i>{});
                                     acc_vec[i] = accum_thread_buf.GetVectorTypeReference(
                                         Number<accum_offset>{});
                                 });
@@ -2212,45 +2250,27 @@ struct BlockwiseSubaConvWconv
                                                     Number<h0 * 2 + y_offset[i]>{},
                                                     Number<w0 * 2 + x_offset[i]>{},
                                                     k0);
-                                    if constexpr(ConvertToTensor)
-                                    {
-                                        element_next_op_.Run(acc_vec[i],
-                                                             out_thread_buf,
-                                                             Number<h0 * 2 + y_offset[i]>{},
-                                                             Number<w0 * 2 + x_offset[i]>{},
-                                                             k0);
-                                    }
-                                    else
-                                    {
-                                        constexpr index_t accum_offset =
-                                            accum_thread_desc_.CalculateOffset(
-                                                make_tuple(Number<h0 * 2 + y_offset[i]>{},
-                                                           Number<w0 * 2 + x_offset[i]>{},
-                                                           k0,
-                                                           I0));
-                                        out_thread_buf.GetVectorTypeReference(
-                                            Number<accum_offset>{}) = acc_vec[i];
-                                    }
+                                    element_next_op_.Run(acc_vec[i],
+                                                         out_thread_buf,
+                                                         Number<h0 * 2 + y_offset[i]>{},
+                                                         Number<w0 * 2 + x_offset[i]>{},
+                                                         k0);
                                 });
                             }
                             else
                             {
                                 static_for<0, NumYX, 1>{}([&](auto i) {
-                                    constexpr index_t accum_offset =
-                                        accum_thread_desc_.CalculateOffset(
-                                            make_tuple(Number<h0 * 2 + y_offset[i]>{},
-                                                       Number<w0 * 2 + x_offset[i]>{},
-                                                       k0,
-                                                       I0));
+                                    constexpr index_t accum_offset = get_accum_offset_transposed(
+                                        Number<h0>{}, Number<w0>{}, Number<k0>{}, Number<i>{});
                                     accum_thread_buf.GetVectorTypeReference(
                                         Number<accum_offset>{}) = acc_vec[i];
                                 });
                             }
                         }
-                    }
+                    });
                 });
             });
-        });
+        }
     }
 
     template <typename WeightBlockBuffer,
@@ -2426,38 +2446,38 @@ struct BlockwiseSubaConvWconv
             }
         };
 
-        static_for<0, KRepeat, 1>{}([&](auto k0) {
-            WeiDataVec weight_thread_vec[CRepeat / CStep];
-            const typename WeiDataVec::type* weight_thread_vec_ptr[CRepeat / CStep];
-            static_for<0, CRepeat, CStep>{}([&](auto c0) {
-                // Load weights
-                if constexpr(EnableWaveGroup4)
+        constexpr auto get_accum_offset = [&](auto h0, auto w0, auto k0) {
+            if constexpr(HasMainLoop{} || (EnableWaveGroup4 == false))
+            {
+                return accum_thread_desc_.CalculateOffset(make_tuple(h0, w0, k0, I0));
+            }
+            else
+            {
+                constexpr index_t Idx = (h0 * WRepeat + w0) & 1 ? 1 : 0;
+                return Idx * NumAccComp;
+            }
+        };
+
+        if constexpr(EnableWaveGroup4)
+        {
+            static_for<0, KRepeat, 1>{}([&](auto k0) {
+                WeiDataVec weight_thread_vec[CRepeat / CStep];
+                const typename WeiDataVec::type* weight_thread_vec_ptr[CRepeat / CStep];
+                auto semaAccumReady = semaAccums[I0];
+                auto semaAccumFree  = semaAccums[I1];
+                if(ThisThreadBlock::GetWaveIdInWaveGroup() == WaveIdRun)
                 {
-                    if(ThisThreadBlock::GetWaveIdInWaveGroup() == WaveIdRun)
-                    {
+                    static_for<0, CRepeat, CStep>{}([&](auto c0) {
+                        // Load weights
                         weight_thread_vec_ptr[c0 / CStep] =
                             load_weight_data(k0, c0, weight_thread_vec[c0 / CStep]);
-                    }
-                }
-                else
-                {
-                    weight_thread_vec_ptr[c0 / CStep] =
-                        load_weight_data(k0, c0, weight_thread_vec[c0 / CStep]);
-                }
-            });
+                    });
 
-            static_for<0, HRepeat, 1>{}([&](auto h0) {
-                static_for<0, WRepeat, 1>{}([&](auto w0) {
-                    constexpr index_t accum_offset =
-                        accum_thread_desc_.CalculateOffset(make_tuple(h0, w0, k0, I0));
+                    static_for<0, HRepeat, 1>{}([&](auto h0) {
+                        static_for<0, WRepeat, 1>{}([&](auto w0) {
+                            constexpr index_t accum_offset =
+                                get_accum_offset(Number<h0>{}, Number<w0>{}, Number<k0>{});
 
-                    if constexpr(EnableWaveGroup4)
-                    {
-                        auto semaAccumReady   = semaAccums[I0];
-                        auto semaAccumFree    = semaAccums[I1];
-                        constexpr index_t Idx = (h0 * WRepeat + w0) & 1 ? 1 : 0;
-                        if(ThisThreadBlock::GetWaveIdInWaveGroup() == WaveIdRun)
-                        {
                             InDataVec indata_thread_vec[4];
                             AccDataVec acc_vec = {};
                             if constexpr(HasMainLoop{})
@@ -2475,8 +2495,8 @@ struct BlockwiseSubaConvWconv
                             if constexpr(IsLast{})
                             {
                                 semaAccumFree->template wait<0>();
-                                accum_thread_buf.GetVectorTypeReference(
-                                    Number<Idx * NumAccComp>{}) = acc_vec;
+                                accum_thread_buf.GetVectorTypeReference(Number<accum_offset>{}) =
+                                    acc_vec;
                                 semaAccumReady->template signal<0>();
                             }
                             else
@@ -2484,28 +2504,48 @@ struct BlockwiseSubaConvWconv
                                 accum_thread_buf.GetVectorTypeReference(Number<accum_offset>{}) =
                                     acc_vec;
                             }
-                        }
-                        // run sba/uba
-                        if(ThisThreadBlock::GetWaveIdInWaveGroup() == WaveIdPostRun)
-                        {
-                            semaAccumReady->template signal<0>();
-                            AccDataVec acc_vec =
-                                accum_thread_buf.GetVectorTypeReference(Number<Idx * NumAccComp>{});
-                            element_op_.Run(ds_block_buf, acc_vec, h0, w0, k0);
-                            if constexpr(ConvertToTensor)
-                            {
-                                element_next_op_.Run(acc_vec, out_thread_buf, h0, w0, k0);
-                            }
-                            else
-                            {
-                                out_thread_buf.GetVectorTypeReference(Number<accum_offset>{}) =
-                                    acc_vec;
-                            }
-                            semaAccumFree->template signal<0>();
-                        }
-                    }
-                    else
+                        });
+                    });
+                }
+
+                // run sba/uba
+                if constexpr(IsLast{})
+                {
+                    if(ThisThreadBlock::GetWaveIdInWaveGroup() == WaveIdPostRun)
                     {
+                        static_for<0, HRepeat, 1>{}([&](auto h0) {
+                            static_for<0, WRepeat, 1>{}([&](auto w0) {
+                                constexpr index_t accum_offset =
+                                    get_accum_offset(Number<h0>{}, Number<w0>{}, Number<k0>{});
+
+                                semaAccumReady->template wait<0>();
+                                AccDataVec acc_vec =
+                                    accum_thread_buf.GetVectorTypeReference(Number<accum_offset>{});
+                                element_op_.Run(ds_block_buf, acc_vec, h0, w0, k0);
+                                element_next_op_.Run(acc_vec, out_thread_buf, h0, w0, k0);
+                                semaAccumFree->template signal<0>();
+                            });
+                        });
+                    }
+                }
+            });
+        }
+        else
+        {
+            static_for<0, KRepeat, 1>{}([&](auto k0) {
+                WeiDataVec weight_thread_vec[CRepeat / CStep];
+                const typename WeiDataVec::type* weight_thread_vec_ptr[CRepeat / CStep];
+                static_for<0, CRepeat, CStep>{}([&](auto c0) {
+                    // Load weights
+                    weight_thread_vec_ptr[c0 / CStep] =
+                        load_weight_data(k0, c0, weight_thread_vec[c0 / CStep]);
+                });
+
+                static_for<0, HRepeat, 1>{}([&](auto h0) {
+                    static_for<0, WRepeat, 1>{}([&](auto w0) {
+                        constexpr index_t accum_offset =
+                            get_accum_offset(Number<h0>{}, Number<w0>{}, Number<k0>{});
+
                         InDataVec indata_thread_vec[4];
                         AccDataVec acc_vec = {};
                         if constexpr(HasMainLoop{})
@@ -2524,25 +2564,17 @@ struct BlockwiseSubaConvWconv
                         if constexpr(IsLast{})
                         {
                             element_op_.Run(ds_block_buf, acc_vec, h0, w0, k0);
-                            if constexpr(ConvertToTensor)
-                            {
-                                element_next_op_.Run(acc_vec, out_thread_buf, h0, w0, k0);
-                            }
-                            else
-                            {
-                                out_thread_buf.GetVectorTypeReference(Number<accum_offset>{}) =
-                                    acc_vec;
-                            }
+                            element_next_op_.Run(acc_vec, out_thread_buf, h0, w0, k0);
                         }
                         else
                         {
                             accum_thread_buf.GetVectorTypeReference(Number<accum_offset>{}) =
                                 acc_vec;
                         }
-                    }
+                    });
                 });
             });
-        });
+        }
     };
 
 #pragma clang diagnostic pop
@@ -2697,7 +2729,7 @@ struct BlockwiseSubaConvWconv
     template <bool shouldCvtToTensor>
     struct BlockwiseNextElementSelect
     {
-        using type = Blockwise_element_passthrough;
+        using type = Blockwise_element_wconv_out_passthrough<decltype(accum_thread_desc_)>;
     };
     template <>
     struct BlockwiseNextElementSelect<true>
@@ -2751,13 +2783,13 @@ struct BlockwiseSubaConvWconv
     struct SharedMemTrait
     {
         // LDS allocation for A and B: be careful of alignment
-        static constexpr auto max_lds_align = 8;
+        static constexpr index_t max_lds_align = 8;
 
-        static constexpr auto in_block_space_size_aligned =
+        static constexpr index_t in_block_space_size_aligned =
             InDataEnableLds ? math::integer_least_multiple(InDataBlockDesc{}.GetElementSpaceSize(),
                                                            max_lds_align)
                             : 0;
-        static constexpr auto wei_block_space_size_aligned =
+        static constexpr index_t wei_block_space_size_aligned =
             WeiDataEnableLds ? math::integer_least_multiple(
                                    WeiDataBlockDesc{}.GetElementSpaceSize(), max_lds_align)
                              : 0;
@@ -2765,11 +2797,11 @@ struct BlockwiseSubaConvWconv
         static constexpr auto ds_block_space_size_aligned =
             BlockwiseElementOpType::SharedMemTrait::ds_block_space_size_aligned;
 
-        static constexpr auto in_block_space_offset  = 0;
-        static constexpr auto wei_block_space_offset = in_block_space_size_aligned;
+        static constexpr index_t in_block_space_offset  = 0;
+        static constexpr index_t wei_block_space_offset = in_block_space_size_aligned;
 
         // LDS allocation for Ds in LDS
-        static constexpr auto ds_base_offset =
+        static constexpr index_t ds_base_offset =
             (wei_block_space_offset + wei_block_space_size_aligned) * sizeof(WeiDataType) /
             sizeof(AccDataType);
 
@@ -2778,50 +2810,59 @@ struct BlockwiseSubaConvWconv
             BlockwiseElementOpType::SharedMemTrait::ds_block_space_offset[I1] + ds_base_offset);
 
         // LDS allocation for C shuffle in LDS
-        static constexpr auto acc_block_space_size = GetAccBlockDescriptor().GetElementSpaceSize();
+        static constexpr index_t acc_block_space_size =
+            GetAccBlockDescriptor().GetElementSpaceSize();
 
-        static constexpr auto acc_block_space_offset = 0;
+        static constexpr index_t acc_block_space_offset = 0;
 
-        static constexpr auto lds_size =
+        static constexpr index_t lds_size =
             math::max(acc_block_space_size * sizeof(AccDataType),
                       in_block_space_size_aligned * sizeof(InDataType) +
                           wei_block_space_size_aligned * sizeof(WeiDataType) +
                           BlockwiseElementOpType::SharedMemTrait::lds_size);
 
-        static constexpr auto out_tensor_block_space_size =
+        static constexpr index_t out_tensor_block_space_size =
             GetAccBlockDescriptor().GetElementSpaceSize();
-        static constexpr auto out_tensor_block_space_offset = 0;
+        static constexpr index_t out_tensor_block_space_offset = 0;
     };
 
     struct LaneSharedMemTrait
     {
-        static constexpr auto max_lane_shared_align = 4;
+        static constexpr index_t max_lane_shared_align = 4;
 
-        static constexpr auto in_block_space_size_aligned =
+        static constexpr index_t in_block_space_size_aligned =
             EnableWaveGroup && (InDataEnableLds == false)
-                ? math::integer_least_multiple(InDataWaveDesc{}.GetElementSpaceSize(),
+                ? math::integer_least_multiple(InDataWaveDesc{}.GetElementSpaceSize() *
+                                                   sizeof(InDataType),
                                                max_lane_shared_align)
                 : 0;
-        static constexpr auto wei_block_space_size_aligned =
+        static constexpr index_t wei_block_space_size_aligned =
             EnableWaveGroup && (WeiDataEnableLds == false)
-                ? math::integer_least_multiple(WeiDataWaveDesc{}.GetElementSpaceSize(),
+                ? math::integer_least_multiple(WeiDataWaveDesc{}.GetElementSpaceSize() *
+                                                   sizeof(WeiDataType),
                                                max_lane_shared_align)
                 : 0;
-        static constexpr auto ds_block_space_size_aligned =
+        static constexpr index_t ds_block_space_size_aligned =
             BlockwiseElementOpType::LaneSharedMemTrait::lane_shared_size;
 
         static constexpr auto ds_block_space_offset =
             BlockwiseElementOpType::LaneSharedMemTrait::ds_block_space_offset;
 
-        static constexpr auto out_block_space_aligned = math::integer_least_multiple(
+        static constexpr index_t out_block_space_aligned = math::integer_least_multiple(
             HRepeatOut * WRepeatOut * KRepeat * wconv_conv.GetNumAccumComponents() *
-                wconv_conv.template SizeOfBits<EDataType>() /
-                wconv_conv.template SizeOfBits<AccDataType>(),
+                wconv_conv.template SizeOfBits<EDataType>() / 8,
             max_lane_shared_align);
 
-        static constexpr auto acc_block_space_alinged = math::integer_least_multiple(
-            (FilterSize == 2 && Transposed) ? 2 * 4 * wconv_conv.GetNumAccumComponents()
-                                            : 2 * wconv_conv.GetNumAccumComponents(),
+        static constexpr index_t acc_ring_size                = 2;
+        static constexpr index_t acc_ring_block_space_aligned = math::integer_least_multiple(
+            (FilterSize == 2 && Transposed)
+                ? acc_ring_size * 4 * wconv_conv.GetNumAccumComponents() * sizeof(AccDataType)
+                : acc_ring_size * wconv_conv.GetNumAccumComponents() * sizeof(AccDataType),
+            max_lane_shared_align);
+
+        static constexpr index_t acc_block_space_aligned = math::integer_least_multiple(
+            HRepeatOut * WRepeatOut * KRepeat * wconv_conv.GetNumAccumComponents() *
+                sizeof(AccDataType),
             max_lane_shared_align);
     };
 };

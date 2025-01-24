@@ -34,6 +34,7 @@ template <typename SrcData,
           InMemoryDataOperationEnum DstInMemOp,
           index_t DstScalarStrideInVector,
           bool DstResetCoordinateAfterRun,
+          bool ForceAlignToUint32                                         = false,
           typename enable_if<SrcDesc::IsKnownAtCompileTime(), bool>::type = false>
 struct ThreadwiseTensorSliceTransfer_v1r3
 {
@@ -103,19 +104,47 @@ struct ThreadwiseTensorSliceTransfer_v1r3
         static_for<0, num_access, 1>{}([&](auto idx_1d) {
             constexpr auto idx_md = SpaceFillingCurve::GetIndex(idx_1d);
 
-            // copy data from src_buf into dst_vector
-            // TODO: It's a hack here to use \p dst_scalar_step_in_vector. Use SpaceFillingCurve?
-            static_for<0, DstScalarPerVector, 1>{}([&](auto i) {
-                constexpr index_t src_offset = src_desc.CalculateOffset(
-                    src_slice_origin_idx + idx_md + i * dst_scalar_step_in_vector);
+            if constexpr(ForceAlignToUint32 && std::is_same<SrcData, DstData>::value)
+            {
+                static_assert(sizeof(uint32_t) / sizeof(SrcData) > 0);
+                constexpr index_t SrcScalarPerUint32 = sizeof(uint32_t) / sizeof(SrcData);
+                constexpr index_t SrcScalarPerVector =
+                    math::max(DstScalarPerVector, SrcScalarPerUint32);
+                using SrcVectorType = typename vector_type_maker<SrcData, SrcScalarPerVector>::type;
+                SrcVectorType src_vector;
+                constexpr index_t src_offset =
+                    src_desc.CalculateOffset(src_slice_origin_idx + idx_md);
+                constexpr index_t src_offset_aligned = src_offset & ~(SrcScalarPerUint32 - 1);
+                constexpr index_t src_offset_offset  = src_offset - src_offset_aligned;
+                src_vector =
+                    *reinterpret_cast<const SrcVectorType*>(&src_buf[Number<src_offset_aligned>{}]);
 
-                DstData v;
-                // apply element-wise operation
-                element_op_(v, src_buf[Number<src_offset>{}]);
+                static_for<0, DstScalarPerVector, 1>{}([&](auto i) {
+                    DstData v;
+                    // apply element-wise operation
+                    SrcData s =
+                        src_vector.template AsType<SrcData>()(Number<i + src_offset_offset>{});
+                    element_op_(v, s);
 
-                dst_vector.template AsType<DstData>()(i) = v;
-            });
+                    dst_vector.template AsType<DstData>()(i) = v;
+                });
+            }
+            else
+            {
+                // copy data from src_buf into dst_vector
+                // TODO: It's a hack here to use \p dst_scalar_step_in_vector. Use
+                // SpaceFillingCurve?
+                static_for<0, DstScalarPerVector, 1>{}([&](auto i) {
+                    constexpr index_t src_offset = src_desc.CalculateOffset(
+                        src_slice_origin_idx + idx_md + i * dst_scalar_step_in_vector);
 
+                    DstData v;
+                    // apply element-wise operation
+                    element_op_(v, src_buf[Number<src_offset>{}]);
+
+                    dst_vector.template AsType<DstData>()(i) = v;
+                });
+            }
 #ifdef __HIP_DEVICE_COMPILE__
             using dst_vector_t =
                 typename vector_type_maker<DstData, DstScalarPerVector>::type::type;
@@ -211,6 +240,7 @@ template <typename SrcData,
           bool SrcResetCoordinateAfterRun,
           bool InvalidElementAsNaN                                        = false,
           bool UseTrLoad                                                  = false,
+          bool ForceAlignToUint32                                         = false,
           typename enable_if<DstDesc::IsKnownAtCompileTime(), bool>::type = false>
 struct ThreadwiseTensorSliceTransfer_v2
 {
@@ -304,7 +334,7 @@ struct ThreadwiseTensorSliceTransfer_v2
                 }
                 else
                 {
-                    return false;
+                    return true;
                 }
             }();
 
@@ -312,22 +342,63 @@ struct ThreadwiseTensorSliceTransfer_v2
             if constexpr(InvalidElementAsNaN == false && std::is_same<SrcData, DstData>::value &&
                          go_fast_copy == true)
             {
-                constexpr index_t dst_offset =
-                    dst_desc.CalculateOffset(to_multi_index(dst_slice_origin_idx) + src_data_idx);
-                src_vector_t* dst_buf_ptr =
-                    reinterpret_cast<src_vector_t*>(&dst_buf(Number<dst_offset>{}));
-                if constexpr(UseTrLoad)
+
+                if constexpr(ForceAlignToUint32)
                 {
-                    *dst_buf_ptr =
-                        src_buf.template trLoad<src_vector_t>(src_coord_.GetOffset(), is_src_valid);
+                    typename vector_type_maker<SrcData, SrcScalarPerVector>::type src_vector;
+                    if constexpr(UseTrLoad)
+                    {
+                        src_vector.template AsType<src_vector_t>()(Number<0>{}) =
+                            src_buf.template trLoad<src_vector_t>(src_coord_.GetOffset(),
+                                                                  is_src_valid);
+                    }
+                    else
+                    {
+                        src_vector.template AsType<src_vector_t>()(Number<0>{}) =
+                            src_buf.template Get<src_vector_t>(src_coord_.GetOffset(),
+                                                               is_src_valid);
+                    }
+
+                    static_assert(sizeof(uint32_t) / sizeof(SrcData) > 0);
+                    constexpr index_t dst_offset = dst_desc.CalculateOffset(
+                        to_multi_index(dst_slice_origin_idx) + src_data_idx);
+
+                    constexpr index_t SrcScalarPerUint32 = sizeof(uint32_t) / sizeof(SrcData);
+                    constexpr index_t SrcScalarPerAlignVector =
+                        math::max(SrcScalarPerVector, SrcScalarPerUint32);
+                    using src_align_vector_t =
+                        typename vector_type_maker<SrcData, SrcScalarPerAlignVector>::type;
+
+                    constexpr index_t dst_offset_aligned = dst_offset & ~(SrcScalarPerUint32 - 1);
+                    constexpr index_t dst_offset_offset  = dst_offset - dst_offset_aligned;
+                    src_align_vector_t* dst_buf_ptr      = reinterpret_cast<src_align_vector_t*>(
+                        &dst_buf(Number<dst_offset_aligned>{}));
+                    src_align_vector_t dst_algin_vector = *dst_buf_ptr;
+
+                    static_for<0, SrcScalarPerVector, 1>{}([&](auto i) {
+                        dst_algin_vector.template AsType<SrcData>()(
+                            Number<i + dst_offset_offset>{}) =
+                            src_vector.template AsType<SrcData>()[i];
+                    });
+                    *dst_buf_ptr = dst_algin_vector;
                 }
                 else
                 {
-                    *dst_buf_ptr =
-                        src_buf.template Get<src_vector_t>(src_coord_.GetOffset(), is_src_valid);
+                    constexpr index_t dst_offset = dst_desc.CalculateOffset(
+                        to_multi_index(dst_slice_origin_idx) + src_data_idx);
+                    src_vector_t* dst_buf_ptr =
+                        reinterpret_cast<src_vector_t*>(&dst_buf(Number<dst_offset>{}));
+                    if constexpr(UseTrLoad)
+                    {
+                        *dst_buf_ptr = src_buf.template trLoad<src_vector_t>(src_coord_.GetOffset(),
+                                                                             is_src_valid);
+                    }
+                    else
+                    {
+                        *dst_buf_ptr = src_buf.template Get<src_vector_t>(src_coord_.GetOffset(),
+                                                                          is_src_valid);
+                    }
                 }
-                // src_buf.template Read<src_vector_t>(src_coord_.GetOffset(), is_src_valid,
-                // dst_buf_ptr);
             }
             else
             {
