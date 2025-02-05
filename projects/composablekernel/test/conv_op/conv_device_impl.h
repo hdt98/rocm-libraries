@@ -799,8 +799,8 @@ bool run_test_fmt()
         if (fail_case == false)
         {
         pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X4, Filter_1X1, false, 0,       WaveGroup, TestMask | 0x20000>();
-        }
         pass &= run_test<SrcType, SrcType, GPUAccType, Shape_8X4, Filter_1X1, false, 0,       WaveGroup, TestMask | 0x40000>();
+        }
         pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X2, Filter_3X3, false, 0,       WaveGroup, TestMask | 0x80000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X4, Filter_3X3, false, 0,       WaveGroup, TestMask | 0x100000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, Shape_8X4, Filter_3X3, false, 0,       WaveGroup, TestMask | 0x200000>();

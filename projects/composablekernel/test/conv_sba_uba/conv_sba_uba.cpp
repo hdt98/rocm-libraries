@@ -562,8 +562,8 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
                                                               out4bitTensorDataVec& cvt_out_vec) {
                             auto outTensor = reinterpret_cast<KernelEDataType*>(outTensor_);
                             constexpr index_t NumCompPerOutType =
-                                wconvConv.SizeOfBits<KernelEDataType>() /
-                                wconvConv.SizeOfBits<EDataType>();
+                                wconvConv.template SizeOfBits<KernelEDataType>() /
+                                wconvConv.template SizeOfBits<EDataType>();
                             if constexpr(HPerWconv == 8 && WPerWconv == 4)
                             {
                                 const index_t subW = (lIdx / NumLanePerPair) % WPerWconv;
