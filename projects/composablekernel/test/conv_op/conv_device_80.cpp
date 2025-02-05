@@ -2,4 +2,4 @@
 // Copyright (c) 2018-2024, Advanced Micro Devices, Inc. All rights reserved.
 #include "conv_device_impl.h"
 
-Def_Test_Func(bhalf_t, bhalf_t, half_t, 0x7, 0x80);
+Def_Test_Func(bhalf_t, bhalf_t, 0x7, 0x80);

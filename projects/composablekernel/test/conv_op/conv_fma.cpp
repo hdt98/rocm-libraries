@@ -236,7 +236,7 @@ __global__ void __launch_bounds__(64, 1) conv_fma(const InDataType* in_, AccData
                 typename AccDataVec::type accum = {};
                 typename AccDataVec::type scale = {};
                 static_for<0, wconvConv.GetNumAccumComponents(), 1>{}(
-                    [&](auto s) { scale[s.value] = 1.0; });
+                    [&](auto s) { scale[s.value] = type_convert<AccDataType>(1.0f); });
 
                 InDataVec in_tile_data1 = {};
                 InDataVec in_tile_data2 = {};
@@ -529,11 +529,7 @@ const char* get_string(FilterType filter)
     }
 }
 
-template <typename InDataType,
-          typename GPUAccType,
-          typename CPUAccType,
-          ShapeType Shape,
-          int32_t TestMask>
+template <typename InDataType, typename GPUAccType, ShapeType Shape, int32_t TestMask>
 bool run_test()
 {
     if((config.test_mask & 0xFFFF0000 & TestMask) == 0)
@@ -587,7 +583,7 @@ bool run_test()
         ck::utils::conv::make_output_host_tensor_descriptor_g_n_k_wos_packed<OutLayout>(conv_param);
 
     Tensor<InDataType> in(in_g_n_c_wis_desc);
-    Tensor<CPUAccType> out_host(out_g_n_k_wos_desc);
+    Tensor<GPUAccType> out_host(out_g_n_k_wos_desc);
     Tensor<GPUAccType> out_device(out_g_n_k_wos_desc);
 
     std::cout << "in: " << in.mDesc << std::endl;
@@ -663,31 +659,22 @@ bool run_test()
 
     if(config.do_verification)
     {
-        if constexpr(std::is_same<GPUAccType, ck::bhalf_t>::value)
+        auto in2 = in.template CopyAsType<GPUAccType>();
+        bool ret = ck::utils::check_err(out_device,
+                                        in2,
+                                        "Error: incorrect results!",
+                                        get_rtol<GPUAccType>(),
+                                        get_atol<GPUAccType>());
+        if(ret)
         {
-            // check_err doesn't support bhalf_t
-            std::cout << " Ignored\n";
-            return true;
+            std::cout << "Passed\n";
         }
         else
         {
-            auto in2 = in.template CopyAsType<GPUAccType>();
-            bool ret = ck::utils::check_err(out_device,
-                                            in2,
-                                            "Error: incorrect results!",
-                                            get_rtol<GPUAccType>(),
-                                            get_atol<GPUAccType>());
-            if(ret)
-            {
-                std::cout << "Passed\n";
-            }
-            else
-            {
-                std::cout << "Failed\n";
-            }
-
-            return ret;
+            std::cout << "Failed\n";
         }
+
+        return ret;
     }
     else
     {
@@ -695,7 +682,7 @@ bool run_test()
     }
 }
 
-template <typename SrcType, typename GPUAccType, typename CPUAccType, int32_t TestMask>
+template <typename SrcType, typename GPUAccType, int32_t TestMask>
 bool run_test_fmt()
 {
     if((config.test_mask & TestMask) == 0)
@@ -707,16 +694,16 @@ bool run_test_fmt()
     //                                                        |ShapeType |TestMask
     if constexpr(std::is_same<GPUAccType, float>::value || std::is_same<GPUAccType, int32_t>::value)
     {
-        pass &= run_test<SrcType, GPUAccType, CPUAccType, Shape_4X2, TestMask | 0x10000  >();
+        pass &= run_test<SrcType, GPUAccType, Shape_4X2, TestMask | 0x10000  >();
     }
     else
     {
-        pass &= run_test<SrcType, GPUAccType, CPUAccType, Shape_4X2, TestMask | 0x80000  >();
+        pass &= run_test<SrcType, GPUAccType, Shape_4X2, TestMask | 0x80000  >();
         // llvm issue
         if constexpr (std::is_same<ck::int4_t, SrcType>::value == false)
         {
-        pass &= run_test<SrcType, GPUAccType, CPUAccType, Shape_4X4, TestMask | 0x100000 >();
-        pass &= run_test<SrcType, GPUAccType, CPUAccType, Shape_8X4, TestMask | 0x200000 >();
+        pass &= run_test<SrcType, GPUAccType, Shape_4X4, TestMask | 0x100000 >();
+        pass &= run_test<SrcType, GPUAccType, Shape_8X4, TestMask | 0x200000 >();
         }
 
     }
@@ -776,25 +763,24 @@ int main(int argc, char* argv[])
     }
 
     // clang-format off
-    //                  |SrcType     |GPUAccType  |CPUAccType
-    pass &= run_test_fmt<ck::half_t,  float,       float,      0x1   >();
-    pass &= run_test_fmt<ck::bhalf_t, float,       float,      0x2   >();
-    pass &= run_test_fmt<ck::f8_t,    float,       float,      0x4   >();
-    pass &= run_test_fmt<ck::bf8_t,   float,       float,      0x8   >();
-    pass &= run_test_fmt<int8_t,      float,       float,      0x10  >();
+    //                  |SrcType     |GPUAccType
+    pass &= run_test_fmt<ck::half_t,  float,       0x1   >();
+    pass &= run_test_fmt<ck::bhalf_t, float,       0x2   >();
+    pass &= run_test_fmt<ck::f8_t,    float,       0x4   >();
+    pass &= run_test_fmt<ck::bf8_t,   float,       0x8   >();
+    pass &= run_test_fmt<int8_t,      float,       0x10  >();
 
-    pass &= run_test_fmt<ck::half_t,  ck::half_t,  ck::half_t, 0x40  >();
-    pass &= run_test_fmt<ck::bhalf_t, ck::bhalf_t, ck::half_t, 0x80  >();
-    pass &= run_test_fmt<ck::f8_t,    ck::half_t,  ck::half_t, 0x100 >();
-    pass &= run_test_fmt<ck::bf8_t,   ck::half_t,  ck::half_t, 0x200 >();
-    pass &= run_test_fmt<int8_t,      ck::half_t,  ck::half_t, 0x400 >();
+    pass &= run_test_fmt<ck::half_t,  ck::half_t,  0x40  >();
+    pass &= run_test_fmt<ck::bhalf_t, ck::bhalf_t, 0x80  >();
+    pass &= run_test_fmt<ck::f8_t,    ck::half_t,  0x100 >();
+    pass &= run_test_fmt<ck::bf8_t,   ck::half_t,  0x200 >();
+    pass &= run_test_fmt<int8_t,      ck::half_t,  0x400 >();
 
 #ifdef CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
-    pass &= run_test_fmt<ck::int4_t,  float,       float     , 0x800 >();
-    pass &= run_test_fmt<ck::int4_t,  ck::bhalf_t, ck::half_t, 0x1000>();
-    pass &= run_test_fmt<ck::int4_t,  ck::half_t,  ck::half_t, 0x2000>();
+    pass &= run_test_fmt<ck::int4_t,  float,       0x800 >();
+    pass &= run_test_fmt<ck::int4_t,  ck::bhalf_t, 0x1000>();
+    pass &= run_test_fmt<ck::int4_t,  ck::half_t,  0x2000>();
 #endif
-
     // clang-format on
     std::cout << "conv_fma: ..... " << (pass ? "SUCCESS" : "FAILURE") << std::endl;
     return pass ? 0 : 1;

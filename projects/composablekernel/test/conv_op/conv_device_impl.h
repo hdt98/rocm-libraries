@@ -403,7 +403,6 @@ inline const char* get_string(FilterType filter)
 template <typename InDataType,
           typename WeiDataType,
           typename GPUAccType,
-          typename CPUAccType,
           ShapeType Shape,
           FilterType Filter,
           bool Dilation,
@@ -513,7 +512,7 @@ bool run_test()
 
     Tensor<InDataType> in(in_g_n_c_wis_desc);
     Tensor<WeiDataType> wei(wei_g_k_c_xs_desc);
-    Tensor<CPUAccType> out_host(out_g_n_k_wos_desc);
+    Tensor<GPUAccType> out_host(out_g_n_k_wos_desc);
     Tensor<GPUAccType> out_device(out_g_n_k_wos_desc);
 
     std::cout << "in: " << in.mDesc << std::endl;
@@ -560,7 +559,7 @@ bool run_test()
     auto ref_conv = ck::tensor_operation::host::ReferenceConvFwd<NDimSpatial,
                                                                  InDataType,
                                                                  WeiDataType,
-                                                                 CPUAccType,
+                                                                 GPUAccType,
                                                                  InElementOp,
                                                                  WeiElementOp,
                                                                  OutElementOp>();
@@ -743,30 +742,20 @@ bool run_test()
 
     if(config.do_verification)
     {
-        if constexpr(std::is_same<GPUAccType, ck::bhalf_t>::value)
+        bool ret = ck::utils::check_err(out_device,
+                                        out_host,
+                                        "Error: incorrect results!",
+                                        get_rtol<GPUAccType>(),
+                                        get_atol<GPUAccType>());
+        if(ret)
         {
-            // check_err doesn't support bhalf_t
-            std::cout << "Ignored\n";
-            return true;
+            std::cout << "Passed\n";
         }
         else
         {
-            bool ret = ck::utils::check_err(out_device,
-                                            out_host,
-                                            "Error: incorrect results!",
-                                            get_rtol<GPUAccType>(),
-                                            get_atol<GPUAccType>());
-            if(ret)
-            {
-                std::cout << "Passed\n";
-            }
-            else
-            {
-                std::cout << "Failed\n";
-            }
-
-            return ret;
+            std::cout << "Failed\n";
         }
+        return ret;
     }
     else
     {
@@ -774,7 +763,7 @@ bool run_test()
     }
 }
 
-template <typename SrcType, typename GPUAccType, typename CPUAccType, int LdsMode, int32_t TestMask>
+template <typename SrcType, typename GPUAccType, int LdsMode, int32_t TestMask>
 bool run_test_fmt()
 {
     if((config.test_mask & TestMask) == 0)
@@ -793,43 +782,43 @@ bool run_test_fmt()
     //                                                           |ShapeType  |FilterType |Dilation |Lds |WaveGroup |TestMask
     if constexpr(std::is_same<GPUAccType, float>::value || std::is_same<GPUAccType, int32_t>::value)
     {
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_1X1, false, 0,       WaveGroup, TestMask | 0x10000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, false, 0,       WaveGroup, TestMask | 0x20000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, true,  0,       WaveGroup, TestMask | 0x40000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_2X2, false, 0,       WaveGroup, TestMask | 0x10000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X2, Filter_1X1, false, 0,       WaveGroup, TestMask | 0x10000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X2, Filter_3X3, false, 0,       WaveGroup, TestMask | 0x20000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X2, Filter_3X3, true,  0,       WaveGroup, TestMask | 0x40000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X2, Filter_2X2, false, 0,       WaveGroup, TestMask | 0x10000>();
 
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_1X1, false, LdsMode, WaveGroup, TestMask | 0x10000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, false, LdsMode, WaveGroup, TestMask | 0x100000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_2X2, false, LdsMode, WaveGroup, TestMask | 0x80000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X2, Filter_1X1, false, LdsMode, WaveGroup, TestMask | 0x10000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X2, Filter_3X3, false, LdsMode, WaveGroup, TestMask | 0x100000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X2, Filter_2X2, false, LdsMode, WaveGroup, TestMask | 0x80000>();
     }
     else
     {
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_1X1, false, 0,       WaveGroup, TestMask | 0x10000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X2, Filter_1X1, false, 0,       WaveGroup, TestMask | 0x10000>();
         // TODO: fix it.
         bool fail_case = WaveGroup && (TestMask == 0x40) && (config.c == 0x40);
         if (fail_case == false)
         {
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_1X1, false, 0,       WaveGroup, TestMask | 0x20000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X4, Filter_1X1, false, 0,       WaveGroup, TestMask | 0x20000>();
         }
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_1X1, false, 0,       WaveGroup, TestMask | 0x40000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, false, 0,       WaveGroup, TestMask | 0x80000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_3X3, false, 0,       WaveGroup, TestMask | 0x100000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_3X3, false, 0,       WaveGroup, TestMask | 0x200000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, true,  0,       WaveGroup, TestMask | 0x400000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_3X3, true,  0,       WaveGroup, TestMask | 0x800000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_3X3, true,  0,       WaveGroup, TestMask | 0x1000000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_2X2, false, 0,       WaveGroup, TestMask | 0x10000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_2X2, false, 0,       WaveGroup, TestMask | 0x20000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_2X2, false, 0,       WaveGroup, TestMask | 0x40000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_1X1, false, LdsMode, WaveGroup, TestMask | 0x2000000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_1X1, false, LdsMode, WaveGroup, TestMask | 0x4000000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_1X1, false, LdsMode, WaveGroup, TestMask | 0x8000000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_3X3, false, LdsMode, WaveGroup, TestMask | 0x10000000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_3X3, false, LdsMode, WaveGroup, TestMask | 0x20000000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_3X3, false, LdsMode, WaveGroup, TestMask | 0x40000000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X2, Filter_2X2, false, LdsMode, WaveGroup, TestMask | 0x2000000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_4X4, Filter_2X2, false, LdsMode, WaveGroup, TestMask | 0x4000000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, CPUAccType, Shape_8X4, Filter_2X2, false, LdsMode, WaveGroup, TestMask | 0x8000000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, Shape_8X4, Filter_1X1, false, 0,       WaveGroup, TestMask | 0x40000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X2, Filter_3X3, false, 0,       WaveGroup, TestMask | 0x80000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X4, Filter_3X3, false, 0,       WaveGroup, TestMask | 0x100000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, Shape_8X4, Filter_3X3, false, 0,       WaveGroup, TestMask | 0x200000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X2, Filter_3X3, true,  0,       WaveGroup, TestMask | 0x400000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X4, Filter_3X3, true,  0,       WaveGroup, TestMask | 0x800000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, Shape_8X4, Filter_3X3, true,  0,       WaveGroup, TestMask | 0x1000000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X2, Filter_2X2, false, 0,       WaveGroup, TestMask | 0x10000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X4, Filter_2X2, false, 0,       WaveGroup, TestMask | 0x20000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, Shape_8X4, Filter_2X2, false, 0,       WaveGroup, TestMask | 0x40000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X2, Filter_1X1, false, LdsMode, WaveGroup, TestMask | 0x2000000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X4, Filter_1X1, false, LdsMode, WaveGroup, TestMask | 0x4000000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, Shape_8X4, Filter_1X1, false, LdsMode, WaveGroup, TestMask | 0x8000000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X2, Filter_3X3, false, LdsMode, WaveGroup, TestMask | 0x10000000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X4, Filter_3X3, false, LdsMode, WaveGroup, TestMask | 0x20000000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, Shape_8X4, Filter_3X3, false, LdsMode, WaveGroup, TestMask | 0x40000000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X2, Filter_2X2, false, LdsMode, WaveGroup, TestMask | 0x2000000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X4, Filter_2X2, false, LdsMode, WaveGroup, TestMask | 0x4000000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, Shape_8X4, Filter_2X2, false, LdsMode, WaveGroup, TestMask | 0x8000000>();
     }
 
     }
@@ -906,14 +895,14 @@ using bhalf_t = ck::bhalf_t;
 using f8_t    = ck::f8_t;
 using bf8_t   = ck::bf8_t;
 
-#define Extern_Test_Func(SrcType, GpuAccType, CpuAccType, LdsMode, TestMask) \
-    extern bool run_test_fmt_##SrcType##_##GpuAccType##_##CpuAccType##_##LdsMode##_##TestMask();
+#define Extern_Test_Func(SrcType, GpuAccType, LdsMode, TestMask) \
+    extern bool run_test_fmt_##SrcType##_##GpuAccType##_##LdsMode##_##TestMask();
 
-#define Call_Test_Func(SrcType, GpuAccType, CpuAccType, LdsMode, TestMask) \
-    run_test_fmt_##SrcType##_##GpuAccType##_##CpuAccType##_##LdsMode##_##TestMask()
+#define Call_Test_Func(SrcType, GpuAccType, LdsMode, TestMask) \
+    run_test_fmt_##SrcType##_##GpuAccType##_##LdsMode##_##TestMask()
 
-#define Def_Test_Func(SrcType, GpuAccType, CpuAccType, LdsMode, TestMask)                \
-    bool run_test_fmt_##SrcType##_##GpuAccType##_##CpuAccType##_##LdsMode##_##TestMask() \
-    {                                                                                    \
-        return run_test_fmt<SrcType, GpuAccType, CpuAccType, LdsMode, TestMask>();       \
+#define Def_Test_Func(SrcType, GpuAccType, LdsMode, TestMask)             \
+    bool run_test_fmt_##SrcType##_##GpuAccType##_##LdsMode##_##TestMask() \
+    {                                                                     \
+        return run_test_fmt<SrcType, GpuAccType, LdsMode, TestMask>();    \
     }

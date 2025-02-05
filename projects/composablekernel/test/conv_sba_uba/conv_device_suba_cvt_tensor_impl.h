@@ -387,7 +387,6 @@ inline const char* get_string(FilterType filter)
 template <typename InDataType,
           typename WeiDataType,
           typename GPUAccType,
-          typename CPUAccType,
           typename EDataType,
           ShapeType Shape,
           FilterType Filter,
@@ -419,7 +418,7 @@ bool run_test()
         EnableWaveGroup ? DEFAULT_WAVEGROUP_BLOCKSIZE : DEFAULT_BLOCKSIZE;
 
     using GPUOutType = typename std::conditional<Convert_to_tensor, EDataType, GPUAccType>::type;
-    using CPUOutType = typename std::conditional<Convert_to_tensor, EDataType, CPUAccType>::type;
+    using CPUOutType = typename std::conditional<Convert_to_tensor, EDataType, GPUAccType>::type;
 
     // on gfx13, the wavegroup count is fixed to 4. so, HPerWave/WPerWave is fixed too.
     constexpr ck::index_t HPerWave = EnableWaveGroup ? DEFAULT_H_PERBLOCK / 2 : DEFAULT_H_PERWAVE;
@@ -604,12 +603,12 @@ bool run_test()
     copy(out_g_n_k_wos_desc.GetLengths(), e_g_n_k_wos_lengths);
     copy(out_g_n_k_wos_desc.GetStrides(), e_g_n_k_wos_strides);
 
-    Tensor<CPUAccType> c_host(out_g_n_k_wos_desc);
+    Tensor<GPUAccType> c_host(out_g_n_k_wos_desc);
 
     auto ref_conv = ck::tensor_operation::host::ReferenceConvFwd<NDimSpatial,
                                                                  InDataType,
                                                                  WeiDataType,
-                                                                 CPUAccType,
+                                                                 GPUAccType,
                                                                  InElementOp,
                                                                  WeiElementOp,
                                                                  PassThroughOp>();
@@ -632,7 +631,7 @@ bool run_test()
         out_host.ForEach([&](auto&, auto idx) {
             if constexpr(Convert_to_tensor)
             {
-                CPUAccType element_op_out = {};
+                GPUAccType element_op_out = {};
                 OutElementOp{}(element_op_out, c_host(idx), scale(idx), bias(idx));
                 const auto out_element_convert_op = OutElementConvertOp{
                     static_cast<float>(std::pow(2, cvtTensorScale)), ActivationOp{}};
@@ -649,6 +648,7 @@ bool run_test()
     DumpTensor(wei, "Weight");
     DumpTensor(bias, "Bias");
     DumpTensor(scale, "Scale");
+    DumpTensor(c_host, "ConvOut");
     DumpTensor(out_host, "Output");
 
     DeviceMem in_device_buf(sizeof(InDataType) *
@@ -827,32 +827,23 @@ bool run_test()
 
     if(config.do_verification)
     {
-        if constexpr(std::is_same<GPUOutType, ck::bhalf_t>::value)
+        bool ret = false;
+        ret      = ck::utils::check_err(out_device,
+                                   out_host,
+                                   "Error: incorrect results!",
+                                   get_rtol<GPUOutType>(),
+                                   get_atol<GPUOutType>());
+
+        if(ret)
         {
-            // check_err doesn't support bhalf_t
-            std::cout << "Ignored\n";
-            return true;
+            std::cout << "Passed\n";
         }
         else
         {
-            bool ret = false;
-            ret      = ck::utils::check_err(out_device,
-                                       out_host,
-                                       "Error: incorrect results!",
-                                       get_rtol<GPUOutType>(),
-                                       get_atol<GPUOutType>());
-
-            if(ret)
-            {
-                std::cout << "Passed\n";
-            }
-            else
-            {
-                std::cout << "Failed\n";
-            }
-
-            return ret;
+            std::cout << "Failed\n";
         }
+
+        return ret;
     }
     else
     {

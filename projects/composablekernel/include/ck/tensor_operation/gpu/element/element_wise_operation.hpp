@@ -228,8 +228,8 @@ struct MultiplyAdd
                                                                           const bhalf_t& d0,
                                                                           const bhalf_t& d1) const
     {
-        const bhalf_t y = type_convert<bhalf_t>(c) * d0 + d1;
-        e               = y;
+        const float y = c * type_convert<float>(d0) + type_convert<float>(d1);
+        e             = type_convert<bhalf_t>(y);
     }
     template <>
     __host__ __device__ void operator()<float, float, half_t, half_t>(float& e,
@@ -273,8 +273,8 @@ struct MultiplyAdd
                                                                             const bhalf_t& d0,
                                                                             const bhalf_t& d1) const
     {
-        const bhalf_t y = c * d0 + d1;
-        e               = y;
+        const float y = type_convert<float>(c) * type_convert<float>(d0) + type_convert<float>(d1);
+        e             = type_convert<bhalf_t>(y);
     }
 
     template <>

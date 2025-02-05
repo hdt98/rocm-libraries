@@ -2,4 +2,4 @@
 // Copyright (c) 2018-2024, Advanced Micro Devices, Inc. All rights reserved.
 #include "conv_device_impl.h"
 
-Def_Test_Func(half_t, float, float, 0x7, 0x1);
+Def_Test_Func(half_t, float, 0x7, 0x1);

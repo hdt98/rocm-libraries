@@ -1258,7 +1258,8 @@ template <typename InDataType,
           typename AccDataType,
           index_t HPerWconv,
           index_t WPerWconv,
-          index_t activeFun>
+          index_t ActiveFun,
+          bool OutputChannelOffset = false>
 struct AccCvtTensor
 {
     __host__ __device__ constexpr AccCvtTensor(){};
@@ -1277,13 +1278,20 @@ struct AccCvtTensor
         // int 4X4X8  = 1;
         // int 4X4X16 = 2;
         // int 4X2X16 = 3;
-        if constexpr((HPerWconv == 8) && (WPerWconv == 4))
-            return 0 | (activeFun << 8);
-        else if constexpr((HPerWconv == 4) && (WPerWconv == 4))
-            return 2 | (activeFun << 8);
-        else if constexpr((HPerWconv == 4) && (WPerWconv == 2))
-            return 3 | (activeFun << 8);
-        static_assert("unsupport shape.");
+        constexpr uint32_t Mod0 = []() {
+            if constexpr((HPerWconv == 8) && (WPerWconv == 4))
+                return 0;
+            else if constexpr((HPerWconv == 4) && (WPerWconv == 4))
+                return 2;
+            else if constexpr((HPerWconv == 4) && (WPerWconv == 2))
+                return 3;
+            else
+                static_assert("unsupport shape.");
+        }();
+
+        constexpr uint32_t Mod1 = (ActiveFun << 1) | (OutputChannelOffset ? (1 << 4) : 0);
+
+        return Mod0 | (Mod1 << 6);
     };
 
     static constexpr auto auxdata = GetAuxData();

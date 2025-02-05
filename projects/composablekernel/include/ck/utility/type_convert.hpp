@@ -91,6 +91,17 @@ inline __host__ __device__ constexpr int8_t type_convert<int8_t, bhalf_t>(bhalf_
     return static_cast<int8_t>(x_fp32);
 }
 
+#ifdef CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
+// convert bfp16 to int4 via fp32
+template <>
+inline __host__ __device__ constexpr int4_t type_convert<int4_t, bhalf_t>(bhalf_t x)
+{
+    float x_fp32 = type_convert<float>(x);
+
+    return static_cast<int4_t>(x_fp32);
+}
+#endif
+
 // convert int8 to bfp16 via fp32
 template <>
 inline __host__ __device__ constexpr bhalf_t type_convert<bhalf_t, int8_t>(int8_t x)
@@ -99,6 +110,17 @@ inline __host__ __device__ constexpr bhalf_t type_convert<bhalf_t, int8_t>(int8_
 
     return type_convert<bhalf_t>(x_fp32);
 }
+
+#ifdef CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
+// convert int4 to bfp16 via fp32
+template <>
+inline __host__ __device__ constexpr bhalf_t type_convert<bhalf_t, int4_t>(int4_t x)
+{
+    float x_fp32 = static_cast<float>(x);
+
+    return type_convert<bhalf_t>(x_fp32);
+}
+#endif
 
 template <>
 inline __host__ __device__ constexpr f8_ocp_t type_convert<f8_ocp_t, int>(int x)

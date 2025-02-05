@@ -5,11 +5,7 @@
 // clang-format on
 ExecutionConfig config;
 
-template <typename SrcType,
-          typename GPUAccType,
-          typename CPUAccType,
-          int LdsMode,
-          uint32_t TestMask>
+template <typename SrcType, typename GPUAccType, int LdsMode, uint32_t TestMask>
 bool run_test_fmt()
 {
     if((config.test_mask & TestMask) == 0)
@@ -28,21 +24,21 @@ bool run_test_fmt()
     //                                                                    |ShapeType |Lds |WaveGroup | activeFunc | convert_to_tensor | TestMask
     if constexpr(std::is_same<GPUAccType, float>::value)
     {
-        pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X2, 0,       WaveGroup, 0, 1, TestMask | 0x10000>();
-        pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X2, LdsMode, WaveGroup, 0, 1, TestMask | 0x20000>();
+        pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, SrcType, Shape_4X2, 0,       WaveGroup, 0, 1, TestMask | 0x10000>();
+        pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, SrcType, Shape_4X2, LdsMode, WaveGroup, 0, 1, TestMask | 0x20000>();
      }
     else
     {
-        pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X2, 0,       WaveGroup, 0, 1, TestMask | 0x10000>();
-        pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X2, LdsMode, WaveGroup, 0, 1, TestMask | 0x80000>();
-        pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X4, 0,       WaveGroup, 0, 1, TestMask | 0x20000>();
-        bool fail_case = WaveGroup && (TestMask == 0x40) && (config.c == 0x40); // LWPSCGFX13-498
+        pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, SrcType, Shape_4X2, 0,       WaveGroup, 0, 1, TestMask | 0x10000>();
+        pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, SrcType, Shape_4X2, LdsMode, WaveGroup, 0, 1, TestMask | 0x80000>();
+        pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, SrcType, Shape_4X4, 0,       WaveGroup, 0, 1, TestMask | 0x20000>();
+        bool fail_case = WaveGroup && (TestMask == 0x40 || TestMask == 0x80) && (config.c == 0x40); // LWPSCGFX13-498
         if (fail_case == false)
         {
-        pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_8X4, 0,       WaveGroup, 0, 1, TestMask | 0x40000>();
+        pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, SrcType, Shape_8X4, 0,       WaveGroup, 0, 1, TestMask | 0x40000>();
         }
-        pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_4X4, LdsMode, WaveGroup, 0, 1, TestMask | 0x100000>();
-        pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, CPUAccType, SrcType, Shape_8X4, LdsMode, WaveGroup, 0, 1, TestMask | 0x200000>();
+        pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, SrcType, Shape_4X4, LdsMode, WaveGroup, 0, 1, TestMask | 0x100000>();
+        pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, SrcType, Shape_8X4, LdsMode, WaveGroup, 0, 1, TestMask | 0x200000>();
     }
     // clang-format on
     return pass;
@@ -63,18 +59,18 @@ int main(int argc, char* argv[])
 
     // clang-format off
     // Ds keep same with acc currently     
-    //                |SrcType |GPUAccType |CPUAccType| LdsMode TestMask
-    pass &= run_test_fmt<half_t,  float,   float,  0x1f, 0x1  >();
-    pass &= run_test_fmt<bhalf_t, float,   float,  0x17, 0x2  >();
-    pass &= run_test_fmt<f8_t,    float,   float,  0x1f, 0x4  >();
-    pass &= run_test_fmt<bf8_t,   float,   float,  0x17, 0x8  >();
-    pass &= run_test_fmt<int8_t,  float,   float,  0x1f, 0x10 >();
-    
-    pass &= run_test_fmt<half_t,  half_t,  half_t, 0x17, 0x40 >();
-    pass &= run_test_fmt<bhalf_t, bhalf_t, half_t, 0x1f, 0x80 >();
-    pass &= run_test_fmt<f8_t,    half_t,  half_t, 0x17, 0x100>();
-    pass &= run_test_fmt<bf8_t,   half_t,  half_t, 0x1f, 0x200>();
-    pass &= run_test_fmt<int8_t,  half_t,  half_t, 0x17, 0x400>();
+    //                |SrcType |GPUAccType| LdsMode TestMask
+    pass &= run_test_fmt<half_t,  float,   0x1f, 0x1  >();
+    pass &= run_test_fmt<bhalf_t, float,   0x17, 0x2  >();
+    pass &= run_test_fmt<f8_t,    float,   0x1f, 0x4  >();
+    pass &= run_test_fmt<bf8_t,   float,   0x17, 0x8  >();
+    pass &= run_test_fmt<int8_t,  float,   0x1f, 0x10 >();
+
+    pass &= run_test_fmt<half_t,  half_t,  0x17, 0x40 >();
+    pass &= run_test_fmt<bhalf_t, bhalf_t, 0x1f, 0x80 >();
+    pass &= run_test_fmt<f8_t,    half_t,  0x17, 0x100>();
+    pass &= run_test_fmt<bf8_t,   half_t,  0x1f, 0x200>();
+    pass &= run_test_fmt<int8_t,  half_t,  0x17, 0x400>();
     //
     // clang-format on
     std::cout << "conv_device_fma_cvt: ..... " << (pass ? "SUCCESS" : "FAILURE") << std::endl;

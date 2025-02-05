@@ -84,8 +84,10 @@ CK_DECLARE_ENV_VAR_BOOL(CK_LOGGING)
 #define CK_BUFFER_RESOURCE_3RD_DWORD 0x00020000
 #elif defined(__gfx103__)
 #define CK_BUFFER_RESOURCE_3RD_DWORD 0x31014000
-#elif defined(__gfx11__) || defined(__gfx12__) || defined(__gfx13__)
+#elif defined(__gfx11__) || defined(__gfx12__)
 #define CK_BUFFER_RESOURCE_3RD_DWORD 0x31004000
+#elif defined(__gfx13__)
+#define CK_BUFFER_RESOURCE_3RD_DWORD 0
 #endif
 
 // FMA instruction

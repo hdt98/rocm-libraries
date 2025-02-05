@@ -517,7 +517,7 @@ struct TestSwmma
                 for(uint32_t k = 0; k < 4; k++)
                 {
                     std::vector<std::size_t> a_idx({i, j + k});
-                    if(a(a_idx) != 0)
+                    if(float(a(a_idx)) != 0)
                     {
                         std::vector<std::size_t> nonzero_idx({i, nonzero_j});
                         a_compressed(nonzero_idx) = a(a_idx);
@@ -528,7 +528,7 @@ struct TestSwmma
             }
             // get nonzero index and pack them into index_compressed
             uint32_t compressed_index_j = 0;
-            for(uint32_t j = 0; j < col; j += 16)
+            for(uint32_t j = 0; j < (col >> 1); j += 16)
             {
                 int32_t packed_value = 0;
                 for(int k = 0; k < 16; k++)
