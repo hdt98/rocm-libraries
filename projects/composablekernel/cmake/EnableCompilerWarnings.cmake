@@ -71,6 +71,7 @@ else()
             -Wsign-compare
             -Wno-extra-semi-stmt
             -Wno-unused-template
+            -Wno-unique-object-duplication
         )
         if (CMAKE_${COMPILER}_COMPILER_ID MATCHES "Clang")
             list(APPEND CMAKE_COMPILER_WARNINGS

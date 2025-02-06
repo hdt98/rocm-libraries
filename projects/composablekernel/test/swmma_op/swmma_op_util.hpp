@@ -246,10 +246,8 @@ __global__ void matmul(const src1_t* a, const int32_t* a_index, const src2_t* b,
     using srcA_cast_type = srcA_traits::ViewT::type;
     using srcB_cast_type = srcB_traits::ViewT::type;
 
-    using srcA_vec      = srcA_traits::VecT;
-    using srcB_vec      = srcB_traits::VecT;
-    using srcA_vec_type = srcA_vec::type;
-    using srcB_vec_type = srcB_vec::type;
+    using srcA_vec = srcA_traits::VecT;
+    using srcB_vec = srcB_traits::VecT;
 
     // this means how many elements in src1_t data type will be loaded
     constexpr int a_src_dim  = 8 * kMultiplier;
@@ -310,18 +308,24 @@ __global__ void matmul(const src1_t* a, const int32_t* a_index, const src2_t* b,
     {
         index_val = a_index[lane];
     }
+
 // currently only support gfx13
-#if defined(__gfx11__) || defined(__gfx12__)
-    ignore = acc_thread_buf_;
-    ignore = dst_thread_buf_;
-#elif defined(__gfx13__)
+#if defined(__gfx13__)
+    using srcA_vec_type = srcA_vec::type;
+    using srcB_vec_type = srcB_vec::type;
     builtin_swmma_naive_selector<src1_t, src2_t, acc_t, dst_t, kMultiplier, SparseSel>(
         a_frag.template AsType<srcA_vec_type>()(I0),
         b_frag.template AsType<srcB_vec_type>()(I0),
         acc_thread_buf_,
         dst_thread_buf_,
         index_val);
+#else
+    ignore = acc_thread_buf_;
+    ignore = dst_thread_buf_;
+    ignore = index_val;
+    ignore = I0;
 #endif
+
     if constexpr(srcA_traits::layoutTransform)
     {
         static_for<0, 8, 1>{}([&](auto ele) {
@@ -517,7 +521,7 @@ struct TestSwmma
                 for(uint32_t k = 0; k < 4; k++)
                 {
                     std::vector<std::size_t> a_idx({i, j + k});
-                    if(float(a(a_idx)) != 0)
+                    if(abs(float(a(a_idx))) > 1e-5)
                     {
                         std::vector<std::size_t> nonzero_idx({i, nonzero_j});
                         a_compressed(nonzero_idx) = a(a_idx);

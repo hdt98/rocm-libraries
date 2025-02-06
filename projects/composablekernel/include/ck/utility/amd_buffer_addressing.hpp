@@ -450,7 +450,8 @@ __device__ typename vector_type<T, N>::type amd_buffer_load_impl(int32x4_t src_w
             (is_same<T, f8_t>::value && (N == 1 || N == 2 || N == 4 || N == 8 || N == 16)) ||
             (is_same<T, bf8_t>::value && (N == 1 || N == 2 || N == 4 || N == 8 || N == 16)) ||
             (is_same<T, int8_t>::value && (N == 1 || N == 2 || N == 4 || N == 8 || N == 16)) ||
-            (is_same<T, uint8_t>::value && (N == 1 || N == 2 || N == 4 || N == 8 || N == 16)),
+            (is_same<T, uint8_t>::value && (N == 1 || N == 2 || N == 4 || N == 8 || N == 16)) ||
+            (is_same<T, pk_i4_t>::value && (N == 1 || N == 2 || N == 4 || N == 8 || N == 16)),
         "wrong! not implemented");
 
     using r_t     = typename vector_type<T, N>::type;
@@ -601,7 +602,7 @@ __device__ void amd_global_atomic_add_impl(const typename vector_type<T, N>::typ
                                                       tmp.template AsType<half2_t>()[i]);
         });
     }
-#if defined(__gfx942__)
+#if defined(__gfx942__) || defined(__gfx950__)
     else if constexpr(is_same<T, bhalf_t>::value)
     {
         vector_type<bhalf_t, N> tmp{src_thread_data};
