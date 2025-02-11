@@ -157,6 +157,66 @@ TEST(normal_distribution_tests, float_out_uint2_in_test)
     EXPECT_NEAR(5.0, std, 1.0); // 20%
 }
 
+TEST(normal_distribution_tests, float4_out_uint4_in_test)
+{
+
+    struct nd
+    {
+        const float mean;
+        const float stddev;
+
+        nd(float mean, float stddev) : mean(mean), stddev(stddev) {}
+
+        __forceinline__ __host__ __device__
+        void operator()(const uint4 &input, float4 &output) const
+        {
+            float4 v  = rocrand_device::detail::normal_distribution4(input);
+            output.w = mean + v.w * stddev;
+            output.x = mean + v.x * stddev;
+            output.y = mean + v.y * stddev;
+            output.z = mean + v.z * stddev;
+        }
+    };
+
+    std::random_device                          rd;
+    std::mt19937                                gen(rd());
+    std::uniform_int_distribution<unsigned int> dis;
+
+    const size_t size = 4000;
+    float        val[size];
+    nd           u(2.0, 5.0);
+
+    // Calculate mean
+    double mean = 0.0;
+    for(size_t i = 0; i < size; i += 4)
+    {
+        uint4     input;
+        float4     output;
+        input.w = dis(gen);
+        input.x = dis(gen);
+        input.y = dis(gen);
+        input.z = dis(gen);
+        u(input, output);
+        val[i]         = output.w;
+        val[i + 1]     = output.x;
+        val[i + 2]     = output.y;
+        val[i + 3]     = output.z;
+        mean += (output.w + output.x + output.y + output.z);
+    }
+    mean /= size;
+
+    // Calculate stddev
+    double std = 0.0;
+    for(size_t i = 0; i < size; i++)
+    {
+        std += std::pow(val[i] - mean, 2);
+    }
+    std = std::sqrt(std / size);
+
+    EXPECT_NEAR(2.0, mean, 0.4); // 20%
+    EXPECT_NEAR(5.0, std, 1.0); // 20%
+}
+
 TEST(normal_distribution_tests, half_test)
 {
     std::random_device                          rd;
