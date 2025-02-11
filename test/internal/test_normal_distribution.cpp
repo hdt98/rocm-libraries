@@ -103,6 +103,60 @@ TEST(normal_distribution_tests, double_test)
     EXPECT_NEAR(5.0, std, 1.0); // 20%
 }
 
+TEST(normal_distribution_tests, float_out_uint2_in_test)
+{
+
+    struct nd
+    {
+        const float mean;
+        const float stddev;
+
+        nd(float mean, float stddev) : mean(mean), stddev(stddev) {}
+
+        __forceinline__ __host__ __device__
+        void operator()(const uint2 &input, float (&output)[2]) const
+        {
+            float2 v  = rocrand_device::detail::normal_distribution2(input);
+            output[0] = mean + v.x * stddev;
+            output[1] = mean + v.y * stddev;
+        }
+    };
+
+    std::random_device                          rd;
+    std::mt19937                                gen(rd());
+    std::uniform_int_distribution<unsigned int> dis;
+
+    const size_t size = 4000;
+    float        val[size];
+    nd           u(2.0, 5.0);
+
+    // Calculate mean
+    double mean = 0.0;
+    for(size_t i = 0; i < size; i += 2)
+    {
+        uint2     input;
+        float     output[2];
+        input.x = dis(gen);
+        input.y = dis(gen);
+        u(input, output);
+        val[i]     = output[0];
+        val[i + 1] = output[1];
+        mean += (output[0] + output[1]);
+    }
+    mean /= size;
+
+    // Calculate stddev
+    double std = 0.0;
+    for(size_t i = 0; i < size; i++)
+    {
+        std += std::pow(val[i] - mean, 2);
+    }
+    std = std::sqrt(std / size);
+
+    EXPECT_NEAR(2.0, mean, 0.4); // 20%
+    EXPECT_NEAR(5.0, std, 1.0); // 20%
+}
+
 TEST(normal_distribution_tests, half_test)
 {
     std::random_device                          rd;
