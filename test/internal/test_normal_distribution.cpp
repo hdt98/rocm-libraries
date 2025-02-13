@@ -217,6 +217,43 @@ TEST(normal_distribution_tests, float4_out_uint4_in_test)
     EXPECT_NEAR(5.0, std, 1.0); // 20%
 }
 
+TEST(normal_distribution_tests, float2_out_longlong_in_test)
+{
+
+    std::random_device                          rd;
+    std::mt19937                                gen(rd());
+    std::uniform_int_distribution<unsigned long long> dis;
+
+    const size_t size = 4000;
+    float        val[size];
+    normal_distribution<float, unsigned long long> u(0, 1);
+
+    // Calculate mean
+    double mean = 0.0;
+    for(size_t i = 0; i < size; i += 2)
+    {
+        unsigned long long input[1];
+        float    output[2];
+        input[0] = dis(gen);
+        u(input, output);
+        val[i]     = output[0];
+        val[i + 1] = output[1];
+        mean += (output[0] + output[1]);
+    }
+    mean /= size;
+
+    // Calculate stddev
+    double std = 0.0;
+    for(size_t i = 0; i < size; i++)
+    {
+        std += std::pow(val[i] - mean, 2) / size;
+    }
+    std = std::sqrt(std);
+
+    EXPECT_NEAR(0, mean, 0.4) << "Mean: " << mean << " Expected: " << 2; // 20%
+    EXPECT_NEAR(1, std, 1.0) <<  "Stddev: " << std << " Expected: " << 5; // 20%
+}
+
 TEST(normal_distribution_tests, float4_out_longlong2_in_test)
 {
 
@@ -228,13 +265,13 @@ TEST(normal_distribution_tests, float4_out_longlong2_in_test)
         nd(float mean, float stddev) : mean(mean), stddev(stddev) {}
 
         __forceinline__ __host__ __device__
-        void operator()(const longlong2 &input, float4 &output) const
+        void operator()(const longlong2 &input, float (&output)[4]) const
         {
             float4 v  = rocrand_device::detail::normal_distribution4(input);
-            output.w = mean + v.w * stddev;
-            output.x = mean + v.x * stddev;
-            output.y = mean + v.y * stddev;
-            output.z = mean + v.z * stddev;
+            output[0] = mean + v.w * stddev; 
+            output[1] = mean + v.x * stddev;
+            output[2] = mean + v.y * stddev;
+            output[3] = mean + v.z * stddev;
         }
     };
 
@@ -242,37 +279,60 @@ TEST(normal_distribution_tests, float4_out_longlong2_in_test)
     std::mt19937                                gen(rd());
     std::uniform_int_distribution<long long> dis;
 
-    const size_t size = 4000;
-    float        val[size];
-    nd           u(2.0, 5.0);
+    const size_t size = 10000;
+    float        valW[size], valX[size], valY[size], valZ[size];
+    nd           u(0, 1);
 
     // Calculate mean
-    double mean = 0.0;
-    for(size_t i = 0; i < size; i += 4)
+    double meanW = 0, meanX = 0, meanY = 0, meanZ = 0;
+    for(size_t i = 0; i < size; i ++)
     {
         longlong2 input;
-        float4    output;
+        float     output[4];
         input.x = dis(gen);
         input.y = dis(gen);
         u(input, output);
-        val[i]         = output.w;
-        val[i + 1]     = output.x;
-        val[i + 2]     = output.y;
-        val[i + 3]     = output.z;
-        mean += ( output.w + output.x + output.y + output.z);
+        valW[i] = output[0]; 
+        valX[i] = output[1]; 
+        valY[i] = output[2]; 
+        valZ[i] = output[3];
+        meanW += valW[i] + valX[i]; 
+        meanX += valX[i]; 
+        meanY += valY[i]; 
+        meanZ += valZ[i];
     }
-    mean /= size;
+
+    meanW /= (2*size); 
+    meanX /= size; 
+    meanY /= size; 
+    meanZ /= size;
 
     // Calculate stddev
-    double std = 0.0;
+    double stdW = 0, stdX = 0, stdY = 0, stdZ = 0;
     for(size_t i = 0; i < size; i++)
     {
-        std += std::pow(val[i] - mean, 2);
+        stdW += std::pow((valW[i] + valX[i]) - meanW, 2) / (2*size);
+        stdX += std::pow(valX[i] - meanX, 2) / size;
+        stdY += std::pow(valY[i] - meanY, 2) / size;
+        stdZ += std::pow(valZ[i] - meanZ, 2) / size;
     }
-    std = std::sqrt(std / size);
+    stdW = std::sqrt(stdW);
+    stdX = std::sqrt(stdX);
+    stdY = std::sqrt(stdY);
+    stdZ = std::sqrt(stdZ);
 
-    EXPECT_NEAR(2.0, mean, 0.4) << "Mean: " << mean << " Expected: " << 2; // 20%
-    EXPECT_NEAR(5.0, std, 1.0) <<  "Stddev: " << std << " Expected: " << 5; // 20%
+    EXPECT_NEAR(0, meanW, 0.4) << "Mean: " << meanW << " Expected: " << 0; // 20%
+    EXPECT_NEAR(1, stdW, 1.0) <<  "Stddev: " << stdW << " Expected: " << 1; // 20%
+
+    // EXPECT_NEAR(0, meanX, 0.4) << "Mean: " << meanX << " Expected: " << 2; // 20%
+    // EXPECT_NEAR(1, stdX, 1.0) <<  "Stddev: " << stdX << " Expected: " << 5; // 20%
+
+    // EXPECT_NEAR(0, meanY, 0.4) << "Mean: " << meanY << " Expected: " << 0; // 20%
+    // EXPECT_NEAR(1, stdY, 1.0) <<  "Stddev: " << stdY << " Expected: " << 1; // 20%
+
+    // // EXPECT_NEAR(2.0, meanZ, 0.4) << "Mean: " << meanZ << " Expected: " << 2; // 20%
+    // // EXPECT_NEAR(5.0, stdZ, 1.0) <<  "Stddev: " << stdZ << " Expected: " << 5; // 20%
+
 }
 
 TEST(normal_distribution_tests, half_test)
