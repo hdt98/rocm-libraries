@@ -291,6 +291,35 @@ static __device__ float2_t cast_to_f32x2_from_f8x2(fp8x2_storage_t v)
         return __builtin_amdgcn_cvt_pk_f32_bf8(i16val, false);
     }
 }
+
+#if defined(__gfx13__)
+template <ck_fp8_interpretation_t interpret>
+static __device__ _Float16 cast_to_f16_from_f8(fp8_storage_t v)
+{
+    union
+    {
+        unsigned short i16val;
+        unsigned char i8val[2];
+    } val;
+    val.i8val[0] = v;
+
+    static_assert(interpret == ck_fp8_interpretation_t::CK_E4M3_FNUZ ||
+                      interpret == ck_fp8_interpretation_t::CK_E4M3_OCP ||
+                      interpret == ck_fp8_interpretation_t::CK_E5M2_FNUZ ||
+                      interpret == ck_fp8_interpretation_t::CK_E5M2_OCP,
+                  "Only FNUZ and OCP interpretations are supported");
+
+    if constexpr((interpret == ck_fp8_interpretation_t::CK_E4M3_FNUZ) ||
+                 (interpret == ck_fp8_interpretation_t::CK_E4M3_OCP))
+    {
+        return __builtin_amdgcn_cvt_f16_fp8(val.i16val, 0);
+    }
+    else
+    {
+        return __builtin_amdgcn_cvt_f16_bf8(val.i16val, 0);
+    }
+}
+#endif
 #endif
 
 } // namespace fp8_impl
@@ -333,7 +362,11 @@ struct f8_ocp_t
 #endif
     {
 #if CK_OCP_FP8_CVT_FAST_PATH
+#if defined(__gfx13__)
+        return fp8_impl::cast_to_f16_from_f8<default_interpret>(this->data);
+#else
         return static_cast<_Float16>(fp8_impl::cast_to_f32_from_f8<default_interpret>(this->data));
+#endif
 #else
         return fp8_impl::cast_from_f8<_Float16, wm, we, false>(
             this->data); // XXX: clip==false must be consistent with operator float
@@ -380,9 +413,10 @@ struct bf8_ocp_t
     __host__ explicit operator _Float16() const
 #endif
     {
-#if defined(__gfx950__) || defined(__gfx1200__) || defined(__gfx1201__) || defined(__gfx1300__) || \
-    defined(__gfx1301__) || defined(__gfx1302__)
+#if defined(__gfx950__) || defined(__gfx1200__) || defined(__gfx1201__)
         return static_cast<_Float16>(fp8_impl::cast_to_f32_from_f8<default_interpret>(this->data));
+#elif defined(__gfx1300__) || defined(__gfx1301__) || defined(__gfx1302__)
+        return fp8_impl::cast_to_f16_from_f8<default_interpret>(this->data);
 #else
         return fp8_impl::cast_from_f8<_Float16, wm, we, false>(
             this->data); // XXX: clip==false must be consistent with operator float
@@ -526,6 +560,69 @@ static __device__ fp8_storage_t cast_to_f8_from_f32(float v, unsigned int rng = 
     }
     return i8data;
 }
+
+#if defined(__gfx13__)
+template <ck_fp8_interpretation_t interpret, bool saturate, bool stochastic_rounding = false>
+static __device__ fp8_storage_t cast_to_f8_from_f16(_Float16 v, unsigned int rng = 0)
+{
+    fp8_storage_t i8data;
+    union
+    {
+        _Float16 fval;
+        unsigned short i16val;
+        unsigned char i8val[2]; // NOTE: not endian independent
+    } val;
+
+    unsigned int ival = 0;
+    val.fval          = v;
+
+    if constexpr(saturate)
+    {
+        if constexpr(interpret == ck_fp8_interpretation_t::CK_E4M3_FNUZ)
+        {
+            if((val.i16val & NumericUtils<half_t>::nan_mask) != NumericUtils<half_t>::nan_mask)
+            { /// propagate NAN/INF, no clipping
+                val.fval = __builtin_amdgcn_fmed3h(val.fval, 240.0, -240.0);
+            }
+        }
+        else if constexpr(interpret == ck_fp8_interpretation_t::CK_E4M3_OCP)
+        { // OCP type
+            if((val.i16val & NumericUtils<half_t>::nan_mask) != NumericUtils<half_t>::nan_mask)
+            { /// propagate NAN/INF, no clipping
+                val.fval = __builtin_amdgcn_fmed3h(val.fval, 448.0, -448.0);
+            }
+        }
+        else
+        {
+            if((val.i16val & NumericUtils<half_t>::nan_mask) != NumericUtils<half_t>::nan_mask)
+            { /// propagate NAN/INF, no clipping
+                val.fval = __builtin_amdgcn_fmed3h(val.fval, 57344.0, -57344.0);
+            }
+        }
+    }
+
+    if constexpr(stochastic_rounding)
+    {
+        ival       = (interpret == ck_fp8_interpretation_t::CK_E4M3_FNUZ) ||
+                       (interpret == ck_fp8_interpretation_t::CK_E4M3_OCP)
+                         ? __builtin_amdgcn_cvt_sr_fp8_f16(val.fval, rng, ival, 0)
+                         : __builtin_amdgcn_cvt_sr_bf8_f16(val.fval, rng, ival, 0); // 0 pos
+        val.i16val = ival;
+        i8data     = val.i8val[0]; // little endian
+    }
+    else
+    { // RNE CVT
+        ival       = (interpret == ck_fp8_interpretation_t::CK_E4M3_FNUZ) ||
+                       (interpret == ck_fp8_interpretation_t::CK_E4M3_OCP)
+                         ? __builtin_amdgcn_cvt_pk_fp8_f16(val.fval, val.fval)
+                         : __builtin_amdgcn_cvt_pk_bf8_f16(val.fval, val.fval);
+        val.i16val = ival;
+        i8data     = val.i8val[0];
+    }
+
+    return i8data;
+}
+#endif
 #endif // CK_FP8_CVT_FAST_PATH
 
 // The conversion function is from rocblas
@@ -895,9 +992,21 @@ __host__ __device__ static inline fp8_storage_t cvt_half_t_to_fp8(const _Float16
 __host__ static inline fp8_storage_t cvt_half_t_to_fp8(const _Float16 x)
 #endif
 {
-    return cvt_float_to_fp8<interp, sat, stochastic_rounding>(static_cast<float>(x));
-}
+#if defined(__gfx13__)
+    __is_interpret_supported(interp);
+    uint32_t rng = 0;
+    if constexpr(stochastic_rounding)
+    {
+        constexpr int seed = 1254739;
+        rng                = prand_generator<_Float16, seed>(reinterpret_cast<uintptr_t>(&x), x);
+    }
 
+    return cast_to_f8_from_f16<interp, sat == ck_saturation_t::CK_SATFINITE, stochastic_rounding>(
+        x, rng);
+#else
+    return cvt_float_to_fp8<interp, sat, stochastic_rounding>(static_cast<float>(x));
+#endif
+}
 } // namespace fp8_impl
 
 // Declare a template function for fp8 conversion using RNE
