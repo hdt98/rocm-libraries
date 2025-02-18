@@ -924,6 +924,7 @@ template <typename src_type_a,
           index_t KPerWmma,
           index_t KPack,
           bool TransposeC      = false,
+          bool WaveGroup       = false,
           bool AssemblyBackend = false>
 struct WmmaGemm
 {
@@ -1182,7 +1183,18 @@ struct WmmaGemm
     }
 #endif
 
-    __device__ static auto GetLaneId() { return get_thread_local_1d_id() % wmma_instr.wave_size; }
+    __device__ static auto GetLaneId()
+    {
+        if constexpr(WaveGroup == false)
+        {
+            return get_thread_local_1d_id() % wmma_instr.wave_size;
+        }
+        else
+        {
+            return get_lane_id();
+        }
+        return get_thread_local_1d_id() % wmma_instr.wave_size;
+    }
 
     __device__ static auto GetSubGroupId()
     {

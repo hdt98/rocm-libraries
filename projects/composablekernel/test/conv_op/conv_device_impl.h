@@ -556,6 +556,10 @@ bool run_test()
     copy(conv_param.input_left_pads_, input_left_pads);
     copy(conv_param.input_right_pads_, input_right_pads);
 
+    constexpr ck::index_t CPerWConv_Bhalf = (Filter == Filter_3X3 && Shape == Shape_4X2) ? 8 : 4;
+
+    constexpr ck::long_index_t Acc_Convert_Interval =
+        std::is_same<GPUAccType, ck::bhalf_t>::value ? CPerWConv_Bhalf : CPerBlock;
     auto ref_conv = ck::tensor_operation::host::ReferenceConvFwd<NDimSpatial,
                                                                  InDataType,
                                                                  WeiDataType,
@@ -574,7 +578,12 @@ bool run_test()
                                               conv_param.input_right_pads_,
                                               in_element_op,
                                               wei_element_op,
-                                              out_element_op);
+                                              out_element_op,
+                                              {},
+                                              {},
+                                              {},
+                                              Acc_Convert_Interval,
+                                              true);
 
     if(config.do_verification)
     {

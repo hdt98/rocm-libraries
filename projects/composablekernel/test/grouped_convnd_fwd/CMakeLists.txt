@@ -1,4 +1,3 @@
-if (ENABLE_GFX13_FAIL_TESTS)
 if(GPU_TARGETS MATCHES "gfx9" OR GPU_TARGETS MATCHES "gfx11" OR GPU_TARGETS MATCHES "gfx12" OR GPU_TARGETS MATCHES "gfx13")
     add_gtest_executable(test_grouped_convnd_fwd test_grouped_convnd_fwd.cpp)
     if((GPU_TARGETS MATCHES "gfx11" OR GPU_TARGETS MATCHES "gfx12" OR GPU_TARGETS MATCHES "gfx13") AND (NOT GPU_TARGETS MATCHES "gfx9"))
@@ -6,7 +5,6 @@ if(GPU_TARGETS MATCHES "gfx9" OR GPU_TARGETS MATCHES "gfx11" OR GPU_TARGETS MATC
     else()
         target_link_libraries(test_grouped_convnd_fwd PRIVATE utility device_grouped_conv1d_fwd_instance device_grouped_conv2d_fwd_instance device_grouped_conv3d_fwd_instance)
     endif()
-endif()
 endif()
 
 if(GPU_TARGETS MATCHES "gfx9")

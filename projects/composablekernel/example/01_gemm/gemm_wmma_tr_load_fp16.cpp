@@ -69,6 +69,7 @@ using DeviceGemmInstance = ck::tensor_operation::device::DeviceGemmWmma_GFX13
            S<1, 32, 1, 4>,
            2,
            false,
+           false,
            ck::LoopScheduler::Default,
            ck::PipelineVersion::v1>;
 // clang-format on

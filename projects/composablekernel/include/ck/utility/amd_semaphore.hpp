@@ -71,18 +71,19 @@ class WavegroupSemaphore
 #else
         __builtin_amdgcn_s_sema_wait(&_sema);
 #endif
-#endif
         if constexpr(MemorySpaces & SemaphoreAddressSpaceGlobal)
             __builtin_amdgcn_fence(__ATOMIC_RELEASE, "workgroup", "global");
         if constexpr(MemorySpaces & SemaphoreAddressSpaceShared)
             __builtin_amdgcn_fence(__ATOMIC_RELEASE, "workgroup", "shared");
         if constexpr(MemorySpaces & SemaphoreAddressSpaceLaneShared)
             __builtin_amdgcn_fence(__ATOMIC_RELEASE, "workgroup", "laneshared");
+#endif
     }
 
     template <index_t MemorySpaces>
     __device__ void signal()
     {
+#if defined(__gfx13__)
         if constexpr(MemorySpaces & SemaphoreAddressSpaceGlobal)
             __builtin_amdgcn_fence(__ATOMIC_ACQUIRE, "workgroup", "global");
         if constexpr(MemorySpaces & SemaphoreAddressSpaceShared)
@@ -90,7 +91,6 @@ class WavegroupSemaphore
         if constexpr(MemorySpaces & SemaphoreAddressSpaceLaneShared)
             __builtin_amdgcn_fence(__ATOMIC_ACQUIRE, "workgroup", "laneshared");
 
-#if defined(__gfx13__)
 #if defined(CK_USE_AMD_SEMAPHORE_ASM)
         constexpr unsigned imm = SemId | (WaveIdInWavegroup << 4);
         asm("s_sema_signal %0" : : "n"(imm) : "memory");
@@ -100,6 +100,7 @@ class WavegroupSemaphore
 #endif
     }
 
+#if defined(__gfx13__)
 #if !defined(CK_USE_AMD_SEMAPHORE_ASM)
     template <unsigned WaveIdInWavegroup_>
     struct SemaphoreType;
@@ -157,6 +158,7 @@ class WavegroupSemaphore
 
     private:
     Type _sema;
+#endif
 #endif
 };
 } // namespace ck

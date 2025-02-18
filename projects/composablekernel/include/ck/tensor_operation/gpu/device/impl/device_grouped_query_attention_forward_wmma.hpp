@@ -599,7 +599,7 @@ struct DeviceGroupedQueryAttentionForward_Wmma
 
     static bool IsSupportedArgument(const RawArg& arg)
     {
-        if(ck::is_gfx11_supported() || ck::is_gfx12_supported())
+        if(ck::is_gfx11_supported() || ck::is_gfx12_supported() || ck::is_gfx13_supported())
         {
             if constexpr(!(is_same_v<Acc0DataType, float> || is_same_v<Acc0DataType, int32_t>))
             {

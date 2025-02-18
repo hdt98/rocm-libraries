@@ -14,11 +14,23 @@
 #include "ck/host_utility/device_prop.hpp"
 #include "test/wmma_op/wmma_op_util.hpp"
 
+static ck::index_t test_case_id = -1;
+
+static ck::index_t case_id = 0;
+
 template <typename SrcType, typename DstType, typename GPUAccType, typename CPUAccType>
 bool run_test()
 {
     if(ck::is_gfx13_supported()) // gfx13 uses another test
         return true;
+
+    case_id++;
+
+    if(test_case_id != -1 && (test_case_id + 1) != case_id)
+    {
+        return true;
+    }
+
     using Row         = ck::tensor_layout::gemm::RowMajor;
     using Col         = ck::tensor_layout::gemm::ColumnMajor;
     using PassThrough = ck::tensor_operation::element_wise::PassThrough;
@@ -59,6 +71,14 @@ bool run_test()
 {
     if(!ck::is_gfx13_supported())
         return true;
+
+    case_id++;
+
+    if(test_case_id != -1 && (test_case_id + 1) != case_id)
+    {
+        return true;
+    }
+
     using Row         = ck::tensor_layout::gemm::RowMajor;
     using Col         = ck::tensor_layout::gemm::ColumnMajor;
     using PassThrough = ck::tensor_operation::element_wise::PassThrough;
@@ -108,6 +128,14 @@ bool run_mixedfp_test()
     bool pass         = true;
     if(!ck::is_gfx13_supported())
         return true;
+
+    case_id++;
+
+    if(test_case_id != -1 && (test_case_id + 1) != case_id)
+    {
+        return true;
+    }
+
     // will change to mixed format
     const auto matmul_default = ck::wmma_op_util::
         matmul_mixedfp<GPUSrc0Type, GPUSrc1Type, AScaleSel, BScaleSel, DstType, GPUAccType>;
@@ -138,9 +166,13 @@ bool run_mixedfp_test()
     return pass ? 1 : 0;
 }
 
-int main(int, char*[])
+int main(int argc, char* argv[])
 {
     bool pass = true;
+    if(argc > 1)
+    {
+        test_case_id = atoi(argv[1]);
+    }
     // clang-format off
     //              |SrcType     |DstType     |GPUAccType  |CPUAccType
     pass &= run_test<ck::half_t,  ck::half_t,  float,       float      >();

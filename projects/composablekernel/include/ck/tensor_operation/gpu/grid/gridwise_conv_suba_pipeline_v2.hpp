@@ -261,7 +261,7 @@ struct GridwiseConvPipeline_v2
                     });
                     in_blockwise_copy.MoveSrcSliceWindow(in_grid_desc, in_block_copy_step);
 
-                    barrierLds.sync_lds<EnableAsync>();
+                    barrierLds.template sync_lds<EnableAsync>();
 
                     semaLdsReady.template signal<0>();
                     semaDataReady.template signal<SemaphoreAddressSpaceGlobal>();
@@ -374,7 +374,7 @@ struct GridwiseConvPipeline_v2
                     }
                 }
 
-                barrierLds.sync_lds<EnableAsync>();
+                barrierLds.template sync_lds<EnableAsync>();
                 semaLdsReady.template signal<0>();
             }
 
@@ -776,7 +776,7 @@ struct GridwiseConvPipeline_v2<1, true, true, true, EnableAsync>
                             .MoveSrcSliceWindow(wei_grid_desc, wei_block_copy_step);
                     });
                     in_blockwise_copy.MoveSrcSliceWindow(in_grid_desc, in_block_copy_step);
-                    barrierLds.sync_lds<EnableAsync>();
+                    barrierLds.template sync_lds<EnableAsync>();
 
                     semaLdsReady.template signal<0>();
                 }
@@ -876,7 +876,7 @@ struct GridwiseConvPipeline_v2<1, true, true, true, EnableAsync>
                     });
                 }
 
-                barrierLds.sync_lds<EnableAsync>();
+                barrierLds.template sync_lds<EnableAsync>();
 
                 semaLdsReady.template signal<0>();
             }

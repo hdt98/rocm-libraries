@@ -14,7 +14,7 @@
 namespace ck {
 
 #if defined(__gfx12__) || defined(__gfx13__)
-template <index_t BlockSize,
+template <typename ThisThreadBlock,
           typename FloatA,
           typename FloatB,
           typename FloatAcc,
@@ -62,8 +62,6 @@ struct BlockwiseGemmWMMA
     static constexpr auto I5    = Number<5>{};
     static constexpr auto WmmaK = Number<KPerWMMA>{};
 
-    using ThisThreadBlock = ThisThreadBlock<BlockSize>;
-
     // Hardcode of WaveSize, since current HIP Runtime(5.4.0-10984) could not return correct one.
     static constexpr index_t WaveSize = 32;
 
@@ -76,8 +74,17 @@ struct BlockwiseGemmWMMA
     static constexpr index_t A_K1 = ABlockDesc{}.GetLength(I5);
     static constexpr index_t B_K1 = BBlockDesc{}.GetLength(I5);
 
-    static constexpr auto wmma_gemm =
-        WmmaGemm<FloatA, FloatB, FloatAcc, MPerWMMA, NPerWMMA, KPerWMMA, KPack, TransposeC>{};
+    static constexpr bool EnableWaveGroup = ThisThreadBlock::InWaveGroup();
+
+    static constexpr auto wmma_gemm = WmmaGemm<FloatA,
+                                               FloatB,
+                                               FloatAcc,
+                                               MPerWMMA,
+                                               NPerWMMA,
+                                               KPerWMMA,
+                                               KPack,
+                                               TransposeC,
+                                               EnableWaveGroup>{};
 
     static constexpr index_t MWaves = MPerBlock / (MRepeat * MPerWMMA);
     static constexpr index_t NWaves = NPerBlock / (NRepeat * NPerWMMA);
@@ -655,7 +662,7 @@ struct BlockwiseGemmWMMA
 };
 
 #ifdef CK_EXTENSION_MX_TYPE
-template <index_t BlockSize,
+template <typename ThisThreadBlock,
           typename FloatA,
           typename FloatB,
           typename FloatAcc,
@@ -675,7 +682,7 @@ template <index_t BlockSize,
           bool AEnableLds = true,
           bool BEnableLds = true,
           bool TransposeC = false>
-struct BlockwiseMXGemmWMMA : public BlockwiseGemmWMMA<BlockSize,
+struct BlockwiseMXGemmWMMA : public BlockwiseGemmWMMA<ThisThreadBlock,
                                                       FloatA,
                                                       FloatB,
                                                       FloatAcc,
@@ -696,7 +703,7 @@ struct BlockwiseMXGemmWMMA : public BlockwiseGemmWMMA<BlockSize,
                                                       false,
                                                       TransposeC>
 {
-    using PARENT = BlockwiseGemmWMMA<BlockSize,
+    using PARENT = BlockwiseGemmWMMA<ThisThreadBlock,
                                      FloatA,
                                      FloatB,
                                      FloatAcc,
@@ -748,7 +755,7 @@ struct BlockwiseMXGemmWMMA : public BlockwiseGemmWMMA<BlockSize,
             const auto waveId_m   = wave_idx[PARENT::I0];
             const auto WMMA_a_idx = PARENT::wmma_gemm.CalculateAThreadOriginDataIndex();
             const auto k1_value   = PARENT::wmma_gemm.GetSubGroupId();
-            const auto k0_value   = get_thread_local_1d_id() / (64 * 4);
+            const auto k0_value   = ThisThreadBlock::GetThreadId() / (64 * 4);
             //   |KRepeat   |MRepeat|MWave  |MLane  |KPack
             return make_tuple(k0_value, 0, waveId_m, WMMA_a_idx, k1_value);
         }
@@ -766,7 +773,7 @@ struct BlockwiseMXGemmWMMA : public BlockwiseGemmWMMA<BlockSize,
             const auto waveId_n   = wave_idx[PARENT::I1];
             const auto WMMA_b_idx = PARENT::wmma_gemm.CalculateBThreadOriginDataIndex();
             const auto k1_value   = PARENT::wmma_gemm.GetSubGroupId();
-            const auto k0_value   = get_thread_local_1d_id() / (64 * 4);
+            const auto k0_value   = ThisThreadBlock::GetThreadId() / (64 * 4);
             //  |KRepeat   |NRepeat|Nwave  |NLane  |KPack
             return make_tuple(k0_value, 0, waveId_n, WMMA_b_idx, k1_value);
         }
@@ -780,7 +787,7 @@ struct BlockwiseMXGemmWMMA : public BlockwiseGemmWMMA<BlockSize,
     __host__ __device__
     BlockwiseMXGemmWMMA(Tuple5 a_scale_origin = CalculateAScaleThreadOriginDataIndex(),
                         Tuple5 b_scale_origin = CalculateBScaleThreadOriginDataIndex())
-        : BlockwiseGemmWMMA<BlockSize,
+        : BlockwiseGemmWMMA<ThisThreadBlock,
                             FloatA,
                             FloatB,
                             FloatAcc,
@@ -1246,7 +1253,7 @@ struct BlockwiseMXGemmWMMA : public BlockwiseGemmWMMA<BlockSize,
 };
 #endif
 #else
-template <index_t BlockSize,
+template <typename ThisThreadBlock,
           typename FloatA,
           typename FloatB,
           typename FloatAcc,
@@ -1294,8 +1301,6 @@ struct BlockwiseGemmWMMA
     static constexpr auto I4    = Number<4>{};
     static constexpr auto I5    = Number<5>{};
     static constexpr auto WmmaK = Number<16>{};
-
-    using ThisThreadBlock = ThisThreadBlock<BlockSize>;
 
     // Hardcode of WaveSize, since current HIP Runtime(5.4.0-10984) could not return correct
     // one.
@@ -1787,7 +1792,7 @@ struct BlockwiseGemmWMMA
 };
 #ifdef CK_EXTENSION_MX_TYPE
 // dummy class to fix compiling error
-template <index_t BlockSize,
+template <typename ThreadThreadBlock,
           typename FloatA,
           typename FloatB,
           typename FloatAcc,
@@ -1807,7 +1812,7 @@ template <index_t BlockSize,
           bool AEnableLds = true,
           bool BEnableLds = true,
           bool TransposeC = false>
-struct BlockwiseMXGemmWMMA : public BlockwiseGemmWMMA<BlockSize,
+struct BlockwiseMXGemmWMMA : public BlockwiseGemmWMMA<ThreadThreadBlock,
                                                       FloatA,
                                                       FloatB,
                                                       FloatAcc,

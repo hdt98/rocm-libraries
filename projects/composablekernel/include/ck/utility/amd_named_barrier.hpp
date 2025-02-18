@@ -59,13 +59,34 @@ class NamedBarrier
 {
     public:
     __device__ NamedBarrier() {}
-    __device__ void init() { __builtin_amdgcn_s_barrier_init(&bar_, Count); }
-    __device__ void join() { __builtin_amdgcn_s_barrier_join(&bar_); }
-    __device__ void wait() { __builtin_amdgcn_s_barrier_wait(bar_id_); }
-    __device__ void signal() { __builtin_amdgcn_s_barrier_signal_var(&bar_, 0); }
+    __device__ void init()
+    {
+#if defined(__gfx13__)
+        __builtin_amdgcn_s_barrier_init(&bar_, Count);
+#endif
+    }
+    __device__ void join()
+    {
+#if defined(__gfx13__)
+        __builtin_amdgcn_s_barrier_join(&bar_);
+#endif
+    }
+    __device__ void wait()
+    {
+#if defined(__gfx13__)
+        __builtin_amdgcn_s_barrier_wait(bar_id_);
+#endif
+    }
+    __device__ void signal()
+    {
+#if defined(__gfx13__)
+        __builtin_amdgcn_s_barrier_signal_var(&bar_, 0);
+#endif
+    }
     template <bool async>
     __device__ void sync_lds()
     {
+#if defined(__gfx13__)
         if constexpr(async)
         {
             asm volatile("s_wait_asynccnt 0x0 " ::);
@@ -77,11 +98,14 @@ class NamedBarrier
 
         signal();
         wait();
+#endif
     }
 
     private:
+#if defined(__gfx13__)
     __amdgpu_named_workgroup_barrier_t bar_;
     static constexpr uint32_t bar_id_ = 1;
+#endif
 };
 #endif
 

@@ -10,6 +10,7 @@
 #include "ck/tensor_operation/gpu/grid/gridwise_gemm_pipeline_v2.hpp"
 #include "ck/tensor_operation/gpu/grid/gridwise_gemm_pipeline_v4_direct_load.hpp"
 #include "ck/tensor_operation/gpu/grid/gridwise_gemm_pipeline_v5.hpp"
+#include "ck/tensor_operation/gpu/grid/gridwise_gemm_pipeline_wavegroup_v1.hpp"
 
 namespace ck {
 
@@ -27,10 +28,33 @@ template <PipelineVersion PipelineVer,
           index_t NumPrefetch     = 1,
           LoopScheduler LoopSched = LoopScheduler::Default,
           bool AEnableLds         = true,
-          bool BEnableLds         = true>
+          bool BEnableLds         = true,
+          bool EnableWaveGroup    = false>
 constexpr auto GridwiseGemmPipeline_Selector()
 {
-    if constexpr(PipelineVer == PipelineVersion::v1)
+    if constexpr(EnableWaveGroup)
+    {
+        if constexpr(PipelineVer == PipelineVersion::v1)
+        {
+            if constexpr(LoopSched == LoopScheduler::Default)
+            {
+                return GridwiseGemmPipeline_Wavegroup_v1<NumPrefetch, AEnableLds, BEnableLds>{};
+            }
+            else
+            {
+                std::cerr << "GridwiseGemmPipeline configuration is not available" << std::endl;
+            }
+        }
+        else if constexpr(PipelineVer == PipelineVersion::v5)
+        {
+            return GridwiseGemmPipeline_Wavegroup_v5<NumPrefetch>{};
+        }
+        else
+        {
+            std::cerr << "GridwiseGemmPipeline configuration is not available" << std::endl;
+        }
+    }
+    else if constexpr(PipelineVer == PipelineVersion::v1)
     {
         if constexpr(LoopSched == LoopScheduler::Default)
         {

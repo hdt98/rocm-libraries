@@ -13,6 +13,10 @@
 #include "ck/tensor_operation/gpu/element/element_wise_operation.hpp"
 #include "test/swmma_op/swmma_op_util.hpp"
 
+static ck::index_t test_case_id = -1;
+
+static ck::index_t case_id = 0;
+
 template <typename Src1Type,
           typename Src2Type,
           typename DstType,
@@ -24,6 +28,13 @@ template <typename Src1Type,
           ck::index_t K>
 bool run_test()
 {
+    case_id++;
+
+    if(test_case_id != -1 && (test_case_id + 1) != case_id)
+    {
+        return true;
+    }
+
     using Row         = ck::tensor_layout::gemm::RowMajor;
     using Col         = ck::tensor_layout::gemm::ColumnMajor;
     using PassThrough = ck::tensor_operation::element_wise::PassThrough;
@@ -57,9 +68,13 @@ bool run_test()
 
     return pass;
 }
-int main(int, char*[])
+int main(int argc, char* argv[])
 {
     bool pass = true;
+    if(argc > 1)
+    {
+        test_case_id = atoi(argv[1]);
+    }
     // clang-format off
     //              |   Src1Type|       Src2Type|      DstType|  DstVecSize|  GPUAccType   | CPUAccType|   M|   N|   K|
     pass &= run_test< ck::half_t,      ck::half_t,      float,          8,       float,      float,       16,  16,  32>(); // V_SWMMA_F32_16X16_F16

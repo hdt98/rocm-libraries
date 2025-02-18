@@ -13,7 +13,7 @@
 #include "ck/tensor_operation/gpu/device/device_gemm.hpp"
 #include "ck/tensor_operation/gpu/device/gemm_specialization.hpp"
 #include "ck/tensor_operation/gpu/device/matrix_padder.hpp"
-#include "ck/tensor_operation/gpu/grid/gridwise_gemm_wmma.hpp"
+#include "ck/tensor_operation/gpu/grid/gridwise_gemm_wmma_gfx13.hpp"
 #include "ck/host_utility/device_prop.hpp"
 #include "ck/host_utility/kernel_launch.hpp"
 #include "ck/tensor_operation/gpu/device/matrix_padder.hpp"
@@ -68,6 +68,7 @@ template <typename ALayout,
           typename CShuffleBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock,
           index_t CShuffleBlockTransferScalarPerVector_NPerBlock,
           bool CStoreEnableAsync,
+          bool EnableWaveGroup,
           ck::LoopScheduler LoopSched     = make_default_loop_scheduler(),
           ck::PipelineVersion PipelineVer = ck::PipelineVersion::v5>
 struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
@@ -101,15 +102,27 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
         ABlockTransferSrcScalarPerVector * sizeof(view_type_t<ADataType>) == 16 ? true : false;
     static constexpr auto MaxVectorLoadB =
         BBlockTransferSrcScalarPerVector * sizeof(view_type_t<ADataType>) == 16 ? true : false;
+
+    // If true, LDS is disabled unconditionally
+#ifdef GEMM_A_DISABLE_LDS
+    static constexpr auto ADisableLds_manu = true;
+#else
+    static constexpr auto ADisableLds_manu = false;
+#endif
+#ifdef GEMM_B_DISABLE_LDS
+    static constexpr auto BDisableLds_manu = true;
+#else
+    static constexpr auto BDisableLds_manu = false;
+#endif
     static constexpr auto AEnableLds_auto = (NWaves == 1 && (MaxVectorLoadA || MRepeat == 1) &&
                                              is_same<tensor_layout::gemm::RowMajor, ALayout>::value)
                                                 ? false
-                                                : (AEnableGlobalTRLoad ? false : true);
+                                                : (AEnableGlobalTRLoad ? false : !ADisableLds_manu);
     static constexpr auto BEnableLds_auto =
         (MWaves == 1 && (MaxVectorLoadB || NRepeat == 1) &&
          is_same<tensor_layout::gemm::ColumnMajor, BLayout>::value)
             ? false
-            : (BEnableGlobalTRLoad ? false : true);
+            : (BEnableGlobalTRLoad ? false : !BDisableLds_manu);
 
     // If true, LDS is used unconditionally
     // if enable lds async load, should always enable lds
@@ -489,6 +502,7 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
         CShuffleBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock,
         CShuffleBlockTransferScalarPerVector_NPerBlock,
         CStoreEnableAsync,
+        EnableWaveGroup,
         NumPrefetch,
         LoopSched,
         PipelineVer>;
@@ -663,7 +677,7 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
                     else
                     {
                         return arg.a_grid_desc_.GetLength(I0) * arg.a_grid_desc_.GetLength(I3) *
-                               arg.a_grid_desc_.GetLength(I4) * arg.a_grid_desc_.GetLength(I6);
+                               arg.a_grid_desc_.GetLength(I5) * arg.a_grid_desc_.GetLength(I7);
                     }
                 }
             }();
@@ -672,80 +686,163 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
 #ifdef CK_EXTENSION_MX_TYPE
                     if constexpr(is_mx_type_t_v<ADataType>)
                     {
-                        const auto kernel = kernel_gemm_mx_wmma<
-                            GridwiseGemm,
-                            ADataType,
-                            BDataType,
-                            CDataType,
-                            remove_reference_t<DeviceGemmWmma_GFX13::AGridDesc>,
-                            remove_reference_t<DeviceGemmWmma_GFX13::BGridDesc>,
-                            remove_reference_t<DeviceGemmWmma_GFX13::AScaleGridDesc>,
-                            remove_reference_t<DeviceGemmWmma_GFX13::BScaleGridDesc>,
-                            remove_reference_t<
-                                typename GridwiseGemm::
-                                    CGridDescriptor_MBlock_MPerBlock_NBlock_NPerBlock>,
-                            AElementwiseOperation,
-                            BElementwiseOperation,
-                            CElementwiseOperation,
-                            remove_reference_t<typename GridwiseGemm::DefaultBlock2CTileMap>,
-                            has_main_k_block_loop>;
+                        if constexpr(EnableWaveGroup)
+                        {
+                            const auto kernel = kernel_gemm_mx_wmma_wavegroup<
+                                GridwiseGemm,
+                                ADataType,
+                                BDataType,
+                                CDataType,
+                                remove_reference_t<DeviceGemmWmma_GFX13::AGridDesc>,
+                                remove_reference_t<DeviceGemmWmma_GFX13::BGridDesc>,
+                                remove_reference_t<DeviceGemmWmma_GFX13::AScaleGridDesc>,
+                                remove_reference_t<DeviceGemmWmma_GFX13::BScaleGridDesc>,
+                                remove_reference_t<
+                                    typename GridwiseGemm::
+                                        CGridDescriptor_MBlock_MPerBlock_NBlock_NPerBlock>,
+                                AElementwiseOperation,
+                                BElementwiseOperation,
+                                CElementwiseOperation,
+                                remove_reference_t<typename GridwiseGemm::DefaultBlock2CTileMap>,
+                                has_main_k_block_loop>;
 
-                        return launch_and_time_kernel(
-                            stream_config,
-                            kernel,
-                            dim3(grid_size),
-                            dim3(BlockSize),
-                            0,
-                            arg.p_a_grid_,
-                            arg.p_b_grid_,
-                            arg.p_a_scale_,
-                            arg.p_b_scale_,
-                            arg.a_scale_grid_desc_,
-                            arg.b_scale_grid_desc_,
-                            arg.p_c_grid_,
-                            arg.a_grid_desc_,
-                            arg.b_grid_desc_k0_n_k1_,
-                            arg.c_grid_desc_mblock_mperblock_nblock_nperblock,
-                            arg.a_element_op_,
-                            arg.b_element_op_,
-                            arg.c_element_op_,
-                            arg.block_2_ctile_map_);
+                            return launch_and_time_kernel(
+                                stream_config,
+                                kernel,
+                                dim3(grid_size),
+                                dim3(BlockSize),
+                                0,
+                                arg.p_a_grid_,
+                                arg.p_b_grid_,
+                                arg.p_a_scale_,
+                                arg.p_b_scale_,
+                                arg.a_scale_grid_desc_,
+                                arg.b_scale_grid_desc_,
+                                arg.p_c_grid_,
+                                arg.a_grid_desc_,
+                                arg.b_grid_desc_k0_n_k1_,
+                                arg.c_grid_desc_mblock_mperblock_nblock_nperblock,
+                                arg.a_element_op_,
+                                arg.b_element_op_,
+                                arg.c_element_op_,
+                                arg.block_2_ctile_map_);
+                        }
+                        else
+                        {
+                            const auto kernel = kernel_gemm_mx_wmma<
+                                GridwiseGemm,
+                                ADataType,
+                                BDataType,
+                                CDataType,
+                                remove_reference_t<DeviceGemmWmma_GFX13::AGridDesc>,
+                                remove_reference_t<DeviceGemmWmma_GFX13::BGridDesc>,
+                                remove_reference_t<DeviceGemmWmma_GFX13::AScaleGridDesc>,
+                                remove_reference_t<DeviceGemmWmma_GFX13::BScaleGridDesc>,
+                                remove_reference_t<
+                                    typename GridwiseGemm::
+                                        CGridDescriptor_MBlock_MPerBlock_NBlock_NPerBlock>,
+                                AElementwiseOperation,
+                                BElementwiseOperation,
+                                CElementwiseOperation,
+                                remove_reference_t<typename GridwiseGemm::DefaultBlock2CTileMap>,
+                                has_main_k_block_loop>;
+
+                            return launch_and_time_kernel(
+                                stream_config,
+                                kernel,
+                                dim3(grid_size),
+                                dim3(BlockSize),
+                                0,
+                                arg.p_a_grid_,
+                                arg.p_b_grid_,
+                                arg.p_a_scale_,
+                                arg.p_b_scale_,
+                                arg.a_scale_grid_desc_,
+                                arg.b_scale_grid_desc_,
+                                arg.p_c_grid_,
+                                arg.a_grid_desc_,
+                                arg.b_grid_desc_k0_n_k1_,
+                                arg.c_grid_desc_mblock_mperblock_nblock_nperblock,
+                                arg.a_element_op_,
+                                arg.b_element_op_,
+                                arg.c_element_op_,
+                                arg.block_2_ctile_map_);
+                        }
                     }
                     else
 #endif
                     {
-                        const auto kernel = kernel_gemm_wmma<
-                            GridwiseGemm,
-                            ADataType,
-                            BDataType,
-                            CDataType,
-                            remove_reference_t<DeviceGemmWmma_GFX13::AGridDesc>,
-                            remove_reference_t<DeviceGemmWmma_GFX13::BGridDesc>,
-                            remove_reference_t<
-                                typename GridwiseGemm::
-                                    CGridDescriptor_MBlock_MPerBlock_NBlock_NPerBlock>,
-                            AElementwiseOperation,
-                            BElementwiseOperation,
-                            CElementwiseOperation,
-                            remove_reference_t<typename GridwiseGemm::DefaultBlock2CTileMap>,
-                            has_main_k_block_loop>;
 
-                        return launch_and_time_kernel(
-                            stream_config,
-                            kernel,
-                            dim3(grid_size),
-                            dim3(BlockSize),
-                            0,
-                            arg.p_a_grid_,
-                            arg.p_b_grid_,
-                            arg.p_c_grid_,
-                            arg.a_grid_desc_,
-                            arg.b_grid_desc_k0_n_k1_,
-                            arg.c_grid_desc_mblock_mperblock_nblock_nperblock,
-                            arg.a_element_op_,
-                            arg.b_element_op_,
-                            arg.c_element_op_,
-                            arg.block_2_ctile_map_);
+                        if constexpr(EnableWaveGroup)
+                        {
+                            const auto kernel = kernel_gemm_wmma_wavegroup<
+                                GridwiseGemm,
+                                ADataType,
+                                BDataType,
+                                CDataType,
+                                remove_reference_t<DeviceGemmWmma_GFX13::AGridDesc>,
+                                remove_reference_t<DeviceGemmWmma_GFX13::BGridDesc>,
+                                remove_reference_t<
+                                    typename GridwiseGemm::
+                                        CGridDescriptor_MBlock_MPerBlock_NBlock_NPerBlock>,
+                                AElementwiseOperation,
+                                BElementwiseOperation,
+                                CElementwiseOperation,
+                                remove_reference_t<typename GridwiseGemm::DefaultBlock2CTileMap>,
+                                has_main_k_block_loop>;
+
+                            return launch_and_time_kernel(
+                                stream_config,
+                                kernel,
+                                dim3(grid_size),
+                                dim3(BlockSize),
+                                0,
+                                arg.p_a_grid_,
+                                arg.p_b_grid_,
+                                arg.p_c_grid_,
+                                arg.a_grid_desc_,
+                                arg.b_grid_desc_k0_n_k1_,
+                                arg.c_grid_desc_mblock_mperblock_nblock_nperblock,
+                                arg.a_element_op_,
+                                arg.b_element_op_,
+                                arg.c_element_op_,
+                                arg.block_2_ctile_map_);
+                        }
+                        else
+                        {
+                            const auto kernel = kernel_gemm_wmma<
+                                GridwiseGemm,
+                                ADataType,
+                                BDataType,
+                                CDataType,
+                                remove_reference_t<DeviceGemmWmma_GFX13::AGridDesc>,
+                                remove_reference_t<DeviceGemmWmma_GFX13::BGridDesc>,
+                                remove_reference_t<
+                                    typename GridwiseGemm::
+                                        CGridDescriptor_MBlock_MPerBlock_NBlock_NPerBlock>,
+                                AElementwiseOperation,
+                                BElementwiseOperation,
+                                CElementwiseOperation,
+                                remove_reference_t<typename GridwiseGemm::DefaultBlock2CTileMap>,
+                                has_main_k_block_loop>;
+
+                            return launch_and_time_kernel(
+                                stream_config,
+                                kernel,
+                                dim3(grid_size),
+                                dim3(BlockSize),
+                                0,
+                                arg.p_a_grid_,
+                                arg.p_b_grid_,
+                                arg.p_c_grid_,
+                                arg.a_grid_desc_,
+                                arg.b_grid_desc_k0_n_k1_,
+                                arg.c_grid_desc_mblock_mperblock_nblock_nperblock,
+                                arg.a_element_op_,
+                                arg.b_element_op_,
+                                arg.c_element_op_,
+                                arg.block_2_ctile_map_);
+                        }
                     }
                 };
 
@@ -1023,6 +1120,7 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
             << K1 << ", "
             << MPerWmma << ", "
             << NPerWmma << ", "
+            << KPerWmma << ", "
             << MRepeat << ", "
             << NRepeat
             << ">"
@@ -1034,6 +1132,10 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
             << AEnableTRLoadFromGlobal << ", "
             << "BEnableTRload: "
             << BEnableTRLoadFromGlobal << ", "
+            << "CStoreEnableAsync: "
+            << CStoreEnableAsync << ", "
+            << "EnableWaveGroup: "
+            << EnableWaveGroup << ", "
             << "NumPrefetch: "
             << NumPrefetch << ", "
             << "LoopScheduler: "

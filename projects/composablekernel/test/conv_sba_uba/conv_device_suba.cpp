@@ -73,31 +73,20 @@ bool run_test_fmt()
 #endif
 // 8x4
         //ActivativeFun: 0
-        bool fail_case = WaveGroup && (TestMask == 0x10) && (config.c == 0x40); // LWPSCGFX13-498
-        if (fail_case == false)
-        {
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_8X4, Filter_1X1, false, 0,       WaveGroup, 0, OutElementNoneOp, ScaleBiasPacked, UniformScale, 0, TestMask | 0x10000>();
-        }
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_8X4, Filter_3X3, false, 0,       WaveGroup, 0, OutElementNoneOp, ScaleBiasPacked, UniformScale, 0, TestMask | 0x20000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_8X4, Filter_3X3, true,  0,       WaveGroup, 0, OutElementNoneOp, ScaleBiasPacked, UniformScale, 0, TestMask | 0x20000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_8X4, Filter_1X1, false, LdsMode, WaveGroup, 0, OutElementNoneOp, ScaleBiasPacked, UniformScale, 0, TestMask | 0x40000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_8X4, Filter_3X3, false, LdsMode, WaveGroup, 0, OutElementNoneOp, ScaleBiasPacked, UniformScale, 0, TestMask | 0x40000>();
-        
         //ActivativeFun: 1
-        if (fail_case == false)
-        {
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_8X4, Filter_1X1, false, 0,       WaveGroup, 1, OutElementReluOp, ScaleBiasPacked, UniformScale, 0, TestMask | 0x80000>();
-        }
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_8X4, Filter_3X3, false, 0,       WaveGroup, 1, OutElementReluOp, ScaleBiasPacked, UniformScale, 0, TestMask | 0x100000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_8X4, Filter_3X3, true,  0,       WaveGroup, 1, OutElementReluOp, ScaleBiasPacked, UniformScale, 0, TestMask | 0x100000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_8X4, Filter_1X1, false, LdsMode, WaveGroup, 1, OutElementReluOp, ScaleBiasPacked, UniformScale, 0, TestMask | 0x200000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_8X4, Filter_3X3, false, LdsMode, WaveGroup, 1, OutElementReluOp, ScaleBiasPacked, UniformScale, 0, TestMask | 0x200000>();
 
         //ActivativeFun: 2
-        if (fail_case == false)
-        {
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_8X4, Filter_1X1, false, 0,       WaveGroup, 2, OutElementTanhOp, ScaleBiasPacked, UniformScale, 0, TestMask | 0x400000>();
-        }
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_8X4, Filter_3X3, false, 0,       WaveGroup, 2, OutElementTanhOp, ScaleBiasPacked, UniformScale, 0, TestMask | 0x800000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_8X4, Filter_3X3, true,  0,       WaveGroup, 2, OutElementTanhOp, ScaleBiasPacked, UniformScale, 0, TestMask | 0x800000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_8X4, Filter_1X1, false, LdsMode, WaveGroup, 2, OutElementTanhOp, ScaleBiasPacked, UniformScale, 0, TestMask | 0x200000>();

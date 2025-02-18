@@ -1149,7 +1149,7 @@ struct GridwiseGemmMultipleD_Wmma
         constexpr auto KPack = math::integer_least_multiple(K1, WmmaK);
 
         auto blockwise_gemm =
-            BlockwiseGemmWMMA<BlockSize,
+            BlockwiseGemmWMMA<ThisThreadBlock,
                               ADataType,
                               BDataType,
                               AccDataType,

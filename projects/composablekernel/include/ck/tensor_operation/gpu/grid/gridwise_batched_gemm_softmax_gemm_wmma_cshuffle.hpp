@@ -1088,7 +1088,7 @@ struct GridwiseBatchedGemmSoftmaxGemm_Wmma
         constexpr auto KPack = math::integer_least_multiple(math::integer_least_multiple(AK1Value,BK1Value), WmmaK);
 
         auto blockwise_gemm0 = BlockwiseGemmWMMA<
-            BlockSize,
+            ThisThreadBlock,
             ADataType,
             B0DataType,
             Acc0DataType,
@@ -1427,7 +1427,7 @@ struct GridwiseBatchedGemmSoftmaxGemm_Wmma
         constexpr auto b1_block_slice_copy_step = MakeB1BlockSliceCopyStep();
 
         auto blockwise_gemm1 =
-            BlockwiseGemmWMMA<BlockSize,
+            BlockwiseGemmWMMA<ThisThreadBlock,
                               ADataType,
                               B1DataType,
                               Acc1DataType,

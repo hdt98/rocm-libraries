@@ -584,7 +584,7 @@ struct DeviceGroupedConvFwdDl_NHWC_KYXC_NHWK : public DeviceGroupedConvFwd<NDimS
 
         // check device
         if(!(ck::get_device_name() == "gfx906" || ck::is_gfx103_supported() ||
-             ck::is_gfx11_supported() || ck::is_gfx12_supported()))
+             ck::is_gfx11_supported() || ck::is_gfx12_supported() || ck::is_gfx13_supported()))
         {
             return false;
         }

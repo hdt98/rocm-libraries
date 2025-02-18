@@ -5,11 +5,11 @@
 
 #include "ck/tensor_operation/gpu/device/impl/device_gemm_wmma_gfx13.hpp"
 
-using ADataType        = std::int8_t;
-using BDataType        = std::int8_t;
-using AccDataType      = std::int32_t;
-using CShuffleDataType = std::int32_t;
-using CDataType        = std::int8_t;
+using ADataType        = ck::half_t;
+using BDataType        = ck::half_t;
+using AccDataType      = float;
+using CShuffleDataType = float;
+using CDataType        = float;
 
 using ALayout = Row;
 using BLayout = Col;
@@ -36,14 +36,14 @@ using DeviceGemmInstance = ck::tensor_operation::device::DeviceGemmWmma_GFX13
            CElementOp,
            GemmDefault,
            1,            // Prefetch stage
-           128,          // BlockSize
+           256,          // BlockSize
            64,           // MPerBlock
            128,          // NPerBlock
            64,           // KPerBlock
-           4,            // K1
+           2,            // K1
            16,           // MPerWmma
            16,           // NPerWmma
-           32,           // KPerWmma
+           16,           // KPerWmma
            2,            // M-Repeat // M-PerWmma / M-Repeat = M-Wave
            4,            // N-Repeat // N-PerWmma / N-Repeat = N-Wave
            S<32, 4, 1>,  // M-K0-K1
@@ -67,9 +67,9 @@ using DeviceGemmInstance = ck::tensor_operation::device::DeviceGemmWmma_GFX13
            1,           // C shuffle (M Repeat) Per store
            1,           // C shuffle (N Repeat) Per store
            S<1, 32, 1, 4>,
-           4,
-           false,
-           false,
+           2,
+           true,
+           true,
            ck::LoopScheduler::Default,
            ck::PipelineVersion::v5>;
 // clang-format on

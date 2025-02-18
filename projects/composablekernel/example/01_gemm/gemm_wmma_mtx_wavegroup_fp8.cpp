@@ -36,7 +36,7 @@ using DeviceGemmInstance = ck::tensor_operation::device::DeviceGemmWmma_GFX13
            CElementOp,
            GemmDefault,
            1,            // Prefetch stage
-           128,          // BlockSize
+           256,          // BlockSize
            64,           // MPerBlock
            128,          // NPerBlock
            256,           // KPerBlock
@@ -69,6 +69,7 @@ using DeviceGemmInstance = ck::tensor_operation::device::DeviceGemmWmma_GFX13
            S<1, 32, 1, 4>,
            4,
            false,
+           true,
            ck::LoopScheduler::Default,
            ck::PipelineVersion::v1>;
 // clang-format on
