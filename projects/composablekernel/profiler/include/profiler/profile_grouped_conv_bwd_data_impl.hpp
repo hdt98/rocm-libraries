@@ -34,7 +34,8 @@ bool profile_grouped_conv_bwd_data_impl(int do_verification,
                                         int init_method,
                                         bool do_log,
                                         bool time_kernel,
-                                        const ck::utils::conv::ConvParam& conv_param)
+                                        const ck::utils::conv::ConvParam& conv_param,
+                                        index_t instance_index = -1)
 {
     using OutElementOp = ck::tensor_operation::element_wise::PassThrough;
     using WeiElementOp = ck::tensor_operation::element_wise::PassThrough;
@@ -122,11 +123,17 @@ bool profile_grouped_conv_bwd_data_impl(int do_verification,
     float best_gb_per_sec = 0;
 
     // profile device op instances
-    bool pass = true;
-
-    auto run_impl = [&](auto& op_ptr, auto& argument_ptr) {
+    bool pass          = true;
+    index_t num_kernel = 0;
+    auto run_impl      = [&](auto& op_ptr, auto& argument_ptr) {
         if(op_ptr->IsSupportedArgument(argument_ptr.get()))
         {
+            num_kernel++;
+            if((instance_index != -1) && (instance_index + 1 != num_kernel))
+            {
+                // skip test if instance_index is specified
+                return;
+            }
             // re-init output to zero before profiling next kernel
             in_device_buf.SetZero();
 
@@ -250,6 +257,11 @@ bool profile_grouped_conv_bwd_data_impl(int do_verification,
               << "\nname: " << best_op_name << "\navg_time: " << best_avg_time
               << "\ntflops: " << best_tflops << "\nGB/s: " << best_gb_per_sec << std::endl;
 
+    if(instance_index != -1)
+    {
+        std::cout << "grouped_conv_bwd_data_instance (" << instance_index << "/" << num_kernel
+                  << "): Passed" << std::endl;
+    }
     return pass;
 }
 

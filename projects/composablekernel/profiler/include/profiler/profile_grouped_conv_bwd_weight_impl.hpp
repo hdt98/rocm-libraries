@@ -41,7 +41,8 @@ bool profile_grouped_conv_bwd_weight_impl(int do_verification,
                                           bool do_log,
                                           bool time_kernel,
                                           const ck::utils::conv::ConvParam& conv_param,
-                                          ck::index_t split_k)
+                                          ck::index_t split_k,
+                                          index_t instance_index = -1)
 {
     using InElementOp  = ck::tensor_operation::element_wise::PassThrough;
     using WeiElementOp = ck::tensor_operation::element_wise::PassThrough;
@@ -178,8 +179,10 @@ bool profile_grouped_conv_bwd_weight_impl(int do_verification,
         split_k_list = {split_k};
     }
 
+    index_t num_kernel = 0;
     for(auto& op_ptr : op_ptrs)
     {
+        bool supported = false;
         for(std::size_t split_k_id = 0; split_k_id < split_k_list.size(); split_k_id++)
         {
             auto argument_ptr = op_ptr->MakeArgumentPointer(
@@ -207,6 +210,12 @@ bool profile_grouped_conv_bwd_weight_impl(int do_verification,
 
             if(op_ptr->IsSupportedArgument(argument_ptr.get()))
             {
+                supported = true;
+                if((instance_index != -1) && (instance_index != num_kernel))
+                {
+                    // skip test if instance_index is specified
+                    continue;
+                }
                 // using atomic add, so need to reset input
                 wei_device_buf.SetZero();
 
@@ -302,6 +311,10 @@ bool profile_grouped_conv_bwd_weight_impl(int do_verification,
                           << std::endl;
             }
         }
+        if(supported)
+        {
+            num_kernel++;
+        }
     }
 
     std::cout << "Best configuration parameters:"
@@ -309,6 +322,11 @@ bool profile_grouped_conv_bwd_weight_impl(int do_verification,
               << "\ntflops: " << best_tflops << "\nGB/s: " << best_gb_per_sec << ", SplitK "
               << best_split_k << std::endl;
 
+    if(instance_index != -1)
+    {
+        std::cout << "grouped_conv_bwd_weight_instance (" << instance_index << "/" << num_kernel
+                  << "): Passed" << std::endl;
+    }
     return all_pass;
 }
 

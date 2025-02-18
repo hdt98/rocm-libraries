@@ -77,12 +77,27 @@ void host_elementwise2D(HostTensorC& C,
         }
 }
 
-int main()
+int main(int argc, char* argv[])
 {
     bool time_kernel = true;
 
-    ck::index_t M      = 48 * 256;
-    ck::index_t N      = 1024;
+    ck::index_t M = 48 * 256;
+    ck::index_t N = 1024;
+    if(argc == 1)
+    {
+        // use default case
+    }
+    else if(argc == 3)
+    {
+        M = std::stoi(argv[1]);
+        N = std::stoi(argv[2]);
+    }
+    else
+    {
+        std::cerr << "arg1 to 2: M, N" << std::endl;
+        return 1;
+    }
+
     ck::index_t Stride = N;
 
     auto f_host_tensor_descriptor1d = [](std::size_t len, std::size_t stride) {
