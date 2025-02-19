@@ -84,7 +84,7 @@ struct GroupedGemmKernel : public GemmKernel<TilePartitioner_, GemmPipeline_, Ep
 
     __host__ static constexpr auto BlockSize() -> dim3 { return dim3(KernelBlockSize); }
 
-    __host__ static constexpr auto GridSize(const std::vector<GroupedGemmHostArgs>& gemm_descs)
+    __host__ static auto GridSize(const std::vector<GroupedGemmHostArgs>& gemm_descs)
     {
         index_t grid_size = 0;
         for(const auto& it_desc : gemm_descs)

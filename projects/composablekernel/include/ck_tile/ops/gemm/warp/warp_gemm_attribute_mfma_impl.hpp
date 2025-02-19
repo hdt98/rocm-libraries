@@ -740,16 +740,16 @@ struct WarpGemmAttributeMfmaImpl_f32_32x32x16_f8_base
 #if defined(__gfx94__)
             if constexpr(std::is_same_v<ADataType, fp8_t> && std::is_same_v<BDataType, fp8_t>)
                 c_vec = __builtin_amdgcn_mfma_f32_32x32x16_fp8_fp8(
-                    bit_cast<long>(a_vec), bit_cast<long>(b_vec), c_vec, 0, 0, 0);
+                    bit_cast<int64_t>(a_vec), bit_cast<int64_t>(b_vec), c_vec, 0, 0, 0);
             else if constexpr(std::is_same_v<ADataType, fp8_t> && std::is_same_v<BDataType, bf8_t>)
                 c_vec = __builtin_amdgcn_mfma_f32_32x32x16_fp8_bf8(
-                    bit_cast<long>(a_vec), bit_cast<long>(b_vec), c_vec, 0, 0, 0);
+                    bit_cast<int64_t>(a_vec), bit_cast<int64_t>(b_vec), c_vec, 0, 0, 0);
             else if constexpr(std::is_same_v<ADataType, bf8_t> && std::is_same_v<BDataType, fp8_t>)
                 c_vec = __builtin_amdgcn_mfma_f32_32x32x16_bf8_fp8(
-                    bit_cast<long>(a_vec), bit_cast<long>(b_vec), c_vec, 0, 0, 0);
+                    bit_cast<int64_t>(a_vec), bit_cast<int64_t>(b_vec), c_vec, 0, 0, 0);
             else if constexpr(std::is_same_v<ADataType, bf8_t> && std::is_same_v<BDataType, bf8_t>)
                 c_vec = __builtin_amdgcn_mfma_f32_32x32x16_bf8_bf8(
-                    bit_cast<long>(a_vec), bit_cast<long>(b_vec), c_vec, 0, 0, 0);
+                    bit_cast<int64_t>(a_vec), bit_cast<int64_t>(b_vec), c_vec, 0, 0, 0);
 #elif defined(__gfx908__) || defined(__gfx90a__)
             static_for<0, 8, 1>{}([&](auto k) {
                 float a_f32 =
