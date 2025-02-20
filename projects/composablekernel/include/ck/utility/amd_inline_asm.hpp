@@ -6,7 +6,6 @@
 
 #include "c_style_pointer_cast.hpp"
 #include "data_type.hpp"
-#include "ck/utility/common_header.hpp"
 
 // TODO: deprecate all amd_assembly_outer_product_xxx
 
