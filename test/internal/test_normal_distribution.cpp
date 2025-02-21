@@ -584,3 +584,160 @@ TEST(sobol_normal_distribution_tests, half_test)
     EXPECT_NEAR(2.0f, mean, 0.4f); // 20%
     EXPECT_NEAR(5.0f, std, 1.0f); // 20%
 }
+
+TEST(normal_distribution_with_states, philox4x32_10_out_4){
+    struct nd{
+        double mean, std;
+        rocrand_state_philox4x32_10 currState;
+        nd(double  mean, double stddev) {
+            this->mean = mean;
+            this->std = stddev;
+            rocrand_init(123456, 654321, 0, &currState);
+        }
+        __forceinline__ __host__ __device__ void operator()(float(&output)[4]){
+            float4 v = rocrand_normal4(&currState);
+            output[0] = static_cast<float>(mean) + v.w * static_cast<float>(std);
+            output[1] = static_cast<float>(mean) + v.x * static_cast<float>(std);
+            output[2] = static_cast<float>(mean) + v.y * static_cast<float>(std);
+            output[3] = static_cast<float>(mean) + v.z * static_cast<float>(std);
+        }
+        
+        __forceinline__ __host__ __device__ void operator()(double(&output)[4]){
+            double4 v = rocrand_normal_double4(&currState);
+            output[0] = mean + v.w * std;
+            output[1] = mean + v.x * std;
+            output[2] = mean + v.y * std;
+            output[3] = mean + v.z * std;
+        }
+    };
+    const size_t size = 8000;
+    float valF[size];
+    double valD[size];
+
+    double expected_mean = 2, expected_std = 5;
+    nd u(expected_mean, expected_std);
+
+    double meanF = 0, meanD = 0;
+    for(size_t i = 0; i < size; i += 4)
+    {
+        float fOut[4];
+        double dOut[4];
+        
+        u(fOut);
+        valF[i]     = fOut[0];
+        valF[i + 1] = fOut[1];
+        valF[i + 2] = fOut[2];
+        valF[i + 3] = fOut[3];
+        meanF += (fOut[0] + fOut[1] + fOut[2] + fOut[3]) / size;
+
+        u(dOut);
+        valD[i]     = dOut[0];
+        valD[i + 1] = dOut[1];
+        valD[i + 2] = dOut[2];
+        valD[i + 3] = dOut[3];
+        meanD += (dOut[0] + dOut[1] + dOut[2] + dOut[3]) / size;
+    }
+
+    // Calculate stddev
+    double stdF = 0, stdD = 0;
+    for(size_t i = 0; i < size; i++){
+        stdF += std::pow(valF[i] - meanF, 2) / size;
+        stdD += std::pow(valD[i] - meanD, 2) / size;
+    }
+    stdF = std::sqrt(stdF);
+    stdD = std::sqrt(stdD);
+
+    EXPECT_NEAR(expected_mean, meanF, (expected_mean * 0.2) + 1e-2) << "Mean: " << meanF << " Expected: " << expected_mean; // 20%
+    EXPECT_NEAR(expected_std, stdF, (expected_std * 0.2) + 1e-2) <<  "Stddev: " << stdF << " Expected: " << expected_std; // 20%
+
+    EXPECT_NEAR(expected_mean, meanD, (expected_mean * 0.2) + 1e-2) << "Mean: " << meanD << " Expected: " << expected_mean; // 20%
+    EXPECT_NEAR(expected_std, stdD, (expected_std * 0.2) + 1e-2) <<  "Stddev: " << stdD << " Expected: " << expected_std; // 20%
+}
+
+template <typename State>
+void run_nd_test_with_state_out2(double expected_mean=2, double expected_std=5){
+    struct nd{
+        double mean, std;
+        State currState;
+        nd(double  mean, double stddev) {
+            this->mean = mean;
+            this->std = stddev;
+            rocrand_init(123456, 654321, 0, &currState);
+        }
+        __forceinline__ __host__ __device__ void operator()(float(&output)[2]){
+            float2 v = rocrand_normal2(&currState);
+            output[0] = static_cast<float>(mean) + v.x * static_cast<float>(std);
+            output[1] = static_cast<float>(mean) + v.y * static_cast<float>(std);
+        }
+        
+        __forceinline__ __host__ __device__ void operator()(double(&output)[2]){
+            double2 v = rocrand_normal_double2(&currState);
+            output[0] = mean + v.x * std;
+            output[1] = mean + v.y * std;
+        }
+    };
+    const size_t size = 8000;
+    float valF[size];
+    double valD[size];
+    nd u(expected_mean, expected_std);
+
+    double meanF = 0, meanD = 0;
+    for(size_t i = 0; i < size; i += 2)
+    {
+        float fOut[2];
+        double dOut[2];
+        
+        u(fOut);
+        valF[i]     = fOut[0];
+        valF[i + 1] = fOut[1];
+        meanF += (fOut[0] + fOut[1]) / size;
+
+        u(dOut);
+        valD[i]     = dOut[0];
+        valD[i + 1] = dOut[1];
+        meanD += (dOut[0] + dOut[1]) / size;
+    }
+
+    // Calculate stddev
+    double stdF = 0, stdD = 0;
+    for(size_t i = 0; i < size; i++){
+        stdF += std::pow(valF[i] - meanF, 2) / size;
+        stdD += std::pow(valD[i] - meanD, 2) / size;
+    }
+    stdF = std::sqrt(stdF);
+    stdD = std::sqrt(stdD);
+
+    EXPECT_NEAR(expected_mean, meanF, (expected_mean * 0.2) + 1e-1) << "Mean: " << meanF << " Expected: " << expected_mean; // 20%
+    EXPECT_NEAR(expected_std, stdF, (expected_std * 0.2) + 1e-1) <<  "Stddev: " << stdF << " Expected: " << expected_std; // 20%
+
+    EXPECT_NEAR(expected_mean, meanD, (expected_mean * 0.2) + 1e-1) << "Mean: " << meanD << " Expected: " << expected_mean; // 20%
+    EXPECT_NEAR(expected_std, stdD, (expected_std * 0.2) + 1e-1) <<  "Stddev: " << stdD << " Expected: " << expected_std; // 20%
+}
+    
+TEST(normal_distribution_with_states, philox4x32_10_out_2){
+    run_nd_test_with_state_out2<rocrand_state_philox4x32_10>(0, 1);
+    run_nd_test_with_state_out2<rocrand_state_philox4x32_10>(2, 5);
+    run_nd_test_with_state_out2<rocrand_state_philox4x32_10>(1, 10);
+    run_nd_test_with_state_out2<rocrand_state_philox4x32_10>(3, 6);
+}
+
+TEST(normal_distribution_with_states, mrg31k3p){
+    run_nd_test_with_state_out2<rocrand_state_mrg31k3p>(0, 1);
+    run_nd_test_with_state_out2<rocrand_state_mrg31k3p>(2, 5);
+    run_nd_test_with_state_out2<rocrand_state_mrg31k3p>(1, 10);
+    run_nd_test_with_state_out2<rocrand_state_mrg31k3p>(3, 6);
+}
+
+TEST(normal_distribution_with_states, mrg32k3a){
+    run_nd_test_with_state_out2<rocrand_state_mrg32k3a>(0, 1);
+    run_nd_test_with_state_out2<rocrand_state_mrg32k3a>(2, 5);
+    run_nd_test_with_state_out2<rocrand_state_mrg32k3a>(1, 10);
+    run_nd_test_with_state_out2<rocrand_state_mrg32k3a>(3, 6);
+}
+
+TEST(normal_distribution_with_states, xorwow){
+    run_nd_test_with_state_out2<rocrand_state_xorwow>(0, 1);
+    run_nd_test_with_state_out2<rocrand_state_xorwow>(2, 5);
+    run_nd_test_with_state_out2<rocrand_state_xorwow>(1, 10);
+    run_nd_test_with_state_out2<rocrand_state_xorwow>(3, 6);
+}
