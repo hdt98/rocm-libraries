@@ -5,6 +5,7 @@
 
 #include "ck_tile/core.hpp"
 #include "ck_tile/ops/gemm/warp/warp_gemm.hpp"
+#include "ck_tile/ops/gemm/warp/warp_wmma_gemm.hpp"
 
 namespace ck_tile {
 
@@ -18,6 +19,18 @@ template <typename AType,
           bool TransposeC,
           bool SwizzleA = false>
 struct WarpGemmMfmaDispatcher;
+
+template <typename AType,
+          typename BType,
+          typename CType,
+          index_t MPerWave,
+          index_t NPerWave,
+          index_t KPerWave,
+          bool TransLdA,
+          bool TransLdB,
+          bool TransposeC,
+          bool SwizzleA = false>
+struct WarpGemmWmmaDispatcher;
 
 // clang-format off
 // fp16
@@ -60,6 +73,13 @@ template<> struct WarpGemmMfmaDispatcher<ck_tile::bf8_t, ck_tile::fp8_t, float, 
 template<> struct WarpGemmMfmaDispatcher<ck_tile::bf8_t, ck_tile::bf8_t, float, 32, 32,  16, false> { using Type = WarpGemmMfma_f32_32x32x16_bf8_bf8; };
 template<> struct WarpGemmMfmaDispatcher<ck_tile::bf8_t, ck_tile::bf8_t, float, 32, 32,  16, true> { using Type = WarpGemmMfma_f32_32x32x16_bf8_bf8_CTransposed; };
 
+template<bool kTransLdA, bool kTransLdB, bool kTransC> struct WarpGemmWmmaDispatcher<ck_tile::half_t, ck_tile::half_t, float, 16, 16,  16, kTransLdA, kTransLdB, kTransC> { 
+ #if defined(__gfx13__)
+    using Type = WarpGemmWmma_f32_16x16x16_f16_f16<kTransLdA, kTransLdB, kTransC>; 
+ #else   
+    using Type = WarpGemmWmma_f32_16x16x16_f16_f16_gfx12;
+ #endif    
+};
 // clang-format on
 } // namespace impl
 
@@ -77,6 +97,27 @@ using WarpGemmMfmaDispatcher = typename impl::WarpGemmMfmaDispatcher<AType,
                                                                      MPerWave,
                                                                      NPerWave,
                                                                      KPerWave,
+                                                                     TransposeC,
+                                                                     SwizzleA>::Type;
+
+template <typename AType,
+          typename BType,
+          typename CType,
+          index_t MPerWave,
+          index_t NPerWave,
+          index_t KPerWave,
+          bool TransLdA,
+          bool TransLdB,
+          bool TransposeC,
+          bool SwizzleA = false>
+using WarpGemmWmmaDispatcher = typename impl::WarpGemmWmmaDispatcher<AType,
+                                                                     BType,
+                                                                     CType,
+                                                                     MPerWave,
+                                                                     NPerWave,
+                                                                     KPerWave,
+                                                                     TransLdA,
+                                                                     TransLdB,
                                                                      TransposeC,
                                                                      SwizzleA>::Type;
 

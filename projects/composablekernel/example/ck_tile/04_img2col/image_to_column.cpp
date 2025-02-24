@@ -19,7 +19,9 @@ float image_to_column(const image_to_column_traits& traits,
         constexpr ck_tile::index_t VectorSize  = 8;
 
         using thread_tile = ck_tile::sequence<8, 8>;
-        using warp_tile   = ck_tile::sequence<64, 64>;
+        using warp_tile   = std::conditional_t<ck_tile::get_warp_size() == 32,
+                                             ck_tile::sequence<32, 64>,
+                                             ck_tile::sequence<64, 64>>;
         using block_tile  = ck_tile::sequence<128, 128>;
 
         using Shape = ck_tile::TileImageToColumnShape<thread_tile, warp_tile, block_tile>;
@@ -110,7 +112,6 @@ int main(int argc, char* argv[])
     const auto in_desc =
         ck_tile::conv::make_input_host_tensor_descriptor_g_n_c_wis_packed<ImLayout>(conv_params);
     const auto out_desc = ck_tile::HostTensorDescriptor({G, NHoWo, CYX});
-
     // host verify
     ck_tile::HostTensor<InDataType> in(in_desc);
     ck_tile::HostTensor<OutDataType> out_device(out_desc);

@@ -315,11 +315,13 @@ endif()
 if(USE_OPT_GFX11)
     add_compile_options(-mcumode)
     add_compile_options(-mno-wavefrontsize64)
+    add_compile_definitions(CK_WAVE32_ENABLED)
     message("CK compiled with USE_OPT_GFX11 set to ${USE_OPT_GFX11}")
 endif()
 
 if(USE_OPT_GFX13 AND (SUPPORTED_GPU_TARGETS MATCHES "gfx13"))
     add_compile_options(-mno-wavefrontsize64)
+    add_compile_definitions(CK_WAVE32_ENABLED)
     message("CK compiled with USE_OPT_GFX13 set to ${USE_OPT_GFX13}")
 endif()
 

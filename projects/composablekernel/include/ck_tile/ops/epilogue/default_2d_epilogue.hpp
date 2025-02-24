@@ -57,8 +57,15 @@ struct Default2DEpilogue
 
     CK_TILE_HOST_DEVICE static constexpr index_t GetSmemSize() { return 0; }
 
+    template <typename ODataType>
+    CK_TILE_HOST_DEVICE static constexpr auto GetVectorSizeC()
+    {
+        constexpr index_t MaxVectorStoreSize = 16;
+        return MaxVectorStoreSize / sizeof(ODataType);
+    } // TODO: need to fix
+
     // TODO: this function assume store out vector size is the same as OAccTile last dimension size
-    //       how do we fix this ?
+    // how do we fix this ?
     template <typename ODramWindowTmp,
               typename OAccTile,
               memory_operation_enum out_memory_data_op = memory_operation_enum::set>

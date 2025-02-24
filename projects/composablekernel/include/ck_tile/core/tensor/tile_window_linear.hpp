@@ -471,12 +471,20 @@ struct tile_window_linear
     template <index_t i_access = -1, bool oob_conditional_check = true>
     CK_TILE_DEVICE auto load(number<i_access> = {}, bool_constant<oob_conditional_check> = {}) const
     {
+        constexpr auto tile_dstr = TileDstr{};
+        auto dst_tensor          = make_static_distributed_tensor<DataType>(tile_dstr);
+        return load(dst_tensor, number<i_access>{}, bool_constant<oob_conditional_check>{});
+    }
+
+    template <typename DstTile, index_t i_access = -1, bool oob_conditional_check = true>
+    CK_TILE_DEVICE auto load(DstTile& dst_tensor,
+                             number<i_access>                     = {},
+                             bool_constant<oob_conditional_check> = {}) const
+    {
         using vector_t = typename traits::vector_t;
         using SFC_Ys   = typename traits::SFC_Ys;
 
         constexpr auto tile_dstr = TileDstr{};
-
-        auto dst_tensor = make_static_distributed_tensor<DataType>(tile_dstr);
 
         auto issue = [&](auto i_access_) {
             constexpr auto IAccess = number<i_access_>{};
@@ -524,10 +532,19 @@ struct tile_window_linear
         return dst_tensor;
     }
 
+    template <index_t i_access = -1, bool oob_conditional_check = true>
+    CK_TILE_DEVICE auto tr_load(number<i_access>                     = {},
+                                bool_constant<oob_conditional_check> = {}) const
+    {
+        constexpr auto tile_dstr = TileDstr{};
+        auto dst_tensor          = make_static_distributed_tensor<DataType>(tile_dstr);
+        return tr_load(dst_tensor, number<i_access>{}, bool_constant<oob_conditional_check>{});
+    }
+
     template <typename DstTile, index_t i_access = -1, bool oob_conditional_check = true>
-    CK_TILE_DEVICE auto load(DstTile& dst_tensor,
-                             number<i_access>                     = {},
-                             bool_constant<oob_conditional_check> = {}) const
+    CK_TILE_DEVICE auto tr_load(DstTile& dst_tensor,
+                                number<i_access>                     = {},
+                                bool_constant<oob_conditional_check> = {}) const
     {
         using vector_t = typename traits::vector_t;
         using SFC_Ys   = typename traits::SFC_Ys;
@@ -547,7 +564,7 @@ struct tile_window_linear
 
             // read from bottom tensor
             const vector_t vec_value =
-                get_bottom_tensor_view().template get_vectorized_elements<vector_t>(
+                get_bottom_tensor_view().template get_tr_vectorized_elements<vector_t>(
                     bottom_tensor_thread_coord,
                     linear_offset,
                     bottom_tensor_flag,

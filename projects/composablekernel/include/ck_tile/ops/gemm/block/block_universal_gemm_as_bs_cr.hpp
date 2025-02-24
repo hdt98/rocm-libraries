@@ -34,6 +34,11 @@ struct BlockUniversalGemmAsBsCr
         static constexpr index_t NPerBlock = BlockGemmShape::kN;
         static constexpr index_t KPerBlock = BlockGemmShape::kK;
 
+        // these two is used to decide whether to transpose load A and B in gfx13 or
+        // gfx12(such as tr16_b128)
+        static constexpr bool kTransLdA = Policy::kTransLdA;
+        static constexpr bool kTransLdB = Policy::kTransLdB;
+
         static constexpr auto config = Policy::template GetWarpGemmMWarpNWarp<Problem>();
 
         using WarpGemm = remove_cvref_t<decltype(config.template at<0>())>;
@@ -103,7 +108,15 @@ struct BlockUniversalGemmAsBsCr
     static constexpr index_t MWarp = Traits::MWarp;
     static constexpr index_t NWarp = Traits::NWarp;
 
+    static constexpr bool TransLdA = Traits::kTransLdA;
+    static constexpr bool TransLdB = Traits::kTransLdB;
+
     static constexpr auto Scheduler = Traits::Scheduler;
+
+    using CLayout = remove_cvref_t<typename Problem_::CLayout>;
+
+    static constexpr bool is_c_column_major =
+        std::is_same_v<CLayout, tensor_layout::gemm::ColumnMajor>;
 
     using I0 = number<0>;
     using I1 = number<1>;
@@ -117,6 +130,19 @@ struct BlockUniversalGemmAsBsCr
     template <typename GemmTraits>
     struct BlockGemmImpl<GemmPipelineScheduler::Default, GemmTraits>
     {
+        // add a function to load tile from window with transpose option
+        template <bool transpose_load_en, typename WindowType>
+        CK_TILE_DEVICE auto load_warp_tile(WindowType& window)
+        {
+            if constexpr(transpose_load_en)
+            {
+                return tr_load_tile(window);
+            }
+            else
+            {
+                return load_tile(window);
+            }
+        }
         // C += A * B
         template <typename CBlockTensor, typename ASmemBlockWindow, typename BSmemBlockWindow>
         CK_TILE_DEVICE void operator()(CBlockTensor& c_block_tensor,
@@ -131,22 +157,58 @@ struct BlockUniversalGemmAsBsCr
                           "The ADataType and BDataType as defined in "
                           "traits should be the same as correspoinding block window data type!");
 
+            using ASemMIndex = std::conditional_t<TransLdA, number<1>, number<0>>;
+            using ASemKIndex = std::conditional_t<TransLdA, number<0>, number<1>>;
+            using BSemNIndex = std::conditional_t<TransLdB, number<1>, number<0>>;
+
             static_assert(
-                GemmTraits::MPerBlock == ASmemBlockWindow{}.get_window_lengths()[I0{}] &&
-                    GemmTraits::NPerBlock == BSmemBlockWindow{}.get_window_lengths()[I0{}] &&
-                    GemmTraits::KPerBlock == ASmemBlockWindow{}.get_window_lengths()[I1{}],
+                GemmTraits::MPerBlock == ASmemBlockWindow{}.get_window_lengths()[ASemMIndex{}] &&
+                    GemmTraits::NPerBlock ==
+                        BSmemBlockWindow{}.get_window_lengths()[BSemNIndex{}] &&
+                    GemmTraits::KPerBlock == ASmemBlockWindow{}.get_window_lengths()[ASemKIndex{}],
                 "MPerBlock, NPerBlock, KPerBlock defined in "
                 " BlockGemmShape are different from A/B block smem windows apropriate dims!");
 
-            const index_t iMWarp = get_warp_id() / NWarp;
-            const index_t iNWarp = get_warp_id() - (iMWarp * NWarp);
+            const auto warp_indices = [&]() constexpr
+            {
+                if constexpr(is_c_column_major)
+                {
+                    // Column-major layout
+                    const index_t n = get_warp_id() / MWarp;
+                    const index_t m = get_warp_id() - (n * MWarp);
+                    return std::make_pair(m, n);
+                }
+                else
+                {
+                    // Row-major layout
+                    const index_t m = get_warp_id() / NWarp;
+                    const index_t n = get_warp_id() - (m * NWarp);
+                    return std::make_pair(m, n);
+                }
+            }
+            ();
+
+            const index_t iMWarp = warp_indices.first;
+            const index_t iNWarp = warp_indices.second;
 
             // TODO: refactor warp_window tile type to class member as it should be
             // compile-time known information.
             auto a_warp_window_tmp = make_tile_window(
                 a_block_window.get_bottom_tensor_view(),
-                make_tuple(number<WarpGemm::kM>{}, number<WarpGemm::kK>{}),
-                a_block_window.get_window_origin() + multi_index<2>{iMWarp * WarpGemm::kM, 0},
+                // Use constexpr if to determine dimensions at compile time
+                []() constexpr {
+                    if constexpr(TransLdA)
+                        return make_tuple(number<WarpGemm::kK>{}, number<WarpGemm::kM>{});
+                    else
+                        return make_tuple(number<WarpGemm::kM>{}, number<WarpGemm::kK>{});
+                }(),
+                a_block_window.get_window_origin() +
+                    [&iMWarp]() constexpr {
+                        if constexpr(TransLdA)
+                            return multi_index<2>{0, iMWarp * WarpGemm::kM};
+                        else
+                            return multi_index<2>{iMWarp * WarpGemm::kM, 0};
+                    }(),
                 make_static_tile_distribution(typename WarpGemm::AWarpDstrEncoding{}));
 
             using AWarpWindow = remove_cvref_t<decltype(a_warp_window_tmp)>;
@@ -167,8 +229,19 @@ struct BlockUniversalGemmAsBsCr
             // construct B-warp-window
             auto b_warp_window_tmp = make_tile_window(
                 b_block_window.get_bottom_tensor_view(),
-                make_tuple(number<WarpGemm::kN>{}, number<WarpGemm::kK>{}),
-                b_block_window.get_window_origin() + multi_index<2>{iNWarp * WarpGemm::kN, 0},
+                []() constexpr {
+                    if constexpr(TransLdB)
+                        return make_tuple(number<WarpGemm::kK>{}, number<WarpGemm::kN>{});
+                    else
+                        return make_tuple(number<WarpGemm::kN>{}, number<WarpGemm::kK>{});
+                }(),
+                b_block_window.get_window_origin() +
+                    [&iNWarp]() constexpr {
+                        if constexpr(TransLdB)
+                            return multi_index<2>{0, iNWarp * WarpGemm::kN};
+                        else
+                            return multi_index<2>{iNWarp * WarpGemm::kN, 0};
+                    }(),
                 make_static_tile_distribution(typename WarpGemm::BWarpDstrEncoding{}));
 
             using BWarpWindow = remove_cvref_t<decltype(b_warp_window_tmp)>;
@@ -191,9 +264,15 @@ struct BlockUniversalGemmAsBsCr
                     a_warp_windows(mIter)(kIter) = a_warp_window_tmp;
 
                     // TODO: I don't have to move 0,0 window!
-                    move_tile_window(a_warp_windows(mIter)(kIter),
-                                     {mIter * GemmTraits::MPerBlockPerIter,
-                                      kIter * GemmTraits::KPerBlockPerIter});
+                    move_tile_window(
+                        a_warp_windows(mIter)(kIter), [&]() constexpr {
+                            if constexpr(TransLdA)
+                                return multi_index<2>{kIter * GemmTraits::KPerBlockPerIter,
+                                                      mIter * GemmTraits::MPerBlockPerIter};
+                            else
+                                return multi_index<2>{mIter * GemmTraits::MPerBlockPerIter,
+                                                      kIter * GemmTraits::KPerBlockPerIter};
+                        }());
                 });
             });
 
@@ -201,9 +280,15 @@ struct BlockUniversalGemmAsBsCr
                 static_for<0, GemmTraits::KIterPerWarp, 1>{}([&](auto kIter) {
                     b_warp_windows(nIter)(kIter) = b_warp_window_tmp;
 
-                    move_tile_window(b_warp_windows(nIter)(kIter),
-                                     {nIter * GemmTraits::NPerBlockPerIter,
-                                      kIter * GemmTraits::KPerBlockPerIter});
+                    move_tile_window(
+                        b_warp_windows(nIter)(kIter), [&]() constexpr {
+                            if constexpr(TransLdB)
+                                return multi_index<2>{kIter * GemmTraits::KPerBlockPerIter,
+                                                      nIter * GemmTraits::NPerBlockPerIter};
+                            else
+                                return multi_index<2>{nIter * GemmTraits::NPerBlockPerIter,
+                                                      kIter * GemmTraits::KPerBlockPerIter};
+                        }());
                 });
             });
 
@@ -217,16 +302,21 @@ struct BlockUniversalGemmAsBsCr
             // hot loop:
             static_for<0, GemmTraits::KIterPerWarp, 1>{}([&](auto kIter) {
                 static_for<0, MIterPerWarp, 1>{}([&](auto mIter) {
-                    const auto a_warp_tile = load_tile(a_warp_windows(mIter)(kIter));
+                    const auto a_warp_tile = load_warp_tile<TransLdA>(a_warp_windows(mIter)(kIter));
 
                     static_for<0, NIterPerWarp, 1>{}([&](auto nIter) {
-                        const auto b_warp_tile = load_tile(b_warp_windows(nIter)(kIter));
+                        const auto b_warp_tile =
+                            load_warp_tile<TransLdB>(b_warp_windows(nIter)(kIter));
 
                         // read C warp tensor from C block tensor-
                         CWarpTensor c_warp_tensor;
 
+                        const auto c_warp_seq = std::conditional_t<is_c_column_major,
+                                                                   sequence<nIter, mIter>,
+                                                                   sequence<mIter, nIter>>{};
+
                         c_warp_tensor.get_thread_buffer() = c_block_tensor.get_y_sliced_thread_data(
-                            merge_sequences(sequence<mIter, nIter>{}, c_warp_y_index_zeros),
+                            merge_sequences(c_warp_seq, c_warp_y_index_zeros),
                             merge_sequences(sequence<1, 1>{}, c_warp_y_lengths));
 
                         // warp GEMM
@@ -234,7 +324,7 @@ struct BlockUniversalGemmAsBsCr
 
                         // write C warp tensor into C block tensor
                         c_block_tensor.set_y_sliced_thread_data(
-                            merge_sequences(sequence<mIter, nIter>{}, c_warp_y_index_zeros),
+                            merge_sequences(c_warp_seq, c_warp_y_index_zeros),
                             merge_sequences(sequence<1, 1>{}, c_warp_y_lengths),
                             c_warp_tensor.get_thread_buffer());
                     });
@@ -608,7 +698,9 @@ struct BlockUniversalGemmAsBsCr
     {
         constexpr auto c_block_outer_dstr_encoding = tile_distribution_encoding<
             sequence<>,
-            tuple<sequence<MIterPerWarp, MWarp>, sequence<NIterPerWarp, NWarp>>,
+            std::conditional_t<is_c_column_major,
+                               tuple<sequence<NIterPerWarp, NWarp>, sequence<MIterPerWarp, MWarp>>,
+                               tuple<sequence<MIterPerWarp, MWarp>, sequence<NIterPerWarp, NWarp>>>,
             tuple<sequence<1, 2>>,
             tuple<sequence<1, 1>>,
             sequence<1, 2>,

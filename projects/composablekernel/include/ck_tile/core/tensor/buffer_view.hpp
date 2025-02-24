@@ -14,6 +14,7 @@
 #include "ck_tile/core/numeric/half.hpp"
 #include "ck_tile/core/numeric/bfloat16.hpp"
 #include "ck_tile/core/utility/type_traits.hpp"
+#include "ck_tile/core/utility/ignore.hpp"
 
 namespace ck_tile {
 
@@ -126,6 +127,31 @@ struct buffer_view<address_space_enum::generic,
             {
                 return X{invalid_element_value_};
             }
+        }
+    }
+
+    template <typename X,
+              bool oob_conditional_check = true,
+              typename std::enable_if<
+                  std::is_same<typename vector_traits<remove_cvref_t<X>>::scalar_type,
+                               typename vector_traits<remove_cvref_t<T>>::scalar_type>::value,
+                  bool>::type = false>
+    CK_TILE_DEVICE constexpr auto tr_get(index_t i,
+                                         index_t linear_offset,
+                                         bool is_valid_element,
+                                         bool_constant<oob_conditional_check> = {}) const
+    {
+        static_assert(false && "Error: transpose load not supported in generic memory space.");
+        ck_tile::ignore = i;
+        ck_tile::ignore = linear_offset;
+        ck_tile::ignore = is_valid_element;
+        if constexpr(InvalidElementUseNumericalZeroValue)
+        {
+            return X{numeric<remove_cvref_t<T>>::zero()};
+        }
+        else
+        {
+            return X{invalid_element_value_};
         }
     }
 
@@ -348,6 +374,67 @@ struct buffer_view<address_space_enum::global,
                 }
             }
         }
+    }
+
+    // i is offset of T, not X. i should be aligned to X
+    template <typename X,
+              bool oob_conditional_check = true,
+              typename std::enable_if<
+                  std::is_same<typename vector_traits<remove_cvref_t<X>>::scalar_type,
+                               typename vector_traits<remove_cvref_t<T>>::scalar_type>::value,
+                  bool>::type = false>
+    CK_TILE_DEVICE constexpr auto tr_get(index_t i,
+                                         index_t linear_offset,
+                                         bool is_valid_element,
+                                         bool_constant<oob_conditional_check> = {}) const
+    {
+        // X contains multiple T
+        constexpr index_t scalar_per_t_vector = vector_traits<remove_cvref_t<T>>::vector_size;
+
+        constexpr index_t scalar_per_x_vector = vector_traits<remove_cvref_t<X>>::vector_size;
+
+        static_assert(scalar_per_x_vector % scalar_per_t_vector == 0,
+                      "wrong! X should contain multiple T");
+
+        constexpr index_t t_per_x = scalar_per_x_vector / scalar_per_t_vector;
+
+        if(is_valid_element)
+        {
+            constexpr address_space_enum addr_space = get_address_space();
+            return amd_tr_load_to_vgpr<remove_cvref_t<T>, t_per_x, addr_space>(p_data_ + i +
+                                                                               linear_offset);
+        }
+        else
+        {
+            if constexpr(InvalidElementUseNumericalZeroValue)
+            {
+                return X{numeric<remove_cvref_t<T>>::zero()};
+            }
+            else
+            {
+                return X{invalid_element_value_};
+            }
+        }
+    }
+
+    template <typename X, typename DstBuffer>
+    CK_TILE_DEVICE constexpr auto async_get_to_lds(DstBuffer& dst_buf,
+                                                   index_t src_offset,
+                                                   index_t dst_offset,
+                                                   bool is_src_valid,
+                                                   bool is_dst_valid) const
+    {
+        constexpr index_t scalar_per_t_vector = vector_traits<remove_cvref_t<T>>::vector_size;
+
+        constexpr index_t scalar_per_x_vector = vector_traits<remove_cvref_t<X>>::vector_size;
+
+        static_assert(scalar_per_x_vector % scalar_per_t_vector == 0,
+                      "wrong! X should contain multiple T");
+
+        constexpr index_t t_per_x = scalar_per_x_vector / scalar_per_t_vector;
+
+        amd_async_load_global_to_lds<remove_cvref_t<T>, t_per_x, Coherence>(
+            p_data_, src_offset, dst_buf.p_data_, dst_offset, is_src_valid, is_dst_valid);
     }
 
     // i is offset of T, not X. i should be aligned to X
@@ -812,6 +899,47 @@ struct buffer_view<address_space_enum::lds,
             auto rtn = *c_style_pointer_cast<const buf_t*>(&p_data_[i + linear_offset]);
             return bit_cast<X>(rtn);
 #endif
+        }
+        else
+        {
+            if constexpr(InvalidElementUseNumericalZeroValue)
+            {
+                return X{numeric<remove_cvref_t<T>>::zero()};
+            }
+            else
+            {
+                return X{invalid_element_value_};
+            }
+        }
+    }
+
+    // i is offset of T, not X. i should be aligned to X
+    template <typename X,
+              bool oob_conditional_check = true,
+              typename std::enable_if<
+                  std::is_same<typename vector_traits<remove_cvref_t<X>>::scalar_type,
+                               typename vector_traits<remove_cvref_t<T>>::scalar_type>::value,
+                  bool>::type = false>
+    CK_TILE_DEVICE constexpr auto tr_get(index_t i,
+                                         index_t linear_offset,
+                                         bool is_valid_element,
+                                         bool_constant<oob_conditional_check> = {}) const
+    {
+        // X contains multiple T
+        constexpr index_t scalar_per_t_vector = vector_traits<remove_cvref_t<T>>::vector_size;
+
+        constexpr index_t scalar_per_x_vector = vector_traits<remove_cvref_t<X>>::vector_size;
+
+        static_assert(scalar_per_x_vector % scalar_per_t_vector == 0,
+                      "wrong! X should contain multiple T");
+
+        constexpr index_t t_per_x = scalar_per_x_vector / scalar_per_t_vector;
+
+        if(is_valid_element)
+        {
+            constexpr address_space_enum addr_space = get_address_space();
+            return amd_tr_load_to_vgpr<remove_cvref_t<T>, t_per_x, addr_space>(p_data_ + i +
+                                                                               linear_offset);
         }
         else
         {

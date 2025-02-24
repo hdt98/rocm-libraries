@@ -19,3 +19,8 @@ add_subdirectory(16_batched_gemm)
 add_subdirectory(17_grouped_gemm)
 add_subdirectory(35_batched_transpose)
 endif()
+
+if (SUPPORTED_GPU_TARGETS MATCHES "gfx13")
+add_subdirectory(04_img2col)
+add_subdirectory(05_reduce)
+endif()

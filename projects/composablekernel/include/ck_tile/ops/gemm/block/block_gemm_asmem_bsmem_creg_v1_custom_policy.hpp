@@ -13,7 +13,9 @@ template <typename AType_,
           typename BType_,
           typename CType_,
           typename BlockWarps_,
-          typename WarpGemm_>
+          typename WarpGemm_,
+          bool TransLdA = false,
+          bool TransLdB = false>
 struct BlockGemmASmemBSmemCRegV1CustomPolicy
 {
     using AType = remove_cvref_t<AType_>;
@@ -25,6 +27,9 @@ struct BlockGemmASmemBSmemCRegV1CustomPolicy
     static constexpr index_t kMWarps = BlockWarps::at(number<0>{});
     static constexpr index_t kNWarps = BlockWarps::at(number<1>{});
     static constexpr index_t kKWarps = BlockWarps::at(number<2>{});
+
+    static constexpr bool kTransLdA = TransLdA;
+    static constexpr bool kTransLdB = TransLdB;
 
     using WarpGemm = remove_cvref_t<WarpGemm_>;
 

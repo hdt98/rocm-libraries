@@ -9,6 +9,7 @@
 #include "ck_tile/core/config.hpp"
 #include "ck_tile/core/numeric/integer.hpp"
 #include "ck_tile/core/numeric/integral_constant.hpp"
+#include "ck_tile/core/utility/ignore.hpp"
 
 namespace ck_tile {
 
@@ -50,8 +51,12 @@ enum struct memory_operation_enum : std::uint16_t
 
 CK_TILE_HOST_DEVICE constexpr index_t get_warp_size()
 {
+#ifdef CK_WAVE32_ENABLED
+    return 32;
+#else
     // warpSize is defined by HIP
     return warpSize;
+#endif
 }
 
 CK_TILE_DEVICE index_t get_grid_size() { return gridDim.x; }
@@ -80,9 +85,10 @@ CK_TILE_DEVICE index_t get_block_id() { return blockIdx.x; }
 CK_TILE_DEVICE void block_sync_lds()
 {
 #if CK_TILE_EXPERIMENTAL_BLOCK_SYNC_LDS_WITHOUT_SYNC_VMEM
-#if defined(__gfx13__)
+#if(defined(__gfx12__) || defined(__gfx13__))
     asm volatile("\
-    s_wait_kmcnt 0x0 \n \
+    s_wait_dscnt 0x0 \n \
+    s_barrier_signal -1 \n \
     s_barrier_wait -1 \
     " ::);
 #else
@@ -96,6 +102,20 @@ CK_TILE_DEVICE void block_sync_lds()
 #endif
 #else
     __syncthreads();
+#endif
+}
+
+CK_TILE_DEVICE void block_async_lds(index_t cnt = 0)
+{
+#if defined(__gfx13__)
+    asm volatile("s_wait_asynccnt %0 \n"
+                 "s_barrier_signal -1 \n"
+                 "s_barrier_wait - 1"
+                 :
+                 : "n"(cnt)
+                 : "memory");
+#else
+    ck_tile::ignore = cnt;
 #endif
 }
 

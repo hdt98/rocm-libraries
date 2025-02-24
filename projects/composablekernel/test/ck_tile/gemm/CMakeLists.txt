@@ -2,3 +2,6 @@
 if(GPU_TARGETS MATCHES "gfx9")
     add_gtest_executable(test_ck_tile_gemm_pipeline test_gemm_pipeline.cpp)
 endif()
+if(GPU_TARGETS MATCHES "gfx13")
+    add_gtest_executable(test_ck_tile_wmma_pipeline test_wmma_pipeline.cpp)
+endif()

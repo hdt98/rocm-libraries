@@ -137,6 +137,64 @@ CK_TILE_DEVICE auto load_tile_raw(T& tile,
         tile, number<i_access>{}, bool_constant<oob_conditional_check>{}, bool_constant<pre_nop>{});
 }
 
+template <typename BottomTensorView_,
+          typename WindowLengths_,
+          typename TileDistribution_,
+          index_t NumCoord,
+          index_t i_access           = -1,
+          bool oob_conditional_check = true>
+CK_TILE_DEVICE auto tr_load_tile(const tile_window_with_static_distribution<BottomTensorView_,
+                                                                            WindowLengths_,
+                                                                            TileDistribution_,
+                                                                            NumCoord>& tile_window,
+                                 number<i_access>                     = {},
+                                 bool_constant<oob_conditional_check> = {})
+{
+    return tile_window.tr_load(number<i_access>{}, bool_constant<oob_conditional_check>{});
+}
+
+template <typename BottomTensorView_,
+          typename WindowLengths_,
+          typename TileDistribution_,
+          typename LinearBottomDims_,
+          index_t i_access           = -1,
+          bool oob_conditional_check = true>
+CK_TILE_DEVICE auto tr_load_tile(const tile_window_linear<BottomTensorView_,
+                                                          WindowLengths_,
+                                                          TileDistribution_,
+                                                          LinearBottomDims_>& tile_window,
+                                 number<i_access>                     = {},
+                                 bool_constant<oob_conditional_check> = {})
+{
+    return tile_window.tr_load(number<i_access>{}, bool_constant<oob_conditional_check>{});
+}
+
+// TODO : be careful that async_load_tile_to_lds's logic is different from async_load_tile_raw; only
+// support builtin async load in gfx13; LdsTileWindow_ only supports tile_window_with_static_lengths
+template <typename LdsBottomTensorView_,
+          typename GlobalBottomTensorView_,
+          typename WindowLengths_,
+          typename TileDistribution_,
+          index_t NumCoord,
+          index_t i_access           = -1,
+          bool oob_conditional_check = true>
+CK_TILE_DEVICE auto async_load_tile_to_lds(
+    tile_window_with_static_lengths<LdsBottomTensorView_, WindowLengths_>& lds_tile_window,
+    const tile_window_with_static_distribution<GlobalBottomTensorView_,
+                                               WindowLengths_,
+                                               TileDistribution_,
+                                               NumCoord>& global_tile_window,
+    number<i_access>                     = {},
+    bool_constant<oob_conditional_check> = {})
+{
+    using lds_data_type    = typename remove_cvref_t<decltype(lds_tile_window)>::DataType;
+    using global_data_type = typename remove_cvref_t<decltype(global_tile_window)>::DataType;
+    static_assert(std::is_same_v<lds_data_type, global_data_type>,
+                  "currently lds and global's data type should be the same!");
+
+    return global_tile_window.async_load_to_lds(lds_tile_window);
+}
+
 template <typename LdsTileWindow_,
           typename BottomTensorView_,
           typename WindowLengths_,
