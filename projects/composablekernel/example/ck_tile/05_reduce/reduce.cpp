@@ -41,9 +41,13 @@ bool run(const ck_tile::ArgParser& arg_parser)
     x_buf.ToDevice(x_host.data());
 
     using ReduceOp   = ck_tile::ReduceOp::Add;
-    using BlockWarps = ck_tile::sequence<4, 1>;
+    using BlockWarps = std::conditional_t<ck_tile::get_warp_size() == 32,
+                                          ck_tile::sequence<8, 1>,
+                                          ck_tile::sequence<4, 1>>;
     using BlockTile  = ck_tile::sequence<128, 128>;
-    using WarpTile   = ck_tile::sequence<32, 128>;
+    using WarpTile   = std::conditional_t<ck_tile::get_warp_size() == 32,
+                                        ck_tile::sequence<16, 128>,
+                                        ck_tile::sequence<32, 128>>;
     using Vector     = ck_tile::sequence<8, 8>;
 
     // cross warp-reduce
