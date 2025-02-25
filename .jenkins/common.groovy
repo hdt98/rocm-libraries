@@ -27,7 +27,7 @@ def runCompileCommand(platform, project, jobName, boolean sameOrg=false)
     platform.runCommand(this, command)
 }
 
-def runTestCommand(platform, project)
+def runTestCommand(platform, project, boolean rocmExamples=false)
 {
     String buildType = project.buildName.contains('Debug') ? "debug" : "release"
     String testExe = "hipsolver-test"
@@ -39,6 +39,35 @@ def runTestCommand(platform, project)
 
     platform.runCommand(this, command)
     junit "${project.paths.project_build_prefix}/build/${buildType}/clients/staging/*.xml"
+
+    //ROCM Examples
+    if (rocmExamples)
+    {
+        String buildString = ""
+        if (platform.os.contains("ubuntu")){
+            buildString += "sudo dpkg -i *.deb"
+        }
+        else {
+            buildString += "sudo rpm -i *.rpm"
+        }
+        testCommand = """#!/usr/bin/env bash
+                    set -ex
+                    cd ${project.paths.project_build_prefix}/build/release/package
+                    ${buildString}
+                    cd ../../..
+                    testDirs=("Libraries/hipSOLVER")
+                    git clone https://github.com/ROCm/rocm-examples.git
+                    rocm_examples_dir=\$(readlink -f rocm-examples)
+                    for testDir in \${testDirs[@]}; do
+                        cd \${rocm_examples_dir}/\${testDir}
+                        cmake -S . -B build
+                        cmake --build build
+                        cd ./build
+                        ctest --output-on-failure
+                    done
+                """
+        platform.runCommand(this, testCommand, "ROCM Examples")  
+    }
 }
 
 def runPackageCommand(platform, project, jobName, label='')
