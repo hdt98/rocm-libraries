@@ -52,6 +52,8 @@ struct BN2DTestCase
                   << " keepRunning: " << tc.keepRunning;
     }
     std::vector<size_t> GetInput() const { return {N, C, H, W}; }
+    bool GetSaveMean() const { return save; }
+    bool GetKeepRunningMean() const { return keepRunning; }
 };
 
 struct BN3DTestCase
@@ -72,6 +74,8 @@ struct BN3DTestCase
                   << " save: " << tc.save << " keepRunning: " << tc.keepRunning;
     }
     std::vector<size_t> GetInput() const { return {N, C, D, H, W}; }
+    bool GetSaveMean() const { return save; }
+    bool GetKeepRunningMean() const { return keepRunning; }
 };
 
 template <typename T>
@@ -192,13 +196,17 @@ struct BNTestData
     miopen::batchnorm::Direction direction;
     miopenTensorLayout_t tensor_layout;
     TConfig bn_config;
+    bool saveMeanVar;
+    bool keepRunningMeanVar;
 
 private:
     void CreateTensors()
     {
-        input   = tensor<XDataType>{tensor_layout, bn_config.GetInput()};
-        output  = tensor<YDataType>{tensor_layout, bn_config.GetInput()};
-        out_ref = tensor<AccDataType>{tensor_layout, bn_config.GetInput()};
+        input              = tensor<XDataType>{tensor_layout, bn_config.GetInput()};
+        output             = tensor<YDataType>{tensor_layout, bn_config.GetInput()};
+        out_ref            = tensor<AccDataType>{tensor_layout, bn_config.GetInput()};
+        saveMeanVar        = bn_config.GetSaveMean();
+        keepRunningMeanVar = bn_config.GetKeepRunningMean();
     }
 
     void InitTensorsWithRandValue()
@@ -393,10 +401,13 @@ private:
     {
         auto&& handle = get_handle();
 
-        bnScale_dev     = handle.Write(bnScale.data);
-        savedMean_dev   = handle.Write(savedMean.data);
-        savedInvVar_dev = handle.Write(savedInvVar.data);
-        dy_dev          = handle.Write(dy.data);
+        bnScale_dev = handle.Write(bnScale.data);
+        if(this->saveMeanVar)
+        {
+            savedMean_dev   = handle.Write(savedMean.data);
+            savedInvVar_dev = handle.Write(savedInvVar.data);
+        }
+        dy_dev = handle.Write(dy.data);
 
         dScale_dev = handle.Write(dScale.data);
         dBias_dev  = handle.Write(dBias.data);
@@ -498,32 +509,43 @@ private:
             uniform_signed_initializer<RunSaveDataType>(2e-3 /*scale*/, 1000 /*range*/));
         runVariance.generate(
             uniform_signed_initializer<RunSaveDataType>(2e-3 /*scale*/, 1000 /*range*/));
-
-        std::transform(saveMean.data.begin(),
-                       saveMean.data.end(),
-                       saveMean_ref.data.begin(),
-                       [](float val) { return static_cast<AccDataType>(val); });
-        std::transform(saveVariance.data.begin(),
-                       saveVariance.data.end(),
-                       saveVariance_ref.data.begin(),
-                       [](float val) { return static_cast<AccDataType>(val); });
-        std::transform(runMean.data.begin(),
-                       runMean.data.end(),
-                       runMean_ref.data.begin(),
-                       [](float val) { return static_cast<AccDataType>(val); });
-        std::transform(runVariance.data.begin(),
-                       runVariance.data.end(),
-                       runVariance_ref.data.begin(),
-                       [](float val) { return static_cast<AccDataType>(val); });
+        if(this->saveMeanVar)
+        {
+            std::transform(saveMean.data.begin(),
+                           saveMean.data.end(),
+                           saveMean_ref.data.begin(),
+                           [](float val) { return static_cast<AccDataType>(val); });
+            std::transform(saveVariance.data.begin(),
+                           saveVariance.data.end(),
+                           saveVariance_ref.data.begin(),
+                           [](float val) { return static_cast<AccDataType>(val); });
+        }
+        if(this->keepRunningMeanVar)
+        {
+            std::transform(runMean.data.begin(),
+                           runMean.data.end(),
+                           runMean_ref.data.begin(),
+                           [](float val) { return static_cast<AccDataType>(val); });
+            std::transform(runVariance.data.begin(),
+                           runVariance.data.end(),
+                           runVariance_ref.data.begin(),
+                           [](float val) { return static_cast<AccDataType>(val); });
+        }
     }
     void WriteToGPU()
     {
-        auto&& handle    = get_handle();
-        scale_dev        = handle.Write(scale.data);
-        shift_dev        = handle.Write(shift.data);
-        saveMean_dev     = handle.Write(saveMean.data);
-        saveVariance_dev = handle.Write(saveVariance.data);
-        runMean_dev      = handle.Write(runMean.data);
-        runVariance_dev  = handle.Write(runVariance.data);
+        auto&& handle = get_handle();
+        scale_dev     = handle.Write(scale.data);
+        shift_dev     = handle.Write(shift.data);
+        if(this->saveMeanVar)
+        {
+            saveMean_dev     = handle.Write(saveMean.data);
+            saveVariance_dev = handle.Write(saveVariance.data);
+        }
+        if(this->keepRunningMeanVar)
+        {
+            runMean_dev     = handle.Write(runMean.data);
+            runVariance_dev = handle.Write(runVariance.data);
+        }
     }
 };
