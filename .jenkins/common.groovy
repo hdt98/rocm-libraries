@@ -47,22 +47,22 @@ def runTestCommand(platform, project, boolean rocmExamples=false)
         if (platform.os.contains("ubuntu")){
             buildString += """
                         sudo dpkg -i *.deb
-                        apt update
-                        apt install hipblas-dev
+                        sudo apt update
+                        sudo apt install hipblas-dev
                         """
         }
         else if (platform.os.contains("sles")){
             buildString += """
                         sudo rpm -i *.rpm
-                        zypper refresh
-                        zypper -n install hipblas-devel
+                        sudo zypper refresh
+                        sudo zypper -n install hipblas-devel
                         """
         }
         else{
             buildString += """
                         sudo rpm -i *.rpm
-                        yum -y update
-                        yum -y install hipblas-devel
+                        sudo yum -y update
+                        sudo yum -y install hipblas-devel
                         """
         }
         testCommand = """#!/usr/bin/env bash
