@@ -45,10 +45,25 @@ def runTestCommand(platform, project, boolean rocmExamples=false)
     {
         String buildString = ""
         if (platform.os.contains("ubuntu")){
-            buildString += "sudo dpkg -i *.deb"
+            buildString += """
+                        sudo dpkg -i *.deb
+                        apt update
+                        apt install hipblas-dev
+                        """
         }
-        else {
-            buildString += "sudo rpm -i *.rpm"
+        else if (platform.os.contains("sles")){
+            buildString += """
+                        sudo rpm -i *.rpm
+                        zypper refresh
+                        zypper -n install hipblas-devel
+                        """
+        }
+        else{
+            buildString += """
+                        sudo rpm -i *.rpm
+                        yum -y update
+                        yum -y install hipblas-devel
+                        """
         }
         testCommand = """#!/usr/bin/env bash
                     set -ex
