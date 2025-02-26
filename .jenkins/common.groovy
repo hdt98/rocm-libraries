@@ -48,13 +48,13 @@ def runTestCommand(platform, project, boolean rocmExamples=false)
             buildString += """
                         sudo dpkg -i *.deb
                         sudo apt update
-                        sudo apt install hipblas-dev
+                        sudo apt install -y hipblas-dev
                         """
         }
         else if (platform.os.contains("sles")){
             buildString += """
                         sudo rpm -i *.rpm
-                        sudo zypper refresh
+                        sudo zypper refresh || true
                         sudo zypper -n install hipblas-devel
                         """
         }
