@@ -637,14 +637,20 @@ protected:
         // 4e-3 is tolerance used by CK kernel.
         test::CompareTensor<YDataType>(
             bn_fwd_train_test_data.output, bn_fwd_train_test_data.out_ref, 4e-3);
-        test::CompareTensor<RunSaveDataType>(
-            bn_fwd_train_test_data.saveMean, bn_fwd_train_test_data.saveMean_ref, 4e-3);
-        test::CompareTensor<RunSaveDataType>(
-            bn_fwd_train_test_data.saveVariance, bn_fwd_train_test_data.saveVariance_ref, 4e-3);
-        test::CompareTensor<RunSaveDataType>(
-            bn_fwd_train_test_data.runMean, bn_fwd_train_test_data.runMean_ref, 4e-3);
-        test::CompareTensor<RunSaveDataType>(
-            bn_fwd_train_test_data.runVariance, bn_fwd_train_test_data.runVariance_ref, 4e-3);
+        if(bn_fwd_train_test_data.saveMeanVar)
+        {
+            test::CompareTensor<RunSaveDataType>(
+                bn_fwd_train_test_data.saveMean, bn_fwd_train_test_data.saveMean_ref, 4e-3);
+            test::CompareTensor<RunSaveDataType>(
+                bn_fwd_train_test_data.saveVariance, bn_fwd_train_test_data.saveVariance_ref, 4e-3);
+        }
+        if(bn_fwd_train_test_data.keepRunningMeanVar)
+        {
+            test::CompareTensor<RunSaveDataType>(
+                bn_fwd_train_test_data.runMean, bn_fwd_train_test_data.runMean_ref, 4e-3);
+            test::CompareTensor<RunSaveDataType>(
+                bn_fwd_train_test_data.runVariance, bn_fwd_train_test_data.runVariance_ref, 4e-3);
+        }
     }
 
     TestCase bn_config;
