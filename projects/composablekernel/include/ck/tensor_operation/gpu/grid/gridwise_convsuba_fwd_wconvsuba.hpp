@@ -12,6 +12,7 @@
 #include "ck/tensor_operation/gpu/block/blockwise_convsuba_wconvsuba.hpp"
 #include "ck/tensor_operation/gpu/block/thread_group_tensor_slice_transfer_v4r1.hpp"
 #include "ck/tensor_operation/gpu/block/thread_group_tensor_slice_transfer_v6r1.hpp"
+#include "ck/tensor_operation/gpu/block/thread_group_tensor_slice_transfer_v7.hpp"
 #include "ck/tensor_operation/gpu/block/thread_group_tensor_slice_transfer_async.hpp"
 #include "ck/tensor_operation/gpu/thread/threadwise_tensor_slice_transfer.hpp"
 #include "ck/tensor_operation/gpu/element/element_wise_operation.hpp"
@@ -90,19 +91,19 @@ __global__ void
                                                acc_element_op,
                                                block_2_ctile_map);
 #else
-    ignore                                = p_in_grid;
-    ignore                                = p_wei_grid;
-    ignore                                = p_ds_grid_grp;
-    ignore                                = p_e_grid;
-    ignore                                = in_grid_desc;
-    ignore                                = wei_grid_desc;
-    ignore                                = ds_grid_desc;
-    ignore                                = acc_grid_desc;
-    ignore                                = in_element_op;
-    ignore                                = wei_element_op;
-    ignore                                = acc_element_op;
-    ignore                                = compute_ptr_offset_of_batch;
-    ignore                                = block_2_ctile_map;
+    ignore = p_in_grid;
+    ignore = p_wei_grid;
+    ignore = p_ds_grid_grp;
+    ignore = p_e_grid;
+    ignore = in_grid_desc;
+    ignore = wei_grid_desc;
+    ignore = ds_grid_desc;
+    ignore = acc_grid_desc;
+    ignore = in_element_op;
+    ignore = wei_element_op;
+    ignore = acc_element_op;
+    ignore = compute_ptr_offset_of_batch;
+    ignore = block_2_ctile_map;
 #endif
 }
 
@@ -186,19 +187,19 @@ __global__ void __exp_amd_wavegroup_kernel(4, 32, 256, 1, 1)
                                                acc_element_op,
                                                block_2_ctile_map);
 #else
-    ignore                                = p_in_grid;
-    ignore                                = p_wei_grid;
-    ignore                                = p_ds_grid_grp;
-    ignore                                = p_e_grid;
-    ignore                                = in_grid_desc;
-    ignore                                = wei_grid_desc;
-    ignore                                = ds_grid_desc;
-    ignore                                = e_grid_desc;
-    ignore                                = in_element_op;
-    ignore                                = wei_element_op;
-    ignore                                = acc_element_op;
-    ignore                                = compute_ptr_offset_of_batch;
-    ignore                                = block_2_ctile_map;
+    ignore = p_in_grid;
+    ignore = p_wei_grid;
+    ignore = p_ds_grid_grp;
+    ignore = p_e_grid;
+    ignore = in_grid_desc;
+    ignore = wei_grid_desc;
+    ignore = ds_grid_desc;
+    ignore = e_grid_desc;
+    ignore = in_element_op;
+    ignore = wei_element_op;
+    ignore = acc_element_op;
+    ignore = compute_ptr_offset_of_batch;
+    ignore = block_2_ctile_map;
 #endif
 }
 template <typename GridwiseOp,
@@ -276,19 +277,19 @@ __global__ void __exp_amd_wavegroup_kernel(4, 32, 512, 1, 1)
                                                acc_element_op,
                                                block_2_ctile_map);
 #else
-    ignore                                = p_in_grid;
-    ignore                                = p_wei_grid;
-    ignore                                = p_ds_grid_grp;
-    ignore                                = p_e_grid;
-    ignore                                = in_grid_desc;
-    ignore                                = wei_grid_desc;
-    ignore                                = ds_grid_desc;
-    ignore                                = e_grid_desc;
-    ignore                                = in_element_op;
-    ignore                                = wei_element_op;
-    ignore                                = acc_element_op;
-    ignore                                = compute_ptr_offset_of_batch;
-    ignore                                = block_2_ctile_map;
+    ignore = p_in_grid;
+    ignore = p_wei_grid;
+    ignore = p_ds_grid_grp;
+    ignore = p_e_grid;
+    ignore = in_grid_desc;
+    ignore = wei_grid_desc;
+    ignore = ds_grid_desc;
+    ignore = e_grid_desc;
+    ignore = in_element_op;
+    ignore = wei_element_op;
+    ignore = acc_element_op;
+    ignore = compute_ptr_offset_of_batch;
+    ignore = block_2_ctile_map;
 #endif
 }
 #pragma clang diagnostic pop
@@ -307,8 +308,6 @@ template <index_t BlockSize,
           typename InElementwiseOperation,
           typename WeiElementwiseOperation,
           typename AccElementwiseOperation,
-          typename AccBlockwiseOperation,
-          typename AccBlockwiseNextOperation,
           index_t HPerBlock,
           index_t WPerBlock,
           index_t CPerBlock,
@@ -341,8 +340,7 @@ template <index_t BlockSize,
           bool EnableAsync,
           index_t NumConvCPrefetchStage,
           bool EnableWaveGroup,
-          bool Transposed,
-          bool ConverToTensor>
+          bool Transposed>
 struct GridwiseConvSuba_Wconvsuba
 {
     static constexpr auto I0 = Number<0>{};
@@ -410,12 +408,352 @@ struct GridwiseConvSuba_Wconvsuba
     static constexpr index_t HPerWaveIn     = HPerWave + H_Pad * 2;
     static constexpr index_t WPerWaveIn     = WPerWave + W_Pad * 2;
 
-#ifdef FORCE_CONVERT_TO_TENSOR
-    static constexpr bool ConvertToTensor = true;
-#else
-    static constexpr bool ConvertToTensor = false;
-#endif
+    template <typename DLayout>
+    static constexpr bool IsGNHWKLayout()
+    {
+        return is_same_v<DLayout, tensor_layout::convolution::G_NW_K> ||
+               is_same_v<DLayout, tensor_layout::convolution::G_NHW_K> ||
+               is_same_v<DLayout, tensor_layout::convolution::G_NDHW_K> ||
+               is_same_v<DLayout, tensor_layout::convolution::GNWK> ||
+               is_same_v<DLayout, tensor_layout::convolution::GNHWK> ||
+               is_same_v<DLayout, tensor_layout::convolution::GNDHWK> ||
+               is_same_v<DLayout, tensor_layout::convolution::NWGK> ||
+               is_same_v<DLayout, tensor_layout::convolution::NHWGK> ||
+               is_same_v<DLayout, tensor_layout::convolution::NDHWGK>;
+    }
 
+    template <index_t relu = 0, index_t clamp = 0>
+    static auto constexpr AccNextOp()
+    {
+        if constexpr(is_same_v<AccDataType, EDataType>)
+        {
+            return convolution::BlockwiseElementOpPassThrough{};
+        }
+        else
+        {
+            return convolution::BlockwiseElementOpCvtTensor<true, relu, 0, clamp>{};
+        }
+    }
+    static auto __device__ __host__
+    MakeAccBlockwiseOp(const AccElementwiseOperation& acc_element_op)
+    {
+        using AccElementwiseOperation_   = remove_cvref_t<AccElementwiseOperation>;
+        auto constexpr AccReluInternalOp = []() {
+            if constexpr(is_same_v<AccDataType, EDataType>)
+            {
+                return tensor_operation::element_wise::Relu{};
+            }
+            else
+            {
+                return tensor_operation::element_wise::PassThrough{};
+            }
+        };
+
+        if constexpr(NumDTensor == 0)
+        {
+            if constexpr(is_same_v<AccElementwiseOperation_,
+                                   tensor_operation::element_wise::PassThrough> ||
+                         is_same_v<AccElementwiseOperation_,
+                                   tensor_operation::element_wise::UnaryConvert>)
+            {
+
+                return make_tuple(convolution::BlockwiseElementOpPassThrough{},
+                                  AccNextOp<>(),
+                                  tensor_operation::element_wise::PassThrough{});
+            }
+            else if constexpr(is_same_v<AccElementwiseOperation_,
+                                        ck::tensor_operation::element_wise::Scale>)
+            {
+                return make_tuple(
+                    convolution::BlockwiseElementOpScaleAndBias<0, true, false>{
+                        acc_element_op.scale_},
+                    AccNextOp<>(),
+                    tensor_operation::element_wise::PassThrough{});
+            }
+            else if constexpr(is_same_v<AccElementwiseOperation_,
+                                        ck::tensor_operation::element_wise::ScaleClamp>)
+            {
+                return make_tuple(
+                    convolution::BlockwiseElementOpScaleAndBias<0, true, false>{
+                        acc_element_op.scale_},
+                    AccNextOp<false, true>(),
+                    tensor_operation::element_wise::PassThrough{});
+            }
+            else if constexpr(is_same_v<AccElementwiseOperation_,
+                                        ck::tensor_operation::element_wise::ScaleRelu<>>)
+            {
+                return make_tuple(
+                    convolution::BlockwiseElementOpScaleAndBias<1, true, false>{
+                        acc_element_op.scale_},
+                    AccNextOp<>(),
+                    tensor_operation::element_wise::PassThrough{});
+            }
+            else if constexpr(is_same_v<AccElementwiseOperation_,
+                                        ck::tensor_operation::element_wise::ScaleRelu<true>>)
+            {
+                return make_tuple(
+                    convolution::BlockwiseElementOpScaleAndBias<1, true, false>{
+                        acc_element_op.scale_},
+                    AccNextOp<true, true>(),
+                    tensor_operation::element_wise::PassThrough{});
+            }
+            else if constexpr(is_same_v<AccElementwiseOperation_,
+                                        ck::tensor_operation::element_wise::ScaleHardTanh>)
+            {
+                return make_tuple(
+                    convolution::BlockwiseElementOpScaleAndBias<2, true, false>{
+                        acc_element_op.scale_},
+                    AccNextOp<>(),
+                    tensor_operation::element_wise::PassThrough{});
+            }
+            else
+            {
+                return make_tuple(convolution::BlockwiseElementOpPassThrough{},
+                                  convolution::BlockwiseElementOpPassThrough{},
+                                  acc_element_op);
+            }
+        }
+        else if constexpr(NumDTensor == 2)
+        {
+            using D0Layout = remove_cvref_t<tuple_element_t<0, DsLayout>>;
+            using D1Layout = remove_cvref_t<tuple_element_t<1, DsLayout>>;
+            if constexpr(is_same_v<D0Layout, tensor_layout::convolution::G_K> &&
+                         is_same_v<D1Layout, tensor_layout::convolution::G_K>)
+            {
+                if constexpr(is_same_v<AccElementwiseOperation_,
+                                       ck::tensor_operation::element_wise::MultiplyAdd>)
+                {
+                    return make_tuple(convolution::BlockwiseElementOpScaleAndBias<0, false, true>{},
+                                      AccNextOp(),
+                                      tensor_operation::element_wise::PassThrough{});
+                }
+                else if constexpr(is_same_v<AccElementwiseOperation_,
+                                            ck::tensor_operation::element_wise::MultiplyAddRelu<>>)
+                {
+                    return make_tuple(convolution::BlockwiseElementOpScaleAndBias<1, false, true>{},
+                                      AccNextOp<true, false>(),
+                                      tensor_operation::element_wise::PassThrough{});
+                }
+                else if constexpr(is_same_v<AccElementwiseOperation_,
+                                            ck::tensor_operation::element_wise::MultiplyAddClamp>)
+                {
+                    return make_tuple(convolution::BlockwiseElementOpScaleAndBias<0, false, true>{},
+                                      AccNextOp<false, true>,
+                                      tensor_operation::element_wise::PassThrough{});
+                }
+                else if constexpr(is_same_v<
+                                      AccElementwiseOperation_,
+                                      ck::tensor_operation::element_wise::MultiplyAddRelu<true>>)
+                {
+                    return make_tuple(convolution::BlockwiseElementOpScaleAndBias<1, false, true>{},
+                                      AccNextOp<true, true>(),
+                                      tensor_operation::element_wise::PassThrough{});
+                }
+                else if constexpr(is_same_v<
+                                      AccElementwiseOperation_,
+                                      ck::tensor_operation::element_wise::MultiplyAddHardTanh>)
+                {
+                    return make_tuple(convolution::BlockwiseElementOpScaleAndBias<2, false, true>{},
+                                      AccNextOp<>(),
+                                      tensor_operation::element_wise::PassThrough{});
+                }
+                else
+                {
+                    return make_tuple(convolution::BlockwiseElementOpPassThrough{},
+                                      convolution::BlockwiseElementOpPassThrough{},
+                                      acc_element_op);
+                }
+            }
+            else if constexpr(IsGNHWKLayout<D0Layout>() && IsGNHWKLayout<D1Layout>())
+            {
+                if constexpr(is_same_v<AccElementwiseOperation_,
+                                       ck::tensor_operation::element_wise::MultiplyAddRev<>>)
+                {
+                    return make_tuple(convolution::BlockwiseElementOpFma<false>{},
+                                      AccNextOp<>(),
+                                      tensor_operation::element_wise::PassThrough{});
+                }
+                else if constexpr(is_same_v<
+                                      AccElementwiseOperation_,
+                                      ck::tensor_operation::element_wise::MultiplyAddRevRelu<>>)
+                {
+                    return make_tuple(convolution::BlockwiseElementOpFma<false>{},
+                                      AccNextOp<true, false>(),
+                                      AccReluInternalOp());
+                }
+                else if constexpr(is_same_v<
+                                      AccElementwiseOperation_,
+                                      ck::tensor_operation::element_wise::MultiplyAddRev<true>>)
+                {
+                    return make_tuple(convolution::BlockwiseElementOpFma<false>{},
+                                      AccNextOp<false, true>(),
+                                      tensor_operation::element_wise::PassThrough{});
+                }
+                else if constexpr(is_same_v<
+                                      AccElementwiseOperation_,
+                                      ck::tensor_operation::element_wise::MultiplyAddRevRelu<true>>)
+                {
+                    return make_tuple(convolution::BlockwiseElementOpFma<false>{},
+                                      AccNextOp<true, true>(),
+                                      AccReluInternalOp());
+                }
+                else
+                {
+                    return make_tuple(convolution::BlockwiseElementOpPassThrough{},
+                                      convolution::BlockwiseElementOpPassThrough{},
+                                      acc_element_op);
+                }
+            }
+            else if constexpr(is_same_v<D0Layout, tensor_layout::convolution::G_K> &&
+                              IsGNHWKLayout<D1Layout>())
+            {
+                if constexpr(is_same_v<AccElementwiseOperation_,
+                                       ck::tensor_operation::element_wise::AddReluAdd>)
+                {
+                    return make_tuple(
+                        convolution::BlockwiseElementOpSbaFma<1, false, false, true>{},
+                        AccNextOp<>(),
+                        tensor_operation::element_wise::PassThrough{});
+                }
+                else
+                {
+                    return make_tuple(convolution::BlockwiseElementOpPassThrough{},
+                                      convolution::BlockwiseElementOpPassThrough{},
+                                      acc_element_op);
+                }
+            }
+            else
+            {
+                return make_tuple(convolution::BlockwiseElementOpPassThrough{},
+                                  convolution::BlockwiseElementOpPassThrough{},
+                                  acc_element_op);
+            }
+        }
+        else if constexpr(NumDTensor == 1)
+        {
+            using D0Layout = remove_cvref_t<tuple_element_t<0, DsLayout>>;
+            if constexpr(is_same_v<D0Layout, tensor_layout::convolution::G_K>)
+            {
+                if constexpr(is_same_v<AccElementwiseOperation_,
+                                       ck::tensor_operation::element_wise::ScaleAdd>)
+                {
+                    return make_tuple(
+                        convolution::BlockwiseElementOpScaleAndBias<0, false, false>{
+                            acc_element_op.scale_},
+                        AccNextOp<>(),
+                        tensor_operation::element_wise::PassThrough{});
+                }
+                else if constexpr(is_same_v<AccElementwiseOperation_,
+                                            ck::tensor_operation::element_wise::ScaleAddRelu<>>)
+                {
+                    return make_tuple(
+                        convolution::BlockwiseElementOpScaleAndBias<1, false, false>{
+                            acc_element_op.scale_},
+                        AccNextOp<true, false>(),
+                        tensor_operation::element_wise::PassThrough{});
+                }
+                else if constexpr(is_same_v<AccElementwiseOperation_,
+                                            ck::tensor_operation::element_wise::ScaleAddClamp>)
+                {
+                    return make_tuple(
+                        convolution::BlockwiseElementOpScaleAndBias<0, false, false>{
+                            acc_element_op.scale_},
+                        AccNextOp<false, true>(),
+                        tensor_operation::element_wise::PassThrough{});
+                }
+                else if constexpr(is_same_v<AccElementwiseOperation_,
+                                            ck::tensor_operation::element_wise::ScaleAddRelu<true>>)
+                {
+                    return make_tuple(
+                        convolution::BlockwiseElementOpScaleAndBias<1, false, false>{
+                            acc_element_op.scale_},
+                        AccNextOp<true, true>(),
+                        tensor_operation::element_wise::PassThrough{});
+                }
+                else if constexpr(is_same_v<AccElementwiseOperation_,
+                                            ck::tensor_operation::element_wise::ScaleAddHardTanh>)
+                {
+                    return make_tuple(
+                        convolution::BlockwiseElementOpScaleAndBias<2, false, false>{
+                            acc_element_op.scale_},
+                        AccNextOp<>(),
+                        tensor_operation::element_wise::PassThrough{});
+                }
+                else
+                {
+                    return make_tuple(convolution::BlockwiseElementOpPassThrough{},
+                                      convolution::BlockwiseElementOpPassThrough{},
+                                      acc_element_op);
+                }
+            }
+            else if constexpr(IsGNHWKLayout<D0Layout>())
+            {
+                if constexpr(is_same_v<AccElementwiseOperation_,
+                                       ck::tensor_operation::element_wise::ScaleAddRev<>>)
+                {
+                    return make_tuple(
+                        convolution::BlockwiseElementOpFma<true>{acc_element_op.scale_},
+                        AccNextOp<>(),
+                        tensor_operation::element_wise::PassThrough{});
+                }
+                else if constexpr(is_same_v<AccElementwiseOperation_,
+                                            ck::tensor_operation::element_wise::ScaleAddRevRelu<>>)
+                {
+                    return make_tuple(
+                        convolution::BlockwiseElementOpFma<true>{acc_element_op.scale_},
+                        AccNextOp<true, false>(),
+                        AccReluInternalOp());
+                }
+                else if constexpr(is_same_v<AccElementwiseOperation_,
+                                            ck::tensor_operation::element_wise::ScaleAddRev<true>>)
+                {
+                    return make_tuple(
+                        convolution::BlockwiseElementOpFma<true>{acc_element_op.scale_},
+                        AccNextOp<false, true>(),
+                        tensor_operation::element_wise::PassThrough{});
+                }
+                else if constexpr(is_same_v<
+                                      AccElementwiseOperation_,
+                                      ck::tensor_operation::element_wise::ScaleAddRevRelu<true>>)
+                {
+                    return make_tuple(
+                        convolution::BlockwiseElementOpFma<true>{acc_element_op.scale_},
+                        AccNextOp<true, true>(),
+                        AccReluInternalOp());
+                }
+                else
+                {
+                    return make_tuple(convolution::BlockwiseElementOpPassThrough{},
+                                      convolution::BlockwiseElementOpPassThrough{},
+                                      acc_element_op);
+                }
+            }
+            else
+            {
+                return make_tuple(convolution::BlockwiseElementOpPassThrough{},
+                                  convolution::BlockwiseElementOpPassThrough{},
+                                  acc_element_op);
+            }
+        }
+        else
+        {
+            return make_tuple(convolution::BlockwiseElementOpPassThrough{},
+                              convolution::BlockwiseElementOpPassThrough{},
+                              acc_element_op);
+        }
+    }
+    using AccBlockwiseOp                  = decltype(MakeAccBlockwiseOp(AccElementwiseOperation{}));
+    using AccElementwiseOperationInternal = remove_cvref_t<tuple_element_t<2, AccBlockwiseOp>>;
+    using AccBlockwiseOperation           = remove_cvref_t<tuple_element_t<0, AccBlockwiseOp>>;
+    using AccBlockwiseNextOperation       = remove_cvref_t<tuple_element_t<1, AccBlockwiseOp>>;
+
+    __host__ __device__ static constexpr bool IsPassthroughBlockwiseOp()
+    {
+        return AccBlockwiseOperation::IsFma == false && AccBlockwiseOperation::IsSuba == false;
+    }
+    static constexpr bool SupportDirectOutput =
+        (IsPassthroughBlockwiseOp() == false) || (NumDTensor == 0);
+    static constexpr bool AccEnableLdsInternal = AccEnableLds || (SupportDirectOutput == false);
     // Describe the layout of InData in block level (LDS or VGPR)
     __host__ __device__ static constexpr auto MakeInBlockDescriptor()
     {
@@ -479,22 +817,32 @@ struct GridwiseConvSuba_Wconvsuba
     // Ds desc for source in blockwise copy
     __host__ __device__ static constexpr auto MakeDsBlockDescriptor()
     {
-        return generate_tuple(
-            [&](auto i) {
-                using DLayout = remove_cvref_t<tuple_element_t<i.value, DsLayout>>;
-                return MakeSingleDBlockDescriptor<DLayout>();
-            },
-            Number<NumDTensor>{});
+        if constexpr(IsPassthroughBlockwiseOp())
+        {
+            return Tuple<>{};
+        }
+        else
+        {
+            return generate_tuple(
+                [&](auto i) {
+                    using DLayout = remove_cvref_t<tuple_element_t<i.value, DsLayout>>;
+                    return MakeSingleDBlockDescriptor<DLayout>();
+                },
+                Number<NumDTensor>{});
+        }
     }
 
     static constexpr auto ds_block_desc = MakeDsBlockDescriptor();
+
+    using BlockOutDataType = typename std::
+        conditional<AccBlockwiseNextOperation::cvt_to_tensor, EDataType, AccDataType>::type;
 
     using BlockwiseConv = BlockwiseSubaConvWconv<ThisThreadBlockGrid,
                                                  WeiDataType,
                                                  InDataType,
                                                  DsDataType,
                                                  AccDataType,
-                                                 EDataType,
+                                                 BlockOutDataType,
                                                  AccBlockwiseOperation,
                                                  AccBlockwiseNextOperation,
                                                  decltype(MakeWeiBlockDescriptor()),
@@ -514,8 +862,7 @@ struct GridwiseConvSuba_Wconvsuba
                                                  WeiEnableLds,
                                                  InEnableLds,
                                                  DsEnableLds,
-                                                 Transposed,
-                                                 ConverToTensor>;
+                                                 Transposed>;
 
     // Pad input and weight data grid description according to Filter size
     __host__ __device__ static constexpr auto
@@ -540,18 +887,29 @@ struct GridwiseConvSuba_Wconvsuba
             return in_grid_desc;
         }
     }
+    // ck::Tuple<const D0DataType*, const D1DataType*, ...>
+    static constexpr auto MakeDsGridPointer()
+    {
+        return generate_tuple(
+            [&](auto i) {
+                using DDataType = remove_cvref_t<tuple_element_t<i.value, DsDataType>>;
 
-    template <typename OutTensorGridDec,
-              typename OutTensorThreadBuffer,
-              typename OutTensorDataType,
-              typename NamedBarrier,
-              typename BlockWiseConv>
+                return static_cast<const DDataType*>(nullptr);
+            },
+            Number<NumDTensor>{});
+    }
+
+    using DsGridPointer = decltype(MakeDsGridPointer());
+
+    template <typename OutTensorThreadBuffer, typename NamedBarrier, typename BlockWiseConv>
     __host__ __device__ static void
-    StoreOutTensorData(const OutTensorGridDec& e_grid_desc,
-                       OutTensorDataType* __restrict__ p_e_grid,
+    StoreOutTensorData(const DsGridDesc& ds_grid_desc,
+                       DsGridPointer p_ds_grid,
+                       const EGridDesc& e_grid_desc,
+                       EDataType* __restrict__ p_e_grid,
                        OutTensorThreadBuffer& out_thread_buf,
                        BlockWiseConv& blockwise_conv,
-                       const AccElementwiseOperation& out_element_op,
+                       const AccElementwiseOperationInternal& out_element_op,
                        void* __restrict__ p_shared,
                        NamedBarrier& barrier_output,
                        index_t h_block_data_idx_on_grid,
@@ -560,34 +918,34 @@ struct GridwiseConvSuba_Wconvsuba
     {
         auto out_grid_buf = make_dynamic_buffer<AddressSpaceEnum::Global>(
             p_e_grid, e_grid_desc.GetElementSpaceSize());
-
         // C mapping in single thread.
         constexpr auto out_tensor_thread_desc   = blockwise_conv.GetAccThreadDescriptor();
         constexpr auto out_tensor_thread_length = blockwise_conv.GetAccThreadDescLength();
         constexpr bool ForceAlignToUint32 =
-            EnableWaveGroup4 && (sizeof(OutTensorDataType) < sizeof(uint32_t));
+            EnableWaveGroup4 && (sizeof(BlockOutDataType) < sizeof(uint32_t));
+        static constexpr auto EGlobalMemoryDataOperation = InMemoryDataOperationEnum::Set;
 
         // calculate origin of thread output tensor on global memory
         // blockwise conv out tensor starting index
         const auto out_thread_mtx_on_block = blockwise_conv.CalculateAccThreadOriginDataIndex();
-        if constexpr(AccEnableLds == false)
+        if constexpr(AccEnableLdsInternal == false)
         {
             const auto out_tensor_grid_wave_desc = blockwise_conv.GetAccWaveDescriptor(e_grid_desc);
 
             // Threadwise copy C from VGPR to global memory
 
             auto out_tensor_thread_copy_vgpr_to_global =
-                ThreadwiseTensorSliceTransfer_v1r3<OutTensorDataType,
-                                                   OutTensorDataType,
+                ThreadwiseTensorSliceTransfer_v1r3<BlockOutDataType,
+                                                   EDataType,
                                                    decltype(out_tensor_thread_desc),
                                                    decltype(out_tensor_grid_wave_desc),
-                                                   AccElementwiseOperation,
+                                                   AccElementwiseOperationInternal,
                                                    decltype(out_tensor_thread_length),
                                                    Sequence<0, 1, 2, 3, 4, 5, 6, 7>,
                                                    7,
                                                    out_tensor_thread_length[I7], // vector write
                                                                                  // pixel
-                                                   InMemoryDataOperationEnum::Set,
+                                                   EGlobalMemoryDataOperation,
                                                    1,
                                                    true,
                                                    ForceAlignToUint32>{
@@ -618,14 +976,14 @@ struct GridwiseConvSuba_Wconvsuba
                 BlockWiseConv::GetAccWaveDescriptor(out_tensor_block_desc);
 
             auto out_tensor_block_buf = make_dynamic_buffer<AddressSpaceEnum::Lds>(
-                static_cast<OutTensorDataType*>(p_shared) +
+                static_cast<BlockOutDataType*>(p_shared) +
                     BlockwiseConv::SharedMemTrait::out_tensor_block_space_offset,
                 BlockwiseConv::SharedMemTrait::out_tensor_block_space_size);
 
             // Threadwise copy C from VGPR to LDS
             auto out_tensor_thread_copy_vgpr_to_lds = ThreadwiseTensorSliceTransfer_v1r3<
-                OutTensorDataType,
-                OutTensorDataType,
+                BlockOutDataType,
+                BlockOutDataType,
                 decltype(out_tensor_thread_desc),
                 decltype(out_tensor_block_wave_desc),
                 ck::tensor_operation::element_wise::PassThrough,
@@ -640,77 +998,165 @@ struct GridwiseConvSuba_Wconvsuba
                                     out_thread_mtx_on_block,
                                     ck::tensor_operation::element_wise::PassThrough{}};
 
-            // blockwise copy C from LDS to global
-            auto out_tensor_block_copy_lds_to_global = ThreadGroupTensorSliceTransfer_v6r1<
-                ThisThreadBlockGrid,
-                AccElementwiseOperation,
-                InMemoryDataOperationEnum::Set,
-                Sequence<BlockwiseConv::HPerBlockOut, BlockwiseConv::WPerBlockOut, KPerBlock>,
-                AccBlockTransferClusterLengths,
-                Sequence<0, 1, 2>,
-                OutTensorDataType,
-                OutTensorDataType,
-                decltype(out_tensor_block_desc),
-                decltype(e_grid_desc),
-                Sequence<0, 1, 2>,
-                2,
-                AccBlockTransferScalarPerVector,
-                true,
-                false>{out_tensor_block_desc,
-                       make_multi_index(0, 0, 0),
-                       e_grid_desc,
-                       make_multi_index(h_block_data_idx_on_grid,
-                                        w_block_data_idx_on_grid,
-                                        k_block_data_idx_on_grid),
-                       out_element_op};
-
-            // make sure it's safe to write to LDS
-            if constexpr(EnableWaveGroup == false)
-            {
-                block_sync_lds();
-            }
-            else
-            {
-                barrier_output.signal();
-                barrier_output.wait();
-            }
-
-            // each thread write its data from VGPR to LDS
-            out_tensor_thread_copy_vgpr_to_lds.Run(out_tensor_thread_desc,
-                                                   make_tuple(I0, I0, I0, I0, I0, I0, I0, I0),
-                                                   out_thread_buf,
-                                                   out_tensor_block_wave_desc,
-                                                   out_tensor_block_buf);
-
-            // make sure it's safe to read from LDS
-            if constexpr(EnableWaveGroup == false)
-            {
-                block_sync_lds();
-            }
-            else
-            {
-                barrier_output.template sync_lds<false>();
-            }
+            constexpr index_t NumOutDTensor = IsPassthroughBlockwiseOp() ? NumDTensor : 0;
 
             // each block copy its data from LDS to global
-            out_tensor_block_copy_lds_to_global.Run(
-                out_tensor_block_desc, out_tensor_block_buf, e_grid_desc, out_grid_buf);
+            if constexpr(NumOutDTensor == 0)
+            {
+                // blockwise copy C from LDS to global
+                auto out_tensor_block_copy_lds_to_global = ThreadGroupTensorSliceTransfer_v6r1<
+                    ThisThreadBlockGrid,
+                    AccElementwiseOperationInternal,
+                    EGlobalMemoryDataOperation,
+                    Sequence<BlockwiseConv::HPerBlockOut, BlockwiseConv::WPerBlockOut, KPerBlock>,
+                    AccBlockTransferClusterLengths,
+                    Sequence<0, 1, 2>,
+                    BlockOutDataType,
+                    EDataType,
+                    decltype(out_tensor_block_desc),
+                    decltype(e_grid_desc),
+                    Sequence<0, 1, 2>,
+                    2,
+                    AccBlockTransferScalarPerVector,
+                    true,
+                    false>{out_tensor_block_desc,
+                           make_multi_index(0, 0, 0),
+                           e_grid_desc,
+                           make_multi_index(h_block_data_idx_on_grid,
+                                            w_block_data_idx_on_grid,
+                                            k_block_data_idx_on_grid),
+                           out_element_op};
+
+                // make sure it's safe to write to LDS
+                if constexpr(EnableWaveGroup == false)
+                {
+                    block_sync_lds();
+                }
+                else
+                {
+                    barrier_output.signal();
+                    barrier_output.wait();
+                }
+
+                // each thread write its data from VGPR to LDS
+                out_tensor_thread_copy_vgpr_to_lds.Run(out_tensor_thread_desc,
+                                                       make_tuple(I0, I0, I0, I0, I0, I0, I0, I0),
+                                                       out_thread_buf,
+                                                       out_tensor_block_wave_desc,
+                                                       out_tensor_block_buf);
+
+                // make sure it's safe to read from LDS
+                if constexpr(EnableWaveGroup == false)
+                {
+                    block_sync_lds();
+                }
+                else
+                {
+                    barrier_output.template sync_lds<false>();
+                }
+
+                out_tensor_block_copy_lds_to_global.Run(
+                    out_tensor_block_desc, out_tensor_block_buf, e_grid_desc, out_grid_buf);
+            }
+            else
+            {
+                const auto ds_grid_buf = generate_tuple(
+                    [&](auto i) {
+                        return make_dynamic_buffer<AddressSpaceEnum::Global>(
+                            p_ds_grid[i], ds_grid_desc[i].GetElementSpaceSize());
+                    },
+                    Number<NumDTensor>{});
+
+                // tuple of reference to C/Ds tensor descriptors
+                const auto c_ds_desc_refs = concat_tuple_of_reference(
+                    tie(out_tensor_block_desc),
+                    generate_tie(
+                        [&](auto i) -> const auto& // return type should be reference
+                        { return ds_grid_desc[i]; },
+                        Number<NumDTensor>{}));
+
+                // tuple of reference to C/Ds tensor buffers
+                const auto c_ds_buf_refs = concat_tuple_of_reference(
+                    tie(out_tensor_block_buf),
+                    generate_tie(
+                        [&](auto i) -> const auto& // return type should be reference
+                        { return ds_grid_buf[i]; },
+                        Number<NumDTensor>{}));
+
+                // tuple of starting index of C/Ds blockwise copy
+                const auto idx_c_ds_block_begin =
+                    container_concat(make_tuple(make_multi_index(0, 0, 0)),
+                                     generate_tuple(
+                                         [&](auto) {
+                                             return make_multi_index(h_block_data_idx_on_grid,
+                                                                     w_block_data_idx_on_grid,
+                                                                     k_block_data_idx_on_grid);
+                                         },
+                                         Number<NumDTensor>{}));
+
+                auto out_tensor_block_copy_lds_to_global = ThreadGroupTensorSliceTransfer_v7<
+                    ThisThreadBlockGrid, // ThreadGroup
+                    decltype(container_concat(make_tuple(BlockOutDataType{}),
+                                              DsDataType{})), // SrcDatas
+                    Tuple<EDataType>,                         // DstDatas
+                    decltype(c_ds_desc_refs),                 // SrcDescs
+                    decltype(tie(e_grid_desc)),               // DstDescs
+                    AccElementwiseOperationInternal,          // ElementwiseOperation,
+                    Sequence<static_cast<index_t>(EGlobalMemoryDataOperation)>, // DstInMemOp,
+                    Sequence<BlockwiseConv::HPerBlockOut,
+                             BlockwiseConv::WPerBlockOut,
+                             KPerBlock>,             // SliceLengths
+                    AccBlockTransferClusterLengths,  // ThreadClusterLengths
+                    Sequence<0, 1, 2>,               // ThreadClusterArrangeOrder
+                    Sequence<0, 1, 2>,               // DimAccessOrder
+                    2,                               // VectorDim
+                    AccBlockTransferScalarPerVector, // ScalarPerVector
+                    sequence_merge_t<Sequence<true>,
+                                     uniform_sequence_gen_t<
+                                         NumDTensor,
+                                         false>>, // bool ThreadTransferSrcResetCoordinateAfterRun,
+                    Sequence<false>>              // bool ThreadTransferDstResetCoordinateAfterRun>
+                    {c_ds_desc_refs,
+                     idx_c_ds_block_begin,
+                     tie(e_grid_desc),
+                     make_tuple(make_multi_index(h_block_data_idx_on_grid,
+                                                 w_block_data_idx_on_grid,
+                                                 k_block_data_idx_on_grid)),
+                     out_element_op};
+
+                // make sure it's safe to write to LDS
+                if constexpr(EnableWaveGroup == false)
+                {
+                    block_sync_lds();
+                }
+                else
+                {
+                    barrier_output.signal();
+                    barrier_output.wait();
+                }
+
+                // each thread write its data from VGPR to LDS
+                out_tensor_thread_copy_vgpr_to_lds.Run(out_tensor_thread_desc,
+                                                       make_tuple(I0, I0, I0, I0, I0, I0, I0, I0),
+                                                       out_thread_buf,
+                                                       out_tensor_block_wave_desc,
+                                                       out_tensor_block_buf);
+
+                // make sure it's safe to read from LDS
+                if constexpr(EnableWaveGroup == false)
+                {
+                    block_sync_lds();
+                }
+                else
+                {
+                    barrier_output.template sync_lds<false>();
+                }
+
+                out_tensor_block_copy_lds_to_global.Run(
+                    c_ds_desc_refs, c_ds_buf_refs, tie(e_grid_desc), tie(out_grid_buf));
+            }
         }
     }
-
-    // ck::Tuple<const D0DataType*, const D1DataType*, ...>
-    static constexpr auto MakeDsGridPointer()
-    {
-        return generate_tuple(
-            [&](auto i) {
-                using DDataType = remove_cvref_t<tuple_element_t<i.value, DsDataType>>;
-
-                return static_cast<const DDataType*>(nullptr);
-            },
-            Number<NumDTensor>{});
-    }
-
-    using DsGridPointer = decltype(MakeDsGridPointer());
 
     template <typename DLayout,
               typename DDataType,
@@ -1005,17 +1451,9 @@ struct GridwiseConvSuba_Wconvsuba
 
         bool valid = true;
         static_for<0, NumDTensor, 1>{}([&](auto i) {
-            using DLayout = remove_cvref_t<tuple_element_t<i.value, DsLayout>>;
-            if constexpr(std::is_same_v<DLayout, tensor_layout::convolution::G_K>)
-            {
-                valid = valid && (K == ds_grid_desc[i].GetLength(I0));
-            }
-            else
-            {
-                valid = valid && (Ho == ds_grid_desc[i].GetLength(I0));
-                valid = valid && (Wo == ds_grid_desc[i].GetLength(I1));
-                valid = valid && (K == ds_grid_desc[i].GetLength(I2));
-            }
+            valid = valid && (Ho == ds_grid_desc[i].GetLength(I0));
+            valid = valid && (Wo == ds_grid_desc[i].GetLength(I1));
+            valid = valid && (K == ds_grid_desc[i].GetLength(I2));
         });
         if(!valid)
         {
@@ -1077,7 +1515,7 @@ struct GridwiseConvSuba_Wconvsuba
         // Tensor & transform debugging code
         BlockwiseConv blockwise_conv = {};
         auto out_thread_buf = blockwise_conv.MakeOutThreadBuffer(nullptr);
-        const AccElementwiseOperation acc_element_op;
+        const AccElementwiseOperationInternal acc_element_op;
         StoreOutTensorData(acc_grid_desc,
             nullptr,
             out_thread_buf,
@@ -1509,7 +1947,11 @@ struct GridwiseConvSuba_Wconvsuba
         };
 
         auto ds_block_trait = [&]() {
-            if constexpr(DsEnableLds)
+            if constexpr(IsPassthroughBlockwiseOp())
+            {
+                return make_tuple(Tuple<>{}, Tuple<>{}, Tuple<>{});
+            }
+            else if constexpr(DsEnableLds)
             {
                 auto ds_array_block_buf = generate_tuple(
                     [&](auto i) {
@@ -1584,11 +2026,12 @@ struct GridwiseConvSuba_Wconvsuba
 
         /*******************************************************************************/
         // CONV
-        BlockwiseConv blockwise_conv = {};
+        auto acc_blockwise_op = MakeAccBlockwiseOp(acc_element_op);
+        BlockwiseConv blockwise_conv(acc_blockwise_op[I0], acc_blockwise_op[I1]);
 
         // Prepare Register for Accum
-        auto pOutData = static_cast<EDataType*>(p_lane_shared) +
-                        laneSharedMemTrait.out_block_space_offset / sizeof(EDataType);
+        auto pOutData = static_cast<BlockOutDataType*>(p_lane_shared) +
+                        laneSharedMemTrait.out_block_space_offset / sizeof(BlockOutDataType);
         auto pAccData = static_cast<AccDataType*>(p_lane_shared) +
                         laneSharedMemTrait.acc_block_space_offset / sizeof(AccDataType);
         auto acc_thread_buf =
@@ -1627,7 +2070,7 @@ struct GridwiseConvSuba_Wconvsuba
         __shared__ NamedBarrier<4> barrier_output;
 #endif
         constexpr auto OutputWaveId = EnableWaveGroup4 ? WaveIdOutput : WaveIdRun;
-        if constexpr(EnableWaveGroup && AccEnableLds)
+        if constexpr(EnableWaveGroup && AccEnableLdsInternal)
         {
             if(get_wave_id_in_wavegroup() == OutputWaveId)
             {
@@ -1673,15 +2116,16 @@ struct GridwiseConvSuba_Wconvsuba
 
         /*******************************************************************************/
         // Store accum buffer
-
         if((EnableWaveGroup == false) || (get_wave_id_in_wavegroup() == OutputWaveId))
         {
             // Store the result: AccElementOp(None/fma/sba/uba) + NextElementOp(cvt_tensor)
-            StoreOutTensorData(e_grid_desc,
+            StoreOutTensorData(ds_grid_desc,
+                               p_ds_grid,
+                               e_grid_desc,
                                p_e_grid,
                                out_thread_buf,
                                blockwise_conv,
-                               acc_element_op,
+                               acc_blockwise_op[I2],
                                p_shared,
                                barrier_output,
                                h_out_block_data_idx_on_grid,

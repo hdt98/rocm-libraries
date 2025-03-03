@@ -38,22 +38,22 @@ enum struct CvtTensorInstr
     cvt_tensor_bf16_bf16
 };
 
-template <CvtTensorInstr Instr, index_t auxdata, index_t H, index_t W>
+template <CvtTensorInstr Instr, index_t AuxData, bool Clamp, index_t H, index_t W>
 struct cvt_tensor_type
 {
     cvt_tensor_type() { static_assert(false, "never called"); }
 };
 
 // i4_f32
-template <index_t auxdata>
-struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_i4_f32, auxdata, 4, 2>
+template <index_t AuxData, bool Clamp>
+struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_i4_f32, AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc, class OutTensor>
     __device__ void Run(const FloatAcc& inAcc, const float& scale, OutTensor& out_0) const
     {
 #if defined(__gfx13__)
         auto dwordOut_0 = 0;
-        intrin_cvt_tensor_i4_f32<auxdata, 4, 2>::Run(inAcc, scale, dwordOut_0);
+        intrin_cvt_tensor_i4_f32<AuxData, Clamp, 4, 2>::Run(inAcc, scale, dwordOut_0);
         out_0 = bit_cast<OutTensor>(dwordOut_0);
 #else
         ignore = inAcc;
@@ -64,15 +64,15 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_i4_f32, auxdata, 4, 2>
 };
 
 // i4_fp16
-template <index_t auxdata>
-struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_i4_fp16, auxdata, 8, 4>
+template <index_t AuxData, bool Clamp>
+struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_i4_fp16, AuxData, Clamp, 8, 4>
 {
     template <class FloatAcc, class OutTensor>
     __device__ void Run(const FloatAcc& inAcc, const half_t& scale, OutTensor& out_0) const
     {
 #if defined(__gfx13__)
         int32x2_t dwordOut_0;
-        intrin_cvt_tensor_i4_f16<auxdata, 8, 4>::Run(inAcc, scale, dwordOut_0);
+        intrin_cvt_tensor_i4_f16<AuxData, Clamp, 8, 4>::Run(inAcc, scale, dwordOut_0);
         out_0 = bit_cast<OutTensor>(dwordOut_0); // int32x2->int4x16
 #else
         ignore = inAcc;
@@ -82,15 +82,15 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_i4_fp16, auxdata, 8, 4>
     }
 };
 
-template <index_t auxdata>
-struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_i4_fp16, auxdata, 4, 4>
+template <index_t AuxData, bool Clamp>
+struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_i4_fp16, AuxData, Clamp, 4, 4>
 {
     template <class FloatAcc, class OutTensor>
     __device__ void Run(const FloatAcc& inAcc, const half_t& scale, OutTensor& out_0) const
     {
 #if defined(__gfx13__)
         auto dwordOut_0 = 0;
-        intrin_cvt_tensor_i4_f16<auxdata, 4, 4>::Run(inAcc, scale, dwordOut_0);
+        intrin_cvt_tensor_i4_f16<AuxData, Clamp, 4, 4>::Run(inAcc, scale, dwordOut_0);
         out_0 = bit_cast<OutTensor>(dwordOut_0);
 #else
         ignore = inAcc;
@@ -100,15 +100,15 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_i4_fp16, auxdata, 4, 4>
     }
 };
 
-template <index_t auxdata>
-struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_i4_fp16, auxdata, 4, 2>
+template <index_t AuxData, bool Clamp>
+struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_i4_fp16, AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc, class OutTensor>
     __device__ void Run(const FloatAcc& inAcc, const half_t& scale, OutTensor& out_0) const
     {
 #if defined(__gfx13__)
         auto dwordOut_0 = 0;
-        intrin_cvt_tensor_i4_f16<auxdata, 4, 2>::Run(inAcc, scale, dwordOut_0);
+        intrin_cvt_tensor_i4_f16<AuxData, Clamp, 4, 2>::Run(inAcc, scale, dwordOut_0);
         out_0 = bit_cast<OutTensor>(dwordOut_0);
 #else
         ignore = inAcc;
@@ -119,15 +119,15 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_i4_fp16, auxdata, 4, 2>
 };
 
 // i4_bf16
-template <index_t auxdata>
-struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_i4_bf16, auxdata, 8, 4>
+template <index_t AuxData, bool Clamp>
+struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_i4_bf16, AuxData, Clamp, 8, 4>
 {
     template <class FloatAcc, class OutTensor>
     __device__ void Run(const FloatAcc& inAcc, const bhalf_t& scale, OutTensor& out_0) const
     {
 #if defined(__gfx13__)
         int32x2_t dwordOut_0;
-        intrin_cvt_tensor_i4_bf16<auxdata, 8, 4>::Run(inAcc, scale, dwordOut_0);
+        intrin_cvt_tensor_i4_bf16<AuxData, Clamp, 8, 4>::Run(inAcc, scale, dwordOut_0);
         out_0 = bit_cast<OutTensor>(dwordOut_0); // int32x2->int4x16
 #else
         ignore = inAcc;
@@ -137,15 +137,15 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_i4_bf16, auxdata, 8, 4>
     }
 };
 
-template <index_t auxdata>
-struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_i4_bf16, auxdata, 4, 4>
+template <index_t AuxData, bool Clamp>
+struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_i4_bf16, AuxData, Clamp, 4, 4>
 {
     template <class FloatAcc, class OutTensor>
     __device__ void Run(const FloatAcc& inAcc, const bhalf_t& scale, OutTensor& out_0) const
     {
 #if defined(__gfx13__)
         auto dwordOut_0 = 0;
-        intrin_cvt_tensor_i4_bf16<auxdata, 4, 4>::Run(inAcc, scale, dwordOut_0);
+        intrin_cvt_tensor_i4_bf16<AuxData, Clamp, 4, 4>::Run(inAcc, scale, dwordOut_0);
         out_0 = bit_cast<OutTensor>(dwordOut_0);
 #else
         ignore = inAcc;
@@ -155,15 +155,15 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_i4_bf16, auxdata, 4, 4>
     }
 };
 
-template <index_t auxdata>
-struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_i4_bf16, auxdata, 4, 2>
+template <index_t AuxData, bool Clamp>
+struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_i4_bf16, AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc, class OutTensor>
     __device__ void Run(const FloatAcc& inAcc, const bhalf_t& scale, OutTensor& out_0) const
     {
 #if defined(__gfx13__)
         auto dwordOut_0 = 0;
-        intrin_cvt_tensor_i4_bf16<auxdata, 4, 2>::Run(inAcc, scale, dwordOut_0);
+        intrin_cvt_tensor_i4_bf16<AuxData, Clamp, 4, 2>::Run(inAcc, scale, dwordOut_0);
         out_0 = bit_cast<OutTensor>(dwordOut_0);
 #else
         ignore = inAcc;
@@ -174,15 +174,15 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_i4_bf16, auxdata, 4, 2>
 };
 
 // u4_f32
-template <index_t auxdata>
-struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_u4_f32, auxdata, 4, 2>
+template <index_t AuxData, bool Clamp>
+struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_u4_f32, AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc, class OutTensor>
     __device__ void Run(const FloatAcc& inAcc, const float& scale, OutTensor& out_0) const
     {
 #if defined(__gfx13__)
         auto dwordOut_0 = 0;
-        intrin_cvt_tensor_u4_f32<auxdata, 4, 2>::Run(inAcc, scale, dwordOut_0);
+        intrin_cvt_tensor_u4_f32<AuxData, Clamp, 4, 2>::Run(inAcc, scale, dwordOut_0);
         out_0 = bit_cast<OutTensor>(dwordOut_0);
 #else
         ignore = inAcc;
@@ -193,15 +193,15 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_u4_f32, auxdata, 4, 2>
 };
 
 // u4_fp16
-template <index_t auxdata>
-struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_u4_fp16, auxdata, 8, 4>
+template <index_t AuxData, bool Clamp>
+struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_u4_fp16, AuxData, Clamp, 8, 4>
 {
     template <class FloatAcc, class OutTensor>
     __device__ void Run(const FloatAcc& inAcc, const half_t& scale, OutTensor& out_0) const
     {
 #if defined(__gfx13__)
         int32x2_t dwordOut_0;
-        intrin_cvt_tensor_u4_f16<auxdata, 8, 4>::Run(inAcc, scale, dwordOut_0);
+        intrin_cvt_tensor_u4_f16<AuxData, Clamp, 8, 4>::Run(inAcc, scale, dwordOut_0);
         out_0 = bit_cast<OutTensor>(dwordOut_0);
 #else
         ignore = inAcc;
@@ -211,15 +211,15 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_u4_fp16, auxdata, 8, 4>
     }
 };
 
-template <index_t auxdata>
-struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_u4_fp16, auxdata, 4, 4>
+template <index_t AuxData, bool Clamp>
+struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_u4_fp16, AuxData, Clamp, 4, 4>
 {
     template <class FloatAcc, class OutTensor>
     __device__ void Run(const FloatAcc& inAcc, const half_t& scale, OutTensor& out_0) const
     {
 #if defined(__gfx13__)
         auto dwordOut_0 = 0;
-        intrin_cvt_tensor_u4_f16<auxdata, 4, 4>::Run(inAcc, scale, dwordOut_0);
+        intrin_cvt_tensor_u4_f16<AuxData, Clamp, 4, 4>::Run(inAcc, scale, dwordOut_0);
         out_0 = bit_cast<OutTensor>(dwordOut_0);
 #else
         ignore = inAcc;
@@ -229,15 +229,15 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_u4_fp16, auxdata, 4, 4>
     }
 };
 
-template <index_t auxdata>
-struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_u4_fp16, auxdata, 4, 2>
+template <index_t AuxData, bool Clamp>
+struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_u4_fp16, AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc, class OutTensor>
     __device__ void Run(const FloatAcc& inAcc, const half_t& scale, OutTensor& out_0) const
     {
 #if defined(__gfx13__)
         auto dwordOut_0 = 0;
-        intrin_cvt_tensor_u4_f16<auxdata, 4, 2>::Run(inAcc, scale, dwordOut_0);
+        intrin_cvt_tensor_u4_f16<AuxData, Clamp, 4, 2>::Run(inAcc, scale, dwordOut_0);
         out_0 = bit_cast<OutTensor>(dwordOut_0);
 #else
         ignore = inAcc;
@@ -248,15 +248,15 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_u4_fp16, auxdata, 4, 2>
 };
 
 // u4_bf16
-template <index_t auxdata>
-struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_u4_bf16, auxdata, 8, 4>
+template <index_t AuxData, bool Clamp>
+struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_u4_bf16, AuxData, Clamp, 8, 4>
 {
     template <class FloatAcc, class OutTensor>
     __device__ void Run(const FloatAcc& inAcc, const bhalf_t& scale, OutTensor& out_0) const
     {
 #if defined(__gfx13__)
         int32x2_t dwordOut_0;
-        intrin_cvt_tensor_i4_bf16<auxdata, 8, 4>::Run(inAcc, scale, dwordOut_0);
+        intrin_cvt_tensor_i4_bf16<AuxData, Clamp, 8, 4>::Run(inAcc, scale, dwordOut_0);
         out_0 = bit_cast<OutTensor>(dwordOut_0); // int32x2->int4x16
 #else
         ignore = inAcc;
@@ -266,15 +266,15 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_u4_bf16, auxdata, 8, 4>
     }
 };
 
-template <index_t auxdata>
-struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_u4_bf16, auxdata, 4, 4>
+template <index_t AuxData, bool Clamp>
+struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_u4_bf16, AuxData, Clamp, 4, 4>
 {
     template <class FloatAcc, class OutTensor>
     __device__ void Run(const FloatAcc& inAcc, const bhalf_t& scale, OutTensor& out_0) const
     {
 #if defined(__gfx13__)
         auto dwordOut_0 = 0;
-        intrin_cvt_tensor_u4_bf16<auxdata, 4, 4>::Run(inAcc, scale, dwordOut_0);
+        intrin_cvt_tensor_u4_bf16<AuxData, Clamp, 4, 4>::Run(inAcc, scale, dwordOut_0);
         out_0 = bit_cast<OutTensor>(dwordOut_0);
 #else
         ignore = inAcc;
@@ -284,15 +284,15 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_u4_bf16, auxdata, 4, 4>
     }
 };
 
-template <index_t auxdata>
-struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_u4_bf16, auxdata, 4, 2>
+template <index_t AuxData, bool Clamp>
+struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_u4_bf16, AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc, class OutTensor>
     __device__ void Run(const FloatAcc& inAcc, const bhalf_t& scale, OutTensor& out_0) const
     {
 #if defined(__gfx13__)
         auto dwordOut_0 = 0;
-        intrin_cvt_tensor_u4_bf16<auxdata, 4, 2>::Run(inAcc, scale, dwordOut_0);
+        intrin_cvt_tensor_u4_bf16<AuxData, Clamp, 4, 2>::Run(inAcc, scale, dwordOut_0);
         out_0 = bit_cast<OutTensor>(dwordOut_0);
 #else
         ignore = inAcc;
@@ -302,15 +302,15 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_u4_bf16, auxdata, 4, 2>
     }
 };
 
-template <index_t auxdata>
-struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_i8_f32, auxdata, 4, 2>
+template <index_t AuxData, bool Clamp>
+struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_i8_f32, AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc, class OutTensor>
     __device__ void Run(const FloatAcc& inAcc, const float& scale, OutTensor& out_0) const
     {
 #if defined(__gfx13__)
         auto dwordOut_0 = 0;
-        intrin_cvt_tensor_i8_f32<auxdata, 4, 2>::Run(inAcc, scale, dwordOut_0);
+        intrin_cvt_tensor_i8_f32<AuxData, Clamp, 4, 2>::Run(inAcc, scale, dwordOut_0);
         out_0 = bit_cast<OutTensor>(dwordOut_0);
 #else
         ignore = inAcc;
@@ -321,15 +321,15 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_i8_f32, auxdata, 4, 2>
 };
 
 // i8_fp16
-template <index_t auxdata>
-struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_i8_fp16, auxdata, 8, 4>
+template <index_t AuxData, bool Clamp>
+struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_i8_fp16, AuxData, Clamp, 8, 4>
 {
     template <class FloatAcc, class OutTensor>
     __device__ void Run(const FloatAcc& inAcc, const half_t& scale, OutTensor& out_0) const
     {
 #if defined(__gfx13__)
         int32x2_t dwordOut_0;
-        intrin_cvt_tensor_i8_f16<auxdata, 8, 4>::Run(inAcc, scale, dwordOut_0);
+        intrin_cvt_tensor_i8_f16<AuxData, Clamp, 8, 4>::Run(inAcc, scale, dwordOut_0);
         out_0 = bit_cast<OutTensor>(dwordOut_0); // int32x2_t->int8x8t
 #else
         ignore = inAcc;
@@ -339,8 +339,8 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_i8_fp16, auxdata, 8, 4>
     }
 };
 
-template <index_t auxdata>
-struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_i8_fp16, auxdata, 4, 4>
+template <index_t AuxData, bool Clamp>
+struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_i8_fp16, AuxData, Clamp, 4, 4>
 {
     template <class FloatAcc, class OutTensor>
     __device__ void Run(const FloatAcc& inAcc, const half_t& scale, OutTensor& out) const
@@ -348,7 +348,7 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_i8_fp16, auxdata, 4, 4>
 #if defined(__gfx13__)
         int dwordOut_0 = 0;
         int dwordOut_1 = 0;
-        intrin_cvt_tensor_i8_f16<auxdata, 4, 4>::Run(inAcc, scale, &dwordOut_0, &dwordOut_1);
+        intrin_cvt_tensor_i8_f16<AuxData, Clamp, 4, 4>::Run(inAcc, scale, &dwordOut_0, &dwordOut_1);
         out.template AsType<int8x4_t>()(Number<0>{}) = bit_cast<int8x4_t>(dwordOut_0);
         out.template AsType<int8x4_t>()(Number<1>{}) = bit_cast<int8x4_t>(dwordOut_1);
 #else
@@ -359,15 +359,15 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_i8_fp16, auxdata, 4, 4>
     }
 };
 
-template <index_t auxdata>
-struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_i8_fp16, auxdata, 4, 2>
+template <index_t AuxData, bool Clamp>
+struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_i8_fp16, AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc, class OutTensor>
     __device__ void Run(const FloatAcc& inAcc, const half_t& scale, OutTensor& out_0) const
     {
 #if defined(__gfx13__)
         auto dwordOut_0 = 0;
-        intrin_cvt_tensor_i8_f16<auxdata, 4, 2>::Run(inAcc, scale, dwordOut_0);
+        intrin_cvt_tensor_i8_f16<AuxData, Clamp, 4, 2>::Run(inAcc, scale, dwordOut_0);
         out_0 = bit_cast<OutTensor>(dwordOut_0);
 #else
         ignore = inAcc;
@@ -378,15 +378,15 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_i8_fp16, auxdata, 4, 2>
 };
 
 // i8_bf16
-template <index_t auxdata>
-struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_i8_bf16, auxdata, 8, 4>
+template <index_t AuxData, bool Clamp>
+struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_i8_bf16, AuxData, Clamp, 8, 4>
 {
     template <class FloatAcc, class OutTensor>
     __device__ void Run(const FloatAcc& inAcc, const bhalf_t& scale, OutTensor& out_0) const
     {
 #if defined(__gfx13__)
         int32x2_t dwordOut_0;
-        intrin_cvt_tensor_i8_bf16<auxdata, 8, 4>::Run(inAcc, scale, dwordOut_0);
+        intrin_cvt_tensor_i8_bf16<AuxData, Clamp, 8, 4>::Run(inAcc, scale, dwordOut_0);
         out_0 = bit_cast<OutTensor>(dwordOut_0);
 #else
         ignore = inAcc;
@@ -396,8 +396,8 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_i8_bf16, auxdata, 8, 4>
     }
 };
 
-template <index_t auxdata>
-struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_i8_bf16, auxdata, 4, 4>
+template <index_t AuxData, bool Clamp>
+struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_i8_bf16, AuxData, Clamp, 4, 4>
 {
     template <class FloatAcc, class OutTensor>
     __device__ void Run(const FloatAcc& inAcc, const bhalf_t& scale, OutTensor& out) const
@@ -405,7 +405,8 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_i8_bf16, auxdata, 4, 4>
 #if defined(__gfx13__)
         auto dwordOut_0 = 0;
         auto dwordOut_1 = 0;
-        intrin_cvt_tensor_i8_bf16<auxdata, 4, 4>::Run(inAcc, scale, &dwordOut_0, &dwordOut_1);
+        intrin_cvt_tensor_i8_bf16<AuxData, Clamp, 4, 4>::Run(
+            inAcc, scale, &dwordOut_0, &dwordOut_1);
         out.template AsType<int8x4_t>()(Number<0>{}) = bit_cast<int8x4_t>(dwordOut_0);
         out.template AsType<int8x4_t>()(Number<1>{}) = bit_cast<int8x4_t>(dwordOut_1);
 #else
@@ -416,15 +417,15 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_i8_bf16, auxdata, 4, 4>
     }
 };
 
-template <index_t auxdata>
-struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_i8_bf16, auxdata, 4, 2>
+template <index_t AuxData, bool Clamp>
+struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_i8_bf16, AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc, class OutTensor>
     __device__ void Run(const FloatAcc& inAcc, const bhalf_t& scale, OutTensor& out_0) const
     {
 #if defined(__gfx13__)
         auto dwordOut_0 = 0;
-        intrin_cvt_tensor_i8_bf16<auxdata, 4, 2>::Run(inAcc, scale, dwordOut_0);
+        intrin_cvt_tensor_i8_bf16<AuxData, Clamp, 4, 2>::Run(inAcc, scale, dwordOut_0);
         out_0 = bit_cast<OutTensor>(dwordOut_0);
 #else
         ignore = inAcc;
@@ -434,15 +435,15 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_i8_bf16, auxdata, 4, 2>
     }
 };
 
-template <index_t auxdata>
-struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_u8_f32, auxdata, 4, 2>
+template <index_t AuxData, bool Clamp>
+struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_u8_f32, AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc, class OutTensor>
     __device__ void Run(const FloatAcc& inAcc, const float& scale, OutTensor& out_0) const
     {
 #if defined(__gfx13__)
         auto dwordOut_0 = 0;
-        intrin_cvt_tensor_u8_f32<auxdata, 4, 2>::Run(inAcc, scale, dwordOut_0);
+        intrin_cvt_tensor_u8_f32<AuxData, Clamp, 4, 2>::Run(inAcc, scale, dwordOut_0);
         out_0 = bit_cast<OutTensor>(dwordOut_0);
 #else
         ignore = inAcc;
@@ -453,15 +454,15 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_u8_f32, auxdata, 4, 2>
 };
 
 // u8_fp16
-template <index_t auxdata>
-struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_u8_fp16, auxdata, 8, 4>
+template <index_t AuxData, bool Clamp>
+struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_u8_fp16, AuxData, Clamp, 8, 4>
 {
     template <class FloatAcc, class OutTensor>
     __device__ void Run(const FloatAcc& inAcc, const half_t& scale, OutTensor& out_0) const
     {
 #if defined(__gfx13__)
         int32x2_t dwordOut_0;
-        intrin_cvt_tensor_u8_f16<auxdata, 8, 4>::Run(inAcc, scale, dwordOut_0);
+        intrin_cvt_tensor_u8_f16<AuxData, Clamp, 8, 4>::Run(inAcc, scale, dwordOut_0);
         out_0 = bit_cast<OutTensor>(dwordOut_0); // int32x2_t->int8x8t
 #else
         ignore = inAcc;
@@ -471,8 +472,8 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_u8_fp16, auxdata, 8, 4>
     }
 };
 
-template <index_t auxdata>
-struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_u8_fp16, auxdata, 4, 4>
+template <index_t AuxData, bool Clamp>
+struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_u8_fp16, AuxData, Clamp, 4, 4>
 {
     template <class FloatAcc, class OutTensor>
     __device__ void Run(const FloatAcc& inAcc, const bhalf_t& scale, OutTensor& out) const
@@ -480,7 +481,7 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_u8_fp16, auxdata, 4, 4>
 #if defined(__gfx13__)
         auto dwordOut_0 = 0;
         auto dwordOut_1 = 0;
-        intrin_cvt_tensor_u8_f16<auxdata, 4, 4>::Run(inAcc, scale, &dwordOut_0, &dwordOut_1);
+        intrin_cvt_tensor_u8_f16<AuxData, Clamp, 4, 4>::Run(inAcc, scale, &dwordOut_0, &dwordOut_1);
         out.template AsType<uint8x4_t>()(Number<0>{}) = bit_cast<uint8x4_t>(dwordOut_0);
         out.template AsType<uint8x4_t>()(Number<1>{}) = bit_cast<uint8x4_t>(dwordOut_1);
 #else
@@ -491,15 +492,15 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_u8_fp16, auxdata, 4, 4>
     }
 };
 
-template <index_t auxdata>
-struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_u8_fp16, auxdata, 4, 2>
+template <index_t AuxData, bool Clamp>
+struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_u8_fp16, AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc, class OutTensor>
     __device__ void Run(const FloatAcc& inAcc, const half_t& scale, OutTensor& out_0) const
     {
 #if defined(__gfx13__)
         auto dwordOut_0 = 0;
-        intrin_cvt_tensor_u8_f16<auxdata, 4, 2>::Run(inAcc, scale, dwordOut_0);
+        intrin_cvt_tensor_u8_f16<AuxData, Clamp, 4, 2>::Run(inAcc, scale, dwordOut_0);
         out_0 = bit_cast<OutTensor>(dwordOut_0);
 #else
         ignore = inAcc;
@@ -510,15 +511,15 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_u8_fp16, auxdata, 4, 2>
 };
 
 // u8_bf16
-template <index_t auxdata>
-struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_u8_bf16, auxdata, 8, 4>
+template <index_t AuxData, bool Clamp>
+struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_u8_bf16, AuxData, Clamp, 8, 4>
 {
     template <class FloatAcc, class OutTensor>
     __device__ void Run(const FloatAcc& inAcc, const bhalf_t& scale, OutTensor& out_0) const
     {
 #if defined(__gfx13__)
         int32x2_t dwordOut_0;
-        intrin_cvt_tensor_u8_bf16<auxdata, 8, 4>::Run(inAcc, scale, dwordOut_0);
+        intrin_cvt_tensor_u8_bf16<AuxData, Clamp, 8, 4>::Run(inAcc, scale, dwordOut_0);
         out_0 = bit_cast<OutTensor>(dwordOut_0);
 #else
         ignore = inAcc;
@@ -528,8 +529,8 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_u8_bf16, auxdata, 8, 4>
     }
 };
 
-template <index_t auxdata>
-struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_u8_bf16, auxdata, 4, 4>
+template <index_t AuxData, bool Clamp>
+struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_u8_bf16, AuxData, Clamp, 4, 4>
 {
     template <class FloatAcc, class OutTensor>
     __device__ void Run(const FloatAcc& inAcc, const bhalf_t& scale, OutTensor& out) const
@@ -537,7 +538,8 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_u8_bf16, auxdata, 4, 4>
 #if defined(__gfx13__)
         auto dwordOut_0 = 0;
         auto dwordOut_1 = 0;
-        intrin_cvt_tensor_u8_bf16<auxdata, 4, 4>::Run(inAcc, scale, &dwordOut_0, &dwordOut_1);
+        intrin_cvt_tensor_u8_bf16<AuxData, Clamp, 4, 4>::Run(
+            inAcc, scale, &dwordOut_0, &dwordOut_1);
         out.template AsType<uint8x4_t>()(Number<0>{}) = bit_cast<uint8x4_t>(dwordOut_0);
         out.template AsType<uint8x4_t>()(Number<1>{}) = bit_cast<uint8x4_t>(dwordOut_1);
 #else
@@ -548,15 +550,15 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_u8_bf16, auxdata, 4, 4>
     }
 };
 
-template <index_t auxdata>
-struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_u8_bf16, auxdata, 4, 2>
+template <index_t AuxData, bool Clamp>
+struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_u8_bf16, AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc, class OutTensor>
     __device__ void Run(const FloatAcc& inAcc, const bhalf_t& scale, OutTensor& out_0) const
     {
 #if defined(__gfx13__)
         auto dwordOut_0 = 0;
-        intrin_cvt_tensor_u8_bf16<auxdata, 4, 2>::Run(inAcc, scale, dwordOut_0);
+        intrin_cvt_tensor_u8_bf16<AuxData, Clamp, 4, 2>::Run(inAcc, scale, dwordOut_0);
         out_0 = bit_cast<OutTensor>(dwordOut_0);
 #else
         ignore = inAcc;
@@ -566,15 +568,15 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_u8_bf16, auxdata, 4, 2>
     }
 };
 
-template <index_t auxdata>
-struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_fp8_f32, auxdata, 4, 2>
+template <index_t AuxData, bool Clamp>
+struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_fp8_f32, AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc, class OutTensor>
     __device__ void Run(const FloatAcc& inAcc, const float& scale, OutTensor& out_0) const
     {
 #if defined(__gfx13__)
         auto dwordOut_0 = 0;
-        intrin_cvt_tensor_fp8_f32<auxdata, 4, 2>::Run(inAcc, scale, dwordOut_0);
+        intrin_cvt_tensor_fp8_f32<AuxData, Clamp, 4, 2>::Run(inAcc, scale, dwordOut_0);
         out_0 = bit_cast<OutTensor>(dwordOut_0);
 #else
         ignore = inAcc;
@@ -585,15 +587,15 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_fp8_f32, auxdata, 4, 2>
 };
 
 // fp8_fp16
-template <index_t auxdata>
-struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_fp8_fp16, auxdata, 8, 4>
+template <index_t AuxData, bool Clamp>
+struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_fp8_fp16, AuxData, Clamp, 8, 4>
 {
     template <class FloatAcc, class OutTensor>
     __device__ void Run(const FloatAcc& inAcc, const half_t& scale, OutTensor& out_0) const
     {
 #if defined(__gfx13__)
         int32x2_t dwordOut_0;
-        intrin_cvt_tensor_fp8_f16<auxdata, 8, 4>::Run(inAcc, scale, dwordOut_0);
+        intrin_cvt_tensor_fp8_f16<AuxData, Clamp, 8, 4>::Run(inAcc, scale, dwordOut_0);
         out_0 = bit_cast<OutTensor>(dwordOut_0);
 #else
         ignore = inAcc;
@@ -603,8 +605,8 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_fp8_fp16, auxdata, 8, 4>
     }
 };
 
-template <index_t auxdata>
-struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_fp8_fp16, auxdata, 4, 4>
+template <index_t AuxData, bool Clamp>
+struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_fp8_fp16, AuxData, Clamp, 4, 4>
 {
     template <class FloatAcc, class OutTensor>
     __device__ void Run(const FloatAcc& inAcc, const half_t& scale, OutTensor& out) const
@@ -612,7 +614,8 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_fp8_fp16, auxdata, 4, 4>
 #if defined(__gfx13__)
         auto dwordOut_0 = 0;
         auto dwordOut_1 = 0;
-        intrin_cvt_tensor_fp8_f16<auxdata, 4, 4>::Run(inAcc, scale, &dwordOut_0, &dwordOut_1);
+        intrin_cvt_tensor_fp8_f16<AuxData, Clamp, 4, 4>::Run(
+            inAcc, scale, &dwordOut_0, &dwordOut_1);
         out.template AsType<f8x4_t>()(Number<0>{}) = bit_cast<f8x4_t>(dwordOut_0);
         out.template AsType<f8x4_t>()(Number<1>{}) = bit_cast<f8x4_t>(dwordOut_1);
 #else
@@ -623,15 +626,15 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_fp8_fp16, auxdata, 4, 4>
     }
 };
 
-template <index_t auxdata>
-struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_fp8_fp16, auxdata, 4, 2>
+template <index_t AuxData, bool Clamp>
+struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_fp8_fp16, AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc, class OutTensor>
     __device__ void Run(const FloatAcc& inAcc, const half_t& scale, OutTensor& out_0) const
     {
 #if defined(__gfx13__)
         auto dwordOut_0 = 0;
-        intrin_cvt_tensor_fp8_f16<auxdata, 4, 2>::Run(inAcc, scale, dwordOut_0);
+        intrin_cvt_tensor_fp8_f16<AuxData, Clamp, 4, 2>::Run(inAcc, scale, dwordOut_0);
         out_0 = bit_cast<OutTensor>(dwordOut_0);
 #else
         ignore = inAcc;
@@ -642,15 +645,15 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_fp8_fp16, auxdata, 4, 2>
 };
 
 // fp8_bf16
-template <index_t auxdata>
-struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_fp8_bf16, auxdata, 8, 4>
+template <index_t AuxData, bool Clamp>
+struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_fp8_bf16, AuxData, Clamp, 8, 4>
 {
     template <class FloatAcc, class OutTensor>
     __device__ void Run(const FloatAcc& inAcc, const bhalf_t& scale, OutTensor& out_0) const
     {
 #if defined(__gfx13__)
         int32x2_t dwordOut_0;
-        intrin_cvt_tensor_fp8_bf16<auxdata, 8, 4>::Run(inAcc, scale, dwordOut_0);
+        intrin_cvt_tensor_fp8_bf16<AuxData, Clamp, 8, 4>::Run(inAcc, scale, dwordOut_0);
         out_0 = bit_cast<OutTensor>(dwordOut_0);
 #else
         ignore = inAcc;
@@ -660,8 +663,8 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_fp8_bf16, auxdata, 8, 4>
     }
 };
 
-template <index_t auxdata>
-struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_fp8_bf16, auxdata, 4, 4>
+template <index_t AuxData, bool Clamp>
+struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_fp8_bf16, AuxData, Clamp, 4, 4>
 {
     template <class FloatAcc, class OutTensor>
     __device__ void Run(const FloatAcc& inAcc, const bhalf_t& scale, OutTensor& out) const
@@ -669,7 +672,8 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_fp8_bf16, auxdata, 4, 4>
 #if defined(__gfx13__)
         auto dwordOut_0 = 0;
         auto dwordOut_1 = 0;
-        intrin_cvt_tensor_fp8_bf16<auxdata, 4, 4>::Run(inAcc, scale, &dwordOut_0, &dwordOut_1);
+        intrin_cvt_tensor_fp8_bf16<AuxData, Clamp, 4, 4>::Run(
+            inAcc, scale, &dwordOut_0, &dwordOut_1);
         out.template AsType<f8x4_t>()(Number<0>{}) = bit_cast<f8x4_t>(dwordOut_0);
         out.template AsType<f8x4_t>()(Number<1>{}) = bit_cast<f8x4_t>(dwordOut_1);
 #else
@@ -680,15 +684,15 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_fp8_bf16, auxdata, 4, 4>
     }
 };
 
-template <index_t auxdata>
-struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_fp8_bf16, auxdata, 4, 2>
+template <index_t AuxData, bool Clamp>
+struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_fp8_bf16, AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc, class OutTensor>
     __device__ void Run(const FloatAcc& inAcc, const bhalf_t& scale, OutTensor& out_0) const
     {
 #if defined(__gfx13__)
         auto dwordOut_0 = 0;
-        intrin_cvt_tensor_fp8_bf16<auxdata, 4, 2>::Run(inAcc, scale, dwordOut_0);
+        intrin_cvt_tensor_fp8_bf16<AuxData, Clamp, 4, 2>::Run(inAcc, scale, dwordOut_0);
         out_0 = bit_cast<OutTensor>(dwordOut_0);
 #else
         ignore = inAcc;
@@ -698,15 +702,15 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_fp8_bf16, auxdata, 4, 2>
     }
 };
 
-template <index_t auxdata>
-struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_bf8_f32, auxdata, 4, 2>
+template <index_t AuxData, bool Clamp>
+struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_bf8_f32, AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc, class OutTensor>
     __device__ void Run(const FloatAcc& inAcc, const float& scale, OutTensor& out_0) const
     {
 #if defined(__gfx13__)
         auto dwordOut_0 = 0;
-        intrin_cvt_tensor_bf8_f32<auxdata, 4, 2>::Run(inAcc, scale, dwordOut_0);
+        intrin_cvt_tensor_bf8_f32<AuxData, Clamp, 4, 2>::Run(inAcc, scale, dwordOut_0);
         out_0 = bit_cast<OutTensor>(dwordOut_0);
 #else
         ignore = inAcc;
@@ -717,15 +721,15 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_bf8_f32, auxdata, 4, 2>
 };
 
 // bf8_fp16
-template <index_t auxdata>
-struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_bf8_half, auxdata, 8, 4>
+template <index_t AuxData, bool Clamp>
+struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_bf8_half, AuxData, Clamp, 8, 4>
 {
     template <class FloatAcc, class OutTensor>
     __device__ void Run(const FloatAcc& inAcc, const half_t& scale, OutTensor& out_0) const
     {
 #if defined(__gfx13__)
         int32x2_t dwordOut_0;
-        intrin_cvt_tensor_bf8_fp16<auxdata, 8, 4>::Run(inAcc, scale, dwordOut_0);
+        intrin_cvt_tensor_bf8_fp16<AuxData, Clamp, 8, 4>::Run(inAcc, scale, dwordOut_0);
         out_0 = bit_cast<OutTensor>(dwordOut_0);
 #else
         ignore = inAcc;
@@ -735,8 +739,8 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_bf8_half, auxdata, 8, 4>
     }
 };
 
-template <index_t auxdata>
-struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_bf8_half, auxdata, 4, 4>
+template <index_t AuxData, bool Clamp>
+struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_bf8_half, AuxData, Clamp, 4, 4>
 {
     template <class FloatAcc, class OutTensor>
     __device__ void Run(const FloatAcc& inAcc, const half_t& scale, OutTensor& out) const
@@ -744,7 +748,8 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_bf8_half, auxdata, 4, 4>
 #if defined(__gfx13__)
         auto dwordOut_0 = 0;
         auto dwordOut_1 = 0;
-        intrin_cvt_tensor_bf8_fp16<auxdata, 4, 4>::Run(inAcc, scale, &dwordOut_0, &dwordOut_1);
+        intrin_cvt_tensor_bf8_fp16<AuxData, Clamp, 4, 4>::Run(
+            inAcc, scale, &dwordOut_0, &dwordOut_1);
         out.template AsType<bf8x4_t>()(Number<0>{}) = bit_cast<bf8x4_t>(dwordOut_0);
         out.template AsType<bf8x4_t>()(Number<1>{}) = bit_cast<bf8x4_t>(dwordOut_1);
 #else
@@ -755,15 +760,15 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_bf8_half, auxdata, 4, 4>
     }
 };
 
-template <index_t auxdata>
-struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_bf8_half, auxdata, 4, 2>
+template <index_t AuxData, bool Clamp>
+struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_bf8_half, AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc, class OutTensor>
     __device__ void Run(const FloatAcc& inAcc, const half_t& scale, OutTensor& out_0) const
     {
 #if defined(__gfx13__)
         auto dwordOut_0 = 0;
-        intrin_cvt_tensor_bf8_fp16<auxdata, 4, 2>::Run(inAcc, scale, dwordOut_0);
+        intrin_cvt_tensor_bf8_fp16<AuxData, Clamp, 4, 2>::Run(inAcc, scale, dwordOut_0);
         out_0 = bit_cast<OutTensor>(dwordOut_0);
 #else
         ignore = inAcc;
@@ -774,15 +779,15 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_bf8_half, auxdata, 4, 2>
 };
 
 // bf8_bf16
-template <index_t auxdata>
-struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_bf8_bhalf, auxdata, 8, 4>
+template <index_t AuxData, bool Clamp>
+struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_bf8_bhalf, AuxData, Clamp, 8, 4>
 {
     template <class FloatAcc, class OutTensor>
     __device__ void Run(const FloatAcc& inAcc, const bhalf_t& scale, OutTensor& out_0) const
     {
 #if defined(__gfx13__)
         int32x2_t dwordOut_0;
-        intrin_cvt_tensor_bf8_bf16<auxdata, 8, 4>::Run(inAcc, scale, dwordOut_0);
+        intrin_cvt_tensor_bf8_bf16<AuxData, Clamp, 8, 4>::Run(inAcc, scale, dwordOut_0);
         out_0 = bit_cast<OutTensor>(dwordOut_0);
 #else
         ignore = inAcc;
@@ -792,8 +797,8 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_bf8_bhalf, auxdata, 8, 4>
     }
 };
 
-template <index_t auxdata>
-struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_bf8_bhalf, auxdata, 4, 4>
+template <index_t AuxData, bool Clamp>
+struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_bf8_bhalf, AuxData, Clamp, 4, 4>
 {
     template <class FloatAcc, class OutTensor>
     __device__ void Run(const FloatAcc& inAcc, const bhalf_t& scale, OutTensor& out) const
@@ -801,7 +806,8 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_bf8_bhalf, auxdata, 4, 4>
 #if defined(__gfx13__)
         auto dwordOut_0 = 0;
         auto dwordOut_1 = 0;
-        intrin_cvt_tensor_bf8_bf16<auxdata, 4, 4>::Run(inAcc, scale, &dwordOut_0, &dwordOut_1);
+        intrin_cvt_tensor_bf8_bf16<AuxData, Clamp, 4, 4>::Run(
+            inAcc, scale, &dwordOut_0, &dwordOut_1);
         out.template AsType<bf8x4_t>()(Number<0>{}) = bit_cast<bf8x4_t>(dwordOut_0);
         out.template AsType<bf8x4_t>()(Number<1>{}) = bit_cast<bf8x4_t>(dwordOut_1);
 #else
@@ -812,15 +818,15 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_bf8_bhalf, auxdata, 4, 4>
     }
 };
 
-template <index_t auxdata>
-struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_bf8_bhalf, auxdata, 4, 2>
+template <index_t AuxData, bool Clamp>
+struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_bf8_bhalf, AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc, class OutTensor>
     __device__ void Run(const FloatAcc& inAcc, const bhalf_t& scale, OutTensor& out_0) const
     {
 #if defined(__gfx13__)
         auto dwordOut_0 = 0;
-        intrin_cvt_tensor_bf8_bf16<auxdata, 4, 2>::Run(inAcc, scale, dwordOut_0);
+        intrin_cvt_tensor_bf8_bf16<AuxData, Clamp, 4, 2>::Run(inAcc, scale, dwordOut_0);
         out_0 = bit_cast<OutTensor>(dwordOut_0);
 #else
         ignore = inAcc;
@@ -830,8 +836,8 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_bf8_bhalf, auxdata, 4, 2>
     }
 };
 
-template <index_t auxdata>
-struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_fp16_f32, auxdata, 4, 2>
+template <index_t AuxData, bool Clamp>
+struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_fp16_f32, AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc, class OutTensor>
     __device__ void Run(const FloatAcc& inAcc, const float& scale, OutTensor& out) const
@@ -839,7 +845,7 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_fp16_f32, auxdata, 4, 2>
 #if defined(__gfx13__)
         half2_t& out_0 = out.template AsType<half2_t>()(Number<0>{});
         half2_t& out_1 = out.template AsType<half2_t>()(Number<1>{});
-        intrin_cvt_tensor_fp16_f32<auxdata, 4, 2>::Run(inAcc, scale, out_0, out_1);
+        intrin_cvt_tensor_fp16_f32<AuxData, Clamp, 4, 2>::Run(inAcc, scale, out_0, out_1);
 #else
         ignore = inAcc;
         ignore = scale;
@@ -849,8 +855,8 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_fp16_f32, auxdata, 4, 2>
 };
 
 // fp16_fp16
-template <index_t auxdata>
-struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_fp16_fp16, auxdata, 8, 4>
+template <index_t AuxData, bool Clamp>
+struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_fp16_fp16, AuxData, Clamp, 8, 4>
 {
     template <class FloatAcc, class OutTensor>
     __device__ void Run(const FloatAcc& inAcc, const half_t& scale, OutTensor& out) const
@@ -858,7 +864,7 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_fp16_fp16, auxdata, 8, 4>
 #if defined(__gfx13__)
         half4_t& out_0 = out.template AsType<half4_t>()(Number<0>{});
         half4_t& out_1 = out.template AsType<half4_t>()(Number<1>{});
-        intrin_cvt_tensor_fp16_fp16<auxdata, 8, 4>::Run(inAcc, scale, out_0, out_1);
+        intrin_cvt_tensor_fp16_fp16<AuxData, Clamp, 8, 4>::Run(inAcc, scale, out_0, out_1);
 #else
         ignore = inAcc;
         ignore = scale;
@@ -867,8 +873,8 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_fp16_fp16, auxdata, 8, 4>
     }
 };
 
-template <index_t auxdata>
-struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_fp16_fp16, auxdata, 4, 4>
+template <index_t AuxData, bool Clamp>
+struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_fp16_fp16, AuxData, Clamp, 4, 4>
 {
     template <class FloatAcc, class OutTensor>
     __device__ void Run(const FloatAcc& inAcc, const half_t& scale, OutTensor& out) const
@@ -878,7 +884,8 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_fp16_fp16, auxdata, 4, 4>
         half2_t& out_1 = out.template AsType<half2_t>()(Number<1>{});
         half2_t& out_2 = out.template AsType<half2_t>()(Number<2>{});
         half2_t& out_3 = out.template AsType<half2_t>()(Number<3>{});
-        intrin_cvt_tensor_fp16_fp16<auxdata, 4, 4>::Run(inAcc, scale, out_0, out_1, out_2, out_3);
+        intrin_cvt_tensor_fp16_fp16<AuxData, Clamp, 4, 4>::Run(
+            inAcc, scale, out_0, out_1, out_2, out_3);
 #else
         ignore = inAcc;
         ignore = scale;
@@ -887,8 +894,8 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_fp16_fp16, auxdata, 4, 4>
     }
 };
 
-template <index_t auxdata>
-struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_fp16_fp16, auxdata, 4, 2>
+template <index_t AuxData, bool Clamp>
+struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_fp16_fp16, AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc, class OutTensor>
     __device__ void Run(const FloatAcc& inAcc, const half_t& scale, OutTensor& out) const
@@ -896,7 +903,7 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_fp16_fp16, auxdata, 4, 2>
 #if defined(__gfx13__)
         half2_t& out_0 = out.template AsType<half2_t>()(Number<0>{});
         half2_t& out_1 = out.template AsType<half2_t>()(Number<1>{});
-        intrin_cvt_tensor_fp16_fp16<auxdata, 4, 2>::Run(inAcc, scale, out_0, out_1);
+        intrin_cvt_tensor_fp16_fp16<AuxData, Clamp, 4, 2>::Run(inAcc, scale, out_0, out_1);
 #else
         ignore = inAcc;
         ignore = scale;
@@ -906,8 +913,8 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_fp16_fp16, auxdata, 4, 2>
 };
 
 // fp16_bf16
-template <index_t auxdata>
-struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_fp16_bf16, auxdata, 8, 4>
+template <index_t AuxData, bool Clamp>
+struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_fp16_bf16, AuxData, Clamp, 8, 4>
 {
     template <class FloatAcc, class OutTensor>
     __device__ void Run(const FloatAcc& inAcc, const bhalf_t& scale, OutTensor& out) const
@@ -915,7 +922,7 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_fp16_bf16, auxdata, 8, 4>
 #if defined(__gfx13__)
         half4_t& out_0 = out.template AsType<half4_t>()(Number<0>{});
         half4_t& out_1 = out.template AsType<half4_t>()(Number<1>{});
-        intrin_cvt_tensor_fp16_bf16<auxdata, 8, 4>::Run(inAcc, scale, out_0, out_1);
+        intrin_cvt_tensor_fp16_bf16<AuxData, Clamp, 8, 4>::Run(inAcc, scale, out_0, out_1);
 #else
         ignore = inAcc;
         ignore = scale;
@@ -924,8 +931,8 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_fp16_bf16, auxdata, 8, 4>
     }
 };
 
-template <index_t auxdata>
-struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_fp16_bf16, auxdata, 4, 4>
+template <index_t AuxData, bool Clamp>
+struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_fp16_bf16, AuxData, Clamp, 4, 4>
 {
     template <class FloatAcc, class OutTensor>
     __device__ void Run(const FloatAcc& inAcc, const bhalf_t& scale, OutTensor& out) const
@@ -935,7 +942,8 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_fp16_bf16, auxdata, 4, 4>
         half2_t& out_1 = out.template AsType<half2_t>()(Number<1>{});
         half2_t& out_2 = out.template AsType<half2_t>()(Number<2>{});
         half2_t& out_3 = out.template AsType<half2_t>()(Number<3>{});
-        intrin_cvt_tensor_fp16_bf16<auxdata, 4, 4>::Run(inAcc, scale, out_0, out_1, out_2, out_3);
+        intrin_cvt_tensor_fp16_bf16<AuxData, Clamp, 4, 4>::Run(
+            inAcc, scale, out_0, out_1, out_2, out_3);
 #else
         ignore = inAcc;
         ignore = scale;
@@ -944,8 +952,8 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_fp16_bf16, auxdata, 4, 4>
     }
 };
 
-template <index_t auxdata>
-struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_fp16_bf16, auxdata, 4, 2>
+template <index_t AuxData, bool Clamp>
+struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_fp16_bf16, AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc, class OutTensor>
     __device__ void Run(const FloatAcc& inAcc, const bhalf_t& scale, OutTensor& out) const
@@ -953,7 +961,7 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_fp16_bf16, auxdata, 4, 2>
 #if defined(__gfx13__)
         half2_t& out_0 = out.template AsType<half2_t>()(Number<0>{});
         half2_t& out_1 = out.template AsType<half2_t>()(Number<1>{});
-        intrin_cvt_tensor_fp16_bf16<auxdata, 4, 2>::Run(inAcc, scale, out_0, out_1);
+        intrin_cvt_tensor_fp16_bf16<AuxData, Clamp, 4, 2>::Run(inAcc, scale, out_0, out_1);
 #else
         ignore = inAcc;
         ignore = scale;
@@ -962,8 +970,8 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_fp16_bf16, auxdata, 4, 2>
     }
 };
 
-template <index_t auxdata>
-struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_bf16_f32, auxdata, 4, 2>
+template <index_t AuxData, bool Clamp>
+struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_bf16_f32, AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc, class OutTensor>
     __device__ void Run(const FloatAcc& inAcc, const float& scale, OutTensor& out) const
@@ -971,7 +979,7 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_bf16_f32, auxdata, 4, 2>
 #if defined(__gfx13__)
         bhalf2_t& out_0 = out.template AsType<bhalf2_t>()(Number<0>{});
         bhalf2_t& out_1 = out.template AsType<bhalf2_t>()(Number<1>{});
-        intrin_cvt_tensor_bf16_f32<auxdata, 4, 2>::Run(inAcc, scale, out_0, out_1);
+        intrin_cvt_tensor_bf16_f32<AuxData, Clamp, 4, 2>::Run(inAcc, scale, out_0, out_1);
 #else
         ignore = inAcc;
         ignore = scale;
@@ -981,8 +989,8 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_bf16_f32, auxdata, 4, 2>
 };
 
 // bf16_fp16
-template <index_t auxdata>
-struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_bf16_fp16, auxdata, 8, 4>
+template <index_t AuxData, bool Clamp>
+struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_bf16_fp16, AuxData, Clamp, 8, 4>
 {
     template <class FloatAcc, class OutTensor>
     __device__ void Run(const FloatAcc& inAcc, const half_t& scale, OutTensor& out) const
@@ -990,7 +998,7 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_bf16_fp16, auxdata, 8, 4>
 #if defined(__gfx13__)
         bhalf4_t& out_0 = out.template AsType<bhalf4_t>()(Number<0>{});
         bhalf4_t& out_1 = out.template AsType<bhalf4_t>()(Number<1>{});
-        intrin_cvt_tensor_fp16_bf16<auxdata, 8, 4>::Run(inAcc, scale, out_0, out_1);
+        intrin_cvt_tensor_fp16_bf16<AuxData, Clamp, 8, 4>::Run(inAcc, scale, out_0, out_1);
 #else
         ignore = inAcc;
         ignore = scale;
@@ -999,8 +1007,8 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_bf16_fp16, auxdata, 8, 4>
     }
 };
 
-template <index_t auxdata>
-struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_bf16_fp16, auxdata, 4, 4>
+template <index_t AuxData, bool Clamp>
+struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_bf16_fp16, AuxData, Clamp, 4, 4>
 {
     template <class FloatAcc, class OutTensor>
     __device__ void Run(const FloatAcc& inAcc, const half_t& scale, OutTensor& out) const
@@ -1010,7 +1018,8 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_bf16_fp16, auxdata, 4, 4>
         bhalf2_t& out_1 = out.template AsType<bhalf2_t>()(Number<1>{});
         bhalf2_t& out_2 = out.template AsType<bhalf2_t>()(Number<2>{});
         bhalf2_t& out_3 = out.template AsType<bhalf2_t>()(Number<3>{});
-        intrin_cvt_tensor_bf16_f16<auxdata, 4, 4>::Run(inAcc, scale, out_0, out_1, out_2, out_3);
+        intrin_cvt_tensor_bf16_f16<AuxData, Clamp, 4, 4>::Run(
+            inAcc, scale, out_0, out_1, out_2, out_3);
 #else
         ignore = inAcc;
         ignore = scale;
@@ -1019,8 +1028,8 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_bf16_fp16, auxdata, 4, 4>
     }
 };
 
-template <index_t auxdata>
-struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_bf16_fp16, auxdata, 4, 2>
+template <index_t AuxData, bool Clamp>
+struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_bf16_fp16, AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc, class OutTensor>
     __device__ void Run(const FloatAcc& inAcc, const half_t& scale, OutTensor& out) const
@@ -1028,7 +1037,7 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_bf16_fp16, auxdata, 4, 2>
 #if defined(__gfx13__)
         bhalf2_t& out_0 = out.template AsType<bhalf2_t>()(Number<0>{});
         bhalf2_t& out_1 = out.template AsType<bhalf2_t>()(Number<1>{});
-        intrin_cvt_tensor_bf16_f16<auxdata, 4, 2>::Run(inAcc, scale, out_0, out_1);
+        intrin_cvt_tensor_bf16_f16<AuxData, Clamp, 4, 2>::Run(inAcc, scale, out_0, out_1);
 #else
         ignore = inAcc;
         ignore = scale;
@@ -1038,8 +1047,8 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_bf16_fp16, auxdata, 4, 2>
 };
 
 // bf16_bf16
-template <index_t auxdata>
-struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_bf16_bf16, auxdata, 8, 4>
+template <index_t AuxData, bool Clamp>
+struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_bf16_bf16, AuxData, Clamp, 8, 4>
 {
     template <class FloatAcc, class OutTensor>
     __device__ void Run(const FloatAcc& inAcc, const bhalf_t& scale, OutTensor& out) const
@@ -1047,7 +1056,7 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_bf16_bf16, auxdata, 8, 4>
 #if defined(__gfx13__)
         bhalf4_t& out_0 = out.template AsType<bhalf4_t>()(Number<0>{});
         bhalf4_t& out_1 = out.template AsType<bhalf4_t>()(Number<1>{});
-        intrin_cvt_tensor_bf16_bf16<auxdata, 8, 4>::Run(inAcc, scale, out_0, out_1);
+        intrin_cvt_tensor_bf16_bf16<AuxData, Clamp, 8, 4>::Run(inAcc, scale, out_0, out_1);
 #else
         ignore = inAcc;
         ignore = scale;
@@ -1056,8 +1065,8 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_bf16_bf16, auxdata, 8, 4>
     }
 };
 
-template <index_t auxdata>
-struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_bf16_bf16, auxdata, 4, 4>
+template <index_t AuxData, bool Clamp>
+struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_bf16_bf16, AuxData, Clamp, 4, 4>
 {
     template <class FloatAcc, class OutTensor>
     __device__ void Run(const FloatAcc& inAcc, const bhalf_t& scale, OutTensor& out) const
@@ -1067,7 +1076,8 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_bf16_bf16, auxdata, 4, 4>
         bhalf2_t& out_1 = out.template AsType<bhalf2_t>()(Number<1>{});
         bhalf2_t& out_2 = out.template AsType<bhalf2_t>()(Number<2>{});
         bhalf2_t& out_3 = out.template AsType<bhalf2_t>()(Number<3>{});
-        intrin_cvt_tensor_bf16_bf16<auxdata, 4, 4>::Run(inAcc, scale, out_0, out_1, out_2, out_3);
+        intrin_cvt_tensor_bf16_bf16<AuxData, Clamp, 4, 4>::Run(
+            inAcc, scale, out_0, out_1, out_2, out_3);
 #else
         ignore = inAcc;
         ignore = scale;
@@ -1076,8 +1086,8 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_bf16_bf16, auxdata, 4, 4>
     }
 };
 
-template <index_t auxdata>
-struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_bf16_bf16, auxdata, 4, 2>
+template <index_t AuxData, bool Clamp>
+struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_bf16_bf16, AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc, class OutTensor>
     __device__ void Run(const FloatAcc& inAcc, const bhalf_t& scale, OutTensor& out) const
@@ -1085,7 +1095,7 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_bf16_bf16, auxdata, 4, 2>
 #if defined(__gfx13__)
         bhalf2_t& out_0 = out.template AsType<bhalf2_t>()(Number<0>{});
         bhalf2_t& out_1 = out.template AsType<bhalf2_t>()(Number<1>{});
-        intrin_cvt_tensor_bf16_bf16<auxdata, 4, 2>::Run(inAcc, scale, out_0, out_1);
+        intrin_cvt_tensor_bf16_bf16<AuxData, Clamp, 4, 2>::Run(inAcc, scale, out_0, out_1);
 #else
         ignore = inAcc;
         ignore = scale;
@@ -1096,7 +1106,8 @@ struct cvt_tensor_type<CvtTensorInstr::cvt_tensor_bf16_bf16, auxdata, 4, 2>
 
 template <typename InDataType,
           typename AccDataType,
-          index_t auxdata,
+          index_t AuxData,
+          bool Clamp,
           index_t HPerWconv,
           index_t WPerWconv>
 struct CvtTensorSelector
@@ -1249,7 +1260,11 @@ struct CvtTensorSelector
     }
 
     static constexpr auto selected_cvt_tensor =
-        cvt_tensor_type<GetCvtTensor<InDataType, AccDataType>(), auxdata, HPerWconv, WPerWconv>{};
+        cvt_tensor_type<GetCvtTensor<InDataType, AccDataType>(),
+                        AuxData,
+                        Clamp,
+                        HPerWconv,
+                        WPerWconv>{};
 
     __host__ __device__ constexpr CvtTensorSelector(){};
 };
@@ -1259,6 +1274,7 @@ template <typename InDataType,
           index_t HPerWconv,
           index_t WPerWconv,
           index_t ActiveFun,
+          bool Clamp,
           bool OutputChannelOffset = false>
 struct AccCvtTensor
 {
@@ -1289,15 +1305,15 @@ struct AccCvtTensor
                 static_assert("unsupport shape.");
         }();
 
-        constexpr uint32_t Mod1 = (ActiveFun << 1) | (OutputChannelOffset ? (1 << 4) : 0);
+        constexpr uint32_t Mod1 = (ActiveFun << 2) | (OutputChannelOffset ? (1 << 4) : 0);
 
         return Mod0 | (Mod1 << 6);
     };
 
-    static constexpr auto auxdata = GetAuxData();
+    static constexpr auto AuxData = GetAuxData();
 
     static constexpr auto cvtTensor =
-        CvtTensorSelector<InDataType, AccDataType, auxdata, HPerWconv, WPerWconv>{};
+        CvtTensorSelector<InDataType, AccDataType, AuxData, Clamp, HPerWconv, WPerWconv>{};
     static constexpr auto cvtTensor_instr = cvtTensor.selected_cvt_tensor;
 };
 

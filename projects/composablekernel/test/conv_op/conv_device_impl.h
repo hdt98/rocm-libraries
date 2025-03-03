@@ -636,10 +636,8 @@ bool run_test()
     constexpr ck::index_t Cluster_Acc_H = ActiveBlockSize / Cluster_Acc_K / Cluster_Acc_W;
     using AccBlockTransferClusterLengths =
         ck::Sequence<Cluster_Acc_H, Cluster_Acc_W, Cluster_Acc_K>;
-    using EmptyTuple                = ck::Tuple<>;
-    using AccBlockwiseOperation     = ck::convolution::BlockwiseElementOpPassThrough;
-    using AccBlockwiseNextOperation = ck::convolution::BlockwiseElementOpPassThrough;
-    float avg_time                  = 0;
+    using EmptyTuple = ck::Tuple<>;
+    float avg_time   = 0;
     using DeviceConvFwdInstance =
         ck::tensor_operation::device::DeviceConvSubaWconv<NDimSpatial,
 #ifdef ENABLE_CONST_LAYOUT
@@ -661,8 +659,6 @@ bool run_test()
                                                           InElementOp,
                                                           WeiElementOp,
                                                           OutElementOp,
-                                                          AccBlockwiseOperation,
-                                                          AccBlockwiseNextOperation,
                                                           ConvSpec,
                                                           1,
                                                           BlockSize,

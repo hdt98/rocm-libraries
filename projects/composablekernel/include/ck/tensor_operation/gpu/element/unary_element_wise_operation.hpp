@@ -546,14 +546,28 @@ struct ConvertF8RNE
     }
 };
 
-struct Scale
+// E = C * scale
+template <bool Clamp = false>
+struct ScaleImpl
 {
-    __host__ __device__ Scale(float scale = 1.f) : scale_(scale) {}
+    __host__ __device__ ScaleImpl(float scale = 1.f) : scale_(scale) {}
 
     template <typename Y, typename X>
     __host__ __device__ void operator()(Y& y, const X& x) const
     {
-        y = type_convert<Y>(type_convert<float>(x) * scale_);
+        float y_0 = type_convert<float>(x) * scale_;
+        // TODO: replace bhalf with native type and remove the addtional check.
+        if constexpr(Clamp && std::is_integral<Y>::value && (is_same_v<Y, bhalf_t> == false))
+        {
+            float y_1 = math::clamp(y_0,
+                                    ck::type_convert<float>(NumericLimits<Y>::Min()),
+                                    ck::type_convert<float>(NumericLimits<Y>::Max()));
+            y         = type_convert<Y>(y_1);
+        }
+        else
+        {
+            y = type_convert<Y>(y_0);
+        }
     }
 
     template <>
@@ -582,14 +596,11 @@ struct Scale
         y = scale_ * x;
     };
 
-    template <>
-    __host__ __device__ void operator()<int8_t, int8_t>(int8_t& y, const int8_t& x) const
-    {
-        y = type_convert<int8_t>(scale_ * type_convert<float>(x));
-    };
-
     float scale_;
 };
+
+using Scale      = ScaleImpl<false>;
+using ScaleClamp = ScaleImpl<true>;
 
 struct ScaleAndResetNaNToMinusInfinity
 {
@@ -718,6 +729,22 @@ struct Relu
         float x_f32 = type_convert<float>(x);
         float y_f32 = x_f32 > 0 ? x_f32 : 0;
         y           = type_convert<bhalf_t>(y_f32);
+    }
+
+    template <>
+    __host__ __device__ void operator()(bf8_t& y, const bf8_t& x) const
+    {
+        float x_f32 = type_convert<float>(x);
+        float y_f32 = x_f32 > 0 ? x_f32 : 0;
+        y           = type_convert<bf8_t>(y_f32);
+    }
+
+    template <>
+    __host__ __device__ void operator()(f8_t& y, const f8_t& x) const
+    {
+        float x_f32 = type_convert<float>(x);
+        float y_f32 = x_f32 > 0 ? x_f32 : 0;
+        y           = type_convert<f8_t>(y_f32);
     }
 };
 
@@ -1278,6 +1305,70 @@ struct LeakyRelu
         y              = x >= 0 ? x : x * casted_alpha;
     }
     const float alpha_;
+};
+
+// E = clamp(C, -1, 1)
+struct HardTanh
+{
+    template <typename T>
+    __host__ __device__ void operator()(T& y, const T& x) const
+    {
+        static_assert(is_same<T, float>::value || is_same<T, double>::value ||
+                          is_same<T, half_t>::value || is_same<T, int32_t>::value ||
+                          is_same<T, int8_t>::value,
+                      "Data type is not supported by this operation!");
+        y = math::min(T(1), math::max(T(-1), x));
+    }
+
+    template <>
+    __host__ __device__ void operator()(bhalf_t& y, const bhalf_t& x) const
+    {
+        float x_f32 = type_convert<float>(x);
+        y           = type_convert<bhalf_t>(math::min(1.0f, math::max(-1.0f, x_f32)));
+    }
+
+    template <>
+    __host__ __device__ void operator()(bf8_t& y, const bf8_t& x) const
+    {
+        float x_f32 = type_convert<float>(x);
+        y           = type_convert<bf8_t>(math::min(1.0f, math::max(-1.0f, x_f32)));
+    }
+
+    template <>
+    __host__ __device__ void operator()(f8_t& y, const f8_t& x) const
+    {
+        float x_f32 = type_convert<float>(x);
+        y           = type_convert<f8_t>(math::min(1.0f, math::max(-1.0f, x_f32)));
+    }
+};
+
+// E = relu(C * scale)
+template <bool Clamp = false>
+struct ScaleRelu
+{
+    ScaleRelu(float scale = 1.0f) : scale_(scale){};
+    template <typename Y, typename X>
+    __host__ __device__ void operator()(Y& y, const X& x) const
+    {
+        Y tmp;
+        ScaleImpl<Clamp>{scale_}.operator()(tmp, x);
+        Relu{}.operator()(y, tmp);
+    }
+    float scale_;
+};
+
+// E = hardtanh(C * scale)
+struct ScaleHardTanh
+{
+    ScaleHardTanh(float scale = 1.0f) : scale_(scale){};
+    template <typename Y, typename X>
+    __host__ __device__ void operator()(Y& y, const X& x) const
+    {
+        Y tmp;
+        ScaleImpl<true>{scale_}.operator()(tmp, x);
+        HardTanh{}.operator()(y, tmp);
+    }
+    float scale_;
 };
 
 struct Elu

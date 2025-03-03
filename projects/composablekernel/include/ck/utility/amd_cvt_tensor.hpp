@@ -29,531 +29,531 @@ namespace ck {
 // 1 ReLU result = MAX (0, input)
 
 // auxData = (activateFun & 0x180) | (pixelShape & 0x7) ;
-template <index_t Auxdata, index_t H, index_t W>
+template <index_t AuxData, bool Clamp, index_t H, index_t W>
 struct intrin_cvt_tensor_i4_f32;
 
-template <index_t Auxdata>
-struct intrin_cvt_tensor_i4_f32<Auxdata, 4, 2>
+template <index_t AuxData, bool Clamp>
+struct intrin_cvt_tensor_i4_f32<AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int& out_0)
     {
         out_0 = __builtin_amdgcn_cvt_to_tensor_i4_f32_4x2x16(
-            inAcc.template AsType<float4_t>()[Number<0>{}], ssrc, Auxdata, 1);
+            inAcc.template AsType<float4_t>()[Number<0>{}], ssrc, AuxData, Clamp);
     }
 };
 
-template <index_t Auxdata, index_t H, index_t W>
+template <index_t AuxData, bool Clamp, index_t H, index_t W>
 struct intrin_cvt_tensor_i4_f16;
 
-template <index_t Auxdata>
-struct intrin_cvt_tensor_i4_f16<Auxdata, 8, 4>
+template <index_t AuxData, bool Clamp>
+struct intrin_cvt_tensor_i4_f16<AuxData, Clamp, 8, 4>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int32x2_t& out_0)
     {
         out_0 = __builtin_amdgcn_cvt_to_tensor_i4_f16_8x4x8(
-            inAcc.template AsType<half8_t>()[Number<0>{}], ssrc, Auxdata, 1);
+            inAcc.template AsType<half8_t>()[Number<0>{}], ssrc, AuxData, Clamp);
     }
 };
 
-template <index_t Auxdata>
-struct intrin_cvt_tensor_i4_f16<Auxdata, 4, 4>
+template <index_t AuxData, bool Clamp>
+struct intrin_cvt_tensor_i4_f16<AuxData, Clamp, 4, 4>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int& out_0)
     {
         out_0 = __builtin_amdgcn_cvt_to_tensor_i4_f16_4x4x16(
-            inAcc.template AsType<half8_t>()[Number<0>{}], ssrc, Auxdata, 1);
+            inAcc.template AsType<half8_t>()[Number<0>{}], ssrc, AuxData, Clamp);
     }
 };
 
-template <index_t Auxdata>
-struct intrin_cvt_tensor_i4_f16<Auxdata, 4, 2>
+template <index_t AuxData, bool Clamp>
+struct intrin_cvt_tensor_i4_f16<AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int& out_0)
     {
         out_0 = __builtin_amdgcn_cvt_to_tensor_i4_f16_4x4x8_4x2x16(
-            inAcc.template AsType<half4_t>()[Number<0>{}], ssrc, Auxdata, 1);
+            inAcc.template AsType<half4_t>()[Number<0>{}], ssrc, AuxData, Clamp);
     }
 };
 
-template <index_t Auxdata, index_t H, index_t W>
+template <index_t AuxData, bool Clamp, index_t H, index_t W>
 struct intrin_cvt_tensor_i4_bf16;
 
-template <index_t Auxdata>
-struct intrin_cvt_tensor_i4_bf16<Auxdata, 8, 4>
+template <index_t AuxData, bool Clamp>
+struct intrin_cvt_tensor_i4_bf16<AuxData, Clamp, 8, 4>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int32x2_t& out_0)
     {
         out_0 = __builtin_amdgcn_cvt_to_tensor_i4_bf16_8x4x8(
-            inAcc.template AsType<bhalf8_t>()[Number<0>{}], ssrc, Auxdata, 1);
+            inAcc.template AsType<bhalf8_t>()[Number<0>{}], ssrc, AuxData, Clamp);
     }
 };
 
-template <index_t Auxdata>
-struct intrin_cvt_tensor_i4_bf16<Auxdata, 4, 4>
+template <index_t AuxData, bool Clamp>
+struct intrin_cvt_tensor_i4_bf16<AuxData, Clamp, 4, 4>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int& out_0)
     {
         out_0 = __builtin_amdgcn_cvt_to_tensor_i4_bf16_4x4x16(
-            inAcc.template AsType<bhalf8_t>()[Number<0>{}], ssrc, Auxdata, 1);
+            inAcc.template AsType<bhalf8_t>()[Number<0>{}], ssrc, AuxData, Clamp);
     }
 };
 
-template <index_t Auxdata>
-struct intrin_cvt_tensor_i4_bf16<Auxdata, 4, 2>
+template <index_t AuxData, bool Clamp>
+struct intrin_cvt_tensor_i4_bf16<AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int& out_0)
     {
         out_0 = __builtin_amdgcn_cvt_to_tensor_i4_bf16_4x4x8_4x2x16(
-            inAcc.template AsType<bhalf4_t>()[Number<0>{}], ssrc, Auxdata, 1);
+            inAcc.template AsType<bhalf4_t>()[Number<0>{}], ssrc, AuxData, Clamp);
     }
 };
 
-template <index_t Auxdata, index_t H, index_t W>
+template <index_t AuxData, bool Clamp, index_t H, index_t W>
 struct intrin_cvt_tensor_u4_f32;
 // u4 input tensor
-template <index_t Auxdata>
-struct intrin_cvt_tensor_u4_f32<Auxdata, 4, 2>
+template <index_t AuxData, bool Clamp>
+struct intrin_cvt_tensor_u4_f32<AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int& out_0)
     {
         out_0 = __builtin_amdgcn_cvt_to_tensor_u4_f32_4x2x16(
-            inAcc.template AsType<float4_t>()[Number<0>{}], ssrc, Auxdata, 1);
+            inAcc.template AsType<float4_t>()[Number<0>{}], ssrc, AuxData, Clamp);
     }
 };
 
-template <index_t Auxdata, index_t H, index_t W>
+template <index_t AuxData, bool Clamp, index_t H, index_t W>
 struct intrin_cvt_tensor_u4_f16;
 
-template <index_t Auxdata>
-struct intrin_cvt_tensor_u4_f16<Auxdata, 8, 4>
+template <index_t AuxData, bool Clamp>
+struct intrin_cvt_tensor_u4_f16<AuxData, Clamp, 8, 4>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int32x2_t& out_0)
     {
         out_0 = __builtin_amdgcn_cvt_to_tensor_u4_f16_8x4x8(
-            inAcc.template AsType<half8_t>()[Number<0>{}], ssrc, Auxdata, 1);
+            inAcc.template AsType<half8_t>()[Number<0>{}], ssrc, AuxData, Clamp);
     }
 };
 
-template <index_t Auxdata>
-struct intrin_cvt_tensor_u4_f16<Auxdata, 4, 4>
+template <index_t AuxData, bool Clamp>
+struct intrin_cvt_tensor_u4_f16<AuxData, Clamp, 4, 4>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int& out_0)
     {
         out_0 = __builtin_amdgcn_cvt_to_tensor_u4_f16_4x4x16(
-            inAcc.template AsType<half8_t>()[Number<0>{}], ssrc, Auxdata, 1);
+            inAcc.template AsType<half8_t>()[Number<0>{}], ssrc, AuxData, Clamp);
     }
 };
 
-template <index_t Auxdata>
-struct intrin_cvt_tensor_u4_f16<Auxdata, 4, 2>
+template <index_t AuxData, bool Clamp>
+struct intrin_cvt_tensor_u4_f16<AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int& out_0)
     {
         out_0 = __builtin_amdgcn_cvt_to_tensor_u4_f16_4x4x8_4x2x16(
-            inAcc.template AsType<half4_t>()[Number<0>{}], ssrc, Auxdata, 1);
+            inAcc.template AsType<half4_t>()[Number<0>{}], ssrc, AuxData, Clamp);
     }
 };
 
-template <index_t Auxdata, index_t H, index_t W>
+template <index_t AuxData, bool Clamp, index_t H, index_t W>
 struct intrin_cvt_tensor_u4_bf16;
 
-template <index_t Auxdata>
-struct intrin_cvt_tensor_u4_bf16<Auxdata, 8, 4>
+template <index_t AuxData, bool Clamp>
+struct intrin_cvt_tensor_u4_bf16<AuxData, Clamp, 8, 4>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int32x2_t& out_0)
     {
         out_0 = __builtin_amdgcn_cvt_to_tensor_u4_bf16_8x4x8(
-            inAcc.template AsType<bhalf8_t>()[Number<0>{}], ssrc, Auxdata, 1);
+            inAcc.template AsType<bhalf8_t>()[Number<0>{}], ssrc, AuxData, Clamp);
     }
 };
 
-template <index_t Auxdata>
-struct intrin_cvt_tensor_u4_bf16<Auxdata, 4, 4>
+template <index_t AuxData, bool Clamp>
+struct intrin_cvt_tensor_u4_bf16<AuxData, Clamp, 4, 4>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int& out_0)
     {
         out_0 = __builtin_amdgcn_cvt_to_tensor_u4_bf16_4x4x16(
-            inAcc.template AsType<bhalf8_t>()[Number<0>{}], ssrc, Auxdata, 1);
+            inAcc.template AsType<bhalf8_t>()[Number<0>{}], ssrc, AuxData, Clamp);
     }
 };
 
-template <index_t Auxdata>
-struct intrin_cvt_tensor_u4_bf16<Auxdata, 4, 2>
+template <index_t AuxData, bool Clamp>
+struct intrin_cvt_tensor_u4_bf16<AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int& out_0)
     {
         out_0 = __builtin_amdgcn_cvt_to_tensor_u4_bf16_4x4x8_4x2x16(
-            inAcc.template AsType<bhalf4_t>()[Number<0>{}], ssrc, Auxdata, 1);
+            inAcc.template AsType<bhalf4_t>()[Number<0>{}], ssrc, AuxData, Clamp);
     }
 };
 
 // i8 input tensor
-template <index_t Auxdata, index_t H, index_t W>
+template <index_t AuxData, bool Clamp, index_t H, index_t W>
 struct intrin_cvt_tensor_i8_f32;
 
-template <index_t Auxdata>
-struct intrin_cvt_tensor_i8_f32<Auxdata, 4, 2>
+template <index_t AuxData, bool Clamp>
+struct intrin_cvt_tensor_i8_f32<AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int& out_0)
     {
         out_0 = __builtin_amdgcn_cvt_to_tensor_i8_f32_4x2x16(
-            inAcc.template AsType<float4_t>()[Number<0>{}], ssrc, Auxdata, 1);
+            inAcc.template AsType<float4_t>()[Number<0>{}], ssrc, AuxData, Clamp);
     }
 };
 
-template <index_t Auxdata, index_t H, index_t W>
+template <index_t AuxData, bool Clamp, index_t H, index_t W>
 struct intrin_cvt_tensor_i8_f16;
 
-template <index_t Auxdata>
-struct intrin_cvt_tensor_i8_f16<Auxdata, 8, 4>
+template <index_t AuxData, bool Clamp>
+struct intrin_cvt_tensor_i8_f16<AuxData, Clamp, 8, 4>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int32x2_t& out_0)
     {
         out_0 = __builtin_amdgcn_cvt_to_tensor_i8_f16_8x4x8(
-            inAcc.template AsType<half8_t>()[Number<0>{}], ssrc, Auxdata, 1);
+            inAcc.template AsType<half8_t>()[Number<0>{}], ssrc, AuxData, Clamp);
     }
 };
 
-template <index_t Auxdata>
-struct intrin_cvt_tensor_i8_f16<Auxdata, 4, 4>
+template <index_t AuxData, bool Clamp>
+struct intrin_cvt_tensor_i8_f16<AuxData, Clamp, 4, 4>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int* out_0, int* out_1)
     {
         __builtin_amdgcn_cvt_to_tensor_i8_f16_4x4x16(
-            out_0, out_1, inAcc.template AsType<half8_t>()[Number<0>{}], ssrc, Auxdata, 1);
+            out_0, out_1, inAcc.template AsType<half8_t>()[Number<0>{}], ssrc, AuxData, Clamp);
     }
 };
 
-template <index_t Auxdata>
-struct intrin_cvt_tensor_i8_f16<Auxdata, 4, 2>
+template <index_t AuxData, bool Clamp>
+struct intrin_cvt_tensor_i8_f16<AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int& out_0)
     {
         out_0 = __builtin_amdgcn_cvt_to_tensor_i8_f16_4x4x8_4x2x16(
-            inAcc.template AsType<half4_t>()[Number<0>{}], ssrc, Auxdata, 1);
+            inAcc.template AsType<half4_t>()[Number<0>{}], ssrc, AuxData, Clamp);
     }
 };
 
-template <index_t Auxdata, index_t H, index_t W>
+template <index_t AuxData, bool Clamp, index_t H, index_t W>
 struct intrin_cvt_tensor_i8_bf16;
 
-template <index_t Auxdata>
-struct intrin_cvt_tensor_i8_bf16<Auxdata, 8, 4>
+template <index_t AuxData, bool Clamp>
+struct intrin_cvt_tensor_i8_bf16<AuxData, Clamp, 8, 4>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int32x2_t& out_0)
     {
         out_0 = __builtin_amdgcn_cvt_to_tensor_i8_bf16_8x4x8(
-            inAcc.template AsType<bhalf8_t>()[Number<0>{}], ssrc, Auxdata, 1);
+            inAcc.template AsType<bhalf8_t>()[Number<0>{}], ssrc, AuxData, Clamp);
     }
 };
 
-template <index_t Auxdata>
-struct intrin_cvt_tensor_i8_bf16<Auxdata, 4, 4>
+template <index_t AuxData, bool Clamp>
+struct intrin_cvt_tensor_i8_bf16<AuxData, Clamp, 4, 4>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int* out_0, int* out_1)
     {
         __builtin_amdgcn_cvt_to_tensor_i8_bf16_4x4x16(
-            out_0, out_1, inAcc.template AsType<bhalf8_t>()[Number<0>{}], ssrc, Auxdata, 1);
+            out_0, out_1, inAcc.template AsType<bhalf8_t>()[Number<0>{}], ssrc, AuxData, Clamp);
     }
 };
 
-template <index_t Auxdata>
-struct intrin_cvt_tensor_i8_bf16<Auxdata, 4, 2>
+template <index_t AuxData, bool Clamp>
+struct intrin_cvt_tensor_i8_bf16<AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int& out_0)
     {
         out_0 = __builtin_amdgcn_cvt_to_tensor_i8_bf16_4x4x8_4x2x16(
-            inAcc.template AsType<bhalf4_t>()[Number<0>{}], ssrc, Auxdata, 1);
+            inAcc.template AsType<bhalf4_t>()[Number<0>{}], ssrc, AuxData, Clamp);
     }
 };
 
-template <index_t Auxdata, index_t H, index_t W>
+template <index_t AuxData, bool Clamp, index_t H, index_t W>
 struct intrin_cvt_tensor_u8_f32;
 // u8 input tensor
-template <index_t Auxdata>
-struct intrin_cvt_tensor_u8_f32<Auxdata, 4, 2>
+template <index_t AuxData, bool Clamp>
+struct intrin_cvt_tensor_u8_f32<AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int& out_0)
     {
         out_0 = __builtin_amdgcn_cvt_to_tensor_u8_f32_4x2x16(
-            inAcc.template AsType<float4_t>()[Number<0>{}], ssrc, Auxdata, 1);
+            inAcc.template AsType<float4_t>()[Number<0>{}], ssrc, AuxData, Clamp);
     }
 };
 
-template <index_t Auxdata, index_t H, index_t W>
+template <index_t AuxData, bool Clamp, index_t H, index_t W>
 struct intrin_cvt_tensor_u8_f16;
 
-template <index_t Auxdata>
-struct intrin_cvt_tensor_u8_f16<Auxdata, 8, 4>
+template <index_t AuxData, bool Clamp>
+struct intrin_cvt_tensor_u8_f16<AuxData, Clamp, 8, 4>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int32x2_t& out_0)
     {
         out_0 = __builtin_amdgcn_cvt_to_tensor_u8_f16_8x4x8(
-            inAcc.template AsType<half8_t>()[Number<0>{}], ssrc, Auxdata, 1);
+            inAcc.template AsType<half8_t>()[Number<0>{}], ssrc, AuxData, Clamp);
     }
 };
 
-template <index_t Auxdata>
-struct intrin_cvt_tensor_u8_f16<Auxdata, 4, 4>
+template <index_t AuxData, bool Clamp>
+struct intrin_cvt_tensor_u8_f16<AuxData, Clamp, 4, 4>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int* out_0, int* out_1)
     {
         __builtin_amdgcn_cvt_to_tensor_u8_f16_4x4x16(
-            out_0, out_1, inAcc.template AsType<half8_t>()[Number<0>{}], ssrc, Auxdata, 1);
+            out_0, out_1, inAcc.template AsType<half8_t>()[Number<0>{}], ssrc, AuxData, Clamp);
     }
 };
 
-template <index_t Auxdata>
-struct intrin_cvt_tensor_u8_f16<Auxdata, 4, 2>
+template <index_t AuxData, bool Clamp>
+struct intrin_cvt_tensor_u8_f16<AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int& out_0)
     {
         out_0 = __builtin_amdgcn_cvt_to_tensor_u8_f16_4x4x8_4x2x16(
-            inAcc.template AsType<half4_t>()[Number<0>{}], ssrc, Auxdata, 1);
+            inAcc.template AsType<half4_t>()[Number<0>{}], ssrc, AuxData, Clamp);
     }
 };
 
-template <index_t Auxdata, index_t H, index_t W>
+template <index_t AuxData, bool Clamp, index_t H, index_t W>
 struct intrin_cvt_tensor_u8_bf16;
 
-template <index_t Auxdata>
-struct intrin_cvt_tensor_u8_bf16<Auxdata, 8, 4>
+template <index_t AuxData, bool Clamp>
+struct intrin_cvt_tensor_u8_bf16<AuxData, Clamp, 8, 4>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int32x2_t& out_0)
     {
         out_0 = __builtin_amdgcn_cvt_to_tensor_u8_bf16_8x4x8(
-            inAcc.template AsType<bhalf8_t>()[Number<0>{}], ssrc, Auxdata, 1);
+            inAcc.template AsType<bhalf8_t>()[Number<0>{}], ssrc, AuxData, Clamp);
     }
 };
 
-template <index_t Auxdata>
-struct intrin_cvt_tensor_u8_bf16<Auxdata, 4, 4>
+template <index_t AuxData, bool Clamp>
+struct intrin_cvt_tensor_u8_bf16<AuxData, Clamp, 4, 4>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int* out_0, int* out_1)
     {
         __builtin_amdgcn_cvt_to_tensor_u8_bf16_4x4x16(
-            out_0, out_1, inAcc.template AsType<bhalf8_t>()[Number<0>{}], ssrc, Auxdata, 1);
+            out_0, out_1, inAcc.template AsType<bhalf8_t>()[Number<0>{}], ssrc, AuxData, Clamp);
     }
 };
 
-template <index_t Auxdata>
-struct intrin_cvt_tensor_u8_bf16<Auxdata, 4, 2>
+template <index_t AuxData, bool Clamp>
+struct intrin_cvt_tensor_u8_bf16<AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int& out_0)
     {
         out_0 = __builtin_amdgcn_cvt_to_tensor_u8_bf16_4x4x8_4x2x16(
-            inAcc.template AsType<bhalf4_t>()[Number<0>{}], ssrc, Auxdata, 1);
+            inAcc.template AsType<bhalf4_t>()[Number<0>{}], ssrc, AuxData, Clamp);
     }
 };
 
 // fp8 input tensor
-template <index_t Auxdata, index_t H, index_t W>
+template <index_t AuxData, bool Clamp, index_t H, index_t W>
 struct intrin_cvt_tensor_fp8_f32;
 
-template <index_t Auxdata>
-struct intrin_cvt_tensor_fp8_f32<Auxdata, 4, 2>
+template <index_t AuxData, bool Clamp>
+struct intrin_cvt_tensor_fp8_f32<AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int& out_0)
     {
         out_0 = __builtin_amdgcn_cvt_to_tensor_fp8_f32_4x2x16(
-            inAcc.template AsType<float4_t>()[Number<0>{}], ssrc, Auxdata, 1);
+            inAcc.template AsType<float4_t>()[Number<0>{}], ssrc, AuxData, Clamp);
     }
 };
 
-template <index_t Auxdata, index_t H, index_t W>
+template <index_t AuxData, bool Clamp, index_t H, index_t W>
 struct intrin_cvt_tensor_fp8_f16;
 
-template <index_t Auxdata>
-struct intrin_cvt_tensor_fp8_f16<Auxdata, 8, 4>
+template <index_t AuxData, bool Clamp>
+struct intrin_cvt_tensor_fp8_f16<AuxData, Clamp, 8, 4>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int32x2_t& out_0)
     {
         out_0 = __builtin_amdgcn_cvt_to_tensor_fp8_f16_8x4x8(
-            inAcc.template AsType<half8_t>()[Number<0>{}], ssrc, Auxdata, 1);
+            inAcc.template AsType<half8_t>()[Number<0>{}], ssrc, AuxData, Clamp);
     }
 };
 
-template <index_t Auxdata>
-struct intrin_cvt_tensor_fp8_f16<Auxdata, 4, 4>
+template <index_t AuxData, bool Clamp>
+struct intrin_cvt_tensor_fp8_f16<AuxData, Clamp, 4, 4>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int* out_0, int* out_1)
     {
         __builtin_amdgcn_cvt_to_tensor_fp8_f16_4x4x16(
-            out_0, out_1, inAcc.template AsType<half8_t>()[Number<0>{}], ssrc, Auxdata, 1);
+            out_0, out_1, inAcc.template AsType<half8_t>()[Number<0>{}], ssrc, AuxData, Clamp);
     }
 };
 
-template <index_t Auxdata>
-struct intrin_cvt_tensor_fp8_f16<Auxdata, 4, 2>
+template <index_t AuxData, bool Clamp>
+struct intrin_cvt_tensor_fp8_f16<AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int& out_0)
     {
         out_0 = __builtin_amdgcn_cvt_to_tensor_fp8_f16_4x4x8_4x2x16(
-            inAcc.template AsType<half4_t>()[Number<0>{}], ssrc, Auxdata, 1);
+            inAcc.template AsType<half4_t>()[Number<0>{}], ssrc, AuxData, Clamp);
     }
 };
 
-template <index_t Auxdata, index_t H, index_t W>
+template <index_t AuxData, bool Clamp, index_t H, index_t W>
 struct intrin_cvt_tensor_fp8_bf16;
 
-template <index_t Auxdata>
-struct intrin_cvt_tensor_fp8_bf16<Auxdata, 8, 4>
+template <index_t AuxData, bool Clamp>
+struct intrin_cvt_tensor_fp8_bf16<AuxData, Clamp, 8, 4>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int32x2_t& out_0)
     {
         out_0 = __builtin_amdgcn_cvt_to_tensor_fp8_bf16_8x4x8(
-            inAcc.template AsType<bhalf8_t>()[Number<0>{}], ssrc, Auxdata, 1);
+            inAcc.template AsType<bhalf8_t>()[Number<0>{}], ssrc, AuxData, Clamp);
     }
 };
 
-template <index_t Auxdata>
-struct intrin_cvt_tensor_fp8_bf16<Auxdata, 4, 4>
+template <index_t AuxData, bool Clamp>
+struct intrin_cvt_tensor_fp8_bf16<AuxData, Clamp, 4, 4>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int* out_0, int* out_1)
     {
         __builtin_amdgcn_cvt_to_tensor_fp8_bf16_4x4x16(
-            out_0, out_1, inAcc.template AsType<bhalf8_t>()[Number<0>{}], ssrc, Auxdata, 1);
+            out_0, out_1, inAcc.template AsType<bhalf8_t>()[Number<0>{}], ssrc, AuxData, Clamp);
     }
 };
 
-template <index_t Auxdata>
-struct intrin_cvt_tensor_fp8_bf16<Auxdata, 4, 2>
+template <index_t AuxData, bool Clamp>
+struct intrin_cvt_tensor_fp8_bf16<AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int& out_0)
     {
         out_0 = __builtin_amdgcn_cvt_to_tensor_fp8_bf16_4x4x8_4x2x16(
-            inAcc.template AsType<bhalf4_t>()[Number<0>{}], ssrc, Auxdata, 1);
+            inAcc.template AsType<bhalf4_t>()[Number<0>{}], ssrc, AuxData, Clamp);
     }
 };
 
 // bf8 input tensor
-template <index_t Auxdata, index_t H, index_t W>
+template <index_t AuxData, bool Clamp, index_t H, index_t W>
 struct intrin_cvt_tensor_bf8_f32;
 
-template <index_t Auxdata>
-struct intrin_cvt_tensor_bf8_f32<Auxdata, 4, 2>
+template <index_t AuxData, bool Clamp>
+struct intrin_cvt_tensor_bf8_f32<AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int& out_0)
     {
         out_0 = __builtin_amdgcn_cvt_to_tensor_bf8_f32_4x2x16(
-            inAcc.template AsType<float4_t>()[Number<0>{}], ssrc, Auxdata, 1);
+            inAcc.template AsType<float4_t>()[Number<0>{}], ssrc, AuxData, Clamp);
     }
 };
 
-template <index_t Auxdata, index_t H, index_t W>
+template <index_t AuxData, bool Clamp, index_t H, index_t W>
 struct intrin_cvt_tensor_bf8_fp16;
 
-template <index_t Auxdata>
-struct intrin_cvt_tensor_bf8_fp16<Auxdata, 8, 4>
+template <index_t AuxData, bool Clamp>
+struct intrin_cvt_tensor_bf8_fp16<AuxData, Clamp, 8, 4>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int32x2_t& out_0)
     {
         out_0 = __builtin_amdgcn_cvt_to_tensor_bf8_f16_8x4x8(
-            inAcc.template AsType<half8_t>()[Number<0>{}], ssrc, Auxdata, 1);
+            inAcc.template AsType<half8_t>()[Number<0>{}], ssrc, AuxData, Clamp);
     }
 };
 
-template <index_t Auxdata>
-struct intrin_cvt_tensor_bf8_fp16<Auxdata, 4, 4>
+template <index_t AuxData, bool Clamp>
+struct intrin_cvt_tensor_bf8_fp16<AuxData, Clamp, 4, 4>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int* out_0, int* out_1)
     {
         __builtin_amdgcn_cvt_to_tensor_bf8_f16_4x4x16(
-            out_0, out_1, inAcc.template AsType<half8_t>()[Number<0>{}], ssrc, Auxdata, 1);
+            out_0, out_1, inAcc.template AsType<half8_t>()[Number<0>{}], ssrc, AuxData, Clamp);
     }
 };
 
-template <index_t Auxdata>
-struct intrin_cvt_tensor_bf8_fp16<Auxdata, 4, 2>
+template <index_t AuxData, bool Clamp>
+struct intrin_cvt_tensor_bf8_fp16<AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int& out_0)
     {
         out_0 = __builtin_amdgcn_cvt_to_tensor_bf8_f16_4x4x8_4x2x16(
-            inAcc.template AsType<half4_t>()[Number<0>{}], ssrc, Auxdata, 1);
+            inAcc.template AsType<half4_t>()[Number<0>{}], ssrc, AuxData, Clamp);
     }
 };
 
-template <index_t Auxdata, index_t H, index_t W>
+template <index_t AuxData, bool Clamp, index_t H, index_t W>
 struct intrin_cvt_tensor_bf8_bf16;
 
-template <index_t Auxdata>
-struct intrin_cvt_tensor_bf8_bf16<Auxdata, 8, 4>
+template <index_t AuxData, bool Clamp>
+struct intrin_cvt_tensor_bf8_bf16<AuxData, Clamp, 8, 4>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int32x2_t& out_0)
     {
         out_0 = __builtin_amdgcn_cvt_to_tensor_bf8_bf16_8x4x8(
-            inAcc.template AsType<bhalf8_t>()[Number<0>{}], ssrc, Auxdata, 1);
+            inAcc.template AsType<bhalf8_t>()[Number<0>{}], ssrc, AuxData, Clamp);
     }
 };
 
-template <index_t Auxdata>
-struct intrin_cvt_tensor_bf8_bf16<Auxdata, 4, 4>
+template <index_t AuxData, bool Clamp>
+struct intrin_cvt_tensor_bf8_bf16<AuxData, Clamp, 4, 4>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int* out_0, int* out_1)
     {
         __builtin_amdgcn_cvt_to_tensor_bf8_bf16_4x4x16(
-            out_0, out_1, inAcc.template AsType<bhalf8_t>()[Number<0>{}], ssrc, Auxdata, 1);
+            out_0, out_1, inAcc.template AsType<bhalf8_t>()[Number<0>{}], ssrc, AuxData, Clamp);
     }
 };
 
-template <index_t Auxdata>
-struct intrin_cvt_tensor_bf8_bf16<Auxdata, 4, 2>
+template <index_t AuxData, bool Clamp>
+struct intrin_cvt_tensor_bf8_bf16<AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int& out_0)
     {
         out_0 = __builtin_amdgcn_cvt_to_tensor_bf8_bf16_4x4x8_4x2x16(
-            inAcc.template AsType<bhalf4_t>()[Number<0>{}], ssrc, Auxdata, 1);
+            inAcc.template AsType<bhalf4_t>()[Number<0>{}], ssrc, AuxData, Clamp);
     }
 };
 
 // fp16 input tensor
-template <index_t Auxdata, index_t H, index_t W>
+template <index_t AuxData, bool Clamp, index_t H, index_t W>
 struct intrin_cvt_tensor_fp16_f32;
 
-template <index_t Auxdata>
-struct intrin_cvt_tensor_fp16_f32<Auxdata, 4, 2>
+template <index_t AuxData, bool Clamp>
+struct intrin_cvt_tensor_fp16_f32<AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc>
     __device__ static void
@@ -564,16 +564,16 @@ struct intrin_cvt_tensor_fp16_f32<Auxdata, 4, 2>
             reinterpret_cast<fp16x2_t*>(&out_1),
             inAcc.template AsType<float4_t>()[Number<0>{}],
             ssrc,
-            Auxdata,
-            1);
+            AuxData,
+            Clamp);
     }
 };
 
-template <index_t Auxdata, index_t H, index_t W>
+template <index_t AuxData, bool Clamp, index_t H, index_t W>
 struct intrin_cvt_tensor_fp16_fp16;
 
-template <index_t Auxdata>
-struct intrin_cvt_tensor_fp16_fp16<Auxdata, 8, 4>
+template <index_t AuxData, bool Clamp>
+struct intrin_cvt_tensor_fp16_fp16<AuxData, Clamp, 8, 4>
 {
     template <class FloatAcc>
     __device__ static void
@@ -583,13 +583,13 @@ struct intrin_cvt_tensor_fp16_fp16<Auxdata, 8, 4>
                                                      reinterpret_cast<fp16x4_t*>(&out_1),
                                                      inAcc.template AsType<half8_t>()[Number<0>{}],
                                                      ssrc,
-                                                     Auxdata,
-                                                     1);
+                                                     AuxData,
+                                                     Clamp);
     }
 };
 
-template <index_t Auxdata>
-struct intrin_cvt_tensor_fp16_fp16<Auxdata, 4, 4>
+template <index_t AuxData, bool Clamp>
+struct intrin_cvt_tensor_fp16_fp16<AuxData, Clamp, 4, 4>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc,
@@ -605,13 +605,13 @@ struct intrin_cvt_tensor_fp16_fp16<Auxdata, 4, 4>
                                                       reinterpret_cast<fp16x2_t*>(&out_3),
                                                       inAcc.template AsType<half8_t>()[Number<0>{}],
                                                       ssrc,
-                                                      Auxdata,
-                                                      1);
+                                                      AuxData,
+                                                      Clamp);
     }
 };
 
-template <index_t Auxdata>
-struct intrin_cvt_tensor_fp16_fp16<Auxdata, 4, 2>
+template <index_t AuxData, bool Clamp>
+struct intrin_cvt_tensor_fp16_fp16<AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc>
     __device__ static void
@@ -622,16 +622,16 @@ struct intrin_cvt_tensor_fp16_fp16<Auxdata, 4, 2>
             reinterpret_cast<fp16x2_t*>(&out_1),
             inAcc.template AsType<half4_t>()[Number<0>{}],
             ssrc,
-            Auxdata,
-            1);
+            AuxData,
+            Clamp);
     }
 };
 
-template <index_t Auxdata, index_t H, index_t W>
+template <index_t AuxData, bool Clamp, index_t H, index_t W>
 struct intrin_cvt_tensor_fp16_bf16;
 
-template <index_t Auxdata>
-struct intrin_cvt_tensor_fp16_bf16<Auxdata, 8, 4>
+template <index_t AuxData, bool Clamp>
+struct intrin_cvt_tensor_fp16_bf16<AuxData, Clamp, 8, 4>
 {
     template <class FloatAcc>
     __device__ static void
@@ -642,13 +642,13 @@ struct intrin_cvt_tensor_fp16_bf16<Auxdata, 8, 4>
             reinterpret_cast<fp16x4_t*>(&out_1),
             inAcc.template AsType<bhalf8_t>()[Number<0>{}],
             ssrc,
-            Auxdata,
-            1);
+            AuxData,
+            Clamp);
     }
 };
 
-template <index_t Auxdata>
-struct intrin_cvt_tensor_fp16_bf16<Auxdata, 4, 4>
+template <index_t AuxData, bool Clamp>
+struct intrin_cvt_tensor_fp16_bf16<AuxData, Clamp, 4, 4>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc,
@@ -665,13 +665,13 @@ struct intrin_cvt_tensor_fp16_bf16<Auxdata, 4, 4>
             reinterpret_cast<fp16x2_t*>(&out_3),
             inAcc.template AsType<bhalf8_t>()[Number<0>{}],
             ssrc,
-            Auxdata,
-            1);
+            AuxData,
+            Clamp);
     }
 };
 
-template <index_t Auxdata>
-struct intrin_cvt_tensor_fp16_bf16<Auxdata, 4, 2>
+template <index_t AuxData, bool Clamp>
+struct intrin_cvt_tensor_fp16_bf16<AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc>
     __device__ static void
@@ -682,17 +682,17 @@ struct intrin_cvt_tensor_fp16_bf16<Auxdata, 4, 2>
             reinterpret_cast<fp16x2_t*>(&out_1),
             inAcc.template AsType<bhalf4_t>()[Number<0>{}],
             ssrc,
-            Auxdata,
-            1);
+            AuxData,
+            Clamp);
     }
 };
 
 // bf16 input tensor
-template <index_t Auxdata, index_t H, index_t W>
+template <index_t AuxData, bool Clamp, index_t H, index_t W>
 struct intrin_cvt_tensor_bf16_f32;
 
-template <index_t Auxdata>
-struct intrin_cvt_tensor_bf16_f32<Auxdata, 4, 2>
+template <index_t AuxData, bool Clamp>
+struct intrin_cvt_tensor_bf16_f32<AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc>
     __device__ static void
@@ -703,16 +703,16 @@ struct intrin_cvt_tensor_bf16_f32<Auxdata, 4, 2>
             reinterpret_cast<bf16x2_t*>(&out_1),
             inAcc.template AsType<float4_t>()[Number<0>{}],
             ssrc,
-            Auxdata,
-            1);
+            AuxData,
+            Clamp);
     }
 };
 
-template <index_t Auxdata, index_t H, index_t W>
+template <index_t AuxData, bool Clamp, index_t H, index_t W>
 struct intrin_cvt_tensor_bf16_f16;
 
-template <index_t Auxdata>
-struct intrin_cvt_tensor_bf16_f16<Auxdata, 8, 4>
+template <index_t AuxData, bool Clamp>
+struct intrin_cvt_tensor_bf16_f16<AuxData, Clamp, 8, 4>
 {
     template <class FloatAcc>
     __device__ static void
@@ -722,13 +722,13 @@ struct intrin_cvt_tensor_bf16_f16<Auxdata, 8, 4>
                                                       reinterpret_cast<bf16x4_t*>(&out_1),
                                                       inAcc.template AsType<half8_t>()[Number<0>{}],
                                                       ssrc,
-                                                      Auxdata,
-                                                      1);
+                                                      AuxData,
+                                                      Clamp);
     }
 };
 
-template <index_t Auxdata>
-struct intrin_cvt_tensor_bf16_f16<Auxdata, 4, 4>
+template <index_t AuxData, bool Clamp>
+struct intrin_cvt_tensor_bf16_f16<AuxData, Clamp, 4, 4>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc,
@@ -745,13 +745,13 @@ struct intrin_cvt_tensor_bf16_f16<Auxdata, 4, 4>
             reinterpret_cast<bf16x2_t*>(&out_3),
             inAcc.template AsType<half8_t>()[Number<0>{}],
             ssrc,
-            Auxdata,
-            1);
+            AuxData,
+            Clamp);
     }
 };
 
-template <index_t Auxdata>
-struct intrin_cvt_tensor_bf16_f16<Auxdata, 4, 2>
+template <index_t AuxData, bool Clamp>
+struct intrin_cvt_tensor_bf16_f16<AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc>
     __device__ static void
@@ -762,16 +762,16 @@ struct intrin_cvt_tensor_bf16_f16<Auxdata, 4, 2>
             reinterpret_cast<bf16x2_t*>(&out_1),
             inAcc.template AsType<half4_t>()[Number<0>{}],
             ssrc,
-            Auxdata,
-            1);
+            AuxData,
+            Clamp);
     }
 };
 
-template <index_t Auxdata, index_t H, index_t W>
+template <index_t AuxData, bool Clamp, index_t H, index_t W>
 struct intrin_cvt_tensor_bf16_bf16;
 
-template <index_t Auxdata>
-struct intrin_cvt_tensor_bf16_bf16<Auxdata, 8, 4>
+template <index_t AuxData, bool Clamp>
+struct intrin_cvt_tensor_bf16_bf16<AuxData, Clamp, 8, 4>
 {
     template <class FloatAcc>
     __device__ static void
@@ -782,13 +782,13 @@ struct intrin_cvt_tensor_bf16_bf16<Auxdata, 8, 4>
             reinterpret_cast<bf16x4_t*>(&out_1),
             inAcc.template AsType<bhalf8_t>()[Number<0>{}],
             ssrc,
-            Auxdata,
-            1);
+            AuxData,
+            Clamp);
     }
 };
 
-template <index_t Auxdata>
-struct intrin_cvt_tensor_bf16_bf16<Auxdata, 4, 4>
+template <index_t AuxData, bool Clamp>
+struct intrin_cvt_tensor_bf16_bf16<AuxData, Clamp, 4, 4>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc,
@@ -805,13 +805,13 @@ struct intrin_cvt_tensor_bf16_bf16<Auxdata, 4, 4>
             reinterpret_cast<bf16x2_t*>(&out_3),
             inAcc.template AsType<bhalf8_t>()[Number<0>{}],
             ssrc,
-            Auxdata,
-            1);
+            AuxData,
+            Clamp);
     }
 };
 
-template <index_t Auxdata>
-struct intrin_cvt_tensor_bf16_bf16<Auxdata, 4, 2>
+template <index_t AuxData, bool Clamp>
+struct intrin_cvt_tensor_bf16_bf16<AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc>
     __device__ static void
@@ -822,8 +822,8 @@ struct intrin_cvt_tensor_bf16_bf16<Auxdata, 4, 2>
             reinterpret_cast<bf16x2_t*>(&out_1),
             inAcc.template AsType<bhalf4_t>()[Number<0>{}],
             ssrc,
-            Auxdata,
-            1);
+            AuxData,
+            Clamp);
     }
 };
 

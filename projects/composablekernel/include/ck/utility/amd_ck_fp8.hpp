@@ -582,21 +582,22 @@ static __device__ fp8_storage_t cast_to_f8_from_f16(_Float16 v, unsigned int rng
     {
         if constexpr(interpret == ck_fp8_interpretation_t::CK_E4M3_FNUZ)
         {
-            if((val.i16val & NumericUtils<half_t>::nan_mask) != NumericUtils<half_t>::nan_mask)
+            // 7C00 is NumericUtils<_Float16>::nan_mask
+            if((val.i16val & 0x7C00) != 0x7C00)
             { /// propagate NAN/INF, no clipping
                 val.fval = __builtin_amdgcn_fmed3h(val.fval, 240.0, -240.0);
             }
         }
         else if constexpr(interpret == ck_fp8_interpretation_t::CK_E4M3_OCP)
         { // OCP type
-            if((val.i16val & NumericUtils<half_t>::nan_mask) != NumericUtils<half_t>::nan_mask)
+            if((val.i16val & 0x7C00) != 0x7C00)
             { /// propagate NAN/INF, no clipping
                 val.fval = __builtin_amdgcn_fmed3h(val.fval, 448.0, -448.0);
             }
         }
         else
         {
-            if((val.i16val & NumericUtils<half_t>::nan_mask) != NumericUtils<half_t>::nan_mask)
+            if((val.i16val & 0x7C00) != 0x7C00)
             { /// propagate NAN/INF, no clipping
                 val.fval = __builtin_amdgcn_fmed3h(val.fval, 57344.0, -57344.0);
             }
@@ -614,12 +615,14 @@ static __device__ fp8_storage_t cast_to_f8_from_f16(_Float16 v, unsigned int rng
     }
     else
     { // RNE CVT
-        ival       = (interpret == ck_fp8_interpretation_t::CK_E4M3_FNUZ) ||
+        typedef _Float16 half2_t __attribute__((ext_vector_type(2)));
+        half2_t val2 = {val.fval, val.fval};
+        ival         = (interpret == ck_fp8_interpretation_t::CK_E4M3_FNUZ) ||
                        (interpret == ck_fp8_interpretation_t::CK_E4M3_OCP)
-                         ? __builtin_amdgcn_cvt_pk_fp8_f16(val.fval, val.fval)
-                         : __builtin_amdgcn_cvt_pk_bf8_f16(val.fval, val.fval);
-        val.i16val = ival;
-        i8data     = val.i8val[0];
+                           ? __builtin_amdgcn_cvt_pk_fp8_f16(val2)
+                           : __builtin_amdgcn_cvt_pk_bf8_f16(val2);
+        val.i16val   = ival;
+        i8data       = val.i8val[0];
     }
 
     return i8data;

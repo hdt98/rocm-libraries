@@ -27,12 +27,18 @@
 #include "ck/tensor_operation/gpu/device/impl/device_convsuba_fwd_wconvsuba.hpp"
 #include "ck/tensor_operation/gpu/element/element_wise_operation.hpp"
 
-using InElementOp         = ck::tensor_operation::element_wise::PassThrough;
-using WeiElementOp        = ck::tensor_operation::element_wise::PassThrough;
-using PassThroughOp       = ck::tensor_operation::element_wise::PassThrough;
-using OutElementOp        = ck::tensor_operation::element_wise::MultiplyAdd;
-using ActivationOp        = ck::tensor_operation::element_wise::PassThrough;
-using OutElementConvertOp = ck::tensor_operation::element_wise::Activation_Mul_Clamp<ActivationOp>;
+using InElementOp        = ck::tensor_operation::element_wise::PassThrough;
+using WeiElementOp       = ck::tensor_operation::element_wise::PassThrough;
+using PassThroughOp      = ck::tensor_operation::element_wise::PassThrough;
+using MultiplyAddRev     = ck::tensor_operation::element_wise::MultiplyAddRev<>;
+using MultiplyAddRevRelu = ck::tensor_operation::element_wise::MultiplyAddRevRelu<>;
+using ScaleAddRev        = ck::tensor_operation::element_wise::ScaleAddRev<>;
+using ScaleAddRevRelu    = ck::tensor_operation::element_wise::ScaleAddRevRelu<>;
+
+using MultiplyAddClampRev     = ck::tensor_operation::element_wise::MultiplyAddRev<true>;
+using MultiplyAddClampRevRelu = ck::tensor_operation::element_wise::MultiplyAddRevRelu<true>;
+using ScaleAddClampRev        = ck::tensor_operation::element_wise::ScaleAddRev<true>;
+using ScaleAddClampRevRelu    = ck::tensor_operation::element_wise::ScaleAddRevRelu<true>;
 
 #define DEFAULT_H 64
 #define DEFAULT_W 64
@@ -393,8 +399,9 @@ template <typename InDataType,
           ShapeType Shape,
           int LdsMode,
           bool EnableWaveGroup,
+          int FmaMode,
           ck::index_t ActiveFun,
-          bool Convert_to_tensor,
+          bool CvtToTensor,
           uint32_t TestMask>
 bool run_test()
 {
@@ -416,8 +423,8 @@ bool run_test()
     constexpr ck::index_t BlockSize =
         EnableWaveGroup ? DEFAULT_WAVEGROUP_BLOCKSIZE : DEFAULT_BLOCKSIZE;
 
-    using GPUOutType = typename std::conditional<Convert_to_tensor, EDataType, GPUAccType>::type;
-    using CPUOutType = typename std::conditional<Convert_to_tensor, EDataType, GPUAccType>::type;
+    using GPUOutType = typename std::conditional<CvtToTensor, EDataType, GPUAccType>::type;
+    using CPUOutType = typename std::conditional<CvtToTensor, EDataType, GPUAccType>::type;
 
     // on gfx13, the wavegroup count is fixed to 4. so, HPerWave/WPerWave is fixed too.
     constexpr ck::index_t HPerWave = EnableWaveGroup ? DEFAULT_H_PERBLOCK / 2 : DEFAULT_H_PERWAVE;
@@ -481,11 +488,11 @@ bool run_test()
                                           left_pads,
                                           right_pads};
 
-    constexpr auto NDimSpatial       = ck::Number<n_dim>{};
-    const auto in_element_op         = InElementOp{};
-    const auto wei_element_op        = WeiElementOp{};
-    const auto pass_through_op       = PassThroughOp{};
-    const ck::index_t cvtTensorScale = 1; // Scale=1 to update
+    constexpr auto NDimSpatial = ck::Number<n_dim>{};
+    const auto in_element_op   = InElementOp{};
+    const auto wei_element_op  = WeiElementOp{};
+    const auto pass_through_op = PassThroughOp{};
+    // const ck::index_t cvtTensorScale = 1; // Scale=1 to update
 
     const auto in_g_n_c_wis_desc =
         ck::utils::conv::make_input_host_tensor_descriptor_g_n_c_wis_packed<
@@ -519,7 +526,7 @@ bool run_test()
     std::cout << "residual: " << residual.mDesc << std::endl;
     std::cout << "scale: " << scale.mDesc << std::endl;
     std::cout << "out: " << out_host.mDesc << std::endl;
-
+    float scale_value = 2.0f;
     switch(config.init_method)
     {
     case 0: break;
@@ -527,24 +534,98 @@ bool run_test()
         in.GenerateTensorValue(GeneratorTensor_2<InDataType>{-5, 5});
         wei.GenerateTensorValue(GeneratorTensor_2<WeiDataType>{-5, 5});
         residual.GenerateTensorValue(GeneratorTensor_2<ResidualDataType>{-10, 10});
-        scale.GenerateTensorValue(GeneratorTensor_2<GPUAccType>{-3, 3});
+        if constexpr(FmaMode == 1)
+        {
+            scale.GenerateTensorValue(GeneratorTensor_2<GPUAccType>{-3, 3});
+        }
+        else
+        {
+            scale_value = 2.0f;
+        }
         break;
     default:
         in.GenerateTensorValue(GeneratorTensor_3<InDataType>{0.0, 1.0});
         wei.GenerateTensorValue(GeneratorTensor_3<WeiDataType>{-0.5, 0.5});
         residual.GenerateTensorValue(GeneratorTensor_3<InDataType>{0.0, 1.0});
-        scale.GenerateTensorValue(GeneratorTensor_2<GPUAccType>{-5, 5});
+        if constexpr(FmaMode == 1)
+        {
+            scale.GenerateTensorValue(GeneratorTensor_2<GPUAccType>{-5, 5});
+        }
+        else
+        {
+            scale_value = 3.0f;
+        }
         break;
     }
+
+    constexpr bool Clamp =
+        ck::is_same_v<GPUOutType, int8_t> || ck::is_same_v<GPUOutType, ck::f8_ocp_t>;
+
+    const auto out_element_op = [&]() {
+        if constexpr(FmaMode == 0)
+        {
+            if constexpr(ActiveFun == 0)
+            {
+                if constexpr(Clamp)
+                {
+                    return ScaleAddClampRev{scale_value};
+                }
+                else
+                {
+                    return ScaleAddRev{scale_value};
+                }
+            }
+            else if constexpr(ActiveFun == 1)
+            {
+                if constexpr(Clamp)
+                {
+                    return ScaleAddClampRevRelu{scale_value};
+                }
+                else
+                {
+                    return ScaleAddRevRelu{scale_value};
+                }
+            }
+        }
+        else if constexpr(FmaMode == 1)
+        {
+            if constexpr(ActiveFun == 0)
+            {
+                if constexpr(Clamp)
+                {
+                    return MultiplyAddClampRev{};
+                }
+                else
+                {
+                    return MultiplyAddRev{};
+                }
+            }
+            else if constexpr(ActiveFun == 1)
+            {
+                if constexpr(Clamp)
+                {
+                    return MultiplyAddClampRevRelu{};
+                }
+                else
+                {
+                    return MultiplyAddRevRelu{};
+                }
+            }
+        }
+        else
+        {
+            static_assert(0);
+        }
+    }();
 
     std::array<ck::index_t, NDimSpatial + 3> a_g_n_c_wis_lengths{};
     std::array<ck::index_t, NDimSpatial + 3> a_g_n_c_wis_strides{};
     std::array<ck::index_t, NDimSpatial + 3> b_g_k_c_xs_lengths{};
     std::array<ck::index_t, NDimSpatial + 3> b_g_k_c_xs_strides{};
-    std::array<ck::index_t, NDimSpatial + 3> d0_g_n_k_wos_lengths{};
-    std::array<ck::index_t, NDimSpatial + 3> d0_g_n_k_wos_strides{};
-    std::array<ck::index_t, NDimSpatial + 3> d1_g_n_k_wos_lengths{};
-    std::array<ck::index_t, NDimSpatial + 3> d1_g_n_k_wos_strides{};
+    std::array<ck::index_t, NDimSpatial + 3> residual_g_n_k_wos_lengths{};
+    std::array<ck::index_t, NDimSpatial + 3> residual_g_n_k_wos_strides{};
+    std::array<ck::index_t, NDimSpatial + 3> scale_g_n_k_wos_lengths{};
+    std::array<ck::index_t, NDimSpatial + 3> scale_g_n_k_wos_strides{};
     std::array<ck::index_t, NDimSpatial + 3> e_g_n_k_wos_lengths{};
     std::array<ck::index_t, NDimSpatial + 3> e_g_n_k_wos_strides{};
     std::array<ck::index_t, NDimSpatial> conv_filter_strides{};
@@ -558,10 +639,10 @@ bool run_test()
     copy(in_g_n_c_wis_desc.GetStrides(), a_g_n_c_wis_strides);
     copy(wei_g_k_c_xs_desc.GetLengths(), b_g_k_c_xs_lengths);
     copy(wei_g_k_c_xs_desc.GetStrides(), b_g_k_c_xs_strides);
-    copy(residual_g_n_k_wos_desc.GetLengths(), d0_g_n_k_wos_lengths);
-    copy(residual_g_n_k_wos_desc.GetStrides(), d0_g_n_k_wos_strides);
-    copy(scale_g_n_k_wos_desc.GetLengths(), d1_g_n_k_wos_lengths);
-    copy(scale_g_n_k_wos_desc.GetStrides(), d1_g_n_k_wos_strides);
+    copy(residual_g_n_k_wos_desc.GetLengths(), residual_g_n_k_wos_lengths);
+    copy(residual_g_n_k_wos_desc.GetStrides(), residual_g_n_k_wos_strides);
+    copy(scale_g_n_k_wos_desc.GetLengths(), scale_g_n_k_wos_lengths);
+    copy(scale_g_n_k_wos_desc.GetStrides(), scale_g_n_k_wos_strides);
     copy(out_g_n_k_wos_desc.GetLengths(), e_g_n_k_wos_lengths);
     copy(out_g_n_k_wos_desc.GetStrides(), e_g_n_k_wos_strides);
     copy(conv_param.conv_filter_strides_, conv_filter_strides);
@@ -602,17 +683,13 @@ bool run_test()
     {
         ref_invoker.Run(ref_argument);
         out_host.ForEach([&](auto&, auto idx) {
-            if constexpr(Convert_to_tensor)
+            if constexpr(FmaMode == 0)
             {
-                GPUAccType element_op_out = {};
-                OutElementOp{}(element_op_out, residual(idx), scale(idx), c_host(idx));
-                const auto out_element_convert_op = OutElementConvertOp{
-                    static_cast<float>(std::pow(2, cvtTensorScale)), ActivationOp{}};
-                out_element_convert_op(out_host(idx), element_op_out);
+                out_element_op(out_host(idx), c_host(idx), residual(idx));
             }
-            else
+            else if constexpr(FmaMode == 1)
             {
-                OutElementOp{}(out_host(idx), residual(idx), scale(idx), c_host(idx));
+                out_element_op(out_host(idx), c_host(idx), scale(idx), residual(idx));
             }
         });
     }
@@ -642,10 +719,6 @@ bool run_test()
         : FilterSize == 2
             ? ck::tensor_operation::device::ConvolutionForwardSpecialization::Filter2x2Stride2Pad0
             : ck::tensor_operation::device::ConvolutionForwardSpecialization::Filter3x3Stride1Pad0;
-
-    using AccBlockwiseOperation = ck::convolution::BlockwiseElementOpFma<false>;
-    using AccBlockwiseNextOperation =
-        ck::convolution::BlockwiseElementOpCvtTensor<Convert_to_tensor, ActiveFun, cvtTensorScale>;
 
     constexpr ck::index_t InBlockTransferScalarPerVector = sizeof(uint32_t) / sizeof(InDataType);
     constexpr ck::index_t Cluster_In_C = CPerBlock / InBlockTransferScalarPerVector;
@@ -684,96 +757,139 @@ bool run_test()
     constexpr ck::index_t Cluster_Residual_H =
         ActiveBlockSize / Cluster_Residual_K / Cluster_Residual_W;
 
-    using DsBlockTransferThreadClusterLengths =
-        ck::Tuple<ck::Sequence<Cluster_Residual_H, Cluster_Residual_W, Cluster_Residual_K>,
-                  ck::Sequence<Cluster_Scale_H, Cluster_Scale_W, Cluster_Scale_K>>;
-    using DsBlockTransferScalarPerVector =
-        ck::Sequence<ResidualBlockTransferScalarPerVector, ScaleBlockTransferScalarPerVector>;
     constexpr ck::index_t DsBlockLdsAddExtraM = true;
 
     float avg_time    = 0;
     using AccDataType = GPUAccType;
-    using DsDataType  = ck::Tuple<ResidualDataType, GPUAccType>;
 
-    using DeviceConvFwdFmaInstance = ck::tensor_operation::device::DeviceConvSubaWconv<
-        NDimSpatial,
-        InputLayout<NDimSpatial>,
-        WeightLayout<NDimSpatial>,
-        ck::Tuple<ResidualLayout<NDimSpatial>, ScaleLayout<NDimSpatial>>,
-        OutputLayout<NDimSpatial>,
-        InDataType,
-        WeiDataType,
-        DsDataType,
-        AccDataType,
-        GPUOutType,
-        InElementOp,
-        WeiElementOp,
-        PassThroughOp,
-        AccBlockwiseOperation,
-        AccBlockwiseNextOperation,
-        ConvSpec,
-        1,
-        BlockSize,
-        HPerBlock,
-        WPerBlock,
-        CPerBlock,
-        KPerBlock,
-        HRepeat,
-        WRepeat,
-        HPerWconv,
-        WPerWconv,
-        FilterSize,
-        DilationSize,
-        DilationSize,
-        InBlockTransferThreadClusterLengths,
-        InBlockTransferScalarPerVector,
-        InBlockTransferScalarPerVector,
-        InEnableLds,
-        InBlockLdsAddExtraM,
-        WeiBlockTransferThreadClusterLengths,
-        WeiBlockTransferScalarPerVector,
-        WeiBlockTransferScalarPerVector,
-        WeiEnableLds,
-        WeiBlockLdsAddExtraM,
-        DsBlockTransferThreadClusterLengths,
-        DsBlockTransferScalarPerVector,
-        DsBlockTransferScalarPerVector,
-        DsEnableLds,
-        DsBlockLdsAddExtraM,
-        AccBlockTransferClusterLengths,
-        AccBlockTransferScalarPerVector,
-        AccEnableLds,
-        EnableAsync,
-        EnableWaveGroup,
-        false, // shuffleOnLoad
-        false, // transpose
-        Convert_to_tensor>;
+    constexpr auto DsDataTypeInfo = [&]() {
+        if constexpr(FmaMode == 0)
+        {
+            using DsDataType   = ck::Tuple<ResidualDataType>;
+            using DsDataLayout = ck::Tuple<ResidualLayout<NDimSpatial>>;
+            using DsBlockTransferThreadClusterLengths =
+                ck::Tuple<ck::Sequence<Cluster_Residual_H, Cluster_Residual_W, Cluster_Residual_K>>;
+            using DsBlockTransferScalarPerVector =
+                ck::Sequence<ResidualBlockTransferScalarPerVector>;
+            return make_tuple(DsDataType{},
+                              DsDataLayout{},
+                              DsBlockTransferThreadClusterLengths{},
+                              DsBlockTransferScalarPerVector{});
+        }
+        else if constexpr(FmaMode == 1)
+        {
+            using DsDataType   = ck::Tuple<GPUAccType, ResidualDataType>;
+            using DsDataLayout = ck::Tuple<ScaleLayout<NDimSpatial>, ResidualLayout<NDimSpatial>>;
+            using DsBlockTransferThreadClusterLengths =
+                ck::Tuple<ck::Sequence<Cluster_Scale_H, Cluster_Scale_W, Cluster_Scale_K>,
+                          ck::Sequence<Cluster_Residual_H, Cluster_Residual_W, Cluster_Residual_K>>;
+            using DsBlockTransferScalarPerVector =
+                ck::Sequence<ScaleBlockTransferScalarPerVector,
+                             ResidualBlockTransferScalarPerVector>;
+            return make_tuple(DsDataType{},
+                              DsDataLayout{},
+                              DsBlockTransferThreadClusterLengths{},
+                              DsBlockTransferScalarPerVector{});
+        }
+    }();
 
-    auto conv    = DeviceConvFwdFmaInstance{};
-    auto invoker = conv.MakeInvoker();
-    auto argument =
-        conv.MakeArgument(in_device_buf.GetDeviceBuffer(),
-                          wei_device_buf.GetDeviceBuffer(),
-                          std::array<const void*, 2>{residual_device_buf.GetDeviceBuffer(),
-                                                     scale_device_buf.GetDeviceBuffer()},
-                          out_device_buf.GetDeviceBuffer(),
-                          a_g_n_c_wis_lengths,
-                          a_g_n_c_wis_strides,
-                          b_g_k_c_xs_lengths,
-                          b_g_k_c_xs_strides,
-                          std::array<std::array<ck::index_t, NDimSpatial + 3>, 2>{
-                              {d0_g_n_k_wos_lengths, d1_g_n_k_wos_lengths}},
-                          std::array<std::array<ck::index_t, NDimSpatial + 3>, 2>{
-                              {d0_g_n_k_wos_strides, d1_g_n_k_wos_strides}},
-                          e_g_n_k_wos_lengths,
-                          e_g_n_k_wos_strides,
-                          conv_filter_strides,
-                          conv_filter_dilations,
-                          input_left_pads,
-                          input_right_pads,
-                          InElementOp{},
-                          WeiElementOp{},
-                          PassThroughOp{});
+    using DsDataType   = ck::remove_cvref_t<ck::tuple_element_t<0, decltype(DsDataTypeInfo)>>;
+    using DsDataLayout = ck::remove_cvref_t<ck::tuple_element_t<1, decltype(DsDataTypeInfo)>>;
+    using DsBlockTransferThreadClusterLengths =
+        ck::remove_cvref_t<ck::tuple_element_t<2, decltype(DsDataTypeInfo)>>;
+    using DsBlockTransferScalarPerVector =
+        ck::remove_cvref_t<ck::tuple_element_t<3, decltype(DsDataTypeInfo)>>;
+
+    using DeviceConvFwdFmaInstance =
+        ck::tensor_operation::device::DeviceConvSubaWconv<NDimSpatial,
+                                                          InputLayout<NDimSpatial>,
+                                                          WeightLayout<NDimSpatial>,
+                                                          DsDataLayout,
+                                                          OutputLayout<NDimSpatial>,
+                                                          InDataType,
+                                                          WeiDataType,
+                                                          DsDataType,
+                                                          AccDataType,
+                                                          GPUOutType,
+                                                          InElementOp,
+                                                          WeiElementOp,
+                                                          decltype(out_element_op),
+                                                          ConvSpec,
+                                                          1,
+                                                          BlockSize,
+                                                          HPerBlock,
+                                                          WPerBlock,
+                                                          CPerBlock,
+                                                          KPerBlock,
+                                                          HRepeat,
+                                                          WRepeat,
+                                                          HPerWconv,
+                                                          WPerWconv,
+                                                          FilterSize,
+                                                          DilationSize,
+                                                          DilationSize,
+                                                          InBlockTransferThreadClusterLengths,
+                                                          InBlockTransferScalarPerVector,
+                                                          InBlockTransferScalarPerVector,
+                                                          InEnableLds,
+                                                          InBlockLdsAddExtraM,
+                                                          WeiBlockTransferThreadClusterLengths,
+                                                          WeiBlockTransferScalarPerVector,
+                                                          WeiBlockTransferScalarPerVector,
+                                                          WeiEnableLds,
+                                                          WeiBlockLdsAddExtraM,
+                                                          DsBlockTransferThreadClusterLengths,
+                                                          DsBlockTransferScalarPerVector,
+                                                          DsBlockTransferScalarPerVector,
+                                                          DsEnableLds,
+                                                          DsBlockLdsAddExtraM,
+                                                          AccBlockTransferClusterLengths,
+                                                          AccBlockTransferScalarPerVector,
+                                                          AccEnableLds,
+                                                          EnableAsync,
+                                                          EnableWaveGroup,
+                                                          false,  // shuffleOnLoad
+                                                          false>; // transpose
+
+    std::array<const void*, FmaMode + 1> ds_bufs;
+    std::array<std::array<ck::index_t, NDimSpatial + 3>, FmaMode + 1> ds_lengths;
+    std::array<std::array<ck::index_t, NDimSpatial + 3>, FmaMode + 1> ds_strides;
+    if constexpr(FmaMode == 0)
+    {
+        ds_bufs[0]    = residual_device_buf.GetDeviceBuffer();
+        ds_lengths[0] = residual_g_n_k_wos_lengths;
+        ds_strides[0] = residual_g_n_k_wos_strides;
+    }
+    else if constexpr(FmaMode == 1)
+    {
+        ds_bufs[0]    = scale_device_buf.GetDeviceBuffer();
+        ds_bufs[1]    = residual_device_buf.GetDeviceBuffer();
+        ds_lengths[0] = scale_g_n_k_wos_lengths;
+        ds_lengths[1] = residual_g_n_k_wos_lengths;
+        ds_strides[0] = scale_g_n_k_wos_strides;
+        ds_strides[1] = residual_g_n_k_wos_strides;
+    }
+    auto conv     = DeviceConvFwdFmaInstance{};
+    auto invoker  = conv.MakeInvoker();
+    auto argument = conv.MakeArgument(in_device_buf.GetDeviceBuffer(),
+                                      wei_device_buf.GetDeviceBuffer(),
+                                      ds_bufs,
+                                      out_device_buf.GetDeviceBuffer(),
+                                      a_g_n_c_wis_lengths,
+                                      a_g_n_c_wis_strides,
+                                      b_g_k_c_xs_lengths,
+                                      b_g_k_c_xs_strides,
+                                      ds_lengths,
+                                      ds_strides,
+                                      e_g_n_k_wos_lengths,
+                                      e_g_n_k_wos_strides,
+                                      conv_filter_strides,
+                                      conv_filter_dilations,
+                                      input_left_pads,
+                                      input_right_pads,
+                                      InElementOp{},
+                                      WeiElementOp{},
+                                      out_element_op);
 
     if(!conv.IsSupportedArgument(argument))
     {
@@ -795,8 +911,8 @@ bool run_test()
 #endif
               << get_string<InDataType>() << ", Out:" << get_string<GPUAccType>() << ", "
               << get_string(Shape) << ", " << get_string(Filter) << ", Dilation:" << DilationSize
-              << ", LdsMod:" << LdsMode << ", ConverToTensor:" << Convert_to_tensor
-              << ", ActiveFunc:" << ActiveFun << ", WaveGroup:" << EnableWaveGroup << ", Id : 0x"
+              << ", LdsMod:" << LdsMode << ", FmaMode:" << FmaMode << ", ActiveFun:" << ActiveFun
+              << ", CvtToTensor:" << CvtToTensor << ", WaveGroup:" << EnableWaveGroup << ", Id : 0x"
               << std::hex << TestMask << " Size: { " << config.h << "x" << config.w << "x"
               << config.c << "x" << config.k << " }>: Status: ";
 

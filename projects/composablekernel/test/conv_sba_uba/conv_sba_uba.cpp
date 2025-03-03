@@ -29,8 +29,8 @@ using namespace std;
 using InElementOp         = ck::tensor_operation::element_wise::PassThrough;
 using WeiElementOp        = ck::tensor_operation::element_wise::PassThrough;
 using OutElementNoneOp    = ck::tensor_operation::element_wise::MultiplyAdd;
-using OutElementReluOp    = ck::tensor_operation::element_wise::MultiplyAddRelu;
-using OutElementTanhOp    = ck::tensor_operation::element_wise::MultiplyAddTanh;
+using OutElementReluOp    = ck::tensor_operation::element_wise::MultiplyAddRelu<>;
+using OutElementTanhOp    = ck::tensor_operation::element_wise::MultiplyAddHardTanh;
 using ActivationOp        = ck::tensor_operation::element_wise::PassThrough;
 using OutElementConvertOp = ck::tensor_operation::element_wise::Activation_Mul_Clamp<ActivationOp>;
 
@@ -463,8 +463,12 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
                 }
                 else
                 {
-                    constexpr auto accCvtInstance = ck::
-                        AccCvtTensor<EDataType, AccDataType, HPerWconv, WPerWconv, activateFunc>();
+                    constexpr auto accCvtInstance = ck::AccCvtTensor<EDataType,
+                                                                     AccDataType,
+                                                                     HPerWconv,
+                                                                     WPerWconv,
+                                                                     activateFunc,
+                                                                     true>();
 
                     if constexpr(!IsInt4)
                     {
@@ -610,6 +614,7 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
                                                                               HPerWconv,
                                                                               WPerWconv,
                                                                               activateFunc,
+                                                                              true,
                                                                               true>();
                             constexpr index_t tileOffset2 =
                                 h * WRepeat * KRepeat + w * KRepeat + k - 1;
@@ -639,6 +644,7 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
                                                                               HPerWconv,
                                                                               WPerWconv,
                                                                               activateFunc,
+                                                                              true,
                                                                               true>();
                             accCvtInstance2.cvtTensor_instr.Run(d_vec, convertScale, outVec);
                             store_out_tensor_4bit_data(h, w, k - 1, laneMask, outVec);
@@ -1640,9 +1646,9 @@ bool run_test()
     std::cout << "conv_sba_uba<In/Wei:" << get_string<InDataType>()
               << ", Out:" << get_string<GPUAccType>() << ", " << get_string(Shape) << ", "
               << get_string(Filter) << ", Dilation:" << DilationSize << ", activeFun:" << activeFunc
-              << ", ConverToTensor:" << convert_to_tensor << ", scalebiaspacked:" << scaleBiasPacked
-              << " ,uniformscale: " << uniformScale << ", Id:0x" << std::hex << TestMask
-              << ">: Status: ";
+              << ", ConvertToTensor:" << convert_to_tensor
+              << ", scalebiaspacked:" << scaleBiasPacked << " ,uniformscale: " << uniformScale
+              << ", Id:0x" << std::hex << TestMask << ">: Status: ";
 
     if(config.do_verification)
     {

@@ -26,7 +26,13 @@ enum struct WconvInstr
     wconv_f32_iu4,
     wconv_i32_iu4,
     wconv_f16_iu4,
-    wconv_bf16_iu4
+    wconv_f32i32_iu4,
+    wconv_f32i32_iu8,
+    wconv_f32_f8_bf8,
+    wconv_f32_bf8_f8,
+    wconv_f16_f8_bf8,
+    wconv_f16_bf8_f8,
+    wconv_bf16_iu4, // invalid
 };
 
 template <WconvInstr Instr,
@@ -212,6 +218,86 @@ template <index_t H,
           index_t Iters,
           bool Aco,
           bool Signed>
+struct wconv_type<WconvInstr::wconv_f32_f8_bf8,
+                  H,
+                  W,
+                  FilterSize,
+                  DilationX,
+                  DilationY,
+                  Iters,
+                  Aco,
+                  Signed>
+{
+    template <class FloatA, class FloatB, class FloatC, class Mod>
+    __device__ void Run(const FloatA& reg_wei, const FloatB reg_data, FloatC& reg_c, Mod) const
+    {
+#if defined(__gfx13__)
+        constexpr bool isHighLane = Mod{} & 1;
+        intrin_wconv_f32_f8_bf8<H,
+                                W,
+                                FilterSize,
+                                DilationX,
+                                DilationY,
+                                Iters,
+                                Aco,
+                                Signed,
+                                isHighLane>::Run(reg_wei, reg_data, reg_c);
+#else
+        ignore = reg_wei;
+        ignore = reg_data;
+        ignore = reg_c;
+#endif
+    }
+};
+
+template <index_t H,
+          index_t W,
+          index_t FilterSize,
+          index_t DilationX,
+          index_t DilationY,
+          index_t Iters,
+          bool Aco,
+          bool Signed>
+struct wconv_type<WconvInstr::wconv_f32_bf8_f8,
+                  H,
+                  W,
+                  FilterSize,
+                  DilationX,
+                  DilationY,
+                  Iters,
+                  Aco,
+                  Signed>
+{
+    template <class FloatA, class FloatB, class FloatC, class Mod>
+    __device__ void Run(const FloatA& reg_wei, const FloatB reg_data, FloatC& reg_c, Mod) const
+    {
+#if defined(__gfx13__)
+        constexpr bool isHighLane = Mod{} & 1;
+        intrin_wconv_f32_bf8_f8<H,
+                                W,
+                                FilterSize,
+                                DilationX,
+                                DilationY,
+                                Iters,
+                                Aco,
+                                Signed,
+                                isHighLane>::Run(reg_wei, reg_data, reg_c);
+#else
+        ignore = reg_wei;
+        ignore = reg_data;
+        ignore = reg_c;
+#endif
+    }
+};
+
+template <index_t H,
+          index_t W,
+          index_t FilterSize,
+          index_t DilationX,
+          index_t DilationY,
+          index_t Iters,
+          bool Aco,
+          bool Signed>
 struct wconv_type<WconvInstr::wconv_f32_iu8,
                   H,
                   W,
@@ -276,6 +362,46 @@ struct wconv_type<WconvInstr::wconv_i32_iu8,
                              Aco,
                              Signed,
                              isHighLane>::Run(reg_wei, reg_data, reg_c);
+#else
+        ignore = reg_wei;
+        ignore = reg_data;
+        ignore = reg_c;
+#endif
+    }
+};
+
+template <index_t H,
+          index_t W,
+          index_t FilterSize,
+          index_t DilationX,
+          index_t DilationY,
+          index_t Iters,
+          bool Aco,
+          bool Signed>
+struct wconv_type<WconvInstr::wconv_f32i32_iu8,
+                  H,
+                  W,
+                  FilterSize,
+                  DilationX,
+                  DilationY,
+                  Iters,
+                  Aco,
+                  Signed>
+{
+    template <class FloatA, class FloatB, class FloatC, class Mod>
+    __device__ void Run(const FloatA& reg_wei, const FloatB reg_data, FloatC& reg_c, Mod) const
+    {
+#if defined(__gfx13__)
+        constexpr bool isHighLane = Mod{} & 1;
+        intrin_wconv_f32i32_iu8<H,
+                                W,
+                                FilterSize,
+                                DilationX,
+                                DilationY,
+                                Iters,
+                                Aco,
+                                Signed,
+                                isHighLane>::Run(reg_wei, reg_data, reg_c);
 #else
         ignore = reg_wei;
         ignore = reg_data;
@@ -357,6 +483,46 @@ struct wconv_type<WconvInstr::wconv_i32_iu4,
                              Aco,
                              Signed,
                              isHighLane>::Run(reg_wei, reg_data, reg_c);
+#else
+        ignore = reg_wei;
+        ignore = reg_data;
+        ignore = reg_c;
+#endif
+    }
+};
+
+template <index_t H,
+          index_t W,
+          index_t FilterSize,
+          index_t DilationX,
+          index_t DilationY,
+          index_t Iters,
+          bool Aco,
+          bool Signed>
+struct wconv_type<WconvInstr::wconv_f32i32_iu4,
+                  H,
+                  W,
+                  FilterSize,
+                  DilationX,
+                  DilationY,
+                  Iters,
+                  Aco,
+                  Signed>
+{
+    template <class FloatA, class FloatB, class FloatC, class Mod>
+    __device__ void Run(const FloatA& reg_wei, const FloatB reg_data, FloatC& reg_c, Mod) const
+    {
+#if defined(__gfx13__)
+        constexpr bool isHighLane = Mod{} & 1;
+        intrin_wconv_f32i32_iu4<H,
+                                W,
+                                FilterSize,
+                                DilationX,
+                                DilationY,
+                                Iters,
+                                Aco,
+                                Signed,
+                                isHighLane>::Run(reg_wei, reg_data, reg_c);
 #else
         ignore = reg_wei;
         ignore = reg_data;
@@ -603,6 +769,86 @@ template <index_t H,
           index_t Iters,
           bool Aco,
           bool Signed>
+struct wconv_type<WconvInstr::wconv_f16_f8_bf8,
+                  H,
+                  W,
+                  FilterSize,
+                  DilationX,
+                  DilationY,
+                  Iters,
+                  Aco,
+                  Signed>
+{
+    template <class FloatA, class FloatB, class FloatC, class Mod>
+    __device__ void Run(const FloatA& reg_wei, const FloatB reg_data, FloatC& reg_c, Mod) const
+    {
+#if defined(__gfx13__)
+        constexpr bool isHighLane = Mod{} & 1;
+        intrin_wconv_f16_f8_bf8<H,
+                                W,
+                                FilterSize,
+                                DilationX,
+                                DilationY,
+                                Iters,
+                                Aco,
+                                Signed,
+                                isHighLane>::Run(reg_wei, reg_data, reg_c);
+#else
+        ignore = reg_wei;
+        ignore = reg_data;
+        ignore = reg_c;
+#endif
+    }
+};
+
+template <index_t H,
+          index_t W,
+          index_t FilterSize,
+          index_t DilationX,
+          index_t DilationY,
+          index_t Iters,
+          bool Aco,
+          bool Signed>
+struct wconv_type<WconvInstr::wconv_f16_bf8_f8,
+                  H,
+                  W,
+                  FilterSize,
+                  DilationX,
+                  DilationY,
+                  Iters,
+                  Aco,
+                  Signed>
+{
+    template <class FloatA, class FloatB, class FloatC, class Mod>
+    __device__ void Run(const FloatA& reg_wei, const FloatB reg_data, FloatC& reg_c, Mod) const
+    {
+#if defined(__gfx13__)
+        constexpr bool isHighLane = Mod{} & 1;
+        intrin_wconv_f16_bf8_f8<H,
+                                W,
+                                FilterSize,
+                                DilationX,
+                                DilationY,
+                                Iters,
+                                Aco,
+                                Signed,
+                                isHighLane>::Run(reg_wei, reg_data, reg_c);
+#else
+        ignore = reg_wei;
+        ignore = reg_data;
+        ignore = reg_c;
+#endif
+    }
+};
+
+template <index_t H,
+          index_t W,
+          index_t FilterSize,
+          index_t DilationX,
+          index_t DilationY,
+          index_t Iters,
+          bool Aco,
+          bool Signed>
 struct wconv_type<WconvInstr::wconv_f16_iu8,
                   H,
                   W,
@@ -644,7 +890,8 @@ template <typename WeiDataType,
           index_t DilationX,
           index_t DilationY,
           index_t Iters,
-          bool Aco>
+          bool Aco,
+          bool UseF32I32>
 struct WconvSelector
 {
     template <typename WeiDataType_, typename InDataType_, typename AccDataType_>
@@ -674,27 +921,39 @@ struct WconvSelector
     }
 
     template <>
+    constexpr auto GetWconv<f8_t, bf8_t, float_t>()
+    {
+        return WconvInstr::wconv_f32_f8_bf8;
+    }
+
+    template <>
+    constexpr auto GetWconv<bf8_t, f8_t, float_t>()
+    {
+        return WconvInstr::wconv_f32_bf8_f8;
+    }
+
+    template <>
     constexpr auto GetWconv<int8_t, int8_t, float_t>()
     {
-        return WconvInstr::wconv_f32_iu8;
+        return UseF32I32 ? WconvInstr::wconv_f32i32_iu8 : WconvInstr::wconv_f32_iu8;
     }
 
     template <>
     constexpr auto GetWconv<uint8_t, uint8_t, float_t>()
     {
-        return WconvInstr::wconv_f32_iu8;
+        return UseF32I32 ? WconvInstr::wconv_f32i32_iu8 : WconvInstr::wconv_f32_iu8;
     }
 
     template <>
     constexpr auto GetWconv<int4_t, int4_t, float_t>()
     {
-        return WconvInstr::wconv_f32_iu4;
+        return UseF32I32 ? WconvInstr::wconv_f32i32_iu4 : WconvInstr::wconv_f32_iu4;
     }
 
     template <>
     constexpr auto GetWconv<uint4_t, uint4_t, float_t>()
     {
-        return WconvInstr::wconv_f32_iu4;
+        return UseF32I32 ? WconvInstr::wconv_f32i32_iu4 : WconvInstr::wconv_f32_iu4;
     }
 
     template <>
@@ -743,6 +1002,18 @@ struct WconvSelector
     constexpr auto GetWconv<bf8_t, bf8_t, half_t>()
     {
         return WconvInstr::wconv_f16_bf8;
+    }
+
+    template <>
+    constexpr auto GetWconv<f8_t, bf8_t, half_t>()
+    {
+        return WconvInstr::wconv_f16_f8_bf8;
+    }
+
+    template <>
+    constexpr auto GetWconv<bf8_t, f8_t, half_t>()
+    {
+        return WconvInstr::wconv_f16_bf8_f8;
     }
 
     template <>
@@ -813,7 +1084,8 @@ template <typename WeiDataType,
           index_t DilationY,
           index_t Iters  = 1,
           bool WaveGroup = false,
-          bool Aco       = false>
+          bool Aco       = false,
+          bool UseF32I32 = false>
 struct WconvConv
 {
     static constexpr index_t WaveSize = 32;
@@ -1145,7 +1417,8 @@ struct WconvConv
                                                 DilationX,
                                                 DilationY,
                                                 Iters,
-                                                Aco>{};
+                                                Aco,
+                                                UseF32I32>{};
     static constexpr auto wconv_instr = wconv.selected_wconv;
 
 #pragma clang diagnostic push
@@ -1153,6 +1426,7 @@ struct WconvConv
     static __device__ void UnshuffleStridedConv2Data(const InDataVec inputQuad[4],
                                                      InDataVec unshuffleQuad[4])
     {
+#if defined(__gfx13__)
         uint32_t tmp0, tmp1, tmp2, tmp3;
         const uint32_t* pIn = reinterpret_cast<const uint32_t*>(inputQuad);
         uint32_t* pOut      = reinterpret_cast<uint32_t*>(unshuffleQuad);
@@ -1192,11 +1466,16 @@ struct WconvConv
             pOut[1] = __builtin_amdgcn_permute_pair_2src_interleave_b64(&pOut[5], tmp0, tmp2, 0x19);
             pOut[3] = __builtin_amdgcn_permute_pair_2src_interleave_b64(&pOut[7], tmp1, tmp3, 0x19);
         }
+#else
+        ignore = inputQuad;
+        ignore = unshuffleQuad;
+#endif
     }
 
     template <typename OutDataVec_>
     static __device__ void ShuffleConv2TransposedData(OutDataVec_* quadPtr[4])
     {
+#if defined(__gfx13__)
         uint32_t tmp0, tmp1, tmp2, tmp3;
         static_assert(sizeof(OutDataVec_) % sizeof(uint32_t) == 0, "");
         constexpr index_t OutDataDw = sizeof(OutDataVec_) / sizeof(uint32_t);
@@ -1251,6 +1530,9 @@ struct WconvConv
                 static_assert(false, "never called");
             }
         });
+#else
+        ignore = quadPtr;
+#endif
     }
 #pragma clang diagnostic pop
 };

@@ -19,9 +19,7 @@
 #include "ck/host_utility/device_prop.hpp"
 #include "ck/host_utility/kernel_launch.hpp"
 #include "ck/utility/loop_scheduler.hpp"
-
-template <typename T>
-struct Debug;
+#include "ck/host_utility/io.hpp"
 
 namespace ck {
 namespace tensor_operation {
@@ -40,8 +38,6 @@ template <index_t NDimSpatial,
           typename InElementwiseOperation,
           typename WeiElementwiseOperation,
           typename AccElementwiseOperation,
-          typename AccBlockwiseOperation,
-          typename AccBlockwiseNextOperation,
           ConvolutionForwardSpecialization ConvForwardSpecialization,
           index_t NumPrefetch,
           index_t BlockSize,
@@ -76,9 +72,8 @@ template <index_t NDimSpatial,
           bool AccEnableLds,
           bool EnableAsync,
           bool EnableWaveGroup,
-          bool ShuffleOnLoad  = false,
-          bool Transposed     = false,
-          bool ConverToTensor = false>
+          bool ShuffleOnLoad = false,
+          bool Transposed    = false>
 struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
                                                                     InLayout,
                                                                     WeiLayout,
@@ -119,7 +114,7 @@ struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
     static constexpr index_t GridHRepeat    = ShuffleConv2 ? HRepeat / 2 : HRepeat;
     static constexpr index_t GridWRepeat    = ShuffleConv2 ? WRepeat / 2 : WRepeat;
     static constexpr index_t GridKPerBlock  = ShuffleTransposeConv2 ? KPerBlock * 4 : KPerBlock;
-    static_assert(std::is_same<AccDataType, EDataType>::value || ConverToTensor);
+
     // Describe how data read from Global memory
     static auto
     MakeInGridDescriptor(const std::array<index_t, NDimSpatial + 3>& a_g_n_c_wis_lengths,
@@ -220,30 +215,8 @@ struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
     MakeSingleDGridDescriptor(const std::array<index_t, NDimSpatial + 3>& ds_g_n_k_wos_lengths,
                               const std::array<index_t, NDimSpatial + 3>& ds_g_n_k_wos_strides)
     {
-        if constexpr(std::is_same_v<DLayout_, tensor_layout::convolution::G_K>)
-        {
-            auto conv_in_transformer = [&]() {
-                const index_t K = ds_g_n_k_wos_lengths[2];
 
-                const auto KStride = I1;
-
-                const auto ds_desc =
-                    make_naive_tensor_descriptor(make_tuple(K), make_tuple(KStride));
-
-                return ds_desc;
-            };
-
-            const auto ds_data_raw_desc = conv_in_transformer();
-
-            const auto ds_data_desc =
-                PadTensorDescriptor(ds_data_raw_desc, make_tuple(KPerBlock), Sequence<true>{});
-
-            return ds_data_desc;
-        }
-        else
-        {
-            return MakeOutGridDescriptor<DLayout_>(ds_g_n_k_wos_lengths, ds_g_n_k_wos_strides);
-        }
+        return MakeOutGridDescriptor<DLayout_>(ds_g_n_k_wos_lengths, ds_g_n_k_wos_strides);
     }
 
     // Shape of Ds and E must be aligned. Strides can be different.
@@ -282,8 +255,6 @@ struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
                                                     InElementwiseOperation,
                                                     WeiElementwiseOperation,
                                                     AccElementwiseOperation,
-                                                    AccBlockwiseOperation,
-                                                    AccBlockwiseNextOperation,
                                                     GridHPerBlock,
                                                     GridWPerBlock,
                                                     GridCPerBlock,
@@ -316,8 +287,7 @@ struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
                                                     EnableAsync,
                                                     NumPrefetch,
                                                     EnableWaveGroup,
-                                                    GridTransposed,
-                                                    ConverToTensor>;
+                                                    GridTransposed>;
 
     // Argument
     struct Argument : public BaseArgument
@@ -407,7 +377,6 @@ struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
                 [&](auto i) { std::cout << "Ds[M, N]: " << ds_grid_desc_[i] << std::endl; });
             std::cout << "Out: " << e_grid_desc_ << std::endl;
         }
-
         // pointers
         const InDataType* p_in_grid_;
         const WeiDataType* p_wei_grid_;
@@ -614,6 +583,258 @@ struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
         // TODO: properly implement this check
         return true;
     }
+    template <typename ConvTensorLayout>
+    static bool IsConvLayoutCompatible(const std::array<index_t, NDimSpatial + 3>& lengths,
+                                       const std::array<index_t, NDimSpatial + 3>& strides)
+    {
+        constexpr bool IsNativePacked =
+            // input
+            is_same_v<ConvTensorLayout, tensor_layout::convolution::GNWC> ||
+            is_same_v<ConvTensorLayout, tensor_layout::convolution::GNHWC> ||
+            is_same_v<ConvTensorLayout, tensor_layout::convolution::GNDHWC> ||
+            // weight
+            is_same_v<ConvTensorLayout, tensor_layout::convolution::GKXC> ||
+            is_same_v<ConvTensorLayout, tensor_layout::convolution::GKYXC> ||
+            is_same_v<ConvTensorLayout, tensor_layout::convolution::GKZYXC> ||
+            // output
+            is_same_v<ConvTensorLayout, tensor_layout::convolution::GNWK> ||
+            is_same_v<ConvTensorLayout, tensor_layout::convolution::GNHWK> ||
+            is_same_v<ConvTensorLayout, tensor_layout::convolution::GNDHWK>;
+
+        constexpr bool IsStrided =
+            // input
+            is_same_v<ConvTensorLayout, tensor_layout::convolution::G_NW_C> ||
+            is_same_v<ConvTensorLayout, tensor_layout::convolution::G_NHW_C> ||
+            is_same_v<ConvTensorLayout, tensor_layout::convolution::G_NDHW_C> ||
+            // output
+            is_same_v<ConvTensorLayout, tensor_layout::convolution::G_NW_K> ||
+            is_same_v<ConvTensorLayout, tensor_layout::convolution::G_NHW_K> ||
+            is_same_v<ConvTensorLayout, tensor_layout::convolution::G_NDHW_K>;
+
+        // weight
+        constexpr bool IsStridedWeight =
+            is_same_v<ConvTensorLayout, tensor_layout::convolution::G_K_X_C> ||
+            is_same_v<ConvTensorLayout, tensor_layout::convolution::G_K_YX_C> ||
+            is_same_v<ConvTensorLayout, tensor_layout::convolution::G_K_ZYX_C>;
+
+        constexpr bool IsGCPacked =
+            // input
+            is_same_v<ConvTensorLayout, tensor_layout::convolution::NWGC> ||
+            is_same_v<ConvTensorLayout, tensor_layout::convolution::NHWGC> ||
+            is_same_v<ConvTensorLayout, tensor_layout::convolution::NDHWGC> ||
+            // weight
+            is_same_v<ConvTensorLayout, tensor_layout::convolution::KXGC> ||
+            is_same_v<ConvTensorLayout, tensor_layout::convolution::KYXGC> ||
+            is_same_v<ConvTensorLayout, tensor_layout::convolution::KZYXGC> ||
+            // output
+            is_same_v<ConvTensorLayout, tensor_layout::convolution::NWGK> ||
+            is_same_v<ConvTensorLayout, tensor_layout::convolution::NHWGK> ||
+            is_same_v<ConvTensorLayout, tensor_layout::convolution::NDHWGK>;
+
+        constexpr bool IsStridedK =
+            // bias
+            is_same_v<ConvTensorLayout, tensor_layout::convolution::G_K>;
+
+        if constexpr(IsGCPacked)
+        {
+            // remap dim order to NHWGC
+            index_t gc_remap_table[NDimSpatial + 3] = {1};
+            for(index_t i = 0; i < NDimSpatial; i++)
+            {
+                gc_remap_table[i + 1] = i + 3;
+            }
+            gc_remap_table[NDimSpatial + 1] = 0;
+            gc_remap_table[NDimSpatial + 2] = 2;
+            bool is_compatible              = strides[gc_remap_table[NDimSpatial + 2]] == 1;
+            for(index_t i = 0; i < NDimSpatial + 2; i++)
+            {
+                is_compatible &= (strides[gc_remap_table[i]] ==
+                                  lengths[gc_remap_table[i + 1]] * strides[gc_remap_table[i + 1]]);
+            }
+            return is_compatible;
+        }
+        else if constexpr(IsStridedK)
+        {
+            return true;
+        }
+        else
+        {
+            // remap dim order to GNHWC
+            index_t remap_table[NDimSpatial + 3] = {0, 1};
+            for(index_t i = 0; i < NDimSpatial; i++)
+            {
+                remap_table[i + 2] = i + 3;
+            }
+            remap_table[NDimSpatial + 2] = 2;
+
+            if constexpr(IsNativePacked)
+            {
+                bool is_compatible = strides[remap_table[NDimSpatial + 2]] == 1;
+                for(index_t i = 0; i < NDimSpatial + 2; i++)
+                {
+                    is_compatible &= (strides[remap_table[i]] ==
+                                      lengths[remap_table[i + 1]] * strides[remap_table[i + 1]]);
+                }
+                return is_compatible;
+            }
+            else if constexpr(IsStrided)
+            {
+                bool is_compatible = true;
+                for(index_t i = 0; i < NDimSpatial; i++)
+                {
+                    is_compatible &= (strides[remap_table[i + 1]] ==
+                                      lengths[remap_table[i + 2]] * strides[remap_table[i + 2]]);
+                }
+                return is_compatible;
+            }
+            else if constexpr(IsStridedWeight)
+            {
+                bool is_compatible = true;
+                for(index_t i = 0; i < NDimSpatial - 1; i++)
+                {
+                    is_compatible &= (strides[remap_table[i + 2]] ==
+                                      lengths[remap_table[i + 3]] * strides[remap_table[i + 3]]);
+                }
+                return is_compatible;
+            }
+            else
+            {
+                static_assert(0, "Unsupported layout");
+                return false;
+            }
+        }
+    }
+
+    static bool IsConvSpecializationCompatible(const Argument& arg)
+    {
+        bool is_compatible = true;
+        // Check filter size
+        if constexpr(ConvForwardSpecialization == ConvolutionForwardSpecialization::Filter1x1Pad0 ||
+                     ConvForwardSpecialization ==
+                         ConvolutionForwardSpecialization::Filter1x1Stride1Pad0)
+        {
+            for(index_t i = 0; i < NDimSpatial; i++)
+            {
+                is_compatible &= (arg.b_g_k_c_xs_lengths_[i + 3] == 1);
+            }
+        }
+        else if constexpr(ConvForwardSpecialization ==
+                              ConvolutionForwardSpecialization::Filter3x3Stride1Pad0 ||
+                          ConvForwardSpecialization ==
+                              ConvolutionForwardSpecialization::Filter3x3Stride1MultiLayerPad0)
+        {
+            for(index_t i = 0; i < NDimSpatial; i++)
+            {
+                is_compatible &= (arg.b_g_k_c_xs_lengths_[i + 3] == 3);
+            }
+        }
+        else if constexpr(ConvForwardSpecialization ==
+                              ConvolutionForwardSpecialization::Filter2x2Stride2Pad0 ||
+                          ConvForwardSpecialization ==
+                              ConvolutionForwardSpecialization::Filter2x2Stride2OddHWPad0)
+        {
+            for(index_t i = 0; i < NDimSpatial; i++)
+            {
+                is_compatible &= (arg.b_g_k_c_xs_lengths_[i + 3] == 2);
+            }
+        }
+        else
+        {
+            static_assert(0, "not supported!");
+        }
+
+        // check stride
+        if constexpr(ConvForwardSpecialization ==
+                         ConvolutionForwardSpecialization::Filter1x1Stride1Pad0 ||
+                     ConvForwardSpecialization ==
+                         ConvolutionForwardSpecialization::Filter3x3Stride1Pad0 ||
+                     ConvForwardSpecialization ==
+                         ConvolutionForwardSpecialization::Filter3x3Stride1MultiLayerPad0)
+        {
+            for(index_t i = 0; i < NDimSpatial; i++)
+            {
+                is_compatible &= (arg.conv_filter_strides_[i] == 1);
+            }
+        }
+        else if constexpr(ConvForwardSpecialization ==
+                              ConvolutionForwardSpecialization::Filter2x2Stride2Pad0 ||
+                          ConvForwardSpecialization ==
+                              ConvolutionForwardSpecialization::Filter2x2Stride2OddHWPad0)
+        {
+            for(index_t i = 0; i < NDimSpatial; i++)
+            {
+                is_compatible &= (arg.conv_filter_strides_[i] == 2);
+            }
+        }
+
+        // check pad, dilation
+        if constexpr(ConvForwardSpecialization ==
+                         ConvolutionForwardSpecialization::Filter3x3Stride1Pad0 ||
+                     ConvForwardSpecialization ==
+                         ConvolutionForwardSpecialization::Filter3x3Stride1MultiLayerPad0)
+        {
+            if constexpr(NDimSpatial == 2)
+            {
+                is_compatible &= (arg.input_left_pads_[0] == DilationX);
+                is_compatible &= (arg.input_left_pads_[1] == DilationY);
+                is_compatible &= (arg.input_right_pads_[0] == DilationX);
+                is_compatible &= (arg.input_right_pads_[1] == DilationY);
+                is_compatible &= (arg.conv_filter_dilations_[0] == DilationX);
+                is_compatible &= (arg.conv_filter_dilations_[1] == DilationY);
+            }
+            else
+            {
+                static_assert(0, "not implemented!");
+            }
+        }
+        else if constexpr(ConvForwardSpecialization ==
+                          ConvolutionForwardSpecialization::Filter2x2Stride2OddHWPad0)
+        {
+            for(index_t i = 0; i < NDimSpatial; i++)
+            {
+                is_compatible &= (arg.input_left_pads_[i] == 0);
+                if(arg.a_g_n_c_wis_lengths_[i + 3] & 1)
+                {
+                    is_compatible &= (arg.input_right_pads_[i] == 1);
+                }
+                else
+                {
+                    is_compatible &= (arg.input_right_pads_[i] == 0);
+                }
+                is_compatible &= (arg.conv_filter_dilations_[i] == 1);
+            }
+        }
+        else
+        {
+            for(index_t i = 0; i < NDimSpatial; i++)
+            {
+                is_compatible &= (arg.input_left_pads_[i] == 0);
+                is_compatible &= (arg.input_right_pads_[i] == 0);
+                is_compatible &= (arg.conv_filter_dilations_[i] == 1);
+            }
+        }
+
+        if constexpr(ConvForwardSpecialization ==
+                     ConvolutionForwardSpecialization::Filter3x3Stride1Pad0)
+        {
+            is_compatible &= (arg.a_g_n_c_wis_lengths_[1] == 1);
+            is_compatible &= (arg.e_g_n_k_wos_lengths_[1] == 1);
+        }
+
+        if constexpr(ConvForwardSpecialization ==
+                     ConvolutionForwardSpecialization::Filter2x2Stride2Pad0)
+        {
+            for(index_t i = 0; i < NDimSpatial; i++)
+            {
+                if(arg.a_g_n_c_wis_lengths_[i + 3] & 1)
+                {
+                    is_compatible = false;
+                }
+            }
+        }
+
+        return is_compatible;
+    }
 
     static bool IsSupportedArgument(const Argument& arg)
     {
@@ -624,13 +845,13 @@ struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
             if constexpr(!(is_same_v<AccDataType, float> || is_same_v<AccDataType, ck::half_t> ||
                            is_same_v<AccDataType, ck::bhalf_t> || is_same_v<AccDataType, int32_t>))
             {
-                printf("DeviceOp err: AccDataType");
+                printf("DeviceOp err: AccDataType\n");
                 return false;
             }
         }
         else
         {
-            printf("DeviceOp err: Arch");
+            printf("DeviceOp err: Arch\n");
             return false;
         }
 
@@ -638,82 +859,88 @@ struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
                       "ShuffleOnLoad only can be used in conv2");
         static_assert((Transposed == false) || (FilterSize == 2),
                       "Transposed conv only support conv2 for now.");
-        // check ConvolutionForwardSpecialization
-        if constexpr(FilterSize == 1)
+
+        bool input_layout_compatible =
+            IsConvLayoutCompatible<InLayout>(arg.a_g_n_c_wis_lengths_, arg.a_g_n_c_wis_strides_);
+        if(input_layout_compatible == false)
         {
-            static_assert(ConvForwardSpecialization ==
-                                  ConvolutionForwardSpecialization::Filter1x1Stride1Pad0 ||
-                              ConvForwardSpecialization ==
-                                  ConvolutionForwardSpecialization::Filter1x1Pad0,
-                          "");
-
-            // check if it's 1x1, stride=1 conv
-            for(index_t i = 0; i < NDimSpatial; ++i)
-            {
-                const index_t X          = arg.b_g_k_c_xs_lengths_[i + 3];
-                const index_t ConvStride = arg.conv_filter_strides_[i];
-                const index_t LeftPad    = arg.input_left_pads_[i];
-                const index_t RightPad   = arg.input_right_pads_[i];
-
-                if(!(X == 1 && ConvStride == 1 && LeftPad == 0 && RightPad == 0))
-                {
-                    return false;
-                }
-            }
-        }
-        else if constexpr(FilterSize == 2)
-        {
-            static_assert(ConvForwardSpecialization ==
-                                  ConvolutionForwardSpecialization::Filter2x2Stride2Pad0 ||
-                              ConvForwardSpecialization ==
-                                  ConvolutionForwardSpecialization::Filter2x2Stride2OddHWPad0,
-                          "");
-            static_assert(NDimSpatial == 2, "Only support 2d for conv2");
-
-            // check if it's 2x2, stride=2 conv
-            for(index_t i = 0; i < NDimSpatial; ++i)
-            {
-                const index_t X          = arg.b_g_k_c_xs_lengths_[i + 3];
-                const index_t ConvStride = arg.conv_filter_strides_[i];
-                const index_t LeftPad    = arg.input_left_pads_[i];
-                const index_t RightPad   = arg.input_right_pads_[i];
-
-                if(!(X == 2 && ConvStride == 2 && LeftPad == 0 && RightPad == 0))
-                {
-                    return false;
-                }
-            }
-        }
-        else if constexpr(FilterSize == 3)
-        {
-            static_assert(ConvForwardSpecialization ==
-                                  ConvolutionForwardSpecialization::Filter3x3Stride1Pad0 ||
-                              ConvForwardSpecialization ==
-                                  ConvolutionForwardSpecialization::Filter3x3Stride1MultiLayerPad0,
-                          "");
-
-            for(index_t i = 0; i < NDimSpatial; ++i)
-            {
-                const index_t X          = arg.b_g_k_c_xs_lengths_[i + 3];
-                const index_t ConvStride = arg.conv_filter_strides_[i];
-                const index_t LeftPad    = arg.input_left_pads_[i];
-                const index_t RightPad   = arg.input_right_pads_[i];
-                const index_t Dilation   = arg.conv_filter_dilations_[i];
-                if(!(X == 3 && ConvStride == 1 && (Dilation < 3) && LeftPad == Dilation &&
-                     RightPad == Dilation))
-                {
-                    return false;
-                }
-            }
-        }
-        else
-        {
-            static_assert(0, "un-supported filter size");
+            printf("Input data incompatible with layout!\n");
             return false;
         }
 
+        bool weight_layout_compatible =
+            IsConvLayoutCompatible<WeiLayout>(arg.b_g_k_c_xs_lengths_, arg.b_g_k_c_xs_strides_);
+        if(weight_layout_compatible == false)
+        {
+            printf("Weight data incompatible with layout!\n");
+            return false;
+        }
+
+        bool output_layout_compatible =
+            IsConvLayoutCompatible<ELayout>(arg.e_g_n_k_wos_lengths_, arg.e_g_n_k_wos_strides_);
+        if(output_layout_compatible == false)
+        {
+            printf("Output data incompatible with layout!\n");
+            return false;
+        }
+
+        // check ConvolutionForwardSpecialization
+        bool conv_desc_compatible = IsConvSpecializationCompatible(arg);
+        if(conv_desc_compatible == false)
+        {
+            return false;
+        }
+
+        // check g
+        if(arg.a_g_n_c_wis_lengths_[0] != arg.b_g_k_c_xs_lengths_[0] ||
+           arg.a_g_n_c_wis_lengths_[0] != arg.e_g_n_k_wos_lengths_[0])
+        {
+            return false;
+        }
+
+        for(index_t i = 0; i < NumDTensor; i++)
+        {
+            if(arg.a_g_n_c_wis_lengths_[0] != arg.ds_g_n_k_wos_lengths_[i][0])
+            {
+                return false;
+            }
+        }
+
+        // check output dim
+        {
+            std::array<index_t, NDimSpatial + 3> output_spatial_lengths;
+            if constexpr(Transposed == false)
+            {
+
+                static_for<0, NDimSpatial, 1>{}([&](auto i) {
+                    const index_t x_eff =
+                        (arg.b_g_k_c_xs_lengths_[i + 3] - 1) * arg.conv_filter_dilations_[i] + 1;
+                    output_spatial_lengths[i] =
+                        (arg.a_g_n_c_wis_lengths_[i + 3] + arg.input_left_pads_[i] +
+                         arg.input_right_pads_[i] - x_eff) /
+                            arg.conv_filter_strides_[i] +
+                        1;
+                });
+            }
+            else
+            {
+                static_for<0, NDimSpatial, 1>{}([&](auto i) {
+                    const ck::long_index_t x_eff =
+                        arg.b_g_k_c_xs_lengths_[i + 3] - arg.conv_filter_strides_[i];
+
+                    output_spatial_lengths[i] =
+                        arg.a_g_n_c_wis_lengths_[i + 3] * arg.conv_filter_strides_[i] + x_eff -
+                        arg.input_left_pads_[i] - arg.input_right_pads_[i];
+                });
+            }
+            for(index_t i = 0; i < NDimSpatial; i++)
+            {
+                if(output_spatial_lengths[i] != arg.e_g_n_k_wos_lengths_[i + 3])
+                    return false;
+            };
+        }
+
         // check vector access of InData
-        // FIXME: layout
         if constexpr(is_same_v<InLayout, ctc::G_NW_C> || is_same_v<InLayout, ctc::G_NHW_C> ||
                      is_same_v<InLayout, ctc::G_NDHW_C> || is_same_v<InLayout, ctc::GNWC> ||
                      is_same_v<InLayout, ctc::GNHWC> || is_same_v<InLayout, ctc::GNDHWC> ||
@@ -733,7 +960,6 @@ struct DeviceConvSubaWconv : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
         }
 
         // check vector access of WeiData
-        // FIXME: layout
         if constexpr(is_same_v<WeiLayout, ctc::G_K_X_C> || is_same_v<WeiLayout, ctc::G_K_YX_C> ||
                      is_same_v<WeiLayout, ctc::G_K_ZYX_C> || is_same_v<WeiLayout, ctc::GKXC> ||
                      is_same_v<WeiLayout, ctc::GKYXC> || is_same_v<WeiLayout, ctc::GKZYXC> ||

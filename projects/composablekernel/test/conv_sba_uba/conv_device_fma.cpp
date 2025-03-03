@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Copyriconv_device_impl.hght (c) 2018-2024, Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (c) 2018-2024, Advanced Micro Devices, Inc. All rights reserved.
 #include "conv_device_fma_cvt_tensor_impl.h"
 
 // clang-format on
@@ -26,20 +26,23 @@ bool run_test_fmt()
 #endif
 
     // clang-format off
-    //                                                                    |ShapeType |Lds |WaveGroup | ActiveFunc | convert_to_tensor | TestMask
+    //                                                          |ShapeType |Lds |WaveGroup |FmaMode | ActiveFunc | CvtToTensor | TestMask
     if constexpr(std::is_same<GPUAccType, float>::value)
     {
-        pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, SrcType, Shape_4X2, 0,       WaveGroup, 0, 0, TestMask | 0x10000>();
-        pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, SrcType, Shape_4X2, LdsMode, WaveGroup, 0, 0, TestMask | 0x20000>();
+        pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, SrcType, Shape_4X2, 0,       WaveGroup, 1, 0, 0, TestMask | 0x10000>();
+        pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, SrcType, Shape_4X2, LdsMode, WaveGroup, 1, 0, 0, TestMask | 0x20000>();
+        pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, SrcType, Shape_4X2, 0,       WaveGroup, 0, 0, 0, TestMask | 0x40000>();
+        pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, SrcType, Shape_4X2, 0,       WaveGroup, 0, 1, 0, TestMask | 0x80000>();
+        pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, SrcType, Shape_4X2, 0,       WaveGroup, 1, 1, 0, TestMask | 0x100000>();
      }
     else
     {
-        pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, SrcType, Shape_4X2, 0,       WaveGroup, 0, 0, TestMask | 0x10000>();
-        pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, SrcType, Shape_4X2, LdsMode, WaveGroup, 0, 0, TestMask | 0x80000>();
-        pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, SrcType, Shape_4X4, 0,       WaveGroup, 0, 0, TestMask | 0x20000>();
-        pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, SrcType, Shape_8X4, 0,       WaveGroup, 0, 0, TestMask | 0x40000>();
-        pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, SrcType, Shape_4X4, LdsMode, WaveGroup, 0, 0, TestMask | 0x100000>();
-        pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, SrcType, Shape_8X4, LdsMode, WaveGroup, 0, 0, TestMask | 0x200000>();
+        pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, SrcType, Shape_4X2, 0,       WaveGroup, 1, 0, 0, TestMask | 0x10000>();
+        pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, SrcType, Shape_4X2, LdsMode, WaveGroup, 1, 0, 0, TestMask | 0x80000>();
+        pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, SrcType, Shape_4X4, 0,       WaveGroup, 1, 0, 0, TestMask | 0x20000>();
+        pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, SrcType, Shape_8X4, 0,       WaveGroup, 1, 0, 0, TestMask | 0x40000>();
+        pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, SrcType, Shape_4X4, LdsMode, WaveGroup, 1, 0, 0, TestMask | 0x100000>();
+        pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, SrcType, Shape_8X4, LdsMode, WaveGroup, 1, 0, 0, TestMask | 0x200000>();
      }
     // clang-format on
     return pass;

@@ -66,6 +66,7 @@ namespace conv_op_util {
 template <typename InDataType,
           typename WeiDataType,
           typename AccDataType,
+          bool UseF32I32,
           index_t HPerWconv,
           index_t WPerWconv,
           index_t FilterSize,
@@ -85,7 +86,11 @@ __global__ void __launch_bounds__(64, 1)
                                              WPerWconv,
                                              FilterSize,
                                              DilationX,
-                                             DilationY>();
+                                             DilationY,
+                                             1,
+                                             false,
+                                             false,
+                                             UseF32I32>();
 
     auto in  = reinterpret_cast<const typename decltype(wconvConv)::KernelInDataType*>(in_);
     auto wei = reinterpret_cast<const typename decltype(wconvConv)::KernelWeightDataType*>(wei_);
@@ -321,6 +326,7 @@ __global__ void __launch_bounds__(64, 1)
 template <typename InDataType,
           typename WeiDataType,
           typename AccDataType,
+          bool UseF32I32,
           index_t HPerWconv,
           index_t WPerWconv,
           index_t FilterSize,
@@ -343,7 +349,11 @@ __global__ void __launch_bounds__(64, 1)
                                              WPerWconv,
                                              FilterSize,
                                              DilationX,
-                                             DilationY>();
+                                             DilationY,
+                                             1,
+                                             false,
+                                             false,
+                                             UseF32I32>();
 
     auto in  = reinterpret_cast<const typename decltype(wconvConv)::KernelInDataType*>(in_);
     auto wei = reinterpret_cast<const typename decltype(wconvConv)::KernelWeightDataType*>(wei_);
@@ -819,6 +829,7 @@ const char* get_string(FilterType filter)
 template <typename InDataType,
           typename WeiDataType,
           typename GPUAccType,
+          bool UseF32I32,
           ShapeType Shape,
           FilterType Filter,
           bool Dilation,
@@ -848,7 +859,11 @@ bool run_test()
                                              WPerWconv,
                                              FilterSize,
                                              DilationSize,
-                                             DilationSize>();
+                                             DilationSize,
+                                             1,
+                                             false,
+                                             false,
+                                             UseF32I32>();
     constexpr ck::index_t Width  = WPerWconv * DEFAULT_W_REPEAT;
     constexpr ck::index_t Height = HPerWconv * DEFAULT_H_REPEAT;
     constexpr ck::index_t InputChannels =
@@ -1028,6 +1043,7 @@ bool run_test()
         auto conv_kernel = ck::conv_op_util::conv_fwd<InDataType,
                                                       WeiDataType,
                                                       GPUAccType,
+                                                      UseF32I32,
                                                       HPerWconv,
                                                       WPerWconv,
                                                       FilterSize,
@@ -1046,6 +1062,7 @@ bool run_test()
         auto conv_kernel = ck::conv_op_util::conv3_fwd<InDataType,
                                                        WeiDataType,
                                                        GPUAccType,
+                                                       UseF32I32,
                                                        HPerWconv,
                                                        WPerWconv,
                                                        FilterSize,
@@ -1092,7 +1109,11 @@ bool run_test()
     }
 }
 
-template <typename SrcType, typename GPUAccType, int32_t TestMask>
+template <typename InDataType,
+          typename WeiDataType,
+          typename GPUAccType,
+          bool UseF32I32,
+          int32_t TestMask>
 bool run_test_fmt()
 {
     if((config.test_mask & TestMask) == 0)
@@ -1101,24 +1122,24 @@ bool run_test_fmt()
     }
     bool pass = true;
     // clang-format off
-    //                                                        |ShapeType |FilterType |Dilation |TestMask
+    //                                                                  |ShapeType |FilterType |Dilation |TestMask
     if constexpr(std::is_same<GPUAccType, float>::value || std::is_same<GPUAccType, int32_t>::value)
     {
-        pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X2, Filter_1X1, false, TestMask | 0x10000  >();
-        pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X2, Filter_3X3, false, TestMask | 0x20000  >();
-        pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X2, Filter_3X3, true,  TestMask | 0x40000  >();
+        pass &= run_test<InDataType, WeiDataType, GPUAccType, UseF32I32, Shape_4X2, Filter_1X1, false, TestMask | 0x10000  >();
+        pass &= run_test<InDataType, WeiDataType, GPUAccType, UseF32I32, Shape_4X2, Filter_3X3, false, TestMask | 0x20000  >();
+        pass &= run_test<InDataType, WeiDataType, GPUAccType, UseF32I32, Shape_4X2, Filter_3X3, true,  TestMask | 0x40000  >();
     }
     else
     {
-        pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X2, Filter_1X1, false, TestMask | 0x80000  >();
-        pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X4, Filter_1X1, false, TestMask | 0x100000 >();
-        pass &= run_test<SrcType, SrcType, GPUAccType, Shape_8X4, Filter_1X1, false, TestMask | 0x200000 >();
-        pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X2, Filter_3X3, false, TestMask | 0x400000 >();
-        pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X4, Filter_3X3, false, TestMask | 0x800000 >();
-        pass &= run_test<SrcType, SrcType, GPUAccType, Shape_8X4, Filter_3X3, false, TestMask | 0x1000000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X2, Filter_3X3, true,  TestMask | 0x2000000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X4, Filter_3X3, true,  TestMask | 0x4000000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, Shape_8X4, Filter_3X3, true,  TestMask | 0x8000000>();
+        pass &= run_test<InDataType, WeiDataType, GPUAccType, UseF32I32, Shape_4X2, Filter_1X1, false, TestMask | 0x80000  >();
+        pass &= run_test<InDataType, WeiDataType, GPUAccType, UseF32I32, Shape_4X4, Filter_1X1, false, TestMask | 0x100000 >();
+        pass &= run_test<InDataType, WeiDataType, GPUAccType, UseF32I32, Shape_8X4, Filter_1X1, false, TestMask | 0x200000 >();
+        pass &= run_test<InDataType, WeiDataType, GPUAccType, UseF32I32, Shape_4X2, Filter_3X3, false, TestMask | 0x400000 >();
+        pass &= run_test<InDataType, WeiDataType, GPUAccType, UseF32I32, Shape_4X4, Filter_3X3, false, TestMask | 0x800000 >();
+        pass &= run_test<InDataType, WeiDataType, GPUAccType, UseF32I32, Shape_8X4, Filter_3X3, false, TestMask | 0x1000000>();
+        pass &= run_test<InDataType, WeiDataType, GPUAccType, UseF32I32, Shape_4X2, Filter_3X3, true,  TestMask | 0x2000000>();
+        pass &= run_test<InDataType, WeiDataType, GPUAccType, UseF32I32, Shape_4X4, Filter_3X3, true,  TestMask | 0x4000000>();
+        pass &= run_test<InDataType, WeiDataType, GPUAccType, UseF32I32, Shape_8X4, Filter_3X3, true,  TestMask | 0x8000000>();
     }
     // clang-format on
 
@@ -1176,25 +1197,33 @@ int main(int argc, char* argv[])
     }
 
     // clang-format off
-    //                  |SrcType     |GPUAccType
-    pass &= run_test_fmt<ck::half_t,  float,       0x1   >();
-    pass &= run_test_fmt<ck::bhalf_t, float,       0x2   >();
-    pass &= run_test_fmt<ck::f8_t,    float,       0x4   >();
-    pass &= run_test_fmt<ck::bf8_t,   float,       0x8   >();
-    pass &= run_test_fmt<int8_t,      float,       0x10  >();
-    pass &= run_test_fmt<int8_t,      int32_t,     0x20  >();
+    //                  |InDataType  |WeiDataType |GPUAccType F32I32
+    pass &= run_test_fmt<ck::half_t,  ck::half_t, float,       false, 0x1   >();
+    pass &= run_test_fmt<ck::bhalf_t, ck::bhalf_t,float,       false, 0x2   >();
+    pass &= run_test_fmt<ck::f8_t,    ck::f8_t,   float,       false, 0x4   >();
+    pass &= run_test_fmt<ck::bf8_t,   ck::f8_t,   float,       false, 0x4   >();
+    pass &= run_test_fmt<ck::bf8_t,   ck::bf8_t,  float,       false, 0x8   >();
+    pass &= run_test_fmt<ck::f8_t,    ck::bf8_t,  float,       false, 0x8   >();
+    pass &= run_test_fmt<int8_t,      int8_t,     float,       false, 0x10  >();
+    //crash Cannot select: intrinsic %llvm.amdgcn.convolve.f32i32.iu8.1x1
+    //pass &= run_test_fmt<int8_t,      int8_t,     float,       true,  0x10  >();
+    pass &= run_test_fmt<int8_t,      int8_t,     int32_t,     false, 0x20  >();
 
-    pass &= run_test_fmt<ck::half_t,  ck::half_t,  0x40  >();
-    pass &= run_test_fmt<ck::bhalf_t, ck::bhalf_t, 0x80  >();
-    pass &= run_test_fmt<ck::f8_t,    ck::half_t,  0x100 >();
-    pass &= run_test_fmt<ck::bf8_t,   ck::half_t,  0x200 >();
-    pass &= run_test_fmt<int8_t,      ck::half_t,  0x400 >();
-    pass &= run_test_fmt<ck::half_t,  float,       0x4000>();
-    pass &= run_test_fmt<ck::half_t,  ck::half_t,  0x8000>();
+    pass &= run_test_fmt<ck::half_t,  ck::half_t, ck::half_t,  false, 0x40  >();
+    pass &= run_test_fmt<ck::bhalf_t, ck::bhalf_t,ck::bhalf_t, false, 0x80  >();
+    pass &= run_test_fmt<ck::f8_t,    ck::f8_t,   ck::half_t,  false, 0x100 >();
+    pass &= run_test_fmt<ck::bf8_t,   ck::f8_t,   ck::half_t,  false, 0x100 >();
+    pass &= run_test_fmt<ck::bf8_t,   ck::bf8_t,  ck::half_t,  false, 0x200 >();
+    pass &= run_test_fmt<ck::f8_t,    ck::bf8_t,  ck::half_t,  false, 0x200 >();
+    pass &= run_test_fmt<int8_t,      int8_t,     ck::half_t,  false, 0x400 >();
+    pass &= run_test_fmt<ck::half_t,  ck::half_t, float,       false, 0x4000>();
+    pass &= run_test_fmt<ck::half_t,  ck::half_t, ck::half_t,  false, 0x8000>();
 #ifdef CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
-    pass &= run_test_fmt<ck::int4_t,  float,       0x800 >();
-    pass &= run_test_fmt<ck::int4_t,  int32_t,     0x1000>();
-    pass &= run_test_fmt<ck::int4_t,  ck::half_t,  0x2000>();
+    pass &= run_test_fmt<ck::int4_t,  ck::int4_t, float,       false, 0x800 >();
+    //crash intrinsic %llvm.amdgcn.convolve.f32i32.iu4.1x1
+    //pass &= run_test_fmt<ck::int4_t,  ck::int4_t, float,       true,  0x800 >();
+    pass &= run_test_fmt<ck::int4_t,  ck::int4_t, int32_t,     false, 0x1000>();
+    pass &= run_test_fmt<ck::int4_t,  ck::int4_t, ck::half_t,  false, 0x2000>();
 #endif
     // clang-format on
 

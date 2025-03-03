@@ -119,13 +119,13 @@ struct TransformConvFwdToWconv
                 in_n_hi_wi_c_desc,
                 make_tuple(make_pass_through_transform(N),
                            make_pad_transform(I1, 0, I1),
-                           make_pad_transform(Wi, 0, Wi & 2),
+                           make_pad_transform(Wi, 0, Wi & 1),
                            make_pass_through_transform(C)),
                 make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}, Sequence<3>{}),
                 make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}, Sequence<3>{}));
 
             const index_t HiP                      = 2;
-            const index_t WiP                      = Wi + (Wi & 2);
+            const index_t WiP                      = Wi + (Wi & 1);
             const auto in_n_hip_wip_c_unmerge_desc = transform_tensor_descriptor(
                 in_n_hip_wip_c_desc,
                 make_tuple(make_pass_through_transform(N),
@@ -335,12 +335,12 @@ struct TransformConvFwdToWconv
                 const auto in_n_hip_wi_c_desc = transform_tensor_descriptor(
                     in_n_hi_wi_c_desc,
                     make_tuple(make_pass_through_transform(N),
-                               make_pad_transform(Hi, 0, Hi & 2),
+                               make_pad_transform(Hi, 0, Hi & 1),
                                make_pass_through_transform(Wi),
                                make_pass_through_transform(C)),
                     make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}, Sequence<3>{}),
                     make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}, Sequence<3>{}));
-                const index_t HiP = Hi + (Hi & 2);
+                const index_t HiP = Hi + (Hi & 1);
                 return transform_tensor_descriptor(
                     in_n_hip_wi_c_desc,
                     make_tuple(make_merge_transform(make_tuple(N, HiP)),
@@ -358,14 +358,14 @@ struct TransformConvFwdToWconv
                 const auto in_n_hip_wip_c_desc = transform_tensor_descriptor(
                     in_n_hi_wi_c_desc,
                     make_tuple(make_pass_through_transform(N),
-                               make_pad_transform(Hi, 0, Hi & 2),
-                               make_pad_transform(Wi, 0, Wi & 2),
+                               make_pad_transform(Hi, 0, Hi & 1),
+                               make_pad_transform(Wi, 0, Wi & 1),
                                make_pass_through_transform(C)),
                     make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}, Sequence<3>{}),
                     make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}, Sequence<3>{}));
 
-                const index_t HiP                      = Hi + (Hi & 2);
-                const index_t WiP                      = Wi + (Wi & 2);
+                const index_t HiP                      = Hi + (Hi & 1);
+                const index_t WiP                      = Wi + (Wi & 1);
                 const auto in_n_hip_wip_c_unmerge_desc = transform_tensor_descriptor(
                     in_n_hip_wip_c_desc,
                     make_tuple(make_pass_through_transform(N),
@@ -531,16 +531,16 @@ struct TransformConvFwdToWconv
                 in_n_di_hi_wi_c_desc,
                 make_tuple(make_pass_through_transform(N),
                            make_pass_through_transform(Di),
-                           make_pad_transform(Hi, 0, Hi & 2),
-                           make_pad_transform(Wi, 0, Wi & 2),
+                           make_pad_transform(Hi, 0, Hi & 1),
+                           make_pad_transform(Wi, 0, Wi & 1),
                            make_pass_through_transform(C)),
                 make_tuple(
                     Sequence<0>{}, Sequence<1>{}, Sequence<2>{}, Sequence<3>{}, Sequence<4>{}),
                 make_tuple(
                     Sequence<0>{}, Sequence<1>{}, Sequence<2>{}, Sequence<3>{}, Sequence<4>{}));
 
-            const index_t HiP                         = Hi + (Hi & 2);
-            const index_t WiP                         = Wi + (Wi & 2);
+            const index_t HiP                         = Hi + (Hi & 1);
+            const index_t WiP                         = Wi + (Wi & 1);
             const auto in_n_di_hip_wip_c_unmerge_desc = transform_tensor_descriptor(
                 in_n_di_hip_wip_c_desc,
                 make_tuple(make_pass_through_transform(N),

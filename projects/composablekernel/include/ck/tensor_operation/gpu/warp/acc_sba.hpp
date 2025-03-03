@@ -478,7 +478,7 @@ struct AccSba
         // ToDo for VGPR split
         index_t K_offset            = 0;
         ck::index_t perThreadNumber = 0;
-        auto laneId                 = get_thread_local_1d_id() & (WaveSize - 1);
+        auto laneId                 = get_lane_id();
         if constexpr(scaleBiasPacked)
         {
             perThreadNumber = 1;

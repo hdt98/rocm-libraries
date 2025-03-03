@@ -133,32 +133,33 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
     using AccBlockwiseOperation     = ck::convolution::BlockwiseElementOpPassThrough;
     using AccBlockwiseNextOperation = ck::convolution::BlockwiseElementOpPassThrough;
     using ThisThreadBlock           = ThisThreadBlock<BlockSize>;
-    auto blockwise_conv             = BlockwiseSubaConvWconv<ThisThreadBlock,
-                                                 WeiDataType,
-                                                 InDataType,
-                                                 EmptyTuple,
-                                                 AccDataType,
-                                                 AccDataType,
-                                                 AccBlockwiseOperation,
-                                                 AccBlockwiseNextOperation,
-                                                 decltype(WeiDataBlockDesc),
-                                                 decltype(InDataBlockDesc),
-                                                 EmptyTuple,
-                                                 HPerBlock,
-                                                 WPerBlock,
-                                                 CPerBlock,
-                                                 KPerBlock,
-                                                 HRepeat,
-                                                 WRepeat,
-                                                 HPerWconv,
-                                                 WPerWconv,
-                                                 FilterSize,
-                                                 DilationX,
-                                                 DilationY,
-                                                 true,
-                                                 true>{};
-    auto accum_thread_buf           = blockwise_conv.template MakeAccumThreadBuffer<false>(c);
-    auto output_thread_buf          = blockwise_conv.MakeOutThreadBuffer(c);
+    auto blockwise_conv =
+        BlockwiseSubaConvWconv<ThisThreadBlock,
+                               WeiDataType,
+                               InDataType,
+                               EmptyTuple,
+                               AccDataType,
+                               AccDataType,
+                               AccBlockwiseOperation,
+                               AccBlockwiseNextOperation,
+                               decltype(WeiDataBlockDesc),
+                               decltype(InDataBlockDesc),
+                               EmptyTuple,
+                               HPerBlock,
+                               WPerBlock,
+                               CPerBlock,
+                               KPerBlock,
+                               HRepeat,
+                               WRepeat,
+                               HPerWconv,
+                               WPerWconv,
+                               FilterSize,
+                               DilationX,
+                               DilationY,
+                               true,
+                               true>{AccBlockwiseOperation{}, AccBlockwiseNextOperation{}};
+    auto accum_thread_buf  = blockwise_conv.template MakeAccumThreadBuffer<false>(c);
+    auto output_thread_buf = blockwise_conv.MakeOutThreadBuffer(c);
     // Data layout: HWC, unit: InDataType
     constexpr index_t data_H_stride = Width * InputChannels;
     constexpr index_t data_W_stride = InputChannels;

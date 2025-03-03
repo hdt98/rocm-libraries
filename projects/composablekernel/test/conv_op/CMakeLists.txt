@@ -47,3 +47,8 @@ target_compile_options(test_conv_device_transposed_wavegroup PRIVATE -save-temps
 add_test_executable(test_conv_fma conv_fma.cpp)
 target_link_libraries(test_conv_fma PRIVATE utility)
 target_compile_options(test_conv_fma PRIVATE -save-temps=obj -Wno-gnu-line-marker)
+
+add_gtest_executable(test_grouped_conv_fwd_wconv_interface grouped_conv_fwd_wconv_interface.cpp)
+if(result EQUAL 0)
+    target_link_libraries(test_grouped_conv_fwd_wconv_interface PRIVATE utility)
+endif()
