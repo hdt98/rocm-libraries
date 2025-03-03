@@ -159,14 +159,14 @@ install_packages( )
   fi
 
   # dependencies needed for library and clients to build
-  local library_dependencies_ubuntu=( "gfortran" "make" "pkg-config" "libnuma1" "git")
+  local library_dependencies_ubuntu=( "gfortran" "make" "pkg-config" "libnuma1" "git" "python3-venv")
   local library_dependencies_centos=( "epel-release" "make" "gcc-c++" "rpm-build" )
   local library_dependencies_centos8=( "epel-release" "make" "gcc-c++" "rpm-build" "numactl-libs" )
   local library_dependencies_fedora=( "gcc-gfortran" "make" "gcc-c++" "libcxx-devel" "rpm-build" "numactl-libs" )
   local library_dependencies_sles=( "gcc-fortran" "make" "gcc-c++" "libcxxtools9" "rpm-build" )
   local library_dependencies_mariner=( "gfortran" "make" "rpm-build" )
 
-  local client_dependencies_ubuntu=( "python3" "python3-yaml")
+  local client_dependencies_ubuntu=( "python3" "python3-yaml" "llvm-dev")
   local client_dependencies_centos=( "python36" "python3-pip" )
   local client_dependencies_centos8=( "python39" "python3-virtualenv" )
   local client_dependencies_fedora=( "python36" "PyYAML" "python3-pip" )
