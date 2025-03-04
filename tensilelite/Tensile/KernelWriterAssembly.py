@@ -10058,7 +10058,8 @@ class KernelWriterAssembly(KernelWriter):
         isSingleKernel and \
         ((kernel["ProblemType"]["DataTypeA"].numRegisters() <= kernel["ProblemType"]["DataType"].numRegisters()) or \
         (kernel["ProblemType"]["DataTypeB"].numRegisters() <= kernel["ProblemType"]["DataType"].numRegisters())):
-        assert(kernel["ProblemType"]["ComputeDataType"].isSingle())
+        assert(kernel["ProblemType"]["ComputeDataType"].isSingle() or kernel["ProblemType"]["ComputeDataType"].isInt32())
+
         sgprScaleA = self.sgprPool.checkOut(1, preventOverflow=False)
         sgprScaleB = self.sgprPool.checkOut(1, preventOverflow=False)
         for i,name in enumerate(['A','B']):
@@ -10315,7 +10316,8 @@ class KernelWriterAssembly(KernelWriter):
       if kernel["ProblemType"]["UseScaleAB"] == "Scalar" and ((kernel["GlobalSplitU"] == 1 or kernel["StreamK"] > 0) or kernel["_GlobalAccumulation"] == 'MultipleBufferSingleKernel') and \
         ((kernel["ProblemType"]["DataTypeA"].numRegisters() <= kernel["ProblemType"]["DataType"].numRegisters()) or \
         (kernel["ProblemType"]["DataTypeB"].numRegisters() <= kernel["ProblemType"]["DataType"].numRegisters())):
-        assert(kernel["ProblemType"]["ComputeDataType"].isSingle())
+        assert(kernel["ProblemType"]["ComputeDataType"].isSingle() or kernel["ProblemType"]["ComputeDataType"].isInt32())
+
         newAlphaVgpr = self.vgprPool.checkOut(1)
         module.add(VMovB32(dst=vgpr(newAlphaVgpr), src=sgpr("Alpha")))
         module.add(SWaitCnt(lgkmcnt=0, kmcnt=0, comment="wait for scaleAB load"))

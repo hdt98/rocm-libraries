@@ -1243,7 +1243,8 @@ class GlobalWriteBatchWriter:
         for vi in range(0, self.gwvw):
           inputVgpr = dataBias + + (0 if self.factorDim else vi)
           sumIdxV   = self.ss.elementSumIdx[elementIdx] + vi
-          if self.kernel["ProblemType"]["ComputeDataType"].isSingle():
+          if self.kernel["ProblemType"]["ComputeDataType"].isSingle() or self.kernel["ProblemType"]["ComputeDataType"].isInt32():
+  
             vgprIdx = sumIdxV - self.parentWriter.states.c.startVgprValu
             vgprDst = (self.activationSetPCStruct.vgprActCopy + vi) if mergeActFuncCall else "ValuC+%d"%vgprIdx
             # Generate single f32 code if edge is detected.
