@@ -124,11 +124,11 @@ if(GPU_TARGETS STREQUAL "all")
   if(BUILD_ADDRESS_SANITIZER)
     # ASAN builds require xnack
     rocm_check_target_ids(DEFAULT_AMDGPU_TARGETS
-      TARGETS "gfx908:xnack+;gfx90a:xnack+;gfx942:xnack+"
+      TARGETS "gfx908:xnack+;gfx90a:xnack+;gfx942:xnack+;gfx950:xnack+"
     )
   else()
     rocm_check_target_ids(DEFAULT_AMDGPU_TARGETS
-      TARGETS "gfx803;gfx900:xnack-;gfx906:xnack-;gfx908:xnack-;gfx90a:xnack-;gfx90a:xnack+;gfx940;gfx941;gfx942;gfx1030;gfx1100;gfx1101;gfx1102;gfx1200;gfx1201;gfx1151"
+      TARGETS "gfx803;gfx900:xnack-;gfx906:xnack-;gfx908:xnack-;gfx90a:xnack-;gfx90a:xnack+;gfx940;gfx941;gfx942;gfx950;gfx1030;gfx1100;gfx1101;gfx1102;gfx1200;gfx1201;gfx1151"
     )
   endif()
 
@@ -142,7 +142,9 @@ include(cmake/VerifyCompiler.cmake)
 option(DISABLE_WERROR "Disable building with Werror" ON)
 
 # Build CXX flags
-set(CMAKE_CXX_STANDARD 11)
+if (NOT DEFINED CMAKE_CXX_STANDARD)
+  set(CMAKE_CXX_STANDARD 17)
+endif()
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 if(DISABLE_WERROR)
@@ -152,6 +154,12 @@ else()
 endif()
 if(CODE_COVERAGE)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fprofile-instr-generate -fcoverage-mapping")
+endif()
+
+if (CMAKE_CXX_STANDARD EQUAL 14)
+  message(WARNING "C++14 will be deprecated in the next major release")
+elseif(NOT CMAKE_CXX_STANDARD EQUAL 17)
+  message(FATAL_ERROR "Only C++14 and C++17 are supported")
 endif()
 
 # HIP on Windows: xhip is required with clang++ to get __half defined

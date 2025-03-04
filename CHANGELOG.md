@@ -3,12 +3,31 @@
 Documentation for rocRAND is available at
 [https://rocm.docs.amd.com/projects/rocRAND/en/latest/](https://rocm.docs.amd.com/projects/rocRAND/en/latest/)
 
-## (unreleased) rocRAND 3.3.0 for ROCm 6.5
+## (Unreleased) rocRAND 3.4.0 for ROCm 6.5
+
+### Added
+
+* gfx950 support
 
 ### Changed
+
 * Updated several `gfx942` auto tuning parameters.
+* Deprecated C++14 and set the default target to C++17.
+* Directly accessing the (scrambled) sobol32 and sobol64 constants and direction vectors is deprecated:
+  * `h_scrambled_sobol32_constants`, use `rocrand_get_scramble_constants32` instead.
+  * `h_scrambled_sobol64_constants`, use `rocrand_get_scramble_constants64` instead.
+  * `rocrand_h_sobol32_direction_vectors`, use `rocrand_get_direction_vectors32` instead.
+  * `rocrand_h_sobol64_direction_vectors`, use `rocrand_get_direction_vectors64` instead.
+  * `rocrand_h_scrambled_sobol32_direction_vectors`, use `rocrand_get_direction_vectors32` instead.
+  * `rocrand_h_scrambled_sobol64_direction_vectors`, use `rocrand_get_direction_vectors64` instead.
+
+### Upcoming changes
+* C++14 will be removed in the next major release.
+* Directly accessing the (scrambled) sobol32 and sobol64 constants and direction vectors will be removed in the next major release.
+
 
 ### Fixed
+
 * Fixed an issue where `mt19937.hpp` would cause kernel errors during auto tuning.
 
 ## rocRAND 3.3.0 for ROCm 6.4
