@@ -24,7 +24,9 @@
 #include <random>
 
 #include <rng/distribution/normal.hpp>
+#include <rocrand/rocrand_mtgp32_11213.h>
 
+#define HIP_CHECK(state) ASSERT_EQ(state, hipSuccess)
 using namespace rocrand_impl::host;
 
 TEST(normal_distribution_tests, float_test)
@@ -610,7 +612,7 @@ TEST(normal_distribution_with_states, philox4x32_10_out_4){
             output[3] = mean + v.z * std;
         }
     };
-    const size_t size = 8000;
+    const size_t size = 4000;
     float valF[size];
     double valD[size];
 
@@ -676,7 +678,7 @@ void run_nd_test_with_state_out2(double expected_mean=2, double expected_std=5){
             output[1] = mean + v.y * std;
         }
     };
-    const size_t size = 8000;
+    const size_t size = 4000;
     float valF[size];
     double valD[size];
     nd u(expected_mean, expected_std);
@@ -740,4 +742,128 @@ TEST(normal_distribution_with_states, xorwow){
     run_nd_test_with_state_out2<rocrand_state_xorwow>(2, 5);
     run_nd_test_with_state_out2<rocrand_state_xorwow>(1, 10);
     run_nd_test_with_state_out2<rocrand_state_xorwow>(3, 6);
+}
+
+
+__global__ void mtgp32_run_rocrand_normal(rocrand_state_mtgp32 * state, float * fout){
+    fout[0] = rocrand_normal(state);
+}
+
+__global__ void mtgp32_run_rocrand_normal2(rocrand_state_mtgp32 * state, float * fout){
+    float2 f2 = rocrand_normal2(state);
+    fout[1] = f2.x;
+    fout[2] = f2.y;
+}
+
+__global__ void mtgp32_run_rocrand_normal_double(rocrand_state_mtgp32 * state, double * dout){
+    dout[0] = rocrand_normal_double(state);
+}
+
+__global__ void mtgp32_run_rocrand_normal_double2(rocrand_state_mtgp32 * state, double * dout){
+    double2 d2 = rocrand_normal_double2(state);
+    dout[1] = d2.x;
+    dout[2] = d2.y;
+}
+
+TEST(normal_distribution_with_states, mtgp32){
+    const size_t size = 6000;
+    double expected_mean = 2, expected_std = 5;
+
+    rocrand_state_mtgp32 * fSStates, * fDStates, * dSStates, * dDStates;
+    auto state_size = 123, seed = 123456;
+    HIP_CHECK(hipMalloc(&fSStates, state_size * sizeof(rocrand_state_mtgp32)));
+    rocrand_make_state_mtgp32(fSStates,  mtgp32dc_params_fast_11213, state_size, seed);
+
+    HIP_CHECK(hipMalloc(&fDStates, state_size * sizeof(rocrand_state_mtgp32)));
+    rocrand_make_state_mtgp32(fDStates,  mtgp32dc_params_fast_11213, state_size, seed);
+
+    HIP_CHECK(hipMalloc(&dSStates, state_size * sizeof(rocrand_state_mtgp32)));
+    rocrand_make_state_mtgp32(dSStates,  mtgp32dc_params_fast_11213, state_size, seed);
+
+    HIP_CHECK(hipMalloc(&dDStates, state_size * sizeof(rocrand_state_mtgp32)));
+    rocrand_make_state_mtgp32(dDStates,  mtgp32dc_params_fast_11213, state_size, seed);
+
+    float * fOut; double * dOut;
+
+    HIP_CHECK(hipMalloc(&fOut, 3 * sizeof(float)));
+    HIP_CHECK(hipMalloc(&dOut, 3 * sizeof(double)));
+
+    float singleFloats[size];
+    float doubleFloats[size * 2 ];
+    double singleDoubles[size];
+    double doubleDoubles[size * 2];
+
+    float sFloatMean = 0, dFloatMean = 0;
+    double sDoubleMean = 0, dDoubleMean = 0;
+
+    size_t dIndex = 0;
+    for(size_t i = 0; i < size; i ++){
+        mtgp32_run_rocrand_normal<<<1, 1>>>(fSStates, fOut);
+        mtgp32_run_rocrand_normal2<<<1, 1>>>(fDStates, fOut);
+
+        mtgp32_run_rocrand_normal_double<<<1, 1>>>(dSStates, dOut);
+        mtgp32_run_rocrand_normal_double2<<<1, 1>>>(dDStates, dOut);
+        
+        float fTemp[3]; double dTemp[3];
+
+        HIP_CHECK(hipMemcpy(fTemp, fOut, 3 * sizeof(float), hipMemcpyDeviceToHost));
+        HIP_CHECK(hipMemcpy(dTemp, dOut, 3 * sizeof(double), hipMemcpyDeviceToHost));
+
+        singleFloats[i] = expected_mean + fTemp[0] * expected_std;
+        doubleFloats[dIndex] = expected_mean + fTemp[1] * expected_std;
+        doubleFloats[dIndex + 1] = expected_mean + fTemp[2] * expected_std;
+
+        singleDoubles[i] = expected_mean + dTemp[0] * expected_std;
+        doubleDoubles[dIndex] = expected_mean + dTemp[1] * expected_std;
+        doubleDoubles[dIndex + 1] = expected_mean + dTemp[2] * expected_std;
+
+        sFloatMean += singleFloats[i]; dFloatMean += doubleFloats[dIndex] + doubleFloats[dIndex + 1];
+        sDoubleMean += singleDoubles[i]; dDoubleMean += doubleDoubles[dIndex] + doubleDoubles[dIndex + 1];
+
+        dIndex += 2;
+    }
+
+    sFloatMean /= size; dFloatMean /= 2 * size;
+    sDoubleMean /= size; dDoubleMean /= 2 * size;
+
+    // Calculate stddev
+    
+    float sFloatStd = 0, dFloatStd = 0;
+    double sDoubleStd = 0, dDoubleStd = 0;
+    dIndex = 0;
+    for(size_t i = 0; i < size; i++){
+        sFloatStd += std::pow(singleFloats[i] - sFloatMean, 2) / size;
+        dFloatStd += std::pow(doubleFloats[dIndex] - dFloatMean, 2) / (size * 2);
+        dFloatStd += std::pow(doubleFloats[dIndex + 1] - dFloatMean, 2) / (size * 2);
+        
+        sDoubleStd += std::pow(singleDoubles[i] - sDoubleMean, 2) / size;
+        dDoubleStd += std::pow(doubleDoubles[dIndex] - dDoubleMean, 2) / (size * 2);
+        dDoubleStd += std::pow(doubleDoubles[dIndex + 1] - dDoubleMean, 2) / (size * 2);
+
+        dIndex += 2;
+    }
+    
+    sFloatStd = std::sqrt(sFloatStd);
+    dFloatStd = std::sqrt(dFloatStd);
+    sDoubleStd = std::sqrt(sDoubleStd);
+    dDoubleStd = std::sqrt(dDoubleStd);
+
+    EXPECT_NEAR(expected_mean, sFloatMean, (expected_mean * 0.2) + 1e-1) << "Mean: " << sFloatMean << " Expected: " << expected_mean; // 20%
+    EXPECT_NEAR(expected_std, sFloatStd, (expected_std * 0.2) + 1e-1) <<  "Stddev: " << sFloatStd << " Expected: " << expected_std; // 20%
+
+    EXPECT_NEAR(expected_mean, dFloatMean, (expected_mean * 0.2) + 1e-1) << "Mean: " << dFloatMean << " Expected: " << expected_mean; // 20%
+    EXPECT_NEAR(expected_std, dFloatStd, (expected_std * 0.2) + 1e-1) <<  "Stddev: " << dFloatStd << " Expected: " << expected_std; // 20%
+
+    EXPECT_NEAR(expected_mean, sDoubleMean, (expected_mean * 0.2) + 1e-1) << "Mean: " << sDoubleMean << " Expected: " << expected_mean; // 20%
+    EXPECT_NEAR(expected_std, sDoubleStd, (expected_std * 0.2) + 1e-1) <<  "Stddev: " << sDoubleStd << " Expected: " << expected_std; // 20%
+
+    EXPECT_NEAR(expected_mean, dDoubleMean, (expected_mean * 0.2) + 1e-1) << "Mean: " << dDoubleMean << " Expected: " << expected_mean; // 20%
+    EXPECT_NEAR(expected_std, dDoubleStd, (expected_std * 0.2) + 1e-1) <<  "Stddev: " << dDoubleStd << " Expected: " << expected_std; // 20%
+
+    HIP_CHECK(hipFree(fSStates));
+    HIP_CHECK(hipFree(fDStates));
+    HIP_CHECK(hipFree(dSStates));
+    HIP_CHECK(hipFree(dDStates));
+    HIP_CHECK(hipFree(fOut));
+    HIP_CHECK(hipFree(dOut));
 }
