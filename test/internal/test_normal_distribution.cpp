@@ -800,6 +800,88 @@ TEST(normal_distribution_with_states, xorwow){
     run_normal_dist_with_state_out2<rocrand_state_xorwow>(&states);
 }
 
+TEST(normal_distribution_with_states, sobol32){
+    rocrand_state_sobol32 states;
+    const unsigned int* directions;
+    HIP_CHECK(rocrand_get_direction_vectors32(&directions, ROCRAND_DIRECTION_VECTORS_32_JOEKUO6));
+
+    rocrand_init(directions, 0, &states);
+
+    run_normal_dist_with_state_out1<rocrand_state_sobol32>(&states);
+
+}
+
+TEST(normal_distribution_with_states, scarambled_sobol32){
+    rocrand_state_scrambled_sobol32 states;
+    const unsigned int* directions;
+    HIP_CHECK(rocrand_get_direction_vectors32(&directions, ROCRAND_DIRECTION_VECTORS_32_JOEKUO6));
+
+    rocrand_init(directions, 123456, 0, &states);
+
+    run_normal_dist_with_state_out1<rocrand_state_scrambled_sobol32>(&states);
+}
+
+TEST(normal_distribution_with_states, sobol64){
+    rocrand_state_sobol64 states;
+    const unsigned long long* directions;
+    HIP_CHECK(rocrand_get_direction_vectors64(&directions, ROCRAND_DIRECTION_VECTORS_64_JOEKUO6));
+
+    rocrand_init(directions, 0, &states);
+
+    run_normal_dist_with_state_out1<rocrand_state_sobol64>(&states);
+
+}
+
+TEST(normal_distribution_with_states, scarambled_sobol64){
+    rocrand_state_scrambled_sobol64 states;
+    const unsigned long long* directions;
+    HIP_CHECK(rocrand_get_direction_vectors64(&directions, ROCRAND_DIRECTION_VECTORS_64_JOEKUO6));
+
+    rocrand_init(directions, 123456, 0, &states);
+
+    run_normal_dist_with_state_out1<rocrand_state_scrambled_sobol64>(&states);
+}
+
+
+TEST(normal_distribution_with_states, lfsr113){
+    rocrand_state_lfsr113 states;
+    rocrand_init(static_cast<uint4>(12), 0, &states);
+
+    run_normal_dist_with_state_out1<rocrand_state_lfsr113>(&states);
+    run_normal_dist_with_state_out2<rocrand_state_lfsr113>(&states);
+}
+
+TEST(normal_distribution_with_states, threefry2x32_20){
+    rocrand_state_threefry2x32_20 states;
+    rocrand_init(123456, 654321, 0, & states);
+
+    run_normal_dist_with_state_out1<rocrand_state_threefry2x32_20>(&states);
+    run_normal_dist_with_state_out2<rocrand_state_threefry2x32_20>(&states);
+}
+
+TEST(normal_distribution_with_states, threefry2x64_20){
+    rocrand_state_threefry2x64_20 states;
+    rocrand_init(123456, 654321, 0, & states);
+
+    run_normal_dist_with_state_out1<rocrand_state_threefry2x64_20>(&states);
+    run_normal_dist_with_state_out2<rocrand_state_threefry2x64_20>(&states);
+}
+
+TEST(normal_distribution_with_states, rocrand_state_threefry4x32_20){
+    rocrand_state_threefry4x32_20 states;
+    rocrand_init(123456, 654321, 0, & states);
+
+    run_normal_dist_with_state_out1<rocrand_state_threefry4x32_20>(&states);
+    run_normal_dist_with_state_out2<rocrand_state_threefry4x32_20>(&states);
+}
+
+TEST(normal_distribution_with_states, rocrand_state_threefry4x64_20){
+    rocrand_state_threefry4x64_20 states;
+    rocrand_init(123456, 654321, 0, & states);
+
+    run_normal_dist_with_state_out1<rocrand_state_threefry4x64_20>(&states);
+    run_normal_dist_with_state_out2<rocrand_state_threefry4x64_20>(&states);
+}
 __global__ void mtgp32_run_rocrand_normal(rocrand_state_mtgp32 * state, float * fout){
     fout[0] = rocrand_normal(state);
 }
@@ -851,7 +933,7 @@ TEST(normal_distribution_with_states, mtgp32){
         mtgp32_run_rocrand_normal_double2<<<1, 1>>>(states, dOut);
         
         float fTemp[3]; double dTemp[3];
-
+        
         HIP_CHECK(hipMemcpy(fTemp, fOut, 3 * sizeof(float), hipMemcpyDeviceToHost));
         HIP_CHECK(hipMemcpy(dTemp, dOut, 3 * sizeof(double), hipMemcpyDeviceToHost));
 
@@ -911,61 +993,3 @@ TEST(normal_distribution_with_states, mtgp32){
     HIP_CHECK(hipFree(dOut));
 }
 
-TEST(normal_distribution_with_states, sobol32){
-    rocrand_state_sobol32 states;
-    const unsigned int* directions;
-    HIP_CHECK(rocrand_get_direction_vectors32(&directions, ROCRAND_DIRECTION_VECTORS_32_JOEKUO6));
-
-    rocrand_init(directions, 0, &states);
-
-    run_normal_dist_with_state_out1<rocrand_state_sobol32>(&states);
-
-}
-
-TEST(normal_distribution_with_states, scarambled_sobol32){
-    rocrand_state_scrambled_sobol32 states;
-    const unsigned int* directions;
-    HIP_CHECK(rocrand_get_direction_vectors32(&directions, ROCRAND_DIRECTION_VECTORS_32_JOEKUO6));
-
-    rocrand_init(directions, 123456, 0, &states);
-
-    run_normal_dist_with_state_out1<rocrand_state_scrambled_sobol32>(&states);
-}
-
-TEST(normal_distribution_with_states, sobol64){
-    rocrand_state_sobol64 states;
-    const unsigned long long* directions;
-    HIP_CHECK(rocrand_get_direction_vectors64(&directions, ROCRAND_DIRECTION_VECTORS_64_JOEKUO6));
-
-    rocrand_init(directions, 0, &states);
-
-    run_normal_dist_with_state_out1<rocrand_state_sobol64>(&states);
-
-}
-
-TEST(normal_distribution_with_states, scarambled_sobol64){
-    rocrand_state_scrambled_sobol64 states;
-    const unsigned long long* directions;
-    HIP_CHECK(rocrand_get_direction_vectors64(&directions, ROCRAND_DIRECTION_VECTORS_64_JOEKUO6));
-
-    rocrand_init(directions, 123456, 0, &states);
-
-    run_normal_dist_with_state_out1<rocrand_state_scrambled_sobol64>(&states);
-}
-
-
-TEST(normal_distribution_with_states, lfsr113){
-    rocrand_state_lfsr113 states;
-    rocrand_init(static_cast<uint4>(12), 0, &states);
-
-    run_normal_dist_with_state_out1<rocrand_state_lfsr113>(&states);
-    run_normal_dist_with_state_out2<rocrand_state_lfsr113>(&states);
-}
-
-TEST(normal_distribution_with_states, threefry2x32_20){
-    rocrand_state_threefry2x32_20 states;
-    rocrand_init(123456, 654321, 0, & states);
-
-    run_normal_dist_with_state_out1<rocrand_state_threefry2x32_20>(&states);
-    run_normal_dist_with_state_out2<rocrand_state_threefry2x32_20>(&states);
-}
