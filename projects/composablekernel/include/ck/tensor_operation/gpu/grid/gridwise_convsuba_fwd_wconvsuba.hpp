@@ -1185,9 +1185,13 @@ struct GridwiseConvSuba_Wconvsuba
 
         constexpr auto CoordDim = DThreadCoord::Size();
 
-        auto h0 = (h_block_data_idx_on_grid + wave_idx[I0] * HPerWave) / HPerWconv;
-        auto w0 = (w_block_data_idx_on_grid + wave_idx[I1] * WPerWave) / WPerWconv;
+        auto h0 =
+            (h_block_data_idx_on_grid + wave_idx[I0] * BlockwiseConv::HPerWaveOut) / HPerWconv;
+        auto w0 =
+            (w_block_data_idx_on_grid + wave_idx[I1] * BlockwiseConv::WPerWaveOut) / WPerWconv;
         auto k0 = (k_block_data_idx_on_grid + wave_idx[I2] * KPerWave) / KPerWconv;
+        // residual use input tensor layout
+        auto c0 = (k_block_data_idx_on_grid + wave_idx[I2] * KPerWave) / CPerWconv;
 
         if constexpr(std::is_same_v<DLayout, tensor_layout::convolution::G_K>)
         {
@@ -1232,7 +1236,7 @@ struct GridwiseConvSuba_Wconvsuba
                                                         false>(
                     ds_grid_block_desc,
                     make_multi_index(w0,
-                                     k0,
+                                     c0,
                                      h0,
                                      0,
                                      thread_origin_coord[Number<CoordDim - 3>{}],
@@ -1477,13 +1481,13 @@ struct GridwiseConvSuba_Wconvsuba
                    e_grid_desc.GetLength(I0),
                    e_grid_desc.GetLength(I1),
                    e_grid_desc.GetLength(I2));
-            printf("GridwiseOp err: ProblemSize check");
+            printf("GridwiseOp err: ProblemSize check\n");
             return false;
         }
 
         if(!(H % HPerBlock == 0 && W % WPerBlock == 0 && K % KPerBlock == 0 && C % CPerBlock == 0))
         {
-            printf("GridwiseOp err: ProblemSize division");
+            printf("GridwiseOp err: ProblemSize division\n");
             return false;
         }
 
@@ -1492,7 +1496,7 @@ struct GridwiseConvSuba_Wconvsuba
 
         if(!GridwiseConvPipe::IsSupported(num_c_loop))
         {
-            printf("GridwiseOp err: Pipeline not support this c_loop");
+            printf("GridwiseOp err: Pipeline not support this c_loop\n");
             return false;
         }
 
@@ -1972,8 +1976,8 @@ struct GridwiseConvSuba_Wconvsuba
                         return MakeSignleDThreadgroupTransfer(i,
                                                               ds_grid_block_desc[Number<i>{}],
                                                               ds_block_desc[Number<i>{}],
-                                                              h_block_data_idx_on_grid,
-                                                              w_block_data_idx_on_grid,
+                                                              h_out_block_data_idx_on_grid,
+                                                              w_out_block_data_idx_on_grid,
                                                               k_block_data_idx_on_grid);
                     },
                     Number<NumDTensor>{});
@@ -2015,8 +2019,8 @@ struct GridwiseConvSuba_Wconvsuba
                                                              ds_wave_desc[Number<i>{}],
                                                              thread_origin_data_idx[Number<i>{}],
                                                              ds_wave_desc_length[Number<i>{}],
-                                                             h_block_data_idx_on_grid,
-                                                             w_block_data_idx_on_grid,
+                                                             h_out_block_data_idx_on_grid,
+                                                             w_out_block_data_idx_on_grid,
                                                              k_block_data_idx_on_grid);
                     },
                     Number<NumDTensor>{});

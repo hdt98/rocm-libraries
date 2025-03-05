@@ -43,7 +43,7 @@ using ConvolutionForwardSpecialization =
 
 static constexpr ck::index_t HPerWconv = 4;
 static constexpr ck::index_t WPerWconv = 2;
-static constexpr ck::index_t HPerBlock = 32;
+static constexpr ck::index_t HPerBlock = 16;
 static constexpr ck::index_t WPerBlock = 16;
 static constexpr bool EnableAsync      = false;
 static constexpr bool EnableWaveGroup  = false;
@@ -80,19 +80,20 @@ using DeviceConvFwdInstance = ck::tensor_operation::device::DeviceConvSubaWconv<
     FilterSize,                   // FilterSize
     DilationSize,                 // DilationX
     DilationSize,                 // DilationY
-    S<1, 4, 4>,                   // InBlockTransferThreadClusterLengths (H W C)
+    S<8, 4, 4>,                   // InBlockTransferThreadClusterLengths (H W C)
     4,                            // InBlockTransferSrcScalarPerVector
     4,                            // InBlockTransferDstScalarPerVector
     true,                         // InEnableLds
-    true,                         // InBlockLdsAddExtraM
-    S<1, 1, 4>,                   // WeiBlockTransferThreadClusterLengths
+    false,                        // InBlockLdsAddExtraM
+    S<16, 1, 8>,                  // WeiBlockTransferThreadClusterLengths
     2,                            // WeiBlockTransferSrcScalarPerVector
     2,                            // WeiBlockTransferDstScalarPerVector
     true,                         // WeiEnableLds
-    true,                         // WeiBlockLdsAddExtraM
-    ck::Tuple<S<8>, S<1, 4, 4>>, // DsBlockTransferThreadClusterLengths (K, HWK)
-    S<2, 4>,                      // DsBlockTransferSrcScalarPerVector
-    S<2, 4>,                      // DsBlockTransferDstScalarPerVector
+    false,                        // WeiBlockLdsAddExtraM
+    ck::Tuple<S<16>, S<8, 4, 4>>, // DsBlockTransferThreadClusterLengths (K, HWK), not used when lds
+                                  // disabled
+    S<1, 4>,                      // DsBlockTransferSrcScalarPerVector, not used when lds disabled
+    S<1, 4>,                      // DsBlockTransferDstScalarPerVector, not used when lds disabled
     false,                        // DsEnableLds
     false,                        // DsBlockLdsAddExtraM
     S<1, 4, 4>,                   // AccBlockTransferClusterLengths
@@ -133,8 +134,7 @@ using DeviceWConvFactory = std::tuple<
     DeviceConvFwdInstance<NDimSpatial,
                           2,
                           1,
-                          ConvolutionForwardSpecialization::Filter2x2Stride2OddHWPad0>
-                          >;
+                          ConvolutionForwardSpecialization::Filter2x2Stride2OddHWPad0>>;
 
 template <ck::index_t NDimSpatial>
 using HostConvFwdInstance = ck::tensor_operation::host::ReferenceConvFwd<NDimSpatial,
@@ -154,12 +154,13 @@ bool run_grouped_conv_fwd_bias_relu_add(const ExecutionConfig& config,
     const auto in_g_n_c_wis_desc   = make_input_descriptor(conv_param);
     const auto wei_g_k_c_xs_desc   = make_weight_descriptor(conv_param);
     const auto bias_g_n_k_wos_desc = make_bias_descriptor(conv_param);
+    const auto residual_g_n_k_wos_desc = make_output_descriptor(conv_param);
     const auto out_g_n_k_wos_desc  = make_output_descriptor(conv_param);
 
     Tensor<InUserDataType> in(in_g_n_c_wis_desc);
     Tensor<WeiUserDataType> wei(wei_g_k_c_xs_desc);
     Tensor<BiasKernelDataType> bias(bias_g_n_k_wos_desc);
-    Tensor<ResidualKernelDataType> residual(bias_g_n_k_wos_desc);
+    Tensor<ResidualKernelDataType> residual(residual_g_n_k_wos_desc);
     Tensor<OutUserDataType> out_host(out_g_n_k_wos_desc);
     Tensor<OutKernelDataType> out_device(out_g_n_k_wos_desc);
 
@@ -176,7 +177,7 @@ bool run_grouped_conv_fwd_bias_relu_add(const ExecutionConfig& config,
         in.GenerateTensorValue(GeneratorTensor_2<InUserDataType>{-5, 5});
         wei.GenerateTensorValue(GeneratorTensor_2<WeiUserDataType>{-5, 5});
         bias.GenerateTensorValue(GeneratorTensor_2<BiasKernelDataType>{-5, 5});
-        residual.GenerateTensorValue(GeneratorTensor_2<ResidualKernelDataType>{-5, 5});
+        residual.GenerateTensorValue(GeneratorTensor_2<ResidualKernelDataType>{-10, 10});
         break;
     default:
         in.GenerateTensorValue(GeneratorTensor_3<InUserDataType>{0.0, 1.0});
@@ -221,8 +222,8 @@ bool run_grouped_conv_fwd_bias_relu_add(const ExecutionConfig& config,
     copy(wei_g_k_c_xs_desc.GetStrides(), b_g_k_c_xs_strides);
     copy(bias_g_n_k_wos_desc.GetLengths(), d0_g_n_k_wos_lengths);
     copy(bias_g_n_k_wos_desc.GetStrides(), d0_g_n_k_wos_strides);
-    copy(bias_g_n_k_wos_desc.GetLengths(), d1_g_n_k_wos_lengths);
-    copy(bias_g_n_k_wos_desc.GetStrides(), d1_g_n_k_wos_strides);
+    copy(residual_g_n_k_wos_desc.GetLengths(), d1_g_n_k_wos_lengths);
+    copy(residual_g_n_k_wos_desc.GetStrides(), d1_g_n_k_wos_strides);
     copy(out_g_n_k_wos_desc.GetLengths(), e_g_n_k_wos_lengths);
     copy(out_g_n_k_wos_desc.GetStrides(), e_g_n_k_wos_strides);
     copy(conv_param.conv_filter_strides_, conv_filter_strides);
@@ -305,12 +306,13 @@ bool run_grouped_conv_fwd_bias_relu_add(const ExecutionConfig& config,
 
         ref_invoker.Run(ref_argument);
 
+        //dump_tensor(c_host, "c_host");
         out_host.ForEach([&](auto&, auto idx) {
             OutElementOp{}(out_host(idx), c_host(idx), bias(idx), residual(idx));
         });
-
+        //dump_tensor(out_host, "out_host");
         out_device_buf.FromDevice(out_device.mData.data());
-
+        //dump_tensor(out_device, "out_device");
         return ck::utils::check_err(
             out_device, out_host, "Error: incorrect results!", 1e-5f, 1e-4f);
     }
@@ -331,9 +333,10 @@ bool run_grouped_conv_fwd_bias_relu_add_example(int argc, char* argv[])
     switch(conv_param.num_dim_spatial_)
     {
     // TODO: remove unsupported kernel instance for dimension 1 & 3.
-    //case 1: return run_grouped_conv_fwd_bias_relu_add<1>(config, conv_param);
-    case 2: return run_grouped_conv_fwd_bias_relu_add<2>(config, conv_param);
-    //case 3: return run_grouped_conv_fwd_bias_relu_add<3>(config, conv_param);
+    // case 1: return run_grouped_conv_fwd_bias_relu_add<1>(config, conv_param);
+    case 2:
+        return run_grouped_conv_fwd_bias_relu_add<2>(config, conv_param);
+        // case 3: return run_grouped_conv_fwd_bias_relu_add<3>(config, conv_param);
     }
 
     return false;

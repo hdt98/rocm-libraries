@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2018-2025, Advanced Micro Devices, Inc. All rights reserved.
 
-#include "common_wmma.hpp"
+#include "common_wconv.hpp"
 #include "ck/host_utility/device_prop.hpp"
 
 // kernel data types
 using InKernelDataType       = I8;
 using WeiKernelDataType      = I8;
-using AccDataType            = I32;
-using CShuffleDataType       = I8;
-using BiasKernelDataType     = I32;
+using AccDataType            = FP16;
+using CShuffleDataType       = FP16;
+using BiasKernelDataType     = FP16;
 using ResidualKernelDataType = I8;
 using OutKernelDataType      = I8;
 
@@ -22,7 +22,7 @@ using InElementOp  = PassThrough;
 using WeiElementOp = PassThrough;
 using OutElementOp = ck::tensor_operation::element_wise::AddReluAdd;
 
-#include "run_grouped_conv_fwd_bias_relu_add_wmma_example.inc"
+#include "run_grouped_conv_fwd_bias_relu_add_wconv_example.inc"
 
 int main(int argc, char* argv[])
 {

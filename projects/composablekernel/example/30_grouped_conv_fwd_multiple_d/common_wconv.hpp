@@ -352,3 +352,65 @@ inline HostTensorDescriptor make_output_descriptor(const ck::utils::conv::ConvPa
 
     throw std::runtime_error("unsuppored # dim spatial");
 }
+
+template <typename DataType>
+void dump_tensor(const Tensor<DataType>& tensor, const char* str)
+{
+    assert(tensor.GetNumOfDimension() == 5);
+    auto lengths = tensor.GetLengths();
+    std::cout << str << "  [ " << std::endl;
+    for(uint32_t i0 = 0; i0 < lengths[0]; i0++)
+    {
+        if(lengths[1] > 1)
+        {
+            std::cout << "  [";
+        }
+        for(uint32_t i1 = 0; i1 < lengths[1]; i1++)
+        {
+            if(lengths[2] > 1)
+            {
+                std::cout << "  [";
+            }
+            for(uint32_t i2 = 0; i2 < lengths[2]; i2++)
+            {
+                if(lengths[3] > 1)
+                {
+                    std::cout << "  [";
+                }
+                for(uint32_t i3 = 0; i3 < lengths[3]; i3++)
+                {
+                    if(lengths[4] > 1)
+                    {
+                        std::cout << "  [";
+                    }
+                    for(uint32_t i4 = 0; i4 < lengths[4]; i4++)
+                    {
+                        std::vector<std::size_t> idx({i0, i1, i2, i3, i4});
+                        std::cout << ck::type_convert<float>(tensor(idx)) << ", ";
+                    }
+                    if(lengths[4] > 1)
+                    {
+                        std::cout << "]";
+                    }
+                    if(lengths[4] > 3)
+                    {
+                        std::cout << std::endl;
+                    }
+                }
+                if(lengths[3] > 1)
+                {
+                    std::cout << "]" << std::endl;
+                }
+            }
+            if(lengths[2] > 1)
+            {
+                std::cout << "]" << std::endl;
+            }
+        }
+        if(lengths[1] > 1)
+        {
+            std::cout << "]" << std::endl;
+        }
+    }
+    std::cout << "]" << std::endl;
+}

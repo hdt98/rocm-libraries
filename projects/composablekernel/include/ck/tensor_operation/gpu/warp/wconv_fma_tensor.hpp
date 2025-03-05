@@ -60,14 +60,10 @@ struct WconvFmaFromTensor
     }
     static constexpr index_t GetAccumChannelOrder()
     {
-        constexpr index_t in_bits  = SizeOfBits<InDataType>();
-        constexpr index_t out_bits = SizeOfBits<AccDataType>();
+        constexpr index_t in_bits = SizeOfBits<InDataType>();
         static_assert(in_bits <= 16);
-        if constexpr(out_bits == 32)
-        {
-            return 1;
-        }
-        else if constexpr(in_bits == 16)
+
+        if constexpr(in_bits == 16)
         {
             return 1;
         }

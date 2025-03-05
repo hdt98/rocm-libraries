@@ -730,9 +730,9 @@ struct Blockwise_element_wconv_fma
         else
         {
             // Residual: H x W x C -> W0 x C0 x H0 x H1 x H2 x W1 x C1
-            const auto H0                 = ds_grid_desc[I0].GetLength(I0);
-            const auto W0                 = ds_grid_desc[I0].GetLength(I1);
-            const auto C0                 = ds_grid_desc[I0].GetLength(I2);
+            const auto H0                 = ds_grid_desc[ResidualId].GetLength(I0);
+            const auto W0                 = ds_grid_desc[ResidualId].GetLength(I1);
+            const auto C0                 = ds_grid_desc[ResidualId].GetLength(I2);
             auto residual_grid_block_desc = transform_tensor_descriptor(
                 ds_grid_desc[ResidualId],
                 make_tuple(
@@ -750,9 +750,9 @@ struct Blockwise_element_wconv_fma
             else
             {
                 // Scale: H x W x K -> H0 x W0 x K0 x H1 x H2 x W1 x K1 x K2
-                const auto H1              = ds_grid_desc[I1].GetLength(I0);
-                const auto W1              = ds_grid_desc[I1].GetLength(I1);
-                const auto C1              = ds_grid_desc[I1].GetLength(I2);
+                const auto H1              = ds_grid_desc[ScaleId].GetLength(I0);
+                const auto W1              = ds_grid_desc[ScaleId].GetLength(I1);
+                const auto C1              = ds_grid_desc[ScaleId].GetLength(I2);
                 auto scale_grid_block_desc = transform_tensor_descriptor(
                     ds_grid_desc[ScaleId],
                     make_tuple(
@@ -1613,12 +1613,7 @@ struct BlockwiseSubaConvWconv
     static constexpr bool EnableWaveGroup4 = ThisThreadBlock::GetNumWavePerGroup() == 4;
 
     static constexpr index_t WaveFilterSize = (FilterSize == 2) ? 1 : FilterSize;
-    static constexpr bool Aco               = [] {
-        if constexpr(AccBlockwiseOperation::IsFma)
-            return sizeof(InDataType) > 1 || sizeof(AccDataType) == 4;
-        else
-            return sizeof(InDataType) > 1;
-    }();
+    static constexpr bool Aco               = [] { return sizeof(InDataType) > 1; }();
 
     // Wave properties
     static constexpr index_t Iters   = GetFilterIters<WeiDataType,
