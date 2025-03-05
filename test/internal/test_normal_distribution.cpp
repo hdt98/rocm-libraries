@@ -856,20 +856,15 @@ TEST(normal_distribution_with_states, mtgp32){
     HIP_CHECK(hipFree(dOut));
 }
 
-TEST(normal_distribution_with_states, sobol32){
-    rocrand_state_sobol32 states;
-    const unsigned int* directions;
-    HIP_CHECK(rocrand_get_direction_vectors32(&directions, ROCRAND_DIRECTION_VECTORS_32_JOEKUO6));
-
-    rocrand_init(directions, 0, &states);
-
+template <typename State>
+void run_sobol_tests(State * states){
     double expected_mean = 2.0f, expected_std = 5.0f;
 
     struct single_out{
         double mean, std;
-        rocrand_state_sobol32 * states;
+        State * states;
         
-        single_out(double mean, double std, rocrand_state_sobol32 * states){
+        single_out(double mean, double std, State * states){
             this->mean = mean;
             this->std = std;
             this->states = states;
@@ -889,7 +884,7 @@ TEST(normal_distribution_with_states, sobol32){
     float fOut[size];
     double dOut[size];
 
-    single_out s(expected_mean, expected_std, &states);
+    single_out s(expected_mean, expected_std, states);
 
     float fMean = 0, fStd = 0;
     double dMean = 0, dStd = 0;
@@ -915,5 +910,25 @@ TEST(normal_distribution_with_states, sobol32){
 
     EXPECT_NEAR(expected_mean, dMean, (expected_mean * 0.2) + 1e-1) << "Mean: " << dMean << " Expected: " << expected_mean; // 20%
     EXPECT_NEAR(expected_std, dStd, (expected_std * 0.2) + 1e-1) <<  "Stddev: " << dStd << " Expected: " << expected_std; // 20%
+}
 
+TEST(normal_distribution_with_states, sobol32){
+    rocrand_state_sobol32 states;
+    const unsigned int* directions;
+    HIP_CHECK(rocrand_get_direction_vectors32(&directions, ROCRAND_DIRECTION_VECTORS_32_JOEKUO6));
+
+    rocrand_init(directions, 0, &states);
+
+    run_sobol_tests<rocrand_state_sobol32>(&states);
+
+}
+
+TEST(normal_distribution_with_states, scarambled_sobol32){
+    rocrand_state_scrambled_sobol32 states;
+    const unsigned int* directions;
+    HIP_CHECK(rocrand_get_direction_vectors32(&directions, ROCRAND_DIRECTION_VECTORS_32_JOEKUO6));
+
+    rocrand_init(directions, 123456, 0, &states);
+
+    run_sobol_tests<rocrand_state_scrambled_sobol32>(&states);
 }
