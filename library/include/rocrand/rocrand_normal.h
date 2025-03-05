@@ -932,7 +932,7 @@ double2 rocrand_normal_double2(rocrand_state_mtgp32* state)
 /**
  * \brief Returns a normally distributed \p float value.
  *
- * Generates and returns a normally distributed \p float value using SOBpOL32
+ * Generates and returns a normally distributed \p float value using SOBOL32
  * generator in \p state, and increments position of the generator by one.
  * Used normal distribution has mean value equal to 0.0f, and standard deviation
  * equal to 1.0f.
