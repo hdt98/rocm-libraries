@@ -33,6 +33,7 @@ Documentation for rocRAND is available at
 ## rocRAND 3.3.0 for ROCm 6.4
 
 ### Added
+* Additional unit tests for `test_normal_distribution.cpp`
 
 * Added extended tests to `rtest.py`. These tests are extra tests that did not fit the criteria of smoke and regression tests. These tests will take much longer to run relative to smoke and regression tests. Use `python rtest.py [--emulation|-e|--test|-t]=extended` to run these tests.
 * Added regression tests to `rtest.py`. These tests recreate scenarios that have caused hardware problems in past emulation environments. Use `python rtest.py [--emulation|-e|--test|-t]=regression` to run these tests.
