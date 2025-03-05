@@ -932,3 +932,24 @@ TEST(normal_distribution_with_states, scarambled_sobol32){
 
     run_sobol_tests<rocrand_state_scrambled_sobol32>(&states);
 }
+
+TEST(normal_distribution_with_states, sobol64){
+    rocrand_state_sobol64 states;
+    const unsigned long long* directions;
+    HIP_CHECK(rocrand_get_direction_vectors64(&directions, ROCRAND_DIRECTION_VECTORS_64_JOEKUO6));
+
+    rocrand_init(directions, 0, &states);
+
+    run_sobol_tests<rocrand_state_sobol64>(&states);
+
+}
+
+TEST(normal_distribution_with_states, scarambled_sobol64){
+    rocrand_state_scrambled_sobol64 states;
+    const unsigned long long* directions;
+    HIP_CHECK(rocrand_get_direction_vectors64(&directions, ROCRAND_DIRECTION_VECTORS_64_JOEKUO6));
+
+    rocrand_init(directions, 123456, 0, &states);
+
+    run_sobol_tests<rocrand_state_scrambled_sobol64>(&states);
+}
