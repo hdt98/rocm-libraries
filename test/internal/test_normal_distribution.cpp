@@ -961,3 +961,11 @@ TEST(normal_distribution_with_states, lfsr113){
     run_normal_dist_with_state_out1<rocrand_state_lfsr113>(&states);
     run_normal_dist_with_state_out2<rocrand_state_lfsr113>(&states);
 }
+
+TEST(normal_distribution_with_states, threefry2x32_20){
+    rocrand_state_threefry2x32_20 states;
+    rocrand_init(123456, 654321, 0, & states);
+
+    run_normal_dist_with_state_out1<rocrand_state_threefry2x32_20>(&states);
+    run_normal_dist_with_state_out2<rocrand_state_threefry2x32_20>(&states);
+}
