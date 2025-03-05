@@ -587,17 +587,137 @@ TEST(sobol_normal_distribution_tests, half_test)
     EXPECT_NEAR(5.0f, std, 1.0f); // 20%
 }
 
-TEST(normal_distribution_with_states, philox4x32_10_out_4){
+template <typename State>
+void run_normal_dist_with_state_out1(State * states){
+    double expected_mean = 2.0f, expected_std = 5.0f;
+
+    struct single_out{
+        double mean, std;
+        State * states;
+        
+        single_out(double mean, double std, State * states){
+            this->mean = mean;
+            this->std = std;
+            this->states = states;
+        }
+
+        float __forceinline__ __device__ __host__ fOp(){
+            return mean + rocrand_normal(states) * std;
+        }
+
+        double __forceinline__ __device__ __host__ dOp(){
+            return mean + rocrand_normal_double(states) * std;
+        }
+    };
+
+    const size_t size = 4000;
+
+    float fOut[size];
+    double dOut[size];
+
+    single_out s(expected_mean, expected_std, states);
+
+    float fMean = 0, fStd = 0;
+    double dMean = 0, dStd = 0;
+
+    for(size_t i = 0; i < size; i++){
+        fOut[i] = s.fOp();
+        dOut[i] = s.dOp();
+
+        fMean += fOut[i] / size;
+        dMean += dOut[i] / size;
+    }
+    
+    for(size_t i = 0; i < size; i++){
+        fStd += std::pow(fOut[i] - fMean, 2) / size;
+        dStd += std::pow(dOut[i] - dMean, 2) / size;
+    }
+
+    fStd = std::sqrt(fStd);
+    dStd = std::sqrt(dStd);
+
+    EXPECT_NEAR(expected_mean, fMean, (expected_mean * 0.2) + 1e-1) << "Mean: " << fMean << " Expected: " << expected_mean; // 20%
+    EXPECT_NEAR(expected_std, fStd, (expected_std * 0.2) + 1e-1) <<  "Stddev: " << fStd << " Expected: " << expected_std; // 20%
+
+    EXPECT_NEAR(expected_mean, dMean, (expected_mean * 0.2) + 1e-1) << "Mean: " << dMean << " Expected: " << expected_mean; // 20%
+    EXPECT_NEAR(expected_std, dStd, (expected_std * 0.2) + 1e-1) <<  "Stddev: " << dStd << " Expected: " << expected_std; // 20%
+}
+
+template <typename State>
+void run_normal_dist_with_state_out2(State * states){
+    double expected_mean = 2.0f, expected_std = 5.0f;
     struct nd{
         double mean, std;
-        rocrand_state_philox4x32_10 currState;
-        nd(double  mean, double stddev) {
+        State * states;
+        nd(double  mean, double stddev, State * states) {
             this->mean = mean;
             this->std = stddev;
-            rocrand_init(123456, 654321, 0, &currState);
+            this->states = states;
+        }
+        __forceinline__ __host__ __device__ void operator()(float(&output)[2]){
+            float2 v = rocrand_normal2(states);
+            output[0] = static_cast<float>(mean) + v.x * static_cast<float>(std);
+            output[1] = static_cast<float>(mean) + v.y * static_cast<float>(std);
+        }
+        
+        __forceinline__ __host__ __device__ void operator()(double(&output)[2]){
+            double2 v = rocrand_normal_double2(states);
+            output[0] = mean + v.x * std;
+            output[1] = mean + v.y * std;
+        }
+    };
+    const size_t size = 4000;
+    float valF[size];
+    double valD[size];
+    nd u(expected_mean, expected_std, states);
+
+    double meanF = 0, meanD = 0;
+    for(size_t i = 0; i < size; i += 2)
+    {
+        float fOut[2];
+        double dOut[2];
+        
+        u(fOut);
+        valF[i]     = fOut[0];
+        valF[i + 1] = fOut[1];
+        meanF += (fOut[0] + fOut[1]) / size;
+
+        u(dOut);
+        valD[i]     = dOut[0];
+        valD[i + 1] = dOut[1];
+        meanD += (dOut[0] + dOut[1]) / size;
+    }
+
+    // Calculate stddev
+    double stdF = 0, stdD = 0;
+    for(size_t i = 0; i < size; i++){
+        stdF += std::pow(valF[i] - meanF, 2) / size;
+        stdD += std::pow(valD[i] - meanD, 2) / size;
+    }
+    stdF = std::sqrt(stdF);
+    stdD = std::sqrt(stdD);
+
+    EXPECT_NEAR(expected_mean, meanF, (expected_mean * 0.2) + 1e-1) << "Mean: " << meanF << " Expected: " << expected_mean; // 20%
+    EXPECT_NEAR(expected_std, stdF, (expected_std * 0.2) + 1e-1) <<  "Stddev: " << stdF << " Expected: " << expected_std; // 20%
+
+    EXPECT_NEAR(expected_mean, meanD, (expected_mean * 0.2) + 1e-1) << "Mean: " << meanD << " Expected: " << expected_mean; // 20%
+    EXPECT_NEAR(expected_std, stdD, (expected_std * 0.2) + 1e-1) <<  "Stddev: " << stdD << " Expected: " << expected_std; // 20%
+}
+
+template <typename State>
+void run_normal_dist_with_state_out4(State * states){
+    double expected_mean = 2.0f, expected_std = 5.0f;
+    
+    struct nd{
+        double mean, std;
+        State * states;
+        nd(double  mean, double stddev, State * states) {
+            this->mean = mean;
+            this->std = stddev;
+            this->states = states;
         }
         __forceinline__ __host__ __device__ void operator()(float(&output)[4]){
-            float4 v = rocrand_normal4(&currState);
+            float4 v = rocrand_normal4(states);
             output[0] = static_cast<float>(mean) + v.w * static_cast<float>(std);
             output[1] = static_cast<float>(mean) + v.x * static_cast<float>(std);
             output[2] = static_cast<float>(mean) + v.y * static_cast<float>(std);
@@ -605,7 +725,7 @@ TEST(normal_distribution_with_states, philox4x32_10_out_4){
         }
         
         __forceinline__ __host__ __device__ void operator()(double(&output)[4]){
-            double4 v = rocrand_normal_double4(&currState);
+            double4 v = rocrand_normal_double4(states);
             output[0] = mean + v.w * std;
             output[1] = mean + v.x * std;
             output[2] = mean + v.y * std;
@@ -616,8 +736,7 @@ TEST(normal_distribution_with_states, philox4x32_10_out_4){
     float valF[size];
     double valD[size];
 
-    double expected_mean = 2, expected_std = 5;
-    nd u(expected_mean, expected_std);
+    nd u(expected_mean, expected_std, states);
 
     double meanF = 0, meanD = 0;
     for(size_t i = 0; i < size; i += 4)
@@ -655,95 +774,31 @@ TEST(normal_distribution_with_states, philox4x32_10_out_4){
     EXPECT_NEAR(expected_mean, meanD, (expected_mean * 0.2) + 1e-2) << "Mean: " << meanD << " Expected: " << expected_mean; // 20%
     EXPECT_NEAR(expected_std, stdD, (expected_std * 0.2) + 1e-2) <<  "Stddev: " << stdD << " Expected: " << expected_std; // 20%
 }
-
-template <typename State>
-void run_nd_test_with_state_out2(double expected_mean=2, double expected_std=5){
-    struct nd{
-        double mean, std;
-        State currState;
-        nd(double  mean, double stddev) {
-            this->mean = mean;
-            this->std = stddev;
-            rocrand_init(123456, 654321, 0, &currState);
-        }
-        __forceinline__ __host__ __device__ void operator()(float(&output)[2]){
-            float2 v = rocrand_normal2(&currState);
-            output[0] = static_cast<float>(mean) + v.x * static_cast<float>(std);
-            output[1] = static_cast<float>(mean) + v.y * static_cast<float>(std);
-        }
-        
-        __forceinline__ __host__ __device__ void operator()(double(&output)[2]){
-            double2 v = rocrand_normal_double2(&currState);
-            output[0] = mean + v.x * std;
-            output[1] = mean + v.y * std;
-        }
-    };
-    const size_t size = 4000;
-    float valF[size];
-    double valD[size];
-    nd u(expected_mean, expected_std);
-
-    double meanF = 0, meanD = 0;
-    for(size_t i = 0; i < size; i += 2)
-    {
-        float fOut[2];
-        double dOut[2];
-        
-        u(fOut);
-        valF[i]     = fOut[0];
-        valF[i + 1] = fOut[1];
-        meanF += (fOut[0] + fOut[1]) / size;
-
-        u(dOut);
-        valD[i]     = dOut[0];
-        valD[i + 1] = dOut[1];
-        meanD += (dOut[0] + dOut[1]) / size;
-    }
-
-    // Calculate stddev
-    double stdF = 0, stdD = 0;
-    for(size_t i = 0; i < size; i++){
-        stdF += std::pow(valF[i] - meanF, 2) / size;
-        stdD += std::pow(valD[i] - meanD, 2) / size;
-    }
-    stdF = std::sqrt(stdF);
-    stdD = std::sqrt(stdD);
-
-    EXPECT_NEAR(expected_mean, meanF, (expected_mean * 0.2) + 1e-1) << "Mean: " << meanF << " Expected: " << expected_mean; // 20%
-    EXPECT_NEAR(expected_std, stdF, (expected_std * 0.2) + 1e-1) <<  "Stddev: " << stdF << " Expected: " << expected_std; // 20%
-
-    EXPECT_NEAR(expected_mean, meanD, (expected_mean * 0.2) + 1e-1) << "Mean: " << meanD << " Expected: " << expected_mean; // 20%
-    EXPECT_NEAR(expected_std, stdD, (expected_std * 0.2) + 1e-1) <<  "Stddev: " << stdD << " Expected: " << expected_std; // 20%
-}
     
-TEST(normal_distribution_with_states, philox4x32_10_out_2){
-    run_nd_test_with_state_out2<rocrand_state_philox4x32_10>(0, 1);
-    run_nd_test_with_state_out2<rocrand_state_philox4x32_10>(2, 5);
-    run_nd_test_with_state_out2<rocrand_state_philox4x32_10>(1, 10);
-    run_nd_test_with_state_out2<rocrand_state_philox4x32_10>(3, 6);
+TEST(normal_distribution_with_states, philox4x32_10){
+    rocrand_state_philox4x32_10 states;
+    rocrand_init(123456, 654321, 0, &states);
+    run_normal_dist_with_state_out2<rocrand_state_philox4x32_10>(&states);
+    run_normal_dist_with_state_out4<rocrand_state_philox4x32_10>(&states);
 }
 
 TEST(normal_distribution_with_states, mrg31k3p){
-    run_nd_test_with_state_out2<rocrand_state_mrg31k3p>(0, 1);
-    run_nd_test_with_state_out2<rocrand_state_mrg31k3p>(2, 5);
-    run_nd_test_with_state_out2<rocrand_state_mrg31k3p>(1, 10);
-    run_nd_test_with_state_out2<rocrand_state_mrg31k3p>(3, 6);
+    rocrand_state_mrg31k3p states;
+    rocrand_init(123456, 654321, 0, &states);
+    run_normal_dist_with_state_out2<rocrand_state_mrg31k3p>(&states);
 }
 
 TEST(normal_distribution_with_states, mrg32k3a){
-    run_nd_test_with_state_out2<rocrand_state_mrg32k3a>(0, 1);
-    run_nd_test_with_state_out2<rocrand_state_mrg32k3a>(2, 5);
-    run_nd_test_with_state_out2<rocrand_state_mrg32k3a>(1, 10);
-    run_nd_test_with_state_out2<rocrand_state_mrg32k3a>(3, 6);
+    rocrand_state_mrg32k3a states;
+    rocrand_init(123456, 654321, 0, &states);
+    run_normal_dist_with_state_out2<rocrand_state_mrg32k3a>(&states);
 }
 
 TEST(normal_distribution_with_states, xorwow){
-    run_nd_test_with_state_out2<rocrand_state_xorwow>(0, 1);
-    run_nd_test_with_state_out2<rocrand_state_xorwow>(2, 5);
-    run_nd_test_with_state_out2<rocrand_state_xorwow>(1, 10);
-    run_nd_test_with_state_out2<rocrand_state_xorwow>(3, 6);
+    rocrand_state_xorwow states;
+    rocrand_init(123456, 654321, 0, &states);
+    run_normal_dist_with_state_out2<rocrand_state_xorwow>(&states);
 }
-
 
 __global__ void mtgp32_run_rocrand_normal(rocrand_state_mtgp32 * state, float * fout){
     fout[0] = rocrand_normal(state);
@@ -856,62 +911,6 @@ TEST(normal_distribution_with_states, mtgp32){
     HIP_CHECK(hipFree(dOut));
 }
 
-template <typename State>
-void run_sobol_tests(State * states){
-    double expected_mean = 2.0f, expected_std = 5.0f;
-
-    struct single_out{
-        double mean, std;
-        State * states;
-        
-        single_out(double mean, double std, State * states){
-            this->mean = mean;
-            this->std = std;
-            this->states = states;
-        }
-
-        float __forceinline__ __device__ __host__ fOp(){
-            return mean + rocrand_normal(states) * std;
-        }
-
-        double __forceinline__ __device__ __host__ dOp(){
-            return mean + rocrand_normal_double(states) * std;
-        }
-    };
-
-    const size_t size = 4000;
-
-    float fOut[size];
-    double dOut[size];
-
-    single_out s(expected_mean, expected_std, states);
-
-    float fMean = 0, fStd = 0;
-    double dMean = 0, dStd = 0;
-
-    for(size_t i = 0; i < size; i++){
-        fOut[i] = s.fOp();
-        dOut[i] = s.dOp();
-
-        fMean += fOut[i] / size;
-        dMean += dOut[i] / size;
-    }
-    
-    for(size_t i = 0; i < size; i++){
-        fStd += std::pow(fOut[i] - fMean, 2) / size;
-        dStd += std::pow(dOut[i] - dMean, 2) / size;
-    }
-
-    fStd = std::sqrt(fStd);
-    dStd = std::sqrt(dStd);
-
-    EXPECT_NEAR(expected_mean, fMean, (expected_mean * 0.2) + 1e-1) << "Mean: " << fMean << " Expected: " << expected_mean; // 20%
-    EXPECT_NEAR(expected_std, fStd, (expected_std * 0.2) + 1e-1) <<  "Stddev: " << fStd << " Expected: " << expected_std; // 20%
-
-    EXPECT_NEAR(expected_mean, dMean, (expected_mean * 0.2) + 1e-1) << "Mean: " << dMean << " Expected: " << expected_mean; // 20%
-    EXPECT_NEAR(expected_std, dStd, (expected_std * 0.2) + 1e-1) <<  "Stddev: " << dStd << " Expected: " << expected_std; // 20%
-}
-
 TEST(normal_distribution_with_states, sobol32){
     rocrand_state_sobol32 states;
     const unsigned int* directions;
@@ -919,7 +918,7 @@ TEST(normal_distribution_with_states, sobol32){
 
     rocrand_init(directions, 0, &states);
 
-    run_sobol_tests<rocrand_state_sobol32>(&states);
+    run_normal_dist_with_state_out1<rocrand_state_sobol32>(&states);
 
 }
 
@@ -930,7 +929,7 @@ TEST(normal_distribution_with_states, scarambled_sobol32){
 
     rocrand_init(directions, 123456, 0, &states);
 
-    run_sobol_tests<rocrand_state_scrambled_sobol32>(&states);
+    run_normal_dist_with_state_out1<rocrand_state_scrambled_sobol32>(&states);
 }
 
 TEST(normal_distribution_with_states, sobol64){
@@ -940,7 +939,7 @@ TEST(normal_distribution_with_states, sobol64){
 
     rocrand_init(directions, 0, &states);
 
-    run_sobol_tests<rocrand_state_sobol64>(&states);
+    run_normal_dist_with_state_out1<rocrand_state_sobol64>(&states);
 
 }
 
@@ -951,5 +950,13 @@ TEST(normal_distribution_with_states, scarambled_sobol64){
 
     rocrand_init(directions, 123456, 0, &states);
 
-    run_sobol_tests<rocrand_state_scrambled_sobol64>(&states);
+    run_normal_dist_with_state_out1<rocrand_state_scrambled_sobol64>(&states);
 }
+
+
+// TEST(normal_distribution_with_states, lfsr113){
+//     rocrand_state_lfsr113 states;
+//     rocrand_init(static_cast<uint4>(12), 0, &states);
+
+//     run_normal_dist_with_state_out1<rocrand_state_lfsr113>(&states);
+// }
