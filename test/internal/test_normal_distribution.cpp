@@ -954,9 +954,10 @@ TEST(normal_distribution_with_states, scarambled_sobol64){
 }
 
 
-// TEST(normal_distribution_with_states, lfsr113){
-//     rocrand_state_lfsr113 states;
-//     rocrand_init(static_cast<uint4>(12), 0, &states);
+TEST(normal_distribution_with_states, lfsr113){
+    rocrand_state_lfsr113 states;
+    rocrand_init(static_cast<uint4>(12), 0, &states);
 
-//     run_normal_dist_with_state_out1<rocrand_state_lfsr113>(&states);
-// }
+    run_normal_dist_with_state_out1<rocrand_state_lfsr113>(&states);
+    run_normal_dist_with_state_out2<rocrand_state_lfsr113>(&states);
+}
