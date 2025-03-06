@@ -6,10 +6,13 @@
 #include "ck_tile/core.hpp"
 #include "ck_tile/ops/gemm/warp/warp_gemm_dispatcher.hpp"
 #include "ck_tile/ops/common/tensor_layout.hpp"
+#include "ck_tile/ops/gemm/pipeline/gemm_pipeline_problem.hpp"
 
 namespace ck_tile {
 
-template <typename AccDataType_,
+template <typename ADataType_,
+          typename BDataType_,
+          typename AccDataType_,
           typename ODataType_,
           typename CLayout_,
           index_t kBlockSize_,
@@ -23,6 +26,8 @@ template <typename AccDataType_,
           bool isCTransposed_>
 struct CShuffleEpilogueProblem
 {
+    using ADataType                        = remove_cvref_t<ADataType_>;
+    using BDataType                        = remove_cvref_t<BDataType_>;
     using AccDataType                      = remove_cvref_t<AccDataType_>;
     using ODataType                        = remove_cvref_t<ODataType_>;
     using CLayout                          = remove_cvref_t<CLayout_>;
@@ -56,13 +61,25 @@ struct CShuffleEpilogue
     static constexpr index_t kMPerIteration = kMPerXdl * kMWave;
     static constexpr index_t kNPerIteration = kNPerXdl * kNWave;
 
-    using WG = WarpGemmMfmaDispatcher<ODataType,
-                                      ODataType,
-                                      AccDataType,
-                                      kMPerXdl,
-                                      kNPerXdl,
-                                      kKPerXdl,
-                                      isCTransposed>;
+#ifdef CK_TILE_USE_XDL
+    using WG = WarpGemmMfmaDispatcher<typename Problem::ADataType,
+                                      typename Problem::BDataType,
+                                      typename Problem::AccDataType,
+                                      Problem::kMPerXdl,
+                                      Problem::kNPerXdl,
+                                      Problem::kKPerXdl,
+                                      Problem::isCTransposed>;
+#elif CK_TILE_USE_WMMA
+    using WG = WarpGemmWmmaDispatcher<typename Problem::ADataType,
+                                      typename Problem::BDataType,
+                                      typename Problem::AccDataType,
+                                      Problem::kMPerXdl,
+                                      Problem::kNPerXdl,
+                                      Problem::kKPerXdl,
+                                      false,
+                                      false,
+                                      false>;
+#endif
 
     using CWarpDstr   = typename WG::CWarpDstr;
     using CWarpTensor = typename WG::CWarpTensor;

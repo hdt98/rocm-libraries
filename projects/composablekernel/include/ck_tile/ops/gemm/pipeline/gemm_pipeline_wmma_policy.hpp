@@ -9,7 +9,9 @@ namespace ck_tile {
 
 // TODO: need to check lds bank conflict
 template <bool TransLoadEn_, bool AsyncCopy_, bool AsyncStore_, index_t Stages_>
-struct GemmPipelineWmmaPolicy : public UniversalGemmPipelineAgBgCrPolicy
+struct GemmPipelineWmmaPolicy
+    : public UniversalGemmBasePolicy<
+          GemmPipelineWmmaPolicy<TransLoadEn_, AsyncCopy_, AsyncStore_, Stages_>>
 {
     // use this variable to decide whether use transpose load(such as DS_LOAD_TR16_B128) or not; the
     // below is used in gfx12/gfx13; when A is Column Major, will still use the similar layout as
@@ -49,11 +51,13 @@ struct GemmPipelineWmmaPolicy : public UniversalGemmPipelineAgBgCrPolicy
 
         constexpr index_t kMKPerBlock = GetSingleASmemElementSpace<Problem>();
 
-        using ALayout = remove_cvref_t<typename Problem::ALayout>;
+        using ALayout   = remove_cvref_t<typename Problem::ALayout>;
+        using ADataType = remove_cvref_t<typename Problem::ADataType>;
         constexpr bool is_a_column_major =
             std::is_same_v<ALayout, ck_tile::tensor_layout::gemm::ColumnMajor>;
 
-        constexpr auto alignment = 8; // TODO : need to change for different data type
+        constexpr auto alignment =
+            128 / (sizeof(ADataType) * 8); // TODO : need to change for different data type
         if constexpr(TransLoadEn && is_a_column_major)
         {
             constexpr auto a_lds_block_desc_0 = make_naive_tensor_descriptor(
@@ -101,11 +105,12 @@ struct GemmPipelineWmmaPolicy : public UniversalGemmPipelineAgBgCrPolicy
         constexpr index_t kKPerBlock  = Problem::BlockGemmShape::kK;
         constexpr index_t kNKPerBlock = kNPerBlock * kKPerBlock;
 
-        using BLayout = remove_cvref_t<typename Problem::BLayout>;
+        using BLayout   = remove_cvref_t<typename Problem::BLayout>;
+        using BDataType = remove_cvref_t<typename Problem::BDataType>;
         constexpr bool is_b_row_major =
             std::is_same_v<BLayout, ck_tile::tensor_layout::gemm::RowMajor>;
 
-        constexpr auto alignment = 8;
+        constexpr auto alignment = 128 / (sizeof(BDataType) * 8);
         if constexpr(TransLoadEn && is_b_row_major)
         {
             constexpr auto b_lds_block_desc_0 = make_naive_tensor_descriptor(
@@ -200,7 +205,7 @@ struct GemmPipelineWmmaPolicy : public UniversalGemmPipelineAgBgCrPolicy
     }
 };
 
-using GemmPipelineWmmaDefaultPolicy = GemmPipelineWmmaPolicy<true, false, false, 1>;
+using GemmPipelineWmmaDefaultPolicy = GemmPipelineWmmaPolicy<false, false, false, 1>;
 // Async Copy should enable transpose load
 using GemmPipelineWmmaTrLoadAsyncCopyPolicy = GemmPipelineWmmaPolicy<true, true, false, 2>;
 // using GemmPipelineWmmaTrLoadAsyncCopyAsyncStorePolicy =

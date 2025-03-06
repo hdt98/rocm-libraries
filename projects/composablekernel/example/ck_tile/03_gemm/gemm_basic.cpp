@@ -36,11 +36,15 @@ float gemm_calc(const ck_tile::GemmHostArgs& args, const ck_tile::stream_config&
     constexpr ck_tile::index_t M_Warp = 2;
     constexpr ck_tile::index_t N_Warp = 2;
     constexpr ck_tile::index_t K_Warp = 1;
-
+#ifdef CK_TILE_USE_XDL
     constexpr ck_tile::index_t M_Warp_Tile = 32;
     constexpr ck_tile::index_t N_Warp_Tile = 32;
     constexpr ck_tile::index_t K_Warp_Tile = 16;
-
+#elif CK_TILE_USE_WMMA
+    constexpr ck_tile::index_t M_Warp_Tile = 16;
+    constexpr ck_tile::index_t N_Warp_Tile = 16;
+    constexpr ck_tile::index_t K_Warp_Tile = 16;
+#endif
     using CodegenGemmShape =
         ck_tile::TileGemmShape<ck_tile::sequence<M_Tile, N_Tile, K_Tile>,
                                ck_tile::sequence<M_Warp, N_Warp, K_Warp>,
@@ -52,9 +56,17 @@ float gemm_calc(const ck_tile::GemmHostArgs& args, const ck_tile::stream_config&
         ck_tile::TileGemmTraits<kPadM, kPadN, kPadK, ALayout, BLayout, CLayout>;
     using CodegenPipelineProblem = ck_tile::
         GemmPipelineProblem<ADataType, BDataType, AccDataType, CodegenGemmShape, CodegenGemmTraits>;
-    using CodegenGemmPipeline = ck_tile::GemmPipelineAGmemBGmemCRegV1<CodegenPipelineProblem>;
-    using GemmEpilogue        = ck_tile::CShuffleEpilogue<
-        ck_tile::CShuffleEpilogueProblem<AccDataType,
+#ifdef CK_TILE_USE_XDL
+    using CodegenGemmPipelinePolicy = ck_tile::GemmPipelineAGmemBGmemCRegV1DefaultPolicy;
+#elif CK_TILE_USE_WMMA
+    using CodegenGemmPipelinePolicy        = ck_tile::GemmPipelineWmmaDefaultPolicy;
+#endif
+    using CodegenGemmPipeline =
+        ck_tile::GemmPipelineAGmemBGmemCRegV1<CodegenPipelineProblem, CodegenGemmPipelinePolicy>;
+    using GemmEpilogue = ck_tile::CShuffleEpilogue<
+        ck_tile::CShuffleEpilogueProblem<ADataType,
+                                         BDataType,
+                                         AccDataType,
                                          CDataType,
                                          CLayout,
                                          CodegenPipelineProblem::kBlockSize,

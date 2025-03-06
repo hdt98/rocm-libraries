@@ -30,11 +30,15 @@ float gemm_calc(const ck_tile::GemmHostArgs& args, const ck_tile::stream_config&
     constexpr ck_tile::index_t M_Warp = 4;
     constexpr ck_tile::index_t N_Warp = 1;
     constexpr ck_tile::index_t K_Warp = 1;
-
+#ifdef CK_TILE_USE_XDL
     constexpr ck_tile::index_t M_Warp_Tile = 32;
     constexpr ck_tile::index_t N_Warp_Tile = 32;
     constexpr ck_tile::index_t K_Warp_Tile = 8;
-
+#elif CK_TILE_USE_WMMA
+    constexpr ck_tile::index_t M_Warp_Tile = 16;
+    constexpr ck_tile::index_t N_Warp_Tile = 16;
+    constexpr ck_tile::index_t K_Warp_Tile = 16;
+#endif
     constexpr bool DoubleSmemBuffer = false;
 #endif
 #if(CK_TILE_PIPELINE_DEFAULT == CK_TILE_PIPELINE_COMPUTE_V3)
@@ -47,9 +51,15 @@ float gemm_calc(const ck_tile::GemmHostArgs& args, const ck_tile::stream_config&
     constexpr ck_tile::index_t N_Warp = 2;
     constexpr ck_tile::index_t K_Warp = 1;
 
+#ifdef CK_TILE_USE_XDL
     constexpr ck_tile::index_t M_Warp_Tile = 32;
     constexpr ck_tile::index_t N_Warp_Tile = 32;
     constexpr ck_tile::index_t K_Warp_Tile = 16;
+#elif CK_TILE_USE_WMMA
+    constexpr ck_tile::index_t M_Warp_Tile = 16;
+    constexpr ck_tile::index_t N_Warp_Tile = 16;
+    constexpr ck_tile::index_t K_Warp_Tile = 16;
+#endif
 
     constexpr bool DoubleSmemBuffer = false;
 #elif(CK_TILE_PIPELINE_DEFAULT == CK_TILE_PIPELINE_COMPUTE_V4)
@@ -59,13 +69,19 @@ float gemm_calc(const ck_tile::GemmHostArgs& args, const ck_tile::stream_config&
     constexpr ck_tile::index_t N_Tile = 256;
     constexpr ck_tile::index_t K_Tile = 32;
 
-    constexpr ck_tile::index_t M_Warp = 2;
-    constexpr ck_tile::index_t N_Warp = 2;
-    constexpr ck_tile::index_t K_Warp = 1;
+    constexpr ck_tile::index_t M_Warp      = 2;
+    constexpr ck_tile::index_t N_Warp      = 2;
+    constexpr ck_tile::index_t K_Warp      = 1;
 
+#ifdef CK_TILE_USE_XDL
     constexpr ck_tile::index_t M_Warp_Tile = 32;
     constexpr ck_tile::index_t N_Warp_Tile = 32;
     constexpr ck_tile::index_t K_Warp_Tile = 16;
+#elif CK_TILE_USE_WMMA
+    constexpr ck_tile::index_t M_Warp_Tile = 16;
+    constexpr ck_tile::index_t N_Warp_Tile = 16;
+    constexpr ck_tile::index_t K_Warp_Tile = 16;
+#endif
 
     constexpr bool DoubleSmemBuffer = true;
 #endif
@@ -124,10 +140,16 @@ float gemm_calc(const ck_tile::GemmHostArgs& args, const ck_tile::stream_config&
                                                                            scheduler,
                                                                            has_hot_loop_v,
                                                                            tail_number_v>;
-
+#ifdef CK_TILE_USE_XDL
         using GemmPipeline = GEMM_PIPELINE<UniversalGemmProblem>;
+#elif CK_TILE_USE_WMMA
+        using GemmPipeline =
+            GEMM_PIPELINE<UniversalGemmProblem, ck_tile::GemmPipelineWmmaDefaultPolicy>;
+#endif
         using GemmEpilogue = ck_tile::CShuffleEpilogue<
-            ck_tile::CShuffleEpilogueProblem<AccDataType,
+            ck_tile::CShuffleEpilogueProblem<ADataType,
+                                             BDataType,
+                                             AccDataType,
                                              CDataType,
                                              CLayout,
                                              GemmPipelineProblem::kBlockSize,

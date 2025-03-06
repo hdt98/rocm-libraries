@@ -299,8 +299,7 @@ struct buffer_load_if<16, pre_nop>
                          "v_cmpx_le_u32 1, %5\n"
                          "buffer_load_dwordx4 %1, %2, %3, null offen offset:%4\n"
                          "s_mov_b32 exec_lo, %0"
-                         : "=&s"(save_exec)                       // 0
-                         : "+v"(reinterpret_cast<mbuf_t&>(value)) // 1
+                         : "=&s"(saved_exec), "+v"(reinterpret_cast<mbuf_t&>(value))
                          : "v"(v_offset), "s"(res), "n"(i_offset), "v"(flag)
                          : "memory");
         }
@@ -310,12 +309,11 @@ struct buffer_load_if<16, pre_nop>
                          "v_cmpx_le_u32 1, %5\n"
                          "buffer_load_dwordx4 %1, %2, %3, null offen offset:%4\n"
                          "s_mov_b32 exec_lo, %0"
-                         : "=&s"(save_exec)                       // 0
-                         : "+v"(reinterpret_cast<mbuf_t&>(value)) // 1
-                         : "v"(v_offset),                         // 2
-                           "s"(res),                              // 3
-                           "n"(i_offset),                         // 4
-                           "v"(flag)                              // 5
+                         : "=&s"(saved_exec), "+v"(reinterpret_cast<mbuf_t&>(value))
+                         : "v"(v_offset), // 2
+                           "s"(res),      // 3
+                           "n"(i_offset), // 4
+                           "v"(flag)      // 5
                          : "memory");
         }
 #else
@@ -363,8 +361,7 @@ struct buffer_load_if<8, pre_nop>
                          "v_cmpx_le_u32 1, %5\n"
                          "buffer_load_dwordx2 %1, %2, %3, null offen offset:%4\n"
                          "s_mov_b32 exec_lo, %0"
-                         : "=&s"(save_exec)                       // 0
-                         : "+v"(reinterpret_cast<mbuf_t&>(value)) // 1
+                         : "=&s"(saved_exec), "+v"(reinterpret_cast<mbuf_t&>(value))
                          : "v"(v_offset), "s"(res), "n"(i_offset), "v"(flag)
                          : "memory");
         }
@@ -374,12 +371,11 @@ struct buffer_load_if<8, pre_nop>
                          "v_cmpx_le_u32 1, %5\n"
                          "buffer_load_dwordx2 %1, %2, %3, null offen offset:%4\n"
                          "s_mov_b32 exec_lo, %0"
-                         : "=&s"(save_exec)                       // 0
-                         : "+v"(reinterpret_cast<mbuf_t&>(value)) // 1
-                         : "v"(v_offset),                         // 2
-                           "s"(res),                              // 3
-                           "n"(i_offset),                         // 4
-                           "v"(flag)                              // 5
+                         : "=&s"(saved_exec), "+v"(reinterpret_cast<mbuf_t&>(value))
+                         : "v"(v_offset), // 2
+                           "s"(res),      // 3
+                           "n"(i_offset), // 4
+                           "v"(flag)      // 5
                          : "memory");
         }
 #else
@@ -427,8 +423,7 @@ struct buffer_load_if<4, pre_nop>
                          "v_cmpx_le_u32 1, %5\n"
                          "buffer_load_dword %1, %2, %3, null offen offset:%4\n"
                          "s_mov_b32 exec_lo, %0"
-                         : "=&s"(save_exec)                       // 0
-                         : "+v"(reinterpret_cast<mbuf_t&>(value)) // 1
+                         : "=&s"(saved_exec), "+v"(reinterpret_cast<mbuf_t&>(value)) // 1
                          : "v"(v_offset), "s"(res), "n"(i_offset), "v"(flag)
                          : "memory");
         }
@@ -438,12 +433,11 @@ struct buffer_load_if<4, pre_nop>
                          "v_cmpx_le_u32 1, %5\n"
                          "buffer_load_dword %1, %2, %3, null offen offset:%4\n"
                          "s_mov_b32 exec_lo, %0"
-                         : "=&s"(save_exec)                       // 0
-                         : "+v"(reinterpret_cast<mbuf_t&>(value)) // 1
-                         : "v"(v_offset),                         // 2
-                           "s"(res),                              // 3
-                           "n"(i_offset),                         // 4
-                           "v"(flag)                              // 5
+                         : "=&s"(saved_exec), "+v"(reinterpret_cast<mbuf_t&>(value)) // 1
+                         : "v"(v_offset),                                            // 2
+                           "s"(res),                                                 // 3
+                           "n"(i_offset),                                            // 4
+                           "v"(flag)                                                 // 5
                          : "memory");
         }
 #else
@@ -491,8 +485,7 @@ struct buffer_load_if<2, pre_nop>
                          "v_cmpx_le_u32 1, %5\n"
                          "buffer_load_ushort %1, %2, %3, null offen offset:%4\n"
                          "s_mov_b32 exec_lo, %0"
-                         : "=&s"(save_exec)                       // 0
-                         : "+v"(reinterpret_cast<mbuf_t&>(value)) // 1
+                         : "=&s"(saved_exec), "+v"(reinterpret_cast<mbuf_t&>(value)) // 1
                          : "v"(v_offset), "s"(res), "n"(i_offset), "v"(flag)
                          : "memory");
         }
@@ -502,12 +495,11 @@ struct buffer_load_if<2, pre_nop>
                          "v_cmpx_le_u32 1, %5\n"
                          "buffer_load_ushort %1, %2, %3, null offen offset:%4\n"
                          "s_mov_b32 exec_lo, %0"
-                         : "=&s"(save_exec)                       // 0
-                         : "+v"(reinterpret_cast<mbuf_t&>(value)) // 1
-                         : "v"(v_offset),                         // 2
-                           "s"(res),                              // 3
-                           "n"(i_offset),                         // 4
-                           "v"(flag)                              // 5
+                         : "=&s"(saved_exec), "+v"(reinterpret_cast<mbuf_t&>(value)) // 1
+                         : "v"(v_offset),                                            // 2
+                           "s"(res),                                                 // 3
+                           "n"(i_offset),                                            // 4
+                           "v"(flag)                                                 // 5
                          : "memory");
         }
 #else
@@ -555,8 +547,7 @@ struct buffer_load_if<1, pre_nop>
                          "v_cmpx_le_u32 1, %5\n"
                          "buffer_load_ubyte %1, %2, %3, null offen offset:%4\n"
                          "s_mov_b32 exec_lo, %0"
-                         : "=&s"(save_exec)                       // 0
-                         : "+v"(reinterpret_cast<mbuf_t&>(value)) // 1
+                         : "=&s"(saved_exec), "+v"(reinterpret_cast<mbuf_t&>(value)) // 1
                          : "v"(v_offset), "s"(res), "n"(i_offset), "v"(flag)
                          : "memory");
         }
@@ -566,12 +557,11 @@ struct buffer_load_if<1, pre_nop>
                          "v_cmpx_le_u32 1, %5\n"
                          "buffer_load_ubyte %1, %2, %3, null offen offset:%4\n"
                          "s_mov_b32 exec_lo, %0"
-                         : "=&s"(save_exec)                       // 0
-                         : "+v"(reinterpret_cast<mbuf_t&>(value)) // 1
-                         : "v"(v_offset),                         // 2
-                           "s"(res),                              // 3
-                           "n"(i_offset),                         // 4
-                           "v"(flag)                              // 5
+                         : "=&s"(saved_exec), "+v"(reinterpret_cast<mbuf_t&>(value)) // 1
+                         : "v"(v_offset),                                            // 2
+                           "s"(res),                                                 // 3
+                           "n"(i_offset),                                            // 4
+                           "v"(flag)                                                 // 5
                          : "memory");
         }
 #else
@@ -751,12 +741,12 @@ struct buffer_store_if<16>
         static_assert(sizeof(T) == 16);
         using mbuf_t = fp32x4_t;
 #if(defined(__gfx12__) || defined(__gfx13__))
-        unsigned save_exec;
+        unsigned saved_exec;
         asm volatile("s_mov_b32 %0, exec_lo\n"
                      "v_cmpx_le_u32 1, %5\n"
                      "buffer_store_dwordx4 %1, %2, %3, null offen offset:%4\n"
                      "s_mov_b32 exec_lo, %0"
-                     : "=&s"(save_exec)              // 0
+                     : "=&s"(saved_exec)             // 0
                      : "v"(bit_cast<mbuf_t>(value)), // 1
                        "v"(v_offset),                // 2
                        "s"(res),                     // 3
@@ -764,8 +754,8 @@ struct buffer_store_if<16>
                        "v"(flag)                     // 5
                      : "memory");
 #else
-        auto save_exec = __builtin_amdgcn_read_exec();
-        using mbuf_t   = fp32x4_t;
+        auto saved_exec = __builtin_amdgcn_read_exec();
+        using mbuf_t    = fp32x4_t;
         asm volatile("v_cmpx_le_u32 exec, 1, %4\n"
                      "buffer_store_dwordx4 %0, %1, %2, 0 offen offset:%3\n"
                      "s_mov_b64 exec %5"
@@ -775,7 +765,7 @@ struct buffer_store_if<16>
                        "s"(res),
                        "n"(i_offset),
                        "v"(flag),
-                       "s"(save_exec)
+                       "s"(saved_exec)
                      : "memory");
 #endif
     }
@@ -795,12 +785,12 @@ struct buffer_store_if<8>
         static_assert(sizeof(T) == 8);
         using mbuf_t = ext_vector_t<typename T::value_type, T::size()>;
 #if(defined(__gfx12__) || defined(__gfx13__))
-        unsigned save_exec;
+        unsigned saved_exec;
         asm volatile("s_mov_b32 %0, exec_lo\n"
                      "v_cmpx_le_u32 1, %5\n"
                      "buffer_store_dwordx2 %1, %2, %3, null offen offset:%4\n"
                      "s_mov_b32 exec_lo, %0"
-                     : "=&s"(save_exec)              // 0
+                     : "=&s"(saved_exec)             // 0
                      : "v"(bit_cast<mbuf_t>(value)), // 1
                        "v"(v_offset),                // 2
                        "s"(res),                     // 3
@@ -808,7 +798,7 @@ struct buffer_store_if<8>
                        "v"(flag)                     // 5
                      : "memory");
 #else
-        auto save_exec = __builtin_amdgcn_read_exec();
+        auto saved_exec = __builtin_amdgcn_read_exec();
         // TODO: ugly. rocm-6.0/6.1 seems neet bit_cast to same base type to avoid scratch
         using mbuf_t = ext_vector_t<typename T::value_type, T::size()>;
         asm volatile("v_cmpx_le_u32 exec, 1, %4\n"
@@ -820,7 +810,7 @@ struct buffer_store_if<8>
                        "s"(res),
                        "n"(i_offset),
                        "v"(flag),
-                       "s"(save_exec)
+                       "s"(saved_exec)
                      : "memory");
 #endif
     }
@@ -840,12 +830,12 @@ struct buffer_store_if<4>
         static_assert(sizeof(T) == 4);
         using mbuf_t = float;
 #if(defined(__gfx12__) || defined(__gfx13__))
-        unsigned save_exec;
+        unsigned saved_exec;
         asm volatile("s_mov_b32 %0, exec_lo\n"
                      "v_cmpx_le_u32 1, %5\n"
                      "buffer_store_dword %1, %2, %3, null offen offset:%4\n"
                      "s_mov_b32 exec_lo, %0"
-                     : "=&s"(save_exec)              // 0
+                     : "=&s"(saved_exec)             // 0
                      : "v"(bit_cast<mbuf_t>(value)), // 1
                        "v"(v_offset),                // 2
                        "s"(res),                     // 3
@@ -853,7 +843,7 @@ struct buffer_store_if<4>
                        "v"(flag)                     // 5
                      : "memory");
 #else
-        auto save_exec = __builtin_amdgcn_read_exec();
+        auto saved_exec = __builtin_amdgcn_read_exec();
 
         asm volatile("v_cmpx_le_u32 exec, 1, %4\n"
                      "buffer_store_dword %0, %1, %2, 0 offen offset:%3\n"
@@ -864,7 +854,7 @@ struct buffer_store_if<4>
                        "s"(res),
                        "n"(i_offset),
                        "v"(flag),
-                       "s"(save_exec)
+                       "s"(saved_exec)
                      : "memory");
 #endif
     }
@@ -884,12 +874,12 @@ struct buffer_store_if<2>
         static_assert(sizeof(T) == 2);
         using mbuf_t = short;
 #if(defined(__gfx12__) || defined(__gfx13__))
-        unsigned save_exec;
+        unsigned saved_exec;
         asm volatile("s_mov_b32 %0, exec_lo\n"
                      "v_cmpx_le_u32 1, %5\n"
                      "buffer_store_short %1, %2, %3, null offen offset:%4\n"
                      "s_mov_b32 exec_lo, %0"
-                     : "=&s"(save_exec)              // 0
+                     : "=&s"(saved_exec)             // 0
                      : "v"(bit_cast<mbuf_t>(value)), // 1
                        "v"(v_offset),                // 2
                        "s"(res),                     // 3
@@ -897,8 +887,8 @@ struct buffer_store_if<2>
                        "v"(flag)                     // 5
                      : "memory");
 #else
-        auto save_exec = __builtin_amdgcn_read_exec();
-        using mbuf_t   = short;
+        auto saved_exec = __builtin_amdgcn_read_exec();
+        using mbuf_t    = short;
         asm volatile("v_cmpx_le_u32 exec, 1, %4\n"
                      "buffer_store_short %0, %1, %2, 0 offen offset:%3\n"
                      "s_mov_b64 exec %5"
@@ -908,7 +898,7 @@ struct buffer_store_if<2>
                        "s"(res),
                        "n"(i_offset),
                        "v"(flag),
-                       "s"(save_exec)
+                       "s"(saved_exec)
                      : "memory");
 #endif
     }
@@ -928,12 +918,12 @@ struct buffer_store_if<1>
         static_assert(sizeof(T) == 4);
         using mbuf_t = float;
 #if(defined(__gfx12__) || defined(__gfx13__))
-        unsigned save_exec;
+        unsigned saved_exec;
         asm volatile("s_mov_b32 %0, exec_lo\n"
                      "v_cmpx_le_u32 1, %5\n"
                      "buffer_store_byte %1, %2, %3, null offen offset:%4\n"
                      "s_mov_b32 exec_lo, %0"
-                     : "=&s"(save_exec)              // 0
+                     : "=&s"(saved_exec)             // 0
                      : "v"(bit_cast<mbuf_t>(value)), // 1
                        "v"(v_offset),                // 2
                        "s"(res),                     // 3
@@ -941,8 +931,8 @@ struct buffer_store_if<1>
                        "v"(flag)                     // 5
                      : "memory");
 #else
-        auto save_exec = __builtin_amdgcn_read_exec();
-        using mbuf_t   = float;
+        auto saved_exec = __builtin_amdgcn_read_exec();
+        using mbuf_t    = float;
         asm volatile("v_cmpx_le_u32 exec, 1, %4\n"
                      "buffer_store_byte %0, %1, %2, 0 offen offset:%3\n"
                      "s_mov_b64 exec %5"
@@ -952,7 +942,7 @@ struct buffer_store_if<1>
                        "s"(res),
                        "n"(i_offset),
                        "v"(flag),
-                       "s"(save_exec)
+                       "s"(saved_exec)
                      : "memory");
 #endif
     }
@@ -987,8 +977,8 @@ struct buffer_atomic_add_if<bf16_t, 2, pre_nop>
                                    index_t flag = 1)
     {
         static_assert(sizeof(T) == 4);
-        auto save_exec = __builtin_amdgcn_read_exec();
-        using mbuf_t   = float;
+        auto saved_exec = __builtin_amdgcn_read_exec();
+        using mbuf_t    = float;
         asm volatile("v_cmpx_le_u32 exec, 1, %4\n"
                      "global_atomic_pk_add_bf16 %0, %1, %2 offset:%3\n"
                      "s_mov_b64 exec %5"
@@ -998,7 +988,7 @@ struct buffer_atomic_add_if<bf16_t, 2, pre_nop>
                        "s"(res.xy),
                        "n"(i_offset),
                        "v"(flag),
-                       "s"(save_exec)
+                       "s"(saved_exec)
                      : "memory");
     }
 };

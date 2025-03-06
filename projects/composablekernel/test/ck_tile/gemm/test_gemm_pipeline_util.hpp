@@ -134,7 +134,9 @@ class TestCkTileGemmPipeline : public ::testing::Test
                 typename GemmPipelineTypeSelector<PipelineType, UniversalGemmProblem>::pipeline;
 
             using GemmEpilogue = ck_tile::CShuffleEpilogue<
-                ck_tile::CShuffleEpilogueProblem<AccDataType,
+                ck_tile::CShuffleEpilogueProblem<ADataType,
+                                                 BDataType,
+                                                 AccDataType,
                                                  CDataType,
                                                  CLayout,
                                                  GemmPipeline::BlockSize,

@@ -73,12 +73,24 @@ template<> struct WarpGemmMfmaDispatcher<ck_tile::bf8_t, ck_tile::fp8_t, float, 
 template<> struct WarpGemmMfmaDispatcher<ck_tile::bf8_t, ck_tile::bf8_t, float, 32, 32,  16, false> { using Type = WarpGemmMfma_f32_32x32x16_bf8_bf8; };
 template<> struct WarpGemmMfmaDispatcher<ck_tile::bf8_t, ck_tile::bf8_t, float, 32, 32,  16, true> { using Type = WarpGemmMfma_f32_32x32x16_bf8_bf8_CTransposed; };
 
-template<bool kTransLdA, bool kTransLdB, bool kTransC> struct WarpGemmWmmaDispatcher<ck_tile::half_t, ck_tile::half_t, float, 16, 16,  16, kTransLdA, kTransLdB, kTransC> { 
+template<bool kTransLdA, bool kTransLdB, bool kTransC> struct WarpGemmWmmaDispatcher<ck_tile::half_t, ck_tile::half_t, float, 16, 16, 16, kTransLdA, kTransLdB, kTransC> { 
  #if defined(__gfx13__)
     using Type = WarpGemmWmma_f32_16x16x16_f16_f16<kTransLdA, kTransLdB, kTransC>; 
  #else   
     using Type = WarpGemmWmma_f32_16x16x16_f16_f16_gfx12;
  #endif    
+};
+
+template<bool kTransLdA, bool kTransLdB, bool kTransC> struct WarpGemmWmmaDispatcher<ck_tile::bf16_t, ck_tile::bf16_t, float, 16, 16, 16, kTransLdA, kTransLdB, kTransC> { 
+    using Type = WarpGemmWmma_f32_16x16x16_bf16_bf16<kTransLdA, kTransLdB, kTransC>;   
+};
+
+template<bool kTransLdA, bool kTransLdB, bool kTransC> struct WarpGemmWmmaDispatcher<ck_tile::fp8_t, ck_tile::fp8_t, float, 16, 16, 16, kTransLdA, kTransLdB, kTransC> { 
+    using Type = WarpGemmWmma_f32_16x16x16_fp8_fp8<kTransLdA, kTransLdB, kTransC>;   
+};
+
+template<bool kTransLdA, bool kTransLdB, bool kTransC> struct WarpGemmWmmaDispatcher<ck_tile::bf8_t, ck_tile::bf8_t, float, 16, 16, 16, kTransLdA, kTransLdB, kTransC> { 
+    using Type = WarpGemmWmma_f32_16x16x16_bf8_bf8<kTransLdA, kTransLdB, kTransC>;   
 };
 // clang-format on
 } // namespace impl

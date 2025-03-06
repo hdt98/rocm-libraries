@@ -51,7 +51,9 @@ float batched_gemm(const ck_tile::BatchedGemmHostArgs& args, const ck_tile::stre
         GemmPipelineProblem<ADataType, BDataType, AccDataType, CodegenGemmShape, CodegenGemmTraits>;
     using CodegenGemmPipeline = ck_tile::GemmPipelineAGmemBGmemCRegV1<CodegenPipelineProblem>;
     using GemmEpilogue        = ck_tile::CShuffleEpilogue<
-        ck_tile::CShuffleEpilogueProblem<AccDataType,
+        ck_tile::CShuffleEpilogueProblem<ADataType,
+                                         BDataType,
+                                         AccDataType,
                                          CDataType,
                                          CLayout,
                                          CodegenPipelineProblem::kBlockSize,

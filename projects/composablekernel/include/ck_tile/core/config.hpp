@@ -246,7 +246,7 @@
 #else
 #define CK_TILE_USE_OCP_FP8 0
 #endif
-#elif defined(__gfx950__) || defined(__gfx12__) // for GPU code
+#elif defined(__gfx950__) || defined(__gfx12__) || defined(__gfx13__) // for GPU code
 #define CK_TILE_USE_OCP_FP8 1
 #else // for GPU code
 #define CK_TILE_USE_OCP_FP8 0

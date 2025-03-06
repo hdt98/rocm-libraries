@@ -531,7 +531,7 @@ CK_TILE_HOST_DEVICE DstT run_cast_from_f8(SrcT x)
     }
     else
     {
-        if(x == 0x80)
+        if((x & 0xff) == 0x80)
         {
             return fNeg0;
         }
