@@ -160,16 +160,33 @@ void ComputeCPUBNFwdTrain(DLModule& dl_module)
 
     if(dl_module.bn_mode == miopenBNSpatial)
     {
-        batchNormSpatialHostFwdTrain(dl_module.input,
-                                     dl_module.out_ref,
-                                     dl_module.scale,
-                                     dl_module.shift,
-                                     dl_module.epsilon,
-                                     dl_module.averageFactor,
-                                     dl_module.saveMean_ref,
-                                     dl_module.saveVariance_ref,
-                                     dl_module.runMean_ref,
-                                     dl_module.runVariance_ref);
+        if(!dl_module.keepRunningMeanVar)
+        {
+            tensor<typename decltype(dl_module.saveMean_ref)::value_type> empty_tensor;
+            batchNormSpatialHostFwdTrain(dl_module.input,
+                                         dl_module.out_ref,
+                                         dl_module.scale,
+                                         dl_module.shift,
+                                         dl_module.epsilon,
+                                         dl_module.averageFactor,
+                                         empty_tensor,
+                                         empty_tensor,
+                                         empty_tensor,
+                                         empty_tensor);
+        }
+        else
+        {
+            batchNormSpatialHostFwdTrain(dl_module.input,
+                                         dl_module.out_ref,
+                                         dl_module.scale,
+                                         dl_module.shift,
+                                         dl_module.epsilon,
+                                         dl_module.averageFactor,
+                                         dl_module.saveMean_ref,
+                                         dl_module.saveVariance_ref,
+                                         dl_module.runMean_ref,
+                                         dl_module.runVariance_ref);
+        }
     }
     else if(dl_module.bn_mode == miopenBNPerActivation)
     {
