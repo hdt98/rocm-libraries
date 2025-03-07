@@ -419,15 +419,15 @@ try
 
         ("c_type",
          value<std::string>(&c_type), "Precision of matrix C. "
-         "Options: f32_r,f16_r,bf16_r,i8_r")
+         "Options: f32_r, f16_r, bf16_r, i8_r, i32_r")
 
         ("d_type",
          value<std::string>(&d_type), "Precision of matrix D. "
-        "Options: f32_r,f16_r,bf16_r,i8_r")
+        "Options: f32_r, f16_r, bf16_r, i8_r, i32_r")
 
         ("compute_type",
          value<std::string>(&compute_type)->default_value("f32_r"), "Precision of computation. "
-         "Options: s,f32_r,x,xf32_r,f64_r,i32_r")
+         "Options: s, f32_r, x, xf32_r, f64_r, i32_r")
 
         ("compute_input_typeA",
          value<std::string>(&compute_input_typeA), "Precision of computation input A. "
@@ -504,7 +504,7 @@ try
 
         ("bias_type",
          value<std::string>(&bias_type), "Precision of bias vector."
-        "Options: f16_r,bf16_r,f32_r,default(same with D type)")
+        "Options: f16_r, bf16_r, f32_r, i32_r, default(same with D type - d_type)")
 
         ("bias_source",
          value<std::string>(&bias_source)->default_value("d"),

@@ -1056,8 +1056,10 @@ hipDataType derive_unset_bias_type(const Arguments& arg)
         {
             real_bias_type = arg.d_type;
         }
-    }
-
+    }     
+    else if(arg.compute_type == HIPBLAS_COMPUTE_32I && arg.bias_type == HIP_R_32F) //if bias_type equals to default (HIP_R_32_F)    
+         real_bias_type = HIP_R_32I; // default should be arg.d_type
+    
     if(supported_bias_types.count(real_bias_type) == 0)
         throw std::invalid_argument("Invalid bias type "
                                     + std::string(hip_datatype_to_string(real_bias_type)));
