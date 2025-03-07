@@ -36,10 +36,10 @@ __host__ __device__ constexpr void SplitVector(const X& x, Y& low, Y& high)
 }
 
 template <index_t H, index_t W, index_t ChanOff>
-struct intrin_fma_from_tensor;
+struct intrin_wcnn_fma_from_tensor;
 
 template <index_t ChanOff>
-struct intrin_fma_from_tensor<4, 2, ChanOff>
+struct intrin_wcnn_fma_from_tensor<4, 2, ChanOff>
 {
 #ifdef CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
     // i4
@@ -368,7 +368,7 @@ struct intrin_fma_from_tensor<4, 2, ChanOff>
 };
 
 template <index_t ChanOff>
-struct intrin_fma_from_tensor<4, 4, ChanOff>
+struct intrin_wcnn_fma_from_tensor<4, 4, ChanOff>
 {
 #ifdef CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
     // i4
@@ -673,7 +673,7 @@ struct intrin_fma_from_tensor<4, 4, ChanOff>
 };
 
 template <index_t ChanOff>
-struct intrin_fma_from_tensor<8, 4, ChanOff>
+struct intrin_wcnn_fma_from_tensor<8, 4, ChanOff>
 {
 #ifdef CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
     // i4

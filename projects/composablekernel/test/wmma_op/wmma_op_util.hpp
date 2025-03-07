@@ -1135,7 +1135,7 @@ struct TestWmma
         return std::make_tuple(a_m_k, b_n_k, c_m_n_host_result, c_m_n_device_result);
     }
     template <typename DataType>
-    void DumpTensor(Tensor<DataType> mat)
+    void dump_tensor(Tensor<DataType> mat)
     {
         std::cout << "mat [ " << std::endl;
 
@@ -1193,10 +1193,10 @@ struct TestWmma
         bool is_supported = (ck::is_gfx11_supported() || ck::is_gfx13_supported()) &&
                             ck::wmma_op_util::RunDeviceGEMM(wmma_kernel, a, b, c_device);
 
-        // DumpTensor(a);
-        // DumpTensor(b);
-        // DumpTensor(c_device);
-        // DumpTensor(c_host);
+        // dump_tensor(a);
+        // dump_tensor(b);
+        // dump_tensor(c_device);
+        // dump_tensor(c_host);
 
         if(is_supported)
         {
@@ -1317,7 +1317,7 @@ struct TestMixedFPWmma
             a_m_k, b_n_k, a_matrix_scale, b_matrix_scale, c_m_n_host_result, c_m_n_device_result);
     }
     template <typename DataType>
-    void DumpTensor(Tensor<DataType> mat)
+    void dump_tensor(Tensor<DataType> mat)
     {
         size_t row = mat.GetLengths()[0];
         size_t col = mat.GetLengths()[1];
@@ -1387,10 +1387,10 @@ struct TestMixedFPWmma
                                                                      AGPUDataType{},
                                                                      BGPUDataType{});
 
-        // DumpTensor(a);
-        // DumpTensor(b);
-        // DumpTensor(c_device);
-        // DumpTensor(c_host);
+        // dump_tensor(a);
+        // dump_tensor(b);
+        // dump_tensor(c_device);
+        // dump_tensor(c_host);
 
         if(is_supported)
         {

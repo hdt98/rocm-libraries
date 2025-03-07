@@ -17,7 +17,7 @@ namespace ck {
 namespace swmma_op_util {
 
 template <typename DataType>
-void DumpTensor(Tensor<DataType> mat)
+void dump_tensor(Tensor<DataType> mat)
 {
     size_t row = mat.GetLengths()[0];
     size_t col = mat.GetLengths()[1];

@@ -30,10 +30,10 @@ namespace ck {
 
 // auxData = (activateFun & 0x180) | (pixelShape & 0x7) ;
 template <index_t AuxData, bool Clamp, index_t H, index_t W>
-struct intrin_cvt_tensor_i4_f32;
+struct intrin_wcnn_cvt_tensor_i4_f32;
 
 template <index_t AuxData, bool Clamp>
-struct intrin_cvt_tensor_i4_f32<AuxData, Clamp, 4, 2>
+struct intrin_wcnn_cvt_tensor_i4_f32<AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int& out_0)
@@ -44,10 +44,10 @@ struct intrin_cvt_tensor_i4_f32<AuxData, Clamp, 4, 2>
 };
 
 template <index_t AuxData, bool Clamp, index_t H, index_t W>
-struct intrin_cvt_tensor_i4_f16;
+struct intrin_wcnn_cvt_tensor_i4_f16;
 
 template <index_t AuxData, bool Clamp>
-struct intrin_cvt_tensor_i4_f16<AuxData, Clamp, 8, 4>
+struct intrin_wcnn_cvt_tensor_i4_f16<AuxData, Clamp, 8, 4>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int32x2_t& out_0)
@@ -58,7 +58,7 @@ struct intrin_cvt_tensor_i4_f16<AuxData, Clamp, 8, 4>
 };
 
 template <index_t AuxData, bool Clamp>
-struct intrin_cvt_tensor_i4_f16<AuxData, Clamp, 4, 4>
+struct intrin_wcnn_cvt_tensor_i4_f16<AuxData, Clamp, 4, 4>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int& out_0)
@@ -69,7 +69,7 @@ struct intrin_cvt_tensor_i4_f16<AuxData, Clamp, 4, 4>
 };
 
 template <index_t AuxData, bool Clamp>
-struct intrin_cvt_tensor_i4_f16<AuxData, Clamp, 4, 2>
+struct intrin_wcnn_cvt_tensor_i4_f16<AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int& out_0)
@@ -80,10 +80,10 @@ struct intrin_cvt_tensor_i4_f16<AuxData, Clamp, 4, 2>
 };
 
 template <index_t AuxData, bool Clamp, index_t H, index_t W>
-struct intrin_cvt_tensor_i4_bf16;
+struct intrin_wcnn_cvt_tensor_i4_bf16;
 
 template <index_t AuxData, bool Clamp>
-struct intrin_cvt_tensor_i4_bf16<AuxData, Clamp, 8, 4>
+struct intrin_wcnn_cvt_tensor_i4_bf16<AuxData, Clamp, 8, 4>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int32x2_t& out_0)
@@ -94,7 +94,7 @@ struct intrin_cvt_tensor_i4_bf16<AuxData, Clamp, 8, 4>
 };
 
 template <index_t AuxData, bool Clamp>
-struct intrin_cvt_tensor_i4_bf16<AuxData, Clamp, 4, 4>
+struct intrin_wcnn_cvt_tensor_i4_bf16<AuxData, Clamp, 4, 4>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int& out_0)
@@ -105,7 +105,7 @@ struct intrin_cvt_tensor_i4_bf16<AuxData, Clamp, 4, 4>
 };
 
 template <index_t AuxData, bool Clamp>
-struct intrin_cvt_tensor_i4_bf16<AuxData, Clamp, 4, 2>
+struct intrin_wcnn_cvt_tensor_i4_bf16<AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int& out_0)
@@ -116,10 +116,10 @@ struct intrin_cvt_tensor_i4_bf16<AuxData, Clamp, 4, 2>
 };
 
 template <index_t AuxData, bool Clamp, index_t H, index_t W>
-struct intrin_cvt_tensor_u4_f32;
+struct intrin_wcnn_cvt_tensor_u4_f32;
 // u4 input tensor
 template <index_t AuxData, bool Clamp>
-struct intrin_cvt_tensor_u4_f32<AuxData, Clamp, 4, 2>
+struct intrin_wcnn_cvt_tensor_u4_f32<AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int& out_0)
@@ -130,10 +130,10 @@ struct intrin_cvt_tensor_u4_f32<AuxData, Clamp, 4, 2>
 };
 
 template <index_t AuxData, bool Clamp, index_t H, index_t W>
-struct intrin_cvt_tensor_u4_f16;
+struct intrin_wcnn_cvt_tensor_u4_f16;
 
 template <index_t AuxData, bool Clamp>
-struct intrin_cvt_tensor_u4_f16<AuxData, Clamp, 8, 4>
+struct intrin_wcnn_cvt_tensor_u4_f16<AuxData, Clamp, 8, 4>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int32x2_t& out_0)
@@ -144,7 +144,7 @@ struct intrin_cvt_tensor_u4_f16<AuxData, Clamp, 8, 4>
 };
 
 template <index_t AuxData, bool Clamp>
-struct intrin_cvt_tensor_u4_f16<AuxData, Clamp, 4, 4>
+struct intrin_wcnn_cvt_tensor_u4_f16<AuxData, Clamp, 4, 4>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int& out_0)
@@ -155,7 +155,7 @@ struct intrin_cvt_tensor_u4_f16<AuxData, Clamp, 4, 4>
 };
 
 template <index_t AuxData, bool Clamp>
-struct intrin_cvt_tensor_u4_f16<AuxData, Clamp, 4, 2>
+struct intrin_wcnn_cvt_tensor_u4_f16<AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int& out_0)
@@ -166,10 +166,10 @@ struct intrin_cvt_tensor_u4_f16<AuxData, Clamp, 4, 2>
 };
 
 template <index_t AuxData, bool Clamp, index_t H, index_t W>
-struct intrin_cvt_tensor_u4_bf16;
+struct intrin_wcnn_cvt_tensor_u4_bf16;
 
 template <index_t AuxData, bool Clamp>
-struct intrin_cvt_tensor_u4_bf16<AuxData, Clamp, 8, 4>
+struct intrin_wcnn_cvt_tensor_u4_bf16<AuxData, Clamp, 8, 4>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int32x2_t& out_0)
@@ -180,7 +180,7 @@ struct intrin_cvt_tensor_u4_bf16<AuxData, Clamp, 8, 4>
 };
 
 template <index_t AuxData, bool Clamp>
-struct intrin_cvt_tensor_u4_bf16<AuxData, Clamp, 4, 4>
+struct intrin_wcnn_cvt_tensor_u4_bf16<AuxData, Clamp, 4, 4>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int& out_0)
@@ -191,7 +191,7 @@ struct intrin_cvt_tensor_u4_bf16<AuxData, Clamp, 4, 4>
 };
 
 template <index_t AuxData, bool Clamp>
-struct intrin_cvt_tensor_u4_bf16<AuxData, Clamp, 4, 2>
+struct intrin_wcnn_cvt_tensor_u4_bf16<AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int& out_0)
@@ -203,10 +203,10 @@ struct intrin_cvt_tensor_u4_bf16<AuxData, Clamp, 4, 2>
 
 // i8 input tensor
 template <index_t AuxData, bool Clamp, index_t H, index_t W>
-struct intrin_cvt_tensor_i8_f32;
+struct intrin_wcnn_cvt_tensor_i8_f32;
 
 template <index_t AuxData, bool Clamp>
-struct intrin_cvt_tensor_i8_f32<AuxData, Clamp, 4, 2>
+struct intrin_wcnn_cvt_tensor_i8_f32<AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int& out_0)
@@ -217,10 +217,10 @@ struct intrin_cvt_tensor_i8_f32<AuxData, Clamp, 4, 2>
 };
 
 template <index_t AuxData, bool Clamp, index_t H, index_t W>
-struct intrin_cvt_tensor_i8_f16;
+struct intrin_wcnn_cvt_tensor_i8_f16;
 
 template <index_t AuxData, bool Clamp>
-struct intrin_cvt_tensor_i8_f16<AuxData, Clamp, 8, 4>
+struct intrin_wcnn_cvt_tensor_i8_f16<AuxData, Clamp, 8, 4>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int32x2_t& out_0)
@@ -231,7 +231,7 @@ struct intrin_cvt_tensor_i8_f16<AuxData, Clamp, 8, 4>
 };
 
 template <index_t AuxData, bool Clamp>
-struct intrin_cvt_tensor_i8_f16<AuxData, Clamp, 4, 4>
+struct intrin_wcnn_cvt_tensor_i8_f16<AuxData, Clamp, 4, 4>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int* out_0, int* out_1)
@@ -242,7 +242,7 @@ struct intrin_cvt_tensor_i8_f16<AuxData, Clamp, 4, 4>
 };
 
 template <index_t AuxData, bool Clamp>
-struct intrin_cvt_tensor_i8_f16<AuxData, Clamp, 4, 2>
+struct intrin_wcnn_cvt_tensor_i8_f16<AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int& out_0)
@@ -253,10 +253,10 @@ struct intrin_cvt_tensor_i8_f16<AuxData, Clamp, 4, 2>
 };
 
 template <index_t AuxData, bool Clamp, index_t H, index_t W>
-struct intrin_cvt_tensor_i8_bf16;
+struct intrin_wcnn_cvt_tensor_i8_bf16;
 
 template <index_t AuxData, bool Clamp>
-struct intrin_cvt_tensor_i8_bf16<AuxData, Clamp, 8, 4>
+struct intrin_wcnn_cvt_tensor_i8_bf16<AuxData, Clamp, 8, 4>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int32x2_t& out_0)
@@ -267,7 +267,7 @@ struct intrin_cvt_tensor_i8_bf16<AuxData, Clamp, 8, 4>
 };
 
 template <index_t AuxData, bool Clamp>
-struct intrin_cvt_tensor_i8_bf16<AuxData, Clamp, 4, 4>
+struct intrin_wcnn_cvt_tensor_i8_bf16<AuxData, Clamp, 4, 4>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int* out_0, int* out_1)
@@ -278,7 +278,7 @@ struct intrin_cvt_tensor_i8_bf16<AuxData, Clamp, 4, 4>
 };
 
 template <index_t AuxData, bool Clamp>
-struct intrin_cvt_tensor_i8_bf16<AuxData, Clamp, 4, 2>
+struct intrin_wcnn_cvt_tensor_i8_bf16<AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int& out_0)
@@ -289,10 +289,10 @@ struct intrin_cvt_tensor_i8_bf16<AuxData, Clamp, 4, 2>
 };
 
 template <index_t AuxData, bool Clamp, index_t H, index_t W>
-struct intrin_cvt_tensor_u8_f32;
+struct intrin_wcnn_cvt_tensor_u8_f32;
 // u8 input tensor
 template <index_t AuxData, bool Clamp>
-struct intrin_cvt_tensor_u8_f32<AuxData, Clamp, 4, 2>
+struct intrin_wcnn_cvt_tensor_u8_f32<AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int& out_0)
@@ -303,10 +303,10 @@ struct intrin_cvt_tensor_u8_f32<AuxData, Clamp, 4, 2>
 };
 
 template <index_t AuxData, bool Clamp, index_t H, index_t W>
-struct intrin_cvt_tensor_u8_f16;
+struct intrin_wcnn_cvt_tensor_u8_f16;
 
 template <index_t AuxData, bool Clamp>
-struct intrin_cvt_tensor_u8_f16<AuxData, Clamp, 8, 4>
+struct intrin_wcnn_cvt_tensor_u8_f16<AuxData, Clamp, 8, 4>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int32x2_t& out_0)
@@ -317,7 +317,7 @@ struct intrin_cvt_tensor_u8_f16<AuxData, Clamp, 8, 4>
 };
 
 template <index_t AuxData, bool Clamp>
-struct intrin_cvt_tensor_u8_f16<AuxData, Clamp, 4, 4>
+struct intrin_wcnn_cvt_tensor_u8_f16<AuxData, Clamp, 4, 4>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int* out_0, int* out_1)
@@ -328,7 +328,7 @@ struct intrin_cvt_tensor_u8_f16<AuxData, Clamp, 4, 4>
 };
 
 template <index_t AuxData, bool Clamp>
-struct intrin_cvt_tensor_u8_f16<AuxData, Clamp, 4, 2>
+struct intrin_wcnn_cvt_tensor_u8_f16<AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int& out_0)
@@ -339,10 +339,10 @@ struct intrin_cvt_tensor_u8_f16<AuxData, Clamp, 4, 2>
 };
 
 template <index_t AuxData, bool Clamp, index_t H, index_t W>
-struct intrin_cvt_tensor_u8_bf16;
+struct intrin_wcnn_cvt_tensor_u8_bf16;
 
 template <index_t AuxData, bool Clamp>
-struct intrin_cvt_tensor_u8_bf16<AuxData, Clamp, 8, 4>
+struct intrin_wcnn_cvt_tensor_u8_bf16<AuxData, Clamp, 8, 4>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int32x2_t& out_0)
@@ -353,7 +353,7 @@ struct intrin_cvt_tensor_u8_bf16<AuxData, Clamp, 8, 4>
 };
 
 template <index_t AuxData, bool Clamp>
-struct intrin_cvt_tensor_u8_bf16<AuxData, Clamp, 4, 4>
+struct intrin_wcnn_cvt_tensor_u8_bf16<AuxData, Clamp, 4, 4>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int* out_0, int* out_1)
@@ -364,7 +364,7 @@ struct intrin_cvt_tensor_u8_bf16<AuxData, Clamp, 4, 4>
 };
 
 template <index_t AuxData, bool Clamp>
-struct intrin_cvt_tensor_u8_bf16<AuxData, Clamp, 4, 2>
+struct intrin_wcnn_cvt_tensor_u8_bf16<AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int& out_0)
@@ -376,10 +376,10 @@ struct intrin_cvt_tensor_u8_bf16<AuxData, Clamp, 4, 2>
 
 // fp8 input tensor
 template <index_t AuxData, bool Clamp, index_t H, index_t W>
-struct intrin_cvt_tensor_fp8_f32;
+struct intrin_wcnn_cvt_tensor_fp8_f32;
 
 template <index_t AuxData, bool Clamp>
-struct intrin_cvt_tensor_fp8_f32<AuxData, Clamp, 4, 2>
+struct intrin_wcnn_cvt_tensor_fp8_f32<AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int& out_0)
@@ -390,10 +390,10 @@ struct intrin_cvt_tensor_fp8_f32<AuxData, Clamp, 4, 2>
 };
 
 template <index_t AuxData, bool Clamp, index_t H, index_t W>
-struct intrin_cvt_tensor_fp8_f16;
+struct intrin_wcnn_cvt_tensor_fp8_f16;
 
 template <index_t AuxData, bool Clamp>
-struct intrin_cvt_tensor_fp8_f16<AuxData, Clamp, 8, 4>
+struct intrin_wcnn_cvt_tensor_fp8_f16<AuxData, Clamp, 8, 4>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int32x2_t& out_0)
@@ -404,7 +404,7 @@ struct intrin_cvt_tensor_fp8_f16<AuxData, Clamp, 8, 4>
 };
 
 template <index_t AuxData, bool Clamp>
-struct intrin_cvt_tensor_fp8_f16<AuxData, Clamp, 4, 4>
+struct intrin_wcnn_cvt_tensor_fp8_f16<AuxData, Clamp, 4, 4>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int* out_0, int* out_1)
@@ -415,7 +415,7 @@ struct intrin_cvt_tensor_fp8_f16<AuxData, Clamp, 4, 4>
 };
 
 template <index_t AuxData, bool Clamp>
-struct intrin_cvt_tensor_fp8_f16<AuxData, Clamp, 4, 2>
+struct intrin_wcnn_cvt_tensor_fp8_f16<AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int& out_0)
@@ -426,10 +426,10 @@ struct intrin_cvt_tensor_fp8_f16<AuxData, Clamp, 4, 2>
 };
 
 template <index_t AuxData, bool Clamp, index_t H, index_t W>
-struct intrin_cvt_tensor_fp8_bf16;
+struct intrin_wcnn_cvt_tensor_fp8_bf16;
 
 template <index_t AuxData, bool Clamp>
-struct intrin_cvt_tensor_fp8_bf16<AuxData, Clamp, 8, 4>
+struct intrin_wcnn_cvt_tensor_fp8_bf16<AuxData, Clamp, 8, 4>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int32x2_t& out_0)
@@ -440,7 +440,7 @@ struct intrin_cvt_tensor_fp8_bf16<AuxData, Clamp, 8, 4>
 };
 
 template <index_t AuxData, bool Clamp>
-struct intrin_cvt_tensor_fp8_bf16<AuxData, Clamp, 4, 4>
+struct intrin_wcnn_cvt_tensor_fp8_bf16<AuxData, Clamp, 4, 4>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int* out_0, int* out_1)
@@ -451,7 +451,7 @@ struct intrin_cvt_tensor_fp8_bf16<AuxData, Clamp, 4, 4>
 };
 
 template <index_t AuxData, bool Clamp>
-struct intrin_cvt_tensor_fp8_bf16<AuxData, Clamp, 4, 2>
+struct intrin_wcnn_cvt_tensor_fp8_bf16<AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int& out_0)
@@ -463,10 +463,10 @@ struct intrin_cvt_tensor_fp8_bf16<AuxData, Clamp, 4, 2>
 
 // bf8 input tensor
 template <index_t AuxData, bool Clamp, index_t H, index_t W>
-struct intrin_cvt_tensor_bf8_f32;
+struct intrin_wcnn_cvt_tensor_bf8_f32;
 
 template <index_t AuxData, bool Clamp>
-struct intrin_cvt_tensor_bf8_f32<AuxData, Clamp, 4, 2>
+struct intrin_wcnn_cvt_tensor_bf8_f32<AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int& out_0)
@@ -477,10 +477,10 @@ struct intrin_cvt_tensor_bf8_f32<AuxData, Clamp, 4, 2>
 };
 
 template <index_t AuxData, bool Clamp, index_t H, index_t W>
-struct intrin_cvt_tensor_bf8_fp16;
+struct intrin_wcnn_cvt_tensor_bf8_fp16;
 
 template <index_t AuxData, bool Clamp>
-struct intrin_cvt_tensor_bf8_fp16<AuxData, Clamp, 8, 4>
+struct intrin_wcnn_cvt_tensor_bf8_fp16<AuxData, Clamp, 8, 4>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int32x2_t& out_0)
@@ -491,7 +491,7 @@ struct intrin_cvt_tensor_bf8_fp16<AuxData, Clamp, 8, 4>
 };
 
 template <index_t AuxData, bool Clamp>
-struct intrin_cvt_tensor_bf8_fp16<AuxData, Clamp, 4, 4>
+struct intrin_wcnn_cvt_tensor_bf8_fp16<AuxData, Clamp, 4, 4>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int* out_0, int* out_1)
@@ -502,7 +502,7 @@ struct intrin_cvt_tensor_bf8_fp16<AuxData, Clamp, 4, 4>
 };
 
 template <index_t AuxData, bool Clamp>
-struct intrin_cvt_tensor_bf8_fp16<AuxData, Clamp, 4, 2>
+struct intrin_wcnn_cvt_tensor_bf8_fp16<AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int& out_0)
@@ -513,10 +513,10 @@ struct intrin_cvt_tensor_bf8_fp16<AuxData, Clamp, 4, 2>
 };
 
 template <index_t AuxData, bool Clamp, index_t H, index_t W>
-struct intrin_cvt_tensor_bf8_bf16;
+struct intrin_wcnn_cvt_tensor_bf8_bf16;
 
 template <index_t AuxData, bool Clamp>
-struct intrin_cvt_tensor_bf8_bf16<AuxData, Clamp, 8, 4>
+struct intrin_wcnn_cvt_tensor_bf8_bf16<AuxData, Clamp, 8, 4>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int32x2_t& out_0)
@@ -527,7 +527,7 @@ struct intrin_cvt_tensor_bf8_bf16<AuxData, Clamp, 8, 4>
 };
 
 template <index_t AuxData, bool Clamp>
-struct intrin_cvt_tensor_bf8_bf16<AuxData, Clamp, 4, 4>
+struct intrin_wcnn_cvt_tensor_bf8_bf16<AuxData, Clamp, 4, 4>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int* out_0, int* out_1)
@@ -538,7 +538,7 @@ struct intrin_cvt_tensor_bf8_bf16<AuxData, Clamp, 4, 4>
 };
 
 template <index_t AuxData, bool Clamp>
-struct intrin_cvt_tensor_bf8_bf16<AuxData, Clamp, 4, 2>
+struct intrin_wcnn_cvt_tensor_bf8_bf16<AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc, const char& ssrc, int& out_0)
@@ -550,10 +550,10 @@ struct intrin_cvt_tensor_bf8_bf16<AuxData, Clamp, 4, 2>
 
 // fp16 input tensor
 template <index_t AuxData, bool Clamp, index_t H, index_t W>
-struct intrin_cvt_tensor_fp16_f32;
+struct intrin_wcnn_cvt_tensor_fp16_f32;
 
 template <index_t AuxData, bool Clamp>
-struct intrin_cvt_tensor_fp16_f32<AuxData, Clamp, 4, 2>
+struct intrin_wcnn_cvt_tensor_fp16_f32<AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc>
     __device__ static void
@@ -570,10 +570,10 @@ struct intrin_cvt_tensor_fp16_f32<AuxData, Clamp, 4, 2>
 };
 
 template <index_t AuxData, bool Clamp, index_t H, index_t W>
-struct intrin_cvt_tensor_fp16_fp16;
+struct intrin_wcnn_cvt_tensor_fp16_fp16;
 
 template <index_t AuxData, bool Clamp>
-struct intrin_cvt_tensor_fp16_fp16<AuxData, Clamp, 8, 4>
+struct intrin_wcnn_cvt_tensor_fp16_fp16<AuxData, Clamp, 8, 4>
 {
     template <class FloatAcc>
     __device__ static void
@@ -589,7 +589,7 @@ struct intrin_cvt_tensor_fp16_fp16<AuxData, Clamp, 8, 4>
 };
 
 template <index_t AuxData, bool Clamp>
-struct intrin_cvt_tensor_fp16_fp16<AuxData, Clamp, 4, 4>
+struct intrin_wcnn_cvt_tensor_fp16_fp16<AuxData, Clamp, 4, 4>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc,
@@ -611,7 +611,7 @@ struct intrin_cvt_tensor_fp16_fp16<AuxData, Clamp, 4, 4>
 };
 
 template <index_t AuxData, bool Clamp>
-struct intrin_cvt_tensor_fp16_fp16<AuxData, Clamp, 4, 2>
+struct intrin_wcnn_cvt_tensor_fp16_fp16<AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc>
     __device__ static void
@@ -628,10 +628,10 @@ struct intrin_cvt_tensor_fp16_fp16<AuxData, Clamp, 4, 2>
 };
 
 template <index_t AuxData, bool Clamp, index_t H, index_t W>
-struct intrin_cvt_tensor_fp16_bf16;
+struct intrin_wcnn_cvt_tensor_fp16_bf16;
 
 template <index_t AuxData, bool Clamp>
-struct intrin_cvt_tensor_fp16_bf16<AuxData, Clamp, 8, 4>
+struct intrin_wcnn_cvt_tensor_fp16_bf16<AuxData, Clamp, 8, 4>
 {
     template <class FloatAcc>
     __device__ static void
@@ -648,7 +648,7 @@ struct intrin_cvt_tensor_fp16_bf16<AuxData, Clamp, 8, 4>
 };
 
 template <index_t AuxData, bool Clamp>
-struct intrin_cvt_tensor_fp16_bf16<AuxData, Clamp, 4, 4>
+struct intrin_wcnn_cvt_tensor_fp16_bf16<AuxData, Clamp, 4, 4>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc,
@@ -671,7 +671,7 @@ struct intrin_cvt_tensor_fp16_bf16<AuxData, Clamp, 4, 4>
 };
 
 template <index_t AuxData, bool Clamp>
-struct intrin_cvt_tensor_fp16_bf16<AuxData, Clamp, 4, 2>
+struct intrin_wcnn_cvt_tensor_fp16_bf16<AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc>
     __device__ static void
@@ -689,10 +689,10 @@ struct intrin_cvt_tensor_fp16_bf16<AuxData, Clamp, 4, 2>
 
 // bf16 input tensor
 template <index_t AuxData, bool Clamp, index_t H, index_t W>
-struct intrin_cvt_tensor_bf16_f32;
+struct intrin_wcnn_cvt_tensor_bf16_f32;
 
 template <index_t AuxData, bool Clamp>
-struct intrin_cvt_tensor_bf16_f32<AuxData, Clamp, 4, 2>
+struct intrin_wcnn_cvt_tensor_bf16_f32<AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc>
     __device__ static void
@@ -709,10 +709,10 @@ struct intrin_cvt_tensor_bf16_f32<AuxData, Clamp, 4, 2>
 };
 
 template <index_t AuxData, bool Clamp, index_t H, index_t W>
-struct intrin_cvt_tensor_bf16_f16;
+struct intrin_wcnn_cvt_tensor_bf16_f16;
 
 template <index_t AuxData, bool Clamp>
-struct intrin_cvt_tensor_bf16_f16<AuxData, Clamp, 8, 4>
+struct intrin_wcnn_cvt_tensor_bf16_f16<AuxData, Clamp, 8, 4>
 {
     template <class FloatAcc>
     __device__ static void
@@ -728,7 +728,7 @@ struct intrin_cvt_tensor_bf16_f16<AuxData, Clamp, 8, 4>
 };
 
 template <index_t AuxData, bool Clamp>
-struct intrin_cvt_tensor_bf16_f16<AuxData, Clamp, 4, 4>
+struct intrin_wcnn_cvt_tensor_bf16_f16<AuxData, Clamp, 4, 4>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc,
@@ -751,7 +751,7 @@ struct intrin_cvt_tensor_bf16_f16<AuxData, Clamp, 4, 4>
 };
 
 template <index_t AuxData, bool Clamp>
-struct intrin_cvt_tensor_bf16_f16<AuxData, Clamp, 4, 2>
+struct intrin_wcnn_cvt_tensor_bf16_f16<AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc>
     __device__ static void
@@ -768,10 +768,10 @@ struct intrin_cvt_tensor_bf16_f16<AuxData, Clamp, 4, 2>
 };
 
 template <index_t AuxData, bool Clamp, index_t H, index_t W>
-struct intrin_cvt_tensor_bf16_bf16;
+struct intrin_wcnn_cvt_tensor_bf16_bf16;
 
 template <index_t AuxData, bool Clamp>
-struct intrin_cvt_tensor_bf16_bf16<AuxData, Clamp, 8, 4>
+struct intrin_wcnn_cvt_tensor_bf16_bf16<AuxData, Clamp, 8, 4>
 {
     template <class FloatAcc>
     __device__ static void
@@ -788,7 +788,7 @@ struct intrin_cvt_tensor_bf16_bf16<AuxData, Clamp, 8, 4>
 };
 
 template <index_t AuxData, bool Clamp>
-struct intrin_cvt_tensor_bf16_bf16<AuxData, Clamp, 4, 4>
+struct intrin_wcnn_cvt_tensor_bf16_bf16<AuxData, Clamp, 4, 4>
 {
     template <class FloatAcc>
     __device__ static void Run(const FloatAcc& inAcc,
@@ -811,7 +811,7 @@ struct intrin_cvt_tensor_bf16_bf16<AuxData, Clamp, 4, 4>
 };
 
 template <index_t AuxData, bool Clamp>
-struct intrin_cvt_tensor_bf16_bf16<AuxData, Clamp, 4, 2>
+struct intrin_wcnn_cvt_tensor_bf16_bf16<AuxData, Clamp, 4, 2>
 {
     template <class FloatAcc>
     __device__ static void
