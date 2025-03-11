@@ -621,7 +621,7 @@ struct MoeSortingKernel
         {
             const index_t prefill_token = topk_mdiv.div(numel);
             // TODO: only support expert-tile like 8, 16, 32
-            static constexpr index_t experts_per_wave = warpSize / Problem::ExpertTile;
+            static constexpr index_t experts_per_wave = get_warp_size() / Problem::ExpertTile;
             {
                 index_t eid           = tid / experts_per_wave;
                 index_t expert_offset = cumsum[eid] +
@@ -686,10 +686,10 @@ struct MoeSortingKernel
                                    const mdiv topk_mdiv,
                                    const mdiv expert_mdiv,
                                    const index_t smem_rows,
-                                   void* smem) const
+                                   void* smem_ptr) const
     {
         const index_t tid            = static_cast<index_t>(threadIdx.x);
-        const index_t wid            = __builtin_amdgcn_readfirstlane(tid / warpSize);
+        const index_t wid            = __builtin_amdgcn_readfirstlane(tid / get_warp_size());
         const index_t lid            = __lane_id();
         constexpr index_t block_size = 256;           // blockDim.x;
         const index_t sub_tokens     = smem_rows - 2; // sub_tokens_mdiv.divisor;
@@ -698,9 +698,9 @@ struct MoeSortingKernel
 
         const index_t smem_cols = num_experts + 1;
 
-        simple_smem_indexer smem_cumsum{reinterpret_cast<index_t*>(smem) + 0};
-        simple_smem_indexer smem_cumdup{reinterpret_cast<index_t*>(smem) + smem_cols};
-        simple_smem_indexer smem_tokens{reinterpret_cast<index_t*>(smem) + 2 * smem_cols,
+        simple_smem_indexer smem_cumsum{reinterpret_cast<index_t*>(smem_ptr) + 0};
+        simple_smem_indexer smem_cumdup{reinterpret_cast<index_t*>(smem_ptr) + smem_cols};
+        simple_smem_indexer smem_tokens{reinterpret_cast<index_t*>(smem_ptr) + 2 * smem_cols,
                                         smem_cols};
 
         // #pragma unroll 8
@@ -794,7 +794,7 @@ struct MoeSortingKernel
                 // NOTE: under this block can never use __syncthreads!
                 int i_e_          = 0;
                 int local_cumsum_ = 0;
-                for(; i_e_ < num_experts; i_e_ += warpSize)
+                for(; i_e_ < num_experts; i_e_ += get_warp_size())
                 {
                     int pre_cumsum_ = smem_cumsum(lid == 0 ? i_e_ : 0);
                     int local_cnt   = smem_cumsum(i_e_ + lid + 1);
@@ -839,7 +839,7 @@ struct MoeSortingKernel
                                                   // cumsum padded in case local cumsum is zero, but
                                                   // pre_sumsum has value, which will result int
                                                   // zero local cumsum(but we want at least padded)
-                    wave_cumsum<int, warpSize>(local_cumsum_);
+                    wave_cumsum<int, get_warp_size()>(local_cumsum_);
 
                     if((i_e_ + lid) < num_experts)
                         smem_cumsum(i_e_ + lid + 1) = local_cumsum_;
@@ -847,7 +847,7 @@ struct MoeSortingKernel
                     if constexpr(Problem::LocalExpertMasking)
                     {
                         local_masking += pre_cumsum_masking;
-                        wave_cumsum<int, warpSize>(local_masking);
+                        wave_cumsum<int, get_warp_size()>(local_masking);
                         if((i_e_ + lid) < num_experts)
                             smem_cumdup(i_e_ + lid + 1) = local_masking;
                     }
@@ -857,7 +857,7 @@ struct MoeSortingKernel
                     // than 0(which is not we want)
                     __builtin_amdgcn_s_waitcnt(0xc07f);
                 }
-                if((lid + i_e_ - warpSize) == (num_experts - 1))
+                if((lid + i_e_ - get_warp_size()) == (num_experts - 1))
                 {
                     *p_total_tokens_post_pad = local_cumsum_;
                 }

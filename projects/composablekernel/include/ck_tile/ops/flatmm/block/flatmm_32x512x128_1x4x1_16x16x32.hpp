@@ -89,24 +89,24 @@ struct Flatmm_32x512x128_1x4x1_16x16x32_Base // for f16/bf16
         return c_block_tensor;
     }
 
-    CK_TILE_HOST_DEVICE static constexpr auto MakeLdsStoreDesc_A()
+    template <index_t LanesPerK,
+              index_t warpSize,
+              index_t KVector,
+              index_t KPad,
+              typename Enabled = void>
+    struct MakeLdsBlockDesc_A
     {
-        // A async->LDS
-        // constexpr index_t Block_M = Problem::BlockShape::Block_M0;
-        // constexpr index_t Block_K = Problem::BlockShape::Block_K0;
-        // constexpr index_t BlockSize = Problem::BlockShape::BlockSize;
-        constexpr index_t warpSize = ck_tile::get_warp_size();
-        // constexpr index_t NumWarps = Problem::BlockShape::NumWarps;
+    };
 
-        constexpr index_t KPack_  = 8;      // GetSmemKPack_A<Problem>(); // LDS
-        constexpr index_t KVector = 2;      // GetAlignment_A<Problem>(); // async copy 1 dword
-        constexpr index_t KPad    = KPack_; // pad between warps
-
-        static_assert(Block_K % KVector == 0);
-        constexpr index_t LanesPerK = Block_K / KVector; // how many thread loading K
-        if constexpr(LanesPerK >= warpSize)
+    template <index_t LanesPerK, index_t warpSize, index_t KVector, index_t KPad>
+    struct MakeLdsBlockDesc_A<LanesPerK,
+                              warpSize,
+                              KVector,
+                              KPad,
+                              std::enable_if_t<(LanesPerK >= warpSize)>>
+    {
+        CK_TILE_HOST_DEVICE static constexpr auto invoke()
         {
-            // need multiple waves to load K
             static_assert(LanesPerK % warpSize == 0);
             constexpr index_t wavesPerK = LanesPerK / warpSize;
             if constexpr(wavesPerK > NumWarps)
@@ -143,7 +143,16 @@ struct Flatmm_32x512x128_1x4x1_16x16x32_Base // for f16/bf16
                 return lds_block_desc_issues_warps_lanes;
             }
         }
-        else
+    };
+
+    template <index_t LanesPerK, index_t warpSize, index_t KVector, index_t KPad>
+    struct MakeLdsBlockDesc_A<LanesPerK,
+                              warpSize,
+                              KVector,
+                              KPad,
+                              std::enable_if_t<(LanesPerK < warpSize)>>
+    {
+        CK_TILE_HOST_DEVICE static constexpr auto invoke()
         {
             // lanes within a wave load different M but same K
             static_assert(warpSize % LanesPerK == 0);
@@ -175,6 +184,26 @@ struct Flatmm_32x512x128_1x4x1_16x16x32_Base // for f16/bf16
 
             return lds_block_desc_issues_warps_lanes;
         }
+    };
+
+    CK_TILE_HOST_DEVICE static constexpr auto MakeLdsStoreDesc_A()
+    {
+        // A async->LDS
+        // constexpr index_t Block_M = Problem::BlockShape::Block_M0;
+        // constexpr index_t Block_K = Problem::BlockShape::Block_K0;
+        // constexpr index_t BlockSize = Problem::BlockShape::BlockSize;
+        constexpr index_t warpSize = ck_tile::get_warp_size();
+        // constexpr index_t NumWarps = Problem::BlockShape::NumWarps;
+
+        constexpr index_t KPack_  = 8;      // GetSmemKPack_A<Problem>(); // LDS
+        constexpr index_t KVector = 2;      // GetAlignment_A<Problem>(); // async copy 1 dword
+        constexpr index_t KPad    = KPack_; // pad between warps
+
+        static_assert(Block_K % KVector == 0);
+        constexpr index_t LanesPerK = Block_K / KVector; // how many thread loading K
+        constexpr auto lds_block_desc_issues_warps_lanes =
+            MakeLdsBlockDesc_A<LanesPerK, warpSize, KVector, KPad>::invoke();
+        return lds_block_desc_issues_warps_lanes;
     }
 
     // template <typename Problem>

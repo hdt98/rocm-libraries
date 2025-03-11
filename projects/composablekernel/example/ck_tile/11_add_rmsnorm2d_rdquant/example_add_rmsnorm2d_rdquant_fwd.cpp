@@ -101,7 +101,7 @@ bool run(const ck_tile::ArgParser& arg_parser)
 
     using BlockWarps = ck_tile::sequence<4, 1>;
     using BlockTile  = ck_tile::sequence<4, 128>;
-    using WarpTile   = ck_tile::sequence<1, 64>;
+    using WarpTile   = ck_tile::sequence<1, ck_tile::get_warp_size()>;
     using Vector     = ck_tile::sequence<1, 1>;
 
     using Shape   = ck_tile::Generic2dBlockShape<BlockTile, BlockWarps, WarpTile, Vector>;

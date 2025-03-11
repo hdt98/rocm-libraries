@@ -22,6 +22,10 @@ enum class rope_enum
     half_rotated = 2,
 };
 
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
 template <typename DataType>
 std::tuple<ck_tile::HostTensor<DataType>, ck_tile::HostTensor<DataType>>
 generate_rotary_cos_sin(ck_tile::index_t seqlen,

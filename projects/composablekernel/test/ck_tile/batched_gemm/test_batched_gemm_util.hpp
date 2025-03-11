@@ -43,11 +43,15 @@ class TestCkTileBatchedGemm : public ::testing::Test
         constexpr ck_tile::index_t M_Warp = 2;
         constexpr ck_tile::index_t N_Warp = 2;
         constexpr ck_tile::index_t K_Warp = 1;
-
+#ifdef CK_TILE_USE_XDL
         constexpr ck_tile::index_t M_Warp_Tile = 32;
         constexpr ck_tile::index_t N_Warp_Tile = 32;
         constexpr ck_tile::index_t K_Warp_Tile = 8;
-
+#elif CK_TILE_USE_WMMA
+        constexpr ck_tile::index_t M_Warp_Tile = 16;
+        constexpr ck_tile::index_t N_Warp_Tile = 16;
+        constexpr ck_tile::index_t K_Warp_Tile = 16;
+#endif
         using CodegenGemmShape =
             ck_tile::TileGemmShape<ck_tile::sequence<M_Tile, N_Tile, K_Tile>,
                                    ck_tile::sequence<M_Warp, N_Warp, K_Warp>,
@@ -63,8 +67,14 @@ class TestCkTileBatchedGemm : public ::testing::Test
                                                                     AccDataType,
                                                                     CodegenGemmShape,
                                                                     CodegenGemmTraits>;
-
-        using CodegenGemmPipeline = ck_tile::GemmPipelineAGmemBGmemCRegV1<CodegenPipelineProblem>;
+#ifdef CK_TILE_USE_XDL
+        using CodegenGemmPipelinePolicy = ck_tile::GemmPipelineAGmemBGmemCRegV1DefaultPolicy;
+#elif CK_TILE_USE_WMMA
+        using CodegenGemmPipelinePolicy        = ck_tile::GemmPipelineWmmaDefaultPolicy;
+#endif
+        using CodegenGemmPipeline =
+            ck_tile::GemmPipelineAGmemBGmemCRegV1<CodegenPipelineProblem,
+                                                  CodegenGemmPipelinePolicy>;
 
         using GemmEpilogue = ck_tile::CShuffleEpilogue<
             ck_tile::CShuffleEpilogueProblem<ADataType,

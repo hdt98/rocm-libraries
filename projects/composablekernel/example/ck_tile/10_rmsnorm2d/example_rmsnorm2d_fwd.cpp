@@ -67,9 +67,9 @@ bool run(const ck_tile::ArgParser& arg_parser)
 
     constexpr bool kTwoPass = true;
 
-    using BlockWarps = ck_tile::sequence<2, 2>;
+    using BlockWarps = ck_tile::sequence<2, 128 / ck_tile::get_warp_size()>;
     using BlockTile  = ck_tile::sequence<2, 128>;
-    using WarpTile   = ck_tile::sequence<1, 64>;
+    using WarpTile   = ck_tile::sequence<1, ck_tile::get_warp_size()>;
     using Vector     = ck_tile::sequence<1, 1>;
     using Shape      = ck_tile::Generic2dBlockShape<BlockTile, BlockWarps, WarpTile, Vector>;
 

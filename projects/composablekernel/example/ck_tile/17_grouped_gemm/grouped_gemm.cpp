@@ -33,9 +33,15 @@ struct GroupedGemmKernelParam
     static const ck_tile::index_t N_Warp = 2;
     static const ck_tile::index_t K_Warp = 1;
 
+#ifdef CK_TILE_USE_XDL
     static const ck_tile::index_t M_Warp_Tile = 32;
     static const ck_tile::index_t N_Warp_Tile = 32;
     static const ck_tile::index_t K_Warp_Tile = 8;
+#elif CK_TILE_USE_WMMA
+    static const ck_tile::index_t M_Warp_Tile = 16;
+    static const ck_tile::index_t N_Warp_Tile = 16;
+    static const ck_tile::index_t K_Warp_Tile = 16;
+#endif
 };
 
 using CodegenGemmShape =
@@ -67,9 +73,15 @@ using CodegenPipelineProblem =
                                  CodegenGemmShape,
                                  CodegenGemmTraits<ALayout, BLayout, CLayout>>;
 
+#ifdef CK_TILE_USE_XDL
+using CodegenGemmPipelinePolicy = ck_tile::GemmPipelineAGmemBGmemCRegV1DefaultPolicy;
+#elif CK_TILE_USE_WMMA
+using CodegenGemmPipelinePolicy = ck_tile::GemmPipelineWmmaDefaultPolicy;
+#endif
 template <typename ALayout, typename BLayout, typename CLayout>
 using CodegenGemmPipeline =
-    ck_tile::GemmPipelineAGmemBGmemCRegV1<CodegenPipelineProblem<ALayout, BLayout, CLayout>>;
+    ck_tile::GemmPipelineAGmemBGmemCRegV1<CodegenPipelineProblem<ALayout, BLayout, CLayout>,
+                                          CodegenGemmPipelinePolicy>;
 
 template <typename ALayout, typename BLayout, typename CLayout>
 using GemmEpilogue = ck_tile::CShuffleEpilogue<ck_tile::CShuffleEpilogueProblem<
