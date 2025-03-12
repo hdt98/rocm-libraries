@@ -66,57 +66,26 @@ rocblas_status rocsolver_gesdd_impl(rocblas_handle handle,
     rocblas_stride strideV = 0;
     rocblas_int batch_count = 1;
 
-    // memory workspace sizes:
-    // size for constants in rocblas calls
-    size_t size_scalars;
-    // size for temporary matrix storage
-    size_t size_VUtmp;
-    // extra requirements for calling SYEVD/HEEVD, GEQRF, ORGQR/UNGQR, GELQF, ORGLQ/UNGLQ
-    size_t size_UVtmpZ, size_work1, size_work2, size_work3, size_work4, size_work5_ipiv,
-        size_splits, size_tmptau_W, size_tau, size_workArr, size_workArr2;
+    auto gesdd_work_items = rocsolver_gesdd_getWorkItems<false, false, T, SS, W>(
+        handle, left_svect, right_svect, m, n, nullptr /* W A */, lda, strideA, nullptr /* S */,
+        strideS, nullptr /* T* U */, ldu, strideU, nullptr /* T* V */, ldv, strideV,
+        nullptr /* rocblas_int* info */, batch_count);
 
-    rocsolver_gesdd_getMemorySize<false, T, SS>(
-        handle, left_svect, right_svect, m, n, strideS, batch_count, &size_VUtmp, &size_UVtmpZ,
-        &size_scalars, &size_work1, &size_work2, &size_work3, &size_work4, &size_work5_ipiv,
-        &size_splits, &size_tmptau_W, &size_tau, &size_workArr, &size_workArr2);
-
+    auto [device_work_ptr, status] = device_workspace::Get(handle, gesdd_work_items);
     if(rocblas_is_device_memory_size_query(handle))
-        return rocblas_set_optimal_device_memory_size(handle, size_VUtmp, size_UVtmpZ, size_scalars,
-                                                      size_work1, size_work2, size_work3, size_work4,
-                                                      size_work5_ipiv, size_splits, size_tmptau_W,
-                                                      size_tau, size_workArr, size_workArr2);
+    {
+        return status;
+    }
 
-    // memory workspace allocation
-    void *scalars, *VUtmp, *UVtmpZ, *work1, *work2, *work3, *work4, *work5_ipiv, *splits, *tmptau_W,
-        *tau, *workArr, *workArr2;
-    rocblas_device_malloc mem(handle, size_VUtmp, size_UVtmpZ, size_scalars, size_work1, size_work2,
-                              size_work3, size_work4, size_work5_ipiv, size_splits, size_tmptau_W,
-                              size_tau, size_workArr, size_workArr2);
-
-    if(!mem)
-        return rocblas_status_memory_error;
-
-    VUtmp = mem[0];
-    UVtmpZ = mem[1];
-    scalars = mem[2];
-    work1 = mem[3];
-    work2 = mem[4];
-    work3 = mem[5];
-    work4 = mem[6];
-    work5_ipiv = mem[7];
-    splits = mem[8];
-    tmptau_W = mem[9];
-    tau = mem[10];
-    workArr = mem[11];
-    workArr2 = mem[12];
-    if(size_scalars > 0)
-        init_scalars(handle, (T*)scalars);
+    if(!device_work_ptr || (status != rocblas_status_success))
+    {
+        return status;
+    }
 
     // execution
     return rocsolver_gesdd_template<false, false, T>(
         handle, left_svect, right_svect, m, n, A, shiftA, lda, strideA, S, strideS, U, ldu, strideU,
-        V, ldv, strideV, info, batch_count, (T*)VUtmp, UVtmpZ, (T*)scalars, work1, work2, work3,
-        work4, work5_ipiv, splits, tmptau_W, tau, workArr, workArr2);
+        V, ldv, strideV, info, batch_count, device_work_ptr);
 }
 
 ROCSOLVER_END_NAMESPACE

@@ -42,6 +42,13 @@
 #include "rocsolver/rocsolver.h"
 #include "rocsolver_run_specialized_kernels.hpp"
 
+#include <map>
+#include <memory>
+#include <string>
+#include <tuple>
+#include <unordered_map>
+#include <vector>
+
 ROCSOLVER_BEGIN_NAMESPACE
 
 template <typename T, typename S>
@@ -199,6 +206,355 @@ rocblas_status rocsolver_gesdd_argCheck(rocblas_handle handle,
     return rocblas_status_continue;
 }
 
+namespace detail
+{
+class work_items_impl
+{
+public:
+    work_items_impl() = default;
+
+    work_items_impl(std::size_t M)
+        : N(M)
+    {
+        items_sizes_ = std::vector<std::size_t>(N, static_cast<std::size_t>(0));
+        items_names_ = std::vector<std::vector<std::string>>(N, std::vector<std::string>());
+    }
+
+    std::size_t num_work_items() const noexcept
+    {
+        return N;
+    }
+
+    bool item(std::size_t id, std::string name, std::size_t size)
+    {
+        std::vector<std::string> names = {name};
+        return item(id, names, size);
+    }
+
+    bool item(std::size_t id, std::vector<std::string> names, std::size_t size)
+    {
+        if(id >= N)
+        {
+            throw(std::domain_error("Error at work_items_n::item(): id >= N"));
+            return false;
+        }
+
+        for(auto& name : names)
+        {
+            map_names_to_ids_[name] = id;
+        }
+        items_sizes_[id] = size;
+        items_names_[id] = names;
+
+        return true;
+    }
+
+    bool merge_item(std::size_t id, std::vector<std::string> names, std::size_t size)
+    {
+        if(id >= N)
+        {
+            throw(std::domain_error("Error at work_items_n::merge_item(): id >= N"));
+            return false;
+        }
+
+        for(auto& name : names)
+        {
+            map_names_to_ids_[name] = id;
+        }
+        items_sizes_[id] = std::max(size, items_sizes_[id]);
+        items_names_[id].insert(items_names_[id].end(), names.begin(), names.end());
+
+        return true;
+    }
+
+    std::size_t id(std::string item_name) const
+    {
+        auto item_id = map_names_to_ids_[item_name];
+        return item_id;
+    }
+
+    std::size_t size(size_t item_id) const
+    {
+        return items_sizes_[item_id];
+    }
+
+    std::size_t size(std::string item_name) const
+    {
+        auto item_id = id(item_name);
+        return items_sizes_[item_id];
+    }
+
+    std::vector<std::string> names(std::size_t item_id) const
+    {
+        return items_names_[item_id];
+    }
+
+    template <std::size_t M>
+    auto tuple_of_items_sizes() const
+    {
+        return generate_tuple<M>([&](std::size_t i) { return items_sizes_[i]; });
+    }
+
+private:
+    mutable std::size_t N{0};
+    mutable std::vector<std::size_t> items_sizes_{};
+    mutable std::vector<std::vector<std::string>> items_names_{};
+    mutable std::unordered_map<std::string, std::size_t> map_names_to_ids_{};
+
+    bool unique_names(const std::vector<std::string>& names)
+    {
+        return true;
+    }
+
+    template <typename Lambda, size_t... Indices>
+    auto generate_tuple_impl(Lambda l, std::integer_sequence<std::size_t, Indices...>) const
+    {
+        return std::make_tuple(l(Indices)...);
+    }
+
+    template <size_t M, typename Lambda>
+    auto generate_tuple(Lambda l) const
+    {
+        return generate_tuple_impl(l, std::make_integer_sequence<std::size_t, M>{});
+    }
+};
+} // namespace detail
+
+using work_items_list_t = std::vector<std::pair<std::string, std::size_t>>;
+
+template <std::size_t N>
+class work_items_n
+{
+public:
+    using work_items_impl = detail::work_items_impl;
+
+    constexpr work_items_n()
+        : impl_(N)
+    {
+    }
+
+    ~work_items_n() = default;
+
+    work_items_n(const work_items_n&) = default;
+    work_items_n& operator=(const work_items_n&) = default;
+
+    work_items_n(work_items_n&&) = default;
+    work_items_n& operator=(work_items_n&&) = default;
+
+    constexpr std::size_t num_work_items() const noexcept
+    {
+        return N;
+    }
+
+    bool item(std::size_t id, std::string name, std::size_t size)
+    {
+        return impl_.item(id, name, size);
+    }
+
+    bool item(std::size_t id, std::vector<std::string> names, std::size_t size)
+    {
+        return impl_.item(id, names, size);
+    }
+
+    std::size_t id(std::string item_name) const
+    {
+        return impl_.id(item_name);
+    }
+
+    std::size_t size(size_t item_id) const
+    {
+        return impl_.size(item_id);
+    }
+
+    std::size_t size(std::string item_name) const
+    {
+        return impl_.size(item_name);
+    }
+
+    std::vector<std::string> names(std::size_t item_id) const
+    {
+        return impl_.names(item_id);
+    }
+
+    work_items_impl& impl() const
+    {
+        return impl_;
+    }
+
+private:
+    mutable work_items_impl impl_{N};
+};
+
+template <std::size_t N>
+auto create_work_items_sorted_by_size(const work_items_list_t& list)
+{
+    work_items_n<N> w_out;
+    if(list.size() > N)
+    {
+        throw(std::domain_error("Error at create_work_items_sorted_by_size(): list.size() > N"));
+        return w_out;
+    }
+
+    std::multimap<std::size_t, std::string, std::greater<std::size_t>> mmap;
+    for(auto& [name, size] : list)
+    {
+        mmap.insert(std::pair{size, name});
+    }
+
+    std::size_t id{0};
+    for(auto iter = mmap.begin(); iter != mmap.end(); ++iter)
+    {
+        auto& [size, name] = *iter;
+        w_out.item(id, name, size);
+        ++id;
+    }
+
+    return w_out;
+}
+
+template <std::size_t N1, std::size_t N2>
+auto merge_work_items(const work_items_n<N1>& w1, const work_items_n<N2>& w2)
+{
+    constexpr std::size_t N = std::max({N1, N2});
+    work_items_n<N> w_out;
+
+    auto merge_item = [&](std::size_t id, std::vector<std::string> names_, std::size_t size_) {
+        if(id >= N)
+        {
+            throw(std::domain_error("Error at merge_work_items::merge_item(): id >= N"));
+        }
+
+        std::size_t size = std::max(size_, w_out.size(id));
+        auto names = w_out.names(id);
+        names.insert(names.end(), names_.begin(), names_.end());
+
+        w_out.item(id, names, size);
+    };
+
+    for(std::size_t i = 0; i < N1; ++i)
+    {
+        merge_item(i, w1.names(i), w1.size(i));
+    }
+
+    for(std::size_t i = 0; i < N2; ++i)
+    {
+        merge_item(i, w2.names(i), w2.size(i));
+    }
+
+    return w_out;
+}
+
+template <std::size_t N1, std::size_t N2>
+auto cat_work_items(const work_items_n<N1>& w1, const work_items_n<N2>& w2)
+{
+    constexpr std::size_t N = N1 + N2;
+    work_items_n<N> w_out;
+
+    for(std::size_t i = 0; i < N1; ++i)
+    {
+        w_out.item(i, w1.names(i), w1.size(i));
+    }
+
+    for(std::size_t i = 0; i < N2; ++i)
+    {
+        w_out.item(i + N1, w2.names(i), w2.size(i));
+    }
+
+    return w_out;
+}
+
+class device_workspace
+{
+public:
+    using Handle = rocblas_handle;
+    using Status = rocblas_status;
+    using DeviceWorkspacePtr = std::shared_ptr<device_workspace>;
+    using work_items_impl = detail::work_items_impl;
+
+    template <std::size_t N>
+    static auto Get(Handle handle, const work_items_n<N>& work_items)
+        -> std::pair<DeviceWorkspacePtr, Status>
+    {
+        DeviceWorkspacePtr ptr{nullptr};
+        Status status = rocblas_status_success;
+        auto sizes = work_items.impl().template tuple_of_items_sizes<N>();
+
+        if(rocblas_is_device_memory_size_query(handle))
+        {
+            status = std::apply(
+                [&](auto&&... args) {
+                    return rocblas_set_optimal_device_memory_size(handle, std::size_t(args)...);
+                },
+                sizes);
+            return std::make_pair(nullptr, status);
+        }
+
+        ptr = DeviceWorkspacePtr(new device_workspace(handle, work_items.impl()));
+        ptr->work_ = std::apply(
+            [&](auto&&... args) { return rocblas_device_malloc(handle, std::size_t(args)...); },
+            sizes);
+
+        if(!ptr->work_)
+        {
+            status = rocblas_status_memory_error;
+            return std::make_pair(nullptr, status);
+        }
+
+        return std::make_pair(std::move(ptr), status);
+    }
+
+    ~device_workspace() = default;
+
+    device_workspace(const device_workspace&) = delete;
+    device_workspace& operator=(const device_workspace&) = delete;
+
+    device_workspace(device_workspace&&) = default;
+    device_workspace& operator=(device_workspace&&) = default;
+
+    std::size_t id(std::string item_name) const
+    {
+        return work_items_.id(item_name);
+    }
+
+    std::size_t size(size_t item_id) const
+    {
+        return work_items_.size(item_id);
+    }
+
+    std::size_t size(std::string item_name) const
+    {
+        return work_items_.size(item_name);
+    }
+
+    std::vector<std::string> names(std::size_t item_id) const
+    {
+        return work_items_.names(item_id);
+    }
+
+    void* work(std::size_t item_id)
+    {
+        return work_[item_id];
+    }
+
+    void* work(std::string item_name)
+    {
+        auto item_id = id(item_name);
+        return work(item_id);
+    }
+
+private:
+    Handle handle_{nullptr};
+    work_items_impl work_items_{};
+    mutable std::unordered_map<std::string, std::size_t> map_names_to_ids_{};
+    rocblas_device_malloc work_{nullptr};
+
+    device_workspace(Handle h, work_items_impl w)
+        : handle_(h)
+        , work_items_(std::move(w))
+    {
+    }
+};
+
 /** Helper to calculate workspace sizes **/
 template <bool BATCHED, typename T, typename SS>
 void rocsolver_gesdd_getMemorySize(rocblas_handle handle,
@@ -317,6 +673,75 @@ void rocsolver_gesdd_getMemorySize(rocblas_handle handle,
     *size_tau = std::max({h1});
     *size_workArr = sizeof(T) * std::min({m, n}) * std::max({stride, 1}) * batch_count;
     *size_workArr = std::max({*size_workArr, f2, f3, f4});
+}
+
+template <bool BATCHED, bool STRIDED, typename T, typename S, typename W>
+auto rocsolver_gesdd_getWorkItems(rocblas_handle handle,
+                                  const rocblas_svect left_svect,
+                                  const rocblas_svect right_svect,
+                                  const rocblas_int m,
+                                  const rocblas_int n,
+                                  W /* A */,
+                                  const rocblas_int /* lda */,
+                                  const rocblas_stride /* strideA */,
+                                  S* /* S */,
+                                  const rocblas_stride strideS,
+                                  T* /* U */,
+                                  const rocblas_int /* ldu */,
+                                  const rocblas_stride /* strideU */,
+                                  T* /* V */,
+                                  const rocblas_int /* ldv */,
+                                  const rocblas_stride /* strideV */,
+                                  rocblas_int* /* info */,
+                                  const rocblas_int batch_count)
+{
+    // memory workspace sizes:
+    // size for constants in rocblas calls
+    size_t size_scalars;
+    // size for temporary matrix storage
+    size_t size_VUtmp;
+    // extra requirements for calling SYEVD/HEEVD, GEQRF, ORGQR/UNGQR, GELQF, ORGLQ/UNGLQ
+    size_t size_UVtmpZ, size_work1, size_work2, size_work3, size_work4, size_work5_ipiv,
+        size_splits, size_tmptau_W, size_tau, size_workArr, size_workArr2;
+
+    rocsolver_gesdd_getMemorySize<false, T, S>(
+        handle, left_svect, right_svect, m, n, strideS, batch_count, &size_VUtmp, &size_UVtmpZ,
+        &size_scalars, &size_work1, &size_work2, &size_work3, &size_work4, &size_work5_ipiv,
+        &size_splits, &size_tmptau_W, &size_tau, &size_workArr, &size_workArr2);
+
+    constexpr std::size_t N = 13;
+    /* work_items_n<N> work; */
+    /* work.item(0, "gesddwi_VUtmp", size_VUtmp); */
+    /* work.item(1, "gesddwi_UVtmpZ", size_UVtmpZ); */
+    /* work.item(2, "gesddwi_scalars", size_scalars); */
+    /* work.item(3, "gesddwi_work1", size_work1); */
+    /* work.item(4, "gesddwi_work2", size_work2); */
+    /* work.item(5, "gesddwi_work3", size_work3); */
+    /* work.item(6, "gesddwi_work4", size_work4); */
+    /* work.item(7, "gesddwi_work5_ipiv", size_work5_ipiv); */
+    /* work.item(8, "gesddwi_splits", size_splits); */
+    /* work.item(9, "gesddwi_tmptau_W", size_tmptau_W); */
+    /* work.item(10, "gesddwi_tau", size_tau); */
+    /* work.item(11, "gesddwi_workArr", size_workArr); */
+    /* work.item(12, "gesddwi_workArr2", size_workArr2); */
+
+    work_items_list_t wlist
+        = {{"gesddwi_VUtmp", size_VUtmp},      {"gesddwi_UVtmpZ", size_UVtmpZ},
+           {"gesddwi_scalars", size_scalars},  {"gesddwi_work1", size_work1},
+           {"gesddwi_work2", size_work2},      {"gesddwi_work3", size_work3},
+           {"gesddwi_work4", size_work4},      {"gesddwi_work5_ipiv", size_work5_ipiv},
+           {"gesddwi_splits", size_splits},    {"gesddwi_tmptau_W", size_tmptau_W},
+           {"gesddwi_tau", size_tau},          {"gesddwi_workArr", size_workArr},
+           {"gesddwi_workArr2", size_workArr2}};
+
+    auto work2 = create_work_items_sorted_by_size<N>(wlist);
+
+    /* merge_work_items(work, work2); */
+    /* cat_work_items(work, work2); */
+
+    /* auto [ws, _] = device_workspace<N>::Get(handle, work); */
+
+    return work2;
 }
 
 template <bool BATCHED, bool STRIDED, typename T, typename SS, typename W>
@@ -506,6 +931,56 @@ rocblas_status rocsolver_gesdd_template(rocblas_handle handle,
 
     rocblas_set_pointer_mode(handle, old_mode);
     return rocblas_status_success;
+}
+
+template <bool BATCHED, bool STRIDED, typename T, typename SS, typename W, typename WorkspacePtr>
+rocblas_status rocsolver_gesdd_template(rocblas_handle handle,
+                                        const rocblas_svect left_svect,
+                                        const rocblas_svect right_svect,
+                                        const rocblas_int m,
+                                        const rocblas_int n,
+                                        W A,
+                                        const rocblas_int shiftA,
+                                        const rocblas_int lda,
+                                        const rocblas_stride strideA,
+                                        SS* S,
+                                        const rocblas_stride strideS,
+                                        T* U,
+                                        const rocblas_int ldu,
+                                        const rocblas_stride strideU,
+                                        T* V,
+                                        const rocblas_int ldv,
+                                        const rocblas_stride strideV,
+                                        rocblas_int* info,
+                                        const rocblas_int batch_count,
+                                        WorkspacePtr wptr)
+{
+    /* ROCSOLVER_ENTER("gesdd", "leftsv:", left_svect, "rightsv:", right_svect, "m:", m, "n:", n, */
+    /*                 "shiftA:", shiftA, "lda:", lda, "ldu:", ldu, "ldv:", ldv, "bc:", batch_count); */
+
+    T* VUtmp = (T*)wptr->work("gesddwi_VUtmp");
+    void* UVtmpZ = wptr->work("gesddwi_UVtmpZ");
+    T* scalars = (T*)wptr->work("gesddwi_scalars");
+    void* work1 = wptr->work("gesddwi_work1");
+    void* work2 = wptr->work("gesddwi_work2");
+    void* work3 = wptr->work("gesddwi_work3");
+    void* work4 = wptr->work("gesddwi_work4");
+    void* work5_ipiv = wptr->work("gesddwi_work5_ipiv");
+    void* splits = wptr->work("gesddwi_splits");
+    void* tmptau_W = wptr->work("gesddwi_tmptau_W");
+    void* tau = wptr->work("gesddwi_tau");
+    void* workArr = wptr->work("gesddwi_workArr");
+    void* workArr2 = wptr->work("gesddwi_workArr2");
+
+    if(wptr->size("gesddwi_scalars") > 0)
+    {
+        init_scalars(handle, (T*)scalars);
+    }
+
+    return rocsolver_gesdd_template<BATCHED, STRIDED, T>(
+        handle, left_svect, right_svect, m, n, A, shiftA, lda, strideA, S, strideS, U, ldu, strideU,
+        V, ldv, strideV, info, batch_count, (T*)VUtmp, UVtmpZ, (T*)scalars, work1, work2, work3,
+        work4, work5_ipiv, splits, tmptau_W, tau, workArr, workArr2);
 }
 
 ROCSOLVER_END_NAMESPACE
