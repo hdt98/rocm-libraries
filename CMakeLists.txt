@@ -173,10 +173,7 @@ if(NOT DEFINED AMDGPU_TARGETS)
   set(MISC_TARGETS
     gfx942
     gfx950
-    gfx1100
-    gfx1101
-    gfx1102
-    gfx1151
+    gfx11-generic
     gfx1200
     gfx1201)
   if(BUILD_ADDRESS_SANITIZER)
