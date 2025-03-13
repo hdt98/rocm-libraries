@@ -61,6 +61,7 @@ def runTestCommand(platform, project, boolean rocmExamples=false)
         else{
             buildString += """
                         sudo rpm -i *.rpm
+                        yum list --installed | grep hip
                         sudo yum -y update
                         sudo yum -y install hipblas-devel
                         """
