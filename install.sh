@@ -557,7 +557,7 @@ pushd .
   # #################################################
   # configure & build
   # #################################################
-  cmake_common_options="-DAMDGPU_TARGETS=${gpu_architecture}"
+  cmake_common_options="-DGPU_TARGETS=${gpu_architecture}"
   cmake_client_options=""
 
   # build type
