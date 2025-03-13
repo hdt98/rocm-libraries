@@ -75,8 +75,8 @@ def runTestCommand(platform, project, boolean rocmExamples=false)
                     rocm_examples_dir=\$(readlink -f rocm-examples)
                     for testDir in \${testDirs[@]}; do
                         cd \${rocm_examples_dir}/\${testDir}
-                        cmake -S . -B build
-                        cmake --build build
+                        cmake -S . -B build || exit 1
+                        cmake --build build || exit 1
                         cd ./build
                         ctest --output-on-failure
                     done
