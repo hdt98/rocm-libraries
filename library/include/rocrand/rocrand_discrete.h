@@ -66,6 +66,7 @@ __forceinline__ __device__ __host__ unsigned int
                    const double* __restrict__ probability)
 {
     // Calculate value using Alias table
+    
     // x is [0, 1)
     const double       nx  = size * x;
     const double       fnx = floor(nx);
