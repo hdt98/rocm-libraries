@@ -25,7 +25,6 @@
 
 #include <vector>
 #include <rocrand/rocrand_discrete.h>
-#include <rocrand/rocrand_mtgp32_11213.h>
 
 #define HIP_CHECK(state) ASSERT_EQ(state, hipSuccess)
 #define TEST_SIZE 1000000

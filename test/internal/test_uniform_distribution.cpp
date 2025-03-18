@@ -731,64 +731,6 @@ TEST(uniform_distribution_tests, xorwow_test){
     );
 }
 
-__global__ void mtgp32_kernel (rocrand_state_mtgp32 * states, float * output){
-    for(size_t i = 0; i < 4; i++)
-        output[i] = rocrand_uniform_double(states);
-}
-
-__global__ void mtgp32_kernel (rocrand_state_mtgp32 * states, double * output){
-    for(size_t i = 0; i < 4; i++)
-        output[i] = rocrand_uniform_double(states);
-}
-
-TEST(uniform_distribution_tests, mtgp32_test){
-    rocrand_state_mtgp32 * states;
-    auto state_size = 100, seed = 654321;
-    HIP_CHECK(hipMalloc(&states, state_size * sizeof(rocrand_state_mtgp32)));
-    rocrand_make_state_mtgp32(states,  mtgp32dc_params_fast_11213, state_size, seed);
-
-    StatesUD<float4> testFloat;
-    float * fhOut = new float[4];
-    float * fdOut;
-    HIP_CHECK(hipMalloc(&fdOut, sizeof(float) * 4));
-
-    testFloat.run_test(
-        [&] (float4 & output){
-
-            mtgp32_kernel<<<1, 1>>>(states, fdOut);
-            HIP_CHECK(hipMemcpy(fhOut, fdOut, sizeof(float) * 4, hipMemcpyDeviceToHost));
-            output = {
-                fhOut[0], fhOut[1], fhOut[3], fhOut[4]
-            };
-        },
-        40000
-    );
-
-    StatesUD<double4> testDouble;
-    double * dhOut = new double[4];
-    double * ddOut;
-    HIP_CHECK(hipMalloc(&ddOut, sizeof(double) * 4));
-
-    testDouble.run_test(
-        [&] (double4 & output){
-
-            mtgp32_kernel<<<1, 1>>>(states, ddOut);
-            HIP_CHECK(hipMemcpy(dhOut, ddOut, sizeof(double) * 4, hipMemcpyDeviceToHost));
-            output = {
-                dhOut[0], dhOut[1], dhOut[3], dhOut[4]
-            };
-        },
-        40000
-    );
-
-    HIP_CHECK(hipFree(states));
-    HIP_CHECK(hipFree(fdOut));
-    HIP_CHECK(hipFree(ddOut));
-
-    delete [] fhOut;
-    delete [] dhOut;
-}
-
 TEST(uniform_distribution_tests, sobol32_test){
     rocrand_state_sobol32 states;
     const unsigned int* directions;
@@ -1038,4 +980,145 @@ TEST(uniform_distribution_tests, threefry4x64_20_test){
             };
         }
     );
+}
+
+template <typename T, typename UDFunction>
+__global__ void mtgp32_kernel (rocrand_state_mtgp32 * states, T * output, const size_t N, const UDFunction & f){
+    const unsigned int state_id  = blockIdx.x;
+    const unsigned int thread_id = threadIdx.x;
+    unsigned int       index     = blockIdx.x * blockDim.x + threadIdx.x;
+    
+    if(index >= N)
+        return;
+
+    __shared__ rocrand_state_mtgp32 state;
+    if(thread_id == 0)
+        state = states[state_id];
+    __syncthreads();
+
+    // output[index] = rocrand_uniform(&state);
+    output[index] = f(&state);
+
+    if(thread_id == 0)
+        states[state_id] = state; 
+}
+
+TEST(uniform_distribution_tests, float_mtgp32_test){
+    size_t testSize = 40192;
+    size_t threads = 256;
+    size_t blocks = std::ceil(static_cast<double>(testSize) / static_cast<double>(threads));
+
+    rocrand_state_mtgp32 * states;
+    size_t state_size = blocks, seed = 654321;
+    HIP_CHECK(hipMalloc(&states, state_size * sizeof(rocrand_state_mtgp32)));
+    rocrand_make_state_mtgp32(states,  mtgp32dc_params_fast_11213, state_size, seed);
+
+    float * hOut = new float[testSize];
+    float * dOut;
+    HIP_CHECK(hipMalloc(&dOut, sizeof(float) * testSize));
+    HIP_CHECK(hipDeviceSynchronize());
+
+
+    hipLaunchKernelGGL(
+        HIP_KERNEL_NAME(mtgp32_kernel<float>),
+        dim3(blocks),
+        dim3(threads),
+        0,
+        0,
+        states,
+        dOut,
+        testSize,
+        [] __device__ (rocrand_state_mtgp32 * state){
+            return rocrand_uniform(state);
+        }
+    );
+
+    HIP_CHECK(hipMemcpy(hOut, dOut, sizeof(float) * testSize, hipMemcpyDeviceToHost));
+
+    double mean = 0.0;
+    for(size_t i = 0; i < testSize; i++){
+        ASSERT_GT(hOut[i], 0.0);
+        ASSERT_LE(hOut[i], 1.0);
+
+        mean += hOut[i];
+    }
+
+    mean /= testSize;
+
+    double std = 0.0;
+    for(size_t i = 0; i < testSize; i++)
+        std += std::pow(hOut[i] - mean, 2);
+
+    std = std::sqrt(std / testSize);
+
+    double eMean = 0.5 * (0 + 1); // 0.5(a + b)
+    double eStd = (1 - 0) / (2 * std::sqrt(3)); // (b - a) / (2*3^0.5)
+
+    ASSERT_NEAR(mean, eMean, eMean * 0.1) << "Expected Mean: " << eMean << " Actual Mean: " << mean << " Eps: " << eMean * 0.1;
+    ASSERT_NEAR(std, eStd, eStd * 0.1) << "Expected Std: " << eStd << " Actual Std: " << std << " Eps: " << eStd * 0.1;
+
+    HIP_CHECK(hipFree(states));
+    HIP_CHECK(hipFree(dOut));
+
+    delete [] hOut;
+}
+
+TEST(uniform_distribution_tests, double_mtgp32_test){
+    size_t testSize = 40192;
+    size_t threads = 256;
+    size_t blocks = std::ceil(static_cast<double>(testSize) / static_cast<double>(threads));
+
+    rocrand_state_mtgp32 * states;
+    size_t state_size = blocks, seed = 654321;
+    HIP_CHECK(hipMalloc(&states, state_size * sizeof(rocrand_state_mtgp32)));
+    rocrand_make_state_mtgp32(states,  mtgp32dc_params_fast_11213, state_size, seed);
+
+    double * hOut = new double[testSize];
+    double * dOut;
+    HIP_CHECK(hipMalloc(&dOut, sizeof(double) * testSize));
+    HIP_CHECK(hipDeviceSynchronize());
+
+
+    hipLaunchKernelGGL(
+        HIP_KERNEL_NAME(mtgp32_kernel<double>),
+        dim3(blocks),
+        dim3(threads),
+        0,
+        0,
+        states,
+        dOut,
+        testSize,
+        [] __device__ (rocrand_state_mtgp32 * state){
+            return rocrand_uniform_double(state);
+        }
+    );
+
+    HIP_CHECK(hipMemcpy(hOut, dOut, sizeof(double) * testSize, hipMemcpyDeviceToHost));
+
+    double mean = 0.0;
+    for(size_t i = 0; i < testSize; i++){
+        ASSERT_GT(hOut[i], 0.0);
+        ASSERT_LE(hOut[i], 1.0);
+
+        mean += hOut[i];
+    }
+
+    mean /= testSize;
+
+    double std = 0.0;
+    for(size_t i = 0; i < testSize; i++)
+        std += std::pow(hOut[i] - mean, 2);
+
+    std = std::sqrt(std / testSize);
+
+    double eMean = 0.5 * (0 + 1); // 0.5(a + b)
+    double eStd = (1 - 0) / (2 * std::sqrt(3)); // (b - a) / (2*3^0.5)
+
+    ASSERT_NEAR(mean, eMean, eMean * 0.1) << "Expected Mean: " << eMean << " Actual Mean: " << mean << " Eps: " << eMean * 0.1;
+    ASSERT_NEAR(std, eStd, eStd * 0.1) << "Expected Std: " << eStd << " Actual Std: " << std << " Eps: " << eStd * 0.1;
+
+    HIP_CHECK(hipFree(states));
+    HIP_CHECK(hipFree(dOut));
+
+    delete [] hOut;
 }

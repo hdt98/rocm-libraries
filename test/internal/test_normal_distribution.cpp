@@ -882,114 +882,256 @@ TEST(normal_distribution_with_states, rocrand_state_threefry4x64_20){
     run_normal_dist_with_state_out1<rocrand_state_threefry4x64_20>(&states);
     run_normal_dist_with_state_out2<rocrand_state_threefry4x64_20>(&states);
 }
-__global__ void mtgp32_run_rocrand_normal(rocrand_state_mtgp32 * state, float * fout){
-    fout[0] = rocrand_normal(state);
+
+template <typename T, typename UDFunction>
+__global__ void mtgp32_kernel (rocrand_state_mtgp32 * states, T * output, const size_t N, const UDFunction & f){
+    const unsigned int state_id  = blockIdx.x;
+    const unsigned int thread_id = threadIdx.x;
+    unsigned int       index     = blockIdx.x * blockDim.x + threadIdx.x;
+    
+    if(index >= N)
+        return;
+
+    __shared__ rocrand_state_mtgp32 state;
+    if(thread_id == 0)
+        state = states[state_id];
+    __syncthreads();
+
+    // output[index] = rocrand_uniform(&state);
+    output[index] = f(&state);
+
+    if(thread_id == 0)
+        states[state_id] = state; 
 }
 
-__global__ void mtgp32_run_rocrand_normal2(rocrand_state_mtgp32 * state, float * fout){
-    float2 f2 = rocrand_normal2(state);
-    fout[1] = f2.x;
-    fout[2] = f2.y;
-}
+TEST(normal_distribution_with_states, float_mtgp32){
 
-__global__ void mtgp32_run_rocrand_normal_double(rocrand_state_mtgp32 * state, double * dout){
-    dout[0] = rocrand_normal_double(state);
-}
-
-__global__ void mtgp32_run_rocrand_normal_double2(rocrand_state_mtgp32 * state, double * dout){
-    double2 d2 = rocrand_normal_double2(state);
-    dout[1] = d2.x;
-    dout[2] = d2.y;
-}
-
-TEST(normal_distribution_with_states, mtgp32){
-    const size_t size = 6000;
-    double expected_mean = 2, expected_std = 5;
+    size_t testSize = 40192;
+    size_t threads = 256;
+    size_t blocks = std::ceil(static_cast<double>(testSize) / static_cast<double>(threads));
 
     rocrand_state_mtgp32 * states;
-    auto state_size = 123, seed = 123456;
+    size_t state_size = blocks, seed = 654321;
     HIP_CHECK(hipMalloc(&states, state_size * sizeof(rocrand_state_mtgp32)));
     rocrand_make_state_mtgp32(states,  mtgp32dc_params_fast_11213, state_size, seed);
 
-    float * fOut; double * dOut;
+    float * hOut = new float[testSize];
+    float * dOut;
+    HIP_CHECK(hipMalloc(&dOut, sizeof(float) * testSize));
+    HIP_CHECK(hipDeviceSynchronize());
 
-    HIP_CHECK(hipMalloc(&fOut, 3 * sizeof(float)));
-    HIP_CHECK(hipMalloc(&dOut, 3 * sizeof(double)));
 
-    float singleFloats[size];
-    float doubleFloats[size * 2 ];
-    double singleDoubles[size];
-    double doubleDoubles[size * 2];
+    hipLaunchKernelGGL(
+        HIP_KERNEL_NAME(mtgp32_kernel<float>),
+        dim3(blocks),
+        dim3(threads),
+        0,
+        0,
+        states,
+        dOut,
+        testSize,
+        [] __device__ (rocrand_state_mtgp32 * state){
+            return rocrand_normal(state);
+        }
+    );
 
-    float sFloatMean = 0, dFloatMean = 0;
-    double sDoubleMean = 0, dDoubleMean = 0;
+    HIP_CHECK(hipMemcpy(hOut, dOut, sizeof(float) * testSize, hipMemcpyDeviceToHost));
 
-    size_t dIndex = 0;
-    for(size_t i = 0; i < size; i ++){
-        mtgp32_run_rocrand_normal<<<1, 1>>>(states, fOut);
-        mtgp32_run_rocrand_normal2<<<1, 1>>>(states, fOut);
-
-        mtgp32_run_rocrand_normal_double<<<1, 1>>>(states, dOut);
-        mtgp32_run_rocrand_normal_double2<<<1, 1>>>(states, dOut);
-        
-        float fTemp[3]; double dTemp[3];
-        
-        HIP_CHECK(hipMemcpy(fTemp, fOut, 3 * sizeof(float), hipMemcpyDeviceToHost));
-        HIP_CHECK(hipMemcpy(dTemp, dOut, 3 * sizeof(double), hipMemcpyDeviceToHost));
-
-        singleFloats[i] = expected_mean + fTemp[0] * expected_std;
-        doubleFloats[dIndex] = expected_mean + fTemp[1] * expected_std;
-        doubleFloats[dIndex + 1] = expected_mean + fTemp[2] * expected_std;
-
-        singleDoubles[i] = expected_mean + dTemp[0] * expected_std;
-        doubleDoubles[dIndex] = expected_mean + dTemp[1] * expected_std;
-        doubleDoubles[dIndex + 1] = expected_mean + dTemp[2] * expected_std;
-
-        sFloatMean += singleFloats[i]; dFloatMean += doubleFloats[dIndex] + doubleFloats[dIndex + 1];
-        sDoubleMean += singleDoubles[i]; dDoubleMean += doubleDoubles[dIndex] + doubleDoubles[dIndex + 1];
-
-        dIndex += 2;
-    }
-
-    sFloatMean /= size; dFloatMean /= 2 * size;
-    sDoubleMean /= size; dDoubleMean /= 2 * size;
-
-    // Calculate stddev
+    double mean = 0.0;
+    for(size_t i = 0; i < testSize; i++)
+        mean += hOut[i];
     
-    float sFloatStd = 0, dFloatStd = 0;
-    double sDoubleStd = 0, dDoubleStd = 0;
-    dIndex = 0;
-    for(size_t i = 0; i < size; i++){
-        sFloatStd += std::pow(singleFloats[i] - sFloatMean, 2) / size;
-        dFloatStd += std::pow(doubleFloats[dIndex] - dFloatMean, 2) / (size * 2);
-        dFloatStd += std::pow(doubleFloats[dIndex + 1] - dFloatMean, 2) / (size * 2);
-        
-        sDoubleStd += std::pow(singleDoubles[i] - sDoubleMean, 2) / size;
-        dDoubleStd += std::pow(doubleDoubles[dIndex] - dDoubleMean, 2) / (size * 2);
-        dDoubleStd += std::pow(doubleDoubles[dIndex + 1] - dDoubleMean, 2) / (size * 2);
 
-        dIndex += 2;
-    }
-    
-    sFloatStd = std::sqrt(sFloatStd);
-    dFloatStd = std::sqrt(dFloatStd);
-    sDoubleStd = std::sqrt(sDoubleStd);
-    dDoubleStd = std::sqrt(dDoubleStd);
+    mean /= testSize;
 
-    EXPECT_NEAR(expected_mean, sFloatMean, (expected_mean * 0.2) + 1e-1) << "Mean: " << sFloatMean << " Expected: " << expected_mean; // 20%
-    EXPECT_NEAR(expected_std, sFloatStd, (expected_std * 0.2) + 1e-1) <<  "Stddev: " << sFloatStd << " Expected: " << expected_std; // 20%
+    double std = 0.0;
+    for(size_t i = 0; i < testSize; i++)
+        std += std::pow(hOut[i] - mean, 2);
 
-    EXPECT_NEAR(expected_mean, dFloatMean, (expected_mean * 0.2) + 1e-1) << "Mean: " << dFloatMean << " Expected: " << expected_mean; // 20%
-    EXPECT_NEAR(expected_std, dFloatStd, (expected_std * 0.2) + 1e-1) <<  "Stddev: " << dFloatStd << " Expected: " << expected_std; // 20%
+    std = std::sqrt(std / testSize);
 
-    EXPECT_NEAR(expected_mean, sDoubleMean, (expected_mean * 0.2) + 1e-1) << "Mean: " << sDoubleMean << " Expected: " << expected_mean; // 20%
-    EXPECT_NEAR(expected_std, sDoubleStd, (expected_std * 0.2) + 1e-1) <<  "Stddev: " << sDoubleStd << " Expected: " << expected_std; // 20%
+    double eMean = 0;
+    double eStd = 1;
 
-    EXPECT_NEAR(expected_mean, dDoubleMean, (expected_mean * 0.2) + 1e-1) << "Mean: " << dDoubleMean << " Expected: " << expected_mean; // 20%
-    EXPECT_NEAR(expected_std, dDoubleStd, (expected_std * 0.2) + 1e-1) <<  "Stddev: " << dDoubleStd << " Expected: " << expected_std; // 20%
+    ASSERT_NEAR(mean, eMean, 0.01) << "Expected Mean: " << eMean << " Actual Mean: " << mean << " Eps: " << 0.01;
+    ASSERT_NEAR(std, eStd, eStd * 0.1) << "Expected Std: " << eStd << " Actual Std: " << std << " Eps: " << eStd * 0.1;
 
     HIP_CHECK(hipFree(states));
-    HIP_CHECK(hipFree(fOut));
     HIP_CHECK(hipFree(dOut));
+
+    delete [] hOut;
 }
 
+TEST(normal_distribution_with_states, float2_mtgp32){
+
+    size_t testSize = 20224;
+    size_t threads = 256;
+    size_t blocks = std::ceil(static_cast<double>(testSize) / static_cast<double>(threads));
+
+    rocrand_state_mtgp32 * states;
+    size_t state_size = blocks, seed = 654321;
+    HIP_CHECK(hipMalloc(&states, state_size * sizeof(rocrand_state_mtgp32)));
+    rocrand_make_state_mtgp32(states,  mtgp32dc_params_fast_11213, state_size, seed);
+
+    float2 * hOut = new float2[testSize];
+    float2 * dOut;
+    HIP_CHECK(hipMalloc(&dOut, sizeof(float2) * testSize));
+    HIP_CHECK(hipDeviceSynchronize());
+
+
+    hipLaunchKernelGGL(
+        HIP_KERNEL_NAME(mtgp32_kernel<float2>),
+        dim3(blocks),
+        dim3(threads),
+        0,
+        0,
+        states,
+        dOut,
+        testSize,
+        [] __device__ (rocrand_state_mtgp32 * state){
+            return rocrand_normal2(state);
+        }
+    );
+
+    HIP_CHECK(hipMemcpy(hOut, dOut, sizeof(float2) * testSize, hipMemcpyDeviceToHost));
+
+    double mean = 0.0;
+    for(size_t i = 0; i < testSize; i++)
+        mean += hOut[i].x + hOut[i].y;
+    
+
+    mean /= (testSize * 2);
+
+    double std = 0.0;
+    for(size_t i = 0; i < testSize; i++)
+        std += std::pow(hOut[i].x - mean, 2) + std::pow(hOut[i].y - mean, 2);
+
+    std = std::sqrt(std / (testSize * 2));
+
+    double eMean = 0;
+    double eStd = 1;
+
+    ASSERT_NEAR(mean, eMean, 0.01) << "Expected Mean: " << eMean << " Actual Mean: " << mean << " Eps: " << 0.01;
+    ASSERT_NEAR(std, eStd, eStd * 0.1) << "Expected Std: " << eStd << " Actual Std: " << std << " Eps: " << eStd * 0.1;
+
+    HIP_CHECK(hipFree(states));
+    HIP_CHECK(hipFree(dOut));
+
+    delete [] hOut;
+}
+
+TEST(normal_distribution_with_states, double_mtgp32){
+
+    size_t testSize = 40192;
+    size_t threads = 256;
+    size_t blocks = std::ceil(static_cast<double>(testSize) / static_cast<double>(threads));
+
+    rocrand_state_mtgp32 * states;
+    size_t state_size = blocks, seed = 654321;
+    HIP_CHECK(hipMalloc(&states, state_size * sizeof(rocrand_state_mtgp32)));
+    rocrand_make_state_mtgp32(states,  mtgp32dc_params_fast_11213, state_size, seed);
+
+    double * hOut = new double[testSize];
+    double * dOut;
+    HIP_CHECK(hipMalloc(&dOut, sizeof(double) * testSize));
+    HIP_CHECK(hipDeviceSynchronize());
+
+
+    hipLaunchKernelGGL(
+        HIP_KERNEL_NAME(mtgp32_kernel<double>),
+        dim3(blocks),
+        dim3(threads),
+        0,
+        0,
+        states,
+        dOut,
+        testSize,
+        [] __device__ (rocrand_state_mtgp32 * state){
+            return rocrand_normal_double(state);
+        }
+    );
+
+    HIP_CHECK(hipMemcpy(hOut, dOut, sizeof(double) * testSize, hipMemcpyDeviceToHost));
+
+    double mean = 0.0;
+    for(size_t i = 0; i < testSize; i++)
+        mean += hOut[i];
+    
+
+    mean /= testSize;
+
+    double std = 0.0;
+    for(size_t i = 0; i < testSize; i++)
+        std += std::pow(hOut[i] - mean, 2);
+
+    std = std::sqrt(std / testSize);
+
+    double eMean = 0;
+    double eStd = 1;
+
+    ASSERT_NEAR(mean, eMean, 0.01) << "Expected Mean: " << eMean << " Actual Mean: " << mean << " Eps: " << 0.01;
+    ASSERT_NEAR(std, eStd, eStd * 0.1) << "Expected Std: " << eStd << " Actual Std: " << std << " Eps: " << eStd * 0.1;
+
+    HIP_CHECK(hipFree(states));
+    HIP_CHECK(hipFree(dOut));
+
+    delete [] hOut;
+}
+
+TEST(normal_distribution_with_states, double2_mtgp32){
+
+    size_t testSize = 20224;
+    size_t threads = 256;
+    size_t blocks = std::ceil(static_cast<double>(testSize) / static_cast<double>(threads));
+
+    rocrand_state_mtgp32 * states;
+    size_t state_size = blocks, seed = 654321;
+    HIP_CHECK(hipMalloc(&states, state_size * sizeof(rocrand_state_mtgp32)));
+    rocrand_make_state_mtgp32(states,  mtgp32dc_params_fast_11213, state_size, seed);
+
+    double2 * hOut = new double2[testSize];
+    double2 * dOut;
+    HIP_CHECK(hipMalloc(&dOut, sizeof(double2) * testSize));
+    HIP_CHECK(hipDeviceSynchronize());
+
+
+    hipLaunchKernelGGL(
+        HIP_KERNEL_NAME(mtgp32_kernel<double2>),
+        dim3(blocks),
+        dim3(threads),
+        0,
+        0,
+        states,
+        dOut,
+        testSize,
+        [] __device__ (rocrand_state_mtgp32 * state){
+            return rocrand_normal_double2(state);
+        }
+    );
+
+    HIP_CHECK(hipMemcpy(hOut, dOut, sizeof(double2) * testSize, hipMemcpyDeviceToHost));
+
+    double mean = 0.0;
+    for(size_t i = 0; i < testSize; i++)
+        mean += hOut[i].x + hOut[i].y;
+    
+
+    mean /= (testSize * 2);
+
+    double std = 0.0;
+    for(size_t i = 0; i < testSize; i++)
+        std += std::pow(hOut[i].x - mean, 2) + std::pow(hOut[i].y - mean, 2);
+
+    std = std::sqrt(std / (testSize * 2));
+
+    double eMean = 0;
+    double eStd = 1;
+
+    ASSERT_NEAR(mean, eMean, 0.01) << "Expected Mean: " << eMean << " Actual Mean: " << mean << " Eps: " << 0.01;
+    ASSERT_NEAR(std, eStd, eStd * 0.1) << "Expected Std: " << eStd << " Actual Std: " << std << " Eps: " << eStd * 0.1;
+
+    HIP_CHECK(hipFree(states));
+    HIP_CHECK(hipFree(dOut));
+
+    delete [] hOut;
+}
