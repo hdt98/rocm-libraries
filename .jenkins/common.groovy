@@ -69,6 +69,7 @@ def runTestCommand(platform, project, boolean rocmExamples=false)
                         sudo yum -y update
                         sudo yum -y install hipblas-devel
                         export hipsolver_DIR=/opt/rocm/lib/cmake/hipsolver
+                        export CMAKE_PREFIX_PATH=\$CMAKE_PREFIX_PATH:/opt/rocm/lib/cmake/hipsolver
                         """
         }
         testCommand = """#!/usr/bin/env bash
