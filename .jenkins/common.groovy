@@ -54,13 +54,15 @@ def runTestCommand(platform, project, boolean rocmExamples=false)
         else if (platform.os.contains("sles")){
             buildString += """
                         sudo rpm -i *.rpm
+                        sudo find /opt -name hipsolver-config.cmake
+                        rpm -ql hipsolver-devel
                         sudo zypper refresh || true
                         sudo zypper -n install hipblas-devel
                         """
         }
         else{
             buildString += """
-                        sudo rpm -i *.rpm
+                        rpm -i *.rpm
                         yum list --installed | grep hip
                         sudo find /opt -name hipsolver-config.cmake
                         rpm -ql hipsolver-devel
