@@ -80,7 +80,6 @@ def runTestCommand(platform, project, boolean rocmExamples=false)
                     rocm_examples_dir=\$(readlink -f rocm-examples)
                     for testDir in \${testDirs[@]}; do
                         cd \${rocm_examples_dir}/\${testDir}
-                        source scl_source enable gcc-toolset-12
                         cmake -S . -B build
                         cmake --build build
                         cd ./build
