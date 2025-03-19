@@ -62,7 +62,7 @@ def runTestCommand(platform, project, boolean rocmExamples=false)
         }
         else{
             buildString += """
-                        rpm -i *.rpm
+                        sudo rpm -i *.rpm
                         yum list --installed | grep hip
                         sudo find /opt -name hipsolver-config.cmake
                         rpm -ql hipsolver-devel
