@@ -62,6 +62,7 @@ def runTestCommand(platform, project, boolean rocmExamples=false)
             buildString += """
                         sudo rpm -i *.rpm
                         yum list --installed | grep hip
+                        find /opt -name hipsolver-config.cmake
                         sudo yum -y update
                         sudo yum -y install hipblas-devel
                         """
@@ -76,8 +77,8 @@ def runTestCommand(platform, project, boolean rocmExamples=false)
                     rocm_examples_dir=\$(readlink -f rocm-examples)
                     for testDir in \${testDirs[@]}; do
                         cd \${rocm_examples_dir}/\${testDir}
-                        cmake -S . -B build || exit 1
-                        cmake --build build || exit 1
+                        cmake -S . -B build
+                        cmake --build build
                         cd ./build
                         ctest --output-on-failure
                     done
