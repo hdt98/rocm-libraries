@@ -68,7 +68,6 @@ def runTestCommand(platform, project, boolean rocmExamples=false)
                         rpm -ql hipsolver-devel
                         sudo yum -y update
                         sudo yum -y install hipblas-devel
-                        scl enable gcc-toolset-12 bash
                         """
         }
         testCommand = """#!/usr/bin/env bash
@@ -81,6 +80,7 @@ def runTestCommand(platform, project, boolean rocmExamples=false)
                     rocm_examples_dir=\$(readlink -f rocm-examples)
                     for testDir in \${testDirs[@]}; do
                         cd \${rocm_examples_dir}/\${testDir}
+                        source scl_source enable gcc-toolset-12
                         cmake -S . -B build
                         cmake --build build
                         cd ./build
