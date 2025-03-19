@@ -62,7 +62,8 @@ def runTestCommand(platform, project, boolean rocmExamples=false)
             buildString += """
                         sudo rpm -i *.rpm
                         yum list --installed | grep hip
-                        find /opt -name hipsolver-config.cmake
+                        sudo find /opt -name hipsolver-config.cmake
+                        rpm -ql hipsolver-devel
                         sudo yum -y update
                         sudo yum -y install hipblas-devel
                         """
