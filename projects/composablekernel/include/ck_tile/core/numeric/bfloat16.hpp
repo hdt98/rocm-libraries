@@ -102,7 +102,11 @@ struct native_t<bfloat16_t>
 using bf16_t     = bfloat16_t;
 using bf16_raw_t = typename bf16_t::raw_type;
 #else
+#if defined(__clang_major__) && (__clang_major__ >= 21)
+using bfloat16_t = __bf16;
+#else
 using bfloat16_t = ushort;
+#endif
 using bf16_t     = bfloat16_t;
 using bf16_raw_t = uint16_t;
 #endif

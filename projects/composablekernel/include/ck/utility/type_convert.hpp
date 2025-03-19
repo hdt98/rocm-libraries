@@ -46,10 +46,12 @@ __host__ __device__ constexpr Y bf16_convert_rtn(X x);
 template <>
 inline __host__ __device__ constexpr bhalf_t bf16_convert_rtn<bhalf_t, float>(float x)
 {
+    uint16_t ret = 0;
     // Nan check
     if(x != x)
     {
-        return uint16_t(0x7FC0);
+        ret = 0x7FC0;
+        return bit_cast<bhalf_t>(ret);
     }
 
     union
@@ -61,7 +63,8 @@ inline __host__ __device__ constexpr bhalf_t bf16_convert_rtn<bhalf_t, float>(fl
     const uint32_t first_bf16_mantisa_bit = ((u.int32 >> 16) & 1);
     constexpr uint32_t rounding_bias      = uint32_t((1 << 15) - 1);
 
-    return uint16_t((u.int32 + first_bf16_mantisa_bit + rounding_bias) >> 16);
+    ret = uint16_t((u.int32 + first_bf16_mantisa_bit + rounding_bias) >> 16);
+    return bit_cast<bhalf_t>(ret);
 }
 
 // convert fp16 to bfp16 via fp32 with RTN if higher precision is needed
@@ -105,7 +108,7 @@ inline __host__ __device__ constexpr float type_convert<float, bhalf_t>(bhalf_t 
     {
         uint32_t int32;
         float fp32;
-    } u = {uint32_t(x) << 16};
+    } u = {uint32_t(bit_cast<uint16_t>(x)) << 16};
 
     return u.fp32;
 }
@@ -123,7 +126,7 @@ inline __host__ __device__ constexpr bhalf_t type_convert<bhalf_t, float>(float 
         float fp32;
     } u;
     u.fp32 = x;
-    return uint16_t(u.int32 >> 16);
+    return bit_cast<bhalf_t>(uint16_t(u.int32 >> 16));
 #endif
 }
 

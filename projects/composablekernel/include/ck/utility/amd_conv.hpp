@@ -176,8 +176,8 @@ struct intrin_wcnn_conv_f32_bf16<4, 2, 1, 1, 1, 1, Aco, Signed, HighLane>
     {
         reg_c.template AsType<float4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f32_bf16_4x2(
             reg_c.template AsType<float4_t>()[Number<0>{}],
-            bit_cast<bf16x4_t>(reg_wei),
-            bit_cast<bf16x2_t>(*reg_data[0]),
+            reg_wei,
+            *reg_data[0],
             GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
     }
@@ -191,9 +191,9 @@ struct intrin_wcnn_conv_f32_bf16<4, 2, 1, 1, 1, 2, Aco, Signed, HighLane>
     {
         reg_c.template AsType<float4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f32_bf16_4x2(
             reg_c.template AsType<float4_t>()[Number<0>{}],
-            bit_cast<bf16x8_t>(reg_wei),
-            bit_cast<bf16x2_t>(*reg_data[0]),
-            bit_cast<bf16x2_t>(*reg_data[1]),
+            reg_wei,
+            *reg_data[0],
+            *reg_data[1],
             GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() |
                 GetItersMod<2>(),
             0);
@@ -208,11 +208,11 @@ struct intrin_wcnn_conv_f32_bf16<4, 2, 1, 1, 1, 4, Aco, Signed, HighLane>
     {
         reg_c.template AsType<float4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f32_bf16_4x2(
             reg_c.template AsType<float4_t>()[Number<0>{}],
-            bit_cast<bf16x16_t>(reg_wei),
-            bit_cast<bf16x2_t>(*reg_data[0]),
-            bit_cast<bf16x2_t>(*reg_data[1]),
-            bit_cast<bf16x2_t>(*reg_data[2]),
-            bit_cast<bf16x2_t>(*reg_data[3]),
+            reg_wei,
+            *reg_data[0],
+            *reg_data[1],
+            *reg_data[2],
+            *reg_data[3],
             GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() |
                 GetItersMod<4>(),
             0);
@@ -1036,14 +1036,12 @@ struct intrin_wcnn_conv_bf16_bf16<4, 2, 1, 1, 1, 1, Aco, Signed, HighLane>
     template <class FloatC>
     __device__ static void Run(const bhalf4_t& reg_wei, const bhalf2_t* reg_data[1], FloatC& reg_c)
     {
-        reg_c.template AsType<bhalf4_t>()(Number<0>{}) =
-            bit_cast<bhalf4_t>(__builtin_amdgcn_convolve_bf16_bf16_4x2(
-                bit_cast<bf16x4_t>(reg_c.template AsType<bhalf4_t>()[Number<0>{}]),
-                bit_cast<bf16x4_t>(reg_wei),
-                bit_cast<bf16x2_t>(*reg_data[0]),
-                GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() |
-                    GetStartLaneMod<HighLane>(),
-                0));
+        reg_c.template AsType<bhalf4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_bf16_bf16_4x2(
+            reg_c.template AsType<bhalf4_t>()[Number<0>{}],
+            reg_wei,
+            *reg_data[0],
+            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
+            0);
     }
 };
 
@@ -1053,15 +1051,14 @@ struct intrin_wcnn_conv_bf16_bf16<4, 2, 1, 1, 1, 2, Aco, Signed, HighLane>
     template <class FloatC>
     __device__ static void Run(const bhalf8_t& reg_wei, const bhalf2_t* reg_data[2], FloatC& reg_c)
     {
-        reg_c.template AsType<bhalf4_t>()(Number<0>{}) =
-            bit_cast<bhalf4_t>(__builtin_amdgcn_convolve_bf16_bf16_4x2(
-                bit_cast<bf16x4_t>(reg_c.template AsType<bhalf4_t>()[Number<0>{}]),
-                bit_cast<bf16x8_t>(reg_wei),
-                bit_cast<bf16x2_t>(*reg_data[0]),
-                bit_cast<bf16x2_t>(*reg_data[1]),
-                GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() |
-                    GetStartLaneMod<HighLane>() | GetItersMod<2>(),
-                0));
+        reg_c.template AsType<bhalf4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_bf16_bf16_4x2(
+            reg_c.template AsType<bhalf4_t>()[Number<0>{}],
+            reg_wei,
+            *reg_data[0],
+            *reg_data[1],
+            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() |
+                GetItersMod<2>(),
+            0);
     }
 };
 
@@ -1071,17 +1068,16 @@ struct intrin_wcnn_conv_bf16_bf16<4, 2, 1, 1, 1, 4, Aco, Signed, HighLane>
     template <class FloatC>
     __device__ static void Run(const bhalf16_t& reg_wei, const bhalf2_t* reg_data[4], FloatC& reg_c)
     {
-        reg_c.template AsType<bhalf4_t>()(Number<0>{}) =
-            bit_cast<bhalf4_t>(__builtin_amdgcn_convolve_bf16_bf16_4x2(
-                bit_cast<bf16x4_t>(reg_c.template AsType<bhalf4_t>()[Number<0>{}]),
-                bit_cast<bf16x16_t>(reg_wei),
-                bit_cast<bf16x2_t>(*reg_data[0]),
-                bit_cast<bf16x2_t>(*reg_data[1]),
-                bit_cast<bf16x2_t>(*reg_data[2]),
-                bit_cast<bf16x2_t>(*reg_data[3]),
-                GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() |
-                    GetStartLaneMod<HighLane>() | GetItersMod<4>(),
-                0));
+        reg_c.template AsType<bhalf4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_bf16_bf16_4x2(
+            reg_c.template AsType<bhalf4_t>()[Number<0>{}],
+            reg_wei,
+            *reg_data[0],
+            *reg_data[1],
+            *reg_data[2],
+            *reg_data[3],
+            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() |
+                GetItersMod<4>(),
+            0);
     }
 };
 
@@ -1091,14 +1087,12 @@ struct intrin_wcnn_conv_bf16_bf16<4, 4, 1, 1, 1, 1, Aco, Signed, HighLane>
     template <class FloatC>
     __device__ static void Run(const bhalf2_t& reg_wei, const bhalf2_t* reg_data[1], FloatC& reg_c)
     {
-        reg_c.template AsType<bhalf8_t>()(Number<0>{}) =
-            bit_cast<bhalf8_t>(__builtin_amdgcn_convolve_bf16_bf16_4x4(
-                bit_cast<bf16x8_t>(reg_c.template AsType<bhalf8_t>()[Number<0>{}]),
-                bit_cast<bf16x2_t>(reg_wei),
-                bit_cast<bf16x2_t>(*reg_data[0]),
-                GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() |
-                    GetStartLaneMod<HighLane>(),
-                0));
+        reg_c.template AsType<bhalf8_t>()(Number<0>{}) = __builtin_amdgcn_convolve_bf16_bf16_4x4(
+            reg_c.template AsType<bhalf8_t>()[Number<0>{}],
+            reg_wei,
+            *reg_data[0],
+            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
+            0);
     }
 };
 
@@ -1108,15 +1102,14 @@ struct intrin_wcnn_conv_bf16_bf16<4, 4, 1, 1, 1, 2, Aco, Signed, HighLane>
     template <class FloatC>
     __device__ static void Run(const bhalf4_t& reg_wei, const bhalf2_t* reg_data[2], FloatC& reg_c)
     {
-        reg_c.template AsType<bhalf8_t>()(Number<0>{}) =
-            bit_cast<bhalf8_t>(__builtin_amdgcn_convolve_bf16_bf16_4x4(
-                bit_cast<bf16x8_t>(reg_c.template AsType<bhalf8_t>()[Number<0>{}]),
-                bit_cast<bf16x4_t>(reg_wei),
-                bit_cast<bf16x2_t>(*reg_data[0]),
-                bit_cast<bf16x2_t>(*reg_data[1]),
-                GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() |
-                    GetStartLaneMod<HighLane>() | GetItersMod<2>(),
-                0));
+        reg_c.template AsType<bhalf8_t>()(Number<0>{}) = __builtin_amdgcn_convolve_bf16_bf16_4x4(
+            reg_c.template AsType<bhalf8_t>()[Number<0>{}],
+            reg_wei,
+            *reg_data[0],
+            *reg_data[1],
+            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() |
+                GetItersMod<2>(),
+            0);
     }
 };
 
@@ -1126,17 +1119,16 @@ struct intrin_wcnn_conv_bf16_bf16<4, 4, 1, 1, 1, 4, Aco, Signed, HighLane>
     template <class FloatC>
     __device__ static void Run(const bhalf8_t& reg_wei, const bhalf2_t* reg_data[4], FloatC& reg_c)
     {
-        reg_c.template AsType<bhalf8_t>()(Number<0>{}) =
-            bit_cast<bhalf8_t>(__builtin_amdgcn_convolve_bf16_bf16_4x4(
-                bit_cast<bf16x8_t>(reg_c.template AsType<bhalf8_t>()[Number<0>{}]),
-                bit_cast<bf16x8_t>(reg_wei),
-                bit_cast<bf16x2_t>(*reg_data[0]),
-                bit_cast<bf16x2_t>(*reg_data[1]),
-                bit_cast<bf16x2_t>(*reg_data[2]),
-                bit_cast<bf16x2_t>(*reg_data[3]),
-                GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() |
-                    GetStartLaneMod<HighLane>() | GetItersMod<4>(),
-                0));
+        reg_c.template AsType<bhalf8_t>()(Number<0>{}) = __builtin_amdgcn_convolve_bf16_bf16_4x4(
+            reg_c.template AsType<bhalf8_t>()[Number<0>{}],
+            reg_wei,
+            *reg_data[0],
+            *reg_data[1],
+            *reg_data[2],
+            *reg_data[3],
+            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() |
+                GetItersMod<4>(),
+            0);
     }
 };
 
@@ -1146,14 +1138,12 @@ struct intrin_wcnn_conv_bf16_bf16<8, 4, 1, 1, 1, 1, Aco, Signed, HighLane>
     template <class FloatC>
     __device__ static void Run(const bhalf2_t& reg_wei, const bhalf4_t* reg_data[1], FloatC& reg_c)
     {
-        reg_c.template AsType<bhalf8_t>()(Number<0>{}) =
-            bit_cast<bhalf8_t>(__builtin_amdgcn_convolve_bf16_bf16_8x4(
-                bit_cast<bf16x8_t>(reg_c.template AsType<bhalf8_t>()[Number<0>{}]),
-                bit_cast<bf16x2_t>(reg_wei),
-                bit_cast<bf16x4_t>(*reg_data[0]),
-                GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() |
-                    GetStartLaneMod<HighLane>(),
-                0));
+        reg_c.template AsType<bhalf8_t>()(Number<0>{}) = __builtin_amdgcn_convolve_bf16_bf16_8x4(
+            reg_c.template AsType<bhalf8_t>()[Number<0>{}],
+            reg_wei,
+            *reg_data[0],
+            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
+            0);
     }
 };
 
@@ -1163,15 +1153,14 @@ struct intrin_wcnn_conv_bf16_bf16<8, 4, 1, 1, 1, 2, Aco, Signed, HighLane>
     template <class FloatC>
     __device__ static void Run(const bhalf2_t& reg_wei, const bhalf4_t* reg_data[2], FloatC& reg_c)
     {
-        reg_c.template AsType<bhalf8_t>()(Number<0>{}) =
-            bit_cast<bhalf8_t>(__builtin_amdgcn_convolve_bf16_bf16_8x4(
-                bit_cast<bf16x8_t>(reg_c.template AsType<bhalf8_t>()[Number<0>{}]),
-                bit_cast<bf16x2_t>(reg_wei),
-                bit_cast<bf16x4_t>(*reg_data[0]),
-                bit_cast<bf16x4_t>(*reg_data[1]),
-                GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() |
-                    GetStartLaneMod<HighLane>() | GetItersMod<2>(),
-                0));
+        reg_c.template AsType<bhalf8_t>()(Number<0>{}) = __builtin_amdgcn_convolve_bf16_bf16_8x4(
+            reg_c.template AsType<bhalf8_t>()[Number<0>{}],
+            reg_wei,
+            *reg_data[0],
+            *reg_data[1],
+            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() |
+                GetItersMod<2>(),
+            0);
     }
 };
 
@@ -1181,17 +1170,16 @@ struct intrin_wcnn_conv_bf16_bf16<8, 4, 1, 1, 1, 4, Aco, Signed, HighLane>
     template <class FloatC>
     __device__ static void Run(const bhalf4_t& reg_wei, const bhalf4_t* reg_data[4], FloatC& reg_c)
     {
-        reg_c.template AsType<bhalf8_t>()(Number<0>{}) =
-            bit_cast<bhalf8_t>(__builtin_amdgcn_convolve_bf16_bf16_8x4(
-                bit_cast<bf16x8_t>(reg_c.template AsType<bhalf8_t>()[Number<0>{}]),
-                bit_cast<bf16x4_t>(reg_wei),
-                bit_cast<bf16x4_t>(*reg_data[0]),
-                bit_cast<bf16x4_t>(*reg_data[1]),
-                bit_cast<bf16x4_t>(*reg_data[2]),
-                bit_cast<bf16x4_t>(*reg_data[3]),
-                GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() |
-                    GetStartLaneMod<HighLane>() | GetItersMod<4>(),
-                0));
+        reg_c.template AsType<bhalf8_t>()(Number<0>{}) = __builtin_amdgcn_convolve_bf16_bf16_8x4(
+            reg_c.template AsType<bhalf8_t>()[Number<0>{}],
+            reg_wei,
+            *reg_data[0],
+            *reg_data[1],
+            *reg_data[2],
+            *reg_data[3],
+            GetFilterSizeMod<1>() | GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>() |
+                GetItersMod<4>(),
+            0);
     }
 };
 
@@ -2235,10 +2223,10 @@ struct intrin_wcnn_conv_f32_bf16<4, 2, 3, DilationX, DilationY, 1, Aco, Signed, 
     {
         reg_c.template AsType<float4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f32_bf16_4x2(
             reg_c.template AsType<float4_t>()[Number<0>{}],
-            bit_cast<bf16x36_t>(reg_wei),
-            bit_cast<bf16x6_t>(*reg_data[1]),
-            bit_cast<bf16x6_t>(*reg_data[0]),
-            bit_cast<bf16x6_t>(*reg_data[2]),
+            reg_wei,
+            *reg_data[1],
+            *reg_data[0],
+            *reg_data[2],
             GetDilationMod<DilationX, DilationY>() | GetFilterSizeMod<3>() |
                 GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
             0);
@@ -2511,16 +2499,15 @@ struct intrin_wcnn_conv_bf16_bf16<4, 2, 3, DilationX, DilationY, 1, Aco, Signed,
     template <class FloatC>
     __device__ static void Run(const bhalf36_t& reg_wei, const bhalf6_t* reg_data[3], FloatC& reg_c)
     {
-        reg_c.template AsType<bhalf4_t>()(Number<0>{}) =
-            bit_cast<bhalf4_t>(__builtin_amdgcn_convolve_bf16_bf16_4x2(
-                bit_cast<bf16x4_t>(reg_c.template AsType<bhalf4_t>()[Number<0>{}]),
-                bit_cast<bf16x36_t>(reg_wei),
-                bit_cast<bf16x6_t>(*reg_data[1]),
-                bit_cast<bf16x6_t>(*reg_data[0]),
-                bit_cast<bf16x6_t>(*reg_data[2]),
-                GetDilationMod<DilationX, DilationY>() | GetFilterSizeMod<3>() |
-                    GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
-                0));
+        reg_c.template AsType<bhalf4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_bf16_bf16_4x2(
+            reg_c.template AsType<bhalf4_t>()[Number<0>{}],
+            reg_wei,
+            *reg_data[1],
+            *reg_data[0],
+            *reg_data[2],
+            GetDilationMod<DilationX, DilationY>() | GetFilterSizeMod<3>() |
+                GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
+            0);
     }
 };
 
@@ -2530,16 +2517,15 @@ struct intrin_wcnn_conv_bf16_bf16<4, 4, 3, DilationX, DilationY, 1, Aco, Signed,
     template <class FloatC>
     __device__ static void Run(const bhalf18_t& reg_wei, const bhalf6_t* reg_data[3], FloatC& reg_c)
     {
-        reg_c.template AsType<bhalf8_t>()(Number<0>{}) =
-            bit_cast<bhalf8_t>(__builtin_amdgcn_convolve_bf16_bf16_4x4(
-                bit_cast<bf16x8_t>(reg_c.template AsType<bhalf8_t>()[Number<0>{}]),
-                bit_cast<bf16x18_t>(reg_wei),
-                bit_cast<bf16x6_t>(*reg_data[1]),
-                bit_cast<bf16x6_t>(*reg_data[0]),
-                bit_cast<bf16x6_t>(*reg_data[2]),
-                GetDilationMod<DilationX, DilationY>() | GetFilterSizeMod<3>() |
-                    GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
-                0));
+        reg_c.template AsType<bhalf8_t>()(Number<0>{}) = __builtin_amdgcn_convolve_bf16_bf16_4x4(
+            reg_c.template AsType<bhalf8_t>()[Number<0>{}],
+            reg_wei,
+            *reg_data[1],
+            *reg_data[0],
+            *reg_data[2],
+            GetDilationMod<DilationX, DilationY>() | GetFilterSizeMod<3>() |
+                GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
+            0);
     }
 };
 
@@ -2549,16 +2535,15 @@ struct intrin_wcnn_conv_bf16_bf16<8, 4, 3, DilationX, DilationY, 1, Aco, Signed,
     template <class FloatC>
     __device__ static void Run(const bhalf10_t& reg_wei, const bhalf8_t* reg_data[3], FloatC& reg_c)
     {
-        reg_c.template AsType<bhalf8_t>()(Number<0>{}) =
-            bit_cast<bhalf8_t>(__builtin_amdgcn_convolve_bf16_bf16_8x4(
-                bit_cast<bf16x8_t>(reg_c.template AsType<bhalf8_t>()[Number<0>{}]),
-                bit_cast<bf16x10_t>(reg_wei),
-                bit_cast<bf16x8_t>(*reg_data[1]),
-                bit_cast<bf16x8_t>(*reg_data[0]),
-                bit_cast<bf16x8_t>(*reg_data[2]),
-                GetDilationMod<DilationX, DilationY>() | GetFilterSizeMod<3>() |
-                    GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
-                0));
+        reg_c.template AsType<bhalf8_t>()(Number<0>{}) = __builtin_amdgcn_convolve_bf16_bf16_8x4(
+            reg_c.template AsType<bhalf8_t>()[Number<0>{}],
+            reg_wei,
+            *reg_data[1],
+            *reg_data[0],
+            *reg_data[2],
+            GetDilationMod<DilationX, DilationY>() | GetFilterSizeMod<3>() |
+                GetAccumChannelOrderMod<Aco>() | GetStartLaneMod<HighLane>(),
+            0);
     }
 };
 

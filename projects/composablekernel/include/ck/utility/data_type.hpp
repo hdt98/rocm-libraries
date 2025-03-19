@@ -23,7 +23,11 @@ using byte = unsigned char;
 using std::byte;
 #endif
 
+#if defined(__clang_major__) && (__clang_major__ >= 21)
+using bhalf_t = __bf16;
+#else
 using bhalf_t = ushort;
+#endif
 using half_t  = _Float16;
 using int4_t  = _BitInt(4);
 using uint4_t = unsigned _BitInt(4);
@@ -5178,20 +5182,6 @@ using bhalf36_t = typename vector_type<bhalf_t, 36>::type;
 using bhalf5_t  = typename vector_type<bhalf_t, 5>::type;
 using bhalf10_t = typename vector_type<bhalf_t, 10>::type;
 
-using bf16x2_t  = typename vector_type<__bf16, 2>::type;
-using bf16x4_t  = typename vector_type<__bf16, 4>::type;
-using bf16x8_t  = typename vector_type<__bf16, 8>::type;
-using bf16x16_t = typename vector_type<__bf16, 16>::type;
-using bf16x32_t = typename vector_type<__bf16, 32>::type;
-using bf16x64_t = typename vector_type<__bf16, 64>::type;
-
-using bf16x3_t  = typename vector_type<__bf16, 3>::type;
-using bf16x6_t  = typename vector_type<__bf16, 6>::type;
-using bf16x9_t  = typename vector_type<__bf16, 9>::type;
-using bf16x18_t = typename vector_type<__bf16, 18>::type;
-using bf16x36_t = typename vector_type<__bf16, 36>::type;
-using bf16x5_t  = typename vector_type<__bf16, 5>::type;
-using bf16x10_t = typename vector_type<__bf16, 10>::type;
 // i32
 using int32x2_t  = typename vector_type<int32_t, 2>::type;
 using int32x4_t  = typename vector_type<int32_t, 4>::type;

@@ -699,12 +699,7 @@ struct intrin_wcnn_cvt_tensor_bf16_f32<AuxData, Clamp, 4, 2>
     Run(const FloatAcc& inAcc, const char& ssrc, bhalf2_t& out_0, bhalf2_t& out_1)
     {
         __builtin_amdgcn_cvt_to_tensor_bf16_f32_4x2x16(
-            reinterpret_cast<bf16x2_t*>(&out_0),
-            reinterpret_cast<bf16x2_t*>(&out_1),
-            inAcc.template AsType<float4_t>()[Number<0>{}],
-            ssrc,
-            AuxData,
-            Clamp);
+            &out_0, &out_1, inAcc.template AsType<float4_t>()[Number<0>{}], ssrc, AuxData, Clamp);
     }
 };
 
@@ -718,12 +713,8 @@ struct intrin_wcnn_cvt_tensor_bf16_f16<AuxData, Clamp, 8, 4>
     __device__ static void
     Run(const FloatAcc& inAcc, const char& ssrc, bhalf4_t& out_0, bhalf4_t& out_1)
     {
-        __builtin_amdgcn_cvt_to_tensor_bf16_f16_8x4x8(reinterpret_cast<bf16x4_t*>(&out_0),
-                                                      reinterpret_cast<bf16x4_t*>(&out_1),
-                                                      inAcc.template AsType<half8_t>()[Number<0>{}],
-                                                      ssrc,
-                                                      AuxData,
-                                                      Clamp);
+        __builtin_amdgcn_cvt_to_tensor_bf16_f16_8x4x8(
+            &out_0, &out_1, inAcc.template AsType<half8_t>()[Number<0>{}], ssrc, AuxData, Clamp);
     }
 };
 
@@ -739,10 +730,10 @@ struct intrin_wcnn_cvt_tensor_bf16_f16<AuxData, Clamp, 4, 4>
                                bhalf2_t& out_3)
     {
         __builtin_amdgcn_cvt_to_tensor_bf16_f16_4x4x16(
-            reinterpret_cast<bf16x2_t*>(&out_0),
-            reinterpret_cast<bf16x2_t*>(&out_1),
-            reinterpret_cast<bf16x2_t*>(&out_2),
-            reinterpret_cast<bf16x2_t*>(&out_3),
+            &out_0,
+            &out_1,
+            &out_2,
+            &out_3,
             inAcc.template AsType<half8_t>()[Number<0>{}],
             ssrc,
             AuxData,
@@ -758,12 +749,7 @@ struct intrin_wcnn_cvt_tensor_bf16_f16<AuxData, Clamp, 4, 2>
     Run(const FloatAcc& inAcc, const char& ssrc, bhalf2_t& out_0, bhalf2_t& out_1)
     {
         __builtin_amdgcn_cvt_to_tensor_bf16_f16_4x4x8_4x2x16(
-            reinterpret_cast<bf16x2_t*>(&out_0),
-            reinterpret_cast<bf16x2_t*>(&out_1),
-            inAcc.template AsType<half4_t>()[Number<0>{}],
-            ssrc,
-            AuxData,
-            Clamp);
+            &out_0, &out_1, inAcc.template AsType<half4_t>()[Number<0>{}], ssrc, AuxData, Clamp);
     }
 };
 
@@ -778,12 +764,7 @@ struct intrin_wcnn_cvt_tensor_bf16_bf16<AuxData, Clamp, 8, 4>
     Run(const FloatAcc& inAcc, const char& ssrc, bhalf4_t& out_0, bhalf4_t& out_1)
     {
         __builtin_amdgcn_cvt_to_tensor_bf16_bf16_8x4x8(
-            reinterpret_cast<bf16x4_t*>(&out_0),
-            reinterpret_cast<bf16x4_t*>(&out_1),
-            inAcc.template AsType<bhalf8_t>()[Number<0>{}],
-            ssrc,
-            AuxData,
-            Clamp);
+            &out_0, &out_1, inAcc.template AsType<bhalf8_t>()[Number<0>{}], ssrc, AuxData, Clamp);
     }
 };
 
@@ -799,10 +780,10 @@ struct intrin_wcnn_cvt_tensor_bf16_bf16<AuxData, Clamp, 4, 4>
                                bhalf2_t& out_3)
     {
         __builtin_amdgcn_cvt_to_tensor_bf16_bf16_4x4x16(
-            reinterpret_cast<bf16x2_t*>(&out_0),
-            reinterpret_cast<bf16x2_t*>(&out_1),
-            reinterpret_cast<bf16x2_t*>(&out_2),
-            reinterpret_cast<bf16x2_t*>(&out_3),
+            &out_0,
+            &out_1,
+            &out_2,
+            &out_3,
             inAcc.template AsType<bhalf8_t>()[Number<0>{}],
             ssrc,
             AuxData,
@@ -818,12 +799,7 @@ struct intrin_wcnn_cvt_tensor_bf16_bf16<AuxData, Clamp, 4, 2>
     Run(const FloatAcc& inAcc, const char& ssrc, bhalf2_t& out_0, bhalf2_t& out_1)
     {
         __builtin_amdgcn_cvt_to_tensor_bf16_bf16_4x4x8_4x2x16(
-            reinterpret_cast<bf16x2_t*>(&out_0),
-            reinterpret_cast<bf16x2_t*>(&out_1),
-            inAcc.template AsType<bhalf4_t>()[Number<0>{}],
-            ssrc,
-            AuxData,
-            Clamp);
+            &out_0, &out_1, inAcc.template AsType<bhalf4_t>()[Number<0>{}], ssrc, AuxData, Clamp);
     }
 };
 

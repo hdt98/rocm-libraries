@@ -175,11 +175,7 @@ struct intrin_wcnn_sba_bhalf<auxdata, 0, 0>
     Run(const FloatAcc& inAcc, const bhalf_t& ssrc, const bhalf2_t& bias, FloatAcc& outAcc)
     {
         outAcc.template AsType<bhalf8_t>()(Number<0>{}) = __builtin_amdgcn_scale_bias_activate_bf16(
-            inAcc.template AsType<bhalf8_t>()[Number<0>{}],
-            bit_cast<__bf16>(ssrc),
-            bit_cast<bf16x2_t>(bias),
-            auxdata,
-            true);
+            inAcc.template AsType<bhalf8_t>()[Number<0>{}], ssrc, bias, auxdata, true);
     }
 };
 
@@ -190,11 +186,7 @@ struct intrin_wcnn_sba_bhalf<auxdata, 1, 0>
     __device__ static void Run(const FloatAcc& inAcc, const bhalf2_t& scaleBias, FloatAcc& outAcc)
     {
         outAcc.template AsType<bhalf8_t>()(Number<0>{}) = __builtin_amdgcn_scale_bias_activate_bf16(
-            inAcc.template AsType<bhalf8_t>()[Number<0>{}],
-            0,
-            bit_cast<bf16x2_t>(scaleBias),
-            auxdata,
-            true);
+            inAcc.template AsType<bhalf8_t>()[Number<0>{}], 0, scaleBias, auxdata, true);
     }
 };
 
@@ -206,10 +198,7 @@ struct intrin_wcnn_sba_bhalf<auxdata, 0, 1>
     {
         outAcc.template AsType<bhalf8_t>()(Number<0>{}) =
             __builtin_amdgcn_uniform_scale_activate_bf16(
-                inAcc.template AsType<bhalf8_t>()[Number<0>{}],
-                bit_cast<__bf16>(ssrc),
-                auxdata,
-                true);
+                inAcc.template AsType<bhalf8_t>()[Number<0>{}], ssrc, auxdata, true);
     }
 };
 
@@ -227,11 +216,11 @@ struct intrin_wcnn_sba_scatter2_bhalf<auxdata, 0, 0>
                                bhalf2_t& outAcc1)
     {
         __builtin_amdgcn_scale_bias_activate_scatter2_bf16(
-            reinterpret_cast<bf16x2_t*>(&outAcc0),
-            reinterpret_cast<bf16x2_t*>(&outAcc1),
+            &outAcc0,
+            &outAcc1,
             inAcc.template AsType<bhalf4_t>()[Number<0>{}],
-            bit_cast<__bf16>(ssrc),
-            bit_cast<bf16x2_t>(bias),
+            ssrc,
+            bias,
             auxdata,
             true);
     }
@@ -245,11 +234,11 @@ struct intrin_wcnn_sba_scatter2_bhalf<auxdata, 1, 0>
     Run(const FloatAcc& inAcc, const bhalf2_t& scale_bias, bhalf2_t& outAcc0, bhalf2_t& outAcc1)
     {
         __builtin_amdgcn_scale_bias_activate_scatter2_bf16(
-            reinterpret_cast<bf16x2_t*>(&outAcc0),
-            reinterpret_cast<bf16x2_t*>(&outAcc1),
+            &outAcc0,
+            &outAcc1,
             inAcc.template AsType<bhalf4_t>()[Number<0>{}],
             0,
-            bit_cast<bf16x2_t>(scale_bias),
+            scale_bias,
             auxdata,
             true);
     }
@@ -263,10 +252,10 @@ struct intrin_wcnn_sba_scatter2_bhalf<auxdata, 0, 1>
     Run(const FloatAcc& inAcc, const bhalf_t& ssrc, bhalf2_t& outAcc0, bhalf2_t& outAcc1)
     {
         __builtin_amdgcn_uniform_scale_activate_scatter2_bf16(
-            reinterpret_cast<bf16x2_t*>(&outAcc0),
-            reinterpret_cast<bf16x2_t*>(&outAcc1),
+            &outAcc0,
+            &outAcc1,
             inAcc.template AsType<bhalf4_t>()[Number<0>{}],
-            bit_cast<__bf16>(ssrc),
+            ssrc,
             auxdata,
             true);
     }
