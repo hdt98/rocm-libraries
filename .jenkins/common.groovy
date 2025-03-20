@@ -63,7 +63,6 @@ def runTestCommand(platform, project, boolean rocmExamples=false)
                         sudo rpm -i *.rpm
                         sudo yum -y update
                         sudo yum -y install hipblas-devel
-                        sudo ln -s  /etc/alternatives/rocm /opt/rocm
                         """
         }
         testCommand = """#!/usr/bin/env bash
