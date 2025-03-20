@@ -58,8 +58,7 @@ def runTestCommand(platform, project, boolean rocmExamples=false)
                         rpm -ql hipsolver-devel
                         sudo zypper refresh || true
                         sudo zypper -n install hipblas-devel
-                        cd /opt
-                        ls -l
+                        ls /opt -l
                         """
         }
         else{
@@ -70,9 +69,8 @@ def runTestCommand(platform, project, boolean rocmExamples=false)
                         rpm -ql hipsolver-devel
                         sudo yum -y update
                         sudo yum -y install hipblas-devel
-                        cd /opt
-                        ls -l
                         sudo ln -s  /opt/rocm-6.4.0 rocm
+                        ls /opt -l
                         """
         }
         String compileCommand = ""
@@ -86,7 +84,6 @@ def runTestCommand(platform, project, boolean rocmExamples=false)
                     set -ex
                     cd ${project.paths.project_build_prefix}/build/release/package
                     ${buildString}
-                    cd ${project.paths.project_build_prefix}/build/release/package
                     cd ../../..
                     testDirs=("Libraries/hipSOLVER")
                     git clone https://github.com/ROCm/rocm-examples.git
