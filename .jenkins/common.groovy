@@ -70,6 +70,13 @@ def runTestCommand(platform, project, boolean rocmExamples=false)
                         sudo yum -y install hipblas-devel
                         """
         }
+        String compileCommand = ""
+            if (platform.os.contains("rhel")){
+                compileCommand = "cmake -DCMAKE_PREFIX_PATH=/opt/rocm/lib/cmake/hipsolver -S . -B build"
+            }
+            else{
+                compileCommand = "cmake -S . -B build"
+            }
         testCommand = """#!/usr/bin/env bash
                     set -ex
                     cd ${project.paths.project_build_prefix}/build/release/package
@@ -80,7 +87,7 @@ def runTestCommand(platform, project, boolean rocmExamples=false)
                     rocm_examples_dir=\$(readlink -f rocm-examples)
                     for testDir in \${testDirs[@]}; do
                         cd \${rocm_examples_dir}/\${testDir}
-                        cmake -S . -B build
+                        ${compileCommand}
                         cmake --build build
                         cd ./build
                         ctest --output-on-failure
