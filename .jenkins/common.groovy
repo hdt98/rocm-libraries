@@ -75,7 +75,7 @@ def runTestCommand(platform, project, boolean rocmExamples=false)
                 compileCommand = 'cmake -DCMAKE_PREFIX_PATH=/opt/rocm-6.4.0/lib/cmake/hipsolver;/opt/rocm-6.4.0 -S . -B build'
             }
             else{
-                compileCommand = "cmake -S . -B build"
+                compileCommand = 'cmake -S . -B build'
             }
         testCommand = """#!/usr/bin/env bash
                     set -ex
