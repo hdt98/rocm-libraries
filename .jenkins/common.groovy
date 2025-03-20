@@ -54,32 +54,18 @@ def runTestCommand(platform, project, boolean rocmExamples=false)
         else if (platform.os.contains("sles")){
             buildString += """
                         sudo rpm -i *.rpm
-                        sudo find /opt -name hipsolver-config.cmake
-                        rpm -ql hipsolver-devel
                         sudo zypper refresh || true
                         sudo zypper -n install hipblas-devel
-                        ls /opt -l
                         """
         }
         else{
             buildString += """
                         sudo rpm -i *.rpm
-                        yum list --installed | grep hip
-                        sudo find /opt -name hipsolver-config.cmake
-                        rpm -ql hipsolver-devel
                         sudo yum -y update
                         sudo yum -y install hipblas-devel
-                        sudo ln -s  /opt/rocm-6.4.0 /opt/rocm
-                        ls /opt -l
+                        sudo ln -s  /etc/alternatives/rocm /opt/rocm
                         """
         }
-        String compileCommand = ""
-            if (platform.os.contains("rhel")){
-                compileCommand = 'cmake -S . -B build'
-            }
-            else{
-                compileCommand = 'cmake -S . -B build'
-            }
         testCommand = """#!/usr/bin/env bash
                     set -ex
                     cd ${project.paths.project_build_prefix}/build/release/package
@@ -90,7 +76,7 @@ def runTestCommand(platform, project, boolean rocmExamples=false)
                     rocm_examples_dir=\$(readlink -f rocm-examples)
                     for testDir in \${testDirs[@]}; do
                         cd \${rocm_examples_dir}/\${testDir}
-                        ${compileCommand}
+                        cmake -S . -B build
                         cmake --build build
                         cd ./build
                         ctest --output-on-failure
