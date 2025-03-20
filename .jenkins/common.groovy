@@ -58,6 +58,8 @@ def runTestCommand(platform, project, boolean rocmExamples=false)
                         rpm -ql hipsolver-devel
                         sudo zypper refresh || true
                         sudo zypper -n install hipblas-devel
+                        cd /opt
+                        ls -l
                         """
         }
         else{
@@ -70,7 +72,7 @@ def runTestCommand(platform, project, boolean rocmExamples=false)
                         sudo yum -y install hipblas-devel
                         cd /opt
                         ls -l
-                        ln -s  /opt/rocm-6.4.0 rocm
+                        sudo ln -s  /opt/rocm-6.4.0 rocm
                         """
         }
         String compileCommand = ""
