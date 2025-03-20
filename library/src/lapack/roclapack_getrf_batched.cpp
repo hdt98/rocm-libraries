@@ -1,5 +1,5 @@
 /* **************************************************************************
- * Copyright (C) 2019-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2019-2025 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -65,6 +65,7 @@ rocblas_status rocsolver_getrf_batched_impl(rocblas_handle handle,
     rocblas_stride strideA = 0;
 
     // memory workspace sizes:
+    rocsolver_workspace_helper work_helper;
     // size for constants in rocblas calls
     size_t size_scalars;
     // size of reusable workspace (and for calling TRSM)
@@ -77,7 +78,7 @@ rocblas_status rocsolver_getrf_batched_impl(rocblas_handle handle,
 
     rocsolver_getrf_getMemorySize<true, false, T>(
         m, n, pivot, batch_count, &size_scalars, &size_work1, &size_work2, &size_work3, &size_work4,
-        &size_pivotval, &size_pivotidx, &size_iipiv, &size_iinfo, &optim_mem, lda);
+        &size_pivotval, &size_pivotidx, &size_iipiv, &size_iinfo, &work_helper, &optim_mem, lda);
 
     if(rocblas_is_device_memory_size_query(handle))
         return rocblas_set_optimal_device_memory_size(handle, size_scalars, size_work1, size_work2,
@@ -107,8 +108,8 @@ rocblas_status rocsolver_getrf_batched_impl(rocblas_handle handle,
     // execution
     return rocsolver_getrf_template<true, false, T>(
         handle, m, n, A, shiftA, inca, lda, strideA, ipiv, shiftP, strideP, info, batch_count,
-        (T*)scalars, work1, work2, work3, work4, (T*)pivotval, (I*)pivotidx, (I*)iipiv, (I*)iinfo,
-        optim_mem, pivot);
+        &work_helper, (T*)scalars, work1, work2, work3, work4, (T*)pivotval, (I*)pivotidx,
+        (I*)iipiv, (I*)iinfo, optim_mem, pivot);
 }
 
 ROCSOLVER_END_NAMESPACE

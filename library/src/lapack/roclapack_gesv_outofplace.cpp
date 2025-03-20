@@ -1,5 +1,5 @@
 /* **************************************************************************
- * Copyright (C) 2019-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2019-2025 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -77,6 +77,7 @@ rocblas_status rocsolver_gesv_outofplace_impl(rocblas_handle handle,
     rocblas_int batch_count = 1;
 
     // memory workspace sizes:
+    rocsolver_workspace_helper work_helper;
     // size for constants in rocblas calls
     size_t size_scalars;
     // size of reusable workspace for calling GETRF and GETRS
@@ -86,7 +87,7 @@ rocblas_status rocsolver_gesv_outofplace_impl(rocblas_handle handle,
     size_t size_pivotval, size_pivotidx, size_iipiv, size_iinfo;
     rocsolver_gesv_outofplace_getMemorySize<false, false, T>(
         n, nrhs, batch_count, &size_scalars, &size_work1, &size_work2, &size_work3, &size_work4,
-        &size_pivotval, &size_pivotidx, &size_iipiv, &size_iinfo, &optim_mem);
+        &size_pivotval, &size_pivotidx, &size_iipiv, &size_iinfo, &work_helper, &optim_mem);
 
     if(rocblas_is_device_memory_size_query(handle))
         return rocblas_set_optimal_device_memory_size(handle, size_scalars, size_work1, size_work2,
@@ -116,8 +117,8 @@ rocblas_status rocsolver_gesv_outofplace_impl(rocblas_handle handle,
     // execution
     return rocsolver_gesv_outofplace_template<false, false, T>(
         handle, n, nrhs, A, shiftA, lda, strideA, ipiv, strideP, B, shiftB, ldb, strideB, X, shiftX,
-        ldx, strideX, info, batch_count, (T*)scalars, work1, work2, work3, work4, (T*)pivotval,
-        (rocblas_int*)pivotidx, (rocblas_int*)iipiv, (rocblas_int*)iinfo, optim_mem);
+        ldx, strideX, info, batch_count, &work_helper, (T*)scalars, work1, work2, work3, work4,
+        (T*)pivotval, (rocblas_int*)pivotidx, (rocblas_int*)iipiv, (rocblas_int*)iinfo, optim_mem);
 }
 
 ROCSOLVER_END_NAMESPACE

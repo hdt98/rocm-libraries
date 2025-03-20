@@ -1,5 +1,5 @@
 /* **************************************************************************
- * Copyright (C) 2019-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2019-2025 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -65,13 +65,14 @@ rocblas_status rocsolver_getf2_strided_batched_impl(rocblas_handle handle,
     I inca = 1;
 
     // memory workspace sizes:
+    rocsolver_workspace_helper work_helper;
     // size for constants in rocblas calls
     size_t size_scalars;
     // sizes to store pivots in intermediate computations
     size_t size_pivotval;
     size_t size_pivotidx;
     rocsolver_getf2_getMemorySize<true, T>(m, n, pivot, batch_count, &size_scalars, &size_pivotval,
-                                           &size_pivotidx);
+                                           &size_pivotidx, &work_helper);
 
     if(rocblas_is_device_memory_size_query(handle))
         return rocblas_set_optimal_device_memory_size(handle, size_scalars, size_pivotval,
@@ -92,8 +93,8 @@ rocblas_status rocsolver_getf2_strided_batched_impl(rocblas_handle handle,
 
     // execution
     return rocsolver_getf2_template<true, T>(handle, m, n, A, shiftA, inca, lda, strideA, ipiv,
-                                             shiftP, strideP, info, batch_count, (T*)scalars,
-                                             (T*)pivotval, (I*)pivotidx, pivot);
+                                             shiftP, strideP, info, batch_count, &work_helper,
+                                             (T*)scalars, (T*)pivotval, (I*)pivotidx, pivot);
 }
 
 ROCSOLVER_END_NAMESPACE

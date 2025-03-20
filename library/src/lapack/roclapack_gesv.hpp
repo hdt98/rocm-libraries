@@ -4,7 +4,7 @@
  *     Univ. of Tennessee, Univ. of California Berkeley,
  *     Univ. of Colorado Denver and NAG Ltd..
  *     December 2016
- * Copyright (C) 2019-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2019-2025 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -36,6 +36,7 @@
 #include "roclapack_getrf.hpp"
 #include "roclapack_getrs.hpp"
 #include "rocsolver/rocsolver.h"
+#include "rocsolver_workspace_helper.hpp"
 
 ROCSOLVER_BEGIN_NAMESPACE
 
@@ -85,6 +86,7 @@ void rocsolver_gesv_getMemorySize(const rocblas_int n,
                                   size_t* size_pivotidx,
                                   size_t* size_iipiv,
                                   size_t* size_iinfo,
+                                  rocsolver_workspace_helper* work_helper,
                                   bool* optim_mem)
 {
     // if quick return, no workspace is needed
@@ -110,7 +112,7 @@ void rocsolver_gesv_getMemorySize(const rocblas_int n,
     // workspace required for calling GETRF
     rocsolver_getrf_getMemorySize<BATCHED, STRIDED, T>(
         n, n, true, batch_count, size_scalars, size_work1, size_work2, size_work3, size_work4,
-        size_pivotval, size_pivotidx, size_iipiv, size_iinfo, &opt1);
+        size_pivotval, size_pivotidx, size_iipiv, size_iinfo, work_helper, &opt1);
 
     // workspace required for calling GETRS
     rocsolver_getrs_getMemorySize<BATCHED, STRIDED, T>(rocblas_operation_none, n, nrhs, batch_count,
@@ -142,6 +144,7 @@ rocblas_status rocsolver_gesv_template(rocblas_handle handle,
                                        const rocblas_stride strideB,
                                        rocblas_int* info,
                                        const rocblas_int batch_count,
+                                       rocsolver_workspace_helper* work_helper,
                                        T* scalars,
                                        T* work,
                                        void* work1,
@@ -181,8 +184,8 @@ rocblas_status rocsolver_gesv_template(rocblas_handle handle,
 
     // compute LU factorization of A
     rocsolver_getrf_template<BATCHED, STRIDED, T>(
-        handle, n, n, A, shiftA, 1, lda, strideA, ipiv, 0, strideP, info, batch_count, scalars,
-        work1, work2, work3, work4, pivotval, pivotidx, iipiv, iinfo, optim_mem, true);
+        handle, n, n, A, shiftA, 1, lda, strideA, ipiv, 0, strideP, info, batch_count, work_helper,
+        scalars, work1, work2, work3, work4, pivotval, pivotidx, iipiv, iinfo, optim_mem, true);
 
     // save elements of B that will be overwritten by GETRS for cases where info is nonzero
     ROCSOLVER_LAUNCH_KERNEL(copy_mat<T>, dim3(copyblocksx, copyblocksy, batch_count), dim3(32, 32),

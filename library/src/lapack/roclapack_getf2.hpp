@@ -4,7 +4,7 @@
  *     Univ. of Tennessee, Univ. of California Berkeley,
  *     Univ. of Colorado Denver and NAG Ltd..
  *     December 2016
- * Copyright (C) 2019-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2019-2025 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -37,6 +37,7 @@
 #include "rocblas.hpp"
 #include "rocsolver/rocsolver.h"
 #include "rocsolver_run_specialized_kernels.hpp"
+#include "rocsolver_workspace_helper.hpp"
 
 ROCSOLVER_BEGIN_NAMESPACE
 
@@ -476,6 +477,7 @@ void rocsolver_getf2_getMemorySize(const I m,
                                    size_t* size_scalars,
                                    size_t* size_pivotval,
                                    size_t* size_pivotidx,
+                                   rocsolver_workspace_helper* work_helper,
                                    bool inblocked = false,
                                    const I inca = 1)
 {
@@ -560,6 +562,7 @@ rocblas_status rocsolver_getf2_template(rocblas_handle handle,
                                         const rocblas_stride strideP,
                                         INFO* info,
                                         const I batch_count,
+                                        rocsolver_workspace_helper* work_helper,
                                         T* scalars,
                                         T* pivotval,
                                         I* pivotidx,

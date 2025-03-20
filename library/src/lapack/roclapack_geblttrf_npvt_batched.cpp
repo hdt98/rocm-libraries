@@ -1,5 +1,5 @@
 /* **************************************************************************
- * Copyright (C) 2021-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2021-2025 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -68,6 +68,7 @@ rocblas_status rocsolver_geblttrf_npvt_batched_impl(rocblas_handle handle,
     rocblas_stride strideC = 0;
 
     // memory workspace sizes:
+    rocsolver_workspace_helper work_helper;
     // requirements for calling GETRF/GETRS
     bool optim_mem;
     size_t size_scalars, size_work1, size_work2, size_work3, size_work4, size_pivotval,
@@ -77,7 +78,8 @@ rocblas_status rocsolver_geblttrf_npvt_batched_impl(rocblas_handle handle,
 
     rocsolver_geblttrf_npvt_getMemorySize<true, false, T>(
         nb, nblocks, batch_count, &size_scalars, &size_work1, &size_work2, &size_work3, &size_work4,
-        &size_pivotval, &size_pivotidx, &size_iipiv, &size_iinfo1, &size_iinfo2, &optim_mem);
+        &size_pivotval, &size_pivotidx, &size_iipiv, &size_iinfo1, &size_iinfo2, &work_helper,
+        &optim_mem);
 
     if(rocblas_is_device_memory_size_query(handle))
         return rocblas_set_optimal_device_memory_size(
@@ -108,9 +110,9 @@ rocblas_status rocsolver_geblttrf_npvt_batched_impl(rocblas_handle handle,
     // Execution
     return rocsolver_geblttrf_npvt_template<true, false, T>(
         handle, nb, nblocks, A, shiftA, inca, lda, strideA, B, shiftB, incb, ldb, strideB, C,
-        shiftC, incc, ldc, strideC, info, batch_count, (T*)scalars, work1, work2, work3, work4,
-        (T*)pivotval, (rocblas_int*)pivotidx, (rocblas_int*)iipiv, (rocblas_int*)iinfo1,
-        (rocblas_int*)iinfo2, optim_mem);
+        shiftC, incc, ldc, strideC, info, batch_count, &work_helper, (T*)scalars, work1, work2,
+        work3, work4, (T*)pivotval, (rocblas_int*)pivotidx, (rocblas_int*)iipiv,
+        (rocblas_int*)iinfo1, (rocblas_int*)iinfo2, optim_mem);
 }
 
 ROCSOLVER_END_NAMESPACE
