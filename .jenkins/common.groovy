@@ -69,7 +69,7 @@ def runTestCommand(platform, project, boolean rocmExamples=false)
                         rpm -ql hipsolver-devel
                         sudo yum -y update
                         sudo yum -y install hipblas-devel
-                        sudo ln -s  /opt/rocm-6.4.0 rocm
+                        sudo ln -s  /opt/rocm-6.4.0 /opt/rocm
                         ls /opt -l
                         """
         }
