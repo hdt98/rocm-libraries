@@ -86,6 +86,7 @@ def runTestCommand(platform, project, boolean rocmExamples=false)
                     set -ex
                     cd ${project.paths.project_build_prefix}/build/release/package
                     ${buildString}
+                    cd ${project.paths.project_build_prefix}/build/release/package
                     cd ../../..
                     testDirs=("Libraries/hipSOLVER")
                     git clone https://github.com/ROCm/rocm-examples.git
