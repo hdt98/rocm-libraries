@@ -65,7 +65,6 @@ def runTestCommand(platform, project, boolean rocmExamples=false)
                         ls /opt -l
                         sudo rpm -i *.rpm
                         ls /opt -l
-                        sudo yum -y update
                         ls /opt -l
                         sudo yum -y install hipblas-devel
                         ls /opt -l
