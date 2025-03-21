@@ -19,6 +19,7 @@ def runCompileCommand(platform, project, jobName, boolean sameOrg=false)
 
     def command = """#!/usr/bin/env bash
                 set -x
+                ls /opt -l
                 cd ${project.paths.project_build_prefix}
                 ${getDependenciesCommand}
                 ${centos}
@@ -33,6 +34,7 @@ def runTestCommand(platform, project, boolean rocmExamples=false)
     String testExe = "hipsolver-test"
     def command = """#!/usr/bin/env bash
                     set -x
+                    ls /opt -l
                     cd ${project.paths.project_build_prefix}/build/${buildType}/clients/staging
                     LD_LIBRARY_PATH=/opt/rocm/lib GTEST_LISTENER=NO_PASS_LINE_IN_LOG ./${testExe} --gtest_output=xml --gtest_color=yes
                 """
