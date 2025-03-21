@@ -62,12 +62,8 @@ def runTestCommand(platform, project, boolean rocmExamples=false)
         }
         else{
             buildString += """
-                        ls /opt -l
                         sudo rpm -i *.rpm
-                        ls /opt -l
-                        ls /opt -l
                         sudo yum -y install hipblas-devel
-                        ls /opt -l
                         """
         }
         testCommand = """#!/usr/bin/env bash
