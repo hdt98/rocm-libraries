@@ -180,6 +180,7 @@ struct ExecutionConfig final
     bool do_verification = true;
     bool dump_tensor     = true;
     bool time_kernel     = false;
+    int d                = 2;
     int h                = 64;
     int w                = 64;
     int c                = 16;
@@ -193,84 +194,245 @@ void dump_tensor(const Tensor<DataType>& tensor, const char* str)
 {
     if(config.dump_tensor == false)
         return;
-    assert(tensor.GetNumOfDimension() == 5);
+    assert(tensor.GetNumOfDimension() >= 4 && tensor.GetNumOfDimension() <= 6);
     auto lengths = tensor.GetLengths();
     auto strides = tensor.GetStrides();
-    std::cout << str << "  [ " << std::endl;
-    for(uint32_t i0 = 0; i0 < lengths[0]; i0++)
+
+    auto numDim = tensor.GetNumOfDimension() - 3;
+    if(numDim == 1)
     {
-        if(lengths[1] > 1)
+        std::cout << str << "  [ " << std::endl;
+        for(uint32_t i0 = 0; i0 < lengths[0]; i0++)
         {
-            std::cout << "  [";
-        }
-        if(i0 > 0 && strides[0] == 0)
-        {
-            continue;
-        }
-        for(uint32_t i1 = 0; i1 < lengths[1]; i1++)
-        {
-            if(lengths[2] > 1)
+            if(lengths[1] > 1)
             {
                 std::cout << "  [";
             }
-            if(i1 > 0 && strides[1] == 0)
+            if(i0 > 0 && strides[0] == 0)
             {
                 continue;
             }
-            for(uint32_t i2 = 0; i2 < lengths[2]; i2++)
+            for(uint32_t i1 = 0; i1 < lengths[1]; i1++)
             {
-                if(lengths[3] > 1)
+                if(lengths[2] > 1)
                 {
                     std::cout << "  [";
                 }
-                if(i2 > 0 && strides[2] == 0)
+                if(i1 > 0 && strides[1] == 0)
                 {
                     continue;
                 }
-                for(uint32_t i3 = 0; i3 < lengths[3]; i3++)
+                for(uint32_t i2 = 0; i2 < lengths[2]; i2++)
                 {
-                    if(lengths[4] > 1)
+                    if(lengths[3] > 1)
                     {
                         std::cout << "  [";
                     }
-                    if(i3 > 0 && strides[3] == 0)
+                    if(i2 > 0 && strides[2] == 0)
                     {
                         continue;
                     }
-                    for(uint32_t i4 = 0; i4 < lengths[4]; i4++)
+                    for(uint32_t i3 = 0; i3 < lengths[3]; i3++)
                     {
-                        if(i4 > 0 && strides[4] == 0)
+                        if(i3 > 0 && strides[3] == 0)
                         {
                             continue;
                         }
-                        std::vector<std::size_t> idx({i0, i1, i2, i3, i4});
+                        std::vector<std::size_t> idx({i0, i1, i2, i3});
                         std::cout << ck::type_convert<float>(tensor(idx)) << ", ";
                     }
-                    if(lengths[4] > 1)
+                    if(lengths[3] > 1)
                     {
-                        std::cout << "]";
+                        std::cout << "]" << std::endl;
                     }
-                    if(lengths[4] > 3)
+                    if(lengths[3] > 3)
                     {
                         std::cout << std::endl;
                     }
                 }
-                if(lengths[3] > 1)
+                if(lengths[2] > 1)
                 {
                     std::cout << "]" << std::endl;
                 }
             }
-            if(lengths[2] > 1)
+            if(lengths[1] > 1)
             {
                 std::cout << "]" << std::endl;
             }
         }
-        if(lengths[1] > 1)
-        {
-            std::cout << "]" << std::endl;
-        }
+        std::cout << "]" << std::endl;
     }
-    std::cout << "]" << std::endl;
+    else if(numDim == 2)
+    {
+        std::cout << str << "  [ " << std::endl;
+        for(uint32_t i0 = 0; i0 < lengths[0]; i0++)
+        {
+            if(lengths[1] > 1)
+            {
+                std::cout << "  [";
+            }
+            if(i0 > 0 && strides[0] == 0)
+            {
+                continue;
+            }
+            for(uint32_t i1 = 0; i1 < lengths[1]; i1++)
+            {
+                if(lengths[2] > 1)
+                {
+                    std::cout << "  [";
+                }
+                if(i1 > 0 && strides[1] == 0)
+                {
+                    continue;
+                }
+                for(uint32_t i2 = 0; i2 < lengths[2]; i2++)
+                {
+                    if(lengths[3] > 1)
+                    {
+                        std::cout << "  [";
+                    }
+                    if(i2 > 0 && strides[2] == 0)
+                    {
+                        continue;
+                    }
+                    for(uint32_t i3 = 0; i3 < lengths[3]; i3++)
+                    {
+                        if(lengths[4] > 1)
+                        {
+                            std::cout << "  [";
+                        }
+                        if(i3 > 0 && strides[3] == 0)
+                        {
+                            continue;
+                        }
+                        for(uint32_t i4 = 0; i4 < lengths[4]; i4++)
+                        {
+                            if(i4 > 0 && strides[4] == 0)
+                            {
+                                continue;
+                            }
+                            std::vector<std::size_t> idx({i0, i1, i2, i3, i4});
+                            std::cout << ck::type_convert<float>(tensor(idx)) << ", ";
+                        }
+                        if(lengths[4] > 1)
+                        {
+                            std::cout << "]";
+                        }
+                        if(lengths[4] > 3)
+                        {
+                            std::cout << std::endl;
+                        }
+                    }
+                    if(lengths[3] > 1)
+                    {
+                        std::cout << "]" << std::endl;
+                    }
+                }
+                if(lengths[2] > 1)
+                {
+                    std::cout << "]" << std::endl;
+                }
+            }
+            if(lengths[1] > 1)
+            {
+                std::cout << "]" << std::endl;
+            }
+        }
+        std::cout << "]" << std::endl;
+    }
+    else if(numDim == 3)
+    {
+        std::cout << str << "  [ " << std::endl;
+        for(uint32_t i0 = 0; i0 < lengths[0]; i0++)
+        {
+            if(lengths[1] > 1)
+            {
+                std::cout << "  [";
+            }
+            if(i0 > 0 && strides[0] == 0)
+            {
+                continue;
+            }
+            for(uint32_t i1 = 0; i1 < lengths[1]; i1++)
+            {
+                if(lengths[2] > 1)
+                {
+                    std::cout << "  [";
+                }
+                if(i1 > 0 && strides[1] == 0)
+                {
+                    continue;
+                }
+                for(uint32_t i2 = 0; i2 < lengths[2]; i2++)
+                {
+                    if(lengths[3] > 1)
+                    {
+                        std::cout << "  [";
+                    }
+                    if(i2 > 0 && strides[2] == 0)
+                    {
+                        continue;
+                    }
+                    for(uint32_t i3 = 0; i3 < lengths[3]; i3++)
+                    {
+                        if(lengths[4] > 1)
+                        {
+                            std::cout << "  [";
+                        }
+                        if(i3 > 0 && strides[3] == 0)
+                        {
+                            continue;
+                        }
+                        for(uint32_t i4 = 0; i4 < lengths[4]; i4++)
+                        {
+                            if(lengths[5] > 1)
+                            {
+                                std::cout << "  [";
+                            }
+                            if(i4 > 0 && strides[4] == 0)
+                            {
+                                continue;
+                            }
+                            for(uint32_t i5 = 0; i5 < lengths[5]; i5++)
+                            {
+                                if(i5 > 0 && strides[5] == 0)
+                                {
+                                    continue;
+                                }
+                                std::vector<std::size_t> idx({i0, i1, i2, i3, i4, i5});
+                                std::cout << ck::type_convert<float>(tensor(idx)) << ", ";
+                            }
+                            if(lengths[5] > 1)
+                            {
+                                std::cout << "]";
+                            }
+                            if(lengths[5] > 3)
+                            {
+                                std::cout << std::endl;
+                            }
+                        }
+                        if(lengths[4] > 1)
+                        {
+                            std::cout << "]";
+                        }
+                    }
+                    if(lengths[3] > 1)
+                    {
+                        std::cout << "]" << std::endl;
+                    }
+                }
+                if(lengths[2] > 1)
+                {
+                    std::cout << "]" << std::endl;
+                }
+            }
+            if(lengths[1] > 1)
+            {
+                std::cout << "]" << std::endl;
+            }
+        }
+        std::cout << "]" << std::endl;
+    }
 }
 
 template <typename DataType>
@@ -495,6 +657,74 @@ inline bool parse_cmd_args(int argc, char* argv[], ExecutionConfig& cfg)
     else
     {
         print_help_msg();
+        return false;
+    }
+
+    return true;
+}
+
+inline void print_help_msg_conv3d()
+{
+    std::cerr << "arg1: test mask (hex)\n"
+              << "arg2: verification (0=no, 1=yes)\n"
+              << "arg3: dump tensor (0=no, 1=yes)\n"
+              << "arg4: initialization (0=no init, 1=integer value, 2=decimal value)\n"
+              << "arg5: time kernel (0=no, 1=yes)\n"
+              << "arg6-10: tensor size {D x H x W x C x K}" << std::endl;
+}
+
+inline bool parse_cmd_args_conv3d(int argc, char* argv[], ExecutionConfig& cfg)
+{
+    if(argc == 1)
+    {
+        // use default
+    }
+    else if(argc <= 11)
+    {
+        if(argc > 1)
+        {
+            cfg.test_mask = std::stoul(argv[1], nullptr, 0);
+        }
+        if(argc > 2)
+        {
+            cfg.do_verification = std::stoi(argv[2]);
+        }
+        if(argc > 3)
+        {
+            cfg.dump_tensor = std::stoi(argv[3]);
+        }
+        if(argc > 4)
+        {
+            cfg.init_method = std::stoi(argv[4]);
+        }
+        if(argc > 5)
+        {
+            cfg.time_kernel = std::stoi(argv[5]);
+        }
+        if(argc > 6)
+        {
+            cfg.d = std::stoi(argv[6]);
+        }
+        if(argc > 7)
+        {
+            cfg.h = std::stoi(argv[7]);
+        }
+        if(argc > 8)
+        {
+            cfg.w = std::stoi(argv[8]);
+        }
+        if(argc > 9)
+        {
+            cfg.c = std::stoi(argv[9]);
+        }
+        if(argc > 10)
+        {
+            cfg.k = std::stoi(argv[10]);
+        }
+    }
+    else
+    {
+        print_help_msg_conv3d();
         return false;
     }
 

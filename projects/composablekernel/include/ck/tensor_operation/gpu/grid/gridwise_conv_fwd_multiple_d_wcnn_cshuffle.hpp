@@ -1432,8 +1432,7 @@ struct GridwiseConvMultipleD_Wcnn_CShuffle
             return false;
         }
 
-        if(!(Ho == e_grid_desc.GetLength(I0) && Wo == e_grid_desc.GetLength(I1) &&
-             K == e_grid_desc.GetLength(I2)) ||
+        if(!(Wo == e_grid_desc.GetLength(I1) && K == e_grid_desc.GetLength(I2)) ||
            !(C == GetWeiProblemsize()[I2]))
         {
             printf("Tensor: HWC = %d x %d x %d, Filter: KXYC = %d x {%d, %d} x %d, Out: HWK = %d "

@@ -867,8 +867,16 @@ struct TransformConvFwdToHWCWcnn
                 }
                 else
                 {
-                    return make_naive_tensor_descriptor(make_tuple(NHo, Wo, K),
-                                                        make_tuple(HoStride, WoStride, KStride));
+                    if constexpr(NDimSpatial == 1)
+                    {
+                        return make_naive_tensor_descriptor(make_tuple(NHo, Wo, K),
+                                                            make_tuple(NStride, WoStride, KStride));
+                    }
+                    else
+                    {
+                        return make_naive_tensor_descriptor(
+                            make_tuple(NHo, Wo, K), make_tuple(HoStride, WoStride, KStride));
+                    }
                 }
             }
         }
