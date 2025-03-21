@@ -63,6 +63,7 @@ def runTestCommand(platform, project, boolean rocmExamples=false)
                         sudo rpm -i *.rpm
                         sudo yum -y update
                         sudo yum -y install hipblas-devel
+                        ls /opt -l
                         """
         }
         testCommand = """#!/usr/bin/env bash
