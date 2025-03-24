@@ -709,70 +709,108 @@ struct DeviceGroupedConvFwdMultipleD_Wcnn_CShuffle
     static bool IsConvSpecializationCompatible(const Argument& arg)
     {
         bool is_compatible = true;
-        // Check filter size
-        if constexpr(ConvForwardSpecialization == ConvolutionForwardSpecialization::Filter1x1Pad0 ||
-                     ConvForwardSpecialization ==
-                         ConvolutionForwardSpecialization::Filter1x1Stride1Pad0)
+        if constexpr(NDimSpatial == 1)
         {
-            for(index_t i = 0; i < NDimSpatial; i++)
+            static_assert(FilterSize == 1);
+            static_assert(DilationX == 1);
+            static_assert(DilationY == 1);
+            if constexpr(ConvForwardSpecialization == ConvolutionForwardSpecialization::Default)
             {
-                is_compatible &= (arg.b_g_k_c_xs_lengths_[i + 3] == 1);
+                return true;
+            }
+            else if constexpr(ConvForwardSpecialization ==
+                                  ConvolutionForwardSpecialization::Filter1x1Pad0 ||
+                              ConvForwardSpecialization ==
+                                  ConvolutionForwardSpecialization::Filter1x1Stride1Pad0)
+            {
+                for(index_t i = 0; i < NDimSpatial; i++)
+                {
+                    is_compatible &= (arg.b_g_k_c_xs_lengths_[i + 3] == 1);
+                }
+                if constexpr(ConvForwardSpecialization ==
+                             ConvolutionForwardSpecialization::Filter1x1Stride1Pad0)
+                {
+                    for(index_t i = 0; i < NDimSpatial; i++)
+                    {
+                        is_compatible &= (arg.conv_filter_strides_[i] == 1);
+                    }
+                }
+                // check pad, dilation
+                is_compatible &= (arg.input_left_pads_[0] == 0);
+                is_compatible &= (arg.input_right_pads_[0] == 0);
+                is_compatible &= (arg.conv_filter_dilations_[0] == 1);
+                return is_compatible;
+            }
+            else
+            {
+                static_assert(0, "unsupported!");
             }
         }
-        else if constexpr(ConvForwardSpecialization ==
-                              ConvolutionForwardSpecialization::Filter3x3Stride1Pad0 ||
-                          ConvForwardSpecialization ==
-                              ConvolutionForwardSpecialization::Filter3x3Stride1MultiLayerPad0)
+        else if constexpr(NDimSpatial == 2)
         {
-            is_compatible &= (arg.b_g_k_c_xs_lengths_[NDimSpatial + 1] == 3);
-            is_compatible &= (arg.b_g_k_c_xs_lengths_[NDimSpatial + 2] == 3);
-        }
-        else if constexpr(ConvForwardSpecialization ==
-                              ConvolutionForwardSpecialization::Filter2x2Stride2Pad0 ||
-                          ConvForwardSpecialization ==
-                              ConvolutionForwardSpecialization::Filter2x2Stride2OddHWPad0)
-        {
-            for(index_t i = 0; i < NDimSpatial; i++)
+            // Check filter size
+            if constexpr(ConvForwardSpecialization ==
+                             ConvolutionForwardSpecialization::Filter1x1Pad0 ||
+                         ConvForwardSpecialization ==
+                             ConvolutionForwardSpecialization::Filter1x1Stride1Pad0)
             {
-                is_compatible &= (arg.b_g_k_c_xs_lengths_[i + 3] == 2);
+                for(index_t i = 0; i < NDimSpatial; i++)
+                {
+                    is_compatible &= (arg.b_g_k_c_xs_lengths_[i + 3] == 1);
+                }
             }
-        }
-        else
-        {
-            static_assert(0, "not supported!");
-        }
+            else if constexpr(ConvForwardSpecialization ==
+                                  ConvolutionForwardSpecialization::Filter3x3Stride1Pad0 ||
+                              ConvForwardSpecialization ==
+                                  ConvolutionForwardSpecialization::Filter3x3Stride1MultiLayerPad0)
+            {
+                is_compatible &= (arg.b_g_k_c_xs_lengths_[NDimSpatial + 1] == 3);
+                is_compatible &= (arg.b_g_k_c_xs_lengths_[NDimSpatial + 2] == 3);
+            }
+            else if constexpr(ConvForwardSpecialization ==
+                                  ConvolutionForwardSpecialization::Filter2x2Stride2Pad0 ||
+                              ConvForwardSpecialization ==
+                                  ConvolutionForwardSpecialization::Filter2x2Stride2OddHWPad0)
+            {
+                for(index_t i = 0; i < NDimSpatial; i++)
+                {
+                    is_compatible &= (arg.b_g_k_c_xs_lengths_[i + 3] == 2);
+                }
+            }
+            else
+            {
+                static_assert(0, "not supported!");
+            }
 
-        // check stride
-        if constexpr(ConvForwardSpecialization ==
-                         ConvolutionForwardSpecialization::Filter1x1Stride1Pad0 ||
-                     ConvForwardSpecialization ==
-                         ConvolutionForwardSpecialization::Filter3x3Stride1Pad0 ||
-                     ConvForwardSpecialization ==
-                         ConvolutionForwardSpecialization::Filter3x3Stride1MultiLayerPad0)
-        {
-            for(index_t i = 0; i < NDimSpatial; i++)
+            // check stride
+            if constexpr(ConvForwardSpecialization ==
+                             ConvolutionForwardSpecialization::Filter1x1Stride1Pad0 ||
+                         ConvForwardSpecialization ==
+                             ConvolutionForwardSpecialization::Filter3x3Stride1Pad0 ||
+                         ConvForwardSpecialization ==
+                             ConvolutionForwardSpecialization::Filter3x3Stride1MultiLayerPad0)
             {
-                is_compatible &= (arg.conv_filter_strides_[i] == 1);
+                for(index_t i = 0; i < NDimSpatial; i++)
+                {
+                    is_compatible &= (arg.conv_filter_strides_[i] == 1);
+                }
             }
-        }
-        else if constexpr(ConvForwardSpecialization ==
-                              ConvolutionForwardSpecialization::Filter2x2Stride2Pad0 ||
-                          ConvForwardSpecialization ==
-                              ConvolutionForwardSpecialization::Filter2x2Stride2OddHWPad0)
-        {
-            for(index_t i = 0; i < NDimSpatial; i++)
+            else if constexpr(ConvForwardSpecialization ==
+                                  ConvolutionForwardSpecialization::Filter2x2Stride2Pad0 ||
+                              ConvForwardSpecialization ==
+                                  ConvolutionForwardSpecialization::Filter2x2Stride2OddHWPad0)
             {
-                is_compatible &= (arg.conv_filter_strides_[i] == 2);
+                for(index_t i = 0; i < NDimSpatial; i++)
+                {
+                    is_compatible &= (arg.conv_filter_strides_[i] == 2);
+                }
             }
-        }
 
-        // check pad, dilation
-        if constexpr(ConvForwardSpecialization ==
-                         ConvolutionForwardSpecialization::Filter3x3Stride1Pad0 ||
-                     ConvForwardSpecialization ==
-                         ConvolutionForwardSpecialization::Filter3x3Stride1MultiLayerPad0)
-        {
-            if constexpr(NDimSpatial == 2)
+            // check pad, dilation
+            if constexpr(ConvForwardSpecialization ==
+                             ConvolutionForwardSpecialization::Filter3x3Stride1Pad0 ||
+                         ConvForwardSpecialization ==
+                             ConvolutionForwardSpecialization::Filter3x3Stride1MultiLayerPad0)
             {
                 is_compatible &= (arg.input_left_pads_[0] == DilationX);
                 is_compatible &= (arg.input_left_pads_[1] == DilationY);
@@ -781,7 +819,84 @@ struct DeviceGroupedConvFwdMultipleD_Wcnn_CShuffle
                 is_compatible &= (arg.conv_filter_dilations_[0] == DilationX);
                 is_compatible &= (arg.conv_filter_dilations_[1] == DilationY);
             }
-            else if constexpr(NDimSpatial == 3)
+            else if constexpr(ConvForwardSpecialization ==
+                              ConvolutionForwardSpecialization::Filter2x2Stride2OddHWPad0)
+            {
+                for(index_t i = 0; i < NDimSpatial; i++)
+                {
+                    is_compatible &= (arg.input_left_pads_[i] == 0);
+                    if(arg.a_g_n_c_wis_lengths_[i + 3] & 1)
+                    {
+                        is_compatible &= (arg.input_right_pads_[i] == 1);
+                    }
+                    else
+                    {
+                        is_compatible &= (arg.input_right_pads_[i] == 0);
+                    }
+                    is_compatible &= (arg.conv_filter_dilations_[i] == 1);
+                }
+            }
+            else
+            {
+                for(index_t i = 0; i < NDimSpatial; i++)
+                {
+                    is_compatible &= (arg.input_left_pads_[i] == 0);
+                    is_compatible &= (arg.input_right_pads_[i] == 0);
+                    is_compatible &= (arg.conv_filter_dilations_[i] == 1);
+                }
+            }
+
+            if constexpr(ConvForwardSpecialization ==
+                         ConvolutionForwardSpecialization::Filter3x3Stride1Pad0)
+            {
+                is_compatible &= (arg.a_g_n_c_wis_lengths_[1] == 1);
+                is_compatible &= (arg.e_g_n_k_wos_lengths_[1] == 1);
+            }
+
+            if constexpr(ConvForwardSpecialization ==
+                         ConvolutionForwardSpecialization::Filter2x2Stride2Pad0)
+            {
+                for(index_t i = 0; i < NDimSpatial; i++)
+                {
+                    if(arg.a_g_n_c_wis_lengths_[i + 3] & 1)
+                    {
+                        is_compatible = false;
+                    }
+                }
+            }
+
+            return is_compatible;
+        }
+        else if constexpr(NDimSpatial == 3)
+        {
+            // Check filter size
+            is_compatible &= (arg.b_g_k_c_xs_lengths_[NDimSpatial + 1] == FilterSize);
+            is_compatible &= (arg.b_g_k_c_xs_lengths_[NDimSpatial + 2] == FilterSize);
+
+            if constexpr(ConvForwardSpecialization ==
+                         ConvolutionForwardSpecialization::Filter1x1Stride1Pad0)
+            {
+                is_compatible &= (arg.b_g_k_c_xs_lengths_[NDimSpatial + 0] == FilterSize);
+            }
+
+            // check stride
+            if constexpr(ConvForwardSpecialization ==
+                             ConvolutionForwardSpecialization::Filter1x1Stride1Pad0 ||
+                         ConvForwardSpecialization ==
+                             ConvolutionForwardSpecialization::Filter3x3Stride1MultiLayerPad0)
+            {
+                is_compatible &= (arg.conv_filter_strides_[1] == 1);
+                is_compatible &= (arg.conv_filter_strides_[2] == 1);
+                if constexpr(ConvForwardSpecialization ==
+                             ConvolutionForwardSpecialization::Filter1x1Stride1Pad0)
+                {
+                    is_compatible &= (arg.conv_filter_strides_[0] == 1);
+                }
+            }
+
+            // check pad, dilation
+            if constexpr(ConvForwardSpecialization ==
+                         ConvolutionForwardSpecialization::Filter3x3Stride1MultiLayerPad0)
             {
                 is_compatible &= (arg.input_left_pads_[1] == DilationX);
                 is_compatible &= (arg.input_left_pads_[2] == DilationY);
@@ -792,56 +907,21 @@ struct DeviceGroupedConvFwdMultipleD_Wcnn_CShuffle
             }
             else
             {
-                static_assert(0, "not implemented!");
-            }
-        }
-        else if constexpr(ConvForwardSpecialization ==
-                          ConvolutionForwardSpecialization::Filter2x2Stride2OddHWPad0)
-        {
-            for(index_t i = 0; i < NDimSpatial; i++)
-            {
-                is_compatible &= (arg.input_left_pads_[i] == 0);
-                if(arg.a_g_n_c_wis_lengths_[i + 3] & 1)
+                const index_t StartDim =
+                    ConvForwardSpecialization ==
+                            ConvolutionForwardSpecialization::Filter1x1Stride1Pad0
+                        ? 0
+                        : 1;
+                for(index_t i = StartDim; i < NDimSpatial; i++)
                 {
-                    is_compatible &= (arg.input_right_pads_[i] == 1);
-                }
-                else
-                {
+                    is_compatible &= (arg.input_left_pads_[i] == 0);
                     is_compatible &= (arg.input_right_pads_[i] == 0);
-                }
-                is_compatible &= (arg.conv_filter_dilations_[i] == 1);
-            }
-        }
-        else
-        {
-            for(index_t i = 0; i < NDimSpatial; i++)
-            {
-                is_compatible &= (arg.input_left_pads_[i] == 0);
-                is_compatible &= (arg.input_right_pads_[i] == 0);
-                is_compatible &= (arg.conv_filter_dilations_[i] == 1);
-            }
-        }
-
-        if constexpr(ConvForwardSpecialization ==
-                     ConvolutionForwardSpecialization::Filter3x3Stride1Pad0)
-        {
-            is_compatible &= (arg.a_g_n_c_wis_lengths_[1] == 1);
-            is_compatible &= (arg.e_g_n_k_wos_lengths_[1] == 1);
-        }
-
-        if constexpr(ConvForwardSpecialization ==
-                     ConvolutionForwardSpecialization::Filter2x2Stride2Pad0)
-        {
-            for(index_t i = 0; i < NDimSpatial; i++)
-            {
-                if(arg.a_g_n_c_wis_lengths_[i + 3] & 1)
-                {
-                    is_compatible = false;
+                    is_compatible &= (arg.conv_filter_dilations_[i] == 1);
                 }
             }
-        }
 
-        return is_compatible;
+            return is_compatible;
+        }
     }
 
     static bool IsSupportedArgument(const Argument& arg)

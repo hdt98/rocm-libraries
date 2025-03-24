@@ -5182,6 +5182,11 @@ using bhalf36_t = typename vector_type<bhalf_t, 36>::type;
 using bhalf5_t  = typename vector_type<bhalf_t, 5>::type;
 using bhalf10_t = typename vector_type<bhalf_t, 10>::type;
 
+// i16
+using int16x2_t = typename vector_type<int16_t, 2>::type;
+using int16x4_t = typename vector_type<int16_t, 4>::type;
+using int16x8_t = typename vector_type<int16_t, 8>::type;
+
 // i32
 using int32x2_t  = typename vector_type<int32_t, 2>::type;
 using int32x4_t  = typename vector_type<int32_t, 4>::type;

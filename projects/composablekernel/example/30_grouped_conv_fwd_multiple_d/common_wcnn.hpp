@@ -356,9 +356,32 @@ inline HostTensorDescriptor make_output_descriptor(const ck::utils::conv::ConvPa
 template <typename DataType>
 void dump_tensor(const Tensor<DataType>& tensor, const char* str)
 {
-    assert(tensor.GetNumOfDimension() == 5);
+    assert(tensor.GetNumOfDimension() >= 4 && tensor.GetNumOfDimension() <= 6);
     auto lengths = tensor.GetLengths();
+
     std::cout << str << "  [ " << std::endl;
+
+    auto dump_data = [&](size_t len, std::vector<std::size_t>& idx) {
+        if(len > 1)
+        {
+            std::cout << "  [";
+        }
+        for(uint32_t i = 0; i < len; i++)
+        {
+            idx.back() = i;
+            std::cout << ck::type_convert<float>(tensor(idx)) << ", ";
+        }
+        if(len > 1)
+        {
+            std::cout << "]";
+            if(len > 3)
+            {
+                std::cout << std::endl;
+            }
+        }
+    };
+
+    auto dim = tensor.GetNumOfDimension() - 3;
     for(uint32_t i0 = 0; i0 < lengths[0]; i0++)
     {
         if(lengths[1] > 1)
@@ -373,33 +396,45 @@ void dump_tensor(const Tensor<DataType>& tensor, const char* str)
             }
             for(uint32_t i2 = 0; i2 < lengths[2]; i2++)
             {
-                if(lengths[3] > 1)
+                if(dim == 1)
                 {
-                    std::cout << "  [";
+                    std::vector<std::size_t> idx({i0, i1, i2, 0});
+                    dump_data(lengths[3], idx);
                 }
-                for(uint32_t i3 = 0; i3 < lengths[3]; i3++)
+                else
                 {
-                    if(lengths[4] > 1)
+                    if(lengths[3] > 1)
                     {
                         std::cout << "  [";
                     }
-                    for(uint32_t i4 = 0; i4 < lengths[4]; i4++)
+                    for(uint32_t i3 = 0; i3 < lengths[3]; i3++)
                     {
-                        std::vector<std::size_t> idx({i0, i1, i2, i3, i4});
-                        std::cout << ck::type_convert<float>(tensor(idx)) << ", ";
+                        if(dim == 2)
+                        {
+                            std::vector<std::size_t> idx({i0, i1, i2, i3, 0});
+                            dump_data(lengths[4], idx);
+                        }
+                        else
+                        {
+                            if(lengths[4] > 1)
+                            {
+                                std::cout << "  [";
+                            }
+                            for(uint32_t i4 = 0; i4 < lengths[4]; i4++)
+                            {
+                                std::vector<std::size_t> idx({i0, i1, i2, i3, i4, 0});
+                                dump_data(lengths[5], idx);
+                            }
+                            if(lengths[4] > 1)
+                            {
+                                std::cout << "]" << std::endl;
+                            }
+                        }
                     }
-                    if(lengths[4] > 1)
+                    if(lengths[3] > 1)
                     {
-                        std::cout << "]";
+                        std::cout << "]" << std::endl;
                     }
-                    if(lengths[4] > 3)
-                    {
-                        std::cout << std::endl;
-                    }
-                }
-                if(lengths[3] > 1)
-                {
-                    std::cout << "]" << std::endl;
                 }
             }
             if(lengths[2] > 1)

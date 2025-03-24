@@ -41,8 +41,8 @@ using ResidualScaleLayout = typename LayoutSettingSelector<NDimSpatial>::Residua
 using ConvolutionForwardSpecialization =
     typename ck::tensor_operation::device::ConvolutionForwardSpecialization;
 
-static constexpr ck::index_t HPerWcnn = 4;
-static constexpr ck::index_t WPerWcnn = 2;
+static constexpr ck::index_t HPerWcnn  = 4;
+static constexpr ck::index_t WPerWcnn  = 2;
 static constexpr ck::index_t HPerBlock = 16;
 static constexpr ck::index_t WPerBlock = 16;
 static constexpr bool EnableAsync      = false;
@@ -52,89 +52,94 @@ template <ck::index_t NDimSpatial,
           ck::index_t FilterSize,
           ck::index_t DilationSize,
           ConvolutionForwardSpecialization ConvSpec>
-using DeviceConvFwdInstance = ck::tensor_operation::device::DeviceGroupedConvFwdMultipleD_Wcnn_CShuffle<
-    NDimSpatial,
-    InputLayout<NDimSpatial>,
-    WeightLayout<NDimSpatial>,
-    ck::Tuple<BiasLayout<NDimSpatial>, ResidualLayout<NDimSpatial>>,
-    OutputLayout<NDimSpatial>,
-    InKernelDataType,
-    WeiKernelDataType,
-    ck::Tuple<BiasKernelDataType, ResidualKernelDataType>,
-    AccDataType,
-    OutKernelDataType,
-    InElementOp,
-    WeiElementOp,
-    OutElementOp,
-    ConvSpec,                     // ConvForwardSpecialization
-    1,                            // NumPrefetch
-    128,                          // BlockSize
-    HPerBlock,                    // HPerBlock
-    WPerBlock,                    // WPerBlock
-    16,                           // CPerBlock
-    16,                           // KPerBlock
-    HPerBlock / 2 / HPerWcnn,    // HRepeat
-    WPerBlock / 2 / WPerWcnn,    // WRepeat
-    HPerWcnn,                    // HPerWcnn
-    WPerWcnn,                    // WPerWcnn
-    FilterSize,                   // FilterSize
-    DilationSize,                 // DilationX
-    DilationSize,                 // DilationY
-    S<8, 4, 4>,                   // InBlockTransferThreadClusterLengths (H W C)
-    4,                            // InBlockTransferSrcScalarPerVector
-    4,                            // InBlockTransferDstScalarPerVector
-    true,                         // InEnableLds
-    false,                        // InBlockLdsAddExtraM
-    S<16, 1, 8>,                  // WeiBlockTransferThreadClusterLengths
-    2,                            // WeiBlockTransferSrcScalarPerVector
-    2,                            // WeiBlockTransferDstScalarPerVector
-    true,                         // WeiEnableLds
-    false,                        // WeiBlockLdsAddExtraM
-    ck::Tuple<S<16>, S<8, 4, 4>>, // DsBlockTransferThreadClusterLengths (K, HWK), not used when lds
-                                  // disabled
-    S<1, 4>,                      // DsBlockTransferSrcScalarPerVector, not used when lds disabled
-    S<1, 4>,                      // DsBlockTransferDstScalarPerVector, not used when lds disabled
-    false,                        // DsEnableLds
-    false,                        // DsBlockLdsAddExtraM
-    S<1, 4, 4>,                   // AccBlockTransferClusterLengths
-    4,                            // AccBlockTransferScalarPerVector
-    true,                         // AccEnableLds
-    EnableAsync,
-    EnableWaveGroup,
-    false,  // ShuffleOnLoad
-    false>; // Transposed
+using DeviceConvFwdInstance =
+    ck::tensor_operation::device::DeviceGroupedConvFwdMultipleD_Wcnn_CShuffle<
+        NDimSpatial,
+        InputLayout<NDimSpatial>,
+        WeightLayout<NDimSpatial>,
+        ck::Tuple<BiasLayout<NDimSpatial>, ResidualLayout<NDimSpatial>>,
+        OutputLayout<NDimSpatial>,
+        InKernelDataType,
+        WeiKernelDataType,
+        ck::Tuple<BiasKernelDataType, ResidualKernelDataType>,
+        AccDataType,
+        OutKernelDataType,
+        InElementOp,
+        WeiElementOp,
+        OutElementOp,
+        ConvSpec,                     // ConvForwardSpecialization
+        1,                            // NumPrefetch
+        128,                          // BlockSize
+        HPerBlock,                    // HPerBlock
+        WPerBlock,                    // WPerBlock
+        16,                           // CPerBlock
+        16,                           // KPerBlock
+        HPerBlock / 2 / HPerWcnn,     // HRepeat
+        WPerBlock / 2 / WPerWcnn,     // WRepeat
+        HPerWcnn,                     // HPerWcnn
+        WPerWcnn,                     // WPerWcnn
+        FilterSize,                   // FilterSize
+        DilationSize,                 // DilationX
+        DilationSize,                 // DilationY
+        S<8, 4, 4>,                   // InBlockTransferThreadClusterLengths (H W C)
+        4,                            // InBlockTransferSrcScalarPerVector
+        4,                            // InBlockTransferDstScalarPerVector
+        true,                         // InEnableLds
+        false,                        // InBlockLdsAddExtraM
+        S<16, 1, 8>,                  // WeiBlockTransferThreadClusterLengths
+        2,                            // WeiBlockTransferSrcScalarPerVector
+        2,                            // WeiBlockTransferDstScalarPerVector
+        true,                         // WeiEnableLds
+        false,                        // WeiBlockLdsAddExtraM
+        ck::Tuple<S<16>, S<8, 4, 4>>, // DsBlockTransferThreadClusterLengths (K, HWK), not used when
+                                      // lds disabled
+        S<1, 4>,    // DsBlockTransferSrcScalarPerVector, not used when lds disabled
+        S<1, 4>,    // DsBlockTransferDstScalarPerVector, not used when lds disabled
+        false,      // DsEnableLds
+        false,      // DsBlockLdsAddExtraM
+        S<1, 4, 4>, // AccBlockTransferClusterLengths
+        4,          // AccBlockTransferScalarPerVector
+        true,       // AccEnableLds
+        EnableAsync,
+        EnableWaveGroup,
+        false,  // ShuffleOnLoad
+        false>; // Transposed
 
-template <ck::index_t NDimSpatial>
-using DeviceWcnnConvFactory = std::tuple<
-    DeviceConvFwdInstance<NDimSpatial,
-                          1,
-                          1,
-                          ConvolutionForwardSpecialization::Filter1x1Stride1Pad0>,
-    DeviceConvFwdInstance<NDimSpatial, 1, 1, ConvolutionForwardSpecialization::Filter1x1Pad0>,
-    DeviceConvFwdInstance<NDimSpatial,
-                          3,
-                          1,
-                          ConvolutionForwardSpecialization::Filter3x3Stride1Pad0>,
-    DeviceConvFwdInstance<NDimSpatial,
+using DeviceWcnnConv1DFactory = std::tuple<
+    DeviceConvFwdInstance<1, 1, 1, ConvolutionForwardSpecialization::Filter1x1Stride1Pad0>,
+    DeviceConvFwdInstance<1, 1, 1, ConvolutionForwardSpecialization::Filter1x1Pad0>,
+    DeviceConvFwdInstance<1, 1, 1, ConvolutionForwardSpecialization::Default>>;
+
+using DeviceWcnnConv2DFactory = std::tuple<
+    DeviceConvFwdInstance<2, 1, 1, ConvolutionForwardSpecialization::Filter1x1Stride1Pad0>,
+    DeviceConvFwdInstance<2, 1, 1, ConvolutionForwardSpecialization::Filter1x1Pad0>,
+    DeviceConvFwdInstance<2, 3, 1, ConvolutionForwardSpecialization::Filter3x3Stride1Pad0>,
+    DeviceConvFwdInstance<2,
                           3,
                           1,
                           ConvolutionForwardSpecialization::Filter3x3Stride1MultiLayerPad0>,
-    DeviceConvFwdInstance<NDimSpatial,
-                          3,
-                          2,
-                          ConvolutionForwardSpecialization::Filter3x3Stride1Pad0>,
-    DeviceConvFwdInstance<NDimSpatial,
+    DeviceConvFwdInstance<2, 3, 2, ConvolutionForwardSpecialization::Filter3x3Stride1Pad0>,
+    DeviceConvFwdInstance<2,
                           3,
                           2,
                           ConvolutionForwardSpecialization::Filter3x3Stride1MultiLayerPad0>,
-    DeviceConvFwdInstance<NDimSpatial,
-                          2,
+    DeviceConvFwdInstance<2, 2, 1, ConvolutionForwardSpecialization::Filter2x2Stride2Pad0>,
+    DeviceConvFwdInstance<2, 2, 1, ConvolutionForwardSpecialization::Filter2x2Stride2OddHWPad0>>;
+
+using DeviceWcnnConv3DFactory = std::tuple<
+    DeviceConvFwdInstance<3, 1, 1, ConvolutionForwardSpecialization::Filter1x1Stride1Pad0>,
+    DeviceConvFwdInstance<3, 1, 1, ConvolutionForwardSpecialization::Filter1x1Pad0>,
+    DeviceConvFwdInstance<3,
+                          3,
                           1,
-                          ConvolutionForwardSpecialization::Filter2x2Stride2Pad0>,
-    DeviceConvFwdInstance<NDimSpatial,
+                          ConvolutionForwardSpecialization::Filter3x3Stride1MultiLayerPad0>,
+    DeviceConvFwdInstance<3,
+                          3,
                           2,
-                          1,
-                          ConvolutionForwardSpecialization::Filter2x2Stride2OddHWPad0>>;
+                          ConvolutionForwardSpecialization::Filter3x3Stride1MultiLayerPad0>>;
+
+using DeviceWcnnConvFactory =
+    std::tuple<DeviceWcnnConv1DFactory, DeviceWcnnConv2DFactory, DeviceWcnnConv3DFactory>;
 
 template <ck::index_t NDimSpatial>
 using HostConvFwdInstance = ck::tensor_operation::host::ReferenceConvFwd<NDimSpatial,
@@ -151,11 +156,11 @@ bool run_grouped_conv_fwd_bias_relu_add(const ExecutionConfig& config,
 {
     static_assert(1 <= NDimSpatial && NDimSpatial <= 3, "Unsupported NDimSpatial");
 
-    const auto in_g_n_c_wis_desc   = make_input_descriptor(conv_param);
-    const auto wei_g_k_c_xs_desc   = make_weight_descriptor(conv_param);
-    const auto bias_g_n_k_wos_desc = make_bias_descriptor(conv_param);
+    const auto in_g_n_c_wis_desc       = make_input_descriptor(conv_param);
+    const auto wei_g_k_c_xs_desc       = make_weight_descriptor(conv_param);
+    const auto bias_g_n_k_wos_desc     = make_bias_descriptor(conv_param);
     const auto residual_g_n_k_wos_desc = make_output_descriptor(conv_param);
-    const auto out_g_n_k_wos_desc  = make_output_descriptor(conv_param);
+    const auto out_g_n_k_wos_desc      = make_output_descriptor(conv_param);
 
     Tensor<InUserDataType> in(in_g_n_c_wis_desc);
     Tensor<WeiUserDataType> wei(wei_g_k_c_xs_desc);
@@ -232,8 +237,11 @@ bool run_grouped_conv_fwd_bias_relu_add(const ExecutionConfig& config,
     copy(conv_param.input_right_pads_, input_right_pads);
 
     bool found_kernel = false;
-    ck::static_for<0, std::tuple_size_v<DeviceWcnnConvFactory<NDimSpatial>>, 1>{}([&](auto i) -> void {
-        const auto device_conv_instance = std::get<i>(DeviceWcnnConvFactory<NDimSpatial>{});
+
+    auto conv_factory = std::get<NDimSpatial - 1>(DeviceWcnnConvFactory{});
+
+    ck::static_for<0, std::tuple_size_v<decltype(conv_factory)>, 1>{}([&](auto i) -> void {
+        const auto device_conv_instance = std::get<i>(conv_factory);
         using DeviceConvInstance        = ck::remove_cvref_t<decltype(device_conv_instance)>;
         // do Conv
         auto conv    = DeviceConvInstance{};
@@ -305,7 +313,8 @@ bool run_grouped_conv_fwd_bias_relu_add(const ExecutionConfig& config,
                                                   PassThrough{});
 
         ref_invoker.Run(ref_argument);
-
+        //dump_tensor(in, "in");
+        //dump_tensor(wei, "wei");
         //dump_tensor(c_host, "c_host");
         out_host.ForEach([&](auto&, auto idx) {
             OutElementOp{}(out_host(idx), c_host(idx), bias(idx), residual(idx));
@@ -333,10 +342,9 @@ bool run_grouped_conv_fwd_bias_relu_add_example(int argc, char* argv[])
     switch(conv_param.num_dim_spatial_)
     {
     // TODO: remove unsupported kernel instance for dimension 1 & 3.
-    // case 1: return run_grouped_conv_fwd_bias_relu_add<1>(config, conv_param);
-    case 2:
-        return run_grouped_conv_fwd_bias_relu_add<2>(config, conv_param);
-        // case 3: return run_grouped_conv_fwd_bias_relu_add<3>(config, conv_param);
+    case 1: return run_grouped_conv_fwd_bias_relu_add<1>(config, conv_param);
+    case 2: return run_grouped_conv_fwd_bias_relu_add<2>(config, conv_param);
+    case 3: return run_grouped_conv_fwd_bias_relu_add<3>(config, conv_param);
     }
 
     return false;

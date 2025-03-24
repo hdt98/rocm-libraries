@@ -90,19 +90,19 @@ llvm_amdgcn_raw_buffer_load_i8x4(int32x4_t srsrc,
                                  index_t glc_slc) __asm("llvm.amdgcn.raw.buffer.load.v4i8");
 
 // buffer load i16
-__device__ bhalf_t
+__device__ int16_t
 llvm_amdgcn_raw_buffer_load_i16(int32x4_t srsrc,
                                 index_t voffset,
                                 index_t soffset,
                                 index_t glc_slc) __asm("llvm.amdgcn.raw.buffer.load.i16");
 
-__device__ bhalf2_t
+__device__ int16x2_t
 llvm_amdgcn_raw_buffer_load_i16x2(int32x4_t srsrc,
                                   index_t voffset,
                                   index_t soffset,
                                   index_t glc_slc) __asm("llvm.amdgcn.raw.buffer.load.v2i16");
 
-__device__ bhalf4_t
+__device__ int16x4_t
 llvm_amdgcn_raw_buffer_load_i16x4(int32x4_t srsrc,
                                   index_t voffset,
                                   index_t soffset,
@@ -189,21 +189,21 @@ llvm_amdgcn_raw_buffer_store_i8x4(int8x4_t vdata,
 
 // buffer store i16
 __device__ void
-llvm_amdgcn_raw_buffer_store_i16(bhalf_t vdata,
+llvm_amdgcn_raw_buffer_store_i16(int16_t vdata,
                                  int32x4_t rsrc,
                                  index_t voffset,
                                  index_t soffset,
                                  index_t glc_slc) __asm("llvm.amdgcn.raw.buffer.store.i16");
 
 __device__ void
-llvm_amdgcn_raw_buffer_store_i16x2(bhalf2_t vdata,
+llvm_amdgcn_raw_buffer_store_i16x2(int16x2_t vdata,
                                    int32x4_t rsrc,
                                    index_t voffset,
                                    index_t soffset,
                                    index_t glc_slc) __asm("llvm.amdgcn.raw.buffer.store.v2i16");
 
 __device__ void
-llvm_amdgcn_raw_buffer_store_i16x4(bhalf4_t vdata,
+llvm_amdgcn_raw_buffer_store_i16x4(int16x4_t vdata,
                                    int32x4_t rsrc,
                                    index_t voffset,
                                    index_t soffset,

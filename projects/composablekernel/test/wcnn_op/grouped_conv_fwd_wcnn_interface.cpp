@@ -331,6 +331,22 @@ class TestGroupedConv2DFwdWcnnFilter3Dilation2 : public TestGroupedConvFwdWcnnIn
 {
 };
 
+class TestGroupedConv1DFwdWcnnFilter1 : public TestGroupedConvFwdWcnnInterface<1, 1, 1>
+{
+};
+
+class TestGroupedConv3DFwdWcnnFilter1 : public TestGroupedConvFwdWcnnInterface<3, 1, 1>
+{
+};
+
+class TestGroupedConv3DFwdWcnnFilter3 : public TestGroupedConvFwdWcnnInterface<3, 3, 1>
+{
+};
+
+class TestGroupedConv3DFwdWcnnFilter3Dilation2 : public TestGroupedConvFwdWcnnInterface<3, 3, 2>
+{
+};
+
 TEST_F(TestGroupedConv2DFwdWcnnFilter1, 2DFilter1)
 {
     // Initialize parameter with packed layout.
@@ -388,16 +404,15 @@ TEST_F(TestGroupedConv2DFwdWcnnFilter1, 2DFilter1)
     ck::utils::conv::ConvParam param_invalid_pad_left = {
         2, 1, 1, 64, 64, {1, 1}, {64, 64}, {2, 2}, {1, 1}, {0, 1}, {0, 0}};
     this->Init(param_invalid_pad_left);
-    bool invalid_pad_left =
-        this->template Run<ConvolutionForwardSpecialization::Filter1x1Stride1Pad0,
-                           ck::half_t,
-                           ck::half_t,
-                           float,
-                           PackedLayout<2>>();
+    bool invalid_pad_left = this->template Run<ConvolutionForwardSpecialization::Filter1x1Pad0,
+                                               ck::half_t,
+                                               ck::half_t,
+                                               float,
+                                               PackedLayout<2>>();
     EXPECT_FALSE(invalid_pad_left);
 
     ck::utils::conv::ConvParam param_invalid_pad_right = {
-        2, 1, 1, 64, 64, {1, 1}, {64, 64}, {2, 2}, {1, 1}, {0, 0}, {0, 1}};
+        2, 1, 1, 64, 64, {1, 1}, {64, 64}, {1, 1}, {1, 1}, {0, 0}, {0, 1}};
     this->Init(param_invalid_pad_right);
     bool invalid_pad_right =
         this->template Run<ConvolutionForwardSpecialization::Filter1x1Stride1Pad0,
@@ -810,4 +825,504 @@ TEST_F(TestGroupedConv2DFwdWcnnFilter2, 2DFilter2Stride2)
                                             float,
                                             PackedLayout<2>>();
     EXPECT_FALSE(size_mismatch);
+}
+
+TEST_F(TestGroupedConv1DFwdWcnnFilter1, 1DFilter1)
+{
+    // Initialize parameter with packed layout.
+    const ck::utils::conv::ConvParam param = {1, 1, 1, 64, 64, {1}, {64}, {1}, {1}, {0}, {0}};
+    this->Init(param);
+
+    // Packed layout
+    bool packed_supported =
+        this->template Run<ConvolutionForwardSpecialization::Filter1x1Stride1Pad0,
+                           ck::half_t,
+                           ck::half_t,
+                           float,
+                           PackedLayout<1>>();
+    EXPECT_TRUE(packed_supported);
+
+    // Strided layout compatible with packed layout
+    bool strided_compatible =
+        this->template Run<ConvolutionForwardSpecialization::Filter1x1Stride1Pad0,
+                           ck::half_t,
+                           ck::half_t,
+                           float,
+                           StridedLayout<1>>();
+    EXPECT_TRUE(strided_compatible);
+
+    // GCPacked layout incompatible with packed layout
+    bool gc_packed_incompatible =
+        this->template Run<ConvolutionForwardSpecialization::Filter1x1Stride1Pad0,
+                           ck::half_t,
+                           ck::half_t,
+                           float,
+                           GCPackedLayout<1>>();
+    EXPECT_FALSE(gc_packed_incompatible);
+
+    // Check stride != 1
+    ck::utils::conv::ConvParam param_strid2 = {1, 1, 1, 64, 64, {1}, {64}, {2}, {1}, {0}, {0}};
+    this->Init(param_strid2);
+    bool is_supported_strid2 = this->template Run<ConvolutionForwardSpecialization::Filter1x1Pad0,
+                                                  ck::half_t,
+                                                  ck::half_t,
+                                                  float,
+                                                  PackedLayout<1>>();
+    EXPECT_TRUE(is_supported_strid2);
+
+    bool strid2_incompatible =
+        this->template Run<ConvolutionForwardSpecialization::Filter1x1Stride1Pad0,
+                           ck::half_t,
+                           ck::half_t,
+                           float,
+                           PackedLayout<1>>();
+    EXPECT_FALSE(strid2_incompatible);
+
+    // Check pad
+    ck::utils::conv::ConvParam param_invalid_pad_left = {
+        1, 1, 1, 64, 64, {1}, {64}, {2}, {1}, {1}, {0}};
+    this->Init(param_invalid_pad_left);
+    bool invalid_pad_left =
+        this->template Run<ConvolutionForwardSpecialization::Filter1x1Stride1Pad0,
+                           ck::half_t,
+                           ck::half_t,
+                           float,
+                           PackedLayout<1>>();
+    EXPECT_FALSE(invalid_pad_left);
+
+    ck::utils::conv::ConvParam param_invalid_pad_right = {
+        1, 1, 1, 64, 64, {1}, {64}, {2}, {1}, {0}, {1}};
+    this->Init(param_invalid_pad_right);
+    bool invalid_pad_right =
+        this->template Run<ConvolutionForwardSpecialization::Filter1x1Stride1Pad0,
+                           ck::half_t,
+                           ck::half_t,
+                           float,
+                           PackedLayout<1>>();
+    EXPECT_FALSE(invalid_pad_right);
+
+    // check Strided layout
+    this->Init(param, 1);
+    bool strided_supported =
+        this->template Run<ConvolutionForwardSpecialization::Filter1x1Stride1Pad0,
+                           ck::half_t,
+                           ck::half_t,
+                           float,
+                           StridedLayout<1>>();
+    EXPECT_TRUE(strided_supported);
+
+    bool packed_incompatible =
+        this->template Run<ConvolutionForwardSpecialization::Filter1x1Stride1Pad0,
+                           ck::half_t,
+                           ck::half_t,
+                           float,
+                           PackedLayout<1>>();
+    EXPECT_FALSE(packed_incompatible);
+
+    bool gc_packed_incompatible2 =
+        this->template Run<ConvolutionForwardSpecialization::Filter1x1Stride1Pad0,
+                           ck::half_t,
+                           ck::half_t,
+                           float,
+                           GCPackedLayout<1>>();
+    EXPECT_FALSE(gc_packed_incompatible2);
+
+    // check GC Packed layout
+    this->Init(param, 2);
+    bool gc_packed_supported =
+        this->template Run<ConvolutionForwardSpecialization::Filter1x1Stride1Pad0,
+                           ck::half_t,
+                           ck::half_t,
+                           float,
+                           GCPackedLayout<1>>();
+    EXPECT_TRUE(gc_packed_supported);
+
+    bool strided_compatible2 =
+        this->template Run<ConvolutionForwardSpecialization::Filter1x1Stride1Pad0,
+                           ck::half_t,
+                           ck::half_t,
+                           float,
+                           StridedLayout<1>>();
+    EXPECT_TRUE(strided_compatible2);
+
+    bool packed_incompatible2 =
+        this->template Run<ConvolutionForwardSpecialization::Filter1x1Stride1Pad0,
+                           ck::half_t,
+                           ck::half_t,
+                           float,
+                           PackedLayout<1>>();
+    EXPECT_FALSE(packed_incompatible2);
+
+    // check filter size mismatch
+    const ck::utils::conv::ConvParam param_filter_mismatch = {
+        1, 1, 1, 64, 64, {3}, {64}, {1}, {1}, {0}, {0}};
+    this->Init(param_filter_mismatch);
+
+    bool filter_mismatch =
+        this->template Run<ConvolutionForwardSpecialization::Filter1x1Stride1Pad0,
+                           ck::half_t,
+                           ck::half_t,
+                           float,
+                           PackedLayout<1>>();
+    EXPECT_FALSE(filter_mismatch);
+
+    // check size mismatch
+    const ck::utils::conv::ConvParam param_size_mismatch = {
+        1, 1, 1, 64, 64, {1}, {128}, {1}, {1}, {0}, {0}};
+    this->Init(param_size_mismatch);
+    auto in_size_mismatch = this->in_g_n_c_wis_desc;
+    this->Init(param);
+    this->in_g_n_c_wis_desc = in_size_mismatch;
+    bool size_mismatch = this->template Run<ConvolutionForwardSpecialization::Filter1x1Stride1Pad0,
+                                            ck::half_t,
+                                            ck::half_t,
+                                            float,
+                                            PackedLayout<1>>();
+    EXPECT_FALSE(size_mismatch);
+}
+
+TEST_F(TestGroupedConv1DFwdWcnnFilter1, 1DFilterN)
+{
+    // Initialize parameter with packed layout.
+    const ck::utils::conv::ConvParam param = {1, 1, 1, 64, 64, {4}, {64}, {1}, {1}, {0}, {0}};
+    this->Init(param);
+
+    // Packed layout
+    bool packed_supported = this->template Run<ConvolutionForwardSpecialization::Default,
+                                               ck::half_t,
+                                               ck::half_t,
+                                               float,
+                                               PackedLayout<1>>();
+    EXPECT_TRUE(packed_supported);
+
+    // Check stride != 1
+    ck::utils::conv::ConvParam param_strid2 = {1, 1, 1, 64, 64, {4}, {64}, {2}, {1}, {0}, {0}};
+    this->Init(param_strid2);
+    bool is_supported_strid2 = this->template Run<ConvolutionForwardSpecialization::Default,
+                                                  ck::half_t,
+                                                  ck::half_t,
+                                                  float,
+                                                  PackedLayout<1>>();
+    EXPECT_TRUE(is_supported_strid2);
+
+    // Check dilation != 1
+    ck::utils::conv::ConvParam param_dilation2 = {1, 1, 1, 64, 64, {4}, {64}, {1}, {2}, {0}, {0}};
+    this->Init(param_dilation2);
+    bool is_supported_dilation2 = this->template Run<ConvolutionForwardSpecialization::Default,
+                                                     ck::half_t,
+                                                     ck::half_t,
+                                                     float,
+                                                     PackedLayout<1>>();
+    EXPECT_TRUE(is_supported_dilation2);
+
+    // Check pad != 0
+    ck::utils::conv::ConvParam param_pad = {1, 1, 1, 64, 64, {5}, {64}, {1}, {1}, {2}, {2}};
+    this->Init(param_pad);
+    bool is_supported_pad = this->template Run<ConvolutionForwardSpecialization::Default,
+                                               ck::half_t,
+                                               ck::half_t,
+                                               float,
+                                               PackedLayout<1>>();
+    EXPECT_TRUE(is_supported_pad);
+
+    // Check stride != 1, dilation != 1, pad != 0
+    ck::utils::conv::ConvParam param_any = {1, 1, 1, 64, 64, {5}, {64}, {2}, {2}, {2}, {2}};
+    this->Init(param_any);
+    bool is_supported_any = this->template Run<ConvolutionForwardSpecialization::Default,
+                                               ck::half_t,
+                                               ck::half_t,
+                                               float,
+                                               PackedLayout<1>>();
+    EXPECT_TRUE(is_supported_any);
+}
+
+TEST_F(TestGroupedConv3DFwdWcnnFilter1, 3DFilter1)
+{
+    // Initialize parameter with packed layout.
+    const ck::utils::conv::ConvParam param = {
+        3, 1, 1, 64, 64, {1, 1, 1}, {64, 64, 64}, {1, 1, 1}, {1, 1, 1}, {0, 0, 0}, {0, 0, 0}};
+    this->Init(param);
+
+    // Packed layout
+    bool packed_supported =
+        this->template Run<ConvolutionForwardSpecialization::Filter1x1Stride1Pad0,
+                           ck::half_t,
+                           ck::half_t,
+                           float,
+                           PackedLayout<3>>();
+    EXPECT_TRUE(packed_supported);
+
+    // Strided layout compatible with packed layout
+    bool strided_compatible =
+        this->template Run<ConvolutionForwardSpecialization::Filter1x1Stride1Pad0,
+                           ck::half_t,
+                           ck::half_t,
+                           float,
+                           StridedLayout<3>>();
+    EXPECT_TRUE(strided_compatible);
+
+    // GCPacked layout incompatible with packed layout
+    bool gc_packed_incompatible =
+        this->template Run<ConvolutionForwardSpecialization::Filter1x1Stride1Pad0,
+                           ck::half_t,
+                           ck::half_t,
+                           float,
+                           GCPackedLayout<3>>();
+    EXPECT_FALSE(gc_packed_incompatible);
+
+    // Check stride != 1
+    ck::utils::conv::ConvParam param_strid2 = {
+        3, 1, 1, 64, 64, {1, 1, 1}, {64, 64, 64}, {2, 2, 2}, {1, 1, 1}, {0, 0, 0}, {0, 0, 0}};
+    this->Init(param_strid2);
+    bool is_supported_strid2 = this->template Run<ConvolutionForwardSpecialization::Filter1x1Pad0,
+                                                  ck::half_t,
+                                                  ck::half_t,
+                                                  float,
+                                                  PackedLayout<3>>();
+    EXPECT_TRUE(is_supported_strid2);
+
+    bool strid2_incompatible =
+        this->template Run<ConvolutionForwardSpecialization::Filter1x1Stride1Pad0,
+                           ck::half_t,
+                           ck::half_t,
+                           float,
+                           PackedLayout<3>>();
+    EXPECT_FALSE(strid2_incompatible);
+
+    // Check pad
+    ck::utils::conv::ConvParam param_invalid_pad_left = {
+        3, 1, 1, 64, 64, {1, 1, 1}, {64, 64, 64}, {1, 1, 1}, {1, 1, 1}, {0, 0, 1}, {0, 0, 0}};
+    this->Init(param_invalid_pad_left);
+    bool invalid_pad_left =
+        this->template Run<ConvolutionForwardSpecialization::Filter1x1Stride1Pad0,
+                           ck::half_t,
+                           ck::half_t,
+                           float,
+                           PackedLayout<3>>();
+    EXPECT_FALSE(invalid_pad_left);
+
+    ck::utils::conv::ConvParam param_invalid_pad_right = {
+        3, 1, 1, 64, 64, {1, 1, 1}, {64, 64, 64}, {1, 1, 1}, {1, 1, 1}, {0, 0, 0}, {0, 0, 1}};
+    this->Init(param_invalid_pad_right);
+    bool invalid_pad_right =
+        this->template Run<ConvolutionForwardSpecialization::Filter1x1Stride1Pad0,
+                           ck::half_t,
+                           ck::half_t,
+                           float,
+                           PackedLayout<3>>();
+    EXPECT_FALSE(invalid_pad_right);
+
+    // Check default 1x1 layout
+    ck::utils::conv::ConvParam param_z2 = {
+        3, 1, 1, 64, 64, {3, 1, 1}, {64, 64, 64}, {2, 1, 1}, {2, 1, 1}, {1, 0, 0}, {1, 0, 0}};
+    this->Init(param_z2);
+    bool is_supported_z2 = this->template Run<ConvolutionForwardSpecialization::Filter1x1Pad0,
+                                              ck::half_t,
+                                              ck::half_t,
+                                              float,
+                                              PackedLayout<3>>();
+    EXPECT_TRUE(is_supported_z2);
+
+    // Check Strided layout
+    this->Init(param, 1);
+    bool strided_supported =
+        this->template Run<ConvolutionForwardSpecialization::Filter1x1Stride1Pad0,
+                           ck::half_t,
+                           ck::half_t,
+                           float,
+                           StridedLayout<3>>();
+    EXPECT_TRUE(strided_supported);
+
+    bool packed_incompatible =
+        this->template Run<ConvolutionForwardSpecialization::Filter1x1Stride1Pad0,
+                           ck::half_t,
+                           ck::half_t,
+                           float,
+                           PackedLayout<3>>();
+    EXPECT_FALSE(packed_incompatible);
+
+    bool gc_packed_incompatible2 =
+        this->template Run<ConvolutionForwardSpecialization::Filter1x1Stride1Pad0,
+                           ck::half_t,
+                           ck::half_t,
+                           float,
+                           GCPackedLayout<3>>();
+    EXPECT_FALSE(gc_packed_incompatible2);
+
+    // Check GC Packed layout
+    this->Init(param, 2);
+    bool gc_packed_supported =
+        this->template Run<ConvolutionForwardSpecialization::Filter1x1Stride1Pad0,
+                           ck::half_t,
+                           ck::half_t,
+                           float,
+                           GCPackedLayout<3>>();
+    EXPECT_TRUE(gc_packed_supported);
+
+    bool strided_compatible2 =
+        this->template Run<ConvolutionForwardSpecialization::Filter1x1Stride1Pad0,
+                           ck::half_t,
+                           ck::half_t,
+                           float,
+                           StridedLayout<3>>();
+    EXPECT_TRUE(strided_compatible2);
+
+    bool packed_incompatible2 =
+        this->template Run<ConvolutionForwardSpecialization::Filter1x1Stride1Pad0,
+                           ck::half_t,
+                           ck::half_t,
+                           float,
+                           PackedLayout<3>>();
+    EXPECT_FALSE(packed_incompatible2);
+
+    // Check filter size mismatch
+    const ck::utils::conv::ConvParam param_filter_mismatch = {
+        3, 1, 1, 64, 64, {1, 3, 3}, {64, 64, 64}, {1, 1, 1}, {1, 1, 1}, {0, 0, 0}, {0, 0, 0}};
+    this->Init(param_filter_mismatch);
+
+    bool filter_mismatch = this->template Run<ConvolutionForwardSpecialization::Filter1x1Pad0,
+                                              ck::half_t,
+                                              ck::half_t,
+                                              float,
+                                              PackedLayout<3>>();
+    EXPECT_FALSE(filter_mismatch);
+
+    // Check size mismatch
+    const ck::utils::conv::ConvParam param_size_mismatch = {
+        3, 1, 1, 64, 64, {1, 1, 1}, {128, 64, 64}, {1, 1, 1}, {1, 1, 1}, {0, 0, 0}, {0, 0, 0}};
+    this->Init(param_size_mismatch);
+    auto in_size_mismatch = this->in_g_n_c_wis_desc;
+    this->Init(param);
+    this->in_g_n_c_wis_desc = in_size_mismatch;
+    bool size_mismatch      = this->template Run<ConvolutionForwardSpecialization::Filter1x1Pad0,
+                                            ck::half_t,
+                                            ck::half_t,
+                                            float,
+                                            PackedLayout<3>>();
+    EXPECT_FALSE(size_mismatch);
+}
+
+TEST_F(TestGroupedConv3DFwdWcnnFilter3, 3DFilter3)
+{
+    // Initialize parameter with packed layout.
+    const ck::utils::conv::ConvParam param = {
+        3, 3, 1, 64, 64, {3, 3, 3}, {64, 64, 64}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}};
+    this->Init(param);
+
+    // Packed layout
+    bool packed_supported =
+        this->template Run<ConvolutionForwardSpecialization::Filter3x3Stride1MultiLayerPad0,
+                           ck::half_t,
+                           ck::half_t,
+                           float,
+                           PackedLayout<3>>();
+    EXPECT_TRUE(packed_supported);
+
+    // Strided layout compatible with packed layout
+    bool strided_compatible =
+        this->template Run<ConvolutionForwardSpecialization::Filter3x3Stride1MultiLayerPad0,
+                           ck::half_t,
+                           ck::half_t,
+                           float,
+                           StridedLayout<3>>();
+    EXPECT_TRUE(strided_compatible);
+
+    // GCPacked layout incompatible with packed layout
+    bool gc_packed_incompatible =
+        this->template Run<ConvolutionForwardSpecialization::Filter3x3Stride1MultiLayerPad0,
+                           ck::half_t,
+                           ck::half_t,
+                           float,
+                           GCPackedLayout<3>>();
+    EXPECT_FALSE(gc_packed_incompatible);
+
+    // multi-n, filter_z != 3, stride_z != 1, dilation_z != 1, pad != 1
+    const ck::utils::conv::ConvParam param_multi_n = {
+        3, 3, 4, 64, 64, {5, 3, 3}, {64, 64, 64}, {2, 1, 1}, {2, 1, 1}, {2, 1, 1}, {2, 1, 1}};
+    this->Init(param_multi_n);
+
+    bool multi_n_supported =
+        this->template Run<ConvolutionForwardSpecialization::Filter3x3Stride1MultiLayerPad0,
+                           ck::half_t,
+                           ck::half_t,
+                           float,
+                           PackedLayout<3>>();
+    EXPECT_TRUE(multi_n_supported);
+
+    // Check dilation_xy != 1
+    ck::utils::conv::ConvParam param_invalid_dilation = {
+        3, 3, 1, 64, 64, {3, 3, 3}, {64, 64, 64}, {1, 1, 1}, {1, 2, 2}, {1, 1, 1}, {1, 1, 1}};
+    this->Init(param_invalid_dilation);
+    bool invalid_dilation =
+        this->template Run<ConvolutionForwardSpecialization::Filter3x3Stride1MultiLayerPad0,
+                           ck::half_t,
+                           ck::half_t,
+                           float,
+                           PackedLayout<3>>();
+    EXPECT_FALSE(invalid_dilation);
+
+    // check Strided layout
+    this->Init(param_multi_n, 1);
+    bool strided_supported =
+        this->template Run<ConvolutionForwardSpecialization::Filter3x3Stride1MultiLayerPad0,
+                           ck::half_t,
+                           ck::half_t,
+                           float,
+                           StridedLayout<3>>();
+    EXPECT_TRUE(strided_supported);
+
+    // check GC Packed layout
+    this->Init(param_multi_n, 2);
+    bool gc_packed_supported =
+        this->template Run<ConvolutionForwardSpecialization::Filter3x3Stride1MultiLayerPad0,
+                           ck::half_t,
+                           ck::half_t,
+                           float,
+                           GCPackedLayout<3>>();
+    EXPECT_TRUE(gc_packed_supported);
+
+    // check filter size mismatch
+    const ck::utils::conv::ConvParam param_filter_mismatch = {
+        3, 3, 1, 64, 64, {1, 1, 1}, {64, 64, 64}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}};
+    this->Init(param_filter_mismatch);
+
+    bool filter_mismatch =
+        this->template Run<ConvolutionForwardSpecialization::Filter3x3Stride1MultiLayerPad0,
+                           ck::half_t,
+                           ck::half_t,
+                           float,
+                           PackedLayout<3>>();
+    EXPECT_FALSE(filter_mismatch);
+
+    // check size mismatch
+    const ck::utils::conv::ConvParam param_size_mismatch = {
+        3, 3, 1, 64, 64, {3, 3, 3}, {128, 64, 64}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}};
+    this->Init(param_size_mismatch);
+    auto in_size_mismatch = this->in_g_n_c_wis_desc;
+    this->Init(param);
+    this->in_g_n_c_wis_desc = in_size_mismatch;
+    bool size_mismatch =
+        this->template Run<ConvolutionForwardSpecialization::Filter3x3Stride1MultiLayerPad0,
+                           ck::half_t,
+                           ck::half_t,
+                           float,
+                           PackedLayout<3>>();
+    EXPECT_FALSE(size_mismatch);
+}
+
+TEST_F(TestGroupedConv3DFwdWcnnFilter3Dilation2, 3DFilter3Dilation2)
+{
+    // Initialize parameter with packed layout.
+    const ck::utils::conv::ConvParam param = {
+        3, 3, 4, 64, 64, {5, 3, 3}, {64, 64, 64}, {2, 1, 1}, {2, 2, 2}, {2, 2, 2}, {2, 2, 2}};
+    this->Init(param);
+
+    // Packed layout
+    bool packed_supported =
+        this->template Run<ConvolutionForwardSpecialization::Filter3x3Stride1MultiLayerPad0,
+                           ck::half_t,
+                           ck::half_t,
+                           float,
+                           PackedLayout<3>>();
+    EXPECT_TRUE(packed_supported);
 }
