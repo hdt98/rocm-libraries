@@ -139,7 +139,7 @@ static void scale_beta_template(rocblas_handle handle,
     I const nx = 32;
     I const ny = 32;
 
-    I const max_blocks = 64 * 1000;
+    I const max_blocks = 1024;
     I const nbx = std::min(max_blocks, ceil(m, nx));
     I const nby = std::min(max_blocks, ceil(n, ny));
     I const nbz = std::min(max_blocks, batch_count);
