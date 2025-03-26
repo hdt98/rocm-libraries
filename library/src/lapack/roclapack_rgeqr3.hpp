@@ -35,7 +35,9 @@
 
 #include "auxiliary/rocauxiliary_lacgv.hpp"
 #include "auxiliary/rocauxiliary_larf.hpp"
+#include "auxiliary/rocauxiliary_larfb.hpp"
 #include "auxiliary/rocauxiliary_larfg.hpp"
+#include "auxiliary/rocauxiliary_larft.hpp"
 #include "rocblas.hpp"
 #include "roclapack_geqr2.hpp"
 #include "rocsolver/rocsolver.h"
@@ -48,29 +50,55 @@ constexpr bool use_trmm_outofplace = true;
 // in case GEMM is not fully optimize for small m, n
 // consider calling GEMV instead
 // -------------------------------------------------
-constexpr bool use_gemm_gemv = false;
+constexpr bool use_gemm_gemv = true;
+
+constexpr bool is_applyQtC_use_larfb = true;
+
+constexpr bool use_geqr2 = false;
 
 #ifndef RGEQR3_BLOCKSIZE
-#define RGEQR3_BLOCKSIZE(T) \
-    ((sizeof(T) == 4) ? 256 : (sizeof(T) == 8) ? 128 : (sizeof(T) == 16) ? 64 : 64)
+// #define RGEQR3_BLOCKSIZE(T) ((sizeof(T) == 4) ? 256 : (sizeof(T) == 8) ? 128 : (sizeof(T) == 16) ? 64 : 64)
+#define RGEQR3_BLOCKSIZE(T) 64
 #endif
 
 // Is power of two
-static __device__ __host__ constexpr bool rocblas_is_po2(rocblas_int x)
+static bool rocblas_is_po2(int x)
 {
     return (x && !(x & (x - 1)));
 }
 
+static uint32_t rocblas_next_po2(uint32_t n)
+{
+    if(n == 0)
+    {
+        return 1;
+    }
+
+    n--;
+    n |= n >> 1;
+    n |= n >> 2;
+    n |= n >> 4;
+    n |= n >> 8;
+    n |= n >> 16;
+    n++;
+    return n;
+}
+
 // Return previous power of two
-static __device__ __host__ constexpr rocblas_int rocblas_previous_po2(rocblas_int x)
+static constexpr int rocblas_previous_po2(int x)
 {
     if(rocblas_is_po2(x))
     {
         return (x);
     };
 
-    return x ? decltype(x){1} << (8 * sizeof(x) - 1 - __builtin_clz(x)) : 0;
+    return (rocblas_next_po2(x) / 2);
 }
+
+static rocblas_int get_n_small()
+{
+    return (16);
+};
 
 #include "specialized/roclapack_simple_gemm.hpp"
 //   -----------------------------------------------------------
@@ -324,7 +352,7 @@ static void copy_diagonal_template(rocblas_handle handle,
 {
     auto ceil = [](auto n, auto nb) { return ((n - 1) / nb + 1); };
 
-    I const max_blocks = 64 * 1000;
+    I const max_blocks = 1024;
     I const nx = 64;
     I const nbx = std::min(max_blocks, ceil(nn, nx));
     I const nbz = std::min(max_blocks, batch_count);
@@ -1092,33 +1120,33 @@ static rocblas_status formT3(rocblas_handle handle,
 //  T is k by k
 // -------------------------
 
-template <typename T, typename I, typename UY, typename UC, typename Istride>
-static rocblas_status applyQtC(rocblas_handle handle,
-                               I const m,
-                               I const n,
-                               I const k,
+template <typename T, typename I, typename UY, typename Istride>
+static rocblas_status applyQtC_body(rocblas_handle handle,
+                                    I const m,
+                                    I const n,
+                                    I const k,
 
-                               UY Ymat,
-                               Istride const shift_Ymat,
-                               I const ldY,
-                               Istride const stride_Ymat,
+                                    UY Ymat,
+                                    Istride const shift_Ymat,
+                                    I const ldY,
+                                    Istride const stride_Ymat,
 
-                               T const* const Tmat,
-                               Istride const shift_Tmat,
-                               I const ldT,
-                               Istride const stride_Tmat,
+                                    T* const Tmat,
+                                    Istride const shift_Tmat,
+                                    I const ldT,
+                                    Istride const stride_Tmat,
 
-                               UC Cmat,
-                               Istride const shift_Cmat,
-                               I const ldC,
-                               Istride const stride_Cmat,
+                                    UY Cmat,
+                                    Istride const shift_Cmat,
+                                    I const ldC,
+                                    Istride const stride_Cmat,
 
-                               I const batch_count,
-                               void* work,
-                               I& lwork_bytes)
+                                    I const batch_count,
+                                    void* work,
+                                    I& lwork_bytes)
 {
-    ROCSOLVER_ENTER("applyQtC", "m:", m, "n:", n, "k:", k, "shift_Ymat:", shift_Ymat, "ldY:", ldY,
-                    "bc:", batch_count);
+    ROCSOLVER_ENTER("applyQtC_body", "m:", m, "n:", n, "k:", k, "shift_Ymat:", shift_Ymat,
+                    "ldY:", ldY, "bc:", batch_count);
     // 1-based matlab/Fortran indexing
     auto idx2F
         = [](auto i, auto j, auto ld) { return ((i - 1) + (j - 1) * static_cast<int64_t>(ld)); };
@@ -1712,6 +1740,90 @@ static rocblas_status applyQtC(rocblas_handle handle,
     return (rocblas_status_success);
 }
 
+template <typename T, typename I, typename UY, typename Istride>
+static rocblas_status applyQtC(rocblas_handle handle,
+                               I const m,
+                               I const n,
+                               I const k,
+
+                               UY Ymat,
+                               Istride const shift_Ymat,
+                               I const ldY,
+                               Istride const stride_Ymat,
+
+                               T* const Tmat,
+                               Istride const shift_Tmat,
+                               I const ldT,
+                               Istride const stride_Tmat,
+
+                               UY Cmat,
+                               Istride const shift_Cmat,
+                               I const ldC,
+                               Istride const stride_Cmat,
+
+                               I const batch_count,
+                               void* work,
+                               I& lwork_bytes)
+{
+    ROCSOLVER_ENTER("applyQtC_body", "m:", m, "n:", n, "k:", k, "shift_Ymat:", shift_Ymat,
+                    "ldY:", ldY, "bc:", batch_count);
+    if(is_applyQtC_use_larfb)
+    {
+        // TODO: check  correct setting for BATCHED and STRIDED
+        bool constexpr BATCHED = true;
+        bool constexpr STRIDED = true;
+
+        rocblas_side const side = rocblas_side_left;
+        rocblas_operation const trans = rocblas_operation_conjugate_transpose;
+        rocblas_direct const direct = rocblas_forward_direction;
+        rocblas_storev const storev = rocblas_column_wise;
+
+        size_t size_tmptr = 0;
+        size_t size_workArr = 0;
+        rocsolver_larfb_getMemorySize<BATCHED, T>(side, m, n, k, batch_count, &size_tmptr,
+                                                  &size_workArr);
+
+        std::byte* pfree = (std::byte*)work;
+        T* const tmptr = (T*)pfree;
+        pfree += size_tmptr;
+
+        T** const workArr = (T**)pfree;
+        pfree += size_workArr;
+
+        bool const is_mem_ok = ((size_tmptr + size_workArr) <= lwork_bytes);
+        if(!is_mem_ok)
+        {
+            return (rocblas_status_memory_error);
+        }
+
+        return (rocsolver_larfb_template<BATCHED, STRIDED, T, UY>(handle, side, trans, direct, storev,
+
+                                                                  m, n, k,
+
+                                                                  Ymat, shift_Ymat, ldY, stride_Ymat,
+
+                                                                  Tmat, shift_Tmat, ldT, stride_Tmat,
+
+                                                                  Cmat, shift_Cmat, ldC, stride_Cmat,
+
+                                                                  batch_count, tmptr, workArr));
+    }
+    else
+    {
+        return (applyQtC_body(handle, m, n, k,
+
+                              Ymat, shift_Ymat, ldY, stride_Ymat,
+
+                              Tmat, shift_Tmat, ldT, stride_Tmat,
+
+                              Cmat, shift_Cmat, ldC, stride_Cmat,
+
+                              batch_count, work, lwork_bytes));
+    }
+
+    return (rocblas_status_success);
+}
+
 template <typename T, typename I>
 static void rocsolver_applyQtC_getMemorySize(I const m,
                                              I const n,
@@ -1747,6 +1859,20 @@ static void rocsolver_applyQtC_getMemorySize(I const m,
     if(use_trmm_outofplace)
     {
         *size_applyQtC += size_Wmat_byte;
+    }
+
+    if(is_applyQtC_use_larfb)
+    {
+        bool constexpr BATCHED = true;
+        rocblas_side const side = rocblas_side_left;
+
+        size_t size_tmptr = 0;
+        size_t size_workArr = 0;
+        rocsolver_larfb_getMemorySize<BATCHED, T>(side, m, n, k, batch_count,
+
+                                                  &size_tmptr, &size_workArr);
+
+        *size_applyQtC = std::max(*size_applyQtC, size_tmptr + size_workArr);
     }
 }
 
@@ -1802,24 +1928,24 @@ static rocblas_status rocsolver_rgeqr3_template(rocblas_handle handle,
         {
             return rocblas_status_success;
         }
-    }
 
-    hipStream_t stream;
-    rocblas_get_stream(handle, &stream);
-
-    std::byte* pfree = reinterpret_cast<std::byte*>(work);
-    {
         if(work == nullptr)
         {
             return (rocblas_status_invalid_pointer);
         }
     }
 
+    hipStream_t stream;
+    rocblas_get_stream(handle, &stream);
+
+    std::byte* pfree = reinterpret_cast<std::byte*>(work);
+
     auto idx2F
         = [=](auto i, auto j, auto ld) { return ((i - 1) + (j - 1) * static_cast<int64_t>(ld)); };
 
-    auto sign = [](auto x) { return ((x > 0) ? 1 : (x < 0) ? -1 : 0); };
+    auto ceil = [](auto m, auto n) { return (1 + (m - 1) / n); };
 
+    I const n_small = get_n_small(); // terminate recursion for small n
     if(n == 1)
     {
         // ------------------------------------------------------
@@ -1872,27 +1998,149 @@ static rocblas_status rocsolver_rgeqr3_template(rocblas_handle handle,
 
         total_bytes = total_bytes - (size_norms_byte + size_work_byte);
     }
+    else if(use_geqr2 && (n <= n_small))
+    {
+        // -------------------------------
+        // terminate recursion for small n
+        // to use GEQR2()
+        // -------------------------------
+
+        // ------------------------------------------------------
+        // call geqr2 to perform QR factorization of narrow panel
+        // of size (m by n), n <= n_small
+        // ------------------------------------------------------
+        {
+            bool constexpr BATCHED = true;
+            size_t size_scalars = 0;
+            size_t size_work_workArr = 0;
+            size_t size_Abyx_norms = 0;
+            size_t size_diag = 0;
+
+            rocsolver_geqr2_getMemorySize<BATCHED, T, I>(m, n, batch_count,
+
+                                                         &size_scalars, &size_work_workArr,
+                                                         &size_Abyx_norms, &size_diag);
+
+            T* const scalars = reinterpret_cast<T*>(pfree);
+            pfree += size_scalars;
+
+            void* const work_workArr = reinterpret_cast<void*>(pfree);
+            pfree += size_work_workArr;
+
+            T* const Abyx_norms = reinterpret_cast<T*>(pfree);
+            pfree += size_Abyx_norms;
+
+            T* const diag = reinterpret_cast<T*>(diag);
+            pfree += size_diag;
+
+            size_t const size_geqr2 = size_scalars + size_work_workArr + size_Abyx_norms + size_diag;
+
+            assert(size_geqr2 <= lwork_bytes);
+
+            T* const tau = Tmat + shift_Tmat;
+            Istride const stride_tau = stride_Tmat;
+
+            auto const istat_geqr2
+                = rocsolver_geqr2_template(handle, m, n, Amat, shift_Amat, ldA, stride_Amat,
+
+                                           tau, stride_tau,
+
+                                           batch_count, scalars, work_workArr, Abyx_norms, diag);
+            if(istat_geqr2 != rocblas_status_success)
+            {
+                return (istat_geqr2);
+            }
+
+            pfree = pfree - size_geqr2;
+        }
+
+        // -----------------------------------
+        // call larft to generate the T matrix
+        // -----------------------------------
+
+        {
+            bool constexpr BATCHED = true;
+
+            size_t size_scalars = 0;
+            size_t size_work = 0;
+            size_t size_workArr = 0;
+
+            rocsolver_larft_getMemorySize<BATCHED, T>(m, n, batch_count,
+
+                                                      &size_scalars, &size_work, &size_workArr);
+
+            T* const scalars = reinterpret_cast<T*>(pfree);
+            pfree += size_scalars;
+
+            T* const work = reinterpret_cast<T*>(pfree);
+            pfree += size_work;
+
+            T** const workArr = reinterpret_cast<T**>(pfree);
+            pfree += size_workArr;
+
+            size_t const size_tmp_tau = sizeof(T) * n * batch_count;
+            Istride const stride_tmp_tau = sizeof(T) * n;
+
+            T* const tmp_tau = reinterpret_cast<T*>(pfree);
+            pfree += size_tmp_tau;
+
+            size_t size_larft = size_scalars + size_work + size_workArr;
+
+            assert((size_larft + size_tmp_tau) <= lwork_bytes);
+
+            copy_diagonal_template<T, I, Istride>(handle, n,
+
+                                                  Tmat, shift_Tmat, ldT, stride_Tmat,
+
+                                                  tmp_tau, stride_tmp_tau,
+
+                                                  batch_count);
+
+            rocblas_direct const direct = rocblas_forward_direction;
+            rocblas_storev const storev = rocblas_column_wise;
+
+            auto const istat_larft = rocsolver_larft_template(handle, direct, storev, m, n,
+
+                                                              Amat, shift_Amat, ldA, stride_Amat,
+
+                                                              tmp_tau, stride_tmp_tau,
+
+                                                              Tmat, ldT, stride_Tmat,
+
+                                                              batch_count, scalars, work, workArr);
+
+            if(istat_larft != rocblas_status_success)
+            {
+                return (istat_larft);
+            }
+
+            pfree = pfree - (size_larft + size_tmp_tau);
+        }
+    }
     else
     {
         // -----------------
         // perform recursion
         // -----------------
 
-        I const n_small = 4;
-        bool const is_n_small = (n <= n_small);
-
-        // auto const n1 = (is_n_small) ? (n - 1) : rocblas_previous_po2(n - 1);
-        I const n1 = rocblas_previous_po2(n / 2);
-        I const n2 = n - n1;
+        I const n_small = get_n_small();
+        I n1 = (n <= n_small) ? 1 : rocblas_previous_po2(ceil(n, 2));
+        I n2 = n - n1;
+        // fall back
+        if((n1 == 0) || (n2 == 0))
+        {
+            n1 = n / 2;
+            n2 = n - n1;
+        }
 
         assert(n1 >= 1);
         assert(n2 >= 1);
 
-        auto const j1 = n1 + 1;
-        auto const m2 = (m - j1 + 1);
+        I const j1 = n1 + 1;
+        I const m2 = (m - j1 + 1);
 
-        auto const k1 = n1;
-        auto const k2 = n2;
+        I const k1 = n1;
+        I const k2 = n2;
 
         // --------------------------------------------
         // [Y1, R1, T1 ] = rgeqr3( A(1:(m), 1:(n1))
@@ -2098,43 +2346,90 @@ static void rocsolver_rgeqr3_getMemorySize(I const m, I const n, I const batch_c
     size_t size_tau = (sizeof(T) * nb) * batch_count;
     *work_size += size_tau;
 
+    if(is_applyQtC_use_larfb)
     {
-        size_t size_geqr2 = 0;
-        // -----------------
-        // scratch space for geqr2
-        // -----------------
-        size_t size_scalars = 0;
-        size_t size_work_workArr = 0;
-        size_t size_Abyx_norms = 0;
-        size_t size_diag = 0;
+        {
+            size_t size_geqr2 = 0;
+            // -----------------
+            // scratch space for geqr2
+            // -----------------
+            size_t size_scalars = 0;
+            size_t size_work_workArr = 0;
+            size_t size_Abyx_norms = 0;
+            size_t size_diag = 0;
 
-        rocsolver_geqr2_getMemorySize<is_batched, T>(
-            m, n, batch_count, &size_scalars, &size_work_workArr, &size_Abyx_norms, &size_diag);
+            rocsolver_geqr2_getMemorySize<is_batched, T>(
+                m, n, batch_count, &size_scalars, &size_work_workArr, &size_Abyx_norms, &size_diag);
 
-        size_geqr2 = (size_scalars + size_work_workArr + size_Abyx_norms + size_diag);
-        *work_size += size_geqr2;
+            size_geqr2 = (size_scalars + size_work_workArr + size_Abyx_norms + size_diag);
+            *work_size += size_geqr2;
+        }
+
+        // -----------------------
+        // scratch space for larft
+        // -----------------------
+        {
+            size_t size_scalars = 0;
+            size_t size_work = 0;
+            size_t size_workArr = 0;
+
+            auto const nn = m;
+            auto const kk = nb;
+            rocsolver_larft_getMemorySize<is_batched, T>(nn, kk, batch_count, &size_scalars,
+                                                         &size_work, &size_workArr);
+
+            size_t const size_larft = (size_scalars + size_work + size_workArr);
+            *work_size += size_larft;
+        }
     }
-
-    // -----------------------
-    // scratch space for larft
-    // -----------------------
-    size_t size_larft = 0;
-    {
-        size_t size_scalars = 0;
-        size_t size_work = 0;
-        size_t size_workArr = 0;
-
-        auto const nn = m;
-        auto const kk = nb;
-        rocsolver_larft_getMemorySize<is_batched, T>(nn, kk, batch_count, &size_scalars, &size_work,
-                                                     &size_workArr);
-
-        size_larft = (size_scalars + size_work + size_workArr);
-        *work_size += size_larft;
-    }
-
     size_t size_Wm = (sizeof(T) * nb * nb) * batch_count;
     *work_size += size_Wm;
+
+    if(use_geqr2)
+    {
+        I const n_small = get_n_small();
+
+        // -----------------------
+        // scratch space for geqr2
+        // -----------------------
+        {
+            bool constexpr BATCHED = true;
+            I const n_small = get_n_small();
+
+            size_t size_scalars = 0;
+            size_t size_work_workArr = 0;
+            size_t size_Abyx_norms = 0;
+            size_t size_diag = 0;
+
+            rocsolver_geqr2_getMemorySize<BATCHED, T, I>(m, n_small, batch_count, &size_scalars,
+                                                         &size_work_workArr, &size_Abyx_norms,
+                                                         &size_diag);
+
+            size_t const size_geqr2 = size_scalars + size_work_workArr + size_Abyx_norms + size_diag;
+            *work_size += size_geqr2;
+        }
+
+        // -----------------------
+        // scratch space for larft
+        // -----------------------
+
+        {
+            bool constexpr BATCHED = true;
+            size_t size_scalars = 0;
+            size_t size_work = 0;
+            size_t size_workArr = 0;
+
+            rocsolver_larft_getMemorySize<BATCHED, T>(m, n_small, batch_count,
+
+                                                      &size_scalars, &size_work, &size_workArr);
+            size_t const size_larft = size_scalars + size_work + size_workArr;
+
+            *work_size += size_larft;
+
+            size_t const size_tmp_tau = (sizeof(T) * n_small) * batch_count;
+            *work_size += size_tmp_tau;
+        }
+    }
 }
 
 // ----------------------------------------------------------
