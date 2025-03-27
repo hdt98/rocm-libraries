@@ -53,6 +53,14 @@ public:
         items_names_ = std::vector<std::vector<std::string>>(N, std::vector<std::string>());
     }
 
+    virtual ~work_items_impl() = default;
+
+    work_items_impl(const work_items_impl&) = default;
+    work_items_impl& operator=(const work_items_impl&) = default;
+
+    work_items_impl(work_items_impl&&) = default;
+    work_items_impl& operator=(work_items_impl&&) = default;
+
     std::size_t num_work_items() const noexcept
     {
         return N;
@@ -190,16 +198,19 @@ public:
         return os;
     }
 
-private:
+protected:
     mutable std::size_t N{0};
     mutable std::vector<std::size_t> items_sizes_{};
     mutable std::vector<std::vector<std::string>> items_names_{};
     mutable std::unordered_map<std::string, std::size_t> map_names_to_ids_{};
+    mutable std::string tag_start = "^";
+    mutable std::string tag_end = "$";
 
-    bool is_prefix_of_str(const std::string& pre, const std::string& str) const
+    bool tag_prefix_str(const std::string& tag, const std::string& str) const
     {
-        auto [iter_pre, _] = std::mismatch(pre.begin(), pre.end(), str.begin());
-        if(iter_pre == pre.end())
+        std::string tag_ = tag_start + tag + tag_end;
+        auto [iter_tag_, _] = std::mismatch(tag_.begin(), tag_.end(), str.begin());
+        if(iter_tag_ == tag_.end())
         {
             return true;
         }
@@ -337,14 +348,32 @@ auto merge(const rocsolver_work_items_n<N1>& w1, const rocsolver_work_items_n<N2
         w_out.item(id, names, size);
     };
 
+    auto item_not_empty = [&](std::vector<std::string> names_, std::size_t size_) {
+        for(auto& name : names_)
+        {
+            if(!name.empty())
+            {
+                return true;
+            }
+        }
+
+        return size_ > 0;
+    };
+
     for(std::size_t i = 0; i < N1; ++i)
     {
-        merge_item(i, w1.names(i), w1.size(i));
+        if(item_not_empty(w1.names(i), w1.size(i)))
+        {
+            merge_item(i, w1.names(i), w1.size(i));
+        }
     }
 
     for(std::size_t i = 0; i < N2; ++i)
     {
-        merge_item(i, w2.names(i), w2.size(i));
+        if(item_not_empty(w2.names(i), w2.size(i)))
+        {
+            merge_item(i, w2.names(i), w2.size(i));
+        }
     }
 
     return w_out;
@@ -369,8 +398,10 @@ auto join(const rocsolver_work_items_n<N1>& w1, const rocsolver_work_items_n<N2>
     return w_out;
 }
 
-template <std::size_t N1, std::size_t N2>
-auto cond(bool condition, const rocsolver_work_items_n<N1>& w1, const rocsolver_work_items_n<N2>& w2)
+template <std::size_t N1, std::size_t N2 = 0>
+auto cond(bool condition,
+          const rocsolver_work_items_n<N1>& w1,
+          const rocsolver_work_items_n<N2>& w2 = rocsolver_work_items_n<N2>())
 {
     constexpr std::size_t N = std::max({N1, N2});
     rocsolver_work_items_n<N> w_out;
@@ -475,7 +506,7 @@ using rocsolver_device_workspace_ptr_t = rocsolver_device_workspace::Ptr;
 // DRAFT methods
 //
 // Those are meant to exist on the respective roclapack and rocauxiliary `.hpp`
-// files.
+// files; will be moved when finalized.
 //
 
 template <bool BATCHED, bool STRIDED, typename T, typename I, typename U>
