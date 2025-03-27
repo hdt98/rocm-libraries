@@ -66,26 +66,10 @@ rocblas_status rocsolver_gesdd_impl(rocblas_handle handle,
     rocblas_stride strideV = 0;
     rocblas_int batch_count = 1;
 
-    auto gesdd_work_items = rocsolver_gesdd_getWorkItems<false, false, T, SS, W>(
-        handle, left_svect, right_svect, m, n, nullptr /* W A */, lda, strideA, nullptr /* S */,
-        strideS, nullptr /* T* U */, ldu, strideU, nullptr /* T* V */, ldv, strideV,
-        nullptr /* rocblas_int* info */, batch_count);
-
-    auto [device_work_ptr, status] = device_workspace::Get(handle, gesdd_work_items);
-    if(rocblas_is_device_memory_size_query(handle))
-    {
-        return status;
-    }
-
-    if(!device_work_ptr || (status != rocblas_status_success))
-    {
-        return status;
-    }
-
     // execution
-    return rocsolver_gesdd_template<false, false, T>(
+    return rocsolver_gesdd_template_alt<false, false, T>(
         handle, left_svect, right_svect, m, n, A, shiftA, lda, strideA, S, strideS, U, ldu, strideU,
-        V, ldv, strideV, info, batch_count, device_work_ptr);
+        V, ldv, strideV, info, batch_count, nullptr);
 }
 
 ROCSOLVER_END_NAMESPACE

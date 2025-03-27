@@ -40,14 +40,8 @@
 #include "roclapack_syevd_heevd.hpp"
 #include "roclapack_syevj_heevj.hpp"
 #include "rocsolver/rocsolver.h"
+#include "rocsolver_device_workspace.hpp"
 #include "rocsolver_run_specialized_kernels.hpp"
-
-#include <map>
-#include <memory>
-#include <string>
-#include <tuple>
-#include <unordered_map>
-#include <vector>
 
 ROCSOLVER_BEGIN_NAMESPACE
 
@@ -206,355 +200,6 @@ rocblas_status rocsolver_gesdd_argCheck(rocblas_handle handle,
     return rocblas_status_continue;
 }
 
-namespace detail
-{
-class work_items_impl
-{
-public:
-    work_items_impl() = default;
-
-    work_items_impl(std::size_t M)
-        : N(M)
-    {
-        items_sizes_ = std::vector<std::size_t>(N, static_cast<std::size_t>(0));
-        items_names_ = std::vector<std::vector<std::string>>(N, std::vector<std::string>());
-    }
-
-    std::size_t num_work_items() const noexcept
-    {
-        return N;
-    }
-
-    bool item(std::size_t id, std::string name, std::size_t size)
-    {
-        std::vector<std::string> names = {name};
-        return item(id, names, size);
-    }
-
-    bool item(std::size_t id, std::vector<std::string> names, std::size_t size)
-    {
-        if(id >= N)
-        {
-            throw(std::domain_error("Error at work_items_n::item(): id >= N"));
-            return false;
-        }
-
-        for(auto& name : names)
-        {
-            map_names_to_ids_[name] = id;
-        }
-        items_sizes_[id] = size;
-        items_names_[id] = names;
-
-        return true;
-    }
-
-    bool merge_item(std::size_t id, std::vector<std::string> names, std::size_t size)
-    {
-        if(id >= N)
-        {
-            throw(std::domain_error("Error at work_items_n::merge_item(): id >= N"));
-            return false;
-        }
-
-        for(auto& name : names)
-        {
-            map_names_to_ids_[name] = id;
-        }
-        items_sizes_[id] = std::max(size, items_sizes_[id]);
-        items_names_[id].insert(items_names_[id].end(), names.begin(), names.end());
-
-        return true;
-    }
-
-    std::size_t id(std::string item_name) const
-    {
-        auto item_id = map_names_to_ids_[item_name];
-        return item_id;
-    }
-
-    std::size_t size(size_t item_id) const
-    {
-        return items_sizes_[item_id];
-    }
-
-    std::size_t size(std::string item_name) const
-    {
-        auto item_id = id(item_name);
-        return items_sizes_[item_id];
-    }
-
-    std::vector<std::string> names(std::size_t item_id) const
-    {
-        return items_names_[item_id];
-    }
-
-    template <std::size_t M>
-    auto tuple_of_items_sizes() const
-    {
-        return generate_tuple<M>([&](std::size_t i) { return items_sizes_[i]; });
-    }
-
-private:
-    mutable std::size_t N{0};
-    mutable std::vector<std::size_t> items_sizes_{};
-    mutable std::vector<std::vector<std::string>> items_names_{};
-    mutable std::unordered_map<std::string, std::size_t> map_names_to_ids_{};
-
-    bool unique_names(const std::vector<std::string>& names)
-    {
-        return true;
-    }
-
-    template <typename Lambda, size_t... Indices>
-    auto generate_tuple_impl(Lambda l, std::integer_sequence<std::size_t, Indices...>) const
-    {
-        return std::make_tuple(l(Indices)...);
-    }
-
-    template <size_t M, typename Lambda>
-    auto generate_tuple(Lambda l) const
-    {
-        return generate_tuple_impl(l, std::make_integer_sequence<std::size_t, M>{});
-    }
-};
-} // namespace detail
-
-using work_items_list_t = std::vector<std::pair<std::string, std::size_t>>;
-
-template <std::size_t N>
-class work_items_n
-{
-public:
-    using work_items_impl = detail::work_items_impl;
-
-    constexpr work_items_n()
-        : impl_(N)
-    {
-    }
-
-    ~work_items_n() = default;
-
-    work_items_n(const work_items_n&) = default;
-    work_items_n& operator=(const work_items_n&) = default;
-
-    work_items_n(work_items_n&&) = default;
-    work_items_n& operator=(work_items_n&&) = default;
-
-    constexpr std::size_t num_work_items() const noexcept
-    {
-        return N;
-    }
-
-    bool item(std::size_t id, std::string name, std::size_t size)
-    {
-        return impl_.item(id, name, size);
-    }
-
-    bool item(std::size_t id, std::vector<std::string> names, std::size_t size)
-    {
-        return impl_.item(id, names, size);
-    }
-
-    std::size_t id(std::string item_name) const
-    {
-        return impl_.id(item_name);
-    }
-
-    std::size_t size(size_t item_id) const
-    {
-        return impl_.size(item_id);
-    }
-
-    std::size_t size(std::string item_name) const
-    {
-        return impl_.size(item_name);
-    }
-
-    std::vector<std::string> names(std::size_t item_id) const
-    {
-        return impl_.names(item_id);
-    }
-
-    work_items_impl& impl() const
-    {
-        return impl_;
-    }
-
-private:
-    mutable work_items_impl impl_{N};
-};
-
-template <std::size_t N>
-auto create_work_items_sorted_by_size(const work_items_list_t& list)
-{
-    work_items_n<N> w_out;
-    if(list.size() > N)
-    {
-        throw(std::domain_error("Error at create_work_items_sorted_by_size(): list.size() > N"));
-        return w_out;
-    }
-
-    std::multimap<std::size_t, std::string, std::greater<std::size_t>> mmap;
-    for(auto& [name, size] : list)
-    {
-        mmap.insert(std::pair{size, name});
-    }
-
-    std::size_t id{0};
-    for(auto iter = mmap.begin(); iter != mmap.end(); ++iter)
-    {
-        auto& [size, name] = *iter;
-        w_out.item(id, name, size);
-        ++id;
-    }
-
-    return w_out;
-}
-
-template <std::size_t N1, std::size_t N2>
-auto merge_work_items(const work_items_n<N1>& w1, const work_items_n<N2>& w2)
-{
-    constexpr std::size_t N = std::max({N1, N2});
-    work_items_n<N> w_out;
-
-    auto merge_item = [&](std::size_t id, std::vector<std::string> names_, std::size_t size_) {
-        if(id >= N)
-        {
-            throw(std::domain_error("Error at merge_work_items::merge_item(): id >= N"));
-        }
-
-        std::size_t size = std::max(size_, w_out.size(id));
-        auto names = w_out.names(id);
-        names.insert(names.end(), names_.begin(), names_.end());
-
-        w_out.item(id, names, size);
-    };
-
-    for(std::size_t i = 0; i < N1; ++i)
-    {
-        merge_item(i, w1.names(i), w1.size(i));
-    }
-
-    for(std::size_t i = 0; i < N2; ++i)
-    {
-        merge_item(i, w2.names(i), w2.size(i));
-    }
-
-    return w_out;
-}
-
-template <std::size_t N1, std::size_t N2>
-auto cat_work_items(const work_items_n<N1>& w1, const work_items_n<N2>& w2)
-{
-    constexpr std::size_t N = N1 + N2;
-    work_items_n<N> w_out;
-
-    for(std::size_t i = 0; i < N1; ++i)
-    {
-        w_out.item(i, w1.names(i), w1.size(i));
-    }
-
-    for(std::size_t i = 0; i < N2; ++i)
-    {
-        w_out.item(i + N1, w2.names(i), w2.size(i));
-    }
-
-    return w_out;
-}
-
-class device_workspace
-{
-public:
-    using Handle = rocblas_handle;
-    using Status = rocblas_status;
-    using DeviceWorkspacePtr = std::shared_ptr<device_workspace>;
-    using work_items_impl = detail::work_items_impl;
-
-    template <std::size_t N>
-    static auto Get(Handle handle, const work_items_n<N>& work_items)
-        -> std::pair<DeviceWorkspacePtr, Status>
-    {
-        DeviceWorkspacePtr ptr{nullptr};
-        Status status = rocblas_status_success;
-        auto sizes = work_items.impl().template tuple_of_items_sizes<N>();
-
-        if(rocblas_is_device_memory_size_query(handle))
-        {
-            status = std::apply(
-                [&](auto&&... args) {
-                    return rocblas_set_optimal_device_memory_size(handle, std::size_t(args)...);
-                },
-                sizes);
-            return std::make_pair(nullptr, status);
-        }
-
-        ptr = DeviceWorkspacePtr(new device_workspace(handle, work_items.impl()));
-        ptr->work_ = std::apply(
-            [&](auto&&... args) { return rocblas_device_malloc(handle, std::size_t(args)...); },
-            sizes);
-
-        if(!ptr->work_)
-        {
-            status = rocblas_status_memory_error;
-            return std::make_pair(nullptr, status);
-        }
-
-        return std::make_pair(std::move(ptr), status);
-    }
-
-    ~device_workspace() = default;
-
-    device_workspace(const device_workspace&) = delete;
-    device_workspace& operator=(const device_workspace&) = delete;
-
-    device_workspace(device_workspace&&) = default;
-    device_workspace& operator=(device_workspace&&) = default;
-
-    std::size_t id(std::string item_name) const
-    {
-        return work_items_.id(item_name);
-    }
-
-    std::size_t size(size_t item_id) const
-    {
-        return work_items_.size(item_id);
-    }
-
-    std::size_t size(std::string item_name) const
-    {
-        return work_items_.size(item_name);
-    }
-
-    std::vector<std::string> names(std::size_t item_id) const
-    {
-        return work_items_.names(item_id);
-    }
-
-    void* work(std::size_t item_id)
-    {
-        return work_[item_id];
-    }
-
-    void* work(std::string item_name)
-    {
-        auto item_id = id(item_name);
-        return work(item_id);
-    }
-
-private:
-    Handle handle_{nullptr};
-    work_items_impl work_items_{};
-    mutable std::unordered_map<std::string, std::size_t> map_names_to_ids_{};
-    rocblas_device_malloc work_{nullptr};
-
-    device_workspace(Handle h, work_items_impl w)
-        : handle_(h)
-        , work_items_(std::move(w))
-    {
-    }
-};
-
 /** Helper to calculate workspace sizes **/
 template <bool BATCHED, typename T, typename SS>
 void rocsolver_gesdd_getMemorySize(rocblas_handle handle,
@@ -675,24 +320,24 @@ void rocsolver_gesdd_getMemorySize(rocblas_handle handle,
     *size_workArr = std::max({*size_workArr, f2, f3, f4});
 }
 
-template <bool BATCHED, bool STRIDED, typename T, typename S, typename W>
+template <bool BATCHED, bool STRIDED, typename T, typename SS, typename W>
 auto rocsolver_gesdd_getWorkItems(rocblas_handle handle,
                                   const rocblas_svect left_svect,
                                   const rocblas_svect right_svect,
                                   const rocblas_int m,
                                   const rocblas_int n,
-                                  W /* A */,
-                                  const rocblas_int /* lda */,
-                                  const rocblas_stride /* strideA */,
-                                  S* /* S */,
+                                  [[maybe_unused]] W A,
+                                  [[maybe_unused]] const rocblas_int lda,
+                                  [[maybe_unused]] const rocblas_stride strideA,
+                                  [[maybe_unused]] SS* S,
                                   const rocblas_stride strideS,
-                                  T* /* U */,
-                                  const rocblas_int /* ldu */,
-                                  const rocblas_stride /* strideU */,
-                                  T* /* V */,
-                                  const rocblas_int /* ldv */,
-                                  const rocblas_stride /* strideV */,
-                                  rocblas_int* /* info */,
+                                  [[maybe_unused]] T* U,
+                                  const rocblas_int ldu,
+                                  const rocblas_stride strideU,
+                                  [[maybe_unused]] T* V,
+                                  [[maybe_unused]] const rocblas_int ldv,
+                                  [[maybe_unused]] const rocblas_stride strideV,
+                                  [[maybe_unused]] rocblas_int* info,
                                   const rocblas_int batch_count)
 {
     // memory workspace sizes:
@@ -704,26 +349,10 @@ auto rocsolver_gesdd_getWorkItems(rocblas_handle handle,
     size_t size_UVtmpZ, size_work1, size_work2, size_work3, size_work4, size_work5_ipiv,
         size_splits, size_tmptau_W, size_tau, size_workArr, size_workArr2;
 
-    rocsolver_gesdd_getMemorySize<false, T, S>(
+    rocsolver_gesdd_getMemorySize<BATCHED, T, SS>(
         handle, left_svect, right_svect, m, n, strideS, batch_count, &size_VUtmp, &size_UVtmpZ,
         &size_scalars, &size_work1, &size_work2, &size_work3, &size_work4, &size_work5_ipiv,
         &size_splits, &size_tmptau_W, &size_tau, &size_workArr, &size_workArr2);
-
-    constexpr std::size_t N = 13;
-    /* work_items_n<N> work; */
-    /* work.item(0, "gesddwi_VUtmp", size_VUtmp); */
-    /* work.item(1, "gesddwi_UVtmpZ", size_UVtmpZ); */
-    /* work.item(2, "gesddwi_scalars", size_scalars); */
-    /* work.item(3, "gesddwi_work1", size_work1); */
-    /* work.item(4, "gesddwi_work2", size_work2); */
-    /* work.item(5, "gesddwi_work3", size_work3); */
-    /* work.item(6, "gesddwi_work4", size_work4); */
-    /* work.item(7, "gesddwi_work5_ipiv", size_work5_ipiv); */
-    /* work.item(8, "gesddwi_splits", size_splits); */
-    /* work.item(9, "gesddwi_tmptau_W", size_tmptau_W); */
-    /* work.item(10, "gesddwi_tau", size_tau); */
-    /* work.item(11, "gesddwi_workArr", size_workArr); */
-    /* work.item(12, "gesddwi_workArr2", size_workArr2); */
 
     work_items_list_t wlist
         = {{"gesddwi_VUtmp", size_VUtmp},      {"gesddwi_UVtmpZ", size_UVtmpZ},
@@ -734,14 +363,10 @@ auto rocsolver_gesdd_getWorkItems(rocblas_handle handle,
            {"gesddwi_tau", size_tau},          {"gesddwi_workArr", size_workArr},
            {"gesddwi_workArr2", size_workArr2}};
 
-    auto work2 = create_work_items_sorted_by_size<N>(wlist);
+    constexpr std::size_t N{13};
+    auto work = create_work_items_sorted_by_size<N>(wlist);
 
-    /* merge_work_items(work, work2); */
-    /* cat_work_items(work, work2); */
-
-    /* auto [ws, _] = device_workspace<N>::Get(handle, work); */
-
-    return work2;
+    return work;
 }
 
 template <bool BATCHED, bool STRIDED, typename T, typename SS, typename W>
@@ -933,7 +558,7 @@ rocblas_status rocsolver_gesdd_template(rocblas_handle handle,
     return rocblas_status_success;
 }
 
-template <bool BATCHED, bool STRIDED, typename T, typename SS, typename W, typename WorkspacePtr>
+template <bool BATCHED, bool STRIDED, typename T, typename SS, typename W, typename DevWorkPtr>
 rocblas_status rocsolver_gesdd_template(rocblas_handle handle,
                                         const rocblas_svect left_svect,
                                         const rocblas_svect right_svect,
@@ -953,7 +578,7 @@ rocblas_status rocsolver_gesdd_template(rocblas_handle handle,
                                         const rocblas_stride strideV,
                                         rocblas_int* info,
                                         const rocblas_int batch_count,
-                                        WorkspacePtr wptr)
+                                        DevWorkPtr wptr)
 {
     /* ROCSOLVER_ENTER("gesdd", "leftsv:", left_svect, "rightsv:", right_svect, "m:", m, "n:", n, */
     /*                 "shiftA:", shiftA, "lda:", lda, "ldu:", ldu, "ldv:", ldv, "bc:", batch_count); */
@@ -981,6 +606,334 @@ rocblas_status rocsolver_gesdd_template(rocblas_handle handle,
         handle, left_svect, right_svect, m, n, A, shiftA, lda, strideA, S, strideS, U, ldu, strideU,
         V, ldv, strideV, info, batch_count, (T*)VUtmp, UVtmpZ, (T*)scalars, work1, work2, work3,
         work4, work5_ipiv, splits, tmptau_W, tau, workArr, workArr2);
+}
+
+template <bool BATCHED, bool STRIDED, typename T, typename S, typename W>
+auto rocsolver_gesdd_getWorkItems_alt(rocblas_handle handle,
+                                      const rocblas_svect left_svect,
+                                      const rocblas_svect right_svect,
+                                      const rocblas_int m,
+                                      const rocblas_int n,
+                                      W /* A */,
+                                      const rocblas_int lda,
+                                      const rocblas_stride strideA,
+                                      S* /* S */,
+                                      const rocblas_stride strideS,
+                                      T* /* U */,
+                                      const rocblas_int ldu,
+                                      const rocblas_stride strideU,
+                                      T* /* V */,
+                                      const rocblas_int ldv,
+                                      const rocblas_stride strideV,
+                                      rocblas_int* /* info */,
+                                      const rocblas_int batch_count)
+{
+    // Make sure workspace is initialized
+    std::size_t size_VUtmp = 0;
+    std::size_t size_UVtmp = 0;
+    std::size_t size_ipiv = 0;
+    std::size_t size_workArr = 0;
+    std::size_t size_work_batched = 0;
+    rocblas_int shiftA = 0;
+    rocblas_stride stride = strideS;
+    rocblas_stride strideP = 0;
+
+    /* // There is no quick return! */
+    /* if(n == 0 || m == 0 || batch_count == 0) */
+    /* { */
+    /*     return; */
+    /* } */
+
+    //
+    // Requirements for external methods
+    //
+
+    // Requirements for Divide-and-Conquer eigensolver
+    auto wi_syevd = [&]() -> auto
+    {
+        if(m >= n)
+        {
+            return rocsolver_syevd_heevd_getWorkItems<BATCHED, STRIDED, T, S, W>(
+                handle, rocblas_evect_original, rocblas_fill_upper, n, nullptr, shiftA, lda,
+                strideA, nullptr, strideS, nullptr, stride, (rocblas_int*)nullptr, batch_count);
+        }
+        else
+        {
+            return rocsolver_syevd_heevd_getWorkItems<BATCHED, STRIDED, T, S, W>(
+                handle, rocblas_evect_original, rocblas_fill_upper, m, nullptr, shiftA, lda,
+                strideA, nullptr, strideS, nullptr, stride, (rocblas_int*)nullptr, batch_count);
+        }
+    };
+
+    // Requirements for QR factorization
+    auto wi_geqrf = rocsolver_geqrf_getWorkItems<BATCHED, STRIDED>(
+        handle, m, n, (W) nullptr, shiftA, lda, strideA, (rocblas_int*)nullptr, 0, batch_count);
+    auto wi_gelqf = rocsolver_gelqf_getWorkItems<BATCHED, STRIDED>(
+        handle, m, n, (W) nullptr, shiftA, lda, strideA, (rocblas_int*)nullptr, 0, batch_count);
+
+    bool left_full = left_svect == rocblas_svect_all;
+    bool right_full = right_svect == rocblas_svect_all;
+    auto wi_orgqr = rocsolver_orgqr_ungqr_getWorkItems<BATCHED, STRIDED, rocblas_int, W>(
+        handle, m, (left_full ? m : n), n, nullptr, shiftA, lda, strideA, (rocblas_int*)nullptr,
+        strideP, batch_count);
+    auto wi_orglq = rocsolver_orglq_unglq_getWorkItems<BATCHED, STRIDED, rocblas_int, W>(
+        handle, (right_full ? n : m), n, m, nullptr, shiftA, lda, strideA, (rocblas_int*)nullptr,
+        strideP, batch_count);
+
+    // Requirements for DC and QR combined
+    auto wi_eig = cond(m >= n, merge(wi_syevd(), merge(wi_geqrf, wi_orgqr)),
+                       merge(wi_syevd(), merge(wi_gelqf, wi_orglq)));
+
+    // Extra requirements for temporary Householder scalars
+    size_ipiv = sizeof(T) * min(m, n) * batch_count;
+
+    // Extra requirements for syevd off-diagonal entries (E)
+    size_workArr = sizeof(T) * std::min({m, n}) * std::max({(int)stride, 1}) * batch_count;
+
+    //
+    // Internal requirements of gesdd
+    //
+
+    // Extra requirements for temporary V & U storage
+    bool leftv = left_svect != rocblas_svect_none;
+    bool rightv = right_svect != rocblas_svect_none;
+    if(m >= n)
+    {
+        size_VUtmp = sizeof(T) * n * n * batch_count;
+        if(!leftv)
+        {
+            size_UVtmp = sizeof(T) * m * n * batch_count;
+        }
+    }
+    else
+    {
+        if(!leftv)
+        {
+            size_VUtmp = sizeof(T) * m * m * batch_count;
+        }
+        if(!rightv)
+        {
+            size_UVtmp = sizeof(T) * m * n * batch_count;
+        }
+    }
+
+    // Size of array of pointers (batched cases)
+    if(BATCHED)
+    {
+        size_work_batched = sizeof(T*) * 2 * batch_count;
+    }
+
+    size_workArr = std::max({size_workArr, size_work_batched});
+
+    work_items_list_t wlist = {{"gesdd_workArr", size_workArr},
+                               {"gesdd_ipiv", size_ipiv},
+                               {"gesdd_VUtmp", size_VUtmp},
+                               {"gesdd_UVtmp", size_UVtmp}};
+
+    constexpr std::size_t N{4};
+    auto wi_gesdd = create_work_items_sorted_by_size<N>(wlist);
+    auto work = join(wi_eig, wi_gesdd);
+
+    return work;
+}
+
+template <bool BATCHED, bool STRIDED, typename T, typename SS, typename W>
+rocblas_status rocsolver_gesdd_template_alt(rocblas_handle handle,
+                                            const rocblas_svect left_svect,
+                                            const rocblas_svect right_svect,
+                                            const rocblas_int m,
+                                            const rocblas_int n,
+                                            W A,
+                                            const rocblas_int shiftA,
+                                            const rocblas_int lda,
+                                            const rocblas_stride strideA,
+                                            SS* S,
+                                            const rocblas_stride strideS,
+                                            T* U,
+                                            const rocblas_int ldu,
+                                            const rocblas_stride strideU,
+                                            T* V,
+                                            const rocblas_int ldv,
+                                            const rocblas_stride strideV,
+                                            rocblas_int* info,
+                                            const rocblas_int batch_count,
+                                            rocsolver_device_workspace_ptr_t dwptr)
+{
+    ROCSOLVER_ENTER("gesdd", "leftsv:", left_svect, "rightsv:", right_svect, "m:", m, "n:", n,
+                    "shiftA:", shiftA, "lda:", lda, "ldu:", ldu, "ldv:", ldv, "bc:", batch_count);
+
+    if(dwptr == nullptr)
+    {
+        auto gesdd_work_items = rocsolver_gesdd_getWorkItems_alt<BATCHED, STRIDED, T, SS, W>(
+            handle, left_svect, right_svect, m, n, nullptr /* W A */, lda, strideA, nullptr /* S */,
+            strideS, nullptr /* T* U */, ldu, strideU, nullptr /* T* V */, ldv, strideV,
+            nullptr /* rocblas_int* info */, batch_count);
+
+        auto [dev_workspace_ptr, status] = rocsolver_device_workspace::Get(handle, gesdd_work_items);
+        if(rocblas_is_device_memory_size_query(handle))
+        {
+            return status;
+        }
+
+        if(!dev_workspace_ptr || (status != rocblas_status_success))
+        {
+            return status;
+        }
+
+        dwptr = dev_workspace_ptr;
+    }
+
+    T* VUtmp = (T*)dwptr->work("gesdd_VUtmp");
+    void* UVtmpZ = dwptr->work("gesdd_UVtmp");
+    void* work5_ipiv = dwptr->work("gesdd_ipiv");
+    void* workArr = dwptr->work("gesdd_workArr");
+
+    // Quick return
+    if(batch_count == 0)
+        return rocblas_status_success;
+
+    hipStream_t stream;
+    rocblas_get_stream(handle, &stream);
+
+    // Quick return
+    if(m == 0 || n == 0)
+    {
+        rocblas_int blocksReset = (batch_count - 1) / BS1 + 1;
+        dim3 gridReset(blocksReset, 1, 1);
+        dim3 threadsReset(BS1, 1, 1);
+
+        ROCSOLVER_LAUNCH_KERNEL(reset_info, gridReset, threadsReset, 0, stream, info, batch_count, 0);
+
+        return rocblas_status_success;
+    }
+
+    // Everything is executed with scalars on the host
+    rocblas_pointer_mode old_mode;
+    rocblas_get_pointer_mode(handle, &old_mode);
+    rocblas_set_pointer_mode(handle, rocblas_pointer_mode_host);
+
+    bool leftv = left_svect != rocblas_svect_none;
+    bool rightv = right_svect != rocblas_svect_none;
+    bool left_full = left_svect == rocblas_svect_all;
+    bool right_full = right_svect == rocblas_svect_all;
+    T neg_one = T(-1);
+    T one = T(1);
+    T zero = T(0);
+
+    rocblas_int device_id;
+    HIP_CHECK(hipGetDevice(&device_id));
+    hipDeviceProp_t properties;
+    HIP_CHECK(hipGetDeviceProperties(&properties, device_id));
+
+    // The general idea is as follows: Given a m by n (m >= n) matrix A, we
+    // compute the eigendecomposition of A^*A with Divide-and-Conquer to obtain
+    //
+    // A^*A |--> (V, D); such that V^*A^*AV = D.
+    //
+    // Discard the computed eigenvalues D, and use the eigenvectors V as the
+    // right singular vectors of A, obtaining the left singular vectors (U) and
+    // the singular values (S) from the QR decomposition of AV (see code for
+    // necessary changes when m < n and AA^* is used instead of A^*A).
+
+    if(m >= n)
+    {
+        // Compute -A'A; negative sign is necessary as `gesdd` outputs singular
+        // values in non-ascending order, while `syevd` outputs eigenvalues in
+        // non-decreasing order.
+        T* V_gemm = VUtmp;
+        rocblas_int ldv_gemm = n;
+        rocblas_int strideV_gemm = n * n;
+
+        rocsolver_gemm(handle, rocblas_operation_conjugate_transpose, rocblas_operation_none, n, n,
+                       m, &neg_one, A, shiftA, lda, strideA, A, shiftA, lda, strideA, &zero, V_gemm,
+                       0, ldv_gemm, strideV_gemm, batch_count, (T**)workArr);
+
+        rocsolver_syevd_heevd_template<false, STRIDED, T>(
+            handle, rocblas_evect_original, rocblas_fill_upper, n, V_gemm, 0, ldv_gemm,
+            strideV_gemm, S, strideS, (SS*)workArr, strideS, info, batch_count, dwptr);
+
+        // Compute AV
+        T* U_gemm = (leftv ? U : (T*)UVtmpZ);
+        rocblas_int ldu_gemm = (leftv ? ldu : m);
+        rocblas_int strideU_gemm = (leftv ? strideU : m * n);
+
+        rocsolver_gemm(handle, rocblas_operation_none, rocblas_operation_none, m, n, n, &one, A,
+                       shiftA, lda, strideA, V_gemm, 0, ldv_gemm, strideV_gemm, &zero, U_gemm, 0,
+                       ldu_gemm, strideU_gemm, batch_count, (T**)workArr);
+
+        // Apply QR factorization to AV, obtaining U from Q and S from the
+        // diagonal of R; notice that, since the QR decomposition is not
+        // unique, we are required to make sure that all of the diagonal
+        // elements of R are positive and flip the signs of the respective
+        // columns of Q otherwise.
+        rocsolver_geqrf_template<false, STRIDED, T>(handle, m, n, U_gemm, 0, ldu_gemm, strideU_gemm,
+                                                    (T*)work5_ipiv, n, batch_count, dwptr);
+
+        rocblas_int blocks = (n - 1) / BS1 + 1;
+        blocks = std::min(blocks, properties.maxGridSize[0]);
+        auto bc = std::min(batch_count, properties.maxGridSize[1]);
+        ROCSOLVER_LAUNCH_KERNEL(gesdd_flip_signs<T>, dim3(blocks, bc, 1), dim3(BS1, 1, 1), 0,
+                                stream, n, S, strideS, U_gemm, ldu_gemm, strideU_gemm, V_gemm,
+                                ldv_gemm, strideV_gemm, batch_count);
+
+        if(leftv)
+            rocsolver_orgqr_ungqr_template<false, STRIDED, T>(handle, m, (left_full ? m : n), n,
+                                                              U_gemm, 0, ldu_gemm, strideU_gemm,
+                                                              (T*)work5_ipiv, n, batch_count, dwptr);
+
+        // Transpose V (for consistency with LAPACK's API)
+        if(rightv)
+        {
+            rocblas_int blocks_n = (n - 1) / BS2 + 1;
+            ROCSOLVER_LAUNCH_KERNEL(copy_trans_mat<T>, dim3(blocks_n, blocks_n, batch_count),
+                                    dim3(BS2, BS2, 1), 0, stream,
+                                    rocblas_operation_conjugate_transpose, n, n, V_gemm, 0,
+                                    ldv_gemm, strideV_gemm, V, 0, ldv, strideV);
+        }
+    }
+    else
+    {
+        // Compute -AA'
+        T* U_gemm = (leftv ? U : VUtmp);
+        rocblas_int ldu_gemm = (leftv ? ldu : m);
+        rocblas_int strideU_gemm = (leftv ? strideU : m * m);
+
+        rocsolver_gemm(handle, rocblas_operation_none, rocblas_operation_conjugate_transpose, m, m,
+                       n, &neg_one, A, shiftA, lda, strideA, A, shiftA, lda, strideA, &zero, U_gemm,
+                       0, ldu_gemm, strideU_gemm, batch_count, (T**)workArr);
+
+        rocsolver_syevd_heevd_template<false, STRIDED, T>(
+            handle, rocblas_evect_original, rocblas_fill_upper, m, U_gemm, 0, ldu_gemm,
+            strideU_gemm, S, strideS, (SS*)workArr, strideS, info, batch_count, dwptr);
+
+        // Compute U^*A
+        T* V_gemm = (rightv ? V : (T*)UVtmpZ);
+        rocblas_int ldv_gemm = (rightv ? ldv : m);
+        rocblas_int strideV_gemm = (rightv ? strideV : m * n);
+
+        rocsolver_gemm(handle, rocblas_operation_conjugate_transpose, rocblas_operation_none, m, n,
+                       m, &one, U_gemm, 0, ldu_gemm, strideU_gemm, A, shiftA, lda, strideA, &zero,
+                       V_gemm, 0, ldv_gemm, strideV_gemm, batch_count, (T**)workArr);
+
+        // Apply LQ factorization to U^*A, obtaining S from the diagonal of L and V^* from Q
+        rocsolver_gelqf_template<false, STRIDED, T>(handle, m, n, V_gemm, 0, ldv_gemm, strideV_gemm,
+                                                    (T*)work5_ipiv, m, batch_count, dwptr);
+
+        rocblas_int blocks = (m - 1) / BS1 + 1;
+        blocks = std::min(blocks, properties.maxGridSize[0]);
+        auto bc = std::min(batch_count, properties.maxGridSize[1]);
+        ROCSOLVER_LAUNCH_KERNEL(gesdd_flip_signs<T>, dim3(blocks, bc, 1), dim3(BS1, 1, 1), 0,
+                                stream, m, S, strideS, V_gemm, ldv_gemm, strideV_gemm, U_gemm,
+                                ldu_gemm, strideU_gemm, batch_count);
+
+        if(rightv)
+            rocsolver_orglq_unglq_template<false, STRIDED, T>(handle, (right_full ? n : m), n, m,
+                                                              V_gemm, 0, ldv_gemm, strideV_gemm,
+                                                              (T*)work5_ipiv, m, batch_count, dwptr);
+    }
+
+    rocblas_set_pointer_mode(handle, old_mode);
+    return rocblas_status_success;
 }
 
 ROCSOLVER_END_NAMESPACE
