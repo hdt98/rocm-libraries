@@ -116,6 +116,27 @@ public:
 
         return reserved + result;
     }
+
+    void print_debug()
+    {
+        std::cout << "Num Sizes: " << sizes.size() << std::endl;
+        for(int i = 0; i < sizes.size(); i++)
+        {
+            std::cout << sizes[i];
+            if(i < sizes.size() - 1)
+                std::cout << ", ";
+        }
+        std::cout << std::endl;
+
+        std::cout << "Num Pointers: " << pointers.size() << std::endl;
+        for(int i = 0; i < pointers.size(); i++)
+        {
+            std::cout << pointers[i];
+            if(i < pointers.size() - 1)
+                std::cout << ", ";
+        }
+        std::cout << std::endl;
+    }
 };
 
 ROCSOLVER_END_NAMESPACE

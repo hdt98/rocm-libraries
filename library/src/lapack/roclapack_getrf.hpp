@@ -499,10 +499,10 @@ rocblas_status getrf_panelLU(rocblas_handle handle,
         jb = std::min(nn - k, blk); // number of columns/pivots in the inner block
 
         // factorize inner panel block
-        rocsolver_getf2_template<ISBATCHED, T>(handle, mm - k, jb, A, shiftA + idx2D(k, k, inca, lda),
-                                               inca, lda, strideA, ipiv, shiftP + k, strideP, info,
-                                               batch_count, work_helper, scalars, pivotval,
-                                               pivotidx, pivot, offset + k, permut_idx, stridePI);
+        rocsolver_getf2_template<ISBATCHED, T>(handle, mm - k, jb, A,
+                                               shiftA + idx2D(k, k, inca, lda), inca, lda, strideA,
+                                               ipiv, shiftP + k, strideP, info, batch_count,
+                                               work_helper, pivot, offset + k, permut_idx, stridePI);
         if(pivot)
         {
             dimx = jb;
@@ -583,9 +583,8 @@ void rocsolver_getrf_getMemorySize(const I m,
     if(blk == 0)
     {
         // requirements for one single GETF2
-        rocsolver_getf2_getMemorySize<ISBATCHED, T>(m, n, pivot, batch_count, size_scalars,
-                                                    size_pivotval, size_pivotidx, work_helper,
-                                                    false, inca);
+        rocsolver_getf2_getMemorySize<ISBATCHED, T>(m, n, pivot, batch_count, work_helper, false,
+                                                    inca);
         *size_work1 = 0;
         *size_work2 = 0;
         *size_work3 = 0;
@@ -601,8 +600,7 @@ void rocsolver_getrf_getMemorySize(const I m,
         dim = min(dim, I(512));
 
         // requirements for largest possible GETF2 for the sub blocks
-        rocsolver_getf2_getMemorySize<ISBATCHED, T>(m, dim, pivot, batch_count, size_scalars,
-                                                    size_pivotval, size_pivotidx, work_helper, true,
+        rocsolver_getf2_getMemorySize<ISBATCHED, T>(m, dim, pivot, batch_count, work_helper, true,
                                                     inca);
 
         // extra workspace to store info about singularity and pivots of sub blocks
@@ -682,9 +680,9 @@ rocblas_status rocsolver_getrf_template(rocblas_handle handle,
     I blk = getrf_get_blksize<ISBATCHED, T>(dim, pivot);
 
     if(blk == 0)
-        return rocsolver_getf2_template<ISBATCHED, T>(
-            handle, m, n, A, shiftA, inca, lda, strideA, ipiv, shiftP, strideP, info, batch_count,
-            work_helper, scalars, pivotval, pivotidx, pivot);
+        return rocsolver_getf2_template<ISBATCHED, T>(handle, m, n, A, shiftA, inca, lda, strideA,
+                                                      ipiv, shiftP, strideP, info, batch_count,
+                                                      work_helper, pivot);
 
     // everything must be executed with scalars on the host
     rocblas_pointer_mode old_mode;

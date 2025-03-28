@@ -474,21 +474,13 @@ void rocsolver_getf2_getMemorySize(const I m,
                                    const I n,
                                    const bool pivot,
                                    const I batch_count,
-                                   size_t* size_scalars,
-                                   size_t* size_pivotval,
-                                   size_t* size_pivotidx,
                                    rocsolver_workspace_helper* work_helper,
                                    bool inblocked = false,
                                    const I inca = 1)
 {
     // if quick return no workspace needed
     if(m == 0 || n == 0 || batch_count == 0)
-    {
-        *size_scalars = 0;
-        *size_pivotval = 0;
-        *size_pivotidx = 0;
         return;
-    }
 
 #ifdef OPTIMAL
     bool nomem = (!std::is_same<I, int64_t>::value
@@ -496,24 +488,21 @@ void rocsolver_getf2_getMemorySize(const I m,
 
     // no workspace needed if using optimized kernel for small sizes
     if(nomem)
-    {
-        *size_scalars = 0;
-        *size_pivotval = 0;
-        *size_pivotidx = 0;
         return;
-    }
 #endif
 
     // inblocked = true when called from inside blocked algorithms like GETRF.
 
     // for scalars
-    *size_scalars = sizeof(T) * 3;
+    size_t size_scalars = sizeof(T) * 3;
 
     // for pivot values
-    *size_pivotval = sizeof(T) * batch_count;
+    size_t size_pivotval = sizeof(T) * batch_count;
 
     // for pivot indices
-    *size_pivotidx = pivot ? sizeof(I) * batch_count : 0;
+    size_t size_pivotidx = pivot ? sizeof(I) * batch_count : 0;
+
+    work_helper->assign_sizes({size_scalars, size_pivotval, size_pivotidx});
 }
 
 /** argument checking **/
@@ -563,9 +552,6 @@ rocblas_status rocsolver_getf2_template(rocblas_handle handle,
                                         INFO* info,
                                         const I batch_count,
                                         rocsolver_workspace_helper* work_helper,
-                                        T* scalars,
-                                        T* pivotval,
-                                        I* pivotidx,
                                         const bool pivot,
                                         const I offset = 0,
                                         I* permut_idx = nullptr,
@@ -628,6 +614,12 @@ rocblas_status rocsolver_getf2_template(rocblas_handle handle,
     rocblas_pointer_mode old_mode;
     rocblas_get_pointer_mode(handle, &old_mode);
     rocblas_set_pointer_mode(handle, rocblas_pointer_mode_device);
+
+    // prepare workspace
+    T* scalars = (T*)(*work_helper)[0];
+    T* pivotval = (T*)(*work_helper)[1];
+    I* pivotidx = (I*)(*work_helper)[2];
+    init_scalars(handle, scalars);
 
     // prepare kernels
     I singular_thds = getf2_get_checksingularity_blksize(n);
