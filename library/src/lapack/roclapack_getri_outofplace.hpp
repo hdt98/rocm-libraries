@@ -1,5 +1,5 @@
 /* **************************************************************************
- * Copyright (C) 2021-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2021-2025 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,6 +31,7 @@
 #include "rocblas.hpp"
 #include "roclapack_getrs.hpp"
 #include "rocsolver/rocsolver.h"
+#include "rocsolver_workspace_helper.hpp"
 
 ROCSOLVER_BEGIN_NAMESPACE
 
@@ -41,6 +42,7 @@ void rocsolver_getri_outofplace_getMemorySize(const rocblas_int n,
                                               size_t* size_work2,
                                               size_t* size_work3,
                                               size_t* size_work4,
+                                              rocsolver_workspace_helper* work_helper,
                                               bool* optim_mem)
 {
     // if quick return, no need of workspace
@@ -56,8 +58,7 @@ void rocsolver_getri_outofplace_getMemorySize(const rocblas_int n,
 
     // requirements for calling GETRS
     rocsolver_getrs_getMemorySize<BATCHED, STRIDED, T>(rocblas_operation_none, n, n, batch_count,
-                                                       size_work1, size_work2, size_work3,
-                                                       size_work4, optim_mem);
+                                                       work_helper, optim_mem);
 }
 
 template <typename T>
@@ -108,6 +109,7 @@ rocblas_status rocsolver_getri_outofplace_template(rocblas_handle handle,
                                                    const rocblas_stride strideC,
                                                    rocblas_int* info,
                                                    const rocblas_int batch_count,
+                                                   rocsolver_workspace_helper* work_helper,
                                                    void* work1,
                                                    void* work2,
                                                    void* work3,
@@ -146,7 +148,7 @@ rocblas_status rocsolver_getri_outofplace_template(rocblas_handle handle,
     // compute inverse
     rocsolver_getrs_template<BATCHED, STRIDED, T>(
         handle, rocblas_operation_none, n, n, A, shiftA, 1, lda, strideA, ipiv, strideP, C, shiftC,
-        1, ldc, strideC, batch_count, work1, work2, work3, work4, optim_mem, pivot);
+        1, ldc, strideC, batch_count, work_helper, optim_mem, pivot);
 
     return rocblas_status_success;
 }

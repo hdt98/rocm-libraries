@@ -1,5 +1,5 @@
 /* **************************************************************************
- * Copyright (C) 2021-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2021-2025 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -75,13 +75,14 @@ rocblas_status rocsolver_geblttrs_npvt_interleaved_batched_impl(rocblas_handle h
     rocblas_int shiftX = 0;
 
     // memory workspace sizes:
+    rocsolver_workspace_helper work_helper;
     // requirements for calling GETRS
     bool optim_mem;
     size_t size_work1, size_work2, size_work3, size_work4;
 
-    rocsolver_geblttrs_npvt_getMemorySize<false, true, T>(nb, nblocks, nrhs, batch_count, &size_work1,
-                                                          &size_work2, &size_work3, &size_work4,
-                                                          &optim_mem, ldb, ldx, incb, incx);
+    rocsolver_geblttrs_npvt_getMemorySize<false, true, T>(
+        nb, nblocks, nrhs, batch_count, &size_work1, &size_work2, &size_work3, &size_work4,
+        &work_helper, &optim_mem, ldb, ldx, incb, incx);
 
     if(rocblas_is_device_memory_size_query(handle))
         return rocblas_set_optimal_device_memory_size(handle, size_work1, size_work2, size_work3,
@@ -101,8 +102,8 @@ rocblas_status rocsolver_geblttrs_npvt_interleaved_batched_impl(rocblas_handle h
     // Execution
     return rocsolver_geblttrs_npvt_template<false, true, T>(
         handle, nb, nblocks, nrhs, A, shiftA, inca, lda, strideA, B, shiftB, incb, ldb, strideB, C,
-        shiftC, incc, ldc, strideC, X, shiftX, incx, ldx, strideX, batch_count, work1, work2, work3,
-        work4, optim_mem);
+        shiftC, incc, ldc, strideC, X, shiftX, incx, ldx, strideX, batch_count, &work_helper, work1,
+        work2, work3, work4, optim_mem);
 }
 
 ROCSOLVER_END_NAMESPACE

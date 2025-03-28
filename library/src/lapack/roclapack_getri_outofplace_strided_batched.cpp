@@ -1,5 +1,5 @@
 /* **************************************************************************
- * Copyright (C) 2021-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2021-2025 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -64,12 +64,14 @@ rocblas_status rocsolver_getri_outofplace_strided_batched_impl(rocblas_handle ha
     rocblas_int shiftC = 0;
 
     // memory workspace sizes:
+    rocsolver_workspace_helper work_helper;
     // size of reusable workspace (for calling GETRS)
     bool optim_mem;
     size_t size_work1, size_work2, size_work3, size_work4;
 
-    rocsolver_getri_outofplace_getMemorySize<false, true, T>(
-        n, batch_count, &size_work1, &size_work2, &size_work3, &size_work4, &optim_mem);
+    rocsolver_getri_outofplace_getMemorySize<false, true, T>(n, batch_count, &size_work1,
+                                                             &size_work2, &size_work3, &size_work4,
+                                                             &work_helper, &optim_mem);
 
     if(rocblas_is_device_memory_size_query(handle))
         return rocblas_set_optimal_device_memory_size(handle, size_work1, size_work2, size_work3,
@@ -89,7 +91,7 @@ rocblas_status rocsolver_getri_outofplace_strided_batched_impl(rocblas_handle ha
     // Execution
     return rocsolver_getri_outofplace_template<false, true, T>(
         handle, n, A, shiftA, lda, strideA, ipiv, shiftP, strideP, C, shiftC, ldc, strideC, info,
-        batch_count, work1, work2, work3, work4, optim_mem, pivot);
+        batch_count, &work_helper, work1, work2, work3, work4, optim_mem, pivot);
 }
 
 ROCSOLVER_END_NAMESPACE

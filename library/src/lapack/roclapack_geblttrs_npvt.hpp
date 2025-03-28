@@ -1,5 +1,5 @@
 /* **************************************************************************
- * Copyright (C) 2021-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2021-2025 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,6 +31,7 @@
 #include "roclapack_getrs.hpp"
 #include "rocsolver/rocsolver.h"
 #include "rocsolver_run_specialized_kernels.hpp"
+#include "rocsolver_workspace_helper.hpp"
 
 ROCSOLVER_BEGIN_NAMESPACE
 
@@ -43,6 +44,7 @@ void rocsolver_geblttrs_npvt_getMemorySize(const rocblas_int nb,
                                            size_t* size_work2,
                                            size_t* size_work3,
                                            size_t* size_work4,
+                                           rocsolver_workspace_helper* work_helper,
                                            bool* optim_mem,
                                            const rocblas_int ldb = 1,
                                            const rocblas_int ldx = 1,
@@ -61,8 +63,7 @@ void rocsolver_geblttrs_npvt_getMemorySize(const rocblas_int nb,
 
     // size requirements for getrs
     rocsolver_getrs_getMemorySize<BATCHED, STRIDED, T>(rocblas_operation_none, nb, nrhs, batch_count,
-                                                       size_work1, size_work2, size_work3,
-                                                       size_work4, optim_mem, ldb, ldx, incb, incx);
+                                                       work_helper, optim_mem, ldb, ldx, incb, incx);
 }
 
 template <typename T>
@@ -142,6 +143,7 @@ rocblas_status rocsolver_geblttrs_npvt_template(rocblas_handle handle,
                                                 const rocblas_int ldx,
                                                 const rocblas_stride strideX,
                                                 const rocblas_int batch_count,
+                                                rocsolver_workspace_helper* work_helper,
                                                 void* work1,
                                                 void* work2,
                                                 void* work3,
@@ -177,8 +179,8 @@ rocblas_status rocsolver_geblttrs_npvt_template(rocblas_handle handle,
 
         rocsolver_getrs_template<BATCHED, STRIDED, T>(
             handle, rocblas_operation_none, nb, nrhs, B, shiftB + k * bsb, incb, ldb, strideB,
-            (rocblas_int*)nullptr, 0, X, shiftX + k * bsx, incx, ldx, strideX, batch_count, work1,
-            work2, work3, work4, optim_mem, false);
+            (rocblas_int*)nullptr, 0, X, shiftX + k * bsx, incx, ldx, strideX, batch_count,
+            work_helper, optim_mem, false);
     }
 
     // backward solve

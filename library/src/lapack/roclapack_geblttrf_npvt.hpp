@@ -98,8 +98,7 @@ void rocsolver_geblttrf_npvt_getMemorySize(const rocblas_int nb,
 
     // size requirements for getrs
     rocsolver_getrs_getMemorySize<BATCHED, STRIDED, T>(rocblas_operation_none, nb, nb, batch_count,
-                                                       &a2, &b2, &c2, &d2, &unused, ldb, ldc, incb,
-                                                       incc);
+                                                       work_helper, &unused, ldb, ldc, incb, incc);
 
     *size_work1 = std::max(a1, a2);
     *size_work2 = std::max(b1, b2);
@@ -221,8 +220,8 @@ rocblas_status rocsolver_geblttrf_npvt_template(rocblas_handle handle,
     {
         rocsolver_getrs_template<BATCHED, STRIDED, T>(
             handle, rocblas_operation_none, nb, nb, B, shiftB + k * bsb, incb, ldb, strideB,
-            (rocblas_int*)nullptr, 0, C, shiftC + k * bsc, incc, ldc, strideC, batch_count, work1,
-            work2, work3, work4, optim_mem, false);
+            (rocblas_int*)nullptr, 0, C, shiftC + k * bsc, incc, ldc, strideC, batch_count,
+            work_helper, optim_mem, false);
 
         rocsolver_gemm(handle, rocblas_operation_none, rocblas_operation_none, nb, nb, nb, &minone,
                        A, shiftA + k * bsa, inca, lda, strideA, C, shiftC + k * bsc, incc, ldc,

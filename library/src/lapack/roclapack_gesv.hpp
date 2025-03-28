@@ -114,7 +114,7 @@ void rocsolver_gesv_getMemorySize(const rocblas_int n,
 
     // workspace required for calling GETRS
     rocsolver_getrs_getMemorySize<BATCHED, STRIDED, T>(rocblas_operation_none, n, nrhs, batch_count,
-                                                       &w1, &w2, &w3, &w4, &opt2);
+                                                       work_helper, &opt2);
 
     *size_work1 = std::max(*size_work1, w1);
     *size_work2 = std::max(*size_work2, w2);
@@ -193,7 +193,7 @@ rocblas_status rocsolver_gesv_template(rocblas_handle handle,
     // solve AX = B, overwriting B with X
     rocsolver_getrs_template<BATCHED, STRIDED, T>(
         handle, rocblas_operation_none, n, nrhs, A, shiftA, 1, lda, strideA, ipiv, strideP, B,
-        shiftB, 1, ldb, strideB, batch_count, work1, work2, work3, work4, optim_mem, true);
+        shiftB, 1, ldb, strideB, batch_count, work_helper, optim_mem, true);
 
     // restore elements of B that were overwritten by GETRS in cases where info is nonzero
     ROCSOLVER_LAUNCH_KERNEL(copy_mat<T>, dim3(copyblocksx, copyblocksy, batch_count), dim3(32, 32),
