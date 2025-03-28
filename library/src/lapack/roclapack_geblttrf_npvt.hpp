@@ -93,9 +93,8 @@ void rocsolver_geblttrf_npvt_getMemorySize(const rocblas_int nb,
     size_t d1 = 0, d2 = 0;
 
     // size requirements for getrf
-    rocsolver_getrf_getMemorySize<BATCHED, STRIDED, T>(
-        nb, nb, false, batch_count, size_scalars, &a1, &b1, &c1, &d1, size_pivotval, size_pivotidx,
-        size_iipiv, size_iinfo1, work_helper, optim_mem, ldb, incb);
+    rocsolver_getrf_getMemorySize<BATCHED, STRIDED, T>(nb, nb, false, batch_count, work_helper,
+                                                       optim_mem, ldb, incb);
 
     // size requirements for getrs
     rocsolver_getrs_getMemorySize<BATCHED, STRIDED, T>(rocblas_operation_none, nb, nb, batch_count,
@@ -214,10 +213,9 @@ rocblas_status rocsolver_geblttrf_npvt_template(rocblas_handle handle,
     rocblas_int bsb = ldb * nb;
     rocblas_int bsc = ldc * nb;
 
-    rocsolver_getrf_template<BATCHED, STRIDED, T>(
-        handle, nb, nb, B, shiftB, incb, ldb, strideB, (rocblas_int*)nullptr, 0, 0, info,
-        batch_count, work_helper, scalars, work1, work2, work3, work4, pivotval, pivotidx, iipiv,
-        iinfo1, optim_mem, false);
+    rocsolver_getrf_template<BATCHED, STRIDED, T>(handle, nb, nb, B, shiftB, incb, ldb, strideB,
+                                                  (rocblas_int*)nullptr, 0, 0, info, batch_count,
+                                                  work_helper, optim_mem, false);
 
     for(rocblas_int k = 0; k < nblocks - 1; k++)
     {
@@ -233,8 +231,7 @@ rocblas_status rocsolver_geblttrf_npvt_template(rocblas_handle handle,
 
         rocsolver_getrf_template<BATCHED, STRIDED, T>(
             handle, nb, nb, B, shiftB + (k + 1) * bsb, incb, ldb, strideB, (rocblas_int*)nullptr, 0,
-            0, iinfo2, batch_count, work_helper, scalars, work1, work2, work3, work4, pivotval,
-            pivotidx, iipiv, iinfo1, optim_mem, false);
+            0, iinfo2, batch_count, work_helper, optim_mem, false);
 
         ROCSOLVER_LAUNCH_KERNEL(geblttrf_update_info, gridReset, threads, 0, stream, info, iinfo2,
                                 (k + 1) * nb, batch_count);
