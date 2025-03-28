@@ -87,6 +87,7 @@ void rocsolver_gesv_getMemorySize(const rocblas_int n,
     }
 
     bool opt1, opt2;
+    work_helper->set_nested_capacity(2);
 
     // extra space to copy B
     size_t size_copyB = sizeof(T) * n * nrhs * batch_count;

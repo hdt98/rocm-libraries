@@ -569,6 +569,8 @@ void rocsolver_getrf_getMemorySize(const I m,
     }
     else
     {
+        work_helper->set_nested_capacity(1);
+
         // largest block panel dimension is 512
         dim = min(dim, I(512));
 

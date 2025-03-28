@@ -68,6 +68,7 @@ void rocsolver_geblttrf_npvt_getMemorySize(const rocblas_int nb,
     }
 
     bool unused;
+    work_helper->set_nested_capacity(2);
 
     // size for temporary info storage
     size_t size_iinfo = sizeof(rocblas_int) * batch_count;
