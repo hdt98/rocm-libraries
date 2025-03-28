@@ -65,33 +65,25 @@ rocblas_status rocsolver_getri_outofplace_impl(rocblas_handle handle,
 
     // memory workspace sizes:
     rocsolver_workspace_helper work_helper;
-    // size of reusable workspace (for calling GETRS)
     bool optim_mem;
-    size_t size_work1, size_work2, size_work3, size_work4;
-
-    rocsolver_getri_outofplace_getMemorySize<false, false, T>(n, batch_count, &size_work1,
-                                                              &size_work2, &size_work3, &size_work4,
-                                                              &work_helper, &optim_mem);
+    rocsolver_getri_outofplace_getMemorySize<false, false, T>(n, batch_count, &work_helper,
+                                                              &optim_mem);
 
     if(rocblas_is_device_memory_size_query(handle))
-        return rocblas_set_optimal_device_memory_size(handle, size_work1, size_work2, size_work3,
-                                                      size_work4);
+        return rocblas_set_optimal_device_memory_size(handle, work_helper.get_total_size());
 
     // memory workspace allocation
-    void *work1, *work2, *work3, *work4;
-    rocblas_device_malloc mem(handle, size_work1, size_work2, size_work3, size_work4);
+    rocblas_device_malloc mem(handle, work_helper.get_total_size());
 
     if(!mem)
         return rocblas_status_memory_error;
-    work1 = mem[0];
-    work2 = mem[1];
-    work3 = mem[2];
-    work4 = mem[3];
+
+    work_helper.assign_buffer((uint8_t*)mem[0]);
 
     // Execution
     return rocsolver_getri_outofplace_template<false, false, T>(
         handle, n, A, shiftA, lda, strideA, ipiv, shiftP, strideP, C, shiftC, ldc, strideC, info,
-        batch_count, &work_helper, work1, work2, work3, work4, optim_mem, pivot);
+        batch_count, &work_helper, optim_mem, pivot);
 }
 
 ROCSOLVER_END_NAMESPACE

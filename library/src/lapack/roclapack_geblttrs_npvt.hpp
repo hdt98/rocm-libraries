@@ -40,10 +40,6 @@ void rocsolver_geblttrs_npvt_getMemorySize(const rocblas_int nb,
                                            const rocblas_int nblocks,
                                            const rocblas_int nrhs,
                                            const rocblas_int batch_count,
-                                           size_t* size_work1,
-                                           size_t* size_work2,
-                                           size_t* size_work3,
-                                           size_t* size_work4,
                                            rocsolver_workspace_helper* work_helper,
                                            bool* optim_mem,
                                            const rocblas_int ldb = 1,
@@ -54,10 +50,7 @@ void rocsolver_geblttrs_npvt_getMemorySize(const rocblas_int nb,
     // if quick return, no need of workspace
     if(nb == 0 || nblocks == 0 || nrhs == 0 || batch_count == 0)
     {
-        *size_work1 = 0;
-        *size_work2 = 0;
-        *size_work3 = 0;
-        *size_work4 = 0;
+        *optim_mem = true;
         return;
     }
 
@@ -144,10 +137,6 @@ rocblas_status rocsolver_geblttrs_npvt_template(rocblas_handle handle,
                                                 const rocblas_stride strideX,
                                                 const rocblas_int batch_count,
                                                 rocsolver_workspace_helper* work_helper,
-                                                void* work1,
-                                                void* work2,
-                                                void* work3,
-                                                void* work4,
                                                 bool optim_mem)
 {
     ROCSOLVER_ENTER("geblttrs_npvt", "nb:", nb, "nblocks:", nblocks, "nrhs:", nrhs,
