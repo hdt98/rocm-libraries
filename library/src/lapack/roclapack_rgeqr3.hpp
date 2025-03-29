@@ -41,10 +41,11 @@
 #include "rocblas.hpp"
 #include "roclapack_geqr2.hpp"
 #include "rocsolver/rocsolver.h"
+#include "specialized/roclapack_gemm_specialized_kernels.hpp"
 
 ROCSOLVER_BEGIN_NAMESPACE
 
-constexpr bool use_trmm_outofplace = true;
+constexpr bool use_trmm_outofplace = false;
 
 // -------------------------------------------------
 // in case GEMM is not fully optimize for small m, n
@@ -100,11 +101,10 @@ static rocblas_int get_n_small()
     return (16);
 };
 
-#include "specialized/roclapack_simple_gemm.hpp"
 //   -----------------------------------------------------------
 //   rocblas gemm may not be optimized for cases with small m,n
 //   consider calling  gemv() when feasible for m==1, or n==1
-//   consider simple_gemm() when m,n are small
+//   consider rocsolver_gemm() when m,n are small
 //   otherwise, use rocblas gemm
 //   -----------------------------------------------------------
 
@@ -242,24 +242,24 @@ static rocblas_status gemm_gemv(rocblas_handle handle,
     else
     {
         I const mn_small = 32;
-        bool const is_small_mn = (m < mn_small) || (n < mn_small);
-        bool const use_simple_gemm = (is_small_mn);
+        bool const is_small_mn = (m <= mn_small) && (n <= mn_small);
+        bool const use_rocsolver_gemm = true;
 
-        if(use_simple_gemm)
+        if(use_rocsolver_gemm && is_small_mn)
         {
-            ROCBLAS_CHECK(roclapack_simple_gemm_template(handle,
+            ROCBLAS_CHECK(rocsolver_gemm(handle,
 
-                                                         transA, transB, m, n, k, alpha,
+                                         transA, transB, m, n, k, alpha,
 
-                                                         Amat, shift_Amat, ldA, stride_Amat,
+                                         Amat, shift_Amat, ldA, stride_Amat,
 
-                                                         Bmat, shift_Bmat, ldB, stride_Bmat,
+                                         Bmat, shift_Bmat, ldB, stride_Bmat,
 
-                                                         beta,
+                                         beta,
 
-                                                         Cmat, shift_Cmat, ldC, stride_Cmat,
+                                         Cmat, shift_Cmat, ldC, stride_Cmat,
 
-                                                         batch_count, workArr));
+                                         batch_count, workArr));
         }
         else
         {
@@ -563,7 +563,7 @@ static void geadd_template(rocblas_handle handle,
     auto ceil = [](auto m, auto nb) { return ((m - 1) / nb + 1); };
 
     I const max_threads = 1024;
-    I const max_blocks = 64 * 1000;
+    I const max_blocks = 1024;
 
     I const nx = 32;
     I const ny = max_threads / nx;
@@ -1783,11 +1783,12 @@ static rocblas_status applyQtC(rocblas_handle handle,
         rocsolver_larfb_getMemorySize<BATCHED, T>(side, m, n, k, batch_count, &size_tmptr,
                                                   &size_workArr);
 
-        std::byte* pfree = (std::byte*)work;
-        T* const tmptr = (T*)pfree;
+        std::byte* pfree = reinterpret_cast<std::byte*>(work);
+
+        T* const tmptr = reinterpret_cast<T*>(pfree);
         pfree += size_tmptr;
 
-        T** const workArr = (T**)pfree;
+        T** const workArr = reinterpret_cast<T**>(pfree);
         pfree += size_workArr;
 
         bool const is_mem_ok = ((size_tmptr + size_workArr) <= lwork_bytes);
@@ -1841,7 +1842,7 @@ static void rocsolver_applyQtC_getMemorySize(I const m,
         return;
     }
 
-    auto const nb = RGEQR3_BLOCKSIZE(T);
+    I const nb = RGEQR3_BLOCKSIZE(T);
 
     size_t size_trmm_byte = 0;
     {
