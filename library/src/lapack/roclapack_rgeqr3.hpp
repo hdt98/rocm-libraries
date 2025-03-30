@@ -55,7 +55,7 @@ constexpr bool use_gemm_gemv = true;
 
 constexpr bool is_applyQtC_use_larfb = true;
 
-constexpr bool use_geqr2 = false;
+constexpr bool use_geqr2 = true;
 
 #ifndef RGEQR3_BLOCKSIZE
 // #define RGEQR3_BLOCKSIZE(T) ((sizeof(T) == 4) ? 256 : (sizeof(T) == 8) ? 128 : (sizeof(T) == 16) ? 64 : 64)
@@ -297,9 +297,9 @@ static void rocblasCall_trmm_mem(rocblas_side const side,
 // where nbx = ceil( n, nx)
 // -----------------------------------------------
 template <typename T, typename I, typename Istride>
-static __global__ void copy_diagonal_kernel(I const n,
-
-                                            T const* const Tmat,
+static __global__ void copy_diagonal_kernel(bool const Tmat2tau,
+                                            I const n,
+                                            T* const Tmat,
                                             Istride const shift_Tmat,
                                             I const ldT,
                                             Istride const stride_Tmat,
@@ -318,10 +318,10 @@ static __global__ void copy_diagonal_kernel(I const n,
 
     for(I bid = bid_start; bid < batch_count; bid += bid_inc)
     {
-        T const* const __restrict__ T_p = load_ptr_batch(Tmat, bid, shift_Tmat, stride_Tmat);
+        T* const __restrict__ T_p = load_ptr_batch(Tmat, bid, shift_Tmat, stride_Tmat);
         T* const __restrict__ tau_p = tau_ + bid * stride_tau;
 
-        auto Tp = [=](auto i, auto j) -> const T {
+        auto Tp = [=](auto i, auto j) -> T& {
             auto const ij = i + j * static_cast<int64_t>(ldT);
             return (T_p[ij]);
         };
@@ -330,9 +330,17 @@ static __global__ void copy_diagonal_kernel(I const n,
 
         for(auto i = i_start; i < n; i += i_inc)
         {
-            tau(i) = Tp(i, i);
+            if(Tmat2tau)
+            {
+                tau(i) = Tp(i, i);
+            }
+            else
+            {
+                Tp(i, i) = tau(i);
+            }
         }
-    }
+
+    } // end for bid
 }
 
 // -----------------------------------
@@ -341,8 +349,9 @@ static __global__ void copy_diagonal_kernel(I const n,
 // -----------------------------------
 template <typename T, typename I, typename Istride>
 static void copy_diagonal_template(rocblas_handle handle,
+                                   bool const Tmat2tau,
                                    I const nn,
-                                   T const* const Tmat,
+                                   T* const Tmat,
                                    Istride const shift_Tmat,
                                    I const ldT,
                                    Istride const stride_Tmat,
@@ -361,7 +370,7 @@ static void copy_diagonal_template(rocblas_handle handle,
     rocblas_get_stream(handle, &stream);
 
     copy_diagonal_kernel<<<dim3(nbx, 1, nbz), dim3(nx, 1, 1), 0, stream>>>(
-        nn, Tmat, shift_Tmat, ldT, stride_Tmat, tau_, stride_tau, batch_count);
+        Tmat2tau, nn, Tmat, shift_Tmat, ldT, stride_Tmat, tau_, stride_tau, batch_count);
 }
 
 // -----------------------------------------
@@ -2017,39 +2026,64 @@ static rocblas_status rocsolver_rgeqr3_template(rocblas_handle handle,
             size_t size_Abyx_norms = 0;
             size_t size_diag = 0;
 
+            auto const min_mn = std::min(m, n);
+
             rocsolver_geqr2_getMemorySize<BATCHED, T, I>(m, n, batch_count,
 
                                                          &size_scalars, &size_work_workArr,
                                                          &size_Abyx_norms, &size_diag);
 
+            size_t size_geqr2 = 0;
+            size_t const size_tau = min_mn * batch_count;
+            Istride const stride_tau = min_mn;
+
+            T* const tau = reinterpret_cast<T*>(pfree);
+            pfree += size_tau;
+            size_geqr2 += size_tau;
+
             T* const scalars = reinterpret_cast<T*>(pfree);
             pfree += size_scalars;
+            size_geqr2 += size_scalars;
 
             void* const work_workArr = reinterpret_cast<void*>(pfree);
             pfree += size_work_workArr;
+            size_geqr2 += size_work_workArr;
 
             T* const Abyx_norms = reinterpret_cast<T*>(pfree);
             pfree += size_Abyx_norms;
+            size_geqr2 += size_Abyx_norms;
 
             T* const diag = reinterpret_cast<T*>(diag);
             pfree += size_diag;
+            size_geqr2 += size_diag;
 
-            size_t const size_geqr2 = size_scalars + size_work_workArr + size_Abyx_norms + size_diag;
-
+            bool const is_mem_ok = (size_geqr2 <= lwork_bytes);
             assert(size_geqr2 <= lwork_bytes);
-
-            T* const tau = Tmat + shift_Tmat;
-            Istride const stride_tau = stride_Tmat;
-
-            auto const istat_geqr2
-                = rocsolver_geqr2_template(handle, m, n, Amat, shift_Amat, ldA, stride_Amat,
-
-                                           tau, stride_tau,
-
-                                           batch_count, scalars, work_workArr, Abyx_norms, diag);
-            if(istat_geqr2 != rocblas_status_success)
+            if(!is_mem_ok)
             {
-                return (istat_geqr2);
+                return (rocblas_status_memory_error);
+            }
+
+            ROCBLAS_CHECK(rocsolver_geqr2_template(handle, m, n, Amat, shift_Amat, ldA, stride_Amat,
+
+                                                   tau, stride_tau,
+
+                                                   batch_count, scalars, work_workArr, Abyx_norms,
+                                                   diag));
+
+            // -----------------------------------
+            // copy tau vector to diagonal of Tmat
+            // -----------------------------------
+
+            {
+                bool const Tmat2tau = false;
+                copy_diagonal_template(handle, Tmat2tau, min_mn,
+
+                                       Tmat, shift_Tmat, ldT, stride_Tmat,
+
+                                       tau, stride_tau,
+
+                                       batch_count);
             }
 
             pfree = pfree - size_geqr2;
@@ -2089,13 +2123,16 @@ static rocblas_status rocsolver_rgeqr3_template(rocblas_handle handle,
 
             assert((size_larft + size_tmp_tau) <= lwork_bytes);
 
-            copy_diagonal_template<T, I, Istride>(handle, n,
+            {
+                bool const Tmat2tau = true;
+                copy_diagonal_template<T, I, Istride>(handle, Tmat2tau, n,
 
-                                                  Tmat, shift_Tmat, ldT, stride_Tmat,
+                                                      Tmat, shift_Tmat, ldT, stride_Tmat,
 
-                                                  tmp_tau, stride_tmp_tau,
+                                                      tmp_tau, stride_tmp_tau,
 
-                                                  batch_count);
+                                                      batch_count);
+            }
 
             rocblas_direct const direct = rocblas_forward_direction;
             rocblas_storev const storev = rocblas_column_wise;
@@ -2556,8 +2593,16 @@ static rocblas_status rocsolver_rgeqrf_template(rocblas_handle handle,
         // copy diagonal entries from T matrix into "tau" array
         // ----------------------------------------------------
 
-        copy_diagonal_template(handle, nn, Tmat, shift_Tmat, ldT, stride_Tmat, tau_, stride_tau,
-                               batch_count);
+        {
+            bool const Tmat2tau = true;
+            copy_diagonal_template(handle, Tmat2tau, nn,
+
+                                   Tmat, shift_Tmat, ldT, stride_Tmat,
+
+                                   tau_, stride_tau,
+
+                                   batch_count);
+        }
 
         // -----------------------------------------------------------
         // update A(j:m,(j+jb):n) = applyQtC( Y, T, A(j:m,(j+jb):n ) );
