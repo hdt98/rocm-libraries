@@ -135,11 +135,6 @@ rocblas_status rocsolver_gesv_template(rocblas_handle handle,
     hipStream_t stream;
     rocblas_get_stream(handle, &stream);
 
-    // prepare workspace
-    T* copyB = (T*)(*work_helper)[0];
-    rocsolver_workspace_helper* getrf_work = work_helper->get_nested(0);
-    rocsolver_workspace_helper* getrs_work = work_helper->get_nested(1);
-
     // prepare kernels
     rocblas_int blocksReset = (batch_count - 1) / BS1 + 1;
     dim3 gridReset(blocksReset, 1, 1);
@@ -151,6 +146,11 @@ rocblas_status rocsolver_gesv_template(rocblas_handle handle,
     // quick return if A or B are empty
     if(n == 0 || nrhs == 0)
         return rocblas_status_success;
+
+    // prepare workspace
+    T* copyB = (T*)(*work_helper)[0];
+    rocsolver_workspace_helper* getrf_work = work_helper->get_nested(0);
+    rocsolver_workspace_helper* getrs_work = work_helper->get_nested(1);
 
     // constants in host memory
     const rocblas_int copyblocksx = (n - 1) / 32 + 1;
