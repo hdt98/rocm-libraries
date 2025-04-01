@@ -5,7 +5,11 @@ Full documentation forrocALUTION is available at [https://rocm.docs.amd.com/proj
 ## (Unreleased) rocALUTION 3.2.3
 
 ### Added
+* The `-a` option has been added to the `rmake.py` build script. This option provides a way to select specific architectures when building on Windows.
 * Added support for gfx950.
+
+### Resolved issues
+* Fixed an issue where the `HIP_PATH` environment variable was being ignored when compiling on Windows.
 
 ### Resolved issues
 
