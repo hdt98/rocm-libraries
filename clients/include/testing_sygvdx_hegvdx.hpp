@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2020-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2020-2025 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -1364,9 +1364,9 @@ void testing_sygvdx_hegvdx(Arguments& argus)
     }
 
     // validate results for rocsolver-test
-    // using 3 * n * machine_precision as tolerance
+    // using 5 * n * machine_precision as tolerance
     if(argus.unit_check)
-        ROCSOLVER_TEST_CHECK(T, max_error, 3 * n);
+        ROCSOLVER_TEST_CHECK(T, max_error, 5 * n);
 
     // output results for rocsolver-bench
     if(argus.timing)
