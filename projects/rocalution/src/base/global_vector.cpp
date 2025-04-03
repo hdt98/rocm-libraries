@@ -38,6 +38,10 @@
 #include <math.h>
 #include <sstream>
 
+#ifndef SUPPORT_MULTINODE
+// LCOV_EXCL_START
+#endif
+
 namespace rocalution
 {
 
@@ -716,3 +720,7 @@ namespace rocalution
 #endif
 
 } // namespace rocalution
+
+#ifndef SUPPORT_MULTINODE
+// LCOV_EXCL_STOP
+#endif

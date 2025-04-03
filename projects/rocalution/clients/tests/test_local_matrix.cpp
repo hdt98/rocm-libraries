@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2018-2024 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2018-2025 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -28,6 +28,7 @@
 
 typedef std::tuple<int, int, std::string> local_matrix_conversions_tuple;
 typedef std::tuple<int, int>              local_matrix_allocations_tuple;
+typedef std::tuple<int, int>              local_matrix_zero_tuple;
 
 int         local_matrix_conversions_size[]     = {10, 17, 21};
 int         local_matrix_conversions_blockdim[] = {4, 7, 11};
@@ -134,6 +135,40 @@ TEST_P(parameterized_local_matrix_allocations, local_matrix_allocations_double)
 }
 
 INSTANTIATE_TEST_CASE_P(local_matrix_allocations,
+                        parameterized_local_matrix_allocations,
+                        testing::Combine(testing::ValuesIn(local_matrix_allocations_size),
+                                         testing::ValuesIn(local_matrix_allocations_blockdim)));
+
+TEST_P(parameterized_local_matrix_allocations, local_matrix_zero_float)
+{
+    Arguments arg = setup_local_matrix_allocations_arguments(GetParam());
+    ASSERT_EQ(testing_local_matrix_zero<float>(arg), true);
+}
+
+TEST_P(parameterized_local_matrix_allocations, local_matrix_zero_double)
+{
+    Arguments arg = setup_local_matrix_allocations_arguments(GetParam());
+    ASSERT_EQ(testing_local_matrix_zero<double>(arg), true);
+}
+
+INSTANTIATE_TEST_CASE_P(local_matrix_zero,
+                        parameterized_local_matrix_allocations,
+                        testing::Combine(testing::ValuesIn(local_matrix_allocations_size),
+                                         testing::ValuesIn(local_matrix_allocations_blockdim)));
+
+TEST_P(parameterized_local_matrix_allocations, local_matrix_set_data_ptr_float)
+{
+    Arguments arg = setup_local_matrix_allocations_arguments(GetParam());
+    ASSERT_EQ(testing_local_matrix_set_data_ptr<float>(arg), true);
+}
+
+TEST_P(parameterized_local_matrix_allocations, local_matrix_set_data_ptr_double)
+{
+    Arguments arg = setup_local_matrix_allocations_arguments(GetParam());
+    ASSERT_EQ(testing_local_matrix_set_data_ptr<double>(arg), true);
+}
+
+INSTANTIATE_TEST_CASE_P(local_matrix_set_data_ptr,
                         parameterized_local_matrix_allocations,
                         testing::Combine(testing::ValuesIn(local_matrix_allocations_size),
                                          testing::ValuesIn(local_matrix_allocations_blockdim)));

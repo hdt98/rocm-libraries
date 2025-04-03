@@ -229,7 +229,6 @@ namespace rocalution
         LOG_INFO("This is NOT a MCSR matrix");
         FATAL_ERROR(__FILE__, __LINE__);
     }
-    // LCOV_EXCL_STOP
 
     // The conversion CSR->COO (or X->CSR->COO)
     template <typename ValueType>
@@ -536,7 +535,6 @@ namespace rocalution
         return false;
     }
 
-    // LCOV_EXCL_START
     template <typename ValueType>
     void BaseMatrix<ValueType>::LUAnalyse(void)
     {
@@ -656,7 +654,6 @@ namespace rocalution
         LOG_INFO("The function is not implemented (yet)!");
         FATAL_ERROR(__FILE__, __LINE__);
     }
-    // LCOV_EXCL_STOP
 
     template <typename ValueType>
     bool BaseMatrix<ValueType>::LSolve(const BaseVector<ValueType>& in,
@@ -665,7 +662,6 @@ namespace rocalution
         return false;
     }
 
-    // LCOV_EXCL_START
     template <typename ValueType>
     void BaseMatrix<ValueType>::UAnalyse(bool diag_unit)
     {
@@ -705,7 +701,6 @@ namespace rocalution
         LOG_INFO("The function is not implemented (yet)!");
         FATAL_ERROR(__FILE__, __LINE__);
     }
-    // LCOV_EXCL_STOP
 
     template <typename ValueType>
     bool BaseMatrix<ValueType>::USolve(const BaseVector<ValueType>& in,
@@ -1256,7 +1251,6 @@ namespace rocalution
         return false;
     }
 
-    // LCOV_EXCL_START
     template <typename ValueType>
     void BaseMatrix<ValueType>::SetDataPtrCOO(
         int** row, int** col, ValueType** val, int64_t nnz, int nrow, int ncol)
@@ -1410,7 +1404,6 @@ namespace rocalution
         LOG_INFO("The function is not implemented (yet)! Check the backend?");
         FATAL_ERROR(__FILE__, __LINE__);
     }
-    // LCOV_EXCL_STOP
 
     template <typename ValueType>
     bool BaseMatrix<ValueType>::CreateFromMap(const BaseVector<int>& map, int n, int m)
@@ -1426,6 +1419,7 @@ namespace rocalution
     {
         return false;
     }
+    // LCOV_EXCL_STOP
 
     template <typename ValueType>
     void BaseMatrix<ValueType>::CopyFromAsync(const BaseMatrix<ValueType>& mat)
@@ -1445,6 +1439,7 @@ namespace rocalution
         this->CopyTo(mat);
     }
 
+    // LCOV_EXCL_START
     template <typename ValueType>
     bool BaseMatrix<ValueType>::ReplaceColumnVector(int idx, const BaseVector<ValueType>& vec)
     {
@@ -1573,6 +1568,7 @@ namespace rocalution
     {
         return false;
     }
+    // LCOV_EXCL_STOP
 
     // TODO print also parameters info?
 

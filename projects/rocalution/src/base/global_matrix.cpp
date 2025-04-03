@@ -42,6 +42,10 @@
 #include <limits>
 #include <sstream>
 
+#ifndef SUPPORT_MULTINODE
+// LCOV_EXCL_START
+#endif
+
 namespace rocalution
 {
     template <typename ValueType>
@@ -4525,3 +4529,7 @@ namespace rocalution
 #endif
 
 } // namespace rocalution
+
+#ifndef SUPPORT_MULTINODE
+// LCOV_EXCL_STOP
+#endif
