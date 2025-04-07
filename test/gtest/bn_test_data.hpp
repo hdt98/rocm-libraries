@@ -391,9 +391,23 @@ private:
             derivedBnDesc.GetLengths()};
     }
 
+    template <typename T, typename ScaleT, typename RangeT>
+    void fill_tensor_with_random_values(tensor<T>& t, ScaleT scale, RangeT range)
+    {
+        // Create a random number generator
+        auto gen = uniform_signed_initializer<T>(scale, range);
+
+        // Fill the tensor's data with random values
+        std::generate(t.data.begin(), t.data.end(), gen);
+    }
+
     void InitTensorsWithRandValue()
     {
-        dy.generate(uniform_signed_initializer<DyDataType>(2e-3 /*scale*/, 1000 /*range*/));
+        if(this->saveMeanVar)
+            dy.generate(uniform_signed_initializer<DyDataType>(2e-3 /*scale*/, 1000 /*range*/));
+        else
+            fill_tensor_with_random_values(dy, 2e-3 /*scale*/, 1000 /*range*/);
+
         bnScale.generate(uniform_signed_initializer<ScaleDataType>(2e-3 /*scale*/, 1000 /*range*/));
         savedMean.generate(
             uniform_signed_initializer<MeanVarDataType>(2e-3 /*scale*/, 1000 /*range*/));
