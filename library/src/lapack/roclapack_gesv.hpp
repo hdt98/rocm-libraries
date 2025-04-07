@@ -93,11 +93,11 @@ void rocsolver_gesv_getMemorySize(const rocblas_int n,
     size_t size_copyB = sizeof(T) * n * nrhs * batch_count;
 
     // workspace required for calling GETRF
-    rocsolver_workspace_helper* getrf_work = work_helper->add_nested(0);
+    rocsolver_workspace_helper* getrf_work = work_helper->add_nested({});
     rocsolver_getrf_getMemorySize<BATCHED, STRIDED, T>(n, n, true, batch_count, getrf_work, &opt1);
 
     // workspace required for calling GETRS
-    rocsolver_workspace_helper* getrs_work = work_helper->add_nested(size_copyB);
+    rocsolver_workspace_helper* getrs_work = work_helper->add_nested({size_copyB});
     rocsolver_getrs_getMemorySize<BATCHED, STRIDED, T>(rocblas_operation_none, n, nrhs, batch_count,
                                                        getrs_work, &opt2);
 

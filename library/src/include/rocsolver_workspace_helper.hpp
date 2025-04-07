@@ -35,6 +35,8 @@
 
 ROCSOLVER_BEGIN_NAMESPACE
 
+#define MIN_CHUNK_SIZE 64
+
 class rocsolver_workspace_helper
 {
 private:
@@ -69,6 +71,11 @@ public:
     void assign_sizes(std::initializer_list<size_t> sizes)
     {
         this->sizes.assign(sizes);
+
+        // round up sizes to nearest MIN_CHUNK_SIZE
+        for(int i = 0; i < sizes.size(); i++)
+            this->sizes[i]
+                = ((this->sizes[i] + MIN_CHUNK_SIZE - 1) / MIN_CHUNK_SIZE) * MIN_CHUNK_SIZE;
     }
     void assign_buffer(uint8_t* buffer)
     {
@@ -93,11 +100,16 @@ public:
     {
         nested.reserve(capacity);
     }
-    rocsolver_workspace_helper* add_nested(size_t reserved)
+    rocsolver_workspace_helper* add_nested(std::initializer_list<size_t> reserved_sizes)
     {
+        // round up sizes to nearest MIN_CHUNK_SIZE
+        size_t bytes_reserved = 0;
+        for(size_t const& size : reserved_sizes)
+            bytes_reserved += ((size + MIN_CHUNK_SIZE - 1) / MIN_CHUNK_SIZE) * MIN_CHUNK_SIZE;
+
         rocsolver_workspace_helper* result = new rocsolver_workspace_helper();
         nested.push_back(result);
-        result->reserved = reserved;
+        result->reserved = bytes_reserved;
         return result;
     }
     rocsolver_workspace_helper* get_nested(int i)
@@ -119,6 +131,8 @@ public:
 
     void print_debug()
     {
+        std::cout << "Reserved Bytes: " << reserved << std::endl;
+
         std::cout << "Num Sizes: " << sizes.size() << std::endl;
         for(int i = 0; i < sizes.size(); i++)
         {
@@ -138,5 +152,7 @@ public:
         std::cout << std::endl;
     }
 };
+
+#undef MIN_CHUNK_SIZE
 
 ROCSOLVER_END_NAMESPACE

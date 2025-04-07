@@ -74,12 +74,12 @@ void rocsolver_geblttrf_npvt_getMemorySize(const rocblas_int nb,
     size_t size_iinfo = sizeof(rocblas_int) * batch_count;
 
     // size requirements for getrf
-    rocsolver_workspace_helper* getrf_work = work_helper->add_nested(size_iinfo);
+    rocsolver_workspace_helper* getrf_work = work_helper->add_nested({size_iinfo});
     rocsolver_getrf_getMemorySize<BATCHED, STRIDED, T>(nb, nb, false, batch_count, getrf_work,
                                                        optim_mem, ldb, incb);
 
     // size requirements for getrs
-    rocsolver_workspace_helper* getrs_work = work_helper->add_nested(0);
+    rocsolver_workspace_helper* getrs_work = work_helper->add_nested({});
     rocsolver_getrs_getMemorySize<BATCHED, STRIDED, T>(rocblas_operation_none, nb, nb, batch_count,
                                                        getrs_work, &unused, ldb, ldc, incb, incc);
 

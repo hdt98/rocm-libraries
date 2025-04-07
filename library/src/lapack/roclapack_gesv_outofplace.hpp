@@ -91,11 +91,11 @@ void rocsolver_gesv_outofplace_getMemorySize(const rocblas_int n,
     work_helper->set_nested_capacity(2);
 
     // workspace required for calling GETRF
-    rocsolver_workspace_helper* getrf_work = work_helper->add_nested(0);
+    rocsolver_workspace_helper* getrf_work = work_helper->add_nested({});
     rocsolver_getrf_getMemorySize<BATCHED, STRIDED, T>(n, n, true, batch_count, getrf_work, &opt1);
 
     // workspace required for calling GETRS
-    rocsolver_workspace_helper* getrs_work = work_helper->add_nested(0);
+    rocsolver_workspace_helper* getrs_work = work_helper->add_nested({});
     rocsolver_getrs_getMemorySize<BATCHED, STRIDED, T>(rocblas_operation_none, n, nrhs, batch_count,
                                                        getrs_work, &opt2);
 
