@@ -552,7 +552,7 @@ struct intrin_wcnn_conv_f32i32_iu8<4, 2, 1, 1, 1, 1, Aco, Signed, HighLane>
     __device__ static void Run(const int8x8_t& reg_wei, const int8x4_t* reg_data[1], FloatC& reg_c)
     {
         reg_c.template AsType<float4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f32i32_iu8_4x2(
-            reg_c.template AsType<float4_t>()[Number<0>{}],
+            bit_cast<int32x4_t>(reg_c.template AsType<float4_t>()[Number<0>{}]),
             bit_cast<int32x2_t>(reg_wei),
             bit_cast<int32_t>(*reg_data[0]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
@@ -568,7 +568,7 @@ struct intrin_wcnn_conv_f32i32_iu8<4, 2, 1, 1, 1, 2, Aco, Signed, HighLane>
     __device__ static void Run(const int8x16_t& reg_wei, const int8x4_t* reg_data[2], FloatC& reg_c)
     {
         reg_c.template AsType<float4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f32i32_iu8_4x2(
-            reg_c.template AsType<float4_t>()[Number<0>{}],
+            bit_cast<int32x4_t>(reg_c.template AsType<float4_t>()[Number<0>{}]),
             bit_cast<int32x4_t>(reg_wei),
             bit_cast<int32_t>(*reg_data[0]),
             bit_cast<int32_t>(*reg_data[1]),
@@ -585,7 +585,7 @@ struct intrin_wcnn_conv_f32i32_iu8<4, 2, 1, 1, 1, 4, Aco, Signed, HighLane>
     __device__ static void Run(const int8x32_t& reg_wei, const int8x4_t* reg_data[4], FloatC& reg_c)
     {
         reg_c.template AsType<float4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f32i32_iu8_4x2(
-            reg_c.template AsType<float4_t>()[Number<0>{}],
+            bit_cast<int32x4_t>(reg_c.template AsType<float4_t>()[Number<0>{}]),
             bit_cast<int32x8_t>(reg_wei),
             bit_cast<int32_t>(*reg_data[0]),
             bit_cast<int32_t>(*reg_data[1]),
@@ -744,7 +744,7 @@ struct intrin_wcnn_conv_f32i32_iu4<4, 2, 1, 1, 1, 1, Aco, Signed, HighLane>
     __device__ static void Run(const int4x16_t& reg_wei, const int4x8_t* reg_data[1], FloatC& reg_c)
     {
         reg_c.template AsType<float4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f32i32_iu4_4x2(
-            reg_c.template AsType<float4_t>()[Number<0>{}],
+            bit_cast<int32x4_t>(reg_c.template AsType<float4_t>()[Number<0>{}]),
             bit_cast<int32x2_t>(reg_wei),
             bit_cast<int32_t>(*reg_data[0]),
             GetTensorSignedMod<Signed>() | GetWeightSignedMod<Signed>() | GetFilterSizeMod<1>() |
@@ -760,7 +760,7 @@ struct intrin_wcnn_conv_f32i32_iu4<4, 2, 1, 1, 1, 2, Aco, Signed, HighLane>
     __device__ static void Run(const int4x32_t& reg_wei, const int4x8_t* reg_data[2], FloatC& reg_c)
     {
         reg_c.template AsType<float4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f32i32_iu4_4x2(
-            reg_c.template AsType<float4_t>()[Number<0>{}],
+            bit_cast<int32x4_t>(reg_c.template AsType<float4_t>()[Number<0>{}]),
             bit_cast<int32x4_t>(reg_wei),
             bit_cast<int32_t>(*reg_data[0]),
             bit_cast<int32_t>(*reg_data[1]),
@@ -777,7 +777,7 @@ struct intrin_wcnn_conv_f32i32_iu4<4, 2, 1, 1, 1, 4, Aco, Signed, HighLane>
     __device__ static void Run(const int4x64_t& reg_wei, const int4x8_t* reg_data[4], FloatC& reg_c)
     {
         reg_c.template AsType<float4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f32i32_iu4_4x2(
-            reg_c.template AsType<float4_t>()[Number<0>{}],
+            bit_cast<int32x4_t>(reg_c.template AsType<float4_t>()[Number<0>{}]),
             bit_cast<int32x8_t>(reg_wei),
             bit_cast<int32_t>(*reg_data[0]),
             bit_cast<int32_t>(*reg_data[1]),
@@ -2339,7 +2339,7 @@ struct intrin_wcnn_conv_f32i32_iu8<4, 2, 3, DilationX, DilationY, 1, Aco, Signed
     Run(const int8x72_t& reg_wei, const int8x12_t* reg_data[3], FloatC& reg_c)
     {
         reg_c.template AsType<float4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f32i32_iu8_4x2(
-            reg_c.template AsType<float4_t>()[Number<0>{}],
+            bit_cast<int32x4_t>(reg_c.template AsType<float4_t>()[Number<0>{}]),
             bit_cast<int32x18_t>(reg_wei),
             bit_cast<int32x3_t>(*reg_data[1]),
             bit_cast<int32x3_t>(*reg_data[0]),
@@ -2403,7 +2403,7 @@ struct intrin_wcnn_conv_f32i32_iu4<4, 2, 3, DilationX, DilationY, 1, Aco, Signed
     Run(const int4x144_t& reg_wei, const int4x24_t* reg_data[3], FloatC& reg_c)
     {
         reg_c.template AsType<float4_t>()(Number<0>{}) = __builtin_amdgcn_convolve_f32i32_iu4_4x2(
-            reg_c.template AsType<float4_t>()[Number<0>{}],
+            bit_cast<int32x4_t>(reg_c.template AsType<float4_t>()[Number<0>{}]),
             bit_cast<int32x18_t>(reg_wei),
             bit_cast<int32x3_t>(*reg_data[1]),
             bit_cast<int32x3_t>(*reg_data[0]),

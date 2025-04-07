@@ -256,8 +256,16 @@ __global__ void __launch_bounds__(64, 1)
                     InDataVec& in_tile_data = inData[h * WRepeat * CRepeat + w * CRepeat + c];
 #endif
                     const InDataVec* p_in_tile_data[1] = {&in_tile_data};
-                    wcnn_conv.conv_instr.Run(
-                        weiData[k * CRepeat + c], p_in_tile_data, c_vec, Number<0>{});
+                    if constexpr(UseF32I32 && c + 1 == CRepeat)
+                    {
+                        wcnn_conv.conv_instr.Run(
+                            weiData[k * CRepeat + c], p_in_tile_data, c_vec, Number<2>{});
+                    }
+                    else
+                    {
+                        wcnn_conv.conv_instr.Run(
+                            weiData[k * CRepeat + c], p_in_tile_data, c_vec, Number<0>{});
+                    }
                 });
 #ifdef LOAD_DATA_PER_TILE
                 store_acc_data(h, w, k, c_vec);
@@ -537,7 +545,14 @@ __global__ void __launch_bounds__(64, 1)
                     inData[1]                         = load_in_data(h, w, c, 0);
                     inData[2]                         = load_in_data(h, w, c, 1);
                     const InDataVec* p_in_data_vec[3] = {&inData[0], &inData[1], &inData[2]};
-                    wcnn_conv.conv_instr.Run(weiData[c], p_in_data_vec, c_vec, Number<0>{});
+                    if constexpr(UseF32I32 && c + 1 == CRepeat)
+                    {
+                        wcnn_conv.conv_instr.Run(weiData[c], p_in_data_vec, c_vec, Number<2>{});
+                    }
+                    else
+                    {
+                        wcnn_conv.conv_instr.Run(weiData[c], p_in_data_vec, c_vec, Number<0>{});
+                    }
                 });
                 store_acc_data(h, w, k, c_vec);
             });
@@ -884,8 +899,7 @@ int main(int argc, char* argv[])
     pass &= run_test_fmt<ck::bf8_t,   ck::bf8_t,  float,       false, 0x8   >();
     pass &= run_test_fmt<ck::f8_t,    ck::bf8_t,  float,       false, 0x8   >();
     pass &= run_test_fmt<int8_t,      int8_t,     float,       false, 0x10  >();
-    //crash Cannot select: intrinsic %llvm.amdgcn.convolve.f32i32.iu8.1x1
-    //pass &= run_test_fmt<int8_t,      int8_t,     float,       true,  0x10  >();
+    pass &= run_test_fmt<int8_t,      int8_t,     float,       true,  0x10  >();
     pass &= run_test_fmt<int8_t,      int8_t,     int32_t,     false, 0x20  >();
 
     pass &= run_test_fmt<ck::half_t,  ck::half_t, ck::half_t,  false, 0x40  >();
@@ -899,8 +913,7 @@ int main(int argc, char* argv[])
     pass &= run_test_fmt<ck::half_t,  ck::half_t, ck::half_t,  false, 0x8000>();
 #ifdef CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
     pass &= run_test_fmt<ck::int4_t,  ck::int4_t, float,       false, 0x800 >();
-    //crash intrinsic %llvm.amdgcn.convolve.f32i32.iu4.1x1
-    //pass &= run_test_fmt<ck::int4_t,  ck::int4_t, float,       true,  0x800 >();
+    pass &= run_test_fmt<ck::int4_t,  ck::int4_t, float,       true,  0x800 >();
     pass &= run_test_fmt<ck::int4_t,  ck::int4_t, int32_t,     false, 0x1000>();
     pass &= run_test_fmt<ck::int4_t,  ck::int4_t, ck::half_t,  false, 0x2000>();
 #endif

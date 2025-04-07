@@ -22,7 +22,8 @@ constexpr index_t FmaAuxData_Mod1 = 6;
 template <index_t ChanOff>
 constexpr index_t GetChanOff()
 {
-    return (ChanOff / 4) << (FmaAuxData_Mod1 + 4);
+    // 0->0, 2->1, 8->2, 10->3, 16->4, 18->5
+    return ((ChanOff + 2) / 4) << (FmaAuxData_Mod1 + 4);
 };
 
 template <typename Y,
@@ -49,7 +50,7 @@ struct intrin_wcnn_fma_from_tensor<4, 2, ChanOff>
     {
         constexpr bool clamp        = false;
         constexpr index_t aux_data0 = GetChanOff<ChanOff>();
-        constexpr index_t aux_data1 = GetChanOff<ChanOff + 8>();
+        constexpr index_t aux_data1 = GetChanOff<ChanOff + 2>();
         float2_t inAcc0, inAcc1;
         float2_t scale0, scale1;
         SplitVector(inAcc, inAcc0, inAcc1);
@@ -90,7 +91,7 @@ struct intrin_wcnn_fma_from_tensor<4, 2, ChanOff>
     Run(const float4_t& inAcc, const uint4x8_t& residual0, const float4_t scale, FloatAcc& outAcc)
     {
         constexpr index_t aux_data0 = GetChanOff<ChanOff>();
-        constexpr index_t aux_data1 = GetChanOff<ChanOff + 8>();
+        constexpr index_t aux_data1 = GetChanOff<ChanOff + 2>();
         constexpr bool clamp        = false;
         float2_t inAcc0, inAcc1;
         float2_t scale0, scale1;
@@ -132,7 +133,7 @@ struct intrin_wcnn_fma_from_tensor<4, 2, ChanOff>
     Run(const float4_t& inAcc, const int8x4_t& residual0, const float4_t scale, FloatAcc& outAcc)
     {
         constexpr index_t aux_data0 = 0;
-        constexpr index_t aux_data1 = GetChanOff<8>();
+        constexpr index_t aux_data1 = GetChanOff<2>();
         constexpr bool clamp        = false;
         float2_t inAcc0, inAcc1;
         float2_t scale0, scale1;
@@ -174,7 +175,7 @@ struct intrin_wcnn_fma_from_tensor<4, 2, ChanOff>
     Run(const float4_t& inAcc, const uint8x4_t& residual0, const float4_t scale, FloatAcc& outAcc)
     {
         constexpr index_t aux_data0 = 0;
-        constexpr index_t aux_data1 = GetChanOff<8>();
+        constexpr index_t aux_data1 = GetChanOff<2>();
         constexpr bool clamp        = false;
         float2_t inAcc0, inAcc1;
         float2_t scale0, scale1;
@@ -216,7 +217,7 @@ struct intrin_wcnn_fma_from_tensor<4, 2, ChanOff>
     Run(const float4_t& inAcc, const f8x4_t& residual0, const float4_t scale, FloatAcc& outAcc)
     {
         constexpr index_t aux_data0 = 0;
-        constexpr index_t aux_data1 = GetChanOff<8>();
+        constexpr index_t aux_data1 = GetChanOff<2>();
         constexpr bool clamp        = false;
         float2_t inAcc0, inAcc1;
         float2_t scale0, scale1;
@@ -258,7 +259,7 @@ struct intrin_wcnn_fma_from_tensor<4, 2, ChanOff>
     Run(const float4_t& inAcc, const bf8x4_t& residual0, const float4_t scale, FloatAcc& outAcc)
     {
         constexpr index_t aux_data0 = 0;
-        constexpr index_t aux_data1 = GetChanOff<8>();
+        constexpr index_t aux_data1 = GetChanOff<2>();
         constexpr bool clamp        = false;
         float2_t inAcc0, inAcc1;
         float2_t scale0, scale1;

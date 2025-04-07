@@ -1190,8 +1190,9 @@ struct TestWmma
             a, b, c_host, a_element_op, b_element_op, c_element_op);
 
         // Act
-        bool is_supported = (ck::is_gfx11_supported() || ck::is_gfx13_supported()) &&
-                            ck::wmma_op_util::RunDeviceGEMM(wmma_kernel, a, b, c_device);
+        bool is_supported =
+            (ck::is_gfx11_supported() || ck::is_gfx12_supported() || ck::is_gfx13_supported()) &&
+            ck::wmma_op_util::RunDeviceGEMM(wmma_kernel, a, b, c_device);
 
         // dump_tensor(a);
         // dump_tensor(b);

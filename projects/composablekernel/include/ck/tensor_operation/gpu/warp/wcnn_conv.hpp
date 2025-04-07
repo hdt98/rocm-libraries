@@ -393,15 +393,36 @@ struct WcnnConvType<WcnnConvInstr::wcnn_conv_f32i32_iu8,
     {
 #if defined(__gfx13__)
         constexpr bool isHighLane = Mod{} & 1;
-        intrin_wcnn_conv_f32i32_iu8<H,
-                                    W,
-                                    FilterSize,
-                                    DilationX,
-                                    DilationY,
-                                    Iters,
-                                    Aco,
-                                    Signed,
-                                    isHighLane>::Run(reg_wei, reg_data, reg_c);
+        constexpr bool isLastPass = (Mod{} & 2) != 0;
+        if constexpr(isLastPass)
+        {
+            intrin_wcnn_conv_f32i32_iu8<H,
+                                        W,
+                                        FilterSize,
+                                        DilationX,
+                                        DilationY,
+                                        Iters,
+                                        Aco,
+                                        Signed,
+                                        isHighLane>::Run(reg_wei, reg_data, reg_c);
+        }
+        else
+        {
+            vector_type<int32_t, 4> tmp_c;
+            tmp_c.template AsType<int32x4_t>()(Number<0>{}) =
+                bit_cast<int32x4_t>(reg_c.template AsType<float4_t>()(Number<0>{}));
+            intrin_wcnn_conv_i32_iu8<H,
+                                     W,
+                                     FilterSize,
+                                     DilationX,
+                                     DilationY,
+                                     Iters,
+                                     Aco,
+                                     Signed,
+                                     isHighLane>::Run(reg_wei, reg_data, tmp_c);
+            reg_c.template AsType<float4_t>()(Number<0>{}) =
+                bit_cast<float4_t>(tmp_c.template AsType<int32x4_t>()(Number<0>{}));
+        }
 #else
         ignore = reg_wei;
         ignore = reg_data;
@@ -514,15 +535,36 @@ struct WcnnConvType<WcnnConvInstr::wcnn_conv_f32i32_iu4,
     {
 #if defined(__gfx13__)
         constexpr bool isHighLane = Mod{} & 1;
-        intrin_wcnn_conv_f32i32_iu4<H,
-                                    W,
-                                    FilterSize,
-                                    DilationX,
-                                    DilationY,
-                                    Iters,
-                                    Aco,
-                                    Signed,
-                                    isHighLane>::Run(reg_wei, reg_data, reg_c);
+        constexpr bool isLastPass = (Mod{} & 2) != 0;
+        if constexpr(isLastPass)
+        {
+            intrin_wcnn_conv_f32i32_iu4<H,
+                                        W,
+                                        FilterSize,
+                                        DilationX,
+                                        DilationY,
+                                        Iters,
+                                        Aco,
+                                        Signed,
+                                        isHighLane>::Run(reg_wei, reg_data, reg_c);
+        }
+        else
+        {
+            vector_type<int32_t, 4> tmp_c;
+            tmp_c.template AsType<int32x4_t>()(Number<0>{}) =
+                bit_cast<int32x4_t>(reg_c.template AsType<float4_t>()(Number<0>{}));
+            intrin_wcnn_conv_i32_iu4<H,
+                                     W,
+                                     FilterSize,
+                                     DilationX,
+                                     DilationY,
+                                     Iters,
+                                     Aco,
+                                     Signed,
+                                     isHighLane>::Run(reg_wei, reg_data, tmp_c);
+            reg_c.template AsType<float4_t>()(Number<0>{}) =
+                bit_cast<float4_t>(tmp_c.template AsType<int32x4_t>()(Number<0>{}));
+        }
 #else
         ignore = reg_wei;
         ignore = reg_data;

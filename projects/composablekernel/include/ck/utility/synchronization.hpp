@@ -56,12 +56,6 @@ __device__ void block_sync_lds_async_load()
     s_barrier_signal -1 \n \
     s_barrier_wait -1 \
     " ::);
-#else
-    asm volatile("\
-    s_waitcnt vmcnt(0) \n \
-    s_waitcnt lgkmcnt(0) \n \
-    s_barrier \
-    " ::);
 #endif
 }
 
