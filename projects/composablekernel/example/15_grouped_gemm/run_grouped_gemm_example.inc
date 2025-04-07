@@ -252,18 +252,10 @@ bool run_grouped_gemm_example(int argc, char* argv[])
     ProblemSize problem_size;
     ExecutionConfig config;
 
-    problem_size.group_count = 16;
-
-    for(int i = 0; i < problem_size.group_count; i++)
-    {
-        problem_size.Ms.push_back(256 + 256 * i);
-        problem_size.Ns.push_back(128 + 128 * i);
-        problem_size.Ks.push_back(128 + 64 * i);
-
-        problem_size.stride_As.push_back(problem_size.Ks[i]);
-        problem_size.stride_Bs.push_back(problem_size.Ks[i]);
-        problem_size.stride_Cs.push_back(problem_size.Ns[i]);
-    }
+    int group_count = 16;
+    int M = 256;
+    int N = 128;
+    int K = 64;
 
     if(argc == 4)
     {
@@ -271,13 +263,36 @@ bool run_grouped_gemm_example(int argc, char* argv[])
         config.init_method     = std::stoi(argv[2]);
         config.time_kernel     = std::stoi(argv[3]);
     }
+    else if(argc == 8)
+    {
+        config.do_verification = std::stoi(argv[1]);
+        config.init_method     = std::stoi(argv[2]);
+        config.time_kernel     = std::stoi(argv[3]);
+        group_count = std::stoi(argv[4]);
+        M = std::stoi(argv[5]);
+        N = std::stoi(argv[6]);
+        K = std::stoi(argv[7]);
+    }
     else
     {
         printf("arg1: verification (0=no, 1=yes)\n");
         printf("arg2: initialization (0=no init, 1=integer value, 2=decimal value)\n");
         printf("arg3: time kernel (0=n0, 1=yes)\n");
+        printf("[optional] arg4-7: group_count, M, N, K");
         exit(0);
     }
 
+    problem_size.group_count = group_count;
+
+    for(int i = 0; i < problem_size.group_count; i++)
+    {
+        problem_size.Ms.push_back(M + M * i);
+        problem_size.Ns.push_back(N + N * i);
+        problem_size.Ks.push_back(K + K * i);
+
+        problem_size.stride_As.push_back(problem_size.Ks[i]);
+        problem_size.stride_Bs.push_back(problem_size.Ks[i]);
+        problem_size.stride_Cs.push_back(problem_size.Ns[i]);
+    }
     return run_grouped_gemm(problem_size, config);
 }

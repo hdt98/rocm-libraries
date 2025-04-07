@@ -649,7 +649,8 @@ struct DeviceBatchedGemmMultipleD_Dl : public DeviceBatchedGemmMultiD<ALayout,
     static bool IsSupportedArgument(const Argument& arg)
     {
         if(ck::get_device_name() == "gfx906" || ck::is_xdl_supported() ||
-           ck::is_gfx103_supported() || ck::is_gfx11_supported() || ck::is_gfx12_supported())
+           ck::is_gfx103_supported() || ck::is_gfx11_supported() || ck::is_gfx12_supported() ||
+           ck::is_gfx13_supported())
         {
             bool pass = true;
             pass      = pass && arg.K_ % K1 == 0;

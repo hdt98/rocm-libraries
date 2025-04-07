@@ -3,7 +3,7 @@
 
 #pragma once
 
-bool run_permute_bundle(const Problem& problem)
+bool run_permute_bundle(bool time_kernel, const Problem& problem)
 {
     const auto& input_bundle_shape = problem.shape;
     const auto& input_bundle_axes  = problem.axes;
@@ -41,7 +41,7 @@ bool run_permute_bundle(const Problem& problem)
     };
 
     auto invoker   = permute.MakeInvoker();
-    float ave_time = invoker.Run(argument, StreamConfig{nullptr, true});
+    float ave_time = invoker.Run(argument, StreamConfig{nullptr, time_kernel});
 
     std::cout << "Perf: " << ave_time << " ms" << std::endl;
 
@@ -72,7 +72,7 @@ bool run_permute_bundle(const Problem& problem)
                                 1e-6);
 }
 
-bool run_permute_bundle_example(const Problem::Shape& shape, const Problem::Axes& axes)
+bool run_permute_bundle_example(bool time_kernel, const Problem::Shape& shape, const Problem::Axes& axes)
 {
-    return run_permute_bundle(Problem{shape, axes});
+    return run_permute_bundle(time_kernel, Problem{shape, axes});
 }

@@ -37,28 +37,42 @@ class TestBatchedGemmMultiD : public ::testing::Test
     {
         using namespace ck::tensor_operation::device;
 
-        const bool pass = ck::profiler::profile_batched_gemm_impl<
-            DataType,
-            DataType,
-            DataType,
-            ALayout,
-            BLayout,
-            CLayout,
-            PassThrough,
-            PassThrough,
-            PassThrough,
-            DeviceBatchedGemmMultiD<ALayout,
-                                    BLayout,
-                                    Empty_Tuple,
-                                    CLayout,
-                                    DataType,
-                                    DataType,
-                                    Empty_Tuple,
-                                    DataType,
-                                    PassThrough,
-                                    PassThrough,
-                                    PassThrough>>(
-            true, 1, false, 1, M, N, K, K, N, N, M * K, K * N, M * N, BatchCount, instance_index);
+        const bool pass =
+            ck::profiler::profile_batched_gemm_impl<DataType,
+                                                    DataType,
+                                                    DataType,
+                                                    ALayout,
+                                                    BLayout,
+                                                    CLayout,
+                                                    PassThrough,
+                                                    PassThrough,
+                                                    PassThrough,
+                                                    DeviceBatchedGemmMultiD<ALayout,
+                                                                            BLayout,
+                                                                            Empty_Tuple,
+                                                                            CLayout,
+                                                                            DataType,
+                                                                            DataType,
+                                                                            Empty_Tuple,
+                                                                            DataType,
+                                                                            PassThrough,
+                                                                            PassThrough,
+                                                                            PassThrough>>(
+                true,
+                1,
+                false,
+                false,
+                M,
+                N,
+                K,
+                K,
+                N,
+                N,
+                M * K,
+                K * N,
+                M * N,
+                BatchCount,
+                instance_index);
         EXPECT_TRUE(pass);
     }
 };

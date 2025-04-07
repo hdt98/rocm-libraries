@@ -87,10 +87,15 @@ int main(int argc, char* argv[])
     {
         // use default case
     }
-    else if(argc == 3)
+    else if(argc == 2)
     {
-        M = std::stoi(argv[1]);
-        N = std::stoi(argv[2]);
+        time_kernel = std::stoi(argv[1]);
+    }
+    else if(argc == 4)
+    {
+        time_kernel = std::stoi(argv[1]);
+        M           = std::stoi(argv[2]);
+        N           = std::stoi(argv[3]);
     }
     else
     {

@@ -19,4 +19,12 @@ using DevicePermuteInstance = ck::tensor_operation::device::DevicePermuteImpl
 
 #include "run_permute_bundle_example.inc"
 
-int main() { return !run_permute_bundle_example({1, 80, 32000}, {0, 2, 1}); }
+int main(int argc, char* argv[])
+{
+    bool time_kernel = true;
+    if(argc == 2)
+    {
+        time_kernel = atoi(argv[1]);
+    }
+    return !run_permute_bundle_example(time_kernel, {1, 80, 32000}, {0, 2, 1});
+}

@@ -54,16 +54,23 @@ int main(int argc, char* argv[])
     {
         // use default case
     }
-    else if(argc == 5)
+    else if(argc == 3)
     {
-        nchw[0] = std::stoi(argv[1]);
-        nchw[1] = std::stoi(argv[2]);
-        nchw[2] = std::stoi(argv[3]);
-        nchw[3] = std::stoi(argv[4]);
+        do_verification = std::stoi(argv[1]);
+        time_kernel     = std::stoi(argv[2]);
+    }
+    else if(argc == 7)
+    {
+        do_verification = std::stoi(argv[1]);
+        time_kernel     = std::stoi(argv[2]);
+        nchw[0]         = std::stoi(argv[3]);
+        nchw[1]         = std::stoi(argv[4]);
+        nchw[2]         = std::stoi(argv[5]);
+        nchw[3]         = std::stoi(argv[6]);
     }
     else
     {
-        std::cerr << "arg1 to 4: N, C, H, W" << std::endl;
+        std::cerr << "arg1 to 6: do_verification, time_kernel, N, C, H, W" << std::endl;
 
         return 1;
     }

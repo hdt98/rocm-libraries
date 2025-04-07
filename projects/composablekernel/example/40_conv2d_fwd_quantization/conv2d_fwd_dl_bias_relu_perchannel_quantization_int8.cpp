@@ -78,8 +78,8 @@ using DeviceGroupedConvNDFwdInstance =
 
 #include "run_conv2d_fwd_bias_perchannel_quantization_example.inc"
 
-int main()
+int main(int argc, char* argv[])
 {
     const auto out_element_op = OutElementOp{ActivationOp{}};
-    run_conv2d_fwd_bias_perchannel_quantization_example(out_element_op);
+    run_conv2d_fwd_bias_perchannel_quantization_example(argc, argv, out_element_op);
 };

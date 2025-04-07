@@ -157,7 +157,9 @@ bool run_grouped_conv_fwd(bool do_verification,
     return (pass ? 0 : 1);
 }
 
-int run_conv2d_fwd_perchannel_quantization_example(const OutElementOp& out_element_op)
+int run_conv2d_fwd_perchannel_quantization_example(int argc,
+                                                   char* argv[],
+                                                   const OutElementOp& out_element_op)
 {
     bool do_verification           = true;
     bool time_kernel               = true;
@@ -176,6 +178,9 @@ int run_conv2d_fwd_perchannel_quantization_example(const OutElementOp& out_eleme
         {1, 1},       // left_pads
         {1, 1}        // right_pads
     };
+
+    if(parse_cmd_args(argc, argv, do_verification, time_kernel, conv_param) == false)
+        return 1;
 
     const auto in_element_op  = InElementOp{};
     const auto wei_element_op = WeiElementOp{};

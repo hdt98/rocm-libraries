@@ -124,10 +124,27 @@ int main(int argc, char* argv[])
     ck::index_t M = 1024;
     ck::index_t K = 1024;
 
-    if(argc == 3)
+    if(argc == 1)
     {
-        M = std::stoi(argv[1]);
-        K = std::stoi(argv[2]);
+        // use default case
+    }
+    else if(argc == 3)
+    {
+        do_verification = std::stoi(argv[1]);
+        time_kernel     = std::stoi(argv[2]);
+    }
+    else if(argc == 5)
+    {
+        do_verification = std::stoi(argv[1]);
+        time_kernel     = std::stoi(argv[2]);
+        M               = std::stoi(argv[3]);
+        K               = std::stoi(argv[4]);
+    }
+    else
+    {
+        std::cerr << "arg1 to 4: do_verification, time_kernel, M, K" << std::endl;
+
+        return 1;
     }
 
     std::array<ck::index_t, 2> dims        = {M, K};

@@ -48,12 +48,37 @@ using DeviceElementwisePermuteInstance = ck::tensor_operation::device::DeviceEle
     ck::Sequence<8, 8, 8>,                      // InScalarPerVectorSeq
     ck::Sequence<8>>;                           // OutScalarPerVectorSeq
 
-int main()
+int main(int argc, char* argv[])
 {
     bool do_verification = true;
     bool time_kernel     = true;
 
     std::vector<std::size_t> nchw = {16, 128, 32, 64};
+    if(argc == 1)
+    {
+        // use default case
+    }
+    else if(argc == 3)
+    {
+        do_verification = std::stoi(argv[1]);
+        time_kernel     = std::stoi(argv[2]);
+    }
+    else if(argc == 7)
+    {
+        do_verification = std::stoi(argv[1]);
+        time_kernel     = std::stoi(argv[2]);
+        nchw[0]         = std::stoi(argv[3]);
+        nchw[1]         = std::stoi(argv[4]);
+        nchw[2]         = std::stoi(argv[5]);
+        nchw[3]         = std::stoi(argv[6]);
+    }
+    else
+    {
+        std::cerr << "arg1 to 6: do_verification, time_kernel, N, C, H, W" << std::endl;
+
+        return 1;
+    }
+
     std::array<ck::index_t, 4> ab_lengths;
     std::array<ck::index_t, 4> ab_strides = {static_cast<int>(nchw[1] * nchw[2] * nchw[3]),
                                              static_cast<int>(nchw[2] * nchw[3]),

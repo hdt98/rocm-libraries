@@ -79,14 +79,15 @@ int main(int argc, char* argv[])
     }
     else if(argc == 4)
     {
-        num_rows     = atoi(argv[1]);
-        dim_mask     = strtol(argv[2], nullptr, 0);
-        index_length = atoi(argv[3]);
+        time_kernel  = atoi(argv[1]);
+        num_rows     = atoi(argv[2]);
+        dim_mask     = strtol(argv[3], nullptr, 0);
+        index_length = atoi(argv[4]);
     }
     else
     {
         std::cout << "Usage of " << argv[0] << std::endl;
-        std::cout << "Arg1-3: num_rows dim_mask index_length" << std::endl;
+        std::cout << "Arg1-4: time_kernel num_rows dim_mask index_length" << std::endl;
     }
     ck::static_for<0, dims.Size(), 1>{}([&](auto I) {
         if(dim_mask & (1 << I.value))
