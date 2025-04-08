@@ -37,6 +37,8 @@ ROCSOLVER_BEGIN_NAMESPACE
 
 #define MIN_CHUNK_SIZE 64
 
+/* ROCSOLVER_WORKSPACE_HELPER provides a wrapper for workspace arrays, allowing workspace arrays to be passed
+   between functions using a single object rather than individually, and improving device memory utilization. */
 class rocsolver_workspace_helper
 {
 private:
@@ -68,6 +70,8 @@ public:
             delete nested[i];
     }
 
+    /* Assigns the given workspace sizes to the workspace helper. Also rounds the sizes up to the nearest
+       MIN_CHUNK_SIZE for better alignment. */
     void assign_sizes(std::initializer_list<size_t> sizes)
     {
         this->sizes.assign(sizes);
@@ -77,6 +81,8 @@ public:
             this->sizes[i]
                 = ((this->sizes[i] + MIN_CHUNK_SIZE - 1) / MIN_CHUNK_SIZE) * MIN_CHUNK_SIZE;
     }
+    /* Assigns device memory to the workspace helper, to be partitioned into individual workspace arrays
+       based on the assigned sizes. Only called after assign_sizes (and, if applicable, add_nested). */
     void assign_buffer(uint8_t* buffer)
     {
         pointers.reserve(sizes.size());
@@ -91,15 +97,27 @@ public:
         for(int i = 0; i < nested.size(); i++)
             nested[i]->assign_buffer(buffer + reserved);
     }
+    /* Gets a pointer to the workspace array at position i, whose size is >= the assigned size at position i.
+       Only called after assign_buffer. */
     uint8_t* operator[](int i)
     {
         return pointers[i];
     }
 
+    /* Sets the capacity of the internal vector that holds workspace helpers for nested functions. Optional,
+       but should be called before add_nested. */
     void set_nested_capacity(int capacity)
     {
         nested.reserve(capacity);
     }
+    /* Adds a nested workspace helper to manage workspaces for a nested function. May be called before or
+       after assign_sizes. add_nested accepts a (possibly empty) list of sizes representing the amount of
+       reserved memory that the nested function should not overwrite. In the standard use case, for n reserved
+       sizes, this list should contain the first n sizes passed to assign_sizes.
+
+       For example, suppose a function requires arrays foo, bar, and qux, where foo and qux must not be
+       overwritten by a nested function. Then, we pass {size_foo, size_qux, size_bar} to assign_sizes, and
+       pass {size_foo, size_qux} to add_nested. */
     rocsolver_workspace_helper* add_nested(std::initializer_list<size_t> reserved_sizes)
     {
         // round up sizes to nearest MIN_CHUNK_SIZE
@@ -112,11 +130,15 @@ public:
         result->reserved = bytes_reserved;
         return result;
     }
+    /* Gets a pointer to the nested workspace helper at position i, which was created by the ith call to
+       add_nested. */
     rocsolver_workspace_helper* get_nested(int i)
     {
         return nested[i];
     }
 
+    /* Returns the total amount of device memory required by the workspaces assigned to this helper and its
+       nested helpers. Only called after assign_sizes (and, if applicable, add_nested). */
     size_t get_total_size()
     {
         size_t result = 0;
