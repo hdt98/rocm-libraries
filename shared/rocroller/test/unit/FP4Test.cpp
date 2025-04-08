@@ -79,12 +79,10 @@ namespace rocRollerTest
 
                 auto bufInstOpts = rocRoller::BufferInstructionOptions();
 
-                co_yield m_context->mem()->loadBuffer(
-                    v_a, vgprSerial, 0, bufferRegs, bufInstOpts, N);
-                bufferExpr = BufferDescriptor::SetBasePointer(bufferExpr, s_result->expression());
-                co_yield Expression::generate(bufferRegs, bufferExpr, m_context);
-                co_yield m_context->mem()->storeBuffer(
-                    v_a, vgprSerial, 0, bufferRegs, bufInstOpts, N);
+                co_yield m_context->mem()->loadBuffer(v_a, vgprSerial, 0, bufDesc, bufInstOpts, N);
+                co_yield bufDesc->setBasePointer(s_result);
+                co_yield bufDesc->setSize(Register::Value::Literal(N));
+                co_yield m_context->mem()->storeBuffer(v_a, vgprSerial, 0, bufDesc, bufInstOpts, N);
             };
 
             m_context->schedule(kb());

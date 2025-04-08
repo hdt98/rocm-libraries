@@ -44,6 +44,7 @@ namespace rocRoller
         GFX1030,
         GFX1200,
         GFX1201,
+        GFX1250,
 
         Count,
     };
@@ -99,6 +100,11 @@ namespace rocRoller
             return gfx == GPUArchitectureGFX::GFX950;
         }
 
+        constexpr bool isCDNA5GPU() const
+        {
+            return gfx == GPUArchitectureGFX::GFX1250;
+        }
+
         constexpr bool isRDNA1GPU() const
         {
             return gfx == GPUArchitectureGFX::GFX1012;
@@ -126,7 +132,7 @@ namespace rocRoller
 
         constexpr bool isCDNAGPU() const
         {
-            return isCDNA1GPU() || isCDNA2GPU() || isCDNA3GPU() || isCDNA4GPU();
+            return isCDNA1GPU() || isCDNA2GPU() || isCDNA3GPU() || isCDNA35GPU() || isCDNA5GPU();
         }
 
         constexpr bool isGFX9GPU() const
@@ -141,7 +147,7 @@ namespace rocRoller
 
         constexpr bool isGFX12GPU() const
         {
-            return isRDNA4GPU();
+            return isRDNA4GPU() || isCDNA5GPU();
         }
 
         auto operator<=>(const GPUArchitectureTarget&) const = default;
@@ -197,7 +203,8 @@ namespace rocRoller
            GPUArchitectureTarget{GPUArchitectureGFX::GFX1012, {.xnack = true}},
            GPUArchitectureTarget{GPUArchitectureGFX::GFX1030},
            GPUArchitectureTarget{GPUArchitectureGFX::GFX1200},
-           GPUArchitectureTarget{GPUArchitectureGFX::GFX1201}};
+           GPUArchitectureTarget{GPUArchitectureGFX::GFX1201},
+           GPUArchitectureTarget{GPUArchitectureGFX::GFX1250}};
 }
 
 #include <rocRoller/GPUArchitecture/GPUArchitectureTarget_impl.hpp>

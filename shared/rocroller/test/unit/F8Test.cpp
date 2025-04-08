@@ -294,10 +294,8 @@ namespace rocRollerTest
             auto bpo = CeilDivide(
                 DataTypeInfo::Get(result_ptr->variableType().dataType).elementBits, 8u);
 
-            Expression::ExpressionPtr bufferExpr = Expression::literal(Buffer{0, 0, 0, 0});
-            bufferExpr = BufferDescriptor::SetDefaults(bufferExpr, m_context);
-            bufferExpr = BufferDescriptor::SetBasePointer(bufferExpr, s_a->expression());
-            bufferExpr = BufferDescriptor::SetSize(bufferExpr, Expression::literal(N));
+            auto bufDesc = std::make_shared<rocRoller::BufferDescriptor>(m_context);
+            co_yield bufDesc->setup();
 
             auto bufferRegs = Register::Value::Placeholder(
                 m_context, Register::Type::Scalar, {DataType::None, PointerType::Buffer}, 1);
@@ -307,16 +305,16 @@ namespace rocRollerTest
 
             auto vgprSerial = m_context->kernel()->workitemIndex()[0];
 
+            co_yield bufDesc->setBasePointer(s_a);
+            co_yield bufDesc->setSize(Register::Value::Literal(N));
             for(int i = 0; i < N; ++i)
             {
                 co_yield m_context->mem()->loadBuffer(
                     v_temp->element({i}), vgprSerial, i, bufferRegs, bufInstOpts, 1);
             }
-            bufferExpr = BufferDescriptor::SetBasePointer(bufferExpr, s_result->expression());
-            co_yield Expression::generate(bufferRegs, bufferExpr, m_context);
-
-            co_yield m_context->mem()->storeBuffer(
-                v_temp, vgprSerial, 0, bufferRegs, bufInstOpts, N);
+            co_yield bufDesc->setBasePointer(s_result);
+            co_yield bufDesc->setSize(Register::Value::Literal(N));
+            co_yield m_context->mem()->storeBuffer(v_temp, vgprSerial, 0, bufDesc, bufInstOpts, N);
         };
 
         m_context->schedule(kb());
