@@ -236,19 +236,13 @@ def trans_map(trans):
     else:
         return None
 
-def bias_datatype_map(dtype):
-    if dtype == "f16_r":
-        return [datatype_map('f32_r'), datatype_map('f16_r')]
-    elif dtype == "f32_r":
-        return [datatype_map('f32_r')]
-    elif dtype == "xf32_r":
-        return [datatype_map('xf32_r')]
-    elif dtype == "bf16_r":
-        return [datatype_map('f32_r'), datatype_map('bf16_r')]
-    elif dtype == "f8_r":
-        return [datatype_map('f32_r'), datatype_map('f8_r')]
-    else:
+def bias_datatype_map(bias_type, data_type, compute_type, dest_type):
+    bias_list = [datatype_map(data_type), datatype_map(compute_type), datatype_map(dest_type)]
+    bias_map = datatype_map(bias_type)
+    if bias_map in bias_list:
         return []
+    bias_list.append(bias_map)
+    return bias_list
 
 def get_high_precision_accumulate(DataType):
     if DataType in ["H", "B", "F8"]:
@@ -282,7 +276,8 @@ def extract_dtype(match):
     if bias_source:
         res["UseBias"] = 1
         res["BiasSrc"] = bias_source
-        res["BiasDataTypeList"] = list(bias_datatype_map(gdict.get("BIAS_TYPE", '').strip()))
+        bias_type = gdict.get("BIAS_TYPE", '').strip()
+        res["BiasDataTypeList"] = bias_datatype_map(bias_type, DataType, ComputeDataType, DestDataType)
     if activation_type != "none":
         res["Activation"] = True
         res["ActivationType"] = "hipblaslt_all"
