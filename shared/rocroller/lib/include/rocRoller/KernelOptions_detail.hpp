@@ -132,6 +132,8 @@ namespace rocRoller
          */
         LDSBankSwizzleMode ldsSwizzleMode = LDSBankSwizzleMode::None;
 
+        bool coexecutionEnabled = true;
+
         std::string toString() const;
     };
 

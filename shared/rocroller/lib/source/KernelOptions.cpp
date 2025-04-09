@@ -168,6 +168,7 @@ namespace rocRoller
         ShowString(assertOpKind);
         ShowOption(removeSetCoordinate);
         ShowString(ldsSwizzleMode);
+        ShowOption(coexecutionEnabled);
 
 #undef Show
 #undef ShowOption
