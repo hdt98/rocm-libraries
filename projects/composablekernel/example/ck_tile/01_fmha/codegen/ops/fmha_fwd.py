@@ -36,6 +36,9 @@ FMHA_FWD_KERNEL_HEADER = """// SPDX-License-Identifier: MIT
 """
 
 FMHA_FWD_KERNEL_BODY="""
+
+#ifdef {F_gemmmode}
+
 using fmha_dtype_{F_idx} = {F_dtype};
 
 using fmha_block_tile_{F_idx} = ck_tile::sequence<{F_bm0}, {F_bn0}, {F_bk0}, {F_bn1}, {F_bk1}, {F_bk0max}>;
@@ -103,6 +106,8 @@ float fmha_fwd_<trait_{F_idx}>(const ck_tile::stream_config& s, fmha_fwd_args a)
     constexpr ck_tile::index_t kBlockPerCu = k_::kBlockPerCu;
     return ck_tile::launch_kernel(s, ck_tile::make_kernel<blocks.x, kBlockPerCu>(k_{{}}, grids, blocks, 0, kargs));
 }}
+
+#endif
 """
 
 FMHA_FWD_API_FILENAME="fmha_fwd_api.cpp"
@@ -305,12 +310,13 @@ class FmhaFwdTileSize:
     F_wn1       : int  # gemm1 warp size along n
     F_wk1       : int  # gemm1 warp size along k
     F_occupancy : int  # occupancy, -1 will let pipeline decide the occupancy, other value will overwrite occupancy
+    F_gemmmode  : str
     @property
     def name(self) -> str:
         return f"b{self.F_bm0}x{self.F_bn0}x{self.F_bk0}x{self.F_bn1}x{self.F_bk1}x{self.F_bk0max}" +\
         f"_r{self.F_rm0}x{self.F_rn0}x{self.F_rk0}_r{self.F_rm1}x{self.F_rn1}x{self.F_rk1}" +\
         f"_w{self.F_wm0}x{self.F_wn0}x{self.F_wk0}_w{self.F_wm1}x{self.F_wn1}x{self.F_wk1}" +\
-        ("" if self.F_occupancy == -1 else f"_o{self.F_occupancy}")
+        ("" if self.F_occupancy == -1 else f"_o{self.F_occupancy}") + "_" + GEMMMODE_MAP[self.F_gemmmode]
 
 @dataclass
 class FmhaFwdKernel:
@@ -358,6 +364,7 @@ class FmhaFwdKernel:
                 F_dropout       = BOOL_MAP[self.F_pipeline.F_dropout],
                 F_squant        = BOOL_MAP[self.F_pipeline.F_squant],
                 F_occupancy     = self.F_tile.F_occupancy,
+                F_gemmmode      = self.F_tile.F_gemmmode,
                 F_pipeline_enum = PIPELINE_ENUM_MAP[self.F_pipeline.tag],
                 F_mask          = get_mask_map(self.mask_impl)[self.F_pipeline.F_mask],
                 F_mode          = MODE_MAP[self.F_mode],
@@ -398,21 +405,39 @@ class FmhaFwdKernel:
 
 # TODO: design a more practical way to do it
 # this is current supported tile size per hdim
-def get_fmha_fwd_tile_dict_from_dtype(dtype : str) -> Optional[dict]:
-    if dtype == 'fp16' or dtype == 'bf16':
-        return {
-            '32'  : FmhaFwdTileSize(128, 64,  16, 32,  32,  32,   2, 1, 1,  2, 1, 1,  32, 32, 16,  32, 32, 16,  -1),
-            '64'  : FmhaFwdTileSize(128, 64,  32, 64,  32,  64,   4, 1, 1,  4, 1, 1,  32, 32, 16,  32, 32, 16,  -1),
-        ### '96'  : FmhaFwdTileSize(128, 128, 32, 128, 32,  96,   4, 1, 1,  4, 1, 1,  32, 32, 16,  32, 32, 16,  -1),
-            '128' : FmhaFwdTileSize(128, 128, 32, 128, 32,  128,  4, 1, 1,  4, 1, 1,  32, 32, 16,  32, 32, 16,  -1),
-            '256' : FmhaFwdTileSize(128, 128, 32, 256, 32,  256,  4, 1, 1,  4, 1, 1,  32, 32, 16,  32, 32, 16,  -1),
-        }
-    elif dtype == 'fp8' or dtype == 'bf8':
-        return {
-            '64'  : FmhaFwdTileSize(128, 64,  32, 64,  32,  64,   2, 1, 1,  2, 1, 1,  32, 32, 32,  32, 32, 32,  -1),
-            '128' : FmhaFwdTileSize(128, 128, 32, 128, 32,  128,  4, 1, 1,  4, 1, 1,  32, 32, 32,  32, 32, 32,  -1),
-            '256' : FmhaFwdTileSize(128, 128, 32, 256, 32,  256,  4, 1, 1,  4, 1, 1,  32, 32, 32,  32, 32, 32,  -1),
-        }
+def get_fmha_fwd_tile_dict_from_dtype(gemm_mode : GEMM_MODE, dtype : str) -> Optional[dict]:
+    if gemm_mode == GEMM_MODE.XDL:
+        if dtype == 'fp16' or dtype == 'bf16':
+            return {
+                '32'  : FmhaFwdTileSize(128, 64,  16, 32,  32,  32,   2, 1, 1,  2, 1, 1,  32, 32, 16,  32, 32, 16,  -1, "CK_TILE_USE_XDL"),
+                '64'  : FmhaFwdTileSize(128, 64,  32, 64,  32,  64,   4, 1, 1,  4, 1, 1,  32, 32, 16,  32, 32, 16,  -1, "CK_TILE_USE_XDL"),
+                '128' : FmhaFwdTileSize(128, 128, 32, 128, 32,  128,  4, 1, 1,  4, 1, 1,  32, 32, 16,  32, 32, 16,  -1, "CK_TILE_USE_XDL"),
+                '256' : FmhaFwdTileSize(128, 128, 32, 256, 32,  256,  4, 1, 1,  4, 1, 1,  32, 32, 16,  32, 32, 16,  -1, "CK_TILE_USE_XDL")
+            }
+        elif dtype == 'fp8' or dtype == 'bf8':
+            return {
+                '64'  : FmhaFwdTileSize(128, 64,  32, 64,  32,  64,   2, 1, 1,  2, 1, 1,  32, 32, 32,  32, 32, 32,  -1, "CK_TILE_USE_XDL"),
+                '128' : FmhaFwdTileSize(128, 128, 32, 128, 32,  128,  4, 1, 1,  4, 1, 1,  32, 32, 32,  32, 32, 32,  -1, "CK_TILE_USE_XDL"),
+                '256' : FmhaFwdTileSize(128, 128, 32, 256, 32,  256,  4, 1, 1,  4, 1, 1,  32, 32, 32,  32, 32, 32,  -1, "CK_TILE_USE_XDL")
+            }
+        else:
+            return None
+    elif gemm_mode == GEMM_MODE.WMMA:
+        if dtype == 'fp16' or dtype == 'bf16':
+            return {
+                '32'  : FmhaFwdTileSize(128, 64,  16, 32,  32,  32,   2, 1, 1,  2, 1, 1,  16, 16, 16,  16, 16, 16,  -1, "CK_TILE_USE_WMMA"),
+                '64'  : FmhaFwdTileSize(128, 64,  32, 64,  32,  64,   4, 1, 1,  4, 1, 1,  16, 16, 16,  16, 16, 16,  -1, "CK_TILE_USE_WMMA"),
+                '128' : FmhaFwdTileSize(128, 128, 32, 128, 32,  128,  4, 1, 1,  4, 1, 1,  16, 16, 16,  16, 16, 16,  -1, "CK_TILE_USE_WMMA"),
+                '256' : FmhaFwdTileSize(128, 128, 32, 256, 32,  256,  4, 1, 1,  4, 1, 1,  16, 16, 16,  16, 16, 16,  -1, "CK_TILE_USE_WMMA")
+            }
+        elif dtype == 'fp8' or dtype == 'bf8':
+            return {
+                '64'  : FmhaFwdTileSize(128, 64,  32, 64,  32,  64,   2, 1, 1,  2, 1, 1,  16, 16, 16,  16, 16, 16,  -1, "CK_TILE_USE_WMMA"),
+                '128' : FmhaFwdTileSize(128, 128, 32, 128, 32,  128,  4, 1, 1,  4, 1, 1,  16, 16, 16,  16, 16, 16,  -1, "CK_TILE_USE_WMMA"),
+                '256' : FmhaFwdTileSize(128, 128, 32, 256, 32,  256,  4, 1, 1,  4, 1, 1,  16, 16, 16,  16, 16, 16,  -1, "CK_TILE_USE_WMMA")
+            }
+        else:
+            return None
     else:
         return None
 
@@ -463,46 +488,47 @@ def get_fwd_blobs(kernel_filter : Optional[str], receipt, mask_impl) -> Tuple[Fm
 
     gen = list()
     api_pool = FmhaFwdApiPool(mask_impl)
-
-    for dtype in FWD_DTYPE_MAP.keys():
-        d = get_fmha_fwd_tile_dict_from_dtype(dtype)
-        if d == None:
-            continue
-        #for hdim_str, mode, mask, bias, lse in itertools.product(d.keys(), MODE_MAP.keys(), MASK_MAP.keys(), ["t", "f"], ["t", "f"]):
-        for hdim_str, mode in itertools.product(d.keys(), MODE_MAP.keys()):
-            tile = d[hdim_str]
-            hdim = int(hdim_str)
-            for pipeline in get_pipelines(dtype, hdim):
-                if mode == "group":
-                    if pipeline.F_spad != 't' or pipeline.F_skpad != 't':
-                        # in group mode, spad/skpad must be true, since we can't predict if seqlen of current batch need pad or not
-                        continue
-                k = FmhaFwdKernel(F_idx=0,
-                                  F_hdim=hdim,
-                                  F_dtype=dtype,
-                                  F_mode=mode,
-                                  F_tile=tile,
-                                  F_pipeline=pipeline,
-                                  mask_impl=mask_impl)
-                if kernel_filter != None:
-                    if not fnmatch.fnmatch(k.name, kernel_filter):
-                        continue
-                if receipt in (2, 3):
-                    cond = dtype in ['fp16', 'bf16']
-                    cond &= pipeline.F_vlayout == 'row'
-                    cond &= pipeline.F_bias in ['no', 'alibi']
-                    cond &= pipeline.F_squant == 'f'
-                    if not cond:
-                        continue
-                if receipt == 4:
-                    cond = dtype in ['fp16', 'bf16']
-                    cond &= pipeline.F_vlayout == 'row'
-                    cond &= pipeline.F_bias in ['no', 'bias']
-                    cond &= pipeline.F_squant == 'f'
-                    if not cond:
-                        continue
-                api_pool.register_traits(k.api_trait())
-                gen.append(k)
+    
+    for gemm_mode in [GEMM_MODE.XDL, GEMM_MODE.WMMA]:
+        for dtype in FWD_DTYPE_MAP.keys():
+            d = get_fmha_fwd_tile_dict_from_dtype(gemm_mode, dtype)
+            if d == None:
+                continue
+            #for hdim_str, mode, mask, bias, lse in itertools.product(d.keys(), MODE_MAP.keys(), MASK_MAP.keys(), ["t", "f"], ["t", "f"]):
+            for hdim_str, mode in itertools.product(d.keys(), MODE_MAP.keys()):
+                tile = d[hdim_str]
+                hdim = int(hdim_str)
+                for pipeline in get_pipelines(dtype, hdim):
+                    if mode == "group":
+                        if pipeline.F_spad != 't' or pipeline.F_skpad != 't':
+                            # in group mode, spad/skpad must be true, since we can't predict if seqlen of current batch need pad or not
+                            continue
+                    k = FmhaFwdKernel(F_idx=0,
+                                    F_hdim=hdim,
+                                    F_dtype=dtype,
+                                    F_mode=mode,
+                                    F_tile=tile,
+                                    F_pipeline=pipeline,
+                                    mask_impl=mask_impl)
+                    if kernel_filter != None:
+                        if not fnmatch.fnmatch(k.name, kernel_filter):
+                            continue
+                    if receipt in (2, 3):
+                        cond = dtype in ['fp16', 'bf16']
+                        cond &= pipeline.F_vlayout == 'row'
+                        cond &= pipeline.F_bias in ['no', 'alibi']
+                        cond &= pipeline.F_squant == 'f'
+                        if not cond:
+                            continue
+                    if receipt == 4:
+                        cond = dtype in ['fp16', 'bf16']
+                        cond &= pipeline.F_vlayout == 'row'
+                        cond &= pipeline.F_bias in ['no', 'bias']
+                        cond &= pipeline.F_squant == 'f'
+                        if not cond:
+                            continue
+                    api_pool.register_traits(k.api_trait())
+                    gen.append(k)
 
     return (api_pool, gen)
 

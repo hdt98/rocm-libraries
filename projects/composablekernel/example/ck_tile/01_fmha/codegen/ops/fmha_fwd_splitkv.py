@@ -602,21 +602,40 @@ class FmhaFwdSplitKVCombineKernel:
 
 # TODO: design a more practical way to do it
 # this is current supported tile size per hdim
-def get_fmha_fwd_tile_dict_from_dtype(dtype : str) -> Optional[dict]:
-    if dtype == 'fp16' or dtype == 'bf16':
-        return {
-            '32'  : FmhaFwdTileSize(32, 64,  16, 32,  32,  32,   2, 1, 1,  2, 1, 1,  16, 16, 16,  16, 16, 16,  -1),
-            '64'  : FmhaFwdTileSize(64, 64,  32, 64,  32,  64,   4, 1, 1,  4, 1, 1,  16, 16, 16,  16, 16, 16,  -1),
-        ### '96'  : FmhaFwdTileSize(64, 128, 32, 128, 32,  96,   4, 1, 1,  4, 1, 1,  16, 16, 16,  16, 16, 16,  -1),
-            '128' : FmhaFwdTileSize(64, 128, 32, 128, 32,  128,  4, 1, 1,  4, 1, 1,  16, 16, 16,  16, 16, 16,  -1),
-            '256' : FmhaFwdTileSize(64, 128, 32, 256, 32,  256,  4, 1, 1,  4, 1, 1,  16, 16, 16,  16, 16, 16,  -1),
-        }
-    elif dtype == 'fp8' or dtype == 'bf8':
-        return {
-            '64'  : FmhaFwdTileSize(128, 64,  32, 64,  32,  64,   2, 1, 1,  2, 1, 1,  32, 32, 32,  32, 32, 32,  -1),
-            '128' : FmhaFwdTileSize(128, 128, 32, 128, 32,  128,  4, 1, 1,  4, 1, 1,  32, 32, 32,  32, 32, 32,  -1),
-            '256' : FmhaFwdTileSize(128, 128, 32, 256, 32,  256,  4, 1, 1,  4, 1, 1,  32, 32, 32,  32, 32, 32,  -1),
-        }
+def get_fmha_fwd_tile_dict_from_dtype(gemm_mode : GEMM_MODE, dtype : str) -> Optional[dict]:
+    if gemm_mode == GEMM_MODE.XDL:
+        if dtype == 'fp16' or dtype == 'bf16':
+            return {
+                '32'  : FmhaFwdTileSize(32, 64,  16, 32,  32,  32,   2, 1, 1,  2, 1, 1,  16, 16, 16,  16, 16, 16,  -1, "CK_TILE_USE_XDL"),
+                '64'  : FmhaFwdTileSize(64, 64,  32, 64,  32,  64,   4, 1, 1,  4, 1, 1,  16, 16, 16,  16, 16, 16,  -1, "CK_TILE_USE_XDL"),
+            ### '96'  : FmhaFwdTileSize(64, 128, 32, 128, 32,  96,   4, 1, 1,  4, 1, 1,  16, 16, 16,  16, 16, 16,  -1),
+                '128' : FmhaFwdTileSize(64, 128, 32, 128, 32,  128,  4, 1, 1,  4, 1, 1,  16, 16, 16,  16, 16, 16,  -1, "CK_TILE_USE_XDL"),
+                '256' : FmhaFwdTileSize(64, 128, 32, 256, 32,  256,  4, 1, 1,  4, 1, 1,  16, 16, 16,  16, 16, 16,  -1, "CK_TILE_USE_XDL"),
+            }
+        elif dtype == 'fp8' or dtype == 'bf8':
+            return {
+                '64'  : FmhaFwdTileSize(128, 64,  32, 64,  32,  64,   2, 1, 1,  2, 1, 1,  32, 32, 32,  32, 32, 32,  -1, "CK_TILE_USE_XDL"),
+                '128' : FmhaFwdTileSize(128, 128, 32, 128, 32,  128,  4, 1, 1,  4, 1, 1,  32, 32, 32,  32, 32, 32,  -1, "CK_TILE_USE_XDL"),
+                '256' : FmhaFwdTileSize(128, 128, 32, 256, 32,  256,  4, 1, 1,  4, 1, 1,  32, 32, 32,  32, 32, 32,  -1, "CK_TILE_USE_XDL"),
+            }
+        else:
+            return None
+    elif gemm_mode == GEMM_MODE.WMMA:
+        if dtype == 'fp16' or dtype == 'bf16':
+            return {
+                '32'  : FmhaFwdTileSize(32, 64,  16, 32,  32,  32,   2, 1, 1,  2, 1, 1,  16, 16, 16,  16, 16, 16,  -1, "CK_TILE_USE_WMMA"),
+                '64'  : FmhaFwdTileSize(64, 64,  32, 64,  32,  64,   4, 1, 1,  4, 1, 1,  16, 16, 16,  16, 16, 16,  -1, "CK_TILE_USE_WMMA"),
+                '128' : FmhaFwdTileSize(64, 128, 32, 128, 32,  128,  4, 1, 1,  4, 1, 1,  16, 16, 16,  16, 16, 16,  -1, "CK_TILE_USE_WMMA"),
+                '256' : FmhaFwdTileSize(64, 128, 32, 256, 32,  256,  4, 1, 1,  4, 1, 1,  16, 16, 16,  16, 16, 16,  -1, "CK_TILE_USE_WMMA"),
+            }
+        elif dtype == 'fp8' or dtype == 'bf8':
+            return {
+                '64'  : FmhaFwdTileSize(128, 64,  32, 64,  32,  64,   2, 1, 1,  2, 1, 1,  32, 32, 32,  32, 32, 32,  -1, "CK_TILE_USE_WMMA"),
+                '128' : FmhaFwdTileSize(128, 128, 32, 128, 32,  128,  4, 1, 1,  4, 1, 1,  32, 32, 32,  32, 32, 32,  -1, "CK_TILE_USE_WMMA"),
+                '256' : FmhaFwdTileSize(128, 128, 32, 256, 32,  256,  4, 1, 1,  4, 1, 1,  32, 32, 32,  32, 32, 32,  -1, "CK_TILE_USE_WMMA"),
+            }
+        else:
+            return None
     else:
         return None
 
@@ -681,39 +700,40 @@ def get_fwd_splitkv_blobs(kernel_filter : Optional[str], receipt, mask_impl) -> 
 
     gen = list()
     api_pool = FmhaFwdSplitKVApiPool(mask_impl)
-
-    for dtype in FWD_DTYPE_MAP.keys():
-        d = get_fmha_fwd_tile_dict_from_dtype(dtype)
-        if d == None:
-            continue
-        #for hdim_str, mode, mask, bias, lse in itertools.product(d.keys(), MODE_MAP.keys(), MASK_MAP.keys(), ["t", "f"], ["t", "f"]):
-        for hdim_str, mode in itertools.product(d.keys(), MODE_MAP.keys()):
-            tile = d[hdim_str]
-            hdim = int(hdim_str)
-            for pipeline in get_pipelines(dtype, hdim):
-                if mode == "group":
-                    if pipeline.F_spad != 't' or pipeline.F_skpad != 't':
-                        # in group mode, spad/skpad must be true, since we can't predict if seqlen of current batch need pad or not
-                        continue
-                k = Kernel(F_idx=0,
-                           F_hdim=hdim,
-                           F_dtype=dtype,
-                           F_mode=mode,
-                           F_tile=tile,
-                           F_pipeline=pipeline,
-                           mask_impl=mask_impl)
-                if kernel_filter != None:
-                    if not fnmatch.fnmatch(k.name, kernel_filter):
-                        continue
-                if receipt == 2:
-                    cond = dtype in ['fp16', 'bf16']
-                    cond &= pipeline.F_vlayout == 'row'
-                    cond &= pipeline.F_bias in ['no', 'alibi']
-                    cond &= pipeline.F_squant == 'f'
-                    if not cond:
-                        continue
-                api_pool.register_traits(k.api_trait())
-                gen.append(k)
+    
+    for gemm_mode in [GEMM_MODE.XDL, GEMM_MODE.WMMA]:
+        for dtype in FWD_DTYPE_MAP.keys():
+            d = get_fmha_fwd_tile_dict_from_dtype(gemm_mode, dtype)
+            if d == None:
+                continue
+            #for hdim_str, mode, mask, bias, lse in itertools.product(d.keys(), MODE_MAP.keys(), MASK_MAP.keys(), ["t", "f"], ["t", "f"]):
+            for hdim_str, mode in itertools.product(d.keys(), MODE_MAP.keys()):
+                tile = d[hdim_str]
+                hdim = int(hdim_str)
+                for pipeline in get_pipelines(dtype, hdim):
+                    if mode == "group":
+                        if pipeline.F_spad != 't' or pipeline.F_skpad != 't':
+                            # in group mode, spad/skpad must be true, since we can't predict if seqlen of current batch need pad or not
+                            continue
+                    k = Kernel(F_idx=0,
+                            F_hdim=hdim,
+                            F_dtype=dtype,
+                            F_mode=mode,
+                            F_tile=tile,
+                            F_pipeline=pipeline,
+                            mask_impl=mask_impl)
+                    if kernel_filter != None:
+                        if not fnmatch.fnmatch(k.name, kernel_filter):
+                            continue
+                    if receipt == 2:
+                        cond = dtype in ['fp16', 'bf16']
+                        cond &= pipeline.F_vlayout == 'row'
+                        cond &= pipeline.F_bias in ['no', 'alibi']
+                        cond &= pipeline.F_squant == 'f'
+                        if not cond:
+                            continue
+                    api_pool.register_traits(k.api_trait())
+                    gen.append(k)
 
     return (api_pool, gen)
 

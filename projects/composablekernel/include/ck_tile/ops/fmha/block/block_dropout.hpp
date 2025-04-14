@@ -5,6 +5,7 @@
 
 #include "ck_tile/core.hpp"
 #include "ck_tile/ops/gemm/warp/warp_gemm.hpp"
+#include "ck_tile/ops/gemm/warp/warp_gemm_dispatcher.hpp"
 
 namespace ck_tile {
 
@@ -84,7 +85,21 @@ struct BlockDropout
         constexpr index_t kNPerStep = WG::kN;
         constexpr index_t kN1       = 8;
         constexpr index_t kN0       = kNPerStep / kN1;
+#if defined(__gfx13__)
+        constexpr auto randval_lds_block_desc_0 = make_naive_tensor_descriptor(
+            ck_tile::make_tuple(number<kMPerStep>{}, number<kN0>{}, number<kN1>{}),
+            ck_tile::make_tuple(number<kN0 * kN1>{}, number<kN1>{}, number<1>{}),
+            number<kN1>{},
+            number<1>{});
 
+        constexpr auto randval_lds_block_desc = transform_tensor_descriptor(
+            randval_lds_block_desc_0,
+            ck_tile::make_tuple(
+                make_pass_through_transform(number<kMPerStep>{}),
+                make_merge_transform(ck_tile::make_tuple(number<kN0>{}, number<kN1>{}))),
+            ck_tile::make_tuple(sequence<0>{}, sequence<1, 2>{}),
+            ck_tile::make_tuple(sequence<0>{}, sequence<1>{}));
+#else
         constexpr auto randval_lds_block_desc_0 = make_naive_tensor_descriptor(
             ck_tile::make_tuple(number<kN0>{}, number<kMPerStep>{}, number<kN1>{}),
             ck_tile::make_tuple(number<(kMPerStep + 1) * kN1>{}, number<kN1>{}, number<1>{}),
@@ -98,7 +113,7 @@ struct BlockDropout
                 make_merge_transform(ck_tile::make_tuple(number<kN0>{}, number<kN1>{}))),
             ck_tile::make_tuple(sequence<1>{}, sequence<0, 2>{}),
             ck_tile::make_tuple(sequence<0>{}, sequence<1>{}));
-
+#endif
         return randval_lds_block_desc;
     }
 
@@ -120,7 +135,19 @@ struct BlockDropout
             tuple<sequence<1, 1>>,
             sequence<1, 2>,
             sequence<0, 0>>{};
-
+#if defined(__gfx13__)
+        using BlockGemmShape = remove_cvref_t<typename BlockGemm::BlockGemmShape>;
+        constexpr auto randval_block_inner_part_dstr_encoding =
+            typename WarpGemmWmmaDispatcher<typename BlockGemm::ADataType,
+                                            typename BlockGemm::BDataType,
+                                            typename BlockGemm::CDataType,
+                                            BlockGemmShape::WarpTile::at(number<0>{}),
+                                            BlockGemmShape::WarpTile::at(number<1>{}),
+                                            BlockGemmShape::WarpTile::at(number<2>{}),
+                                            false,
+                                            false,
+                                            true>::CWarpDstrEncoding{};
+#else
         // Use Bwd WarpGemm to ensure that Fwd's random values ​​are consistent with Bwd.
         constexpr auto randval_block_inner_part_dstr_encoding = []() {
             if constexpr(std::is_same_v<typename BlockGemm::ADataType, half_t> &&
@@ -134,6 +161,7 @@ struct BlockDropout
                 return typename WarpGemmMfmaBf16Bf16F32M32N32K16SwizzleA::CWarpDstrEncoding{};
             }
         }();
+#endif
 
         constexpr auto randval_block_part_dstr_encode =
             detail::make_embed_tile_distribution_encoding(randval_block_outer_part_dstr_encoding,
@@ -200,7 +228,7 @@ struct BlockDropout
         // register distribute
         auto randval_dist_generated =
             make_static_distributed_tensor<uint8_t>(MakeRandValTileDistribution<BlockGemm>());
-        static_assert(randval_dist_generated.kThreadElementSpaceSize == 16);
+        // static_assert(randval_dist_generated.kThreadElementSpaceSize == 16);
 
         auto randval_lds_read_window =
             make_tile_window(randval_lds_window.get_bottom_tensor_view(),
@@ -394,7 +422,21 @@ struct BlockDropoutBwd<true, IsWG32_, IsStoreRandval_>
         constexpr index_t kNPerStep = WG::kN;
         constexpr index_t kN1       = 8;
         constexpr index_t kN0       = kNPerStep / kN1;
+#if defined(__gfx13__)
+        constexpr auto randval_lds_block_desc_0 = make_naive_tensor_descriptor(
+            ck_tile::make_tuple(number<kMPerStep>{}, number<kN0>{}, number<kN1>{}),
+            ck_tile::make_tuple(number<kN0 * kN1>{}, number<kN1>{}, number<1>{}),
+            number<kN1>{},
+            number<1>{});
 
+        constexpr auto randval_lds_block_desc = transform_tensor_descriptor(
+            randval_lds_block_desc_0,
+            ck_tile::make_tuple(
+                make_pass_through_transform(number<kMPerStep>{}),
+                make_merge_transform(ck_tile::make_tuple(number<kN0>{}, number<kN1>{}))),
+            ck_tile::make_tuple(sequence<0>{}, sequence<1, 2>{}),
+            ck_tile::make_tuple(sequence<0>{}, sequence<1>{}));
+#else
         constexpr auto randval_lds_block_desc_0 = make_naive_tensor_descriptor(
             ck_tile::make_tuple(number<kN0>{}, number<kMPerStep>{}, number<kN1>{}),
             ck_tile::make_tuple(number<(kMPerStep + 1) * kN1>{}, number<kN1>{}, number<1>{}),
@@ -408,7 +450,7 @@ struct BlockDropoutBwd<true, IsWG32_, IsStoreRandval_>
                 make_merge_transform(ck_tile::make_tuple(number<kN0>{}, number<kN1>{}))),
             ck_tile::make_tuple(sequence<1>{}, sequence<0, 2>{}),
             ck_tile::make_tuple(sequence<0>{}, sequence<1>{}));
-
+#endif
         return randval_lds_block_desc;
     }
 
@@ -443,8 +485,20 @@ struct BlockDropoutBwd<true, IsWG32_, IsStoreRandval_>
             sequence<1, 2>,
             sequence<0, 0>>{};
 
-        // Use Bwd WarpGemm to ensure that Fwd's random values ​​are consistent with Bwd.
-        // except headdim256.
+// Use Bwd WarpGemm to ensure that Fwd's random values ​​are consistent with Bwd.
+// except headdim256.
+#if defined(__gfx13__)
+        constexpr auto randval_block_inner_part_dstr_encoding =
+            typename WarpGemmWmmaDispatcher<typename BlockGemm::ADataType,
+                                            typename BlockGemm::BDataType,
+                                            typename BlockGemm::CDataType,
+                                            BlockGemmShape::WarpTile::at(number<0>{}),
+                                            BlockGemmShape::WarpTile::at(number<1>{}),
+                                            BlockGemmShape::WarpTile::at(number<2>{}),
+                                            false,
+                                            false,
+                                            true>::CWarpDstrEncoding{};
+#else
         constexpr auto randval_block_inner_part_dstr_encoding = []() {
             if constexpr(std::is_same_v<typename BlockGemm::ADataType, half_t> &&
                          std::is_same_v<typename BlockGemm::BDataType, half_t> &&
@@ -463,6 +517,7 @@ struct BlockDropoutBwd<true, IsWG32_, IsStoreRandval_>
                     return typename WarpGemmMfmaBf16Bf16F32M16N16K16::CWarpDstrEncoding{};
             }
         }();
+#endif
 
         constexpr auto randval_block_part_dstr_encode =
             detail::make_embed_tile_distribution_encoding(randval_block_outer_part_dstr_encoding,

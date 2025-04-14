@@ -404,7 +404,11 @@ struct BlockFmhaPipelineQRKSVS
                 sequence<1>{},
                 f_max,
                 -numeric<SMPLComputeDataType>::infinity()); // m_local = rowmax(S{j})
+#if(defined(__gfx13__))
+            block_tile_reduce_xor_sync(m_local, f_max);
+#else
             block_tile_reduce_sync(m_local, f_max, bool_constant<false>{});
+#endif
 
             const auto m_old = m; // m{j-1}
             tile_elementwise_inout(
@@ -455,8 +459,11 @@ struct BlockFmhaPipelineQRKSVS
 
             auto rowsum_p = block_tile_reduce<SMPLComputeDataType>(
                 p_compute, sequence<1>{}, f_sum, SMPLComputeDataType{0}); // rowsum(Pcompute{j})
-
+#if(defined(__gfx13__))
+            block_tile_reduce_xor_sync(rowsum_p, f_sum);
+#else
             block_tile_reduce_sync(rowsum_p, f_sum, bool_constant<false>{});
+#endif
             // l{j}, Oacc{j}
             constexpr auto o_spans = decltype(o_acc)::get_distributed_spans();
             sweep_tile_span(o_spans[number<0>{}], [&](auto idx0) {
@@ -489,6 +496,7 @@ struct BlockFmhaPipelineQRKSVS
 
             if constexpr(kHasDropout)
             {
+                block_sync_lds();
                 dropout.template Run<decltype(gemm_0), SMPLComputeDataType, RandValOutputDataType>(
                     smem_ptr, seqlen_k_start + i_total_loops * kN0, p_compute, randval_dram_window);
             }

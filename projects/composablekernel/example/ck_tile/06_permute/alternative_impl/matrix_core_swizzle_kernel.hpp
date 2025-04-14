@@ -16,6 +16,7 @@ enum class matrix_core_inst_enum
 {
     MFMA_32x32x8_F16  = 0,
     MFMA_16x16x16_F16 = 1,
+    WMMA_16x16x16_F16 = 2,
 };
 
 namespace detail {
@@ -33,6 +34,21 @@ struct to_warp_gemm<matrix_core_inst_enum::MFMA_16x16x16_F16>
 {
     using type = ck_tile::WarpGemmMfmaF16F16F32M16N16K16;
 };
+
+template <>
+struct to_warp_gemm<matrix_core_inst_enum::WMMA_16x16x16_F16>
+{
+    using type = ck_tile::WarpGemmWmmaDispatcher<ck_tile::half_t,
+                                                 ck_tile::half_t,
+                                                 float,
+                                                 16,
+                                                 16,
+                                                 16,
+                                                 false,
+                                                 false,
+                                                 false>;
+};
+
 } // namespace detail
 template <matrix_core_inst_enum Inst>
 using to_warp_gemm_t = typename detail::to_warp_gemm<Inst>::type;
@@ -91,7 +107,7 @@ struct matrix_core_swizzle_kernel
     static constexpr int BLOCK_SIZE      = BLOCK_SIZE_;
     static constexpr int WavesPerBlock_N = 4;
     static constexpr int WavesPerBlock_K = 1;
-    static_assert(WavesPerBlock_N * WavesPerBlock_K * 64 == BLOCK_SIZE);
+    static_assert(WavesPerBlock_N * WavesPerBlock_K * ck_tile::get_warp_size() == BLOCK_SIZE);
     static constexpr int NPerBlock                    = NPerBlock_;
     static constexpr int KPerBlock                    = KPerBlock_;
     static constexpr matrix_core_permute_style pstyle = pstyle_;

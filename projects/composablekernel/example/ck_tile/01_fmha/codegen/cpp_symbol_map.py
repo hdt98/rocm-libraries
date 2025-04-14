@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2018-2024, Advanced Micro Devices, Inc. All rights reserved.
 # generate kernel instances to speed up compilation
+from enum import Enum
 
 FWD_DTYPE_MAP = {
     "fp16"   : "FmhaFwdFp16",
@@ -30,6 +31,10 @@ _MASK_MAP = {
     "causal" : "FmhaMasks::CausalMask",
     "generic" : "FmhaMasks::GenericMask"
 }
+
+class GEMM_MODE(Enum):
+    XDL = 0
+    WMMA = 1
 
 def get_mask_map(mask : str):
     if mask == "generic":
@@ -64,6 +69,11 @@ BIAS_MAP = {
     "no" : "ck_tile::BlockAttentionBiasEnum::NO_BIAS",
     "bias"  : "ck_tile::BlockAttentionBiasEnum::ELEMENTWISE_BIAS",
     "alibi" : "ck_tile::BlockAttentionBiasEnum::ALIBI"
+}
+
+GEMMMODE_MAP = {
+    "CK_TILE_USE_WMMA" : "wmma",
+    "CK_TILE_USE_XDL"  : "xdl"
 }
 
 # TODO: this is ugly

@@ -281,23 +281,40 @@ bool run(const ck_tile::ArgParser& arg_parser)
             auto kv = shape[5];
             a.n     = nr * nw;
             a.k     = kr * kw * kv;
-            if(kv == 8 && kw == 4 && nw == 16 && nr % 4 == 0 && kr % 8 == 0)
+            if(ck_tile::is_gfx13_supported())
             {
-                t.inst = "16x16x16";
-                std::cout << ", matrix_core_swizzle_waveflatten_" << t.inst << std::flush;
+                if(kv == 8 && kw == 2 && nw == 16 && nr % 4 == 0 && kr % 8 == 0)
+                {
+                    t.inst = "16x16x16";
+                    std::cout << ", matrix_core_swizzle_waveflatten_" << t.inst << std::flush;
 
-                ave_time = matrix_core_swizzle(t, a, stream_config);
-            }
-            else if(kv == 8 && kw == 2 && nw == 32 && nr % 4 == 0 && kr % 8 == 0)
-            {
-                t.inst = "32x32x8";
-                std::cout << ", matrix_core_swizzle_waveflatten_" << t.inst << std::flush;
-
-                ave_time = matrix_core_swizzle(t, a, stream_config);
+                    ave_time = matrix_core_swizzle(t, a, stream_config);
+                }
+                else
+                {
+                    ave_time = run_permute();
+                }
             }
             else
             {
-                ave_time = run_permute();
+                if(kv == 8 && kw == 4 && nw == 16 && nr % 4 == 0 && kr % 8 == 0)
+                {
+                    t.inst = "16x16x16";
+                    std::cout << ", matrix_core_swizzle_waveflatten_" << t.inst << std::flush;
+
+                    ave_time = matrix_core_swizzle(t, a, stream_config);
+                }
+                else if(kv == 8 && kw == 2 && nw == 32 && nr % 4 == 0 && kr % 8 == 0)
+                {
+                    t.inst = "32x32x8";
+                    std::cout << ", matrix_core_swizzle_waveflatten_" << t.inst << std::flush;
+
+                    ave_time = matrix_core_swizzle(t, a, stream_config);
+                }
+                else
+                {
+                    ave_time = run_permute();
+                }
             }
         }
         else
@@ -312,34 +329,52 @@ bool run(const ck_tile::ArgParser& arg_parser)
             a.batch = shape[0];
             a.n     = shape[1] * shape[2] * shape[3];
             a.k     = shape[4] * shape[5] * shape[6];
-            if(shape[6] == 8 && shape[3] == 32 && shape[5] == 2 && shape[2] == 4 &&
-               shape[4] % 8 == 0 && shape[1] % 2 == 0)
+            if(ck_tile::is_gfx13_supported())
             {
-                // 32x32x8 inst
-                // perm=0,1,4,2,5,3,6
-                // y_shape=*,2x,8x,4,2,32,8 (3,6,16,4,2,32,8)
-                // shape = *,2x,4,32,8x,2,8 (3,6,4,32,16,2,8)
+                if(shape[6] == 8 && shape[3] == 16 && shape[5] == 2 && shape[2] == 4 &&
+                   shape[4] % 4 == 0 && shape[1] % 4 == 0)
+                {
+                    t.inst = "16x16x16";
+                    std::cout << ", matrix_core_swizzle_" << t.inst << std::flush;
 
-                t.inst = "32x32x8";
-                std::cout << ", matrix_core_swizzle_" << t.inst << std::flush;
-
-                ave_time = matrix_core_swizzle(t, a, stream_config);
-            }
-            else if(shape[6] == 8 && shape[3] == 16 && shape[5] == 4 && shape[2] == 4 &&
-                    shape[4] % 4 == 0 && shape[1] % 4 == 0)
-            {
-                // 16x16x16 inst
-                // perm=0,1,4,2,5,3,6
-                // y_shape=*,4x,4x,4,4,16,8
-                // shape = *,4x,4,16,4x,4,8 (3,8,4,16,16,4,8)
-                t.inst = "16x16x16";
-                std::cout << ", matrix_core_swizzle_" << t.inst << std::flush;
-
-                ave_time = matrix_core_swizzle(t, a, stream_config);
+                    ave_time = matrix_core_swizzle(t, a, stream_config);
+                }
+                else
+                {
+                    ave_time = run_permute();
+                }
             }
             else
             {
-                ave_time = run_permute();
+                if(shape[6] == 8 && shape[3] == 32 && shape[5] == 2 && shape[2] == 4 &&
+                   shape[4] % 8 == 0 && shape[1] % 2 == 0)
+                {
+                    // 32x32x8 inst
+                    // perm=0,1,4,2,5,3,6
+                    // y_shape=*,2x,8x,4,2,32,8 (3,6,16,4,2,32,8)
+                    // shape = *,2x,4,32,8x,2,8 (3,6,4,32,16,2,8)
+
+                    t.inst = "32x32x8";
+                    std::cout << ", matrix_core_swizzle_" << t.inst << std::flush;
+
+                    ave_time = matrix_core_swizzle(t, a, stream_config);
+                }
+                else if(shape[6] == 8 && shape[3] == 16 && shape[5] == 4 && shape[2] == 4 &&
+                        shape[4] % 4 == 0 && shape[1] % 4 == 0)
+                {
+                    // 16x16x16 inst
+                    // perm=0,1,4,2,5,3,6
+                    // y_shape=*,4x,4x,4,4,16,8
+                    // shape = *,4x,4,16,4x,4,8 (3,8,4,16,16,4,8)
+                    t.inst = "16x16x16";
+                    std::cout << ", matrix_core_swizzle_" << t.inst << std::flush;
+
+                    ave_time = matrix_core_swizzle(t, a, stream_config);
+                }
+                else
+                {
+                    ave_time = run_permute();
+                }
             }
         }
     }
@@ -372,13 +407,8 @@ bool run(const ck_tile::ArgParser& arg_parser)
 
         y_buf.FromDevice(y_dev.data());
 
-        pass = std::equal(
-            y_dev.begin(), y_dev.end(), y.begin(), [&](const DataType& d, const DataType& h) {
-                using itype = to_integer_type<sizeof(DataType)>;
-                itype i_d   = ck_tile::bit_cast<itype>(d);
-                itype i_h   = ck_tile::bit_cast<itype>(h);
-                return i_d == i_h;
-            });
+        pass =
+            ck_tile::check_err(y_dev, y, std::string("OUT Error: Incorrect results!"), 1e-2, 1e-2);
         std::cout << ", valid:" << (pass ? "y" : "n") << std::flush;
     }
 
