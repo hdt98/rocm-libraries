@@ -277,7 +277,9 @@ def extract_dtype(match):
         res["UseBias"] = 1
         res["BiasSrc"] = bias_source
         bias_type = gdict.get("BIAS_TYPE", '').strip()
-        res["BiasDataTypeList"] = bias_datatype_map(bias_type, DataType, ComputeDataType, DestDataType)
+        bias_list = bias_datatype_map(bias_type, DataType, ComputeDataType, DestDataType)
+        if bias_list:
+            res["BiasDataTypeList"] = bias_list
     if activation_type != "none":
         res["Activation"] = True
         res["ActivationType"] = "hipblaslt_all"
