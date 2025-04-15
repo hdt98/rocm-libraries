@@ -237,7 +237,7 @@ def trans_map(trans):
         return None
 
 def bias_datatype_map(bias_type, data_type, compute_type, dest_type):
-    bias_list = [data_type, compute_type, dest_type]
+    bias_list = list(set([data_type, compute_type, dest_type]))
     if bias_type in bias_list:
         return []
     bias_list.append(bias_type)
@@ -402,9 +402,11 @@ def dump_yaml(gpu_idx, gemm_group, yaml_file, m_sum, n_sum, batch_sum, k_sum, sa
         if i >= len(data["BenchmarkProblems"]):
             data["BenchmarkProblems"].append(copy.deepcopy(data["BenchmarkProblems"][0]))
         data["BenchmarkProblems"][i][1]["BenchmarkFinalParameters"][0]["ProblemSizes"] = gemm_group[dtype_str]
-        if "BiasDataTypeList" in dtype:
-            data["BenchmarkProblems"][i][1]["BenchmarkFinalParameters"].append({"BiasTypeArgs": list(dtype["BiasDataTypeList"])})
-
+        if "UseBias" in dtype and dtype["UseBias"] == 1:
+            if "BiasTypeArgs" in dtype:
+                data["BenchmarkProblems"][i][1]["BenchmarkFinalParameters"].append({"BiasTypeArgs": list(dtype["BiasDataTypeList"])})
+            else:
+                data["BenchmarkProblems"][i][1]["BenchmarkFinalParameters"].append({"BiasTypeArgs": list(dtype["DestDataType"])})
         # Add groupd here if needed
         group_params = [[]]
 
