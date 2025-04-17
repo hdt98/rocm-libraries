@@ -24,9 +24,10 @@ struct GemmPipelineAgBgCrWmmaImplBase : GemmPipelineAgBgCrImplBase<Problem, Poli
     static constexpr index_t NPerBlock = BlockGemmShape::kN;
     static constexpr index_t KPerBlock = BlockGemmShape::kK;
 
-    template <typename ADramBlockWindowTmp, typename ALdsTensorView>
+    template <typename ADramBlockWindowTmp, typename ALdsTensorView, typename ALdsLoadTileDistr>
     CK_TILE_DEVICE auto GetAWindows(const ADramBlockWindowTmp& a_dram_block_window_tmp,
-                                    const ALdsTensorView& a_lds_block_view) const
+                                    const ALdsTensorView& a_lds_block_view,
+                                    const ALdsLoadTileDistr&) const
     {
         constexpr bool is_col_major = std::is_same_v<ALayout, tensor_layout::gemm::ColumnMajor>;
         constexpr bool kTransLoadEn = Policy::TransLoadEn;
@@ -49,16 +50,18 @@ struct GemmPipelineAgBgCrWmmaImplBase : GemmPipelineAgBgCrImplBase<Problem, Poli
         // TODO: this part should have something.
         auto a_copy_lds_window = make_tile_window(a_lds_block_view, LdsTileWindow{}, {0, 0});
 
-        auto a_lds_gemm_window = make_tile_window(a_lds_block_view, LdsTileWindow{}, {0, 0});
+        auto a_lds_gemm_window =
+            make_tile_window(a_lds_block_view, LdsTileWindow{}, {0, 0}, ALdsLoadTileDistr{});
 
         return make_tuple(std::move(a_copy_dram_window),
                           std::move(a_copy_lds_window),
                           std::move(a_lds_gemm_window));
     }
 
-    template <typename BDramBlockWindowTmp, typename BLdsTensorView>
+    template <typename BDramBlockWindowTmp, typename BLdsTensorView, typename BLdsLoadTileDistr>
     CK_TILE_DEVICE auto GetBWindows(const BDramBlockWindowTmp& b_dram_block_window_tmp,
-                                    const BLdsTensorView& b_lds_block_view) const
+                                    const BLdsTensorView& b_lds_block_view,
+                                    const BLdsLoadTileDistr&) const
     {
         constexpr bool is_row_major = std::is_same_v<BLayout, tensor_layout::gemm::RowMajor>;
         constexpr bool kTransLoadEn = Policy::TransLoadEn;
@@ -81,16 +84,18 @@ struct GemmPipelineAgBgCrWmmaImplBase : GemmPipelineAgBgCrImplBase<Problem, Poli
         // B LDS tile window for store
         auto b_copy_lds_window = make_tile_window(b_lds_block_view, LdsTileWindow{}, {0, 0});
 
-        auto b_lds_gemm_window = make_tile_window(b_lds_block_view, LdsTileWindow{}, {0, 0});
+        auto b_lds_gemm_window =
+            make_tile_window(b_lds_block_view, LdsTileWindow{}, {0, 0}, BLdsLoadTileDistr{});
 
         return make_tuple(std::move(b_copy_dram_window),
                           std::move(b_copy_lds_window),
                           std::move(b_lds_gemm_window));
     }
 
-    template <typename ADramBlockWindowTmp, typename ALdsTensorView>
+    template <typename ADramBlockWindowTmp, typename ALdsTensorView, typename ALdsLoadTileDistr>
     CK_TILE_DEVICE auto GetAMultiLdsWindows(const ADramBlockWindowTmp& a_dram_block_window_tmp,
-                                            const ALdsTensorView& a_lds_block_view) const
+                                            const ALdsTensorView& a_lds_block_view,
+                                            const ALdsLoadTileDistr&) const
     {
         constexpr bool is_col_major = std::is_same_v<ALayout, tensor_layout::gemm::ColumnMajor>;
         constexpr bool kTransLoadEn = Policy::TransLoadEn;
@@ -117,8 +122,10 @@ struct GemmPipelineAgBgCrWmmaImplBase : GemmPipelineAgBgCrImplBase<Problem, Poli
 
         auto a_lds_gemm_window = generate_tuple(
             [&](auto i_buf) {
-                return make_tile_window(
-                    a_lds_block_view, LdsTileWindow{}, {LdsTileWindow{}[I0{}] * i_buf, 0});
+                return make_tile_window(a_lds_block_view,
+                                        LdsTileWindow{},
+                                        {LdsTileWindow{}[I0{}] * i_buf, 0},
+                                        ALdsLoadTileDistr{});
             },
             number<Policy::NumLdsNumA>{});
 
@@ -127,9 +134,10 @@ struct GemmPipelineAgBgCrWmmaImplBase : GemmPipelineAgBgCrImplBase<Problem, Poli
                           std::move(a_lds_gemm_window));
     }
 
-    template <typename BDramBlockWindowTmp, typename BLdsTensorView>
+    template <typename BDramBlockWindowTmp, typename BLdsTensorView, typename BLdsLoadTileDistr>
     CK_TILE_DEVICE auto GetBMultiLdsWindows(const BDramBlockWindowTmp& b_dram_block_window_tmp,
-                                            const BLdsTensorView& b_lds_block_view) const
+                                            const BLdsTensorView& b_lds_block_view,
+                                            const BLdsLoadTileDistr&) const
     {
         constexpr bool is_row_major = std::is_same_v<BLayout, tensor_layout::gemm::RowMajor>;
         constexpr bool kTransLoadEn = Policy::TransLoadEn;
@@ -157,8 +165,10 @@ struct GemmPipelineAgBgCrWmmaImplBase : GemmPipelineAgBgCrImplBase<Problem, Poli
 
         auto b_lds_gemm_window = generate_tuple(
             [&](auto i_buf) {
-                return make_tile_window(
-                    b_lds_block_view, LdsTileWindow{}, {LdsTileWindow{}[I0{}] * i_buf, 0});
+                return make_tile_window(b_lds_block_view,
+                                        LdsTileWindow{},
+                                        {LdsTileWindow{}[I0{}] * i_buf, 0},
+                                        BLdsLoadTileDistr{});
             },
             number<Policy::NumLdsNumB>{});
 

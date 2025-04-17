@@ -139,17 +139,25 @@ struct GemmWmmaPipelineAsync
             // A/B tiles in LDS
             auto&& [a_lds_block, b_lds_block] = Base::GetABLdsTensorViews(p_smem);
 
+            // Tile distribution for load from lds
+            constexpr auto a_lds_load_tile_distr = decltype(make_static_tile_distribution(
+                BlockGemm::MakeABlockDistributionEncode())){};
+            constexpr auto b_lds_load_tile_distr = decltype(make_static_tile_distribution(
+                BlockGemm::MakeBBlockDistributionEncode())){};
+
             // A DRAM tile window for load
             // A LDS tile window for store
             // A LDS tile for block GEMM
             auto&& [a_copy_dram_window, a_copy_lds_window, a_lds_gemm_window] =
-                Base::GetAMultiLdsWindows(a_dram_block_window_tmp, a_lds_block);
+                Base::GetAMultiLdsWindows(
+                    a_dram_block_window_tmp, a_lds_block, a_lds_load_tile_distr);
 
             // B DRAM tile window for load
             // B LDS tile window for store
             // B LDS tile for block GEMM
             auto&& [b_copy_dram_window, b_copy_lds_window, b_lds_gemm_window] =
-                Base::GetBMultiLdsWindows(b_dram_block_window_tmp, b_lds_block);
+                Base::GetBMultiLdsWindows(
+                    b_dram_block_window_tmp, b_lds_block, b_lds_load_tile_distr);
 
             // Block GEMM
             auto block_gemm   = BlockGemm();

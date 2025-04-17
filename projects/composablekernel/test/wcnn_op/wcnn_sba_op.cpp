@@ -640,7 +640,7 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
               AccDataType* c_,
               AccDataType* scale_,
               AccDataType* bias_,
-              EDataType* outTensor_)
+              EDataType*)
 {
     constexpr index_t DataTileHeight = 4;
 

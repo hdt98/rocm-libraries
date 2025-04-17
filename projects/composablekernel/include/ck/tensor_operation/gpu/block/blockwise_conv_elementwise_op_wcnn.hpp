@@ -589,7 +589,7 @@ struct BlockwiseElementSbaWcnn<ThisThreadBlock,
               typename NumberW0,
               typename NumberK0>
     __device__ void
-    Run(const DsBlockBuffer& ds_block_buf, AccDataVec& acc_vec, NumberH0, NumberW0, NumberK0) const
+    Run(const DsBlockBuffer&, AccDataVec& acc_vec, NumberH0, NumberW0, NumberK0) const
     {
         if constexpr(std::is_same<float, AccDataType>::value)
         {

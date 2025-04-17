@@ -57,7 +57,7 @@ struct Default2DEpilogue
 
     CK_TILE_HOST_DEVICE static constexpr index_t GetSmemSize() { return 0; }
 
-    template <typename ODataType>
+    // template <typename ODataType_>
     CK_TILE_HOST_DEVICE static constexpr auto GetVectorSizeC()
     {
         constexpr index_t MaxVectorStoreSize = 16;

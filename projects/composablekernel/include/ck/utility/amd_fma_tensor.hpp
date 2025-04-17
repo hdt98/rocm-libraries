@@ -433,7 +433,7 @@ struct intrin_wcnn_fma_from_tensor<4, 4, ChanOff>
 
     template <class FloatAcc>
     __device__ static void
-    Run(const bhalf8_t& inAcc, const uint4x8_t& residual0, const bhalf2_t scale, FloatAcc& outAcc)
+    Run(const bhalf8_t& inAcc, const uint4x8_t& residual0, const bhalf8_t scale, FloatAcc& outAcc)
     {
         constexpr index_t aux_data0 = GetChanOff<ChanOff>();
         constexpr index_t aux_data1 = GetChanOff<ChanOff + 8>();

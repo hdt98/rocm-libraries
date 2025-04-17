@@ -533,7 +533,7 @@ struct BlockwiseConvWcnn
 
     __host__ __device__
     BlockwiseConvWcnn(const AccBlockwiseOperation& acc_blockwise_op,
-                      const AccBlockwiseNextOperation& acc_blockwise_nextop,
+                      const AccBlockwiseNextOperation&,
                       TupleWeiData weight_origin = CalculateWeiDataThreadOriginDataIndex(),
                       TupleInData indata_origin  = CalculateInDataThreadOriginDataIndex())
         : weight_thread_copy_(weight_origin),
