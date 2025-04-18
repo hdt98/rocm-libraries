@@ -13,12 +13,11 @@ class CMakeBuild(build_ext):
             os.makedirs(self.build_lib, exist_ok=True)
             source_dir = os.path.abspath(os.path.dirname(__file__))
             rocm_path = os.environ.get('ROCM_PATH', '/opt/rocm')
-            compilerpath = os.path.join(rocm_path, 'bin/amdclang++')
             cmakeargs = [
                 "cmake",
                 f"-S{source_dir}",
                 f"-B{self.build_temp}",
-                f"-DCMAKE_CXX_COMPILER={compilerpath}",
+                f"-DCMAKE_PREFIX_PATH={rocm_path}",
                 "-DCMAKE_BUILD_TYPE=Release",
                 f"-DPython_EXECUTABLE={sys.executable}",
             ]

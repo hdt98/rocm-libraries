@@ -29,9 +29,12 @@
 
 using IsaVersion = std::array<int, 3>;
 
-std::pair<int, std::string>
-            run(const std::vector<char*>& cmd, const std::string& input, bool debug = false);
-std::string demangle(const char* name);
+std::pair<int, std::string> runComgr(const std::string& input,
+                                     const std::string& gfxStr,
+                                     const char**       optionStr,
+                                     const size_t       optionSize,
+                                     bool               debug);
+std::string                 demangle(const char* name);
 
 inline std::string getGfxNameTuple(const IsaVersion& isaVersion)
 {
@@ -39,7 +42,7 @@ inline std::string getGfxNameTuple(const IsaVersion& isaVersion)
 
     Args:
         arch: An object representing the major, minor, and step version of the ISA.
-    
+
     Returns:
         The name of the GPU architecture (e.g., 'gfx906').
     */
