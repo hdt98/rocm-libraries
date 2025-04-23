@@ -249,6 +249,8 @@ struct BlockUniversalGemmAsBsCr
                                        const ASmemBlockWindow& a_block_window,
                                        const BSmemBlockWindow& b_block_window)
         {
+#if 0
+            // Disable stg code in gfx1300 branch temporarily
             static_assert(std::is_same_v<CDataType, typename CBlockTensor::DataType>,
                           "The CDataType as defined in traits should be the same as correspoinding "
                           "C block tensor data type!");
@@ -318,6 +320,164 @@ struct BlockUniversalGemmAsBsCr
 
                         // warp GEMM
                         WarpGemm{}(c_warp_tensor, a_warp_tensor, b_warp_tensor);
+
+                        // write C warp tensor into C block tensor
+                        c_block_tensor.set_y_sliced_thread_data(
+                            merge_sequences(c_warp_seq, c_warp_y_index_zeros),
+                            merge_sequences(sequence<1, 1>{}, c_warp_y_lengths),
+                            c_warp_tensor.get_thread_buffer());
+                    });
+                });
+            });
+#endif
+            static_assert(std::is_same_v<CDataType, typename CBlockTensor::DataType>,
+                          "The CDataType as defined in traits should be the same as correspoinding "
+                          "C block tensor data type!");
+            static_assert(std::is_same_v<ADataType, typename ASmemBlockWindow::DataType> &&
+                              std::is_same_v<BDataType, typename BSmemBlockWindow::DataType>,
+                          "The ADataType and BDataType as defined in "
+                          "traits should be the same as correspoinding block window data type!");
+
+            using ASemMIndex = std::conditional_t<TransLdA, number<1>, number<0>>;
+            using ASemKIndex = std::conditional_t<TransLdA, number<0>, number<1>>;
+            using BSemNIndex = std::conditional_t<TransLdB, number<1>, number<0>>;
+
+            static_assert(
+                GemmTraits::MPerBlock == ASmemBlockWindow{}.get_window_lengths()[ASemMIndex{}] &&
+                    GemmTraits::NPerBlock ==
+                        BSmemBlockWindow{}.get_window_lengths()[BSemNIndex{}] &&
+                    GemmTraits::KPerBlock == ASmemBlockWindow{}.get_window_lengths()[ASemKIndex{}],
+                "MPerBlock, NPerBlock, KPerBlock defined in "
+                " BlockGemmShape are different from A/B block smem windows apropriate dims!");
+
+            const auto warp_indices = [&]() constexpr
+            {
+                if constexpr(is_c_column_major)
+                {
+                    // Column-major layout
+                    const index_t n = get_warp_id() / MWarp;
+                    const index_t m = get_warp_id() - (n * MWarp);
+                    return std::make_pair(m, n);
+                }
+                else
+                {
+                    // Row-major layout
+                    const index_t m = get_warp_id() / NWarp;
+                    const index_t n = get_warp_id() - (m * NWarp);
+                    return std::make_pair(m, n);
+                }
+            }
+            ();
+
+            const index_t iMWarp = warp_indices.first;
+            const index_t iNWarp = warp_indices.second;
+
+            // TODO: refactor warp_window tile type to class member as it should be
+            // compile-time known information.
+            auto a_warp_window_tmp = make_tile_window(
+                a_block_window.get_bottom_tensor_view(),
+                // Use constexpr if to determine dimensions at compile time
+                []() constexpr {
+                    if constexpr(TransLdA)
+                        return make_tuple(number<WarpGemm::kK>{}, number<WarpGemm::kM>{});
+                    else
+                        return make_tuple(number<WarpGemm::kM>{}, number<WarpGemm::kK>{});
+                }(),
+                a_block_window.get_window_origin() +
+                    [&iMWarp]() constexpr {
+                        if constexpr(TransLdA)
+                            return multi_index<2>{0, iMWarp * WarpGemm::kM};
+                        else
+                            return multi_index<2>{iMWarp * WarpGemm::kM, 0};
+                    }(),
+                make_static_tile_distribution(typename WarpGemm::AWarpDstrEncoding{}));
+
+            using AWarpWindow = remove_cvref_t<decltype(a_warp_window_tmp)>;
+
+            statically_indexed_array<
+                statically_indexed_array<AWarpWindow, GemmTraits::KIterPerWarp>,
+                MIterPerWarp>
+                a_warp_windows;
+
+            // construct B-warp-window
+            auto b_warp_window_tmp = make_tile_window(
+                b_block_window.get_bottom_tensor_view(),
+                []() constexpr {
+                    if constexpr(TransLdB)
+                        return make_tuple(number<WarpGemm::kK>{}, number<WarpGemm::kN>{});
+                    else
+                        return make_tuple(number<WarpGemm::kN>{}, number<WarpGemm::kK>{});
+                }(),
+                b_block_window.get_window_origin() +
+                    [&iNWarp]() constexpr {
+                        if constexpr(TransLdB)
+                            return multi_index<2>{0, iNWarp * WarpGemm::kN};
+                        else
+                            return multi_index<2>{iNWarp * WarpGemm::kN, 0};
+                    }(),
+                make_static_tile_distribution(typename WarpGemm::BWarpDstrEncoding{}));
+
+            using BWarpWindow = remove_cvref_t<decltype(b_warp_window_tmp)>;
+            statically_indexed_array<
+                statically_indexed_array<BWarpWindow, GemmTraits::KIterPerWarp>,
+                NIterPerWarp>
+                b_warp_windows;
+
+            static_for<0, MIterPerWarp, 1>{}([&](auto mIter) {
+                static_for<0, GemmTraits::KIterPerWarp, 1>{}([&](auto kIter) {
+                    a_warp_windows(mIter)(kIter) = a_warp_window_tmp;
+
+                    // TODO: I don't have to move 0,0 window!
+                    move_tile_window(
+                        a_warp_windows(mIter)(kIter), [&]() constexpr {
+                            if constexpr(TransLdA)
+                                return multi_index<2>{kIter * GemmTraits::KPerBlockPerIter,
+                                                      mIter * GemmTraits::MPerBlockPerIter};
+                            else
+                                return multi_index<2>{mIter * GemmTraits::MPerBlockPerIter,
+                                                      kIter * GemmTraits::KPerBlockPerIter};
+                        }());
+                });
+            });
+
+            static_for<0, NIterPerWarp, 1>{}([&](auto nIter) {
+                static_for<0, GemmTraits::KIterPerWarp, 1>{}([&](auto kIter) {
+                    b_warp_windows(nIter)(kIter) = b_warp_window_tmp;
+
+                    move_tile_window(
+                        b_warp_windows(nIter)(kIter), [&]() constexpr {
+                            if constexpr(TransLdB)
+                                return multi_index<2>{kIter * GemmTraits::KPerBlockPerIter,
+                                                      nIter * GemmTraits::NPerBlockPerIter};
+                            else
+                                return multi_index<2>{nIter * GemmTraits::NPerBlockPerIter,
+                                                      kIter * GemmTraits::KPerBlockPerIter};
+                        }());
+                });
+            });
+
+            // hot loop:
+            static_for<0, GemmTraits::KIterPerWarp, 1>{}([&](auto kIter) {
+                static_for<0, MIterPerWarp, 1>{}([&](auto mIter) {
+                    const auto a_warp_tile = load_warp_tile<TransLdA>(a_warp_windows(mIter)(kIter));
+
+                    static_for<0, NIterPerWarp, 1>{}([&](auto nIter) {
+                        const auto b_warp_tile =
+                            load_warp_tile<TransLdB>(b_warp_windows(nIter)(kIter));
+
+                        // read C warp tensor from C block tensor-
+                        CWarpTensor c_warp_tensor;
+
+                        const auto c_warp_seq = std::conditional_t<is_c_column_major,
+                                                                   sequence<nIter, mIter>,
+                                                                   sequence<mIter, nIter>>{};
+
+                        c_warp_tensor.get_thread_buffer() = c_block_tensor.get_y_sliced_thread_data(
+                            merge_sequences(c_warp_seq, c_warp_y_index_zeros),
+                            merge_sequences(sequence<1, 1>{}, c_warp_y_lengths));
+
+                        // warp GEMM
+                        WarpGemm{}(c_warp_tensor, a_warp_tile, b_warp_tile);
 
                         // write C warp tensor into C block tensor
                         c_block_tensor.set_y_sliced_thread_data(
