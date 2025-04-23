@@ -35,6 +35,7 @@
 #include <miopen/execution_context.hpp>
 
 #include <miopen/find_db.hpp>
+#include <miopen/hip_build_utils.hpp>
 #include <miopen/tensor.hpp>
 #include <miopen/conv/problem_description.hpp>
 #include <miopen/conv_algo_name.hpp>
@@ -626,7 +627,16 @@ void CheckDynamicFDBEntry(size_t thread_index,
                     auto program_file           = miopen::make_object_file_name(kern.kernel_file);
                     ASSERT_TRUE(kern.kernel_file.extension() != ".mlir")
                         << "MLIR detected in dynamic solvers";
-                    compile_options += " -mcpu=" + handle.GetDeviceName();
+                    compile_options += " -mcpu=";
+                    if(miopen::EndsWith(kern.kernel_file, ".s"))
+                    {
+                        compile_options +=
+                            miopen::LcOptionTargetStrings{handle.GetTargetProperties()}.targetId;
+                    }
+                    else
+                    {
+                        compile_options += handle.GetDeviceName();
+                    }
                     auto search = checked_kdbs.find({program_file, compile_options});
                     if(search !=
                        checked_kdbs
@@ -698,6 +708,7 @@ void CheckFDBEntry(size_t thread_index,
                    std::atomic<size_t>& counter)
 {
     fs::path fdb_file_path, pdb_file_path, kdb_file_path;
+    auto& handle = _ctx.GetStream();
     SetupPaths(fdb_file_path, pdb_file_path, kdb_file_path, _ctx.GetStream());
     std::unordered_set<KDBKey> checked_kdbs;
     const auto data_size = data.size();
@@ -828,8 +839,17 @@ void CheckFDBEntry(size_t thread_index,
                         auto program_file = miopen::make_object_file_name(kern.kernel_file);
                         if(kern.kernel_file.extension() != ".mlir")
                         {
-                            auto& handle = ctx.GetStream();
-                            compile_options += " -mcpu=" + handle.GetDeviceName();
+                            compile_options += " -mcpu="
+                            if(miopen::EndsWith(kern.kernel_file, ".s"))
+                            {
+                                compile_options +=
+                                    miopen::LcOptionTargetStrings{handle.GetTargetProperties()}
+                                        .targetId;
+                            }
+                            else
+                            {
+                                compile_options += handle.GetDeviceName();
+                            }
                         }
                         auto search           = checked_kdbs.find({program_file, compile_options});
                         bool reported_already = search != checked_kdbs.end();
@@ -851,7 +871,7 @@ void CheckFDBEntry(size_t thread_index,
                                 << compile_options; // for fdb key, solver id, solver pdb entry and
                                                     // kdb file and args
                         if(!reported_already)
-                            BuildKernel(kern.kernel_file, kern.comp_options, ctx.GetStream());
+                            BuildKernel(kern.kernel_file, kern.comp_options, handle);
                     }
                 }
             }

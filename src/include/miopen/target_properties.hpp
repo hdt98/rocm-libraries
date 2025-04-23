@@ -29,7 +29,7 @@
 #include <boost/optional.hpp>
 #include <string>
 
-#define WORKAROUND_ISSUE_3001 1
+#define WORKAROUND_ISSUE_3001 0
 
 namespace miopen {
 
