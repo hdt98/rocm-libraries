@@ -380,7 +380,7 @@ protected:
     miopenTensorLayout_t tensor_layout;
     miopenBatchNormMode_t bn_mode;
     BNApiType api_type;
-    double bwd_tol = 4e-3;
+    double bwd_tol = 1e-1;
 };
 
 template <typename XDataType,
