@@ -44,9 +44,13 @@ struct CShuffleEpilogueProblem
 template <typename Problem_, typename Policy_ = void>
 struct CShuffleEpilogue
 {
-    using Problem                           = remove_cvref_t<Problem_>;
-    using AccDataType                       = remove_cvref_t<typename Problem::AccDataType>;
-    using ODataType                         = remove_cvref_t<typename Problem::ODataType>;
+    using Problem     = remove_cvref_t<Problem_>;
+    using ADataType   = remove_cvref_t<typename Problem::ADataType>;
+    using BDataType   = remove_cvref_t<typename Problem::BDataType>;
+    using AccDataType = remove_cvref_t<typename Problem::AccDataType>;
+    using ODataType   = remove_cvref_t<typename Problem::ODataType>;
+    using BTypeToUse =
+        std::conditional_t<std::is_same_v<BDataType, pk_int4_t>, ODataType, BDataType>;
     using CLayout                           = remove_cvref_t<typename Problem::CLayout>;
     static constexpr index_t kBlockSize     = Problem::kBlockSize;
     static constexpr index_t kMPerBlock     = Problem::kMPerBlock;
@@ -61,20 +65,20 @@ struct CShuffleEpilogue
     static constexpr index_t kNPerIteration = kNPerXdl * kNWave;
 
 #ifdef CK_TILE_USE_XDL
-    using WG = WarpGemmMfmaDispatcher<typename Problem::ADataType,
-                                      typename Problem::BDataType,
-                                      typename Problem::AccDataType,
-                                      Problem::kMPerXdl,
-                                      Problem::kNPerXdl,
-                                      Problem::kKPerXdl,
-                                      Problem::isCTransposed>;
+    using WG = WarpGemmMfmaDispatcher<ADataType,
+                                      BTypeToUse,
+                                      AccDataType,
+                                      kMPerXdl,
+                                      kNPerXdl,
+                                      kKPerXdl,
+                                      isCTransposed>;
 #elif CK_TILE_USE_WMMA
-    using WG = WarpGemmWmmaDispatcher<typename Problem::ADataType,
-                                      typename Problem::BDataType,
-                                      typename Problem::AccDataType,
-                                      Problem::kMPerXdl,
-                                      Problem::kNPerXdl,
-                                      Problem::kKPerXdl,
+    using WG = WarpGemmWmmaDispatcher<ADataType,
+                                      BTypeToUse,
+                                      AccDataType,
+                                      kMPerXdl,
+                                      kNPerXdl,
+                                      kKPerXdl,
                                       false,
                                       false,
                                       false>;
@@ -93,7 +97,6 @@ struct CShuffleEpilogue
      *
      * @return The vector store size for C tensor.
      */
-    template <typename ODataType>
     CK_TILE_HOST_DEVICE static constexpr auto GetVectorSizeC()
     {
         constexpr index_t MaxVectorStoreSize = 16;
@@ -159,7 +162,7 @@ struct CShuffleEpilogue
             TileDistributionEncodingPattern2D<kBlockSize,
                                               kMPerIteration,
                                               kNPerIteration,
-                                              GetVectorSizeC<ODataType>(),
+                                              GetVectorSizeC(),
                                               tile_distribution_pattern::thread_raked>;
         constexpr auto dram_tile_distribution = TileEncodingPattern::Make2DStaticTileDistribution();
 

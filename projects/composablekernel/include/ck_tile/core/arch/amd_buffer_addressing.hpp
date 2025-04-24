@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2024, Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (c) 2018-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
-#include "ck_tile/core/arch/arch.hpp"
+#if !CK_TILE_USE_BUFFER_ADDRESSING_BUILTIN
+
 #include "ck_tile/core/numeric/integer.hpp"
 #include "ck_tile/core/numeric/integral_constant.hpp"
 #include "ck_tile/core/numeric/vector_type.hpp"
@@ -1660,7 +1661,9 @@ CK_TILE_DEVICE thread_buffer<T, N> amd_buffer_load_impl(int32x4_t src_wave_buffe
              (N == 1 || N == 2 || N == 4 || N == 8 || N == 16)) ||
             (std::is_same<T, fp8_t>::value && (N == 1 || N == 2 || N == 4 || N == 8 || N == 16)) ||
             (std::is_same<T, bf8_t>::value && (N == 1 || N == 2 || N == 4 || N == 8 || N == 16)) ||
-            (std::is_same<T, int8_t>::value && (N == 1 || N == 2 || N == 4 || N == 8 || N == 16)),
+            (std::is_same<T, int8_t>::value && (N == 1 || N == 2 || N == 4 || N == 8 || N == 16)) ||
+            (std::is_same<T, pk_int4_t>::value &&
+             (N == 1 || N == 2 || N == 4 || N == 8 || N == 16 || N == 32)),
         "wrong! not implemented");
 
     using rtn_type = thread_buffer<T, N>;
@@ -1900,7 +1903,7 @@ CK_TILE_DEVICE void amd_async_buffer_load(CK_TILE_LDS_ADDR T* smem,
 
     if constexpr(oob_conditional_check)
     {
-        index_t v_offset = flag ? v_offset : src_wave_buffer_resource[2];
+        index_t v_offset = flag ? src_thread_addr_offset : src_wave_buffer_resource[2];
         llvm_amdgcn_raw_buffer_load_lds(src_wave_buffer_resource,
                                         smem,
                                         sizeof(uint32_t),
@@ -3057,3 +3060,5 @@ __device__ void amd_async_load_global_to_lds(const T* global_base_ptr,
 }
 
 } // namespace ck_tile
+
+#endif // !CK_TILE_USE_BUFFER_ADDRESSING_BUILTIN

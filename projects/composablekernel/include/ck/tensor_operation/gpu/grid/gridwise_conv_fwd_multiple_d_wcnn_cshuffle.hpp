@@ -888,8 +888,8 @@ struct GridwiseConvMultipleD_Wcnn_CShuffle
         auto out_grid_buf = make_dynamic_buffer<AddressSpaceEnum::Global>(
             p_e_grid, e_grid_desc.GetElementSpaceSize());
         // C mapping in single thread.
-        constexpr auto out_tensor_thread_desc   = blockwise_conv.GetAccThreadDescriptor();
-        constexpr auto out_tensor_thread_length = blockwise_conv.GetAccThreadDescLength();
+        constexpr auto out_tensor_thread_desc   = BlockWiseConv::GetAccThreadDescriptor();
+        constexpr auto out_tensor_thread_length = BlockWiseConv::GetAccThreadDescLength();
         constexpr bool ForceAlignToUint32 =
             EnableWaveGroup4 && (sizeof(BlockOutDataType) < sizeof(uint32_t));
         static constexpr auto EGlobalMemoryDataOperation = InMemoryDataOperationEnum::Set;

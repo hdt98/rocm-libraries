@@ -2587,6 +2587,7 @@ struct GridwiseGemm_Wmma_GFX13
         ignore = c_thread_buf;
         ignore = p_shared;
         ignore = c_grid_buf;
+        ignore = barrier_output;
 #endif
     }
 };
