@@ -435,6 +435,7 @@ auto LoadKDBObjects(const fs::path& filename)
             const auto kernel_name = stmt.ColumnText(0);
             const auto kernel_args = stmt.ColumnText(1);
             kdb_cache.emplace(KDBKey{kernel_name, kernel_args});
+            MIOPEN_LOG_I(kernel_name + ": " + kernel_args);
         }
         else if(rc == SQLITE_DONE)
             break;
@@ -566,10 +567,29 @@ void BuildKernel(const fs::path& program_file,
     try
     {
         auto p = handle.LoadProgram(program_file, program_args, "");
+
+        if(program_file.extension() == ".s")
+        {
+            std::string compile_options = program_args;
+            std::string compile_options_tid = program_args;
+            compile_options += " -mcpu=" + handle.GetDeviceName();
+            compile_options_tid += " -mcpu=" + miopen::LcOptionTargetStrings{handle.GetTargetProperties()}.targetId;
+            auto hsaco = miopen::LoadBinary(
+                handle.GetTargetProperties(), handle.GetMaxComputeUnits(), program_file, compile_options_tid);
+
+            if(!hsaco.empty())
+            {
+                miopen::SaveBinary(hsaco,
+                               handle.GetTargetProperties(),
+                               handle.GetMaxComputeUnits(),
+                               program_file,
+                               compile_options);
+            }
+        }
     }
-    catch(std::exception&)
+    catch(std::exception& e)
     {
-        MIOPEN_LOG_W("Exception thrown while building kernel");
+        MIOPEN_LOG_W("Exception thrown while building kernel, " << e.what());
     }
 #endif
 }
@@ -627,16 +647,7 @@ void CheckDynamicFDBEntry(size_t thread_index,
                     auto program_file           = miopen::make_object_file_name(kern.kernel_file);
                     ASSERT_TRUE(kern.kernel_file.extension() != ".mlir")
                         << "MLIR detected in dynamic solvers";
-                    compile_options += " -mcpu=";
-                    if(miopen::EndsWith(kern.kernel_file, ".s"))
-                    {
-                        compile_options +=
-                            miopen::LcOptionTargetStrings{handle.GetTargetProperties()}.targetId;
-                    }
-                    else
-                    {
-                        compile_options += handle.GetDeviceName();
-                    }
+                    compile_options += " -mcpu=" + handle.GetDeviceName();
                     auto search = checked_kdbs.find({program_file, compile_options});
                     if(search !=
                        checked_kdbs
@@ -838,19 +849,8 @@ void CheckFDBEntry(size_t thread_index,
                         std::string compile_options = kern.comp_options;
                         auto program_file = miopen::make_object_file_name(kern.kernel_file);
                         if(kern.kernel_file.extension() != ".mlir")
-                        {
-                            compile_options += " -mcpu="
-                            if(miopen::EndsWith(kern.kernel_file, ".s"))
-                            {
-                                compile_options +=
-                                    miopen::LcOptionTargetStrings{handle.GetTargetProperties()}
-                                        .targetId;
-                            }
-                            else
-                            {
-                                compile_options += handle.GetDeviceName();
-                            }
-                        }
+                            compile_options += " -mcpu=" + handle.GetDeviceName();
+
                         auto search           = checked_kdbs.find({program_file, compile_options});
                         bool reported_already = search != checked_kdbs.end();
                         if(!reported_already) // we have reported this object before, no need to

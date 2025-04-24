@@ -31,6 +31,7 @@
 #include <miopen/env.hpp>
 #include <miopen/errors.hpp>
 #include <miopen/handle_lock.hpp>
+#include <miopen/hip_build_utils.hpp>
 #include <miopen/invoker.hpp>
 #include <miopen/kernel_cache.hpp>
 #include <miopen/logger.hpp>
@@ -622,7 +623,7 @@ Program Handle::LoadProgram(const fs::path& program_name,
             else
                 boost::filesystem::copy_file(p.GetCodeObjectPathname(), path);
             cache_path = miopen::SaveBinary(
-                path, this->GetTargetProperties(), program_name, params, is_kernel_str);
+                path, this->GetTargetProperties(), program_name, params);
         }
 
         if(force_attach_binary && p.IsCodeObjectInTempFile())

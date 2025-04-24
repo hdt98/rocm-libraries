@@ -134,7 +134,7 @@ KDb GetDb(const TargetProperties& target, size_t num_cu)
     if(user_dir.empty())
         user_path = user_dir;
     if(!fs::exists(sys_path))
-        sys_path = sys_dir / (target.DbId() + ".kdb");
+        sys_path = sys_dir / (target.Name() + ".kdb");
 #if !MIOPEN_EMBED_DB
     if(!fs::exists(sys_path))
         sys_path = fs::path{};
