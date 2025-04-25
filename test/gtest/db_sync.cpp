@@ -522,11 +522,50 @@ void SetupPaths(fs::path& fdb_file_path,
         << "Db file does not exist" << kdb_file_path;
 }
 
-TEST(CPU_DBSync_NONE, KDBTargetID)
+namespace miopen {
+struct TestHandle : Handle
+{
+    TestHandle(size_t _num_cu) : Handle(), num_cu(_num_cu) {}
+
+// Probably, according to the idea of the author of this test, the number of CUs should have been
+// substituted with the value passed to the constructor (which in fact did not happen). After
+// https://github.com/ROCm/MIOpen/pull/3175, the method became virtual, the substitution actually
+// happened, and the test broke. I disabled that part (since it doesn't work as intended anyway) to
+// keep its behavior the same.
+#if 1
+    std::size_t GetMaxComputeUnits() const override
+    {
+        if(num_cu == 0)
+            return Handle::GetMaxComputeUnits();
+        return num_cu;
+    }
+#endif
+
+    size_t num_cu = 0;
+};
+} // namespace miopen
+
+static inline miopen::TestHandle& get_test_handle(size_t num_cu)
+{
+    // NOLINTNEXTLINE (cppcoreguidelines-avoid-non-const-global-variables)
+    static miopen::TestHandle h{num_cu};
+    static const std::thread::id id = std::this_thread::get_id();
+    if(std::this_thread::get_id() != id)
+    {
+        std::cout << "Cannot use handle across multiple threads\n";
+        std::abort();
+    }
+    return h;
+}
+
+void KDBTargetID(const std::string& arch, const size_t num_cu)
 {
     // Skip this test for gfx11 and gfx12 to avoid test failure (we don't have databases for those
     // devices yet)
-    const auto& handle = get_handle();
+    auto& handle = get_test_handle(num_cu);
+    if(handle.GetDeviceName() != arch)
+        GTEST_SKIP();
+    handle.num_cu = num_cu;
     if(miopen::StartsWith(handle.GetDeviceName(), "gfx11") ||
        miopen::StartsWith(handle.GetDeviceName(), "gfx12"))
     {
@@ -537,7 +576,7 @@ TEST(CPU_DBSync_NONE, KDBTargetID)
 #if WORKAROUND_ISSUE_2492
     ScopedEnvironment<std::string> issue_2492_env(MIOPEN_DEBUG_WORKAROUND_ISSUE_2492, "0");
 #endif
-    SetupPaths(fdb_file_path, pdb_file_path, kdb_file_path, get_handle());
+    SetupPaths(fdb_file_path, pdb_file_path, kdb_file_path, handle);
     std::ignore = fdb_file_path;
     std::ignore = pdb_file_path;
     EXPECT_TRUE(miopen::CheckKDBJournalMode(kdb_file_path));
@@ -890,41 +929,6 @@ void CheckFDBEntry(size_t thread_index,
         counter.fetch_add(1, std::memory_order_relaxed);
     }
 }
-namespace miopen {
-struct TestHandle : Handle
-{
-    TestHandle(size_t _num_cu) : Handle(), num_cu(_num_cu) {}
-
-// Probably, according to the idea of the author of this test, the number of CUs should have been
-// substituted with the value passed to the constructor (which in fact did not happen). After
-// https://github.com/ROCm/MIOpen/pull/3175, the method became virtual, the substitution actually
-// happened, and the test broke. I disabled that part (since it doesn't work as intended anyway) to
-// keep its behavior the same.
-#if 1
-    std::size_t GetMaxComputeUnits() const override
-    {
-        if(num_cu == 0)
-            return Handle::GetMaxComputeUnits();
-        return num_cu;
-    }
-#endif
-
-    size_t num_cu = 0;
-};
-} // namespace miopen
-
-static inline miopen::TestHandle& get_test_handle(size_t num_cu)
-{
-    // NOLINTNEXTLINE (cppcoreguidelines-avoid-non-const-global-variables)
-    static miopen::TestHandle h{num_cu};
-    static const std::thread::id id = std::this_thread::get_id();
-    if(std::this_thread::get_id() != id)
-    {
-        std::cout << "Cannot use handle across multiple threads\n";
-        std::abort();
-    }
-    return h;
-}
 
 void StaticFDBSync(const std::string& arch, const size_t num_cu)
 {
@@ -982,6 +986,14 @@ void StaticFDBSync(const std::string& arch, const size_t num_cu)
 struct CPU_DBSync_NONE : testing::TestWithParam<std::pair<std::string, size_t>>
 {
 };
+
+TEST_P(CPU_DBSync_NONE, KDBTargetID)
+{
+    std::string arch;
+    size_t num_cu;
+    std::tie(arch, num_cu) = GetParam();
+    KDBTargetID(arch, num_cu);
+}
 
 TEST_P(CPU_DBSync_NONE, StaticFDBSync)
 {
