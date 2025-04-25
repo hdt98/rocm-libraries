@@ -622,8 +622,8 @@ Program Handle::LoadProgram(const fs::path& program_name,
                 miopen::WriteFile(p.GetCodeObjectBlob(), path);
             else
                 boost::filesystem::copy_file(p.GetCodeObjectPathname(), path);
-            cache_path = miopen::SaveBinary(
-                path, this->GetTargetProperties(), program_name, params);
+            cache_path =
+                miopen::SaveBinary(path, this->GetTargetProperties(), program_name, params);
         }
 
         if(force_attach_binary && p.IsCodeObjectInTempFile())

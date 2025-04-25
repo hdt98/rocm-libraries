@@ -568,24 +568,27 @@ void BuildKernel(const fs::path& program_file,
     {
         auto p = handle.LoadProgram(program_file, program_args, "");
 
-        std::string compile_options = program_args;
+        std::string compile_options     = program_args;
         std::string compile_options_tid = program_args;
         compile_options += " -mcpu=" + handle.GetDeviceName();
-        if(program_file.extension() == ".mlir"){}
+        if(program_file.extension() == ".mlir") {}
         else if(program_file.extension() == ".s")
-            compile_options_tid += " -mcpu=" + miopen::LcOptionTargetStrings{handle.GetTargetProperties()}.targetId;
+            compile_options_tid +=
+                " -mcpu=" + miopen::LcOptionTargetStrings{handle.GetTargetProperties()}.targetId;
         else
             compile_options_tid += " -mcpu=" + handle.GetDeviceName();
-        auto hsaco = miopen::LoadBinary(
-            handle.GetTargetProperties(), handle.GetMaxComputeUnits(), program_file, compile_options_tid);
+        auto hsaco = miopen::LoadBinary(handle.GetTargetProperties(),
+                                        handle.GetMaxComputeUnits(),
+                                        program_file,
+                                        compile_options_tid);
 
         if(!hsaco.empty())
         {
             miopen::SaveBinary(hsaco,
-                           handle.GetTargetProperties(),
-                           handle.GetMaxComputeUnits(),
-                           program_file,
-                           compile_options);
+                               handle.GetTargetProperties(),
+                               handle.GetMaxComputeUnits(),
+                               program_file,
+                               compile_options);
         }
     }
     catch(std::exception& e)
