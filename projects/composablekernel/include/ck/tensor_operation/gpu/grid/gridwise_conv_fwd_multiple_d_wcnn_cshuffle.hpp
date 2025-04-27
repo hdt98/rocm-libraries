@@ -323,11 +323,13 @@ template <index_t BlockSize,
           index_t InBlockTransferDstScalarPerVector,
           bool InEnableLds,
           bool InBlockLdsAddExtraM,
+          bool InTileLoad,
           typename WeiBlockTransferThreadClusterLengths,
           index_t WeiBlockTransferSrcScalarPerVector,
           index_t WeiBlockTransferDstScalarPerVector,
           bool WeiEnableLds,
           bool WeiBlockLdsAddExtraM,
+          bool WeiTileLoad,
           typename DsBlockTransferThreadClusterLengths,
           typename DsBlockTransferSrcScalarPerVector,
           typename DsBlockTransferDstScalarPerVector,
@@ -339,7 +341,8 @@ template <index_t BlockSize,
           bool EnableAsync,
           index_t NumConvCPrefetchStage,
           bool EnableWaveGroup,
-          bool Transposed>
+          bool Transposed,
+          bool TileStore>
 struct GridwiseConvMultipleD_Wcnn_CShuffle
 {
     static constexpr auto I0 = Number<0>{};
@@ -377,7 +380,9 @@ struct GridwiseConvMultipleD_Wcnn_CShuffle
                                                DilationX,
                                                DilationY,
                                                1,
-                                               EnableWaveGroup>{};
+                                               EnableWaveGroup,
+                                               false,
+                                               false>{};
 
     using GridwiseConvPipe =
         remove_cvref_t<decltype(GridwiseConvPipeline_Selector<NumConvCPrefetchStage,
@@ -394,6 +399,10 @@ struct GridwiseConvMultipleD_Wcnn_CShuffle
     static constexpr index_t NumWeightCompPerTile    = wcnn_conv.GetNumWeightCompPerTile();
     static constexpr index_t NumSubTilePerImage      = wcnn_conv.GetNumSubTilesPerImageTile();
     static constexpr index_t NumDataCompPerTile      = wcnn_conv.GetNumDataCompPerTile();
+    static constexpr index_t NumSubTilePerImageLoad =
+        wcnn_conv.template GetInDataPerSubImageTileLoad<InTileLoad>();
+    static constexpr index_t NumDataCompPerTileLoad =
+        wcnn_conv.template GetInDataPerTileLoad<InTileLoad>();
 
     static constexpr index_t DataTileHeight = 4;
     static constexpr index_t H_Pad          = (FilterSize == 3) ? DataTileHeight : 0;
@@ -735,13 +744,14 @@ struct GridwiseConvMultipleD_Wcnn_CShuffle
         else
         {
             // W0 x C0 x H0 x H1 x H2 x W1 x C1
-            return make_naive_tensor_descriptor_packed(make_tuple(Number<WPerWaveIn / WPerWcnn>{},
-                                                                  Number<CPerWave / CPerWcnn>{},
-                                                                  Number<HPerWaveIn / HPerWcnn>{},
-                                                                  Number<NumSubTilePerImage>{},
-                                                                  I1,
-                                                                  I1,
-                                                                  Number<NumDataCompPerTile>{}));
+            return make_naive_tensor_descriptor_packed(
+                make_tuple(Number<WPerWaveIn / WPerWcnn>{},
+                           Number<CPerWave / CPerWcnn>{},
+                           Number<HPerWaveIn / HPerWcnn>{},
+                           Number<NumSubTilePerImageLoad>{},
+                           I1,
+                           I1,
+                           Number<NumDataCompPerTileLoad>{}));
         }
     }
 
@@ -829,9 +839,12 @@ struct GridwiseConvMultipleD_Wcnn_CShuffle
                                             DilationX,
                                             DilationY,
                                             WeiEnableLds,
+                                            WeiTileLoad,
                                             InEnableLds,
+                                            InTileLoad,
                                             DsEnableLds,
-                                            Transposed>;
+                                            Transposed,
+                                            TileStore>;
 
     // Pad input and weight data grid description according to Filter size
     __host__ __device__ static constexpr auto
@@ -901,40 +914,84 @@ struct GridwiseConvMultipleD_Wcnn_CShuffle
         {
             const auto out_tensor_grid_wave_desc = blockwise_conv.GetAccWaveDescriptor(e_grid_desc);
 
+            constexpr index_t threadsPerTensorTile = (WPerWcnn == 4) ? 2 : 4;
+            constexpr index_t vgprPerTensorTile    = (HPerWcnn == 8) ? 2 : 1;
             // Threadwise copy C from VGPR to global memory
+            if constexpr(TileStore)
+            {
+                auto out_tensor_thread_copy_vgpr_to_global =
+                    ThreadwiseTensorSliceTransfer_v1r3<BlockOutDataType,
+                                                       EDataType,
+                                                       decltype(out_tensor_thread_desc),
+                                                       decltype(out_tensor_grid_wave_desc),
+                                                       AccElementwiseOperationInternal,
+                                                       decltype(out_tensor_thread_length),
+                                                       Sequence<0, 1, 2, 3, 4, 5, 6>,
+                                                       6,
+                                                       out_tensor_thread_length[I6], // vector write
+                                                                                     // pixel
+                                                       EGlobalMemoryDataOperation,
+                                                       1,
+                                                       true,
+                                                       ForceAlignToUint32,
+                                                       true, // TileStore,
+                                                       threadsPerTensorTile,
+                                                       vgprPerTensorTile>{
+                        out_tensor_grid_wave_desc,
+                        out_thread_mtx_on_block +
+                            make_multi_index(h_block_data_idx_on_grid / HPerWcnn,
+                                             w_block_data_idx_on_grid / WPerWcnn,
+                                             k_block_data_idx_on_grid / KPerWcnn,
+                                             I0,
+                                             I0,
+                                             I0,
+                                             I0),
+                        out_element_op};
 
-            auto out_tensor_thread_copy_vgpr_to_global =
-                ThreadwiseTensorSliceTransfer_v1r3<BlockOutDataType,
-                                                   EDataType,
-                                                   decltype(out_tensor_thread_desc),
-                                                   decltype(out_tensor_grid_wave_desc),
-                                                   AccElementwiseOperationInternal,
-                                                   decltype(out_tensor_thread_length),
-                                                   Sequence<0, 1, 2, 3, 4, 5, 6, 7>,
-                                                   7,
-                                                   out_tensor_thread_length[I7], // vector write
-                                                                                 // pixel
-                                                   EGlobalMemoryDataOperation,
-                                                   1,
-                                                   true,
-                                                   ForceAlignToUint32>{
+                // each thread write its data from VGPR to global
+                out_tensor_thread_copy_vgpr_to_global.Run(out_tensor_thread_desc,
+                                                          make_tuple(I0, I0, I0, I0, I0, I0, I0),
+                                                          out_thread_buf,
+                                                          out_tensor_grid_wave_desc,
+                                                          out_grid_buf);
+            }
+            else
+            {
+                auto out_tensor_thread_copy_vgpr_to_global =
+                    ThreadwiseTensorSliceTransfer_v1r3<BlockOutDataType,
+                                                       EDataType,
+                                                       decltype(out_tensor_thread_desc),
+                                                       decltype(out_tensor_grid_wave_desc),
+                                                       AccElementwiseOperationInternal,
+                                                       decltype(out_tensor_thread_length),
+                                                       Sequence<0, 1, 2, 3, 4, 5, 6, 7>,
+                                                       7,
+                                                       out_tensor_thread_length[I7], // vector write
+                                                                                     // pixel
+                                                       EGlobalMemoryDataOperation,
+                                                       1,
+                                                       true,
+                                                       ForceAlignToUint32>{
+                        out_tensor_grid_wave_desc,
+                        out_thread_mtx_on_block +
+                            make_multi_index(h_block_data_idx_on_grid / HPerWcnn,
+                                             w_block_data_idx_on_grid / WPerWcnn,
+                                             k_block_data_idx_on_grid / KPerWcnn,
+                                             I0,
+                                             I0,
+                                             I0,
+                                             I0,
+                                             I0),
+                        out_element_op};
+
+                // each thread write its data from VGPR to global
+                out_tensor_thread_copy_vgpr_to_global.Run(
+                    out_tensor_thread_desc,
+                    make_tuple(I0, I0, I0, I0, I0, I0, I0, I0),
+                    out_thread_buf,
                     out_tensor_grid_wave_desc,
-                    out_thread_mtx_on_block + make_multi_index(h_block_data_idx_on_grid / HPerWcnn,
-                                                               w_block_data_idx_on_grid / WPerWcnn,
-                                                               k_block_data_idx_on_grid / KPerWcnn,
-                                                               I0,
-                                                               I0,
-                                                               I0,
-                                                               I0,
-                                                               I0),
-                    out_element_op};
-
-            // each thread write its data from VGPR to global
-            out_tensor_thread_copy_vgpr_to_global.Run(out_tensor_thread_desc,
-                                                      make_tuple(I0, I0, I0, I0, I0, I0, I0, I0),
-                                                      out_thread_buf,
-                                                      out_tensor_grid_wave_desc,
-                                                      out_grid_buf);
+                    out_grid_buf);
+            }
         }
         else
         {
@@ -1702,12 +1759,12 @@ struct GridwiseConvMultipleD_Wcnn_CShuffle
             }
             else
             {
-                // Thread-wise copy
-                // W0 x C0 x H0 x H1 x H2 x W1 x C1
-                auto indata_slice_origin_idx = wcnn_conv.CalculateInDataThreadOriginDataIndex();
+                auto indata_slice_origin_idx =
+                    wcnn_conv.template CalculateInDataThreadOriginDataIndex<InTileLoad>();
                 auto h0 = (h_block_data_idx_on_grid + wave_idx[I0] * HPerWave) / HPerWcnn;
                 auto w0 = (w_block_data_idx_on_grid + wave_idx[I1] * WPerWave) / WPerWcnn;
-
+                constexpr index_t threadsPerTensorTile = (WPerWcnn == 4) ? 2 : 4;
+                constexpr index_t vgprPerTensorTile    = (HPerWcnn == 8) ? 2 : 1;
                 // Limitation: NumDim of Src and Dst descriptor should be identical
                 auto in_blockwise_copy =
                     ThreadwiseTensorSliceTransfer_v2<InDataType,
@@ -1717,9 +1774,15 @@ struct GridwiseConvMultipleD_Wcnn_CShuffle
                                                      decltype(BlockwiseConv::GetInWaveDescLength()),
                                                      Sequence<0, 1, 2, 3, 4, 5, 6>,
                                                      6,
-                                                     NumDataCompPerTile,
+                                                     NumDataCompPerTileLoad,
                                                      1,
-                                                     false>(
+                                                     false,
+                                                     false,
+                                                     false,
+                                                     false,
+                                                     InTileLoad,
+                                                     threadsPerTensorTile,
+                                                     vgprPerTensorTile>(
                         in_grid_block_desc,
                         make_multi_index(w0,
                                          0,
@@ -1836,9 +1899,12 @@ struct GridwiseConvMultipleD_Wcnn_CShuffle
             }
             else
             {
-                auto wei_slice_origin_idx = wcnn_conv.CalculateWeiDataThreadOriginDataIndex();
+                auto wei_slice_origin_idx =
+                    wcnn_conv.template CalculateWeiDataThreadOriginDataIndex<WeiTileLoad>();
                 auto k0 = (k_block_data_idx_on_grid + wave_idx[I2] * KPerWave) / KPerWcnn;
 
+                constexpr index_t threadsPerSubWeiTile = 2;
+                constexpr index_t vgprPerSubWeiTile    = 1;
                 // Limitation: NumDim of Src and Dst descriptor should be identical
                 using WeiThreadGroupTensorSliceTransfer = ThreadwiseTensorSliceTransfer_v2<
                     WeiDataType,
@@ -1850,7 +1916,13 @@ struct GridwiseConvMultipleD_Wcnn_CShuffle
                     5,
                     NumWeightCompPerTile,
                     1,
-                    false>;
+                    false,
+                    false,
+                    false,
+                    false,
+                    WeiTileLoad,
+                    threadsPerSubWeiTile,
+                    vgprPerSubWeiTile>;
 
                 auto wei_blockwise_copy = generate_tuple(
                     [&](auto I) {

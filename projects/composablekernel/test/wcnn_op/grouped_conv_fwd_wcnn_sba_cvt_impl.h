@@ -101,6 +101,9 @@ bool run_test()
     constexpr bool AccEnableLds = LdsMode & 4 ? true : false;
     constexpr bool EnableAsync  = LdsMode & 8 ? true : false;
     constexpr bool DsEnableLds  = LdsMode & 16 ? true : false;
+    constexpr bool InTileLoad   = LdsMode & 0x20 ? true : false;
+    constexpr bool WeiTileLoad  = LdsMode & 0x40 ? true : false;
+    constexpr bool TileStore    = LdsMode & 0x80 ? true : false;
 
     ck::utils::conv::ConvParam conv_param{n_dim,
                                           group_count,
@@ -163,7 +166,6 @@ bool run_test()
     case 1:
         in.GenerateTensorValue(GeneratorTensor_2<InDataType>{-5, 5});
         wei.GenerateTensorValue(GeneratorTensor_2<WeiDataType>{-5, 5});
-
         if constexpr(SbaMode == 2) // ScaleBiasPacked
         {
             bias.GenerateTensorValue(GeneratorTensor_2<GPUAccType>{-10, 10});
@@ -514,11 +516,13 @@ bool run_test()
             InBlockTransferScalarPerVector,
             InEnableLds,
             InBlockLdsAddExtraM,
+            InTileLoad,
             WeiBlockTransferThreadClusterLengths,
             WeiBlockTransferScalarPerVector,
             WeiBlockTransferScalarPerVector,
             WeiEnableLds,
             WeiBlockLdsAddExtraM,
+            WeiTileLoad,
             DsBlockTransferThreadClusterLengths,
             DsBlockTransferScalarPerVector,
             DsBlockTransferScalarPerVector,
@@ -529,8 +533,9 @@ bool run_test()
             AccEnableLds,
             EnableAsync,
             EnableWaveGroup,
-            false,  // shuffleOnLoad
-            false>; // transpose>;
+            false,      // shuffleOnLoad
+            false,      // transpose
+            TileStore>; // TileOnMemAccess
 
     std::array<const void*, SbaMode> ds_bufs;
     std::array<std::array<ck::index_t, NDimSpatial + 3>, SbaMode> ds_lengths;

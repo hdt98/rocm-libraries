@@ -916,7 +916,7 @@ struct BlockwiseElementFmaWcnn
         const auto waveId_h    = wave_idx[I0];
         const auto waveId_w    = wave_idx[I1];
         const auto waveId_k    = wave_idx[I2];
-        const auto wcnn_ds_idx = wcnn_conv.CalculateAccThreadOriginDataIndex();
+        const auto wcnn_ds_idx = wcnn_conv.template CalculateAccThreadOriginDataIndex<false>();
 
         return make_tuple(waveId_h * HRepeat,
                           waveId_w * WRepeat,
@@ -936,7 +936,8 @@ struct BlockwiseElementFmaWcnn
         const auto wave_idx         = GetWaveIdx();
         const auto waveId_h         = wave_idx[I0];
         const auto waveId_w         = wave_idx[I1];
-        const auto wcnn_in_data_idx = wcnn_conv.CalculateInDataThreadOriginDataIndex();
+        const auto wcnn_in_data_idx =
+            wcnn_conv.template CalculateInDataThreadOriginDataIndex<false>();
         // W0 x C0 x H0 x H1 x H2 x W1 x C1
         return make_tuple(waveId_w * WRepeat,
                           0,

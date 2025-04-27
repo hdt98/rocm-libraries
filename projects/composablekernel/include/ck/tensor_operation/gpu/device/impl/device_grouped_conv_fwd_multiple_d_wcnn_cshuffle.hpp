@@ -57,11 +57,13 @@ template <index_t NDimSpatial,
           index_t InBlockTransferDstScalarPerVector,
           bool InEnableLds,
           bool InBlockLdsAddExtraM,
+          bool InTileLoad,
           typename WeiBlockTransferThreadClusterLengths,
           index_t WeiBlockTransferSrcScalarPerVector,
           index_t WeiBlockTransferDstScalarPerVector,
           bool WeiEnableLds,
           bool WeiBlockLdsAddExtraM,
+          bool WeiTileLoad,
           typename DsBlockTransferThreadClusterLengths,
           typename DsBlockTransferSrcScalarPerVector,
           typename DsBlockTransferDstScalarPerVector,
@@ -73,7 +75,8 @@ template <index_t NDimSpatial,
           bool EnableAsync,
           bool EnableWaveGroup,
           bool ShuffleOnLoad = false,
-          bool Transposed    = false>
+          bool Transposed    = false,
+          bool TileStore     = false>
 struct DeviceGroupedConvFwdMultipleD_Wcnn_CShuffle
     : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
                                              InLayout,
@@ -272,11 +275,13 @@ struct DeviceGroupedConvFwdMultipleD_Wcnn_CShuffle
                                                              InBlockTransferDstScalarPerVector,
                                                              InEnableLds,
                                                              InBlockLdsAddExtraM,
+                                                             InTileLoad,
                                                              WeiBlockTransferThreadClusterLengths,
                                                              WeiBlockTransferSrcScalarPerVector,
                                                              WeiBlockTransferDstScalarPerVector,
                                                              WeiEnableLds,
                                                              WeiBlockLdsAddExtraM,
+                                                             WeiTileLoad,
                                                              DsBlockTransferThreadClusterLengths,
                                                              DsBlockTransferSrcScalarPerVector,
                                                              DsBlockTransferDstScalarPerVector,
@@ -288,7 +293,8 @@ struct DeviceGroupedConvFwdMultipleD_Wcnn_CShuffle
                                                              EnableAsync,
                                                              NumPrefetch,
                                                              EnableWaveGroup,
-                                                             GridTransposed>;
+                                                             GridTransposed,
+                                                             TileStore>;
 
     // Argument
     struct Argument : public BaseArgument
@@ -1393,8 +1399,12 @@ struct DeviceGroupedConvFwdMultipleD_Wcnn_CShuffle
             << DilationY << ", "
             << " InEnableLds: "
             << InEnableLds << ", "
+            << " InTileLoad: "
+            << InTileLoad << ", "
             << "WeiEnableLds: "
             << WeiEnableLds << ", "
+            << "WeiTileLoad: "
+            << WeiTileLoad << ", "
             << "DsEnableLds: "
             << DsEnableLds << ", "
             << "NumPrefetch: "
@@ -1404,7 +1414,9 @@ struct DeviceGroupedConvFwdMultipleD_Wcnn_CShuffle
             << "ShuffleOnLoad: "
             << ShuffleOnLoad << ", "
             << "Transpose: "
-            << Transposed << ">";
+            << Transposed << ", "
+            << "TileStore: "
+            << TileStore << ">";
         // clang-format on
 
         return str.str();

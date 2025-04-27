@@ -34,9 +34,12 @@ template <typename ThisThreadBlock,
           index_t DilationX,
           index_t DilationY,
           bool WeiDataEnableLds = false,
+          bool WeiDataTileLoad  = false,
           bool InDataEnableLds  = false,
+          bool InDataTileLoad   = false,
           bool DsEnableLds      = false,
-          bool Transposed       = false>
+          bool Transposed       = false,
+          bool TileStore        = false>
 /* Option: Read from LDS, big buffer hold all threads required data
  * Source
  * Weight: NumYX x KPerBlock x  CPerBlock (YXKC)
@@ -95,7 +98,8 @@ struct BlockwiseConvWcnn
                                                DilationY,
                                                Iters,
                                                ThisThreadBlock::InWaveGroup(),
-                                               Aco>{};
+                                               Aco,
+                                               false>{};
 
     static constexpr index_t CPerWcnn = wcnn_conv.GetNumInputChannels();
     static constexpr index_t KPerWcnn = wcnn_conv.GetNumOutputChannels();
@@ -225,6 +229,7 @@ struct BlockwiseConvWcnn
             const auto H = in_grid_pad_desc.GetLength(I0);
             const auto W = in_grid_pad_desc.GetLength(I1);
             const auto C = in_grid_pad_desc.GetLength(I2);
+
             return transform_tensor_descriptor(
                 in_grid_pad_desc,
                 make_tuple(
@@ -286,22 +291,28 @@ struct BlockwiseConvWcnn
 
     __host__ __device__ static constexpr auto GetInWaveDescLength()
     {
+        constexpr index_t num_access_per_thread =
+            wcnn_conv.template GetInDataPerTileLoad<InDataTileLoad>();
+        constexpr index_t num_subImageTile_load =
+            wcnn_conv.template GetInDataPerSubImageTileLoad<InDataTileLoad>();
+
         return Sequence<WPerWaveIn / WPerWcnn,
                         CPerWave / CPerWcnn,
                         HPerWaveIn / HPerWcnn,
-                        NumSubTilePerImage,
+                        num_subImageTile_load,
                         1,
                         1,
-                        NumDataCompPerTile>{};
+                        num_access_per_thread>{};
     }
-
     __device__ __host__ static auto CalculateInDataThreadOriginDataIndex()
     {
 #ifdef __HIP_DEVICE_COMPILE__
         const auto wave_idx         = GetWaveIdx();
         const auto waveId_h         = wave_idx[I0];
         const auto waveId_w         = wave_idx[I1];
-        const auto wcnn_in_data_idx = wcnn_conv.CalculateInDataThreadOriginDataIndex();
+
+        const auto wcnn_in_data_idx =
+            wcnn_conv.template CalculateInDataThreadOriginDataIndex<InDataTileLoad>();
         // W0 x C0 x H0 x H1 x H2 x W1 x C1
         return make_tuple(waveId_w * WRepeat,
                           0,
@@ -406,7 +417,8 @@ struct BlockwiseConvWcnn
 #ifdef __HIP_DEVICE_COMPILE__
         const auto wave_idx     = GetWaveIdx();
         const auto waveId_k     = wave_idx[I2];
-        const auto wcnn_wei_idx = wcnn_conv.CalculateWeiDataThreadOriginDataIndex();
+        const auto wcnn_wei_idx =
+            wcnn_conv.template CalculateWeiDataThreadOriginDataIndex<InDataTileLoad>();
 
         if constexpr(FilterSize == 2)
         {
@@ -447,28 +459,49 @@ struct BlockwiseConvWcnn
         static_assert(NumAccComp == 4 || NumAccComp == 8, "");
         static_assert(NumAccCompPerTile % NumAccCompSubTile == 0, "");
 
-        // HRepeat x WRepeat x KRepeat x H1 x H2 x W1 x K1 x K2
-        return make_naive_tensor_descriptor_packed(
-            make_tuple(Number<HRepeatOut>{},
-                       Number<WRepeatOut>{},
-                       Number<KRepeat>{},
-                       Number<NumSubTilePerImage>{},
-                       I1,
-                       I1,
-                       Number<NumAccCompSubTile>{},
-                       Number<NumAccCompPerTile / NumAccCompSubTile>{}));
+        if constexpr(TileStore)
+        {
+            // HRepeat x WRepeat x KRepeat x H1 x H2 x W1 x K1
+            return make_naive_tensor_descriptor_packed(make_tuple(Number<HRepeatOut>{},
+                                                                  Number<WRepeatOut>{},
+                                                                  Number<KRepeat>{},
+                                                                  I1,
+                                                                  I1,
+                                                                  I1,
+                                                                  Number<NumAccComp>{}));
+        }
+        else
+        {
+            // HRepeat x WRepeat x KRepeat x H1 x H2 x W1 x K1 x K2
+            return make_naive_tensor_descriptor_packed(
+                make_tuple(Number<HRepeatOut>{},
+                           Number<WRepeatOut>{},
+                           Number<KRepeat>{},
+                           Number<NumSubTilePerImage>{},
+                           I1,
+                           I1,
+                           Number<NumAccCompSubTile>{},
+                           Number<NumAccCompPerTile / NumAccCompSubTile>{}));
+        }
     }
 
     __host__ __device__ static constexpr auto GetAccThreadDescLength()
     {
-        return Sequence<HRepeatOut,
-                        WRepeatOut,
-                        KRepeat,
-                        NumSubTilePerImage,
-                        I1,
-                        I1,
-                        NumAccCompSubTile,
-                        NumAccCompPerTile / NumAccCompSubTile>{};
+        if constexpr(TileStore)
+        {
+            return Sequence<HRepeatOut, WRepeatOut, KRepeat, I1, I1, I1, NumAccComp>{};
+        }
+        else
+        {
+            return Sequence<HRepeatOut,
+                            WRepeatOut,
+                            KRepeat,
+                            NumSubTilePerImage,
+                            I1,
+                            I1,
+                            NumAccCompSubTile,
+                            NumAccCompPerTile / NumAccCompSubTile>{};
+        }
     }
 
     // Describe how data store to LDS buffer
@@ -483,41 +516,84 @@ struct BlockwiseConvWcnn
     template <typename AccBlockDesc_>
     __host__ __device__ static constexpr auto GetAccWaveDescriptor(const AccBlockDesc_& accDesc)
     {
-        // H x W x K -> H0 x W0 x K0 x H1 x H2 x W1 x K1 x K2
-        return transform_tensor_descriptor(
-            accDesc,
-            make_tuple(make_unmerge_transform(make_tuple(Number<HPerBlockOut / HPerWcnn>{},
-                                                         Number<NumSubTilePerImage>{},
-                                                         Number<HPerWcnn / NumSubTilePerImage>{})),
-                       make_unmerge_transform(
-                           make_tuple(Number<WPerBlockOut / WPerWcnn>{}, Number<WPerWcnn>{})),
-                       make_unmerge_transform(make_tuple(Number<KPerBlock / KPerWcnn>{},
-                                                         Number<NumAccCompSubTile>{},
-                                                         Number<KPerWcnn / NumAccCompSubTile>{}))),
-            make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}),
-            make_tuple(Sequence<0, 3, 4>{}, Sequence<1, 5>{}, Sequence<2, 6, 7>{}));
+        if constexpr(TileStore)
+        {
+            // H x W x K -> H0 x W0 x K0 x H1 x H2 x W1 x K1
+            return transform_tensor_descriptor(
+                accDesc,
+                make_tuple(
+                    make_unmerge_transform(make_tuple(Number<HPerBlockOut / HPerWcnn>{},
+                                                      Number<NumSubTilePerImage>{},
+                                                      Number<HPerWcnn / NumSubTilePerImage>{})),
+                    make_unmerge_transform(
+                        make_tuple(Number<WPerBlockOut / WPerWcnn>{}, Number<WPerWcnn>{})),
+                    make_unmerge_transform(
+                        make_tuple(Number<KPerBlock / KPerWcnn>{}, Number<KPerWcnn>{}))),
+                make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}),
+                make_tuple(Sequence<0, 3, 4>{}, Sequence<1, 5>{}, Sequence<2, 6>{}));
+        }
+        else
+        {
+            // H x W x K -> H0 x W0 x K0 x H1 x H2 x W1 x K1 x K2
+            return transform_tensor_descriptor(
+                accDesc,
+                make_tuple(
+                    make_unmerge_transform(make_tuple(Number<HPerBlockOut / HPerWcnn>{},
+                                                      Number<NumSubTilePerImage>{},
+                                                      Number<HPerWcnn / NumSubTilePerImage>{})),
+                    make_unmerge_transform(
+                        make_tuple(Number<WPerBlockOut / WPerWcnn>{}, Number<WPerWcnn>{})),
+                    make_unmerge_transform(make_tuple(Number<KPerBlock / KPerWcnn>{},
+                                                      Number<NumAccCompSubTile>{},
+                                                      Number<KPerWcnn / NumAccCompSubTile>{}))),
+                make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}),
+                make_tuple(Sequence<0, 3, 4>{}, Sequence<1, 5>{}, Sequence<2, 6, 7>{}));
+        }
     }
 
     __device__ __host__ static auto CalculateAccThreadOriginDataIndex()
     {
+        if constexpr(TileStore)
+        {
 #ifdef __HIP_DEVICE_COMPILE__
-        const auto wave_idx         = GetWaveIdx();
-        const auto wcnn_in_data_idx = wcnn_conv.CalculateAccThreadOriginDataIndex();
-        const auto waveId_h         = wave_idx[I0];
-        const auto waveId_w         = wave_idx[I1];
-        const auto waveId_k         = wave_idx[I2];
-
-        return make_tuple(waveId_h * HRepeatOut,
-                          waveId_w * WRepeatOut,
-                          waveId_k * KRepeat,
-                          wcnn_in_data_idx[I0],
-                          wcnn_in_data_idx[I1],
-                          wcnn_in_data_idx[I2],
-                          wcnn_in_data_idx[I3],
-                          wcnn_in_data_idx[I4]);
+            const auto wave_idx = GetWaveIdx();
+            const auto wcnn_in_data_idx =
+                wcnn_conv.template CalculateAccThreadOriginDataIndex<true>();
+            const auto waveId_h = wave_idx[I0];
+            const auto waveId_w = wave_idx[I1];
+            const auto waveId_k = wave_idx[I2];
+            return make_tuple(waveId_h * HRepeatOut,
+                              waveId_w * WRepeatOut,
+                              waveId_k * KRepeat,
+                              wcnn_in_data_idx[I0],
+                              wcnn_in_data_idx[I1],
+                              wcnn_in_data_idx[I2],
+                              wcnn_in_data_idx[I3]);
 #else
-        return make_tuple(0, 0, 0, 0, 0, 0, 0, 0);
+            return make_tuple(0, 0, 0, 0, 0, 0, 0);
 #endif
+        }
+        else
+        {
+#ifdef __HIP_DEVICE_COMPILE__
+            const auto wave_idx = GetWaveIdx();
+            const auto wcnn_in_data_idx =
+                wcnn_conv.template CalculateAccThreadOriginDataIndex<false>();
+            const auto waveId_h = wave_idx[I0];
+            const auto waveId_w = wave_idx[I1];
+            const auto waveId_k = wave_idx[I2];
+            return make_tuple(waveId_h * HRepeatOut,
+                              waveId_w * WRepeatOut,
+                              waveId_k * KRepeat,
+                              wcnn_in_data_idx[I0],
+                              wcnn_in_data_idx[I1],
+                              wcnn_in_data_idx[I2],
+                              wcnn_in_data_idx[I3],
+                              wcnn_in_data_idx[I4]);
+#else
+            return make_tuple(0, 0, 0, 0, 0, 0, 0, 0);
+#endif
+        }
     }
 
     using TupleWeiData    = decltype(CalculateWeiDataThreadOriginDataIndex());

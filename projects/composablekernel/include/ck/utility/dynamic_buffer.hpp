@@ -259,6 +259,41 @@ struct DynamicBuffer
             p_data_, src_offset, dst_buf.p_data_, dst_offset, is_src_valid, is_dst_valid);
     }
 
+    template <typename DstBuffer,
+              index_t NumElemsPerThread,
+              index_t NumThreadsPerTile,
+              index_t NumVgprsPerTile>
+    __host__ __device__ constexpr auto
+    tileLoad(index_t src_offset, index_t thread_id, bool is_valid_element) const
+    {
+        static_assert(GetAddressSpace() == AddressSpaceEnum::Global,
+                      "Source data must come from a global memory buffer.");
+        __attribute__((address_space(1))) const T* global_ptr =
+            reinterpret_cast<__attribute__((address_space(1))) T*>(
+                reinterpret_cast<uintptr_t>(p_data_ + src_offset));
+        return amd_tile_load_to_vgpr<remove_cvref_t<T>,
+                                     NumElemsPerThread,
+                                     NumThreadsPerTile,
+                                     NumVgprsPerTile>(global_ptr, is_valid_element, thread_id);
+    }
+
+    template <typename X,
+              index_t NumElemsPerThread,
+              index_t NumThreadsPerTile,
+              index_t NumVgprsPerTile>
+    __host__ __device__ void
+    tileStore(const X& x, index_t dst_offset, bool is_dst_valid, index_t thread_id) const
+    {
+        // Copy data from global to LDS memory using direct loads.
+        __attribute__((address_space(1))) const T* global_ptr =
+            reinterpret_cast<__attribute__((address_space(1))) T*>(
+                reinterpret_cast<uintptr_t>(p_data_ + dst_offset));
+        amd_tile_store_to_buffer<remove_cvref_t<T>,
+                                 NumElemsPerThread,
+                                 NumThreadsPerTile,
+                                 NumVgprsPerTile>(x, global_ptr, is_dst_valid, thread_id);
+    }
+
     template <typename X,
               typename enable_if<is_same<typename scalar_type<remove_cvref_t<X>>::type,
                                          typename scalar_type<remove_cvref_t<T>>::type>::value ||

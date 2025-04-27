@@ -86,11 +86,13 @@ using DeviceConvFwdInstance =
         4,                            // InBlockTransferDstScalarPerVector
         true,                         // InEnableLds
         false,                        // InBlockLdsAddExtraM
+        false,                        // InTileLoad
         S<16, 1, 8>,                  // WeiBlockTransferThreadClusterLengths
         2,                            // WeiBlockTransferSrcScalarPerVector
         2,                            // WeiBlockTransferDstScalarPerVector
         true,                         // WeiEnableLds
         false,                        // WeiBlockLdsAddExtraM
+        false,                        // WeiTileLoad
         ck::Tuple<S<16>, S<8, 4, 4>>, // DsBlockTransferThreadClusterLengths (K, HWK), not used when
                                       // lds disabled
         S<1, 4>,    // DsBlockTransferSrcScalarPerVector, not used when lds disabled

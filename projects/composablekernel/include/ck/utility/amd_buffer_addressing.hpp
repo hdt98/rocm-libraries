@@ -1333,4 +1333,173 @@ __device__ auto amd_tr_load_to_vgpr(const T* in_ptr, bool is_src_valid)
 #endif
 }
 
+template <typename T, index_t N, index_t NumThreadsPerTile, index_t NumVgprsPerTile>
+__device__ auto amd_tile_load_to_vgpr(__attribute__((address_space(1))) const T* in_ptr,
+                                      bool is_src_valid,
+                                      index_t thread_id)
+{
+    using vector_t = typename vector_type_maker<T, N>::type::type;
+#if defined(__gfx13__)
+    if(is_src_valid)
+    {
+        ignore = thread_id;
+        if constexpr(NumThreadsPerTile == 2 && NumVgprsPerTile == 2)
+        {
+            __attribute__((address_space(1))) int32x2_t* global_ptr =
+                const_cast<__attribute__((address_space(1))) int32x2_t*>(
+                    reinterpret_cast<const __attribute__((address_space(1))) int32x2_t*>(in_ptr));
+            return bit_cast<vector_t>(__builtin_amdgcn_global_tiled_load_b64(global_ptr));
+        }
+        else if constexpr(NumThreadsPerTile == 2 && NumVgprsPerTile == 1)
+        {
+            __attribute__((address_space(1))) int32_t* global_ptr =
+                const_cast<__attribute__((address_space(1))) int32_t*>(
+                    reinterpret_cast<const __attribute__((address_space(1))) int32_t*>(in_ptr));
+            return bit_cast<vector_t>(__builtin_amdgcn_global_tiled_load_half_b64(global_ptr));
+        }
+        else if constexpr(NumThreadsPerTile == 4 && NumVgprsPerTile == 1)
+        {
+            __attribute__((address_space(1))) int32_t* global_ptr =
+                const_cast<__attribute__((address_space(1))) int32_t*>(
+                    reinterpret_cast<const __attribute__((address_space(1))) int32_t*>(in_ptr));
+            return bit_cast<vector_t>(__builtin_amdgcn_global_tiled_load_qtr_b128(global_ptr));
+        }
+        else
+        {
+            static_assert(0, "wrong! not implemented");
+        }
+    }
+    else
+    {
+        return vector_t{0};
+    }
+#else
+    ignore = in_ptr;
+    ignore = is_src_valid;
+    ignore = thread_id;
+    return vector_t{0};
+#endif
+}
+
+template <typename T, index_t N, index_t NumThreadsPerTile, index_t NumVgprsPerTile>
+__device__ void
+amd_tile_store_to_buffer(const typename vector_type_maker<T, N>::type::type src_thread_data,
+                         __attribute__((address_space(1))) const T* in_ptr,
+                         bool dst_thread_element_valid,
+                         index_t thread_id)
+{
+    // uint32_t dst_addr_shift = dst_thread_element_valid ? 0 : 0x80000000; Todo add for invalid
+    // addr
+#if defined(__gfx13__)
+    if constexpr((NumThreadsPerTile == 2) && (NumVgprsPerTile == 2))
+    {
+        // 8X4X8
+        if constexpr((is_same<T, half_t>::value && (N == 8)) ||
+                     (is_same<T, bhalf_t>::value && (N == 8)))
+        {
+            vector_type<int32_t, 4> tmp{bit_cast<int32x4_t>(src_thread_data)};
+            int32x3_t store_value_up;
+            store_value_up[0] = tmp.AsType<int32_t>()[Number<0>{}];
+            store_value_up[1] = tmp.AsType<int32_t>()[Number<1>{}];
+            store_value_up[2] = tmp.AsType<int32_t>()[Number<2>{}];
+            __attribute__((address_space(1))) int32x3_t* global_ptr_up =
+                const_cast<__attribute__((address_space(1))) int32x3_t*>(
+                    reinterpret_cast<const __attribute__((address_space(1))) int32x3_t*>(in_ptr));
+            __builtin_amdgcn_global_tiled_store_vst2_b64(store_value_up, global_ptr_up);
+
+            int32x3_t store_value_down;
+            store_value_down[0] = tmp.AsType<int32_t>()[Number<1>{}];
+            store_value_down[1] = tmp.AsType<int32_t>()[Number<2>{}];
+            store_value_down[2] = tmp.AsType<int32_t>()[Number<3>{}];
+            __attribute__((address_space(1)))
+            int32x3_t* global_ptr_down = const_cast<__attribute__((address_space(1))) int32x3_t*>(
+                reinterpret_cast<const __attribute__((address_space(1))) int32x3_t*>(in_ptr + 4));
+            __builtin_amdgcn_global_tiled_store_vst2_b64(store_value_down, global_ptr_down);
+        }
+        else if constexpr((is_same<T, f8_t>::value && (N == 8)) ||
+                          (is_same<T, bf8_t>::value && (N == 8)) ||
+                          (is_same<T, int8_t>::value && (N == 8)))
+        {
+            __attribute__((address_space(1))) int32x2_t* global_ptr =
+                const_cast<__attribute__((address_space(1))) int32x2_t*>(
+                    reinterpret_cast<const __attribute__((address_space(1))) int32x2_t*>(in_ptr));
+            __builtin_amdgcn_global_tiled_store_b64(bit_cast<int32x2_t>(src_thread_data),
+                                                    global_ptr);
+        }
+        else
+        {
+            static_assert(0, "wrong! not implemented");
+        }
+    }
+    else if constexpr((NumThreadsPerTile == 2) && (NumVgprsPerTile == 1))
+    {
+        if constexpr((is_same<T, half_t>::value && (N == 8)) ||
+                     (is_same<T, bhalf_t>::value && (N == 8)))
+        {
+            vector_type<int32_t, 4> tmp{bit_cast<int32x4_t>(src_thread_data)};
+            static_for<0, 4, 1>{}([&](auto i) {
+                __attribute__((address_space(1))) int32_t* global_ptr =
+                    const_cast<__attribute__((address_space(1))) int32_t*>(
+                        reinterpret_cast<const __attribute__((address_space(1))) int32_t*>(in_ptr +
+                                                                                           i * 4));
+                __builtin_amdgcn_global_tiled_store_half_b64(tmp.AsType<int32_t>()[i], global_ptr);
+            });
+        }
+        else if constexpr((is_same<T, f8_t>::value && (N == 8)) ||
+                          (is_same<T, bf8_t>::value && (N == 8)) ||
+                          (is_same<T, int8_t>::value && (N == 8)))
+        {
+            vector_type<int32_t, 2> tmp{bit_cast<int32x2_t>(src_thread_data)};
+            static_for<0, 2, 1>{}([&](auto i) {
+                __attribute__((address_space(1))) int32_t* global_ptr =
+                    const_cast<__attribute__((address_space(1))) int32_t*>(
+                        reinterpret_cast<const __attribute__((address_space(1))) int32_t*>(in_ptr +
+                                                                                           i * 8));
+                __builtin_amdgcn_global_tiled_store_half_b64(tmp.AsType<int32_t>()[i], global_ptr);
+            });
+        }
+        else
+        {
+            static_assert(0, "wrong! not implemented");
+        }
+    }
+    else if constexpr((NumThreadsPerTile == 4) && (NumVgprsPerTile == 1))
+    {
+        // 4x2x16
+        if constexpr(is_same<T, half_t>::value || is_same<T, bhalf_t>::value)
+        {
+            vector_type<int32_t, 2> tmp{bit_cast<int32x2_t>(src_thread_data)};
+            static_for<0, 2, 1>{}([&](auto i) {
+                __attribute__((address_space(1))) int32_t* global_ptr =
+                    const_cast<__attribute__((address_space(1))) int32_t*>(
+                        reinterpret_cast<const __attribute__((address_space(1))) int32_t*>(in_ptr +
+                                                                                           i * 8));
+                __builtin_amdgcn_global_tiled_store_qtr_b128(tmp.AsType<int32_t>()[i], global_ptr);
+            });
+        }
+        else if constexpr(is_same<T, f8_t>::value || is_same<T, bf8_t>::value ||
+                          is_same<T, int8_t>::value)
+        {
+            __attribute__((address_space(1))) int32_t* global_ptr =
+                const_cast<__attribute__((address_space(1))) int32_t*>(
+                    reinterpret_cast<const __attribute__((address_space(1))) int32_t*>(in_ptr));
+            __builtin_amdgcn_global_tiled_store_qtr_b128(bit_cast<int32_t>(src_thread_data),
+                                                         global_ptr);
+        }
+        else
+        {
+            static_assert(0, "wrong! not implemented");
+        }
+    }
+    else
+    {
+        static_assert(0, "wrong! The shape is not supported yet.");
+    }
+#else
+    ignore = in_ptr;
+    ignore = dst_thread_element_valid;
+    ignore = thread_id;
+#endif
+}
+
 } // namespace ck

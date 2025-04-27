@@ -295,11 +295,13 @@ bool run_test()
             InBlockTransferScalarPerVector,
             InEnableLds,
             InBlockLdsAddExtraM,
+            false, // InTileLoad
             WeiBlockTransferThreadClusterLengths,
             WeiBlockTransferScalarPerVector,
             WeiBlockTransferScalarPerVector,
             WeiEnableLds,
             WeiBlockLdsAddExtraM,
+            false, // WeiTileLoad
             EmptyTuple,
             ck::Sequence<>,
             ck::Sequence<>,
