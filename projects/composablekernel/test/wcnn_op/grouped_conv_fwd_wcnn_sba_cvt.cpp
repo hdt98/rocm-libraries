@@ -21,7 +21,7 @@ bool run_test_fmt()
     // clang-format off
     //                                                     |ShapeType  |FilterType |Dilation |Lds |WaveGroup | SbaMode | activeFun | CvtToTensor | TestMask
     if constexpr(std::is_same<GPUAccType, float>::value)
-    { 
+    {
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_4X2, Filter_1X1, false, 0,       WaveGroup, SbaMode, 0, 1, TestMask | 0x100>();
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_4X2, Filter_1X1, false, 0,       WaveGroup, SbaMode, 0, 1, TestMask | 0x100>();
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_4X2, Filter_3X3, false, 0,       WaveGroup, SbaMode, 0, 1, TestMask | 0x200>();
@@ -35,7 +35,8 @@ bool run_test_fmt()
     }
     else
     {
-        // 4X4 issue
+// 4X4
+        //ActivativeFun: 0
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_4X4, Filter_1X1, false, 0,       WaveGroup, SbaMode, 0, 1, TestMask | 0x100>();
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_4X4, Filter_3X3, false, 0,       WaveGroup, SbaMode, 0, 1, TestMask | 0x200>();
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_4X4, Filter_3X3, true,  0,       WaveGroup, SbaMode, 0, 1, TestMask | 0x200>();
@@ -112,6 +113,12 @@ int main(int argc, char* argv[])
     pass &= run_test_fmt<half_t,   half_t,  0x1f, 1, 0x40>();
     pass &= run_test_fmt<bf8_t,    half_t,  0x1f, 1, 0x80>();
     pass &= run_test_fmt<bhalf_t,  bhalf_t, 0x1f, 1, 0x80>();
+
+     // For tiled_store
+     pass &= run_test_fmt<int8_t,   float,   0x80, 0, 0x4>();
+     pass &= run_test_fmt<half_t,   float,   0x80, 0, 0x1>();
+     pass &= run_test_fmt<half_t,   half_t,  0x80, 0, 0x40>();
+     pass &= run_test_fmt<int8_t,   half_t,  0x80, 0, 0x20>();
 #endif
     // clang-format on
     std::cout << "conv_device_suba_cvt: ..... " << (pass ? "SUCCESS" : "FAILURE") << std::endl;

@@ -490,11 +490,13 @@ bool run_test()
             InBlockTransferScalarPerVector,
             InEnableLds,
             InBlockLdsAddExtraM,
+            false, // InTileLoad
             WeiBlockTransferThreadClusterLengths,
             WeiBlockTransferScalarPerVector,
             WeiBlockTransferScalarPerVector,
             WeiEnableLds,
             WeiBlockLdsAddExtraM,
+            false, // WeiTileLoad
             DsBlockTransferThreadClusterLengths,
             DsBlockTransferScalarPerVector,
             DsBlockTransferScalarPerVector,

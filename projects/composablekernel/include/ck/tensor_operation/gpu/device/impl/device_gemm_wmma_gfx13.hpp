@@ -54,6 +54,7 @@ template <typename ALayout,
           bool ABlockLdsAddExtraM,
           bool ABlockLdsAsyncCopy,
           bool AEnableGlobalTRLoad,
+          bool AEnableGlobalTiledLoad,
           typename BBlockTransferThreadClusterLengths_N_K0_K1,
           typename BBlockTransferThreadClusterArrangeOrder,
           typename BBlockTransferSrcAccessOrder,
@@ -63,6 +64,7 @@ template <typename ALayout,
           bool BBlockLdsAddExtraN,
           bool BBlockLdsAsyncCopy,
           bool BEnableGlobalTRLoad,
+          bool BEnableGlobalTiledLoad,
           index_t CShuffleMRepeatPerShuffle,
           index_t CShuffleNRepeatPerShuffle,
           typename CShuffleBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock,
@@ -114,15 +116,19 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
 #else
     static constexpr auto BDisableLds_manu = false;
 #endif
-    static constexpr auto AEnableLds_auto = (NWaves == 1 && (MaxVectorLoadA || MRepeat == 1) &&
-                                             is_same<tensor_layout::gemm::RowMajor, ALayout>::value)
-                                                ? false
-                                                : (AEnableGlobalTRLoad ? false : !ADisableLds_manu);
-    static constexpr auto BEnableLds_auto =
+    static constexpr auto AEnableLds_auto_tmp =
+        (NWaves == 1 && (MaxVectorLoadA || MRepeat == 1) &&
+         is_same<tensor_layout::gemm::RowMajor, ALayout>::value)
+            ? false
+            : (AEnableGlobalTRLoad ? false : !ADisableLds_manu);
+    static constexpr auto AEnableLds_auto = AEnableGlobalTiledLoad ? false : AEnableLds_auto_tmp;
+
+    static constexpr auto BEnableLds_auto_tmp =
         (MWaves == 1 && (MaxVectorLoadB || NRepeat == 1) &&
          is_same<tensor_layout::gemm::ColumnMajor, BLayout>::value)
             ? false
             : (BEnableGlobalTRLoad ? false : !BDisableLds_manu);
+    static constexpr auto BEnableLds_auto = BEnableGlobalTiledLoad ? false : BEnableLds_auto_tmp;
 
     // If true, LDS is used unconditionally
     // if enable lds async load, should always enable lds
@@ -300,6 +306,26 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
                     // load; no real meaning, many codes use 7 dimensions
                     make_tuple(Sequence<0>{}, Sequence<1>{}),
                     make_tuple(Sequence<1, 2, 3, 4, 7>{}, Sequence<0, 5, 6>{}));
+            }
+            else if constexpr(AEnableGlobalTiledLoad)
+            {
+                // TODO, the logic not changed
+                constexpr auto A_KRow      = 2;
+                constexpr auto A_K0PerWmma = AKPerWmma / A_KRow / K1Number;
+                const auto A_KWmma         = K / AKPerWmma;
+
+                const auto M0 = M / MPerBlock;
+                // 0   1     0         1                2        3             4        5 6
+                // M - K <-> A_KWmma - MBlock*MRepeat - MWaves - A_K0PerWmma - A_KRow -
+                // MPerWmma - A_K1
+                return transform_tensor_descriptor(
+                    a_grid_desc_m_k,
+                    make_tuple(make_unmerge_transform(make_tuple(
+                                   A_KWmma, Number<A_K0PerWmma>{}, Number<A_KRow>{}, K1Number)),
+                               make_unmerge_transform(make_tuple(
+                                   M0, Number<MRepeat>{}, Number<MWaves>{}, Number<MPerWmma>{}))),
+                    make_tuple(Sequence<1>{}, Sequence<0>{}),
+                    make_tuple(Sequence<0, 4, 5, 7>{}, Sequence<1, 2, 3, 6>{}));
             }
             else
             {
@@ -486,6 +512,7 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
         ABlockLdsAddExtraM,
         ABlockLdsAsyncCopy,
         AEnableTRLoadFromGlobal,
+        AEnableGlobalTiledLoad,
         BBlockTransferThreadClusterLengths_N_K0_K1,
         BBlockTransferThreadClusterArrangeOrder,
         BBlockTransferSrcAccessOrder,
@@ -497,6 +524,7 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
         BBlockLdsAddExtraN,
         BBlockLdsAsyncCopy,
         BEnableTRLoadFromGlobal,
+        BEnableGlobalTiledLoad,
         CShuffleMRepeatPerShuffle,
         CShuffleNRepeatPerShuffle,
         CShuffleBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock,
@@ -676,7 +704,7 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
                     }
                     else
                     {
-                        return arg.a_grid_desc_.GetLength(I0) * arg.a_grid_desc_.GetLength(I3) *
+                        return arg.a_grid_desc_.GetLength(I0) * arg.a_grid_desc_.GetLength(I4) *
                                arg.a_grid_desc_.GetLength(I5) * arg.a_grid_desc_.GetLength(I7);
                     }
                 }
@@ -1130,8 +1158,12 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
             << BEnableLds << ", "
             << "AEnableTRload: "
             << AEnableTRLoadFromGlobal << ", "
+            << "AEnableTiledload: "
+            << AEnableGlobalTiledLoad << ", "
             << "BEnableTRload: "
             << BEnableTRLoadFromGlobal << ", "
+            << "BEnableTiledload: "
+            << BEnableGlobalTiledLoad << ", "
             << "CStoreEnableAsync: "
             << CStoreEnableAsync << ", "
             << "EnableWaveGroup: "

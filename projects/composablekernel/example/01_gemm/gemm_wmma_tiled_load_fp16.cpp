@@ -9,7 +9,7 @@ using ADataType        = ck::half_t;
 using BDataType        = ck::half_t;
 using AccDataType      = float;
 using CShuffleDataType = float;
-using CDataType        = float;
+using CDataType        = ck::half_t;
 
 using ALayout = Row;
 using BLayout = Col;
@@ -35,45 +35,45 @@ using DeviceGemmInstance = ck::tensor_operation::device::DeviceGemmWmma_GFX13
            BElementOp,
            CElementOp,
            GemmDefault,
-           1,            // Prefetch stage
-           256,          // BlockSize
-           64,           // MPerBlock
-           128,          // NPerBlock
-           64,           // KPerBlock
+           1,      // Prefetch stage
+           32, //128,    // BlockSize
+           16, //64,     // MPerBlock
+           16, //128,    // NPerBlock
+           16, //64,     // KPerBlock
            2,            // K1
            16,           // MPerWmma
            16,           // NPerWmma
            16,           // KPerWmma
-           2,            // M-Repeat // M-PerWmma / M-Repeat = M-Wave
-           4,            // N-Repeat // N-PerWmma / N-Repeat = N-Wave
-           S<32, 4, 1>,  // M-K0-K1
+           1, //2,       // M-Repeat // M-PerWmma / M-Repeat = M-Wave
+           1, //4,       // N-Repeat // N-PerWmma / N-Repeat = N-Wave
+           S<8, 4, 1>, //S<32, 4, 1>, 
            S<0, 1, 2>,
            S<0, 1, 2>,
            2,
-           8,
-           8,
-           false,
-           true,
+           2,
+           2,
            false,
            false,
-           S<32, 4, 1>,
+           false,  // AEnableGlobalTRLoad
+           true,   // AEnableGlobalTiledLoad    
+           S<8, 4, 1>, //S<32, 4, 1>,
            S<0, 1, 2>,
            S<0, 1, 2>,
            2,
-           8,
-           8,
-           false,
-           true,
-           false,
-           false,
-           1,           // C shuffle (M Repeat) Per store
-           1,           // C shuffle (N Repeat) Per store
-           S<1, 32, 1, 4>,
            2,
-           true,
-           true,
+           2,
+           false,
+           false,
+           false, // BEnableGlobalTRLoad
+           true,  // BEnableGlobalTiledLoad
+           1,     // C shuffle (M Repeat) Per store
+           1,     // C shuffle (N Repeat) Per store
+           S<1, 8, 1, 4>,//S<1, 32, 1, 4>, 
+           4,
+           false,
+           false,
            ck::LoopScheduler::Default,
-           ck::PipelineVersion::v5>;
+           ck::PipelineVersion::v1>;
 // clang-format on
 
 using ReferenceGemmInstance = ck::tensor_operation::host::

@@ -35,6 +35,9 @@ template <typename SrcData,
           index_t DstScalarStrideInVector,
           bool DstResetCoordinateAfterRun,
           bool ForceAlignToUint32                                         = false,
+          bool TileStore                                                  = false,
+          index_t NumThreadsPerTile                                       = 1,
+          index_t NumVgprsPerTile                                         = 1,
           typename enable_if<SrcDesc::IsKnownAtCompileTime(), bool>::type = false>
 struct ThreadwiseTensorSliceTransfer_v1r3
 {
@@ -149,10 +152,26 @@ struct ThreadwiseTensorSliceTransfer_v1r3
             using dst_vector_t =
                 typename vector_type_maker<DstData, DstScalarPerVector>::type::type;
             // copy data from dst_vector into dst_buf
-            dst_buf.template Update<DstInMemOp, dst_vector_t>(
-                dst_coord_.GetOffset(),
-                coordinate_has_valid_offset_assuming_visible_index_is_valid(dst_desc, dst_coord_),
-                dst_vector.template AsType<dst_vector_t>()[Number<0>{}]);
+            if constexpr(TileStore && (DstInMemOp == InMemoryDataOperationEnum::Set))
+            {
+                dst_buf.template tileStore<dst_vector_t,
+                                           DstScalarPerVector,
+                                           NumThreadsPerTile,
+                                           NumVgprsPerTile>(
+                    dst_vector.template AsType<dst_vector_t>()[Number<0>{}],
+                    dst_coord_.GetOffset(),
+                    coordinate_has_valid_offset_assuming_visible_index_is_valid(dst_desc,
+                                                                                dst_coord_),
+                    get_thread_local_1d_id());
+            }
+            else
+            {
+                dst_buf.template Update<DstInMemOp, dst_vector_t>(
+                    dst_coord_.GetOffset(),
+                    coordinate_has_valid_offset_assuming_visible_index_is_valid(dst_desc,
+                                                                                dst_coord_),
+                    dst_vector.template AsType<dst_vector_t>()[Number<0>{}]);
+            }
 #else
             ignore = dst_buf;
 #endif
@@ -241,6 +260,9 @@ template <typename SrcData,
           bool InvalidElementAsNaN                                        = false,
           bool UseTrLoad                                                  = false,
           bool ForceAlignToUint32                                         = false,
+          bool UseTileLoad                                                = false,
+          index_t ThreadLengthPerTile                                     = 1,
+          index_t VgprLengthPerTile                                       = 1,
           typename enable_if<DstDesc::IsKnownAtCompileTime(), bool>::type = false>
 struct ThreadwiseTensorSliceTransfer_v2
 {
@@ -271,7 +293,7 @@ struct ThreadwiseTensorSliceTransfer_v2
                       "wrong! SrcDesc need to known at compile-time");
         static_assert(SliceLengths::At(Number<SrcVectorDim>{}) % SrcScalarPerVector == 0,
                       "wrong! Not divisible");
-        if constexpr(UseTrLoad)
+        if constexpr(UseTrLoad || UseTileLoad)
         {
             static_assert(ck::is_same_v<SrcData, DstData>,
                           "tr load does not support datatypes conversion. Source and "
@@ -363,6 +385,15 @@ struct ThreadwiseTensorSliceTransfer_v2
                             src_buf.template trLoad<src_vector_t>(
                                 src_coord_.GetOffset() / PackedSize, is_src_valid);
                     }
+                    else if constexpr(UseTileLoad)
+                    {
+                        src_vector.template AsType<src_vector_t>()(Number<0>{}) =
+                            src_buf.template tileLoad<SrcData,
+                                                      SrcScalarPerVector,
+                                                      ThreadLengthPerTile,
+                                                      VgprLengthPerTile>(
+                                src_coord_.GetOffset(), get_thread_local_1d_id(), is_src_valid);
+                    }
                     else
                     {
                         src_vector.template AsType<src_vector_t>()(Number<0>{}) =
@@ -404,6 +435,14 @@ struct ThreadwiseTensorSliceTransfer_v2
                         *dst_buf_ptr = src_buf.template trLoad<src_vector_t>(
                             src_coord_.GetOffset() / PackedSize, is_src_valid);
                     }
+                    else if constexpr(UseTileLoad)
+                    {
+                        *dst_buf_ptr = src_buf.template tileLoad<SrcData,
+                                                                 SrcScalarPerVector,
+                                                                 ThreadLengthPerTile,
+                                                                 VgprLengthPerTile>(
+                            src_coord_.GetOffset(), get_thread_local_1d_id(), is_src_valid);
+                    }
                     else
                     {
                         *dst_buf_ptr = src_buf.template Get<src_vector_t>(
@@ -419,6 +458,15 @@ struct ThreadwiseTensorSliceTransfer_v2
                     src_vector.template AsType<src_vector_t>()(Number<0>{}) =
                         src_buf.template trLoad<src_vector_t>(src_coord_.GetOffset() / PackedSize,
                                                               is_src_valid);
+                }
+                else if constexpr(UseTileLoad)
+                {
+                    src_vector.template AsType<src_vector_t>()(Number<0>{}) =
+                        src_buf.template tileLoad<SrcData,
+                                                  SrcScalarPerVector,
+                                                  ThreadLengthPerTile,
+                                                  VgprLengthPerTile>(
+                            src_coord_.GetOffset(), get_thread_local_1d_id(), is_src_valid);
                 }
                 else
                 {

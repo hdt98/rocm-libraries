@@ -246,11 +246,13 @@ class TestGroupedConvFwdWcnnInterface : public ::testing::Test
                 InBlockTransferScalarPerVector,
                 false,
                 true,
+                false, // InTileLoad
                 WeiBlockTransferThreadClusterLengths,
                 WeiBlockTransferScalarPerVector,
                 WeiBlockTransferScalarPerVector,
                 false,
                 true,
+                false, // WeiTileLoad
                 EmptyTuple,
                 ck::Sequence<>,
                 ck::Sequence<>,

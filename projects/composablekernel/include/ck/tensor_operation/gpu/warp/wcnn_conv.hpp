@@ -1353,63 +1353,127 @@ struct WcnnConv
 
     // Helper functions of origin data index per thread
     // {tap_offset x k1 x c1 x c2}
+    template <bool TileAccess>
     static constexpr auto CalculateWeiDataThreadOriginDataIndex()
     {
-        auto laneId                      = GetLaneId();
-        constexpr index_t NumCompPerTile = GetNumWeightCompPerTile();
-        if constexpr((HPerWcnn == 8) && (WPerWcnn == 4))
+        if constexpr(TileAccess)
         {
-            return make_tuple(laneId / 16,
-                              (laneId / 2) & (GetNumOutputChannels() - 1),
-                              0,
-                              (laneId % 2) * NumCompPerTile);
+            auto laneId = GetLaneId();
+            if constexpr((HPerWcnn == 8) && (WPerWcnn == 4))
+            {
+                return make_tuple(laneId / 8, laneId & (GetNumOutputChannels() - 1), 0, 0);
+            }
+            else
+            {
+                return make_tuple(0, laneId, 0, 0);
+            }
         }
         else
         {
-            return make_tuple(0, (laneId / 2), 0, (laneId % 2) * NumCompPerTile);
+            auto laneId                      = GetLaneId();
+            constexpr index_t NumCompPerTile = GetNumWeightCompPerTile();
+            if constexpr((HPerWcnn == 8) && (WPerWcnn == 4))
+            {
+                return make_tuple(laneId / 16,
+                                  (laneId / 2) & (GetNumOutputChannels() - 1),
+                                  0,
+                                  (laneId % 2) * NumCompPerTile);
+            }
+            else
+            {
+                return make_tuple(0, (laneId / 2), 0, (laneId % 2) * NumCompPerTile);
+            }
         }
     }
 
     // {h1 x w1 x c1}
+    template <bool TileAccess>
     static constexpr auto CalculateInDataThreadOriginDataIndex()
     {
-        auto laneId                      = GetLaneId();
-        constexpr index_t NumCompPerTile = GetNumDataCompPerTile();
-        const index_t SubC               = (laneId * NumCompPerTile) % GetNumInputChannels();
-        const index_t PixelOffset        = laneId * NumCompPerTile / GetNumInputChannels();
-
-        return make_tuple(PixelOffset / WPerWcnn, PixelOffset % WPerWcnn, SubC);
-    }
-
-    // {h1 x h2 x w1 x k1 x k2}
-    static constexpr auto CalculateAccThreadOriginDataIndex()
-    {
-        auto laneId              = GetLaneId();
-        const index_t accCompIdx = laneId * GetNumAccumComponents() / GetNumSubTilesPerImageTile();
-        const index_t subW       = (accCompIdx / GetNumOutputChannels()) % WPerWcnn;
-        const index_t subH       = (accCompIdx / GetNumOutputChannels()) / WPerWcnn;
-
-        if constexpr(Aco == 0)
+        if constexpr(TileAccess)
         {
-            constexpr index_t SwizzleComp = 4;
-            const index_t subK            = accCompIdx % GetNumOutputChannels();
-            const index_t subK_8          = (laneId & 1) * SwizzleComp;
-
-            if constexpr(GetNumAccumComponents() == 4)
-            {
-                return make_tuple(0, subH, subW, 0, subK);
-            }
-            else
-            {
-                return make_tuple(0, subH, subW, 0, subK_8);
-            }
+            auto laneId               = GetLaneId();
+            const index_t PixelOffset = laneId % (HPerWcnn * WPerWcnn);
+            return make_tuple(PixelOffset / WPerWcnn, PixelOffset % WPerWcnn, 0);
         }
         else
         {
-            constexpr index_t SwizzleComp    = 2;
-            constexpr index_t NumLanePerPair = (WPerWcnn == 2) && (HPerWcnn == 4) ? 4 : 2;
-            const index_t subK               = (laneId & (NumLanePerPair - 1)) * SwizzleComp;
-            return make_tuple(0, subH, subW, 0, subK);
+            auto laneId                      = GetLaneId();
+            constexpr index_t NumCompPerTile = GetNumDataCompPerTile();
+            const index_t SubC               = (laneId * NumCompPerTile) % GetNumInputChannels();
+            const index_t PixelOffset        = laneId * NumCompPerTile / GetNumInputChannels();
+
+            return make_tuple(PixelOffset / WPerWcnn, PixelOffset % WPerWcnn, SubC);
+        }
+    }
+
+    template <bool TileAccess>
+    static constexpr auto CalculateAccThreadOriginDataIndex()
+    {
+        auto laneId              = GetLaneId();
+        if constexpr(TileAccess)
+        {
+            // {h1 x h2 x w1 x k1}
+            const index_t subW = laneId % WPerWcnn;
+            const index_t subH = laneId / WPerWcnn;
+            return make_tuple(0, subH, subW, 0);
+        }
+        else
+        {
+            // {h1 x h2 x w1 x k1 x k2}
+            const index_t accCompIdx =
+                laneId * GetNumAccumComponents() / GetNumSubTilesPerImageTile();
+            const index_t subW = (accCompIdx / GetNumOutputChannels()) % WPerWcnn;
+            const index_t subH = (accCompIdx / GetNumOutputChannels()) / WPerWcnn;
+
+            if constexpr(Aco == 0)
+            {
+                constexpr index_t SwizzleComp = 4;
+                const index_t subK            = accCompIdx % GetNumOutputChannels();
+                const index_t subK_8          = (laneId & 1) * SwizzleComp;
+
+                if constexpr(GetNumAccumComponents() == 4)
+                {
+                    return make_tuple(0, subH, subW, 0, subK);
+                }
+                else
+                {
+                    return make_tuple(0, subH, subW, 0, subK_8);
+                }
+            }
+            else
+            {
+                constexpr index_t SwizzleComp    = 2;
+                constexpr index_t NumLanePerPair = (WPerWcnn == 2) && (HPerWcnn == 4) ? 4 : 2;
+                const index_t subK               = (laneId & (NumLanePerPair - 1)) * SwizzleComp;
+                return make_tuple(0, subH, subW, 0, subK);
+            }
+        }
+    }
+
+    template <bool TileAccess>
+    static constexpr auto GetInDataPerTileLoad()
+    {
+        if constexpr(TileAccess & (HPerWcnn == 8) && (WPerWcnn == 4))
+        {
+            return GetNumDataCompPerTile() * 2;
+        }
+        else
+        {
+            return GetNumDataCompPerTile();
+        }
+    }
+
+    template <bool TileAccess>
+    static constexpr auto GetInDataPerSubImageTileLoad()
+    {
+        if constexpr(TileAccess)
+        {
+            return 1;
+        }
+        else
+        {
+            return GetNumSubTilesPerImageTile();
         }
     }
 

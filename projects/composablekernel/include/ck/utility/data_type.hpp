@@ -1095,6 +1095,88 @@ struct vector_type<T, 13, typename ck::enable_if_t<is_native_type<T>()>>
 };
 
 template <typename T>
+struct vector_type<T, 14, typename ck::enable_if_t<is_native_type<T>()>>
+{
+    using d1_t = T;
+    typedef T d4_t __attribute__((ext_vector_type(4)));
+    typedef T d8_t __attribute__((ext_vector_type(8)));
+    typedef T d14_t __attribute__((ext_vector_type(14)));
+
+    using type = d14_t;
+
+    union
+    {
+        d14_t d14_;
+        StaticallyIndexedArray<d1_t, 14> d1x14_;
+        StaticallyIndexedArray<d4_t, 3> d4x3_;
+        StaticallyIndexedArray<d8_t, 1> d8x1_;
+        StaticallyIndexedArray<d14_t, 1> d14x1_;
+    } data_;
+
+    __host__ __device__ constexpr vector_type() : data_{type{0}} {}
+
+    __host__ __device__ constexpr vector_type(type v) : data_{v} {}
+
+    template <typename X>
+    __host__ __device__ constexpr const auto& AsType() const
+    {
+        static_assert(is_same<X, d1_t>::value || is_same<X, d4_t>::value ||
+                          is_same<X, d8_t>::value || is_same<X, d14_t>::value,
+                      "Something went wrong, please check src and dst types.");
+
+        if constexpr(is_same<X, d1_t>::value)
+        {
+            return data_.d1x14_;
+        }
+        else if constexpr(is_same<X, d4_t>::value)
+        {
+            return data_.d4x3_;
+        }
+        else if constexpr(is_same<X, d8_t>::value)
+        {
+            return data_.d8x1_;
+        }
+        else if constexpr(is_same<X, d14_t>::value)
+        {
+            return data_.d14x1_;
+        }
+        else
+        {
+            return err;
+        }
+    }
+
+    template <typename X>
+    __host__ __device__ constexpr auto& AsType()
+    {
+        static_assert(is_same<X, d1_t>::value || is_same<X, d4_t>::value ||
+                          is_same<X, d8_t>::value || is_same<X, d14_t>::value,
+                      "Something went wrong, please check src and dst types.");
+
+        if constexpr(is_same<X, d1_t>::value)
+        {
+            return data_.d1x14_;
+        }
+        else if constexpr(is_same<X, d4_t>::value)
+        {
+            return data_.d4x3_;
+        }
+        else if constexpr(is_same<X, d8_t>::value)
+        {
+            return data_.d8x1_;
+        }
+        else if constexpr(is_same<X, d14_t>::value)
+        {
+            return data_.d14x1_;
+        }
+        else
+        {
+            return err;
+        }
+    }
+};
+
+template <typename T>
 struct vector_type<T, 16, typename ck::enable_if_t<is_native_type<T>()>>
 {
     using d1_t = T;
@@ -5173,6 +5255,7 @@ using half18_t = typename vector_type<half_t, 18>::type;
 using half36_t = typename vector_type<half_t, 36>::type;
 using half5_t  = typename vector_type<half_t, 5>::type;
 using half10_t = typename vector_type<half_t, 10>::type;
+using half14_t = typename vector_type<half_t, 14>::type;
 
 // bfp16
 using bhalf2_t  = typename vector_type<bhalf_t, 2>::type;
@@ -5205,6 +5288,7 @@ using int32x64_t = typename vector_type<int32_t, 64>::type;
 
 using int32x3_t  = typename vector_type<int32_t, 3>::type;
 using int32x5_t  = typename vector_type<int32_t, 5>::type;
+using int32x7_t  = typename vector_type<int32_t, 7>::type;
 using int32x9_t  = typename vector_type<int32_t, 9>::type;
 using int32x18_t = typename vector_type<int32_t, 18>::type;
 

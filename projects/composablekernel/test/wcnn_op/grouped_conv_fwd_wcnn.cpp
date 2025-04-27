@@ -90,6 +90,9 @@ bool run_test()
     constexpr bool WeiEnableLds = LdsMode & 2 ? true : false;
     constexpr bool AccEnableLds = LdsMode & 4 ? true : false;
     constexpr bool EnableAsync  = LdsMode & 8 ? true : false;
+    constexpr bool InTileLoad   = LdsMode & 0x10 ? true : false;
+    constexpr bool WeiTileLoad  = LdsMode & 0x20 ? true : false;
+    constexpr bool TileStore    = LdsMode & 0x40 ? true : false;
 
     ck::utils::conv::ConvParam conv_param{n_dim,
                                           group_count,
@@ -293,11 +296,13 @@ bool run_test()
             InBlockTransferScalarPerVector,
             InEnableLds,
             InBlockLdsAddExtraM,
+            InTileLoad,
             WeiBlockTransferThreadClusterLengths,
             WeiBlockTransferScalarPerVector,
             WeiBlockTransferScalarPerVector,
             WeiEnableLds,
             WeiBlockLdsAddExtraM,
+            WeiTileLoad,
             EmptyTuple,
             ck::Sequence<>,
             ck::Sequence<>,
@@ -307,7 +312,10 @@ bool run_test()
             AccBlockTransferScalarPerVector,
             AccEnableLds,
             EnableAsync,
-            EnableWaveGroup>;
+            EnableWaveGroup,
+            false,
+            false,
+            TileStore>;
 
     auto conv     = DeviceConvFwdInstance{};
     auto invoker  = conv.MakeInvoker();
@@ -418,8 +426,8 @@ bool run_test_fmt()
         bool fail_case = WaveGroup && (TestMask == 0x40) && (config.c == 0x40);
         if (fail_case == false)
         {
-        pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X4, Filter_1X1, false, 0,       WaveGroup, TestMask | 0x20000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, Shape_8X4, Filter_1X1, false, 0,       WaveGroup, TestMask | 0x40000>();
+            pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X4, Filter_1X1, false, 0,       WaveGroup, TestMask | 0x20000>();
+            pass &= run_test<SrcType, SrcType, GPUAccType, Shape_8X4, Filter_1X1, false, 0,       WaveGroup, TestMask | 0x40000>();
         }
         pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X2, Filter_3X3, false, 0,       WaveGroup, TestMask | 0x80000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X4, Filter_3X3, false, 0,       WaveGroup, TestMask | 0x100000>();
@@ -454,7 +462,6 @@ int main(int argc, char* argv[])
     {
         return -1;
     }
-
     // clang-format off
     //                |SrcType |GPUAccType | LdsMode |TestMask
     pass &= run_test_fmt<half_t,  float,   0x7, 0x1  >();
@@ -468,8 +475,13 @@ int main(int argc, char* argv[])
     pass &= run_test_fmt<f8_t,    half_t,  0x3, 0x100>();
     pass &= run_test_fmt<bf8_t,   half_t,  0xb, 0x200>();
     pass &= run_test_fmt<int8_t,  half_t,  0x9, 0x400>();
-    // clang-format on
 
+    //FOR TILE_LOAD test
+    // This tests can be passed only when https://github.amd.com/GFX-Modeling/shader_complex_ffm/pull/1284 merged.
+    pass &= run_test_fmt<half_t,  half_t,  0x30, 0x800 >();
+    pass &= run_test_fmt<half_t,  float,   0x30, 0x800 >();
+
+    // clang-format on
     std::cout << "grouped_conv_fwd_wcnn: ..... " << (pass ? "SUCCESS" : "FAILURE") << std::endl;
     return pass ? 0 : 1;
 }

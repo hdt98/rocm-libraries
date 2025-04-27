@@ -313,6 +313,7 @@ template <index_t BlockSize,
           bool ABlockLdsExtraM,
           bool AEnableAsyncCopy,
           bool AEnableTRLoadFromGlobal,
+          bool AEnableTiledLoadFromGlobal,
           typename BBlockTransferThreadClusterLengths_N_K0_K1,
           typename BBlockTransferThreadClusterArrangeOrder,
           typename BBlockTransferSrcAccessOrder,
@@ -324,6 +325,7 @@ template <index_t BlockSize,
           bool BBlockLdsExtraN,
           bool BEnableAsyncCopy,
           bool BEnableTRLoadFromGlobal,
+          bool BEnableTiledLoadFromGlobal,
           index_t CShuffleMRepeatPerShuffle,
           index_t CShuffleNRepeatPerShuffle,
           typename CShuffleBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock,
@@ -335,9 +337,13 @@ template <index_t BlockSize,
           PipelineVersion PipelineVer   = PipelineVersion::v5>
 struct GridwiseGemm_Wmma_GFX13
 {
-    static_assert((AEnableLds & AEnableTRLoadFromGlobal) == false,
+    static_assert((AEnableLds & (AEnableTRLoadFromGlobal | AEnableTiledLoadFromGlobal)) == false,
                   "these two options will not be enabled at the same time");
-    static_assert((BEnableLds & BEnableTRLoadFromGlobal) == false,
+    static_assert((BEnableLds & (BEnableTRLoadFromGlobal | BEnableTiledLoadFromGlobal)) == false,
+                  "these two options will not be enabled at the same time");
+    static_assert((AEnableTRLoadFromGlobal & AEnableTiledLoadFromGlobal) == false,
+                  "these two options will not be enabled at the same time");
+    static_assert((BEnableTRLoadFromGlobal & BEnableTiledLoadFromGlobal) == false,
                   "these two options will not be enabled at the same time");
     static constexpr auto I0 = Number<0>{};
     static constexpr auto I1 = Number<1>{};
@@ -1413,6 +1419,7 @@ struct GridwiseGemm_Wmma_GFX13
                 make_multi_index(m_block_data_idx_on_grid, 0, 0),
                 a_element_op,
                 a_block_desc,
+
                 make_multi_index(0, 0, 0),
                 ck::tensor_operation::element_wise::PassThrough{});
 
@@ -2011,6 +2018,69 @@ struct GridwiseGemm_Wmma_GFX13
                         return make_tuple(a_block_buf, a_blockwise_copy);
                     }
                 }
+                else if constexpr(AEnableTiledLoadFromGlobal)
+                {
+                    // Thread-wise copy
+                    // KPerBlock/WmmaK -> MRepeat -> MWaves -> K0PerWmma -> KRow -> MPerWmma -> K1
+                    // TODO not fixed
+                    constexpr auto KWmmaPerBlock  = AKPerBlock / AKPerWmma;
+                    constexpr auto K0PerWmma      = AKPerWmma / 2 / K1Value;
+                    constexpr auto ThreadsPerTile = 2;
+                    constexpr auto VgprsPerTile   = 1;
+                    constexpr auto AddrCnt        = 32 / ThreadsPerTile;
+                    // Limitation: NumDim of Src and Dst descriptor should be identical
+                    auto a_blockwise_copy = ThreadwiseTensorSliceTransfer_v2<
+                        ADataType,
+                        ADataType,
+                        decltype(a_grid_desc),
+                        decltype(a_block_desc),
+                        Sequence<Number<KWmmaPerBlock>{},
+                                 I1,
+                                 Number<MRepeat>{},
+                                 I1,
+                                 Number<K0PerWmma>{},
+                                 I1,
+                                 I1,
+                                 Number<K1Value>{}>,
+                        Sequence<0, 1, 2, 3, 4, 5, 6, 7>,
+                        7,
+                        ABlockTransferSrcScalarPerVector,
+                        1,
+                        AThreadTransferSrcResetCoordinateAfterRun,
+                        /*InvalidElementAsNaN       */ true,
+                        /*UseTrLoad                 */ false,
+                        /*ForceAlignToUint32        */ false,
+                        /*UseTileLoad               */ true,
+                        /*ThreadsPerTile            */ ThreadsPerTile,
+                        /*VgprsPerTile              */ VgprsPerTile>(
+                        a_grid_desc,
+
+                        make_multi_index(
+                            0,
+                            m_block_data_idx_on_grid / (MWaves * MPerWmma * MRepeat),
+                            /*MRepeat     */ 0,
+                            /*MWaves      */ (ThisThreadBlockGrid::GetThreadId() / 32) / NWaves,
+                            /*A_K0PerWmma */ 0,
+                            /*A_KRow      */ 0,
+                            /*MPerWmma    */ (ThisThreadBlockGrid::GetThreadId() % AddrCnt),
+                            /*K1Row       */ 0));
+
+                    if constexpr(EnableWaveGroup)
+                    {
+                        auto a_block_buf = make_static_buffer_v4<AddressSpaceEnum::Vgpr, ADataType>(
+                            a_block_desc.GetElementSpaceSize(),
+                            static_cast<ADataType*>(p_lane_shared) +
+                                LaneSharedMemTrait::a_block_space_offset / sizeof(ADataType));
+
+                        return make_tuple(a_block_buf, a_blockwise_copy);
+                    }
+                    else
+                    {
+                        auto a_block_buf = make_static_buffer<AddressSpaceEnum::Vgpr, ADataType>(
+                            a_block_desc.GetElementSpaceSize());
+                        return make_tuple(a_block_buf, a_blockwise_copy);
+                    }
+                }
                 else
                 {
                     // Thread-wise copy
@@ -2140,7 +2210,6 @@ struct GridwiseGemm_Wmma_GFX13
                 if constexpr(BEnableTRLoadFromGlobal)
                 {
                     constexpr auto KWmmaPerBlock = BKPerBlock / BKPerWmma;
-
                     // clang-format off
                     auto b_blockwise_copy = ThreadwiseTensorSliceTransfer_v2<
 /*SrcData                     */                    BDataType,
@@ -2165,6 +2234,64 @@ struct GridwiseGemm_Wmma_GFX13
                                          0,
                                          0));
                     // clang-format on
+                    if constexpr(EnableWaveGroup)
+                    {
+                        auto b_block_buf = make_static_buffer_v4<AddressSpaceEnum::Vgpr, BDataType>(
+                            b_block_desc.GetElementSpaceSize(),
+                            static_cast<BDataType*>(p_lane_shared) +
+                                LaneSharedMemTrait::b_block_space_offset / sizeof(BDataType));
+                        return make_tuple(b_block_buf, b_blockwise_copy);
+                    }
+                    else
+                    {
+                        auto b_block_buf = make_static_buffer<AddressSpaceEnum::Vgpr, BDataType>(
+                            b_block_desc.GetElementSpaceSize());
+                        return make_tuple(b_block_buf, b_blockwise_copy);
+                    }
+                }
+                else if constexpr(BEnableTiledLoadFromGlobal)
+                {
+                    // Thread-wise copy
+                    // KPerBlock/WmmaK -> NRepeat -> NWaves -> WmmaK/K1 -> NPerWmma -> K1
+                    constexpr auto KWmmaPerBlock  = BKPerBlock / BKPerWmma;
+                    constexpr auto K0PerWmma      = BKPerWmma / 2 / K1Value;
+                    constexpr auto ThreadsPerTile = 2;
+                    constexpr auto VgprsPerTile   = 1;
+                    constexpr auto AddrCnt        = 32 / ThreadsPerTile;
+                    // Limitation: NumDim of Src and Dst descriptor should be identical
+                    auto b_blockwise_copy = ThreadwiseTensorSliceTransfer_v2<
+                        BDataType,
+                        BDataType,
+                        decltype(b_grid_desc),
+                        decltype(b_block_desc),
+                        Sequence<Number<KWmmaPerBlock>{},
+                                 I1,
+                                 Number<NRepeat>{},
+                                 I1,
+                                 Number<K0PerWmma>{},
+                                 I1,
+                                 I1,
+                                 Number<K1Value>{}>,
+                        Sequence<0, 1, 2, 3, 4, 5, 6, 7>,
+                        7,
+                        BBlockTransferSrcScalarPerVector,
+                        1,
+                        BThreadTransferSrcResetCoordinateAfterRun,
+                        /*InvalidElementAsNaN        */ true,
+                        /*UseTrLoad                  */ false,
+                        /*ForceAlignToUint32         */ false,
+                        /*UseTileLoad                */ true,
+                        /*ThreadsPerTile             */ ThreadsPerTile,
+                        /*VgprsPerTile               */ VgprsPerTile>(
+                        b_grid_desc,
+                        make_multi_index(0,
+                                         n_block_data_idx_on_grid / (NWaves * NPerWmma * NRepeat),
+                                         0,
+                                         (ThisThreadBlockGrid::GetThreadId() / 32) % NWaves,
+                                         0,
+                                         0,
+                                         (ThisThreadBlockGrid::GetThreadId() % AddrCnt),
+                                         0));
                     if constexpr(EnableWaveGroup)
                     {
                         auto b_block_buf = make_static_buffer_v4<AddressSpaceEnum::Vgpr, BDataType>(

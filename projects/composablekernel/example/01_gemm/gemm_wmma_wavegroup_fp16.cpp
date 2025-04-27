@@ -60,6 +60,7 @@ using DeviceGemmInstance = ck::tensor_operation::device::DeviceGemmWmma_GFX13
            false,
            false,
            false,
+           false,
            S<32, 4, 1>,
            S<0, 1, 2>,
            S<0, 1, 2>,
@@ -71,6 +72,7 @@ using DeviceGemmInstance = ck::tensor_operation::device::DeviceGemmWmma_GFX13
            8,
            8,
 #endif
+           false,
            false,
            false,
            false,
