@@ -412,13 +412,8 @@ bool run_test_fmt()
     else
     {
         pass &= run_test<SrcType, GPUAccType, Shape_4X2, TestMask | 0x80000  >();
-        // llvm issue
-        if constexpr (std::is_same<ck::int4_t, SrcType>::value == false)
-        {
         pass &= run_test<SrcType, GPUAccType, Shape_4X4, TestMask | 0x100000 >();
         pass &= run_test<SrcType, GPUAccType, Shape_8X4, TestMask | 0x200000 >();
-        }
-
     }
     // clang-format on
 

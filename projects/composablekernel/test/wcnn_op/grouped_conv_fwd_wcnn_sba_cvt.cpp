@@ -35,10 +35,7 @@ bool run_test_fmt()
     }
     else
     {
-        // 1st issue@llvm: https://ontrack-internal.amd.com/browse/LWPSCGFX13-478 for v_scale_bias_activate_f16 which will impact the all the accType=half case which will impact 4x4
-        // 2nd issue@ffm: https://github.amd.com/GFX-Modeling/shader_complex_ffm/issues/960 impact on i8_f16 for 4X4 and 8x4 
-// 4X4 issue
-#if 0
+        // 4X4 issue
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_4X4, Filter_1X1, false, 0,       WaveGroup, SbaMode, 0, 1, TestMask | 0x100>();
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_4X4, Filter_3X3, false, 0,       WaveGroup, SbaMode, 0, 1, TestMask | 0x200>();
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_4X4, Filter_3X3, true,  0,       WaveGroup, SbaMode, 0, 1, TestMask | 0x200>();
@@ -51,7 +48,6 @@ bool run_test_fmt()
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_4X4, Filter_3X3, true,  0,       WaveGroup, SbaMode, 1, 1, TestMask | 0x2000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_4X4, Filter_1X1, false, LdsMode, WaveGroup, SbaMode, 1, 1, TestMask | 0x4000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_4X4, Filter_3X3, false, LdsMode, WaveGroup, SbaMode, 1, 1, TestMask | 0x8000>();
-#endif
 // 8x4
         //ActivativeFun: 0
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_8X4, Filter_1X1, false, 0,       WaveGroup, SbaMode, 0, 1, TestMask | 0x10000>();

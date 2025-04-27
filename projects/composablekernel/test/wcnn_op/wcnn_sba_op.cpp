@@ -1453,8 +1453,6 @@ bool run_test_fmt()
     }
     else
     {
-        // issue@llvm: https://ontrack-internal.amd.com/browse/LWPSCGFX13-478 for v_scale_bias_activate_f16 which will impact the all the accType=half case which will impact 4x4
-#if 0
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_4X4, Filter_1X1, false, 0, OutElementNoneOp, scaleBiasPacked, uniformScale, convert_to_tensor, TestMask | 0x80000  >();
 #ifdef ENABLE_FULL_TEST
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_4X4, Filter_3X3, false, 0, OutElementNoneOp, scaleBiasPacked, uniformScale, 0, TestMask | 0x80000  >();
@@ -1466,7 +1464,7 @@ bool run_test_fmt()
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_4X4, Filter_3X3, true,  1, OutElementReluOp, scaleBiasPacked, uniformScale, 0, TestMask | 0x100000 >();
 #endif
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_4X4, Filter_1X1, false, 2, OutElementTanhOp, scaleBiasPacked, uniformScale, 0, TestMask | 0x200000 >();
-#endif
+
 #ifdef ENABLE_FULL_TEST
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_4X4, Filter_3X3, false, 2, OutElementTanhOp, scaleBiasPacked, uniformScale, 0, TestMask | 0x200000 >();
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_4X4, Filter_3X3, true,  2, OutElementTanhOp, scaleBiasPacked, uniformScale, 0, TestMask | 0x200000 >();
@@ -1494,8 +1492,6 @@ bool run_test_fmt()
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_4X2, Filter_3X3, false, 2, OutElementTanhOp, scaleBiasPacked, uniformScale, 0, TestMask | 0x8000000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_4X2, Filter_3X3, true,  2, OutElementTanhOp, scaleBiasPacked, uniformScale, 0, TestMask | 0x8000000>();
 #endif
-
-
     }
     // clang-format on
 

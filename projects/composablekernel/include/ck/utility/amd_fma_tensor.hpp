@@ -683,7 +683,7 @@ struct intrin_wcnn_fma_from_tensor<8, 4, ChanOff>
     Run(const half8_t& inAcc, const int4x16_t& residual, const half8_t scale, FloatAcc& outAcc)
     {
         constexpr index_t aux_data0 = GetChanOff<ChanOff>();
-        constexpr index_t aux_data1 = GetChanOff<ChanOff + 8>();
+        constexpr index_t aux_data1 = GetChanOff<ChanOff>();
         constexpr bool clamp        = false;
         half4_t inAcc0, inAcc1;
         half4_t scale0, scale1;
@@ -704,7 +704,7 @@ struct intrin_wcnn_fma_from_tensor<8, 4, ChanOff>
     Run(const bhalf8_t& inAcc, const int4x16_t& residual, const bhalf8_t scale, FloatAcc& outAcc)
     {
         constexpr index_t aux_data0 = GetChanOff<ChanOff>();
-        constexpr index_t aux_data1 = GetChanOff<ChanOff + 8>();
+        constexpr index_t aux_data1 = GetChanOff<ChanOff>();
         constexpr bool clamp        = false;
         bhalf4_t inAcc0, inAcc1;
         bhalf4_t scale0, scale1;
@@ -726,7 +726,7 @@ struct intrin_wcnn_fma_from_tensor<8, 4, ChanOff>
     Run(const half8_t& inAcc, const uint4x16_t& residual, const half8_t scale, FloatAcc& outAcc)
     {
         constexpr index_t aux_data0 = GetChanOff<ChanOff>();
-        constexpr index_t aux_data1 = GetChanOff<ChanOff + 8>();
+        constexpr index_t aux_data1 = GetChanOff<ChanOff>();
         constexpr bool clamp        = false;
         half4_t inAcc0, inAcc1;
         half4_t scale0, scale1;
@@ -747,7 +747,7 @@ struct intrin_wcnn_fma_from_tensor<8, 4, ChanOff>
     Run(const bhalf8_t& inAcc, const uint4x16_t& residual, const bhalf8_t scale, FloatAcc& outAcc)
     {
         constexpr index_t aux_data0 = GetChanOff<ChanOff>();
-        constexpr index_t aux_data1 = GetChanOff<ChanOff + 8>();
+        constexpr index_t aux_data1 = GetChanOff<ChanOff>();
         constexpr bool clamp        = false;
         half4_t inAcc0, inAcc1;
         half4_t scale0, scale1;
