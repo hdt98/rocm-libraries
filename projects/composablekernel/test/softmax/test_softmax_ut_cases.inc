@@ -59,14 +59,13 @@ TYPED_TEST(TestSoftmax, ReduceOddLengths)
     this->Run({this->Rank - 2});
 }
 
-
 int main(int argc, char** argv)
 {
     testing::InitGoogleTest(&argc, argv);
-    if (argc == 1) {}
-    else if (argc == 3)
+    if(argc == 1) {}
+    else if(argc == 3)
     {
-        param_mask = strtol(argv[1], nullptr, 0);
+        param_mask     = strtol(argv[1], nullptr, 0);
         instance_index = atoi(argv[2]);
     }
     else

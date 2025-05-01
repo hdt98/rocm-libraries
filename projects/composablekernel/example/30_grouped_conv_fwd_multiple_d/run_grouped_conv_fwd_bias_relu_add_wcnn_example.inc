@@ -315,15 +315,15 @@ bool run_grouped_conv_fwd_bias_relu_add(const ExecutionConfig& config,
                                                   PassThrough{});
 
         ref_invoker.Run(ref_argument);
-        //dump_tensor(in, "in");
-        //dump_tensor(wei, "wei");
-        //dump_tensor(c_host, "c_host");
+        // dump_tensor(in, "in");
+        // dump_tensor(wei, "wei");
+        // dump_tensor(c_host, "c_host");
         out_host.ForEach([&](auto&, auto idx) {
             OutElementOp{}(out_host(idx), c_host(idx), bias(idx), residual(idx));
         });
-        //dump_tensor(out_host, "out_host");
+        // dump_tensor(out_host, "out_host");
         out_device_buf.FromDevice(out_device.mData.data());
-        //dump_tensor(out_device, "out_device");
+        // dump_tensor(out_device, "out_device");
         return ck::utils::check_err(
             out_device, out_host, "Error: incorrect results!", 1e-5f, 1e-4f);
     }

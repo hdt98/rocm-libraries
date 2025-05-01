@@ -269,9 +269,9 @@ bool run_grouped_gemm_example(int argc, char* argv[])
     ExecutionConfig config;
 
     int group_count = 16;
-    int M = 256;
-    int N = 128;
-    int K = 64;
+    int M           = 256;
+    int N           = 128;
+    int K           = 64;
 
     if(argc == 4)
     {
@@ -284,10 +284,10 @@ bool run_grouped_gemm_example(int argc, char* argv[])
         config.do_verification = std::stoi(argv[1]);
         config.init_method     = std::stoi(argv[2]);
         config.time_kernel     = std::stoi(argv[3]);
-        group_count = std::stoi(argv[4]);
-        M = std::stoi(argv[5]);
-        N = std::stoi(argv[6]);
-        K = std::stoi(argv[7]);
+        group_count            = std::stoi(argv[4]);
+        M                      = std::stoi(argv[5]);
+        N                      = std::stoi(argv[6]);
+        K                      = std::stoi(argv[7]);
     }
     else
     {

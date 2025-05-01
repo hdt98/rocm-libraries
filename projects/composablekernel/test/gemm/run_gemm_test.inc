@@ -15,9 +15,9 @@ int run_gemm_test(int argc, char* argv[])
     }
     else if(argc == 4 || argc == 5)
     {
-        params.M = atoi(argv[1]);
-        params.N = atoi(argv[2]);
-        params.K = atoi(argv[3]);
+        params.M       = atoi(argv[1]);
+        params.N       = atoi(argv[2]);
+        params.K       = atoi(argv[3]);
         params.StrideA = params.M;
         params.StrideB = params.N;
         params.StrideC = params.K;
@@ -32,7 +32,8 @@ int run_gemm_test(int argc, char* argv[])
         std::cout << "Usage of " << argv[0] << std::endl;
         std::cout << "Arg1-4: M N K instance_index(-1 means all)" << std::endl;
     }
-    std::cout << "Params (M, N, K, index) " << params.M << " " <<  params.N << " " <<  params.K << " " <<  instance_index << std::endl; 
+    std::cout << "Params (M, N, K, index) " << params.M << " " << params.N << " " << params.K << " "
+              << instance_index << std::endl;
     auto test = [&](auto a_layout, auto b_layout, auto c_layout) {
         bool pass = true;
 

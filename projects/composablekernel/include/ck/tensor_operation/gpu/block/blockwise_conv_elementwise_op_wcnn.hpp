@@ -933,9 +933,9 @@ struct BlockwiseElementFmaWcnn
     __device__ static auto CalculateResidualThreadOriginDataIndex()
     {
 #ifdef __HIP_DEVICE_COMPILE__
-        const auto wave_idx         = GetWaveIdx();
-        const auto waveId_h         = wave_idx[I0];
-        const auto waveId_w         = wave_idx[I1];
+        const auto wave_idx = GetWaveIdx();
+        const auto waveId_h = wave_idx[I0];
+        const auto waveId_w = wave_idx[I1];
         const auto wcnn_in_data_idx =
             wcnn_conv.template CalculateInDataThreadOriginDataIndex<false>();
         // W0 x C0 x H0 x H1 x H2 x W1 x C1

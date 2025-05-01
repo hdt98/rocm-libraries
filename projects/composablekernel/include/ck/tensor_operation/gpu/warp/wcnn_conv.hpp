@@ -1410,7 +1410,7 @@ struct WcnnConv
     template <bool TileAccess>
     static constexpr auto CalculateAccThreadOriginDataIndex()
     {
-        auto laneId              = GetLaneId();
+        auto laneId = GetLaneId();
         if constexpr(TileAccess)
         {
             // {h1 x h2 x w1 x k1}

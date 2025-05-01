@@ -307,9 +307,9 @@ struct BlockwiseConvWcnn
     __device__ __host__ static auto CalculateInDataThreadOriginDataIndex()
     {
 #ifdef __HIP_DEVICE_COMPILE__
-        const auto wave_idx         = GetWaveIdx();
-        const auto waveId_h         = wave_idx[I0];
-        const auto waveId_w         = wave_idx[I1];
+        const auto wave_idx = GetWaveIdx();
+        const auto waveId_h = wave_idx[I0];
+        const auto waveId_w = wave_idx[I1];
 
         const auto wcnn_in_data_idx =
             wcnn_conv.template CalculateInDataThreadOriginDataIndex<InDataTileLoad>();
@@ -415,8 +415,8 @@ struct BlockwiseConvWcnn
     __device__ __host__ static auto CalculateWeiDataThreadOriginDataIndex()
     {
 #ifdef __HIP_DEVICE_COMPILE__
-        const auto wave_idx     = GetWaveIdx();
-        const auto waveId_k     = wave_idx[I2];
+        const auto wave_idx = GetWaveIdx();
+        const auto waveId_k = wave_idx[I2];
         const auto wcnn_wei_idx =
             wcnn_conv.template CalculateWeiDataThreadOriginDataIndex<InDataTileLoad>();
 

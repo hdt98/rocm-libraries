@@ -59,7 +59,9 @@ bool run_permute_element(bool time_kernel, const Problem& problem)
                                 1e-6);
 }
 
-bool run_permute_element_example(bool time_kernel, const Problem::Shape& shape, const Problem::Axes& axes)
+bool run_permute_element_example(bool time_kernel,
+                                 const Problem::Shape& shape,
+                                 const Problem::Axes& axes)
 {
     return run_permute_element(time_kernel, Problem{shape, axes});
 }
