@@ -387,7 +387,7 @@ public:
       KeyT max_key = oob_default;
 
       #pragma unroll
-      for (int item = 1; item < ITEMS_PER_THREAD; ++item)
+      for (int item = 0; item < ITEMS_PER_THREAD; ++item)
       {
         if (ITEMS_PER_THREAD * static_cast<int>(linear_tid) + item < valid_items)
         {
@@ -439,14 +439,16 @@ public:
 
       int thread_idx_in_thread_group_being_merged = mask & linear_tid;
 
+      const int ITEMS_PER_BLOCK = ITEMS_PER_THREAD * blockDim.x;
+
       int diag =
-        (::rocprim::min)(valid_items,
+        (::rocprim::min)(ITEMS_PER_BLOCK,
                    ITEMS_PER_THREAD * thread_idx_in_thread_group_being_merged);
 
-      int keys1_beg = (::rocprim::min)(valid_items, start);
-      int keys1_end = (::rocprim::min)(valid_items, keys1_beg + size);
+      int keys1_beg = (::rocprim::min)(ITEMS_PER_BLOCK, start);
+      int keys1_end = (::rocprim::min)(ITEMS_PER_BLOCK, keys1_beg + size);
       int keys2_beg = keys1_end;
-      int keys2_end = (::rocprim::min)(valid_items, keys2_beg + size);
+      int keys2_end = (::rocprim::min)(ITEMS_PER_BLOCK, keys2_beg + size);
 
       int keys1_count = keys1_end - keys1_beg;
       int keys2_count = keys2_end - keys2_beg;
