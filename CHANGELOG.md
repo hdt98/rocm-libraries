@@ -24,6 +24,9 @@ Full documentation for hipCUB is available at [https://rocm.docs.amd.com/project
 * Updated `thread_load` and `thread_store` to align hipCUB with CUB.
 * All kernels now have hidden symbol visibility. All symbols now have inline namespaces that include the library version, (for example, hipcub::HIPCUB_300400_NS::symbol instead of hipcub::symbol), letting the user link multiple libraries built with different versions of hipCUB.
 
+### Resolved issues
+* Fixed an issue where `Sort(keys, compare_op, valid_items, oob_default)` in `block_merge_sort.hpp` would not fill in elements that are out of range (items after `valid_items`) with `oob_default`.
+
 ### Known issues
 
 * `BlockAdjacentDifference::FlagHeads`, `BlockAdjacentDifference::FlagTails` and `BlockAdjacentDifference::FlagHeadsAndTails` have been removed from hipCUB's CUB backend. They were already deprecated as of version 2.12.0 of hipCUB and they were removed from CCCL (CUB) as of CCCL's 2.6.0 release.
