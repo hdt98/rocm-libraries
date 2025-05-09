@@ -114,6 +114,11 @@ namespace GPUArchitectureGenerator
             {rocRoller::GPUCapability::HasWMMA_f32_16x16x4_f32,
              {{"v_wmma_f32_16x16x4_f32 v[0:7], v[32:33], v[34:35], v[0:7]"}, ""}},
 
+            {rocRoller::GPUCapability::HasWMMA_f8f6f4,
+             {{"v_wmma_f32_16x16x128_f8f6f4 v[0:7], v[30:37], v[38:49], v[0:7] "
+               "matrix_a_fmt:MATRIX_FMT_FP4 matrix_b_fmt:MATRIX_FMT_FP6"},
+              ""}},
+
             {rocRoller::GPUCapability::HasAccumOffset,
              {{R"(
                 .amdhsa_kernel hello_world
@@ -1099,8 +1104,6 @@ namespace GPUArchitectureGenerator
              }},
             {gfx125XISAs(),
              {
-                 rocRoller::GPUInstructionInfo("v_wmma_f64_16x16x4_f64", 0, {}, 32),
-                 rocRoller::GPUInstructionInfo("v_wmma_f64_16x16x8_f64", 0, {}, 32),
                  rocRoller::GPUInstructionInfo("v_wmma_f32_16x16x4_f32", 0, {}, 16),
                  // V_WMMA_F32_16x16x32_{F16,BF16}
                  rocRoller::GPUInstructionInfo("v_wmma_f32_16x16x32_bf16", 0, {}, 8),
@@ -1124,22 +1127,7 @@ namespace GPUArchitectureGenerator
                  rocRoller::GPUInstructionInfo("v_wmma_scale16_f32_16x16x128_f8f6f4", 0, {}, 16),
                  rocRoller::GPUInstructionInfo("v_wmma_scale_f32_16x16x128_f8f6f4", 0, {}, 16),
                  // V_WMMA_I32_*_{IU4,IU8}
-                 rocRoller::GPUInstructionInfo("v_wmma_i32_16x16x128_iu4", 0, {}, 16),
                  rocRoller::GPUInstructionInfo("v_wmma_i32_16x16x64_iu8", 0, {}, 16),
-
-                 // TODO: Remove when MRISA is fixed
-                 // V_WMMA_F32_16x16x16_{fp8,bf8}_{fp8,bf8}
-                 rocRoller::GPUInstructionInfo("v_wmma_f32_16x16x16_bf8_bf8", -1, {}, -1),
-                 rocRoller::GPUInstructionInfo("v_wmma_f32_16x16x16_bf8_fp8", -1, {}, -1),
-                 rocRoller::GPUInstructionInfo("v_wmma_f32_16x16x16_fp8_bf8", -1, {}, -1),
-                 rocRoller::GPUInstructionInfo("v_wmma_f32_16x16x16_fp8_fp8", -1, {}, -1),
-                 rocRoller::GPUInstructionInfo("v_wmma_f32_16x16x16_bf16", -1, {}, -1),
-                 rocRoller::GPUInstructionInfo("v_wmma_f32_16x16x16_f16", -1, {}, -1),
-                 rocRoller::GPUInstructionInfo("v_wmma_bf16_16x16x16_bf16", -1, {}, -1),
-                 rocRoller::GPUInstructionInfo("v_wmma_f16_16x16x16_f16", -1, {}, -1),
-                 rocRoller::GPUInstructionInfo("v_wmma_i32_16x16x16_iu4", -1, {}, -1),
-                 rocRoller::GPUInstructionInfo("v_wmma_i32_16x16x32_iu4", -1, {}, -1),
-                 rocRoller::GPUInstructionInfo("v_wmma_i32_16x16x16_iu8", -1, {}, -1),
              }},
             {gfx9ISAs(),
              {
