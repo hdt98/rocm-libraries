@@ -1496,6 +1496,7 @@ amd_tile_store_to_buffer(const typename vector_type_maker<T, N>::type::type src_
         static_assert(0, "wrong! The shape is not supported yet.");
     }
 #else
+    ignore = src_thread_data;
     ignore = in_ptr;
     ignore = dst_thread_element_valid;
     ignore = thread_id;
