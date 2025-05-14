@@ -329,7 +329,7 @@ if(HIPBLASLT_ENABLE_HOST)
     rocm_install_targets(TARGETS hipblaslt)
 
     rocm_export_targets(
-        TARGETS roc::hipblaslt
+        TARGETS hipblaslt
         DEPENDS PACKAGE hip
         DEPENDS PACKAGE ${hipblas_target}
         NAMESPACE roc::
@@ -508,7 +508,8 @@ if(HIPBLASLT_ENABLE_SAMPLES)
     )
     rocm_package_setup_client_component(samples)
 endif()
-# rocm_create_package makes decisions on what type of package to produce
+
+# rocm_create_package makes decisions on what type of package to produce 
 # based on BUILD_SHARED_LIBS. If we don't set this here we will only get
 # a dev package.
 set(BUILD_SHARED_LIBS ${HIPBLASLT_BUILD_SHARED_LIBS})
