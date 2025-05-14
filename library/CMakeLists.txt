@@ -159,7 +159,8 @@ if(NOT BUILD_CUDA)
 endif()
 
 if(HIPBLASLT_ENABLE_MARKER)
-  target_link_libraries(hipblaslt PRIVATE -lroctx64)
+  target_include_directories(hipblaslt PRIVATE ${ROCTRACER_INCLUDE_DIR})
+  target_link_libraries(hipblaslt PRIVATE ${rocTracer})
 endif()
 
 if( NOT BUILD_CUDA AND NOT LEGACY_HIPBLAS_DIRECT )

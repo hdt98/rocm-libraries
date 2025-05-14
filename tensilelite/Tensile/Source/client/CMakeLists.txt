@@ -65,7 +65,8 @@ target_include_directories(TensileClient PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/inc
 target_link_libraries(TensileClient PRIVATE TensileHost Boost::program_options Boost::filesystem rocm_smi)
 
 if(Tensile_ENABLE_MARKER)
-    target_link_libraries(TensileClient PRIVATE -lroctx64)
+    target_include_directories(TensileClient PRIVATE ${ROCTRACER_INCLUDE_DIR})
+    target_link_libraries(TensileClient PRIVATE ${rocTracer})
 endif()
 
 if(TENSILE_USE_OPENMP)

@@ -281,6 +281,7 @@ endif()
 
 if(HIPBLASLT_ENABLE_MARKER)
   find_library(rocTracer roctx64)
+  find_path(ROCTRACER_INCLUDE_DIR "roctracer/roctx.h")
   if(NOT rocTracer)
     message(FATAL_ERROR "roctracer not found, but HIPBLASLT_ENABLE_MARKER is enabled")
   endif()
