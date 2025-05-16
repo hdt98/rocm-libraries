@@ -329,7 +329,7 @@ if(HIPBLASLT_ENABLE_HOST)
     rocm_install_targets(TARGETS hipblaslt)
 
     rocm_export_targets(
-        TARGETS hipblaslt
+        TARGETS roc::hipblaslt
         DEPENDS PACKAGE hip
         DEPENDS PACKAGE ${hipblas_target}
         NAMESPACE roc::
