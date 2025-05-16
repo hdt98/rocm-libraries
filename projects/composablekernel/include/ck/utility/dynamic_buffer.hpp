@@ -295,6 +295,28 @@ struct DynamicBuffer
     }
 
     template <typename X,
+              GlobalLoadTypeEnum MulticastLoad,
+              typename enable_if<is_same<typename scalar_type<remove_cvref_t<X>>::type,
+                                         typename scalar_type<remove_cvref_t<T>>::type>::value,
+                                 bool>::type = false>
+    __host__ __device__ constexpr auto multicastLoad(index_t src_offset,
+                                                     bool is_valid_element) const
+    {
+        constexpr index_t scalar_per_t_vector = scalar_type<remove_cvref_t<T>>::vector_size;
+        constexpr index_t scalar_per_x_vector = scalar_type<remove_cvref_t<X>>::vector_size;
+        static_assert(scalar_per_x_vector % scalar_per_t_vector == 0,
+                      "wrong! X should contain multiple T");
+        constexpr index_t t_per_x             = scalar_per_x_vector / scalar_per_t_vector;
+        constexpr AddressSpaceEnum addr_space = GetAddressSpace();
+
+        __attribute__((address_space(1))) const T* global_ptr =
+            reinterpret_cast<__attribute__((address_space(1))) T*>(
+                reinterpret_cast<uintptr_t>(p_data_ + src_offset));
+        return amd_multicast_load_to_vgpr<remove_cvref_t<T>, t_per_x, addr_space, MulticastLoad>(
+            global_ptr, is_valid_element);
+    }
+
+    template <typename X,
               typename enable_if<is_same<typename scalar_type<remove_cvref_t<X>>::type,
                                          typename scalar_type<remove_cvref_t<T>>::type>::value ||
                                      !is_native_type<X>(),

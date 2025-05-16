@@ -55,6 +55,8 @@ template <typename ALayout,
           bool ABlockLdsAsyncCopy,
           bool AEnableGlobalTRLoad,
           bool AEnableGlobalTiledLoad,
+          ck::GlobalLoadTypeEnum AGlobalMultiCastLoad, // 0x1: cluster_multicast 0x2: wgp_muticast
+          index_t AClusterSize,                        /* Set when AMultiCastLoad == 1*/
           typename BBlockTransferThreadClusterLengths_N_K0_K1,
           typename BBlockTransferThreadClusterArrangeOrder,
           typename BBlockTransferSrcAccessOrder,
@@ -65,6 +67,8 @@ template <typename ALayout,
           bool BBlockLdsAsyncCopy,
           bool BEnableGlobalTRLoad,
           bool BEnableGlobalTiledLoad,
+          ck::GlobalLoadTypeEnum BGlobalMultiCastLoad, // 0x1: cluster_multicast 0x2: wgp_muticast
+          index_t BClusterSize,                        /* Set when BMultiCastLoad == 1*/
           index_t CShuffleMRepeatPerShuffle,
           index_t CShuffleNRepeatPerShuffle,
           typename CShuffleBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock,
@@ -121,14 +125,20 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
          is_same<tensor_layout::gemm::RowMajor, ALayout>::value)
             ? false
             : (AEnableGlobalTRLoad ? false : !ADisableLds_manu);
-    static constexpr auto AEnableLds_auto = AEnableGlobalTiledLoad ? false : AEnableLds_auto_tmp;
+    static constexpr auto AEnableLds_auto =
+        (AEnableGlobalTiledLoad || (AGlobalMultiCastLoad != GlobalLoadTypeEnum::DEFAULT_LOAD))
+            ? false
+            : AEnableLds_auto_tmp;
 
     static constexpr auto BEnableLds_auto_tmp =
         (MWaves == 1 && (MaxVectorLoadB || NRepeat == 1) &&
          is_same<tensor_layout::gemm::ColumnMajor, BLayout>::value)
             ? false
             : (BEnableGlobalTRLoad ? false : !BDisableLds_manu);
-    static constexpr auto BEnableLds_auto = BEnableGlobalTiledLoad ? false : BEnableLds_auto_tmp;
+    static constexpr auto BEnableLds_auto =
+        (BEnableGlobalTiledLoad || (BGlobalMultiCastLoad != GlobalLoadTypeEnum::DEFAULT_LOAD))
+            ? false
+            : BEnableLds_auto_tmp;
 
     // If true, LDS is used unconditionally
     // if enable lds async load, should always enable lds
@@ -513,6 +523,8 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
         ABlockLdsAsyncCopy,
         AEnableTRLoadFromGlobal,
         AEnableGlobalTiledLoad,
+        AGlobalMultiCastLoad,
+        AClusterSize,
         BBlockTransferThreadClusterLengths_N_K0_K1,
         BBlockTransferThreadClusterArrangeOrder,
         BBlockTransferSrcAccessOrder,
@@ -525,6 +537,8 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
         BBlockLdsAsyncCopy,
         BEnableTRLoadFromGlobal,
         BEnableGlobalTiledLoad,
+        BGlobalMultiCastLoad,
+        BClusterSize,
         CShuffleMRepeatPerShuffle,
         CShuffleNRepeatPerShuffle,
         CShuffleBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock,
@@ -803,6 +817,8 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
 
                         if constexpr(EnableWaveGroup)
                         {
+                            /* WGP multicast load handled in this kernel as it needs to enable
+                             * wavegroup */
                             const auto kernel = kernel_gemm_wmma_wavegroup<
                                 GridwiseGemm,
                                 ADataType,
@@ -817,6 +833,54 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
                                 BElementwiseOperation,
                                 CElementwiseOperation,
                                 remove_reference_t<typename GridwiseGemm::DefaultBlock2CTileMap>,
+                                has_main_k_block_loop>;
+
+                            return launch_and_time_kernel(
+                                stream_config,
+                                kernel,
+                                dim3(grid_size),
+                                dim3(BlockSize),
+                                0,
+                                arg.p_a_grid_,
+                                arg.p_b_grid_,
+                                arg.p_c_grid_,
+                                arg.a_grid_desc_,
+                                arg.b_grid_desc_k0_n_k1_,
+                                arg.c_grid_desc_mblock_mperblock_nblock_nperblock,
+                                arg.a_element_op_,
+                                arg.b_element_op_,
+                                arg.c_element_op_,
+                                arg.block_2_ctile_map_);
+                        }
+                        else if constexpr((AGlobalMultiCastLoad ==
+                                           GlobalLoadTypeEnum::CLUSTER_MULTICAST_LOAD) ||
+                                          (BGlobalMultiCastLoad ==
+                                           GlobalLoadTypeEnum::CLUSTER_MULTICAST_LOAD))
+                        {
+                            /* Cluster MulticastLoad */
+                            static_assert(
+                                AGlobalMultiCastLoad == GlobalLoadTypeEnum::DEFAULT_LOAD ||
+                                    BGlobalMultiCastLoad == GlobalLoadTypeEnum::DEFAULT_LOAD,
+                                "Either A or B should not be Cluster MulticastLoad.");
+                            constexpr int ClusterSize =
+                                AGlobalMultiCastLoad != GlobalLoadTypeEnum::DEFAULT_LOAD
+                                    ? AClusterSize
+                                    : BClusterSize;
+                            const auto kernel = kernel_gemm_wmma_cluster<
+                                GridwiseGemm,
+                                ADataType,
+                                BDataType,
+                                CDataType,
+                                remove_reference_t<DeviceGemmWmma_GFX13::AGridDesc>,
+                                remove_reference_t<DeviceGemmWmma_GFX13::BGridDesc>,
+                                remove_reference_t<
+                                    typename GridwiseGemm::
+                                        CGridDescriptor_MBlock_MPerBlock_NBlock_NPerBlock>,
+                                AElementwiseOperation,
+                                BElementwiseOperation,
+                                CElementwiseOperation,
+                                remove_reference_t<typename GridwiseGemm::DefaultBlock2CTileMap>,
+                                ClusterSize,
                                 has_main_k_block_loop>;
 
                             return launch_and_time_kernel(
@@ -1138,6 +1202,11 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
         std::map<PipelineVersion, std::string> PipelineVersionToString{
             {PipelineVersion::v1, "v1"}, {PipelineVersion::v2, "v2"}, {PipelineVersion::v5, "v5"}};
 
+        std::map<GlobalLoadTypeEnum, std::string> LoadMethodToString{
+            {GlobalLoadTypeEnum::DEFAULT_LOAD, "default"},
+            {GlobalLoadTypeEnum::CLUSTER_MULTICAST_LOAD, "cluster_multicast"},
+            {GlobalLoadTypeEnum::WGP_MULTICAST_LOAD, "wgp_multicast"}};
+
         // clang-format off
         str << "DeviceGemmWmma_GFX13"
             << "<"
@@ -1160,10 +1229,14 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
             << AEnableTRLoadFromGlobal << ", "
             << "AEnableTiledload: "
             << AEnableGlobalTiledLoad << ", "
+            << "AGlobalMultiCastLoad: "
+            << LoadMethodToString[AGlobalMultiCastLoad] << ", "
             << "BEnableTRload: "
             << BEnableTRLoadFromGlobal << ", "
             << "BEnableTiledload: "
             << BEnableGlobalTiledLoad << ", "
+            << "BGlobalMultiCastLoad: "
+            << LoadMethodToString[BGlobalMultiCastLoad] << ", "
             << "CStoreEnableAsync: "
             << CStoreEnableAsync << ", "
             << "EnableWaveGroup: "

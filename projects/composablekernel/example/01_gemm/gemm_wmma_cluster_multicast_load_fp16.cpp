@@ -5,11 +5,11 @@
 
 #include "ck/tensor_operation/gpu/device/impl/device_gemm_wmma_gfx13.hpp"
 
-using ADataType        = std::int8_t;
-using BDataType        = std::int8_t;
-using AccDataType      = std::int32_t;
-using CShuffleDataType = std::int32_t;
-using CDataType        = std::int8_t;
+using ADataType        = ck::half_t;
+using BDataType        = ck::half_t;
+using AccDataType      = float;
+using CShuffleDataType = float;
+using CDataType        = ck::half_t;
 
 using ALayout = Row;
 using BLayout = Col;
@@ -35,49 +35,49 @@ using DeviceGemmInstance = ck::tensor_operation::device::DeviceGemmWmma_GFX13
            BElementOp,
            CElementOp,
            GemmDefault,
-           1,            // Prefetch stage
-           128,          // BlockSize
-           64,           // MPerBlock
-           128,          // NPerBlock
-           64,           // KPerBlock
-           4,            // K1
+           1,      // Prefetch stage
+           32, //128,    // BlockSize
+           16, //64,     // MPerBlock
+           16, //128,    // NPerBlock
+           16, //64,     // KPerBlock
+           2,            // K1
            16,           // MPerWmma
            16,           // NPerWmma
-           32,           // KPerWmma
-           2,            // M-Repeat // M-PerWmma / M-Repeat = M-Wave
-           4,            // N-Repeat // N-PerWmma / N-Repeat = N-Wave
-           S<32, 4, 1>,  // M-K0-K1
+           16,           // KPerWmma
+           1, //2,       // M-Repeat // M-PerWmma / M-Repeat = M-Wave
+           1, //4,       // N-Repeat // N-PerWmma / N-Repeat = N-Wave
+           S<8, 4, 1>, //S<32, 4, 1>,
            S<0, 1, 2>,
            S<0, 1, 2>,
            2,
-           8,
-           8,
-           false,
-           true,
+           2,
+           2,
            false,
            false,
-           ck::GlobalLoadTypeEnum::DEFAULT_LOAD,
-           0,
-           S<32, 4, 1>,
+           false,  // AEnableGlobalTRLoad
+           false,  // AEnableGlobalTiledLoad
+           ck::GlobalLoadTypeEnum::CLUSTER_MULTICAST_LOAD,      // AGlobalMultiCastLoad:cluster
+           4,      // A_cluster_size = 4
+           S<8, 4, 1>, //S<32, 4, 1>,
            S<0, 1, 2>,
            S<0, 1, 2>,
            2,
-           8,
-           8,
-           false,
-           true,
+           2,
+           2,
            false,
            false,
-           ck::GlobalLoadTypeEnum::DEFAULT_LOAD,
-           0,
-           1,           // C shuffle (M Repeat) Per store
-           1,           // C shuffle (N Repeat) Per store
-           S<1, 32, 1, 4>,
+           false, // BEnableGlobalTRLoad
+           false, // BEnableGlobalTiledLoad
+           ck::GlobalLoadTypeEnum::DEFAULT_LOAD,     // BGlobalMultiCastLoad
+           0,     // B_cluster_size = 0
+           1,     // C shuffle (M Repeat) Per store
+           1,     // C shuffle (N Repeat) Per store
+           S<1, 8, 1, 4>,//S<1, 32, 1, 4>,
            4,
            false,
-           false,
+           false, //EnableWaveGroup
            ck::LoopScheduler::Default,
-           ck::PipelineVersion::v5>;
+           ck::PipelineVersion::v1>;
 // clang-format on
 
 using ReferenceGemmInstance = ck::tensor_operation::host::

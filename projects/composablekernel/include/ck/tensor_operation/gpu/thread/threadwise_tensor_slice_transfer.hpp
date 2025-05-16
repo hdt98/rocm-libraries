@@ -257,12 +257,13 @@ template <typename SrcData,
           index_t SrcScalarPerVector,
           index_t SrcScalarStrideInVector,
           bool SrcResetCoordinateAfterRun,
-          bool InvalidElementAsNaN                                        = false,
-          bool UseTrLoad                                                  = false,
-          bool ForceAlignToUint32                                         = false,
-          bool UseTileLoad                                                = false,
-          index_t ThreadLengthPerTile                                     = 1,
-          index_t VgprLengthPerTile                                       = 1,
+          bool InvalidElementAsNaN               = false,
+          bool UseTrLoad                         = false,
+          bool ForceAlignToUint32                = false,
+          bool UseTileLoad                       = false,
+          index_t ThreadLengthPerTile            = 1,
+          index_t VgprLengthPerTile              = 1,
+          GlobalLoadTypeEnum GlobalMulticastLoad = GlobalLoadTypeEnum::DEFAULT_LOAD,
           typename enable_if<DstDesc::IsKnownAtCompileTime(), bool>::type = false>
 struct ThreadwiseTensorSliceTransfer_v2
 {
@@ -346,7 +347,6 @@ struct ThreadwiseTensorSliceTransfer_v2
 
         // loop over tensor and copy
         constexpr auto num_access = SpaceFillingCurve::GetNumOfAccess();
-
         static_for<0, num_access, 1>{}([&](auto idx_1d) {
             typename vector_type_maker<SrcData, SrcScalarPerVector / PackedSize>::type src_vector;
             using src_vector_t =
@@ -372,7 +372,6 @@ struct ThreadwiseTensorSliceTransfer_v2
                     return true;
                 }
             }();
-
             // copy data from src_vector into dst_buf
             if constexpr(InvalidElementAsNaN == false && std::is_same<SrcData, DstData>::value &&
                          go_fast_copy == true)
@@ -393,6 +392,12 @@ struct ThreadwiseTensorSliceTransfer_v2
                                                       ThreadLengthPerTile,
                                                       VgprLengthPerTile>(
                                 src_coord_.GetOffset(), get_thread_local_1d_id(), is_src_valid);
+                    }
+                    else if constexpr(GlobalMulticastLoad != GlobalLoadTypeEnum::DEFAULT_LOAD)
+                    {
+                        src_vector.template AsType<src_vector_t>()(Number<0>{}) =
+                            src_buf.template multicastLoad<src_vector_t, GlobalMulticastLoad>(
+                                src_coord_.GetOffset(), is_src_valid);
                     }
                     else
                     {
@@ -443,6 +448,12 @@ struct ThreadwiseTensorSliceTransfer_v2
                                                                  VgprLengthPerTile>(
                             src_coord_.GetOffset(), get_thread_local_1d_id(), is_src_valid);
                     }
+                    else if constexpr(GlobalMulticastLoad != GlobalLoadTypeEnum::DEFAULT_LOAD)
+                    {
+                        *dst_buf_ptr =
+                            src_buf.template multicastLoad<src_vector_t, GlobalMulticastLoad>(
+                                src_coord_.GetOffset(), is_src_valid);
+                    }
                     else
                     {
                         *dst_buf_ptr = src_buf.template Get<src_vector_t>(
@@ -467,6 +478,12 @@ struct ThreadwiseTensorSliceTransfer_v2
                                                   ThreadLengthPerTile,
                                                   VgprLengthPerTile>(
                             src_coord_.GetOffset(), get_thread_local_1d_id(), is_src_valid);
+                }
+                else if constexpr(GlobalMulticastLoad != GlobalLoadTypeEnum::DEFAULT_LOAD)
+                {
+                    src_vector.template AsType<src_vector_t>()(Number<0>{}) =
+                        src_buf.template multicastLoad<src_vector_t, GlobalMulticastLoad>(
+                            src_coord_.GetOffset(), is_src_valid);
                 }
                 else
                 {
