@@ -105,7 +105,7 @@ For more information, run the command with the ``--help`` option. The output of 
    --activation_type <value>          Options: none, gelu, relu, swish, clamp                                             (Default value is: none)
    --activation_arg1 <value>          First extra argument for activation function if needed.                             (Default value is: 0)
    --activation_arg2 <value>          Second extra argument for activation function if needed.                            (Default value is: inf)
-   --bias_type <value>                Precision of bias vector.Options: f16_r,bf16_r,f32_r,default(same with D type)
+   --bias_type <value>                Precision of bias vector. Options: f16_r,bf16_r,f32_r,default(same with D type)
    --bias_source <value>              Choose bias source: a, b, d                                                         (Default value is: d)
    --bias_vector                      Apply bias vector
    --scaleA <value>                   Apply scale for A buffer. 0 = None, 1 = scalar, 2 = vector, 3 = block.              (Default value is: 0)
