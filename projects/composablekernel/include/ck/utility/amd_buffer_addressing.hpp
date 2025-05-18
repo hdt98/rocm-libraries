@@ -331,6 +331,13 @@ enum struct AmdBufferCoherenceEnum
     SYSTEM_NT1 = 11,
 };
 
+enum struct GlobalLoadTypeEnum
+{
+    DEFAULT_LOAD           = 0,
+    CLUSTER_MULTICAST_LOAD = 1,
+    WGP_MULTICAST_LOAD     = 2,
+};
+
 template <index_t N, AmdBufferCoherenceEnum coherence = AmdBufferCoherenceEnum::DefaultCoherence>
 __device__ typename vector_type<int8_t, N>::type
 amd_buffer_load_impl_raw(int32x4_t src_wave_buffer_resource,
@@ -1500,6 +1507,53 @@ amd_tile_store_to_buffer(const typename vector_type_maker<T, N>::type::type src_
     ignore = in_ptr;
     ignore = dst_thread_element_valid;
     ignore = thread_id;
+#endif
+}
+
+template <typename T,
+          index_t N,
+          AddressSpaceEnum BufferAddressSpace,
+          GlobalLoadTypeEnum MultiCastLoad>
+__device__ auto amd_multicast_load_to_vgpr(__attribute__((address_space(1))) const T* in_ptr,
+                                           bool is_src_valid)
+{
+    using vector_t = typename vector_type_maker<T, N>::type::type;
+#if defined(__gfx13__)
+    if constexpr(is_same_v<remove_cvref_t<T>, ck::half_t>)
+    {
+        if(is_src_valid)
+        {
+            if constexpr(MultiCastLoad ==
+                         GlobalLoadTypeEnum::CLUSTER_MULTICAST_LOAD) // Cluster MutiCast load
+            {
+                __attribute__((address_space(1))) int32_t* global_ptr =
+                    const_cast<__attribute__((address_space(1))) int32_t*>(
+                        reinterpret_cast<const __attribute__((address_space(1))) int32_t*>(in_ptr));
+                return bit_cast<vector_t>(__builtin_amdgcn_cluster_load_b32(global_ptr, 0, 0xf));
+            }
+            else if constexpr(MultiCastLoad ==
+                              GlobalLoadTypeEnum::WGP_MULTICAST_LOAD) // WGP MultiCast load
+            {
+                __attribute__((address_space(1))) int32_t* global_ptr =
+                    const_cast<__attribute__((address_space(1))) int32_t*>(
+                        reinterpret_cast<const __attribute__((address_space(1))) int32_t*>(in_ptr));
+                return bit_cast<vector_t>(
+                    __builtin_amdgcn_cluster_load_b32(global_ptr, 0, 0xf << 16));
+            }
+            else
+            {
+                return vector_t{0};
+            }
+        }
+        else
+        {
+            return vector_t{0};
+        }
+    }
+#else
+    ignore = in_ptr;
+    ignore = is_src_valid;
+    return vector_t{0};
 #endif
 }
 

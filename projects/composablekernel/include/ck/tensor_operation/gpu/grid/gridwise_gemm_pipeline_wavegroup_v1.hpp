@@ -12,7 +12,11 @@
 
 namespace ck {
 
-template <index_t NumPrefetch, bool AEnableLds, bool BEnableLds>
+template <index_t NumPrefetch,
+          bool AEnableLds,
+          bool BEnableLds,
+          GlobalLoadTypeEnum AMultiCastLoad = GlobalLoadTypeEnum::DEFAULT_LOAD,
+          GlobalLoadTypeEnum BMultiCastLoad = GlobalLoadTypeEnum::DEFAULT_LOAD>
 struct GridwiseGemmPipeline_Wavegroup_v1;
 
 // 1-stage prefetch
@@ -987,4 +991,141 @@ struct GridwiseGemmPipeline_Wavegroup_v1<1, false, false>
 #endif
 };
 
+template <GlobalLoadTypeEnum AMultiCastLoad, GlobalLoadTypeEnum BMultiCastLoad>
+struct GridwiseGemmPipeline_Wavegroup_v1<1, false, false, AMultiCastLoad, BMultiCastLoad>
+{
+    static constexpr auto I0 = Number<0>{};
+    static constexpr auto I1 = Number<1>{};
+
+    __host__ __device__ static constexpr bool IsSupported(index_t /* num_loop */) { return true; }
+
+    __host__ __device__ static constexpr bool CalculateHasMainLoop(index_t num_loop)
+    {
+        return num_loop > 1;
+    }
+
+    template <bool HasMainLoop,
+              typename AGridDesc,
+              typename ABlockDesc,
+              typename ABlockTransfer,
+              typename AGridBuffer,
+              typename ABlockBuffer,
+              typename ABlockTransferStep,
+              typename BGridDesc,
+              typename BBlockDesc,
+              typename BBlockTransfer,
+              typename BGridBuffer,
+              typename BBlockBuffer,
+              typename BBlockTransferStep,
+              typename BlockwiseGemm,
+              typename CThreadBuffer>
+    __device__ static void Run(const AGridDesc& a_grid_desc,
+                               const ABlockDesc& a_block_desc,
+                               ABlockTransfer& a_blockwise_copy,
+                               const AGridBuffer& a_grid_buf,
+                               ABlockBuffer& a_block_buf,
+                               const ABlockTransferStep& a_block_copy_step,
+                               const BGridDesc& b_grid_desc,
+                               const BBlockDesc& b_block_desc,
+                               BBlockTransfer& b_blockwise_copy,
+                               const BGridBuffer& b_grid_buf,
+                               BBlockBuffer& b_block_buf,
+                               const BBlockTransferStep& b_block_copy_step,
+                               const BlockwiseGemm& blockwise_gemm,
+                               CThreadBuffer& c_thread_buf,
+                               index_t num_loop)
+    {
+        __shared__ WavegroupSemaphore<WaveIdRun> semaDataReady;
+        __shared__ WavegroupSemaphore<WaveIdLoad> semaDataFree;
+
+        constexpr auto b_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0, I0);
+        constexpr auto a_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0, I0);
+
+        semaDataReady.init();
+        semaDataFree.init();
+        // wait semaphore init
+        __syncthreads();
+
+        // preload data
+        if(get_wave_id_in_wavegroup() == WaveIdLoad)
+        {
+            // Need add this if condition when the LLVM fix the scratch_store only in wave_roup_id
+            // == 0 issue.
+            // if((AMultiCastLoad == GlobalLoadTypeEnum::DEFAULT_LOAD) || (AMultiCastLoad ==
+            // GlobalLoadTypeEnum::WGP_MULTICAST_LOAD && (get_wavegroup_id() == 0)))
+            {
+                a_blockwise_copy.Run(
+                    a_grid_desc, a_grid_buf, a_block_desc, a_block_origin_idx, a_block_buf);
+            }
+            // if((BMultiCastLoad == GlobalLoadTypeEnum::DEFAULT_LOAD) || (BMultiCastLoad ==
+            // GlobalLoadTypeEnum::WGP_MULTICAST_LOAD && (get_wavegroup_id() == 0)))
+            {
+                b_blockwise_copy.Run(
+                    b_grid_desc, b_grid_buf, b_block_desc, b_block_origin_idx, b_block_buf);
+            }
+            a_blockwise_copy.MoveSrcSliceWindow(a_grid_desc, a_block_copy_step);
+            b_blockwise_copy.MoveSrcSliceWindow(b_grid_desc, b_block_copy_step);
+            semaDataReady.template signal<SemaphoreAddressSpaceGlobal>();
+            // main body
+            if constexpr(HasMainLoop)
+            {
+                index_t i = 0;
+
+                a_block_buf.SwitchBuffer();
+                b_block_buf.SwitchBuffer();
+
+                do
+                {
+                    // if((AMultiCastLoad == GlobalLoadTypeEnum::DEFAULT_LOAD) || (AMultiCastLoad ==
+                    // GlobalLoadTypeEnum::WGP_MULTICAST_LOAD && (get_wavegroup_id() == 0)))
+                    {
+                        a_blockwise_copy.Run(
+                            a_grid_desc, a_grid_buf, a_block_desc, a_block_origin_idx, a_block_buf);
+                    }
+                    // if((BMultiCastLoad == GlobalLoadTypeEnum::DEFAULT_LOAD) || (BMultiCastLoad ==
+                    // GlobalLoadTypeEnum::WGP_MULTICAST_LOAD && (get_wavegroup_id() == 0)))
+                    {
+                        b_blockwise_copy.Run(
+                            b_grid_desc, b_grid_buf, b_block_desc, b_block_origin_idx, b_block_buf);
+                    }
+                    semaDataReady.template signal<SemaphoreAddressSpaceGlobal>();
+
+                    a_block_buf.SwitchBuffer();
+                    b_block_buf.SwitchBuffer();
+                    a_blockwise_copy.MoveSrcSliceWindow(a_grid_desc, a_block_copy_step);
+                    b_blockwise_copy.MoveSrcSliceWindow(b_grid_desc, b_block_copy_step);
+                    semaDataFree.template wait<0>();
+                    ++i;
+                } while(i < (num_loop - 1));
+            }
+        }
+        if(get_wave_id_in_wavegroup() == WaveIdRun)
+        {
+            // Initialize C
+            c_thread_buf.Clear();
+
+            if constexpr(HasMainLoop)
+            {
+                index_t i = 0;
+
+                do
+                {
+                    semaDataReady.template wait<0>();
+                    blockwise_gemm.Run(a_block_buf, b_block_buf, c_thread_buf);
+
+                    a_block_buf.SwitchBuffer();
+                    b_block_buf.SwitchBuffer();
+                    semaDataFree.template signal<0>();
+                    ++i;
+                } while(i < (num_loop - 1));
+            }
+
+            // tail
+            {
+                semaDataReady.template wait<0>();
+                blockwise_gemm.Run(a_block_buf, b_block_buf, c_thread_buf);
+            }
+        }
+    }
+};
 } // namespace ck
