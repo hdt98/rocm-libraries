@@ -4,6 +4,10 @@
 #pragma once
 #ifndef __HIPCC_RTC__
 #include <hip/hip_runtime.h>
+#include <hip/hip_ext.h>
+
+#include <vector>
+#include <cassert>
 
 #include "ck/ck.hpp"
 #include "ck/utility/env.hpp"
@@ -12,6 +16,8 @@
 #include "ck/host_utility/flush_cache.hpp"
 
 namespace ck {
+
+#include "hip_fix_ext.h"
 
 template <typename... Args, typename F>
 float launch_and_time_kernel(const StreamConfig& stream_config,
@@ -26,8 +32,9 @@ float launch_and_time_kernel(const StreamConfig& stream_config,
     {
         if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
         {
-            printf("%s: grid_dim {%u, %u, %u}, block_dim {%u, %u, %u} \n",
+            printf("%s: kernel %p, grid_dim {%u, %u, %u}, block_dim {%u, %u, %u} \n",
                    __func__,
+                   reinterpret_cast<void*>(kernel),
                    grid_dim.x,
                    grid_dim.y,
                    grid_dim.z,
@@ -37,48 +44,103 @@ float launch_and_time_kernel(const StreamConfig& stream_config,
 
             printf("Warm up %d times\n", stream_config.cold_niters_);
         }
-        // warm up
-        for(int i = 0; i < stream_config.cold_niters_; ++i)
+        if(!ck::EnvIsEnabled(CK_ENV(CK_NEWTIMING)))
         {
-            kernel<<<grid_dim, block_dim, lds_byte, stream_config.stream_id_>>>(args...);
-            hip_check_error(hipGetLastError());
+            // old algorithm: warm up then time nrepeat iterations and take the mean
+            // warm up
+            for(int i = 0; i < stream_config.cold_niters_; ++i)
+            {
+                kernel<<<grid_dim, block_dim, lds_byte, stream_config.stream_id_>>>(args...);
+                hip_check_error(hipGetLastError());
+            }
         }
 
         const int nrepeat = stream_config.nrepeat_;
+        assert(nrepeat > 0);
+
         if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
         {
             printf("Start running %d times...\n", nrepeat);
         }
+
         hipEvent_t start, stop;
 
         hip_check_error(hipEventCreate(&start));
         hip_check_error(hipEventCreate(&stop));
 
         hip_check_error(hipDeviceSynchronize());
-        hip_check_error(hipEventRecord(start, stream_config.stream_id_));
-
-        for(int i = 0; i < nrepeat; ++i)
+        if(!ck::EnvIsEnabled(CK_ENV(CK_NEWTIMING)))
         {
-            kernel<<<grid_dim, block_dim, lds_byte, stream_config.stream_id_>>>(args...);
-            hip_check_error(hipGetLastError());
+            hip_check_error(hipEventRecord(start, stream_config.stream_id_));
+
+            for(int i = 0; i < nrepeat; ++i)
+            {
+                kernel<<<grid_dim, block_dim, lds_byte, stream_config.stream_id_>>>(args...);
+                hip_check_error(hipGetLastError());
+            }
+
+            hip_check_error(hipEventRecord(stop, stream_config.stream_id_));
+            hip_check_error(hipEventSynchronize(stop));
+
+            float total_time = 0;
+
+            hip_check_error(hipEventElapsedTime(&total_time, start, stop));
+
+            hip_check_error(hipEventDestroy(start));
+            hip_check_error(hipEventDestroy(stop));
+
+            return total_time / nrepeat;
         }
-
-        hip_check_error(hipEventRecord(stop, stream_config.stream_id_));
-        hip_check_error(hipEventSynchronize(stop));
-
+        // New algorithm: adaptive, no warmup, return minimum
+        // Need to print all the values for stats.
+        constexpr float maxtime = 10;   // ms
+        constexpr int minrep = 2;
+        std::vector<float> times;
         float total_time = 0;
+        hip_check_error(hipDeviceSynchronize());
+        for (int i = 0; i < nrepeat; ++i)
+        {
+            myhipExtLaunchKernelGGL(kernel,
+                                    grid_dim,
+                                    block_dim,
+                                    lds_byte,
+                                    stream_config.stream_id_,
+                                    start,
+                                    stop,
+                                    0,
+                                    args...);
 
-        hip_check_error(hipEventElapsedTime(&total_time, start, stop));
+            hip_check_error(hipGetLastError());
+            hip_check_error(hipEventSynchronize(stop));
 
-        // hipEventElapsedTime can return a small negative value on Windows for a
-        // very fast kernel. Clamp to zero, as negative elapsed time is never physical.
-        if(total_time < 0)
-            total_time = 0;
+            float cur_time = 0;
+            hip_check_error(hipEventElapsedTime(&cur_time, start, stop));
+            // hipEventElapsedTime can return a small negative value on Windows for a
+            // very fast kernel. Clamp to zero, as negative elapsed time is never physical.
+            if(cur_time < 0)
+                cur_time = 0;
+            times.push_back(cur_time);
+            total_time += cur_time;
+            if(total_time >= maxtime && i + 1 >= minrep)
+                break;
+        }
+        printf("%s: kernel %p, grid_dim {%u, %u, %u}, block_dim {%u, %u, %u}, ",
+               __func__,
+               reinterpret_cast<void *>(kernel),
+               grid_dim.x,
+               grid_dim.y,
+               grid_dim.z,
+               block_dim.x,
+               block_dim.y,
+               block_dim.z);
+        printf("times {");
+        for (float t: times) printf(" %.7f", t);
+        printf("}\n");
 
         hip_check_error(hipEventDestroy(start));
         hip_check_error(hipEventDestroy(stop));
 
-        return total_time / nrepeat;
+        return total_time / times.size();
     }
     else
     {
@@ -109,8 +171,9 @@ float launch_and_time_kernel_with_preprocess(const StreamConfig& stream_config,
     {
         if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
         {
-            printf("%s: grid_dim {%u, %u, %u}, block_dim {%u, %u, %u} \n",
+            printf("%s: kernel %p, grid_dim {%u, %u, %u}, block_dim {%u, %u, %u} \n",
                    __func__,
+                   reinterpret_cast<void*>(kernel),
                    grid_dim.x,
                    grid_dim.y,
                    grid_dim.z,
@@ -120,12 +183,16 @@ float launch_and_time_kernel_with_preprocess(const StreamConfig& stream_config,
 
             printf("Warm up %d times\n", stream_config.cold_niters_);
         }
-        // warm up
-        preprocess();
-        for(int i = 0; i < stream_config.cold_niters_; ++i)
+        if(!ck::EnvIsEnabled(CK_ENV(CK_NEWTIMING)))
         {
-            kernel<<<grid_dim, block_dim, lds_byte, stream_config.stream_id_>>>(args...);
-            hip_check_error(hipGetLastError());
+            // old algorithm: warm up then time nrepeat iterations and take the mean
+            // warm up
+            preprocess();
+            for(int i = 0; i < stream_config.cold_niters_; ++i)
+            {
+                kernel<<<grid_dim, block_dim, lds_byte, stream_config.stream_id_>>>(args...);
+                hip_check_error(hipGetLastError());
+            }
         }
 
         const int nrepeat = stream_config.nrepeat_;
@@ -139,26 +206,74 @@ float launch_and_time_kernel_with_preprocess(const StreamConfig& stream_config,
         hip_check_error(hipEventCreate(&stop));
 
         hip_check_error(hipDeviceSynchronize());
-        hip_check_error(hipEventRecord(start, stream_config.stream_id_));
 
-        for(int i = 0; i < nrepeat; ++i)
+        if(!ck::EnvIsEnabled(CK_ENV(CK_NEWTIMING)))
+        {
+            hip_check_error(hipEventRecord(start, stream_config.stream_id_));
+
+            for(int i = 0; i < nrepeat; ++i)
+            {
+                preprocess();
+                kernel<<<grid_dim, block_dim, lds_byte, stream_config.stream_id_>>>(args...);
+                hip_check_error(hipGetLastError());
+            }
+
+            hip_check_error(hipEventRecord(stop, stream_config.stream_id_));
+            hip_check_error(hipEventSynchronize(stop));
+
+            float total_time = 0;
+
+            hip_check_error(hipEventElapsedTime(&total_time, start, stop));
+
+            hip_check_error(hipEventDestroy(start));
+            hip_check_error(hipEventDestroy(stop));
+
+            return total_time / nrepeat;
+        }
+        // New algorithm: adaptive, no warmup, return minimum
+        // Need to print all the values for stats.
+        constexpr float maxtime = 10;   // ms
+        constexpr int minrep = 2;
+        std::vector<float> times;
+        float total_time = 0;
+        hip_check_error(hipDeviceSynchronize());
+        for (int i = 0; i < nrepeat; ++i)
         {
             preprocess();
-            kernel<<<grid_dim, block_dim, lds_byte, stream_config.stream_id_>>>(args...);
+
+            hipExtLaunchKernelGGL(kernel,
+                                  grid_dim,
+                                  block_dim,
+                                  lds_byte,
+                                  stream_config.stream_id_,
+                                  start,
+                                  stop,
+                                  0,
+                                  args...);
             hip_check_error(hipGetLastError());
+            hip_check_error(hipEventSynchronize(stop));
+
+            float cur_time = 0;
+            hip_check_error(hipEventElapsedTime(&cur_time, start, stop));
+            times.push_back(cur_time);
+            total_time += cur_time;
+            if(total_time >= maxtime && i + 1 >= minrep)
+                break;
         }
+        printf("%s: kernel %p, grid_dim {%u, %u, %u}, block_dim {%u, %u, %u}, ",
+               __func__,
+               reinterpret_cast<void *>(kernel),
+               grid_dim.x,
+               grid_dim.y,
+               grid_dim.z,
+               block_dim.x,
+               block_dim.y,
+               block_dim.z);
+        printf("times {");
+        for (float t: times) printf(" %.7f", t);
+        printf("}\n");
 
-        hip_check_error(hipEventRecord(stop, stream_config.stream_id_));
-        hip_check_error(hipEventSynchronize(stop));
-
-        float total_time = 0;
-
-        hip_check_error(hipEventElapsedTime(&total_time, start, stop));
-
-        hip_check_error(hipEventDestroy(start));
-        hip_check_error(hipEventDestroy(stop));
-
-        return total_time / nrepeat;
+        return total_time / times.size();
     }
     else
     {
