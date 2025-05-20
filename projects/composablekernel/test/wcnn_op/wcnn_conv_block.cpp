@@ -113,7 +113,9 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
                           DilationX,
                           DilationY,
                           true,
-                          true>{AccBlockwiseOperation{}, AccBlockwiseNextOperation{}};
+                          false,
+                          true,
+                          false>{AccBlockwiseOperation{}, AccBlockwiseNextOperation{}};
     auto accum_thread_buf  = blockwise_conv.template MakeAccumThreadBuffer<false>(c);
     auto output_thread_buf = blockwise_conv.MakeOutThreadBuffer(c);
     // Data layout: HWC, unit: InDataType
