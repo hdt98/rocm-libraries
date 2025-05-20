@@ -67,7 +67,7 @@ supported_distro( )
   fi
 
   case "${ID}" in
-    ubuntu|centos|almalinux|rhel|fedora|sles|opensuse-leap|mariner|azurelinux)
+    ubuntu|centos|almalinux|rhel|rocky|fedora|sles|opensuse-leap|mariner|azurelinux)
         true
         ;;
     *)  printf "This script is currently supported on Ubuntu, CentOS, RHEL, Fedora, SLES, mariner and azurelinux\n"
@@ -211,7 +211,7 @@ install_packages( )
     fi
   fi
 
-  if [[ ( "${ID}" == "centos" ) || ( "${ID}" == "rhel" ) || ( "${ID}" == "almalinux" ) ]]; then
+  if [[ ( "${ID}" == "centos" ) || ( "${ID}" == "rhel" ) || ( "${ID}" == "rocky" ) || ( "${ID}" == "almalinux" ) ]]; then
     if [[ "${VERSION_ID}" == "6" ]]; then
       library_dependencies_centos+=( "numactl" )
     else
@@ -243,7 +243,7 @@ install_packages( )
       pip3 install wheel
       ;;
 
-    centos|rhel|almalinux)
+    centos|rhel|rocky|almalinux)
 #     yum -y update brings *all* installed packages up to date
 #     without seeking user approval
 #     elevate_if_not_root yum -y update
@@ -339,7 +339,7 @@ install_blis()
         #Download prebuilt AMD multithreaded blis
         if [[ ! -e "./blis/lib/libblis.a" ]]; then
           case "${ID}" in
-              centos|rhel|sles|opensuse-leap|almalinux)
+              centos|rhel|rocky|sles|opensuse-leap|almalinux)
                   wget -nv -O blis.tar.gz https://github.com/amd/blis/releases/download/2.0/aocl-blis-mt-centos-2.0.tar.gz
                   ;;
               ubuntu)
@@ -669,7 +669,7 @@ if [[ "${install_dependencies}" == true ]]; then
 
   # cmake is needed to install msgpack
   case "${ID}" in
-    centos|rhel|sles|opensuse-leap|almalinux)
+    centos|rhel|rocky|sles|opensuse-leap|almalinux)
       if [[ "${tensile_msgpack_backend}" == true ]]; then
         install_msgpack_from_source
       fi
@@ -893,7 +893,7 @@ pushd .
       ubuntu)
         elevate_if_not_root dpkg -i hipblaslt[-\_]*.deb
       ;;
-      centos|rhel|almalinux)
+      centos|rhel|rocky|almalinux)
         elevate_if_not_root rpm --nodeps -U hipblaslt-*.rpm
       ;;
       fedora)
