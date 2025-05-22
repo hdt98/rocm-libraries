@@ -49,6 +49,7 @@ class TestGroupedConvndBwdDataWmma : public ::testing::Test
                                false, // do_log
                                false, // time_kernel
                                param,
+                               1, // split_k
                                instance_index);
         }
         EXPECT_TRUE(pass);

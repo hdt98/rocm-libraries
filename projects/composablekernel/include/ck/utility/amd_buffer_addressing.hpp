@@ -602,7 +602,7 @@ __device__ void amd_global_atomic_add_impl(const typename vector_type<T, N>::typ
                                                       tmp.template AsType<half2_t>()[i]);
         });
     }
-#if defined(__gfx942__) || defined(__gfx950__)
+#if defined(__gfx942__) || defined(__gfx950__) || defined(__gfx12__)
     else if constexpr(is_same<T, bhalf_t>::value)
     {
         vector_type<bhalf_t, N> tmp{src_thread_data};
@@ -1496,6 +1496,7 @@ amd_tile_store_to_buffer(const typename vector_type_maker<T, N>::type::type src_
         static_assert(0, "wrong! The shape is not supported yet.");
     }
 #else
+    ignore = src_thread_data;
     ignore = in_ptr;
     ignore = dst_thread_element_valid;
     ignore = thread_id;
