@@ -27,12 +27,19 @@
 
 #pragma once
 
-#include <fmt/format.h>
-#include <fmt/ostream.h>
+// #include <fmt/format.h>
+// #include <fmt/ostream.h>
+#include "rocsolver_utility.hpp"
 
 #include "fmt_rocblas_types.hpp"
 #include "rocsolver_datatype2string.hpp"
 
+
+#ifdef USE_LIB_FMT
+#define LIB_NAMESPACE fmt
+#else
+#define LIB_NAMESPACE std
+#endif
 /***************************************************************************
  * Wrapper for types passed to logger, so we can more easily adjust the
  * default way of printing built-in types without doing it globally. (e.g.
@@ -54,7 +61,7 @@ rocsolver_logvalue<T> rocsolver_make_logvalue(T value)
     return rocsolver_logvalue<T>{value};
 }
 
-namespace fmt
+namespace LIB_NAMESPACE
 {
 /* By default, forward log values to the original printer for their type. */
 template <typename T>

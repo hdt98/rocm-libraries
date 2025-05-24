@@ -27,17 +27,24 @@
 
 #pragma once
 
-#include <fmt/format.h>
-#include <fmt/ostream.h>
+// #include <fmt/format.h>
+// #include <fmt/ostream.h>
+#include "rocsolver_utility.hpp"
 #include <rocblas/rocblas.h>
 
 /* The format function for user-defined types cannot be const before fmt v8.0
    but must be const in fmt v8.1 if the type is used in a tuple. */
+#if USE_LIB_FMT
 #if FMT_VERSION < 80000
 #define ROCSOLVER_FMT_CONST
 #else
 #define ROCSOLVER_FMT_CONST const
 #endif
+#else
+#define ROCSOLVER_FMT_CONST const
+#endif
+
+#ifdef USE_LIBFMT
 
 namespace fmt
 {
@@ -55,3 +62,4 @@ struct formatter<rocblas_complex_num<T>> : formatter<T>
     }
 };
 }
+#endif

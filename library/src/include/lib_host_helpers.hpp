@@ -30,8 +30,9 @@
 #include <cassert>
 #include <cstdlib>
 #include <cstring>
-#include <fmt/core.h>
-#include <fmt/ostream.h>
+// #include <fmt/core.h>
+// #include <fmt/ostream.h>
+#include "rocsolver_utility.hpp"
 #include <hip/hip_runtime.h>
 #include <rocblas/rocblas.h>
 
@@ -180,7 +181,7 @@ static bool is_device_pointer(void* ptr)
 
     auto istat = hipPointerGetAttributes(&dev_attributes, ptr);
     if(istat != hipSuccess)
-        fmt::print(stderr, "is_device_pointer: istat = {} {}\n", static_cast<std::int32_t>(istat),
+        rocsolver::print(stderr, "is_device_pointer: istat = {} {}\n", static_cast<std::int32_t>(istat),
                    hipGetErrorName(istat));
 
     assert(istat == hipSuccess);

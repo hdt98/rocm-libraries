@@ -38,8 +38,8 @@
 #include <unordered_map>
 #include <utility>
 
-#include <fmt/core.h>
-#include <fmt/ostream.h>
+// #include <fmt/core.h>
+// #include <fmt/ostream.h>
 #include <rocblas/rocblas.h>
 
 // Suppress warnings about hipMalloc(), hipFree() except in rocblas-test and
@@ -89,7 +89,7 @@ inline void rocblas_expect_status(rocblas_status status, rocblas_status expect)
 {
     if(status != expect)
     {
-        fmt::print(stderr, "rocBLAS status error: Expected {}, received {}\n",
+        rocsolver::print(stderr, "rocBLAS status error: Expected {}, received {}\n",
                    rocblas_status_to_string(expect), rocblas_status_to_string(status));
         if(expect == rocblas_status_success)
             exit(EXIT_FAILURE);
@@ -102,7 +102,7 @@ inline void rocblas_expect_status(rocblas_status status, rocblas_status expect)
         auto error = ERROR;                                                           \
         if(error != hipSuccess)                                                       \
         {                                                                             \
-            fmt::print(stderr, "error: {} ({}) at {}:{}\n", hipGetErrorString(error), \
+            rocsolver::print(stderr, "error: {} ({}) at {}:{}\n", hipGetErrorString(error), \
                        static_cast<int32_t>(error), __FILE__, __LINE__);              \
             rocblas_abort();                                                          \
         }                                                                             \
@@ -114,7 +114,7 @@ inline void rocblas_expect_status(rocblas_status status, rocblas_status expect)
         auto status__ = (STATUS);                                                                     \
         if(!(status__ == rocblas_status_size_increased || status__ == rocblas_status_size_unchanged)) \
         {                                                                                             \
-            fmt::print(stderr,                                                                        \
+            rocsolver::print(stderr,                                                                        \
                        "rocBLAS status error: Expected rocblas_status_size_unchanged or "             \
                        "rocblas_status_size_increase,\nreceived {}\n",                                \
                        rocblas_status_to_string(status__));                                           \

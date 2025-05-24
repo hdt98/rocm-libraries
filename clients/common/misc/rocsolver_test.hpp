@@ -41,9 +41,10 @@ namespace fs = std::filesystem;
 namespace fs = std::experimental::filesystem;
 #endif
 
-#include <fmt/core.h>
-#include <fmt/ostream.h>
-#include <fmt/ranges.h>
+// #include <fmt/core.h>
+// #include <fmt/ostream.h>
+// #include <fmt/ranges.h>
+#include "rocsolver_utility.hpp"
 #include <rocblas/rocblas.h>
 
 #ifdef ROCSOLVER_CLIENTS_TEST
@@ -52,7 +53,7 @@ namespace fs = std::experimental::filesystem;
 #define ROCSOLVER_TEST_CHECK(T, max_error, tol)
 #endif
 
-#define ROCSOLVER_FORMAT_HASH(h) fmt::format("0x{:x}", h)
+#define ROCSOLVER_FORMAT_HASH(h) rocsolver::format("0x{:x}", h)
 
 typedef enum rocsolver_inform_type_
 {
@@ -66,13 +67,13 @@ inline void rocsolver_bench_inform(rocsolver_inform_type it, size_t arg = 0)
 {
     switch(it)
     {
-    case inform_quick_return: fmt::print("Quick return...\n"); break;
-    case inform_invalid_size: fmt::print("Invalid size arguments...\n"); break;
-    case inform_invalid_args: fmt::print("Invalid value in arguments...\n"); break;
-    case inform_mem_query: fmt::print("{} bytes of device memory are required...\n", arg); break;
+    case inform_quick_return: rocsolver::print("Quick return...\n"); break;
+    case inform_invalid_size: rocsolver::print("Invalid size arguments...\n"); break;
+    case inform_invalid_args: rocsolver::print("Invalid value in arguments...\n"); break;
+    case inform_mem_query: rocsolver::print("{} bytes of device memory are required...\n", arg); break;
     }
-    fmt::print("No performance data to collect.\n");
-    fmt::print("No computations to verify.\n");
+    rocsolver::print("No performance data to collect.\n");
+    rocsolver::print("No computations to verify.\n");
     std::fflush(stdout);
 }
 
@@ -83,7 +84,7 @@ inline void format_bench_table(std::string&) {}
 template <typename T, typename... Ts>
 inline void format_bench_table(std::string& str, T arg, Ts... args)
 {
-    str += fmt::format("{:<15}", arg);
+    str += rocsolver::format("{:<15}", arg);
     if(sizeof...(Ts) > 0)
         str += ' ';
     format_bench_table(str, args...);
@@ -100,7 +101,7 @@ void rocsolver_bench_output(Ts... args)
 
 inline void rocsolver_bench_header(const char* title)
 {
-    fmt::print("\n{:=<44}\n{}\n{:=<44}\n", "", title, "");
+    rocsolver::print("\n{:=<44}\n{}\n{:=<44}\n", "", title, "");
 }
 
 inline void rocsolver_bench_endl()
@@ -132,7 +133,7 @@ public:
         : value(c)
     {
         if(c < 0x20 || c >= 0x7F)
-            throw std::invalid_argument(fmt::format(
+            throw std::invalid_argument(rocsolver::format(
                 "printable_char must be a printable ASCII character (received {:#x})", c));
     }
 

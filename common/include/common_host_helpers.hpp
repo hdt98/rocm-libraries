@@ -35,8 +35,9 @@
 #include <string>
 #include <vector>
 
-#include <fmt/core.h>
-#include <fmt/ostream.h>
+// #include <fmt/core.h>
+// #include <fmt/ostream.h>
+#include "rocsolver_utility.hpp"
 #include <hip/hip_runtime_api.h>
 
 #include "fmt_rocblas_types.hpp"
@@ -58,7 +59,7 @@ ROCSOLVER_BEGIN_NAMESPACE
     {                                                                                  \
         hipError_t _status = (expr);                                                   \
         if(_status != hipSuccess)                                                      \
-            throw std::runtime_error(fmt::format("{}:{}: [{}] {}", __FILE__, __LINE__, \
+            throw std::runtime_error(rocsolver::format("{}:{}: [{}] {}", __FILE__, __LINE__, \
                                                  hipGetErrorName(_status),             \
                                                  hipGetErrorString(_status)));         \
     } while(0)
@@ -110,7 +111,7 @@ inline void pairs_to_string(std::string& str, const char* sep)
 template <typename T1, typename T2, typename... Ts>
 void pairs_to_string(std::string& str, const char* sep, T1 arg1, T2 arg2, Ts... args)
 {
-    str += fmt::format("{} {}", arg1, arg2);
+    str += rocsolver::format("{} {}", arg1, arg2);
 
     if(sizeof...(Ts) > 0)
     {
@@ -136,7 +137,7 @@ void print_to_stream(std::ostream& os,
     std::string s;
     bool empty = name.empty();
     if(!empty)
-        s += fmt::format("{}-by-{} matrix: {}\n", m, n, name);
+        s += rocsolver::format("{}-by-{} matrix: {}\n", m, n, name);
 
     if(uplo == rocblas_fill_full)
     {
@@ -147,7 +148,7 @@ void print_to_stream(std::ostream& os,
                 s += "    ";
             for(int j = 0; j < n; j++)
             {
-                s += fmt::format("{}", A[j * lda + i * inca]);
+                s += rocsolver::format("{}", A[j * lda + i * inca]);
                 if(j < n - 1)
                     s += ", ";
             }
@@ -166,16 +167,16 @@ void print_to_stream(std::ostream& os,
                 if(uplo == rocblas_fill_upper)
                 {
                     if(i < j)
-                        s += fmt::format("{}", A[j * lda + i * inca]);
+                        s += rocsolver::format("{}", A[j * lda + i * inca]);
                     else
-                        s += fmt::format("{}", A[i * lda + j * inca]);
+                        s += rocsolver::format("{}", A[i * lda + j * inca]);
                 }
                 else
                 {
                     if(i > j)
-                        s += fmt::format("{}", A[j * lda + i * inca]);
+                        s += rocsolver::format("{}", A[j * lda + i * inca]);
                     else
-                        s += fmt::format("{}", A[i * lda + j * inca]);
+                        s += rocsolver::format("{}", A[i * lda + j * inca]);
                 }
 
                 if(j < n - 1)
@@ -358,13 +359,13 @@ void print_host_matrix(std::ostream& os,
     std::string s;
     bool empty = name.empty();
     if(!empty)
-        s += fmt::format("{}-by-{} matrix: {}\n", m, n, name);
+        s += rocsolver::format("{}-by-{} matrix: {}\n", m, n, name);
 
     for(size_t j = 0; j < n; j++)
     {
         for(size_t i = 0; i < m; i++)
         {
-            s += fmt::format("matrix  row {}, col {}, CPU result={}, GPU result={}\n", i, j,
+            s += rocsolver::format("matrix  row {}, col {}, CPU result={}, GPU result={}\n", i, j,
                              CPU_result[j * lda + i], GPU_result[j * lda + i]);
         }
     }
@@ -386,7 +387,7 @@ void print_host_matrix(std::ostream& os,
     std::string s;
     bool empty = name.empty();
     if(!empty)
-        s += fmt::format("{}-by-{} matrix: {}\n", m, n, name);
+        s += rocsolver::format("{}-by-{} matrix: {}\n", m, n, name);
 
     for(size_t j = 0; j < n; j++)
     {
@@ -394,7 +395,7 @@ void print_host_matrix(std::ostream& os,
         {
             T comp = (CPU_result[j * lda + i] - GPU_result[j * lda + i]) / CPU_result[j * lda + i];
             if(std::abs(comp) > error_tolerance)
-                s += fmt::format("matrix  row {}, col {}, CPU result={}, GPU result={}\n", i, j,
+                s += rocsolver::format("matrix  row {}, col {}, CPU result={}, GPU result={}\n", i, j,
                                  CPU_result[j * lda + i], GPU_result[j * lda + i]);
         }
     }
@@ -424,7 +425,7 @@ inline void read_matrix(const std::string filenameS,
 
     if(mat == NULL)
         throw std::invalid_argument(
-            fmt::format("Error: Could not open file {} with test data...", filename));
+            rocsolver::format("Error: Could not open file {} with test data...", filename));
 
     rewind(mat);
 
@@ -436,7 +437,7 @@ inline void read_matrix(const std::string filenameS,
             int read = fscanf(mat, "%d", &v);
             if(read != 1)
                 throw std::out_of_range(
-                    fmt::format("Error: Could not read element {},{} from file {}", i, j, filename));
+                    rocsolver::format("Error: Could not read element {},{} from file {}", i, j, filename));
             A[i + j * lda] = v;
         }
     }
@@ -444,7 +445,7 @@ inline void read_matrix(const std::string filenameS,
     if(fclose(mat) != 0)
     {
         throw std::invalid_argument(
-            fmt::format("Error: Could not close file {} with test data...", filename));
+            rocsolver::format("Error: Could not close file {} with test data...", filename));
     }
 }
 inline void read_last(const std::string filenameS, rocblas_int* A)
@@ -454,7 +455,7 @@ inline void read_last(const std::string filenameS, rocblas_int* A)
 
     if(mat == NULL)
         throw std::invalid_argument(
-            fmt::format("Error: Could not open file {} with test data...", filename));
+            rocsolver::format("Error: Could not open file {} with test data...", filename));
 
     rewind(mat);
 
@@ -469,7 +470,7 @@ inline void read_last(const std::string filenameS, rocblas_int* A)
     if(fclose(mat) != 0)
     {
         throw std::invalid_argument(
-            fmt::format("Error: Could not close file {} with test data...", filename));
+            rocsolver::format("Error: Could not close file {} with test data...", filename));
     }
 }
 
@@ -491,7 +492,7 @@ inline void read_matrix(const std::string filenameS,
 
     if(mat == NULL)
         throw std::invalid_argument(
-            fmt::format("Error: Could not open file {} with test data...", filename));
+            rocsolver::format("Error: Could not open file {} with test data...", filename));
 
     rewind(mat);
 
@@ -503,7 +504,7 @@ inline void read_matrix(const std::string filenameS,
             int read = fscanf(mat, "%g", &v);
             if(read != 1)
                 throw std::out_of_range(
-                    fmt::format("Error: Could not read element {},{} from file {}", i, j, filename));
+                    rocsolver::format("Error: Could not read element {},{} from file {}", i, j, filename));
             A[i + j * lda] = v;
         }
     }
@@ -511,7 +512,7 @@ inline void read_matrix(const std::string filenameS,
     if(fclose(mat) != 0)
     {
         throw std::invalid_argument(
-            fmt::format("Error: Could not close file {} with test data...", filename));
+            rocsolver::format("Error: Could not close file {} with test data...", filename));
     }
 }
 
@@ -532,7 +533,7 @@ inline void read_matrix(const std::string filenameS,
 
     if(mat == NULL)
         throw std::invalid_argument(
-            fmt::format("Error: Could not open file {} with test data...", filename));
+            rocsolver::format("Error: Could not open file {} with test data...", filename));
 
     rewind(mat);
 
@@ -544,7 +545,7 @@ inline void read_matrix(const std::string filenameS,
             int read = fscanf(mat, "%lg", &v);
             if(read != 1)
                 throw std::out_of_range(
-                    fmt::format("Error: Could not read element {},{} from file {}", i, j, filename));
+                    rocsolver::format("Error: Could not read element {},{} from file {}", i, j, filename));
             A[i + j * lda] = v;
         }
     }
@@ -552,7 +553,7 @@ inline void read_matrix(const std::string filenameS,
     if(fclose(mat) != 0)
     {
         throw std::invalid_argument(
-            fmt::format("Error: Could not close file {} with test data...", filename));
+            rocsolver::format("Error: Could not close file {} with test data...", filename));
     }
 }
 

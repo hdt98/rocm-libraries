@@ -29,7 +29,8 @@
 #include <cstring>
 #include <string>
 
-#include <fmt/core.h>
+//#include <fmt/core.h>
+#include "rocsolver_utility.hpp"
 #include <rocblas/rocblas.h>
 
 #include "clients_utility.hpp"
@@ -114,14 +115,14 @@ rocblas_int query_device_property()
     hipError_t status = hipGetDeviceCount(&device_count);
     if(status != hipSuccess)
     {
-        fmt::print(stderr, "Query device error: cannot get device count\n");
+        rocsolver::print(stderr, "Query device error: cannot get device count\n");
         return -1;
     }
-    fmt::print("Query device success: there are {} devices\n", device_count);
+    rocsolver::print("Query device success: there are {} devices\n", device_count);
 
     for(int i = 0;; i++)
     {
-        fmt::print("{:-<79}\n", ""); // horizontal rule
+        rocsolver::print("{:-<79}\n", ""); // horizontal rule
         if(i >= device_count)
             break;
 
@@ -129,11 +130,11 @@ rocblas_int query_device_property()
         status = hipGetDeviceProperties(&props, i);
         if(status != hipSuccess)
         {
-            fmt::print(stderr, "Query device error: cannot get device ID {}'s property\n", i);
+            rocsolver::print(stderr, "Query device error: cannot get device ID {}'s property\n", i);
             continue;
         }
 
-        fmt::print("Device ID {} : {}\nwith {:3.1f} GB memory, max. SCLK {} MHz, "
+        rocsolver::print("Device ID {} : {}\nwith {:3.1f} GB memory, max. SCLK {} MHz, "
                    "max. MCLK {} MHz, compute capability {}.{}\nmaxGridDimX {}, "
                    "sharedMemPerBlock {:3.1f} KB, maxThreadsPerBlock {}, warpSize {}\n",
                    i, props.name, props.totalGlobalMem / 1e9, int(props.clockRate / 1000),
@@ -148,5 +149,5 @@ void set_device(rocblas_int device_id)
 {
     hipError_t status = hipSetDevice(device_id);
     if(status != hipSuccess)
-        fmt::print(stderr, "Set device error: cannot set device ID {}\n", device_id);
+        rocsolver::print(stderr, "Set device error: cannot set device ID {}\n", device_id);
 }

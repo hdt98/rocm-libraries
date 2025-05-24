@@ -177,14 +177,14 @@ void csrrf_solve_initData(rocblas_handle handle,
         read_matrix(file.string(), 1, n, hpivQ.data(), 1);
 
         // read-in B
-        file = testcase / fs::path(fmt::format("B_{}", nrhs));
+        file = testcase / fs::path(rocsolver::format("B_{}", nrhs));
         read_matrix(file.string(), n, nrhs, hB.data(), ldb);
 
         // get results (matrix X) if validation is required
         if(test)
         {
             // read-in X
-            file = testcase / fs::path(fmt::format("X_{}", nrhs));
+            file = testcase / fs::path(rocsolver::format("X_{}", nrhs));
             read_matrix(file.string(), n, nrhs, hX.data(), ldb);
         }
     }
@@ -404,9 +404,9 @@ void testing_csrrf_solve(Arguments& argus)
     {
         std::string matname;
         if(mode == rocsolver_rfinfo_mode_lu)
-            matname = fmt::format("mat_{}_{}", n, nnzA);
+            matname = rocsolver::format("mat_{}_{}", n, nnzA);
         else
-            matname = fmt::format("posmat_{}_{}", n, nnzA);
+            matname = rocsolver::format("posmat_{}_{}", n, nnzA);
 
         testcase = get_sparse_data_dir() / fs::path(matname);
         fs::path file = testcase / "ptrT";

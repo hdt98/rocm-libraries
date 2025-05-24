@@ -392,7 +392,7 @@ void testing_csrrf_refactchol(Arguments& argus)
     fs::path testcase;
     if(n > 0)
     {
-        testcase = get_sparse_data_dir() / fs::path(fmt::format("posmat_{}_{}", n, nnzA));
+        testcase = get_sparse_data_dir() / fs::path(rocsolver::format("posmat_{}_{}", n, nnzA));
         fs::path fileA = testcase / "ptrA";
         read_last(fileA.string(), &nnzA);
         fs::path fileT = testcase / "ptrT";

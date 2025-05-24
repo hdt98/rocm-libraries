@@ -29,9 +29,10 @@
 
 #include <set>
 
-#include <fmt/format.h>
-#include <fmt/ostream.h>
-#include <fmt/ranges.h>
+// #include <fmt/format.h>
+// #include <fmt/ostream.h>
+// #include <fmt/ranges.h>
+#include "rocsolver_utility.hpp"
 #include <rocblas/rocblas.h>
 
 #include "program_options.hpp"
@@ -322,6 +323,6 @@ public:
     {
         if(!to_consume.empty())
             throw std::invalid_argument(
-                fmt::format("Not all arguments were consumed: {}", fmt::join(to_consume, " ")));
+                rocsolver::format("Not all arguments were consumed: {}", rocsolver::join(to_consume, " ")));
     }
 };

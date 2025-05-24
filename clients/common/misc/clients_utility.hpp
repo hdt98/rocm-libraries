@@ -35,6 +35,7 @@
 #include <vector>
 
 #include "rocblas_test.hpp"
+#include "rocsolver_utility.hpp"
 
 /*!\file
  * \brief provide common utilities
@@ -108,7 +109,7 @@ void print_strided_batched(const char* name,
 {
     // n1, n2, n3 are matrix dimensions, sometimes called m, n, batch_count
     // s1, s1, s3 are matrix strides, sometimes called 1, lda, stride_a
-    std::string s = fmt::format("----------{}----------\n", name);
+    std::string s = rocsolver::format("----------{}----------\n", name);
     int max_size = 8;
 
     for(int i3 = 0; i3 < n3 && i3 < max_size; i3++)
@@ -117,7 +118,7 @@ void print_strided_batched(const char* name,
         {
             for(int i2 = 0; i2 < n2 && i2 < max_size; i2++)
             {
-                s += fmt::format("{}|", A[(i1 * s1) + (i2 * s2) + (i3 * s3)]);
+                s += rocsolver::format("{}|", A[(i1 * s1) + (i2 * s2) + (i3 * s3)]);
             }
             s += '\n';
         }

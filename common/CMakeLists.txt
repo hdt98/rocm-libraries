@@ -27,12 +27,23 @@
 
 add_library(rocsolver-common INTERFACE)
 
+# add cmake 23 requirement
+#add_library(c++23_compiler_flags INTERFACE)
+#target_compile_features(c++23_compiler_flags INTERFACE cxx_std_23)
+#target_link_libraries(rocsolver-common PUBLIC c++23_compiler_flags)
+
+# add libstdc++ requirement
+#target_compile_options(c++23_compiler_flags INTERFACE -stdlib=libstdc++)
+# add linker requirement
+#target_link_options(c++23_compiler_flags INTERFACE -L /usr/local/gcc-15.1.0/lib64/)
+
 target_include_directories(rocsolver-common INTERFACE
   ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
 set(source_files
   common_host_helpers.cpp
+  rocsolver_aliased_formatting.cpp
 )
 prepend_path("${CMAKE_CURRENT_SOURCE_DIR}/src/" source_files source_paths)
 target_sources(rocsolver-common INTERFACE ${source_paths})

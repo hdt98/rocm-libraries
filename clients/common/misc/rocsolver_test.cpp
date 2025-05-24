@@ -28,9 +28,10 @@
 #include <cstdlib>
 #include <system_error>
 
-#include <fmt/core.h>
-#include <fmt/ostream.h>
-#include <fmt/ranges.h>
+// #include <fmt/core.h>
+// #include <fmt/ostream.h>
+// #include <fmt/ranges.h>
+#include "rocsolver_utility.hpp"
 
 #include "clients_utility.hpp"
 #include "common/misc/rocsolver_test.hpp"
@@ -55,11 +56,11 @@ fs::path get_sparse_data_dir()
         considered.push_back(exe_relative.string());
     }
 
-    fmt::print(stderr,
+    rocsolver::print(stderr,
                "Warning: default sparse data directories not found. "
                "Defaulting to current working directory.\nExecutable location: {}\n"
                "Paths considered:\n{}\n",
-               exe_path.string(), fmt::join(considered, "\n"));
+               exe_path.string(), rocsolver::join(considered, "\n"));
 
     return fs::current_path();
 }

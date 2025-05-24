@@ -103,7 +103,7 @@ void csrrf_workflow_initData(rocblas_handle handle,
         read_matrix(file.string(), 1, n, hpivQ.data(), 1);
 
         // read-in B
-        file = testcase / fs::path(fmt::format("B_{}", nrhs));
+        file = testcase / fs::path(rocsolver::format("B_{}", nrhs));
         read_matrix(file.string(), n, nrhs, hB.data(), ldb);
     }
 
@@ -329,9 +329,9 @@ void testing_csrrf_workflow(Arguments& argus)
     {
         std::string matname;
         if(analysis_mode == rocsolver_rfinfo_mode_lu)
-            matname = fmt::format("mat_{}_{}", n, nnzM);
+            matname = rocsolver::format("mat_{}_{}", n, nnzM);
         else
-            matname = fmt::format("posmat_{}_{}", n, nnzM);
+            matname = rocsolver::format("posmat_{}_{}", n, nnzM);
 
         testcase = get_sparse_data_dir() / fs::path(matname);
         fs::path fileA = testcase / "ptrA";

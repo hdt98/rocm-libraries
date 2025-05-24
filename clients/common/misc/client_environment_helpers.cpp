@@ -27,8 +27,9 @@
 
 #include <stdlib.h>
 
-#include <fmt/format.h>
-#include <fmt/ostream.h>
+// #include <fmt/format.h>
+// #include <fmt/ostream.h>
+#include "rocsolver_utility.hpp"
 
 #include "common/misc/client_environment_helpers.hpp"
 
@@ -58,7 +59,7 @@ scoped_envvar::scoped_envvar(const char* name, const char* value)
         m_old_value.emplace(old_value);
     }
     if(!set_environment_variable(name, value))
-        throw environment_error(fmt::format("failed to set {:s}={:s}", name, value));
+        throw environment_error(rocsolver::format("failed to set {:s}={:s}", name, value));
 }
 
 scoped_envvar::~scoped_envvar()

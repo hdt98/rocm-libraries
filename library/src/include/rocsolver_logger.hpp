@@ -27,9 +27,10 @@
 
 #pragma once
 
-#include <fmt/format.h>
-#include <fmt/ostream.h>
-#include <fmt/ranges.h>
+// #include <fmt/format.h>
+// #include <fmt/ostream.h>
+// #include <fmt/ranges.h>
+#include "rocsolver_utility.hpp"
 #include <forward_list>
 #include <fstream>
 #include <memory>
@@ -190,14 +191,14 @@ private:
     std::string get_func_name(const char* func_prefix, const char* func_name)
     {
         if(func_prefix)
-            return fmt::format("{}_{}{}", func_prefix, rocblas2char_precision<T>, func_name);
+            return rocsolver::format("{}_{}{}", func_prefix, rocblas2char_precision<T>, func_name);
         else
             return std::string(func_name);
     }
     std::string get_template_name(const char* func_prefix, const char* func_name)
     {
         if(func_prefix)
-            return fmt::format("{}_{}_template", func_prefix, func_name);
+            return rocsolver::format("{}_{}_template", func_prefix, func_name);
         else
             return std::string(func_name);
     }
@@ -206,8 +207,8 @@ private:
     template <typename T, typename... Ts>
     void log_bench(int level, const char* func_prefix, const char* func_name, Ts... args)
     {
-        fmt::print(*bench_os, "./rocsolver-bench -f {} -r {} {}\n", func_name,
-                   rocblas2char_precision<T>, fmt::join(std::tie(args...), " "));
+        rocsolver::print(*bench_os, "./rocsolver-bench -f {} -r {} {}\n", func_name,
+                   rocblas2char_precision<T>, rocsolver::join(std::tie(args...), " "));
         bench_os->flush();
     }
 
@@ -224,13 +225,13 @@ private:
             std::string pairs;
             pairs_to_string(pairs, ", ", args...);
 
-            trace_str += fmt::format("{: <{}}{} ({})\n", "", indent,
+            trace_str += rocsolver::format("{: <{}}{} ({})\n", "", indent,
                                      get_template_name(func_prefix, func_name), pairs);
         }
         else
         {
             trace_str
-                += fmt::format("{: <{}}{}\n", "", indent, get_template_name(func_prefix, func_name));
+                += rocsolver::format("{: <{}}{}\n", "", indent, get_template_name(func_prefix, func_name));
         }
     }
 
@@ -306,7 +307,7 @@ public:
             log_bench<T>(entry.level, func_prefix, func_name, rocsolver_make_logvalue(args)...);
 
         if(trace_enabled)
-            trace_str += fmt::format("------- ENTER {} trace tree -------\n", entry.name);
+            trace_str += rocsolver::format("------- ENTER {} trace tree -------\n", entry.name);
     }
 
     // logging function to be called before exiting a top-level (i.e. impl) function
@@ -321,7 +322,7 @@ public:
 
         if(trace_enabled)
         {
-            trace_str += fmt::format("------- EXIT {} trace tree -------\n\n", entry.name);
+            trace_str += rocsolver::format("------- EXIT {} trace tree -------\n\n", entry.name);
             *trace_os << trace_str;
             trace_str.clear();
             trace_os->flush();
