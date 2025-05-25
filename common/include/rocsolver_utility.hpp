@@ -30,25 +30,21 @@
     }
 #endif
 
-#ifdef USE_LIB_FMT
+#ifdef USE_FMT_LIB
     #include <fmt/base.h>
     #include <fmt/format.h>
     #include <fmt/ostream.h>
-	#include <fmt/ranges.h>
-	#define LIB_NAMESPACE fmt
+    #include <fmt/ranges.h>
+    #define LIB_NAMESPACE fmt
 #else
+
+    #include <ahdsaiwiakjsdjiwajidwa>
     #include <format>
     #include <print>
     #include <ostream>
     
 	#include <ranges>
 	#define LIB_NAMESPACE std
-#endif
-
-#ifdef USE_LIB_FMT
-#define LIB_NAMESPACE fmt
-#else
-#define LIB_NAMESPACE std
 #endif
 
 // Aliased printing
@@ -130,11 +126,17 @@ void print(LIB_NAMESPACE::format_string<Args...> fmt, Args&&... args){
 
 template<class... Args>
 void print(FILE* stream, LIB_NAMESPACE::format_string<Args...> fmt, Args&&... args){
+	#ifdef USE_FMT_LIB
+	LIB_NAMESPACE::print(stream, "meow!!!\n");
+	#endif
 	LIB_NAMESPACE::print(stream, fmt, std::forward<Args>(args)...);
 }
 
 template<class... Args>
 void print(std::ostream& stream, LIB_NAMESPACE::format_string<Args...> fmt, Args&&... args){
+	#ifdef USE_FMT_LIB
+	LIB_NAMESPACE::print(stream, "meow!!!\n");
+	#endif
 	LIB_NAMESPACE::print(stream, fmt, std::forward<Args>(args)...);
 }
 

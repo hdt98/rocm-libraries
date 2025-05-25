@@ -28,15 +28,29 @@
 add_library(rocsolver-common INTERFACE)
 
 # add cmake 23 requirement
-add_library(c++23_compiler_flags INTERFACE)
-target_compile_features(c++23_compiler_flags INTERFACE cxx_std_23)
-target_link_libraries(rocsolver-common INTERFACE c++23_compiler_flags)
-
-# add libstdc++ requirement
-target_compile_options(c++23_compiler_flags INTERFACE -stdlib=libstdc++)
-# add linker requirement TODO: users using c++23 need to link this manually if the compiler can't find it automatically
-target_link_options(c++23_compiler_flags INTERFACE -L /usr/local/gcc-15.1.0/lib64/)
-
+if (NOT USE_FMT_LIB)
+   # add an interface target for specifying higher c++ standard required
+   add_library(c++23_compiler_flags INTERFACE)
+   target_compile_features(c++23_compiler_flags INTERFACE cxx_std_23)
+   target_link_libraries(rocsolver-common INTERFACE c++23_compiler_flags)
+   # add libstdc++ requirement
+   target_compile_options(c++23_compiler_flags INTERFACE -stdlib=libstdc++)
+   # add linker requirement TODO: users using c++23 need to link this manually if the compiler can't find it automatically
+   target_link_options(c++23_compiler_flags INTERFACE -L /usr/local/gcc-15.1.0/lib64/)
+else()   
+   # add preprocessor definition for aliased printing
+   target_compile_definitions(rocsolver-common INTERFACE USE_FMT_LIB)
+   find_package(fmt REQUIRED)
+   if (fmt_FOUND)
+      message(STATUS "fmt library found")
+   endif()
+   if(ROCSOLVER_EMBED_FMT)
+	   target_link_libraries(rocsolver-common INTERFACE $<BUILD_INTERFACE:fmt::fmt-header-only>)
+   else()
+      list(APPEND static_depends PACKAGE fmt)
+      target_link_libraries(rocsolver-common INTERFACE fmt::fmt)
+   endif()
+endif()
 target_include_directories(rocsolver-common INTERFACE
   ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
