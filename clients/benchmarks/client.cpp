@@ -27,7 +27,7 @@
 // #include <fmt/core.h>
 // #include <fmt/ostream.h>
 
-#include "common/include/rocsolver_utility.hpp"
+#include "rocsolver_utility.hpp"
 #include "common/misc/program_options.hpp"
 #include "common/misc/rocsolver_dispatcher.hpp"
 

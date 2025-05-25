@@ -1,6 +1,5 @@
-#add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-L /usr/local/gcc-15.1.0/lib64/")
-add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-std=c++23>")
-add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-stdlib=libstdc++>")
+# TODO: the user must specify this manually if using c++23 and the linker cannot find it manually
+# TODO: why does this have to be duplicated twice?
 add_link_options(-L /usr/local/gcc-15.1.0/lib64/)
 if (DEFINED ENV{ROCM_PATH})
   set(rocm_bin "$ENV{ROCM_PATH}/bin")

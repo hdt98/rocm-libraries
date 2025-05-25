@@ -50,7 +50,7 @@ message(STATUS "Using CMake ${CMAKE_VERSION}")
 
 project(rocsolver LANGUAGES CXX C)
 
-set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -68,9 +68,6 @@ option(USE_FMT_LIB "Use libfmt for string formatting and printing" OFF)
 if(USE_FMT_LIB)
   find_package(fmt REQUIRED)
 endif()
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++23 -stdlib=libstdc++")
-add_compile_options(-stdlib=libstdc++)
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -stdlib=libstdc++")
 
 
 set(THREADS_PREFER_PTHREAD_FLAG ON)

@@ -92,6 +92,33 @@
 	    }
 
     };
+
+    template<typename... T, typename CharT>
+    struct LIB_NAMESPACE::formatter<joinable_range<std::tuple<T...>>, CharT>{
+	    constexpr auto parse(std::format_parse_context& ctx){
+		auto it = ctx.begin();
+		auto end = ctx.end();
+
+		if (it != ctx.end() && *it != '}')
+			throw std::format_error("Invalid format args provided for rocsolver::join. The format string '{}' must be used. \n \
+					The joinable_range type should be privately used by rocsolver::join.");
+
+		return it;
+	    }
+
+	    template<typename FormatContext>
+	    auto format(const joinable_range<std::tuple<T...>>& jr, FormatContext& ctx) const {
+		std::string result = "";
+    		std::apply([&](auto&&... args){
+		      size_t i = 0;
+		      ((result += std::format("{}", args),
+		        i != sizeof...(args) - 1 ? result += jr.sep : result += ""), ...);
+		    }, jr.range);
+		result += "";
+		return std::format_to(ctx.out(), "{}", result);
+	    }
+
+    };
 #endif
 
 ROCSOLVER_BEGIN_NAMESPACE
@@ -123,32 +150,6 @@ std::string join(Range&& r, std::string_view sep){
 	#else
 	joinable_range range{r, sep};
 	return LIB_NAMESPACE::format("{}", range);
-	#endif
-}
-/*
-template<typename T>
-concept TupleType = std::is_tuple_v<T>;
-
-template <TupleType T>
-std::string join(T&& tup, std::string_view sep){
-	#ifdef USE_FMT_LIB
-	return LIB_NAMESAPCE::join(tup, sep);
-	#else
-	LIB_NAMESPACE::formatter<T> formatter;
-	formatter.set_separator(sep);
-	return LIB_NAMESPACE::format("{}", tup);
-	#endif
-}
-*/
-
-template<class... Args>
-std::string join(std::tuple<Args...>&& tup, std::string_view sep){
-	#ifdef USE_FMT_LIB
-	return LIB_NAMESAPCE::join(tup, sep);
-	#else
-	LIB_NAMESPACE::formatter<std::tuple<Args...>> formatter;
-	formatter.set_separator(sep);
-	return LIB_NAMESPACE::format("{}", tup);
 	#endif
 }
 ROCSOLVER_END_NAMESPACE
