@@ -2,7 +2,7 @@
 
 #include <rocblas/rocblas.h>
 
-#ifdef USE_LIB_FMT
+#ifdef USE_FMT_LIB
 #include <fmt/format.h>
 #include <fmt/ostream.h>
 #if FMT_VERSION < 80000
@@ -10,20 +10,18 @@
 #else
 #define ROCSOLVER_FMT_CONST const
 #endif
-#define BEGIN_CONDITIONAL_NAMESPACE						\
-namespace fmt                                                			\
-    {                                                                   
-#define END_CONDITIONAL_NAMESPACE						\
-   }								
-#else 
-#include <print>
+#define BEGIN_CONDITIONAL_NAMESPACE \
+    namespace fmt                   \
+    {
+#define END_CONDITIONAL_NAMESPACE }
+#else
 #include <format>
+#include <print>
 #define ROCSOLVER_FMT_CONST const
-#define BEGIN_CONDITIONAL_NAMESPACE						\
-namespace std                                                			\
-    {                                                                   
-#define END_CONDITIONAL_NAMESPACE						\
-   }	
+#define BEGIN_CONDITIONAL_NAMESPACE \
+    namespace std                   \
+    {
+#define END_CONDITIONAL_NAMESPACE }
 #endif
 
 /* The format function for user-defined types cannot be const before fmt v8.0

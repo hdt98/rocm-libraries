@@ -54,7 +54,7 @@ double get_time_us()
 #ifdef ROCSOLVER_LIBRARY
     if(status != hipSuccess)
         rocsolver::print(std::cerr, "{}: [{}] {}\n", __PRETTY_FUNCTION__, hipGetErrorName(status),
-                   hipGetErrorString(status));
+                         hipGetErrorString(status));
 #else
     THROW_IF_HIP_ERROR(status);
 #endif
@@ -69,7 +69,7 @@ double get_time_us_sync(hipStream_t stream)
 #ifdef ROCSOLVER_LIBRARY
     if(status != hipSuccess)
         rocsolver::print(std::cerr, "{}: [{}] {}\n", __PRETTY_FUNCTION__, hipGetErrorName(status),
-                   hipGetErrorString(status));
+                         hipGetErrorString(status));
 #else
     THROW_IF_HIP_ERROR(status);
 #endif

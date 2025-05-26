@@ -35,7 +35,7 @@
 #include "rocsolver_datatype2string.hpp"
 
 
-#ifdef USE_LIB_FMT
+#ifdef USE_FMT_LIB 
 #define LIB_NAMESPACE fmt
 #else
 #define LIB_NAMESPACE std

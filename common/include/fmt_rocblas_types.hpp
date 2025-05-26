@@ -34,7 +34,7 @@
 
 /* The format function for user-defined types cannot be const before fmt v8.0
    but must be const in fmt v8.1 if the type is used in a tuple. */
-#if USE_LIB_FMT
+#if USE_FMT_LIB
 #if FMT_VERSION < 80000
 #define ROCSOLVER_FMT_CONST
 #else

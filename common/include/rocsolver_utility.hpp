@@ -31,127 +31,166 @@
 #endif
 
 #ifdef USE_FMT_LIB
-    #include <fmt/base.h>
-    #include <fmt/format.h>
-    #include <fmt/ostream.h>
-    #include <fmt/ranges.h>
-    #define LIB_NAMESPACE fmt
+#include <fmt/format.h>
+#include <fmt/ostream.h>
+#include <fmt/ranges.h>
+#define LIB_NAMESPACE fmt
 #else
+#include <format>
+#include <ostream>
+#include <print>
 
-    #include <ahdsaiwiakjsdjiwajidwa>
-    #include <format>
-    #include <print>
-    #include <ostream>
-    
-	#include <ranges>
-	#define LIB_NAMESPACE std
+#include <ranges>
+#define LIB_NAMESPACE std
 #endif
 
 // Aliased printing
 #ifndef USE_FMT_LIB
-    template<typename Range>
-    struct joinable_range{
-	const Range& range;
-	const std::string_view sep;
-    };
+template <typename Range>
+struct joinable_range
+{
+    const Range& range;
+    const std::string_view sep;
+};
 
-    template<typename Range, typename CharT>
-    struct LIB_NAMESPACE::formatter<joinable_range<Range>, CharT>{
-	    constexpr auto parse(std::format_parse_context& ctx){
-		auto it = ctx.begin();
-		auto end = ctx.end();
+template <typename Range, typename CharT>
+struct LIB_NAMESPACE::formatter<joinable_range<Range>, CharT>
+{
+    constexpr auto parse(std::format_parse_context& ctx)
+    {
+        auto it = ctx.begin();
+        auto end = ctx.end();
 
-		if (it != ctx.end() && *it != '}')
-			throw std::format_error("Invalid format args provided for rocsolver::join. The format string '{}' must be used. \n \
+        if(it != ctx.end() && *it != '}')
+            throw std::format_error(
+                "Invalid format args provided for rocsolver::join. The format string '{}' must be used. \n \
 					The joinable_range type should be privately used by rocsolver::join.");
 
-		return it;
-	    }
+        return it;
+    }
 
-	    template<typename FormatContext>
-	    auto format(const joinable_range<Range>& jr, FormatContext& ctx) const {
-		auto it = std::begin(jr.range);
-		auto end = std::end(jr.range);
+    template <typename FormatContext>
+    auto format(const joinable_range<Range>& jr, FormatContext& ctx) const
+    {
+        auto it = std::begin(jr.range);
+        auto end = std::end(jr.range);
 
-		auto out = ctx.out();
-		if (it != end){
-			out = std::format_to(out, "{}", *it);
-			++it;
-		}
+        auto out = ctx.out();
+        if(it != end)
+        {
+            out = std::format_to(out, "{}", *it);
+            ++it;
+        }
 
-		for (;it != end; ++it){
-			out = std::format_to(out, "{}", jr.sep);
-			out = std::format_to(out, "{}", *it);
-		}
+        for(; it != end; ++it)
+        {
+            out = std::format_to(out, "{}", jr.sep);
+            out = std::format_to(out, "{}", *it);
+        }
 
-		return out;
-	    }
+        return out;
+    }
+};
 
-    };
+template <typename... T, typename CharT>
+struct LIB_NAMESPACE::formatter<joinable_range<std::tuple<T...>>, CharT>
+{
+    constexpr auto parse(std::format_parse_context& ctx)
+    {
+        auto it = ctx.begin();
+        auto end = ctx.end();
 
-    template<typename... T, typename CharT>
-    struct LIB_NAMESPACE::formatter<joinable_range<std::tuple<T...>>, CharT>{
-	    constexpr auto parse(std::format_parse_context& ctx){
-		auto it = ctx.begin();
-		auto end = ctx.end();
-
-		if (it != ctx.end() && *it != '}')
-			throw std::format_error("Invalid format args provided for rocsolver::join. The format string '{}' must be used. \n \
+        if(it != ctx.end() && *it != '}')
+            throw std::format_error(
+                "Invalid format args provided for rocsolver::join. The format string '{}' must be used. \n \
 					The joinable_range type should be privately used by rocsolver::join.");
 
-		return it;
-	    }
+        return it;
+    }
 
-	    template<typename FormatContext>
-	    auto format(const joinable_range<std::tuple<T...>>& jr, FormatContext& ctx) const {
-		std::string result = "";
-    		std::apply([&](auto&&... args){
-		      size_t i = 0;
-		      ((result += std::format("{}", args),
-		        i != sizeof...(args) - 1 ? result += jr.sep : result += ""), ...);
-		    }, jr.range);
-		result += "";
-		return std::format_to(ctx.out(), "{}", result);
-	    }
-
-    };
+    template <typename FormatContext>
+    auto format(const joinable_range<std::tuple<T...>>& jr, FormatContext& ctx) const
+    {
+        std::string result = "";
+        std::apply(
+            [&](auto&&... args) {
+                size_t i = 0;
+                ((result += std::format("{}", args),
+                  i != sizeof...(args) - 1 ? result += jr.sep : result += ""),
+                 ...);
+            },
+            jr.range);
+        result += "";
+        return std::format_to(ctx.out(), "{}", result);
+    }
+};
 #endif
 
 ROCSOLVER_BEGIN_NAMESPACE
 
-template<class... Args>
-void print(LIB_NAMESPACE::format_string<Args...> fmt, Args&&... args){
-	LIB_NAMESPACE::print(fmt, std::forward<Args>(args)...);
+#ifndef USE_FMT_LIB
+template <class... Args>
+void print(LIB_NAMESPACE::format_string<Args...> fmt_string, Args&&... args)
+{
+    LIB_NAMESPACE::print(fmt_string, std::forward<Args>(args)...);
 }
 
-template<class... Args>
-void print(FILE* stream, LIB_NAMESPACE::format_string<Args...> fmt, Args&&... args){
-	#ifdef USE_FMT_LIB
-	LIB_NAMESPACE::print(stream, "meow!!!\n");
-	#endif
-	LIB_NAMESPACE::print(stream, fmt, std::forward<Args>(args)...);
+template <class... Args>
+void print(FILE* stream, LIB_NAMESPACE::format_string<Args...> fmt_string, Args&&... args)
+{
+    //	#ifdef USE_FMT_LIB
+    //	LIB_NAMESPACE::print(stream, "meow!!!\n");
+    //	#endif
+    LIB_NAMESPACE::print(stream, fmt_string, std::forward<Args>(args)...);
 }
 
-template<class... Args>
-void print(std::ostream& stream, LIB_NAMESPACE::format_string<Args...> fmt, Args&&... args){
-	#ifdef USE_FMT_LIB
-	LIB_NAMESPACE::print(stream, "meow!!!\n");
-	#endif
-	LIB_NAMESPACE::print(stream, fmt, std::forward<Args>(args)...);
+template <class... Args>
+void print(std::ostream& stream, LIB_NAMESPACE::format_string<Args...> fmt_string, Args&&... args)
+{
+    //	#ifdef USE_FMT_LIB
+    //	LIB_NAMESPACE::print(stream, "meow!!!\n");
+    //	#endif
+    LIB_NAMESPACE::print(stream, fmt_string, std::forward<Args>(args)...);
 }
 
-template<class... Args>
-std::string format(LIB_NAMESPACE::format_string<Args...> fmt, Args&&... args){
-	return LIB_NAMESPACE::format(fmt, std::forward<Args>(args)...);
+template <class... Args>
+std::string format(LIB_NAMESPACE::format_string<Args...> fmt_string, Args&&... args)
+{
+    return LIB_NAMESPACE::format(fmt_string, std::forward<Args>(args)...);
+}
+#else
+
+template <class T, class... Args>
+void print(T&& fmt_string, Args&&... args)
+{
+	LIB_NAMESPACE::print(std::forward<T>(fmt_string), std::forward<Args>(args)...);
 }
 
+template <class T, class... Args>
+void print(FILE* stream, T&& fmt_string, Args&&... args)
+{
+	LIB_NAMESPACE::print(stream, std::forward<T>(fmt_string), std::forward<Args>(args)...);
+}
+
+template <class T, class... Args>
+void print(std::ostream& stream, T&& fmt_string, Args&&... args)
+{
+	LIB_NAMESPACE::print(stream, std::forward<T>(fmt_string), std::forward<Args>(args)...);
+}
+
+template<class T, class... Args>
+std::string format(T&& fmt_string, Args&&... args){
+	return LIB_NAMESPACE::format(std::forward<T>(fmt_string), std::forward<Args>(args)...);
+}
+#endif
 template <typename Range>
-std::string join(Range&& r, std::string_view sep){
-    #ifdef USE_FMT_LIB
-	return LIB_NAMESPACE::join(r, sep);
-	#else
-	joinable_range range{r, sep};
-	return LIB_NAMESPACE::format("{}", range);
-	#endif
+std::string join(Range&& r, std::string_view sep)
+{
+#ifdef USE_FMT_LIB
+    return LIB_NAMESPACE::format("{}", LIB_NAMESPACE::join(r, sep));
+#else
+    joinable_range range{r, sep};
+    return LIB_NAMESPACE::format("{}", range);
+#endif
 }
 ROCSOLVER_END_NAMESPACE

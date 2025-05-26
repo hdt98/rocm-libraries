@@ -40,14 +40,15 @@ if (NOT USE_FMT_LIB)
 else()   
    # add preprocessor definition for aliased printing
    target_compile_definitions(rocsolver-common INTERFACE USE_FMT_LIB)
-   find_package(fmt REQUIRED)
-   if (fmt_FOUND)
-      message(STATUS "fmt library found")
-   endif()
+   #   find_package(fmt REQUIRED)
+   #   if (fmt_FOUND)
+	   #      message(STATUS "fmt library found")
+      #   endif()
    if(ROCSOLVER_EMBED_FMT)
-	   target_link_libraries(rocsolver-common INTERFACE $<BUILD_INTERFACE:fmt::fmt-header-only>)
+      target_link_libraries(rocsolver-common INTERFACE fmt::fmt-header-only)
+	   #target_link_libraries(rocsolver-common INTERFACE $<BUILD_INTERFACE:fmt::fmt-header-only>)
    else()
-      list(APPEND static_depends PACKAGE fmt)
+	   #      list(APPEND static_depends PACKAGE fmt)
       target_link_libraries(rocsolver-common INTERFACE fmt::fmt)
    endif()
 endif()
@@ -57,7 +58,6 @@ target_include_directories(rocsolver-common INTERFACE
 
 set(source_files
   common_host_helpers.cpp
-  rocsolver_aliased_formatting.cpp
 )
 prepend_path("${CMAKE_CURRENT_SOURCE_DIR}/src/" source_files source_paths)
 target_sources(rocsolver-common INTERFACE ${source_paths})

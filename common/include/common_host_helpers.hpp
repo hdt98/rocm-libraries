@@ -54,14 +54,14 @@ ROCSOLVER_BEGIN_NAMESPACE
  * ===========================================================================
  */
 
-#define THROW_IF_HIP_ERROR(expr)                                                       \
-    do                                                                                 \
-    {                                                                                  \
-        hipError_t _status = (expr);                                                   \
-        if(_status != hipSuccess)                                                      \
+#define THROW_IF_HIP_ERROR(expr)                                                             \
+    do                                                                                       \
+    {                                                                                        \
+        hipError_t _status = (expr);                                                         \
+        if(_status != hipSuccess)                                                            \
             throw std::runtime_error(rocsolver::format("{}:{}: [{}] {}", __FILE__, __LINE__, \
-                                                 hipGetErrorName(_status),             \
-                                                 hipGetErrorString(_status)));         \
+                                                       hipGetErrorName(_status),             \
+                                                       hipGetErrorString(_status)));         \
     } while(0)
 
 /* =============================================================================================== */
@@ -366,7 +366,7 @@ void print_host_matrix(std::ostream& os,
         for(size_t i = 0; i < m; i++)
         {
             s += rocsolver::format("matrix  row {}, col {}, CPU result={}, GPU result={}\n", i, j,
-                             CPU_result[j * lda + i], GPU_result[j * lda + i]);
+                                   CPU_result[j * lda + i], GPU_result[j * lda + i]);
         }
     }
     s += '\n';
@@ -395,8 +395,8 @@ void print_host_matrix(std::ostream& os,
         {
             T comp = (CPU_result[j * lda + i] - GPU_result[j * lda + i]) / CPU_result[j * lda + i];
             if(std::abs(comp) > error_tolerance)
-                s += rocsolver::format("matrix  row {}, col {}, CPU result={}, GPU result={}\n", i, j,
-                                 CPU_result[j * lda + i], GPU_result[j * lda + i]);
+                s += rocsolver::format("matrix  row {}, col {}, CPU result={}, GPU result={}\n", i,
+                                       j, CPU_result[j * lda + i], GPU_result[j * lda + i]);
         }
     }
     s += '\n';
@@ -436,8 +436,8 @@ inline void read_matrix(const std::string filenameS,
             rocblas_int v;
             int read = fscanf(mat, "%d", &v);
             if(read != 1)
-                throw std::out_of_range(
-                    rocsolver::format("Error: Could not read element {},{} from file {}", i, j, filename));
+                throw std::out_of_range(rocsolver::format(
+                    "Error: Could not read element {},{} from file {}", i, j, filename));
             A[i + j * lda] = v;
         }
     }
@@ -503,8 +503,8 @@ inline void read_matrix(const std::string filenameS,
             float v;
             int read = fscanf(mat, "%g", &v);
             if(read != 1)
-                throw std::out_of_range(
-                    rocsolver::format("Error: Could not read element {},{} from file {}", i, j, filename));
+                throw std::out_of_range(rocsolver::format(
+                    "Error: Could not read element {},{} from file {}", i, j, filename));
             A[i + j * lda] = v;
         }
     }
@@ -544,8 +544,8 @@ inline void read_matrix(const std::string filenameS,
             double v;
             int read = fscanf(mat, "%lg", &v);
             if(read != 1)
-                throw std::out_of_range(
-                    rocsolver::format("Error: Could not read element {},{} from file {}", i, j, filename));
+                throw std::out_of_range(rocsolver::format(
+                    "Error: Could not read element {},{} from file {}", i, j, filename));
             A[i + j * lda] = v;
         }
     }

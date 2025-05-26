@@ -47,13 +47,7 @@
     }
 #endif
 
-
-
-
 // ROCSOLVER_BEGIN_NAMESPACE
-
-
-
 
 // template<class... Args>
 // void print(LIB_NAMESPACE::format_string<Args...> fmt, Args&&... args){
@@ -69,7 +63,6 @@
 // std::string format(LIB_NAMESPACE::format_string<Args...> fmt, Args&&... args){
 // 	return LIB_NAMESPACE::format(fmt, std::forward<Args>(args)...);
 // }
-
 
 // template <typename Range>
 // std::string join(Range& r, std::string_view sep){
