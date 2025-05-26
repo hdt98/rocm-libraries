@@ -178,6 +178,9 @@ namespace
                     name << "_GSU" << (int)arg.gsu_vector[0];
                 if(arg.wgm_vector[0])
                     name << "_WGM" << (int)arg.wgm_vector[0];
+
+                if(arg.HMM)
+                    name << "_HMM";
             }
 
             return std::move(name);

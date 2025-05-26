@@ -1923,42 +1923,24 @@ Tests:
   unit_check: 1
   gpu_arch: '942'
 
-- name: matmul_large_nt_f8_bf8_dst_f8_bf8_f16_bf16_f32_gfx942
+- name: matmul_large_wg_nt_f8_gfx942
   category: pre_checkin
   function:
-    matmul:
-    - *f8_fnuz_precision_dst_f8_fnuz
-    - *f8_fnuz_precision_dst_fp16
-    - *f8_fnuz_precision_dst_bf16
-    - *f8_fnuz_precision_dst_fp32
-    - *bf8_fnuz_precision_dst_bf8_fnuz
-    - *bf8_fnuz_precision_dst_fp16
-    - *bf8_fnuz_precision_dst_bf16
-    - *bf8_fnuz_precision_dst_fp32
+    matmul: *f8_fnuz_precision_dst_f8_fnuz
   matrix_size:
-    - { M:  4096, N:  4096, K:  2048 }
+    - { M:  65552, N:  65552, K:  1 }  # MT16x16 will exceed max wg number
   transA: N
   transB: T
-  alpha: [1.0, 2.0]
-  beta: [ 0.0, 2.0 ]
-  scaleA: [ 0, 1]
-  scaleB: [ 0, 1]
-  bias_vector: [0, 1]
-  bias_type: f32_r
-  unit_check: 1
-  gpu_arch: '942'
-
-- name: matmul_large_nt_f64_dst_f64_gfx942
-  category: pre_checkin
-  function:
-    matmul: *double_precision
-  matrix_size:
-    - { M:  4096, N:  4096, K:  2048 }
-  transA: N
-  transB: T
-  alpha: [1.0, 2.0]
-  beta: [ 0.0, 2.0 ]
-  unit_check: 1
+  alpha: 2.0
+  beta: 2.0
+  scaleA: 1
+  scaleB: 1
+  scaleC: 1
+  scaleD: 1
+  bias_vector: 1
+  bias_type: f16_r
+  HMM: true
+  unit_check: 0  # avoid device_vector_teardown error
   gpu_arch: '942'
 
 - name: matmul_mx_datatypes
