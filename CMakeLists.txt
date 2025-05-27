@@ -64,7 +64,7 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 # Configure which formatting dependency to use
 
 option(ROCSOLVER_EMBED_FMT "Hide libfmt symbols" ON)
-option(USE_FMT_LIB "Use libfmt for string formatting and printing" ON)
+option(USE_FMT_LIB "Use libfmt for string formatting and printing" OFF)
 if(USE_FMT_LIB)
   find_package(fmt REQUIRED)
 endif()

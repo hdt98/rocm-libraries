@@ -116,7 +116,7 @@ struct LIB_NAMESPACE::formatter<joinable_range<std::tuple<T...>>, CharT>
             [&](auto&&... args) {
                 size_t i = 0;
                 ((result += std::format("{}", args),
-                  i != sizeof...(args) - 1 ? result += jr.sep : result += ""),
+                  ++i != sizeof...(args) ? result += jr.sep : result += ""),
                  ...);
             },
             jr.range);
