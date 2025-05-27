@@ -42,8 +42,6 @@ body:
     label: CPU
     description: What CPU did you encounter the issue on?
     placeholder: "e.g. AMD Ryzen 9 5900HX with Radeon Graphics"
-  validations:
-    required: true
 
 - type: dropdown
   attributes:
@@ -82,8 +80,6 @@ body:
         - AMD Radeon RX 6600 XT
         - AMD Radeon RX 6600
         - Other
-  validations:
-    required: true
 
 - type: input
   attributes:
@@ -113,11 +109,6 @@ body:
     - ROCm 6.1.0
     - ROCm 6.0.2
     - ROCm 6.0.0
-    - ROCm 5.7.1
-    - ROCm 5.7.0
-    - ROCm 5.6.0
-    - ROCm 5.5.1
-    - ROCm 5.5.0
   validations:
     required: true
 
@@ -129,24 +120,24 @@ body:
     options:
       - Other
       - CI/CD
-      - composable_kernel
-      - hipBLAS-common
-      - hipBLAS
-      - hipBLASlt
-      - hipCUB
-      - hipFFT
-      - hipRAND
-      - hipSOLVER
-      - hipSPARSE
-      - hipSPARSElt
-      - MIOpen
-      - rocBLAS
-      - rocFFT
-      - rocPRIM
-      - rocRAND
-      - rocSOLVER
-      - rocSPARSE
-      - rocThrust
+      - composablekernel
+      - hipblas-common
+      - hipblas
+      - hipblaslt
+      - hipcub
+      - hipfft
+      - hiprand
+      - hipsolver
+      - hipsparse
+      - hipsparselt
+      - miopen
+      - rocblas
+      - rocfft
+      - rocprim
+      - rocrand
+      - rocsolver
+      - rocsparse
+      - rocthrust
 
 - type: textarea
   attributes:
