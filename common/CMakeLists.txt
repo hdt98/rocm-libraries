@@ -1,5 +1,5 @@
 # ##########################################################################
-# Copyright (C) 2021-2024 Advanced Micro Devices, Inc. All rights reserved.
+# Copyright (C) 2021-2025 Advanced Micro Devices, Inc. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -35,9 +35,7 @@ if (NOT USE_FMT_LIB)
    target_link_libraries(rocsolver-common INTERFACE c++23_compiler_flags)
    # add libstdc++ requirement
    target_compile_options(c++23_compiler_flags INTERFACE -stdlib=libstdc++)
-   # add linker requirement TODO: users using c++23 need to link this manually if the compiler can't find it automatically
-   target_link_options(c++23_compiler_flags INTERFACE -L /usr/local/gcc-15.1.0/lib64/)
-else()   
+else()
    # add preprocessor definition for aliased printing
    target_compile_definitions(rocsolver-common INTERFACE USE_FMT_LIB)
    if(ROCSOLVER_EMBED_FMT)
