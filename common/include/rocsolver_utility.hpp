@@ -96,67 +96,69 @@ struct std::formatter<joinable_range<std::tuple<T...>>, CharT>
 };
 #endif
 
-namespace rocsolver{
-	namespace formatting{
-
+namespace rocsolver
+{
+namespace formatting
+{
 #ifndef USE_FMT_LIB
-template <class... Args>
-void print(std::format_string<Args...> fmt_string, Args&&... args)
-{
-    std::print(fmt_string, std::forward<Args>(args)...);
-}
+    template <class... Args>
+    void print(std::format_string<Args...> fmt_string, Args&&... args)
+    {
+        std::print(fmt_string, std::forward<Args>(args)...);
+    }
 
-template <class... Args>
-void print(FILE* stream, std::format_string<Args...> fmt_string, Args&&... args)
-{
-    std::print(stream, fmt_string, std::forward<Args>(args)...);
-}
+    template <class... Args>
+    void print(FILE* stream, std::format_string<Args...> fmt_string, Args&&... args)
+    {
+        std::print(stream, fmt_string, std::forward<Args>(args)...);
+    }
 
-template <class... Args>
-void print(std::ostream& stream, std::format_string<Args...> fmt_string, Args&&... args)
-{
-    std::print(stream, fmt_string, std::forward<Args>(args)...);
-}
+    template <class... Args>
+    void print(std::ostream& stream, std::format_string<Args...> fmt_string, Args&&... args)
+    {
+        std::print(stream, fmt_string, std::forward<Args>(args)...);
+    }
 
-template <class... Args>
-std::string format(std::format_string<Args...> fmt_string, Args&&... args)
-{
-    return std::format(fmt_string, std::forward<Args>(args)...);
-}
+    template <class... Args>
+    std::string format(std::format_string<Args...> fmt_string, Args&&... args)
+    {
+        return std::format(fmt_string, std::forward<Args>(args)...);
+    }
 #else
 
-template <class T, class... Args>
-void print(T&& fmt_string, Args&&... args)
-{
-	fmt::print(std::forward<T>(fmt_string), std::forward<Args>(args)...);
-}
+    template <class T, class... Args>
+    void print(T&& fmt_string, Args&&... args)
+    {
+        fmt::print(std::forward<T>(fmt_string), std::forward<Args>(args)...);
+    }
 
-template <class T, class... Args>
-void print(FILE* stream, T&& fmt_string, Args&&... args)
-{
-	fmt::print(stream, std::forward<T>(fmt_string), std::forward<Args>(args)...);
-}
+    template <class T, class... Args>
+    void print(FILE* stream, T&& fmt_string, Args&&... args)
+    {
+        fmt::print(stream, std::forward<T>(fmt_string), std::forward<Args>(args)...);
+    }
 
-template <class T, class... Args>
-void print(std::ostream& stream, T&& fmt_string, Args&&... args)
-{
-	fmt::print(stream, std::forward<T>(fmt_string), std::forward<Args>(args)...);
-}
+    template <class T, class... Args>
+    void print(std::ostream& stream, T&& fmt_string, Args&&... args)
+    {
+        fmt::print(stream, std::forward<T>(fmt_string), std::forward<Args>(args)...);
+    }
 
-template<class T, class... Args>
-std::string format(T&& fmt_string, Args&&... args){
-	return fmt::format(std::forward<T>(fmt_string), std::forward<Args>(args)...);
-}
+    template <class T, class... Args>
+    std::string format(T&& fmt_string, Args&&... args)
+    {
+        return fmt::format(std::forward<T>(fmt_string), std::forward<Args>(args)...);
+    }
 #endif
-template <typename Range>
-std::string join(Range&& r, std::string_view sep)
-{
+    template <typename Range>
+    std::string join(Range&& r, std::string_view sep)
+    {
 #ifdef USE_FMT_LIB
-    return fmt::format("{}", fmt::join(r, sep));
+        return fmt::format("{}", fmt::join(r, sep));
 #else
-    joinable_range range{r, sep};
-    return std::format("{}", range);
+        joinable_range range{r, sep};
+        return std::format("{}", range);
 #endif
-}
+    }
 }
 }

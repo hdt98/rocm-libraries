@@ -1,5 +1,5 @@
 /* **************************************************************************
- * Copyright (C) 2021-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2021-2025 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -54,14 +54,14 @@ ROCSOLVER_BEGIN_NAMESPACE
  * ===========================================================================
  */
 
-#define THROW_IF_HIP_ERROR(expr)                                                             \
-    do                                                                                       \
-    {                                                                                        \
-        hipError_t _status = (expr);                                                         \
-        if(_status != hipSuccess)                                                            \
-            throw std::runtime_error(rocsolver::formatting::format("{}:{}: [{}] {}", __FILE__, __LINE__, \
-                                                       hipGetErrorName(_status),             \
-                                                       hipGetErrorString(_status)));         \
+#define THROW_IF_HIP_ERROR(expr)                                                \
+    do                                                                          \
+    {                                                                           \
+        hipError_t _status = (expr);                                            \
+        if(_status != hipSuccess)                                               \
+            throw std::runtime_error(rocsolver::formatting::format(             \
+                "{}:{}: [{}] {}", __FILE__, __LINE__, hipGetErrorName(_status), \
+                hipGetErrorString(_status)));                                   \
     } while(0)
 
 /* =============================================================================================== */
@@ -365,8 +365,9 @@ void print_host_matrix(std::ostream& os,
     {
         for(size_t i = 0; i < m; i++)
         {
-            s += rocsolver::formatting::format("matrix  row {}, col {}, CPU result={}, GPU result={}\n", i, j,
-                                   CPU_result[j * lda + i], GPU_result[j * lda + i]);
+            s += rocsolver::formatting::format(
+                "matrix  row {}, col {}, CPU result={}, GPU result={}\n", i, j,
+                CPU_result[j * lda + i], GPU_result[j * lda + i]);
         }
     }
     s += '\n';
@@ -395,8 +396,9 @@ void print_host_matrix(std::ostream& os,
         {
             T comp = (CPU_result[j * lda + i] - GPU_result[j * lda + i]) / CPU_result[j * lda + i];
             if(std::abs(comp) > error_tolerance)
-                s += rocsolver::formatting::format("matrix  row {}, col {}, CPU result={}, GPU result={}\n", i,
-                                       j, CPU_result[j * lda + i], GPU_result[j * lda + i]);
+                s += rocsolver::formatting::format(
+                    "matrix  row {}, col {}, CPU result={}, GPU result={}\n", i, j,
+                    CPU_result[j * lda + i], GPU_result[j * lda + i]);
         }
     }
     s += '\n';
@@ -424,8 +426,8 @@ inline void read_matrix(const std::string filenameS,
     FILE* mat = fopen(filename, "r");
 
     if(mat == NULL)
-        throw std::invalid_argument(
-            rocsolver::formatting::format("Error: Could not open file {} with test data...", filename));
+        throw std::invalid_argument(rocsolver::formatting::format(
+            "Error: Could not open file {} with test data...", filename));
 
     rewind(mat);
 
@@ -444,8 +446,8 @@ inline void read_matrix(const std::string filenameS,
 
     if(fclose(mat) != 0)
     {
-        throw std::invalid_argument(
-            rocsolver::formatting::format("Error: Could not close file {} with test data...", filename));
+        throw std::invalid_argument(rocsolver::formatting::format(
+            "Error: Could not close file {} with test data...", filename));
     }
 }
 inline void read_last(const std::string filenameS, rocblas_int* A)
@@ -454,8 +456,8 @@ inline void read_last(const std::string filenameS, rocblas_int* A)
     FILE* mat = fopen(filename, "r");
 
     if(mat == NULL)
-        throw std::invalid_argument(
-            rocsolver::formatting::format("Error: Could not open file {} with test data...", filename));
+        throw std::invalid_argument(rocsolver::formatting::format(
+            "Error: Could not open file {} with test data...", filename));
 
     rewind(mat);
 
@@ -469,8 +471,8 @@ inline void read_last(const std::string filenameS, rocblas_int* A)
 
     if(fclose(mat) != 0)
     {
-        throw std::invalid_argument(
-            rocsolver::formatting::format("Error: Could not close file {} with test data...", filename));
+        throw std::invalid_argument(rocsolver::formatting::format(
+            "Error: Could not close file {} with test data...", filename));
     }
 }
 
@@ -491,8 +493,8 @@ inline void read_matrix(const std::string filenameS,
     FILE* mat = fopen(filename, "r");
 
     if(mat == NULL)
-        throw std::invalid_argument(
-            rocsolver::formatting::format("Error: Could not open file {} with test data...", filename));
+        throw std::invalid_argument(rocsolver::formatting::format(
+            "Error: Could not open file {} with test data...", filename));
 
     rewind(mat);
 
@@ -511,8 +513,8 @@ inline void read_matrix(const std::string filenameS,
 
     if(fclose(mat) != 0)
     {
-        throw std::invalid_argument(
-            rocsolver::formatting::format("Error: Could not close file {} with test data...", filename));
+        throw std::invalid_argument(rocsolver::formatting::format(
+            "Error: Could not close file {} with test data...", filename));
     }
 }
 
@@ -532,8 +534,8 @@ inline void read_matrix(const std::string filenameS,
     FILE* mat = fopen(filename, "r");
 
     if(mat == NULL)
-        throw std::invalid_argument(
-            rocsolver::formatting::format("Error: Could not open file {} with test data...", filename));
+        throw std::invalid_argument(rocsolver::formatting::format(
+            "Error: Could not open file {} with test data...", filename));
 
     rewind(mat);
 
@@ -552,8 +554,8 @@ inline void read_matrix(const std::string filenameS,
 
     if(fclose(mat) != 0)
     {
-        throw std::invalid_argument(
-            rocsolver::formatting::format("Error: Could not close file {} with test data...", filename));
+        throw std::invalid_argument(rocsolver::formatting::format(
+            "Error: Could not close file {} with test data...", filename));
     }
 }
 

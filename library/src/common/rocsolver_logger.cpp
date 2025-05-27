@@ -1,5 +1,5 @@
 /* **************************************************************************
- * Copyright (C) 2021-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2021-2025 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -78,9 +78,9 @@ std::ostream* rocsolver_logger::open_log_stream(const char* environment_variable
         if(&os != trace_os && &os != bench_os && &os != profile_os)
         {
             rocsolver::formatting::print(os,
-                       "ROCSOLVER LOG FILE\n"
-                       "rocSOLVER Version: {}\nrocBLAS Version: {}\n",
-                       rocsolver_version(), rocblas_version());
+                                         "ROCSOLVER LOG FILE\n"
+                                         "rocSOLVER Version: {}\nrocBLAS Version: {}\n",
+                                         rocsolver_version(), rocblas_version());
             os.flush();
         }
         return &os;
@@ -144,8 +144,8 @@ void rocsolver_logger::append_profile(std::string& str,
         int indent_level = entry.level - 1;
         int indent = shift_width * indent_level;
 
-        str += rocsolver::formatting::format("{: <{}}{}: Calls: {}, Total Time: {:.3f} ms", "", indent, it->first,
-                           entry.calls, entry.time * 1e-3);
+        str += rocsolver::formatting::format("{: <{}}{}: Calls: {}, Total Time: {:.3f} ms", "",
+                                             indent, it->first, entry.calls, entry.time * 1e-3);
 
         if(entry.internal_calls)
         {
@@ -153,7 +153,8 @@ void rocsolver_logger::append_profile(std::string& str,
             for(const auto& nested : *entry.internal_calls)
                 internal_time += nested.second.time;
 
-            str += rocsolver::formatting::format(" (in nested functions: {:.3f} ms)\n", internal_time * 1e-3);
+            str += rocsolver::formatting::format(" (in nested functions: {:.3f} ms)\n",
+                                                 internal_time * 1e-3);
 
             if(entry.level < max_levels)
                 append_profile(str, entry.internal_calls->begin(), entry.internal_calls->end());
@@ -228,7 +229,8 @@ rocblas_status rocsolver_log_end_impl()
     {
         std::string profile_str;
         logger->append_profile(profile_str, logger->profile.begin(), logger->profile.end());
-        rocsolver::formatting::print(*logger->profile_os, "------- PROFILE -------\n{}\n", profile_str);
+        rocsolver::formatting::print(*logger->profile_os, "------- PROFILE -------\n{}\n",
+                                     profile_str);
         logger->profile_os->flush();
     }
 
@@ -307,7 +309,8 @@ rocblas_status rocsolver_log_write_profile_impl()
     {
         std::string profile_str;
         logger->append_profile(profile_str, logger->profile.begin(), logger->profile.end());
-        rocsolver::formatting::print(*logger->profile_os, "------- PROFILE -------\n{}\n", profile_str);
+        rocsolver::formatting::print(*logger->profile_os, "------- PROFILE -------\n{}\n",
+                                     profile_str);
         logger->profile_os->flush();
     }
     return rocblas_status_success;
@@ -328,7 +331,8 @@ rocblas_status rocsolver_log_flush_profile_impl()
     {
         std::string profile_str;
         logger->append_profile(profile_str, logger->profile.begin(), logger->profile.end());
-        rocsolver::formatting::print(*logger->profile_os, "------- PROFILE -------\n{}\n", profile_str);
+        rocsolver::formatting::print(*logger->profile_os, "------- PROFILE -------\n{}\n",
+                                     profile_str);
         logger->profile_os->flush();
 
         logger->profile.clear();
