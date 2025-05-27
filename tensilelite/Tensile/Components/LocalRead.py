@@ -174,7 +174,8 @@ class LocalReadMFMA(LocalRead):
         tileBlockWidth   = tP["bpeDS"]/4 if kernel["UnrollMajorLDS%s"%tc] else instruction.blockWidth
 
         vectorWidth  = kernel["VectorWidth%s"%tc]
-
+        numSubTiles = kernel["numSubTiles%s"%tc]
+        subTileIdx = kernel["SubTileIdx%s"%tc]
         MIWaveGroupShape = [ kernel["MatrixInstM"] * kernel["MatrixInstBM"] * kernel["MIWaveGroup"][0] * kernel["VectorWidthA"], \
                             kernel["MatrixInstN"] * kernel["MatrixInstBN"] * kernel["MIWaveGroup"][1] * kernel["VectorWidthB"]]
 
@@ -234,7 +235,10 @@ class LocalReadMFMA(LocalRead):
                     blockStride = elementsPerBlockSMFMA * threadGroups
                     blockOffsetSMFMA = blockStride - elementsPerBlockSMFMA
 
-        valufIdx = 0
+        eIdxCnt = numReadsPerVector//numSubTiles
+        eIdxStart = subTileIdx * (numReadsPerVector//numSubTiles)
+        valufIdx = eIdxStart * blockWidth *numReadsPerUnroll 
+        #print("Debug: %s, eIdxStart %u, eIdxCnt %u, numReadsPerVector %u, numSubTiles %u, subTileIdx %u" % (tc, eIdxStart, eIdxCnt, numReadsPerVector, numSubTiles, subTileIdx))
         if enableLDSTr:
             numberMTilesPerWave = kernel["MIWaveTile"][tile01]
             highBits = 0
@@ -258,9 +262,9 @@ class LocalReadMFMA(LocalRead):
                 localReadCode.add(LocalReadX(dst=destVgpr, src=vgpr("LocalReadAddr%s"%tc), ds=ds, comment=comment))
         else:
             for vIdx in range(0, numVectorsPerTile):
-                for eIdx in range(0, numReadsPerVector):
+                for eIdx in range(eIdxStart, (eIdxStart + eIdxCnt)):
                     valuiIdx = int(valufIdx)
-                    localReadCode = imod.add(Module("LocalRead%s Valu%u"%(tc,valuiIdx)))
+                    localReadCode = imod.add(Module("LocalRead%s Valu%u"%(tc,valuiIdx)))                 
                     if needPack or numSplitMetadata:
                         packCode = pack.add(Module("packCode"))
                     for rIdx in range(0, numReadsPerUnroll):
