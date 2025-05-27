@@ -34,20 +34,30 @@
 
 /* The format function for user-defined types cannot be const before fmt v8.0
    but must be const in fmt v8.1 if the type is used in a tuple. */
-#if USE_FMT_LIB
+#ifdef USE_FMT_LIB
+#include <fmt/format.h>
+#include <fmt/ostream.h>
+#define BEGIN_CONDITIONAL_NAMESPACE \
+    namespace fmt                   \
+    {
+#define END_CONDITIONAL_NAMESPACE }
 #if FMT_VERSION < 80000
 #define ROCSOLVER_FMT_CONST
 #else
 #define ROCSOLVER_FMT_CONST const
 #endif
 #else
+#include <format>
+#include <print>
+#define BEGIN_CONDITIONAL_NAMESPACE \
+    namespace std                   \
+    {
+#define END_CONDITIONAL_NAMESPACE }
 #define ROCSOLVER_FMT_CONST const
 #endif
 
-#ifdef USE_LIBFMT
+BEGIN_CONDITIONAL_NAMESPACE
 
-namespace fmt
-{
 template <typename T>
 struct formatter<rocblas_complex_num<T>> : formatter<T>
 {
@@ -61,5 +71,5 @@ struct formatter<rocblas_complex_num<T>> : formatter<T>
         return ctx.out();
     }
 };
-}
-#endif
+
+END_CONDITIONAL_NAMESPACE
