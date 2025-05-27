@@ -65,7 +65,7 @@ public:
         T* d = nullptr;
         if((hipMalloc)(&d, bytes) != hipSuccess)
         {
-            rocsolver::print(stderr, "Error allocating {} bytes ({} GB)\n", bytes, bytes >> 30);
+            rocsolver::formatting::print(stderr, "Error allocating {} bytes ({} GB)\n", bytes, bytes >> 30);
             d = nullptr;
         }
         if(d != nullptr)
@@ -73,7 +73,7 @@ public:
             auto status = (hipMemset)(d, 0, bytes);
             if(status != hipSuccess)
             {
-                rocsolver::print(stderr, "error: {} ({}) at {}:{}\n", hipGetErrorString(status),
+                rocsolver::formatting::print(stderr, "error: {} ({}) at {}:{}\n", hipGetErrorString(status),
                            static_cast<std::int32_t>(status), __FILE__, __LINE__);
                 rocblas_abort();
             }

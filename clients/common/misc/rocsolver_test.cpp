@@ -56,11 +56,11 @@ fs::path get_sparse_data_dir()
         considered.push_back(exe_relative.string());
     }
 
-    rocsolver::print(stderr,
+    rocsolver::formatting::print(stderr,
                "Warning: default sparse data directories not found. "
                "Defaulting to current working directory.\nExecutable location: {}\n"
                "Paths considered:\n{}\n",
-               exe_path.string(), rocsolver::join(considered, "\n"));
+               exe_path.string(), rocsolver::formatting::join(considered, "\n"));
 
     return fs::current_path();
 }

@@ -76,7 +76,7 @@ static bool load_function(void* handle, const char* symbol, Fn& fn)
     char* err = dlerror(); // clear errors
 #ifndef NDEBUG
     if(err)
-        rocsolver::print(stderr, "rocsolver: error loading {:s}: {:s}\n", symbol, err);
+        rocsolver::formatting::print(stderr, "rocsolver: error loading {:s}: {:s}\n", symbol, err);
 #endif /* NDEBUG */
 #endif /* _WIN32 */
     return !err;
@@ -99,7 +99,7 @@ static bool load_rocsparse()
     char* err = dlerror(); // clear errors
 #ifndef NDEBUG
     if(!handle)
-        rocsolver::print(stderr, "rocsolver: error loading librocsparse.so.1: {:s}\n", err);
+        rocsolver::formatting::print(stderr, "rocsolver: error loading librocsparse.so.1: {:s}\n", err);
 #endif /* NDEBUG */
 #endif /* _WIN32 */
     if(!handle)

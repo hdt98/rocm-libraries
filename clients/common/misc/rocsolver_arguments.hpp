@@ -323,6 +323,6 @@ public:
     {
         if(!to_consume.empty())
             throw std::invalid_argument(
-                rocsolver::format("Not all arguments were consumed: {}", rocsolver::join(to_consume, " ")));
+                rocsolver::formatting::format("Not all arguments were consumed: {}", rocsolver::formatting::join(to_consume, " ")));
     }
 };

@@ -76,7 +76,7 @@ static std::string rocsolver_version()
 
 static void print_version_info()
 {
-    rocsolver::print("rocSOLVER version {} (with rocBLAS {})\n", rocsolver_version(), rocblas_version());
+    rocsolver::formatting::print("rocSOLVER version {} (with rocBLAS {})\n", rocsolver_version(), rocblas_version());
     std::fflush(stdout);
 }
 
@@ -638,7 +638,7 @@ try
     {
         std::stringstream desc_ss{};
         desc_ss << desc;
-        rocsolver::print("{}{}\n", help_str, desc_ss.str());
+        rocsolver::formatting::print("{}{}\n", help_str, desc_ss.str());
         return 0;
     }
 
@@ -691,6 +691,6 @@ try
 }
 catch(const std::exception& exp)
 {
-    rocsolver::print(stderr, "{}\n", exp.what());
+    rocsolver::formatting::print(stderr, "{}\n", exp.what());
     return -1;
 }

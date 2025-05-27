@@ -59,7 +59,7 @@ scoped_envvar::scoped_envvar(const char* name, const char* value)
         m_old_value.emplace(old_value);
     }
     if(!set_environment_variable(name, value))
-        throw environment_error(rocsolver::format("failed to set {:s}={:s}", name, value));
+        throw environment_error(rocsolver::formatting::format("failed to set {:s}={:s}", name, value));
 }
 
 scoped_envvar::~scoped_envvar()

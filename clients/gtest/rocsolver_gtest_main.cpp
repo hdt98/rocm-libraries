@@ -56,7 +56,7 @@ static std::string rocsolver_version()
 
 static void print_version_info()
 {
-    rocsolver::print("rocSOLVER version {} (with rocBLAS {})\n", rocsolver_version(), rocblas_version());
+    rocsolver::formatting::print("rocSOLVER version {} (with rocBLAS {})\n", rocsolver_version(), rocblas_version());
     std::fflush(stdout);
 }
 
@@ -68,7 +68,7 @@ int main(int argc, char** argv)
     int device_count = query_device_property();
     if(device_count <= 0)
     {
-        rocsolver::print(stderr, "Error: No devices found\n");
+        rocsolver::formatting::print(stderr, "Error: No devices found\n");
         return -1;
     }
     set_device(0); // use first device
