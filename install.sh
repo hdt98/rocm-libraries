@@ -158,7 +158,7 @@ install_zypper_packages( )
 
 install_fmt_from_source( )
 {
-  fmt_version=8.1.0
+  fmt_version=7.1.3
   fmt_srcdir=fmt-$fmt_version-src
   fmt_blddir=fmt-$fmt_version-bld
   wget -nv -O fmt-$fmt_version.tar.gz \

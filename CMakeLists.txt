@@ -69,7 +69,6 @@ if(USE_FMT_LIB)
   find_package(fmt REQUIRED)
 endif()
 
-
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
