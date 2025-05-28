@@ -79,7 +79,6 @@ jobs:
 
       - name: Determine jobs to run
         id: jobs
-        if: steps.detect.outputs.subtrees
         env:
           SUBTREES: ${{ steps.detect.outputs.subtrees }}
         run: |
@@ -88,7 +87,7 @@ jobs:
   therock-build-linux:
     name: Build Linux Packages
     needs: setup
-    if: ${{ needs.setup.outputs.jobs }}
+    if: ${{ needs.setup.outputs.jobs != '[]' }}
     permissions:
       contents: read
       id-token: write
