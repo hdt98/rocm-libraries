@@ -1,0 +1,40 @@
+{
+  "repositories": [
+    {
+      "name": "hipcub",
+      "url": "ROCm/hipCUB",
+      "branch": "develop",
+      "category": "projects",
+      "auto_subtree_pull": false,
+      "auto_subtree_push": true,
+      "enable_pr_fanout": false
+    },
+    {
+      "name": "rocprim",
+      "url": "ROCm/rocPRIM",
+      "branch": "develop",
+      "category": "projects",
+      "auto_subtree_pull": false,
+      "auto_subtree_push": true,
+      "enable_pr_fanout": false
+    },
+    {
+      "name": "rocrand",
+      "url": "ROCm/rocRAND",
+      "branch": "develop",
+      "category": "projects",
+      "auto_subtree_pull": false,
+      "auto_subtree_push": true,
+      "enable_pr_fanout": false
+    },
+    {
+      "name": "rocthrust",
+      "url": "ROCm/rocThrust",
+      "branch": "develop",
+      "category": "projects",
+      "auto_subtree_pull": false,
+      "auto_subtree_push": true,
+      "enable_pr_fanout": false
+    }
+  ]
+}
