@@ -401,14 +401,17 @@ void testing_syev_heev(Arguments& argus)
     if(argus.alg_mode == 1)
     {
         EXPECT_ROCBLAS_STATUS(
-            rocsolver_set_alg_mode(handle, rocsolver_function_sterf, rocsolver_alg_mode_hybrid),
+            rocsolver_set_alg_mode(handle, rocsolver_function_syev_heev, rocsolver_alg_mode_hybrid),
             rocblas_status_success);
 
-        rocsolver_alg_mode alg_mode;
-        EXPECT_ROCBLAS_STATUS(rocsolver_get_alg_mode(handle, rocsolver_function_sterf, &alg_mode),
+        rocsolver_alg_mode sterf_mode, steqr_mode;
+        EXPECT_ROCBLAS_STATUS(rocsolver_get_alg_mode(handle, rocsolver_function_sterf, &sterf_mode),
+                              rocblas_status_success);
+        EXPECT_ROCBLAS_STATUS(rocsolver_get_alg_mode(handle, rocsolver_function_steqr, &steqr_mode),
                               rocblas_status_success);
 
-        EXPECT_EQ(alg_mode, rocsolver_alg_mode_hybrid);
+        EXPECT_EQ(sterf_mode, rocsolver_alg_mode_hybrid);
+        EXPECT_EQ(steqr_mode, rocsolver_alg_mode_hybrid);
     }
 
     // check non-supported values
@@ -462,7 +465,7 @@ void testing_syev_heev(Arguments& argus)
     }
 
     // memory size query is necessary
-    if(argus.mem_query || !USE_ROCBLAS_REALLOC_ON_DEMAND)
+    if(argus.mem_query)
     {
         CHECK_ROCBLAS_ERROR(rocblas_start_device_memory_size_query(handle));
         if(BATCHED)
@@ -476,13 +479,9 @@ void testing_syev_heev(Arguments& argus)
 
         size_t size;
         CHECK_ROCBLAS_ERROR(rocblas_stop_device_memory_size_query(handle, &size));
-        if(argus.mem_query)
-        {
-            rocsolver_bench_inform(inform_mem_query, size);
-            return;
-        }
 
-        CHECK_ROCBLAS_ERROR(rocblas_set_device_memory_size(handle, size));
+        rocsolver_bench_inform(inform_mem_query, size);
+        return;
     }
 
     // memory allocations (all cases)
