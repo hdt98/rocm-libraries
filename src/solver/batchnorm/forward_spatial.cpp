@@ -144,6 +144,13 @@ bool BnFwdTrainingSpatial::IsApplicable(
     if(!IsOCLFwdTrainTypeValid(bn_problem))
         return false;
 
+    int activ_mode = bn_problem.GetActivationDesc().GetMode();
+    if(activ_mode != miopenActivationPASTHRU && activ_mode != miopenActivationRELU &&
+       activ_mode != miopenActivationCLIPPEDRELU && activ_mode != miopenActivationCLAMP)
+    {
+        return false;
+    }
+
     return true;
 }
 
@@ -321,7 +328,7 @@ ConvSolution BnFwdTrainingSpatial::GetSolution(const ExecutionContext& context,
             {"MIO_BN_VECTORIZE", static_cast<int>(vectorsize > 1)},
             {"MIO_BN_VEC_SIZE", vectorsize},
             {"MIO_BN_STASH_METHOD", stash_method},
-        };
+            {"MIOPEN_NRN_OP_ID", problem.GetActivationDesc().GetMode()}};
 
         if(variant != 4)
         {
@@ -381,6 +388,9 @@ ConvSolution BnFwdTrainingSpatial::GetSolution(const ExecutionContext& context,
             const auto resultrunning =
                 params.resultRunningMean != nullptr && params.resultRunningVariance != nullptr;
 
+            float alpha_activ = problem.GetActivationDesc().GetAlpha();
+            float beta_activ  = problem.GetActivationDesc().GetBeta();
+
             float ctime = 0.;
             visit_float(dtype, [&](auto as_float) {
                 if(variant != 2)
@@ -400,7 +410,9 @@ ConvSolution BnFwdTrainingSpatial::GetSolution(const ExecutionContext& context,
                                    params.resultRunningVariance,
                                    params.epsilon,
                                    params.resultSaveMean,
-                                   params.resultSaveInvVariance);
+                                   params.resultSaveInvVariance,
+                                   alpha_activ,
+                                   beta_activ);
                         }
                         else
                         {
@@ -416,7 +428,9 @@ ConvSolution BnFwdTrainingSpatial::GetSolution(const ExecutionContext& context,
                                    params.resultSaveMean,
                                    params.resultSaveInvVariance,
                                    in_cstride,
-                                   in_nstride);
+                                   in_nstride,
+                                   alpha_activ,
+                                   beta_activ);
                         }
                     }
                     else if(resultsave)
@@ -430,7 +444,9 @@ ConvSolution BnFwdTrainingSpatial::GetSolution(const ExecutionContext& context,
                                    as_float(inhw),
                                    params.epsilon,
                                    params.resultSaveMean,
-                                   params.resultSaveInvVariance);
+                                   params.resultSaveInvVariance,
+                                   alpha_activ,
+                                   beta_activ);
                         }
                         else
                         {
@@ -443,7 +459,9 @@ ConvSolution BnFwdTrainingSpatial::GetSolution(const ExecutionContext& context,
                                    params.resultSaveMean,
                                    params.resultSaveInvVariance,
                                    in_cstride,
-                                   in_nstride);
+                                   in_nstride,
+                                   alpha_activ,
+                                   beta_activ);
                         }
                     }
                     else if(resultrunning)
@@ -458,7 +476,9 @@ ConvSolution BnFwdTrainingSpatial::GetSolution(const ExecutionContext& context,
                                    params.expAvgFactor,
                                    params.resultRunningMean,
                                    params.resultRunningVariance,
-                                   params.epsilon);
+                                   params.epsilon,
+                                   alpha_activ,
+                                   beta_activ);
                         }
                         else
                         {
@@ -472,7 +492,9 @@ ConvSolution BnFwdTrainingSpatial::GetSolution(const ExecutionContext& context,
                                    params.resultRunningVariance,
                                    params.epsilon,
                                    in_cstride,
-                                   in_nstride);
+                                   in_nstride,
+                                   alpha_activ,
+                                   beta_activ);
                         }
                     }
                     else
@@ -484,7 +506,9 @@ ConvSolution BnFwdTrainingSpatial::GetSolution(const ExecutionContext& context,
                                    params.bnScale,
                                    params.bnBias,
                                    as_float(inhw),
-                                   params.epsilon);
+                                   params.epsilon,
+                                   alpha_activ,
+                                   beta_activ);
                         }
                         else
                         {
@@ -495,7 +519,9 @@ ConvSolution BnFwdTrainingSpatial::GetSolution(const ExecutionContext& context,
                                    as_float(inhw),
                                    params.epsilon,
                                    in_cstride,
-                                   in_nstride);
+                                   in_nstride,
+                                   alpha_activ,
+                                   beta_activ);
                         }
                     }
                 }
@@ -539,7 +565,8 @@ ConvSolution BnFwdTrainingSpatial::GetSolution(const ExecutionContext& context,
 
                     profileSequence(handle_, 1, &ctime);
 
-                    handle_.Run(kernels[2])(params.x, params.y, params.bnScale, params.bnBias);
+                    handle_.Run(kernels[2])(
+                        params.x, params.y, params.bnScale, params.bnBias, alpha_activ, beta_activ);
                     profileSequence(handle_, 2, &ctime);
                 }
             });
