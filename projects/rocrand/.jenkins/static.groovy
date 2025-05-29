@@ -14,6 +14,8 @@ def runCI =
 
     def commonGroovy
 
+    def settings = [staticLibrary: true]
+
     boolean formatCheck = false
      
     def compileCommand =
@@ -21,14 +23,14 @@ def runCI =
         platform, project->
 
         commonGroovy = load "${project.paths.project_src_prefix}/.jenkins/common.groovy"
-        commonGroovy.runCompileCommand(platform, project, jobName, debug=false, staticLibrary=true)
+        commonGroovy.runCompileCommand(platform, project, jobName, settings)
     }
     
     def testCommand =
     {
         platform, project->
 
-        commonGroovy.runTestCommand(platform, project)
+        commonGroovy.runTestCommand(platform, project, settings)
     }
 
     def packageCommand =

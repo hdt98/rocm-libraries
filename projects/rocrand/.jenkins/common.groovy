@@ -1,34 +1,38 @@
 // This file is for internal AMD use.
 // If you are interested in running your own Jenkins, please raise a github issue for assistance.
 
-def runCompileCommand(platform, project, jobName, boolean debug=false, boolean staticLibrary=false, boolean codeCoverage=false)
+def runCompileCommand(platform, project, jobName, settings)
 {
     project.paths.construct_build_prefix()
 
     project.paths.build_command = './install -c'
-    String buildTypeArg = debug ? '-DCMAKE_BUILD_TYPE=Debug' : '-DCMAKE_BUILD_TYPE=Release'
-    String buildTypeDir = debug ? 'debug' : 'release'
-    String buildStatic = staticLibrary ? '-DBUILD_SHARED_LIBS=OFF' : '-DBUILD_SHARED_LIBS=ON'
-    String codeCovFlag = codeCoverage ? '-DCODE_COVERAGE=ON' : ''
+    String buildTypeArg = settings.debug ? '-DCMAKE_BUILD_TYPE=Debug' : '-DCMAKE_BUILD_TYPE=Release'
+    String buildTypeDir = settings.debug ? 'debug' : 'release'
+    String buildStatic = settings.staticLibrary ? '-DBUILD_STATIC_LIBS=ON' : '-DBUILD_SHARED=OFF'
+    String codeCovFlag = settings.codeCoverage ? '-DCODE_COVERAGE=ON' : ''
+    String asanFlag = settings.addressSanitizer ? '-DBUILD_ADDRESS_SANITIZER=ON' : ''
     String cmake = platform.jenkinsLabel.contains('centos') ? 'cmake3' : 'cmake'
     String cmakePrefixPath = '-DCMAKE_PREFIX_PATH="/opt/rocm;/opt/rocm/llvm;/opt/rocm/bin"'
     //Set CI node's gfx arch as target if PR, otherwise use default targets of the library
     String amdgpuTargets = env.BRANCH_NAME.startsWith('PR-') ? '-DAMDGPU_TARGETS=\$gfx_arch' : ''
 
+    String xnackToggle = settings.addressSanitizer ? "export HSA_XNACK=1" : ''
+
     def command = """#!/usr/bin/env bash
                 set -x
+                ${xnackToggle}
                 cd ${project.paths.project_build_prefix}
                 mkdir -p build/${buildTypeDir} && cd build/${buildTypeDir}
                 # gfxTargetParser reads gfxarch and adds target features such as xnack
                 ${auxiliary.gfxTargetParser()}
-                ${cmake} --toolchain=toolchain-linux.cmake ${cmakePrefixPath} ${buildTypeArg} ${buildStatic} ${amdgpuTargets} ${codeCovFlag} -DBUILD_TEST=ON -DBUILD_BENCHMARK=ON ../..
+                ${cmake} --toolchain=toolchain-linux.cmake ${cmakePrefixPath} ${buildTypeArg} ${buildStatic} ${amdgpuTargets} ${codeCovFlag} ${asanFlag} -DBUILD_TEST=ON -DBUILD_BENCHMARK=ON ../..
                 make -j\$(nproc)
                 """
 
     platform.runCommand(this, command)
 }
 
-def runTestCommand (platform, project, boolean rocmExamples=false)
+def runTestCommand (platform, project, settings)
 {
     String sudo = auxiliary.sudo(platform.jenkinsLabel)
     // String centos = platform.jenkinsLabel.contains('centos') ? '3' : ''
@@ -36,16 +40,30 @@ def runTestCommand (platform, project, boolean rocmExamples=false)
     // def testCommand = "ctest${centos} --output-on-failure"
     def testCommand = "ctest --output-on-failure"
 
+    String LD_PATH = settings.addressSanitizer ? """export ASAN_LIB_PATH=\$(/opt/rocm/llvm/bin/clang -print-file-name=libclang_rt.asan-x86_64.so)
+    export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:\$(dirname "\${ASAN_LIB_PATH}")""" : 'export LD_LIBRARY_PATH=/opt/rocm/lib/'
+
+    String ASAN_EXPORTS = settings.addressSanitizer ? """export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:/opt/rocm/llvm/lib/clang/18/lib/linux
+                export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:/opt/rocm/lib/asan
+                export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:/opt/rocm/libexec/rocm_smi
+                export ASAN_SYMBOLIZER_PATH=/opt/rocm/llvm/bin/llvm-symbolizer
+                export PATH=/opt/rocm/llvm/bin/:\$PATH
+                export PATH=/opt/rocm/:\$PATH
+                export HSA_XNACK=1
+                export ASAN_OPTIONS=detect_leaks=0""" : ''
+                
     def command = """#!/usr/bin/env bash
                 set -x
                 cd ${project.paths.project_build_prefix}/build/release
                 make -j4
-                ${sudo} LD_LIBRARY_PATH=/opt/rocm/lib/ ${testCommand}
+                ${LD_PATH}
+                ${ASAN_EXPORTS}
+                ${sudo} ${testCommand}
             """
 
     platform.runCommand(this, command)
     //ROCM Examples
-    if (rocmExamples){
+    if (settings.rocmExamples){
         String buildString = ""
         if (platform.os.contains("ubuntu")){
             buildString += "sudo dpkg -i *.deb"
