@@ -70,7 +70,7 @@ if(HIPBLASLT_ENABLE_HOST)
     set(HIPBLASLT_ENABLE_MSGPACK ON CACHE BOOL "Use msgpack for parsing configuration files.")
     set(HIPBLASLT_ENABLE_OPENMP ON CACHE BOOL "Use OpenMP to improve performance.")
     set(HIPBLASLT_ENABLE_LLVM OFF CACHE BOOL "Use msgpack for parsing configuration files.")
-    set(HIPBLASLT_ENABLE_ROCROLLER OFF CACHE BOOL "Use RocRoller library.")
+    set(HIPBLASLT_ENABLE_ROCROLLER ON CACHE BOOL "Use RocRoller library.")
     set(HIPBLASLT_ENABLE_BLIS ON CACHE BOOL "Enable BLIS support.") # I don't know that we can build with this OFF
     set(HIPBLASLT_ENABLE_LAZY_LOAD ON CACHE BOOL "Enable lazy loading of runtime code oject files to reduce ram usage.")
     cmake_dependent_option(HIPBLASLT_ENABLE_MARKER "Use the marker library." ON "NOT WIN32" OFF)
@@ -295,6 +295,27 @@ if(HIPBLASLT_ENABLE_HOST)
 
     add_subdirectory(rocisa/rocisa-cpp)
     add_subdirectory(host-library)
+endif()
+
+if(HIPBLASLT_ENABLE_ROCROLLER)
+    find_package(rocroller)
+    set(ROCROLLER_ENABLE_FETCH ON)
+    set(ROCROLLER_BUILD_TESTING OFF)
+    set(ROCROLLER_ENABLE_CLIENT OFF)
+    option(YAML_CPP_INSTALL "" ON)
+    if(NOT rocroller_FOUND)
+        FetchContent_Declare(
+            rocRoller
+            GIT_REPOSITORY https://github.com/ROCm/rocRoller.git
+            GIT_TAG main
+            SOURCE_SUBDIR next-cmake
+        )
+        FetchContent_MakeAvailable(rocRoller)
+    else()
+        message(FATAL_ERROR "Could not find rocroller")
+    endif()
+    target_link_libraries(hipblaslt PRIVATE roc::rocroller)
+    target_compile_definitions(hipblaslt PUBLIC HIPBLASLT_USE_ROCROLLER)
 endif()
 
 if(HIPBLASLT_ENABLE_DEVICE)

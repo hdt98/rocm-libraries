@@ -818,7 +818,7 @@ pushd .
   fi
 
   if [[ "${use_rocroller}" == false ]]; then
-    cmake_common_options="${cmake_common_options} -DHIPBLASLT_USE_ROCROLLER=OFF"
+    cmake_common_options="${cmake_common_options} -DHIPBLASLT_ENABLE_ROCROLLER=OFF"
   fi
 
   cmake_common_options="${cmake_common_options} ${tensile_opt}"
@@ -828,6 +828,11 @@ pushd .
     compiler="${rocm_path}/bin/amdclang++"
   fi
 
+  ccompiler="amdclang"
+  if [[ "${build_hip_clang}" == true ]]; then
+    ccompiler="${rocm_path}/bin/amdclang"
+  fi
+
   if [[ "${build_clients}" == false ]]; then
     cmake_client_options=""
   fi
@@ -835,7 +840,7 @@ pushd .
   echo $cmake_common_options ${cmake_client_options}
   # Build library with AMD toolchain because of existense of device kernels
   if [[ "${build_relocatable}" == true ]]; then
-    FC=gfortran CXX=${compiler} ${cmake_executable} ${cmake_common_options} ${cmake_client_options} -DCPACK_SET_DESTDIR=OFF \
+    FC=gfortran CXX=${compiler} CC=${ccompiler} ${cmake_executable} ${cmake_common_options} ${cmake_client_options} -DCPACK_SET_DESTDIR=OFF \
       -DCMAKE_INSTALL_PREFIX=${rocm_path} \
       -DCPACK_PACKAGING_INSTALL_PREFIX=${rocm_path} \
       -DCMAKE_SHARED_LINKER_FLAGS="${rocm_rpath}" \
@@ -844,7 +849,7 @@ pushd .
       -DROCM_DISABLE_LDCONFIG=ON \
       -DROCM_PATH="${rocm_path}" ${root_path}/next-cmake
   else
-    FC=gfortran CXX=${compiler} ${cmake_executable} ${cmake_common_options} ${cmake_client_options} -DCPACK_SET_DESTDIR=OFF -DCMAKE_INSTALL_PREFIX=${install_prefix} -DCPACK_PACKAGING_INSTALL_PREFIX=${rocm_path} -DROCM_PATH="${rocm_path}" ${root_path}/next-cmake
+    FC=gfortran CXX=${compiler} CC=${ccompiler} ${cmake_executable} ${cmake_common_options} ${cmake_client_options} -DCPACK_SET_DESTDIR=OFF -DCMAKE_INSTALL_PREFIX=${install_prefix} -DCPACK_PACKAGING_INSTALL_PREFIX=${rocm_path} -DROCM_PATH="${rocm_path}" ${root_path}/next-cmake
   fi
   check_exit_code "$?"
 
