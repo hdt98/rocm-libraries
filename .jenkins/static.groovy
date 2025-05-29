@@ -14,7 +14,7 @@ def runCI =
 
     def commonGroovy
 
-    def settings = [codeCoverage: true]
+    def settings = [staticLibrary: true]
 
     boolean formatCheck = false
      
@@ -30,7 +30,7 @@ def runCI =
     {
         platform, project->
 
-        commonGroovy.runTestCommand(platform, project)
+        commonGroovy.runTestCommand(platform, project, settings)
     }
 
     def packageCommand =

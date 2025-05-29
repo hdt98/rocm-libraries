@@ -55,12 +55,14 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "rocrand/rocrand_common.h"
 
+#include <hip/hip_runtime.h>
+
 // Constants from Random123
 // See https://www.deshawresearch.com/resources_random123.html
 #define ROCRAND_PHILOX_M4x32_0 0xD2511F53U
 #define ROCRAND_PHILOX_M4x32_1 0xCD9E8D57U
-#define ROCRAND_PHILOX_W32_0   0x9E3779B9U
-#define ROCRAND_PHILOX_W32_1   0xBB67AE85U
+#define ROCRAND_PHILOX_W32_0 0x9E3779B9U
+#define ROCRAND_PHILOX_W32_1 0xBB67AE85U
 
 /** \rocrand_internal \addtogroup rocranddevice
  *
@@ -73,18 +75,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define ROCRAND_PHILOX4x32_DEFAULT_SEED 0xdeadbeefdeadbeefULL
 /** @} */ // end of group rocranddevice
 
-namespace rocrand_device {
-namespace detail {
-
-__forceinline__ __device__ __host__ unsigned int
-    mulhilo32(unsigned int x, unsigned int y, unsigned int& z)
+namespace rocrand_device
 {
-    unsigned long long xy = mad_u64_u32(x, y, 0);
-    z = static_cast<unsigned int>(xy >> 32);
-    return static_cast<unsigned int>(xy);
-}
-
-} // end detail namespace
 
 class philox4x32_10_engine
 {
@@ -295,16 +287,13 @@ private:
     __forceinline__ __device__ __host__ static uint4 single_round(uint4 counter, uint2 key)
     {
         // Source: Random123
-        unsigned int hi0;
-        unsigned int hi1;
-        unsigned int lo0 = detail::mulhilo32(ROCRAND_PHILOX_M4x32_0, counter.x, hi0);
-        unsigned int lo1 = detail::mulhilo32(ROCRAND_PHILOX_M4x32_1, counter.z, hi1);
-        return uint4 {
-            hi1 ^ counter.y ^ key.x,
-            lo1,
-            hi0 ^ counter.w ^ key.y,
-            lo0
-        };
+        unsigned long long mul0 = detail::mul_u64_u32(ROCRAND_PHILOX_M4x32_0, counter.x);
+        unsigned int       hi0  = static_cast<unsigned int>(mul0 >> 32);
+        unsigned int       lo0  = static_cast<unsigned int>(mul0);
+        unsigned long long mul1 = detail::mul_u64_u32(ROCRAND_PHILOX_M4x32_1, counter.z);
+        unsigned int       hi1  = static_cast<unsigned int>(mul1 >> 32);
+        unsigned int       lo1  = static_cast<unsigned int>(mul1);
+        return uint4{hi1 ^ counter.y ^ key.x, lo1, hi0 ^ counter.w ^ key.y, lo0};
     }
 
     __forceinline__ __device__ __host__ static uint2 bumpkey(uint2 key)
@@ -435,6 +424,6 @@ void skipahead_sequence(unsigned long long sequence, rocrand_state_philox4x32_10
     return state->discard_subsequence(sequence);
 }
 
-#endif // ROCRAND_PHILOX4X32_10_H_
-
 /** @} */ // end of group rocranddevice
+
+#endif // ROCRAND_PHILOX4X32_10_H_

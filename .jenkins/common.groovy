@@ -7,7 +7,7 @@ def runCompileCommand(platform, project, jobName, settings)
 
     project.paths.build_command = './install -c'
     String buildTypeArg = settings.debug ? '-DCMAKE_BUILD_TYPE=Debug' : '-DCMAKE_BUILD_TYPE=Release'
-    String buildTypeDir = settings.debug ?: 'release'
+    String buildTypeDir = settings.debug ? 'debug' : 'release'
     String buildStatic = settings.staticLibrary ? '-DBUILD_STATIC_LIBS=ON' : '-DBUILD_SHARED=OFF'
     String codeCovFlag = settings.codeCoverage ? '-DCODE_COVERAGE=ON' : ''
     String asanFlag = settings.addressSanitizer ? '-DBUILD_ADDRESS_SANITIZER=ON' : ''
@@ -21,8 +21,6 @@ def runCompileCommand(platform, project, jobName, settings)
     def command = """#!/usr/bin/env bash
                 set -x
                 ${xnackToggle}
-                export "CMAKE_CXX_COMPILER=/opt/rocm/bin/amdclang++"
-                rocminfo
                 cd ${project.paths.project_build_prefix}
                 mkdir -p build/${buildTypeDir} && cd build/${buildTypeDir}
                 # gfxTargetParser reads gfxarch and adds target features such as xnack
@@ -45,24 +43,53 @@ def runTestCommand (platform, project, settings)
     String LD_PATH = settings.addressSanitizer ? """export ASAN_LIB_PATH=\$(/opt/rocm/llvm/bin/clang -print-file-name=libclang_rt.asan-x86_64.so)
     export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:\$(dirname "\${ASAN_LIB_PATH}")""" : 'export LD_LIBRARY_PATH=/opt/rocm/lib/'
 
-    def command = """#!/usr/bin/env bash
-                set -x
-                cd ${project.paths.project_build_prefix}/build/release
-                make -j4
-                ${LD_PATH}
-                ldd ctest
-                export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:/opt/rocm/llvm/lib/clang/18/lib/linux
+    String ASAN_EXPORTS = settings.addressSanitizer ? """export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:/opt/rocm/llvm/lib/clang/18/lib/linux
                 export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:/opt/rocm/lib/asan
                 export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:/opt/rocm/libexec/rocm_smi
                 export ASAN_SYMBOLIZER_PATH=/opt/rocm/llvm/bin/llvm-symbolizer
                 export PATH=/opt/rocm/llvm/bin/:\$PATH
                 export PATH=/opt/rocm/:\$PATH
                 export HSA_XNACK=1
-                export ASAN_OPTIONS=detect_leaks=0
+                export ASAN_OPTIONS=detect_leaks=0""" : ''
+                
+    def command = """#!/usr/bin/env bash
+                set -x
+                cd ${project.paths.project_build_prefix}/build/release
+                make -j4
+                ${LD_PATH}
+                ${ASAN_EXPORTS}
                 ${sudo} ${testCommand}
             """
 
     platform.runCommand(this, command)
+    //ROCM Examples
+    if (settings.rocmExamples){
+        String buildString = ""
+        if (platform.os.contains("ubuntu")){
+            buildString += "sudo dpkg -i *.deb"
+        }
+        else {
+            buildString += "sudo rpm -i *.rpm"
+        }
+        testCommand = """#!/usr/bin/env bash
+                    set -ex
+                    cd ${project.paths.project_build_prefix}/build/release/package
+                    ${buildString}
+                    cd ../../..
+                    testDirs=("Libraries/rocRAND")
+                    git clone https://github.com/ROCm/rocm-examples.git
+                    rocm_examples_dir=\$(readlink -f rocm-examples)
+                    for testDir in \${testDirs[@]}; do
+                        cd \${rocm_examples_dir}/\${testDir}
+                        cmake -S . -B build
+                        cmake --build build
+                        cd ./build
+                        ctest --output-on-failure
+                    done
+                """
+        platform.runCommand(this, testCommand, "ROCM Examples")  
+
+    }
 }
 
 def runPackageCommand(platform, project)

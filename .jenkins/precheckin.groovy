@@ -14,7 +14,8 @@ def runCI =
 
     def commonGroovy
 
-    def settings = [:]
+    def settings = [rocmExamples: true]
+
 
     boolean formatCheck = false
      
