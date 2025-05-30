@@ -1326,9 +1326,9 @@ struct WmmaGemm
                     wmma_instr.template run<MPerWmma,
                                             NPerWmma,
                                             KPerWmma,
-                                            FloatA,
-                                            FloatB,
-                                            FloatC,
+                                            remove_cvref_t<decltype(p_a_wave[k])>,
+                                            remove_cvref_t<decltype(p_b_wave[k])>,
+                                            remove_cvref_t<decltype(p_c_thread)>,
                                             neg_a,
                                             neg_b>(p_a_wave[k], p_b_wave[k], p_c_thread);
                 }
@@ -1337,9 +1337,9 @@ struct WmmaGemm
                     wmma_instr.template run<MPerWmma,
                                             NPerWmma,
                                             KPerWmma,
-                                            FloatA,
-                                            FloatB,
-                                            FloatC,
+                                            remove_cvref_t<decltype(p_b_wave[k])>,
+                                            remove_cvref_t<decltype(p_a_wave[k])>,
+                                            remove_cvref_t<decltype(p_c_thread)>,
                                             neg_b,
                                             neg_a>(p_b_wave[k], p_a_wave[k], p_c_thread);
                 }

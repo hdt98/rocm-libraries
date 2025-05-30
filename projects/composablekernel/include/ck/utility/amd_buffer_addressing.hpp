@@ -1342,22 +1342,13 @@ __device__ auto amd_tr_load_to_vgpr(const T* in_ptr, bool is_src_valid)
 
 template <typename T, index_t N, index_t NumThreadsPerTile, index_t NumVgprsPerTile>
 __device__ auto amd_tile_load_to_vgpr(__attribute__((address_space(1))) const T* in_ptr,
-                                      bool is_src_valid,
-                                      index_t thread_id)
+                                      bool is_src_valid)
 {
     using vector_t = typename vector_type_maker<T, N>::type::type;
 #if defined(__gfx13__)
     if(is_src_valid)
     {
-        ignore = thread_id;
-        if constexpr(NumThreadsPerTile == 2 && NumVgprsPerTile == 2)
-        {
-            __attribute__((address_space(1))) int32x2_t* global_ptr =
-                const_cast<__attribute__((address_space(1))) int32x2_t*>(
-                    reinterpret_cast<const __attribute__((address_space(1))) int32x2_t*>(in_ptr));
-            return bit_cast<vector_t>(__builtin_amdgcn_global_tiled_load_b64(global_ptr));
-        }
-        else if constexpr(NumThreadsPerTile == 2 && NumVgprsPerTile == 1)
+        if constexpr(NumThreadsPerTile == 2)
         {
             __attribute__((address_space(1))) int32_t* global_ptr =
                 const_cast<__attribute__((address_space(1))) int32_t*>(
@@ -1371,6 +1362,16 @@ __device__ auto amd_tile_load_to_vgpr(__attribute__((address_space(1))) const T*
                     reinterpret_cast<const __attribute__((address_space(1))) int32_t*>(in_ptr));
             return bit_cast<vector_t>(__builtin_amdgcn_global_tiled_load_qtr_b128(global_ptr));
         }
+        /* Remove for padding 4x4 + normal 4x4 */
+        /*
+        else if constexpr(NumThreadsPerTile == 2 && NumVgprsPerTile == 2)
+        {
+            __attribute__((address_space(1))) int32x2_t* global_ptr =
+                const_cast<__attribute__((address_space(1))) int32x2_t*>(
+                    reinterpret_cast<const __attribute__((address_space(1))) int32x2_t*>(in_ptr));
+            return bit_cast<vector_t>(__builtin_amdgcn_global_tiled_load_b64(global_ptr));
+        }
+        */
         else
         {
             static_assert(0, "wrong! not implemented");
@@ -1383,7 +1384,6 @@ __device__ auto amd_tile_load_to_vgpr(__attribute__((address_space(1))) const T*
 #else
     ignore = in_ptr;
     ignore = is_src_valid;
-    ignore = thread_id;
     return vector_t{0};
 #endif
 }
