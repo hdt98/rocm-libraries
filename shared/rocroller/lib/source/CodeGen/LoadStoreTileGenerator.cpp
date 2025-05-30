@@ -596,6 +596,7 @@ namespace rocRoller
                 AssertFatal(numBytes == 1 || numBytes == 2 || numBytes == 4, ShowValue(numBytes));
             auto m0 = m_context->getM0();
             AssertFatal(info.ldsWriteStride == m_workgroupSizeTotal * numBytes);
+
             if(setM0)
             {
                 auto tmp = Register::Value::Placeholder(
@@ -1311,7 +1312,6 @@ namespace rocRoller
                         ShowValue(load.varType));
             n /= packing;
 
-            co_yield Instruction::Lock(Scheduling::Dependency::M0, "Lock M0");
             co_yield moveTile<MemoryInstructions::MemoryDirection::Load>(
                 MemoryInstructions::MemoryKind::Buffer2LDS,
                 m,
@@ -1323,7 +1323,6 @@ namespace rocRoller
                 coords,
                 {})
                 .map(MemoryInstructions::addExtraDst(ldsAllocation));
-            co_yield Instruction::Unlock("Unlock M0");
         }
 
         Generator<Instruction> LoadStoreTileGenerator::loadMacroTileWAVELDS(int                tag,
