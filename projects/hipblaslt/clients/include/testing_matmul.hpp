@@ -413,7 +413,7 @@ void epilogue_func(int64_t     m,
     auto in_Tact = static_cast<Tact>(in[pos]) + bias_data;                                    \
     if(e && !gradient)                                                                        \
     {                                                                                         \
-        saturate_cast_to_type(e, in_Tact* scaleE, aux_type, pos);                             \
+        saturate_cast_to_type(e, in_Tact * scaleE, aux_type, pos);                            \
     }                                                                                         \
     Tact in_Tact_act = 0;                                                                     \
     if(gradient)                                                                              \
@@ -559,12 +559,12 @@ void epilogue_func(int64_t     m,
                    bool        gradient,
                    hipDataType To)
 {
-#define CALCULATE_EPILOGUE_BASIC                               \
-    auto pos  = j * ld + i;                                    \
-    Tc   temp = static_cast<Ti>(*(in + pos)) + bias_data;      \
-    if(e)                                                      \
-    {                                                          \
-        saturate_cast_to_type(e, temp* scaleE, aux_type, pos); \
+#define CALCULATE_EPILOGUE_BASIC                                \
+    auto pos  = j * ld + i;                                     \
+    Tc   temp = static_cast<Ti>(*(in + pos)) + bias_data;       \
+    if(e)                                                       \
+    {                                                           \
+        saturate_cast_to_type(e, temp * scaleE, aux_type, pos); \
     }
 
     for(int i = 0; i < m; i++)
@@ -2152,7 +2152,7 @@ void testing_matmul_with_bias(const Arguments& arg,
             // Set the row and col sizes of scale block for matrix B
             if(arg.scaleB == hipblaslt_scaling_format::Block)
             {
-                if(arg.scaleBBlockRowSize == 32 && arg.scaleBBlockColSize == 1)
+                if(arg.scaleBBlockRowSize == 1 && arg.scaleBBlockColSize == 32)
                 {
                     mode = HIPBLASLT_MATMUL_MATRIX_SCALE_VEC32_UE8M0;
                 }
@@ -2297,11 +2297,11 @@ void testing_matmul_with_bias(const Arguments& arg,
     std::vector<size_t>                           heuristicTuningIndex;
 
     // Cpp API
-    hipblaslt_ext::GemmPreferenceV2 gemmPref;
+    hipblaslt_ext::GemmPreference gemmPref;
     gemmPref.setMaxWorkspaceBytes(max_workspace_size);
-    std::vector<hipblaslt_ext::Gemm>                      gemmVec;
-    std::vector<hipblaslt_ext::GroupedGemm>               groupedGemmVec;
-    std::vector<std::vector<hipblaslt_ext::GemmInputsV2>> extinputs;
+    std::vector<hipblaslt_ext::Gemm>                    gemmVec;
+    std::vector<hipblaslt_ext::GroupedGemm>             groupedGemmVec;
+    std::vector<std::vector<hipblaslt_ext::GemmInputs>> extinputs;
 
     // C to Cpp API for GG
     std::vector<std::vector<void*>> da(block_count, std::vector<void*>(gemm_count));
@@ -2331,11 +2331,11 @@ void testing_matmul_with_bias(const Arguments& arg,
                                                                 arg.compute_type));
     }
 
-    std::vector<hipblaslt_ext::GemmEpilogueV2> extepilogue;
-    hipblaslt_ext::GemmProblemTypeV2           extproblemtype;
+    std::vector<hipblaslt_ext::GemmEpilogue> extepilogue;
+    hipblaslt_ext::GemmProblemType           extproblemtype;
     if(arg.use_ext_setproblem)
     {
-        extinputs.resize(block_count, std::vector<hipblaslt_ext::GemmInputsV2>(gemm_count));
+        extinputs.resize(block_count, std::vector<hipblaslt_ext::GemmInputs>(gemm_count));
         extepilogue.resize(gemm_count);
 
         for(int gemmIdx = 0; gemmIdx < gemm_count; gemmIdx++)
@@ -2357,15 +2357,18 @@ void testing_matmul_with_bias(const Arguments& arg,
                 }
                 if(b == 0)
                 {
+                    hipblasLtMatmulMatrixScale_t sscale = HIPBLASLT_MATMUL_MATRIX_SCALE_SCALAR_32F;
+                    hipblasLtMatmulMatrixScale_t svector
+                        = HIPBLASLT_MATMUL_MATRIX_SCALE_OUTER_VEC_32F;
                     extepilogue[gemmIdx].setMode(epilogue[gemmIdx]);
                     extepilogue[gemmIdx].setBiasDataType(bias_type);
                     extepilogue[gemmIdx].setAuxDataType(aux_type);
                     extepilogue[gemmIdx].setAuxLeadingDimension(lde[gemmIdx]);
                     extepilogue[gemmIdx].setAuxBatchStride(stride_e[gemmIdx]);
                     extepilogue[gemmIdx].setScalingAType(
-                        arg.scaleA == hipblaslt_scaling_format::Vector ? 1 : 0);
+                        arg.scaleA == hipblaslt_scaling_format::Vector ? svector : sscale);
                     extepilogue[gemmIdx].setScalingBType(
-                        arg.scaleB == hipblaslt_scaling_format::Vector ? 1 : 0);
+                        arg.scaleB == hipblaslt_scaling_format::Vector ? svector : sscale);
                 }
                 extinputs[b][gemmIdx].setA((void*)((dA[gemmIdx].as<char>())
                                                    + b * size_dA[gemmIdx] * realDataTypeSize(TiA)));
@@ -2459,8 +2462,8 @@ void testing_matmul_with_bias(const Arguments& arg,
             for(size_t gsu = 0; gsu < gsu_vector.size(); gsu++)
             {
                 hipblaslt_ext::GemmTuning tuning;
-                tuning.splitK = gsu_vector[gsu];
-                tuning.wgm    = wgm_vector[wgm];
+                tuning.setSplitK(gsu_vector[gsu]);
+                tuning.setWgm(wgm_vector[wgm]);
                 tuningVec.push_back(tuning);
             }
     }
@@ -3924,8 +3927,8 @@ void testing_matmul_with_bias(const Arguments& arg,
                     archName,
                     cuNum,
                     arg,
-                    (uint32_t)tuningVec[heuristicTuningIndex[sol]].splitK,
-                    (uint32_t)tuningVec[heuristicTuningIndex[sol]].wgm,
+                    (uint32_t)tuningVec[heuristicTuningIndex[sol]].getSplitK(),
+                    (uint32_t)tuningVec[heuristicTuningIndex[sol]].getWgm(),
                     gpu_time_used,
                     flush_time_used,
                     flops,
@@ -3982,8 +3985,8 @@ void testing_matmul_with_bias(const Arguments& arg,
                 archName,
                 cuNum,
                 arg,
-                (uint32_t)tuningVec[heuristicTuningIndex[best_sol]].splitK,
-                (uint32_t)tuningVec[heuristicTuningIndex[best_sol]].wgm,
+                (uint32_t)tuningVec[heuristicTuningIndex[best_sol]].getSplitK(),
+                (uint32_t)tuningVec[heuristicTuningIndex[best_sol]].getWgm(),
                 best_gpu_time,
                 flush_time_used,
                 best_flops,
