@@ -25,6 +25,7 @@
 #ifndef TESTING_SPGEMM_CSR_HPP
 #define TESTING_SPGEMM_CSR_HPP
 
+#include "hipsparse_arguments.hpp"
 #include "hipsparse_test_unique_ptr.hpp"
 #include "unit.hpp"
 #include "utility.hpp"
@@ -92,13 +93,6 @@ void testing_spgemm_csr_bad_arg(void)
     int*   dcsr_col_ind_C = (int*)dcsr_col_ind_C_managed.get();
     float* dcsr_val_C     = (float*)dcsr_val_C_managed.get();
     void*  dbuf           = (void*)dbuf_managed.get();
-
-    if(!dcsr_row_ptr_A || !dcsr_col_ind_A || !dcsr_val_A || !dcsr_row_ptr_B || !dcsr_col_ind_B
-       || !dcsr_val_B || !dcsr_row_ptr_C || !dcsr_col_ind_C || !dcsr_val_C || !dbuf)
-    {
-        PRINT_IF_HIP_ERROR(hipErrorOutOfMemory);
-        return;
-    }
 
     // SpGEMM structures
     hipsparseSpMatDescr_t A, B, C;
@@ -305,10 +299,6 @@ void testing_spgemm_csr_bad_arg(void)
                                                                     &bufferSize,
                                                                     dbuf),
                                             "Error: C is nullptr");
-    verify_hipsparse_status_invalid_pointer(
-        hipsparseSpGEMM_compute(
-            handle, transA, transB, &alpha, A, B, &beta, C, dataType, alg, descr, nullptr, dbuf),
-        "Error: bufferSize is nullptr");
 
     // SpGEMM copy
     verify_hipsparse_status_invalid_handle(hipsparseSpGEMM_copy(
@@ -341,35 +331,30 @@ void testing_spgemm_csr_bad_arg(void)
 }
 
 template <typename I, typename J, typename T>
-hipsparseStatus_t testing_spgemm_csr(void)
+hipsparseStatus_t testing_spgemm_csr(Arguments argus)
 {
 #if(!defined(CUDART_VERSION) || CUDART_VERSION >= 11000)
-    T                    h_alpha  = make_DataType<T>(2.0);
-    T                    h_beta   = make_DataType<T>(0.0);
-    hipsparseOperation_t transA   = HIPSPARSE_OPERATION_NON_TRANSPOSE;
-    hipsparseOperation_t transB   = HIPSPARSE_OPERATION_NON_TRANSPOSE;
-    hipsparseIndexBase_t idxBaseA = HIPSPARSE_INDEX_BASE_ZERO;
-    hipsparseIndexBase_t idxBaseB = HIPSPARSE_INDEX_BASE_ZERO;
-    hipsparseIndexBase_t idxBaseC = HIPSPARSE_INDEX_BASE_ZERO;
-    hipsparseSpGEMMAlg_t alg      = HIPSPARSE_SPGEMM_DEFAULT;
+    J                    m        = argus.M;
+    J                    k        = argus.K;
+    T                    h_alpha  = make_DataType<T>(argus.alpha);
+    hipsparseIndexBase_t idxBaseA = argus.baseA;
+    hipsparseIndexBase_t idxBaseB = argus.baseB;
+    hipsparseIndexBase_t idxBaseC = argus.baseC;
+    hipsparseSpGEMMAlg_t alg      = static_cast<hipsparseSpGEMMAlg_t>(argus.spgemm_alg);
+    std::string          filename = argus.filename;
 
-    // Matrices are stored at the same path in matrices directory
-    std::string filename = get_filename("nos6.bin");
+    T                    h_beta = make_DataType<T>(0);
+    hipsparseOperation_t transA = HIPSPARSE_OPERATION_NON_TRANSPOSE;
+    hipsparseOperation_t transB = HIPSPARSE_OPERATION_NON_TRANSPOSE;
 
     // Index and data type
-    hipsparseIndexType_t typeI
-        = (typeid(I) == typeid(int32_t)) ? HIPSPARSE_INDEX_32I : HIPSPARSE_INDEX_64I;
-    hipsparseIndexType_t typeJ
-        = (typeid(J) == typeid(int32_t)) ? HIPSPARSE_INDEX_32I : HIPSPARSE_INDEX_64I;
-    hipDataType typeT = (typeid(T) == typeid(float))
-                            ? HIP_R_32F
-                            : ((typeid(T) == typeid(double))
-                                   ? HIP_R_64F
-                                   : ((typeid(T) == typeid(hipComplex) ? HIP_C_32F : HIP_C_64F)));
+    hipsparseIndexType_t typeI = getIndexType<I>();
+    hipsparseIndexType_t typeJ = getIndexType<J>();
+    hipDataType          typeT = getDataType<T>();
 
     // hipSPARSE handles
-    std::unique_ptr<handle_struct> test_handle(new handle_struct);
-    hipsparseHandle_t              handle = test_handle->handle;
+    std::unique_ptr<handle_struct> unique_ptr_handle(new handle_struct);
+    hipsparseHandle_t              handle = unique_ptr_handle->handle;
 
     std::unique_ptr<spgemm_struct> unique_ptr_descr(new spgemm_struct);
     hipsparseSpGEMMDescr_t         descr = unique_ptr_descr->descr;
@@ -382,20 +367,15 @@ hipsparseStatus_t testing_spgemm_csr(void)
     // Initial Data on CPU
     srand(12345ULL);
 
-    // Some sparse matrix A
-    J m;
-    J k;
     I nnz_A;
-
-    if(read_bin_matrix(
-           filename.c_str(), m, k, nnz_A, hcsr_row_ptr_A, hcsr_col_ind_A, hcsr_val_A, idxBaseA)
-       != 0)
+    if(!generate_csr_matrix(
+           filename, m, k, nnz_A, hcsr_row_ptr_A, hcsr_col_ind_A, hcsr_val_A, idxBaseA))
     {
-        fprintf(stderr, "Cannot open [read] %s\n", filename.c_str());
+        fprintf(stderr, "Cannot open [read] %s\ncol", filename.c_str());
         return HIPSPARSE_STATUS_INTERNAL_ERROR;
     }
 
-    // Sparse matrix B as the transpose of A
+    // For sparse matrix B, use the transpose of A
     J n     = m;
     I nnz_B = nnz_A;
 
@@ -429,7 +409,7 @@ hipsparseStatus_t testing_spgemm_csr(void)
     auto dcsr_row_ptr_C_1_managed
         = hipsparse_unique_ptr{device_malloc(sizeof(I) * (m + 1)), device_free};
     auto dcsr_row_ptr_C_2_managed
-        = hipsparse_unique_ptr{device_malloc(sizeof(I) * (m + 1)), device_free};
+        = hipsparse_unique_ptr{device_malloc(sizeof(I) * (n + 1)), device_free};
     auto d_alpha_managed = hipsparse_unique_ptr{device_malloc(sizeof(T)), device_free};
     auto d_beta_managed  = hipsparse_unique_ptr{device_malloc(sizeof(T)), device_free};
 
@@ -443,17 +423,6 @@ hipsparseStatus_t testing_spgemm_csr(void)
     I* dcsr_row_ptr_C_2 = (I*)dcsr_row_ptr_C_2_managed.get();
     T* d_alpha          = (T*)d_alpha_managed.get();
     T* d_beta           = (T*)d_beta_managed.get();
-
-    if(!dcsr_row_ptr_A || !dcsr_col_ind_A || !dcsr_val_A || !dcsr_row_ptr_B || !dcsr_col_ind_B
-       || !dcsr_val_B || !dcsr_row_ptr_C_1 || !dcsr_row_ptr_C_2 || !d_alpha || !d_beta)
-    {
-        verify_hipsparse_status_success(
-            HIPSPARSE_STATUS_ALLOC_FAILED,
-            "!dcsr_row_ptr_A || !dcsr_col_ind_A || !dcsr_val_A || "
-            "!dcsr_row_ptr_B || !dcsr_col_ind_B || !dcsr_val_B || "
-            "!dcsr_row_ptr_C_1 || !dcsr_row_ptr_C_2 || !d_alpha || !d_beta");
-        return HIPSPARSE_STATUS_ALLOC_FAILED;
-    }
 
     // copy data from CPU to device
     CHECK_HIP_ERROR(hipMemcpy(
@@ -650,13 +619,8 @@ hipsparseStatus_t testing_spgemm_csr(void)
     J* dcsr_col_ind_C_2 = (J*)dcsr_col_ind_C_2_managed.get();
     T* dcsr_val_C_2     = (T*)dcsr_val_C_2_managed.get();
 
-    if(!dcsr_col_ind_C_1 || !dcsr_val_C_1 || !dcsr_col_ind_C_2 || !dcsr_val_C_2)
-    {
-        verify_hipsparse_status_success(
-            HIPSPARSE_STATUS_ALLOC_FAILED,
-            "!dcsr_col_ind_C_1 || !dcsr_val_C_1 || !dcsr_col_ind_C_2 || !dcsr_val_C_2");
-        return HIPSPARSE_STATUS_ALLOC_FAILED;
-    }
+    CHECK_HIP_ERROR(hipMemset(dcsr_val_C_1, 0, sizeof(T) * nnz_C_1));
+    CHECK_HIP_ERROR(hipMemset(dcsr_val_C_2, 0, sizeof(T) * nnz_C_2));
 
     // Set C pointers
     CHECK_HIPSPARSE_ERROR(
@@ -696,22 +660,22 @@ hipsparseStatus_t testing_spgemm_csr(void)
     // Compute SpGEMM nnz of C on host
     std::vector<I> hcsr_row_ptr_C_gold(m + 1);
 
-    int64_t nnz_C_gold = csrgemm2_nnz(m,
-                                      n,
-                                      k,
-                                      &h_alpha,
-                                      hcsr_row_ptr_A.data(),
-                                      hcsr_col_ind_A.data(),
-                                      hcsr_row_ptr_B.data(),
-                                      hcsr_col_ind_B.data(),
-                                      (const T*)nullptr,
-                                      (const I*)nullptr,
-                                      (const J*)nullptr,
-                                      hcsr_row_ptr_C_gold.data(),
-                                      idxBaseA,
-                                      idxBaseB,
-                                      idxBaseC,
-                                      HIPSPARSE_INDEX_BASE_ZERO);
+    int64_t nnz_C_gold = host_csrgemm2_nnz(m,
+                                           n,
+                                           k,
+                                           &h_alpha,
+                                           hcsr_row_ptr_A.data(),
+                                           hcsr_col_ind_A.data(),
+                                           hcsr_row_ptr_B.data(),
+                                           hcsr_col_ind_B.data(),
+                                           (const T*)nullptr,
+                                           (const I*)nullptr,
+                                           (const J*)nullptr,
+                                           hcsr_row_ptr_C_gold.data(),
+                                           idxBaseA,
+                                           idxBaseB,
+                                           idxBaseC,
+                                           HIPSPARSE_INDEX_BASE_ZERO);
 
     // Verify nnz and row pointer array
     unit_check_general(1, 1, 1, &nnz_C_gold, &nnz_C_1);
@@ -723,27 +687,27 @@ hipsparseStatus_t testing_spgemm_csr(void)
     std::vector<J> hcsr_col_ind_C_gold(nnz_C_gold);
     std::vector<T> hcsr_val_C_gold(nnz_C_gold);
 
-    csrgemm2(m,
-             n,
-             k,
-             &h_alpha,
-             hcsr_row_ptr_A.data(),
-             hcsr_col_ind_A.data(),
-             hcsr_val_A.data(),
-             hcsr_row_ptr_B.data(),
-             hcsr_col_ind_B.data(),
-             hcsr_val_B.data(),
-             (const T*)nullptr,
-             (const I*)nullptr,
-             (const J*)nullptr,
-             (const T*)nullptr,
-             hcsr_row_ptr_C_gold.data(),
-             hcsr_col_ind_C_gold.data(),
-             hcsr_val_C_gold.data(),
-             idxBaseA,
-             idxBaseB,
-             idxBaseC,
-             HIPSPARSE_INDEX_BASE_ZERO);
+    host_csrgemm2(m,
+                  n,
+                  k,
+                  &h_alpha,
+                  hcsr_row_ptr_A.data(),
+                  hcsr_col_ind_A.data(),
+                  hcsr_val_A.data(),
+                  hcsr_row_ptr_B.data(),
+                  hcsr_col_ind_B.data(),
+                  hcsr_val_B.data(),
+                  (const T*)nullptr,
+                  (const I*)nullptr,
+                  (const J*)nullptr,
+                  (const T*)nullptr,
+                  hcsr_row_ptr_C_gold.data(),
+                  hcsr_col_ind_C_gold.data(),
+                  hcsr_val_C_gold.data(),
+                  idxBaseA,
+                  idxBaseB,
+                  idxBaseC,
+                  HIPSPARSE_INDEX_BASE_ZERO);
 
     // Verify column and value array
     unit_check_general(1, nnz_C_gold, 1, hcsr_col_ind_C_gold.data(), hcsr_col_ind_C_1.data());
@@ -760,9 +724,9 @@ hipsparseStatus_t testing_spgemm_csr(void)
     CHECK_HIPSPARSE_ERROR(hipsparseDestroySpMat(B));
     CHECK_HIPSPARSE_ERROR(hipsparseDestroySpMat(C1));
     CHECK_HIPSPARSE_ERROR(hipsparseDestroySpMat(C2));
+#endif
 
     return HIPSPARSE_STATUS_SUCCESS;
-#endif
 }
 
 #endif // TESTING_SPGEMM_CSR_HPP

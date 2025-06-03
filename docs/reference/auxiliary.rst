@@ -1,16 +1,17 @@
 .. meta::
-  :description: hipSPARSE documentation and API reference library
-  :keywords: hipSPARSE, rocSPARSE, ROCm, API, documentation
+  :description: hipSPARSE sparse auxiliary functions API documentation
+  :keywords: hipSPARSE, rocSPARSE, ROCm, API, documentation, auxiliary functions
 
 .. _hipsparse_auxiliary_functions:
 
 ********************************************************************
-Sparse Auxiliary Functions
+Sparse auxiliary functions
 ********************************************************************
 
-This module holds all sparse auxiliary functions.
+This module contains all sparse auxiliary functions.
 
-The functions that are contained in the auxiliary module describe all available helper functions that are required for subsequent library calls.
+The functions that are contained in the auxiliary module describe all available helper functions
+that are required for subsequent library calls.
 
 .. _hipsparse_create_handle_:
 

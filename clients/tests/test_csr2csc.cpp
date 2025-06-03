@@ -31,8 +31,8 @@
 typedef std::tuple<int, int, hipsparseAction_t, hipsparseIndexBase_t>    csr2csc_tuple;
 typedef std::tuple<hipsparseAction_t, hipsparseIndexBase_t, std::string> csr2csc_bin_tuple;
 
-int csr2csc_M_range[] = {-1, 0, 10, 500, 872, 1000};
-int csr2csc_N_range[] = {-3, 0, 33, 242, 623, 1000};
+int csr2csc_M_range[] = {0, 10, 500, 872, 1000};
+int csr2csc_N_range[] = {0, 33, 242, 623, 1000};
 
 hipsparseAction_t csr2csc_action_range[] = {HIPSPARSE_ACTION_NUMERIC, HIPSPARSE_ACTION_SYMBOLIC};
 
@@ -73,22 +73,22 @@ protected:
 Arguments setup_csr2csc_arguments(csr2csc_tuple tup)
 {
     Arguments arg;
-    arg.M        = std::get<0>(tup);
-    arg.N        = std::get<1>(tup);
-    arg.action   = std::get<2>(tup);
-    arg.idx_base = std::get<3>(tup);
-    arg.timing   = 0;
+    arg.M      = std::get<0>(tup);
+    arg.N      = std::get<1>(tup);
+    arg.action = std::get<2>(tup);
+    arg.baseA  = std::get<3>(tup);
+    arg.timing = 0;
     return arg;
 }
 
 Arguments setup_csr2csc_arguments(csr2csc_bin_tuple tup)
 {
     Arguments arg;
-    arg.M        = -99;
-    arg.N        = -99;
-    arg.action   = std::get<0>(tup);
-    arg.idx_base = std::get<1>(tup);
-    arg.timing   = 0;
+    arg.M      = -99;
+    arg.N      = -99;
+    arg.action = std::get<0>(tup);
+    arg.baseA  = std::get<1>(tup);
+    arg.timing = 0;
 
     // Determine absolute path of test matrix
     std::string bin_file = std::get<2>(tup);
@@ -99,8 +99,7 @@ Arguments setup_csr2csc_arguments(csr2csc_bin_tuple tup)
     return arg;
 }
 
-// Only run tests for CUDA 11.1 or greater
-#if(!defined(CUDART_VERSION) || CUDART_VERSION >= 11010)
+#if(!defined(CUDART_VERSION) || CUDART_VERSION < 11000)
 TEST(csr2csc_bad_arg, csr2csc)
 {
     testing_csr2csc_bad_arg<float>();
@@ -153,7 +152,6 @@ TEST_P(parameterized_csr2csc_bin, csr2csc_bin_double)
     hipsparseStatus_t status = testing_csr2csc<double>(arg);
     EXPECT_EQ(status, HIPSPARSE_STATUS_SUCCESS);
 }
-#endif
 
 INSTANTIATE_TEST_SUITE_P(csr2csc,
                          parameterized_csr2csc,
@@ -167,3 +165,4 @@ INSTANTIATE_TEST_SUITE_P(csr2csc_bin,
                          testing::Combine(testing::ValuesIn(csr2csc_action_range),
                                           testing::ValuesIn(csr2csc_csr_base_range),
                                           testing::ValuesIn(csr2csc_bin)));
+#endif

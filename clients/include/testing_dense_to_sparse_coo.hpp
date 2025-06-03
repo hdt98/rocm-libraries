@@ -25,6 +25,10 @@
 #ifndef TESTING_DENSE_TO_SPARSE_COO_HPP
 #define TESTING_DENSE_TO_SPARSE_COO_HPP
 
+#include "display.hpp"
+#include "flops.hpp"
+#include "gbyte.hpp"
+#include "hipsparse_arguments.hpp"
 #include "hipsparse_test_unique_ptr.hpp"
 #include "unit.hpp"
 #include "utility.hpp"
@@ -59,7 +63,7 @@ void testing_dense_to_sparse_coo_bad_arg(void)
     auto ddense_val_managed
         = hipsparse_unique_ptr{device_malloc(sizeof(float) * safe_size), device_free};
     auto dcoo_row_ind_managed
-        = hipsparse_unique_ptr{device_malloc(sizeof(int64_t) * safe_size), device_free};
+        = hipsparse_unique_ptr{device_malloc(sizeof(int32_t) * safe_size), device_free};
     auto dcoo_col_ind_managed
         = hipsparse_unique_ptr{device_malloc(sizeof(int32_t) * safe_size), device_free};
     auto dcoo_val_managed
@@ -67,16 +71,10 @@ void testing_dense_to_sparse_coo_bad_arg(void)
     auto dbuf_managed = hipsparse_unique_ptr{device_malloc(sizeof(char) * safe_size), device_free};
 
     float*   ddense_val   = (float*)ddense_val_managed.get();
-    int64_t* dcoo_row_ind = (int64_t*)dcoo_row_ind_managed.get();
+    int32_t* dcoo_row_ind = (int32_t*)dcoo_row_ind_managed.get();
     int32_t* dcoo_col_ind = (int32_t*)dcoo_col_ind_managed.get();
     float*   dcoo_val     = (float*)dcoo_val_managed.get();
     void*    dbuf         = (void*)dbuf_managed.get();
-
-    if(!ddense_val || !dcoo_row_ind || !dcoo_col_ind || !dcoo_val || !dbuf)
-    {
-        PRINT_IF_HIP_ERROR(hipErrorOutOfMemory);
-        return;
-    }
 
     // Matrix structures
     hipsparseDnVecDescr_t matA;
@@ -135,58 +133,63 @@ void testing_dense_to_sparse_coo_bad_arg(void)
 }
 
 template <typename I, typename T>
-hipsparseStatus_t testing_dense_to_sparse_coo(void)
+hipsparseStatus_t testing_dense_to_sparse_coo(Arguments argus)
 {
 #if(!defined(CUDART_VERSION))
-    hipsparseIndexBase_t        idx_base = HIPSPARSE_INDEX_BASE_ZERO;
-    hipsparseDenseToSparseAlg_t alg      = HIPSPARSE_DENSETOSPARSE_ALG_DEFAULT;
-    hipsparseOrder_t            order    = HIPSPARSE_ORDER_COL;
+    I                           m        = argus.M;
+    I                           n        = argus.N;
+    hipsparseIndexBase_t        idx_base = argus.baseA;
+    hipsparseDenseToSparseAlg_t alg
+        = static_cast<hipsparseDenseToSparseAlg_t>(argus.dense2sparse_alg);
+    hipsparseOrder_t order = argus.orderA;
 
     // Index and data type
-    hipsparseIndexType_t typeI
-        = (typeid(I) == typeid(int32_t)) ? HIPSPARSE_INDEX_32I : HIPSPARSE_INDEX_64I;
-    hipDataType typeT = (typeid(T) == typeid(float))
-                            ? HIP_R_32F
-                            : ((typeid(T) == typeid(double))
-                                   ? HIP_R_64F
-                                   : ((typeid(T) == typeid(hipComplex) ? HIP_C_32F : HIP_C_64F)));
+    hipsparseIndexType_t typeI = getIndexType<I>();
+    hipDataType          typeT = getDataType<T>();
 
     // hipSPARSE handle
-    std::unique_ptr<handle_struct> test_handle(new handle_struct);
-    hipsparseHandle_t              handle = test_handle->handle;
+    std::unique_ptr<handle_struct> unique_ptr_handle(new handle_struct);
+    hipsparseHandle_t              handle = unique_ptr_handle->handle;
 
-    I m  = 100;
-    I n  = 100;
-    I ld = m;
+    I ld = (order == HIPSPARSE_ORDER_COL) ? m : n;
 
     // Host structures
-    std::vector<T> hdense_val(ld * n);
+    I              nrow = (order == HIPSPARSE_ORDER_COL) ? ld : m;
+    I              ncol = (order == HIPSPARSE_ORDER_COL) ? n : ld;
+    std::vector<T> hdense_val(nrow * ncol);
 
-    for(int i = 0; i < ld; ++i)
+    if(order == HIPSPARSE_ORDER_COL)
     {
-        for(int j = 0; j < n; ++j)
+        for(int i = 0; i < n; ++i)
         {
-            hdense_val[j * ld + i] = make_DataType<T>(-1);
+            for(int j = 0; j < ld; ++j)
+            {
+                hdense_val[i * ld + j] = make_DataType<T>(-1);
+            }
+        }
+    }
+    else
+    {
+        for(int i = 0; i < m; ++i)
+        {
+            for(int j = 0; j < ld; ++j)
+            {
+                hdense_val[i * ld + j] = make_DataType<T>(-1);
+            }
         }
     }
 
     srand(0);
-    gen_dense_random_sparsity_pattern(m, n, hdense_val.data(), ld, 0.2);
+    gen_dense_random_sparsity_pattern(m, n, hdense_val.data(), ld, order, 0.2);
 
     // allocate memory on device
-    auto ddense_managed = hipsparse_unique_ptr{device_malloc(sizeof(T) * ld * n), device_free};
+    auto ddense_managed = hipsparse_unique_ptr{device_malloc(sizeof(T) * nrow * ncol), device_free};
 
     T* ddense = (T*)ddense_managed.get();
 
-    if(!ddense)
-    {
-        verify_hipsparse_status_success(HIPSPARSE_STATUS_ALLOC_FAILED, "!ddense");
-        return HIPSPARSE_STATUS_ALLOC_FAILED;
-    }
-
     // Copy host dense matrix to device
     CHECK_HIP_ERROR(
-        hipMemcpy(ddense, hdense_val.data(), sizeof(T) * ld * n, hipMemcpyHostToDevice));
+        hipMemcpy(ddense, hdense_val.data(), sizeof(T) * nrow * ncol, hipMemcpyHostToDevice));
 
     // Create dense matrix
     hipsparseDnMatDescr_t matA;
@@ -217,52 +220,107 @@ hipsparseStatus_t testing_dense_to_sparse_coo(void)
     I* dcol = (I*)dcol_managed.get();
     T* dval = (T*)dval_managed.get();
 
-    if(!drow || !dcol || !dval)
-    {
-        verify_hipsparse_status_success(HIPSPARSE_STATUS_ALLOC_FAILED, "!drow || !dcol || !dval");
-        return HIPSPARSE_STATUS_ALLOC_FAILED;
-    }
-
     CHECK_HIPSPARSE_ERROR(hipsparseCooSetPointers(matB, drow, dcol, dval));
 
-    CHECK_HIPSPARSE_ERROR(hipsparseDenseToSparse_convert(handle, matA, matB, alg, buffer));
-
-    // copy output from device to CPU
-    std::vector<I> hcoo_row_ind(nnz);
-    std::vector<I> hcoo_col_ind(nnz);
-    std::vector<T> hcoo_val(nnz);
-
-    CHECK_HIP_ERROR(hipMemcpy(hcoo_row_ind.data(), drow, sizeof(I) * nnz, hipMemcpyDeviceToHost));
-    CHECK_HIP_ERROR(hipMemcpy(hcoo_col_ind.data(), dcol, sizeof(I) * nnz, hipMemcpyDeviceToHost));
-    CHECK_HIP_ERROR(hipMemcpy(hcoo_val.data(), dval, sizeof(T) * nnz, hipMemcpyDeviceToHost));
-
-    // Query for warpSize
-    hipDeviceProp_t prop;
-    hipGetDeviceProperties(&prop, 0);
-
-    std::vector<I> hcoo_row_ind_cpu(nnz);
-    std::vector<I> hcoo_col_ind_cpu(nnz);
-    std::vector<T> hcoo_val_cpu(nnz);
-
-    int index = 0;
-    for(I i = 0; i < m; ++i)
+    if(argus.unit_check)
     {
-        for(I j = 0; j < n; ++j)
-        {
-            if(hdense_val[j * ld + i] != make_DataType<T>(0.0))
-            {
-                hcoo_row_ind_cpu[index] = i + idx_base;
-                hcoo_col_ind_cpu[index] = j + idx_base;
-                hcoo_val_cpu[index]     = hdense_val[j * ld + i];
+        CHECK_HIPSPARSE_ERROR(hipsparseDenseToSparse_convert(handle, matA, matB, alg, buffer));
 
-                index++;
+        // copy output from device to CPU
+        std::vector<I> hcoo_row_ind(nnz);
+        std::vector<I> hcoo_col_ind(nnz);
+        std::vector<T> hcoo_val(nnz);
+
+        CHECK_HIP_ERROR(
+            hipMemcpy(hcoo_row_ind.data(), drow, sizeof(I) * nnz, hipMemcpyDeviceToHost));
+        CHECK_HIP_ERROR(
+            hipMemcpy(hcoo_col_ind.data(), dcol, sizeof(I) * nnz, hipMemcpyDeviceToHost));
+        CHECK_HIP_ERROR(hipMemcpy(hcoo_val.data(), dval, sizeof(T) * nnz, hipMemcpyDeviceToHost));
+
+        std::vector<I> hcoo_row_ind_cpu(nnz);
+        std::vector<I> hcoo_col_ind_cpu(nnz);
+        std::vector<T> hcoo_val_cpu(nnz);
+
+        if(order == HIPSPARSE_ORDER_COL)
+        {
+            int index = 0;
+            for(I i = 0; i < m; ++i)
+            {
+                for(I j = 0; j < n; ++j)
+                {
+                    if(hdense_val[j * ld + i] != make_DataType<T>(0.0))
+                    {
+                        hcoo_row_ind_cpu[index] = i + idx_base;
+                        hcoo_col_ind_cpu[index] = j + idx_base;
+                        hcoo_val_cpu[index]     = hdense_val[j * ld + i];
+
+                        index++;
+                    }
+                }
             }
         }
+        else
+        {
+            int index = 0;
+            for(I i = 0; i < m; ++i)
+            {
+                for(I j = 0; j < n; ++j)
+                {
+                    if(hdense_val[i * ld + j] != make_DataType<T>(0.0))
+                    {
+                        hcoo_row_ind_cpu[index] = i + idx_base;
+                        hcoo_col_ind_cpu[index] = j + idx_base;
+                        hcoo_val_cpu[index]     = hdense_val[i * ld + j];
+
+                        index++;
+                    }
+                }
+            }
+        }
+
+        unit_check_general(1, nnz, 1, hcoo_row_ind_cpu.data(), hcoo_row_ind.data());
+        unit_check_general(1, nnz, 1, hcoo_col_ind_cpu.data(), hcoo_col_ind.data());
+        unit_check_general(1, nnz, 1, hcoo_val_cpu.data(), hcoo_val.data());
     }
 
-    unit_check_general(1, nnz, 1, hcoo_row_ind_cpu.data(), hcoo_row_ind.data());
-    unit_check_general(1, nnz, 1, hcoo_col_ind_cpu.data(), hcoo_col_ind.data());
-    unit_check_general(1, nnz, 1, hcoo_val_cpu.data(), hcoo_val.data());
+    if(argus.timing)
+    {
+        int number_cold_calls = 2;
+        int number_hot_calls  = argus.iters;
+
+        // Warm-up
+        for(int iter = 0; iter < number_cold_calls; ++iter)
+        {
+            CHECK_HIPSPARSE_ERROR(hipsparseDenseToSparse_convert(handle, matA, matB, alg, buffer));
+        }
+
+        double gpu_time_used = get_time_us();
+
+        // Performance run
+        for(int iter = 0; iter < number_hot_calls; ++iter)
+        {
+            CHECK_HIPSPARSE_ERROR(hipsparseDenseToSparse_convert(handle, matA, matB, alg, buffer));
+        }
+        gpu_time_used = (get_time_us() - gpu_time_used) / number_hot_calls;
+
+        double gbyte_count = dense2coo_gbyte_count<T>(m, n, (I)nnz);
+        double gpu_gbyte   = get_gpu_gbyte(gpu_time_used, gbyte_count);
+
+        display_timing_info(display_key_t::M,
+                            m,
+                            display_key_t::N,
+                            n,
+                            display_key_t::nnz,
+                            nnz,
+                            display_key_t::order,
+                            order,
+                            display_key_t::algorithm,
+                            hipsparse_densetosparsealg2string(alg),
+                            display_key_t::bandwidth,
+                            gpu_gbyte,
+                            display_key_t::time_ms,
+                            get_gpu_time_msec(gpu_time_used));
+    }
 
     CHECK_HIP_ERROR(hipFree(buffer));
     CHECK_HIPSPARSE_ERROR(hipsparseDestroyDnMat(matA));

@@ -31,7 +31,7 @@ typedef hipsparseIndexBase_t       base;
 typedef std::tuple<int, int, base> gthr_tuple;
 
 int gthr_N_range[]   = {12000, 15332, 22031};
-int gthr_nnz_range[] = {-1, 0, 5, 10, 500, 1000, 7111, 10000};
+int gthr_nnz_range[] = {0, 5, 10, 500, 1000, 7111, 10000};
 
 base gthr_idx_base_range[] = {HIPSPARSE_INDEX_BASE_ZERO, HIPSPARSE_INDEX_BASE_ONE};
 
@@ -47,15 +47,14 @@ protected:
 Arguments setup_gthr_arguments(gthr_tuple tup)
 {
     Arguments arg;
-    arg.N        = std::get<0>(tup);
-    arg.nnz      = std::get<1>(tup);
-    arg.idx_base = std::get<2>(tup);
-    arg.timing   = 0;
+    arg.N      = std::get<0>(tup);
+    arg.nnz    = std::get<1>(tup);
+    arg.baseA  = std::get<2>(tup);
+    arg.timing = 0;
     return arg;
 }
 
-// Only run tests for CUDA 11.1 or greater (removed in cusparse 12.0.0)
-#if(!defined(CUDART_VERSION) || (CUDART_VERSION >= 11010 && CUDART_VERSION < 12000))
+#if(!defined(CUDART_VERSION) || CUDART_VERSION < 12000)
 TEST(gthr_bad_arg, gthr_float)
 {
     testing_gthr_bad_arg<float>();
@@ -92,10 +91,10 @@ TEST_P(parameterized_gthr, gthr_double_complex)
     hipsparseStatus_t status = testing_gthr<hipDoubleComplex>(arg);
     EXPECT_EQ(status, HIPSPARSE_STATUS_SUCCESS);
 }
-#endif
 
 INSTANTIATE_TEST_SUITE_P(gthr,
                          parameterized_gthr,
                          testing::Combine(testing::ValuesIn(gthr_N_range),
                                           testing::ValuesIn(gthr_nnz_range),
                                           testing::ValuesIn(gthr_idx_base_range)));
+#endif

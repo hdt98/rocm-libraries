@@ -25,7 +25,11 @@
 #ifndef TESTING_SCTR_HPP
 #define TESTING_SCTR_HPP
 
+#include "display.hpp"
+#include "flops.hpp"
+#include "gbyte.hpp"
 #include "hipsparse.hpp"
+#include "hipsparse_arguments.hpp"
 #include "hipsparse_test_unique_ptr.hpp"
 #include "unit.hpp"
 #include "utility.hpp"
@@ -54,12 +58,6 @@ void testing_sctr_bad_arg(void)
     int* dx_ind = (int*)dx_ind_managed.get();
     T*   dy     = (T*)dy_managed.get();
 
-    if(!dx_ind || !dx_val || !dy)
-    {
-        PRINT_IF_HIP_ERROR(hipErrorOutOfMemory);
-        return;
-    }
-
     verify_hipsparse_status_invalid_value(hipsparseXsctr(handle, -1, dx_val, dx_ind, dy, idx_base),
                                           "Error: nnz is invalid");
 
@@ -81,49 +79,12 @@ template <typename T>
 hipsparseStatus_t testing_sctr(Arguments argus)
 {
 #if(!defined(CUDART_VERSION) || CUDART_VERSION < 12000)
-    int                  N         = argus.N;
-    int                  nnz       = argus.nnz;
-    int                  safe_size = 100;
-    hipsparseIndexBase_t idx_base  = argus.idx_base;
-    hipsparseStatus_t    status;
+    int                  N        = argus.N;
+    int                  nnz      = argus.nnz;
+    hipsparseIndexBase_t idx_base = argus.baseA;
 
-    std::unique_ptr<handle_struct> test_handle(new handle_struct);
-    hipsparseHandle_t              handle = test_handle->handle;
-
-    // Argument sanity check before allocating invalid memory
-    if(nnz <= 0)
-    {
-        auto dx_ind_managed
-            = hipsparse_unique_ptr{device_malloc(sizeof(int) * safe_size), device_free};
-        auto dx_val_managed
-            = hipsparse_unique_ptr{device_malloc(sizeof(T) * safe_size), device_free};
-        auto dy_managed = hipsparse_unique_ptr{device_malloc(sizeof(T) * safe_size), device_free};
-
-        int* dx_ind = (int*)dx_ind_managed.get();
-        T*   dx_val = (T*)dx_val_managed.get();
-        T*   dy     = (T*)dy_managed.get();
-
-        if(!dx_ind || !dx_val || !dy)
-        {
-            verify_hipsparse_status_success(HIPSPARSE_STATUS_ALLOC_FAILED,
-                                            "!dx_ind || !dx_val || !dy");
-            return HIPSPARSE_STATUS_ALLOC_FAILED;
-        }
-
-        CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_HOST));
-        status = hipsparseXsctr(handle, nnz, dx_val, dx_ind, dy, idx_base);
-
-        if(nnz < 0)
-        {
-            verify_hipsparse_status_invalid_size(status, "Error: nnz < 0");
-        }
-        else
-        {
-            verify_hipsparse_status_success(status, "nnz == 0");
-        }
-
-        return HIPSPARSE_STATUS_SUCCESS;
-    }
+    std::unique_ptr<handle_struct> unique_ptr_handle(new handle_struct);
+    hipsparseHandle_t              handle = unique_ptr_handle->handle;
 
     // Host structures
     std::vector<int> hx_ind(nnz);
@@ -148,12 +109,6 @@ hipsparseStatus_t testing_sctr(Arguments argus)
     T*   dx_val = (T*)dx_val_managed.get();
     T*   dy     = (T*)dy_managed.get();
 
-    if(!dx_ind || !dx_val || !dy)
-    {
-        verify_hipsparse_status_success(HIPSPARSE_STATUS_ALLOC_FAILED, "!dx_ind || !dx_val || !dy");
-        return HIPSPARSE_STATUS_ALLOC_FAILED;
-    }
-
     // copy data from CPU to device
     CHECK_HIP_ERROR(hipMemcpy(dx_ind, hx_ind.data(), sizeof(int) * nnz, hipMemcpyHostToDevice));
     CHECK_HIP_ERROR(hipMemcpy(dx_val, hx_val.data(), sizeof(T) * nnz, hipMemcpyHostToDevice));
@@ -161,7 +116,7 @@ hipsparseStatus_t testing_sctr(Arguments argus)
 
     if(argus.unit_check)
     {
-        // ROCSPARSE pointer mode host
+        // HIPSPARSE pointer mode host
         CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_HOST));
         CHECK_HIPSPARSE_ERROR(hipsparseXsctr(handle, nnz, dx_val, dx_ind, dy, idx_base));
 
@@ -176,6 +131,40 @@ hipsparseStatus_t testing_sctr(Arguments argus)
         // enable unit check, notice unit check is not invasive, but norm check is,
         // unit check and norm check can not be interchanged their order
         unit_check_general(1, N, 1, hy_gold.data(), hy.data());
+    }
+
+    if(argus.timing)
+    {
+        int number_cold_calls = 2;
+        int number_hot_calls  = argus.iters;
+
+        CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_HOST));
+
+        // Warm up
+        for(int iter = 0; iter < number_cold_calls; ++iter)
+        {
+            CHECK_HIPSPARSE_ERROR(hipsparseXsctr(handle, nnz, dx_val, dx_ind, dy, idx_base));
+        }
+
+        double gpu_time_used = get_time_us();
+
+        // Performance run
+        for(int iter = 0; iter < number_hot_calls; ++iter)
+        {
+            CHECK_HIPSPARSE_ERROR(hipsparseXsctr(handle, nnz, dx_val, dx_ind, dy, idx_base));
+        }
+
+        gpu_time_used = (get_time_us() - gpu_time_used) / number_hot_calls;
+
+        double gbyte_count = sctr_gbyte_count<T>(nnz);
+        double gpu_gbyte   = get_gpu_gbyte(gpu_time_used, gbyte_count);
+
+        display_timing_info(display_key_t::nnz,
+                            nnz,
+                            display_key_t::bandwidth,
+                            gpu_gbyte,
+                            display_key_t::time_ms,
+                            get_gpu_time_msec(gpu_time_used));
     }
 #endif
 

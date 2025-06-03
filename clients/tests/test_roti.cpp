@@ -31,7 +31,7 @@ typedef hipsparseIndexBase_t                       base;
 typedef std::tuple<int, int, double, double, base> roti_tuple;
 
 int roti_N_range[]   = {12000, 15332, 22031};
-int roti_nnz_range[] = {-1, 0, 5, 10, 500, 1000, 7111, 10000};
+int roti_nnz_range[] = {0, 5, 10, 500, 1000, 7111, 10000};
 
 double roti_c_range[] = {-2.0, 0.0, 1.0};
 double roti_s_range[] = {-3.0, 0.0, 4.0};
@@ -50,17 +50,16 @@ protected:
 Arguments setup_roti_arguments(roti_tuple tup)
 {
     Arguments arg;
-    arg.N        = std::get<0>(tup);
-    arg.nnz      = std::get<1>(tup);
-    arg.alpha    = std::get<2>(tup);
-    arg.beta     = std::get<3>(tup);
-    arg.idx_base = std::get<4>(tup);
-    arg.timing   = 0;
+    arg.N      = std::get<0>(tup);
+    arg.nnz    = std::get<1>(tup);
+    arg.alpha  = std::get<2>(tup);
+    arg.beta   = std::get<3>(tup);
+    arg.baseA  = std::get<4>(tup);
+    arg.timing = 0;
     return arg;
 }
 
-// Only run tests for CUDA 11.1 or greater (removed in cusparse 12.0.0)
-#if(!defined(CUDART_VERSION) || (CUDART_VERSION >= 11010 && CUDART_VERSION < 12000))
+#if(!defined(CUDART_VERSION) || CUDART_VERSION < 12000)
 TEST(roti_bad_arg, roti_float)
 {
     testing_roti_bad_arg<float>();
@@ -81,7 +80,6 @@ TEST_P(parameterized_roti, roti_double)
     hipsparseStatus_t status = testing_roti<double>(arg);
     EXPECT_EQ(status, HIPSPARSE_STATUS_SUCCESS);
 }
-#endif
 
 INSTANTIATE_TEST_SUITE_P(roti,
                          parameterized_roti,
@@ -90,3 +88,4 @@ INSTANTIATE_TEST_SUITE_P(roti,
                                           testing::ValuesIn(roti_c_range),
                                           testing::ValuesIn(roti_s_range),
                                           testing::ValuesIn(roti_idx_base_range)));
+#endif

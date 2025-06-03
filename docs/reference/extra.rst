@@ -1,14 +1,14 @@
 .. meta::
-  :description: hipSPARSE documentation and API reference library
-  :keywords: hipSPARSE, rocSPARSE, ROCm, API, documentation
+  :description: hipSPARSE sparse extra functions API documentation
+  :keywords: hipSPARSE, rocSPARSE, ROCm, API, documentation, extra functions
 
 .. _hipsparse_extra_functions:
 
 ********************************************************************
-Sparse Extra Functions
+Sparse extra functions
 ********************************************************************
 
-This module holds all sparse extra routines.
+This module contains all sparse extra routines.
 
 The sparse extra routines describe operations that manipulate sparse matrices.
 

@@ -27,7 +27,7 @@
 #include <hipsparse.h>
 #include <vector>
 
-int identity_N_range[] = {-3, 0, 33, 242, 623, 1000};
+int identity_N_range[] = {0, 33, 242, 623, 1000};
 
 class parameterized_identity : public testing::TestWithParam<int>
 {
@@ -46,8 +46,7 @@ Arguments setup_identity_arguments(int n)
     return arg;
 }
 
-// Only run tests for CUDA 11.1 or greater
-#if(!defined(CUDART_VERSION) || CUDART_VERSION >= 11010)
+#if(!defined(CUDART_VERSION) || CUDART_VERSION < 13000)
 TEST(identity_bad_arg, identity)
 {
     testing_identity_bad_arg();
@@ -60,6 +59,6 @@ TEST_P(parameterized_identity, identity)
     hipsparseStatus_t status = testing_identity(arg);
     EXPECT_EQ(status, HIPSPARSE_STATUS_SUCCESS);
 }
-#endif
 
 INSTANTIATE_TEST_SUITE_P(identity, parameterized_identity, testing::ValuesIn(identity_N_range));
+#endif

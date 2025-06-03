@@ -31,8 +31,8 @@
 typedef std::tuple<int, int, hipsparseIndexBase_t>    csr2coo_tuple;
 typedef std::tuple<hipsparseIndexBase_t, std::string> csr2coo_bin_tuple;
 
-int csr2coo_M_range[] = {-1, 0, 10, 500, 872, 1000};
-int csr2coo_N_range[] = {-3, 0, 33, 242, 623, 1000};
+int csr2coo_M_range[] = {0, 10, 500, 872, 1000};
+int csr2coo_N_range[] = {0, 33, 242, 623, 1000};
 
 hipsparseIndexBase_t csr2coo_idx_base_range[]
     = {HIPSPARSE_INDEX_BASE_ZERO, HIPSPARSE_INDEX_BASE_ONE};
@@ -78,20 +78,20 @@ protected:
 Arguments setup_csr2coo_arguments(csr2coo_tuple tup)
 {
     Arguments arg;
-    arg.M        = std::get<0>(tup);
-    arg.N        = std::get<1>(tup);
-    arg.idx_base = std::get<2>(tup);
-    arg.timing   = 0;
+    arg.M      = std::get<0>(tup);
+    arg.N      = std::get<1>(tup);
+    arg.baseA  = std::get<2>(tup);
+    arg.timing = 0;
     return arg;
 }
 
 Arguments setup_csr2coo_arguments(csr2coo_bin_tuple tup)
 {
     Arguments arg;
-    arg.M        = -99;
-    arg.N        = -99;
-    arg.idx_base = std::get<0>(tup);
-    arg.timing   = 0;
+    arg.M      = -99;
+    arg.N      = -99;
+    arg.baseA  = std::get<0>(tup);
+    arg.timing = 0;
 
     // Determine absolute path of test matrix
     std::string bin_file = std::get<1>(tup);
@@ -102,29 +102,26 @@ Arguments setup_csr2coo_arguments(csr2coo_bin_tuple tup)
     return arg;
 }
 
-// Only run tests for CUDA 11.1 or greater
-#if(!defined(CUDART_VERSION) || CUDART_VERSION >= 11010)
 TEST(csr2coo_bad_arg, csr2coo)
 {
     testing_csr2coo_bad_arg();
 }
 
-TEST_P(parameterized_csr2coo, csr2coo)
+TEST_P(parameterized_csr2coo, csr2coo_float)
 {
     Arguments arg = setup_csr2coo_arguments(GetParam());
 
-    hipsparseStatus_t status = testing_csr2coo(arg);
+    hipsparseStatus_t status = testing_csr2coo<float>(arg);
     EXPECT_EQ(status, HIPSPARSE_STATUS_SUCCESS);
 }
 
-TEST_P(parameterized_csr2coo_bin, csr2coo_bin)
+TEST_P(parameterized_csr2coo_bin, csr2coo_bin_float)
 {
     Arguments arg = setup_csr2coo_arguments(GetParam());
 
-    hipsparseStatus_t status = testing_csr2coo(arg);
+    hipsparseStatus_t status = testing_csr2coo<float>(arg);
     EXPECT_EQ(status, HIPSPARSE_STATUS_SUCCESS);
 }
-#endif
 
 INSTANTIATE_TEST_SUITE_P(csr2coo,
                          parameterized_csr2coo,

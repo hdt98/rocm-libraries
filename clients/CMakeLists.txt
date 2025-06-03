@@ -52,12 +52,22 @@ if(NOT TARGET hipsparse)
 
   option(BUILD_CLIENTS_TESTS "Build tests (requires googletest)" OFF)
   option(BUILD_CLIENTS_SAMPLES "Build examples" ON)
+  option(BUILD_CLIENTS_BENCHMARKS "Build benchmarks" ON)
 endif()
 
-# Build flags
-set(CMAKE_CXX_STANDARD 11)
+# Set CXX flags
+if (NOT DEFINED CMAKE_CXX_STANDARD)
+  set(CMAKE_CXX_STANDARD 17)
+endif()
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+
+# Set CXX standard
+if (CMAKE_CXX_STANDARD EQUAL 14)
+  message( DEPRECATION "Builds using the C++14 standard will no longer be supported in the next major release" )
+elseif(NOT CMAKE_CXX_STANDARD EQUAL 17)
+  message(FATAL_ERROR "Only C++14 and C++17 are supported")
+endif()
 
 # If OpenMP is available, we can use it to speed up some tests
 find_package(OpenMP QUIET)
@@ -76,6 +86,10 @@ if(BUILD_CLIENTS_SAMPLES)
   add_subdirectory(samples)
 endif()
 
+if(BUILD_CLIENTS_BENCHMARKS)
+  add_subdirectory(benchmarks)
+endif()
+
 if(BUILD_CLIENTS_TESTS)
   enable_testing()
   add_subdirectory(tests)
@@ -83,7 +97,7 @@ if(BUILD_CLIENTS_TESTS)
   if(NOT CONVERT_SOURCE)
     set(CONVERT_SOURCE ${CMAKE_SOURCE_DIR}/deps/convert.cpp)
   endif()
-  execute_process(COMMAND ${CMAKE_CXX_COMPILER} ${CONVERT_SOURCE} -O3 -o ${PROJECT_BINARY_DIR}/mtx2csr.exe RESULT_VARIABLE STATUS)
+  execute_process(COMMAND ${CMAKE_CXX_COMPILER} ${CONVERT_SOURCE} -Wl,--build-id=sha1 -O3 -o ${PROJECT_BINARY_DIR}/mtx2csr.exe RESULT_VARIABLE STATUS)
   if(STATUS AND NOT STATUS EQUAL 0)
     message(FATAL_ERROR "mtx2csr.exe failed to build, aborting.")
   endif()
@@ -97,16 +111,16 @@ if(BUILD_CLIENTS_TESTS)
     WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
   
   add_custom_target(hipsparse-common DEPENDS "${HIPSPARSE_CLIENTMATRICES}" "${HIPSPARSE_CONVERT}")
-  
+
   rocm_install(
     PROGRAMS "${HIPSPARSE_CONVERT}"
-    COMPONENT tests
+    COMPONENT clients-common
     DESTINATION ${CMAKE_INSTALL_BINDIR}
     )
   
   rocm_install(
     FILES "${HIPSPARSE_CLIENTMATRICES}"
-    COMPONENT tests
+    COMPONENT clients-common
     DESTINATION "${CMAKE_INSTALL_DATADIR}/hipsparse/test"
     )
   

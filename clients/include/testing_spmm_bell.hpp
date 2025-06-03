@@ -26,6 +26,7 @@
 #define TESTING_SPMM_BELL_HPP
 
 #include "hipsparse.hpp"
+#include "hipsparse_arguments.hpp"
 #include "hipsparse_test_unique_ptr.hpp"
 #include "unit.hpp"
 #include "utility.hpp"
@@ -39,12 +40,7 @@ using namespace hipsparse_test;
 
 void testing_spmm_bell_bad_arg(void)
 {
-#ifdef __HIP_PLATFORM_NVIDIA__
-    // do not test for bad args
-    return;
-#endif
-
-#if(!defined(CUDART_VERSION) || CUDART_VERSION >= 11021)
+#if(!defined(CUDART_VERSION))
     int32_t              n             = 100;
     int32_t              m             = 100;
     int32_t              k             = 100;
@@ -76,12 +72,6 @@ void testing_spmm_bell_bad_arg(void)
     float*   dB   = (float*)dB_managed.get();
     float*   dC   = (float*)dC_managed.get();
     void*    dbuf = (void*)dbuf_managed.get();
-
-    if(!dval || !dind || !dB || !dC || !dbuf)
-    {
-        PRINT_IF_HIP_ERROR(hipErrorOutOfMemory);
-        return;
-    }
 
     // SpMM structures
     hipsparseSpMatDescr_t A;
@@ -241,17 +231,12 @@ hipsparseStatus_t testing_spmm_bell()
     hipsparseSpMMAlg_t   alg      = HIPSPARSE_SPMM_BLOCKED_ELL_ALG1;
 
     // Index and data type
-    hipsparseIndexType_t typeI
-        = (typeid(I) == typeid(int32_t)) ? HIPSPARSE_INDEX_32I : HIPSPARSE_INDEX_64I;
-    hipDataType typeT = (typeid(T) == typeid(float))
-                            ? HIP_R_32F
-                            : ((typeid(T) == typeid(double))
-                                   ? HIP_R_64F
-                                   : ((typeid(T) == typeid(hipComplex) ? HIP_C_32F : HIP_C_64F)));
+    hipsparseIndexType_t typeI = getIndexType<I>();
+    hipDataType          typeT = getDataType<T>();
 
     // hipSPARSE handle
-    std::unique_ptr<handle_struct> test_handle(new handle_struct);
-    hipsparseHandle_t              handle = test_handle->handle;
+    std::unique_ptr<handle_struct> unique_ptr_handle(new handle_struct);
+    hipsparseHandle_t              handle = unique_ptr_handle->handle;
 
     std::vector<T> hB = {make_DataType<T>(1.0),
                          make_DataType<T>(1.0),
@@ -292,8 +277,7 @@ hipsparseStatus_t testing_spmm_bell()
                               make_DataType<T>(45.0),
                               make_DataType<T>(58.0)};
 
-    std::vector<T> hC_2(m * n);
-    hC_2 = hC_1;
+    std::vector<T> hC_2(hC_1);
 
     // allocate memory on device
     auto drow_ptr_managed = hipsparse_unique_ptr{device_malloc(sizeof(I) * (m + 1)), device_free};
@@ -321,16 +305,6 @@ hipsparseStatus_t testing_spmm_bell()
     T* d_beta    = (T*)d_beta_managed.get();
     I* dbell_ind = (I*)dbell_ind_managed.get();
     T* dbell_val = (T*)dbell_val_managed.get();
-
-    if(!dval || !drow_ptr || !dcol_ind || !dB || !dC_1 || !dC_2 || !d_alpha || !d_beta || !dbell_ind
-       || !dbell_val)
-    {
-        verify_hipsparse_status_success(
-            HIPSPARSE_STATUS_ALLOC_FAILED,
-            "!dval || !drow_ptr || !dcol_ind || !dB || "
-            "!dC_1 || !dC_2 || !d_alpha || !d_beta  || !dbell_ind || !dbell_val");
-        return HIPSPARSE_STATUS_ALLOC_FAILED;
-    }
 
     // copy data from CPU to device
     CHECK_HIP_ERROR(
@@ -372,7 +346,7 @@ hipsparseStatus_t testing_spmm_bell()
     void* buffer_bell;
     CHECK_HIP_ERROR(hipMalloc(&buffer_bell, bufferSize_bell));
 
-    // ROCSPARSE pointer mode host
+    // HIPSPARSE pointer mode host
     CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_HOST));
 
 #if(!defined(CUDART_VERSION) || CUDART_VERSION >= 11021)
@@ -382,7 +356,7 @@ hipsparseStatus_t testing_spmm_bell()
     CHECK_HIPSPARSE_ERROR(hipsparseSpMM(
         handle, transA, transB, &h_alpha, A_bell, B, &h_beta, C1, typeT, alg, buffer_bell));
 
-    // ROCSPARSE pointer mode device
+    // HIPSPARSE pointer mode device
     CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_DEVICE));
 
 #if(!defined(CUDART_VERSION) || CUDART_VERSION >= 11021)

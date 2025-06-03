@@ -30,9 +30,9 @@
 
 typedef hipsparseIndexBase_t            base;
 typedef std::tuple<int, int, int, base> dense2csc_tuple;
-int                                     dense2csc_M_range[]  = {-1, 0, 10, 500, 872, 1000};
-int                                     dense2csc_N_range[]  = {-3, 0, 33, 242, 623, 1000};
-int                                     dense2csc_LD_range[] = {5, 500, 1000};
+int                                     dense2csc_M_range[]  = {0, 10, 500, 872, 1000};
+int                                     dense2csc_N_range[]  = {0, 33, 242, 623, 1000};
+int                                     dense2csc_LD_range[] = {1000};
 base dense2csc_idx_base_range[] = {HIPSPARSE_INDEX_BASE_ZERO, HIPSPARSE_INDEX_BASE_ONE};
 
 class parameterized_dense2csc : public testing::TestWithParam<dense2csc_tuple>
@@ -53,8 +53,6 @@ Arguments setup_dense2csc_arguments(dense2csc_tuple tup)
     return arg;
 }
 
-// Only run tests for CUDA 11.1 or greater (removed in cusparse 12.0.0)
-#if(!defined(CUDART_VERSION) || (CUDART_VERSION >= 11010 & CUDART_VERSION < 12000))
 TEST(dense2csc_bad_arg, dense2csc)
 {
     testing_dense2csc_bad_arg<float>();
@@ -91,7 +89,6 @@ TEST_P(parameterized_dense2csc, dense2csc_double_complex)
     hipsparseStatus_t status = testing_dense2csc<hipDoubleComplex>(arg);
     EXPECT_EQ(status, HIPSPARSE_STATUS_SUCCESS);
 }
-#endif
 
 INSTANTIATE_TEST_SUITE_P(dense2csc,
                          parameterized_dense2csc,

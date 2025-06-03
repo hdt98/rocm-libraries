@@ -35,18 +35,19 @@ typedef std::
         bsr2csr_bin_tuple;
 
 // Random matrices
-int bsr2csr_M_range[]         = {0, 872, 13095, 21453};
-int bsr2csr_N_range[]         = {0, 623, 12766, 29285};
+int bsr2csr_M_range[]         = {0, 872, 21453};
+int bsr2csr_N_range[]         = {0, 12766, 29285};
 int bsr2csr_block_dim_range[] = {1, 2, 4, 7, 16};
 
-hipsparseIndexBase_t bsr2csr_csr_base_range[] = {HIPSPARSE_INDEX_BASE_ZERO};
+hipsparseIndexBase_t bsr2csr_csr_base_range[]
+    = {HIPSPARSE_INDEX_BASE_ZERO, HIPSPARSE_INDEX_BASE_ONE};
 
-hipsparseIndexBase_t bsr2csr_bsr_base_range[] = {HIPSPARSE_INDEX_BASE_ONE};
+hipsparseIndexBase_t bsr2csr_bsr_base_range[]
+    = {HIPSPARSE_INDEX_BASE_ZERO, HIPSPARSE_INDEX_BASE_ONE};
 
 hipsparseDirection_t bsr2csr_dir_range[] = {HIPSPARSE_DIRECTION_ROW, HIPSPARSE_DIRECTION_COLUMN};
 
-// Matrices from files (float and double)
-int bsr2csr_block_dim_range_bin[] = {5};
+int bsr2csr_block_dim_range_bin[] = {5, 7, 12};
 
 hipsparseIndexBase_t bsr2csr_csr_base_range_bin[] = {HIPSPARSE_INDEX_BASE_ONE};
 
@@ -82,8 +83,8 @@ Arguments setup_bsr2csr_arguments(bsr2csr_tuple tup)
     arg.M         = std::get<0>(tup);
     arg.N         = std::get<1>(tup);
     arg.block_dim = std::get<2>(tup);
-    arg.idx_base  = std::get<3>(tup);
-    arg.idx_base2 = std::get<4>(tup);
+    arg.baseA     = std::get<3>(tup);
+    arg.baseB     = std::get<4>(tup);
     arg.dirA      = std::get<5>(tup);
     arg.timing    = 0;
     return arg;
@@ -95,8 +96,8 @@ Arguments setup_bsr2csr_arguments(bsr2csr_bin_tuple tup)
     arg.M         = -99;
     arg.N         = -99;
     arg.block_dim = std::get<0>(tup);
-    arg.idx_base  = std::get<1>(tup);
-    arg.idx_base2 = std::get<2>(tup);
+    arg.baseA     = std::get<1>(tup);
+    arg.baseB     = std::get<2>(tup);
     arg.dirA      = std::get<3>(tup);
     arg.timing    = 0;
 
@@ -109,8 +110,6 @@ Arguments setup_bsr2csr_arguments(bsr2csr_bin_tuple tup)
     return arg;
 }
 
-// Only run tests for CUDA 11.1 or greater
-#if(!defined(CUDART_VERSION) || CUDART_VERSION >= 11010)
 TEST(bsr2csr_bad_arg, bsr2csr)
 {
     testing_bsr2csr_bad_arg<float>();
@@ -163,7 +162,6 @@ TEST_P(parameterized_bsr2csr_bin, bsr2csr_bin_double)
     hipsparseStatus_t status = testing_bsr2csr<double>(arg);
     EXPECT_EQ(status, HIPSPARSE_STATUS_SUCCESS);
 }
-#endif
 
 INSTANTIATE_TEST_SUITE_P(bsr2csr,
                          parameterized_bsr2csr,

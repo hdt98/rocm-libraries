@@ -31,29 +31,19 @@
 typedef std::tuple<int, int, int, hipsparseIndexBase_t>    cscsort_tuple;
 typedef std::tuple<int, hipsparseIndexBase_t, std::string> cscsort_bin_tuple;
 
-int                  cscsort_M_range[] = {-1, 0, 10, 500, 872, 1000};
-int                  cscsort_N_range[] = {-3, 0, 33, 242, 623, 1000};
+int                  cscsort_M_range[] = {0, 10, 500, 872, 1000};
+int                  cscsort_N_range[] = {0, 33, 242, 623, 1000};
 int                  cscsort_perm[]    = {0, 1};
 hipsparseIndexBase_t cscsort_base[]    = {HIPSPARSE_INDEX_BASE_ZERO, HIPSPARSE_INDEX_BASE_ONE};
 
-std::string cscsort_bin[] = {"rma10.bin",
-                             "mac_econ_fwd500.bin",
-                             "bibd_22_8.bin",
+std::string cscsort_bin[] = {"mac_econ_fwd500.bin",
                              "mc2depi.bin",
-                             "scircuit.bin",
                              "ASIC_320k.bin",
-                             "bmwcra_1.bin",
-                             "nos1.bin",
                              "nos2.bin",
-                             "nos3.bin",
                              "nos4.bin",
-                             "nos5.bin",
                              "nos6.bin",
-                             "nos7.bin",
                              "amazon0312.bin",
-                             "Chebyshev4.bin",
                              "sme3Dc.bin",
-                             "webbase-1M.bin",
                              "shipsec1.bin"};
 
 class parameterized_cscsort : public testing::TestWithParam<cscsort_tuple>
@@ -77,22 +67,22 @@ protected:
 Arguments setup_cscsort_arguments(cscsort_tuple tup)
 {
     Arguments arg;
-    arg.M        = std::get<0>(tup);
-    arg.N        = std::get<1>(tup);
-    arg.temp     = std::get<2>(tup);
-    arg.idx_base = std::get<3>(tup);
-    arg.timing   = 0;
+    arg.M       = std::get<0>(tup);
+    arg.N       = std::get<1>(tup);
+    arg.permute = std::get<2>(tup);
+    arg.baseA   = std::get<3>(tup);
+    arg.timing  = 0;
     return arg;
 }
 
 Arguments setup_cscsort_arguments(cscsort_bin_tuple tup)
 {
     Arguments arg;
-    arg.M        = -99;
-    arg.N        = -99;
-    arg.temp     = std::get<0>(tup);
-    arg.idx_base = std::get<1>(tup);
-    arg.timing   = 0;
+    arg.M       = -99;
+    arg.N       = -99;
+    arg.permute = std::get<0>(tup);
+    arg.baseA   = std::get<1>(tup);
+    arg.timing  = 0;
 
     // Determine absolute path of test matrix
     std::string bin_file = std::get<2>(tup);
@@ -103,8 +93,6 @@ Arguments setup_cscsort_arguments(cscsort_bin_tuple tup)
     return arg;
 }
 
-// Only run tests for CUDA 11.1 or greater
-#if(!defined(CUDART_VERSION) || CUDART_VERSION >= 11010)
 TEST(cscsort_bad_arg, cscsort)
 {
     testing_cscsort_bad_arg();
@@ -125,7 +113,6 @@ TEST_P(parameterized_cscsort_bin, cscsort_bin)
     hipsparseStatus_t status = testing_cscsort(arg);
     EXPECT_EQ(status, HIPSPARSE_STATUS_SUCCESS);
 }
-#endif
 
 INSTANTIATE_TEST_SUITE_P(cscsort,
                          parameterized_cscsort,

@@ -64,16 +64,26 @@ if (NOT WIN32)
 endif( )
 
 # hipSPARSE project
-project(hipsparse LANGUAGES CXX ${fortran_language})
+project(hipsparse LANGUAGES CXX C ${fortran_language})
 
-# Build flags
-set(CMAKE_CXX_STANDARD 14)
+# Set CXX flags
+if (NOT DEFINED CMAKE_CXX_STANDARD)
+  set(CMAKE_CXX_STANDARD 17)
+endif()
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+
+# Set CXX standard
+if (CMAKE_CXX_STANDARD EQUAL 14)
+  message( DEPRECATION "Builds using the C++14 standard will no longer be supported in the next major release" )
+elseif(NOT CMAKE_CXX_STANDARD EQUAL 17)
+  message(FATAL_ERROR "Only C++14 and C++17 are supported")
+endif()
 
 # Build options
 option(BUILD_SHARED_LIBS "Build hipSPARSE as a shared library" ON)
 option(BUILD_CLIENTS_TESTS "Build tests (requires googletest)" OFF)
+option(BUILD_CLIENTS_BENCHMARKS "Build benchmarks" ON)
 option(BUILD_CLIENTS_SAMPLES "Build examples" ON)
 option(BUILD_VERBOSE "Output additional build information" OFF)
 option(USE_CUDA "Build hipSPARSE using CUDA backend" OFF)
@@ -114,49 +124,86 @@ endif()
 
 
 # Setup version
-rocm_setup_version(VERSION 3.0.1)
-set(hipsparse_SOVERSION 1.0.0)
+rocm_setup_version(VERSION 4.0.1)
+set(hipsparse_SOVERSION 4.0.1)
 
 # hipSPARSE library
 add_subdirectory(library)
 
-if(BUILD_CLIENTS_SAMPLES OR BUILD_CLIENTS_TESTS)
+if(BUILD_CLIENTS_SAMPLES OR BUILD_CLIENTS_TESTS OR BUILD_CLIENTS_BENCHMARKS)
   if(NOT CLIENTS_OS)
     rocm_set_os_id(CLIENTS_OS)
     string(TOLOWER "${CLIENTS_OS}" CLIENTS_OS)
     rocm_read_os_release(CLIENTS_OS_VERSION VERSION_ID)
   endif()
   message(STATUS "OS: ${CLIENTS_OS} ${CLIENTS_OS_VERSION}")
-  set(GFORTRAN_PKG "gcc-gfortran")
-  set(OPENMP_PKG "libgomp")
-  if(CLIENTS_OS STREQUAL "sles")
-    set(GFORTRAN_PKG "gcc-fortran")
-    set(OPENMP_PKG "libgomp1")
-  elseif(CLIENTS_OS STREQUAL "centos" AND CLIENTS_OS_VERSION EQUAL 7)
-    set(GFORTRAN_PKG "devtoolset-7-gcc-gfortran")
+  set(GFORTRAN_RPM "libgfortran4")
+  set(GFORTRAN_DEB "libgfortran4")
+  find_package(OpenMP QUIET)
+  if(OPENMP_FOUND)
+    set(OPENMP_RPM "libgomp")
+    set(OPENMP_DEB "libomp-dev")
   endif()
-  add_subdirectory(clients)
+  if(CLIENTS_OS STREQUAL "centos" OR CLIENTS_OS STREQUAL "rhel" OR CLIENTS_OS STREQUAL "almalinux")
+    if(CLIENTS_OS_VERSION VERSION_GREATER_EQUAL "8")
+      set(GFORTRAN_RPM "libgfortran")
+    endif()
+  elseif(CLIENTS_OS STREQUAL "ubuntu" AND CLIENTS_OS_VERSION VERSION_GREATER_EQUAL "20.04")
+    set(GFORTRAN_DEB "libgfortran5")
+  elseif(CLIENTS_OS STREQUAL "sles" AND OPENMP_FOUND)
+    set(OPENMP_RPM "libgomp1")
+  elseif(CLIENTS_OS STREQUAL "mariner" OR CLIENTS_OS STREQUAL "azurelinux")
+    set(GFORTRAN_RPM "gfortran")
+  endif()
+
   rocm_package_setup_component(clients)
+  rocm_package_setup_client_component(clients-common)
   if(BUILD_CLIENTS_TESTS)
-    rocm_package_setup_client_component(tests)
+    rocm_package_setup_client_component(
+      tests
+      DEPENDS
+        COMPONENT clients-common
+        DEB "${GFORTRAN_DEB}"
+        RPM "${GFORTRAN_RPM}")
+    rocm_package_setup_client_component(
+      tests
+      DEPENDS
+        COMPONENT clients-common
+        DEB "${OPENMP_DEB}"
+        RPM "${OPENMP_RPM}"
+    )
   endif()
+
+  if( BUILD_CLIENTS_BENCHMARKS )
+  rocm_package_setup_client_component(
+    benchmarks
+    DEPENDS
+      COMPONENT clients-common
+      DEB "${OPENMP_DEB}"
+      RPM "${OPENMP_RPM}"
+  )
+  endif()
+  
+  add_subdirectory( clients )
+
   if(NOT WIN32)
-    rocm_package_add_rpm_dependencies(COMPONENT tests DEPENDS "${GFORTRAN_PKG}")
-    rocm_package_add_deb_dependencies(COMPONENT tests DEPENDS "gfortran")
-    rocm_package_add_rpm_dependencies(COMPONENT benchmarks DEPENDS "${GFORTRAN_PKG}")
-    rocm_package_add_deb_dependencies(COMPONENT benchmarks DEPENDS "gfortran")
+    rocm_package_add_rpm_dependencies(COMPONENT tests DEPENDS "${GFORTRAN_RPM}")
+    rocm_package_add_deb_dependencies(COMPONENT tests DEPENDS "${GFORTRAN_DEB}")
+    rocm_package_add_rpm_dependencies(COMPONENT benchmarks DEPENDS "${GFORTRAN_RPM}")
+    rocm_package_add_deb_dependencies(COMPONENT benchmarks DEPENDS "${GFORTRAN_DEB}")
   endif()
   if(TARGET OpenMP::OpenMP_CXX)
-    rocm_package_add_rpm_dependencies(COMPONENT tests DEPENDS "${OPENMP_PKG}")
-    rocm_package_add_deb_dependencies(COMPONENT tests DEPENDS "libomp-dev")
-    rocm_package_add_rpm_dependencies(COMPONENT benchmarks DEPENDS "${OPENMP_PKG}")
-    rocm_package_add_deb_dependencies(COMPONENT benchmarks DEPENDS "libomp-dev")
+    rocm_package_add_rpm_dependencies(COMPONENT tests DEPENDS "${OPENMP_RPM}")
+    rocm_package_add_deb_dependencies(COMPONENT tests DEPENDS "${OPENMP_DEB}")
   endif()
 endif()
 
 # Package specific CPACK vars
 if(NOT USE_CUDA)
-  rocm_package_add_dependencies(DEPENDS "rocsparse >= 1.12.10")
+  set(ROCSPARSE_MINIMUM "4.0.1")
+  rocm_package_add_dependencies(SHARED_DEPENDS "rocsparse >= ${ROCSPARSE_MINIMUM}")
+  rocm_package_add_deb_dependencies(STATIC_DEPENDS "rocsparse-static-dev >= ${ROCSPARSE_MINIMUM}")
+  rocm_package_add_rpm_dependencies(STATIC_DEPENDS "rocsparse-static-devel >= ${ROCSPARSE_MINIMUM}")
 endif()
 set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE.md")
 set(CPACK_RPM_PACKAGE_LICENSE "MIT")
@@ -164,7 +211,9 @@ set(CPACK_RPM_PACKAGE_LICENSE "MIT")
 if(WIN32)
   set(CPACK_SOURCE_GENERATOR "ZIP")
   set(CPACK_GENERATOR "ZIP")
-  set(CMAKE_INSTALL_PREFIX "C:/hipSDK" CACHE PATH "Install path" FORCE)
+  if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+    set(CMAKE_INSTALL_PREFIX "C:/hipSDK" CACHE PATH "Install path" FORCE)
+  endif()
   set(INSTALL_PREFIX "C:/hipSDK")
   set(CPACK_SET_DESTDIR OFF)
   set(CPACK_PACKAGE_INSTALL_DIRECTORY "C:/hipSDK")
@@ -228,17 +277,13 @@ if(BUILD_CODE_COVERAGE)
   add_custom_target(coverage_output
     DEPENDS coverage_analysis
     COMMAND mkdir -p lcoverage
-    COMMAND echo "\\#!/bin/bash" > llvm-gcov.sh
-    COMMAND echo "\\# THIS FILE HAS BEEN GENERATED" >> llvm-gcov.sh
-    COMMAND printf "exec /opt/rocm/llvm/bin/llvm-cov gcov $$\\@" >> llvm-gcov.sh
-    COMMAND chmod +x llvm-gcov.sh
     )
 
   #
   # Generate coverage output.
   #
   add_custom_command(TARGET coverage_output
-    COMMAND lcov --directory . --base-directory . --gcov-tool ${CMAKE_BINARY_DIR}/llvm-gcov.sh --capture -o lcoverage/raw_main_coverage.info
+    COMMAND lcov --directory . --base-directory . --capture -o lcoverage/raw_main_coverage.info
     COMMAND lcov --remove lcoverage/raw_main_coverage.info "'/opt/*'" "'/usr/*'" -o lcoverage/main_coverage.info
     COMMAND genhtml lcoverage/main_coverage.info --output-directory lcoverage
     )

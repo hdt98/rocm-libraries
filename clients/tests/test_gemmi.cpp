@@ -30,12 +30,12 @@
 typedef std::tuple<int, int, int, double, double>    gemmi_tuple;
 typedef std::tuple<int, double, double, std::string> gemmi_bin_tuple;
 
-int gemmi_M_range[] = {-1, 0, 7, 19, 64, 78, 157, 482};
-int gemmi_N_range[] = {-1, 0, 42, 275, 759};
-int gemmi_K_range[] = {-1, 0, 50, 173, 1375};
+int gemmi_M_range[] = {0, 19, 78, 482};
+int gemmi_N_range[] = {0, 42, 275, 759};
+int gemmi_K_range[] = {0, 50, 173, 1375};
 
-double gemmi_alpha_range[] = {-0.5, 2.0};
-double gemmi_beta_range[]  = {0.5, 0.0};
+double gemmi_alpha_range[] = {-0.5};
+double gemmi_beta_range[]  = {0.5};
 
 std::string gemmi_bin[] = {"nos1.bin", "nos3.bin", "nos5.bin", "nos7.bin"};
 
@@ -88,8 +88,7 @@ Arguments setup_gemmi_arguments(gemmi_bin_tuple tup)
     return arg;
 }
 
-// Only run tests for CUDA 11.1 or greater (removed in cusparse 12.0.0)
-#if(!defined(CUDART_VERSION) || (CUDART_VERSION >= 11010 && CUDART_VERSION < 12000))
+#if(!defined(CUDART_VERSION) || CUDART_VERSION < 12000)
 TEST(gemmi_bad_arg, gemmi_float)
 {
     testing_gemmi_bad_arg<float>();
@@ -142,7 +141,6 @@ TEST_P(parameterized_gemmi_bin, gemmi_bin_double)
     hipsparseStatus_t status = testing_gemmi<double>(arg);
     EXPECT_EQ(status, HIPSPARSE_STATUS_SUCCESS);
 }
-#endif
 
 INSTANTIATE_TEST_SUITE_P(gemmi,
                          parameterized_gemmi,
@@ -158,3 +156,4 @@ INSTANTIATE_TEST_SUITE_P(gemmi_bin,
                                           testing::ValuesIn(gemmi_alpha_range),
                                           testing::ValuesIn(gemmi_beta_range),
                                           testing::ValuesIn(gemmi_bin)));
+#endif

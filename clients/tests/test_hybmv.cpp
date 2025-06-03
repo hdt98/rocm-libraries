@@ -33,8 +33,8 @@ typedef std::tuple<int, int, double, double, hipsparseIndexBase_t, hipsparseHybP
 typedef std::tuple<double, double, hipsparseIndexBase_t, hipsparseHybPartition_t, int, std::string>
     hybmv_bin_tuple;
 
-int hyb_M_range[] = {-1, 0, 10, 500, 7111, 10000};
-int hyb_N_range[] = {-3, 0, 33, 842, 4441, 10000};
+int hyb_M_range[] = {0, 10, 500, 7111, 10000};
+int hyb_N_range[] = {0, 33, 842, 4441, 10000};
 
 std::vector<double> hyb_alpha_range = {3.0};
 std::vector<double> hyb_beta_range  = {0.67};
@@ -74,7 +74,7 @@ Arguments setup_hybmv_arguments(hybmv_tuple tup)
     arg.N         = std::get<1>(tup);
     arg.alpha     = std::get<2>(tup);
     arg.beta      = std::get<3>(tup);
-    arg.idx_base  = std::get<4>(tup);
+    arg.baseA     = std::get<4>(tup);
     arg.part      = std::get<5>(tup);
     arg.ell_width = std::get<6>(tup);
     arg.timing    = 0;
@@ -88,7 +88,7 @@ Arguments setup_hybmv_arguments(hybmv_bin_tuple tup)
     arg.N         = -99;
     arg.alpha     = std::get<0>(tup);
     arg.beta      = std::get<1>(tup);
-    arg.idx_base  = std::get<2>(tup);
+    arg.baseA     = std::get<2>(tup);
     arg.part      = std::get<3>(tup);
     arg.ell_width = std::get<4>(tup);
     arg.timing    = 0;
@@ -102,8 +102,7 @@ Arguments setup_hybmv_arguments(hybmv_bin_tuple tup)
     return arg;
 }
 
-// Only run tests for CUDA 11.1 or greater
-#if(!defined(CUDART_VERSION) || CUDART_VERSION >= 11010)
+#if(!defined(CUDART_VERSION) || CUDART_VERSION < 11000)
 TEST(hybmv_bad_arg, hybmv_float)
 {
     testing_hybmv_bad_arg<float>();
@@ -156,7 +155,6 @@ TEST_P(parameterized_hybmv_bin, hybmv_bin_double)
     hipsparseStatus_t status = testing_hybmv<double>(arg);
     EXPECT_EQ(status, HIPSPARSE_STATUS_SUCCESS);
 }
-#endif
 
 INSTANTIATE_TEST_SUITE_P(hybmv,
                          parameterized_hybmv,
@@ -176,3 +174,4 @@ INSTANTIATE_TEST_SUITE_P(hybmv_bin,
                                           testing::ValuesIn(hyb_partition),
                                           testing::ValuesIn(hyb_ELL_range),
                                           testing::ValuesIn(hyb_bin)));
+#endif

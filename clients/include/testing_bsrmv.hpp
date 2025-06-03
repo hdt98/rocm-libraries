@@ -25,7 +25,11 @@
 #ifndef TESTING_BSRMV_HPP
 #define TESTING_BSRMV_HPP
 
+#include "display.hpp"
+#include "flops.hpp"
+#include "gbyte.hpp"
 #include "hipsparse.hpp"
+#include "hipsparse_arguments.hpp"
 #include "hipsparse_test_unique_ptr.hpp"
 #include "unit.hpp"
 #include "utility.hpp"
@@ -67,14 +71,8 @@ void testing_bsrmv_bad_arg(void)
     T*   dx   = (T*)dx_managed.get();
     T*   dy   = (T*)dy_managed.get();
 
-    if(!dval || !dptr || !dcol || !dx || !dy)
-    {
-        PRINT_IF_HIP_ERROR(hipErrorOutOfMemory);
-        return;
-    }
-
     // Test hipsparseXbsrmv
-    verify_hipsparse_status_invalid_handle(hipsparseXbsrmv(nullptr,
+    verify_hipsparse_status_invalid_handle(hipsparseXbsrmv((hipsparseHandle_t) nullptr,
                                                            dirA,
                                                            transA,
                                                            safe_size,
@@ -112,7 +110,7 @@ void testing_bsrmv_bad_arg(void)
                                                             safe_size,
                                                             safe_size,
                                                             &alpha,
-                                                            nullptr,
+                                                            (hipsparseMatDescr_t) nullptr,
                                                             dval,
                                                             dptr,
                                                             dcol,
@@ -146,7 +144,7 @@ void testing_bsrmv_bad_arg(void)
                                                             &alpha,
                                                             descr,
                                                             dval,
-                                                            nullptr,
+                                                            (int*)nullptr,
                                                             dcol,
                                                             safe_dim,
                                                             dx,
@@ -163,7 +161,7 @@ void testing_bsrmv_bad_arg(void)
                                                             descr,
                                                             dval,
                                                             dptr,
-                                                            nullptr,
+                                                            (int*)nullptr,
                                                             safe_dim,
                                                             dx,
                                                             &beta,
@@ -184,7 +182,7 @@ void testing_bsrmv_bad_arg(void)
                                                             (T*)nullptr,
                                                             &beta,
                                                             dy),
-                                            "Error: xy is nullptr");
+                                            "Error: x is nullptr");
     verify_hipsparse_status_invalid_pointer(hipsparseXbsrmv(handle,
                                                             dirA,
                                                             transA,
@@ -287,36 +285,21 @@ void testing_bsrmv_bad_arg(void)
 template <typename T>
 hipsparseStatus_t testing_bsrmv(Arguments argus)
 {
-    int                  safe_size = 100;
     int                  m         = argus.M;
     int                  n         = argus.N;
     int                  block_dim = argus.block_dim;
     T                    h_alpha   = make_DataType<T>(argus.alpha);
     T                    h_beta    = make_DataType<T>(argus.beta);
     hipsparseOperation_t transA    = argus.transA;
-    hipsparseIndexBase_t idx_base  = argus.idx_base;
+    hipsparseIndexBase_t idx_base  = argus.baseA;
     hipsparseDirection_t dir       = argus.dirA;
-    std::string          binfile   = "";
-    std::string          filename  = "";
+    std::string          filename  = argus.filename;
 
-    // When in testing mode, M == N == -99 indicates that we are testing with a real
-    // matrix from cise.ufl.edu
-    if(m == -99 && n == -99 && argus.timing == 0)
-    {
-        binfile = argus.filename;
-        m = n = safe_size;
-    }
+    std::unique_ptr<handle_struct> unique_ptr_handle(new handle_struct);
+    hipsparseHandle_t              handle = unique_ptr_handle->handle;
 
-    if(argus.timing == 1)
-    {
-        filename = argus.filename;
-    }
-
-    std::unique_ptr<handle_struct> test_handle(new handle_struct);
-    hipsparseHandle_t              handle = test_handle->handle;
-
-    std::unique_ptr<descr_struct> test_descr(new descr_struct);
-    hipsparseMatDescr_t           descr = test_descr->descr;
+    std::unique_ptr<descr_struct> unique_ptr_descr(new descr_struct);
+    hipsparseMatDescr_t           descr = unique_ptr_descr->descr;
 
     // Set matrix index base
     CHECK_HIPSPARSE_ERROR(hipsparseSetMatIndexBase(descr, idx_base));
@@ -324,7 +307,7 @@ hipsparseStatus_t testing_bsrmv(Arguments argus)
     int mb = (m + block_dim - 1) / block_dim;
     int nb = (n + block_dim - 1) / block_dim;
 
-    if(block_dim == 1)
+    if(block_dim == 1 || mb == 0 || nb == 0)
     {
 #ifdef __HIP_PLATFORM_NVIDIA__
         // cusparse only accepts block_dim > 1
@@ -332,112 +315,19 @@ hipsparseStatus_t testing_bsrmv(Arguments argus)
 #endif
     }
 
-    // Argument sanity check before allocating invalid memory
-    if(mb == 0 || nb == 0)
-    {
-        auto dptr_managed
-            = hipsparse_unique_ptr{device_malloc(sizeof(int) * safe_size), device_free};
-        auto dcol_managed
-            = hipsparse_unique_ptr{device_malloc(sizeof(int) * safe_size), device_free};
-        auto dval_managed = hipsparse_unique_ptr{device_malloc(sizeof(T) * safe_size), device_free};
-        auto dx_managed   = hipsparse_unique_ptr{device_malloc(sizeof(T) * safe_size), device_free};
-        auto dy_managed   = hipsparse_unique_ptr{device_malloc(sizeof(T) * safe_size), device_free};
-
-        int* dptr = (int*)dptr_managed.get();
-        int* dcol = (int*)dcol_managed.get();
-        T*   dval = (T*)dval_managed.get();
-        T*   dx   = (T*)dx_managed.get();
-        T*   dy   = (T*)dy_managed.get();
-
-        if(!dval || !dptr || !dcol || !dx || !dy)
-        {
-            verify_hipsparse_status_success(HIPSPARSE_STATUS_ALLOC_FAILED,
-                                            "!dptr || !dcol || !dval || !dx || !dy");
-            return HIPSPARSE_STATUS_ALLOC_FAILED;
-        }
-
-        CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_HOST));
-        hipsparseStatus_t status = hipsparseXbsrmv(handle,
-                                                   dir,
-                                                   transA,
-                                                   mb,
-                                                   nb,
-                                                   safe_size,
-                                                   &h_alpha,
-                                                   descr,
-                                                   dval,
-                                                   dptr,
-                                                   dcol,
-                                                   block_dim,
-                                                   dx,
-                                                   &h_beta,
-                                                   dy);
-
-        verify_hipsparse_status_success(status, "mb >= 0 && nb >= 0");
-
-        return HIPSPARSE_STATUS_SUCCESS;
-    }
+    srand(12345ULL);
 
     // Host structures
     std::vector<int> hcsr_row_ptr;
     std::vector<int> hcsr_col_ind;
     std::vector<T>   hcsr_val;
-    int              nnz;
 
-    // Initial Data on CPU
-    srand(12345ULL);
-    if(binfile != "")
+    // Read or construct CSR matrix
+    int nnz = 0;
+    if(!generate_csr_matrix(filename, m, n, nnz, hcsr_row_ptr, hcsr_col_ind, hcsr_val, idx_base))
     {
-        if(read_bin_matrix(
-               binfile.c_str(), m, n, nnz, hcsr_row_ptr, hcsr_col_ind, hcsr_val, idx_base)
-           != 0)
-        {
-            fprintf(stderr, "Cannot open [read] %s\n", binfile.c_str());
-            return HIPSPARSE_STATUS_INTERNAL_ERROR;
-        }
-    }
-    else if(argus.laplacian)
-    {
-        m = n = gen_2d_laplacian(argus.laplacian, hcsr_row_ptr, hcsr_col_ind, hcsr_val, idx_base);
-        nnz   = hcsr_row_ptr[m];
-    }
-    else
-    {
-        std::vector<int> coo_row_ind;
-
-        if(filename != "")
-        {
-            if(read_mtx_matrix(
-                   filename.c_str(), m, n, nnz, coo_row_ind, hcsr_col_ind, hcsr_val, idx_base)
-               != 0)
-            {
-                fprintf(stderr, "Cannot open [read] %s\n", filename.c_str());
-                return HIPSPARSE_STATUS_INTERNAL_ERROR;
-            }
-        }
-        else
-        {
-            double scale = 0.02;
-            if(m > 1000 || n > 1000)
-            {
-                scale = 2.0 / std::max(m, n);
-            }
-            nnz = m * scale * n;
-            gen_matrix_coo(m, n, nnz, coo_row_ind, hcsr_col_ind, hcsr_val, idx_base);
-        }
-
-        // Convert COO to CSR
-        hcsr_row_ptr.resize(m + 1, 0);
-        for(int i = 0; i < nnz; ++i)
-        {
-            ++hcsr_row_ptr[coo_row_ind[i] + 1 - idx_base];
-        }
-
-        hcsr_row_ptr[0] = idx_base;
-        for(int i = 0; i < m; ++i)
-        {
-            hcsr_row_ptr[i + 1] += hcsr_row_ptr[i];
-        }
+        fprintf(stderr, "Cannot open [read] %s\ncol", filename.c_str());
+        return HIPSPARSE_STATUS_INTERNAL_ERROR;
     }
 
     mb = (m + block_dim - 1) / block_dim;
@@ -531,7 +421,7 @@ hipsparseStatus_t testing_bsrmv(Arguments argus)
     {
         CHECK_HIP_ERROR(hipMemcpy(dy_2, hy_2.data(), sizeof(T) * m, hipMemcpyHostToDevice));
 
-        // ROCSPARSE pointer mode host
+        // HIPSPARSE pointer mode host
         CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_HOST));
         CHECK_HIPSPARSE_ERROR(hipsparseXbsrmv(handle,
                                               dir,
@@ -549,7 +439,7 @@ hipsparseStatus_t testing_bsrmv(Arguments argus)
                                               &h_beta,
                                               dy_1));
 
-        // ROCSPARSE pointer mode device
+        // HIPSPARSE pointer mode device
         CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_DEVICE));
         CHECK_HIPSPARSE_ERROR(hipsparseXbsrmv(handle,
                                               dir,
@@ -602,6 +492,85 @@ hipsparseStatus_t testing_bsrmv(Arguments argus)
 
         unit_check_near(1, m, 1, hy_gold.data(), hy_1.data());
         unit_check_near(1, m, 1, hy_gold.data(), hy_2.data());
+    }
+
+    if(argus.timing)
+    {
+        int number_cold_calls = 2;
+        int number_hot_calls  = argus.iters;
+
+        CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_HOST));
+
+        // Warm up
+        for(int iter = 0; iter < number_cold_calls; ++iter)
+        {
+            CHECK_HIPSPARSE_ERROR(hipsparseXbsrmv(handle,
+                                                  dir,
+                                                  transA,
+                                                  mb,
+                                                  nb,
+                                                  nnzb,
+                                                  &h_alpha,
+                                                  descr,
+                                                  dbsr_val,
+                                                  dbsr_row_ptr,
+                                                  dbsr_col_ind,
+                                                  block_dim,
+                                                  dx,
+                                                  &h_beta,
+                                                  dy_1));
+        }
+
+        double gpu_time_used = get_time_us();
+
+        // Performance run
+        for(int iter = 0; iter < number_hot_calls; ++iter)
+        {
+            CHECK_HIPSPARSE_ERROR(hipsparseXbsrmv(handle,
+                                                  dir,
+                                                  transA,
+                                                  mb,
+                                                  nb,
+                                                  nnzb,
+                                                  &h_alpha,
+                                                  descr,
+                                                  dbsr_val,
+                                                  dbsr_row_ptr,
+                                                  dbsr_col_ind,
+                                                  block_dim,
+                                                  dx,
+                                                  &h_beta,
+                                                  dy_1));
+        }
+
+        gpu_time_used = (get_time_us() - gpu_time_used) / number_hot_calls;
+
+        double gflop_count
+            = spmv_gflop_count(m, nnzb * block_dim * block_dim, h_beta != make_DataType<T>(0.0));
+        double gbyte_count
+            = bsrmv_gbyte_count<T>(mb, nb, nnzb, block_dim, h_beta != make_DataType<T>(0.0));
+
+        double gpu_gflops = get_gpu_gflops(gpu_time_used, gflop_count);
+        double gpu_gbyte  = get_gpu_gbyte(gpu_time_used, gbyte_count);
+
+        display_timing_info(display_key_t::M,
+                            m,
+                            display_key_t::N,
+                            n,
+                            display_key_t::block_dim,
+                            block_dim,
+                            display_key_t::direction,
+                            hipsparse_direction2string(dir),
+                            display_key_t::alpha,
+                            h_alpha,
+                            display_key_t::beta,
+                            h_beta,
+                            display_key_t::gflops,
+                            gpu_gflops,
+                            display_key_t::bandwidth,
+                            gpu_gbyte,
+                            display_key_t::time_ms,
+                            get_gpu_time_msec(gpu_time_used));
     }
 
     return HIPSPARSE_STATUS_SUCCESS;

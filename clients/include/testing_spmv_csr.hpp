@@ -25,6 +25,10 @@
 #ifndef TESTING_SPMV_CSR_HPP
 #define TESTING_SPMV_CSR_HPP
 
+#include "display.hpp"
+#include "flops.hpp"
+#include "gbyte.hpp"
+#include "hipsparse_arguments.hpp"
 #include "hipsparse_test_unique_ptr.hpp"
 #include "unit.hpp"
 #include "utility.hpp"
@@ -76,12 +80,6 @@ void testing_spmv_csr_bad_arg(void)
     float* dx   = (float*)dx_managed.get();
     float* dy   = (float*)dy_managed.get();
     void*  dbuf = (void*)dbuf_managed.get();
-
-    if(!dval || !dptr || !dcol || !dx || !dy || !dbuf)
-    {
-        PRINT_IF_HIP_ERROR(hipErrorOutOfMemory);
-        return;
-    }
 
     // SpMV structures
     hipsparseSpMatDescr_t A;
@@ -174,42 +172,27 @@ void testing_spmv_csr_bad_arg(void)
 }
 
 template <typename I, typename J, typename T>
-hipsparseStatus_t testing_spmv_csr(void)
+hipsparseStatus_t testing_spmv_csr(Arguments argus)
 {
 #if(!defined(CUDART_VERSION) || CUDART_VERSION > 10010 \
     || (CUDART_VERSION == 10010 && CUDART_10_1_UPDATE_VERSION == 1))
-    T                    h_alpha  = make_DataType<T>(2.0);
-    T                    h_beta   = make_DataType<T>(1.0);
-    hipsparseOperation_t transA   = HIPSPARSE_OPERATION_NON_TRANSPOSE;
-    hipsparseIndexBase_t idx_base = HIPSPARSE_INDEX_BASE_ZERO;
-
-#if(!defined(CUDART_VERSION))
-    hipsparseSpMVAlg_t alg = HIPSPARSE_CSRMV_ALG2;
-#else
-#if(CUDART_VERSION >= 12000)
-    hipsparseSpMVAlg_t alg = HIPSPARSE_SPMV_CSR_ALG2;
-#elif(CUDART_VERSION >= 10010 && CUDART_VERSION < 12000)
-    hipsparseSpMVAlg_t alg = HIPSPARSE_CSRMV_ALG2;
-#endif
-#endif
-
-    // Matrices are stored at the same path in matrices directory
-    std::string filename = get_filename("nos3.bin");
+    J                    m        = argus.M;
+    J                    n        = argus.N;
+    T                    h_alpha  = make_DataType<T>(argus.alpha);
+    T                    h_beta   = make_DataType<T>(argus.beta);
+    hipsparseOperation_t transA   = argus.transA;
+    hipsparseIndexBase_t idx_base = argus.baseA;
+    hipsparseSpMVAlg_t   alg      = static_cast<hipsparseSpMVAlg_t>(argus.spmv_alg);
+    std::string          filename = argus.filename;
 
     // Index and data type
-    hipsparseIndexType_t typeI
-        = (typeid(I) == typeid(int32_t)) ? HIPSPARSE_INDEX_32I : HIPSPARSE_INDEX_64I;
-    hipsparseIndexType_t typeJ
-        = (typeid(J) == typeid(int32_t)) ? HIPSPARSE_INDEX_32I : HIPSPARSE_INDEX_64I;
-    hipDataType typeT = (typeid(T) == typeid(float))
-                            ? HIP_R_32F
-                            : ((typeid(T) == typeid(double))
-                                   ? HIP_R_64F
-                                   : ((typeid(T) == typeid(hipComplex) ? HIP_C_32F : HIP_C_64F)));
+    hipsparseIndexType_t typeI = getIndexType<I>();
+    hipsparseIndexType_t typeJ = getIndexType<J>();
+    hipDataType          typeT = getDataType<T>();
 
     // hipSPARSE handle
-    std::unique_ptr<handle_struct> test_handle(new handle_struct);
-    hipsparseHandle_t              handle = test_handle->handle;
+    std::unique_ptr<handle_struct> unique_ptr_handle(new handle_struct);
+    hipsparseHandle_t              handle = unique_ptr_handle->handle;
 
     // Host structures
     std::vector<I> hcsr_row_ptr;
@@ -219,13 +202,10 @@ hipsparseStatus_t testing_spmv_csr(void)
     // Initial Data on CPU
     srand(12345ULL);
 
-    J m;
-    J n;
     I nnz;
-
-    if(read_bin_matrix(filename.c_str(), m, n, nnz, hcsr_row_ptr, hcol_ind, hval, idx_base) != 0)
+    if(!generate_csr_matrix(filename, m, n, nnz, hcsr_row_ptr, hcol_ind, hval, idx_base))
     {
-        fprintf(stderr, "Cannot open [read] %s\n", filename.c_str());
+        fprintf(stderr, "Cannot open [read] %s\ncol", filename.c_str());
         return HIPSPARSE_STATUS_INTERNAL_ERROR;
     }
 
@@ -259,14 +239,6 @@ hipsparseStatus_t testing_spmv_csr(void)
     T* dy_2    = (T*)dy_2_managed.get();
     T* d_alpha = (T*)d_alpha_managed.get();
     T* d_beta  = (T*)d_beta_managed.get();
-
-    if(!dval || !dptr || !dcol || !dx || !dy_1 || !dy_2 || !d_alpha || !d_beta)
-    {
-        verify_hipsparse_status_success(HIPSPARSE_STATUS_ALLOC_FAILED,
-                                        "!dval || !dptr || !dcol || !dx || "
-                                        "!dy_1 || !dy_2 || !d_alpha || !d_beta");
-        return HIPSPARSE_STATUS_ALLOC_FAILED;
-    }
 
     // copy data from CPU to device
     CHECK_HIP_ERROR(
@@ -302,96 +274,153 @@ hipsparseStatus_t testing_spmv_csr(void)
     CHECK_HIPSPARSE_ERROR(
         hipsparseSpMV_preprocess(handle, transA, &h_alpha, A, x, &h_beta, y1, typeT, alg, buffer));
 
-    // ROCSPARSE pointer mode host
-    CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_HOST));
-    CHECK_HIPSPARSE_ERROR(
-        hipsparseSpMV(handle, transA, &h_alpha, A, x, &h_beta, y1, typeT, alg, buffer));
-
-    // ROCSPARSE pointer mode device
-    CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_DEVICE));
-    CHECK_HIPSPARSE_ERROR(
-        hipsparseSpMV(handle, transA, d_alpha, A, x, d_beta, y2, typeT, alg, buffer));
-
-    // copy output from device to CPU
-    CHECK_HIP_ERROR(hipMemcpy(hy_1.data(), dy_1, sizeof(T) * m, hipMemcpyDeviceToHost));
-    CHECK_HIP_ERROR(hipMemcpy(hy_2.data(), dy_2, sizeof(T) * m, hipMemcpyDeviceToHost));
-
-    // Query for warpSize
-    hipDeviceProp_t prop;
-    hipGetDeviceProperties(&prop, 0);
-
-    int WF_SIZE;
-    I   nnz_per_row = nnz / m;
-
-    if(prop.warpSize == 32)
+    if(argus.unit_check)
     {
-        if(nnz_per_row < 4)
-            WF_SIZE = 2;
-        else if(nnz_per_row < 8)
-            WF_SIZE = 4;
-        else if(nnz_per_row < 16)
-            WF_SIZE = 8;
-        else if(nnz_per_row < 32)
-            WF_SIZE = 16;
-        else
-            WF_SIZE = 32;
-    }
-    else if(prop.warpSize == 64)
-    {
-        if(nnz_per_row < 4)
-            WF_SIZE = 2;
-        else if(nnz_per_row < 8)
-            WF_SIZE = 4;
-        else if(nnz_per_row < 16)
-            WF_SIZE = 8;
-        else if(nnz_per_row < 32)
-            WF_SIZE = 16;
-        else if(nnz_per_row < 64)
-            WF_SIZE = 32;
-        else
-            WF_SIZE = 64;
-    }
-    else
-    {
-        return HIPSPARSE_STATUS_INTERNAL_ERROR;
-    }
+        // HIPSPARSE pointer mode host
+        CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_HOST));
+        CHECK_HIPSPARSE_ERROR(
+            hipsparseSpMV(handle, transA, &h_alpha, A, x, &h_beta, y1, typeT, alg, buffer));
 
-    for(J i = 0; i < m; ++i)
-    {
-        std::vector<T> sum(WF_SIZE, make_DataType<T>(0.0));
+        // HIPSPARSE pointer mode device
+        CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_DEVICE));
+        CHECK_HIPSPARSE_ERROR(
+            hipsparseSpMV(handle, transA, d_alpha, A, x, d_beta, y2, typeT, alg, buffer));
 
-        for(I j = hcsr_row_ptr[i] - idx_base; j < hcsr_row_ptr[i + 1] - idx_base; j += WF_SIZE)
+        // copy output from device to CPU
+        CHECK_HIP_ERROR(hipMemcpy(hy_1.data(), dy_1, sizeof(T) * m, hipMemcpyDeviceToHost));
+        CHECK_HIP_ERROR(hipMemcpy(hy_2.data(), dy_2, sizeof(T) * m, hipMemcpyDeviceToHost));
+
+        // Query for warpSize
+        hipDeviceProp_t prop;
+        CHECK_HIP_ERROR(hipGetDeviceProperties(&prop, 0));
+
+        int WF_SIZE;
+        I   nnz_per_row = nnz / m;
+
+        if(prop.warpSize == 32)
         {
-            for(int k = 0; k < WF_SIZE; ++k)
+            if(nnz_per_row < 4)
+                WF_SIZE = 2;
+            else if(nnz_per_row < 8)
+                WF_SIZE = 4;
+            else if(nnz_per_row < 16)
+                WF_SIZE = 8;
+            else if(nnz_per_row < 32)
+                WF_SIZE = 16;
+            else
+                WF_SIZE = 32;
+        }
+        else if(prop.warpSize == 64)
+        {
+            if(nnz_per_row < 4)
+                WF_SIZE = 2;
+            else if(nnz_per_row < 8)
+                WF_SIZE = 4;
+            else if(nnz_per_row < 16)
+                WF_SIZE = 8;
+            else if(nnz_per_row < 32)
+                WF_SIZE = 16;
+            else if(nnz_per_row < 64)
+                WF_SIZE = 32;
+            else
+                WF_SIZE = 64;
+        }
+        else
+        {
+            return HIPSPARSE_STATUS_INTERNAL_ERROR;
+        }
+
+        for(J i = 0; i < m; ++i)
+        {
+            std::vector<T> sum(WF_SIZE, make_DataType<T>(0.0));
+
+            for(I j = hcsr_row_ptr[i] - idx_base; j < hcsr_row_ptr[i + 1] - idx_base; j += WF_SIZE)
             {
-                if(j + k < hcsr_row_ptr[i + 1] - idx_base)
+                for(int k = 0; k < WF_SIZE; ++k)
                 {
-                    sum[k] = testing_fma(
-                        testing_mult(h_alpha, hval[j + k]), hx[hcol_ind[j + k] - idx_base], sum[k]);
+                    if(j + k < hcsr_row_ptr[i + 1] - idx_base)
+                    {
+                        sum[k] = testing_fma(testing_mult(h_alpha, hval[j + k]),
+                                             hx[hcol_ind[j + k] - idx_base],
+                                             sum[k]);
+                    }
                 }
             }
-        }
 
-        for(int j = 1; j < WF_SIZE; j <<= 1)
-        {
-            for(int k = 0; k < WF_SIZE - j; ++k)
+            for(int j = 1; j < WF_SIZE; j <<= 1)
             {
-                sum[k] = sum[k] + sum[k + j];
+                for(int k = 0; k < WF_SIZE - j; ++k)
+                {
+                    sum[k] = sum[k] + sum[k + j];
+                }
+            }
+
+            if(h_beta == make_DataType<T>(0.0))
+            {
+                hy_gold[i] = sum[0];
+            }
+            else
+            {
+                hy_gold[i] = testing_fma(h_beta, hy_gold[i], sum[0]);
             }
         }
 
-        if(h_beta == make_DataType<T>(0.0))
-        {
-            hy_gold[i] = sum[0];
-        }
-        else
-        {
-            hy_gold[i] = testing_fma(h_beta, hy_gold[i], sum[0]);
-        }
+        unit_check_near(1, m, 1, hy_gold.data(), hy_1.data());
+        unit_check_near(1, m, 1, hy_gold.data(), hy_2.data());
     }
 
-    unit_check_near(1, m, 1, hy_gold.data(), hy_1.data());
-    unit_check_near(1, m, 1, hy_gold.data(), hy_2.data());
+    if(argus.timing)
+    {
+        int number_cold_calls = 2;
+        int number_hot_calls  = argus.iters;
+
+        CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_HOST));
+
+        // Warm up
+        for(int iter = 0; iter < number_cold_calls; ++iter)
+        {
+            CHECK_HIPSPARSE_ERROR(
+                hipsparseSpMV(handle, transA, &h_alpha, A, x, &h_beta, y1, typeT, alg, buffer));
+        }
+
+        double gpu_time_used = get_time_us();
+
+        // Performance run
+        for(int iter = 0; iter < number_hot_calls; ++iter)
+        {
+            CHECK_HIPSPARSE_ERROR(
+                hipsparseSpMV(handle, transA, &h_alpha, A, x, &h_beta, y1, typeT, alg, buffer));
+        }
+
+        gpu_time_used = (get_time_us() - gpu_time_used) / number_hot_calls;
+
+        double gflop_count = spmv_gflop_count(m, nnz, h_beta != make_DataType<T>(0.0));
+        double gbyte_count = csrmv_gbyte_count<T>(m, n, nnz, h_beta != make_DataType<T>(0.0));
+
+        double gpu_gflops = get_gpu_gflops(gpu_time_used, gflop_count);
+        double gpu_gbyte  = get_gpu_gbyte(gpu_time_used, gbyte_count);
+
+        display_timing_info(display_key_t::M,
+                            m,
+                            display_key_t::N,
+                            n,
+                            display_key_t::nnz,
+                            nnz,
+                            display_key_t::transA,
+                            transA,
+                            display_key_t::alpha,
+                            h_alpha,
+                            display_key_t::beta,
+                            h_beta,
+                            display_key_t::algorithm,
+                            hipsparse_spmvalg2string(alg),
+                            display_key_t::gflops,
+                            gpu_gflops,
+                            display_key_t::bandwidth,
+                            gpu_gbyte,
+                            display_key_t::time_ms,
+                            get_gpu_time_msec(gpu_time_used));
+    }
 
     CHECK_HIP_ERROR(hipFree(buffer));
     CHECK_HIPSPARSE_ERROR(hipsparseDestroySpMat(A));

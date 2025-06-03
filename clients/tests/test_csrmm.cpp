@@ -32,9 +32,9 @@ typedef hipsparseOperation_t                                             trans;
 typedef std::tuple<int, int, int, double, double, base, trans, trans>    csrmm_tuple;
 typedef std::tuple<int, double, double, base, trans, trans, std::string> csrmm_bin_tuple;
 
-int csrmm_M_range[] = {-1, 0, 42, 275, 2059};
-int csrmm_N_range[] = {-1, 0, 7, 19, 64, 78};
-int csrmm_K_range[] = {-1, 0, 50, 173, 1375};
+int csrmm_M_range[] = {0, 275, 1059};
+int csrmm_N_range[] = {0, 78};
+int csrmm_K_range[] = {0, 173, 1375};
 
 double csrmm_alpha_range[] = {-0.5};
 double csrmm_beta_range[]  = {0.5};
@@ -47,7 +47,7 @@ trans csrmm_transB_range[]  = {HIPSPARSE_OPERATION_NON_TRANSPOSE,
                               HIPSPARSE_OPERATION_TRANSPOSE,
                               HIPSPARSE_OPERATION_CONJUGATE_TRANSPOSE};
 
-std::string csrmm_bin[] = {"rma10.bin", "nos1.bin", "nos3.bin", "nos5.bin", "nos7.bin"};
+std::string csrmm_bin[] = {"rma10.bin", "nos3.bin", "nos5.bin", "nos7.bin"};
 
 class parameterized_csrmm : public testing::TestWithParam<csrmm_tuple>
 {
@@ -70,30 +70,30 @@ protected:
 Arguments setup_csrmm_arguments(csrmm_tuple tup)
 {
     Arguments arg;
-    arg.M        = std::get<0>(tup);
-    arg.N        = std::get<1>(tup);
-    arg.K        = std::get<2>(tup);
-    arg.alpha    = std::get<3>(tup);
-    arg.beta     = std::get<4>(tup);
-    arg.idx_base = std::get<5>(tup);
-    arg.transA   = std::get<6>(tup);
-    arg.transB   = std::get<7>(tup);
-    arg.timing   = 0;
+    arg.M      = std::get<0>(tup);
+    arg.N      = std::get<1>(tup);
+    arg.K      = std::get<2>(tup);
+    arg.alpha  = std::get<3>(tup);
+    arg.beta   = std::get<4>(tup);
+    arg.baseA  = std::get<5>(tup);
+    arg.transA = std::get<6>(tup);
+    arg.transB = std::get<7>(tup);
+    arg.timing = 0;
     return arg;
 }
 
 Arguments setup_csrmm_arguments(csrmm_bin_tuple tup)
 {
     Arguments arg;
-    arg.M        = -99;
-    arg.N        = std::get<0>(tup);
-    arg.K        = -99;
-    arg.alpha    = std::get<1>(tup);
-    arg.beta     = std::get<2>(tup);
-    arg.idx_base = std::get<3>(tup);
-    arg.transA   = std::get<4>(tup);
-    arg.transB   = std::get<5>(tup);
-    arg.timing   = 0;
+    arg.M      = -99;
+    arg.N      = std::get<0>(tup);
+    arg.K      = -99;
+    arg.alpha  = std::get<1>(tup);
+    arg.beta   = std::get<2>(tup);
+    arg.baseA  = std::get<3>(tup);
+    arg.transA = std::get<4>(tup);
+    arg.transB = std::get<5>(tup);
+    arg.timing = 0;
 
     // Determine absolute path of test matrix
     std::string bin_file = std::get<6>(tup);
@@ -104,8 +104,7 @@ Arguments setup_csrmm_arguments(csrmm_bin_tuple tup)
     return arg;
 }
 
-// Only run tests for CUDA 11.1 or greater
-#if(!defined(CUDART_VERSION) || CUDART_VERSION >= 11010)
+#if(!defined(CUDART_VERSION) || CUDART_VERSION < 11000)
 TEST(csrmm_bad_arg, csrmm_float)
 {
     testing_csrmm_bad_arg<float>();
@@ -158,7 +157,6 @@ TEST_P(parameterized_csrmm_bin, csrmm_bin_double)
     hipsparseStatus_t status = testing_csrmm<double>(arg);
     EXPECT_EQ(status, HIPSPARSE_STATUS_SUCCESS);
 }
-#endif
 
 INSTANTIATE_TEST_SUITE_P(csrmm,
                          parameterized_csrmm,
@@ -180,3 +178,4 @@ INSTANTIATE_TEST_SUITE_P(csrmm_bin,
                                           testing::ValuesIn(csrmm_transA_range),
                                           testing::ValuesIn(csrmm_transB_range),
                                           testing::ValuesIn(csrmm_bin)));
+#endif

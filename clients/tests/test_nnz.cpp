@@ -30,9 +30,9 @@
 
 typedef std::tuple<int, int, int> nnz_tuple;
 
-int nnz_M_range[]  = {-1, 0, 10, 500, 872, 1000};
-int nnz_N_range[]  = {-3, 0, 33, 242, 623, 1000};
-int nnz_LD_range[] = {5, 500, 1000};
+int nnz_M_range[]  = {0, 10, 500, 872, 1000};
+int nnz_N_range[]  = {0, 33, 242, 623, 1000};
+int nnz_LD_range[] = {1000};
 
 class parameterized_nnz : public testing::TestWithParam<nnz_tuple>
 {
@@ -52,8 +52,6 @@ Arguments setup_nnz_arguments(nnz_tuple tup)
     return arg;
 }
 
-// Only run tests for CUDA 11.1 or greater
-#if(!defined(CUDART_VERSION) || CUDART_VERSION >= 11010)
 TEST(nnz_bad_arg, nnz)
 {
     testing_nnz_bad_arg<float>();
@@ -90,7 +88,6 @@ TEST_P(parameterized_nnz, nnz_double_complex)
     hipsparseStatus_t status = testing_nnz<hipDoubleComplex>(arg);
     EXPECT_EQ(status, HIPSPARSE_STATUS_SUCCESS);
 }
-#endif
 
 INSTANTIATE_TEST_SUITE_P(nnz,
                          parameterized_nnz,

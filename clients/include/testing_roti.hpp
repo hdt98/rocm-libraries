@@ -25,7 +25,11 @@
 #ifndef TESTING_ROTI_HPP
 #define TESTING_ROTI_HPP
 
+#include "display.hpp"
+#include "flops.hpp"
+#include "gbyte.hpp"
 #include "hipsparse.hpp"
+#include "hipsparse_arguments.hpp"
 #include "hipsparse_test_unique_ptr.hpp"
 #include "unit.hpp"
 #include "utility.hpp"
@@ -56,12 +60,6 @@ void testing_roti_bad_arg(void)
     int* dx_ind = (int*)dx_ind_managed.get();
     T*   dy     = (T*)dy_managed.get();
 
-    if(!dx_ind || !dx_val || !dy)
-    {
-        PRINT_IF_HIP_ERROR(hipErrorOutOfMemory);
-        return;
-    }
-
     verify_hipsparse_status_invalid_value(
         hipsparseXroti(handle, -1, dx_val, dx_ind, dy, &c, &s, idx_base), "Error: nnz is invalid");
 
@@ -91,51 +89,14 @@ template <typename T>
 hipsparseStatus_t testing_roti(Arguments argus)
 {
 #if(!defined(CUDART_VERSION) || CUDART_VERSION < 12000)
-    int                  N         = argus.N;
-    int                  nnz       = argus.nnz;
-    T                    c         = argus.alpha;
-    T                    s         = argus.beta;
-    int                  safe_size = 100;
-    hipsparseIndexBase_t idx_base  = argus.idx_base;
-    hipsparseStatus_t    status;
+    int                  N        = argus.N;
+    int                  nnz      = argus.nnz;
+    T                    c        = argus.get_alpha<T>();
+    T                    s        = argus.get_beta<T>();
+    hipsparseIndexBase_t idx_base = argus.baseA;
 
-    std::unique_ptr<handle_struct> test_handle(new handle_struct);
-    hipsparseHandle_t              handle = test_handle->handle;
-
-    // Argument sanity check before allocating invalid memory
-    if(nnz <= 0)
-    {
-        auto dx_ind_managed
-            = hipsparse_unique_ptr{device_malloc(sizeof(int) * safe_size), device_free};
-        auto dx_val_managed
-            = hipsparse_unique_ptr{device_malloc(sizeof(T) * safe_size), device_free};
-        auto dy_managed = hipsparse_unique_ptr{device_malloc(sizeof(T) * safe_size), device_free};
-
-        int* dx_ind = (int*)dx_ind_managed.get();
-        T*   dx_val = (T*)dx_val_managed.get();
-        T*   dy     = (T*)dy_managed.get();
-
-        if(!dx_ind || !dx_val || !dy)
-        {
-            verify_hipsparse_status_success(HIPSPARSE_STATUS_ALLOC_FAILED,
-                                            "!dx_ind || !dx_val || !dy");
-            return HIPSPARSE_STATUS_ALLOC_FAILED;
-        }
-
-        CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_HOST));
-        status = hipsparseXroti(handle, nnz, dx_val, dx_ind, dy, &c, &s, idx_base);
-
-        if(nnz < 0)
-        {
-            verify_hipsparse_status_invalid_size(status, "Error: nnz < 0");
-        }
-        else
-        {
-            verify_hipsparse_status_success(status, "nnz == 0");
-        }
-
-        return HIPSPARSE_STATUS_SUCCESS;
-    }
+    std::unique_ptr<handle_struct> unique_ptr_handle(new handle_struct);
+    hipsparseHandle_t              handle = unique_ptr_handle->handle;
 
     // Host structures
     std::vector<int> hx_ind(nnz);
@@ -174,14 +135,6 @@ hipsparseStatus_t testing_roti(Arguments argus)
     T*   dc       = (T*)dc_managed.get();
     T*   ds       = (T*)ds_managed.get();
 
-    if(!dx_ind || !dx_val_1 || !dx_val_2 || !dy_1 || !dy_2 || !dc || !ds)
-    {
-        verify_hipsparse_status_success(
-            HIPSPARSE_STATUS_ALLOC_FAILED,
-            "!dx_ind || !dx_val_1 || !dx_val_2 || !dy_1 || !dy_2 || !dc || !ds");
-        return HIPSPARSE_STATUS_ALLOC_FAILED;
-    }
-
     // copy data from CPU to device
     CHECK_HIP_ERROR(hipMemcpy(dx_ind, hx_ind.data(), sizeof(int) * nnz, hipMemcpyHostToDevice));
     CHECK_HIP_ERROR(hipMemcpy(dx_val_1, hx_val_1.data(), sizeof(T) * nnz, hipMemcpyHostToDevice));
@@ -195,12 +148,12 @@ hipsparseStatus_t testing_roti(Arguments argus)
         CHECK_HIP_ERROR(hipMemcpy(dc, &c, sizeof(T), hipMemcpyHostToDevice));
         CHECK_HIP_ERROR(hipMemcpy(ds, &s, sizeof(T), hipMemcpyHostToDevice));
 
-        // ROCSPARSE pointer mode host
+        // HIPSPARSE pointer mode host
         CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_HOST));
         CHECK_HIPSPARSE_ERROR(
             hipsparseXroti(handle, nnz, dx_val_1, dx_ind, dy_1, &c, &s, idx_base));
 
-        // ROCSPARSE pointer mode device
+        // HIPSPARSE pointer mode device
         CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_DEVICE));
         CHECK_HIPSPARSE_ERROR(
             hipsparseXroti(handle, nnz, dx_val_2, dx_ind, dy_2, dc, ds, idx_base));
@@ -231,6 +184,47 @@ hipsparseStatus_t testing_roti(Arguments argus)
         unit_check_general(1, nnz, 1, hx_val_gold.data(), hx_val_2.data());
         unit_check_general(1, N, 1, hy_gold.data(), hy_1.data());
         unit_check_general(1, N, 1, hy_gold.data(), hy_2.data());
+    }
+
+    if(argus.timing)
+    {
+        int number_cold_calls = 2;
+        int number_hot_calls  = argus.iters;
+
+        CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_HOST));
+
+        // Warm up
+        for(int iter = 0; iter < number_cold_calls; ++iter)
+        {
+            CHECK_HIPSPARSE_ERROR(
+                hipsparseXroti(handle, nnz, dx_val_1, dx_ind, dy_1, &c, &s, idx_base));
+        }
+
+        double gpu_time_used = get_time_us();
+
+        // Performance run
+        for(int iter = 0; iter < number_hot_calls; ++iter)
+        {
+            CHECK_HIPSPARSE_ERROR(
+                hipsparseXroti(handle, nnz, dx_val_1, dx_ind, dy_1, &c, &s, idx_base));
+        }
+
+        gpu_time_used = (get_time_us() - gpu_time_used) / number_hot_calls;
+
+        double gflop_count = roti_gflop_count(nnz);
+        double gbyte_count = roti_gbyte_count<T>(nnz);
+
+        double gpu_gbyte  = get_gpu_gbyte(gpu_time_used, gbyte_count);
+        double gpu_gflops = get_gpu_gflops(gpu_time_used, gflop_count);
+
+        display_timing_info(display_key_t::nnz,
+                            nnz,
+                            display_key_t::gflops,
+                            gpu_gflops,
+                            display_key_t::bandwidth,
+                            gpu_gbyte,
+                            display_key_t::time_ms,
+                            get_gpu_time_msec(gpu_time_used));
     }
 #endif
 

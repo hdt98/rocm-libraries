@@ -26,6 +26,7 @@
 #define TESTING_CSRGEMM2_B_HPP
 
 #include "hipsparse.hpp"
+#include "hipsparse_arguments.hpp"
 #include "hipsparse_test_unique_ptr.hpp"
 #include "unit.hpp"
 #include "utility.hpp"
@@ -88,12 +89,6 @@ void testing_csrgemm2_b_bad_arg(void)
 
     CHECK_HIP_ERROR(
         hipMemcpy(dCptr, hcsr_row_ptr_C.data(), sizeof(int) * (M + 1), hipMemcpyHostToDevice));
-
-    if(!dDval || !dDptr || !dDcol || !dCval || !dCptr || !dCcol || !dbuffer)
-    {
-        PRINT_IF_HIP_ERROR(hipErrorOutOfMemory);
-        return;
-    }
 
     // Scenario: alpha == 0 and beta != 0
 
@@ -821,47 +816,29 @@ template <typename T>
 hipsparseStatus_t testing_csrgemm2_b(Arguments argus)
 {
 #if(!defined(CUDART_VERSION) || CUDART_VERSION < 12000)
-    int                  safe_size  = 100;
     int                  M          = argus.M;
     int                  N          = argus.N;
-    hipsparseIndexBase_t idx_base_C = argus.idx_base3;
-    hipsparseIndexBase_t idx_base_D = argus.idx_base4;
-    std::string          binfile    = "";
-    std::string          filename   = "";
+    hipsparseIndexBase_t idx_base_C = argus.baseC;
+    hipsparseIndexBase_t idx_base_D = argus.baseD;
+    std::string          filename   = argus.filename;
     T                    beta       = make_DataType<T>(argus.beta);
-
-    hipsparseStatus_t status;
-    size_t            size;
 
     T* h_beta = &beta;
 
-    // When in testing mode, M == N == -99 indicates that we are testing with a real
-    // matrix from cise.ufl.edu
-    if(M == -99 && N == -99 && argus.timing == 0)
-    {
-        binfile = argus.filename;
-        M = N = safe_size;
-    }
+    std::unique_ptr<handle_struct> unique_ptr_handle(new handle_struct);
+    hipsparseHandle_t              handle = unique_ptr_handle->handle;
 
-    if(argus.timing == 1)
-    {
-        filename = argus.filename;
-    }
+    std::unique_ptr<descr_struct> unique_ptr_descr_A(new descr_struct);
+    hipsparseMatDescr_t           descr_A = unique_ptr_descr_A->descr;
 
-    std::unique_ptr<handle_struct> test_handle(new handle_struct);
-    hipsparseHandle_t              handle = test_handle->handle;
+    std::unique_ptr<descr_struct> unique_ptr_descr_B(new descr_struct);
+    hipsparseMatDescr_t           descr_B = unique_ptr_descr_B->descr;
 
-    std::unique_ptr<descr_struct> test_descr_A(new descr_struct);
-    hipsparseMatDescr_t           descr_A = test_descr_A->descr;
+    std::unique_ptr<descr_struct> unique_ptr_descr_C(new descr_struct);
+    hipsparseMatDescr_t           descr_C = unique_ptr_descr_C->descr;
 
-    std::unique_ptr<descr_struct> test_descr_B(new descr_struct);
-    hipsparseMatDescr_t           descr_B = test_descr_B->descr;
-
-    std::unique_ptr<descr_struct> test_descr_C(new descr_struct);
-    hipsparseMatDescr_t           descr_C = test_descr_C->descr;
-
-    std::unique_ptr<descr_struct> test_descr_D(new descr_struct);
-    hipsparseMatDescr_t           descr_D = test_descr_D->descr;
+    std::unique_ptr<descr_struct> unique_ptr_descr_D(new descr_struct);
+    hipsparseMatDescr_t           descr_D = unique_ptr_descr_D->descr;
 
     std::unique_ptr<csrgemm2_struct> unique_ptr_csrgemm2(new csrgemm2_struct);
     csrgemm2Info_t                   info = unique_ptr_csrgemm2->info;
@@ -870,225 +847,28 @@ hipsparseStatus_t testing_csrgemm2_b(Arguments argus)
     CHECK_HIPSPARSE_ERROR(hipsparseSetMatIndexBase(descr_C, idx_base_C));
     CHECK_HIPSPARSE_ERROR(hipsparseSetMatIndexBase(descr_D, idx_base_D));
 
-    // Determine number of non-zero elements
-    double scale = 0.02;
-    if(M > 1000 || N > 1000)
-    {
-        scale = 2.0 / std::max(M, N);
-    }
-    int nnz_D = M * scale * N;
-
-    // Argument sanity check before allocating invalid memory
-    if(M <= 0 || N <= 0 || nnz_D <= 0)
-    {
-#ifdef __HIP_PLATFORM_NVIDIA__
-        // do not test for zero
-        return HIPSPARSE_STATUS_SUCCESS;
-#endif
-        auto dDptr_managed
-            = hipsparse_unique_ptr{device_malloc(sizeof(int) * safe_size), device_free};
-        auto dDcol_managed
-            = hipsparse_unique_ptr{device_malloc(sizeof(int) * safe_size), device_free};
-        auto dDval_managed
-            = hipsparse_unique_ptr{device_malloc(sizeof(T) * safe_size), device_free};
-        auto dCptr_managed
-            = hipsparse_unique_ptr{device_malloc(sizeof(int) * safe_size), device_free};
-        auto dCcol_managed
-            = hipsparse_unique_ptr{device_malloc(sizeof(int) * safe_size), device_free};
-        auto dCval_managed
-            = hipsparse_unique_ptr{device_malloc(sizeof(T) * safe_size), device_free};
-        auto dbuffer_managed
-            = hipsparse_unique_ptr{device_malloc(sizeof(char) * safe_size), device_free};
-
-        int*  dDptr   = (int*)dDptr_managed.get();
-        int*  dDcol   = (int*)dDcol_managed.get();
-        T*    dDval   = (T*)dDval_managed.get();
-        int*  dCptr   = (int*)dCptr_managed.get();
-        int*  dCcol   = (int*)dCcol_managed.get();
-        T*    dCval   = (T*)dCval_managed.get();
-        void* dbuffer = (void*)dbuffer_managed.get();
-
-        if(!dDval || !dDptr || !dDcol || !dCval || !dCptr || !dCcol || !dbuffer)
-        {
-            verify_hipsparse_status_success(HIPSPARSE_STATUS_ALLOC_FAILED,
-                                            "!dDptr || !dDcol || !dDval || "
-                                            "!dCptr || !dCcol || !dCval || "
-                                            "!dbuffer");
-            return HIPSPARSE_STATUS_ALLOC_FAILED;
-        }
-
-        // Test hipsparseXcsrgemm2_bufferSizeExt
-        status = hipsparseXcsrgemm2_bufferSizeExt(handle,
-                                                  M,
-                                                  N,
-                                                  0,
-                                                  (T*)nullptr,
-                                                  descr_A,
-                                                  0,
-                                                  nullptr,
-                                                  nullptr,
-                                                  descr_B,
-                                                  0,
-                                                  nullptr,
-                                                  nullptr,
-                                                  h_beta,
-                                                  descr_D,
-                                                  nnz_D,
-                                                  dDptr,
-                                                  dDcol,
-                                                  info,
-                                                  &size);
-
-        if(M < 0 || N < 0 || nnz_D < 0)
-        {
-            verify_hipsparse_status_invalid_size(status, "Error: M < 0 || N < 0 || nnz_D < 0");
-        }
-        else
-        {
-            verify_hipsparse_status_success(status, "M >= 0 && N >= 0 && nnz_D >= 0");
-        }
-
-        // Test hipsparseXcsrgemm2Nnz
-        int nnz_C;
-        status = hipsparseXcsrgemm2Nnz(handle,
-                                       M,
-                                       N,
-                                       0,
-                                       descr_A,
-                                       0,
-                                       nullptr,
-                                       nullptr,
-                                       descr_B,
-                                       0,
-                                       nullptr,
-                                       nullptr,
-                                       descr_D,
-                                       nnz_D,
-                                       dDptr,
-                                       dDcol,
-                                       descr_C,
-                                       dCptr,
-                                       &nnz_C,
-                                       info,
-                                       dbuffer);
-
-        if(M < 0 || N < 0 || nnz_D < 0)
-        {
-            verify_hipsparse_status_invalid_size(status, "Error: M < 0 || N < 0 || nnz_D < 0");
-        }
-        else
-        {
-            verify_hipsparse_status_success(status, "M >= 0 && N >= 0 && nnz_D >= 0");
-        }
-
-        // Test hipsparseXcsrgemm2
-        status = hipsparseXcsrgemm2(handle,
-                                    M,
-                                    N,
-                                    0,
-                                    (T*)nullptr,
-                                    descr_A,
-                                    0,
-                                    (T*)nullptr,
-                                    nullptr,
-                                    nullptr,
-                                    descr_B,
-                                    0,
-                                    (T*)nullptr,
-                                    nullptr,
-                                    nullptr,
-                                    h_beta,
-                                    descr_D,
-                                    nnz_D,
-                                    dDval,
-                                    dDptr,
-                                    dDcol,
-                                    descr_C,
-                                    dCval,
-                                    dCptr,
-                                    dCcol,
-                                    info,
-                                    dbuffer);
-
-        if(M < 0 || N < 0 || nnz_D < 0)
-        {
-            verify_hipsparse_status_invalid_size(status, "Error: M < 0 || N < 0 || nnz_D < 0");
-        }
-        else
-        {
-            verify_hipsparse_status_success(status, "M >= 0 && N >= 0 && nnz_D >= 0");
-        }
-
-        return HIPSPARSE_STATUS_SUCCESS;
-    }
+    srand(12345ULL);
 
     // Host structures
+    std::vector<int> hcsr_row_ptr_D;
+    std::vector<int> hcsr_col_ind_D;
+    std::vector<T>   hcsr_val_D;
+
+    // Read or construct CSR matrix
+    int nnz_D = 0;
+    if(!generate_csr_matrix(
+           filename, M, N, nnz_D, hcsr_row_ptr_D, hcsr_col_ind_D, hcsr_val_D, idx_base_D))
+    {
+        fprintf(stderr, "Cannot open [read] %s\ncol", filename.c_str());
+        return HIPSPARSE_STATUS_INTERNAL_ERROR;
+    }
+
     std::vector<int> hcsr_row_ptr_A;
     std::vector<int> hcsr_col_ind_A;
     std::vector<T>   hcsr_val_A;
     std::vector<int> hcsr_row_ptr_B;
     std::vector<int> hcsr_col_ind_B;
     std::vector<T>   hcsr_val_B;
-    std::vector<int> hcsr_row_ptr_D;
-    std::vector<int> hcsr_col_ind_D;
-    std::vector<T>   hcsr_val_D;
-
-    // Initial Data on CPU
-    srand(12345ULL);
-    if(binfile != "")
-    {
-        if(read_bin_matrix(
-               binfile.c_str(), M, N, nnz_D, hcsr_row_ptr_D, hcsr_col_ind_D, hcsr_val_D, idx_base_D)
-           != 0)
-        {
-            fprintf(stderr, "Cannot open [read] %s\n", binfile.c_str());
-            return HIPSPARSE_STATUS_INTERNAL_ERROR;
-        }
-    }
-    else if(argus.laplacian)
-    {
-        M = N = gen_2d_laplacian(
-            argus.laplacian, hcsr_row_ptr_D, hcsr_col_ind_D, hcsr_val_D, idx_base_D);
-        nnz_D = hcsr_row_ptr_D[M];
-    }
-    else
-    {
-        std::vector<int> hcoo_row_ind;
-
-        if(filename != "")
-        {
-            if(read_mtx_matrix(filename.c_str(),
-                               M,
-                               N,
-                               nnz_D,
-                               hcoo_row_ind,
-                               hcsr_col_ind_D,
-                               hcsr_val_D,
-                               idx_base_D)
-               != 0)
-            {
-                fprintf(stderr, "Cannot open [read] %s\n", filename.c_str());
-                return HIPSPARSE_STATUS_INTERNAL_ERROR;
-            }
-        }
-        else
-        {
-            gen_matrix_coo(M, N, nnz_D, hcoo_row_ind, hcsr_col_ind_D, hcsr_val_D, idx_base_D);
-        }
-
-        // Convert COO to CSR
-        hcsr_row_ptr_D.resize(M + 1, 0);
-        for(int i = 0; i < nnz_D; ++i)
-        {
-            ++hcsr_row_ptr_D[hcoo_row_ind[i] + 1 - idx_base_D];
-        }
-
-        hcsr_row_ptr_D[0] = idx_base_D;
-        for(int i = 0; i < M; ++i)
-        {
-            hcsr_row_ptr_D[i + 1] += hcsr_row_ptr_D[i];
-        }
-    }
 
     // Allocate memory on device
     int one        = 1;
@@ -1106,14 +886,6 @@ hipsparseStatus_t testing_csrgemm2_b(Arguments argus)
     int* dCptr = (int*)dCptr_managed.get();
     T*   dbeta = (T*)dbeta_managed.get();
 
-    if(!dDval || !dDptr || !dDcol || !dCptr || !dbeta)
-    {
-        verify_hipsparse_status_success(HIPSPARSE_STATUS_ALLOC_FAILED,
-                                        "!dDval || !dDptr || !dDcol || "
-                                        "!dCptr || !dbeta");
-        return HIPSPARSE_STATUS_ALLOC_FAILED;
-    }
-
     // copy data from CPU to device
     CHECK_HIP_ERROR(
         hipMemcpy(dDptr, hcsr_row_ptr_D.data(), sizeof(int) * (M + 1), hipMemcpyHostToDevice));
@@ -1123,6 +895,7 @@ hipsparseStatus_t testing_csrgemm2_b(Arguments argus)
     CHECK_HIP_ERROR(hipMemcpy(dbeta, h_beta, sizeof(T), hipMemcpyHostToDevice));
 
     // Obtain csrgemm2 buffer size
+    size_t bufferSize;
     CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_HOST));
     CHECK_HIPSPARSE_ERROR(hipsparseXcsrgemm2_bufferSizeExt(handle,
                                                            M,
@@ -1143,10 +916,11 @@ hipsparseStatus_t testing_csrgemm2_b(Arguments argus)
                                                            dDptr,
                                                            dDcol,
                                                            info,
-                                                           &size));
+                                                           &bufferSize));
 
     // Allocate buffer on the device
-    auto dbuffer_managed = hipsparse_unique_ptr{device_malloc(sizeof(char) * size), device_free};
+    auto dbuffer_managed
+        = hipsparse_unique_ptr{device_malloc(sizeof(char) * bufferSize), device_free};
 
     void* dbuffer = (void*)dbuffer_managed.get();
 
@@ -1187,12 +961,6 @@ hipsparseStatus_t testing_csrgemm2_b(Arguments argus)
     int* dCcol = (int*)dCcol_managed.get();
     T*   dCval = (T*)dCval_managed.get();
 
-    if(!dCval || !dCcol)
-    {
-        verify_hipsparse_status_success(HIPSPARSE_STATUS_ALLOC_FAILED, "!dCval || !dCcol");
-        return HIPSPARSE_STATUS_ALLOC_FAILED;
-    }
-
     if(argus.unit_check)
     {
         // hipsparse pointer mode device
@@ -1227,22 +995,22 @@ hipsparseStatus_t testing_csrgemm2_b(Arguments argus)
 
         double cpu_time_used = get_time_us();
 
-        int nnz_C_gold = csrgemm2_nnz(M,
-                                      N,
-                                      0,
-                                      (T*)nullptr,
-                                      hcsr_row_ptr_A.data(),
-                                      hcsr_col_ind_A.data(),
-                                      hcsr_row_ptr_B.data(),
-                                      hcsr_col_ind_B.data(),
-                                      h_beta,
-                                      hcsr_row_ptr_D.data(),
-                                      hcsr_col_ind_D.data(),
-                                      hcsr_row_ptr_C_gold.data(),
-                                      HIPSPARSE_INDEX_BASE_ZERO,
-                                      HIPSPARSE_INDEX_BASE_ZERO,
-                                      idx_base_C,
-                                      idx_base_D);
+        int nnz_C_gold = host_csrgemm2_nnz(M,
+                                           N,
+                                           0,
+                                           (T*)nullptr,
+                                           hcsr_row_ptr_A.data(),
+                                           hcsr_col_ind_A.data(),
+                                           hcsr_row_ptr_B.data(),
+                                           hcsr_col_ind_B.data(),
+                                           h_beta,
+                                           hcsr_row_ptr_D.data(),
+                                           hcsr_col_ind_D.data(),
+                                           hcsr_row_ptr_C_gold.data(),
+                                           HIPSPARSE_INDEX_BASE_ZERO,
+                                           HIPSPARSE_INDEX_BASE_ZERO,
+                                           idx_base_C,
+                                           idx_base_D);
 
         // If nnz_C == 0, we are done
         if(nnz_C_gold == 0)
@@ -1253,27 +1021,27 @@ hipsparseStatus_t testing_csrgemm2_b(Arguments argus)
         std::vector<int> hcsr_col_ind_C_gold(nnz_C_gold);
         std::vector<T>   hcsr_val_C_gold(nnz_C_gold);
 
-        csrgemm2(M,
-                 N,
-                 0,
-                 (T*)nullptr,
-                 hcsr_row_ptr_A.data(),
-                 hcsr_col_ind_A.data(),
-                 hcsr_val_A.data(),
-                 hcsr_row_ptr_B.data(),
-                 hcsr_col_ind_B.data(),
-                 hcsr_val_B.data(),
-                 h_beta,
-                 hcsr_row_ptr_D.data(),
-                 hcsr_col_ind_D.data(),
-                 hcsr_val_D.data(),
-                 hcsr_row_ptr_C_gold.data(),
-                 hcsr_col_ind_C_gold.data(),
-                 hcsr_val_C_gold.data(),
-                 HIPSPARSE_INDEX_BASE_ZERO,
-                 HIPSPARSE_INDEX_BASE_ZERO,
-                 idx_base_C,
-                 idx_base_D);
+        host_csrgemm2(M,
+                      N,
+                      0,
+                      (T*)nullptr,
+                      hcsr_row_ptr_A.data(),
+                      hcsr_col_ind_A.data(),
+                      hcsr_val_A.data(),
+                      hcsr_row_ptr_B.data(),
+                      hcsr_col_ind_B.data(),
+                      hcsr_val_B.data(),
+                      h_beta,
+                      hcsr_row_ptr_D.data(),
+                      hcsr_col_ind_D.data(),
+                      hcsr_val_D.data(),
+                      hcsr_row_ptr_C_gold.data(),
+                      hcsr_col_ind_C_gold.data(),
+                      hcsr_val_C_gold.data(),
+                      HIPSPARSE_INDEX_BASE_ZERO,
+                      HIPSPARSE_INDEX_BASE_ZERO,
+                      idx_base_C,
+                      idx_base_D);
 
         cpu_time_used = get_time_us() - cpu_time_used;
 

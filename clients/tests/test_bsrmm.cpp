@@ -36,7 +36,7 @@ typedef std::tuple<int, int, double, double, direction, base, trans, trans, std:
 
 int bsrmm_M_range[]         = {42, 2059};
 int bsrmm_N_range[]         = {7, 78};
-int bsrmm_K_range[]         = {50, 173, 1375};
+int bsrmm_K_range[]         = {50, 1375};
 int bsrmm_block_dim_range[] = {4, 7, 16};
 
 double bsrmm_alpha_range[] = {-0.5};
@@ -47,7 +47,7 @@ base      bsrmm_idxbase_range[] = {HIPSPARSE_INDEX_BASE_ZERO, HIPSPARSE_INDEX_BA
 trans     bsrmm_transA_range[]  = {HIPSPARSE_OPERATION_NON_TRANSPOSE};
 trans     bsrmm_transB_range[] = {HIPSPARSE_OPERATION_NON_TRANSPOSE, HIPSPARSE_OPERATION_TRANSPOSE};
 
-int bsrmm_N_range_bin[]         = {9, 17, 23};
+int bsrmm_N_range_bin[]         = {9, 23};
 int bsrmm_block_dim_range_bin[] = {5};
 
 double bsrmm_alpha_range_bin[] = {0.75};
@@ -89,7 +89,7 @@ Arguments setup_bsrmm_arguments(bsrmm_tuple tup)
     arg.alpha     = std::get<4>(tup);
     arg.beta      = std::get<5>(tup);
     arg.dirA      = std::get<6>(tup);
-    arg.idx_base  = std::get<7>(tup);
+    arg.baseA     = std::get<7>(tup);
     arg.transA    = std::get<8>(tup);
     arg.transB    = std::get<9>(tup);
     arg.timing    = 0;
@@ -106,7 +106,7 @@ Arguments setup_bsrmm_arguments(bsrmm_bin_tuple tup)
     arg.alpha     = std::get<2>(tup);
     arg.beta      = std::get<3>(tup);
     arg.dirA      = std::get<4>(tup);
-    arg.idx_base  = std::get<5>(tup);
+    arg.baseA     = std::get<5>(tup);
     arg.transA    = std::get<6>(tup);
     arg.transB    = std::get<7>(tup);
     arg.timing    = 0;
@@ -120,8 +120,6 @@ Arguments setup_bsrmm_arguments(bsrmm_bin_tuple tup)
     return arg;
 }
 
-// Only run tests for CUDA 11.1 or greater
-#if(!defined(CUDART_VERSION) || CUDART_VERSION >= 11010)
 TEST(bsrmm_bad_arg, bsrmm_float)
 {
     testing_bsrmm_bad_arg<float>();
@@ -174,7 +172,6 @@ TEST_P(parameterized_bsrmm_bin, bsrmm_bin_double)
     hipsparseStatus_t status = testing_bsrmm<double>(arg);
     EXPECT_EQ(status, HIPSPARSE_STATUS_SUCCESS);
 }
-#endif
 
 INSTANTIATE_TEST_SUITE_P(bsrmm,
                          parameterized_bsrmm,

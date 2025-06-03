@@ -30,8 +30,8 @@
 typedef hipsparseIndexBase_t               base;
 typedef std::tuple<int, int, double, base> axpyi_tuple;
 
-int axpyi_N_range[]   = {12000, 15332, 22031};
-int axpyi_nnz_range[] = {-1, 0, 5, 10, 500, 1000, 7111, 10000};
+int axpyi_N_range[]   = {15332};
+int axpyi_nnz_range[] = {0, 10, 500, 7111};
 
 std::vector<double> axpyi_alpha_range = {1.0, 0.0};
 
@@ -49,16 +49,15 @@ protected:
 Arguments setup_axpyi_arguments(axpyi_tuple tup)
 {
     Arguments arg;
-    arg.N        = std::get<0>(tup);
-    arg.nnz      = std::get<1>(tup);
-    arg.alpha    = std::get<2>(tup);
-    arg.idx_base = std::get<3>(tup);
-    arg.timing   = 0;
+    arg.N      = std::get<0>(tup);
+    arg.nnz    = std::get<1>(tup);
+    arg.alpha  = std::get<2>(tup);
+    arg.baseA  = std::get<3>(tup);
+    arg.timing = 0;
     return arg;
 }
 
-// Only run tests for CUDA 11.1 or greater (removed in cusparse 12.0.0)
-#if(!defined(CUDART_VERSION) || (CUDART_VERSION >= 11010 && CUDART_VERSION < 12000))
+#if(!defined(CUDART_VERSION) || CUDART_VERSION < 12000)
 TEST(axpyi_bad_arg, axpyi_float)
 {
     testing_axpyi_bad_arg<float>();
@@ -95,7 +94,6 @@ TEST_P(parameterized_axpyi, axpyi_double_complex)
     hipsparseStatus_t status = testing_axpyi<hipDoubleComplex>(arg);
     EXPECT_EQ(status, HIPSPARSE_STATUS_SUCCESS);
 }
-#endif
 
 INSTANTIATE_TEST_SUITE_P(axpyi,
                          parameterized_axpyi,
@@ -103,3 +101,4 @@ INSTANTIATE_TEST_SUITE_P(axpyi,
                                           testing::ValuesIn(axpyi_nnz_range),
                                           testing::ValuesIn(axpyi_alpha_range),
                                           testing::ValuesIn(axpyi_idx_base_range)));
+#endif

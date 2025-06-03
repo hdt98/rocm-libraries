@@ -3,6 +3,97 @@
 Documentation for hipSPARSE is available at
 [https://rocm.docs.amd.com/projects/hipSPARSE/en/latest/](https://rocm.docs.amd.com/projects/hipSPARSE/en/latest/).
 
+## hipSPARSE 4.0.1 for ROCm 7.0.0
+
+### Added
+
+* Add the `int8`, `int32`, and `float16` data types to `hipDataTypeToHCCDataType` so that sparse matrix descriptors can be used with them.
+* Adds half float mixed precision to `hipsparseAxpby` where X and Y use float16 and result and the compute type use float
+* Adds half float mixed precision to `hipsparseSpVV` where X and Y use float16 and result and the compute type use float
+* Adds half float mixed precision to `hipsparseSpMM` where A and B use float16 and C and the compute type use float
+* Adds half float mixed precision to `hipsparseSDDMM` where A and B use float16 and C and the compute type use float
+* Adds half float uniform precision to `hipsparseScatter` and `hipsparseGather` routines
+* Adds half float uniform precision to `hipsparseSDDMM` routine
+* Add `int8` precision to `hipsparseCsr2cscEx2` routine.
+* Add the `almalinux` OS name to correct the gfortran dependency
+
+### Changed
+
+* Switch to defaulting to C++17 when building hipSPARSE from source. Previously hipSPARSE was using C++14 by default.
+
+### Resolved issues
+
+* Fixed a compilation [issue](https://github.com/ROCm/hipSPARSE/issues/555) related to using `std::filesystem` and C++14.
+* Fixed the empty clients-common package by moving the `hipsparse_clientmatrices.cmake` and `hipsparse_mtx2csr` files to it.
+
+### Known issues
+
+* In `hipsparseSpSM_solve()`, the external buffer is passed as a parameter. This does not match the NVIDIA CUDA cuSPARSE API. This extra external buffer parameter will be removed in a future release. For now, this extra parameter can be ignored and nullptr passed because it is unused internally by `hipsparseSpSM_solve()`.
+
+## hipSPARSE 3.2.0 for ROCm 6.4.0
+
+### Added
+
+* Added build dependencies for CentOS/RHEL 9 in install script
+
+### Changed
+
+* Moved the `hipsparse_clientmatrices.cmake` and `hipsparse_mtx2csr` files from the `hipsparse-tests` package to the `hipsparse-clients-common` package
+
+### Optimized
+
+* Removed unused `GTest` dependency from `hipsparse-bench`
+
+### Known issues
+
+* In `hipsparseSpSM_solve()`, the external buffer is passed as a parameter. This does not match the NVIDIA CUDA cuSPARSE API. This extra external buffer parameter will be removed in a future release. For now this extra parameter can be ignored and nullptr passed as it is unused internally by `hipsparseSpSM_solve()`.
+
+## hipSPARSE 3.1.2 for ROCm 6.3.0
+
+### Added
+
+* Added an alpha version of the hipsparse-bench executable to facilitate comparing NVIDIA CUDA cuSPARSE and rocSPARSE backends
+
+### Changed
+
+* Changed the default compiler from hipcc to amdclang in the install script and cmake files.
+
+### Optimized
+
+* Improved the user documentation
+
+### Resolved issues
+
+* Fixed the gfortran dependency for the `azurelinux` operating system.
+
+### Known issues
+
+* In `hipsparseSpSM_solve()`, the external buffer is passed as a parameter. This does not match the NVIDIA CUDA cuSPARSE API. This extra external buffer parameter will be removed in a future release. For now this extra parameter can be ignored and nullptr passed as it is unused internally by `hipsparseSpSM_solve()`.
+
+## hipSPARSE 3.1.1 for ROCm 6.2.0
+
+### Additions
+
+* Added missing `hipsparseCscGet()` routine
+
+### Changes
+
+* All internal hipSPARSE functions now exist inside a namespace
+* Match deprecations found in NVIDIA CUDA cuSPARSE 12.x.x when using NVIDIA CUDA cuSPARSE backend.
+
+### Fixes
+
+* Fixed SpGEMM and SpGEMM_reuse routines which were not matching NVIDIA CUDA cuSPARSE behaviour
+
+### Optimizations
+
+* Improved user manual 
+* Improved contribution guidelines
+
+### Known issues
+
+* In `hipsparseSpSM_solve()`, we currently pass the external buffer as a parameter. This does not match the NVIDIA CUDA cuSPARSE API and this extra external buffer parameter will be removed in a future release. For now this extra parameter can be ignored and nullptr passed as it is unused internally by `hipsparseSpSM_solve()`.
+
 ## hipSPARSE 3.0.1 for ROCm 6.1.0
 
 ### Fixes
@@ -16,7 +107,7 @@ Documentation for hipSPARSE is available at
 
 ### Changes
 
-* Changed the `hipsparseSpSV_solve()` API function to match the cuSPARSE API
+* Changed the `hipsparseSpSV_solve()` API function to match the NVIDIA CUDA cuSPARSE API
 * Changed generic API functions to use const descriptors
 * Improved documentation
 
@@ -24,8 +115,8 @@ Documentation for hipSPARSE is available at
 
 ### Fixes
 
-* Compilation failures when using the cuSPARSE 12.1.0 and 12.0.0 backends
-* Compilation failures when using the cuSPARSE 10.1 (non-update version) backend
+* Compilation failures when using the NVIDIA CUDA cuSPARSE 12.1.0 and 12.0.0 backends
+* Compilation failures when using the NVIDIA CUDA cuSPARSE 10.1 (non-update version) backend
 
 ## hipSPARSE 2.3.7 for ROCm 5.6.1
 
@@ -50,7 +141,7 @@ Documentation for hipSPARSE is available at
 ### Fixes
 
 * Fixed an issue where the `rocm` folder was not removed after upgrading meta packages
-* Fixed a compilation issue with the cuSPARSE backend
+* Fixed a compilation issue with the NVIDIA CUDA cuSPARSE backend
 * Added more detailed messages for unit test failures due related to missing input data
 * Improved documentation
 * Fixed a bug with deprecation messages when using gcc9
@@ -64,7 +155,7 @@ Documentation for hipSPARSE is available at
 ### Changes
 
 * `HIPSPARSE_ORDER_COLUMN` has been renamed to `HIPSPARSE_ORDER_COL` in order to match
-    cuSPARSE
+    NVIDIA CUDA cuSPARSE
 
 ## hipSPARSE 2.3.1 for ROCm 5.3.0
 

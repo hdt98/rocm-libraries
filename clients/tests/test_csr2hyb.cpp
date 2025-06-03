@@ -32,8 +32,8 @@ typedef std::tuple<int, int, hipsparseIndexBase_t, hipsparseHybPartition_t, int>
 typedef std::tuple<hipsparseIndexBase_t, hipsparseHybPartition_t, int, std::string>
     csr2hyb_bin_tuple;
 
-int csr2hyb_M_range[] = {-1, 0, 10, 500, 872, 1000};
-int csr2hyb_N_range[] = {-3, 0, 33, 242, 623, 1000};
+int csr2hyb_M_range[] = {0, 10, 500, 872, 1000};
+int csr2hyb_N_range[] = {0, 33, 242, 623, 1000};
 
 hipsparseIndexBase_t csr2hyb_idx_base_range[]
     = {HIPSPARSE_INDEX_BASE_ZERO, HIPSPARSE_INDEX_BASE_ONE};
@@ -69,7 +69,7 @@ Arguments setup_csr2hyb_arguments(csr2hyb_tuple tup)
     Arguments arg;
     arg.M         = std::get<0>(tup);
     arg.N         = std::get<1>(tup);
-    arg.idx_base  = std::get<2>(tup);
+    arg.baseA     = std::get<2>(tup);
     arg.part      = std::get<3>(tup);
     arg.ell_width = std::get<4>(tup);
     arg.timing    = 0;
@@ -81,7 +81,7 @@ Arguments setup_csr2hyb_arguments(csr2hyb_bin_tuple tup)
     Arguments arg;
     arg.M         = -99;
     arg.N         = -99;
-    arg.idx_base  = std::get<0>(tup);
+    arg.baseA     = std::get<0>(tup);
     arg.part      = std::get<1>(tup);
     arg.ell_width = std::get<2>(tup);
     arg.timing    = 0;
@@ -95,8 +95,7 @@ Arguments setup_csr2hyb_arguments(csr2hyb_bin_tuple tup)
     return arg;
 }
 
-// Only run tests for CUDA 11.1 or greater
-#if(!defined(CUDART_VERSION) || CUDART_VERSION >= 11010)
+#if(!defined(CUDART_VERSION) || CUDART_VERSION < 11000)
 TEST(csr2hyb_bad_arg, csr2hyb)
 {
     testing_csr2hyb_bad_arg<float>();
@@ -149,7 +148,6 @@ TEST_P(parameterized_csr2hyb_bin, csr2hyb_bin_double)
     hipsparseStatus_t status = testing_csr2hyb<double>(arg);
     EXPECT_EQ(status, HIPSPARSE_STATUS_SUCCESS);
 }
-#endif
 
 INSTANTIATE_TEST_SUITE_P(csr2hyb,
                          parameterized_csr2hyb,
@@ -165,3 +163,4 @@ INSTANTIATE_TEST_SUITE_P(csr2hyb_bin,
                                           testing::ValuesIn(csr2hyb_partition),
                                           testing::ValuesIn(csr2hyb_ELL_range),
                                           testing::ValuesIn(csr2hyb_bin)));
+#endif

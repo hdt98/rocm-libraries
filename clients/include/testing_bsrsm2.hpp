@@ -22,10 +22,14 @@
  * ************************************************************************ */
 
 #pragma once
-#ifndef TESTING_BSRSV2_HPP
-#define TESTING_BSRSV2_HPP
+#ifndef TESTING_BSRSM2_HPP
+#define TESTING_BSRSM2_HPP
 
+#include "display.hpp"
+#include "flops.hpp"
+#include "gbyte.hpp"
 #include "hipsparse.hpp"
+#include "hipsparse_arguments.hpp"
 #include "hipsparse_test_unique_ptr.hpp"
 #include "unit.hpp"
 #include "utility.hpp"
@@ -37,7 +41,7 @@ using namespace hipsparse_test;
 
 void testing_bsrsm2_bad_arg(void)
 {
-#ifdef __HIP_PLATFORM_AMD__
+#if(!defined(CUDART_VERSION))
     int   mb        = 100;
     int   nrhs      = 100;
     int   nnzb      = 100;
@@ -74,12 +78,6 @@ void testing_bsrsm2_bad_arg(void)
     float* dB   = (float*)dB_managed.get();
     float* dX   = (float*)dX_managed.get();
     void*  dbuf = (void*)dbuf_managed.get();
-
-    if(!dval || !dptr || !dcol || !dB || !dX || !dbuf)
-    {
-        PRINT_IF_HIP_ERROR(hipErrorOutOfMemory);
-        return;
-    }
 
     // testing hipsparseXbsrsm2_bufferSize
     int size;
@@ -516,66 +514,71 @@ void testing_bsrsm2_bad_arg(void)
 }
 
 template <typename T>
-hipsparseStatus_t testing_bsrsm2(void)
+hipsparseStatus_t testing_bsrsm2(Arguments argus)
 {
-    T   h_alpha = make_DataType<T>(2.0);
-    int nrhs    = 15;
+#if(!defined(CUDART_VERSION) || CUDART_VERSION < 13000)
+    int                  m         = argus.M;
+    int                  nrhs      = argus.N;
+    int                  block_dim = argus.block_dim;
+    T                    h_alpha   = make_DataType<T>(argus.alpha);
+    hipsparseDirection_t dir       = argus.dirA;
+    hipsparseIndexBase_t idx_base  = argus.baseA;
+    hipsparseOperation_t transA    = argus.transA;
+    hipsparseOperation_t transX    = argus.transB;
+    std::string          filename  = argus.filename;
 
-    // Determine absolute path of test matrix
+    std::unique_ptr<handle_struct> unique_ptr_handle(new handle_struct);
+    hipsparseHandle_t              handle = unique_ptr_handle->handle;
 
-    // Get current executables absolute path
-
-    // Matrices are stored at the same path in matrices directory
-    std::string filename = get_filename("nos3.bin");
-
-    // hipSPARSE handle and opaque structs
-    std::unique_ptr<handle_struct> test_handle(new handle_struct);
-    hipsparseHandle_t              handle = test_handle->handle;
-
-    std::unique_ptr<descr_struct> test_descr(new descr_struct);
-    hipsparseMatDescr_t           descr = test_descr->descr;
+    std::unique_ptr<descr_struct> unique_ptr_descr(new descr_struct);
+    hipsparseMatDescr_t           descr = unique_ptr_descr->descr;
 
     std::unique_ptr<bsrsm2_struct> unique_ptr_bsrsm2_info(new bsrsm2_struct);
     bsrsm2Info_t                   info = unique_ptr_bsrsm2_info->info;
+
+    // Set matrix index base
+    CHECK_HIPSPARSE_ERROR(hipsparseSetMatIndexBase(descr, idx_base));
+
+    if(m == 0)
+    {
+#ifdef __HIP_PLATFORM_NVIDIA__
+        // cusparse does not support m == 0 for csr2bsr
+        return HIPSPARSE_STATUS_SUCCESS;
+#endif
+    }
+
+    srand(12345ULL);
 
     // Host structures
     std::vector<int> hcsr_row_ptr;
     std::vector<int> hcsr_col_ind;
     std::vector<T>   hcsr_val;
 
-    // Initial Data on CPU
-    srand(12345ULL);
-
-    int m;
-    int n;
-    int nnz;
-
-    if(read_bin_matrix(filename.c_str(),
-                       m,
-                       n,
-                       nnz,
-                       hcsr_row_ptr,
-                       hcsr_col_ind,
-                       hcsr_val,
-                       HIPSPARSE_INDEX_BASE_ZERO)
-       != 0)
+    // Read or construct CSR matrix
+    int nnz = 0;
+    if(!generate_csr_matrix(filename, m, m, nnz, hcsr_row_ptr, hcsr_col_ind, hcsr_val, idx_base))
     {
-        fprintf(stderr, "Cannot open [read] %s\n", filename.c_str());
+        fprintf(stderr, "Cannot open [read] %s\ncol", filename.c_str());
         return HIPSPARSE_STATUS_INTERNAL_ERROR;
     }
 
-    int block_dim = 3;
-    int mb        = (m + block_dim - 1) / block_dim;
+    int mb = (m + block_dim - 1) / block_dim;
 
-    int ldb = m;
-    int ldx = m;
+    int ldb = (transX == HIPSPARSE_OPERATION_NON_TRANSPOSE) ? mb * block_dim : nrhs;
+    int ldx = (transX == HIPSPARSE_OPERATION_NON_TRANSPOSE) ? mb * block_dim : nrhs;
 
-    std::vector<T> hB(mb * block_dim * nrhs);
-    std::vector<T> hX_1(mb * block_dim * nrhs);
-    std::vector<T> hX_2(mb * block_dim * nrhs);
-    std::vector<T> hX_gold(mb * block_dim * nrhs);
+    int64_t nrowB = (transX == HIPSPARSE_OPERATION_NON_TRANSPOSE) ? mb * block_dim : nrhs;
+    int64_t ncolB = (transX == HIPSPARSE_OPERATION_NON_TRANSPOSE) ? nrhs : mb * block_dim;
 
-    hipsparseInit<T>(hB, m, nrhs);
+    int64_t nrowX = nrowB;
+    int64_t ncolX = ncolB;
+
+    std::vector<T> hB(nrowB * ncolB);
+    std::vector<T> hX_1(nrowX * ncolX);
+    std::vector<T> hX_2(nrowX * ncolX);
+    std::vector<T> hX_gold(nrowX * ncolX);
+
+    hipsparseInit<T>(hB, nrowB, ncolB);
 
     // Allocate memory on device
     auto dcsr_row_ptr_managed
@@ -584,12 +587,9 @@ hipsparseStatus_t testing_bsrsm2(void)
     auto dcsr_val_managed     = hipsparse_unique_ptr{device_malloc(sizeof(T) * nnz), device_free};
     auto dbsr_row_ptr_managed
         = hipsparse_unique_ptr{device_malloc(sizeof(int) * (mb + 1)), device_free};
-    auto dB_managed
-        = hipsparse_unique_ptr{device_malloc(sizeof(T) * mb * block_dim * nrhs), device_free};
-    auto dX_1_managed
-        = hipsparse_unique_ptr{device_malloc(sizeof(T) * mb * block_dim * nrhs), device_free};
-    auto dX_2_managed
-        = hipsparse_unique_ptr{device_malloc(sizeof(T) * mb * block_dim * nrhs), device_free};
+    auto dB_managed   = hipsparse_unique_ptr{device_malloc(sizeof(T) * nrowB * ncolB), device_free};
+    auto dX_1_managed = hipsparse_unique_ptr{device_malloc(sizeof(T) * nrowX * ncolX), device_free};
+    auto dX_2_managed = hipsparse_unique_ptr{device_malloc(sizeof(T) * nrowX * ncolX), device_free};
     auto dalpha_managed = hipsparse_unique_ptr{device_malloc(sizeof(T)), device_free};
     auto dpos_managed   = hipsparse_unique_ptr{device_malloc(sizeof(int)), device_free};
 
@@ -603,29 +603,19 @@ hipsparseStatus_t testing_bsrsm2(void)
     T*   dalpha       = (T*)dalpha_managed.get();
     int* dposition    = (int*)dpos_managed.get();
 
-    if(!dcsr_val || !dcsr_row_ptr || !dcsr_col_ind || !dbsr_row_ptr || !dB || !dX_1 || !dX_2
-       || !dalpha || !dposition)
-    {
-        verify_hipsparse_status_success(
-            HIPSPARSE_STATUS_ALLOC_FAILED,
-            "!dcsr_val || !dcsr_row_ptr || !dcsr_col_ind || !dbsr_row_ptr || !dB || !dX_1 || !dX_2 "
-            "|| !dalpha || !dposition");
-        return HIPSPARSE_STATUS_ALLOC_FAILED;
-    }
-
     // copy data from CPU to device
     CHECK_HIP_ERROR(
         hipMemcpy(dcsr_row_ptr, hcsr_row_ptr.data(), sizeof(int) * (m + 1), hipMemcpyHostToDevice));
     CHECK_HIP_ERROR(
         hipMemcpy(dcsr_col_ind, hcsr_col_ind.data(), sizeof(int) * nnz, hipMemcpyHostToDevice));
     CHECK_HIP_ERROR(hipMemcpy(dcsr_val, hcsr_val.data(), sizeof(T) * nnz, hipMemcpyHostToDevice));
-    CHECK_HIP_ERROR(hipMemcpy(dB, hB.data(), sizeof(T) * m * nrhs, hipMemcpyHostToDevice));
+    CHECK_HIP_ERROR(hipMemcpy(dB, hB.data(), sizeof(T) * nrowB * ncolB, hipMemcpyHostToDevice));
     CHECK_HIP_ERROR(hipMemcpy(dalpha, &h_alpha, sizeof(T), hipMemcpyHostToDevice));
 
     // Convert to BSR
     int nnzb;
     CHECK_HIPSPARSE_ERROR(hipsparseXcsr2bsrNnz(handle,
-                                               HIPSPARSE_DIRECTION_ROW,
+                                               dir,
                                                m,
                                                m,
                                                descr,
@@ -644,15 +634,8 @@ hipsparseStatus_t testing_bsrsm2(void)
     int* dbsr_col_ind = (int*)dbsr_col_ind_managed.get();
     T*   dbsr_val     = (T*)dbsr_val_managed.get();
 
-    if(!dbsr_val || !dbsr_col_ind)
-    {
-        verify_hipsparse_status_success(HIPSPARSE_STATUS_ALLOC_FAILED,
-                                        "!dbsr_val || !dbsr_col_ind");
-        return HIPSPARSE_STATUS_ALLOC_FAILED;
-    }
-
     CHECK_HIPSPARSE_ERROR(hipsparseXcsr2bsr(handle,
-                                            HIPSPARSE_DIRECTION_ROW,
+                                            dir,
                                             m,
                                             m,
                                             descr,
@@ -666,12 +649,11 @@ hipsparseStatus_t testing_bsrsm2(void)
                                             dbsr_col_ind));
 
     // Obtain bsrsm2 buffer size
-    int size;
-
+    int bufferSize;
     CHECK_HIPSPARSE_ERROR(hipsparseXbsrsm2_bufferSize(handle,
-                                                      HIPSPARSE_DIRECTION_ROW,
-                                                      HIPSPARSE_OPERATION_NON_TRANSPOSE,
-                                                      HIPSPARSE_OPERATION_NON_TRANSPOSE,
+                                                      dir,
+                                                      transA,
+                                                      transX,
                                                       mb,
                                                       nrhs,
                                                       nnzb,
@@ -681,24 +663,19 @@ hipsparseStatus_t testing_bsrsm2(void)
                                                       dbsr_col_ind,
                                                       block_dim,
                                                       info,
-                                                      &size));
+                                                      &bufferSize));
 
     // Allocate buffer on the device
-    auto dbuffer_managed = hipsparse_unique_ptr{device_malloc(sizeof(char) * size), device_free};
+    auto dbuffer_managed
+        = hipsparse_unique_ptr{device_malloc(sizeof(char) * bufferSize), device_free};
 
     void* dbuffer = (void*)dbuffer_managed.get();
 
-    if(!dbuffer)
-    {
-        verify_hipsparse_status_success(HIPSPARSE_STATUS_ALLOC_FAILED, "!dbuffer");
-        return HIPSPARSE_STATUS_ALLOC_FAILED;
-    }
-
     // bsrsm2 analysis
     CHECK_HIPSPARSE_ERROR(hipsparseXbsrsm2_analysis(handle,
-                                                    HIPSPARSE_DIRECTION_ROW,
-                                                    HIPSPARSE_OPERATION_NON_TRANSPOSE,
-                                                    HIPSPARSE_OPERATION_NON_TRANSPOSE,
+                                                    dir,
+                                                    transA,
+                                                    transX,
                                                     mb,
                                                     nrhs,
                                                     nnzb,
@@ -714,119 +691,227 @@ hipsparseStatus_t testing_bsrsm2(void)
     int pos_analysis;
     hipsparseXbsrsm2_zeroPivot(handle, info, &pos_analysis);
 
-    // HIPSPARSE pointer mode host
-    CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_HOST));
-    CHECK_HIPSPARSE_ERROR(hipsparseXbsrsm2_solve(handle,
-                                                 HIPSPARSE_DIRECTION_ROW,
-                                                 HIPSPARSE_OPERATION_NON_TRANSPOSE,
-                                                 HIPSPARSE_OPERATION_NON_TRANSPOSE,
-                                                 mb,
-                                                 nrhs,
-                                                 nnzb,
-                                                 &h_alpha,
-                                                 descr,
-                                                 dbsr_val,
-                                                 dbsr_row_ptr,
-                                                 dbsr_col_ind,
-                                                 block_dim,
-                                                 info,
-                                                 dB,
-                                                 ldb,
-                                                 dX_1,
-                                                 ldx,
-                                                 HIPSPARSE_SOLVE_POLICY_USE_LEVEL,
-                                                 dbuffer));
-
-    int               hposition_1;
-    hipsparseStatus_t pivot_status_1 = hipsparseXbsrsm2_zeroPivot(handle, info, &hposition_1);
-
-    // HIPSPARSE pointer mode device
-    CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_DEVICE));
-    CHECK_HIPSPARSE_ERROR(hipsparseXbsrsm2_solve(handle,
-                                                 HIPSPARSE_DIRECTION_ROW,
-                                                 HIPSPARSE_OPERATION_NON_TRANSPOSE,
-                                                 HIPSPARSE_OPERATION_NON_TRANSPOSE,
-                                                 mb,
-                                                 nrhs,
-                                                 nnzb,
-                                                 dalpha,
-                                                 descr,
-                                                 dbsr_val,
-                                                 dbsr_row_ptr,
-                                                 dbsr_col_ind,
-                                                 block_dim,
-                                                 info,
-                                                 dB,
-                                                 ldb,
-                                                 dX_2,
-                                                 ldx,
-                                                 HIPSPARSE_SOLVE_POLICY_USE_LEVEL,
-                                                 dbuffer));
-
-    hipsparseStatus_t pivot_status_2 = hipsparseXbsrsm2_zeroPivot(handle, info, dposition);
-
-    // Copy output from device to CPU
-    int hposition_2;
-    CHECK_HIP_ERROR(hipMemcpy(hX_1.data(), dX_1, sizeof(T) * m * nrhs, hipMemcpyDeviceToHost));
-    CHECK_HIP_ERROR(hipMemcpy(hX_2.data(), dX_2, sizeof(T) * m * nrhs, hipMemcpyDeviceToHost));
-    CHECK_HIP_ERROR(hipMemcpy(&hposition_2, dposition, sizeof(int), hipMemcpyDeviceToHost));
-
-    // Host bsrsm2
-    std::vector<int> hbsr_row_ptr(mb + 1);
-    std::vector<int> hbsr_col_ind(nnzb);
-    std::vector<T>   hbsr_val(nnzb * block_dim * block_dim);
-
-    CHECK_HIP_ERROR(hipMemcpy(
-        hbsr_row_ptr.data(), dbsr_row_ptr, sizeof(int) * (mb + 1), hipMemcpyDeviceToHost));
-    CHECK_HIP_ERROR(
-        hipMemcpy(hbsr_col_ind.data(), dbsr_col_ind, sizeof(int) * nnzb, hipMemcpyDeviceToHost));
-    CHECK_HIP_ERROR(hipMemcpy(hbsr_val.data(),
-                              dbsr_val,
-                              sizeof(T) * nnzb * block_dim * block_dim,
-                              hipMemcpyDeviceToHost));
-
-    int struct_position_gold;
-    int numeric_position_gold;
-
-    bsrsm(mb,
-          nrhs,
-          nnzb,
-          HIPSPARSE_DIRECTION_ROW,
-          HIPSPARSE_OPERATION_NON_TRANSPOSE,
-          HIPSPARSE_OPERATION_NON_TRANSPOSE,
-          h_alpha,
-          hbsr_row_ptr.data(),
-          hbsr_col_ind.data(),
-          hbsr_val.data(),
-          block_dim,
-          hB.data(),
-          ldb,
-          hX_gold.data(),
-          ldx,
-          HIPSPARSE_DIAG_TYPE_NON_UNIT,
-          HIPSPARSE_FILL_MODE_LOWER,
-          HIPSPARSE_INDEX_BASE_ZERO,
-          &struct_position_gold,
-          &numeric_position_gold);
-
-    unit_check_general(1, 1, 1, &struct_position_gold, &pos_analysis);
-    unit_check_general(1, 1, 1, &numeric_position_gold, &hposition_1);
-    unit_check_general(1, 1, 1, &numeric_position_gold, &hposition_2);
-
-    if(hposition_1 != -1)
+    if(argus.unit_check)
     {
-        verify_hipsparse_status_zero_pivot(pivot_status_1, "expected HIPSPARSE_STATUS_ZERO_PIVOT");
-        return HIPSPARSE_STATUS_SUCCESS;
+        // HIPSPARSE pointer mode host
+        CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_HOST));
+        CHECK_HIPSPARSE_ERROR(hipsparseXbsrsm2_solve(handle,
+                                                     dir,
+                                                     transA,
+                                                     transX,
+                                                     mb,
+                                                     nrhs,
+                                                     nnzb,
+                                                     &h_alpha,
+                                                     descr,
+                                                     dbsr_val,
+                                                     dbsr_row_ptr,
+                                                     dbsr_col_ind,
+                                                     block_dim,
+                                                     info,
+                                                     dB,
+                                                     ldb,
+                                                     dX_1,
+                                                     ldx,
+                                                     HIPSPARSE_SOLVE_POLICY_USE_LEVEL,
+                                                     dbuffer));
+
+        int               hposition_1;
+        hipsparseStatus_t pivot_status_1 = hipsparseXbsrsm2_zeroPivot(handle, info, &hposition_1);
+
+        // HIPSPARSE pointer mode device
+        CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_DEVICE));
+        CHECK_HIPSPARSE_ERROR(hipsparseXbsrsm2_solve(handle,
+                                                     dir,
+                                                     transA,
+                                                     transX,
+                                                     mb,
+                                                     nrhs,
+                                                     nnzb,
+                                                     dalpha,
+                                                     descr,
+                                                     dbsr_val,
+                                                     dbsr_row_ptr,
+                                                     dbsr_col_ind,
+                                                     block_dim,
+                                                     info,
+                                                     dB,
+                                                     ldb,
+                                                     dX_2,
+                                                     ldx,
+                                                     HIPSPARSE_SOLVE_POLICY_USE_LEVEL,
+                                                     dbuffer));
+
+        hipsparseStatus_t pivot_status_2 = hipsparseXbsrsm2_zeroPivot(handle, info, dposition);
+
+        // Copy output from device to CPU
+        int hposition_2;
+        CHECK_HIP_ERROR(
+            hipMemcpy(hX_1.data(), dX_1, sizeof(T) * nrowX * ncolX, hipMemcpyDeviceToHost));
+        CHECK_HIP_ERROR(
+            hipMemcpy(hX_2.data(), dX_2, sizeof(T) * nrowX * ncolX, hipMemcpyDeviceToHost));
+        CHECK_HIP_ERROR(hipMemcpy(&hposition_2, dposition, sizeof(int), hipMemcpyDeviceToHost));
+
+        // Host bsrsm2
+        std::vector<int> hbsr_row_ptr(mb + 1);
+        std::vector<int> hbsr_col_ind(nnzb);
+        std::vector<T>   hbsr_val(nnzb * block_dim * block_dim);
+
+        CHECK_HIP_ERROR(hipMemcpy(
+            hbsr_row_ptr.data(), dbsr_row_ptr, sizeof(int) * (mb + 1), hipMemcpyDeviceToHost));
+        CHECK_HIP_ERROR(hipMemcpy(
+            hbsr_col_ind.data(), dbsr_col_ind, sizeof(int) * nnzb, hipMemcpyDeviceToHost));
+        CHECK_HIP_ERROR(hipMemcpy(hbsr_val.data(),
+                                  dbsr_val,
+                                  sizeof(T) * nnzb * block_dim * block_dim,
+                                  hipMemcpyDeviceToHost));
+
+        int struct_position_gold;
+        int numeric_position_gold;
+
+        CHECK_HIP_ERROR(hipDeviceSynchronize());
+
+        host_bsrsm(mb,
+                   nrhs,
+                   nnzb,
+                   dir,
+                   transA,
+                   transX,
+                   h_alpha,
+                   hbsr_row_ptr.data(),
+                   hbsr_col_ind.data(),
+                   hbsr_val.data(),
+                   block_dim,
+                   hB.data(),
+                   ldb,
+                   hX_gold.data(),
+                   ldx,
+                   HIPSPARSE_DIAG_TYPE_NON_UNIT,
+                   HIPSPARSE_FILL_MODE_LOWER,
+                   idx_base,
+                   &struct_position_gold,
+                   &numeric_position_gold);
+
+        unit_check_general(1, 1, 1, &struct_position_gold, &pos_analysis);
+        unit_check_general(1, 1, 1, &numeric_position_gold, &hposition_1);
+        unit_check_general(1, 1, 1, &numeric_position_gold, &hposition_2);
+
+        if(hposition_1 != -1)
+        {
+            verify_hipsparse_status_zero_pivot(pivot_status_1,
+                                               "expected HIPSPARSE_STATUS_ZERO_PIVOT");
+            return HIPSPARSE_STATUS_SUCCESS;
+        }
+
+        if(hposition_2 != -1)
+        {
+            verify_hipsparse_status_zero_pivot(pivot_status_2,
+                                               "expected HIPSPARSE_STATUS_ZERO_PIVOT");
+            return HIPSPARSE_STATUS_SUCCESS;
+        }
+
+        unit_check_near(nrowX, ncolX, ldx, hX_gold.data(), hX_1.data());
+        unit_check_near(nrowX, ncolX, ldx, hX_gold.data(), hX_2.data());
     }
 
-    if(hposition_2 != -1)
+    if(argus.timing)
     {
-        verify_hipsparse_status_zero_pivot(pivot_status_2, "expected HIPSPARSE_STATUS_ZERO_PIVOT");
-        return HIPSPARSE_STATUS_SUCCESS;
-    }
+        int number_cold_calls = 2;
+        int number_hot_calls  = argus.iters;
 
-    unit_check_near(m, nrhs, ldx, hX_gold.data(), hX_1.data());
-    unit_check_near(m, nrhs, ldx, hX_gold.data(), hX_2.data());
+        CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_HOST));
+
+        // Warm up
+        for(int iter = 0; iter < number_cold_calls; ++iter)
+        {
+            CHECK_HIPSPARSE_ERROR(hipsparseXbsrsm2_solve(handle,
+                                                         dir,
+                                                         transA,
+                                                         transX,
+                                                         mb,
+                                                         nrhs,
+                                                         nnzb,
+                                                         &h_alpha,
+                                                         descr,
+                                                         dbsr_val,
+                                                         dbsr_row_ptr,
+                                                         dbsr_col_ind,
+                                                         block_dim,
+                                                         info,
+                                                         dB,
+                                                         ldb,
+                                                         dX_1,
+                                                         ldx,
+                                                         HIPSPARSE_SOLVE_POLICY_USE_LEVEL,
+                                                         dbuffer));
+        }
+
+        double gpu_time_used = get_time_us();
+
+        // Performance run
+        for(int iter = 0; iter < number_hot_calls; ++iter)
+        {
+            CHECK_HIPSPARSE_ERROR(hipsparseXbsrsm2_solve(handle,
+                                                         dir,
+                                                         transA,
+                                                         transX,
+                                                         mb,
+                                                         nrhs,
+                                                         nnzb,
+                                                         &h_alpha,
+                                                         descr,
+                                                         dbsr_val,
+                                                         dbsr_row_ptr,
+                                                         dbsr_col_ind,
+                                                         block_dim,
+                                                         info,
+                                                         dB,
+                                                         ldb,
+                                                         dX_1,
+                                                         ldx,
+                                                         HIPSPARSE_SOLVE_POLICY_USE_LEVEL,
+                                                         dbuffer));
+        }
+
+        gpu_time_used = (get_time_us() - gpu_time_used) / number_hot_calls;
+
+        double gflop_count = csrsv_gflop_count(m,
+                                               size_t(nnzb) * block_dim * block_dim,
+                                               HIPSPARSE_DIAG_TYPE_NON_UNIT)
+                             * nrhs;
+        double gbyte_count = bsrsv_gbyte_count<T>(mb, nnzb, block_dim) * nrhs;
+
+        double gpu_gflops = get_gpu_gflops(gpu_time_used, gflop_count);
+        double gpu_gbyte  = get_gpu_gbyte(gpu_time_used, gbyte_count);
+
+        display_timing_info(display_key_t::M,
+                            m,
+                            display_key_t::nnz,
+                            nnzb * block_dim * block_dim,
+                            display_key_t::nrhs,
+                            nrhs,
+                            display_key_t::block_dim,
+                            block_dim,
+                            display_key_t::alpha,
+                            h_alpha,
+                            display_key_t::transA,
+                            hipsparse_operation2string(transA),
+                            display_key_t::transX,
+                            hipsparse_operation2string(transX),
+                            display_key_t::diag_type,
+                            hipsparse_diagtype2string(HIPSPARSE_DIAG_TYPE_NON_UNIT),
+                            display_key_t::fill_mode,
+                            hipsparse_fillmode2string(HIPSPARSE_FILL_MODE_LOWER),
+                            display_key_t::solve_policy,
+                            hipsparse_solvepolicy2string(HIPSPARSE_SOLVE_POLICY_USE_LEVEL),
+                            display_key_t::gflops,
+                            gpu_gflops,
+                            display_key_t::bandwidth,
+                            gpu_gbyte,
+                            display_key_t::time_ms,
+                            get_gpu_time_msec(gpu_time_used));
+    }
+#endif
 
     return HIPSPARSE_STATUS_SUCCESS;
 }

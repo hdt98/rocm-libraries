@@ -35,7 +35,7 @@ using namespace hipsparse_test;
 
 void testing_dnmat_descr_bad_arg(void)
 {
-#if(!defined(CUDART_VERSION) || CUDART_VERSION >= 10010)
+#if(!defined(CUDART_VERSION))
     int64_t          rows  = 100;
     int64_t          cols  = 100;
     int64_t          ld    = 100;
@@ -48,12 +48,6 @@ void testing_dnmat_descr_bad_arg(void)
         = hipsparse_unique_ptr{device_malloc(sizeof(float) * rows * cols), device_free};
 
     float* val_data = (float*)val_data_managed.get();
-
-    if(!val_data)
-    {
-        PRINT_IF_HIP_ERROR(hipErrorOutOfMemory);
-        return;
-    }
 
     hipsparseDnMatDescr_t x;
 
@@ -72,11 +66,7 @@ void testing_dnmat_descr_bad_arg(void)
         "Error: val_data is nullptr");
 
     // hipsparseDestroyDnVec
-#if(!defined(CUDART_VERSION))
     verify_hipsparse_status_invalid_pointer(hipsparseDestroyDnMat(nullptr), "Error: x is nullptr");
-#else
-    verify_hipsparse_status_success(hipsparseDestroyDnMat(nullptr), "Success");
-#endif
 
     // Create valid descriptor
     verify_hipsparse_status_success(

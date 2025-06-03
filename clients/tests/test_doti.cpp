@@ -31,7 +31,7 @@ typedef hipsparseIndexBase_t       base;
 typedef std::tuple<int, int, base> doti_tuple;
 
 int doti_N_range[]   = {12000, 15332, 22031};
-int doti_nnz_range[] = {-1, 0, 5, 10, 500, 1000, 7111, 10000};
+int doti_nnz_range[] = {0, 5, 10, 500, 1000, 7111, 10000};
 
 base doti_idx_base_range[] = {HIPSPARSE_INDEX_BASE_ZERO, HIPSPARSE_INDEX_BASE_ONE};
 
@@ -47,15 +47,14 @@ protected:
 Arguments setup_doti_arguments(doti_tuple tup)
 {
     Arguments arg;
-    arg.N        = std::get<0>(tup);
-    arg.nnz      = std::get<1>(tup);
-    arg.idx_base = std::get<2>(tup);
-    arg.timing   = 0;
+    arg.N      = std::get<0>(tup);
+    arg.nnz    = std::get<1>(tup);
+    arg.baseA  = std::get<2>(tup);
+    arg.timing = 0;
     return arg;
 }
 
-// Only run tests for CUDA 11.1 or greater
-#if(!defined(CUDART_VERSION) || CUDART_VERSION >= 11010)
+#if(!defined(CUDART_VERSION) || CUDART_VERSION < 11000)
 TEST(doti_bad_arg, doti_float)
 {
     testing_doti_bad_arg<float>();
@@ -92,10 +91,10 @@ TEST_P(parameterized_doti, doti_double_complex)
     hipsparseStatus_t status = testing_doti<hipDoubleComplex>(arg);
     EXPECT_EQ(status, HIPSPARSE_STATUS_SUCCESS);
 }
-#endif
 
 INSTANTIATE_TEST_SUITE_P(doti,
                          parameterized_doti,
                          testing::Combine(testing::ValuesIn(doti_N_range),
                                           testing::ValuesIn(doti_nnz_range),
                                           testing::ValuesIn(doti_idx_base_range)));
+#endif

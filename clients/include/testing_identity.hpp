@@ -25,7 +25,11 @@
 #ifndef TESTING_IDENTITY_HPP
 #define TESTING_IDENTITY_HPP
 
+#include "display.hpp"
+#include "flops.hpp"
+#include "gbyte.hpp"
 #include "hipsparse.hpp"
+#include "hipsparse_arguments.hpp"
 #include "hipsparse_test_unique_ptr.hpp"
 #include "unit.hpp"
 #include "utility.hpp"
@@ -38,6 +42,7 @@ using namespace hipsparse_test;
 
 void testing_identity_bad_arg(void)
 {
+#if(!defined(CUDART_VERSION))
     int n         = 100;
     int safe_size = 100;
 
@@ -48,13 +53,6 @@ void testing_identity_bad_arg(void)
 
     int* p = (int*)p_managed.get();
 
-    if(!p)
-    {
-        PRINT_IF_HIP_ERROR(hipErrorOutOfMemory);
-        return;
-    }
-
-#if(!defined(CUDART_VERSION))
     verify_hipsparse_status_invalid_pointer(
         hipsparseCreateIdentityPermutation(handle, n, (int*)nullptr), "Error: p is nullptr");
     verify_hipsparse_status_invalid_handle(hipsparseCreateIdentityPermutation(nullptr, n, p));
@@ -63,39 +61,11 @@ void testing_identity_bad_arg(void)
 
 hipsparseStatus_t testing_identity(Arguments argus)
 {
-    int               n         = argus.N;
-    int               safe_size = 100;
-    hipsparseStatus_t status;
+#if(!defined(CUDART_VERSION) || CUDART_VERSION < 13000)
+    int n = argus.N;
 
     std::unique_ptr<handle_struct> unique_ptr_handle(new handle_struct);
     hipsparseHandle_t              handle = unique_ptr_handle->handle;
-
-    // Argument sanity check before allocating invalid memory
-    if(n <= 0)
-    {
-        auto p_managed = hipsparse_unique_ptr{device_malloc(sizeof(int) * safe_size), device_free};
-
-        int* p = (int*)p_managed.get();
-
-        if(!p)
-        {
-            verify_hipsparse_status_success(HIPSPARSE_STATUS_ALLOC_FAILED, "!p");
-            return HIPSPARSE_STATUS_ALLOC_FAILED;
-        }
-
-        status = hipsparseCreateIdentityPermutation(handle, n, p);
-
-        if(n < 0)
-        {
-            verify_hipsparse_status_invalid_size(status, "Error: n < 0");
-        }
-        else
-        {
-            verify_hipsparse_status_success(status, "n >= 0");
-        }
-
-        return HIPSPARSE_STATUS_SUCCESS;
-    }
 
     // Host structures
     std::vector<int> hp(n);
@@ -112,12 +82,6 @@ hipsparseStatus_t testing_identity(Arguments argus)
 
     int* dp = (int*)dp_managed.get();
 
-    if(!dp)
-    {
-        verify_hipsparse_status_success(HIPSPARSE_STATUS_ALLOC_FAILED, "!p");
-        return HIPSPARSE_STATUS_ALLOC_FAILED;
-    }
-
     if(argus.unit_check)
     {
         CHECK_HIPSPARSE_ERROR(hipsparseCreateIdentityPermutation(handle, n, dp));
@@ -128,6 +92,39 @@ hipsparseStatus_t testing_identity(Arguments argus)
         // Unit check
         unit_check_general(1, n, 1, hp_gold.data(), hp.data());
     }
+
+    if(argus.timing)
+    {
+        int number_cold_calls = 2;
+        int number_hot_calls  = argus.iters;
+
+        // Warm up
+        for(int iter = 0; iter < number_cold_calls; ++iter)
+        {
+            CHECK_HIPSPARSE_ERROR(hipsparseCreateIdentityPermutation(handle, n, dp));
+        }
+
+        double gpu_time_used = get_time_us();
+
+        // Performance run
+        for(int iter = 0; iter < number_hot_calls; ++iter)
+        {
+            CHECK_HIPSPARSE_ERROR(hipsparseCreateIdentityPermutation(handle, n, dp));
+        }
+
+        gpu_time_used = (get_time_us() - gpu_time_used) / number_hot_calls;
+
+        double gbyte_count = identity_gbyte_count(n);
+        double gpu_gbyte   = get_gpu_gbyte(gpu_time_used, gbyte_count);
+
+        display_timing_info(display_key_t::N,
+                            n,
+                            display_key_t::bandwidth,
+                            gpu_gbyte,
+                            display_key_t::time_ms,
+                            get_gpu_time_msec(gpu_time_used));
+    }
+#endif
 
     return HIPSPARSE_STATUS_SUCCESS;
 }

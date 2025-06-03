@@ -1,14 +1,14 @@
 .. meta::
-  :description: hipSPARSE documentation and API reference library
-  :keywords: hipSPARSE, rocSPARSE, ROCm, API, documentation
+  :description: hipSPARSE preconditioner functions API documentation
+  :keywords: hipSPARSE, rocSPARSE, ROCm, API, documentation, preconditioner functions
 
 .. _hipsparse_precond_functions:
 
 ********************************************************************
-Preconditioner Functions
+Preconditioner functions
 ********************************************************************
 
-This module holds all sparse preconditioners.
+This module contains all sparse preconditioners.
 
 The sparse preconditioners describe manipulations on a matrix in sparse format to obtain a sparse preconditioner matrix.
 

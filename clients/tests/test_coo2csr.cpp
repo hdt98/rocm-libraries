@@ -31,8 +31,8 @@
 typedef std::tuple<int, int, hipsparseIndexBase_t>    coo2csr_tuple;
 typedef std::tuple<hipsparseIndexBase_t, std::string> coo2csr_bin_tuple;
 
-int coo2csr_M_range[] = {-1, 0, 10, 500, 872, 1000};
-int coo2csr_N_range[] = {-3, 0, 33, 242, 623, 1000};
+int coo2csr_M_range[] = {0, 10, 500, 872, 1000};
+int coo2csr_N_range[] = {0, 33, 242, 623, 1000};
 
 hipsparseIndexBase_t coo2csr_idx_base_range[]
     = {HIPSPARSE_INDEX_BASE_ZERO, HIPSPARSE_INDEX_BASE_ONE};
@@ -78,10 +78,10 @@ protected:
 Arguments setup_coo2csr_arguments(coo2csr_tuple tup)
 {
     Arguments arg;
-    arg.M        = std::get<0>(tup);
-    arg.N        = std::get<1>(tup);
-    arg.idx_base = std::get<2>(tup);
-    arg.timing   = 0;
+    arg.M      = std::get<0>(tup);
+    arg.N      = std::get<1>(tup);
+    arg.baseA  = std::get<2>(tup);
+    arg.timing = 0;
     return arg;
 }
 
@@ -90,7 +90,7 @@ Arguments setup_coo2csr_arguments(coo2csr_bin_tuple tup)
     Arguments arg;
     arg.M                = -99;
     arg.N                = -99;
-    arg.idx_base         = std::get<0>(tup);
+    arg.baseA            = std::get<0>(tup);
     arg.timing           = 0;
     std::string bin_file = std::get<1>(tup);
 
@@ -99,29 +99,26 @@ Arguments setup_coo2csr_arguments(coo2csr_bin_tuple tup)
     return arg;
 }
 
-// Only run tests for CUDA 11.1 or greater
-#if(!defined(CUDART_VERSION) || CUDART_VERSION >= 11010)
 TEST(coo2csr_bad_arg, coo2csr)
 {
     testing_coo2csr_bad_arg();
 }
 
-TEST_P(parameterized_coo2csr, coo2csr)
+TEST_P(parameterized_coo2csr, coo2csr_float)
 {
     Arguments arg = setup_coo2csr_arguments(GetParam());
 
-    hipsparseStatus_t status = testing_coo2csr(arg);
+    hipsparseStatus_t status = testing_coo2csr<float>(arg);
     EXPECT_EQ(status, HIPSPARSE_STATUS_SUCCESS);
 }
 
-TEST_P(parameterized_coo2csr_bin, coo2csr_bin)
+TEST_P(parameterized_coo2csr_bin, coo2csr_bin_float)
 {
     Arguments arg = setup_coo2csr_arguments(GetParam());
 
-    hipsparseStatus_t status = testing_coo2csr(arg);
+    hipsparseStatus_t status = testing_coo2csr<float>(arg);
     EXPECT_EQ(status, HIPSPARSE_STATUS_SUCCESS);
 }
-#endif
 
 INSTANTIATE_TEST_SUITE_P(coo2csr,
                          parameterized_coo2csr,

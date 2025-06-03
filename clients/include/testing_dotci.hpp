@@ -25,7 +25,11 @@
 #ifndef TESTING_DOTCI_HPP
 #define TESTING_DOTCI_HPP
 
+#include "display.hpp"
+#include "flops.hpp"
+#include "gbyte.hpp"
 #include "hipsparse.hpp"
+#include "hipsparse_arguments.hpp"
 #include "hipsparse_test_unique_ptr.hpp"
 #include "unit.hpp"
 #include "utility.hpp"
@@ -39,11 +43,9 @@ template <typename T>
 void testing_dotci_bad_arg(void)
 {
 #if(!defined(CUDART_VERSION))
-    int nnz       = 100;
-    int safe_size = 100;
-
-    hipsparseIndexBase_t idx_base = HIPSPARSE_INDEX_BASE_ZERO;
-    hipsparseStatus_t    status;
+    int                  nnz       = 100;
+    int                  safe_size = 100;
+    hipsparseIndexBase_t idx_base  = HIPSPARSE_INDEX_BASE_ZERO;
 
     std::unique_ptr<handle_struct> unique_ptr_handle(new handle_struct);
     hipsparseHandle_t              handle = unique_ptr_handle->handle;
@@ -56,108 +58,38 @@ void testing_dotci_bad_arg(void)
     int* dx_ind = (int*)dx_ind_managed.get();
     T*   dy     = (T*)dy_managed.get();
 
-    if(!dx_ind || !dx_val || !dy)
-    {
-        PRINT_IF_HIP_ERROR(hipErrorOutOfMemory);
-        return;
-    }
-
     T result;
-
-    // testing for (nullptr == dx_val)
-    {
-        T* dx_val_null = nullptr;
-
-        status = hipsparseXdotci(handle, nnz, dx_val_null, dx_ind, dy, &result, idx_base);
-        verify_hipsparse_status_invalid_pointer(status, "Error: x_val is nullptr");
-    }
-
-    // testing for (nullptr == dx_ind)
-    {
-        int* dx_ind_null = nullptr;
-
-        status = hipsparseXdotci(handle, nnz, dx_val, dx_ind_null, dy, &result, idx_base);
-        verify_hipsparse_status_invalid_pointer(status, "Error: x_ind is nullptr");
-    }
-
-    // testing for (nullptr == dy)
-    {
-        T* dy_null = nullptr;
-
-        status = hipsparseXdotci(handle, nnz, dx_val, dx_ind, dy_null, &result, idx_base);
-        verify_hipsparse_status_invalid_pointer(status, "Error: y is nullptr");
-    }
-
-    // testing for (nullptr == result)
-    {
-        T* result_null = nullptr;
-
-        status = hipsparseXdotci(handle, nnz, dx_val, dx_ind, dy, result_null, idx_base);
-        verify_hipsparse_status_invalid_pointer(status, "Error: result is nullptr");
-    }
-
-    // testing for(nullptr == handle)
-    {
-        hipsparseHandle_t handle_null = nullptr;
-
-        status = hipsparseXdotci(handle_null, nnz, dx_val, dx_ind, dy, &result, idx_base);
-        verify_hipsparse_status_invalid_handle(status);
-    }
+    verify_hipsparse_status_invalid_pointer(
+        hipsparseXdotci(handle, nnz, (T*)nullptr, dx_ind, dy, &result, idx_base),
+        "Error: x_val is nullptr");
+    verify_hipsparse_status_invalid_pointer(
+        hipsparseXdotci(handle, nnz, dx_val, (int*)nullptr, dy, &result, idx_base),
+        "Error: x_ind is nullptr");
+    verify_hipsparse_status_invalid_pointer(
+        hipsparseXdotci(handle, nnz, dx_val, dx_ind, (T*)nullptr, &result, idx_base),
+        "Error: y is nullptr");
+    verify_hipsparse_status_invalid_pointer(
+        hipsparseXdotci(handle, nnz, dx_val, dx_ind, dy, (T*)nullptr, idx_base),
+        "Error: result is nullptr");
+    verify_hipsparse_status_invalid_handle(
+        hipsparseXdotci((hipsparseHandle_t) nullptr, nnz, dx_val, dx_ind, dy, &result, idx_base));
 #endif
 }
 
 template <typename T>
 hipsparseStatus_t testing_dotci(Arguments argus)
 {
-    int                  N         = argus.N;
-    int                  nnz       = argus.nnz;
-    int                  safe_size = 100;
-    hipsparseIndexBase_t idx_base  = argus.idx_base;
-    hipsparseStatus_t    status;
+#if(!defined(CUDART_VERSION) || CUDART_VERSION < 11000)
+    int                  N        = argus.N;
+    int                  nnz      = argus.nnz;
+    hipsparseIndexBase_t idx_base = argus.baseA;
 
-    std::unique_ptr<handle_struct> test_handle(new handle_struct);
-    hipsparseHandle_t              handle = test_handle->handle;
+    std::unique_ptr<handle_struct> unique_ptr_handle(new handle_struct);
+    hipsparseHandle_t              handle = unique_ptr_handle->handle;
 
-    // Argument sanity check before allocating invalid memory
-    if(nnz <= 0)
-    {
-#ifdef __HIP_PLATFORM_NVIDIA__
-        // Do not test args in cusparse
-        return HIPSPARSE_STATUS_SUCCESS;
-#endif
-        auto dx_ind_managed
-            = hipsparse_unique_ptr{device_malloc(sizeof(int) * safe_size), device_free};
-        auto dx_val_managed
-            = hipsparse_unique_ptr{device_malloc(sizeof(T) * safe_size), device_free};
-        auto dy_managed = hipsparse_unique_ptr{device_malloc(sizeof(T) * safe_size), device_free};
-
-        int* dx_ind = (int*)dx_ind_managed.get();
-        T*   dx_val = (T*)dx_val_managed.get();
-        T*   dy     = (T*)dy_managed.get();
-
-        if(!dx_ind || !dx_val || !dy)
-        {
-            verify_hipsparse_status_success(HIPSPARSE_STATUS_ALLOC_FAILED,
-                                            "!dx_ind || !dx_val || !dy");
-            return HIPSPARSE_STATUS_ALLOC_FAILED;
-        }
-
-        T result;
-
-        CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_HOST));
-        status = hipsparseXdotci(handle, nnz, dx_val, dx_ind, dy, &result, idx_base);
-
-        if(nnz < 0)
-        {
-            verify_hipsparse_status_invalid_size(status, "Error: nnz < 0");
-        }
-        else
-        {
-            verify_hipsparse_status_success(status, "nnz == 0");
-        }
-
-        return HIPSPARSE_STATUS_SUCCESS;
-    }
+    // Grab stream used by handle
+    hipStream_t stream;
+    CHECK_HIPSPARSE_ERROR(hipsparseGetStream(handle, &stream));
 
     // Host structures
     std::vector<int> hx_ind(nnz);
@@ -185,13 +117,6 @@ hipsparseStatus_t testing_dotci(Arguments argus)
     T*   dy        = (T*)dy_managed.get();
     T*   dresult_2 = (T*)dresult_2_managed.get();
 
-    if(!dx_ind || !dx_val || !dy || !dresult_2)
-    {
-        verify_hipsparse_status_success(HIPSPARSE_STATUS_ALLOC_FAILED,
-                                        "!dx_ind || !dx_val || !dy || !dresult_2");
-        return HIPSPARSE_STATUS_ALLOC_FAILED;
-    }
-
     // copy data from CPU to device
     CHECK_HIP_ERROR(hipMemcpy(dx_ind, hx_ind.data(), sizeof(int) * nnz, hipMemcpyHostToDevice));
     CHECK_HIP_ERROR(hipMemcpy(dx_val, hx_val.data(), sizeof(T) * nnz, hipMemcpyHostToDevice));
@@ -199,12 +124,12 @@ hipsparseStatus_t testing_dotci(Arguments argus)
 
     if(argus.unit_check)
     {
-        // ROCSPARSE pointer mode host
+        // HIPSPARSE pointer mode host
         CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_HOST));
         CHECK_HIPSPARSE_ERROR(
             hipsparseXdotci(handle, nnz, dx_val, dx_ind, dy, &hresult_1, idx_base));
 
-        // ROCSPARSE pointer mode device
+        // HIPSPARSE pointer mode device
         CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_DEVICE));
         CHECK_HIPSPARSE_ERROR(
             hipsparseXdotci(handle, nnz, dx_val, dx_ind, dy, dresult_2, idx_base));
@@ -219,11 +144,56 @@ hipsparseStatus_t testing_dotci(Arguments argus)
             hresult_gold
                 = hresult_gold + testing_mult(testing_conj(hx_val[i]), hy[hx_ind[i] - idx_base]);
         }
+
         // enable unit check, notice unit check is not invasive, but norm check is,
         // unit check and norm check can not be interchanged their order
         unit_check_general(1, 1, 1, &hresult_gold, &hresult_1);
         unit_check_general(1, 1, 1, &hresult_gold, &hresult_2);
     }
+
+    if(argus.timing)
+    {
+        int number_cold_calls = 2;
+        int number_hot_calls  = argus.iters;
+
+        CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_HOST));
+
+        // Warm up
+        for(int iter = 0; iter < number_cold_calls; ++iter)
+        {
+            CHECK_HIPSPARSE_ERROR(
+                hipsparseXdotci(handle, nnz, dx_val, dx_ind, dy, &hresult_1, idx_base));
+            CHECK_HIP_ERROR(hipStreamSynchronize(stream));
+        }
+
+        double gpu_time_used = get_time_us();
+
+        // Performance run
+        for(int iter = 0; iter < number_hot_calls; ++iter)
+        {
+            CHECK_HIPSPARSE_ERROR(
+                hipsparseXdotci(handle, nnz, dx_val, dx_ind, dy, &hresult_1, idx_base));
+            CHECK_HIP_ERROR(hipStreamSynchronize(stream));
+        }
+
+        gpu_time_used = (get_time_us() - gpu_time_used) / number_hot_calls;
+
+        double gflop_count = doti_gflop_count(nnz);
+        double gbyte_count = doti_gbyte_count<T, T>(nnz);
+
+        double gpu_gbyte  = get_gpu_gbyte(gpu_time_used, gbyte_count);
+        double gpu_gflops = get_gpu_gflops(gpu_time_used, gflop_count);
+
+        display_timing_info(display_key_t::nnz,
+                            nnz,
+                            display_key_t::gflops,
+                            gpu_gflops,
+                            display_key_t::bandwidth,
+                            gpu_gbyte,
+                            display_key_t::time_ms,
+                            get_gpu_time_msec(gpu_time_used));
+    }
+#endif
 
     return HIPSPARSE_STATUS_SUCCESS;
 }

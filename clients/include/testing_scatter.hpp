@@ -25,6 +25,10 @@
 #ifndef TESTING_SCATTER_HPP
 #define TESTING_SCATTER_HPP
 
+#include "display.hpp"
+#include "flops.hpp"
+#include "gbyte.hpp"
+#include "hipsparse_arguments.hpp"
 #include "hipsparse_test_unique_ptr.hpp"
 #include "unit.hpp"
 #include "utility.hpp"
@@ -55,12 +59,6 @@ void testing_scatter_bad_arg(void)
     int*   dx_ind = (int*)dx_ind_managed.get();
     float* dy     = (float*)dy_managed.get();
 
-    if(!dx_ind || !dx_val || !dy)
-    {
-        PRINT_IF_HIP_ERROR(hipErrorOutOfMemory);
-        return;
-    }
-
     // Structures
     hipsparseSpVecDescr_t x;
     hipsparseDnVecDescr_t y;
@@ -83,27 +81,21 @@ void testing_scatter_bad_arg(void)
 }
 
 template <typename I, typename T>
-hipsparseStatus_t testing_scatter(void)
+hipsparseStatus_t testing_scatter(Arguments argus)
 {
 #if(!defined(CUDART_VERSION) || CUDART_VERSION >= 11000)
-    int64_t size = 15332;
-    int64_t nnz  = 500;
+    I size = argus.N;
+    I nnz  = argus.nnz;
 
-    hipsparseIndexBase_t idxBase = HIPSPARSE_INDEX_BASE_ZERO;
+    hipsparseIndexBase_t idxBase = argus.baseA;
 
     // Index and data type
-    hipsparseIndexType_t idxType
-        = (typeid(I) == typeid(int32_t)) ? HIPSPARSE_INDEX_32I : HIPSPARSE_INDEX_64I;
-    hipDataType dataType
-        = (typeid(T) == typeid(float))
-              ? HIP_R_32F
-              : ((typeid(T) == typeid(double))
-                     ? HIP_R_64F
-                     : ((typeid(T) == typeid(hipComplex) ? HIP_C_32F : HIP_C_64F)));
+    hipsparseIndexType_t idxType  = getIndexType<I>();
+    hipDataType          dataType = getDataType<T>();
 
     // hipSPARSE handle
-    std::unique_ptr<handle_struct> test_handle(new handle_struct);
-    hipsparseHandle_t              handle = test_handle->handle;
+    std::unique_ptr<handle_struct> unique_ptr_handle(new handle_struct);
+    hipsparseHandle_t              handle = unique_ptr_handle->handle;
 
     // Host structures
     std::vector<I> hx_ind(nnz);
@@ -128,12 +120,6 @@ hipsparseStatus_t testing_scatter(void)
     T* dx_val = (T*)dx_val_managed.get();
     T* dy     = (T*)dy_managed.get();
 
-    if(!dx_ind || !dx_val || !dy)
-    {
-        verify_hipsparse_status_success(HIPSPARSE_STATUS_ALLOC_FAILED, "!dx_ind || !dx_val || !dy");
-        return HIPSPARSE_STATUS_ALLOC_FAILED;
-    }
-
     // copy data from CPU to device
     CHECK_HIP_ERROR(hipMemcpy(dx_ind, hx_ind.data(), sizeof(I) * nnz, hipMemcpyHostToDevice));
     CHECK_HIP_ERROR(hipMemcpy(dx_val, hx_val.data(), sizeof(T) * nnz, hipMemcpyHostToDevice));
@@ -147,20 +133,55 @@ hipsparseStatus_t testing_scatter(void)
         hipsparseCreateSpVec(&x, size, nnz, dx_ind, dx_val, idxType, idxBase, dataType));
     CHECK_HIPSPARSE_ERROR(hipsparseCreateDnVec(&y, size, dy, dataType));
 
-    // Scatter
-    CHECK_HIPSPARSE_ERROR(hipsparseScatter(handle, x, y));
-
-    // Copy output from device to CPU
-    CHECK_HIP_ERROR(hipMemcpy(hy.data(), dy, sizeof(T) * size, hipMemcpyDeviceToHost));
-
-    // CPU
-    for(int64_t i = 0; i < nnz; ++i)
+    if(argus.unit_check)
     {
-        hy_gold[hx_ind[i] - idxBase] = hx_val[i];
+        // Scatter
+        CHECK_HIPSPARSE_ERROR(hipsparseScatter(handle, x, y));
+
+        // Copy output from device to CPU
+        CHECK_HIP_ERROR(hipMemcpy(hy.data(), dy, sizeof(T) * size, hipMemcpyDeviceToHost));
+
+        // CPU
+        for(int64_t i = 0; i < nnz; ++i)
+        {
+            hy_gold[hx_ind[i] - idxBase] = hx_val[i];
+        }
+
+        // Verify results against host
+        unit_check_general(1, size, 1, hy_gold.data(), hy.data());
     }
 
-    // Verify results against host
-    unit_check_general(1, size, 1, hy_gold.data(), hy.data());
+    if(argus.timing)
+    {
+        int number_cold_calls = 2;
+        int number_hot_calls  = argus.iters;
+
+        // Warm up
+        for(int iter = 0; iter < number_cold_calls; ++iter)
+        {
+            CHECK_HIPSPARSE_ERROR(hipsparseScatter(handle, x, y));
+        }
+
+        double gpu_time_used = get_time_us();
+
+        // Performance run
+        for(int iter = 0; iter < number_hot_calls; ++iter)
+        {
+            CHECK_HIPSPARSE_ERROR(hipsparseScatter(handle, x, y));
+        }
+
+        gpu_time_used = (get_time_us() - gpu_time_used) / number_hot_calls;
+
+        double gbyte_count = sctr_gbyte_count<T>(nnz);
+        double gpu_gbyte   = get_gpu_gbyte(gpu_time_used, gbyte_count);
+
+        display_timing_info(display_key_t::nnz,
+                            nnz,
+                            display_key_t::bandwidth,
+                            gpu_gbyte,
+                            display_key_t::time_ms,
+                            get_gpu_time_msec(gpu_time_used));
+    }
 
     CHECK_HIPSPARSE_ERROR(hipsparseDestroySpVec(x));
     CHECK_HIPSPARSE_ERROR(hipsparseDestroyDnVec(y));

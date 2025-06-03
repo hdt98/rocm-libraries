@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2018-2021 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2018-2025 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -36,40 +36,10 @@
 
 #ifdef __cpp_lib_filesystem
 #include <filesystem>
+namespace fs = std::filesystem;
 #else
 #include <experimental/filesystem>
-
-namespace std
-{
-    namespace filesystem = experimental::filesystem;
-}
-#endif
-#if 0
-#ifdef WIN32
-#include <windows.h>
-#endif
-
-#include "utility.hpp"
-
-#include <hip/hip_runtime_api.h>
-#include <hipsparse.h>
-#include <stdio.h>
-// #include <sys/time.h>
-#include <chrono>
-//#define _USE_MATH_DEFINES
-#include <cmath>
-#include <cstdlib>
-
-#ifdef __cpp_lib_filesystem
-#include <filesystem>
-#else
-#include <experimental/filesystem>
-
-namespace std
-{
-    namespace filesystem = experimental::filesystem;
-}
-#endif
+namespace fs = std::experimental::filesystem;
 #endif
 
 /* ============================================================================================ */
@@ -91,7 +61,7 @@ std::string hipsparse_exepath()
         result.resize(result.size() * 2);
     }
 
-    std::filesystem::path exepath(result.begin(), result.end());
+    fs::path exepath(result.begin(), result.end());
     exepath = exepath.remove_filename();
     exepath += exepath.empty() ? "" : "/";
     return exepath.string();
@@ -121,18 +91,47 @@ extern "C" {
 /*  query for hipsparse version and git commit SHA-1. */
 void query_version(char* version)
 {
+    int  hipsparse_ver;
+    char hipsparse_rev[64];
+
+    hipsparseStatus_t status;
+
     hipsparseHandle_t handle;
-    hipsparseCreate(&handle);
+    status = hipsparseCreate(&handle);
+    if(HIPSPARSE_STATUS_SUCCESS != status)
+    {
+        std::cerr << "The creation of the hipsparseHandle_t failed." << std::endl;
+        throw(status);
+    }
 
-    int ver;
-    hipsparseGetVersion(handle, &ver);
+    status = hipsparseGetVersion(handle, &hipsparse_ver);
+    if(HIPSPARSE_STATUS_SUCCESS != status)
+    {
+        std::cerr << "hipsparseGetVersion failed." << std::endl;
+        throw(status);
+    }
 
-    char rev[128];
-    hipsparseGetGitRevision(handle, rev);
+    status = hipsparseGetGitRevision(handle, hipsparse_rev);
+    if(HIPSPARSE_STATUS_SUCCESS != status)
+    {
+        std::cerr << "hipsparseGetGitRevision failed." << std::endl;
+        throw(status);
+    }
 
-    sprintf(version, "v%d.%d.%d-%s", ver / 100000, ver / 100 % 1000, ver % 100, rev);
+    status = hipsparseDestroy(handle);
 
-    hipsparseDestroy(handle);
+    if(HIPSPARSE_STATUS_SUCCESS != status)
+    {
+        std::cerr << "rocsparse_destroy_handle failed." << std::endl;
+        throw(status);
+    }
+
+    sprintf(version,
+            "v%d.%d.%d-%s",
+            hipsparse_ver / 100000,
+            hipsparse_ver / 100 % 1000,
+            hipsparse_ver % 100,
+            hipsparse_rev);
 }
 
 /* ============================================================================================ */
@@ -199,8 +198,8 @@ void set_device(int device_id)
 /*! \brief  CPU Timer(in microsecond): synchronize with the default device and return wall time */
 double get_time_us(void)
 {
-    hipDeviceSynchronize();
-    auto now = std::chrono::steady_clock::now();
+    std::ignore = hipDeviceSynchronize();
+    auto now    = std::chrono::steady_clock::now();
     // struct timeval tv;
     // gettimeofday(&tv, NULL);
     //  return (tv.tv_sec * 1000 * 1000) + tv.tv_usec;
@@ -217,8 +216,8 @@ double get_time_us(void)
 /*! \brief  CPU Timer(in microsecond): synchronize with given queue/stream and return wall time */
 double get_time_us_sync(hipStream_t stream)
 {
-    hipStreamSynchronize(stream);
-    auto now = std::chrono::steady_clock::now();
+    std::ignore = hipStreamSynchronize(stream);
+    auto now    = std::chrono::steady_clock::now();
 
     // struct timeval tv;
     // gettimeofday(&tv, NULL);

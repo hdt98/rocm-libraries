@@ -26,6 +26,7 @@
 #define TESTING_CSRCOLOR_HPP
 
 #include "hipsparse.hpp"
+#include "hipsparse_arguments.hpp"
 #include "hipsparse_test_unique_ptr.hpp"
 #include "unit.hpp"
 #include "utility.hpp"
@@ -65,11 +66,7 @@ void testing_csrcolor_bad_arg(void)
     int* d_csr_row_ptr = (int*)m_csr_row_ptr.get();
     int* d_csr_col_ind = (int*)m_csr_col_ind.get();
     int  ncolors;
-    if(!d_csr_row_ptr || !d_csr_col_ind || !d_csr_val)
-    {
-        PRINT_IF_HIP_ERROR(hipErrorOutOfMemory);
-        return;
-    }
+
     hipsparseColorInfo_t colorInfo = (hipsparseColorInfo_t)0x4;
 
     status = hipsparseXcsrcolor<T>(handle,
@@ -231,13 +228,14 @@ void testing_csrcolor_bad_arg(void)
 template <typename T>
 hipsparseStatus_t testing_csrcolor()
 {
+#if(!defined(CUDART_VERSION) || CUDART_VERSION < 13000)
     // Determine absolute path of test matrix
     // Matrices are stored at the same path in matrices directory
     std::string filename = get_filename("nos3.bin");
 
     // hipSPARSE handle
-    std::unique_ptr<handle_struct> test_handle(new handle_struct);
-    hipsparseHandle_t              handle = test_handle->handle;
+    std::unique_ptr<handle_struct> unique_ptr_handle(new handle_struct);
+    hipsparseHandle_t              handle = unique_ptr_handle->handle;
 
     std::unique_ptr<descr_struct> unique_ptr_descr(new descr_struct);
     hipsparseMatDescr_t           descr = unique_ptr_descr->descr;
@@ -278,14 +276,6 @@ hipsparseStatus_t testing_csrcolor()
     int* dcoloring   = (int*)dcoloring_managed.get();
     int* dreordering = (int*)dreordering_managed.get();
 
-    if(!dval || !drow_ptr || !dcol_ind || !dcoloring || !dreordering)
-    {
-        verify_hipsparse_status_success(HIPSPARSE_STATUS_ALLOC_FAILED,
-                                        "!dval || !drow || !dcol || !dB || "
-                                        "!dC_1 || !dC_2 || !d_alpha || !d_beta");
-        return HIPSPARSE_STATUS_ALLOC_FAILED;
-    }
-
     // copy data from CPU to device
     CHECK_HIP_ERROR(
         hipMemcpy(drow_ptr, hrow_ptr.data(), sizeof(int) * (m + 1), hipMemcpyHostToDevice));
@@ -308,6 +298,8 @@ hipsparseStatus_t testing_csrcolor()
                                              colorInfo));
 
     hipsparseDestroyColorInfo(colorInfo);
+#endif
+
     return HIPSPARSE_STATUS_SUCCESS;
 }
 

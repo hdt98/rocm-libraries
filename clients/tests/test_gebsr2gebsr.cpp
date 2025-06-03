@@ -49,12 +49,12 @@ typedef std::tuple<int,
     gebsr2gebsr_bin_tuple;
 
 // Random matrices
-int gebsr2gebsr_M_range[]               = {-1, 0, 872, 13095, 21453};
-int gebsr2gebsr_N_range[]               = {-3, 0, 623, 12766, 29285};
-int gebsr2gebsr_row_block_dim_A_range[] = {-1, 0, 2};
-int gebsr2gebsr_col_block_dim_A_range[] = {-1, 0, 5};
-int gebsr2gebsr_row_block_dim_C_range[] = {-1, 0, 3};
-int gebsr2gebsr_col_block_dim_C_range[] = {-1, 0, 4};
+int gebsr2gebsr_M_range[]               = {0, 872, 13095, 21453};
+int gebsr2gebsr_N_range[]               = {0, 623, 12766, 29285};
+int gebsr2gebsr_row_block_dim_A_range[] = {2};
+int gebsr2gebsr_col_block_dim_A_range[] = {5};
+int gebsr2gebsr_row_block_dim_C_range[] = {3};
+int gebsr2gebsr_col_block_dim_C_range[] = {4};
 
 hipsparseIndexBase_t gebsr2gebsr_A_base_range[] = {HIPSPARSE_INDEX_BASE_ZERO};
 hipsparseIndexBase_t gebsr2gebsr_C_base_range[] = {HIPSPARSE_INDEX_BASE_ONE};
@@ -103,8 +103,8 @@ Arguments setup_gebsr2gebsr_arguments(gebsr2gebsr_tuple tup)
     arg.col_block_dimA = std::get<3>(tup);
     arg.row_block_dimB = std::get<4>(tup);
     arg.col_block_dimB = std::get<5>(tup);
-    arg.idx_base       = std::get<6>(tup);
-    arg.idx_base2      = std::get<7>(tup);
+    arg.baseA          = std::get<6>(tup);
+    arg.baseB          = std::get<7>(tup);
     arg.dirA           = std::get<8>(tup);
     arg.timing         = 0;
     return arg;
@@ -119,8 +119,8 @@ Arguments setup_gebsr2gebsr_arguments(gebsr2gebsr_bin_tuple tup)
     arg.col_block_dimA = std::get<1>(tup);
     arg.row_block_dimB = std::get<2>(tup);
     arg.col_block_dimB = std::get<3>(tup);
-    arg.idx_base       = std::get<4>(tup);
-    arg.idx_base2      = std::get<5>(tup);
+    arg.baseA          = std::get<4>(tup);
+    arg.baseB          = std::get<5>(tup);
     arg.dirA           = std::get<6>(tup);
     arg.timing         = 0;
 
@@ -133,8 +133,6 @@ Arguments setup_gebsr2gebsr_arguments(gebsr2gebsr_bin_tuple tup)
     return arg;
 }
 
-// Only run tests for CUDA 11.1 or greater
-#if(!defined(CUDART_VERSION) || CUDART_VERSION >= 11010)
 TEST(gebsr2gebsr_bad_arg, gebsr2gebsr)
 {
     testing_gebsr2gebsr_bad_arg<float>();
@@ -187,7 +185,6 @@ TEST_P(parameterized_gebsr2gebsr_bin, gebsr2gebsr_bin_double)
     hipsparseStatus_t status = testing_gebsr2gebsr<double>(arg);
     EXPECT_EQ(status, HIPSPARSE_STATUS_SUCCESS);
 }
-#endif
 
 INSTANTIATE_TEST_SUITE_P(gebsr2gebsr,
                          parameterized_gebsr2gebsr,

@@ -36,10 +36,10 @@ typedef std::
         csr2gebsr_bin_tuple;
 
 // Random matrices
-int csr2gebsr_M_range[]             = {-1, 0, 2, 13095};
-int csr2gebsr_N_range[]             = {-3, 0, 2, 12766};
-int csr2gebsr_row_block_dim_range[] = {-1, 0, 1, 2, 7, 16};
-int csr2gebsr_col_block_dim_range[] = {-1, 0, 1, 2};
+int csr2gebsr_M_range[]             = {0, 13095};
+int csr2gebsr_N_range[]             = {0, 12766};
+int csr2gebsr_row_block_dim_range[] = {1, 2, 7};
+int csr2gebsr_col_block_dim_range[] = {1, 2};
 
 hipsparseIndexBase_t csr2gebsr_csr_base_range[] = {HIPSPARSE_INDEX_BASE_ZERO};
 
@@ -63,10 +63,6 @@ std::string csr2gebsr_bin[] = {"rma10.bin",
                                "scircuit.bin",
                                "bmwcra_1.bin",
                                "nos1.bin",
-                               "nos2.bin",
-                               "nos3.bin",
-                               "nos4.bin",
-                               "nos5.bin",
                                "nos6.bin",
                                "nos7.bin"};
 
@@ -95,8 +91,8 @@ Arguments setup_csr2gebsr_arguments(csr2gebsr_tuple tup)
     arg.N              = std::get<1>(tup);
     arg.row_block_dimA = std::get<2>(tup);
     arg.col_block_dimA = std::get<3>(tup);
-    arg.idx_base       = std::get<4>(tup);
-    arg.idx_base2      = std::get<5>(tup);
+    arg.baseA          = std::get<4>(tup);
+    arg.baseB          = std::get<5>(tup);
     arg.dirA           = std::get<6>(tup);
     arg.timing         = 0;
     return arg;
@@ -109,8 +105,8 @@ Arguments setup_csr2gebsr_arguments(csr2gebsr_bin_tuple tup)
     arg.N              = -99;
     arg.row_block_dimA = std::get<0>(tup);
     arg.col_block_dimA = std::get<1>(tup);
-    arg.idx_base       = std::get<2>(tup);
-    arg.idx_base2      = std::get<3>(tup);
+    arg.baseA          = std::get<2>(tup);
+    arg.baseB          = std::get<3>(tup);
     arg.dirA           = std::get<4>(tup);
     arg.timing         = 0;
 
@@ -123,8 +119,6 @@ Arguments setup_csr2gebsr_arguments(csr2gebsr_bin_tuple tup)
     return arg;
 }
 
-// Only run tests for CUDA 11.1 or greater
-#if(!defined(CUDART_VERSION) || CUDART_VERSION >= 11010)
 TEST(csr2gebsr_bad_arg, csr2gebsr)
 {
     testing_csr2gebsr_bad_arg<float>();
@@ -177,7 +171,6 @@ TEST_P(parameterized_csr2gebsr_bin, csr2gebsr_bin_double)
     hipsparseStatus_t status = testing_csr2gebsr<double>(arg);
     EXPECT_EQ(status, HIPSPARSE_STATUS_SUCCESS);
 }
-#endif
 
 INSTANTIATE_TEST_SUITE_P(csr2gebsr,
                          parameterized_csr2gebsr,

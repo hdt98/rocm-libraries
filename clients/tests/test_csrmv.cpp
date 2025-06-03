@@ -33,16 +33,18 @@ typedef hipsparseIndexBase_t                                 base;
 typedef std::tuple<int, int, double, double, trans, base>    csrmv_tuple;
 typedef std::tuple<double, double, trans, base, std::string> csrmv_bin_tuple;
 
-int csr_M_range[] = {-1, 0, 500, 7111};
-int csr_N_range[] = {-3, 0, 842, 4441};
+int csr_M_range[] = {0, 500, 7111};
+int csr_N_range[] = {0, 842, 4441};
 
 std::vector<double> csr_alpha_range = {3.0};
 std::vector<double> csr_beta_range  = {1.0};
 
+// clang-format off
 trans csr_trans_range[]   = {HIPSPARSE_OPERATION_NON_TRANSPOSE,
-                           HIPSPARSE_OPERATION_TRANSPOSE,
-                           HIPSPARSE_OPERATION_CONJUGATE_TRANSPOSE};
-base  csr_idxbase_range[] = {HIPSPARSE_INDEX_BASE_ZERO, HIPSPARSE_INDEX_BASE_ONE};
+                             HIPSPARSE_OPERATION_TRANSPOSE,
+                             HIPSPARSE_OPERATION_CONJUGATE_TRANSPOSE};
+// clang-format on
+base csr_idxbase_range[] = {HIPSPARSE_INDEX_BASE_ZERO, HIPSPARSE_INDEX_BASE_ONE};
 
 std::string csr_bin[] = {"nos1.bin",
                          "nos2.bin",
@@ -75,26 +77,26 @@ protected:
 Arguments setup_csrmv_arguments(csrmv_tuple tup)
 {
     Arguments arg;
-    arg.M        = std::get<0>(tup);
-    arg.N        = std::get<1>(tup);
-    arg.alpha    = std::get<2>(tup);
-    arg.beta     = std::get<3>(tup);
-    arg.transA   = std::get<4>(tup);
-    arg.idx_base = std::get<5>(tup);
-    arg.timing   = 0;
+    arg.M      = std::get<0>(tup);
+    arg.N      = std::get<1>(tup);
+    arg.alpha  = std::get<2>(tup);
+    arg.beta   = std::get<3>(tup);
+    arg.transA = std::get<4>(tup);
+    arg.baseA  = std::get<5>(tup);
+    arg.timing = 0;
     return arg;
 }
 
 Arguments setup_csrmv_arguments(csrmv_bin_tuple tup)
 {
     Arguments arg;
-    arg.M        = -99;
-    arg.N        = -99;
-    arg.alpha    = std::get<0>(tup);
-    arg.beta     = std::get<1>(tup);
-    arg.transA   = std::get<2>(tup);
-    arg.idx_base = std::get<3>(tup);
-    arg.timing   = 0;
+    arg.M      = -99;
+    arg.N      = -99;
+    arg.alpha  = std::get<0>(tup);
+    arg.beta   = std::get<1>(tup);
+    arg.transA = std::get<2>(tup);
+    arg.baseA  = std::get<3>(tup);
+    arg.timing = 0;
 
     // Determine absolute path of test matrix
     std::string bin_file = std::get<4>(tup);
@@ -105,8 +107,7 @@ Arguments setup_csrmv_arguments(csrmv_bin_tuple tup)
     return arg;
 }
 
-// Only run tests for CUDA 11.1 or greater
-#if(!defined(CUDART_VERSION) || CUDART_VERSION >= 11010)
+#if(!defined(CUDART_VERSION) || CUDART_VERSION < 11000)
 TEST(csrmv_bad_arg, csrmv_float)
 {
     testing_csrmv_bad_arg<float>();
@@ -159,7 +160,6 @@ TEST_P(parameterized_csrmv_bin, csrmv_bin_double)
     hipsparseStatus_t status = testing_csrmv<double>(arg);
     EXPECT_EQ(status, HIPSPARSE_STATUS_SUCCESS);
 }
-#endif
 
 INSTANTIATE_TEST_SUITE_P(csrmv,
                          parameterized_csrmv,
@@ -177,3 +177,4 @@ INSTANTIATE_TEST_SUITE_P(csrmv_bin,
                                           testing::ValuesIn(csr_trans_range),
                                           testing::ValuesIn(csr_idxbase_range),
                                           testing::ValuesIn(csr_bin)));
+#endif

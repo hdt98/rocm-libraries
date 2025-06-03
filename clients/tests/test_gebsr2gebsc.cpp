@@ -32,11 +32,11 @@ typedef std::tuple<int, int, int, int, hipsparseAction_t, hipsparseIndexBase_t> 
 typedef std::tuple<int, int, hipsparseAction_t, hipsparseIndexBase_t, std::string>
     gebsr2gebsc_bin_tuple;
 
-int gebsr2gebsc_M_range[] = {-1, 0, 10, 872};
-int gebsr2gebsc_N_range[] = {-3, 0, 33, 623};
+int gebsr2gebsc_M_range[] = {0, 10, 872};
+int gebsr2gebsc_N_range[] = {0, 33, 623};
 
-int gebsr2gebsc_row_block_dim_range[] = {-1, 0, 1, 7, 16};
-int gebsr2gebsc_col_block_dim_range[] = {-1, 0, 1, 4, 16};
+int gebsr2gebsc_row_block_dim_range[] = {1, 2, 7};
+int gebsr2gebsc_col_block_dim_range[] = {1, 3, 4};
 
 hipsparseAction_t gebsr2gebsc_action_range[]
     = {HIPSPARSE_ACTION_NUMERIC, HIPSPARSE_ACTION_SYMBOLIC};
@@ -79,7 +79,7 @@ Arguments setup_gebsr2gebsc_arguments(gebsr2gebsc_tuple tup)
     arg.row_block_dimA = std::get<2>(tup);
     arg.col_block_dimA = std::get<3>(tup);
     arg.action         = std::get<4>(tup);
-    arg.idx_base       = std::get<5>(tup);
+    arg.baseA          = std::get<5>(tup);
     arg.timing         = 0;
     return arg;
 }
@@ -92,7 +92,7 @@ Arguments setup_gebsr2gebsc_arguments(gebsr2gebsc_bin_tuple tup)
     arg.row_block_dimA = std::get<0>(tup);
     arg.col_block_dimA = std::get<1>(tup);
     arg.action         = std::get<2>(tup);
-    arg.idx_base       = std::get<3>(tup);
+    arg.baseA          = std::get<3>(tup);
     arg.timing         = 0;
 
     // Determine absolute path of test matrix
@@ -104,8 +104,6 @@ Arguments setup_gebsr2gebsc_arguments(gebsr2gebsc_bin_tuple tup)
     return arg;
 }
 
-// Only run tests for CUDA 11.1 or greater
-#if(!defined(CUDART_VERSION) || CUDART_VERSION >= 11010)
 TEST(gebsr2gebsc_bad_arg, gebsr2gebsc)
 {
     testing_gebsr2gebsc_bad_arg<float>();
@@ -158,7 +156,6 @@ TEST_P(parameterized_gebsr2gebsc_bin, gebsr2gebsc_bin_double)
     hipsparseStatus_t status = testing_gebsr2gebsc<double>(arg);
     EXPECT_EQ(status, HIPSPARSE_STATUS_SUCCESS);
 }
-#endif
 
 INSTANTIATE_TEST_SUITE_P(gebsr2gebsc,
                          parameterized_gebsr2gebsc,

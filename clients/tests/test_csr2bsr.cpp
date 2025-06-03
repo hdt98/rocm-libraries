@@ -35,8 +35,8 @@ typedef std::
         csr2bsr_bin_tuple;
 
 // Random matrices
-int csr2bsr_M_range[]         = {0, 872, 13095, 21453};
-int csr2bsr_N_range[]         = {0, 623, 12766, 29285};
+int csr2bsr_M_range[]         = {0, 872, 21453};
+int csr2bsr_N_range[]         = {0, 623, 29285};
 int csr2bsr_block_dim_range[] = {1, 2, 4, 7, 16};
 
 hipsparseIndexBase_t csr2bsr_csr_base_range[] = {HIPSPARSE_INDEX_BASE_ZERO};
@@ -55,15 +55,7 @@ hipsparseIndexBase_t csr2bsr_bsr_base_range_bin[] = {HIPSPARSE_INDEX_BASE_ONE};
 hipsparseDirection_t csr2bsr_dir_range_bin[]
     = {HIPSPARSE_DIRECTION_ROW, HIPSPARSE_DIRECTION_COLUMN};
 
-std::string csr2bsr_bin[] = {"scircuit.bin",
-                             "nos1.bin",
-                             "nos2.bin",
-                             "nos3.bin",
-                             "nos4.bin",
-                             "nos5.bin",
-                             "nos6.bin",
-                             "nos7.bin",
-                             "sme3Dc.bin"};
+std::string csr2bsr_bin[] = {"scircuit.bin", "nos2.bin", "nos4.bin", "nos6.bin", "sme3Dc.bin"};
 
 class parameterized_csr2bsr : public testing::TestWithParam<csr2bsr_tuple>
 {
@@ -89,8 +81,8 @@ Arguments setup_csr2bsr_arguments(csr2bsr_tuple tup)
     arg.M         = std::get<0>(tup);
     arg.N         = std::get<1>(tup);
     arg.block_dim = std::get<2>(tup);
-    arg.idx_base  = std::get<3>(tup);
-    arg.idx_base2 = std::get<4>(tup);
+    arg.baseA     = std::get<3>(tup);
+    arg.baseB     = std::get<4>(tup);
     arg.dirA      = std::get<5>(tup);
     arg.timing    = 0;
     return arg;
@@ -102,8 +94,8 @@ Arguments setup_csr2bsr_arguments(csr2bsr_bin_tuple tup)
     arg.M         = -99;
     arg.N         = -99;
     arg.block_dim = std::get<0>(tup);
-    arg.idx_base  = std::get<1>(tup);
-    arg.idx_base2 = std::get<2>(tup);
+    arg.baseA     = std::get<1>(tup);
+    arg.baseB     = std::get<2>(tup);
     arg.dirA      = std::get<3>(tup);
     arg.timing    = 0;
 
@@ -116,8 +108,6 @@ Arguments setup_csr2bsr_arguments(csr2bsr_bin_tuple tup)
     return arg;
 }
 
-// Only run tests for CUDA 11.1 or greater
-#if(!defined(CUDART_VERSION) || CUDART_VERSION >= 11010)
 TEST(csr2bsr_bad_arg, csr2bsr)
 {
     testing_csr2bsr_bad_arg<float>();
@@ -170,7 +160,6 @@ TEST_P(parameterized_csr2bsr_bin, csr2bsr_bin_double)
     hipsparseStatus_t status = testing_csr2bsr<double>(arg);
     EXPECT_EQ(status, HIPSPARSE_STATUS_SUCCESS);
 }
-#endif
 
 INSTANTIATE_TEST_SUITE_P(csr2bsr,
                          parameterized_csr2bsr,

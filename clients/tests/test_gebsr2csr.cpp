@@ -36,10 +36,10 @@ typedef std::
         gebsr2csr_bin_tuple;
 
 // Random matrices
-int gebsr2csr_M_range[]             = {-1, 872, 21453};
-int gebsr2csr_N_range[]             = {-3, 623, 29285};
-int gebsr2csr_row_block_dim_range[] = {0, 2, 4, 8};
-int gebsr2csr_col_block_dim_range[] = {-1, 2, 4, 8};
+int gebsr2csr_M_range[]             = {872, 21453};
+int gebsr2csr_N_range[]             = {623, 29285};
+int gebsr2csr_row_block_dim_range[] = {2, 4, 8};
+int gebsr2csr_col_block_dim_range[] = {2, 4, 8};
 
 hipsparseIndexBase_t gebsr2csr_csr_base_range[] = {HIPSPARSE_INDEX_BASE_ZERO};
 
@@ -86,8 +86,8 @@ Arguments setup_gebsr2csr_arguments(gebsr2csr_tuple tup)
     arg.N              = std::get<1>(tup);
     arg.row_block_dimA = std::get<2>(tup);
     arg.col_block_dimA = std::get<3>(tup);
-    arg.idx_base       = std::get<4>(tup);
-    arg.idx_base2      = std::get<5>(tup);
+    arg.baseA          = std::get<4>(tup);
+    arg.baseB          = std::get<5>(tup);
     arg.dirA           = std::get<6>(tup);
     arg.timing         = 0;
     return arg;
@@ -100,8 +100,8 @@ Arguments setup_gebsr2csr_arguments(gebsr2csr_bin_tuple tup)
     arg.N              = -99;
     arg.row_block_dimA = std::get<0>(tup);
     arg.col_block_dimA = std::get<1>(tup);
-    arg.idx_base       = std::get<2>(tup);
-    arg.idx_base2      = std::get<3>(tup);
+    arg.baseA          = std::get<2>(tup);
+    arg.baseB          = std::get<3>(tup);
     arg.dirA           = std::get<4>(tup);
     arg.timing         = 0;
 
@@ -114,8 +114,6 @@ Arguments setup_gebsr2csr_arguments(gebsr2csr_bin_tuple tup)
     return arg;
 }
 
-// Only run tests for CUDA 11.1 or greater
-#if(!defined(CUDART_VERSION) || CUDART_VERSION >= 11010)
 TEST(gebsr2csr_bad_arg, gebsr2csr)
 {
     testing_gebsr2csr_bad_arg<float>();
@@ -168,7 +166,6 @@ TEST_P(parameterized_gebsr2csr_bin, gebsr2csr_bin_double)
     hipsparseStatus_t status = testing_gebsr2csr<double>(arg);
     EXPECT_EQ(status, HIPSPARSE_STATUS_SUCCESS);
 }
-#endif
 
 INSTANTIATE_TEST_SUITE_P(gebsr2csr,
                          parameterized_gebsr2csr,

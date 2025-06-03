@@ -31,8 +31,8 @@
 typedef std::tuple<int, int, hipsparseOperation_t, int, hipsparseIndexBase_t>    coosort_tuple;
 typedef std::tuple<hipsparseOperation_t, int, hipsparseIndexBase_t, std::string> coosort_bin_tuple;
 
-int                  coosort_M_range[] = {-1, 0, 10, 500, 3872, 10000};
-int                  coosort_N_range[] = {-3, 0, 33, 242, 1623, 10000};
+int                  coosort_M_range[] = {0, 10, 500, 3872, 10000};
+int                  coosort_N_range[] = {0, 33, 242, 1623, 10000};
 hipsparseOperation_t coosort_trans[]
     = {HIPSPARSE_OPERATION_NON_TRANSPOSE, HIPSPARSE_OPERATION_TRANSPOSE};
 
@@ -77,24 +77,24 @@ protected:
 Arguments setup_coosort_arguments(coosort_tuple tup)
 {
     Arguments arg;
-    arg.M        = std::get<0>(tup);
-    arg.N        = std::get<1>(tup);
-    arg.transA   = std::get<2>(tup);
-    arg.temp     = std::get<3>(tup);
-    arg.idx_base = std::get<4>(tup);
-    arg.timing   = 0;
+    arg.M       = std::get<0>(tup);
+    arg.N       = std::get<1>(tup);
+    arg.transA  = std::get<2>(tup);
+    arg.permute = std::get<3>(tup);
+    arg.baseA   = std::get<4>(tup);
+    arg.timing  = 0;
     return arg;
 }
 
 Arguments setup_coosort_arguments(coosort_bin_tuple tup)
 {
     Arguments arg;
-    arg.M        = -99;
-    arg.N        = -99;
-    arg.transA   = std::get<0>(tup);
-    arg.temp     = std::get<1>(tup);
-    arg.idx_base = std::get<2>(tup);
-    arg.timing   = 0;
+    arg.M       = -99;
+    arg.N       = -99;
+    arg.transA  = std::get<0>(tup);
+    arg.permute = std::get<1>(tup);
+    arg.baseA   = std::get<2>(tup);
+    arg.timing  = 0;
 
     // Determine absolute path of test matrix
     std::string bin_file = std::get<3>(tup);
@@ -105,8 +105,6 @@ Arguments setup_coosort_arguments(coosort_bin_tuple tup)
     return arg;
 }
 
-// Only run tests for CUDA 11.1 or greater
-#if(!defined(CUDART_VERSION) || CUDART_VERSION >= 11010)
 TEST(coosort_bad_arg, coosort)
 {
     testing_coosort_bad_arg();
@@ -127,7 +125,6 @@ TEST_P(parameterized_coosort_bin, coosort_bin)
     hipsparseStatus_t status = testing_coosort(arg);
     EXPECT_EQ(status, HIPSPARSE_STATUS_SUCCESS);
 }
-#endif
 
 INSTANTIATE_TEST_SUITE_P(coosort,
                          parameterized_coosort,

@@ -31,8 +31,8 @@
 typedef std::tuple<int, int, hipsparseIndexBase_t>    hyb2csr_tuple;
 typedef std::tuple<hipsparseIndexBase_t, std::string> hyb2csr_bin_tuple;
 
-int hyb2csr_M_range[] = {-1, 0, 10, 500, 872, 1000};
-int hyb2csr_N_range[] = {-3, 0, 33, 242, 623, 1000};
+int hyb2csr_M_range[] = {0, 10, 500, 872, 1000};
+int hyb2csr_N_range[] = {0, 33, 242, 623, 1000};
 
 hipsparseIndexBase_t hyb2csr_idx_base_range[]
     = {HIPSPARSE_INDEX_BASE_ZERO, HIPSPARSE_INDEX_BASE_ONE};
@@ -69,20 +69,20 @@ protected:
 Arguments setup_hyb2csr_arguments(hyb2csr_tuple tup)
 {
     Arguments arg;
-    arg.M        = std::get<0>(tup);
-    arg.N        = std::get<1>(tup);
-    arg.idx_base = std::get<2>(tup);
-    arg.timing   = 0;
+    arg.M      = std::get<0>(tup);
+    arg.N      = std::get<1>(tup);
+    arg.baseA  = std::get<2>(tup);
+    arg.timing = 0;
     return arg;
 }
 
 Arguments setup_hyb2csr_arguments(hyb2csr_bin_tuple tup)
 {
     Arguments arg;
-    arg.M        = -99;
-    arg.N        = -99;
-    arg.idx_base = std::get<0>(tup);
-    arg.timing   = 0;
+    arg.M      = -99;
+    arg.N      = -99;
+    arg.baseA  = std::get<0>(tup);
+    arg.timing = 0;
 
     // Determine absolute path of test matrix
     std::string bin_file = std::get<1>(tup);
@@ -93,8 +93,7 @@ Arguments setup_hyb2csr_arguments(hyb2csr_bin_tuple tup)
     return arg;
 }
 
-// Only run tests for CUDA 11.1 or greater
-#if(!defined(CUDART_VERSION) || CUDART_VERSION >= 11010)
+#if(!defined(CUDART_VERSION) || CUDART_VERSION < 11000)
 TEST(hyb2csr_bad_arg, hyb2csr)
 {
     testing_hyb2csr_bad_arg<float>();
@@ -147,7 +146,6 @@ TEST_P(parameterized_hyb2csr_bin, hyb2csr_bin_double)
     hipsparseStatus_t status = testing_hyb2csr<double>(arg);
     EXPECT_EQ(status, HIPSPARSE_STATUS_SUCCESS);
 }
-#endif
 
 INSTANTIATE_TEST_SUITE_P(hyb2csr,
                          parameterized_hyb2csr,
@@ -159,3 +157,4 @@ INSTANTIATE_TEST_SUITE_P(hyb2csr_bin,
                          parameterized_hyb2csr_bin,
                          testing::Combine(testing::ValuesIn(hyb2csr_idx_base_range),
                                           testing::ValuesIn(hyb2csr_bin)));
+#endif

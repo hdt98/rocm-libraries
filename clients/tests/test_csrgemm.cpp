@@ -33,22 +33,19 @@ typedef hipsparseOperation_t trans;
 typedef std::tuple<int, int, int, base, base, base, trans, trans> csrgemm_tuple;
 typedef std::tuple<base, base, base, trans, trans, std::string>   csrgemm_bin_tuple;
 
-int csrgemm_M_range[] = {-1, 0, 50, 647, 1799};
-int csrgemm_N_range[] = {-1, 0, 13, 523, 3712};
-int csrgemm_K_range[] = {-1, 0, 50, 254, 1942};
+int csrgemm_M_range[] = {0, 647, 1799};
+int csrgemm_N_range[] = {0, 523, 3712};
+int csrgemm_K_range[] = {0, 254, 1942};
 
-base csrgemm_idxbaseA_range[] = {HIPSPARSE_INDEX_BASE_ZERO, HIPSPARSE_INDEX_BASE_ONE};
-base csrgemm_idxbaseB_range[] = {HIPSPARSE_INDEX_BASE_ZERO, HIPSPARSE_INDEX_BASE_ONE};
-base csrgemm_idxbaseC_range[] = {HIPSPARSE_INDEX_BASE_ZERO, HIPSPARSE_INDEX_BASE_ONE};
+base csrgemm_idxbaseA_range[] = {HIPSPARSE_INDEX_BASE_ZERO};
+base csrgemm_idxbaseB_range[] = {HIPSPARSE_INDEX_BASE_ONE};
+base csrgemm_idxbaseC_range[] = {HIPSPARSE_INDEX_BASE_ZERO};
 
 trans csrgemm_transA_range[] = {HIPSPARSE_OPERATION_NON_TRANSPOSE};
 trans csrgemm_transB_range[] = {HIPSPARSE_OPERATION_NON_TRANSPOSE};
 
-std::string csrgemm_bin[] = {/*"rma10.bin",*/
-                             /*"bibd_22_8.bin",*/
-                             "mc2depi.bin",
+std::string csrgemm_bin[] = {"mc2depi.bin",
                              "scircuit.bin",
-                             /*"bmwcra_1.bin",*/
                              "nos1.bin",
                              "nos2.bin",
                              "nos3.bin",
@@ -78,30 +75,30 @@ protected:
 Arguments setup_csrgemm_arguments(csrgemm_tuple tup)
 {
     Arguments arg;
-    arg.M         = std::get<0>(tup);
-    arg.N         = std::get<1>(tup);
-    arg.K         = std::get<2>(tup);
-    arg.idx_base  = std::get<3>(tup);
-    arg.idx_base2 = std::get<4>(tup);
-    arg.idx_base3 = std::get<5>(tup);
-    arg.transA    = std::get<6>(tup);
-    arg.transB    = std::get<7>(tup);
-    arg.timing    = 0;
+    arg.M      = std::get<0>(tup);
+    arg.N      = std::get<1>(tup);
+    arg.K      = std::get<2>(tup);
+    arg.baseA  = std::get<3>(tup);
+    arg.baseB  = std::get<4>(tup);
+    arg.baseC  = std::get<5>(tup);
+    arg.transA = std::get<6>(tup);
+    arg.transB = std::get<7>(tup);
+    arg.timing = 0;
     return arg;
 }
 
 Arguments setup_csrgemm_arguments(csrgemm_bin_tuple tup)
 {
     Arguments arg;
-    arg.M         = -99;
-    arg.N         = -99;
-    arg.K         = -99;
-    arg.idx_base  = std::get<0>(tup);
-    arg.idx_base2 = std::get<1>(tup);
-    arg.idx_base3 = std::get<2>(tup);
-    arg.transA    = std::get<3>(tup);
-    arg.transB    = std::get<4>(tup);
-    arg.timing    = 0;
+    arg.M      = -99;
+    arg.N      = -99;
+    arg.K      = -99;
+    arg.baseA  = std::get<0>(tup);
+    arg.baseB  = std::get<1>(tup);
+    arg.baseC  = std::get<2>(tup);
+    arg.transA = std::get<3>(tup);
+    arg.transB = std::get<4>(tup);
+    arg.timing = 0;
 
     // Determine absolute path of test matrix
     std::string bin_file = std::get<5>(tup);
@@ -112,8 +109,7 @@ Arguments setup_csrgemm_arguments(csrgemm_bin_tuple tup)
     return arg;
 }
 
-// Only run tests for CUDA 11.1 or greater
-#if(!defined(CUDART_VERSION) || CUDART_VERSION >= 11010)
+#if(!defined(CUDART_VERSION) || CUDART_VERSION < 11000)
 TEST(csrgemm_bad_arg, csrgemm_float)
 {
     testing_csrgemm_bad_arg<float>();
@@ -166,7 +162,6 @@ TEST_P(parameterized_csrgemm_bin, csrgemm_bin_double)
     hipsparseStatus_t status = testing_csrgemm<double>(arg);
     EXPECT_EQ(status, HIPSPARSE_STATUS_SUCCESS);
 }
-#endif
 
 INSTANTIATE_TEST_SUITE_P(csrgemm,
                          parameterized_csrgemm,
@@ -187,3 +182,4 @@ INSTANTIATE_TEST_SUITE_P(csrgemm_bin,
                                           testing::ValuesIn(csrgemm_transA_range),
                                           testing::ValuesIn(csrgemm_transB_range),
                                           testing::ValuesIn(csrgemm_bin)));
+#endif

@@ -25,7 +25,11 @@
 #ifndef TESTING_GEMMI_HPP
 #define TESTING_GEMMI_HPP
 
+#include "display.hpp"
+#include "flops.hpp"
+#include "gbyte.hpp"
 #include "hipsparse.hpp"
+#include "hipsparse_arguments.hpp"
 #include "hipsparse_test_unique_ptr.hpp"
 #include "unit.hpp"
 #include "utility.hpp"
@@ -58,12 +62,6 @@ void testing_gemmi_bad_arg(void)
     T*   dval = (T*)dval_managed.get();
     T*   dA   = (T*)dA_managed.get();
     T*   dC   = (T*)dC_managed.get();
-
-    if(!dval || !dptr || !drow || !dA || !dC)
-    {
-        PRINT_IF_HIP_ERROR(hipErrorOutOfMemory);
-        return;
-    }
 
     verify_hipsparse_status_invalid_handle(hipsparseXgemmi<T>(nullptr,
                                                               safe_size,
@@ -281,164 +279,41 @@ template <typename T>
 hipsparseStatus_t testing_gemmi(Arguments argus)
 {
 #if(!defined(CUDART_VERSION) || CUDART_VERSION < 12000)
-    int               safe_size = 100;
-    int               M         = argus.M;
-    int               N         = argus.N;
-    int               K         = argus.K;
-    int               lda       = argus.lda;
-    int               ldc       = argus.ldc;
-    T                 h_alpha   = make_DataType<T>(argus.alpha);
-    T                 h_beta    = make_DataType<T>(argus.beta);
-    std::string       binfile   = "";
-    std::string       filename  = "";
-    hipsparseStatus_t status;
+    int         M        = argus.M;
+    int         N        = argus.N;
+    int         K        = argus.K;
+    T           h_alpha  = make_DataType<T>(argus.alpha);
+    T           h_beta   = make_DataType<T>(argus.beta);
+    std::string filename = argus.filename;
 
-    // When in testing mode, M == N == -99 indicates that we are testing with a real
-    // matrix from cise.ufl.edu
-    if(K == -99 && N == -99 && argus.timing == 0)
+    std::unique_ptr<handle_struct> unique_ptr_handle(new handle_struct);
+    hipsparseHandle_t              handle = unique_ptr_handle->handle;
+
+    if(M == 0 || N == 0 || K == 0)
     {
-        binfile = argus.filename;
-        K = N = safe_size;
-    }
-
-    if(argus.timing == 1)
-    {
-        filename = argus.filename;
-    }
-
-    std::unique_ptr<handle_struct> test_handle(new handle_struct);
-    hipsparseHandle_t              handle = test_handle->handle;
-
-    // Determine number of non-zero elements
-    double scale = 0.02;
-    if(K > 1000 || N > 1000)
-    {
-        scale = 2.0 / std::max(K, N);
-    }
-    int nnz = K * scale * N;
-
 #ifdef __HIP_PLATFORM_NVIDIA__
-    // Do not test args in cusparse
-    if(M <= 0 || N <= 0 || K <= 0)
-    {
         return HIPSPARSE_STATUS_SUCCESS;
-    }
 #endif
-
-    // Argument sanity check before allocating invalid memory
-    if(M <= 0 || N <= 0 || K < 0)
-    {
-        auto dptr_managed
-            = hipsparse_unique_ptr{device_malloc(sizeof(int) * safe_size), device_free};
-        auto drow_managed
-            = hipsparse_unique_ptr{device_malloc(sizeof(int) * safe_size), device_free};
-        auto dval_managed = hipsparse_unique_ptr{device_malloc(sizeof(T) * safe_size), device_free};
-        auto dA_managed   = hipsparse_unique_ptr{device_malloc(sizeof(T) * safe_size), device_free};
-        auto dC_managed   = hipsparse_unique_ptr{device_malloc(sizeof(T) * safe_size), device_free};
-
-        int* dptr = (int*)dptr_managed.get();
-        int* drow = (int*)drow_managed.get();
-        T*   dval = (T*)dval_managed.get();
-        T*   dA   = (T*)dA_managed.get();
-        T*   dC   = (T*)dC_managed.get();
-
-        if(!dval || !dptr || !drow || !dA || !dC)
-        {
-            verify_hipsparse_status_success(HIPSPARSE_STATUS_ALLOC_FAILED,
-                                            "!dptr || !drow || !dval || !dA || !dC");
-            return HIPSPARSE_STATUS_ALLOC_FAILED;
-        }
-
-        CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_HOST));
-        status = hipsparseXgemmi(
-            handle, M, N, K, nnz, &h_alpha, dA, lda, dval, dptr, drow, &h_beta, dC, ldc);
-
-        if(M < 0 || N < 0 || K < 0 || nnz < 0)
-        {
-            verify_hipsparse_status_invalid_size(status,
-                                                 "Error: M < 0 || N < 0 || K < 0 || nnz < 0");
-        }
-        else
-        {
-            verify_hipsparse_status_success(status, "M >= 0 && N >= 0 && K >= 0 && nnz >= 0");
-        }
-
-        return HIPSPARSE_STATUS_SUCCESS;
     }
 
-    // Initialize random seed
     srand(12345ULL);
 
-    // Host structures - CSC matrix A
+    // Host structures
     std::vector<int> hcsc_col_ptrB;
     std::vector<int> hcsc_row_indB;
     std::vector<T>   hcsc_valB;
 
-    // Initial Data on CPU
-    if(binfile != "")
+    // Read or construct CSR matrix
+    int nnz = 0;
+    if(!generate_csr_matrix(
+           filename, N, K, nnz, hcsc_col_ptrB, hcsc_row_indB, hcsc_valB, HIPSPARSE_INDEX_BASE_ZERO))
     {
-        if(read_bin_matrix(binfile.c_str(),
-                           N,
-                           K,
-                           nnz,
-                           hcsc_col_ptrB,
-                           hcsc_row_indB,
-                           hcsc_valB,
-                           HIPSPARSE_INDEX_BASE_ZERO)
-           != 0)
-        {
-            fprintf(stderr, "Cannot open [read] %s\n", binfile.c_str());
-            return HIPSPARSE_STATUS_INTERNAL_ERROR;
-        }
-    }
-    else if(argus.laplacian)
-    {
-        N = K = gen_2d_laplacian(
-            argus.laplacian, hcsc_col_ptrB, hcsc_row_indB, hcsc_valB, HIPSPARSE_INDEX_BASE_ZERO);
-        nnz = hcsc_col_ptrB[N];
-    }
-    else
-    {
-        std::vector<int> hcoo_row_indA;
-
-        if(filename != "")
-        {
-            if(read_mtx_matrix(filename.c_str(),
-                               N,
-                               K,
-                               nnz,
-                               hcoo_row_indA,
-                               hcsc_row_indB,
-                               hcsc_valB,
-                               HIPSPARSE_INDEX_BASE_ZERO)
-               != 0)
-            {
-                fprintf(stderr, "Cannot open [read] %s\n", filename.c_str());
-                return HIPSPARSE_STATUS_INTERNAL_ERROR;
-            }
-        }
-        else
-        {
-            gen_matrix_coo(
-                N, K, nnz, hcoo_row_indA, hcsc_row_indB, hcsc_valB, HIPSPARSE_INDEX_BASE_ZERO);
-        }
-
-        // Convert COO to CSC
-        hcsc_col_ptrB.resize(N + 1, 0);
-        for(int i = 0; i < nnz; ++i)
-        {
-            ++hcsc_col_ptrB[hcoo_row_indA[i] + 1];
-        }
-
-        hcsc_col_ptrB[0] = 0;
-        for(int i = 0; i < N; ++i)
-        {
-            hcsc_col_ptrB[i + 1] += hcsc_col_ptrB[i];
-        }
+        fprintf(stderr, "Cannot open [read] %s\ncol", filename.c_str());
+        return HIPSPARSE_STATUS_INTERNAL_ERROR;
     }
 
-    lda = std::max(1, M);
-    ldc = std::max(1, M);
+    int lda = std::max(1, M);
+    int ldc = std::max(1, M);
 
     int Annz = lda * K;
     int Cnnz = ldc * N;
@@ -456,14 +331,13 @@ hipsparseStatus_t testing_gemmi(Arguments argus)
     auto dcsc_col_ptrB_managed
         = hipsparse_unique_ptr{device_malloc(sizeof(int) * (N + 1)), device_free};
     auto dcsc_row_indB_managed
-        = hipsparse_unique_ptr{device_malloc(sizeof(int) * (nnz + 1)), device_free};
-    auto dcsc_valB_managed
-        = hipsparse_unique_ptr{device_malloc(sizeof(T) * (nnz + 1)), device_free};
-    auto dA_managed      = hipsparse_unique_ptr{device_malloc(sizeof(T) * (Annz + 1)), device_free};
-    auto dC_1_managed    = hipsparse_unique_ptr{device_malloc(sizeof(T) * Cnnz), device_free};
-    auto dC_2_managed    = hipsparse_unique_ptr{device_malloc(sizeof(T) * Cnnz), device_free};
-    auto d_alpha_managed = hipsparse_unique_ptr{device_malloc(sizeof(T)), device_free};
-    auto d_beta_managed  = hipsparse_unique_ptr{device_malloc(sizeof(T)), device_free};
+        = hipsparse_unique_ptr{device_malloc(sizeof(int) * nnz), device_free};
+    auto dcsc_valB_managed = hipsparse_unique_ptr{device_malloc(sizeof(T) * nnz), device_free};
+    auto dA_managed        = hipsparse_unique_ptr{device_malloc(sizeof(T) * Annz), device_free};
+    auto dC_1_managed      = hipsparse_unique_ptr{device_malloc(sizeof(T) * Cnnz), device_free};
+    auto dC_2_managed      = hipsparse_unique_ptr{device_malloc(sizeof(T) * Cnnz), device_free};
+    auto d_alpha_managed   = hipsparse_unique_ptr{device_malloc(sizeof(T)), device_free};
+    auto d_beta_managed    = hipsparse_unique_ptr{device_malloc(sizeof(T)), device_free};
 
     int* dcsc_col_ptrB = (int*)dcsc_col_ptrB_managed.get();
     int* dcsc_row_indB = (int*)dcsc_row_indB_managed.get();
@@ -473,14 +347,6 @@ hipsparseStatus_t testing_gemmi(Arguments argus)
     T*   dC_2          = (T*)dC_2_managed.get();
     T*   d_alpha       = (T*)d_alpha_managed.get();
     T*   d_beta        = (T*)d_beta_managed.get();
-
-    if(!dcsc_valB || !dcsc_col_ptrB || !dcsc_row_indB || !dA || !dC_1 || !d_alpha || !d_beta)
-    {
-        verify_hipsparse_status_success(HIPSPARSE_STATUS_ALLOC_FAILED,
-                                        "!dcsc_valB || !dcsc_col_ptrB || !dcsc_row_indB || !dA || "
-                                        "!dC_1 || !d_alpha || !d_beta");
-        return HIPSPARSE_STATUS_ALLOC_FAILED;
-    }
 
     // copy data from CPU to device
     CHECK_HIP_ERROR(hipMemcpy(
@@ -497,7 +363,7 @@ hipsparseStatus_t testing_gemmi(Arguments argus)
         CHECK_HIP_ERROR(hipMemcpy(d_alpha, &h_alpha, sizeof(T), hipMemcpyHostToDevice));
         CHECK_HIP_ERROR(hipMemcpy(d_beta, &h_beta, sizeof(T), hipMemcpyHostToDevice));
 
-        // ROCSPARSE pointer mode host
+        // pointer mode host
         CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_HOST));
         CHECK_HIPSPARSE_ERROR(hipsparseXgemmi(handle,
                                               M,
@@ -514,7 +380,7 @@ hipsparseStatus_t testing_gemmi(Arguments argus)
                                               dC_1,
                                               ldc));
 
-        // ROCSPARSE pointer mode device
+        // pointer mode device
         CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_DEVICE));
         CHECK_HIPSPARSE_ERROR(hipsparseXgemmi(handle,
                                               M,
@@ -561,6 +427,86 @@ hipsparseStatus_t testing_gemmi(Arguments argus)
 
         unit_check_near(M, N, ldc, hC_gold.data(), hC_1.data());
         unit_check_near(M, N, ldc, hC_gold.data(), hC_2.data());
+    }
+
+    if(argus.timing)
+    {
+        int number_cold_calls = 2;
+        int number_hot_calls  = argus.iters;
+
+        CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_HOST));
+
+        // Warm up
+        for(int iter = 0; iter < number_cold_calls; ++iter)
+        {
+            CHECK_HIPSPARSE_ERROR(hipsparseXgemmi(handle,
+                                                  M,
+                                                  N,
+                                                  K,
+                                                  nnz,
+                                                  &h_alpha,
+                                                  dA,
+                                                  lda,
+                                                  dcsc_valB,
+                                                  dcsc_col_ptrB,
+                                                  dcsc_row_indB,
+                                                  &h_beta,
+                                                  dC_1,
+                                                  ldc));
+        }
+
+        double gpu_time_used = get_time_us();
+
+        // Performance run
+        for(int iter = 0; iter < number_hot_calls; ++iter)
+        {
+            CHECK_HIPSPARSE_ERROR(hipsparseXgemmi(handle,
+                                                  M,
+                                                  N,
+                                                  K,
+                                                  nnz,
+                                                  &h_alpha,
+                                                  dA,
+                                                  lda,
+                                                  dcsc_valB,
+                                                  dcsc_col_ptrB,
+                                                  dcsc_row_indB,
+                                                  &h_beta,
+                                                  dC_1,
+                                                  ldc));
+        }
+
+        gpu_time_used = (get_time_us() - gpu_time_used) / number_hot_calls;
+
+        double gflop_count = gemmi_gflop_count(M, nnz, M * N, h_beta != make_DataType<T>(0.0));
+        double gbyte_count
+            = gemmi_gbyte_count<T>(N, nnz, M * K, M * N, h_beta != make_DataType<T>(0.0));
+
+        double gpu_gflops = get_gpu_gflops(gpu_time_used, gflop_count);
+        double gpu_gbyte  = get_gpu_gbyte(gpu_time_used, gbyte_count);
+
+        display_timing_info(display_key_t::M,
+                            M,
+                            display_key_t::N,
+                            N,
+                            display_key_t::K,
+                            K,
+                            display_key_t::nnzA,
+                            M * K,
+                            display_key_t::nnzB,
+                            nnz,
+                            display_key_t::nnzC,
+                            M * N,
+                            display_key_t::alpha,
+                            h_alpha,
+                            display_key_t::beta,
+                            h_beta,
+                            display_key_t::gflops,
+                            gpu_gflops,
+                            display_key_t::bandwidth,
+                            gpu_gbyte,
+                            display_key_t::time_ms,
+                            get_gpu_time_msec(gpu_time_used));
     }
 #endif
 

@@ -146,15 +146,29 @@ public:
     }
 };
 
+hipsparseStatus_t hipsparse_record_output_legend(const std::string& s)
+{
+    return HIPSPARSE_STATUS_SUCCESS;
+}
+
+hipsparseStatus_t hipsparse_record_output(const std::string& s)
+{
+    return HIPSPARSE_STATUS_SUCCESS;
+}
+
+hipsparseStatus_t hipsparse_record_timing(double msec, double gflops, double gbs)
+{
+    return HIPSPARSE_STATUS_SUCCESS;
+}
+
+bool display_timing_info_is_stdout_disabled()
+{
+    return HIPSPARSE_STATUS_SUCCESS;
+}
+
 /* =====================================================================
       Main function:
 =================================================================== */
-
-static const char* s_hipsparse_clients_matrices_dir = nullptr;
-const char*        get_hipsparse_clients_matrices_dir()
-{
-    return s_hipsparse_clients_matrices_dir;
-}
 
 int main(int argc, char** argv)
 {
@@ -248,7 +262,7 @@ int main(int argc, char** argv)
     int ret = RUN_ALL_TESTS();
 
     // Reset HIP device
-    hipDeviceReset();
+    (void)hipDeviceReset();
 
     return ret;
 }

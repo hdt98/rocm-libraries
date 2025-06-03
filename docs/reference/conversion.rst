@@ -1,16 +1,17 @@
 .. meta::
-  :description: hipSPARSE documentation and API reference library
-  :keywords: hipSPARSE, rocSPARSE, ROCm, API, documentation
+  :description: hipSPARSE sparse conversion functions API documentation
+  :keywords: hipSPARSE, rocSPARSE, ROCm, API, documentation, conversion functions
 
 .. _hipsparse_conversion_functions:
 
 ********************************************************************
-Sparse Conversion Functions
+Sparse conversion functions
 ********************************************************************
 
-This module holds all sparse conversion routines.
+This module contains all sparse conversion routines.
 
-The sparse conversion routines describe operations on a matrix in sparse format to obtain a matrix in a different sparse format.
+The sparse conversion routines describe operations performed on a matrix in sparse format
+to obtain a matrix in a different sparse format.
 
 hipsparseXnnz()
 ===============
@@ -40,6 +41,13 @@ hipsparseXpruneDense2csr_bufferSize()
 .. doxygenfunction:: hipsparseSpruneDense2csr_bufferSize
   :outline:
 .. doxygenfunction:: hipsparseDpruneDense2csr_bufferSize
+
+hipsparseXpruneDense2csr_bufferSizeExt()
+========================================
+
+.. doxygenfunction:: hipsparseSpruneDense2csr_bufferSizeExt
+  :outline:
+.. doxygenfunction:: hipsparseDpruneDense2csr_bufferSizeExt
 
 hipsparseXpruneDense2csrNnz()
 =================================
