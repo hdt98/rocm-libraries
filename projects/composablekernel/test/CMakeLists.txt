@@ -15,6 +15,9 @@ set(REGRESSION_TESTS
     test_gemm_splitk
     test_batched_gemm
     test_gemm_universal
+    test_gemm_universal_streamk_fp16
+    test_gemm_universal_streamk_bf16
+    test_gemm_universal_streamk_fp8
     test_batched_gemm_softmax_gemm_fp16
     test_batched_gemm_softmax_gemm_permute_fp16
     test_batched_gemm_bias_softmax_gemm_permute_fp16
@@ -33,6 +36,7 @@ set(REGRESSION_TESTS
     test_batchnorm_bwd_rank_4
     test_grouped_convnd_bwd_data_xdl
     test_conv_tensor_rearrange
+    test_gemm_mx
 )
 
 function(add_test_executable TEST_NAME)
@@ -104,11 +108,11 @@ function(add_test_executable TEST_NAME)
     #only continue if there are some source files left on the list
     if(ARGN)
         if(ARGN MATCHES "_xdl")
-             list(REMOVE_ITEM TEST_TARGETS gfx900 gfx906 gfx906:xnack- gfx1030 gfx1100 gfx1101 gfx1102 gfx1103 gfx1200 gfx1201 gfx1300 gfx1301 gfx1302 gfx10.3-generic gfx11-generic gfx12-generic)
+             list(REMOVE_ITEM TEST_TARGETS gfx900 gfx906 gfx906:xnack- gfx1030 gfx1100 gfx1101 gfx1102 gfx1103 gfx1150 gfx1151 gfx1152 gfx1200 gfx1201 gfx1300 gfx1301 gfx1302 gfx10.3-generic gfx11-generic gfx12-generic)
         elseif(ARGN MATCHES "_wmma")
              list(REMOVE_ITEM TEST_TARGETS gfx900 gfx906 gfx906:xnack- gfx908:xnack+ gfx908:xnack- gfx90a:xnack+ gfx90a:xnack- gfx908 gfx90a gfx942 gfx1030 gfx950)
         elseif(ARGN MATCHES "_smfmac")
-             list(REMOVE_ITEM TEST_TARGETS gfx900 gfx906 gfx906:xnack- gfx1030 gfx1100 gfx1101 gfx1102 gfx1103 gfx908 gfx90a gfx1200 gfx1201 gfx1300 gfx1301 gfx1302 gfx10.3-generic gfx11-generic gfx12-generic)
+             list(REMOVE_ITEM TEST_TARGETS gfx900 gfx906 gfx906:xnack- gfx1030 gfx1100 gfx1101 gfx1102 gfx1103 gfx1150 gfx1151 gfx1152 gfx908 gfx90a gfx1200 gfx1201 gfx1300 gfx1301 gfx1302 gfx10.3-generic gfx11-generic gfx12-generic)
         elseif(ARGN MATCHES "wcnn") #only build wcnn example for gfx13
              list(REMOVE_ITEM TEST_TARGETS gfx900 gfx906 gfx906:xnack- gfx908:xnack+ gfx908:xnack- gfx90a:xnack+ gfx90a:xnack- gfx908 gfx90a gfx940 gfx941 gfx942 gfx1030 gfx950 gfx1100 gfx1101 gfx1102 gfx1103 gfx1200 gfx1201 gfx10.3-generic gfx11-generic gfx12-generic)
         endif()
@@ -209,14 +213,14 @@ function(add_gtest_executable TEST_NAME)
     #only continue if there are some source files left on the list
     if(ARGN)
         if(ARGN MATCHES "_xdl")
-             list(REMOVE_ITEM TEST_TARGETS gfx900 gfx906 gfx906:xnack- gfx1030 gfx1100 gfx1101 gfx1102 gfx1103 gfx1200 gfx1201 gfx1300 gfx1301 gfx1302 gfx10.3-generic gfx11-generic gfx12-generic)
+             list(REMOVE_ITEM TEST_TARGETS gfx900 gfx906 gfx906:xnack- gfx1030 gfx1100 gfx1101 gfx1102 gfx1103 gfx1150 gfx1151 gfx1152 gfx1200 gfx1201 gfx1300 gfx1301 gfx1302 gfx10.3-generic gfx11-generic gfx12-generic)
         elseif(ARGN MATCHES "_wmma")
              list(REMOVE_ITEM TEST_TARGETS gfx900 gfx906 gfx906:xnack- gfx908:xnack+ gfx908:xnack- gfx90a:xnack+ gfx90a:xnack- gfx908 gfx90a gfx942 gfx1030 gfx950)
         elseif(ARGN MATCHES "_smfmac")
-             list(REMOVE_ITEM TEST_TARGETS gfx900 gfx906 gfx906:xnack- gfx1030 gfx1100 gfx1101 gfx1102 gfx1103 gfx908 gfx90a gfx1200 gfx1201 gfx1300 gfx1301 gfx1302 gfx10.3-generic gfx11-generic gfx12-generic)
+             list(REMOVE_ITEM TEST_TARGETS gfx900 gfx906 gfx906:xnack- gfx1030 gfx1100 gfx1101 gfx1102 gfx1103 gfx1150 gfx1151 gfx1152 gfx908 gfx90a gfx1200 gfx1201 gfx1300 gfx1301 gfx1302 gfx10.3-generic gfx11-generic gfx12-generic)
         elseif(ARGN MATCHES "_mx") #only build mx example for gfx950
-             list(REMOVE_ITEM TEST_TARGETS gfx900 gfx906 gfx906:xnack- gfx908:xnack+ gfx908:xnack- gfx90a:xnack+ gfx90a:xnack- gfx908 gfx90a gfx942 gfx1030 gfx1100 gfx1101 gfx1102 gfx1103 gfx1200 gfx1201 gfx1300 gfx1301 gfx1302 gfx10.3-generic gfx11-generic gfx12-generic)
-         elseif(ARGN MATCHES "wcnn") #only build wcnn example for gfx13
+             list(REMOVE_ITEM TEST_TARGETS gfx900 gfx906 gfx906:xnack- gfx908:xnack+ gfx908:xnack- gfx90a:xnack+ gfx90a:xnack- gfx908 gfx90a gfx942 gfx1030 gfx1100 gfx1101 gfx1102 gfx1103 gfx1150 gfx1151 gfx1152 gfx1200 gfx1201 gfx1300 gfx1301 gfx1302 gfx10.3-generic gfx11-generic gfx12-generic)
+        elseif(ARGN MATCHES "wcnn") #only build wcnn example for gfx13
              list(REMOVE_ITEM TEST_TARGETS gfx900 gfx906 gfx906:xnack- gfx908:xnack+ gfx908:xnack- gfx90a:xnack+ gfx90a:xnack- gfx908 gfx90a gfx942 gfx1030 gfx950 gfx1100 gfx1101 gfx1102 gfx1103 gfx1200 gfx1201 gfx10.3-generic gfx11-generic gfx12-generic)
         endif()
         set_source_files_properties(${ARGN} PROPERTIES LANGUAGE HIP)
@@ -256,6 +260,7 @@ add_subdirectory(gemm_add)
 add_subdirectory(gemm_layernorm)
 add_subdirectory(gemm_split_k)
 add_subdirectory(gemm_universal)
+add_subdirectory(gemm_universal_streamk)
 add_subdirectory(gemm_reduce)
 add_subdirectory(batched_gemm)
 add_subdirectory(batched_gemm_reduce)
@@ -267,6 +272,7 @@ add_subdirectory(reduce)
 add_subdirectory(convnd_fwd)
 add_subdirectory(convnd_bwd_data)
 add_subdirectory(grouped_convnd_fwd)
+add_subdirectory(grouped_convnd_fwd_bias_relu)
 add_subdirectory(grouped_convnd_bwd_weight)
 add_subdirectory(block_to_ctile_map)
 add_subdirectory(softmax)
@@ -294,8 +300,9 @@ endif()
 if(SUPPORTED_GPU_TARGETS MATCHES "gfx942" OR SUPPORTED_GPU_TARGETS MATCHES "gfx950") # smfmac needs ROCm6.2
     add_subdirectory(smfmac_op)
 endif()
-if(SUPPORTED_GPU_TARGETS MATCHES "gfx950") 
+if(SUPPORTED_GPU_TARGETS MATCHES "gfx950")
     add_subdirectory(mx_mfma_op)
+    add_subdirectory(gemm_mx)
 endif()
 if(SUPPORTED_GPU_TARGETS MATCHES "gfx13")
     add_subdirectory(wcnn_op)
