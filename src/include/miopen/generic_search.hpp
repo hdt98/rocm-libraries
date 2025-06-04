@@ -532,7 +532,7 @@ auto GenericSearch(const Solver s,
                 MIOPEN_LOG_E("Error: Unknown exception thrown.");
                 ret = 1;
             }
-
+            
             MIOPEN_LOG_T("##"
                          << "(n_current, n_failed, n_runs_total):  " << n_current << '/' << n_failed
                          << '/' << n_runs_total << " elapsed_time: " << elapsed_time
@@ -545,7 +545,19 @@ auto GenericSearch(const Solver s,
                 // config), then gather 9 more samples, and remove positive z-score outliers. Use
                 // the mean value with outliers removed for calculating best config.
                 constexpr int N_RUNS = 10;
-                if(elapsed_time / worst_time < 1.10f)
+                // check if the first probe is not too bad, or check for env variable MIOPEN_TUNING_ALLOW_OUTLIERS
+                // TODO make this check for env variable MIOPEN_TUNING_ALLOW_OUTLIERS
+                if(elapsed_time / worst_time < 1.10f || miopen::IsLogging(miopen::LoggingLevel::Info2))
+                {
+                    last_imprv = 0; // Reset the patience counter.
+                }
+                else
+                {
+                    MIOPEN_LOG_I2("First probe elapsed time is too high: " << elapsed_time
+                                                             << " / " << worst_time << " = " << (elapsed_time / worst_time)
+                                                             << " >= 1.10, skipping this config");
+                    ret = 1; // Skip this config.
+                }
                 {
                     MIOPEN_LOG_I2("Finding average for: " << elapsed_time << " / " << best_time
                                                           << " = " << (elapsed_time / best_time));
@@ -567,10 +579,17 @@ auto GenericSearch(const Solver s,
                     if(ret == 0)
                     {
                         is_passed = true;
-
                         // Remove outliers that are more than 2 positive modified z-score's away,
                         // and get the mean.
                         elapsed_time = miopen::removeHighOutliersAndGetMean(samples, 2.0f);
+
+                        // Always log every candidate and its post-processed avg time
+                        MIOPEN_LOG_I2("Finished benchmark (n_current, n_failed, n_runs_total):  "
+                                     << n_current << '/' << n_failed
+                                     << '/' << n_runs_total
+                                     << ": config=" << current_config
+                                     << " avg_time=" << elapsed_time << " ms");
+
                         if(elapsed_time < best_time)
                         {
                             MIOPEN_LOG_I('#' << n_current << '/' << n_failed << '/' << n_runs_total
@@ -590,6 +609,10 @@ auto GenericSearch(const Solver s,
                             MIOPEN_LOG_I2("Mean is not better: " << elapsed_time
                                                                  << " >= " << best_time);
                         }
+                    }
+                    else
+                    {
+                        MIOPEN_LOG_I("Failed to get average time for " << current_config);
                     }
                 }
             }
