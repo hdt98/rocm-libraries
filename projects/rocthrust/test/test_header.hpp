@@ -197,7 +197,7 @@ struct Params<thrust::device_vector<T>, ExecutionPolicy>
   TYPED_TEST_SUITE(x, y);
 
 // Set of test parameter types
-
+namespace test {
 class large_data
 {
 public:
@@ -234,6 +234,7 @@ public:
 
   int8_t data[512];
 };
+}
 
 template <class T>
 bool __host__ __device__ operator==(T const& lhs, large_data const& rhs)
@@ -283,7 +284,7 @@ using FullWithLargeTypesTestsParams = ::testing::Types<
   Params<thrust::device_vector<float>, std::decay_t<decltype(thrust::hip::par_det)>>,
   Params<thrust::device_vector<float>, std::decay_t<decltype(thrust::hip::par_det_nosync)>>,
   Params<thrust::device_vector<double>>,
-  Params<thrust::device_vector<large_data>>>;
+  Params<thrust::device_vector<test::large_data>>>;
 
 // Host and device vectors of signed type
 using VectorSignedTestsParams =
