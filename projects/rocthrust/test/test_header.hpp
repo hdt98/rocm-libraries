@@ -197,7 +197,8 @@ struct Params<thrust::device_vector<T>, ExecutionPolicy>
   TYPED_TEST_SUITE(x, y);
 
 // Set of test parameter types
-namespace test {
+namespace test
+{
 class large_data
 {
 public:
