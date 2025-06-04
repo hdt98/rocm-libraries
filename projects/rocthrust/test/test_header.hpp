@@ -234,13 +234,13 @@ public:
 
   int8_t data[512];
 };
-}
 
 template <class T>
 bool __host__ __device__ operator==(T const& lhs, large_data const& rhs)
 {
   return static_cast<large_data>(lhs).data[0] == rhs.data[0];
 }
+} // namespace test
 
 // Host and device vectors of all type as a test parameter
 using FullTestsParams = ::testing::Types<
