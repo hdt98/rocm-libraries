@@ -228,6 +228,11 @@ protected:
             test_skipped = true;
             GTEST_SKIP() << "Not Applicable on " << handle.GetDeviceName() << " Architecture";
         }
+        if(!bn_bwd_test_data.saveMeanVar && bn_bwd_test_data.bn_mode == miopenBNPerActivation)
+        {
+            test_skipped = true;
+            GTEST_SKIP() << "Per activation needs saved mean to be 1";
+        }
         miopenStatus_t res = miopenStatusUnknownError;
         if(api_type == BNApiType::testBNAPIV1)
         {
@@ -405,6 +410,12 @@ protected:
         {
             test_skipped = true;
             GTEST_SKIP() << "Not Applicable on " << handle.GetDeviceName() << " Architecture";
+        }
+        if(!bn_fwd_train_test_data.saveMeanVar &&
+           bn_fwd_train_test_data.bn_mode == miopenBNPerActivation)
+        {
+            test_skipped = true;
+            GTEST_SKIP() << "Per activation needs saved mean to be 1";
         }
         miopenStatus_t res = miopenStatusUnknownError;
         if(api_type == BNApiType::testBNAPIV1)
