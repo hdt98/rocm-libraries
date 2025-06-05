@@ -1051,14 +1051,16 @@ struct GridwiseGemmPipeline_Wavegroup_v1<1, false, false, AMultiCastLoad, BMulti
         {
             // Need add this if condition when the LLVM fix the scratch_store only in wave_roup_id
             // == 0 issue.
-            // if((AMultiCastLoad == GlobalLoadTypeEnum::DEFAULT_LOAD) || (AMultiCastLoad ==
-            // GlobalLoadTypeEnum::WGP_MULTICAST_LOAD && (get_wavegroup_id() == 0)))
+            if((AMultiCastLoad == GlobalLoadTypeEnum::DEFAULT_LOAD) ||
+               (AMultiCastLoad == GlobalLoadTypeEnum::WGP_MULTICAST_LOAD &&
+                (get_wavegroup_id() == 0)))
             {
                 a_blockwise_copy.Run(
                     a_grid_desc, a_grid_buf, a_block_desc, a_block_origin_idx, a_block_buf);
             }
-            // if((BMultiCastLoad == GlobalLoadTypeEnum::DEFAULT_LOAD) || (BMultiCastLoad ==
-            // GlobalLoadTypeEnum::WGP_MULTICAST_LOAD && (get_wavegroup_id() == 0)))
+            if((BMultiCastLoad == GlobalLoadTypeEnum::DEFAULT_LOAD) ||
+               (BMultiCastLoad == GlobalLoadTypeEnum::WGP_MULTICAST_LOAD &&
+                (get_wavegroup_id() == 0)))
             {
                 b_blockwise_copy.Run(
                     b_grid_desc, b_grid_buf, b_block_desc, b_block_origin_idx, b_block_buf);
@@ -1076,14 +1078,16 @@ struct GridwiseGemmPipeline_Wavegroup_v1<1, false, false, AMultiCastLoad, BMulti
 
                 do
                 {
-                    // if((AMultiCastLoad == GlobalLoadTypeEnum::DEFAULT_LOAD) || (AMultiCastLoad ==
-                    // GlobalLoadTypeEnum::WGP_MULTICAST_LOAD && (get_wavegroup_id() == 0)))
+                    if((AMultiCastLoad == GlobalLoadTypeEnum::DEFAULT_LOAD) ||
+                       (AMultiCastLoad == GlobalLoadTypeEnum::WGP_MULTICAST_LOAD &&
+                        (get_wavegroup_id() == 0)))
                     {
                         a_blockwise_copy.Run(
                             a_grid_desc, a_grid_buf, a_block_desc, a_block_origin_idx, a_block_buf);
                     }
-                    // if((BMultiCastLoad == GlobalLoadTypeEnum::DEFAULT_LOAD) || (BMultiCastLoad ==
-                    // GlobalLoadTypeEnum::WGP_MULTICAST_LOAD && (get_wavegroup_id() == 0)))
+                    if((BMultiCastLoad == GlobalLoadTypeEnum::DEFAULT_LOAD) ||
+                       (BMultiCastLoad == GlobalLoadTypeEnum::WGP_MULTICAST_LOAD &&
+                        (get_wavegroup_id() == 0)))
                     {
                         b_blockwise_copy.Run(
                             b_grid_desc, b_grid_buf, b_block_desc, b_block_origin_idx, b_block_buf);
