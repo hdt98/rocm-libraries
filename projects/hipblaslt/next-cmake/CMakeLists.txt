@@ -25,7 +25,7 @@
 # to confirm if they are required and document what we dropped if not.
 
 cmake_minimum_required(VERSION 3.22.1)
-project(hipblaslt VERSION 0.15.0 LANGUAGES CXX)
+project(hipblaslt VERSION 1.0.0 LANGUAGES CXX)
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/../cmake)
@@ -39,7 +39,7 @@ include(hipblaslt_python)
 include(hipblaslt_target_configure_sanitizers)
 
 rocm_setup_version(VERSION ${PROJECT_VERSION})
-set(hipblaslt_SOVERSION 0.15)
+set(hipblaslt_SOVERSION 1.0)
 
 if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
     if(WIN32)
@@ -388,7 +388,7 @@ if(HIPBLASLT_ENABLE_CLIENT)
         COMPONENT benchmarks
     )
     rocm_install(
-        FILES 
+        FILES
             "${HIPBLASLT_CLIENTS_DIR}/include/hipblaslt_common.yaml"
             "${HIPBLASLT_CLIENTS_DIR}/include/hipblaslt_template.yaml"
         DESTINATION "${CMAKE_INSTALL_BINDIR}"
@@ -481,7 +481,6 @@ if(HIPBLASLT_ENABLE_SAMPLES)
             sample_hipblaslt_gemm_attr_tciA_tciB
             sample_hipblaslt_ext_op_layernorm
             sample_hipblaslt_ext_op_amax
-            sample_hipblaslt_ext_op_amax_with_scale
             sample_hipblaslt_gemm_with_TF32
             sample_hipblaslt_gemm_swizzle_a
             sample_hipblaslt_gemm_bias_swizzle_a_ext
@@ -493,7 +492,7 @@ if(HIPBLASLT_ENABLE_SAMPLES)
     )
     rocm_package_setup_client_component(samples)
 endif()
-# rocm_create_package makes decisions on what type of package to produce 
+# rocm_create_package makes decisions on what type of package to produce
 # based on BUILD_SHARED_LIBS. If we don't set this here we will only get
 # a dev package.
 set(BUILD_SHARED_LIBS ${HIPBLASLT_BUILD_SHARED_LIBS})
@@ -525,9 +524,9 @@ if(HIPBLASLT_ENABLE_COVERAGE)
         DEPENDS hipblaslt-test
         COMMAND ${CMAKE_COMMAND} -E rm -rf "${coverage_dir}"
         COMMAND ${CMAKE_COMMAND} -E make_directory "${coverage_dir}/profraw"
-        COMMAND ${CMAKE_COMMAND} -E env LLVM_PROFILE_FILE="${coverage_dir}/profraw/hipblaslt-coverage_%p.profraw" 
-                                        GTEST_LISTENER=NO_PASS_LINE_IN_LOG 
-                                        $<TARGET_FILE:hipblaslt-test> 
+        COMMAND ${CMAKE_COMMAND} -E env LLVM_PROFILE_FILE="${coverage_dir}/profraw/hipblaslt-coverage_%p.profraw"
+                                        GTEST_LISTENER=NO_PASS_LINE_IN_LOG
+                                        $<TARGET_FILE:hipblaslt-test>
                                         --precompile=hipblaslt-test-precompile.db
       )
       find_program(
