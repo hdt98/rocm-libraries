@@ -1392,8 +1392,10 @@ struct WcnnConv
     {
         if constexpr(TileAccess)
         {
-            auto laneId               = GetLaneId();
-            const index_t PixelOffset = laneId % (HPerWcnn * WPerWcnn);
+
+            auto laneId                          = GetLaneId();
+            constexpr index_t NumSubTilePerImage = GetNumSubTilesPerImageTile();
+            const index_t PixelOffset = laneId % (HPerWcnn * WPerWcnn / NumSubTilePerImage);
             return make_tuple(PixelOffset / WPerWcnn, PixelOffset % WPerWcnn, 0);
         }
         else
@@ -1448,32 +1450,6 @@ struct WcnnConv
                 const index_t subK               = (laneId & (NumLanePerPair - 1)) * SwizzleComp;
                 return make_tuple(0, subH, subW, 0, subK);
             }
-        }
-    }
-
-    template <bool TileAccess>
-    static constexpr auto GetInDataPerTileLoad()
-    {
-        if constexpr(TileAccess & (HPerWcnn == 8) && (WPerWcnn == 4))
-        {
-            return GetNumDataCompPerTile() * 2;
-        }
-        else
-        {
-            return GetNumDataCompPerTile();
-        }
-    }
-
-    template <bool TileAccess>
-    static constexpr auto GetInDataPerSubImageTileLoad()
-    {
-        if constexpr(TileAccess)
-        {
-            return 1;
-        }
-        else
-        {
-            return GetNumSubTilesPerImageTile();
         }
     }
 

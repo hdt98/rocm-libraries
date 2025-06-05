@@ -264,8 +264,7 @@ struct DynamicBuffer
               index_t NumElemsPerThread,
               index_t NumThreadsPerTile,
               index_t NumVgprsPerTile>
-    __host__ __device__ constexpr auto
-    tileLoad(index_t src_offset, index_t thread_id, bool is_valid_element) const
+    __host__ __device__ constexpr auto tileLoad(index_t src_offset, bool is_valid_element) const
     {
         static_assert(GetAddressSpace() == AddressSpaceEnum::Global,
                       "Source data must come from a global memory buffer.");
@@ -275,7 +274,7 @@ struct DynamicBuffer
         return amd_tile_load_to_vgpr<remove_cvref_t<T>,
                                      NumElemsPerThread,
                                      NumThreadsPerTile,
-                                     NumVgprsPerTile>(global_ptr, is_valid_element, thread_id);
+                                     NumVgprsPerTile>(global_ptr, is_valid_element);
     }
 
     template <typename X,

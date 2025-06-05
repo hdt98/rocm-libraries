@@ -399,10 +399,6 @@ struct GridwiseConvMultipleD_Wcnn_CShuffle
     static constexpr index_t NumWeightCompPerTile    = wcnn_conv.GetNumWeightCompPerTile();
     static constexpr index_t NumSubTilePerImage      = wcnn_conv.GetNumSubTilesPerImageTile();
     static constexpr index_t NumDataCompPerTile      = wcnn_conv.GetNumDataCompPerTile();
-    static constexpr index_t NumSubTilePerImageLoad =
-        wcnn_conv.template GetInDataPerSubImageTileLoad<InTileLoad>();
-    static constexpr index_t NumDataCompPerTileLoad =
-        wcnn_conv.template GetInDataPerTileLoad<InTileLoad>();
 
     static constexpr index_t DataTileHeight = 4;
     static constexpr index_t H_Pad          = (FilterSize == 3) ? DataTileHeight : 0;
@@ -744,14 +740,13 @@ struct GridwiseConvMultipleD_Wcnn_CShuffle
         else
         {
             // W0 x C0 x H0 x H1 x H2 x W1 x C1
-            return make_naive_tensor_descriptor_packed(
-                make_tuple(Number<WPerWaveIn / WPerWcnn>{},
-                           Number<CPerWave / CPerWcnn>{},
-                           Number<HPerWaveIn / HPerWcnn>{},
-                           Number<NumSubTilePerImageLoad>{},
-                           I1,
-                           I1,
-                           Number<NumDataCompPerTileLoad>{}));
+            return make_naive_tensor_descriptor_packed(make_tuple(Number<WPerWaveIn / WPerWcnn>{},
+                                                                  Number<CPerWave / CPerWcnn>{},
+                                                                  Number<HPerWaveIn / HPerWcnn>{},
+                                                                  Number<NumSubTilePerImage>{},
+                                                                  I1,
+                                                                  I1,
+                                                                  Number<NumDataCompPerTile>{}));
         }
     }
 
@@ -1774,7 +1769,7 @@ struct GridwiseConvMultipleD_Wcnn_CShuffle
                                                      decltype(BlockwiseConv::GetInWaveDescLength()),
                                                      Sequence<0, 1, 2, 3, 4, 5, 6>,
                                                      6,
-                                                     NumDataCompPerTileLoad,
+                                                     NumDataCompPerTile,
                                                      1,
                                                      false,
                                                      false,

@@ -410,8 +410,8 @@ struct ThreadwiseTensorSliceTransfer_v2
                             src_buf.template tileLoad<SrcData,
                                                       SrcScalarPerVector,
                                                       ThreadLengthPerTile,
-                                                      VgprLengthPerTile>(
-                                src_coord_.GetOffset(), get_thread_local_1d_id(), is_src_valid);
+                                                      VgprLengthPerTile>(src_coord_.GetOffset(),
+                                                                         is_src_valid);
                     }
                     else if constexpr(GlobalMulticastLoad != GlobalLoadTypeEnum::DEFAULT_LOAD)
                     {
@@ -466,7 +466,7 @@ struct ThreadwiseTensorSliceTransfer_v2
                                                                  SrcScalarPerVector,
                                                                  ThreadLengthPerTile,
                                                                  VgprLengthPerTile>(
-                            src_coord_.GetOffset(), get_thread_local_1d_id(), is_src_valid);
+                            src_coord_.GetOffset(), is_src_valid);
                     }
                     else if constexpr(GlobalMulticastLoad != GlobalLoadTypeEnum::DEFAULT_LOAD)
                     {
@@ -496,8 +496,8 @@ struct ThreadwiseTensorSliceTransfer_v2
                         src_buf.template tileLoad<SrcData,
                                                   SrcScalarPerVector,
                                                   ThreadLengthPerTile,
-                                                  VgprLengthPerTile>(
-                            src_coord_.GetOffset(), get_thread_local_1d_id(), is_src_valid);
+                                                  VgprLengthPerTile>(src_coord_.GetOffset(),
+                                                                     is_src_valid);
                 }
                 else if constexpr(GlobalMulticastLoad != GlobalLoadTypeEnum::DEFAULT_LOAD)
                 {
