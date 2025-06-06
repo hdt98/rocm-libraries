@@ -289,8 +289,7 @@ template <typename GridwiseGemm,
           typename Block2CTileMap,
           int ClusterSize,
           bool HasMainKBlockLoop>
-__global__ void __cluster_dims__(
-    4) // Todo use ClusterSize as clang issue:https://github.com/llvm/llvm-project/issues/139570
+__global__ void __cluster_dims__(ClusterSize)
     kernel_gemm_wmma_cluster(const ADataType* __restrict__ p_a_grid,
                              const BDataType* __restrict__ p_b_grid,
                              CDataType* __restrict__ p_c_grid,
