@@ -79,6 +79,7 @@ jobs:
         run: git config submodule.recurse false
 
       - name: Run and auto-commit pre-commit fixes
+        if: github.event.pull_request.head.repo.fork == false 
         env:
           GIT_AUTHOR_NAME: "assistant-librarian[bot]"
           GIT_AUTHOR_EMAIL: "assistant-librarian[bot]@users.noreply.github.com"
@@ -101,3 +102,30 @@ jobs:
             git commit -m "ci: apply pre-commit fixes"
             git push --force-with-lease origin HEAD:${{ github.head_ref }}
           fi
+      - name: Post a comment with diff for forked PRs 
+        if: github.event.pull_request.head.repo.fork == true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |  
+          var="${{ steps.changed-files.outputs.all_modified_files }}"  
+          read -r -a files <<< "$var"  
+          if [ ${#files[@]} -eq 0 ]; then  
+            echo "No files changed, skipping pre-commit."  
+            exit 0  
+          fi  
+          echo "Running pre-commit on these files (dry run to capture diff):"  
+          printf "  %s\n" "${files[@]}"  
+          diff_output=$(pre-commit run --files "${files[@]}" --show-diff-on-failure 2>&1 || true)  
+          # Check if diff output shows that changes would be applied.  
+          if echo "$diff_output" | grep -q "Failed"; then  
+            echo "Pre-commit suggests the following changes:"  
+            echo "$diff_output"  
+            # Post a comment to the PR with the diff. This uses the GitHub CLI.  
+            gh pr comment "${{ github.event.pull_request.number }}" --body "Pre-commit found some formatting issues that should be fixed. Here is a diff of the suggested changes:  
+            \`\`\`  
+            $diff_output  
+            \`\`\`  
+            Please apply these fixes and push the changes to update the PR."  
+          else  
+            echo "No formatting issues detected."  
+          fi 
