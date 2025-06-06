@@ -55,15 +55,6 @@
       "enable_pr_fanout": false
     },
     {
-      "name": "hiprand",
-      "url": "ROCm/hipRAND",
-      "branch": "release-staging/rocm-rel-7.0",
-      "category": "projects",
-      "auto_subtree_pull": false,
-      "auto_subtree_push": true,
-      "enable_pr_fanout": false
-    },
-    {
       "name": "hipsolver",
       "url": "ROCm/hipSOLVER",
       "branch": "release-staging/rocm-rel-7.0",
@@ -133,6 +124,50 @@
       "category": "projects",
       "auto_subtree_pull": true,
       "auto_subtree_push": false,
+      "enable_pr_fanout": false
+    },{
+      "name": "hipcub",
+      "url": "ROCm/hipCUB",
+      "branch": "release-staging/rocm-rel-7.0",
+      "category": "projects",
+      "auto_subtree_pull": false,
+      "auto_subtree_push": true,
+      "enable_pr_fanout": false
+    },
+    {
+      "name": "rocprim",
+      "url": "ROCm/rocPRIM",
+      "branch": "release-staging/rocm-rel-7.0",
+      "category": "projects",
+      "auto_subtree_pull": false,
+      "auto_subtree_push": true,
+      "enable_pr_fanout": false
+    },
+    {
+      "name": "rocrand",
+      "url": "ROCm/rocRAND",
+      "branch": "release-staging/rocm-rel-7.0",
+      "category": "projects",
+      "auto_subtree_pull": false,
+      "auto_subtree_push": true,
+      "enable_pr_fanout": false
+    },
+    {
+      "name": "rocthrust",
+      "url": "ROCm/rocThrust",
+      "branch": "release-staging/rocm-rel-7.0",
+      "category": "projects",
+      "auto_subtree_pull": false,
+      "auto_subtree_push": true,
+      "enable_pr_fanout": false
+    },
+    {
+      "name": "hiprand",
+      "url": "ROCm/hipRAND",
+      "branch": "release-staging/rocm-rel-7.0",
+      "category": "projects",
+      "auto_subtree_pull": false,
+      "auto_subtree_push": true,
       "enable_pr_fanout": false
     }
   ]
