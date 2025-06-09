@@ -502,48 +502,189 @@ protected:
         {
             if(api_type == BNApiType::testBNAPIV1)
             {
-                res = miopenBatchNormalizationForwardTraining(
-                    &handle,
-                    bn_mode,
-                    &bn_fwd_train_test_data.alpha,
-                    &bn_fwd_train_test_data.beta,
-                    &bn_fwd_train_test_data.input.desc,
-                    bn_fwd_train_test_data.in_dev.get(),
-                    &bn_fwd_train_test_data.output.desc,
-                    bn_fwd_train_test_data.out_dev.get(),
-                    &bn_fwd_train_test_data.scale.desc,
-                    bn_fwd_train_test_data.scale_dev.get(),
-                    bn_fwd_train_test_data.shift_dev.get(),
-                    bn_fwd_train_test_data.averageFactor,
-                    bn_fwd_train_test_data.runMean_dev.get(),
-                    bn_fwd_train_test_data.runVariance_dev.get(),
-                    bn_fwd_train_test_data.epsilon,
-                    bn_fwd_train_test_data.saveMean_dev.get(),
-                    bn_fwd_train_test_data.saveVariance_dev.get());
+                if(bn_fwd_train_test_data.saveMeanVar && bn_fwd_train_test_data.keepRunningMeanVar)
+                {
+                    res = miopenBatchNormalizationForwardTraining(
+                        &handle,
+                        bn_mode,
+                        &bn_fwd_train_test_data.alpha,
+                        &bn_fwd_train_test_data.beta,
+                        &bn_fwd_train_test_data.input.desc,
+                        bn_fwd_train_test_data.in_dev.get(),
+                        &bn_fwd_train_test_data.output.desc,
+                        bn_fwd_train_test_data.out_dev.get(),
+                        &bn_fwd_train_test_data.scale.desc,
+                        bn_fwd_train_test_data.scale_dev.get(),
+                        bn_fwd_train_test_data.shift_dev.get(),
+                        bn_fwd_train_test_data.averageFactor,
+                        bn_fwd_train_test_data.runMean_dev.get(),
+                        bn_fwd_train_test_data.runVariance_dev.get(),
+                        bn_fwd_train_test_data.epsilon,
+                        bn_fwd_train_test_data.saveMean_dev.get(),
+                        bn_fwd_train_test_data.saveVariance_dev.get());
+                }
+                else if(bn_fwd_train_test_data.saveMeanVar)
+                {
+                    res = miopenBatchNormalizationForwardTraining(
+                        &handle,
+                        bn_mode,
+                        &bn_fwd_train_test_data.alpha,
+                        &bn_fwd_train_test_data.beta,
+                        &bn_fwd_train_test_data.input.desc,
+                        bn_fwd_train_test_data.in_dev.get(),
+                        &bn_fwd_train_test_data.output.desc,
+                        bn_fwd_train_test_data.out_dev.get(),
+                        &bn_fwd_train_test_data.scale.desc,
+                        bn_fwd_train_test_data.scale_dev.get(),
+                        bn_fwd_train_test_data.shift_dev.get(),
+                        bn_fwd_train_test_data.averageFactor,
+                        nullptr,
+                        nullptr,
+                        bn_fwd_train_test_data.epsilon,
+                        bn_fwd_train_test_data.saveMean_dev.get(),
+                        bn_fwd_train_test_data.saveVariance_dev.get());
+                }
+                else if(bn_fwd_train_test_data.keepRunningMeanVar)
+                {
+                    res = miopenBatchNormalizationForwardTraining(
+                        &handle,
+                        bn_mode,
+                        &bn_fwd_train_test_data.alpha,
+                        &bn_fwd_train_test_data.beta,
+                        &bn_fwd_train_test_data.input.desc,
+                        bn_fwd_train_test_data.in_dev.get(),
+                        &bn_fwd_train_test_data.output.desc,
+                        bn_fwd_train_test_data.out_dev.get(),
+                        &bn_fwd_train_test_data.scale.desc,
+                        bn_fwd_train_test_data.scale_dev.get(),
+                        bn_fwd_train_test_data.shift_dev.get(),
+                        bn_fwd_train_test_data.averageFactor,
+                        bn_fwd_train_test_data.runMean_dev.get(),
+                        bn_fwd_train_test_data.runVariance_dev.get(),
+                        bn_fwd_train_test_data.epsilon,
+                        nullptr,
+                        nullptr);
+                }
+                else
+                {
+                    res = miopenBatchNormalizationForwardTraining(
+                        &handle,
+                        bn_mode,
+                        &bn_fwd_train_test_data.alpha,
+                        &bn_fwd_train_test_data.beta,
+                        &bn_fwd_train_test_data.input.desc,
+                        bn_fwd_train_test_data.in_dev.get(),
+                        &bn_fwd_train_test_data.output.desc,
+                        bn_fwd_train_test_data.out_dev.get(),
+                        &bn_fwd_train_test_data.scale.desc,
+                        bn_fwd_train_test_data.scale_dev.get(),
+                        bn_fwd_train_test_data.shift_dev.get(),
+                        bn_fwd_train_test_data.averageFactor,
+                        nullptr,
+                        nullptr,
+                        bn_fwd_train_test_data.epsilon,
+                        nullptr,
+                        nullptr);
+                }
             }
             else if(api_type == BNApiType::testBNAPIV2)
             {
-                res = miopenBatchNormalizationForwardTraining_V2(
-                    &handle,
-                    bn_mode,
-                    &bn_fwd_train_test_data.alpha,
-                    &bn_fwd_train_test_data.beta,
-                    &bn_fwd_train_test_data.input.desc,
-                    bn_fwd_train_test_data.in_dev.get(),
-                    &bn_fwd_train_test_data.output.desc,
-                    bn_fwd_train_test_data.out_dev.get(),
-                    &bn_fwd_train_test_data.scale.desc,
-                    &bn_fwd_train_test_data.shift.desc,
-                    &bn_fwd_train_test_data.saveMean.desc,
-                    &bn_fwd_train_test_data.saveVariance.desc,
-                    bn_fwd_train_test_data.scale_dev.get(),
-                    bn_fwd_train_test_data.shift_dev.get(),
-                    bn_fwd_train_test_data.averageFactor,
-                    bn_fwd_train_test_data.runMean_dev.get(),
-                    bn_fwd_train_test_data.runVariance_dev.get(),
-                    bn_fwd_train_test_data.epsilon,
-                    bn_fwd_train_test_data.saveMean_dev.get(),
-                    bn_fwd_train_test_data.saveVariance_dev.get());
+                if(bn_fwd_train_test_data.saveMeanVar && bn_fwd_train_test_data.keepRunningMeanVar)
+                {
+                    res = miopenBatchNormalizationForwardTraining_V2(
+                        &handle,
+                        bn_mode,
+                        &bn_fwd_train_test_data.alpha,
+                        &bn_fwd_train_test_data.beta,
+                        &bn_fwd_train_test_data.input.desc,
+                        bn_fwd_train_test_data.in_dev.get(),
+                        &bn_fwd_train_test_data.output.desc,
+                        bn_fwd_train_test_data.out_dev.get(),
+                        &bn_fwd_train_test_data.scale.desc,
+                        &bn_fwd_train_test_data.shift.desc,
+                        &bn_fwd_train_test_data.saveMean.desc,
+                        &bn_fwd_train_test_data.saveVariance.desc,
+                        bn_fwd_train_test_data.scale_dev.get(),
+                        bn_fwd_train_test_data.shift_dev.get(),
+                        bn_fwd_train_test_data.averageFactor,
+                        bn_fwd_train_test_data.runMean_dev.get(),
+                        bn_fwd_train_test_data.runVariance_dev.get(),
+                        bn_fwd_train_test_data.epsilon,
+                        bn_fwd_train_test_data.saveMean_dev.get(),
+                        bn_fwd_train_test_data.saveVariance_dev.get());
+                }
+                else if(bn_fwd_train_test_data.saveMeanVar)
+                {
+                    res = miopenBatchNormalizationForwardTraining_V2(
+                        &handle,
+                        bn_mode,
+                        &bn_fwd_train_test_data.alpha,
+                        &bn_fwd_train_test_data.beta,
+                        &bn_fwd_train_test_data.input.desc,
+                        bn_fwd_train_test_data.in_dev.get(),
+                        &bn_fwd_train_test_data.output.desc,
+                        bn_fwd_train_test_data.out_dev.get(),
+                        &bn_fwd_train_test_data.scale.desc,
+                        &bn_fwd_train_test_data.shift.desc,
+                        &bn_fwd_train_test_data.saveMean.desc,
+                        &bn_fwd_train_test_data.saveVariance.desc,
+                        bn_fwd_train_test_data.scale_dev.get(),
+                        bn_fwd_train_test_data.shift_dev.get(),
+                        bn_fwd_train_test_data.averageFactor,
+                        nullptr,
+                        nullptr,
+                        bn_fwd_train_test_data.epsilon,
+                        bn_fwd_train_test_data.saveMean_dev.get(),
+                        bn_fwd_train_test_data.saveVariance_dev.get());
+                }
+                else if(bn_fwd_train_test_data.keepRunningMeanVar)
+                {
+                    res = miopenBatchNormalizationForwardTraining_V2(
+                        &handle,
+                        bn_mode,
+                        &bn_fwd_train_test_data.alpha,
+                        &bn_fwd_train_test_data.beta,
+                        &bn_fwd_train_test_data.input.desc,
+                        bn_fwd_train_test_data.in_dev.get(),
+                        &bn_fwd_train_test_data.output.desc,
+                        bn_fwd_train_test_data.out_dev.get(),
+                        &bn_fwd_train_test_data.scale.desc,
+                        &bn_fwd_train_test_data.shift.desc,
+                        &bn_fwd_train_test_data.saveMean.desc,
+                        &bn_fwd_train_test_data.saveVariance.desc,
+                        bn_fwd_train_test_data.scale_dev.get(),
+                        bn_fwd_train_test_data.shift_dev.get(),
+                        bn_fwd_train_test_data.averageFactor,
+                        bn_fwd_train_test_data.runMean_dev.get(),
+                        bn_fwd_train_test_data.runVariance_dev.get(),
+                        bn_fwd_train_test_data.epsilon,
+                        nullptr,
+                        nullptr);
+                }
+                else
+                {
+                    res = miopenBatchNormalizationForwardTraining_V2(
+                        &handle,
+                        bn_mode,
+                        &bn_fwd_train_test_data.alpha,
+                        &bn_fwd_train_test_data.beta,
+                        &bn_fwd_train_test_data.input.desc,
+                        bn_fwd_train_test_data.in_dev.get(),
+                        &bn_fwd_train_test_data.output.desc,
+                        bn_fwd_train_test_data.out_dev.get(),
+                        &bn_fwd_train_test_data.scale.desc,
+                        &bn_fwd_train_test_data.shift.desc,
+                        &bn_fwd_train_test_data.saveMean.desc,
+                        &bn_fwd_train_test_data.saveVariance.desc,
+                        bn_fwd_train_test_data.scale_dev.get(),
+                        bn_fwd_train_test_data.shift_dev.get(),
+                        bn_fwd_train_test_data.averageFactor,
+                        nullptr,
+                        nullptr,
+                        bn_fwd_train_test_data.epsilon,
+                        nullptr,
+                        nullptr);
+                }
             }
             else
                 GTEST_FAIL() << "ERROR: unknown bn api type!!";
