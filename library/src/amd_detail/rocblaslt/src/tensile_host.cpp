@@ -38,7 +38,7 @@
 #include "rocblaslt_mat_utils.hpp"
 #include "tensile_host.hpp"
 
-#ifdef USE_ROCROLLER
+#ifdef HIPBLASLT_USE_ROCROLLER
 #include "rocroller_host.hpp"
 #endif
 
@@ -222,7 +222,6 @@ RocblasltContractionProblem::RocblasltContractionProblem(hipblasOperation_t     
             else //more default cases once support C != D
                 this->bias_type = HIP_R_16F;
         }
-#ifdef ROCM_USE_FLOAT8
         else if((this->a_type == HIP_R_8F_E4M3 || this->a_type == HIP_R_8F_E5M2)
                 && (this->b_type == HIP_R_8F_E4M3 || this->b_type == HIP_R_8F_E5M2))
         {
@@ -233,27 +232,26 @@ RocblasltContractionProblem::RocblasltContractionProblem(hipblasOperation_t     
             else //more default cases once support C != D
                 this->bias_type = HIP_R_16F;
         }
-#endif
         else
         {
             this->bias_type = this->d_type;
         }
+    }
 
-        if(this->aux_type == HIPBLASLT_DATATYPE_INVALID)
-        {
-            this->aux_type = this->d_type;
-        }
+    if(this->aux_type == HIPBLASLT_DATATYPE_INVALID)
+    {
+        this->aux_type = this->d_type;
+    }
 
-        if(this->trans_a == HIPBLAS_OP_C)
-        {
-            if(rocblaslt_is_complex_datatype(this->a_type))
-                this->trans_a = HIPBLAS_OP_T;
-        }
-        if(this->trans_b == HIPBLAS_OP_C)
-        {
-            if(rocblaslt_is_complex_datatype(this->b_type))
-                this->trans_b = HIPBLAS_OP_T;
-        }
+    if(this->trans_a == HIPBLAS_OP_C)
+    {
+        if(rocblaslt_is_complex_datatype(this->a_type))
+            this->trans_a = HIPBLAS_OP_T;
+    }
+    if(this->trans_b == HIPBLAS_OP_C)
+    {
+        if(rocblaslt_is_complex_datatype(this->b_type))
+            this->trans_b = HIPBLAS_OP_T;
     }
 }
 
@@ -385,12 +383,10 @@ namespace
             return rocisa::DataType::Float8_fnuz;
         case HIP_R_8F_E5M2_FNUZ:
             return rocisa::DataType::BFloat8_fnuz;
-#ifdef ROCM_USE_FLOAT8
         case HIP_R_8F_E4M3:
             return rocisa::DataType::Float8;
         case HIP_R_8F_E5M2:
             return rocisa::DataType::BFloat8;
-#endif
         case HIP_R_8I:
             return rocisa::DataType::Int8;
         case HIP_R_32I:
@@ -423,12 +419,10 @@ namespace
             return HIP_R_8F_E4M3_FNUZ;
         case rocisa::DataType::BFloat8_fnuz:
             return HIP_R_8F_E5M2_FNUZ;
-#ifdef ROCM_USE_FLOAT8
         case rocisa::DataType::Float8:
             return HIP_R_8F_E4M3;
         case rocisa::DataType::BFloat8:
             return HIP_R_8F_E5M2;
-#endif
         case rocisa::DataType::Int8:
             return HIP_R_8I;
         case rocisa::DataType::Int32:
@@ -453,12 +447,10 @@ namespace
         case rocblaslt_compute_f32_fast_bf8_fnuz:
         case rocblaslt_compute_f32_fast_f8bf8_fnuz:
         case rocblaslt_compute_f32_fast_bf8f8_fnuz:
-#ifdef ROCM_USE_FLOAT8
         case rocblaslt_compute_f32_fast_f8:
         case rocblaslt_compute_f32_fast_bf8:
         case rocblaslt_compute_f32_fast_f8bf8:
         case rocblaslt_compute_f32_fast_bf8f8:
-#endif
             return rocisa::DataType::Float;
         case rocblaslt_compute_f64:
             return rocisa::DataType::Double;
@@ -489,7 +481,6 @@ namespace
             return rocisa::DataType::Float8BFloat8_fnuz;
         case rocblaslt_compute_f32_fast_bf8f8_fnuz:
             return rocisa::DataType::BFloat8Float8_fnuz;
-#ifdef ROCM_USE_FLOAT8
         case rocblaslt_compute_f32_fast_f8:
             return rocisa::DataType::Float8;
         case rocblaslt_compute_f32_fast_bf8:
@@ -498,7 +489,6 @@ namespace
             return rocisa::DataType::Float8BFloat8;
         case rocblaslt_compute_f32_fast_bf8f8:
             return rocisa::DataType::BFloat8Float8;
-#endif
         default:;
         }
 
@@ -511,7 +501,6 @@ namespace
             return rocisa::DataType::BFloat8Float8_fnuz;
         }
 
-#ifdef ROCM_USE_FLOAT8
         if(typeA == rocisa::DataType::Float8 && typeB == rocisa::DataType::BFloat8)
         {
             return rocisa::DataType::Float8BFloat8;
@@ -520,7 +509,6 @@ namespace
         {
             return rocisa::DataType::BFloat8Float8;
         }
-#endif
 
         return TensileLite::DataTypeInfo::Get(typeA).elementSize
                        <= TensileLite::DataTypeInfo::Get(typeB).elementSize
@@ -715,7 +703,7 @@ namespace
                 : "",
             problem.tensor(TensileLite::ContractionProblemGemm::TENSOR::E).strides().size()
                 ? std::to_string(
-                      problem.tensor(TensileLite::ContractionProblemGemm::TENSOR::E).strides()[1])
+                    problem.tensor(TensileLite::ContractionProblemGemm::TENSOR::E).strides()[1])
                 : "",
             "--stride_a",
             problem.a().strides()[2],
@@ -730,7 +718,7 @@ namespace
                 : "",
             problem.tensor(TensileLite::ContractionProblemGemm::TENSOR::E).strides().size()
                 ? std::to_string(
-                      problem.tensor(TensileLite::ContractionProblemGemm::TENSOR::E).strides()[2])
+                    problem.tensor(TensileLite::ContractionProblemGemm::TENSOR::E).strides()[2])
                 : "",
             "--alpha",
             ToString(inputs.alpha),
@@ -767,7 +755,8 @@ namespace
             "--bias_type",
             hipDataType_to_bench_string(tensile2HipType(problem.bias().dataType())),
             problem.useE() ? "--aux_type" : "",
-            problem.useE() ? hipDataType_to_bench_string(tensile2HipType(problem.e().dataType())) : "",
+            problem.useE() ? hipDataType_to_bench_string(tensile2HipType(problem.e().dataType()))
+                           : "",
             problem.getParams().gsu() ? "--splitk" : "",
             problem.getParams().gsu() ? std::to_string(problem.getParams().gsu()) : "",
             problem.getParams().wgm() ? "--wgm" : "",
@@ -1077,7 +1066,9 @@ namespace
             "--bias_type",
             hipDataType_to_bench_string(tensile2HipType(problem.gemms[0].bias().dataType())),
             problem.gemms[0].useE() ? "--aux_type" : "",
-            problem.gemms[0].useE() ? hipDataType_to_bench_string(tensile2HipType(problem.gemms[0].e().dataType())) : "",
+            problem.gemms[0].useE()
+                ? hipDataType_to_bench_string(tensile2HipType(problem.gemms[0].e().dataType()))
+                : "",
             problem.gemms[0].getParams().gsu() ? "--splitk" : "",
             problem.gemms[0].getParams().gsu() ? std::to_string(problem.gemms[0].getParams().gsu())
                                                : "",
@@ -1644,6 +1635,8 @@ namespace
 
         if(prob.compute_type == rocblaslt_compute_f32_fast_xf32)
             tensileProblem.setF32XdlMathOp(rocisa::DataType::XFloat32);
+        else
+            tensileProblem.setF32XdlMathOp(rocisa::DataType::Float);
 
         tensileProblem.setSwizzleTensorA(prob.swizzleA);
         tensileProblem.setSwizzleTensorB(prob.swizzleB);
@@ -1672,7 +1665,8 @@ namespace
         inputs.batchD = reinterpret_cast<void* const*>(prob.batch_D);
 
         // Set the GSU workspace
-        inputs.ws = prob.workspace;
+        inputs.ws            = prob.workspace;
+        inputs.workspaceSize = prob.workspaceSize;
 
         inputs.Synchronizer = prob.Synchronizer;
 
@@ -1883,7 +1877,7 @@ namespace
             return m_devicePropMap.at(deviceName);
         }
 #else
-        auto& get_device_property() const
+        auto&                            get_device_property() const
         {
             return m_deviceProp;
         }
@@ -1929,34 +1923,20 @@ namespace
             {
                 // Find the location of librocblaslt.so
                 // Fall back on hard-coded path if static library or not found
+                std::optional<std::filesystem::path> default_lib_path;
                 if(staticLib)
                 {
-                    path = HIPBLASLT_LIB_PATH;
+                    default_lib_path = HIPBLASLT_LIB_PATH;
                 }
-                else
+                if(auto maybe_path = rocblaslt_find_library_relative_path(
+                       /*relpath=*/std::nullopt, default_lib_path))
+                    path = std::move(*maybe_path);
+                // Optionally, look for a `processor` sub-directory under the library path.
                 {
-                    auto hipblaslt_so_path
-                        = std::filesystem::path(rocblaslt_internal_get_so_path());
-                    path = hipblaslt_so_path.parent_path();
+                    auto processor_path = path / processor;
+                    if(std::filesystem::exists(processor_path))
+                        path = std::move(processor_path);
                 }
-
-                auto pathIfExists
-                    = [](std::filesystem::path p) -> std::optional<std::filesystem::path> {
-                    if(std::filesystem::exists(p))
-                        return p;
-                    return {};
-                };
-
-                // Find the location of the libraries
-                if(auto p = pathIfExists(path / ".." / "Tensile" / "library"))
-                    path = *p;
-                else if(auto p = pathIfExists(path / "library"))
-                    path = *p;
-                else
-                    path = path / "hipblaslt" / "library";
-
-                if(auto p = pathIfExists(path / processor))
-                    path = *p;
 
                 if(get_logger_layer_mode() & rocblaslt_layer_mode_log_info)
                 {
@@ -2234,7 +2214,7 @@ TensileLite::ProblemOverride
                                         problem.trans_b == HIPBLAS_OP_N ? false : true,
                                         hipDataType_to_tensile_type(problem.a_type),
                                         hipDataType_to_tensile_type(problem.b_type),
-                                        roc2TensileType(problem.compute_type),
+                                        rocComputeType_to_tensile_type(problem.compute_type),
                                         hipDataType_to_tensile_type(problem.c_type),
                                         problem.m,
                                         problem.n,
@@ -2245,17 +2225,40 @@ TensileLite::ProblemOverride
 TensileLite::ProblemOverride TensileDataGemm2ProblemOverride(std::shared_ptr<void> gemmData)
 {
     std::shared_ptr<TensileDataGemm> data = std::static_pointer_cast<TensileDataGemm>(gemmData);
+    rocisa::DataType                 computeType      = rocisa::DataType::None;
+    rocisa::DataType                 computeInputType = data->problem.computeInputType();
+
+    if(data->problem.f32XdlMathOp() == rocisa::DataType::XFloat32)
+    {
+        computeType = rocisa::DataType::XFloat32;
+    }
+    else if(computeInputType == rocisa::DataType::BFloat16
+            || computeInputType == rocisa::DataType::Half)
+    {
+        computeType = computeInputType;
+    }
+    else
+    {
+        computeType = data->problem.computeType();
+    }
 
     return TensileLite::ProblemOverride(data->problem.transA(),
                                         data->problem.transB(),
                                         data->problem.a().dataType(),
                                         data->problem.b().dataType(),
-                                        data->problem.computeInputType(),
+                                        computeType,
                                         data->problem.c().dataType(),
                                         data->problem.freeSizeA(0),
                                         data->problem.freeSizeB(0),
                                         data->problem.boundSize(0),
                                         data->problem.batchSize(0));
+}
+
+TensileLite::ContractionProblemGemm* ExtractProblemGemm(std::shared_ptr<void> gemmData)
+{
+    std::shared_ptr<TensileDataGemm> data = std::static_pointer_cast<TensileDataGemm>(gemmData);
+
+    return &data->problem;
 }
 
 void initTensileGemmData(rocblaslt_handle       handle,
@@ -2321,7 +2324,7 @@ void initTensileGemmData(rocblaslt_handle       handle,
     throw std::runtime_error("Gemm problem type initialization not implemented.");
 }
 
-#ifdef USE_ROCROLLER
+#ifdef HIPBLASLT_USE_ROCROLLER
 bool useRocRoller(rocblaslt_handle handle, const RocblasltContractionProblem& prob)
 {
     return handle->useRocRoller == 1
@@ -2343,7 +2346,7 @@ rocblaslt_status runContractionProblem(rocblaslt_handle                   handle
     rocblaslt_status status = rocblaslt_status_internal_error;
     try
     {
-#ifdef USE_ROCROLLER
+#ifdef HIPBLASLT_USE_ROCROLLER
         if(useRocRoller(handle, prob))
             return runRocRollerContractionProblem(handle, algo, prob);
 #endif
@@ -2473,6 +2476,21 @@ rocblaslt_status runContractionProblem(rocblaslt_handle                   handle
         }
         else
         {
+            // cu-fallback detection
+            bool isCUFallback = solution->isFallbackForHW(*hardware);
+            if(isCUFallback)
+            {
+                if(get_logger_layer_mode() & rocblaslt_layer_mode_log_info)
+                {
+                    std::ostringstream msg;
+                    msg << "The solution is a cu-fallback for current HW. Use XCC=1 kernelArg."
+                        << std::endl;
+                    log_info(__func__, msg.str());
+                }
+            }
+            // set XCC=1 to param when this is a fallback solution
+            data->problem.setParams().setWGMXCC((isCUFallback ? 1 : 0));
+
             auto kernels = solution->solve(data->problem, GetTensileInputs(prob), *hardware);
             // Remove this after supports getting comgr buffers from hip.
             bool isPreloaded = false;
@@ -2736,6 +2754,21 @@ rocblaslt_status makeArgument(rocblaslt_handle             handle,
                 data->problem.setParams().resetInternalArgs();
             }
 
+            // cu-fallback detection
+            bool isCUFallback = solution->isFallbackForHW(*hardware);
+            if(isCUFallback)
+            {
+                if(get_logger_layer_mode() & rocblaslt_layer_mode_log_info)
+                {
+                    std::ostringstream msg;
+                    msg << "The solution is a cu-fallback for current HW. Use XCC=1 kernelArg."
+                        << std::endl;
+                    log_info(__func__, msg.str());
+                }
+            }
+            // set XCC=1 to param when this is a fallback solution
+            data->problem.setParams().setWGMXCC((isCUFallback ? 1 : 0));
+
             data->inputs.ws = workspace;
 
             data->kernels = solution->solve(data->problem, data->inputs, *hardware);
@@ -2772,6 +2805,25 @@ rocblaslt_status makeArgument(rocblaslt_handle             handle,
                 {
                     data->problem.gemms[i].setParams().resetInternalArgs();
                 }
+            }
+
+            // cu-fallback detection
+            bool isCUFallback = solution->isFallbackForHW(*hardware);
+            if(isCUFallback)
+            {
+                if(get_logger_layer_mode() & rocblaslt_layer_mode_log_info)
+                {
+                    std::ostringstream msg;
+                    msg << "The solution is a cu-fallback for current HW. Use XCC=1 kernelArg."
+                        << std::endl;
+                    log_info(__func__, msg.str()); // set xcc to 1 in the for-loop below
+                }
+            }
+            uint16_t xcc_param = isCUFallback ? 1 : 0;
+            for(size_t i = 0; i < data->problem.gemms.size(); i++)
+            {
+                // set XCC=1 to param when this is a fallback solution
+                data->problem.gemms[i].setParams().setWGMXCC(xcc_param);
             }
 
             for(int i = 0; i < data->inputs.grouped.size(); i++)
@@ -3231,7 +3283,7 @@ rocblaslt_status getBestSolutions(RocblasltContractionProblem const& prob,
                                   int*                               returnAlgoCount,
                                   size_t                             maxWorkSpaceBytes)
 {
-#ifdef USE_ROCROLLER
+#ifdef HIPBLASLT_USE_ROCROLLER
     if(useRocRoller(handle, prob))
         return getRocRollerBestSolutions(
             handle, prob, requestedAlgoCount, heuristicResultsArray, returnAlgoCount);
@@ -3373,7 +3425,7 @@ rocblaslt_status getAllSolutions(RocblasltContractionProblem&                   
                                  std::vector<rocblaslt_matmul_heuristic_result>& heuristicResults,
                                  size_t                                          maxWorkSpaceBytes)
 {
-#ifdef USE_ROCROLLER
+#ifdef HIPBLASLT_USE_ROCROLLER
     if(useRocRoller(handle, prob))
         return getAllSolutionsRocRoller(prob, handle, heuristicResults, maxWorkSpaceBytes);
 #endif
@@ -3451,7 +3503,7 @@ rocblaslt_status
     int  i                 = 0;
     for(auto index : solutionIndex)
     {
-#ifdef USE_ROCROLLER
+#ifdef HIPBLASLT_USE_ROCROLLER
         if(index < 0)
         {
             isOutOfBound = false;
@@ -3532,6 +3584,22 @@ rocblaslt_status isSolutionSupported(rocblaslt_handle       handle,
             tensile_prob.setParams().resetInternalArgs();
         }
 
+        // cu-fallback detection
+        bool isCUFallback = solution->isFallbackForHW(*hardware);
+        if(isCUFallback)
+        {
+            if(get_logger_layer_mode() & rocblaslt_layer_mode_log_info)
+            {
+                std::ostringstream msg;
+                msg << "The solution is a cu-fallback for current HW. Use XCC=1 for predicate."
+                    << std::endl;
+                log_info(__func__, msg.str());
+            }
+        }
+        // set this flag for SW predicate
+        tensile_prob.setParams().setFallbackStatus(isCUFallback);
+
+        TensileLite::Task task(*hardware, tensile_prob, *solution);
         tensile_prob.setWorkspaceSize(algo->max_workspace_bytes);
         if(!(*solution->hardwarePredicate)(*hardware))
         {
@@ -3553,6 +3621,20 @@ rocblaslt_status isSolutionSupported(rocblaslt_handle       handle,
                 std::ostringstream msg;
                 msg << "Software match: " << solution->description();
                 solution->problemPredicate->debugEval(tensile_prob, msg);
+                msg << std::endl;
+                log_info(__func__, msg.str());
+            }
+
+            log_error(__func__, "Solution is not supported");
+            return rocblaslt_status_invalid_value;
+        }
+        if(!(*solution->taskPredicate)(task))
+        {
+            if(get_logger_layer_mode() & rocblaslt_layer_mode_log_info)
+            {
+                std::ostringstream msg;
+                msg << "Software match: " << solution->description();
+                solution->taskPredicate->debugEval(task, msg);
                 msg << std::endl;
                 log_info(__func__, msg.str());
             }
@@ -3597,12 +3679,26 @@ rocblaslt_status isSolutionSupported(rocblaslt_handle       handle,
 
         bool isSupported  = true;
         bool isNormalGemm = true;
+        // cu-fallback detection
+        bool isCUFallback = solution->isFallbackForHW(*hardware);
+        if(isCUFallback)
+        {
+            if(get_logger_layer_mode() & rocblaslt_layer_mode_log_info)
+            {
+                std::ostringstream msg;
+                msg << "The solution is a cu-fallback for current HW. Use XCC=1 for predicate."
+                    << std::endl;
+                log_info(__func__, msg.str()); // will set status in the for-loop below
+            }
+        }
         auto problemWs = solution->requiredWorkspaceSizeGroupedGemm(tensile_prob.gemms, *hardware);
         for(int i = 0; i < tensile_prob.gemms.size(); i++)
         {
             tensile_prob.gemms[i].setWorkspaceSize(algo->max_workspace_bytes);
             tensile_prob.gemms[i].setWorkspaceSizeGroupedGemm(problemWs);
             tensile_prob.gemms[i].setGroupedGemmCount(tensile_prob.gemms.size());
+            // set this flag for SW predicate
+            tensile_prob.gemms[i].setParams().setFallbackStatus(isCUFallback);
         }
         for(int i = 0; i < tensile_prob.gemms.size(); i++)
         {
@@ -3637,7 +3733,7 @@ rocblaslt_status isSolutionSupported(rocblaslt_handle             handle,
                                      rocblaslt_matmul_algo*       algo,
                                      size_t*                      workspaceSizeInBytes)
 {
-#ifdef USE_ROCROLLER
+#ifdef HIPBLASLT_USE_ROCROLLER
     if(useRocRoller(handle, prob))
         return isRocRollerSolutionSupported(handle, prob, algo, workspaceSizeInBytes);
 #endif
@@ -3974,5 +4070,4 @@ std::atomic_bool& rocblaslt_internal_tensile_is_initialized()
                                                           const Tuning*                 tuning,                \
                                                           size_t&                       workspaceSizeInBytes);
 // clang-format on
-CREATECOMPATIBILITYFUNCTION(rocblaslt::RocTuning)
 CREATECOMPATIBILITYFUNCTION(rocblaslt::RocTuningV2)

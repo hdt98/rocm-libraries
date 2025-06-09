@@ -58,6 +58,7 @@ namespace TensileLite
 
                 iot::mapRequired(io, "hardwarePredicate", s.hardwarePredicate);
                 iot::mapRequired(io, "problemPredicate", s.problemPredicate);
+                iot::mapRequired(io, "taskPredicate", s.taskPredicate);
 
                 iot::mapRequired(io, "debugKernel", s.debugKernel);
                 iot::mapOptional(io, "libraryLogicIndex", s.libraryLogicIndex);
@@ -124,6 +125,7 @@ namespace TensileLite
                 iot::mapRequired(io, "CUOccupancy", s.CUOccupancy);
                 iot::mapRequired(io, "PrefetchGlobalRead", s.PrefetchGlobalRead);
                 iot::mapRequired(io, "MathClocksUnrolledLoop", s.MathClocksUnrolledLoop);
+                iot::mapRequired(io, "synchronizerSizePerWG", s.synchronizerSizePerWG);
             }
 
             const static bool flow = false;

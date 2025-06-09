@@ -45,7 +45,7 @@ target_include_directories( hipblaslt-bench
 
 target_link_libraries( hipblaslt-bench PRIVATE ${BLAS_LIBRARY} roc::hipblaslt )
 
-if( USE_ROCROLLER )
+if( HIPBLASLT_USE_ROCROLLER )
     set_source_files_properties(${mxDataGen_SRC} PROPERTIES LANGUAGE CXX COMPILE_OPTIONS "-std=c++20")
 endif()
 
@@ -98,6 +98,8 @@ target_link_libraries( hipblaslt-bench PRIVATE ${COMMON_LINK_LIBS} )
 
 set_target_properties( hipblaslt-bench PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/staging"
+  BUILD_RPATH "${HIP_CLANG_ROOT}/lib"
+  INSTALL_RPATH "$ORIGIN/../llvm/lib"
 )
 
 add_dependencies( hipblaslt-bench hipblaslt-common )

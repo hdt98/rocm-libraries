@@ -33,6 +33,13 @@ void init_enum(nb::module_ m)
 {
     auto m_enum = m.def_submodule("enum", "rocIsa enum submodule.");
 
+    nb::enum_<rocisa::RegisterType>(m_enum, "RegisterType")
+        .value("Vgpr", rocisa::RegisterType::Vgpr)
+        .value("Sgpr", rocisa::RegisterType::Sgpr)
+        .value("Accvgpr", rocisa::RegisterType::Accvgpr)
+        .value("mgpr", rocisa::RegisterType::mgpr)
+        .export_values();
+
     // For Python only, Python already has a class named DataType
     nb::enum_<rocisa::DataType>(m_enum, "DataTypeEnum")
         .value("Float", rocisa::DataType::Float)
@@ -141,5 +148,12 @@ void init_enum(nb::module_ m)
     nb::enum_<rocisa::RoundType>(m_enum, "RoundType")
         .value("ROUND_UP", rocisa::RoundType::ROUND_UP)
         .value("ROUND_TO_NEAREST_EVEN", rocisa::RoundType::ROUND_TO_NEAREST_EVEN)
+        .export_values();
+
+    nb::enum_<rocisa::SaturateCastType>(m_enum, "SaturateCastType")
+        .value("NORMAL", rocisa::SaturateCastType::NORMAL)
+        .value("DO_NOTHING", rocisa::SaturateCastType::DO_NOTHING)
+        .value("UPPER", rocisa::SaturateCastType::UPPER)
+        .value("LOWER", rocisa::SaturateCastType::LOWER)
         .export_values();
 }

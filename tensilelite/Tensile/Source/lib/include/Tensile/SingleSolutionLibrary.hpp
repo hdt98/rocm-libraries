@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright (C) 2022-2023 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2022-2025 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -92,18 +92,20 @@ namespace TensileLite
 
             if(solution)
             {
+                Task task(hardware, problem, *(solution));
                 if(debug)
                 {
-                    std::cout << "hardwarePredicate:" << std::endl;
                     solution->hardwarePredicate->debugEval(hardware, std::cout);
                     std::cout << std::endl;
-                    std::cout << "problemPredicate:" << std::endl;
                     solution->problemPredicate->debugEval(problem, std::cout);
+                    std::cout << std::endl;
+                    solution->taskPredicate->debugEval(task, std::cout);
                     std::cout << std::endl;
                 }
 
                 if((*solution->hardwarePredicate)(hardware)
-                   && (*solution->problemPredicate)(problem))
+                   && softwarePredicate(
+                       SolutionLibrarySearchType::DEFAULT, task, hardware, (*solution), problem))
                     return solution;
             }
             else if(debug)
@@ -129,7 +131,9 @@ namespace TensileLite
                     for(int idx = 0; idx < problems.size(); idx++)
                     {
                         auto problem = problems[idx];
+                        Task task(hardware, problem, *(solution));
                         solution->problemPredicate->debugEval(problem, std::cout);
+                        solution->taskPredicate->debugEval(task, std::cout);
                     }
                 }
 
@@ -141,16 +145,17 @@ namespace TensileLite
                 for(int idx = 0; idx < problems.size(); idx++)
                 {
                     auto problem = problems[idx];
+                    Task task(hardware, problem, *(solution));
                     problem.setWorkspaceSizeGroupedGemm(ws);
                     problem.setGroupedGemmCount(problems.size());
-                    if(!(*solution->problemPredicate)(problem))
+                    if(!(*solution->problemPredicate)(problem) || !(*solution->taskPredicate)(task))
                         return std::shared_ptr<MySolution>();
                 }
 
                 if(solution->requiredHostWorkspaceSizePerProblem == static_cast<size_t>(-1))
                 {
                     solution->requiredHostWorkspaceSizePerProblem
-                        = solution->requiredHostSizeGroupedGemmSingle(problems[0],hardware);
+                        = solution->requiredHostSizeGroupedGemmSingle(problems[0], hardware);
                 }
 
                 return solution;
@@ -174,15 +179,19 @@ namespace TensileLite
             bool useSolution = false;
             if(solution)
             {
+                Task task(hardware, problem, (*solution));
                 if(debug)
                 {
                     solution->hardwarePredicate->debugEval(hardware, std::cout);
                     if(searchType == SolutionLibrarySearchType::DEFAULT)
+                    {
                         solution->problemPredicate->debugEval(problem, std::cout);
+                        solution->taskPredicate->debugEval(task, std::cout);
+                    }
                 }
 
                 if((*solution->hardwarePredicate)(hardware)
-                   && softwarePredicate(searchType, (*solution), problem))
+                   && softwarePredicate(searchType, task, hardware, (*solution), problem))
                     useSolution = true;
             }
             else if(debug)
@@ -225,9 +234,11 @@ namespace TensileLite
                     for(int idx = 0; idx < problems.size(); idx++)
                     {
                         auto problem = problems[idx];
+                        Task task(hardware, problem, (*solution));
                         problem.setWorkspaceSizeGroupedGemm(ws);
                         problem.setGroupedGemmCount(problems.size());
-                        if(!(*solution->problemPredicate)(problem))
+                        if(!(*solution->problemPredicate)(problem)
+                           || !(*solution->taskPredicate)(task))
                             useSolution = false;
                     }
                 }
@@ -244,7 +255,9 @@ namespace TensileLite
                         for(int idx = 0; idx < problems.size(); idx++)
                         {
                             auto problem = problems[idx];
+                            Task task(hardware, problem, (*solution));
                             solution->problemPredicate->debugEval(problem, std::cout);
+                            solution->taskPredicate->debugEval(task, std::cout);
                         }
                 }
             }
@@ -266,7 +279,7 @@ namespace TensileLite
                 if(solution->requiredHostWorkspaceSizePerProblem == static_cast<size_t>(-1))
                 {
                     solution->requiredHostWorkspaceSizePerProblem
-                        = solution->requiredHostSizeGroupedGemmSingle(problems[0],hardware);
+                        = solution->requiredHostSizeGroupedGemmSingle(problems[0], hardware);
                 }
                 return SolutionSet<MySolution>({solution});
             }

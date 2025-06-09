@@ -39,16 +39,13 @@ Full build of |project_name|
 
       cd |project_name|/next-cmake
       # configure
-      CC=/opt/rocm/bin/amdclang++          \
-      CXX=/opt/rocm/bin/amdclang++         \
-      cmake -B build                       \
-            -S .                           \
-            -D CMAKE_BUILD_TYPE=Release    \
-            -D CMAKE_PREFIX_PATH=/opt/rocm \
-            -D GPU_TARGETS=gfx950          \
-            -D HIPBLASLT_ENABLE_DEVICE=ON  \
-            -D HIPBLASLT_ENABLE_HOST=OFF   \
-            -D HIPBLASLT_ENABLE_CLIENT=OFF 
+      cmake -B build                                       \
+            -S .                                           \
+            -D CMAKE_CXX_COMPILER=/opt/rocm/bin/amdclang++ \
+            -D CMAKE_C_COMPILER=/opt/rocm/bin/amdclang     \
+            -D CMAKE_BUILD_TYPE=Release                    \
+            -D CMAKE_PREFIX_PATH=/opt/rocm                 \
+            -D GPU_TARGETS=gfx950
       # build
       cmake --build build --parallel 32
 
@@ -60,13 +57,13 @@ Building device libraries
 
       cd |project_name|/next-cmake
       # configure
-      CC=/opt/rocm/bin/amdclang++          \
-      CXX=/opt/rocm/bin/amdclang++         \
-      cmake -B build                       \
-            -S .                           \
-            -D CMAKE_BUILD_TYPE=Release    \
-            -D CMAKE_PREFIX_PATH=/opt/rocm \
-            -D GPU_TARGETS=gfx950          \
+      cmake -B build                                       \
+            -S .                                           \
+            -D CMAKE_CXX_COMPILER=/opt/rocm/bin/amdclang++ \
+            -D CMAKE_C_COMPILER=/opt/rocm/bin/amdclang     \
+            -D CMAKE_BUILD_TYPE=Release                    \
+            -D CMAKE_PREFIX_PATH=/opt/rocm                 \
+            -D GPU_TARGETS=gfx950
             -D HIPBLASLT_ENABLE_DEVICE=ON  \
             -D HIPBLASLT_ENABLE_HOST=OFF   \
             -D HIPBLASLT_ENABLE_CLIENT=OFF 
@@ -101,14 +98,15 @@ Options
 * `HIPBLASLT_ENABLE_BLIS`: Enable BLIS support (default `ON`)
 * `HIPBLASLT_ENABLE_HIP`: Use the HIP runtime (default `ON`)
 * `HIPBLASLT_ENABLE_LLVM`: Use msgpack for parsing configuration files (default `OFF`)
-* `HIBLASLT_ENABLE_MSGPACK`` Use msgpack for parsing configuration files (default `ON`)
+* `HIPBLASLT_ENABLE_MSGPACK`` Use msgpack for parsing configuration files (default `ON`)
 * `HIPBLASLT_ENABLE_OPENMP`: "Use OpenMP to improve performance (default `ON`)
 * `HIPBLASLT_ENABLE_ROCROLLER:` Use RocRoller library (default `OFF`)
 
 *Device libraries options:*
 
-* `HIPBLASLT_DEVICE_JOBS:` Allow N jobs generating device code libraries (default empty, use nproc jobs)
-* `HIPBLASLT_DEVICE_KEEP_TMP:` Keep temporary build files (default `OFF`)
+* `HIPBLASLT_DEVICE_JOBS:` Allow N jobs generating device code libraries (default empty, uses nproc jobs)
+* `HIPBLASLT_KEEP_TMP:` Keep temporary build files (default `OFF`)
+* `HIPBLASLT_LIBLOGIC_PATH:` Custom path to library logic files (default empty, uses path to 'library')
 
 *Client options:*
 

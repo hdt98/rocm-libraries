@@ -1,6 +1,6 @@
 ################################################################################
 #
-# Copyright (C) 2022-2024 Advanced Micro Devices, Inc. All rights reserved.
+# Copyright (C) 2022-2025 Advanced Micro Devices, Inc. All rights reserved.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -25,7 +25,7 @@
 from copy import deepcopy
 
 from Tensile.Common import INDEX_CHARS
-from .TensileInstructions import DataType
+from Tensile.Common.DataType import DataType
 from .KernelWriterBase import KernelWriterBase
 
 class KernelWriterBetaOnly(KernelWriterBase):
@@ -56,10 +56,10 @@ class KernelWriterBetaOnly(KernelWriterBase):
     self.f8MacroGuardStart = "";
     self.f8MacroGuardEnd   = "";
     if (self.state["ProblemType"]["DestDataType"].isFloat8() or self.state["ProblemType"]["DestDataType"].isBFloat8()):
-      self.f8MacroGuardStart = "\n#if TENSILELITE_FP8_TYPE_OCP\n"
+      self.f8MacroGuardStart = "\n#if HIP_FP8_TYPE_OCP\n"
       self.f8MacroGuardEnd   = "\n#endif // F8 macro guard\n"
     if (self.state["ProblemType"]["DestDataType"].isFloat8_fnuz() or self.state["ProblemType"]["DestDataType"].isBFloat8_fnuz()):
-      self.f8MacroGuardStart = "\n#if TENSILELITE_FP8_TYPE_FNUZ\n"
+      self.f8MacroGuardStart = "\n#if HIP_FP8_TYPE_FNUZ\n"
       self.f8MacroGuardEnd   = "\n#endif // F8 macro guard\n"
 
 

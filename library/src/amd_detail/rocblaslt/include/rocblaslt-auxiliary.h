@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright (C) 2022-2024 Advanced Micro Devices, Inc.
+ * Copyright (C) 2022-2025 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -33,6 +33,8 @@
 #define _ROCBLASLT_AUXILIARY_H_
 
 #include "rocblaslt-types.h"
+#include <filesystem>
+#include <optional>
 #include <stdint.h>
 #include <vector>
 
@@ -373,25 +375,18 @@ rocblaslt_status rocblaslt_matmul_get_algos_from_index_cpp(
     std::vector<int>&                               solutionIndex,
     std::vector<rocblaslt_matmul_heuristic_result>& heuristicResults);
 
-rocblaslt_status rocblaslt_is_algo_supported_cpp(rocblaslt_handle            handle,
-                                                 rocblaslt::RocGemmType      gemmType,
-                                                 std::shared_ptr<void>       gemmData,
-                                                 rocblaslt_matmul_algo&      algo,
-                                                 const rocblaslt::RocTuning* tuning,
-                                                 size_t&                     workspaceSizeInBytes);
-
 rocblaslt_status rocblaslt_is_algo_supported_cpp(rocblaslt_handle              handle,
                                                  rocblaslt::RocGemmType        gemmType,
                                                  std::shared_ptr<void>         gemmData,
                                                  rocblaslt_matmul_algo&        algo,
                                                  const rocblaslt::RocTuningV2* tuning,
-                                                 size_t&                       workspaceSizeInBytes);
+                                                 size_t& workspaceSizeInBytes);
 
 rocblaslt_status
     rocblaslt_algo_get_heuristic_cpp(rocblaslt_handle       handle,
                                      rocblaslt::RocGemmType gemmType,
                                      std::shared_ptr<void>  gemmData,
-                                     const int              workspaceBytes,
+                                     const size_t           maxWorkspaceBytes,
                                      const int              requestedAlgoCount,
                                      std::vector<rocblaslt_matmul_heuristic_result>& results);
 
@@ -405,6 +400,21 @@ bool rocblaslt_internal_test_path(const std::string&);
 
 // Gets the absolute path of the so/dll/exe containing this function.
 std::string rocblaslt_internal_get_so_path();
+
+// Finds a path relative to the hipblaslt "library" directory, and returns the full path
+// if it exists.
+// Without `default_lib_dir` specified, this will first attempt to locate a plausible
+// library directory relative to the hosting shared library. On Windows, this will
+// search the containing "bin" directory and its sibling "lib" directory. Searching
+// the "bin" directory is for backwards compatibility with the original Windows
+// build system and should be considered deprecated in favor of the standard Posix
+// layout.
+// If `default_lib_dir` is given, then no shared library relative search heuristic
+// is used and the given directory is taken verbatim.
+std::optional<std::filesystem::path>
+    rocblaslt_find_library_relative_path(const std::optional<std::filesystem::path>& relpath,
+                                         const std::optional<std::filesystem::path>& default_lib_dir
+                                         = std::nullopt);
 
 void rocblaslt_log_error(const char* func, const char* var, const char* msg);
 #endif

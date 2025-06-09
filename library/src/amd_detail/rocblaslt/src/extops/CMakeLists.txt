@@ -33,7 +33,19 @@ list(REMOVE_DUPLICATES archs)
 
 set(python_venv_executable "${VIRTUALENV_BIN_DIR}/${VIRTUALENV_PYTHON_EXENAME}")
 set(python_launch_prefix "PYTHONPATH=${PROJECT_BINARY_DIR}/lib" "${python_venv_executable}")
-set(dat_deps "")
+set(dat_depends "")
+
+if($ENV{ENABLE_ADDRESS_SANITIZER})
+    # Must populate LD_PRELOAD with ASAN runtime if ASAN is being used.
+    # Find the ASAN RT with compiler and update env for Tensile call.
+    execute_process(
+        COMMAND ${CMAKE_CXX_COMPILER} --print-file-name=libclang_rt.asan-x86_64.so
+        OUTPUT_VARIABLE ASAN_LIB_PATH
+        COMMAND_ECHO STDOUT)
+    string(STRIP ${ASAN_LIB_PATH} ASAN_LIB_PATH)
+    set(python_launch_prefix "LD_PRELOAD=${ASAN_LIB_PATH}" "${python_launch_prefix}")
+endif()
+
 foreach(arch IN LISTS archs)
     add_library(ExtOpObj_${arch} OBJECT)
     add_dependencies(ExtOpObj_${arch} rocisa)
@@ -56,7 +68,7 @@ foreach(arch IN LISTS archs)
             ${CMAKE_CURRENT_BINARY_DIR}/A_S_H_256_4_${arch}.s
     )
     add_custom_command(
-        OUTPUT 
+        OUTPUT
             ${CMAKE_CURRENT_BINARY_DIR}/L_256_4_1_${arch}.s
             ${CMAKE_CURRENT_BINARY_DIR}/L_256_4_0_${arch}.s
             ${CMAKE_CURRENT_BINARY_DIR}/S_8_32_${arch}.s
@@ -82,50 +94,6 @@ foreach(arch IN LISTS archs)
         COMMENT "Creating Layer Norm, Softmax and Amax Assembly for ${arch}"
         WORKING_DIRECTORY ${ops_path}
     )
-    if(arch STREQUAL "gfx942")
-        add_custom_command(
-            OUTPUT
-                ${CMAKE_CURRENT_BINARY_DIR}/A_S_S_F8N_256_4_${arch}.s
-                ${CMAKE_CURRENT_BINARY_DIR}/A_S_S_B8N_256_4_${arch}.s
-                ${CMAKE_CURRENT_BINARY_DIR}/A_S_H_F8N_256_4_${arch}.s
-                ${CMAKE_CURRENT_BINARY_DIR}/A_S_H_B8N_256_4_${arch}.s
-            COMMAND ${python_launch_prefix} AMaxGenerator.py --is-scale -o ${CMAKE_CURRENT_BINARY_DIR}/A_S_S_F8N_256_4_${arch}.s -t S -d S -s F8N -w 256 -c 4 --arch ${arch}
-            COMMAND ${python_launch_prefix} AMaxGenerator.py --is-scale -o ${CMAKE_CURRENT_BINARY_DIR}/A_S_S_B8N_256_4_${arch}.s -t S -d S -s B8N -w 256 -c 4 --arch ${arch}
-            COMMAND ${python_launch_prefix} AMaxGenerator.py --is-scale -o ${CMAKE_CURRENT_BINARY_DIR}/A_S_H_F8N_256_4_${arch}.s -t S -d H -s F8N -w 256 -c 4 --arch ${arch}
-            COMMAND ${python_launch_prefix} AMaxGenerator.py --is-scale -o ${CMAKE_CURRENT_BINARY_DIR}/A_S_H_B8N_256_4_${arch}.s -t S -d H -s B8N -w 256 -c 4 --arch ${arch}
-            COMMENT "Creating Extra Amax Assembly for gfx942"
-            WORKING_DIRECTORY ${ops_path}
-        )
-        target_sources(ExtOpObj_${arch}
-            PRIVATE
-            ${CMAKE_CURRENT_BINARY_DIR}/A_S_S_F8N_256_4_${arch}.s
-            ${CMAKE_CURRENT_BINARY_DIR}/A_S_S_B8N_256_4_${arch}.s
-            ${CMAKE_CURRENT_BINARY_DIR}/A_S_H_F8N_256_4_${arch}.s
-            ${CMAKE_CURRENT_BINARY_DIR}/A_S_H_B8N_256_4_${arch}.s
-        )
-    endif()
-    if(arch STREQUAL "gfx950")
-        add_custom_command(
-            OUTPUT
-                ${CMAKE_CURRENT_BINARY_DIR}/A_S_S_F8_256_4_${arch}.s
-                ${CMAKE_CURRENT_BINARY_DIR}/A_S_S_B8_256_4_${arch}.s
-                ${CMAKE_CURRENT_BINARY_DIR}/A_S_H_F8_256_4_${arch}.s
-                ${CMAKE_CURRENT_BINARY_DIR}/A_S_H_B8_256_4_${arch}.s
-            COMMAND ${python_launch_prefix} AMaxGenerator.py --is-scale -o ${CMAKE_CURRENT_BINARY_DIR}/A_S_S_F8_256_4_${arch}.s -t S -d S -s F8 -w 256 -c 4 --arch ${arch}
-            COMMAND ${python_launch_prefix} AMaxGenerator.py --is-scale -o ${CMAKE_CURRENT_BINARY_DIR}/A_S_S_B8_256_4_${arch}.s -t S -d S -s B8 -w 256 -c 4 --arch ${arch}
-            COMMAND ${python_launch_prefix} AMaxGenerator.py --is-scale -o ${CMAKE_CURRENT_BINARY_DIR}/A_S_H_F8_256_4_${arch}.s -t S -d H -s F8 -w 256 -c 4 --arch ${arch}
-            COMMAND ${python_launch_prefix} AMaxGenerator.py --is-scale -o ${CMAKE_CURRENT_BINARY_DIR}/A_S_H_B8_256_4_${arch}.s -t S -d H -s B8 -w 256 -c 4 --arch ${arch}
-            COMMENT "Creating Extra Amax Assembly for gfx950"
-            WORKING_DIRECTORY ${ops_path}
-        )
-        target_sources(ExtOpObj_${arch}
-            PRIVATE
-                ${CMAKE_CURRENT_BINARY_DIR}/A_S_S_F8_256_4_${arch}.s
-                ${CMAKE_CURRENT_BINARY_DIR}/A_S_S_B8_256_4_${arch}.s
-                ${CMAKE_CURRENT_BINARY_DIR}/A_S_H_F8_256_4_${arch}.s
-                ${CMAKE_CURRENT_BINARY_DIR}/A_S_H_B8_256_4_${arch}.s
-        )
-    endif()
     add_custom_command(
         DEPENDS ExtOpObj_${arch}
         OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/extop_${arch}.co
@@ -134,16 +102,16 @@ foreach(arch IN LISTS archs)
         COMMAND_EXPAND_LISTS
     )
     add_custom_target(ExtOpLibrary_${arch} ALL
-        DEPENDS ${dat_deps} ${CMAKE_CURRENT_BINARY_DIR}/extop_${arch}.co
+        DEPENDS ${dat_depends} ${CMAKE_CURRENT_BINARY_DIR}/extop_${arch}.co
         COMMAND ${python_launch_prefix} ExtOpCreateLibrary.py --src=${CMAKE_CURRENT_BINARY_DIR} --co=${CMAKE_CURRENT_BINARY_DIR}/extop_${arch}.co --output=${CMAKE_CURRENT_BINARY_DIR} --arch=${arch}
         COMMENT "Creating hipblasltExtOpLibrary.dat"
         WORKING_DIRECTORY ${ops_path}
     )
-    list(APPEND dat_deps "ExtOpLibrary_${arch}")
+    list(APPEND dat_depends "ExtOpLibrary_${arch}")
 endforeach()
 
 add_custom_target(ExtOpCp ALL
-    DEPENDS TENSILE_LIBRARY_TARGET
+    DEPENDS ${dat_depends} TENSILE_LIBRARY_TARGET
     COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_BINARY_DIR}/*.co" ${PROJECT_BINARY_DIR}/Tensile/library
     COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_BINARY_DIR}/*.dat" ${PROJECT_BINARY_DIR}/Tensile/library
     COMMENT "Copying ExtOp Library"

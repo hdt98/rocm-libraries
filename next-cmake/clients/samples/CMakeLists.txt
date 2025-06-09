@@ -43,6 +43,10 @@ target_include_directories(sample-helper
         $<BUILD_INTERFACE:${TEMP_CLIENTS_SOURCE_DIR}/include>
 )
 
+if(HIPBLASLT_ENABLE_ASAN)
+    hipblaslt_target_configure_sanitizers(sample-helper INTERFACE)
+endif()
+
 target_link_libraries(sample-helper
     INTERFACE
         roc::hipblaslt
@@ -82,9 +86,8 @@ add_subdirectory(20_hipblaslt_gemm_mix_precision_with_amax_ext)
 add_subdirectory(21_hipblaslt_gemm_attr_tciA_tciB)
 add_subdirectory(22_hipblaslt_ext_op_layernorm)
 add_subdirectory(23_hipblaslt_ext_op_amax)
-add_subdirectory(24_hipblaslt_ext_op_amax_with_scale)
-add_subdirectory(25_hipblaslt_gemm_with_TF32)
-add_subdirectory(26_hipblaslt_gemm_swizzle_a)
-add_subdirectory(26_hipblaslt_gemm_bias_swizzle_a_ext)
-add_subdirectory(26_hipblaslt_weight_swizzle_padding)
-add_subdirectory(27_hipblaslt_gemm_swish_bias)
+add_subdirectory(24_hipblaslt_gemm_with_TF32)
+add_subdirectory(25_hipblaslt_gemm_swizzle_a)
+add_subdirectory(25_hipblaslt_gemm_bias_swizzle_a_ext)
+add_subdirectory(25_hipblaslt_weight_swizzle_padding)
+add_subdirectory(26_hipblaslt_gemm_swish_bias)

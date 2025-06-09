@@ -255,7 +255,8 @@ validParameters = { # we need to make sure this matches develop
     # Split the unroll summation into multiple sections and combine the sections
     # GSU applies only to the unroll summation dimension
     # Set to 0 to disable GSU, kernel code will be generated without GSU support
-    "GlobalSplitU": list(range(0, 1024 + 1)),
+    # Set to -1 to choose GSU automatically in runtime, determined by function calculateAutoGSU
+    "GlobalSplitU": list(range(-1, 1024 + 1)),
     # choose how to do GlobalSplitU
     # 1: use atomic operation to accumulate on one buffer
     # 2: each GSU group write to each own buffer and accumulate by another kernel
@@ -523,6 +524,7 @@ validParameters = { # we need to make sure this matches develop
     "MaxOccupancy": list(
         range(1, 40 + 1)
     ),  # wg / CU; if cache thrashing is hurting performance, this allocates extra lds to artificially limit occupancy
+    "MaxLDS": [-1, 65536, 163840],
     "WorkGroup": makeValidWorkGroups(),  # ( wg0 x wg1 x LocalSplitU ) dimensions of the workgroup which will operate on a tile and share lds
     # ThreadTile: ( tt0 x tt1 ) dimensions of the C tile that each thread works on,
     # TT=4 and VW=4 means a thread will work on a tight 4x4 tile of C, where VW=1 means the tile will work on 16 spread out values
@@ -633,6 +635,9 @@ validParameters = { # we need to make sure this matches develop
     #   2 = Also reduce CUs used for large sizes to improve data-parallel portion and reduce power.
     #   3 = Analytically predict the best grid-size by weighing the cost of the fix-up step and the cost of processing MACs (default).
     #       Note: dynamic grid coefficients currently apply to gfx942 variants
+    #   4 = StreamK algorithm will behave as data parallel (Launch WGs = #CUs)
+    #   5 = StreamK Algorithm will use Origami's "select_best_grid_size" function
+    # TENSILE_STREAMK_DYNAMIC_WGM Enables Origami's analytical model-based WGM selection
     # TENSILE_STREAMK_MAX_CUS allows the user to manually set maximum number of CUs used, which could free up some CUs for
     #   other operations to run in parallel with gemm.
     # TENSILE_STREAMK_GRID_MULTIPLIER lets you set how many workgroups are created per CU being used.
@@ -783,7 +788,7 @@ validParameters = { # we need to make sure this matches develop
     # Intended for use with custom kernels which have confirmed to be correct
     "NoReject": [False, True],
     # Debug use only.
-    "ActivationFused": [False, True],
+    "ActivationFused": [True],
     # True-  function call
     # False- inline
     "ActivationFuncCall": [False, True],
@@ -800,7 +805,7 @@ validParameters = { # we need to make sure this matches develop
     "ForceDisableShadowInit": [False, True],
     # Enable LDS Transpose Instruction
     "LDSTrInst": [False, True],
-    # False: Use LocalSplitU. Number of WorkGroup[2] WorkItems (wave or thread) will compute the same output elements (matrix D) along different 
+    # False: Use LocalSplitU. Number of WorkGroup[2] WorkItems (wave or thread) will compute the same output elements (matrix D) along different
     #        unroll indices. The local sum from those WorkItems are reduced through LDS.
     # True:  Use WaveSplitK. Number of WorkGroup[2] threads in the same wave compute the same output elements (matrix D) along different unroll indices.
     #        The local sum from those threads are reduced through suffling using VALU instructions. Currently only support dot2 kernel.

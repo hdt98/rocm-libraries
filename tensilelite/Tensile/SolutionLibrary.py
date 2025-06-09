@@ -22,14 +22,12 @@
 #
 ################################################################################
 
-import itertools
 from typing import Dict
 
 from . import Properties
 from . import Hardware
 from . import Contractions
-from .SolutionStructs import Solution as OriginalSolution
-from Tensile.Common import state, IsaInfo, DepthUConfig
+from Tensile.Common import state, IsaInfo
 from Tensile.Common.Architectures import gfxToIsa
 from Tensile.SolutionStructs.Naming import getSolutionNameMin, getKernelNameMin
 
@@ -175,6 +173,42 @@ class FreeSizeLibrary:
     def __init__(self, table):
         self.table = table
 
+class PredictionLibrary:
+    Tag = "Prediction"
+    StateKeys = [("type", "tag"), "table"]
+
+    @classmethod
+    def FromOriginalState(cls, d, solutions):
+        origTable = d["table"]
+
+        table = []
+
+        try:
+            indexStart  = origTable[0]
+            indexOffset = origTable[1]
+            for index in range(indexStart, indexStart + indexOffset):
+                value = IndexSolutionLibrary(solutions[index])
+                table.append(value)
+        except KeyError:
+            pass
+
+        return cls(table)
+
+    @property
+    def tag(self):
+        return self.__class__.Tag
+
+    def merge(self, other):
+        assert self.__class__ == other.__class__
+
+        self.table += other.table
+
+    def remapSolutionIndices(self, indexMap):
+        pass
+
+    def __init__(self, table):
+        self.table = table
+
 class MLPClassificationLibrary:
     Tag = "MLPClassification"
     StateKeys = [("type", "tag"), "table", "mlp", "problemFeatures"]
@@ -299,7 +333,6 @@ class MasterSolutionLibrary:
                           splitGSU: bool,
                           printSolutionRejectionReason: bool,
                           printIndexAssignmentInfo: bool,
-                          depthUConfig: DepthUConfig,
                           assembler,
                           isaInfoMap: Dict[str, IsaInfo],
                           lazyLibraryLoading: bool,
@@ -383,6 +416,12 @@ class MasterSolutionLibrary:
                 freesizeLib = FreeSizeLibrary.FromOriginalState(d["Library"], solutions)
                 library = PredicateLibrary(tag="Problem")
                 library.rows.append({"predicate": predicate, "library": freesizeLib})
+            elif d["LibraryType"] == "Prediction":
+                predicate = Properties.Predicate(tag="FreeSizeMatching") # TODO Do we need a new predicate here?
+
+                predictionLib = PredictionLibrary.FromOriginalState(d["Library"], solutions)
+                library = PredicateLibrary(tag="Problem")
+                library.rows.append({"predicate": predicate, "library": predictionLib})
             elif d["LibraryType"] == "MLPClassification":
                 predicate = Properties.Predicate(tag="TruePred")
 
@@ -458,7 +497,6 @@ class MasterSolutionLibrary:
                                                         splitGSU,
                                                         printSolutionRejectionReason,
                                                         printIndexAssignmentInfo,
-                                                        depthUConfig,
                                                         assembler,
                                                         isaInfoMap,
                                                         lazyLibraryLoading,
@@ -474,7 +512,6 @@ class MasterSolutionLibrary:
                             splitGSU,
                             printSolutionRejectionReason,
                             printIndexAssignmentInfo,
-                            depthUConfig,
                             assembler,
                             isaInfoMap
                         ) for s in origSolutions]
@@ -505,7 +542,6 @@ class MasterSolutionLibrary:
         splitGSU: bool,
         printSolutionRejectionReason: bool,
         printIndexAssignmentInfo: bool,
-        depthUConfig: DepthUConfig,
         isaInfoMap
     ):
         solutionObjs = list([Contractions.Solution.FromOriginalState(
@@ -513,7 +549,6 @@ class MasterSolutionLibrary:
                                  splitGSU,
                                  printSolutionRejectionReason,
                                  printIndexAssignmentInfo,
-                                 depthUConfig,
                                  assembler,
                                  isaInfoMap)
                             for s in solutions])

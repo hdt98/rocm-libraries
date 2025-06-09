@@ -24,13 +24,12 @@
 
 from typing import Dict
 from copy import deepcopy
-from typing import List
 
 from .KernelWriterBase import KernelWriterBase
-from .TensileInstructions import DataType
 
 from Tensile.Common.Architectures import isaToGfx
 from Tensile.Common import INDEX_CHARS, IsaInfo
+from Tensile.Common.DataType import DataType
 
 class KernelWriterConversion(KernelWriterBase):
 
@@ -59,10 +58,10 @@ class KernelWriterConversion(KernelWriterBase):
     self.f8MacroGuardStart = "";
     self.f8MacroGuardEnd   = "";
     if (self.state["ProblemType"]["DestDataType"].isFloat8() or self.state["ProblemType"]["DestDataType"].isBFloat8()):
-      self.f8MacroGuardStart = "\n#if TENSILELITE_FP8_TYPE_OCP\n"
+      self.f8MacroGuardStart = "\n#if HIP_FP8_TYPE_OCP\n"
       self.f8MacroGuardEnd   = "\n#endif // F8 macro guard\n"
     if (self.state["ProblemType"]["DestDataType"].isFloat8_fnuz() or self.state["ProblemType"]["DestDataType"].isBFloat8_fnuz()):
-      self.f8MacroGuardStart = "\n#if TENSILELITE_FP8_TYPE_FNUZ\n"
+      self.f8MacroGuardStart = "\n#if HIP_FP8_TYPE_FNUZ\n"
       self.f8MacroGuardEnd   = "\n#endif // F8 macro guard\n"
 
     # derive parameter
@@ -526,7 +525,7 @@ class KernelWriterConversion(KernelWriterBase):
             kStr += "  float2 accumVec2(accum[2], accum[3]);" + self.endLine
       canPKF32Arch = []
       for isa in self.isaInfoMap.keys():
-        if self.isaInfoMap[isa].asmCaps['v_pk_add_f32']: 
+        if self.isaInfoMap[isa].asmCaps['v_pk_add_f32']:
           canPKF32Arch.append(isa)
       defineStr = []
       if len(canPKF32Arch) > 0:
@@ -948,7 +947,7 @@ class KernelWriterConversion(KernelWriterBase):
         kStr += defineStr + self.endLine
         kStr += space + "    \"v_pk_add_f32 %0, %2, %0 \\n\\t\"" + self.endLine
         kStr += space + "    \"v_pk_add_f32 %1, %3, %1 \\n\\t\"" + self.endLine
-        kStr += space + "    : \"+v\"(accumVec), \"+v\"(accumVec2): \"v\"(%stemp[%d].data.xy), \"v\"(%stemp[%d].data.zw)"% (castToIntermidate, gsuIdx, castToIntermidate, gsuIdx) + self.endLine
+        kStr += space + "    : \"+v\"(accumVec), \"+v\"(accumVec2): \"v\"(%smake_float2(temp[%d].x,temp[%d].y)), \"v\"(%smake_float2(temp[%d].data.z,temp[%d].data.w))"% (castToIntermidate, gsuIdx, gsuIdx, castToIntermidate, gsuIdx, gsuIdx) + self.endLine
         kStr += "#else" + self.endLine
         kStr += space + "    \"v_add_f32 %0, %4, %0 \\n\\t\"" + self.endLine
         kStr += space + "    \"v_add_f32 %1, %5, %1 \\n\\t\"" + self.endLine

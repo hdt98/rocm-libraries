@@ -39,7 +39,7 @@ add_executable( hipblaslt-test ${hipblaslt_test_source} ${hipblaslt_test_bench_c
 
 target_compile_definitions( hipblaslt-test PRIVATE GOOGLE_TEST )
 
-if( USE_ROCROLLER )
+if( HIPBLASLT_USE_ROCROLLER )
    set_source_files_properties(${mxDataGen_SRC} PROPERTIES LANGUAGE CXX COMPILE_OPTIONS "-std=c++20")
 endif()
 
@@ -120,6 +120,8 @@ set_target_properties( hipblaslt-test PROPERTIES
   IMPORT_SUFFIX ".lib"
   LINKER_LANGUAGE CXX
   RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/staging"
+  BUILD_RPATH "${HIP_CLANG_ROOT}/lib"
+  INSTALL_RPATH "$ORIGIN/../llvm/lib"
 )
 
 set( HIPBLASLT_TEST_DATA "${PROJECT_BINARY_DIR}/staging/hipblaslt_gtest.data")

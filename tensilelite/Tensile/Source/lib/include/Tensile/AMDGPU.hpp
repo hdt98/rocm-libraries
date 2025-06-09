@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright (C) 2022-2023 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2022-2025 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -227,12 +227,15 @@ namespace TensileLite
         int         simdPerCu        = 4;
         int         computeUnitCount = 0;
         int         skDynamicGrid    = 3;
+        int         skDynamicWGM     = 0;
         int         skMaxCUs         = 0;
         int         skGridMultiplier = 1;
         int         skFixedGrid      = 0;
         int         skFullTiles      = 1;
+        mutable int isStandardCUs    = -1; // -1: unset, 0:false, 1:true
         std::string deviceName;
 
+        virtual bool   isStandardCU() const;
         virtual bool   runsKernelTargeting(Processor p) const;
         virtual size_t id() const
         {
@@ -250,6 +253,13 @@ namespace TensileLite
         {
             static const char* envStr = std::getenv("TENSILE_STREAMK_DYNAMIC_GRID");
             static const int   value  = (envStr == NULL ? 3 : std::atoi(envStr));
+            return value;
+        }
+
+        const int getSKDynamicWGM() const
+        {
+            static const char* envStr = std::getenv("TENSILE_STREAMK_DYNAMIC_WGM");
+            static const int   value  = (envStr == NULL ? 0 : std::atoi(envStr));
             return value;
         }
 
