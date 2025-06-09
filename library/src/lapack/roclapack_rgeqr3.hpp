@@ -2053,7 +2053,7 @@ static rocblas_status rocsolver_rgeqr3_template(rocblas_handle handle,
             pfree += size_Abyx_norms;
             size_geqr2 += size_Abyx_norms;
 
-            T* const diag = reinterpret_cast<T*>(diag);
+            T* const diag = reinterpret_cast<T*>(pfree);
             pfree += size_diag;
             size_geqr2 += size_diag;
 
