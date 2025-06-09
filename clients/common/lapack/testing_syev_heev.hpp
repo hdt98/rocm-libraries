@@ -1,5 +1,5 @@
 /* **************************************************************************
- * Copyright (C) 2021-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2021-2025 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -398,6 +398,22 @@ void testing_syev_heev(Arguments& argus)
     rocblas_int bc = argus.batch_count;
     rocblas_int hot_calls = argus.iters;
 
+    if(argus.alg_mode == 1)
+    {
+        EXPECT_ROCBLAS_STATUS(
+            rocsolver_set_alg_mode(handle, rocsolver_function_syev_heev, rocsolver_alg_mode_hybrid),
+            rocblas_status_success);
+
+        rocsolver_alg_mode sterf_mode, steqr_mode;
+        EXPECT_ROCBLAS_STATUS(rocsolver_get_alg_mode(handle, rocsolver_function_sterf, &sterf_mode),
+                              rocblas_status_success);
+        EXPECT_ROCBLAS_STATUS(rocsolver_get_alg_mode(handle, rocsolver_function_steqr, &steqr_mode),
+                              rocblas_status_success);
+
+        EXPECT_EQ(sterf_mode, rocsolver_alg_mode_hybrid);
+        EXPECT_EQ(steqr_mode, rocsolver_alg_mode_hybrid);
+    }
+
     // check non-supported values
     if(uplo == rocblas_fill_full || evect == rocblas_evect_tridiagonal)
     {
@@ -449,7 +465,7 @@ void testing_syev_heev(Arguments& argus)
     }
 
     // memory size query is necessary
-    if(argus.mem_query || !USE_ROCBLAS_REALLOC_ON_DEMAND)
+    if(argus.mem_query)
     {
         CHECK_ROCBLAS_ERROR(rocblas_start_device_memory_size_query(handle));
         if(BATCHED)
@@ -463,13 +479,9 @@ void testing_syev_heev(Arguments& argus)
 
         size_t size;
         CHECK_ROCBLAS_ERROR(rocblas_stop_device_memory_size_query(handle, &size));
-        if(argus.mem_query)
-        {
-            rocsolver_bench_inform(inform_mem_query, size);
-            return;
-        }
 
-        CHECK_ROCBLAS_ERROR(rocblas_set_device_memory_size(handle, size));
+        rocsolver_bench_inform(inform_mem_query, size);
+        return;
     }
 
     // memory allocations (all cases)
