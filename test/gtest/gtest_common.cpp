@@ -80,6 +80,8 @@ Gpu GetDevGpuType()
             return Gpu::gfx90A;
         else if(dev_name == "gfx942")
             return Gpu::gfx94X;
+        else if(dev_name == "gfx950")
+            return Gpu::gfx950;
         else if(miopen::StartsWith(dev_name, "gfx103"))
             return Gpu::gfx103X;
         else if(miopen::StartsWith(dev_name, "gfx110"))
@@ -108,6 +110,7 @@ const std::multimap<Gpu, DevDescription>& GetAllKnownDevices()
         {Gpu::gfx90A,  {"gfx90a",  110}},
         {Gpu::gfx94X,  {"gfx942",  228}},
         {Gpu::gfx94X,  {"gfx942",  304}},
+        {Gpu::gfx950,  {"gfx950",  256}},
         {Gpu::gfx103X, {"gfx1030", 30}},
         {Gpu::gfx103X, {"gfx1030", 36}},
         {Gpu::gfx103X, {"gfx1030", 40}},
@@ -123,7 +126,8 @@ const std::multimap<Gpu, DevDescription>& GetAllKnownDevices()
         {Gpu::gfx110X, {"gfx1101", 27}},
         {Gpu::gfx110X, {"gfx1101", 30}},
         {Gpu::gfx110X, {"gfx1102", 16}},
-        {Gpu::gfx120X, {"gfx1201", 10000}}, //\todo 10000 is a dummy value, replace with real value.
+        {Gpu::gfx120X, {"gfx1201", 32}},
+        {Gpu::gfx120X, {"gfx1201", 28}}
         // clang-format on
     };
     return known_devs;

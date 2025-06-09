@@ -136,6 +136,13 @@ TEST_P(GPU_ConvBiasActivInfer_FP16, ConvWinoFuryRxSf2x3Fused)
     RunSolver<miopen::solver::fusion::ConvWinoFuryRxSFused<2, 3>>(
         fusePlanDesc, plan_params, conv_config, test_skipped);
 }
+TEST_P(GPU_ConvBiasActivInfer_FP16, ConvWinoRageRxSf2x3Fused)
+{
+    const auto plan_params = std::make_unique<miopen::fusion::FusionInvokeParams>(
+        params, input.desc, in_dev.get(), output.desc, out_dev.get(), false);
+    RunSolver<miopen::solver::fusion::ConvWinoRageRxSFused<2, 3>>(
+        fusePlanDesc, plan_params, conv_config, test_skipped);
+}
 
 TEST_P(GPU_ConvBiasActivInfer_FP16, ConvCKIgemmFwdBiasActivFused)
 {
@@ -149,8 +156,9 @@ TEST_P(GPU_ConvBiasActivInfer_FP16, ConvCKIgemmFwdBiasActivFused)
 
 TEST_P(GPU_ConvBiasActivInferFusionCompileStep_FP32, ConvBiasActivAsm1x1UFloat_testCompile)
 {
-    lib_env::update(MIOPEN_FIND_ENFORCE, "SEARCH_DB_UPDATE");
-    lib_env::update(wa::MIOPEN_DEBUG_TUNING_ITERATIONS_MAX, 5);
+    ScopedEnvironment<std::string> find_enforce_env(MIOPEN_FIND_ENFORCE, "SEARCH_DB_UPDATE");
+    ScopedEnvironment<int> find_enforce_tuning_iter_env(wa::MIOPEN_DEBUG_TUNING_ITERATIONS_MAX, 5);
+
     fusePlanDesc.Compile(get_handle());
     const auto plan_params = std::make_unique<miopen::fusion::FusionInvokeParams>(
         params, input.desc, in_dev.get(), output.desc, out_dev.get(), false);
@@ -177,4 +185,4 @@ INSTANTIATE_TEST_SUITE_P(Smoke,
                          GPU_ConvBiasActivInfer_FP16,
                          testing::Combine(testing::Values(miopenActivationRELU),
                                           testing::ValuesIn(GetNetwork1<ConvTestCaseBase>()),
-                                          testing::Values(miopenTensorNHWC)));
+                                          testing::Values(miopenTensorNCHW)));

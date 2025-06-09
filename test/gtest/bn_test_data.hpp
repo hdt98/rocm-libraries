@@ -260,12 +260,12 @@ struct BNInferTestData : public BNTestData<XDataType, YDataType, AccDataType, TC
     miopen::Allocator::ManageDataPtr shift_dev;
     miopen::Allocator::ManageDataPtr estMean_dev;
     miopen::Allocator::ManageDataPtr estVariance_dev;
-    double epsilon          = 1.0e-5;
-    float alpha             = static_cast<float>(1.0f);
-    float beta              = static_cast<float>(0);
-    const float activ_alpha = static_cast<double>(0.5f);
-    const float activ_beta  = static_cast<double>(0.5f);
-    const float activ_gamma = static_cast<double>(0.5f);
+    double epsilon = 1.0e-5;
+    float alpha    = static_cast<float>(1.0f);
+    float beta     = static_cast<float>(0);
+    double activ_alpha;
+    double activ_beta;
+    miopenActivationMode_t activ_mode;
 
 private:
     void CreateTensors()
@@ -332,6 +332,7 @@ struct BNBwdTestData : public BNTestData<XDataType, DyDataType, AccDataType, TCo
     }
 
     tensor<ScaleDataType> bnScale;
+    tensor<ScaleDataType> bnBias;
 
     tensor<MeanVarDataType> savedMean;
     tensor<MeanVarDataType> savedInvVar;
@@ -343,6 +344,7 @@ struct BNBwdTestData : public BNTestData<XDataType, DyDataType, AccDataType, TCo
     tensor<AccDataType> dBias_ref;
 
     miopen::Allocator::ManageDataPtr bnScale_dev;
+    miopen::Allocator::ManageDataPtr bnBias_dev;
     miopen::Allocator::ManageDataPtr savedMean_dev;
     miopen::Allocator::ManageDataPtr savedInvVar_dev;
 
@@ -355,6 +357,10 @@ struct BNBwdTestData : public BNTestData<XDataType, DyDataType, AccDataType, TCo
 
     float alphaDataDiff = static_cast<float>(1), betaDataDiff = static_cast<float>(0);
     float alphaParamDiff = static_cast<float>(1), betaParamDiff = static_cast<float>(0);
+
+    double activ_alpha;
+    double activ_beta;
+    miopenActivationMode_t activ_mode;
 
 private:
     void CreateTensors()
@@ -369,6 +375,9 @@ private:
             BNTestData<XDataType, DyDataType, AccDataType, TConfig>::input.desc,
             BNTestData<XDataType, DyDataType, AccDataType, TConfig>::bn_mode);
         bnScale = tensor<ScaleDataType>{
+            BNTestData<XDataType, DyDataType, AccDataType, TConfig>::tensor_layout,
+            derivedBnDesc.GetLengths()};
+        bnBias = tensor<ScaleDataType>{
             BNTestData<XDataType, DyDataType, AccDataType, TConfig>::tensor_layout,
             derivedBnDesc.GetLengths()};
         savedMean = tensor<MeanVarDataType>{
@@ -409,6 +418,7 @@ private:
             fill_tensor_with_random_values(dy, 2e-3 /*scale*/, 1000 /*range*/);
 
         bnScale.generate(uniform_signed_initializer<ScaleDataType>(2e-3 /*scale*/, 1000 /*range*/));
+        bnBias.generate(uniform_signed_initializer<ScaleDataType>(2e-3 /*scale*/, 1000 /*range*/));
         savedMean.generate(
             uniform_signed_initializer<MeanVarDataType>(2e-3 /*scale*/, 1000 /*range*/));
         savedInvVar.generate(
@@ -425,6 +435,7 @@ private:
         auto&& handle = get_handle();
 
         bnScale_dev     = handle.Write(bnScale.data);
+        bnBias_dev      = handle.Write(bnBias.data);
         savedMean_dev   = handle.Write(savedMean.data);
         savedInvVar_dev = handle.Write(savedInvVar.data);
         dy_dev          = handle.Write(dy.data);
@@ -471,13 +482,13 @@ struct BNFwdTrainTestData : public BNTestData<XDataType, YDataType, AccDataType,
     miopen::Allocator::ManageDataPtr saveVariance_dev;
     miopen::Allocator::ManageDataPtr runMean_dev;
     miopen::Allocator::ManageDataPtr runVariance_dev;
-    double epsilon          = 1.0e-5;
-    double averageFactor    = 0.1;
-    float alpha             = static_cast<float>(1.0f);
-    float beta              = static_cast<float>(0);
-    const float activ_alpha = static_cast<double>(0.5f);
-    const float activ_beta  = static_cast<double>(0.5f);
-    const float activ_gamma = static_cast<double>(0.5f);
+    double epsilon       = 1.0e-5;
+    double averageFactor = 0.1;
+    float alpha          = static_cast<float>(1.0f);
+    float beta           = static_cast<float>(0);
+    double activ_alpha;
+    double activ_beta;
+    miopenActivationMode_t activ_mode;
 
 private:
     void CreateTensors()

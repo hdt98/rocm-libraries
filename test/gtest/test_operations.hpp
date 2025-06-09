@@ -95,29 +95,18 @@ void ComputeCPUBNBwd(DLModule& dl_module)
 
     if(dl_module.bn_mode == miopenBNSpatial)
     {
-        if(dl_module.saveMeanVar)
-        {
-            batchNormSpatialHostBwdTrain(dl_module.input,
-                                         dl_module.dy,
-                                         dl_module.out_ref,
-                                         dl_module.bnScale,
-                                         dl_module.dScale_ref,
-                                         dl_module.dBias_ref,
-                                         dl_module.savedMean,
-                                         dl_module.savedInvVar);
-        }
-        else
-        {
-            tensor<typename decltype(dl_module.savedMean)::value_type> empty_tensor;
-            batchNormSpatialHostBwdTrain(dl_module.input,
-                                         dl_module.dy,
-                                         dl_module.out_ref,
-                                         dl_module.bnScale,
-                                         dl_module.dScale_ref,
-                                         dl_module.dBias_ref,
-                                         empty_tensor,
-                                         empty_tensor);
-        }
+        batchNormSpatialHostBwdTrain(dl_module.input,
+                                     dl_module.dy,
+                                     dl_module.out_ref,
+                                     dl_module.bnScale,
+                                     dl_module.bnBias,
+                                     dl_module.dScale_ref,
+                                     dl_module.dBias_ref,
+                                     dl_module.savedMean,
+                                     dl_module.savedInvVar,
+                                     dl_module.activ_mode,
+                                     dl_module.activ_beta,
+                                     dl_module.activ_alpha);
     }
     else if(dl_module.bn_mode == miopenBNPerActivation)
     {
