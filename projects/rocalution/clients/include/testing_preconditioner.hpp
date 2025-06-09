@@ -28,8 +28,6 @@
 #include <gtest/gtest.h>
 #include <rocalution/rocalution.hpp>
 
-//#include "testing_local_matrix.hpp"
-
 using namespace rocalution;
 
 template <typename T>
