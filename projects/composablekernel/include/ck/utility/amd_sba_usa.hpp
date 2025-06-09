@@ -7,7 +7,8 @@
 #include "data_type.hpp"
 namespace ck {
 
-#if defined(__gfx1300__) || defined(__gfx1301__) || defined(__gfx1302__)
+#if defined(__gfx1300__) || defined(__gfx1301__) || defined(__gfx1302__) || \
+    defined(__gfx130E__) || defined(__gfx130F__)
 #define __gfx13__
 #endif
 #pragma clang diagnostic push

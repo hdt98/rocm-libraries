@@ -22,7 +22,8 @@
 #endif
 
 #if(defined(__gfx942__) || defined(__gfx1200__) || defined(__gfx1201__) || defined(__gfx950__) || \
-    defined(__gfx1300__) || defined(__gfx1301__) || defined(__gfx1302__)) &&                      \
+    defined(__gfx1300__) || defined(__gfx1301__) || defined(__gfx1302__) ||                       \
+    defined(__gfx130E__) || defined(__gfx130F__)) &&                                              \
     __HIP_DEVICE_COMPILE__
 #define CK_FP8_CVT_FAST_PATH 1
 #else
@@ -30,7 +31,8 @@
 #endif
 
 #if(defined(__gfx1200__) || defined(__gfx1201__) || defined(__gfx950__) || defined(__gfx1300__) || \
-    defined(__gfx1301__) || defined(__gfx1302__)) &&                                               \
+    defined(__gfx1301__) || defined(__gfx1302__) || defined(__gfx130E__) ||                        \
+    defined(__gfx130F__)) &&                                                                       \
     __HIP_DEVICE_COMPILE__
 #define CK_OCP_FP8_CVT_FAST_PATH 1
 #else
@@ -404,7 +406,7 @@ struct bf8_ocp_t
 #endif
     {
 #if defined(__gfx950__) || defined(__gfx1200__) || defined(__gfx1201__) || defined(__gfx1300__) || \
-    defined(__gfx1301__) || defined(__gfx1302__)
+    defined(__gfx1301__) || defined(__gfx1302__) || defined(__gfx130E__) || defined(__gfx130F__)
         return fp8_impl::cast_to_f32_from_f8<default_interpret>(this->data);
 #else
         return fp8_impl::cast_from_f8<float, wm, we, false>(
@@ -420,7 +422,8 @@ struct bf8_ocp_t
     {
 #if defined(__gfx950__) || defined(__gfx1200__) || defined(__gfx1201__)
         return static_cast<_Float16>(fp8_impl::cast_to_f32_from_f8<default_interpret>(this->data));
-#elif defined(__gfx1300__) || defined(__gfx1301__) || defined(__gfx1302__)
+#elif defined(__gfx1300__) || defined(__gfx1301__) || defined(__gfx1302__) || \
+    defined(__gfx130E__) || defined(__gfx130F__)
         return fp8_impl::cast_to_f16_from_f8<default_interpret>(this->data);
 #else
         return fp8_impl::cast_from_f8<_Float16, wm, we, false>(

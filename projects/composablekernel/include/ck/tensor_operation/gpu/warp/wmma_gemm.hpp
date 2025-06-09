@@ -937,7 +937,6 @@ struct wmma_type<WmmaInstr::wmma_f32_16x16x64_f8f6f4_gfx13,
     static constexpr index_t loop_of_consecutive = num_acc_per_thread / num_consecutive_acc;
     template <index_t MPerWmma,
               index_t NPerWmma,
-              index_t KPerWmma,
               typename AType,
               typename BType,
               index_t ABlockSel,

@@ -99,7 +99,8 @@ inline bool is_gfx12_supported()
 inline bool is_gfx13_supported()
 {
     return ck::get_device_name() == "gfx1300" || ck::get_device_name() == "gfx1301" ||
-           ck::get_device_name() == "gfx1302";
+           ck::get_device_name() == "gfx1302" || ck::get_device_name() == "gfx130E" ||
+           ck::get_device_name() == "gfx130F";
 }
 
 } // namespace ck
