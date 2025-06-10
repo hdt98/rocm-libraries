@@ -53,9 +53,9 @@ constexpr bool use_trmm_outofplace = false;
 // -------------------------------------------------
 constexpr bool use_gemm_gemv = true;
 
-constexpr bool is_applyQtC_use_larfb = true;
+constexpr bool is_applyQtC_use_larfb = false;
 
-constexpr bool use_geqr2 = true;
+constexpr bool use_geqr2 = false;
 
 #ifndef RGEQR3_BLOCKSIZE
 // #define RGEQR3_BLOCKSIZE(T) ((sizeof(T) == 4) ? 256 : (sizeof(T) == 8) ? 128 : (sizeof(T) == 16) ? 64 : 64)
