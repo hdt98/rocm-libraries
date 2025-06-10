@@ -49,7 +49,7 @@ set(ROCALUTION_TEST_SOURCES
   test_ruge_stueben_amg.cpp
   test_saamg.cpp
   test_uaamg.cpp
-# Other iterative solvers
+# Other tests
   test_preconditioner.cpp
   test_itersolver.cpp
   test_chebyshev.cpp
