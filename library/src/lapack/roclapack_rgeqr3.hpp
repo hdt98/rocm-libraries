@@ -2076,8 +2076,8 @@ static rocblas_status rocsolver_rgeqr3_template(rocblas_handle handle,
             // -----------------------------------
 
             {
-                bool const Tmat2tau = false;
-                copy_diagonal_template(handle, Tmat2tau, min_mn,
+                bool const is_copy_Tmat2tau = false;
+                copy_diagonal_template(handle, is_copy_Tmat2tau, min_mn,
 
                                        Tmat, shift_Tmat, ldT, stride_Tmat,
 
