@@ -4,6 +4,7 @@
 #pragma once
 
 #include "statically_indexed_array.hpp"
+#include "ck/utility/dtype_vector.hpp"
 
 namespace ck {
 

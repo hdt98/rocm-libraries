@@ -39,7 +39,8 @@ inline std::string get_device_name()
 inline bool is_gfx13_supported()
 {
     return ck_tile::get_device_name() == "gfx1300" || ck_tile::get_device_name() == "gfx1301" ||
-           ck_tile::get_device_name() == "gfx1302";
+           ck_tile::get_device_name() == "gfx1302" || ck_tile::get_device_name() == "gfx130E" ||
+           ck_tile::get_device_name() == "gfx130F";
 }
 
 } // namespace ck_tile
