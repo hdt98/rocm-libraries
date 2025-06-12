@@ -150,6 +150,9 @@ option(WERROR "Treat warnings as errors" OFF)
 option(BUILD_COMPRESSED_DBG "Enable compressed debug symbols" ON)
 check_cxx_compiler_flag("--offload-compress" CXX_COMPILER_SUPPORTS_OFFLOAD_COMPRESS)
 cmake_dependent_option(BUILD_OFFLOAD_COMPRESS "Build with offload compression" ON CXX_COMPILER_SUPPORTS_OFFLOAD_COMPRESS OFF)
+check_cxx_compiler_flag("-parallel-jobs=4" CXX_COMPILER_SUPPORTS_PARALLEL_HIP_JOBS)
+cmake_dependent_option(BUILD_PARALLEL_HIP_JOBS "Build with parallel hip jobs" ON CXX_COMPILER_SUPPORTS_PARALLEL_HIP_JOBS OFF)
+
 
 cmake_dependent_option(BUILD_FILE_REORG_BACKWARD_COMPATIBILITY
   "Build with file/folder reorg backward compatibility enabled" OFF "NOT WIN32" OFF)

@@ -448,6 +448,10 @@ if(BUILD_OFFLOAD_COMPRESS)
   target_compile_options(rocsolver PRIVATE "--offload-compress")
 endif()
 
+if(BUILD_PARALLEL_HIP_JOBS)
+  target_compile_options(rocsolver PRIVATE "-parallel-jobs=4")
+endif()
+
 target_include_directories(rocsolver
   PUBLIC
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/library/include>
