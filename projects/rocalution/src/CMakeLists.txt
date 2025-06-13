@@ -130,6 +130,10 @@ if(SUPPORT_MPI)
   target_compile_definitions(rocalution PRIVATE SUPPORT_MULTINODE)
 endif()
 
+if(BUILD_SUPPORT_COMPLEX)
+  target_compile_definitions(rocalution PRIVATE SUPPORT_COMPLEX)
+endif()
+
 if(SUPPORT_HIP)
   target_compile_definitions(rocalution PRIVATE SUPPORT_HIP)
   list(APPEND package_depends PACKAGE HIP)
