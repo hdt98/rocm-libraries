@@ -580,8 +580,27 @@ auto GenericSearch(const Solver s,
                     {
                         is_passed = true;
                         // Remove outliers that are more than 2 positive modified z-score's away,
-                        // and get the mean.
+                        // and get the mean. Note that the "modified z-score" is based on the median
+                        // and median absolute deviation, so it is more robust to outliers than the
+                        // standard z-score.
                         elapsed_time = miopen::removeHighOutliersAndGetMean(samples, 2.0f);
+
+                        // log the samples if the logging level is set to Info2, all in one line
+                        if(miopen::IsLogging(miopen::LoggingLevel::Info2))
+                        {
+                            // convert the samples vector to a string
+                            std::ostringstream oss;
+                            // start the string with open bracket
+                            oss << "[";
+                            std::copy(samples.begin(),
+                                      samples.end(),
+                                      std::ostream_iterator<float>(oss, ", "));
+                                      
+                            // end the string with close bracket
+                            oss << "]";
+                            // log the samples
+                            MIOPEN_LOG_I2("Samples: " << oss.str());
+                        }
 
                         // Always log every candidate and its post-processed avg time
                         MIOPEN_LOG_I2("Finished benchmark (n_current, n_failed, n_runs_total):  "
