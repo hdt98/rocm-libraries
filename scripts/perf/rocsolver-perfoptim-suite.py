@@ -1,5 +1,5 @@
 # ##########################################################################
-# Copyright (C) 2024 Advanced Micro Devices, Inc. All rights reserved.
+# Copyright (C) 2024-2025 Advanced Micro Devices, Inc. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -35,6 +35,7 @@ import shlex
 import sys
 from itertools import chain, repeat
 from subprocess import Popen, PIPE
+import matplotlib as plt
 
 
 #################################################
@@ -264,6 +265,9 @@ if __name__ == '__main__':
             dest='output_path',
             default=None,
             help='the output file name for the benchmark results')
+    parser.add_argument('--graph',
+            action='store_true',
+            help='generate graphs using matplotlib')
     parser.add_argument('suite',
             choices=suites.keys(),
             help='the set of benchmarks to run')
