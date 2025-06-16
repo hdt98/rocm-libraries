@@ -1,13 +1,13 @@
-name: Synchronize Staging Subtrees
+name: Synchronize Release Staging Subtrees
 
 on:
   workflow_dispatch:
   # schedule:
-  #   - cron: '50 * * * *'
+  #   - cron: '0 * * * *'
 
 env:
   MONOREPO_URL: github.com/ROCm/rocm-libraries.git
-  MONOREPO_BRANCH: ${{ github.ref_name }}
+  MONOREPO_BRANCH: release-staging/rocm-rel-7.0
 
 jobs:
   synchronize-subtrees:
