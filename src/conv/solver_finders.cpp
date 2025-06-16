@@ -291,9 +291,6 @@ static std::vector<Solution> EvaluateInvokers(const Handle& handle,
 
             if(samples.size() > 0)
             {
-                // Remove outliers that are more than 2 positive modified z-score's away, and get
-                // the mean.
-                elapsed = miopen::removeHighOutliersAndGetMean(samples, 2.0f);
                 // log the samples if the logging level is set to Info2, all in one line
                 if(miopen::IsLogging(miopen::LoggingLevel::Info2))
                 {
@@ -310,6 +307,9 @@ static std::vector<Solution> EvaluateInvokers(const Handle& handle,
                     // log the samples
                     MIOPEN_LOG_I2("Samples: " << oss.str());
                 }
+                // Remove outliers that are more than 2 positive modified z-score's away, and get
+                // the mean.
+                elapsed = miopen::removeHighOutliersAndGetMean(samples, 2.0f);
             }
             else
             {
