@@ -542,31 +542,13 @@ auto GenericSearch(const Solver s,
             if(ret == 0)
             {
                 // Smooth the jitter of measurements:
-                // If the 1st probe is NOT too bad (measured time <= 1.10 * worst sample of the best
-                // config), then gather 9 more samples, and remove positive z-score outliers. Use
-                // the mean value with outliers removed for calculating best config.
                 constexpr int N_RUNS = 10;
-                // check if the first probe is not too bad, or check for env variable MIOPEN_TUNING_ALLOW_OUTLIERS
-                // TODO make this check for env variable MIOPEN_TUNING_ALLOW_OUTLIERS
-
-                
-
+                // check if the first probe is not too bad (<=1.10×worst) or allow outliers
                 if(elapsed_time / worst_time < 1.10f ||
                    miopen::env::enabled(MIOPEN_TUNING_ALLOW_OUTLIERS))
                 {
-                    last_imprv = 0; // Reset the patience counter.
-                }
-                else
-                {
-                    MIOPEN_LOG_I2("First probe elapsed time is too high: " << elapsed_time
-                                                             << " / " << worst_time << " = " << (elapsed_time / worst_time)
-                                                             << " >= 1.10, skipping this config");
-                    ret = 1; // Skip this config.
-                }
-                {
                     MIOPEN_LOG_I2("Finding average for: " << elapsed_time << " / " << best_time
                                                           << " = " << (elapsed_time / best_time));
-
                     try
                     {
                         for(int i = 1; i < N_RUNS; ++i)
@@ -584,11 +566,6 @@ auto GenericSearch(const Solver s,
                     if(ret == 0)
                     {
                         is_passed = true;
-                        // Remove outliers that are more than 2 positive modified z-score's away,
-                        // and get the mean. Note that the "modified z-score" is based on the median
-                        // and median absolute deviation, so it is more robust to outliers than the
-                        // standard z-score.
-                        elapsed_time = miopen::removeHighOutliersAndGetMean(samples, 2.0f);
 
                         // log the samples if the logging level is set to Info2, all in one line
                         if(miopen::IsLogging(miopen::LoggingLevel::Info2))
@@ -606,6 +583,11 @@ auto GenericSearch(const Solver s,
                             // log the samples
                             MIOPEN_LOG_I2("Samples: " << oss.str());
                         }
+                        // Remove outliers that are more than 2 positive modified z-score's away,
+                        // and get the mean. Note that the "modified z-score" is based on the median
+                        // and median absolute deviation, so it is more robust to outliers than the
+                        // standard z-score.
+                        elapsed_time = miopen::removeHighOutliersAndGetMean(samples, 2.0f);
 
                         // Always log every candidate and its post-processed avg time
                         MIOPEN_LOG_I2("Finished benchmark (n_current, n_failed, n_runs_total):  "
@@ -641,7 +623,7 @@ auto GenericSearch(const Solver s,
                 }
             }
 
-            // Banchmarked kernels will not be used anymore.
+            // Benchmarked kernels will not be used anymore.
             // Now we can delete Program objects that belong to OCL/HIP
             // runtime and free the associated resources (memory, file handles...)
             for(const auto& kernelInfo : current_solution.construction_params)
