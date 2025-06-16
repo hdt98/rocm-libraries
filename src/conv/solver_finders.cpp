@@ -298,10 +298,9 @@ static std::vector<Solution> EvaluateInvokers(const Handle& handle,
                     std::ostringstream oss;
                     // start the string with open bracket
                     oss << "[";
-                    std::copy(samples.begin(),
-                                samples.end(),
-                                std::ostream_iterator<float>(oss, ", "));
-                                
+                    std::copy(
+                        samples.begin(), samples.end(), std::ostream_iterator<float>(oss, ", "));
+
                     // end the string with close bracket
                     oss << "]";
                     // log the samples

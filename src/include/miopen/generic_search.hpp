@@ -533,7 +533,7 @@ auto GenericSearch(const Solver s,
                 MIOPEN_LOG_E("Error: Unknown exception thrown.");
                 ret = 1;
             }
-            
+
             MIOPEN_LOG_T("##"
                          << "(n_current, n_failed, n_runs_total):  " << n_current << '/' << n_failed
                          << '/' << n_runs_total << " elapsed_time: " << elapsed_time
@@ -577,7 +577,7 @@ auto GenericSearch(const Solver s,
                             std::copy(samples.begin(),
                                       samples.end(),
                                       std::ostream_iterator<float>(oss, ", "));
-                                      
+
                             // end the string with close bracket
                             oss << "]";
                             // log the samples
@@ -591,10 +591,9 @@ auto GenericSearch(const Solver s,
 
                         // Always log every candidate and its post-processed avg time
                         MIOPEN_LOG_I2("Finished benchmark (n_current, n_failed, n_runs_total):  "
-                                     << n_current << '/' << n_failed
-                                     << '/' << n_runs_total
-                                     << ": config=" << current_config
-                                     << " avg_time=" << elapsed_time << " ms");
+                                      << n_current << '/' << n_failed << '/' << n_runs_total
+                                      << ": config=" << current_config
+                                      << " avg_time=" << elapsed_time << " ms");
 
                         if(elapsed_time < best_time)
                         {
