@@ -38,6 +38,7 @@
 #include <miopen/mt_queue.hpp>
 #include <miopen/generic_search_controls.hpp>
 #include <miopen/utility/modified_z.hpp>
+#include <miopen/env.hpp>
 
 #include <algorithm>
 #include <vector>
@@ -547,7 +548,11 @@ auto GenericSearch(const Solver s,
                 constexpr int N_RUNS = 10;
                 // check if the first probe is not too bad, or check for env variable MIOPEN_TUNING_ALLOW_OUTLIERS
                 // TODO make this check for env variable MIOPEN_TUNING_ALLOW_OUTLIERS
-                if(elapsed_time / worst_time < 1.10f || miopen::IsLogging(miopen::LoggingLevel::Info2))
+
+                
+
+                if(elapsed_time / worst_time < 1.10f ||
+                   miopen::env::enabled(MIOPEN_TUNING_ALLOW_OUTLIERS))
                 {
                     last_imprv = 0; // Reset the patience counter.
                 }

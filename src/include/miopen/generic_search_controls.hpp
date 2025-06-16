@@ -47,3 +47,6 @@ MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_COMPILE_PARALLEL_LEVEL,
                               std::thread::hardware_concurrency() / 2)
 #endif
 MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_COMPILE_ONLY)
+
+/// Allow outliers even if first probe ≥ 1.10 × worst time
+MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_TUNING_ALLOW_OUTLIERS, 0)
