@@ -585,7 +585,10 @@ class KernelWriter(metaclass=abc.ABCMeta):
     globalReadCode       = deepcopy(self.codes.perIterGlobalRead[iteration])
     localWriteCodeCounts = self.codes.perIterLocalWrite[iteration][0]
     localWriteCode       = self.codes.perIterLocalWrite[iteration][1]
-    print("localWriteCode",localWriteCode)
+    #print("localWriteCode",localWriteCode)
+    print("ponterLWCode",pointerLWCode)
+    print("pointerLRCode",pointerLRCode)   
+    print("waitCode",waitCode)
     isBarrier            = kernel["LoopIters"] - self.states.numItersPLR
     hasLocalRead = countLocalRead(localReadCode)
     # Default schedule is other, local reads, then local writes:
@@ -1008,6 +1011,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
       # scheduled local read to previous iterations
       ####
       if kernel["ClusterLocalRead"]:
+        print("ClusterLocalRead:")
         for vacancy in self.localReadsVacancy:
           # {"items","latencyLeft","atIter","atMfmaIndex","noReadsAtThisIter"}
           for localRead in list(localReadItemsThisLoop):
@@ -1105,7 +1109,10 @@ class KernelWriter(metaclass=abc.ABCMeta):
       def calculateRangeAndUpdateCounter(itemCounter, writeCounters, length):
         newItemCounter = itemCounter + length
         numLoops = 0
-        for count in writeCounters:
+        counter = [1,2] 
+
+        #for count in writeCounters:
+        for count in counter:
           if count > newItemCounter:
             break
           numLoops += 1
@@ -1123,9 +1130,12 @@ class KernelWriter(metaclass=abc.ABCMeta):
         numReadsInst = len(localReadItemsThisLoop)
         readLeft = numReadsInst
         latencyLeft = self.states.miLatencyLeft
+        print("mfmaIndex:%u, latencyLeft:%u, numReadsInst:%u" %(mfmaIndex, latencyLeft, numReadsInst))
+        
+        print("iteration, isbarrier, numMfmaPerIter:", iteration, isBarrier, numMfmaPerIter)
         if iteration < isBarrier:
           # with PrefetchLocalRead, localreads can interleave with mfma
-          if self.states.numItersPLR:
+          if self.states.numItersPLR or 1:
             # take ds_write into account to schedule ds_read, assume A and B localwrite have same width (TLDS=1)
             if (mfmaIndex >= self.states.lwStartMfmaIndex) and not countGlobalRead(globalReadCode):
               writeItemLength = (localWriteCodeCounts[-1] - itemCounter) if localWriteCodeCounts else 0
@@ -1152,6 +1162,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
                 readLeftLREven = numReadsInst / (numMfmaPerIter - i)
             # if there are too many localreads, change strategy to even.
             readLeft = checkLocalReadFIFOFull(mfmaIndex, self.localReadThisLoopFIFO, localReadItemsThisLoop, readLeftLROPT, readLeftLREven)
+            print("mfmaIndex:%u, readLeft:%u, readLeftLROPT:%u, readLeftLREven:%u" \
+                  %(mfmaIndex, readLeft, readLeftLROPT, readLeftLREven))
           elif kernel["EnableMatrixInstruction"] and self.do["OptimizeNumItersPLR0"]:
             # if numItersPLR == 0, try to schedule local reads with instruction level prefetch.
             mfmas = getMFMAs(macIterCode)
@@ -1163,6 +1175,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
               localReadItemsThisLoop = sorted(localReadItemsThisLoop, key=lambda o: hasAnyDependency(o, instsToCheck), reverse=True)
 
               for lr in localReadItemsThisLoop:
+                print("lr, instsToCheck:", lr, instsToCheck)
                 if hasAnyDependency(lr, instsToCheck):
                   numLocalReadShouldSchedule += 1
                 else:
@@ -1182,6 +1195,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
             latencyLeft -= sum(j.issueLatency()*2 for j in localReadItemsThisLoop)
 
         # force to schedule all remaining localreads before start to schedule localwrite.
+        print("sync1LdsMfmaIndex", self.states.sync1LdsMfmaIndex)
         if mfmaIndex == self.states.sync1LdsMfmaIndex and oneBufferScheduling:
           iterCode.addComment0("schedule remaining localreads for one buffer scheduling")
           while (localReadItemsThisLoop):
@@ -1200,9 +1214,9 @@ class KernelWriter(metaclass=abc.ABCMeta):
                                         })
         # if start to schedule localwrite, but still have localreads not scheduled yet,
         # reject to use 1LDSB, since it will write and read same lds buffer at same time.
-        if mfmaIndex > self.states.sync1LdsMfmaIndex and localReadItemsThisLoop and oneBufferScheduling:
+#        if mfmaIndex > self.states.sync1LdsMfmaIndex and localReadItemsThisLoop and oneBufferScheduling:
           #TODO: can we remove this restriction?
-          self.states.overflowedResources = 5
+#          self.states.overflowedResources = 5
         for j in range(readLeft):
           if localReadItemsThisLoop:
             item = localReadItemsThisLoop.pop(0)
@@ -1267,8 +1281,12 @@ class KernelWriter(metaclass=abc.ABCMeta):
               flagInsert = True
           if flagInsert:
             iterCode.add(SSetPrior(prior=3, comment="store optimization"))
+        print("mfmaIndex:%u, lwStartMfmaIndex:%s, writeItems:%s"\
+              %(mfmaIndex, self.states.lwStartMfmaIndex, writeItems))    
         if (mfmaIndex >= self.states.lwStartMfmaIndex):
           numLoops, itemCounter = calculateRangeAndUpdateCounter(itemCounter, localWriteCodeCounts, self.states.numLocalWriteModPerMfma)
+          print("mfmaIndex:%u, numLoops:%u, itemCounter:%u writeItemslen %u  " %(mfmaIndex, numLoops, itemCounter, len(writeItems)))
+          print("localWriteCodeCounts:", localWriteCodeCounts)
           for j in range(min(len(writeItems), numLoops)):
             # in case there are localWrite and globalread in same iteration
             # we need to make sure globalRead before localWrite
@@ -1704,8 +1722,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
     else:
       assert 0, "Unsupported scheduleIterAlg=%u"%self.states.scheduleIterAlg
 
-    if isinstance(waitCode, SWaitCnt):
 
+    if isinstance(waitCode, SWaitCnt):
       # Set the waitCount, based on the new iter schedule
       lgkmcnt = waitCode.lgkmcnt
       localReads = 0
@@ -2683,8 +2701,11 @@ class KernelWriter(metaclass=abc.ABCMeta):
       # Is this test necessary because of the global variable this if was previously always true
       # after removing the global variable it is always false...
       # if self.states.numItersPLR:
-      print("u=", u, "slocalReads=", localReads)
+      print("u = ", u, "localReads = ", localReads)
       print("macIterCode = ", macIterCode)
+      localWriteCode       = self.codes.perIterLocalWrite[u][1]
+      print("localWriteCode",localWriteCode)
+
       subIterCode = self._makeSubIterSchedule(kernel, tensorParametersA, tensorParametersB, localReads, \
                       u, pointerLWCode, pointerLRCode, waitCode, macIterCode, waitLWCode, syncCode, pack[luIdx], module)
       module.add(subIterCode) # add scheduled "other", local reads, local writes
@@ -3490,8 +3511,13 @@ class KernelWriter(metaclass=abc.ABCMeta):
     if kernel["EnableMatrixInstruction"] and kernel["LocalReadVectorWidth"] >= kernel["MIInputPerThread"]:
       WLR = max(kernel["LocalReadVectorWidth"]//kernel["MIInputPerThread"], 1)
       self.states.numItersPLR = kernel["PrefetchLocalRead"]%(kernel["LoopIters"]//WLR)
+      print("PrefetchLocalRead: %u, LoopIters: %u, WLR: %u, numItersPLR: %u" % \
+        (kernel["PrefetchLocalRead"], kernel["LoopIters"], WLR, self.states.numItersPLR))
+
     else:
       self.states.numItersPLR = kernel["PrefetchLocalRead"]%(kernel["LoopIters"])
+      print("PrefetchLocalRead: %u, LoopIters: %u, numItersPLR: %u" % \
+        (kernel["PrefetchLocalRead"], kernel["LoopIters"], self.states.numItersPLR))
 
     if kernel["ClusterLocalRead"]:
       self.states.numVgprBuffer = kernel["LoopIters"]

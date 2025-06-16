@@ -51,6 +51,10 @@ class SIA3(SIA):
         if kernel["LocalWritePerMfma"] == -1:
             lwStartMfmaIndex = getLocalWriteMFMAStart(writer, kernel, tensorParametersA, tensorParametersB, latencyLeft)
             numLocalWriteModPerMfma = getNumLocalWritePerMfma(writer, kernel, lwStartMfmaIndex)
+            print("numLocalWriteModPerMfma",numLocalWriteModPerMfma)
+            print("lwStartMfmaIndex",lwStartMfmaIndex)
+            numLocalWriteModPerMfma = 1
+            print(" Forcing numLocalWriteModPerMfma=1 for SIA3")
         else:
             numLocalWriteModPerMfma = roundUp(kernel["LocalWritePerMfma"]*PRECISION)
 
@@ -260,6 +264,9 @@ def getLocalWriteMFMAEnd(writer, kernel, tensorParametersA, tensorParametersB):
     writer.states.syncPlrMfmaIndex = numMfmaPerIter*(kernel["LoopIters"]-writer.states.numItersPLR+1) - writer.states.numMfmaForNextLoopLR - 1 if writer.states.numItersPLR else 0
     numMfmaBetweenLWandBarrier = 2 if kernel["MatrixInstM"] == 32 else 3
     writer.states.lwEndMfmaIndex = max(writer.states.syncPlrMfmaIndex - numMfmaBetweenLWandBarrier,0) if writer.states.numItersPLR else numMfmaPerIter*kernel["LoopIters"] - 1
+    print(" Forcing lwEndMfmaIndex=31 for SIA3")
+    writer.states.lwEndMfmaIndex = 31
+    print("lwEndMfmaIndex=%s numMfmaPerIter=%s LoopIters=%s"%(writer.states.lwEndMfmaIndex, numMfmaPerIter, kernel["LoopIters"]))
     if kernel["DirectToLds"] and kernel["PrefetchGlobalRead"] == 2:
         # DirectToLds + PGR=2 case, lwEndMfmaIndex must be after the end of local read (excluding local reads for next iter)
         lrEnd = min(writer.states.syncPlrMfmaIndex - 1, writer.states.numMfmaForNextLoopLR)
@@ -323,17 +330,22 @@ def getLocalWriteMFMAStart(writer, kernel, tensorParametersA, tensorParametersB,
             lwStartMfmaIndex = numMfmaForCurrentLoopLR
         else:
             lwStartMfmaIndex = numMfmaPerIter * (kernel["LoopIters"] - 1 - writer.states.numItersPLR) + writer.states.numMfmaForLR
+            print("lwStartMfmaIndex=%s numMfmaForLR=%s LoopIters=%s numMfmaPerIter=%s"%(lwStartMfmaIndex, writer.states.numMfmaForLR, kernel["LoopIters"], numMfmaPerIter))
         # to calculate number of mfma we need to wait before data arrive from lds to vgpr.
         # latency: 40 quad-cycle for 4 word, 20 quad-cycle for 2 word, 10 quad-cycle for 1 word / half word
         if writer.states.numIterPerCoalescedReadB > writer.states.numIterPerCoalescedReadA:
             latencyForLR = roundUp(tensorParametersA["localReadInstruction"].blockWidth) * 10
         else:
             latencyForLR = roundUp(tensorParametersB["localReadInstruction"].blockWidth) * 10
+        print("latencyForLR=%s"%(latencyForLR))
         latencyForLR -= max(latencyLeft,0) # remaining latency in mfma
+        print("latencyForLR=%s"%(latencyForLR))
         while latencyForLR > 0:
             latencyForLR -= writer.states.miLatency
             lwStartMfmaIndex += 1
-
+        print("latencyForLR1=%s"%(latencyForLR))
+        print("lwStartMfmaIndex=%s"%(lwStartMfmaIndex))
+        
     if lwStartMfmaIndex > writer.states.lwEndMfmaIndex:
         lwStartMfmaIndex = writer.states.lwEndMfmaIndex
     return lwStartMfmaIndex
@@ -423,6 +435,9 @@ def fixLocalWriteEndMfmaIndex(writer, kernel, tPA, tPB, globalReadIncACode, glob
         numMfmaBetweenLWandBarrier -= 1
 
     writer.states.lwEndMfmaIndex = max(writer.states.syncPlrMfmaIndex - numMfmaBetweenLWandBarrier,0) if writer.states.numItersPLR else numMfmaPerIter*kernel["LoopIters"] - 1
+    print("Forcing writer.states.lwEndMfmaIndex = 31 for SIA3")
+    # Forcing lwEndMfmaIndex to 31 for SIA3
+    writer.states.lwEndMfmaIndex = 31
     # adjust lwEndMfmaIndex for the following cases
     #  1) PGR=2
     #  2) last loop enabled case
@@ -728,10 +743,16 @@ def assignLWSchedIndexSIA3(writer, kernel, numLocalWritesPerSched, localWriteEnd
         lrEnd = min(writer.states.lwEndMfmaIndex, writer.states.numMfmaForLR * (kernel["LoopIters"] - writer.states.numItersPLR))
         if writer.states.lwStartMfmaIndex < lrEnd:
             writer.states.lwStartMfmaIndex = lrEnd
+    writer.states.lwStartMfmaIndex =16
+    print("Forcing lwStartMfmaIndex to 16 for SIA3")
+
     if kernel["1LDSBuffer"] or kernel["DirectToLds"]:
         writer.states.sync1LdsMfmaIndex = max(writer.states.lwStartMfmaIndex - 1, 0)
     startIter = writer.states.lwStartMfmaIndex//numMfmaPerIter
     assert startIter < localWriteEndIter+1 # startIter should be at or before the endIter
+    print("assignLWSchedIndexSIA3: lwStartMfmaIndex=%u, lwEndMfmaIndex=%u, startIter=%u, numMfmaPerIter=%u, numLocalWritesPerSched=%u, numWritesToSched=%u" % \
+          (writer.states.lwStartMfmaIndex, writer.states.lwEndMfmaIndex, startIter, numMfmaPerIter, numLocalWritesPerSched, numWritesToSched))
+    startIter = 1
     return startIter
 
 def assignLWSchedIndexDefault(writer, kernel, numLocalWritesPerSched, localWriteEndIter, lastLoadIter, numWritesToSched):
@@ -759,6 +780,8 @@ def schedLocalWrite(writer, kernel, numLocalWriteModPerIter, numLocalWritesPerSc
         itemsLWToSched.pop(0) # remove the dummy item
 
     itemsLWToSchedIndexLast = 0
+    print("schedLocalWrite: itemsLWToSched=%s, startIter=%u, localWriteEndIter=%u, numLocalWriteModPerIter=%u, numLocalWritesPerSched=%u" % \
+          (itemsLWToSched, startIter, localWriteEndIter, numLocalWriteModPerIter, numLocalWritesPerSched))
     for u in range(startIter, localWriteEndIter+1):
         itemsLWToSchedLength = itemsLWToSched[-1][0] if itemsLWToSched else 0
         if u == localWriteEndIter:
@@ -914,6 +937,9 @@ def schedLocalWrite(writer, kernel, numLocalWriteModPerIter, numLocalWritesPerSc
 
                 perIterLocalWriteCodeCounter += 1
                 perIterLocalWriteCodeNGLLCounter += 1
+                print("perIterLocalWriteCodeCounter=%u, perIterLocalWriteCodeNGLLCounter=%u, u=%u, itemsLWToSchedIndex=%u, itemPerIter=%u imodList=%s" % \
+                      (perIterLocalWriteCodeCounter, perIterLocalWriteCodeNGLLCounter, u, itemsLWToSchedIndex, itemPerIter,imodList))
+
                 if imodList:
                     imod = Module("LocalWriteMod%u"%u)
                     imod.addItems(imodList)
@@ -934,7 +960,8 @@ def schedLocalWrite(writer, kernel, numLocalWriteModPerIter, numLocalWritesPerSc
         if lastLc and writer.codes.perIterLocalWriteCodeNGLL[u][0] and writer.codes.perIterLocalWriteCodeNGLL[u][0][-1] != perIterLocalWriteCodeNGLLCounter:
             writer.codes.perIterLocalWriteCodeNGLL[u][0].append(perIterLocalWriteCodeNGLLCounter)
         itemsLWToSched = itemsLWToSched[itemPerIter:]
-
+        localWriteCodeCounts = writer.codes.perIterLocalWrite[u][0]
+        print("localWriteCodeCounts",localWriteCodeCounts)
     # should never run out of items to schedule
     assert not itemsLWToSched # should have scheduled everthing already
 
