@@ -938,7 +938,7 @@ def schedLocalWrite(writer, kernel, numLocalWriteModPerIter, numLocalWritesPerSc
         if lastLc and writer.codes.perIterLocalWriteCodeNGLL[u][0] and writer.codes.perIterLocalWriteCodeNGLL[u][0][-1] != perIterLocalWriteCodeNGLLCounter:
             writer.codes.perIterLocalWriteCodeNGLL[u][0].append(perIterLocalWriteCodeNGLLCounter)
         itemsLWToSched = itemsLWToSched[itemPerIter:]
-        
+
     # should never run out of items to schedule
     assert not itemsLWToSched # should have scheduled everthing already
 
