@@ -2163,14 +2163,20 @@ class KernelWriter(metaclass=abc.ABCMeta):
       needNextBufLR = not needExtraDTVLocalReadDo
       hasLiveLdsData = hasLiveLdsData or needExtraDTVLocalReadDo
       # reads for current loop are done in previous iteration because of wider local read
-      doReadA = (u < kernel["LoopIters"]/self.states.numIterPerCoalescedReadA - self.states.numItersPLR)
-      doReadB = (u < kernel["LoopIters"]/self.states.numIterPerCoalescedReadB - self.states.numItersPLR)
-      doReadM = (u < kernel["LoopIters"]/self.states.numIterPerCoalescedReadMetadata - self.states.numItersPLR)
+      doReadA = 0
+      doReadB = 0
+      doReadM = 0
+      if u==0:
+        doReadA = 1
+        doReadB = 1
+        doReadM = 1
       # reads for next loop
       doReadA = doReadA or (hasLiveLdsData and u > localWriteEndIter)
       doReadB = doReadB or (hasLiveLdsData and u > localWriteEndIter)
       doReadM = doReadM or (hasLiveLdsData and u > localWriteEndIter)
       doReadM = doReadM and (kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"])
+      print("tpA offset", tensorParametersA["localReadOffset"])
+      print("tpB offset", tensorParametersB["localReadOffset"])
       for iui in range(0,kernel["InnerUnroll"]):
         doReadA = doReadA and iui*self.states.numReadsIterCoalescedA < kernel["InnerUnroll"]
         doReadB = doReadB and iui*self.states.numReadsIterCoalescedB < kernel["InnerUnroll"]
@@ -2182,6 +2188,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
             # DTV + pack or input conversion case, offset bufferIdx for local read packing instructions
             bufferIdx = plrIdxDTV*self.states.numIterPerCoalescedReadA + vregSetIdxLR * kernel["LoopIters"]
           localReadCodeA, packCodeA = self.localReadDo(kernel, bufferIdx, iui*self.states.numReadsIterCoalescedA, 0, tensorParametersA)
+          print("localReadCodeA=%s" % (localReadCodeA))
           if needNextBufLR:
             localReads.add(localReadCodeA)
           pack[plrIdx*self.states.numIterPerCoalescedReadA].add(packCodeA)
@@ -2198,10 +2205,11 @@ class KernelWriter(metaclass=abc.ABCMeta):
             # DTV + pack or input conversion case, offset bufferIdx for local read packing instructions
             bufferIdx = plrIdxDTV*self.states.numIterPerCoalescedReadB + vregSetIdxLR * kernel["LoopIters"]
           localReadCodeB, packCodeB = self.localReadDo(kernel, bufferIdx, iui*self.states.numReadsIterCoalescedB, 0, tensorParametersB)
+          print("localReadCodeB=%s" % (localReadCodeB))
           if needNextBufLR:
             localReads.add(localReadCodeB)
           pack[plrIdx*self.states.numIterPerCoalescedReadB].add(packCodeB)
-        if (not isResetLroIter or iui != kernel["InnerUnroll"]-1):
+        if 0: # (not isResetLroIter or iui != kernel["InnerUnroll"]-1):
           if doReadA:
             localReads.addComment1("local read increment a")
             localReads.add(self.localReadInc(kernel, iui, tensorParametersA))
@@ -2278,10 +2286,16 @@ class KernelWriter(metaclass=abc.ABCMeta):
       if kernel["ProblemType"]["Gradient"] and kernel["ProblemType"]["UseBias"] and (kernel["ProblemType"]["BiasSrc"] == "A" or kernel["ProblemType"]["BiasSrc"] == "B"):
         tP = tensorParametersA if kernel["ProblemType"]["BiasSrc"] == "A" else tensorParametersB
         macIterCode.add(self.exclasses.biasSumUnroll.loopSum(self, kernel, tP, u, kernel["InnerUnroll"]))
-
+      print("u=%u, localWriteEndIter=%u, isLastLoop=%s, NLLlast=%s" % (u, localWriteEndIter, isLastLoop, NLLlast))
+      print("localreads=%s, pointerLWCode=%s, pointerLRCode=%s, waitCode=%s, macIterCode=%s, waitLWCode=%s, syncCode=%s" % \
+            (localReads, pointerLWCode, pointerLRCode, waitCode, macIterCode, waitLWCode, syncCode))
+      # if isLastLoop, we do not need to
       subIterCode = self._makeSubIterSchedule(kernel, tensorParametersA, tensorParametersB, localReads, \
-                      u, pointerLWCode, pointerLRCode, waitCode, macIterCode, waitLWCode, syncCode, pack[luIdx], module, NLLlast)
+                      u, pointerLWCode, pointerLRCode, waitCode, macIterCode, waitLWCode, syncCode, pack[luIdx], module, NLLlast)            
       module.add(subIterCode)
+      kernel["SubTileIdxA"] = (kernel["SubTileIdxA"] + 1) % kernel["numSubTilesA"]
+      kernel["SubTileIdxB"] = (kernel["SubTileIdxB"] + 1) % kernel["numSubTilesB"]
+
       pack[luIdx] = Module()
     return module
 
@@ -2614,7 +2628,10 @@ class KernelWriter(metaclass=abc.ABCMeta):
           localReadsB.add(localReadCodeB)
           pack[plrIdx*self.states.numIterPerCoalescedReadB].add(packCodeB)
         # Don't increment the LRO if we are going to reset them below:
-        if not isResetLroIter or iui != kernel["InnerUnroll"]-1:
+          print("tpA offset 0", tensorParametersA["localReadOffset"])
+          print("tpB offset 0", tensorParametersB["localReadOffset"])
+
+        if 0 :#(not isResetLroIter or iui != kernel["InnerUnroll"]-1):
           if doReadA:
             localReads.addComment1("local read increment a")
             localReads.add(self.localReadInc(kernel, iui, tensorParametersA))
@@ -2624,6 +2641,9 @@ class KernelWriter(metaclass=abc.ABCMeta):
           if doReadB:
             localReads.addComment1("local read increment b")
             localReads.add(self.localReadInc(kernel, iui, tensorParametersB))
+
+          print("tpA offset 1", tensorParametersA["localReadOffset"])
+          print("tpB offset 1", tensorParametersB["localReadOffset"])
 
       if kernel["PrefetchGlobalRead"]:
         # wait code for DirectToVgpr
@@ -2714,6 +2734,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
       print("macIterCode = ", macIterCode)
       localWriteCode       = self.codes.perIterLocalWrite[u][1]
       print("localWriteCode",localWriteCode)
+      print("tpA offset", tensorParametersA["localReadOffset"])
+      print("tpB offset", tensorParametersB["localReadOffset"])
 
       subIterCode = self._makeSubIterSchedule(kernel, tensorParametersA, tensorParametersB, localReads, \
                       u, pointerLWCode, pointerLRCode, waitCode, macIterCode, waitLWCode, syncCode, pack[luIdx], module)
