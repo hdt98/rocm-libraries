@@ -53,8 +53,6 @@ class SIA3(SIA):
             numLocalWriteModPerMfma = getNumLocalWritePerMfma(writer, kernel, lwStartMfmaIndex)
             print("numLocalWriteModPerMfma",numLocalWriteModPerMfma)
             print("lwStartMfmaIndex",lwStartMfmaIndex)
-            numLocalWriteModPerMfma = 1
-            print(" Forcing numLocalWriteModPerMfma=1 for SIA3")
         else:
             numLocalWriteModPerMfma = roundUp(kernel["LocalWritePerMfma"]*PRECISION)
 
@@ -202,6 +200,8 @@ def getLocalWriteMFMAEnd(writer, kernel, tensorParametersA, tensorParametersB):
     writer.states.numMfmaForLR = 1
     latencyLeft = writer.states.miLatencyLeft
     miLatencyLeft = writer.states.miLatencyLeft
+    print("latencyLeft=%s miLatencyLeft=%s"%(latencyLeft, miLatencyLeft))
+    print("writer.states.numMfmaForLR=%s"%(writer.states.numMfmaForLR))
     tPM = tensorParametersA["tpsMetadata"] if tensorParametersA["is_sparse"] else tensorParametersB["tpsMetadata"]
 
     # we can skip some LR waitcnt
@@ -230,13 +230,16 @@ def getLocalWriteMFMAEnd(writer, kernel, tensorParametersA, tensorParametersB):
     for iui in range(kernel["InnerUnroll"]):
         # ds_read[A][0]
         calculateLatencyLeft(writer.states.numReadsPerUnrollA, tensorParametersA["localReadInstruction"].blockWidth, tensorParametersA["localReadInstruction"].issueLatency)
+        print("A0 writer.states.numMfmaForLR=%s latencyLeft%u "%(writer.states.numMfmaForLR,latencyLeft))
         # ds_read[M][0]
         if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]:
             calculateLatencyLeft(writer.states.numReadsPerUnrollMetadata, tPM["localReadInstruction"].blockWidth, tPM["localReadInstruction"].issueLatency)
         # ds_read[B][0]
         calculateLatencyLeft(writer.states.numReadsPerUnrollB, tensorParametersB["localReadInstruction"].blockWidth, tensorParametersB["localReadInstruction"].issueLatency)
+        print("B0 writer.states.numMfmaForLR=%s latencyLeft%u"%(writer.states.numMfmaForLR,latencyLeft))
         # ds_read[A][1:]
         calculateLatencyLeft((writer.states.numReadsPerIterA//kernel["InnerUnroll"] - writer.states.numReadsPerUnrollA), tensorParametersA["localReadInstruction"].blockWidth, tensorParametersA["localReadInstruction"].issueLatency)
+        print("A1 writer.states.numMfmaForLR=%s latencyLeft%u"%(writer.states.numMfmaForLR,latencyLeft))
         # ds_read[M][1:]
         if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]:
             calculateLatencyLeft((writer.states.numReadsPerIterMetadata//kernel["InnerUnroll"] - writer.states.numReadsPerUnrollMetadata), tPM["localReadInstruction"].blockWidth, tPM["localReadInstruction"].issueLatency)
@@ -246,6 +249,7 @@ def getLocalWriteMFMAEnd(writer, kernel, tensorParametersA, tensorParametersB):
             tmpNumMfmaForLR = writer.states.numMfmaForLR
         # ds_read[B][1:]
         calculateLatencyLeft((writer.states.numReadsPerIterB//kernel["InnerUnroll"] - writer.states.numReadsPerUnrollB), tensorParametersB["localReadInstruction"].blockWidth, tensorParametersB["localReadInstruction"].issueLatency)
+        print("B1 writer.states.numMfmaForLR=%s latencyLeft%u"%(writer.states.numMfmaForLR,latencyLeft))
     # to calculate number of mfma we need to wait before data arrive from lds to vgpr.
     # latency: 40 quad-cycle for 4 word, 20 quad-cycle for 2 word, 10 quad-cycle for 1 word / half word
     writer.states.numMfmaForNextLoopLR = writer.states.numMfmaForLR
@@ -264,9 +268,12 @@ def getLocalWriteMFMAEnd(writer, kernel, tensorParametersA, tensorParametersB):
     writer.states.syncPlrMfmaIndex = numMfmaPerIter*(kernel["LoopIters"]-writer.states.numItersPLR+1) - writer.states.numMfmaForNextLoopLR - 1 if writer.states.numItersPLR else 0
     numMfmaBetweenLWandBarrier = 2 if kernel["MatrixInstM"] == 32 else 3
     writer.states.lwEndMfmaIndex = max(writer.states.syncPlrMfmaIndex - numMfmaBetweenLWandBarrier,0) if writer.states.numItersPLR else numMfmaPerIter*kernel["LoopIters"] - 1
-    print(" Forcing lwEndMfmaIndex=31 for SIA3")
-    writer.states.lwEndMfmaIndex = 31
-    print("lwEndMfmaIndex=%s numMfmaPerIter=%s LoopIters=%s"%(writer.states.lwEndMfmaIndex, numMfmaPerIter, kernel["LoopIters"]))
+    print("Calculated lwEndMfmaIndex",writer.states.lwEndMfmaIndex)
+    print("Calculated syncPlrMfmaIndex",writer.states.syncPlrMfmaIndex)
+    print("Calculated numMfmaForNextLoopLR",writer.states.numMfmaForNextLoopLR)
+    print("Calculated numMfmaForLR",writer.states.numMfmaForLR)
+    print("Calculated numMfmaBetweenLWandBarrier",numMfmaBetweenLWandBarrier)
+    print("Calculated latencyLeft",latencyLeft)
     if kernel["DirectToLds"] and kernel["PrefetchGlobalRead"] == 2:
         # DirectToLds + PGR=2 case, lwEndMfmaIndex must be after the end of local read (excluding local reads for next iter)
         lrEnd = min(writer.states.syncPlrMfmaIndex - 1, writer.states.numMfmaForNextLoopLR)
@@ -329,10 +336,14 @@ def getLocalWriteMFMAStart(writer, kernel, tensorParametersA, tensorParametersB,
                     calculateLatencyLeft((writer.states.numReadsPerIterB//kernel["InnerUnroll"] - writer.states.numReadsPerUnrollB) * doReadB, tensorParametersB["localReadInstruction"].blockWidth, tensorParametersB["localReadInstruction"].issueLatency)
             lwStartMfmaIndex = numMfmaForCurrentLoopLR
         else:
-            lwStartMfmaIndex = numMfmaPerIter * (kernel["LoopIters"] - 1 - writer.states.numItersPLR) + writer.states.numMfmaForLR
+            if 1:
+                lwStartMfmaIndex = numMfmaPerIter * (kernel["LoopIters"] - 1 - writer.states.numItersPLR)
+            else:
+                lwStartMfmaIndex = numMfmaPerIter * (kernel["LoopIters"] - 1 - writer.states.numItersPLR) + writer.states.numMfmaForLR
             print("lwStartMfmaIndex=%s numMfmaForLR=%s LoopIters=%s numMfmaPerIter=%s"%(lwStartMfmaIndex, writer.states.numMfmaForLR, kernel["LoopIters"], numMfmaPerIter))
         # to calculate number of mfma we need to wait before data arrive from lds to vgpr.
         # latency: 40 quad-cycle for 4 word, 20 quad-cycle for 2 word, 10 quad-cycle for 1 word / half word
+        
         if writer.states.numIterPerCoalescedReadB > writer.states.numIterPerCoalescedReadA:
             latencyForLR = roundUp(tensorParametersA["localReadInstruction"].blockWidth) * 10
         else:
@@ -342,10 +353,11 @@ def getLocalWriteMFMAStart(writer, kernel, tensorParametersA, tensorParametersB,
         print("latencyForLR=%s"%(latencyForLR))
         while latencyForLR > 0:
             latencyForLR -= writer.states.miLatency
-            lwStartMfmaIndex += 1
+            if 0:
+                lwStartMfmaIndex += 1
         print("latencyForLR1=%s"%(latencyForLR))
         print("lwStartMfmaIndex=%s"%(lwStartMfmaIndex))
-        
+
     if lwStartMfmaIndex > writer.states.lwEndMfmaIndex:
         lwStartMfmaIndex = writer.states.lwEndMfmaIndex
     return lwStartMfmaIndex
@@ -435,9 +447,7 @@ def fixLocalWriteEndMfmaIndex(writer, kernel, tPA, tPB, globalReadIncACode, glob
         numMfmaBetweenLWandBarrier -= 1
 
     writer.states.lwEndMfmaIndex = max(writer.states.syncPlrMfmaIndex - numMfmaBetweenLWandBarrier,0) if writer.states.numItersPLR else numMfmaPerIter*kernel["LoopIters"] - 1
-    print("Forcing writer.states.lwEndMfmaIndex = 31 for SIA3")
-    # Forcing lwEndMfmaIndex to 31 for SIA3
-    writer.states.lwEndMfmaIndex = 31
+    print("fixLocalWriteEndMfmaIndex: lwEndMfmaIndex for SIA3", writer.states.lwEndMfmaIndex)
     # adjust lwEndMfmaIndex for the following cases
     #  1) PGR=2
     #  2) last loop enabled case
@@ -743,8 +753,6 @@ def assignLWSchedIndexSIA3(writer, kernel, numLocalWritesPerSched, localWriteEnd
         lrEnd = min(writer.states.lwEndMfmaIndex, writer.states.numMfmaForLR * (kernel["LoopIters"] - writer.states.numItersPLR))
         if writer.states.lwStartMfmaIndex < lrEnd:
             writer.states.lwStartMfmaIndex = lrEnd
-    writer.states.lwStartMfmaIndex =16
-    print("Forcing lwStartMfmaIndex to 16 for SIA3")
 
     if kernel["1LDSBuffer"] or kernel["DirectToLds"]:
         writer.states.sync1LdsMfmaIndex = max(writer.states.lwStartMfmaIndex - 1, 0)
@@ -752,7 +760,7 @@ def assignLWSchedIndexSIA3(writer, kernel, numLocalWritesPerSched, localWriteEnd
     assert startIter < localWriteEndIter+1 # startIter should be at or before the endIter
     print("assignLWSchedIndexSIA3: lwStartMfmaIndex=%u, lwEndMfmaIndex=%u, startIter=%u, numMfmaPerIter=%u, numLocalWritesPerSched=%u, numWritesToSched=%u" % \
           (writer.states.lwStartMfmaIndex, writer.states.lwEndMfmaIndex, startIter, numMfmaPerIter, numLocalWritesPerSched, numWritesToSched))
-    startIter = 1
+   
     return startIter
 
 def assignLWSchedIndexDefault(writer, kernel, numLocalWritesPerSched, localWriteEndIter, lastLoadIter, numWritesToSched):

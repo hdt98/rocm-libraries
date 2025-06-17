@@ -589,6 +589,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
     print("ponterLWCode",pointerLWCode)
     print("pointerLRCode",pointerLRCode)   
     print("waitCode",waitCode)
+    print("waitLWCode",waitLWCode)
+    print("syncCode",syncCode)
     isBarrier            = kernel["LoopIters"] - self.states.numItersPLR
     hasLocalRead = countLocalRead(localReadCode)
     # Default schedule is other, local reads, then local writes:
@@ -1109,10 +1111,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
       def calculateRangeAndUpdateCounter(itemCounter, writeCounters, length):
         newItemCounter = itemCounter + length
         numLoops = 0
-        counter = [1,2] 
 
-        #for count in writeCounters:
-        for count in counter:
+        for count in writeCounters:
           if count > newItemCounter:
             break
           numLoops += 1
@@ -1321,6 +1321,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
         ####
         # scheduled sync
         ####
+        print("mfmaIndex:%u, syncPlrMfmaIndex:%s, sync1LdsMfmaIndex:%s" \
+              %(mfmaIndex, self.states.syncPlrMfmaIndex, self.states.sync1LdsMfmaIndex))
         if mfmaIndex == self.states.syncPlrMfmaIndex and self.states.numItersPLR:
           iterCode.add(waitLWCode)
           iterCode.add(syncCode)
@@ -2211,10 +2213,13 @@ class KernelWriter(metaclass=abc.ABCMeta):
             localReads.add(self.localReadInc(kernel, iui, tensorParametersB))
 
       if not isLastLoop:
+        print("isLastLoop is False, u=%u, localWriteEndIter=%u" % (u, localWriteEndIter))
         if kernel["PrefetchGlobalRead"]:
           # put barrier at localWriteEndIter+1
           if u == localWriteEndIter+1 or (u == (localWriteEndIter+1)%kernel["LoopIters"] and kernel["ScheduleIterAlg"] == 2):
+            print("u == localWriteEndIter+1 ")
             if not kernel["NoLdsWriteCode"]:
+              print("u == localWriteEndIter+1, but NoLdsWriteCode is False")
               waitLWCode.add(self._wait(kernel, tensorParametersA, tensorParametersB, -1, 0, -1, "3wait for local write"))
             if (kernel["DirectToVgprA"] or kernel["DirectToVgprB"]) and (kernel["DirectToLdsA"] or kernel["DirectToLdsB"]):
               # DirectToVgpr + DirectToLds case, add waitcnt vmcnt before s_barrier
@@ -2625,6 +2630,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
         if kernel["DirectToVgprA"] or kernel["DirectToVgprB"]:
           module.add(self.getWaitcntCodeForDirectToVgpr(kernel, tensorParametersA, tensorParametersB, localWriteEndIter, u))
         # put barrier at localWriteEndIter+1
+        print("u=%u, localWriteEndIter=%u, kernel['LoopIters']=%u, kernel['ScheduleIterAlg']=%u" % (u, localWriteEndIter, kernel["LoopIters"], kernel["ScheduleIterAlg"]))
         if u == localWriteEndIter+1 or (u == (localWriteEndIter+1)%kernel["LoopIters"] and kernel["ScheduleIterAlg"] == 2):
           if kernel["DirectToLdsA"] or kernel["DirectToLdsB"]:
             vmcntVal = 1 if kernel["PrefetchGlobalRead"] == 2 else 0
@@ -2632,7 +2638,10 @@ class KernelWriter(metaclass=abc.ABCMeta):
                                       "wait for previous set of global reads"))
           # (no local write code. Global read wait for DirectToLds is already done)
           if not kernel["NoLdsWriteCode"]:
+            print("u == localWriteEndIter+1, but NoLdsWriteCode is False")
+            print("waitLWCode before", waitLWCode)
             waitLWCode.add(self._wait(kernel, tensorParametersA, tensorParametersB, -1, 0, -1, "3wait for local write"))
+            print("waitLWCode after", waitLWCode)
           skipForceWaitcnt0 = False
           if kernel["DirectToVgprA"] or kernel["DirectToVgprB"] or kernel["DirectToLdsA"] or kernel["DirectToLdsB"]:
             # DTVA/B or DTLA/B case, skip generating force waitcnt0
@@ -2880,6 +2889,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
       kernel["SubTileIdxB"] = 0             
 
       if D_U_iseqMI_K:
+        self.states.numItersPLR = 1
         # not generate wait for local write if LDS write code is not generated
         if not kernel["NoLdsWriteCode"]:
           module.add(self._wait(kernel, tensorParametersA, tensorParametersB, -1, 0, -1, "0prefetch wait for local write"))
@@ -3518,7 +3528,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
       self.states.numItersPLR = kernel["PrefetchLocalRead"]%(kernel["LoopIters"])
       print("PrefetchLocalRead: %u, LoopIters: %u, numItersPLR: %u" % \
         (kernel["PrefetchLocalRead"], kernel["LoopIters"], self.states.numItersPLR))
-
+      
     if kernel["ClusterLocalRead"]:
       self.states.numVgprBuffer = kernel["LoopIters"]
     else:
