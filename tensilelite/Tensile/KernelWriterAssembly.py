@@ -6746,14 +6746,26 @@ class KernelWriterAssembly(KernelWriter):
         outer = 0
         loopSwap = True
       inner = 1 - outer # inner is the opposite of outer
-      outerBy2=(kernel["MIWaveTile"][outer]//2)
-      innerBy2=(kernel["MIWaveTile"][inner]//2)
 
-      idxHalfO = u//2
-      idxHalfI = u % 2
-      print("idxHalfO, idxHalfI", idxHalfO, idxHalfI)
-      for idxOuter in range(outerBy2*idxHalfO, kernel["MIWaveTile"][outer] - (1-idxHalfO)* outerBy2):
-        for idxInner in range(innerBy2*idxHalfI, kernel["MIWaveTile"][inner] - (1-idxHalfI)* innerBy2):
+      idxOuter_start = 0
+      idxInner_start = 0
+      idxOuter_stop = kernel["MIWaveTile"][outer]
+      idxInner_stop = kernel["MIWaveTile"][inner]
+
+      numSubTiles = kernel["numSubTilesA"]
+
+      if numSubTiles > 1:
+        outerBy2=(kernel["MIWaveTile"][outer]//numSubTiles)
+        innerBy2=(kernel["MIWaveTile"][inner]//numSubTiles)
+        idxHalfO = u//numSubTiles
+        idxHalfI = u % numSubTiles
+        idxOuter_start = outerBy2*idxHalfO
+        idxInner_start = innerBy2*idxHalfI
+        idxOuter_stop = kernel["MIWaveTile"][outer] - (1-idxHalfO)* outerBy2
+        idxInner_stop = kernel["MIWaveTile"][inner] - (1-idxHalfI)* innerBy2
+
+      for idxOuter in range(idxOuter_start, idxOuter_stop):
+        for idxInner in range(idxInner_start, idxInner_stop):
           idx0 = idxInner
           idx1 = idxOuter
           if loopSwap:
