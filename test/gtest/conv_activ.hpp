@@ -34,20 +34,19 @@
 #include <fusionHost.hpp>
 
 #include "tensor_util.hpp"
-#include "get_handle.hpp"
 #include "conv_common.hpp"
 
 #include "conv_test_base.hpp"
 #include "conv_tensor_gen.hpp"
 
 template <typename T = float, typename TestCaseType = ConvTestCaseBase>
-struct ConvBiasActivInferTest : public ::testing::TestWithParam<std::tuple<miopenActivationMode_t,
-                                                                           TestCaseType,
-                                                                           miopenTensorLayout_t,
-                                                                           float,
-                                                                           float,
-                                                                           float>>,
-                                ConvFwdSolverTestBase<T, T, TestCaseType>
+struct ConvActivInferTest : public ::testing::TestWithParam<std::tuple<miopenActivationMode_t,
+                                                                       TestCaseType,
+                                                                       miopenTensorLayout_t,
+                                                                       float,
+                                                                       float,
+                                                                       float>>,
+                            ConvFwdSolverTestBase<T, T, TestCaseType>
 {
 protected:
     void SetUp() override
@@ -58,27 +57,16 @@ protected:
 
         cfsb::SetUpImpl(conv_config, tensor_layout);
         activ_desc = {activ_mode, activ_alpha, activ_beta, activ_gamma};
-        int dim    = cfsb::output.desc.GetNumDims() - 2;
-        if(dim == 3)
-            bias = tensor<T>{1, static_cast<size_t>(conv_config.k), 1, 1, 1};
-        else
-            bias = tensor<T>{1, static_cast<size_t>(conv_config.k), 1, 1};
-        bias.generate(tensor_elem_gen_integer{3});
-        auto&& handle = get_handle();
         std::fill(
             cfsb::output.begin(), cfsb::output.end(), std::numeric_limits<double>::quiet_NaN());
-        bias_dev = handle.Write(bias.data);
 
         // Setup the Fusionplan
         fusePlanDesc = miopen::FusionPlanDescriptor(miopenVerticalFusion, cfsb::input.desc);
         auto convOp =
             std::make_shared<miopen::ConvForwardOpDescriptor>(cfsb::conv_desc, cfsb::weights.desc);
-        auto biasOp  = std::make_shared<miopen::BiasFusionOpDescriptor>(bias.desc);
         auto activOp = std::make_shared<miopen::ActivFwdFusionOpDescriptor>(activ_desc.GetMode());
         EXPECT_EQ(fusePlanDesc.AddOp(convOp), miopenStatusSuccess);
         convOp->SetArgs(params, &alpha, &beta, cfsb::wei_dev.get());
-        EXPECT_EQ(fusePlanDesc.AddOp(biasOp), miopenStatusSuccess);
-        biasOp->SetArgs(params, &alpha, &beta, bias_dev.get());
         EXPECT_EQ(fusePlanDesc.AddOp(activOp), miopenStatusSuccess);
         activOp->SetArgs(params, &alpha, &beta, activ_alpha, activ_beta, activ_gamma);
     }
@@ -88,7 +76,6 @@ protected:
             return;
         conv_stats stats;
         cfsb::TearDownConv();
-        cpu_bias_forward(cfsb::ref_out, bias);
 
         activationHostInfer(activ_mode,
                             activ_gamma,
@@ -100,8 +87,6 @@ protected:
     }
     TestCaseType conv_config;
     miopen::ActivationDescriptor activ_desc;
-    tensor<T> bias;
-    miopen::Allocator::ManageDataPtr bias_dev;
     bool test_skipped = false;
     miopenActivationMode_t activ_mode;
     miopen::FusionPlanDescriptor fusePlanDesc;
