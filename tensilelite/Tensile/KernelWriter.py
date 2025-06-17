@@ -784,7 +784,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
       #####
       # Prepare localReadCode
       ####
-      localReadCodeAB = Module()      
+      localReadCodeAB = Module()
       for iui in range(kernel["InnerUnroll"]):
         localReadCodeA = localReadCode.findNamedItem("LocalReadDoA_I%s"%(iui))
         localReadCodeB = localReadCode.findNamedItem("LocalReadDoB_I%s"%(iui))
@@ -1104,7 +1104,6 @@ class KernelWriter(metaclass=abc.ABCMeta):
       def calculateRangeAndUpdateCounter(itemCounter, writeCounters, length):
         newItemCounter = itemCounter + length
         numLoops = 0
-
         for count in writeCounters:
           if count > newItemCounter:
             break
@@ -1125,7 +1124,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
         latencyLeft = self.states.miLatencyLeft
         if iteration < isBarrier:
           # with PrefetchLocalRead, localreads can interleave with mfma
-          if self.states.numItersPLR or 1:
+          if self.states.numItersPLR:
             # take ds_write into account to schedule ds_read, assume A and B localwrite have same width (TLDS=1)
             if (mfmaIndex >= self.states.lwStartMfmaIndex) and not countGlobalRead(globalReadCode):
               writeItemLength = (localWriteCodeCounts[-1] - itemCounter) if localWriteCodeCounts else 0
@@ -2259,13 +2258,12 @@ class KernelWriter(metaclass=abc.ABCMeta):
       if kernel["ProblemType"]["Gradient"] and kernel["ProblemType"]["UseBias"] and (kernel["ProblemType"]["BiasSrc"] == "A" or kernel["ProblemType"]["BiasSrc"] == "B"):
         tP = tensorParametersA if kernel["ProblemType"]["BiasSrc"] == "A" else tensorParametersB
         macIterCode.add(self.exclasses.biasSumUnroll.loopSum(self, kernel, tP, u, kernel["InnerUnroll"]))
-      # if isLastLoop, we do not need to
+
       subIterCode = self._makeSubIterSchedule(kernel, tensorParametersA, tensorParametersB, localReads, \
-                      u, pointerLWCode, pointerLRCode, waitCode, macIterCode, waitLWCode, syncCode, pack[luIdx], module, NLLlast)            
+                      u, pointerLWCode, pointerLRCode, waitCode, macIterCode, waitLWCode, syncCode, pack[luIdx], module, NLLlast)
       module.add(subIterCode)
       kernel["SubTileIdxA"] = (kernel["SubTileIdxA"] + 1) % kernel["numSubTilesA"]
       kernel["SubTileIdxB"] = (kernel["SubTileIdxB"] + 1) % kernel["numSubTilesB"]
-
       pack[luIdx] = Module()
     return module
 
@@ -2598,7 +2596,6 @@ class KernelWriter(metaclass=abc.ABCMeta):
           localReadsB.add(localReadCodeB)
           pack[plrIdx*self.states.numIterPerCoalescedReadB].add(packCodeB)
         # Don't increment the LRO if we are going to reset them below:
-
         if 0 :#(not isResetLroIter or iui != kernel["InnerUnroll"]-1):
           if doReadA:
             localReads.addComment1("local read increment a")
@@ -2691,14 +2688,11 @@ class KernelWriter(metaclass=abc.ABCMeta):
       # Is this test necessary because of the global variable this if was previously always true
       # after removing the global variable it is always false...
       # if self.states.numItersPLR:
-      localWriteCode       = self.codes.perIterLocalWrite[u][1]
-
       subIterCode = self._makeSubIterSchedule(kernel, tensorParametersA, tensorParametersB, localReads, \
                       u, pointerLWCode, pointerLRCode, waitCode, macIterCode, waitLWCode, syncCode, pack[luIdx], module)
       module.add(subIterCode) # add scheduled "other", local reads, local writes
       kernel["SubTileIdxA"] = (kernel["SubTileIdxA"] + 1) % kernel["numSubTilesA"]
       kernel["SubTileIdxB"] = (kernel["SubTileIdxB"] + 1) % kernel["numSubTilesB"]
-
       pack[luIdx] = Module()
 
     # close unrolled loop
@@ -3501,7 +3495,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
       self.states.numItersPLR = kernel["PrefetchLocalRead"]%(kernel["LoopIters"]//WLR)
     else:
       self.states.numItersPLR = kernel["PrefetchLocalRead"]%(kernel["LoopIters"])
-      
+  
     if kernel["ClusterLocalRead"]:
       self.states.numVgprBuffer = kernel["LoopIters"]
     else:

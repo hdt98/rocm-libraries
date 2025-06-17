@@ -328,7 +328,6 @@ def getLocalWriteMFMAStart(writer, kernel, tensorParametersA, tensorParametersB,
                 lwStartMfmaIndex = numMfmaPerIter * (kernel["LoopIters"] - 1 - writer.states.numItersPLR) + writer.states.numMfmaForLR
         # to calculate number of mfma we need to wait before data arrive from lds to vgpr.
         # latency: 40 quad-cycle for 4 word, 20 quad-cycle for 2 word, 10 quad-cycle for 1 word / half word
-        
         if writer.states.numIterPerCoalescedReadB > writer.states.numIterPerCoalescedReadA:
             latencyForLR = roundUp(tensorParametersA["localReadInstruction"].blockWidth) * 10
         else:
@@ -733,12 +732,10 @@ def assignLWSchedIndexSIA3(writer, kernel, numLocalWritesPerSched, localWriteEnd
         lrEnd = min(writer.states.lwEndMfmaIndex, writer.states.numMfmaForLR * (kernel["LoopIters"] - writer.states.numItersPLR))
         if writer.states.lwStartMfmaIndex < lrEnd:
             writer.states.lwStartMfmaIndex = lrEnd
-
     if kernel["1LDSBuffer"] or kernel["DirectToLds"]:
         writer.states.sync1LdsMfmaIndex = max(writer.states.lwStartMfmaIndex - 1, 0)
     startIter = writer.states.lwStartMfmaIndex//numMfmaPerIter
-    assert startIter < localWriteEndIter+1 # startIter should be at or before the endIter
-   
+    assert startIter < localWriteEndIter+1 # startIter should be at or before the endIter 
     return startIter
 
 def assignLWSchedIndexDefault(writer, kernel, numLocalWritesPerSched, localWriteEndIter, lastLoadIter, numWritesToSched):
@@ -921,7 +918,6 @@ def schedLocalWrite(writer, kernel, numLocalWriteModPerIter, numLocalWritesPerSc
 
                 perIterLocalWriteCodeCounter += 1
                 perIterLocalWriteCodeNGLLCounter += 1
-
                 if imodList:
                     imod = Module("LocalWriteMod%u"%u)
                     imod.addItems(imodList)
@@ -942,7 +938,7 @@ def schedLocalWrite(writer, kernel, numLocalWriteModPerIter, numLocalWritesPerSc
         if lastLc and writer.codes.perIterLocalWriteCodeNGLL[u][0] and writer.codes.perIterLocalWriteCodeNGLL[u][0][-1] != perIterLocalWriteCodeNGLLCounter:
             writer.codes.perIterLocalWriteCodeNGLL[u][0].append(perIterLocalWriteCodeNGLLCounter)
         itemsLWToSched = itemsLWToSched[itemPerIter:]
-        localWriteCodeCounts = writer.codes.perIterLocalWrite[u][0]
+        
     # should never run out of items to schedule
     assert not itemsLWToSched # should have scheduled everthing already
 

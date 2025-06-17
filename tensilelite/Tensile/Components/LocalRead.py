@@ -174,6 +174,7 @@ class LocalReadMFMA(LocalRead):
         tileBlockWidth   = tP["bpeDS"]/4 if kernel["UnrollMajorLDS%s"%tc] else instruction.blockWidth
 
         vectorWidth  = kernel["VectorWidth%s"%tc]
+
         numSubTiles = kernel["numSubTiles%s"%tc]
         subTileIdx = kernel["SubTileIdx%s"%tc]
         MIWaveGroupShape = [ kernel["MatrixInstM"] * kernel["MatrixInstBM"] * kernel["MIWaveGroup"][0] * kernel["VectorWidthA"], \
@@ -238,7 +239,6 @@ class LocalReadMFMA(LocalRead):
         eIdxCnt = numReadsPerVector//numSubTiles
         eIdxStart = subTileIdx * (numReadsPerVector//numSubTiles)
         valufIdx = eIdxStart * blockWidth *numReadsPerUnroll 
-        #print("Debug: %s, eIdxStart %u, eIdxCnt %u, numReadsPerVector %u, numSubTiles %u, subTileIdx %u" % (tc, eIdxStart, eIdxCnt, numReadsPerVector, numSubTiles, subTileIdx))
         if enableLDSTr:
             numberMTilesPerWave = kernel["MIWaveTile"][tile01]
             highBits = 0
@@ -264,7 +264,7 @@ class LocalReadMFMA(LocalRead):
             for vIdx in range(0, numVectorsPerTile):
                 for eIdx in range(eIdxStart, (eIdxStart + eIdxCnt)):
                     valuiIdx = int(valufIdx)
-                    localReadCode = imod.add(Module("LocalRead%s Valu%u"%(tc,valuiIdx)))                 
+                    localReadCode = imod.add(Module("LocalRead%s Valu%u"%(tc,valuiIdx)))           
                     if needPack or numSplitMetadata:
                         packCode = pack.add(Module("packCode"))
                     for rIdx in range(0, numReadsPerUnroll):
