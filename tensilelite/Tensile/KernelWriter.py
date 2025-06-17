@@ -1702,8 +1702,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
         iterCode.add(macIterItems.pop(0))
     else:
       assert 0, "Unsupported scheduleIterAlg=%u"%self.states.scheduleIterAlg
-
-
+      
     if isinstance(waitCode, SWaitCnt):
       # Set the waitCount, based on the new iter schedule
       lgkmcnt = waitCode.lgkmcnt
