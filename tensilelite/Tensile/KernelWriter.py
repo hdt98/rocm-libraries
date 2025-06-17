@@ -1702,7 +1702,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
         iterCode.add(macIterItems.pop(0))
     else:
       assert 0, "Unsupported scheduleIterAlg=%u"%self.states.scheduleIterAlg
-      
+
     if isinstance(waitCode, SWaitCnt):
       # Set the waitCount, based on the new iter schedule
       lgkmcnt = waitCode.lgkmcnt
@@ -3494,7 +3494,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
       self.states.numItersPLR = kernel["PrefetchLocalRead"]%(kernel["LoopIters"]//WLR)
     else:
       self.states.numItersPLR = kernel["PrefetchLocalRead"]%(kernel["LoopIters"])
-  
+
     if kernel["ClusterLocalRead"]:
       self.states.numVgprBuffer = kernel["LoopIters"]
     else:
