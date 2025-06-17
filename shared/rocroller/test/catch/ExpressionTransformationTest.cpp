@@ -1393,179 +1393,81 @@ TEST_CASE("LowerUnsignedArithmeticShiftR ExpressionTransformation works",
     }
 }
 
-TEST_CASE("SplitConcatenate ExpressionTransformation works",
-          "[expression][expression-transformation]")
+TEST_CASE("periodizeWorkitemValues works", "[expression][expression-transformation]")
 {
     using namespace rocRoller;
-    using namespace Expression;
-    auto context = TestContext::ForDefaultTarget();
-
-    auto r
-        = Register::Value::Placeholder(context.get(), Register::Type::Vector, DataType::UInt64, 1);
-    r->allocateNow();
-    auto v = r->expression();
-
-    SECTION("Split uint64_t literal into two Raw32 operands")
-    {
-        auto                       uint64Literal = literal(0x0123456789ABCDEFull, DataType::UInt64);
-        std::vector<ExpressionPtr> operands{uint64Literal, v};
-        auto concatExpr = Concatenate{{operands}, {DataType::None, PointerType::Buffer}};
-
-        Concatenate result = splitConcatenate(concatExpr);
-
-        std::vector<ExpressionPtr> expectedOperands{
-            literal(Raw32(0x89ABCDEF)), literal(Raw32(0x01234567)), v};
-        auto expectedExpr = Concatenate{{expectedOperands}, {DataType::None, PointerType::Buffer}};
-
-        CHECK_THAT(std::make_shared<rocRoller::Expression::Expression>(result),
-                   IdenticalTo(std::make_shared<rocRoller::Expression::Expression>(expectedExpr)));
-    }
-
-    SECTION("Multiple uint64_t literals are all split")
-    {
-        auto uint64Literal1 = literal(0xFFFFFFFF00000000ull, DataType::UInt64);
-        auto uint64Literal2 = literal(0x00000000FFFFFFFFull, DataType::UInt64);
-
-        std::vector<ExpressionPtr> operands{uint64Literal1, uint64Literal2};
-        auto concatExpr = Concatenate{{operands}, {DataType::None, PointerType::Buffer}};
-
-        Concatenate result = splitConcatenate(concatExpr);
-
-        std::vector<ExpressionPtr> expectedOperands{literal(Raw32(0x00000000)),
-                                                    literal(Raw32(0xFFFFFFFF)),
-                                                    literal(Raw32(0xFFFFFFFF)),
-                                                    literal(Raw32(0x00000000))};
-        auto expectedExpr = Concatenate{{expectedOperands}, {DataType::None, PointerType::Buffer}};
-
-        CHECK_THAT(std::make_shared<rocRoller::Expression::Expression>(result),
-                   IdenticalTo(std::make_shared<rocRoller::Expression::Expression>(expectedExpr)));
-    }
-}
-
-TEST_CASE("BitfieldCombine expression and lowering", "[expression][expression-transformation]")
-{
-    using namespace rocRoller;
+    using Expression::ExpressionPtr;
+    using Expression::literal;
 
     auto context = TestContext::ForDefaultTarget();
 
-    Register::AllocationOptions allocOptions{.contiguousChunkWidth = Register::FULLY_CONTIGUOUS};
+    auto kernel = context.get()->kernel();
+    auto loader = context->argLoader();
 
-    auto src = std::make_shared<Register::Value>(
-        context.get(), Register::Type::Vector, DataType::UInt32, 1, allocOptions);
-    src->allocateNow();
-    auto srcExpr = src->expression();
+    kernel->setKernelDimensions(2);
 
-    auto dst = std::make_shared<Register::Value>(
-        context.get(), Register::Type::Vector, DataType::UInt32, 1, allocOptions);
-    dst->allocateNow();
-    auto dstExpr = dst->expression();
+    context.get()->schedule(kernel->allocateInitialRegisters());
 
-    auto const srcOffset = 10u;
-    auto const dstOffset = 4u;
-    auto const width     = 7u;
+    auto wiXExpr = context->kernel()->workitemIndex()[0]->expression();
 
-    auto offsetDiff = Expression::literal(srcOffset - dstOffset);
+    uint period        = 16;
+    auto logPeriod     = static_cast<uint>(log2(period));
+    auto logPeriodExpr = literal(logPeriod);
+    auto periodMask    = literal(period - 1);
 
-    SECTION("Lowering Basic")
+    auto const wavefrontSize
+        = context.get()->targetArchitecture().GetCapability(GPUCapability::DefaultWavefrontSize);
+    auto logWavefrontSize     = static_cast<uint>(log2(wavefrontSize));
+    auto workitemXExpr        = context->kernel()->workitemIndex()[0]->expression();
+    auto logWavefrontSizeExpr = literal(logWavefrontSize);
+
+    auto nWave = std::make_shared<Expression::Expression>(
+        Expression::ArithmeticShiftR({workitemXExpr, logWavefrontSizeExpr}));
+
+    auto nWaveOffset
+        = std::make_shared<Expression::Expression>(Expression::ShiftL({nWave, logPeriodExpr}));
+
+    auto maskedPeriodInWave = std::make_shared<Expression::Expression>(
+        Expression::BitwiseAnd({workitemXExpr, periodMask}));
+
+    auto expectedBase = std::make_shared<Expression::Expression>(
+        Expression::Add({maskedPeriodInWave, nWaveOffset}));
+
+    SECTION("Simple")
     {
-        auto bfc = std::make_shared<Expression::Expression>(
-            Expression::BitfieldCombine{srcExpr, dstExpr, "", srcOffset, dstOffset, width});
+        auto expected = expectedBase;
+        auto actual   = Expression::periodizeWorkitemValues(wiXExpr, context.get(), period);
 
-        auto expected
-            = logicalShiftR(
-                  (Expression::literal(Raw32(((1u << width) - 1u) << srcOffset)) & srcExpr),
-                  offsetDiff)
-              | (Expression::literal(Raw32(~(((1u << width) - 1u) << dstOffset))) & dstExpr);
-
-        CHECK_THAT(lowerBitfieldCombine(bfc), IdenticalTo(expected));
+        CHECK(toString(expected) == toString(actual));
     }
 
-    SECTION("Lowering with srcIsZero")
+    SECTION("Simple twice")
     {
-        auto bfc = std::make_shared<Expression::Expression>(
-            Expression::BitfieldCombine{srcExpr, dstExpr, "", srcOffset, dstOffset, width, true});
+        auto expected = expectedBase * expectedBase;
+        auto expr     = wiXExpr * wiXExpr;
+        auto actual   = Expression::periodizeWorkitemValues(expr, context.get(), period);
 
-        auto expected
-            = logicalShiftR(srcExpr, offsetDiff)
-              | (Expression::literal(Raw32(~(((1u << width) - 1u) << dstOffset))) & dstExpr);
-
-        CHECK_THAT(lowerBitfieldCombine(bfc), IdenticalTo(expected));
+        CHECK(toString(expected) == toString(actual));
     }
 
-    SECTION("Lowering with dstIsZero")
+    SECTION("Workitem Y")
     {
-        auto bfc = std::make_shared<Expression::Expression>(Expression::BitfieldCombine{
-            srcExpr, dstExpr, "", srcOffset, dstOffset, width, std::nullopt, true});
+        auto wiYExpr  = context->kernel()->workitemIndex()[1]->expression();
+        auto expected = expectedBase * wiYExpr;
+        auto expr     = wiXExpr * wiYExpr;
+        auto actual   = Expression::periodizeWorkitemValues(expr, context.get(), period);
 
-        auto expected = logicalShiftR((Expression::literal(Raw32(((1u << width) - 1u) << srcOffset))
-                                       & srcExpr),
-                                      offsetDiff)
-                        | dstExpr;
-
-        CHECK_THAT(lowerBitfieldCombine(bfc), IdenticalTo(expected));
+        CHECK(toString(expected) == toString(actual));
     }
 
-    SECTION("Lowering with srcIsZero & dstIsZero")
+    SECTION("Complex")
     {
-        auto bfc = std::make_shared<Expression::Expression>(Expression::BitfieldCombine{
-            srcExpr, dstExpr, "", srcOffset, dstOffset, width, true, true});
+        auto wiYExpr  = context->kernel()->workitemIndex()[1]->expression();
+        auto expected = expectedBase + wiYExpr / literal(wavefrontSize)
+                        << literal(period) + expectedBase;
+        auto expr   = wiXExpr + wiYExpr / literal(wavefrontSize) << literal(period) + wiXExpr;
+        auto actual = Expression::periodizeWorkitemValues(expr, context.get(), period);
 
-        auto expected = logicalShiftR(srcExpr, offsetDiff) | dstExpr;
-
-        CHECK_THAT(lowerBitfieldCombine(bfc), IdenticalTo(expected));
+        CHECK(toString(expected) == toString(actual));
     }
-
-    SECTION("Lowering with width=32 (full width)")
-    {
-        auto const fullWidth   = 32u;
-        auto const srcOffset32 = 0u;
-        auto const dstOffset32 = 0u;
-
-        auto bfc = std::make_shared<Expression::Expression>(
-            Expression::BitfieldCombine{srcExpr, dstExpr, "", srcOffset32, dstOffset32, fullWidth});
-
-        // When width=32, srcMask should be 0xFFFFFFFF (all bits)
-        // and dstMask should be 0x00000000 (clear all bits)
-        auto expected = (Expression::literal(Raw32(0xFFFFFFFFu)) & srcExpr)
-                        | (Expression::literal(Raw32(0x00000000u)) & dstExpr);
-
-        CHECK_THAT(lowerBitfieldCombine(bfc), IdenticalTo(expected));
-    }
-}
-
-TEST_CASE("Code gen with ConvertPropagation", "[expression][expression-transformation][codegen]")
-{
-    using namespace rocRoller;
-    auto context = TestContext::ForDefaultTarget();
-
-    const auto srcDatatype = GENERATE(DataType::Int64, DataType::UInt64);
-    const auto dstDatatype = GENERATE(DataType::Int32, DataType::UInt32);
-
-    auto r64a
-        = std::make_shared<Register::Value>(context.get(), Register::Type::Vector, srcDatatype, 1);
-    r64a->allocateNow();
-    auto r64b
-        = std::make_shared<Register::Value>(context.get(), Register::Type::Vector, srcDatatype, 1);
-    r64b->allocateNow();
-
-    Register::ValuePtr d32;
-
-    auto kb = [&]() -> Generator<Instruction> {
-        co_yield Expression::generate(
-            d32, convert(dstDatatype, r64a->expression() + r64b->expression()), context.get());
-    };
-    context.get()->schedule(kb());
-
-    std::string expected;
-    if(DataTypeInfo::Get(dstDatatype).isSigned)
-        expected = R"(
-            v_add_i32 v4, v0, v2
-        )";
-    else
-        expected = R"(
-            v_add_u32 v4, v0, v2
-        )";
-
-    INFO(context.output());
-    CHECK(NormalizedSource(context.output()) == NormalizedSource(expected));
 }

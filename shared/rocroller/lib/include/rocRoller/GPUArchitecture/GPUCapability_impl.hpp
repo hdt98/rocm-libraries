@@ -181,7 +181,6 @@ namespace rocRoller
             {"HasXCC", Value::HasXCC},
             {"DefaultRemapXCCValue", Value::DefaultRemapXCCValue},
 
-            {"MaxPreloadedKernargs", Value::MaxPreloadedKernargs},
-
+            {"PartiallyActiveWaveSize", Value::PartiallyActiveWaveSize},
     };
 }
