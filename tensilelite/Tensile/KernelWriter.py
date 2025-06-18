@@ -2478,7 +2478,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
     # unrolled loop: mac iterations
     ############################################################################
 
-    # double/quadruple the number of compute loop for each DepthU's worth of data read 
+    # double/quadruple the number of compute loop for each DepthU's worth of data read
     for uIdx in range(0, kernel["LoopIters"]):
       u = uIdx % kernel["LoopIters"]    #   u: index in compute loop (in contrast to the notion of global read loop)
       if u==0: # if at start of subloop...
