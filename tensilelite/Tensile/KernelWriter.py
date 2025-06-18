@@ -2032,7 +2032,6 @@ class KernelWriter(metaclass=abc.ABCMeta):
     lastuIdx = False
     pflr     = self.states.numItersPLR
     localWriteEndIter = kernel["LoopIters"] - self.states.numItersPLR - 1
-    print("noLoadLoopBody :localWriteEndIter",localWriteEndIter)
     dsWriteBA = False
     if isNGLL and kernel["UnrollLoopSwapGlobalReadOrder"] == 1 and NLLindex == 0 and NLLnum == 2:
       dsWriteBA = True
@@ -2406,7 +2405,6 @@ class KernelWriter(metaclass=abc.ABCMeta):
     # localWriteEndIter is used to determine which iteration to put sync
     # if PGR=0, GR,LW,sync,LR will put at front of loop.
     localWriteEndIter = kernel["LoopIters"] - self.states.numItersPLR - 1
-    print("loop_body :localWriteEndIter",localWriteEndIter)
     # Schedule the global read, global read inc, and writes:
     unrollLoopHeaderCodeScheduled = False
     if not kernel["PrefetchGlobalRead"]:
@@ -2480,10 +2478,6 @@ class KernelWriter(metaclass=abc.ABCMeta):
     ############################################################################
 
     # double/quadruple the number of compute loop for each DepthU's worth of data read
-    if kernel["D_U_iseqMI_K"]:
-      kernel["LoopIters"] = 4 
-      localWriteEndIter = kernel["LoopIters"] - self.states.numItersPLR - 1
-      self.states.numMfmaPerIter = self.states.numMfmaPerIter//4
       
     for uIdx in range(0, kernel["LoopIters"]):
       u = uIdx % kernel["LoopIters"]    #   u: index in compute loop (in contrast to the notion of global read loop)
@@ -2866,8 +2860,13 @@ class KernelWriter(metaclass=abc.ABCMeta):
       kernel["SubTileIdxA"] = 0
       kernel["SubTileIdxB"] = 0             
 
+
       if kernel["D_U_iseqMI_K"]:
+        kernel["LoopIters"] = 4 
+        self.states.numMfmaPerIter = self.states.numMfmaPerIter//4
         self.states.numItersPLR = 1
+        localWriteEndIter = kernel["LoopIters"] - self.states.numItersPLR - 1
+
         # not generate wait for local write if LDS write code is not generated
         if not kernel["NoLdsWriteCode"]:
           module.add(self._wait(kernel, tensorParametersA, tensorParametersB, -1, 0, -1, "0prefetch wait for local write"))
