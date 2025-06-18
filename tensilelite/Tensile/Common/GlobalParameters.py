@@ -420,6 +420,10 @@ defaultBenchmarkCommonParameters = [
     {"WaveSplitK": [ False ]},
     {"MbskPrefetchOpt": [0]},
     {"D_U_iseqMI_K": [False]},
+    {"numSubTilesA": [1]},
+    {"numSubTilesB": [1]},
+    {"SubTileIdxA": [0]},
+    {"SubTileIdxB": [0]},
 ]
 
 # dictionary of defaults comprised of default option for each parameter

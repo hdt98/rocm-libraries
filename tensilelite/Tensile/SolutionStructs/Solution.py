@@ -1326,8 +1326,6 @@ class Solution(collections.abc.Mapping):
       # and we are using 2x2 sub-tiles for A and B.
       state["numSubTilesA"] = 2 
       state["numSubTilesB"] = 2 
-      state["SubTileIdxA"] = 0
-      state["SubTileIdxB"] = 0
     else:
       state["D_U_iseqMI_K"] = False
 
