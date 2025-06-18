@@ -2032,6 +2032,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
     lastuIdx = False
     pflr     = self.states.numItersPLR
     localWriteEndIter = kernel["LoopIters"] - self.states.numItersPLR - 1
+    print("noLoadLoopBody :localWriteEndIter",localWriteEndIter)
     dsWriteBA = False
     if isNGLL and kernel["UnrollLoopSwapGlobalReadOrder"] == 1 and NLLindex == 0 and NLLnum == 2:
       dsWriteBA = True
@@ -2405,7 +2406,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
     # localWriteEndIter is used to determine which iteration to put sync
     # if PGR=0, GR,LW,sync,LR will put at front of loop.
     localWriteEndIter = kernel["LoopIters"] - self.states.numItersPLR - 1
-
+    print("loop_body :localWriteEndIter",localWriteEndIter)
     # Schedule the global read, global read inc, and writes:
     unrollLoopHeaderCodeScheduled = False
     if not kernel["PrefetchGlobalRead"]:
@@ -2479,9 +2480,11 @@ class KernelWriter(metaclass=abc.ABCMeta):
     ############################################################################
 
     # double/quadruple the number of compute loop for each DepthU's worth of data read
-    kernel["LoopIters"] = 4 
-    localWriteEndIter = 2 
-    self.states.numMfmaPerIter = self.states.numMfmaPerIter//4
+    if kernel["D_U_iseqMI_K"]:
+      kernel["LoopIters"] = 4 
+      localWriteEndIter = kernel["LoopIters"] - self.states.numItersPLR - 1
+      self.states.numMfmaPerIter = self.states.numMfmaPerIter//4
+      
     for uIdx in range(0, kernel["LoopIters"]):
       u = uIdx % kernel["LoopIters"]    #   u: index in compute loop (in contrast to the notion of global read loop)
       if u==0: # if at start of subloop...
@@ -2549,9 +2552,12 @@ class KernelWriter(metaclass=abc.ABCMeta):
 
       hasLiveLdsData = kernel["PrefetchGlobalRead"]
       # reads for current loop are done in previous iteration because of wider local read
-      #doReadA = (u < kernel["LoopIters"]/self.states.numIterPerCoalescedReadA - self.states.numItersPLR)
-      #doReadB = (u < kernel["LoopIters"]/self.states.numIterPerCoalescedReadB - self.states.numItersPLR)
-      #doReadM = (u < kernel["LoopIters"]/self.states.numIterPerCoalescedReadMetadata - self.states.numItersPLR)
+      doReadA = (u < kernel["LoopIters"]/self.states.numIterPerCoalescedReadA - self.states.numItersPLR)
+      doReadB = (u < kernel["LoopIters"]/self.states.numIterPerCoalescedReadB - self.states.numItersPLR)
+      doReadM = (u < kernel["LoopIters"]/self.states.numIterPerCoalescedReadMetadata - self.states.numItersPLR)
+      print("doReadA=%u, doReadB=%u, doReadM=%u, u=%u, kernel[LoopIters]=%u, numIterPerCoalescedReadA=%u, numIterPerCoalescedReadB=%u, numIterPerCoalescedReadMetadata=%u" % \
+            (doReadA, doReadB, doReadM, u, kernel["LoopIters"], \
+             self.states.numIterPerCoalescedReadA, self.states.numIterPerCoalescedReadB, self.states.numIterPerCoalescedReadMetadata))
       doReadA = 0
       doReadB = 0
       doReadM = 0
@@ -2854,13 +2860,13 @@ class KernelWriter(metaclass=abc.ABCMeta):
                 module.addComment1("local read inc b")
                 module.add(self.localReadInc(kernel, iui, tensorParametersB))
       
-      D_U_iseqMI_K = 1
+      kernel["D_U_iseqMI_K"] = 1
       kernel["numSubTilesA"] = 1
       kernel["numSubTilesB"] = 1               
       kernel["SubTileIdxA"] = 0
       kernel["SubTileIdxB"] = 0             
 
-      if D_U_iseqMI_K:
+      if kernel["D_U_iseqMI_K"]:
         self.states.numItersPLR = 1
         # not generate wait for local write if LDS write code is not generated
         if not kernel["NoLdsWriteCode"]:
