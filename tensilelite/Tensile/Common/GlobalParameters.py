@@ -419,6 +419,7 @@ defaultBenchmarkCommonParameters = [
     {"LDSTrInst": [False]},
     {"WaveSplitK": [ False ]},
     {"MbskPrefetchOpt": [0]},
+    {"D_U_iseqMI_K": [False]},
 ]
 
 # dictionary of defaults comprised of default option for each parameter
