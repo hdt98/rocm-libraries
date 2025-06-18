@@ -4654,6 +4654,7 @@ struct PerformanceConfigHipImplicitGemm3DGroupBwdXdlops
     : PerfConfigBaseCK<PerformanceConfigHipImplicitGemm3DGroupBwdXdlops>
 {
     int index;
+    int split_k;
     std::string kernel_id;
     std::vector<std::string> valid_kernels;
     PerformanceConfigHipImplicitGemm3DGroupBwdXdlops(int idx, std::string kernl_id)
