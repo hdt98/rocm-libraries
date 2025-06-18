@@ -268,6 +268,9 @@ if __name__ == '__main__':
     parser.add_argument('--graph',
             action='store_true',
             help='generate graphs using matplotlib')
+    parser.add_argument('--rocprofv3',
+            default=None,
+            help='choose to use rocprofv3 to generate profiling results')
     parser.add_argument('suite',
             choices=suites.keys(),
             help='the set of benchmarks to run')
