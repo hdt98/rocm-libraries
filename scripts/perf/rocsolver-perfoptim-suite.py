@@ -29,8 +29,6 @@ import argparse
 import collections
 import csv
 import math
-import os
-import re
 import shlex
 import sys
 from itertools import chain, repeat
