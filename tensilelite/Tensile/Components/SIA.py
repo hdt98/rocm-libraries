@@ -321,11 +321,10 @@ def getLocalWriteMFMAStart(writer, kernel, tensorParametersA, tensorParametersB,
                     # ds_read[B][1:]
                     calculateLatencyLeft((writer.states.numReadsPerIterB//kernel["InnerUnroll"] - writer.states.numReadsPerUnrollB) * doReadB, tensorParametersB["localReadInstruction"].blockWidth, tensorParametersB["localReadInstruction"].issueLatency)
             lwStartMfmaIndex = numMfmaForCurrentLoopLR
+        elif kernel["D_U_iseqMI_K"]:
+            lwStartMfmaIndex = numMfmaPerIter * (kernel["LoopIters"] - 1 - writer.states.numItersPLR)
         else:
-            if 1:
-                lwStartMfmaIndex = numMfmaPerIter * (kernel["LoopIters"] - 1 - writer.states.numItersPLR)
-            else:
-                lwStartMfmaIndex = numMfmaPerIter * (kernel["LoopIters"] - 1 - writer.states.numItersPLR) + writer.states.numMfmaForLR
+            lwStartMfmaIndex = numMfmaPerIter * (kernel["LoopIters"] - 1 - writer.states.numItersPLR) + writer.states.numMfmaForLR
         # to calculate number of mfma we need to wait before data arrive from lds to vgpr.
         # latency: 40 quad-cycle for 4 word, 20 quad-cycle for 2 word, 10 quad-cycle for 1 word / half word
         if writer.states.numIterPerCoalescedReadB > writer.states.numIterPerCoalescedReadA:
@@ -335,7 +334,7 @@ def getLocalWriteMFMAStart(writer, kernel, tensorParametersA, tensorParametersB,
         latencyForLR -= max(latencyLeft,0) # remaining latency in mfma
         while latencyForLR > 0:
             latencyForLR -= writer.states.miLatency
-            if 0:
+            if not kernel["D_U_iseqMI_K"]:
                 lwStartMfmaIndex += 1
 
     if lwStartMfmaIndex > writer.states.lwEndMfmaIndex:
