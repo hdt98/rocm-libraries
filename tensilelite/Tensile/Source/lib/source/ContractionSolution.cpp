@@ -1240,7 +1240,7 @@ namespace TensileLite
         if(internalArgsSupport.useUniversalArgs)
         {
             auto defaultWGM = sizeMapping.workGroupMapping;
-            // Enable Origami dynamic WGM mapping for all kernels
+            // Allow Origami dynamic WGM mapping for all kernels (enabled by setting TENSILE_STREAMK_DYNAMIC_WGM)
             {
                 AMDGPU const* pAMDGPU = dynamic_cast<AMDGPU const*>(&hardware);
                 if(pAMDGPU->skFixedWGM != 0)
