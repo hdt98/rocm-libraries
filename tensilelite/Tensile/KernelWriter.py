@@ -2142,13 +2142,13 @@ class KernelWriter(metaclass=abc.ABCMeta):
       needNextBufLR = not needExtraDTVLocalReadDo
       hasLiveLdsData = hasLiveLdsData or needExtraDTVLocalReadDo
       # reads for current loop are done in previous iteration because of wider local read
-      doReadA = 0
-      doReadB = 0
-      doReadM = 0
-      if u==0:
-        doReadA = 1
-        doReadB = 1
-        doReadM = 1
+      doReadA = (u < kernel["LoopIters"]/self.states.numIterPerCoalescedReadA - self.states.numItersPLR)
+      doReadB = (u < kernel["LoopIters"]/self.states.numIterPerCoalescedReadB - self.states.numItersPLR)
+      doReadM = (u < kernel["LoopIters"]/self.states.numIterPerCoalescedReadMetadata - self.states.numItersPLR)
+      if kernel["D_U_iseqMI_K"]:
+        doReadA = 1 if u == 0 else 0
+        doReadB = 1 if u == 0 else 0
+        doReadM = 1 if u == 0 else 0
       # reads for next loop
       doReadA = doReadA or (hasLiveLdsData and u > localWriteEndIter)
       doReadB = doReadB or (hasLiveLdsData and u > localWriteEndIter)
@@ -2184,7 +2184,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
           if needNextBufLR:
             localReads.add(localReadCodeB)
           pack[plrIdx*self.states.numIterPerCoalescedReadB].add(packCodeB)
-        if 0: # (not isResetLroIter or iui != kernel["InnerUnroll"]-1):
+        if not kernel["D_U_iseqMI_K"] and (not isResetLroIter or iui != kernel["InnerUnroll"]-1):
           if doReadA:
             localReads.addComment1("local read increment a")
             localReads.add(self.localReadInc(kernel, iui, tensorParametersA))
@@ -2549,17 +2549,12 @@ class KernelWriter(metaclass=abc.ABCMeta):
       doReadA = (u < kernel["LoopIters"]/self.states.numIterPerCoalescedReadA - self.states.numItersPLR)
       doReadB = (u < kernel["LoopIters"]/self.states.numIterPerCoalescedReadB - self.states.numItersPLR)
       doReadM = (u < kernel["LoopIters"]/self.states.numIterPerCoalescedReadMetadata - self.states.numItersPLR)
-      print("doReadA=%u, doReadB=%u, doReadM=%u, u=%u, kernel[LoopIters]=%u, numIterPerCoalescedReadA=%u, numIterPerCoalescedReadB=%u, numIterPerCoalescedReadMetadata=%u" % \
-            (doReadA, doReadB, doReadM, u, kernel["LoopIters"], \
-             self.states.numIterPerCoalescedReadA, self.states.numIterPerCoalescedReadB, self.states.numIterPerCoalescedReadMetadata))
-      doReadA = 0
-      doReadB = 0
-      doReadM = 0
 
-      if u==0:
-        doReadA = 1
-        doReadB = 1
-        doReadM = 1
+      if kernel["D_U_iseqMI_K"]:
+        doReadA = 1 if u == 0 else 0
+        doReadB = 1 if u == 0 else 0
+        doReadM = 1 if u == 0 else 0
+
       # reads for next loop
       doReadA = doReadA or (hasLiveLdsData and u > localWriteEndIter)
       doReadB = doReadB or (hasLiveLdsData and u > localWriteEndIter)
@@ -2596,7 +2591,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
           localReadsB.add(localReadCodeB)
           pack[plrIdx*self.states.numIterPerCoalescedReadB].add(packCodeB)
         # Don't increment the LRO if we are going to reset them below:
-        if 0 :#(not isResetLroIter or iui != kernel["InnerUnroll"]-1):
+        if not kernel["D_U_iseqMI_K"] and (not isResetLroIter or iui != kernel["InnerUnroll"]-1):
           if doReadA:
             localReads.addComment1("local read increment a")
             localReads.add(self.localReadInc(kernel, iui, tensorParametersA))
