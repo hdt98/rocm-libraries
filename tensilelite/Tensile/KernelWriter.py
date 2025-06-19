@@ -2091,7 +2091,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
 
       # which loop iteration to reset the LRO,
       # note if PLR=0, isResetLroIter is False for all u
-      isResetLroIter = (u == localWriteEndIter)
+      isResetLroIter = 1 if kernel["D_U_iseqMI_K"] else (u == localWriteEndIter)
       isSwapAndResetLwoIter = isResetLroIter
       isSwapLroIter = isResetLroIter
       if kernel["ScheduleIterAlg"] == 3:
@@ -2184,7 +2184,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
           if needNextBufLR:
             localReads.add(localReadCodeB)
           pack[plrIdx*self.states.numIterPerCoalescedReadB].add(packCodeB)
-        if not kernel["D_U_iseqMI_K"] and (not isResetLroIter or iui != kernel["InnerUnroll"]-1):
+        if not isResetLroIter or iui != kernel["InnerUnroll"]-1:
           if doReadA:
             localReads.addComment1("local read increment a")
             localReads.add(self.localReadInc(kernel, iui, tensorParametersA))
@@ -2500,7 +2500,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
 
       # which loop iteration to reset the LRO,
       # note if PLR=0, isResetLroIter is False for all u
-      isResetLroIter = (u == localWriteEndIter)
+      isResetLroIter = 1 if kernel["D_U_iseqMI_K"] else (u == localWriteEndIter)
       isSwapAndResetLwoIter = isResetLroIter
       isSwapLroIter = isResetLroIter
       if kernel["ScheduleIterAlg"] == 3:
@@ -2591,7 +2591,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
           localReadsB.add(localReadCodeB)
           pack[plrIdx*self.states.numIterPerCoalescedReadB].add(packCodeB)
         # Don't increment the LRO if we are going to reset them below:
-        if not kernel["D_U_iseqMI_K"] and (not isResetLroIter or iui != kernel["InnerUnroll"]-1):
+        if not isResetLroIter or iui != kernel["InnerUnroll"]-1:
           if doReadA:
             localReads.addComment1("local read increment a")
             localReads.add(self.localReadInc(kernel, iui, tensorParametersA))
