@@ -1199,9 +1199,9 @@ class KernelWriter(metaclass=abc.ABCMeta):
                                         })
         # if start to schedule localwrite, but still have localreads not scheduled yet,
         # reject to use 1LDSB, since it will write and read same lds buffer at same time.
-#        if mfmaIndex > self.states.sync1LdsMfmaIndex and localReadItemsThisLoop and oneBufferScheduling:
+        if mfmaIndex > self.states.sync1LdsMfmaIndex and localReadItemsThisLoop and oneBufferScheduling :
           #TODO: can we remove this restriction?
-#          self.states.overflowedResources = 5
+          self.states.overflowedResources = 5
         for j in range(readLeft):
           if localReadItemsThisLoop:
             item = localReadItemsThisLoop.pop(0)
