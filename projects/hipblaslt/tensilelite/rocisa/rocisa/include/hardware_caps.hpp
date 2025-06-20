@@ -38,27 +38,23 @@ inline bool tryAssembler(const IsaVersion&  isaVersion,
     if(isaVersion[0] >= 10)
         options.push_back("-mwavefrontsize64");
 
+    const char** optionStr        = new const char*[options.size()];
+    std::string  optionOneLineStr = "";
+    for(size_t i = 0; i < options.size(); i++)
+    {
+        optionStr[i] = options[i].c_str();
+        optionOneLineStr += options[i] + " ";
+    }
     std::string isastr = getGfxNameTuple(isaVersion);
 
-    std::vector<std::string> cmd
-        = {assemblerPath, "-x", "assembler", "-target", "amdgcn-amdhsa", "-mcpu=" + isastr};
-    for(auto o : options)
-    {
-        cmd.push_back(o);
-    }
-    cmd.push_back("-");
-    std::vector<char*> args(cmd.size());
-    std::transform(cmd.begin(), cmd.end(), args.begin(), [](auto& str) { return &str[0]; });
-    args.push_back(nullptr);
-    auto [rcode, result] = run(args, asmString, debug);
+    auto [rcode, result] = runComgr(asmString, isastr, optionStr, options.size(), debug);
+    delete[] optionStr;
 
     if(debug)
     {
         std::string s;
-        for(auto c : cmd)
-            s += c + " ";
         std::cout << "isaVersion: " << isastr << std::endl;
-        std::cout << "asm_cmd: " << s << std::endl;
+        std::cout << "options: " << optionOneLineStr << std::endl;
         std::cout << "asmString: " << asmString << std::endl;
         std::cout << "result: " << result << std::endl;
         std::cout << "return code: " << rcode << std::endl;
