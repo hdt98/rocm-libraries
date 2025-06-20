@@ -61,7 +61,7 @@ class argument_profile
     mutable std::ostream* os;
 
     // Mutex for multithreaded access to table
-    mutable std::shared_timed_mutex mutex;
+    mutable std::mutex mutex;
 
     // Table mapping argument tuples into counts
     // size_t is used for the map target type since atomic types are not movable, and
@@ -78,28 +78,20 @@ public:
     // arg is assumed to be an rvalue for efficiency
     void operator()(TUP&& arg)
     {
-        { // Acquire a shared lock for reading map
-            std::shared_lock<std::shared_timed_mutex> lock(mutex);
+        std::lock_guard<std::mutex> lock(mutex);
 
-            // Look up the tuple in the map
-            auto p = map.find(arg);
-
-            // If tuple already exists, atomically increment count and return
-            if(p != map.end())
-            {
-                __atomic_fetch_add(&p->second, 1, __ATOMIC_SEQ_CST);
-                return;
-            }
-        } // Release shared lock
-
-        { // Acquire an exclusive lock for modifying map
-            std::lock_guard<std::shared_timed_mutex> lock(mutex);
-
-            // If doesn't already exist, insert tuple by moving arg and initializing count to 0.
-            // Increment the count after searching for tuple and returning old or new match.
-            // We hold a lock to the map, so we don't have to increment the count atomically.
-            map.emplace(std::move(arg), 0).first->second++;
-        } // Release exclusive lock
+        // Look up the tuple in the map
+        auto p = map.find(arg);
+        if(p != map.end())
+        {
+            // If tuple already exists, increment count 
+            p->second++;
+        }
+        else
+        {
+            // If doesn't already exist, insert tuple by moving arg and initializing count to 1.
+            map.emplace(std::move(arg), 1);
+        }
     }
 
     // Constructor
@@ -112,7 +104,7 @@ public:
     void dump() const
     {
         // Acquire an exclusive lock to use map
-        std::lock_guard<std::shared_timed_mutex> lock(mutex);
+        std::lock_guard<std::mutex> lock(mutex);
 
         // Clear the output buffer
         os->clear();
