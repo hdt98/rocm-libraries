@@ -700,7 +700,7 @@ class Solution:
         isaInfoMap: Dict[str, IsaInfo]
     ):
         return cls.FromOriginalState(
-                   solution._state,
+                   solution,
                    splitGSU,
                    printSolutionRejectionReason,
                    printIndexAssignmentInfo,
@@ -766,15 +766,16 @@ class Solution:
             d['CUCount'] = None
 
         rv.hardwarePredicate = Hardware.HardwarePredicate.FromHardware(d['ISA'], d['CUCount'])
-        rv.originalSolution = OriginalSolution(
-                                  d,
-                                  splitGSU,
-                                  printSolutionRejectionReason,
-                                  printIndexAssignmentInfo,
-                                  assembler,
-                                  isaInfoMap,
-                                  srcName
-                              )
+        rv.originalSolution = d
+        #rv.originalSolution = OriginalSolution(
+        #                          d,
+        #                          splitGSU,
+        #                          printSolutionRejectionReason,
+        #                          printIndexAssignmentInfo,
+        #                          assembler,
+        #                          isaInfoMap,
+        #                          srcName
+        #                      )
         rv.srcName = srcName
 
         return rv
