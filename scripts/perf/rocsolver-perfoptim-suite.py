@@ -31,6 +31,7 @@ import csv
 import math
 import shlex
 import sys
+import os
 from itertools import chain, repeat
 from subprocess import Popen, PIPE
 import matplotlib.pyplot as plt
@@ -220,7 +221,7 @@ def call_rocsolver_bench(bench_executable, *args):
 EXECUTE_BENCHMARKS collects the arguments for the benchmark client, calls
 the client, gets the resulting time, and put everything in file or screen
 """
-def execute_benchmarks(output_file, suite, precision, case, bench_executable, graph):
+def execute_benchmarks(output_file, suite, precision, case, bench_executable, rocprof, graph):
     init = False
     benchmark_generator = suites[suite];
     sizenormal = list(chain(range(2, 64, 8), range(64, 256, 32), range(256, 1024, 64)))
@@ -232,11 +233,18 @@ def execute_benchmarks(output_file, suite, precision, case, bench_executable, gr
         sizenormal += list(chain(range(4096, 8192, 256), range(8192, 12300, 512)))
         sizebatch += list(chain(zip(range(544, 1050, 32), repeat(500)), zip(range(1088, 2050, 64), repeat(50))))
 
-    graph_group = None
-    group_index = None
-    graph_group_values = {}
+    if rocprof:
+        command_executable = "rocprofv3"
+    else:
+        command_executable = bench_executable
+
     for row, n, bench_args in benchmark_generator(suite=suite, precision=precision, sizenormal=sizenormal, sizebatch=sizebatch):
-        out, err, exitcode = call_rocsolver_bench(bench_executable, bench_args)
+        if rocprof:
+            benchmark_string = "_".join([str(x) for x in list(row.values())])
+            command_args = f'--kernel-trace --stats=ON -d {benchmark_string} -o {benchmark_string} -- {bench_executable} {bench_args}'
+        else:
+            command_args = bench_args
+        out, err, exitcode = call_rocsolver_bench(command_executable, command_args)
         if exitcode != 0:
             sys.exit("rocsolver-bench call failure: {}".format(err))
         time = float(out)
@@ -248,37 +256,45 @@ def execute_benchmarks(output_file, suite, precision, case, bench_executable, gr
             results.writeheader()
             init = True
         results.writerow(row)
+        print(benchmark_string)
         if graph:
-            if graph_group is None:
-                group_index = list(row.keys()).index('precision') + 1
-                graph_group = list(row.values())[group_index]
+            generate_graph(benchmark_string)
 
-            group_comparison = list(row.values())[group_index]
+def generate_graph(benchmark_string, n=10):
+    x = []
+    y = []
 
-            if group_comparison != graph_group:
-                generate_graph(graph_group_values, graph_group)
-                graph_group_values.clear()
-                graph_group = group_comparison
+    directory = benchmark_string
+    filename = f'{benchmark_string}_kernel_stats.csv'
+    filepath = os.path.join(directory, filename)
+    with open(filepath, newline='') as csvfile:
+        reader = csv.DictReader(csvfile)
+        for i, row in enumerate(reader):
+            if i >= n:
+                break
+            try:
+                slice_index = row['Name'].index('<')
+            except ValueError:
+                slice_index = -1
+            sliced_name = row['Name'][:slice_index]
+            x.append(sliced_name)
+            y.append(float(row['Percentage']))
 
-            graph_element_key = "_".join([str(x) for x in list(row.values())[group_index:]]) # create a string of all elements after precision
-            print(graph_element_key)
-            print(row)
-            print(row.values())
-            print(group_index)
-            print(list(row.values())[group_index:])
-            graph_group_values[graph_element_key] = time
-    if graph:
-        generate_graph(graph_group_values, graph_group)
+    fig, ax = plt.subplots(figsize=(5, 10))
 
-def generate_graph(graph_group_values, group_name):
-    x = graph_group_values.keys()
-    y = graph_group_values.values()
+    ax.set_ylabel('Proportion of Run Time (%)')
+    ax.set_xlabel('Kernel Name')
 
-    fig, ax = plt.subplots()
-    ax.plot(x, y)
-    fig.suptitle('Time (us)')
-    ax.tick_params("x", rotation=45)
-    plt.savefig(str(group_name))
+    rects = ax.bar(x, y)
+    ax.bar_label(rects)
+
+    ax.set_ylim(0, 1.2*max(y))
+    ax.tick_params("x", rotation=90)
+
+    fig.suptitle('Proportion of Time (%) by Kernel')
+
+    plt.subplots_adjust(bottom=0.40)
+    plt.savefig(str(benchmark_string))
 
 
 #################################################
@@ -297,11 +313,11 @@ if __name__ == '__main__':
             dest='output_path',
             default=None,
             help='the output file name for the benchmark results')
-    parser.add_argument('--graph',
+    parser.add_argument('--graph_rocprof',
             action='store_true',
             help='generate graphs using matplotlib')
     parser.add_argument('--rocprofv3',
-            default=None,
+            action='store_true',
             help='choose to use rocprofv3 to generate profiling results')
     parser.add_argument('suite',
             choices=suites.keys(),
@@ -315,10 +331,13 @@ if __name__ == '__main__':
     args = parser.parse_args()
     setup_vprint(args)
 
+    if args.graph_rocprof and not args.rocprofv3:
+        raise Exception("Error: must enable --rocprofv3 option in order to graph rocprof results.")
+
     if args.output_path is not None:
         with open(args.output_path, 'w', buffering=1, encoding='utf-8') as output_file:
-            execute_benchmarks(output_file, args.suite, args.precision, args.case, args.exe, args.graph)
+            execute_benchmarks(output_file, args.suite, args.precision, args.case, args.exe, args.rocprofv3, args.graph_rocprof)
     else:
-        execute_benchmarks(sys.stdout, args.suite, args.precision, args.case, args.exe, args.graph)
+        execute_benchmarks(sys.stdout, args.suite, args.precision, args.case, args.exe, args.rocprofv3, args.graph_rocprof)
 
 
