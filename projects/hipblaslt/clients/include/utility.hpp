@@ -490,23 +490,23 @@ void print_strided_batched(
 }
 
 /* ===================================================================== */
-/*! \brief For special numerical types, to convert a value to such type. */
+/*! \brief For int8 numerical types, to convert a value to such type. */
 template <typename T, typename Accumulator>
-typename std::enable_if<std::is_same<int8_t, T>::value, T>::type saturate_cast(Accumulator val)
+typename std::enable_if<std::is_same<hipblasLtInt8, T>::value, T>::type saturate_cast(Accumulator val)
 {
     if constexpr(std::is_same<Accumulator, hipblasLtHalf>::value
-                 || std::is_same<Accumulator, hip_bfloat16>::value)
+                 || std::is_same<Accumulator, hipblasLtBfloat16>::value)
     {
-        float tmp = std::nearbyint((float)val); //round to even
-        if(tmp > static_cast<float>(127))
-            tmp = static_cast<float>(127);
-        else if(tmp < static_cast<float>(-128))
-            tmp = static_cast<float>(-128);
+        hipblasLtFloat tmp = std::nearbyint((hipblasLtFloat)val); //round to even
+        if(tmp > static_cast<hipblasLtFloat>(127))
+            tmp = static_cast<hipblasLtFloat>(127);
+        else if(tmp < static_cast<hipblasLtFloat>(-128))
+            tmp = static_cast<hipblasLtFloat>(-128);
         return static_cast<T>(tmp);
     }
     else
     {
-        if constexpr(std::is_same<Accumulator, float>::value
+        if constexpr(std::is_same<Accumulator, hipblasLtFloat>::value
                      || std::is_same<Accumulator, double>::value)
             val = std::nearbyint(val); //round to even
         if(val > static_cast<Accumulator>(127))
@@ -517,10 +517,31 @@ typename std::enable_if<std::is_same<int8_t, T>::value, T>::type saturate_cast(A
     }
 }
 
+/* ===================================================================== */
+/*! \brief For float8/bfloat8 numerical types, to convert a value to such type. */
+template <typename T, typename Accumulator>
+typename std::enable_if<
+    std::is_same<hipblaslt_f8, T>::value || std::is_same<hipblaslt_f8_fnuz, T>::value
+        || std::is_same<hipblaslt_bf8, T>::value || std::is_same<hipblaslt_bf8_fnuz, T>::value,
+    T>::type
+    saturate_cast(Accumulator val)
+{
+    if constexpr(std::is_same<Accumulator, hipblasLtHalf>::value
+                 || std::is_same<Accumulator, hipblasLtBfloat16>::value)
+        return static_cast<T>(static_cast<hipblasLtFloat>(val));
+    else
+        return static_cast<T>(val);
+}
+
 /* ==================================================================== */
 /*! \brief For common numerical types, to convert a value to such type. */
 template <typename T, typename Accumulator>
-typename std::enable_if<!std::is_same<int8_t, T>::value, T>::type saturate_cast(Accumulator val)
+typename std::enable_if<!std::is_same<hipblasLtInt8, T>::value && !std::is_same<hipblaslt_f8, T>::value
+                            && !std::is_same<hipblaslt_f8_fnuz, T>::value
+                            && !std::is_same<hipblaslt_bf8, T>::value
+                            && !std::is_same<hipblaslt_bf8_fnuz, T>::value,
+                        T>::type
+    saturate_cast(Accumulator val)
 {
     return static_cast<T>(val);
 }
