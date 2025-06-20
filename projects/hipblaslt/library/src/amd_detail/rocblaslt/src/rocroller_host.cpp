@@ -38,6 +38,7 @@
 #include <rocRoller/KernelGraph/CoordinateGraph/Dimension.hpp>
 #include <rocRoller/Operations/Command.hpp>
 #include <rocRoller/TensorDescriptor.hpp>
+#include <rocRoller/Expression.hpp>
 
 using namespace rocRoller;
 
