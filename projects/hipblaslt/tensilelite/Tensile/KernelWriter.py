@@ -2091,7 +2091,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
 
       # which loop iteration to reset the LRO,
       # note if PLR=0, isResetLroIter is False for all u
-      isResetLroIter = (u == localWriteEndIter)
+      isResetLroIter = 1 if kernel["D_U_iseqMI_K"] else (u == localWriteEndIter)
       isSwapAndResetLwoIter = isResetLroIter
       isSwapLroIter = isResetLroIter
       if kernel["ScheduleIterAlg"] == 3:
@@ -2145,6 +2145,10 @@ class KernelWriter(metaclass=abc.ABCMeta):
       doReadA = (u < kernel["LoopIters"]/self.states.numIterPerCoalescedReadA - self.states.numItersPLR)
       doReadB = (u < kernel["LoopIters"]/self.states.numIterPerCoalescedReadB - self.states.numItersPLR)
       doReadM = (u < kernel["LoopIters"]/self.states.numIterPerCoalescedReadMetadata - self.states.numItersPLR)
+      if kernel["D_U_iseqMI_K"]:
+        doReadA = 1 if u == 0 else 0
+        doReadB = 1 if u == 0 else 0
+        doReadM = 1 if u == 0 else 0
       # reads for next loop
       doReadA = doReadA or (hasLiveLdsData and u > localWriteEndIter)
       doReadB = doReadB or (hasLiveLdsData and u > localWriteEndIter)
@@ -2258,6 +2262,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
       subIterCode = self._makeSubIterSchedule(kernel, tensorParametersA, tensorParametersB, localReads, \
                       u, pointerLWCode, pointerLRCode, waitCode, macIterCode, waitLWCode, syncCode, pack[luIdx], module, NLLlast)
       module.add(subIterCode)
+      kernel["SubTileIdxA"] = (kernel["SubTileIdxA"] + 1) % kernel["numSubTilesA"]
+      kernel["SubTileIdxB"] = (kernel["SubTileIdxB"] + 1) % kernel["numSubTilesB"]
       pack[luIdx] = Module()
     return module
 
@@ -2494,7 +2500,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
 
       # which loop iteration to reset the LRO,
       # note if PLR=0, isResetLroIter is False for all u
-      isResetLroIter = (u == localWriteEndIter)
+      isResetLroIter = 1 if kernel["D_U_iseqMI_K"] else (u == localWriteEndIter)
       isSwapAndResetLwoIter = isResetLroIter
       isSwapLroIter = isResetLroIter
       if kernel["ScheduleIterAlg"] == 3:
@@ -2543,6 +2549,12 @@ class KernelWriter(metaclass=abc.ABCMeta):
       doReadA = (u < kernel["LoopIters"]/self.states.numIterPerCoalescedReadA - self.states.numItersPLR)
       doReadB = (u < kernel["LoopIters"]/self.states.numIterPerCoalescedReadB - self.states.numItersPLR)
       doReadM = (u < kernel["LoopIters"]/self.states.numIterPerCoalescedReadMetadata - self.states.numItersPLR)
+
+      if kernel["D_U_iseqMI_K"]:
+        doReadA = 1 if u == 0 else 0
+        doReadB = 1 if u == 0 else 0
+        doReadM = 1 if u == 0 else 0
+
       # reads for next loop
       doReadA = doReadA or (hasLiveLdsData and u > localWriteEndIter)
       doReadB = doReadB or (hasLiveLdsData and u > localWriteEndIter)
@@ -2674,6 +2686,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
       subIterCode = self._makeSubIterSchedule(kernel, tensorParametersA, tensorParametersB, localReads, \
                       u, pointerLWCode, pointerLRCode, waitCode, macIterCode, waitLWCode, syncCode, pack[luIdx], module)
       module.add(subIterCode) # add scheduled "other", local reads, local writes
+      kernel["SubTileIdxA"] = (kernel["SubTileIdxA"] + 1) % kernel["numSubTilesA"]
+      kernel["SubTileIdxB"] = (kernel["SubTileIdxB"] + 1) % kernel["numSubTilesB"]
       pack[luIdx] = Module()
 
     # close unrolled loop
@@ -2796,6 +2810,11 @@ class KernelWriter(metaclass=abc.ABCMeta):
 
         module.add(self.closePrefetchGlobalRead2())
 
+      if kernel["D_U_iseqMI_K"]:
+        kernel["LoopIters"] = kernel["numSubTilesA"] * kernel["numSubTilesA"]
+        self.states.numMfmaPerIter = self.states.numMfmaPerIter//kernel["LoopIters"]
+        self.states.numItersPLR = 1
+
       # prefetch-local
       if self.states.numItersPLR:
         # not generate wait for local write if LDS write code is not generated
@@ -2824,16 +2843,18 @@ class KernelWriter(metaclass=abc.ABCMeta):
                 localReadCodeB, packCodeB = self.localReadDo(kernel, plrIdx*self.states.numIterPerCoalescedReadB, iui*self.states.numReadsIterCoalescedB, espi, tensorParametersB)
                 module.add(localReadCodeB)
                 pack[plrIdx].add(packCodeB)
-              if iui*self.states.numReadsIterCoalescedA < kernel["InnerUnroll"]:
+              if not kernel["D_U_iseqMI_K"] and (iui*self.states.numReadsIterCoalescedA < kernel["InnerUnroll"]):
                 module.addComment1("local read inc a")
                 module.add(self.localReadInc(kernel, iui, tensorParametersA))
-              if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]:
+              if not kernel["D_U_iseqMI_K"] and (kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]):
                 if iui*self.states.numReadsIterCoalescedMetadata < kernel["InnerUnroll"]: # no local read code if DirectToVgpr is enabled
                   module.addComment1("local read inc metadata")
                   module.add(self.localReadInc(kernel, iui, tPM))
-              if iui*self.states.numReadsIterCoalescedB < kernel["InnerUnroll"]:
+              if not kernel["D_U_iseqMI_K"] and (iui*self.states.numReadsIterCoalescedB < kernel["InnerUnroll"]):
                 module.addComment1("local read inc b")
                 module.add(self.localReadInc(kernel, iui, tensorParametersB))
+        kernel["SubTileIdxA"] = (kernel["SubTileIdxA"] + 1) % kernel["numSubTilesA"]
+        kernel["SubTileIdxB"] = (kernel["SubTileIdxB"] + 1) % kernel["numSubTilesB"]
       module.add(self.closeSumAtLeastUnroll(kernel, tensorParametersA, tensorParametersB, prefetch=True, isOptNLL=False, isNGLL=False))
 
     loopCopies = 2 if expand else 1
