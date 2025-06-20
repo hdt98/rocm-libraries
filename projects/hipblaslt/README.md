@@ -66,6 +66,7 @@ Required software:
 * CMake 3.16.8 or later
 * python3.8 or later
 * python3.8-venv or later
+* python development headers
 * AMD [ROCm](https://github.com/RadeonOpenCompute/ROCm), version 5.5 or later
 * [hipBLAS-common](https://github.com/ROCm/hipBLAS-common)
 * [roctracer](https://github.com/ROCm/roctracer)
