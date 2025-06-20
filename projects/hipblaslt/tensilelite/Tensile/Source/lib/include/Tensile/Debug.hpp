@@ -139,7 +139,7 @@ namespace TensileLite
         std::string m_metric              = "";
         int         m_gridbasedTopSols    = 1;
         bool        m_benchmark           = false;
-        bool        m_gridbasedKdTree     = false;
+        bool        m_gridbasedKdTree     = true;
         bool        m_gridbasedBatchExp   = false;
         bool        m_printMarker         = false;
 
