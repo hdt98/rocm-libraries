@@ -270,18 +270,17 @@ def constructForkPermutations(forkParams, paramGroups):
         permutation = {}
         pIdx = i
         for name, v in myParams.items():
-            values = deepcopy(v)
             valueIdx = pIdx % len(v)
+            entry = deepcopy(v[valueIdx])
 
             # groups have multiple parameters to update
             if "_group" in name:
-                entry = values[valueIdx]
                 for n2, v2 in entry.items():
                     permutation[n2] = v2
             else:
-                permutation[name] = values[valueIdx]
+                permutation[name] = entry
 
-            pIdx //= len(values)
+            pIdx //= len(v)
         forkPermutations.append(permutation)
 
     return forkPermutations
