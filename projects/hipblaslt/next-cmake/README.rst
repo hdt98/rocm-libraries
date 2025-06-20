@@ -80,6 +80,7 @@ Options
 -------
 
 *CMake options*:
+
 * `CMAKE_BUILD_TYPE`: Any of Release, Debug, RelWithDebInfo, MinSizeRel
 * `CMAKE_INSTALL_PREFIX`: Base installation directory
 * `CMAKE_PREFIX_PATH`: Find package search path (consider setting to ``$ROCM_PATH``)
