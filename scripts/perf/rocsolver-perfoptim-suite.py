@@ -221,7 +221,7 @@ def call_rocsolver_bench(bench_executable, *args):
 EXECUTE_BENCHMARKS collects the arguments for the benchmark client, calls
 the client, gets the resulting time, and put everything in file or screen
 """
-def execute_benchmarks(output_file, suite, precision, case, bench_executable, rocprof, graph):
+def execute_benchmarks(output_file, suite, precision, case, bench_executable, graph, rocprof, graph_rocprof):
     init = False
     benchmark_generator = suites[suite];
     sizenormal = list(chain(range(2, 64, 8), range(64, 256, 32), range(256, 1024, 64)))
@@ -238,7 +238,22 @@ def execute_benchmarks(output_file, suite, precision, case, bench_executable, ro
     else:
         command_executable = bench_executable
 
+    if graph:                   # track metrics related to graphing grouped instances of benchmarks
+        precision_index = None
+        size_index = None
+        current_group = None
+        group_names = []
+        x_groups = []           # 2D array of x axis metrics (typically n) for a group of benchmark instances with all other parameters equal
+        y_groups = []           # 2D array of y axis metrics (typically time) for a group of benchmark instances with all other parameters equal
+        current_x = []
+        current_y = []
     for row, n, bench_args in benchmark_generator(suite=suite, precision=precision, sizenormal=sizenormal, sizebatch=sizebatch):
+        
+        if graph and current_group is None:   # record where to look for grouped instances
+            list_row = list(row.keys())
+            precision_index = list_row.index('precision')
+            size_index = list_row.index('n')
+            current_group = "_".join(list_row[precision_index+1:size_index])
         if rocprof:
             benchmark_string = "_".join([str(x) for x in list(row.values())])
             command_args = f'--kernel-trace --stats=ON -d {benchmark_string} -o {benchmark_string} -- {bench_executable} {bench_args}'
@@ -256,9 +271,25 @@ def execute_benchmarks(output_file, suite, precision, case, bench_executable, ro
             results.writeheader()
             init = True
         results.writerow(row)
-        print(benchmark_string)
-        if graph:
+        if graph_rocprof:
             generate_graph(benchmark_string)
+        if graph:
+            group_string = "_".join(list_row[precision_index+1:size_index])
+            if group_string != current_group:
+                x_groups.append(current_x)
+                y_groups.append(current_y)
+                group_names.append(current_group)
+                current_group = group_name
+                current_x = []
+                current_y = []
+        current_x.append(row['n'])
+        current_y.append(time)
+
+    group_names.append(current_group)
+    x_groups.append(current_x)
+    y_groups.append(current_y)
+
+
 
 def generate_graph(benchmark_string, n=10):
     x = []
@@ -313,9 +344,12 @@ if __name__ == '__main__':
             dest='output_path',
             default=None,
             help='the output file name for the benchmark results')
-    parser.add_argument('--graph_rocprof',
+    parser.add_argument('--graph',
             action='store_true',
             help='generate graphs using matplotlib')
+    parser.add_argument('--graph_rocprof',
+            action='store_true',
+            help='generate graphs of the rocprof results using matplotlib')
     parser.add_argument('--rocprofv3',
             action='store_true',
             help='choose to use rocprofv3 to generate profiling results')
@@ -334,10 +368,19 @@ if __name__ == '__main__':
     if args.graph_rocprof and not args.rocprofv3:
         raise Exception("Error: must enable --rocprofv3 option in order to graph rocprof results.")
 
+    mylist = [5, 10, 15, 20]
+    print(mylist)
+    print(mylist[2:2])
+    print("_".join(mylist[2:2]))
+    a = "_".join(mylist[2:2])
+    b = ""
+    if a==b:
+        print("good")
+
     if args.output_path is not None:
         with open(args.output_path, 'w', buffering=1, encoding='utf-8') as output_file:
-            execute_benchmarks(output_file, args.suite, args.precision, args.case, args.exe, args.rocprofv3, args.graph_rocprof)
+            execute_benchmarks(output_file, args.suite, args.precision, args.case, args.exe, args.graph, args.rocprofv3, args.graph_rocprof)
     else:
-        execute_benchmarks(sys.stdout, args.suite, args.precision, args.case, args.exe, args.rocprofv3, args.graph_rocprof)
+        execute_benchmarks(sys.stdout, args.suite, args.precision, args.case, args.exe, args.graph, args.rocprofv3, args.graph_rocprof)
 
 
