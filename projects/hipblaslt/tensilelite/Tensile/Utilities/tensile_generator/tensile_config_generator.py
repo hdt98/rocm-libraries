@@ -247,19 +247,12 @@ def trans_map(trans):
     else:
         return None
 
-def bias_datatype_map(dtype):
-    if dtype == "f16_r":
-        return [datatype_map('f32_r'), datatype_map('f16_r')]
-    elif dtype == "f32_r":
-        return [datatype_map('f32_r')]
-    elif dtype == "xf32_r":
-        return [datatype_map('xf32_r')]
-    elif dtype == "bf16_r":
-        return [datatype_map('f32_r'), datatype_map('bf16_r')]
-    elif dtype == "f8_r":
-        return [datatype_map('f32_r'), datatype_map('f8_r')]
-    else:
+def bias_datatype_map(bias_type, data_type, compute_type, dest_type):
+    bias_list = list(set([data_type, compute_type, dest_type]))
+    if bias_type in bias_list:
         return []
+    bias_list.append(bias_type)
+    return bias_list
 
 def get_high_precision_accumulate(DataType):
     if DataType in ["H", "B"] + FP8_DTYPES:
@@ -307,7 +300,10 @@ def extract_dtype(match):
     if bias_source:
         res["UseBias"] = 1
         res["BiasSrc"] = bias_source
-        res["BiasDataTypeList"] = list(bias_datatype_map(gdict.get("BIAS_TYPE", '').strip()))
+        bias_type = datatype_map(gdict.get("BIAS_TYPE", '').strip())
+        bias_list = bias_datatype_map(bias_type, DataType, ComputeDataType, DestDataType)
+        if bias_list:
+            res["BiasDataTypeList"] = bias_list
     if activation_type != "none":
         res["Activation"] = True
         res["ActivationType"] = "hipblaslt_all"
@@ -431,9 +427,11 @@ def dump_yaml(gpu_idx, gemm_group, yaml_file, m_sum, n_sum, batch_sum, k_sum, sa
         if i >= len(data["BenchmarkProblems"]):
             data["BenchmarkProblems"].append(copy.deepcopy(data["BenchmarkProblems"][0]))
         data["BenchmarkProblems"][i][1]["BenchmarkFinalParameters"][0]["ProblemSizes"] = gemm_group[dtype_str]
-        if "BiasDataTypeList" in dtype:
-            data["BenchmarkProblems"][i][1]["BenchmarkFinalParameters"].append({"BiasTypeArgs": list(dtype["BiasDataTypeList"])})
-
+        if "UseBias" in dtype and dtype["UseBias"] == 1:
+            if "BiasTypeArgs" in dtype:
+                data["BenchmarkProblems"][i][1]["BenchmarkFinalParameters"].append({"BiasTypeArgs": list(dtype["BiasDataTypeList"])})
+            else:
+                data["BenchmarkProblems"][i][1]["BenchmarkFinalParameters"].append({"BiasTypeArgs": list(dtype["DestDataType"])})
         # Add groupd here if needed
         group_params = [[]]
 
