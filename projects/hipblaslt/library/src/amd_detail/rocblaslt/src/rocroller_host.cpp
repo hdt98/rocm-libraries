@@ -39,6 +39,8 @@
 #include <rocRoller/Operations/Command.hpp>
 #include <rocRoller/TensorDescriptor.hpp>
 
+#include <Tensile/analytical/Utils.hpp>
+
 using namespace rocRoller;
 
 const int MAX_BITS_WORKGROUPTILE_M    = 8;
@@ -651,6 +653,37 @@ const std::vector<WorkGroupTileSize> possibleTileSizes
        {64, 32, 128},   {32, 64, 128},   {64, 16, 128},   {16, 64, 128},  {32, 32, 64},
        {32, 16, 128},   {16, 32, 128},   {16, 16, 128}};
 
+MachineInstructionSize pickMI(KernelType kernelType, WorkGroupTileSize workgroupTile)
+{
+    // Choose the Machine Instruction to use
+    if(kernelType.typeA == rocRoller::DataType::Half
+       || kernelType.typeA == rocRoller::DataType::BFloat16)
+    {
+        return {32, 32, 8, 1};
+    }
+    else if(kernelType.typeA == rocRoller::DataType::Float)
+    {
+        return {32, 32, 2, 1};
+    }
+    else
+    {
+        // F6 with 16X16X256 MI gives higher rnorms than expected with
+        // certain tile sizes
+        if((kernelType.typeA == rocRoller::DataType::FP6
+            || kernelType.typeA == rocRoller::DataType::BF6
+            || kernelType.typeB == rocRoller::DataType::FP6
+            || kernelType.typeB == rocRoller::DataType::BF6)
+           && ((workgroupTile.m == 256 && workgroupTile.n == 64)
+               || (workgroupTile.m == 64 && workgroupTile.n == 256)))
+            return {32, 32, 64, 1};
+        else if(workgroupTile.k % 128 == 0)
+            return {16, 16, 128, 1};
+        else
+            return {32, 32, 64, 1};
+    }
+}
+
+
 /**
  * @brief Choose the SolutionIndexParameters to use for a given problem
  *
@@ -668,8 +701,68 @@ std::vector<SolutionIndexParameters> chooseSolutionIndexParameters(
 {
     std::vector<SolutionIndexParameters> params;
 
+    std::vector<TensileLite::analytical::TileTuple>             tile_list;
+
     for(auto const& wgt : possibleTileSizes)
     {
+        auto MI = pickMI(kernelType, wgt);
+        
+        auto wgtk = wgt.k;
+
+        if(kernelType.typeA == rocRoller::DataType::Half
+            || kernelType.typeA == rocRoller::DataType::BFloat16
+            || kernelType.typeA == rocRoller::DataType::Float)
+        {
+            wgtk = 32;
+        }
+
+        auto solution_tuple = std::make_tuple(
+            wgt.m, // MT_M
+            wgt.n, // MT_N
+            wgtk, // MT_K
+            MI.m, // MI_M
+            MI.n, // MI_N
+            MI.k); // MI_K
+        
+        
+
+
+        tile_list.emplace_back(solution_tuple);
+
+    }
+
+    size_t                elementSizeA_bits
+        = 16; // TODO update for A/B different types
+    size_t elementSizeB_bits
+        = 16; // TODO update for A/B different types
+    size_t elementSizeC_bits
+        = 32; // TODO update for A/B different types
+    const TensileLite::analytical::Hardware analaytical_hardware = TensileLite::analytical::Hardware::getHardwareForDevice(0);
+    int                         WGM
+        = std::sqrt(std::floor(analaytical_hardware.N_CU / analaytical_hardware.NUM_XCD));
+    auto selected_tiles = TensileLite::analytical::select_best_macro_tile_size(
+        prob.m,
+        prob.n,
+        prob.k,
+        prob.batch_count,
+        prob.trans_a == hipblasOperation_t::HIPBLAS_OP_T,
+        prob.trans_b == hipblasOperation_t::HIPBLAS_OP_T,
+        analaytical_hardware,
+        tile_list,
+        elementSizeA_bits,
+        elementSizeA_bits,
+        elementSizeC_bits,
+        0, //mx_block_size -> MX Data types come from rocroller.
+        0.8,
+        true,
+        true,
+        WGM);
+
+    for(auto const& selected_tile : selected_tiles)
+    {
+
+        WorkGroupTileSize wgt{(int)std::get<1>(selected_tile), (int)std::get<2>(selected_tile), (int)std::get<3>(selected_tile)};
+
         if((requestedAlgoCount == -1)
            || (prob.m % wgt.m == 0 && prob.n % wgt.n == 0 && prob.k % wgt.k == 0))
         {
@@ -682,13 +775,6 @@ std::vector<SolutionIndexParameters> chooseSolutionIndexParameters(
                 continue;
 
             params.push_back({wgt, 1});
-
-            if(kernelType.typeA == rocRoller::DataType::Half
-               || kernelType.typeA == rocRoller::DataType::BFloat16
-               || kernelType.typeA == rocRoller::DataType::Float)
-            {
-                params.back().workgroupTile.k = 32;
-            }
 
             // Other datatypes run out of registers when prefetchInFlight is too
             // large.
@@ -733,37 +819,18 @@ std::shared_ptr<SolutionParameters>
 
     gemm->workgroupTile = solutionIndexParameters.workgroupTile;
 
-    // Choose the Machine Instruction to use
-    if(gemm->kernelType.typeA == rocRoller::DataType::Half
-       || gemm->kernelType.typeA == rocRoller::DataType::BFloat16)
-    {
-        gemm->machineInstruction = {32, 32, 8, 1};
-    }
-    else if(gemm->kernelType.typeA == rocRoller::DataType::Float)
-    {
-        gemm->machineInstruction = {32, 32, 2, 1};
-    }
-    else
-    {
-        // F6 with 16X16X256 MI gives higher rnorms than expected with
-        // certain tile sizes
-        if((gemm->kernelType.typeA == rocRoller::DataType::FP6
-            || gemm->kernelType.typeA == rocRoller::DataType::BF6
-            || gemm->kernelType.typeB == rocRoller::DataType::FP6
-            || gemm->kernelType.typeB == rocRoller::DataType::BF6)
-           && ((gemm->workgroupTile.m == 256 && gemm->workgroupTile.n == 64)
-               || (gemm->workgroupTile.m == 64 && gemm->workgroupTile.n == 256)))
-            gemm->machineInstruction = {32, 32, 64, 1};
-        else if(gemm->workgroupTile.k % 128 == 0)
-            gemm->machineInstruction = {16, 16, 128, 1};
-        else
-            gemm->machineInstruction = {32, 32, 64, 1};
-    }
+    std::cout << "WGT: " << gemm->workgroupTile.m << "x" << gemm->workgroupTile.n << "x" << gemm->workgroupTile.k << std::endl;
+
+    gemm->machineInstruction = pickMI(gemm->kernelType, gemm->workgroupTile);
+
+    std::cout << "MI: " << gemm->machineInstruction.m << "x" << gemm->machineInstruction.n << "x" << gemm->machineInstruction.k << std::endl;
 
     if(gemm->workgroupTile.m / gemm->machineInstruction.m == 1)
         gemm->workgroupSizeX = gemm->wavefrontSize;
     if(gemm->workgroupTile.n / gemm->machineInstruction.n == 1)
         gemm->workgroupSizeY = 1;
+
+    std::cout << "WGS: " << gemm->workgroupSizeX << "x" << gemm->workgroupSizeY << std::endl;
 
     if(solutionIndexParameters.prefetchInFlight == 1)
     {
@@ -788,10 +855,14 @@ std::shared_ptr<SolutionParameters>
         gemm->direct2LDSB = false;
     }
 
+    std::cout << "genSolutionParameters::AfterD2LDS" << std::endl;
+
     if(gemm->direct2LDSA == false || gemm->direct2LDSB == false)
     {
         gemm->prefetchLDSFactor = 2;
     }
+
+    std::cout << "genSolutionParameters::AfterPRefecth" << std::endl;
 
     // Swizzle Scale only support in certain situations
     // Swizzle Scale also runs out of registers with FP8
@@ -810,16 +881,22 @@ std::shared_ptr<SolutionParameters>
         gemm->loadLDSScaleB = true;
     }
 
+    std::cout << "genSolutionParameters::AfterSwizzle" << std::endl;
+
     // LDS can only be used for scaling data with certain workgroup tile sizes
     auto workgroupSize = gemm->workgroupSizeX * gemm->workgroupSizeY;
+    std::cout << "gemm->kernelType.scaleABlockRowSize * gemm->kernelType.scaleABlockColSize:" << gemm->kernelType.scaleABlockRowSize * gemm->kernelType.scaleABlockColSize << std::endl;
     auto numScaleElementsA
         = gemm->workgroupTile.m
           * (gemm->workgroupTile.k
              / (gemm->kernelType.scaleABlockRowSize * gemm->kernelType.scaleABlockColSize));
+    std::cout << "numScaleElementsA:" << numScaleElementsA << std::endl;
     auto numScaleElementsB
         = gemm->workgroupTile.n
           * (gemm->workgroupTile.k
              / (gemm->kernelType.scaleBBlockRowSize * gemm->kernelType.scaleBBlockColSize));
+    std::cout << "numScaleElementsB:" << numScaleElementsB << std::endl;
+    std::cout << "genSolutionParameters::afternumScaleElements" << std::endl;
     if(numScaleElementsA % workgroupSize != 0)
     {
         gemm->loadLDSScaleA     = false;
@@ -830,6 +907,8 @@ std::shared_ptr<SolutionParameters>
         gemm->loadLDSScaleB     = false;
         gemm->prefetchMixMemOps = false;
     }
+
+    std::cout << "genSolutionParameters::End" << std::endl;
 
     return gemm;
 }
