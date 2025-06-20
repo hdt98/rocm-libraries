@@ -33,7 +33,7 @@ import shlex
 import sys
 from itertools import chain, repeat
 from subprocess import Popen, PIPE
-import matplotlib as plt
+import matplotlib.pyplot as plt
 
 
 #################################################
@@ -220,7 +220,7 @@ def call_rocsolver_bench(bench_executable, *args):
 EXECUTE_BENCHMARKS collects the arguments for the benchmark client, calls
 the client, gets the resulting time, and put everything in file or screen
 """
-def execute_benchmarks(output_file, suite, precision, case, bench_executable):
+def execute_benchmarks(output_file, suite, precision, case, bench_executable, graph):
     init = False
     benchmark_generator = suites[suite];
     sizenormal = list(chain(range(2, 64, 8), range(64, 256, 32), range(256, 1024, 64)))
@@ -232,6 +232,9 @@ def execute_benchmarks(output_file, suite, precision, case, bench_executable):
         sizenormal += list(chain(range(4096, 8192, 256), range(8192, 12300, 512)))
         sizebatch += list(chain(zip(range(544, 1050, 32), repeat(500)), zip(range(1088, 2050, 64), repeat(50))))
 
+    graph_group = None
+    group_index = None
+    graph_group_values = {}
     for row, n, bench_args in benchmark_generator(suite=suite, precision=precision, sizenormal=sizenormal, sizebatch=sizebatch):
         out, err, exitcode = call_rocsolver_bench(bench_executable, bench_args)
         if exitcode != 0:
@@ -245,6 +248,37 @@ def execute_benchmarks(output_file, suite, precision, case, bench_executable):
             results.writeheader()
             init = True
         results.writerow(row)
+        if graph:
+            if graph_group is None:
+                group_index = list(row.keys()).index('precision') + 1
+                graph_group = list(row.values())[group_index]
+
+            group_comparison = list(row.values())[group_index]
+
+            if group_comparison != graph_group:
+                generate_graph(graph_group_values, graph_group)
+                graph_group_values.clear()
+                graph_group = group_comparison
+
+            graph_element_key = "_".join([str(x) for x in list(row.values())[group_index:]]) # create a string of all elements after precision
+            print(graph_element_key)
+            print(row)
+            print(row.values())
+            print(group_index)
+            print(list(row.values())[group_index:])
+            graph_group_values[graph_element_key] = time
+    if graph:
+        generate_graph(graph_group_values, graph_group)
+
+def generate_graph(graph_group_values, group_name):
+    x = graph_group_values.keys()
+    y = graph_group_values.values()
+
+    fig, ax = plt.subplots()
+    ax.plot(x, y)
+    fig.suptitle('Time (us)')
+    ax.tick_params("x", rotation=45)
+    plt.savefig(str(group_name))
 
 
 #################################################
@@ -283,8 +317,8 @@ if __name__ == '__main__':
 
     if args.output_path is not None:
         with open(args.output_path, 'w', buffering=1, encoding='utf-8') as output_file:
-            execute_benchmarks(output_file, args.suite, args.precision, args.case, args.exe)
+            execute_benchmarks(output_file, args.suite, args.precision, args.case, args.exe, args.graph)
     else:
-        execute_benchmarks(sys.stdout, args.suite, args.precision, args.case, args.exe)
+        execute_benchmarks(sys.stdout, args.suite, args.precision, args.case, args.exe, args.graph)
 
 
