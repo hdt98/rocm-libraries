@@ -247,13 +247,17 @@ def execute_benchmarks(output_file, suite, precision, case, bench_executable, gr
         y_groups = []           # 2D array of y axis metrics (typically time) for a group of benchmark instances with all other parameters equal
         current_x = []
         current_y = []
+        graph_title = None
     for row, n, bench_args in benchmark_generator(suite=suite, precision=precision, sizenormal=sizenormal, sizebatch=sizebatch):
-        
+
         if graph and current_group is None:   # record where to look for grouped instances
             list_row = list(row.keys())
             precision_index = list_row.index('precision')
             size_index = list_row.index('n')
-            current_group = "_".join(list_row[precision_index+1:size_index])
+            list_row_values = list(row.values())
+            keys_and_values = [item for pair in zip(list_row[precision_index+1:size_index], list_row_values[precision_index+1:size_index]) for item in pair]
+            current_group = "_".join([str(x) for x in keys_and_values])
+            graph_title = row['name']
         if rocprof:
             benchmark_string = "_".join([str(x) for x in list(row.values())])
             command_args = f'--kernel-trace --stats=ON -d {benchmark_string} -o {benchmark_string} -- {bench_executable} {bench_args}'
@@ -272,26 +276,58 @@ def execute_benchmarks(output_file, suite, precision, case, bench_executable, gr
             init = True
         results.writerow(row)
         if graph_rocprof:
-            generate_graph(benchmark_string)
+            generate_rocprof_graph(benchmark_string)
         if graph:
-            group_string = "_".join(list_row[precision_index+1:size_index])
+            list_row = list(row.keys())
+            list_row_values = list(row.values())
+            keys_and_values = [item for pair in zip(list_row[precision_index+1:size_index], list_row_values[precision_index+1:size_index]) for item in pair]
+            group_string = "_".join([str(x) for x in keys_and_values])
             if group_string != current_group:
+                group_names.append(current_group)
                 x_groups.append(current_x)
                 y_groups.append(current_y)
-                group_names.append(current_group)
-                current_group = group_name
+                current_group = group_string
                 current_x = []
                 current_y = []
-        current_x.append(row['n'])
-        current_y.append(time)
+            current_x.append(row['n'])
+            current_y.append(time)
 
-    group_names.append(current_group)
-    x_groups.append(current_x)
-    y_groups.append(current_y)
+    if graph:
+        group_names.append(current_group)
+        x_groups.append(current_x)
+        y_groups.append(current_y)
+        generate_graph(group_names, x_groups, y_groups, graph_title)
+    print(group_names)
+    print(len(x_groups))
+    print(x_groups)
+    print(len(y_groups))
+    print(y_groups)
+    for item in y_groups:
+        print(len(item))
+    for item in x_groups:
+        print(len(item))
 
 
+# each group represents a line on the graph
+def generate_graph(group_names, x_groups, y_groups, filename):
+    assert len(group_names) == len(x_groups) == len(y_groups)
+    for i in range(len(group_names)):
+        assert len(x_groups[i]) == len(y_groups[i])
 
-def generate_graph(benchmark_string, n=10):
+    fig, ax = plt.subplots()
+    for name, x_group, y_group in zip(group_names, x_groups, y_groups):
+        ax.plot(x_group, y_group, label=name)
+
+    ax.set_xlabel('Input Size (n)')
+    ax.set_ylabel('Total Time (ms)')
+
+    ax.legend()
+
+    fig.suptitle(f'{filename} Total Runtime by Size')
+
+    plt.savefig(filename)
+
+def generate_rocprof_graph(benchmark_string, n=10):
     x = []
     y = []
 
@@ -367,15 +403,6 @@ if __name__ == '__main__':
 
     if args.graph_rocprof and not args.rocprofv3:
         raise Exception("Error: must enable --rocprofv3 option in order to graph rocprof results.")
-
-    mylist = [5, 10, 15, 20]
-    print(mylist)
-    print(mylist[2:2])
-    print("_".join(mylist[2:2]))
-    a = "_".join(mylist[2:2])
-    b = ""
-    if a==b:
-        print("good")
 
     if args.output_path is not None:
         with open(args.output_path, 'w', buffering=1, encoding='utf-8') as output_file:
