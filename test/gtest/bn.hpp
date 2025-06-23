@@ -329,50 +329,104 @@ protected:
         {
             if(api_type == BNApiType::testBNAPIV1)
             {
-                res = miopenBatchNormalizationBackward(&handle,
-                                                       bn_mode,
-                                                       &bn_bwd_test_data.alphaDataDiff,
-                                                       &bn_bwd_test_data.betaDataDiff,
-                                                       &bn_bwd_test_data.alphaParamDiff,
-                                                       &bn_bwd_test_data.betaParamDiff,
-                                                       &bn_bwd_test_data.input.desc,
-                                                       bn_bwd_test_data.in_dev.get(),
-                                                       &bn_bwd_test_data.dy.desc,
-                                                       bn_bwd_test_data.dy_dev.get(),
-                                                       &bn_bwd_test_data.output.desc,
-                                                       bn_bwd_test_data.out_dev.get(),
-                                                       &bn_bwd_test_data.bnScale.desc,
-                                                       bn_bwd_test_data.bnScale_dev.get(),
-                                                       bn_bwd_test_data.dScale_dev.get(),
-                                                       bn_bwd_test_data.dBias_dev.get(),
-                                                       bn_bwd_test_data.epsilon,
-                                                       bn_bwd_test_data.savedMean_dev.get(),
-                                                       bn_bwd_test_data.savedInvVar_dev.get());
+                if(bn_bwd_test_data.saveMeanVar)
+                {
+                    res = miopenBatchNormalizationBackward(&handle,
+                                                           bn_mode,
+                                                           &bn_bwd_test_data.alphaDataDiff,
+                                                           &bn_bwd_test_data.betaDataDiff,
+                                                           &bn_bwd_test_data.alphaParamDiff,
+                                                           &bn_bwd_test_data.betaParamDiff,
+                                                           &bn_bwd_test_data.input.desc,
+                                                           bn_bwd_test_data.in_dev.get(),
+                                                           &bn_bwd_test_data.dy.desc,
+                                                           bn_bwd_test_data.dy_dev.get(),
+                                                           &bn_bwd_test_data.output.desc,
+                                                           bn_bwd_test_data.out_dev.get(),
+                                                           &bn_bwd_test_data.bnScale.desc,
+                                                           bn_bwd_test_data.bnScale_dev.get(),
+                                                           bn_bwd_test_data.dScale_dev.get(),
+                                                           bn_bwd_test_data.dBias_dev.get(),
+                                                           bn_bwd_test_data.epsilon,
+                                                           bn_bwd_test_data.savedMean_dev.get(),
+                                                           bn_bwd_test_data.savedInvVar_dev.get());
+                }
+                else
+                {
+                    res = miopenBatchNormalizationBackward(&handle,
+                                                           bn_mode,
+                                                           &bn_bwd_test_data.alphaDataDiff,
+                                                           &bn_bwd_test_data.betaDataDiff,
+                                                           &bn_bwd_test_data.alphaParamDiff,
+                                                           &bn_bwd_test_data.betaParamDiff,
+                                                           &bn_bwd_test_data.input.desc,
+                                                           bn_bwd_test_data.in_dev.get(),
+                                                           &bn_bwd_test_data.dy.desc,
+                                                           bn_bwd_test_data.dy_dev.get(),
+                                                           &bn_bwd_test_data.output.desc,
+                                                           bn_bwd_test_data.out_dev.get(),
+                                                           &bn_bwd_test_data.bnScale.desc,
+                                                           bn_bwd_test_data.bnScale_dev.get(),
+                                                           bn_bwd_test_data.dScale_dev.get(),
+                                                           bn_bwd_test_data.dBias_dev.get(),
+                                                           bn_bwd_test_data.epsilon,
+                                                           nullptr,
+                                                           nullptr);
+                }
             }
             else if(api_type == BNApiType::testBNAPIV2)
             {
-                res = miopenBatchNormalizationBackward_V2(&handle,
-                                                          bn_mode,
-                                                          &bn_bwd_test_data.alphaDataDiff,
-                                                          &bn_bwd_test_data.betaDataDiff,
-                                                          &bn_bwd_test_data.alphaParamDiff,
-                                                          &bn_bwd_test_data.betaParamDiff,
-                                                          &bn_bwd_test_data.input.desc,
-                                                          bn_bwd_test_data.in_dev.get(),
-                                                          &bn_bwd_test_data.dy.desc,
-                                                          bn_bwd_test_data.dy_dev.get(),
-                                                          &bn_bwd_test_data.output.desc,
-                                                          bn_bwd_test_data.out_dev.get(),
-                                                          &bn_bwd_test_data.bnScale.desc,
-                                                          &bn_bwd_test_data.dBias.desc,
-                                                          &bn_bwd_test_data.savedMean.desc,
-                                                          &bn_bwd_test_data.savedInvVar.desc,
-                                                          bn_bwd_test_data.bnScale_dev.get(),
-                                                          bn_bwd_test_data.dScale_dev.get(),
-                                                          bn_bwd_test_data.dBias_dev.get(),
-                                                          bn_bwd_test_data.epsilon,
-                                                          bn_bwd_test_data.savedMean_dev.get(),
-                                                          bn_bwd_test_data.savedInvVar_dev.get());
+                if(bn_bwd_test_data.saveMeanVar)
+                {
+                    res =
+                        miopenBatchNormalizationBackward_V2(&handle,
+                                                            bn_mode,
+                                                            &bn_bwd_test_data.alphaDataDiff,
+                                                            &bn_bwd_test_data.betaDataDiff,
+                                                            &bn_bwd_test_data.alphaParamDiff,
+                                                            &bn_bwd_test_data.betaParamDiff,
+                                                            &bn_bwd_test_data.input.desc,
+                                                            bn_bwd_test_data.in_dev.get(),
+                                                            &bn_bwd_test_data.dy.desc,
+                                                            bn_bwd_test_data.dy_dev.get(),
+                                                            &bn_bwd_test_data.output.desc,
+                                                            bn_bwd_test_data.out_dev.get(),
+                                                            &bn_bwd_test_data.bnScale.desc,
+                                                            &bn_bwd_test_data.dBias.desc,
+                                                            &bn_bwd_test_data.savedMean.desc,
+                                                            &bn_bwd_test_data.savedInvVar.desc,
+                                                            bn_bwd_test_data.bnScale_dev.get(),
+                                                            bn_bwd_test_data.dScale_dev.get(),
+                                                            bn_bwd_test_data.dBias_dev.get(),
+                                                            bn_bwd_test_data.epsilon,
+                                                            bn_bwd_test_data.savedMean_dev.get(),
+                                                            bn_bwd_test_data.savedInvVar_dev.get());
+                }
+                else
+                {
+                    res = miopenBatchNormalizationBackward_V2(&handle,
+                                                              bn_mode,
+                                                              &bn_bwd_test_data.alphaDataDiff,
+                                                              &bn_bwd_test_data.betaDataDiff,
+                                                              &bn_bwd_test_data.alphaParamDiff,
+                                                              &bn_bwd_test_data.betaParamDiff,
+                                                              &bn_bwd_test_data.input.desc,
+                                                              bn_bwd_test_data.in_dev.get(),
+                                                              &bn_bwd_test_data.dy.desc,
+                                                              bn_bwd_test_data.dy_dev.get(),
+                                                              &bn_bwd_test_data.output.desc,
+                                                              bn_bwd_test_data.out_dev.get(),
+                                                              &bn_bwd_test_data.bnScale.desc,
+                                                              &bn_bwd_test_data.dBias.desc,
+                                                              &bn_bwd_test_data.savedMean.desc,
+                                                              &bn_bwd_test_data.savedInvVar.desc,
+                                                              bn_bwd_test_data.bnScale_dev.get(),
+                                                              bn_bwd_test_data.dScale_dev.get(),
+                                                              bn_bwd_test_data.dBias_dev.get(),
+                                                              bn_bwd_test_data.epsilon,
+                                                              nullptr,
+                                                              nullptr);
+                }
             }
             else
                 GTEST_FAIL() << "ERROR: unknown bn api type!!";
