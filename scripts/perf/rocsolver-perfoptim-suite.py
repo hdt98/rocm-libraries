@@ -320,6 +320,7 @@ def generate_graph(group_names, x_groups, y_groups, filename):
     fig.suptitle(f'{filename} Total Runtime by Size')
 
     plt.savefig(filename)
+    plt.close()
 
 """
 GENEREATE_ROCPROF_GRAPH generates a graph that decomposes the total runtime of a
@@ -361,7 +362,9 @@ def generate_rocprof_graph(benchmark_string, n=10):
     fig.suptitle('Proportion of Time (%) by Kernel')
 
     plt.subplots_adjust(bottom=0.40)
-    plt.savefig(str(benchmark_string))
+    graph_filepath = os.path.join(directory, benchmark_string)
+    plt.savefig(graph_filepath)
+    plt.close()
 
 
 #################################################
