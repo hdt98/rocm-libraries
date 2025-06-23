@@ -297,18 +297,12 @@ def execute_benchmarks(output_file, suite, precision, case, bench_executable, gr
         x_groups.append(current_x)
         y_groups.append(current_y)
         generate_graph(group_names, x_groups, y_groups, graph_title)
-    print(group_names)
-    print(len(x_groups))
-    print(x_groups)
-    print(len(y_groups))
-    print(y_groups)
-    for item in y_groups:
-        print(len(item))
-    for item in x_groups:
-        print(len(item))
 
-
-# each group represents a line on the graph
+"""
+GENERATE_GRAPH generates a graph of the changing runtime as a function of input size.
+this function is invoked upon groups of inputs and their resulting runtime as collected
+by the EXECUTE_BENCHMARKS function
+"""
 def generate_graph(group_names, x_groups, y_groups, filename):
     assert len(group_names) == len(x_groups) == len(y_groups)
     for i in range(len(group_names)):
@@ -327,6 +321,12 @@ def generate_graph(group_names, x_groups, y_groups, filename):
 
     plt.savefig(filename)
 
+"""
+GENEREATE_ROCPROF_GRAPH generates a graph that decomposes the total runtime of a
+test suite into the individual kernels that are invoked as a part of that function.
+this function uses the results produced by invoking the test suite with rocprof.
+n controls the number of kernels that are shown (top n contributors to total runtime).
+"""
 def generate_rocprof_graph(benchmark_string, n=10):
     x = []
     y = []
