@@ -59,6 +59,8 @@ Required hardware:
 * gfx90a card
 * gfx94x card
 * gfx110x card
+* gfx120x card
+* gfx1151 card
 
 Required software:
 
