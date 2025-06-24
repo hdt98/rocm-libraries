@@ -4,7 +4,8 @@
 #pragma once
 #include "data_type.hpp"
 #include "amd_address_space.hpp"
-#if defined(__gfx1300__) || defined(__gfx1301__) || defined(__gfx1302__)
+#if defined(__gfx1300__) || defined(__gfx1301__) || defined(__gfx1302__) || \
+    defined(__gfx130E__) || defined(__gfx130F__)
 #define __gfx13__
 #endif
 
@@ -1342,22 +1343,13 @@ __device__ auto amd_tr_load_to_vgpr(const T* in_ptr, bool is_src_valid)
 
 template <typename T, index_t N, index_t NumThreadsPerTile, index_t NumVgprsPerTile>
 __device__ auto amd_tile_load_to_vgpr(__attribute__((address_space(1))) const T* in_ptr,
-                                      bool is_src_valid,
-                                      index_t thread_id)
+                                      bool is_src_valid)
 {
     using vector_t = typename vector_type_maker<T, N>::type::type;
 #if defined(__gfx13__)
     if(is_src_valid)
     {
-        ignore = thread_id;
-        if constexpr(NumThreadsPerTile == 2 && NumVgprsPerTile == 2)
-        {
-            __attribute__((address_space(1))) int32x2_t* global_ptr =
-                const_cast<__attribute__((address_space(1))) int32x2_t*>(
-                    reinterpret_cast<const __attribute__((address_space(1))) int32x2_t*>(in_ptr));
-            return bit_cast<vector_t>(__builtin_amdgcn_global_tiled_load_b64(global_ptr));
-        }
-        else if constexpr(NumThreadsPerTile == 2 && NumVgprsPerTile == 1)
+        if constexpr(NumThreadsPerTile == 2)
         {
             __attribute__((address_space(1))) int32_t* global_ptr =
                 const_cast<__attribute__((address_space(1))) int32_t*>(
@@ -1371,6 +1363,16 @@ __device__ auto amd_tile_load_to_vgpr(__attribute__((address_space(1))) const T*
                     reinterpret_cast<const __attribute__((address_space(1))) int32_t*>(in_ptr));
             return bit_cast<vector_t>(__builtin_amdgcn_global_tiled_load_qtr_b128(global_ptr));
         }
+        /* Remove for padding 4x4 + normal 4x4 */
+        /*
+        else if constexpr(NumThreadsPerTile == 2 && NumVgprsPerTile == 2)
+        {
+            __attribute__((address_space(1))) int32x2_t* global_ptr =
+                const_cast<__attribute__((address_space(1))) int32x2_t*>(
+                    reinterpret_cast<const __attribute__((address_space(1))) int32x2_t*>(in_ptr));
+            return bit_cast<vector_t>(__builtin_amdgcn_global_tiled_load_b64(global_ptr));
+        }
+        */
         else
         {
             static_assert(0, "wrong! not implemented");
@@ -1383,7 +1385,6 @@ __device__ auto amd_tile_load_to_vgpr(__attribute__((address_space(1))) const T*
 #else
     ignore = in_ptr;
     ignore = is_src_valid;
-    ignore = thread_id;
     return vector_t{0};
 #endif
 }
@@ -1510,45 +1511,100 @@ amd_tile_store_to_buffer(const typename vector_type_maker<T, N>::type::type src_
 #endif
 }
 
-template <typename T,
-          index_t N,
-          AddressSpaceEnum BufferAddressSpace,
-          GlobalLoadTypeEnum MultiCastLoad>
-__device__ auto amd_multicast_load_to_vgpr(__attribute__((address_space(1))) const T* in_ptr,
-                                           bool is_src_valid)
+template <typename T, index_t N, AddressSpaceEnum BufferAddressSpace>
+__device__ auto
+amd_wgp_multicast_load_to_vgpr(__attribute__((address_space(1))) const T* in_ptr,
+                               typename vector_type<remove_cvref_t<T>, N>::type& out,
+                               bool is_src_valid)
 {
-    using vector_t = typename vector_type_maker<T, N>::type::type;
 #if defined(__gfx13__)
-    if constexpr(is_same_v<remove_cvref_t<T>, ck::half_t>)
+    if(is_src_valid)
     {
-        if(is_src_valid)
+        if constexpr(is_same_v<remove_cvref_t<T>, ck::half_t> && N == 2)
         {
-            if constexpr(MultiCastLoad ==
-                         GlobalLoadTypeEnum::CLUSTER_MULTICAST_LOAD) // Cluster MutiCast load
-            {
-                __attribute__((address_space(1))) int32_t* global_ptr =
-                    const_cast<__attribute__((address_space(1))) int32_t*>(
-                        reinterpret_cast<const __attribute__((address_space(1))) int32_t*>(in_ptr));
-                return bit_cast<vector_t>(__builtin_amdgcn_cluster_load_b32(global_ptr, 0, 0xf));
-            }
-            else if constexpr(MultiCastLoad ==
-                              GlobalLoadTypeEnum::WGP_MULTICAST_LOAD) // WGP MultiCast load
-            {
-                __attribute__((address_space(1))) int32_t* global_ptr =
-                    const_cast<__attribute__((address_space(1))) int32_t*>(
-                        reinterpret_cast<const __attribute__((address_space(1))) int32_t*>(in_ptr));
-                return bit_cast<vector_t>(
-                    __builtin_amdgcn_cluster_load_b32(global_ptr, 0, 0xf << 16));
-            }
-            else
-            {
-                return vector_t{0};
-            }
+            __attribute__((address_space(1))) int32_t* global_ptr =
+                const_cast<__attribute__((address_space(1))) int32_t*>(
+                    reinterpret_cast<const __attribute__((address_space(1))) int32_t*>(in_ptr));
+
+            __attribute__((address_space(10))) int32_t* lane_vgpr_ptr =
+                reinterpret_cast<__attribute__((address_space(10))) int32_t*>(
+                    reinterpret_cast<uintptr_t>(&out));
+            __builtin_amdgcn_load_mcast_b32(lane_vgpr_ptr, global_ptr, 10, 0xf << 16);
+        }
+        else if constexpr(is_same_v<remove_cvref_t<T>, ck::half_t> && N == 4)
+        {
+            __attribute__((address_space(1))) int32x2_t* global_ptr =
+                const_cast<__attribute__((address_space(1))) int32x2_t*>(
+                    reinterpret_cast<const __attribute__((address_space(1))) int32x2_t*>(in_ptr));
+
+            __attribute__((address_space(10))) int32x2_t* lane_vgpr_ptr =
+                reinterpret_cast<__attribute__((address_space(10))) int32x2_t*>(
+                    reinterpret_cast<uintptr_t>(&out));
+            __builtin_amdgcn_load_mcast_b64(lane_vgpr_ptr, global_ptr, 10, 0xf << 16);
+        }
+        else if constexpr(is_same_v<remove_cvref_t<T>, ck::half_t> && N == 8)
+        {
+            __attribute__((address_space(1))) int32x4_t* global_ptr =
+                const_cast<__attribute__((address_space(1))) int32x4_t*>(
+                    reinterpret_cast<const __attribute__((address_space(1))) int32x4_t*>(in_ptr));
+
+            __attribute__((address_space(10))) int32x4_t* lane_vgpr_ptr =
+                reinterpret_cast<__attribute__((address_space(10))) int32x4_t*>(
+                    reinterpret_cast<uintptr_t>(&out));
+            __builtin_amdgcn_load_mcast_b128(lane_vgpr_ptr, global_ptr, 10, 0xf << 16);
         }
         else
         {
+            // To add for other types.
+        }
+    }
+#else
+    ignore = in_ptr;
+    ignore = out;
+    ignore = is_src_valid;
+#endif
+    return;
+}
+
+template <typename T, index_t N, AddressSpaceEnum BufferAddressSpace>
+__device__ auto amd_cluster_multicast_load_to_vgpr(__attribute__((address_space(1)))
+                                                   const T* in_ptr,
+                                                   bool is_src_valid)
+{
+    using vector_t = typename vector_type_maker<T, N>::type::type;
+#if defined(__gfx13__)
+    if(is_src_valid)
+    {
+        if constexpr(is_same_v<remove_cvref_t<T>, ck::half_t> && N == 2)
+        {
+            __attribute__((address_space(1))) int32_t* global_ptr =
+                const_cast<__attribute__((address_space(1))) int32_t*>(
+                    reinterpret_cast<const __attribute__((address_space(1))) int32_t*>(in_ptr));
+            return bit_cast<vector_t>(__builtin_amdgcn_cluster_load_b32(global_ptr, 0, 0xf));
+        }
+        else if constexpr(is_same_v<remove_cvref_t<T>, ck::half_t> && N == 4)
+        {
+            __attribute__((address_space(1))) int32x2_t* global_ptr =
+                const_cast<__attribute__((address_space(1))) int32x2_t*>(
+                    reinterpret_cast<const __attribute__((address_space(1))) int32x2_t*>(in_ptr));
+            return bit_cast<vector_t>(__builtin_amdgcn_cluster_load_b64(global_ptr, 0, 0xf));
+        }
+        else if constexpr(is_same_v<remove_cvref_t<T>, ck::half_t> && N == 8)
+        {
+            __attribute__((address_space(1))) int32x4_t* global_ptr =
+                const_cast<__attribute__((address_space(1))) int32x4_t*>(
+                    reinterpret_cast<const __attribute__((address_space(1))) int32x4_t*>(in_ptr));
+            return bit_cast<vector_t>(__builtin_amdgcn_cluster_load_b128(global_ptr, 0, 0xf));
+        }
+        else
+        {
+            // To add for other types
             return vector_t{0};
         }
+    }
+    else
+    {
+        return vector_t{0};
     }
 #else
     ignore = in_ptr;
@@ -1556,5 +1612,4 @@ __device__ auto amd_multicast_load_to_vgpr(__attribute__((address_space(1))) con
     return vector_t{0};
 #endif
 }
-
 } // namespace ck

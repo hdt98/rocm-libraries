@@ -291,18 +291,13 @@ struct BlockwiseConvWcnn
 
     __host__ __device__ static constexpr auto GetInWaveDescLength()
     {
-        constexpr index_t num_access_per_thread =
-            wcnn_conv.template GetInDataPerTileLoad<InDataTileLoad>();
-        constexpr index_t num_subImageTile_load =
-            wcnn_conv.template GetInDataPerSubImageTileLoad<InDataTileLoad>();
-
         return Sequence<WPerWaveIn / WPerWcnn,
                         CPerWave / CPerWcnn,
                         HPerWaveIn / HPerWcnn,
-                        num_subImageTile_load,
+                        NumSubTilePerImage,
                         1,
                         1,
-                        num_access_per_thread>{};
+                        NumDataCompPerTile>{};
     }
     __device__ __host__ static auto CalculateInDataThreadOriginDataIndex()
     {

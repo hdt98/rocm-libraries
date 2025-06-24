@@ -750,6 +750,9 @@ def get_fwd_splitkv_blobs(kernel_filter : Optional[str], receipt, mask_impl) -> 
                         if pipeline.F_spad != 't' or pipeline.F_skpad != 't':
                             # in group mode, spad/skpad must be true, since we can't predict if seqlen of current batch need pad or not
                             continue
+                    # logits_soft_cap is only allowed if no bias
+                    if not ((pipeline.F_logits == 't' and pipeline.F_bias == 'no') or pipeline.F_logits == 'f'):
+                        continue
                     k = Kernel(F_idx=0,
                             F_hdim=hdim,
                             F_dtype=dtype,

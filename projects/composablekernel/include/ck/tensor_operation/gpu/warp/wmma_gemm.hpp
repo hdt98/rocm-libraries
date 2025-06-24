@@ -937,7 +937,6 @@ struct wmma_type<WmmaInstr::wmma_f32_16x16x64_f8f6f4_gfx13,
     static constexpr index_t loop_of_consecutive = num_acc_per_thread / num_consecutive_acc;
     template <index_t MPerWmma,
               index_t NPerWmma,
-              index_t KPerWmma,
               typename AType,
               typename BType,
               index_t ABlockSel,
@@ -1326,9 +1325,9 @@ struct WmmaGemm
                     wmma_instr.template run<MPerWmma,
                                             NPerWmma,
                                             KPerWmma,
-                                            FloatA,
-                                            FloatB,
-                                            FloatC,
+                                            remove_cvref_t<decltype(p_a_wave[k])>,
+                                            remove_cvref_t<decltype(p_b_wave[k])>,
+                                            remove_cvref_t<decltype(p_c_thread)>,
                                             neg_a,
                                             neg_b>(p_a_wave[k], p_b_wave[k], p_c_thread);
                 }
@@ -1337,9 +1336,9 @@ struct WmmaGemm
                     wmma_instr.template run<MPerWmma,
                                             NPerWmma,
                                             KPerWmma,
-                                            FloatA,
-                                            FloatB,
-                                            FloatC,
+                                            remove_cvref_t<decltype(p_b_wave[k])>,
+                                            remove_cvref_t<decltype(p_a_wave[k])>,
+                                            remove_cvref_t<decltype(p_c_thread)>,
                                             neg_b,
                                             neg_a>(p_b_wave[k], p_a_wave[k], p_c_thread);
                 }

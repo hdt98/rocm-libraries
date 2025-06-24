@@ -411,13 +411,21 @@ struct ThreadwiseTensorSliceTransfer_v2
                                                       SrcScalarPerVector,
                                                       ThreadLengthPerTile,
                                                       VgprLengthPerTile>(
-                                src_coord_.GetOffset(), get_thread_local_1d_id(), is_src_valid);
+                                src_coord_.GetOffset() / PackedSize, is_src_valid);
                     }
-                    else if constexpr(GlobalMulticastLoad != GlobalLoadTypeEnum::DEFAULT_LOAD)
+                    else if constexpr(GlobalMulticastLoad ==
+                                      GlobalLoadTypeEnum::CLUSTER_MULTICAST_LOAD)
                     {
                         src_vector.template AsType<src_vector_t>()(Number<0>{}) =
-                            src_buf.template multicastLoad<src_vector_t, GlobalMulticastLoad>(
-                                src_coord_.GetOffset(), is_src_valid);
+                            src_buf.template clusterMulticastLoad<src_vector_t>(
+                                src_coord_.GetOffset() / PackedSize, is_src_valid);
+                    }
+                    else if constexpr(GlobalMulticastLoad == GlobalLoadTypeEnum::WGP_MULTICAST_LOAD)
+                    {
+                        src_buf.template wgpMulticastLoad<src_vector_t>(
+                            src_vector.template AsType<src_vector_t>()(Number<0>{}),
+                            src_coord_.GetOffset() / PackedSize,
+                            is_src_valid);
                     }
                     else
                     {
@@ -466,13 +474,18 @@ struct ThreadwiseTensorSliceTransfer_v2
                                                                  SrcScalarPerVector,
                                                                  ThreadLengthPerTile,
                                                                  VgprLengthPerTile>(
-                            src_coord_.GetOffset(), get_thread_local_1d_id(), is_src_valid);
+                            src_coord_.GetOffset() / PackedSize, is_src_valid);
                     }
-                    else if constexpr(GlobalMulticastLoad != GlobalLoadTypeEnum::DEFAULT_LOAD)
+                    else if constexpr(GlobalMulticastLoad ==
+                                      GlobalLoadTypeEnum::CLUSTER_MULTICAST_LOAD)
                     {
-                        *dst_buf_ptr =
-                            src_buf.template multicastLoad<src_vector_t, GlobalMulticastLoad>(
-                                src_coord_.GetOffset(), is_src_valid);
+                        *dst_buf_ptr = src_buf.template clusterMulticastLoad<src_vector_t>(
+                            src_coord_.GetOffset() / PackedSize, is_src_valid);
+                    }
+                    else if constexpr(GlobalMulticastLoad == GlobalLoadTypeEnum::WGP_MULTICAST_LOAD)
+                    {
+                        src_buf.template wgpMulticastLoad<src_vector_t>(
+                            *dst_buf_ptr, src_coord_.GetOffset() / PackedSize, is_src_valid);
                     }
                     else
                     {
@@ -497,13 +510,20 @@ struct ThreadwiseTensorSliceTransfer_v2
                                                   SrcScalarPerVector,
                                                   ThreadLengthPerTile,
                                                   VgprLengthPerTile>(
-                            src_coord_.GetOffset(), get_thread_local_1d_id(), is_src_valid);
+                            src_coord_.GetOffset() / PackedSize, is_src_valid);
                 }
-                else if constexpr(GlobalMulticastLoad != GlobalLoadTypeEnum::DEFAULT_LOAD)
+                else if constexpr(GlobalMulticastLoad == GlobalLoadTypeEnum::CLUSTER_MULTICAST_LOAD)
                 {
                     src_vector.template AsType<src_vector_t>()(Number<0>{}) =
-                        src_buf.template multicastLoad<src_vector_t, GlobalMulticastLoad>(
-                            src_coord_.GetOffset(), is_src_valid);
+                        src_buf.template clusterMulticastLoad<src_vector_t>(
+                            src_coord_.GetOffset() / PackedSize, is_src_valid);
+                }
+                else if constexpr(GlobalMulticastLoad == GlobalLoadTypeEnum::WGP_MULTICAST_LOAD)
+                {
+                    src_buf.template wgpMulticastLoad<src_vector_t>(
+                        src_vector.template AsType<src_vector_t>()(Number<0>{}),
+                        src_coord_.GetOffset() / PackedSize,
+                        is_src_valid);
                 }
                 else
                 {

@@ -462,6 +462,7 @@ int main(int argc, char* argv[])
     {
         return -1;
     }
+
     // clang-format off
     //                |SrcType |GPUAccType | LdsMode |TestMask
     pass &= run_test_fmt<half_t,  float,   0x7, 0x1  >();
@@ -480,7 +481,6 @@ int main(int argc, char* argv[])
     // This tests can be passed only when https://github.amd.com/GFX-Modeling/shader_complex_ffm/pull/1284 merged.
     pass &= run_test_fmt<half_t,  half_t,  0x30, 0x800 >();
     pass &= run_test_fmt<half_t,  float,   0x30, 0x800 >();
-
     // clang-format on
     std::cout << "grouped_conv_fwd_wcnn: ..... " << (pass ? "SUCCESS" : "FAILURE") << std::endl;
     return pass ? 0 : 1;
