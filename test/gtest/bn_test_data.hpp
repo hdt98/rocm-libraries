@@ -176,6 +176,16 @@ inline std::vector<BN3DTestCase> Network3DBN()
     // clang-format on
 }
 
+template <typename T, typename ScaleT, typename RangeT>
+void fill_tensor_with_random_values(tensor<T>& t, ScaleT scale, RangeT range)
+{
+    // Create a random number generator
+    auto gen = uniform_signed_initializer<T>(scale, range);
+
+    // Fill the tensor's data with random values
+    std::generate(t.data.begin(), t.data.end(), gen);
+}
+
 template <typename XDataType, typename YDataType, typename AccDataType, typename TConfig>
 struct BNTestData
 {
@@ -221,7 +231,10 @@ private:
     void InitTensorsWithRandValue()
     {
         // -2.0 to 2.0
-        input.generate(uniform_signed_initializer<XDataType>(2e-3 /*scale*/, 1000 /*range*/));
+        if(this->saveMeanVar)
+            input.generate(uniform_signed_initializer<XDataType>(2e-3 /*scale*/, 1000 /*range*/));
+        else
+            fill_tensor_with_random_values(input, 2e-3 /*scale*/, 1000 /*range*/);
     }
 
     void SetDirection() { direction = bn_config.Direction; }
@@ -400,16 +413,6 @@ private:
             derivedBnDesc.GetLengths()};
     }
 
-    template <typename T, typename ScaleT, typename RangeT>
-    void fill_tensor_with_random_values(tensor<T>& t, ScaleT scale, RangeT range)
-    {
-        // Create a random number generator
-        auto gen = uniform_signed_initializer<T>(scale, range);
-
-        // Fill the tensor's data with random values
-        std::generate(t.data.begin(), t.data.end(), gen);
-    }
-
     void InitTensorsWithRandValue()
     {
         if(this->saveMeanVar)
@@ -417,13 +420,24 @@ private:
         else
             fill_tensor_with_random_values(dy, 2e-3 /*scale*/, 1000 /*range*/);
 
-        bnScale.generate(uniform_signed_initializer<ScaleDataType>(2e-3 /*scale*/, 1000 /*range*/));
-        bnBias.generate(uniform_signed_initializer<ScaleDataType>(2e-3 /*scale*/, 1000 /*range*/));
-        savedMean.generate(
-            uniform_signed_initializer<MeanVarDataType>(2e-3 /*scale*/, 1000 /*range*/));
-        savedInvVar.generate(
-            uniform_signed_initializer<MeanVarDataType>(2e-3 /*scale*/, 1000 /*range*/));
-
+        if(this->saveMeanVar)
+        {
+            bnScale.generate(
+                uniform_signed_initializer<ScaleDataType>(2e-3 /*scale*/, 1000 /*range*/));
+            bnBias.generate(
+                uniform_signed_initializer<ScaleDataType>(2e-3 /*scale*/, 1000 /*range*/));
+            savedMean.generate(
+                uniform_signed_initializer<MeanVarDataType>(2e-3 /*scale*/, 1000 /*range*/));
+            savedInvVar.generate(
+                uniform_signed_initializer<MeanVarDataType>(2e-3 /*scale*/, 1000 /*range*/));
+        }
+        else
+        {
+            fill_tensor_with_random_values(bnScale, 2e-3 /*scale*/, 1000 /*range*/);
+            fill_tensor_with_random_values(bnBias, 2e-3 /*scale*/, 1000 /*range*/);
+            fill_tensor_with_random_values(savedMean, 2e-3 /*scale*/, 1000 /*range*/);
+            fill_tensor_with_random_values(savedInvVar, 2e-3 /*scale*/, 1000 /*range*/);
+        }
         std::fill(dScale.begin(), dScale.end(), 0.);
         std::fill(dBias.begin(), dBias.end(), 0.);
 
