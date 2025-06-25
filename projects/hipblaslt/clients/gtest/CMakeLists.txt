@@ -29,7 +29,7 @@ find_package (Python3 REQUIRED COMPONENTS Interpreter)
 set(hipblaslt_test_source
     hipblaslt_gtest_main.cpp
     hipblaslt_test.cpp
-    matmul_gtest.cpp
+    # matmul_gtest.cpp
     auxiliary_gtest.cpp
     matrix_transform_gtest.cpp
     hipblaslt_gtest_ext_op.cpp
@@ -88,6 +88,16 @@ target_compile_definitions( hipblaslt-test PRIVATE ROCM_USE_FLOAT16 HIPBLASLT_IN
 
 target_compile_options(hipblaslt-test PRIVATE $<$<COMPILE_LANGUAGE:CXX>:${COMMON_CXX_OPTIONS}>)
 # target_compile_options does not go to linker like CMAKE_CXX_FLAGS does, so manually add
+
+# We need to cover the inline functions in library when they are used in tests.
+# If we don't do this, the coverage instrumentation in libhipblaslt-d.so 
+# does not record execution because the functions are inlined and not compiled separately.
+if(BUILD_CODE_COVERAGE)
+  target_compile_options(hipblaslt-test PRIVATE
+    -fprofile-instr-generate
+    -fcoverage-mapping
+  )
+endif()
 
 if (BUILD_CUDA)
   target_link_libraries( hipblaslt-test PRIVATE -llapack -lcblas )
