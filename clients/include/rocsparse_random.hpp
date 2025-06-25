@@ -30,36 +30,156 @@
 
 #include <random>
 #include <type_traits>
-
-/* ==================================================================================== */
-// Random number generator
+#include <vector>
 
 using rocsparse_rng_t = std::mt19937;
 
-void rocsparse_rng_set(rocsparse_rng_t a);
+namespace rocsparse
+{
+    class random
+    {
+    private:
+        random();
+        ~random()                        = default;
+        random(const random&)            = delete;
+        random& operator=(const random&) = delete;
 
-void rocsparse_seed_set(rocsparse_rng_t a);
+        rocsparse_rng_t rng;
+        rocsparse_rng_t rng_nan;
+        rocsparse_rng_t rng_seed;
 
-void rocsparse_rng_nan_set(rocsparse_rng_t a);
+        int                 rand_uniform_idx;
+        int                 rand_normal_idx;
+        std::vector<double> rand_uniform_cache;
+        std::vector<double> rand_normal_cache;
 
-rocsparse_rng_t& rocsparse_rng_get();
+        float  uniform_float(float a, float b);
+        double uniform_double(double a, double b);
+        int    uniform_int(int a, int b);
+        double normal_double();
 
-rocsparse_rng_t& rocsparse_seed_get();
+    public:
+        static random& Instance()
+        {
+            static random instance;
+            return instance;
+        }
 
-rocsparse_rng_t& rocsparse_rng_nan_get();
+        void reset_seed()
+        {
+            rand_uniform_idx = 0;
+            rand_normal_idx  = 0;
 
-// extern  rocsparse_rng_t rocsparse_rng, rocsparse_seed, rocsparse_rng_nan;
+            rng_set(rng_seed);
+            rng_nan_set(rng_seed);
+        }
 
-extern int rocsparse_rand_uniform_idx;
-extern int rocsparse_rand_normal_idx;
+        void rng_set(rocsparse_rng_t a)
+        {
+            rng = a;
+        }
+        void rng_nan_set(rocsparse_rng_t a)
+        {
+            rng_nan = a;
+        }
+        void rng_seed_set(rocsparse_rng_t a)
+        {
+            rng_seed = a;
+        }
+
+        rocsparse_rng_t& rng_get()
+        {
+            return rng;
+        }
+        rocsparse_rng_t& rng_nan_get()
+        {
+            return rng_nan;
+        }
+        rocsparse_rng_t& rng_seed_get()
+        {
+            return rng_seed;
+        }
+
+        /*! \brief  generate a random number in range [a,b] using integer numbers*/
+        template <typename T>
+        T random_generator_exact(int a = 1, int b = 10);
+
+        /*! \brief  generate a random number in range [a,b]*/
+        template <typename T, typename std::enable_if_t<std::is_integral<T>::value, bool> = true>
+        T random_generator(T a = static_cast<T>(1), T b = static_cast<T>(10));
+
+        template <typename T, typename std::enable_if_t<!std::is_integral<T>::value, bool> = true>
+        T random_generator(T a = static_cast<T>(0), T b = static_cast<T>(1));
+
+        /*! \brief  generate a random number in range [a,b] from a predetermined finite cache using integer numbers*/
+        template <typename T>
+        T random_cached_generator_exact(int a = 1, int b = 10);
+
+        /*! \brief  generate a random number in range [a,b] from a predetermined finite cache*/
+        template <typename T, typename std::enable_if_t<std::is_integral<T>::value, bool> = true>
+        T random_cached_generator(T a = static_cast<T>(1), T b = static_cast<T>(10));
+
+        template <typename T, typename std::enable_if_t<!std::is_integral<T>::value, bool> = true>
+        T random_cached_generator(T a = static_cast<T>(0), T b = static_cast<T>(1));
+
+        /*! \brief generate a random normally distributed number around 0 with stddev 1 from a predetermined finite cache */
+        template <typename T>
+        T random_cached_generator_normal();
+    };
+}
+
+/* ==================================================================================== */
+/* generate random number :*/
+
+/*! \brief  generate a random number in range [a,b] using integer numbers*/
+template <typename T>
+inline T random_generator_exact(int a = 1, int b = 10)
+{
+    return rocsparse::random::Instance().random_generator_exact<T>(a, b);
+}
+
+/*! \brief  generate a random number in range [a,b]*/
+template <typename T, typename std::enable_if_t<std::is_integral<T>::value, bool> = true>
+inline T random_generator(T a = static_cast<T>(1), T b = static_cast<T>(10))
+{
+    return rocsparse::random::Instance().random_generator<T>(a, b);
+}
+
+template <typename T, typename std::enable_if_t<!std::is_integral<T>::value, bool> = true>
+inline T random_generator(T a = static_cast<T>(0), T b = static_cast<T>(1))
+{
+    return rocsparse::random::Instance().random_generator<T>(a, b);
+}
+
+/*! \brief  generate a random number in range [a,b] from a predetermined finite cache using integer numbers*/
+template <typename T>
+inline T random_cached_generator_exact(int a = 1, int b = 10)
+{
+    return rocsparse::random::Instance().random_cached_generator_exact<T>(a, b);
+}
+
+/*! \brief  generate a random number in range [a,b] from a predetermined finite cache*/
+template <typename T, typename std::enable_if_t<std::is_integral<T>::value, bool> = true>
+inline T random_cached_generator(T a = static_cast<T>(1), T b = static_cast<T>(10))
+{
+    return rocsparse::random::Instance().random_cached_generator<T>(a, b);
+}
+
+template <typename T, typename std::enable_if_t<!std::is_integral<T>::value, bool> = true>
+inline T random_cached_generator(T a = static_cast<T>(0), T b = static_cast<T>(1))
+{
+    return rocsparse::random::Instance().random_cached_generator<T>(a, b);
+}
+
+/*! \brief generate a random normally distributed number around 0 with stddev 1 from a predetermined finite cache */
+template <typename T>
+inline T random_cached_generator_normal()
+{
+    return rocsparse::random::Instance().random_cached_generator_normal<T>();
+}
 
 // Reset the seed (mainly to ensure repeatability of failures in a given suite)
 void rocsparse_seedrand();
-
-int    rocsparse_uniform_int(int a, int b);
-float  rocsparse_uniform_float(float a, float b);
-double rocsparse_uniform_double(double a, double b);
-double rocsparse_normal_double();
 
 /* ==================================================================================== */
 /*! \brief  Random number generator which generates NaN values */
@@ -77,7 +197,8 @@ class rocsparse_nan_rng
             T      fp;
         } x;
         do
-            x.u = std::uniform_int_distribution<UINT_T>{}(rocsparse_rng_nan_get());
+            x.u = std::uniform_int_distribution<UINT_T>{}(
+                rocsparse::random::Instance().rng_nan_get());
         while(!(x.u & (((UINT_T)1 << SIG) - 1))); // Reject Inf (mantissa == 0)
         x.u |= (((UINT_T)1 << EXP) - 1) << SIG; // Exponent = all 1's
         return x.fp; // NaN with random bits
@@ -88,7 +209,7 @@ public:
     template <typename T, typename std::enable_if<std::is_integral<T>{}, int>::type = 0>
     explicit operator T()
     {
-        return std::uniform_int_distribution<T>{}(rocsparse_rng_nan_get());
+        return std::uniform_int_distribution<T>{}(rocsparse::random::Instance().rng_nan_get());
     }
 
     // Random int8_t
@@ -96,7 +217,7 @@ public:
     {
         return (int8_t)std::uniform_int_distribution<int>(std::numeric_limits<int8_t>::min(),
                                                           std::numeric_limits<int8_t>::max())(
-            rocsparse_rng_nan_get());
+            rocsparse::random::Instance().rng_nan_get());
     }
 
     // Random char
@@ -104,7 +225,7 @@ public:
     {
         return (char)std::uniform_int_distribution<int>(std::numeric_limits<char>::min(),
                                                         std::numeric_limits<char>::max())(
-            rocsparse_rng_nan_get());
+            rocsparse::random::Instance().rng_nan_get());
     }
 
     // Random NaN half
@@ -141,145 +262,5 @@ public:
         return {double(*this), double(*this)};
     }
 };
-
-/* ==================================================================================== */
-/* generate random number :*/
-
-/*! \brief  generate a random number in range [a,b] using integer numbers*/
-template <typename T>
-inline T random_generator_exact(int a = 1, int b = 10)
-{
-    return std::uniform_int_distribution<int>(a, b)(rocsparse_rng_get());
-}
-
-template <>
-inline rocsparse_float_complex random_generator_exact<rocsparse_float_complex>(int a, int b)
-{
-    return rocsparse_float_complex(random_generator_exact<float>(a, b),
-                                   random_generator_exact<float>(a, b));
-}
-
-template <>
-inline rocsparse_double_complex random_generator_exact<rocsparse_double_complex>(int a, int b)
-{
-    return rocsparse_double_complex(random_generator_exact<double>(a, b),
-                                    random_generator_exact<double>(a, b));
-}
-
-/*! \brief  generate a random number in range [a,b]*/
-template <typename T, typename std::enable_if_t<std::is_integral<T>::value, bool> = true>
-inline T random_generator(T a = static_cast<T>(1), T b = static_cast<T>(10))
-{
-    return random_generator_exact<T>(a, b);
-}
-
-template <typename T, typename std::enable_if_t<!std::is_integral<T>::value, bool> = true>
-inline T random_generator(T a = static_cast<T>(0), T b = static_cast<T>(1))
-{
-    return std::uniform_real_distribution<T>(a, b)(rocsparse_rng_get());
-}
-
-template <>
-inline rocsparse_float_complex random_generator<rocsparse_float_complex>(rocsparse_float_complex a,
-                                                                         rocsparse_float_complex b)
-{
-    float theta = random_generator<float>(0.0f, 2.0f * acos(-1.0f));
-    float r     = random_generator<float>(std::abs(a), std::abs(b));
-
-    return rocsparse_float_complex(r * cos(theta), r * sin(theta));
-}
-
-template <>
-inline rocsparse_double_complex
-    random_generator<rocsparse_double_complex>(rocsparse_double_complex a,
-                                               rocsparse_double_complex b)
-{
-    double theta = random_generator<double>(0.0, 2.0 * acos(-1.0));
-    double r     = random_generator<double>(std::abs(a), std::abs(b));
-
-    return rocsparse_double_complex(r * cos(theta), r * sin(theta));
-}
-
-/*! \brief  generate a random number in range [a,b] from a predetermined finite cache using integer numbers*/
-template <typename T>
-inline T random_cached_generator_exact(int a = 1, int b = 10)
-{
-    return rocsparse_uniform_int(a, b);
-}
-
-template <>
-inline float random_cached_generator_exact(int a, int b)
-{
-    return static_cast<float>(rocsparse_uniform_int(a, b));
-}
-
-template <>
-inline double random_cached_generator_exact(int a, int b)
-{
-    return static_cast<double>(rocsparse_uniform_int(a, b));
-}
-
-template <>
-inline rocsparse_float_complex random_cached_generator_exact<rocsparse_float_complex>(int a, int b)
-{
-    return rocsparse_float_complex(random_cached_generator_exact<float>(a, b),
-                                   random_cached_generator_exact<float>(a, b));
-}
-
-template <>
-inline rocsparse_double_complex random_cached_generator_exact<rocsparse_double_complex>(int a,
-                                                                                        int b)
-{
-    return rocsparse_double_complex(random_cached_generator_exact<double>(a, b),
-                                    random_cached_generator_exact<double>(a, b));
-}
-
-/*! \brief  generate a random number in range [a,b] from a predetermined finite cache*/
-template <typename T, typename std::enable_if_t<std::is_integral<T>::value, bool> = true>
-inline T random_cached_generator(T a = static_cast<T>(1), T b = static_cast<T>(10))
-{
-    return random_cached_generator_exact<T>(a, b);
-}
-
-template <typename T, typename std::enable_if_t<!std::is_integral<T>::value, bool> = true>
-inline T random_cached_generator(T a = static_cast<T>(0), T b = static_cast<T>(1))
-{
-    return static_cast<T>(rocsparse_uniform_float(a, b));
-}
-
-template <>
-inline double random_cached_generator(double a, double b)
-{
-    return rocsparse_uniform_double(a, b);
-}
-
-template <>
-inline rocsparse_float_complex
-    random_cached_generator<rocsparse_float_complex>(rocsparse_float_complex a,
-                                                     rocsparse_float_complex b)
-{
-    float theta = random_cached_generator<float>(0.0f, 2.0f * acos(-1.0f));
-    float r     = random_cached_generator<float>(std::abs(a), std::abs(b));
-
-    return rocsparse_float_complex(r * cos(theta), r * sin(theta));
-}
-
-template <>
-inline rocsparse_double_complex
-    random_cached_generator<rocsparse_double_complex>(rocsparse_double_complex a,
-                                                      rocsparse_double_complex b)
-{
-    double theta = random_cached_generator<double>(0.0, 2.0 * acos(-1.0));
-    double r     = random_cached_generator<double>(std::abs(a), std::abs(b));
-
-    return rocsparse_double_complex(r * cos(theta), r * sin(theta));
-}
-
-/*! \brief generate a random normally distributed number around 0 with stddev 1 from a predetermined finite cache */
-template <typename T>
-inline T random_cached_generator_normal()
-{
-    return static_cast<T>(rocsparse_normal_double());
-}
 
 #endif // ROCSPARSE_RANDOM_HPP

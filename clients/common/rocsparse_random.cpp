@@ -1,6 +1,6 @@
 /*! \file */
 /* ************************************************************************
- * Copyright (C) 2023-2024 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2023-2025 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -26,121 +26,220 @@
 #include "rocsparse_reproducibility.hpp"
 #include <iostream>
 
-// Random number generator
-// Note: We do not use random_device to initialize the RNG, because we want
-// repeatability in case of test failure. TODO: Add seed as an optional CLI
-// argument, and print the seed on output, to ensure repeatability.
-rocsparse_rng_t rocsparse_rng(69069);
-rocsparse_rng_t rocsparse_rng_nan(69069);
-rocsparse_rng_t rocsparse_seed(rocsparse_rng);
+#define RANDOM_CACHE_SIZE 1024
+
+rocsparse::random::random()
+    : rng(69069)
+    , rng_nan(69069)
+    , rng_seed(rng)
+{
+    rand_uniform_cache.resize(RANDOM_CACHE_SIZE);
+    rand_normal_cache.resize(RANDOM_CACHE_SIZE);
+
+    for(int i = 0; i < RANDOM_CACHE_SIZE; i++)
+    {
+        rand_uniform_cache[i] = std::uniform_real_distribution<double>(0.0, 1.0)(rng_get());
+    }
+
+    for(int i = 0; i < RANDOM_CACHE_SIZE; i++)
+    {
+        rand_normal_cache[i] = std::normal_distribution<double>(0.0, 1.0)(rng_get());
+    }
+
+    reset_seed();
+}
+
+float rocsparse::random::uniform_float(float a, float b)
+{
+    rand_uniform_idx = (rand_uniform_idx + 1) & (RANDOM_CACHE_SIZE - 1);
+
+    return a + rand_uniform_cache[rand_uniform_idx] * (b - a);
+}
+
+double rocsparse::random::uniform_double(double a, double b)
+{
+    rand_uniform_idx = (rand_uniform_idx + 1) & (RANDOM_CACHE_SIZE - 1);
+
+    return a + rand_uniform_cache[rand_uniform_idx] * (b - a);
+}
+
+int rocsparse::random::uniform_int(int a, int b)
+{
+    return uniform_float(static_cast<float>(a), static_cast<float>(b));
+}
+
+double rocsparse::random::normal_double()
+{
+    rand_normal_idx = (rand_normal_idx + 1) & (RANDOM_CACHE_SIZE - 1);
+
+    return rand_normal_cache[rand_normal_idx];
+}
 
 void rocsparse_seedrand()
 {
-    rocsparse_rng_set(rocsparse_seed_get());
-    rocsparse_rng_nan_set(rocsparse_seed_get());
-
-    rocsparse_rand_uniform_idx = 0;
-    rocsparse_rand_normal_idx  = 0;
+    rocsparse::random::Instance().reset_seed();
 }
 
-void rocsparse_rng_set(rocsparse_rng_t a)
+template <typename T>
+T rocsparse::random::random_generator_exact(int a, int b)
 {
-    rocsparse_rng = a;
+    return std::uniform_int_distribution<int>(a, b)(rng_get());
 }
 
-void rocsparse_seed_set(rocsparse_rng_t a)
+template <typename T, typename std::enable_if_t<std::is_integral<T>::value, bool>>
+T rocsparse::random::random_generator(T a, T b)
 {
-    rocsparse_seed = a;
+    return random_generator_exact<T>(a, b);
 }
 
-void rocsparse_rng_nan_set(rocsparse_rng_t a)
+template <typename T, typename std::enable_if_t<!std::is_integral<T>::value, bool>>
+T rocsparse::random::random_generator(T a, T b)
 {
-    rocsparse_rng_nan = a;
+    return std::uniform_real_distribution<T>(a, b)(rng_get());
 }
 
-rocsparse_rng_t& rocsparse_rng_get()
+template <typename T>
+T rocsparse::random::random_cached_generator_exact(int a, int b)
 {
-    return rocsparse_rng;
+    return uniform_int(a, b);
 }
 
-rocsparse_rng_t& rocsparse_seed_get()
+template <typename T, typename std::enable_if_t<std::is_integral<T>::value, bool>>
+T rocsparse::random::random_cached_generator(T a, T b)
 {
-    return rocsparse_seed;
+    return random_cached_generator_exact<T>(a, b);
 }
 
-rocsparse_rng_t& rocsparse_rng_nan_get()
+template <typename T, typename std::enable_if_t<!std::is_integral<T>::value, bool>>
+T rocsparse::random::random_cached_generator(T a, T b)
 {
-    return rocsparse_rng_nan;
+    return static_cast<T>(uniform_float(a, b));
 }
 
-#define RANDOM_CACHE_SIZE 1024
-
-int rocsparse_rand_uniform_idx;
-int rocsparse_rand_normal_idx;
-
-static int s_rand_uniform_init = 0;
-static int s_rand_normal_init  = 0;
-
-// random uniform numbers between 0.0 - 1.0
-static double s_rand_uniform_array[RANDOM_CACHE_SIZE];
-// random normal numbers between 0.0 - 1.0
-static double s_rand_normal_array[RANDOM_CACHE_SIZE];
-
-void generate_random_cache()
+template <typename T>
+T rocsparse::random::random_cached_generator_normal()
 {
-    if(!s_rand_uniform_init)
-    {
-        for(int i = 0; i < RANDOM_CACHE_SIZE; i++)
-        {
-            s_rand_uniform_array[i]
-                = std::uniform_real_distribution<double>(0.0, 1.0)(rocsparse_rng_get());
-        }
-        s_rand_uniform_init = 1;
-        if(rocsparse_reproducibility_t::instance().is_enabled())
-            rocsparse_seedrand();
-    }
-
-    if(!s_rand_normal_init)
-    {
-        for(int i = 0; i < RANDOM_CACHE_SIZE; i++)
-        {
-            s_rand_normal_array[i]
-                = std::normal_distribution<double>(0.0, 1.0)(rocsparse_rng_get());
-        }
-        s_rand_normal_init = 1;
-        if(rocsparse_reproducibility_t::instance().is_enabled())
-            rocsparse_seedrand();
-    }
+    return static_cast<T>(normal_double());
 }
 
-float rocsparse_uniform_float(float a, float b)
+template int32_t rocsparse::random::random_generator_exact<int32_t>(int a, int b);
+template int64_t rocsparse::random::random_generator_exact<int64_t>(int a, int b);
+
+template int8_t   rocsparse::random::random_cached_generator<int8_t, true>(int8_t a, int8_t b);
+template int32_t  rocsparse::random::random_cached_generator<int32_t, true>(int32_t a, int32_t b);
+template int64_t  rocsparse::random::random_cached_generator<int64_t, true>(int64_t a, int64_t b);
+template uint64_t rocsparse::random::random_cached_generator<uint64_t, true>(uint64_t a,
+                                                                             uint64_t b);
+template _Float16 rocsparse::random::random_cached_generator<_Float16, true>(_Float16 a,
+                                                                             _Float16 b);
+template rocsparse_bfloat16
+    rocsparse::random::random_cached_generator<rocsparse_bfloat16, true>(rocsparse_bfloat16 a,
+                                                                         rocsparse_bfloat16 b);
+template float rocsparse::random::random_cached_generator<float, true>(float a, float b);
+
+template int8_t   rocsparse::random::random_cached_generator_exact<int8_t>(int a, int b);
+template int32_t  rocsparse::random::random_cached_generator_exact<int32_t>(int a, int b);
+template int64_t  rocsparse::random::random_cached_generator_exact<int64_t>(int a, int b);
+template uint64_t rocsparse::random::random_cached_generator_exact<uint64_t>(int a, int b);
+template _Float16 rocsparse::random::random_cached_generator_exact<_Float16>(int a, int b);
+template rocsparse_bfloat16
+    rocsparse::random::random_cached_generator_exact<rocsparse_bfloat16>(int a, int b);
+
+template float  rocsparse::random::random_cached_generator_normal<float>();
+template double rocsparse::random::random_cached_generator_normal<double>();
+
+template int32_t rocsparse::random::random_generator<int32_t, true>(int32_t a, int32_t b);
+
+template <>
+rocsparse_float_complex rocsparse::random::random_generator_exact<rocsparse_float_complex>(int a,
+                                                                                           int b)
 {
-    generate_random_cache();
-
-    rocsparse_rand_uniform_idx = (rocsparse_rand_uniform_idx + 1) & (RANDOM_CACHE_SIZE - 1);
-
-    return a + s_rand_uniform_array[rocsparse_rand_uniform_idx] * (b - a);
+    return rocsparse_float_complex(rocsparse::random::random_generator_exact<float>(a, b),
+                                   rocsparse::random::random_generator_exact<float>(a, b));
 }
 
-double rocsparse_uniform_double(double a, double b)
+template <>
+rocsparse_double_complex rocsparse::random::random_generator_exact<rocsparse_double_complex>(int a,
+                                                                                             int b)
 {
-    generate_random_cache();
-
-    rocsparse_rand_uniform_idx = (rocsparse_rand_uniform_idx + 1) & (RANDOM_CACHE_SIZE - 1);
-
-    return a + s_rand_uniform_array[rocsparse_rand_uniform_idx] * (b - a);
+    return rocsparse_double_complex(rocsparse::random::random_generator_exact<double>(a, b),
+                                    rocsparse::random::random_generator_exact<double>(a, b));
 }
 
-int rocsparse_uniform_int(int a, int b)
+template <>
+rocsparse_float_complex
+    rocsparse::random::random_generator<rocsparse_float_complex>(rocsparse_float_complex a,
+                                                                 rocsparse_float_complex b)
 {
-    return rocsparse_uniform_float(static_cast<float>(a), static_cast<float>(b));
+    float theta = rocsparse::random::random_generator<float>(0.0f, 2.0f * acos(-1.0f));
+    float r     = rocsparse::random::random_generator<float>(std::abs(a), std::abs(b));
+
+    return rocsparse_float_complex(r * cos(theta), r * sin(theta));
 }
 
-double rocsparse_normal_double()
+template <>
+rocsparse_double_complex
+    rocsparse::random::random_generator<rocsparse_double_complex>(rocsparse_double_complex a,
+                                                                  rocsparse_double_complex b)
 {
-    generate_random_cache();
+    double theta = rocsparse::random::random_generator<double>(0.0, 2.0 * acos(-1.0));
+    double r     = rocsparse::random::random_generator<double>(std::abs(a), std::abs(b));
 
-    rocsparse_rand_normal_idx = (rocsparse_rand_normal_idx + 1) & (RANDOM_CACHE_SIZE - 1);
+    return rocsparse_double_complex(r * cos(theta), r * sin(theta));
+}
 
-    return s_rand_normal_array[rocsparse_rand_normal_idx];
+template <>
+float rocsparse::random::random_cached_generator_exact(int a, int b)
+{
+    return static_cast<float>(rocsparse::random::uniform_int(a, b));
+}
+
+template <>
+double rocsparse::random::random_cached_generator_exact(int a, int b)
+{
+    return static_cast<double>(rocsparse::random::uniform_int(a, b));
+}
+
+template <>
+rocsparse_float_complex
+    rocsparse::random::random_cached_generator_exact<rocsparse_float_complex>(int a, int b)
+{
+    return rocsparse_float_complex(rocsparse::random::random_cached_generator_exact<float>(a, b),
+                                   rocsparse::random::random_cached_generator_exact<float>(a, b));
+}
+
+template <>
+rocsparse_double_complex
+    rocsparse::random::random_cached_generator_exact<rocsparse_double_complex>(int a, int b)
+{
+    return rocsparse_double_complex(rocsparse::random::random_cached_generator_exact<double>(a, b),
+                                    rocsparse::random::random_cached_generator_exact<double>(a, b));
+}
+
+template <>
+double rocsparse::random::random_cached_generator(double a, double b)
+{
+    return rocsparse::random::uniform_double(a, b);
+}
+
+template <>
+rocsparse_float_complex
+    rocsparse::random::random_cached_generator<rocsparse_float_complex>(rocsparse_float_complex a,
+                                                                        rocsparse_float_complex b)
+{
+    float theta = rocsparse::random::random_cached_generator<float>(0.0f, 2.0f * acos(-1.0f));
+    float r     = rocsparse::random::random_cached_generator<float>(std::abs(a), std::abs(b));
+
+    return rocsparse_float_complex(r * cos(theta), r * sin(theta));
+}
+
+template <>
+rocsparse_double_complex
+    rocsparse::random::random_cached_generator<rocsparse_double_complex>(rocsparse_double_complex a,
+                                                                         rocsparse_double_complex b)
+{
+    double theta = rocsparse::random::random_cached_generator<double>(0.0, 2.0 * acos(-1.0));
+    double r     = rocsparse::random::random_cached_generator<double>(std::abs(a), std::abs(b));
+
+    return rocsparse_double_complex(r * cos(theta), r * sin(theta));
 }
