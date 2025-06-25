@@ -58,8 +58,8 @@ constexpr bool is_applyQtC_use_larfb = false;
 constexpr bool use_geqr2 = false;
 
 #ifndef RGEQR3_BLOCKSIZE
-// #define RGEQR3_BLOCKSIZE(T) ((sizeof(T) == 4) ? 256 : (sizeof(T) == 8) ? 128 : (sizeof(T) == 16) ? 64 : 64)
-#define RGEQR3_BLOCKSIZE(T) 64
+#define RGEQR3_BLOCKSIZE(T) \
+    ((sizeof(T) == 4) ? 512 : (sizeof(T) == 8) ? 256 : (sizeof(T) == 16) ? 128 : 64)
 #endif
 
 #ifndef CHECK_MEM
@@ -2473,16 +2473,8 @@ static rocblas_status rocsolver_rgeqr3_template(rocblas_handle handle,
         // -----------------
         // perform recursion
         // -----------------
-
-        I const n_small = get_n_small();
-        I n1 = (n <= n_small) ? 1 : rocblas_previous_po2(ceil(n, 2));
-        I n2 = n - n1;
-        // fall back
-        if((n1 == 0) || (n2 == 0))
-        {
-            n1 = n / 2;
-            n2 = n - n1;
-        }
+        I const n1 = n / 2;
+        I const n2 = n - n1;
 
         assert(n1 >= 1);
         assert(n2 >= 1);
