@@ -29,7 +29,7 @@ find_package (Python3 REQUIRED COMPONENTS Interpreter)
 set(hipblaslt_test_source
     hipblaslt_gtest_main.cpp
     hipblaslt_test.cpp
-    # matmul_gtest.cpp
+    matmul_gtest.cpp
     auxiliary_gtest.cpp
     matrix_transform_gtest.cpp
     hipblaslt_gtest_ext_op.cpp
