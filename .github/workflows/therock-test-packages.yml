@@ -1,0 +1,69 @@
+name: TheRock Test Packages
+
+on:
+  workflow_call:
+    inputs:
+      project_to_test:
+        type: string
+      amdgpu_families:
+        type: string
+      test_runs_on:
+        type: string
+      platform:
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  # BLAS tests
+  test_hipblaslt:
+    name: "hipBLASLt math-lib"
+    if: ${{ contains(inputs.project_to_test, 'test_hipblaslt') }}
+    uses: ROCm/TheRock/.github/workflows/test_hipblaslt.yml@f4ab495f20eec5038d15a530f1d31beea59fc526
+    with:
+      artifact_run_id: "${{ github.run_id }}"
+      amdgpu_families: ${{ inputs.amdgpu_families }}
+      test_runs_on: ${{ inputs.test_runs_on }}
+      platform: ${{ inputs.platform }}
+
+  test_rocblas:
+    name: "rocBLAS math-lib"
+    if: ${{ contains(inputs.project_to_test, 'test_rocblas') }}
+    uses: ROCm/TheRock/.github/workflows/test_rocblas.yml@f4ab495f20eec5038d15a530f1d31beea59fc526
+    with:
+      artifact_run_id: "${{ github.run_id }}"
+      amdgpu_families: ${{ inputs.amdgpu_families }}
+      test_runs_on: ${{ inputs.test_runs_on }}
+      platform: ${{ inputs.platform }}
+
+  # PRIM tests
+  test_rocprim:
+    name: "rocPRIM math-lib"
+    if: ${{ contains(inputs.project_to_test, 'test_rocprim') }}
+    uses: ROCm/TheRock/.github/workflows/test_rocprim.yml@f4ab495f20eec5038d15a530f1d31beea59fc526
+    with:
+      artifact_run_id: "${{ github.run_id }}"
+      amdgpu_families: ${{ inputs.amdgpu_families }}
+      test_runs_on: ${{ inputs.test_runs_on }}
+      platform: ${{ inputs.platform }}
+
+  test_rocthrust:
+    name: "rocTHRUST math-lib"
+    if:  ${{ contains(inputs.project_to_test, 'test_rocthrust') }}
+    uses: ROCm/TheRock/.github/workflows/test_rocthrust.yml@f4ab495f20eec5038d15a530f1d31beea59fc526
+    with:
+      artifact_run_id: "${{ github.run_id }}"
+      amdgpu_families: ${{ inputs.amdgpu_families }}
+      test_runs_on: ${{ inputs.test_runs_on }}
+      platform: ${{ inputs.platform }}
+
+  test_hipcub:
+    name: "hipCUB math-lib"
+    if: ${{ contains(inputs.project_to_test, 'test_hipcub') }}
+    uses: ROCm/TheRock/.github/workflows/test_hipcub.yml@f4ab495f20eec5038d15a530f1d31beea59fc526
+    with:
+      artifact_run_id: "${{ github.run_id }}"
+      amdgpu_families: ${{ inputs.amdgpu_families }}
+      test_runs_on: ${{ inputs.test_runs_on }}
+      platform: ${{ inputs.platform }}
