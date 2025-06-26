@@ -55,7 +55,7 @@ constexpr bool use_gemm_gemv = true;
 
 constexpr bool is_applyQtC_use_larfb = false;
 
-constexpr bool use_geqr2 = false;
+constexpr bool use_geqr2 = true;
 
 #ifndef RGEQR3_BLOCKSIZE
 #define RGEQR3_BLOCKSIZE(T) \
@@ -764,7 +764,8 @@ static rocblas_status formT3(rocblas_handle handle,
     hipStream_t stream;
     rocblas_get_stream(handle, &stream);
 
-    std::byte* pfree = reinterpret_cast<std::byte*>(work);
+    std::byte* const pfree0 = reinterpret_cast<std::byte*>(work);
+    std::byte* pfree = pfree;
 
     // W is k1 by k2
     // W  = zeros( size(T1,1), size(T2,2) );
@@ -805,6 +806,8 @@ static rocblas_status formT3(rocblas_handle handle,
         pfree += size_Wmat2;
         total_bytes += size_Wmat2;
     }
+
+    CHECK_MEM(pfree);
 
     remain_bytes = lwork_bytes - total_bytes;
     if(remain_bytes < 0)
@@ -963,6 +966,8 @@ static rocblas_status formT3(rocblas_handle handle,
 
         remain_bytes = lwork_bytes - total_bytes;
 
+        CHECK_MEM(pfree);
+
         {
             if(remain_bytes < 0)
             {
@@ -1053,6 +1058,8 @@ static rocblas_status formT3(rocblas_handle handle,
         pfree += size_gemm;
         total_bytes += size_gemm;
 
+        CHECK_MEM(pfree);
+
         remain_bytes = lwork_bytes - total_bytes;
 
         {
@@ -1128,6 +1135,8 @@ static rocblas_status formT3(rocblas_handle handle,
         T** const workArr = reinterpret_cast<T**>(pfree);
         pfree += size_workArr;
 
+        CHECK_MEM(pfree);
+
         total_bytes += size_workArr;
         remain_bytes = lwork_bytes - total_bytes;
 
@@ -1185,6 +1194,8 @@ static rocblas_status formT3(rocblas_handle handle,
         T** const workArr = reinterpret_cast<T**>(pfree);
         pfree += size_workArr;
         total_bytes += size_workArr;
+
+        CHECK_MEM(pfree);
 
         remain_bytes = lwork_bytes - total_bytes;
 
@@ -1275,7 +1286,7 @@ static rocblas_status applyQtC_body(rocblas_handle handle,
         }
     }
 
-    std::byte* pfree0 = reinterpret_cast<std::byte*>(work);
+    std::byte* const pfree0 = reinterpret_cast<std::byte*>(work);
     std::byte* pfree = pfree0;
 
     {
@@ -1627,6 +1638,8 @@ static rocblas_status applyQtC_body(rocblas_handle handle,
             total_bytes += size_Wmat_bytes;
         }
 
+        CHECK_MEM(pfree);
+
         remain_bytes = lwork_bytes - total_bytes;
 
         {
@@ -1688,6 +1701,8 @@ static rocblas_status applyQtC_body(rocblas_handle handle,
             pfree += size_trmm_bytes;
 
             total_bytes += size_trmm_bytes;
+
+            CHECK_MEM(pfree);
 
             remain_bytes = lwork_bytes - total_bytes;
             {
@@ -1767,6 +1782,8 @@ static rocblas_status applyQtC_body(rocblas_handle handle,
             T** const workArr = reinterpret_cast<T**>(pfree);
             pfree += size_workArr;
             total_bytes += size_workArr;
+
+            CHECK_MEM(pfree);
 
             remain_bytes = lwork_bytes - total_bytes;
             {
@@ -1849,6 +1866,8 @@ static rocblas_status applyQtC_body(rocblas_handle handle,
 
             total_bytes += size_trmm_bytes;
 
+            CHECK_MEM(pfree);
+
             remain_bytes = lwork_bytes - total_bytes;
             {
                 if(remain_bytes < 0)
@@ -1925,6 +1944,8 @@ static rocblas_status applyQtC_body(rocblas_handle handle,
             pfree += size_workArr;
 
             total_bytes += size_workArr;
+
+            CHECK_MEM(pfree);
 
             remain_bytes = lwork_bytes - total_bytes;
             {
@@ -2004,6 +2025,8 @@ static rocblas_status applyQtC_body(rocblas_handle handle,
             pfree += size_trmm_bytes;
 
             total_bytes += size_trmm_bytes;
+
+            CHECK_MEM(pfree);
 
             remain_bytes = lwork_bytes - total_bytes;
             {
@@ -2107,7 +2130,7 @@ static rocblas_status applyQtC(rocblas_handle handle,
     ROCSOLVER_ENTER("applyQtC_body", "m:", m, "n:", n, "k:", k, "shift_Ymat:", shift_Ymat,
                     "ldY:", ldY, "bc:", batch_count);
 
-    std::byte* pfree0 = reinterpret_cast<std::byte*>(work);
+    std::byte* const pfree0 = reinterpret_cast<std::byte*>(work);
     std::byte* pfree = pfree0;
 
     if(is_applyQtC_use_larfb)
@@ -2275,7 +2298,8 @@ static rocblas_status rocsolver_rgeqr3_template(rocblas_handle handle,
     hipStream_t stream;
     rocblas_get_stream(handle, &stream);
 
-    std::byte* pfree = reinterpret_cast<std::byte*>(work);
+    std::byte* const pfree0 = reinterpret_cast<std::byte*>(work);
+    std::byte* pfree = pfree0;
 
     auto idx2F
         = [=](auto i, auto j, auto ld) { return ((i - 1) + (j - 1) * static_cast<int64_t>(ld)); };
@@ -2309,6 +2333,8 @@ static rocblas_status rocsolver_rgeqr3_template(rocblas_handle handle,
         Istride const stride_tau = stride_Tmat;
         I const ldtau = 1;
         Istride const shift_tau = 0;
+
+        CHECK_MEM(pfree);
 
         remain_bytes = lwork_bytes - total_bytes;
         {
@@ -2372,7 +2398,7 @@ static rocblas_status rocsolver_rgeqr3_template(rocblas_handle handle,
         size_t size_workArr = std::max(size_work_workArr_geqr2, size_workArr_larft);
         size_t size_work = std::max(size_Abyx_norms, size_work_larft);
 
-        auto const pfree0 = pfree;
+        auto const pfree_save = pfree;
 
         size_t const size_tau = sizeof(T) * n * batch_count;
         Istride const stride_tau = n;
@@ -2405,11 +2431,7 @@ static rocblas_status rocsolver_rgeqr3_template(rocblas_handle handle,
         T* const diag = reinterpret_cast<T*>(pfree);
         pfree += size_diag;
 
-        bool const is_mem_ok = (pfree <= pfree0 + lwork_bytes);
-        if(!is_mem_ok)
-        {
-            return (rocblas_status_memory_error);
-        }
+        CHECK_MEM(pfree);
 
         ROCBLAS_CHECK(rocsolver_geqr2_template(handle, m, n, Amat, shift_Amat, ldA, stride_Amat,
 
@@ -2466,7 +2488,7 @@ static rocblas_status rocsolver_rgeqr3_template(rocblas_handle handle,
             return (istat_larft);
         }
 
-        pfree = pfree0;
+        pfree = pfree_save;
     }
     else
     {
@@ -2822,7 +2844,8 @@ static rocblas_status rocsolver_rgeqrf_template(rocblas_handle handle,
 
     I const nb = RGEQR3_BLOCKSIZE(T);
 
-    std::byte* pfree = reinterpret_cast<std::byte*>(work);
+    std::byte* const pfree0 = reinterpret_cast<std::byte*>(work);
+    std::byte* pfree = pfree0;
 
     bool const zero_work_array = false;
     if(zero_work_array)
@@ -2840,6 +2863,8 @@ static rocblas_status rocsolver_rgeqrf_template(rocblas_handle handle,
     T* const Wmat = reinterpret_cast<T*>(pfree);
     pfree += size_Wmat_bytes;
 
+    CHECK_MEM(pfree);
+
     total_bytes += size_Wmat_bytes;
     remain_bytes = lwork_bytes - total_bytes;
 
@@ -2853,6 +2878,8 @@ static rocblas_status rocsolver_rgeqrf_template(rocblas_handle handle,
 
     T* Tmat = reinterpret_cast<T*>(pfree);
     pfree += size_Tmat_bytes;
+
+    CHECK_MEM(pfree);
 
     total_bytes += size_Tmat_bytes;
     remain_bytes = lwork_bytes - total_bytes;
@@ -2876,13 +2903,6 @@ static rocblas_status rocsolver_rgeqrf_template(rocblas_handle handle,
         Istride const shift_Aj = shift_Amat + idx2F(j, j, ldA);
 
         {
-            if(remain_bytes < 0)
-            {
-                return (rocblas_status_memory_error);
-            }
-        }
-
-        {
             // clang-format off
                   ROCBLAS_CHECK(rocsolver_rgeqr3_template(
 				handle,
@@ -2899,8 +2919,8 @@ static rocblas_status rocsolver_rgeqrf_template(rocblas_handle handle,
         // ----------------------------------------------------
 
         {
-            bool const Tmat2tau = true;
-            copy_diagonal_template(handle, Tmat2tau, nn,
+            bool const is_copy_Tmat2tau = true;
+            copy_diagonal_template(handle, is_copy_Tmat2tau, nn,
 
                                    Tmat, shift_Tmat, ldT, stride_Tmat,
 
