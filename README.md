@@ -13,10 +13,10 @@ This table provides the current status of the migration of specific ROCm librari
 
 | Component           | Migration Status | CI Status                            |
 |---------------------|------------------|---------------------------------------|
-| `composablekernel`  | Pending     |  |
+| `composablekernel`  | Pending     |  ||[![Build Status](http://rocm-ci-dev.amd.com:8080/embeddable-build-status/icon?job=compute-rocm-dkms-mathlibs-psdb&style=flat&subject=ROCm%20Mathlibs)](http://rocm-ci-dev.amd.com:8080/job/compute-rocm-dkms-mathlibs-psdb/)
+|
 | `hipblas`           | Pending     |  |
-| `hipblas-common`    | Completed   | [![Azure CI](https://dev.azure.com/ROCm-CI/ROCm-CI/_apis/build/status%2Fmonorepo%2FhipBLAS-common?repoName=ROCm%2Frocm-libraries&branchName=develop)](https://dev.azure.com/ROCm-CI/ROCm-CI/_build/latest?definitionId=300&repoName=ROCm%2Frocm-libraries&branchName=develop) [![Build Status](http://rocm-ci-dev.amd.com:8080/embeddable-build-status/icon?job=compute-rocm-dkms-mathlibs-psdb)](http://rocm-ci-dev.amd.com:8080/job/compute-rocm-dkms-mathlibs-psdb/)
- |
+| `hipblas-common`    | Completed   | [![Azure CI](https://dev.azure.com/ROCm-CI/ROCm-CI/_apis/build/status%2Fmonorepo%2FhipBLAS-common?repoName=ROCm%2Frocm-libraries&branchName=develop)](https://dev.azure.com/ROCm-CI/ROCm-CI/_build/latest?definitionId=300&repoName=ROCm%2Frocm-libraries&branchName=develop) |
 | `hipblaslt`         | Completed   | [![Azure CI](https://dev.azure.com/ROCm-CI/ROCm-CI/_apis/build/status%2Fmonorepo%2FhipBLASLt?repoName=ROCm%2Frocm-libraries&branchName=develop)](https://dev.azure.com/ROCm-CI/ROCm-CI/_build/latest?definitionId=301&repoName=ROCm%2Frocm-libraries&branchName=develop) |
 | `hipcub`            | Completed   | [![Azure CI](https://dev.azure.com/ROCm-CI/ROCm-CI/_apis/build/status%2Fmonorepo%2FhipCUB?repoName=ROCm%2Frocm-libraries&branchName=develop)](https://dev.azure.com/ROCm-CI/ROCm-CI/_build/latest?definitionId=277&repoName=ROCm%2Frocm-libraries&branchName=develop) |
 | `hipfft`            | Pending     |  |
