@@ -92,6 +92,12 @@ namespace rocRoller
         Generator<Instruction> generateUInt64(Register::ValuePtr dest, Register::ValuePtr arg);
 
         Generator<Instruction> generateDouble(Register::ValuePtr dest, Register::ValuePtr arg);
+
+        Generator<Instruction> generatePackedScales(Register::ValuePtr dest,
+                                                    Register::ValuePtr arg);
+
+    public:
+        static const std::string Name;
     };
 
     /**

@@ -408,7 +408,7 @@ namespace rocRoller
         transforms.push_back(
             std::make_shared<KernelGraph::AssignIndexExpressions>(m_context, m_command));
         transforms.push_back(std::make_shared<KernelGraph::LoadPacked>(m_context));
-        transforms.push_back(std::make_shared<KernelGraph::AddConvert>());
+        transforms.push_back(std::make_shared<KernelGraph::AddConvert>(m_context));
 
         //
         // TODO: Turn on this transformation by default when SGPR issue gets resolved

@@ -2075,11 +2075,10 @@ namespace GEMMTests
                                                  rocRoller::DataType::BF6,
                                                  rocRoller::DataType::FP4),
                                ::testing::Values(/*waveK*/ 128),
-                               // TODO: add non-TN cases
-                               // std::pair<std::string, std::string>("N", "N"),
-                               // std::pair<std::string, std::string>("N", "T"),
-                               // std::pair<std::string, std::string>("T", "T"),
-                               ::testing::Values(std::pair<std::string, std::string>("T", "N")))));
+                               ::testing::Values(std::pair<std::string, std::string>("N", "N"),
+                                                 std::pair<std::string, std::string>("N", "T"),
+                                                 std::pair<std::string, std::string>("T", "N"),
+                                                 std::pair<std::string, std::string>("T", "T")))));
 
     INSTANTIATE_TEST_SUITE_P(
         ScaledMixedGEMMTestWMMA1250,
@@ -2113,9 +2112,8 @@ namespace GEMMTests
                         Operations::ScaleMode::SingleScale,
                         Operations::ScaleMode::SingleScale,
                         32)),
-                // TODO: add non-TN cases
-                // std::pair<std::string, std::string>("N", "N"),
-                // std::pair<std::string, std::string>("N", "T"),
-                // std::pair<std::string, std::string>("T", "T"),
-                ::testing::Values(std::pair<std::string, std::string>("T", "N")))));
+                ::testing::Values(std::pair<std::string, std::string>("N", "N"),
+                                  std::pair<std::string, std::string>("N", "T"),
+                                  std::pair<std::string, std::string>("T", "N"),
+                                  std::pair<std::string, std::string>("T", "T")))));
 }
