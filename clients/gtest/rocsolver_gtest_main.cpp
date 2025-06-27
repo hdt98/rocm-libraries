@@ -28,8 +28,8 @@
 #include <cstdio>
 #include <string>
 
-// #include <fmt/core.h>
-// #include <fmt/ostream.h>
+
+
 #include "rocsolver_utility.hpp"
 #include <gtest/gtest.h>
 #include <rocsolver/rocsolver.h>

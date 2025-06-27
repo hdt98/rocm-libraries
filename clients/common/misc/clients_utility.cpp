@@ -29,7 +29,6 @@
 #include <cstring>
 #include <string>
 
-//#include <fmt/core.h>
 #include "rocsolver_utility.hpp"
 #include <rocblas/rocblas.h>
 

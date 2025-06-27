@@ -38,8 +38,8 @@
 #include <unordered_map>
 #include <utility>
 
-// #include <fmt/core.h>
-// #include <fmt/ostream.h>
+
+
 #include <rocblas/rocblas.h>
 
 // Suppress warnings about hipMalloc(), hipFree() except in rocblas-test and

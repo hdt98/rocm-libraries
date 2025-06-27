@@ -36,8 +36,8 @@ namespace fs = std::experimental::filesystem;
 #include <fstream>
 #include <vector>
 
-// #include <fmt/format.h>
-// #include <fmt/ostream.h>
+
+
 #include "rocsolver_utility.hpp"
 #include <gtest/gtest.h>
 #include <rocblas/rocblas.h>

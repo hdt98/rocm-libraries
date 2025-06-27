@@ -27,8 +27,8 @@
 
 #include <stdlib.h>
 
-// #include <fmt/format.h>
-// #include <fmt/ostream.h>
+
+
 #include "rocsolver_utility.hpp"
 
 #include "common/misc/client_environment_helpers.hpp"

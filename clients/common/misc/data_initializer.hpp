@@ -31,8 +31,8 @@
 #include <iostream>
 #include <vector>
 
-// #include <fmt/core.h>
-// #include <fmt/ostream.h>
+
+
 #include "rocsolver_utility.hpp"
 #include <rocblas/rocblas.h>
 

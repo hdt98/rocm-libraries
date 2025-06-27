@@ -27,8 +27,8 @@
 
 #pragma once
 
-// #include <fmt/format.h>
-// #include <fmt/ostream.h>
+
+
 #include "rocsolver_utility.hpp"
 
 #include "fmt_rocblas_types.hpp"

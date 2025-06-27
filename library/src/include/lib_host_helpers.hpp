@@ -30,8 +30,8 @@
 #include <cassert>
 #include <cstdlib>
 #include <cstring>
-// #include <fmt/core.h>
-// #include <fmt/ostream.h>
+
+
 #include "rocsolver_utility.hpp"
 #include <hip/hip_runtime.h>
 #include <rocblas/rocblas.h>

@@ -28,9 +28,9 @@
 #include <cstdlib>
 #include <system_error>
 
-// #include <fmt/core.h>
-// #include <fmt/ostream.h>
-// #include <fmt/ranges.h>
+
+
+
 #include "rocsolver_utility.hpp"
 
 #include "clients_utility.hpp"

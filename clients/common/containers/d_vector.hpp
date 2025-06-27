@@ -30,8 +30,8 @@
 #include <cinttypes>
 #include <cstdio>
 
-// #include <fmt/core.h>
-// #include <fmt/ostream.h>
+
+
 #include "rocsolver_utility.hpp"
 #include <rocblas/rocblas.h>
 

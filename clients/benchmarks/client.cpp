@@ -24,8 +24,8 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  * *************************************************************************/
-// #include <fmt/core.h>
-// #include <fmt/ostream.h>
+
+
 
 #include "rocsolver_utility.hpp"
 #include "common/misc/program_options.hpp"

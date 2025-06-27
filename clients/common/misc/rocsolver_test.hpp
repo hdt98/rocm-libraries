@@ -41,9 +41,9 @@ namespace fs = std::filesystem;
 namespace fs = std::experimental::filesystem;
 #endif
 
-// #include <fmt/core.h>
-// #include <fmt/ostream.h>
-// #include <fmt/ranges.h>
+
+
+
 #include "rocsolver_utility.hpp"
 #include <rocblas/rocblas.h>
 
