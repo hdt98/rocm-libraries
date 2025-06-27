@@ -23,8 +23,6 @@
  * ************************************************************************ */
 
 #pragma once
-#ifndef ROCSPARSE_RANDOM_HPP
-#define ROCSPARSE_RANDOM_HPP
 
 #include "rocsparse_math.hpp"
 
@@ -36,22 +34,22 @@ using rocsparse_rng_t = std::mt19937;
 
 namespace rocsparse
 {
-    class random
+    class rng_t
     {
     private:
-        random();
-        ~random()                        = default;
-        random(const random&)            = delete;
-        random& operator=(const random&) = delete;
+        rng_t();
+        ~rng_t()                       = default;
+        rng_t(const rng_t&)            = delete;
+        rng_t& operator=(const rng_t&) = delete;
 
-        rocsparse_rng_t rng;
-        rocsparse_rng_t rng_nan;
-        rocsparse_rng_t rng_seed;
+        rocsparse_rng_t m_rng;
+        rocsparse_rng_t m_rng_nan;
+        rocsparse_rng_t m_rng_seed;
 
-        int                 rand_uniform_idx;
-        int                 rand_normal_idx;
-        std::vector<double> rand_uniform_cache;
-        std::vector<double> rand_normal_cache;
+        int                 m_rand_uniform_idx;
+        int                 m_rand_normal_idx;
+        std::vector<double> m_rand_uniform_cache;
+        std::vector<double> m_rand_normal_cache;
 
         float  uniform_float(float a, float b);
         double uniform_double(double a, double b);
@@ -59,72 +57,72 @@ namespace rocsparse
         double normal_double();
 
     public:
-        static random& Instance()
+        static rng_t& Instance()
         {
-            static random instance;
+            static rng_t instance;
             return instance;
         }
 
         void reset_seed()
         {
-            rand_uniform_idx = 0;
-            rand_normal_idx  = 0;
+            m_rand_uniform_idx = 0;
+            m_rand_normal_idx  = 0;
 
-            rng_set(rng_seed);
-            rng_nan_set(rng_seed);
+            set_rng(m_rng_seed);
+            set_rng_nan(m_rng_seed);
         }
 
-        void rng_set(rocsparse_rng_t a)
+        void set_rng(rocsparse_rng_t a)
         {
-            rng = a;
+            m_rng = a;
         }
-        void rng_nan_set(rocsparse_rng_t a)
+        void set_rng_nan(rocsparse_rng_t a)
         {
-            rng_nan = a;
+            m_rng_nan = a;
         }
         void rng_seed_set(rocsparse_rng_t a)
         {
-            rng_seed = a;
+            m_rng_seed = a;
         }
 
-        rocsparse_rng_t& rng_get()
+        rocsparse_rng_t& get_rng()
         {
-            return rng;
+            return m_rng;
         }
-        rocsparse_rng_t& rng_nan_get()
+        rocsparse_rng_t& get_rng_nan()
         {
-            return rng_nan;
+            return m_rng_nan;
         }
-        rocsparse_rng_t& rng_seed_get()
+        rocsparse_rng_t& get_rng_seed()
         {
-            return rng_seed;
+            return m_rng_seed;
         }
 
         /*! \brief  generate a random number in range [a,b] using integer numbers*/
         template <typename T>
-        T random_generator_exact(int a = 1, int b = 10);
+        T generator_exact(int a = 1, int b = 10);
 
         /*! \brief  generate a random number in range [a,b]*/
         template <typename T, typename std::enable_if_t<std::is_integral<T>::value, bool> = true>
-        T random_generator(T a = static_cast<T>(1), T b = static_cast<T>(10));
+        T generator(T a = static_cast<T>(1), T b = static_cast<T>(10));
 
         template <typename T, typename std::enable_if_t<!std::is_integral<T>::value, bool> = true>
-        T random_generator(T a = static_cast<T>(0), T b = static_cast<T>(1));
+        T generator(T a = static_cast<T>(0), T b = static_cast<T>(1));
 
         /*! \brief  generate a random number in range [a,b] from a predetermined finite cache using integer numbers*/
         template <typename T>
-        T random_cached_generator_exact(int a = 1, int b = 10);
+        T cached_generator_exact(int a = 1, int b = 10);
 
         /*! \brief  generate a random number in range [a,b] from a predetermined finite cache*/
         template <typename T, typename std::enable_if_t<std::is_integral<T>::value, bool> = true>
-        T random_cached_generator(T a = static_cast<T>(1), T b = static_cast<T>(10));
+        T cached_generator(T a = static_cast<T>(1), T b = static_cast<T>(10));
 
         template <typename T, typename std::enable_if_t<!std::is_integral<T>::value, bool> = true>
-        T random_cached_generator(T a = static_cast<T>(0), T b = static_cast<T>(1));
+        T cached_generator(T a = static_cast<T>(0), T b = static_cast<T>(1));
 
         /*! \brief generate a random normally distributed number around 0 with stddev 1 from a predetermined finite cache */
         template <typename T>
-        T random_cached_generator_normal();
+        T cached_generator_normal();
     };
 }
 
@@ -135,47 +133,47 @@ namespace rocsparse
 template <typename T>
 inline T random_generator_exact(int a = 1, int b = 10)
 {
-    return rocsparse::random::Instance().random_generator_exact<T>(a, b);
+    return rocsparse::rng_t::Instance().generator_exact<T>(a, b);
 }
 
 /*! \brief  generate a random number in range [a,b]*/
 template <typename T, typename std::enable_if_t<std::is_integral<T>::value, bool> = true>
 inline T random_generator(T a = static_cast<T>(1), T b = static_cast<T>(10))
 {
-    return rocsparse::random::Instance().random_generator<T>(a, b);
+    return rocsparse::rng_t::Instance().generator<T>(a, b);
 }
 
 template <typename T, typename std::enable_if_t<!std::is_integral<T>::value, bool> = true>
 inline T random_generator(T a = static_cast<T>(0), T b = static_cast<T>(1))
 {
-    return rocsparse::random::Instance().random_generator<T>(a, b);
+    return rocsparse::rng_t::Instance().generator<T>(a, b);
 }
 
 /*! \brief  generate a random number in range [a,b] from a predetermined finite cache using integer numbers*/
 template <typename T>
 inline T random_cached_generator_exact(int a = 1, int b = 10)
 {
-    return rocsparse::random::Instance().random_cached_generator_exact<T>(a, b);
+    return rocsparse::rng_t::Instance().cached_generator_exact<T>(a, b);
 }
 
 /*! \brief  generate a random number in range [a,b] from a predetermined finite cache*/
 template <typename T, typename std::enable_if_t<std::is_integral<T>::value, bool> = true>
 inline T random_cached_generator(T a = static_cast<T>(1), T b = static_cast<T>(10))
 {
-    return rocsparse::random::Instance().random_cached_generator<T>(a, b);
+    return rocsparse::rng_t::Instance().cached_generator<T>(a, b);
 }
 
 template <typename T, typename std::enable_if_t<!std::is_integral<T>::value, bool> = true>
 inline T random_cached_generator(T a = static_cast<T>(0), T b = static_cast<T>(1))
 {
-    return rocsparse::random::Instance().random_cached_generator<T>(a, b);
+    return rocsparse::rng_t::Instance().cached_generator<T>(a, b);
 }
 
 /*! \brief generate a random normally distributed number around 0 with stddev 1 from a predetermined finite cache */
 template <typename T>
 inline T random_cached_generator_normal()
 {
-    return rocsparse::random::Instance().random_cached_generator_normal<T>();
+    return rocsparse::rng_t::Instance().cached_generator_normal<T>();
 }
 
 // Reset the seed (mainly to ensure repeatability of failures in a given suite)
@@ -198,7 +196,7 @@ class rocsparse_nan_rng
         } x;
         do
             x.u = std::uniform_int_distribution<UINT_T>{}(
-                rocsparse::random::Instance().rng_nan_get());
+                rocsparse::rng_t::Instance().get_rng_nan());
         while(!(x.u & (((UINT_T)1 << SIG) - 1))); // Reject Inf (mantissa == 0)
         x.u |= (((UINT_T)1 << EXP) - 1) << SIG; // Exponent = all 1's
         return x.fp; // NaN with random bits
@@ -209,7 +207,7 @@ public:
     template <typename T, typename std::enable_if<std::is_integral<T>{}, int>::type = 0>
     explicit operator T()
     {
-        return std::uniform_int_distribution<T>{}(rocsparse::random::Instance().rng_nan_get());
+        return std::uniform_int_distribution<T>{}(rocsparse::rng_t::Instance().get_rng_nan());
     }
 
     // Random int8_t
@@ -217,7 +215,7 @@ public:
     {
         return (int8_t)std::uniform_int_distribution<int>(std::numeric_limits<int8_t>::min(),
                                                           std::numeric_limits<int8_t>::max())(
-            rocsparse::random::Instance().rng_nan_get());
+            rocsparse::rng_t::Instance().get_rng_nan());
     }
 
     // Random char
@@ -225,7 +223,7 @@ public:
     {
         return (char)std::uniform_int_distribution<int>(std::numeric_limits<char>::min(),
                                                         std::numeric_limits<char>::max())(
-            rocsparse::random::Instance().rng_nan_get());
+            rocsparse::rng_t::Instance().get_rng_nan());
     }
 
     // Random NaN half
@@ -262,5 +260,3 @@ public:
         return {double(*this), double(*this)};
     }
 };
-
-#endif // ROCSPARSE_RANDOM_HPP
