@@ -473,7 +473,7 @@ void testing_aux_matmul_set_get_attr(const Arguments& arg)
     
     ASSERT_TRUE(d_bias_r == d_bias);
 
-    // for ROCBLASLT_MATMUL_DESC_A_SCALE_POINTER & ROCBLASLT_MATMUL_DESC_A_SCALE_POINTER_VEC_EXT
+    // for ROCBLASLT_MATMUL_DESC_A_SCALE_POINTER
     // We create a new matmul_descr becasue we don't want to set matmulDesc->scaleAType as Scalar in advance.
     // If we set it as Scalar, it will skip some cases, which is not what we desire for.
     const hipblasOperation_t opA = HIPBLAS_OP_T;
@@ -487,9 +487,6 @@ void testing_aux_matmul_set_get_attr(const Arguments& arg)
     float* d_scale_a_r;
     CHECK_HIP_ERROR(hipMalloc(&d_scale_a, sizeof(float)));
     CHECK_HIP_ERROR(hipMemcpy(d_scale_a, &h_scale_a_for_desc_a_scale_pointer, sizeof(float), hipMemcpyHostToDevice));
-    // EXPECT_HIPBLAS_STATUS(hipblasLtMatmulDescSetAttribute(
-    //                         matmul_descr, HIPBLASLT_MATMUL_MATRIX_SCALE_OUTER_VEC_32F, &d_scale_a, sizeof(void*)),
-    //                     HIPBLAS_STATUS_SUCCESS); // this is necessary to cover in set
 
     EXPECT_HIPBLAS_STATUS(hipblasLtMatmulDescSetAttribute(
                             matmul_descr, HIPBLASLT_MATMUL_DESC_A_SCALE_POINTER, &d_scale_a, sizeof(float*)/2),
@@ -635,20 +632,12 @@ void testing_aux_matmul_set_get_attr(const Arguments& arg)
     hipStream_t        stream;
     CHECK_HIP_ERROR(hipStreamCreate(&stream));
 
-    // for HIPBLASLT_MATMUL_DESC_B_SCALE_POINTER_VEC_EXT & ROCBLASLT_MATMUL_DESC_B_SCALE_POINTER 
+    // for ROCBLASLT_MATMUL_DESC_B_SCALE_POINTER 
     float h_scale_b = 3.f;
     float* d_scale_b;
     float* d_scale_b_r;
     CHECK_HIP_ERROR(hipMalloc(&d_scale_b, sizeof(float)));
     CHECK_HIP_ERROR(hipMemcpyAsync(d_scale_b, &h_scale_b, sizeof(float), hipMemcpyHostToDevice, stream));
-
-    // EXPECT_HIPBLAS_STATUS(hipblasLtMatmulDescSetAttribute(
-    //                         matmul, HIPBLASLT_MATMUL_MATRIX_SCALE_OUTER_VEC_32F, &d_scale_b, sizeof(float*)),
-    //                     HIPBLAS_STATUS_SUCCESS);
-
-    // EXPECT_HIPBLAS_STATUS(hipblasLtMatmulDescSetAttribute(
-    //                         matmul, HIPBLASLT_MATMUL_MATRIX_SCALE_OUTER_VEC_32F, &d_scale_b, sizeof(float*)/2),
-    //                     HIPBLAS_STATUS_INVALID_VALUE);
 
     EXPECT_HIPBLAS_STATUS(hipblasLtMatmulDescSetAttribute(
                             matmul, HIPBLASLT_MATMUL_DESC_B_SCALE_POINTER, &d_scale_b, sizeof(float*)/2),
