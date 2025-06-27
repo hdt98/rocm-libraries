@@ -1,5 +1,5 @@
 /* **************************************************************************
- * Copyright (C) 2023-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2023-2025 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,9 +28,6 @@
 #include <cstdlib>
 #include <system_error>
 
-
-
-
 #include "rocsolver_utility.hpp"
 
 #include "clients_utility.hpp"
@@ -56,11 +53,12 @@ fs::path get_sparse_data_dir()
         considered.push_back(exe_relative.string());
     }
 
-    rocsolver::formatting::print(stderr,
-               "Warning: default sparse data directories not found. "
-               "Defaulting to current working directory.\nExecutable location: {}\n"
-               "Paths considered:\n{}\n",
-               exe_path.string(), rocsolver::formatting::join(considered, "\n"));
+    rocsolver::formatting::print(
+        stderr,
+        "Warning: default sparse data directories not found. "
+        "Defaulting to current working directory.\nExecutable location: {}\n"
+        "Paths considered:\n{}\n",
+        exe_path.string(), rocsolver::formatting::join(considered, "\n"));
 
     return fs::current_path();
 }

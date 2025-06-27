@@ -1,5 +1,5 @@
 /* **************************************************************************
- * Copyright (C) 2018-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2018-2025 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,9 +28,6 @@
 #pragma once
 
 #include <set>
-
-
-
 
 #include "rocsolver_utility.hpp"
 #include <rocblas/rocblas.h>
@@ -322,7 +319,7 @@ public:
     void validate_consumed() const
     {
         if(!to_consume.empty())
-            throw std::invalid_argument(
-                rocsolver::formatting::format("Not all arguments were consumed: {}", rocsolver::formatting::join(to_consume, " ")));
+            throw std::invalid_argument(rocsolver::formatting::format(
+                "Not all arguments were consumed: {}", rocsolver::formatting::join(to_consume, " ")));
     }
 };

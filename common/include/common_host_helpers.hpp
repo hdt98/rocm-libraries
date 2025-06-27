@@ -35,8 +35,6 @@
 #include <string>
 #include <vector>
 
-
-
 #include "rocsolver_utility.hpp"
 #include <hip/hip_runtime_api.h>
 

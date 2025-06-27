@@ -1,5 +1,5 @@
 /* **************************************************************************
- * Copyright (C) 2018-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2018-2025 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,8 +30,6 @@
 #include <cinttypes>
 #include <iostream>
 #include <vector>
-
-
 
 #include "rocsolver_utility.hpp"
 #include <rocblas/rocblas.h>
@@ -261,7 +259,8 @@ template <typename T>
 void rocblas_packInt8(std::vector<T>& A, size_t M, size_t N, size_t batch_count, size_t lda, size_t stride_a)
 {
     if(N % 4 != 0)
-        rocsolver::formatting::print(stderr, "ERROR: dimension must be a multiple of 4 in order to pack\n");
+        rocsolver::formatting::print(stderr,
+                                     "ERROR: dimension must be a multiple of 4 in order to pack\n");
 
     std::vector<T> temp(A);
     for(size_t count = 0; count < batch_count; count++)

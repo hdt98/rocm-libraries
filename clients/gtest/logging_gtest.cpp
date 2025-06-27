@@ -1,5 +1,5 @@
 /* **************************************************************************
- * Copyright (C) 2022-2023 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2022-2025 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -36,8 +36,6 @@ namespace fs = std::experimental::filesystem;
 #include <fstream>
 #include <vector>
 
-
-
 #include "rocsolver_utility.hpp"
 #include <gtest/gtest.h>
 #include <rocblas/rocblas.h>
@@ -57,8 +55,10 @@ protected:
     {
         fs::path temp_dir = fs::temp_directory_path();
         std::string test_name = UnitTest::GetInstance()->current_test_info()->name();
-        log_filepath = temp_dir / rocsolver::formatting::format("{}.{}.log", test_name, nondeterministic_value());
-        fs::path nonexistent_dirpath = temp_dir / rocsolver::formatting::format("nonexistent_{}", test_name);
+        log_filepath = temp_dir
+            / rocsolver::formatting::format("{}.{}.log", test_name, nondeterministic_value());
+        fs::path nonexistent_dirpath
+            = temp_dir / rocsolver::formatting::format("nonexistent_{}", test_name);
         ASSERT_FALSE(fs::exists(nonexistent_dirpath));
         invalid_log_filepath = nonexistent_dirpath / "invalid.log";
 
@@ -72,8 +72,9 @@ protected:
         if(fs::exists(log_filepath))
         {
             if(HasFailure() && std::getenv("ROCSOLVER_TEST_DEBUG"))
-                rocsolver::formatting::print(stderr, "ROCSOLVER_TEST_DEBUG is set so {} was not removed.\n",
-                           log_filepath.string());
+                rocsolver::formatting::print(stderr,
+                                             "ROCSOLVER_TEST_DEBUG is set so {} was not removed.\n",
+                                             log_filepath.string());
             else
                 EXPECT_TRUE(fs::remove(log_filepath));
         }

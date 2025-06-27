@@ -31,7 +31,6 @@
 #include <cstdlib>
 #include <cstring>
 
-
 #include "rocsolver_utility.hpp"
 #include <hip/hip_runtime.h>
 #include <rocblas/rocblas.h>
@@ -181,8 +180,8 @@ static bool is_device_pointer(void* ptr)
 
     auto istat = hipPointerGetAttributes(&dev_attributes, ptr);
     if(istat != hipSuccess)
-        rocsolver::formatting::print(stderr, "is_device_pointer: istat = {} {}\n", static_cast<std::int32_t>(istat),
-                   hipGetErrorName(istat));
+        rocsolver::formatting::print(stderr, "is_device_pointer: istat = {} {}\n",
+                                     static_cast<std::int32_t>(istat), hipGetErrorName(istat));
 
     assert(istat == hipSuccess);
     return (dev_attributes.type == hipMemoryTypeDevice);

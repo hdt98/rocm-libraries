@@ -1,5 +1,5 @@
 /* **************************************************************************
- * Copyright (C) 2018-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2018-2025 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,8 +29,6 @@
 
 #include <cinttypes>
 #include <cstdio>
-
-
 
 #include "rocsolver_utility.hpp"
 #include <rocblas/rocblas.h>
@@ -65,7 +63,8 @@ public:
         T* d = nullptr;
         if((hipMalloc)(&d, bytes) != hipSuccess)
         {
-            rocsolver::formatting::print(stderr, "Error allocating {} bytes ({} GB)\n", bytes, bytes >> 30);
+            rocsolver::formatting::print(stderr, "Error allocating {} bytes ({} GB)\n", bytes,
+                                         bytes >> 30);
             d = nullptr;
         }
         if(d != nullptr)
@@ -73,8 +72,9 @@ public:
             auto status = (hipMemset)(d, 0, bytes);
             if(status != hipSuccess)
             {
-                rocsolver::formatting::print(stderr, "error: {} ({}) at {}:{}\n", hipGetErrorString(status),
-                           static_cast<std::int32_t>(status), __FILE__, __LINE__);
+                rocsolver::formatting::print(stderr, "error: {} ({}) at {}:{}\n",
+                                             hipGetErrorString(status),
+                                             static_cast<std::int32_t>(status), __FILE__, __LINE__);
                 rocblas_abort();
             }
         }

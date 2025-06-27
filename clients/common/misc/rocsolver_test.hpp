@@ -41,9 +41,6 @@ namespace fs = std::filesystem;
 namespace fs = std::experimental::filesystem;
 #endif
 
-
-
-
 #include "rocsolver_utility.hpp"
 #include <rocblas/rocblas.h>
 
@@ -69,8 +66,12 @@ inline void rocsolver_bench_inform(rocsolver_inform_type it, size_t arg = 0)
     {
     case inform_quick_return: rocsolver::formatting::print("Quick return...\n"); break;
     case inform_invalid_size: rocsolver::formatting::print("Invalid size arguments...\n"); break;
-    case inform_invalid_args: rocsolver::formatting::print("Invalid value in arguments...\n"); break;
-    case inform_mem_query: rocsolver::formatting::print("{} bytes of device memory are required...\n", arg); break;
+    case inform_invalid_args:
+        rocsolver::formatting::print("Invalid value in arguments...\n");
+        break;
+    case inform_mem_query:
+        rocsolver::formatting::print("{} bytes of device memory are required...\n", arg);
+        break;
     }
     rocsolver::formatting::print("No performance data to collect.\n");
     rocsolver::formatting::print("No computations to verify.\n");

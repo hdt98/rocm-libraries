@@ -1,5 +1,5 @@
 /* **************************************************************************
- * Copyright (C) 2018-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2018-2025 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -37,8 +37,6 @@
 #include <type_traits>
 #include <unordered_map>
 #include <utility>
-
-
 
 #include <rocblas/rocblas.h>
 
@@ -90,22 +88,24 @@ inline void rocblas_expect_status(rocblas_status status, rocblas_status expect)
     if(status != expect)
     {
         rocsolver::formatting::print(stderr, "rocBLAS status error: Expected {}, received {}\n",
-                   rocblas_status_to_string(expect), rocblas_status_to_string(status));
+                                     rocblas_status_to_string(expect),
+                                     rocblas_status_to_string(status));
         if(expect == rocblas_status_success)
             exit(EXIT_FAILURE);
     }
 }
 
-#define CHECK_HIP_ERROR(ERROR)                                                        \
-    do                                                                                \
-    {                                                                                 \
-        auto error = ERROR;                                                           \
-        if(error != hipSuccess)                                                       \
-        {                                                                             \
-            rocsolver::formatting::print(stderr, "error: {} ({}) at {}:{}\n", hipGetErrorString(error), \
-                       static_cast<int32_t>(error), __FILE__, __LINE__);              \
-            rocblas_abort();                                                          \
-        }                                                                             \
+#define CHECK_HIP_ERROR(ERROR)                                                                  \
+    do                                                                                          \
+    {                                                                                           \
+        auto error = ERROR;                                                                     \
+        if(error != hipSuccess)                                                                 \
+        {                                                                                       \
+            rocsolver::formatting::print(stderr, "error: {} ({}) at {}:{}\n",                   \
+                                         hipGetErrorString(error), static_cast<int32_t>(error), \
+                                         __FILE__, __LINE__);                                   \
+            rocblas_abort();                                                                    \
+        }                                                                                       \
     } while(0)
 
 #define CHECK_ALLOC_QUERY(STATUS)                                                                     \
@@ -114,10 +114,11 @@ inline void rocblas_expect_status(rocblas_status status, rocblas_status expect)
         auto status__ = (STATUS);                                                                     \
         if(!(status__ == rocblas_status_size_increased || status__ == rocblas_status_size_unchanged)) \
         {                                                                                             \
-            rocsolver::formatting::print(stderr,                                                                        \
-                       "rocBLAS status error: Expected rocblas_status_size_unchanged or "             \
-                       "rocblas_status_size_increase,\nreceived {}\n",                                \
-                       rocblas_status_to_string(status__));                                           \
+            rocsolver::formatting::print(                                                             \
+                stderr,                                                                               \
+                "rocBLAS status error: Expected rocblas_status_size_unchanged or "                    \
+                "rocblas_status_size_increase,\nreceived {}\n",                                       \
+                rocblas_status_to_string(status__));                                                  \
             rocblas_abort();                                                                          \
         }                                                                                             \
     } while(0)

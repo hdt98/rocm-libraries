@@ -1,5 +1,5 @@
 /* **************************************************************************
- * Copyright (C) 2018-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2018-2025 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -129,16 +129,18 @@ rocblas_int query_device_property()
         status = hipGetDeviceProperties(&props, i);
         if(status != hipSuccess)
         {
-            rocsolver::formatting::print(stderr, "Query device error: cannot get device ID {}'s property\n", i);
+            rocsolver::formatting::print(
+                stderr, "Query device error: cannot get device ID {}'s property\n", i);
             continue;
         }
 
-        rocsolver::formatting::print("Device ID {} : {}\nwith {:3.1f} GB memory, max. SCLK {} MHz, "
-                   "max. MCLK {} MHz, compute capability {}.{}\nmaxGridDimX {}, "
-                   "sharedMemPerBlock {:3.1f} KB, maxThreadsPerBlock {}, warpSize {}\n",
-                   i, props.name, props.totalGlobalMem / 1e9, int(props.clockRate / 1000),
-                   int(props.memoryClockRate / 1000), props.major, props.minor, props.maxGridSize[0],
-                   props.sharedMemPerBlock / 1e3, props.maxThreadsPerBlock, props.warpSize);
+        rocsolver::formatting::print(
+            "Device ID {} : {}\nwith {:3.1f} GB memory, max. SCLK {} MHz, "
+            "max. MCLK {} MHz, compute capability {}.{}\nmaxGridDimX {}, "
+            "sharedMemPerBlock {:3.1f} KB, maxThreadsPerBlock {}, warpSize {}\n",
+            i, props.name, props.totalGlobalMem / 1e9, int(props.clockRate / 1000),
+            int(props.memoryClockRate / 1000), props.major, props.minor, props.maxGridSize[0],
+            props.sharedMemPerBlock / 1e3, props.maxThreadsPerBlock, props.warpSize);
     }
     return device_count;
 }
@@ -148,5 +150,6 @@ void set_device(rocblas_int device_id)
 {
     hipError_t status = hipSetDevice(device_id);
     if(status != hipSuccess)
-        rocsolver::formatting::print(stderr, "Set device error: cannot set device ID {}\n", device_id);
+        rocsolver::formatting::print(stderr, "Set device error: cannot set device ID {}\n",
+                                     device_id);
 }
