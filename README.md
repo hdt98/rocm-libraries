@@ -15,11 +15,11 @@ This table provides the current status of the migration of specific ROCm librari
 |---------------------|------------------|--------------------------------------|
 | `composablekernel`  | Pending     |  |
 | `hipblas`           | Pending     |  |
-| `hipblas-common`    | Completed   | [![Azure CI](https://dev.azure.com/ROCm-CI/ROCm-CI/_apis/build/status%2Fmonorepo%2FhipBLAS-common?repoName=ROCm%2Frocm-libraries&branchName=develop)](https://dev.azure.com/ROCm-CI/ROCm-CI/_build/latest?definitionId=300&repoName=ROCm%2Frocm-libraries&branchName=develop) \n [![Math-CI](http://math-ci.amd.com/buildStatus/icon?job=/rocm-libraries/precheckin/hipblas-common/develop)](http://math-ci.amd.com/job/rocm-libraries/job/precheckin/job/hipblas-common/job/develop/) |
-| `hipblaslt`         | Completed   | [![Azure CI](https://dev.azure.com/ROCm-CI/ROCm-CI/_apis/build/status%2Fmonorepo%2FhipBLASLt?repoName=ROCm%2Frocm-libraries&branchName=develop)](https://dev.azure.com/ROCm-CI/ROCm-CI/_build/latest?definitionId=301&repoName=ROCm%2Frocm-libraries&branchName=develop) |
-| `hipcub`            | Completed   | [![Azure CI](https://dev.azure.com/ROCm-CI/ROCm-CI/_apis/build/status%2Fmonorepo%2FhipCUB?repoName=ROCm%2Frocm-libraries&branchName=develop)](https://dev.azure.com/ROCm-CI/ROCm-CI/_build/latest?definitionId=277&repoName=ROCm%2Frocm-libraries&branchName=develop) |
+| `hipblas-common`    | Completed   | [![Azure CI](https://dev.azure.com/ROCm-CI/ROCm-CI/_apis/build/status%2Fmonorepo%2FhipBLAS-common?repoName=ROCm%2Frocm-libraries&branchName=develop)](https://dev.azure.com/ROCm-CI/ROCm-CI/_build/latest?definitionId=300&repoName=ROCm%2Frocm-libraries&branchName=develop) <br>[Math-CI](http://math-ci.amd.com/buildStatus/icon?job=/rocm-libraries/precheckin/hipblas-common/develop) |
+| `hipblaslt`         | Completed   | [![Azure CI](https://dev.azure.com/ROCm-CI/ROCm-CI/_apis/build/status%2Fmonorepo%2FhipBLASLt?repoName=ROCm%2Frocm-libraries&branchName=develop)](https://dev.azure.com/ROCm-CI/ROCm-CI/_build/latest?definitionId=301&repoName=ROCm%2Frocm-libraries&branchName=develop) <br>[Math-CI](http://math-ci.amd.com/buildStatus/icon?job=/rocm-libraries/precheckin/hipblaslt/develop) |
+| `hipcub`            | Completed   | [![Azure CI](https://dev.azure.com/ROCm-CI/ROCm-CI/_apis/build/status%2Fmonorepo%2FhipCUB?repoName=ROCm%2Frocm-libraries&branchName=develop)](https://dev.azure.com/ROCm-CI/ROCm-CI/_build/latest?definitionId=277&repoName=ROCm%2Frocm-libraries&branchName=develop) <br>[Math-CI](http://math-ci.amd.com/buildStatus/icon?job=/rocm-libraries/precheckin/hipcub/develop)|
 | `hipfft`            | Pending     |  |
-| `hiprand`           | Completed   | [![Azure CI](https://dev.azure.com/ROCm-CI/ROCm-CI/_apis/build/status%2Fmonorepo%2FrocRAND?repoName=ROCm%2Frocm-libraries&branchName=develop)](https://dev.azure.com/ROCm-CI/ROCm-CI/_build/latest?definitionId=274&repoName=ROCm%2Frocm-libraries&branchName=develop) |
+| `hiprand`           | Completed   | [![Azure CI](https://dev.azure.com/ROCm-CI/ROCm-CI/_apis/build/status%2Fmonorepo%2FrocRAND?repoName=ROCm%2Frocm-libraries&branchName=develop)](https://dev.azure.com/ROCm-CI/ROCm-CI/_build/latest?definitionId=274&repoName=ROCm%2Frocm-libraries&branchName=develop) <br>[Math-CI](http://math-ci.amd.com/buildStatus/icon?job=/rocm-libraries/precheckin/hiprand/develop) |
 | `hipsolver`         | Pending     |  |
 | `hipsparse`         | Pending     |  |
 | `hipsparselt`       | Pending     |  |
@@ -27,13 +27,13 @@ This table provides the current status of the migration of specific ROCm librari
 | `mxdatagenerator`   | Completed   |  |
 | `rocblas`           | Pending 🔥 | Next in line. ETA 06/30 |
 | `rocfft`            | Pending     |  |
-| `rocprim`           | Completed   | [![Azure CI](https://dev.azure.com/ROCm-CI/ROCm-CI/_apis/build/status%2Fmonorepo%2FrocPRIM?repoName=ROCm%2Frocm-libraries&branchName=develop)](https://dev.azure.com/ROCm-CI/ROCm-CI/_build/latest?definitionId=273&repoName=ROCm%2Frocm-libraries&branchName=develop) |
-| `rocrand`           | Completed   | [![Azure CI](https://dev.azure.com/ROCm-CI/ROCm-CI/_apis/build/status%2Fmonorepo%2FrocRAND?repoName=ROCm%2Frocm-libraries&branchName=develop)](https://dev.azure.com/ROCm-CI/ROCm-CI/_build/latest?definitionId=274&repoName=ROCm%2Frocm-libraries&branchName=develop) |
+| `rocprim`           | Completed   | [![Azure CI](https://dev.azure.com/ROCm-CI/ROCm-CI/_apis/build/status%2Fmonorepo%2FrocPRIM?repoName=ROCm%2Frocm-libraries&branchName=develop)](https://dev.azure.com/ROCm-CI/ROCm-CI/_build/latest?definitionId=273&repoName=ROCm%2Frocm-libraries&branchName=develop) <br>[Math-CI](http://math-ci.amd.com/buildStatus/icon?job=/rocm-libraries/precheckin/rocprim/develop) |
+| `rocrand`           | Completed   | [![Azure CI](https://dev.azure.com/ROCm-CI/ROCm-CI/_apis/build/status%2Fmonorepo%2FrocRAND?repoName=ROCm%2Frocm-libraries&branchName=develop)](https://dev.azure.com/ROCm-CI/ROCm-CI/_build/latest?definitionId=274&repoName=ROCm%2Frocm-libraries&branchName=develop) <br>[Math-CI](http://math-ci.amd.com/buildStatus/icon?job=/rocm-libraries/precheckin/rocrand/develop)|
 | `rocsolver`         | Pending     |  |
 | `rocsparse`         | Pending     |  |
-| `rocthrust`         | Completed   | [![Azure CI](https://dev.azure.com/ROCm-CI/ROCm-CI/_apis/build/status%2Fmonorepo%2FrocThrust?repoName=ROCm%2Frocm-libraries&branchName=develop)](https://dev.azure.com/ROCm-CI/ROCm-CI/_build/latest?definitionId=276&repoName=ROCm%2Frocm-libraries&branchName=develop) |
+| `rocthrust`         | Completed   | [![Azure CI](https://dev.azure.com/ROCm-CI/ROCm-CI/_apis/build/status%2Fmonorepo%2FrocThrust?repoName=ROCm%2Frocm-libraries&branchName=develop)](https://dev.azure.com/ROCm-CI/ROCm-CI/_build/latest?definitionId=276&repoName=ROCm%2Frocm-libraries&branchName=develop) <br>[Math-CI](http://math-ci.amd.com/buildStatus/icon?job=/rocm-libraries/precheckin/rocthrust/develop)|
 | `rocroller`         | Pending     | Next in line. |
-| `tensile`           | Completed   | [![Azure CI](https://dev.azure.com/ROCm-CI/ROCm-CI/_apis/build/status%2Fmonorepo%2FTensile?repoName=ROCm%2Frocm-libraries&branchName=develop)](https://dev.azure.com/ROCm-CI/ROCm-CI/_build/latest?definitionId=305&repoName=ROCm%2Frocm-libraries&branchName=develop) |
+| `tensile`           | Completed   | [![Azure CI](https://dev.azure.com/ROCm-CI/ROCm-CI/_apis/build/status%2Fmonorepo%2FTensile?repoName=ROCm%2Frocm-libraries&branchName=develop)](https://dev.azure.com/ROCm-CI/ROCm-CI/_build/latest?definitionId=305&repoName=ROCm%2Frocm-libraries&branchName=develop) <br>[Math-CI](http://math-ci.amd.com/buildStatus/icon?job=/rocm-libraries/precheckin/tensile/develop)|
 
 # TheRock CI Status
 
