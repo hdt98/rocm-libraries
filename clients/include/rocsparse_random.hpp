@@ -51,10 +51,8 @@ namespace rocsparse
         std::vector<double> m_rand_uniform_cache;
         std::vector<double> m_rand_normal_cache;
 
-        float   uniform_float(float a, float b);
-        double  uniform_double(double a, double b);
-        int32_t uniform_int(int32_t a, int32_t b);
-        double  normal_double();
+        double uniform_double(double a, double b);
+        double normal_double();
 
     public:
         static rng_t& Instance()
@@ -73,26 +71,12 @@ namespace rocsparse
         rocsparse_rng_t& get_rng_nan();
         rocsparse_rng_t& get_rng_seed();
 
-        /*! \brief  generate a random number in range [a,b] using integer numbers*/
-        template <typename T>
-        T generator_exact(int32_t a, int32_t b);
-
         /*! \brief  generate a random number in range [a,b]*/
-        template <typename T, typename std::enable_if_t<std::is_integral<T>::value, bool> = true>
-        T generator(T a, T b);
-
-        template <typename T, typename std::enable_if_t<!std::is_integral<T>::value, bool> = true>
-        T generator(T a, T b);
-
-        /*! \brief  generate a random number in range [a,b] from a predetermined finite cache using integer numbers*/
         template <typename T>
-        T cached_generator_exact(int32_t a, int32_t b);
+        T generator(T a, T b);
 
         /*! \brief  generate a random number in range [a,b] from a predetermined finite cache*/
-        template <typename T, typename std::enable_if_t<std::is_integral<T>::value, bool> = true>
-        T cached_generator(T a, T b);
-
-        template <typename T, typename std::enable_if_t<!std::is_integral<T>::value, bool> = true>
+        template <typename T>
         T cached_generator(T a, T b);
 
         /*! \brief generate a random normally distributed number around 0 with stddev 1 from a predetermined finite cache */
@@ -101,55 +85,37 @@ namespace rocsparse
     };
 }
 
-/* ==================================================================================== */
-/* generate random number :*/
+/*
+* ===========================================================================
+*    Wrappers
+* ===========================================================================
+*/
 
 /*! \brief  generate a random number in range [a,b] using integer numbers*/
 template <typename T>
-inline T random_generator_exact(int a = 1, int b = 10)
-{
-    return rocsparse::rng_t::Instance().generator_exact<T>(a, b);
-}
+T random_generator_exact(int a = 1, int b = 10);
 
 /*! \brief  generate a random number in range [a,b]*/
 template <typename T, typename std::enable_if_t<std::is_integral<T>::value, bool> = true>
-inline T random_generator(T a = static_cast<T>(1), T b = static_cast<T>(10))
-{
-    return rocsparse::rng_t::Instance().generator<T>(a, b);
-}
+T random_generator(T a = static_cast<T>(1), T b = static_cast<T>(10));
 
 template <typename T, typename std::enable_if_t<!std::is_integral<T>::value, bool> = true>
-inline T random_generator(T a = static_cast<T>(0), T b = static_cast<T>(1))
-{
-    return rocsparse::rng_t::Instance().generator<T>(a, b);
-}
+T random_generator(T a = static_cast<T>(0), T b = static_cast<T>(1));
 
 /*! \brief  generate a random number in range [a,b] from a predetermined finite cache using integer numbers*/
 template <typename T>
-inline T random_cached_generator_exact(int a = 1, int b = 10)
-{
-    return rocsparse::rng_t::Instance().cached_generator_exact<T>(a, b);
-}
+T random_cached_generator_exact(int a = 1, int b = 10);
 
 /*! \brief  generate a random number in range [a,b] from a predetermined finite cache*/
 template <typename T, typename std::enable_if_t<std::is_integral<T>::value, bool> = true>
-inline T random_cached_generator(T a = static_cast<T>(1), T b = static_cast<T>(10))
-{
-    return rocsparse::rng_t::Instance().cached_generator<T>(a, b);
-}
+T random_cached_generator(T a = static_cast<T>(1), T b = static_cast<T>(10));
 
 template <typename T, typename std::enable_if_t<!std::is_integral<T>::value, bool> = true>
-inline T random_cached_generator(T a = static_cast<T>(0), T b = static_cast<T>(1))
-{
-    return rocsparse::rng_t::Instance().cached_generator<T>(a, b);
-}
+T random_cached_generator(T a = static_cast<T>(0), T b = static_cast<T>(1));
 
 /*! \brief generate a random normally distributed number around 0 with stddev 1 from a predetermined finite cache */
 template <typename T>
-inline T random_cached_generator_normal()
-{
-    return rocsparse::rng_t::Instance().cached_generator_normal<T>();
-}
+T random_cached_generator_normal();
 
 // Reset the seed (mainly to ensure repeatability of failures in a given suite)
 void rocsparse_seedrand();
