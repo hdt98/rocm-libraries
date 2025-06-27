@@ -64,7 +64,7 @@ double rocsparse::rng_t::uniform_double(double a, double b)
     return a + this->m_rand_uniform_cache[this->m_rand_uniform_idx] * (b - a);
 }
 
-int rocsparse::rng_t::uniform_int(int a, int b)
+int32_t rocsparse::rng_t::uniform_int(int32_t a, int32_t b)
 {
     return this->uniform_float(static_cast<float>(a), static_cast<float>(b));
 }
@@ -76,15 +76,50 @@ double rocsparse::rng_t::normal_double()
     return this->m_rand_normal_cache[this->m_rand_normal_idx];
 }
 
+void rocsparse::rng_t::reset_seed()
+{
+    m_rand_uniform_idx = 0;
+    m_rand_normal_idx  = 0;
+
+    set_rng(m_rng_seed);
+    set_rng_nan(m_rng_seed);
+}
+
+void rocsparse::rng_t::set_rng(rocsparse_rng_t a)
+{
+    m_rng = a;
+}
+void rocsparse::rng_t::set_rng_nan(rocsparse_rng_t a)
+{
+    m_rng_nan = a;
+}
+void rocsparse::rng_t::rng_seed_set(rocsparse_rng_t a)
+{
+    m_rng_seed = a;
+}
+
+rocsparse_rng_t& rocsparse::rng_t::get_rng()
+{
+    return m_rng;
+}
+rocsparse_rng_t& rocsparse::rng_t::get_rng_nan()
+{
+    return m_rng_nan;
+}
+rocsparse_rng_t& rocsparse::rng_t::get_rng_seed()
+{
+    return m_rng_seed;
+}
+
 void rocsparse_seedrand()
 {
     rocsparse::rng_t::Instance().reset_seed();
 }
 
 template <typename T>
-T rocsparse::rng_t::generator_exact(int a, int b)
+T rocsparse::rng_t::generator_exact(int32_t a, int32_t b)
 {
-    return std::uniform_int_distribution<int>(a, b)(get_rng());
+    return std::uniform_int_distribution<int32_t>(a, b)(get_rng());
 }
 
 template <typename T, typename std::enable_if_t<std::is_integral<T>::value, bool>>
@@ -100,7 +135,7 @@ T rocsparse::rng_t::generator(T a, T b)
 }
 
 template <typename T>
-T rocsparse::rng_t::cached_generator_exact(int a, int b)
+T rocsparse::rng_t::cached_generator_exact(int32_t a, int32_t b)
 {
     return this->uniform_int(a, b);
 }

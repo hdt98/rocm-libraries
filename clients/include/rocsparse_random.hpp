@@ -46,15 +46,15 @@ namespace rocsparse
         rocsparse_rng_t m_rng_nan;
         rocsparse_rng_t m_rng_seed;
 
-        int                 m_rand_uniform_idx;
-        int                 m_rand_normal_idx;
+        int32_t             m_rand_uniform_idx;
+        int32_t             m_rand_normal_idx;
         std::vector<double> m_rand_uniform_cache;
         std::vector<double> m_rand_normal_cache;
 
-        float  uniform_float(float a, float b);
-        double uniform_double(double a, double b);
-        int    uniform_int(int a, int b);
-        double normal_double();
+        float   uniform_float(float a, float b);
+        double  uniform_double(double a, double b);
+        int32_t uniform_int(int32_t a, int32_t b);
+        double  normal_double();
 
     public:
         static rng_t& Instance()
@@ -63,62 +63,37 @@ namespace rocsparse
             return instance;
         }
 
-        void reset_seed()
-        {
-            m_rand_uniform_idx = 0;
-            m_rand_normal_idx  = 0;
+        void reset_seed();
 
-            set_rng(m_rng_seed);
-            set_rng_nan(m_rng_seed);
-        }
+        void set_rng(rocsparse_rng_t a);
+        void set_rng_nan(rocsparse_rng_t a);
+        void rng_seed_set(rocsparse_rng_t a);
 
-        void set_rng(rocsparse_rng_t a)
-        {
-            m_rng = a;
-        }
-        void set_rng_nan(rocsparse_rng_t a)
-        {
-            m_rng_nan = a;
-        }
-        void rng_seed_set(rocsparse_rng_t a)
-        {
-            m_rng_seed = a;
-        }
-
-        rocsparse_rng_t& get_rng()
-        {
-            return m_rng;
-        }
-        rocsparse_rng_t& get_rng_nan()
-        {
-            return m_rng_nan;
-        }
-        rocsparse_rng_t& get_rng_seed()
-        {
-            return m_rng_seed;
-        }
+        rocsparse_rng_t& get_rng();
+        rocsparse_rng_t& get_rng_nan();
+        rocsparse_rng_t& get_rng_seed();
 
         /*! \brief  generate a random number in range [a,b] using integer numbers*/
         template <typename T>
-        T generator_exact(int a = 1, int b = 10);
+        T generator_exact(int32_t a, int32_t b);
 
         /*! \brief  generate a random number in range [a,b]*/
         template <typename T, typename std::enable_if_t<std::is_integral<T>::value, bool> = true>
-        T generator(T a = static_cast<T>(1), T b = static_cast<T>(10));
+        T generator(T a, T b);
 
         template <typename T, typename std::enable_if_t<!std::is_integral<T>::value, bool> = true>
-        T generator(T a = static_cast<T>(0), T b = static_cast<T>(1));
+        T generator(T a, T b);
 
         /*! \brief  generate a random number in range [a,b] from a predetermined finite cache using integer numbers*/
         template <typename T>
-        T cached_generator_exact(int a = 1, int b = 10);
+        T cached_generator_exact(int32_t a, int32_t b);
 
         /*! \brief  generate a random number in range [a,b] from a predetermined finite cache*/
         template <typename T, typename std::enable_if_t<std::is_integral<T>::value, bool> = true>
-        T cached_generator(T a = static_cast<T>(1), T b = static_cast<T>(10));
+        T cached_generator(T a, T b);
 
         template <typename T, typename std::enable_if_t<!std::is_integral<T>::value, bool> = true>
-        T cached_generator(T a = static_cast<T>(0), T b = static_cast<T>(1));
+        T cached_generator(T a, T b);
 
         /*! \brief generate a random normally distributed number around 0 with stddev 1 from a predetermined finite cache */
         template <typename T>
