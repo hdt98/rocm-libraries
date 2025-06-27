@@ -12,10 +12,10 @@ This table provides the current status of the migration of specific ROCm librari
 - **Pending**: Not yet started or in the early planning stages. The individual repo should be considered the source of truth for this project.
 
 | Component           | Migration Status | CI Status                            |
-|---------------------|------------------|---------------------------------------|
+|---------------------|------------------|--------------------------------------|
 | `composablekernel`  | Pending     |  |
 | `hipblas`           | Pending     |  |
-| `hipblas-common`    | Completed   | [![Azure CI](https://dev.azure.com/ROCm-CI/ROCm-CI/_apis/build/status%2Fmonorepo%2FhipBLAS-common?repoName=ROCm%2Frocm-libraries&branchName=develop)](https://dev.azure.com/ROCm-CI/ROCm-CI/_build/latest?definitionId=300&repoName=ROCm%2Frocm-libraries&branchName=develop) |
+| `hipblas-common`    | Completed   | [![Azure CI](https://dev.azure.com/ROCm-CI/ROCm-CI/_apis/build/status%2Fmonorepo%2FhipBLAS-common?repoName=ROCm%2Frocm-libraries&branchName=develop)](https://dev.azure.com/ROCm-CI/ROCm-CI/_build/latest?definitionId=300&repoName=ROCm%2Frocm-libraries&branchName=develop) \n [![Math-CI](http://math-ci.amd.com/buildStatus/icon?job=/rocm-libraries/precheckin/hipblas-common/develop)(http://math-ci.amd.com/job/rocm-libraries/job/precheckin/job/hipblas-common/job/develop/) |
 | `hipblaslt`         | Completed   | [![Azure CI](https://dev.azure.com/ROCm-CI/ROCm-CI/_apis/build/status%2Fmonorepo%2FhipBLASLt?repoName=ROCm%2Frocm-libraries&branchName=develop)](https://dev.azure.com/ROCm-CI/ROCm-CI/_build/latest?definitionId=301&repoName=ROCm%2Frocm-libraries&branchName=develop) |
 | `hipcub`            | Completed   | [![Azure CI](https://dev.azure.com/ROCm-CI/ROCm-CI/_apis/build/status%2Fmonorepo%2FhipCUB?repoName=ROCm%2Frocm-libraries&branchName=develop)](https://dev.azure.com/ROCm-CI/ROCm-CI/_build/latest?definitionId=277&repoName=ROCm%2Frocm-libraries&branchName=develop) |
 | `hipfft`            | Pending     |  |
