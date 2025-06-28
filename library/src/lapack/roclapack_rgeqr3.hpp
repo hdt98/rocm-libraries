@@ -2414,6 +2414,11 @@ static rocblas_status rocsolver_rgeqr3_template(rocblas_handle handle,
         T* const scalars = reinterpret_cast<T*>(pfree);
         pfree += size_scalars;
 
+        if(size_scalars > 0)
+        {
+            init_scalars(handle, (T*)scalars);
+        }
+
         // -------------------------------------------------
         // note reuse storge for workArr for geqr2 and larft
         // -------------------------------------------------
@@ -2438,37 +2443,6 @@ static rocblas_status rocsolver_rgeqr3_template(rocblas_handle handle,
                                                tau, stride_tau,
 
                                                batch_count, scalars, work_workArr, Abyx_norms, diag));
-#if(0)
-        // -----------------------------------
-        // copy tau vector to diagonal of Tmat
-        // -----------------------------------
-
-        {
-            bool const is_copy_Tmat2tau = false;
-            copy_diagonal_template(handle, is_copy_Tmat2tau, min_mn,
-
-                                   Tmat, shift_Tmat, ldT, stride_Tmat,
-
-                                   tau, stride_tau,
-
-                                   batch_count);
-        }
-
-        // -----------------------------------
-        // call larft to generate the T matrix
-        // -----------------------------------
-
-        {
-            bool const is_copy_Tmat2tau = true;
-            copy_diagonal_template<T, I, Istride>(handle, is_copy_Tmat2tau, n,
-
-                                                  Tmat, shift_Tmat, ldT, stride_Tmat,
-
-                                                  tmp_tau, stride_tmp_tau,
-
-                                                  batch_count);
-        }
-#endif
 
         rocblas_direct const direct = rocblas_forward_direction;
         rocblas_storev const storev = rocblas_column_wise;
@@ -2479,7 +2453,7 @@ static rocblas_status rocsolver_rgeqr3_template(rocblas_handle handle,
 
                                                           tau, stride_tau,
 
-                                                          Tmat, ldT, stride_Tmat,
+                                                          Tmat + shift_Tmat, ldT, stride_Tmat,
 
                                                           batch_count, scalars, work, workArr);
 
