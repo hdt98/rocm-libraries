@@ -54,8 +54,8 @@ from rocisa.instruction import BranchInstruction, BufferLoadB128, BufferLoadB32,
   SCBranchSCC1, SCBranchVCCNZ, SCBranchVCCZ, SCMovB32, SCSelectB32, SCmpEQI32, \
   SCmpEQU32, SCmpEQU64, SCmpGeI32, SCmpGeU32, SCmpGtI32, SCmpGtU32, SCmpKEQU32, \
   SCmpKGeU32, SCmpKGtU32, SCmpKLGU32, SCmpLeI32, SCmpLeU32, SCmpLgU32, SCmpLtU32, SCmpLtI32, \
-  SEndpgm, SFf1B32, SGetRegB32, SLShiftLeft2AddU32, SLShiftLeftB32, SLShiftLeftB64, SLShiftRightB32, \
-  SLShiftRightB64, SLoadB32, SLoadB64, SMFMAInstruction, SMemLoadInstruction, SMinI32, \
+  SEndpgm, SFf1B32, SGetRegB32, SFlbitI32B32, SLShiftLeft2AddU32, SLShiftLeftB32, SLShiftLeftB64, SLShiftRightB32, \
+  SLShiftRightB64, SLoadB32, SLoadB64, SMFMAInstruction, SMemLoadInstruction, SMaxU32, SMinI32, \
   SMinU32, SMovB32, SMovB64, SMulHIU32, SMulI32, SNop, SOrB32, SOrSaveExecB32, \
   SOrSaveExecB64, SSExtI16toI32, SSetPCB64, SSetRegIMM32B32, SSetPrior, SSubBU32, SSubI32, SSubU32, \
   SWaitCnt, SWaitAlu, SXorB32, VAShiftRightI32, VAccvgprReadB32, VAccvgprWrite, VAccvgprWriteB32, \
@@ -1581,6 +1581,313 @@ class KernelWriterAssembly(KernelWriter):
       module.add(label_skipWGMXCC)
     return module
 
+  def remapGeneralWGMWalk(self, kernel):
+    module = Module("remapGeneralWGMWalk")
+
+    # TODO: Query arch specific values instead of hard code
+    numTotalCU = 256
+    numXCC = 8
+
+    # Apply XCC remap
+    useXCCRemap = False
+
+    sgprWGID = "WorkGroup0"
+    #sgprNumMT0WG = sgpr("NumWorkGroups0")
+    #sgprNumMT1WG = sgpr("NumWorkGroups1")
+
+
+    #sgprWGID = self.sgprPool.checkOut(1)
+    tmpSgprCurM = self.sgprPool.checkOut(1, preventOverflow=False)
+    tmpSgprCurN = self.sgprPool.checkOut(1, preventOverflow=False)
+
+    if not kernel["StreamK"]:
+      module.add(SMovB32(dst=sgpr(sgprWGID), src=sgpr("WorkGroup0"), comment=""))
+
+
+    if kernel["StreamK"]:
+      qReg = self.vgprPool.checkOut(4)
+      dReg = qReg + 1
+      divReg = qReg + 2
+      rReg = qReg + 3
+      module.addComment0("Compute NumWG in M/N dims")
+      module.add(VMovB32(dst=vgpr(divReg), src="MT0", comment="set MT0 into sgpr"))
+      module.add(VMovB32(dst=vgpr(dReg), src=sgpr("SizesFree+0"), comment="set Free0 size"))
+      module.add(vectorUInt32CeilDivideAndRemainder(qReg=qReg, dReg=dReg, divReg=divReg, rReg=rReg, doRemainder=False))
+      module.add(VMovB32(dst=vgpr(divReg), src="MT1", comment="set MT1 into sgpr"))
+      module.add(VMovB32(dst=vgpr(dReg), src=sgpr("SizesFree+1"), comment="set Free1 size"))
+      module.add(VReadfirstlaneB32(dst=sgpr(tmpSgprCurM), src=vgpr(qReg), comment="set back to numWorkGroup0"))
+      module.add(vectorUInt32CeilDivideAndRemainder(qReg=qReg, dReg=dReg, divReg=divReg, rReg=rReg, doRemainder=False))
+      module.add(VReadfirstlaneB32(dst=sgpr(tmpSgprCurN), src=vgpr(qReg), comment="set back to numWorkGroup1"))
+      self.vgprPool.checkIn(qReg)
+    else:
+      module.add(SMovB32(dst=sgpr(tmpSgprCurM), src=sgpr("NumWorkGroups0"), comment=""))
+      module.add(SMovB32(dst=sgpr(tmpSgprCurN), src=sgpr("NumWorkGroups1"), comment=""))
+    
+    if useXCCRemap:
+      tmpSgpr = []
+      numTmpSgpr = 3 + 2 + 1 + 2
+      for i in range(0, numTmpSgpr):
+        tmpSgpr.append(self.sgprPool.checkOut(1, preventOverflow=False))
+
+      module.addComment0("Remap 1D based on XCC")
+      numWG = tmpSgpr[0] # alias
+      module.add(SMulI32(dst=sgpr(numWG), src0=sgpr("NumWorkGroups0"), src1=sgpr("NumWorkGroups1")))
+      module.add(SAddU32(dst=sgpr(tmpSgpr[1]), src0=sgpr(numWG), src1=(numTotalCU - 1)))
+      numRd = tmpSgpr[1] # alias, number of rounds
+      curRd = tmpSgpr[2] # alias, current round
+    # Need to use this for non power of 2 total CUs
+   #module.add(scalarUInt32DivideAndRemainder(qReg=tmpSgpr.idx, dReg="WorkGroup0", divReg=tmpSgpr.idx, rReg=tmpSgpr.idx+1,\
+     #                                     tmpVgprRes=tmpVgprRes, wavewidth=kernel["WavefrontSize"], doRemainder=False))
+      module.add(SLShiftRightB32(dst=sgpr(numRd), src=sgpr(numRd), shiftHex=log2(numTotalCU), comment="Calc number rounds"))
+      module.add(SLShiftRightB32(dst=sgpr(curRd), src=sgpr(sgprWGID), shiftHex=log2(numTotalCU), comment="Calc current rounds"))
+      module.addComment0("")
+      # tmp sgpr 3, 4, 5
+      module.add(SMinU32(dst=sgpr(tmpSgpr[3]), src0=sgpr(numWG), src1=numTotalCU, comment="min(numwg, %u)"%(numTotalCU) ))
+      module.add(SLShiftLeftB32(dst=sgpr(tmpSgpr[4]), src=sgpr(curRd), shiftHex=log2(numTotalCU), comment=" current round * %u"%(numTotalCU)))
+      module.add(SSubU32(dst=sgpr(tmpSgpr[4]), src0=sgpr(numWG), src1=sgpr(tmpSgpr[4]), comment="numwg - cr * %u"%(numTotalCU)))
+      module.addComment0("nwg = cr < nr - 1 ? std::min<int>(%u, nwg) : nwg - (cr) * %u"%(numTotalCU, numTotalCU))
+      module.add(SSubU32(dst=sgpr(tmpSgpr[5]), src0=sgpr(numRd), src1=1, comment="num rounds - 1"))
+      module.add(SCmpLtU32(sgpr(curRd), sgpr(tmpSgpr[5]), comment="current round < num rounds - 1"))
+      module.add(SCSelectB32(dst=sgpr(numWG), src0=sgpr(tmpSgpr[3]), src1=sgpr(tmpSgpr[4])))
+      module.addComment0("")
+      # tmp sgpr 3, 4, 5
+      module.add(SAndB32(dst=sgpr(sgprWGID), src0=sgpr(sgprWGID), src1=(numTotalCU - 1)))
+      module.add(SLShiftRightB32(dst=sgpr(tmpSgpr[3]), src=sgpr(numWG), shiftHex=log2(numXCC), comment="num wg per xcc"))
+      module.add(SAndB32(dst=sgpr(tmpSgpr[4]), src0=sgpr(numWG), src1=(numXCC - 1), comment="num xcc with extra wg"))
+      module.addComment0("")
+      module.add(SAndB32(dst=sgpr(tmpSgpr[5]), src0=sgpr(sgprWGID), src1=(numXCC - 1), comment="logical xcc id"))
+      numWGPerXCC = tmpSgpr[3] # alias
+      numXCCExtraWG = tmpSgpr[4] # alias
+      logicalXCCID = tmpSgpr[5] # alias
+      # tmp sgpr 0, 1, 6, 7 numWG, numRd not needed anymore
+      module.add(SMinU32(dst=sgpr(tmpSgpr[1]), src0=sgpr(logicalXCCID), src1=sgpr(numXCCExtraWG), comment="min(cutoff, xccid)" ))
+      module.add(SSubU32(dst=sgpr(tmpSgpr[6]), src0=sgpr(logicalXCCID), src1=sgpr(tmpSgpr[1]), comment="xccid - min(cutoff, xccid)"))
+      module.addComment0("")
+      module.add(SMulI32(dst=sgpr(tmpSgpr[7]), src0=sgpr(tmpSgpr[6]), src1=sgpr(numWGPerXCC)))
+      module.add(SAddU32(dst=sgpr(numWGPerXCC), src0=sgpr(numWGPerXCC), src1=1))
+      module.add(SMulI32(dst=sgpr(tmpSgpr[0]), src0=sgpr(tmpSgpr[1]), src1=sgpr(numWGPerXCC)))
+      module.add(SAddU32(dst=sgpr(tmpSgpr[0]), src0=sgpr(tmpSgpr[0]), src1=sgpr(tmpSgpr[7])))
+      module.addComment0("")
+      module.add(SLShiftRightB32(dst=sgpr(numWGPerXCC), src=sgpr(sgprWGID), shiftHex=log2(numXCC), comment=""))
+      module.add(SAddU32(dst=sgpr(sgprWGID), src0=sgpr(tmpSgpr[0]), src1=sgpr(numWGPerXCC)))
+
+      module.add(SLShiftLeftB32(dst=sgpr(curRd), src=sgpr(curRd), shiftHex=log2(numTotalCU), comment=""))
+      module.add(SAddU32(dst=sgpr(sgprWGID), src0=sgpr(sgprWGID), src1=sgpr(curRd)))
+      for i in range(0, numTmpSgpr):
+        self.sgprPool.checkIn(tmpSgpr[i])
+
+
+    module.addComment0("General WGM  Walk Calculation")
+    tmpSgprSerialIDOrig = self.sgprPool.checkOut(1, preventOverflow=False)
+    tmpSgprBlockM       = self.sgprPool.checkOut(1, preventOverflow=False)
+    tmpSgprBlockN       = self.sgprPool.checkOut(1, preventOverflow=False)
+    tmpSgprBlockSz       = self.sgprPool.checkOut(1, preventOverflow=False)
+    #tmpSgprCurM       = self.sgprPool.checkOut(1, preventOverflow=False)
+    #tmpSgprCurN       = self.sgprPool.checkOut(1, preventOverflow=False)
+    tmpSgprCurX       = self.sgprPool.checkOut(1, preventOverflow=False)
+    tmpSgprCurY       = self.sgprPool.checkOut(1, preventOverflow=False)
+    tmpSgprCurDir     = self.sgprPool.checkOut(1, preventOverflow=False)
+
+
+    tmpSgprCurM1       = self.sgprPool.checkOut(1, preventOverflow=False)
+    tmpSgprCurN1       = self.sgprPool.checkOut(1, preventOverflow=False)
+    tmpSgprCurM2       = self.sgprPool.checkOut(1, preventOverflow=False)
+    tmpSgprCurN2       = self.sgprPool.checkOut(1, preventOverflow=False)
+
+    block0 = [tmpSgprCurM1, tmpSgprCurN1]
+    block1 = [tmpSgprCurM2, tmpSgprCurN1]
+    block2 = [tmpSgprCurM1, tmpSgprCurN2]
+    block3 = [tmpSgprCurM2, tmpSgprCurN2]
+
+    def blockXYOffset(block):
+      if block == block0:
+        return [0,0]
+      elif block == block1:
+        return [tmpSgprCurM1, 0]
+      elif block == block2:
+        return [0, tmpSgprCurN1]
+      elif block == block3:
+        return [tmpSgprCurM1, tmpSgprCurN1]
+
+    directions = []
+    directionBlocks = []
+    directionNewDir = []
+    directionLabels = []
+
+    if kernel["UseGeneralWGM"] == 1:
+      directions = [
+        "HilbertWalkNCC",
+        "HilbertWalkN",
+        "HilbertWalkSCC",
+        "HilbertWalkS",
+        "HilbertWalkECC",
+        "HilbertWalkE",
+        "HilbertWalkWCC",
+        "HilbertWalkW",
+      ]
+      directionBlocks = [
+        [block0, block1, block3, block2], # NCC
+        [block2, block3, block1, block0], # N
+        [block3, block2, block0, block1], # SCC
+        [block1, block0, block2, block3], # S
+        [block2, block0, block1, block3], # ECC
+        [block3, block1, block0, block2], # E
+        [block0, block1, block3, block2], # WCC
+        [block1, block3, block2, block0], # W
+      ]
+      directionNewDir = [
+        [directions[7], directions[0], directions[0], directions[5]], #NCC
+        [directions[4], directions[1], directions[1], directions[6]], #N
+        [directions[6], directions[2], directions[2], directions[4]], #SCC
+        [directions[5], directions[3], directions[3], directions[7]], #S
+        [directions[1], directions[4], directions[4], directions[3]], #ECC
+        [directions[2], directions[5], directions[5], directions[0]], #E
+        [directions[3], directions[6], directions[6], directions[1]], #WCC
+        [directions[0], directions[7], directions[7], directions[2]], #W
+      ]
+    elif kernel["UseGeneralWGM"] == 2:
+      # Z-Walk
+      directions = ["MortonZ"]
+      directionBlocks = [
+        [block0, block2, block1, block3],
+      ]
+    elif kernel["UseGeneralWGM"] == 3:
+      # ReverseN-Walk
+      directions = ["MortonRN"]
+      directionBlocks = [
+        [block0, block1, block2, block3],
+      ]
+    elif kernel["UseGeneralWGM"] == 4:
+      # U-Walk
+      directions = ["MortonU"]
+      directionBlocks = [
+        [block0, block1, block3, block2],
+      ]  
+      
+    for i in range(0, len(directions)):
+      directionLabels.append(Label((self.labels.getUniqueNamePrefix(directions[i])), comment=""))
+
+    for i in range(0, len(directions)):
+      module.add(ValueSet(directions[i], i, format=1))
+
+    module.add(SMovB32(dst=sgpr(tmpSgprSerialIDOrig), src=sgpr(sgprWGID)))
+    #module.add(SMovB32(dst=sgpr(tmpSgprCurM), src=sgpr(sgprNumMT0WG)))
+    #module.add(SMovB32(dst=sgpr(tmpSgprCurN), src=sgpr(sgprNumMT1WG)))
+    module.add(SMovB32(dst=sgpr(tmpSgprCurX), src=0))
+    module.add(SMovB32(dst=sgpr(tmpSgprCurY), src=0))
+    if len(directions) > 1:
+      module.add(SMovB32(dst=sgpr(tmpSgprCurDir), src=directions[0]))
+    module.add(SMovB32(dst=sgpr(tmpSgprBlockM), src=16))
+    module.add(SMovB32(dst=sgpr(tmpSgprBlockN), src=16))
+    module.add(SMulI32(dst=sgpr(tmpSgprBlockSz), src0=sgpr(tmpSgprBlockM), src1=sgpr(tmpSgprBlockN)))
+    # Begin Hilbert Walk
+
+    labelStartWhile = Label(self.labels.getUniqueNamePrefix("GeneralWGMWalkStartWhile"), comment="")
+    labelEndWhile = Label(self.labels.getUniqueNamePrefix("GeneralWGMWalkEndWhile"), comment="")
+
+    tmpSgpr = []
+    numTmpSgpr = 3
+    for i in range(0, numTmpSgpr):
+      tmpSgpr.append(self.sgprPool.checkOut(1, preventOverflow=False))
+
+    module.add(labelStartWhile)
+    #module.addComment0("start while")
+    module.add(SMulI32(dst=sgpr(tmpSgpr[0]), src0=sgpr(tmpSgprCurM), src1=sgpr(tmpSgprCurN)))
+    module.add(SCmpGtU32(src0=sgpr(tmpSgpr[0]), src1=sgpr(tmpSgprBlockSz), comment="M * N > bkM * bkN"))
+    module.add(SCBranchSCC0(labelName=labelEndWhile.getLabelName(), comment=""))
+
+    # body of loop
+    module.add(SFlbitI32B32(dst=sgpr(tmpSgpr[0]), src=sgpr(tmpSgprCurM), comment=""))
+    module.add(SFlbitI32B32(dst=sgpr(tmpSgpr[1]), src=sgpr(tmpSgprCurN), comment=""))
+    module.add(SSubU32(dst=sgpr(tmpSgpr[0]), src0=31, src1=sgpr(tmpSgpr[0]), comment=""))
+    module.add(SSubU32(dst=sgpr(tmpSgpr[1]), src0=31, src1=sgpr(tmpSgpr[1]), comment=""))
+    module.add(SLShiftLeftB32(dst=sgpr(tmpSgpr[0]), src=1, shiftHex=sgpr(tmpSgpr[0]), comment=""))
+    module.add(SLShiftLeftB32(dst=sgpr(tmpSgpr[1]), src=1, shiftHex=sgpr(tmpSgpr[1]), comment=""))
+
+    module.add(SLShiftRightB32(dst=sgpr(tmpSgprCurM1), src=sgpr(tmpSgprCurM), shiftHex=1, comment="M1 = M / 2"))
+    module.add(SLShiftRightB32(dst=sgpr(tmpSgprCurN1), src=sgpr(tmpSgprCurN), shiftHex=1, comment="N1 = N / 2"))
+    module.add(SCmpEQU32(src0=sgpr(tmpSgpr[0]), src1=sgpr(tmpSgprCurM), comment=""))
+    module.add(SCSelectB32(dst=sgpr(tmpSgprCurM1), src0=sgpr(tmpSgprCurM1), src1=sgpr(tmpSgpr[0])))
+    module.add(SCmpEQU32(src0=sgpr(tmpSgpr[1]), src1=sgpr(tmpSgprCurN), comment=""))
+    module.add(SCSelectB32(dst=sgpr(tmpSgprCurN1), src0=sgpr(tmpSgprCurN1), src1=sgpr(tmpSgpr[1])))
+
+    module.add(SMinU32(dst=sgpr(tmpSgprCurM2), src0=sgpr(tmpSgprCurM), src1=sgpr(tmpSgprBlockM), comment="" ))
+    module.add(SMinU32(dst=sgpr(tmpSgprCurN2), src0=sgpr(tmpSgprCurN), src1=sgpr(tmpSgprBlockN), comment="" ))
+    module.add(SMaxU32(dst=sgpr(tmpSgprCurM1), src0=sgpr(tmpSgprCurM1), src1=sgpr(tmpSgprCurM2), comment="" ))
+    module.add(SMaxU32(dst=sgpr(tmpSgprCurN1), src0=sgpr(tmpSgprCurN1), src1=sgpr(tmpSgprCurN2), comment="" ))
+
+    module.add(SSubU32(dst=sgpr(tmpSgprCurM2), src0=sgpr(tmpSgprCurM), src1=sgpr(tmpSgprCurM1), comment=""))
+    module.add(SSubU32(dst=sgpr(tmpSgprCurN2), src0=sgpr(tmpSgprCurN), src1=sgpr(tmpSgprCurN1), comment=""))
+
+    if len(directions) > 1:
+      for i in range(0, len(directions)):
+        module.add(SCmpEQU32(src0=sgpr(tmpSgprCurDir), src1=directions[i], comment=""))
+        module.add(SCBranchSCC1(labelName=directionLabels[i].getLabelName()))
+
+    for i in range(0, len(directions)):
+      if len(directions) > 1:
+        module.add(directionLabels[i])
+      block = directionBlocks[i]
+      module.add(SMulI32(dst=sgpr(tmpSgpr[0]), src0=sgpr(block[0][0]), src1=sgpr(block[0][1])))
+      module.add(SMulI32(dst=sgpr(tmpSgpr[1]), src0=sgpr(block[1][0]), src1=sgpr(block[1][1])))
+      module.add(SMulI32(dst=sgpr(tmpSgpr[2]), src0=sgpr(block[2][0]), src1=sgpr(block[2][1])))
+      module.add(SAddU32(dst=sgpr(tmpSgpr[1]), src0=sgpr(tmpSgpr[1]), src1=sgpr(tmpSgpr[0])))
+      module.add(SAddU32(dst=sgpr(tmpSgpr[2]), src0=sgpr(tmpSgpr[2]), src1=sgpr(tmpSgpr[1])))
+      for j in range(0, 4):
+        label = Label((self.labels.getUniqueNamePrefix(directions[i]+"_block%u"%(j+1))), comment="")
+        if j < 3:
+          module.add(SCmpLtU32(sgpr("WorkGroup0"), sgpr(tmpSgpr[j]), comment=""))
+          module.add(SCBranchSCC0(labelName=label.getLabelName(), comment=""))
+        module.add(SMovB32(dst=sgpr(tmpSgprCurM), src=sgpr(block[j][0]), comment="Update M"))
+        module.add(SMovB32(dst=sgpr(tmpSgprCurN), src=sgpr(block[j][1]), comment="Update N"))
+        curBlockOffset = blockXYOffset(directionBlocks[i][j])
+        if curBlockOffset[0] != 0:
+          module.add(SAddU32(dst=sgpr(tmpSgprCurX), src0=sgpr(tmpSgprCurX), src1=sgpr(curBlockOffset[0]), comment="Update idX"))
+        if curBlockOffset[1] != 0:
+          module.add(SAddU32(dst=sgpr(tmpSgprCurY), src0=sgpr(tmpSgprCurY), src1=sgpr(curBlockOffset[1]), comment="Update idY"))
+        if len(directions) > 1:
+          module.add(SMovB32(dst=sgpr(tmpSgprCurDir), src=directionNewDir[i][j], comment="Update direction"))
+        if j > 0:
+          module.add(SSubU32(dst=sgpr("WorkGroup0"), src0=sgpr("WorkGroup0"), src1=sgpr(tmpSgpr[j-1]), comment="Update serial idx"))
+        module.add(SBranch(labelName=labelStartWhile.getLabelName()))
+        if j < 3:
+          module.add(label)
+
+
+    #module.addComment0("end while")
+    module.add(labelEndWhile)
+    tmpVgpr = self.vgprPool.checkOutAligned(2,2,"tmpVgpr")
+    tmpVgprRes = ContinuousRegister(tmpVgpr, 2)
+    module.add(scalarUInt32DivideAndRemainder(qReg=tmpSgpr[0], dReg="WorkGroup0", divReg=tmpSgprCurN, rReg=tmpSgpr[1], tmpVgprRes=tmpVgprRes, wavewidth=kernel["WavefrontSize"], doRemainder=True, comment=""))
+    module.add(SAddU32(dst=sgpr("WorkGroup0"), src0=sgpr(tmpSgprCurX), src1=sgpr(tmpSgpr[0]), comment=""))
+    module.add(SAddU32(dst=sgpr("WorkGroup1"), src0=sgpr(tmpSgprCurY), src1=sgpr(tmpSgpr[1]), comment=""))
+
+    self.vgprPool.checkIn(tmpVgpr)
+    for i in range(0, numTmpSgpr):
+      self.sgprPool.checkIn(tmpSgpr[i])
+
+
+    self.sgprPool.checkIn(tmpSgprSerialIDOrig)
+    self.sgprPool.checkIn(tmpSgprBlockM)
+    self.sgprPool.checkIn(tmpSgprBlockN)
+    self.sgprPool.checkIn(tmpSgprBlockSz)
+    self.sgprPool.checkIn(tmpSgprCurM)
+    self.sgprPool.checkIn(tmpSgprCurN)
+    self.sgprPool.checkIn(tmpSgprCurX)
+    self.sgprPool.checkIn(tmpSgprCurY)
+    self.sgprPool.checkIn(tmpSgprCurDir)
+    self.sgprPool.checkIn(tmpSgprCurM1)
+    self.sgprPool.checkIn(tmpSgprCurN1)
+    self.sgprPool.checkIn(tmpSgprCurM2)
+    self.sgprPool.checkIn(tmpSgprCurN2)
+
+
+    #self.sgprPool.checkIn(sgprWGID)
+    #self.sgprPool.checkIn(sgprNumMT0WG)
+    #self.sgprPool.checkIn(sgprNumMT1WG)
+    
+    return module
+
   def remapWgSerial(self, kernel, earlyStop=True):
     module = Module("RemapWgSerial")
     ########
@@ -1600,21 +1907,27 @@ class KernelWriterAssembly(KernelWriter):
         module.add(scalarUInt32DivideAndRemainder(qReg=tmpSgpr.idx, dReg="WorkGroup0", divReg=tmpSgpr.idx, rReg=tmpSgpr.idx+1,\
                                         tmpVgprRes=tmpVgprRes, wavewidth=kernel["WavefrontSize"], doRemainder=False))
         module.add(SMovB32(dst=sgpr("WorkGroup2"), src=sgpr(tmpSgpr.idx)))
-        module.addComment0("idxWG01 = idxWG012 - wg2 * numWG0 * numWG1")
-        module.add(SMulI32(dst=sgpr(tmpSgpr.idx), src0=sgpr("NumWorkGroups1"), src1=sgpr("NumWorkGroups0")))
-        module.add(SMulI32(dst=sgpr(tmpSgpr.idx), src0=sgpr(tmpSgpr.idx), src1=sgpr("WorkGroup2")))
-        if kernel["GlobalSplitU"] != 0:
-          module.add(SMulI32(dst=sgpr(tmpSgpr.idx), src0=sgpr(tmpSgpr.idx), src1=sgpr(tmpSgpr.idx+1)))
-        module.add(SSubU32(dst=sgpr("WorkGroup0"), src0=sgpr("WorkGroup0"), src1=sgpr(tmpSgpr.idx)))
-        module.addComment0("wg1 = idxWG01 * smallMagicNumber(1/numWG0)")
-        module.add(scalarUInt32DivideAndRemainder(qReg=tmpSgpr.idx, dReg="WorkGroup0", divReg="NumWorkGroups0", rReg=tmpSgpr.idx+1,\
+        # Convert 1D to 2D
+        if not kernel["UseGeneralWGM"]:
+          module.addComment0("idxWG01 = idxWG012 - wg2 * numWG0 * numWG1")
+          module.add(SMulI32(dst=sgpr(tmpSgpr.idx), src0=sgpr("NumWorkGroups1"), src1=sgpr("NumWorkGroups0")))
+          module.add(SMulI32(dst=sgpr(tmpSgpr.idx), src0=sgpr(tmpSgpr.idx), src1=sgpr("WorkGroup2")))
+          if kernel["GlobalSplitU"] != 0:
+            module.add(SMulI32(dst=sgpr(tmpSgpr.idx), src0=sgpr(tmpSgpr.idx), src1=sgpr(tmpSgpr.idx+1)))
+          module.add(SSubU32(dst=sgpr("WorkGroup0"), src0=sgpr("WorkGroup0"), src1=sgpr(tmpSgpr.idx)))
+          module.addComment0("wg1 = idxWG01 * smallMagicNumber(1/numWG0)")
+          module.add(scalarUInt32DivideAndRemainder(qReg=tmpSgpr.idx, dReg="WorkGroup0", divReg="NumWorkGroups0", rReg=tmpSgpr.idx+1,\
                                         tmpVgprRes=tmpVgprRes, wavewidth=kernel["WavefrontSize"], doRemainder=False))
-        self.vgprPool.checkIn(tmpVgpr)
-        module.add(SMovB32(dst=sgpr("WorkGroup1"), src=sgpr(tmpSgpr.idx)))
-        module.addComment0("wg0 = idxWG01 - wg1 * numWG0")
-        module.add(SMulI32(dst=sgpr(tmpSgpr.idx), src0=sgpr("WorkGroup1"), src1=sgpr("NumWorkGroups0")))
-        module.add(SSubU32(dst=sgpr("WorkGroup0"), src0=sgpr("WorkGroup0"), src1=sgpr(tmpSgpr.idx)))
+          self.vgprPool.checkIn(tmpVgpr)
+          module.add(SMovB32(dst=sgpr("WorkGroup1"), src=sgpr(tmpSgpr.idx)))
+          module.addComment0("wg0 = idxWG01 - wg1 * numWG0")
+          module.add(SMulI32(dst=sgpr(tmpSgpr.idx), src0=sgpr("WorkGroup1"), src1=sgpr("NumWorkGroups0")))
+          module.add(SSubU32(dst=sgpr("WorkGroup0"), src0=sgpr("WorkGroup0"), src1=sgpr(tmpSgpr.idx)))
+        else:
+          self.vgprPool.checkIn(tmpVgpr)
 
+      #if kernel["UseGeneralWGM"]:
+      #  module.add(self.remapGeneralWGMWalk(kernel))
       # early stop if wgIdx exceed wg needed
       if earlyStop:
         module.addComment1("Early stop if wg exceed")
@@ -1887,7 +2200,8 @@ class KernelWriterAssembly(KernelWriter):
       labelMultiGemmEnd = Label(label="MultiGemmEnd", comment="")
       module.add(moduleArgs)
       module.add(moduleRegInit)
-      module.add(self.wgmXCC(kernel, tmpSgprNumWorkGroups))
+      if not kernel["UseGeneralWGM"]:
+        module.add(self.wgmXCC(kernel, tmpSgprNumWorkGroups))
       self.sgprPool.checkIn(tmpSgprNumWorkGroups)
       tmpSgprNumWorkGroups = None
       module.add(SCmpEQU32(src0=sgpr(sgprArgType), src1=0))
@@ -2271,23 +2585,10 @@ class KernelWriterAssembly(KernelWriter):
     self.vgprPool.checkIn(tmpV0)
     return module
 
-  ##############################################################################
-  # Global Read Addresses: WorkGroup
-  ##############################################################################
-  def graWorkGroup(self, kernel, tPA, tPB):
-    module = Module("graWorkGroup")
-    module.addComment0("graWorkGroup mapping")
 
-    skComponent = Component.StreamK.find(self)
-    module.add(skComponent.graWorkGroup(self, kernel, tPA, tPB))
-
-    gsuComponent = Component.GSU.find(self)
-    module.add(gsuComponent.graWorkGroup(self, kernel))
-
-    ########################################
-    # Blocked rows or columns
-    # Do branch
-
+  def graWGMImpl(self, kernel):
+    module = Module("graWGMCalc")
+    module.addComment0("WGM Calculation")
     # Restore WGM
     module.add(SSExtI16toI32(dst=sgpr("WGM"), src=sgpr("WGM"), comment="Restore WGM"))
 
@@ -2364,7 +2665,34 @@ class KernelWriterAssembly(KernelWriter):
       self.sgprPool.checkIn(tmpSgpr)
     tmpVgprRes = None
     self.vgprPool.checkIn(tmpVgpr)
+
     return module
+
+  ##############################################################################
+  # Global Read Addresses: WorkGroup
+  ##############################################################################
+  def graWorkGroup(self, kernel, tPA, tPB):
+    module = Module("graWorkGroup")
+    module.addComment0("graWorkGroup mapping")
+
+    skComponent = Component.StreamK.find(self)
+    module.add(skComponent.graWorkGroup(self, kernel, tPA, tPB))
+
+    gsuComponent = Component.GSU.find(self)
+    module.add(gsuComponent.graWorkGroup(self, kernel))
+
+    ########################################
+    # Blocked rows or columns
+    # Do branch
+
+    if not kernel["UseGeneralWGM"]:
+      module.add(self.graWGMImpl(kernel))
+    else:
+      module.add(self.remapGeneralWGMWalk(kernel))
+    return module
+
+
+
 
   def graMetadataTileAssignment(self, kernel, tP):
     module = Module("graMetadataTileAssignment")

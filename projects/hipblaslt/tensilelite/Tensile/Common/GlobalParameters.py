@@ -383,6 +383,7 @@ defaultBenchmarkCommonParameters = [
     {"WorkGroupMapping": [8]},
     {"WorkGroupMappingXCC": [1]},
     {"WorkGroupMappingXCCGroup": [-1]},
+    {"UseGeneralWGM":[0]},
     {"ThreadTile": [[4, 4]]},
     {"WavefrontSize": [64]},
     {"MatrixInstruction": [[]]},

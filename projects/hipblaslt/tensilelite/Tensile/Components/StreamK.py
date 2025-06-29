@@ -148,7 +148,22 @@ class StreamK(Component):
     def skIndexToWG(self, writer, kernel, sTmp):
         # Note: There's one unused sgpr passed with sTmp.
         module = Module("StreamK skIndexToWG")
+        
+        if kernel["UseGeneralWGM"]:
+            module.addComment0("Map StreamK tile index to wg0/1/2")
+            module.add(SMulI32(dst=sgpr(sTmp+1), src0=sgpr("NumWorkGroups0"), src1=sgpr("NumWorkGroups1"), comment="Total tiles"))
+            tmpVgpr = writer.vgprPool.checkOut(2, "div")
+            tmpVgprRes = ContinuousRegister(idx=tmpVgpr, size=2)
+            module.add(scalarUInt32DivideAndRemainder(qReg="WorkGroup2", dReg=sTmp, divReg=sTmp+1, rReg=sTmp+2, tmpVgprRes=tmpVgprRes, wavewidth=kernel["WavefrontSize"], doRemainder=True, comment="TileID // nWG0*nWG1"))
+            tmpVgprRes = None
+            writer.vgprPool.checkIn(tmpVgpr)
 
+            module.add(Label(writer.labels.getUniqueNamePrefix("asdf"),""))
+            module.add(SMovB32(dst=sgpr("WorkGroup0"), src=sgpr(sTmp), comment=""))
+            #module.add(SMovB32(dst=sgpr("WorkGroup1"), src=0, comment=""))
+            module.addSpaceLine()
+            return module
+        
         # Map StreamK tile index to wg0/1
         module.addComment0("Map StreamK tile index to wg0/1/2")
         module.add(SMulI32(dst=sgpr(sTmp+1), src0=sgpr("NumWorkGroups0"), src1=sgpr("NumWorkGroups1"), comment="Total tiles"))

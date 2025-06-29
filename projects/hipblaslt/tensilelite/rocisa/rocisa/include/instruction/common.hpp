@@ -1079,6 +1079,33 @@ namespace rocisa
         }
     };
 
+    struct SFlbitI32B32 : public CommonInstruction
+    {
+        SFlbitI32B32(const std::shared_ptr<Container>& dst,
+                const InstructionInput&           src,
+                const std::string&                comment = "")
+            : CommonInstruction(InstType::INST_B32,
+                                dst,
+                                {src},
+                                std::nullopt,
+                                std::nullopt,
+                                std::nullopt,
+                                comment)
+        {
+            setInst("s_flbit_i32_b32");
+        }
+
+        SFlbitI32B32(const SFlbitI32B32& other)
+            : CommonInstruction(other)
+        {
+        }
+
+        std::shared_ptr<Item> clone() const override
+        {
+            return std::make_shared<SFlbitI32B32>(*this);
+        }
+    };
+  
     struct SMovkI32 : public CommonInstruction
     {
         SMovkI32(const std::shared_ptr<Container>& dst,
