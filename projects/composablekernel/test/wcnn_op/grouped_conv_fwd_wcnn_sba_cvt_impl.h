@@ -533,6 +533,7 @@ bool run_test()
             AccEnableLds,
             EnableAsync,
             EnableWaveGroup,
+            false,
             false,      // shuffleOnLoad
             false,      // transpose
             TileStore>; // TileOnMemAccess

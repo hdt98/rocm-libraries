@@ -1479,7 +1479,8 @@ template <index_t NumPrefetch,
           bool WeiDataEnableLds,
           bool DsDataEnableLds,
           bool AsyncLoad,
-          bool WaveGroup>
+          bool WaveGroup,
+          bool SpatialCluster>
 constexpr auto GridwiseConvPipeline_Selector()
 {
     if constexpr(WaveGroup)
@@ -1488,7 +1489,8 @@ constexpr auto GridwiseConvPipeline_Selector()
                                        InDataEnableLds,
                                        WeiDataEnableLds,
                                        DsDataEnableLds,
-                                       AsyncLoad>{};
+                                       AsyncLoad,
+                                       SpatialCluster>{};
     }
     else
     {

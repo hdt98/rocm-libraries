@@ -19,7 +19,8 @@ template <index_t NumPrefetch,
           bool InDataEnableLds,
           bool WeiDataEnableLds,
           bool DsDataEnableLds,
-          bool EnableAsync>
+          bool EnableAsync,
+          bool EnableSpatialCluster>
 struct GridwiseConvPipeline_v2
 {
     static constexpr auto I0 = Number<0>{};
@@ -38,6 +39,7 @@ struct GridwiseConvPipeline_v2
               typename InDataBlockTransfer,
               typename InDataGridBuffer,
               typename InDataBlockBuffer,
+              typename ExchangeDataBlockBuffer,
               typename InDataBlockTransferStep,
               typename WeiDataGridDesc,
               typename WeiDataBlockDesc,
@@ -58,6 +60,8 @@ struct GridwiseConvPipeline_v2
                                InDataBlockTransfer& in_blockwise_copy,
                                const InDataGridBuffer& in_grid_buf,
                                InDataBlockBuffer& in_block_buf,
+                               ExchangeDataBlockBuffer& prev_block_buf,
+                               ExchangeDataBlockBuffer& next_block_buf,
                                const InDataBlockTransferStep&,
                                const WeiDataGridDesc& wei_grid_desc,
                                const WeiDataBlockDesc& wei_block_desc,
@@ -85,12 +89,16 @@ struct GridwiseConvPipeline_v2
         WavegroupSemaphore<WaveIdLoad, 1> semaDataLdsFree;
         WavegroupSemaphore<WaveIdRun, 3> semaAccumFree;
         WavegroupSemaphore<WaveIdPostRun, 1> semaAccumReady;
+        WavegroupSemaphore<WaveIdLoad, 1> semFromNext;
+        WavegroupSemaphore<WaveIdLoad, 1> semFromPrev;
 #else
         __shared__ WavegroupSemaphore<WaveIdRun> semaDataReady;
         __shared__ WavegroupSemaphore<WaveIdRun> semaLdsReady;
         __shared__ WavegroupSemaphore<WaveIdLoad> semaDataLdsFree;
         __shared__ WavegroupSemaphore<WaveIdRun> semaAccumFree;
         __shared__ WavegroupSemaphore<WaveIdPostRun> semaAccumReady;
+        __shared__ WavegroupSemaphore<WaveIdLoad> semFromNext;
+        __shared__ WavegroupSemaphore<WaveIdLoad> semFromPrev;
 #endif
         // sync for all wave with id = 0 in a group
 #ifdef CK_USE_AMD_NAMED_BARRIER_ASM
@@ -98,6 +106,9 @@ struct GridwiseConvPipeline_v2
 #else
         __shared__ NamedBarrier<4> barrierLds;
 #endif
+
+        __attribute__((exp_amd_laneshared)) int dataFromPrev[in_block_buf.Size()];
+        __attribute__((exp_amd_laneshared)) int dataFromNext[in_block_buf.Size()];
 
         constexpr index_t NumTap           = WeiDataBlockTransfer::Size();
         constexpr auto in_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0);
@@ -159,6 +170,12 @@ struct GridwiseConvPipeline_v2
             {
                 in_blockwise_copy.Run(
                     in_grid_desc, in_grid_buf, in_block_desc, in_block_origin_idx, in_block_buf);
+
+                if constexpr(EnableSpatialCluster)
+                {
+                    blockwise_conv.exchange_neighbor_data(in_grid_desc, in_block_buf, prev_block_buf, next_block_buf, dataFromPrev, semFromPrev, dataFromNext, semFromNext);
+                }
+
                 if constexpr(HasMainLoop)
                 {
                     in_blockwise_copy.MoveSrcSliceWindow(in_grid_desc, in_block_copy_step);
@@ -244,6 +261,11 @@ struct GridwiseConvPipeline_v2
                             in_blockwise_copy.RunRead(in_grid_desc, in_grid_buf);
                             in_blockwise_copy.RunWrite(in_block_desc, in_block_buf);
                         }
+
+                        if constexpr(EnableSpatialCluster)
+                        {
+                            blockwise_conv.exchange_neighbor_data(in_grid_desc, in_block_buf, prev_block_buf, next_block_buf, dataFromPrev, semFromPrev, dataFromNext, semFromNext);
+                        }
                     }
                     else
                     {
@@ -252,6 +274,12 @@ struct GridwiseConvPipeline_v2
                                               in_block_desc,
                                               in_block_origin_idx,
                                               in_block_buf);
+
+                        if constexpr(EnableSpatialCluster)
+                        {
+                            blockwise_conv.exchange_neighbor_data(in_grid_desc, in_block_buf, prev_block_buf, next_block_buf, dataFromPrev, semFromPrev, dataFromNext, semFromNext);
+                        }
+
                         in_block_buf.SwitchBuffer();
                     }
 
@@ -277,6 +305,8 @@ struct GridwiseConvPipeline_v2
                 {
                     blockwise_conv.Run(wei_block_buf,
                                        in_block_buf,
+                                       prev_block_buf,
+                                       next_block_buf,
                                        ds_block_buf,
                                        accum_thread_buf,
                                        out_thread_buf,
@@ -341,6 +371,11 @@ struct GridwiseConvPipeline_v2
                         in_blockwise_copy.RunRead(in_grid_desc, in_grid_buf);
                         in_blockwise_copy.RunWrite(in_block_desc, in_block_buf);
                     }
+
+                    if constexpr(EnableSpatialCluster)
+                    {
+                        blockwise_conv.exchange_neighbor_data(in_grid_desc, in_block_buf, prev_block_buf, next_block_buf, dataFromPrev, semFromPrev, dataFromNext, semFromNext);
+                    }
                 }
                 if constexpr(DsDataEnableLds)
                 {
@@ -388,6 +423,8 @@ struct GridwiseConvPipeline_v2
             {
                 blockwise_conv.Run(wei_block_buf,
                                    in_block_buf,
+                                   prev_block_buf,
+                                   next_block_buf,
                                    ds_block_buf,
                                    accum_thread_buf,
                                    out_thread_buf,
@@ -399,8 +436,8 @@ struct GridwiseConvPipeline_v2
     }
 };
 
-template <bool EnableAsync>
-struct GridwiseConvPipeline_v2<1, false, false, false, EnableAsync>
+template <bool EnableAsync, bool EnableSpatialCluster>
+struct GridwiseConvPipeline_v2<1, false, false, false, EnableAsync, EnableSpatialCluster>
 {
     static constexpr auto I0 = Number<0>{};
     static constexpr auto I1 = Number<1>{};
@@ -418,6 +455,7 @@ struct GridwiseConvPipeline_v2<1, false, false, false, EnableAsync>
               typename InDataBlockTransfer,
               typename InDataGridBuffer,
               typename InDataBlockBuffer,
+              typename ExchangeDataBlockBuffer,
               typename InDataBlockTransferStep,
               typename WeiDataGridDesc,
               typename WeiDataBlockDesc,
@@ -438,6 +476,8 @@ struct GridwiseConvPipeline_v2<1, false, false, false, EnableAsync>
                                InDataBlockTransfer& in_blockwise_copy,
                                const InDataGridBuffer& in_grid_buf,
                                InDataBlockBuffer& in_block_buf,
+                               ExchangeDataBlockBuffer& prev_block_buf,
+                               ExchangeDataBlockBuffer& next_block_buf,
                                const InDataBlockTransferStep&,
                                const WeiDataGridDesc& wei_grid_desc,
                                const WeiDataBlockDesc& wei_block_desc,
@@ -464,12 +504,19 @@ struct GridwiseConvPipeline_v2<1, false, false, false, EnableAsync>
         WavegroupSemaphore<WaveIdLoad, 1> semaDataFree;
         WavegroupSemaphore<WaveIdRun, 2> semaAccumFree;
         WavegroupSemaphore<WaveIdPostRun, 1> semaAccumReady;
+        WavegroupSemaphore<WaveIdLoad, 1> semFromNext;
+        WavegroupSemaphore<WaveIdLoad, 1> semFromPrev;
 #else
         __shared__ WavegroupSemaphore<WaveIdRun> semaDataReady;
         __shared__ WavegroupSemaphore<WaveIdLoad> semaDataFree;
         __shared__ WavegroupSemaphore<WaveIdRun> semaAccumFree;
         __shared__ WavegroupSemaphore<WaveIdPostRun> semaAccumReady;
+        __shared__ WavegroupSemaphore<WaveIdLoad> semFromNext;
+        __shared__ WavegroupSemaphore<WaveIdLoad> semFromPrev;
 #endif
+
+        static __attribute__((exp_amd_laneshared)) int dataFromPrev[in_block_buf.Size()];
+        static __attribute__((exp_amd_laneshared)) int dataFromNext[in_block_buf.Size()];
 
         constexpr index_t NumTap           = WeiDataBlockTransfer::Size();
         constexpr auto in_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0);
@@ -511,6 +558,11 @@ struct GridwiseConvPipeline_v2<1, false, false, false, EnableAsync>
             in_blockwise_copy.Run(
                 in_grid_desc, in_grid_buf, in_block_desc, in_block_origin_idx, in_block_buf);
 
+            if constexpr(EnableSpatialCluster)
+            {
+                blockwise_conv.exchange_neighbor_data(in_grid_desc, in_block_buf, prev_block_buf, next_block_buf, dataFromPrev, semFromPrev, dataFromNext, semFromNext);
+            }
+
             constexpr index_t NumDs = DsDataBlockTransfer::Size();
             static_for<0, NumDs, 1>{}([&](auto i) {
                 using DDataBlockTransfer =
@@ -534,6 +586,8 @@ struct GridwiseConvPipeline_v2<1, false, false, false, EnableAsync>
                 });
                 in_blockwise_copy.MoveSrcSliceWindow(in_grid_desc, in_block_copy_step);
                 in_block_buf.SwitchBuffer();
+                prev_block_buf.SwitchBuffer();
+                next_block_buf.SwitchBuffer();
                 wei_block_buf.SwitchBuffer();
             }
 
@@ -564,7 +618,15 @@ struct GridwiseConvPipeline_v2<1, false, false, false, EnableAsync>
                                           in_block_desc,
                                           in_block_origin_idx,
                                           in_block_buf);
+
+                    if constexpr(EnableSpatialCluster)
+                    {
+                        blockwise_conv.exchange_neighbor_data(in_grid_desc, in_block_buf, prev_block_buf, next_block_buf, dataFromPrev, semFromPrev, dataFromNext, semFromNext);
+                    }
+
                     in_block_buf.SwitchBuffer();
+                    prev_block_buf.SwitchBuffer();
+                    next_block_buf.SwitchBuffer();
 
                     static_for<0, NumTap, 1>{}([&](auto tapIdx) {
                         const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[tapIdx])
@@ -584,6 +646,8 @@ struct GridwiseConvPipeline_v2<1, false, false, false, EnableAsync>
                 {
                     blockwise_conv.Run(wei_block_buf,
                                        in_block_buf,
+                                       prev_block_buf,
+                                       next_block_buf,
                                        ds_block_buf,
                                        accum_thread_buf,
                                        out_thread_buf,
@@ -594,6 +658,8 @@ struct GridwiseConvPipeline_v2<1, false, false, false, EnableAsync>
                 if(get_wave_id_in_wavegroup() == WaveIdRun)
                 {
                     in_block_buf.SwitchBuffer();
+                    prev_block_buf.SwitchBuffer();
+                    next_block_buf.SwitchBuffer();
                     wei_block_buf.SwitchBuffer();
                     semaDataFree.template signal<0>();
                 }
@@ -613,6 +679,8 @@ struct GridwiseConvPipeline_v2<1, false, false, false, EnableAsync>
             {
                 blockwise_conv.Run(wei_block_buf,
                                    in_block_buf,
+                                   prev_block_buf,
+                                   next_block_buf,
                                    ds_block_buf,
                                    accum_thread_buf,
                                    out_thread_buf,
@@ -624,8 +692,8 @@ struct GridwiseConvPipeline_v2<1, false, false, false, EnableAsync>
     }
 };
 
-template <bool EnableAsync>
-struct GridwiseConvPipeline_v2<1, true, true, true, EnableAsync>
+template <bool EnableAsync, bool EnableSpatialCluster>
+struct GridwiseConvPipeline_v2<1, true, true, true, EnableAsync, EnableSpatialCluster>
 {
     static constexpr auto I0 = Number<0>{};
     static constexpr auto I1 = Number<1>{};
@@ -643,6 +711,7 @@ struct GridwiseConvPipeline_v2<1, true, true, true, EnableAsync>
               typename InDataBlockTransfer,
               typename InDataGridBuffer,
               typename InDataBlockBuffer,
+              typename ExchangeDataBlockBuffer,
               typename InDataBlockTransferStep,
               typename WeiDataGridDesc,
               typename WeiDataBlockDesc,
@@ -663,6 +732,8 @@ struct GridwiseConvPipeline_v2<1, true, true, true, EnableAsync>
                                InDataBlockTransfer& in_blockwise_copy,
                                const InDataGridBuffer& in_grid_buf,
                                InDataBlockBuffer& in_block_buf,
+                               ExchangeDataBlockBuffer& prev_block_buf,
+                               ExchangeDataBlockBuffer& next_block_buf,
                                const InDataBlockTransferStep&,
                                const WeiDataGridDesc& wei_grid_desc,
                                const WeiDataBlockDesc& wei_block_desc,
@@ -689,17 +760,24 @@ struct GridwiseConvPipeline_v2<1, true, true, true, EnableAsync>
         WavegroupSemaphore<WaveIdLoad, 1> semaLdsFree;
         WavegroupSemaphore<WaveIdRun, 2> semaAccumFree;
         WavegroupSemaphore<WaveIdPostRun, 1> semaAccumReady;
+        WavegroupSemaphore<WaveIdLoad, 1> semFromNext;
+        WavegroupSemaphore<WaveIdLoad, 1> semFromPrev;
 #else
         __shared__ WavegroupSemaphore<WaveIdRun> semaLdsReady;
         __shared__ WavegroupSemaphore<WaveIdLoad> semaLdsFree;
         __shared__ WavegroupSemaphore<WaveIdRun> semaAccumFree;
         __shared__ WavegroupSemaphore<WaveIdPostRun> semaAccumReady;
+        __shared__ WavegroupSemaphore<WaveIdLoad> semFromNext;
+        __shared__ WavegroupSemaphore<WaveIdLoad> semFromPrev;
 #endif
 #ifdef CK_USE_AMD_NAMED_BARRIER_ASM
         NamedBarrier<1, 4> barrierLds;
 #else
         __shared__ NamedBarrier<4> barrierLds;
 #endif
+
+        __attribute__((exp_amd_laneshared)) int dataFromPrev;
+        __attribute__((exp_amd_laneshared)) int dataFromNext;
 
         constexpr index_t NumTap = WeiDataBlockTransfer::Size();
 
@@ -771,6 +849,11 @@ struct GridwiseConvPipeline_v2<1, true, true, true, EnableAsync>
                         in_blockwise_copy.RunWrite(in_block_desc, in_block_buf);
                     }
 
+                    if constexpr(EnableSpatialCluster)
+                    {
+                        blockwise_conv.exchange_neighbor_data(in_grid_desc, in_block_buf, prev_block_buf, next_block_buf, dataFromPrev, semFromPrev, dataFromNext, semFromNext);
+                    }
+
                     static_for<0, NumTap, 1>{}([&](auto tapIdx) {
                         const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[tapIdx])
                             .MoveSrcSliceWindow(wei_grid_desc, wei_block_copy_step);
@@ -790,6 +873,8 @@ struct GridwiseConvPipeline_v2<1, true, true, true, EnableAsync>
                 {
                     blockwise_conv.Run(wei_block_buf,
                                        in_block_buf,
+                                       prev_block_buf,
+                                       next_block_buf,
                                        ds_block_buf,
                                        accum_thread_buf,
                                        out_thread_buf,
@@ -841,6 +926,11 @@ struct GridwiseConvPipeline_v2<1, true, true, true, EnableAsync>
                     in_blockwise_copy.RunWrite(in_block_desc, in_block_buf);
                 }
 
+                if constexpr(EnableSpatialCluster)
+                {
+                    blockwise_conv.exchange_neighbor_data(in_grid_desc, in_block_buf, prev_block_buf, next_block_buf, dataFromPrev, semFromPrev, dataFromNext, semFromNext);
+                }
+
                 static_for<0, NumTap, 1>{}([&](auto tapIdx) {
                     const_cast<WeiDataBlockTransfer0&>(wei_blockwise_copy[tapIdx])
                         .MoveSrcSliceWindow(wei_grid_desc, wei_block_copy_step);
@@ -890,6 +980,8 @@ struct GridwiseConvPipeline_v2<1, true, true, true, EnableAsync>
             {
                 blockwise_conv.Run(wei_block_buf,
                                    in_block_buf,
+                                   prev_block_buf,
+                                   next_block_buf,
                                    ds_block_buf,
                                    accum_thread_buf,
                                    out_thread_buf,

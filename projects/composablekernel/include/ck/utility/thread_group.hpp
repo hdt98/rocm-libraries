@@ -46,6 +46,8 @@ struct ThisThreadBlockWaveGroup
     __device__ static index_t GetWaveIdInWaveGroup() { return get_wave_id_in_wavegroup(); }
 
     static constexpr index_t GetNumWavePerGroup() { return kNumWavePerGroup_; }
+
+    static constexpr index_t GetNumWaveGroups() {return NumWaveGroup;}
 };
 
 } // namespace ck

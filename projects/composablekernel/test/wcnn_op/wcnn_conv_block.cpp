@@ -66,7 +66,7 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
 
     constexpr index_t DataTileHeight = 4;
     constexpr index_t H_Pad          = (FilterSize == 3) ? DataTileHeight : 0;
-    constexpr index_t W_Pad          = (FilterSize == 3) ? WPerWcnn : 0;
+    constexpr index_t W_Pad          = 0;
     constexpr index_t HPerBlockIn    = (FilterSize == 3) ? HPerBlock + H_Pad * 2 : HPerBlock;
     constexpr index_t WPerBlockIn    = (FilterSize == 3) ? WPerBlock + W_Pad * 2 : WPerBlock;
 
