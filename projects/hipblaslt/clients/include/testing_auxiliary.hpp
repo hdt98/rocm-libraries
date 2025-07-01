@@ -1375,7 +1375,6 @@ void testing_aux_mat_copy(const Arguments& arg)
 {
     hipblasLtMatmulDesc_t matmul_src;
     CHECK_HIPBLASLT_ERROR(hipblasLtMatmulDescCreate(&matmul_src, arg.compute_type, arg.scale_type));
-    CHECK_HIPBLASLT_ERROR(hipblasLtMatmulDescCreate(&matmul_src, arg.compute_type, arg.scale_type));
     hipblasLtMatmulDesc_t matmul_dest;
     CHECK_HIPBLASLT_ERROR(hipblasLtMatmulDescCreate(&matmul_dest, HIPBLAS_COMPUTE_32F, HIP_R_32F));
     
