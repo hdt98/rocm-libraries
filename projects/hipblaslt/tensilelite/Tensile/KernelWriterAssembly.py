@@ -275,9 +275,16 @@ class KernelWriterAssembly(KernelWriter):
     dim is index 0...max indices and is in global index space.
     """
     problemType = self.states.kernel["ProblemType"]
+    constStrideDimIdx = 0
     if tc in ['A','B', "Metadata"]:
+
+      if tc == 'A':
+        constStrideDimIdx = self.states.constStrideDimIdxA
+      elif tc == 'B':
+        constStrideDimIdx = self.states.constStrideDimIdxB
+
       if not problemType["UseInitialStridesAB"] and \
-          dim == problemType["IndexAssignments%s"%tc][0]:
+          dim == problemType["IndexAssignments%s"%tc][constStrideDimIdx]:
         return ("constStride%s%s"%(tc,self.states.indexChars[dim]))
       else:
         return sgpr("Stride%s%s"%(tc,self.states.indexChars[dim]))
@@ -971,9 +978,10 @@ class KernelWriterAssembly(KernelWriter):
     if kernel["ProblemType"]["Sparse"]:
       tcList.append("Metadata")
     for tc in tcList:
+      constStrideDimIdx = self.states.constStrideDimIdxA if tc == "A" else self.states.constStrideDimIdxB
       for i, idx in enumerate(problemType["IndexAssignments%s"%tc]):
         idxChar= self.states.indexChars[idx]
-        if i == 0 and not kernel["ProblemType"]["UseInitialStridesAB"]:
+        if i == constStrideDimIdx and not kernel["ProblemType"]["UseInitialStridesAB"]:
           module.add(ValueSet("constStride%s%s"%(tc,idxChar), 1))
         else:
           if not kernel["ProblemType"]["UseInitialStridesAB"]:
@@ -2912,6 +2920,7 @@ class KernelWriterAssembly(KernelWriter):
 
       module.add(SMovB32(dst=sgpr(tP["swizzledBlockSize"]), src=hex(16*swizzleK), comment=commentMsg))
 
+    # Swizzle doesn't support _UseSgprForGRO, so swz will not go to it.
     # both UseSgprForGRO and DTVA/B are enabled
     if ((tP["isA"] or tP["isB"]) and kernel["DirectToVgpr%s"%tc]) and kernel["_UseSgprForGRO"]:
       if tP["tlu"]:
@@ -11489,7 +11498,7 @@ class KernelWriterAssembly(KernelWriter):
         # module.add(SMovB64(dst=sgpr("SrdTD+0", 2), src=sgpr("SrdD+0", 2), comment="SrdTD = SrdD for GSU == 1"))
         # module.add(SMovB64(dst=sgpr("SrdTD+2", 2), src=sgpr("SrdD+2", 2), comment="SrdTD = SrdD for GSU == 1"))
         # module.add(SBranch(labelName=reductionEndLabel.getLabelName(), comment="branch if GSU == 1"))
-        
+
       gsuComponent = Component.GSU.find(self)
       if kernel["GlobalSplitU"] > 1 and kernel["GlobalSplitUAlgorithm"] == "MultipleBufferSingleKernel":
         self.defineSgpr("GSUStartWGIdx", 1)
@@ -11750,7 +11759,7 @@ class KernelWriterAssembly(KernelWriter):
       if maxVgprs != maxVgprsN:
         #print("refineOccupancy maxVgprs, new", maxVgprsN, "old", maxVgprs)
         return self.refineOccupancy(kernel, atomic, elements, actPCMaxTempSgpr, edgeI, gwvw, maxVgprsN, ss)
-  
+
     # # Get true numVgprAvailable
     # numVgprAvailable = self.vgprPool.availableBlock(ss.numVgprsPerElement, ss.align)
     # print("Available vgprs =", numVgprAvailable, "pool size =", self.vgprPool.size())
@@ -11767,7 +11776,7 @@ class KernelWriterAssembly(KernelWriter):
       #print("refineOccupancy maxVgprs, new", maxVgprsN, "old", maxVgprs)
       return self.refineOccupancy(kernel, atomic, elements, actPCMaxTempSgpr, edgeI, gwvw, maxVgprsN, ss)
     return numElementsPerBatch, nBatchesPerRow, numBatches, numSgprs
-    
+
 
   ##############################################################################
   # globalWriteElementBatch :

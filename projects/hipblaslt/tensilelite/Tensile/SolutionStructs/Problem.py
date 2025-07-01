@@ -937,8 +937,12 @@ class ProblemType(Mapping):
     strideIdxB = state["IndexAssignmentsB"].index(state["Index01B"])
     unrollIdxA = state["IndexAssignmentsA"].index(state["IndexUnroll"])
     unrollIdxB = state["IndexAssignmentsB"].index(state["IndexUnroll"])
-    state["TLUA"] = strideIdxA < unrollIdxA
-    state["TLUB"] = strideIdxB < unrollIdxB
+    state["TLUA_ORI"] = state["TLUA"] = strideIdxA < unrollIdxA
+    state["TLUB_ORI"] = state["TLUB"] = strideIdxB < unrollIdxB
+    if state["SwizzleTensorA"]:
+      state["TLUA"] = False
+    if state["SwizzleTensorB"]:
+      state["TLUB"] = True
     #state["TLUB"] = True # hack
 
     if printIndexAssignmentInfo:

@@ -266,6 +266,9 @@ class StateValues:
 
   dtvKIntervalA: int                     = 1
   dtvKIntervalB: int                     = 1
+  ## Swizzle
+  constStrideDimIdxA: int                = 0 # 0 default, but 1 for swizzle + TLU (N)
+  constStrideDimIdxB: int                = 0 # 0 default, but 1 for swizzle + TLU (T)
   ## MFMA
   miLatency: int                         = 0
   miLatencyLeft: int                     = 0
@@ -3611,6 +3614,10 @@ class KernelWriter(metaclass=abc.ABCMeta):
     self.states.convDTVA = kernel["DirectToVgprA"] and kernel["ConvertAfterDS"] and tensorParametersA["bpe"] > tensorParametersA["bpeGR"]
     self.states.convDTVB = kernel["DirectToVgprB"] and kernel["ConvertAfterDS"] and tensorParametersB["bpe"] > tensorParametersB["bpeGR"]
 
+    # Swizzle case, save constStrideDim
+    self.states.constStrideDimIdxA = tensorParametersA["constStrideDimIdx"]
+    self.states.constStrideDimIdxB = tensorParametersB["constStrideDimIdx"]
+
     #---
     # Internal optimization and debug controls.
     # These have a default which is almost always faster so don't make a full-blown YAML parm
@@ -5092,8 +5099,16 @@ class KernelWriter(metaclass=abc.ABCMeta):
     tP["gpr"] = {}
     tP["metadataWriteSwapByteOffset"] = 0
     tP["isSwizzled"] = (kernel["ProblemType"]["SwizzleTensorB"] and tP["isB"]) or (kernel["ProblemType"]["SwizzleTensorA"] and tP["isA"])
+    tP["constStrideDimIdx"] = 0
 
-    if (cM == "A" or cM == "B") and kernel["ProblemType"]["SwizzleTensor%s"%cM]:
+    # Swizzle case, leading dim is K. And it's IndexAssignments is:
+    #   which is 0 for TransA=T (TLU=False), and 1 for TransA=N (TLU=True)
+    #   which is 0 for TransB=N (TLU=False), and 1 for TransB=T (TLU=True)
+    #   In summary: for swizzle case, IndexAssignments for constStride(1) is 0 for TLU=False and 1 for TLU=True
+    if tP["isSwizzled"]:
+      tP["constStrideDimIdx"] = 1 if kernel["ProblemType"]["TLU%s_ORI"%cM] else 0
+
+    if tP["isSwizzled"]:
       # 16 means bytes of buffer_load_dwordx4
       tP["swizzlePackK"] = 16 // kernel["MIInputPerThread%s"%cM] // kernel["ProblemType"]["DataType%s"%cM].numBytes()
       tP["swizzleK"] = kernel["MatrixInstK"] * tP["swizzlePackK"]

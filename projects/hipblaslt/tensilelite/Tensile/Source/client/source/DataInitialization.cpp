@@ -2061,8 +2061,12 @@ namespace TensileLite
                     // currently, if A then it means MiM = 16, if B then it means MiN = 16
                     size_t MiM_N = 16, MiK = 0, MiKv = 0, PackK = 0;
                     calculateKforSwizzling(desc.dataType(), MiK, MiKv, PackK);
+                    // TransA = T
                     auto                          unrolledSize = desc.sizes()[0];
                     auto                          tiledSize    = desc.sizes()[1];
+                    // TransA = N
+                    // auto                          unrolledSize = desc.sizes()[1];
+                    // auto                          tiledSize    = desc.sizes()[0];
                     ::Tensor::Manipulation::Shape paddedShape{
                         ((tiledSize / MiM_N) + !!(tiledSize % MiM_N)) * MiM_N,
                         (unrolledSize / (MiK * PackK) + !!(unrolledSize % (MiK * PackK))) * MiK
