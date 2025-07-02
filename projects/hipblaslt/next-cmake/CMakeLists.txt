@@ -52,13 +52,14 @@ endif()
 set(HIPBLASLT_ENABLE_DEVICE ON CACHE BOOL "Build hipBLASLt device libraries.")
 set(HIPBLASLT_ENABLE_CLIENT ON CACHE BOOL "Build hipBLASLt client apps.")
 cmake_dependent_option(HIPBLASLT_ENABLE_HOST "Build hipBLASLt host library." ON "HIPBLASLT_ENABLE_CLIENT" OFF)
+set(HIPBLASLT_ENABLE_TENSILEITE_CLIENT ON CACHE BOOL "Build tensilelite client app.")
 set(HIPBLASLT_ENABLE_COVERAGE OFF CACHE BOOL "Build gcov support")
 
 if(HIPBLASLT_ENABLE_CLIENT)
     set(HIPBLASLT_BUILD_TESTING ON CACHE BOOL "Build hipblaslt client tests.")
     set(HIPBLASLT_ENABLE_SAMPLES ON CACHE BOOL "Build client samples.")
     # rocm-smi is not presently available on Windows so we do not require it.
-    cmake_dependent_option(HIPBLASLT_REQUIRE_ROCM_SMI "Require rocm_smi." ON "NOT WIN32" OFF)
+    cmake_dependent_option(HIPBLASLT_ENABLE_ROCM_SMI "Require rocm_smi." ON "NOT WIN32" OFF)
 endif()
 
 set(HIPBLASLT_ENABLE_ASAN OFF CACHE BOOL "Build hipBLASLt with address sanitizer enabled.")
@@ -82,6 +83,7 @@ if(HIPBLASLT_ENABLE_DEVICE)
     set(HIPBLASLT_DEVICE_JOBS "" CACHE STRING "Number of CPU threads to use for building device libraries (will use nproc if unset).")
     set(HIPBLASLT_KEEP_BUILD_TMP OFF CACHE STRING "Keep temporary build directory for device libraries (turning this ON  bloat the build size).")
     set(HIPBLASLT_LIBLOGIC_PATH "" CACHE STRING "Path to library logic files (will use 'library' if unset).")
+    set(HIPBLASLT_ENABLE_TENSILELITE_CLIENT ON CACHE BOOL "Build the tensilelite client.")
     set(HIPBLASLT_LIBRARY_FORMAT "" CACHE STRING "Format of master solution library files (msgpack or yaml).")
     set(HIPBLASLT_ASM_DEBUG "" CACHE STRING "Keep debug information for built code objects.")
     set(HIPBLASLT_LOGIC_FILTER "" CACHE STRING "Cutomsized logic filter, default is *, i.e. all logics.")
@@ -125,7 +127,7 @@ if(HIPBLASLT_ENABLE_HOST)
         set(rocTracer)
     endif()
 endif()
-if(HIPBLASLT_REQUIRE_ROCM_SMI)
+if(HIPBLASLT_ENABLE_ROCM_SMI)
     find_package(rocm_smi REQUIRED)
 else()
     find_package(rocm_smi)
@@ -246,6 +248,7 @@ if(HIPBLASLT_ENABLE_HOST)
         PRIVATE
             TENSILE_DEFAULT_SERIALIZATION
         PUBLIC
+            $<BUILD_INTERFACE:TENSILE_DEFAULT_SERIALIZATION>
             ROCM_USE_FLOAT16
             __HIP_PLATFORM_AMD__
     )
@@ -259,7 +262,7 @@ if(HIPBLASLT_ENABLE_HOST)
     endif()
 
     if(HIPBLASLT_ENABLE_HIP)
-        target_compile_definitions(hipblaslt PRIVATE TENSILE_USE_HIP)
+        target_compile_definitions(hipblaslt PUBLIC $<BUILD_INTERFACE:TENSILE_USE_HIP>)
     endif()
 
     if(HIPBLASLT_ENABLE_MSGPACK)
@@ -303,6 +306,9 @@ endif()
 
 if(HIPBLASLT_ENABLE_CLIENT)
     add_subdirectory(clients)
+endif()
+if(HIPBLASLT_ENABLE_TENSILELITE_CLIENT)
+    add_subdirectory(tensilelite-client)
 endif()
 
 

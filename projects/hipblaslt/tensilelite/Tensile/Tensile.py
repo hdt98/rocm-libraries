@@ -200,7 +200,7 @@ def addCommonArguments(argParser):
     argParser.add_argument("--library-format", dest="LibraryFormat", choices=["yaml", "msgpack"], \
         action="store", default="yaml", help="select which library format to use")
     argParser.add_argument("--client-lock", default=None)
-    argParser.add_argument("--prebuilt-client", default=None)
+    argParser.add_argument("--prebuilt-client", default=os.path.abspath(os.path.join('build', 'tensilelite-client', 'tensilelite-client')))
 
     argParser.add_argument("--global-parameters", nargs="+", type=splitExtraParameters, default=[])
 
