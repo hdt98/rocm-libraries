@@ -2061,12 +2061,11 @@ namespace TensileLite
                     // currently, if A then it means MiM = 16, if B then it means MiN = 16
                     size_t MiM_N = 16, MiK = 0, MiKv = 0, PackK = 0;
                     calculateKforSwizzling(desc.dataType(), MiK, MiKv, PackK);
-                    // TransA = T
-                    auto                          unrolledSize = desc.sizes()[0];
-                    auto                          tiledSize    = desc.sizes()[1];
-                    // TransA = N
-                    // auto                          unrolledSize = desc.sizes()[1];
-                    // auto                          tiledSize    = desc.sizes()[0];
+                    bool transA       = problem.transA();
+                    auto unrolledSize = transA ? desc.sizes()[0] : desc.sizes()[1];
+                    auto tiledSize    = transA ? desc.sizes()[1] : desc.sizes()[0];
+                    // std::cout << "unroll:" << unrolledSize << ", tiled:" << tiledSize << std::endl;
+
                     ::Tensor::Manipulation::Shape paddedShape{
                         ((tiledSize / MiM_N) + !!(tiledSize % MiM_N)) * MiM_N,
                         (unrolledSize / (MiK * PackK) + !!(unrolledSize % (MiK * PackK))) * MiK
@@ -2092,10 +2091,16 @@ namespace TensileLite
                     }
                     else
                     {
-                        auto tmpTensor = Tensor({tiledSize, unrolledSize}, desc.elementBytes());
-
+                        // default assume TransA=T, Tensor shape is [M, K]
+                        auto tmpTensor
+                            = Tensor({desc.sizes()[1], desc.sizes()[0]}, desc.elementBytes());
                         memcpy(
                             tmpTensor.as<void>(), p.cpuInput.valid.get(), tmpTensor.getNumBytes());
+
+                        // Transpose first if not transA
+                        if(!transA)
+                            tmpTensor = permute(tmpTensor, {1, 0});
+
                         //Temporary hack
                         uint64_t padVal{};
                         auto     paddedTensor = ::Tensor::Manipulation::pad(

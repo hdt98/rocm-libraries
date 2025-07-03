@@ -985,7 +985,7 @@ class KernelWriterAssembly(KernelWriter):
           module.add(ValueSet("constStride%s%s"%(tc,idxChar), 1))
         else:
           if not kernel["ProblemType"]["UseInitialStridesAB"]:
-            i = i-1
+            i = max(i-1, 0)
           module.add(RegSet("s", "sgprStride%s%s"%(tc,idxChar), \
                     "sgprStrides%s"%tc, i))
 
@@ -2344,7 +2344,7 @@ class KernelWriterAssembly(KernelWriter):
           module.add(SBranch(wgmLabel.getLabelName()))
     module.add(wgmLabel)
 
-    if kernel["StreamK"] > 0:  
+    if kernel["StreamK"] > 0:
       self.sgprPool.checkIn(tmpSgpr)
     tmpVgprRes = None
     self.vgprPool.checkIn(tmpVgpr)
@@ -2910,15 +2910,15 @@ class KernelWriterAssembly(KernelWriter):
     swapPerpPara = (((tP["isA"] or tP["isB"]) and kernel["DirectToVgpr%s"%tc]) and (not tP["tlu"]) and tP["nrp"] > 1)
 
     # swizzle
-    if tP["isSwizzled"]:
-      swizzleK = tP["swizzleK"]
-      tP["swizzledBlockSize"] = self.sgprPool.checkOut(1)
-      if tc == "A":
-        commentMsg = "SWZ-%s: swizzled block = MI_M(%u) * MI_K(%u) * pack-K(%u)" %(tc, 16, kernel["MatrixInstK"], tP["swizzlePackK"])
-      elif tc == "B":
-        commentMsg = "SWZ-%s: swizzled block = MI_N(%u) * MI_K(%u) * pack-K(%u)" %(tc, 16, kernel["MatrixInstK"], tP["swizzlePackK"])
+    # if tP["isSwizzled"]:
+    #   swizzleK = tP["swizzleK"]
+    #   tP["swizzledBlockSize"] = self.sgprPool.checkOut(1)
+    #   if tc == "A":
+    #     commentMsg = "SWZ-%s: swizzled block = MI_M(%u) * MI_K(%u) * pack-K(%u)" %(tc, 16, kernel["MatrixInstK"], tP["swizzlePackK"])
+    #   elif tc == "B":
+    #     commentMsg = "SWZ-%s: swizzled block = MI_N(%u) * MI_K(%u) * pack-K(%u)" %(tc, 16, kernel["MatrixInstK"], tP["swizzlePackK"])
 
-      module.add(SMovB32(dst=sgpr(tP["swizzledBlockSize"]), src=hex(16*swizzleK), comment=commentMsg))
+    #   module.add(SMovB32(dst=sgpr(tP["swizzledBlockSize"]), src=hex(16*swizzleK), comment=commentMsg))
 
     # Swizzle doesn't support _UseSgprForGRO, so swz will not go to it.
     # both UseSgprForGRO and DTVA/B are enabled
@@ -2963,8 +2963,8 @@ class KernelWriterAssembly(KernelWriter):
               singleModule, graIdx = self.graFinalOffsetsSingleLoop(kernel, tP, tc, tmp, graIdx, perp, sPerp, para, sPara)
               module.add(singleModule)
 
-    if tP["isSwizzled"]:
-      self.sgprPool.checkIn(tP["swizzledBlockSize"])
+    # if tP["isSwizzled"]:
+    #   self.sgprPool.checkIn(tP["swizzledBlockSize"])
 
     self.vgprPool.checkIn(tP["gpr"]["lwoT"])
     tP["gpr"]["lwoT"] = None
