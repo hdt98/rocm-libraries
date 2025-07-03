@@ -142,4 +142,19 @@ Tests:
   category: pre_checkin
   function:
     - aux_auxiliary_func: *hpa_half_precision
+
+- name: aux_float8_func
+  category: pre_checkin
+  function:
+    - aux_float8_func: *hpa_half_precision
+
+- name: aux_rocblaslt_utility_func
+  category: pre_checkin
+  function:
+    - aux_rocblaslt_utility_func: *hpa_half_precision
+
+- name: aux_rocblaslt_rocroller_host_func
+  category: pre_checkin
+  function:
+    - aux_rocblaslt_rocroller_host_func: *hpa_half_precision
 ...

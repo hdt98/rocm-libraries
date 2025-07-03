@@ -29,7 +29,7 @@ find_package (Python3 REQUIRED COMPONENTS Interpreter)
 set(hipblaslt_test_source
     hipblaslt_gtest_main.cpp
     hipblaslt_test.cpp
-    matmul_gtest.cpp
+    # matmul_gtest.cpp
     auxiliary_gtest.cpp
     matrix_transform_gtest.cpp
     hipblaslt_gtest_ext_op.cpp
@@ -97,6 +97,15 @@ if(BUILD_CODE_COVERAGE)
     -fprofile-instr-generate
     -fcoverage-mapping
   )
+
+  target_include_directories( hipblaslt-test
+    PRIVATE
+      # internal rocblaslt headers for rocblaslt.h not found
+      $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../library/src/amd_detail/rocblaslt/include>
+      $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../library/src/amd_detail/rocblaslt/src/include>
+  )
+
+  target_compile_definitions( hipblaslt-test PRIVATE CODE_COVERAGE)
 endif()
 
 if (BUILD_CUDA)

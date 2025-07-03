@@ -35,6 +35,9 @@
 #include "hipblaslt_vector.hpp"
 #include "unit.hpp"
 #include "utility.hpp"
+#include "rocblaslt/utility.hpp"
+#include "rocblaslt/rocroller_host.hpp"
+#include <hipblaslt/hipblaslt-ext-op.h>
 #include <hipblaslt/hipblaslt-ext.hpp> // Add check for hipblaslt-ext
 #include <hipblaslt/hipblaslt.h>
 
@@ -1541,4 +1544,891 @@ void testing_aux_auxiliary_func(const Arguments& arg)
 
     hipblasLtHalf nan = static_cast<hipblasLtHalf>(NAN);
     ASSERT_TRUE(hipblaslt_isnan(nan));
+}
+
+void testing_aux_float8_func(const Arguments& arg)
+{
+    // Test hipblaslt_float8
+    _Float16 f16 = 2.0;
+    hipblaslt_f8_fnuz f8_fnuz_data(f16);
+    ASSERT_TRUE(f16 == static_cast<_Float16>(f8_fnuz_data));
+    f8_fnuz_data.__x = 0x00;
+    ASSERT_TRUE(f8_fnuz_data.is_zero());
+    f8_fnuz_data.__x = 0x80;
+    ASSERT_TRUE(f8_fnuz_data.is_inf());
+    hipblaslt_f8_fnuz f8_fnuz_data_copy;
+    f8_fnuz_data_copy = f8_fnuz_data;
+    ASSERT_TRUE(f8_fnuz_data_copy.__x == f8_fnuz_data.__x);
+
+    // Test hipblaslt_f8
+    hipblaslt_f8 f8_data(f16);
+    ASSERT_TRUE(f16 == static_cast<_Float16>(f8_data));
+    f8_data.__x = 0x00;
+    ASSERT_TRUE(f8_data.is_zero());
+    f8_data.__x = 0x80;
+    ASSERT_TRUE(f8_data.is_inf());
+    hipblaslt_f8 f8_data_copy;
+    f8_data_copy = f8_data;
+    ASSERT_TRUE(f8_data_copy.__x == f8_data.__x);
+
+    // Test hipblaslt_bf8_fnuz
+    hipblaslt_bf8_fnuz bf8_fnuz_data(f16);
+    ASSERT_TRUE(f16 == static_cast<_Float16>(bf8_fnuz_data));
+    bf8_fnuz_data.__x = 0x00;
+    ASSERT_TRUE(bf8_fnuz_data.is_zero());
+    bf8_fnuz_data.__x = 0x80;
+    ASSERT_TRUE(bf8_fnuz_data.is_inf());
+    hipblaslt_bf8_fnuz bf8_fnuz_data_copy;
+    bf8_fnuz_data_copy = bf8_fnuz_data;
+    ASSERT_TRUE(bf8_fnuz_data_copy.__x == bf8_fnuz_data.__x);
+
+    // Test hipblaslt_bf8
+    hipblaslt_bf8 bf8_data(f16);
+    ASSERT_TRUE(f16 == static_cast<_Float16>(bf8_data));
+    bf8_data.__x = 0x00;
+    ASSERT_TRUE(bf8_data.is_zero());
+    bf8_data.__x = 0xff;
+    ASSERT_TRUE(bf8_data.is_nan());
+    bf8_data.__x = 0xfc;
+    ASSERT_TRUE(bf8_data.is_inf());
+    hipblaslt_bf8 bf8_data_copy;
+    bf8_data_copy = bf8_data;
+    ASSERT_TRUE(bf8_data_copy.__x == bf8_data.__x);
+
+    // namespace std functions
+    // Test hipblaslt_f8_fnuz sin function
+    hipblaslt_f8_fnuz f8_fnuz_sin_val(f16);
+    hipblaslt_f8_fnuz f8_fnuz_sin_val_r = std::sin(f8_fnuz_sin_val);
+    ASSERT_TRUE(f8_fnuz_sin_val_r == hipblaslt_f8_fnuz(sinf(float(f8_fnuz_sin_val))));
+    
+    // Test hipblaslt_f8_fnuz cos function
+    hipblaslt_f8_fnuz f8_fnuz_cos_val(f16);
+    hipblaslt_f8_fnuz f8_fnuz_cos_val_r = std::cos(f8_fnuz_cos_val);
+    ASSERT_TRUE(f8_fnuz_cos_val_r == hipblaslt_f8_fnuz(cosf(float(f8_fnuz_cos_val))));
+    
+    // Test hipblaslt_f8 sin function
+    hipblaslt_f8 f8_sin_val(f16);
+    hipblaslt_f8 f8_sin_val_r = std::sin(f8_sin_val);
+    ASSERT_TRUE(f8_sin_val_r == hipblaslt_f8(sinf(float(f8_sin_val))));
+    
+    // Test hipblaslt_f8 cos function
+    hipblaslt_f8 f8_cos_val(f16);
+    hipblaslt_f8 f8_cos_val_r = std::cos(f8_cos_val);
+    ASSERT_TRUE(f8_cos_val_r == hipblaslt_f8(cosf(float(f8_cos_val))));
+    
+    // Test hipblaslt_bf8_fnuz sin function
+    hipblaslt_bf8_fnuz bf8_fnuz_sin_val(f16);
+    hipblaslt_bf8_fnuz bf8_fnuz_sin_val_r = std::sin(bf8_fnuz_sin_val);
+    ASSERT_TRUE(bf8_fnuz_sin_val_r == hipblaslt_bf8_fnuz(sinf(float(bf8_fnuz_sin_val))));
+    
+    // Test hipblaslt_bf8_fnuz cos function
+    hipblaslt_bf8_fnuz bf8_fnuz_cos_val(f16);
+    hipblaslt_bf8_fnuz bf8_fnuz_cos_val_r = std::cos(bf8_fnuz_cos_val);
+    ASSERT_TRUE(bf8_fnuz_cos_val_r == hipblaslt_bf8_fnuz(cosf(float(bf8_fnuz_cos_val))));
+    
+    // Test hipblaslt_bf8 sin function
+    hipblaslt_bf8 bf8_sin_val(f16);
+    hipblaslt_bf8 bf8_sin_val_r = std::sin(bf8_sin_val);
+    ASSERT_TRUE(bf8_sin_val_r == hipblaslt_bf8(sinf(float(bf8_sin_val))));
+    
+    // Test hipblaslt_bf8 cos function
+    hipblaslt_bf8 bf8_cos_val(f16);
+    hipblaslt_bf8 bf8_cos_val_r = std::cos(bf8_cos_val);
+    ASSERT_TRUE(bf8_cos_val_r == hipblaslt_bf8(cosf(float(bf8_cos_val))));
+    
+    // Test hipblaslt_f8_fnuz real function
+    hipblaslt_f8_fnuz f8_fnuz_real_val(f16);
+    hipblaslt_f8_fnuz f8_fnuz_real_val_r = std::real(f8_fnuz_real_val);
+    ASSERT_TRUE(f8_fnuz_real_val_r == hipblaslt_f8_fnuz(std::real(float(f8_fnuz_real_val))));
+
+    // Test hipblaslt_f8 real function
+    hipblaslt_f8 f8_real_val(f16);
+    hipblaslt_f8 f8_real_val_r = std::real(f8_real_val);
+    ASSERT_TRUE(f8_real_val_r == hipblaslt_f8(std::real(float(f8_real_val))));
+
+    // Test hipblaslt_bf8_fnuz real function
+    hipblaslt_bf8_fnuz bf8_fnuz_real_val(f16);
+    hipblaslt_bf8_fnuz bf8_fnuz_real_val_r = std::real(bf8_fnuz_real_val);
+    ASSERT_TRUE(bf8_fnuz_real_val_r == hipblaslt_bf8_fnuz(std::real(float(bf8_fnuz_real_val))));
+
+    // Test hipblaslt_bf8 real function
+    hipblaslt_bf8 bf8_real_val(f16);
+    hipblaslt_bf8 bf8_real_val_r = std::real(bf8_real_val);
+    ASSERT_TRUE(bf8_real_val_r == hipblaslt_bf8(std::real(float(bf8_real_val))));
+
+    // Test hipblaslt_f8_fnuz ostream operator
+    hipblaslt_f8_fnuz f8_fnuz_stream_val(f16);
+    std::ostringstream f8_fnuz_stream;
+    f8_fnuz_stream << f8_fnuz_stream_val;
+    std::ostringstream f8_fnuz_expected;
+    f8_fnuz_expected << float(f8_fnuz_stream_val);
+    ASSERT_TRUE(f8_fnuz_stream.str() == f8_fnuz_expected.str());
+
+    // Test hipblaslt_f8 ostream operator
+    hipblaslt_f8 f8_stream_val(f16);
+    std::ostringstream f8_stream;
+    f8_stream << f8_stream_val;
+    std::ostringstream f8_expected;
+    f8_expected << float(f8_stream_val);
+    ASSERT_TRUE(f8_stream.str() == f8_expected.str());
+
+    // Test hipblaslt_bf8_fnuz ostream operator
+    hipblaslt_bf8_fnuz bf8_fnuz_stream_val(f16);
+    std::ostringstream bf8_fnuz_stream;
+    bf8_fnuz_stream << bf8_fnuz_stream_val;
+    std::ostringstream bf8_fnuz_expected;
+    bf8_fnuz_expected << float(bf8_fnuz_stream_val);
+    ASSERT_TRUE(bf8_fnuz_stream.str() == bf8_fnuz_expected.str());
+
+    // Test hipblaslt_bf8 ostream operator
+    hipblaslt_bf8 bf8_stream_val(f16);
+    std::ostringstream bf8_stream;
+    bf8_stream << bf8_stream_val;
+    std::ostringstream bf8_expected;
+    bf8_expected << float(bf8_stream_val);
+
+
+    // Test code for hipblaslt_float8.h operator overloads (lines 336-588)
+    _Float16 f16_a = 2.5;
+    _Float16 f16_b = 1.5;
+    float float_val = 3.0f;
+    int32_t int_val = 4;
+    double double_val = 5.0;
+
+    // Test addition operators with mixed types (float + f8 types)
+    hipblaslt_f8_fnuz f8_fnuz_val(f16_a);
+    hipblaslt_f8 f8_val(f16_a);
+    hipblaslt_bf8_fnuz bf8_fnuz_val(f16_a);
+    hipblaslt_bf8 bf8_val(f16_a);
+
+    // Test float + f8 types
+    float result_f = float_val + f8_fnuz_val;
+    ASSERT_TRUE(result_f == (float_val + float(f8_fnuz_val)));
+    result_f = float_val + f8_val;
+    ASSERT_TRUE(result_f == (float_val + float(f8_val)));
+    result_f = float_val + bf8_fnuz_val;
+    ASSERT_TRUE(result_f == (float_val + float(bf8_fnuz_val)));
+    result_f = float_val + bf8_val;
+    ASSERT_TRUE(result_f == (float_val + float(bf8_val)));
+
+    // Test f8 types + float
+    result_f = f8_fnuz_val + float_val;
+    ASSERT_TRUE(result_f == (float(f8_fnuz_val) + float_val));
+    result_f = f8_val + float_val;
+    ASSERT_TRUE(result_f == (float(f8_val) + float_val));
+    result_f = bf8_fnuz_val + float_val;
+    ASSERT_TRUE(result_f == (float(bf8_fnuz_val) + float_val));
+    result_f = bf8_val + float_val;
+    ASSERT_TRUE(result_f == (float(bf8_val) + float_val));
+
+    // Test mixed f8 types addition (returns float)
+    result_f = f8_fnuz_val + bf8_fnuz_val;
+    ASSERT_TRUE(result_f == (float(f8_fnuz_val) + float(bf8_fnuz_val)));
+    result_f = f8_val + bf8_val;
+    ASSERT_TRUE(result_f == (float(f8_val) + float(bf8_val)));
+    result_f = bf8_fnuz_val + f8_fnuz_val;
+    ASSERT_TRUE(result_f == (float(bf8_fnuz_val) + float(f8_fnuz_val)));
+    result_f = bf8_val + f8_val;
+    ASSERT_TRUE(result_f == (float(bf8_val) + float(f8_val)));
+
+    // Test same type addition (returns same type)
+    hipblaslt_f8_fnuz f8_fnuz_b(f16_b);
+    hipblaslt_f8_fnuz f8_fnuz_result = f8_fnuz_val + f8_fnuz_b;
+    ASSERT_TRUE(f8_fnuz_result == hipblaslt_f8_fnuz(float(f8_fnuz_val) + float(f8_fnuz_b)));
+
+    hipblaslt_f8 f8_b(f16_b);
+    hipblaslt_f8 f8_result = f8_val + f8_b;
+    ASSERT_TRUE(f8_result == hipblaslt_f8(float(f8_val) + float(f8_b)));
+
+    hipblaslt_bf8_fnuz bf8_fnuz_b(f16_b);
+    hipblaslt_bf8_fnuz bf8_fnuz_result = bf8_fnuz_val + bf8_fnuz_b;
+    ASSERT_TRUE(bf8_fnuz_result == hipblaslt_bf8_fnuz(float(bf8_fnuz_val) + float(bf8_fnuz_b)));
+
+    hipblaslt_bf8 bf8_b(f16_b);
+    hipblaslt_bf8 bf8_result = bf8_val + bf8_b;
+    ASSERT_TRUE(bf8_result == hipblaslt_bf8(float(bf8_val) + float(bf8_b)));
+
+    // Test += operators
+    hipblaslt_f8_fnuz f8_fnuz_copy = f8_fnuz_val;
+    f8_fnuz_copy += f8_fnuz_b;
+    ASSERT_TRUE(f8_fnuz_copy == hipblaslt_f8_fnuz(float(f8_fnuz_val) + float(f8_fnuz_b)));
+
+    hipblaslt_f8 f8_copy = f8_val;
+    f8_copy += f8_b;
+    ASSERT_TRUE(f8_copy == hipblaslt_f8(float(f8_val) + float(f8_b)));
+
+    hipblaslt_bf8_fnuz bf8_fnuz_copy = bf8_fnuz_val;
+    bf8_fnuz_copy += bf8_fnuz_b;
+    ASSERT_TRUE(bf8_fnuz_copy == hipblaslt_bf8_fnuz(float(bf8_fnuz_val) + float(bf8_fnuz_b)));
+
+    hipblaslt_bf8 bf8_copy = bf8_val;
+    bf8_copy += bf8_b;
+    ASSERT_TRUE(bf8_copy == hipblaslt_bf8(float(bf8_val) + float(bf8_b)));
+
+    // Test multiplication operators (all return float)
+    // Same type multiplication
+    result_f = f8_fnuz_val * f8_fnuz_b;
+    ASSERT_TRUE(result_f == (float(f8_fnuz_val) * float(f8_fnuz_b)));
+    result_f = f8_val * f8_b;
+    ASSERT_TRUE(result_f == (float(f8_val) * float(f8_b)));
+
+    // Test float * f8 types
+    result_f = float_val * f8_fnuz_val;
+    ASSERT_TRUE(result_f == (float_val * float(f8_fnuz_val)));
+    result_f = float_val * f8_val;
+    ASSERT_TRUE(result_f == (float_val * float(f8_val)));
+
+    // Test f8 types * float
+    result_f = f8_fnuz_val * float_val;
+    ASSERT_TRUE(result_f == (float(f8_fnuz_val) * float_val));
+    result_f = f8_val * float_val;
+    ASSERT_TRUE(result_f == (float(f8_val) * float_val));
+
+    // Test int32_t * f8 types
+    result_f = int_val * f8_fnuz_val;
+    ASSERT_TRUE(result_f == ((float)int_val * float(f8_fnuz_val)));
+    result_f = int_val * f8_val;
+    ASSERT_TRUE(result_f == ((float)int_val * float(f8_val)));
+
+    // Test double * f8 types
+    result_f = double_val * f8_fnuz_val;
+    ASSERT_TRUE(result_f == ((float)double_val * float(f8_fnuz_val)));
+    result_f = double_val * f8_val;
+    ASSERT_TRUE(result_f == ((float)double_val * float(f8_val)));
+
+    // Test bf8 type multiplication tests
+    result_f = bf8_fnuz_val * bf8_fnuz_b;
+    ASSERT_TRUE(result_f == (float(bf8_fnuz_val) * float(bf8_fnuz_b)));
+    result_f = bf8_val * bf8_b;
+    ASSERT_TRUE(result_f == (float(bf8_val) * float(bf8_b)));
+
+    result_f = float_val * bf8_fnuz_val;
+    ASSERT_TRUE(result_f == (float_val * float(bf8_fnuz_val)));
+    result_f = float_val * bf8_val;
+    ASSERT_TRUE(result_f == (float_val * float(bf8_val)));
+
+    result_f = bf8_fnuz_val * float_val;
+    ASSERT_TRUE(result_f == (float(bf8_fnuz_val) * float_val));
+    result_f = bf8_val * float_val;
+    ASSERT_TRUE(result_f == (float(bf8_val) * float_val));
+
+    result_f = int_val * bf8_fnuz_val;
+    ASSERT_TRUE(result_f == ((float)int_val * float(bf8_fnuz_val)));
+    result_f = int_val * bf8_val;
+    ASSERT_TRUE(result_f == ((float)int_val * float(bf8_val)));
+
+    result_f = double_val * bf8_fnuz_val;
+    ASSERT_TRUE(result_f == ((float)double_val * float(bf8_fnuz_val)));
+    result_f = double_val * bf8_val;
+    ASSERT_TRUE(result_f == ((float)double_val * float(bf8_val)));
+
+    // Test Mixed f8 and bf8 multiplication
+    result_f = f8_fnuz_val * bf8_fnuz_val;
+    ASSERT_TRUE(result_f == (float(f8_fnuz_val) * float(bf8_fnuz_val)));
+    result_f = f8_val * bf8_val;
+    ASSERT_TRUE(result_f == (float(f8_val) * float(bf8_val)));
+    result_f = bf8_fnuz_val * f8_fnuz_val;
+    ASSERT_TRUE(result_f == (float(bf8_fnuz_val) * float(f8_fnuz_val)));
+    result_f = bf8_val * f8_val;
+    ASSERT_TRUE(result_f == (float(bf8_val) * float(f8_val)));
+
+    // Test comparison operators
+    // Equality operators
+    bool result_b = (f8_fnuz_val == f8_fnuz_b);
+    ASSERT_TRUE(result_b == (f8_fnuz_val.__x == f8_fnuz_b.__x));
+    result_b = (f8_val == f8_b);
+    ASSERT_TRUE(result_b == (f8_val.__x == f8_b.__x));
+    result_b = (bf8_fnuz_val == bf8_fnuz_b);
+    ASSERT_TRUE(result_b == (bf8_fnuz_val.__x == bf8_fnuz_b.__x));
+    result_b = (bf8_val == bf8_b);
+    ASSERT_TRUE(result_b == (bf8_val.__x == bf8_b.__x));
+
+    // Test Inequality operators
+    result_b = (f8_fnuz_val != f8_fnuz_b);
+    ASSERT_TRUE(result_b == (f8_fnuz_val.__x != f8_fnuz_b.__x));
+    result_b = (f8_val != f8_b);
+    ASSERT_TRUE(result_b == (f8_val.__x != f8_b.__x));
+    result_b = (bf8_fnuz_val != bf8_fnuz_b);
+    ASSERT_TRUE(result_b == (bf8_fnuz_val.__x != bf8_fnuz_b.__x));
+    result_b = (bf8_val != bf8_b);
+    ASSERT_TRUE(result_b == (bf8_val.__x != bf8_b.__x));
+
+    // Test Greater than or equal operators
+    result_b = (f8_fnuz_val >= f8_fnuz_b);
+    ASSERT_TRUE(result_b == (static_cast<float>(f8_fnuz_val) >= static_cast<float>(f8_fnuz_b)));
+    result_b = (f8_val >= f8_b);
+    ASSERT_TRUE(result_b == (static_cast<float>(f8_val) >= static_cast<float>(f8_b)));
+
+    // Test Greater than operators
+    result_b = (f8_fnuz_val > f8_fnuz_b);
+    ASSERT_TRUE(result_b == (static_cast<float>(f8_fnuz_val) > static_cast<float>(f8_fnuz_b)));
+    result_b = (f8_val > f8_b);
+    ASSERT_TRUE(result_b == (static_cast<float>(f8_val) > static_cast<float>(f8_b)));
+
+    // ------------------- Test hipblaslt-ext-op.h -------------------
+    hipblasltGetTotalGranularityValue();
+    hipblasltGetTilesPerCuValue();
+    hipblasltGetTile0Granularity();
+    hipblasltGetTile1Granularity();
+    hipblasltGetCuGranularity();
+    hipblasltGetWaveGranularity();
+    hipblasltGetCUs();
+    hipblasltGetMemWriteBytesD();
+    hipblasltGetMemReadBytes();
+
+}
+
+void testing_aux_rocblaslt_utility_func(const Arguments& arg)
+{
+
+    // ------------------- Test utility.cpp -------------------
+    // Test basic prefix functionality
+    std::string result = prefix("TEST_LAYER", "test_caller");
+    
+    // Check that result is not empty
+    ASSERT_TRUE(!result.empty());
+    
+    // Check that result contains expected components
+    ASSERT_TRUE(result.find("[HIPBLASLT]") != std::string::npos);
+    ASSERT_TRUE(result.find("[TEST_LAYER]") != std::string::npos);
+    ASSERT_TRUE(result.find("[test_caller]") != std::string::npos);
+    
+    // Check date format pattern (YYYY-MM-DD)
+    std::regex date_pattern(R"(\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\])");
+    ASSERT_TRUE(std::regex_search(result, date_pattern));
+    
+    // Check process ID is included (numeric value in brackets)
+    std::regex pid_pattern(R"(\[\d+\])");
+    ASSERT_TRUE(std::regex_search(result, pid_pattern));
+    
+    // Test with different layer and caller names
+    std::string result2 = prefix("ERROR", "function_name");
+    ASSERT_TRUE(result2.find("[ERROR]") != std::string::npos);
+    ASSERT_TRUE(result2.find("[function_name]") != std::string::npos);
+    
+    // Test with empty strings (edge case)
+    std::string result3 = prefix("", "");
+    ASSERT_TRUE(result3.find("[]") != std::string::npos); // Should contain empty brackets
+    ASSERT_TRUE(result3.find("[HIPBLASLT]") != std::string::npos); // HIPBLASLT should always be present
+    
+    // Test format consistency - two calls should have similar structure
+    std::string result4 = prefix("LAYER1", "caller1");
+    std::string result5 = prefix("LAYER2", "caller2");
+    
+    // Both should contain HIPBLASLT
+    ASSERT_TRUE(result4.find("[HIPBLASLT]") != std::string::npos);
+    ASSERT_TRUE(result5.find("[HIPBLASLT]") != std::string::npos);
+    
+    // Both should match the expected format pattern
+    std::regex full_pattern(R"(\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\]\[HIPBLASLT\]\[\d+\]\[.*\]\[.*\])");
+    ASSERT_TRUE(std::regex_match(result4, full_pattern));
+    ASSERT_TRUE(std::regex_match(result5, full_pattern));
+
+    // Test hipDataType_to_string function
+    ASSERT_TRUE(std::string_view{hipDataType_to_string(HIP_R_16F)} == "R_16F");
+    ASSERT_TRUE(std::string_view{hipDataType_to_string(HIP_R_16BF)} == "R_16BF");
+    ASSERT_TRUE(std::string_view{hipDataType_to_string(HIP_R_32F)} == "R_32F");
+    ASSERT_TRUE(std::string_view{hipDataType_to_string(HIP_R_64F)} == "R_64F");
+    ASSERT_TRUE(std::string_view{hipDataType_to_string(HIP_R_8F_E4M3_FNUZ)} == "R_8F_E4M3_FNUZ");
+    ASSERT_TRUE(std::string_view{hipDataType_to_string(HIP_R_8F_E5M2_FNUZ)} == "R_8F_E5M2_FNUZ");
+    ASSERT_TRUE(std::string_view{hipDataType_to_string(HIP_R_8F_E4M3)} == "R_8F_E4M3");
+    ASSERT_TRUE(std::string_view{hipDataType_to_string(HIP_R_8F_E5M2)} == "R_8F_E5M2");
+    ASSERT_TRUE(std::string_view{hipDataType_to_string(HIP_R_8I)} == "R_8I");
+    ASSERT_TRUE(std::string_view{hipDataType_to_string(static_cast<hipDataType>(HIP_R_6F_E2M3_EXT))} == "R_6F_E2M3");
+    ASSERT_TRUE(std::string_view{hipDataType_to_string(static_cast<hipDataType>(HIP_R_6F_E3M2_EXT))} == "R_6F_E3M2");
+    ASSERT_TRUE(std::string_view{hipDataType_to_string(static_cast<hipDataType>(HIP_R_4F_E2M1_EXT))} == "R_4F_E2M1");
+    ASSERT_TRUE(std::string_view{hipDataType_to_string(static_cast<hipDataType>(999))} == "Invalid");
+
+    ASSERT_TRUE(std::string_view{hipDataType_to_bench_string(HIP_R_32F)} == "f32_r");
+    ASSERT_TRUE(std::string_view{hipDataType_to_bench_string(HIP_R_64F)} == "f64_r");
+    ASSERT_TRUE(std::string_view{hipDataType_to_bench_string(HIP_R_16F)} == "f16_r");
+    ASSERT_TRUE(std::string_view{hipDataType_to_bench_string(HIP_R_16BF)} == "bf16_r");
+    ASSERT_TRUE(std::string_view{hipDataType_to_bench_string(HIP_R_8I)} == "i8_r");
+    ASSERT_TRUE(std::string_view{hipDataType_to_bench_string(HIP_R_32I)} == "i32_r");
+    ASSERT_TRUE(std::string_view{hipDataType_to_bench_string(HIP_R_8F_E4M3_FNUZ)} == "f8_r");
+    ASSERT_TRUE(std::string_view{hipDataType_to_bench_string(HIP_R_8F_E5M2_FNUZ)} == "bf8_r");
+    ASSERT_TRUE(std::string_view{hipDataType_to_bench_string(HIP_R_8F_E4M3)} == "f8_r");
+    ASSERT_TRUE(std::string_view{hipDataType_to_bench_string(HIP_R_8F_E5M2)} == "bf8_r");
+    ASSERT_TRUE(std::string_view{hipDataType_to_bench_string(HIP_R_8F_E5M2_FNUZ)} == "bf8_r");
+    ASSERT_TRUE(std::string_view{hipDataType_to_bench_string(static_cast<hipDataType>(HIP_R_6F_E2M3_EXT))} == "f6_r");
+    ASSERT_TRUE(std::string_view{hipDataType_to_bench_string(static_cast<hipDataType>(HIP_R_6F_E3M2_EXT))} == "bf6_r");
+    ASSERT_TRUE(std::string_view{hipDataType_to_bench_string(static_cast<hipDataType>(HIP_R_4F_E2M1_EXT))} == "f4_r");
+    ASSERT_TRUE(std::string_view{hipDataType_to_bench_string(static_cast<hipDataType>(HIP_R_4F_E2M1_EXT+1))} == "invalid");
+
+    // Test rocblaslt_compute_type_to_string
+    ASSERT_TRUE(std::string_view{rocblaslt_compute_type_to_string(rocblaslt_compute_f16)} == "COMPUTE_16F");
+    ASSERT_TRUE(std::string_view{rocblaslt_compute_type_to_string(rocblaslt_compute_f32)} == "COMPUTE_32F");
+    ASSERT_TRUE(std::string_view{rocblaslt_compute_type_to_string(rocblaslt_compute_f32_fast_xf32)} == "COMPUTE_32XF");
+    ASSERT_TRUE(std::string_view{rocblaslt_compute_type_to_string(rocblaslt_compute_f64)} == "COMPUTE_64F");
+    ASSERT_TRUE(std::string_view{rocblaslt_compute_type_to_string(rocblaslt_compute_i32)} == "COMPUTE_32I");
+    ASSERT_TRUE(std::string_view{rocblaslt_compute_type_to_string(rocblaslt_compute_f32_fast_f16)} == "COMPUTE_32F_16F");
+    ASSERT_TRUE(std::string_view{rocblaslt_compute_type_to_string(rocblaslt_compute_f32_fast_bf16)} == "COMPUTE_32F_16BF");
+    ASSERT_TRUE(std::string_view{rocblaslt_compute_type_to_string(static_cast<rocblaslt_compute_type>(999))} == "Invalid");
+
+    // Test rocblaslt_matrix_layout_attributes_to_string
+    ASSERT_TRUE(std::string_view{rocblaslt_matrix_layout_attributes_to_string(ROCBLASLT_MATRIX_LAYOUT_BATCH_COUNT)} == "MATRIX_LAYOUT_BATCH_COUNT");
+    ASSERT_TRUE(std::string_view{rocblaslt_matrix_layout_attributes_to_string(ROCBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET)} == "MATRIX_LAYOUT_STRIDED_BATCH_OFFSET");
+    ASSERT_TRUE(std::string_view{rocblaslt_matrix_layout_attributes_to_string(ROCBLASLT_MATRIX_LAYOUT_TYPE)} == "ROCBLASLT_MATRIX_LAYOUT_TYPE");
+    ASSERT_TRUE(std::string_view{rocblaslt_matrix_layout_attributes_to_string(ROCBLASLT_MATRIX_LAYOUT_ORDER)} == "ROCBLASLT_MATRIX_LAYOUT_ORDER");
+    ASSERT_TRUE(std::string_view{rocblaslt_matrix_layout_attributes_to_string(ROCBLASLT_MATRIX_LAYOUT_ROWS)} == "ROCBLASLT_MATRIX_LAYOUT_ROWS");
+    ASSERT_TRUE(std::string_view{rocblaslt_matrix_layout_attributes_to_string(ROCBLASLT_MATRIX_LAYOUT_COLS)} == "ROCBLASLT_MATRIX_LAYOUT_COLS");
+    ASSERT_TRUE(std::string_view{rocblaslt_matrix_layout_attributes_to_string(ROCBLASLT_MATRIX_LAYOUT_LD)} == "ROCBLASLT_MATRIX_LAYOUT_LD");
+    ASSERT_TRUE(std::string_view{rocblaslt_matrix_layout_attributes_to_string(ROCBLASLT_MATRIX_LAYOUT_MAX)} == "ROCBLASLT_MATRIX_LAYOUT_MAX");
+    ASSERT_TRUE(std::string_view{rocblaslt_matrix_layout_attributes_to_string(static_cast<rocblaslt_matrix_layout_attribute_>(999))} == "Invalid");
+
+    // Test rocblaslt_matmul_desc_attributes_to_string
+    ASSERT_TRUE(std::string_view{rocblaslt_matmul_desc_attributes_to_string(ROCBLASLT_MATMUL_DESC_TRANSA)} == "MATMUL_DESC_TRANSA");
+    ASSERT_TRUE(std::string_view{rocblaslt_matmul_desc_attributes_to_string(ROCBLASLT_MATMUL_DESC_TRANSB)} == "MATMUL_DESC_TRANSB");
+    ASSERT_TRUE(std::string_view{rocblaslt_matmul_desc_attributes_to_string(ROCBLASLT_MATMUL_DESC_EPILOGUE)} == "MATMUL_DESC_EPILOGUE");
+    ASSERT_TRUE(std::string_view{rocblaslt_matmul_desc_attributes_to_string(ROCBLASLT_MATMUL_DESC_BIAS_POINTER)} == "MATMUL_DESC_BIAS_POINTER");
+    ASSERT_TRUE(std::string_view{rocblaslt_matmul_desc_attributes_to_string(ROCBLASLT_MATMUL_DESC_BIAS_DATA_TYPE)} == "MATMUL_DESC_BIAS_DATA_TYPE");
+    ASSERT_TRUE(std::string_view{rocblaslt_matmul_desc_attributes_to_string(ROCBLASLT_MATMUL_DESC_A_SCALE_POINTER)} == "MATMUL_DESC_A_SCALE_POINTER");
+    ASSERT_TRUE(std::string_view{rocblaslt_matmul_desc_attributes_to_string(ROCBLASLT_MATMUL_DESC_B_SCALE_POINTER)} == "MATMUL_DESC_B_SCALE_POINTER");
+    ASSERT_TRUE(std::string_view{rocblaslt_matmul_desc_attributes_to_string(ROCBLASLT_MATMUL_DESC_C_SCALE_POINTER)} == "MATMUL_DESC_C_SCALE_POINTER");
+    ASSERT_TRUE(std::string_view{rocblaslt_matmul_desc_attributes_to_string(ROCBLASLT_MATMUL_DESC_D_SCALE_POINTER)} == "MATMUL_DESC_D_SCALE_POINTER");
+    ASSERT_TRUE(std::string_view{rocblaslt_matmul_desc_attributes_to_string(ROCBLASLT_MATMUL_DESC_EPILOGUE_AUX_POINTER)} == "MATMUL_DESC_EPILOGUE_AUX_POINTER");
+    ASSERT_TRUE(std::string_view{rocblaslt_matmul_desc_attributes_to_string(ROCBLASLT_MATMUL_DESC_EPILOGUE_AUX_LD)} == "MATMUL_DESC_EPILOGUE_AUX_LD");
+    ASSERT_TRUE(std::string_view{rocblaslt_matmul_desc_attributes_to_string(ROCBLASLT_MATMUL_DESC_EPILOGUE_AUX_BATCH_STRIDE)} == "MATMUL_DESC_EPILOGUE_AUX_BATCH_STRIDE");
+    ASSERT_TRUE(std::string_view{rocblaslt_matmul_desc_attributes_to_string(ROCBLASLT_MATMUL_DESC_POINTER_MODE)} == "MATMUL_DESC_POINTER_MODE");
+    ASSERT_TRUE(std::string_view{rocblaslt_matmul_desc_attributes_to_string(ROCBLASLT_MATMUL_DESC_AMAX_D_POINTER)} == "MATMUL_DESC_AMAX_D_POINTER");
+    ASSERT_TRUE(std::string_view{rocblaslt_matmul_desc_attributes_to_string(ROCBLASLT_MATMUL_DESC_EPILOGUE_AUX_DATA_TYPE)} == "MATMUL_DESC_EPILOGUE_AUX_DATA_TYPE");
+    ASSERT_TRUE(std::string_view{rocblaslt_matmul_desc_attributes_to_string(ROCBLASLT_MATMUL_DESC_COMPUTE_INPUT_TYPE_A_EXT)} == "MATMUL_DESC_COMPUTE_INPUT_TYPE_A_EXT");
+    ASSERT_TRUE(std::string_view{rocblaslt_matmul_desc_attributes_to_string(ROCBLASLT_MATMUL_DESC_COMPUTE_INPUT_TYPE_B_EXT)} == "MATMUL_DESC_COMPUTE_INPUT_TYPE_B_EXT");
+    ASSERT_TRUE(std::string_view{rocblaslt_matmul_desc_attributes_to_string(static_cast<rocblaslt_matmul_desc_attributes>(999))} == "Invalid");
+
+    // Test hipblasOperation_to_string
+    ASSERT_TRUE(std::string_view{hipblasOperation_to_string(HIPBLAS_OP_N)} == "OP_N");
+    ASSERT_TRUE(std::string_view{hipblasOperation_to_string(HIPBLAS_OP_T)} == "OP_T");
+    ASSERT_TRUE(std::string_view{hipblasOperation_to_string(HIPBLAS_OP_C)} == "OP_C");
+    ASSERT_TRUE(std::string_view{hipblasOperation_to_string(static_cast<hipblasOperation_t>(999))} == "Invalid");
+
+    // Test rocblaslt_layer_mode2string
+    ASSERT_TRUE(std::string_view{rocblaslt_layer_mode2string(rocblaslt_layer_mode_none)} == "None");
+    ASSERT_TRUE(std::string_view{rocblaslt_layer_mode2string(rocblaslt_layer_mode_log_error)} == "Error");
+    ASSERT_TRUE(std::string_view{rocblaslt_layer_mode2string(rocblaslt_layer_mode_log_trace)} == "Trace");
+    ASSERT_TRUE(std::string_view{rocblaslt_layer_mode2string(rocblaslt_layer_mode_log_hints)} == "Hints");
+    ASSERT_TRUE(std::string_view{rocblaslt_layer_mode2string(rocblaslt_layer_mode_log_info)} == "Info");
+    ASSERT_TRUE(std::string_view{rocblaslt_layer_mode2string(rocblaslt_layer_mode_log_api)} == "Api");
+    ASSERT_TRUE(std::string_view{rocblaslt_layer_mode2string(rocblaslt_layer_mode_log_bench)} == "Bench");
+    ASSERT_TRUE(std::string_view{rocblaslt_layer_mode2string(rocblaslt_layer_mode_log_profile)} == "Profile");
+    ASSERT_TRUE(std::string_view{rocblaslt_layer_mode2string(rocblaslt_layer_mode_log_extended_profile)} == "ExtendedProfile");
+    ASSERT_TRUE(std::string_view{rocblaslt_layer_mode2string(static_cast<rocblaslt_layer_mode>(999))} == "Invalid");
+
+    // Test rocblaslt_epilogue_to_string
+    ASSERT_TRUE(std::string_view{rocblaslt_epilogue_to_string(ROCBLASLT_EPILOGUE_DEFAULT)} == "EPILOGUE_DEFAULT");
+    ASSERT_TRUE(std::string_view{rocblaslt_epilogue_to_string(ROCBLASLT_EPILOGUE_RELU)} == "EPILOGUE_RELU");
+    ASSERT_TRUE(std::string_view{rocblaslt_epilogue_to_string(ROCBLASLT_EPILOGUE_BIAS)} == "EPILOGUE_BIAS");
+    ASSERT_TRUE(std::string_view{rocblaslt_epilogue_to_string(ROCBLASLT_EPILOGUE_RELU_BIAS)} == "EPILOGUE_RELU_BIAS");
+    ASSERT_TRUE(std::string_view{rocblaslt_epilogue_to_string(ROCBLASLT_EPILOGUE_GELU)} == "EPILOGUE_GELU");
+    ASSERT_TRUE(std::string_view{rocblaslt_epilogue_to_string(ROCBLASLT_EPILOGUE_DGELU)} == "EPILOGUE_DGELU");
+    ASSERT_TRUE(std::string_view{rocblaslt_epilogue_to_string(ROCBLASLT_EPILOGUE_GELU_BIAS)} == "EPILOGUE_GELU_BIAS");
+    ASSERT_TRUE(std::string_view{rocblaslt_epilogue_to_string(ROCBLASLT_EPILOGUE_GELU_AUX)} == "EPILOGUE_GELU_AUX");
+    ASSERT_TRUE(std::string_view{rocblaslt_epilogue_to_string(ROCBLASLT_EPILOGUE_GELU_AUX_BIAS)} == "EPILOGUE_GELU_AUX_BIAS");
+    ASSERT_TRUE(std::string_view{rocblaslt_epilogue_to_string(ROCBLASLT_EPILOGUE_DGELU_BGRAD)} == "EPILOGUE_DGELU_BGRAD");
+    ASSERT_TRUE(std::string_view{rocblaslt_epilogue_to_string(ROCBLASLT_EPILOGUE_BGRADA)} == "EPILOGUE_DGELU_BGRADA");
+    ASSERT_TRUE(std::string_view{rocblaslt_epilogue_to_string(ROCBLASLT_EPILOGUE_BGRADB)} == "EPILOGUE_DGELU_BGRADB");
+    ASSERT_TRUE(std::string_view{rocblaslt_epilogue_to_string(ROCBLASLT_EPILOGUE_SWISH_EXT)} == "EPILOGUE_SWISH_EXT");
+    ASSERT_TRUE(std::string_view{rocblaslt_epilogue_to_string(ROCBLASLT_EPILOGUE_SWISH_BIAS_EXT)} == "EPILOGUE_SWISH_BIAS_EXT");
+    ASSERT_TRUE(std::string_view{rocblaslt_epilogue_to_string(static_cast<rocblaslt_epilogue>(999))} == "Invalid epilogue");
+
+    // Test rocblaslt_matrix_layout_to_string function
+    // Create test matrix layout structures
+    _rocblaslt_matrix_layout mat1, mat2, mat3, mat4;
+    
+    // Test case 1: Single batch matrix (batch_count <= 1)
+    mat1.type = HIP_R_32F;
+    mat1.m = 128;
+    mat1.n = 256;
+    mat1.ld = 128;
+    mat1.batch_count = 1;
+    mat1.batch_stride = 0;
+    
+    std::string mat1_result = rocblaslt_matrix_layout_to_string(&mat1);
+    ASSERT_TRUE(!mat1_result.empty());
+    ASSERT_TRUE(mat1_result.find("[type=R_32F") != std::string::npos);
+    ASSERT_TRUE(mat1_result.find("rows=128") != std::string::npos);
+    ASSERT_TRUE(mat1_result.find("cols=256") != std::string::npos);
+    ASSERT_TRUE(mat1_result.find("ld=128") != std::string::npos);
+    // Should NOT contain batch_count and batch_stride for single batch
+    ASSERT_TRUE(mat1_result.find("batch_count") == std::string::npos);
+    ASSERT_TRUE(mat1_result.find("batch_stride") == std::string::npos);
+    
+    // Test case 2: Batch matrix (batch_count > 1)
+    mat2.type = HIP_R_16F;
+    mat2.m = 64;
+    mat2.n = 128;
+    mat2.ld = 64;
+    mat2.batch_count = 4;
+    mat2.batch_stride = 8192;
+    
+    std::string mat2_result = rocblaslt_matrix_layout_to_string(&mat2);
+    ASSERT_TRUE(!mat2_result.empty());
+    ASSERT_TRUE(mat2_result.find("[type=R_16F") != std::string::npos);
+    ASSERT_TRUE(mat2_result.find("rows=64") != std::string::npos);
+    ASSERT_TRUE(mat2_result.find("cols=128") != std::string::npos);
+    ASSERT_TRUE(mat2_result.find("ld=64") != std::string::npos);
+    // Should contain batch_count and batch_stride for batch matrix
+    ASSERT_TRUE(mat2_result.find("batch_count=4") != std::string::npos);
+    ASSERT_TRUE(mat2_result.find("batch_stride=8192") != std::string::npos);
+    
+    // Test case 3: Zero batch count
+    mat3.type = HIP_R_64F;
+    mat3.m = 32;
+    mat3.n = 64;
+    mat3.ld = 32;
+    mat3.batch_count = 0;
+    mat3.batch_stride = 0;
+    
+    std::string mat3_result = rocblaslt_matrix_layout_to_string(&mat3);
+    ASSERT_TRUE(!mat3_result.empty());
+    ASSERT_TRUE(mat3_result.find("[type=R_64F") != std::string::npos);
+    ASSERT_TRUE(mat3_result.find("rows=32") != std::string::npos);
+    ASSERT_TRUE(mat3_result.find("cols=64") != std::string::npos);
+    ASSERT_TRUE(mat3_result.find("ld=32") != std::string::npos);
+    // batch_count <= 1, so should NOT contain batch info
+    ASSERT_TRUE(mat3_result.find("batch_count") == std::string::npos);
+    ASSERT_TRUE(mat3_result.find("batch_stride") == std::string::npos);
+    
+    // Test case 4: Different data types
+    mat4.type = HIP_R_8F_E4M3_FNUZ;
+    mat4.m = 16;
+    mat4.n = 32;
+    mat4.ld = 16;
+    mat4.batch_count = 8;
+    mat4.batch_stride = 512;
+    
+    std::string mat4_result = rocblaslt_matrix_layout_to_string(&mat4);
+    ASSERT_TRUE(!mat4_result.empty());
+    ASSERT_TRUE(mat4_result.find("[type=R_8F_E4M3_FNUZ") != std::string::npos);
+    ASSERT_TRUE(mat4_result.find("rows=16") != std::string::npos);
+    ASSERT_TRUE(mat4_result.find("cols=32") != std::string::npos);
+    ASSERT_TRUE(mat4_result.find("ld=16") != std::string::npos);
+    ASSERT_TRUE(mat4_result.find("batch_count=8") != std::string::npos);
+    ASSERT_TRUE(mat4_result.find("batch_stride=512") != std::string::npos);
+    
+    // Test format consistency - all results should start with '[' and end with ']'
+    ASSERT_TRUE(mat1_result.front() == '[' && mat1_result.back() == ']');
+    ASSERT_TRUE(mat2_result.front() == '[' && mat2_result.back() == ']');
+    ASSERT_TRUE(mat3_result.front() == '[' && mat3_result.back() == ']');
+    ASSERT_TRUE(mat4_result.front() == '[' && mat4_result.back() == ']');
+    
+    // Test edge case: Large dimensions
+    _rocblaslt_matrix_layout mat_large;
+    mat_large.type = HIP_R_16BF;
+    mat_large.m = 4096;
+    mat_large.n = 8192;
+    mat_large.ld = 4096;
+    mat_large.batch_count = 16;
+    mat_large.batch_stride = 33554432; // 4096 * 8192
+    
+    std::string result_large = rocblaslt_matrix_layout_to_string(&mat_large);
+    ASSERT_TRUE(!result_large.empty());
+    ASSERT_TRUE(result_large.find("rows=4096") != std::string::npos);
+    ASSERT_TRUE(result_large.find("cols=8192") != std::string::npos);
+    ASSERT_TRUE(result_large.find("batch_count=16") != std::string::npos);
+    ASSERT_TRUE(result_large.find("batch_stride=33554432") != std::string::npos);
+
+
+    // Test rocblaslt_matmul_desc_to_string function
+    // Create test matmul descriptor structures
+    _rocblaslt_matmul_desc desc1, desc2, desc3, desc4;
+    
+    // Mock is_e_enabled function behavior (assuming GELU_AUX enables epilogue extensions)
+    // auto mock_is_e_enabled = [](rocblaslt_epilogue epilogue) {
+    //     return epilogue == ROCBLASLT_EPILOGUE_GELU_AUX || 
+    //            epilogue == ROCBLASLT_EPILOGUE_GELU_AUX_BIAS ||
+    //            epilogue == ROCBLASLT_EPILOGUE_DGELU_BGRAD;
+    // };
+    
+    // Test case 1: No bias, no epilogue extension (simplest case)
+    desc1.compute_type = rocblaslt_compute_f32;
+    desc1.scale_type = HIP_R_32F;
+    desc1.op_A = HIPBLAS_OP_N;
+    desc1.op_B = HIPBLAS_OP_T;
+    desc1.epilogue = ROCBLASLT_EPILOGUE_DEFAULT;
+    desc1.bias = nullptr;
+    desc1.bias_type = HIPBLASLT_DATATYPE_INVALID;
+    desc1.aux_type = HIPBLASLT_DATATYPE_INVALID;
+    desc1.e = nullptr;
+    desc1.lde = 0;
+    
+    std::string desc_result1 = rocblaslt_matmul_desc_to_string(&desc1);
+    ASSERT_TRUE(!desc_result1.empty());
+    ASSERT_TRUE(desc_result1.find("[computeType=COMPUTE_32F") != std::string::npos);
+    ASSERT_TRUE(desc_result1.find("scaleType=R_32F") != std::string::npos);
+    ASSERT_TRUE(desc_result1.find("transA=OP_N") != std::string::npos);
+    ASSERT_TRUE(desc_result1.find("transB=OP_T") != std::string::npos);
+    ASSERT_TRUE(desc_result1.find("epilogue=EPILOGUE_DEFAULT") != std::string::npos);
+    ASSERT_TRUE(desc_result1.find("biasPointer=0x") != std::string::npos);
+    // Should NOT contain epilogue aux or bias type info
+    ASSERT_TRUE(desc_result1.find("epilogueAuxPointer") == std::string::npos);
+    ASSERT_TRUE(desc_result1.find("biasType") == std::string::npos);
+    ASSERT_TRUE(desc_result1.front() == '[' && desc_result1.back() == ']');
+    
+    // Test case 2: With bias, no epilogue extension
+    desc2.compute_type = rocblaslt_compute_f16;
+    desc2.scale_type = HIP_R_16F;
+    desc2.op_A = HIPBLAS_OP_T;
+    desc2.op_B = HIPBLAS_OP_N;
+    desc2.epilogue = ROCBLASLT_EPILOGUE_BIAS;
+    desc2.bias = reinterpret_cast<void*>(0x12345678);
+    desc2.bias_type = HIP_R_16F;
+    desc2.aux_type = HIPBLASLT_DATATYPE_INVALID;
+    desc2.e = nullptr;
+    desc2.lde = 0;
+    
+    std::string desc_result2 = rocblaslt_matmul_desc_to_string(&desc2);
+    ASSERT_TRUE(!desc_result2.empty());
+    ASSERT_TRUE(desc_result2.find("computeType=COMPUTE_16F") != std::string::npos);
+    ASSERT_TRUE(desc_result2.find("scaleType=R_16F") != std::string::npos);
+    ASSERT_TRUE(desc_result2.find("transA=OP_T") != std::string::npos);
+    ASSERT_TRUE(desc_result2.find("transB=OP_N") != std::string::npos);
+    ASSERT_TRUE(desc_result2.find("epilogue=EPILOGUE_BIAS") != std::string::npos);
+    ASSERT_TRUE(desc_result2.find("biasType=R_16F") != std::string::npos);
+    // Should NOT contain epilogue aux info
+    ASSERT_TRUE(desc_result2.find("epilogueAuxPointer") == std::string::npos);
+    ASSERT_TRUE(desc_result2.front() == '[' && desc_result2.back() == ']');
+    
+    // Test case 3: No bias, with epilogue extension
+    desc3.compute_type = rocblaslt_compute_f32;
+    desc3.scale_type = HIP_R_32F;
+    desc3.op_A = HIPBLAS_OP_N;
+    desc3.op_B = HIPBLAS_OP_N;
+    desc3.epilogue = ROCBLASLT_EPILOGUE_GELU_AUX;
+    desc3.bias = nullptr;
+    desc3.bias_type = HIPBLASLT_DATATYPE_INVALID;
+    desc3.aux_type = HIP_R_32F;
+    desc3.e = reinterpret_cast<void*>(0x87654321);
+    desc3.lde = 128;
+    
+    std::string desc_result3 = rocblaslt_matmul_desc_to_string(&desc3);
+    ASSERT_TRUE(!desc_result3.empty());
+    ASSERT_TRUE(desc_result3.find("computeType=COMPUTE_32F") != std::string::npos);
+    ASSERT_TRUE(desc_result3.find("epilogue=EPILOGUE_GELU_AUX") != std::string::npos);
+    ASSERT_TRUE(desc_result3.find("epilogueAuxPointer=0x") != std::string::npos);
+    ASSERT_TRUE(desc_result3.find("epilogueAuxLd=128") != std::string::npos);
+    ASSERT_TRUE(desc_result3.find("epilogueAuxDataType=R_32F") != std::string::npos);
+    // Should NOT contain bias type info
+    ASSERT_TRUE(desc_result3.find("biasType") == std::string::npos);
+    ASSERT_TRUE(desc_result3.front() == '[' && desc_result3.back() == ']');
+    
+    // Test case 4: With bias and epilogue extension (most complex case)
+    desc4.compute_type = rocblaslt_compute_f64;
+    desc4.scale_type = HIP_R_64F;
+    desc4.op_A = HIPBLAS_OP_C;
+    desc4.op_B = HIPBLAS_OP_C;
+    desc4.epilogue = ROCBLASLT_EPILOGUE_GELU_AUX_BIAS;
+    desc4.bias = reinterpret_cast<void*>(0xABCDEF00);
+    desc4.bias_type = HIP_R_64F;
+    desc4.aux_type = HIP_R_64F;
+    desc4.e = reinterpret_cast<void*>(0x11223344);
+    desc4.lde = 256;
+    
+    std::string desc_result4 = rocblaslt_matmul_desc_to_string(&desc4);
+    ASSERT_TRUE(!desc_result4.empty());
+    ASSERT_TRUE(desc_result4.find("computeType=COMPUTE_64F") != std::string::npos);
+    ASSERT_TRUE(desc_result4.find("scaleType=R_64F") != std::string::npos);
+    ASSERT_TRUE(desc_result4.find("transA=OP_C") != std::string::npos);
+    ASSERT_TRUE(desc_result4.find("transB=OP_C") != std::string::npos);
+    ASSERT_TRUE(desc_result4.find("epilogue=EPILOGUE_GELU_AUX_BIAS") != std::string::npos);
+    ASSERT_TRUE(desc_result4.find("biasType=R_64F") != std::string::npos);
+    ASSERT_TRUE(desc_result4.find("epilogueAuxPointer=0x") != std::string::npos);
+    ASSERT_TRUE(desc_result4.find("epilogueAuxLd=256") != std::string::npos);
+    ASSERT_TRUE(desc_result4.find("epilogueAuxDataType=R_64F") != std::string::npos);
+    ASSERT_TRUE(desc_result4.front() == '[' && desc_result4.back() == ']');
+    
+    // Test case 5: Epilogue extension without aux_type
+    _rocblaslt_matmul_desc desc5;
+    desc5.compute_type = rocblaslt_compute_i32;
+    desc5.scale_type = HIP_R_32I;
+    desc5.op_A = HIPBLAS_OP_N;
+    desc5.op_B = HIPBLAS_OP_N;
+    desc5.epilogue = ROCBLASLT_EPILOGUE_DGELU_BGRAD;
+    desc5.bias = nullptr;
+    desc5.bias_type = HIPBLASLT_DATATYPE_INVALID;
+    desc5.aux_type = HIPBLASLT_DATATYPE_INVALID; // Invalid aux type
+    desc5.e = reinterpret_cast<void*>(0x55555555);
+    desc5.lde = 64;
+    
+    std::string desc_result5 = rocblaslt_matmul_desc_to_string(&desc5);
+    ASSERT_TRUE(!desc_result5.empty());
+    ASSERT_TRUE(desc_result5.find("computeType=COMPUTE_32I") != std::string::npos);
+    ASSERT_TRUE(desc_result5.find("epilogue=EPILOGUE_DGELU_BGRAD") != std::string::npos);
+    ASSERT_TRUE(desc_result5.find("epilogueAuxPointer=0x") != std::string::npos);
+    ASSERT_TRUE(desc_result5.find("epilogueAuxLd=64") != std::string::npos);
+    // Should NOT contain epilogueAuxDataType since aux_type is invalid
+    ASSERT_TRUE(desc_result5.find("epilogueAuxDataType") == std::string::npos);
+    ASSERT_TRUE(desc_result5.front() == '[' && desc_result5.back() == ']');
+    
+    // Test different data types
+    _rocblaslt_matmul_desc desc6;
+    desc6.compute_type = rocblaslt_compute_f32_fast_bf16;
+    desc6.scale_type = HIP_R_16BF;
+    desc6.op_A = HIPBLAS_OP_N;
+    desc6.op_B = HIPBLAS_OP_T;
+    desc6.epilogue = ROCBLASLT_EPILOGUE_RELU_BIAS;
+    desc6.bias = reinterpret_cast<void*>(0x99999999);
+    desc6.bias_type = HIP_R_8F_E4M3_FNUZ;
+    desc6.aux_type = HIPBLASLT_DATATYPE_INVALID;
+    desc6.e = nullptr;
+    desc6.lde = 0;
+    
+    std::string desc_result6 = rocblaslt_matmul_desc_to_string(&desc6);
+    ASSERT_TRUE(!desc_result6.empty());
+    ASSERT_TRUE(desc_result6.find("computeType=COMPUTE_32F_16BF") != std::string::npos);
+    ASSERT_TRUE(desc_result6.find("scaleType=R_16BF") != std::string::npos);
+    ASSERT_TRUE(desc_result6.find("epilogue=EPILOGUE_RELU_BIAS") != std::string::npos);
+    ASSERT_TRUE(desc_result6.find("biasType=R_8F_E4M3_FNUZ") != std::string::npos);
+    ASSERT_TRUE(desc_result6.front() == '[' && desc_result6.back() == ']');
+}
+
+void testing_aux_rocblaslt_rocroller_host_func(const Arguments& arg)
+{
+    
+    // ------------------- Test rocroller.cpp -------------------
+
+    hipblasLtHandle_t handle;
+    CHECK_HIPBLASLT_ERROR(hipblasLtCreate(&handle));
+    
+    hipblasOperation_t   opA = HIPBLAS_OP_T;
+    hipblasOperation_t   opB = HIPBLAS_OP_N;
+    int64_t                m = 128;
+    int64_t                n = 128;
+    int64_t                k = 128;
+    
+    hipblasLtMatmulDesc_t matmul;
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatmulDescCreate(&matmul, arg.compute_type, arg.scale_type));
+
+    float alpha_v = arg.alpha;
+    void* alpha = &alpha_v;
+    float beta_v = arg.beta;
+    void* beta = &beta_v;
+
+    const int64_t row = 128;
+    const int64_t col = 128;
+    const int64_t ld  = 128;
+
+    hipStream_t        stream;
+    CHECK_HIP_ERROR(hipStreamCreate(&stream));
+
+    hipblaslt_local_matrix_layout matA(row, col, ld, arg.a_type);
+    hipblaslt_local_matrix_layout matB(row, col, ld, arg.b_type);
+    hipblaslt_local_matrix_layout matC(row, col, ld, arg.c_type);
+    hipblaslt_local_matrix_layout matD(row, col, ld, arg.d_type);
+
+    const int                        request_solutions = 1;
+    hipblasLtMatmulHeuristicResult_t heuristicResult[request_solutions];
+    int                              returnedAlgoCount = 0;
+    int64_t            max_workspace_size = 32 * 1024 * 1024;
+    hipblasLtMatmulPreference_t pref;
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatmulPreferenceCreate(&pref));
+    CHECK_HIPBLASLT_ERROR(
+        hipblasLtMatmulPreferenceSetAttribute(pref,
+                                              HIPBLASLT_MATMUL_PREF_MAX_WORKSPACE_BYTES,
+                                              &max_workspace_size,
+                                              sizeof(max_workspace_size)));
+    
+    void*   d_workspace;
+    if(heuristicResult[0].algo.max_workspace_bytes > 0)
+        CHECK_HIP_ERROR(hipMalloc(&d_workspace, heuristicResult[0].algo.max_workspace_bytes));
+
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatmulAlgoGetHeuristic(handle,
+                                                          matmul,
+                                                          matA,
+                                                          matB,
+                                                          matC,
+                                                          matD,
+                                                          pref,
+                                                          request_solutions,
+                                                          heuristicResult,
+                                                          &returnedAlgoCount));
+
+    // auto problem = construct_rocblaslt_problem(handle, matmul_descr, matA, matB, matC, matD, &alpha, &beta, &heuristicResult[0].algo.max_workspace_bytes);
+    
+    rocblaslt_matmul_desc matmul_descr = (rocblaslt_matmul_desc) matmul;
+    int64_t            batch_count = 1;
+    void *A, *B, *C, *D, *E, *d_alphaVec; // device
+    CHECK_HIP_ERROR(hipMalloc(&A, m * k * batch_count * sizeof(int64_t)));
+    CHECK_HIP_ERROR(hipMalloc(&B, n * k * batch_count * sizeof(int64_t)));
+    CHECK_HIP_ERROR(hipMalloc(&C, m * n * batch_count * sizeof(int64_t)));
+    CHECK_HIP_ERROR(hipMalloc(&D, m * n * batch_count * sizeof(int64_t)));
+    CHECK_HIP_ERROR(hipMalloc(&E, m * n * batch_count * sizeof(int64_t)));
+
+    int64_t batch_stride_a = 1;
+    int64_t batch_stride_b = 1;
+    int64_t batch_stride_c = 1;
+    int64_t batch_stride_d = 1;
+    int64_t batch_stride_e = 1;
+    bool                   strided_batch = true;
+    bool                   grouped_gemm = true;
+    void *                 bias = nullptr, *scaleAlphaVec = nullptr;
+    bool                   gradient = false;
+
+    rocblaslt_handle roc_handle = (rocblaslt_handle) handle;
+    RocblasltContractionProblem problem{opA,
+                                        opB,
+                                        m,
+                                        n,
+                                        k,
+                                        alpha,
+                                        arg.a_type,
+                                        A, // A
+                                        nullptr,
+                                        ld, // arg.lda
+                                        batch_stride_a,
+                                        arg.b_type,
+                                        nullptr, // B
+                                        nullptr,
+                                        ld, // arg.ldb
+                                        batch_stride_b,
+                                        beta,
+                                        arg.c_type,
+                                        nullptr, // C
+                                        nullptr,
+                                        ld, // arg.ldc
+                                        batch_stride_c,
+                                        arg.d_type,
+                                        nullptr, // D
+                                        nullptr,
+                                        ld, // arg.ldc
+                                        batch_stride_d,
+                                        nullptr, // E
+                                        nullptr,
+                                        ld, //arg.lde
+                                        batch_stride_e,
+                                        batch_count,
+                                        strided_batch,
+                                        grouped_gemm,
+                                        gradient,
+                                        matmul_descr->compute_type,
+                                        HIPBLASLT_DATATYPE_INVALID,
+                                        bias,
+                                        matmul_descr->scaleA,
+                                        matmul_descr->scaleB,
+                                        matmul_descr->scaleC,
+                                        matmul_descr->scaleD,
+                                        matmul_descr->scaleE,
+                                        scaleAlphaVec,
+                                        matmul_descr->scaleAType,
+                                        matmul_descr->scaleBType,
+                                        1, // scaleABlockRowSize 
+                                        1, // scaleABlockColSize 
+                                        1, // scaleBBlockRowSize
+                                        1, // scaleBBlockColSize 
+                                        arg.bias_type,
+                                        arg.aux_type,
+                                        matmul_descr->epilogue,
+                                        matmul_descr->amaxD,
+                                        nullptr,
+                                        0,
+                                        nullptr,
+                                        roc_handle->Synchronizer,
+                                        false,
+                                        false};
+    const hipblasLtMatmulAlgo_t* hip_algo = &heuristicResult[0].algo;
+    const rocblaslt_matmul_algo* roc_algo = (const rocblaslt_matmul_algo*) hip_algo;
+    runRocRollerContractionProblem(roc_handle, roc_algo, problem);
+    
+    // runRocRollerContractionProblem(roc_handle, nullptr, problem);
+
 }

@@ -96,6 +96,12 @@ namespace
                 testing_aux_mat_copy(arg);
             else if(!strcmp(arg.function, "aux_auxiliary_func"))
                 testing_aux_auxiliary_func(arg);
+            else if(!strcmp(arg.function, "aux_float8_func"))
+                testing_aux_float8_func(arg);
+            else if(!strcmp(arg.function, "aux_rocblaslt_utility_func"))
+                testing_aux_rocblaslt_utility_func(arg);
+            else if(!strcmp(arg.function, "aux_rocblaslt_rocroller_host_func"))
+                testing_aux_rocblaslt_rocroller_host_func(arg);
             else
                 FAIL() << "Internal error: Test called with unknown function: " << arg.function;
         }
@@ -138,7 +144,10 @@ namespace
                    || !strcmp(arg.function, "aux_matmul_pref_get_attr_bad_arg")
                    || !strcmp(arg.function, "aux_matmul_pref_get_attr")
                    || !strcmp(arg.function, "aux_mat_copy")
-                   || !strcmp(arg.function, "aux_auxiliary_func");
+                   || !strcmp(arg.function, "aux_auxiliary_func")
+                   || !strcmp(arg.function, "aux_float8_func")
+                   || !strcmp(arg.function, "aux_rocblaslt_utility_func")
+                   || !strcmp(arg.function, "aux_rocblaslt_rocroller_host_func");
         }
 
         // Google Test name suffix based on parameters
