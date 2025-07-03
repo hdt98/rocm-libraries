@@ -101,7 +101,7 @@ __device__ void device_grouped_conv_fwd_multiple_abd_xdl_cshuffle(
     const index_t g_idx = __builtin_amdgcn_readfirstlane(get_block_1d_id() / num_blocks_per_batch);
 
     const long_index_t e_batch_offset = amd_wave_read_first_lane(
-        static_cast<int64_t>(compute_ptr_offset_of_batch.GetEPtrOffset(g_idx)));
+        compute_ptr_offset_of_batch.GetEPtrOffset(g_idx));
     const auto ds_batch_offset = compute_ptr_offset_of_batch.GetDsPtrOffset(g_idx);
 
     __shared__ char p_shared[GridwiseGemm::GetSharedMemoryNumberOfByte()];
@@ -149,9 +149,9 @@ __device__ void device_grouped_conv_fwd_multiple_abd_xdl_cshuffle(
     else
     {
         const long_index_t a_batch_offset = amd_wave_read_first_lane(
-            static_cast<int64_t>(compute_ptr_offset_of_batch.GetAPtrOffset(g_idx)));
+            compute_ptr_offset_of_batch.GetAPtrOffset(g_idx));
         const long_index_t b_batch_offset = amd_wave_read_first_lane(
-            static_cast<int64_t>(compute_ptr_offset_of_batch.GetBPtrOffset(g_idx)));
+            compute_ptr_offset_of_batch.GetBPtrOffset(g_idx));
 
         GridwiseGemm::template Run<HasMainKBlockLoop, InMemoryDataOperationEnum::Set>(
             p_as_grid + a_batch_offset,

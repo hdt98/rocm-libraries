@@ -60,16 +60,16 @@ __global__ void
     const index_t n_idx      = __builtin_amdgcn_readfirstlane(blockIdx.z);
 
     const long_index_t a_group_offset = amd_wave_read_first_lane(
-        static_cast<int64_t>(compute_ptr_offset_of_groups.GetAPtrOffset(g_idx)));
+        compute_ptr_offset_of_groups.GetAPtrOffset(g_idx));
     const long_index_t b_group_offset = amd_wave_read_first_lane(
-        static_cast<int64_t>(compute_ptr_offset_of_groups.GetBPtrOffset(g_idx)));
+        compute_ptr_offset_of_groups.GetBPtrOffset(g_idx));
     const long_index_t e_group_offset = amd_wave_read_first_lane(
-        static_cast<int64_t>(compute_ptr_offset_of_groups.GetEPtrOffset(g_idx)));
+        compute_ptr_offset_of_groups.GetEPtrOffset(g_idx));
 
     const long_index_t a_n_offset = amd_wave_read_first_lane(
-        static_cast<int64_t>(compute_ptr_offset_of_n.GetAPtrOffset(n_idx)));
+        compute_ptr_offset_of_n.GetAPtrOffset(n_idx));
     const long_index_t e_n_offset = amd_wave_read_first_lane(
-        static_cast<int64_t>(compute_ptr_offset_of_n.GetEPtrOffset(n_idx)));
+        compute_ptr_offset_of_n.GetEPtrOffset(n_idx));
 
     index_t left     = 0;
     index_t right    = gemms_count;
