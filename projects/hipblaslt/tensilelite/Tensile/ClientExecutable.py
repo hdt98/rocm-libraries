@@ -69,6 +69,13 @@
 #                'Tensile_ENABLE_MARKER' : globalParameters["EnableMarker"],
 #                'CMAKE_CXX_COMPILER': os.path.join(globalParameters["ROCmBinPath"], cxxCompiler),
 #                'CMAKE_C_COMPILER': os.path.join(globalParameters["ROCmBinPath"], cCompiler)}
+# NEW:
+            #     'HIPBLASLT_ENABLE_MSGPACK': 'ON',
+            #    'HIPBLASLT_ENABLE_LLVM': 'OFF' if (os.name == "nt") else 'ON',
+            #    'HIPBLASLT_LIBRARY_FORMAT': globalParameters["LibraryFormat"], # changes if using msgpack or yaml 
+            #    'HIPBLASLT_ENABLE_MARKER' : globalParameters["EnableMarker"],  # on or off marker tool: performance marking tool 
+            #    'HIPBLASLT_ENABLE_DEVICE' : "OFF",
+            #    'HIPBLASLT_ENABLE_CLIENTS' : "OFF",
 
 #     if "CCACHE_BASEDIR" in os.environ:
 #         options.update({'CMAKE_C_COMPILER_LAUNCHER': 'ccache', 'CMAKE_CXX_COMPILER_LAUNCHER': 'ccache'})

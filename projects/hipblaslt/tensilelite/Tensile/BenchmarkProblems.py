@@ -507,7 +507,7 @@ def main(
 ):
     """Entry point for the "BenchmarkProblems" section of a Tensile config yaml"""
     # ClientExecutable.getClientExecutable(str(srcToolchain.compiler.path), cCompiler, outputPath)
-    ClientWriter.getClientExecutablePath()
+    getClientExecutablePath()
 
     if config is None:
         print(f'No config specified in {globalParameters["ConfigPath"]}, built client only')
