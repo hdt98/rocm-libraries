@@ -216,17 +216,6 @@ class Solution(collections.abc.Mapping):
     if "AssignedDerivedParameters" not in self._state:
       self["AssignedDerivedParameters"] = False
 
-    # # NB:
-    # #   For swizzleA but TransA = N, we internally change it to TransA=T during the kernel-writer part.
-    # #   Then note that need to change back right after soure code is emitted. We still use the original PT
-    # #   We need it to back to the original PT to put in the correct folder.
-    # if (self["ProblemType"]["SwizzleTensorA"]) and (not self["ProblemType"]["TransposeA"]):
-    #   config["ProblemType_bak"] = deepcopy(config["ProblemType"])
-    #   self["ProblemType_bak"] = deepcopy(self["ProblemType"])
-    #   # internally change it TransA to T for the following code-gen
-    #   config["ProblemType"]["TransposeA"] = 1
-    #   self["ProblemType"] = ProblemType(config["ProblemType"], printIndexAssignmentInfo)
-
     Solution.assignDerivedParameters(
       self._state,
       splitGSU,
@@ -598,7 +587,6 @@ class Solution(collections.abc.Mapping):
     MIindex = 0 if tc == 'A' else 1
     numBytes = state["ProblemType"]["DataType"].numBytes()
     numBytesGR = state["ProblemType"]["DataType%s"%tc].numBytes()
-    isSwizzle = state["ProblemType"]["SwizzleTensor%c"%tc]
     # With MatrixInstruction only
     if not state["EnableMatrixInstruction"] :
       reject(state, printRejectionReason, "DirectToVgpr is for MatrixInstruction only")
@@ -681,8 +669,6 @@ class Solution(collections.abc.Mapping):
       return False
 
     # Does not work with TLU + VectorWidth != GlobalReadVectorWidth (VW = 2 + GRVW = 1 or VW = 1 + GRVW = 2 does not work)
-    # Unless this is swizzling case
-    # if (not isSwizzle) and state["ProblemType"]["TLU%c"%tc] and state["VectorWidth%s"%tc] != state["GlobalReadVectorWidth%c"%tc]:
     if state["ProblemType"]["TLU%c"%tc] and state["VectorWidth%s"%tc] != state["GlobalReadVectorWidth%c"%tc]:
       reject(state, printRejectionReason, "DirectToVgpr%c does not supports TLU + VectorWidth%s(=%u) != GlobalReadVectorWidth%c(%u)"%(tc, tc, state["VectorWidth%s"%tc], tc, state["GlobalReadVectorWidth%c"%tc]))
       return False
@@ -1851,9 +1837,6 @@ class Solution(collections.abc.Mapping):
       if state["ProblemType"]["SwizzleTensorA"]:
         if not state["DirectToVgprA"]:
           reject(state, printRejectionReason, f"Tensor A swizzling requires DirectToVgprA")
-        # Temp Test
-        # if not state["ProblemType"]["TransposeA"]:
-        #   reject(state, printRejectionReason, f"Tensor A swizzling supports TN or TT only")
 
       if state["ProblemType"]["SwizzleTensorB"]:
         if not state["DirectToVgprB"]:

@@ -2909,17 +2909,6 @@ class KernelWriterAssembly(KernelWriter):
     graIdx = 0
     swapPerpPara = (((tP["isA"] or tP["isB"]) and kernel["DirectToVgpr%s"%tc]) and (not tP["tlu"]) and tP["nrp"] > 1)
 
-    # swizzle
-    # if tP["isSwizzled"]:
-    #   swizzleK = tP["swizzleK"]
-    #   tP["swizzledBlockSize"] = self.sgprPool.checkOut(1)
-    #   if tc == "A":
-    #     commentMsg = "SWZ-%s: swizzled block = MI_M(%u) * MI_K(%u) * pack-K(%u)" %(tc, 16, kernel["MatrixInstK"], tP["swizzlePackK"])
-    #   elif tc == "B":
-    #     commentMsg = "SWZ-%s: swizzled block = MI_N(%u) * MI_K(%u) * pack-K(%u)" %(tc, 16, kernel["MatrixInstK"], tP["swizzlePackK"])
-
-    #   module.add(SMovB32(dst=sgpr(tP["swizzledBlockSize"]), src=hex(16*swizzleK), comment=commentMsg))
-
     # Swizzle doesn't support _UseSgprForGRO, so swz will not go to it.
     # both UseSgprForGRO and DTVA/B are enabled
     if ((tP["isA"] or tP["isB"]) and kernel["DirectToVgpr%s"%tc]) and kernel["_UseSgprForGRO"]:
@@ -2962,9 +2951,6 @@ class KernelWriterAssembly(KernelWriter):
               # single loop
               singleModule, graIdx = self.graFinalOffsetsSingleLoop(kernel, tP, tc, tmp, graIdx, perp, sPerp, para, sPara)
               module.add(singleModule)
-
-    # if tP["isSwizzled"]:
-    #   self.sgprPool.checkIn(tP["swizzledBlockSize"])
 
     self.vgprPool.checkIn(tP["gpr"]["lwoT"])
     tP["gpr"]["lwoT"] = None

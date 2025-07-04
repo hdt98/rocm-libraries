@@ -21,7 +21,7 @@ GlobalParameters:
 
 BenchmarkProblems:
   ########################################
-  # HHS TN DTVA + SWIZZLED_A + BIAS + Activation + SAV
+  # HHS TN SWIZZLED_A + BIAS + Activation + SAV
   ########################################
   -
     - # ProblemType
@@ -45,14 +45,6 @@ BenchmarkProblems:
         - KernelLanguage: ["Assembly"]
       ForkParameters:
         - MatrixInstruction:
-          - [16, 16, 16, 1,  1,   1, 1,  4,1 ] # MT = 64x16
-          - [16, 16, 16, 1,  1,   2, 1,  4,1 ] # MT = 128x16
-          - [16, 16, 16, 1,  1,   4, 1,  4,1 ] # MT = 256x16
-          - [16, 16, 16, 1,  1,   8, 1,  4,1 ] # MT = 512x16
-          - [16, 16, 16, 1,  1,   5, 1,  2,1 ] # MT = 160x16
-
-          - [16, 16, 16, 1,  1,   1, 8,  4,1 ] # MT = 64x128
-          - [16, 16, 16, 1,  1,   1, 16, 4,1 ] # MT = 64x256
           - [16, 16, 16, 1,  1,   2, 8,  4,1 ] # MT = 128x128
           - [16, 16, 16, 1,  1,   2, 16, 4,1 ] # MT = 128x256
           - [16, 16, 16, 1,  1,   4, 8,  4,1 ] # MT = 256x128
@@ -70,14 +62,6 @@ BenchmarkProblems:
           - [16, 16, 16, 1,  1,   16, 4, 2,2 ] # MT = 512x128
           - [16, 16, 16, 1,  1,   16, 8, 2,2 ] # MT = 512x256
           - [16, 16, 16, 1,  1,   5, 4,  2,2 ] # MT = 160x128
-
-          - [16, 16, 16, 1,  1,   4, 2,  1,4 ] # MT = 64x128
-          - [16, 16, 16, 1,  1,   4, 4,  1,4 ] # MT = 64x256
-          - [16, 16, 16, 1,  1,   8, 2,  1,4 ] # MT = 128x128
-          - [16, 16, 16, 1,  1,   8, 4,  1,4 ] # MT = 128x256
-          - [16, 16, 16, 1,  1,   16, 2, 1,4 ] # MT = 256x128
-          - [16, 16, 16, 1,  1,   16, 4, 1,4 ] # MT = 256x256
-          - [16, 16, 16, 1,  1,   10, 2, 1,4 ] # MT = 160x128
         - GlobalReadVectorWidthA: [8]
         - GlobalReadVectorWidthB: [-1]
         - PrefetchGlobalRead: [1,2]
@@ -128,7 +112,7 @@ BenchmarkProblems:
           - [Enum: relu]
 
   ########################################
-  # HSS TN DTVA + SWIZZLED_A
+  # HSS TN SWIZZLED_A
   ########################################
   -
     - # ProblemType
@@ -196,7 +180,7 @@ BenchmarkProblems:
           - Exact: [127, 1, 1, 127]
 
   ########################################
-  # BBS TN DTVA + SWIZZLED_A
+  # BBS TN SWIZZLED_A
   ########################################
   -
     - # ProblemType
@@ -264,7 +248,7 @@ BenchmarkProblems:
           - Exact: [127, 1, 1, 127]
 
   ########################################
-  # F8B8NHS TN DTVA + SWIZZLED_A
+  # F8B8NHS TN SWIZZLED_A
   ########################################
   -
     - # ProblemType
@@ -332,7 +316,7 @@ BenchmarkProblems:
           - Exact: [127, 1, 1, 127]
 
   ########################################
-  # XFloat TN DTVA + SWIZZLED_A
+  # XFloat TN SWIZZLED_A
   ########################################
   -
     - # ProblemType

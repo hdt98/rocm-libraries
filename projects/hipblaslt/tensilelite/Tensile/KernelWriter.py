@@ -5106,9 +5106,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
     #   which is 0 for TransB=N (TLU=False), and 1 for TransB=T (TLU=True)
     #   In summary: for swizzle case, IndexAssignments for constStride(1) is 0 for TLU=False and 1 for TLU=True
     if tP["isSwizzled"]:
-      tP["constStrideDimIdx"] = 1 if kernel["ProblemType"]["TLU%s_ORI"%cM] else 0
-
-    if tP["isSwizzled"]:
+      tP["constStrideDimIdx"] = 1 if kernel["ProblemType"]["_OriTLU%s"%cM] else 0
       # 16 means bytes of buffer_load_dwordx4
       tP["swizzlePackK"] = 16 // kernel["MIInputPerThread%s"%cM] // kernel["ProblemType"]["DataType%s"%cM].numBytes()
       tP["swizzleK"] = kernel["MatrixInstK"] * tP["swizzlePackK"]
