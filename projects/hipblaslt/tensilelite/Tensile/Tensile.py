@@ -201,7 +201,7 @@ def addCommonArguments(argParser):
         action="store", default="yaml", help="select which library format to use")
     argParser.add_argument("--client-lock", default=None)
     argParser.add_argument("--prebuilt-client", default=os.path.abspath(os.path.join('build', 'tensilelite-client', 'tensilelite-client')),
-        type=os.path.abspath, help="Specify the full path to a pre-built tensile-client executable")
+        type=os.path.abspath, help="Specify the full path to a pre-built tensilelite-client executable")
 
     argParser.add_argument("--global-parameters", nargs="+", type=splitExtraParameters, default=[])
 
