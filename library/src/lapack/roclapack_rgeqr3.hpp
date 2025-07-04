@@ -59,7 +59,7 @@ constexpr bool use_geqr2 = true;
 
 #ifndef RGEQR3_BLOCKSIZE
 #define RGEQR3_BLOCKSIZE(T) \
-    ((sizeof(T) == 4) ? 512 : (sizeof(T) == 8) ? 256 : (sizeof(T) == 16) ? 128 : 64)
+    ((sizeof(T) == 4) ? 256 : (sizeof(T) == 8) ? 128 : (sizeof(T) == 16) ? 64 : 64)
 #endif
 
 #ifndef CHECK_MEM
@@ -110,7 +110,7 @@ static constexpr int rocblas_previous_po2(int x)
 
 static rocblas_int get_n_small()
 {
-    return (16);
+    return (GEQxF_BLOCKSIZE);
 };
 
 // --------------------------------------------------------
@@ -736,8 +736,8 @@ static rocblas_status formT3(rocblas_handle handle,
                              Istride const stride_Tmat,
                              I const batch_count,
 
-                             void* work,
-                             I& lwork_bytes)
+                             void* const work,
+                             I const lwork_bytes)
 
 {
     ROCSOLVER_ENTER("formT3", "m:", m, "k1:", k1, "k2:", k2, "shift_Y1:", shift_Y1, "ldY:", ldY,
@@ -765,7 +765,7 @@ static rocblas_status formT3(rocblas_handle handle,
     rocblas_get_stream(handle, &stream);
 
     std::byte* const pfree0 = reinterpret_cast<std::byte*>(work);
-    std::byte* pfree = pfree;
+    std::byte* pfree = pfree0;
 
     // W is k1 by k2
     // W  = zeros( size(T1,1), size(T2,2) );
@@ -1260,8 +1260,8 @@ static rocblas_status applyQtC_body(rocblas_handle handle,
                                     Istride const stride_Cmat,
 
                                     I const batch_count,
-                                    void* work,
-                                    I& lwork_bytes)
+                                    void* const work,
+                                    I const lwork_bytes)
 {
     ROCSOLVER_ENTER("applyQtC_body", "m:", m, "n:", n, "k:", k, "shift_Ymat:", shift_Ymat,
                     "ldY:", ldY, "bc:", batch_count);
@@ -2124,8 +2124,8 @@ static rocblas_status applyQtC(rocblas_handle handle,
                                Istride const stride_Cmat,
 
                                I const batch_count,
-                               void* work,
-                               I& lwork_bytes)
+                               void* const work,
+                               I const lwork_bytes)
 {
     ROCSOLVER_ENTER("applyQtC_body", "m:", m, "n:", n, "k:", k, "shift_Ymat:", shift_Ymat,
                     "ldY:", ldY, "bc:", batch_count);
@@ -2257,23 +2257,23 @@ static void rocsolver_applyQtC_getMemorySize(I const m,
 
 template <typename T, typename I, typename U, typename Istride>
 static rocblas_status rocsolver_rgeqr3_template(rocblas_handle handle,
-                                                const I m,
-                                                const I n,
+                                                I const m,
+                                                I const n,
 
                                                 U Amat,
-                                                const Istride shift_Amat,
-                                                const I ldA,
-                                                const Istride stride_Amat,
+                                                Istride const shift_Amat,
+                                                I const ldA,
+                                                Istride const stride_Amat,
 
                                                 T* const Tmat,
-                                                const Istride shift_Tmat,
-                                                const I ldT,
-                                                const Istride stride_Tmat,
+                                                Istride const shift_Tmat,
+                                                I const ldT,
+                                                Istride const stride_Tmat,
 
-                                                const I batch_count,
+                                                I const batch_count,
 
-                                                void* work,
-                                                I& lwork_bytes)
+                                                void* const work,
+                                                I const lwork_bytes)
 {
     ROCSOLVER_ENTER("rgeqr3", "m:", m, "n:", n, "shift_Amat:", shift_Amat, "lda:", ldA,
                     "bc:", batch_count);
@@ -2382,21 +2382,21 @@ static rocblas_status rocsolver_rgeqr3_template(rocblas_handle handle,
         size_t size_diag = 0;
         size_t size_work_larft = 0;
 
-        auto const min_mn = std::min(m, n);
-
         rocsolver_geqr2_getMemorySize<BATCHED, T, I>(m, n, batch_count,
 
                                                      &size_scalars_geqr2, &size_work_workArr_geqr2,
                                                      &size_Abyx_norms, &size_diag);
+
+        size_work_workArr_geqr2 = std::max(size_work_workArr_geqr2, sizeof(T*) * batch_count);
 
         rocsolver_larft_getMemorySize<BATCHED, T>(m, n, batch_count,
 
                                                   &size_scalars_larft, &size_work_larft,
                                                   &size_workArr_larft);
 
+        size_workArr_larft = std::max(size_workArr_larft, sizeof(T*) * batch_count);
+
         size_t size_scalars = std::max(size_scalars_geqr2, size_scalars_larft);
-        size_t size_workArr = std::max(size_work_workArr_geqr2, size_workArr_larft);
-        size_t size_work = std::max(size_Abyx_norms, size_work_larft);
 
         auto const pfree_save = pfree;
 
@@ -2416,50 +2416,77 @@ static rocblas_status rocsolver_rgeqr3_template(rocblas_handle handle,
 
         if(size_scalars > 0)
         {
+            // -------------------------------------
+            // setup pre-defined values in scalars[] = {-1, 0, 1}
+            // -------------------------------------
             init_scalars(handle, (T*)scalars);
         }
 
-        // -------------------------------------------------
-        // note reuse storge for workArr for geqr2 and larft
-        // -------------------------------------------------
-        T** const work_workArr = reinterpret_cast<T**>(pfree);
-        T** const workArr = work_workArr;
-        pfree += size_workArr;
-
-        // -----------------------------------------------
-        // note reuse storage for Abyx_norms in geqr2 and work for larft
-        // -----------------------------------------------
-        T* const Abyx_norms = reinterpret_cast<T*>(pfree);
-        T* const work = Abyx_norms;
-        pfree += size_work;
-
-        T* const diag = reinterpret_cast<T*>(pfree);
-        pfree += size_diag;
-
-        CHECK_MEM(pfree);
-
-        ROCBLAS_CHECK(rocsolver_geqr2_template(handle, m, n, Amat, shift_Amat, ldA, stride_Amat,
-
-                                               tau, stride_tau,
-
-                                               batch_count, scalars, work_workArr, Abyx_norms, diag));
-
-        rocblas_direct const direct = rocblas_forward_direction;
-        rocblas_storev const storev = rocblas_column_wise;
-
-        auto const istat_larft = rocsolver_larft_template(handle, direct, storev, m, n,
-
-                                                          Amat, shift_Amat, ldA, stride_Amat,
-
-                                                          tau, stride_tau,
-
-                                                          Tmat + shift_Tmat, ldT, stride_Tmat,
-
-                                                          batch_count, scalars, work, workArr);
-
-        if(istat_larft != rocblas_status_success)
         {
-            return (istat_larft);
+            // --------------------------------
+            // allocate scratch space for geqr2
+            // --------------------------------
+
+            void* const work_workArr = (void*)pfree;
+            pfree += size_work_workArr_geqr2;
+
+            T* const Abyx_norms = (T*)pfree;
+            pfree += size_Abyx_norms;
+
+            T* const diag = (T*)pfree;
+            pfree += size_diag;
+
+            CHECK_MEM(pfree);
+
+            assert(work_workArr != nullptr);
+            assert(Abyx_norms != nullptr);
+            assert(diag != nullptr);
+            assert(tau != nullptr);
+
+            ROCBLAS_CHECK(rocsolver_geqr2_template(handle, m, n, Amat, shift_Amat, ldA, stride_Amat,
+
+                                                   tau, stride_tau,
+
+                                                   batch_count, scalars, work_workArr, Abyx_norms,
+                                                   diag));
+
+            pfree = pfree - size_diag;
+            pfree = pfree - size_Abyx_norms;
+            pfree = pfree - size_work_workArr_geqr2;
+        }
+
+        {
+            T* const work = (T*)pfree;
+            pfree += size_work_larft;
+
+            T** const workArr = (T**)pfree;
+            pfree += size_workArr_larft;
+
+            CHECK_MEM(pfree);
+
+            rocblas_direct const direct = rocblas_forward_direction;
+            rocblas_storev const storev = rocblas_column_wise;
+
+            assert(work != nullptr);
+            assert(workArr != nullptr);
+
+            auto const istat_larft = rocsolver_larft_template(handle, direct, storev, m, n,
+
+                                                              Amat, shift_Amat, ldA, stride_Amat,
+
+                                                              tau, stride_tau,
+
+                                                              Tmat + shift_Tmat, ldT, stride_Tmat,
+
+                                                              batch_count, scalars, work, workArr);
+
+            pfree = pfree - size_workArr_larft;
+            pfree = pfree - size_work_larft;
+
+            if(istat_larft != rocblas_status_success)
+            {
+                return (istat_larft);
+            }
         }
 
         pfree = pfree_save;
@@ -2491,25 +2518,25 @@ static rocblas_status rocsolver_rgeqr3_template(rocblas_handle handle,
         // part of original Amat
         // ---------------------------------------------
         auto const Ymat = Amat;
-        auto const shift_Ymat = shift_Amat;
-        auto const stride_Ymat = stride_Amat;
-        auto const ldY = ldA;
+        Istride const shift_Ymat = shift_Amat;
+        Istride const stride_Ymat = stride_Amat;
+        I const ldY = ldA;
 
-        auto const shift_Y1 = shift_Ymat + idx2F(1, 1, ldY);
-        auto const shift_T1 = shift_Tmat + idx2F(1, 1, ldT);
+        Istride const shift_Y1 = shift_Ymat + idx2F(1, 1, ldY);
+        Istride const shift_T1 = shift_Tmat + idx2F(1, 1, ldT);
 
-        auto const nrows_Y1 = m;
-        auto const ncols_Y1 = n1;
+        I const nrows_Y1 = m;
+        I const ncols_Y1 = n1;
 
-        auto const nrows_T1 = n1;
-        auto const ncols_T1 = n1;
+        I const nrows_T1 = n1;
+        I const ncols_T1 = n1;
 
         {
-            auto const mm = m;
-            auto const nn = n1;
+            I const mm = m;
+            I const nn = n1;
 
             // clang-format off
-              ROCBLAS_CHECK(rocsolver_rgeqr3_template(
+              ROCBLAS_CHECK(rocsolver_rgeqr3_template<T,I>(
                 handle,
 		mm, nn,
 	        Amat, shift_Amat, ldA, stride_Amat,
@@ -2746,6 +2773,9 @@ static void rocsolver_rgeqr3_getMemorySize(I const m, I const n, I const batch_c
 
             size_t const size_geqr2 = size_scalars + size_work_workArr + size_Abyx_norms + size_diag;
             *work_size += size_geqr2;
+
+            size_t const size_tau = sizeof(T) * n * batch_count;
+            *work_size += size_tau;
         }
 
         // -----------------------
@@ -2789,8 +2819,8 @@ static rocblas_status rocsolver_rgeqrf_template(rocblas_handle handle,
                                                 Istride const stride_tau,
 
                                                 I const batch_count,
-                                                void* work,
-                                                I& lwork_bytes)
+                                                void* const work,
+                                                I const lwork_bytes)
 {
     ROCSOLVER_ENTER("rgeqrf", "m:", m, "n:", n, "shift_Amat:", shift_Amat, "lda:", ldA,
                     "bc:", batch_count);
