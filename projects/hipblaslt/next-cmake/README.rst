@@ -125,7 +125,8 @@ used to specify this custom path when running a test.
           -DCMAKE_PREFIX_PATH=/opt/rocm         \
           -DTENSILE_ENABLE_CLIENT=ON            \
           -DTENSILE_ENABLE_HOST=ON              \
-          -DTENSILE_ENABLE_DEVICE=OFF
+          -DTENSILE_ENABLE_DEVICE=OFF           \
+          -DHIPBLASLT_ENABLE_LLVM=ON
       # build
       cmake --build my-custom-build --parallel
 
