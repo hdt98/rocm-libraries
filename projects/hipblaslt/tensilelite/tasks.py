@@ -11,7 +11,7 @@ import os
     }
 )
 def build_client(c, clean=False, configure=True, build=True, build_dir=None, build_type="Release", gpu_targets="gfx90a"):
-    client_build_dir = "build_tmp"
+    build_dir = "build_tmp"
 
     if clean and os.path.exists(client_build_dir):
         c.run(f"rm -rf {build_dir}")
@@ -29,6 +29,7 @@ def build_client(c, clean=False, configure=True, build=True, build_dir=None, bui
             "-DHIPBLASLT_ENABLE_CLIENT=ON",
             "-DHIPBLASLT_ENABLE_HOST=ON",
             "-DHIPBLASLT_ENABLE_DEVICE=OFF",
+            "-DHIPBLASLT_ENABLE_LLVM=ON",
             f"-DGPU_TARGETS={gpu_targets}"
         ]
 

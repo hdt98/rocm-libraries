@@ -39,7 +39,6 @@ from Tensile.Toolchain.Component import Assembler
 import rocisa
 
 from . import ROOT_PATH
-# from . import ClientExecutable
 from . import LibraryIO
 from Tensile.Common import ensurePath, print1, printExit, printWarning, ClientExecutionLock,\
                            LIBRARY_LOGIC_DIR, LIBRARY_CLIENT_DIR
@@ -204,7 +203,6 @@ def main(config, assembler: Assembler, cCompiler: str, isaInfoMap, outputPath: P
 ################################################################################
 def runNewClient(scriptPath, clientParametersPath, cxxCompiler: str, cCompiler: str, clientBuildDir=None):
 
-  # clientExe = ClientExecutable.getClientExecutable(cxxCompiler, cCompiler, clientBuildDir)
   clientExe = getClientExecutablePath()
   iniFile = "--config-file={}".format(clientParametersPath)
   args = [clientExe, iniFile]
@@ -296,7 +294,6 @@ def writeRunScript(path, forBenchmark, enableTileSelection, cxxCompiler: str, cC
 
     runScriptFile.write("ERR1=0\n")
 
-    # clientExe = ClientExecutable.getClientExecutable(cxxCompiler, cCompiler, buildDir)
     clientExe = getClientExecutablePath()
     for configFile in configPaths:
       runScriptFile.write("{} --config-file {}\n".format(clientExe, configFile))
@@ -322,7 +319,6 @@ fi
         runScriptFile.write("%s -d 0 --setfan 50\n" % globalParameters["ROCmSMIPath"])
   else:
     for configFile in configPaths:
-      # runScriptFile.write("{} --config-file {} --best-solution 1\n".format(ClientExecutable.getClientExecutable(cxxCompiler, cCompiler, buildDir), configFile))
       runScriptFile.write("{} --config-file {} --best-solution 1\n".format(getClientExecutablePath(), configFile))
 
   if os.name != "nt":
@@ -732,3 +728,5 @@ def getClientExecutablePath():
         "For custom cmake build instructions, please refer to the README in next-cmake."
     )
   return clientExe
+
+  

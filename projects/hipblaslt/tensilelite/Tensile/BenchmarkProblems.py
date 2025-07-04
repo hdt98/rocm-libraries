@@ -31,7 +31,7 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Dict
 
-from Tensile import CUSTOM_KERNEL_PATH, ClientExecutable, SolutionLibrary, LibraryIO
+from Tensile import CUSTOM_KERNEL_PATH, SolutionLibrary, LibraryIO
 from Tensile.KernelWriter import DebugConfig
 from Tensile.KernelHelperNaming import KernelHelperEnum, initHelperKernelObjects
 from Tensile.Toolchain.Component import Assembler
@@ -506,7 +506,6 @@ def main(
     isaInfoMap: Dict[str, IsaInfo]
 ):
     """Entry point for the "BenchmarkProblems" section of a Tensile config yaml"""
-    # ClientExecutable.getClientExecutable(str(srcToolchain.compiler.path), cCompiler, outputPath)
     getClientExecutablePath()
 
     if config is None:
