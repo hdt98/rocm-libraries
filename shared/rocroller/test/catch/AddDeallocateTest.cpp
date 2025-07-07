@@ -80,7 +80,7 @@ namespace AddDeallocateTest
         transforms.push_back(std::make_shared<OrderEpilogueBlocks>());
         transforms.push_back(std::make_shared<CleanLoops>());
         transforms.push_back(std::make_shared<AddPrefetch>(params, context.get()));
-        transforms.push_back(std::make_shared<AddComputeIndex>());
+        transforms.push_back(std::make_shared<AddComputeIndex>(context.get()));
 
         for(auto& t : transforms)
             kgraph = kgraph.transform(t);

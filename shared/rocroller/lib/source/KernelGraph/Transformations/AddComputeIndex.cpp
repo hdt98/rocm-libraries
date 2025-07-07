@@ -320,7 +320,8 @@ namespace rocRoller::KernelGraph
                                       ExpressionPtr step,
                                       int           location,
                                       BufferMap&    bufferMap,
-                                      bool          isDirect2LDS)
+                                      bool          isDirect2LDS,
+                                      ContextPtr    context)
     {
         rocRoller::Log::getLogger()->debug(
             "KernelGraph::AddComputeIndex()::genericComputeIndex(): op {} location {}",
@@ -597,7 +598,7 @@ namespace rocRoller::KernelGraph
             stageChain(kgraph, target, candidate, candidate, GD::Upstream, isDirect2LDS);
         }
 
-        KernelGraph commit(KernelGraph const& original) const
+        KernelGraph commit(KernelGraph const& original, ContextPtr context) const
         {
             auto               kgraph = original;
             std::map<int, int> scopes;
@@ -623,7 +624,7 @@ namespace rocRoller::KernelGraph
                     isDirect2LDS);
 
                 auto chain = addComputeIndex(
-                    kgraph, candidates[0], step, spec.location, bufferMap, isDirect2LDS);
+                    kgraph, candidates[0], step, spec.location, bufferMap, isDirect2LDS, context);
 
                 if(spec.direction == GD::Downstream)
                 {
@@ -720,6 +721,6 @@ namespace rocRoller::KernelGraph
                 indexer.stage(original, candidate, true);
         }
 
-        return indexer.commit(original);
+        return indexer.commit(original, m_context);
     }
 }
