@@ -49,7 +49,7 @@ set(
     unit/ContextFixture.cpp
     unit/GPUContextFixture.cpp
     unit/GenericContextFixture.cpp
-
+    unit/AssignComputeIndexTest.cpp
     unit/AddStreamKTest.cpp
     unit/AllocatingObserverTest.cpp
     unit/ArgumentLoaderTest.cpp

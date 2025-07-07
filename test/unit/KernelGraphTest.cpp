@@ -1273,7 +1273,7 @@ namespace KernelGraphTest
         auto removeDuplicatesTransform = std::make_shared<RemoveDuplicates>();
 
         auto cleanLoopsTransform      = std::make_shared<CleanLoops>();
-        auto addComputeIndexTransform = std::make_shared<AddComputeIndex>();
+        auto addComputeIndexTransform = std::make_shared<AddComputeIndex>(m_context);
 
         kgraph0      = kgraph0.transform(updateParametersTransform);
         auto kgraph1 = kgraph0.transform(addLDSTransform);
@@ -1402,7 +1402,7 @@ namespace KernelGraphTest
             = std::make_shared<LowerTensorContraction>(params, m_context);
         auto unrollLoopsTransform        = std::make_shared<UnrollLoops>(params, m_context);
         auto cleanLoopsTransform         = std::make_shared<CleanLoops>();
-        auto addComputeIndexTransform    = std::make_shared<AddComputeIndex>();
+        auto addComputeIndexTransform    = std::make_shared<AddComputeIndex>(m_context);
         auto inlineInrecrementsTransform = std::make_shared<InlineIncrements>();
 
         kgraph = kgraph.transform(updateParametersTransform);
@@ -1610,7 +1610,7 @@ namespace KernelGraphTest
 
         auto addLDSTransform          = std::make_shared<AddLDS>(params, m_context);
         auto lowerTileTransform       = std::make_shared<LowerTile>(params, m_context);
-        auto addComputeIndexTransform = std::make_shared<AddComputeIndex>();
+        auto addComputeIndexTransform = std::make_shared<AddComputeIndex>(m_context);
 
         auto kgraph1 = kgraph0.transform(addLDSTransform);
         kgraph1      = kgraph1.transform(lowerTileTransform);
