@@ -181,12 +181,6 @@ namespace rocRoller::KernelGraph
         return Expression::literal(x);
     }
 
-    inline ExpressionPtr DF(const int tag, DataType dataType)
-    {
-        return std::make_shared<Expression::Expression>(
-            Expression::DataFlowTag{tag, Register::Type::Vector, dataType});
-    }
-
     int makeAssignBase(KernelGraph& graph,
                        int          target,
                        int          base,
@@ -199,7 +193,6 @@ namespace rocRoller::KernelGraph
                        ContextPtr   context,
                        Transformer& coords)
     {
-        auto        assignTag = -1;
         auto        indexExpr = forward ? coords.forward({target})[0] : coords.reverse({target})[0];
         auto const& typeInfo  = DataTypeInfo::Get(valueType);
         auto        numBits   = DataTypeInfo::Get(typeInfo.segmentVariableType).elementBits;
@@ -220,8 +213,14 @@ namespace rocRoller::KernelGraph
         auto assignNode
             = Assign{Register::Type::Vector, convert(offsetType, toBytes(indexExpr, valueType) + paddingBytes)};
         assignNode.variableType = offsetType;
-        assignTag               = graph.control.addElement(assignNode);
+        auto assignTag          = graph.control.addElement(assignNode);
         graph.mapper.connect(assignTag, offset, NaryArgument::DEST);
+
+        rocRoller::Log::getLogger()->debug(
+            "KernelGraph::makeAssignBase: assign {} expression {} to offset {}",
+            assignTag,
+            toString(assignNode.expression),
+            offset);
 
         return assignTag;
     }
@@ -461,6 +460,12 @@ namespace rocRoller::KernelGraph
                toBytes(trLoadPairStride, valueType) + trLoadPairStridePaddingBytes};
         auto assignTag = graph.control.addElement(assignNode);
         graph.mapper.connect(assignTag, stride, NaryArgument::DEST);
+
+        rocRoller::Log::getLogger()->debug(
+            "KernelGraph::makeAssignBase: assign {} expression {} to stride {}",
+            assignTag,
+            toString(assignNode.expression),
+            stride);
         return assignTag;
     }
 
@@ -682,7 +687,7 @@ namespace rocRoller::KernelGraph
                 strideDataType = DataType::Int64;
             }
 
-            auto const ci = makeComputeIndex(graph,
+            makeComputeIndex(graph,
                                              target,
                                              info.coord,
                                              base,
@@ -748,7 +753,7 @@ namespace rocRoller::KernelGraph
             }
 
             // Assign base expression
-            if(base < 0)
+            if(base < 0 && offset > 0)
             {
                 chain.push_back(makeAssignBase(graph,
                                                newTarget,
@@ -792,7 +797,7 @@ namespace rocRoller::KernelGraph
                 auto offsetExpr = std::make_shared<Expression::Expression>(
                     Expression::DataFlowTag{offset, Register::Type::Vector, offsetDataType});
                 auto strideExpr = std::make_shared<Expression::Expression>(
-                    Expression::DataFlowTag{stride, Register::Type::Scalar, DataType::UInt64});
+                    Expression::DataFlowTag{stride, Register::Type::Scalar, strideDataType});
 
                 if(step == nullptr)
                     update = graph.control.addElement(Assign{
