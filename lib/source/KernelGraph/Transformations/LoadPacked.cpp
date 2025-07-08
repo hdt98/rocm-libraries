@@ -94,17 +94,23 @@ namespace rocRoller::KernelGraph
             auto isRegisterDim = [](auto dim) -> bool {
                 using T = std::decay_t<decltype(dim)>;
 
-                return CIsAnyOf<T, Wavefront, Workitem, Workgroup, ForLoop, MacroTileNumber>;
+                // return CIsAnyOf<T, Wavefront, Workitem, Workgroup, ForLoop, MacroTileNumber>;
+                // YL: verify if it breaks any existing test
+                return CIsAnyOf<T, Wavefront, Workitem, Workgroup>;
             };
 
             for(auto coord : requiredCoords)
             {
                 if(std::visit(isRegisterDim, graph.coordinates.getNode(coord)))
                 {
-                    auto reg = Register::Value::Placeholder(
-                        context, Register::Type::Vector, DataType::Int32, 1);
+                    // auto reg = Register::Value::Placeholder(
+                    //     context, Register::Type::Vector, DataType::Int32, 1);
 
-                    rv[coord] = reg->expression();
+                    // rv[coord] = reg->expression();
+                    // YL: verify if it breaks any existing test
+                    auto coordDF = std::make_shared<Expression::Expression>(
+                        Expression::DataFlowTag{coord, Register::Type::Vector, DataType::UInt32});
+                    rv[coord] = coordDF;
                 }
             }
 

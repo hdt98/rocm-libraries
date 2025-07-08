@@ -610,10 +610,10 @@ namespace rocRoller
                 co_yield Instruction::Comment(
                     fmt::format("  Offset({}): paddingBytes: {}", offset, toString(paddingBytes)));
 
-                co_yield generate(
-                    offsetReg,
-                    convert(offsetReg->variableType(), toBytes(indexExpr) + paddingBytes));
-                offsetReg->setReadOnly();
+                // co_yield generate(
+                //     offsetReg,
+                //     convert(offsetReg->variableType(), toBytes(indexExpr) + paddingBytes));
+                // offsetReg->setReadOnly();
             }
             else
             {
@@ -720,14 +720,14 @@ namespace rocRoller
                                                           toString(trLoadPairStride),
                                                           toString(trLoadPairStridePaddingBytes)));
 
-                tagger->addExpression(stride,
-                                      m_fastArith(toBytes(indexExpr) + indexExprPaddingBytes),
-                                      {ci.strideType,
-                                       unitStride,
-                                       elementBlockSize,
-                                       toBytes(elementBlockStride) + elementBlockStridePaddingBytes,
-                                       toBytes(trLoadPairStride) + trLoadPairStridePaddingBytes});
-                scope->addRegister(stride);
+                // tagger->addExpression(stride,
+                //                       m_fastArith(toBytes(indexExpr) + indexExprPaddingBytes),
+                //                       {ci.strideType,
+                //                        unitStride,
+                //                        elementBlockSize,
+                //                        toBytes(elementBlockStride) + elementBlockStridePaddingBytes,
+                //                        toBytes(trLoadPairStride) + trLoadPairStridePaddingBytes});
+                // scope->addRegister(stride);
             }
 
             // Create a buffer descriptor
