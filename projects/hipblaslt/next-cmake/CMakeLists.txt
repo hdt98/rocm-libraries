@@ -52,7 +52,8 @@ endif()
 set(HIPBLASLT_ENABLE_DEVICE ON CACHE BOOL "Build hipBLASLt device libraries.")
 set(HIPBLASLT_ENABLE_CLIENT ON CACHE BOOL "Build hipBLASLt client apps.")
 cmake_dependent_option(HIPBLASLT_ENABLE_HOST "Build hipBLASLt host library." ON "HIPBLASLT_ENABLE_CLIENT" OFF)
-set(HIPBLASLT_ENABLE_TENSILELITE_CLIENT ON CACHE BOOL "Build the tensilelite client.")
+set(TENSILELITE_ENABLE_CLIENT ON CACHE BOOL "Build the tensilelite client.")
+set(TENSILELITE_ENABLE_HOST ON CACHE BOOL "Build the tensilelite host library.")
 set(HIPBLASLT_ENABLE_COVERAGE OFF CACHE BOOL "Build gcov support")
 
 if(HIPBLASLT_ENABLE_CLIENT)
@@ -65,7 +66,7 @@ endif()
 set(HIPBLASLT_ENABLE_ASAN OFF CACHE BOOL "Build hipBLASLt with address sanitizer enabled.")
 set(HIPBLASLT_ENABLE_LAZY_LOAD ON CACHE BOOL "Enable lazy loading of runtime code oject files to reduce ram usage.")
 
-if(HIPBLASLT_ENABLE_HOST)
+if(HIPBLASLT_ENABLE_HOST OR TENSILELITE_ENABLE_HOST)
     set(HIPBLASLT_BUILD_SHARED_LIBS ON CACHE BOOL "Build the hipblaslt library as shared vs static")
     set(HIPBLASLT_ENABLE_HIP ON CACHE BOOL "Use the HIP runtime.")
     set(HIPBLASLT_ENABLE_MSGPACK ON CACHE BOOL "Use msgpack for parsing configuration files.")
@@ -213,6 +214,57 @@ if(HIPBLASLT_ENABLE_ROCROLLER AND NOT TARGET roc::rocroller)
     endif()
 endif()
 
+if(TENSILELITE_ENABLE_HOST OR HIPBLASLT_ENABLE_HOST)
+    add_library(tensilelite-host OBJECT)
+    add_library(tensilelite::tensilelite-host ALIAS tensilelite-host)
+
+    set_target_properties(tensilelite-host PROPERTIES
+        POSITION_INDEPENDENT_CODE ON
+    )
+
+    target_compile_features(tensilelite-host PUBLIC cxx_std_17)
+    target_compile_definitions(tensilelite-host
+        PUBLIC
+            $<BUILD_INTERFACE:TENSILE_DEFAULT_SERIALIZATION>
+            __HIP_PLATFORM_AMD__
+    )
+
+    if(HIPBLASLT_ENABLE_HIP)
+        target_compile_definitions(tensilelite-host PUBLIC $<BUILD_INTERFACE:TENSILE_USE_HIP>)
+    endif()
+
+    if(HIPBLASLT_ENABLE_LLVM)
+        target_link_libraries(tensilelite-host PRIVATE LLVMObjectYAML)
+        target_include_directories(tensilelite-host PRIVATE ${LLVM_INCLUDE_DIRS})
+        target_compile_definitions(tensilelite-host PUBLIC TENSILE_YAML)
+    endif()
+
+    if(HIPBLASLT_ENABLE_MSGPACK)
+        if(msgpack-cxx_FOUND)
+            target_link_libraries(tensilelite-host PRIVATE msgpack-cxx)
+        else()
+            target_link_libraries(tensilelite-host PRIVATE msgpackc)
+        endif()
+        target_compile_definitions(tensilelite-host PRIVATE TENSILE_MSGPACK)
+    endif()
+
+    target_include_directories(tensilelite-host
+        PUBLIC
+            $<BUILD_INTERFACE:${TEMP_TENSILE_HOST_SOURCE_DIR}/include>
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+        PRIVATE
+            "${CMAKE_CURRENT_BINARY_DIR}/include"
+    )
+
+    target_link_libraries(tensilelite-host 
+        PUBLIC
+            rocisa::rocisa-cpp
+            hip::device
+    )
+
+    add_subdirectory(rocisa/rocisa-cpp)
+endif()
+
 if(HIPBLASLT_ENABLE_HOST)
     if(HIPBLASLT_BUILD_SHARED_LIBS)
         add_library(hipblaslt SHARED)
@@ -230,19 +282,15 @@ if(HIPBLASLT_ENABLE_HOST)
     target_link_libraries(hipblaslt
         PUBLIC
             roc::${hipblas_target}
-        PRIVATE
             hip::device
+        PRIVATE
+            # hip::device
             rocisa::rocisa-cpp
+            tensilelite-host
             ${CMAKE_DL_LIBS}
             ${rocTracer}
     )
     
-    if(HIPBLASLT_ENABLE_LLVM)
-        target_link_libraries(hipblaslt PRIVATE LLVMObjectYAML)
-        target_include_directories(hipblaslt PRIVATE ${LLVM_INCLUDE_DIRS})
-        target_compile_definitions(hipblaslt PUBLIC TENSILE_YAML)
-    endif()
-
     if(HIPBLASLT_ENABLE_ASAN)
         hipblaslt_target_configure_sanitizers(hipblaslt PRIVATE)
     endif()
@@ -250,10 +298,7 @@ if(HIPBLASLT_ENABLE_HOST)
     target_compile_features(hipblaslt PUBLIC cxx_std_17) # I would like to make this configurable
 
     target_compile_definitions(hipblaslt
-        PRIVATE
-            TENSILE_DEFAULT_SERIALIZATION
         PUBLIC
-            $<BUILD_INTERFACE:TENSILE_DEFAULT_SERIALIZATION>
             ROCM_USE_FLOAT16
             __HIP_PLATFORM_AMD__
     )
@@ -266,19 +311,6 @@ if(HIPBLASLT_ENABLE_HOST)
         target_compile_definitions(hipblaslt PRIVATE ROCBLASLT_TENSILE_LAZY_LOAD)
     endif()
 
-    if(HIPBLASLT_ENABLE_HIP)
-        target_compile_definitions(hipblaslt PUBLIC $<BUILD_INTERFACE:TENSILE_USE_HIP>)
-    endif()
-
-    if(HIPBLASLT_ENABLE_MSGPACK)
-        if(msgpack-cxx_FOUND)
-            target_link_libraries(hipblaslt PRIVATE msgpack-cxx)
-        else()
-            target_link_libraries(hipblaslt PRIVATE msgpackc)
-        endif()
-        target_compile_definitions(hipblaslt PRIVATE TENSILE_MSGPACK)
-    endif()
-
     if(HIPBLASLT_ENABLE_MARKER)
         target_compile_definitions(hipblaslt PRIVATE HIPBLASLT_ENABLE_MARKER)
     endif()
@@ -288,7 +320,6 @@ if(HIPBLASLT_ENABLE_HOST)
             $<BUILD_INTERFACE:${HIPBLASLT_LIB_DIR}/src/include>
             $<BUILD_INTERFACE:${HIPBLASLT_LIB_DIR}/include>
             $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/host-library/include>
-            $<BUILD_INTERFACE:${TEMP_TENSILE_HOST_SOURCE_DIR}/include>
             $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
         PRIVATE
             "${ROCBLASLT_LIB_DIR}/include"
@@ -300,10 +331,9 @@ if(HIPBLASLT_ENABLE_HOST)
         PROPERTIES
         LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/host-library
     )
-
-    add_subdirectory(rocisa/rocisa-cpp)
-    add_subdirectory(host-library)
 endif()
+
+add_subdirectory(host-library)
 
 if(HIPBLASLT_ENABLE_DEVICE)
     add_subdirectory(device-library)
@@ -312,10 +342,15 @@ endif()
 if(HIPBLASLT_ENABLE_CLIENT)
     add_subdirectory(clients)
 endif()
-if(HIPBLASLT_ENABLE_TENSILELITE_CLIENT)
+if(TENSILELITE_ENABLE_CLIENT)
     add_subdirectory(tensilelite-client)
 endif()
 
+if(TENSILELITE_ENABLE_CLIENT)
+    target_link_libraries(tensilelite-client PRIVATE tensilelite::tensilelite-host) # trying to link against cmake target with namespace.
+endif()
+#setting include dirs correctly, setting compile flags correctly
+#look at whatis being set on hipblasllt target. grep tensilelite directory and (tesilelite/tensile/src). if it does appear with grep cmd: is it in a header file or cpp file. if header: public, if only cpp: private
 
 if(HIPBLASLT_ENABLE_HOST)
     # work around code object stripping failure if using /usr/bin/strip

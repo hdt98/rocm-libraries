@@ -31,7 +31,7 @@ target_link_libraries(tensilelite-client
     PRIVATE
         hip::device
         hip::host
-        roc::hipblaslt
+        tensilelite::tensilelite-host
         rocisa::rocisa-cpp
         Boost::program_options
         Boost::filesystem
@@ -42,9 +42,7 @@ if(rocm_smi_FOUND)
 endif()
 target_include_directories(tensilelite-client PRIVATE "${_CMAKE_CURRENT_SOURCE_DIR}/include")
 target_compile_definitions(tensilelite-client PRIVATE TENSILE_DEFAULT_SERIALIZATION)
-#remove any files need to be del
-# cleanup
-# documentation
+
 set_target_properties(tensilelite-client
     PROPERTIES
     CXX_STANDARD 17
