@@ -695,41 +695,20 @@ namespace rocRoller::KernelGraph
 
             chain.push_back(ci);
 
-            // make Assign base expression
-            // Set the zero-coordinates to zero
-            // auto coords           = Transformer(&graph.coordinates);
-            auto increment        = info.coord;
-            auto fullStop         = [&](int ciTag) { return ciTag == increment; };
-            auto [required, path] = findRequiredCoordinates(target, direction, fullStop, graph);
-
-            for(auto ciTag : required)
-                if((ciTag != increment) && (!coords.hasCoordinate(ciTag)))
-                    coords.setCoordinate(ciTag, Expression::literal(0u));
-
-            // Set the increment coordinate to zero if it doesn't
-            // already have a value
-            bool initializeIncrement
-                = !coords.hasPath({target}, direction == Graph::Direction::Upstream);
-            if(initializeIncrement)
-            {
-                coords.setCoordinate(increment, Expression::literal(0u));
-            }
-
-            // Assign base expression
-
             // determine if target is LDS
-            auto maybeLDS = graph.coordinates.get<LDS>(target).has_value();
+            auto maybeLDS  = graph.coordinates.get<LDS>(target).has_value();
+            auto newTarget = target;
             if(maybeLDS)
             {
                 // If target is LDS; it might be a duplicated LDS
                 // node.  For the purposes of computing indexes,
                 // use the parent LDS as the target instead.
                 auto maybeParentLDS = only(graph.coordinates.getOutputNodeIndices(
-                    target, rocRoller::KernelGraph::CoordinateGraph::isEdge<Duplicate>));
+                    newTarget, rocRoller::KernelGraph::CoordinateGraph::isEdge<Duplicate>));
                 if(maybeParentLDS)
-                    target = *maybeParentLDS;
+                    newTarget = *maybeParentLDS;
             }
-            maybeLDS = graph.coordinates.get<LDS>(target).has_value();
+            maybeLDS = graph.coordinates.get<LDS>(newTarget).has_value();
 
             // determin if the operation is tranpose load
             auto isLoad       = graph.control.get<LoadTiled>(op).has_value();
@@ -746,10 +725,31 @@ namespace rocRoller::KernelGraph
                 isTransposed = tile.isTransposedTile;
             }
 
+            // make Assign base expression
+            // Set the zero-coordinates to zero
+            // auto coords           = Transformer(&graph.coordinates);
+            auto increment        = info.coord;
+            auto fullStop         = [&](int ciTag) { return ciTag == increment; };
+            auto [required, path] = findRequiredCoordinates(newTarget, direction, fullStop, graph);
+
+            for(auto ciTag : required)
+                if((ciTag != increment) && (!coords.hasCoordinate(ciTag)))
+                    coords.setCoordinate(ciTag, Expression::literal(0u));
+
+            // Set the increment coordinate to zero if it doesn't
+            // already have a value
+            bool initializeIncrement
+                = !coords.hasPath({newTarget}, direction == Graph::Direction::Upstream);
+            if(initializeIncrement)
+            {
+                coords.setCoordinate(increment, Expression::literal(0u));
+            }
+
+            // Assign base expression
             if(base < 0)
             {
                 chain.push_back(makeAssignBase(graph,
-                                               target,
+                                               newTarget,
                                                base,
                                                offset,
                                                direction == Graph::Direction::Upstream,
@@ -764,7 +764,7 @@ namespace rocRoller::KernelGraph
             if(stride > 0)
             {
                 chain.push_back(makeAssignStride(graph,
-                                                 target,
+                                                 newTarget,
                                                  stride,
                                                  increment,
                                                  direction == Graph::Direction::Upstream,
