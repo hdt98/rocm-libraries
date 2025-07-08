@@ -727,22 +727,6 @@ namespace rocRoller::KernelGraph
                 isTransposed = tile.isTransposedTile;
             }
 
-<<<<<<< HEAD:shared/rocroller/lib/source/KernelGraph/Transformations/AddComputeIndex.cpp
-            // if(base < 0 && offset > 0)
-            // {
-            //     chain.push_back(makeAssignBase(graph,
-            //                                    target,
-            //                                    base,
-            //                                    offset,
-            //                                    direction == Graph::Direction::Upstream,
-            //                                    dtype,
-            //                                    offsetDataType,
-            //                                    maybeLDS,
-            //                                    isTransposed,
-            //                                    context,
-            //                                    coords));
-            // }
-=======
             // make Assign base expression
             // Set the zero-coordinates to zero
             // auto coords           = Transformer(&graph.coordinates);
@@ -778,7 +762,6 @@ namespace rocRoller::KernelGraph
                                                context,
                                                coords));
             }
->>>>>>> 53afb5817f (Tidy up):lib/source/KernelGraph/Transformations/AddComputeIndex.cpp
 
             if(stride > 0)
             {
