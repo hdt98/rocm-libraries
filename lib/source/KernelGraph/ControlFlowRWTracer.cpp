@@ -263,7 +263,6 @@ namespace rocRoller::KernelGraph
 
         if(maybeStride || maybeOffset)
         {
-            std::cout << "YL: tag " << tag << " assign stride or offset expression." << std::endl;
             return;
         }
 
