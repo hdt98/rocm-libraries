@@ -284,8 +284,6 @@ if(HIPBLASLT_ENABLE_HOST)
             roc::${hipblas_target}
             hip::device
         PRIVATE
-            # hip::device
-            rocisa::rocisa-cpp
             tensilelite-host
             ${CMAKE_DL_LIBS}
             ${rocTracer}
@@ -347,10 +345,8 @@ if(TENSILELITE_ENABLE_CLIENT)
 endif()
 
 if(TENSILELITE_ENABLE_CLIENT)
-    target_link_libraries(tensilelite-client PRIVATE tensilelite::tensilelite-host) # trying to link against cmake target with namespace.
+    target_link_libraries(tensilelite-client PRIVATE tensilelite::tensilelite-host) 
 endif()
-#setting include dirs correctly, setting compile flags correctly
-#look at whatis being set on hipblasllt target. grep tensilelite directory and (tesilelite/tensile/src). if it does appear with grep cmd: is it in a header file or cpp file. if header: public, if only cpp: private
 
 if(HIPBLASLT_ENABLE_HOST)
     # work around code object stripping failure if using /usr/bin/strip
