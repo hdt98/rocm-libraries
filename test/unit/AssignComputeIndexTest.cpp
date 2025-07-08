@@ -202,10 +202,8 @@ namespace ComputeIndexTest
         auto addComputeIndex = std::make_shared<AddComputeIndex>(m_context);
         kgraph               = kgraph.transform(addComputeIndex);
 
-        // auto deallocateDF = std::make_shared<AddDeallocateDataFlow>();
-        // kgraph               = kgraph.transform(deallocateDF);
-
-        // std::cout << kgraph.toDOT(true) << std::endl;
+        auto deallocateDF = std::make_shared<AddDeallocateDataFlow>();
+        kgraph            = kgraph.transform(deallocateDF);
 
         m_context->schedule(k->preamble());
         m_context->schedule(k->prolog());
