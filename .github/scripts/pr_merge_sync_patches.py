@@ -101,20 +101,6 @@ def _apply_patch(repo_path: Path, patch_path: Path) -> None:
     _run_git(["am", str(patch_path)], cwd=repo_path)
     logger.info(f"Applied patch to working tree at {repo_path}")
 
-def _stage_changes(repo_path: Path) -> None:
-    """Stage all changes in the repository."""
-    _run_git(["add", "."], cwd=repo_path)
-    logger.debug(f"Staged all changes in {repo_path}")
-
-def _commit_changes(repo_path: Path, message: str, author_name: str, author_email: str) -> None:
-    """Commit staged changes with the specified author and message."""
-    _run_git([
-        "commit",
-        "--author", f"{author_name} <{author_email}>",
-        "-m", message
-    ], cwd=repo_path)
-    logger.debug(f"Committed changes with author {author_name} <{author_email}>")
-
 def _set_authenticated_remote(repo_path: Path, repo_url: str) -> None:
     """Set the push URL to use the GitHub App token from GH_TOKEN env."""
     token = os.environ.get("GH_TOKEN")
@@ -257,12 +243,8 @@ def apply_patches_and_squash(entry: RepoEntry, monorepo_url: str, monorepo_pr: i
         for patch_path in modified_patch_paths:
             logger.debug(f"Applying patch {patch_path.name} to {entry.name}")
             _apply_patch(subrepo_path, patch_path)
-            _stage_changes(subrepo_path)
-            msg = f"[rocm-libraries] Applying patch {patch_path.name}"
-            _commit_changes(subrepo_path, msg, author_name, author_email)
 
         # Final squash
-        _stage_changes(subrepo_path)
         commit_msg = f"[rocm-libraries] {monorepo_url}#{monorepo_pr} (commit {merge_sha[:7]})\n\n" + \
                     _run_git(["log", "-1", "--pretty=%B", merge_sha])
         _run_git(["reset", "--soft", base_commit], cwd=subrepo_path)
