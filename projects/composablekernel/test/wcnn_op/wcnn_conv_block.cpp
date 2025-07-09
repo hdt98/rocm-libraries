@@ -85,6 +85,8 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
     // HWC
     constexpr auto InDataBlockDesc = make_naive_tensor_descriptor_packed(
         make_tuple(Number<HPerBlockIn>{}, Number<WPerBlockIn>{}, Number<CPerBlock>{}));
+    constexpr auto InClusterBorderDataBlockDesc = make_naive_tensor_descriptor_packed(
+        make_tuple(Number<HPerBlockIn>{}, I1, Number<CPerBlock>{}));
     using EmptyTuple                = ck::Tuple<>;
     using AccBlockwiseOperation     = ck::BlockwiseElementPassThrough;
     using AccBlockwiseNextOperation = ck::BlockwiseElementPassThrough;
@@ -100,6 +102,7 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
                           AccBlockwiseNextOperation,
                           decltype(WeiDataBlockDesc),
                           decltype(InDataBlockDesc),
+                          decltype(InClusterBorderDataBlockDesc),
                           EmptyTuple,
                           HPerBlock,
                           WPerBlock,

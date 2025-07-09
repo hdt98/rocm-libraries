@@ -977,6 +977,27 @@ struct GridwiseConvMultipleD_Wcnn_CShuffle
         }
     }
 
+    __host__ __device__ static constexpr auto MakeInClusterBorderBlockDescriptor()
+    {
+        if constexpr(InEnableLds)
+        {
+            // H x W x C Per Block
+            return make_naive_tensor_descriptor_packed(
+                make_tuple(Number<HPerBlockIn>{}, Number<WPerBlockIn>{}, Number<CPerBlock>{}));
+        }
+        else
+        {
+            // W0 x C0 x H0 x H1 x H2 x W1 x C1
+            return make_naive_tensor_descriptor_packed(make_tuple(I1,
+                                                                  Number<CPerWave / CPerWcnn>{},
+                                                                  Number<HPerWaveIn / HPerWcnn>{},
+                                                                  Number<NumSubTilePerImage>{},
+                                                                  I1,
+                                                                  I1,
+                                                                  Number<NumDataCompPerTile>{}));
+        }
+    }
+
     // Describe the layout of WeiData in block level (LDS or VGPR)
     __host__ __device__ static constexpr auto MakeWeiBlockDescriptor()
     {
@@ -1048,6 +1069,7 @@ struct GridwiseConvMultipleD_Wcnn_CShuffle
                                             AccBlockwiseNextOperation,
                                             decltype(MakeWeiBlockDescriptor()),
                                             decltype(MakeInBlockDescriptor()),
+                                            decltype(MakeInClusterBorderBlockDescriptor()),
                                             decltype(MakeDsBlockDescriptor()),
                                             HPerBlock,
                                             WPerBlock,
@@ -1797,8 +1819,12 @@ struct GridwiseConvMultipleD_Wcnn_CShuffle
             in_block_space_offset + BlockwiseConv::LaneSharedMemTrait::in_block_space_size_aligned * mem_count;
         static constexpr index_t next_in_block_space_offset =
             pre_in_block_space_offset + BlockwiseConv::LaneSharedMemTrait::in_block_space_size_aligned * mem_count;
-        static constexpr index_t wei_block_space_offset =
+        static constexpr index_t pre_cluster_in_block_space_offset =
             next_in_block_space_offset + BlockwiseConv::LaneSharedMemTrait::in_block_space_size_aligned * mem_count;
+        static constexpr index_t next_cluster_in_block_space_offset =
+            pre_cluster_in_block_space_offset + BlockwiseConv::LaneSharedMemTrait::in_block_space_size_aligned * mem_count;
+        static constexpr index_t wei_block_space_offset =
+            next_cluster_in_block_space_offset + BlockwiseConv::LaneSharedMemTrait::in_block_space_size_aligned * mem_count;
         static constexpr index_t ds_base_offset =
             wei_block_space_offset +
             BlockwiseConv::LaneSharedMemTrait::wei_block_space_size_aligned * mem_count;
@@ -1843,6 +1869,7 @@ struct GridwiseConvMultipleD_Wcnn_CShuffle
 
     static constexpr auto in_block_desc  = MakeInBlockDescriptor();
     static constexpr auto wei_block_desc = MakeWeiBlockDescriptor();
+    static constexpr auto in_cluster_border_block_desc = MakeInClusterBorderBlockDescriptor();
 
     template <bool HasMainBlockLoop, typename Block2CTileMap = DefaultBlock2CTileMap>
     __device__ static void Run(const InDataType* __restrict__ p_in_grid,
@@ -2035,6 +2062,253 @@ struct GridwiseConvMultipleD_Wcnn_CShuffle
                     return make_tuple(make_static_buffer_v2<AddressSpaceEnum::Vgpr, InDataType>(
                                           in_block_desc.GetElementSpaceSize()),
                                       in_blockwise_copy);
+                }
+            }
+        };
+
+        auto pre_block_buf = make_static_buffer_v4<AddressSpaceEnum::Vgpr, int32_t>(
+            in_block_desc.GetElementSpaceSize(), //Need change to HRepeat*CRepeat
+            static_cast<int32_t *>(p_lane_shared) +
+            laneSharedMemTrait.pre_in_block_space_offset / sizeof(int32_t));
+
+        auto next_block_buf = make_static_buffer_v4<AddressSpaceEnum::Vgpr, int32_t>(
+            in_block_desc.GetElementSpaceSize(),//Need change to HRepeat*CRepeat
+            static_cast<int32_t *>(p_lane_shared) +
+            laneSharedMemTrait.next_in_block_space_offset / sizeof(int32_t));
+
+        auto pre_cluster_buf = make_static_buffer_v4<AddressSpaceEnum::Vgpr, InDataType>(
+            in_block_desc.GetElementSpaceSize(),
+            static_cast<InDataType*>(p_lane_shared) +
+                laneSharedMemTrait.pre_cluster_in_block_space_offset / sizeof(InDataType));
+
+        auto next_cluster_buf = make_static_buffer_v4<AddressSpaceEnum::Vgpr, InDataType>(
+            in_block_desc.GetElementSpaceSize(),
+            static_cast<InDataType*>(p_lane_shared) +
+                laneSharedMemTrait.next_cluster_in_block_space_offset / sizeof(InDataType));
+
+        auto pre_border_block_trait = [&]() {
+            // input data blockwise copy
+            if constexpr(InEnableLds)
+            {
+                auto in_block_buf = make_dynamic_buffer<AddressSpaceEnum::Lds>(
+                    static_cast<InDataType*>(p_shared),
+                    BlockwiseConv::SharedMemTrait::in_block_space_size_aligned);
+                using InBlockTransferThreadClusterArrangeOrder = Sequence<0, 1, 2>;
+                using InBlockTransferAccessOrder               = Sequence<0, 1, 2>;
+                constexpr index_t InBlockTransferVectorDim     = 2;
+
+                if constexpr(EnableAsync)
+                {
+                    auto in_blockwise_copy = ThreadGroupTensorSliceTransferAsync<
+                        ThisThreadBlockGrid,
+                        Sequence<HPerBlockIn, WPerBlockIn, CPerBlock>,
+                        InBlockTransferThreadClusterLengths,
+                        InBlockTransferThreadClusterArrangeOrder,
+                        InDataType,
+                        InDataType,
+                        decltype(in_grid_block_desc),
+                        decltype(in_block_desc),
+                        InBlockTransferVectorDim,
+                        InBlockTransferVectorDim,
+                        InBlockTransferDstScalarPerVector,
+                        false,
+                        true>(
+                        in_grid_block_desc,
+                        make_multi_index(h_block_data_idx_on_grid, w_block_data_idx_on_grid, 0),
+                        in_block_desc,
+                        make_multi_index(0, 0, 0));
+                    return make_tuple(in_block_buf, in_blockwise_copy);
+                }
+                else
+                {
+                    auto in_blockwise_copy = ThreadGroupTensorSliceTransfer_v4r1<
+                        ThisThreadBlockGrid,
+                        InElementwiseOperation,
+                        ck::tensor_operation::element_wise::PassThrough,
+                        InMemoryDataOperationEnum::Set,
+                        Sequence<HPerBlockIn, WPerBlockIn, CPerBlock>,
+                        InBlockTransferThreadClusterLengths,
+                        InBlockTransferThreadClusterArrangeOrder,
+                        InDataType,
+                        InDataType,
+                        decltype(in_grid_block_desc),
+                        decltype(in_block_desc),
+                        InBlockTransferAccessOrder,
+                        InBlockTransferAccessOrder,
+                        InBlockTransferVectorDim,
+                        InBlockTransferVectorDim,
+                        InBlockTransferSrcScalarPerVector,
+                        InBlockTransferDstScalarPerVector,
+                        1,
+                        1,
+                        false,
+                        true,
+                        NumConvCPrefetchStage>(
+                        in_grid_block_desc,
+                        make_multi_index(h_block_data_idx_on_grid, w_block_data_idx_on_grid, 0),
+                        in_element_op,
+                        in_block_desc,
+                        make_multi_index(0, 0, 0),
+                        ck::tensor_operation::element_wise::PassThrough{});
+                    return make_tuple(in_block_buf, in_blockwise_copy);
+                }
+            }
+            else
+            {
+                if constexpr(EnableWaveGroup && EnableSpatialCluster)
+                {
+                    auto indata_slice_origin_idx =
+                        wcnn_conv.template CalculateInDataThreadOriginDataIndex<InTileLoad>();
+                    auto h0 = (h_block_data_idx_on_grid + wave_idx[I0] * HPerWave) / HPerWcnn;
+                    auto w0 = (w_block_data_idx_on_grid + wave_idx[I1] * WPerWave) / WPerWcnn;
+                    constexpr index_t threadsPerTensorTile = (WPerWcnn == 4) ? 2 : 4;
+                    constexpr index_t vgprPerTensorTile    = (HPerWcnn == 8) ? 2 : 1;
+
+                    // Limitation: NumDim of Src and Dst descriptor should be identical
+                    auto pre_blockwise_copy =
+                        ThreadwiseTensorSliceTransfer_v2<InDataType,
+                                                        InDataType,
+                                                        decltype(in_grid_block_desc),
+                                                        decltype(in_cluster_border_block_desc),
+                                                        decltype(BlockwiseConv::GetInBorderWaveDescLength()),
+                                                        Sequence<0, 1, 2, 3, 4, 5, 6>,
+                                                        6,
+                                                        NumDataCompPerTile,
+                                                        1,
+                                                        false,
+                                                        false,
+                                                        false,
+                                                        false,
+                                                        InTileLoad,
+                                                        threadsPerTensorTile,
+                                                        vgprPerTensorTile>(
+                            in_grid_block_desc,
+                            make_multi_index(w0-1,
+                                            0,
+                                            h0,
+                                            0,
+                                            indata_slice_origin_idx[I0],
+                                            indata_slice_origin_idx[I1],
+                                            indata_slice_origin_idx[I2]));
+
+                    return make_tuple(pre_cluster_buf, pre_blockwise_copy);
+                }
+                else
+                {
+                    static_assert(0, "Only fetch the border tile in spatial cluster");
+                }
+            }
+        };
+
+        auto next_border_block_trait = [&]() {
+            // input data blockwise copy
+            if constexpr(InEnableLds)
+            {
+                auto in_block_buf = make_dynamic_buffer<AddressSpaceEnum::Lds>(
+                    static_cast<InDataType*>(p_shared),
+                    BlockwiseConv::SharedMemTrait::in_block_space_size_aligned);
+                using InBlockTransferThreadClusterArrangeOrder = Sequence<0, 1, 2>;
+                using InBlockTransferAccessOrder               = Sequence<0, 1, 2>;
+                constexpr index_t InBlockTransferVectorDim     = 2;
+
+                if constexpr(EnableAsync)
+                {
+                    auto in_blockwise_copy = ThreadGroupTensorSliceTransferAsync<
+                        ThisThreadBlockGrid,
+                        Sequence<HPerBlockIn, WPerBlockIn, CPerBlock>,
+                        InBlockTransferThreadClusterLengths,
+                        InBlockTransferThreadClusterArrangeOrder,
+                        InDataType,
+                        InDataType,
+                        decltype(in_grid_block_desc),
+                        decltype(in_block_desc),
+                        InBlockTransferVectorDim,
+                        InBlockTransferVectorDim,
+                        InBlockTransferDstScalarPerVector,
+                        false,
+                        true>(
+                        in_grid_block_desc,
+                        make_multi_index(h_block_data_idx_on_grid, w_block_data_idx_on_grid, 0),
+                        in_block_desc,
+                        make_multi_index(0, 0, 0));
+                    return make_tuple(in_block_buf, in_blockwise_copy);
+                }
+                else
+                {
+                    auto in_blockwise_copy = ThreadGroupTensorSliceTransfer_v4r1<
+                        ThisThreadBlockGrid,
+                        InElementwiseOperation,
+                        ck::tensor_operation::element_wise::PassThrough,
+                        InMemoryDataOperationEnum::Set,
+                        Sequence<HPerBlockIn, WPerBlockIn, CPerBlock>,
+                        InBlockTransferThreadClusterLengths,
+                        InBlockTransferThreadClusterArrangeOrder,
+                        InDataType,
+                        InDataType,
+                        decltype(in_grid_block_desc),
+                        decltype(in_block_desc),
+                        InBlockTransferAccessOrder,
+                        InBlockTransferAccessOrder,
+                        InBlockTransferVectorDim,
+                        InBlockTransferVectorDim,
+                        InBlockTransferSrcScalarPerVector,
+                        InBlockTransferDstScalarPerVector,
+                        1,
+                        1,
+                        false,
+                        true,
+                        NumConvCPrefetchStage>(
+                        in_grid_block_desc,
+                        make_multi_index(h_block_data_idx_on_grid, w_block_data_idx_on_grid, 0),
+                        in_element_op,
+                        in_block_desc,
+                        make_multi_index(0, 0, 0),
+                        ck::tensor_operation::element_wise::PassThrough{});
+                    return make_tuple(in_block_buf, in_blockwise_copy);
+                }
+            }
+            else
+            {
+                if constexpr(EnableWaveGroup && EnableSpatialCluster)
+                {
+                    auto indata_slice_origin_idx =
+                        wcnn_conv.template CalculateInDataThreadOriginDataIndex<InTileLoad>();
+                    auto h0 = (h_block_data_idx_on_grid + wave_idx[I0] * HPerWave) / HPerWcnn;
+                    auto w0 = (w_block_data_idx_on_grid + (wave_idx[I1] + 1) * WPerWave) / WPerWcnn;
+                    constexpr index_t threadsPerTensorTile = (WPerWcnn == 4) ? 2 : 4;
+                    constexpr index_t vgprPerTensorTile    = (HPerWcnn == 8) ? 2 : 1;
+
+                    auto next_blockwise_copy =
+                        ThreadwiseTensorSliceTransfer_v2<InDataType,
+                                                        InDataType,
+                                                        decltype(in_grid_block_desc),
+                                                        decltype(in_cluster_border_block_desc),
+                                                        decltype(BlockwiseConv::GetInBorderWaveDescLength()),
+                                                        Sequence<0, 1, 2, 3, 4, 5, 6>,
+                                                        6,
+                                                        NumDataCompPerTile,
+                                                        1,
+                                                        false,
+                                                        false,
+                                                        false,
+                                                        false,
+                                                        InTileLoad,
+                                                        threadsPerTensorTile,
+                                                        vgprPerTensorTile>(
+                            in_grid_block_desc,
+                            make_multi_index(w0,
+                                            0,
+                                            h0,
+                                            0,
+                                            indata_slice_origin_idx[I0],
+                                            indata_slice_origin_idx[I1],
+                                            indata_slice_origin_idx[I2]));
+
+                    return make_tuple(next_cluster_buf, next_blockwise_copy);
+                }
+                else
+                {
+                    static_assert(0, "Only fetch the border tile in spatial cluster");
                 }
             }
         };
@@ -2325,6 +2599,10 @@ struct GridwiseConvMultipleD_Wcnn_CShuffle
         auto ds_block_buf       = ds_block_trait()[I0];
         auto ds_blockwise_copy  = ds_block_trait()[I1];
         auto ds_copy_block_desc = ds_block_trait()[I2];
+
+        auto pre_blockwise_copy = pre_border_block_trait()[I1];
+        auto next_blockwise_copy = next_border_block_trait()[I1];
+
 #ifdef CK_USE_AMD_SEMAPHORE_ASM
         WavegroupSemaphore<WaveIdOutput, 1> sema_output;
 #else
@@ -2349,23 +2627,18 @@ struct GridwiseConvMultipleD_Wcnn_CShuffle
             }
         }
 
-        auto pre_block_buf = make_static_buffer_v4<AddressSpaceEnum::Vgpr, int32_t>(
-            in_block_desc.GetElementSpaceSize(), //Need change to HRepeat*CRepeat
-            static_cast<int32_t *>(p_lane_shared) +
-            laneSharedMemTrait.pre_in_block_space_offset / sizeof(int32_t));
-
-        auto next_block_buf = make_static_buffer_v4<AddressSpaceEnum::Vgpr, int32_t>(
-            in_block_desc.GetElementSpaceSize(),//Need change to HRepeat*CRepeat
-            static_cast<int32_t *>(p_lane_shared) +
-            laneSharedMemTrait.next_in_block_space_offset / sizeof(int32_t));
-
         GridwiseConvPipe::template Run<HasMainBlockLoop>(in_grid_block_desc,
                                                          in_block_desc,
+                                                         in_cluster_border_block_desc,
                                                          in_blockwise_copy,
                                                          in_grid_buf,
                                                          in_block_buf,
                                                          pre_block_buf,
+                                                         pre_cluster_buf,
+                                                         pre_blockwise_copy,
                                                          next_block_buf,
+                                                         next_cluster_buf,
+                                                         next_blockwise_copy,
                                                          in_block_slice_copy_step,
                                                          wei_grid_block_desc,
                                                          wei_block_desc,

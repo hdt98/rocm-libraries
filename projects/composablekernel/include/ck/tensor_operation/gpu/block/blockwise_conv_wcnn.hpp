@@ -21,6 +21,7 @@ template <typename ThisThreadBlock,
           typename AccBlockwiseNextOperation,
           typename WeiDataBlockDesc,
           typename InDataBlockDesc,
+          typename ClusterBorderBlockDesc,
           typename DsBlockDesc,
           index_t HPerBlock,
           index_t WPerBlock,
@@ -300,6 +301,18 @@ struct BlockwiseConvWcnn
                         1,
                         NumDataCompPerTile>{};
     }
+
+    __host__ __device__ static constexpr auto GetInBorderWaveDescLength()
+    {
+        return Sequence<1,
+                        CPerWave / CPerWcnn,
+                        HPerWaveIn / HPerWcnn,
+                        NumSubTilePerImage,
+                        1,
+                        1,
+                        NumDataCompPerTile>{};
+    }
+
     __device__ __host__ static auto CalculateInDataThreadOriginDataIndex()
     {
 #ifdef __HIP_DEVICE_COMPILE__
@@ -596,6 +609,7 @@ struct BlockwiseConvWcnn
     using TupleInData     = decltype(CalculateInDataThreadOriginDataIndex());
     using InDataWaveDesc  = decltype(MakeInWaveDescriptor(InDataBlockDesc{}));
     using WeiDataWaveDesc = decltype(MakeWeiWaveDescriptor(WeiDataBlockDesc{}));
+    using InClusterBorderWaveDesc = decltype(MakeInWaveDescriptor(ClusterBorderBlockDesc{}));
 
     template <bool HasMainLoop>
     static constexpr index_t GetLaneSharedMemCount()
@@ -654,6 +668,7 @@ struct BlockwiseConvWcnn
     // Describe how data allocated in thread copy src buffer
     static constexpr WeiDataWaveDesc weight_wave_desc_;
     static constexpr InDataWaveDesc indata_wave_desc_;
+    static constexpr InClusterBorderWaveDesc indata_clusterborder_wave_desc_;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wundefined-reinterpret-cast"
@@ -1230,7 +1245,9 @@ struct BlockwiseConvWcnn
     __device__ void RunConv(const WeightBlockBuffer& weight_block_buf,
                             const InDataBlockBuffer& indata_block_buf,
                             const ExchangeDataBlockBuffer& predata_block_buf,
+                            const InDataBlockBuffer& pre_cluster_buf,
                             const ExchangeDataBlockBuffer& nextdata_block_buf,
+                            const InDataBlockBuffer& next_cluster_buf,
                             const DsBlockBuffer& ds_block_buf,
                             AccumThreadBuffer& accum_thread_buf,
                             OutTensorThreadBuffer& out_thread_buf,
@@ -1329,6 +1346,10 @@ struct BlockwiseConvWcnn
         };
 
         auto load_in_data = [&](auto h0, auto w0, auto c0, auto& tmp_buf) {
+            bool isChainStartVal = __builtin_amdgcn_spatial_cluster_is_chain_start();
+            bool isChainStart = __builtin_amdgcn_readfirstlane(isChainStartVal);
+            bool isChainEndVal = __builtin_amdgcn_spatial_cluster_is_chain_end();
+            bool isChainEnd = __builtin_amdgcn_readfirstlane(isChainEndVal);
             if constexpr(InDataEnableLds)
             {
                 // Load input tensor data
@@ -1390,9 +1411,19 @@ struct BlockwiseConvWcnn
                             make_tuple(w0, c0, h0, I0, I0, I0, I0));
                         if constexpr(w0 == 0)
                         {
-                            constexpr index_t prebuf_offset = c0 * HRepeatIn * NumSubTilePerImage + h0 * NumSubTilePerImage;
-                            indata_thread_vec_ptr[0] = reinterpret_cast<const typename InDataVec::type*>(
-                                                            &predata_block_buf[Number<prebuf_offset>{}]);
+                            if(isChainStart)
+                            {
+                                constexpr index_t prebuf_offset = indata_clusterborder_wave_desc_.CalculateOffset(
+                                    make_tuple(I0, c0, h0, I0, I0, I0, I0));
+                                indata_thread_vec_ptr[0] = reinterpret_cast<const typename InDataVec::type*>(
+                                                                &pre_cluster_buf[Number<prebuf_offset>{}]);
+                            }
+                            else
+                            {
+                                constexpr index_t prebuf_offset = c0 * HRepeatIn * NumSubTilePerImage + h0 * NumSubTilePerImage;
+                                indata_thread_vec_ptr[0] = reinterpret_cast<const typename InDataVec::type*>(
+                                                                &predata_block_buf[Number<prebuf_offset>{}]);
+                            }
                         }
                         else
                         {
@@ -1404,12 +1435,21 @@ struct BlockwiseConvWcnn
 
                         indata_thread_vec_ptr[1] = reinterpret_cast<const typename InDataVec::type*>(
                                                         &indata_block_buf[Number<indata_offset>{}]);
-
                         if constexpr(w0 == WRepeat-1)
                         {
-                            constexpr index_t nextbuf_offset = c0 * HRepeatIn * NumSubTilePerImage + h0 * NumSubTilePerImage;
-                            indata_thread_vec_ptr[2] = reinterpret_cast<const typename InDataVec::type*>(
-                                    &nextdata_block_buf[Number<nextbuf_offset>{}]);
+                            if(isChainEnd)
+                            {
+                                constexpr index_t nextbuf_offset = indata_clusterborder_wave_desc_.CalculateOffset(
+                                    make_tuple(I0, c0, h0, I0, I0, I0, I0));
+                                indata_thread_vec_ptr[2] = reinterpret_cast<const typename InDataVec::type*>(
+                                                                &next_cluster_buf[Number<nextbuf_offset>{}]);
+                            }
+                            else
+                            {
+                                constexpr index_t nextbuf_offset = c0 * HRepeatIn * NumSubTilePerImage + h0 * NumSubTilePerImage;
+                                indata_thread_vec_ptr[2] = reinterpret_cast<const typename InDataVec::type*>(
+                                        &nextdata_block_buf[Number<nextbuf_offset>{}]);
+                            }
                         }
                         else
                         {
@@ -1578,7 +1618,9 @@ struct BlockwiseConvWcnn
     __device__ void Run(const WeightBlockBuffer& weight_block_buf,
                         const InDataBlockBuffer& indata_block_buf,
                         const ExchangeDataBlockBuffer& predata_block_buf,
+                        const InDataBlockBuffer& pre_cluster_buf,
                         const ExchangeDataBlockBuffer& nextdata_block_buf,
+                        const InDataBlockBuffer& next_cluster_buf,
                         const DsBlockBuffer& ds_block_buf,
                         AccumThreadBuffer& accum_thread_buf,
                         OutTensorThreadBuffer& out_thread_buf,
@@ -1602,7 +1644,9 @@ struct BlockwiseConvWcnn
             RunConv(weight_block_buf,
                     indata_block_buf,
                     predata_block_buf,
+                    pre_cluster_buf,
                     nextdata_block_buf,
+                    next_cluster_buf,
                     ds_block_buf,
                     accum_thread_buf,
                     out_thread_buf,
@@ -1632,7 +1676,6 @@ struct BlockwiseConvWcnn
         auto* pSemNext = (__attribute__((address_space(3))) WavegroupSemaphore<0> *)(&semFromNext);
 #pragma clang diagnostic pop
         constexpr index_t HRepeatIn = HPerWaveIn / HPerWcnn;
-
         // H x W x C -> W0 x C0 x H0 x H1 x H2 x W1 x C1
         const auto W0 = in_grid_desc.GetLength(I0);
         const auto W1 = in_grid_desc.GetLength(I5);
@@ -1640,9 +1683,13 @@ struct BlockwiseConvWcnn
         constexpr index_t numWaveGroup = ThisThreadBlock::GetNumWaveGroups();
         constexpr index_t hSubTile = NumSubTilePerImage;
 
-        uint32_t waveGroupIdInCluster = __builtin_amdgcn_wavegroup_id_in_cluster();
-        bool isChainStart = __builtin_amdgcn_spatial_cluster_is_chain_start();
-        bool isChainEnd = __builtin_amdgcn_spatial_cluster_is_chain_end();
+        uint32_t blockId     = blockIdx.x;
+        uint32_t waveGroupId = __builtin_amdgcn_wavegroup_id();
+
+        bool isChainStartVal = __builtin_amdgcn_spatial_cluster_is_chain_start();
+        bool isChainStart = __builtin_amdgcn_readfirstlane(isChainStartVal);
+        bool isChainEndVal = __builtin_amdgcn_spatial_cluster_is_chain_end();
+        bool isChainEnd = __builtin_amdgcn_readfirstlane(isChainEndVal);
 
         static_for<0, CRepeat, 1>{}([&](auto c0) {
             static_for<0, HRepeatIn, 1>{}([&](auto h0) {
@@ -1656,7 +1703,7 @@ struct BlockwiseConvWcnn
     #pragma clang diagnostic pop
 
                     // Head of Neighbor Chain or Left_W_border in the Grid
-                    if (isChainStart || (waveGroupIdInCluster % (Gridsize_W * numWaveGroup) != 0))
+                    if (!isChainStart && ((waveGroupId + blockId * numWaveGroup) % (Gridsize_W * numWaveGroup) != 0))
                     {
                         constexpr index_t w0_indata_offset = indata_wave_desc_.CalculateOffset(
                                             make_tuple(I0, c0, h0, h1, I0, I0, I0));
@@ -1666,7 +1713,7 @@ struct BlockwiseConvWcnn
                     }
 
                     // Tail of Neighbor Chain or Right_W_border in the Grid
-                    if (isChainEnd || ((waveGroupIdInCluster + 1) % (Gridsize_W * numWaveGroup) != 0))
+                    if (!isChainEnd && ((waveGroupId + blockId * numWaveGroup + 1) % (Gridsize_W * numWaveGroup) != 0))
                     {
                         constexpr index_t w3_indata_offset = indata_wave_desc_.CalculateOffset(
                                             make_tuple(Number<WRepeat-1>{}, c0, h0, h1, I0, I0, I0));

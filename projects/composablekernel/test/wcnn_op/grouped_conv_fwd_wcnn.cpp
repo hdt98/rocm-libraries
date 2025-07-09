@@ -413,13 +413,14 @@ bool run_test_fmt()
     constexpr bool WaveGroup = false;
 #endif
 
-    constexpr bool EnableSpatialCluster = false;
+    //constexpr bool EnableSpatialCluster = false;
     // clang-format off
     {
-    //                                                           |ShapeType  |FilterType |Dilation |Lds |WaveGroup |TestMask
+    //                                                           |ShapeType  |FilterType |Dilation |Lds |WaveGroup | EnableSpatialCluster | TestMask
     if constexpr(std::is_same<GPUAccType, float>::value || std::is_same<GPUAccType, int32_t>::value)
     {
-#if 1
+        //pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X2, Filter_3X3, false, 0,       WaveGroup, true, TestMask | 0x20000>();
+#if 0
         pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X2, Filter_1X1, false, 0,       WaveGroup, EnableSpatialCluster, TestMask | 0x10000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X2, Filter_3X3, false, 0,       WaveGroup, EnableSpatialCluster, TestMask | 0x20000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X2, Filter_3X3, true,  0,       WaveGroup, EnableSpatialCluster, TestMask | 0x40000>();
@@ -433,8 +434,9 @@ bool run_test_fmt()
     }
     else
     {
-        //pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X2, Filter_3X3, false, 0,       true, true, TestMask | 0x80000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, Shape_8X4, Filter_3X3, false, 0,       true, true, TestMask | 0x100000>();
+        //pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X2, Filter_3X3, false, 0,       WaveGroup, true, TestMask | 0x80000>();
+        pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X4, Filter_3X3, false, 0,       WaveGroup, true, TestMask | 0x100000>();
+        //pass &= run_test<SrcType, SrcType, GPUAccType, Shape_8X4, Filter_3X3, false, 0,       WaveGroup, true, TestMask | 0x100000>();
 #if 0
         pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X2, Filter_1X1, false, 0,       WaveGroup, EnableSpatialCluster, TestMask | 0x10000>();
         // TODO: fix it.
@@ -478,7 +480,9 @@ int main(int argc, char* argv[])
     {
         return -1;
     }
-
+    //pass &= run_test_fmt<f8_t,    float,   0x5, 0x4  >();
+    //pass &= run_test_fmt<f8_t,    half_t,  0x3, 0x100>();
+    //pass &= run_test_fmt<half_t,  float,   0x7, 0x1  >();
     pass &= run_test_fmt<half_t,  half_t,  0xf, 0x40 >();
 #if 0
     // clang-format off

@@ -120,7 +120,7 @@ struct DeviceGroupedConvFwdMultipleD_Wcnn_CShuffle
     static constexpr index_t GridWRepeat    = ShuffleConv2 ? WRepeat / 2 : WRepeat;
     static constexpr index_t GridKPerBlock  = ShuffleTransposeConv2 ? KPerBlock * 4 : KPerBlock;
 
-    static constexpr index_t cluster_dim_size = 8;
+    static constexpr index_t cluster_dim_size = 8;//4;
     static constexpr index_t num_wave_group = 4;
 
     // Describe how data read from Global memory
