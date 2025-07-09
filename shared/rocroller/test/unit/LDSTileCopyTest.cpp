@@ -270,11 +270,11 @@ namespace LDSCopyTest
 
         addDirect2LDS(kgraph);
 
-        auto addComputeIndex = std::make_shared<AddComputeIndex>(m_context);
-        kgraph               = kgraph.transform(addComputeIndex);
-
         auto updateWavefrontParams = std::make_shared<UpdateWavefrontParameters>(params);
         kgraph                     = kgraph.transform(updateWavefrontParams);
+
+        auto addComputeIndex = std::make_shared<AddComputeIndex>(m_context);
+        kgraph               = kgraph.transform(addComputeIndex);
 
         m_context->schedule(k->preamble());
         m_context->schedule(k->prolog());
@@ -322,5 +322,5 @@ namespace LDSCopyTest
         }
     }
 
-    INSTANTIATE_TEST_SUITE_P(LDSCopyTest, LDSCopyTest, supportedISATuples());
+    INSTANTIATE_TEST_SUITE_P(LDSCopyTest, LDSCopyTest, currentGPUISA());
 }
