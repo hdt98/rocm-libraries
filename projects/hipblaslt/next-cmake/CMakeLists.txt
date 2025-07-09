@@ -37,7 +37,6 @@ include(GenerateExportHeader)
 include(CMakeDependentOption)
 include(hipblaslt_python)
 include(hipblaslt_target_configure_sanitizers)
-include(TensileliteSupportedArchitectures)
 
 rocm_setup_version(VERSION ${PROJECT_VERSION})
 set(hipblaslt_SOVERSION 1.0)
