@@ -96,7 +96,7 @@ def _configure_git_user(repo_path: Path) -> None:
     _run_git(["config", "user.name", "assistant-librarian[bot]"], cwd=repo_path)
     _run_git(["config", "user.email", "assistant-librarian[bot]@users.noreply.github.com"], cwd=repo_path)
 
-def _apply_patch(repo_path: Path, patch_path: Path, rel_file_path: Path, monorepo_path: Path, prefix: str) -> None:
+def _apply_patch(repo_path: Path, patch_path: Path, rel_file_path: Path, monorepo_path: Path) -> None:
     """Try to apply a patch; if it fails, fallback to full file replacement."""
     try:
         _run_git(["am", str(patch_path)], cwd=repo_path)
@@ -105,7 +105,7 @@ def _apply_patch(repo_path: Path, patch_path: Path, rel_file_path: Path, monorep
         logger.warning(f"Patch {patch_path.name} failed to apply; falling back to full file copy")
 
         # Construct source and destination
-        monorepo_file = monorepo_path / prefix / rel_file_path
+        monorepo_file = monorepo_path / rel_file_path
         subrepo_file = repo_path / rel_file_path
         subrepo_file.parent.mkdir(parents=True, exist_ok=True)
 
@@ -259,7 +259,7 @@ def apply_patches_and_squash(entry: RepoEntry, monorepo_url: str, monorepo_pr: i
             logger.debug(f"Applying patch {patch_path.name} to {entry.name}")
             filename = patch_path.stem.replace("_", "/")
             rel_path = Path(filename)
-            _apply_patch(subrepo_path, patch_path, rel_path, Path.cwd(), prefix)
+            _apply_patch(subrepo_path, patch_path, rel_path, Path.cwd())
 
         # Final squash
         commit_msg = f"[rocm-libraries] {monorepo_url}#{monorepo_pr} (commit {merge_sha[:7]})\n\n" + \
