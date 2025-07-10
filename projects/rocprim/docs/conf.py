@@ -32,7 +32,7 @@ with open('../CMakeLists.txt', encoding='utf-8') as f:
         raise ValueError("VERSION not found!")
     version_number = match[1]
 
-project = "rocPRIM Documentation"
+project = "rocPRIM Documentation test"
 html_title = f"rocPRIM {version_number} Documentation"
 author = "Advanced Micro Devices, Inc."
 copyright = "Copyright (c) 2025 Advanced Micro Devices, Inc. All rights reserved."
