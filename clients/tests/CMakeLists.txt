@@ -98,11 +98,7 @@ add_executable( rtc_helper_crash rtc_helper_crash.cpp )
 # contains device code for callback functions, so ensure the device
 # code is built with the same optimization level to minimize chance
 # of a mismatch
-# Adding -Xarch_device -O3 causes hash or ABI mismatches on Windows,
-# leading to errors when kernels are reused from the RTC cache.
-if( NOT WIN32 )
-  target_compile_options( rocfft-test PRIVATE -Xarch_device -O3 )
-endif( )
+target_compile_options( rocfft-test PRIVATE -Xarch_device -O3 -mcumode )
 
 find_package( Boost REQUIRED )
 set( Boost_DEBUG ON )
