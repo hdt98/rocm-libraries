@@ -75,6 +75,7 @@ template <index_t NDimSpatial,
           bool EnableAsync,
           bool EnableWaveGroup,
           bool EnableSpatialCluster = false,
+          index_t ClusterDimSize = 0,
           bool ShuffleOnLoad = false,
           bool Transposed    = false,
           bool TileStore     = false>
@@ -120,7 +121,7 @@ struct DeviceGroupedConvFwdMultipleD_Wcnn_CShuffle
     static constexpr index_t GridWRepeat    = ShuffleConv2 ? WRepeat / 2 : WRepeat;
     static constexpr index_t GridKPerBlock  = ShuffleTransposeConv2 ? KPerBlock * 4 : KPerBlock;
 
-    static constexpr index_t cluster_dim_size = 8;//4;
+    static constexpr index_t Cluster_dim_size = ClusterDimSize;
     static constexpr index_t num_wave_group = 4;
 
     // Describe how data read from Global memory
@@ -298,6 +299,7 @@ struct DeviceGroupedConvFwdMultipleD_Wcnn_CShuffle
                                                              NumPrefetch,
                                                              EnableWaveGroup,
                                                              EnableSpatialCluster,
+                                                             Cluster_dim_size,
                                                              GridTransposed,
                                                              TileStore>;
 
@@ -470,7 +472,7 @@ struct DeviceGroupedConvFwdMultipleD_Wcnn_CShuffle
                             remove_reference_t<typename GridwiseConv::DefaultBlock2CTileMap>,
                             ComputePtrOffsetOfStridedBatch<I1, I1, Number<NumDTensor>{}>,
                             has_main_loop,
-                            cluster_dim_size>;
+                            Cluster_dim_size>;
 
                         return launch_and_time_kernel(stream_config,
                                                     kernel,
@@ -554,7 +556,7 @@ struct DeviceGroupedConvFwdMultipleD_Wcnn_CShuffle
                             remove_reference_t<typename GridwiseConv::DefaultBlock2CTileMap>,
                             ComputePtrOffsetOfStridedBatch<I1, I1, Number<NumDTensor>{}>,
                             has_main_loop,
-                            cluster_dim_size>;
+                            Cluster_dim_size>;
 
                         return launch_and_time_kernel(stream_config,
                                                     kernel,
@@ -595,7 +597,7 @@ struct DeviceGroupedConvFwdMultipleD_Wcnn_CShuffle
                             remove_reference_t<typename GridwiseConv::DefaultBlock2CTileMap>,
                             ComputePtrOffsetOfStridedBatch<I1, I1, Number<NumDTensor>{}>,
                             has_main_loop,
-                            cluster_dim_size>;
+                            Cluster_dim_size>;
 
                         return launch_and_time_kernel(stream_config,
                                                     kernel,
@@ -1507,6 +1509,8 @@ struct DeviceGroupedConvFwdMultipleD_Wcnn_CShuffle
             << EnableWaveGroup << ", "
             << "EnableSpatialCluster: "
             << EnableSpatialCluster << ", "
+            << "ClusterDimSize: "
+            << ClusterDimSize << ", "
             << "ShuffleOnLoad: "
             << ShuffleOnLoad << ", "
             << "Transpose: "

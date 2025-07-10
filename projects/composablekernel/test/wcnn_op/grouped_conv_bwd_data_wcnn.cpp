@@ -295,6 +295,7 @@ bool run_test()
             EnableAsync,
             EnableWaveGroup,
             false,
+            0,
             ShuffleOnLoad,
             true>;
 

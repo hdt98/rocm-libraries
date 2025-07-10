@@ -105,7 +105,8 @@ using DeviceConvFwdInstance =
         true,       // AccEnableLds
         EnableAsync,
         EnableWaveGroup,
-        EnableSpatialCluster,
+        false, //EnableSpatialCluster
+        0,
         false,  // ShuffleOnLoad
         false>; // Transposed
 

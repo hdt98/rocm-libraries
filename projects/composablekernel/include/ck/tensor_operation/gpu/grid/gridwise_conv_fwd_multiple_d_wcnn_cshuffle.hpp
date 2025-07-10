@@ -124,9 +124,9 @@ template <typename GridwiseOp,
           typename Block2CTileMap,
           typename ComputePtrOffsetOfBatch,
           bool HasMainBlockLoop,
-          index_t cluster_dim_size>
+          index_t Cluster_dim_size>
 __attribute__((amdgpu_spatial_cluster_kernel))
-__attribute__((cluster_dims(cluster_dim_size)))
+__attribute__((cluster_dims(Cluster_dim_size)))
 __global__ void __exp_amd_wavegroup_kernel(4, 32, 256, 1, 1)
     kernel_grouped_conv_fwd_wcnn_wavegroup256_spatial_cluster(
         const InDataType* __restrict__ p_in_grid,
@@ -169,7 +169,7 @@ __global__ void __exp_amd_wavegroup_kernel(4, 32, 256, 1, 1)
         {
             __builtin_amdgcn_spatial_cluster_set_chain_start(true);
         }
-        else if(waveGroupIdInCluster == (cluster_dim_size * 4 - 1)) // cluster_size * wavegroupIncluster - 1
+        else if(waveGroupIdInCluster == (Cluster_dim_size * 4 - 1)) // cluster_size * wavegroupIncluster - 1
         {
             __builtin_amdgcn_spatial_cluster_set_chain_end(true);
         }
@@ -234,9 +234,9 @@ template <typename GridwiseOp,
           typename Block2CTileMap,
           typename ComputePtrOffsetOfBatch,
           bool HasMainBlockLoop,
-          index_t cluster_dim_size>
+          index_t Cluster_dim_size>
 __attribute__((amdgpu_spatial_cluster_kernel))
-__attribute__((cluster_dims(cluster_dim_size)))
+__attribute__((cluster_dims(Cluster_dim_size)))
 __global__ void __exp_amd_wavegroup_kernel(4, 32, 512, 1, 1)
     kernel_grouped_conv_fwd_wcnn_wavegroup512_spatial_cluster(
         const InDataType* __restrict__ p_in_grid,
@@ -344,8 +344,8 @@ template <typename GridwiseOp,
           typename Block2CTileMap,
           typename ComputePtrOffsetOfBatch,
           bool HasMainBlockLoop,
-          index_t cluster_dim_size>
-__attribute__((cluster_dims(cluster_dim_size)))
+          index_t Cluster_dim_size>
+__attribute__((cluster_dims(Cluster_dim_size)))
 __global__ void __exp_amd_wavegroup_kernel(4, 32, 256, 1, 1)
     kernel_grouped_conv_fwd_wcnn_wavegroup256(
         const InDataType* __restrict__ p_in_grid,
@@ -566,6 +566,7 @@ template <index_t BlockSize,
           index_t NumConvCPrefetchStage,
           bool EnableWaveGroup,
           bool EnableSpatialCluster,
+          index_t ClusterDimSize,
           bool Transposed,
           bool TileStore>
 struct GridwiseConvMultipleD_Wcnn_CShuffle
@@ -1089,7 +1090,8 @@ struct GridwiseConvMultipleD_Wcnn_CShuffle
                                             DsEnableLds,
                                             Transposed,
                                             TileStore,
-                                            EnableSpatialCluster>;
+                                            EnableSpatialCluster,
+                                            ClusterDimSize>;
 
     // Pad input and weight data grid description according to Filter size
     __host__ __device__ static constexpr auto
