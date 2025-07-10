@@ -1246,9 +1246,7 @@ struct BlockwiseConvWcnn
     __device__ void RunConv(const WeightBlockBuffer& weight_block_buf,
                             const InDataBlockBuffer& indata_block_buf,
                             const ExchangeDataBlockBuffer& predata_block_buf,
-                            const InDataBlockBuffer& pre_cluster_buf,
                             const ExchangeDataBlockBuffer& nextdata_block_buf,
-                            const InDataBlockBuffer& next_cluster_buf,
                             const DsBlockBuffer& ds_block_buf,
                             AccumThreadBuffer& accum_thread_buf,
                             OutTensorThreadBuffer& out_thread_buf,
@@ -1415,91 +1413,37 @@ struct BlockwiseConvWcnn
                         constexpr index_t HRepeatIn = HPerWaveIn / HPerWcnn;
                         constexpr index_t wave_border_offset = c0 * HRepeatIn * NumSubTilePerImage + h0 * NumSubTilePerImage;
 
-                        constexpr index_t cluster_border_offset = indata_clusterborder_wave_desc_.CalculateOffset(
-                                    make_tuple(I0, c0, h0, I0, I0, I0, I0));
+                        //constexpr index_t cluster_border_offset = indata_clusterborder_wave_desc_.CalculateOffset(
+                        //            make_tuple(I0, c0, h0, I0, I0, I0, I0));
 
                         indata_thread_vec_ptr[1] = reinterpret_cast<const typename InDataVec::type*>(
                                         &indata_block_buf[Number<indata_offset>{}]);
 
-                        if constexpr(WRepeat == 1)
+                        if constexpr(w0 == 0)
                         {
-                            uint32_t waveGroupIdInCluster = __builtin_amdgcn_wavegroup_id_in_cluster();
-                            const index_t num_wave_group = ThisThreadBlock::GetNumWaveGroups();
-                            bool isChainStart = (waveGroupIdInCluster == 0);
-                            bool isChainEnd = (waveGroupIdInCluster == (ClusterDimSize * num_wave_group - 1));
-
-                            if(isChainStart)
-                            {
-                                indata_thread_vec_ptr[0] = reinterpret_cast<const typename InDataVec::type*>(
-                                                            &pre_cluster_buf[Number<cluster_border_offset>{}]);
-                                indata_thread_vec_ptr[2] = reinterpret_cast<const typename InDataVec::type*>(
-                                                            &nextdata_block_buf[Number<wave_border_offset>{}]);
-                            }
-                            else if(isChainEnd)
-                            {
-                                indata_thread_vec_ptr[0] = reinterpret_cast<const typename InDataVec::type*>(
-                                                                &predata_block_buf[Number<wave_border_offset>{}]);
-                                indata_thread_vec_ptr[2] = reinterpret_cast<const typename InDataVec::type*>(
-                                                                &next_cluster_buf[Number<cluster_border_offset>{}]);
-                            }
-                            else
-                            {
-                                indata_thread_vec_ptr[0] = reinterpret_cast<const typename InDataVec::type*>(
-                                                                &predata_block_buf[Number<wave_border_offset>{}]);
-
-                                indata_thread_vec_ptr[2] = reinterpret_cast<const typename InDataVec::type*>(
-                                                                &nextdata_block_buf[Number<wave_border_offset>{}]);
-                            }
+                            indata_thread_vec_ptr[0] = reinterpret_cast<const typename InDataVec::type*>(
+                                                            &predata_block_buf[Number<wave_border_offset>{}]);
                         }
                         else
                         {
-                            bool isChainStartVal = __builtin_amdgcn_spatial_cluster_is_chain_start();
-                            bool isChainStart = __builtin_amdgcn_readfirstlane(isChainStartVal);
-                            bool isChainEndVal = __builtin_amdgcn_spatial_cluster_is_chain_end();
-                            bool isChainEnd = __builtin_amdgcn_readfirstlane(isChainEndVal);
+                            constexpr index_t pre_offset = indata_wave_desc_.CalculateOffset(
+                                make_tuple(w0-1, c0, h0, I0, I0, I0, I0));
+                            indata_thread_vec_ptr[0] = reinterpret_cast<const typename InDataVec::type*>(
+                                                            &indata_block_buf[Number<pre_offset>{}]);
+                        }
 
-                            if constexpr(w0 == 0)
-                            {
-                                if(isChainStart)
-                                {
-                                    indata_thread_vec_ptr[0] = reinterpret_cast<const typename InDataVec::type*>(
-                                                                    &pre_cluster_buf[Number<cluster_border_offset>{}]);
-                                }
-                                else
-                                {
-                                    indata_thread_vec_ptr[0] = reinterpret_cast<const typename InDataVec::type*>(
-                                                                    &predata_block_buf[Number<wave_border_offset>{}]);
-                                }
-                            }
-                            else
-                            {
-                                constexpr index_t pre_offset = indata_wave_desc_.CalculateOffset(
-                                    make_tuple(w0-1, c0, h0, I0, I0, I0, I0));
-                                indata_thread_vec_ptr[0] = reinterpret_cast<const typename InDataVec::type*>(
-                                                                &indata_block_buf[Number<pre_offset>{}]);
-                            }
+                        if constexpr(w0 == WRepeat-1)
+                        {
+                            indata_thread_vec_ptr[2] = reinterpret_cast<const typename InDataVec::type*>(
+                                                           &nextdata_block_buf[Number<wave_border_offset>{}]);
+                        }
+                        else
+                        {
+                            constexpr index_t next_offset = indata_wave_desc_.CalculateOffset(
+                                make_tuple(w0+1, c0, h0, I0, I0, I0, I0));
+                            indata_thread_vec_ptr[2] = reinterpret_cast<const typename InDataVec::type*>(
+                                    &indata_block_buf[Number<next_offset>{}]);
 
-                            if constexpr(w0 == WRepeat-1)
-                            {
-                                if(isChainEnd)
-                                {
-                                    indata_thread_vec_ptr[2] = reinterpret_cast<const typename InDataVec::type*>(
-                                                                &next_cluster_buf[Number<cluster_border_offset>{}]);
-                                }
-                                else
-                                {
-                                    indata_thread_vec_ptr[2] = reinterpret_cast<const typename InDataVec::type*>(
-                                                                &nextdata_block_buf[Number<wave_border_offset>{}]);
-                                }
-                            }
-                            else
-                            {
-                                constexpr index_t next_offset = indata_wave_desc_.CalculateOffset(
-                                    make_tuple(w0+1, c0, h0, I0, I0, I0, I0));
-                                indata_thread_vec_ptr[2] = reinterpret_cast<const typename InDataVec::type*>(
-                                        &indata_block_buf[Number<next_offset>{}]);
-
-                            }
                         }
                     }
                     else
@@ -1660,9 +1604,7 @@ struct BlockwiseConvWcnn
     __device__ void Run(const WeightBlockBuffer& weight_block_buf,
                         const InDataBlockBuffer& indata_block_buf,
                         const ExchangeDataBlockBuffer& predata_block_buf,
-                        const InDataBlockBuffer& pre_cluster_buf,
                         const ExchangeDataBlockBuffer& nextdata_block_buf,
-                        const InDataBlockBuffer& next_cluster_buf,
                         const DsBlockBuffer& ds_block_buf,
                         AccumThreadBuffer& accum_thread_buf,
                         OutTensorThreadBuffer& out_thread_buf,
@@ -1686,9 +1628,7 @@ struct BlockwiseConvWcnn
             RunConv(weight_block_buf,
                     indata_block_buf,
                     predata_block_buf,
-                    pre_cluster_buf,
                     nextdata_block_buf,
-                    next_cluster_buf,
                     ds_block_buf,
                     accum_thread_buf,
                     out_thread_buf,

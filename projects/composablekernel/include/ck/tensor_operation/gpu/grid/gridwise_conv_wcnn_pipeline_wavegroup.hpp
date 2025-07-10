@@ -184,15 +184,18 @@ struct GridwiseConvPipeline_v2
 
                 if constexpr(EnableSpatialCluster)
                 {
+
                     blockwise_conv.exchange_neighbor_data(in_grid_desc, in_block_buf, prev_block_buf, next_block_buf, dataFromPrev, semFromPrev, dataFromNext, semFromNext);
                     // Cluster border, need to identfy whether is in multi-cluster case OOXX
                     if(isChainStart)
                     {
                         pre_blockwise_copy.Run(in_grid_desc, in_grid_buf, in_cluster_border_desc, in_block_origin_idx, pre_cluster_buf);
+                        prev_block_buf = bit_cast<ExchangeDataBlockBuffer>(pre_cluster_buf);
                     }
                     if(isChainEnd)
                     {
                         next_blockwise_copy.Run(in_grid_desc, in_grid_buf, in_cluster_border_desc, in_block_origin_idx, next_cluster_buf);
+                        next_block_buf = bit_cast<ExchangeDataBlockBuffer>(next_cluster_buf);
                     }
                 }
 
@@ -289,10 +292,12 @@ struct GridwiseConvPipeline_v2
                             if(isChainStart)
                             {
                                 pre_blockwise_copy.Run(in_grid_desc, in_grid_buf, in_cluster_border_desc, in_block_origin_idx, pre_cluster_buf);
+                                prev_block_buf = bit_cast<ExchangeDataBlockBuffer>(pre_cluster_buf);
                             }
                             if(isChainEnd)
                             {
                                 next_blockwise_copy.Run(in_grid_desc, in_grid_buf, in_cluster_border_desc, in_block_origin_idx, next_cluster_buf);
+                                next_block_buf = bit_cast<ExchangeDataBlockBuffer>(next_cluster_buf);
                             }
                         }
                     }
@@ -311,10 +316,12 @@ struct GridwiseConvPipeline_v2
                             if(isChainStart)
                             {
                                 pre_blockwise_copy.Run(in_grid_desc, in_grid_buf, in_cluster_border_desc, in_block_origin_idx, pre_cluster_buf);
+                                prev_block_buf = bit_cast<ExchangeDataBlockBuffer>(pre_cluster_buf);
                             }
                             if(isChainEnd)
                             {
                                 next_blockwise_copy.Run(in_grid_desc, in_grid_buf, in_cluster_border_desc, in_block_origin_idx, next_cluster_buf);
+                                next_block_buf = bit_cast<ExchangeDataBlockBuffer>(next_cluster_buf);
                             }
                         }
 
@@ -351,9 +358,7 @@ struct GridwiseConvPipeline_v2
                     blockwise_conv.Run(wei_block_buf,
                                        in_block_buf,
                                        prev_block_buf,
-                                       pre_cluster_buf,
                                        next_block_buf,
-                                       next_cluster_buf,
                                        ds_block_buf,
                                        accum_thread_buf,
                                        out_thread_buf,
@@ -427,10 +432,12 @@ struct GridwiseConvPipeline_v2
                         if(isChainStart)
                         {
                             pre_blockwise_copy.Run(in_grid_desc, in_grid_buf, in_cluster_border_desc, in_block_origin_idx, pre_cluster_buf);
+                            prev_block_buf = bit_cast<ExchangeDataBlockBuffer>(pre_cluster_buf);
                         }
                         if(isChainEnd)
                         {
                             next_blockwise_copy.Run(in_grid_desc, in_grid_buf, in_cluster_border_desc, in_block_origin_idx, next_cluster_buf);
+                            next_block_buf = bit_cast<ExchangeDataBlockBuffer>(next_cluster_buf);
                         }
                     }
                 }
@@ -481,9 +488,7 @@ struct GridwiseConvPipeline_v2
                 blockwise_conv.Run(wei_block_buf,
                                    in_block_buf,
                                    prev_block_buf,
-                                   pre_cluster_buf,
                                    next_block_buf,
-                                   next_cluster_buf,
                                    ds_block_buf,
                                    accum_thread_buf,
                                    out_thread_buf,
@@ -609,10 +614,6 @@ struct GridwiseConvPipeline_v2<1, false, false, false, EnableAsync, EnableSpatia
         // wait semaphore init
         __syncthreads();
 
-        bool isChainStartVal = __builtin_amdgcn_spatial_cluster_is_chain_start();
-        bool isChainStart = __builtin_amdgcn_readfirstlane(isChainStartVal);
-        bool isChainEndVal = __builtin_amdgcn_spatial_cluster_is_chain_end();
-        bool isChainEnd = __builtin_amdgcn_readfirstlane(isChainEndVal);
         // pre-fetch data
         if(get_wave_id_in_wavegroup() == WaveIdLoad)
         {
@@ -633,12 +634,9 @@ struct GridwiseConvPipeline_v2<1, false, false, false, EnableAsync, EnableSpatia
                 blockwise_conv.exchange_neighbor_data(in_grid_desc, in_block_buf, prev_block_buf, next_block_buf, dataFromPrev, semFromPrev, dataFromNext, semFromNext);
 
                 // Cluster border, need to identfy whether is in multi-cluster case OOXX
-                if(isChainStart)
+                if constexpr(1)
                 {
                     pre_blockwise_copy.Run(in_grid_desc, in_grid_buf, in_cluster_border_desc, in_block_origin_idx, pre_cluster_buf);
-                }
-                if(isChainEnd)
-                {
                     next_blockwise_copy.Run(in_grid_desc, in_grid_buf, in_cluster_border_desc, in_block_origin_idx, next_cluster_buf);
                 }
             }
@@ -708,12 +706,9 @@ struct GridwiseConvPipeline_v2<1, false, false, false, EnableAsync, EnableSpatia
                     {
                         blockwise_conv.exchange_neighbor_data(in_grid_desc, in_block_buf, prev_block_buf, next_block_buf, dataFromPrev, semFromPrev, dataFromNext, semFromNext);
                         // Cluster border, need to identfy whether is in multi-cluster case OOXX
-                        if(isChainStart)
+                        if constexpr(1)
                         {
                             pre_blockwise_copy.Run(in_grid_desc, in_grid_buf, in_cluster_border_desc, in_block_origin_idx, pre_cluster_buf);
-                        }
-                        if(isChainEnd)
-                        {
                             next_blockwise_copy.Run(in_grid_desc, in_grid_buf, in_cluster_border_desc, in_block_origin_idx, next_cluster_buf);
                         }
                     }
@@ -743,12 +738,18 @@ struct GridwiseConvPipeline_v2<1, false, false, false, EnableAsync, EnableSpatia
                 if(get_wave_id_in_wavegroup() == WaveIdRun ||
                    get_wave_id_in_wavegroup() == WaveIdPostRun)
                 {
+                    bool isChainStartVal = __builtin_amdgcn_spatial_cluster_is_chain_start();
+                    bool isChainStart = __builtin_amdgcn_readfirstlane(isChainStartVal);
+                    bool isChainEndVal = __builtin_amdgcn_spatial_cluster_is_chain_end();
+                    bool isChainEnd = __builtin_amdgcn_readfirstlane(isChainEndVal);
+
+                    ExchangeDataBlockBuffer preBuf = isChainStart? bit_cast<ExchangeDataBlockBuffer>(pre_cluster_buf):prev_block_buf;
+                    ExchangeDataBlockBuffer nextBuf = isChainEnd? bit_cast<ExchangeDataBlockBuffer>(next_cluster_buf):next_block_buf;
+
                     blockwise_conv.Run(wei_block_buf,
                                        in_block_buf,
-                                       prev_block_buf,
-                                       pre_cluster_buf,
-                                       next_block_buf,
-                                       next_cluster_buf,
+                                       preBuf,
+                                       nextBuf,
                                        ds_block_buf,
                                        accum_thread_buf,
                                        out_thread_buf,
@@ -778,12 +779,17 @@ struct GridwiseConvPipeline_v2<1, false, false, false, EnableAsync, EnableSpatia
             if(get_wave_id_in_wavegroup() == WaveIdRun ||
                get_wave_id_in_wavegroup() == WaveIdPostRun)
             {
+                bool isChainStartVal = __builtin_amdgcn_spatial_cluster_is_chain_start();
+                bool isChainStart = __builtin_amdgcn_readfirstlane(isChainStartVal);
+                bool isChainEndVal = __builtin_amdgcn_spatial_cluster_is_chain_end();
+                bool isChainEnd = __builtin_amdgcn_readfirstlane(isChainEndVal);
+
+                ExchangeDataBlockBuffer preBuf = isChainStart? bit_cast<ExchangeDataBlockBuffer>(pre_cluster_buf):prev_block_buf;
+                ExchangeDataBlockBuffer nextBuf = isChainEnd? bit_cast<ExchangeDataBlockBuffer>(next_cluster_buf):next_block_buf;
                 blockwise_conv.Run(wei_block_buf,
                                    in_block_buf,
-                                   prev_block_buf,
-                                   pre_cluster_buf,
-                                   next_block_buf,
-                                   next_cluster_buf,
+                                   preBuf,
+                                   nextBuf,
                                    ds_block_buf,
                                    accum_thread_buf,
                                    out_thread_buf,
@@ -975,10 +981,12 @@ struct GridwiseConvPipeline_v2<1, true, true, true, EnableAsync, EnableSpatialCl
                             if(isChainStart)
                             {
                                 pre_blockwise_copy.Run(in_grid_desc, in_grid_buf, in_cluster_border_desc, in_block_origin_idx, pre_cluster_buf);
+                                prev_block_buf = bit_cast<ExchangeDataBlockBuffer>(pre_cluster_buf);
                             }
                             if(isChainEnd)
                             {
                                 next_blockwise_copy.Run(in_grid_desc, in_grid_buf, in_cluster_border_desc, in_block_origin_idx, next_cluster_buf);
+                                next_block_buf = bit_cast<ExchangeDataBlockBuffer>(next_cluster_buf);
                             }
                         }
                     }
@@ -1003,9 +1011,7 @@ struct GridwiseConvPipeline_v2<1, true, true, true, EnableAsync, EnableSpatialCl
                     blockwise_conv.Run(wei_block_buf,
                                        in_block_buf,
                                        prev_block_buf,
-                                       pre_cluster_buf,
                                        next_block_buf,
-                                       next_cluster_buf,
                                        ds_block_buf,
                                        accum_thread_buf,
                                        out_thread_buf,
@@ -1068,10 +1074,12 @@ struct GridwiseConvPipeline_v2<1, true, true, true, EnableAsync, EnableSpatialCl
                         if(isChainStart)
                         {
                             pre_blockwise_copy.Run(in_grid_desc, in_grid_buf, in_cluster_border_desc, in_block_origin_idx, pre_cluster_buf);
+                            prev_block_buf = bit_cast<ExchangeDataBlockBuffer>(pre_cluster_buf);
                         }
                         if(isChainEnd)
                         {
                             next_blockwise_copy.Run(in_grid_desc, in_grid_buf, in_cluster_border_desc, in_block_origin_idx, next_cluster_buf);
+                            next_block_buf = bit_cast<ExchangeDataBlockBuffer>(next_cluster_buf);
                         }
                     }
                 }
@@ -1126,9 +1134,7 @@ struct GridwiseConvPipeline_v2<1, true, true, true, EnableAsync, EnableSpatialCl
                 blockwise_conv.Run(wei_block_buf,
                                    in_block_buf,
                                    prev_block_buf,
-                                   pre_cluster_buf,
                                    next_block_buf,
-                                   next_cluster_buf,
                                    ds_block_buf,
                                    accum_thread_buf,
                                    out_thread_buf,

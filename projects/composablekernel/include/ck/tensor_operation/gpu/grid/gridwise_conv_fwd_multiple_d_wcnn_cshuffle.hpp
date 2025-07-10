@@ -279,7 +279,7 @@ __global__ void __exp_amd_wavegroup_kernel(4, 32, 512, 1, 1)
     {
         __builtin_amdgcn_spatial_cluster_set_chain_start(true);
     }
-    else if(waveGroupIdInCluster == 31)
+    else if(waveGroupIdInCluster == (Cluster_dim_size * 4 - 1))
     {
         __builtin_amdgcn_spatial_cluster_set_chain_end(true);
     }
