@@ -209,6 +209,7 @@ namespace rocRoller::KernelGraph
             paddingBytes           = indexExpr / L(elementsPerTrLoad) * L(extraLdsBytes);
         }
 
+        AssertFatal(offset > 0);
         auto assignNode         = Assign{Register::Type::Vector,
                                  convert(offsetType, toBytes(indexExpr, valueType) + paddingBytes)};
         assignNode.variableType = offsetType;
@@ -220,6 +221,10 @@ namespace rocRoller::KernelGraph
             assignTag,
             toString(assignNode.expression),
             offset);
+        // std::cout << "YL: makeAssignBase tag " << assignTag << ", expression " << toString(assignNode.expression) << ", target " << target <<
+        // ", offset " << offset << std::endl;
+        std::cout << "YL makeAssignOffset (tag, expression, offset) " << assignTag << ", "
+                  << toString(assignNode.expression) << ", " << offset << std::endl;
 
         return assignTag;
     }
@@ -461,10 +466,12 @@ namespace rocRoller::KernelGraph
         graph.mapper.connect(assignTag, stride, NaryArgument::DEST);
 
         rocRoller::Log::getLogger()->debug(
-            "KernelGraph::makeAssignBase: assign {} expression {} to stride {}",
+            "KernelGraph::makeAssignStride: assign {} expression {} to stride {}",
             assignTag,
             toString(assignNode.expression),
             stride);
+        std::cout << "YL makeAssignStride (tag, expression, stride) " << assignTag << ", "
+                  << toString(assignNode.expression) << ", " << stride << std::endl;
         return assignTag;
     }
 
@@ -643,8 +650,8 @@ namespace rocRoller::KernelGraph
         std::vector<DeferredConnection> connections;
         std::map<int, int>              offsetOfCoord;
 
-        auto [coords, remainingCoords]
-            = LoadPackedDetail::getFakeTransformerForControlNode(op, graph, context);
+        auto [coords, remainingCoords] = LoadPackedDetail::getFakeTransformerForControlNode(
+            op, graph, context, isDirect2LDS, true);
 
         for(auto coord : remainingCoords)
         {
@@ -698,6 +705,11 @@ namespace rocRoller::KernelGraph
                                              offsetDataType,
                                              strideDataType));
 
+            // if (isDirect2LDS)
+            // {
+            //     std::cout << "YL: node " << op << " target " << target << std::endl;
+            // }
+
             // determine if target is LDS
             auto maybeLDS  = graph.coordinates.get<LDS>(target).has_value();
             auto newTarget = target;
@@ -712,6 +724,11 @@ namespace rocRoller::KernelGraph
                     newTarget = *maybeParentLDS;
             }
             maybeLDS = graph.coordinates.get<LDS>(newTarget).has_value();
+
+            // if (isDirect2LDS)
+            // {
+            //     std::cout << "YL: node " << op << " new target" << newTarget << std::endl;
+            // }
 
             // determin if the operation is tranpose load
             auto isLoad       = graph.control.get<LoadTiled>(op).has_value();
@@ -749,7 +766,7 @@ namespace rocRoller::KernelGraph
             }
 
             // Assign base expression
-            if(base < 0 && offset > 0)
+            if(base < 0)
             {
                 chain.push_back(makeAssignBase(graph,
                                                newTarget,
@@ -1063,6 +1080,8 @@ namespace rocRoller::KernelGraph
                             scopes[spec.location] = kgraph.control.addElement(Scope());
                             insertWithBody(kgraph, spec.location, scopes[spec.location]);
                         }
+                        std::cout << "Insert chain.bottom " << chain.bottom << " before location "
+                                  << spec.location << std::endl;
                         insertBefore(kgraph, spec.location, chain.top, chain.bottom);
                     }
                 }
@@ -1091,7 +1110,8 @@ namespace rocRoller::KernelGraph
                     }
                 }
             }
-
+            // // YL: test
+            // kgraph.control.deleteElement(35);
             return kgraph;
         }
 
