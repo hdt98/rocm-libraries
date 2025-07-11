@@ -30,7 +30,7 @@ from rocisa.code import KernelBody, Label, Macro, Module, RegSet, SrdUpperValue,
 from rocisa.container import DSModifiers, SDWAModifiers, VOP3PModifiers, \
                       MUBUFModifiers, SMEMModifiers, EXEC, VCC, RegisterContainer, \
                       DPPModifiers, vgpr, sgpr, accvgpr, mgpr, ContinuousRegister, \
-                      HWRegContainer
+                      HWRegContainer, FLATModifiers
 from rocisa.instruction import SGetPositivePCOffset, SLongBranchPositive, SCLongBranchScc0, SCLongBranchScc1, \
                         SMulInt64to32, VCvtBF16toFP32
 from rocisa.functions import vectorStaticDivide, vectorStaticRemainder, vectorUInt32CeilDivideAndRemainder, \
@@ -472,6 +472,8 @@ class KernelWriterAssembly(KernelWriter):
     return sgprIdx
 
   def defineSgpr(self, name, numSgprs, align=1):
+    if numSgprs == 0: return
+
     return RegSet("s", "sgpr"+name, self.defineSgprIdx(name, numSgprs, align))
 
   def defineMultiSgprIndex(self, names: List[str], numSgprs: List[int], align=1):
@@ -533,10 +535,11 @@ class KernelWriterAssembly(KernelWriter):
     if kernel["ProblemType"]["Sparse"]:
       module.add(self.defineSgpr("WrapUMetadata", 2))  # Bytes to add to SrdMetadata to reset address from N-1 iter to AddressMetadata
 
-    module.add(self.defineSgpr("GlobalReadIncsA", self.states.a.numSgprGlobalReadIncs))
-    module.add(self.defineSgpr("GlobalReadIncsB", self.states.b.numSgprGlobalReadIncs))
-    if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]:
-      module.add(self.defineSgpr("GlobalReadIncsMetadata", self.states.m.numSgprGlobalReadIncs))
+    if not self.states.globalReadIncsUseVgpr:
+      module.add(self.defineSgpr("GlobalReadIncsA", self.states.a.numSgprGlobalReadIncs))
+      module.add(self.defineSgpr("GlobalReadIncsB", self.states.b.numSgprGlobalReadIncs))
+      if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]:
+        module.add(self.defineSgpr("GlobalReadIncsMetadata", self.states.m.numSgprGlobalReadIncs))
 
     needPackK16  = False
     needPackK8Lw = False
@@ -2411,6 +2414,20 @@ class KernelWriterAssembly(KernelWriter):
     tc = tP["tensorChar"]
     tReg =  tP["gpr"]["lwoT"]
 
+    divisorName = tP["lvc"]
+    divisor = kernel[divisorName]
+
+    # DTV case, use tlu path
+    isDTVAB = (tP["isA"] or tP["isB"]) and kernel["DirectToVgpr%s"%tc]
+
+    # swizzled goes to else
+    if (tP["tlu"] or isDTVAB) and (not tP["isSwizzled"]):
+      tOpStr = "%"
+      uOpStr = "/"
+    else:
+      tOpStr = "/"
+      uOpStr = "%"
+
     module.addComment0("graTileAssignment%s = %s" % (tc, vgpr(tReg)))
 
     if self.states.groOffsetInMacroTile:
@@ -3481,7 +3498,7 @@ class KernelWriterAssembly(KernelWriter):
       tmp = self.vgprPool.checkOut(2, "tmp", self.states.preventVgprOverflowDuringNewTile)
 
       skComponent = Component.StreamK.find(self)
-      module.add(skComponent.graAddresses(self, kernel, tc, tmp))
+      module.add(skComponent.graAddresses(self, kernel, tP, tmp))
 
       for perp in range(0, tP["nrp"]):
         for sPerp in range(0, tP["nrpv"]):

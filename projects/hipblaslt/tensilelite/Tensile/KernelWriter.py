@@ -1971,7 +1971,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
           module.add(self.openLoop(kernel, tensorParametersA, tensorParametersB, i))
       module.add(self.calculateLoopNumIter(kernel, tensorParametersA, tensorParametersB, self.states.unrollIdx))
 
-    if not forceNoTileCode:
+    if not forceNoTileCode and kernel["BufferLoad"]:
       module.add(self.declareStaggerParms(kernel))
       module.add(self.calculateStagger(kernel, tensorParametersA))
       if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]:
@@ -2931,7 +2931,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
           module.add(self.noLoadLoop(kernel, tensorParametersA, tensorParametersB, isOptNLL=False, isNGLL=False, pack=deepCopyPack, NLLindex=NLLindex, NLLnum=NLLnum))
           self.restoreLocalPointers(kernel, tensorParametersA, tensorParametersB)
 
-    if self.states.actualSummationLoops>1:
+    if self.states.actualSummationLoops>1 and kernel["BufferLoad"]:
       module.addComment1("remove stagger offsets")
       module.add(self.removeStagger(kernel, tensorParametersA))
       module.add(self.removeStagger(kernel, tensorParametersB))
@@ -2989,7 +2989,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
       module.add(moduleMacroDTLLWVgpr)
 
       module.add(self.calculateLoopNumIter(kernel, tensorParametersA, tensorParametersB, -1))
-      if self.states.actualSummationLoops==1:
+      if self.states.actualSummationLoops==1 and kernel["BufferLoad"]:
         module.addComment1("remove stagger offsets for tail loop")
         module.add(self.removeStagger(kernel, tensorParametersA))
         module.add(self.removeStagger(kernel, tensorParametersB))

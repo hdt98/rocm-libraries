@@ -389,7 +389,7 @@ class Solution(collections.abc.Mapping):
 
     if (state["ISA"] != (9, 4, 2)) or \
        (state["ProblemType"]["Sparse"]) or \
-       (state["UseDotInstruction"]):
+       (state["UseDotInstruction"]) or (not state["BufferLoad"]):
       state["tailLoopOptA"] = False
       state["tailLoopOptB"] = False
     if (state["DirectToVgprA"]):
