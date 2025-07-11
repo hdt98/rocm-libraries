@@ -86,7 +86,7 @@ TEST(CPU_test_errors_NONE, test_MIOPEN_THROW)
             {
                 MIOPEN_THROW(miopenStatusUnknownError, err_msg1);
             }
-            catch (const miopen::Exception& e)
+            catch(const miopen::Exception& e)
             {
                 EXPECT_THAT(e.message, ::testing::StartsWith(__FILE__));
                 EXPECT_THAT(e.message, ::testing::EndsWith(err_msg1));
@@ -97,9 +97,8 @@ TEST(CPU_test_errors_NONE, test_MIOPEN_THROW)
                 EXPECT_EQ(e.status, miopenStatusUnknownError);
                 throw;
             }
-        }
-        , miopen::Exception
-    );
+        },
+        miopen::Exception);
 
     EXPECT_THROW(
         {
@@ -107,7 +106,7 @@ TEST(CPU_test_errors_NONE, test_MIOPEN_THROW)
             {
                 MIOPEN_THROW(err_msg2);
             }
-            catch (const miopen::Exception& e)
+            catch(const miopen::Exception& e)
             {
                 EXPECT_THAT(e.message, ::testing::StartsWith(__FILE__));
                 EXPECT_THAT(e.message, ::testing::EndsWith(err_msg2));
@@ -118,6 +117,6 @@ TEST(CPU_test_errors_NONE, test_MIOPEN_THROW)
                 EXPECT_EQ(e.status, miopenStatusUnknownError);
                 throw;
             }
-        }
-        , miopen::Exception
-    );}
+        },
+        miopen::Exception);
+}
