@@ -53,7 +53,8 @@ namespace rocRoller::KernelGraph
         std::map<int, Expression::ExpressionPtr>
             fillRegisterCoords(std::unordered_set<int> const& requiredCoords,
                                KernelGraph const&             graph,
-                               ContextPtr                     context);
+                               ContextPtr                     context,
+                               bool                           addComputeIndex = false);
 
         /**
          * Creates a Transformer that is as close as possible to the
@@ -65,8 +66,12 @@ namespace rocRoller::KernelGraph
          * - Register dimensions will be set to unallocated registers.
          * - Returns other dimensions that cannot be determined in the set.
          */
-        std::tuple<CoordinateGraph::Transformer, std::set<int>> getFakeTransformerForControlNode(
-            int controlNode, KernelGraph const& graph, ContextPtr context);
+        std::tuple<CoordinateGraph::Transformer, std::set<int>>
+            getFakeTransformerForControlNode(int                controlNode,
+                                             KernelGraph const& graph,
+                                             ContextPtr         context,
+                                             bool               isDirect2LDS    = false,
+                                             bool               addComputeIndex = false);
 
         /**
          * Returns the fastest moving coordinate out of `coords`, which:

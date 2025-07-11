@@ -221,7 +221,7 @@ namespace rocRoller::KernelGraph
     std::vector<int> addDataFlowTagDeallocates(KernelGraph& graph)
     {
         auto tracer    = LastRWTracer(graph);
-        auto locations = tracer.lastRWLocations();
+        auto locations = tracer.lastRWLocations(); //
         auto topo      = TopologicalCompare(std::make_shared<KernelGraph>(graph));
 
         // Map of <incoming Sequence edges to add, tags to deallocate>
