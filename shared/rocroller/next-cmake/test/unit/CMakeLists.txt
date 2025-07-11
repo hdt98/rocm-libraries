@@ -24,6 +24,7 @@ target_sources(rocroller-tests
         "${_CMAKE_CURRENT_SOURCE_DIR}/ContextFixture.cpp"
         "${_CMAKE_CURRENT_SOURCE_DIR}/GPUContextFixture.cpp"
         "${_CMAKE_CURRENT_SOURCE_DIR}/GenericContextFixture.cpp"
+        "${_CMAKE_CURRENT_SOURCE_DIR}/AssignComputeIndexTest.cpp"
         "${_CMAKE_CURRENT_SOURCE_DIR}/AddStreamKTest.cpp"
         "${_CMAKE_CURRENT_SOURCE_DIR}/AllocatingObserverTest.cpp"
         "${_CMAKE_CURRENT_SOURCE_DIR}/ArgumentLoaderTest.cpp"

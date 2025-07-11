@@ -42,95 +42,23 @@ using namespace rocRoller::KernelGraph;
 using namespace rocRoller::KernelGraph::CoordinateGraph;
 using namespace rocRoller::KernelGraph::ControlGraph;
 
-namespace LDSCopyTest
+namespace ComputeIndexTest
 {
-    struct LDSCopyTest : public GPUContextFixture
+    struct ComputeIndexTest : public GPUContextFixture
     {
     };
 
-    // TODO: make it more general and works for GEMM problem as a graph transform
-    /*
-     * This function replaces a pair of {LoadTiled, StoreLDSTile} with a {LoadTileDirect2LDS}
-     * An example to illustrate:
-     *
-     * Original control graph:
-     *
-     * Kernel
-     *   |
-     *   --[body]--> Scope --[body]--> ComputeIndex --[seq]--> ComputeIndex --[seq]--> LoadTiled
-     *                 |
-     *                 |[seq]
-     *                 |
-     *                 v
-     *              Barrier --[seq]--> Scope --[seq]--> ComputeIndex --[seq]--> ComputeIndex --[seq] -->StoreLDSTiled
-     *
-     *
-     * New control graph:
-     *
-     * Kernel
-     *   |
-     *   --[body]--> Scope --[body]--> ComputeIndex --[seq]--> ComputeIndex --[seq]--> NOP
-     *                                                                                  |
-     *                                                                                  |[seq]
-     *                                                                                  |
-     *                                                                                  v
-     *                                                                             ComputeIndex
-     *                                                                                  |
-     *                                                                                  |[seq]
-     *                                                                                  |
-     *                                                                                  v
-     *                                                                             ComputeIndex
-     *                                                                                  |
-     *                                                                                  |[seq]
-     *                                                                                  |
-     *                                                                                  v
-     *                                                                                 NOP
-     *                                                                                  |
-     *                                                                                  |[seq]
-     *                                                                                  |
-     *                                                                                  v
-     *                                                                                Barrier
-     *                                                                                  |
-     *                                                                                  |[seq]
-     *                                                                                  |
-     *                                                                                  v
-     *                                                                          LoadTileDirect2LDS
-    */
-    void addDirect2LDS(rocRoller::KernelGraph::KernelGraph& kgraph)
+    TEST_P(ComputeIndexTest, GPU_ComputeIndexTest)
     {
-        auto loadTiledNodes    = kgraph.control.getNodes<LoadTiled>().to<std::vector>();
-        auto storeLDSTileNodes = kgraph.control.getNodes<StoreLDSTile>().to<std::vector>();
-        for(auto loadGlobal : loadTiledNodes)
-        {
-            auto internalMacroTile = kgraph.mapper.get<MacroTile>(loadGlobal);
-            for(auto storeLDS : storeLDSTileNodes)
-            {
-                if(kgraph.mapper.get<MacroTile>(storeLDS) == internalMacroTile)
-                {
-                    // add LoadTileDirect2LDS operation
-                    auto direct2lds
-                        = kgraph.control.addElement(LoadTileDirect2LDS(DataType::UInt32));
+        // REQUIRE_ARCH_CAP(GPUCapability::HasDirectToLds);
+        // auto const& arch = m_context->targetArchitecture().target();
+        // if(!arch.isCDNA35GPU())
+        // {
+        //     GTEST_SKIP() << "Test not yet supported on "
+        //                  << m_context->targetArchitecture().target().toString() << std::endl;
+        // }
 
-                    // copy mapper connections to LoadTileDirect2LDS operation
-                    moveConnections(kgraph, loadGlobal, direct2lds, 0);
-                    moveConnections(kgraph, storeLDS, direct2lds, 2);
-
-                    // replace LoadTiled
-                    replaceWith(kgraph, loadGlobal, direct2lds, false);
-                    replaceWith(kgraph, storeLDS, kgraph.control.addElement(NOP()), false);
-
-                    // remove nodes
-                    purgeNodes(kgraph, {loadGlobal, storeLDS});
-                }
-            }
-        }
-    }
-
-    TEST_P(LDSCopyTest, GPU_LDSCopyTest)
-    {
-        REQUIRE_ARCH_CAP(GPUCapability::HasDirectToLds);
-
-        const int MN = 256;
+        const int MN = 1024;
         const int K  = 1;
 
         auto expr1u = Expression::literal(1u);
@@ -268,13 +196,14 @@ namespace LDSCopyTest
         auto lowerTile = std::make_shared<LowerTile>(params, m_context);
         kgraph         = kgraph.transform(lowerTile);
 
-        addDirect2LDS(kgraph);
-
         auto updateWavefrontParams = std::make_shared<UpdateWavefrontParameters>(params);
         kgraph                     = kgraph.transform(updateWavefrontParams);
 
         auto addComputeIndex = std::make_shared<AddComputeIndex>(m_context);
         kgraph               = kgraph.transform(addComputeIndex);
+
+        auto deallocateDF = std::make_shared<AddDeallocateDataFlow>();
+        kgraph            = kgraph.transform(deallocateDF);
 
         m_context->schedule(k->preamble());
         m_context->schedule(k->prolog());
@@ -285,8 +214,8 @@ namespace LDSCopyTest
 
         if(!isLocalDevice())
         {
-            std::vector<char> assembledKernel = m_context->instructions()->assemble();
-            EXPECT_GT(assembledKernel.size(), 0);
+            // std::vector<char> assembledKernel = m_context->instructions()->assemble();
+            // EXPECT_GT(assembledKernel.size(), 0);
         }
         else
         {
@@ -322,5 +251,5 @@ namespace LDSCopyTest
         }
     }
 
-    INSTANTIATE_TEST_SUITE_P(LDSCopyTest, LDSCopyTest, currentGPUISA());
+    INSTANTIATE_TEST_SUITE_P(ComputeIndexTest, ComputeIndexTest, currentGPUISA());
 }

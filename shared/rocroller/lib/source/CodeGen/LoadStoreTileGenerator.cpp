@@ -579,6 +579,10 @@ namespace rocRoller
 
             // Compute an offset address if we don't have an
             // associated base address to inherit from
+            // if(base >= 0)
+            // {
+            //     m_baseOffsets.insert_or_assign(offset, base);
+            // }
             if(base < 0)
             {
                 auto offsetReg
@@ -610,10 +614,15 @@ namespace rocRoller
                 co_yield Instruction::Comment(
                     fmt::format("  Offset({}): paddingBytes: {}", offset, toString(paddingBytes)));
 
-                co_yield generate(
-                    offsetReg,
-                    convert(offsetReg->variableType(), toBytes(indexExpr) + paddingBytes));
-                offsetReg->setReadOnly();
+                auto newExpr = toBytes(indexExpr) + paddingBytes;
+
+                std::cout << "YL: code generator (tag, expression, offset) " << tag << ", "
+                          << toString(newExpr) << ", " << offset << std::endl;
+
+                // co_yield generate(
+                //     offsetReg,
+                //     convert(offsetReg->variableType(), toBytes(indexExpr) + paddingBytes));
+                // offsetReg->setReadOnly();
             }
             else
             {
@@ -699,35 +708,39 @@ namespace rocRoller
                     }
                 }
 
-                co_yield Instruction::Comment(
-                    fmt::format("  Stride({}): indexExpr: {}", stride, toString(indexExpr)));
-                co_yield Instruction::Comment(fmt::format("  Stride({}): indexExprPaddingBytes: {}",
-                                                          stride,
-                                                          toString(indexExprPaddingBytes)));
-                co_yield Instruction::Comment(
-                    fmt::format("  Stride({}): unitStride: {} vgprBlockSize: {}",
-                                stride,
-                                unitStride,
-                                elementBlockSize));
-                co_yield Instruction::Comment(fmt::format(
-                    "  Stride({}): elementBlockStride: {} elementBlockStridePaddingBytes: {}",
-                    stride,
-                    toString(elementBlockStride),
-                    toString(elementBlockStridePaddingBytes)));
-                co_yield Instruction::Comment(fmt::format("  Stride({}): trLoadPairStride:  {} "
-                                                          "trLoadPairStridePaddingBytes: {}",
-                                                          stride,
-                                                          toString(trLoadPairStride),
-                                                          toString(trLoadPairStridePaddingBytes)));
+                // co_yield Instruction::Comment(
+                //     fmt::format("  Stride({}): indexExpr: {}", stride, toString(indexExpr)));
+                // co_yield Instruction::Comment(fmt::format("  Stride({}): indexExprPaddingBytes: {}",
+                //                                           stride,
+                //                                           toString(indexExprPaddingBytes)));
+                // co_yield Instruction::Comment(
+                //     fmt::format("  Stride({}): unitStride: {} vgprBlockSize: {}",
+                //                 stride,
+                //                 unitStride,
+                //                 elementBlockSize));
+                // co_yield Instruction::Comment(fmt::format(
+                //     "  Stride({}): elementBlockStride: {} elementBlockStridePaddingBytes: {}",
+                //     stride,
+                //     toString(elementBlockStride),
+                //     toString(elementBlockStridePaddingBytes)));
+                // co_yield Instruction::Comment(fmt::format("  Stride({}): trLoadPairStride:  {} "
+                //                                           "trLoadPairStridePaddingBytes: {}",
+                //                                           stride,
+                //                                           toString(trLoadPairStride),
+                //                                           toString(trLoadPairStridePaddingBytes)));
 
-                tagger->addExpression(stride,
-                                      m_fastArith(toBytes(indexExpr) + indexExprPaddingBytes),
-                                      {ci.strideType,
-                                       unitStride,
-                                       elementBlockSize,
-                                       toBytes(elementBlockStride) + elementBlockStridePaddingBytes,
-                                       toBytes(trLoadPairStride) + trLoadPairStridePaddingBytes});
-                scope->addRegister(stride);
+                // tagger->addExpression(stride,
+                //                       m_fastArith(toBytes(indexExpr) + indexExprPaddingBytes),
+                //                       {ci.strideType,
+                //                        unitStride,
+                //                        elementBlockSize,
+                //                        toBytes(elementBlockStride) + elementBlockStridePaddingBytes,
+                //                        toBytes(trLoadPairStride) + trLoadPairStridePaddingBytes});
+                // scope->addRegister(stride);
+                auto newExpr = toBytes(indexExpr) + indexExprPaddingBytes;
+
+                std::cout << "YL: code generator (tag, expression, stride) " << tag << ", "
+                          << toString(newExpr) << ", " << stride << std::endl;
             }
 
             // Create a buffer descriptor

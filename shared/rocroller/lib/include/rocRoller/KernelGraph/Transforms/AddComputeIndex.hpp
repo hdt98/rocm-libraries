@@ -51,11 +51,18 @@ namespace rocRoller
         class AddComputeIndex : public GraphTransform
         {
         public:
+            AddComputeIndex(ContextPtr context)
+                : m_context(context)
+            {
+            }
             KernelGraph apply(KernelGraph const& original) override;
             std::string name() const override
             {
                 return "AddComputeIndex";
             }
+
+        private:
+            ContextPtr m_context;
         };
     }
 }
