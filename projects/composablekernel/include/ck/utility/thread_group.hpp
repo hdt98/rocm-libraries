@@ -47,7 +47,7 @@ struct ThisThreadBlockWaveGroup
 
     static constexpr index_t GetNumWavePerGroup() { return kNumWavePerGroup_; }
 
-    static constexpr index_t GetNumWaveGroups() {return NumWaveGroup;}
+    static constexpr index_t GetNumWaveGroups() { return NumWaveGroup; }
 };
 
 } // namespace ck

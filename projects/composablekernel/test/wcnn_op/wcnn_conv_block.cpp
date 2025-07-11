@@ -102,7 +102,7 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
                           AccBlockwiseNextOperation,
                           decltype(WeiDataBlockDesc),
                           decltype(InDataBlockDesc),
-                          decltype(InClusterBorderDataBlockDesc),
+                          decltype(MakeInClusterBorderBlockDescriptor<false>()),
                           EmptyTuple,
                           HPerBlock,
                           WPerBlock,

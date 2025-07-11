@@ -75,10 +75,10 @@ template <index_t NDimSpatial,
           bool EnableAsync,
           bool EnableWaveGroup,
           bool EnableSpatialCluster = false,
-          index_t ClusterDimSize = 0,
-          bool ShuffleOnLoad = false,
-          bool Transposed    = false,
-          bool TileStore     = false>
+          index_t ClusterDimSize    = 0,
+          bool ShuffleOnLoad        = false,
+          bool Transposed           = false,
+          bool TileStore            = false>
 struct DeviceGroupedConvFwdMultipleD_Wcnn_CShuffle
     : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
                                              InLayout,
@@ -121,7 +121,6 @@ struct DeviceGroupedConvFwdMultipleD_Wcnn_CShuffle
     static constexpr index_t GridWRepeat    = ShuffleConv2 ? WRepeat / 2 : WRepeat;
     static constexpr index_t GridKPerBlock  = ShuffleTransposeConv2 ? KPerBlock * 4 : KPerBlock;
 
-    static constexpr index_t Cluster_dim_size = ClusterDimSize;
     static constexpr index_t num_wave_group = 4;
 
     // Describe how data read from Global memory
@@ -299,7 +298,7 @@ struct DeviceGroupedConvFwdMultipleD_Wcnn_CShuffle
                                                              NumPrefetch,
                                                              EnableWaveGroup,
                                                              EnableSpatialCluster,
-                                                             Cluster_dim_size,
+                                                             ClusterDimSize,
                                                              GridTransposed,
                                                              TileStore>;
 
@@ -455,44 +454,45 @@ struct DeviceGroupedConvFwdMultipleD_Wcnn_CShuffle
                 {
                     if constexpr(EnableSpatialCluster)
                     {
-                        const auto kernel = kernel_grouped_conv_fwd_wcnn_wavegroup512_spatial_cluster<
-                            GridwiseConv,
-                            InDataType,
-                            WeiDataType,
-                            typename GridwiseConv::DsGridPointer,
-                            AccDataType,
-                            EDataType,
-                            InElementwiseOperation,
-                            WeiElementwiseOperation,
-                            AccElementwiseOperation,
-                            DeviceOp::InGridDesc,
-                            DeviceOp::WeiGridDesc,
-                            DeviceOp::DsGridDesc,
-                            DeviceOp::EGridDesc,
-                            remove_reference_t<typename GridwiseConv::DefaultBlock2CTileMap>,
-                            ComputePtrOffsetOfStridedBatch<I1, I1, Number<NumDTensor>{}>,
-                            has_main_loop,
-                            Cluster_dim_size>;
+                        const auto kernel =
+                            kernel_grouped_conv_fwd_wcnn_wavegroup512_spatial_cluster<
+                                GridwiseConv,
+                                InDataType,
+                                WeiDataType,
+                                typename GridwiseConv::DsGridPointer,
+                                AccDataType,
+                                EDataType,
+                                InElementwiseOperation,
+                                WeiElementwiseOperation,
+                                AccElementwiseOperation,
+                                DeviceOp::InGridDesc,
+                                DeviceOp::WeiGridDesc,
+                                DeviceOp::DsGridDesc,
+                                DeviceOp::EGridDesc,
+                                remove_reference_t<typename GridwiseConv::DefaultBlock2CTileMap>,
+                                ComputePtrOffsetOfStridedBatch<I1, I1, Number<NumDTensor>{}>,
+                                has_main_loop,
+                                ClusterDimSize>;
 
                         return launch_and_time_kernel(stream_config,
-                                                    kernel,
-                                                    dim3(grid_size),
-                                                    dim3(BlockSize),
-                                                    0,
-                                                    arg.p_in_grid_,
-                                                    arg.p_wei_grid_,
-                                                    arg.p_ds_grid_,
-                                                    arg.p_e_grid_,
-                                                    arg.in_element_op_,
-                                                    arg.wei_element_op_,
-                                                    arg.acc_element_op_,
-                                                    arg.a_g_n_c_wis_lengths_[0], // Group count
-                                                    arg.in_grid_desc_,
-                                                    arg.wei_grid_desc_,
-                                                    arg.ds_grid_desc_,
-                                                    arg.e_grid_desc_,
-                                                    arg.block_2_etile_map_,
-                                                    arg.compute_ptr_offset_of_batch_);
+                                                      kernel,
+                                                      dim3(grid_size),
+                                                      dim3(BlockSize),
+                                                      0,
+                                                      arg.p_in_grid_,
+                                                      arg.p_wei_grid_,
+                                                      arg.p_ds_grid_,
+                                                      arg.p_e_grid_,
+                                                      arg.in_element_op_,
+                                                      arg.wei_element_op_,
+                                                      arg.acc_element_op_,
+                                                      arg.a_g_n_c_wis_lengths_[0], // Group count
+                                                      arg.in_grid_desc_,
+                                                      arg.wei_grid_desc_,
+                                                      arg.ds_grid_desc_,
+                                                      arg.e_grid_desc_,
+                                                      arg.block_2_etile_map_,
+                                                      arg.compute_ptr_offset_of_batch_);
                     }
                     else
                     {
@@ -515,68 +515,69 @@ struct DeviceGroupedConvFwdMultipleD_Wcnn_CShuffle
                             has_main_loop>;
 
                         return launch_and_time_kernel(stream_config,
-                                                    kernel,
-                                                    dim3(grid_size),
-                                                    dim3(BlockSize),
-                                                    0,
-                                                    arg.p_in_grid_,
-                                                    arg.p_wei_grid_,
-                                                    arg.p_ds_grid_,
-                                                    arg.p_e_grid_,
-                                                    arg.in_element_op_,
-                                                    arg.wei_element_op_,
-                                                    arg.acc_element_op_,
-                                                    arg.a_g_n_c_wis_lengths_[0], // Group count
-                                                    arg.in_grid_desc_,
-                                                    arg.wei_grid_desc_,
-                                                    arg.ds_grid_desc_,
-                                                    arg.e_grid_desc_,
-                                                    arg.block_2_etile_map_,
-                                                    arg.compute_ptr_offset_of_batch_);
+                                                      kernel,
+                                                      dim3(grid_size),
+                                                      dim3(BlockSize),
+                                                      0,
+                                                      arg.p_in_grid_,
+                                                      arg.p_wei_grid_,
+                                                      arg.p_ds_grid_,
+                                                      arg.p_e_grid_,
+                                                      arg.in_element_op_,
+                                                      arg.wei_element_op_,
+                                                      arg.acc_element_op_,
+                                                      arg.a_g_n_c_wis_lengths_[0], // Group count
+                                                      arg.in_grid_desc_,
+                                                      arg.wei_grid_desc_,
+                                                      arg.ds_grid_desc_,
+                                                      arg.e_grid_desc_,
+                                                      arg.block_2_etile_map_,
+                                                      arg.compute_ptr_offset_of_batch_);
                     }
                 }
                 else if constexpr(EnableWaveGroup)
                 {
                     if constexpr(EnableSpatialCluster)
                     {
-                        const auto kernel = kernel_grouped_conv_fwd_wcnn_wavegroup256_spatial_cluster<
-                            GridwiseConv,
-                            InDataType,
-                            WeiDataType,
-                            typename GridwiseConv::DsGridPointer,
-                            AccDataType,
-                            EDataType,
-                            InElementwiseOperation,
-                            WeiElementwiseOperation,
-                            AccElementwiseOperation,
-                            DeviceOp::InGridDesc,
-                            DeviceOp::WeiGridDesc,
-                            DeviceOp::DsGridDesc,
-                            DeviceOp::EGridDesc,
-                            remove_reference_t<typename GridwiseConv::DefaultBlock2CTileMap>,
-                            ComputePtrOffsetOfStridedBatch<I1, I1, Number<NumDTensor>{}>,
-                            has_main_loop,
-                            Cluster_dim_size>;
+                        const auto kernel =
+                            kernel_grouped_conv_fwd_wcnn_wavegroup256_spatial_cluster<
+                                GridwiseConv,
+                                InDataType,
+                                WeiDataType,
+                                typename GridwiseConv::DsGridPointer,
+                                AccDataType,
+                                EDataType,
+                                InElementwiseOperation,
+                                WeiElementwiseOperation,
+                                AccElementwiseOperation,
+                                DeviceOp::InGridDesc,
+                                DeviceOp::WeiGridDesc,
+                                DeviceOp::DsGridDesc,
+                                DeviceOp::EGridDesc,
+                                remove_reference_t<typename GridwiseConv::DefaultBlock2CTileMap>,
+                                ComputePtrOffsetOfStridedBatch<I1, I1, Number<NumDTensor>{}>,
+                                has_main_loop,
+                                ClusterDimSize>;
 
                         return launch_and_time_kernel(stream_config,
-                                                    kernel,
-                                                    dim3(grid_size),
-                                                    dim3(BlockSize),
-                                                    0,
-                                                    arg.p_in_grid_,
-                                                    arg.p_wei_grid_,
-                                                    arg.p_ds_grid_,
-                                                    arg.p_e_grid_,
-                                                    arg.in_element_op_,
-                                                    arg.wei_element_op_,
-                                                    arg.acc_element_op_,
-                                                    arg.a_g_n_c_wis_lengths_[0], // Group count
-                                                    arg.in_grid_desc_,
-                                                    arg.wei_grid_desc_,
-                                                    arg.ds_grid_desc_,
-                                                    arg.e_grid_desc_,
-                                                    arg.block_2_etile_map_,
-                                                    arg.compute_ptr_offset_of_batch_);
+                                                      kernel,
+                                                      dim3(grid_size),
+                                                      dim3(BlockSize),
+                                                      0,
+                                                      arg.p_in_grid_,
+                                                      arg.p_wei_grid_,
+                                                      arg.p_ds_grid_,
+                                                      arg.p_e_grid_,
+                                                      arg.in_element_op_,
+                                                      arg.wei_element_op_,
+                                                      arg.acc_element_op_,
+                                                      arg.a_g_n_c_wis_lengths_[0], // Group count
+                                                      arg.in_grid_desc_,
+                                                      arg.wei_grid_desc_,
+                                                      arg.ds_grid_desc_,
+                                                      arg.e_grid_desc_,
+                                                      arg.block_2_etile_map_,
+                                                      arg.compute_ptr_offset_of_batch_);
                     }
                     else
                     {
@@ -597,27 +598,27 @@ struct DeviceGroupedConvFwdMultipleD_Wcnn_CShuffle
                             remove_reference_t<typename GridwiseConv::DefaultBlock2CTileMap>,
                             ComputePtrOffsetOfStridedBatch<I1, I1, Number<NumDTensor>{}>,
                             has_main_loop,
-                            Cluster_dim_size>;
+                            ClusterDimSize>;
 
                         return launch_and_time_kernel(stream_config,
-                                                    kernel,
-                                                    dim3(grid_size),
-                                                    dim3(BlockSize),
-                                                    0,
-                                                    arg.p_in_grid_,
-                                                    arg.p_wei_grid_,
-                                                    arg.p_ds_grid_,
-                                                    arg.p_e_grid_,
-                                                    arg.in_element_op_,
-                                                    arg.wei_element_op_,
-                                                    arg.acc_element_op_,
-                                                    arg.a_g_n_c_wis_lengths_[0], // Group count
-                                                    arg.in_grid_desc_,
-                                                    arg.wei_grid_desc_,
-                                                    arg.ds_grid_desc_,
-                                                    arg.e_grid_desc_,
-                                                    arg.block_2_etile_map_,
-                                                    arg.compute_ptr_offset_of_batch_);
+                                                      kernel,
+                                                      dim3(grid_size),
+                                                      dim3(BlockSize),
+                                                      0,
+                                                      arg.p_in_grid_,
+                                                      arg.p_wei_grid_,
+                                                      arg.p_ds_grid_,
+                                                      arg.p_e_grid_,
+                                                      arg.in_element_op_,
+                                                      arg.wei_element_op_,
+                                                      arg.acc_element_op_,
+                                                      arg.a_g_n_c_wis_lengths_[0], // Group count
+                                                      arg.in_grid_desc_,
+                                                      arg.wei_grid_desc_,
+                                                      arg.ds_grid_desc_,
+                                                      arg.e_grid_desc_,
+                                                      arg.block_2_etile_map_,
+                                                      arg.compute_ptr_offset_of_batch_);
                     }
                 }
                 else
@@ -1049,6 +1050,8 @@ struct DeviceGroupedConvFwdMultipleD_Wcnn_CShuffle
                       "ShuffleOnLoad only can be used in conv2");
         static_assert((Transposed == false) || (FilterSize == 2),
                       "Transposed conv only support conv2 for now.");
+        static_assert((EnableSpatialCluster == false) || (ClusterDimSize != 0),
+                      "ClusterDimSize shoule set when EnableSpatialCluster");
 
         bool input_layout_compatible =
             IsConvLayoutCompatible<InLayout>(arg.a_g_n_c_wis_lengths_, arg.a_g_n_c_wis_strides_);
