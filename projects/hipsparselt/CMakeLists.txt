@@ -135,6 +135,10 @@ else()
       )
     endif()
 
+    if(AMDGPU_TARGETS AND NOT GPU_TARGETS)
+      message( DEPRECATION "AMDGPU_TARGETS use is deprecated. Use GPU_TARGETS." )
+    endif()
+
     if (AMDGPU_TARGETS)
         set(TMPAMDGPU_TARGETS "${AMDGPU_TARGETS}")
         if(TMPAMDGPU_TARGETS STREQUAL "all" )
@@ -146,7 +150,10 @@ else()
         set(AMDGPU_TARGETS "${DEFAULT_AMDGPU_TARGETS}" CACHE STRING "List of specific machine types for library to target")
     endif()
 
-    message(STATUS "AMDGPU_TARGETS: ${AMDGPU_TARGETS}")
+    # Don't force, as users should be able to override GPU_TARGETS at the command line if desired
+    set(GPU_TARGETS "${AMDGPU_TARGETS}" CACHE STRING "GPU architectures to build for")
+
+    message(STATUS "GPU_TARGETS: ${GPU_TARGETS}")
 
     if( CMAKE_CXX_COMPILER_ID MATCHES "Clang" )
         find_package( hip REQUIRED CONFIG PATHS ${HIP_DIR} ${ROCM_PATH} /opt/rocm )
@@ -156,7 +163,7 @@ else()
 
     if( BUILD_WITH_TENSILE )
       # we will have expanded "all" for tensile to ensure consistency as we have local rules
-      set( Tensile_ARCHITECTURE "${AMDGPU_TARGETS}" CACHE STRING "Tensile to use which architecture?" FORCE)
+      set( Tensile_ARCHITECTURE "${GPU_TARGETS}" CACHE STRING "Tensile to use which architecture?" FORCE)
 
       set( Tensile_LOGIC "asm_full" CACHE STRING "Tensile to use which logic?")
 
