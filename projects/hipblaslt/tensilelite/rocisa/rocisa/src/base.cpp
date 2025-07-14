@@ -26,6 +26,11 @@ namespace nb = nanobind;
 
 namespace rocisa
 {
+    std::string getGitVersion()
+    {
+        return ROCISA_GIT_COMMIT_HASH;
+    }
+
     std::string isaToGfx(const nb::tuple& arch)
     {
         return getGfxNameTuple(
@@ -58,6 +63,7 @@ namespace rocisa
 
 void init_base(nb::module_ m)
 {
+    m.def("getGitVersion", &rocisa::getGitVersion, "Get git commit hash of rocisa.");
     m.def("isaToGfx", nb::overload_cast<const nb::tuple&>(&rocisa::isaToGfx));
     m.def("isaToGfx", nb::overload_cast<const IsaVersion&>(&rocisa::isaToGfx));
     m.def("getGlcBitName", &rocisa::getGlcBitName);

@@ -27,6 +27,23 @@ from functools import lru_cache
 
 from .Architectures import SUPPORTED_ISA
 
+from rocisa import getGitVersion
+
+# Force version check here
+def verifyRocisaVersion():
+    import subprocess
+    def getGitVersionPython():
+        return subprocess.check_output(
+            ['git', 'rev-parse', '--short', 'HEAD']
+        ).decode('ascii').strip()
+    cppVersion = getGitVersion()
+    pyVersion  = getGitVersionPython()
+    if cppVersion != pyVersion:
+        raise RuntimeError(f"rocisa version mismatch: C++ version {cppVersion} != Python version {pyVersion}. Please rebuild rocisa.")
+    print(f"rocisa version {cppVersion} (git commit hash) is same as Python version {pyVersion}")
+
+verifyRocisaVersion()
+
 ################################################################################
 # Enumerate Valid Solution Parameters
 ################################################################################

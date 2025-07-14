@@ -44,6 +44,8 @@ namespace nb = nanobind;
 
 namespace rocisa
 {
+    std::string getGitVersion();
+
     struct KernelInfo
     {
         IsaVersion isaVersion;
