@@ -1782,6 +1782,11 @@ struct GridwiseConvMultipleD_Wcnn_CShuffle
             return false;
         }
 
+        if(EnableSpatialCluster && (FilterSize == 2))
+        {
+            return false;
+        }
+
 #if 0
         // Tensor & transform debugging code
         BlockwiseConv blockwise_conv = {};
@@ -1815,17 +1820,25 @@ struct GridwiseConvMultipleD_Wcnn_CShuffle
             BlockwiseConv::template GetLaneSharedMemCount<HasMainBlockLoop>();
         static constexpr index_t in_block_space_offset = 0;
         static constexpr index_t pre_in_block_space_offset =
-            in_block_space_offset +
-            BlockwiseConv::LaneSharedMemTrait::in_block_space_size_aligned * mem_count;
+            EnableSpatialCluster
+                ? (in_block_space_offset +
+                   BlockwiseConv::LaneSharedMemTrait::in_block_space_size_aligned * mem_count)
+                : in_block_space_offset;
         static constexpr index_t next_in_block_space_offset =
-            pre_in_block_space_offset +
-            BlockwiseConv::LaneSharedMemTrait::in_block_space_size_aligned * mem_count;
+            EnableSpatialCluster
+                ? (pre_in_block_space_offset +
+                   BlockwiseConv::LaneSharedMemTrait::in_block_space_size_aligned * mem_count)
+                : in_block_space_offset;
         static constexpr index_t pre_cluster_in_block_space_offset =
-            next_in_block_space_offset +
-            BlockwiseConv::LaneSharedMemTrait::in_block_space_size_aligned * mem_count;
+            EnableSpatialCluster
+                ? (next_in_block_space_offset +
+                   BlockwiseConv::LaneSharedMemTrait::in_block_space_size_aligned * mem_count)
+                : in_block_space_offset;
         static constexpr index_t next_cluster_in_block_space_offset =
-            pre_cluster_in_block_space_offset +
-            BlockwiseConv::LaneSharedMemTrait::in_block_space_size_aligned * mem_count;
+            EnableSpatialCluster
+                ? (pre_cluster_in_block_space_offset +
+                   BlockwiseConv::LaneSharedMemTrait::in_block_space_size_aligned * mem_count)
+                : in_block_space_offset;
         static constexpr index_t wei_block_space_offset =
             next_cluster_in_block_space_offset +
             BlockwiseConv::LaneSharedMemTrait::in_block_space_size_aligned * mem_count;
@@ -2096,6 +2109,7 @@ struct GridwiseConvMultipleD_Wcnn_CShuffle
             // input data blockwise copy
             if constexpr(InEnableLds)
             {
+                // Not support in LDS
                 auto in_block_buf = make_dynamic_buffer<AddressSpaceEnum::Lds>(
                     static_cast<InDataType*>(p_shared),
                     BlockwiseConv::SharedMemTrait::in_block_space_size_aligned);
@@ -2161,47 +2175,40 @@ struct GridwiseConvMultipleD_Wcnn_CShuffle
             }
             else
             {
-                if constexpr(EnableWaveGroup && EnableSpatialCluster)
-                {
-                    auto indata_slice_origin_idx =
-                        wcnn_conv.template CalculateInDataThreadOriginDataIndex<InTileLoad>();
-                    auto h0 = (h_block_data_idx_on_grid + wave_idx[I0] * HPerWave) / HPerWcnn;
-                    auto w0 = (w_block_data_idx_on_grid + wave_idx[I1] * WPerWave) / WPerWcnn;
-                    constexpr index_t threadsPerTensorTile = (WPerWcnn == 4) ? 2 : 4;
-                    constexpr index_t vgprPerTensorTile    = (HPerWcnn == 8) ? 2 : 1;
+                auto indata_slice_origin_idx =
+                    wcnn_conv.template CalculateInDataThreadOriginDataIndex<InTileLoad>();
+                auto h0 = (h_block_data_idx_on_grid + wave_idx[I0] * HPerWave) / HPerWcnn;
+                auto w0 = (w_block_data_idx_on_grid + wave_idx[I1] * WPerWave) / WPerWcnn;
+                constexpr index_t threadsPerTensorTile = (WPerWcnn == 4) ? 2 : 4;
+                constexpr index_t vgprPerTensorTile    = (HPerWcnn == 8) ? 2 : 1;
 
-                    // Limitation: NumDim of Src and Dst descriptor should be identical
-                    auto pre_blockwise_copy = ThreadwiseTensorSliceTransfer_v2<
-                        InDataType,
-                        InDataType,
-                        decltype(in_grid_block_desc),
-                        decltype(in_cluster_border_block_desc),
-                        decltype(BlockwiseConv::GetInBorderWaveDescLength()),
-                        Sequence<0, 1, 2, 3, 4, 5, 6>,
-                        6,
-                        NumDataCompPerTile,
-                        1,
-                        false,
-                        false,
-                        false,
-                        false,
-                        InTileLoad,
-                        threadsPerTensorTile,
-                        vgprPerTensorTile>(in_grid_block_desc,
-                                           make_multi_index(w0 - 1,
-                                                            0,
-                                                            h0,
-                                                            0,
-                                                            indata_slice_origin_idx[I0],
-                                                            indata_slice_origin_idx[I1],
-                                                            indata_slice_origin_idx[I2]));
+                // Limitation: NumDim of Src and Dst descriptor should be identical
+                auto pre_blockwise_copy = ThreadwiseTensorSliceTransfer_v2<
+                    InDataType,
+                    InDataType,
+                    decltype(in_grid_block_desc),
+                    decltype(in_cluster_border_block_desc),
+                    decltype(BlockwiseConv::GetInBorderWaveDescLength()),
+                    Sequence<0, 1, 2, 3, 4, 5, 6>,
+                    6,
+                    NumDataCompPerTile,
+                    1,
+                    false,
+                    false,
+                    false,
+                    false,
+                    InTileLoad,
+                    threadsPerTensorTile,
+                    vgprPerTensorTile>(in_grid_block_desc,
+                                       make_multi_index(w0 - 1,
+                                                        0,
+                                                        h0,
+                                                        0,
+                                                        indata_slice_origin_idx[I0],
+                                                        indata_slice_origin_idx[I1],
+                                                        indata_slice_origin_idx[I2]));
 
-                    return make_tuple(pre_cluster_buf, pre_blockwise_copy);
-                }
-                else
-                {
-                    static_assert(0, "Only fetch the border tile in spatial cluster");
-                }
+                return make_tuple(pre_cluster_buf, pre_blockwise_copy);
             }
         };
 
@@ -2274,46 +2281,39 @@ struct GridwiseConvMultipleD_Wcnn_CShuffle
             }
             else
             {
-                if constexpr(EnableWaveGroup && EnableSpatialCluster)
-                {
-                    auto indata_slice_origin_idx =
-                        wcnn_conv.template CalculateInDataThreadOriginDataIndex<InTileLoad>();
-                    auto h0 = (h_block_data_idx_on_grid + wave_idx[I0] * HPerWave) / HPerWcnn;
-                    auto w0 = (w_block_data_idx_on_grid + (wave_idx[I1] + 1) * WPerWave) / WPerWcnn;
-                    constexpr index_t threadsPerTensorTile = (WPerWcnn == 4) ? 2 : 4;
-                    constexpr index_t vgprPerTensorTile    = (HPerWcnn == 8) ? 2 : 1;
+                auto indata_slice_origin_idx =
+                    wcnn_conv.template CalculateInDataThreadOriginDataIndex<InTileLoad>();
+                auto h0 = (h_block_data_idx_on_grid + wave_idx[I0] * HPerWave) / HPerWcnn;
+                auto w0 = (w_block_data_idx_on_grid + (wave_idx[I1] + 1) * WPerWave) / WPerWcnn;
+                constexpr index_t threadsPerTensorTile = (WPerWcnn == 4) ? 2 : 4;
+                constexpr index_t vgprPerTensorTile    = (HPerWcnn == 8) ? 2 : 1;
 
-                    auto next_blockwise_copy = ThreadwiseTensorSliceTransfer_v2<
-                        InDataType,
-                        InDataType,
-                        decltype(in_grid_block_desc),
-                        decltype(in_cluster_border_block_desc),
-                        decltype(BlockwiseConv::GetInBorderWaveDescLength()),
-                        Sequence<0, 1, 2, 3, 4, 5, 6>,
-                        6,
-                        NumDataCompPerTile,
-                        1,
-                        false,
-                        false,
-                        false,
-                        false,
-                        InTileLoad,
-                        threadsPerTensorTile,
-                        vgprPerTensorTile>(in_grid_block_desc,
-                                           make_multi_index(w0,
-                                                            0,
-                                                            h0,
-                                                            0,
-                                                            indata_slice_origin_idx[I0],
-                                                            indata_slice_origin_idx[I1],
-                                                            indata_slice_origin_idx[I2]));
+                auto next_blockwise_copy = ThreadwiseTensorSliceTransfer_v2<
+                    InDataType,
+                    InDataType,
+                    decltype(in_grid_block_desc),
+                    decltype(in_cluster_border_block_desc),
+                    decltype(BlockwiseConv::GetInBorderWaveDescLength()),
+                    Sequence<0, 1, 2, 3, 4, 5, 6>,
+                    6,
+                    NumDataCompPerTile,
+                    1,
+                    false,
+                    false,
+                    false,
+                    false,
+                    InTileLoad,
+                    threadsPerTensorTile,
+                    vgprPerTensorTile>(in_grid_block_desc,
+                                       make_multi_index(w0,
+                                                        0,
+                                                        h0,
+                                                        0,
+                                                        indata_slice_origin_idx[I0],
+                                                        indata_slice_origin_idx[I1],
+                                                        indata_slice_origin_idx[I2]));
 
-                    return make_tuple(next_cluster_buf, next_blockwise_copy);
-                }
-                else
-                {
-                    static_assert(0, "Only fetch the border tile in spatial cluster");
-                }
+                return make_tuple(next_cluster_buf, next_blockwise_copy);
             }
         };
 
@@ -2631,34 +2631,61 @@ struct GridwiseConvMultipleD_Wcnn_CShuffle
             }
         }
 
-        GridwiseConvPipe::template Run<HasMainBlockLoop>(in_grid_block_desc,
-                                                         in_block_desc,
-                                                         in_cluster_border_block_desc,
-                                                         in_blockwise_copy,
-                                                         in_grid_buf,
-                                                         in_block_buf,
-                                                         pre_block_buf,
-                                                         pre_cluster_buf,
-                                                         pre_blockwise_copy,
-                                                         next_block_buf,
-                                                         next_cluster_buf,
-                                                         next_blockwise_copy,
-                                                         in_block_slice_copy_step,
-                                                         wei_grid_block_desc,
-                                                         wei_block_desc,
-                                                         wei_blockwise_copy,
-                                                         wei_grid_buf,
-                                                         wei_block_buf,
-                                                         wei_block_slice_copy_step,
-                                                         ds_grid_block_desc,
-                                                         ds_copy_block_desc,
-                                                         ds_blockwise_copy,
-                                                         ds_grid_buf,
-                                                         ds_block_buf,
-                                                         blockwise_conv,
-                                                         acc_thread_buf,
-                                                         out_thread_buf,
-                                                         CBlockMainLoop);
+        if constexpr(EnableWaveGroup)
+        {
+            GridwiseConvPipe::template Run<HasMainBlockLoop>(in_grid_block_desc,
+                                                             in_block_desc,
+                                                             in_cluster_border_block_desc,
+                                                             in_blockwise_copy,
+                                                             in_grid_buf,
+                                                             in_block_buf,
+                                                             pre_block_buf,
+                                                             pre_cluster_buf,
+                                                             pre_blockwise_copy,
+                                                             next_block_buf,
+                                                             next_cluster_buf,
+                                                             next_blockwise_copy,
+                                                             in_block_slice_copy_step,
+                                                             wei_grid_block_desc,
+                                                             wei_block_desc,
+                                                             wei_blockwise_copy,
+                                                             wei_grid_buf,
+                                                             wei_block_buf,
+                                                             wei_block_slice_copy_step,
+                                                             ds_grid_block_desc,
+                                                             ds_copy_block_desc,
+                                                             ds_blockwise_copy,
+                                                             ds_grid_buf,
+                                                             ds_block_buf,
+                                                             blockwise_conv,
+                                                             acc_thread_buf,
+                                                             out_thread_buf,
+                                                             CBlockMainLoop);
+        }
+        else
+        {
+            GridwiseConvPipe::template Run<HasMainBlockLoop>(in_grid_block_desc,
+                                                             in_block_desc,
+                                                             in_blockwise_copy,
+                                                             in_grid_buf,
+                                                             in_block_buf,
+                                                             in_block_slice_copy_step,
+                                                             wei_grid_block_desc,
+                                                             wei_block_desc,
+                                                             wei_blockwise_copy,
+                                                             wei_grid_buf,
+                                                             wei_block_buf,
+                                                             wei_block_slice_copy_step,
+                                                             ds_grid_block_desc,
+                                                             ds_copy_block_desc,
+                                                             ds_blockwise_copy,
+                                                             ds_grid_buf,
+                                                             ds_block_buf,
+                                                             blockwise_conv,
+                                                             acc_thread_buf,
+                                                             out_thread_buf,
+                                                             CBlockMainLoop);
+        }
 
         // sync post-run wave and output wave
         if constexpr(EnableWaveGroup4)

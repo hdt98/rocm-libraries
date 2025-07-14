@@ -642,9 +642,10 @@ struct BlockwiseConvWcnn
 
         static_assert(!(Transposed && (FilterSize != 2)),
                       "Only support strided conv2x2 transpose conv");
-        static_assert(!((Transposed == false) && (FilterSize == 2) &&
-                        ((HRepeat % 2 != 0) || (WRepeat % 2 != 0))),
-                      "Repeat must be even for strided conv 2x2 conv");
+        static_assert(
+            !((Transposed == false) && (FilterSize == 2) &&
+              ((HRepeat % 2 != 0) || ((EnableSpatialCluster == false) && (WRepeat % 2 != 0)))),
+            "Repeat must be even for strided conv 2x2 conv");
         static_assert(HPerBlock % (HRepeat * HPerWcnn) == 0, "");
         static_assert(WPerBlock % (WRepeat * WPerWcnn) == 0, "");
         static_assert(KWaves > 0, "");
@@ -1341,13 +1342,6 @@ struct BlockwiseConvWcnn
         };
 
         auto load_in_data = [&](auto h0, auto w0, auto c0, auto& tmp_buf) {
-            // Use waveGroupId to identify the chain_start or chain_end as the LLVM
-            // bug:LWPSCGFX13-618 bool isChainStartVal =
-            // __builtin_amdgcn_spatial_cluster_is_chain_start(); bool isChainStart =
-            // __builtin_amdgcn_readfirstlane(isChainStartVal); bool isChainEndVal =
-            // __builtin_amdgcn_spatial_cluster_is_chain_end(); bool isChainEnd =
-            // __builtin_amdgcn_readfirstlane(isChainEndVal);
-
             if constexpr(InDataEnableLds)
             {
                 // Load input tensor data
@@ -1674,14 +1668,14 @@ struct BlockwiseConvWcnn
         static_for<0, CRepeat, 1>{}([&](auto c0) {
             static_for<0, HRepeatIn, 1>{}([&](auto h0) {
                 static_for<0, hSubTile, 1>{}([&](auto h1) {
-                    constexpr index_t pre_next_data_offset =
-                        indata_wave_desc_.CalculateOffset(make_tuple(I0, c0, h0, h1, I0, I0, I0));
+                    constexpr index_t offset =
+                        indata_border_wave_desc_.CalculateOffset(make_tuple(c0, h0, h1));
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wold-style-cast"
-                    auto* pPrev = (__attribute__((
-                        address_space(10))) int*)(&dataFromPrev[Number<pre_next_data_offset>{}]);
-                    auto* pNext = (__attribute__((
-                        address_space(10))) int*)(&dataFromNext[Number<pre_next_data_offset>{}]);
+                    auto* pPrev =
+                        (__attribute__((address_space(10))) int*)(&dataFromPrev[Number<offset>{}]);
+                    auto* pNext =
+                        (__attribute__((address_space(10))) int*)(&dataFromNext[Number<offset>{}]);
 #pragma clang diagnostic pop
 
                     // Head of Neighbor Chain or Left_W_border in the Grid
@@ -1720,11 +1714,10 @@ struct BlockwiseConvWcnn
         static_for<0, CRepeat, 1>{}([&](auto c0) {
             static_for<0, HRepeatIn, 1>{}([&](auto h0) {
                 static_for<0, hSubTile, 1>{}([&](auto h1) {
-                    constexpr index_t offset = c0 * HRepeatIn * hSubTile + h0 * hSubTile + h1;
-                    constexpr index_t pre_next_data_offset =
-                        indata_wave_desc_.CalculateOffset(make_tuple(I0, c0, h0, h1, I0, I0, I0));
-                    prev_block_buf(Number<offset>{}) = dataFromPrev[Number<pre_next_data_offset>{}];
-                    next_block_buf(Number<offset>{}) = dataFromNext[Number<pre_next_data_offset>{}];
+                    constexpr index_t offset =
+                        indata_border_wave_desc_.CalculateOffset(make_tuple(c0, h0, h1));
+                    prev_block_buf(Number<offset>{}) = dataFromPrev[Number<offset>{}];
+                    next_block_buf(Number<offset>{}) = dataFromNext[Number<offset>{}];
                 });
             });
         });

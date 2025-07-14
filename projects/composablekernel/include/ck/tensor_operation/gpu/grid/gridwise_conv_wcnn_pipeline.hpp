@@ -252,6 +252,8 @@ struct GridwiseConvPipeline_v1
                 }
                 blockwise_conv.Run(wei_block_buf,
                                    in_block_buf,
+                                   in_block_buf,
+                                   in_block_buf,
                                    ds_block_buf,
                                    accum_thread_buf,
                                    out_thread_buf,
@@ -316,6 +318,8 @@ struct GridwiseConvPipeline_v1
             }
 
             blockwise_conv.Run(wei_block_buf,
+                               in_block_buf,
+                               in_block_buf,
                                in_block_buf,
                                ds_block_buf,
                                accum_thread_buf,
@@ -454,6 +458,8 @@ struct GridwiseConvPipeline_v1<1, true, true, true, false>
 
                 blockwise_conv.Run(wei_block_buf,
                                    in_block_buf,
+                                   in_block_buf,
+                                   in_block_buf,
                                    ds_block_buf,
                                    accum_thread_buf,
                                    out_thread_buf,
@@ -486,6 +492,8 @@ struct GridwiseConvPipeline_v1<1, true, true, true, false>
             block_sync_lds();
 
             blockwise_conv.Run(wei_block_buf,
+                               in_block_buf,
+                               in_block_buf,
                                in_block_buf,
                                ds_block_buf,
                                accum_thread_buf,
@@ -628,6 +636,8 @@ struct GridwiseConvPipeline_v1<1, false, true, false, false>
 
                 blockwise_conv.Run(wei_block_buf,
                                    in_block_buf,
+                                   in_block_buf,
+                                   in_block_buf,
                                    ds_block_buf,
                                    accum_thread_buf,
                                    out_thread_buf,
@@ -659,6 +669,8 @@ struct GridwiseConvPipeline_v1<1, false, true, false, false>
             block_sync_lds();
 
             blockwise_conv.Run(wei_block_buf,
+                               in_block_buf,
+                               in_block_buf,
                                in_block_buf,
                                ds_block_buf,
                                accum_thread_buf,
@@ -803,6 +815,8 @@ struct GridwiseConvPipeline_v1<1, false, false, false, EnableAsync>
 
                 blockwise_conv.Run(wei_block_buf,
                                    in_block_buf,
+                                   in_block_buf,
+                                   in_block_buf,
                                    ds_block_buf,
                                    accum_thread_buf,
                                    out_thread_buf,
@@ -826,6 +840,8 @@ struct GridwiseConvPipeline_v1<1, false, false, false, EnableAsync>
         // tail
         {
             blockwise_conv.Run(wei_block_buf,
+                               in_block_buf,
+                               in_block_buf,
                                in_block_buf,
                                ds_block_buf,
                                accum_thread_buf,
@@ -967,6 +983,8 @@ struct GridwiseConvPipeline_v1<1, true, false, true, false>
 
                 blockwise_conv.Run(wei_block_buf,
                                    in_block_buf,
+                                   in_block_buf,
+                                   in_block_buf,
                                    ds_block_buf,
                                    accum_thread_buf,
                                    out_thread_buf,
@@ -995,6 +1013,8 @@ struct GridwiseConvPipeline_v1<1, true, false, true, false>
             block_sync_lds();
 
             blockwise_conv.Run(wei_block_buf,
+                               in_block_buf,
+                               in_block_buf,
                                in_block_buf,
                                ds_block_buf,
                                accum_thread_buf,
@@ -1111,6 +1131,8 @@ struct GridwiseConvPipeline_v1<1, true, true, true, true>
 
                 blockwise_conv.Run(wei_block_buf,
                                    in_block_buf,
+                                   in_block_buf,
+                                   in_block_buf,
                                    ds_block_buf,
                                    accum_thread_buf,
                                    out_thread_buf,
@@ -1144,6 +1166,8 @@ struct GridwiseConvPipeline_v1<1, true, true, true, true>
             block_sync_lds_async_load();
 
             blockwise_conv.Run(wei_block_buf,
+                               in_block_buf,
+                               in_block_buf,
                                in_block_buf,
                                ds_block_buf,
                                accum_thread_buf,
@@ -1276,6 +1300,8 @@ struct GridwiseConvPipeline_v1<1, false, true, false, true>
 
                 blockwise_conv.Run(wei_block_buf,
                                    in_block_buf,
+                                   in_block_buf,
+                                   in_block_buf,
                                    ds_block_buf,
                                    accum_thread_buf,
                                    out_thread_buf,
@@ -1306,6 +1332,8 @@ struct GridwiseConvPipeline_v1<1, false, true, false, true>
             block_sync_lds_async_load();
 
             blockwise_conv.Run(wei_block_buf,
+                               in_block_buf,
+                               in_block_buf,
                                in_block_buf,
                                ds_block_buf,
                                accum_thread_buf,
@@ -1439,6 +1467,8 @@ struct GridwiseConvPipeline_v1<1, true, false, true, true>
 
                 blockwise_conv.Run(wei_block_buf,
                                    in_block_buf,
+                                   in_block_buf,
+                                   in_block_buf,
                                    ds_block_buf,
                                    accum_thread_buf,
                                    out_thread_buf,
@@ -1463,6 +1493,8 @@ struct GridwiseConvPipeline_v1<1, true, false, true, true>
             block_sync_lds();
 
             blockwise_conv.Run(wei_block_buf,
+                               in_block_buf,
+                               in_block_buf,
                                in_block_buf,
                                ds_block_buf,
                                accum_thread_buf,

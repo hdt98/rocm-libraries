@@ -512,7 +512,8 @@ struct DeviceGroupedConvFwdMultipleD_Wcnn_CShuffle
                             DeviceOp::EGridDesc,
                             remove_reference_t<typename GridwiseConv::DefaultBlock2CTileMap>,
                             ComputePtrOffsetOfStridedBatch<I1, I1, Number<NumDTensor>{}>,
-                            has_main_loop>;
+                            has_main_loop,
+                            ClusterDimSize>;
 
                         return launch_and_time_kernel(stream_config,
                                                       kernel,
