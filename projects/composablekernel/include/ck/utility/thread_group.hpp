@@ -21,6 +21,8 @@ struct ThisThreadBlock
     __device__ static index_t GetThreadId() { return get_thread_local_1d_id(); }
 
     static constexpr index_t GetNumWavePerGroup() { return 0; }
+
+    static constexpr index_t GetNumWaveGroups() { return 0; }
 };
 
 template <index_t ThreadPerBlock, index_t WaveSize, index_t NumWaveGroup>

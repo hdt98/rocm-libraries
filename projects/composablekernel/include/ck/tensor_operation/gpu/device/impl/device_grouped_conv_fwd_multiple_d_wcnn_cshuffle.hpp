@@ -121,8 +121,6 @@ struct DeviceGroupedConvFwdMultipleD_Wcnn_CShuffle
     static constexpr index_t GridWRepeat    = ShuffleConv2 ? WRepeat / 2 : WRepeat;
     static constexpr index_t GridKPerBlock  = ShuffleTransposeConv2 ? KPerBlock * 4 : KPerBlock;
 
-    static constexpr index_t num_wave_group = 4;
-
     // Describe how data read from Global memory
     static auto
     MakeInGridDescriptor(const std::array<index_t, NDimSpatial + 3>& a_g_n_c_wis_lengths,
@@ -512,8 +510,7 @@ struct DeviceGroupedConvFwdMultipleD_Wcnn_CShuffle
                             DeviceOp::EGridDesc,
                             remove_reference_t<typename GridwiseConv::DefaultBlock2CTileMap>,
                             ComputePtrOffsetOfStridedBatch<I1, I1, Number<NumDTensor>{}>,
-                            has_main_loop,
-                            ClusterDimSize>;
+                            has_main_loop>;
 
                         return launch_and_time_kernel(stream_config,
                                                       kernel,
@@ -598,8 +595,7 @@ struct DeviceGroupedConvFwdMultipleD_Wcnn_CShuffle
                             DeviceOp::EGridDesc,
                             remove_reference_t<typename GridwiseConv::DefaultBlock2CTileMap>,
                             ComputePtrOffsetOfStridedBatch<I1, I1, Number<NumDTensor>{}>,
-                            has_main_loop,
-                            ClusterDimSize>;
+                            has_main_loop>;
 
                         return launch_and_time_kernel(stream_config,
                                                       kernel,
@@ -1053,6 +1049,9 @@ struct DeviceGroupedConvFwdMultipleD_Wcnn_CShuffle
                       "Transposed conv only support conv2 for now.");
         static_assert((EnableSpatialCluster == false) || (ClusterDimSize != 0),
                       "ClusterDimSize shoule set when EnableSpatialCluster");
+        static_assert((EnableSpatialCluster == false) || (FilterSize >= 3),
+                      "Enable spatial cluster only when filterSize is >= 3");
+        static_assert(ClusterDimSize <= 16, "Full cluster size is too large!");
 
         bool input_layout_compatible =
             IsConvLayoutCompatible<InLayout>(arg.a_g_n_c_wis_lengths_, arg.a_g_n_c_wis_strides_);

@@ -339,9 +339,7 @@ template <typename GridwiseOp,
           typename EGridDesc,
           typename Block2CTileMap,
           typename ComputePtrOffsetOfBatch,
-          bool HasMainBlockLoop,
-          index_t ClusterSize>
-__attribute__((cluster_dims(ClusterSize)))
+          bool HasMainBlockLoop>
 __global__ void __exp_amd_wavegroup_kernel(4, 32, 256, 1, 1)
     kernel_grouped_conv_fwd_wcnn_wavegroup256(
         const InDataType* __restrict__ p_in_grid,
@@ -435,9 +433,7 @@ template <typename GridwiseOp,
           typename EGridDesc,
           typename Block2CTileMap,
           typename ComputePtrOffsetOfBatch,
-          bool HasMainBlockLoop,
-          index_t ClusterSize>
-__attribute__((cluster_dims(ClusterSize)))
+          bool HasMainBlockLoop>
 __global__ void __exp_amd_wavegroup_kernel(4, 32, 512, 1, 1)
     kernel_grouped_conv_fwd_wcnn_wavegroup512(
         const InDataType* __restrict__ p_in_grid,

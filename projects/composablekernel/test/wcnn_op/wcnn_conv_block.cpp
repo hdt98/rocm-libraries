@@ -66,7 +66,7 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
 
     constexpr index_t DataTileHeight = 4;
     constexpr index_t H_Pad          = (FilterSize == 3) ? DataTileHeight : 0;
-    constexpr index_t W_Pad          = 0;
+    constexpr index_t W_Pad          = (FilterSize == 3) ? WPerWcnn : 0;
     constexpr index_t HPerBlockIn    = (FilterSize == 3) ? HPerBlock + H_Pad * 2 : HPerBlock;
     constexpr index_t WPerBlockIn    = (FilterSize == 3) ? WPerBlock + W_Pad * 2 : WPerBlock;
 
@@ -85,8 +85,6 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
     // HWC
     constexpr auto InDataBlockDesc = make_naive_tensor_descriptor_packed(
         make_tuple(Number<HPerBlockIn>{}, Number<WPerBlockIn>{}, Number<CPerBlock>{}));
-    constexpr auto InClusterBorderDataBlockDesc = make_naive_tensor_descriptor_packed(
-        make_tuple(Number<HPerBlockIn>{}, I1, Number<CPerBlock>{}));
     using EmptyTuple                = ck::Tuple<>;
     using AccBlockwiseOperation     = ck::BlockwiseElementPassThrough;
     using AccBlockwiseNextOperation = ck::BlockwiseElementPassThrough;
@@ -102,7 +100,7 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
                           AccBlockwiseNextOperation,
                           decltype(WeiDataBlockDesc),
                           decltype(InDataBlockDesc),
-                          decltype(MakeInClusterBorderBlockDescriptor<false>()),
+                          decltype(InDataBlockDesc),
                           EmptyTuple,
                           HPerBlock,
                           WPerBlock,
@@ -389,8 +387,8 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
                 WeiDataBlockSize);
             blockwise_conv.Run(weight_block_buf,
                                indata_block_buf,
-                               indata_block_buf,
-                               indata_block_buf,
+                               nullptr,
+                               nullptr,
                                ck::Tuple<>{},
                                accum_thread_buf,
                                output_thread_buf,

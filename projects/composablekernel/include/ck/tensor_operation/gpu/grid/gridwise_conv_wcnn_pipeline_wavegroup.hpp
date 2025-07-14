@@ -97,8 +97,8 @@ struct GridwiseConvPipeline_v2
         WavegroupSemaphore<WaveIdLoad, 1> semaDataLdsFree;
         WavegroupSemaphore<WaveIdRun, 3> semaAccumFree;
         WavegroupSemaphore<WaveIdPostRun, 1> semaAccumReady;
-        WavegroupSemaphore<WaveIdLoad, 1> semFromNext;
-        WavegroupSemaphore<WaveIdLoad, 1> semFromPrev;
+        WavegroupSemaphore<WaveIdLoad, 2> semFromNext;
+        WavegroupSemaphore<WaveIdLoad, 3> semFromPrev;
 #else
         __shared__ WavegroupSemaphore<WaveIdRun> semaDataReady;
         __shared__ WavegroupSemaphore<WaveIdRun> semaLdsReady;
@@ -151,15 +151,11 @@ struct GridwiseConvPipeline_v2
         // wait semaphore, named-barrier init
         __syncthreads();
 
-#if 0 // Multi-Chain
         bool isChainStartVal = __builtin_amdgcn_spatial_cluster_is_chain_start();
         bool isChainStart = __builtin_amdgcn_readfirstlane(isChainStartVal);
         bool isChainEndVal = __builtin_amdgcn_spatial_cluster_is_chain_end();
         bool isChainEnd = __builtin_amdgcn_readfirstlane(isChainEndVal);
-#else // Single-Chain
-        bool isChainStart = false;
-        bool isChainEnd   = false;
-#endif
+
         // pre-fetch data
         if(get_wave_id_in_wavegroup() == WaveIdLoad)
         {
@@ -373,11 +369,15 @@ struct GridwiseConvPipeline_v2
                    get_wave_id_in_wavegroup() == WaveIdPostRun)
                 {
                     ExchangeDataBlockBuffer preBuf =
-                        isChainStart ? bit_cast<ExchangeDataBlockBuffer>(pre_cluster_buf)
-                                     : prev_block_buf;
+                        EnableSpatialCluster
+                            ? (isChainStart ? bit_cast<ExchangeDataBlockBuffer>(pre_cluster_buf)
+                                            : prev_block_buf)
+                            : nullptr;
                     ExchangeDataBlockBuffer nextBuf =
-                        isChainEnd ? bit_cast<ExchangeDataBlockBuffer>(next_cluster_buf)
-                                   : next_block_buf;
+                        EnableSpatialCluster
+                            ? (isChainEnd ? bit_cast<ExchangeDataBlockBuffer>(next_cluster_buf)
+                                          : next_block_buf)
+                            : nullptr;
 
                     blockwise_conv.Run(wei_block_buf,
                                        in_block_buf,
@@ -500,11 +500,15 @@ struct GridwiseConvPipeline_v2
                get_wave_id_in_wavegroup() == WaveIdPostRun)
             {
                 ExchangeDataBlockBuffer preBuf =
-                    isChainStart ? bit_cast<ExchangeDataBlockBuffer>(pre_cluster_buf)
-                                 : prev_block_buf;
+                    EnableSpatialCluster
+                        ? (isChainStart ? bit_cast<ExchangeDataBlockBuffer>(pre_cluster_buf)
+                                        : prev_block_buf)
+                        : nullptr;
                 ExchangeDataBlockBuffer nextBuf =
-                    isChainEnd ? bit_cast<ExchangeDataBlockBuffer>(next_cluster_buf)
-                               : next_block_buf;
+                    EnableSpatialCluster
+                        ? (isChainEnd ? bit_cast<ExchangeDataBlockBuffer>(next_cluster_buf)
+                                      : next_block_buf)
+                        : nullptr;
 
                 blockwise_conv.Run(wei_block_buf,
                                    in_block_buf,
@@ -597,8 +601,8 @@ struct GridwiseConvPipeline_v2<1, false, false, false, EnableAsync, EnableSpatia
         WavegroupSemaphore<WaveIdLoad, 1> semaDataFree;
         WavegroupSemaphore<WaveIdRun, 2> semaAccumFree;
         WavegroupSemaphore<WaveIdPostRun, 1> semaAccumReady;
-        WavegroupSemaphore<WaveIdLoad, 1> semFromNext;
-        WavegroupSemaphore<WaveIdLoad, 1> semFromPrev;
+        WavegroupSemaphore<WaveIdLoad, 2> semFromNext;
+        WavegroupSemaphore<WaveIdLoad, 3> semFromPrev;
 #else
         __shared__ WavegroupSemaphore<WaveIdRun> semaDataReady;
         __shared__ WavegroupSemaphore<WaveIdLoad> semaDataFree;
@@ -796,11 +800,15 @@ struct GridwiseConvPipeline_v2<1, false, false, false, EnableAsync, EnableSpatia
                    get_wave_id_in_wavegroup() == WaveIdPostRun)
                 {
                     ExchangeDataBlockBuffer preBuf =
-                        isChainStart ? bit_cast<ExchangeDataBlockBuffer>(pre_cluster_buf)
-                                     : prev_block_buf;
+                        EnableSpatialCluster
+                            ? (isChainStart ? bit_cast<ExchangeDataBlockBuffer>(pre_cluster_buf)
+                                            : prev_block_buf)
+                            : nullptr;
                     ExchangeDataBlockBuffer nextBuf =
-                        isChainEnd ? bit_cast<ExchangeDataBlockBuffer>(next_cluster_buf)
-                                   : next_block_buf;
+                        EnableSpatialCluster
+                            ? (isChainEnd ? bit_cast<ExchangeDataBlockBuffer>(next_cluster_buf)
+                                          : next_block_buf)
+                            : nullptr;
 
                     blockwise_conv.Run(wei_block_buf,
                                        in_block_buf,
@@ -842,11 +850,16 @@ struct GridwiseConvPipeline_v2<1, false, false, false, EnableAsync, EnableSpatia
                get_wave_id_in_wavegroup() == WaveIdPostRun)
             {
                 ExchangeDataBlockBuffer preBuf =
-                    isChainStart ? bit_cast<ExchangeDataBlockBuffer>(pre_cluster_buf)
-                                 : prev_block_buf;
+                    EnableSpatialCluster
+                        ? (isChainStart ? bit_cast<ExchangeDataBlockBuffer>(pre_cluster_buf)
+                                        : prev_block_buf)
+                        : nullptr;
                 ExchangeDataBlockBuffer nextBuf =
-                    isChainEnd ? bit_cast<ExchangeDataBlockBuffer>(next_cluster_buf)
-                               : next_block_buf;
+                    EnableSpatialCluster
+                        ? (isChainEnd ? bit_cast<ExchangeDataBlockBuffer>(next_cluster_buf)
+                                      : next_block_buf)
+                        : nullptr;
+
                 blockwise_conv.Run(wei_block_buf,
                                    in_block_buf,
                                    preBuf,
@@ -1038,8 +1051,8 @@ struct GridwiseConvPipeline_v2<1, true, true, true, EnableAsync, EnableSpatialCl
                 {
                     blockwise_conv.Run(wei_block_buf,
                                        in_block_buf,
-                                       prev_block_buf,
-                                       next_block_buf,
+                                       nullptr,
+                                       nullptr,
                                        ds_block_buf,
                                        accum_thread_buf,
                                        out_thread_buf,
@@ -1140,8 +1153,8 @@ struct GridwiseConvPipeline_v2<1, true, true, true, EnableAsync, EnableSpatialCl
             {
                 blockwise_conv.Run(wei_block_buf,
                                    in_block_buf,
-                                   prev_block_buf,
-                                   next_block_buf,
+                                   nullptr,
+                                   nullptr,
                                    ds_block_buf,
                                    accum_thread_buf,
                                    out_thread_buf,

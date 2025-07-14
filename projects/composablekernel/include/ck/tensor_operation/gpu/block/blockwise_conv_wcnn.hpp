@@ -1138,6 +1138,7 @@ struct BlockwiseConvWcnn
                                     accum_thread_buf.GetVectorTypeReference(Number<accum_offset>{});
                             }
                             static_for<0, CRepeat, CStep>{}([&](auto c0) {
+                                load_in_data(h0, w0, c0, indata_thread_vec);
                                 wcnn_conv.conv_instr.Run(*weight_thread_vec_ptr[c0 / CStep][0],
                                                          indata_thread_vec_ptr,
                                                          acc_vec,
@@ -1403,6 +1404,10 @@ struct BlockwiseConvWcnn
 
                         constexpr index_t wave_border_offset =
                             indata_border_wave_desc_.CalculateOffset(make_tuple(c0, h0, I0));
+
+                        static_assert((wave_border_offset < predata_block_buf.Size()) &&
+                                          (wave_border_offset < nextdata_block_buf.Size()),
+                                      "The offset is out of range of the buffer");
 
                         indata_thread_vec_ptr[1] =
                             reinterpret_cast<const typename InDataVec::type*>(
