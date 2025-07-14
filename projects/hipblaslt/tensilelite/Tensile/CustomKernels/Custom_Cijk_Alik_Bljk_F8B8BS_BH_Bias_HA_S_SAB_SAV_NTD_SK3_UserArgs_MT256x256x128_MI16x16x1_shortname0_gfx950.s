@@ -50,7 +50,7 @@ custom.config:
     KernArgsVersion: 2
   ProblemType:
       OperationType: GEMM
-      DataType: f8
+      DataType: f8b8
       DestDataType: b
       ComputeDataType: s
       HighPrecisionAccumulate: True
