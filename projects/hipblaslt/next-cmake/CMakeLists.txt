@@ -342,6 +342,27 @@ endif()
 
 add_subdirectory(host-library)
 
+if(HIPBLASLT_ENABLE_ROCROLLER)
+    find_package(rocroller)
+    set(ROCROLLER_ENABLE_FETCH ON)
+    set(ROCROLLER_BUILD_TESTING OFF)
+    set(ROCROLLER_ENABLE_CLIENT OFF)
+    option(YAML_CPP_INSTALL "" ON)
+    if(NOT rocroller_FOUND)
+        FetchContent_Declare(
+            rocRoller
+            GIT_REPOSITORY https://github.com/ROCm/rocRoller.git
+            GIT_TAG main
+            SOURCE_SUBDIR next-cmake
+        )
+        FetchContent_MakeAvailable(rocRoller)
+    else()
+        message(FATAL_ERROR "Could not find rocroller")
+    endif()
+    target_link_libraries(hipblaslt PRIVATE roc::rocroller)
+    target_compile_definitions(hipblaslt PUBLIC HIPBLASLT_USE_ROCROLLER)
+endif()
+
 if(HIPBLASLT_ENABLE_DEVICE)
     add_subdirectory(device-library)
 endif()
