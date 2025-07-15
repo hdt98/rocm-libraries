@@ -154,15 +154,11 @@ namespace
                    || !strcmp(arg.function, "aux_mat_copy")
                    || !strcmp(arg.function, "aux_auxiliary_func")
                    || !strcmp(arg.function, "aux_float8_func")
-                   || !strcmp(arg.function, "aux_rocblaslt_utility_func")
                    || !strcmp(arg.function, "aux_status_func")
                    || !strcmp(arg.function, "aux_hipblaslt_func")
                    || !strcmp(arg.function, "aux_tensile_host_func")
                    || !strcmp(arg.function, "aux_tuple_helper_equal_func")
                    || !strcmp(arg.function, "aux_rocblaslt_rocroller_host_func");
-        }
-
-        // Google Test name suffix based on parameters
         static std::string name_suffix(const Arguments& arg)
         {
             RocBlasLt_TestName<aux_test> name(arg.name);
