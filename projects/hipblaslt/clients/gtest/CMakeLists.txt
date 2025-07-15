@@ -101,11 +101,14 @@ if(BUILD_CODE_COVERAGE)
   target_include_directories( hipblaslt-test
     PRIVATE
       # internal rocblaslt headers for rocblaslt.h not found
+      $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../library/src/amd_detail>
       $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../library/src/amd_detail/rocblaslt/include>
       $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../library/src/amd_detail/rocblaslt/src/include>
   )
 
   target_compile_definitions( hipblaslt-test PRIVATE CODE_COVERAGE)
+  
+  target_link_libraries( hipblaslt-test PRIVATE TensileHost)
 endif()
 
 if (BUILD_CUDA)

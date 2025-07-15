@@ -37,6 +37,10 @@
 #include "utility.hpp"
 #include "rocblaslt/utility.hpp"
 #include "rocblaslt/rocroller_host.hpp"
+#include "rocblaslt/rocblaslt_mat_utils.hpp"
+#include "rocblaslt/status.h"
+#include "hipblaslt_internal.hpp"
+#include "rocblaslt/tensile_host.hpp"
 #include <hipblaslt/hipblaslt-ext-op.h>
 #include <hipblaslt/hipblaslt-ext.hpp> // Add check for hipblaslt-ext
 #include <hipblaslt/hipblaslt.h>
@@ -2031,6 +2035,25 @@ void testing_aux_rocblaslt_utility_func(const Arguments& arg)
     ASSERT_TRUE(std::string_view{rocblaslt_epilogue_to_string(ROCBLASLT_EPILOGUE_SWISH_BIAS_EXT)} == "EPILOGUE_SWISH_BIAS_EXT");
     ASSERT_TRUE(std::string_view{rocblaslt_epilogue_to_string(static_cast<rocblaslt_epilogue>(999))} == "Invalid epilogue");
 
+    // Test all valid rocblaslt_compute_type values
+    ASSERT_TRUE(std::string_view{rocblaslt_compute_type_string(rocblaslt_compute_f16)} == "f16_r");
+    ASSERT_TRUE(std::string_view{rocblaslt_compute_type_string(rocblaslt_compute_f32)} == "f32_r");
+    ASSERT_TRUE(std::string_view{rocblaslt_compute_type_string(rocblaslt_compute_f32_fast_xf32)} == "xf32_r");
+    ASSERT_TRUE(std::string_view{rocblaslt_compute_type_string(rocblaslt_compute_i32)} == "i32_r");
+    ASSERT_TRUE(std::string_view{rocblaslt_compute_type_string(rocblaslt_compute_f64)} == "f64_r");
+    ASSERT_TRUE(std::string_view{rocblaslt_compute_type_string(rocblaslt_compute_f32_fast_f16)} == "f32_f16_r");
+    ASSERT_TRUE(std::string_view{rocblaslt_compute_type_string(rocblaslt_compute_f32_fast_bf16)} == "f32_bf16_r");
+    ASSERT_TRUE(std::string_view{rocblaslt_compute_type_string(rocblaslt_compute_f32_fast_f8)} == "f32_f8_r");
+    ASSERT_TRUE(std::string_view{rocblaslt_compute_type_string(rocblaslt_compute_f32_fast_f8_fnuz)} == "f32_f8_fnuz_r");
+    ASSERT_TRUE(std::string_view{rocblaslt_compute_type_string(rocblaslt_compute_f32_fast_bf8)} == "f32_bf8_fnuz_r");
+    ASSERT_TRUE(std::string_view{rocblaslt_compute_type_string(rocblaslt_compute_f32_fast_bf8_fnuz)} == "f32_bf8_r");
+    ASSERT_TRUE(std::string_view{rocblaslt_compute_type_string(rocblaslt_compute_f32_fast_f8bf8)} == "f32_f8bf8_r");
+    ASSERT_TRUE(std::string_view{rocblaslt_compute_type_string(rocblaslt_compute_f32_fast_f8bf8_fnuz)} == "f32_f8bf8_fnuz_r");
+    ASSERT_TRUE(std::string_view{rocblaslt_compute_type_string(rocblaslt_compute_f32_fast_bf8f8)} == "f32_bf8f8_r");
+    ASSERT_TRUE(std::string_view{rocblaslt_compute_type_string(rocblaslt_compute_f32_fast_bf8f8_fnuz)} == "f32_bf8f8_fnuz_r");
+    ASSERT_TRUE(std::string_view{rocblaslt_compute_type_string(static_cast<rocblaslt_compute_type>(999))} == "invalidType");
+    
+
     // Test rocblaslt_matrix_layout_to_string function
     // Create test matrix layout structures
     _rocblaslt_matrix_layout mat1, mat2, mat3, mat4;
@@ -2132,13 +2155,6 @@ void testing_aux_rocblaslt_utility_func(const Arguments& arg)
     // Test rocblaslt_matmul_desc_to_string function
     // Create test matmul descriptor structures
     _rocblaslt_matmul_desc desc1, desc2, desc3, desc4;
-    
-    // Mock is_e_enabled function behavior (assuming GELU_AUX enables epilogue extensions)
-    // auto mock_is_e_enabled = [](rocblaslt_epilogue epilogue) {
-    //     return epilogue == ROCBLASLT_EPILOGUE_GELU_AUX || 
-    //            epilogue == ROCBLASLT_EPILOGUE_GELU_AUX_BIAS ||
-    //            epilogue == ROCBLASLT_EPILOGUE_DGELU_BGRAD;
-    // };
     
     // Test case 1: No bias, no epilogue extension (simplest case)
     desc1.compute_type = rocblaslt_compute_f32;
@@ -2280,21 +2296,380 @@ void testing_aux_rocblaslt_utility_func(const Arguments& arg)
     ASSERT_TRUE(desc_result6.find("epilogue=EPILOGUE_RELU_BIAS") != std::string::npos);
     ASSERT_TRUE(desc_result6.find("biasType=R_8F_E4M3_FNUZ") != std::string::npos);
     ASSERT_TRUE(desc_result6.front() == '[' && desc_result6.back() == ']');
+
+
+    // Test case 1: No exception (nullptr) - should return success
+    rocblaslt_status excep_result1 = exception_to_rocblaslt_status(nullptr);
+    ASSERT_TRUE(excep_result1 == rocblaslt_status_success);
+    
+    // Test case 2: Catch rocblaslt_status exception - should return the status value
+    std::exception_ptr status_exception;
+    try {
+        throw rocblaslt_status_invalid_handle;
+    } catch (...) {
+        status_exception = std::current_exception();
+    }
+    
+    rocblaslt_status excep_result2 = exception_to_rocblaslt_status(status_exception);
+    ASSERT_TRUE(excep_result2 == rocblaslt_status_invalid_handle);
+    
+    // Test case 3: Different rocblaslt_status values
+    std::exception_ptr status_exception2;
+    try {
+        throw rocblaslt_status_not_initialized;
+    } catch (...) {
+        status_exception2 = std::current_exception();
+    }
+    
+    rocblaslt_status excep_result3 = exception_to_rocblaslt_status(status_exception2);
+    ASSERT_TRUE(excep_result3 == rocblaslt_status_not_initialized);
+    
+    // Test case 4: Catch std::bad_alloc - should return memory error
+    std::exception_ptr bad_alloc_exception;
+    try {
+        throw std::bad_alloc();
+    } catch (...) {
+        bad_alloc_exception = std::current_exception();
+    }
+    
+    rocblaslt_status excep_result4 = exception_to_rocblaslt_status(bad_alloc_exception);
+    ASSERT_TRUE(excep_result4 == rocblaslt_status_memory_error);
 }
+
+void testing_aux_status_func(const Arguments& arg)
+{   
+    // Test get_rocblaslt_status_for_hip_status function
+    ASSERT_TRUE(get_rocblaslt_status_for_hip_status(hipSuccess) == rocblaslt_status_success);
+    ASSERT_TRUE(get_rocblaslt_status_for_hip_status(hipErrorMemoryAllocation) == rocblaslt_status_memory_error);
+    ASSERT_TRUE(get_rocblaslt_status_for_hip_status(hipErrorLaunchOutOfResources) == rocblaslt_status_memory_error);
+    ASSERT_TRUE(get_rocblaslt_status_for_hip_status(hipErrorInvalidDevicePointer) == rocblaslt_status_invalid_pointer);
+    ASSERT_TRUE(get_rocblaslt_status_for_hip_status(hipErrorInvalidDevice) == rocblaslt_status_invalid_handle);
+    ASSERT_TRUE(get_rocblaslt_status_for_hip_status(hipErrorInvalidResourceHandle) == rocblaslt_status_invalid_handle);
+    ASSERT_TRUE(get_rocblaslt_status_for_hip_status(hipErrorInvalidValue) == rocblaslt_status_internal_error);
+    ASSERT_TRUE(get_rocblaslt_status_for_hip_status(hipErrorNoDevice) == rocblaslt_status_internal_error);
+    ASSERT_TRUE(get_rocblaslt_status_for_hip_status(hipErrorUnknown) == rocblaslt_status_internal_error);
+    // Test default case with unknown/unmapped hip errors -> rocblaslt_status_internal_error
+    ASSERT_TRUE(get_rocblaslt_status_for_hip_status(static_cast<hipError_t>(999)) == rocblaslt_status_internal_error);
+}
+
+void testing_aux_hipblaslt_func(const Arguments& arg)
+{   
+    // Test success case
+    ASSERT_TRUE(RocBlasLtStatusToHIPStatus(rocblaslt_status_success) == HIPBLAS_STATUS_SUCCESS);
+    
+    // Test invalid handle -> not initialized
+    ASSERT_TRUE(RocBlasLtStatusToHIPStatus(rocblaslt_status_invalid_handle) == HIPBLAS_STATUS_NOT_INITIALIZED);
+    
+    // Test not implemented -> internal error
+    ASSERT_TRUE(RocBlasLtStatusToHIPStatus(rocblaslt_status_not_implemented) == HIPBLAS_STATUS_INTERNAL_ERROR);
+    
+    // Test invalid pointer -> invalid value
+    ASSERT_TRUE(RocBlasLtStatusToHIPStatus(rocblaslt_status_invalid_pointer) == HIPBLAS_STATUS_INVALID_VALUE);
+    
+    // Test invalid size -> invalid value
+    ASSERT_TRUE(RocBlasLtStatusToHIPStatus(rocblaslt_status_invalid_size) == HIPBLAS_STATUS_INVALID_VALUE);
+    
+    // Test memory error -> alloc failed
+    ASSERT_TRUE(RocBlasLtStatusToHIPStatus(rocblaslt_status_memory_error) == HIPBLAS_STATUS_ALLOC_FAILED);
+    
+    // Test internal error -> internal error
+    ASSERT_TRUE(RocBlasLtStatusToHIPStatus(rocblaslt_status_internal_error) == HIPBLAS_STATUS_INTERNAL_ERROR);
+    
+    // Test invalid value -> invalid value
+    ASSERT_TRUE(RocBlasLtStatusToHIPStatus(rocblaslt_status_invalid_value) == HIPBLAS_STATUS_INVALID_VALUE);
+    
+    // Test arch mismatch -> arch mismatch
+    ASSERT_TRUE(RocBlasLtStatusToHIPStatus(rocblaslt_status_arch_mismatch) == HIPBLAS_STATUS_ARCH_MISMATCH);
+
+    // Test default case - should throw HIPBLAS_STATUS_INVALID_ENUM
+    bool exception_thrown = false;
+    hipblasStatus_t thrown_status = HIPBLAS_STATUS_SUCCESS;
+    
+    try {
+        RocBlasLtStatusToHIPStatus(static_cast<rocblaslt_status_>(999));
+    } catch (hipblasStatus_t status) {
+        exception_thrown = true;
+        thrown_status = status;
+    } catch (...) {
+        exception_thrown = true;
+        thrown_status = HIPBLAS_STATUS_INTERNAL_ERROR; // Unexpected exception type
+    }
+    
+    ASSERT_TRUE(exception_thrown);
+    ASSERT_TRUE(thrown_status == HIPBLAS_STATUS_INVALID_ENUM);
+
+
+    // hipDataType              scaleDatatype{HIP_R_32F};
+    // hipblasLtMatrixTransformDesc_t desc;
+    // ASSERT_TRUE(hipblasLtMatrixTransformDescSetAttribute(
+    //     desc,
+    //     hipblasLtMatrixTransformDescAttributes_t::HIPBLASLT_MATRIX_TRANSFORM_DESC_SCALE_TYPE,
+    //     &scaleDatatype,
+    //     sizeof(scaleDatatype)) == HIPBLAS_STATUS_SUCCESS);
+    
+    // Test hipblasLtMatrixTransformDescSetAttribute function
+    hipblasLtMatrixTransformDesc_t transformDesc;
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatrixTransformDescCreate(&transformDesc, HIP_R_32F));
+
+    // Test SCALE_TYPE attribute
+    hipDataType scaleDatatype{HIP_R_16F};
+    ASSERT_TRUE(hipblasLtMatrixTransformDescSetAttribute(
+        transformDesc,
+        HIPBLASLT_MATRIX_TRANSFORM_DESC_SCALE_TYPE,
+        &scaleDatatype,
+        sizeof(scaleDatatype)) == HIPBLAS_STATUS_SUCCESS);
+
+    // Test POINTER_MODE attribute
+    hipblasLtPointerMode_t pointerMode{HIPBLASLT_POINTER_MODE_DEVICE};
+    ASSERT_TRUE(hipblasLtMatrixTransformDescSetAttribute(
+        transformDesc,
+        HIPBLASLT_MATRIX_TRANSFORM_DESC_POINTER_MODE,
+        &pointerMode,
+        sizeof(pointerMode)) == HIPBLAS_STATUS_SUCCESS);
+
+    // Test TRANSA attribute
+    hipblasOperation_t transA{HIPBLAS_OP_T};
+    ASSERT_TRUE(hipblasLtMatrixTransformDescSetAttribute(
+        transformDesc,
+        HIPBLASLT_MATRIX_TRANSFORM_DESC_TRANSA,
+        &transA,
+        sizeof(transA)) == HIPBLAS_STATUS_SUCCESS);
+
+    // Test TRANSB attribute
+    hipblasOperation_t transB{HIPBLAS_OP_C};
+    ASSERT_TRUE(hipblasLtMatrixTransformDescSetAttribute(
+        transformDesc,
+        HIPBLASLT_MATRIX_TRANSFORM_DESC_TRANSB,
+        &transB,
+        sizeof(transB)) == HIPBLAS_STATUS_SUCCESS);
+
+    // Test invalid buffer (nullptr)
+    ASSERT_TRUE(hipblasLtMatrixTransformDescSetAttribute(
+        transformDesc,
+        HIPBLASLT_MATRIX_TRANSFORM_DESC_SCALE_TYPE,
+        nullptr,
+        sizeof(hipDataType)) == HIPBLAS_STATUS_INVALID_VALUE);
+
+    // Test invalid size
+    ASSERT_TRUE(hipblasLtMatrixTransformDescSetAttribute(
+        transformDesc,
+        HIPBLASLT_MATRIX_TRANSFORM_DESC_SCALE_TYPE,
+        &scaleDatatype,
+        sizeof(int16_t)) == HIPBLAS_STATUS_INVALID_VALUE);
+
+    // Test SCALE_TYPE attribute get
+    int32_t retrievedScaleType;
+    size_t sizeWritten;
+    ASSERT_TRUE(hipblasLtMatrixTransformDescGetAttribute(
+        transformDesc,
+        HIPBLASLT_MATRIX_TRANSFORM_DESC_SCALE_TYPE,
+        &retrievedScaleType,
+        sizeof(retrievedScaleType),
+        &sizeWritten) == HIPBLAS_STATUS_SUCCESS);
+    ASSERT_TRUE(static_cast<hipDataType>(retrievedScaleType) == HIP_R_16F);
+    ASSERT_TRUE(sizeWritten == sizeof(int32_t));
+
+    // Test POINTER_MODE attribute get
+    int32_t retrievedPointerMode;
+    ASSERT_TRUE(hipblasLtMatrixTransformDescGetAttribute(
+        transformDesc,
+        HIPBLASLT_MATRIX_TRANSFORM_DESC_POINTER_MODE,
+        &retrievedPointerMode,
+        sizeof(retrievedPointerMode),
+        &sizeWritten) == HIPBLAS_STATUS_SUCCESS);
+    ASSERT_TRUE(static_cast<hipblasLtPointerMode_t>(retrievedPointerMode) == HIPBLASLT_POINTER_MODE_DEVICE);
+    ASSERT_TRUE(sizeWritten == sizeof(int32_t));
+
+    // Test TRANSA attribute get
+    int32_t retrievedTransA;
+    ASSERT_TRUE(hipblasLtMatrixTransformDescGetAttribute(
+        transformDesc,
+        HIPBLASLT_MATRIX_TRANSFORM_DESC_TRANSA,
+        &retrievedTransA,
+        sizeof(retrievedTransA),
+        &sizeWritten) == HIPBLAS_STATUS_SUCCESS);
+    ASSERT_TRUE(static_cast<hipblasOperation_t>(retrievedTransA) == HIPBLAS_OP_T);
+    ASSERT_TRUE(sizeWritten == sizeof(int32_t));
+
+    // Test TRANSB attribute get
+    int32_t retrievedTransB;
+    ASSERT_TRUE(hipblasLtMatrixTransformDescGetAttribute(
+        transformDesc,
+        HIPBLASLT_MATRIX_TRANSFORM_DESC_TRANSB,
+        &retrievedTransB,
+        sizeof(retrievedTransB),
+        &sizeWritten) == HIPBLAS_STATUS_SUCCESS);
+    ASSERT_TRUE(static_cast<hipblasOperation_t>(retrievedTransB) == HIPBLAS_OP_C);
+    ASSERT_TRUE(sizeWritten == sizeof(int32_t));
+
+    // Test error cases: both sizeInBytes and sizeWritten are 0/nullptr
+    ASSERT_TRUE(hipblasLtMatrixTransformDescGetAttribute(
+        transformDesc,
+        HIPBLASLT_MATRIX_TRANSFORM_DESC_SCALE_TYPE,
+        &retrievedScaleType,
+        0,
+        nullptr) == HIPBLAS_STATUS_INVALID_VALUE);
+
+    // Test error case: sizeInBytes provided but sizeWritten is nullptr
+    ASSERT_TRUE(hipblasLtMatrixTransformDescGetAttribute(
+        transformDesc,
+        HIPBLASLT_MATRIX_TRANSFORM_DESC_SCALE_TYPE,
+        &retrievedScaleType,
+        sizeof(retrievedScaleType),
+        nullptr) == HIPBLAS_STATUS_INVALID_VALUE);
+
+    // Test error case: invalid size (not sizeof(int32_t))
+    ASSERT_TRUE(hipblasLtMatrixTransformDescGetAttribute(
+        transformDesc,
+        HIPBLASLT_MATRIX_TRANSFORM_DESC_SCALE_TYPE,
+        &retrievedScaleType,
+        sizeof(int16_t),
+        &sizeWritten) == HIPBLAS_STATUS_INVALID_VALUE);
+
+    // Test error case: invalid attribute (using default case)
+    ASSERT_TRUE(hipblasLtMatrixTransformDescGetAttribute(
+        transformDesc,
+        static_cast<hipblasLtMatrixTransformDescAttributes_t>(999),
+        &retrievedScaleType,
+        sizeof(retrievedScaleType),
+        &sizeWritten) == HIPBLAS_STATUS_INVALID_VALUE);
+
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatrixTransformDescDestroy(transformDesc));
+}
+
+
+void testing_aux_tensile_host_func(const Arguments& arg)
+{
+    // Test hipDataType_to_tensile_type function
+    
+    // Test HIP_R_16F -> Half
+    ASSERT_TRUE(hipDataType_to_tensile_type(HIP_R_16F) == rocisa::DataType::Half);
+
+    // Test HIP_R_32F -> Float
+    ASSERT_TRUE(hipDataType_to_tensile_type(HIP_R_32F) == rocisa::DataType::Float);
+    
+    // Test HIP_R_64F -> Double
+    ASSERT_TRUE(hipDataType_to_tensile_type(HIP_R_64F) == rocisa::DataType::Double);
+    
+    // Test HIP_R_16BF -> BFloat16
+    ASSERT_TRUE(hipDataType_to_tensile_type(HIP_R_16BF) == rocisa::DataType::BFloat16);
+    
+    // Test HIP_R_8F_E4M3_FNUZ -> Float8_fnuz
+    ASSERT_TRUE(hipDataType_to_tensile_type(HIP_R_8F_E4M3_FNUZ) == rocisa::DataType::Float8_fnuz);
+    
+    // Test HIP_R_8F_E5M2_FNUZ -> BFloat8_fnuz
+    ASSERT_TRUE(hipDataType_to_tensile_type(HIP_R_8F_E5M2_FNUZ) == rocisa::DataType::BFloat8_fnuz);
+    
+    // Test HIP_R_8F_E4M3 -> Float8
+    ASSERT_TRUE(hipDataType_to_tensile_type(HIP_R_8F_E4M3) == rocisa::DataType::Float8);
+    
+    // Test HIP_R_8F_E5M2 -> BFloat8
+    ASSERT_TRUE(hipDataType_to_tensile_type(HIP_R_8F_E5M2) == rocisa::DataType::BFloat8);
+    
+    // Test HIP_R_8I -> Int8
+    ASSERT_TRUE(hipDataType_to_tensile_type(HIP_R_8I) == rocisa::DataType::Int8);
+    
+    // Test HIP_R_32I -> Int32
+    ASSERT_TRUE(hipDataType_to_tensile_type(HIP_R_32I) == rocisa::DataType::Int32);
+    
+    // Test default case (unsupported type) -> None
+    // ASSERT_TRUE(hipDataType_to_tensile_type(static_cast<hipDataType>(999)) == rocisa::DataType::None);
+
+
+
+    // Test rocComputeType_to_tensile_type function
+    
+    // Test rocblaslt_compute_f32_fast_xf32 -> XFloat32
+    ASSERT_TRUE(rocComputeType_to_tensile_type(rocblaslt_compute_f32_fast_xf32) == rocisa::DataType::XFloat32);
+    
+    // Test rocblaslt_compute_f32_fast_f16 -> Half
+    ASSERT_TRUE(rocComputeType_to_tensile_type(rocblaslt_compute_f32_fast_f16) == rocisa::DataType::Half);
+    
+    // Test rocblaslt_compute_f32_fast_bf16 -> BFloat16
+    ASSERT_TRUE(rocComputeType_to_tensile_type(rocblaslt_compute_f32_fast_bf16) == rocisa::DataType::BFloat16);
+    
+    // Test multiple types that map to Float
+    ASSERT_TRUE(rocComputeType_to_tensile_type(rocblaslt_compute_f16) == rocisa::DataType::Float);
+    ASSERT_TRUE(rocComputeType_to_tensile_type(rocblaslt_compute_f32) == rocisa::DataType::Float);
+    ASSERT_TRUE(rocComputeType_to_tensile_type(rocblaslt_compute_f32_fast_f8_fnuz) == rocisa::DataType::Float);
+    ASSERT_TRUE(rocComputeType_to_tensile_type(rocblaslt_compute_f32_fast_bf8_fnuz) == rocisa::DataType::Float);
+    ASSERT_TRUE(rocComputeType_to_tensile_type(rocblaslt_compute_f32_fast_f8bf8_fnuz) == rocisa::DataType::Float);
+    ASSERT_TRUE(rocComputeType_to_tensile_type(rocblaslt_compute_f32_fast_bf8f8_fnuz) == rocisa::DataType::Float);
+    ASSERT_TRUE(rocComputeType_to_tensile_type(rocblaslt_compute_f32_fast_f8) == rocisa::DataType::Float);
+    ASSERT_TRUE(rocComputeType_to_tensile_type(rocblaslt_compute_f32_fast_bf8) == rocisa::DataType::Float);
+    ASSERT_TRUE(rocComputeType_to_tensile_type(rocblaslt_compute_f32_fast_f8bf8) == rocisa::DataType::Float);
+    ASSERT_TRUE(rocComputeType_to_tensile_type(rocblaslt_compute_f32_fast_bf8f8) == rocisa::DataType::Float);
+    
+    // Test rocblaslt_compute_f64 -> Double
+    ASSERT_TRUE(rocComputeType_to_tensile_type(rocblaslt_compute_f64) == rocisa::DataType::Double);
+    
+    // Test rocblaslt_compute_i32 -> Int32
+    ASSERT_TRUE(rocComputeType_to_tensile_type(rocblaslt_compute_i32) == rocisa::DataType::Int32);
+
+
+
+    
+}
+
+void testing_aux_tuple_helper_equal_func(const Arguments& arg)
+{
+    // Test tuple_helper equal functionality
+    
+    // Test basic integer equality
+    auto tuple1 = std::make_tuple("key1", 42, "key2", 100);
+    auto tuple2 = std::make_tuple("key1", 42, "key2", 100);
+    auto tuple3 = std::make_tuple("key1", 42, "key2", 99);
+    
+    tuple_helper::equal_t<decltype(tuple1)> equal_checker;
+    
+    // Test equal tuples
+    ASSERT_TRUE(equal_checker(tuple1, tuple2));
+    
+    // Test unequal tuples (different values)
+    ASSERT_FALSE(equal_checker(tuple1, tuple3));
+    
+    // Test C-string equality
+    auto str_tuple1 = std::make_tuple("name", "test", "value", "data");
+    auto str_tuple2 = std::make_tuple("name", "test", "value", "data");
+    auto str_tuple3 = std::make_tuple("name", "test", "value", "different");
+    
+    tuple_helper::equal_t<decltype(str_tuple1)> str_equal_checker;
+    
+    // Test equal C-string tuples
+    ASSERT_TRUE(str_equal_checker(str_tuple1, str_tuple2));
+    
+    // Test unequal C-string tuples
+    ASSERT_FALSE(str_equal_checker(str_tuple1, str_tuple3));
+
+
+
+    
+    int64_t                m = 1;
+    int64_t                n = 1;
+    int64_t                k = 1;
+    
+    hipblasLtHandle_t handle;
+    CHECK_HIPBLASLT_ERROR(hipblasLtCreate(&handle));
+    hipblasOperation_t   trans_a = HIPBLAS_OP_T;
+    hipblasOperation_t   trans_b = HIPBLAS_OP_N;
+    hipblaslt_ext::Gemm gemm(
+        handle, trans_a, trans_b, HIP_R_16F, HIP_R_16F, HIP_R_16F, HIP_R_16F, HIPBLAS_COMPUTE_32F);
+
+
+
+}
+
 
 void testing_aux_rocblaslt_rocroller_host_func(const Arguments& arg)
 {
-    
-    // ------------------- Test rocroller.cpp -------------------
-
     hipblasLtHandle_t handle;
     CHECK_HIPBLASLT_ERROR(hipblasLtCreate(&handle));
     
     hipblasOperation_t   opA = HIPBLAS_OP_T;
     hipblasOperation_t   opB = HIPBLAS_OP_N;
-    int64_t                m = 128;
-    int64_t                n = 128;
-    int64_t                k = 128;
+    int64_t                m = 1;
+    int64_t                n = 1;
+    int64_t                k = 1;
     
     hipblasLtMatmulDesc_t matmul;
     CHECK_HIPBLASLT_ERROR(hipblasLtMatmulDescCreate(&matmul, arg.compute_type, arg.scale_type));
@@ -2304,22 +2679,28 @@ void testing_aux_rocblaslt_rocroller_host_func(const Arguments& arg)
     float beta_v = arg.beta;
     void* beta = &beta_v;
 
-    const int64_t row = 128;
-    const int64_t col = 128;
-    const int64_t ld  = 128;
+    // const int64_t row = 128;
+    // const int64_t col = 128;
+    int64_t ld  = 128;
+    int64_t lda  = 1;
+    int64_t ldb  = 1;
+    int64_t ldc  = 1;
+    int64_t ldd  = 1;
+    int64_t lde  = 1;
 
     hipStream_t        stream;
     CHECK_HIP_ERROR(hipStreamCreate(&stream));
-
-    hipblaslt_local_matrix_layout matA(row, col, ld, arg.a_type);
-    hipblaslt_local_matrix_layout matB(row, col, ld, arg.b_type);
-    hipblaslt_local_matrix_layout matC(row, col, ld, arg.c_type);
-    hipblaslt_local_matrix_layout matD(row, col, ld, arg.d_type);
+    hipblasLtMatrixLayout_t matA, matB, matC, matD;
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatrixLayoutCreate(&matA, arg.a_type, m, k, m));
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatrixLayoutCreate(&matB, arg.a_type, k, n, k));
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatrixLayoutCreate(&matC, arg.a_type, m, n, m));
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatrixLayoutCreate(&matD, arg.a_type, m, n, m));
+    hipDataType            a_type, b_type, c_type, d_type;
 
     const int                        request_solutions = 1;
     hipblasLtMatmulHeuristicResult_t heuristicResult[request_solutions];
     int                              returnedAlgoCount = 0;
-    int64_t            max_workspace_size = 32 * 1024 * 1024;
+    size_t                           max_workspace_size = 128 * 1024 * 1024;
     hipblasLtMatmulPreference_t pref;
     CHECK_HIPBLASLT_ERROR(hipblasLtMatmulPreferenceCreate(&pref));
     CHECK_HIPBLASLT_ERROR(
@@ -2343,6 +2724,7 @@ void testing_aux_rocblaslt_rocroller_host_func(const Arguments& arg)
                                                           heuristicResult,
                                                           &returnedAlgoCount));
 
+    CHECK_SOLUTION_FOUND(returnedAlgoCount);
     // auto problem = construct_rocblaslt_problem(handle, matmul_descr, matA, matB, matC, matD, &alpha, &beta, &heuristicResult[0].algo.max_workspace_bytes);
     
     rocblaslt_matmul_desc matmul_descr = (rocblaslt_matmul_desc) matmul;
@@ -2354,47 +2736,94 @@ void testing_aux_rocblaslt_rocroller_host_func(const Arguments& arg)
     CHECK_HIP_ERROR(hipMalloc(&D, m * n * batch_count * sizeof(int64_t)));
     CHECK_HIP_ERROR(hipMalloc(&E, m * n * batch_count * sizeof(int64_t)));
 
-    int64_t batch_stride_a = 1;
-    int64_t batch_stride_b = 1;
-    int64_t batch_stride_c = 1;
-    int64_t batch_stride_d = 1;
-    int64_t batch_stride_e = 1;
+    int64_t batch_stride = 0;
+    int64_t batch_stride_a = batch_stride;
+    int64_t batch_stride_b = batch_stride;
+    int64_t batch_stride_c = batch_stride;
+    int64_t batch_stride_d = batch_stride;
+    int64_t batch_stride_e = batch_stride;
     bool                   strided_batch = true;
     bool                   grouped_gemm = true;
-    void *                 bias = nullptr, *scaleAlphaVec = nullptr;
-    bool                   gradient = false;
+    void*                  bias = nullptr;
+    hipDataType                bias_type;
+    void*                      scaleAlphaVec = nullptr;
+    hipDataType                aux_type;
+    bool                            gradient = false;
+    rocblaslt_compute_type     compute_type;
 
     rocblaslt_handle roc_handle = (rocblaslt_handle) handle;
+
+    rocblaslt_status isValid = rocblaslt_matmul_valid_args( matmul_descr,
+                                                            A,
+                                                            B,
+                                                            C,
+                                                            D,
+                                                            (rocblaslt_matrix_layout) matA,
+                                                            (rocblaslt_matrix_layout) matB,
+                                                            (rocblaslt_matrix_layout) matC,
+                                                            (rocblaslt_matrix_layout) matD,
+                                                            alpha,
+                                                            beta,
+                                                            m,
+                                                            n,
+                                                            k,
+                                                            a_type,
+                                                            lda,
+                                                            batch_stride_a,
+                                                            b_type,
+                                                            ldb,
+                                                            batch_stride_b,
+                                                            c_type,
+                                                            ldc,
+                                                            batch_stride_c,
+                                                            d_type,
+                                                            ldd,
+                                                            batch_stride_d,
+                                                            lde,
+                                                            batch_stride_e,
+                                                            bias,
+                                                            bias_type,
+                                                            scaleAlphaVec,
+                                                            E,
+                                                            aux_type,
+                                                            gradient,
+                                                            compute_type,
+                                                            false,
+                                                            false);
+
+
+    ASSERT_TRUE(isValid == rocblaslt_status_continue);
+
     RocblasltContractionProblem problem{opA,
                                         opB,
                                         m,
                                         n,
                                         k,
                                         alpha,
-                                        arg.a_type,
+                                        a_type,
                                         A, // A
                                         nullptr,
-                                        ld, // arg.lda
+                                        lda, // arg.lda
                                         batch_stride_a,
-                                        arg.b_type,
-                                        nullptr, // B
+                                        b_type,
+                                        B, // B
                                         nullptr,
-                                        ld, // arg.ldb
+                                        ldb, // arg.ldb
                                         batch_stride_b,
                                         beta,
-                                        arg.c_type,
-                                        nullptr, // C
+                                        c_type,
+                                        C, // C
                                         nullptr,
-                                        ld, // arg.ldc
+                                        ldc, // arg.ldc
                                         batch_stride_c,
-                                        arg.d_type,
-                                        nullptr, // D
+                                        d_type,
+                                        D, // D
                                         nullptr,
-                                        ld, // arg.ldc
+                                        ldd, // arg.ldc
                                         batch_stride_d,
-                                        nullptr, // E
+                                        E, // E
                                         nullptr,
-                                        ld, //arg.lde
+                                        lde, //arg.lde
                                         batch_stride_e,
                                         batch_count,
                                         strided_batch,
@@ -2420,14 +2849,21 @@ void testing_aux_rocblaslt_rocroller_host_func(const Arguments& arg)
                                         matmul_descr->epilogue,
                                         matmul_descr->amaxD,
                                         nullptr,
-                                        0,
-                                        nullptr,
+                                        max_workspace_size, // workspaceSize
+                                        stream, // stream
                                         roc_handle->Synchronizer,
-                                        false,
-                                        false};
+                                        arg.swizzle_a, // swizzleA
+                                        false}; // swizzleB
+
     const hipblasLtMatmulAlgo_t* hip_algo = &heuristicResult[0].algo;
     const rocblaslt_matmul_algo* roc_algo = (const rocblaslt_matmul_algo*) hip_algo;
+    
+    runRocRollerContractionProblem(roc_handle, nullptr, problem);
     runRocRollerContractionProblem(roc_handle, roc_algo, problem);
+    
+    hipblasLtMatmulAlgo_t* hip_algo2 = &heuristicResult[0].algo;
+    rocblaslt_matmul_algo* roc_algo2 = (rocblaslt_matmul_algo*) hip_algo;
+    ASSERT_TRUE(isRocRollerSolutionSupported(roc_handle, problem, roc_algo2, &max_workspace_size) != rocblaslt_status_success);
     
     // runRocRollerContractionProblem(roc_handle, nullptr, problem);
 

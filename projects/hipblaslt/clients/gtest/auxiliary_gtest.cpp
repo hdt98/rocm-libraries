@@ -100,6 +100,14 @@ namespace
                 testing_aux_float8_func(arg);
             else if(!strcmp(arg.function, "aux_rocblaslt_utility_func"))
                 testing_aux_rocblaslt_utility_func(arg);
+            else if(!strcmp(arg.function, "aux_status_func"))
+                testing_aux_status_func(arg);
+            else if(!strcmp(arg.function, "aux_hipblaslt_func"))
+                testing_aux_hipblaslt_func(arg);
+            else if(!strcmp(arg.function, "aux_tensile_host_func"))
+                testing_aux_tensile_host_func(arg);
+            else if(!strcmp(arg.function, "aux_tuple_helper_equal_func"))
+                testing_aux_tuple_helper_equal_func(arg);
             else if(!strcmp(arg.function, "aux_rocblaslt_rocroller_host_func"))
                 testing_aux_rocblaslt_rocroller_host_func(arg);
             else
@@ -147,6 +155,10 @@ namespace
                    || !strcmp(arg.function, "aux_auxiliary_func")
                    || !strcmp(arg.function, "aux_float8_func")
                    || !strcmp(arg.function, "aux_rocblaslt_utility_func")
+                   || !strcmp(arg.function, "aux_status_func")
+                   || !strcmp(arg.function, "aux_hipblaslt_func")
+                   || !strcmp(arg.function, "aux_tensile_host_func")
+                   || !strcmp(arg.function, "aux_tuple_helper_equal_func")
                    || !strcmp(arg.function, "aux_rocblaslt_rocroller_host_func");
         }
 

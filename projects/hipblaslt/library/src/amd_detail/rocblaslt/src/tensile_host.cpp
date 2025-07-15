@@ -287,19 +287,19 @@ namespace
         }
     }
 
-    inline bool gpu_arch_match(std::string_view gpu_arch, std::string_view pattern)
-    {
-        if(!pattern.length())
-        {
-            return true;
-        }
+    // inline bool gpu_arch_match(std::string_view gpu_arch, std::string_view pattern)
+    // {
+    //     if(!pattern.length())
+    //     {
+    //         return true;
+    //     }
 
-        constexpr char    prefix[]   = "gfx";
-        const std::size_t prefix_len = std::string_view(prefix).length();
-        gpu_arch.remove_prefix(prefix_len);
-        std::regex arch_regex(pattern.data());
-        return std::regex_search(gpu_arch.data(), arch_regex);
-    }
+    //     constexpr char    prefix[]   = "gfx";
+    //     const std::size_t prefix_len = std::string_view(prefix).length();
+    //     gpu_arch.remove_prefix(prefix_len);
+    //     std::regex arch_regex(pattern.data());
+    //     return std::regex_search(gpu_arch.data(), arch_regex);
+    // }
 
     inline TensileLite::ActivationType getTensileActivationType(rocblaslt_epilogue epilogue)
     {
@@ -1103,7 +1103,7 @@ namespace
             rocblaslt::Debug::Instance().logMarkerStop();
         }
     }
-
+/*
     inline void
         logProfileFromTensileDataGemm(const TensileLite::ContractionProblemGroupedGemm& problem,
                                       const TensileLite::ContractionGroupedInputs&      inputs,
@@ -1236,6 +1236,7 @@ namespace
             "iters",
             hotIterations);
     }
+*/
 #undef GEN_BENCH_ARG
 
     /****************************************************************

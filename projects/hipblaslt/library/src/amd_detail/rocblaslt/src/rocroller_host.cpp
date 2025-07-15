@@ -282,6 +282,9 @@ SolutionIndexParameters indexToParameters(int index)
     pos += MAX_BITS_WORKGROUPTILE_N;
     result.workgroupTile.m
         = ((index >> pos) & mask(MAX_BITS_WORKGROUPTILE_M)) * REQUIRED_MULTIPLE_M_N;
+    // Tom check:
+    // AssertFatal(index == 0, "indexToParameters:",
+    //             ShowValue(index));
     pos += MAX_BITS_WORKGROUPTILE_M;
     result.prefetchInFlight = (index >> pos) & mask(MAX_BITS_PREFETCH_IN_FLIGHT);
 
@@ -761,13 +764,13 @@ std::shared_ptr<SolutionParameters>
             gemm->machineInstruction = {32, 32, 64, 1};
     }
 
-    // return gemm; // success!
+    // return gemm; // success! 
 
     if(gemm->workgroupTile.m / gemm->machineInstruction.m == 1)
         gemm->workgroupSizeX = gemm->wavefrontSize;
     if(gemm->workgroupTile.n / gemm->machineInstruction.n == 1)
         gemm->workgroupSizeY = 1;
-    // return gemm; // success!
+    // return gemm; // success! 
     if(solutionIndexParameters.prefetchInFlight == 1)
     {
         gemm->prefetch = false;
@@ -815,7 +818,7 @@ std::shared_ptr<SolutionParameters>
 
     // LDS can only be used for scaling data with certain workgroup tile sizes
     auto workgroupSize = gemm->workgroupSizeX * gemm->workgroupSizeY;
-    // return gemm; // success
+    // return gemm; // success 
     auto numScaleElementsA
         = gemm->workgroupTile.m
           * (gemm->workgroupTile.k
@@ -824,7 +827,7 @@ std::shared_ptr<SolutionParameters>
         = gemm->workgroupTile.n
           * (gemm->workgroupTile.k
              / (gemm->kernelType.scaleBBlockRowSize * gemm->kernelType.scaleBBlockColSize));
-    // return gemm; // failure
+    // return gemm; // failure 
     if(numScaleElementsA % workgroupSize != 0)
     {
         gemm->loadLDSScaleA     = false;
@@ -1101,18 +1104,18 @@ std::shared_ptr<GemmKernel> genGemmKernel(std::shared_ptr<SolutionParameters> ge
     AssertFatal(wavetilePerWavefrontM > 0, "WaveTile size mismatch.");
     AssertFatal(wavetilePerWavefrontN > 0, "WaveTile size mismatch.");
 
-    /* Right here
-    genKernelFromSolutionIndexParameters ex: /data0/tomtang2/rocm_library_workspace/rocm-libraries/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/rocroller_host.cpp:1108: FatalError(gemm->workgroupTile.m % (gemm->machineInstruction.m * wavetilePerWavefrontM) == 0)
-WaveTile size mismatch (M)      gemm->workgroupTile.m = 144
-        gemm->machineInstruction.m = 32
-        wavetilePerWavefrontM = 2
-    
-    */
+        /* Right here
+        genKernelFromSolutionIndexParameters ex: /data0/tomtang2/rocm_library_workspace/rocm-libraries/projects/hipblaslt/library/src/amd_detail/rocblaslt/src/rocroller_host.cpp:1108: FatalError(gemm->workgroupTile.m % (gemm->machineInstruction.m * wavetilePerWavefrontM) == 0)
+    WaveTile size mismatch (M)      gemm->workgroupTile.m = 144
+            gemm->machineInstruction.m = 32
+            wavetilePerWavefrontM = 2
+        
+        */
     AssertFatal(gemm->workgroupTile.m % (gemm->machineInstruction.m * wavetilePerWavefrontM) == 0,
                 "WaveTile size mismatch (M)",
                 ShowValue(gemm->workgroupTile.m),
                 ShowValue(gemm->machineInstruction.m),
-                ShowValue(wavetilePerWavefrontM));
+                ShowValue(wavetilePerWavefrontM), ShowValue(gemm->wavefrontSize), ShowValue(gemm->workgroupSizeX));
     AssertFatal(gemm->workgroupTile.n % (gemm->machineInstruction.n * wavetilePerWavefrontN) == 0,
                 "WaveTile size mismatch (N)",
                 ShowValue(gemm->workgroupTile.n),
@@ -1291,14 +1294,14 @@ rocblaslt_status
                                          int                          solutionIndex,
                                          std::shared_ptr<GemmKernel>& kernel)
 {
-    // return rocblaslt_status_success; // success
-    auto params = genSolutionParameters(kernelType, solutionIndexParameter); // right here
-    // return rocblaslt_status_success; // failure
+    // return rocblaslt_status_success; // success 
+    auto params = genSolutionParameters(kernelType, solutionIndexParameter); // right here 
+    // return rocblaslt_status_success; // failure 
     try
     {
-        // return rocblaslt_status_success; // failure
+        // return rocblaslt_status_success; // failure 
         kernel                                                        = genGemmKernel(params);
-        // return rocblaslt_status_success; // exception happended
+        // return rocblaslt_status_success; // exception happended 
         rocroller_handle->generatedKernels[kernelType][solutionIndex] = kernel;
     }
     catch(const std::exception& e)
@@ -1567,7 +1570,7 @@ rocblaslt_status getKernelFromAlgo(rocblaslt_handle                   handle,
     {
         auto solutionIndexParameter = indexToParameters(*solutionIndex);
 
-        // return rocblaslt_status_success; // success
+        // return rocblaslt_status_success; // success 
         auto status = genKernelFromSolutionIndexParameters(
             rocroller_handle, kernelType, solutionIndexParameter, *solutionIndex, kernel);
         return status;
@@ -1606,7 +1609,7 @@ rocblaslt_status runGemmKernel(std::shared_ptr<GemmKernel>        gemm,
                                const RocblasltContractionProblem& prob)
 {
     auto commandArgs = createCommandArguments(gemm, prob);
-    // return rocblaslt_status_success; // success!
+    // return rocblaslt_status_success; // success! 
     auto runtimeArgs = commandArgs.runtimeArguments();
 
     if(!gemm->commandKernel->matchesPredicates(runtimeArgs, LogLevel::Error))
@@ -1614,7 +1617,7 @@ rocblaslt_status runGemmKernel(std::shared_ptr<GemmKernel>        gemm,
         return rocblaslt_status_invalid_value;
     }
 
-    // return rocblaslt_status_success; // success!
+    // return rocblaslt_status_success; // success! 
     // TODO: Add scratch space when needed
 
     gemm->commandKernel->launchKernel(runtimeArgs, prob.stream);
@@ -1674,13 +1677,13 @@ rocblaslt_status runRocRollerContractionProblem(rocblaslt_handle                
         logProfile(prob, flush, rotatingBufferSize, coldIterations, hotIterations);
     }
 
-    // return rocblaslt_status_success; // success!
+    // return rocblaslt_status_success; // success! 
     std::shared_ptr<GemmKernel> kernel;
     auto                        status = getKernelFromAlgo(handle, prob, algo, kernel);
     if(status != rocblaslt_status_success)
         return status;
 
-    // return rocblaslt_status_success; // failure because / (gemm->kernelType.scaleABlockRowSize, now it's success
+    // return rocblaslt_status_success; // failure because / (gemm->kernelType.scaleABlockRowSize, now it's success 
     if(get_logger_layer_mode() & rocblaslt_layer_mode_log_extended_profile)
     {
         auto kernelName = genKernelName(kernel->params);
@@ -1693,7 +1696,7 @@ rocblaslt_status runRocRollerContractionProblem(rocblaslt_handle                
                            hotIterations);
     }
 
-    // return rocblaslt_status_success; // success!
+    // return rocblaslt_status_success; // success! 
 
     return runGemmKernel(kernel, prob);
 }

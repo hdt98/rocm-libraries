@@ -30,7 +30,7 @@
 #include "auxiliary.hpp"
 #include "handle.h"
 #include "utility.hpp"
-
+/*
 inline rocblaslt_status getOriginalSizes(hipblasOperation_t opA,
                                          hipblasOperation_t opB,
                                          int64_t            num_rows_a,
@@ -54,18 +54,23 @@ inline rocblaslt_status getOriginalSizes(hipblasOperation_t opA,
         n = num_rows_b;
         if(k != num_cols_b)
         {
+#ifndef CODE_COVERAGE
             std::cerr << "A, B matrix size are not matched" << std::endl;
+#endif
             return rocblaslt_status_invalid_size;
         }
     }
     else if(k != num_rows_b)
     {
+#ifndef CODE_COVERAGE
         std::cerr << "A, B matrix size are not matched" << std::endl;
+#endif
         return rocblaslt_status_invalid_size;
     }
 
     return rocblaslt_status_success;
 }
+*/
 
 inline bool isValidOrderForDatatype(hipDataType datatype, hipblasLtOrder_t order)
 {
@@ -80,6 +85,7 @@ inline bool isValidOrderForDatatype(hipDataType datatype, hipblasLtOrder_t order
 /*******************************************************************************
  * Validate Matmul Descr. init Arguments - matrix init.
  ******************************************************************************/
+/*
 inline rocblaslt_status validateMatmulDescrArgs(rocblaslt_handle       handle,
                                                 hipblasOperation_t     opA,
                                                 hipblasOperation_t     opB,
@@ -117,7 +123,9 @@ inline rocblaslt_status validateMatmulDescrArgs(rocblaslt_handle       handle,
 
     if(m != num_rows_c || m != num_rows_d || n != num_cols_c || n != num_cols_d)
     {
+#ifndef CODE_COVERAGE
         std::cerr << " matrix size is not valid" << std::endl;
+#endif
         return rocblaslt_status_invalid_size;
     }
 
@@ -146,6 +154,7 @@ inline rocblaslt_status validateMatmulDescrArgs(rocblaslt_handle       handle,
 
     return rocblaslt_status_success;
 }
+*/
 
 /*******************************************************************************
  * Validate Matmul Swizzle Arguments
@@ -276,7 +285,9 @@ inline rocblaslt_status validateMatmulArgs(int64_t                       m,
     // sizes must not be negative
     if(batch_stride_a < 0 || batch_stride_b < 0 || batch_stride_c < 0 || batch_stride_d < 0)
     {
+#ifndef CODE_COVERAGE
         std::cerr << "matrix and stride size must be positive" << std::endl;
+#endif
         return rocblaslt_status_invalid_size;
     }
 
@@ -284,8 +295,10 @@ inline rocblaslt_status validateMatmulArgs(int64_t                       m,
     if(num_batches_a != num_batches_b || num_batches_a != num_batches_c
        || num_batches_a != num_batches_d || num_batches_a < 1)
     {
+#ifndef CODE_COVERAGE
         std::cerr << " number of batches of matrics A,B,C,D must be the same and negative"
                   << std::endl;
+#endif
         return rocblaslt_status_invalid_size;
     }
 
