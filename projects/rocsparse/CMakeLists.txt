@@ -18,7 +18,7 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
-#
+# TEST CHANGE DO NOT MERGE
 # ########################################################################
 
 # The ROCm platform requires at least Ubuntu 16.04 or Fedora 24, which have cmake 3.5
