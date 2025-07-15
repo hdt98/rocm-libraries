@@ -12,11 +12,12 @@ Quick Start Guide
 This section describes how to configure and build the |project_name| project. We assume the user has a
 ROCm installation, Python 3.8 or newer and CMake 3.25.0 or newer.
 
-The |project_name| project consists of three components:
+The |project_name| project consists of four components:
 
 1. host library
 2. device libraries
 3. client applications
+4. tensilelite client
 
 Each component has a corresponding subdirectory. The host and device libraries are independently
 configurable and buildable but the client applications require the host library build time and the
@@ -201,11 +202,12 @@ CMake Targets
 Physical Design
 ---------------
 
-|project_name| consists of three components:
+|project_name| consists of four components:
 
 1. host library
 2. device libraries
 3. client applications
+4. tensilelite client
 
 Each component has a corresponding directory. The host
 and device libraries are independently configurable and
