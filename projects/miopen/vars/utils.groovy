@@ -275,7 +275,7 @@ def getDockerImage(Map conf=[:])
     }
     catch(Exception ex)
     {
-        dockerImage = docker.build("${image}", "${dockerArgs} .")
+        dockerImage = docker.build("${image}", "${dockerArgs} -f ./projects/miopen/Dockerfile ./projects/miopen/.")
         withDockerRegistry([ credentialsId: "docker_test_cred", url: "" ]) {
             dockerImage.push()
         }
@@ -302,7 +302,7 @@ def getDockerImage(Map conf=[:])
         }
         catch(Exception ex)
         {
-            dockerImage = docker.build("${image}", "${dockerArgs} .")
+            dockerImage = docker.build("${image}", "${dockerArgs} -f ./projects/miopen/Dockerfilei.perftests ./projects/miopen/.")
             withDockerRegistry([ credentialsId: "docker_test_cred", url: "" ]) {
                 dockerImage.push()
             }
