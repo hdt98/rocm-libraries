@@ -1870,17 +1870,19 @@ void testing_aux_float8_func(const Arguments& arg)
     ASSERT_TRUE(result_b == (static_cast<float>(f8_fnuz_val) > static_cast<float>(f8_fnuz_b)));
     result_b = (f8_val > f8_b);
     ASSERT_TRUE(result_b == (static_cast<float>(f8_val) > static_cast<float>(f8_b)));
+}
 
-    // ------------------- Test hipblaslt-ext-op.h -------------------
-    ASSERT_TRUE(hipblasltGetTotalGranularityValue() == hipblasltClientPerformanceArgs::totalGranularity);
-    ASSERT_TRUE(hipblasltGetTilesPerCuValue() == hipblasltClientPerformanceArgs::tilesPerCu);
-    ASSERT_TRUE(hipblasltGetTile0Granularity() == hipblasltClientPerformanceArgs::tile0Granularity);
-    ASSERT_TRUE(hipblasltGetTile1Granularity() == hipblasltClientPerformanceArgs::tile1Granularity);
-    ASSERT_TRUE(hipblasltGetCuGranularity() == hipblasltClientPerformanceArgs::cuGranularity);
-    ASSERT_TRUE(hipblasltGetWaveGranularity() == hipblasltClientPerformanceArgs::waveGranularity);
-    ASSERT_TRUE(hipblasltGetCUs() == hipblasltClientPerformanceArgs::CUs);
-    ASSERT_TRUE(hipblasltGetMemWriteBytesD() == hipblasltClientPerformanceArgs::memWriteBytesD);
-    ASSERT_TRUE(hipblasltGetMemReadBytes() == hipblasltClientPerformanceArgs::memReadBytes);
+void testing_aux_hipblaslt_ext_op_func(const Arguments& arg)
+{
+        ASSERT_TRUE(hipblasltGetTotalGranularityValue() == hipblasltClientPerformanceArgs::totalGranularity);
+        ASSERT_TRUE(hipblasltGetTilesPerCuValue() == hipblasltClientPerformanceArgs::tilesPerCu);
+        ASSERT_TRUE(hipblasltGetTile0Granularity() == hipblasltClientPerformanceArgs::tile0Granularity);
+        ASSERT_TRUE(hipblasltGetTile1Granularity() == hipblasltClientPerformanceArgs::tile1Granularity);
+        ASSERT_TRUE(hipblasltGetCuGranularity() == hipblasltClientPerformanceArgs::cuGranularity);
+        ASSERT_TRUE(hipblasltGetWaveGranularity() == hipblasltClientPerformanceArgs::waveGranularity);
+        ASSERT_TRUE(hipblasltGetCUs() == hipblasltClientPerformanceArgs::CUs);
+        ASSERT_TRUE(hipblasltGetMemWriteBytesD() == hipblasltClientPerformanceArgs::memWriteBytesD);
+        ASSERT_TRUE(hipblasltGetMemReadBytes() == hipblasltClientPerformanceArgs::memReadBytes);
 }
 
 void testing_aux_rocblaslt_utility_func(const Arguments& arg)

@@ -97,6 +97,8 @@ namespace
                 testing_aux_auxiliary_func(arg);
             else if(!strcmp(arg.function, "aux_float8_func"))
                 testing_aux_float8_func(arg);
+            else if(!strcmp(arg.function, "aux_hipblaslt_ext_op_func"))
+                testing_aux_hipblaslt_ext_op_func(arg);
             else if(!strcmp(arg.function, "aux_rocblaslt_utility_func"))
                 testing_aux_rocblaslt_utility_func(arg);
             else if(!strcmp(arg.function, "aux_status_func"))
@@ -156,6 +158,8 @@ namespace
 #ifdef CODE_COVERAGE
                    || !strcmp(arg.function, "aux_auxiliary_func")
                    || !strcmp(arg.function, "aux_float8_func")
+                   || !strcmp(arg.function, "aux_hipblaslt_ext_op_func")
+                   || !strcmp(arg.function, "aux_rocblaslt_utility_func")
                    || !strcmp(arg.function, "aux_status_func")
                    || !strcmp(arg.function, "aux_hipblaslt_func")
                    || !strcmp(arg.function, "aux_tensile_host_func")
