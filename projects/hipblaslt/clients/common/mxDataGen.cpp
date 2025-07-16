@@ -309,8 +309,8 @@ std::vector<float> generateMXInput(hipDataType            dataType,
 
     const uint32_t seed = 1713573849;
 
-    std::vector<int> sizes{rowSize, colSize};
-    std::vector<int> strides;
+    std::vector<index_t> sizes{rowSize, colSize};
+    std::vector<index_t> strides;
 
     strides.push_back(1);
     strides.push_back(stride);
