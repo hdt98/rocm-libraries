@@ -85,9 +85,9 @@ class ComputeStoreVgprsVALU(ComputeStoreVgprs):
 
             writer.vgprPool.checkIn(tmpVgpr)
             tmpS1Res = ContinuousRegister(tmpS1, 1)
-            module.add(vectorStaticMultiply(vgpr(tid0), vgpr(tid0), tid0Scale, tmpS1Res))
+            module.add(vectorStaticMultiply(vgpr(tid0), vgpr(tid0), tid0Scale, tmpVgprRes))
             if tid1Scale != 1:
-                module.add(vectorStaticMultiply(vgpr(tid1), vgpr(tid1), tid1Scale, tmpS1Res))
+                module.add(vectorStaticMultiply(vgpr(tid1), vgpr(tid1), tid1Scale, tmpVgprRes))
 
             if kernel["BufferStore"]:
                 # compute rowStart- this is just tid1 scaled by appropriate stride.
@@ -213,7 +213,7 @@ class ComputeStoreVgprsMFMA(ComputeStoreVgprs):
             # coord 0 : thread part
             module.add(vectorStaticRemainder(dummy, tid0, "Serial", writer.states.kernel["WavefrontSize"], tmpVgpr1Res, tmpSgprInfo))
             module.add(vectorStaticDivide(tid0, tid0, matrixInstN, tmpVgpr1Res))
-            module.add(vectorStaticMultiply(vgpr(tid0), vgpr(tid0), kernel["MIOutputVectorWidth"], tmpSgprInfo, "thread0 * continuous_output"))
+            module.add(vectorStaticMultiply(vgpr(tid0), vgpr(tid0), kernel["MIOutputVectorWidth"], tmpVgprRes, "thread0 * continuous_output"))
             module.add(VAddLShiftLeftU32(dst=vgpr(lsuTid0), src0=vgpr(tmpVgpr0), src1=vgpr(tid0), shiftHex=log2(kernel["VectorWidthA"]), comment="coordination 0 = vwA *(wave_id0 + tid0)"))
 
             wg0="WorkGroup0"
@@ -313,7 +313,7 @@ class ComputeStoreVgprsMFMASwap(ComputeStoreVgprs):
             # coord 1 : thread part
             module.add(vectorStaticRemainder(dummy, tid1, "Serial", writer.states.kernel["WavefrontSize"], tmpVgpr1Res, tmpSgprInfo))
             module.add(vectorStaticDivide(tid1, tid1, matrixInstM, tmpVgpr1Res))
-            module.add(vectorStaticMultiply(vgpr(tid1), vgpr(tid1), kernel["MIOutputVectorWidth"], tmpSgprInfo, "thread0 * continuous_output"))
+            module.add(vectorStaticMultiply(vgpr(tid1), vgpr(tid1), kernel["MIOutputVectorWidth"], tmpVgpr1Res, "thread0 * continuous_output"))
             module.add(VAddLShiftLeftU32(dst=vgpr(lsuTid1), src0=vgpr(tmpVgpr0), src1=vgpr(tid1), shiftHex=log2(kernel["VectorWidthB"]), comment="coordination 1 = vwB *(wave_id1 + tid1)"))
 
             # coord 1 : offset part

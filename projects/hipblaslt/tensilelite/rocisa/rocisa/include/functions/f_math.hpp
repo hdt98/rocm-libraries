@@ -788,8 +788,7 @@ namespace rocisa
     std::shared_ptr<Module> vectorStaticMultiply(const std::shared_ptr<RegisterContainer>& product,
                                                  const std::shared_ptr<RegisterContainer>& operand,
                                                  int multiplier,
-                                                 const std::optional<ContinuousRegister>& tmpSgprRes
-                                                 = std::nullopt,
+                                                 std::optional<ContinuousRegister> tmpVgprRes,
                                                  const std::string& comment = "");
 
     // MultiplyAdd

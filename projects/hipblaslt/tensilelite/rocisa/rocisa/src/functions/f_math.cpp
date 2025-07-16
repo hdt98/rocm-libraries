@@ -154,7 +154,7 @@ namespace rocisa
         vectorStaticMultiply(const std::shared_ptr<RegisterContainer>& product,
                              const std::shared_ptr<RegisterContainer>& operand,
                              int                                       multiplier,
-                             const std::optional<ContinuousRegister>&  tmpSgprRes,
+                             std::optional<ContinuousRegister>         tmpVgprRes,
                              const std::string&                        comment)
     {
         std::string dComment = comment.empty() ? product->toString() + " = " + operand->toString()
@@ -185,13 +185,13 @@ namespace rocisa
             }
             else
             {
-                if(!tmpSgprRes || tmpSgprRes->size < 1)
+                if(!tmpVgprRes || tmpVgprRes->size < 1)
                 {
-                    throw std::runtime_error("Invalid tmpSgprRes, must be at least 1");
+                    throw std::runtime_error("Invalid tmpVgprRes, must be at least 1");
                 }
-                auto tmpSgpr = sgpr(tmpSgprRes->idx);
-                module->addT<SMovB32>(tmpSgpr, multiplier, dComment);
-                module->addT<VMulLOU32>(product, tmpSgpr, operand, dComment);
+                auto tmpVgpr  = vgpr(tmpVgprRes->idx);
+                module->addT<VMovB32>(tmpVgpr, multiplier, std::nullopt, dComment);
+                module->addT<VMulLOU32>(product, tmpVgpr, operand, dComment);
             }
         }
         return module;
@@ -720,7 +720,7 @@ void math_func(nb::module_ m)
           nb::arg("product"),
           nb::arg("operand"),
           nb::arg("multiplier"),
-          nb::arg("tmpSgprRes") = std::nullopt,
+          nb::arg("tmpVgprRes") = std::nullopt,
           nb::arg("comment")    = "");
     m.def("vectorStaticMultiplyAdd",
           &rocisa::vectorStaticMultiplyAdd,

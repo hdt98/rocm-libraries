@@ -2181,8 +2181,7 @@ class KernelWriterAssembly(KernelWriter):
           comment="%s=wg1*nwg0"%vgpr(v+1) ))
       module.add(VAddCOU32(dst=vgpr(v), dst1=VCC(), src0=vgpr(v), src1=vgpr(v+1), \
           comment="%s=wg1*nwg0+wg0"%vgpr(v) ))
-      with self.allocTmpSgpr(1) as tmpSgprInfo:
-        module.add(vectorStaticMultiply(vgpr(v), vgpr(v), kernel["NumThreads"], tmpSgprInfo))
+      module.add(vectorStaticMultiply(vgpr(v), vgpr(v), kernel["NumThreads"], tmpVgprRes))
       module.add(VAddCOU32(dst=vgpr(v), dst1=VCC(), src0=vgpr(v), src1=vgpr("Serial"), \
           comment="%s=tid+NT*(wg1*nwg0+wg0)=serial"%vgpr(v) ))
       module.add(VMulLOU32(dst=vgpr(v), src0=hex(self.nipt*4), src1=vgpr(v), \
@@ -2438,16 +2437,20 @@ class KernelWriterAssembly(KernelWriter):
     else:
       tReg2 = self.vgprPool.checkOut(1, 'treg2', self.states.preventVgprOverflowDuringNewTile)
 
-    with self.allocTmpSgpr(1) as tmpSgprInfo:
-      if not self.states.groOffsetInMacroTile:
-        tmpVgpr = self.vgprPool.checkOut(1, 'graTA vgpr', self.states.preventVgprOverflowDuringNewTile)
-        # Buffer Load will set the SRD to start of the MacroTile
-        # So don't add the static wg-related component here - save for later.
-        module.add(vectorStaticMultiply(vgpr(tmpVgpr), sgpr(tP["wg"]), kernel[tP["mt"]], tmpSgprInfo))  # workgroup
-        module.add(VAddCOU32(dst=vgpr(tReg2), dst1=VCC(), src0=vgpr(tmpVgpr), \
-            src1=vgpr(tReg), comment="gro%s-tile = serial%s%s*VW + (wg%s*MT%s)" \
-            % (tc, tOpStr, divisorName, tc, tc) ))
-        self.vgprPool.checkIn(tmpVgpr)
+    if not self.states.groOffsetInMacroTile:
+      tmpVgpr = self.vgprPool.checkOut(1, 'graTA vgpr', self.states.preventVgprOverflowDuringNewTile)
+      dummy = self.vgprPool.checkOut(1)
+      dummyRes = ContinuousRegister(dummy, 1)
+
+      # Buffer Load will set the SRD to start of the MacroTile
+      # So don't add the static wg-related component here - save for later.
+      module.add(vectorStaticMultiply(vgpr(tmpVgpr), sgpr(tP["wg"]), kernel[tP["mt"]], \
+                                      dummyRes))  # workgroup
+      module.add(VAddCOU32(dst=vgpr(tReg2), dst1=VCC(), src0=vgpr(tmpVgpr), \
+          src1=vgpr(tReg), comment="gro%s-tile = serial%s%s*VW + (wg%s*MT%s)" \
+          % (tc, tOpStr, divisorName, tc, tc) ))
+      self.vgprPool.checkIn(tmpVgpr)
+      self.vgprPool.checkIn(dummy)
 
     tP["gpr"]["tReg"] = tReg2
 
@@ -2463,9 +2466,11 @@ class KernelWriterAssembly(KernelWriter):
       gsuOffset = self.vgprPool.checkOut(1, "gsuOffset", self.states.preventVgprOverflowDuringNewTile)
       module.add(VMovB32(dst=vgpr(gsuOffset), src=sgpr("GSUSumIdx"), comment="=gsuSumIdx"))
 
-      with self.allocTmpSgpr(1) as tmpSgprInfo:
-        # graUnrollAssignment += gsuSumIdx*DepthU
-        module.add(vectorStaticMultiply(vgpr(gsuOffset), vgpr(gsuOffset), kernel["DepthU"], tmpSgprInfo))
+      tmpVgpr = self.vgprPool.checkOut(1)
+      tmpVgprRes = ContinuousRegister(tmpVgpr, 2)
+      # graUnrollAssignment += gsuSumIdx*DepthU
+      module.add(vectorStaticMultiply(vgpr(gsuOffset), vgpr(gsuOffset), kernel["DepthU"], tmpVgprRes))
+      self.vgprPool.checkIn(tmpVgpr)
 
       module.add(VAddCOU32(dst=vgpr(tP["gpr"]["uReg"]), dst1=VCC(), \
           src0=vgpr(gsuOffset), src1=vgpr(tP["gpr"]["uReg"]), \
@@ -2885,7 +2890,7 @@ class KernelWriterAssembly(KernelWriter):
           "0. thread id in wave: wtid = tid %% wavelength(%u)" % waveWidth))
       module.add(vectorStaticDivide(kReg, kReg, dividendForKId, tmpVgprRes, \
           "1. unroll offset: kIdx = wtid / (MIN(%u) )" % (kernel["MatrixInstN"])))
-      module.add(vectorStaticMultiply(vgpr(kReg), vgpr(kReg), strideK, tmpSgprInfo, \
+      module.add(vectorStaticMultiply(vgpr(kReg), vgpr(kReg), strideK, tmpVgprRes, \
           "1. unroll offset: grKOffset = kIdx * mStride(%u)" % strideK))
 
     # Calculate final element offset
@@ -3764,14 +3769,14 @@ class KernelWriterAssembly(KernelWriter):
       self.vgprPool.checkIn(dividendReg)
       self.vgprPool.checkIn(dummy)
 
-    with self.allocTmpSgpr(1) as tmpSgprInfo:
-      if tP["glvw"] > 1:
-        if tP["tlu"]:
-          module.addComment0("tile *= glvw")
-          module.add(vectorStaticMultiply(vgpr(tReg), vgpr(tReg), tP["glvw"], tmpSgprInfo))
-        else:
-          module.addComment0("unroll *= glvw")
-          module.add(vectorStaticMultiply(vgpr(uReg), vgpr(uReg), tP["glvw"], tmpSgprInfo))
+
+    if tP["glvw"] > 1:
+      if tP["tlu"]:
+        module.addComment0("tile *= glvw")
+        module.add(vectorStaticMultiply(vgpr(tReg), vgpr(tReg), tP["glvw"], tmpVgprRes))
+      else:
+        module.addComment0("unroll *= glvw")
+        module.add(vectorStaticMultiply(vgpr(uReg), vgpr(uReg), tP["glvw"], tmpVgprRes))
 
 
     uReg2 = self.vgprPool.checkOut(1, "uReg2", self.states.preventVgprOverflowDuringNewTile)
@@ -4045,6 +4050,8 @@ class KernelWriterAssembly(KernelWriter):
       divisor     = kernel["SubGroup0"] * kernel["SubGroup1"]
       mtAddPad    = kernel["MacroTile%u" % tile01] + LdsPad
       lrvw        = self.states.lrvwUnrollA if tc == 'A' else self.states.lrvwUnrollB
+      tmpVgpr = self.vgprPool.checkOut(1)
+      tmpVgprRes = ContinuousRegister(tmpVgpr, 1)
 
       # final offset
       finalVgpr = vgpr("LocalReadAddr%s"%tc)
@@ -4054,7 +4061,7 @@ class KernelWriterAssembly(KernelWriter):
         if kernel["UseDotInstruction"]:
           kidx = self.vgprPool.checkOut(1) # remainder
           module.add(VAndB32(dst=vgpr(kidx), src0=(kernel["NumWaveSplitK"]-1), src1=vgpr("Serial"), comment="kidx = Serial % NumWaveSplitK"))
-          module.add(vectorStaticMultiply(vgpr(kidx), vgpr(kidx), lrvw, tmpSgprInfo, \
+          module.add(vectorStaticMultiply(vgpr(kidx), vgpr(kidx), lrvw, tmpVgprRes, \
             "*= lrvw"))
           # Final offset
           module.add(VAddLShiftLeftU32(dst=finalVgpr, shiftHex=hex(log2(tP["bpe"])), src0=vgpr(kidx), src1=vgpr(tP["gpr"]["lro"]), \
@@ -4066,11 +4073,11 @@ class KernelWriterAssembly(KernelWriter):
           vCont = ContinuousRegister(vtmp, 1)
           module.add(vectorStaticDivide(sgid, "Serial", divisor, vCont, \
             "LSU offset: sgid = Serial / subGroup(%u)" % divisor))
-          module.add(vectorStaticMultiply(vgpr(sgid), vgpr(sgid), mtAddPad, tmpSgprInfo, \
+          module.add(vectorStaticMultiply(vgpr(sgid), vgpr(sgid), mtAddPad, tmpVgprRes, \
             "LSU offset: lsuoffset = sgid*(MT%u+PAD)"%tile01))
           # module.add(SMovB32(dst=sgpr(tmpSgpr), src=mtAddPad*lsuStride, \
           #   comment="LSU offset: stride = lsuStride(%u)*(MT%u(%u) + PAD%u(%u))" % (lsuStride,tile01, kernel["MacroTile%u" % tile01], tile01, LdsPad)))
-          module.add(vectorStaticMultiply(vgpr(tP["gpr"]["lro"]), vgpr(tP["gpr"]["lro"]), kernel["VectorWidthB"], tmpSgprInfo, \
+          module.add(vectorStaticMultiply(vgpr(tP["gpr"]["lro"]), vgpr(tP["gpr"]["lro"]), kernel["VectorWidthB"], tmpVgprRes, \
             "Final Offset: lr%sOffset * VW" % tc))
           module.add(VAddLShiftLeftU32(dst=finalVgpr, shiftHex=hex(log2(tP["bpe"])), src0=vgpr(sgid), src1=vgpr(tP["gpr"]["lro"]), \
             comment="Final Offset: add padding %u per block %u" % (kernel["LdsPad%s"%tc] * tP["bpeDS"], kernel["LdsBlockSizePerPad%s"%tc])))
@@ -4079,6 +4086,7 @@ class KernelWriterAssembly(KernelWriter):
 
       # release resources
       self.vgprPool.checkIn(tP["gpr"]["lro"])
+      self.vgprPool.checkIn(tmpVgpr)
 
       # LdsBlockSizePerPad: add padding
       if kernel["LdsBlockSizePerPad%s"%tc] != 0 and kernel["LdsPad%s"%tc] !=0:
@@ -6203,6 +6211,8 @@ class KernelWriterAssembly(KernelWriter):
     kReg    = None
     abReg   = None
     dummy   = -1
+    tmpVgpr = self.vgprPool.checkOut(1)
+    tmpVgprRes = ContinuousRegister(tmpVgpr, 1)
 
     if isTail and (kernel["AssertSummationElementMultiple"] % kPerIter != 0):
       kReg    = self.vgprPool.checkOut(1,"kReg") # remainder
@@ -6222,7 +6232,7 @@ class KernelWriterAssembly(KernelWriter):
           tmpSgprX1 = tmpSgprInfo.idx
 
         # replace 0 for differnet thread
-        shiftK.add(vectorStaticMultiply(vgpr(kReg), vgpr(kReg), numInput, tmpSgprInfo))
+        shiftK.add(vectorStaticMultiply(vgpr(kReg), vgpr(kReg), numInput, tmpVgprRes))
         shiftK.add(VCmpGEI32(dst=sgpr(tmpSgprX2, self.states.laneSGPRCount), src0=vgpr(kReg), src1=sgpr(loopCntSgpr), comment="check K index >= Size L"))
         for a in range(0, kernel["ThreadTileA"]):
           for iui in range(0, iuiCount):
@@ -6266,6 +6276,8 @@ class KernelWriterAssembly(KernelWriter):
         self.sgprPool.checkIn(loopCntSgpr)
 
       s_nop = 2
+
+    self.vgprPool.check(tmpVgpr)
 
     if s_nop != 0:
       imod.add(SNop(waitState=(s_nop - 1), comment=""))
@@ -6453,11 +6465,15 @@ class KernelWriterAssembly(KernelWriter):
 
           blocksPerTGroupSMFMAA, elementsPerBlockSMFMAA, blockOffsetSMFMAA = findSparseOffset(True)
           blocksPerTGroupSMFMAB, elementsPerBlockSMFMAB, blockOffsetSMFMAB = findSparseOffset(False)
+
+          dummy = self.vgprPool.checkOut(1)
+          dummyRes = ContinuousRegister(dummy, 1)
+
           # replace 0 for differnet thread
           if kernel["ProblemType"]["Sparse"] == 1 and numMIInput//8 >= 1:
             vgprPerSet0Group = 1
           elif vgprPerInputA <= 2:
-            shiftK.add(vectorStaticMultiply(vgpr(kReg_first), vgpr(kReg_first), numMIInput * numReadsIterCoalesced, tmpSgprInfo))
+            shiftK.add(vectorStaticMultiply(vgpr(kReg_first), vgpr(kReg_first), numMIInput * numReadsIterCoalesced, dummyRes))
             kStepForCoalesced = (u%numReadsIterCoalesced) * numMIInput
             if kStepForCoalesced > 0:
               shiftK.add(VAddU32(vgpr(kReg_first), hex(kStepForCoalesced), vgpr(kReg_first), "k += (u%%numReadsIterCoalesced) * numMIInput"))
@@ -6477,7 +6493,7 @@ class KernelWriterAssembly(KernelWriter):
                     multiplyBy = numMIInput//blocksPerTGroupSMFMAA
                 else:
                     multiplyBy = numMIInput//2 if vgprPerInputA == 8 else numMIInput
-                shiftK.add(vectorStaticMultiply(vgpr(kReg_first), vgpr(kReg_first), multiplyBy, tmpSgprInfo))
+                shiftK.add(vectorStaticMultiply(vgpr(kReg_first), vgpr(kReg_first), multiplyBy, dummyRes))
                 shiftK.add(VAddU32(vgpr(kReg), vgpr(kReg_first), 0, ""))
               elif blocksPerTGroupSMFMAA == 2 and (group * vgprPerSet0Group) == (elementsPerBlockSMFMAA * numRegistersIn):
                 kIncA = blockOffsetSMFMAA + (numMIInput//numSet0GroupA) * max(group - 1, 0)
@@ -6522,7 +6538,7 @@ class KernelWriterAssembly(KernelWriter):
                     multiplyBy = numMIInput//blocksPerTGroupSMFMAB
                 else:
                     multiplyBy = numMIInput//2 if vgprPerInputB == 8 else numMIInput
-                shiftK.add(vectorStaticMultiply(vgpr(kReg_first), vgpr(kReg_first), multiplyBy, tmpSgprInfo))
+                shiftK.add(vectorStaticMultiply(vgpr(kReg_first), vgpr(kReg_first), multiplyBy, dummyRes))
                 shiftK.add(VAddU32(vgpr(kReg), vgpr(kReg_first), 0, ""))
               elif blocksPerTGroupSMFMAB == 2 and (group * vgprPerSet0Group) == (elementsPerBlockSMFMAB * numRegistersIn):
                 kIncB = blockOffsetSMFMAB + (numMIInput//numSet0GroupB) * max(group - 1, 0)
@@ -6541,6 +6557,8 @@ class KernelWriterAssembly(KernelWriter):
                 for iui in range(0, innerUnroll):
                   bStr = vgpr(self.generateSrcStrForMFMA(kernel, tPB, innerUnroll, vregSetIdx, vgprPerInputB, m, u, iui, b, bk=bk + group*vgprPerSet0Group), 1)
                   shiftK.add(VCndMaskB32(dst=bStr, src0=bStr, src1=0, src2=sgpr(tmpSgprX2, self.states.laneSGPRCount), comment="set 0 if K_idx >= sizeL"))
+
+          self.vgprPool.checkIn(dummy)
 
           # replace 0 for same thread
           if numMIInput > 1 and kernel["AssertSummationElementMultiple"] < 8:
@@ -12909,6 +12927,9 @@ class KernelWriterAssembly(KernelWriter):
 
     assert gwvw % 2 == 0 or gwvw == 1
 
+    dummy = self.vgprPool.checkOut(1)
+    dummyRes = ContinuousRegister(dummy, 2)
+
     # Params
     biasBpe = int(self.states.bpr * biasDataType.numRegisters())
     module = Module("WriteBiasToGlobal")
@@ -12924,9 +12945,9 @@ class KernelWriterAssembly(KernelWriter):
 
     # Local read
     # remaining size % VW
-    module.add(vectorStaticMultiply(vgpr(offsetVgpr), vgpr("Serial"), maxKId, tmpSgprRes, \
+    module.add(vectorStaticMultiply(vgpr(offsetVgpr), vgpr("Serial"), maxKId, dummyRes, \
             "offset = serial * maxKId"))
-    module.add(vectorStaticMultiply(vgpr(offsetVgpr), vgpr(offsetVgpr), gwvw, tmpSgprRes, \
+    module.add(vectorStaticMultiply(vgpr(offsetVgpr), vgpr(offsetVgpr), gwvw, dummyRes, \
             "apply VectorWidth: offset = bnOffset * vw(%u)" % gwvw))
 
     enableEdge = False
@@ -12971,7 +12992,7 @@ class KernelWriterAssembly(KernelWriter):
             offset_at_g += shit_offset
           ds_read vpgr_at_g, offset_at_g
         '''
-        module.add(vectorStaticMultiply(vgpr(serialOffsetVgpr), vgpr("Serial"), gwvw, tmpSgprShift, comment="serial = serial * gwvw"))
+        module.add(vectorStaticMultiply(vgpr(serialOffsetVgpr), vgpr("Serial"), gwvw, dummyRes, comment="serial = serial * gwvw"))
         for g in range(gwvw):
           if g != 0:
             module.add(VAddU32(dst=vgpr(offsetVgpr+g), src0=vgpr(offsetVgpr+(g-1)), src1=maxKId, comment="new offset = offset + maxKId"))
@@ -13072,13 +13093,15 @@ class KernelWriterAssembly(KernelWriter):
     # Calculate global offset- macro tile 0 part
     tmpSgpr = tmpSgprRes.idx
     module.add(SMulI32(dst=sgpr(tmpSgpr), src0=mt, src1=sgpr("WorkGroup%u" % tile01), comment="wgp * MT"))
-    module.add(vectorStaticMultiply(vgpr(offsetVgpr), vgpr("Serial"), gwvw, tmpSgprRes, \
+    module.add(vectorStaticMultiply(vgpr(offsetVgpr), vgpr("Serial"), gwvw, dummyRes, \
             "apply VectorWidth: offset = serial * vw(%u)" % gwvw))
     module.add(VAddU32(dst=vgpr(offsetVgpr), src0=sgpr(tmpSgpr), src1=vgpr(offsetVgpr), comment="coord = wgp * MT + thread offset"))
     module.add(VLShiftLeftB32(dst=vgpr(offsetVgpr), \
                               shiftHex=hex(log2(biasBpe)), \
                               src=vgpr(offsetVgpr), \
                               comment="Global bias address scaled by BPE"))
+    self.vgprPool.checkIn(dummy)
+
     with self.allocTmpSgpr(1, 1) as tmpSgprRes:
       module.add(SMovB32(dst=sgpr(tmpSgprRes.idx), src=hex(mt//gwvw), comment="%d=%d//%d"%(mt//gwvw, mt, gwvw)))
       module.add(VCmpXLtU32(dst=EXEC(), src0=vgpr("Serial"), src1=sgpr(tmpSgprRes.idx), comment="if serial < MacroTile%d/gwvw"%tile01))
