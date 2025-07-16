@@ -1,5 +1,3 @@
-force commit
-
 #!/usr/bin/python3
 """Copyright (C) 2020-2024 Advanced Micro Devices, Inc. All rights reserved.
 
@@ -20,6 +18,8 @@ force commit
    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNE-
    CTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
+
+#another commit
 
 import re
 import sys
