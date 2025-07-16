@@ -714,9 +714,6 @@ pushd .
   # #################################################
   # configure & build
   # #################################################
-  if [[ "${gpu_architecture}" == "all" ]]; then
-    gpu_architecture="gfx908:xnack+;gfx908:xnack-;gfx90a:xnack+;gfx90a:xnack-;gfx942;gfx950;gfx1100;gfx1101;gfx1103;gfx1150;gfx1151;gfx1200;gfx1201"
-  fi
   cmake_common_options="-DGPU_TARGETS=${gpu_architecture}"
   cmake_client_options=""
 
