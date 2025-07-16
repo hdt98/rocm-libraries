@@ -44,7 +44,7 @@ target_link_libraries(test_grouped_conv_bwd_data_wcnn PRIVATE utility)
 add_test_executable(test_grouped_conv_fwd_wcnn_wavegroup grouped_conv_fwd_wcnn.cpp)
 target_link_libraries(test_grouped_conv_fwd_wcnn_wavegroup PRIVATE utility)
 target_compile_definitions(test_grouped_conv_fwd_wcnn_wavegroup PRIVATE ENABLE_WAVEGROUP=1)
-target_compile_options(test_grouped_conv_fwd_wcnn_wavegroup PRIVATE -save-temps=obj -Wno-gnu-line-marker)
+target_compile_options(test_grouped_conv_fwd_wcnn_wavegroup PRIVATE -save-temps=obj -Wno-gnu-line-marker -mprintf-kind=buffered)
 
 add_test_executable(test_grouped_conv_fwd_wcnn_wavegroup_1d grouped_conv_fwd_wcnn_1d.cpp)
 target_link_libraries(test_grouped_conv_fwd_wcnn_wavegroup_1d PRIVATE utility)
@@ -80,3 +80,10 @@ add_test_executable(test_grouped_conv_bwd_data_wcnn_wavegroup grouped_conv_bwd_d
 target_compile_definitions(test_grouped_conv_bwd_data_wcnn_wavegroup PRIVATE ENABLE_WAVEGROUP=1)
 target_link_libraries(test_grouped_conv_bwd_data_wcnn_wavegroup PRIVATE utility)
 target_compile_options(test_grouped_conv_bwd_data_wcnn_wavegroup PRIVATE -save-temps=obj -Wno-gnu-line-marker)
+
+#conv wavegroup+spatialCluster test
+add_test_executable(test_grouped_conv_fwd_wcnn_wavegroup_spcluster grouped_conv_fwd_wcnn.cpp)
+target_link_libraries(test_grouped_conv_fwd_wcnn_wavegroup_spcluster PRIVATE utility)
+target_compile_definitions(test_grouped_conv_fwd_wcnn_wavegroup_spcluster PRIVATE ENABLE_WAVEGROUP=1)
+target_compile_definitions(test_grouped_conv_fwd_wcnn_wavegroup_spcluster PRIVATE ENABLE_SPATIAL_CLUSTER=1)
+target_compile_options(test_grouped_conv_fwd_wcnn_wavegroup_spcluster PRIVATE -save-temps=obj -Wno-gnu-line-marker -mprintf-kind=buffered)

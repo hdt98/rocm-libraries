@@ -100,6 +100,7 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
                           AccBlockwiseNextOperation,
                           decltype(WeiDataBlockDesc),
                           decltype(InDataBlockDesc),
+                          decltype(InDataBlockDesc),
                           EmptyTuple,
                           HPerBlock,
                           WPerBlock,
@@ -386,6 +387,8 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
                 WeiDataBlockSize);
             blockwise_conv.Run(weight_block_buf,
                                indata_block_buf,
+                               nullptr,
+                               nullptr,
                                ck::Tuple<>{},
                                accum_thread_buf,
                                output_thread_buf,

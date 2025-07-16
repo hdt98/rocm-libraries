@@ -294,6 +294,8 @@ bool run_test()
             AccEnableLds,
             EnableAsync,
             EnableWaveGroup,
+            false,
+            0,
             ShuffleOnLoad,
             true>;
 

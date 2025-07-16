@@ -47,6 +47,7 @@ static constexpr ck::index_t HPerBlock = 16;
 static constexpr ck::index_t WPerBlock = 16;
 static constexpr bool EnableAsync      = false;
 static constexpr bool EnableWaveGroup  = false;
+static constexpr bool EnableSpatialCluster = false;
 
 template <ck::index_t NDimSpatial,
           ck::index_t FilterSize,
@@ -104,6 +105,8 @@ using DeviceConvFwdInstance =
         true,       // AccEnableLds
         EnableAsync,
         EnableWaveGroup,
+        false, // EnableSpatialCluster
+        0,
         false,  // ShuffleOnLoad
         false>; // Transposed
 

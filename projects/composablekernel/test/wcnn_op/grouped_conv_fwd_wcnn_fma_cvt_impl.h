@@ -506,9 +506,7 @@ bool run_test()
             AccBlockTransferScalarPerVector,
             AccEnableLds,
             EnableAsync,
-            EnableWaveGroup,
-            false,  // shuffleOnLoad
-            false>; // transpose
+            EnableWaveGroup>; // wavegrouop
 
     std::array<const void*, FmaMode + 1> ds_bufs;
     std::array<std::array<ck::index_t, NDimSpatial + 3>, FmaMode + 1> ds_lengths;
