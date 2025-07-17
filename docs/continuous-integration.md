@@ -18,6 +18,12 @@ This document is to detail the various continuous integration (CI) systems that 
     1. [Overview](#win-overview)
 4. [TheRock CI](#therock-ci)
     1. [Overview](#rock-overview)
+5. [ROCM CI](#rocm-ci)
+    1. [Overview](#rocm-ci-overview)
+    2. [PR Workflow](#rocm-ci-workflow)
+    3. [Interpreting Results](#rocm-ci-results)
+    4. [Build and Test Coverage](#rocm-ci-coverage)
+
 
 ## Azure Pipelines
 
@@ -110,3 +116,22 @@ graph TD;
 ## TheRock CI
 
 ### Overview <a id="rock-overview"></a>
+
+
+## ROCM CI
+
+### Overview <a id="rocm-ci-overview"></a>
+The ROCm CI Pipelines (also known as Internal Jenkins ROCm CI ) is a CI system sitting behind AMD VPN and it builds and tests against last successful mainline build. It runs a full ROCm stack build, typically pulling source code from last successfull mainline build (LKG develop/mainline tip hashes) and applying the current PR changes on top of it. The CI's infra and source is not publicly available.
+
+For commits, the pipelines will run based on the conditions defined in the trigger files under [/rocm_ci_caller.yml](https://github.com/ROCm/rocm-libraries/blob/develop/.azuredevops/rocm_ci_caller.yml).
+### PR Workflow <a id="rocm-ci-workflow"></a>
+1. PR is created.
+2. Azure Devops workflow rocm-ci-caller is run on the PR. 
+    1. This workflow will invoke an rocm-ci internal jenkins pipeline and also created the commit status called as PSDB (pre-submit developer build).
+3. `Jenkins ROCm-CI` builds and tests the PR against last successfull mainline build (so against last promoted hip and compiler changes)
+4. `Jenkins ROCm-CI` waits until all runs are finished and reports their overall status back to PR as PSDB status check
+
+URLs for rocm-ci-caller Azure runs can be found in the logs of the `rocm-ci-caller` action (this is viewable from public), and the internal jenkins url can be found on view details of PSDB status (this can be viewed inside AMD VPN only)
+
+### Interpreting Results <a id="rocm-ci-results"></a>
+### Build and Test Coverage <a id="rocm-ci-coverage"></a>
