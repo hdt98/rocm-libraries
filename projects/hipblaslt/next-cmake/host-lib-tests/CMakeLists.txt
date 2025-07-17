@@ -75,6 +75,7 @@ target_link_libraries(hostlib-tests
         tensilelite::tensilelite-host
         Boost::filesystem
         roc::hipblaslt
+        testlib
 )
 
 if(GTEST_INTEGRATION)
