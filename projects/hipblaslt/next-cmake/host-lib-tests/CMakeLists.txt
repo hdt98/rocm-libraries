@@ -74,14 +74,13 @@ target_link_libraries(hostlib-tests
     PUBLIC
         tensilelite::tensilelite-host
         Boost::filesystem
+        roc::hipblaslt
 )
 
-if(NOT TENSILE_DISABLE_CTEST)
-    if(GTEST_INTEGRATION)
-        gtest_discover_tests(hostlib-tests WORKING_DIRECTORY ${CMAKE_BINARY_DIR} TIMEOUT 60)
-    else()
-        add_test(NAME TensileHostLibraryTests COMMAND hostlib-tests WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
-    endif()
+if(GTEST_INTEGRATION)
+    gtest_discover_tests(hostlib-tests WORKING_DIRECTORY ${CMAKE_BINARY_DIR} TIMEOUT 60)
+else()
+    add_test(NAME TensileHostLibraryTests COMMAND hostlib-tests WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 endif()
 
 
