@@ -76,23 +76,24 @@ if(TENSILE_USE_HIP)
     find_package(HIP REQUIRED CONFIG PATHS $ENV{ROCM_PATH} /opt/rocm)
 endif()
 
-if(TENSILE_USE_OPENMP AND NOT TARGET custom_openmp_cxx)
+# if(TENSILE_USE_OPENMP AND NOT TARGET custom_openmp_cxx)
 
-    # Workaround for https://gitlab.kitware.com/cmake/cmake/-/issues/21787
-    # ensures we link to HIP's libomp and get an rpath to it.
-    add_library(custom_openmp_cxx INTERFACE)
+#     # Workaround for https://gitlab.kitware.com/cmake/cmake/-/issues/21787
+#     # ensures we link to HIP's libomp and get an rpath to it.
+#     add_library(custom_openmp_cxx INTERFACE)
 
-    if(TENSILE_USE_HIP)
-        target_compile_options(custom_openmp_cxx INTERFACE "-fopenmp")
-        target_link_options(custom_openmp_cxx INTERFACE "-fopenmp")
-    else ()
-        find_package(OpenMP REQUIRED)
-        target_link_libraries(custom_openmp_cxx INTERFACE OpenMP::OpenMP_CXX)
-    endif ()
-endif()
+#     if(TENSILE_USE_HIP)
+#         target_compile_options(custom_openmp_cxx INTERFACE "-fopenmp")
+#         target_link_options(custom_openmp_cxx INTERFACE "-fopenmp")
+#     else ()
+#         find_package(OpenMP REQUIRED)
+#         target_link_libraries(custom_openmp_cxx INTERFACE OpenMP::OpenMP_CXX)
+#     endif ()
+# endif()
 
-add_subdirectory(configs)
+# add_subdirectory(configs)
 
+# TO BE DONE IN CONFIGS:
 set(TEST_DATA_DIR "${CMAKE_CURRENT_BINARY_DIR}/data")
 file(MAKE_DIRECTORY "${TEST_DATA_DIR}")
 
@@ -103,28 +104,32 @@ foreach(FILE ${SOLUTION_LIBRARY_FILES})
     file(COPY ${FILE} DESTINATION "${TEST_DATA_DIR}")
 endforeach(FILE)
 
-add_subdirectory(testlib)
+# DONE:
+# add_subdirectory(testlib)
 
-set(test_sources ${test_sources}
-    test.cpp
-    ContractionSelectionLibrary_test.cpp
-    DataTypes_test.cpp
-    Predicates_test.cpp
-)
+# DONE
+# set(test_sources ${test_sources}
+#     test.cpp
+#     ContractionSelectionLibrary_test.cpp
+#     DataTypes_test.cpp
+#     Predicates_test.cpp
+# )
 
-if(TENSILE_USE_LLVM)
-    find_package(LLVM REQUIRED CONFIG)
+#DONE:
+# if(TENSILE_USE_LLVM)
+#     find_package(LLVM REQUIRED CONFIG)
 
-    set(test_sources ${test_sources}
-        llvm/LibraryPerformance_test.cpp
-        )
-endif()
+#     set(test_sources ${test_sources}
+#         llvm/LibraryPerformance_test.cpp
+#         )
+# endif()
 
 # if(TENSILE_USE_HIP)
 #     add_subdirectory(hip)
 # endif()
 
-add_executable(TensileTests ${test_sources})
+# DONE:
+# add_executable(TensileTests ${test_sources})
 
 if(NOT TENSILE_DISABLE_CTEST)
     if(GTEST_INTEGRATION)
@@ -140,19 +145,19 @@ if(GTEST_INTEGRATION)
     target_link_libraries(TensileTests PUBLIC GTest::gtest)
 endif()
 
-if(TENSILE_USE_LLVM)
-    find_library(LLVMObjectYAML_LIBRARY
-        NAMES LLVMObjectYAML
-        PATHS ${LLVM_LIBRARY_DIR})
-    message("LLVMObjectYAML_LIBRARY: ${LLVMObjectYAML_LIBRARY}")
-    #Use LLVM shared libs if LLVMObjectYAML static lib cannot be found
-    if(LLVMObjectYAML_LIBRARY)
-        target_link_libraries(TensileTests PUBLIC LLVMObjectYAML )
-    else()
-        target_link_libraries(TensileTests PUBLIC LLVM )
-    endif()
-    target_include_directories(TensileTests PUBLIC ${LLVM_INCLUDE_DIRS})
-endif()
+# if(TENSILE_USE_LLVM)
+#     find_library(LLVMObjectYAML_LIBRARY
+#         NAMES LLVMObjectYAML
+#         PATHS ${LLVM_LIBRARY_DIR})
+#     message("LLVMObjectYAML_LIBRARY: ${LLVMObjectYAML_LIBRARY}")
+#     #Use LLVM shared libs if LLVMObjectYAML static lib cannot be found
+#     if(LLVMObjectYAML_LIBRARY)
+#         target_link_libraries(TensileTests PUBLIC LLVMObjectYAML )
+#     else()
+#         target_link_libraries(TensileTests PUBLIC LLVM )
+#     endif()
+#     target_include_directories(TensileTests PUBLIC ${LLVM_INCLUDE_DIRS})
+# endif()
 
 if(TENSILE_USE_HIP)
 
