@@ -52,10 +52,24 @@ namespace rocRoller
 
         InstructionStatus MFMAObserver::peek(Instruction const& inst) const
         {
+            using bs = EnumBitset<CoexecCategory>;
             InstructionStatus rv;
             if(isMFMAInstruction(inst))
             {
-                rv.stallCycles = m_remainingCycles;
+                // rv.stallCycles = m_remainingCycles;
+
+                bs anything = {CoexecCategory::NotAnInstruction};
+                auto nothing = ~anything;
+
+                rv.disallowedCoexec = {{1, nothing},
+                                       {2,
+                                        {CoexecCategory::VMEM,
+                                         CoexecCategory::VALU,
+                                         CoexecCategory::VALU_Trans,
+                                         CoexecCategory::XDL,
+                                         CoexecCategory::XDL_Scale,
+                                         CoexecCategory::LDS}},
+                                       {3, {CoexecCategory::XDL, CoexecCategory::XDL_Scale}}};
 
                 auto aOperands = inst.getSrcs()[0]->getRegisterIds().to<std::vector>();
                 if(aOperands == m_aOperands)
@@ -65,18 +79,46 @@ namespace rocRoller
                 if(bOperands == m_bOperands)
                     rv.reusedOperands++;
             }
+
+            auto category = inst.getCategory();
+
+            do
+            {
+                auto iter = m_disallowedOps.find(m_programCycle + inst.numExecutedInstructions() + rv.stallCycles);
+                if(iter == m_disallowedOps.end() || !iter->second[category])
+                    break;
+
+                ++rv.stallCycles;
+            } while(true);
+
             return rv;
         }
 
         void MFMAObserver::modify(Instruction& inst) const
         {
-            if(m_remainingCycles > 0 && !inst.isCommentOnly()
-               && Settings::Get(Settings::LogLvl) >= LogLevel::Info)
-                inst.addComment(concatenate("MFMA remaining: ", m_remainingCycles));
+            if(!inst.isCommentOnly() && !m_disallowedOps.empty())
+            //    && Settings::Get(Settings::LogLvl) >= LogLevel::Info)
+            {
+                auto lastCycle = m_disallowedOps.rbegin()->first;
+                // inst.addComment(concatenate("MFMA remaining: ", lastCycle - m_programCycle));
+                inst.addComment(
+                    fmt::format("Cycle: {}\nQueue: {}", m_programCycle, toString(m_disallowedOps)));
+            }
         }
 
         void MFMAObserver::observe(Instruction const& inst)
         {
+#if 1
+            int myCycles = inst.numExecutedInstructions() + inst.peekedStatus().stallCycles;
+            m_programCycle += myCycles;
+
+            auto iter = m_disallowedOps.upper_bound(m_programCycle);
+            m_disallowedOps.erase(m_disallowedOps.begin(), iter);
+
+            // for(auto iter = m_disallowedOps.begin(); iter != m_disallowedOps.end() && iter->first < )
+
+            combineCoexec(m_disallowedOps, inst.peekedStatus().disallowedCoexec, m_programCycle-1);
+#else
             const static std::unordered_set<std::string> variableCycleInsts
                 = {"v_mfma_f32_16x16x128_f8f6f4",
                    "v_mfma_scale_f32_16x16x128_f8f6f4",
@@ -122,6 +164,7 @@ namespace rocRoller
                 int myCycles = inst.numExecutedInstructions() + inst.peekedStatus().stallCycles;
                 m_remainingCycles = std::max(0, m_remainingCycles - myCycles);
             }
+#endif
         }
 
     }

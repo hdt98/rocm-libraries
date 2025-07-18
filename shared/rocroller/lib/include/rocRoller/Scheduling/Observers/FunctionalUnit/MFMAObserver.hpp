@@ -57,7 +57,9 @@ namespace rocRoller
         private:
             bool isMFMAInstruction(Instruction const& inst) const;
 
-            int m_remainingCycles = 0;
+            int m_programCycle = 0;
+
+            std::map<int, EnumBitset<CoexecCategory>> m_disallowedOps;
 
             std::vector<Register::RegisterId> m_aOperands;
             std::vector<Register::RegisterId> m_bOperands;
