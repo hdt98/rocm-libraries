@@ -31,7 +31,6 @@ import csv
 import math
 import shlex
 import sys
-import os
 from itertools import chain, repeat
 from subprocess import Popen, PIPE
 
