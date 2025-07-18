@@ -71,7 +71,10 @@ namespace rocRoller
 
         inline std::string InstructionStatus::toString() const
         {
-            return concatenate("Status: {wait ",
+            return concatenate("Status: {",
+                               "stall ",
+                               stallCycles,
+                               ", wait ",
                                waitCount.toString(LogLevel::Terse),
                                ", nop ",
                                nops,
@@ -79,10 +82,12 @@ namespace rocRoller
                                reusedOperands,
                                ", q {",
                                waitLengths,
-                               "}, a {",
-                               allocatedRegisters,
-                               "}, h {",
-                               highWaterMarkRegistersDelta,
+                               //    "}, a {",
+                               //    allocatedRegisters,
+                               //    "}, h {",
+                               //    highWaterMarkRegistersDelta,
+                               "}, c {",
+                               disallowedCoexec,
                                "}}");
         }
 
@@ -123,6 +128,8 @@ namespace rocRoller
             outOfRegisters |= other.outOfRegisters;
 
             errors.insert(errors.end(), other.errors.begin(), other.errors.end());
+
+            combineCoexec(disallowedCoexec, other.disallowedCoexec, 0);
         }
 
         inline IObserver::~IObserver() = default;

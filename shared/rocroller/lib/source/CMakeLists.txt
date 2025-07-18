@@ -38,6 +38,7 @@ target_sources(rocroller
         "${CMAKE_CURRENT_SOURCE_DIR}/ReplaceKernelArgs.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/ScheduledInstructions.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/Scheduler.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/Scheduling.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/Timer.cpp"
 )
 

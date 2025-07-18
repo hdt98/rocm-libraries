@@ -101,11 +101,39 @@ namespace rocRoller
                 os << "\n";
             }
         }
+
+        if(!isCommentOnly())
+        {
+            auto ctx = findContextFromOperands();
+            if(ctx)
+            {
+                auto category = GPUInstructionInfo::getCoexecCategory(m_opcode);
+                for(auto const& line : EscapeComment("Category: " + rocRoller::toString(category)))
+                    os << line;
+                os << "\n";
+            }
+
+            for(auto const& line : EscapeComment(m_peekedStatus.toString()))
+                os << line;
+            os << "\n";
+        }
     }
 
     void Instruction::addControlOp(int id)
     {
         m_controlOps.push_back(id);
+    }
+
+    CoexecCategory Instruction::getCategory() const
+    {
+        auto category = GPUInstructionInfo::getCoexecCategory(m_opcode);
+
+        if(category == CoexecCategory::NotAnInstruction && getWaitCount() != WaitCount())
+        {
+            category = CoexecCategory::Scalar;
+        }
+
+        return category;
     }
 
     std::vector<int> const& Instruction::controlOps() const

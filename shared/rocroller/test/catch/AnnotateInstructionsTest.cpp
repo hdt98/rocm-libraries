@@ -26,6 +26,8 @@
 
 #include <rocRoller/CodeGen/Annotate.hpp>
 #include <rocRoller/CodeGen/Instruction.hpp>
+#include <rocRoller/GPUArchitecture/GPUInstructionInfo.hpp>
+#include <rocRoller/Scheduling/Scheduling.hpp>
 #include <rocRoller/Utilities/Generator.hpp>
 
 #include <catch2/benchmark/catch_benchmark_all.hpp>
@@ -35,7 +37,7 @@
 #include <catch2/generators/catch_generators_range.hpp>
 #include <catch2/matchers/catch_matchers_all.hpp>
 
-TEST_CASE("AddComment works", "")
+TEST_CASE("AddComment works", "[codegen]")
 {
     using namespace rocRoller;
     using namespace Catch::Matchers;
@@ -62,7 +64,7 @@ TEST_CASE("AddComment works", "")
         CHECK_THAT(inst.comments(), Contains("bar") && Contains("baz"));
 }
 
-TEST_CASE("AddControlOp works", "")
+TEST_CASE("AddControlOp works", "[codegen]")
 {
     using namespace rocRoller;
     using namespace Catch::Matchers;
@@ -87,4 +89,44 @@ TEST_CASE("AddControlOp works", "")
 
     for(auto inst : generatorTwo().map(AddControlOp(4)))
         CHECK(inst.controlOps() == std::vector({9, 4}));
+}
+
+TEST_CASE("combineCoexec function works", "[scheduling]")
+{
+    using namespace rocRoller;
+    using namespace rocRoller::Scheduling;
+
+    DisallowedCycles a = {{2, {CoexecCategory::Scalar}}};
+    DisallowedCycles b = {{3, {CoexecCategory::VMEM}}};
+
+    auto newB = b;
+
+    SECTION("a")
+    {
+        combineCoexec(newB, a, 0);
+        DisallowedCycles expectedB = {{2, {CoexecCategory::Scalar}}, {3, {CoexecCategory::VMEM}}};
+
+        CHECK(newB == expectedB);
+    }
+
+    SECTION("b")
+    {
+        a[3] = {CoexecCategory::LDS};
+
+        combineCoexec(newB, a, 0);
+        DisallowedCycles expectedB
+            = {{2, {CoexecCategory::Scalar}}, {3, {CoexecCategory::VMEM, CoexecCategory::LDS}}};
+
+        CHECK(newB == expectedB);
+    }
+
+    SECTION("c")
+    {
+        a = {{4, {CoexecCategory::LDS}}};
+
+        combineCoexec(newB, a, 0);
+        DisallowedCycles expectedB = {{3, {CoexecCategory::VMEM}}, {4, {CoexecCategory::LDS}}};
+
+        CHECK(newB == expectedB);
+    }
 }

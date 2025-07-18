@@ -31,6 +31,18 @@ namespace rocRoller
 {
     namespace Scheduling
     {
+        auto addCommentToFirst(std::string comment)
+        {
+            // bool first = true;
+            return [comment](Instruction inst) {
+                if(!inst.isCommentOnly())
+                    inst.addComment(comment);
+
+                // first = false;
+                return inst;
+            };
+        }
+
         RegisterComponent(PriorityScheduler);
         static_assert(Component::Component<PriorityScheduler>);
 
@@ -82,12 +94,21 @@ namespace rocRoller
                 float minCost = std::numeric_limits<float>::max();
                 minCostIdx    = -1;
 
+                EnumBitset<CoexecCategory> categories;
+                std::string                comment;
+
                 for(size_t idx = 0; idx < numSeqs; idx++)
                 {
                     if(iterators[idx] == seqs[idx].end())
                         continue;
 
+                    auto cat = iterators[idx]->getCategory();
+
+                    categories.set(cat);
+
                     float myCost = (*m_cost)(iterators[idx]);
+
+                    comment += fmt::format("{}: {}\n", toString(cat), myCost);
 
                     if(myCost < minCost)
                     {
@@ -101,7 +122,15 @@ namespace rocRoller
 
                 if(minCostIdx >= 0)
                 {
-                    co_yield yieldFromStream(iterators[minCostIdx]);
+                    if(categories.count() > 1)
+                    {
+                        co_yield yieldFromStream(iterators[minCostIdx])
+                            .map(addCommentToFirst(comment));
+                    }
+                    else
+                    {
+                        co_yield yieldFromStream(iterators[minCostIdx]);
+                    }
                 }
 
             } while(minCostIdx >= 0);

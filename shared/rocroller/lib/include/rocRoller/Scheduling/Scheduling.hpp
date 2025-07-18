@@ -37,8 +37,14 @@
 
 namespace rocRoller
 {
+        using DisallowedCycles = std::map<int, EnumBitset<CoexecCategory>>;
+        void combineCoexec(DisallowedCycles& dst, DisallowedCycles const& src, int offset);
+        std::string toString(DisallowedCycles const& cycles);
+        std::string makeAString(EnumBitset<CoexecCategory> const& set);
+
     namespace Scheduling
     {
+
 
         /**
          * Struct that describes modeled properties of an instruction if it were to be scheduled now.
@@ -70,6 +76,8 @@ namespace rocRoller
             /// Will this cause an out-of-registers error?
             EnumBitset<Register::Type> outOfRegisters;
 
+            DisallowedCycles disallowedCoexec;
+
             std::vector<std::string> errors;
 
             static InstructionStatus StallCycles(unsigned int const value);
@@ -82,48 +90,41 @@ namespace rocRoller
              */
             void combine(InstructionStatus const& other);
 
+            std::string coexecString() const;
+
             InstructionStatus();
 
             std::string toString() const;
         };
 
         template <typename T>
-        concept CObserver = requires(T a, Instruction inst)
-        {
+        concept CObserver = requires(T a, Instruction inst) {
             //> Speculatively predict stalls if this instruction were scheduled now.
-            {
-                a.peek(inst)
-                } -> std::convertible_to<InstructionStatus>;
+            { a.peek(inst) } -> std::convertible_to<InstructionStatus>;
 
             //> Add any waitcnt or nop instructions needed before `inst` if it were to be scheduled now.
             //> Throw an exception if it can't be scheduled now.
-            {a.modify(inst)};
+            { a.modify(inst) };
 
             //> This instruction _will_ be scheduled now, record any side effects.
             //> This is after all observers have had the opportunity to modify the instruction.
-            {a.observe(inst)};
+            { a.observe(inst) };
         };
 
         template <typename T>
-        concept CObserverConst = requires(T a, GPUArchitectureTarget const& target)
-        {
+        concept CObserverConst = requires(T a, GPUArchitectureTarget const& target) {
             requires CObserver<T>;
 
             //> This observer is required in ctx, checking GPUArchitectureTarget if needed.
-            {
-                a.required(target)
-                } -> std::convertible_to<bool>;
+            { a.required(target) } -> std::convertible_to<bool>;
         };
 
         template <typename T>
-        concept CObserverRuntime = requires(T a)
-        {
+        concept CObserverRuntime = requires(T a) {
             requires CObserver<T>;
 
             //> This observer is required in ctx, determined at runtime.
-            {
-                a.runtimeRequired()
-                } -> std::convertible_to<bool>;
+            { a.runtimeRequired() } -> std::convertible_to<bool>;
         };
 
         struct IObserver

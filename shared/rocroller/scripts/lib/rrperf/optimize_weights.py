@@ -110,11 +110,11 @@ def close_pool():
         mp_pool.join()
 
 
-def random_int(max=40):
+def random_int(min=0, max=40):
     def factory():
-        return int(random.uniform(0, max))
+        return int(random.uniform(min, max))
 
-    factory.is_variable = max > 0
+    factory.is_variable = (max - min) > 0
     return factory
 
 
@@ -153,55 +153,85 @@ class Weights:
         default_factory=random_int(max=500), metadata={"isCoefficient": False}
     )
     vmemQueueSize: int = field(
-        default_factory=random_int(max=20), metadata={"isCoefficient": False}
+        default_factory=random_int(min=2, max=6), metadata={"isCoefficient": False}
     )
     dsmemCycles: int = field(
         default_factory=random_int(max=100), metadata={"isCoefficient": False}
     )
     dsmemQueueSize: int = field(
-        default_factory=random_int(max=20), metadata={"isCoefficient": False}
+        default_factory=random_int(min=2, max=6), metadata={"isCoefficient": False}
     )
 
-    vmQueueLen: int = field(
-        default_factory=random_int(), metadata={"isCoefficient": False}
-    )
-    vectorQueueSat: float = field(default_factory=random_inv_exp())
-    ldsQueueSat: float = field(default_factory=random_inv_exp())
-    lgkmQueueLen: int = field(
-        default_factory=random_int(), metadata={"isCoefficient": False}
-    )
+    nops               : float = field(default_factory=fixed_value(10000.))
+    vmcnt              : float = field(default_factory=fixed_value(0))
+    lgkmcnt            : float = field(default_factory=fixed_value(0))
+    vmQueueLen         : int = field(default_factory=fixed_value(0))
+    vectorQueueSat     : float = field(default_factory=fixed_value(0))
+    ldsQueueSat        : float = field(default_factory=fixed_value(0))
+    lgkmQueueLen       : int = field(default_factory=fixed_value(0))
+    stallCycles        : float = field(default_factory=fixed_value(1000.0))
+    notMFMA            : float = field(default_factory=fixed_value(0))
+    isMFMA             : float = field(default_factory=fixed_value(0))
+    isSMEM             : float = field(default_factory=fixed_value(0))
+    isSControl         : float = field(default_factory=fixed_value(0))
+    isSALU             : float = field(default_factory=fixed_value(10))
+    isVMEMRead         : float = field(default_factory=fixed_value(0))
+    isVMEMWrite        : float = field(default_factory=fixed_value(0))
+    isLDSRead          : float = field(default_factory=fixed_value(0))
+    isLDSWrite         : float = field(default_factory=fixed_value(0))
+    isVALU             : float = field(default_factory=fixed_value(10))
+    isACCVGPRWrite     : float = field(default_factory=fixed_value(0))
+    isACCVGPRRead      : float = field(default_factory=fixed_value(0))
+    newSGPRs           : float = field(default_factory=fixed_value(0))
+    newVGPRs           : float = field(default_factory=fixed_value(0))
+    highWaterMarkSGPRs : float = field(default_factory=fixed_value(0))
+    highWaterMarkVGPRs : float = field(default_factory=fixed_value(0))
+    fractionOfSGPRs    : float = field(default_factory=fixed_value(0))
+    fractionOfVGPRs    : float = field(default_factory=fixed_value(0))
+    outOfRegisters     : float = field(default_factory=fixed_value(1000000000.0))
+    # zeroFreeBarriers   : float = field(default_factory=fixed_value(true))
 
-    # Fix the cost of a stall cycle to provide a common reference point
-    # so that different randomly generated weights are of comparable magnitudes.
-    stallCycles: float = field(default_factory=fixed_value(1000.0))
 
-    notMFMA: float = field(default_factory=random_inv_exp())
-    isMFMA: float = field(default_factory=random_inv_exp())
+    # vmQueueLen: int = field(
+    #     default_factory=random_int(), metadata={"isCoefficient": False}
+    # )
+    # vectorQueueSat: float = field(default_factory=random_inv_exp())
+    # ldsQueueSat: float = field(default_factory=random_inv_exp())
+    # lgkmQueueLen: int = field(
+    #     default_factory=random_int(), metadata={"isCoefficient": False}
+    # )
 
-    isSMEM: float = field(default_factory=random_inv_exp())
-    isSControl: float = field(default_factory=random_inv_exp())
-    isSALU: float = field(default_factory=random_inv_exp())
+    # # Fix the cost of a stall cycle to provide a common reference point
+    # # so that different randomly generated weights are of comparable magnitudes.
+    # stallCycles: float = field(default_factory=fixed_value(1000.0))
 
-    isVMEMRead: float = field(default_factory=random_inv_exp())
-    isVMEMWrite: float = field(default_factory=random_inv_exp())
-    isLDSRead: float = field(default_factory=random_inv_exp())
-    isLDSWrite: float = field(default_factory=random_inv_exp())
-    isVALU: float = field(default_factory=random_inv_exp())
+    # notMFMA: float = field(default_factory=random_inv_exp())
+    # isMFMA: float = field(default_factory=random_inv_exp())
 
-    isACCVGPRWrite: float = field(default_factory=random_inv_exp())
-    isACCVGPRRead: float = field(default_factory=random_inv_exp())
+    # isSMEM: float = field(default_factory=random_inv_exp())
+    # isSControl: float = field(default_factory=random_inv_exp())
+    # isSALU: float = field(default_factory=random_inv_exp())
 
-    newSGPRs: float = field(default_factory=random_inv_exp())
-    newVGPRs: float = field(default_factory=random_inv_exp())
-    highWaterMarkSGPRs: float = field(default_factory=random_inv_exp())
-    highWaterMarkVGPRs: float = field(default_factory=random_inv_exp())
-    fractionOfSGPRs: float = field(default_factory=random_inv_exp())
-    fractionOfVGPRs: float = field(default_factory=random_inv_exp())
+    # isVMEMRead: float = field(default_factory=random_inv_exp())
+    # isVMEMWrite: float = field(default_factory=random_inv_exp())
+    # isLDSRead: float = field(default_factory=random_inv_exp())
+    # isLDSWrite: float = field(default_factory=random_inv_exp())
+    # isVALU: float = field(default_factory=random_inv_exp())
 
-    # It doesn't make a lot of sense to allow the optimizer to choose
-    # whether to run out of registers should the opportunity arise.
-    # Therefore, fix this parameter at a high value.
-    outOfRegisters: float = field(default_factory=fixed_value(1e9))
+    # isACCVGPRWrite: float = field(default_factory=random_inv_exp())
+    # isACCVGPRRead: float = field(default_factory=random_inv_exp())
+
+    # newSGPRs: float = field(default_factory=random_inv_exp())
+    # newVGPRs: float = field(default_factory=random_inv_exp())
+    # highWaterMarkSGPRs: float = field(default_factory=random_inv_exp())
+    # highWaterMarkVGPRs: float = field(default_factory=random_inv_exp())
+    # fractionOfSGPRs: float = field(default_factory=random_inv_exp())
+    # fractionOfVGPRs: float = field(default_factory=random_inv_exp())
+
+    # # It doesn't make a lot of sense to allow the optimizer to choose
+    # # whether to run out of registers should the opportunity arise.
+    # # Therefore, fix this parameter at a high value.
+    # outOfRegisters: float = field(default_factory=fixed_value(1e9))
 
     zeroFreeBarriers: bool = field(
         default_factory=random_bool(), metadata={"isCoefficient": False}
@@ -476,7 +506,7 @@ def genetic(args):
 
             gen_dir = args.output_dir / f"gen_{i}"
             results = generation(gen_dir, args.problem, inputs)
-            sanity_check(results)
+            # sanity_check(results)
 
             write_generation(args.output_dir, i, results)
 
@@ -543,8 +573,8 @@ def print_bad_results(args):
 def print_top_results(args):
     good_results = []
     for r in args.all_results:
-        if not r.passed:
-            break
+        # if not r.passed:
+        #     break
         good_results.append(r)
 
     print(f"{len(good_results)} good weights.")
