@@ -1,3 +1,4 @@
+
 # ##########################################################################
 # Copyright (C) 2024-2025 Advanced Micro Devices, Inc. All rights reserved.
 #
@@ -34,6 +35,7 @@ import sys
 import os
 from itertools import chain, repeat
 from subprocess import Popen, PIPE
+import matplotlib.pyplot as plt
 
 
 #################################################
@@ -220,7 +222,7 @@ def call_rocsolver_bench(bench_executable, *args):
 EXECUTE_BENCHMARKS collects the arguments for the benchmark client, calls
 the client, gets the resulting time, and put everything in file or screen
 """
-def execute_benchmarks(output_file, suite, precision, case, bench_executable, rocprof):
+def execute_benchmarks(output_file, suite, precision, case, bench_executable, graph, rocprof, graph_rocprof):
     init = False
     benchmark_generator = suites[suite];
     sizenormal = list(chain(range(2, 64, 8), range(64, 256, 32), range(256, 1024, 64)))
@@ -237,8 +239,26 @@ def execute_benchmarks(output_file, suite, precision, case, bench_executable, ro
     else:
         command_executable = bench_executable
 
+    if graph:                   # track metrics related to graphing grouped instances of benchmarks
+        precision_index = None
+        size_index = None
+        current_group = None
+        group_names = []
+        x_groups = []           # 2D array of x axis metrics (typically n) for a group of benchmark instances with all other parameters equal
+        y_groups = []           # 2D array of y axis metrics (typically time) for a group of benchmark instances with all other parameters equal
+        current_x = []
+        current_y = []
+        graph_title = None
     for row, n, bench_args in benchmark_generator(suite=suite, precision=precision, sizenormal=sizenormal, sizebatch=sizebatch):
 
+        if graph and current_group is None:   # record where to look for grouped instances
+            list_row = list(row.keys())
+            precision_index = list_row.index('precision')
+            size_index = list_row.index('n')
+            list_row_values = list(row.values())
+            keys_and_values = [item for pair in zip(list_row[precision_index+1:size_index], list_row_values[precision_index+1:size_index]) for item in pair]
+            current_group = "_".join([str(x) for x in keys_and_values])
+            graph_title = row['name']
         if rocprof:
             benchmark_string = "_".join([str(x) for x in list(row.values())])
             command_args = f'--kernel-trace --stats=ON -d {benchmark_string} -o {benchmark_string} -- {bench_executable} {bench_args}'
@@ -256,6 +276,96 @@ def execute_benchmarks(output_file, suite, precision, case, bench_executable, ro
             results.writeheader()
             init = True
         results.writerow(row)
+        if graph_rocprof:
+            generate_rocprof_graph(benchmark_string)
+        if graph:
+            list_row = list(row.keys())
+            list_row_values = list(row.values())
+            keys_and_values = [item for pair in zip(list_row[precision_index+1:size_index], list_row_values[precision_index+1:size_index]) for item in pair]
+            group_string = "_".join([str(x) for x in keys_and_values])
+            if group_string != current_group:
+                group_names.append(current_group)
+                x_groups.append(current_x)
+                y_groups.append(current_y)
+                current_group = group_string
+                current_x = []
+                current_y = []
+            current_x.append(row['n'])
+            current_y.append(time)
+
+    if graph:
+        group_names.append(current_group)
+        x_groups.append(current_x)
+        y_groups.append(current_y)
+        generate_graph(group_names, x_groups, y_groups, graph_title)
+
+"""
+GENERATE_GRAPH generates a graph of the changing runtime as a function of input size.
+this function is invoked upon groups of inputs and their resulting runtime as collected
+by the EXECUTE_BENCHMARKS function
+"""
+def generate_graph(group_names, x_groups, y_groups, filename):
+    assert len(group_names) == len(x_groups) == len(y_groups)
+    for i in range(len(group_names)):
+        assert len(x_groups[i]) == len(y_groups[i])
+
+    fig, ax = plt.subplots()
+    for name, x_group, y_group in zip(group_names, x_groups, y_groups):
+        ax.plot(x_group, y_group, label=name)
+
+    ax.set_xlabel('Input Size (n)')
+    ax.set_ylabel('Total Time (ms)')
+
+    ax.legend()
+
+    fig.suptitle(f'{filename} Total Runtime by Size')
+
+    plt.savefig(filename)
+    plt.close()
+
+"""
+GENEREATE_ROCPROF_GRAPH generates a graph that decomposes the total runtime of a
+test suite into the individual kernels that are invoked as a part of that function.
+this function uses the results produced by invoking the test suite with rocprof.
+n controls the number of kernels that are shown (top n contributors to total runtime).
+"""
+def generate_rocprof_graph(benchmark_string, n=10):
+    x = []
+    y = []
+
+    directory = benchmark_string
+    filename = f'{benchmark_string}_kernel_stats.csv'
+    filepath = os.path.join(directory, filename)
+    with open(filepath, newline='') as csvfile:
+        reader = csv.DictReader(csvfile)
+        for i, row in enumerate(reader):
+            if i >= n:
+                break
+            try:
+                slice_index = row['Name'].index('<')
+            except ValueError:
+                slice_index = -1
+            sliced_name = row['Name'][:slice_index]
+            x.append(sliced_name)
+            y.append(float(row['Percentage']))
+
+    fig, ax = plt.subplots(figsize=(5, 10))
+
+    ax.set_ylabel('Proportion of Run Time (%)')
+    ax.set_xlabel('Kernel Name')
+
+    rects = ax.bar(x, y)
+    ax.bar_label(rects)
+
+    ax.set_ylim(0, 1.2*max(y))
+    ax.tick_params("x", rotation=90)
+
+    fig.suptitle('Proportion of Time (%) by Kernel')
+
+    plt.subplots_adjust(bottom=0.40)
+    graph_filepath = os.path.join(directory, benchmark_string)
+    plt.savefig(graph_filepath)
+    plt.close()
 
 
 #################################################
@@ -274,6 +384,12 @@ if __name__ == '__main__':
             dest='output_path',
             default=None,
             help='the output file name for the benchmark results')
+    parser.add_argument('--graph',
+            action='store_true',
+            help='generate graphs using matplotlib')
+    parser.add_argument('--graph_rocprof',
+            action='store_true',
+            help='generate graphs of the rocprof results using matplotlib')
     parser.add_argument('--rocprofv3',
             action='store_true',
             help='choose to use rocprofv3 to generate profiling results')
@@ -289,10 +405,13 @@ if __name__ == '__main__':
     args = parser.parse_args()
     setup_vprint(args)
 
+    if args.graph_rocprof and not args.rocprofv3:
+        raise Exception("Error: must enable --rocprofv3 option in order to graph rocprof results.")
+
     if args.output_path is not None:
         with open(args.output_path, 'w', buffering=1, encoding='utf-8') as output_file:
-            execute_benchmarks(output_file, args.suite, args.precision, args.case, args.exe, args.rocprofv3)
+            execute_benchmarks(output_file, args.suite, args.precision, args.case, args.exe, args.graph, args.rocprofv3, args.graph_rocprof)
     else:
-        execute_benchmarks(sys.stdout, args.suite, args.precision, args.case, args.exe, args.rocprofv3,)
+        execute_benchmarks(sys.stdout, args.suite, args.precision, args.case, args.exe, args.graph, args.rocprofv3, args.graph_rocprof)
 
 
