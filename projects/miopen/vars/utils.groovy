@@ -318,6 +318,7 @@ def buildHipClangJob(Map conf=[:]){
         //miopenCheckout()
         checkout scm
         //sh(script: "git submodule update --init --recursive && pwd && find . -name fin -type d -exec ls {} +")
+        sh(script: "git submodule update --init --recursive || true")
         env.HSA_ENABLE_SDMA=0
         env.DOCKER_BUILDKIT=1
         def image
