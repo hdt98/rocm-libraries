@@ -25,20 +25,8 @@
  * SUCH DAMAGE.
  * *************************************************************************/
 
-#include "rocauxiliary_larfg_specialized_kernels.hpp"
+#include "testing_gemm.hpp"
 
-ROCSOLVER_BEGIN_NAMESPACE
+#define TESTING_GEMM(...) template void testing_gemm<__VA_ARGS__>(Arguments&);
 
-/*************************************************************
-    Instantiate template methods using macros
-*************************************************************/
-INSTANTIATE_LARFG_SMALL(double, rocblas_int, double, double*);
-INSTANTIATE_LARFG_SMALL(double, rocblas_int, double, double* const*);
-
-#ifdef HAVE_ROCBLAS_64
-// 64-bit APIs
-INSTANTIATE_LARFG_SMALL(double, int64_t, double, double*);
-INSTANTIATE_LARFG_SMALL(double, int64_t, double, double* const*);
-#endif /* HAVE_ROCBLAS_64 */
-
-ROCSOLVER_END_NAMESPACE
+INSTANTIATE(TESTING_GEMM, FOREACH_MATRIX_DATA_LAYOUT, FOREACH_SCALAR_TYPE, FOREACH_INT_TYPE, APPLY_STAMP)

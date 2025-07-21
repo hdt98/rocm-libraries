@@ -1,5 +1,5 @@
 # ##########################################################################
-# Copyright (C) 2019-2024 Advanced Micro Devices, Inc. All rights reserved.
+# Copyright (C) 2019-2025 Advanced Micro Devices, Inc. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -53,11 +53,15 @@ project(rocsolver LANGUAGES CXX C)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_HIP_STANDARD 17)
+set(CMAKE_HIP_EXTENSIONS OFF)
+set(CMAKE_HIP_STANDARD_REQUIRED ON)
 
 option(ROCSOLVER_EMBED_FMT "Hide libfmt symbols" ON)
 option(OPTIMAL "Build specialized kernels for small matrix sizes" ON)
 option(ROCSOLVER_FIND_PACKAGE_LAPACK_CONFIG "Skip module mode search for LAPACK" ON)
 option(ROCSOLVER_USE_INTERNAL_BLAS "Use internal implementation of GEMM and TRSM for debugging." OFF)
+option(ROCSOLVER_USE_REFERENCE_SECULAR_EQUATIONS_SOLVER "Use LAPACK like implementation of secular equations solver" OFF)
 
 # Add our CMake helper files to the lookup path
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
@@ -88,7 +92,7 @@ get_os_id(OS_ID)
 message(STATUS "OS detected is ${OS_ID}")
 
 # Versioning via rocm-cmake
-set(VERSION_STRING "3.30.0")
+set(VERSION_STRING "3.31.0")
 rocm_setup_version(VERSION ${VERSION_STRING})
 
 # Workaround until llvm and hip CMake modules fix symlink logic in their config files
@@ -119,6 +123,7 @@ option(BUILD_SHARED_LIBS "Build rocSOLVER as a shared library" ON)
 
 # Include helper functions and wrapper functions
 include(util)
+include(CheckLanguage)
 include(CMakeDependentOption)
 include(CheckCXXCompilerFlag)
 
@@ -147,58 +152,53 @@ option(BUILD_COMPRESSED_DBG "Enable compressed debug symbols" ON)
 check_cxx_compiler_flag("--offload-compress" CXX_COMPILER_SUPPORTS_OFFLOAD_COMPRESS)
 cmake_dependent_option(BUILD_OFFLOAD_COMPRESS "Build with offload compression" ON CXX_COMPILER_SUPPORTS_OFFLOAD_COMPRESS OFF)
 
-cmake_dependent_option(BUILD_FILE_REORG_BACKWARD_COMPATIBILITY
-  "Build with file/folder reorg backward compatibility enabled" OFF "NOT WIN32" OFF)
-if(BUILD_FILE_REORG_BACKWARD_COMPATIBILITY)
-  rocm_wrap_header_dir(
-    ${CMAKE_SOURCE_DIR}/library/include/rocsolver
-    PATTERNS "*.h"
-    GUARDS SYMLINK WRAPPER
-    WRAPPER_LOCATIONS ${CMAKE_INSTALL_INCLUDEDIR}
-  )
-endif()
-
-
 message(STATUS "Tests: ${BUILD_CLIENTS_TESTS}")
 message(STATUS "Benchmarks: ${BUILD_CLIENTS_BENCHMARKS}")
 message(STATUS "Samples: ${BUILD_CLIENTS_SAMPLES}")
 
-if(NOT DEFINED AMDGPU_TARGETS)
-  set(XNACK_PLUS_TARGETS
-    gfx90a:xnack+
-    gfx908:xnack+
-    gfx942:xnack+
-    gfx950:xnack+)
-  set(XNACK_MINUS_TARGETS gfx90a:xnack-)
-  set(MISC_TARGETS
-    gfx942
-    gfx950
-    gfx1100
-    gfx1101
-    gfx1102
-    gfx1151
-    gfx1200
-    gfx1201)
-  if(BUILD_ADDRESS_SANITIZER)
-    set(OPTIONAL_TARGETS_QUERY ${XNACK_PLUS_TARGETS})
-  else()
-    set(OPTIONAL_TARGETS_QUERY ${XNACK_MINUS_TARGETS} ${MISC_TARGETS})
-    set(DEFAULT_TARGETS
-      gfx900
-      gfx906:xnack-
-      gfx908:xnack-
-      gfx1010
-      gfx1030)
+check_language(HIP)
+cmake_dependent_option(USE_HIPCXX "Use CMake HIP language support" OFF CMAKE_HIP_COMPILER OFF)
+if(USE_HIPCXX)
+  enable_language(HIP)
+else()
+  if(NOT DEFINED AMDGPU_TARGETS)
+    set(XNACK_PLUS_TARGETS
+      gfx90a:xnack+
+      gfx908:xnack+
+      gfx942:xnack+
+      gfx950:xnack+)
+    set(XNACK_MINUS_TARGETS gfx90a:xnack-)
+    set(MISC_TARGETS
+      gfx942
+      gfx950
+      gfx10-1-generic
+      gfx10-3-generic
+      gfx1100
+      gfx1101
+      gfx1102
+      gfx1151
+      gfx12-generic
+    )
+    if(BUILD_ADDRESS_SANITIZER)
+      set(OPTIONAL_TARGETS_QUERY ${XNACK_PLUS_TARGETS})
+    else()
+      set(OPTIONAL_TARGETS_QUERY ${XNACK_MINUS_TARGETS} ${MISC_TARGETS})
+      set(DEFAULT_TARGETS
+        gfx900
+        gfx906:xnack-
+        gfx908:xnack-
+      )
+    endif()
+    # Query for compiler support of GPU archs
+    rocm_check_target_ids(OPTIONAL_AMDGPU_TARGETS TARGETS ${OPTIONAL_TARGETS_QUERY})
+    set(AMDGPU_TARGETS_INIT ${OPTIONAL_AMDGPU_TARGETS} ${DEFAULT_TARGETS})
   endif()
-  # Query for compiler support of GPU archs
-  rocm_check_target_ids(OPTIONAL_AMDGPU_TARGETS TARGETS ${OPTIONAL_TARGETS_QUERY})
-  set(AMDGPU_TARGETS_INIT ${OPTIONAL_AMDGPU_TARGETS} ${DEFAULT_TARGETS})
-endif()
 
-# Set this before finding hip so that hip::device has the required arch flags
-# added as usage requirements on its interface
-set(AMDGPU_TARGETS "${AMDGPU_TARGETS_INIT}"
-  CACHE STRING "List of specific machine types for library to target")
+  # Set this before finding hip so that hip::device has the required arch flags
+  # added as usage requirements on its interface
+  set(AMDGPU_TARGETS "${AMDGPU_TARGETS_INIT}"
+    CACHE STRING "List of specific machine types for library to target")
+endif()
 
 # Find HIP dependencies
 find_package(hip REQUIRED CONFIG PATHS ${ROCM_PATH} /opt/rocm)
@@ -271,7 +271,9 @@ set(CPACK_RPM_PACKAGE_LICENSE "BSD")
 if(WIN32)
   set(CPACK_SOURCE_GENERATOR "ZIP")
   set(CPACK_GENERATOR "ZIP")
-  set(CMAKE_INSTALL_PREFIX "C:/hipSDK" CACHE PATH "Install path" FORCE)
+  if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+    set(CMAKE_INSTALL_PREFIX "C:/hipSDK" CACHE PATH "Install path" FORCE)
+  endif()
   set(INSTALL_PREFIX "C:/hipSDK")
   set(CPACK_SET_DESTDIR OFF)
   set(CPACK_PACKAGE_INSTALL_DIRECTORY "C:/hipSDK")

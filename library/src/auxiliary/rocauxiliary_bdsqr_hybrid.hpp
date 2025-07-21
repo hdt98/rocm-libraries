@@ -33,6 +33,7 @@
 
 #pragma once
 
+#include "common_host_helpers.hpp"
 #include "lapack_host_functions.hpp"
 #include "rocauxiliary_lasr.hpp"
 #include "rocsolver_hybrid_storage.hpp"
@@ -43,7 +44,7 @@ ROCSOLVER_BEGIN_NAMESPACE
 /***************** Kernel launchers *************************************************/
 /************************************************************************************/
 
-template <typename S, typename T, typename I>
+template <typename T, typename I>
 static void swap_template(rocblas_handle handle,
                           I const n,
                           T* x,
@@ -52,10 +53,10 @@ static void swap_template(rocblas_handle handle,
                           I const incy,
                           hipStream_t stream)
 {
-    auto nthreads = warpSize * 2;
+    auto nthreads = get_device_warp_size() * 2;
     auto nblocks = (n - 1) / nthreads + 1;
 
-    ROCSOLVER_LAUNCH_KERNEL((swap_kernel<S, T, I>), dim3(nblocks, 1, 1), dim3(nthreads, 1, 1), 0,
+    ROCSOLVER_LAUNCH_KERNEL((swap_kernel<T, I>), dim3(nblocks, 1, 1), dim3(nthreads, 1, 1), 0,
                             stream, n, x, incx, y, incy);
 }
 
@@ -70,7 +71,7 @@ static void rot_template(rocblas_handle handle,
                          S const s,
                          hipStream_t stream)
 {
-    auto nthreads = warpSize * 2;
+    auto nthreads = get_device_warp_size() * 2;
     auto nblocks = (n - 1) / nthreads + 1;
 
     ROCSOLVER_LAUNCH_KERNEL((rot_kernel<S, T, I>), dim3(nblocks, 1, 1), dim3(nthreads, 1, 1), 0,
@@ -85,7 +86,7 @@ static void scal_template(rocblas_handle handle,
                           I const incx,
                           hipStream_t stream)
 {
-    auto nthreads = warpSize * 2;
+    auto nthreads = get_device_warp_size() * 2;
     auto nblocks = (n - 1) / nthreads + 1;
 
     ROCSOLVER_LAUNCH_KERNEL((scal_kernel<S, T, I>), dim3(nblocks, 1, 1), dim3(nthreads, 1, 1), 0,
@@ -139,7 +140,7 @@ static void bdsqr_single_template(rocblas_handle handle,
     // Lambda expressions used as helpers
     // -------------------------------------
     auto call_swap_gpu = [=](I n, T& x, I incx, T& y, I incy) {
-        swap_template<S, T, I>(handle, n, &x, incx, &y, incy, stream);
+        swap_template<T, I>(handle, n, &x, incx, &y, incy, stream);
     };
 
     auto call_rot_gpu = [=](I n, T& x, I incx, T& y, I incy, S cosl, S sinl) {
