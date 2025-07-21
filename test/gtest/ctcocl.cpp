@@ -27,6 +27,10 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 
+#include <algorithm>
+#include <iterator>
+#include <vector>
+
 #include <miopen/ctc.hpp>
 #include "get_handle.hpp"
 
@@ -80,7 +84,7 @@ static void check_vals(miopen::CTCLossDescriptor& ctc, TestCaseValues& vals)
         miopen::Exception);
 }
 
-TEST(CTCLossDescriptor_CTCLoss, test_miopen_throw1)
+TEST(CPU_CTCLoss_NONE, test_miopen_throw1)
 {
     miopen::TensorDescriptor td_float{miopenFloat, std::vector{10, 3, 2}};
     miopen::TensorDescriptor td_half{miopenHalf, std::vector{10, 3, 2}};
@@ -117,7 +121,7 @@ TEST(CTCLossDescriptor_CTCLoss, test_miopen_throw1)
     }
 }
 
-TEST(CTCLossDescriptor_CTCLoss, test_miopen_throw2)
+TEST(CPU_CTCLoss_NONE, test_miopen_throw2)
 {
     constexpr int class_sz      = 2;
     constexpr int batch_size    = 10;
