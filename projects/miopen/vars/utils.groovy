@@ -214,7 +214,8 @@ def cmake_fin_build_cmd(prefixpath){
 
 def getDockerImageName(dockerArgs)
 {
-    miopenCheckout()
+    //miopenCheckout()
+    checkout scm
     sh "echo ${dockerArgs} > factors.txt"
     def image = "${env.MIOPEN_DOCKER_IMAGE_URL}"
     sh "md5sum projects/miopen/Dockerfile projects/miopen/requirements.txt projects/miopen/dev-requirements.txt >> factors.txt"
@@ -232,7 +233,8 @@ def getDockerImageName(dockerArgs)
 
 def getDockerImage(Map conf=[:])
 {
-    miopenCheckout()
+    //miopenCheckout()
+    checkout scm
     env.DOCKER_BUILDKIT=1
     def prefixpath = conf.get("prefixpath", "/opt/rocm") // one image for each prefix 1: /usr/local 2:/opt/rocm
     // Note: With offload compress disabled for CK expanding the target list might cause issues with the docker build.
@@ -313,7 +315,8 @@ def getDockerImage(Map conf=[:])
 
 def buildHipClangJob(Map conf=[:]){
         show_node_info()
-        miopenCheckout()
+        //miopenCheckout()
+        checkout scm
         //sh(script: "git submodule update --init --recursive && pwd && find . -name fin -type d -exec ls {} +")
         env.HSA_ENABLE_SDMA=0
         env.DOCKER_BUILDKIT=1
@@ -398,7 +401,8 @@ def buildHipClangJobAndReboot(Map conf=[:]){
 
 
 def RunPerfTest(Map conf=[:]){
-    miopenCheckout()
+    //miopenCheckout()
+    checkout scm
     def dockerOpts="--device=/dev/kfd --device=/dev/dri --group-add video --group-add render --cap-add=SYS_PTRACE --security-opt seccomp=unconfined"
     try {
         def docker_image = conf.get("docker_image")
