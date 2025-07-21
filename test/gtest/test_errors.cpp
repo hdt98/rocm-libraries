@@ -72,7 +72,7 @@ TEST(CPU_test_errors_NONE, test_error_string)
     }
 }
 
-TEST(CPU_test_errors_NONE, test_MIOPEN_THROW)
+TEST(CPU_test_errors_NONE, test_miopen_throw)
 {
     const std::string err_msg1{"test error message"};
     const std::string err_msg2{"another error message"};

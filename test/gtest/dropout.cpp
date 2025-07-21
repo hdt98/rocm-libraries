@@ -479,7 +479,7 @@ static void check_vals(miopen::DropoutDescriptor& dd, TestCaseValues& vals)
         miopen::Exception);
 }
 
-TEST(Dropout, DropoutDescriptor_Dropout_validation)
+TEST(CPU_dropout_NONE, test_dropout_miopen_throw)
 {
     miopen::DropoutDescriptor dd;
 
