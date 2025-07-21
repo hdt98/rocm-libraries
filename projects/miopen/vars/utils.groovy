@@ -334,6 +334,7 @@ def buildHipClangJob(Map conf=[:]){
 
         def retimage
         gitStatusWrapper(credentialsId: "${env.monorepo_status_wrapper_creds}", gitHubContext: "${variant}", account: 'ROCm', repo: 'rocm-libraries') {
+            echo "credentials ID ====== ${env.monorepo_status_wrapper_creds}"
             try {
                 (retimage, image) = getDockerImage(conf)
                 if (needs_gpu) {
