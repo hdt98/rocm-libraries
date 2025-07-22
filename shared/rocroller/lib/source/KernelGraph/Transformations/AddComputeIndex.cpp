@@ -799,6 +799,97 @@ namespace rocRoller::KernelGraph
                                                  coords));
             }
 
+            // if (isDirect2LDS)
+            // {
+            //     std::cout << "YL: node " << op << " target " << target << std::endl;
+            // }
+
+            // determine if target is LDS
+            auto maybeLDS  = graph.coordinates.get<LDS>(target).has_value();
+            auto newTarget = target;
+            if(maybeLDS)
+            {
+                // If target is LDS; it might be a duplicated LDS
+                // node.  For the purposes of computing indexes,
+                // use the parent LDS as the target instead.
+                auto maybeParentLDS = only(graph.coordinates.getOutputNodeIndices(
+                    newTarget, rocRoller::KernelGraph::CoordinateGraph::isEdge<Duplicate>));
+                if(maybeParentLDS)
+                    newTarget = *maybeParentLDS;
+            }
+            maybeLDS = graph.coordinates.get<LDS>(newTarget).has_value();
+
+            // if (isDirect2LDS)
+            // {
+            //     std::cout << "YL: node " << op << " new target" << newTarget << std::endl;
+            // }
+
+            // determin if the operation is tranpose load
+            auto isLoad       = graph.control.get<LoadTiled>(op).has_value();
+            auto isLoadLDS    = graph.control.get<LoadLDSTile>(op).has_value();
+            auto isTransposed = false;
+            if(isLoad)
+            {
+                auto tile    = graph.control.get<LoadTiled>(op).value();
+                isTransposed = tile.isTransposedTile;
+            }
+            else if(isLoadLDS)
+            {
+                auto tile    = graph.control.get<LoadLDSTile>(op).value();
+                isTransposed = tile.isTransposedTile;
+            }
+
+            // make Assign base expression
+            // Set the zero-coordinates to zero
+            // auto coords           = Transformer(&graph.coordinates);
+            auto increment        = info.coord;
+            auto fullStop         = [&](int ciTag) { return ciTag == increment; };
+            auto [required, path] = findRequiredCoordinates(newTarget, direction, fullStop, graph);
+
+            for(auto ciTag : required)
+                if((ciTag != increment) && (!coords.hasCoordinate(ciTag)))
+                    coords.setCoordinate(ciTag, Expression::literal(0u));
+
+            // Set the increment coordinate to zero if it doesn't
+            // already have a value
+            bool initializeIncrement
+                = !coords.hasPath({newTarget}, direction == Graph::Direction::Upstream);
+            if(initializeIncrement)
+            {
+                coords.setCoordinate(increment, Expression::literal(0u));
+            }
+
+            // Assign base expression
+            if(base < 0)
+            {
+                chain.push_back(makeAssignBase(graph,
+                                               newTarget,
+                                               base,
+                                               offset,
+                                               direction == Graph::Direction::Upstream,
+                                               dtype,
+                                               offsetDataType,
+                                               maybeLDS,
+                                               isTransposed,
+                                               context,
+                                               coords));
+            }
+
+            if(stride > 0)
+            {
+                chain.push_back(makeAssignStride(graph,
+                                                 newTarget,
+                                                 stride,
+                                                 increment,
+                                                 direction == Graph::Direction::Upstream,
+                                                 dtype,
+                                                 strideDataType,
+                                                 maybeLDS,
+                                                 isTransposed,
+                                                 context,
+                                                 coords));
+            }
+
             // Add connections for register allocate, and so tracer
             // can determine correct lifetimes
             if(offset != -1)
