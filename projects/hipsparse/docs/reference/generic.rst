@@ -112,6 +112,11 @@ hipsparseSpGEMM_workEstimation()
 
 .. doxygenfunction:: hipsparseSpGEMM_workEstimation
 
+hipsparseSpGEMM_estimateMemory()
+================================
+
+.. doxygenfunction:: hipsparseSpGEMM_estimateMemory
+
 hipsparseSpGEMM_compute()
 =========================
 
