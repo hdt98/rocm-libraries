@@ -626,7 +626,6 @@ namespace rocRoller
                 std::cout << "YL generate expression " << toString(expr) << "to offset tag " << offset << std::endl;
 
                 co_yield generate(offsetReg, convert(offsetReg->variableType(), expr));
-                // offsetReg->setReadOnly();
             }
             else
             {
