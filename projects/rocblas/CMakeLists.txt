@@ -133,11 +133,9 @@ set_property(CACHE GPU_TARGETS PROPERTY STRINGS
 # Detect if target ID syntax if supported for default all GPU_TARGETS list
 # Sets the GPU_TARGETS with backward compatibility
 if (GPU_TARGETS STREQUAL "all")
-  #rocm_check_target_ids(target_list TARGETS "${SUPPORTED_TARGETS}")
-  set(target_list "${SUPPORTED_TARGETS}")
+  rocm_check_target_ids(target_list TARGETS "${SUPPORTED_TARGETS}")
 else()
-  #rocm_check_target_ids(target_list TARGETS "${GPU_TARGETS}")
-  set(target_list "${GPU_TARGETS}")
+  rocm_check_target_ids(target_list TARGETS "${GPU_TARGETS}")
 endif()
 
 # if 'target_list' is empty, then compile does not support the gpu arch passed as an argument.
@@ -181,6 +179,12 @@ if(NOT SKIP_LIBRARY)
     set( Tensile_ARCHITECTURE "${GPU_TARGETS}" CACHE STRING "Tensile to use which architecture?" FORCE)
 
     list_replace( Tensile_ARCHITECTURE "gfx90a" "gfx90a:xnack+\;gfx90a:xnack-")
+    # map generic to Tensile sets 
+    list_replace( Tensile_ARCHITECTURE "gfx9-generic" "gfx900;gfx906:xnack-")
+    list_replace( Tensile_ARCHITECTURE "gfx10-1-generic" "gfx1010;gfx1012")
+    list_replace( Tensile_ARCHITECTURE "gfx10-3-generic" "gfx1030")
+    list_replace( Tensile_ARCHITECTURE "gfx11-generic" "gfx1100;gfx1101;gfx1102;gfx1150;gfx1151")
+    list_replace( Tensile_ARCHITECTURE "gfx12-generic" "gfx1200;gfx1201")
 
     set( TENSILE_VERSION 4.44.0 CACHE STRING "The version of Tensile to be used")
 
