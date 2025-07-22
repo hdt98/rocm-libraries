@@ -34,7 +34,7 @@ library "shared-libraries-monorepo@${get_branch_name()}"
 
 
 def withWorkingDir(Closure body) {
-    dir('projects/miopen/') {
+    dir("${env.WORKSPACE}/projects/miopen") {
         body()
     }
 }
