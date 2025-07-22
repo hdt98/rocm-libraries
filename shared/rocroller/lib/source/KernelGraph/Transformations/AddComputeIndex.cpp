@@ -27,14 +27,19 @@
 #include <algorithm>
 #include <variant>
 
+#include <rocRoller/CodeGen/Utils.hpp>
 #include <rocRoller/DataTypes/DataTypes.hpp>
 #include <rocRoller/Expression.hpp>
 #include <rocRoller/ExpressionTransformations.hpp>
 #include <rocRoller/Graph/Hypergraph.hpp>
 #include <rocRoller/KernelGraph/ControlToCoordinateMapper.hpp>
+#include <rocRoller/KernelGraph/CoordinateGraph/Transformer.hpp>
 #include <rocRoller/KernelGraph/KernelGraph.hpp>
 #include <rocRoller/KernelGraph/Transforms/AddComputeIndex.hpp>
 #include <rocRoller/KernelGraph/Utils.hpp>
+
+#include <rocRoller/KernelGraph/Transforms/LoadPacked_detail.hpp>
+#include <rocRoller/KernelGraph/Transforms/LowerTile_details.hpp>
 
 namespace rocRoller::KernelGraph
 {
@@ -161,6 +166,302 @@ namespace rocRoller::KernelGraph
             stride);
 
         return ci;
+    }
+
+    ExpressionPtr toBytes(ExpressionPtr expr, DataType valueType)
+    {
+        uint numBits = DataTypeInfo::Get(valueType).elementBits;
+        if(numBits % 8u == 0)
+            return expr * Expression::literal(numBits / 8u);
+        return (expr * Expression::literal(numBits)) / Expression::literal(8u);
+    }
+
+    inline ExpressionPtr L(auto const& x)
+    {
+        return Expression::literal(x);
+    }
+
+    inline ExpressionPtr DF(const int tag, DataType dataType)
+    {
+        return std::make_shared<Expression::Expression>(
+            Expression::DataFlowTag{tag, Register::Type::Vector, dataType});
+    }
+
+    int makeAssignBase(KernelGraph& graph,
+                       int          target,
+                       int          base,
+                       int          offset,
+                       bool         forward,
+                       DataType     valueType,
+                       DataType     offsetType,
+                       bool         maybeLDS,
+                       bool         isTransposed,
+                       ContextPtr   context,
+                       Transformer& coords)
+    {
+        auto        assignTag = -1;
+        auto        indexExpr = forward ? coords.forward({target})[0] : coords.reverse({target})[0];
+        auto const& typeInfo  = DataTypeInfo::Get(valueType);
+        auto        numBits   = DataTypeInfo::Get(typeInfo.segmentVariableType).elementBits;
+
+        auto const& arch = context->targetArchitecture();
+        const auto  needsPadding
+            = numBits == 6 && isTransposed
+              && arch.HasCapability(GPUCapability::DSReadTransposeB6PaddingBytes);
+
+        ExpressionPtr paddingBytes{L(0u)};
+        if(needsPadding && maybeLDS)
+        {
+            uint elementsPerTrLoad = bitsPerTransposeLoad(arch, numBits) / numBits;
+            auto extraLdsBytes     = extraLDSBytesPerElementBlock(arch, numBits);
+            paddingBytes           = indexExpr / L(elementsPerTrLoad) * L(extraLdsBytes);
+        }
+
+        auto assignNode
+            = Assign{Register::Type::Vector, convert(offsetType, toBytes(indexExpr, valueType) + paddingBytes)};
+        assignNode.variableType = offsetType;
+        assignTag               = graph.control.addElement(assignNode);
+        graph.mapper.connect(assignTag, offset, NaryArgument::DEST);
+
+        return assignTag;
+    }
+
+    static std::pair<uint, uint>
+        getElementBlockValues(KernelGraph const& graph, int target, const bool isTransposed)
+    {
+        uint elementBlockNumber = 0;
+        uint elementBlockIndex  = 0;
+
+        std::unordered_set<int> tileTags;
+        using OpsAndTilesType
+            = std::tuple<std::pair<int, Operation>, std::pair<int, MacroTile>, DataType>;
+        std::vector<OpsAndTilesType> targetOpsAndTiles;
+
+        for(auto conn : graph.mapper.getCoordinateConnections(target))
+        {
+            auto     opTag = conn.control;
+            auto     op    = std::get<Operation>(graph.control.getElement(opTag));
+            DataType dataType;
+            if(std::visit(rocRoller::overloaded{[&](LoadTiled& load) {
+                                                    dataType = load.varType.dataType;
+                                                    return true;
+                                                },
+                                                [&](LoadLDSTile& load) {
+                                                    dataType = load.varType.dataType;
+                                                    return true;
+                                                },
+                                                [&](StoreTiled& store) {
+                                                    dataType = store.varType.dataType;
+                                                    return true;
+                                                },
+                                                [&](StoreLDSTile& store) {
+                                                    dataType = store.varType.dataType;
+                                                    return true;
+                                                },
+                                                [&](auto& other) { return false; }},
+                          op))
+            {
+                auto [macTileTag, macTile] = graph.getDimension<MacroTile>(opTag);
+
+                auto maybeParentTile = only(graph.coordinates.getOutputNodeIndices(
+                    macTileTag, rocRoller::KernelGraph::CoordinateGraph::isEdge<Duplicate>));
+                if(maybeParentTile)
+                {
+                    macTileTag = *maybeParentTile;
+                    macTile    = *graph.coordinates.get<MacroTile>(macTileTag);
+                }
+
+                if(!tileTags.count(macTileTag))
+                {
+                    targetOpsAndTiles.push_back({{opTag, op}, {macTileTag, macTile}, dataType});
+                }
+            }
+        }
+
+        auto [tagAndOp, tagAndTile, dataType] = [](auto opsAndTiles) -> OpsAndTilesType {
+            for(OpsAndTilesType& elem : opsAndTiles)
+            {
+                auto memType = std::get<1>(elem).second.memoryType;
+                if(memType == MemoryType::WAVE || memType == MemoryType::WAVE_SWIZZLE)
+                {
+                    return elem;
+                }
+            }
+            return opsAndTiles[0];
+        }(targetOpsAndTiles);
+        auto [opTag, op]           = tagAndOp;
+        auto [macTileTag, macTile] = tagAndTile;
+
+        if(macTile.memoryType == MemoryType::VGPR
+           || (macTile.layoutType == LayoutType::MATRIX_ACCUMULATOR
+               && macTile.memoryType == MemoryType::WAVE_SPLIT))
+        {
+            auto [elementNumberXTag, elementNumberX] = graph.getDimension<ElementNumber>(opTag, 0);
+            AssertFatal(Expression::evaluationTimes(elementNumberX.size)[EvaluationTime::Translate],
+                        "Could not determine ElementNumberX size at translate-time.\n",
+                        ShowValue(elementNumberX));
+
+            auto [elementNumberYTag, elementNumberY] = graph.getDimension<ElementNumber>(opTag, 1);
+            AssertFatal(Expression::evaluationTimes(elementNumberY.size)[EvaluationTime::Translate],
+                        "Could not determine ElementNumber size at translate-time.\n",
+                        ShowValue(elementNumberY));
+
+            elementBlockNumber = getUnsignedInt(evaluate(elementNumberX.size));
+            elementBlockIndex  = getUnsignedInt(evaluate(elementNumberY.size));
+        }
+        else if(macTile.memoryType == MemoryType::WAVE
+                || macTile.memoryType == MemoryType::WAVE_SWIZZLE)
+        {
+            auto [vgprBlockNumberTag, vgprBlockNumber]
+                = graph.getDimension<VGPRBlockNumber>(opTag, 0);
+            AssertFatal(
+                Expression::evaluationTimes(vgprBlockNumber.size)[EvaluationTime::Translate],
+                "Could not determine VGPRBlockNumber size at translate-time.\n",
+                ShowValue(vgprBlockNumber));
+
+            auto [vgprBlockIndexTag, vgprBlockIndex] = graph.getDimension<VGPRBlockIndex>(opTag, 0);
+            AssertFatal(Expression::evaluationTimes(vgprBlockIndex.size)[EvaluationTime::Translate],
+                        "Could not determine VGPRBlockIndex size at translate-time.\n",
+                        ShowValue(vgprBlockIndex));
+
+            elementBlockNumber = getUnsignedInt(evaluate(vgprBlockNumber.size));
+            elementBlockIndex  = getUnsignedInt(evaluate(vgprBlockIndex.size));
+            if(isScaleType(dataType))
+            {
+                // Scales are another special case here. For Scales we need
+                // to get VGPR coordinate instead of VGPRBlockNumber/Index
+                // (see addLoadSwizzleTileCT).
+                auto [vgprTag, vgpr] = graph.getDimension<VGPR>(opTag, 0);
+                AssertFatal(Expression::evaluationTimes(vgpr.size)[EvaluationTime::Translate],
+                            "Could not determine VGPR size at translate-time.\n",
+                            ShowValue(vgpr));
+                // Multiplying by elementBlockNumber here forces the use
+                // of the widest load/store possible
+                elementBlockIndex = elementBlockNumber * getUnsignedInt(evaluate(vgpr.size));
+            }
+
+            if((!LowerTileDetails::isTileOfSubDwordTypeWithNonContiguousVGPRBlocks(
+                    dataType,
+                    {.m = macTile.subTileSizes[0],
+                     .n = macTile.subTileSizes[1],
+                     .k = macTile.subTileSizes[2]})
+                || isScaleType(dataType))
+               && !isTransposed)
+            {
+                // For Scales and other kinds of tiles, VGPRBlockIndex holds
+                // number of VGPR per block and not elements per VGPRBlock.
+                elementBlockIndex *= packingFactorForDataType(dataType);
+            }
+        }
+        else
+        {
+            Throw<FatalError>(
+                "Could not find ElementNumber or VGPRBlockNumber/Index coordinates.\n",
+                ShowValue(op),
+                ShowValue(macTile));
+        }
+
+        AssertFatal(elementBlockNumber > 0 && elementBlockIndex > 0,
+                    "elemementBlockNumber & elementBlockIndex must be greater than zero. ",
+                    ShowValue(elementBlockNumber),
+                    ShowValue(elementBlockIndex));
+        return {elementBlockNumber, elementBlockIndex};
+    }
+
+    int makeAssignStride(KernelGraph& graph,
+                         int          target,
+                         int          stride,
+                         int          increment,
+                         bool         forward,
+                         DataType     valueType,
+                         DataType     strideType,
+                         bool         maybeLDS,
+                         bool         isTransposed,
+                         ContextPtr   context,
+                         Transformer& coords)
+    {
+        auto indexExpr = forward
+                             ? coords.forwardStride(increment, Expression::literal(1), {target})[0]
+                             : coords.reverseStride(increment, Expression::literal(1), {target})[0];
+
+        bool unitStride = false;
+        if(Expression::evaluationTimes(indexExpr)[EvaluationTime::Translate])
+        {
+            if(getUnsignedInt(evaluate(indexExpr)) == 1u)
+                unitStride = true;
+        }
+
+        uint          elementBlockSize = 0;
+        ExpressionPtr elementBlockStride;
+        ExpressionPtr trLoadPairStride;
+        ExpressionPtr elementBlockStridePaddingBytes{L(0u)};
+        ExpressionPtr trLoadPairStridePaddingBytes{L(0u)};
+        ExpressionPtr indexExprPaddingBytes{L(0u)};
+
+        auto const& typeInfo = DataTypeInfo::Get(valueType);
+        auto        numBits  = DataTypeInfo::Get(typeInfo.segmentVariableType).elementBits;
+
+        if(numBits == 16 || numBits == 8 || numBits == 6 || numBits == 4)
+        {
+            auto [elementBlockNumber, elementBlockIndex]
+                = getElementBlockValues(graph, target, isTransposed);
+
+            elementBlockSize = elementBlockIndex;
+
+            auto const& arch = context->targetArchitecture();
+            if(isTransposed)
+            {
+                // See addLoadWaveTileCTF8F6F4 in LowerTile.cpp
+                const auto wfs        = arch.GetCapability(GPUCapability::DefaultWavefrontSize);
+                uint const numVBlocks = wfs == 64 ? (numBits == 8 ? 2 : 1) : (numBits == 8 ? 4 : 2);
+                elementBlockSize      = (elementBlockNumber / numVBlocks) * elementBlockSize;
+            }
+            AssertFatal(elementBlockSize > 0, "Invalid elementBlockSize: ", elementBlockSize);
+
+            const auto needsPadding
+                = numBits == 6 && isTransposed
+                  && arch.HasCapability(GPUCapability::DSReadTransposeB6PaddingBytes);
+
+            // Padding is added after every 16 elements, thus for F6 datatypes that will
+            // be transpose loaded from LDS elementBlockSize is set to 16 instead of 32.
+            if(needsPadding)
+            {
+                elementBlockSize = 16;
+            }
+
+            elementBlockStride
+                = forward ? coords.forwardStride(increment, L(elementBlockSize), {target})[0]
+                          : coords.reverseStride(increment, L(elementBlockSize), {target})[0];
+
+            uint elementsPerTrLoad = elementBlockIndex;
+            trLoadPairStride
+                = forward ? coords.forwardStride(increment, L(elementsPerTrLoad), {target})[0]
+                          : coords.reverseStride(increment, L(elementsPerTrLoad), {target})[0];
+
+            if(needsPadding && maybeLDS)
+            {
+                uint elementsPerTrLoad = bitsPerTransposeLoad(arch, numBits) / numBits;
+                auto extraLdsBytes     = extraLDSBytesPerElementBlock(arch, numBits);
+                elementBlockStridePaddingBytes
+                    = elementBlockStride / L(elementsPerTrLoad) * L(extraLdsBytes);
+                trLoadPairStridePaddingBytes
+                    = trLoadPairStride / L(elementsPerTrLoad) * L(extraLdsBytes);
+                indexExprPaddingBytes = indexExpr / L(elementsPerTrLoad) * L(extraLdsBytes);
+            }
+        }
+
+        auto assignNode
+            = Assign{Register::Type::Vector, toBytes(indexExpr, valueType) + indexExprPaddingBytes};
+        assignNode.variableType = strideType;
+        assignNode.strideExpressionAttributes
+            = {strideType,
+               unitStride,
+               elementBlockSize,
+               toBytes(elementBlockStride, valueType) + elementBlockStridePaddingBytes,
+               toBytes(trLoadPairStride, valueType) + trLoadPairStridePaddingBytes};
+        auto assignTag = graph.control.addElement(assignNode);
+        graph.mapper.connect(assignTag, stride, NaryArgument::DEST);
+        return assignTag;
     }
 
     /**
@@ -299,6 +600,7 @@ namespace rocRoller::KernelGraph
      * generating `op`.
      */
     DataType getOffsetDataType(int op, KernelGraph const& graph, bool direct2LDS)
+
     {
         DataType rv = DataType::UInt64;
         auto     s  = graph.control.get<StoreTiled>(op);
@@ -337,6 +639,14 @@ namespace rocRoller::KernelGraph
         std::vector<DeferredConnection> connections;
         std::map<int, int>              offsetOfCoord;
 
+        auto [coords, remainingCoords]
+            = LoadPackedDetail::getFakeTransformerForControlNode(op, graph, context);
+
+        for(auto coord : remainingCoords)
+        {
+            coords.setCoordinate(coord, Expression::literal(0u));
+        }
+
         for(auto info : getRequiredCoordinatesInfo(op, location, graph, isDirect2LDS))
         {
             // Add ComputeIndex operation
@@ -371,7 +681,8 @@ namespace rocRoller::KernelGraph
                 offsetDataType = DataType::Int64;
                 strideDataType = DataType::Int64;
             }
-            chain.push_back(makeComputeIndex(graph,
+
+            auto const ci = makeComputeIndex(graph,
                                              target,
                                              info.coord,
                                              base,
@@ -382,7 +693,90 @@ namespace rocRoller::KernelGraph
                                              dtype,
                                              offsetDataType,
                                              strideDataType,
-                                             isDirect2LDS));
+                                             isDirect2LDS);
+
+            chain.push_back(ci);
+
+            // make Assign base expression
+            // Set the zero-coordinates to zero
+            // auto coords           = Transformer(&graph.coordinates);
+            auto increment        = info.coord;
+            auto fullStop         = [&](int ciTag) { return ciTag == increment; };
+            auto [required, path] = findRequiredCoordinates(target, direction, fullStop, graph);
+
+            for(auto ciTag : required)
+                if((ciTag != increment) && (!coords.hasCoordinate(ciTag)))
+                    coords.setCoordinate(ciTag, Expression::literal(0u));
+
+            // Set the increment coordinate to zero if it doesn't
+            // already have a value
+            bool initializeIncrement
+                = !coords.hasPath({target}, direction == Graph::Direction::Upstream);
+            if(initializeIncrement)
+            {
+                coords.setCoordinate(increment, Expression::literal(0u));
+            }
+
+            // Assign base expression
+
+            // determine if target is LDS
+            auto maybeLDS = graph.coordinates.get<LDS>(target).has_value();
+            if(maybeLDS)
+            {
+                // If target is LDS; it might be a duplicated LDS
+                // node.  For the purposes of computing indexes,
+                // use the parent LDS as the target instead.
+                auto maybeParentLDS = only(graph.coordinates.getOutputNodeIndices(
+                    target, rocRoller::KernelGraph::CoordinateGraph::isEdge<Duplicate>));
+                if(maybeParentLDS)
+                    target = *maybeParentLDS;
+            }
+            maybeLDS = graph.coordinates.get<LDS>(target).has_value();
+
+            // determin if the operation is tranpose load
+            auto isLoad       = graph.control.get<LoadTiled>(op).has_value();
+            auto isLoadLDS    = graph.control.get<LoadLDSTile>(op).has_value();
+            auto isTransposed = false;
+            if(isLoad)
+            {
+                auto tile    = graph.control.get<LoadTiled>(op).value();
+                isTransposed = tile.isTransposedTile;
+            }
+            else if(isLoadLDS)
+            {
+                auto tile    = graph.control.get<LoadLDSTile>(op).value();
+                isTransposed = tile.isTransposedTile;
+            }
+
+            // if(base < 0 && offset > 0)
+            // {
+            //     chain.push_back(makeAssignBase(graph,
+            //                                    target,
+            //                                    base,
+            //                                    offset,
+            //                                    direction == Graph::Direction::Upstream,
+            //                                    dtype,
+            //                                    offsetDataType,
+            //                                    maybeLDS,
+            //                                    isTransposed,
+            //                                    context,
+            //                                    coords));
+            // }
+
+            if(stride > 0)
+            {
+                chain.push_back(makeAssignStride(graph,
+                                                 target,
+                                                 stride,
+                                                 increment,
+                                                 direction == Graph::Direction::Upstream,
+                                                 dtype,
+                                                 strideDataType,
+                                                 maybeLDS,
+                                                 isTransposed,
+                                                 context,
+                                                 coords));
+            }
 
             // Add connections for register allocate, and so tracer
             // can determine correct lifetimes

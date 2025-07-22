@@ -623,8 +623,10 @@ namespace rocRoller
                 if(ci.isDirect2LDS)
                     expr = makeScalar(expr);
 
+                std::cout << "YL generate expression " << toString(expr) << "to offset tag " << offset << std::endl;
+
                 co_yield generate(offsetReg, convert(offsetReg->variableType(), expr));
-                offsetReg->setReadOnly();
+                // offsetReg->setReadOnly();
             }
             else
             {
@@ -731,14 +733,16 @@ namespace rocRoller
                                                           toString(trLoadPairStride),
                                                           toString(trLoadPairStridePaddingBytes)));
 
-                tagger->addExpression(stride,
-                                      m_fastArith(toBytes(indexExpr) + indexExprPaddingBytes),
-                                      {ci.strideType,
-                                       unitStride,
-                                       elementBlockSize,
-                                       toBytes(elementBlockStride) + elementBlockStridePaddingBytes,
-                                       toBytes(trLoadPairStride) + trLoadPairStridePaddingBytes});
-                scope->addRegister(stride);
+                std::cout << "YL generate expression " << toString((toBytes(indexExpr) + indexExprPaddingBytes)) << "to stride tag " << stride << std::endl;
+
+                // tagger->addExpression(stride,
+                //                       m_fastArith(toBytes(indexExpr) + indexExprPaddingBytes),
+                //                       {ci.strideType,
+                //                        unitStride,
+                //                        elementBlockSize,
+                //                        toBytes(elementBlockStride) + elementBlockStridePaddingBytes,
+                //                        toBytes(trLoadPairStride) + trLoadPairStridePaddingBytes});
+                // scope->addRegister(stride);
             }
 
             // Create a buffer descriptor
