@@ -218,7 +218,8 @@ option( BUILD_CLIENTS_TESTS_OPENMP "Build tests with OpenMP" ON )
 
 if( BUILD_CLIENTS_TESTS_OPENMP )
   find_package(OpenMP REQUIRED)
-  list( APPEND rocfft-test_link_libs OpenMP::OpenMP_CXX )
+  target_link_libraries( rocfft-test PRIVATE OpenMP::OpenMP_CXX
+                         -L${HIP_CLANG_ROOT}/lib -Wl,-rpath=${HIP_CLANG_ROOT}/lib )
   foreach(omplib ${OpenMP_CXX_LIBRARIES})
     if(NOT EXISTS ${omplib})
       message( FATAL_ERROR "OpenMP configuration mentions ${omplib} which does not exist." )
