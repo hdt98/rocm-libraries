@@ -179,12 +179,23 @@ static inline void gcn_reduce2(_FLOAT_ACCUM* x,
 
     barrier(CLK_LOCAL_MEM_FENCE);
     *x = *y = (_FLOAT_ACCUM)0.;
+#ifdef MIO_BN_FP64MEAN
+    double x_f64 = 0.0;
+#endif
     __attribute__((opencl_unroll_hint(2))) for(unsigned int i = 0; i < MIO_BN_LDSGCN_SIZE; i++)
     {
+#ifdef MIO_BN_FP64MEAN
+        x_f64 += lcl_data_x[i];
+#else
         *x += lcl_data_x[i];
+#endif
         *y += lcl_data_y[i];
     }
+#ifdef MIO_BN_FP64MEAN
+    *x = ((_FLOAT_ACCUM) x_f64) * scale;
+#else
     *x *= scale;
+#endif
     *y *= scale;
 }
 
