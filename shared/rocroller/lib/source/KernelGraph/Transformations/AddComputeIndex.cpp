@@ -693,7 +693,7 @@ namespace rocRoller::KernelGraph
                 strideDataType = DataType::Int64;
             }
 
-            makeComputeIndex(graph,
+            auto ci = makeComputeIndex(graph,
                                              target,
                                              info.coord,
                                              base,
@@ -769,20 +769,20 @@ namespace rocRoller::KernelGraph
             }
 
             // Assign base expression
-            if(base < 0)
-            {
-                chain.push_back(makeAssignBase(graph,
-                                               newTarget,
-                                               base,
-                                               offset,
-                                               direction == Graph::Direction::Upstream,
-                                               dtype,
-                                               offsetDataType,
-                                               maybeLDS,
-                                               isTransposed,
-                                               context,
-                                               coords));
-            }
+            // if(base < 0 && offset > 0)
+            // {
+            //     chain.push_back(makeAssignBase(graph,
+            //                                    newTarget,
+            //                                    base,
+            //                                    offset,
+            //                                    direction == Graph::Direction::Upstream,
+            //                                    dtype,
+            //                                    offsetDataType,
+            //                                    maybeLDS,
+            //                                    isTransposed,
+            //                                    context,
+            //                                    coords));
+            // }
 
             if(stride > 0)
             {
