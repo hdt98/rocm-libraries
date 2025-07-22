@@ -59,7 +59,8 @@ struct GridwiseGemmPipeline_v1<1, true, true>
                                const BBlockTransferStep& b_block_copy_step,
                                const BlockwiseGemm& blockwise_gemm,
                                CThreadBuffer& c_thread_buf,
-                               index_t num_loop)
+                               index_t num_loop,
+                               index_t num_loop_in_cluster)
     {
         // preload data into LDS
         a_blockwise_copy.RunRead(a_grid_desc, a_grid_buf);
@@ -274,7 +275,8 @@ struct GridwiseGemmPipeline_v1<2, true, true>
                                const BBlockTransferStep& b_block_copy_step,
                                const BlockwiseGemm& blockwise_gemm,
                                CThreadBuffer& c_thread_buf,
-                               index_t num_loop)
+                               index_t num_loop,
+                               index_t num_loop_in_cluster)
     {
         // preload data into LDS
         {
@@ -417,7 +419,8 @@ struct GridwiseGemmPipeline_v1<1, false, true>
                                const BBlockTransferStep& b_block_copy_step,
                                const BlockwiseGemm& blockwise_gemm,
                                CThreadBuffer& c_thread_buf,
-                               index_t num_loop)
+                               index_t num_loop,
+                               index_t num_loop_in_cluster)
     {
         constexpr auto a_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0, I0);
         auto a_block_buf_switch           = a_block_buf;
@@ -516,7 +519,8 @@ struct GridwiseGemmPipeline_v1<1, true, false>
                                const BBlockTransferStep& b_block_copy_step,
                                const BlockwiseGemm& blockwise_gemm,
                                CThreadBuffer& c_thread_buf,
-                               index_t num_loop)
+                               index_t num_loop,
+                               index_t num_loop_in_cluster)
     {
         constexpr auto b_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0, I0);
         auto b_block_buf_switch           = b_block_buf;
@@ -615,7 +619,8 @@ struct GridwiseGemmPipeline_v1<1, false, false>
                                const BBlockTransferStep& b_block_copy_step,
                                const BlockwiseGemm& blockwise_gemm,
                                CThreadBuffer& c_thread_buf,
-                               index_t num_loop)
+                               index_t num_loop,
+                               index_t num_loop_in_cluster)
     {
         constexpr auto b_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0, I0);
         constexpr auto a_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0, I0);
@@ -858,7 +863,8 @@ struct GridwiseGemmPipeline_v1<1, false, false, AMultiCastLoad, BMultiCastLoad>
                                const BBlockTransferStep& b_block_copy_step,
                                const BlockwiseGemm& blockwise_gemm,
                                CThreadBuffer& c_thread_buf,
-                               index_t num_loop)
+                               index_t num_loop,
+                               index_t num_loop_in_cluster)
     {
         constexpr auto b_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0, I0);
         constexpr auto a_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0, I0);
@@ -945,6 +951,148 @@ struct GridwiseGemmPipeline_v1<1, false, false, AMultiCastLoad, BMultiCastLoad>
     }
 };
 
+//template <bool AEnableLds, bool BEnableLds, GlobalLoadTypeEnum ATmaLoad, GlobalLoadTypeEnum BTmaLoad>
+template<>
+struct GridwiseGemmPipeline_v1<1, true, false, GlobalLoadTypeEnum::CLUSTER_DDS_LOAD, GlobalLoadTypeEnum::DEFAULT_LOAD>
+{
+    static constexpr auto I0 = Number<0>{};
+    static constexpr auto I1 = Number<1>{};
+
+    __host__ __device__ static constexpr bool IsSupported(index_t /* num_loop */) { return true; }
+
+    __host__ __device__ static constexpr bool CalculateHasMainLoop(index_t num_loop)
+    {
+        return num_loop > 1;
+    }
+
+    template <typename T>
+    __device__ static T* map_shared_rank(T *addr, int rank)
+    {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wold-style-cast"
+#pragma clang diagnostic ignored "-Wcast-align"
+        auto ptr = (__attribute__((address_space(3))) void *)addr;
+        return (T*)__builtin_amdgcn_map_shared_rank(ptr, rank);
+#pragma clang diagnostic pop
+    };
+
+    template <bool HasMainLoop,
+              typename AGridDesc,
+              typename ABlockDesc,
+              typename ABlockTransfer,
+              typename AGridBuffer,
+              typename ABlockBuffer,
+              typename ABlockTransferStep,
+              typename BGridDesc,
+              typename BBlockDesc,
+              typename BBlockTransfer,
+              typename BGridBuffer,
+              typename BBlockBuffer,
+              typename BBlockTransferStep,
+              typename BlockwiseGemm,
+              typename CThreadBuffer>
+    __device__ static void Run(const AGridDesc& a_grid_desc,
+                               const ABlockDesc& a_block_desc,
+                               ABlockTransfer& a_blockwise_copy,
+                               const AGridBuffer& a_grid_buf,
+                               ABlockBuffer& a_block_buf,
+                               const ABlockTransferStep& a_block_copy_step,
+                               const BGridDesc& b_grid_desc,
+                               const BBlockDesc& b_block_desc,
+                               BBlockTransfer& b_blockwise_copy,
+                               const BGridBuffer& b_grid_buf,
+                               BBlockBuffer& b_block_buf,
+                               const BBlockTransferStep& b_block_copy_step,
+                               const BlockwiseGemm& blockwise_gemm,
+                               CThreadBuffer& c_thread_buf,
+                               index_t num_loop,
+                               index_t num_loop_in_cluster)
+    {
+        constexpr auto b_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0, I0);
+
+        // preload data into LDS
+        a_blockwise_copy.RunRead(a_grid_desc, a_grid_buf);
+
+        // Initialize C
+        c_thread_buf.Clear();
+
+        a_blockwise_copy.MoveSrcSliceWindow(a_grid_desc, a_block_copy_step);
+        a_blockwise_copy.RunWrite(a_block_desc, a_block_buf);
+
+        index_t k = 0;
+        do
+        {
+            b_blockwise_copy.Run(
+                b_grid_desc, b_grid_buf, b_block_desc, b_block_origin_idx, b_block_buf);
+
+            block_sync_lds();
+
+            bool isFirst = __builtin_amdgcn_s_barrier_signal_isfirst(-1);
+            __builtin_amdgcn_s_barrier_wait(-1);
+
+            if (isFirst)
+                __builtin_amdgcn_s_barrier_signal(-3);
+
+            __builtin_amdgcn_s_barrier_wait(-3);
+
+            //ABlockBuffer a_block_map_buf = map_shared_rank(&a_block_buf, k)[0];
+            //blockwise_gemm.Run(a_block_map_buf, b_block_buf, c_thread_buf);
+            blockwise_gemm.Run(a_block_buf, b_block_buf, c_thread_buf);
+
+            b_blockwise_copy.MoveSrcSliceWindow(b_grid_desc, b_block_copy_step);
+
+            ++k;
+        } while(k < num_loop_in_cluster);
+
+        block_sync_lds();
+
+        a_blockwise_copy.MoveSrcSliceWindow(a_grid_desc, a_block_copy_step);
+        a_blockwise_copy.RunWrite(a_block_desc, a_block_buf);
+
+        // main body
+        if constexpr(HasMainLoop)
+        {
+            index_t i = 0;
+            do
+            {
+                index_t j = 0;
+                do
+                {
+                    b_blockwise_copy.Run(
+                        b_grid_desc, b_grid_buf, b_block_desc, b_block_origin_idx, b_block_buf);
+
+                    block_sync_lds();
+
+                    bool isFirst = __builtin_amdgcn_s_barrier_signal_isfirst(-1);
+                    __builtin_amdgcn_s_barrier_wait(-1);
+
+                    if (isFirst)
+                        __builtin_amdgcn_s_barrier_signal(-3);
+
+                    __builtin_amdgcn_s_barrier_wait(-3);
+
+                    //ABlockBuffer a_block_map_buf = map_shared_rank(&a_block_buf, j)[0];
+                    //blockwise_gemm.Run(a_block_map_buf, b_block_buf, c_thread_buf);  // OOXX
+                    blockwise_gemm.Run(a_block_buf, b_block_buf, c_thread_buf);
+
+                    b_blockwise_copy.MoveSrcSliceWindow(b_grid_desc, b_block_copy_step);
+
+                    ++j;
+                } while(j < num_loop_in_cluster);
+
+                block_sync_lds();
+
+                a_blockwise_copy.RunRead(a_grid_desc, a_grid_buf);
+
+                a_blockwise_copy.MoveSrcSliceWindow(a_grid_desc, a_block_copy_step);
+                a_blockwise_copy.RunWrite(a_block_desc, a_block_buf);
+
+                ++i;
+            } while (i < (num_loop / num_loop_in_cluster -1));
+        }
+    }
+};
+
 template <index_t NumPrefetch, bool AEnableLds, bool BEnableLds>
 struct GridwiseGemmPipeline_v1_WeightOnly;
 
@@ -994,7 +1142,8 @@ struct GridwiseGemmPipeline_v1_WeightOnly<1, true, true>
                                const ScaleGridBuffer& scale_grid_buf,
                                const BlockwiseGemm& blockwise_gemm,
                                CThreadBuffer& c_thread_buf,
-                               index_t num_loop)
+                               index_t num_loop,
+                               index_t num_loop_in_cluster)
     {
         // Global Prefetch Stage 1
         a_blockwise_copy.RunRead(a_grid_desc, a_grid_buf);
@@ -1090,7 +1239,8 @@ struct GridwiseGemmPipelineInterwave_v1<1>
                                const BBlockTransferStep& b_block_copy_step,
                                const BlockwiseGemm& blockwise_gemm,
                                CThreadBuffer& c_thread_buf,
-                               index_t num_loop)
+                               index_t num_loop,
+                               index_t num_loop_in_cluster)
     {
         // preload data into LDS
         a_blockwise_copy.RunRead(a_grid_desc, a_grid_buf);
