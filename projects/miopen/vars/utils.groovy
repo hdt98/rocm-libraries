@@ -215,6 +215,7 @@ def cmake_fin_build_cmd(prefixpath){
 
 def getDockerImageName(dockerArgs)
 {
+    sh "ls ${env.WORKSPACE}/projects/miopen/"
     sh "echo ${dockerArgs} > factors.txt"
     def image = "${env.MIOPEN_DOCKER_IMAGE_URL}"
     sh "md5sum ${env.WORKSPACE}/projects/miopen/Dockerfile ${env.WORKSPACE}/projects/miopen/requirements.txt ${env.WORKSPACE}/projects/miopen/dev-requirements.txt >> factors.txt"
