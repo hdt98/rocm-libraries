@@ -87,7 +87,7 @@ extern "C" {
 *          is invalid.
 *
 *  \par Example
-*  \include example_rocsparse_saxpyi.cpp
+*  \include example_rocsparse_axpyi.cpp
 */
 /**@{*/
 ROCSPARSE_EXPORT
