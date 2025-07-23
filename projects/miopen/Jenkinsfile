@@ -11,8 +11,6 @@ def get_branch_name(){
     return shared_library_branch
 }
 
-library "shared-libraries-monorepo@${get_branch_name()}"
-
 /// Stage name format:
 /// [DataType] Backend[/Compiler] BuildType [TestSet] [Target]
 ///
@@ -32,6 +30,7 @@ library "shared-libraries-monorepo@${get_branch_name()}"
 ///   * "Performance Dataset" is a performance test with a specified dataset.
 /// Target := { gfx908 | gfx90a | gfx94x } [ Xnack+ ]
 
+def utils
 
 def withWorkingDir(Closure body) {
     dir("${env.WORKSPACE}/projects/miopen") {
@@ -176,6 +175,7 @@ pipeline {
             steps{
                 script {
                     withWorkingDir {
+                        utils = load "vars/utils.groovy"
                         utils.getDockerImage()
                     }
                 }
