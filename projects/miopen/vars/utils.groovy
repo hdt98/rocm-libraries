@@ -215,13 +215,9 @@ def cmake_fin_build_cmd(prefixpath){
 
 def getDockerImageName(dockerArgs)
 {
-    sh "echo pwd: `pwd`"
-    echo "workspace: ${env.WORKSPACE}"
-    sh "ls ${env.WORKSPACE}/projects/miopen/"
     sh "echo ${dockerArgs} > ${env.WORKSPACE}/factors.txt"
     def image = "${env.MIOPEN_DOCKER_IMAGE_URL}"
     sh "cd ${env.WORKSPACE}/projects/miopen/ && md5sum Dockerfile requirements.txt dev-requirements.txt >> ${env.WORKSPACE}/factors.txt"
-    sh "cat ${env.WORKSPACE}/factors.txt"
     def docker_hash = sh(script: "cd ${env.WORKSPACE} && md5sum factors.txt | awk '{print \$1}' | head -c 6", returnStdout: true)
     sh "rm ${env.WORKSPACE}/factors.txt"
     echo "Docker tag hash: ${docker_hash}"
@@ -338,7 +334,6 @@ def buildHipClangJob(Map conf=[:]){
 
         def retimage
         gitStatusWrapper(credentialsId: "${env.monorepo_status_wrapper_creds}", gitHubContext: "${variant}", account: 'ROCm', repo: 'rocm-libraries') {
-            echo "credentials ID ====== ${env.monorepo_status_wrapper_creds}"
             try {
                 (retimage, image) = getDockerImage(conf)
                 if (needs_gpu) {
@@ -371,7 +366,6 @@ def buildHipClangJob(Map conf=[:]){
                 {
                     if (lfs_pull) {
                         sh """
-                            echo `pwd`
                             cd ${env.WORKSPACE}/projects/miopen
                             git lfs pull --exclude=
                            """.stripIndent()

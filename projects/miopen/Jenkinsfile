@@ -175,8 +175,6 @@ pipeline {
             steps{
                 script {
                     withWorkingDir {
-                        echo "LOADING UTILS"
-                        sh "echo `pwd`"
                         utils = load "vars/utils.groovy"
                         utils.getDockerImage()
                     }
