@@ -142,7 +142,7 @@ def cmake_build(Map conf=[:]){
     def pre_setup_cmd = """
             echo \$HSA_ENABLE_SDMA
             ulimit -c unlimited
-            cd ${"${env.WORKSPACE}/projects/miopen"}
+            cd ${env.WORKSPACE}/projects/miopen
             rm -rf build
             mkdir build
             rm -rf install
