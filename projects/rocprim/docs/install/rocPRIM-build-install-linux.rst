@@ -33,16 +33,18 @@ You can build and install the rocPRIM library without any examples, tests, or be
     cmake ../.
     make install
 
-To build examples, tests, or benchmarks, use the appropriate CMake directive: 
+Use the appropriate CMake directive: 
 
 * ``BUILD_TEST``: Set to ``ON`` to build the CTests. ``OFF`` by default.
 * ``BUILD_EXAMPLE``: Set to ``ON`` to build examples. ``OFF`` by default.
-* ``BUILD_BENCHMARK``: Set to ``ON`` to build benchmarking tests. ``OFF`` by default.
 * ``BUILD_DOCS``: Set to ``ON`` to build a local copy of the rocPRIM documentation. ``OFF`` by default.
-* ``AMDGPU_TARGETS``: Set this to a specific architecture target or set of architecture targets. When not set, examples, tests, and benchmarks are built for gfx803, gfx900, gfx906, and gfx908 architectures. The list of targets must be separated by a semicolon (``;``).
+* ``BUILD_BENCHMARK``: Set to ``ON`` to build benchmarking tests. ``OFF`` by default.
+* ``BENCHMARK_CONFIG_TUNING``: Set to ``ON`` to find the best kernel configuration parameters for benchmarking. Turning this on might increase compilation time significantly. ``OFF`` by default. 
+* ``AMDGPU_TARGETS``: Set this to build the library, examples, tests, examples, and benchmarks for specific architecture targets. When not set, the examples, tests, and benchmarks are built for gfx803, gfx900:xnack-, gfx906:xnack-, gfx908:xnack-, gfx90a:xnack-, gfx90a:xnack+, gfx942;gfx950, gfx1030, gfx1100, gfx1101, gfx1102, gfx1151, gfx1200, and gfx1201 architectures. The list of targets must be separated by a semicolon (``;``).
+* ``AMDGPU_TEST_TARGETS``: Set this to build tests for a subset of the architectures specified by ``AMDGPU_TARGETS``. When set, copies of the same test will be generated for each of the architectures listed. These tests can be run using ``ctest -R "TARGET_ARCHITECTURE"``. The list of targets must be separated by a semicolon (``;``).
 * ``ONLY_INSTALL``: Set to ``ON`` to ignore any example, test, or benchmark build instructions. ``OFF`` by default.
 
-Run ``make`` after ``cmake`` to build the examples, tests, and benchmarks, then run ``make install``. For example, to build tests run:
+ Run ``make`` after ``cmake`` to build the examples, tests, and benchmarks, then run ``make install``. For example, to build tests run:
 
 .. code:: 
 
