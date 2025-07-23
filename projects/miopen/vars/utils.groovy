@@ -218,7 +218,8 @@ def getDockerImageName(dockerArgs)
     sh "ls ${env.WORKSPACE}/projects/miopen/"
     sh "echo ${dockerArgs} > factors.txt"
     def image = "${env.MIOPEN_DOCKER_IMAGE_URL}"
-    sh "md5sum ${env.WORKSPACE}/projects/miopen/Dockerfile ${env.WORKSPACE}/projects/miopen/requirements.txt ${env.WORKSPACE}/projects/miopen/dev-requirements.txt >> factors.txt"
+    sh "cd ${env.WORKSPACE}/projects/miopen/ && md5sum Dockerfile requirements.txt dev-requirements.txt >> ${env.WORKSPACE}/factors.txt"
+    sh "cat factors.txt"
     def docker_hash = sh(script: "md5sum factors.txt | awk '{print \$1}' | head -c 6", returnStdout: true)
     sh "rm factors.txt"
     echo "Docker tag hash: ${docker_hash}"
