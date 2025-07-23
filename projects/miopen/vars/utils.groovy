@@ -366,11 +366,15 @@ def buildHipClangJob(Map conf=[:]){
                 }
             }
 
-            withDockerContainer(image: image, args: dockerOpts + ' -v=/var/jenkins/:/var/jenkins') {
+            withDockerContainer(image: image, args: dockerOpts + " -v=/var/jenkins/:/var/jenkins -v=${env.WORKSPACE}:${env.WORKSPACE}") {
                 timeout(time: 420, unit:'MINUTES')
                 {
                     if (lfs_pull) {
-                        sh "git lfs pull --exclude="
+                        sh """
+                            echo `pwd`
+                            cd ${env.WORKSPACE}/projects/miopen
+                            git lfs pull --exclude=
+                           """.stripIndent()
                     }
                     cmake_build(conf)
                 }
@@ -409,7 +413,7 @@ def RunPerfTest(Map conf=[:]){
         def results_dir = conf.get("results_dir", "${env.WORKSPACE}/projects/miopen/results")
         docker_image.pull()
         echo "docker image: ${docker_image}"
-        docker_image.inside(dockerOpts + ' -v=/var/jenkins/:/var/jenkins')
+        docker_image.inside(dockerOpts + " -v=/var/jenkins/:/var/jenkins ${env.WORKSPACE}:${env.WORKSPACE}")
         {
             timeout(time: 100, unit: 'MINUTES')
             {
