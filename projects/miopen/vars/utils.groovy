@@ -407,7 +407,7 @@ def RunPerfTest(Map conf=[:]){
         def results_dir = conf.get("results_dir", "${env.WORKSPACE}/${env.REPO_DIR}/results")
         docker_image.pull()
         echo "docker image: ${docker_image}"
-        docker_image.inside(dockerOpts + " -v=/var/jenkins/:/var/jenkins ${env.WORKSPACE}:${env.WORKSPACE}")
+        docker_image.inside(dockerOpts + " -v=/var/jenkins/:/var/jenkins -v=${env.WORKSPACE}:${env.WORKSPACE}")
         {
             timeout(time: 100, unit: 'MINUTES')
             {
