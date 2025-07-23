@@ -1,3 +1,10 @@
+def repoName = scm.getUserRemoteConfigs()[0].getUrl().tokenize('/').last().replace('.git', '')
+
+def repoDir = "./"
+if (repoName == "rocm-libraries") {
+    repoDir = "/projects/miopen"
+}
+
 def rocmnode(name) {
     return '(rocmtest || miopen) && (' + name + ')'
 }
@@ -33,7 +40,7 @@ def get_branch_name(){
 def utils
 
 def withWorkingDir(Closure body) {
-    dir("${env.WORKSPACE}/projects/miopen") {
+    dir("${env.WORKSPACE}/${env.REPO_DIR}") {
         body()
     }
 }
@@ -165,6 +172,7 @@ pipeline {
         Smoke_targets   = " check MIOpenDriver"
         NOCOMGR_flags   = " -DMIOPEN_USE_COMGR=Off"
         NOMLIR_flags    = " -DMIOPEN_USE_MLIR=Off"
+        REPO_DIR        = "${repoDir}"
     }
     stages{
         stage('Build Docker'){
@@ -200,7 +208,7 @@ pipeline {
                 stage('Clang Format') {
                     agent{ label rocmnode("nogpu") }
                     environment{
-                        execute_cmd = "find ./projects/miopen/ -iname \'*.h\' \
+                        execute_cmd = "find ${repoDir} -iname \'*.h\' \
                                 -o -iname \'*.hpp\' \
                                 -o -iname \'*.cpp\' \
                                 -o -iname \'*.h.in\' \

@@ -70,7 +70,7 @@ def cmake_build(Map conf=[:]){
     def build_envs = "CTEST_PARALLEL_LEVEL=4 " + conf.get("build_env","")
     def prefixpath = conf.get("prefixpath","/opt/rocm")
     def build_type_debug = (conf.get("build_type",'release') == 'debug')
-    def miopen_install_path = conf.get("miopen_install_path", "${env.WORKSPACE}/projects/miopen/install")
+    def miopen_install_path = conf.get("miopen_install_path", "${env.WORKSPACE}/${env.REPO_DIR}/install")
 
     def mlir_args = " -DMIOPEN_USE_MLIR=" + conf.get("mlir_build", "ON")
     // WORKAROUND_ISSUE_3192 Disabling MLIR for debug builds since MLIR generates sanitizer errors.
@@ -142,7 +142,7 @@ def cmake_build(Map conf=[:]){
     def pre_setup_cmd = """
             echo \$HSA_ENABLE_SDMA
             ulimit -c unlimited
-            cd ${env.WORKSPACE}/projects/miopen
+            cd ${env.WORKSPACE}/${env.REPO_DIR}
             rm -rf build
             mkdir build
             rm -rf install
@@ -168,7 +168,7 @@ def cmake_build(Map conf=[:]){
         def fin_build_cmd = cmake_fin_build_cmd(miopen_install_path)
         cmd += """
             export RETDIR=\$PWD
-            cd ${env.WORKSPACE}/projects/miopen/fin
+            cd ${env.WORKSPACE}/${env.REPO_DIR}/fin
             ${fin_build_cmd}
             cd \$RETDIR
         """
@@ -217,7 +217,7 @@ def getDockerImageName(dockerArgs)
 {
     sh "echo ${dockerArgs} > ${env.WORKSPACE}/factors.txt"
     def image = "${env.MIOPEN_DOCKER_IMAGE_URL}"
-    sh "cd ${env.WORKSPACE}/projects/miopen/ && md5sum Dockerfile requirements.txt dev-requirements.txt >> ${env.WORKSPACE}/factors.txt"
+    sh "cd ${env.WORKSPACE}/${env.REPO_DIR}/ && md5sum Dockerfile requirements.txt dev-requirements.txt >> ${env.WORKSPACE}/factors.txt"
     def docker_hash = sh(script: "cd ${env.WORKSPACE} && md5sum factors.txt | awk '{print \$1}' | head -c 6", returnStdout: true)
     sh "rm ${env.WORKSPACE}/factors.txt"
     echo "Docker tag hash: ${docker_hash}"
@@ -274,7 +274,7 @@ def getDockerImage(Map conf=[:])
     catch(Exception ex)
     {
         echo "Building image..."
-        dockerImage = docker.build("${image}", "${dockerArgs} ${env.WORKSPACE}/projects/miopen/.")
+        dockerImage = docker.build("${image}", "${dockerArgs} ${env.WORKSPACE}/${env.REPO_DIR}/.")
         withDockerRegistry([ credentialsId: "docker_test_cred", url: "" ]) {
             dockerImage.push()
         }
@@ -284,7 +284,7 @@ def getDockerImage(Map conf=[:])
     if(params.INSTALL_MIOPEN == 'ON')
     {
         def freckle = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-        dockerArgs = " --build-arg BASE_DOCKER=${image} --build-arg FRECKLE=${freckle} -f ${env.WORKSPACE}/projects/miopen/Dockerfile.perftests"
+        dockerArgs = " --build-arg BASE_DOCKER=${image} --build-arg FRECKLE=${freckle} -f ${env.WORKSPACE}/${env.REPO_DIR}/Dockerfile.perftests"
 
         // Get updated image name for perf tests.
         image = getDockerImageName(dockerArgs)
@@ -301,7 +301,7 @@ def getDockerImage(Map conf=[:])
         }
         catch(Exception ex)
         {
-            dockerImage = docker.build("${image}", "${dockerArgs} -f ${env.WORKSPACE}/projects/miopen/.")
+            dockerImage = docker.build("${image}", "${dockerArgs} -f ${env.WORKSPACE}/${env.REPO_DIR}/.")
             withDockerRegistry([ credentialsId: "docker_test_cred", url: "" ]) {
                 dockerImage.push()
             }
@@ -366,7 +366,7 @@ def buildHipClangJob(Map conf=[:]){
                 {
                     if (lfs_pull) {
                         sh """
-                            cd ${env.WORKSPACE}/projects/miopen
+                            cd ${env.WORKSPACE}/${env.REPO_DIR}
                             git lfs pull --exclude=
                            """.stripIndent()
                     }
@@ -404,7 +404,7 @@ def RunPerfTest(Map conf=[:]){
     try {
         def docker_image = conf.get("docker_image")
         def miopen_install_path = conf.get("miopen_install_path", "/opt/rocm")
-        def results_dir = conf.get("results_dir", "${env.WORKSPACE}/projects/miopen/results")
+        def results_dir = conf.get("results_dir", "${env.WORKSPACE}/${env.REPO_DIR}/results")
         docker_image.pull()
         echo "docker image: ${docker_image}"
         docker_image.inside(dockerOpts + " -v=/var/jenkins/:/var/jenkins ${env.WORKSPACE}:${env.WORKSPACE}")
