@@ -624,14 +624,14 @@ struct GridwiseConvMultipleD_Wcnn_CShuffle
     static constexpr index_t DataTileHeight = 4;
     static constexpr index_t H_Pad          = (FilterSize == 3) ? DataTileHeight : 0;
     static constexpr index_t W_Pad = ((FilterSize == 3) && !EnableSpatialCluster) ? WPerWcnn : 0;
-    static constexpr index_t HPerBlockIn    = HPerBlock + H_Pad * 2;
-    static constexpr index_t WPerBlockIn    = WPerBlock + W_Pad * 2;
-    static constexpr index_t HPerWave       = HRepeat * HPerWcnn;
-    static constexpr index_t WPerWave       = WRepeat * WPerWcnn;
-    static constexpr index_t CPerWave       = CPerBlock;
-    static constexpr index_t KPerWave       = KPerBlock;
-    static constexpr index_t HPerWaveIn     = HPerWave + H_Pad * 2;
-    static constexpr index_t WPerWaveIn     = WPerWave + W_Pad * 2;
+    static constexpr index_t HPerBlockIn = HPerBlock + H_Pad * 2;
+    static constexpr index_t WPerBlockIn = WPerBlock + W_Pad * 2;
+    static constexpr index_t HPerWave    = HRepeat * HPerWcnn;
+    static constexpr index_t WPerWave    = WRepeat * WPerWcnn;
+    static constexpr index_t CPerWave    = CPerBlock;
+    static constexpr index_t KPerWave    = KPerBlock;
+    static constexpr index_t HPerWaveIn  = HPerWave + H_Pad * 2;
+    static constexpr index_t WPerWaveIn  = WPerWave + W_Pad * 2;
 
     template <typename DLayout>
     static constexpr bool IsGNHWKLayout()
@@ -1880,8 +1880,8 @@ struct GridwiseConvMultipleD_Wcnn_CShuffle
     using DefaultBlock2CTileMap =
         remove_cvref_t<decltype(MakeDefaultBlock2CTileMap(EGridDesc{}, 1, 1))>;
 
-    static constexpr auto in_block_desc  = MakeInBlockDescriptor();
-    static constexpr auto wei_block_desc = MakeWeiBlockDescriptor();
+    static constexpr auto in_block_desc                = MakeInBlockDescriptor();
+    static constexpr auto wei_block_desc               = MakeWeiBlockDescriptor();
     static constexpr auto in_cluster_border_block_desc = MakeInClusterBorderBlockDescriptor<true>();
     static constexpr auto in_wavegroup_border_block_desc =
         MakeInClusterBorderBlockDescriptor<false>();

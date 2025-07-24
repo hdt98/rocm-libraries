@@ -5,7 +5,11 @@
 
 #include "ck_tile/core/config.hpp"
 #include "ck_tile/core/arch/arch.hpp"
+#if __clang_major__ == 20
+#include "ck_tile/core/arch/amd_buffer_addressing_builtins.hpp"
+#else
 #include "ck_tile/core/arch/amd_buffer_addressing.hpp"
+#endif
 #include "ck_tile/core/arch/generic_memory_space_atomic.hpp"
 #include "ck_tile/core/container/array.hpp"
 #include "ck_tile/core/numeric/integer.hpp"
@@ -153,6 +157,28 @@ struct buffer_view<address_space_enum::generic,
         {
             return X{invalid_element_value_};
         }
+    }
+
+    /*
+    In the generic address space, we do not support the transpose instruction in the buffer view.
+    Will report compilation error when developer wants to use it.
+    */
+    template <typename X,
+              bool oob_conditional_check = true,
+              typename std::enable_if<
+                  std::is_same<typename vector_traits<remove_cvref_t<X>>::scalar_type,
+                               typename vector_traits<remove_cvref_t<T>>::scalar_type>::value,
+                  bool>::type = false>
+    CK_TILE_DEVICE constexpr auto transpose_get(index_t i,
+                                                index_t linear_offset,
+                                                bool is_valid_element,
+                                                bool_constant<oob_conditional_check> = {}) const
+    {
+        static_assert(false, "Error: transpose load not supported in global memory space.");
+        ignore = i;
+        ignore = linear_offset;
+        ignore = is_valid_element;
+        return;
     }
 
     // i is offset of T, not X. i should be aligned to X
@@ -440,6 +466,28 @@ struct buffer_view<address_space_enum::global,
 
         amd_async_load_global_to_lds<remove_cvref_t<T>, t_per_x, Coherence>(
             p_data_, src_offset, dst_buf.p_data_, dst_offset, is_src_valid, is_dst_valid);
+    }
+
+    /*
+    In the global memory address space, we do not support the transpose instruction in the buffer
+    view. Will report compilation error when developer wants to use it.
+    */
+    template <typename X,
+              bool oob_conditional_check = true,
+              typename std::enable_if<
+                  std::is_same<typename vector_traits<remove_cvref_t<X>>::scalar_type,
+                               typename vector_traits<remove_cvref_t<T>>::scalar_type>::value,
+                  bool>::type = false>
+    CK_TILE_DEVICE constexpr auto transpose_get(index_t i,
+                                                index_t linear_offset,
+                                                bool is_valid_element,
+                                                bool_constant<oob_conditional_check> = {}) const
+    {
+        static_assert(false, "Error: transpose load not supported in global memory space.");
+        ignore = i;
+        ignore = linear_offset;
+        ignore = is_valid_element;
+        return;
     }
 
     // i is offset of T, not X. i should be aligned to X
@@ -974,6 +1022,47 @@ struct buffer_view<address_space_enum::lds,
                                           bool_constant<pre_nop> = {}) const
     {
         smem_load<sizeof(X)>{}(dst, v_offset * sizeof(T), i_offset * sizeof(T));
+    }
+
+    template <typename X,
+              typename std::enable_if<
+                  std::is_same<typename vector_traits<remove_cvref_t<X>>::scalar_type,
+                               typename vector_traits<remove_cvref_t<T>>::scalar_type>::value,
+                  bool>::type = false>
+    CK_TILE_DEVICE constexpr auto transpose_get([[maybe_unused]] index_t i,
+                                                [[maybe_unused]] index_t linear_offset,
+                                                bool is_valid_element) const
+    {
+        // X contains multiple T
+        constexpr index_t scalar_per_t_vector = vector_traits<remove_cvref_t<T>>::vector_size;
+
+        constexpr index_t scalar_per_x_vector = vector_traits<remove_cvref_t<X>>::vector_size;
+
+        static_assert(scalar_per_x_vector % scalar_per_t_vector == 0,
+                      "wrong! X should contain multiple T");
+
+        if(is_valid_element)
+        {
+#if defined(__gfx950__)
+            constexpr index_t t_per_x               = scalar_per_x_vector / scalar_per_t_vector;
+            constexpr address_space_enum addr_space = get_address_space();
+            return amd_transpose_load_to_vgpr<remove_cvref_t<T>, t_per_x, addr_space>(
+                p_data_ + i + linear_offset);
+#else
+            return X{numeric<remove_cvref_t<T>>::zero()};
+#endif
+        }
+        else
+        {
+            if constexpr(InvalidElementUseNumericalZeroValue)
+            {
+                return X{numeric<remove_cvref_t<T>>::zero()};
+            }
+            else
+            {
+                return X{invalid_element_value_};
+            }
+        }
     }
 
     // i is offset of T, not X. i should be aligned to X

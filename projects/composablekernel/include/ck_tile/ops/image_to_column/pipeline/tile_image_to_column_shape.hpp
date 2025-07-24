@@ -27,7 +27,7 @@ struct TileImageToColumnShape
     static constexpr index_t kKWarpPerBlock = kKPerBlock / kKPerWarp;
     static constexpr index_t kWarpSize      = get_warp_size();
 
-    static constexpr index_t kBlockSize = kWarpSize * kMWarpPerBlock * kKWarpPerBlock;
+    static constexpr index_t kBlockSize = get_warp_size() * kMWarpPerBlock * kKWarpPerBlock;
 };
 
 } // namespace ck_tile

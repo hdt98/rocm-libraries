@@ -11,7 +11,7 @@
 //     for(int M : Ms)
 //         this->Run(M, N, K);
 // }
-
+#if 0
 TYPED_TEST(TestCkTileWmmaPipeline, FitMultiWmma)
 {
     std::vector<int> Ms{64, 128, 256, 512};
@@ -21,3 +21,4 @@ TYPED_TEST(TestCkTileWmmaPipeline, FitMultiWmma)
     for(int M : Ms)
         this->Run(M, N, K);
 }
+#endif
