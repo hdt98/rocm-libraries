@@ -282,7 +282,7 @@ struct DynamicBuffer
               index_t NumThreadsPerTile,
               index_t NumVgprsPerTile>
     __host__ __device__ void
-    tileStore(const X& x, index_t dst_offset, bool is_dst_valid, index_t thread_id) const
+    tileStore(const X& x, index_t dst_offset) const
     {
         // Copy data from global to LDS memory using direct loads.
         __attribute__((address_space(1))) const T* global_ptr =
@@ -291,7 +291,7 @@ struct DynamicBuffer
         amd_tile_store_to_buffer<remove_cvref_t<T>,
                                  NumElemsPerThread,
                                  NumThreadsPerTile,
-                                 NumVgprsPerTile>(x, global_ptr, is_dst_valid, thread_id);
+                                 NumVgprsPerTile>(x, global_ptr);
     }
 
     template <typename X,

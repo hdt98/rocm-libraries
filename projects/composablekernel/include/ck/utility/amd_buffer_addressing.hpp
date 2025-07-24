@@ -1392,12 +1392,8 @@ __device__ auto amd_tile_load_to_vgpr(__attribute__((address_space(1))) const T*
 template <typename T, index_t N, index_t NumThreadsPerTile, index_t NumVgprsPerTile>
 __device__ void
 amd_tile_store_to_buffer(const typename vector_type_maker<T, N>::type::type src_thread_data,
-                         __attribute__((address_space(1))) const T* in_ptr,
-                         bool dst_thread_element_valid,
-                         index_t thread_id)
+                         __attribute__((address_space(1))) const T* in_ptr)
 {
-    // uint32_t dst_addr_shift = dst_thread_element_valid ? 0 : 0x80000000; Todo add for invalid
-    // addr
 #if defined(__gfx13__)
     if constexpr((NumThreadsPerTile == 2) && (NumVgprsPerTile == 2))
     {
@@ -1506,8 +1502,6 @@ amd_tile_store_to_buffer(const typename vector_type_maker<T, N>::type::type src_
 #else
     ignore = src_thread_data;
     ignore = in_ptr;
-    ignore = dst_thread_element_valid;
-    ignore = thread_id;
 #endif
 }
 
