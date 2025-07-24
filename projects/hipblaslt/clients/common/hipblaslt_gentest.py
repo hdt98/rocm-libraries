@@ -396,11 +396,13 @@ def instantiate(test):
 
     try:
         setdefaults(test)
-
         # For enum arguments, replace name with value
         for typename in enum_args:
-            if test[typename] in datatypes:
-                test[typename] = datatypes[test[typename]]
+            dt = test[typename]
+            if typename == "compute_type" and not dt.startswith("c_"):
+                dt = "c_" + dt
+            if dt in datatypes:
+                test[typename] = datatypes[dt]
 
         known_bug_platforms = set()
 
