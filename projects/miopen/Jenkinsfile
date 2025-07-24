@@ -173,6 +173,7 @@ pipeline {
         NOCOMGR_flags   = " -DMIOPEN_USE_COMGR=Off"
         NOMLIR_flags    = " -DMIOPEN_USE_MLIR=Off"
         REPO_DIR        = "${repoDir}"
+        REPO_NAME       = "${repoName}"
     }
     stages{
         stage('Build Docker'){
