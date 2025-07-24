@@ -14,3 +14,32 @@ jobs:
         run: |
           curl -X POST "https://readthedocs.com/api/v3/projects/advanced-micro-devices-monorepo-rocprim/versions/latest/builds/" \
                -H "Authorization: Token ${{ secrets.RTD_API_TOKEN }}"
+jobs:
+  trigger-rtd:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Detect changed project
+        id: detect
+        run: |
+          echo "Looking for modified top-level project folders..."
+
+          changed=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep '^projects/' | cut -d/ -f2 | sort -u)
+          echo "Changed projects: $changed"
+
+          # Assuming only one project is changed per commit
+          for project in $changed; do
+            echo "PROJECT=$project" >> $GITHUB_OUTPUT
+            exit 0
+          done
+
+          echo "No relevant project changes detected."
+          exit 1
+
+      - name: Trigger RTD build
+        if: steps.detect.outputs.PROJECT != ''
+        run: |
+          PROJECT=${{ steps.detect.outputs.PROJECT }}
+          echo "Triggering RTD build for $PROJECT"
+
+          curl -X POST "https://readthedocs.org/api/v3/projects/advanced-micro-devices-monorepo-$PROJECT/versions/latest/builds/" \
+           -H "Authorization: Token ${{ secrets.RTD_API_TOKEN }}"
