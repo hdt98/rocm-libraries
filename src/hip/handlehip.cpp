@@ -545,10 +545,6 @@ Program Handle::LoadProgram(const fs::path& program_name,
 
     std::string orig_params = params; // make a copy for target ID fallback
 
-#if WORKAROUND_ISSUE_3001
-    if(program_name.extension() != ".mlir")
-        params = params + " -mcpu=" + this->GetTargetProperties().Name();
-#else
     if(program_name.extension() == ".mlir")
     { // no -mcpu
     }
@@ -560,7 +556,6 @@ Program Handle::LoadProgram(const fs::path& program_name,
     {
         params += " -mcpu=" + this->GetTargetProperties().Name();
     }
-#endif
 
     auto hsaco = miopen::LoadBinary(
         this->GetTargetProperties(), this->GetMaxComputeUnits(), program_name, params);
