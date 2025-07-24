@@ -1,0 +1,124 @@
+#include <iostream>
+#include <rocsparse.h>
+#include <hip/hip_runtime.h>
+
+#define HIP_CHECK(stat)                                                        \
+    {                                                                          \
+        if(stat != hipSuccess)                                                 \
+        {                                                                      \
+            std::cerr << "Error: hip error " << stat << " in line " << __LINE__ << std::endl; \
+            return -1;                                                         \
+        }                                                                      \
+    }
+
+#define ROCSPARSE_CHECK(stat)                                                        \
+    {                                                                                \
+        if(stat != rocsparse_status_success)                                         \
+        {                                                                            \
+            std::cerr << "Error: rocsparse error " << stat << " in line " << __LINE__ << std::endl; \
+            return -1;                                                               \
+        }                                                                            \
+    }
+
+int main()
+{
+    // alpha * ( 1.0  0.0  2.0 ) * ( 1.0 ) + beta * ( 4.0 ) = (  31.1 )
+    //         ( 3.0  0.0  4.0 ) * ( 2.0 )          ( 5.0 ) = (  62.0 )
+    //         ( 5.0  6.0  0.0 ) * ( 3.0 )          ( 6.0 ) = (  70.7 )
+    //         ( 7.0  0.0  8.0 ) *                  ( 7.0 ) = ( 123.8 )
+
+    // GEBSR block dimensions
+    rocsparse_int row_block_dim = 2;
+    rocsparse_int col_block_dim = 3;
+
+    // Number of block rows and columns
+    rocsparse_int mb = 2;
+    rocsparse_int nb = 1;
+
+    // Number of non-zero blocks
+    rocsparse_int nnzb = 2;
+
+    // BSR row pointers
+    rocsparse_int hbsr_row_ptr[3] = {0, 1, 2};
+
+    // BSR column indices
+    rocsparse_int hbsr_col_ind[2] = {0, 0};
+
+    // BSR values
+    double hbsr_val[16] = {1.0, 3.0, 0.0, 0.0, 2.0, 4.0, 5.0, 7.0, 6.0, 0.0, 0.0, 8.0};
+
+    // Block storage in column major
+    rocsparse_direction dir = rocsparse_direction_column;
+
+    // Transposition of the matrix
+    rocsparse_operation trans = rocsparse_operation_none;
+
+    // Scalar alpha and beta
+    double alpha = 3.7;
+    double beta  = 1.3;
+
+    // x and y
+    double hx[4] = {1.0, 2.0, 3.0, 0.0};
+    double hy[4] = {4.0, 5.0, 6.0, 7.0};
+
+    // rocSPARSE handle
+    rocsparse_handle handle;
+    ROCSPARSE_CHECK(rocsparse_create_handle(&handle));
+
+    // Matrix descriptor
+    rocsparse_mat_descr descr;
+    ROCSPARSE_CHECK(rocsparse_create_mat_descr(&descr));
+
+    // Offload data to device
+    rocsparse_int* dbsr_row_ptr;
+    rocsparse_int* dbsr_col_ind;
+    double*        dbsr_val;
+    double*        dx;
+    double*        dy;
+
+    HIP_CHECK(hipMalloc((void**)&dbsr_row_ptr, sizeof(rocsparse_int) * (mb + 1)));
+    HIP_CHECK(hipMalloc((void**)&dbsr_col_ind, sizeof(rocsparse_int) * nnzb));
+    HIP_CHECK(hipMalloc((void**)&dbsr_val, sizeof(double) * nnzb * row_block_dim * col_block_dim));
+    HIP_CHECK(hipMalloc((void**)&dx, sizeof(double) * nb * col_block_dim));
+    HIP_CHECK(hipMalloc((void**)&dy, sizeof(double) * mb * row_block_dim));
+
+    HIP_CHECK(hipMemcpy(dbsr_row_ptr, hbsr_row_ptr, sizeof(rocsparse_int) * (mb + 1), hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(dbsr_col_ind, hbsr_col_ind, sizeof(rocsparse_int) * nnzb, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(dbsr_val, hbsr_val, sizeof(double) * nnzb * row_block_dim * col_block_dim, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(dx, hx, sizeof(double) * nb * col_block_dim, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(dy, hy, sizeof(double) * mb * row_block_dim, hipMemcpyHostToDevice));
+
+    // Call dbsrmv to perform y = alpha * A x + beta * y
+    ROCSPARSE_CHECK(rocsparse_dgebsrmv(handle,
+                        dir,
+                        trans,
+                        mb,
+                        nb,
+                        nnzb,
+                        &alpha,
+                        descr,
+                        dbsr_val,
+                        dbsr_row_ptr,
+                        dbsr_col_ind,
+                        row_block_dim,
+                        col_block_dim,
+                        dx,
+                        &beta,
+                        dy));
+
+    // Copy result back to host
+    HIP_CHECK(hipMemcpy(hy, dy, sizeof(double) * mb * row_block_dim, hipMemcpyDeviceToHost));
+
+    // Clear rocSPARSE
+    ROCSPARSE_CHECK(rocsparse_destroy_mat_descr(descr));
+    ROCSPARSE_CHECK(rocsparse_destroy_handle(handle));
+
+    // Clear device memory
+    HIP_CHECK(hipFree(dbsr_row_ptr));
+    HIP_CHECK(hipFree(dbsr_col_ind));
+    HIP_CHECK(hipFree(dbsr_val));
+    HIP_CHECK(hipFree(dx));
+    HIP_CHECK(hipFree(dy));
+
+    return 0;
+}

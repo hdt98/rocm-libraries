@@ -1,0 +1,133 @@
+#include <iostream>
+#include <vector>
+#include <rocsparse.h>
+#include <hip/hip_runtime.h>
+
+#define HIP_CHECK(stat)                                                        \
+    {                                                                          \
+        if(stat != hipSuccess)                                                 \
+        {                                                                      \
+            std::cerr << "Error: hip error " << stat << " in line " << __LINE__ << std::endl; \
+            return -1;                                                         \
+        }                                                                      \
+    }
+
+#define ROCSPARSE_CHECK(stat)                                                        \
+    {                                                                                \
+        if(stat != rocsparse_status_success)                                         \
+        {                                                                            \
+            std::cerr << "Error: rocsparse error " << stat << " in line " << __LINE__ << std::endl; \
+            return -1;                                                               \
+        }                                                                            \
+    }
+
+int main()
+{
+    // Size of each square tridiagonal matrix
+    int m = 6;
+
+    // Number of batches
+    int batch_count = 4;
+
+    // Batch stride
+    int batch_stride = m;
+
+    // Host tridiagonal matrix
+    std::vector<float> hdl(batch_stride * batch_count);
+    std::vector<float> hd(batch_stride * batch_count);
+    std::vector<float> hdu(batch_stride * batch_count);
+
+    // Solve multiple tridiagonal matrix systems:
+    //
+    //      4 2 0 0 0 0        5 3 0 0 0 0        6 4 0 0 0 0        7 5 0 0 0 0
+    //      2 4 2 0 0 0        3 5 3 0 0 0        4 6 4 0 0 0        5 7 5 0 0 0
+    // A1 = 0 2 4 2 0 0   A2 = 0 3 5 3 0 0   A3 = 0 4 6 4 0 0   A4 = 0 5 7 5 0 0
+    //      0 0 2 4 2 0        0 0 3 5 3 0        0 0 4 6 4 0        0 0 5 7 5 0
+    //      0 0 0 2 4 2        0 0 0 3 5 3        0 0 0 4 6 4        0 0 0 5 7 5
+    //      0 0 0 0 2 4        0 0 0 0 3 5        0 0 0 0 4 6        0 0 0 0 5 7
+    //
+    // hdl = 0 2 2 2 2 2 0 3 3 3 3 3 0 4 4 4 4 4 0 5 5 5 5 5
+    // hd  = 4 4 4 4 4 4 5 5 5 5 5 5 6 6 6 6 6 6 7 7 7 7 7 7
+    // hdu = 2 2 2 2 2 0 3 3 3 3 3 0 4 4 4 4 4 0 5 5 5 5 5 0
+    for(int b = 0; b < batch_count; ++b)
+    {
+        for(rocsparse_int i = 0; i < m; ++i)
+        {
+            hdl[batch_stride * b + i] = 2 + b;
+            hd[batch_stride * b + i]  = 4 + b;
+            hdu[batch_stride * b + i] = 2 + b;
+        }
+
+        hdl[batch_stride * b + 0]       = 0.0f;
+        hdu[batch_stride * b + (m - 1)] = 0.0f;
+    }
+
+    // Host dense rhs
+    std::vector<float> hx(batch_stride * batch_count);
+
+    for(int b = 0; b < batch_count; ++b)
+    {
+        for(int i = 0; i < m; ++i)
+        {
+            hx[batch_stride * b + i] = static_cast<float>(b + 1);
+        }
+    }
+
+    float* ddl = nullptr;
+    float* dd = nullptr;
+    float* ddu = nullptr;
+    float* dx = nullptr;
+    HIP_CHECK(hipMalloc((void**)&ddl, sizeof(float) * batch_stride * batch_count));
+    HIP_CHECK(hipMalloc((void**)&dd, sizeof(float) * batch_stride * batch_count));
+    HIP_CHECK(hipMalloc((void**)&ddu, sizeof(float) * batch_stride * batch_count));
+    HIP_CHECK(hipMalloc((void**)&dx, sizeof(float) * batch_stride * batch_count));
+
+    HIP_CHECK(hipMemcpy(ddl, hdl.data(), sizeof(float) * batch_stride * batch_count, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(dd, hd.data(), sizeof(float) * batch_stride * batch_count, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(ddu, hdu.data(), sizeof(float) * batch_stride * batch_count, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(dx, hx.data(), sizeof(float) * batch_stride * batch_count, hipMemcpyHostToDevice));
+
+    // rocSPARSE handle
+    rocsparse_handle handle;
+    ROCSPARSE_CHECK(rocsparse_create_handle(&handle));
+
+    // Obtain required buffer size
+    size_t buffer_size;
+    ROCSPARSE_CHECK(rocsparse_sgtsv_no_pivot_strided_batch_buffer_size(handle,
+                                                       m,
+                                                       ddl,
+                                                       dd,
+                                                       ddu,
+                                                       dx,
+                                                       batch_count,
+                                                       batch_stride,
+                                                       &buffer_size));
+
+    void* dbuffer;
+    HIP_CHECK(hipMalloc(&dbuffer, buffer_size));
+
+    ROCSPARSE_CHECK(rocsparse_sgtsv_no_pivot_strided_batch(handle,
+                                           m,
+                                           ddl,
+                                           dd,
+                                           ddu,
+                                           dx,
+                                           batch_count,
+                                           batch_stride,
+                                           dbuffer));
+
+    // Copy right-hand side to host
+    HIP_CHECK(hipMemcpy(hx.data(), dx, sizeof(float) * batch_stride * batch_count, hipMemcpyDeviceToHost));
+
+    // Clear rocSPARSE
+    ROCSPARSE_CHECK(rocsparse_destroy_handle(handle));
+
+    // Clear device memory
+    HIP_CHECK(hipFree(ddl));
+    HIP_CHECK(hipFree(dd));
+    HIP_CHECK(hipFree(ddu));
+    HIP_CHECK(hipFree(dx));
+    HIP_CHECK(hipFree(dbuffer));
+
+    return 0;
+}

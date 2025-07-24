@@ -1,0 +1,100 @@
+#include <iostream>
+#include <rocsparse.h>
+#include <hip/hip_runtime.h>
+
+#define HIP_CHECK(stat)                                                        \
+    {                                                                          \
+        if(stat != hipSuccess)                                                 \
+        {                                                                      \
+            std::cerr << "Error: hip error " << stat << " in line " << __LINE__ << std::endl; \
+            return -1;                                                         \
+        }                                                                      \
+    }
+
+#define ROCSPARSE_CHECK(stat)                                                        \
+    {                                                                                \
+        if(stat != rocsparse_status_success)                                         \
+        {                                                                            \
+            std::cerr << "Error: rocsparse error " << stat << " in line " << __LINE__ << std::endl; \
+            return -1;                                                               \
+        }                                                                            \
+    }
+
+int main()
+{
+    // rocSPARSE handle
+    rocsparse_handle handle;
+    ROCSPARSE_CHECK(rocsparse_create_handle(&handle));
+
+    rocsparse_mat_descr descr;
+    ROCSPARSE_CHECK(rocsparse_create_mat_descr(&descr));
+
+    // Number of rows and columns
+    rocsparse_int m = 3;
+    rocsparse_int n = 5;
+
+    // Dense matrix A in column-major
+    rocsparse_int lda    = m;
+    double        hA[15] = {9, 14, 19, 10, 15, 20, 11, 16, 21, 12, 17, 22, 13, 18, 23};
+
+    // Number of non-zero entries
+    rocsparse_int nnz = 3;
+
+    // Vector x indices
+    rocsparse_int hx_ind[3] = {0, 1, 3};
+ 
+    // Vector x values
+    double hx_val[3] = {1, 2, 3};
+
+    // Vector y values
+    double hy[3] = {4, 5, 6};
+
+    // Scalar alpha and beta
+    double alpha = 3.7;
+    double beta  = 1.3;
+
+    // Matrix operation
+    rocsparse_operation trans = rocsparse_operation_none;
+
+    // Index base
+    rocsparse_index_base base = rocsparse_index_base_zero;
+
+    // Offload data to device
+    double*        dA;
+    rocsparse_int* dx_ind;
+    double*        dx_val;
+    double*        dy;
+    HIP_CHECK(hipMalloc((void**)&dA, sizeof(double) * m * n));
+    HIP_CHECK(hipMalloc((void**)&dx_ind, sizeof(rocsparse_int) * nnz));
+    HIP_CHECK(hipMalloc((void**)&dx_val, sizeof(double) * nnz));
+    HIP_CHECK(hipMalloc((void**)&dy, sizeof(double) * m));
+
+    HIP_CHECK(hipMemcpy(dA, hA, sizeof(double) * m * n, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(dx_ind, hx_ind, sizeof(rocsparse_int) * nnz, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(dx_val, hx_val, sizeof(double) * nnz, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(dy, hy, sizeof(double) * m, hipMemcpyHostToDevice));
+
+    // Obtain buffer size
+    size_t buffer_size;
+    ROCSPARSE_CHECK(rocsparse_dgemvi_buffer_size(handle, trans, m, n, nnz, &buffer_size));
+ 
+    void* buffer;
+    HIP_CHECK(hipMalloc(&buffer, buffer_size));
+
+    // Call dgemvi
+    ROCSPARSE_CHECK(rocsparse_dgemvi(handle, trans, m, n, &alpha, dA, lda, nnz, dx_val, dx_ind, &beta, dy, base, buffer));
+
+    // Copy result back to host
+    HIP_CHECK(hipMemcpy(hy, dy, sizeof(double) * m, hipMemcpyDeviceToHost));
+
+    // Clear rocSPARSE
+    ROCSPARSE_CHECK(rocsparse_destroy_handle(handle));
+
+    // Clear device memory
+    HIP_CHECK(hipFree(dA));
+    HIP_CHECK(hipFree(dx_ind));
+    HIP_CHECK(hipFree(dx_val));
+    HIP_CHECK(hipFree(dy));
+    HIP_CHECK(hipFree(buffer));
+    return 0;
+}

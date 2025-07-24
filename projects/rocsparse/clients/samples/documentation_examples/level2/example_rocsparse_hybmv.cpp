@@ -1,0 +1,95 @@
+#include <iostream>
+#include <rocsparse.h>
+#include <hip/hip_runtime.h>
+
+#define HIP_CHECK(stat)                                                        \
+    {                                                                          \
+        if(stat != hipSuccess)                                                 \
+        {                                                                      \
+            std::cerr << "Error: hip error " << stat << " in line " << __LINE__ << std::endl; \
+            return -1;                                                         \
+        }                                                                      \
+    }
+
+#define ROCSPARSE_CHECK(stat)                                                        \
+    {                                                                                \
+        if(stat != rocsparse_status_success)                                         \
+        {                                                                            \
+            std::cerr << "Error: rocsparse error " << stat << " in line " << __LINE__ << std::endl; \
+            return -1;                                                               \
+        }                                                                            \
+    }
+
+int main()
+{
+    // rocSPARSE handle
+    rocsparse_handle handle;
+    ROCSPARSE_CHECK(rocsparse_create_handle(&handle));
+
+    // A sparse matrix
+    // 1 0 3 4
+    // 0 0 5 1
+    // 0 2 0 0
+    // 4 0 0 8
+    rocsparse_int hAptr[5] = {0, 3, 5, 6, 8};
+    rocsparse_int hAcol[8] = {0, 2, 3, 2, 3, 1, 0, 3};
+    double        hAval[8] = {1.0, 3.0, 4.0, 5.0, 1.0, 2.0, 4.0, 8.0};
+
+    rocsparse_int m = 4;
+    rocsparse_int n = 4;
+    rocsparse_int nnz = 8;
+
+    double halpha = 1.0;
+    double hbeta  = 0.0;
+
+    double  hx[4] = {1.0, 2.0, 3.0, 4.0};
+    double  hy[4] = {4.0, 5.0, 6.0, 7.0};
+
+    // Matrix descriptor
+    rocsparse_mat_descr descrA;
+    ROCSPARSE_CHECK(rocsparse_create_mat_descr(&descrA));
+
+    // Offload data to device
+    rocsparse_int* dAptr = NULL;
+    rocsparse_int* dAcol = NULL;
+    double*        dAval = NULL;
+    double*        dx    = NULL;
+    double*        dy    = NULL;
+
+    HIP_CHECK(hipMalloc((void**)&dAptr, sizeof(rocsparse_int) * (m + 1)));
+    HIP_CHECK(hipMalloc((void**)&dAcol, sizeof(rocsparse_int) * nnz));
+    HIP_CHECK(hipMalloc((void**)&dAval, sizeof(double) * nnz));
+    HIP_CHECK(hipMalloc((void**)&dx, sizeof(double) * n));
+    HIP_CHECK(hipMalloc((void**)&dy, sizeof(double) * m));
+
+    HIP_CHECK(hipMemcpy(dAptr, hAptr, sizeof(rocsparse_int) * (m + 1), hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(dAcol, hAcol, sizeof(rocsparse_int) * nnz, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(dAval, hAval, sizeof(double) * nnz, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(dx, hx, sizeof(double) * n, hipMemcpyHostToDevice));
+
+    // Convert CSR matrix to HYB format
+    rocsparse_hyb_mat hybA;
+    ROCSPARSE_CHECK(rocsparse_create_hyb_mat(&hybA));
+
+    ROCSPARSE_CHECK(rocsparse_dcsr2hyb(handle, m, n, descrA, dAval, dAptr, dAcol, hybA, 0, rocsparse_hyb_partition_auto));
+
+    // Clean up CSR structures
+    HIP_CHECK(hipFree(dAptr));
+    HIP_CHECK(hipFree(dAcol));
+    HIP_CHECK(hipFree(dAval));
+
+    // Call rocsparse hybmv
+    ROCSPARSE_CHECK(rocsparse_dhybmv(handle, rocsparse_operation_none, &halpha, descrA, hybA, dx, &hbeta, dy));
+
+    // Copy result back to host
+    HIP_CHECK(hipMemcpy(hy, dy, sizeof(double) * m, hipMemcpyDeviceToHost));
+
+    // Clear up on device
+    ROCSPARSE_CHECK(rocsparse_destroy_hyb_mat(hybA));
+    ROCSPARSE_CHECK(rocsparse_destroy_mat_descr(descrA));
+    ROCSPARSE_CHECK(rocsparse_destroy_handle(handle));
+
+    HIP_CHECK(hipFree(dx));
+    HIP_CHECK(hipFree(dy));
+    return 0;
+}
