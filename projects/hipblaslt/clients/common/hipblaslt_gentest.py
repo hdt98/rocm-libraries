@@ -119,6 +119,8 @@ Expand hipBLASLt YAML test data file into binary Arguments records
                         default=[])
     parser.add_argument('-t', '--template',
                         type=argparse.FileType('r'))
+    parser.add_argument('--allow_duplicate',
+                        action='store_true')
     return parser.parse_args()
 
 
@@ -353,7 +355,7 @@ def write_test(test):
             sys.exit("TypeError: " + str(err) + " for " + name +
                      ", which has type " + str(type(test[name])) + "\n")
     byt = bytes(param['Arguments'](*arg))
-    if byt not in testcases:
+    if byt not in testcases or args['allow_duplicate']:
         testcases.add(byt)
         write_signature(args['outfile'])
         args['outfile'].write(byt)
@@ -451,7 +453,6 @@ def instantiate(test):
         # known_bug_platforms to a space-separated list of platforms
         test['known_bug_platforms'] = ' ' . join(known_bug_platforms) if test[
             'category'] not in ('known_bug') else ''
-
         write_test(test)
 
     except KeyError as err:

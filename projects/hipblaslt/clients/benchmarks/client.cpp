@@ -302,6 +302,7 @@ try
     std::string algo_method_str = "";
 
     bool verify = 0;
+    bool allow_duplicate = false;
 
     bool                  grouped_gemm;
     std::vector<int64_t>  m, n, k;
@@ -455,6 +456,10 @@ try
         ("verify,v",
          value<bool>(&verify)->default_value(false),
          "Validate GPU results with CPU?")
+
+        ("allow_duplicate",
+         value<bool>(&allow_duplicate)->default_value(false),
+         "Allow duplicate benchmark sizes")
 
         ("iters,i",
          value<int32_t>(&arg.iters)->default_value(tuningEnv? 1000 : 10),

@@ -35,15 +35,16 @@
 #include <sys/types.h>
 
 // Parse YAML data
-static std::string hipblaslt_parse_yaml(const std::string& yaml)
+static std::string hipblaslt_parse_yaml(const std::string& yaml, bool allow_duplicate)
 {
     // TODO: This function is inherently unsafe because it returns a string vs an open
     // file handle which will block further colliding creates. See comments in
     // hipblaslt_tempname() and under no circumstances copy this to new code.
     std::string tmp     = hipblaslt_tempname();
     auto        exepath = hipblaslt_exepath();
-    auto        cmd     = exepath + "hipblaslt_gentest.py --template " + exepath
-               + "hipblaslt_template.yaml -o " + tmp + " " + yaml;
+    auto        cmd     = exepath + "hipblaslt_gentest.py "
+        + (allow_duplicate ? "--allow_duplicate " : "")
+        + "--template " + exepath + "hipblaslt_template.yaml -o " + tmp + " " + yaml;
     hipblaslt_cerr << cmd << std::endl;
 
 #ifdef _WIN32
@@ -65,6 +66,7 @@ bool hipblaslt_parse_data(int& argc, char** argv, const std::string& default_fil
     std::string filename;
     char**      argv_p = argv + 1;
     bool        help = false, yaml = false;
+    bool        allow_duplicate = false;
 
     // Scan, process and remove any --yaml or --data options
     for(int i = 1; argv[i]; ++i)
@@ -90,6 +92,8 @@ bool hipblaslt_parse_data(int& argc, char** argv, const std::string& default_fil
             }
             filename = argv[++i];
         }
+        else if(!strcmp(argv[i], "--allow_duplicate"))
+            allow_duplicate = true;
         else
         {
             *argv_p++ = argv[i];
@@ -113,7 +117,7 @@ bool hipblaslt_parse_data(int& argc, char** argv, const std::string& default_fil
         filename = default_file;
 
     if(yaml)
-        filename = hipblaslt_parse_yaml(filename);
+        filename = hipblaslt_parse_yaml(filename, allow_duplicate);
 
     if(filename != "")
     {
