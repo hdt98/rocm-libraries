@@ -22,26 +22,27 @@
  *
  * ************************************************************************ */
 
+#include <hip/hip_runtime.h>
 #include <iostream>
 #include <rocsparse.h>
-#include <hip/hip_runtime.h>
 
-#define HIP_CHECK(stat)                                                        \
-    {                                                                          \
-        if(stat != hipSuccess)                                                 \
-        {                                                                      \
+#define HIP_CHECK(stat)                                                                       \
+    {                                                                                         \
+        if(stat != hipSuccess)                                                                \
+        {                                                                                     \
             std::cerr << "Error: hip error " << stat << " in line " << __LINE__ << std::endl; \
-            return -1;                                                         \
-        }                                                                      \
+            return -1;                                                                        \
+        }                                                                                     \
     }
 
-#define ROCSPARSE_CHECK(stat)                                                        \
-    {                                                                                \
-        if(stat != rocsparse_status_success)                                         \
-        {                                                                            \
-            std::cerr << "Error: rocsparse error " << stat << " in line " << __LINE__ << std::endl; \
-            return -1;                                                               \
-        }                                                                            \
+#define ROCSPARSE_CHECK(stat)                                                         \
+    {                                                                                 \
+        if(stat != rocsparse_status_success)                                          \
+        {                                                                             \
+            std::cerr << "Error: rocsparse error " << stat << " in line " << __LINE__ \
+                      << std::endl;                                                   \
+            return -1;                                                                \
+        }                                                                             \
     }
 
 //! [doc example]
@@ -67,8 +68,8 @@ int main()
 
     // Offload data to device
     rocsparse_int* dx_ind;
-    float*        dx_val;
-    float*        dy;
+    float*         dx_val;
+    float*         dy;
 
     HIP_CHECK(hipMalloc((void**)&dx_ind, sizeof(rocsparse_int) * nnz));
     HIP_CHECK(hipMalloc((void**)&dx_val, sizeof(float) * nnz));

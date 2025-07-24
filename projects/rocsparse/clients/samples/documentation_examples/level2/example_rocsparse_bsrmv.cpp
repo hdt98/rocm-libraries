@@ -22,26 +22,27 @@
  *
  * ************************************************************************ */
 
+#include <hip/hip_runtime.h>
 #include <iostream>
 #include <rocsparse.h>
-#include <hip/hip_runtime.h>
 
-#define HIP_CHECK(stat)                                                        \
-    {                                                                          \
-        if(stat != hipSuccess)                                                 \
-        {                                                                      \
+#define HIP_CHECK(stat)                                                                       \
+    {                                                                                         \
+        if(stat != hipSuccess)                                                                \
+        {                                                                                     \
             std::cerr << "Error: hip error " << stat << " in line " << __LINE__ << std::endl; \
-            return -1;                                                         \
-        }                                                                      \
+            return -1;                                                                        \
+        }                                                                                     \
     }
 
-#define ROCSPARSE_CHECK(stat)                                                        \
-    {                                                                                \
-        if(stat != rocsparse_status_success)                                         \
-        {                                                                            \
-            std::cerr << "Error: rocsparse error " << stat << " in line " << __LINE__ << std::endl; \
-            return -1;                                                               \
-        }                                                                            \
+#define ROCSPARSE_CHECK(stat)                                                         \
+    {                                                                                 \
+        if(stat != rocsparse_status_success)                                          \
+        {                                                                             \
+            std::cerr << "Error: rocsparse error " << stat << " in line " << __LINE__ \
+                      << std::endl;                                                   \
+            return -1;                                                                \
+        }                                                                             \
     }
 
 //! [doc example]
@@ -74,7 +75,7 @@ int main()
 
     // BSR values
     double hbsr_val[16]
-    = {1.0, 3.0, 0.0, 0.0, 2.0, 4.0, 0.0, 0.0, 5.0, 7.0, 6.0, 0.0, 0.0, 8.0, 0.0, 0.0};
+        = {1.0, 3.0, 0.0, 0.0, 2.0, 4.0, 0.0, 0.0, 5.0, 7.0, 6.0, 0.0, 0.0, 8.0, 0.0, 0.0};
 
     // Block storage in column major
     rocsparse_direction dir = rocsparse_direction_column;
@@ -107,9 +108,12 @@ int main()
     HIP_CHECK(hipMalloc((void**)&dx, sizeof(double) * nb * bsr_dim));
     HIP_CHECK(hipMalloc((void**)&dy, sizeof(double) * mb * bsr_dim));
 
-    HIP_CHECK(hipMemcpy(dbsr_row_ptr, hbsr_row_ptr, sizeof(rocsparse_int) * (mb + 1), hipMemcpyHostToDevice));
-    HIP_CHECK(hipMemcpy(dbsr_col_ind, hbsr_col_ind, sizeof(rocsparse_int) * nnzb, hipMemcpyHostToDevice));
-    HIP_CHECK(hipMemcpy(dbsr_val, hbsr_val, sizeof(double) * nnzb * bsr_dim * bsr_dim, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(
+        dbsr_row_ptr, hbsr_row_ptr, sizeof(rocsparse_int) * (mb + 1), hipMemcpyHostToDevice));
+    HIP_CHECK(
+        hipMemcpy(dbsr_col_ind, hbsr_col_ind, sizeof(rocsparse_int) * nnzb, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(
+        dbsr_val, hbsr_val, sizeof(double) * nnzb * bsr_dim * bsr_dim, hipMemcpyHostToDevice));
     HIP_CHECK(hipMemcpy(dx, hx, sizeof(double) * nb * bsr_dim, hipMemcpyHostToDevice));
     HIP_CHECK(hipMemcpy(dy, hy, sizeof(double) * mb * bsr_dim, hipMemcpyHostToDevice));
 
@@ -118,35 +122,35 @@ int main()
 
     // Call dbsrmv_analysis (Optional)
     ROCSPARSE_CHECK(rocsparse_dbsrmv_analysis(handle,
-                            dir,
-                            trans,
-                            mb,
-                            nb,
-                            nnzb,
-                            descr,
-                            dbsr_val,
-                            dbsr_row_ptr,
-                            dbsr_col_ind,
-                            bsr_dim,
-                            info));
+                                              dir,
+                                              trans,
+                                              mb,
+                                              nb,
+                                              nnzb,
+                                              descr,
+                                              dbsr_val,
+                                              dbsr_row_ptr,
+                                              dbsr_col_ind,
+                                              bsr_dim,
+                                              info));
 
     // Call dbsrmv to perform y = alpha * A x + beta * y
     ROCSPARSE_CHECK(rocsparse_dbsrmv(handle,
-                    dir,
-                    trans,
-                    mb,
-                    nb,
-                    nnzb,
-                    &alpha,
-                    descr,
-                    dbsr_val,
-                    dbsr_row_ptr,
-                    dbsr_col_ind,
-                    bsr_dim,
-                    info,
-                    dx,
-                    &beta,
-                    dy));
+                                     dir,
+                                     trans,
+                                     mb,
+                                     nb,
+                                     nnzb,
+                                     &alpha,
+                                     descr,
+                                     dbsr_val,
+                                     dbsr_row_ptr,
+                                     dbsr_col_ind,
+                                     bsr_dim,
+                                     info,
+                                     dx,
+                                     &beta,
+                                     dy));
 
     // Copy result back to host
     HIP_CHECK(hipMemcpy(hy, dy, sizeof(double) * mb * bsr_dim, hipMemcpyDeviceToHost));
@@ -162,7 +166,7 @@ int main()
     HIP_CHECK(hipFree(dbsr_val));
     HIP_CHECK(hipFree(dx));
     HIP_CHECK(hipFree(dy));
-    
+
     return 0;
 }
 //! [doc example]

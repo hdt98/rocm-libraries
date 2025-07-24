@@ -22,27 +22,28 @@
  *
  * ************************************************************************ */
 
-#include <iostream>
-#include <vector>
-#include <rocsparse.h>
 #include <hip/hip_runtime.h>
+#include <iostream>
+#include <rocsparse.h>
+#include <vector>
 
-#define HIP_CHECK(stat)                                                        \
-    {                                                                          \
-        if(stat != hipSuccess)                                                 \
-        {                                                                      \
+#define HIP_CHECK(stat)                                                                       \
+    {                                                                                         \
+        if(stat != hipSuccess)                                                                \
+        {                                                                                     \
             std::cerr << "Error: hip error " << stat << " in line " << __LINE__ << std::endl; \
-            return -1;                                                         \
-        }                                                                      \
+            return -1;                                                                        \
+        }                                                                                     \
     }
 
-#define ROCSPARSE_CHECK(stat)                                                        \
-    {                                                                                \
-        if(stat != rocsparse_status_success)                                         \
-        {                                                                            \
-            std::cerr << "Error: rocsparse error " << stat << " in line " << __LINE__ << std::endl; \
-            return -1;                                                               \
-        }                                                                            \
+#define ROCSPARSE_CHECK(stat)                                                         \
+    {                                                                                 \
+        if(stat != rocsparse_status_success)                                          \
+        {                                                                             \
+            std::cerr << "Error: rocsparse error " << stat << " in line " << __LINE__ \
+                      << std::endl;                                                   \
+            return -1;                                                                \
+        }                                                                             \
     }
 
 //! [doc example]
@@ -70,7 +71,7 @@ int main()
     float beta = 1.2f;
 
     // Offload data to device
-    int* dx_ind;
+    int*   dx_ind;
     float* dx_val;
     float* dy;
     HIP_CHECK(hipMalloc((void**)&dx_ind, sizeof(int) * nnz));
@@ -81,38 +82,25 @@ int main()
     HIP_CHECK(hipMemcpy(dx_val, hx_val.data(), sizeof(float) * nnz, hipMemcpyHostToDevice));
     HIP_CHECK(hipMemcpy(dy, hy.data(), sizeof(float) * size, hipMemcpyHostToDevice));
 
-    rocsparse_handle     handle;
+    rocsparse_handle      handle;
     rocsparse_spvec_descr vecX;
     rocsparse_dnvec_descr vecY;
 
-    rocsparse_indextype idx_type = rocsparse_indextype_i32;
-    rocsparse_datatype  data_type = rocsparse_datatype_f32_r;
-    rocsparse_index_base idx_base = rocsparse_index_base_zero;
+    rocsparse_indextype  idx_type  = rocsparse_indextype_i32;
+    rocsparse_datatype   data_type = rocsparse_datatype_f32_r;
+    rocsparse_index_base idx_base  = rocsparse_index_base_zero;
 
     ROCSPARSE_CHECK(rocsparse_create_handle(&handle));
 
     // Create sparse vector X
-    ROCSPARSE_CHECK(rocsparse_create_spvec_descr(&vecX,
-                                    size,
-                                    nnz,
-                                    dx_ind,
-                                    dx_val,
-                                    idx_type,
-                                    idx_base,
-                                    data_type));
+    ROCSPARSE_CHECK(rocsparse_create_spvec_descr(
+        &vecX, size, nnz, dx_ind, dx_val, idx_type, idx_base, data_type));
 
     // Create dense vector Y
-    ROCSPARSE_CHECK(rocsparse_create_dnvec_descr(&vecY,
-                                    size,
-                                    dy,
-                                    data_type));
+    ROCSPARSE_CHECK(rocsparse_create_dnvec_descr(&vecY, size, dy, data_type));
 
     // Call axpby to perform y = beta * y + alpha * x
-    ROCSPARSE_CHECK(rocsparse_axpby(handle,
-                    &alpha,
-                    vecX,
-                    &beta,
-                    vecY));
+    ROCSPARSE_CHECK(rocsparse_axpby(handle, &alpha, vecX, &beta, vecY));
 
     ROCSPARSE_CHECK(rocsparse_dnvec_get_values(vecY, (void**)&dy));
 
@@ -135,7 +123,7 @@ int main()
     HIP_CHECK(hipFree(dx_ind));
     HIP_CHECK(hipFree(dx_val));
     HIP_CHECK(hipFree(dy));
-    
+
     return 0;
 }
 //! [doc example]

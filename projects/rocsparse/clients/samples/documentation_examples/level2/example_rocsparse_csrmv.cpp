@@ -22,27 +22,28 @@
  *
  * ************************************************************************ */
 
-#include <iostream>
-#include <vector>
-#include <rocsparse.h>
 #include <hip/hip_runtime.h>
+#include <iostream>
+#include <rocsparse.h>
+#include <vector>
 
-#define HIP_CHECK(stat)                                                        \
-    {                                                                          \
-        if(stat != hipSuccess)                                                 \
-        {                                                                      \
+#define HIP_CHECK(stat)                                                                       \
+    {                                                                                         \
+        if(stat != hipSuccess)                                                                \
+        {                                                                                     \
             std::cerr << "Error: hip error " << stat << " in line " << __LINE__ << std::endl; \
-            return -1;                                                         \
-        }                                                                      \
+            return -1;                                                                        \
+        }                                                                                     \
     }
 
-#define ROCSPARSE_CHECK(stat)                                                        \
-    {                                                                                \
-        if(stat != rocsparse_status_success)                                         \
-        {                                                                            \
-            std::cerr << "Error: rocsparse error " << stat << " in line " << __LINE__ << std::endl; \
-            return -1;                                                               \
-        }                                                                            \
+#define ROCSPARSE_CHECK(stat)                                                         \
+    {                                                                                 \
+        if(stat != rocsparse_status_success)                                          \
+        {                                                                             \
+            std::cerr << "Error: rocsparse error " << stat << " in line " << __LINE__ \
+                      << std::endl;                                                   \
+            return -1;                                                                \
+        }                                                                             \
     }
 
 //! [doc example]
@@ -56,19 +57,19 @@ int main()
     int n = 5;
 
     float alpha = 1.0f;
-    float beta = -1.0f;
-    
-    std::vector<int> hcsr_row_ptr = {0, 3, 4, 7, 9};
-    std::vector<int> hcsr_col_ind = {0, 1, 2, 4, 0, 1, 4, 2, 3};
-    std::vector<float> hcsr_val = {1.0f, 2.0f, 3.0f, 3.0f, 2.0f, 1.0f, 1.0f, 3.0f, 4.0f};
+    float beta  = -1.0f;
+
+    std::vector<int>   hcsr_row_ptr = {0, 3, 4, 7, 9};
+    std::vector<int>   hcsr_col_ind = {0, 1, 2, 4, 0, 1, 4, 2, 3};
+    std::vector<float> hcsr_val     = {1.0f, 2.0f, 3.0f, 3.0f, 2.0f, 1.0f, 1.0f, 3.0f, 4.0f};
 
     std::vector<float> hx(n, 1.0f);
     std::vector<float> hy(m, 1.0f);
 
     int nnz = hcsr_row_ptr[m] - hcsr_row_ptr[0];
 
-    int* dcsr_row_ptr;
-    int* dcsr_col_ind;
+    int*   dcsr_row_ptr;
+    int*   dcsr_col_ind;
     float* dcsr_val;
     float* dx;
     float* dy;
@@ -78,8 +79,10 @@ int main()
     HIP_CHECK(hipMalloc((void**)&dx, sizeof(float) * n));
     HIP_CHECK(hipMalloc((void**)&dy, sizeof(float) * m));
 
-    HIP_CHECK(hipMemcpy(dcsr_row_ptr, hcsr_row_ptr.data(), sizeof(int) * (m + 1), hipMemcpyHostToDevice));
-    HIP_CHECK(hipMemcpy(dcsr_col_ind, hcsr_col_ind.data(), sizeof(int) * nnz, hipMemcpyHostToDevice));
+    HIP_CHECK(
+        hipMemcpy(dcsr_row_ptr, hcsr_row_ptr.data(), sizeof(int) * (m + 1), hipMemcpyHostToDevice));
+    HIP_CHECK(
+        hipMemcpy(dcsr_col_ind, hcsr_col_ind.data(), sizeof(int) * nnz, hipMemcpyHostToDevice));
     HIP_CHECK(hipMemcpy(dcsr_val, hcsr_val.data(), sizeof(float) * nnz, hipMemcpyHostToDevice));
     HIP_CHECK(hipMemcpy(dx, hx.data(), sizeof(float) * n, hipMemcpyHostToDevice));
     HIP_CHECK(hipMemcpy(dy, hy.data(), sizeof(float) * m, hipMemcpyHostToDevice));
@@ -98,31 +101,31 @@ int main()
 
     // Perform analysis step to obtain meta data
     ROCSPARSE_CHECK(rocsparse_scsrmv_analysis(handle,
-                            rocsparse_operation_none,
-                            m,
-                            n,
-                            nnz,
-                            descr,
-                            dcsr_val,
-                            dcsr_row_ptr,
-                            dcsr_col_ind,
-                            info));
+                                              rocsparse_operation_none,
+                                              m,
+                                              n,
+                                              nnz,
+                                              descr,
+                                              dcsr_val,
+                                              dcsr_row_ptr,
+                                              dcsr_col_ind,
+                                              info));
 
     // Compute y = Ax
     ROCSPARSE_CHECK(rocsparse_scsrmv(handle,
-                    rocsparse_operation_none,
-                    m,
-                    n,
-                    nnz,
-                    &alpha,
-                    descr,
-                    dcsr_val,
-                    dcsr_row_ptr,
-                    dcsr_col_ind,
-                    info,
-                    dx,
-                    &beta,
-                    dy));
+                                     rocsparse_operation_none,
+                                     m,
+                                     n,
+                                     nnz,
+                                     &alpha,
+                                     descr,
+                                     dcsr_val,
+                                     dcsr_row_ptr,
+                                     dcsr_col_ind,
+                                     info,
+                                     dx,
+                                     &beta,
+                                     dy));
 
     HIP_CHECK(hipMemcpy(hy.data(), dy, sizeof(float) * m, hipMemcpyDeviceToHost));
 

@@ -22,27 +22,28 @@
  *
  * ************************************************************************ */
 
-#include <iostream>
-#include <vector>
-#include <rocsparse.h>
 #include <hip/hip_runtime.h>
+#include <iostream>
+#include <rocsparse.h>
+#include <vector>
 
-#define HIP_CHECK(stat)                                                        \
-    {                                                                          \
-        if(stat != hipSuccess)                                                 \
-        {                                                                      \
+#define HIP_CHECK(stat)                                                                       \
+    {                                                                                         \
+        if(stat != hipSuccess)                                                                \
+        {                                                                                     \
             std::cerr << "Error: hip error " << stat << " in line " << __LINE__ << std::endl; \
-            return -1;                                                         \
-        }                                                                      \
+            return -1;                                                                        \
+        }                                                                                     \
     }
 
-#define ROCSPARSE_CHECK(stat)                                                        \
-    {                                                                                \
-        if(stat != rocsparse_status_success)                                         \
-        {                                                                            \
-            std::cerr << "Error: rocsparse error " << stat << " in line " << __LINE__ << std::endl; \
-            return -1;                                                               \
-        }                                                                            \
+#define ROCSPARSE_CHECK(stat)                                                         \
+    {                                                                                 \
+        if(stat != rocsparse_status_success)                                          \
+        {                                                                             \
+            std::cerr << "Error: rocsparse error " << stat << " in line " << __LINE__ \
+                      << std::endl;                                                   \
+            return -1;                                                                \
+        }                                                                             \
     }
 
 //! [doc example]
@@ -99,18 +100,22 @@ int main()
     }
 
     float* ddl = nullptr;
-    float* dd = nullptr;
+    float* dd  = nullptr;
     float* ddu = nullptr;
-    float* dx = nullptr;
+    float* dx  = nullptr;
     HIP_CHECK(hipMalloc((void**)&ddl, sizeof(float) * batch_stride * batch_count));
     HIP_CHECK(hipMalloc((void**)&dd, sizeof(float) * batch_stride * batch_count));
     HIP_CHECK(hipMalloc((void**)&ddu, sizeof(float) * batch_stride * batch_count));
     HIP_CHECK(hipMalloc((void**)&dx, sizeof(float) * batch_stride * batch_count));
 
-    HIP_CHECK(hipMemcpy(ddl, hdl.data(), sizeof(float) * batch_stride * batch_count, hipMemcpyHostToDevice));
-    HIP_CHECK(hipMemcpy(dd, hd.data(), sizeof(float) * batch_stride * batch_count, hipMemcpyHostToDevice));
-    HIP_CHECK(hipMemcpy(ddu, hdu.data(), sizeof(float) * batch_stride * batch_count, hipMemcpyHostToDevice));
-    HIP_CHECK(hipMemcpy(dx, hx.data(), sizeof(float) * batch_stride * batch_count, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(
+        ddl, hdl.data(), sizeof(float) * batch_stride * batch_count, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(
+        dd, hd.data(), sizeof(float) * batch_stride * batch_count, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(
+        ddu, hdu.data(), sizeof(float) * batch_stride * batch_count, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(
+        dx, hx.data(), sizeof(float) * batch_stride * batch_count, hipMemcpyHostToDevice));
 
     // rocSPARSE handle
     rocsparse_handle handle;
@@ -118,31 +123,18 @@ int main()
 
     // Obtain required buffer size
     size_t buffer_size;
-    ROCSPARSE_CHECK(rocsparse_sgtsv_no_pivot_strided_batch_buffer_size(handle,
-                                                       m,
-                                                       ddl,
-                                                       dd,
-                                                       ddu,
-                                                       dx,
-                                                       batch_count,
-                                                       batch_stride,
-                                                       &buffer_size));
+    ROCSPARSE_CHECK(rocsparse_sgtsv_no_pivot_strided_batch_buffer_size(
+        handle, m, ddl, dd, ddu, dx, batch_count, batch_stride, &buffer_size));
 
     void* dbuffer;
     HIP_CHECK(hipMalloc(&dbuffer, buffer_size));
 
-    ROCSPARSE_CHECK(rocsparse_sgtsv_no_pivot_strided_batch(handle,
-                                           m,
-                                           ddl,
-                                           dd,
-                                           ddu,
-                                           dx,
-                                           batch_count,
-                                           batch_stride,
-                                           dbuffer));
+    ROCSPARSE_CHECK(rocsparse_sgtsv_no_pivot_strided_batch(
+        handle, m, ddl, dd, ddu, dx, batch_count, batch_stride, dbuffer));
 
     // Copy right-hand side to host
-    HIP_CHECK(hipMemcpy(hx.data(), dx, sizeof(float) * batch_stride * batch_count, hipMemcpyDeviceToHost));
+    HIP_CHECK(hipMemcpy(
+        hx.data(), dx, sizeof(float) * batch_stride * batch_count, hipMemcpyDeviceToHost));
 
     // Clear rocSPARSE
     ROCSPARSE_CHECK(rocsparse_destroy_handle(handle));

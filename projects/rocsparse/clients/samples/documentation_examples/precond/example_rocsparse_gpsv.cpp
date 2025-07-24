@@ -22,27 +22,28 @@
  *
  * ************************************************************************ */
 
-#include <iostream>
-#include <vector>
-#include <rocsparse.h>
 #include <hip/hip_runtime.h>
+#include <iostream>
+#include <rocsparse.h>
+#include <vector>
 
-#define HIP_CHECK(stat)                                                        \
-    {                                                                          \
-        if(stat != hipSuccess)                                                 \
-        {                                                                      \
+#define HIP_CHECK(stat)                                                                       \
+    {                                                                                         \
+        if(stat != hipSuccess)                                                                \
+        {                                                                                     \
             std::cerr << "Error: hip error " << stat << " in line " << __LINE__ << std::endl; \
-            return -1;                                                         \
-        }                                                                      \
+            return -1;                                                                        \
+        }                                                                                     \
     }
 
-#define ROCSPARSE_CHECK(stat)                                                        \
-    {                                                                                \
-        if(stat != rocsparse_status_success)                                         \
-        {                                                                            \
-            std::cerr << "Error: rocsparse error " << stat << " in line " << __LINE__ << std::endl; \
-            return -1;                                                               \
-        }                                                                            \
+#define ROCSPARSE_CHECK(stat)                                                         \
+    {                                                                                 \
+        if(stat != rocsparse_status_success)                                          \
+        {                                                                             \
+            std::cerr << "Error: rocsparse error " << stat << " in line " << __LINE__ \
+                      << std::endl;                                                   \
+            return -1;                                                                \
+        }                                                                             \
     }
 
 //! [doc example]
@@ -110,10 +111,10 @@ int main()
 
     float* dds = nullptr;
     float* ddl = nullptr;
-    float* dd = nullptr;
+    float* dd  = nullptr;
     float* ddu = nullptr;
     float* ddw = nullptr;
-    float* dx = nullptr;
+    float* dx  = nullptr;
     HIP_CHECK(hipMalloc((void**)&dds, sizeof(float) * m * batch_stride));
     HIP_CHECK(hipMalloc((void**)&ddl, sizeof(float) * m * batch_stride));
     HIP_CHECK(hipMalloc((void**)&dd, sizeof(float) * m * batch_stride));
@@ -134,34 +135,35 @@ int main()
 
     // Obtain required buffer size
     size_t buffer_size;
-    ROCSPARSE_CHECK(rocsparse_sgpsv_interleaved_batch_buffer_size(handle,
-                                                    rocsparse_gpsv_interleaved_alg_default,
-                                                    m,
-                                                    dds,
-                                                    ddl,
-                                                    dd,
-                                                    ddu,
-                                                    ddw,
-                                                    dx,
-                                                    batch_count,
-                                                    batch_stride,
-                                                    &buffer_size));
+    ROCSPARSE_CHECK(
+        rocsparse_sgpsv_interleaved_batch_buffer_size(handle,
+                                                      rocsparse_gpsv_interleaved_alg_default,
+                                                      m,
+                                                      dds,
+                                                      ddl,
+                                                      dd,
+                                                      ddu,
+                                                      ddw,
+                                                      dx,
+                                                      batch_count,
+                                                      batch_stride,
+                                                      &buffer_size));
 
     void* dbuffer;
     HIP_CHECK(hipMalloc(&dbuffer, buffer_size));
 
     ROCSPARSE_CHECK(rocsparse_sgpsv_interleaved_batch(handle,
-                                        rocsparse_gpsv_interleaved_alg_default,
-                                        m,
-                                        dds,
-                                        ddl,
-                                        dd,
-                                        ddu,
-                                        ddw,
-                                        dx,
-                                        batch_count,
-                                        batch_stride,
-                                        dbuffer));
+                                                      rocsparse_gpsv_interleaved_alg_default,
+                                                      m,
+                                                      dds,
+                                                      ddl,
+                                                      dd,
+                                                      ddu,
+                                                      ddw,
+                                                      dx,
+                                                      batch_count,
+                                                      batch_stride,
+                                                      dbuffer));
 
     // Copy right-hand side to host
     HIP_CHECK(hipMemcpy(hx.data(), dx, sizeof(float) * m * batch_stride, hipMemcpyDeviceToHost));

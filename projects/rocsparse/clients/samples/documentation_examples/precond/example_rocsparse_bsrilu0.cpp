@@ -22,27 +22,28 @@
  *
  * ************************************************************************ */
 
-#include <iostream>
-#include <vector>
-#include <rocsparse.h>
 #include <hip/hip_runtime.h>
+#include <iostream>
+#include <rocsparse.h>
+#include <vector>
 
-#define HIP_CHECK(stat)                                                        \
-    {                                                                          \
-        if(stat != hipSuccess)                                                 \
-        {                                                                      \
+#define HIP_CHECK(stat)                                                                       \
+    {                                                                                         \
+        if(stat != hipSuccess)                                                                \
+        {                                                                                     \
             std::cerr << "Error: hip error " << stat << " in line " << __LINE__ << std::endl; \
-            return -1;                                                         \
-        }                                                                      \
+            return -1;                                                                        \
+        }                                                                                     \
     }
 
-#define ROCSPARSE_CHECK(stat)                                                        \
-    {                                                                                \
-        if(stat != rocsparse_status_success)                                         \
-        {                                                                            \
-            std::cerr << "Error: rocsparse error " << stat << " in line " << __LINE__ << std::endl; \
-            return -1;                                                               \
-        }                                                                            \
+#define ROCSPARSE_CHECK(stat)                                                         \
+    {                                                                                 \
+        if(stat != rocsparse_status_success)                                          \
+        {                                                                             \
+            std::cerr << "Error: rocsparse error " << stat << " in line " << __LINE__ \
+                      << std::endl;                                                   \
+            return -1;                                                                \
+        }                                                                             \
     }
 
 //! [doc example]
@@ -52,26 +53,26 @@ int main()
     // A = 1 2 0 0
     //     0 0 2 1
     //     0 0 1 2
-    
-    int mb = 2;
-    int nb = 2;
-    int nnzb = 2;
+
+    int mb        = 2;
+    int nb        = 2;
+    int nnzb      = 2;
     int block_dim = 2;
 
     double alpha = 1.0;
 
-    std::vector<int> hbsr_row_ptr = {0, 1, 2};
-    std::vector<int> hbsr_col_ind = {0, 1};
-    std::vector<double> hbsr_val = {2.0, 1.0, 1.0, 2.0, 2.0, 1.0, 1.0, 2.0};
-    
+    std::vector<int>    hbsr_row_ptr = {0, 1, 2};
+    std::vector<int>    hbsr_col_ind = {0, 1};
+    std::vector<double> hbsr_val     = {2.0, 1.0, 1.0, 2.0, 2.0, 1.0, 1.0, 2.0};
+
     std::vector<double> hx(mb * block_dim, 1.0);
 
-    int* dbsr_row_ptr = nullptr;
-    int* dbsr_col_ind = nullptr;
-    double* dbsr_val = nullptr;
-    double* dx = nullptr;
-    double* dy = nullptr;
-    double* dz = nullptr;
+    int*    dbsr_row_ptr = nullptr;
+    int*    dbsr_col_ind = nullptr;
+    double* dbsr_val     = nullptr;
+    double* dx           = nullptr;
+    double* dy           = nullptr;
+    double* dz           = nullptr;
     HIP_CHECK(hipMalloc((void**)&dbsr_row_ptr, sizeof(int) * (mb + 1)));
     HIP_CHECK(hipMalloc((void**)&dbsr_col_ind, sizeof(int) * nnzb));
     HIP_CHECK(hipMalloc((void**)&dbsr_val, sizeof(double) * nnzb * block_dim * block_dim));
@@ -79,9 +80,14 @@ int main()
     HIP_CHECK(hipMalloc((void**)&dy, sizeof(double) * mb * block_dim));
     HIP_CHECK(hipMalloc((void**)&dz, sizeof(double) * mb * block_dim));
 
-    HIP_CHECK(hipMemcpy(dbsr_row_ptr, hbsr_row_ptr.data(), sizeof(int) * (mb + 1), hipMemcpyHostToDevice));
-    HIP_CHECK(hipMemcpy(dbsr_col_ind, hbsr_col_ind.data(), sizeof(int) * nnzb, hipMemcpyHostToDevice));
-    HIP_CHECK(hipMemcpy(dbsr_val, hbsr_val.data(), sizeof(double) * nnzb * block_dim * block_dim, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(
+        dbsr_row_ptr, hbsr_row_ptr.data(), sizeof(int) * (mb + 1), hipMemcpyHostToDevice));
+    HIP_CHECK(
+        hipMemcpy(dbsr_col_ind, hbsr_col_ind.data(), sizeof(int) * nnzb, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(dbsr_val,
+                        hbsr_val.data(),
+                        sizeof(double) * nnzb * block_dim * block_dim,
+                        hipMemcpyHostToDevice));
     HIP_CHECK(hipMemcpy(dx, hx.data(), sizeof(double) * mb * block_dim, hipMemcpyHostToDevice));
 
     // Create rocSPARSE handle
@@ -113,40 +119,40 @@ int main()
     size_t buffer_size_L;
     size_t buffer_size_U;
     ROCSPARSE_CHECK(rocsparse_dbsrilu0_buffer_size(handle,
-                                    rocsparse_direction_row,
-                                    mb,
-                                    nnzb,
-                                    descr_M,
-                                    dbsr_val,
-                                    dbsr_row_ptr,
-                                    dbsr_col_ind,
-                                    block_dim,
-                                    info,
-                                    &buffer_size_M));
+                                                   rocsparse_direction_row,
+                                                   mb,
+                                                   nnzb,
+                                                   descr_M,
+                                                   dbsr_val,
+                                                   dbsr_row_ptr,
+                                                   dbsr_col_ind,
+                                                   block_dim,
+                                                   info,
+                                                   &buffer_size_M));
     ROCSPARSE_CHECK(rocsparse_dbsrsv_buffer_size(handle,
-                                rocsparse_direction_row,
-                                rocsparse_operation_none,
-                                mb,
-                                nnzb,
-                                descr_L,
-                                dbsr_val,
-                                dbsr_row_ptr,
-                                dbsr_col_ind,
-                                block_dim,
-                                info,
-                                &buffer_size_L));
+                                                 rocsparse_direction_row,
+                                                 rocsparse_operation_none,
+                                                 mb,
+                                                 nnzb,
+                                                 descr_L,
+                                                 dbsr_val,
+                                                 dbsr_row_ptr,
+                                                 dbsr_col_ind,
+                                                 block_dim,
+                                                 info,
+                                                 &buffer_size_L));
     ROCSPARSE_CHECK(rocsparse_dbsrsv_buffer_size(handle,
-                                rocsparse_direction_row,
-                                rocsparse_operation_none,
-                                mb,
-                                nnzb,
-                                descr_U,
-                                dbsr_val,
-                                dbsr_row_ptr,
-                                dbsr_col_ind,
-                                block_dim,
-                                info,
-                                &buffer_size_U));
+                                                 rocsparse_direction_row,
+                                                 rocsparse_operation_none,
+                                                 mb,
+                                                 nnzb,
+                                                 descr_U,
+                                                 dbsr_val,
+                                                 dbsr_row_ptr,
+                                                 dbsr_col_ind,
+                                                 block_dim,
+                                                 info,
+                                                 &buffer_size_U));
 
     size_t buffer_size = max(buffer_size_M, max(buffer_size_L, buffer_size_U));
 
@@ -157,115 +163,109 @@ int main()
     // Perform analysis steps, using rocsparse_analysis_policy_reuse to improve
     // computation performance
     ROCSPARSE_CHECK(rocsparse_dbsrilu0_analysis(handle,
-                                rocsparse_direction_row,
-                                mb,
-                                nnzb,
-                                descr_M,
-                                dbsr_val,
-                                dbsr_row_ptr,
-                                dbsr_col_ind,
-                                block_dim,
-                                info,
-                                rocsparse_analysis_policy_reuse,
-                                rocsparse_solve_policy_auto,
-                                temp_buffer));
+                                                rocsparse_direction_row,
+                                                mb,
+                                                nnzb,
+                                                descr_M,
+                                                dbsr_val,
+                                                dbsr_row_ptr,
+                                                dbsr_col_ind,
+                                                block_dim,
+                                                info,
+                                                rocsparse_analysis_policy_reuse,
+                                                rocsparse_solve_policy_auto,
+                                                temp_buffer));
     ROCSPARSE_CHECK(rocsparse_dbsrsv_analysis(handle,
-                                rocsparse_direction_row,
-                                rocsparse_operation_none,
-                                mb,
-                                nnzb,
-                                descr_L,
-                                dbsr_val,
-                                dbsr_row_ptr,
-                                dbsr_col_ind,
-                                block_dim,
-                                info,
-                                rocsparse_analysis_policy_reuse,
-                                rocsparse_solve_policy_auto,
-                                temp_buffer));
+                                              rocsparse_direction_row,
+                                              rocsparse_operation_none,
+                                              mb,
+                                              nnzb,
+                                              descr_L,
+                                              dbsr_val,
+                                              dbsr_row_ptr,
+                                              dbsr_col_ind,
+                                              block_dim,
+                                              info,
+                                              rocsparse_analysis_policy_reuse,
+                                              rocsparse_solve_policy_auto,
+                                              temp_buffer));
     ROCSPARSE_CHECK(rocsparse_dbsrsv_analysis(handle,
-                                rocsparse_direction_row,
-                                rocsparse_operation_none,
-                                mb,
-                                nnzb,
-                                descr_U,
-                                dbsr_val,
-                                dbsr_row_ptr,
-                                dbsr_col_ind,
-                                block_dim,
-                                info,
-                                rocsparse_analysis_policy_reuse,
-                                rocsparse_solve_policy_auto,
-                                temp_buffer));
+                                              rocsparse_direction_row,
+                                              rocsparse_operation_none,
+                                              mb,
+                                              nnzb,
+                                              descr_U,
+                                              dbsr_val,
+                                              dbsr_row_ptr,
+                                              dbsr_col_ind,
+                                              block_dim,
+                                              info,
+                                              rocsparse_analysis_policy_reuse,
+                                              rocsparse_solve_policy_auto,
+                                              temp_buffer));
 
     // Check for zero pivot
     rocsparse_int position;
-    if(rocsparse_status_zero_pivot == rocsparse_bsrilu0_zero_pivot(handle,
-                                                                    info,
-                                                                    &position))
+    if(rocsparse_status_zero_pivot == rocsparse_bsrilu0_zero_pivot(handle, info, &position))
     {
         printf("A has structural zero at A(%d,%d)\n", position, position);
     }
 
     // Compute incomplete LU factorization M = LU
     ROCSPARSE_CHECK(rocsparse_dbsrilu0(handle,
-                        rocsparse_direction_row,
-                        mb,
-                        nnzb,
-                        descr_M,
-                        dbsr_val,
-                        dbsr_row_ptr,
-                        dbsr_col_ind,
-                        block_dim,
-                        info,
-                        rocsparse_solve_policy_auto,
-                        temp_buffer));
+                                       rocsparse_direction_row,
+                                       mb,
+                                       nnzb,
+                                       descr_M,
+                                       dbsr_val,
+                                       dbsr_row_ptr,
+                                       dbsr_col_ind,
+                                       block_dim,
+                                       info,
+                                       rocsparse_solve_policy_auto,
+                                       temp_buffer));
 
     // Check for zero pivot
-    if(rocsparse_status_zero_pivot == rocsparse_bsrilu0_zero_pivot(handle,
-                                                                    info,
-                                                                    &position))
+    if(rocsparse_status_zero_pivot == rocsparse_bsrilu0_zero_pivot(handle, info, &position))
     {
-        printf("L has structural and/or numerical zero at L(%d,%d)\n",
-                position,
-                position);
+        printf("L has structural and/or numerical zero at L(%d,%d)\n", position, position);
     }
 
     // Solve Lz = x
     ROCSPARSE_CHECK(rocsparse_dbsrsv_solve(handle,
-                            rocsparse_direction_row,
-                            rocsparse_operation_none,
-                            mb,
-                            nnzb,
-                            &alpha,
-                            descr_L,
-                            dbsr_val,
-                            dbsr_row_ptr,
-                            dbsr_col_ind,
-                            block_dim,
-                            info,
-                            dx,
-                            dz,
-                            rocsparse_solve_policy_auto,
-                            temp_buffer));
+                                           rocsparse_direction_row,
+                                           rocsparse_operation_none,
+                                           mb,
+                                           nnzb,
+                                           &alpha,
+                                           descr_L,
+                                           dbsr_val,
+                                           dbsr_row_ptr,
+                                           dbsr_col_ind,
+                                           block_dim,
+                                           info,
+                                           dx,
+                                           dz,
+                                           rocsparse_solve_policy_auto,
+                                           temp_buffer));
 
     // Solve Uy = z
     ROCSPARSE_CHECK(rocsparse_dbsrsv_solve(handle,
-                            rocsparse_direction_row,
-                            rocsparse_operation_none,
-                            mb,
-                            nnzb,
-                            &alpha,
-                            descr_U,
-                            dbsr_val,
-                            dbsr_row_ptr,
-                            dbsr_col_ind,
-                            block_dim,
-                            info,
-                            dz,
-                            dy,
-                            rocsparse_solve_policy_auto,
-                            temp_buffer));
+                                           rocsparse_direction_row,
+                                           rocsparse_operation_none,
+                                           mb,
+                                           nnzb,
+                                           &alpha,
+                                           descr_U,
+                                           dbsr_val,
+                                           dbsr_row_ptr,
+                                           dbsr_col_ind,
+                                           block_dim,
+                                           info,
+                                           dz,
+                                           dy,
+                                           rocsparse_solve_policy_auto,
+                                           temp_buffer));
 
     std::vector<double> hy(mb * block_dim);
     HIP_CHECK(hipMemcpy(hy.data(), dy, sizeof(double) * mb * block_dim, hipMemcpyDeviceToHost));

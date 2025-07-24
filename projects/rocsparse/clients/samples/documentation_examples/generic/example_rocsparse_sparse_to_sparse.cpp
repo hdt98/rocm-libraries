@@ -22,27 +22,28 @@
  *
  * ************************************************************************ */
 
-#include <iostream>
-#include <vector>
-#include <rocsparse.h>
 #include <hip/hip_runtime.h>
+#include <iostream>
+#include <rocsparse.h>
+#include <vector>
 
-#define HIP_CHECK(stat)                                                        \
-    {                                                                          \
-        if(stat != hipSuccess)                                                 \
-        {                                                                      \
+#define HIP_CHECK(stat)                                                                       \
+    {                                                                                         \
+        if(stat != hipSuccess)                                                                \
+        {                                                                                     \
             std::cerr << "Error: hip error " << stat << " in line " << __LINE__ << std::endl; \
-            return -1;                                                         \
-        }                                                                      \
+            return -1;                                                                        \
+        }                                                                                     \
     }
 
-#define ROCSPARSE_CHECK(stat)                                                        \
-    {                                                                                \
-        if(stat != rocsparse_status_success)                                         \
-        {                                                                            \
-            std::cerr << "Error: rocsparse error " << stat << " in line " << __LINE__ << std::endl; \
-            return -1;                                                               \
-        }                                                                            \
+#define ROCSPARSE_CHECK(stat)                                                         \
+    {                                                                                 \
+        if(stat != rocsparse_status_success)                                          \
+        {                                                                             \
+            std::cerr << "Error: rocsparse error " << stat << " in line " << __LINE__ \
+                      << std::endl;                                                   \
+            return -1;                                                                \
+        }                                                                             \
     }
 
 //! [doc example]
@@ -70,7 +71,7 @@ int main()
     // HIP_CHECK(hipFree(buffer));
 
     // // the user is responsible to allocate target arrays after the analysis phase.
-    // { 
+    // {
     //     int64_t rows, cols, ell_width;
     //     void * ind, * val;
     //     rocsparse_indextype        idx_type;
@@ -88,7 +89,7 @@ int main()
     //                     &data_type));
     //     HIP_CHECK(hipMalloc(&ell_ind,ell_width * M * sizeof(int32_t)));
     //     HIP_CHECK(hipMalloc(&ell_val,ell_width * M * sizeof(float)));
-    //     ROCSPARSE_CHECK(rocsparse_ell_set_pointers(target, ell_ind, ell_val)); 
+    //     ROCSPARSE_CHECK(rocsparse_ell_set_pointers(target, ell_ind, ell_val));
     // }
 
     // // Calculation phase

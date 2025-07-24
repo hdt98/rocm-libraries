@@ -22,27 +22,28 @@
  *
  * ************************************************************************ */
 
-#include <iostream>
-#include <vector>
-#include <rocsparse.h>
 #include <hip/hip_runtime.h>
+#include <iostream>
+#include <rocsparse.h>
+#include <vector>
 
-#define HIP_CHECK(stat)                                                        \
-    {                                                                          \
-        if(stat != hipSuccess)                                                 \
-        {                                                                      \
+#define HIP_CHECK(stat)                                                                       \
+    {                                                                                         \
+        if(stat != hipSuccess)                                                                \
+        {                                                                                     \
             std::cerr << "Error: hip error " << stat << " in line " << __LINE__ << std::endl; \
-            return -1;                                                         \
-        }                                                                      \
+            return -1;                                                                        \
+        }                                                                                     \
     }
 
-#define ROCSPARSE_CHECK(stat)                                                        \
-    {                                                                                \
-        if(stat != rocsparse_status_success)                                         \
-        {                                                                            \
-            std::cerr << "Error: rocsparse error " << stat << " in line " << __LINE__ << std::endl; \
-            return -1;                                                               \
-        }                                                                            \
+#define ROCSPARSE_CHECK(stat)                                                         \
+    {                                                                                 \
+        if(stat != rocsparse_status_success)                                          \
+        {                                                                             \
+            std::cerr << "Error: rocsparse error " << stat << " in line " << __LINE__ \
+                      << std::endl;                                                   \
+            return -1;                                                                \
+        }                                                                             \
     }
 
 //! [doc example]
@@ -52,12 +53,12 @@ int main()
     // A = 4 2 0 0
     //     0 3 7 0
     //     0 0 0 1
-    int m   = 4;
-    int n   = 2;
+    int m = 4;
+    int n = 2;
 
-    std::vector<int> hcsr_row_ptr = {0, 1, 3, 5, 6};
-    std::vector<int> hcsr_col_ind = {0, 0, 1, 1, 2, 3};
-    std::vector<float> hcsr_val   = {1, 4, 2, 3, 7, 1};
+    std::vector<int>   hcsr_row_ptr = {0, 1, 3, 5, 6};
+    std::vector<int>   hcsr_col_ind = {0, 0, 1, 1, 2, 3};
+    std::vector<float> hcsr_val     = {1, 4, 2, 3, 7, 1};
     std::vector<float> hB(m * n);
     std::vector<float> hC(m * n);
 
@@ -75,8 +76,8 @@ int main()
     int nnz = hcsr_row_ptr[m] - hcsr_row_ptr[0];
 
     // Offload data to device
-    int* dcsr_row_ptr;
-    int* dcsr_col_ind;
+    int*   dcsr_row_ptr;
+    int*   dcsr_col_ind;
     float* dcsr_val;
     float* dB;
     float* dC;
@@ -86,102 +87,94 @@ int main()
     HIP_CHECK(hipMalloc((void**)&dB, sizeof(float) * m * n));
     HIP_CHECK(hipMalloc((void**)&dC, sizeof(float) * m * n));
 
-    HIP_CHECK(hipMemcpy(dcsr_row_ptr, hcsr_row_ptr.data(), sizeof(int) * (m + 1), hipMemcpyHostToDevice));
-    HIP_CHECK(hipMemcpy(dcsr_col_ind, hcsr_col_ind.data(), sizeof(int) * nnz, hipMemcpyHostToDevice));
+    HIP_CHECK(
+        hipMemcpy(dcsr_row_ptr, hcsr_row_ptr.data(), sizeof(int) * (m + 1), hipMemcpyHostToDevice));
+    HIP_CHECK(
+        hipMemcpy(dcsr_col_ind, hcsr_col_ind.data(), sizeof(int) * nnz, hipMemcpyHostToDevice));
     HIP_CHECK(hipMemcpy(dcsr_val, hcsr_val.data(), sizeof(float) * nnz, hipMemcpyHostToDevice));
     HIP_CHECK(hipMemcpy(dB, hB.data(), sizeof(float) * m * n, hipMemcpyHostToDevice));
 
-    rocsparse_handle     handle;
+    rocsparse_handle      handle;
     rocsparse_spmat_descr matA;
     rocsparse_dnmat_descr matB;
     rocsparse_dnmat_descr matC;
 
-    rocsparse_indextype row_idx_type = rocsparse_indextype_i32;
-    rocsparse_indextype col_idx_type = rocsparse_indextype_i32;
-    rocsparse_datatype  data_type = rocsparse_datatype_f32_r;
-    rocsparse_datatype  compute_type = rocsparse_datatype_f32_r;
-    rocsparse_index_base idx_base = rocsparse_index_base_zero;
-    rocsparse_operation trans_A = rocsparse_operation_none;
-    rocsparse_operation trans_B = rocsparse_operation_none;
+    rocsparse_indextype  row_idx_type = rocsparse_indextype_i32;
+    rocsparse_indextype  col_idx_type = rocsparse_indextype_i32;
+    rocsparse_datatype   data_type    = rocsparse_datatype_f32_r;
+    rocsparse_datatype   compute_type = rocsparse_datatype_f32_r;
+    rocsparse_index_base idx_base     = rocsparse_index_base_zero;
+    rocsparse_operation  trans_A      = rocsparse_operation_none;
+    rocsparse_operation  trans_B      = rocsparse_operation_none;
 
     ROCSPARSE_CHECK(rocsparse_create_handle(&handle));
 
     // Create sparse matrix A
     ROCSPARSE_CHECK(rocsparse_create_csr_descr(&matA,
-                                m,
-                                m,
-                                nnz,
-                                dcsr_row_ptr,
-                                dcsr_col_ind,
-                                dcsr_val,
-                                row_idx_type,
-                                col_idx_type,
-                                idx_base,
-                                data_type));
+                                               m,
+                                               m,
+                                               nnz,
+                                               dcsr_row_ptr,
+                                               dcsr_col_ind,
+                                               dcsr_val,
+                                               row_idx_type,
+                                               col_idx_type,
+                                               idx_base,
+                                               data_type));
 
     // Create dense matrix B
-    ROCSPARSE_CHECK(rocsparse_create_dnmat_descr(&matB,
-                                    m,
-                                    n,
-                                    m,
-                                    dB,
-                                    data_type,
-                                    rocsparse_order_column));
+    ROCSPARSE_CHECK(
+        rocsparse_create_dnmat_descr(&matB, m, n, m, dB, data_type, rocsparse_order_column));
 
     // Create dense matrix C
-    ROCSPARSE_CHECK(rocsparse_create_dnmat_descr(&matC,
-                                    m,
-                                    n,
-                                    m,
-                                    dC,
-                                    data_type,
-                                    rocsparse_order_column));
+    ROCSPARSE_CHECK(
+        rocsparse_create_dnmat_descr(&matC, m, n, m, dC, data_type, rocsparse_order_column));
 
     // Call spsv to get buffer size
     size_t buffer_size;
     ROCSPARSE_CHECK(rocsparse_spsm(handle,
-                    trans_A,
-                    trans_B,
-                    &alpha,
-                    matA,
-                    matB,
-                    matC,
-                    compute_type,
-                    rocsparse_spsm_alg_default,
-                    rocsparse_spsm_stage_buffer_size,
-                    &buffer_size,
-                    nullptr));
+                                   trans_A,
+                                   trans_B,
+                                   &alpha,
+                                   matA,
+                                   matB,
+                                   matC,
+                                   compute_type,
+                                   rocsparse_spsm_alg_default,
+                                   rocsparse_spsm_stage_buffer_size,
+                                   &buffer_size,
+                                   nullptr));
 
     void* temp_buffer;
     HIP_CHECK(hipMalloc((void**)&temp_buffer, buffer_size));
 
     // Call spsv to perform analysis
     ROCSPARSE_CHECK(rocsparse_spsm(handle,
-                    trans_A,
-                    trans_B,
-                    &alpha,
-                    matA,
-                    matB,
-                    matC,
-                    compute_type,
-                    rocsparse_spsm_alg_default,
-                    rocsparse_spsm_stage_preprocess,
-                    &buffer_size,
-                    temp_buffer));
+                                   trans_A,
+                                   trans_B,
+                                   &alpha,
+                                   matA,
+                                   matB,
+                                   matC,
+                                   compute_type,
+                                   rocsparse_spsm_alg_default,
+                                   rocsparse_spsm_stage_preprocess,
+                                   &buffer_size,
+                                   temp_buffer));
 
     // Call spsv to perform computation
     ROCSPARSE_CHECK(rocsparse_spsm(handle,
-                    trans_A,
-                    trans_B,
-                    &alpha,
-                    matA,
-                    matB,
-                    matC,
-                    compute_type,
-                    rocsparse_spsm_alg_default,
-                    rocsparse_spsm_stage_compute,
-                    &buffer_size,
-                    temp_buffer));
+                                   trans_A,
+                                   trans_B,
+                                   &alpha,
+                                   matA,
+                                   matB,
+                                   matC,
+                                   compute_type,
+                                   rocsparse_spsm_alg_default,
+                                   rocsparse_spsm_stage_compute,
+                                   &buffer_size,
+                                   temp_buffer));
 
     // Copy result back to host
     HIP_CHECK(hipMemcpy(hC.data(), dC, sizeof(float) * m * n, hipMemcpyDeviceToHost));

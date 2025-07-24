@@ -22,26 +22,27 @@
  *
  * ************************************************************************ */
 
+#include <hip/hip_runtime.h>
 #include <iostream>
 #include <rocsparse.h>
-#include <hip/hip_runtime.h>
 
-#define HIP_CHECK(stat)                                                        \
-    {                                                                          \
-        if(stat != hipSuccess)                                                 \
-        {                                                                      \
+#define HIP_CHECK(stat)                                                                       \
+    {                                                                                         \
+        if(stat != hipSuccess)                                                                \
+        {                                                                                     \
             std::cerr << "Error: hip error " << stat << " in line " << __LINE__ << std::endl; \
-            return -1;                                                         \
-        }                                                                      \
+            return -1;                                                                        \
+        }                                                                                     \
     }
 
-#define ROCSPARSE_CHECK(stat)                                                        \
-    {                                                                                \
-        if(stat != rocsparse_status_success)                                         \
-        {                                                                            \
-            std::cerr << "Error: rocsparse error " << stat << " in line " << __LINE__ << std::endl; \
-            return -1;                                                               \
-        }                                                                            \
+#define ROCSPARSE_CHECK(stat)                                                         \
+    {                                                                                 \
+        if(stat != rocsparse_status_success)                                          \
+        {                                                                             \
+            std::cerr << "Error: rocsparse error " << stat << " in line " << __LINE__ \
+                      << std::endl;                                                   \
+            return -1;                                                                \
+        }                                                                             \
     }
 
 //! [doc example]
@@ -56,15 +57,15 @@ int main()
     rocsparse_int hAcol[8] = {0, 2, 3, 2, 3, 1, 0, 3};
     double        hAval[8] = {1.0, 3.0, 4.0, 5.0, 1.0, 2.0, 4.0, 8.0};
 
-    rocsparse_int m = 4;
-    rocsparse_int n = 4;
+    rocsparse_int m   = 4;
+    rocsparse_int n   = 4;
     rocsparse_int nnz = 8;
 
     double halpha = 1.0;
     double hbeta  = 0.0;
 
-    double  hx[4] = {1.0, 2.0, 3.0, 4.0};
-    double  hy[4] = {4.0, 5.0, 6.0, 7.0};
+    double hx[4] = {1.0, 2.0, 3.0, 4.0};
+    double hy[4] = {4.0, 5.0, 6.0, 7.0};
 
     // rocSPARSE handle
     rocsparse_handle handle;
@@ -108,7 +109,8 @@ int main()
     HIP_CHECK(hipMalloc((void**)&dBval, sizeof(double) * ell_width * m));
 
     // Convert matrix from CSR to ELL
-    ROCSPARSE_CHECK(rocsparse_dcsr2ell(handle, m, descrA, dAval, dAptr, dAcol, descrB, ell_width, dBval, dBcol));
+    ROCSPARSE_CHECK(rocsparse_dcsr2ell(
+        handle, m, descrA, dAval, dAptr, dAcol, descrB, ell_width, dBval, dBcol));
 
     // Clean up CSR structures
     HIP_CHECK(hipFree(dAptr));
@@ -117,17 +119,17 @@ int main()
 
     // Call rocsparse ellmv
     ROCSPARSE_CHECK(rocsparse_dellmv(handle,
-                    rocsparse_operation_none,
-                    m,
-                    n,
-                    &halpha,
-                    descrB,
-                    dBval,
-                    dBcol,
-                    ell_width,
-                    dx,
-                    &hbeta,
-                    dy));
+                                     rocsparse_operation_none,
+                                     m,
+                                     n,
+                                     &halpha,
+                                     descrB,
+                                     dBval,
+                                     dBcol,
+                                     ell_width,
+                                     dx,
+                                     &hbeta,
+                                     dy));
 
     // Copy result back to host
     HIP_CHECK(hipMemcpy(hy, dy, sizeof(double) * m, hipMemcpyDeviceToHost));
