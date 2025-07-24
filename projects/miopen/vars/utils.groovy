@@ -108,7 +108,9 @@ def cmake_build(Map conf=[:]){
     def test_flags = conf.get("test_flags","")
 
     if (conf.get("vcache_enable","") == "true"){
-        def vcache = conf.get(vcache_path,"/var/jenkins/.cache/miopen/vcache")
+        //grab root of node workspace. not guaranteed to be /var/jenkins
+        String remote_root = env.WORKSPACE.substring(0, env.WORKSPACE.lastIndexOf("workspace/")) 
+        def vcache = conf.get(vcache_path,"${remote_root}/.cache/miopen/vcache")
         build_envs = " MIOPEN_VERIFY_CACHE_PATH='${vcache}' " + build_envs
     } else{
         test_flags = " --disable-verification-cache " + test_flags
@@ -313,7 +315,11 @@ def getDockerImage(Map conf=[:])
 
 def buildHipClangJob(Map conf=[:]){
         show_node_info()
-        //sh(script: "git submodule update --init --recursive && pwd && find . -name fin -type d -exec ls {} +")
+        /*
+            The following is a workaround for git submodule updating for the fin module.  After Jenkins upgrade,
+            many plugins started misbehaving, and submodules wouldn't get pulled.  This ensures that we always pull
+            the fin submodule and fail silently when the submodule directory already has artifacts in it.
+        */
         sh(script: "git submodule update --init --recursive || true")
         env.HSA_ENABLE_SDMA=0
         env.DOCKER_BUILDKIT=1
@@ -333,7 +339,11 @@ def buildHipClangJob(Map conf=[:]){
         def lfs_pull = conf.get("lfs_pull", false)
 
         def retimage
-        gitStatusWrapper(credentialsId: "${env.miopen_git_creds}", gitHubContext: "${variant}", account: 'ROCm', repo: "${env.REPO_NAME}") {
+        def credentialsID = env.monorepo_status_wrapper_creds
+        if (env.REPO_NAME == "MIOpen") {
+            credentialsID = env.miopen_git_creds
+        }
+        gitStatusWrapper(credentialsId: "${credentialsID}", gitHubContext: "${variant}", account: 'ROCm', repo: "${env.REPO_NAME}") {
             try {
                 (retimage, image) = getDockerImage(conf)
                 if (needs_gpu) {
@@ -361,12 +371,13 @@ def buildHipClangJob(Map conf=[:]){
                 }
             }
 
-            withDockerContainer(image: image, args: dockerOpts + " -v=/var/jenkins/:/var/jenkins -v=/home/jenkins:/home/jenkins") {
+            //grab root of node workspace. not guaranteed to be /var/jenkins
+            String remote_root = env.WORKSPACE.substring(0, env.WORKSPACE.lastIndexOf("workspace/")) 
+            withDockerContainer(image: image, args: dockerOpts + " -v=${remote_root}:${remote_root}") {
                 timeout(time: 420, unit:'MINUTES')
                 {
                     if (lfs_pull) {
                         sh """
-                            echo ${env.WORKSPACE}/${env.REPO_DIR}
                             cd ${env.WORKSPACE}/${env.REPO_DIR}
                             git lfs pull --exclude=
                            """.stripIndent()
@@ -408,7 +419,9 @@ def RunPerfTest(Map conf=[:]){
         def results_dir = conf.get("results_dir", "${env.WORKSPACE}/${env.REPO_DIR}/results")
         docker_image.pull()
         echo "docker image: ${docker_image}"
-        docker_image.inside(dockerOpts + " -v=/var/jenkins/:/var/jenkins")
+        //grab root of node workspace. not guaranteed to be /var/jenkins
+        String remote_root = env.WORKSPACE.substring(0, env.WORKSPACE.lastIndexOf("workspace/")) 
+        docker_image.inside(dockerOpts + " -v=${remote_root}:${remote_root}")
         {
             timeout(time: 100, unit: 'MINUTES')
             {
