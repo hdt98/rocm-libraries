@@ -98,7 +98,7 @@ extern "C" {
 *  In this example we want to check whether a matrix is upper triangular. The matrix passed to 
 *  \ref rocsparse_check_spmat is invalid because it contains an entry in the lower triangular 
 *  part of the matrix.
-*  \include example_rocsparse_check_spmat.cpp
+*  \snippet example_rocsparse_check_spmat.cpp doc example
 */
 ROCSPARSE_EXPORT
 rocsparse_status rocsparse_check_spmat(rocsparse_handle            handle,

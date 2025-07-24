@@ -253,11 +253,11 @@ extern "C" {
 *               currently not supported.
 *  \par Example
 *  This example performs sparse matrix-dense matrix multiplication, \f$C := \alpha \cdot A \cdot B + \beta \cdot C\f$
-*  \include example_rocsparse_spmm.cpp
+*  \snippet example_rocsparse_spmm.cpp doc example
 *
 *  \par Example
 *  An example of the first batch mode (\f$C_i = A \times B_i\f$) is provided below.
-*  \include example_rocsparse_spmm_batched.cpp
+*  \snippet example_rocsparse_spmm_batched.cpp doc example
 */
 /**@{*/
 ROCSPARSE_EXPORT

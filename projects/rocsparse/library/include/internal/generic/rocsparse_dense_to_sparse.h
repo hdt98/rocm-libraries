@@ -129,7 +129,7 @@ extern "C" {
 *               pointer is invalid.
 *
 *  \par Example
-*  \include example_rocsparse_dense_to_sparse.cpp
+*  \snippet example_rocsparse_dense_to_sparse.cpp doc example
 */
 ROCSPARSE_EXPORT
 rocsparse_status rocsparse_dense_to_sparse(rocsparse_handle              handle,

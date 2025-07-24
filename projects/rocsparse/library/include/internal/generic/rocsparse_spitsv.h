@@ -135,7 +135,7 @@ extern "C" {
 *                currently not supported.
 *
 *  \par Example
-*  \include example_rocsparse_spitsv.cpp
+*  \snippet example_rocsparse_spitsv.cpp doc example
 */
 ROCSPARSE_EXPORT
 rocsparse_status rocsparse_spitsv(rocsparse_handle            handle,

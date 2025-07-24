@@ -122,7 +122,7 @@ extern "C" {
 *
 *  \par Example
 *  This example performs a sparse matrix vector multiplication in COO format.
-*  \include example_rocsparse_coomv.cpp
+*  \snippet example_rocsparse_coomv.cpp doc example
 */
 /**@{*/
 ROCSPARSE_EXPORT

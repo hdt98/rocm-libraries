@@ -251,7 +251,7 @@ rocsparse_status rocsparse_zbsrmv_analysis(rocsparse_handle                handl
 *
 *  \par Example
 *  This example performs a sparse matrix vector multiplication in BSR format.
-*  \include example_rocsparse_bsrmv.cpp
+*  \snippet example_rocsparse_bsrmv.cpp doc example
 */
 /**@{*/
 ROCSPARSE_EXPORT

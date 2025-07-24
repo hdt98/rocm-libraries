@@ -114,7 +114,7 @@ extern "C" {
 *
 *  \par Example
 *  This example performs a sparse matrix vector multiplication in GEBSR format.
-*  \include example_rocsparse_gebsrmv.cpp
+*  \snippet example_rocsparse_gebsrmv.cpp doc example
 */
 /**@{*/
 ROCSPARSE_EXPORT

@@ -175,7 +175,7 @@ rocsparse_status rocsparse_zgemvi_buffer_size(rocsparse_handle    handle,
  *              \ref rocsparse_matrix_type != \ref rocsparse_matrix_type_general.
  *
  *  \par Example
- *  \include example_rocsparse_gemvi.cpp
+ *  \snippet example_rocsparse_gemvi.cpp doc example
  */
 /**@{*/
 ROCSPARSE_EXPORT

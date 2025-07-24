@@ -279,7 +279,7 @@ rocsparse_status rocsparse_csrmv_clear(rocsparse_handle handle, rocsparse_mat_in
 *  \par Example
 *  This example performs a sparse matrix vector multiplication in CSR format
 *  using additional meta data to improve performance.
-*  \include example_rocsparse_csrmv.cpp
+*  \snippet example_rocsparse_csrmv.cpp doc example
 */
 /**@{*/
 ROCSPARSE_EXPORT

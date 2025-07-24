@@ -76,7 +76,7 @@ extern "C" {
 *              invalid.
 *
 *  \par Example
-*  \include example_rocsparse_sctr.cpp
+*  \snippet example_rocsparse_sctr.cpp doc example
 */
 /**@{*/
 ROCSPARSE_EXPORT

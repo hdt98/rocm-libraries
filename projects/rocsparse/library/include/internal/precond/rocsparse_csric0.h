@@ -561,7 +561,7 @@ rocsparse_status rocsparse_csric0_clear(rocsparse_handle handle, rocsparse_mat_i
 *  Consider the sparse \f$m \times m\f$ matrix \f$A\f$, stored in CSR
 *  storage format. The following example computes the incomplete Cholesky factorization
 *  \f$M \approx LL^T\f$ and solves the preconditioned system \f$My = x\f$.
-*  \include example_rocsparse_csric0.cpp
+*  \snippet example_rocsparse_csric0.cpp doc example
 */
 /**@{*/
 ROCSPARSE_EXPORT

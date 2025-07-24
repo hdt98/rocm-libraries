@@ -132,7 +132,7 @@ extern "C" {
  *
  *  \par Example
  *  This example multiplies a BSR matrix with a column-oriented dense matrix.
- *  \include example_rocsparse_bsrmm.cpp
+ *  \snippet example_rocsparse_bsrmm.cpp doc example
  */
 /**@{*/
 ROCSPARSE_EXPORT

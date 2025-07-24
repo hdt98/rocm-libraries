@@ -135,7 +135,7 @@ extern "C" {
  *
  *  \par Example
  *  This example multiplies a GEneral BSR matrix with a column-oriented dense matrix.
- *  \include example_rocsparse_gebsrmm.cpp
+ *  \snippet example_rocsparse_gebsrmm.cpp doc example
  */
 /**@{*/
 ROCSPARSE_EXPORT

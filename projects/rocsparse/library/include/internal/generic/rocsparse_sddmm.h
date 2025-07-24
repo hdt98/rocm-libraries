@@ -260,7 +260,7 @@ rocsparse_status rocsparse_sddmm_preprocess(rocsparse_handle            handle,
 *  \par Example
 *  This example performs sampled dense-dense matrix product, \f$C := \alpha ( A \cdot B ) \circ spy(C) + \beta C\f$
 *  where \f$\circ\f$ is the hadamard product
-*  \include example_rocsparse_sddmm.cpp
+*  \snippet example_rocsparse_sddmm.cpp doc example
 */
 ROCSPARSE_EXPORT
 rocsparse_status rocsparse_sddmm(rocsparse_handle            handle,

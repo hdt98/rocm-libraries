@@ -190,7 +190,7 @@ extern "C" {
 *               currently not supported.
 *
 *  \par Example
-*  \include example_rocsparse_spmv.cpp
+*  \snippet example_rocsparse_spmv.cpp doc example
 */
 __attribute__((deprecated("This function is deprecated and will be removed in a future release. "
                           "Use rocsparse_v2_spmv instead."))) ROCSPARSE_EXPORT rocsparse_status

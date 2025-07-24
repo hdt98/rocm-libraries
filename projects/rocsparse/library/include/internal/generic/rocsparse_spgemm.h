@@ -179,7 +179,7 @@ extern "C" {
 *          \p trans_B != \ref rocsparse_operation_none.
 *
 *  \par Example
-*  \include example_rocsparse_spgemm.cpp
+*  \snippet example_rocsparse_spgemm.cpp doc example
 */
 ROCSPARSE_EXPORT
 rocsparse_status rocsparse_spgemm(rocsparse_handle            handle,

@@ -100,7 +100,7 @@ extern "C" {
 *          invalid.
 *
 *  \par Example
-*  \include example_rocsparse_axpby.cpp
+*  \snippet example_rocsparse_axpby.cpp doc example
 */
 ROCSPARSE_EXPORT
 rocsparse_status rocsparse_axpby(rocsparse_handle            handle,

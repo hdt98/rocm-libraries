@@ -125,7 +125,7 @@ extern "C" {
 *               supported.
 *
 *  \par Example
-*  \include example_rocsparse_spvv.cpp
+*  \snippet example_rocsparse_spvv.cpp doc example
 */
 ROCSPARSE_EXPORT
 rocsparse_status rocsparse_spvv(rocsparse_handle            handle,

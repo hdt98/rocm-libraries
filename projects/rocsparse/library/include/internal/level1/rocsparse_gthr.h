@@ -75,7 +75,7 @@ extern "C" {
 *              invalid.
 *
 *  \par Example
-*  \include example_rocsparse_gthr.cpp
+*  \snippet example_rocsparse_gthr.cpp doc example
 */
 /**@{*/
 ROCSPARSE_EXPORT

@@ -197,10 +197,10 @@ rocsparse_status rocsparse_spgeam_buffer_size(rocsparse_handle            handle
 *  \retval rocsparse_status_invalid_pointer \p mat_A, \p mat_B, \p mat_C, \p descr or \p buffer_size pointer is invalid.
 *
 *  \par First Example
-*  \include example_rocsparse_spgeam_1.cpp
+*  \snippet example_rocsparse_spgeam_1.cpp doc example
 *
 *  \par Second Example
-*  \include example_rocsparse_spgeam_2.cpp
+*  \snippet example_rocsparse_spgeam_2.cpp doc example
 *
 */
 ROCSPARSE_EXPORT

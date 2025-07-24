@@ -612,7 +612,7 @@ rocsparse_status rocsparse_bsrsm_clear(rocsparse_handle handle, rocsparse_mat_in
 *  \par Example
 *  Consider the lower triangular \f$m \times m\f$ matrix \f$L\f$, stored in BSR
 *  storage format with non-unit diagonal. The following example solves \f$L \cdot X = B\f$.
-*  \include example_rocsparse_bsrsm.cpp
+*  \snippet example_rocsparse_bsrsm.cpp doc example
 */
 /**@{*/
 ROCSPARSE_EXPORT

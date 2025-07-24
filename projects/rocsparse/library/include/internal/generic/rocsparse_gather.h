@@ -81,7 +81,7 @@ extern "C" {
 *  \retval      rocsparse_status_invalid_pointer \p x or \p y pointer is invalid.
 *
 *  \par Example
-*  \include example_rocsparse_gather.cpp
+*  \snippet example_rocsparse_gather.cpp doc example
 */
 ROCSPARSE_EXPORT
 rocsparse_status rocsparse_gather(rocsparse_handle            handle,

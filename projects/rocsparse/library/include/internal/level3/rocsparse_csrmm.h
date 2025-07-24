@@ -142,7 +142,7 @@ extern "C" {
 *
 *  \par Example
 *  This example multiplies a CSR matrix with a column-oriented dense matrix.
-*  \include example_rocsparse_csrmm.cpp
+*  \snippet example_rocsparse_csrmm.cpp doc example
 */
 /**@{*/
 ROCSPARSE_EXPORT

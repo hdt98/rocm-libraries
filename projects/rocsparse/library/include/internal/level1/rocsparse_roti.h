@@ -86,7 +86,7 @@ extern "C" {
 *              pointer is invalid.
 *
 *  \par Example
-*  \include example_rocsparse_roti.cpp
+*  \snippet example_rocsparse_roti.cpp doc example
 */
 /**@{*/
 ROCSPARSE_EXPORT

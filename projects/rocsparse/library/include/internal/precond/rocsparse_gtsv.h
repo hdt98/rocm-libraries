@@ -172,7 +172,7 @@ rocsparse_status rocsparse_zgtsv_buffer_size(rocsparse_handle                han
 *  \retval     rocsparse_status_internal_error an internal error occurred.
 *
 *  \par Example
-*  \include example_rocsparse_gtsv.cpp
+*  \snippet example_rocsparse_gtsv.cpp doc example
 */
 /**@{*/
 ROCSPARSE_EXPORT
@@ -360,7 +360,7 @@ rocsparse_status rocsparse_zgtsv_no_pivot_buffer_size(rocsparse_handle          
 *  \retval     rocsparse_status_internal_error an internal error occurred.
 *
 *  \par Example
-*  \include example_rocsparse_gtsv_no_pivot.cpp
+*  \snippet example_rocsparse_gtsv_no_pivot.cpp doc example
 */
 /**@{*/
 ROCSPARSE_EXPORT
@@ -584,7 +584,7 @@ rocsparse_status
 *  \retval     rocsparse_status_internal_error an internal error occurred.
 *
 *  \par Example
-*  \include example_rocsparse_gtsv_no_pivot_strided_batch.cpp
+*  \snippet example_rocsparse_gtsv_no_pivot_strided_batch.cpp doc example
 */
 /**@{*/
 ROCSPARSE_EXPORT
@@ -826,7 +826,7 @@ rocsparse_status rocsparse_zgtsv_interleaved_batch_buffer_size(rocsparse_handle 
 *  \retval     rocsparse_status_internal_error an internal error occurred.
 *
 *  \par Example
-*  \include example_rocsparse_gtsv_interleaved_batch.cpp
+*  \snippet example_rocsparse_gtsv_interleaved_batch.cpp doc example
 */
 /**@{*/
 ROCSPARSE_EXPORT

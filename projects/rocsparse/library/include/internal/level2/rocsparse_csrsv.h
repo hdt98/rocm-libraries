@@ -439,7 +439,7 @@ rocsparse_status rocsparse_csrsv_clear(rocsparse_handle          handle,
 *  \par Example
 *  Consider the lower triangular \f$m \times m\f$ matrix \f$L\f$, stored in CSR
 *  storage format with unit diagonal. The following example solves \f$L \cdot y = x\f$.
-*  \include example_rocsparse_csrsv.cpp
+*  \snippet example_rocsparse_csrsv.cpp doc example
 */
 /**@{*/
 ROCSPARSE_EXPORT

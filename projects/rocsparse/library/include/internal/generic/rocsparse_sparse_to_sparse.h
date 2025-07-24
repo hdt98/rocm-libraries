@@ -94,7 +94,7 @@ rocsparse_status rocsparse_sparse_to_sparse_buffer_size(rocsparse_handle        
 *  \retval      rocsparse_status_success the operation completed successfully.
 *  \par Example
 *  This example converts a CSR matrix into an ELL matrix.
-*  \include example_rocsparse_sparse_to_sparse.cpp
+*  \snippet example_rocsparse_sparse_to_sparse.cpp doc example
 */
 ROCSPARSE_EXPORT
 rocsparse_status rocsparse_sparse_to_sparse(rocsparse_handle                 handle,

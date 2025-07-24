@@ -246,7 +246,7 @@ rocsparse_status rocsparse_zgpsv_interleaved_batch_buffer_size(rocsparse_handle 
 *  \retval     rocsparse_status_internal_error an internal error occurred.
 *
 *  \par Example
-*  \include example_rocsparse_gpsv.cpp
+*  \snippet example_rocsparse_gpsv.cpp doc example
 */
 /**@{*/
 ROCSPARSE_EXPORT

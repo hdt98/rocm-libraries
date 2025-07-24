@@ -575,7 +575,7 @@ rocsparse_status rocsparse_csrsm_clear(rocsparse_handle handle, rocsparse_mat_in
 *  \par Example
 *  Consider the lower triangular \f$m \times m\f$ matrix \f$L\f$, stored in CSR
 *  storage format with unit diagonal. The following example solves \f$L \cdot X = B\f$.
-*  \include example_rocsparse_csrmm.cpp
+*  \snippet example_rocsparse_csrmm.cpp doc example
 */
 /**@{*/
 ROCSPARSE_EXPORT

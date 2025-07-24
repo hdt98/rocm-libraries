@@ -84,7 +84,7 @@ extern "C" {
 *  \retval rocsparse_status_internal_error an internal error occurred.
 *
 *  \par Example
-*  \include example_rocsparse_doti.cpp
+*  \snippet example_rocsparse_doti.cpp doc example
 */
 /**@{*/
 ROCSPARSE_EXPORT

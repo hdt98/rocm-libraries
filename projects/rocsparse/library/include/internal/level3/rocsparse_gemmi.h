@@ -127,7 +127,7 @@ extern "C" {
 *
 *  \par Example
 *  This example multiplies a column-oriented dense matrix with a CSC matrix.
-*  \include example_rocsparse_gemmi.cpp
+*  \snippet example_rocsparse_gemmi.cpp doc example
 */
 /**@{*/
 ROCSPARSE_EXPORT

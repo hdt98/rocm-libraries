@@ -218,7 +218,7 @@ rocsparse_status rocsparse_v2_spmv_buffer_size(rocsparse_handle            handl
 *  \retval      rocsparse_status_not_implemented if \p alg is not supported or if the mixed precision configuration is not supported.
 *
 *  \par Example
-*  \include example_rocsparse_v2_spmv.cpp
+*  \snippet example_rocsparse_v2_spmv.cpp doc example
 */
 ROCSPARSE_EXPORT
 rocsparse_status rocsparse_v2_spmv(rocsparse_handle            handle,

@@ -237,7 +237,7 @@ rocsparse_status
    *               pointer is invalid.
    *  \par Example
    *  This example extracts the lower part of CSR matrix into a CSR matrix.
-   *  \include example_rocsparse_extract.cpp
+   *  \snippet example_rocsparse_extract.cpp doc example
    */
 ROCSPARSE_EXPORT
 rocsparse_status rocsparse_extract(rocsparse_handle            handle,
