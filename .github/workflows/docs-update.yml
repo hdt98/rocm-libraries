@@ -1,0 +1,16 @@
+name: Trigger documentation build on Read the Docs
+
+on:
+  push:
+    paths:
+      - 'projects/**'
+
+jobs:
+  api-calls:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger docs build for rocPRIM
+        if: contains(join(github.event.head_commit.modified, github.event.head_commit.added, github.event.head_commit.removed), 'YYY1/')
+        run: |
+          curl -X POST "https://readthedocs.com/api/v3/projects/advanced-micro-devices-monorepo-rocprim/versions/latest/builds/" \
+               -H "Authorization: Token ${{ secrets.RTD_API_TOKEN }}"
