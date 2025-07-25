@@ -2,6 +2,10 @@ name: Trigger documentation build on Read the Docs
 
 on:
   push:
+    branches:
+      - 'develop'
+      - 'docs/**'
+      - 'users/alexxu12/docs-demo' # for test
     paths:
       - 'projects/**'
 
@@ -9,33 +13,38 @@ jobs:
   trigger-rtd:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Detect changed project
-        id: detect
+      - name: Get changed files using GitHub REST API
+        id: diff
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "Looking for modified top-level project folders..."
+          echo "Fetching changed files between ${{ github.event.before }} and ${{ github.event.after }}"
 
-          changed=$(git diff --name-only ${{ github.event.before }} ${{ github.event.after }} | grep '^projects/' | cut -d/ -f2 | sort -u)
-          echo "Changed projects: $changed"
+          changed_files=$(gh api \
+            repos/${{ github.repository }}/compare/${{ github.event.before }}...${{ github.event.after }} \
+            --jq '.files[].filename')
 
-          # Assuming only one project is changed per commit
-          for project in $changed; do
-            echo "PROJECT=$project" >> $GITHUB_OUTPUT
-            exit 0
-          done
+          echo "Changed files:"
+          echo "$changed_files"
 
-          echo "No relevant project changes detected."
-          exit 1
+          # Extract project names like p1, p2 from paths like projects/p1/...
+          project_names=$(echo "$changed_files" \
+            | grep '^projects/' \
+            | awk -F/ '{print $2}' \
+            | sort -u)
+
+          echo "Detected changed projects:"
+          echo "$project_names"
+
+          echo "changed_projects<<EOF" >> $GITHUB_ENV
+          echo "$project_names" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
 
       - name: Trigger RTD build
-        if: steps.detect.outputs.PROJECT != ''
+        env: 
+          changed_projects: ${{ env.changed_projects }}
         run: |
-          PROJECT=${{ steps.detect.outputs.PROJECT }}
-          echo "Triggering RTD build for $PROJECT"
-
-          curl -X POST "https://readthedocs.org/api/v3/projects/advanced-micro-devices-monorepo-$PROJECT/versions/latest/builds/" \
-           -H "Authorization: Token ${{ secrets.RTD_API_TOKEN }}"
+          for project in $changed_projects; do
+            echo "Triggering RTD build for $project"
+            curl -X POST "https://readthedocs.org/api/v3/projects/advanced-micro-devices-monorepo-$project/versions/latest/builds/" \
+                -H "Authorization: Token ${{ secrets.RTD_API_TOKEN }}"
