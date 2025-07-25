@@ -1,4 +1,3 @@
-/*! \file */
 /* ************************************************************************
  * Copyright (C) 2025 Advanced Micro Devices, Inc. All rights Reserved.
  *
@@ -22,10 +21,10 @@
  *
  * ************************************************************************ */
 
-#include <hip/hip_runtime.h>
 #include <iostream>
-#include <rocsparse.h>
 #include <vector>
+
+#include <rocsparse/rocsparse.h>
 
 #define HIP_CHECK(stat)                                                                       \
     {                                                                                         \
@@ -87,13 +86,13 @@ int main()
     int*   dcsr_col_ind_B = nullptr;
     float* dcsr_val_B     = nullptr;
 
-    HIP_CHECK(hipMalloc((void**)&dcsr_row_ptr_A, (m + 1) * sizeof(int)));
-    HIP_CHECK(hipMalloc((void**)&dcsr_col_ind_A, nnz_A * sizeof(int)));
-    HIP_CHECK(hipMalloc((void**)&dcsr_val_A, nnz_A * sizeof(float)));
+    HIP_CHECK(hipMalloc(&dcsr_row_ptr_A, (m + 1) * sizeof(int)));
+    HIP_CHECK(hipMalloc(&dcsr_col_ind_A, nnz_A * sizeof(int)));
+    HIP_CHECK(hipMalloc(&dcsr_val_A, nnz_A * sizeof(float)));
 
-    HIP_CHECK(hipMalloc((void**)&dcsr_row_ptr_B, (m + 1) * sizeof(int)));
-    HIP_CHECK(hipMalloc((void**)&dcsr_col_ind_B, nnz_B * sizeof(int)));
-    HIP_CHECK(hipMalloc((void**)&dcsr_val_B, nnz_B * sizeof(float)));
+    HIP_CHECK(hipMalloc(&dcsr_row_ptr_B, (m + 1) * sizeof(int)));
+    HIP_CHECK(hipMalloc(&dcsr_col_ind_B, nnz_B * sizeof(int)));
+    HIP_CHECK(hipMalloc(&dcsr_val_B, nnz_B * sizeof(float)));
 
     HIP_CHECK(hipMemcpy(
         dcsr_row_ptr_A, hcsr_row_ptr_A.data(), (m + 1) * sizeof(int), hipMemcpyHostToDevice));
@@ -218,9 +217,9 @@ int main()
     int*   dcsr_row_ptr_C = nullptr;
     int*   dcsr_col_ind_C = nullptr;
     float* dcsr_val_C     = nullptr;
-    HIP_CHECK(hipMalloc((void**)&dcsr_row_ptr_C, (m + 1) * sizeof(int)));
-    HIP_CHECK(hipMalloc((void**)&dcsr_col_ind_C, sizeof(int32_t) * nnz_C));
-    HIP_CHECK(hipMalloc((void**)&dcsr_val_C, sizeof(float) * nnz_C));
+    HIP_CHECK(hipMalloc(&dcsr_row_ptr_C, (m + 1) * sizeof(int)));
+    HIP_CHECK(hipMalloc(&dcsr_col_ind_C, sizeof(int32_t) * nnz_C));
+    HIP_CHECK(hipMalloc(&dcsr_val_C, sizeof(float) * nnz_C));
 
     // Create sparse matrix C in CSR format
     ROCSPARSE_CHECK(rocsparse_create_csr_descr(&matC,

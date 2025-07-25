@@ -1,5 +1,4 @@
 
-/*! \file */
 /* ************************************************************************
  * Copyright (C) 2025 Advanced Micro Devices, Inc. All rights Reserved.
  *
@@ -23,10 +22,10 @@
  *
  * ************************************************************************ */
 
-#include <hip/hip_runtime.h>
 #include <iostream>
-#include <rocsparse.h>
 #include <vector>
+
+#include <rocsparse/rocsparse.h>
 
 #define HIP_CHECK(stat)                                                                       \
     {                                                                                         \
@@ -69,9 +68,9 @@ int main()
     int*   dx_ind;
     float* dx_val;
     float* dy;
-    HIP_CHECK(hipMalloc((void**)&dx_ind, sizeof(int) * nnz));
-    HIP_CHECK(hipMalloc((void**)&dx_val, sizeof(float) * nnz));
-    HIP_CHECK(hipMalloc((void**)&dy, sizeof(float) * size));
+    HIP_CHECK(hipMalloc(&dx_ind, sizeof(int) * nnz));
+    HIP_CHECK(hipMalloc(&dx_val, sizeof(float) * nnz));
+    HIP_CHECK(hipMalloc(&dy, sizeof(float) * size));
 
     HIP_CHECK(hipMemcpy(dx_ind, hx_ind.data(), sizeof(int) * nnz, hipMemcpyHostToDevice));
     HIP_CHECK(hipMemcpy(dx_val, hx_val.data(), sizeof(float) * nnz, hipMemcpyHostToDevice));

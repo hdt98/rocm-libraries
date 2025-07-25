@@ -1,4 +1,3 @@
-/*! \file */
 /* ************************************************************************
  * Copyright (C) 2025 Advanced Micro Devices, Inc. All rights Reserved.
  *
@@ -22,10 +21,10 @@
  *
  * ************************************************************************ */
 
-#include <hip/hip_runtime.h>
 #include <iostream>
-#include <rocsparse.h>
 #include <vector>
+
+#include <rocsparse/rocsparse.h>
 
 #define HIP_CHECK(stat)                                                                       \
     {                                                                                         \
@@ -88,11 +87,11 @@ int main()
     float* dbsr_val;
     float* dB;
     float* dC;
-    HIP_CHECK(hipMalloc((void**)&dbsr_row_ptr, sizeof(int) * (mb + 1)));
-    HIP_CHECK(hipMalloc((void**)&dbsr_col_ind, sizeof(int) * nnzb));
-    HIP_CHECK(hipMalloc((void**)&dbsr_val, sizeof(float) * nnzb * row_block_dim * col_block_dim));
-    HIP_CHECK(hipMalloc((void**)&dB, sizeof(float) * k * n));
-    HIP_CHECK(hipMalloc((void**)&dC, sizeof(float) * m * n));
+    HIP_CHECK(hipMalloc(&dbsr_row_ptr, sizeof(int) * (mb + 1)));
+    HIP_CHECK(hipMalloc(&dbsr_col_ind, sizeof(int) * nnzb));
+    HIP_CHECK(hipMalloc(&dbsr_val, sizeof(float) * nnzb * row_block_dim * col_block_dim));
+    HIP_CHECK(hipMalloc(&dB, sizeof(float) * k * n));
+    HIP_CHECK(hipMalloc(&dC, sizeof(float) * m * n));
 
     HIP_CHECK(hipMemcpy(
         dbsr_row_ptr, hbsr_row_ptr.data(), sizeof(int) * (mb + 1), hipMemcpyHostToDevice));

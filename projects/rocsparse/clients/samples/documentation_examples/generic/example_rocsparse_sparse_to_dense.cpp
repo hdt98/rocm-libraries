@@ -1,4 +1,3 @@
-/*! \file */
 /* ************************************************************************
  * Copyright (C) 2025 Advanced Micro Devices, Inc. All rights Reserved.
  *
@@ -22,10 +21,10 @@
  *
  * ************************************************************************ */
 
-#include <hip/hip_runtime.h>
 #include <iostream>
-#include <rocsparse.h>
 #include <vector>
+
+#include <rocsparse/rocsparse.h>
 
 #define HIP_CHECK(stat)                                                                       \
     {                                                                                         \
@@ -68,10 +67,10 @@ int main()
     int*   dcsr_col_ind;
     float* dcsr_val;
     float* ddense;
-    HIP_CHECK(hipMalloc((void**)&dcsr_row_ptr, sizeof(int) * (m + 1)));
-    HIP_CHECK(hipMalloc((void**)&dcsr_col_ind, sizeof(int) * nnz));
-    HIP_CHECK(hipMalloc((void**)&dcsr_val, sizeof(float) * nnz));
-    HIP_CHECK(hipMalloc((void**)&ddense, sizeof(float) * m * n));
+    HIP_CHECK(hipMalloc(&dcsr_row_ptr, sizeof(int) * (m + 1)));
+    HIP_CHECK(hipMalloc(&dcsr_col_ind, sizeof(int) * nnz));
+    HIP_CHECK(hipMalloc(&dcsr_val, sizeof(float) * nnz));
+    HIP_CHECK(hipMalloc(&ddense, sizeof(float) * m * n));
 
     HIP_CHECK(
         hipMemcpy(dcsr_row_ptr, hcsr_row_ptr.data(), sizeof(int) * (m + 1), hipMemcpyHostToDevice));
@@ -114,7 +113,7 @@ int main()
         handle, matA, matB, rocsparse_sparse_to_dense_alg_default, &buffer_size, nullptr));
 
     void* temp_buffer;
-    HIP_CHECK(hipMalloc((void**)&temp_buffer, buffer_size));
+    HIP_CHECK(hipMalloc(&temp_buffer, buffer_size));
 
     ROCSPARSE_CHECK(rocsparse_sparse_to_dense(
         handle, matA, matB, rocsparse_sparse_to_dense_alg_default, &buffer_size, temp_buffer));

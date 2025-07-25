@@ -1,4 +1,3 @@
-/*! \file */
 /* ************************************************************************
  * Copyright (C) 2025 Advanced Micro Devices, Inc. All rights Reserved.
  *
@@ -22,10 +21,10 @@
  *
  * ************************************************************************ */
 
-#include <hip/hip_runtime.h>
 #include <iostream>
-#include <rocsparse.h>
 #include <vector>
+
+#include <rocsparse/rocsparse.h>
 
 #define HIP_CHECK(stat)                                                                       \
     {                                                                                         \
@@ -84,11 +83,11 @@ int main()
     int*   dcsc_row_ind_B;
     float* dcsc_val_B;
     float* dC;
-    HIP_CHECK(hipMalloc((void**)&dA, sizeof(float) * lda * k));
-    HIP_CHECK(hipMalloc((void**)&dcsc_col_ptr_B, sizeof(int) * (n + 1)));
-    HIP_CHECK(hipMalloc((void**)&dcsc_row_ind_B, sizeof(int) * nnz));
-    HIP_CHECK(hipMalloc((void**)&dcsc_val_B, sizeof(float) * nnz));
-    HIP_CHECK(hipMalloc((void**)&dC, sizeof(float) * ldc * n));
+    HIP_CHECK(hipMalloc(&dA, sizeof(float) * lda * k));
+    HIP_CHECK(hipMalloc(&dcsc_col_ptr_B, sizeof(int) * (n + 1)));
+    HIP_CHECK(hipMalloc(&dcsc_row_ind_B, sizeof(int) * nnz));
+    HIP_CHECK(hipMalloc(&dcsc_val_B, sizeof(float) * nnz));
+    HIP_CHECK(hipMalloc(&dC, sizeof(float) * ldc * n));
 
     HIP_CHECK(hipMemcpy(dA, hA.data(), sizeof(float) * lda * k, hipMemcpyHostToDevice));
     HIP_CHECK(hipMemcpy(

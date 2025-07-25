@@ -1,4 +1,3 @@
-/*! \file */
 /* ************************************************************************
  * Copyright (C) 2025 Advanced Micro Devices, Inc. All rights Reserved.
  *
@@ -22,9 +21,10 @@
  *
  * ************************************************************************ */
 
-#include <hip/hip_runtime.h>
 #include <iostream>
-#include <rocsparse.h>
+#include <vector>
+
+#include <rocsparse/rocsparse.h>
 
 #define HIP_CHECK(stat)                                                                       \
     {                                                                                         \
@@ -102,11 +102,11 @@ int main()
     double*        dx;
     double*        dy;
 
-    HIP_CHECK(hipMalloc((void**)&dbsr_row_ptr, sizeof(rocsparse_int) * (mb + 1)));
-    HIP_CHECK(hipMalloc((void**)&dbsr_col_ind, sizeof(rocsparse_int) * nnzb));
-    HIP_CHECK(hipMalloc((void**)&dbsr_val, sizeof(double) * nnzb * row_block_dim * col_block_dim));
-    HIP_CHECK(hipMalloc((void**)&dx, sizeof(double) * nb * col_block_dim));
-    HIP_CHECK(hipMalloc((void**)&dy, sizeof(double) * mb * row_block_dim));
+    HIP_CHECK(hipMalloc(&dbsr_row_ptr, sizeof(rocsparse_int) * (mb + 1)));
+    HIP_CHECK(hipMalloc(&dbsr_col_ind, sizeof(rocsparse_int) * nnzb));
+    HIP_CHECK(hipMalloc(&dbsr_val, sizeof(double) * nnzb * row_block_dim * col_block_dim));
+    HIP_CHECK(hipMalloc(&dx, sizeof(double) * nb * col_block_dim));
+    HIP_CHECK(hipMalloc(&dy, sizeof(double) * mb * row_block_dim));
 
     HIP_CHECK(hipMemcpy(
         dbsr_row_ptr, hbsr_row_ptr, sizeof(rocsparse_int) * (mb + 1), hipMemcpyHostToDevice));

@@ -1,4 +1,3 @@
-/*! \file */
 /* ************************************************************************
  * Copyright (C) 2025 Advanced Micro Devices, Inc. All rights Reserved.
  *
@@ -22,10 +21,10 @@
  *
  * ************************************************************************ */
 
-#include <hip/hip_runtime.h>
 #include <iostream>
-#include <rocsparse.h>
 #include <vector>
+
+#include <rocsparse/rocsparse.h>
 
 #define HIP_CHECK(stat)                                                                       \
     {                                                                                         \
@@ -64,9 +63,9 @@ int main()
     int*   dcsr_row_ptr = nullptr;
     int*   dcsr_col_ind = nullptr;
     float* dcsr_val     = nullptr;
-    HIP_CHECK(hipMalloc((void**)&dcsr_row_ptr, sizeof(int) * (M + 1)));
-    HIP_CHECK(hipMalloc((void**)&dcsr_col_ind, sizeof(int) * nnz));
-    HIP_CHECK(hipMalloc((void**)&dcsr_val, sizeof(float) * nnz));
+    HIP_CHECK(hipMalloc(&dcsr_row_ptr, sizeof(int) * (M + 1)));
+    HIP_CHECK(hipMalloc(&dcsr_col_ind, sizeof(int) * nnz));
+    HIP_CHECK(hipMalloc(&dcsr_val, sizeof(float) * nnz));
 
     HIP_CHECK(
         hipMemcpy(dcsr_row_ptr, hcsr_row_ptr.data(), sizeof(int) * (M + 1), hipMemcpyHostToDevice));
@@ -109,7 +108,7 @@ int main()
                                           nullptr));
 
     void* dbuffer = nullptr;
-    HIP_CHECK(hipMalloc((void**)&dbuffer, buffer_size));
+    HIP_CHECK(hipMalloc(&dbuffer, buffer_size));
 
     ROCSPARSE_CHECK(rocsparse_check_spmat(
         handle, matA, &data_status, rocsparse_check_spmat_stage_compute, &buffer_size, dbuffer));
