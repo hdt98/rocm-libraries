@@ -121,6 +121,7 @@ include(CMakeDependentOption)
 cmake_dependent_option(HIPBLASLT_ENABLE_MARKER "Enable roctx marker in hipBLASLt" ON "BUILD_SHARED_LIBS" OFF)
 # For rocRoller
 option(HIPBLASLT_USE_ROCROLLER "Build with the rocRoller library" ON)
+option(HIPBLASLT_CTEST_PACKAGE_SUPPORT "Ship CTestTestfile.cmake along with the package" OFF)
 
 if(BUILD_ADDRESS_SANITIZER)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -shared-libasan")

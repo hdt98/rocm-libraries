@@ -428,6 +428,7 @@ disable_hipblaslt_marker=false
 enable_tensile_marker=false
 skip_rocroller=false
 use_rocroller=false
+ctest_package_support=false
 logic_filter=
 legacy_hipblas_direct=false
 quiet=false
@@ -573,6 +574,9 @@ while true; do
             shift;;
         --skip_rocroller)
             skip_rocroller=true
+            shift;;
+        --ctest_package_support)
+            ctest_package_support=true
             shift;;
         --logic_yaml_filter|--logic-yaml-filter)
             logic_filter=${2}
@@ -854,6 +858,10 @@ pushd .
 
   if [[ "${use_rocroller}" == false ]]; then
     cmake_common_options="${cmake_common_options} -DHIPBLASLT_USE_ROCROLLER=OFF"
+  fi
+
+  if [[ "${ctest_package_support}" == true ]]; then
+    cmake_common_options="${cmake_common_options} -DHIPBLASLT_CTEST_PACKAGE_SUPPORT=ON"
   fi
 
   echo $cmake_common_options
