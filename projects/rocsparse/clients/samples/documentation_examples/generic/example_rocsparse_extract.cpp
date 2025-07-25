@@ -67,9 +67,9 @@ int main()
         = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 1.0f, 3.0f, 5.0f, 7.0f, 1.0f, 3.0f, 9.0f, 1.0f, 2.0f, 3.0f,
            4.0f, 1.0f, 2.0f, 1.0f, 5.0f, 8.0f, 1.0f, 2.0f, 3.0f, 4.0f, 1.0f, 2.0f, 1.0f, 2.0f};
 
-    int32_t* dsource_row_ptr = nullptr;
-    int32_t* dsource_col_ind = nullptr;
-    float*   dsource_val     = nullptr;
+    int32_t* dsource_row_ptr;
+    int32_t* dsource_col_ind;
+    float*   dsource_val;
     HIP_CHECK(hipMalloc(&dsource_row_ptr, sizeof(int32_t) * (M + 1)));
     HIP_CHECK(hipMalloc(&dsource_col_ind, sizeof(int32_t) * nnz));
     HIP_CHECK(hipMalloc(&dsource_val, sizeof(float) * nnz));
@@ -131,7 +131,7 @@ int main()
     size_t buffer_size;
     ROCSPARSE_CHECK(rocsparse_extract_buffer_size(
         handle, descr, source, target, rocsparse_extract_stage_analysis, &buffer_size));
-    void* dbuffer = nullptr;
+    void* dbuffer;
     HIP_CHECK(hipMalloc(&dbuffer, buffer_size));
     ROCSPARSE_CHECK(rocsparse_extract(
         handle, descr, source, target, rocsparse_extract_stage_analysis, buffer_size, dbuffer));

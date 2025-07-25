@@ -83,14 +83,14 @@ int main()
     std::vector<int>   hcsr_col_indC = {0, 0, 1, 0, 1};
     std::vector<float> hcsr_valC     = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f};
 
-    float* dA = nullptr;
-    float* dB = nullptr;
+    float* dA;
+    float* dB;
     HIP_CHECK(hipMalloc(&dA, sizeof(float) * m * k));
     HIP_CHECK(hipMalloc(&dB, sizeof(float) * k * n));
 
-    int*   dcsr_row_ptrC = nullptr;
-    int*   dcsr_col_indC = nullptr;
-    float* dcsr_valC     = nullptr;
+    int*   dcsr_row_ptrC;
+    int*   dcsr_col_indC;
+    float* dcsr_valC;
     HIP_CHECK(hipMalloc(&dcsr_row_ptrC, sizeof(int) * (m + 1)));
     HIP_CHECK(hipMalloc(&dcsr_col_indC, sizeof(int) * nnzC));
     HIP_CHECK(hipMalloc(&dcsr_valC, sizeof(float) * nnzC));
@@ -138,7 +138,7 @@ int main()
                                                 rocsparse_sddmm_alg_default,
                                                 &buffer_size));
 
-    void* dbuffer = nullptr;
+    void* dbuffer;
     HIP_CHECK(hipMalloc(&dbuffer, buffer_size));
 
     ROCSPARSE_CHECK(rocsparse_sddmm_preprocess(handle,

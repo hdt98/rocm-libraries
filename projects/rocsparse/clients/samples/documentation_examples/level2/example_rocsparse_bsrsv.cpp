@@ -67,11 +67,11 @@ int main()
     std::vector<double> hx(mb * block_dim, 1.0);
     std::vector<double> hy(mb * block_dim);
 
-    int*    dbsr_row_ptr = nullptr;
-    int*    dbsr_col_ind = nullptr;
-    double* dbsr_val     = nullptr;
-    double* dx           = nullptr;
-    double* dy           = nullptr;
+    int*    dbsr_row_ptr;
+    int*    dbsr_col_ind;
+    double* dbsr_val;
+    double* dx;
+    double* dy;
     HIP_CHECK(hipMalloc(&dbsr_row_ptr, sizeof(int) * (mb + 1)));
     HIP_CHECK(hipMalloc(&dbsr_col_ind, sizeof(int) * nnzb));
     HIP_CHECK(hipMalloc(&dbsr_val, sizeof(double) * nnzb * block_dim * block_dim));

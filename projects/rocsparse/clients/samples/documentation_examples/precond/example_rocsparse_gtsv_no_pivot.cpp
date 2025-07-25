@@ -70,10 +70,10 @@ int main()
     // Host right-hand side column vectors
     std::vector<float> hB(ldb * n, 1.0f);
 
-    float* ddl = nullptr;
-    float* dd  = nullptr;
-    float* ddu = nullptr;
-    float* dB  = nullptr;
+    float* ddl;
+    float* dd;
+    float* ddu;
+    float* dB;
     HIP_CHECK(hipMalloc(&ddl, sizeof(float) * m));
     HIP_CHECK(hipMalloc(&dd, sizeof(float) * m));
     HIP_CHECK(hipMalloc(&ddu, sizeof(float) * m));

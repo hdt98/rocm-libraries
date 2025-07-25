@@ -76,11 +76,11 @@ int main()
     ROCSPARSE_CHECK(rocsparse_create_mat_descr(&descrA));
 
     // Offload data to device
-    rocsparse_int* dAptr = NULL;
-    rocsparse_int* dAcol = NULL;
-    double*        dAval = NULL;
-    double*        dx    = NULL;
-    double*        dy    = NULL;
+    rocsparse_int* dAptr;
+    rocsparse_int* dAcol;
+    double*        dAval;
+    double*        dx;
+    double*        dy;
 
     HIP_CHECK(hipMalloc(&dAptr, sizeof(rocsparse_int) * (m + 1)));
     HIP_CHECK(hipMalloc(&dAcol, sizeof(rocsparse_int) * nnz));

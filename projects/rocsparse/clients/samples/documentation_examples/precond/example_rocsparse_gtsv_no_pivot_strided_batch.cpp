@@ -98,10 +98,10 @@ int main()
         }
     }
 
-    float* ddl = nullptr;
-    float* dd  = nullptr;
-    float* ddu = nullptr;
-    float* dx  = nullptr;
+    float* ddl;
+    float* dd;
+    float* ddu;
+    float* dx;
     HIP_CHECK(hipMalloc(&ddl, sizeof(float) * batch_stride * batch_count));
     HIP_CHECK(hipMalloc(&dd, sizeof(float) * batch_stride * batch_count));
     HIP_CHECK(hipMalloc(&ddu, sizeof(float) * batch_stride * batch_count));

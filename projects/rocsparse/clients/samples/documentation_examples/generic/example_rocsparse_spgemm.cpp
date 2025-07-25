@@ -80,15 +80,15 @@ int main()
     float alpha = 1.0f;
     float beta  = 0.0f;
 
-    int*   dcsr_row_ptr_A = nullptr;
-    int*   dcsr_col_ind_A = nullptr;
-    float* dcsr_val_A     = nullptr;
+    int*   dcsr_row_ptr_A;
+    int*   dcsr_col_ind_A;
+    float* dcsr_val_A;
 
-    int*   dcsr_row_ptr_B = nullptr;
-    int*   dcsr_col_ind_B = nullptr;
-    float* dcsr_val_B     = nullptr;
+    int*   dcsr_row_ptr_B;
+    int*   dcsr_col_ind_B;
+    float* dcsr_val_B;
 
-    int* dcsr_row_ptr_C = nullptr;
+    int* dcsr_row_ptr_C;
 
     HIP_CHECK(hipMalloc(&dcsr_row_ptr_A, (m + 1) * sizeof(int)));
     HIP_CHECK(hipMalloc(&dcsr_col_ind_A, nnz_A * sizeof(int)));
@@ -116,7 +116,7 @@ int main()
 
     rocsparse_handle      handle;
     rocsparse_spmat_descr matA, matB, matC, matD;
-    void*                 temp_buffer = NULL;
+    void*                 temp_buffer;
     size_t                buffer_size = 0;
 
     rocsparse_operation  trans_A    = rocsparse_operation_none;

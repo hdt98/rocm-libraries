@@ -60,9 +60,9 @@ int main()
     int N   = 4;
     int nnz = 7;
 
-    int*   dcsr_row_ptr = nullptr;
-    int*   dcsr_col_ind = nullptr;
-    float* dcsr_val     = nullptr;
+    int*   dcsr_row_ptr;
+    int*   dcsr_col_ind;
+    float* dcsr_val;
     HIP_CHECK(hipMalloc(&dcsr_row_ptr, sizeof(int) * (M + 1)));
     HIP_CHECK(hipMalloc(&dcsr_col_ind, sizeof(int) * nnz));
     HIP_CHECK(hipMalloc(&dcsr_val, sizeof(float) * nnz));
@@ -107,7 +107,7 @@ int main()
                                           &buffer_size,
                                           nullptr));
 
-    void* dbuffer = nullptr;
+    void* dbuffer;
     HIP_CHECK(hipMalloc(&dbuffer, buffer_size));
 
     ROCSPARSE_CHECK(rocsparse_check_spmat(

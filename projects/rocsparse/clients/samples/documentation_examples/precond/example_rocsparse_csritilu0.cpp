@@ -62,10 +62,10 @@ int main()
     std::vector<int>   hcsr_col_ind = {0, 1, 0, 1, 2, 1, 2};
     std::vector<float> hcsr_val     = {2.0f, 1.0f, 1.0f, 2.0f, 1.0f, 1.0f, 2.0f};
 
-    int*   dcsr_row_ptr = nullptr;
-    int*   dcsr_col_ind = nullptr;
-    float* dcsr_val     = nullptr;
-    float* dilu0        = nullptr;
+    int*   dcsr_row_ptr;
+    int*   dcsr_col_ind;
+    float* dcsr_val;
+    float* dilu0;
     HIP_CHECK(hipMalloc(&dcsr_row_ptr, sizeof(int) * (m + 1)));
     HIP_CHECK(hipMalloc(&dcsr_col_ind, sizeof(int) * nnz));
     HIP_CHECK(hipMalloc(&dcsr_val, sizeof(float) * nnz));
@@ -100,7 +100,7 @@ int main()
                                                     datatype,
                                                     &buffer_size));
 
-    void* dbuffer = nullptr;
+    void* dbuffer;
     HIP_CHECK(hipMalloc(&dbuffer, buffer_size));
 
     ROCSPARSE_CHECK(rocsparse_csritilu0_preprocess(handle,

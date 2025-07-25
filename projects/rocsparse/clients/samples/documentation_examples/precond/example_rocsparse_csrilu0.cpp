@@ -66,12 +66,12 @@ int main()
 
     std::vector<double> hx(m, 1.0);
 
-    int*    dcsr_row_ptr = nullptr;
-    int*    dcsr_col_ind = nullptr;
-    double* dcsr_val     = nullptr;
-    double* dx           = nullptr;
-    double* dy           = nullptr;
-    double* dz           = nullptr;
+    int*    dcsr_row_ptr;
+    int*    dcsr_col_ind;
+    double* dcsr_val;
+    double* dx;
+    double* dy;
+    double* dz;
     HIP_CHECK(hipMalloc(&dcsr_row_ptr, sizeof(int) * (m + 1)));
     HIP_CHECK(hipMalloc(&dcsr_col_ind, sizeof(int) * nnz));
     HIP_CHECK(hipMalloc(&dcsr_val, sizeof(double) * nnz));

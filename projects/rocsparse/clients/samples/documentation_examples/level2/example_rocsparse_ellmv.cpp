@@ -79,11 +79,11 @@ int main()
     ROCSPARSE_CHECK(rocsparse_create_mat_descr(&descrB));
 
     // Offload data to device
-    rocsparse_int* dAptr = NULL;
-    rocsparse_int* dAcol = NULL;
-    double*        dAval = NULL;
-    double*        dx    = NULL;
-    double*        dy    = NULL;
+    rocsparse_int* dAptr;
+    rocsparse_int* dAcol;
+    double*        dAval;
+    double*        dx;
+    double*        dy;
 
     HIP_CHECK(hipMalloc(&dAptr, sizeof(rocsparse_int) * (m + 1)));
     HIP_CHECK(hipMalloc(&dAcol, sizeof(rocsparse_int) * nnz));
@@ -97,8 +97,8 @@ int main()
     HIP_CHECK(hipMemcpy(dx, hx, sizeof(double) * n, hipMemcpyHostToDevice));
 
     // Convert CSR matrix to ELL format
-    rocsparse_int* dBcol = NULL;
-    double*        dBval = NULL;
+    rocsparse_int* dBcol;
+    double*        dBval;
 
     // Determine ELL width
     rocsparse_int ell_width;
