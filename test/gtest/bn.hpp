@@ -274,7 +274,7 @@ protected:
                                            : static_cast<double>(0.5f);
         bn_bwd_test_data.activ_beta  = static_cast<double>(0.3f);
 
-        auto&& handle      = get_handle();
+        auto&& handle = get_handle();
         if(!bn_bwd_test_data.saveMeanVar && bn_bwd_test_data.bn_mode == miopenBNPerActivation)
         {
             test_skipped = true;
@@ -527,7 +527,7 @@ protected:
         bn_fwd_train_test_data.activ_alpha = static_cast<double>(0.1f);
         bn_fwd_train_test_data.activ_beta  = static_cast<double>(0.3f);
 
-        auto&& handle      = get_handle();
+        auto&& handle = get_handle();
         if(!bn_fwd_train_test_data.saveMeanVar &&
            bn_fwd_train_test_data.bn_mode == miopenBNPerActivation)
         {
