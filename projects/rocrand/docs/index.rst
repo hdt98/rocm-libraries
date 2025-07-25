@@ -8,6 +8,8 @@
 rocRAND documentation
 ********************************************************************
 
+Test
+
 rocRAND provides functions that generate pseudo-random and quasi-random numbers.
 The rocRAND library is implemented in the :doc:`HIP <hip:index>`
 programming language and optimized for the latest discrete AMD GPUs. It is designed to run on top
