@@ -48,3 +48,4 @@ jobs:
             echo "Triggering RTD build for $project"
             curl -X POST "https://readthedocs.org/api/v3/projects/advanced-micro-devices-monorepo-$project/versions/latest/builds/" \
                 -H "Authorization: Token ${{ secrets.RTD_TOKEN }}"
+          done
