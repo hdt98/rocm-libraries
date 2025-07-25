@@ -27,7 +27,7 @@ jobs:
           echo "Changed files:"
           echo "$changed_files"
 
-          # Extract project names like p1, p2 from paths like projects/p1/...
+          # Extract project names from paths like projects/rocprim/...
           project_names=$(echo "$changed_files" \
             | grep '^projects/' \
             | awk -F/ '{print $2}' \
@@ -45,9 +45,15 @@ jobs:
           changed_projects: ${{ env.changed_projects }}
           RTD_TOKEN: ${{ secrets.RTD_TOKEN }}
         run: |
+          branch_name = "${GITHUB_REF#refs/heads/}"
+          version_slug = "${branch_name//\//-}"
+
+          echo "Target github branch: $branch_name"
+          echo "Read the Docs version slug: $version_slug"
+
           for project in $changed_projects; do
             echo "Triggering RTD build for $project"
             curl -X POST \
                  -H "Authorization: Token $RTD_TOKEN" \
-                 "https://readthedocs.com/api/v3/projects/advanced-micro-devices-monorepo-$project/versions/latest/builds/"
+                 "https://readthedocs.com/api/v3/projects/advanced-micro-devices-monorepo-$project/versions/$version_slug/builds/"
           done
