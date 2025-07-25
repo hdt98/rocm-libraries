@@ -45,8 +45,8 @@ jobs:
           changed_projects: ${{ env.changed_projects }}
           RTD_TOKEN: ${{ secrets.RTD_TOKEN }}
         run: |
-          branch_name = "${GITHUB_REF#refs/heads/}"
-          version_slug = "${branch_name//\//-}"
+          branch_name="${GITHUB_REF#refs/heads/}"
+          version_slug="${branch_name//\//-}"
 
           echo "Target github branch: $branch_name"
           echo "Read the Docs version slug: $version_slug"
