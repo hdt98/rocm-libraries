@@ -46,6 +46,7 @@ jobs:
         run: |
           for project in $changed_projects; do
             echo "Triggering RTD build for $project"
-            curl -X POST "https://readthedocs.com/api/v3/projects/advanced-micro-devices-monorepo-$project/versions/latest/builds/" \
-                -H "Authorization: Token ${{ secrets.RTD_TOKEN }}"
+            curl -X POST \
+                 -H "Authorization: Token ${{ secrets.RTD_TOKEN }}" \
+                 "https://readthedocs.com/api/v3/projects/advanced-micro-devices-monorepo-$project/versions/latest/builds/"
           done
