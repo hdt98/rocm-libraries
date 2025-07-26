@@ -5,6 +5,7 @@
 
 #include "ck/utility/dtype_vector.hpp"
 #include "ck/utility/f8_utils.hpp"
+#include "ck/utility/get_id.hpp"
 #include "ck/utility/mxf4_utils.hpp"
 #include "ck/utility/mxf6_utils.hpp"
 #include "ck/utility/random_gen.hpp"
@@ -265,12 +266,18 @@ __host__ __device__ constexpr Y f8_convert_sr(X x);
 template <>
 inline __host__ __device__ f8_fnuz_t f8_convert_sr<f8_fnuz_t, float>(float x)
 {
+#if defined(__gfx950__)
+    // use HW clock for stochastic input multiply by incremented thread id
+    uint32_t rng = __builtin_amdgcn_prng_b32(__builtin_amdgcn_s_memrealtime() *
+                                             (get_thread_global_1d_id() + 1));
+#else
     constexpr int seed = 1254739;
 #ifndef CK_CODE_GEN_RTC
-    uint32_t rng = prand_generator<float, seed>(reinterpret_cast<uintptr_t>(&x), x);
+    uint32_t rng       = prand_generator<float, seed>(reinterpret_cast<uintptr_t>(&x), x);
 #else
     uint32_t rng = prand_generator<float, seed>(reinterpret_cast<size_t>(&x), x);
-#endif
+#endif // #ifndef CK_CODE_GEN_RTC
+#endif // #if defined(__gfx950__)
 #if defined(__gfx94__)
     union
     {
@@ -327,12 +334,18 @@ inline __host__ __device__ f8_fnuz_t f8_convert_sr<f8_fnuz_t, half_t>(half_t x)
 template <>
 inline __host__ __device__ bf8_fnuz_t f8_convert_sr<bf8_fnuz_t, float>(float x)
 {
+#if defined(__gfx950__)
+    // use HW clock for stochastic input multiply by incremented thread id
+    uint32_t rng = __builtin_amdgcn_prng_b32(__builtin_amdgcn_s_memrealtime() *
+                                             (get_thread_global_1d_id() + 1));
+#else
     constexpr int seed = 1254739;
 #ifndef CK_CODE_GEN_RTC
-    uint32_t rng = prand_generator<float, seed>(reinterpret_cast<uintptr_t>(&x), x);
+    uint32_t rng       = prand_generator<float, seed>(reinterpret_cast<uintptr_t>(&x), x);
 #else
     uint32_t rng = prand_generator<float, seed>(reinterpret_cast<size_t>(&x), x);
-#endif
+#endif // #ifndef CK_CODE_GEN_RTC
+#endif // #if defined(__gfx950__)
 #if defined(__gfx94__)
     union
     {
@@ -916,7 +929,14 @@ template <>
 inline __host__ __device__ float2_t type_convert<float2_t, f8x2_ocp_t>(f8x2_ocp_t x)
 {
 #if CK_OCP_FP8_CVT_FAST_PATH
+// __builtin_amdgcn_cvt_pk_f32_fp8 can produce incorrect results due to a compiler issue.
+// TODO: Enable when SWDEV-532959 is fixed.
+#if defined(__gfx1200__) || defined(__gfx1201__)
+    return float2_t{__builtin_amdgcn_cvt_f32_fp8(bit_cast<uint16_t>(x), 0),
+                    __builtin_amdgcn_cvt_f32_fp8(bit_cast<uint16_t>(x), 1)};
+#else
     return __builtin_amdgcn_cvt_pk_f32_fp8(bit_cast<uint16_t>(x), false);
+#endif
 #else
     return float2_t{fp8_impl::cast_from_f8<float, f8_ocp_t::wm, f8_ocp_t::we, false>(
                         x.AsType<fp8_storage_t>()[Number<0>{}]),
@@ -1052,7 +1072,14 @@ template <>
 inline __host__ __device__ float2_t type_convert<float2_t, bf8x2_ocp_t>(bf8x2_ocp_t x)
 {
 #if CK_OCP_FP8_CVT_FAST_PATH
+// __builtin_amdgcn_cvt_pk_f32_bf8 can produce incorrect results due to a compiler issue.
+// TODO: Enable when SWDEV-532959 is fixed.
+#if defined(__gfx1200__) || defined(__gfx1201__)
+    return float2_t{__builtin_amdgcn_cvt_f32_bf8(bit_cast<uint16_t>(x), 0),
+                    __builtin_amdgcn_cvt_f32_bf8(bit_cast<uint16_t>(x), 1)};
+#else
     return __builtin_amdgcn_cvt_pk_f32_bf8(bit_cast<uint16_t>(x), false);
+#endif
 #else
     return float2_t{fp8_impl::cast_from_f8<float, bf8_ocp_t::wm, bf8_ocp_t::we, false>(
                         x.AsType<fp8_storage_t>()[Number<0>{}]),
@@ -1463,13 +1490,10 @@ inline __host__ __device__ f4x32_t f4_convert_rne(float32_t x, float scale = 1.0
 // convert fp32 to fp4 with stochastic rounding
 inline __host__ __device__ f4_t f4_convert_sr(float x, float scale = 1.0f)
 {
-    constexpr int seed = 1254739;
-#ifndef CK_CODE_GEN_RTC
-    uint32_t rng = prand_generator<float, seed>(reinterpret_cast<uintptr_t>(&x), x);
-#else
-    uint32_t rng = prand_generator<float, seed>(reinterpret_cast<size_t>(&x), x);
-#endif
 #if defined(__gfx950__)
+    // use HW clock for stochastic input multiply by incremented thread id
+    uint32_t rng = __builtin_amdgcn_prng_b32(__builtin_amdgcn_s_memrealtime() *
+                                             (get_thread_global_1d_id() + 1));
     union
     {
         uint32_t bitwise;
@@ -1485,6 +1509,12 @@ inline __host__ __device__ f4_t f4_convert_sr(float x, float scale = 1.0f)
         value.bitwise, float_values.float2_array, rng, scale, 0);
     return value.f4_array[0];
 #else
+    constexpr int seed = 1254739;
+#ifndef CK_CODE_GEN_RTC
+    uint32_t rng       = prand_generator<float, seed>(reinterpret_cast<uintptr_t>(&x), x);
+#else
+    uint32_t rng = prand_generator<float, seed>(reinterpret_cast<size_t>(&x), x);
+#endif
     return utils::sat_convert_to_type_sr<f4_t>(x / scale, rng);
 #endif
 }
@@ -1492,13 +1522,10 @@ inline __host__ __device__ f4_t f4_convert_sr(float x, float scale = 1.0f)
 // convert vector of 2 fp32 to vector of 2 fp4 with sr
 inline __host__ __device__ f4x2_t f4_convert_sr(float2_t x, float scale = 1.0f)
 {
-    constexpr int seed = 1254739;
-#ifndef CK_CODE_GEN_RTC
-    uint32_t rng = prand_generator<float, seed>(reinterpret_cast<uintptr_t>(&x), x[0]);
-#else
-    uint32_t rng = prand_generator<float, seed>(reinterpret_cast<size_t>(&x), x[0]);
-#endif
 #if defined(__gfx950__)
+    // use HW clock for stochastic input multiply by incremented thread id
+    uint32_t rng = __builtin_amdgcn_prng_b32(__builtin_amdgcn_s_memrealtime() *
+                                             (get_thread_global_1d_id() + 1));
     union
     {
         uint32_t bitwise;
@@ -1516,6 +1543,12 @@ inline __host__ __device__ f4x2_t f4_convert_sr(float2_t x, float scale = 1.0f)
 #endif // CK_WORKAROUND_FP32_TO_FP4_SR_CONVERSION
     return value.f4x2_array[0];
 #else
+    constexpr int seed = 1254739;
+#ifndef CK_CODE_GEN_RTC
+    uint32_t rng       = prand_generator<float, seed>(reinterpret_cast<uintptr_t>(&x), x[0]);
+#else
+    uint32_t rng = prand_generator<float, seed>(reinterpret_cast<size_t>(&x), x[0]);
+#endif
     union
     {
         uint32_t bitwise;
@@ -1531,13 +1564,10 @@ inline __host__ __device__ f4x2_t f4_convert_sr(float2_t x, float scale = 1.0f)
 // convert vector of 32 fp32 to vector of 32 fp4 with sr
 inline __host__ __device__ f4x32_t f4_convert_sr(float32_t x, float scale = 1.0f)
 {
-    constexpr int seed = 1254739;
-#ifndef CK_CODE_GEN_RTC
-    uint32_t rng = prand_generator<float, seed>(reinterpret_cast<uintptr_t>(&x), x[0]);
-#else
-    uint32_t rng = prand_generator<float, seed>(reinterpret_cast<size_t>(&x), x[0]);
-#endif
 #if defined(__gfx950__)
+    // use HW clock for stochastic input multiply by incremented thread id
+    uint32_t rng = __builtin_amdgcn_prng_b32(__builtin_amdgcn_s_memrealtime() *
+                                             (get_thread_global_1d_id() + 1));
     union
     {
         __uint128_t bitwise;
@@ -1563,6 +1593,12 @@ inline __host__ __device__ f4x32_t f4_convert_sr(float32_t x, float scale = 1.0f
 
     return f4_values.f4x32_array;
 #else
+    constexpr int seed = 1254739;
+#ifndef CK_CODE_GEN_RTC
+    uint32_t rng       = prand_generator<float, seed>(reinterpret_cast<uintptr_t>(&x), x[0]);
+#else
+    uint32_t rng = prand_generator<float, seed>(reinterpret_cast<size_t>(&x), x[0]);
+#endif
     union
     {
         __uint128_t bitwise;
@@ -1602,6 +1638,11 @@ inline __host__ __device__ f4x2_t type_convert<f4x2_t, float2_t>(float2_t x)
 #else
     return f4_convert_rne(x);
 #endif
+}
+template <>
+inline __host__ __device__ f4x2_pk_t type_convert<f4x2_pk_t, float2_t>(float2_t x)
+{
+    return static_cast<f4x2_pk_t>(type_convert<f4x2_t>(x));
 }
 
 // convert vector of 32 fp32 to vector of 32 fp4
@@ -1788,13 +1829,10 @@ inline __host__ __device__ f6x32_t f6_convert_rne(float32_t x, float scale = 1.0
  */
 inline __host__ __device__ f6_t f6_convert_sr(float x, float scale = 1.0f)
 {
-    constexpr int seed = 1254739;
-#ifndef CK_CODE_GEN_RTC
-    uint32_t rng = prand_generator<float, seed>(reinterpret_cast<uintptr_t>(&x), x);
-#else
-    uint32_t rng = prand_generator<float, seed>(reinterpret_cast<size_t>(&x), x);
-#endif
 #if defined(__gfx950__)
+    // use HW clock for stochastic input multiply by incremented thread id
+    uint32_t rng = __builtin_amdgcn_prng_b32(__builtin_amdgcn_s_memrealtime() *
+                                             (get_thread_global_1d_id() + 1));
     union
     {
         float32_t float_vector;
@@ -1811,6 +1849,12 @@ inline __host__ __device__ f6_t f6_convert_sr(float x, float scale = 1.0f)
 
     return out.f6_array[0];
 #else
+    constexpr int seed = 1254739;
+#ifndef CK_CODE_GEN_RTC
+    uint32_t rng       = prand_generator<float, seed>(reinterpret_cast<uintptr_t>(&x), x);
+#else
+    uint32_t rng = prand_generator<float, seed>(reinterpret_cast<size_t>(&x), x);
+#endif
     return utils::sat_convert_to_type_sr<f6_t>(x / scale, rng);
 #endif
 }
@@ -1827,6 +1871,12 @@ inline __host__ __device__ f6_t f6_convert_sr(float x, float scale = 1.0f)
  */
 inline __host__ __device__ f6x32_t f6_convert_sr(float32_t x, float scale = 1.0f)
 {
+#if defined(__gfx950__)
+    // use HW clock for stochastic input multiply by incremented thread id
+    uint32_t rng = __builtin_amdgcn_prng_b32(__builtin_amdgcn_s_memrealtime() *
+                                             (get_thread_global_1d_id() + 1));
+    return __builtin_amdgcn_cvt_scalef32_sr_pk32_fp6_f32(x, rng, scale);
+#else
     constexpr int seed = 1254739;
     union
     {
@@ -1840,9 +1890,6 @@ inline __host__ __device__ f6x32_t f6_convert_sr(float32_t x, float scale = 1.0f
     uint32_t rng =
         prand_generator<float, seed>(reinterpret_cast<size_t>(&x), float_values.float_array[0]);
 #endif
-#if defined(__gfx950__)
-    return __builtin_amdgcn_cvt_scalef32_sr_pk32_fp6_f32(x, rng, scale);
-#else
     union
     {
         float32_t float_vector;
@@ -2056,13 +2103,10 @@ inline __host__ __device__ bf6x32_t bf6_convert_rne(float32_t x, float scale = 1
  */
 inline __host__ __device__ bf6_t bf6_convert_sr(float x, float scale = 1.0f)
 {
-    constexpr int seed = 1254739;
-#ifndef CK_CODE_GEN_RTC
-    uint32_t rng = prand_generator<float, seed>(reinterpret_cast<uintptr_t>(&x), x);
-#else
-    uint32_t rng = prand_generator<float, seed>(reinterpret_cast<size_t>(&x), x);
-#endif
 #if defined(__gfx950__)
+    // use HW clock for stochastic input multiply by incremented thread id
+    uint32_t rng = __builtin_amdgcn_prng_b32(__builtin_amdgcn_s_memrealtime() *
+                                             (get_thread_global_1d_id() + 1));
     union
     {
         float32_t float_vector;
@@ -2079,6 +2123,12 @@ inline __host__ __device__ bf6_t bf6_convert_sr(float x, float scale = 1.0f)
 
     return out.bf6_array[0];
 #else
+    constexpr int seed = 1254739;
+#ifndef CK_CODE_GEN_RTC
+    uint32_t rng       = prand_generator<float, seed>(reinterpret_cast<uintptr_t>(&x), x);
+#else
+    uint32_t rng = prand_generator<float, seed>(reinterpret_cast<size_t>(&x), x);
+#endif
     return utils::sat_convert_to_type_sr<bf6_t>(x / scale, rng);
 #endif
 }
@@ -2097,6 +2147,12 @@ inline __host__ __device__ bf6_t bf6_convert_sr(float x, float scale = 1.0f)
  */
 inline __host__ __device__ bf6x32_t bf6_convert_sr(float32_t x, float scale = 1.0f)
 {
+#if defined(__gfx950__)
+    // use HW clock for stochastic input multiply by incremented thread id
+    uint32_t rng = __builtin_amdgcn_prng_b32(__builtin_amdgcn_s_memrealtime() *
+                                             (get_thread_global_1d_id() + 1));
+    return __builtin_amdgcn_cvt_scalef32_sr_pk32_bf6_f32(x, rng, scale);
+#else
     constexpr int seed = 1254739;
     union
     {
@@ -2110,9 +2166,6 @@ inline __host__ __device__ bf6x32_t bf6_convert_sr(float32_t x, float scale = 1.
     uint32_t rng =
         prand_generator<float, seed>(reinterpret_cast<size_t>(&x), float_values.float_array[0]);
 #endif
-#if defined(__gfx950__)
-    return __builtin_amdgcn_cvt_scalef32_sr_pk32_bf6_f32(x, rng, scale);
-#else
     union
     {
         float32_t float_vector;

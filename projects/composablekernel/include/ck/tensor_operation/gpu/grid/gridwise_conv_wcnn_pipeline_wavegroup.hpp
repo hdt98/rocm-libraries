@@ -152,9 +152,9 @@ struct GridwiseConvPipeline_v2
         __syncthreads();
 
         bool isChainStartVal = __builtin_amdgcn_spatial_cluster_is_chain_start();
-        bool isChainStart = __builtin_amdgcn_readfirstlane(isChainStartVal);
-        bool isChainEndVal = __builtin_amdgcn_spatial_cluster_is_chain_end();
-        bool isChainEnd = __builtin_amdgcn_readfirstlane(isChainEndVal);
+        bool isChainStart    = __builtin_amdgcn_readfirstlane(isChainStartVal);
+        bool isChainEndVal   = __builtin_amdgcn_spatial_cluster_is_chain_end();
+        bool isChainEnd      = __builtin_amdgcn_readfirstlane(isChainEndVal);
 
         // pre-fetch data
         if(get_wave_id_in_wavegroup() == WaveIdLoad)

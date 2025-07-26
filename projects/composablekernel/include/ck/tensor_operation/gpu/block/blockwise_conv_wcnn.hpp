@@ -117,8 +117,8 @@ struct BlockwiseConvWcnn
     static constexpr index_t DataTileHeight = 4;
     static constexpr index_t H_Pad          = (FilterSize == 3) ? DataTileHeight : 0;
     static constexpr index_t W_Pad = ((FilterSize == 3) && !EnableSpatialCluster) ? WPerWcnn : 0;
-    static constexpr index_t HPerBlockIn    = HPerBlock + H_Pad * 2;
-    static constexpr index_t WPerBlockIn    = WPerBlock + W_Pad * 2;
+    static constexpr index_t HPerBlockIn = HPerBlock + H_Pad * 2;
+    static constexpr index_t WPerBlockIn = WPerBlock + W_Pad * 2;
 
     static constexpr index_t NumSubTilePerImage      = wcnn_conv.GetNumSubTilesPerImageTile();
     static constexpr index_t NumSubTilesPerWeightTap = wcnn_conv.GetNumSubTilesPerWeightTap();

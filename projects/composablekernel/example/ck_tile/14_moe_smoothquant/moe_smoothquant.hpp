@@ -52,7 +52,7 @@ struct moe_smoothquant_traits_
         }
         else
         {
-            // static_assert(get_warp_size() % ThreadPerBlock_M_ == 0);
+            // static_assert(ck_tile::get_warp_size() % ThreadPerBlock_M_ == 0);
             return total_warps / (ThreadPerBlock_N_ / ck_tile::get_warp_size());
         }
     }();

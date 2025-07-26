@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2023, Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (c) 2018-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -281,8 +281,7 @@ struct DynamicBuffer
               index_t NumElemsPerThread,
               index_t NumThreadsPerTile,
               index_t NumVgprsPerTile>
-    __host__ __device__ void
-    tileStore(const X& x, index_t dst_offset) const
+    __host__ __device__ void tileStore(const X& x, index_t dst_offset) const
     {
         // Copy data from global to LDS memory using direct loads.
         __attribute__((address_space(1))) const T* global_ptr =
