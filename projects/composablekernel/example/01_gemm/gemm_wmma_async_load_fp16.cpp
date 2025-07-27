@@ -74,7 +74,11 @@ using DeviceGemmInstance = ck::tensor_operation::device::DeviceGemmWmma_GFX13
            1,           // C shuffle (N Repeat) Per store
            S<1, 32, 1, 4>,
            2,
+#ifdef GEMM_DISABLE_ASYNC_STORE
+           false,
+#else
            true,
+#endif
            false,
            ck::LoopScheduler::Default,
            ck::PipelineVersion::v5>;
