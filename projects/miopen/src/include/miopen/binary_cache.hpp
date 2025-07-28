@@ -41,17 +41,7 @@ GetCacheFile(const std::string& device, const fs::path& name, const std::string&
 
 MIOPEN_INTERNALS_EXPORT fs::path GetCachePath(bool is_system);
 
-#if !MIOPEN_ENABLE_SQLITE_KERN_CACHE
-fs::path LoadBinary(const TargetProperties& target,
-                    std::size_t num_cu,
-                    const fs::path& name,
-                    const std::string& args);
-
-fs::path SaveBinary(const fs::path& binary_path,
-                    const TargetProperties& target,
-                    const fs::path& name,
-                    const std::string& args);
-#else
+#if MIOPEN_ENABLE_SQLITE_KERN_CACHE
 std::vector<char> LoadBinary(const TargetProperties& target,
                              std::size_t num_cu,
                              const fs::path& name,
@@ -62,6 +52,16 @@ void SaveBinary(const std::vector<char>& hsaco,
                 std::size_t num_cu,
                 const fs::path& name,
                 const std::string& args);
+#else
+fs::path LoadBinary(const TargetProperties& target,
+                    std::size_t num_cu,
+                    const fs::path& name,
+                    const std::string& args);
+
+fs::path SaveBinary(const fs::path& binary_path,
+                    const TargetProperties& target,
+                    const fs::path& name,
+                    const std::string& args);
 #endif
 
 } // namespace miopen

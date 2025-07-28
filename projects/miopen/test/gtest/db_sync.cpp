@@ -35,6 +35,7 @@
 #include <miopen/execution_context.hpp>
 
 #include <miopen/find_db.hpp>
+#include <miopen/hip_build_utils.hpp>
 #include <miopen/tensor.hpp>
 #include <miopen/conv/problem_description.hpp>
 #include <miopen/conv_algo_name.hpp>
@@ -434,6 +435,7 @@ auto LoadKDBObjects(const fs::path& filename)
             const auto kernel_name = stmt.ColumnText(0);
             const auto kernel_args = stmt.ColumnText(1);
             kdb_cache.emplace(KDBKey{kernel_name, kernel_args});
+            MIOPEN_LOG_I(kernel_name + ": " + kernel_args);
         }
         else if(rc == SQLITE_DONE)
             break;
@@ -520,11 +522,43 @@ void SetupPaths(fs::path& fdb_file_path,
         << "Db file does not exist" << kdb_file_path;
 }
 
-TEST(CPU_DBSync_NONE, KDBTargetID)
+namespace miopen {
+struct TestHandle : Handle
+{
+    TestHandle(size_t _num_cu) : Handle(), num_cu(_num_cu) {}
+
+    std::size_t GetMaxComputeUnits() const override
+    {
+        if(num_cu == 0)
+            return Handle::GetMaxComputeUnits();
+        return num_cu;
+    }
+
+    size_t num_cu = 0;
+};
+} // namespace miopen
+
+static inline miopen::TestHandle& get_test_handle(size_t num_cu)
+{
+    // NOLINTNEXTLINE (cppcoreguidelines-avoid-non-const-global-variables)
+    static miopen::TestHandle h{num_cu};
+    static const std::thread::id id = std::this_thread::get_id();
+    if(std::this_thread::get_id() != id)
+    {
+        std::cout << "Cannot use handle across multiple threads\n";
+        std::abort();
+    }
+    return h;
+}
+
+void KDBTargetID(const std::string& arch, const size_t num_cu)
 {
     // Skip this test for gfx11 and gfx12 to avoid test failure (we don't have databases for those
     // devices yet)
-    const auto& handle = get_handle();
+    auto& handle = get_test_handle(num_cu);
+    if(handle.GetDeviceName() != arch)
+        GTEST_SKIP();
+    handle.num_cu = num_cu;
     if(miopen::StartsWith(handle.GetDeviceName(), "gfx11") ||
        miopen::StartsWith(handle.GetDeviceName(), "gfx12"))
     {
@@ -535,7 +569,7 @@ TEST(CPU_DBSync_NONE, KDBTargetID)
 #if WORKAROUND_ISSUE_2492
     ScopedEnvironment<std::string> issue_2492_env(MIOPEN_DEBUG_WORKAROUND_ISSUE_2492, "0");
 #endif
-    SetupPaths(fdb_file_path, pdb_file_path, kdb_file_path, get_handle());
+    SetupPaths(fdb_file_path, pdb_file_path, kdb_file_path, handle);
     std::ignore = fdb_file_path;
     std::ignore = pdb_file_path;
     EXPECT_TRUE(miopen::CheckKDBJournalMode(kdb_file_path));
@@ -565,10 +599,33 @@ void BuildKernel(const fs::path& program_file,
     try
     {
         auto p = handle.LoadProgram(program_file, program_args, "");
+
+        std::string compile_options     = program_args;
+        std::string compile_options_tid = program_args;
+        compile_options += " -mcpu=" + handle.GetDeviceName();
+        if(program_file.extension() == ".mlir") {}
+        else if(program_file.extension() == ".s")
+            compile_options_tid +=
+                " -mcpu=" + miopen::LcOptionTargetStrings{handle.GetTargetProperties()}.targetId;
+        else
+            compile_options_tid += " -mcpu=" + handle.GetDeviceName();
+        auto hsaco = miopen::LoadBinary(handle.GetTargetProperties(),
+                                        handle.GetMaxComputeUnits(),
+                                        program_file,
+                                        compile_options_tid);
+
+        if(!hsaco.empty())
+        {
+            miopen::SaveBinary(hsaco,
+                               handle.GetTargetProperties(),
+                               handle.GetMaxComputeUnits(),
+                               program_file,
+                               compile_options);
+        }
     }
-    catch(std::exception&)
+    catch(std::exception& e)
     {
-        MIOPEN_LOG_W("Exception thrown while building kernel");
+        MIOPEN_LOG_W("Exception thrown while building kernel, " << e.what());
     }
 #endif
 }
@@ -698,6 +755,7 @@ void CheckFDBEntry(size_t thread_index,
                    std::atomic<size_t>& counter)
 {
     fs::path fdb_file_path, pdb_file_path, kdb_file_path;
+    auto& handle = _ctx.GetStream();
     SetupPaths(fdb_file_path, pdb_file_path, kdb_file_path, _ctx.GetStream());
     std::unordered_set<KDBKey> checked_kdbs;
     const auto data_size = data.size();
@@ -842,10 +900,8 @@ void CheckFDBEntry(size_t thread_index,
                         std::string compile_options = kern.comp_options;
                         auto program_file = miopen::make_object_file_name(kern.kernel_file);
                         if(kern.kernel_file.extension() != ".mlir")
-                        {
-                            auto& handle = ctx.GetStream();
                             compile_options += " -mcpu=" + handle.GetDeviceName();
-                        }
+
                         auto search           = checked_kdbs.find({program_file, compile_options});
                         bool reported_already = search != checked_kdbs.end();
                         if(!reported_already) // we have reported this object before, no need to
@@ -866,7 +922,7 @@ void CheckFDBEntry(size_t thread_index,
                                 << compile_options; // for fdb key, solver id, solver pdb entry and
                                                     // kdb file and args
                         if(!reported_already)
-                            BuildKernel(kern.kernel_file, kern.comp_options, ctx.GetStream());
+                            BuildKernel(kern.kernel_file, kern.comp_options, handle);
                     }
                 }
             }
@@ -880,41 +936,6 @@ void CheckFDBEntry(size_t thread_index,
             std::cout << "Lines of find db completed:" << kidx << std::endl;
         counter.fetch_add(1, std::memory_order_relaxed);
     }
-}
-namespace miopen {
-struct TestHandle : Handle
-{
-    TestHandle(size_t _num_cu) : Handle(), num_cu(_num_cu) {}
-
-// Probably, according to the idea of the author of this test, the number of CUs should have been
-// substituted with the value passed to the constructor (which in fact did not happen). After
-// https://github.com/ROCm/MIOpen/pull/3175, the method became virtual, the substitution actually
-// happened, and the test broke. I disabled that part (since it doesn't work as intended anyway) to
-// keep its behavior the same.
-#if 1
-    std::size_t GetMaxComputeUnits() const override
-    {
-        if(num_cu == 0)
-            return Handle::GetMaxComputeUnits();
-        return num_cu;
-    }
-#endif
-
-    size_t num_cu = 0;
-};
-} // namespace miopen
-
-static inline miopen::TestHandle& get_test_handle(size_t num_cu)
-{
-    // NOLINTNEXTLINE (cppcoreguidelines-avoid-non-const-global-variables)
-    static miopen::TestHandle h{num_cu};
-    static const std::thread::id id = std::this_thread::get_id();
-    if(std::this_thread::get_id() != id)
-    {
-        std::cout << "Cannot use handle across multiple threads\n";
-        std::abort();
-    }
-    return h;
 }
 
 void StaticFDBSync(const std::string& arch, const size_t num_cu)
@@ -973,6 +994,14 @@ void StaticFDBSync(const std::string& arch, const size_t num_cu)
 struct CPU_DBSync_NONE : testing::TestWithParam<std::pair<std::string, size_t>>
 {
 };
+
+TEST_P(CPU_DBSync_NONE, KDBTargetID)
+{
+    std::string arch;
+    size_t num_cu;
+    std::tie(arch, num_cu) = GetParam();
+    KDBTargetID(arch, num_cu);
+}
 
 TEST_P(CPU_DBSync_NONE, StaticFDBSync)
 {
