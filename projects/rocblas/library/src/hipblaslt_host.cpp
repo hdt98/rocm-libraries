@@ -205,33 +205,34 @@ namespace
             std::vector<Ti const*> B(batch_count, nullptr);
             std::vector<To*>       C(batch_count, nullptr);
             std::vector<To*>       D(batch_count, nullptr);
+            auto stream = prob.handle->get_stream();
             if(prob.batch_A)
             {
-                THROW_IF_HIP_ERROR(hipMemcpy((void*)(&A[0]),
+                THROW_IF_HIP_ERROR(hipMemcpyAsync((void*)(&A[0]),
                                              prob.batch_A,
                                              sizeof(void*) * batch_count,
-                                             hipMemcpyDeviceToHost));
+                                             hipMemcpyDeviceToHost, stream));
             }
             if(prob.batch_B)
             {
-                THROW_IF_HIP_ERROR(hipMemcpy((void*)(&B[0]),
+                THROW_IF_HIP_ERROR(hipMemcpyAsync((void*)(&B[0]),
                                              prob.batch_B,
                                              sizeof(void*) * batch_count,
-                                             hipMemcpyDeviceToHost));
+                                             hipMemcpyDeviceToHost, stream));
             }
             if(prob.batch_C)
             {
-                THROW_IF_HIP_ERROR(hipMemcpy((void*)(&C[0]),
+                THROW_IF_HIP_ERROR(hipMemcpyAsync((void*)(&C[0]),
                                              prob.batch_C,
                                              sizeof(void*) * batch_count,
-                                             hipMemcpyDeviceToHost));
+                                             hipMemcpyDeviceToHost, stream));
             }
             if(prob.batch_D)
             {
-                THROW_IF_HIP_ERROR(hipMemcpy((void*)(&D[0]),
+                THROW_IF_HIP_ERROR(hipMemcpyAsync((void*)(&D[0]),
                                              prob.batch_D,
                                              sizeof(void*) * batch_count,
-                                             hipMemcpyDeviceToHost));
+                                             hipMemcpyDeviceToHost, stream));
             }
 
             for(int batch = 0; batch < batch_count; batch++)
@@ -513,13 +514,14 @@ rocblas_status runContractionProblemHipBlasLT(const RocblasContractionProblem<Ti
         gemm.getDefaultValueForDeviceUserArguments(userArgs);
 
         // Copy them to device memory
+        auto stream = prob.handle->get_stream();
         hipblaslt_ext::UserArguments* d_userArgs
             = (hipblaslt_ext::UserArguments*)((char*)(prob.handle->gsu_workspace)
                                               + (workspace_size - userArgsSize));
-        hipMemcpy(d_userArgs, userArgs, userArgsSize, hipMemcpyHostToDevice);
-        hipFree(userArgs);
+        THROW_IF_HIP_ERROR(hipMemcpyAsync(d_userArgs, userArgs, userArgsSize, hipMemcpyHostToDevice, stream));
+        THROW_IF_HIP_ERROR(hipFreeAsync(userArgs, stream));
 
-        if(gemm.run(d_userArgs, prob.handle->get_stream()) != HIPBLAS_STATUS_SUCCESS)
+        if(gemm.run(d_userArgs, stream) != HIPBLAS_STATUS_SUCCESS)
         {
             rocblas_internal_ostream msg;
             print_if_verbose(msg << "rocBLAS warning: hipBLASLt execution failed!");
