@@ -271,6 +271,9 @@ MIOpenBatchNormFwdTrainSpatial(const __global _FLOAT* __restrict in,
 
 #if !MIO_LAYOUT_NHWC && MIO_BN_HW >= 4096
     _FLOAT4 read4;
+#ifdef MIO_BN_FP64MEAN
+    double mean_f64 = 0.;
+#endif
     __attribute__((opencl_unroll_hint(2))) for(unsigned int k = lid << 2; k < MIO_BN_LESS4;
                                                k += GRPRD)
     {
@@ -278,10 +281,17 @@ MIOpenBatchNormFwdTrainSpatial(const __global _FLOAT* __restrict in,
         hwidx = k - (nidx * MIO_BN_HW);
         index = nidx * MIO_BN_CHW + chwid + hwidx;
         read4 = *((const global _FLOAT4*)(in + index));
+#ifdef MIO_BN_FP64MEAN
+        mean_f64 += FLOAT2FLOATPREC(read4.x);
+        mean_f64 += FLOAT2FLOATPREC(read4.y);
+        mean_f64 += FLOAT2FLOATPREC(read4.z);
+        mean_f64 += FLOAT2FLOATPREC(read4.w);
+#else
         mean += FLOAT2FLOATPREC(read4.x);
         mean += FLOAT2FLOATPREC(read4.y);
         mean += FLOAT2FLOATPREC(read4.z);
         mean += FLOAT2FLOATPREC(read4.w);
+#endif
         variance = mad(FLOAT2FLOATPREC(read4.x), FLOAT2FLOATPREC(read4.x), variance);
         variance = mad(FLOAT2FLOATPREC(read4.y), FLOAT2FLOATPREC(read4.y), variance);
         variance = mad(FLOAT2FLOATPREC(read4.z), FLOAT2FLOATPREC(read4.z), variance);
@@ -296,16 +306,27 @@ MIOpenBatchNormFwdTrainSpatial(const __global _FLOAT* __restrict in,
     if(index < (MIO_BN_NCHW - 3))
     {
         read4 = *((const global _FLOAT4*)(in + index));
+#ifdef MIO_BN_FP64MEAN
+        mean_f64 += FLOAT2FLOATPREC(read4.x);
+        mean_f64 += FLOAT2FLOATPREC(read4.y);
+        mean_f64 += FLOAT2FLOATPREC(read4.z);
+        mean_f64 += FLOAT2FLOATPREC(read4.w);
+#else
         mean += FLOAT2FLOATPREC(read4.x);
         mean += FLOAT2FLOATPREC(read4.y);
         mean += FLOAT2FLOATPREC(read4.z);
         mean += FLOAT2FLOATPREC(read4.w);
+#endif
         variance = mad(FLOAT2FLOATPREC(read4.x), FLOAT2FLOATPREC(read4.x), variance);
         variance = mad(FLOAT2FLOATPREC(read4.y), FLOAT2FLOATPREC(read4.y), variance);
         variance = mad(FLOAT2FLOATPREC(read4.z), FLOAT2FLOATPREC(read4.z), variance);
         variance = mad(FLOAT2FLOATPREC(read4.w), FLOAT2FLOATPREC(read4.w), variance);
     }
 
+#endif
+
+#ifdef MIO_BN_FP64MEAN
+    mean = (_FLOAT_PREC) mean_f64;
 #endif
 
 #else

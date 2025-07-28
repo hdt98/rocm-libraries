@@ -31,6 +31,7 @@
 #if MIOPEN_USE_FP32 == 1
 #define _FLOAT float
 #define _FLOAT_PREC float
+#define MIO_BN_FP64MEAN /* use double to avoid propogating fp errors */
 #define EPSILON (_FLOAT)0.000001
 #ifndef FLT_MAX
 #define MAX_VAL 3.402823466e+38F /* max value */
