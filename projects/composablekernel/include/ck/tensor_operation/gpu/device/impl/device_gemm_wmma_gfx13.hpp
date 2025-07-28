@@ -126,8 +126,9 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
             ? false
             : (AEnableGlobalTRLoad ? false : !ADisableLds_manu);
     static constexpr auto AEnableLds_auto =
-        (AEnableGlobalTiledLoad || ((AGlobalMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_MULTICAST_LOAD) ||
-                                    (AGlobalMultiCastLoad == GlobalLoadTypeEnum::WGP_MULTICAST_LOAD)))
+        (AEnableGlobalTiledLoad ||
+         ((AGlobalMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_MULTICAST_LOAD) ||
+          (AGlobalMultiCastLoad == GlobalLoadTypeEnum::WGP_MULTICAST_LOAD)))
             ? false
             : AEnableLds_auto_tmp;
 
@@ -137,8 +138,9 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
             ? false
             : (BEnableGlobalTRLoad ? false : !BDisableLds_manu);
     static constexpr auto BEnableLds_auto =
-        (BEnableGlobalTiledLoad || ((BGlobalMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_MULTICAST_LOAD) ||
-                                    (BGlobalMultiCastLoad == GlobalLoadTypeEnum::WGP_MULTICAST_LOAD)))
+        (BEnableGlobalTiledLoad ||
+         ((BGlobalMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_MULTICAST_LOAD) ||
+          (BGlobalMultiCastLoad == GlobalLoadTypeEnum::WGP_MULTICAST_LOAD)))
             ? false
             : BEnableLds_auto_tmp;
 
@@ -148,11 +150,15 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
     static constexpr auto AEnableLds_manu = ABlockLdsAsyncCopy;
     static constexpr auto BEnableLds_manu = BBlockLdsAsyncCopy;
 
-    static constexpr auto AEnableLds_dds = (AGlobalMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_DDS_LOAD);
-    static constexpr auto BEnableLds_dds = (BGlobalMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_DDS_LOAD);
+    static constexpr auto AEnableLds_dds =
+        (AGlobalMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_DDS_LOAD);
+    static constexpr auto BEnableLds_dds =
+        (BGlobalMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_DDS_LOAD);
 
-    static constexpr auto AEnableLds = AEnableLds_auto || AEnableLds_manu || (NumPrefetch > 1) || AEnableLds_dds;
-    static constexpr auto BEnableLds = BEnableLds_auto || BEnableLds_manu || (NumPrefetch > 1) || BEnableLds_dds;
+    static constexpr auto AEnableLds =
+        AEnableLds_auto || AEnableLds_manu || (NumPrefetch > 1) || AEnableLds_dds;
+    static constexpr auto BEnableLds =
+        BEnableLds_auto || BEnableLds_manu || (NumPrefetch > 1) || BEnableLds_dds;
 
     static constexpr auto AEnableTRLoadFromGlobal =
         !AEnableLds && AEnableGlobalTRLoad && is_same_v<tensor_layout::gemm::ColumnMajor, ALayout>;
@@ -870,7 +876,7 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
                             /* Cluster MulticastLoad */
                             static_assert(
                                 AGlobalMultiCastLoad == GlobalLoadTypeEnum::DEFAULT_LOAD ||
-                                AGlobalMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_DDS_LOAD ||
+                                    AGlobalMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_DDS_LOAD ||
                                     BGlobalMultiCastLoad == GlobalLoadTypeEnum::DEFAULT_LOAD ||
                                     BGlobalMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_DDS_LOAD,
                                 "Either A or B should not be Cluster MulticastLoad.");

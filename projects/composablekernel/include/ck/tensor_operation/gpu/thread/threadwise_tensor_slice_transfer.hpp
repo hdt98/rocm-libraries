@@ -2067,8 +2067,8 @@ struct ThreadwiseTensorSliceTransfer_DdsToVgpr
 
             // copy data from src_buf into src_tmp_vector
             src_tmp_vector.template AsType<src_vector_t>()(Number<0>{}) =
-                src_buf.template ddsLoad<src_vector_t>(map_rank_id, src_data_coord.GetOffset() / PackedSize,
-                                                    is_src_valid);
+                src_buf.template ddsLoad<src_vector_t>(
+                    map_rank_id, src_data_coord.GetOffset() / PackedSize, is_src_valid);
 
             if constexpr(is_same<remove_cvref_t<SrcData>, pk_i4_t>::value)
             {

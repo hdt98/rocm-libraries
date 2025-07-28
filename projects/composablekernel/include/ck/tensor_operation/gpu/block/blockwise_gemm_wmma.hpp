@@ -399,7 +399,8 @@ struct BlockwiseGemmWMMA
                             {
                                 b_thread_copy_.Run(
                                     b_block_desc_k0_n0_n1_n2_k1,
-                                    make_tuple(n0, Number<k * KPack / B_K1 / B_KRow>{}, I0, I0, I0, I0),
+                                    make_tuple(
+                                        n0, Number<k * KPack / B_K1 / B_KRow>{}, I0, I0, I0, I0),
                                     b_block_buf,
                                     b_thread_desc_,
                                     make_tuple(n0, I0, I0, I0, I0, I0),
@@ -410,7 +411,8 @@ struct BlockwiseGemmWMMA
                             {
                                 b_thread_copy_.Run(
                                     b_block_desc_k0_n0_n1_n2_k1,
-                                    make_tuple(n0, Number<k * KPack / B_K1 / B_KRow>{}, I0, I0, I0, I0),
+                                    make_tuple(
+                                        n0, Number<k * KPack / B_K1 / B_KRow>{}, I0, I0, I0, I0),
                                     b_block_buf,
                                     b_thread_desc_,
                                     make_tuple(n0, I0, I0, I0, I0, I0),
@@ -687,16 +689,16 @@ struct BlockwiseGemmWMMA
     template <>
     struct AThreadCopySelector<true, true>
     {
-        using type =
-            ThreadwiseTensorSliceTransfer_DdsToVgpr<FloatA,
-                                             FloatA,
-                                             decltype(a_block_desc_k0_m0_m1_m2_k1),
-                                             decltype(a_thread_desc_),
-                                             Sequence<1, KPack / A_K1 / A_KRow, 1, 1, 1, A_K1>,
-                                             Sequence<0, 1, 2, 3, 4, 5>,
-                                             5,
-                                             A_K1,
-                                             A_K1>;
+        using type = ThreadwiseTensorSliceTransfer_DdsToVgpr<
+            FloatA,
+            FloatA,
+            decltype(a_block_desc_k0_m0_m1_m2_k1),
+            decltype(a_thread_desc_),
+            Sequence<1, KPack / A_K1 / A_KRow, 1, 1, 1, A_K1>,
+            Sequence<0, 1, 2, 3, 4, 5>,
+            5,
+            A_K1,
+            A_K1>;
     };
 
     template <bool EnableLds, bool EnabldDds = false>
@@ -733,19 +735,19 @@ struct BlockwiseGemmWMMA
             false>;
     };
 
-	template <>
+    template <>
     struct BThreadCopySelector<true, true>
     {
-        using type =
-            ThreadwiseTensorSliceTransfer_DdsToVgpr<FloatB,
-                                             FloatB,
-                                             decltype(b_block_desc_k0_n0_n1_n2_k1),
-                                             decltype(b_thread_desc_),
-                                             Sequence<1, KPack / B_K1 / B_KRow, 1, 1, 1, B_K1>,
-                                             Sequence<0, 1, 2, 3, 4, 5>,
-                                             5,
-                                             B_K1,
-                                             B_K1>;
+        using type = ThreadwiseTensorSliceTransfer_DdsToVgpr<
+            FloatB,
+            FloatB,
+            decltype(b_block_desc_k0_n0_n1_n2_k1),
+            decltype(b_thread_desc_),
+            Sequence<1, KPack / B_K1 / B_KRow, 1, 1, 1, B_K1>,
+            Sequence<0, 1, 2, 3, 4, 5>,
+            5,
+            B_K1,
+            B_K1>;
     };
 
     typename AThreadCopySelector<AEnableLds, AEnableDds>::type a_thread_copy_;

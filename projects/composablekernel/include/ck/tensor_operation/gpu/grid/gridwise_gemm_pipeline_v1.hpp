@@ -951,9 +951,14 @@ struct GridwiseGemmPipeline_v1<1, false, false, AMultiCastLoad, BMultiCastLoad>
     }
 };
 
-//template <bool AEnableLds, bool BEnableLds, GlobalLoadTypeEnum ATmaLoad, GlobalLoadTypeEnum BTmaLoad>
-template<>
-struct GridwiseGemmPipeline_v1<1, true, false, GlobalLoadTypeEnum::CLUSTER_DDS_LOAD, GlobalLoadTypeEnum::DEFAULT_LOAD>
+// template <bool AEnableLds, bool BEnableLds, GlobalLoadTypeEnum ATmaLoad, GlobalLoadTypeEnum
+// BTmaLoad>
+template <>
+struct GridwiseGemmPipeline_v1<1,
+                               true,
+                               false,
+                               GlobalLoadTypeEnum::CLUSTER_DDS_LOAD,
+                               GlobalLoadTypeEnum::DEFAULT_LOAD>
 {
     static constexpr auto I0 = Number<0>{};
     static constexpr auto I1 = Number<1>{};
@@ -966,12 +971,12 @@ struct GridwiseGemmPipeline_v1<1, true, false, GlobalLoadTypeEnum::CLUSTER_DDS_L
     }
 
     template <typename T>
-    __device__ static T* map_shared_rank(T *addr, int rank)
+    __device__ static T* map_shared_rank(T* addr, int rank)
     {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wold-style-cast"
 #pragma clang diagnostic ignored "-Wcast-align"
-        auto ptr = (__attribute__((address_space(3))) void *)addr;
+        auto ptr = (__attribute__((address_space(3))) void*)addr;
         return (T*)__builtin_amdgcn_map_shared_rank(ptr, rank);
 #pragma clang diagnostic pop
     };
@@ -1020,7 +1025,7 @@ struct GridwiseGemmPipeline_v1<1, true, false, GlobalLoadTypeEnum::CLUSTER_DDS_L
         // Cluster sync
         bool isFirst = __builtin_amdgcn_s_barrier_signal_isfirst(-1);
         __builtin_amdgcn_s_barrier_wait(-1);
-        if (isFirst)
+        if(isFirst)
             __builtin_amdgcn_s_barrier_signal(-3);
         __builtin_amdgcn_s_barrier_wait(-3);
 
@@ -1060,7 +1065,7 @@ struct GridwiseGemmPipeline_v1<1, true, false, GlobalLoadTypeEnum::CLUSTER_DDS_L
                 // Cluster sync
                 isFirst = __builtin_amdgcn_s_barrier_signal_isfirst(-1);
                 __builtin_amdgcn_s_barrier_wait(-1);
-                if (isFirst)
+                if(isFirst)
                     __builtin_amdgcn_s_barrier_signal(-3);
                 __builtin_amdgcn_s_barrier_wait(-3);
 
@@ -1083,7 +1088,147 @@ struct GridwiseGemmPipeline_v1<1, true, false, GlobalLoadTypeEnum::CLUSTER_DDS_L
                 block_sync_lds();
 
                 ++i;
-            } while (i < (num_loop / cluster_size -1));
+            } while(i < (num_loop / cluster_size - 1));
+        }
+    }
+};
+
+template <>
+struct GridwiseGemmPipeline_v1<1,
+                               false,
+                               true,
+                               GlobalLoadTypeEnum::DEFAULT_LOAD,
+                               GlobalLoadTypeEnum::CLUSTER_DDS_LOAD>
+{
+    static constexpr auto I0 = Number<0>{};
+    static constexpr auto I1 = Number<1>{};
+
+    __host__ __device__ static constexpr bool IsSupported(index_t /* num_loop */) { return true; }
+
+    __host__ __device__ static constexpr bool CalculateHasMainLoop(index_t num_loop)
+    {
+        return num_loop > 1;
+    }
+
+    template <typename T>
+    __device__ static T* map_shared_rank(T* addr, int rank)
+    {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wold-style-cast"
+#pragma clang diagnostic ignored "-Wcast-align"
+        auto ptr = (__attribute__((address_space(3))) void*)addr;
+        return (T*)__builtin_amdgcn_map_shared_rank(ptr, rank);
+#pragma clang diagnostic pop
+    };
+
+    template <bool HasMainLoop,
+              typename AGridDesc,
+              typename ABlockDesc,
+              typename ABlockTransfer,
+              typename AGridBuffer,
+              typename ABlockBuffer,
+              typename ABlockTransferStep,
+              typename BGridDesc,
+              typename BBlockDesc,
+              typename BBlockTransfer,
+              typename BGridBuffer,
+              typename BBlockBuffer,
+              typename BBlockTransferStep,
+              typename BlockwiseGemm,
+              typename CThreadBuffer>
+    __device__ static void Run(const AGridDesc& a_grid_desc,
+                               const ABlockDesc& a_block_desc,
+                               ABlockTransfer& a_blockwise_copy,
+                               const AGridBuffer& a_grid_buf,
+                               ABlockBuffer& a_block_buf,
+                               const ABlockTransferStep& a_block_copy_step,
+                               const BGridDesc& b_grid_desc,
+                               const BBlockDesc& b_block_desc,
+                               BBlockTransfer& b_blockwise_copy,
+                               const BGridBuffer& b_grid_buf,
+                               BBlockBuffer& b_block_buf,
+                               const BBlockTransferStep& b_block_copy_step,
+                               const BlockwiseGemm& blockwise_gemm,
+                               CThreadBuffer& c_thread_buf,
+                               index_t num_loop,
+                               index_t cluster_size)
+    {
+        constexpr auto a_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0, I0);
+        // Initialize C
+        c_thread_buf.Clear();
+
+        // preload data into LDS
+        b_blockwise_copy.RunRead(b_grid_desc, b_grid_buf);
+        b_blockwise_copy.MoveSrcSliceWindow(b_grid_desc, b_block_copy_step);
+        b_blockwise_copy.RunWrite(b_block_desc, b_block_buf);
+
+        // Cluster sync
+        bool isFirst = __builtin_amdgcn_s_barrier_signal_isfirst(-1);
+        __builtin_amdgcn_s_barrier_wait(-1);
+        if(isFirst)
+            __builtin_amdgcn_s_barrier_signal(-3);
+        __builtin_amdgcn_s_barrier_wait(-3);
+
+        const int wgRank = __builtin_amdgcn_cluster_workgroup_flat_id();
+
+        index_t k = 0;
+        do
+        {
+            a_blockwise_copy.Run(
+                a_grid_desc, a_grid_buf, a_block_desc, a_block_origin_idx, a_block_buf);
+
+            block_sync_lds();
+
+            const index_t b_map_rank_id = (wgRank & ~(cluster_size - 1)) | k;
+
+            blockwise_gemm.Run(a_block_buf, b_block_buf, c_thread_buf, 0, b_map_rank_id);
+
+            a_blockwise_copy.MoveSrcSliceWindow(a_grid_desc, a_block_copy_step);
+
+            ++k;
+        } while(k < cluster_size);
+
+        block_sync_lds();
+
+        // main body
+        if constexpr(HasMainLoop)
+        {
+            index_t i = 0;
+            do
+            {
+                index_t j = 0;
+
+                b_blockwise_copy.RunRead(b_grid_desc, b_grid_buf);
+                b_blockwise_copy.MoveSrcSliceWindow(b_grid_desc, b_block_copy_step);
+                b_blockwise_copy.RunWrite(b_block_desc, b_block_buf);
+
+                // Cluster sync
+                isFirst = __builtin_amdgcn_s_barrier_signal_isfirst(-1);
+                __builtin_amdgcn_s_barrier_wait(-1);
+                if(isFirst)
+                    __builtin_amdgcn_s_barrier_signal(-3);
+                __builtin_amdgcn_s_barrier_wait(-3);
+
+                do
+                {
+                    a_blockwise_copy.Run(
+                        a_grid_desc, a_grid_buf, a_block_desc, a_block_origin_idx, a_block_buf);
+
+                    block_sync_lds();
+
+                    const index_t b_map_rank_id = (wgRank & ~(cluster_size - 1)) | j;
+
+                    blockwise_gemm.Run(a_block_buf, b_block_buf, c_thread_buf, 0, b_map_rank_id);
+
+                    a_blockwise_copy.MoveSrcSliceWindow(a_grid_desc, a_block_copy_step);
+
+                    ++j;
+                } while(j < cluster_size);
+
+                block_sync_lds();
+
+                ++i;
+            } while(i < (num_loop / cluster_size - 1));
         }
     }
 };

@@ -372,7 +372,8 @@ template <index_t BlockSize,
           bool AEnableAsyncCopy,
           bool AEnableTRLoadFromGlobal,
           bool AEnableTiledLoadFromGlobal,
-          GlobalLoadTypeEnum AMultiCastLoad, /* 0x1: ClusterMulticastLoad, 0x2: WGPMulticastLoad, 0x3:DDS */
+          GlobalLoadTypeEnum AMultiCastLoad, /* 0x1: ClusterMulticastLoad, 0x2: WGPMulticastLoad,
+                                                0x3:DDS */
           index_t AClusterSize,              /* Set when AMultiCastLoad == 1 or 3*/
           typename BBlockTransferThreadClusterLengths_N_K0_K1,
           typename BBlockTransferThreadClusterArrangeOrder,
@@ -1061,7 +1062,7 @@ struct GridwiseGemm_Wmma_GFX13
         }
 
         if constexpr(AMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_MULTICAST_LOAD ||
-                    AMultiCastLoad == GlobalLoadTypeEnum::WGP_MULTICAST_LOAD)
+                     AMultiCastLoad == GlobalLoadTypeEnum::WGP_MULTICAST_LOAD)
         {
             static_assert((AEnableLds == false) && (AEnableTRLoadFromGlobal == false) &&
                               (AEnableTiledLoadFromGlobal == false),
@@ -1241,7 +1242,7 @@ struct GridwiseGemm_Wmma_GFX13
         const CGridDesc_M_N& c_grid_desc_m_n, index_t /* M01 */, index_t /* N01 */)
     {
         static_assert(AMultiCastLoad == GlobalLoadTypeEnum::DEFAULT_LOAD ||
-                      AMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_DDS_LOAD ||
+                          AMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_DDS_LOAD ||
                           BMultiCastLoad == GlobalLoadTypeEnum::DEFAULT_LOAD ||
                           BMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_DDS_LOAD,
                       "Both A and B cannot enable MultiCastLoad at the same time.");
@@ -2107,7 +2108,7 @@ struct GridwiseGemm_Wmma_GFX13
         /* bool ThreadTransferDstResetCoordinateAfterRun, */    true,
                                                                 NumGemmKPrefetchStage>(
                         a_grid_desc,
-                        make_multi_index(m_block_data_idx_on_grid, k0_start_index_on_block, 0),//OOXX
+                        make_multi_index(m_block_data_idx_on_grid, k0_start_index_on_block, 0),
                         a_element_op,
                         a_block_desc,
                         make_multi_index(0, 0, 0),
@@ -2414,6 +2415,10 @@ struct GridwiseGemm_Wmma_GFX13
                 {
                     if constexpr(BMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_DDS_LOAD)
                     {
+                        auto k1 = b_grid_desc.GetLength(I2);
+                        const index_t mk_block_data_idx_on_grid = __builtin_amdgcn_readfirstlane((block_work_idx[I0] % BClusterSize) * MPerBlock);
+                        const index_t k0_start_index_on_block = mk_block_data_idx_on_grid / k1;
+
                         auto b_blockwise_copy =
                             ThreadGroupTensorSliceTransfer_v4r1<ThisThreadBlockGrid,
                                                                 BElementwiseOperation,
@@ -2438,7 +2443,7 @@ struct GridwiseGemm_Wmma_GFX13
                                                                 true,
                                                                 NumGemmKPrefetchStage>(
                             b_grid_desc,
-                            make_multi_index(n_block_data_idx_on_grid, m_block_data_idx_on_grid % BClusterSize, 0),
+                            make_multi_index(n_block_data_idx_on_grid, k0_start_index_on_block, 0),
                             b_element_op,
                             b_block_desc,
                             make_multi_index(0, 0, 0),
@@ -2706,28 +2711,29 @@ struct GridwiseGemm_Wmma_GFX13
         // GEMM
         constexpr auto KPack = math::integer_least_multiple(K1, WmmaK);
 
-        auto blockwise_gemm = BlockwiseGemmWMMA<ThisThreadBlockGrid,
-                                                ADataType,
-                                                BDataType,
-                                                AccDataType,
-                                                decltype(MakeAWaveDescriptor(a_block_wmma_desc)),
-                                                decltype(MakeBWaveDescriptor(b_block_wmma_desc)),
-                                                MPerBlock,
-                                                NPerBlock,
-                                                KPerBlock,
-                                                MPerWmma,
-                                                NPerWmma,
-                                                KPerWmma,
-                                                MRepeat,
-                                                NRepeat,
-                                                KPack,
-                                                AEnableLds,
-                                                BEnableLds,
-                                                false, //APermute
-                                                false, //BPermute
-                                                false, //Transpose C
-                                                AMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_DDS_LOAD,
-                                                BMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_DDS_LOAD>{};
+        auto blockwise_gemm =
+            BlockwiseGemmWMMA<ThisThreadBlockGrid,
+                              ADataType,
+                              BDataType,
+                              AccDataType,
+                              decltype(MakeAWaveDescriptor(a_block_wmma_desc)),
+                              decltype(MakeBWaveDescriptor(b_block_wmma_desc)),
+                              MPerBlock,
+                              NPerBlock,
+                              KPerBlock,
+                              MPerWmma,
+                              NPerWmma,
+                              KPerWmma,
+                              MRepeat,
+                              NRepeat,
+                              KPack,
+                              AEnableLds,
+                              BEnableLds,
+                              false, // APermute
+                              false, // BPermute
+                              false, // Transpose C
+                              AMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_DDS_LOAD,
+                              BMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_DDS_LOAD>{};
         // Prepare Register for C matrix
         auto c_thread_buf = blockwise_gemm.GetCThreadBuffer();
 
@@ -2738,9 +2744,10 @@ struct GridwiseGemm_Wmma_GFX13
         // gridwise GEMM pipeline
         const index_t KBlockMainLoop = __builtin_amdgcn_readfirstlane(K / AKPerBlock);
 
-        constexpr index_t ClusterSize = (AMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_DDS_LOAD)? AClusterSize:
-                                        (BMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_DDS_LOAD)? BClusterSize:
-                                        1;
+        constexpr index_t ClusterSize =
+            (AMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_DDS_LOAD)   ? AClusterSize
+            : (BMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_DDS_LOAD) ? BClusterSize
+                                                                       : 1;
 
         __shared__ NamedBarrier<4> barrier_output;
         if constexpr(EnableWaveGroup)
