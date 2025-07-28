@@ -293,6 +293,7 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
         const auto M = a_grid_desc_m_k.GetLength(I0);
         const auto K = a_grid_desc_m_k.GetLength(I1);
         assert(K % ABlockTransferSrcScalarPerVector == 0);
+
         // for gfx13, the layout changes to M->K0->K1
         if constexpr(AEnableLds)
         {

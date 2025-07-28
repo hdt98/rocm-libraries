@@ -60,7 +60,7 @@ struct GridwiseGemmPipeline_v1<1, true, true>
                                const BlockwiseGemm& blockwise_gemm,
                                CThreadBuffer& c_thread_buf,
                                index_t num_loop,
-                               index_t num_loop_in_cluster)
+                               index_t cluster_size)
     {
         // preload data into LDS
         a_blockwise_copy.RunRead(a_grid_desc, a_grid_buf);
@@ -276,7 +276,7 @@ struct GridwiseGemmPipeline_v1<2, true, true>
                                const BlockwiseGemm& blockwise_gemm,
                                CThreadBuffer& c_thread_buf,
                                index_t num_loop,
-                               index_t num_loop_in_cluster)
+                               index_t cluster_size)
     {
         // preload data into LDS
         {
@@ -420,7 +420,7 @@ struct GridwiseGemmPipeline_v1<1, false, true>
                                const BlockwiseGemm& blockwise_gemm,
                                CThreadBuffer& c_thread_buf,
                                index_t num_loop,
-                               index_t num_loop_in_cluster)
+                               index_t cluster_size)
     {
         constexpr auto a_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0, I0);
         auto a_block_buf_switch           = a_block_buf;
@@ -520,7 +520,7 @@ struct GridwiseGemmPipeline_v1<1, true, false>
                                const BlockwiseGemm& blockwise_gemm,
                                CThreadBuffer& c_thread_buf,
                                index_t num_loop,
-                               index_t num_loop_in_cluster)
+                               index_t cluster_size)
     {
         constexpr auto b_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0, I0);
         auto b_block_buf_switch           = b_block_buf;
@@ -620,7 +620,7 @@ struct GridwiseGemmPipeline_v1<1, false, false>
                                const BlockwiseGemm& blockwise_gemm,
                                CThreadBuffer& c_thread_buf,
                                index_t num_loop,
-                               index_t num_loop_in_cluster)
+                               index_t cluster_size)
     {
         constexpr auto b_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0, I0);
         constexpr auto a_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0, I0);
@@ -864,7 +864,7 @@ struct GridwiseGemmPipeline_v1<1, false, false, AMultiCastLoad, BMultiCastLoad>
                                const BlockwiseGemm& blockwise_gemm,
                                CThreadBuffer& c_thread_buf,
                                index_t num_loop,
-                               index_t num_loop_in_cluster)
+                               index_t cluster_size)
     {
         constexpr auto b_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0, I0);
         constexpr auto a_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0, I0);
@@ -1006,18 +1006,25 @@ struct GridwiseGemmPipeline_v1<1, true, false, GlobalLoadTypeEnum::CLUSTER_DDS_L
                                const BlockwiseGemm& blockwise_gemm,
                                CThreadBuffer& c_thread_buf,
                                index_t num_loop,
-                               index_t num_loop_in_cluster)
+                               index_t cluster_size)
     {
         constexpr auto b_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0, I0);
-
-        // preload data into LDS
-        a_blockwise_copy.RunRead(a_grid_desc, a_grid_buf);
-
         // Initialize C
         c_thread_buf.Clear();
 
+        // preload data into LDS
+        a_blockwise_copy.RunRead(a_grid_desc, a_grid_buf);
         a_blockwise_copy.MoveSrcSliceWindow(a_grid_desc, a_block_copy_step);
         a_blockwise_copy.RunWrite(a_block_desc, a_block_buf);
+
+        // Cluster sync
+        bool isFirst = __builtin_amdgcn_s_barrier_signal_isfirst(-1);
+        __builtin_amdgcn_s_barrier_wait(-1);
+        if (isFirst)
+            __builtin_amdgcn_s_barrier_signal(-3);
+        __builtin_amdgcn_s_barrier_wait(-3);
+
+        const int wgRank = __builtin_amdgcn_cluster_workgroup_flat_id();
 
         index_t k = 0;
         do
@@ -1027,27 +1034,16 @@ struct GridwiseGemmPipeline_v1<1, true, false, GlobalLoadTypeEnum::CLUSTER_DDS_L
 
             block_sync_lds();
 
-            bool isFirst = __builtin_amdgcn_s_barrier_signal_isfirst(-1);
-            __builtin_amdgcn_s_barrier_wait(-1);
+            const index_t a_map_rank_id = (wgRank & ~(cluster_size - 1)) | k;
 
-            if (isFirst)
-                __builtin_amdgcn_s_barrier_signal(-3);
-
-            __builtin_amdgcn_s_barrier_wait(-3);
-
-            //ABlockBuffer a_block_map_buf = map_shared_rank(&a_block_buf, k)[0];
-            //blockwise_gemm.Run(a_block_map_buf, b_block_buf, c_thread_buf);
-            blockwise_gemm.Run(a_block_buf, b_block_buf, c_thread_buf);
+            blockwise_gemm.Run(a_block_buf, b_block_buf, c_thread_buf, a_map_rank_id, 0);
 
             b_blockwise_copy.MoveSrcSliceWindow(b_grid_desc, b_block_copy_step);
 
             ++k;
-        } while(k < num_loop_in_cluster);
+        } while(k < cluster_size);
 
         block_sync_lds();
-
-        a_blockwise_copy.MoveSrcSliceWindow(a_grid_desc, a_block_copy_step);
-        a_blockwise_copy.RunWrite(a_block_desc, a_block_buf);
 
         // main body
         if constexpr(HasMainLoop)
@@ -1056,6 +1052,18 @@ struct GridwiseGemmPipeline_v1<1, true, false, GlobalLoadTypeEnum::CLUSTER_DDS_L
             do
             {
                 index_t j = 0;
+
+                a_blockwise_copy.RunRead(a_grid_desc, a_grid_buf);
+                a_blockwise_copy.MoveSrcSliceWindow(a_grid_desc, a_block_copy_step);
+                a_blockwise_copy.RunWrite(a_block_desc, a_block_buf);
+
+                // Cluster sync
+                isFirst = __builtin_amdgcn_s_barrier_signal_isfirst(-1);
+                __builtin_amdgcn_s_barrier_wait(-1);
+                if (isFirst)
+                    __builtin_amdgcn_s_barrier_signal(-3);
+                __builtin_amdgcn_s_barrier_wait(-3);
+
                 do
                 {
                     b_blockwise_copy.Run(
@@ -1063,32 +1071,19 @@ struct GridwiseGemmPipeline_v1<1, true, false, GlobalLoadTypeEnum::CLUSTER_DDS_L
 
                     block_sync_lds();
 
-                    bool isFirst = __builtin_amdgcn_s_barrier_signal_isfirst(-1);
-                    __builtin_amdgcn_s_barrier_wait(-1);
+                    const index_t a_map_rank_id = (wgRank & ~(cluster_size - 1)) | j;
 
-                    if (isFirst)
-                        __builtin_amdgcn_s_barrier_signal(-3);
-
-                    __builtin_amdgcn_s_barrier_wait(-3);
-
-                    //ABlockBuffer a_block_map_buf = map_shared_rank(&a_block_buf, j)[0];
-                    //blockwise_gemm.Run(a_block_map_buf, b_block_buf, c_thread_buf);  // OOXX
-                    blockwise_gemm.Run(a_block_buf, b_block_buf, c_thread_buf);
+                    blockwise_gemm.Run(a_block_buf, b_block_buf, c_thread_buf, a_map_rank_id, 0);
 
                     b_blockwise_copy.MoveSrcSliceWindow(b_grid_desc, b_block_copy_step);
 
                     ++j;
-                } while(j < num_loop_in_cluster);
+                } while(j < cluster_size);
 
                 block_sync_lds();
 
-                a_blockwise_copy.RunRead(a_grid_desc, a_grid_buf);
-
-                a_blockwise_copy.MoveSrcSliceWindow(a_grid_desc, a_block_copy_step);
-                a_blockwise_copy.RunWrite(a_block_desc, a_block_buf);
-
                 ++i;
-            } while (i < (num_loop / num_loop_in_cluster -1));
+            } while (i < (num_loop / cluster_size -1));
         }
     }
 };
@@ -1143,7 +1138,7 @@ struct GridwiseGemmPipeline_v1_WeightOnly<1, true, true>
                                const BlockwiseGemm& blockwise_gemm,
                                CThreadBuffer& c_thread_buf,
                                index_t num_loop,
-                               index_t num_loop_in_cluster)
+                               index_t cluster_size)
     {
         // Global Prefetch Stage 1
         a_blockwise_copy.RunRead(a_grid_desc, a_grid_buf);
@@ -1240,7 +1235,7 @@ struct GridwiseGemmPipelineInterwave_v1<1>
                                const BlockwiseGemm& blockwise_gemm,
                                CThreadBuffer& c_thread_buf,
                                index_t num_loop,
-                               index_t num_loop_in_cluster)
+                               index_t cluster_size)
     {
         // preload data into LDS
         a_blockwise_copy.RunRead(a_grid_desc, a_grid_buf);

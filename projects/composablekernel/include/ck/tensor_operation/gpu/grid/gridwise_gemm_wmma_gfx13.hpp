@@ -2081,6 +2081,8 @@ struct GridwiseGemm_Wmma_GFX13
                     if constexpr(AMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_DDS_LOAD)
                     {
                         const index_t nk_block_data_idx_on_grid = __builtin_amdgcn_readfirstlane((block_work_idx[I1] % AClusterSize) * NPerBlock);
+                        auto k1 = a_grid_desc.GetLength(I2);
+                        const index_t k0_start_index_on_block = nk_block_data_idx_on_grid / k1;
                         auto a_blockwise_copy =
                             ThreadGroupTensorSliceTransfer_v4r1<ThisThreadBlockGrid,
         /* typename SrcElementwiseOperation,              */    AElementwiseOperation,
@@ -2105,7 +2107,7 @@ struct GridwiseGemm_Wmma_GFX13
         /* bool ThreadTransferDstResetCoordinateAfterRun, */    true,
                                                                 NumGemmKPrefetchStage>(
                         a_grid_desc,
-                        make_multi_index(m_block_data_idx_on_grid, nk_block_data_idx_on_grid, 0),
+                        make_multi_index(m_block_data_idx_on_grid, k0_start_index_on_block, 0),//OOXX
                         a_element_op,
                         a_block_desc,
                         make_multi_index(0, 0, 0),
@@ -2720,7 +2722,12 @@ struct GridwiseGemm_Wmma_GFX13
                                                 NRepeat,
                                                 KPack,
                                                 AEnableLds,
-                                                BEnableLds>{};
+                                                BEnableLds,
+                                                false, //APermute
+                                                false, //BPermute
+                                                false, //Transpose C
+                                                AMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_DDS_LOAD,
+                                                BMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_DDS_LOAD>{};
         // Prepare Register for C matrix
         auto c_thread_buf = blockwise_gemm.GetCThreadBuffer();
 

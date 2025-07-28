@@ -33,7 +33,9 @@ template <typename ThisThreadBlock,
           bool BEnableLds = true,
           bool APermute   = false, // APermute and BPermute are used for gfx13
           bool BPermute   = false,
-          bool TransposeC = false>
+          bool TransposeC = false,
+          bool AEnableDds = false,
+          bool BEnableDds = false>
 /* Option: Read from LDS, big buffer hold all threads required data
  * Source
  * A: K0PerBlock x MPerBlock x K1
@@ -350,7 +352,9 @@ struct BlockwiseGemmWMMA
     template <typename ABlockBuffer, typename BBlockBuffer, typename CThreadBuffer>
     __device__ void Run(const ABlockBuffer& a_block_buf,
                         const BBlockBuffer& b_block_buf,
-                        CThreadBuffer& c_thread_buf) const
+                        CThreadBuffer& c_thread_buf,
+                        const index_t a_share_map_rank_id = 0,
+                        const index_t b_share_map_rank_id = 0) const
     {
         auto a_thread_buf = make_static_buffer<AddressSpaceEnum::Vgpr, FloatA>(
             a_thread_desc_.GetElementSpaceSize());
@@ -367,23 +371,51 @@ struct BlockwiseGemmWMMA
                 [&](auto k) { // k=0,1,2 instead of k=0,kpack*1, ...
                     static_for<0, MRepeat, 1>{}([&](auto m0) {
                         // read A
-                        a_thread_copy_.Run(
-                            a_block_desc_k0_m0_m1_m2_k1,
-                            make_tuple(m0, Number<k * KPack / A_K1 / A_KRow>{}, I0, I0, I0, I0),
-                            a_block_buf,
-                            a_thread_desc_,
-                            make_tuple(m0, I0, I0, I0, I0, I0),
-                            a_thread_buf);
+                        if constexpr(AEnableDds)
+                        {
+                            a_thread_copy_.Run(
+                                a_block_desc_k0_m0_m1_m2_k1,
+                                make_tuple(m0, Number<k * KPack / A_K1 / A_KRow>{}, I0, I0, I0, I0),
+                                a_block_buf,
+                                a_thread_desc_,
+                                make_tuple(m0, I0, I0, I0, I0, I0),
+                                a_thread_buf,
+                                a_share_map_rank_id);
+                        }
+                        else
+                        {
+                            a_thread_copy_.Run(
+                                a_block_desc_k0_m0_m1_m2_k1,
+                                make_tuple(m0, Number<k * KPack / A_K1 / A_KRow>{}, I0, I0, I0, I0),
+                                a_block_buf,
+                                a_thread_desc_,
+                                make_tuple(m0, I0, I0, I0, I0, I0),
+                                a_thread_buf);
+                        }
 
                         static_for<0, NRepeat, 1>{}([&](auto n0) {
                             // read B
-                            b_thread_copy_.Run(
-                                b_block_desc_k0_n0_n1_n2_k1,
-                                make_tuple(n0, Number<k * KPack / B_K1 / B_KRow>{}, I0, I0, I0, I0),
-                                b_block_buf,
-                                b_thread_desc_,
-                                make_tuple(n0, I0, I0, I0, I0, I0),
-                                b_thread_buf);
+                            if constexpr(BEnableDds)
+                            {
+                                b_thread_copy_.Run(
+                                    b_block_desc_k0_n0_n1_n2_k1,
+                                    make_tuple(n0, Number<k * KPack / B_K1 / B_KRow>{}, I0, I0, I0, I0),
+                                    b_block_buf,
+                                    b_thread_desc_,
+                                    make_tuple(n0, I0, I0, I0, I0, I0),
+                                    b_thread_buf,
+                                    b_share_map_rank_id);
+                            }
+                            else
+                            {
+                                b_thread_copy_.Run(
+                                    b_block_desc_k0_n0_n1_n2_k1,
+                                    make_tuple(n0, Number<k * KPack / B_K1 / B_KRow>{}, I0, I0, I0, I0),
+                                    b_block_buf,
+                                    b_thread_desc_,
+                                    make_tuple(n0, I0, I0, I0, I0, I0),
+                                    b_thread_buf);
+                            }
 
                             vector_type<FloatA, KPack / A_KRow> a_thread_vec;
                             vector_type<FloatB, KPack / B_KRow> b_thread_vec;
@@ -469,21 +501,50 @@ struct BlockwiseGemmWMMA
                     static_for<0, KPerBlock / KPack, 1>{}([&](auto k) { // k=0,1,2 instead of
                                                                         // k=0,kpack*1, ..
                         // read B
-                        b_thread_copy_.Run(
-                            b_block_desc_k0_n0_n1_n2_k1,
-                            make_tuple(n0, Number<k * KPack / B_K1 / B_KRow>{}, I0, I0, I0, I0),
-                            b_block_buf,
-                            b_thread_desc_,
-                            make_tuple(n0, I0, I0, I0, I0, I0),
-                            b_thread_buf);
+                        if constexpr(BEnableDds)
+                        {
+                            b_thread_copy_.Run(
+                                b_block_desc_k0_n0_n1_n2_k1,
+                                make_tuple(n0, Number<k * KPack / B_K1 / B_KRow>{}, I0, I0, I0, I0),
+                                b_block_buf,
+                                b_thread_desc_,
+                                make_tuple(n0, I0, I0, I0, I0, I0),
+                                b_thread_buf,
+                                b_share_map_rank_id);
+                        }
+                        else
+                        {
+                            b_thread_copy_.Run(
+                                b_block_desc_k0_n0_n1_n2_k1,
+                                make_tuple(n0, Number<k * KPack / B_K1 / B_KRow>{}, I0, I0, I0, I0),
+                                b_block_buf,
+                                b_thread_desc_,
+                                make_tuple(n0, I0, I0, I0, I0, I0),
+                                b_thread_buf);
+                        }
+
                         // read A
-                        a_thread_copy_.Run(
-                            a_block_desc_k0_m0_m1_m2_k1,
-                            make_tuple(m0, Number<k * KPack / A_K1 / A_KRow>{}, I0, I0, I0, I0),
-                            a_block_buf,
-                            a_thread_desc_,
-                            make_tuple(m0, I0, I0, I0, I0, I0),
-                            a_thread_buf);
+                        if constexpr(AEnableDds)
+                        {
+                            a_thread_copy_.Run(
+                                a_block_desc_k0_m0_m1_m2_k1,
+                                make_tuple(m0, Number<k * KPack / A_K1 / A_KRow>{}, I0, I0, I0, I0),
+                                a_block_buf,
+                                a_thread_desc_,
+                                make_tuple(m0, I0, I0, I0, I0, I0),
+                                a_thread_buf,
+                                a_share_map_rank_id);
+                        }
+                        else
+                        {
+                            a_thread_copy_.Run(
+                                a_block_desc_k0_m0_m1_m2_k1,
+                                make_tuple(m0, Number<k * KPack / A_K1 / A_KRow>{}, I0, I0, I0, I0),
+                                a_block_buf,
+                                a_thread_desc_,
+                                make_tuple(m0, I0, I0, I0, I0, I0),
+                                a_thread_buf);
+                        }
 
                         vector_type<FloatA, KPack / A_KRow> a_thread_vec;
                         vector_type<FloatB, KPack / B_KRow> b_thread_vec;
@@ -589,7 +650,7 @@ struct BlockwiseGemmWMMA
     static constexpr auto c_thread_desc_ = make_naive_tensor_descriptor_packed(
         make_tuple(Number<MRepeat>{}, Number<NRepeat>{}, wmma_gemm.GetRegSizePerWmma()));
 
-    template <bool EnableLds>
+    template <bool EnableLds, bool EnabldDds = false>
     struct AThreadCopySelector;
 
     template <>
@@ -623,7 +684,22 @@ struct BlockwiseGemmWMMA
             false>;
     };
 
-    template <bool EnableLds>
+    template <>
+    struct AThreadCopySelector<true, true>
+    {
+        using type =
+            ThreadwiseTensorSliceTransfer_DdsToVgpr<FloatA,
+                                             FloatA,
+                                             decltype(a_block_desc_k0_m0_m1_m2_k1),
+                                             decltype(a_thread_desc_),
+                                             Sequence<1, KPack / A_K1 / A_KRow, 1, 1, 1, A_K1>,
+                                             Sequence<0, 1, 2, 3, 4, 5>,
+                                             5,
+                                             A_K1,
+                                             A_K1>;
+    };
+
+    template <bool EnableLds, bool EnabldDds = false>
     struct BThreadCopySelector;
 
     template <>
@@ -657,8 +733,23 @@ struct BlockwiseGemmWMMA
             false>;
     };
 
-    typename AThreadCopySelector<AEnableLds>::type a_thread_copy_;
-    typename BThreadCopySelector<BEnableLds>::type b_thread_copy_;
+	template <>
+    struct BThreadCopySelector<true, true>
+    {
+        using type =
+            ThreadwiseTensorSliceTransfer_DdsToVgpr<FloatB,
+                                             FloatB,
+                                             decltype(b_block_desc_k0_n0_n1_n2_k1),
+                                             decltype(b_thread_desc_),
+                                             Sequence<1, KPack / B_K1 / B_KRow, 1, 1, 1, B_K1>,
+                                             Sequence<0, 1, 2, 3, 4, 5>,
+                                             5,
+                                             B_K1,
+                                             B_K1>;
+    };
+
+    typename AThreadCopySelector<AEnableLds, AEnableDds>::type a_thread_copy_;
+    typename BThreadCopySelector<BEnableLds, BEnableDds>::type b_thread_copy_;
 };
 
 #ifdef CK_EXTENSION_MX_TYPE
@@ -1111,7 +1202,7 @@ struct BlockwiseMXGemmWMMA : public BlockwiseGemmWMMA<ThisThreadBlock,
             Number<ScaleK0PerBlock>{}, Number<NRepeat>{}, PARENT::I1, PARENT::I1, PARENT::I1),
         make_tuple(PARENT::I1, Number<ScaleK0PerBlock>{}, PARENT::I1, PARENT::I1, PARENT::I1));
 
-    template <bool EnableLds>
+    template <bool EnableLds, bool EndableDds = false>
     struct AThreadCopySelector;
 
     template <>
@@ -1145,7 +1236,7 @@ struct BlockwiseMXGemmWMMA : public BlockwiseGemmWMMA<ThisThreadBlock,
             false>;
     };
 
-    template <bool EnableLds>
+    template <bool EnableLds, bool EnableDds = false>
     struct BThreadCopySelector;
 
     template <>
@@ -1272,7 +1363,9 @@ template <typename ThisThreadBlock,
           bool BEnableLds = true,
           bool APermute   = false,
           bool BPermute   = false,
-          bool TransposeC = false>
+          bool TransposeC = false,
+          bool AEnableDds = false,
+          bool BEnableDds = false>
 /* Option: Read from LDS, big buffer hold all threads required data
  * Source
  * A: K0PerBlock x MPerBlock x K1
@@ -1555,7 +1648,9 @@ struct BlockwiseGemmWMMA
     template <typename ABlockBuffer, typename BBlockBuffer, typename CThreadBuffer>
     __device__ void Run(const ABlockBuffer& a_block_buf,
                         const BBlockBuffer& b_block_buf,
-                        CThreadBuffer& c_thread_buf) const
+                        CThreadBuffer& c_thread_buf,
+                        const index_t a_share_map_rank_id = 0,
+                        const index_t b_share_map_rank_id = 0) const
     {
         auto a_thread_buf = make_static_buffer<AddressSpaceEnum::Vgpr, FloatA>(
             a_thread_desc_.GetElementSpaceSize());
