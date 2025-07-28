@@ -8,7 +8,7 @@
 rocRAND documentation
 ********************************************************************
 
-Test2
+Test3
 
 rocRAND provides functions that generate pseudo-random and quasi-random numbers.
 The rocRAND library is implemented in the :doc:`HIP <hip:index>`
