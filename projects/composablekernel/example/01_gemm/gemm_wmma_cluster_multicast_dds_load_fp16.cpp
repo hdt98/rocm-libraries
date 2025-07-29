@@ -56,8 +56,8 @@ using DeviceGemmInstance = ck::tensor_operation::device::DeviceGemmWmma_GFX13
            false,
            false,  // AEnableGlobalTRLoad
            false,  // AEnableGlobalTiledLoad
-           ck::GlobalLoadTypeEnum::DEFAULT_LOAD, //ck::GlobalLoadTypeEnum::CLUSTER_DDS_LOAD,      // AGlobalMultiCastLoad:cluster
-           1, //4,      // A_cluster_size = 4
+           ck::GlobalLoadTypeEnum::CLUSTER_MULTICAST_LOAD, //ck::GlobalLoadTypeEnum::CLUSTER_DDS_LOAD,      // AGlobalMultiCastLoad:cluster
+           4,      // A_cluster_size = 4
            S<8, 4, 1>, //S<32, 4, 1>,
            S<0, 1, 2>,
            S<0, 1, 2>,
@@ -68,8 +68,9 @@ using DeviceGemmInstance = ck::tensor_operation::device::DeviceGemmWmma_GFX13
            false, // BBlockLdsAsyncCopy
            false, // BEnableGlobalTRLoad
            false, // BEnableGlobalTiledLoad
-           ck::GlobalLoadTypeEnum::CLUSTER_DDS_LOAD, //ck::GlobalLoadTypeEnum::DEFAULT_LOAD,     // BGlobalMultiCastLoad
-           4,//1,     // B_cluster_size = 1 as default
+           //ck::GlobalLoadTypeEnum::DEFAULT_LOAD,
+           ck::GlobalLoadTypeEnum::CLUSTER_DDS_LOAD, //ck::GlobalLoadTypeEnum::CLUSTER_MULTICAST_LOAD, //ck::GlobalLoadTypeEnum::DEFAULT_LOAD,     // BGlobalMultiCastLoad
+           1,     // B_cluster_size = 0
            1,     // C shuffle (M Repeat) Per store
            1,     // C shuffle (N Repeat) Per store
            S<1, 8, 1, 4>,//S<1, 32, 1, 4>,

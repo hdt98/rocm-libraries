@@ -287,9 +287,10 @@ template <typename GridwiseGemm,
           typename BElementwiseOperation,
           typename CElementwiseOperation,
           typename Block2CTileMap,
-          int ClusterSize,
+          int AClusterSize,
+          int BClusterSize,
           bool HasMainKBlockLoop>
-__global__ void __cluster_dims__(ClusterSize)
+__global__ void __cluster_dims__(AClusterSize, BClusterSize, 1)
     kernel_gemm_wmma_cluster(const ADataType* __restrict__ p_a_grid,
                              const BDataType* __restrict__ p_b_grid,
                              CDataType* __restrict__ p_c_grid,
@@ -1260,6 +1261,11 @@ struct GridwiseGemm_Wmma_GFX13
         else if constexpr(BMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_MULTICAST_LOAD ||
                           BMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_DDS_LOAD)
         {
+            const auto M = c_grid_desc_m_n.GetLength(I0);
+            if((M / MPerBlock) % BClusterSize == 0)
+            {
+                printf("GridwiseOp err: MBlocks must be multiple of BClusterSize\n");
+            }
             return BlockToCTileMap_M00_N0_M01Adapt<MPerBlock, NPerBlock, CGridDesc_M_N>(
                 c_grid_desc_m_n, BClusterSize);
         }
@@ -2744,11 +2750,6 @@ struct GridwiseGemm_Wmma_GFX13
         // gridwise GEMM pipeline
         const index_t KBlockMainLoop = __builtin_amdgcn_readfirstlane(K / AKPerBlock);
 
-        constexpr index_t ClusterSize =
-            (AMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_DDS_LOAD)   ? AClusterSize
-            : (BMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_DDS_LOAD) ? BClusterSize
-                                                                       : 1;
-
         __shared__ NamedBarrier<4> barrier_output;
         if constexpr(EnableWaveGroup)
         {
@@ -2759,22 +2760,48 @@ struct GridwiseGemm_Wmma_GFX13
             }
         }
 
-        GridwiseGemmPipe::template Run<HasMainKBlockLoop>(a_grid_desc,
-                                                          a_block_desc,
-                                                          a_blockwise_copy,
-                                                          a_grid_buf,
-                                                          a_block_buf,
-                                                          a_block_slice_copy_step,
-                                                          b_grid_desc,
-                                                          b_block_desc,
-                                                          b_blockwise_copy,
-                                                          b_grid_buf,
-                                                          b_block_buf,
-                                                          b_block_slice_copy_step,
-                                                          blockwise_gemm,
-                                                          c_thread_buf,
-                                                          KBlockMainLoop,
-                                                          ClusterSize);
+        if constexpr(AMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_DDS_LOAD ||
+                     AMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_MULTICAST_LOAD ||
+                     BMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_DDS_LOAD ||
+                     BMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_MULTICAST_LOAD)
+        {
+            GridwiseGemmPipe::template Run<HasMainKBlockLoop>(a_grid_desc,
+                                                              a_block_desc,
+                                                              a_blockwise_copy,
+                                                              a_grid_buf,
+                                                              a_block_buf,
+                                                              a_block_slice_copy_step,
+                                                              b_grid_desc,
+                                                              b_block_desc,
+                                                              b_blockwise_copy,
+                                                              b_grid_buf,
+                                                              b_block_buf,
+                                                              b_block_slice_copy_step,
+                                                              blockwise_gemm,
+                                                              c_thread_buf,
+                                                              KBlockMainLoop,
+                                                              AClusterSize,
+                                                              BClusterSize);
+        }
+        else
+        {
+            GridwiseGemmPipe::template Run<HasMainKBlockLoop>(a_grid_desc,
+                                                              a_block_desc,
+                                                              a_blockwise_copy,
+                                                              a_grid_buf,
+                                                              a_block_buf,
+                                                              a_block_slice_copy_step,
+                                                              b_grid_desc,
+                                                              b_block_desc,
+                                                              b_blockwise_copy,
+                                                              b_grid_buf,
+                                                              b_block_buf,
+                                                              b_block_slice_copy_step,
+                                                              blockwise_gemm,
+                                                              c_thread_buf,
+                                                              KBlockMainLoop);
+        }
+
         /*******************************************************************************/
         if(EnableWaveGroup == false || get_wave_id_in_wavegroup() == WaveIdRun)
         {

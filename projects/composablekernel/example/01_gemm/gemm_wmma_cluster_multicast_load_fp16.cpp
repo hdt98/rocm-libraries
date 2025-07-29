@@ -69,7 +69,7 @@ using DeviceGemmInstance = ck::tensor_operation::device::DeviceGemmWmma_GFX13
            false, // BEnableGlobalTRLoad
            false, // BEnableGlobalTiledLoad
            ck::GlobalLoadTypeEnum::DEFAULT_LOAD,     // BGlobalMultiCastLoad
-           0,     // B_cluster_size = 0
+           1,     // B_cluster_size = 1
            1,     // C shuffle (M Repeat) Per store
            1,     // C shuffle (N Repeat) Per store
            S<1, 8, 1, 4>,//S<1, 32, 1, 4>,

@@ -880,10 +880,7 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
                                     BGlobalMultiCastLoad == GlobalLoadTypeEnum::DEFAULT_LOAD ||
                                     BGlobalMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_DDS_LOAD,
                                 "Either A or B should not be Cluster MulticastLoad.");
-                            constexpr int ClusterSize =
-                                AGlobalMultiCastLoad != GlobalLoadTypeEnum::DEFAULT_LOAD
-                                    ? AClusterSize
-                                    : BClusterSize;
+
                             const auto kernel = kernel_gemm_wmma_cluster<
                                 GridwiseGemm,
                                 ADataType,
@@ -898,7 +895,8 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
                                 BElementwiseOperation,
                                 CElementwiseOperation,
                                 remove_reference_t<typename GridwiseGemm::DefaultBlock2CTileMap>,
-                                ClusterSize,
+                                AClusterSize,
+                                BClusterSize,
                                 has_main_k_block_loop>;
 
                             return launch_and_time_kernel(
