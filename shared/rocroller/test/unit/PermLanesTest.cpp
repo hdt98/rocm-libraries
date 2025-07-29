@@ -120,10 +120,10 @@ namespace PermLanesTest
         params->setManualWavefrontCount({4, 1});
         auto lowerTile             = std::make_shared<LowerTile>(params, context);
         kgraph                     = kgraph.transform(lowerTile);
-        auto addComputeIndex       = std::make_shared<AddComputeIndex>(context);
-        kgraph                     = kgraph.transform(addComputeIndex);
         auto updateWavefrontParams = std::make_shared<UpdateWavefrontParameters>(params);
         kgraph                     = kgraph.transform(updateWavefrontParams);
+        auto addComputeIndex       = std::make_shared<AddComputeIndex>(context);
+        kgraph                     = kgraph.transform(addComputeIndex);
         kgraph                     = kgraph.transform(std::make_shared<LoadPacked>(context));
 
         context->schedule(k->preamble());

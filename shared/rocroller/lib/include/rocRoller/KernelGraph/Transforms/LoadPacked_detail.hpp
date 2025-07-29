@@ -52,7 +52,8 @@ namespace rocRoller::KernelGraph
          */
         std::map<int, Expression::ExpressionPtr>
             fillRegisterCoords(std::unordered_set<int> const& requiredCoords,
-                               KernelGraph const&             graph);
+                               KernelGraph const&             graph,
+                               ContextPtr                     context);
 
         /**
          * Creates a Transformer that is as close as possible to the

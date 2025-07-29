@@ -539,17 +539,17 @@ namespace rocRoller
             }
             maybeLDS = m_graph->coordinates.get<LDS>(target);
 
-            auto isTransposed
-                = m_graph->coordinates
-                      .findNodes(target,
-                                 [&](int tag) -> bool {
-                                     auto maybeAdhoc = m_graph->coordinates.get<Adhoc>(tag);
-                                     return maybeAdhoc
-                                            && maybeAdhoc->name() == "Adhoc.transpose.simdsPerWave";
-                                 })
-                      .to<std::vector>()
-                      .size()
-                  == 1;
+            // auto isTransposed
+            //     = m_graph->coordinates
+            //           .findNodes(target,
+            //                      [&](int tag) -> bool {
+            //                          auto maybeAdhoc = m_graph->coordinates.get<Adhoc>(tag);
+            //                          return maybeAdhoc
+            //                                 && maybeAdhoc->name() == "Adhoc.transpose.simdsPerWave";
+            //                      })
+            //           .to<std::vector>()
+            //           .size()
+            //       == 1;
 
             auto scope = m_context->getScopeManager();
 

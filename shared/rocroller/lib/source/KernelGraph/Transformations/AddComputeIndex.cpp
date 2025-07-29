@@ -654,14 +654,6 @@ namespace rocRoller::KernelGraph
         std::vector<DeferredConnection> connections;
         std::map<int, int>              offsetOfCoord;
 
-        // auto [coords, remainingCoords] = LoadPackedDetail::getFakeTransformerForControlNode(
-        //     op, graph, context, isDirect2LDS, true);
-
-        // for(auto coord : remainingCoords)
-        // {
-        //     coords.setCoordinate(coord, Expression::literal(0u));
-        // }
-
         for(auto info : getRequiredCoordinatesInfo(op, location, graph, isDirect2LDS))
         {
             // Add ComputeIndex operation
@@ -743,12 +735,10 @@ namespace rocRoller::KernelGraph
                 // Set required coordinates
                 Transformer coords(&graph.coordinates);
                 auto increment        = info.coord;
-                // auto ci = graph.control.get<ComputeIndex>(tag).value();
                 auto fullStop  = [&](int tag) { return tag == increment; };
                 auto [required, path] = findRequiredCoordinates(target, direction, fullStop, graph);
                 auto const maybeInForLoop = findContainingOperation<ForLoopOp>(op, graph).has_value();
 
-                // Set required register coordinate
                 std::map<int, Expression::ExpressionPtr> regCoords;
                 auto isRegisterDim = [&maybeInForLoop](auto dim) -> bool {
                     using T = std::decay_t<decltype(dim)>;
@@ -762,8 +752,6 @@ namespace rocRoller::KernelGraph
                     if(std::visit(isRegisterDim, graph.coordinates.getNode(requiredTag)))
                     {
                         auto registerType = Register::Type::Vector;
-                        // if(ci.isDirect2LDS)
-                        //     registerType = Register::Type::Scalar;
                         auto coordDF
                             = std::make_shared<Expression::Expression>(Expression::DataFlowTag{
                                 requiredTag, registerType, DataType::UInt32});
@@ -775,7 +763,6 @@ namespace rocRoller::KernelGraph
                     coords.setCoordinate(regCoord, expr);
                 }
 
-                // Set other required coordinate
                 for(auto requiredTag : required)
                     if((requiredTag  != increment) && (!coords.hasCoordinate(requiredTag )))
                         coords.setCoordinate(requiredTag , L(0u));
