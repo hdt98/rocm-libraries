@@ -190,9 +190,14 @@ namespace rocRoller::KernelGraph
                        DataType     offsetType,
                        bool         maybeLDS,
                        bool         isTransposed,
+                       bool isDirect2LDS,
                        ContextPtr   context,
                        Transformer& coords)
     {
+        auto offsetRegisterType = Register::Type::Vector;
+        if(isDirect2LDS)
+            offsetRegisterType = Register::Type::Scalar;
+
         auto        indexExpr = forward ? coords.forward({target})[0] : coords.reverse({target})[0];
         auto const& typeInfo  = DataTypeInfo::Get(valueType);
         auto        numBits   = DataTypeInfo::Get(typeInfo.segmentVariableType).elementBits;
@@ -210,8 +215,16 @@ namespace rocRoller::KernelGraph
             paddingBytes           = indexExpr / L(elementsPerTrLoad) * L(extraLdsBytes);
         }
 
-        auto assignNode
-            = Assign{Register::Type::Vector, convert(offsetType, toBytes(indexExpr, valueType) + paddingBytes)};
+        auto expr = toBytes(indexExpr, valueType) + paddingBytes;
+
+        if(isDirect2LDS)
+        {
+                expr = std::make_shared<Expression::Expression>(Expression::ToScalar{expr});
+        }
+
+        // auto assignNode
+        //     = Assign{Register::Type::Vector, convert(offsetType, toBytes(indexExpr, valueType) + paddingBytes)};
+        auto assignNode = Assign{offsetRegisterType, convert(offsetType, expr)};
         assignNode.variableType = offsetType;
         auto assignTag          = graph.control.addElement(assignNode);
         graph.mapper.connect(assignTag, offset, NaryArgument::DEST);
@@ -223,8 +236,8 @@ namespace rocRoller::KernelGraph
             offset);
         // std::cout << "YL: makeAssignBase tag " << assignTag << ", expression " << toString(assignNode.expression) << ", target " << target <<
         // ", offset " << offset << std::endl;
-        std::cout << "YL makeAssignOffset (tag, expression, offset) " << assignTag << ", "
-                  << toString(assignNode.expression) << ", " << offset << std::endl;
+        // std::cout << "YL makeAssignOffset (tag, expression, offset) " << assignTag << ", "
+        //           << toString(assignNode.expression) << ", " << offset << std::endl;
 
         return assignTag;
     }
@@ -470,8 +483,8 @@ namespace rocRoller::KernelGraph
             assignTag,
             toString(assignNode.expression),
             stride);
-        std::cout << "YL makeAssignStride (tag, expression, stride) " << assignTag << ", "
-                  << toString(assignNode.expression) << ", " << stride << std::endl;
+        // std::cout << "YL makeAssignStride (tag, expression, stride) " << assignTag << ", "
+        //           << toString(assignNode.expression) << ", " << stride << std::endl;
         return assignTag;
     }
 
@@ -708,97 +721,6 @@ namespace rocRoller::KernelGraph
 
             chain.push_back(ci);
 
-            // if (isDirect2LDS)
-            // {
-            //     std::cout << "YL: node " << op << " target " << target << std::endl;
-            // }
-
-            // determine if target is LDS
-            auto maybeLDS  = graph.coordinates.get<LDS>(target).has_value();
-            auto newTarget = target;
-            if(maybeLDS)
-            {
-                // If target is LDS; it might be a duplicated LDS
-                // node.  For the purposes of computing indexes,
-                // use the parent LDS as the target instead.
-                auto maybeParentLDS = only(graph.coordinates.getOutputNodeIndices(
-                    newTarget, rocRoller::KernelGraph::CoordinateGraph::isEdge<Duplicate>));
-                if(maybeParentLDS)
-                    newTarget = *maybeParentLDS;
-            }
-            maybeLDS = graph.coordinates.get<LDS>(newTarget).has_value();
-
-            // if (isDirect2LDS)
-            // {
-            //     std::cout << "YL: node " << op << " new target" << newTarget << std::endl;
-            // }
-
-            // determin if the operation is tranpose load
-            auto isLoad       = graph.control.get<LoadTiled>(op).has_value();
-            auto isLoadLDS    = graph.control.get<LoadLDSTile>(op).has_value();
-            auto isTransposed = false;
-            if(isLoad)
-            {
-                auto tile    = graph.control.get<LoadTiled>(op).value();
-                isTransposed = tile.isTransposedTile;
-            }
-            else if(isLoadLDS)
-            {
-                auto tile    = graph.control.get<LoadLDSTile>(op).value();
-                isTransposed = tile.isTransposedTile;
-            }
-
-            // make Assign base expression
-            // Set the zero-coordinates to zero
-            // auto coords           = Transformer(&graph.coordinates);
-            auto increment        = info.coord;
-            auto fullStop         = [&](int ciTag) { return ciTag == increment; };
-            auto [required, path] = findRequiredCoordinates(newTarget, direction, fullStop, graph);
-
-            for(auto ciTag : required)
-                if((ciTag != increment) && (!coords.hasCoordinate(ciTag)))
-                    coords.setCoordinate(ciTag, Expression::literal(0u));
-
-            // Set the increment coordinate to zero if it doesn't
-            // already have a value
-            bool initializeIncrement
-                = !coords.hasPath({newTarget}, direction == Graph::Direction::Upstream);
-            if(initializeIncrement)
-            {
-                coords.setCoordinate(increment, Expression::literal(0u));
-            }
-
-            // Assign base expression
-            // if(base < 0 && offset > 0)
-            // {
-            //     chain.push_back(makeAssignBase(graph,
-            //                                    newTarget,
-            //                                    base,
-            //                                    offset,
-            //                                    direction == Graph::Direction::Upstream,
-            //                                    dtype,
-            //                                    offsetDataType,
-            //                                    maybeLDS,
-            //                                    isTransposed,
-            //                                    context,
-            //                                    coords));
-            // }
-
-            if(stride > 0)
-            {
-                chain.push_back(makeAssignStride(graph,
-                                                 newTarget,
-                                                 stride,
-                                                 increment,
-                                                 direction == Graph::Direction::Upstream,
-                                                 dtype,
-                                                 strideDataType,
-                                                 maybeLDS,
-                                                 isTransposed,
-                                                 context,
-                                                 coords));
-            }
-
             // // if (isDirect2LDS)
             // // {
             // //     std::cout << "YL: node " << op << " target " << target << std::endl;
@@ -859,36 +781,114 @@ namespace rocRoller::KernelGraph
             //     coords.setCoordinate(increment, Expression::literal(0u));
             // }
 
-            // // Assign base expression
-            // if(base < 0)
-            // {
-            //     chain.push_back(makeAssignBase(graph,
-            //                                    newTarget,
-            //                                    base,
-            //                                    offset,
-            //                                    direction == Graph::Direction::Upstream,
-            //                                    dtype,
-            //                                    offsetDataType,
-            //                                    maybeLDS,
-            //                                    isTransposed,
-            //                                    context,
-            //                                    coords));
-            // }
+                // check maybeLDS
+            auto maybeLDS  = graph.coordinates.get<LDS>(target).has_value();
+            auto newTarget = target;
+            if(maybeLDS)
+            {
+                // If target is LDS; it might be a duplicated LDS
+                // node.  For the purposes of computing indexes,
+                // use the parent LDS as the target instead.
+                auto maybeParentLDS = only(graph.coordinates.getOutputNodeIndices(
+                    newTarget, rocRoller::KernelGraph::CoordinateGraph::isEdge<Duplicate>));
+                if(maybeParentLDS)
+                    newTarget = *maybeParentLDS;
+            }
+            maybeLDS = graph.coordinates.get<LDS>(newTarget).has_value();
 
-            // if(stride > 0)
-            // {
-            //     chain.push_back(makeAssignStride(graph,
-            //                                      newTarget,
-            //                                      stride,
-            //                                      increment,
-            //                                      direction == Graph::Direction::Upstream,
-            //                                      dtype,
-            //                                      strideDataType,
-            //                                      maybeLDS,
-            //                                      isTransposed,
-            //                                      context,
-            //                                      coords));
-            // }
+                // check isTransposed
+                auto isTransposed
+                = graph.coordinates
+                      .findNodes(target,
+                                 [&](int tag) -> bool {
+                                     auto maybeAdhoc = graph.coordinates.get<Adhoc>(tag);
+                                     return maybeAdhoc
+                                            && maybeAdhoc->name() == "Adhoc.transpose.simdsPerWave";
+                                 })
+                      .to<std::vector>()
+                      .size()
+                  == 1;
+
+
+                // Set required coordinates
+                Transformer coords(&graph.coordinates);
+                auto increment        = info.coord;
+                // auto ci = graph.control.get<ComputeIndex>(tag).value();
+                auto fullStop  = [&](int tag) { return tag == increment; };
+                auto [required, path] = findRequiredCoordinates(target, direction, fullStop, graph);
+                auto const maybeInForLoop = findContainingOperation<ForLoopOp>(op, graph).has_value();
+
+                // Set required register coordinate
+                std::map<int, Expression::ExpressionPtr> regCoords;
+                auto isRegisterDim = [&maybeInForLoop](auto dim) -> bool {
+                    using T = std::decay_t<decltype(dim)>;
+                    if (maybeInForLoop)
+                        return CIsAnyOf<T, Wavefront, Workitem, Workgroup, ForLoop>;
+                    else
+                        return CIsAnyOf<T, Wavefront, Workitem, Workgroup>;
+                };
+                for(auto requiredTag : required)
+                {
+                    if(std::visit(isRegisterDim, graph.coordinates.getNode(requiredTag)))
+                    {
+                        auto registerType = Register::Type::Vector;
+                        // if(ci.isDirect2LDS)
+                        //     registerType = Register::Type::Scalar;
+                        auto coordDF
+                            = std::make_shared<Expression::Expression>(Expression::DataFlowTag{
+                                requiredTag, registerType, DataType::UInt32});
+                        regCoords[requiredTag] = coordDF;
+                    }
+                }
+                for(auto const& [regCoord, expr] : regCoords)
+                {
+                    coords.setCoordinate(regCoord, expr);
+                }
+
+                // Set other required coordinate
+                for(auto requiredTag : required)
+                    if((requiredTag  != increment) && (!coords.hasCoordinate(requiredTag )))
+                        coords.setCoordinate(requiredTag , L(0u));
+
+                // Set the increment coordinate to zero if it doesn't
+                // already have a value
+                bool initializeIncrement = !coords.hasPath({target}, direction == Graph::Direction::Upstream);
+                if(initializeIncrement)
+                {
+                    coords.setCoordinate(increment, L(0u));
+                }
+
+            // Assign base expression
+            if(base < 0 && offset > 0)
+            {
+                chain.push_back(makeAssignBase(graph,
+                                               newTarget,
+                                               base,
+                                               offset,
+                                               direction == Graph::Direction::Upstream,
+                                               dtype,
+                                               offsetDataType,
+                                               maybeLDS,
+                                               isTransposed,
+                                               isDirect2LDS,
+                                               context,
+                                               coords));
+            }
+
+            if(stride > 0)
+            {
+                chain.push_back(makeAssignStride(graph,
+                                                 newTarget,
+                                                 stride,
+                                                 increment,
+                                                 direction == Graph::Direction::Upstream,
+                                                 dtype,
+                                                 strideDataType,
+                                                 maybeLDS,
+                                                 isTransposed,
+                                                 context,
+                                                 coords));
+            }
 
             // Add connections for register allocate, and so tracer
             // can determine correct lifetimes
