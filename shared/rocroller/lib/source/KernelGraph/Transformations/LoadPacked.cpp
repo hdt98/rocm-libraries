@@ -86,8 +86,7 @@ namespace rocRoller::KernelGraph
         std::map<int, Expression::ExpressionPtr>
             fillRegisterCoords(std::unordered_set<int> const& requiredCoords,
                                KernelGraph const&             graph,
-                               ContextPtr                     context,
-                               bool                           addComputeIndex)
+                               ContextPtr                     context)
         {
             using namespace CoordinateGraph;
             std::map<int, Expression::ExpressionPtr> rv;
@@ -96,54 +95,17 @@ namespace rocRoller::KernelGraph
                 using T = std::decay_t<decltype(dim)>;
 
                 return CIsAnyOf<T, Wavefront, Workitem, Workgroup, ForLoop, MacroTileNumber>;
-                // YL: verify if it breaks any existing test
-                // if (addComputeIndex)
-                // {
-                //     return CIsAnyOf<T, Wavefront, Workitem, Workgroup>;
-                // }
-                // else
-                // {
-                //     return CIsAnyOf<T, Wavefront, Workitem, Workgroup, ForLoop, MacroTileNumber>;
-                // }
-            };
-
-            auto isComputeIndexDim = [](auto dim) -> bool {
-                using T = std::decay_t<decltype(dim)>;
-
-                return CIsAnyOf<T, Wavefront, Workitem, Workgroup>;
-                // YL: verify if it breaks any existing test
-                // if (addComputeIndex)
-                // {
-                //     return CIsAnyOf<T, Wavefront, Workitem, Workgroup>;
-                // }
-                // else
-                // {
-                //     return CIsAnyOf<T, Wavefront, Workitem, Workgroup, ForLoop, MacroTileNumber>;
-                // }
             };
 
             for(auto coord : requiredCoords)
             {
-                if(addComputeIndex)
+
+                if(std::visit(isRegisterDim, graph.coordinates.getNode(coord)))
                 {
-                    if(std::visit(isComputeIndexDim, graph.coordinates.getNode(coord)))
-                    {
-                        // YL: verify if it breaks any existing test
-                        auto coordDF
-                            = std::make_shared<Expression::Expression>(Expression::DataFlowTag{
-                                coord, Register::Type::Vector, DataType::UInt32});
-                        rv[coord] = coordDF;
-                    }
-                }
-                else
-                {
-                    if(std::visit(isRegisterDim, graph.coordinates.getNode(coord)))
-                    {
-                        auto reg = Register::Value::Placeholder(
+                    auto reg = Register::Value::Placeholder(
                             context, Register::Type::Vector, DataType::Int32, 1);
 
-                        rv[coord] = reg->expression();
-                    }
+                    rv[coord] = reg->expression();
                 }
             }
 
@@ -153,15 +115,13 @@ namespace rocRoller::KernelGraph
         std::tuple<CoordinateGraph::Transformer, std::set<int>>
             getFakeTransformerForControlNode(int                controlNode,
                                              KernelGraph const& graph,
-                                             ContextPtr         context,
-                                             bool               isDirect2LDS,
-                                             bool               addComputeIndex)
+                                             ContextPtr         context)
         {
             auto const& [coords, paths]
-                = findAllRequiredCoordinates(controlNode, graph, isDirect2LDS);
+                = findAllRequiredCoordinates(controlNode, graph);
 
             auto staticCoords = getStaticCoords(controlNode, graph);
-            auto regCoords    = fillRegisterCoords(coords, graph, context, addComputeIndex);
+            auto regCoords    = fillRegisterCoords(coords, graph, context);
 
             CoordinateGraph::Transformer xform(&graph.coordinates);
 

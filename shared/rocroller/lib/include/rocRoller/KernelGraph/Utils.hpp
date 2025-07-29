@@ -204,7 +204,7 @@ namespace rocRoller
                                     KernelGraph const&       kgraph);
 
         std::pair<std::unordered_set<int>, std::unordered_set<int>>
-            findAllRequiredCoordinates(int op, KernelGraph const& graph, bool isDirect2LDS = false);
+            findAllRequiredCoordinates(int op, KernelGraph const& graph);
 
         /**
          * @brief Return an augmented path that includes all

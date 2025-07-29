@@ -733,11 +733,11 @@ namespace rocRoller
         }
 
         std::pair<std::unordered_set<int>, std::unordered_set<int>>
-            findAllRequiredCoordinates(int tag, KernelGraph const& graph, bool isDirect2LDS)
+            findAllRequiredCoordinates(int tag, KernelGraph const& graph)
         {
             std::unordered_set<int> required;
 
-            auto [target, direction] = getOperationTarget(tag, graph, isDirect2LDS);
+            auto [target, direction] = getOperationTarget(tag, graph);
             Log::debug("{} target: {}", tag, target);
             auto [targetRequired, path] = findRequiredCoordinates(target, direction, graph);
 
