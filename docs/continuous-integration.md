@@ -103,6 +103,13 @@ graph TD;
 
 ### Overview <a id="math-overview"></a>
 
+math-ci is an internal AMD CI system used for Libraries developers. It provides Libraries developers a stable platform for implementing new features and performance optimizations.
+
+Targeted branches (and PRs targeting these branches): develop and release/rocm-rel-7.0
+
+math-ci only runs on PRs that have a label corresponding to a component. This is usually automatically done by the assistant-librarian bot, but currently has issues on PRs with infinite diffs.
+
+
 ## Windows CI
 
 ### Overview <a id="win-overview"></a>
