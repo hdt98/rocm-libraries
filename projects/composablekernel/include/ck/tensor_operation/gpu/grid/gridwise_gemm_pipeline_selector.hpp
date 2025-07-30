@@ -27,13 +27,13 @@ enum struct PipelineVersion
 };
 
 template <PipelineVersion PipelineVer,
-          index_t NumPrefetch               = 1,
-          LoopScheduler LoopSched           = LoopScheduler::Default,
-          bool AEnableLds                   = true,
-          bool BEnableLds                   = true,
-          bool EnableWaveGroup              = false,
-          GlobalLoadTypeEnum AMultiCastLoad = GlobalLoadTypeEnum::DEFAULT_LOAD,
-          GlobalLoadTypeEnum BMultiCastLoad = GlobalLoadTypeEnum::DEFAULT_LOAD>
+          index_t NumPrefetch          = 1,
+          LoopScheduler LoopSched      = LoopScheduler::Default,
+          bool AEnableLds              = true,
+          bool BEnableLds              = true,
+          bool EnableWaveGroup         = false,
+          TensorLoadOption ALoadOption = TensorLoadOption::DEFAULT_LOAD,
+          TensorLoadOption BLoadOption = TensorLoadOption::DEFAULT_LOAD>
 constexpr auto GridwiseGemmPipeline_Selector()
 {
     if constexpr(EnableWaveGroup)
@@ -45,8 +45,8 @@ constexpr auto GridwiseGemmPipeline_Selector()
                 return GridwiseGemmPipeline_Wavegroup_v1<NumPrefetch,
                                                          AEnableLds,
                                                          BEnableLds,
-                                                         AMultiCastLoad,
-                                                         BMultiCastLoad>{};
+                                                         ALoadOption,
+                                                         BLoadOption>{};
             }
             else
             {
@@ -69,8 +69,8 @@ constexpr auto GridwiseGemmPipeline_Selector()
             return GridwiseGemmPipeline_v1<NumPrefetch,
                                            AEnableLds,
                                            BEnableLds,
-                                           AMultiCastLoad,
-                                           BMultiCastLoad>{};
+                                           ALoadOption,
+                                           BLoadOption>{};
         }
         else if constexpr(LoopSched == LoopScheduler::Interwave)
         {

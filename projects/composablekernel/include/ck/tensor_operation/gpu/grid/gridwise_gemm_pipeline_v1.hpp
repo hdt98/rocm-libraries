@@ -12,8 +12,8 @@ namespace ck {
 template <index_t NumPrefetch,
           bool AEnableLds,
           bool BEnableLds,
-          GlobalLoadTypeEnum AMulctiCastLoad = GlobalLoadTypeEnum::DEFAULT_LOAD,
-          GlobalLoadTypeEnum BMulticastLoad  = GlobalLoadTypeEnum::DEFAULT_LOAD>
+          TensorLoadOption AMulctiCastLoad = TensorLoadOption::DEFAULT_LOAD,
+          TensorLoadOption BMulticastLoad  = TensorLoadOption::DEFAULT_LOAD>
 struct GridwiseGemmPipeline_v1;
 
 // 1-stage prefetch
@@ -816,8 +816,8 @@ struct GridwiseGemmPipeline_v1<1, false, false>
 #endif
 };
 
-template <GlobalLoadTypeEnum AMultiCastLoad, GlobalLoadTypeEnum BMultiCastLoad>
-struct GridwiseGemmPipeline_v1<1, false, false, AMultiCastLoad, BMultiCastLoad>
+template <TensorLoadOption ALoadOption, TensorLoadOption BLoadOption>
+struct GridwiseGemmPipeline_v1<1, false, false, ALoadOption, BLoadOption>
 {
     static constexpr auto I0 = Number<0>{};
     static constexpr auto I1 = Number<1>{};
@@ -868,9 +868,8 @@ struct GridwiseGemmPipeline_v1<1, false, false, AMultiCastLoad, BMultiCastLoad>
         auto a_block_buf_switch           = a_block_buf;
 
 #if defined(__gfx13__)
-        if constexpr(AMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_MULTICAST_LOAD ||
-                     BMultiCastLoad ==
-                         GlobalLoadTypeEnum::CLUSTER_MULTICAST_LOAD) // ClustMultiCastLoad
+        if constexpr(ALoadOption == TensorLoadOption::CLUSTER_MULTICAST_LOAD ||
+                     BLoadOption == TensorLoadOption::CLUSTER_MULTICAST_LOAD) // ClustMultiCastLoad
         {
             __builtin_amdgcn_fence(__ATOMIC_ACQUIRE, "workgroup", "global");
             __builtin_amdgcn_s_barrier_signal(-3);
@@ -887,9 +886,8 @@ struct GridwiseGemmPipeline_v1<1, false, false, AMultiCastLoad, BMultiCastLoad>
         b_blockwise_copy.MoveSrcSliceWindow(b_grid_desc, b_block_copy_step);
 
 #if defined(__gfx13__)
-        if constexpr(AMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_MULTICAST_LOAD ||
-                     BMultiCastLoad ==
-                         GlobalLoadTypeEnum::CLUSTER_MULTICAST_LOAD) // ClustMultiCastLoad
+        if constexpr(ALoadOption == TensorLoadOption::CLUSTER_MULTICAST_LOAD ||
+                     BLoadOption == TensorLoadOption::CLUSTER_MULTICAST_LOAD) // ClustMultiCastLoad
         {
             __builtin_amdgcn_fence(__ATOMIC_ACQUIRE, "workgroup", "global");
             __builtin_amdgcn_s_barrier_signal(-3);
@@ -907,9 +905,9 @@ struct GridwiseGemmPipeline_v1<1, false, false, AMultiCastLoad, BMultiCastLoad>
             do
             {
 #if defined(__gfx13__)
-                if constexpr(AMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_MULTICAST_LOAD ||
-                             BMultiCastLoad ==
-                                 GlobalLoadTypeEnum::CLUSTER_MULTICAST_LOAD) // ClustMultiCastLoad
+                if constexpr(ALoadOption == TensorLoadOption::CLUSTER_MULTICAST_LOAD ||
+                             BLoadOption ==
+                                 TensorLoadOption::CLUSTER_MULTICAST_LOAD) // ClustMultiCastLoad
                 {
                     __builtin_amdgcn_fence(__ATOMIC_ACQUIRE, "workgroup", "global");
                     __builtin_amdgcn_s_barrier_signal(-3);
@@ -947,14 +945,14 @@ struct GridwiseGemmPipeline_v1<1, false, false, AMultiCastLoad, BMultiCastLoad>
     }
 };
 
-// template <bool AEnableLds, bool BEnableLds, GlobalLoadTypeEnum ATmaLoad, GlobalLoadTypeEnum
+// template <bool AEnableLds, bool BEnableLds, TensorLoadOption ATmaLoad, TensorLoadOption
 // BTmaLoad>
 template <>
 struct GridwiseGemmPipeline_v1<1,
                                true,
                                false,
-                               GlobalLoadTypeEnum::CLUSTER_DDS_LOAD,
-                               GlobalLoadTypeEnum::DEFAULT_LOAD>
+                               TensorLoadOption::CLUSTER_DDS_LOAD,
+                               TensorLoadOption::DEFAULT_LOAD>
 {
     static constexpr auto I0 = Number<0>{};
     static constexpr auto I1 = Number<1>{};
@@ -1087,8 +1085,8 @@ template <>
 struct GridwiseGemmPipeline_v1<1,
                                false,
                                true,
-                               GlobalLoadTypeEnum::DEFAULT_LOAD,
-                               GlobalLoadTypeEnum::CLUSTER_DDS_LOAD>
+                               TensorLoadOption::DEFAULT_LOAD,
+                               TensorLoadOption::CLUSTER_DDS_LOAD>
 {
     static constexpr auto I0 = Number<0>{};
     static constexpr auto I1 = Number<1>{};
@@ -1215,13 +1213,12 @@ struct GridwiseGemmPipeline_v1<1,
     }
 };
 
-// For this, alimition is <ClusterSize_A, ClusterSize_B> == <MBlockNumber, NBlockNumber>
 template <>
 struct GridwiseGemmPipeline_v1<1,
                                false,
                                true,
-                               GlobalLoadTypeEnum::CLUSTER_MULTICAST_LOAD,
-                               GlobalLoadTypeEnum::CLUSTER_DDS_LOAD>
+                               TensorLoadOption::CLUSTER_MULTICAST_LOAD,
+                               TensorLoadOption::CLUSTER_DDS_LOAD>
 {
     static constexpr auto I0 = Number<0>{};
     static constexpr auto I1 = Number<1>{};
@@ -1269,8 +1266,6 @@ struct GridwiseGemmPipeline_v1<1,
         constexpr auto a_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0, I0);
         // Initialize C
         c_thread_buf.Clear();
-
-        index_t b_cluster_size = 1;
 
         // preload data into LDS
         b_blockwise_copy.RunRead(b_grid_desc, b_grid_buf);

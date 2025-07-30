@@ -274,13 +274,13 @@ template <typename SrcData,
           index_t SrcScalarPerVector,
           index_t SrcScalarStrideInVector,
           bool SrcResetCoordinateAfterRun,
-          bool InvalidElementAsNaN               = false,
-          bool UseTrLoad                         = false,
-          bool ForceAlignToUint32                = false,
-          bool UseTileLoad                       = false,
-          index_t ThreadLengthPerTile            = 1,
-          index_t VgprLengthPerTile              = 1,
-          GlobalLoadTypeEnum GlobalMulticastLoad = GlobalLoadTypeEnum::DEFAULT_LOAD,
+          bool InvalidElementAsNaN             = false,
+          bool UseTrLoad                       = false,
+          bool ForceAlignToUint32              = false,
+          bool UseTileLoad                     = false,
+          index_t ThreadLengthPerTile          = 1,
+          index_t VgprLengthPerTile            = 1,
+          TensorLoadOption GlobalMulticastLoad = TensorLoadOption::DEFAULT_LOAD,
           typename enable_if<DstDesc::IsKnownAtCompileTime(), bool>::type = false>
 struct ThreadwiseTensorSliceTransfer_v2
 {
@@ -412,13 +412,13 @@ struct ThreadwiseTensorSliceTransfer_v2
                                 src_coord_.GetOffset() / PackedSize, is_src_valid);
                     }
                     else if constexpr(GlobalMulticastLoad ==
-                                      GlobalLoadTypeEnum::CLUSTER_MULTICAST_LOAD)
+                                      TensorLoadOption::CLUSTER_MULTICAST_LOAD)
                     {
                         src_vector.template AsType<src_vector_t>()(Number<0>{}) =
                             src_buf.template clusterMulticastLoad<src_vector_t>(
                                 src_coord_.GetOffset() / PackedSize, is_src_valid);
                     }
-                    else if constexpr(GlobalMulticastLoad == GlobalLoadTypeEnum::WGP_MULTICAST_LOAD)
+                    else if constexpr(GlobalMulticastLoad == TensorLoadOption::WGP_MULTICAST_LOAD)
                     {
                         src_buf.template wgpMulticastLoad<src_vector_t>(
                             src_vector.template AsType<src_vector_t>()(Number<0>{}),
@@ -475,12 +475,12 @@ struct ThreadwiseTensorSliceTransfer_v2
                             src_coord_.GetOffset() / PackedSize, is_src_valid);
                     }
                     else if constexpr(GlobalMulticastLoad ==
-                                      GlobalLoadTypeEnum::CLUSTER_MULTICAST_LOAD)
+                                      TensorLoadOption::CLUSTER_MULTICAST_LOAD)
                     {
                         *dst_buf_ptr = src_buf.template clusterMulticastLoad<src_vector_t>(
                             src_coord_.GetOffset() / PackedSize, is_src_valid);
                     }
-                    else if constexpr(GlobalMulticastLoad == GlobalLoadTypeEnum::WGP_MULTICAST_LOAD)
+                    else if constexpr(GlobalMulticastLoad == TensorLoadOption::WGP_MULTICAST_LOAD)
                     {
                         src_buf.template wgpMulticastLoad<src_vector_t>(
                             *dst_buf_ptr, src_coord_.GetOffset() / PackedSize, is_src_valid);
@@ -510,13 +510,13 @@ struct ThreadwiseTensorSliceTransfer_v2
                                                   VgprLengthPerTile>(
                             src_coord_.GetOffset() / PackedSize, is_src_valid);
                 }
-                else if constexpr(GlobalMulticastLoad == GlobalLoadTypeEnum::CLUSTER_MULTICAST_LOAD)
+                else if constexpr(GlobalMulticastLoad == TensorLoadOption::CLUSTER_MULTICAST_LOAD)
                 {
                     src_vector.template AsType<src_vector_t>()(Number<0>{}) =
                         src_buf.template clusterMulticastLoad<src_vector_t>(
                             src_coord_.GetOffset() / PackedSize, is_src_valid);
                 }
-                else if constexpr(GlobalMulticastLoad == GlobalLoadTypeEnum::WGP_MULTICAST_LOAD)
+                else if constexpr(GlobalMulticastLoad == TensorLoadOption::WGP_MULTICAST_LOAD)
                 {
                     src_buf.template wgpMulticastLoad<src_vector_t>(
                         src_vector.template AsType<src_vector_t>()(Number<0>{}),

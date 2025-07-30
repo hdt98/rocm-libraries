@@ -373,9 +373,9 @@ template <index_t BlockSize,
           bool AEnableAsyncCopy,
           bool AEnableTRLoadFromGlobal,
           bool AEnableTiledLoadFromGlobal,
-          GlobalLoadTypeEnum AMultiCastLoad, /* 0x1: ClusterMulticastLoad, 0x2: WGPMulticastLoad,
+          TensorLoadOption ALoadOption, /* 0x1: ClusterMulticastLoad, 0x2: WGPMulticastLoad,
                                                 0x3:DDS */
-          index_t AClusterSize,              /* Set when AMultiCastLoad == 1 or 3*/
+          index_t AClusterSize,         /* Set when ALoadOption == 1 or 3*/
           typename BBlockTransferThreadClusterLengths_N_K0_K1,
           typename BBlockTransferThreadClusterArrangeOrder,
           typename BBlockTransferSrcAccessOrder,
@@ -388,8 +388,8 @@ template <index_t BlockSize,
           bool BEnableAsyncCopy,
           bool BEnableTRLoadFromGlobal,
           bool BEnableTiledLoadFromGlobal,
-          GlobalLoadTypeEnum BMultiCastLoad, /* 0x1: ClusterMulticastLoad, 0x2: WGPMulticastLoad */
-          index_t BClusterSize,              /* Set when BMultiCastLoad == 1 or 3*/
+          TensorLoadOption BLoadOption, /* 0x1: ClusterMulticastLoad, 0x2: WGPMulticastLoad */
+          index_t BClusterSize,         /* Set when BLoadOption == 1 or 3*/
           index_t CShuffleMRepeatPerShuffle,
           index_t CShuffleNRepeatPerShuffle,
           typename CShuffleBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock,
@@ -490,8 +490,8 @@ struct GridwiseGemm_Wmma_GFX13
                                                               AEnableLds,
                                                               BEnableLds,
                                                               EnableWaveGroup,
-                                                              AMultiCastLoad,
-                                                              BMultiCastLoad>())>;
+                                                              ALoadOption,
+                                                              BLoadOption>())>;
 #ifdef CK_EXTENSION_MX_TYPE
     __host__ __device__ static constexpr auto MakeAScaleBlockDescriptor()
     {
@@ -801,7 +801,7 @@ struct GridwiseGemm_Wmma_GFX13
             if constexpr(AEnableLds)
             {
                 constexpr auto K0PerBlock = AKPerBlock / ABlockTransferSrcScalarPerVector;
-                if constexpr(AMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_DDS_LOAD)
+                if constexpr(ALoadOption == TensorLoadOption::CLUSTER_DDS_LOAD)
                 {
                     return make_multi_index(0, K0PerBlock * AClusterSize, 0);
                 }
@@ -828,7 +828,7 @@ struct GridwiseGemm_Wmma_GFX13
             if constexpr(BEnableLds)
             {
                 constexpr auto K0PerBlock = BKPerBlock / BBlockTransferSrcScalarPerVector;
-                if constexpr(BMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_DDS_LOAD)
+                if constexpr(BLoadOption == TensorLoadOption::CLUSTER_DDS_LOAD)
                 {
                     return make_multi_index(0, K0PerBlock * BClusterSize, 0);
                 }
@@ -1053,6 +1053,14 @@ struct GridwiseGemm_Wmma_GFX13
                           (NPerBlock % (NRepeat * NPerWmma)) == 0,
                       "Invalid tuning param!");
 
+        static_assert((ALoadOption != TensorLoadOption::CLUSTER_MULTICAST_LOAD) ||
+                          (BLoadOption != TensorLoadOption::CLUSTER_MULTICAST_LOAD),
+                      "Both A and B cannot enable MultiCastLoad at the same time.");
+
+        static_assert((ALoadOption != TensorLoadOption::CLUSTER_DDS_LOAD) ||
+                          (BLoadOption != TensorLoadOption::CLUSTER_DDS_LOAD),
+                      "Both A and B cannot enable DdsLoad at the same time.");
+
         if constexpr(is_mx_type_t_v<ADataType> && is_mx_type_t_v<BDataType>)
         {
             static_assert((ABlockTransferSrcScalarPerVector <= 4));
@@ -1062,25 +1070,25 @@ struct GridwiseGemm_Wmma_GFX13
             static_assert((K1Value == 1), "for MX type K1 should be 1, because of int32 based");
         }
 
-        if constexpr(AMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_MULTICAST_LOAD ||
-                     AMultiCastLoad == GlobalLoadTypeEnum::WGP_MULTICAST_LOAD)
+        if constexpr(ALoadOption == TensorLoadOption::CLUSTER_MULTICAST_LOAD ||
+                     ALoadOption == TensorLoadOption::WGP_MULTICAST_LOAD)
         {
             static_assert((AEnableLds == false) && (AEnableTRLoadFromGlobal == false) &&
                               (AEnableTiledLoadFromGlobal == false),
                           "A use multicast load and other load methods should be unused.");
-            if constexpr(AMultiCastLoad == GlobalLoadTypeEnum::WGP_MULTICAST_LOAD)
+            if constexpr(ALoadOption == TensorLoadOption::WGP_MULTICAST_LOAD)
             {
                 static_assert(EnableWaveGroup == true,
                               "A WGPMultiCastLoad should be used with WaveGroup enabled.");
             }
         }
-        if constexpr(BMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_MULTICAST_LOAD ||
-                     BMultiCastLoad == GlobalLoadTypeEnum::WGP_MULTICAST_LOAD)
+        if constexpr(BLoadOption == TensorLoadOption::CLUSTER_MULTICAST_LOAD ||
+                     BLoadOption == TensorLoadOption::WGP_MULTICAST_LOAD)
         {
             static_assert((BEnableLds == false) && (BEnableTRLoadFromGlobal == false) &&
                               (BEnableTiledLoadFromGlobal == false),
                           "A use multicast load and other load methods should be unused.");
-            if constexpr(BMultiCastLoad == GlobalLoadTypeEnum::WGP_MULTICAST_LOAD)
+            if constexpr(BLoadOption == TensorLoadOption::WGP_MULTICAST_LOAD)
             {
                 static_assert(EnableWaveGroup == true,
                               "B WGPMultiCastLoad should be used with WaveGroup enabled.");
@@ -1205,11 +1213,11 @@ struct GridwiseGemm_Wmma_GFX13
     __host__ __device__ static constexpr bool CalculateHasMainKBlockLoop(index_t K)
     {
         index_t ClusterSize = 1;
-        if constexpr(AMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_DDS_LOAD)
+        if constexpr(ALoadOption == TensorLoadOption::CLUSTER_DDS_LOAD)
         {
             ClusterSize = AClusterSize;
         }
-        else if constexpr(BMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_DDS_LOAD)
+        else if constexpr(BLoadOption == TensorLoadOption::CLUSTER_DDS_LOAD)
         {
             ClusterSize = BClusterSize;
         }
@@ -1242,13 +1250,7 @@ struct GridwiseGemm_Wmma_GFX13
     __host__ __device__ static constexpr auto MakeDefaultBlock2CTileMap(
         const CGridDesc_M_N& c_grid_desc_m_n, index_t /* M01 */, index_t /* N01 */)
     {
-        static_assert(AMultiCastLoad == GlobalLoadTypeEnum::DEFAULT_LOAD ||
-                          AMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_DDS_LOAD ||
-                          BMultiCastLoad == GlobalLoadTypeEnum::DEFAULT_LOAD ||
-                          BMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_DDS_LOAD,
-                      "Both A and B cannot enable MultiCastLoad at the same time.");
-        if constexpr(AMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_MULTICAST_LOAD ||
-                     AMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_DDS_LOAD)
+        if constexpr((AClusterSize > 1) && (BClusterSize == 1))
         {
             const auto N = c_grid_desc_m_n.GetLength(I1);
             if((N / NPerBlock) % AClusterSize == 0)
@@ -1258,8 +1260,7 @@ struct GridwiseGemm_Wmma_GFX13
             return BlockToCTileMap_M00_N0_M01Adapt<MPerBlock, NPerBlock, CGridDesc_M_N>(
                 c_grid_desc_m_n, 1);
         }
-        else if constexpr(BMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_MULTICAST_LOAD ||
-                          BMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_DDS_LOAD)
+        else if constexpr((AClusterSize == 1) && (BClusterSize > 1))
         {
             const auto M = c_grid_desc_m_n.GetLength(I0);
             if((M / MPerBlock) % BClusterSize == 0)
@@ -1269,6 +1270,7 @@ struct GridwiseGemm_Wmma_GFX13
             return BlockToCTileMap_M00_N0_M01Adapt<MPerBlock, NPerBlock, CGridDesc_M_N>(
                 c_grid_desc_m_n, BClusterSize);
         }
+        // else if constexpr((AClusterSize > 1) && (BClusterSize > 1))
         else
         {
             return BlockToCTileMap_M00_N0_M01Adapt<MPerBlock, NPerBlock, CGridDesc_M_N>(
@@ -2085,7 +2087,7 @@ struct GridwiseGemm_Wmma_GFX13
                 }
                 else
                 {
-                    if constexpr(AMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_DDS_LOAD)
+                    if constexpr(ALoadOption == TensorLoadOption::CLUSTER_DDS_LOAD)
                     {
                         const index_t nk_block_data_idx_on_grid = __builtin_amdgcn_readfirstlane((block_work_idx[I1] % AClusterSize) * NPerBlock);
                         auto k1 = a_grid_desc.GetLength(I2);
@@ -2267,8 +2269,8 @@ struct GridwiseGemm_Wmma_GFX13
                         return make_tuple(a_block_buf, a_blockwise_copy);
                     }
                 }
-                else if constexpr(AMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_MULTICAST_LOAD ||
-                                  AMultiCastLoad == GlobalLoadTypeEnum::WGP_MULTICAST_LOAD)
+                else if constexpr(ALoadOption == TensorLoadOption::CLUSTER_MULTICAST_LOAD ||
+                                  ALoadOption == TensorLoadOption::WGP_MULTICAST_LOAD)
                 {
                     // Thread-wise copy
                     // KPerBlock/WmmaK -> MRepeat -> MWaves -> K0PerWmma -> KRow -> MPerWmma -> K1
@@ -2300,7 +2302,7 @@ struct GridwiseGemm_Wmma_GFX13
                         /*UseTileLoad               */ false,
                         /*ThreadsPerTile            */ 1,
                         /*VgprsPerTile              */ 1,
-                        /*ClusterMulticastLoad      */ AMultiCastLoad>(
+                        /*ClusterMulticastLoad      */ ALoadOption>(
                         a_grid_desc,
 
                         make_multi_index(
@@ -2419,7 +2421,7 @@ struct GridwiseGemm_Wmma_GFX13
                 }
                 else
                 {
-                    if constexpr(BMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_DDS_LOAD)
+                    if constexpr(BLoadOption == TensorLoadOption::CLUSTER_DDS_LOAD)
                     {
                         auto k1 = b_grid_desc.GetLength(I2);
                         const index_t mk_block_data_idx_on_grid = __builtin_amdgcn_readfirstlane((block_work_idx[I0] % BClusterSize) * MPerBlock);
@@ -2596,8 +2598,8 @@ struct GridwiseGemm_Wmma_GFX13
                         return make_tuple(b_block_buf, b_blockwise_copy);
                     }
                 }
-                else if constexpr(BMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_MULTICAST_LOAD ||
-                                  BMultiCastLoad == GlobalLoadTypeEnum::WGP_MULTICAST_LOAD)
+                else if constexpr(BLoadOption == TensorLoadOption::CLUSTER_MULTICAST_LOAD ||
+                                  BLoadOption == TensorLoadOption::WGP_MULTICAST_LOAD)
                 {
                     // Thread-wise copy
                     // KPerBlock/WmmaK -> NRepeat -> NWaves -> WmmaK/K1 -> NPerWmma -> K1
@@ -2628,7 +2630,7 @@ struct GridwiseGemm_Wmma_GFX13
                         /*UseTileLoad                */ false,
                         /*ThreadsPerTile             */ 1,
                         /*VgprsPerTile               */ 1,
-                        /*ClusterMulticastLoad       */ BMultiCastLoad>(
+                        /*ClusterMulticastLoad       */ BLoadOption>(
                         b_grid_desc,
                         make_multi_index(0,
                                          n_block_data_idx_on_grid / (NWaves * NPerWmma * NRepeat),
@@ -2738,8 +2740,8 @@ struct GridwiseGemm_Wmma_GFX13
                               false, // APermute
                               false, // BPermute
                               false, // Transpose C
-                              AMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_DDS_LOAD,
-                              BMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_DDS_LOAD>{};
+                              ALoadOption == TensorLoadOption::CLUSTER_DDS_LOAD,
+                              BLoadOption == TensorLoadOption::CLUSTER_DDS_LOAD>{};
         // Prepare Register for C matrix
         auto c_thread_buf = blockwise_gemm.GetCThreadBuffer();
 
@@ -2760,10 +2762,10 @@ struct GridwiseGemm_Wmma_GFX13
             }
         }
 
-        if constexpr(AMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_DDS_LOAD ||
-                     AMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_MULTICAST_LOAD ||
-                     BMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_DDS_LOAD ||
-                     BMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_MULTICAST_LOAD)
+        if constexpr(ALoadOption == TensorLoadOption::CLUSTER_DDS_LOAD ||
+                     ALoadOption == TensorLoadOption::CLUSTER_MULTICAST_LOAD ||
+                     BLoadOption == TensorLoadOption::CLUSTER_DDS_LOAD ||
+                     BLoadOption == TensorLoadOption::CLUSTER_MULTICAST_LOAD)
         {
             GridwiseGemmPipe::template Run<HasMainKBlockLoop>(a_grid_desc,
                                                               a_block_desc,

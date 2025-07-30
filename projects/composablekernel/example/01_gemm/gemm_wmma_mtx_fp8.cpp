@@ -56,8 +56,8 @@ using DeviceGemmInstance = ck::tensor_operation::device::DeviceGemmWmma_GFX13
            false,
            false,
            false,
-           ck::GlobalLoadTypeEnum::DEFAULT_LOAD,
-           0,
+           ck::TensorLoadOption::DEFAULT_LOAD,
+           1,
            S<32, 4, 1>,
            S<0, 1, 2>,
            S<0, 1, 2>,
@@ -68,8 +68,8 @@ using DeviceGemmInstance = ck::tensor_operation::device::DeviceGemmWmma_GFX13
            false,
            false,
            false,
-           ck::GlobalLoadTypeEnum::DEFAULT_LOAD,
-           0,
+           ck::TensorLoadOption::DEFAULT_LOAD,
+           1,
            1,           // C shuffle (M Repeat) Per store
            1,           // C shuffle (N Repeat) Per store
            S<1, 32, 1, 4>,

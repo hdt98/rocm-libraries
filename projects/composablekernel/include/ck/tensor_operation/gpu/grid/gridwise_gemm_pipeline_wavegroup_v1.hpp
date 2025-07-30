@@ -15,8 +15,8 @@ namespace ck {
 template <index_t NumPrefetch,
           bool AEnableLds,
           bool BEnableLds,
-          GlobalLoadTypeEnum AMultiCastLoad = GlobalLoadTypeEnum::DEFAULT_LOAD,
-          GlobalLoadTypeEnum BMultiCastLoad = GlobalLoadTypeEnum::DEFAULT_LOAD>
+          TensorLoadOption ALoadOption = TensorLoadOption::DEFAULT_LOAD,
+          TensorLoadOption BLoadOption = TensorLoadOption::DEFAULT_LOAD>
 struct GridwiseGemmPipeline_Wavegroup_v1;
 
 // 1-stage prefetch
@@ -991,8 +991,8 @@ struct GridwiseGemmPipeline_Wavegroup_v1<1, false, false>
 #endif
 };
 
-template <GlobalLoadTypeEnum AMultiCastLoad, GlobalLoadTypeEnum BMultiCastLoad>
-struct GridwiseGemmPipeline_Wavegroup_v1<1, false, false, AMultiCastLoad, BMultiCastLoad>
+template <TensorLoadOption ALoadOption, TensorLoadOption BLoadOption>
+struct GridwiseGemmPipeline_Wavegroup_v1<1, false, false, ALoadOption, BLoadOption>
 {
     static constexpr auto I0 = Number<0>{};
     static constexpr auto I1 = Number<1>{};
@@ -1051,16 +1051,14 @@ struct GridwiseGemmPipeline_Wavegroup_v1<1, false, false, AMultiCastLoad, BMulti
         {
             // Need add this if condition when the LLVM fix the scratch_store only in wave_roup_id
             // == 0 issue.
-            if((AMultiCastLoad == GlobalLoadTypeEnum::DEFAULT_LOAD) ||
-               (AMultiCastLoad == GlobalLoadTypeEnum::WGP_MULTICAST_LOAD &&
-                (get_wavegroup_id() == 0)))
+            if((ALoadOption == TensorLoadOption::DEFAULT_LOAD) ||
+               (ALoadOption == TensorLoadOption::WGP_MULTICAST_LOAD && (get_wavegroup_id() == 0)))
             {
                 a_blockwise_copy.Run(
                     a_grid_desc, a_grid_buf, a_block_desc, a_block_origin_idx, a_block_buf);
             }
-            if((BMultiCastLoad == GlobalLoadTypeEnum::DEFAULT_LOAD) ||
-               (BMultiCastLoad == GlobalLoadTypeEnum::WGP_MULTICAST_LOAD &&
-                (get_wavegroup_id() == 0)))
+            if((BLoadOption == TensorLoadOption::DEFAULT_LOAD) ||
+               (BLoadOption == TensorLoadOption::WGP_MULTICAST_LOAD && (get_wavegroup_id() == 0)))
             {
                 b_blockwise_copy.Run(
                     b_grid_desc, b_grid_buf, b_block_desc, b_block_origin_idx, b_block_buf);
@@ -1078,15 +1076,15 @@ struct GridwiseGemmPipeline_Wavegroup_v1<1, false, false, AMultiCastLoad, BMulti
 
                 do
                 {
-                    if((AMultiCastLoad == GlobalLoadTypeEnum::DEFAULT_LOAD) ||
-                       (AMultiCastLoad == GlobalLoadTypeEnum::WGP_MULTICAST_LOAD &&
+                    if((ALoadOption == TensorLoadOption::DEFAULT_LOAD) ||
+                       (ALoadOption == TensorLoadOption::WGP_MULTICAST_LOAD &&
                         (get_wavegroup_id() == 0)))
                     {
                         a_blockwise_copy.Run(
                             a_grid_desc, a_grid_buf, a_block_desc, a_block_origin_idx, a_block_buf);
                     }
-                    if((BMultiCastLoad == GlobalLoadTypeEnum::DEFAULT_LOAD) ||
-                       (BMultiCastLoad == GlobalLoadTypeEnum::WGP_MULTICAST_LOAD &&
+                    if((BLoadOption == TensorLoadOption::DEFAULT_LOAD) ||
+                       (BLoadOption == TensorLoadOption::WGP_MULTICAST_LOAD &&
                         (get_wavegroup_id() == 0)))
                     {
                         b_blockwise_copy.Run(
