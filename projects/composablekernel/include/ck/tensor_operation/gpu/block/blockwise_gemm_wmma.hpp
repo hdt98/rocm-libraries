@@ -652,7 +652,7 @@ struct BlockwiseGemmWMMA
     static constexpr auto c_thread_desc_ = make_naive_tensor_descriptor_packed(
         make_tuple(Number<MRepeat>{}, Number<NRepeat>{}, wmma_gemm.GetRegSizePerWmma()));
 
-    template <bool EnableLds, bool EnabldDds = false>
+    template <bool EnableLds, bool EnableDds = false>
     struct AThreadCopySelector;
 
     template <>
@@ -701,7 +701,7 @@ struct BlockwiseGemmWMMA
             A_K1>;
     };
 
-    template <bool EnableLds, bool EnabldDds = false>
+    template <bool EnableLds, bool EnableDds = false>
     struct BThreadCopySelector;
 
     template <>

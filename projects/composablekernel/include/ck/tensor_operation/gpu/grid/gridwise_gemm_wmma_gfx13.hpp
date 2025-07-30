@@ -1250,27 +1250,55 @@ struct GridwiseGemm_Wmma_GFX13
     __host__ __device__ static constexpr auto MakeDefaultBlock2CTileMap(
         const CGridDesc_M_N& c_grid_desc_m_n, index_t /* M01 */, index_t /* N01 */)
     {
-        if constexpr((AClusterSize > 1) && (BClusterSize == 1))
+        // Current it should align on the DDS block2tile firstly as mcast can fetch data
+        // from different address
+        if constexpr(AClusterSize > 1)
         {
             const auto N = c_grid_desc_m_n.GetLength(I1);
             if((N / NPerBlock) % AClusterSize == 0)
             {
                 printf("GridwiseOp err: NBlocks must be multiple of AClusterSize\n");
             }
-            return BlockToCTileMap_M00_N0_M01Adapt<MPerBlock, NPerBlock, CGridDesc_M_N>(
-                c_grid_desc_m_n, 1);
+
+            if constexpr((BClusterSize > 1) && (BLoadOption == TensorLoadOption::CLUSTER_DDS_LOAD))
+            {
+                const auto M = c_grid_desc_m_n.GetLength(I0);
+                if((M / MPerBlock) % BClusterSize == 0)
+                {
+                    printf("GridwiseOp err: MBlocks must be multiple of BClusterSize\n");
+                }
+                return BlockToCTileMap_M00_N0_M01Adapt<MPerBlock, NPerBlock, CGridDesc_M_N>(
+                    c_grid_desc_m_n, BClusterSize);
+            }
+            else
+            {
+                return BlockToCTileMap_M00_N0_M01Adapt<MPerBlock, NPerBlock, CGridDesc_M_N>(
+                    c_grid_desc_m_n, 1);
+            }
         }
-        else if constexpr((AClusterSize == 1) && (BClusterSize > 1))
+        else if constexpr(BClusterSize > 1)
         {
             const auto M = c_grid_desc_m_n.GetLength(I0);
             if((M / MPerBlock) % BClusterSize == 0)
             {
                 printf("GridwiseOp err: MBlocks must be multiple of BClusterSize\n");
             }
-            return BlockToCTileMap_M00_N0_M01Adapt<MPerBlock, NPerBlock, CGridDesc_M_N>(
-                c_grid_desc_m_n, BClusterSize);
+            if constexpr((AClusterSize > 1) && (ALoadOption == TensorLoadOption::CLUSTER_DDS_LOAD))
+            {
+                const auto N = c_grid_desc_m_n.GetLength(I1);
+                if((N / NPerBlock) % AClusterSize == 0)
+                {
+                    printf("GridwiseOp err: NBlocks must be multiple of AClusterSize\n");
+                }
+                return BlockToCTileMap_M00_N0_M01Adapt<MPerBlock, NPerBlock, CGridDesc_M_N>(
+                    c_grid_desc_m_n, 1);
+            }
+            else
+            {
+                return BlockToCTileMap_M00_N0_M01Adapt<MPerBlock, NPerBlock, CGridDesc_M_N>(
+                    c_grid_desc_m_n, BClusterSize);
+            }
         }
-        // else if constexpr((AClusterSize > 1) && (BClusterSize > 1))
         else
         {
             return BlockToCTileMap_M00_N0_M01Adapt<MPerBlock, NPerBlock, CGridDesc_M_N>(

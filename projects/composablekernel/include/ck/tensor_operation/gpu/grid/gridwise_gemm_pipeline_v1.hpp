@@ -1297,7 +1297,7 @@ struct GridwiseGemmPipeline_v1<1,
             __builtin_amdgcn_s_barrier_wait(-3);
 #endif
 
-            const index_t b_map_rank_id = wgRank + k * a_cluster_size;
+            const index_t b_map_rank_id = (wgRank & ~(b_cluster_size - 1)) | k;
 
             blockwise_gemm.Run(a_block_buf, b_block_buf, c_thread_buf, 0, b_map_rank_id);
 
@@ -1340,7 +1340,7 @@ struct GridwiseGemmPipeline_v1<1,
 
                     block_sync_lds();
 
-                    const index_t b_map_rank_id = wgRank + j * a_cluster_size;
+                    const index_t b_map_rank_id = (wgRank & ~(b_cluster_size - 1)) | j;
 
                     blockwise_gemm.Run(a_block_buf, b_block_buf, c_thread_buf, 0, b_map_rank_id);
 
