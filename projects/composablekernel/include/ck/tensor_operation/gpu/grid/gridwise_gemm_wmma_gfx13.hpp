@@ -290,7 +290,7 @@ template <typename GridwiseGemm,
           int AClusterSize,
           int BClusterSize,
           bool HasMainKBlockLoop>
-__global__ void __cluster_dims__(AClusterSize, BClusterSize, 1)
+__global__ void __cluster_dims__(AClusterSize* BClusterSize, 1, 1)
     kernel_gemm_wmma_cluster(const ADataType* __restrict__ p_a_grid,
                              const BDataType* __restrict__ p_b_grid,
                              CDataType* __restrict__ p_c_grid,
@@ -2597,7 +2597,7 @@ struct GridwiseGemm_Wmma_GFX13
                     }
                 }
                 else if constexpr(BMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_MULTICAST_LOAD ||
-                                  BMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_DDS_LOAD)
+                                  BMultiCastLoad == GlobalLoadTypeEnum::WGP_MULTICAST_LOAD)
                 {
                     // Thread-wise copy
                     // KPerBlock/WmmaK -> NRepeat -> NWaves -> WmmaK/K1 -> NPerWmma -> K1

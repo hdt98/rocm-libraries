@@ -966,17 +966,6 @@ struct GridwiseGemmPipeline_v1<1,
         return num_loop > 1;
     }
 
-    template <typename T>
-    __device__ static T* map_shared_rank(T* addr, int rank)
-    {
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wold-style-cast"
-#pragma clang diagnostic ignored "-Wcast-align"
-        auto ptr = (__attribute__((address_space(3))) void*)addr;
-        return (T*)__builtin_amdgcn_map_shared_rank(ptr, rank);
-#pragma clang diagnostic pop
-    };
-
     template <bool HasMainLoop,
               typename AGridDesc,
               typename ABlockDesc,
@@ -1111,17 +1100,6 @@ struct GridwiseGemmPipeline_v1<1,
         return num_loop > 1;
     }
 
-    template <typename T>
-    __device__ static T* map_shared_rank(T* addr, int rank)
-    {
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wold-style-cast"
-#pragma clang diagnostic ignored "-Wcast-align"
-        auto ptr = (__attribute__((address_space(3))) void*)addr;
-        return (T*)__builtin_amdgcn_map_shared_rank(ptr, rank);
-#pragma clang diagnostic pop
-    };
-
     template <bool HasMainLoop,
               typename AGridDesc,
               typename ABlockDesc,
@@ -1205,7 +1183,6 @@ struct GridwiseGemmPipeline_v1<1,
                 b_blockwise_copy.RunRead(b_grid_desc, b_grid_buf);
                 b_blockwise_copy.MoveSrcSliceWindow(b_grid_desc, b_block_copy_step);
                 b_blockwise_copy.RunWrite(b_block_desc, b_block_buf);
-
 #if defined(__gfx13__)
                 // Cluster sync
                 isFirst = __builtin_amdgcn_s_barrier_signal_isfirst(-1);
@@ -1214,7 +1191,6 @@ struct GridwiseGemmPipeline_v1<1,
                     __builtin_amdgcn_s_barrier_signal(-3);
                 __builtin_amdgcn_s_barrier_wait(-3);
 #endif
-
                 do
                 {
                     a_blockwise_copy.Run(
@@ -1256,17 +1232,6 @@ struct GridwiseGemmPipeline_v1<1,
     {
         return num_loop > 1;
     }
-
-    template <typename T>
-    __device__ static T* map_shared_rank(T* addr, int rank)
-    {
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wold-style-cast"
-#pragma clang diagnostic ignored "-Wcast-align"
-        auto ptr = (__attribute__((address_space(3))) void*)addr;
-        return (T*)__builtin_amdgcn_map_shared_rank(ptr, rank);
-#pragma clang diagnostic pop
-    };
 
     template <bool HasMainLoop,
               typename AGridDesc,
@@ -1337,7 +1302,6 @@ struct GridwiseGemmPipeline_v1<1,
             __builtin_amdgcn_s_barrier_wait(-3);
 #endif
 
-            // const index_t b_map_rank_id = (wgRank & ~(cluster_size - 1)) | k;
             const index_t b_map_rank_id = wgRank + k * a_cluster_size;
 
             blockwise_gemm.Run(a_block_buf, b_block_buf, c_thread_buf, 0, b_map_rank_id);
@@ -1381,7 +1345,6 @@ struct GridwiseGemmPipeline_v1<1,
 
                     block_sync_lds();
 
-                    // const index_t b_map_rank_id = (wgRank & ~(cluster_size - 1)) | j;
                     const index_t b_map_rank_id = wgRank + j * a_cluster_size;
 
                     blockwise_gemm.Run(a_block_buf, b_block_buf, c_thread_buf, 0, b_map_rank_id);
