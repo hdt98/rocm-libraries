@@ -53,6 +53,44 @@ CBLAS_ORDER HIPOrderToCBLASOrder(hipsparseOrder_t order)
     }
 }
 
+//dim0 = same ROW# use the same alpha, dim1 = same COL# use the same alpha
+template<typename T>
+void alpha_vector_scaling(hipsparseOrder_t     order,
+                          int64_t              m,
+                          int64_t              n,
+                          float*               alphaVec,
+                          float                beta,
+                          T*                   C,
+                          T*                   D,
+                          int64_t              ldc,
+                          int32_t              dim)
+ {
+    if(dim == 0)
+    {
+        for(int i = 0; i < m; i++)
+        {
+            auto alpha = static_cast<T>(alphaVec[i]);
+            for(int j = 0; j < n; j++)
+            {
+                size_t pos   = order == HIPSPARSE_ORDER_COL ? j * ldc + i : i * ldc + j;
+                D[pos] = C[pos] * alpha + D[pos] * static_cast<T>(beta);
+            }
+        }
+    }
+    else
+    {
+        for(int j = 0; j < n; j++)
+        {
+            auto alpha = j >=m ? static_cast<T>(0.0) : static_cast<T>(alphaVec[j]);
+            for(int i = 0; i < m; i++)
+            {
+                size_t pos   = order == HIPSPARSE_ORDER_COL ? j * ldc + i : i * ldc + j;
+                D[pos] = C[pos] * alpha + D[pos] * static_cast<T>(beta);
+            }
+        }
+    }
+}
+
 // gemm
 template <>
 void cblas_gemm<hip_bfloat16, hip_bfloat16, float>(hipsparseOrder_t     order,
@@ -73,6 +111,7 @@ void cblas_gemm<hip_bfloat16, hip_bfloat16, float>(hipsparseOrder_t     order,
                                                    int64_t              ldc,
                                                    int64_t              sizeC,
                                                    float*               alphaVec,
+                                                   int32_t              dim,
                                                    bool                 alt)
 {
     // cblas does not support hip_bfloat16, so convert to higher precision float
@@ -105,14 +144,7 @@ void cblas_gemm<hip_bfloat16, hip_bfloat16, float>(hipsparseOrder_t     order,
                     static_cast<float>(0),
                     T_float,
                     ldc);
-        for(int i = 0; i < m; i++)
-        {
-            for(int j = 0; j < n; j++)
-            {
-                size_t pos   = order == HIPSPARSE_ORDER_COL ? j * ldc + i : i * ldc + j;
-                C_float[pos] = T_float[pos] * alphaVec[i] + C_float[pos] * beta;
-            }
-        }
+        alpha_vector_scaling<float>(order, m, n, alphaVec, beta, T_float, C_float, ldc, dim);
     }
     else
     {
@@ -157,6 +189,7 @@ void cblas_gemm<hip_bfloat16, float, float>(hipsparseOrder_t     order,
                                             int64_t              ldc,
                                             int64_t              sizeC,
                                             float*               alphaVec,
+                                            int32_t              dim,
                                             bool                 alt)
 {
     // cblas does not support hip_bfloat16, so convert to higher precision float
@@ -187,14 +220,7 @@ void cblas_gemm<hip_bfloat16, float, float>(hipsparseOrder_t     order,
                     static_cast<float>(0),
                     T_float,
                     ldc);
-        for(int i = 0; i < m; i++)
-        {
-            for(int j = 0; j < n; j++)
-            {
-                size_t pos = order == HIPSPARSE_ORDER_COL ? j * ldc + i : i * ldc + j;
-                C[pos]     = T_float[pos] * alphaVec[i] + C[pos] * beta;
-            }
-        }
+        alpha_vector_scaling<float>(order, m, n, alphaVec, beta, T_float, C, ldc, dim);
     }
     else
     {
@@ -236,6 +262,7 @@ void cblas_gemm<__half, __half, float>(hipsparseOrder_t     order,
                                        int64_t              ldc,
                                        int64_t              sizeC,
                                        float*               alphaVec,
+                                       int32_t              dim,
                                        bool                 alt)
 {
     // cblas does not support __half, so convert to higher precision float
@@ -280,14 +307,7 @@ void cblas_gemm<__half, __half, float>(hipsparseOrder_t     order,
                     static_cast<float>(0),
                     T_float,
                     ldc);
-        for(int i = 0; i < m; i++)
-        {
-            for(int j = 0; j < n; j++)
-            {
-                size_t pos   = order == HIPSPARSE_ORDER_COL ? j * ldc + i : i * ldc + j;
-                C_float[pos] = T_float[pos] * alphaVec[i] + C_float[pos] * beta;
-            }
-        }
+        alpha_vector_scaling<float>(order, m, n, alphaVec, beta, T_float, C_float, ldc, dim);
     }
     else
     {
@@ -332,6 +352,7 @@ void cblas_gemm<__half, float, float>(hipsparseOrder_t     order,
                                       int64_t              ldc,
                                       int64_t              sizeC,
                                       float*               alphaVec,
+                                      int32_t              dim,
                                       bool                 alt)
 {
     // cblas does not support __half, so convert to higher precision float
@@ -372,14 +393,7 @@ void cblas_gemm<__half, float, float>(hipsparseOrder_t     order,
                     static_cast<float>(0),
                     T_float,
                     ldc);
-        for(int i = 0; i < m; i++)
-        {
-            for(int j = 0; j < n; j++)
-            {
-                size_t pos = order == HIPSPARSE_ORDER_COL ? j * ldc + i : i * ldc + j;
-                C[pos]     = T_float[pos] * alphaVec[i] + C[pos] * beta;
-            }
-        }
+        alpha_vector_scaling<float>(order, m, n, alphaVec, beta, T_float, C, ldc, dim);
     }
     else
     {
@@ -422,6 +436,7 @@ void cblas_gemm<int8_t, int8_t, float>(hipsparseOrder_t     order,
                                        int64_t              ldc,
                                        int64_t              sizeC,
                                        float*               alphaVec,
+                                       int32_t              dim,
                                        bool                 alt)
 {
     // cblas does not support int8_t input / int8_t output, however non-overflowing
@@ -459,15 +474,7 @@ void cblas_gemm<int8_t, int8_t, float>(hipsparseOrder_t     order,
                     static_cast<double>(0),
                     T_double,
                     ldc);
-        for(int i = 0; i < m; i++)
-        {
-            for(int j = 0; j < n; j++)
-            {
-                size_t pos    = order == HIPSPARSE_ORDER_COL ? j * ldc + i : i * ldc + j;
-                C_double[pos] = T_double[pos] * static_cast<double>(alphaVec[i])
-                                + C_double[pos] * static_cast<double>(beta);
-            }
-        }
+        alpha_vector_scaling<double>(order, m, n, alphaVec, beta, T_double, C_double, ldc, dim);
     }
     else
     {
@@ -517,6 +524,7 @@ void cblas_gemm<int8_t, float, float>(hipsparseOrder_t     order,
                                       int64_t              ldc,
                                       int64_t              sizeC,
                                       float*               alphaVec,
+                                      int32_t              dim,
                                       bool                 alt)
 {
     // cblas does not support int8_t input / int8_t output, however non-overflowing
@@ -539,7 +547,7 @@ void cblas_gemm<int8_t, float, float>(hipsparseOrder_t     order,
     if(alphaVec != nullptr)
     {
         host_vector<double> T_double(sizeC);
-        memset(T_double, 0, sizeC);
+        memset(T_double, 0, sizeC*sizeof(double));
         cblas_dgemm(HIPOrderToCBLASOrder(order),
                     HIPOperationToCBLASTanspose(transA),
                     HIPOperationToCBLASTanspose(transB),
@@ -554,15 +562,7 @@ void cblas_gemm<int8_t, float, float>(hipsparseOrder_t     order,
                     static_cast<double>(0),
                     T_double,
                     ldc);
-        for(int i = 0; i < m; i++)
-        {
-            for(int j = 0; j < n; j++)
-            {
-                size_t pos    = order == HIPSPARSE_ORDER_COL ? j * ldc + i : i * ldc + j;
-                C_double[pos] = T_double[pos] * static_cast<double>(alphaVec[i])
-                                + C_double[pos] * static_cast<double>(beta);
-            }
-        }
+        alpha_vector_scaling<double>(order, m, n, alphaVec, beta, T_double, C_double, ldc, dim);
     }
     else
     {
@@ -606,6 +606,7 @@ void cblas_gemm<int8_t, __half, float>(hipsparseOrder_t     order,
                                        int64_t              ldc,
                                        int64_t              sizeC,
                                        float*               alphaVec,
+                                       int32_t              dim,
                                        bool                 alt)
 {
     // cblas does not support int8_t input / int8_t output, however non-overflowing
@@ -643,15 +644,7 @@ void cblas_gemm<int8_t, __half, float>(hipsparseOrder_t     order,
                     static_cast<double>(0),
                     T_double,
                     ldc);
-        for(int i = 0; i < m; i++)
-        {
-            for(int j = 0; j < n; j++)
-            {
-                size_t pos    = order == HIPSPARSE_ORDER_COL ? j * ldc + i : i * ldc + j;
-                C_double[pos] = T_double[pos] * static_cast<double>(alphaVec[i])
-                                + C_double[pos] * static_cast<double>(beta);
-            }
-        }
+        alpha_vector_scaling<double>(order, m, n, alphaVec, beta, T_double, C_double, ldc, dim);        
     }
     else
     {
@@ -695,6 +688,7 @@ void cblas_gemm<int8_t, hip_bfloat16, float>(hipsparseOrder_t     order,
                                              int64_t              ldc,
                                              int64_t              sizeC,
                                              float*               alphaVec,
+                                             int32_t              dim,
                                              bool                 alt)
 {
     // cblas does not support int8_t input / int8_t output, however non-overflowing
@@ -732,15 +726,7 @@ void cblas_gemm<int8_t, hip_bfloat16, float>(hipsparseOrder_t     order,
                     static_cast<double>(0),
                     T_double,
                     ldc);
-        for(int i = 0; i < m; i++)
-        {
-            for(int j = 0; j < n; j++)
-            {
-                size_t pos    = order == HIPSPARSE_ORDER_COL ? j * ldc + i : i * ldc + j;
-                C_double[pos] = T_double[pos] * static_cast<double>(alphaVec[i])
-                                + C_double[pos] * static_cast<double>(beta);
-            }
-        }
+        alpha_vector_scaling<double>(order, m, n, alphaVec, beta, T_double, C_double, ldc, dim);
     }
     else
     {
@@ -786,6 +772,7 @@ void cblas_gemm<hipsparselt_fp8_e4m3, double, float>(hipsparseOrder_t      order
                                               int64_t               ldc,
                                               int64_t               sizeC,
                                               float*                alphaVec,
+                                              int32_t               dim,
                                               bool                  alt)
 {
     // cblas does not support int8_t input / int8_t output, however non-overflowing
@@ -820,15 +807,7 @@ void cblas_gemm<hipsparselt_fp8_e4m3, double, float>(hipsparseOrder_t      order
                     static_cast<double>(0),
                     T_double,
                     ldc);
-        for(int i = 0; i < m; i++)
-        {
-            for(int j = 0; j < n; j++)
-            {
-                size_t pos    = order == HIPSPARSE_ORDER_COL ? j * ldc + i : i * ldc + j;
-                C[pos]        = T_double[pos] * static_cast<double>(alphaVec[i])
-                                + C[pos] * static_cast<double>(beta);
-            }
-        }
+        alpha_vector_scaling<double>(order, m, n, alphaVec, beta, T_double, C, ldc, dim);
     }
     else
     {
@@ -869,6 +848,7 @@ void cblas_gemm<hipsparselt_fp8_e5m2, double, float>(hipsparseOrder_t      order
                                               int64_t               ldc,
                                               int64_t               sizeC,
                                               float*                alphaVec,
+                                              int32_t               dim,
                                               bool                  alt)
 {
     // cblas does not support int8_t input / int8_t output, however non-overflowing
@@ -903,15 +883,7 @@ void cblas_gemm<hipsparselt_fp8_e5m2, double, float>(hipsparseOrder_t      order
                     static_cast<double>(0),
                     T_double,
                     ldc);
-        for(int i = 0; i < m; i++)
-        {
-            for(int j = 0; j < n; j++)
-            {
-                size_t pos    = order == HIPSPARSE_ORDER_COL ? j * ldc + i : i * ldc + j;
-                C[pos]        = T_double[pos] * static_cast<double>(alphaVec[i])
-                                + C[pos] * static_cast<double>(beta);
-            }
-        }
+        alpha_vector_scaling<double>(order, m, n, alphaVec, beta, T_double, C, ldc, dim);
     }
     else
     {
@@ -952,6 +924,7 @@ void cblas_gemm<hipsparselt_fp8_e4m3, float, float>(hipsparseOrder_t      order,
                                               int64_t               ldc,
                                               int64_t               sizeC,
                                               float*                alphaVec,
+                                              int32_t               dim,
                                               bool                  alt)
 {
     host_vector<double> C_double(sizeC);
@@ -985,6 +958,7 @@ void cblas_gemm<hipsparselt_fp8_e5m2, float, float>(hipsparseOrder_t      order,
                                               int64_t               ldc,
                                               int64_t               sizeC,
                                               float*                alphaVec,
+                                              int32_t               dim,
                                               bool                  alt)
 {
     host_vector<double> C_double(sizeC);
@@ -1020,6 +994,7 @@ void cblas_gemm<hipsparselt_fp8_e4m3, __half, float>(hipsparseOrder_t      order
                                               int64_t               ldc,
                                               int64_t               sizeC,
                                               float*                alphaVec,
+                                              int32_t               dim,
                                               bool                  alt)
 {
     host_vector<double> C_double(sizeC);
@@ -1053,6 +1028,7 @@ void cblas_gemm<hipsparselt_fp8_e4m3, hip_bfloat16, float>(hipsparseOrder_t     
                                               int64_t               ldc,
                                               int64_t               sizeC,
                                               float*                alphaVec,
+                                              int32_t               dim,
                                               bool                  alt)
 {
     host_vector<double> C_double(sizeC);
@@ -1086,6 +1062,7 @@ void cblas_gemm<hipsparselt_fp8_e5m2, __half, float>(hipsparseOrder_t      order
                                               int64_t               ldc,
                                               int64_t               sizeC,
                                               float*                alphaVec,
+                                              int32_t               dim,
                                               bool                  alt)
 {
     host_vector<double> C_double(sizeC);
@@ -1118,6 +1095,7 @@ void cblas_gemm<hipsparselt_fp8_e5m2, hip_bfloat16, float>(hipsparseOrder_t     
                                               int64_t               ldc,
                                               int64_t               sizeC,
                                               float*                alphaVec,
+                                              int32_t               dim,
                                               bool                  alt)
 {
     host_vector<double> C_double(sizeC);

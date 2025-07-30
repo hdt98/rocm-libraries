@@ -888,11 +888,24 @@ void testing_spmm(const Arguments& arg)
                                                tB + tStrideB * i,
                                                tLdb,
                                                tSizeB,
+#ifdef __HIP_PLATFORM_AMD__
                                                h_beta,
+#endif
+#ifdef __HIP_PLATFORM_NVIDIA__
+                                               //BUG? beta is not used when only alpha vector scaling is enabled
+                                               arg.alpha_vector_scaling ? 0 : h_beta,
+#endif
                                                hD_gold_act + stride_d * i,
                                                ldd,
                                                tSizeD,
                                                arg.alpha_vector_scaling ? hAlpahVector : (float*)nullptr,
+#ifdef __HIP_PLATFORM_AMD__
+                                               0,
+#endif                                               
+#ifdef __HIP_PLATFORM_NVIDIA__
+                                               //BUG? when sparseB same COL# use the same alpha
+                                               arg.sparse_b ? 1 : 0,
+#endif
                                                false);
 
                 auto pos = stride_d * i;
@@ -959,11 +972,24 @@ void testing_spmm(const Arguments& arg)
                                            tB + tStrideB * i,
                                            tLdb,
                                            tSizeB,
+#ifdef __HIP_PLATFORM_AMD__
                                            h_beta,
+#endif
+#ifdef __HIP_PLATFORM_NVIDIA__
+                                           //BUG? beta is not used when only alpha vector scaling is enabled
+                                           arg.alpha_vector_scaling ? 0 : h_beta,
+#endif
                                            hD_gold + stride_d * i,
                                            ldd,
                                            tSizeD,
                                            arg.alpha_vector_scaling ? hAlpahVector : (float*)nullptr,
+#ifdef __HIP_PLATFORM_AMD__
+                                           0,
+#endif                                               
+#ifdef __HIP_PLATFORM_NVIDIA__
+                                           //BUG? when sparseB same COL# use the same alpha
+                                           arg.sparse_b ? 1 : 0,
+#endif
                                            false);
         }
 #undef activation_param
@@ -1440,6 +1466,7 @@ void testing_aux_plan_assign(const Arguments& arg)
                                                          ldd,
                                                          ldd * N,
                                                          nullptr,
+                                                         0,
                                                          false);
 
                           auto pos = stride_d * i;
@@ -1465,6 +1492,7 @@ void testing_aux_plan_assign(const Arguments& arg)
                                                      ldd,
                                                      ldd * N,
                                                      nullptr,
+                                                     0,
                                                      false);
                   }
 #undef activation_param
