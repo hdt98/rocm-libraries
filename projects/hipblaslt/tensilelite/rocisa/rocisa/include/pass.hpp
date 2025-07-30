@@ -94,12 +94,12 @@ namespace rocisa
     void compositeToInstruction(std::shared_ptr<Module>& module);
     std::unordered_map<std::string, int>
           getAssignmentDict(const std::shared_ptr<Module>& module); // Return value is std::move()d
-    Graph buildGraph(
-        std::shared_ptr<Module>               module,
-        int                                   vgprMax,
-        int                                   sgprMax,
-        std::unordered_map<std::string, int>& assignmentDict); // Return value is std::move()d
-    void removeDuplicateAssignment(Graph& graph);
+    void  convertTextVariablesToRegisters(std::shared_ptr<Module>               module,
+                                          std::unordered_map<std::string, int>& assignmentDict);
+    Graph buildGraph(std::shared_ptr<Module> module,
+                     int                     vgprMax,
+                     int                     sgprMax); // Return value is std::move()d
+    void  removeDuplicateAssignment(Graph& graph);
 
     int getCycles(std::shared_ptr<Module> module, int numWaves);
 } // namespace rocisa

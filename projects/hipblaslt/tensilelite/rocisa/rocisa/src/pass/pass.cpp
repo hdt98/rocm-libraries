@@ -39,11 +39,14 @@ namespace rocisa
 
         auto assignDict = getAssignmentDict(kernel->body);
         compositeToInstruction(kernel->body);
+        // Convert text variables to registers
+        convertTextVariablesToRegisters(kernel->body, assignDict);
+
         if(option.doOpt())
         {
             auto maxVgpr = kernel->totalVgprs;
             auto maxSgpr = kernel->totalSgprs;
-            auto graph   = buildGraph(kernel->body, maxVgpr, maxSgpr, assignDict);
+            auto graph   = buildGraph(kernel->body, maxVgpr, maxSgpr);
             if(option.removeDupAssign)
             {
                 removeDuplicateAssignment(graph);

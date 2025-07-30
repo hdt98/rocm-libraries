@@ -81,11 +81,36 @@ namespace rocisa
         return std::move(RegNumList);
     }
 
-    void _addRegToGraph(std::shared_ptr<Item>                 item,
-                        std::unordered_map<std::string, int>& assignmentDict,
-                        const std::vector<InstructionInput>&  params,
-                        Graph&                                graph,
-                        bool                                  noOpt)
+    void convertTextVariablesToRegisters(std::shared_ptr<Module>               module,
+                                         std::unordered_map<std::string, int>& assignmentDict)
+    {
+        for(auto item : module->items())
+        {
+            if(auto subModule = std::dynamic_pointer_cast<Module>(item))
+            {
+                convertTextVariablesToRegisters(subModule, assignmentDict);
+            }
+            else if(auto inst = std::dynamic_pointer_cast<Instruction>(item))
+            {
+                auto params = inst->getParams();
+                for(auto p : params)
+                {
+                    if(auto pptr = std::get_if<std::shared_ptr<Container>>(&p))
+                    {
+                        if(auto regContainer = std::dynamic_pointer_cast<RegisterContainer>(*pptr))
+                        {
+                            _setName2RegNum(regContainer.get(), assignmentDict);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    void _addRegToGraph(std::shared_ptr<Item>                item,
+                        const std::vector<InstructionInput>& params,
+                        Graph&                               graph,
+                        bool                                 noOpt)
     {
         for(auto p : params)
         {
@@ -93,7 +118,6 @@ namespace rocisa
             {
                 if(auto regContainer = std::dynamic_pointer_cast<RegisterContainer>(*pptr))
                 {
-                    _setName2RegNum(regContainer.get(), assignmentDict);
                     if(regContainer->regType == "acc")
                         continue;
                     for(int i = regContainer->regIdx;
@@ -119,22 +143,20 @@ namespace rocisa
         }
     }
 
-    void _recordGraph(std::shared_ptr<Module>               module,
-                      Graph&                                graph,
-                      std::unordered_map<std::string, int>& assignmentDict)
+    void _recordGraph(std::shared_ptr<Module> module, Graph& graph)
     {
         for(auto item : module->items())
         {
             if(auto subModule = std::dynamic_pointer_cast<Module>(item))
             {
-                _recordGraph(subModule, graph, assignmentDict);
+                _recordGraph(subModule, graph);
             }
             else if(std::dynamic_pointer_cast<CommonInstruction>(item)
                     || std::dynamic_pointer_cast<ReadWriteInstruction>(item)
                     || std::dynamic_pointer_cast<MacroInstruction>(item))
             {
                 auto inst = std::dynamic_pointer_cast<Instruction>(item);
-                _addRegToGraph(item, assignmentDict, inst->getParams(), graph, module->isNoOpt());
+                _addRegToGraph(item, inst->getParams(), graph, module->isNoOpt());
             }
             else if(std::dynamic_pointer_cast<BranchInstruction>(item)
                     || std::dynamic_pointer_cast<Label>(item)
@@ -153,16 +175,13 @@ namespace rocisa
         }
     }
 
-    Graph buildGraph(std::shared_ptr<Module>               module,
-                     int                                   vgprMax,
-                     int                                   sgprMax,
-                     std::unordered_map<std::string, int>& assignmentDict)
+    Graph buildGraph(std::shared_ptr<Module> module, int vgprMax, int sgprMax)
     {
         Graph graph;
         graph.vgpr = std::move(std::vector<std::vector<std::shared_ptr<Item>>>(vgprMax));
         graph.sgpr = std::move(std::vector<std::vector<std::shared_ptr<Item>>>(sgprMax));
         graph.mgpr = std::move(std::vector<std::vector<std::shared_ptr<Item>>>(1));
-        _recordGraph(module, graph, assignmentDict);
+        _recordGraph(module, graph);
         return std::move(graph);
     }
 
