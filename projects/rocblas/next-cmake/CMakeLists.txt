@@ -60,7 +60,7 @@ if(ROCBLAS_ENABLE_TENSILE)
   else()
     set(ROCBLAS_TENSILE_INSTALL_DIR "\${CPACK_PACKAGING_INSTALL_PREFIX}${CMAKE_INSTALL_LIBDIR}/rocblas/library" CACHE PATH "Path to tensile library")
   endif()
-  set(ROCBLAS_TENSILE_SUBDIR_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../../Tensile" CACHE STRING "Path to Tensile subdirectory")
+  set(ROCBLAS_TENSILE_SUBDIR_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../../../shared/tensile" CACHE STRING "Path to Tensile subdirectory")
 endif()
 set(ROCBLAS_CONFIG_DIR "\${CPACK_PACKAGING_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}" CACHE PATH "Path placed into ldconfig file")
 

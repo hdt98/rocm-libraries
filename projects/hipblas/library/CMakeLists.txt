@@ -29,7 +29,7 @@ list( APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake )
 set( CMAKE_EXPORT_COMPILE_COMMANDS ON )
 
 # Print out compiler flags for viewing/debug
-if( BUILD_VERBOSE )
+if( HIPBLAS_BUILD_VERBOSE )
   message( STATUS "hipblas_VERSION: ${hipblas_VERSION}" )
   message( STATUS "\t==>CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}" )
   message( STATUS "\t==>BUILD_SHARED_LIBS: ${BUILD_SHARED_LIBS}" )

@@ -20,79 +20,134 @@
 # ########################################################################
 
 # ROCm software requires Ubuntu 16.04 or Fedora 24, which has cmake 3.5
-cmake_minimum_required( VERSION 3.5 )
+# cmake_minimum_required( VERSION 3.5 )
+cmake_minimum_required(VERSION 3.21)
+project(hipblas VERSION 3.1.0 LANGUAGES CXX)
+
+if(POLICY CMP0077)
+  cmake_policy(SET CMP0077 NEW) # option() honors normal variables
+endif()
+
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+
+# Set cpack license file here to avoid rocm-cmake warning
+set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE.md")
+
+#CHANGE:
+include(dependencies)
+
+rocm_setup_version(VERSION ${PROJECT_VERSION})
 
 # We use C++14 features, this will add compile option: -std=c++14
-set( CMAKE_CXX_STANDARD 17 )
+# set( CMAKE_CXX_STANDARD 17 )
 
 # Build documentation
-option(BUILD_DOCS "Build documentation" OFF)
+# option(BUILD_DOCS "Build documentation" OFF)
 
 # Consider removing this in the future
 # This should appear before the project command, because it does not use FORCE
-if( WIN32 )
-  set( CMAKE_INSTALL_PREFIX "${PROJECT_BINARY_DIR}/package" CACHE PATH "Install path prefix, prepended onto install directories" )
+if(WIN32)
+  set(CMAKE_INSTALL_PREFIX "${PROJECT_BINARY_DIR}/package" CACHE PATH "Install path prefix." FORCE)
 else( )
-  set( CMAKE_INSTALL_PREFIX "/opt/rocm" CACHE PATH "Install path prefix, prepended onto install directories" )
+  set(CMAKE_INSTALL_PREFIX "/opt/rocm" CACHE PATH "Install path prefix." FORCE)
 endif( )
+
+# ============================================================================
+# Build Options and Validation
+# ============================================================================
+
+option(HIPBLAS_BUILD_SHARED_LIBS "Build hipBLAS as a shared library." ON)
+option(HIPBLAS_BUILD_CLIENTS "Build hipBLAS clients (tests, benchmarks, samples)." ON)
+if(HIPBLAS_BUILD_CLIENTS)
+  option(HIPBLAS_BUILD_TESTS "Build test clients." ON)
+  option(HIPBLAS_BUILD_BENCHMARKS "Build benchmark clients." ON)
+  option(HIPBLAS_BUILD_SAMPLES "Build sample clients." ON)
+  option(HIPBLAS_ENABLE_FORTRAN "Build Fortran clients." ON) 
+endif()
+
+option(HIPBLAS_BUILD_SOLVER "Build with rocSOLVER integration." ON)
+option(HIPBLAS_BUILD_COVERAGE "Build with code coverage enabled." OFF)
+option(HIPBLAS_BUILD_ASAN "Build with address sanitizer enabled." OFF)
+option(HIPBLAS_BUILD_DOCS "Build documentation." OFF)
+option(HIPBLAS_BUILD_VERBOSE "Output additional build information." OFF)
+
+# CXX_STANDARD?
+
+# ENABLE HIP?
+
+if(HIPBLAS_BUILD_COVERAGE AND NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
+    message(FATAL_ERROR "Code coverage is only supported for CMAKE_BUILD_TYPE=Debug.")
+endif()
+
+if(HIPBLAS_ENABLE_FORTRAN)
+  enable_language(Fortran)
+  # set( CMAKE_Fortran_COMPILER  "gfortran" )
+endif()
+
+# =====================================
+# Dependency Setup
+# =======================================
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+find_package(hip REQUIRED)
 
 # This has to be initialized before the project() command appears
 # Set the default of CMAKE_BUILD_TYPE to be release, unless user specifies with -D.  MSVC_IDE does not use CMAKE_BUILD_TYPE
-if( NOT DEFINED CMAKE_CONFIGURATION_TYPES AND NOT DEFINED CMAKE_BUILD_TYPE )
-  set( CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build, options are: None Debug Release RelWithDebInfo MinSizeRel." )
-endif()
+# if( NOT DEFINED CMAKE_CONFIGURATION_TYPES AND NOT DEFINED CMAKE_BUILD_TYPE )
+#   set( CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build, options are: None Debug Release RelWithDebInfo MinSizeRel." )
+# endif()
 
-if (NOT WIN32)
-    if ( NOT DEFINED CMAKE_Fortran_COMPILER AND NOT DEFINED ENV{FC} )
-      set( CMAKE_Fortran_COMPILER  "gfortran" )
-    endif()
-    set( fortran_language "Fortran" )
-endif( )
+# if (NOT WIN32)
+#     if ( NOT DEFINED CMAKE_Fortran_COMPILER AND NOT DEFINED ENV{FC} )
+#       set( CMAKE_Fortran_COMPILER  "gfortran" )
+#     endif()
+#     set( fortran_language "Fortran" )
+# endif( )
 
-project( hipblas LANGUAGES CXX ${fortran_language} )
+# project( hipblas LANGUAGES CXX ${fortran_language} )
 
-if (NOT python)
-    set(python "python3") # default for linux
-endif()
+# if (NOT python)
+#     set(python "python3") # default for linux
+# endif()
 
 # Append our library helper cmake path and the cmake path for hip (for convenience)
 # Users may override HIP path by specifying their own in CMAKE_MODULE_PATH
-list( APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake  ${ROCM_PATH}/lib/cmake/hip /opt/rocm/lib/cmake/hip ${HIP_DIR}/cmake )
+# list( APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake  ${ROCM_PATH}/lib/cmake/hip /opt/rocm/lib/cmake/hip ${HIP_DIR}/cmake )
 
 # NOTE:  workaround until hip cmake modules fixes symlink logic in their config files; remove when fixed
 list( APPEND CMAKE_PREFIX_PATH ${ROCM_PATH}/lib/cmake/hip /opt/rocm /opt/rocm/llvm /opt/rocm/hip )
 
 # This finds the rocm-cmake project, and installs it if not found
 # rocm-cmake contains common cmake code for rocm projects to help setup and install
-include(dependencies)
+# include(dependencies)
 
-set ( VERSION_STRING "3.1.0" )
-rocm_setup_version( VERSION ${VERSION_STRING} )
+# set ( VERSION_STRING "3.1.0" )
+# rocm_setup_version( VERSION ${VERSION_STRING} )
 
-option( BUILD_VERBOSE "Output additional build information" OFF )
+# option( BUILD_VERBOSE "Output additional build information" OFF )
 
-option( BUILD_WITH_SOLVER "Add additional functions from rocSOLVER" ON )
+# option( BUILD_WITH_SOLVER "Add additional functions from rocSOLVER" ON )
 
-if( BUILD_WITH_SOLVER )
+# Should be linked to a target:
+if(HIPBLAS_BUILD_SOLVER)
     add_definitions( -D__HIP_PLATFORM_SOLVER__ )
 endif( )
 
 # BUILD_SHARED_LIBS is a cmake built-in; we make it an explicit option such that it shows in cmake-gui
-option( BUILD_SHARED_LIBS "Build hipBLAS as a shared library" ON )
+# option( BUILD_SHARED_LIBS "Build hipBLAS as a shared library" ON )
 
 # Deprecated USE_CUDA option
-if(DEFINED USE_CUDA)
-  if(USE_CUDA)
-    set(ENV{HIP_PLATFORM} nvidia)
-    message(DEPRECATED "USE_CUDA is deprecated (use environment variable HIP_PLATFORM=nvidia)")
-  else()
-    set(ENV{HIP_PLATFORM} amd)
-    message(DEPRECATION "USE_CUDA is deprecated (use environment variable HIP_PLATFORM=amd)")
-  endif()
-endif()
+# if(DEFINED USE_CUDA)
+#   if(USE_CUDA)
+#     set(ENV{HIP_PLATFORM} nvidia)
+#     message(DEPRECATED "USE_CUDA is deprecated (use environment variable HIP_PLATFORM=nvidia)")
+#   else()
+#     set(ENV{HIP_PLATFORM} amd)
+#     message(DEPRECATION "USE_CUDA is deprecated (use environment variable HIP_PLATFORM=amd)")
+#   endif()
+# endif()
 
 # Hip headers required of all clients; clients use hip to allocate device memory
-find_package( hip CONFIG PATHS ${HIP_DIR} ${ROCM_PATH} /opt/rocm )
+# find_package( hip CONFIG PATHS ${HIP_DIR} ${ROCM_PATH} /opt/rocm )
 
 # support for cuda backend with hip < 6.0
 if(NOT hip_FOUND)
@@ -107,20 +162,21 @@ else()
       set(HIP_PLATFORM amd)
     endif()
 endif()
-
+# Should be linked to a target:
 if(HIP_PLATFORM STREQUAL nvidia)
   find_package( CUDA REQUIRED )
   set( HIPBLAS_HIP_PLATFORM_COMPILER_DEFINES __HIP_PLATFORM_NVCC__ __HIP_PLATFORM_NVIDIA__ )
 endif()
 
-option(BUILD_CODE_COVERAGE "Build with code coverage enabled" OFF)
-if(BUILD_CODE_COVERAGE)
-  #add_compile_options(-fprofile-arcs -ftest-coverage)
-  #add_link_options(--coverage)
-endif()
+# option(BUILD_CODE_COVERAGE "Build with code coverage enabled" OFF)
+# if(BUILD_CODE_COVERAGE)
+#   #add_compile_options(-fprofile-arcs -ftest-coverage)
+#   #add_link_options(--coverage)
+# endif()
 
-option(BUILD_ADDRESS_SANITIZER "Build with address sanitizer enabled" OFF)
-if(BUILD_ADDRESS_SANITIZER)
+# option(BUILD_ADDRESS_SANITIZER "Build with address sanitizer enabled" OFF)
+# Should be linked to a target:
+if(HIPBLAS_BUILD_ASAN)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -shared-libasan")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address -shared-libasan")
 endif()
@@ -130,7 +186,7 @@ add_subdirectory( library )
 include( clients/cmake/build-options.cmake )
 
 # Build clients of the library
-if( BUILD_CLIENTS_SAMPLES OR BUILD_CLIENTS_TESTS OR BUILD_CLIENTS_BENCHMARKS )
+if(HIPBLAS_BUILD_CLIENTS)
   if(NOT CLIENTS_OS)
     rocm_set_os_id(CLIENTS_OS)
     string(TOLOWER "${CLIENTS_OS}" CLIENTS_OS)
@@ -149,10 +205,10 @@ if( BUILD_CLIENTS_SAMPLES OR BUILD_CLIENTS_TESTS OR BUILD_CLIENTS_BENCHMARKS )
     set(GFORTRAN_RPM "gfortran")
   endif()
 
-  set( BUILD_CLIENTS ON )
+  # set( BUILD_CLIENTS ON )
   rocm_package_setup_component(clients)
   rocm_package_setup_client_component(clients-common)
-  if(BUILD_CLIENTS_TESTS)
+  if(HIPBLAS_BUILD_TESTS)
     rocm_package_setup_client_component(
       tests
       DEPENDS
@@ -160,7 +216,7 @@ if( BUILD_CLIENTS_SAMPLES OR BUILD_CLIENTS_TESTS OR BUILD_CLIENTS_BENCHMARKS )
         DEB "${GFORTRAN_DEB}"
         RPM "${GFORTRAN_RPM}")
   endif()
-  if(BUILD_CLIENTS_BENCHMARKS)
+  if(HIPBLAS_BUILD_BENCHMARKS)
     rocm_package_setup_client_component(
       benchmarks
       DEPENDS
@@ -168,7 +224,7 @@ if( BUILD_CLIENTS_SAMPLES OR BUILD_CLIENTS_TESTS OR BUILD_CLIENTS_BENCHMARKS )
         DEB "${GFORTRAN_DEB}"
         RPM "${GFORTRAN_RPM}")
   endif()
-  if(BUILD_CLIENTS_SAMPLES)
+  if(HIPBLAS_BUILD_SAMPLES)
     rocm_package_setup_client_component(
       samples
       DEPENDS
@@ -180,7 +236,7 @@ if( BUILD_CLIENTS_SAMPLES OR BUILD_CLIENTS_TESTS OR BUILD_CLIENTS_BENCHMARKS )
 endif( )
 
 # Build docs
-if(BUILD_DOCS)
+if(HIPBLAS_BUILD_DOCS)
   add_subdirectory(docs)
 endif()
 
@@ -201,7 +257,7 @@ endif( )
 
 set(hipblas_common_minimum 1.3.0)
 
-if(BUILD_SHARED_LIBS)
+if(HIPBLAS_BUILD_SHARED_LIBS)
   rocm_package_add_deb_dependencies(COMPONENT devel DEPENDS "hipblas-common-dev >= ${hipblas_common_minimum}")
   rocm_package_add_rpm_dependencies(COMPONENT devel DEPENDS "hipblas-common-devel >= ${hipblas_common_minimum}")
 else()
@@ -209,7 +265,7 @@ else()
   rocm_package_add_rpm_dependencies(COMPONENT devel DEPENDS "hipblas-common-static-devel >= ${hipblas_common_minimum}")
 endif()
 
-set( CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE.md" )
+# set( CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE.md" )
 set( CPACK_RPM_PACKAGE_LICENSE "MIT")
 
 if (WIN32)
@@ -247,7 +303,7 @@ rocm_create_package(
 )
 
 
-#
+# DO THIS LATER:
 # ADDITIONAL TARGETS FOR CODE COVERAGE
 #
 if(BUILD_CODE_COVERAGE)

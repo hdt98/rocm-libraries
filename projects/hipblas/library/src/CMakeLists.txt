@@ -56,7 +56,7 @@ if(NOT WIN32)
     add_library(hipblas_fortran ${hipblas_f90_source})
 endif()
 
-if(BUILD_ADDRESS_SANITIZER)
+if(HIPBLAS_BUILD_ASAN)
     add_link_options(-fuse-ld=lld)
 endif()
 
@@ -90,7 +90,7 @@ if(HIP_PLATFORM STREQUAL amd)
   target_link_libraries( hipblas PUBLIC hip::host )
 
   # Add rocSOLVER as a dependency if BUILD_WITH_SOLVER is on
-  if( BUILD_WITH_SOLVER )
+  if( HIPBLAS_BUILD_SOLVER )
     if( NOT TARGET rocsolver )
       if( CUSTOM_ROCSOLVER)
         set ( ENV{rocsolver_DIR} ${CUSTOM_ROCSOLVER})
@@ -158,7 +158,7 @@ if (WIN32)
   endif()
 endif()
 
-if(BUILD_CODE_COVERAGE)
+if(HIPBLAS_BUILD_COVERAGE)
   #target_compile_options(-fprofile-instr-generate -fcoverage-mapping)
   target_compile_options( hipblas PRIVATE -fprofile-arcs -ftest-coverage )
   target_link_libraries( hipblas PRIVATE --coverage -lgcov)
