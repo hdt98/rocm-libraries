@@ -344,6 +344,7 @@ void testing_compress_bad_arg(const Arguments& arg)
             hipsparseLtSpMMACompress(handle, plan, dA_1, nullptr, dA_ws, stream),
             HIPSPARSE_STATUS_INVALID_VALUE);
     }
+#ifdef __HIP_PLATFORM_AMD__  //The compress2 function was deprecated at CUDA backend
     else if (arg.func_version == 2)
     {
         // test version 2
@@ -412,6 +413,7 @@ void testing_compress_bad_arg(const Arguments& arg)
             hipsparseLtSpMMACompress2(handle, matA, true, transA, dA_1, nullptr, dA_ws, stream),
             HIPSPARSE_STATUS_INVALID_VALUE);
     }
+#endif
 }
 
 template <typename Ti,
@@ -420,6 +422,11 @@ template <typename Ti,
           hipsparselt_batch_type btype = hipsparselt_batch_type::none>
 void testing_compress(const Arguments& arg)
 {
+#ifdef __HIP_PLATFORM_NVIDIA__
+    // func v2 are deprecated
+    if(arg.func_version > 1)
+        return;
+#endif
     hipsparseOperation_t transA = char_to_hipsparselt_operation(arg.transA);
     hipsparseOperation_t transB = char_to_hipsparselt_operation(arg.transB);
 
@@ -547,23 +554,23 @@ void testing_compress(const Arguments& arg)
         hipsparselt_matrix_type_dense, handle, M, N, ldd, arg.d_type, orderD);
 
     hipsparseStatus_t eStatus = expected_hipsparse_status_of_matrix_size(
-        arg.a_type, A_row, A_col, lda, orderA, !arg.sparse_b);
+        arg.a_type, A_row, A_col, lda, orderA, !arg.sparse_b, false);
     EXPECT_HIPSPARSE_STATUS(matA.status(), eStatus);
     if(eStatus != HIPSPARSE_STATUS_SUCCESS)
         return;
 
     eStatus = expected_hipsparse_status_of_matrix_size(
-        arg.b_type, B_row, B_col, ldb, orderB, arg.sparse_b);
+        arg.b_type, B_row, B_col, ldb, orderB, arg.sparse_b, false);
     EXPECT_HIPSPARSE_STATUS(matB.status(), eStatus);
     if(eStatus != HIPSPARSE_STATUS_SUCCESS)
         return;
 
-    eStatus = expected_hipsparse_status_of_matrix_size(arg.c_type, M, N, ldc, orderC);
+    eStatus = expected_hipsparse_status_of_matrix_size(arg.c_type, M, N, ldc, orderC, false, true);
     EXPECT_HIPSPARSE_STATUS(matC.status(), eStatus);
     if(eStatus != HIPSPARSE_STATUS_SUCCESS)
         return;
 
-    eStatus = expected_hipsparse_status_of_matrix_size(arg.d_type, M, N, ldd, orderD);
+    eStatus = expected_hipsparse_status_of_matrix_size(arg.d_type, M, N, ldd, orderD, false, true);
     EXPECT_HIPSPARSE_STATUS(matD.status(), eStatus);
     if(eStatus != HIPSPARSE_STATUS_SUCCESS)
         return;
@@ -643,6 +650,13 @@ void testing_compress(const Arguments& arg)
 
     hipsparselt_local_matmul_descr matmul(
         handle, transA, transB, matA, matB, matC, matD, arg.compute_type);
+    auto eStatusMatmul = expected_hipsparse_status_of_matmul_init(transA, transB, orderA, orderB, arg.a_type);
+    EXPECT_HIPSPARSE_STATUS(matmul.status(), eStatusMatmul);
+#ifdef __HIP_PLATFORM_NVIDIA__
+    // skip the test if the status is not sucess, and this failure is expected.
+    if(eStatusMatmul != HIPSPARSE_STATUS_SUCCESS)
+        return;
+#endif
 
     hipsparselt_local_matmul_alg_selection alg_sel(handle, matmul, HIPSPARSELT_MATMUL_ALG_DEFAULT);
 

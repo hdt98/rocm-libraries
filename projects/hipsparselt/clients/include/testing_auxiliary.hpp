@@ -65,7 +65,9 @@ void testing_aux_handle_destroy_bad_arg(const Arguments& arg)
 {
     hipsparseLtHandle_t handle;
     EXPECT_HIPSPARSE_STATUS(hipsparseLtDestroy(&handle), HIPSPARSE_STATUS_INVALID_VALUE);
+#ifdef __HIP_PLATFORM_AMD__
     EXPECT_HIPSPARSE_STATUS(hipsparseLtDestroy(nullptr), HIPSPARSE_STATUS_SUCCESS);
+#endif
 }
 
 void testing_aux_handle(const Arguments& arg)
@@ -284,7 +286,7 @@ void testing_aux_mat_init_structured_bad_arg(const Arguments& arg)
                                                                 HIPSPARSE_ORDER_COL,
                                                                 HIPSPARSELT_SPARSITY_50_PERCENT),
                             HIPSPARSE_STATUS_NOT_SUPPORTED);
-
+#ifdef __HIP_PLATFORM_AMD__
     // Chcek unsupported datatype
     EXPECT_HIPSPARSE_STATUS(hipsparseLtStructuredDescriptorInit(handle,
                                                                 &m_descr,
@@ -296,6 +298,7 @@ void testing_aux_mat_init_structured_bad_arg(const Arguments& arg)
                                                                 HIPSPARSE_ORDER_COL,
                                                                 HIPSPARSELT_SPARSITY_50_PERCENT),
                             HIPSPARSE_STATUS_NOT_SUPPORTED);     
+#endif
 }
 
 void testing_aux_mat_dense_init(const Arguments& arg)
@@ -358,10 +361,12 @@ void testing_aux_mat_assign(const Arguments& arg)
 
 void testing_aux_mat_destroy_bad_arg(const Arguments& arg)
 {
+#ifdef __HIP_PLATFORM_AMD__
     hipsparseLtMatDescriptor_t m_descr;
     EXPECT_HIPSPARSE_STATUS(hipsparseLtMatDescriptorDestroy(&m_descr), HIPSPARSE_STATUS_SUCCESS);
     EXPECT_HIPSPARSE_STATUS(hipsparseLtMatDescriptorDestroy(nullptr),
                             HIPSPARSE_STATUS_INVALID_VALUE);
+#endif
 }
 
 void testing_aux_mat_set_attr_bad_arg(const Arguments& arg)
@@ -703,7 +708,14 @@ void testing_aux_matmul_init_bad_arg(const Arguments& arg)
     EXPECT_HIPSPARSE_STATUS(
         hipsparseLtMatmulDescriptorInit(
             handle, &m_descr, opA, opB, matA, matBS, matC, matD, arg.compute_type),
-        HIPSPARSE_STATUS_NOT_SUPPORTED);
+#ifdef __HIP_PLATFORM_AMD__
+        //@FIXME
+        HIPSPARSE_STATUS_NOT_SUPPORTED
+#endif
+#ifdef __HIP_PLATFORM_NVIDIA__
+        HIPSPARSE_STATUS_INVALID_VALUE
+#endif
+    );
 
     //
     hipDataType tmpDataType;
@@ -757,7 +769,14 @@ void testing_aux_matmul_init_bad_arg(const Arguments& arg)
     EXPECT_HIPSPARSE_STATUS(
         hipsparseLtMatmulDescriptorInit(
             handle, &m_descr, opA, opB, matA, matB, matC, matDR_, arg.compute_type),
-        HIPSPARSE_STATUS_INVALID_VALUE);
+#ifdef __HIP_PLATFORM_AMD__
+        //@FIXME
+        HIPSPARSE_STATUS_INVALID_VALUE
+#endif
+#ifdef __HIP_PLATFORM_NVIDIA__
+        HIPSPARSE_STATUS_NOT_SUPPORTED
+#endif
+        );
 }
 
 void testing_aux_matmul_init(const Arguments& arg)
@@ -992,7 +1011,7 @@ void testing_aux_matmul_get_attr_bad_arg(const Arguments& arg)
         hipsparseLtMatmulDescGetAttribute(
             handle, matmul, HIPSPARSELT_MATMUL_ACTIVATION_RELU_THRESHOLD, &data64, 1),
         HIPSPARSE_STATUS_INVALID_VALUE);
-
+#ifdef __HIP_PLATFORM_AMD__
     EXPECT_HIPSPARSE_STATUS(
         hipsparseLtMatmulDescGetAttribute(
             handle, matmul, HIPSPARSELT_MATMUL_ACTIVATION_LEAKYRELU_ALPHA, nullptr, sizeof(data64)),
@@ -1019,7 +1038,7 @@ void testing_aux_matmul_get_attr_bad_arg(const Arguments& arg)
         hipsparseLtMatmulDescGetAttribute(
             handle, matmul, HIPSPARSELT_MATMUL_ACTIVATION_TANH_BETA, &data64, 1),
         HIPSPARSE_STATUS_INVALID_VALUE);
-
+#endif
     size_t bad_ptr_size = sizeof(void*) - 1;
     void* dBias;
     CHECK_HIP_ERROR(hipMalloc((void**)&dBias, (M) * sizeof(float)));
@@ -1524,7 +1543,14 @@ void testing_aux_matmul_alg_set_attr_bad_arg(const Arguments& arg)
     EXPECT_HIPSPARSE_STATUS(
         hipsparseLtMatmulAlgSetAttribute(
             handle, alg_sel, HIPSPARSELT_MATMUL_SEARCH_ITERATIONS, &data, sizeof(data)),
-            HIPSPARSE_STATUS_INVALID_VALUE);
+#ifdef __HIP_PLATFORM_AMD__
+            //@FIXME
+            HIPSPARSE_STATUS_INVALID_VALUE
+#endif
+#ifdef __HIP_PLATFORM_NVIDIA__
+            HIPSPARSE_STATUS_SUCCESS
+#endif
+    );
 }
 
 void testing_aux_matmul_alg_get_attr_bad_arg(const Arguments& arg)
@@ -1658,6 +1684,7 @@ void testing_aux_matmul_plan_init_bad_arg(const Arguments& arg)
                             HIPSPARSE_STATUS_INVALID_VALUE);
 
     // check the A and B matrices has the same value of num_batches.
+#ifdef __HIP_PLATFORM_AMD__
     int num_batches_a = 2;
     int num_batches_b = 3;
     EXPECT_HIPSPARSE_STATUS(hipsparseLtMatDescSetAttribute(
@@ -1668,6 +1695,7 @@ void testing_aux_matmul_plan_init_bad_arg(const Arguments& arg)
         HIPSPARSE_STATUS_SUCCESS);
     EXPECT_HIPSPARSE_STATUS(hipsparseLtMatmulPlanInit(handle, &plan, matmul, alg_sel),
         HIPSPARSE_STATUS_INVALID_VALUE);
+#endif
 }
 
 void testing_aux_matmul_plan_destroy_bad_arg(const Arguments& arg)

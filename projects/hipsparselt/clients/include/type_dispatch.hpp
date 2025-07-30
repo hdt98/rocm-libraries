@@ -89,8 +89,10 @@ auto hipsparselt_spmm_dispatch(const Arguments& arg)
             {
             case HIP_R_16F:
                 return TEST<__half, __half, float, __half>{}(arg);
+#ifdef __HIP_PLATFORM_AMD__
             case HIP_R_32F:
                 return TEST<__half, __half, float, float>{}(arg);
+#endif
             default:
                 break;
             }
@@ -101,8 +103,10 @@ auto hipsparselt_spmm_dispatch(const Arguments& arg)
             {
             case HIP_R_16BF:
                 return TEST<hip_bfloat16, hip_bfloat16, float, hip_bfloat16>{}(arg);
+#ifdef __HIP_PLATFORM_AMD__
             case HIP_R_32F:
                 return TEST<hip_bfloat16, hip_bfloat16, float, float>{}(arg);
+#endif
             default:
                 break;
             }
@@ -120,6 +124,7 @@ auto hipsparselt_spmm_dispatch(const Arguments& arg)
         {
             return TEST<int8_t, int8_t, int32_t, float>{}(arg);
         }
+#ifdef __HIP_PLATFORM_AMD__
         else if(Ti == HIP_R_8I && To == HIP_R_16F && Tc == HIPSPARSELT_COMPUTE_32I
                 && TBias == HIP_R_32F)
         {
@@ -130,6 +135,20 @@ auto hipsparselt_spmm_dispatch(const Arguments& arg)
         {
             return TEST<int8_t, hip_bfloat16, int32_t, float>{}(arg);
         }
+#endif
+#ifdef __HIP_PLATFORM_NVIDIA__
+        // SM90 or later, bias type same as C type
+        else if(Ti == HIP_R_8I && To == HIP_R_16F && Tc == HIPSPARSELT_COMPUTE_32I
+                && TBias == HIP_R_32F)
+        {
+            return TEST<int8_t, __half, int32_t, __half>{}(arg);
+        }
+        else if(Ti == HIP_R_8I && To == HIP_R_16BF && Tc == HIPSPARSELT_COMPUTE_32I
+                && TBias == HIP_R_32F)
+        {
+            return TEST<int8_t, hip_bfloat16, int32_t, hip_bfloat16>{}(arg);
+        }
+#endif
 #ifdef HIPSPARSELT_CLIENT_ENABLE_FP8_OCP
         else if(Ti == HIP_R_8F_E4M3 && To == HIP_R_32F && Tc == HIPSPARSELT_COMPUTE_32F
                 && TBias == HIP_R_32F)

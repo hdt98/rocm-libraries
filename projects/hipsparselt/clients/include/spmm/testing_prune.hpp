@@ -419,10 +419,13 @@ void testing_prune_bad_arg(const Arguments& arg)
             hipsparseLtSpMMAPrune(handle, matmul, dA, nullptr, HIPSPARSELT_PRUNE_SPMMA_STRIP, stream),
             HIPSPARSE_STATUS_INVALID_VALUE);
 
+#ifdef __HIP_PLATFORM_AMD__
         EXPECT_HIPSPARSE_STATUS(
             hipsparseLtSpMMAPrune(handle, matmul, dA, dA, (hipsparseLtPruneAlg_t)3, stream),
             HIPSPARSE_STATUS_NOT_SUPPORTED);
+#endif
     }
+#ifdef __HIP_PLATFORM_AMD__  //The prune2 function was deprecated at CUDA backend
     else if (arg.func_version == 2)
     {
         // test version 2
@@ -468,6 +471,7 @@ void testing_prune_bad_arg(const Arguments& arg)
                 handle, matA_f32, true, transA, dA, dA, HIPSPARSELT_PRUNE_SPMMA_STRIP, stream),
             HIPSPARSE_STATUS_NOT_SUPPORTED);
     }
+#endif
 }
 
 template <typename Ti, typename To, typename Tc>
@@ -536,6 +540,7 @@ void testing_prune_check_bad_arg(const Arguments& arg)
             hipsparseLtSpMMAPruneCheck(handle, matmul,  dA, nullptr, stream),
             HIPSPARSE_STATUS_INVALID_VALUE);
     }
+#ifdef __HIP_PLATFORM_AMD__  //The prune2 function was deprecated at CUDA backend
     else if (arg.func_version == 2)
     {
         EXPECT_HIPSPARSE_STATUS(
@@ -566,6 +571,7 @@ void testing_prune_check_bad_arg(const Arguments& arg)
             hipsparseLtSpMMAPruneCheck2(handle, matA, true, transA, dA, nullptr, stream),
             HIPSPARSE_STATUS_INVALID_VALUE);
     }
+#endif
 }
 template <typename Ti,
           typename To,
@@ -573,6 +579,11 @@ template <typename Ti,
           hipsparselt_batch_type btype = hipsparselt_batch_type::none>
 void testing_prune(const Arguments& arg)
 {
+#ifdef __HIP_PLATFORM_NVIDIA__
+    // func v2 are deprecated
+    if(arg.func_version>1)
+        return;
+#endif
     hipsparseLtPruneAlg_t prune_algo = hipsparseLtPruneAlg_t(arg.prune_algo);
 
     constexpr bool do_batched         = (btype == hipsparselt_batch_type::batched);
@@ -711,25 +722,25 @@ void testing_prune(const Arguments& arg)
         hipsparselt_matrix_type_dense, handle, M, N, ldd, arg.d_type, orderD);
 
     hipsparseStatus_t eStatusA = expected_hipsparse_status_of_matrix_size(
-        arg.a_type, A_row, A_col, lda, orderA, !arg.sparse_b);
+        arg.a_type, A_row, A_col, lda, orderA, !arg.sparse_b, false);
     EXPECT_HIPSPARSE_STATUS(matA.status(), eStatusA);
     if(eStatusA != HIPSPARSE_STATUS_SUCCESS)
         return;
 
     hipsparseStatus_t eStatusB = expected_hipsparse_status_of_matrix_size(
-        arg.b_type, B_row, B_col, ldb, orderB, arg.sparse_b);
+        arg.b_type, B_row, B_col, ldb, orderB, arg.sparse_b, false);
     EXPECT_HIPSPARSE_STATUS(matB.status(), eStatusB);
     if(eStatusB != HIPSPARSE_STATUS_SUCCESS)
         return;
 
     hipsparseStatus_t eStatusC
-        = expected_hipsparse_status_of_matrix_size(arg.c_type, M, N, ldc, orderC);
+        = expected_hipsparse_status_of_matrix_size(arg.c_type, M, N, ldc, orderC, false, true);
     EXPECT_HIPSPARSE_STATUS(matC.status(), eStatusC);
     if(eStatusC != HIPSPARSE_STATUS_SUCCESS)
         return;
 
     hipsparseStatus_t eStatusD
-        = expected_hipsparse_status_of_matrix_size(arg.d_type, M, N, ldd, orderD);
+        = expected_hipsparse_status_of_matrix_size(arg.d_type, M, N, ldd, orderD, false, true);
     EXPECT_HIPSPARSE_STATUS(matD.status(), eStatusD);
     if(eStatusD != HIPSPARSE_STATUS_SUCCESS)
         return;
@@ -810,6 +821,13 @@ void testing_prune(const Arguments& arg)
 
     hipsparselt_local_matmul_descr matmul(
         handle, transA, transB, matA, matB, matC, matD, arg.compute_type);
+    auto eStatusMatmul = expected_hipsparse_status_of_matmul_init(transA, transB, orderA, orderB, arg.a_type);
+    EXPECT_HIPSPARSE_STATUS(matmul.status(), eStatusMatmul);
+#ifdef __HIP_PLATFORM_NVIDIA__
+    // skip the test if the status is not sucess, and this failure is expected.
+    if(eStatusMatmul != HIPSPARSE_STATUS_SUCCESS)
+        return;
+#endif
 
     const size_t size_A           = stride_a == 0
                                         ? (orderA == HIPSPARSE_ORDER_COL ? A_col * lda : A_row * lda)

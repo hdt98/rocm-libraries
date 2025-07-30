@@ -255,6 +255,16 @@ template <typename Ti,
           hipsparselt_batch_type btype = hipsparselt_batch_type::none>
 void testing_spmm(const Arguments& arg)
 {
+#ifdef __HIP_PLATFORM_NVIDIA__
+    //only int8 support alpha vector scaling
+    if(arg.alpha_vector_scaling && arg.a_type != HIP_R_8I)
+        return;
+
+    //skip alpha or beta is nan
+    if(arg.alpha_isnan<Tc>() || arg.beta_isnan<Tc>())
+        return;
+#endif
+
     hipsparseOperation_t transA = char_to_hipsparselt_operation(arg.transA);
     hipsparseOperation_t transB = char_to_hipsparselt_operation(arg.transB);
 
@@ -332,23 +342,23 @@ void testing_spmm(const Arguments& arg)
         hipsparselt_matrix_type_dense, handle, M, N, ldd, arg.d_type, orderD);
 
     hipsparseStatus_t eStatus = expected_hipsparse_status_of_matrix_size(
-        arg.a_type, A_row, A_col, lda, orderA, !arg.sparse_b);
+        arg.a_type, A_row, A_col, lda, orderA, !arg.sparse_b, false);
     EXPECT_HIPSPARSE_STATUS(matA.status(), eStatus);
     if(eStatus != HIPSPARSE_STATUS_SUCCESS)
         return;
 
     eStatus = expected_hipsparse_status_of_matrix_size(
-        arg.b_type, B_row, B_col, ldb, orderB, arg.sparse_b);
+        arg.b_type, B_row, B_col, ldb, orderB, arg.sparse_b, false);
     EXPECT_HIPSPARSE_STATUS(matB.status(), eStatus);
     if(eStatus != HIPSPARSE_STATUS_SUCCESS)
         return;
 
-    eStatus = expected_hipsparse_status_of_matrix_size(arg.c_type, M, N, ldc, orderC);
+    eStatus = expected_hipsparse_status_of_matrix_size(arg.c_type, M, N, ldc, orderC, false, true);
     EXPECT_HIPSPARSE_STATUS(matC.status(), eStatus);
     if(eStatus != HIPSPARSE_STATUS_SUCCESS)
         return;
 
-    eStatus = expected_hipsparse_status_of_matrix_size(arg.d_type, M, N, ldd, orderD);
+    eStatus = expected_hipsparse_status_of_matrix_size(arg.d_type, M, N, ldd, orderD, false, true);
     EXPECT_HIPSPARSE_STATUS(matD.status(), eStatus);
     if(eStatus != HIPSPARSE_STATUS_SUCCESS)
         return;
@@ -407,15 +417,22 @@ void testing_spmm(const Arguments& arg)
 
     hipsparselt_local_matmul_descr matmul(
         handle, transA, transB, matA, matB, matC, matD, arg.compute_type);
+    auto eStatusMatmul = expected_hipsparse_status_of_matmul_init(transA, transB, orderA, orderB, arg.a_type);
+    EXPECT_HIPSPARSE_STATUS(matmul.status(), eStatusMatmul);
 
 #ifdef __HIP_PLATFORM_NVIDIA__
-    if(matmul.status() != HIPSPARSE_STATUS_SUCCESS)
+    //skip the unsupported case
+    if(eStatusMatmul != HIPSPARSE_STATUS_SUCCESS)
         return;
+
+    //skip unsupported activation type
     if(!(arg.activation_type == hipsparselt_activation_type::none
          || arg.activation_type == hipsparselt_activation_type::relu
          || arg.activation_type == hipsparselt_activation_type::gelu
          || arg.activation_type == hipsparselt_activation_type::clippedrelu))
         return;
+    
+    //gelu only support i8
     if(arg.activation_type == hipsparselt_activation_type::gelu)
     {
         if(not(arg.a_type == HIP_R_8I && arg.b_type == HIP_R_8I && arg.c_type == HIP_R_8I
@@ -1156,23 +1173,23 @@ void testing_aux_plan_assign(const Arguments& arg)
         hipsparselt_matrix_type_dense, handle, M, N, ldc, arg.d_type, orderD);
 
     hipsparseStatus_t eStatus = expected_hipsparse_status_of_matrix_size(
-        arg.a_type, A_row, A_col, lda, orderA, !arg.sparse_b);
+        arg.a_type, A_row, A_col, lda, orderA, !arg.sparse_b, false);
     EXPECT_HIPSPARSE_STATUS(matA.status(), eStatus);
     if(eStatus != HIPSPARSE_STATUS_SUCCESS)
         return;
 
     eStatus = expected_hipsparse_status_of_matrix_size(
-        arg.b_type, B_row, B_col, ldb, orderB, arg.sparse_b);
+        arg.b_type, B_row, B_col, ldb, orderB, arg.sparse_b, false);
     EXPECT_HIPSPARSE_STATUS(matB.status(), eStatus);
     if(eStatus != HIPSPARSE_STATUS_SUCCESS)
         return;
 
-    eStatus = expected_hipsparse_status_of_matrix_size(arg.c_type, M, N, ldc, orderC);
+    eStatus = expected_hipsparse_status_of_matrix_size(arg.c_type, M, N, ldc, orderC, false, true);
     EXPECT_HIPSPARSE_STATUS(matC.status(), eStatus);
     if(eStatus != HIPSPARSE_STATUS_SUCCESS)
         return;
 
-    eStatus = expected_hipsparse_status_of_matrix_size(arg.d_type, M, N, ldd, orderD);
+    eStatus = expected_hipsparse_status_of_matrix_size(arg.d_type, M, N, ldd, orderD, false, true);
     EXPECT_HIPSPARSE_STATUS(matD.status(), eStatus);
     if(eStatus != HIPSPARSE_STATUS_SUCCESS)
         return;

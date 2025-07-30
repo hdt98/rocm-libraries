@@ -536,7 +536,8 @@ inline hipsparseStatus_t expected_hipsparse_status_of_matrix_size(hipDataType   
                                                                   int64_t          n,
                                                                   int64_t          ld,
                                                                   hipsparseOrder_t order,
-                                                                  bool             isSparse = false)
+                                                                  bool             isSparse = false,
+                                                                  bool             isCorD = false)
 {
     int row_  = 8;
     int col_  = 8;
@@ -601,10 +602,6 @@ inline hipsparseStatus_t expected_hipsparse_status_of_matrix_size(hipDataType   
 
             if(ld_ != -1 && ld % ld_ != 0)
                 return HIPSPARSE_STATUS_NOT_SUPPORTED;
-#ifdef __HIP_PLATFORM_NVIDIA__
-            if(n * ld * bytes > 4294967295)
-                return HIPSPARSE_STATUS_INVALID_VALUE;
-#endif
         }
         else
         {
@@ -613,14 +610,16 @@ inline hipsparseStatus_t expected_hipsparse_status_of_matrix_size(hipDataType   
 
             if(ld_ != -1 && ld % ld_ != 0)
                 return HIPSPARSE_STATUS_NOT_SUPPORTED;
-#ifdef __HIP_PLATFORM_NVIDIA__
-            if(m * ld * bytes > 4294967295)
-                return HIPSPARSE_STATUS_INVALID_VALUE;
-#endif
         }
     }
 
 #ifdef __HIP_PLATFORM_NVIDIA__
+    if(isCorD)
+    {
+        if(m > 2097120 || n > 2097120)
+            return HIPSPARSE_STATUS_INVALID_VALUE;
+    }
+
     if(m < row_ || n < col_)
         return HIPSPARSE_STATUS_NOT_SUPPORTED;
 
@@ -638,6 +637,25 @@ inline hipsparseStatus_t expected_hipsparse_status_of_matrix_stride(
         return HIPSPARSE_STATUS_SUCCESS;
     else
         return HIPSPARSE_STATUS_INVALID_VALUE;
+}
+
+inline hipsparseStatus_t expected_hipsparse_status_of_matmul_init(hipsparseOperation_t tA, hipsparseOperation_t tB, hipsparseOrder_t oA, hipsparseOrder_t oB, hipDataType type)
+{
+#ifdef __HIP_PLATFORM_NVIDIA__
+    if(type == HIP_R_8I || type == HIP_R_8F_E4M3 || type == HIP_R_8F_E5M2)
+    {
+        if(tA == HIPSPARSE_OPERATION_TRANSPOSE && tB == HIPSPARSE_OPERATION_NON_TRANSPOSE && oA == HIPSPARSE_ORDER_COL && oB == HIPSPARSE_ORDER_COL)
+            return HIPSPARSE_STATUS_SUCCESS;
+        if(tA == HIPSPARSE_OPERATION_NON_TRANSPOSE && tB == HIPSPARSE_OPERATION_TRANSPOSE && oA == HIPSPARSE_ORDER_ROW && oB == HIPSPARSE_ORDER_ROW)
+            return HIPSPARSE_STATUS_SUCCESS;
+        if(tA == HIPSPARSE_OPERATION_NON_TRANSPOSE && tB == HIPSPARSE_OPERATION_NON_TRANSPOSE && oA == HIPSPARSE_ORDER_ROW && oB == HIPSPARSE_ORDER_COL)
+            return HIPSPARSE_STATUS_SUCCESS;
+        if(tA == HIPSPARSE_OPERATION_TRANSPOSE && tB == HIPSPARSE_OPERATION_TRANSPOSE && oA == HIPSPARSE_ORDER_COL && oB == HIPSPARSE_ORDER_ROW)
+            return HIPSPARSE_STATUS_SUCCESS;
+        return HIPSPARSE_STATUS_NOT_SUPPORTED;                      
+    }
+#endif
+    return HIPSPARSE_STATUS_SUCCESS;
 }
 
 class Logger
