@@ -41,6 +41,51 @@ import yaml
 
 import rrperf
 
+renames = {
+    "hipblaslt-Gflops": "gflops",
+    "hipblaslt-GB/s": "gbs",
+}
+
+included_headers = [
+    "transA",
+    "transB",
+    "grouped_gemm",
+    "batch_count",
+    "m",
+    "n",
+    "k",
+    "alpha",
+    "lda",
+    "stride_a",
+    "beta",
+    "ldb",
+    "stride_b",
+    "ldc",
+    "stride_c",
+    "ldd",
+    "stride_d",
+    "a_type",
+    "b_type",
+    "c_type",
+    "d_type",
+    "compute_type",
+    "scaleA",
+    "scaleB",
+    "scaleC",
+    "scaleD",
+    "amaxD",
+    "activation_type",
+    "bias_vector",
+    "bias_type",
+    "rotating_buffer",
+    "gflops",
+    "gbs",
+    "us",
+    "macro_tile",
+    "grid_size",
+    "extra_fields",
+]
+
 
 def submit_directory(suite: str, wrkdir: Path, ptsdir: Path) -> None:
     """Consolidate performance data and submit it to SOMEWHERE.
@@ -55,6 +100,33 @@ def submit_directory(suite: str, wrkdir: Path, ptsdir: Path) -> None:
     df = pd.DataFrame(results)
     df.to_csv(f"{str(ptsdir)}/{suite}-benchmark.csv", index=False)
     # TODO: add call to SOMEWHERE to submit
+
+
+def dump_hipblaslt_csv(suite: str, rundir: Path, outdir: Path = None):
+    """
+    Consolidate performance data and dump a hipblaslt-bench-compatible CSV.
+    Only the specified columns (included_headers) are included,
+    with empty fields for missing data.
+    """
+    if outdir is None:
+        outdir = rundir
+    results = []
+    for jpath in rundir.glob(f"gemm-*.yaml"):
+        yamldata = yaml.safe_load(jpath.read_text())
+        if isinstance(yamldata, dict):
+            results.append(yamldata)
+        elif isinstance(yamldata, list):
+            results.extend(yamldata)
+    df = pd.DataFrame(results)
+    df = df.rename(columns=renames)
+    for col in included_headers:
+        if col not in df.columns:
+            df[col] = ""
+    df = df[included_headers]
+    outpath = outdir / f"{suite}-hipblaslt.csv"
+    print(f"Outpath: {outpath}")
+    df.to_csv(outpath, index=False)
+    print(f"Wrote hipBLASLt CSV: {outpath.resolve()}")
 
 
 def from_token(token: str):
@@ -159,6 +231,12 @@ def get_args(parser: argparse.ArgumentParser):
         action="store_true",
         help="Pin clocks before launching benchmark clients.",
     )
+    parser.add_argument(
+        "--dump_hipblaslt_csv",
+        help="Dump hipblaslt-bench compatible CSV with included headers.",
+        action="store_true",
+        default=False,
+    )
 
 
 def run(args):
@@ -230,5 +308,8 @@ def run_cli(
         ptsdir.mkdir(parents=True)
         # XXX if running single token, suite might be None
         submit_directory(suite, rundir, ptsdir)
+
+    if kwargs.get("dump_hipblaslt_csv", False):
+        dump_hipblaslt_csv(suite, rundir)
 
     return result, rundir
