@@ -105,6 +105,8 @@ During this period, a high priority will be placed on keeping the `develop` bran
 
 When creating a branch for your work, use the following convention to make branch names informative and consistent: `users/<github-husername>/<branch-name>`.
 
+For component specific feature branches, use the following convention: `<component>/<feature-branch-name>`.
+
 Try to keep branch names descriptive yet concise to reflect the purpose of the branch. For example, referencing the GitHub Issue number if the pull request is related.
 
 The build and test infrastructure has some tasks where pull requests from forks have fewer privileges than pull requests from branches within this repo. Thus, branches in this repo are encouraged but you are welcome to use forks and their potential gaps. We are actively working towards achieving feature parity between pull requests from branches and pull requests from forks. Please stay tuned.
