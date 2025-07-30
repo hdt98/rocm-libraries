@@ -9,16 +9,18 @@
 # presented in the superbuild GUI, but then passed into the ExternalProject as -D
 # parameters, which would already define them.
 
-if( NOT BUILD_CLIENTS_TESTS )
-  option( BUILD_CLIENTS_TESTS "Build hipBLAS unit tests" OFF )
+#WE CAN EITHER PUT THIS IN ROOT CMAKE OR MOVE IT TO hipBLAS/cmake
+
+if( NOT HIPBLAS_BUILD_TESTS )
+  option( HIPBLAS_BUILD_TESTS "Build hipBLAS unit tests" OFF )
 endif( )
 
-if( NOT BUILD_CLIENTS_BENCHMARKS )
-  option( BUILD_CLIENTS_BENCHMARKS "Build hipBLAS benchmarks" OFF )
+if( NOT HIPBLAS_BUILD_BENCHMARKS )
+  option( HIPBLAS_BUILD_BENCHMARKS "Build hipBLAS benchmarks" OFF )
 endif( )
 
-if( NOT BUILD_CLIENTS_SAMPLES )
-  option( BUILD_CLIENTS_SAMPLES "Build hipBLAS samples" OFF )
+if( NOT HIPBLAS_BUILD_SAMPLES )
+  option( HIPBLAS_BUILD_SAMPLES "Build hipBLAS samples" OFF )
 endif( )
 
 if( HIP_PLATFORM STREQUAL nvidia )
