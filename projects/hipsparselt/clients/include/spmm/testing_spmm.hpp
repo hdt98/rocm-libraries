@@ -42,8 +42,9 @@
 #include <hipsparselt/hipsparselt.h>
 #include <omp.h>
 
+//dim0 = same ROW# use the same bias, dim1 = same COL# use the same bias
 template <typename T, typename Tb = T, typename To = T, hipsparseOrder_t order>
-void bias(int64_t m, int64_t n, int64_t ld, T* src, To* dest, Tb* bias)
+void bias(int64_t m, int64_t n, int64_t ld, T* src, To* dest, Tb* bias, int32_t dim=0)
 {
     auto saturate_i8 = [](Tb val) {
         auto _val = std::nearbyint(static_cast<double>(val));
@@ -58,11 +59,7 @@ void bias(int64_t m, int64_t n, int64_t ld, T* src, To* dest, Tb* bias)
 
     using TAccum = std::conditional_t<std::is_same<__half, Tb>::value, float, Tb>;
 
-    for(int64_t i = 0; i < m; i++)
-    {
-        Tb _bias = *(bias + i);
-#pragma omp parallel for
-        for(int64_t j = 0; j < n; j++)
+    auto bias_ = [&](int64_t i, int64_t j, Tb bias)
         {
             int64_t pos;
             if constexpr(order == HIPSPARSE_ORDER_COL)
@@ -75,7 +72,31 @@ void bias(int64_t m, int64_t n, int64_t ld, T* src, To* dest, Tb* bias)
             else
                 src_Taccum = static_cast<TAccum>(*(src + pos));
 
-            *(dest + pos) = saturate(src_Taccum + static_cast<TAccum>(_bias));
+        *(dest + pos) = saturate(src_Taccum + static_cast<TAccum>(bias));
+    };
+
+    if(dim == 0)
+    {
+        for(int64_t i = 0; i < m; i++)
+        {
+            Tb _bias = *(bias + i);
+    #pragma omp parallel for
+            for(int64_t j = 0; j < n; j++)
+            {
+                bias_(i, j, _bias);
+            }
+        }
+    }
+    else
+    {
+        for(int64_t j = 0; j < n; j++)
+        {
+            Tb _bias = j >= m ? static_cast<Tb>(0.0) : *(bias + j);
+    #pragma omp parallel for
+            for(int64_t i = 0; i < m; i++)
+            {
+                bias_(i, j, _bias);
+            }
         }
     }
 }
@@ -867,8 +888,17 @@ void testing_spmm(const Arguments& arg)
 
 #define activation_param \
     tM, tN, ldd, hD_gold_act + pos, hD_gold + pos, arg.activation_arg1, arg.activation_arg2
+
+#ifdef __HIP_PLATFORM_AMD__
 #define bias_act_param M, N, ldd, hD_gold_act + pos, hD_gold_act + pos, hBias + bias_stride* i
 #define bias_param M, N, ldd, hD_gold_act + pos, hD_gold + pos, hBias + bias_stride* i
+#endif
+
+#ifdef __HIP_PLATFORM_NVIDIA__
+//BUG? when sparseB same COL# use the same bias
+#define bias_act_param M, N, ldd, hD_gold_act + pos, hD_gold_act + pos, hBias + bias_stride* i, arg.sparse_b ? 1 : 0
+#define bias_param M, N, ldd, hD_gold_act + pos, hD_gold + pos, hBias + bias_stride* i, arg.sparse_b ? 1 : 0
+#endif
 
         for(int i = 0; i < num_batches; i++)
         {
