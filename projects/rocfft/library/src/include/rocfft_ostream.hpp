@@ -1,4 +1,4 @@
-// Copyright (C) 2016 - 2022 Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (C) 2016 - 2025 Advanced Micro Devices, Inc. All rights reserved.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -20,6 +20,10 @@
 
 #ifndef _ROCFFT_OSTREAM_HPP_
 #define _ROCFFT_OSTREAM_HPP_
+
+#ifdef WIN32
+#include <windows.h>
+#endif
 
 #include "../../../shared/rocfft_complex.h"
 #include "rocfft/rocfft.h"
@@ -132,6 +136,9 @@ private:
 
         // Mutex for this thread's queue
         std::mutex mutex;
+
+        // File handler
+        HANDLE handle = nullptr;
 
         // Queue of tasks
         std::queue<task_t> queue;

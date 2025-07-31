@@ -1,5 +1,5 @@
 /******************************************************************************
-* Copyright (C) 2016 - 2022 Advanced Micro Devices, Inc. All rights reserved.
+* Copyright (C) 2016 - 2025 Advanced Micro Devices, Inc. All rights reserved.
 *
 * Permission is hereby granted, free of charge, to any person obtaining a copy
 * of this software and associated documentation files (the "Software"), to deal
@@ -28,9 +28,6 @@ static int rocfft_abort_once();
 #include <fcntl.h>
 #include <iostream>
 #include <type_traits>
-#ifdef WIN32
-#include <windows.h>
-#endif
 
 // static data
 std::unique_ptr<rocfft_ostream::worker_map_t> rocfft_ostream::worker_map;
@@ -350,18 +347,36 @@ void rocfft_ostream::worker::thread_function()
             break;
         }
 
-        // Write the data
-        fwrite(task.data(), 1, task.size(), file);
+// Write the data
+#ifdef WIN32
+        DWORD bytesWritten = 0;
+        BOOL  success      = WriteFile(
+            handle, task.data(), static_cast<DWORD>(task.size()), &bytesWritten, nullptr);
 
-        // Detect any error and flush the C FILE stream
-        if(ferror(file) || fflush(file))
+        if(!success || bytesWritten != task.size())
         {
-            perror("Error writing log file");
-
-            // Tell future to wake up
+            perror("WriteFile() failed");
             task.set_value();
             break;
         }
+
+        // Flush buffer to disk, like fflush()
+if(!FlushFileBuffers(handle))
+{
+    perror("FlushFileBuffers() failed");
+    task.set_value();
+    break;
+}
+
+#else
+        fwrite(task.data(), 1, task.size(), file);
+        if(ferror(file) || fflush(file))
+        {
+            perror("Error writing log file");
+            task.set_value();
+            break;
+        }
+#endif
 
         // Promise that the data has been written
         task.set_value();
@@ -381,12 +396,30 @@ rocfft_ostream::worker::worker(int fd)
     fd = fcntl(fd, F_DUPFD_CLOEXEC, 0);
 #endif
 
-    // If the dup fails or fdopen fails, print error and abort
+// If the dup fails or fdopen fails, print error and abort
+#ifdef WIN32
+    fd = _dup(fd);
+    if(fd == -1)
+    {
+        perror("_dup() failed");
+        rocfft_abort();
+    }
+
+    // Get raw Windows HANDLE
+    handle = (HANDLE)_get_osfhandle(fd);
+    if(handle == INVALID_HANDLE_VALUE)
+    {
+        perror("_get_osfhandle() failed");
+        rocfft_abort();
+    }
+#else
+    fd = fcntl(fd, F_DUPFD_CLOEXEC, 0);
     if(fd == -1 || !(file = FDOPEN(fd, "a")))
     {
         perror("fdopen() error");
         rocfft_abort();
     }
+#endif
 
     // Create a worker thread, capturing *this
     thread = std::thread([=] { thread_function(); });
@@ -401,8 +434,13 @@ rocfft_ostream::worker::~worker()
     send({});
 
     // Close the FILE
+#ifdef WIN32
+    if(handle)
+        CloseHandle(handle);
+#else
     if(file)
         fclose(file);
+#endif
 }
 
 // output of rocfft-specific types

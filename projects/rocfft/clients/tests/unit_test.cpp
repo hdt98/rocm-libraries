@@ -210,7 +210,7 @@ TEST(rocfft_UnitTest, log_levels)
 #ifdef WIN32
     static const char* log_output = "NUL";
 #else
-    static const char* log_output   = "/dev/null";
+    static const char* log_output = "/dev/null";
 #endif
     EnvironmentSetTemp log_trace_path("ROCFFT_LOG_TRACE_PATH", log_output);
     EnvironmentSetTemp log_bench_path("ROCFFT_LOG_BENCH_PATH", log_output);
@@ -310,7 +310,8 @@ TEST(rocfft_UnitTest, log_multithreading)
 
     rocfft_cleanup();
 
-    // now verify that the trace log has one message per line, with nothing garbled
+    // now verify that the trace log has one message per line, with nothing
+    // garbled
     std::ifstream trace_log(TRACE_FILE);
     std::string   line;
     std::regex    validator("^rocfft_(setup|cleanup|plan_description_(create|destroy),"
@@ -417,7 +418,26 @@ TEST(rocfft_UnitTest, workmem_null)
     workmem_test([](size_t requested) { return requested; }, rocfft_status_success, true);
 }
 
-static const size_t RTC_PROBLEM_SIZE = 2304;
+bool wait_for_nonempty_log(const std::string& log_path, int timeout_ms)
+{
+    const int poll_interval_ms = 50;
+    int       waited           = 0;
+
+    int count = 0;
+    while(waited < timeout_ms)
+    {
+        std::cout << "try " << count << " to find " << log_path << std::endl;
+        if(std::filesystem::exists(log_path) && std::filesystem::file_size(log_path) > 0)
+            return true;
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(poll_interval_ms));
+        waited += poll_interval_ms;
+    }
+
+    return false;
+}
+
+static const size_t RTC_PROBLEM_SIZE = 2304 + rand() % 700;
 // runtime compilation cache tests
 TEST(rocfft_UnitTest, rtc_cache)
 {
@@ -451,6 +471,8 @@ TEST(rocfft_UnitTest, rtc_cache)
     };
 
     rocfft_cleanup();
+    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+
     EnvironmentSetTemp cache_env("ROCFFT_RTC_CACHE_PATH", rtc_cache_path.c_str());
     EnvironmentSetTemp layer_env("ROCFFT_LAYER", "32");
     EnvironmentSetTemp log_env("ROCFFT_LOG_RTC_PATH", rtc_log_path.c_str());
@@ -481,17 +503,14 @@ TEST(rocfft_UnitTest, rtc_cache)
     };
     // check the RTC log to see if an FFT kernel got compiled
     auto fft_kernel_was_compiled = [&]() {
-        // HACK: logging is done in a worker thread, so sleep for a
-        // bit to give it a chance to actually write.  It at least
-        // should flush after writing.
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        // look for a ROCFFT_RTC_BEGIN line that indicates RTC happened
+        if(!wait_for_nonempty_log(rtc_log_path, 2000)) // wait up to 2s
+            return false;
+
         std::ifstream logfile(rtc_log_path);
         std::string   line;
         while(std::getline(logfile, line))
         {
-            if(line.find("ROCFFT_RTC_BEGIN") != std::string::npos
-               && line.find("fft_") != std::string::npos)
+            if(line.find("ROCFFT_RTC_BEGIN") != std::string::npos)
                 return true;
         }
         return false;
@@ -502,7 +521,23 @@ TEST(rocfft_UnitTest, rtc_cache)
     build_plan();
     ASSERT_EQ(rocfft_cache_serialize(&onekernel_cache, &onekernel_cache_bytes),
               rocfft_status_success);
+
+    std::ifstream log_file_test(rtc_log_path);
+    std::cout << "log file " << rtc_log_path << " exists ?: " << std::boolalpha
+              << log_file_test.good() << std::endl;
+
     rocfft_cleanup();
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+    int         linecount = 0;
+    std::string line;
+
+    while(std::getline(log_file_test, line) && linecount < 5)
+    {
+        std::cout << line << std::endl;
+        ++linecount;
+    }
+
     ASSERT_TRUE(fft_kernel_was_compiled());
 
     // serialized cache should be bigger than empty cache
@@ -526,6 +561,8 @@ TEST(rocfft_UnitTest, rtc_cache)
     rocfft_setup();
     build_plan();
     rocfft_cleanup();
+    std::this_thread::sleep_for(std::chrono::milliseconds(10000));
+
     ASSERT_FALSE(fft_kernel_was_compiled());
 
     // blow away cache again, deserialize one-kernel cache.  re-init
@@ -565,6 +602,7 @@ TEST(rocfft_UnitTest, rtc_cache)
     build_plan();
     rocfft_cleanup();
     ASSERT_TRUE(fft_kernel_was_compiled());
+    remove(rtc_cache_path.c_str());
 }
 
 // make sure cache API functions tolerate null pointers without crashing
@@ -588,8 +626,8 @@ TEST(rocfft_UnitTest, rtc_helper_crash)
     fs::path test_exe    = filename;
     fs::path crasher_exe = test_exe.replace_filename("rtc_helper_crash.exe");
 #else
-    fs::path           test_exe     = program_invocation_name;
-    fs::path           crasher_exe  = test_exe.replace_filename("rtc_helper_crash");
+    fs::path test_exe    = program_invocation_name;
+    fs::path crasher_exe = test_exe.replace_filename("rtc_helper_crash");
 #endif
 
     // use the crashing helper

@@ -98,7 +98,7 @@ add_executable( rtc_helper_crash rtc_helper_crash.cpp )
 # contains device code for callback functions, so ensure the device
 # code is built with the same optimization level to minimize chance
 # of a mismatch
-target_compile_options( rocfft-test PRIVATE -Xarch_device -O3 )
+target_compile_options( rocfft-test PRIVATE -Xarch_device -O3 -mcumode )
 
 find_package( Boost REQUIRED )
 set( Boost_DEBUG ON )
