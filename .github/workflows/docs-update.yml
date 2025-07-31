@@ -20,6 +20,7 @@ on:
       - 'develop'
 #      - 'docs/**'
       - 'docs/test'
+      - 'users/alexxu12/docs-demo'
     paths:
 #      - 'projects/**'
 #      - 'shared/**'
