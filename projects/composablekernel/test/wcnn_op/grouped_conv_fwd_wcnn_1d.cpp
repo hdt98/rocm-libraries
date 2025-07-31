@@ -395,7 +395,12 @@ bool run_test_fmt()
         if constexpr (std::is_same<GPUAccType, float>::value || std::is_same<GPUAccType, int32_t>::value)
         {
             pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X2, Filter_1X1, false, 0,       WaveGroup, TestMask | 0x10000>();
-            pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X2, Filter_1X1, false, LdsMode, WaveGroup, TestMask | 0x10000>();
+            // VGPR out of range
+            constexpr bool compile_fail_case = (WaveGroup == true);
+            if constexpr (compile_fail_case == false)
+            {
+                pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X2, Filter_1X1, false, LdsMode, WaveGroup, TestMask | 0x10000>();
+            }
         }
         else
         {

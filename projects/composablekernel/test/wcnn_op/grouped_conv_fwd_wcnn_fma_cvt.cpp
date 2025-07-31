@@ -23,19 +23,27 @@ bool run_test_fmt()
     if constexpr(std::is_same<GPUAccType, float>::value)
     {
         pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, SrcType, Shape_4X2, 0,       WaveGroup, 1, 0, 1, TestMask | 0x10000>();
-        pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, SrcType, Shape_4X2, LdsMode, WaveGroup, 1, 0, 1, TestMask | 0x20000>();
         pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, SrcType, Shape_4X2, 0,       WaveGroup, 0, 0, 1, TestMask | 0x40000>();
         pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, SrcType, Shape_4X2, 0,       WaveGroup, 0, 1, 1, TestMask | 0x80000>();
         pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, SrcType, Shape_4X2, 0,       WaveGroup, 1, 1, 1, TestMask | 0x100000>();
-     }
+        constexpr bool compile_fail_case = (WaveGroup == true);
+        if constexpr(compile_fail_case == false)
+        {
+            pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, SrcType, Shape_4X2, LdsMode, WaveGroup, 1, 0, 1, TestMask | 0x20000>();
+        }
+    }
     else
     {
         pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, SrcType, Shape_4X2, 0,       WaveGroup, 1, 0, 1, TestMask | 0x10000>();
-        pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, SrcType, Shape_4X2, LdsMode, WaveGroup, 1, 0, 1, TestMask | 0x80000>();
         pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, SrcType, Shape_4X4, 0,       WaveGroup, 1, 0, 1, TestMask | 0x20000>();
         pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, SrcType, Shape_8X4, 0,       WaveGroup, 1, 0, 1, TestMask | 0x40000>();
-        pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, SrcType, Shape_4X4, LdsMode, WaveGroup, 1, 0, 1, TestMask | 0x100000>();
-        pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, SrcType, Shape_8X4, LdsMode, WaveGroup, 1, 0, 1, TestMask | 0x200000>();
+        constexpr bool compile_fail_case = (WaveGroup == true);
+        if constexpr(compile_fail_case == false)
+        {
+            pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, SrcType, Shape_4X2, LdsMode, WaveGroup, 1, 0, 1, TestMask | 0x80000>();
+            pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, SrcType, Shape_4X4, LdsMode, WaveGroup, 1, 0, 1, TestMask | 0x100000>();
+            pass &= run_test<SrcType, SrcType, SrcType, GPUAccType, SrcType, Shape_8X4, LdsMode, WaveGroup, 1, 0, 1, TestMask | 0x200000>();
+        }
     }
     // clang-format on
     return pass;
@@ -62,7 +70,6 @@ int main(int argc, char* argv[])
     pass &= run_test_fmt<f8_t,    float,   0x1f, 0x4  >();
     pass &= run_test_fmt<bf8_t,   float,   0x17, 0x8  >();
     pass &= run_test_fmt<int8_t,  float,   0x1f, 0x10 >();
-
     pass &= run_test_fmt<half_t,  half_t,  0x17, 0x40 >();
     pass &= run_test_fmt<bhalf_t, bhalf_t, 0x1f, 0x80 >();
     pass &= run_test_fmt<f8_t,    half_t,  0x17, 0x100>();

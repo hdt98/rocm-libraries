@@ -1,4 +1,4 @@
-﻿// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: MIT
 // Copyright (c) 2018-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
@@ -1405,8 +1405,8 @@ struct BlockwiseConvWcnn
                         constexpr index_t wave_border_offset =
                             indata_border_wave_desc_.CalculateOffset(make_tuple(c0, h0, I0));
 
-                        static_assert((wave_border_offset < predata_block_buf.Size()) &&
-                                          (wave_border_offset < nextdata_block_buf.Size()),
+                        static_assert((wave_border_offset < ExchangeDataBlockBuffer::Size()) &&
+                                          (wave_border_offset < ExchangeDataBlockBuffer::Size()),
                                       "The offset is out of range of the buffer");
 
                         indata_thread_vec_ptr[1] =

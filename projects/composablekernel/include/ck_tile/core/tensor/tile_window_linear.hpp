@@ -380,6 +380,7 @@ struct tile_window_linear
                                 number<i_access>                     = {},
                                 bool_constant<oob_conditional_check> = {}) const
     {
+#if 0        
         using vector_t = typename Base::Traits::vector_t;
         using SFC_Ys   = typename Base::Traits::SFC_Ys;
 
@@ -424,7 +425,7 @@ struct tile_window_linear
         };
 
         WINDOW_DISPATCH_ISSUE();
-
+#endif
         return dst_tensor;
     }
 

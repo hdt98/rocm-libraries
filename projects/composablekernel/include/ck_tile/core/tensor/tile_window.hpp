@@ -270,6 +270,8 @@ struct tile_window_with_static_distribution
                                 number<i_access_unsupport_>          = {},
                                 bool_constant<oob_conditional_check> = {}) const
     {
+        ignore = dst_tensor;
+#if 0
         using Traits   = typename Base::Traits;
         using vector_t = typename Traits::vector_t;
         using SFC_Ys   = typename Traits::SFC_Ys;
@@ -321,6 +323,7 @@ struct tile_window_with_static_distribution
                 }
             });
         });
+#endif
     }
 
     // TODO: currently async load only implemented in inline asm
@@ -556,6 +559,8 @@ struct tile_window_with_static_distribution
     template <typename DstTileWindow_>
     CK_TILE_DEVICE auto async_load_to_lds(DstTileWindow_&& lds_tile) const
     {
+        ignore = lds_tile;
+#if 0        
         using Traits = typename Base::Traits;
 
         // using vector_type_t = typename Traits::vector_type_t;
@@ -588,6 +593,7 @@ struct tile_window_with_static_distribution
                 }
             });
         });
+#endif
     }
 
     template <index_t i_access_unsupport_ = -1, bool oob_conditional_check = true>

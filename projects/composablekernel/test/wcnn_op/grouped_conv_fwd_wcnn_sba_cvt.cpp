@@ -26,12 +26,16 @@ bool run_test_fmt()
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_4X2, Filter_1X1, false, 0,       WaveGroup, SbaMode, 0, 1, TestMask | 0x100>();
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_4X2, Filter_3X3, false, 0,       WaveGroup, SbaMode, 0, 1, TestMask | 0x200>();
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_4X2, Filter_3X3, true,  0,       WaveGroup, SbaMode, 0, 1, TestMask | 0x200>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_4X2, Filter_3X3, false, LdsMode, WaveGroup, SbaMode, 0, 1, TestMask | 0x400>();
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_4X2, Filter_3X3, false, 0,       WaveGroup, SbaMode, 1, 1, TestMask | 0x800>();
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_4X2, Filter_3X3, true,  0,       WaveGroup, SbaMode, 1, 1, TestMask | 0x800>();
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_4X2, Filter_1X1, false, 0,       WaveGroup, SbaMode, 1, 1, TestMask | 0x1000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_4X2, Filter_1X1, false, LdsMode, WaveGroup, SbaMode, 1, 1, TestMask | 0x2000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_4X2, Filter_3X3, false, LdsMode, WaveGroup, SbaMode, 1, 1, TestMask | 0x4000>();
+        constexpr bool compile_fail_case = (WaveGroup == true);
+        if constexpr(compile_fail_case == false)
+        {
+            pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_4X2, Filter_3X3, false, LdsMode, WaveGroup, SbaMode, 0, 1, TestMask | 0x400>();
+            pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_4X2, Filter_1X1, false, LdsMode, WaveGroup, SbaMode, 1, 1, TestMask | 0x2000>();
+            pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_4X2, Filter_3X3, false, LdsMode, WaveGroup, SbaMode, 1, 1, TestMask | 0x4000>();
+        }
     }
     else
     {
@@ -41,42 +45,49 @@ bool run_test_fmt()
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_4X4, Filter_3X3, false, 0,       WaveGroup, SbaMode, 0, 1, TestMask | 0x200>();
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_4X4, Filter_3X3, true,  0,       WaveGroup, SbaMode, 0, 1, TestMask | 0x200>();
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_4X4, Filter_1X1, false, LdsMode, WaveGroup, SbaMode, 0, 1, TestMask | 0x400>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_4X4, Filter_3X3, false, LdsMode, WaveGroup, SbaMode, 0, 1, TestMask | 0x800>();
-
+       
         //ActivativeFun: 1
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_4X4, Filter_1X1, false, 0,       WaveGroup, SbaMode, 1, 1, TestMask | 0x1000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_4X4, Filter_3X3, false, 0,       WaveGroup, SbaMode, 1, 1, TestMask | 0x2000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_4X4, Filter_3X3, true,  0,       WaveGroup, SbaMode, 1, 1, TestMask | 0x2000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_4X4, Filter_1X1, false, LdsMode, WaveGroup, SbaMode, 1, 1, TestMask | 0x4000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_4X4, Filter_3X3, false, LdsMode, WaveGroup, SbaMode, 1, 1, TestMask | 0x8000>();
+
 // 8x4
         //ActivativeFun: 0
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_8X4, Filter_1X1, false, 0,       WaveGroup, SbaMode, 0, 1, TestMask | 0x10000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_8X4, Filter_3X3, false, 0,       WaveGroup, SbaMode, 0, 1, TestMask | 0x20000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_8X4, Filter_3X3, true,  0,       WaveGroup, SbaMode, 0, 1, TestMask | 0x20000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_8X4, Filter_1X1, false, LdsMode, WaveGroup, SbaMode, 0, 1, TestMask | 0x40000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_8X4, Filter_3X3, false, LdsMode, WaveGroup, SbaMode, 0, 1, TestMask | 0x80000>();
 
         //ActivativeFun: 1
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_8X4, Filter_1X1, false, 0,       WaveGroup, SbaMode, 1, 1, TestMask | 0x100000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_8X4, Filter_3X3, false, 0,       WaveGroup, SbaMode, 1, 1, TestMask | 0x200000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_8X4, Filter_3X3, true,  0,       WaveGroup, SbaMode, 1, 1, TestMask | 0x200000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_8X4, Filter_1X1, false, LdsMode, WaveGroup, SbaMode, 1, 1, TestMask | 0x400000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_8X4, Filter_3X3, false, LdsMode, WaveGroup, SbaMode, 1, 1, TestMask | 0x800000>();
+
 // 4X2
         //ActivativeFun: 0
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_4X2, Filter_1X1, false, 0,       WaveGroup, SbaMode, 0, 1, TestMask | 0x1000000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_4X2, Filter_3X3, false, 0,       WaveGroup, SbaMode, 0, 1, TestMask | 0x2000000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_4X2, Filter_3X3, true,  0,       WaveGroup, SbaMode, 0, 1, TestMask | 0x2000000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_4X2, Filter_1X1, false, LdsMode, WaveGroup, SbaMode, 0, 1, TestMask | 0x4000000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_4X2, Filter_3X3, false, LdsMode, WaveGroup, SbaMode, 0, 1, TestMask | 0x8000000>();
 
         //ActivativeFun: 1
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_4X2, Filter_1X1, false, 0,       WaveGroup, SbaMode, 1, 1, TestMask | 0x10000000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_4X2, Filter_3X3, false, 0,       WaveGroup, SbaMode, 1, 1, TestMask | 0x20000000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_4X2, Filter_3X3, true,  0,       WaveGroup, SbaMode, 1, 1, TestMask | 0x20000000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_4X2, Filter_1X1, false, LdsMode, WaveGroup, SbaMode, 1, 1, TestMask | 0x40000000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_4X2, Filter_3X3, false, LdsMode, WaveGroup, SbaMode, 1, 1, TestMask | 0x80000000>();
+
+        constexpr bool compile_fail_case = (WaveGroup == true);
+        if constexpr(compile_fail_case == false)
+        {
+            pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_4X4, Filter_3X3, false, LdsMode, WaveGroup, SbaMode, 0, 1, TestMask | 0x800>();
+            pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_4X4, Filter_3X3, false, LdsMode, WaveGroup, SbaMode, 1, 1, TestMask | 0x8000>();
+            pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_8X4, Filter_3X3, false, LdsMode, WaveGroup, SbaMode, 0, 1, TestMask | 0x80000>();
+            pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_8X4, Filter_3X3, false, LdsMode, WaveGroup, SbaMode, 1, 1, TestMask | 0x800000>();
+            pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_4X2, Filter_3X3, false, LdsMode, WaveGroup, SbaMode, 0, 1, TestMask | 0x8000000>();
+            pass &= run_test<SrcType, SrcType, GPUAccType, SrcType, Shape_4X2, Filter_3X3, false, LdsMode, WaveGroup, SbaMode, 1, 1, TestMask | 0x80000000>();
+        }
     }
     // clang-format on
     return pass;

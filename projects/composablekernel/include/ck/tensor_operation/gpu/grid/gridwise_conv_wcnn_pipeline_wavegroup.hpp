@@ -115,8 +115,10 @@ struct GridwiseConvPipeline_v2
         __shared__ NamedBarrier<4> barrierLds;
 #endif
 
-        static __attribute__((exp_amd_laneshared)) int dataFromPrev[prev_block_buf.Size()];
-        static __attribute__((exp_amd_laneshared)) int dataFromNext[next_block_buf.Size()];
+        static
+            __attribute__((exp_amd_laneshared)) int dataFromPrev[ExchangeDataBlockBuffer::Size()];
+        static
+            __attribute__((exp_amd_laneshared)) int dataFromNext[ExchangeDataBlockBuffer::Size()];
 
         constexpr index_t NumTap           = WeiDataBlockTransfer::Size();
         constexpr auto in_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0);
@@ -612,8 +614,10 @@ struct GridwiseConvPipeline_v2<1, false, false, false, EnableAsync, EnableSpatia
         __shared__ WavegroupSemaphore<WaveIdLoad> semFromPrev;
 #endif
 
-        static __attribute__((exp_amd_laneshared)) int dataFromPrev[prev_block_buf.Size()];
-        static __attribute__((exp_amd_laneshared)) int dataFromNext[next_block_buf.Size()];
+        static
+            __attribute__((exp_amd_laneshared)) int dataFromPrev[ExchangeDataBlockBuffer::Size()];
+        static
+            __attribute__((exp_amd_laneshared)) int dataFromNext[ExchangeDataBlockBuffer::Size()];
 
         constexpr index_t NumTap           = WeiDataBlockTransfer::Size();
         constexpr auto in_block_origin_idx = make_tuple(I0, I0, I0, I0, I0, I0, I0);
@@ -945,6 +949,13 @@ struct GridwiseConvPipeline_v2<1, true, true, true, EnableAsync, EnableSpatialCl
         constexpr auto wei_block_copy_step = to_multi_index(WeiDataBlockTransferStep{});
         constexpr auto in_block_copy_step  = to_multi_index(InDataBlockTransferStep{});
 
+        ignore = in_cluster_border_desc;
+        ignore = prev_block_buf;
+        ignore = pre_cluster_buf;
+        ignore = pre_blockwise_copy;
+        ignore = next_block_buf;
+        ignore = next_cluster_buf;
+        ignore = next_blockwise_copy;
         // sync between data load wave (0) and conv wave (1)
 #ifdef CK_USE_AMD_SEMAPHORE_ASM
         WavegroupSemaphore<WaveIdRun, 1> semaLdsReady;

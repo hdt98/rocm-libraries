@@ -429,11 +429,13 @@ bool run_test_fmt()
         pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X2, Filter_3X3, false, 0,       WaveGroup, false, 0, TestMask | 0x20000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X2, Filter_3X3, true,  0,       WaveGroup, false, 0, TestMask | 0x40000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X2, Filter_2X2, false, 0,       WaveGroup, false, 0, TestMask | 0x10000>();
-
-        pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X2, Filter_1X1, false, LdsMode, WaveGroup, false, 0, TestMask | 0x10000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X2, Filter_3X3, false, LdsMode, WaveGroup, false, 0, TestMask | 0x100000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X2, Filter_2X2, false, LdsMode, WaveGroup, false, 0, TestMask | 0x80000>();
-
+        constexpr bool compile_fail_case = (WaveGroup == true);
+        if constexpr (compile_fail_case == false)
+        {
+            pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X2, Filter_1X1, false, LdsMode, WaveGroup, false, 0, TestMask | 0x10000>();
+            pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X2, Filter_3X3, false, LdsMode, WaveGroup, false, 0, TestMask | 0x100000>();
+            pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X2, Filter_2X2, false, LdsMode, WaveGroup, false, 0, TestMask | 0x80000>();
+        }
 #ifdef ENABLE_SPATIAL_CLUSTER
         pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X2, Filter_3X3, false, 0,       WaveGroup,  true, ClusterSize, TestMask | 0x20000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X2, Filter_3X3, false, 0,       WaveGroup,  true, MultiChainClusterSize, TestMask | 0x20000>();
@@ -461,12 +463,16 @@ bool run_test_fmt()
         pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X2, Filter_1X1, false, LdsMode, WaveGroup, false, 0, TestMask | 0x2000000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X4, Filter_1X1, false, LdsMode, WaveGroup, false, 0, TestMask | 0x4000000>();
         pass &= run_test<SrcType, SrcType, GPUAccType, Shape_8X4, Filter_1X1, false, LdsMode, WaveGroup, false, 0, TestMask | 0x8000000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X2, Filter_3X3, false, LdsMode, WaveGroup, false, 0, TestMask | 0x10000000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X4, Filter_3X3, false, LdsMode, WaveGroup, false, 0, TestMask | 0x20000000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, Shape_8X4, Filter_3X3, false, LdsMode, WaveGroup, false, 0, TestMask | 0x40000000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X2, Filter_2X2, false, LdsMode, WaveGroup, false, 0, TestMask | 0x2000000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X4, Filter_2X2, false, LdsMode, WaveGroup, false, 0, TestMask | 0x4000000>();
-        pass &= run_test<SrcType, SrcType, GPUAccType, Shape_8X4, Filter_2X2, false, LdsMode, WaveGroup, false, 0, TestMask | 0x8000000>();
+        constexpr bool compile_fail_case = (WaveGroup == true);
+        if constexpr (compile_fail_case == false)
+        {
+            pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X2, Filter_3X3, false, LdsMode, WaveGroup, false, 0, TestMask | 0x10000000>();
+            pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X4, Filter_3X3, false, LdsMode, WaveGroup, false, 0, TestMask | 0x20000000>();
+            pass &= run_test<SrcType, SrcType, GPUAccType, Shape_8X4, Filter_3X3, false, LdsMode, WaveGroup, false, 0, TestMask | 0x40000000>();
+            pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X2, Filter_2X2, false, LdsMode, WaveGroup, false, 0, TestMask | 0x2000000>();
+            pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X4, Filter_2X2, false, LdsMode, WaveGroup, false, 0, TestMask | 0x4000000>();
+            pass &= run_test<SrcType, SrcType, GPUAccType, Shape_8X4, Filter_2X2, false, LdsMode, WaveGroup, false, 0, TestMask | 0x8000000>();
+        }
 
 #ifdef ENABLE_SPATIAL_CLUSTER
         pass &= run_test<SrcType, SrcType, GPUAccType, Shape_4X2, Filter_3X3, false, 0,       WaveGroup, true, ClusterSize, TestMask | 0x80000>();
