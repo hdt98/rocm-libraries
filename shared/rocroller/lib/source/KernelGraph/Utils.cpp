@@ -450,9 +450,22 @@ namespace rocRoller
 
         std::vector<int> findComputeIndexCandidates(KernelGraph const& kgraph, int start)
         {
-            std::vector<int> rv;
+            // std::vector<int> rv;
 
-            return kgraph.control
+            // return kgraph.control
+            //     .findNodes(
+            //         start,
+            //         [&](int tag) -> bool {
+            //             auto elem = kgraph.control.getElement(tag);
+            //             if(!std::holds_alternative<CG::Operation>(elem))
+            //                 return false;
+            //             auto op = std::get<CG::Operation>(elem);
+            //             return needsComputeIndex(op);
+            //         },
+            //         GD::Downstream)
+            //     .to<std::vector>();
+            
+            auto rv = kgraph.control
                 .findNodes(
                     start,
                     [&](int tag) -> bool {
@@ -464,6 +477,9 @@ namespace rocRoller
                     },
                     GD::Downstream)
                 .to<std::vector>();
+            auto compare = TopologicalCompare(std::make_shared<KernelGraph>(kgraph));
+            std::sort(rv.begin(), rv.end(), compare);
+            return rv;
         }
 
         void purgeFor(KernelGraph& kgraph, int loop)
