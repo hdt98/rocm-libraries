@@ -22,10 +22,8 @@ on:
       - 'docs/test'
       - 'users/alexxu12/docs-demo'
     paths:
-#      - 'projects/**'
-#      - 'shared/**'
-      - 'projects/composablekernel'
-      - 'projects/hipblas'
+     - 'projects/**'
+     - 'shared/**'
 
 jobs:
   trigger-rtd:
