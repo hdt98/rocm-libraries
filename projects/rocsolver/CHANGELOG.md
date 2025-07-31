@@ -15,6 +15,9 @@ Full documentation for rocSOLVER is available at the [rocSOLVER documentation](h
 * Improved the performance of STEQR and downstream functions such as SYEV/HEEV
 * Improved the performance of LARFT and downstream functions such as GEQR2 and GEQRF
 
+### Resolved issues
+
+* Fixed corner cases that can produce NaNs in SYEVD, for valid input matrices
 
 
 ## rocSOLVER 3.28.2 for ROCm 6.4.2
