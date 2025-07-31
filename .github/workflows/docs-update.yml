@@ -1,14 +1,30 @@
-name: Trigger documentation build on Read the Docs
+# Update documentation on Read the docs
+# -----------------------------------
+# This GitHub Actions workflow runs on push commits. It detects commit's target branch and project,
+# then triggers the corresponding build on Read the Docs.
+# Key Steps:
+# 1. Compare the current commit to the last commit and obtain the path of changed files
+# 2. Extract a set of project names from changed file path
+# 3. Obtain the target branch name and convert it into Read the Docs format
+# 4. Use Read the Docs V3 API to trigger the build for the corresponding docs:
+#    Github project name -> Read the docs project name
+#    Github branch name -> Read the docs version
+#
+# This ensures live documentation is synchronized with the latest change.
+
+name: RTD Docs Synchronization
 
 on:
   push:
     branches:
       - 'develop'
-      - 'docs/**'
-      - 'users/alexxu12/docs-demo' # for test
+#      - 'docs/**'
+      - 'docs/test'
     paths:
-      - 'projects/**'
-      - 'shared/**'
+#      - 'projects/**'
+#      - 'shared/**'
+      - 'projects/composablekernel'
+      - 'projects/hipblas'
 
 jobs:
   trigger-rtd:
@@ -42,7 +58,7 @@ jobs:
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Trigger RTD build
-        if: steps.diff.outputs.changed_projects
+        if: steps.diff.outputs.changed_projects != ""
         env: 
           changed_projects: ${{ steps.diff.outputs.changed_projects }}
           RTD_TOKEN: ${{ secrets.RTD_TOKEN }}
@@ -53,9 +69,24 @@ jobs:
           echo "Target github branch: $branch_name"
           echo "Read the Docs version slug: $version_slug"
 
-          for project in $changed_projects; do
-            echo "Triggering RTD build for $project"
-            curl -X POST \
+          # List of project slugs on RTD
+          project_list=$( curl
                  -H "Authorization: Token $RTD_TOKEN" \
-                 "https://readthedocs.com/api/v3/projects/advanced-micro-devices-monorepo-$project/versions/$version_slug/builds/"
+                 "https://app.readthedocs.com/api/v3/projects/?expand=advanced-micro-devices&limit=300" \
+                 | jq -r '.results[].slug'
+          )
+
+          for project in $changed_projects; do
+            slug="advanced-micro-devices-monorepo-$project" # Remove monorepo keyword when using on live docs later
+            if echo "project_list" | grep -Fxq "$slug"; then
+              echo "Triggering RTD build for $project"
+              response=$(curl -f -s -X POST \
+                  -H "Authorization: Token $RTD_TOKEN" \
+                  "https://readthedocs.com/api/v3/projects/$slug/versions/$version_slug/builds/") || {
+                  echo "Failed to trigger RTD build for $project. Response: $response"
+                  exit 1
+              }
+              echo "Successfully triggered RTD build for $project. Response: $response"
+            else
+              echo "Skipping $project - Does not exist on Read the Docs"
           done
