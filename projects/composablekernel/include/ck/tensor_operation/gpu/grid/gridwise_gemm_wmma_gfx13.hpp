@@ -287,9 +287,10 @@ template <typename GridwiseGemm,
           typename BElementwiseOperation,
           typename CElementwiseOperation,
           typename Block2CTileMap,
-          int ClusterSize,
+          int AClusterSize,
+          int BClusterSize,
           bool HasMainKBlockLoop>
-__global__ void __cluster_dims__(ClusterSize)
+__global__ void __cluster_dims__(AClusterSize* BClusterSize, 1, 1)
     kernel_gemm_wmma_cluster(const ADataType* __restrict__ p_a_grid,
                              const BDataType* __restrict__ p_b_grid,
                              CDataType* __restrict__ p_c_grid,
@@ -372,8 +373,9 @@ template <index_t BlockSize,
           bool AEnableAsyncCopy,
           bool AEnableTRLoadFromGlobal,
           bool AEnableTiledLoadFromGlobal,
-          GlobalLoadTypeEnum AMultiCastLoad, /* 0x1: ClusterMulticastLoad, 0x2: WGPMulticastLoad */
-          index_t AClusterSize,              /* Set when AMultiCastLoad == 1*/
+          TensorLoadOption ALoadOption, /* 0x1: ClusterMulticastLoad, 0x2: WGPMulticastLoad,
+                                                0x3:DDS */
+          index_t AClusterSize,         /* Set when ALoadOption == 1 or 3*/
           typename BBlockTransferThreadClusterLengths_N_K0_K1,
           typename BBlockTransferThreadClusterArrangeOrder,
           typename BBlockTransferSrcAccessOrder,
@@ -386,8 +388,8 @@ template <index_t BlockSize,
           bool BEnableAsyncCopy,
           bool BEnableTRLoadFromGlobal,
           bool BEnableTiledLoadFromGlobal,
-          GlobalLoadTypeEnum BMultiCastLoad, /* 0x1: ClusterMulticastLoad, 0x2: WGPMulticastLoad */
-          index_t BClusterSize,              /* Set when BMultiCastLoad == 1*/
+          TensorLoadOption BLoadOption, /* 0x1: ClusterMulticastLoad, 0x2: WGPMulticastLoad */
+          index_t BClusterSize,         /* Set when BLoadOption == 1 or 3*/
           index_t CShuffleMRepeatPerShuffle,
           index_t CShuffleNRepeatPerShuffle,
           typename CShuffleBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock,
@@ -488,8 +490,8 @@ struct GridwiseGemm_Wmma_GFX13
                                                               AEnableLds,
                                                               BEnableLds,
                                                               EnableWaveGroup,
-                                                              AMultiCastLoad,
-                                                              BMultiCastLoad>())>;
+                                                              ALoadOption,
+                                                              BLoadOption>())>;
 #ifdef CK_EXTENSION_MX_TYPE
     __host__ __device__ static constexpr auto MakeAScaleBlockDescriptor()
     {
@@ -799,7 +801,14 @@ struct GridwiseGemm_Wmma_GFX13
             if constexpr(AEnableLds)
             {
                 constexpr auto K0PerBlock = AKPerBlock / ABlockTransferSrcScalarPerVector;
-                return make_multi_index(0, K0PerBlock, 0);
+                if constexpr(ALoadOption == TensorLoadOption::CLUSTER_DDS_LOAD)
+                {
+                    return make_multi_index(0, K0PerBlock * AClusterSize, 0);
+                }
+                else
+                {
+                    return make_multi_index(0, K0PerBlock, 0);
+                }
             }
             else
             {
@@ -819,7 +828,14 @@ struct GridwiseGemm_Wmma_GFX13
             if constexpr(BEnableLds)
             {
                 constexpr auto K0PerBlock = BKPerBlock / BBlockTransferSrcScalarPerVector;
-                return make_multi_index(0, K0PerBlock, 0);
+                if constexpr(BLoadOption == TensorLoadOption::CLUSTER_DDS_LOAD)
+                {
+                    return make_multi_index(0, K0PerBlock * BClusterSize, 0);
+                }
+                else
+                {
+                    return make_multi_index(0, K0PerBlock, 0);
+                }
             }
             else
             {
@@ -1037,6 +1053,14 @@ struct GridwiseGemm_Wmma_GFX13
                           (NPerBlock % (NRepeat * NPerWmma)) == 0,
                       "Invalid tuning param!");
 
+        static_assert((ALoadOption != TensorLoadOption::CLUSTER_MULTICAST_LOAD) ||
+                          (BLoadOption != TensorLoadOption::CLUSTER_MULTICAST_LOAD),
+                      "Both A and B cannot enable MultiCastLoad at the same time.");
+
+        static_assert((ALoadOption != TensorLoadOption::CLUSTER_DDS_LOAD) ||
+                          (BLoadOption != TensorLoadOption::CLUSTER_DDS_LOAD),
+                      "Both A and B cannot enable DdsLoad at the same time.");
+
         if constexpr(is_mx_type_t_v<ADataType> && is_mx_type_t_v<BDataType>)
         {
             static_assert((ABlockTransferSrcScalarPerVector <= 4));
@@ -1046,23 +1070,25 @@ struct GridwiseGemm_Wmma_GFX13
             static_assert((K1Value == 1), "for MX type K1 should be 1, because of int32 based");
         }
 
-        if constexpr(AMultiCastLoad != GlobalLoadTypeEnum::DEFAULT_LOAD)
+        if constexpr(ALoadOption == TensorLoadOption::CLUSTER_MULTICAST_LOAD ||
+                     ALoadOption == TensorLoadOption::WGP_MULTICAST_LOAD)
         {
             static_assert((AEnableLds == false) && (AEnableTRLoadFromGlobal == false) &&
                               (AEnableTiledLoadFromGlobal == false),
                           "A use multicast load and other load methods should be unused.");
-            if constexpr(AMultiCastLoad == GlobalLoadTypeEnum::WGP_MULTICAST_LOAD)
+            if constexpr(ALoadOption == TensorLoadOption::WGP_MULTICAST_LOAD)
             {
                 static_assert(EnableWaveGroup == true,
                               "A WGPMultiCastLoad should be used with WaveGroup enabled.");
             }
         }
-        if constexpr(BMultiCastLoad != GlobalLoadTypeEnum::DEFAULT_LOAD)
+        if constexpr(BLoadOption == TensorLoadOption::CLUSTER_MULTICAST_LOAD ||
+                     BLoadOption == TensorLoadOption::WGP_MULTICAST_LOAD)
         {
             static_assert((BEnableLds == false) && (BEnableTRLoadFromGlobal == false) &&
                               (BEnableTiledLoadFromGlobal == false),
                           "A use multicast load and other load methods should be unused.");
-            if constexpr(BMultiCastLoad == GlobalLoadTypeEnum::WGP_MULTICAST_LOAD)
+            if constexpr(BLoadOption == TensorLoadOption::WGP_MULTICAST_LOAD)
             {
                 static_assert(EnableWaveGroup == true,
                               "B WGPMultiCastLoad should be used with WaveGroup enabled.");
@@ -1186,7 +1212,17 @@ struct GridwiseGemm_Wmma_GFX13
 
     __host__ __device__ static constexpr bool CalculateHasMainKBlockLoop(index_t K)
     {
-        const index_t num_loop = K / AKPerBlock;
+        index_t ClusterSize = 1;
+        if constexpr(ALoadOption == TensorLoadOption::CLUSTER_DDS_LOAD)
+        {
+            ClusterSize = AClusterSize;
+        }
+        else if constexpr(BLoadOption == TensorLoadOption::CLUSTER_DDS_LOAD)
+        {
+            ClusterSize = BClusterSize;
+        }
+
+        const index_t num_loop = K / AKPerBlock / ClusterSize;
 
         return GridwiseGemmPipe::CalculateHasMainLoop(num_loop);
     }
@@ -1214,23 +1250,54 @@ struct GridwiseGemm_Wmma_GFX13
     __host__ __device__ static constexpr auto MakeDefaultBlock2CTileMap(
         const CGridDesc_M_N& c_grid_desc_m_n, index_t /* M01 */, index_t /* N01 */)
     {
-        static_assert(AMultiCastLoad == GlobalLoadTypeEnum::DEFAULT_LOAD ||
-                          BMultiCastLoad == GlobalLoadTypeEnum::DEFAULT_LOAD,
-                      "Both A and B cannot enable MultiCastLoad at the same time.");
-        if constexpr(AMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_MULTICAST_LOAD)
+        // Current it should align on the DDS block2tile firstly as mcast can fetch data
+        // from different address
+        if constexpr(AClusterSize > 1)
         {
             const auto N = c_grid_desc_m_n.GetLength(I1);
             if((N / NPerBlock) % AClusterSize == 0)
             {
                 printf("GridwiseOp err: NBlocks must be multiple of AClusterSize\n");
             }
-            return BlockToCTileMap_M00_N0_M01Adapt<MPerBlock, NPerBlock, CGridDesc_M_N>(
-                c_grid_desc_m_n, 1);
+
+            if constexpr((BClusterSize > 1) && (BLoadOption == TensorLoadOption::CLUSTER_DDS_LOAD))
+            {
+                const auto M = c_grid_desc_m_n.GetLength(I0);
+                if((M / MPerBlock) % BClusterSize == 0)
+                {
+                    printf("GridwiseOp err: MBlocks must be multiple of BClusterSize\n");
+                }
+                return BlockToCTileMap_M00_N0_M01Adapt<MPerBlock, NPerBlock, CGridDesc_M_N>(
+                    c_grid_desc_m_n, BClusterSize);
+            }
+            else
+            {
+                return BlockToCTileMap_M00_N0_M01Adapt<MPerBlock, NPerBlock, CGridDesc_M_N>(
+                    c_grid_desc_m_n, 1);
+            }
         }
-        else if constexpr(BMultiCastLoad == GlobalLoadTypeEnum::CLUSTER_MULTICAST_LOAD)
+        else if constexpr(BClusterSize > 1)
         {
-            return BlockToCTileMap_M00_N0_M01Adapt<MPerBlock, NPerBlock, CGridDesc_M_N>(
-                c_grid_desc_m_n, BClusterSize);
+            const auto M = c_grid_desc_m_n.GetLength(I0);
+            if((M / MPerBlock) % BClusterSize == 0)
+            {
+                printf("GridwiseOp err: MBlocks must be multiple of BClusterSize\n");
+            }
+            if constexpr((AClusterSize > 1) && (ALoadOption == TensorLoadOption::CLUSTER_DDS_LOAD))
+            {
+                const auto N = c_grid_desc_m_n.GetLength(I1);
+                if((N / NPerBlock) % AClusterSize == 0)
+                {
+                    printf("GridwiseOp err: NBlocks must be multiple of AClusterSize\n");
+                }
+                return BlockToCTileMap_M00_N0_M01Adapt<MPerBlock, NPerBlock, CGridDesc_M_N>(
+                    c_grid_desc_m_n, 1);
+            }
+            else
+            {
+                return BlockToCTileMap_M00_N0_M01Adapt<MPerBlock, NPerBlock, CGridDesc_M_N>(
+                    c_grid_desc_m_n, BClusterSize);
+            }
         }
         else
         {
@@ -2024,64 +2091,103 @@ struct GridwiseGemm_Wmma_GFX13
                 auto a_block_buf          = make_dynamic_buffer<AddressSpaceEnum::Lds>(
                     static_cast<ADataType*>(p_shared), SharedMemTrait::a_block_space_size_aligned);
                 // clang-format off
-               if constexpr(AEnableAsyncCopy)
-               {
-                auto a_blockwise_copy =
-                          ThreadGroupTensorSliceTransferAsync<ThisThreadBlockGrid,
- /* typename BlockSliceLengths,                    */         Sequence<MPerBlock, K0PerBlock, ABlockTransferSrcScalarPerVector>,
- /* typename ThreadClusterLengths,                 */         ABlockTransferThreadClusterLengths_M_K0_K1,
- /* typename ThreadClusterArrangeOrder,            */         ABlockTransferThreadClusterArrangeOrder,
- /* typename SrcData,                              */         ADataType,
- /* typename DstData,                              */         ADataType,
- /* typename SrcDesc,                              */         decltype(a_grid_desc),
- /* typename DstDesc,                              */         decltype(a_block_desc),
- /* index_t SrcVectorDim,                          */         ABlockTransferSrcVectorDim,
- /* index_t DstVectorDim,                          */         2,
- /* index_t SrcScalarPerVector,                    */         ABlockTransferSrcScalarPerVector,
-                                                              false,
-                                                              true>(
-                a_grid_desc,
-                make_multi_index(m_block_data_idx_on_grid, 0, 0),
-                a_block_desc,
-                make_multi_index(0, 0, 0));
-                return make_tuple(a_block_buf, a_blockwise_copy);
-               }
-               else
-               {
-                auto a_blockwise_copy =
-                    ThreadGroupTensorSliceTransfer_v4r1<ThisThreadBlockGrid,
-/* typename SrcElementwiseOperation,              */    AElementwiseOperation,
-/* typename DstElementwiseOperation,              */    ck::tensor_operation::element_wise::PassThrough,
-/* InMemoryDataOperationEnum DstInMemOp,          */    InMemoryDataOperationEnum::Set,
-/* typename BlockSliceLengths,                    */    Sequence<MPerBlock, K0PerBlock, ABlockTransferSrcScalarPerVector>,
-/* typename ThreadClusterLengths,                 */    ABlockTransferThreadClusterLengths_M_K0_K1,
-/* typename ThreadClusterArrangeOrder,            */    ABlockTransferThreadClusterArrangeOrder,
-/* typename SrcData,                              */    ADataType,
-/* typename DstData,                              */    ADataType,
-/* typename SrcDesc,                              */    decltype(a_grid_desc),
-/* typename DstDesc,                              */    decltype(a_block_desc),
-/* typename SrcDimAccessOrder,                    */    ABlockTransferSrcAccessOrder,
-/* typename DstDimAccessOrder,                    */    Sequence<0, 1, 2>,
-/* index_t SrcVectorDim,                          */    ABlockTransferSrcVectorDim,
-/* index_t DstVectorDim,                          */    2,
-/* index_t SrcScalarPerVector,                    */    ABlockTransferSrcScalarPerVector,
-/* index_t DstScalarPerVector,                    */    ABlockTransferDstScalarPerVector_K1,
-/* index_t SrcScalarStrideInVector,               */    1,
-/* index_t DstScalarStrideInVector,               */    1,
-/* bool ThreadTransferSrcResetCoordinateAfterRun, */    AThreadTransferSrcResetCoordinateAfterRun,
-/* bool ThreadTransferDstResetCoordinateAfterRun, */    true,
-                                                        NumGemmKPrefetchStage>(
-                a_grid_desc,
-                make_multi_index(m_block_data_idx_on_grid, 0, 0),
-                a_element_op,
-                a_block_desc,
-                make_multi_index(0, 0, 0),
-                ck::tensor_operation::element_wise::PassThrough{});
+                if constexpr(AEnableAsyncCopy)
+                {
+                    auto a_blockwise_copy =
+                            ThreadGroupTensorSliceTransferAsync<ThisThreadBlockGrid,
+    /* typename BlockSliceLengths,                    */         Sequence<MPerBlock, K0PerBlock, ABlockTransferSrcScalarPerVector>,
+    /* typename ThreadClusterLengths,                 */         ABlockTransferThreadClusterLengths_M_K0_K1,
+    /* typename ThreadClusterArrangeOrder,            */         ABlockTransferThreadClusterArrangeOrder,
+    /* typename SrcData,                              */         ADataType,
+    /* typename DstData,                              */         ADataType,
+    /* typename SrcDesc,                              */         decltype(a_grid_desc),
+    /* typename DstDesc,                              */         decltype(a_block_desc),
+    /* index_t SrcVectorDim,                          */         ABlockTransferSrcVectorDim,
+    /* index_t DstVectorDim,                          */         2,
+    /* index_t SrcScalarPerVector,                    */         ABlockTransferSrcScalarPerVector,
+                                                                false,
+                                                                true>(
+                    a_grid_desc,
+                    make_multi_index(m_block_data_idx_on_grid, 0, 0),
+                    a_block_desc,
+                    make_multi_index(0, 0, 0));
+                    return make_tuple(a_block_buf, a_blockwise_copy);
+                }
+                else
+                {
+                    if constexpr(ALoadOption == TensorLoadOption::CLUSTER_DDS_LOAD)
+                    {
+                        const index_t nk_block_data_idx_on_grid = __builtin_amdgcn_readfirstlane((block_work_idx[I1] % AClusterSize) * NPerBlock);
+                        auto k1 = a_grid_desc.GetLength(I2);
+                        const index_t k0_start_index_on_block = nk_block_data_idx_on_grid / k1;
+                        auto a_blockwise_copy =
+                            ThreadGroupTensorSliceTransfer_v4r1<ThisThreadBlockGrid,
+        /* typename SrcElementwiseOperation,              */    AElementwiseOperation,
+        /* typename DstElementwiseOperation,              */    ck::tensor_operation::element_wise::PassThrough,
+        /* InMemoryDataOperationEnum DstInMemOp,          */    InMemoryDataOperationEnum::Set,
+        /* typename BlockSliceLengths,                    */    Sequence<MPerBlock, K0PerBlock, ABlockTransferSrcScalarPerVector>,
+        /* typename ThreadClusterLengths,                 */    ABlockTransferThreadClusterLengths_M_K0_K1,
+        /* typename ThreadClusterArrangeOrder,            */    ABlockTransferThreadClusterArrangeOrder,
+        /* typename SrcData,                              */    ADataType,
+        /* typename DstData,                              */    ADataType,
+        /* typename SrcDesc,                              */    decltype(a_grid_desc),
+        /* typename DstDesc,                              */    decltype(a_block_desc),
+        /* typename SrcDimAccessOrder,                    */    ABlockTransferSrcAccessOrder,
+        /* typename DstDimAccessOrder,                    */    Sequence<0, 1, 2>,
+        /* index_t SrcVectorDim,                          */    ABlockTransferSrcVectorDim,
+        /* index_t DstVectorDim,                          */    2,
+        /* index_t SrcScalarPerVector,                    */    ABlockTransferSrcScalarPerVector,
+        /* index_t DstScalarPerVector,                    */    ABlockTransferDstScalarPerVector_K1,
+        /* index_t SrcScalarStrideInVector,               */    1,
+        /* index_t DstScalarStrideInVector,               */    1,
+        /* bool ThreadTransferSrcResetCoordinateAfterRun, */    AThreadTransferSrcResetCoordinateAfterRun,
+        /* bool ThreadTransferDstResetCoordinateAfterRun, */    true,
+                                                                NumGemmKPrefetchStage>(
+                        a_grid_desc,
+                        make_multi_index(m_block_data_idx_on_grid, k0_start_index_on_block, 0),
+                        a_element_op,
+                        a_block_desc,
+                        make_multi_index(0, 0, 0),
+                        ck::tensor_operation::element_wise::PassThrough{});
 
-                return make_tuple(a_block_buf, a_blockwise_copy);
+                        return make_tuple(a_block_buf, a_blockwise_copy);
+                    }
+                    else
+                    {
+                        auto a_blockwise_copy =
+                            ThreadGroupTensorSliceTransfer_v4r1<ThisThreadBlockGrid,
+        /* typename SrcElementwiseOperation,              */    AElementwiseOperation,
+        /* typename DstElementwiseOperation,              */    ck::tensor_operation::element_wise::PassThrough,
+        /* InMemoryDataOperationEnum DstInMemOp,          */    InMemoryDataOperationEnum::Set,
+        /* typename BlockSliceLengths,                    */    Sequence<MPerBlock, K0PerBlock, ABlockTransferSrcScalarPerVector>,
+        /* typename ThreadClusterLengths,                 */    ABlockTransferThreadClusterLengths_M_K0_K1,
+        /* typename ThreadClusterArrangeOrder,            */    ABlockTransferThreadClusterArrangeOrder,
+        /* typename SrcData,                              */    ADataType,
+        /* typename DstData,                              */    ADataType,
+        /* typename SrcDesc,                              */    decltype(a_grid_desc),
+        /* typename DstDesc,                              */    decltype(a_block_desc),
+        /* typename SrcDimAccessOrder,                    */    ABlockTransferSrcAccessOrder,
+        /* typename DstDimAccessOrder,                    */    Sequence<0, 1, 2>,
+        /* index_t SrcVectorDim,                          */    ABlockTransferSrcVectorDim,
+        /* index_t DstVectorDim,                          */    2,
+        /* index_t SrcScalarPerVector,                    */    ABlockTransferSrcScalarPerVector,
+        /* index_t DstScalarPerVector,                    */    ABlockTransferDstScalarPerVector_K1,
+        /* index_t SrcScalarStrideInVector,               */    1,
+        /* index_t DstScalarStrideInVector,               */    1,
+        /* bool ThreadTransferSrcResetCoordinateAfterRun, */    AThreadTransferSrcResetCoordinateAfterRun,
+        /* bool ThreadTransferDstResetCoordinateAfterRun, */    true,
+                                                                NumGemmKPrefetchStage>(
+                        a_grid_desc,
+                        make_multi_index(m_block_data_idx_on_grid, 0, 0),
+                        a_element_op,
+                        a_block_desc,
+                        make_multi_index(0, 0, 0),
+                        ck::tensor_operation::element_wise::PassThrough{});
 
-               }
-                // clang-format on
+                        return make_tuple(a_block_buf, a_blockwise_copy);
+                    }
+                    // clang-format on
+                }
             }
             else
             {
@@ -2191,7 +2297,8 @@ struct GridwiseGemm_Wmma_GFX13
                         return make_tuple(a_block_buf, a_blockwise_copy);
                     }
                 }
-                else if constexpr(AMultiCastLoad != GlobalLoadTypeEnum::DEFAULT_LOAD)
+                else if constexpr(ALoadOption == TensorLoadOption::CLUSTER_MULTICAST_LOAD ||
+                                  ALoadOption == TensorLoadOption::WGP_MULTICAST_LOAD)
                 {
                     // Thread-wise copy
                     // KPerBlock/WmmaK -> MRepeat -> MWaves -> K0PerWmma -> KRow -> MPerWmma -> K1
@@ -2223,7 +2330,7 @@ struct GridwiseGemm_Wmma_GFX13
                         /*UseTileLoad               */ false,
                         /*ThreadsPerTile            */ 1,
                         /*VgprsPerTile              */ 1,
-                        /*ClusterMulticastLoad      */ AMultiCastLoad>(
+                        /*ClusterMulticastLoad      */ ALoadOption>(
                         a_grid_desc,
 
                         make_multi_index(
@@ -2319,62 +2426,103 @@ struct GridwiseGemm_Wmma_GFX13
                 // clang-format off
                 if constexpr(BEnableAsyncCopy)
                 {
-                auto b_blockwise_copy =
-                          ThreadGroupTensorSliceTransferAsync<ThisThreadBlockGrid,
- /* typename BlockSliceLengths,                    */         Sequence<NPerBlock, K0PerBlock, BBlockTransferSrcScalarPerVector>,
- /* typename ThreadClusterLengths,                 */         BBlockTransferThreadClusterLengths_N_K0_K1,
- /* typename ThreadClusterArrangeOrder,            */         BBlockTransferThreadClusterArrangeOrder,
- /* typename SrcData,                              */         BDataType,
- /* typename DstData,                              */         BDataType,
- /* typename SrcDesc,                              */         decltype(b_grid_desc),
- /* typename DstDesc,                              */         decltype(b_block_desc),
- /* index_t SrcVectorDim,                          */         BBlockTransferSrcVectorDim,
- /* index_t DstVectorDim,                          */         2,
- /* index_t SrcScalarPerVector,                    */         BBlockTransferSrcScalarPerVector,
-                                                              false,
-                                                              true>(
-                   b_grid_desc,
-                   make_multi_index(n_block_data_idx_on_grid, 0, 0),
-                   b_block_desc,
-                   make_multi_index(0, 0, 0));
+                    auto b_blockwise_copy =
+                            ThreadGroupTensorSliceTransferAsync<ThisThreadBlockGrid,
+    /* typename BlockSliceLengths,                    */         Sequence<NPerBlock, K0PerBlock, BBlockTransferSrcScalarPerVector>,
+    /* typename ThreadClusterLengths,                 */         BBlockTransferThreadClusterLengths_N_K0_K1,
+    /* typename ThreadClusterArrangeOrder,            */         BBlockTransferThreadClusterArrangeOrder,
+    /* typename SrcData,                              */         BDataType,
+    /* typename DstData,                              */         BDataType,
+    /* typename SrcDesc,                              */         decltype(b_grid_desc),
+    /* typename DstDesc,                              */         decltype(b_block_desc),
+    /* index_t SrcVectorDim,                          */         BBlockTransferSrcVectorDim,
+    /* index_t DstVectorDim,                          */         2,
+    /* index_t SrcScalarPerVector,                    */         BBlockTransferSrcScalarPerVector,
+                                                                false,
+                                                                true>(
+                    b_grid_desc,
+                    make_multi_index(n_block_data_idx_on_grid, 0, 0),
+                    b_block_desc,
+                    make_multi_index(0, 0, 0));
 
-                return make_tuple(b_block_buf, b_blockwise_copy);
+                    return make_tuple(b_block_buf, b_blockwise_copy);
                 }
                 else
                 {
-                auto b_blockwise_copy =
-                    ThreadGroupTensorSliceTransfer_v4r1<ThisThreadBlockGrid,
-                                                        BElementwiseOperation,
-                                                        ck::tensor_operation::element_wise::PassThrough,
-                                                        InMemoryDataOperationEnum::Set,
-                                                        Sequence<NPerBlock, K0PerBlock, BBlockTransferSrcScalarPerVector>,
-                                                        BBlockTransferThreadClusterLengths_N_K0_K1,
-                                                        BBlockTransferThreadClusterArrangeOrder,
-                                                        BDataType,
-                                                        BDataType,
-                                                        decltype(b_grid_desc),
-                                                        decltype(b_block_desc),
-                                                        BBlockTransferSrcAccessOrder,
-                                                        Sequence<0, 1, 2>,
-                                                        BBlockTransferSrcVectorDim,
-                                                        2,
-                                                        BBlockTransferSrcScalarPerVector,
-                                                        BBlockTransferDstScalarPerVector_K1,
-                                                        1,
-                                                        1,
-                                                        BThreadTransferSrcResetCoordinateAfterRun,
-                                                        true,
-                                                        NumGemmKPrefetchStage>(
-                    b_grid_desc,
-                    make_multi_index(n_block_data_idx_on_grid, 0, 0),
-                    b_element_op,
-                    b_block_desc,
-                    make_multi_index(0, 0, 0),
-                    ck::tensor_operation::element_wise::PassThrough{});
+                    if constexpr(BLoadOption == TensorLoadOption::CLUSTER_DDS_LOAD)
+                    {
+                        auto k1 = b_grid_desc.GetLength(I2);
+                        const index_t mk_block_data_idx_on_grid = __builtin_amdgcn_readfirstlane((block_work_idx[I0] % BClusterSize) * MPerBlock);
+                        const index_t k0_start_index_on_block = mk_block_data_idx_on_grid / k1;
 
-                return make_tuple(b_block_buf, b_blockwise_copy);
+                        auto b_blockwise_copy =
+                            ThreadGroupTensorSliceTransfer_v4r1<ThisThreadBlockGrid,
+                                                                BElementwiseOperation,
+                                                                ck::tensor_operation::element_wise::PassThrough,
+                                                                InMemoryDataOperationEnum::Set,
+                                                                Sequence<NPerBlock, K0PerBlock, BBlockTransferSrcScalarPerVector>,
+                                                                BBlockTransferThreadClusterLengths_N_K0_K1,
+                                                                BBlockTransferThreadClusterArrangeOrder,
+                                                                BDataType,
+                                                                BDataType,
+                                                                decltype(b_grid_desc),
+                                                                decltype(b_block_desc),
+                                                                BBlockTransferSrcAccessOrder,
+                                                                Sequence<0, 1, 2>,
+                                                                BBlockTransferSrcVectorDim,
+                                                                2,
+                                                                BBlockTransferSrcScalarPerVector,
+                                                                BBlockTransferDstScalarPerVector_K1,
+                                                                1,
+                                                                1,
+                                                                BThreadTransferSrcResetCoordinateAfterRun,
+                                                                true,
+                                                                NumGemmKPrefetchStage>(
+                            b_grid_desc,
+                            make_multi_index(n_block_data_idx_on_grid, k0_start_index_on_block, 0),
+                            b_element_op,
+                            b_block_desc,
+                            make_multi_index(0, 0, 0),
+                            ck::tensor_operation::element_wise::PassThrough{});
+
+                        return make_tuple(b_block_buf, b_blockwise_copy);
+                    }
+                    else
+                    {
+                        auto b_blockwise_copy =
+                            ThreadGroupTensorSliceTransfer_v4r1<ThisThreadBlockGrid,
+                                                                BElementwiseOperation,
+                                                                ck::tensor_operation::element_wise::PassThrough,
+                                                                InMemoryDataOperationEnum::Set,
+                                                                Sequence<NPerBlock, K0PerBlock, BBlockTransferSrcScalarPerVector>,
+                                                                BBlockTransferThreadClusterLengths_N_K0_K1,
+                                                                BBlockTransferThreadClusterArrangeOrder,
+                                                                BDataType,
+                                                                BDataType,
+                                                                decltype(b_grid_desc),
+                                                                decltype(b_block_desc),
+                                                                BBlockTransferSrcAccessOrder,
+                                                                Sequence<0, 1, 2>,
+                                                                BBlockTransferSrcVectorDim,
+                                                                2,
+                                                                BBlockTransferSrcScalarPerVector,
+                                                                BBlockTransferDstScalarPerVector_K1,
+                                                                1,
+                                                                1,
+                                                                BThreadTransferSrcResetCoordinateAfterRun,
+                                                                true,
+                                                                NumGemmKPrefetchStage>(
+                            b_grid_desc,
+                            make_multi_index(n_block_data_idx_on_grid, 0, 0),
+                            b_element_op,
+                            b_block_desc,
+                            make_multi_index(0, 0, 0),
+                            ck::tensor_operation::element_wise::PassThrough{});
+
+                        return make_tuple(b_block_buf, b_blockwise_copy);
+                    }
+                    // clang-format on
                 }
-                // clang-format on
             }
             else
             {
@@ -2478,7 +2626,8 @@ struct GridwiseGemm_Wmma_GFX13
                         return make_tuple(b_block_buf, b_blockwise_copy);
                     }
                 }
-                else if constexpr(BMultiCastLoad != GlobalLoadTypeEnum::DEFAULT_LOAD)
+                else if constexpr(BLoadOption == TensorLoadOption::CLUSTER_MULTICAST_LOAD ||
+                                  BLoadOption == TensorLoadOption::WGP_MULTICAST_LOAD)
                 {
                     // Thread-wise copy
                     // KPerBlock/WmmaK -> NRepeat -> NWaves -> WmmaK/K1 -> NPerWmma -> K1
@@ -2509,7 +2658,7 @@ struct GridwiseGemm_Wmma_GFX13
                         /*UseTileLoad                */ false,
                         /*ThreadsPerTile             */ 1,
                         /*VgprsPerTile               */ 1,
-                        /*ClusterMulticastLoad       */ BMultiCastLoad>(
+                        /*ClusterMulticastLoad       */ BLoadOption>(
                         b_grid_desc,
                         make_multi_index(0,
                                          n_block_data_idx_on_grid / (NWaves * NPerWmma * NRepeat),
@@ -2598,23 +2747,29 @@ struct GridwiseGemm_Wmma_GFX13
         // GEMM
         constexpr auto KPack = math::integer_least_multiple(K1, WmmaK);
 
-        auto blockwise_gemm = BlockwiseGemmWMMA<ThisThreadBlockGrid,
-                                                ADataType,
-                                                BDataType,
-                                                AccDataType,
-                                                decltype(MakeAWaveDescriptor(a_block_wmma_desc)),
-                                                decltype(MakeBWaveDescriptor(b_block_wmma_desc)),
-                                                MPerBlock,
-                                                NPerBlock,
-                                                KPerBlock,
-                                                MPerWmma,
-                                                NPerWmma,
-                                                KPerWmma,
-                                                MRepeat,
-                                                NRepeat,
-                                                KPack,
-                                                AEnableLds,
-                                                BEnableLds>{};
+        auto blockwise_gemm =
+            BlockwiseGemmWMMA<ThisThreadBlockGrid,
+                              ADataType,
+                              BDataType,
+                              AccDataType,
+                              decltype(MakeAWaveDescriptor(a_block_wmma_desc)),
+                              decltype(MakeBWaveDescriptor(b_block_wmma_desc)),
+                              MPerBlock,
+                              NPerBlock,
+                              KPerBlock,
+                              MPerWmma,
+                              NPerWmma,
+                              KPerWmma,
+                              MRepeat,
+                              NRepeat,
+                              KPack,
+                              AEnableLds,
+                              BEnableLds,
+                              false, // APermute
+                              false, // BPermute
+                              false, // Transpose C
+                              ALoadOption == TensorLoadOption::CLUSTER_DDS_LOAD,
+                              BLoadOption == TensorLoadOption::CLUSTER_DDS_LOAD>{};
         // Prepare Register for C matrix
         auto c_thread_buf = blockwise_gemm.GetCThreadBuffer();
 
@@ -2634,21 +2789,49 @@ struct GridwiseGemm_Wmma_GFX13
                 barrier_output.join();
             }
         }
-        GridwiseGemmPipe::template Run<HasMainKBlockLoop>(a_grid_desc,
-                                                          a_block_desc,
-                                                          a_blockwise_copy,
-                                                          a_grid_buf,
-                                                          a_block_buf,
-                                                          a_block_slice_copy_step,
-                                                          b_grid_desc,
-                                                          b_block_desc,
-                                                          b_blockwise_copy,
-                                                          b_grid_buf,
-                                                          b_block_buf,
-                                                          b_block_slice_copy_step,
-                                                          blockwise_gemm,
-                                                          c_thread_buf,
-                                                          KBlockMainLoop);
+
+        if constexpr(ALoadOption == TensorLoadOption::CLUSTER_DDS_LOAD ||
+                     ALoadOption == TensorLoadOption::CLUSTER_MULTICAST_LOAD ||
+                     BLoadOption == TensorLoadOption::CLUSTER_DDS_LOAD ||
+                     BLoadOption == TensorLoadOption::CLUSTER_MULTICAST_LOAD)
+        {
+            GridwiseGemmPipe::template Run<HasMainKBlockLoop>(a_grid_desc,
+                                                              a_block_desc,
+                                                              a_blockwise_copy,
+                                                              a_grid_buf,
+                                                              a_block_buf,
+                                                              a_block_slice_copy_step,
+                                                              b_grid_desc,
+                                                              b_block_desc,
+                                                              b_blockwise_copy,
+                                                              b_grid_buf,
+                                                              b_block_buf,
+                                                              b_block_slice_copy_step,
+                                                              blockwise_gemm,
+                                                              c_thread_buf,
+                                                              KBlockMainLoop,
+                                                              AClusterSize,
+                                                              BClusterSize);
+        }
+        else
+        {
+            GridwiseGemmPipe::template Run<HasMainKBlockLoop>(a_grid_desc,
+                                                              a_block_desc,
+                                                              a_blockwise_copy,
+                                                              a_grid_buf,
+                                                              a_block_buf,
+                                                              a_block_slice_copy_step,
+                                                              b_grid_desc,
+                                                              b_block_desc,
+                                                              b_blockwise_copy,
+                                                              b_grid_buf,
+                                                              b_block_buf,
+                                                              b_block_slice_copy_step,
+                                                              blockwise_gemm,
+                                                              c_thread_buf,
+                                                              KBlockMainLoop);
+        }
+
         /*******************************************************************************/
         if(EnableWaveGroup == false || get_wave_id_in_wavegroup() == WaveIdRun)
         {

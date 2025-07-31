@@ -332,11 +332,13 @@ enum struct AmdBufferCoherenceEnum
     SYSTEM_NT1 = 11,
 };
 
-enum struct GlobalLoadTypeEnum
+// To do: need refactor as a tuple for combination load
+enum struct TensorLoadOption
 {
     DEFAULT_LOAD           = 0,
     CLUSTER_MULTICAST_LOAD = 1,
     WGP_MULTICAST_LOAD     = 2,
+    CLUSTER_DDS_LOAD       = 3,
 };
 
 template <index_t N, AmdBufferCoherenceEnum coherence = AmdBufferCoherenceEnum::DefaultCoherence>

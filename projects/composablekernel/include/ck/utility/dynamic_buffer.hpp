@@ -119,7 +119,11 @@ struct DynamicBuffer
 
                 return tmp;
 #else
-                return *c_style_pointer_cast<const X*>(&p_data_[i]);
+                const int wgRank = __builtin_amdgcn_cluster_workgroup_flat_id();
+                auto ptr =
+                    c_style_pointer_cast<__attribute__((address_space(3))) void*>(&p_data_[i]);
+                auto ptr_swizzle = __builtin_amdgcn_map_shared_rank(ptr, wgRank);
+                return *c_style_pointer_cast<const X*>(ptr_swizzle);
 #endif
             }
             else
@@ -186,6 +190,44 @@ struct DynamicBuffer
             else
             {
                 this->template Set<X>(i, is_valid_element, x + tmp);
+            }
+        }
+    }
+
+    template <typename X,
+              typename enable_if<is_same<typename scalar_type<remove_cvref_t<X>>::type,
+                                         typename scalar_type<remove_cvref_t<T>>::type>::value ||
+                                     !is_native_type<X>(),
+                                 bool>::type = false>
+    __host__ __device__ constexpr auto
+    ddsLoad(const index_t map_rank_id, IndexType i, bool is_valid_element) const
+    {
+        // X contains multiple T
+        constexpr index_t scalar_per_t_vector = scalar_type<remove_cvref_t<T>>::vector_size;
+
+        constexpr index_t scalar_per_x_vector = scalar_type<remove_cvref_t<X>>::vector_size;
+
+        static_assert(scalar_per_x_vector % scalar_per_t_vector == 0,
+                      "wrong! X should contain multiple T");
+
+        static_assert(GetAddressSpace() == AddressSpaceEnum::Lds,
+                      "The address space is not supported for dds_load");
+
+        if(is_valid_element)
+        {
+            auto ptr = c_style_pointer_cast<__attribute__((address_space(3))) void*>(&p_data_[i]);
+            auto ptr_swizzle = __builtin_amdgcn_map_shared_rank(ptr, map_rank_id);
+            return *c_style_pointer_cast<const X*>(ptr_swizzle);
+        }
+        else
+        {
+            if constexpr(InvalidElementUseNumericalZeroValue)
+            {
+                return X{0};
+            }
+            else
+            {
+                return X{invalid_element_value_};
             }
         }
     }

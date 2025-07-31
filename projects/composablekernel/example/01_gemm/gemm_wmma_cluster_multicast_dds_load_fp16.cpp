@@ -9,7 +9,7 @@ using ADataType        = ck::half_t;
 using BDataType        = ck::half_t;
 using AccDataType      = float;
 using CShuffleDataType = float;
-using CDataType        = float;
+using CDataType        = ck::half_t;
 
 using ALayout = Row;
 using BLayout = Col;
@@ -35,57 +35,48 @@ using DeviceGemmInstance = ck::tensor_operation::device::DeviceGemmWmma_GFX13
            BElementOp,
            CElementOp,
            GemmDefault,
-           1,            // Prefetch stage
-           256,          // BlockSize
-           64,           // MPerBlock
-           128,          // NPerBlock
-           64,           // KPerBlock
+           1,      // Prefetch stage
+           32, //128,    // BlockSize
+           16, //64,     // MPerBlock
+           16, //128,    // NPerBlock
+           16, //64,     // KPerBlock
            2,            // K1
            16,           // MPerWmma
            16,           // NPerWmma
            16,           // KPerWmma
-           2,            // M-Repeat // M-PerWmma / M-Repeat = M-Wave
-           4,            // N-Repeat // N-PerWmma / N-Repeat = N-Wave
-           S<32, 4, 1>,  // M-K0-K1
+           1, //2,       // M-Repeat // M-PerWmma / M-Repeat = M-Wave
+           1, //4,       // N-Repeat // N-PerWmma / N-Repeat = N-Wave
+           S<8, 4, 1>, //S<32, 4, 1>,
            S<0, 1, 2>,
            S<0, 1, 2>,
            2,
-#ifdef GEMM_A_DISABLE_LDS
            2,
            2,
-#else
-           8,
-           8,
-#endif
            false,
            false,
-           false,
-           false,
-           ck::TensorLoadOption::DEFAULT_LOAD,
-           1,
-           S<32, 4, 1>,
+           false,  // AEnableGlobalTRLoad
+           false,  // AEnableGlobalTiledLoad
+           ck::TensorLoadOption::CLUSTER_MULTICAST_LOAD,
+           2,      // A_cluster_size = 2
+           S<8, 4, 1>, //S<32, 4, 1>,
            S<0, 1, 2>,
            S<0, 1, 2>,
            2,
-#ifdef GEMM_B_DISABLE_LDS
            2,
            2,
-#else
-           8,
-           8,
-#endif
            false,
+           false, // BBlockLdsAsyncCopy
+           false, // BEnableGlobalTRLoad
+           false, // BEnableGlobalTiledLoad
+           //ck::TensorLoadOption::DEFAULT_LOAD,
+           ck::TensorLoadOption::CLUSTER_DDS_LOAD,
+           2,     // B_cluster_size = 2
+           1,     // C shuffle (M Repeat) Per store
+           1,     // C shuffle (N Repeat) Per store
+           S<1, 8, 1, 4>,//S<1, 32, 1, 4>,
+           4,
            false,
-           false,
-           false,
-           ck::TensorLoadOption::DEFAULT_LOAD,
-           1,
-           1,           // C shuffle (M Repeat) Per store
-           1,           // C shuffle (N Repeat) Per store
-           S<1, 32, 1, 4>,
-           2,
-           false,
-           true,
+           false, //EnableWaveGroup
            ck::LoopScheduler::Default,
            ck::PipelineVersion::v1>;
 // clang-format on
