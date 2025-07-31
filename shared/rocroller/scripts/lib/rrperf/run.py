@@ -44,6 +44,17 @@ import rrperf
 renames = {
     "hipblaslt-Gflops": "gflops",
     "hipblaslt-GB/s": "gbs",
+    "type_A": "a_type",
+    "type_B": "b_type",
+    "type_C": "c_type",
+    "type_D": "d_type",
+    "trans_A": "transA",
+    "trans_B": "transB",
+    "M": "m",
+    "N": "n",
+    "K": "k",
+    "scale_A": "scaleA",
+    "scale_B": "scaleB",
 }
 
 included_headers = [
