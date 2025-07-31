@@ -39,6 +39,7 @@
 #include <rocRoller/KernelGraph/Utils.hpp>
 #include <rocRoller/KernelGraph/Transforms/LowerTile_details.hpp>
 
+
 namespace rocRoller::KernelGraph
 {
     using namespace CoordinateGraph;
@@ -732,50 +733,64 @@ namespace rocRoller::KernelGraph
                   == 1;
 
 
-                // Set required coordinates
-                Transformer coords(&graph.coordinates);
+                // 1. Set register coordinates
+                Transformer xform(&graph.coordinates);
+
+                auto const maybeForLoop = findContainingOperation<ForLoopOp>(op, graph);
                 auto increment        = info.coord;
                 auto fullStop  = [&](int tag) { return tag == increment; };
                 auto [required, path] = findRequiredCoordinates(target, direction, fullStop, graph);
-                auto const maybeInForLoop = findContainingOperation<ForLoopOp>(op, graph).has_value();
-
                 std::map<int, Expression::ExpressionPtr> regCoords;
-                auto isRegisterDim = [&maybeInForLoop](auto dim) -> bool {
+                auto isRegisterDim = [&maybeForLoop](auto dim) -> bool {
                     using T = std::decay_t<decltype(dim)>;
-                    if (maybeInForLoop)
+                    if (maybeForLoop)
                         return CIsAnyOf<T, Wavefront, Workitem, Workgroup, ForLoop>;
                     else
                         return CIsAnyOf<T, Wavefront, Workitem, Workgroup>;
                 };
-                for(auto requiredTag : required)
+                for(auto coord : required)
                 {
-                    if(std::visit(isRegisterDim, graph.coordinates.getNode(requiredTag)))
+                    if(std::visit(isRegisterDim, graph.coordinates.getNode(coord)))
                     {
+                        auto parentCoord = coord;
+                        // if the coordinate if ForLoop, it might be a duplicate,
+                        // use the parent coordinate instead
+                        if (graph.coordinates.get<ForLoop>(coord) && maybeForLoop)
+                        {
+                                auto maybeParentForLoop = only(graph.coordinates.getInputNodeIndices(coord, rocRoller::KernelGraph::CoordinateGraph::isEdge<DataFlow>));
+                                if(maybeParentForLoop)
+                                {
+                                    parentCoord = *maybeParentForLoop;
+                                }
+     
+                        }
+
                         auto registerType = Register::Type::Vector;
                         auto coordDF
                             = std::make_shared<Expression::Expression>(Expression::DataFlowTag{
-                                requiredTag, registerType, DataType::UInt32});
-                        regCoords[requiredTag] = coordDF;
+                                parentCoord, registerType, DataType::UInt32});
+                        regCoords[coord] = coordDF;
                     }
                 }
-                for(auto const& [regCoord, expr] : regCoords)
+                for(auto const& [coord, expr] : regCoords)
                 {
-                    coords.setCoordinate(regCoord, expr);
+                    if (!xform.hasCoordinate(coord))
+                    xform.setCoordinate(coord, expr);
                 }
 
-                for(auto requiredTag : required)
-                    if((requiredTag  != increment) && (!coords.hasCoordinate(requiredTag )))
-                        coords.setCoordinate(requiredTag , L(0u));
+                // 2. Set remaining coordinates 
+                for(auto coord : required)
+                    if((coord  != increment) && (!xform.hasCoordinate(coord)))
+                        xform.setCoordinate(coord , L(0u));
 
-                // Set the increment coordinate to zero if it doesn't
+                // 3. Set the increment coordinate to zero if it doesn't
                 // already have a value
-                bool initializeIncrement = !coords.hasPath({target}, direction == Graph::Direction::Upstream);
+                bool initializeIncrement = !xform.hasPath({target}, direction == Graph::Direction::Upstream);
                 if(initializeIncrement)
                 {
-                    coords.setCoordinate(increment, L(0u));
+                    xform.setCoordinate(increment, L(0u));
                 }
 
-            // Assign base expression
             if(base < 0 && offset > 0)
             {
                 chain.push_back(makeAssignBase(graph,
@@ -789,7 +804,7 @@ namespace rocRoller::KernelGraph
                                                isTransposed,
                                                isDirect2LDS,
                                                context,
-                                               coords));
+                                               xform));
             }
 
             if(stride > 0)
@@ -804,7 +819,7 @@ namespace rocRoller::KernelGraph
                                                  maybeLDS,
                                                  isTransposed,
                                                  context,
-                                                 coords));
+                                                 xform));
             }
 
             // Add connections for register allocate, and so tracer
