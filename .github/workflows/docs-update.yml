@@ -88,4 +88,5 @@ jobs:
               echo "Successfully triggered RTD build for $project. Response: $response"
             else
               echo "Skipping $project - Does not exist on Read the Docs"
+            fi
           done
