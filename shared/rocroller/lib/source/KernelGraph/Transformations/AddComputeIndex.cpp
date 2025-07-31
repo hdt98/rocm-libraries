@@ -39,6 +39,8 @@
 #include <rocRoller/KernelGraph/Utils.hpp>
 #include <rocRoller/KernelGraph/Transforms/LowerTile_details.hpp>
 
+#include <rocRoller/KernelGraph/Transforms/LoadPacked_detail.hpp>
+
 
 namespace rocRoller::KernelGraph
 {
@@ -735,6 +737,11 @@ namespace rocRoller::KernelGraph
 
                 // 1. Set register coordinates
                 Transformer xform(&graph.coordinates);
+
+                // test: set static coordinates
+                auto staticCoords = LoadPackedDetail::getStaticCoords(op, graph);
+                for(auto const& [coord, expr] : staticCoords)
+                    xform.setCoordinate(coord, expr);
 
                 auto const maybeForLoop = findContainingOperation<ForLoopOp>(op, graph);
                 auto increment        = info.coord;
