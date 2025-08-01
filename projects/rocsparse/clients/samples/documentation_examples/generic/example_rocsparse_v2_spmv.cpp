@@ -55,38 +55,38 @@ int main()
     int m = 4;
     int n = 6;
 
-    std::vector<int>   hcsr_row_ptr = {0, 2, 4, 7, 9};
-    std::vector<int>   hcsr_col_ind = {0, 1, 1, 2, 0, 3, 4, 2, 4};
-    std::vector<float> hcsr_val     = {1, 4, 2, 3, 5, 7, 8, 9, 6};
-    std::vector<float> hx(n, 1.0f);
-    std::vector<float> hy(m, 0.0f);
+    std::vector<int>    hcsr_row_ptr = {0, 2, 4, 7, 9};
+    std::vector<int>    hcsr_col_ind = {0, 1, 1, 2, 0, 3, 4, 2, 4};
+    std::vector<float>  hcsr_val     = {1, 4, 2, 3, 5, 7, 8, 9, 6};
+    std::vector<double> hx(n, 1.0f);
+    std::vector<double> hy(m, 0.0f);
 
     // Scalar alpha
-    float alpha = 3.7f;
+    double alpha = 3.7f;
 
     // Scalar beta
-    float beta = 0.0f;
+    double beta = 0.0f;
 
     int nnz = hcsr_row_ptr[m] - hcsr_row_ptr[0];
 
     // Offload data to device
-    int*   dcsr_row_ptr;
-    int*   dcsr_col_ind;
-    float* dcsr_val;
-    float* dx;
-    float* dy;
+    int*    dcsr_row_ptr;
+    int*    dcsr_col_ind;
+    float*  dcsr_val;
+    double* dx;
+    double* dy;
     HIP_CHECK(hipMalloc(&dcsr_row_ptr, sizeof(int) * (m + 1)));
     HIP_CHECK(hipMalloc(&dcsr_col_ind, sizeof(int) * nnz));
     HIP_CHECK(hipMalloc(&dcsr_val, sizeof(float) * nnz));
-    HIP_CHECK(hipMalloc(&dx, sizeof(float) * n));
-    HIP_CHECK(hipMalloc(&dy, sizeof(float) * m));
+    HIP_CHECK(hipMalloc(&dx, sizeof(double) * n));
+    HIP_CHECK(hipMalloc(&dy, sizeof(double) * m));
 
     HIP_CHECK(
         hipMemcpy(dcsr_row_ptr, hcsr_row_ptr.data(), sizeof(int) * (m + 1), hipMemcpyHostToDevice));
     HIP_CHECK(
         hipMemcpy(dcsr_col_ind, hcsr_col_ind.data(), sizeof(int) * nnz, hipMemcpyHostToDevice));
     HIP_CHECK(hipMemcpy(dcsr_val, hcsr_val.data(), sizeof(float) * nnz, hipMemcpyHostToDevice));
-    HIP_CHECK(hipMemcpy(dx, hx.data(), sizeof(float) * n, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(dx, hx.data(), sizeof(double) * n, hipMemcpyHostToDevice));
 
     rocsparse_handle      handle;
     rocsparse_error       p_error[1] = {};
@@ -115,10 +115,10 @@ int main()
                                                data_type));
 
     // Create dense vector X
-    ROCSPARSE_CHECK(rocsparse_create_dnvec_descr(&vecX, n, dx, data_type));
+    ROCSPARSE_CHECK(rocsparse_create_dnvec_descr(&vecX, n, dx, rocsparse_datatype_f64_r));
 
     // Create dense vector Y
-    ROCSPARSE_CHECK(rocsparse_create_dnvec_descr(&vecY, m, dy, data_type));
+    ROCSPARSE_CHECK(rocsparse_create_dnvec_descr(&vecY, m, dy, rocsparse_datatype_f64_r));
 
     rocsparse_spmv_descr spmv_descr;
     ROCSPARSE_CHECK(rocsparse_create_spmv_descr(&spmv_descr));
@@ -135,7 +135,7 @@ int main()
                                              sizeof(spmv_operation),
                                              p_error));
 
-    const rocsparse_datatype spmv_scalar_datatype = rocsparse_datatype_f32_r;
+    const rocsparse_datatype spmv_scalar_datatype = rocsparse_datatype_f64_r;
     ROCSPARSE_CHECK(rocsparse_spmv_set_input(handle,
                                              spmv_descr,
                                              rocsparse_spmv_input_scalar_datatype,
@@ -210,7 +210,7 @@ int main()
     ROCSPARSE_CHECK(rocsparse_destroy_spmv_descr(spmv_descr));
 
     // Copy result back to host
-    HIP_CHECK(hipMemcpy(hy.data(), dy, sizeof(float) * m, hipMemcpyDeviceToHost));
+    HIP_CHECK(hipMemcpy(hy.data(), dy, sizeof(double) * m, hipMemcpyDeviceToHost));
 
     // Clear rocSPARSE
     ROCSPARSE_CHECK(rocsparse_destroy_spmat_descr(matA));

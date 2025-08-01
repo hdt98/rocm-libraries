@@ -175,9 +175,9 @@ int main()
 
     // Set alpha and beta.
     ROCSPARSE_CHECK(rocsparse_spgeam_set_input(
-        handle, descr, rocsparse_spgeam_input_scalar_alpha, &alpha, sizeof(alpha), p_error));
+        handle, descr, rocsparse_spgeam_input_scalar_alpha, &alpha, sizeof(&alpha), p_error));
     ROCSPARSE_CHECK(rocsparse_spgeam_set_input(
-        handle, descr, rocsparse_spgeam_input_scalar_beta, &beta, sizeof(beta), p_error));
+        handle, descr, rocsparse_spgeam_input_scalar_beta, &beta, sizeof(&beta), p_error));
 
     // Set the compute type on the descriptor
     const rocsparse_datatype compute_datatype = rocsparse_datatype_f32_r;

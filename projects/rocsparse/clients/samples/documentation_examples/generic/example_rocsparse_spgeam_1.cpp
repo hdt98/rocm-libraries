@@ -246,9 +246,9 @@ int main()
 
     // Set alpha and beta
     ROCSPARSE_CHECK(rocsparse_spgeam_set_input(
-        handle, descr, rocsparse_spgeam_input_scalar_alpha, &alpha, sizeof(alpha), p_error));
+        handle, descr, rocsparse_spgeam_input_scalar_alpha, &alpha, sizeof(&alpha), p_error));
     ROCSPARSE_CHECK(rocsparse_spgeam_set_input(
-        handle, descr, rocsparse_spgeam_input_scalar_beta, &beta, sizeof(beta), p_error));
+        handle, descr, rocsparse_spgeam_input_scalar_beta, &beta, sizeof(&beta), p_error));
 
     HIP_CHECK(hipMalloc(&buffer, buffer_size_in_bytes));
     ROCSPARSE_CHECK(rocsparse_spgeam(handle,
@@ -273,6 +273,26 @@ int main()
         hcsr_col_ind_C.data(), dcsr_col_ind_C, sizeof(int) * nnz_C, hipMemcpyDeviceToHost));
     HIP_CHECK(
         hipMemcpy(hcsr_val_C.data(), dcsr_val_C, sizeof(float) * nnz_C, hipMemcpyDeviceToHost));
+
+    std::cout << "C" << std::endl;
+    for(int i = 0; i < m; i++)
+    {
+        int start = hcsr_row_ptr_C[i];
+        int end   = hcsr_row_ptr_C[i + 1];
+
+        std::vector<float> htemp(n, 0.0f);
+        for(int j = start; j < end; j++)
+        {
+            htemp[hcsr_col_ind_C[j]] = hcsr_val_C[j];
+        }
+
+        for(int j = 0; j < n; j++)
+        {
+            std::cout << htemp[j] << " ";
+        }
+        std::cout << "" << std::endl;
+    }
+    std::cout << "" << std::endl;
 
     // Destroy matrix descriptors
     ROCSPARSE_CHECK(rocsparse_destroy_spmat_descr(matA));
