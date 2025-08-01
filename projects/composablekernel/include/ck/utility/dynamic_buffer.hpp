@@ -119,11 +119,7 @@ struct DynamicBuffer
 
                 return tmp;
 #else
-                const int wgRank = __builtin_amdgcn_cluster_workgroup_flat_id();
-                auto ptr =
-                    c_style_pointer_cast<__attribute__((address_space(3))) void*>(&p_data_[i]);
-                auto ptr_swizzle = __builtin_amdgcn_map_shared_rank(ptr, wgRank);
-                return *c_style_pointer_cast<const X*>(ptr_swizzle);
+                return *c_style_pointer_cast<const X*>(&p_data_[i]);
 #endif
             }
             else
