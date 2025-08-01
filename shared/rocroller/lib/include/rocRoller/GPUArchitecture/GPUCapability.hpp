@@ -129,6 +129,8 @@ namespace rocRoller
             HasBlockScaling16,
             DefaultScaleBlockSize,
             HasE8M0Scale,
+            HasE5M3Scale,
+            HasE4M3Scale,
 
             HasXnack,
 
