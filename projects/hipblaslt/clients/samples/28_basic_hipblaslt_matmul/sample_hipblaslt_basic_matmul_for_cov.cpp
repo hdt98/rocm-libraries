@@ -90,25 +90,6 @@
                           int64_t            max_workspace_size,
                           hipStream_t        stream)
  {
-    // using InTypeA   = hipblasLtHalf;
-    // using InTypeB   = hipblasLtHalf;
-    // using OutType   = hipblasLtHalf;
-    // using AlphaType = hipblasLtFloat;
-    // using BetaType  = hipblasLtFloat;
-    // hipStream_t        stream;
-    // hipblasLtHandle_t  handle;
-    // hipblasOperation_t trans_a     = HIPBLAS_OP_N;
-    // hipblasOperation_t trans_b     = HIPBLAS_OP_T;
-    // int64_t            m           = arg.M[0];
-    // int64_t            n           = arg.N[0];
-    // int64_t            k           = arg.K[0];
-    // int64_t            batch_count = 1;
-    // float              alpha       = arg.alpha;
-    // float              beta        = arg.beta;
-    // void*              d_a;
-    // void*              d_b;
-    // void*              d_c;
-    // void*              d_d;
     void*              a;
     void*              b;
     void*              c;
