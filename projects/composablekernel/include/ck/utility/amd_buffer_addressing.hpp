@@ -1527,7 +1527,7 @@ amd_wgp_multicast_load_to_vgpr(__attribute__((address_space(1))) const T* in_ptr
             __attribute__((address_space(10))) int32_t* lane_vgpr_ptr =
                 reinterpret_cast<__attribute__((address_space(10))) int32_t*>(
                     reinterpret_cast<uintptr_t>(&out));
-            __builtin_amdgcn_load_mcast_b32(lane_vgpr_ptr, global_ptr, 10, 0xf << 16);
+            __builtin_amdgcn_load_mcast_b32(lane_vgpr_ptr, global_ptr, 0, 0x3 << 18);
         }
         else if constexpr(is_same_v<remove_cvref_t<T>, ck::half_t> && N == 4)
         {
@@ -1538,7 +1538,7 @@ amd_wgp_multicast_load_to_vgpr(__attribute__((address_space(1))) const T* in_ptr
             __attribute__((address_space(10))) int32x2_t* lane_vgpr_ptr =
                 reinterpret_cast<__attribute__((address_space(10))) int32x2_t*>(
                     reinterpret_cast<uintptr_t>(&out));
-            __builtin_amdgcn_load_mcast_b64(lane_vgpr_ptr, global_ptr, 10, 0xf << 16);
+            __builtin_amdgcn_load_mcast_b64(lane_vgpr_ptr, global_ptr, 0, 0x3 << 18);
         }
         else if constexpr(is_same_v<remove_cvref_t<T>, ck::half_t> && N == 8)
         {
@@ -1549,7 +1549,7 @@ amd_wgp_multicast_load_to_vgpr(__attribute__((address_space(1))) const T* in_ptr
             __attribute__((address_space(10))) int32x4_t* lane_vgpr_ptr =
                 reinterpret_cast<__attribute__((address_space(10))) int32x4_t*>(
                     reinterpret_cast<uintptr_t>(&out));
-            __builtin_amdgcn_load_mcast_b128(lane_vgpr_ptr, global_ptr, 10, 0xf << 16);
+            __builtin_amdgcn_load_mcast_b128(lane_vgpr_ptr, global_ptr, 0, 0x3 << 18);
         }
         else
         {
