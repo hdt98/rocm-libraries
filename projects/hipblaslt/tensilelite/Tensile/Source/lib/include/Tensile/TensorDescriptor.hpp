@@ -284,7 +284,7 @@ namespace TensileLite
 
             if(Debug::Instance().printTensorInfo())
             {
-#ifndef CODE_COVERAGE
+#ifndef HIPBLASLT_CODE_COVERAGE
                 std::cout << "TensorDescriptor:calculate  " << *this
                           << "totalLogicalElements=" << m_totalLogicalElements
                           << " totalAllocatedElem=" << m_totalAllocatedElements << "\n";

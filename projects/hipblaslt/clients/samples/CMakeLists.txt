@@ -62,7 +62,7 @@ add_executable( sample_hipblaslt_gemm_bias_swizzle_a_ext 25_gemm_swizzle_a/sampl
 add_executable( sample_hipblaslt_weight_swizzle_padding 25_gemm_swizzle_a/sample_hipblaslt_weight_swizzle_padding.cpp)
 add_executable( sample_hipblaslt_gemm_swish_bias 26_gemm_swish_bias/sample_hipblaslt_gemm_swish_bias.cpp)
 add_executable( sample_hipblaslt_gemm_clamp_bias 27_gemm_clamp_bias/sample_hipblaslt_gemm_clamp_bias.cpp)
-
+add_executable( sample_hipblaslt_basic_matmul_for_cov 28_basic_hipblaslt_matmul/sample_hipblaslt_basic_matmul_for_cov.cpp)
 
 set(samples sample_hipblaslt_gemm
             sample_hipblaslt_gemm_ext
@@ -103,7 +103,8 @@ set(samples sample_hipblaslt_gemm
             sample_hipblaslt_gemm_bias_swizzle_a_ext
             sample_hipblaslt_weight_swizzle_padding
             sample_hipblaslt_gemm_swish_bias
-            sample_hipblaslt_gemm_clamp_bias)
+            sample_hipblaslt_gemm_clamp_bias
+            sample_hipblaslt_basic_matmul_for_cov)
 
 set( sample_list_all ${samples})
 

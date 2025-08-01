@@ -302,6 +302,7 @@ catch(...)
 {
     return exception_to_hipblas_status();
 }
+
 hipblasStatus_t hipblasLtMatmulDescGetAttribute(hipblasLtMatmulDesc_t           matmulDesc,
                                                 hipblasLtMatmulDescAttributes_t matmulAttr,
                                                 void*                           buf,

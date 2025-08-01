@@ -33,8 +33,25 @@
 #include "hipblaslt_random.hpp"
 #include "hipblaslt_test.hpp"
 #include "hipblaslt_vector.hpp"
+<<<<<<< HEAD
+#ifdef HIPBLASLT_CODE_COVERAGE
+=======
+#ifdef CODE_COVERAGE
+>>>>>>> develop
+#include "hipblaslt_internal.hpp"
+#include "rocblaslt/utility.hpp"
+#include "rocblaslt/rocroller_host.hpp"
+#include "rocblaslt/rocblaslt_mat_utils.hpp"
+#include "rocblaslt/status.h"
+#include "rocblaslt/tensile_host.hpp"
+<<<<<<< HEAD
+#include "rocblaslt/UserDrivenTuningParser.hpp"
+=======
+>>>>>>> develop
+#endif
 #include "unit.hpp"
 #include "utility.hpp"
+#include <hipblaslt/hipblaslt-ext-op.h>
 #include <hipblaslt/hipblaslt-ext.hpp> // Add check for hipblaslt-ext
 #include <hipblaslt/hipblaslt.h>
 
@@ -64,7 +81,7 @@ void testing_aux_mat_init_bad_arg(const Arguments& arg)
     hipblasLtMatrixLayout_t m_descr;
 
     EXPECT_HIPBLAS_STATUS(hipblasLtMatrixLayoutCreate(nullptr, arg.a_type, row, col, ld),
-                          HIPBLAS_STATUS_INVALID_VALUE);
+                        HIPBLAS_STATUS_INVALID_VALUE);
 }
 
 void testing_aux_mat_init(const Arguments& arg)
@@ -858,6 +875,42 @@ void testing_aux_matmul_set_get_attr(const Arguments& arg)
     ASSERT_TRUE(computeTypeA_r == computeTypeA);
     ASSERT_TRUE(computeTypeB_r == computeTypeB);
 
+
+    // For HIPBLASLT_MATMUL_DESC_EPILOGUE_ACT_ARG0_EXT
+    float act_arg0 = 2.5f;
+    
+    // Test invalid buffer size (edge case)
+    EXPECT_HIPBLAS_STATUS(hipblasLtMatmulDescSetAttribute(
+                            matmul, HIPBLASLT_MATMUL_DESC_EPILOGUE_ACT_ARG0_EXT, &act_arg0, sizeof(float)/2),
+                        HIPBLAS_STATUS_INVALID_VALUE);
+    
+    // Test zero buffer size (edge case)
+    EXPECT_HIPBLAS_STATUS(hipblasLtMatmulDescSetAttribute(
+                            matmul, HIPBLASLT_MATMUL_DESC_EPILOGUE_ACT_ARG0_EXT, &act_arg0, 0),
+                        HIPBLAS_STATUS_INVALID_VALUE);
+    
+    // Test normal case - set activation argument 0
+    EXPECT_HIPBLAS_STATUS(hipblasLtMatmulDescSetAttribute(
+                            matmul, HIPBLASLT_MATMUL_DESC_EPILOGUE_ACT_ARG0_EXT, &act_arg0, sizeof(float)),
+                        HIPBLAS_STATUS_SUCCESS);
+    
+    // For HIPBLASLT_MATMUL_DESC_EPILOGUE_ACT_ARG1_EXT
+    float act_arg1 = 1.0f;     // Example activation argument 1
+    
+    // Test invalid buffer size (edge case)
+    EXPECT_HIPBLAS_STATUS(hipblasLtMatmulDescSetAttribute(
+                            matmul, HIPBLASLT_MATMUL_DESC_EPILOGUE_ACT_ARG1_EXT, &act_arg1, sizeof(float)/2),
+                        HIPBLAS_STATUS_INVALID_VALUE);
+    
+    // Test zero buffer size (edge case)
+    EXPECT_HIPBLAS_STATUS(hipblasLtMatmulDescSetAttribute(
+                            matmul, HIPBLASLT_MATMUL_DESC_EPILOGUE_ACT_ARG1_EXT, &act_arg1, 0),
+                        HIPBLAS_STATUS_INVALID_VALUE);
+    
+    // Test normal case - set activation argument 1
+    EXPECT_HIPBLAS_STATUS(hipblasLtMatmulDescSetAttribute(
+                            matmul, HIPBLASLT_MATMUL_DESC_EPILOGUE_ACT_ARG1_EXT, &act_arg1, sizeof(float)),
+                        HIPBLAS_STATUS_SUCCESS);
     // for default
 
     void* default_ptr;
@@ -1172,7 +1225,7 @@ void testing_aux_get_sol_with_zero_alpha_null_a_b(const Arguments& arg)
     CHECK_SOLUTION_FOUND(returnedAlgoCount);
 
     // Validation for solution running.
-    CHECK_HIPBLASLT_ERROR(hipblasLtMatmul(handle,
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatmul(handle, // here, add this to sample program with flags
                                           matmul,
                                           &alpha,
                                           d_a,
@@ -1323,7 +1376,7 @@ void testing_aux_matmul_alg_null_matmul(const Arguments& arg)
     CHECK_HIPBLASLT_ERROR(hipblasLtMatmulDescSetAttribute(
         matmul, HIPBLASLT_MATMUL_DESC_TRANSB, &trans_b, sizeof(int32_t)));
 
-    CHECK_HIPBLASLT_ERROR(hipblasLtMatmul(handle,
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatmul(handle, // here, add this to sample program with flags
                                           matmul,
                                           &alpha,
                                           d_a,
@@ -1386,6 +1439,7 @@ void testing_aux_mat_copy(const Arguments& arg)
     CHECK_HIPBLASLT_ERROR(hipblasLtMatmulDescDestroy(matmul_dest));
 }
 
+#ifdef HIPBLASLT_CODE_COVERAGE
 void testing_aux_auxiliary_func(const Arguments& arg)
 {
     // Test gpu_arch_match
@@ -1542,3 +1596,2719 @@ void testing_aux_auxiliary_func(const Arguments& arg)
     hipblasLtHalf nan = static_cast<hipblasLtHalf>(NAN);
     ASSERT_TRUE(hipblaslt_isnan(nan));
 }
+
+void testing_aux_float8_func(const Arguments& arg)
+{
+    // Test hipblaslt_float8
+    _Float16 f16 = 2.0;
+    hipblaslt_f8_fnuz f8_fnuz_data(f16);
+    ASSERT_TRUE(f16 == static_cast<_Float16>(f8_fnuz_data));
+    f8_fnuz_data.__x = 0x00;
+    ASSERT_TRUE(f8_fnuz_data.is_zero());
+    f8_fnuz_data.__x = 0x80;
+    ASSERT_TRUE(f8_fnuz_data.is_inf());
+    hipblaslt_f8_fnuz f8_fnuz_data_copy;
+    f8_fnuz_data_copy = f8_fnuz_data;
+    ASSERT_TRUE(f8_fnuz_data_copy.__x == f8_fnuz_data.__x);
+
+    // Test hipblaslt_f8
+    hipblaslt_f8 f8_data(f16);
+    ASSERT_TRUE(f16 == static_cast<_Float16>(f8_data));
+    f8_data.__x = 0x00;
+    ASSERT_TRUE(f8_data.is_zero());
+    f8_data.__x = 0x80;
+    ASSERT_TRUE(f8_data.is_inf());
+    hipblaslt_f8 f8_data_copy;
+    f8_data_copy = f8_data;
+    ASSERT_TRUE(f8_data_copy.__x == f8_data.__x);
+
+    // Test hipblaslt_bf8_fnuz
+    hipblaslt_bf8_fnuz bf8_fnuz_data(f16);
+    ASSERT_TRUE(f16 == static_cast<_Float16>(bf8_fnuz_data));
+    bf8_fnuz_data.__x = 0x00;
+    ASSERT_TRUE(bf8_fnuz_data.is_zero());
+    bf8_fnuz_data.__x = 0x80;
+    ASSERT_TRUE(bf8_fnuz_data.is_inf());
+    hipblaslt_bf8_fnuz bf8_fnuz_data_copy;
+    bf8_fnuz_data_copy = bf8_fnuz_data;
+    ASSERT_TRUE(bf8_fnuz_data_copy.__x == bf8_fnuz_data.__x);
+
+    // Test hipblaslt_bf8
+    hipblaslt_bf8 bf8_data(f16);
+    ASSERT_TRUE(f16 == static_cast<_Float16>(bf8_data));
+    bf8_data.__x = 0x00;
+    ASSERT_TRUE(bf8_data.is_zero());
+    bf8_data.__x = 0xff;
+    ASSERT_TRUE(bf8_data.is_nan());
+    bf8_data.__x = 0xfc;
+    ASSERT_TRUE(bf8_data.is_inf());
+    hipblaslt_bf8 bf8_data_copy;
+    bf8_data_copy = bf8_data;
+    ASSERT_TRUE(bf8_data_copy.__x == bf8_data.__x);
+
+    // namespace std functions
+    // Test hipblaslt_f8_fnuz sin function
+    hipblaslt_f8_fnuz f8_fnuz_sin_val(f16);
+    hipblaslt_f8_fnuz f8_fnuz_sin_val_r = std::sin(f8_fnuz_sin_val);
+    ASSERT_TRUE(f8_fnuz_sin_val_r == hipblaslt_f8_fnuz(sinf(float(f8_fnuz_sin_val))));
+    
+    // Test hipblaslt_f8_fnuz cos function
+    hipblaslt_f8_fnuz f8_fnuz_cos_val(f16);
+    hipblaslt_f8_fnuz f8_fnuz_cos_val_r = std::cos(f8_fnuz_cos_val);
+    ASSERT_TRUE(f8_fnuz_cos_val_r == hipblaslt_f8_fnuz(cosf(float(f8_fnuz_cos_val))));
+    
+    // Test hipblaslt_f8 sin function
+    hipblaslt_f8 f8_sin_val(f16);
+    hipblaslt_f8 f8_sin_val_r = std::sin(f8_sin_val);
+    ASSERT_TRUE(f8_sin_val_r == hipblaslt_f8(sinf(float(f8_sin_val))));
+    
+    // Test hipblaslt_f8 cos function
+    hipblaslt_f8 f8_cos_val(f16);
+    hipblaslt_f8 f8_cos_val_r = std::cos(f8_cos_val);
+    ASSERT_TRUE(f8_cos_val_r == hipblaslt_f8(cosf(float(f8_cos_val))));
+    
+    // Test hipblaslt_bf8_fnuz sin function
+    hipblaslt_bf8_fnuz bf8_fnuz_sin_val(f16);
+    hipblaslt_bf8_fnuz bf8_fnuz_sin_val_r = std::sin(bf8_fnuz_sin_val);
+    ASSERT_TRUE(bf8_fnuz_sin_val_r == hipblaslt_bf8_fnuz(sinf(float(bf8_fnuz_sin_val))));
+    
+    // Test hipblaslt_bf8_fnuz cos function
+    hipblaslt_bf8_fnuz bf8_fnuz_cos_val(f16);
+    hipblaslt_bf8_fnuz bf8_fnuz_cos_val_r = std::cos(bf8_fnuz_cos_val);
+    ASSERT_TRUE(bf8_fnuz_cos_val_r == hipblaslt_bf8_fnuz(cosf(float(bf8_fnuz_cos_val))));
+    
+    // Test hipblaslt_bf8 sin function
+    hipblaslt_bf8 bf8_sin_val(f16);
+    hipblaslt_bf8 bf8_sin_val_r = std::sin(bf8_sin_val);
+    ASSERT_TRUE(bf8_sin_val_r == hipblaslt_bf8(sinf(float(bf8_sin_val))));
+    
+    // Test hipblaslt_bf8 cos function
+    hipblaslt_bf8 bf8_cos_val(f16);
+    hipblaslt_bf8 bf8_cos_val_r = std::cos(bf8_cos_val);
+    ASSERT_TRUE(bf8_cos_val_r == hipblaslt_bf8(cosf(float(bf8_cos_val))));
+    
+    // Test hipblaslt_f8_fnuz real function
+    hipblaslt_f8_fnuz f8_fnuz_real_val(f16);
+    hipblaslt_f8_fnuz f8_fnuz_real_val_r = std::real(f8_fnuz_real_val);
+    ASSERT_TRUE(f8_fnuz_real_val_r == hipblaslt_f8_fnuz(std::real(float(f8_fnuz_real_val))));
+
+    // Test hipblaslt_f8 real function
+    hipblaslt_f8 f8_real_val(f16);
+    hipblaslt_f8 f8_real_val_r = std::real(f8_real_val);
+    ASSERT_TRUE(f8_real_val_r == hipblaslt_f8(std::real(float(f8_real_val))));
+
+    // Test hipblaslt_bf8_fnuz real function
+    hipblaslt_bf8_fnuz bf8_fnuz_real_val(f16);
+    hipblaslt_bf8_fnuz bf8_fnuz_real_val_r = std::real(bf8_fnuz_real_val);
+    ASSERT_TRUE(bf8_fnuz_real_val_r == hipblaslt_bf8_fnuz(std::real(float(bf8_fnuz_real_val))));
+
+    // Test hipblaslt_bf8 real function
+    hipblaslt_bf8 bf8_real_val(f16);
+    hipblaslt_bf8 bf8_real_val_r = std::real(bf8_real_val);
+    ASSERT_TRUE(bf8_real_val_r == hipblaslt_bf8(std::real(float(bf8_real_val))));
+
+    // Test hipblaslt_f8_fnuz ostream operator
+    hipblaslt_f8_fnuz f8_fnuz_stream_val(f16);
+    std::ostringstream f8_fnuz_stream;
+    f8_fnuz_stream << f8_fnuz_stream_val;
+    std::ostringstream f8_fnuz_expected;
+    f8_fnuz_expected << float(f8_fnuz_stream_val);
+    ASSERT_TRUE(f8_fnuz_stream.str() == f8_fnuz_expected.str());
+
+    // Test hipblaslt_f8 ostream operator
+    hipblaslt_f8 f8_stream_val(f16);
+    std::ostringstream f8_stream;
+    f8_stream << f8_stream_val;
+    std::ostringstream f8_expected;
+    f8_expected << float(f8_stream_val);
+    ASSERT_TRUE(f8_stream.str() == f8_expected.str());
+
+    // Test hipblaslt_bf8_fnuz ostream operator
+    hipblaslt_bf8_fnuz bf8_fnuz_stream_val(f16);
+    std::ostringstream bf8_fnuz_stream;
+    bf8_fnuz_stream << bf8_fnuz_stream_val;
+    std::ostringstream bf8_fnuz_expected;
+    bf8_fnuz_expected << float(bf8_fnuz_stream_val);
+    ASSERT_TRUE(bf8_fnuz_stream.str() == bf8_fnuz_expected.str());
+
+    // Test hipblaslt_bf8 ostream operator
+    hipblaslt_bf8 bf8_stream_val(f16);
+    std::ostringstream bf8_stream;
+    bf8_stream << bf8_stream_val;
+    std::ostringstream bf8_expected;
+    bf8_expected << float(bf8_stream_val);
+
+    // Test code for hipblaslt_float8.h operator overloads
+    _Float16 f16_a = 2.5;
+    _Float16 f16_b = 1.5;
+    float float_val = 3.0f;
+    int32_t int_val = 4;
+    double double_val = 5.0;
+
+    // Test addition operators with mixed types (float + f8 types)
+    hipblaslt_f8_fnuz f8_fnuz_val(f16_a);
+    hipblaslt_f8 f8_val(f16_a);
+    hipblaslt_bf8_fnuz bf8_fnuz_val(f16_a);
+    hipblaslt_bf8 bf8_val(f16_a);
+
+    // Test float + f8 types
+    float result_f = float_val + f8_fnuz_val;
+    ASSERT_TRUE(result_f == (float_val + float(f8_fnuz_val)));
+    result_f = float_val + f8_val;
+    ASSERT_TRUE(result_f == (float_val + float(f8_val)));
+    result_f = float_val + bf8_fnuz_val;
+    ASSERT_TRUE(result_f == (float_val + float(bf8_fnuz_val)));
+    result_f = float_val + bf8_val;
+    ASSERT_TRUE(result_f == (float_val + float(bf8_val)));
+
+    // Test f8 types + float
+    result_f = f8_fnuz_val + float_val;
+    ASSERT_TRUE(result_f == (float(f8_fnuz_val) + float_val));
+    result_f = f8_val + float_val;
+    ASSERT_TRUE(result_f == (float(f8_val) + float_val));
+    result_f = bf8_fnuz_val + float_val;
+    ASSERT_TRUE(result_f == (float(bf8_fnuz_val) + float_val));
+    result_f = bf8_val + float_val;
+    ASSERT_TRUE(result_f == (float(bf8_val) + float_val));
+
+    // Test mixed f8 types addition (returns float)
+    result_f = f8_fnuz_val + bf8_fnuz_val;
+    ASSERT_TRUE(result_f == (float(f8_fnuz_val) + float(bf8_fnuz_val)));
+    result_f = f8_val + bf8_val;
+    ASSERT_TRUE(result_f == (float(f8_val) + float(bf8_val)));
+    result_f = bf8_fnuz_val + f8_fnuz_val;
+    ASSERT_TRUE(result_f == (float(bf8_fnuz_val) + float(f8_fnuz_val)));
+    result_f = bf8_val + f8_val;
+    ASSERT_TRUE(result_f == (float(bf8_val) + float(f8_val)));
+
+    // Test same type addition (returns same type)
+    hipblaslt_f8_fnuz f8_fnuz_b(f16_b);
+    hipblaslt_f8_fnuz f8_fnuz_result = f8_fnuz_val + f8_fnuz_b;
+    ASSERT_TRUE(f8_fnuz_result == hipblaslt_f8_fnuz(float(f8_fnuz_val) + float(f8_fnuz_b)));
+
+    hipblaslt_f8 f8_b(f16_b);
+    hipblaslt_f8 f8_result = f8_val + f8_b;
+    ASSERT_TRUE(f8_result == hipblaslt_f8(float(f8_val) + float(f8_b)));
+
+    hipblaslt_bf8_fnuz bf8_fnuz_b(f16_b);
+    hipblaslt_bf8_fnuz bf8_fnuz_result = bf8_fnuz_val + bf8_fnuz_b;
+    ASSERT_TRUE(bf8_fnuz_result == hipblaslt_bf8_fnuz(float(bf8_fnuz_val) + float(bf8_fnuz_b)));
+
+    hipblaslt_bf8 bf8_b(f16_b);
+    hipblaslt_bf8 bf8_result = bf8_val + bf8_b;
+    ASSERT_TRUE(bf8_result == hipblaslt_bf8(float(bf8_val) + float(bf8_b)));
+
+    // Test += operators
+    hipblaslt_f8_fnuz f8_fnuz_copy = f8_fnuz_val;
+    f8_fnuz_copy += f8_fnuz_b;
+    ASSERT_TRUE(f8_fnuz_copy == hipblaslt_f8_fnuz(float(f8_fnuz_val) + float(f8_fnuz_b)));
+
+    hipblaslt_f8 f8_copy = f8_val;
+    f8_copy += f8_b;
+    ASSERT_TRUE(f8_copy == hipblaslt_f8(float(f8_val) + float(f8_b)));
+
+    hipblaslt_bf8_fnuz bf8_fnuz_copy = bf8_fnuz_val;
+    bf8_fnuz_copy += bf8_fnuz_b;
+    ASSERT_TRUE(bf8_fnuz_copy == hipblaslt_bf8_fnuz(float(bf8_fnuz_val) + float(bf8_fnuz_b)));
+
+    hipblaslt_bf8 bf8_copy = bf8_val;
+    bf8_copy += bf8_b;
+    ASSERT_TRUE(bf8_copy == hipblaslt_bf8(float(bf8_val) + float(bf8_b)));
+
+    // Test multiplication operators (all return float)
+    // Same type multiplication
+    result_f = f8_fnuz_val * f8_fnuz_b;
+    ASSERT_TRUE(result_f == (float(f8_fnuz_val) * float(f8_fnuz_b)));
+    result_f = f8_val * f8_b;
+    ASSERT_TRUE(result_f == (float(f8_val) * float(f8_b)));
+
+    // Test float * f8 types
+    result_f = float_val * f8_fnuz_val;
+    ASSERT_TRUE(result_f == (float_val * float(f8_fnuz_val)));
+    result_f = float_val * f8_val;
+    ASSERT_TRUE(result_f == (float_val * float(f8_val)));
+
+    // Test f8 types * float
+    result_f = f8_fnuz_val * float_val;
+    ASSERT_TRUE(result_f == (float(f8_fnuz_val) * float_val));
+    result_f = f8_val * float_val;
+    ASSERT_TRUE(result_f == (float(f8_val) * float_val));
+
+    // Test int32_t * f8 types
+    result_f = int_val * f8_fnuz_val;
+    ASSERT_TRUE(result_f == ((float)int_val * float(f8_fnuz_val)));
+    result_f = int_val * f8_val;
+    ASSERT_TRUE(result_f == ((float)int_val * float(f8_val)));
+
+    // Test double * f8 types
+    result_f = double_val * f8_fnuz_val;
+    ASSERT_TRUE(result_f == ((float)double_val * float(f8_fnuz_val)));
+    result_f = double_val * f8_val;
+    ASSERT_TRUE(result_f == ((float)double_val * float(f8_val)));
+
+    // Test bf8 type multiplication tests
+    result_f = bf8_fnuz_val * bf8_fnuz_b;
+    ASSERT_TRUE(result_f == (float(bf8_fnuz_val) * float(bf8_fnuz_b)));
+    result_f = bf8_val * bf8_b;
+    ASSERT_TRUE(result_f == (float(bf8_val) * float(bf8_b)));
+
+    result_f = float_val * bf8_fnuz_val;
+    ASSERT_TRUE(result_f == (float_val * float(bf8_fnuz_val)));
+    result_f = float_val * bf8_val;
+    ASSERT_TRUE(result_f == (float_val * float(bf8_val)));
+
+    result_f = bf8_fnuz_val * float_val;
+    ASSERT_TRUE(result_f == (float(bf8_fnuz_val) * float_val));
+    result_f = bf8_val * float_val;
+    ASSERT_TRUE(result_f == (float(bf8_val) * float_val));
+
+    result_f = int_val * bf8_fnuz_val;
+    ASSERT_TRUE(result_f == ((float)int_val * float(bf8_fnuz_val)));
+    result_f = int_val * bf8_val;
+    ASSERT_TRUE(result_f == ((float)int_val * float(bf8_val)));
+
+    result_f = double_val * bf8_fnuz_val;
+    ASSERT_TRUE(result_f == ((float)double_val * float(bf8_fnuz_val)));
+    result_f = double_val * bf8_val;
+    ASSERT_TRUE(result_f == ((float)double_val * float(bf8_val)));
+
+    // Test Mixed f8 and bf8 multiplication
+    result_f = f8_fnuz_val * bf8_fnuz_val;
+    ASSERT_TRUE(result_f == (float(f8_fnuz_val) * float(bf8_fnuz_val)));
+    result_f = f8_val * bf8_val;
+    ASSERT_TRUE(result_f == (float(f8_val) * float(bf8_val)));
+    result_f = bf8_fnuz_val * f8_fnuz_val;
+    ASSERT_TRUE(result_f == (float(bf8_fnuz_val) * float(f8_fnuz_val)));
+    result_f = bf8_val * f8_val;
+    ASSERT_TRUE(result_f == (float(bf8_val) * float(f8_val)));
+
+    // Test comparison operators
+    // Equality operators
+    bool result_b = (f8_fnuz_val == f8_fnuz_b);
+    ASSERT_TRUE(result_b == (f8_fnuz_val.__x == f8_fnuz_b.__x));
+    result_b = (f8_val == f8_b);
+    ASSERT_TRUE(result_b == (f8_val.__x == f8_b.__x));
+    result_b = (bf8_fnuz_val == bf8_fnuz_b);
+    ASSERT_TRUE(result_b == (bf8_fnuz_val.__x == bf8_fnuz_b.__x));
+    result_b = (bf8_val == bf8_b);
+    ASSERT_TRUE(result_b == (bf8_val.__x == bf8_b.__x));
+
+    // Test Inequality operators
+    result_b = (f8_fnuz_val != f8_fnuz_b);
+    ASSERT_TRUE(result_b == (f8_fnuz_val.__x != f8_fnuz_b.__x));
+    result_b = (f8_val != f8_b);
+    ASSERT_TRUE(result_b == (f8_val.__x != f8_b.__x));
+    result_b = (bf8_fnuz_val != bf8_fnuz_b);
+    ASSERT_TRUE(result_b == (bf8_fnuz_val.__x != bf8_fnuz_b.__x));
+    result_b = (bf8_val != bf8_b);
+    ASSERT_TRUE(result_b == (bf8_val.__x != bf8_b.__x));
+
+    // Test Greater than or equal operators
+    result_b = (f8_fnuz_val >= f8_fnuz_b);
+    ASSERT_TRUE(result_b == (static_cast<float>(f8_fnuz_val) >= static_cast<float>(f8_fnuz_b)));
+    result_b = (f8_val >= f8_b);
+    ASSERT_TRUE(result_b == (static_cast<float>(f8_val) >= static_cast<float>(f8_b)));
+
+    // Test Greater than operators
+    result_b = (f8_fnuz_val > f8_fnuz_b);
+    ASSERT_TRUE(result_b == (static_cast<float>(f8_fnuz_val) > static_cast<float>(f8_fnuz_b)));
+    result_b = (f8_val > f8_b);
+    ASSERT_TRUE(result_b == (static_cast<float>(f8_val) > static_cast<float>(f8_b)));
+}
+
+void testing_aux_hipblaslt_ext_op_func(const Arguments& arg)
+{
+    ASSERT_TRUE(hipblasltGetTotalGranularityValue() == hipblasltClientPerformanceArgs::totalGranularity);
+    ASSERT_TRUE(hipblasltGetTilesPerCuValue() == hipblasltClientPerformanceArgs::tilesPerCu);
+    ASSERT_TRUE(hipblasltGetTile0Granularity() == hipblasltClientPerformanceArgs::tile0Granularity);
+    ASSERT_TRUE(hipblasltGetTile1Granularity() == hipblasltClientPerformanceArgs::tile1Granularity);
+    ASSERT_TRUE(hipblasltGetCuGranularity() == hipblasltClientPerformanceArgs::cuGranularity);
+    ASSERT_TRUE(hipblasltGetWaveGranularity() == hipblasltClientPerformanceArgs::waveGranularity);
+    ASSERT_TRUE(hipblasltGetCUs() == hipblasltClientPerformanceArgs::CUs);
+    ASSERT_TRUE(hipblasltGetMemWriteBytesD() == hipblasltClientPerformanceArgs::memWriteBytesD);
+    ASSERT_TRUE(hipblasltGetMemReadBytes() == hipblasltClientPerformanceArgs::memReadBytes);
+
+
+     // Test default constructor and initial state
+    {
+        hipblaslt_ext::GemmPreference pref;
+        // Note: workspace_bytes is not initialized in constructor, so we can't test initial value
+        // This tests that constructor doesn't crash
+    }
+    
+    // Test setMaxWorkspaceBytes and getMaxWorkspaceBytes basic functionality
+    {
+        hipblaslt_ext::GemmPreference pref;
+        size_t testSize = 1024;
+        
+        pref.setMaxWorkspaceBytes(testSize);
+        ASSERT_TRUE(pref.getMaxWorkspaceBytes() == testSize);
+    }
+
+    // Test with zero bytes
+    {
+        hipblaslt_ext::GemmPreference pref;
+        size_t zeroSize = 0;
+        
+        pref.setMaxWorkspaceBytes(zeroSize);
+        ASSERT_TRUE(pref.getMaxWorkspaceBytes() == zeroSize);
+    }
+    
+    // Test with large value
+    {
+        hipblaslt_ext::GemmPreference pref;
+        size_t largeSize = 1024 * 1024 * 1024; // 1GB
+        
+        pref.setMaxWorkspaceBytes(largeSize);
+        ASSERT_TRUE(pref.getMaxWorkspaceBytes() == largeSize);
+    }
+
+    // Test copy constructor
+    {
+        hipblaslt_ext::GemmPreference pref1;
+        size_t testSize = 2048;
+        pref1.setMaxWorkspaceBytes(testSize);
+        
+        hipblaslt_ext::GemmPreference pref2(pref1);
+        ASSERT_TRUE(pref2.getMaxWorkspaceBytes() == testSize);
+        
+        // Verify original is unchanged
+        ASSERT_TRUE(pref1.getMaxWorkspaceBytes() == testSize);
+    }
+    
+    // Test copy assignment operator
+    {
+        hipblaslt_ext::GemmPreference pref1;
+        hipblaslt_ext::GemmPreference pref2;
+        
+        size_t testSize1 = 4096;
+        size_t testSize2 = 8192;
+        
+        pref1.setMaxWorkspaceBytes(testSize1);
+        pref2.setMaxWorkspaceBytes(testSize2);
+        
+        pref2 = pref1;
+        ASSERT_TRUE(pref2.getMaxWorkspaceBytes() == testSize1);
+        ASSERT_TRUE(pref1.getMaxWorkspaceBytes() == testSize1);
+    }
+    
+    // Test copy constructor
+    {
+        hipblaslt_ext::GemmPreference pref1;
+        size_t testSize = 2048;
+        pref1.setMaxWorkspaceBytes(testSize);
+        
+        hipblaslt_ext::GemmPreference pref2(pref1);
+        ASSERT_TRUE(pref2.getMaxWorkspaceBytes() == testSize);
+        
+        // Verify original is unchanged
+        ASSERT_TRUE(pref1.getMaxWorkspaceBytes() == testSize);
+    }
+    
+    // Test copy assignment operator
+    {
+        hipblaslt_ext::GemmPreference pref1;
+        hipblaslt_ext::GemmPreference pref2;
+        
+        size_t testSize1 = 4096;
+        size_t testSize2 = 8192;
+        
+        pref1.setMaxWorkspaceBytes(testSize1);
+        pref2.setMaxWorkspaceBytes(testSize2);
+        
+        pref2 = pref1;
+        ASSERT_TRUE(pref2.getMaxWorkspaceBytes() == testSize1);
+        ASSERT_TRUE(pref1.getMaxWorkspaceBytes() == testSize1);
+    }
+    
+    // Test move constructor
+    {
+        hipblaslt_ext::GemmPreference pref1;
+        size_t testSize = 16384;
+        pref1.setMaxWorkspaceBytes(testSize);
+        
+        hipblaslt_ext::GemmPreference pref2(std::move(pref1));
+        ASSERT_TRUE(pref2.getMaxWorkspaceBytes() == testSize);
+        // Note: pref1 is in moved-from state, shouldn't access it
+    }
+    
+    // Test move assignment operator
+    {
+        hipblaslt_ext::GemmPreference pref1;
+        hipblaslt_ext::GemmPreference pref2;
+        
+        size_t testSize1 = 32768;
+        size_t testSize2 = 65536;
+        
+        pref1.setMaxWorkspaceBytes(testSize1);
+        pref2.setMaxWorkspaceBytes(testSize2);
+        
+        pref2 = std::move(pref1);
+        ASSERT_TRUE(pref2.getMaxWorkspaceBytes() == testSize1);
+        // Note: pref1 is in moved-from state, shouldn't access it
+    }
+
+
+    // Test default constructor
+    hipblaslt_ext::GemmProblemType problemType1;
+    
+    // Test parameterized constructor
+    hipblaslt_ext::GemmProblemType problemType2(
+        HIPBLAS_OP_N,           // opA
+        HIPBLAS_OP_T,           // opB
+        HIP_R_32F,              // typeA
+        HIP_R_32F,              // typeB
+        HIP_R_32F,              // typeC
+        HIP_R_32F,              // typeD
+        HIPBLAS_COMPUTE_32F     // typeCompute
+    );
+    
+    // Test getters for parameterized constructor
+    ASSERT_TRUE(problemType2.getOpA() == HIPBLAS_OP_N);
+    ASSERT_TRUE(problemType2.getOpB() == HIPBLAS_OP_T);
+    ASSERT_TRUE(problemType2.getTypeA() == HIP_R_32F);
+    ASSERT_TRUE(problemType2.getTypeB() == HIP_R_32F);
+    ASSERT_TRUE(problemType2.getTypeC() == HIP_R_32F);
+    ASSERT_TRUE(problemType2.getTypeD() == HIP_R_32F);
+    ASSERT_TRUE(problemType2.getTypeCompute() == HIPBLAS_COMPUTE_32F);
+    
+    // Test setters
+    problemType1.setOpA(HIPBLAS_OP_C);
+    problemType1.setOpB(HIPBLAS_OP_N);
+    problemType1.setTypeA(HIP_R_16F);
+    problemType1.setTypeB(HIP_R_16F);
+    problemType1.setTypeC(HIP_R_16F);
+    problemType1.setTypeD(HIP_R_16F);
+    problemType1.setTypeCompute(HIPBLAS_COMPUTE_16F);
+    
+    // Test getters after setting values
+    ASSERT_TRUE(problemType1.getOpA() == HIPBLAS_OP_C);
+    ASSERT_TRUE(problemType1.getOpB() == HIPBLAS_OP_N);
+    ASSERT_TRUE(problemType1.getTypeA() == HIP_R_16F);
+    ASSERT_TRUE(problemType1.getTypeB() == HIP_R_16F);
+    ASSERT_TRUE(problemType1.getTypeC() == HIP_R_16F);
+    ASSERT_TRUE(problemType1.getTypeD() == HIP_R_16F);
+    ASSERT_TRUE(problemType1.getTypeCompute() == HIPBLAS_COMPUTE_16F);
+    
+    // Test copy constructor
+    hipblaslt_ext::GemmProblemType problemType3(problemType2);
+    ASSERT_TRUE(problemType3.getOpA() == HIPBLAS_OP_N);
+    ASSERT_TRUE(problemType3.getOpB() == HIPBLAS_OP_T);
+    ASSERT_TRUE(problemType3.getTypeA() == HIP_R_32F);
+    ASSERT_TRUE(problemType3.getTypeB() == HIP_R_32F);
+    ASSERT_TRUE(problemType3.getTypeC() == HIP_R_32F);
+    ASSERT_TRUE(problemType3.getTypeD() == HIP_R_32F);
+    ASSERT_TRUE(problemType3.getTypeCompute() == HIPBLAS_COMPUTE_32F);
+    
+    // Test assignment operator
+    hipblaslt_ext::GemmProblemType problemType4;
+    problemType4 = problemType1;
+    ASSERT_TRUE(problemType4.getOpA() == HIPBLAS_OP_C);
+    ASSERT_TRUE(problemType4.getOpB() == HIPBLAS_OP_N);
+    ASSERT_TRUE(problemType4.getTypeA() == HIP_R_16F);
+    ASSERT_TRUE(problemType4.getTypeB() == HIP_R_16F);
+    ASSERT_TRUE(problemType4.getTypeC() == HIP_R_16F);
+    ASSERT_TRUE(problemType4.getTypeD() == HIP_R_16F);
+    ASSERT_TRUE(problemType4.getTypeCompute() == HIPBLAS_COMPUTE_16F);
+    
+    // Test move constructor
+    hipblaslt_ext::GemmProblemType problemType5(std::move(problemType3));
+    ASSERT_TRUE(problemType5.getOpA() == HIPBLAS_OP_N);
+    ASSERT_TRUE(problemType5.getOpB() == HIPBLAS_OP_T);
+    ASSERT_TRUE(problemType5.getTypeA() == HIP_R_32F);
+    ASSERT_TRUE(problemType5.getTypeB() == HIP_R_32F);
+    ASSERT_TRUE(problemType5.getTypeC() == HIP_R_32F);
+    ASSERT_TRUE(problemType5.getTypeD() == HIP_R_32F);
+    ASSERT_TRUE(problemType5.getTypeCompute() == HIPBLAS_COMPUTE_32F);
+    
+    // Test move assignment operator
+    hipblaslt_ext::GemmProblemType problemType6;
+    problemType6 = std::move(problemType4);
+    ASSERT_TRUE(problemType6.getOpA() == HIPBLAS_OP_C);
+    ASSERT_TRUE(problemType6.getOpB() == HIPBLAS_OP_N);
+    ASSERT_TRUE(problemType6.getTypeA() == HIP_R_16F);
+    ASSERT_TRUE(problemType6.getTypeB() == HIP_R_16F);
+    ASSERT_TRUE(problemType6.getTypeC() == HIP_R_16F);
+    ASSERT_TRUE(problemType6.getTypeD() == HIP_R_16F);
+    ASSERT_TRUE(problemType6.getTypeCompute() == HIPBLAS_COMPUTE_16F);
+
+
+
+    // Test default constructor
+    hipblaslt_ext::GemmEpilogue epilogue1;
+    
+    // Test default values
+    ASSERT_TRUE(epilogue1.getMode() == HIPBLASLT_EPILOGUE_DEFAULT);
+    ASSERT_TRUE(epilogue1.getBiasDataType() == HIPBLASLT_DATATYPE_INVALID);
+    ASSERT_TRUE(epilogue1.getAuxDataType() == HIPBLASLT_DATATYPE_INVALID);
+    ASSERT_TRUE(epilogue1.getAuxLeadingDimension() == 0);
+    ASSERT_TRUE(epilogue1.getAuxBatchStride() == 0);
+    
+    // Test setMode and getMode
+    epilogue1.setMode(HIPBLASLT_EPILOGUE_RELU);
+    ASSERT_TRUE(epilogue1.getMode() == HIPBLASLT_EPILOGUE_RELU);
+    
+    epilogue1.setMode(HIPBLASLT_EPILOGUE_GELU_BIAS);
+    ASSERT_TRUE(epilogue1.getMode() == HIPBLASLT_EPILOGUE_GELU_BIAS);
+    
+    epilogue1.setMode(HIPBLASLT_EPILOGUE_BIAS);
+    ASSERT_TRUE(epilogue1.getMode() == HIPBLASLT_EPILOGUE_BIAS);
+    
+    // Test setBiasDataType and getBiasDataType
+    epilogue1.setBiasDataType(HIP_R_32F);
+    ASSERT_TRUE(epilogue1.getBiasDataType() == HIP_R_32F);
+    
+    epilogue1.setBiasDataType(HIP_R_16F);
+    ASSERT_TRUE(epilogue1.getBiasDataType() == HIP_R_16F);
+    
+    epilogue1.setBiasDataType(HIP_R_16BF);
+    ASSERT_TRUE(epilogue1.getBiasDataType() == HIP_R_16BF);
+    
+    // Test setAuxDataType and getAuxDataType
+    epilogue1.setAuxDataType(HIP_R_32F);
+    ASSERT_TRUE(epilogue1.getAuxDataType() == HIP_R_32F);
+    
+    epilogue1.setAuxDataType(HIP_R_8I);
+    ASSERT_TRUE(epilogue1.getAuxDataType() == HIP_R_8I);
+    
+    // Test setAuxLeadingDimension and getAuxLeadingDimension
+    epilogue1.setAuxLeadingDimension(128);
+    ASSERT_TRUE(epilogue1.getAuxLeadingDimension() == 128);
+    
+    epilogue1.setAuxLeadingDimension(64);
+    ASSERT_TRUE(epilogue1.getAuxLeadingDimension() == 64);
+    
+    epilogue1.setAuxLeadingDimension(0);
+    ASSERT_TRUE(epilogue1.getAuxLeadingDimension() == 0);
+    
+    // Test setAuxBatchStride and getAuxBatchStride
+    epilogue1.setAuxBatchStride(1024);
+    ASSERT_TRUE(epilogue1.getAuxBatchStride() == 1024);
+    
+    epilogue1.setAuxBatchStride(512);
+    ASSERT_TRUE(epilogue1.getAuxBatchStride() == 512);
+    
+    epilogue1.setAuxBatchStride(0);
+    ASSERT_TRUE(epilogue1.getAuxBatchStride() == 0);
+    
+    // Test setScalingAType and getScalingAType
+    epilogue1.setScalingAType(HIPBLASLT_MATMUL_MATRIX_SCALE_SCALAR_32F);
+    ASSERT_TRUE(epilogue1.getScalingAType() == HIPBLASLT_MATMUL_MATRIX_SCALE_SCALAR_32F);
+    
+    epilogue1.setScalingAType(HIPBLASLT_MATMUL_MATRIX_SCALE_OUTER_VEC_32F);
+    ASSERT_TRUE(epilogue1.getScalingAType() == HIPBLASLT_MATMUL_MATRIX_SCALE_OUTER_VEC_32F);
+    
+    // Test setScalingBType and getScalingBType
+    epilogue1.setScalingBType(HIPBLASLT_MATMUL_MATRIX_SCALE_SCALAR_32F);
+    ASSERT_TRUE(epilogue1.getScalingBType() == HIPBLASLT_MATMUL_MATRIX_SCALE_SCALAR_32F);
+    
+    epilogue1.setScalingBType(HIPBLASLT_MATMUL_MATRIX_SCALE_OUTER_VEC_32F);
+    ASSERT_TRUE(epilogue1.getScalingBType() == HIPBLASLT_MATMUL_MATRIX_SCALE_OUTER_VEC_32F);
+    
+    // Test setAct0 and getAct0
+    epilogue1.setAct0(1.5f);
+    ASSERT_TRUE(epilogue1.getAct0() == 1.5f);
+    
+    epilogue1.setAct0(0.0f);
+    ASSERT_TRUE(epilogue1.getAct0() == 0.0f);
+    
+    epilogue1.setAct0(-2.5f);
+    ASSERT_TRUE(epilogue1.getAct0() == -2.5f);
+    
+    // Test setAct1 and getAct1
+    epilogue1.setAct1(3.14f);
+    ASSERT_TRUE(epilogue1.getAct1() == 3.14f);
+    
+    epilogue1.setAct1(0.0f);
+    ASSERT_TRUE(epilogue1.getAct1() == 0.0f);
+    
+    epilogue1.setAct1(-1.0f);
+    ASSERT_TRUE(epilogue1.getAct1() == -1.0f);
+    
+    // Test copy constructor
+    hipblaslt_ext::GemmEpilogue epilogue2(epilogue1);
+    ASSERT_TRUE(epilogue2.getMode() == epilogue1.getMode());
+    ASSERT_TRUE(epilogue2.getBiasDataType() == epilogue1.getBiasDataType());
+    ASSERT_TRUE(epilogue2.getAuxDataType() == epilogue1.getAuxDataType());
+    ASSERT_TRUE(epilogue2.getAuxLeadingDimension() == epilogue1.getAuxLeadingDimension());
+    ASSERT_TRUE(epilogue2.getAuxBatchStride() == epilogue1.getAuxBatchStride());
+    ASSERT_TRUE(epilogue2.getScalingAType() == epilogue1.getScalingAType());
+    ASSERT_TRUE(epilogue2.getScalingBType() == epilogue1.getScalingBType());
+    ASSERT_TRUE(epilogue2.getAct0() == epilogue1.getAct0());
+    ASSERT_TRUE(epilogue2.getAct1() == epilogue1.getAct1());
+    
+    // Test assignment operator
+    hipblaslt_ext::GemmEpilogue epilogue3;
+    epilogue3 = epilogue1;
+    ASSERT_TRUE(epilogue3.getMode() == epilogue1.getMode());
+    ASSERT_TRUE(epilogue3.getBiasDataType() == epilogue1.getBiasDataType());
+    ASSERT_TRUE(epilogue3.getAuxDataType() == epilogue1.getAuxDataType());
+    ASSERT_TRUE(epilogue3.getAuxLeadingDimension() == epilogue1.getAuxLeadingDimension());
+    ASSERT_TRUE(epilogue3.getAuxBatchStride() == epilogue1.getAuxBatchStride());
+    ASSERT_TRUE(epilogue3.getScalingAType() == epilogue1.getScalingAType());
+    ASSERT_TRUE(epilogue3.getScalingBType() == epilogue1.getScalingBType());
+    ASSERT_TRUE(epilogue3.getAct0() == epilogue1.getAct0());
+    ASSERT_TRUE(epilogue3.getAct1() == epilogue1.getAct1());
+    
+    // Test move constructor
+    hipblaslt_ext::GemmEpilogue epilogue4(std::move(epilogue2));
+    ASSERT_TRUE(epilogue4.getMode() == epilogue1.getMode());
+    ASSERT_TRUE(epilogue4.getBiasDataType() == epilogue1.getBiasDataType());
+    ASSERT_TRUE(epilogue4.getAuxDataType() == epilogue1.getAuxDataType());
+    ASSERT_TRUE(epilogue4.getAuxLeadingDimension() == epilogue1.getAuxLeadingDimension());
+    ASSERT_TRUE(epilogue4.getAuxBatchStride() == epilogue1.getAuxBatchStride());
+    ASSERT_TRUE(epilogue4.getScalingAType() == epilogue1.getScalingAType());
+    ASSERT_TRUE(epilogue4.getScalingBType() == epilogue1.getScalingBType());
+    ASSERT_TRUE(epilogue4.getAct0() == epilogue1.getAct0());
+    ASSERT_TRUE(epilogue4.getAct1() == epilogue1.getAct1());
+    
+    // Test move assignment operator
+    hipblaslt_ext::GemmEpilogue epilogue5;
+    epilogue5 = std::move(epilogue3);
+    ASSERT_TRUE(epilogue5.getMode() == epilogue1.getMode());
+    ASSERT_TRUE(epilogue5.getBiasDataType() == epilogue1.getBiasDataType());
+    ASSERT_TRUE(epilogue5.getAuxDataType() == epilogue1.getAuxDataType());
+    ASSERT_TRUE(epilogue5.getAuxLeadingDimension() == epilogue1.getAuxLeadingDimension());
+    ASSERT_TRUE(epilogue5.getAuxBatchStride() == epilogue1.getAuxBatchStride());
+    ASSERT_TRUE(epilogue5.getScalingAType() == epilogue1.getScalingAType());
+    ASSERT_TRUE(epilogue5.getScalingBType() == epilogue1.getScalingBType());
+    ASSERT_TRUE(epilogue5.getAct0() == epilogue1.getAct0());
+    ASSERT_TRUE(epilogue5.getAct1() == epilogue1.getAct1());
+    
+    // Test different epilogue modes
+    hipblaslt_ext::GemmEpilogue epilogue6;
+    epilogue6.setMode(HIPBLASLT_EPILOGUE_DGELU_BGRAD);
+    epilogue6.setBiasDataType(HIP_R_8F_E4M3_FNUZ);
+    epilogue6.setAuxDataType(HIP_R_64F);
+    epilogue6.setAuxLeadingDimension(256);
+    epilogue6.setAuxBatchStride(2048);
+    
+    ASSERT_TRUE(epilogue6.getMode() == HIPBLASLT_EPILOGUE_DGELU_BGRAD);
+    ASSERT_TRUE(epilogue6.getBiasDataType() == HIP_R_8F_E4M3_FNUZ);
+    ASSERT_TRUE(epilogue6.getAuxDataType() == HIP_R_64F);
+    ASSERT_TRUE(epilogue6.getAuxLeadingDimension() == 256);
+    ASSERT_TRUE(epilogue6.getAuxBatchStride() == 2048);
+    
+    // Test complex data types
+    hipblaslt_ext::GemmEpilogue epilogue7;
+    epilogue7.setBiasDataType(HIP_C_32F);
+    epilogue7.setAuxDataType(HIP_C_64F);
+    
+    ASSERT_TRUE(epilogue7.getBiasDataType() == HIP_C_32F);
+    ASSERT_TRUE(epilogue7.getAuxDataType() == HIP_C_64F);
+    
+    // Test edge cases with large values
+    hipblaslt_ext::GemmEpilogue epilogue8;
+    epilogue8.setAuxLeadingDimension(65536);
+    epilogue8.setAuxBatchStride(1048576);
+    epilogue8.setAct0(1e6f);
+    epilogue8.setAct1(-1e6f);
+    
+    ASSERT_TRUE(epilogue8.getAuxLeadingDimension() == 65536);
+    ASSERT_TRUE(epilogue8.getAuxBatchStride() == 1048576);
+    ASSERT_TRUE(epilogue8.getAct0() == 1e6f);
+    ASSERT_TRUE(epilogue8.getAct1() == -1e6f);
+    
+    // Test specific epilogue combinations
+    hipblaslt_ext::GemmEpilogue epilogue9;
+    epilogue9.setMode(HIPBLASLT_EPILOGUE_SWISH_BIAS_EXT);
+    epilogue9.setBiasDataType(HIP_R_32F);
+    epilogue9.setAct0(2.0f);
+    epilogue9.setAct1(0.5f);
+    
+    ASSERT_TRUE(epilogue9.getMode() == HIPBLASLT_EPILOGUE_SWISH_BIAS_EXT);
+    ASSERT_TRUE(epilogue9.getBiasDataType() == HIP_R_32F);
+    ASSERT_TRUE(epilogue9.getAct0() == 2.0f);
+    ASSERT_TRUE(epilogue9.getAct1() == 0.5f);
+    
+    // Test CLAMP epilogue
+    hipblaslt_ext::GemmEpilogue epilogue10;
+    epilogue10.setMode(HIPBLASLT_EPILOGUE_CLAMP_EXT);
+    epilogue10.setAct0(0.0f);  // min value for clamp
+    epilogue10.setAct1(6.0f);  // max value for clamp
+    
+    ASSERT_TRUE(epilogue10.getMode() == HIPBLASLT_EPILOGUE_CLAMP_EXT);
+    ASSERT_TRUE(epilogue10.getAct0() == 0.0f);
+    ASSERT_TRUE(epilogue10.getAct1() == 6.0f);
+    
+    // Test multiple assignments to same object
+    epilogue10.setMode(HIPBLASLT_EPILOGUE_RELU_BIAS);
+    epilogue10.setMode(HIPBLASLT_EPILOGUE_GELU_AUX);  // Override previous value
+    ASSERT_TRUE(epilogue10.getMode() == HIPBLASLT_EPILOGUE_GELU_AUX);
+    
+    epilogue10.setBiasDataType(HIP_R_16F);
+    epilogue10.setBiasDataType(HIP_R_32F);  // Override previous value
+    ASSERT_TRUE(epilogue10.getBiasDataType() == HIP_R_32F);
+    
+
+    // For GemmInputs
+    // Test default constructor
+    hipblaslt_ext::GemmInputs inputs1;
+    
+    // Test default values (all should be nullptr)
+    ASSERT_TRUE(inputs1.getA() == nullptr);
+    ASSERT_TRUE(inputs1.getB() == nullptr);
+    ASSERT_TRUE(inputs1.getC() == nullptr);
+    ASSERT_TRUE(inputs1.getD() == nullptr);
+    ASSERT_TRUE(inputs1.getAlpha() == nullptr);
+    ASSERT_TRUE(inputs1.getBeta() == nullptr);
+    ASSERT_TRUE(inputs1.getBias() == nullptr);
+    ASSERT_TRUE(inputs1.getScaleA() == nullptr);
+    ASSERT_TRUE(inputs1.getScaleB() == nullptr);
+    ASSERT_TRUE(inputs1.getScaleC() == nullptr);
+    ASSERT_TRUE(inputs1.getScaleD() == nullptr);
+    ASSERT_TRUE(inputs1.getScaleAux() == nullptr);
+    ASSERT_TRUE(inputs1.getScaleAlphaVec() == nullptr);
+    ASSERT_TRUE(inputs1.getAux() == nullptr);
+    ASSERT_TRUE(inputs1.getAmaxD() == nullptr);
+    
+    // Create some dummy pointers for testing
+    float dummy_a = 1.0f, dummy_b = 2.0f, dummy_c = 3.0f, dummy_d = 4.0f;
+    float dummy_alpha = 0.5f, dummy_beta = 1.5f;
+    float dummy_bias = 0.1f, dummy_scaleA = 2.0f, dummy_scaleB = 3.0f;
+    float dummy_scaleC = 4.0f, dummy_scaleD = 5.0f, dummy_scaleAux = 6.0f;
+    float dummy_scaleAlphaVec = 7.0f, dummy_aux = 8.0f, dummy_amaxD = 9.0f;
+    
+    // Test setters and getters for matrix pointers
+    inputs1.setA(&dummy_a);
+    ASSERT_TRUE(inputs1.getA() == &dummy_a);
+    
+    inputs1.setB(&dummy_b);
+    ASSERT_TRUE(inputs1.getB() == &dummy_b);
+    
+    inputs1.setC(&dummy_c);
+    ASSERT_TRUE(inputs1.getC() == &dummy_c);
+    
+    inputs1.setD(&dummy_d);
+    ASSERT_TRUE(inputs1.getD() == &dummy_d);
+    
+    // Test setters and getters for scalar values
+    inputs1.setAlpha(&dummy_alpha);
+    ASSERT_TRUE(inputs1.getAlpha() == &dummy_alpha);
+    
+    inputs1.setBeta(&dummy_beta);
+    ASSERT_TRUE(inputs1.getBeta() == &dummy_beta);
+    
+    // Test setters and getters for epilogue inputs
+    inputs1.setBias(&dummy_bias);
+    ASSERT_TRUE(inputs1.getBias() == &dummy_bias);
+    
+    inputs1.setScaleA(&dummy_scaleA);
+    ASSERT_TRUE(inputs1.getScaleA() == &dummy_scaleA);
+    
+    inputs1.setScaleB(&dummy_scaleB);
+    ASSERT_TRUE(inputs1.getScaleB() == &dummy_scaleB);
+    
+    inputs1.setScaleC(&dummy_scaleC);
+    ASSERT_TRUE(inputs1.getScaleC() == &dummy_scaleC);
+    
+    inputs1.setScaleD(&dummy_scaleD);
+    ASSERT_TRUE(inputs1.getScaleD() == &dummy_scaleD);
+    
+    inputs1.setScaleAux(&dummy_scaleAux);
+    ASSERT_TRUE(inputs1.getScaleAux() == &dummy_scaleAux);
+    
+    inputs1.setScaleAlphaVec(&dummy_scaleAlphaVec);
+    ASSERT_TRUE(inputs1.getScaleAlphaVec() == &dummy_scaleAlphaVec);
+    
+    inputs1.setAux(&dummy_aux);
+    ASSERT_TRUE(inputs1.getAux() == &dummy_aux);
+    
+    inputs1.setAmaxD(&dummy_amaxD);
+    ASSERT_TRUE(inputs1.getAmaxD() == &dummy_amaxD);
+    
+    // Test copy constructor
+    hipblaslt_ext::GemmInputs inputs2(inputs1);
+    ASSERT_TRUE(inputs2.getA() == &dummy_a);
+    ASSERT_TRUE(inputs2.getB() == &dummy_b);
+    ASSERT_TRUE(inputs2.getC() == &dummy_c);
+    ASSERT_TRUE(inputs2.getD() == &dummy_d);
+    ASSERT_TRUE(inputs2.getAlpha() == &dummy_alpha);
+    ASSERT_TRUE(inputs2.getBeta() == &dummy_beta);
+    ASSERT_TRUE(inputs2.getBias() == &dummy_bias);
+    ASSERT_TRUE(inputs2.getScaleA() == &dummy_scaleA);
+    ASSERT_TRUE(inputs2.getScaleB() == &dummy_scaleB);
+    ASSERT_TRUE(inputs2.getScaleC() == &dummy_scaleC);
+    ASSERT_TRUE(inputs2.getScaleD() == &dummy_scaleD);
+    ASSERT_TRUE(inputs2.getScaleAux() == &dummy_scaleAux);
+    ASSERT_TRUE(inputs2.getScaleAlphaVec() == &dummy_scaleAlphaVec);
+    ASSERT_TRUE(inputs2.getAux() == &dummy_aux);
+    ASSERT_TRUE(inputs2.getAmaxD() == &dummy_amaxD);
+}
+
+void testing_aux_rocblaslt_utility_func(const Arguments& arg)
+{
+    // Test basic prefix functionality
+    std::string result = prefix("TEST_LAYER", "test_caller");
+    
+    // Check that result is not empty
+    ASSERT_TRUE(!result.empty());
+    
+    // Check that result contains expected components
+    ASSERT_TRUE(result.find("[HIPBLASLT]") != std::string::npos);
+    ASSERT_TRUE(result.find("[TEST_LAYER]") != std::string::npos);
+    ASSERT_TRUE(result.find("[test_caller]") != std::string::npos);
+    
+    // Check date format pattern (YYYY-MM-DD)
+    std::regex date_pattern(R"(\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\])");
+    ASSERT_TRUE(std::regex_search(result, date_pattern));
+    
+    // Check process ID is included (numeric value in brackets)
+    std::regex pid_pattern(R"(\[\d+\])");
+    ASSERT_TRUE(std::regex_search(result, pid_pattern));
+    
+    // Test with different layer and caller names
+    std::string result2 = prefix("ERROR", "function_name");
+    ASSERT_TRUE(result2.find("[ERROR]") != std::string::npos);
+    ASSERT_TRUE(result2.find("[function_name]") != std::string::npos);
+    
+    // Test with empty strings (edge case)
+    std::string result3 = prefix("", "");
+    ASSERT_TRUE(result3.find("[]") != std::string::npos); // Should contain empty brackets
+    ASSERT_TRUE(result3.find("[HIPBLASLT]") != std::string::npos); // HIPBLASLT should always be present
+    
+    // Test format consistency - two calls should have similar structure
+    std::string result4 = prefix("LAYER1", "caller1");
+    std::string result5 = prefix("LAYER2", "caller2");
+    
+    // Both should contain HIPBLASLT
+    ASSERT_TRUE(result4.find("[HIPBLASLT]") != std::string::npos);
+    ASSERT_TRUE(result5.find("[HIPBLASLT]") != std::string::npos);
+    
+    // Both should match the expected format pattern
+    std::regex full_pattern(R"(\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\]\[HIPBLASLT\]\[\d+\]\[.*\]\[.*\])");
+    ASSERT_TRUE(std::regex_match(result4, full_pattern));
+    ASSERT_TRUE(std::regex_match(result5, full_pattern));
+
+    // Test hipDataType_to_string function
+    ASSERT_TRUE(std::string_view{hipDataType_to_string(HIP_R_16F)} == "R_16F");
+    ASSERT_TRUE(std::string_view{hipDataType_to_string(HIP_R_16BF)} == "R_16BF");
+    ASSERT_TRUE(std::string_view{hipDataType_to_string(HIP_R_32F)} == "R_32F");
+    ASSERT_TRUE(std::string_view{hipDataType_to_string(HIP_R_64F)} == "R_64F");
+    ASSERT_TRUE(std::string_view{hipDataType_to_string(HIP_R_8F_E4M3_FNUZ)} == "R_8F_E4M3_FNUZ");
+    ASSERT_TRUE(std::string_view{hipDataType_to_string(HIP_R_8F_E5M2_FNUZ)} == "R_8F_E5M2_FNUZ");
+    ASSERT_TRUE(std::string_view{hipDataType_to_string(HIP_R_8F_E4M3)} == "R_8F_E4M3");
+    ASSERT_TRUE(std::string_view{hipDataType_to_string(HIP_R_8F_E5M2)} == "R_8F_E5M2");
+    ASSERT_TRUE(std::string_view{hipDataType_to_string(HIP_R_8I)} == "R_8I");
+    ASSERT_TRUE(std::string_view{hipDataType_to_string(static_cast<hipDataType>(HIP_R_6F_E2M3_EXT))} == "R_6F_E2M3");
+    ASSERT_TRUE(std::string_view{hipDataType_to_string(static_cast<hipDataType>(HIP_R_6F_E3M2_EXT))} == "R_6F_E3M2");
+    ASSERT_TRUE(std::string_view{hipDataType_to_string(static_cast<hipDataType>(HIP_R_4F_E2M1_EXT))} == "R_4F_E2M1");
+    ASSERT_TRUE(std::string_view{hipDataType_to_string(static_cast<hipDataType>(999))} == "Invalid");
+
+    ASSERT_TRUE(std::string_view{hipDataType_to_bench_string(HIP_R_32F)} == "f32_r");
+    ASSERT_TRUE(std::string_view{hipDataType_to_bench_string(HIP_R_64F)} == "f64_r");
+    ASSERT_TRUE(std::string_view{hipDataType_to_bench_string(HIP_R_16F)} == "f16_r");
+    ASSERT_TRUE(std::string_view{hipDataType_to_bench_string(HIP_R_16BF)} == "bf16_r");
+    ASSERT_TRUE(std::string_view{hipDataType_to_bench_string(HIP_R_8I)} == "i8_r");
+    ASSERT_TRUE(std::string_view{hipDataType_to_bench_string(HIP_R_32I)} == "i32_r");
+    ASSERT_TRUE(std::string_view{hipDataType_to_bench_string(HIP_R_8F_E4M3_FNUZ)} == "f8_r");
+    ASSERT_TRUE(std::string_view{hipDataType_to_bench_string(HIP_R_8F_E5M2_FNUZ)} == "bf8_r");
+    ASSERT_TRUE(std::string_view{hipDataType_to_bench_string(HIP_R_8F_E4M3)} == "f8_r");
+    ASSERT_TRUE(std::string_view{hipDataType_to_bench_string(HIP_R_8F_E5M2)} == "bf8_r");
+    ASSERT_TRUE(std::string_view{hipDataType_to_bench_string(HIP_R_8F_E5M2_FNUZ)} == "bf8_r");
+    ASSERT_TRUE(std::string_view{hipDataType_to_bench_string(static_cast<hipDataType>(HIP_R_6F_E2M3_EXT))} == "f6_r");
+    ASSERT_TRUE(std::string_view{hipDataType_to_bench_string(static_cast<hipDataType>(HIP_R_6F_E3M2_EXT))} == "bf6_r");
+    ASSERT_TRUE(std::string_view{hipDataType_to_bench_string(static_cast<hipDataType>(HIP_R_4F_E2M1_EXT))} == "f4_r");
+    ASSERT_TRUE(std::string_view{hipDataType_to_bench_string(static_cast<hipDataType>(HIP_R_4F_E2M1_EXT+1))} == "invalid");
+
+    // Test rocblaslt_compute_type_to_string
+    ASSERT_TRUE(std::string_view{rocblaslt_compute_type_to_string(rocblaslt_compute_f16)} == "COMPUTE_16F");
+    ASSERT_TRUE(std::string_view{rocblaslt_compute_type_to_string(rocblaslt_compute_f32)} == "COMPUTE_32F");
+    ASSERT_TRUE(std::string_view{rocblaslt_compute_type_to_string(rocblaslt_compute_f32_fast_xf32)} == "COMPUTE_32XF");
+    ASSERT_TRUE(std::string_view{rocblaslt_compute_type_to_string(rocblaslt_compute_f64)} == "COMPUTE_64F");
+    ASSERT_TRUE(std::string_view{rocblaslt_compute_type_to_string(rocblaslt_compute_i32)} == "COMPUTE_32I");
+    ASSERT_TRUE(std::string_view{rocblaslt_compute_type_to_string(rocblaslt_compute_f32_fast_f16)} == "COMPUTE_32F_16F");
+    ASSERT_TRUE(std::string_view{rocblaslt_compute_type_to_string(rocblaslt_compute_f32_fast_bf16)} == "COMPUTE_32F_16BF");
+    ASSERT_TRUE(std::string_view{rocblaslt_compute_type_to_string(static_cast<rocblaslt_compute_type>(999))} == "Invalid");
+
+    // Test rocblaslt_matrix_layout_attributes_to_string
+    ASSERT_TRUE(std::string_view{rocblaslt_matrix_layout_attributes_to_string(ROCBLASLT_MATRIX_LAYOUT_BATCH_COUNT)} == "MATRIX_LAYOUT_BATCH_COUNT");
+    ASSERT_TRUE(std::string_view{rocblaslt_matrix_layout_attributes_to_string(ROCBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET)} == "MATRIX_LAYOUT_STRIDED_BATCH_OFFSET");
+    ASSERT_TRUE(std::string_view{rocblaslt_matrix_layout_attributes_to_string(ROCBLASLT_MATRIX_LAYOUT_TYPE)} == "ROCBLASLT_MATRIX_LAYOUT_TYPE");
+    ASSERT_TRUE(std::string_view{rocblaslt_matrix_layout_attributes_to_string(ROCBLASLT_MATRIX_LAYOUT_ORDER)} == "ROCBLASLT_MATRIX_LAYOUT_ORDER");
+    ASSERT_TRUE(std::string_view{rocblaslt_matrix_layout_attributes_to_string(ROCBLASLT_MATRIX_LAYOUT_ROWS)} == "ROCBLASLT_MATRIX_LAYOUT_ROWS");
+    ASSERT_TRUE(std::string_view{rocblaslt_matrix_layout_attributes_to_string(ROCBLASLT_MATRIX_LAYOUT_COLS)} == "ROCBLASLT_MATRIX_LAYOUT_COLS");
+    ASSERT_TRUE(std::string_view{rocblaslt_matrix_layout_attributes_to_string(ROCBLASLT_MATRIX_LAYOUT_LD)} == "ROCBLASLT_MATRIX_LAYOUT_LD");
+    ASSERT_TRUE(std::string_view{rocblaslt_matrix_layout_attributes_to_string(ROCBLASLT_MATRIX_LAYOUT_MAX)} == "ROCBLASLT_MATRIX_LAYOUT_MAX");
+    ASSERT_TRUE(std::string_view{rocblaslt_matrix_layout_attributes_to_string(static_cast<rocblaslt_matrix_layout_attribute_>(999))} == "Invalid");
+
+    // Test rocblaslt_matmul_desc_attributes_to_string
+    ASSERT_TRUE(std::string_view{rocblaslt_matmul_desc_attributes_to_string(ROCBLASLT_MATMUL_DESC_TRANSA)} == "MATMUL_DESC_TRANSA");
+    ASSERT_TRUE(std::string_view{rocblaslt_matmul_desc_attributes_to_string(ROCBLASLT_MATMUL_DESC_TRANSB)} == "MATMUL_DESC_TRANSB");
+    ASSERT_TRUE(std::string_view{rocblaslt_matmul_desc_attributes_to_string(ROCBLASLT_MATMUL_DESC_EPILOGUE)} == "MATMUL_DESC_EPILOGUE");
+    ASSERT_TRUE(std::string_view{rocblaslt_matmul_desc_attributes_to_string(ROCBLASLT_MATMUL_DESC_BIAS_POINTER)} == "MATMUL_DESC_BIAS_POINTER");
+    ASSERT_TRUE(std::string_view{rocblaslt_matmul_desc_attributes_to_string(ROCBLASLT_MATMUL_DESC_BIAS_DATA_TYPE)} == "MATMUL_DESC_BIAS_DATA_TYPE");
+    ASSERT_TRUE(std::string_view{rocblaslt_matmul_desc_attributes_to_string(ROCBLASLT_MATMUL_DESC_A_SCALE_POINTER)} == "MATMUL_DESC_A_SCALE_POINTER");
+    ASSERT_TRUE(std::string_view{rocblaslt_matmul_desc_attributes_to_string(ROCBLASLT_MATMUL_DESC_B_SCALE_POINTER)} == "MATMUL_DESC_B_SCALE_POINTER");
+    ASSERT_TRUE(std::string_view{rocblaslt_matmul_desc_attributes_to_string(ROCBLASLT_MATMUL_DESC_C_SCALE_POINTER)} == "MATMUL_DESC_C_SCALE_POINTER");
+    ASSERT_TRUE(std::string_view{rocblaslt_matmul_desc_attributes_to_string(ROCBLASLT_MATMUL_DESC_D_SCALE_POINTER)} == "MATMUL_DESC_D_SCALE_POINTER");
+    ASSERT_TRUE(std::string_view{rocblaslt_matmul_desc_attributes_to_string(ROCBLASLT_MATMUL_DESC_EPILOGUE_AUX_POINTER)} == "MATMUL_DESC_EPILOGUE_AUX_POINTER");
+    ASSERT_TRUE(std::string_view{rocblaslt_matmul_desc_attributes_to_string(ROCBLASLT_MATMUL_DESC_EPILOGUE_AUX_LD)} == "MATMUL_DESC_EPILOGUE_AUX_LD");
+    ASSERT_TRUE(std::string_view{rocblaslt_matmul_desc_attributes_to_string(ROCBLASLT_MATMUL_DESC_EPILOGUE_AUX_BATCH_STRIDE)} == "MATMUL_DESC_EPILOGUE_AUX_BATCH_STRIDE");
+    ASSERT_TRUE(std::string_view{rocblaslt_matmul_desc_attributes_to_string(ROCBLASLT_MATMUL_DESC_POINTER_MODE)} == "MATMUL_DESC_POINTER_MODE");
+    ASSERT_TRUE(std::string_view{rocblaslt_matmul_desc_attributes_to_string(ROCBLASLT_MATMUL_DESC_AMAX_D_POINTER)} == "MATMUL_DESC_AMAX_D_POINTER");
+    ASSERT_TRUE(std::string_view{rocblaslt_matmul_desc_attributes_to_string(ROCBLASLT_MATMUL_DESC_EPILOGUE_AUX_DATA_TYPE)} == "MATMUL_DESC_EPILOGUE_AUX_DATA_TYPE");
+    ASSERT_TRUE(std::string_view{rocblaslt_matmul_desc_attributes_to_string(ROCBLASLT_MATMUL_DESC_COMPUTE_INPUT_TYPE_A_EXT)} == "MATMUL_DESC_COMPUTE_INPUT_TYPE_A_EXT");
+    ASSERT_TRUE(std::string_view{rocblaslt_matmul_desc_attributes_to_string(ROCBLASLT_MATMUL_DESC_COMPUTE_INPUT_TYPE_B_EXT)} == "MATMUL_DESC_COMPUTE_INPUT_TYPE_B_EXT");
+    ASSERT_TRUE(std::string_view{rocblaslt_matmul_desc_attributes_to_string(static_cast<rocblaslt_matmul_desc_attributes>(999))} == "Invalid");
+
+    // Test hipblasOperation_to_string
+    ASSERT_TRUE(std::string_view{hipblasOperation_to_string(HIPBLAS_OP_N)} == "OP_N");
+    ASSERT_TRUE(std::string_view{hipblasOperation_to_string(HIPBLAS_OP_T)} == "OP_T");
+    ASSERT_TRUE(std::string_view{hipblasOperation_to_string(HIPBLAS_OP_C)} == "OP_C");
+    ASSERT_TRUE(std::string_view{hipblasOperation_to_string(static_cast<hipblasOperation_t>(999))} == "Invalid");
+
+    // Test rocblaslt_layer_mode2string
+    ASSERT_TRUE(std::string_view{rocblaslt_layer_mode2string(rocblaslt_layer_mode_none)} == "None");
+    ASSERT_TRUE(std::string_view{rocblaslt_layer_mode2string(rocblaslt_layer_mode_log_error)} == "Error");
+    ASSERT_TRUE(std::string_view{rocblaslt_layer_mode2string(rocblaslt_layer_mode_log_trace)} == "Trace");
+    ASSERT_TRUE(std::string_view{rocblaslt_layer_mode2string(rocblaslt_layer_mode_log_hints)} == "Hints");
+    ASSERT_TRUE(std::string_view{rocblaslt_layer_mode2string(rocblaslt_layer_mode_log_info)} == "Info");
+    ASSERT_TRUE(std::string_view{rocblaslt_layer_mode2string(rocblaslt_layer_mode_log_api)} == "Api");
+    ASSERT_TRUE(std::string_view{rocblaslt_layer_mode2string(rocblaslt_layer_mode_log_bench)} == "Bench");
+    ASSERT_TRUE(std::string_view{rocblaslt_layer_mode2string(rocblaslt_layer_mode_log_profile)} == "Profile");
+    ASSERT_TRUE(std::string_view{rocblaslt_layer_mode2string(rocblaslt_layer_mode_log_extended_profile)} == "ExtendedProfile");
+    ASSERT_TRUE(std::string_view{rocblaslt_layer_mode2string(static_cast<rocblaslt_layer_mode>(999))} == "Invalid");
+
+    // Test rocblaslt_epilogue_to_string
+    ASSERT_TRUE(std::string_view{rocblaslt_epilogue_to_string(ROCBLASLT_EPILOGUE_DEFAULT)} == "EPILOGUE_DEFAULT");
+    ASSERT_TRUE(std::string_view{rocblaslt_epilogue_to_string(ROCBLASLT_EPILOGUE_RELU)} == "EPILOGUE_RELU");
+    ASSERT_TRUE(std::string_view{rocblaslt_epilogue_to_string(ROCBLASLT_EPILOGUE_BIAS)} == "EPILOGUE_BIAS");
+    ASSERT_TRUE(std::string_view{rocblaslt_epilogue_to_string(ROCBLASLT_EPILOGUE_RELU_BIAS)} == "EPILOGUE_RELU_BIAS");
+    ASSERT_TRUE(std::string_view{rocblaslt_epilogue_to_string(ROCBLASLT_EPILOGUE_GELU)} == "EPILOGUE_GELU");
+    ASSERT_TRUE(std::string_view{rocblaslt_epilogue_to_string(ROCBLASLT_EPILOGUE_DGELU)} == "EPILOGUE_DGELU");
+    ASSERT_TRUE(std::string_view{rocblaslt_epilogue_to_string(ROCBLASLT_EPILOGUE_GELU_BIAS)} == "EPILOGUE_GELU_BIAS");
+    ASSERT_TRUE(std::string_view{rocblaslt_epilogue_to_string(ROCBLASLT_EPILOGUE_GELU_AUX)} == "EPILOGUE_GELU_AUX");
+    ASSERT_TRUE(std::string_view{rocblaslt_epilogue_to_string(ROCBLASLT_EPILOGUE_GELU_AUX_BIAS)} == "EPILOGUE_GELU_AUX_BIAS");
+    ASSERT_TRUE(std::string_view{rocblaslt_epilogue_to_string(ROCBLASLT_EPILOGUE_DGELU_BGRAD)} == "EPILOGUE_DGELU_BGRAD");
+    ASSERT_TRUE(std::string_view{rocblaslt_epilogue_to_string(ROCBLASLT_EPILOGUE_BGRADA)} == "EPILOGUE_DGELU_BGRADA");
+    ASSERT_TRUE(std::string_view{rocblaslt_epilogue_to_string(ROCBLASLT_EPILOGUE_BGRADB)} == "EPILOGUE_DGELU_BGRADB");
+    ASSERT_TRUE(std::string_view{rocblaslt_epilogue_to_string(ROCBLASLT_EPILOGUE_SWISH_EXT)} == "EPILOGUE_SWISH_EXT");
+    ASSERT_TRUE(std::string_view{rocblaslt_epilogue_to_string(ROCBLASLT_EPILOGUE_SWISH_BIAS_EXT)} == "EPILOGUE_SWISH_BIAS_EXT");
+    ASSERT_TRUE(std::string_view{rocblaslt_epilogue_to_string(static_cast<rocblaslt_epilogue>(999))} == "Invalid epilogue");
+
+    // Test all valid rocblaslt_compute_type values
+    ASSERT_TRUE(std::string_view{rocblaslt_compute_type_string(rocblaslt_compute_f16)} == "f16_r");
+    ASSERT_TRUE(std::string_view{rocblaslt_compute_type_string(rocblaslt_compute_f32)} == "f32_r");
+    ASSERT_TRUE(std::string_view{rocblaslt_compute_type_string(rocblaslt_compute_f32_fast_xf32)} == "xf32_r");
+    ASSERT_TRUE(std::string_view{rocblaslt_compute_type_string(rocblaslt_compute_i32)} == "i32_r");
+    ASSERT_TRUE(std::string_view{rocblaslt_compute_type_string(rocblaslt_compute_f64)} == "f64_r");
+    ASSERT_TRUE(std::string_view{rocblaslt_compute_type_string(rocblaslt_compute_f32_fast_f16)} == "f32_f16_r");
+    ASSERT_TRUE(std::string_view{rocblaslt_compute_type_string(rocblaslt_compute_f32_fast_bf16)} == "f32_bf16_r");
+    ASSERT_TRUE(std::string_view{rocblaslt_compute_type_string(rocblaslt_compute_f32_fast_f8)} == "f32_f8_r");
+    ASSERT_TRUE(std::string_view{rocblaslt_compute_type_string(rocblaslt_compute_f32_fast_f8_fnuz)} == "f32_f8_fnuz_r");
+    ASSERT_TRUE(std::string_view{rocblaslt_compute_type_string(rocblaslt_compute_f32_fast_bf8)} == "f32_bf8_fnuz_r");
+    ASSERT_TRUE(std::string_view{rocblaslt_compute_type_string(rocblaslt_compute_f32_fast_bf8_fnuz)} == "f32_bf8_r");
+    ASSERT_TRUE(std::string_view{rocblaslt_compute_type_string(rocblaslt_compute_f32_fast_f8bf8)} == "f32_f8bf8_r");
+    ASSERT_TRUE(std::string_view{rocblaslt_compute_type_string(rocblaslt_compute_f32_fast_f8bf8_fnuz)} == "f32_f8bf8_fnuz_r");
+    ASSERT_TRUE(std::string_view{rocblaslt_compute_type_string(rocblaslt_compute_f32_fast_bf8f8)} == "f32_bf8f8_r");
+    ASSERT_TRUE(std::string_view{rocblaslt_compute_type_string(rocblaslt_compute_f32_fast_bf8f8_fnuz)} == "f32_bf8f8_fnuz_r");
+    ASSERT_TRUE(std::string_view{rocblaslt_compute_type_string(static_cast<rocblaslt_compute_type>(999))} == "invalidType");
+    
+
+    // Test rocblaslt_matrix_layout_to_string function
+    // Create test matrix layout structures
+    _rocblaslt_matrix_layout mat1, mat2, mat3, mat4;
+    
+    // Test case 1: Single batch matrix (batch_count <= 1)
+    mat1.type = HIP_R_32F;
+    mat1.m = 128;
+    mat1.n = 256;
+    mat1.ld = 128;
+    mat1.batch_count = 1;
+    mat1.batch_stride = 0;
+    
+    std::string mat1_result = rocblaslt_matrix_layout_to_string(&mat1);
+    ASSERT_TRUE(!mat1_result.empty());
+    ASSERT_TRUE(mat1_result.find("[type=R_32F") != std::string::npos);
+    ASSERT_TRUE(mat1_result.find("rows=128") != std::string::npos);
+    ASSERT_TRUE(mat1_result.find("cols=256") != std::string::npos);
+    ASSERT_TRUE(mat1_result.find("ld=128") != std::string::npos);
+    // Should NOT contain batch_count and batch_stride for single batch
+    ASSERT_TRUE(mat1_result.find("batch_count") == std::string::npos);
+    ASSERT_TRUE(mat1_result.find("batch_stride") == std::string::npos);
+    
+    // Test case 2: Batch matrix (batch_count > 1)
+    mat2.type = HIP_R_16F;
+    mat2.m = 64;
+    mat2.n = 128;
+    mat2.ld = 64;
+    mat2.batch_count = 4;
+    mat2.batch_stride = 8192;
+    
+    std::string mat2_result = rocblaslt_matrix_layout_to_string(&mat2);
+    ASSERT_TRUE(!mat2_result.empty());
+    ASSERT_TRUE(mat2_result.find("[type=R_16F") != std::string::npos);
+    ASSERT_TRUE(mat2_result.find("rows=64") != std::string::npos);
+    ASSERT_TRUE(mat2_result.find("cols=128") != std::string::npos);
+    ASSERT_TRUE(mat2_result.find("ld=64") != std::string::npos);
+    // Should contain batch_count and batch_stride for batch matrix
+    ASSERT_TRUE(mat2_result.find("batch_count=4") != std::string::npos);
+    ASSERT_TRUE(mat2_result.find("batch_stride=8192") != std::string::npos);
+    
+    // Test case 3: Zero batch count
+    mat3.type = HIP_R_64F;
+    mat3.m = 32;
+    mat3.n = 64;
+    mat3.ld = 32;
+    mat3.batch_count = 0;
+    mat3.batch_stride = 0;
+    
+    std::string mat3_result = rocblaslt_matrix_layout_to_string(&mat3);
+    ASSERT_TRUE(!mat3_result.empty());
+    ASSERT_TRUE(mat3_result.find("[type=R_64F") != std::string::npos);
+    ASSERT_TRUE(mat3_result.find("rows=32") != std::string::npos);
+    ASSERT_TRUE(mat3_result.find("cols=64") != std::string::npos);
+    ASSERT_TRUE(mat3_result.find("ld=32") != std::string::npos);
+    // batch_count <= 1, so should NOT contain batch info
+    ASSERT_TRUE(mat3_result.find("batch_count") == std::string::npos);
+    ASSERT_TRUE(mat3_result.find("batch_stride") == std::string::npos);
+    
+    // Test case 4: Different data types
+    mat4.type = HIP_R_8F_E4M3_FNUZ;
+    mat4.m = 16;
+    mat4.n = 32;
+    mat4.ld = 16;
+    mat4.batch_count = 8;
+    mat4.batch_stride = 512;
+    
+    std::string mat4_result = rocblaslt_matrix_layout_to_string(&mat4);
+    ASSERT_TRUE(!mat4_result.empty());
+    ASSERT_TRUE(mat4_result.find("[type=R_8F_E4M3_FNUZ") != std::string::npos);
+    ASSERT_TRUE(mat4_result.find("rows=16") != std::string::npos);
+    ASSERT_TRUE(mat4_result.find("cols=32") != std::string::npos);
+    ASSERT_TRUE(mat4_result.find("ld=16") != std::string::npos);
+    ASSERT_TRUE(mat4_result.find("batch_count=8") != std::string::npos);
+    ASSERT_TRUE(mat4_result.find("batch_stride=512") != std::string::npos);
+    
+    // Test format consistency - all results should start with '[' and end with ']'
+    ASSERT_TRUE(mat1_result.front() == '[' && mat1_result.back() == ']');
+    ASSERT_TRUE(mat2_result.front() == '[' && mat2_result.back() == ']');
+    ASSERT_TRUE(mat3_result.front() == '[' && mat3_result.back() == ']');
+    ASSERT_TRUE(mat4_result.front() == '[' && mat4_result.back() == ']');
+    
+    // Test edge case: Large dimensions
+    _rocblaslt_matrix_layout mat_large;
+    mat_large.type = HIP_R_16BF;
+    mat_large.m = 4096;
+    mat_large.n = 8192;
+    mat_large.ld = 4096;
+    mat_large.batch_count = 16;
+    mat_large.batch_stride = 33554432; // 4096 * 8192
+    
+    std::string result_large = rocblaslt_matrix_layout_to_string(&mat_large);
+    ASSERT_TRUE(!result_large.empty());
+    ASSERT_TRUE(result_large.find("rows=4096") != std::string::npos);
+    ASSERT_TRUE(result_large.find("cols=8192") != std::string::npos);
+    ASSERT_TRUE(result_large.find("batch_count=16") != std::string::npos);
+    ASSERT_TRUE(result_large.find("batch_stride=33554432") != std::string::npos);
+
+
+    // Test rocblaslt_matmul_desc_to_string function
+    // Create test matmul descriptor structures
+    _rocblaslt_matmul_desc desc1, desc2, desc3, desc4;
+    
+    // Test case 1: No bias, no epilogue extension (simplest case)
+    desc1.compute_type = rocblaslt_compute_f32;
+    desc1.scale_type = HIP_R_32F;
+    desc1.op_A = HIPBLAS_OP_N;
+    desc1.op_B = HIPBLAS_OP_T;
+    desc1.epilogue = ROCBLASLT_EPILOGUE_DEFAULT;
+    desc1.bias = nullptr;
+    desc1.bias_type = HIPBLASLT_DATATYPE_INVALID;
+    desc1.aux_type = HIPBLASLT_DATATYPE_INVALID;
+    desc1.e = nullptr;
+    desc1.lde = 0;
+    
+    std::string desc_result1 = rocblaslt_matmul_desc_to_string(&desc1);
+    ASSERT_TRUE(!desc_result1.empty());
+    ASSERT_TRUE(desc_result1.find("[computeType=COMPUTE_32F") != std::string::npos);
+    ASSERT_TRUE(desc_result1.find("scaleType=R_32F") != std::string::npos);
+    ASSERT_TRUE(desc_result1.find("transA=OP_N") != std::string::npos);
+    ASSERT_TRUE(desc_result1.find("transB=OP_T") != std::string::npos);
+    ASSERT_TRUE(desc_result1.find("epilogue=EPILOGUE_DEFAULT") != std::string::npos);
+    ASSERT_TRUE(desc_result1.find("biasPointer=0x") != std::string::npos);
+    // Should NOT contain epilogue aux or bias type info
+    ASSERT_TRUE(desc_result1.find("epilogueAuxPointer") == std::string::npos);
+    ASSERT_TRUE(desc_result1.find("biasType") == std::string::npos);
+    ASSERT_TRUE(desc_result1.front() == '[' && desc_result1.back() == ']');
+    
+    // Test case 2: With bias, no epilogue extension
+    desc2.compute_type = rocblaslt_compute_f16;
+    desc2.scale_type = HIP_R_16F;
+    desc2.op_A = HIPBLAS_OP_T;
+    desc2.op_B = HIPBLAS_OP_N;
+    desc2.epilogue = ROCBLASLT_EPILOGUE_BIAS;
+    desc2.bias = reinterpret_cast<void*>(0x12345678);
+    desc2.bias_type = HIP_R_16F;
+    desc2.aux_type = HIPBLASLT_DATATYPE_INVALID;
+    desc2.e = nullptr;
+    desc2.lde = 0;
+    
+    std::string desc_result2 = rocblaslt_matmul_desc_to_string(&desc2);
+    ASSERT_TRUE(!desc_result2.empty());
+    ASSERT_TRUE(desc_result2.find("computeType=COMPUTE_16F") != std::string::npos);
+    ASSERT_TRUE(desc_result2.find("scaleType=R_16F") != std::string::npos);
+    ASSERT_TRUE(desc_result2.find("transA=OP_T") != std::string::npos);
+    ASSERT_TRUE(desc_result2.find("transB=OP_N") != std::string::npos);
+    ASSERT_TRUE(desc_result2.find("epilogue=EPILOGUE_BIAS") != std::string::npos);
+    ASSERT_TRUE(desc_result2.find("biasType=R_16F") != std::string::npos);
+    // Should NOT contain epilogue aux info
+    ASSERT_TRUE(desc_result2.find("epilogueAuxPointer") == std::string::npos);
+    ASSERT_TRUE(desc_result2.front() == '[' && desc_result2.back() == ']');
+    
+    // Test case 3: No bias, with epilogue extension
+    desc3.compute_type = rocblaslt_compute_f32;
+    desc3.scale_type = HIP_R_32F;
+    desc3.op_A = HIPBLAS_OP_N;
+    desc3.op_B = HIPBLAS_OP_N;
+    desc3.epilogue = ROCBLASLT_EPILOGUE_GELU_AUX;
+    desc3.bias = nullptr;
+    desc3.bias_type = HIPBLASLT_DATATYPE_INVALID;
+    desc3.aux_type = HIP_R_32F;
+    desc3.e = reinterpret_cast<void*>(0x87654321);
+    desc3.lde = 128;
+    
+    std::string desc_result3 = rocblaslt_matmul_desc_to_string(&desc3);
+    ASSERT_TRUE(!desc_result3.empty());
+    ASSERT_TRUE(desc_result3.find("computeType=COMPUTE_32F") != std::string::npos);
+    ASSERT_TRUE(desc_result3.find("epilogue=EPILOGUE_GELU_AUX") != std::string::npos);
+    ASSERT_TRUE(desc_result3.find("epilogueAuxPointer=0x") != std::string::npos);
+    ASSERT_TRUE(desc_result3.find("epilogueAuxLd=128") != std::string::npos);
+    ASSERT_TRUE(desc_result3.find("epilogueAuxDataType=R_32F") != std::string::npos);
+    // Should NOT contain bias type info
+    ASSERT_TRUE(desc_result3.find("biasType") == std::string::npos);
+    ASSERT_TRUE(desc_result3.front() == '[' && desc_result3.back() == ']');
+    
+    // Test case 4: With bias and epilogue extension (most complex case)
+    desc4.compute_type = rocblaslt_compute_f64;
+    desc4.scale_type = HIP_R_64F;
+    desc4.op_A = HIPBLAS_OP_C;
+    desc4.op_B = HIPBLAS_OP_C;
+    desc4.epilogue = ROCBLASLT_EPILOGUE_GELU_AUX_BIAS;
+    desc4.bias = reinterpret_cast<void*>(0xABCDEF00);
+    desc4.bias_type = HIP_R_64F;
+    desc4.aux_type = HIP_R_64F;
+    desc4.e = reinterpret_cast<void*>(0x11223344);
+    desc4.lde = 256;
+    
+    std::string desc_result4 = rocblaslt_matmul_desc_to_string(&desc4);
+    ASSERT_TRUE(!desc_result4.empty());
+    ASSERT_TRUE(desc_result4.find("computeType=COMPUTE_64F") != std::string::npos);
+    ASSERT_TRUE(desc_result4.find("scaleType=R_64F") != std::string::npos);
+    ASSERT_TRUE(desc_result4.find("transA=OP_C") != std::string::npos);
+    ASSERT_TRUE(desc_result4.find("transB=OP_C") != std::string::npos);
+    ASSERT_TRUE(desc_result4.find("epilogue=EPILOGUE_GELU_AUX_BIAS") != std::string::npos);
+    ASSERT_TRUE(desc_result4.find("biasType=R_64F") != std::string::npos);
+    ASSERT_TRUE(desc_result4.find("epilogueAuxPointer=0x") != std::string::npos);
+    ASSERT_TRUE(desc_result4.find("epilogueAuxLd=256") != std::string::npos);
+    ASSERT_TRUE(desc_result4.find("epilogueAuxDataType=R_64F") != std::string::npos);
+    ASSERT_TRUE(desc_result4.front() == '[' && desc_result4.back() == ']');
+    
+    // Test case 5: Epilogue extension without aux_type
+    _rocblaslt_matmul_desc desc5;
+    desc5.compute_type = rocblaslt_compute_i32;
+    desc5.scale_type = HIP_R_32I;
+    desc5.op_A = HIPBLAS_OP_N;
+    desc5.op_B = HIPBLAS_OP_N;
+    desc5.epilogue = ROCBLASLT_EPILOGUE_DGELU_BGRAD;
+    desc5.bias = nullptr;
+    desc5.bias_type = HIPBLASLT_DATATYPE_INVALID;
+    desc5.aux_type = HIPBLASLT_DATATYPE_INVALID; // Invalid aux type
+    desc5.e = reinterpret_cast<void*>(0x55555555);
+    desc5.lde = 64;
+    
+    std::string desc_result5 = rocblaslt_matmul_desc_to_string(&desc5);
+    ASSERT_TRUE(!desc_result5.empty());
+    ASSERT_TRUE(desc_result5.find("computeType=COMPUTE_32I") != std::string::npos);
+    ASSERT_TRUE(desc_result5.find("epilogue=EPILOGUE_DGELU_BGRAD") != std::string::npos);
+    ASSERT_TRUE(desc_result5.find("epilogueAuxPointer=0x") != std::string::npos);
+    ASSERT_TRUE(desc_result5.find("epilogueAuxLd=64") != std::string::npos);
+    // Should NOT contain epilogueAuxDataType since aux_type is invalid
+    ASSERT_TRUE(desc_result5.find("epilogueAuxDataType") == std::string::npos);
+    ASSERT_TRUE(desc_result5.front() == '[' && desc_result5.back() == ']');
+    
+    // Test different data types
+    _rocblaslt_matmul_desc desc6;
+    desc6.compute_type = rocblaslt_compute_f32_fast_bf16;
+    desc6.scale_type = HIP_R_16BF;
+    desc6.op_A = HIPBLAS_OP_N;
+    desc6.op_B = HIPBLAS_OP_T;
+    desc6.epilogue = ROCBLASLT_EPILOGUE_RELU_BIAS;
+    desc6.bias = reinterpret_cast<void*>(0x99999999);
+    desc6.bias_type = HIP_R_8F_E4M3_FNUZ;
+    desc6.aux_type = HIPBLASLT_DATATYPE_INVALID;
+    desc6.e = nullptr;
+    desc6.lde = 0;
+    
+    std::string desc_result6 = rocblaslt_matmul_desc_to_string(&desc6);
+    ASSERT_TRUE(!desc_result6.empty());
+    ASSERT_TRUE(desc_result6.find("computeType=COMPUTE_32F_16BF") != std::string::npos);
+    ASSERT_TRUE(desc_result6.find("scaleType=R_16BF") != std::string::npos);
+    ASSERT_TRUE(desc_result6.find("epilogue=EPILOGUE_RELU_BIAS") != std::string::npos);
+    ASSERT_TRUE(desc_result6.find("biasType=R_8F_E4M3_FNUZ") != std::string::npos);
+    ASSERT_TRUE(desc_result6.front() == '[' && desc_result6.back() == ']');
+
+
+    // Test case 1: No exception (nullptr) - should return success
+    rocblaslt_status excep_result1 = exception_to_rocblaslt_status(nullptr);
+    ASSERT_TRUE(excep_result1 == rocblaslt_status_success);
+    
+    // Test case 2: Catch rocblaslt_status exception - should return the status value
+    std::exception_ptr status_exception;
+    try {
+        throw rocblaslt_status_invalid_handle;
+    } catch (...) {
+        status_exception = std::current_exception();
+    }
+    
+    rocblaslt_status excep_result2 = exception_to_rocblaslt_status(status_exception);
+    ASSERT_TRUE(excep_result2 == rocblaslt_status_invalid_handle);
+    
+    // Test case 3: Different rocblaslt_status values
+    std::exception_ptr status_exception2;
+    try {
+        throw rocblaslt_status_not_initialized;
+    } catch (...) {
+        status_exception2 = std::current_exception();
+    }
+    
+    rocblaslt_status excep_result3 = exception_to_rocblaslt_status(status_exception2);
+    ASSERT_TRUE(excep_result3 == rocblaslt_status_not_initialized);
+    
+    // Test case 4: Catch std::bad_alloc - should return memory error
+    std::exception_ptr bad_alloc_exception;
+    try {
+        throw std::bad_alloc();
+    } catch (...) {
+        bad_alloc_exception = std::current_exception();
+    }
+    
+    rocblaslt_status excep_result4 = exception_to_rocblaslt_status(bad_alloc_exception);
+    ASSERT_TRUE(excep_result4 == rocblaslt_status_memory_error);
+
+    // Test all epilogue values that should return true (activation enabled)
+    ASSERT_TRUE(is_act_enabled(ROCBLASLT_EPILOGUE_RELU) == true);
+    ASSERT_TRUE(is_act_enabled(ROCBLASLT_EPILOGUE_RELU_BIAS) == true);
+    ASSERT_TRUE(is_act_enabled(ROCBLASLT_EPILOGUE_GELU) == true);
+    ASSERT_TRUE(is_act_enabled(ROCBLASLT_EPILOGUE_GELU_BIAS) == true);
+    ASSERT_TRUE(is_act_enabled(ROCBLASLT_EPILOGUE_GELU_AUX) == true);
+    ASSERT_TRUE(is_act_enabled(ROCBLASLT_EPILOGUE_GELU_AUX_BIAS) == true);
+    ASSERT_TRUE(is_act_enabled(ROCBLASLT_EPILOGUE_DGELU) == true);
+    ASSERT_TRUE(is_act_enabled(ROCBLASLT_EPILOGUE_DGELU_BGRAD) == true);
+    ASSERT_TRUE(is_act_enabled(ROCBLASLT_EPILOGUE_SWISH_EXT) == true);
+    ASSERT_TRUE(is_act_enabled(ROCBLASLT_EPILOGUE_SWISH_BIAS_EXT) == true);
+    ASSERT_TRUE(is_act_enabled(ROCBLASLT_EPILOGUE_CLAMP_EXT) == true);
+    ASSERT_TRUE(is_act_enabled(ROCBLASLT_EPILOGUE_CLAMP_BIAS_EXT) == true);
+
+    // Test all epilogue values that should return false (activation disabled)
+    ASSERT_TRUE(is_act_enabled(ROCBLASLT_EPILOGUE_DEFAULT) == false);
+    ASSERT_TRUE(is_act_enabled(ROCBLASLT_EPILOGUE_BIAS) == false);
+}
+
+void testing_aux_rocblaslt_mat_utils_func(const Arguments& arg)
+{
+    // For rocblaslt_mat_utils
+    // Test case 1: Valid swizzle configuration - swizzleA with HIPBLAS_OP_T
+    _rocblaslt_matmul_desc desc1;
+    desc1.op_A = HIPBLAS_OP_T;
+    desc1.op_B = HIPBLAS_OP_N;
+    
+    _rocblaslt_matrix_layout matA1, matB1;
+    matA1.m = 128;
+    matA1.n = 256;
+    matA1.ld = 128;
+    matA1.order = HIPBLASLT_ORDER_COL16_4R8;
+    
+    matB1.m = 256;
+    matB1.n = 512;
+    matB1.ld = 256;
+    matB1.order = HIPBLASLT_ORDER_COL;
+    
+    hipDataType a_type1 = HIP_R_16F;
+    hipDataType b_type1 = HIP_R_32F;
+    bool swizzleA1 = true;
+    bool swizzleB1 = false;
+    
+    rocblaslt_status result1 = validateMatmulSwizzleArgs(&desc1, &matA1, &matB1, a_type1, b_type1, swizzleA1, swizzleB1);
+    ASSERT_TRUE(result1 == rocblaslt_status_continue);
+
+    // Test case 2: Valid swizzle configuration - swizzleB with HIPBLAS_OP_N
+    _rocblaslt_matmul_desc desc2;
+    desc2.op_A = HIPBLAS_OP_N;
+    desc2.op_B = HIPBLAS_OP_N;
+    
+    _rocblaslt_matrix_layout matA2, matB2;
+    matA2.m = 64;
+    matA2.n = 128;
+    matA2.ld = 64;
+    matA2.order = HIPBLASLT_ORDER_COL;
+    
+    matB2.m = 128;
+    matB2.n = 256;
+    matB2.ld = 128;
+    matB2.order = HIPBLASLT_ORDER_COL16_4R16;
+    
+    hipDataType a_type2 = HIP_R_32F;
+    hipDataType b_type2 = HIP_R_8F_E4M3_FNUZ;
+    bool swizzleA2 = false;
+    bool swizzleB2 = true;
+    
+    rocblaslt_status result2 = validateMatmulSwizzleArgs(&desc2, &matA2, &matB2, a_type2, b_type2, swizzleA2, swizzleB2);
+    ASSERT_TRUE(result2 == rocblaslt_status_continue);
+    
+    // Test case 3: Invalid swizzleA with wrong operation (should be HIPBLAS_OP_T)
+    _rocblaslt_matmul_desc desc3;
+    desc3.op_A = HIPBLAS_OP_N;  // Invalid for swizzleA
+    desc3.op_B = HIPBLAS_OP_N;
+    
+    _rocblaslt_matrix_layout matA3, matB3;
+    matA3.m = 128;
+    matA3.n = 256;
+    matA3.ld = 128;
+    matA3.order = HIPBLASLT_ORDER_COL16_4R8;
+    
+    matB3.m = 256;
+    matB3.n = 512;
+    matB3.ld = 256;
+    matB3.order = HIPBLASLT_ORDER_COL;
+    
+    hipDataType a_type3 = HIP_R_16F;
+    hipDataType b_type3 = HIP_R_32F;
+    bool swizzleA3 = true;
+    bool swizzleB3 = false;
+    
+    rocblaslt_status result3 = validateMatmulSwizzleArgs(&desc3, &matA3, &matB3, a_type3, b_type3, swizzleA3, swizzleB3);
+    ASSERT_TRUE(result3 == rocblaslt_status_invalid_value);
+    
+    // Test case 4: Invalid swizzleB with wrong operation (should be HIPBLAS_OP_N)
+    _rocblaslt_matmul_desc desc4;
+    desc4.op_A = HIPBLAS_OP_N;
+    desc4.op_B = HIPBLAS_OP_T;  // Invalid for swizzleB
+    
+    _rocblaslt_matrix_layout matA4, matB4;
+    matA4.m = 64;
+    matA4.n = 128;
+    matA4.ld = 64;
+    matA4.order = HIPBLASLT_ORDER_COL;
+    
+    matB4.m = 128;
+    matB4.n = 256;
+    matB4.ld = 128;
+    matB4.order = HIPBLASLT_ORDER_COL16_4R16;
+    
+    hipDataType a_type4 = HIP_R_32F;
+    hipDataType b_type4 = HIP_R_8F_E4M3_FNUZ;
+    bool swizzleA4 = false;
+    bool swizzleB4 = true;
+    
+    rocblaslt_status result4 = validateMatmulSwizzleArgs(&desc4, &matA4, &matB4, a_type4, b_type4, swizzleA4, swizzleB4);
+    ASSERT_TRUE(result4 == rocblaslt_status_invalid_value);
+    
+    // Test case 5: Invalid order for swizzleA (HIP_R_16F requires HIPBLASLT_ORDER_COL16_4R8)
+    _rocblaslt_matmul_desc desc5;
+    desc5.op_A = HIPBLAS_OP_T;
+    desc5.op_B = HIPBLAS_OP_N;
+    
+    _rocblaslt_matrix_layout matA5, matB5;
+    matA5.m = 128;
+    matA5.n = 256;
+    matA5.ld = 128;
+    matA5.order = HIPBLASLT_ORDER_COL;  // Invalid for HIP_R_16F
+    
+    matB5.m = 256;
+    matB5.n = 512;
+    matB5.ld = 256;
+    matB5.order = HIPBLASLT_ORDER_COL;
+    
+    hipDataType a_type5 = HIP_R_16F;
+    hipDataType b_type5 = HIP_R_32F;
+    bool swizzleA5 = true;
+    bool swizzleB5 = false;
+    
+    rocblaslt_status result5 = validateMatmulSwizzleArgs(&desc5, &matA5, &matB5, a_type5, b_type5, swizzleA5, swizzleB5);
+    ASSERT_TRUE(result5 == rocblaslt_status_invalid_value);
+
+    // Test case 6: Invalid order for swizzleB (HIP_R_8F_E4M3_FNUZ requires HIPBLASLT_ORDER_COL16_4R16)
+    _rocblaslt_matmul_desc desc6;
+    desc6.op_A = HIPBLAS_OP_N;
+    desc6.op_B = HIPBLAS_OP_N;
+    
+    _rocblaslt_matrix_layout matA6, matB6;
+    matA6.m = 64;
+    matA6.n = 128;
+    matA6.ld = 64;
+    matA6.order = HIPBLASLT_ORDER_COL;
+    
+    matB6.m = 128;
+    matB6.n = 256;
+    matB6.ld = 128;
+    matB6.order = HIPBLASLT_ORDER_COL;  // Invalid for HIP_R_8F_E4M3_FNUZ
+    
+    hipDataType a_type6 = HIP_R_32F;
+    hipDataType b_type6 = HIP_R_8F_E4M3_FNUZ;
+    bool swizzleA6 = false;
+    bool swizzleB6 = true;
+    
+    rocblaslt_status result6 = validateMatmulSwizzleArgs(&desc6, &matA6, &matB6, a_type6, b_type6, swizzleA6, swizzleB6);
+    ASSERT_TRUE(result6 == rocblaslt_status_invalid_value);
+    
+    // Test case 7: No swizzling enabled (should always pass)
+    _rocblaslt_matmul_desc desc7;
+    desc7.op_A = HIPBLAS_OP_N;
+    desc7.op_B = HIPBLAS_OP_T;
+    
+    _rocblaslt_matrix_layout matA7, matB7;
+    matA7.m = 128;
+    matA7.n = 256;
+    matA7.ld = 128;
+    matA7.order = HIPBLASLT_ORDER_COL;
+    
+    matB7.m = 256;
+    matB7.n = 512;
+    matB7.ld = 256;
+    matB7.order = HIPBLASLT_ORDER_COL;
+    
+    hipDataType a_type7 = HIP_R_32F;
+    hipDataType b_type7 = HIP_R_32F;
+    bool swizzleA7 = false;
+    bool swizzleB7 = false;
+    
+    rocblaslt_status result7 = validateMatmulSwizzleArgs(&desc7, &matA7, &matB7, a_type7, b_type7, swizzleA7, swizzleB7);
+    ASSERT_TRUE(result7 == rocblaslt_status_continue);
+    
+    // Test case 8: Both swizzles enabled with correct configurations
+    _rocblaslt_matmul_desc desc8;
+    desc8.op_A = HIPBLAS_OP_T;
+    desc8.op_B = HIPBLAS_OP_N;
+    
+    _rocblaslt_matrix_layout matA8, matB8;
+    matA8.m = 128;
+    matA8.n = 256;
+    matA8.ld = 128;
+    matA8.order = HIPBLASLT_ORDER_COL16_4R8;
+    
+    matB8.m = 256;
+    matB8.n = 512;
+    matB8.ld = 256;
+    matB8.order = HIPBLASLT_ORDER_COL16_4R16;
+    
+    hipDataType a_type8 = HIP_R_16F;
+    hipDataType b_type8 = HIP_R_8F_E4M3_FNUZ;
+    bool swizzleA8 = true;
+    bool swizzleB8 = true;
+    
+    rocblaslt_status result8 = validateMatmulSwizzleArgs(&desc8, &matA8, &matB8, a_type8, b_type8, swizzleA8, swizzleB8);
+    ASSERT_TRUE(result8 == rocblaslt_status_continue);
+    
+    // Test case 9: Test warning case - swizzleA with ld != m (should still return continue but log warning)
+    _rocblaslt_matmul_desc desc9;
+    desc9.op_A = HIPBLAS_OP_T;
+    desc9.op_B = HIPBLAS_OP_N;
+    
+    _rocblaslt_matrix_layout matA9, matB9;
+    matA9.m = 128;
+    matA9.n = 256;
+    matA9.ld = 256;  // ld != m, should trigger warning
+    matA9.order = HIPBLASLT_ORDER_COL16_4R8;
+    
+    matB9.m = 256;
+    matB9.n = 512;
+    matB9.ld = 256;
+    matB9.order = HIPBLASLT_ORDER_COL;
+    
+    hipDataType a_type9 = HIP_R_16F;
+    hipDataType b_type9 = HIP_R_32F;
+    bool swizzleA9 = true;
+    bool swizzleB9 = false;
+    
+    rocblaslt_status result9 = validateMatmulSwizzleArgs(&desc9, &matA9, &matB9, a_type9, b_type9, swizzleA9, swizzleB9);
+    ASSERT_TRUE(result9 == rocblaslt_status_continue);
+    
+    // Test case 10: Test warning case - swizzleB with ld != m (should still return continue but log warning)
+    _rocblaslt_matmul_desc desc10;
+    desc10.op_A = HIPBLAS_OP_N;
+    desc10.op_B = HIPBLAS_OP_N;
+    
+    _rocblaslt_matrix_layout matA10, matB10;
+    matA10.m = 64;
+    matA10.n = 128;
+    matA10.ld = 64;
+    matA10.order = HIPBLASLT_ORDER_COL;
+    
+    matB10.m = 128;
+    matB10.n = 256;
+    matB10.ld = 256;  // ld != m, should trigger warning
+    matB10.order = HIPBLASLT_ORDER_COL16_4R16;
+    
+    hipDataType a_type10 = HIP_R_32F;
+    hipDataType b_type10 = HIP_R_8F_E4M3_FNUZ;
+    bool swizzleA10 = false;
+    bool swizzleB10 = true;
+    
+    rocblaslt_status result10 = validateMatmulSwizzleArgs(&desc10, &matA10, &matB10, a_type10, b_type10, swizzleA10, swizzleB10);
+    ASSERT_TRUE(result10 == rocblaslt_status_continue);
+
+
+    // Test case 1: Valid F32 configuration
+    {
+        int64_t m = 128, n = 256, k = 64;
+        float alpha_val = 1.0f, beta_val = 0.0f;
+        void* alpha = &alpha_val;
+        void* beta = &beta_val;
+        void* a = (void*)0x1000;
+        void* b = (void*)0x2000;
+        void* c = (void*)0x3000;
+        void* d = (void*)0x4000;
+        
+        rocblaslt_status result = validateMatmulArgs(
+            m, n, k, alpha, a, b, beta, c, d,
+            HIP_R_32F, HIP_R_32F, HIP_R_32F, HIP_R_32F,
+            rocblaslt_compute_f32,
+            HIPBLAS_OP_N, HIPBLAS_OP_N);
+        
+        ASSERT_TRUE(result == rocblaslt_status_continue);
+    }
+
+    // Test case 2: Invalid compute type for F32 data types
+    {
+        int64_t m = 128, n = 256, k = 64;
+        float alpha_val = 1.0f, beta_val = 0.0f;
+        void* alpha = &alpha_val;
+        void* beta = &beta_val;
+        void* a = (void*)0x1000;
+        void* b = (void*)0x2000;
+        void* c = (void*)0x3000;
+        void* d = (void*)0x4000;
+        
+        rocblaslt_status result = validateMatmulArgs(
+            m, n, k, alpha, a, b, beta, c, d,
+            HIP_R_16F, HIP_R_16F, HIP_R_16F, HIP_R_16F,  // Wrong types for f32_fast_xf32
+            rocblaslt_compute_f32_fast_xf32,
+            HIPBLAS_OP_N, HIPBLAS_OP_N);
+        
+        ASSERT_TRUE(result == rocblaslt_status_not_implemented);
+    }
+
+    // Test case 3: Valid I32 configuration
+    {
+        int64_t m = 128, n = 256, k = 64;
+        int32_t alpha_val = 1, beta_val = 0;
+        void* alpha = &alpha_val;
+        void* beta = &beta_val;
+        void* a = (void*)0x1000;
+        void* b = (void*)0x2000;
+        void* c = (void*)0x3000;
+        void* d = (void*)0x4000;
+        
+        rocblaslt_status result = validateMatmulArgs(
+            m, n, k, alpha, a, b, beta, c, d,
+            HIP_R_8I, HIP_R_8I, HIP_R_32I, HIP_R_32I,
+            rocblaslt_compute_i32,
+            HIPBLAS_OP_N, HIPBLAS_OP_N);
+        
+        ASSERT_TRUE(result == rocblaslt_status_continue);
+    }
+
+    // Test case 4: Invalid compute type for I8 data types
+    {
+        int64_t m = 128, n = 256, k = 64;
+        int32_t alpha_val = 1, beta_val = 0;
+        void* alpha = &alpha_val;
+        void* beta = &beta_val;
+        void* a = (void*)0x1000;
+        void* b = (void*)0x2000;
+        void* c = (void*)0x3000;
+        void* d = (void*)0x4000;
+        
+        rocblaslt_status result = validateMatmulArgs(
+            m, n, k, alpha, a, b, beta, c, d,
+            HIP_R_32F, HIP_R_32F, HIP_R_32F, HIP_R_32F,  // Wrong types for i32 compute
+            rocblaslt_compute_i32,
+            HIPBLAS_OP_N, HIPBLAS_OP_N);
+        
+        ASSERT_TRUE(result == rocblaslt_status_not_implemented);
+    }
+
+    // Test case 5: Invalid operation A
+    {
+        int64_t m = 128, n = 256, k = 64;
+        float alpha_val = 1.0f, beta_val = 0.0f;
+        void* alpha = &alpha_val;
+        void* beta = &beta_val;
+        void* a = (void*)0x1000;
+        void* b = (void*)0x2000;
+        void* c = (void*)0x3000;
+        void* d = (void*)0x4000;
+        
+        rocblaslt_status result = validateMatmulArgs(
+            m, n, k, alpha, a, b, beta, c, d,
+            HIP_R_32F, HIP_R_32F, HIP_R_32F, HIP_R_32F,
+            rocblaslt_compute_f32,
+            HIPBLASLT_OPERATION_INVALID, HIPBLAS_OP_N);
+        
+        ASSERT_TRUE(result == rocblaslt_status_not_implemented);
+    }
+
+    // Test case 6: Invalid operation B
+    {
+        int64_t m = 128, n = 256, k = 64;
+        float alpha_val = 1.0f, beta_val = 0.0f;
+        void* alpha = &alpha_val;
+        void* beta = &beta_val;
+        void* a = (void*)0x1000;
+        void* b = (void*)0x2000;
+        void* c = (void*)0x3000;
+        void* d = (void*)0x4000;
+        
+        rocblaslt_status result = validateMatmulArgs(
+            m, n, k, alpha, a, b, beta, c, d,
+            HIP_R_32F, HIP_R_32F, HIP_R_32F, HIP_R_32F,
+            rocblaslt_compute_f32,
+            HIPBLAS_OP_N, HIPBLASLT_OPERATION_INVALID);
+        
+        ASSERT_TRUE(result == rocblaslt_status_not_implemented);
+    }
+
+    // Test case 7: Negative batch stride A
+    {
+        int64_t m = 128, n = 256, k = 64;
+        float alpha_val = 1.0f, beta_val = 0.0f;
+        void* alpha = &alpha_val;
+        void* beta = &beta_val;
+        void* a = (void*)0x1000;
+        void* b = (void*)0x2000;
+        void* c = (void*)0x3000;
+        void* d = (void*)0x4000;
+        
+        rocblaslt_status result = validateMatmulArgs(
+            m, n, k, alpha, a, b, beta, c, d,
+            HIP_R_32F, HIP_R_32F, HIP_R_32F, HIP_R_32F,
+            rocblaslt_compute_f32,
+            HIPBLAS_OP_N, HIPBLAS_OP_N,
+            1, 1, 1, 1,  // num_batches
+            -1, 0, 0, 0);  // batch_stride_a is negative
+        
+        ASSERT_TRUE(result == rocblaslt_status_invalid_size);
+    }
+
+    // Test case 8: Mismatched batch counts
+    {
+        int64_t m = 128, n = 256, k = 64;
+        float alpha_val = 1.0f, beta_val = 0.0f;
+        void* alpha = &alpha_val;
+        void* beta = &beta_val;
+        void* a = (void*)0x1000;
+        void* b = (void*)0x2000;
+        void* c = (void*)0x3000;
+        void* d = (void*)0x4000;
+        
+        rocblaslt_status result = validateMatmulArgs(
+            m, n, k, alpha, a, b, beta, c, d,
+            HIP_R_32F, HIP_R_32F, HIP_R_32F, HIP_R_32F,
+            rocblaslt_compute_f32,
+            HIPBLAS_OP_N, HIPBLAS_OP_N,
+            2, 1, 1, 1);  // num_batches_a != num_batches_b
+        
+        ASSERT_TRUE(result == rocblaslt_status_invalid_size);
+    }
+
+    // Test case 9: Zero batch count
+    {
+        int64_t m = 128, n = 256, k = 64;
+        float alpha_val = 1.0f, beta_val = 0.0f;
+        void* alpha = &alpha_val;
+        void* beta = &beta_val;
+        void* a = (void*)0x1000;
+        void* b = (void*)0x2000;
+        void* c = (void*)0x3000;
+        void* d = (void*)0x4000;
+        
+        rocblaslt_status result = validateMatmulArgs(
+            m, n, k, alpha, a, b, beta, c, d,
+            HIP_R_32F, HIP_R_32F, HIP_R_32F, HIP_R_32F,
+            rocblaslt_compute_f32,
+            HIPBLAS_OP_N, HIPBLAS_OP_N,
+            0, 0, 0, 0);  // num_batches all zero
+        
+        ASSERT_TRUE(result == rocblaslt_status_invalid_size);
+    }
+
+    // Test case 10: Quick return - m = 0
+    {
+        int64_t m = 0, n = 256, k = 64;
+        float alpha_val = 1.0f, beta_val = 0.0f;
+        void* alpha = &alpha_val;
+        void* beta = &beta_val;
+        void* a = (void*)0x1000;
+        void* b = (void*)0x2000;
+        void* c = (void*)0x3000;
+        void* d = (void*)0x4000;
+        
+        rocblaslt_status result = validateMatmulArgs(
+            m, n, k, alpha, a, b, beta, c, d,
+            HIP_R_32F, HIP_R_32F, HIP_R_32F, HIP_R_32F,
+            rocblaslt_compute_f32,
+            HIPBLAS_OP_N, HIPBLAS_OP_N);
+        
+        ASSERT_TRUE(result == rocblaslt_status_success);
+    }
+
+    // Test case 11: Null beta pointer
+    {
+        int64_t m = 128, n = 256, k = 64;
+        float alpha_val = 1.0f;
+        void* alpha = &alpha_val;
+        void* beta = nullptr;  // Null beta
+        void* a = (void*)0x1000;
+        void* b = (void*)0x2000;
+        void* c = (void*)0x3000;
+        void* d = (void*)0x4000;
+        
+        rocblaslt_status result = validateMatmulArgs(
+            m, n, k, alpha, a, b, beta, c, d,
+            HIP_R_32F, HIP_R_32F, HIP_R_32F, HIP_R_32F,
+            rocblaslt_compute_f32,
+            HIPBLAS_OP_N, HIPBLAS_OP_N);
+        
+        ASSERT_TRUE(result == rocblaslt_status_invalid_pointer);
+    }
+}
+
+void testing_aux_status_func(const Arguments& arg)
+{   
+    // Test get_rocblaslt_status_for_hip_status function
+    ASSERT_TRUE(get_rocblaslt_status_for_hip_status(hipSuccess) == rocblaslt_status_success);
+    ASSERT_TRUE(get_rocblaslt_status_for_hip_status(hipErrorMemoryAllocation) == rocblaslt_status_memory_error);
+    ASSERT_TRUE(get_rocblaslt_status_for_hip_status(hipErrorLaunchOutOfResources) == rocblaslt_status_memory_error);
+    ASSERT_TRUE(get_rocblaslt_status_for_hip_status(hipErrorInvalidDevicePointer) == rocblaslt_status_invalid_pointer);
+    ASSERT_TRUE(get_rocblaslt_status_for_hip_status(hipErrorInvalidDevice) == rocblaslt_status_invalid_handle);
+    ASSERT_TRUE(get_rocblaslt_status_for_hip_status(hipErrorInvalidResourceHandle) == rocblaslt_status_invalid_handle);
+    ASSERT_TRUE(get_rocblaslt_status_for_hip_status(hipErrorInvalidValue) == rocblaslt_status_internal_error);
+    ASSERT_TRUE(get_rocblaslt_status_for_hip_status(hipErrorNoDevice) == rocblaslt_status_internal_error);
+    ASSERT_TRUE(get_rocblaslt_status_for_hip_status(hipErrorUnknown) == rocblaslt_status_internal_error);
+
+    // Test default case with unknown/unmapped hip errors -> rocblaslt_status_internal_error
+    ASSERT_TRUE(get_rocblaslt_status_for_hip_status(static_cast<hipError_t>(999)) == rocblaslt_status_internal_error);
+}
+
+void testing_aux_hipblaslt_func(const Arguments& arg)
+{   
+    // Test RocBlasLtStatusToHIPStatus
+    ASSERT_TRUE(RocBlasLtStatusToHIPStatus(rocblaslt_status_success) == HIPBLAS_STATUS_SUCCESS);
+    ASSERT_TRUE(RocBlasLtStatusToHIPStatus(rocblaslt_status_invalid_handle) == HIPBLAS_STATUS_NOT_INITIALIZED);
+    ASSERT_TRUE(RocBlasLtStatusToHIPStatus(rocblaslt_status_not_implemented) == HIPBLAS_STATUS_INTERNAL_ERROR);
+    ASSERT_TRUE(RocBlasLtStatusToHIPStatus(rocblaslt_status_invalid_pointer) == HIPBLAS_STATUS_INVALID_VALUE);
+    ASSERT_TRUE(RocBlasLtStatusToHIPStatus(rocblaslt_status_invalid_size) == HIPBLAS_STATUS_INVALID_VALUE);
+    ASSERT_TRUE(RocBlasLtStatusToHIPStatus(rocblaslt_status_memory_error) == HIPBLAS_STATUS_ALLOC_FAILED);
+    ASSERT_TRUE(RocBlasLtStatusToHIPStatus(rocblaslt_status_internal_error) == HIPBLAS_STATUS_INTERNAL_ERROR);
+    ASSERT_TRUE(RocBlasLtStatusToHIPStatus(rocblaslt_status_invalid_value) == HIPBLAS_STATUS_INVALID_VALUE);
+    ASSERT_TRUE(RocBlasLtStatusToHIPStatus(rocblaslt_status_arch_mismatch) == HIPBLAS_STATUS_ARCH_MISMATCH);
+
+    // Test default case - should throw HIPBLAS_STATUS_INVALID_ENUM
+    bool exception_thrown = false;
+    hipblasStatus_t thrown_status = HIPBLAS_STATUS_SUCCESS;
+    
+    try {
+        RocBlasLtStatusToHIPStatus(static_cast<rocblaslt_status_>(999));
+    } catch (hipblasStatus_t status) {
+        exception_thrown = true;
+        thrown_status = status;
+    } catch (...) {
+        exception_thrown = true;
+        thrown_status = HIPBLAS_STATUS_INTERNAL_ERROR; // Unexpected exception type
+    }
+    
+    ASSERT_TRUE(exception_thrown);
+    ASSERT_TRUE(thrown_status == HIPBLAS_STATUS_INVALID_ENUM);
+    
+    // Test hipblasLtMatrixTransformDescSetAttribute function
+    hipblasLtMatrixTransformDesc_t transformDesc;
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatrixTransformDescCreate(&transformDesc, HIP_R_32F));
+
+    // Test SCALE_TYPE attribute
+    hipDataType scaleDatatype{HIP_R_16F};
+    ASSERT_TRUE(hipblasLtMatrixTransformDescSetAttribute(
+        transformDesc,
+        HIPBLASLT_MATRIX_TRANSFORM_DESC_SCALE_TYPE,
+        &scaleDatatype,
+        sizeof(scaleDatatype)) == HIPBLAS_STATUS_SUCCESS);
+
+    // Test POINTER_MODE attribute
+    hipblasLtPointerMode_t pointerMode{HIPBLASLT_POINTER_MODE_DEVICE};
+    ASSERT_TRUE(hipblasLtMatrixTransformDescSetAttribute(
+        transformDesc,
+        HIPBLASLT_MATRIX_TRANSFORM_DESC_POINTER_MODE,
+        &pointerMode,
+        sizeof(pointerMode)) == HIPBLAS_STATUS_SUCCESS);
+
+    // Test TRANSA attribute
+    hipblasOperation_t transA{HIPBLAS_OP_T};
+    ASSERT_TRUE(hipblasLtMatrixTransformDescSetAttribute(
+        transformDesc,
+        HIPBLASLT_MATRIX_TRANSFORM_DESC_TRANSA,
+        &transA,
+        sizeof(transA)) == HIPBLAS_STATUS_SUCCESS);
+
+    // Test TRANSB attribute
+    hipblasOperation_t transB{HIPBLAS_OP_C};
+    ASSERT_TRUE(hipblasLtMatrixTransformDescSetAttribute(
+        transformDesc,
+        HIPBLASLT_MATRIX_TRANSFORM_DESC_TRANSB,
+        &transB,
+        sizeof(transB)) == HIPBLAS_STATUS_SUCCESS);
+
+    // Test invalid buffer (nullptr)
+    ASSERT_TRUE(hipblasLtMatrixTransformDescSetAttribute(
+        transformDesc,
+        HIPBLASLT_MATRIX_TRANSFORM_DESC_SCALE_TYPE,
+        nullptr,
+        sizeof(hipDataType)) == HIPBLAS_STATUS_INVALID_VALUE);
+
+    // Test invalid size
+    ASSERT_TRUE(hipblasLtMatrixTransformDescSetAttribute(
+        transformDesc,
+        HIPBLASLT_MATRIX_TRANSFORM_DESC_SCALE_TYPE,
+        &scaleDatatype,
+        sizeof(int16_t)) == HIPBLAS_STATUS_INVALID_VALUE);
+
+    // Test SCALE_TYPE attribute get
+    int32_t retrievedScaleType;
+    size_t sizeWritten;
+    ASSERT_TRUE(hipblasLtMatrixTransformDescGetAttribute(
+        transformDesc,
+        HIPBLASLT_MATRIX_TRANSFORM_DESC_SCALE_TYPE,
+        &retrievedScaleType,
+        sizeof(retrievedScaleType),
+        &sizeWritten) == HIPBLAS_STATUS_SUCCESS);
+    ASSERT_TRUE(static_cast<hipDataType>(retrievedScaleType) == HIP_R_16F);
+    ASSERT_TRUE(sizeWritten == sizeof(int32_t));
+
+    // Test POINTER_MODE attribute get
+    int32_t retrievedPointerMode;
+    ASSERT_TRUE(hipblasLtMatrixTransformDescGetAttribute(
+        transformDesc,
+        HIPBLASLT_MATRIX_TRANSFORM_DESC_POINTER_MODE,
+        &retrievedPointerMode,
+        sizeof(retrievedPointerMode),
+        &sizeWritten) == HIPBLAS_STATUS_SUCCESS);
+    ASSERT_TRUE(static_cast<hipblasLtPointerMode_t>(retrievedPointerMode) == HIPBLASLT_POINTER_MODE_DEVICE);
+    ASSERT_TRUE(sizeWritten == sizeof(int32_t));
+
+    // Test TRANSA attribute get
+    int32_t retrievedTransA;
+    ASSERT_TRUE(hipblasLtMatrixTransformDescGetAttribute(
+        transformDesc,
+        HIPBLASLT_MATRIX_TRANSFORM_DESC_TRANSA,
+        &retrievedTransA,
+        sizeof(retrievedTransA),
+        &sizeWritten) == HIPBLAS_STATUS_SUCCESS);
+    ASSERT_TRUE(static_cast<hipblasOperation_t>(retrievedTransA) == HIPBLAS_OP_T);
+    ASSERT_TRUE(sizeWritten == sizeof(int32_t));
+
+    // Test TRANSB attribute get
+    int32_t retrievedTransB;
+    ASSERT_TRUE(hipblasLtMatrixTransformDescGetAttribute(
+        transformDesc,
+        HIPBLASLT_MATRIX_TRANSFORM_DESC_TRANSB,
+        &retrievedTransB,
+        sizeof(retrievedTransB),
+        &sizeWritten) == HIPBLAS_STATUS_SUCCESS);
+    ASSERT_TRUE(static_cast<hipblasOperation_t>(retrievedTransB) == HIPBLAS_OP_C);
+    ASSERT_TRUE(sizeWritten == sizeof(int32_t));
+
+    // Test error cases: both sizeInBytes and sizeWritten are 0/nullptr
+    ASSERT_TRUE(hipblasLtMatrixTransformDescGetAttribute(
+        transformDesc,
+        HIPBLASLT_MATRIX_TRANSFORM_DESC_SCALE_TYPE,
+        &retrievedScaleType,
+        0,
+        nullptr) == HIPBLAS_STATUS_INVALID_VALUE);
+
+    // Test error case: sizeInBytes provided but sizeWritten is nullptr
+    ASSERT_TRUE(hipblasLtMatrixTransformDescGetAttribute(
+        transformDesc,
+        HIPBLASLT_MATRIX_TRANSFORM_DESC_SCALE_TYPE,
+        &retrievedScaleType,
+        sizeof(retrievedScaleType),
+        nullptr) == HIPBLAS_STATUS_INVALID_VALUE);
+
+    // Test error case: invalid size (not sizeof(int32_t))
+    ASSERT_TRUE(hipblasLtMatrixTransformDescGetAttribute(
+        transformDesc,
+        HIPBLASLT_MATRIX_TRANSFORM_DESC_SCALE_TYPE,
+        &retrievedScaleType,
+        sizeof(int16_t),
+        &sizeWritten) == HIPBLAS_STATUS_INVALID_VALUE);
+
+    // Test error case: invalid attribute (using default case)
+    ASSERT_TRUE(hipblasLtMatrixTransformDescGetAttribute(
+        transformDesc,
+        static_cast<hipblasLtMatrixTransformDescAttributes_t>(999),
+        &retrievedScaleType,
+        sizeof(retrievedScaleType),
+        &sizeWritten) == HIPBLAS_STATUS_INVALID_VALUE);
+
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatrixTransformDescDestroy(transformDesc));
+}
+
+
+void testing_aux_tensile_host_func(const Arguments& arg)
+{
+    // Test hipDataType_to_tensile_type function
+    ASSERT_TRUE(hipDataType_to_tensile_type(HIP_R_16F) == rocisa::DataType::Half);
+    ASSERT_TRUE(hipDataType_to_tensile_type(HIP_R_32F) == rocisa::DataType::Float);
+    ASSERT_TRUE(hipDataType_to_tensile_type(HIP_R_64F) == rocisa::DataType::Double);
+    ASSERT_TRUE(hipDataType_to_tensile_type(HIP_R_16BF) == rocisa::DataType::BFloat16);
+    ASSERT_TRUE(hipDataType_to_tensile_type(HIP_R_8F_E4M3_FNUZ) == rocisa::DataType::Float8_fnuz);
+    ASSERT_TRUE(hipDataType_to_tensile_type(HIP_R_8F_E5M2_FNUZ) == rocisa::DataType::BFloat8_fnuz);
+    ASSERT_TRUE(hipDataType_to_tensile_type(HIP_R_8F_E4M3) == rocisa::DataType::Float8);
+    ASSERT_TRUE(hipDataType_to_tensile_type(HIP_R_8F_E5M2) == rocisa::DataType::BFloat8);
+    ASSERT_TRUE(hipDataType_to_tensile_type(HIP_R_8I) == rocisa::DataType::Int8);
+    ASSERT_TRUE(hipDataType_to_tensile_type(HIP_R_32I) == rocisa::DataType::Int32);
+    
+    // Test rocComputeType_to_tensile_type function
+    ASSERT_TRUE(rocComputeType_to_tensile_type(rocblaslt_compute_f32_fast_xf32) == rocisa::DataType::XFloat32);
+    ASSERT_TRUE(rocComputeType_to_tensile_type(rocblaslt_compute_f32_fast_f16) == rocisa::DataType::Half);
+    ASSERT_TRUE(rocComputeType_to_tensile_type(rocblaslt_compute_f32_fast_bf16) == rocisa::DataType::BFloat16);
+    ASSERT_TRUE(rocComputeType_to_tensile_type(rocblaslt_compute_f16) == rocisa::DataType::Float);
+    ASSERT_TRUE(rocComputeType_to_tensile_type(rocblaslt_compute_f32) == rocisa::DataType::Float);
+    ASSERT_TRUE(rocComputeType_to_tensile_type(rocblaslt_compute_f32_fast_f8_fnuz) == rocisa::DataType::Float);
+    ASSERT_TRUE(rocComputeType_to_tensile_type(rocblaslt_compute_f32_fast_bf8_fnuz) == rocisa::DataType::Float);
+    ASSERT_TRUE(rocComputeType_to_tensile_type(rocblaslt_compute_f32_fast_f8bf8_fnuz) == rocisa::DataType::Float);
+    ASSERT_TRUE(rocComputeType_to_tensile_type(rocblaslt_compute_f32_fast_bf8f8_fnuz) == rocisa::DataType::Float);
+    ASSERT_TRUE(rocComputeType_to_tensile_type(rocblaslt_compute_f32_fast_f8) == rocisa::DataType::Float);
+    ASSERT_TRUE(rocComputeType_to_tensile_type(rocblaslt_compute_f32_fast_bf8) == rocisa::DataType::Float);
+    ASSERT_TRUE(rocComputeType_to_tensile_type(rocblaslt_compute_f32_fast_f8bf8) == rocisa::DataType::Float);
+    ASSERT_TRUE(rocComputeType_to_tensile_type(rocblaslt_compute_f32_fast_bf8f8) == rocisa::DataType::Float);
+    ASSERT_TRUE(rocComputeType_to_tensile_type(rocblaslt_compute_f64) == rocisa::DataType::Double);
+    ASSERT_TRUE(rocComputeType_to_tensile_type(rocblaslt_compute_i32) == rocisa::DataType::Int32);
+
+    // Test runKernelFromInvocation
+    hipblasLtHandle_t handle;
+    std::vector<int64_t>   m_vec = {1024, 512};
+    std::vector<int64_t>   n_vec = {512, 512};
+    std::vector<int64_t>   k_vec = {1920, 128};
+    std::vector<int64_t>   batch_count_vec = {1, 1};
+    std::vector<float> alpha_vec = {1.0f, 1.0f};
+    std::vector<float>  beta_vec = {1.0f, 1.0f};
+
+    std::vector<void*> a_vec, b_vec, c_vec, d_vec, h_alpha_vec; // host
+    std::vector<void*> d_a_vec, d_b_vec, d_c_vec, d_d_vec, d_alpha_vec; // device
+
+    void*   d_workspace;
+    size_t max_workspace_size = 32 * 1024 * 1024;
+    hipblasOperation_t trans_a     = HIPBLAS_OP_N;
+    hipblasOperation_t trans_b     = HIPBLAS_OP_T;
+    
+    CHECK_HIP_ERROR(hipStreamCreate(&stream));
+    CHECK_HIPBLASLT_ERROR(hipblasLtCreate(&handle));
+    d_a_vec.resize(m_vec.size(), nullptr);
+    d_b_vec.resize(m_vec.size(), nullptr);
+    d_c_vec.resize(m_vec.size(), nullptr);
+    d_d_vec.resize(m_vec.size(), nullptr);
+    d_alpha_vec.resize(m_vec.size(), nullptr);
+    a_vec.resize(m_vec.size(), nullptr);
+    b_vec.resize(m_vec.size(), nullptr);
+    c_vec.resize(m_vec.size(), nullptr);
+    d_vec.resize(m_vec.size(), nullptr);
+    h_alpha_vec.resize(m_vec.size(), nullptr);
+    for(int j = 0; j < m_vec.size(); j++)
+    {
+        CHECK_HIP_ERROR(hipMalloc(&d_a_vec[j], m_vec[j] * k_vec[j] * batch_count_vec[j] * sizeof(hipblasLtHalf)));
+        CHECK_HIP_ERROR(hipMalloc(&d_b_vec[j], n_vec[j] * k_vec[j] * batch_count_vec[j] * sizeof(hipblasLtHalf)));
+        CHECK_HIP_ERROR(hipMalloc(&d_c_vec[j], m_vec[j] * n_vec[j] * batch_count_vec[j] * sizeof(hipblasLtHalf)));
+        CHECK_HIP_ERROR(hipMalloc(&d_d_vec[j], m_vec[j] * n_vec[j] * batch_count_vec[j] * sizeof(hipblasLtHalf)));
+        CHECK_HIP_ERROR(hipMalloc(&d_alpha_vec[j], m_vec[j] * batch_count_vec[j] * sizeof(float)));
+
+        CHECK_HIP_ERROR(hipHostMalloc(&a_vec[j], m_vec[j] * k_vec[j] * batch_count_vec[j] * sizeof(hipblasLtHalf)));
+        CHECK_HIP_ERROR(hipHostMalloc(&b_vec[j], n_vec[j] * k_vec[j] * batch_count_vec[j] * sizeof(hipblasLtHalf)));
+        CHECK_HIP_ERROR(hipHostMalloc(&c_vec[j], m_vec[j] * n_vec[j] * batch_count_vec[j] * sizeof(hipblasLtHalf)));
+        CHECK_HIP_ERROR(hipHostMalloc(&d_vec[j], m_vec[j] * n_vec[j] * batch_count_vec[j] * sizeof(hipblasLtHalf)));
+        CHECK_HIP_ERROR(hipHostMalloc(&h_alpha_vec[j], m_vec[j] * batch_count_vec[j] * sizeof(float)));
+
+        for(int i = 0; i < m_vec[j] * k_vec[j] * batch_count_vec[j]; i++)
+            ((hipblasLtHalf*)a_vec[j])[i] = static_cast<hipblasLtHalf>((rand() % 7) - 3);
+        for(int i = 0; i < n_vec[j] * k_vec[j] * batch_count_vec[j]; i++)
+            ((hipblasLtHalf*)b_vec[j])[i] = static_cast<hipblasLtHalf>((rand() % 7) - 3);
+        for(int i = 0; i < m_vec[j] * n_vec[j] * batch_count_vec[j]; i++)
+            ((hipblasLtHalf*)c_vec[j])[i] = static_cast<hipblasLtHalf>((rand() % 7) - 3);
+        for(int i = 0; i < m_vec[j] * batch_count_vec[j]; i++)
+            ((float*)h_alpha_vec[j])[i] = static_cast<float>((rand() % 7) - 3);
+    }
+    if(max_workspace_size > 0)
+        CHECK_HIP_ERROR(hipMalloc(&d_workspace, max_workspace_size));
+    
+    hipblaslt_ext::GemmPreference gemmPref;
+    gemmPref.setMaxWorkspaceBytes(max_workspace_size);
+    hipblaslt_ext::GroupedGemm groupedgemm(
+        handle, trans_a, trans_b, HIP_R_16F, HIP_R_16F, HIP_R_16F, HIP_R_16F, HIPBLAS_COMPUTE_32F);
+
+    std::vector<hipblaslt_ext::GemmEpilogue> epilogue_vec{
+        hipblaslt_ext::
+            GemmEpilogue()}; // No action needed, default is HIPBLASLT_EPILOGUE_DEFAULT. (Gemm only)
+    std::vector<hipblaslt_ext::GemmInputs> inputs_vec(m_vec.size());
+    for(int i = 0; i < m_vec.size(); i++)
+    {
+        inputs_vec[i].setA(d_a_vec[i]);
+        inputs_vec[i].setB(d_b_vec[i]);
+        inputs_vec[i].setC(d_c_vec[i]);
+        inputs_vec[i].setD(d_d_vec[i]);
+        inputs_vec[i].setAlpha(&alpha_vec[i]);
+        inputs_vec[i].setBeta(&beta_vec[i]);
+    }
+    // hipblaslt_ext::GemmEpilogue supports broadcasting
+    groupedgemm.setProblem(m_vec, n_vec, k_vec, batch_count_vec, epilogue_vec, inputs_vec);
+
+    const int                                     request_solutions = 1;
+    std::vector<hipblasLtMatmulHeuristicResult_t> heuristicResult_vec;
+    CHECK_HIPBLASLT_ERROR(
+        groupedgemm.algoGetHeuristic(request_solutions, gemmPref, heuristicResult_vec));
+
+    CHECK_HIPBLASLT_ERROR(groupedgemm.initialize(heuristicResult_vec[0].algo, d_workspace, false));
+    CHECK_HIPBLASLT_ERROR(groupedgemm.run(stream));
+    
+    // For getSolutionNameFromData
+    std::string kernel_name = groupedgemm.getKernelName();
+    ASSERT_TRUE(kernel_name.find(";"));
+    std::string sol_name = groupedgemm.getSolutionName();
+    ASSERT_TRUE(sol_name.find(";"));
+
+    int* idx = (int*) heuristicResult_vec[0].algo.data;
+    std::vector<int> index_vec = {*idx};
+    std::vector<rocblaslt_matmul_heuristic_result> new_heuristicResult_vec;
+    ASSERT_TRUE(rocblaslt_status_success == getSolutionsFromIndex((rocblaslt_handle) handle, index_vec, new_heuristicResult_vec, max_workspace_size));
+
+
+    // For RocblasltContractionProblem2ProblemOverride
+    hipblasLtMatmulDesc_t matmul;
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatmulDescCreate(&matmul, arg.compute_type, arg.scale_type));
+    rocblaslt_matmul_desc matmul_descr = (rocblaslt_matmul_desc) matmul;
+
+    hipblasOperation_t     opA = HIPBLAS_OP_T;
+    hipblasOperation_t     opB = HIPBLAS_OP_N;
+    int64_t                m = 128;
+    int64_t                n = 128;
+    int64_t                k = 128;
+    float                  alpha_v = arg.alpha;
+    void*                  alpha = &alpha_v;
+    float                  beta_v = arg.beta;
+    void*                  beta = &beta_v;
+    int64_t                lda  = 1;
+    int64_t                ldb  = 1;
+    int64_t                ldc  = 1;
+    int64_t                ldd  = 1;
+    int64_t                lde  = 1;
+    int64_t                batch_stride_a = 0;
+    int64_t                batch_stride_b = 0;
+    int64_t                batch_stride_c = 0;
+    int64_t                batch_stride_d = 0;
+    int64_t                batch_stride_e = 0;
+    int64_t                batch_count = 1;
+    void *A, *B, *C, *D, *E, *d_alphaVec; // device
+    CHECK_HIP_ERROR(hipMalloc(&A, m * k * batch_count * sizeof(int64_t)));
+    CHECK_HIP_ERROR(hipMalloc(&B, n * k * batch_count * sizeof(int64_t)));
+    CHECK_HIP_ERROR(hipMalloc(&C, m * n * batch_count * sizeof(int64_t)));
+    CHECK_HIP_ERROR(hipMalloc(&D, m * n * batch_count * sizeof(int64_t)));
+    CHECK_HIP_ERROR(hipMalloc(&E, m * n * batch_count * sizeof(int64_t)));
+    bool                       strided_batch = true;
+    bool                       grouped_gemm = true;
+    void*                      bias = nullptr;
+    hipDataType                bias_type;
+    void*                      scaleAlphaVec = nullptr;
+    hipDataType                aux_type;
+    bool                       gradient = false;
+    rocblaslt_compute_type     compute_type;
+    rocblaslt_handle roc_handle = (rocblaslt_handle) handle;
+
+    
+    const RocblasltContractionProblem problem{opA,
+                                              opB,
+                                              m,
+                                              n,
+                                              k,
+                                              alpha,
+                                              arg.a_type,
+                                              A, // A
+                                              nullptr,
+                                              lda, // arg.lda
+                                              batch_stride_a,
+                                              arg.b_type,
+                                              B, // B
+                                              nullptr,
+                                              ldb, // arg.ldb
+                                              batch_stride_b,
+                                              beta,
+                                              arg.c_type,
+                                              C, // C
+                                              nullptr,
+                                              ldc, // arg.ldc
+                                              batch_stride_c,
+                                              arg.d_type,
+                                              D, // D
+                                              nullptr,
+                                              ldd, // arg.ldc
+                                              batch_stride_d,
+                                              E, // E
+                                              nullptr,
+                                              lde, //arg.lde
+                                              batch_stride_e,
+                                              batch_count,
+                                              strided_batch,
+                                              grouped_gemm,
+                                              gradient,
+                                              matmul_descr->compute_type,
+                                              HIP_R_32F,
+                                              bias,
+                                              matmul_descr->scaleA,
+                                              matmul_descr->scaleB,
+                                              matmul_descr->scaleC,
+                                              matmul_descr->scaleD,
+                                              matmul_descr->scaleE,
+                                              scaleAlphaVec,
+                                              matmul_descr->scaleAType,
+                                              matmul_descr->scaleBType,
+                                              1, // scaleABlockRowSize 
+                                              1, // scaleABlockColSize 
+                                              1, // scaleBBlockRowSize
+                                              1, // scaleBBlockColSize 
+                                              arg.bias_type,
+                                              arg.aux_type,
+                                              matmul_descr->epilogue,
+                                              matmul_descr->amaxD,
+                                              nullptr,
+                                              max_workspace_size, // workspaceSize
+                                              HIPBLASLT_MATMUL_DESC_EPILOGUE_ACT_ARG0_EXT, // act0
+                                              HIPBLASLT_MATMUL_DESC_EPILOGUE_ACT_ARG1_EXT, // act1
+                                              stream, // stream
+                                              roc_handle->Synchronizer,
+                                              arg.swizzle_a, // swizzleA
+                                              false}; // swizzleB
+
+    TensileLite::ProblemOverride prob1 = RocblasltContractionProblem2ProblemOverride(problem);
+    TensileLite::ProblemOverride prob2 = RocblasltContractionProblem2ProblemOverride(problem);
+    int result = TensileLite::Comparison<TensileLite::ProblemOverride>::compare(prob1, prob2);
+    ASSERT_TRUE(result == 0); // Should be equal
+
+    // For TensileDataGemm2ProblemOverrid
+    std::shared_ptr<void> gemm_data;
+
+    initTensileGemmData(roc_handle, rocblaslt::RocGemmType::ROCBLASLT_GEMM, trans_a, trans_b, HIP_R_16F, HIP_R_16F, HIP_R_16F, HIP_R_16F, (rocblaslt_compute_type) HIPBLAS_COMPUTE_32F, max_workspace_size, gemm_data);
+
+    TensileLite::ProblemOverride gemm2prob = TensileDataGemm2ProblemOverride(gemm_data);
+
+
+    std::vector<rocblaslt_matmul_heuristic_result> all_sol_heuristicResult_vec;
+    ASSERT_TRUE(rocblaslt_status_success == getAllSolutions(gemm_data, roc_handle, rocblaslt::RocGemmType::ROCBLASLT_GEMM, all_sol_heuristicResult_vec, max_workspace_size));
+
+    
+    std::vector<rocblaslt_matmul_heuristic_result> algo_get_heuristic_results;
+    ASSERT_TRUE(rocblaslt_status_success == rocblaslt_algo_get_heuristic_cpp(roc_handle, rocblaslt::RocGemmType::ROCBLASLT_GEMM, gemm_data, max_workspace_size, 10, algo_get_heuristic_results));
+
+    for(int j = 0; j < m_vec.size(); j++)
+        {
+            CHECK_HIP_ERROR(hipFree(a_vec[j]));
+            CHECK_HIP_ERROR(hipFree(b_vec[j]));
+            CHECK_HIP_ERROR(hipFree(c_vec[j]));
+            CHECK_HIP_ERROR(hipFree(d_vec[j]));
+            CHECK_HIP_ERROR(hipFree(h_alpha_vec[j]));
+            CHECK_HIP_ERROR(hipFree(d_a_vec[j]));
+            CHECK_HIP_ERROR(hipFree(d_b_vec[j]));
+            CHECK_HIP_ERROR(hipFree(d_c_vec[j]));
+            CHECK_HIP_ERROR(hipFree(d_d_vec[j]));
+            CHECK_HIP_ERROR(hipFree(d_alpha_vec[j]));
+        }
+    CHECK_HIP_ERROR(hipFree(d_workspace));
+    CHECK_HIPBLASLT_ERROR(hipblasLtDestroy(handle));
+    CHECK_HIP_ERROR(hipStreamDestroy(stream));
+}
+{
+    // Test tuple_helper equal functionality
+    
+    // Test basic integer equality
+    auto tuple1 = std::make_tuple("key1", 42, "key2", 100);
+    auto tuple2 = std::make_tuple("key1", 42, "key2", 100);
+    auto tuple3 = std::make_tuple("key1", 42, "key2", 99);
+    
+    tuple_helper::equal_t<decltype(tuple1)> equal_checker;
+    
+    // Test equal tuples
+    ASSERT_TRUE(equal_checker(tuple1, tuple2));
+    
+    // Test unequal tuples (different values)
+    ASSERT_FALSE(equal_checker(tuple1, tuple3));
+    
+    // Test C-string equality
+    auto str_tuple1 = std::make_tuple("name", "test", "value", "data");
+    auto str_tuple2 = std::make_tuple("name", "test", "value", "data");
+    auto str_tuple3 = std::make_tuple("name", "test", "value", "different");
+    
+    tuple_helper::equal_t<decltype(str_tuple1)> str_equal_checker;
+    
+    // Test equal C-string tuples
+    ASSERT_TRUE(str_equal_checker(str_tuple1, str_tuple2));
+    
+    // Test unequal C-string tuples
+    ASSERT_FALSE(str_equal_checker(str_tuple1, str_tuple3));
+}
+
+void testing_aux_rocblaslt_rocroller_host_func(const Arguments& arg)
+{
+    hipblasLtHandle_t handle;
+    CHECK_HIPBLASLT_ERROR(hipblasLtCreate(&handle));
+    
+    hipblasLtMatmulDesc_t matmul;
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatmulDescCreate(&matmul, arg.compute_type, arg.scale_type));
+
+    hipblasOperation_t     opA = HIPBLAS_OP_T;
+    hipblasOperation_t     opB = HIPBLAS_OP_N;
+    int64_t                m = 1;
+    int64_t                n = 1;
+    int64_t                k = 1;
+    float                  alpha_v = arg.alpha;
+    void*                  alpha = &alpha_v;
+    float                  beta_v = arg.beta;
+    void*                  beta = &beta_v;
+    int64_t                lda  = 1;
+    int64_t                ldb  = 1;
+    int64_t                ldc  = 1;
+    int64_t                ldd  = 1;
+    int64_t                lde  = 1;
+
+    hipStream_t        stream;
+    CHECK_HIP_ERROR(hipStreamCreate(&stream));
+    hipblasLtMatrixLayout_t matA, matB, matC, matD;
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatrixLayoutCreate(&matA, arg.a_type, m, k, m));
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatrixLayoutCreate(&matB, arg.a_type, k, n, k));
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatrixLayoutCreate(&matC, arg.a_type, m, n, m));
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatrixLayoutCreate(&matD, arg.a_type, m, n, m));
+    hipDataType            a_type, b_type, c_type, d_type;
+
+    const int                        request_solutions = 1;
+    hipblasLtMatmulHeuristicResult_t heuristicResult[request_solutions];
+    int                              returnedAlgoCount = 0;
+    size_t                           max_workspace_size = 128 * 1024 * 1024;
+    hipblasLtMatmulPreference_t pref;
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatmulPreferenceCreate(&pref));
+    CHECK_HIPBLASLT_ERROR(
+        hipblasLtMatmulPreferenceSetAttribute(pref,
+                                              HIPBLASLT_MATMUL_PREF_MAX_WORKSPACE_BYTES,
+                                              &max_workspace_size,
+                                              sizeof(max_workspace_size)));
+    
+    void*   d_workspace;
+    if(max_workspace_size > 0)
+        CHECK_HIP_ERROR(hipMalloc(&d_workspace, max_workspace_size));
+
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatmulAlgoGetHeuristic(handle,
+                                                          matmul,
+                                                          matA,
+                                                          matB,
+                                                          matC,
+                                                          matD,
+                                                          pref,
+                                                          request_solutions,
+                                                          heuristicResult,
+                                                          &returnedAlgoCount));
+
+    CHECK_SOLUTION_FOUND(returnedAlgoCount);
+    rocblaslt_matmul_desc matmul_descr = (rocblaslt_matmul_desc) matmul;
+    int64_t            batch_count = 1;
+    void *A, *B, *C, *D, *E, *d_alphaVec; // device
+    CHECK_HIP_ERROR(hipMalloc(&A, m * k * batch_count * sizeof(int64_t)));
+    CHECK_HIP_ERROR(hipMalloc(&B, n * k * batch_count * sizeof(int64_t)));
+    CHECK_HIP_ERROR(hipMalloc(&C, m * n * batch_count * sizeof(int64_t)));
+    CHECK_HIP_ERROR(hipMalloc(&D, m * n * batch_count * sizeof(int64_t)));
+    CHECK_HIP_ERROR(hipMalloc(&E, m * n * batch_count * sizeof(int64_t)));
+
+    int64_t                    batch_stride_a = 0;
+    int64_t                    batch_stride_b = 0;
+    int64_t                    batch_stride_c = 0;
+    int64_t                    batch_stride_d = 0;
+    int64_t                    batch_stride_e = 0;
+    bool                       strided_batch = true;
+    bool                       grouped_gemm = true;
+    void*                      bias = nullptr;
+    hipDataType                bias_type;
+    void*                      scaleAlphaVec = nullptr;
+    hipDataType                aux_type;
+    bool                       gradient = false;
+    rocblaslt_compute_type     compute_type;
+    rocblaslt_handle roc_handle = (rocblaslt_handle) handle;
+
+    rocblaslt_status isValid = rocblaslt_matmul_valid_args( matmul_descr,
+                                                            A,
+                                                            B,
+                                                            C,
+                                                            D,
+                                                            (rocblaslt_matrix_layout) matA,
+                                                            (rocblaslt_matrix_layout) matB,
+                                                            (rocblaslt_matrix_layout) matC,
+                                                            (rocblaslt_matrix_layout) matD,
+                                                            alpha,
+                                                            beta,
+                                                            m,
+                                                            n,
+                                                            k,
+                                                            a_type,
+                                                            lda,
+                                                            batch_stride_a,
+                                                            b_type,
+                                                            ldb,
+                                                            batch_stride_b,
+                                                            c_type,
+                                                            ldc,
+                                                            batch_stride_c,
+                                                            d_type,
+                                                            ldd,
+                                                            batch_stride_d,
+                                                            lde,
+                                                            batch_stride_e,
+                                                            bias,
+                                                            bias_type,
+                                                            scaleAlphaVec,
+                                                            E,
+                                                            aux_type,
+                                                            gradient,
+                                                            compute_type,
+                                                            false,
+                                                            false);
+
+
+    ASSERT_TRUE(isValid == rocblaslt_status_continue);
+
+    RocblasltContractionProblem problem{opA,
+                                        opB,
+                                        m,
+                                        n,
+                                        k,
+                                        alpha,
+                                        a_type,
+                                        A, // A
+                                        nullptr,
+                                        lda, // arg.lda
+                                        batch_stride_a,
+                                        b_type,
+                                        B, // B
+                                        nullptr,
+                                        ldb, // arg.ldb
+                                        batch_stride_b,
+                                        beta,
+                                        c_type,
+                                        C, // C
+                                        nullptr,
+                                        ldc, // arg.ldc
+                                        batch_stride_c,
+                                        d_type,
+                                        D, // D
+                                        nullptr,
+                                        ldd, // arg.ldc
+                                        batch_stride_d,
+                                        E, // E
+                                        nullptr,
+                                        lde, //arg.lde
+                                        batch_stride_e,
+                                        batch_count,
+                                        strided_batch,
+                                        grouped_gemm,
+                                        gradient,
+                                        matmul_descr->compute_type,
+                                        HIPBLASLT_DATATYPE_INVALID,
+                                        bias,
+                                        matmul_descr->scaleA,
+                                        matmul_descr->scaleB,
+                                        matmul_descr->scaleC,
+                                        matmul_descr->scaleD,
+                                        matmul_descr->scaleE,
+                                        scaleAlphaVec,
+                                        matmul_descr->scaleAType,
+                                        matmul_descr->scaleBType,
+                                        1, // scaleABlockRowSize 
+                                        1, // scaleABlockColSize 
+                                        1, // scaleBBlockRowSize
+                                        1, // scaleBBlockColSize 
+                                        arg.bias_type,
+                                        arg.aux_type,
+                                        matmul_descr->epilogue,
+                                        matmul_descr->amaxD,
+                                        nullptr,
+                                        max_workspace_size, // workspaceSize
+                                        HIPBLASLT_MATMUL_DESC_EPILOGUE_ACT_ARG0_EXT, // act0
+                                        HIPBLASLT_MATMUL_DESC_EPILOGUE_ACT_ARG1_EXT, // act1
+                                        stream, // stream
+                                        roc_handle->Synchronizer,
+                                        arg.swizzle_a, // swizzleA
+                                        false}; // swizzleB
+
+    const hipblasLtMatmulAlgo_t* hip_algo = &heuristicResult[0].algo;
+    const rocblaslt_matmul_algo* roc_algo = (const rocblaslt_matmul_algo*) hip_algo;
+    
+    ASSERT_TRUE(runRocRollerContractionProblem(roc_handle, nullptr, problem) != rocblaslt_status_success);
+    ASSERT_TRUE(runRocRollerContractionProblem(roc_handle, roc_algo, problem) != rocblaslt_status_success);
+    
+    hipblasLtMatmulAlgo_t* hip_algo2 = &heuristicResult[0].algo;
+    rocblaslt_matmul_algo* roc_algo2 = (rocblaslt_matmul_algo*) hip_algo;
+    ASSERT_TRUE(isRocRollerSolutionSupported(roc_handle, problem, roc_algo2, &max_workspace_size) != rocblaslt_status_success);
+
+    // For getAllSolutionsRocRoller
+    std::vector<rocblaslt_matmul_heuristic_result> new_heuristicResults;
+    rocblaslt_status all_sol_status = getAllSolutionsRocRoller(problem, roc_handle, new_heuristicResults, max_workspace_size);
+    ASSERT_TRUE(all_sol_status == rocblaslt_status_invalid_value);
+
+    // Free GPU memory allocations
+    CHECK_HIP_ERROR(hipFree(A));
+    CHECK_HIP_ERROR(hipFree(B));
+    CHECK_HIP_ERROR(hipFree(C));
+    CHECK_HIP_ERROR(hipFree(D));
+    CHECK_HIP_ERROR(hipFree(E));
+
+    // Free workspace
+    CHECK_HIP_ERROR(hipFree(d_workspace));
+
+    // Destroy preference object
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatmulPreferenceDestroy(pref));
+
+    // Destroy handles
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatmulDescDestroy(matmul));
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatrixLayoutDestroy(matA));
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatrixLayoutDestroy(matB));
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatrixLayoutDestroy(matC));
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatrixLayoutDestroy(matD));
+    CHECK_HIPBLASLT_ERROR(hipblasLtDestroy(handle));
+    CHECK_HIP_ERROR(hipStreamDestroy(stream));
+}
+
+void testing_aux_hipblaslt_ostream_func(const Arguments& arg)
+{
+    // Test default (non-enumeration) template operator<<
+    hipblaslt_internal_ostream os1;
+    
+    // Test basic types that use the default template
+    os1 << "Hello";
+    ASSERT_TRUE(os1.str() == "Hello");
+    os1.clear();
+    
+    os1 << 42;
+    ASSERT_TRUE(os1.str() == "42");
+    os1.clear();
+    
+    os1 << 3.14f;
+    ASSERT_TRUE(os1.str().find("3.14") != std::string::npos);
+    os1.clear();
+    
+    // Test enumeration type operator<<
+    hipblaslt_internal_ostream os2;
+    hipblasOperation_t op = HIPBLAS_OP_N;
+    os2 << op;
+    ASSERT_TRUE(os2.str() == "N"); // Assuming hipblas_operation_to_string returns "N"
+    os2.clear();
+    
+    // Test std::pair operator<< (YAML mode toggle)
+    hipblaslt_internal_ostream os3;
+    std::pair<std::string, int> test_pair{"key", 42};
+    os3 << test_pair;
+    ASSERT_TRUE(os3.str() == "key: 42");
+    os3.clear();
+    
+    std::pair<const char*, double> float_pair{"value", 3.14};
+    os3 << float_pair;
+    ASSERT_TRUE(os3.str().find("value: 3.14") != std::string::npos);
+    os3.clear();
+    
+    // Test double operator<< in non-YAML mode
+    hipblaslt_internal_ostream os4;
+    os4 << 3.14159;
+    ASSERT_TRUE(os4.str() == "3.14159");
+    os4.clear();
+    
+    os4 << std::numeric_limits<double>::infinity();
+    ASSERT_TRUE(os4.str() == "inf");
+    os4.clear();
+    
+    os4 << -std::numeric_limits<double>::infinity();
+    ASSERT_TRUE(os4.str() == "-inf");
+    os4.clear();
+    
+    os4 << std::numeric_limits<double>::quiet_NaN();
+    ASSERT_TRUE(os4.str() == "nan");
+    os4.clear();
+    
+    // Test double operator<< in YAML mode
+    hipblaslt_internal_ostream os5;
+    os5 << hipblaslt_internal_ostream::yaml_on;
+    
+    os5 << 1.0;
+    ASSERT_TRUE(os5.str() == "1.0");
+    os5.clear();
+    
+    os5 << std::numeric_limits<double>::infinity();
+    ASSERT_TRUE(os5.str() == ".inf");
+    os5.clear();
+    
+    os5 << -std::numeric_limits<double>::infinity();
+    ASSERT_TRUE(os5.str() == "-.inf");
+    os5.clear();
+    
+    os5 << std::numeric_limits<double>::quiet_NaN();
+    ASSERT_TRUE(os5.str() == ".nan");
+    os5.clear();
+    
+    // Test hipblasLtHalf operator<<
+    hipblaslt_internal_ostream os6;
+    hipblasLtHalf half_val = 2.5f;
+    os6 << half_val;
+    ASSERT_TRUE(os6.str().find("2.5") != std::string::npos);
+    os6.clear();
+    
+    // Test hip_bfloat16 operator<<
+    hipblaslt_internal_ostream os7;
+    hip_bfloat16 bf16_val = static_cast<hip_bfloat16>(1.25f);
+    os7 << bf16_val;
+    ASSERT_TRUE(os7.str().find("1.25") != std::string::npos);
+    os7.clear();
+    
+    // Test integer operators<<
+    hipblaslt_internal_ostream os8;
+    
+    int32_t i32 = -123;
+    os8 << i32;
+    ASSERT_TRUE(os8.str() == "-123");
+    os8.clear();
+    
+    uint32_t u32 = 456;
+    os8 << u32;
+    ASSERT_TRUE(os8.str() == "456");
+    os8.clear();
+    
+    int64_t i64 = -9876543210LL;
+    os8 << i64;
+    ASSERT_TRUE(os8.str() == "-9876543210");
+    os8.clear();
+    
+    uint64_t u64 = 1234567890ULL;
+    os8 << u64;
+    ASSERT_TRUE(os8.str() == "1234567890");
+    os8.clear();
+    
+    // Test bool operator<< in non-YAML mode
+    hipblaslt_internal_ostream os9;
+    os9 << true;
+    ASSERT_TRUE(os9.str() == "1");
+    os9.clear();
+    
+    os9 << false;
+    ASSERT_TRUE(os9.str() == "0");
+    os9.clear();
+    
+    // Test bool operator<< in YAML mode
+    os9 << hipblaslt_internal_ostream::yaml_on;
+    os9 << true;
+    ASSERT_TRUE(os9.str() == "true");
+    os9.clear();
+    
+    os9 << false;
+    ASSERT_TRUE(os9.str() == "false");
+    os9.clear();
+    
+    // Test char operator<< in non-YAML mode
+    hipblaslt_internal_ostream os10;
+    os10 << 'A';
+    ASSERT_TRUE(os10.str() == "A");
+    os10.clear();
+    
+    os10 << '\n';
+    ASSERT_TRUE(os10.str() == "\n");
+    os10.clear();
+    
+    // Test char operator<< in YAML mode
+    os10 << hipblaslt_internal_ostream::yaml_on;
+    os10 << 'B';
+    ASSERT_TRUE(os10.str() == "'B'");
+    os10.clear();
+    
+    os10 << ' ';
+    ASSERT_TRUE(os10.str() == "' '");
+    os10.clear();
+    
+    // Test const char* operator<< in non-YAML mode
+    hipblaslt_internal_ostream os11;
+    os11 << "Hello World";
+    ASSERT_TRUE(os11.str() == "Hello World");
+    os11.clear();
+    
+    os11 << "";
+    ASSERT_TRUE(os11.str() == "");
+    os11.clear();
+    
+    // Test const char* operator<< in YAML mode
+    os11 << hipblaslt_internal_ostream::yaml_on;
+    os11 << "Test String";
+    ASSERT_TRUE(os11.str() == "\"Test String\"");
+    os11.clear();
+    
+    os11 << "String with \"quotes\"";
+    ASSERT_TRUE(os11.str().find("\"") != std::string::npos);
+    os11.clear();
+
+    // Test UserDrivenTuningParser.cpp
+
+    // Test getContractionProblemsFromFile
+    TensileLite::getContractionProblemsFromFile("./code_coverage_tuning_file.txt");
+
+    // Test ProblemOverride
+
+    // Create two ProblemOverride objects
+    TensileLite::ProblemOverride prob1(true, false, rocisa::DataType::Float, 
+                                    rocisa::DataType::Float, rocisa::DataType::XFloat32, 
+                                    rocisa::DataType::Float, 128, 256, 64, 2);
+
+    TensileLite::ProblemOverride prob2(true, false, rocisa::DataType::Float, 
+                                    rocisa::DataType::Float, rocisa::DataType::XFloat32, 
+                                    rocisa::DataType::Float, 128, 256, 64, 1);
+
+    // Use the compare function
+    int result = TensileLite::Comparison<TensileLite::ProblemOverride>::compare(prob1, prob2);
+    ASSERT_TRUE(result > 0);
+
+    // Use in std::unordered_map
+    std::unordered_map<TensileLite::ProblemOverride, int> problemSolutionMap;
+    problemSolutionMap[prob1] = 42;  // Hash function is called automatically
+    problemSolutionMap[prob2] = 84;
+
+    // Use in std::unordered_set
+    auto it1 = problemSolutionMap.find(prob1);
+    auto it2 = problemSolutionMap.find(prob2);
+    
+    ASSERT_TRUE(it1 != problemSolutionMap.end());
+    ASSERT_TRUE(it2 != problemSolutionMap.end());
+}
+
+void testing_aux_handle_func(const Arguments& arg)
+{
+    // Test _rocblaslt_attribute
+    // Test basic constructor and destructor
+    {
+        _rocblaslt_attribute attr;
+        // Should be initialized with nullptr and 0 size
+        EXPECT_EQ(attr.data(), nullptr);
+        EXPECT_EQ(attr.length(), 0);
+    }
+    
+    // Test set and get with basic data types
+    {
+        _rocblaslt_attribute attr;
+        int32_t test_value = 42;
+        
+        // Set value
+        attr.set(&test_value, sizeof(test_value));
+        EXPECT_NE(attr.data(), nullptr);
+        EXPECT_EQ(attr.length(), sizeof(test_value));
+        
+        // Get value
+        int32_t retrieved_value = 0;
+        size_t bytes_copied = attr.get(&retrieved_value, sizeof(retrieved_value));
+        EXPECT_EQ(bytes_copied, sizeof(test_value));
+        EXPECT_EQ(retrieved_value, test_value);
+    }
+}
+#endif // HIPBLASLT_CODE_COVERAGE
