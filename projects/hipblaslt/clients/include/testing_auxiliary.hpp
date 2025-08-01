@@ -33,14 +33,21 @@
 #include "hipblaslt_random.hpp"
 #include "hipblaslt_test.hpp"
 #include "hipblaslt_vector.hpp"
+<<<<<<< HEAD
 #ifdef HIPBLASLT_CODE_COVERAGE
+=======
+#ifdef CODE_COVERAGE
+>>>>>>> develop
 #include "hipblaslt_internal.hpp"
 #include "rocblaslt/utility.hpp"
 #include "rocblaslt/rocroller_host.hpp"
 #include "rocblaslt/rocblaslt_mat_utils.hpp"
 #include "rocblaslt/status.h"
 #include "rocblaslt/tensile_host.hpp"
+<<<<<<< HEAD
 #include "rocblaslt/UserDrivenTuningParser.hpp"
+=======
+>>>>>>> develop
 #endif
 #include "unit.hpp"
 #include "utility.hpp"
@@ -3578,7 +3585,6 @@ void testing_aux_tensile_host_func(const Arguments& arg)
     ASSERT_TRUE(rocComputeType_to_tensile_type(rocblaslt_compute_i32) == rocisa::DataType::Int32);
 
     // Test runKernelFromInvocation
-    hipStream_t       stream;
     hipblasLtHandle_t handle;
     std::vector<int64_t>   m_vec = {1024, 512};
     std::vector<int64_t>   n_vec = {512, 512};
@@ -3816,8 +3822,6 @@ void testing_aux_tensile_host_func(const Arguments& arg)
     CHECK_HIPBLASLT_ERROR(hipblasLtDestroy(handle));
     CHECK_HIP_ERROR(hipStreamDestroy(stream));
 }
-
-void testing_aux_tuple_helper_equal_func(const Arguments& arg)
 {
     // Test tuple_helper equal functionality
     
