@@ -149,6 +149,16 @@ CallGemmStridedBatchedSequential(const Handle& handle,
                                  std::size_t c_offset,
                                  GemmBackend_t gemm_backend = GemmBackend_t::rocblas);
 
+miopenStatus_t CallGemmMix(const Handle& handle,
+                           GemmDescriptor gemm_desc,
+                           ConstData_t A,
+                           std::size_t a_offset,
+                           ConstData_t B,
+                           std::size_t b_offset,
+                           Data_t C,
+                           std::size_t c_offset,
+                           GemmBackend_t gemm_backend = GemmBackend_t::rocblas);
+
 // GEMM parameters for Convolution (using Im2Col) Fwd
 // y = w * Im2Col(x)
 GemmDescriptor CreateGemmDescriptorConvFwd(const TensorDescriptor& wDesc,

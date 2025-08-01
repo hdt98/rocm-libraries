@@ -1532,6 +1532,148 @@ miopenStatus_t CallGemmStridedBatchedSequential(const Handle& handle,
     return miopenStatusUnknownError;
 }
 
+miopenStatus_t CallGemmMix(const Handle& handle,
+                           GemmDescriptor gemm_desc,
+                           ConstData_t A,
+                           std::size_t a_offset,
+                           ConstData_t B,
+                           std::size_t b_offset,
+                           Data_t C,
+                           std::size_t c_offset,
+                           GemmBackend_t gemm_backend)
+{
+    MIOPEN_LOG_I2("gemm_desc: " << gemm_desc);
+
+    gemm_backend = enforce_gemm_backend(gemm_backend);
+
+    if(!gemm_desc.isColMajor)
+    {
+        gemm_desc.isColMajor = !gemm_desc.isColMajor;
+        std::swap(A, B);
+        std::swap(a_offset, b_offset);
+        std::swap(gemm_desc.a_cast_type, gemm_desc.b_cast_type);
+        std::swap(gemm_desc.transA, gemm_desc.transB);
+        std::swap(gemm_desc.m, gemm_desc.n);
+        std::swap(gemm_desc.lda, gemm_desc.ldb);
+    }
+
+    switch(gemm_backend)
+    {
+    case GemmBackend_t::nogemmbackend: return miopenStatusNotImplemented;
+    case GemmBackend_t::rocblas: {
+#if MIOPEN_USE_ROCBLAS
+        MIOPEN_LOG_I2("rocBLAS");
+
+        HipEventPtr start = nullptr;
+        HipEventPtr stop  = nullptr;
+        if(handle.IsProfilingEnabled())
+        {
+            ProfilingRecordStart(handle, start, stop);
+        }
+        rocblas_atomics_mode cur_mode =
+            rocblas_atomics_mode::rocblas_atomics_allowed; // default value from rocblas
+        if(gemm_desc.deterministic)
+            cur_mode = DisableRocblasAtomics(handle);
+
+        rocblas_status rb_status = rocblas_status::rocblas_status_internal_error;
+
+        switch(gemm_desc.dataType)
+        {
+        case miopenHalf: {
+            float alpha = gemm_desc.alpha;
+            float beta  = gemm_desc.beta;
+            rb_status   = miopen_rocblas_gemm_ex(
+                handle,
+                gemm_desc,
+                gemm_desc.transA ? rocblas_operation_transpose : rocblas_operation_none,
+                gemm_desc.transB ? rocblas_operation_transpose : rocblas_operation_none,
+                gemm_desc.m,
+                gemm_desc.n,
+                gemm_desc.k,
+                &alpha,
+                static_cast<const rocblas_half*>(A) + a_offset,
+                rocblas_datatype::rocblas_datatype_f16_r,
+                gemm_desc.lda,
+                static_cast<const rocblas_half*>(B) + b_offset,
+                rocblas_datatype::rocblas_datatype_f16_r,
+                gemm_desc.ldb,
+                &beta,
+                static_cast<const rocblas_half*>(C) + c_offset,
+                rocblas_datatype::rocblas_datatype_f32_r,
+                gemm_desc.ldc,
+                static_cast<rocblas_half*>(C) + c_offset,
+                rocblas_datatype::rocblas_datatype_f32_r,
+                gemm_desc.ldc,
+                rocBlasComputeType(gemm_desc),
+                rocblas_gemm_algo::rocblas_gemm_algo_standard,
+                0,
+                FlagsForRocblasFp32Fp16Call(gemm_desc)); // gfx90a_alt_impl));
+        }
+        break;
+        case miopenBFloat16: {
+            float alpha = gemm_desc.alpha;
+            float beta  = gemm_desc.beta;
+            rb_status   = miopen_rocblas_gemm_ex(
+                handle,
+                gemm_desc,
+                gemm_desc.transA ? rocblas_operation_transpose : rocblas_operation_none,
+                gemm_desc.transB ? rocblas_operation_transpose : rocblas_operation_none,
+                gemm_desc.m,
+                gemm_desc.n,
+                gemm_desc.k,
+                &alpha,
+                static_cast<const rocblas_bfloat16*>(A) + a_offset,
+                rocblas_datatype::rocblas_datatype_bf16_r,
+                gemm_desc.lda,
+                static_cast<const rocblas_bfloat16*>(B) + b_offset,
+                rocblas_datatype::rocblas_datatype_bf16_r,
+                gemm_desc.ldb,
+                &beta,
+                static_cast<const rocblas_bfloat16*>(C) + c_offset,
+                rocblas_datatype::rocblas_datatype_f32_r,
+                gemm_desc.ldc,
+                static_cast<rocblas_bfloat16*>(C) + c_offset,
+                rocblas_datatype::rocblas_datatype_f32_r,
+                gemm_desc.ldc,
+                rocBlasComputeType(gemm_desc),
+                rocblas_gemm_algo::rocblas_gemm_algo_standard,
+                0,
+                0);
+        }
+        break;
+
+        default: {
+            MIOPEN_THROW(miopenStatusInternalError, "gemm mixed is only for fp16 and bp16 conv.");
+        }
+        }
+
+        if(handle.IsProfilingEnabled())
+            ProfilingRecordStop(handle, start, stop);
+
+        if(rb_status != rocblas_status::rocblas_status_success)
+            MIOPEN_THROW(miopenStatusInternalError, "rocBlas error encountered");
+
+        if(gemm_desc.deterministic)
+            SetRocblasAtomics(handle, cur_mode);
+        return miopenStatusSuccess;
+#else
+        return miopenStatusNotImplemented;
+#endif
+    } // case GemmBackend_t::rocblas:
+    case GemmBackend_t::hipblaslt: {
+#if MIOPEN_USE_HIPBLASLT
+        // IsBf16Supported is disabled when MIOPEN_USE_ROCBLAS is disabled
+        MIOPEN_THROW(miopenStatusInternalError,
+                     "hipBlas not expected to use this solution for conv");
+#else
+        return miopenStatusNotImplemented;
+#endif
+    }
+    } // switch(gemm_backend)
+
+    return miopenStatusUnknownError;
+}
+
 // y = w * Im2Col(x)
 GemmDescriptor CreateGemmDescriptorConvFwd(const TensorDescriptor& wDesc,
                                            const TensorDescriptor& xDesc,

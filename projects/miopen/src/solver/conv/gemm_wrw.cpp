@@ -313,16 +313,23 @@ size_t GemmWrwUniversal::GetWorkspaceSize(const ExecutionContext& context,
     const auto wei_spatial = boost::adaptors::slice(dwDesc.GetLengths(), 2, 2 + spatial_dim);
     const auto wei_c       = dwDesc.GetLengths()[1];
 
-    const auto ws_size = GetTypeSize(dyDesc.GetType()) * wei_c *
-                         std::accumulate(out_spatial.begin(),
-                                         out_spatial.end(),
-                                         std::size_t(1),
-                                         std::multiplies<std::size_t>()) *
-                         std::accumulate(wei_spatial.begin(),
-                                         wei_spatial.end(),
-                                         std::size_t(1),
-                                         std::multiplies<std::size_t>()) *
-                         conv.group_count;
+    auto ws_size = GetTypeSize(dyDesc.GetType()) * wei_c *
+                   std::accumulate(out_spatial.begin(),
+                                   out_spatial.end(),
+                                   std::size_t(1),
+                                   std::multiplies<std::size_t>()) *
+                   std::accumulate(wei_spatial.begin(),
+                                   wei_spatial.end(),
+                                   std::size_t(1),
+                                   std::multiplies<std::size_t>()) *
+                   conv.group_count;
+
+    // fp16 grad need an fp32 buffer for accumulation
+    if(dwDesc.GetType() == miopenHalf || dwDesc.GetType() == miopenBFloat16)
+    {
+        TensorDescriptor dwf32Desc(miopenFloat, dwDesc.GetLengths(), dwDesc.GetStrides());
+        ws_size += dwf32Desc.GetNumBytes();
+    }
 
     if(ws_size > gemm::MaxMemAllocSz(handle, problem))
     {
@@ -448,6 +455,19 @@ ConvSolution GemmWrwUniversal::GetSolution(const ExecutionContext& context,
             float zero = 0.0f;
             SetTensor(handle, dwDesc_, dw, &zero);
 
+            const bool use_mixed =
+                (dwDesc_.GetType() == miopenHalf || dwDesc.GetType() == miopenBFloat16) ? true
+                                                                                        : false;
+            TensorDescriptor dwf32Desc;
+            Data_t dw_fp32 = nullptr;
+            if(use_mixed)
+            {
+                dwf32Desc =
+                    TensorDescriptor(miopenFloat, dwDesc_.GetLengths(), dwDesc_.GetStrides());
+                dw_fp32 = static_cast<char*>(workspace) + workspace_size - dwf32Desc.GetNumBytes();
+                SetTensor(handle, dwf32Desc, dw_fp32, &zero);
+            }
+
             float time = 0;
 
             for(std::size_t i = 0; i < in_n; i++)
@@ -485,22 +505,46 @@ ConvSolution GemmWrwUniversal::GetSolution(const ExecutionContext& context,
                 }
                 else
                 {
-                    // dw = dy * transpose(Im2Col(x))
-                    status = CallGemm(handle,
-                                      gemm_desc,
-                                      dy,
-                                      out_offset,
-                                      workspace,
-                                      0,
-                                      dw,
-                                      0,
-                                      GemmBackend_t::rocblas);
+                    if(use_mixed)
+                    {
+                        // dw = dy * transpose(Im2Col(x))
+                        status = CallGemmMix(handle,
+                                             gemm_desc,
+                                             dy,
+                                             out_offset,
+                                             workspace,
+                                             0,
+                                             dw_fp32,
+                                             0,
+                                             GemmBackend_t::rocblas);
+                    }
+                    else
+                    {
+                        // dw = dy * transpose(Im2Col(x))
+                        status = CallGemm(handle,
+                                          gemm_desc,
+                                          dy,
+                                          out_offset,
+                                          workspace,
+                                          0,
+                                          dw,
+                                          0,
+                                          GemmBackend_t::rocblas);
+                    }
                 }
 
                 if(status != miopenStatusSuccess)
                     MIOPEN_THROW("GemmWrw1x1_stride1 execution failure.");
 
                 // Update times for both the kernels
+                if(handle.IsProfilingEnabled())
+                    time += handle.GetKernelTime();
+            }
+
+            if(use_mixed)
+            {
+                CastTensor(handle, &conv.lowp_quant, true, dwf32Desc, dw_fp32, dwDesc_, dw, 0, 0);
+
                 if(handle.IsProfilingEnabled())
                     time += handle.GetKernelTime();
             }
