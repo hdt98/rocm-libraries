@@ -1219,7 +1219,7 @@ void testing_aux_get_sol_with_zero_alpha_null_a_b(const Arguments& arg)
     CHECK_SOLUTION_FOUND(returnedAlgoCount);
 
     // Validation for solution running.
-    CHECK_HIPBLASLT_ERROR(hipblasLtMatmul(handle, // here, add this to sample program with flags
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatmul(handle,
                                           matmul,
                                           &alpha,
                                           d_a,
@@ -1370,7 +1370,7 @@ void testing_aux_matmul_alg_null_matmul(const Arguments& arg)
     CHECK_HIPBLASLT_ERROR(hipblasLtMatmulDescSetAttribute(
         matmul, HIPBLASLT_MATMUL_DESC_TRANSB, &trans_b, sizeof(int32_t)));
 
-    CHECK_HIPBLASLT_ERROR(hipblasLtMatmul(handle, // here, add this to sample program with flags
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatmul(handle,
                                           matmul,
                                           &alpha,
                                           d_a,

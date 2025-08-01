@@ -126,7 +126,7 @@
     CHECK_HIPBLASLT_ERROR(hipblasLtMatmulDescSetAttribute(
         matmul, HIPBLASLT_MATMUL_DESC_TRANSB, &trans_b, sizeof(int32_t)));
 
-    CHECK_HIPBLASLT_ERROR(hipblasLtMatmul(handle, // here, add this to sample program with flags
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatmul(handle,
                                           matmul,
                                           &alpha,
                                           d_a,
