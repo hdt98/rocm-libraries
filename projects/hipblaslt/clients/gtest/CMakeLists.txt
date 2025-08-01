@@ -106,9 +106,19 @@ if(BUILD_CODE_COVERAGE)
 )
   # When we are doing code coverage with GOOGLE_TEST flag,
   # the std::cerr and std::cout are labeled as poison in hipblaslt/clients/include/utility.hpp.
-  # Thus, we use CODE_COVERAGE to ignore some code that is using std::cerr and std::cout.
-  target_compile_definitions( hipblaslt-test PRIVATE CODE_COVERAGE)
+  # Thus, we use HIPBLASLT_CODE_COVERAGE to ignore some code that is using std::cerr and std::cout.
+  target_compile_definitions( hipblaslt-test PRIVATE HIPBLASLT_CODE_COVERAGE)
   target_link_libraries( hipblaslt-test PRIVATE TensileHost)
+
+  # UserDrivenTuningParser.cpp needs this sample text file to run
+  file(WRITE "${CMAKE_BINARY_DIR}/code_coverage_tuning_file.txt"
+      "Git Version: 844d756925-dirty\n"
+      "    transA,transB,grouped_gemm,batch_count,m,n,k,alpha,lda,stride_a,beta,ldb,stride_b,ldc,stride_c,ldd,stride_d,"
+      "a_type,b_type,c_type,d_type,compute_type,scaleA,scaleB,scaleC,scaleD,amaxD,activation_type,bias_vector,bias_type,"
+      "aux_type,rotating_buffer,hipblaslt-Gflops,hipblaslt-GB/s,us,solution_index,gcnArchName,CUs\n"
+      "    T,N,0,1,512,1024,13,1,13,6656,0,13,13312,512,524288,512,524288,f32_r,f32_r,f32_r,f32_r,xf32_r,0,0,0,0,0,none,"
+      "1,f32_r,f32_r,512,464.651,69.1759,29.3371,532705,gfx942:sramecc+:xnack-,304"
+      )
 endif()
 
 if (BUILD_CUDA)

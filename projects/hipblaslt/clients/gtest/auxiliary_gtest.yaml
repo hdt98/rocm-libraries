@@ -163,6 +163,11 @@ Tests:
   function:
     - aux_status_func: *hpa_half_precision
 
+- name: aux_rocblaslt_mat_utils_func
+  category: pre_checkin
+  function:
+    - aux_rocblaslt_mat_utils_func: *hpa_half_precision
+
 - name: aux_hipblaslt_func
   category: pre_checkin
   function:
@@ -182,4 +187,14 @@ Tests:
   category: pre_checkin
   function:
     - aux_rocblaslt_rocroller_host_func: *hpa_half_precision
+
+- name: aux_hipblaslt_ostream_func
+  category: pre_checkin
+  function:
+    - aux_hipblaslt_ostream_func: *hpa_half_precision
+
+- name: aux_handle_func
+  category: pre_checkin
+  function:
+    - aux_handle_func: *hpa_half_precision
 ...

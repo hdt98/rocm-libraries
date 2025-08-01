@@ -168,7 +168,7 @@ public:
  *              will stream to log_ofs. Else it will stream to std::cerr.
  */
 
-#ifndef CODE_COVERAGE
+#ifndef HIPBLASLT_CODE_COVERAGE
 inline void open_log_stream(std::ostream** log_os,
                             std::ofstream* log_ofs,
                             std::string    environment_variable_name)
@@ -259,7 +259,7 @@ private:
             }
         }
 
-#ifndef CODE_COVERAGE
+#ifndef HIPBLASLT_CODE_COVERAGE
         // Open log file
         if(env_layer_mode != rocblaslt_layer_mode_none)
         {
