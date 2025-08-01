@@ -45,6 +45,7 @@
 #include "unit.hpp"
 #include "utility.hpp"
 #include <hipblaslt/hipblaslt-ext-op.h>
+#include <hipblaslt/hipblaslt-ext-op.h>
 #include <hipblaslt/hipblaslt-ext.hpp> // Add check for hipblaslt-ext
 #include <hipblaslt/hipblaslt.h>
 
@@ -74,6 +75,7 @@ void testing_aux_mat_init_bad_arg(const Arguments& arg)
     hipblasLtMatrixLayout_t m_descr;
 
     EXPECT_HIPBLAS_STATUS(hipblasLtMatrixLayoutCreate(nullptr, arg.a_type, row, col, ld),
+                        HIPBLAS_STATUS_INVALID_VALUE);
                         HIPBLAS_STATUS_INVALID_VALUE);
 }
 

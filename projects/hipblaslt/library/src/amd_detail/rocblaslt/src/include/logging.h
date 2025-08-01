@@ -206,6 +206,7 @@ inline void open_log_stream(std::ostream** log_os,
     }
 }
 #endif
+#endif
 
 class LoggerSingleton
 {
@@ -265,6 +266,7 @@ private:
         {
             open_log_stream(&log_os, &log_file_ofs, "HIPBLASLT_LOG_FILE");
         }
+#endif
 #endif
     }
 

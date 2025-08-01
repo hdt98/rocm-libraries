@@ -289,6 +289,7 @@ namespace TensileLite
                           << "totalLogicalElements=" << m_totalLogicalElements
                           << " totalAllocatedElem=" << m_totalAllocatedElements << "\n";
 #endif
+#endif
             }
         }
 
