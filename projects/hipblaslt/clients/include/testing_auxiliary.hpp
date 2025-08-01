@@ -76,7 +76,6 @@ void testing_aux_mat_init_bad_arg(const Arguments& arg)
 
     EXPECT_HIPBLAS_STATUS(hipblasLtMatrixLayoutCreate(nullptr, arg.a_type, row, col, ld),
                         HIPBLAS_STATUS_INVALID_VALUE);
-                        HIPBLAS_STATUS_INVALID_VALUE);
 }
 
 void testing_aux_mat_init(const Arguments& arg)
@@ -3799,6 +3798,9 @@ void testing_aux_tensile_host_func(const Arguments& arg)
 
     
     std::vector<rocblaslt_matmul_heuristic_result> algo_get_heuristic_results;
+    int returnAlgoCount;
+    ASSERT_TRUE(rocblaslt_status_invalid_handle == rocblaslt_matmul_algo_get_heuristic(nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 1, algo_get_heuristic_results.data(), &returnAlgoCount));
+    ASSERT_TRUE(rocblaslt_status_invalid_value == rocblaslt_algo_get_heuristic_cpp(roc_handle, rocblaslt::RocGemmType::ROCBLASLT_GEMM, gemm_data, max_workspace_size, 0, algo_get_heuristic_results));
     ASSERT_TRUE(rocblaslt_status_success == rocblaslt_algo_get_heuristic_cpp(roc_handle, rocblaslt::RocGemmType::ROCBLASLT_GEMM, gemm_data, max_workspace_size, 10, algo_get_heuristic_results));
 
     for(int j = 0; j < m_vec.size(); j++)

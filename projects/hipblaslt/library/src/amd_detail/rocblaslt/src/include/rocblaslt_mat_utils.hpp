@@ -173,7 +173,6 @@ inline rocblaslt_status validateMatmulArgs(int64_t                       m,
 #ifndef HIPBLASLT_CODE_COVERAGE
         std::cerr << "matrix and stride size must be positive" << std::endl;
 #endif
-#endif
         return rocblaslt_status_invalid_size;
     }
 
@@ -184,7 +183,6 @@ inline rocblaslt_status validateMatmulArgs(int64_t                       m,
 #ifndef HIPBLASLT_CODE_COVERAGE
         std::cerr << " number of batches of matrics A,B,C,D must be the same and negative"
                   << std::endl;
-#endif
 #endif
         return rocblaslt_status_invalid_size;
     }
