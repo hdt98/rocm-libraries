@@ -212,6 +212,7 @@ class GEMMSolution:
     streamKTwoTile: bool = False
 
     architecture: GPUArchitectureTarget = GPUArchitectureTarget()
+    matchMemoryAcccess: bool = True
 
     version: str = ""
 

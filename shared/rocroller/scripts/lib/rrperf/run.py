@@ -115,14 +115,14 @@ def submit_directory(suite: str, wrkdir: Path, ptsdir: Path) -> None:
 
 def dump_hipblaslt_csv(suite: str, rundir: Path, outdir: Path = None):
     """
-    Consolidate performance data and dump a hipblaslt-bench-compatible CSV.
+    Consolidate performance data and dump a hipblaslt bench compatible CSV.
     Only the specified columns (included_headers) are included,
     with empty fields for missing data.
     """
     if outdir is None:
         outdir = rundir
     results = []
-    for jpath in rundir.glob(f"gemm-*.yaml"):
+    for jpath in rundir.glob("gemm-*.yaml"):
         yamldata = yaml.safe_load(jpath.read_text())
         if isinstance(yamldata, dict):
             results.append(yamldata)
@@ -244,7 +244,7 @@ def get_args(parser: argparse.ArgumentParser):
     )
     parser.add_argument(
         "--dump_hipblaslt_csv",
-        help="Dump hipblaslt-bench compatible CSV with included headers.",
+        help="Dump hipblaslt bench compatible CSV with included headers.",
         action="store_true",
         default=False,
     )
