@@ -6,6 +6,8 @@
 Logging and debugging
 ********************************************************************
 
+Test!!
+
 All logging messages are output to the standard error stream (``stderr``). You can use the following
 environmental variables to control logging. Both variables are disabled by default.
 

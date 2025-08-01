@@ -6,7 +6,7 @@
 MIOpen documentation
 ********************************************************************
 
-If you see this, the pipeline is working!
+If you see this, the pipeline is working!!
 
 MIOpen is the AMD open-source, deep-learning primitives library for GPUs. It implements fusion to
 optimize for memory bandwidth and GPU launch overheads, providing an auto-tuning infrastructure
