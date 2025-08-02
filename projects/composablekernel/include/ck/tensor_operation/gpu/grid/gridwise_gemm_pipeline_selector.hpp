@@ -50,7 +50,9 @@ constexpr auto GridwiseGemmPipeline_Selector()
             }
             else
             {
+#if !(defined(__HIPCC_RTC__) || defined(CK_CODE_GEN_RTC))
                 std::cerr << "GridwiseGemmPipeline configuration is not available" << std::endl;
+#endif
             }
         }
         else if constexpr(PipelineVer == PipelineVersion::v5)
@@ -59,7 +61,9 @@ constexpr auto GridwiseGemmPipeline_Selector()
         }
         else
         {
+#if !(defined(__HIPCC_RTC__) || defined(CK_CODE_GEN_RTC))
             std::cerr << "GridwiseGemmPipeline configuration is not available" << std::endl;
+#endif
         }
     }
     else if constexpr(PipelineVer == PipelineVersion::v1)

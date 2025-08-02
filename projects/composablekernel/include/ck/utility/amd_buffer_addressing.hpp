@@ -1272,6 +1272,7 @@ __device__ void amd_async_load_global_to_lds(const T* global_base_ptr,
 {
     if(is_src_valid && is_dst_valid)
     {
+#if defined(__gfx13__)
         const index_t in_global_offset = global_offset;
         __attribute__((address_space(1))) const T* global_ptr =
             reinterpret_cast<__attribute__((address_space(1))) T*>(
@@ -1280,6 +1281,10 @@ __device__ void amd_async_load_global_to_lds(const T* global_base_ptr,
             reinterpret_cast<__attribute__((address_space(3))) T*>(
                 reinterpret_cast<uintptr_t>(lds_base_ptr + lds_offset));
         amd_async_copy_to_lds_impl<T, NumElemsPerThread, coherence>(global_ptr, lds_ptr);
+#else
+        ignore = global_base_ptr;
+        ignore = global_offset;
+#endif
     }
     else
     {
@@ -1308,6 +1313,7 @@ __device__ void amd_async_store_lds_to_global(const T* lds_base_ptr,
 {
     if(is_src_valid && is_dst_valid)
     {
+#if defined(__gfx13__)
         __attribute__((address_space(3))) const T* lds_ptr =
             reinterpret_cast<__attribute__((address_space(3))) T*>(
                 reinterpret_cast<uintptr_t>(lds_base_ptr + lds_offset));
@@ -1315,6 +1321,12 @@ __device__ void amd_async_store_lds_to_global(const T* lds_base_ptr,
             reinterpret_cast<__attribute__((address_space(1))) T*>(
                 reinterpret_cast<uintptr_t>(global_base_ptr + global_offset));
         amd_async_store_to_global_impl<T, NumElemsPerThread, coherence>(lds_ptr, global_ptr);
+#else
+        ignore = lds_base_ptr;
+        ignore = lds_offset;
+        ignore = global_base_ptr;
+        ignore = global_offset;
+#endif
     }
 }
 

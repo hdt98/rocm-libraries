@@ -255,13 +255,14 @@ struct DynamicBuffer
                       "Source data must come from a global memory buffer.");
         static_assert(DstBuffer::GetAddressSpace() == AddressSpaceEnum::Lds,
                       "Destination data must be stored in an LDS memory buffer.");
-
+#ifndef __HIPCC_RTC__
         amd_direct_load_global_to_lds<T, NumElemsPerThread>(p_data_,
                                                             src_offset,
                                                             dst_buf.p_data_,
                                                             dst_offset,
                                                             is_valid_element,
                                                             element_space_size_ / PackedSize);
+#endif
     }
 
     template <typename DstBuffer, index_t NumElemsPerThread>
@@ -293,9 +294,16 @@ struct DynamicBuffer
                       "Source data must come from a LDS memory buffer.");
         static_assert(DstBuffer::GetAddressSpace() == AddressSpaceEnum::Global,
                       "Destination data must be stored in a global memory buffer.");
-
+#if defined(__gfx13__)
         amd_async_store_lds_to_global<remove_cvref_t<T>, NumElemsPerThread, coherence>(
             p_data_, src_offset, dst_buf.p_data_, dst_offset, is_src_valid, is_dst_valid);
+#else
+        ignore = dst_buf;
+        ignore = src_offset;
+        ignore = dst_offset;
+        ignore = is_src_valid;
+        ignore = is_dst_valid;
+#endif
     }
 
     template <typename DstBuffer,
@@ -306,6 +314,7 @@ struct DynamicBuffer
     {
         static_assert(GetAddressSpace() == AddressSpaceEnum::Global,
                       "Source data must come from a global memory buffer.");
+#if defined(__gfx13__)
         __attribute__((address_space(1))) const T* global_ptr =
             reinterpret_cast<__attribute__((address_space(1))) T*>(
                 reinterpret_cast<uintptr_t>(p_data_ + src_offset));
@@ -313,6 +322,11 @@ struct DynamicBuffer
                                      NumElemsPerThread,
                                      NumThreadsPerTile,
                                      NumVgprsPerTile>(global_ptr, is_valid_element);
+#else
+        ignore = src_offset;
+        ignore = is_valid_element;
+        return T{};
+#endif
     }
 
     template <typename X,
@@ -321,6 +335,7 @@ struct DynamicBuffer
               index_t NumVgprsPerTile>
     __host__ __device__ void tileStore(const X& x, index_t dst_offset) const
     {
+#if defined(__gfx13__)
         // Copy data from global to LDS memory using direct loads.
         __attribute__((address_space(1))) const T* global_ptr =
             reinterpret_cast<__attribute__((address_space(1))) T*>(
@@ -329,6 +344,10 @@ struct DynamicBuffer
                                  NumElemsPerThread,
                                  NumThreadsPerTile,
                                  NumVgprsPerTile>(x, global_ptr);
+#else
+        ignore = x;
+        ignore = dst_offset;
+#endif
     }
 
     template <typename X,
@@ -338,6 +357,7 @@ struct DynamicBuffer
     __host__ __device__ constexpr auto clusterMulticastLoad(index_t src_offset,
                                                             bool is_valid_element) const
     {
+#if defined(__gfx13__)
         constexpr index_t scalar_per_t_vector = scalar_type<remove_cvref_t<T>>::vector_size;
         constexpr index_t scalar_per_x_vector = scalar_type<remove_cvref_t<X>>::vector_size;
         static_assert(scalar_per_x_vector % scalar_per_t_vector == 0,
@@ -351,6 +371,11 @@ struct DynamicBuffer
 
         return amd_cluster_multicast_load_to_vgpr<remove_cvref_t<T>, t_per_x, addr_space>(
             global_ptr, is_valid_element);
+#else
+        ignore = src_offset;
+        ignore = is_valid_element;
+        return T{};
+#endif
     }
 
     template <typename X,
@@ -360,6 +385,7 @@ struct DynamicBuffer
     __host__ __device__ void
     wgpMulticastLoad(X& out, index_t src_offset, bool is_valid_element) const
     {
+#if defined(__gfx13__)
         constexpr index_t scalar_per_t_vector = scalar_type<remove_cvref_t<T>>::vector_size;
         constexpr index_t scalar_per_x_vector = scalar_type<remove_cvref_t<X>>::vector_size;
         static_assert(scalar_per_x_vector % scalar_per_t_vector == 0,
@@ -372,6 +398,11 @@ struct DynamicBuffer
                 reinterpret_cast<uintptr_t>(p_data_ + src_offset));
 
         amd_wgp_multicast_load_to_vgpr<T, t_per_x, addr_space>(global_ptr, out, is_valid_element);
+#else
+        ignore                                        = out;
+        ignore                                        = src_offset;
+        ignore                                        = is_valid_element;
+#endif
     }
 
     template <typename X,

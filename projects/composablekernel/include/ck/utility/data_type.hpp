@@ -6,8 +6,6 @@
 #include "ck/utility/amd_ck_fp8.hpp"
 #include "ck/utility/e8m0.hpp"
 #include "ck/utility/statically_indexed_array.hpp"
-#include <vector>
-#define CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4 1
 
 /// Definitions from <cstdint>, <cmath> conflict with
 /// /opt/rocm/include/hip/amd_detail/amd_hip_vector_types.h.

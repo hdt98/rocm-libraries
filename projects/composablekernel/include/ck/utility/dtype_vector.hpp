@@ -2,6 +2,9 @@
 // // // Copyright (c) 2025, Advanced Micro Devices, Inc. All rights reserved.
 #pragma once
 #include "ck/utility/data_type.hpp"
+#if !(defined(__HIPCC_RTC__) || defined(CK_CODE_GEN_RTC))
+#include <vector>
+#endif
 
 namespace ck {
 
@@ -612,7 +615,7 @@ struct vector_type<T, 8, typename ck::enable_if_t<is_native_type<T>()>>
 };
 
 template <typename T>
-struct vector_type<T, 12, typename std::enable_if_t<is_native_type<T>()>>
+struct vector_type<T, 12, typename ck::enable_if_t<is_native_type<T>()>>
 {
     using d1_t = T;
     typedef T d2_t __attribute__((ext_vector_type(2)));
@@ -973,7 +976,7 @@ struct vector_type<T, 16, typename ck::enable_if_t<is_native_type<T>()>>
 };
 
 template <typename T>
-struct vector_type<T, 18, typename std::enable_if_t<is_native_type<T>()>>
+struct vector_type<T, 18, typename ck::enable_if_t<is_native_type<T>()>>
 {
     using d1_t = T;
     typedef T d2_t __attribute__((ext_vector_type(2)));
@@ -1077,7 +1080,7 @@ struct vector_type<T, 18, typename std::enable_if_t<is_native_type<T>()>>
 };
 
 template <typename T>
-struct vector_type<T, 24, typename std::enable_if_t<is_native_type<T>()>>
+struct vector_type<T, 24, typename ck::enable_if_t<is_native_type<T>()>>
 {
     using d1_t = T;
     typedef T d2_t __attribute__((ext_vector_type(2)));
@@ -1310,7 +1313,7 @@ struct vector_type<T, 32, typename ck::enable_if_t<is_native_type<T>()>>
 };
 
 template <typename T>
-struct vector_type<T, 36, typename std::enable_if_t<is_native_type<T>()>>
+struct vector_type<T, 36, typename ck::enable_if_t<is_native_type<T>()>>
 {
     using d1_t = T;
     typedef T d2_t __attribute__((ext_vector_type(2)));
@@ -1561,7 +1564,7 @@ struct vector_type<T, 64, typename ck::enable_if_t<is_native_type<T>()>>
 };
 
 template <typename T>
-struct vector_type<T, 72, typename std::enable_if_t<is_native_type<T>()>>
+struct vector_type<T, 72, typename ck::enable_if_t<is_native_type<T>()>>
 {
     using d1_t = T;
     typedef T d2_t __attribute__((ext_vector_type(2)));
@@ -1854,7 +1857,7 @@ struct vector_type<T, 128, typename ck::enable_if_t<is_native_type<T>()>>
 };
 
 template <typename T>
-struct vector_type<T, 144, typename std::enable_if_t<is_native_type<T>()>>
+struct vector_type<T, 144, typename ck::enable_if_t<is_native_type<T>()>>
 {
     using d1_t = T;
     typedef T d2_t __attribute__((ext_vector_type(2)));
@@ -2157,7 +2160,7 @@ struct vector_type<T, 256, typename ck::enable_if_t<is_native_type<T>()>>
 };
 
 template <typename T>
-struct vector_type<T, 10, typename std::enable_if_t<is_native_type<T>()>>
+struct vector_type<T, 10, typename ck::enable_if_t<is_native_type<T>()>>
 {
     using d1_t = T;
     typedef T d2_t __attribute__((ext_vector_type(2)));
@@ -2238,7 +2241,7 @@ struct vector_type<T, 10, typename std::enable_if_t<is_native_type<T>()>>
 };
 
 template <typename T>
-struct vector_type<T, 20, typename std::enable_if_t<is_native_type<T>()>>
+struct vector_type<T, 20, typename ck::enable_if_t<is_native_type<T>()>>
 {
     using d1_t = T;
     typedef T d2_t __attribute__((ext_vector_type(2)));
@@ -2341,7 +2344,7 @@ struct vector_type<T, 20, typename std::enable_if_t<is_native_type<T>()>>
 };
 
 template <typename T>
-struct vector_type<T, 9, typename std::enable_if_t<is_native_type<T>()>>
+struct vector_type<T, 9, typename ck::enable_if_t<is_native_type<T>()>>
 {
     using d1_t = T;
     typedef T d3_t __attribute__((ext_vector_type(3)));
@@ -3236,7 +3239,7 @@ struct vector_type<T, 64, typename ck::enable_if_t<!is_native_type<T>()>>
 };
 
 template <typename T>
-struct vector_type<T, 128, typename std::enable_if_t<!is_native_type<T>()>>
+struct vector_type<T, 128, typename ck::enable_if_t<!is_native_type<T>()>>
 {
     using d1_t   = T;
     using d2_t   = non_native_vector_base<T, 2>;
@@ -3362,7 +3365,7 @@ struct vector_type<T, 128, typename std::enable_if_t<!is_native_type<T>()>>
 };
 
 template <typename T>
-struct vector_type<T, 256, typename std::enable_if_t<!is_native_type<T>()>>
+struct vector_type<T, 256, typename ck::enable_if_t<!is_native_type<T>()>>
 {
     using d1_t   = T;
     using d2_t   = non_native_vector_base<T, 2>;
@@ -3498,7 +3501,7 @@ struct vector_type<T, 256, typename std::enable_if_t<!is_native_type<T>()>>
 };
 
 template <typename T>
-struct vector_type<T, 3, typename std::enable_if_t<!is_native_type<T>()>>
+struct vector_type<T, 3, typename ck::enable_if_t<!is_native_type<T>()>>
 {
     using d1_t = T;
     using d3_t = non_native_vector_base<T, 3>;
@@ -3556,7 +3559,7 @@ struct vector_type<T, 3, typename std::enable_if_t<!is_native_type<T>()>>
 };
 
 template <typename T>
-struct vector_type<T, 6, typename std::enable_if_t<!is_native_type<T>()>>
+struct vector_type<T, 6, typename ck::enable_if_t<!is_native_type<T>()>>
 {
     using d1_t = T;
     using d2_t = non_native_vector_base<T, 2>;
@@ -3638,7 +3641,7 @@ struct vector_type<T, 6, typename std::enable_if_t<!is_native_type<T>()>>
 };
 
 template <typename T>
-struct vector_type<T, 12, typename std::enable_if_t<!is_native_type<T>()>>
+struct vector_type<T, 12, typename ck::enable_if_t<!is_native_type<T>()>>
 {
     using d1_t  = T;
     using d2_t  = non_native_vector_base<T, 2>;
@@ -3741,7 +3744,7 @@ struct vector_type<T, 12, typename std::enable_if_t<!is_native_type<T>()>>
 };
 
 template <typename T>
-struct vector_type<T, 18, typename std::enable_if_t<!is_native_type<T>()>>
+struct vector_type<T, 18, typename ck::enable_if_t<!is_native_type<T>()>>
 {
     using d1_t  = T;
     using d2_t  = non_native_vector_base<T, 2>;
@@ -3845,7 +3848,7 @@ struct vector_type<T, 18, typename std::enable_if_t<!is_native_type<T>()>>
 };
 
 template <typename T>
-struct vector_type<T, 24, typename std::enable_if_t<!is_native_type<T>()>>
+struct vector_type<T, 24, typename ck::enable_if_t<!is_native_type<T>()>>
 {
     using d1_t  = T;
     using d2_t  = non_native_vector_base<T, 2>;
@@ -3970,7 +3973,7 @@ struct vector_type<T, 24, typename std::enable_if_t<!is_native_type<T>()>>
 };
 
 template <typename T>
-struct vector_type<T, 36, typename std::enable_if_t<!is_native_type<T>()>>
+struct vector_type<T, 36, typename ck::enable_if_t<!is_native_type<T>()>>
 {
     using d1_t  = T;
     using d2_t  = non_native_vector_base<T, 2>;
@@ -4105,7 +4108,7 @@ struct vector_type<T, 36, typename std::enable_if_t<!is_native_type<T>()>>
 };
 
 template <typename T>
-struct vector_type<T, 72, typename std::enable_if_t<!is_native_type<T>()>>
+struct vector_type<T, 72, typename ck::enable_if_t<!is_native_type<T>()>>
 {
     using d1_t  = T;
     using d2_t  = non_native_vector_base<T, 2>;
@@ -4272,7 +4275,7 @@ struct vector_type<T, 72, typename std::enable_if_t<!is_native_type<T>()>>
 };
 
 template <typename T>
-struct vector_type<T, 144, typename std::enable_if_t<!is_native_type<T>()>>
+struct vector_type<T, 144, typename ck::enable_if_t<!is_native_type<T>()>>
 {
     using d1_t   = T;
     using d2_t   = non_native_vector_base<T, 2>;
@@ -4439,7 +4442,7 @@ struct vector_type<T, 144, typename std::enable_if_t<!is_native_type<T>()>>
 };
 
 template <typename T>
-struct vector_type<T, 5, typename std::enable_if_t<!is_native_type<T>()>>
+struct vector_type<T, 5, typename ck::enable_if_t<!is_native_type<T>()>>
 {
     using d1_t = T;
     using d5_t = non_native_vector_base<T, 5>;
@@ -4496,7 +4499,7 @@ struct vector_type<T, 5, typename std::enable_if_t<!is_native_type<T>()>>
 };
 
 template <typename T>
-struct vector_type<T, 10, typename std::enable_if_t<!is_native_type<T>()>>
+struct vector_type<T, 10, typename ck::enable_if_t<!is_native_type<T>()>>
 {
     using d1_t  = T;
     using d2_t  = non_native_vector_base<T, 2>;
@@ -4577,7 +4580,7 @@ struct vector_type<T, 10, typename std::enable_if_t<!is_native_type<T>()>>
 };
 
 template <typename T>
-struct vector_type<T, 20, typename std::enable_if_t<!is_native_type<T>()>>
+struct vector_type<T, 20, typename ck::enable_if_t<!is_native_type<T>()>>
 {
     using d1_t  = T;
     using d2_t  = non_native_vector_base<T, 2>;
@@ -4680,7 +4683,7 @@ struct vector_type<T, 20, typename std::enable_if_t<!is_native_type<T>()>>
 };
 
 template <typename T>
-struct vector_type<T, 9, typename std::enable_if_t<!is_native_type<T>()>>
+struct vector_type<T, 9, typename ck::enable_if_t<!is_native_type<T>()>>
 {
     using d1_t = T;
     using d3_t = non_native_vector_base<T, 3>;
@@ -5069,6 +5072,7 @@ struct MxType_t<MTX_FMT::MTX_FMT_FP4_E2M1> : public MxType_t<MTX_FMT::MTX_FMT_DE
     static constexpr index_t dwords_per_wmmak = 8;
     static constexpr index_t BITS             = 4;
     // the below function is used for data preparation in host side; not used in device side
+#if !(defined(__HIPCC_RTC__) || defined(CK_CODE_GEN_RTC))
     static std::vector<type_t> compact_to_raw(const std::vector<type_t>& in)
     {
         std::vector<type_t> in_packed;
@@ -5083,6 +5087,7 @@ struct MxType_t<MTX_FMT::MTX_FMT_FP4_E2M1> : public MxType_t<MTX_FMT::MTX_FMT_DE
 
         return in_packed;
     }
+#endif
 };
 
 template <>
@@ -5095,6 +5100,7 @@ struct MxType_t<MTX_FMT::MTX_FMT_FP6_E3M2> : public MxType_t<MTX_FMT::MTX_FMT_DE
     static constexpr index_t vec_size         = 6;
     static constexpr index_t dwords_per_wmmak = 12;
     static constexpr index_t BITS             = 6;
+#if !(defined(__HIPCC_RTC__) || defined(CK_CODE_GEN_RTC))
     static std::vector<type_t> compact_to_raw(const std::vector<type_t>& in)
     {
         std::vector<type_t> in_packed;
@@ -5112,6 +5118,7 @@ struct MxType_t<MTX_FMT::MTX_FMT_FP6_E3M2> : public MxType_t<MTX_FMT::MTX_FMT_DE
         }
         return in_packed;
     }
+#endif
 };
 
 template <>
@@ -5123,6 +5130,7 @@ struct MxType_t<MTX_FMT::MTX_FMT_FP6_E2M3> : public MxType_t<MTX_FMT::MTX_FMT_DE
     static constexpr index_t vec_size         = 6;
     static constexpr index_t dwords_per_wmmak = 12;
     static constexpr index_t BITS             = 6;
+#if !(defined(__HIPCC_RTC__) || defined(CK_CODE_GEN_RTC))
     static std::vector<type_t> compact_to_raw(const std::vector<type_t>& in)
     {
         std::vector<type_t> in_packed;
@@ -5140,6 +5148,7 @@ struct MxType_t<MTX_FMT::MTX_FMT_FP6_E2M3> : public MxType_t<MTX_FMT::MTX_FMT_DE
         }
         return in_packed;
     }
+#endif
 };
 
 template <>
@@ -5152,7 +5161,9 @@ struct MxType_t<MTX_FMT::MTX_FMT_FP8_E4M3> : public MxType_t<MTX_FMT::MTX_FMT_DE
     static constexpr index_t vec_size         = 8;
     static constexpr index_t dwords_per_wmmak = 16;
     static constexpr index_t BITS             = 8;
+#if !(defined(__HIPCC_RTC__) || defined(CK_CODE_GEN_RTC))
     static std::vector<type_t> compact_to_raw(const std::vector<type_t>& in) { return in; }
+#endif
 };
 
 template <>
@@ -5165,7 +5176,9 @@ struct MxType_t<MTX_FMT::MTX_FMT_FP8_E5M2> : public MxType_t<MTX_FMT::MTX_FMT_DE
     static constexpr index_t vec_size         = 8;
     static constexpr index_t dwords_per_wmmak = 16;
     static constexpr index_t BITS             = 8;
+#if !(defined(__HIPCC_RTC__) || defined(CK_CODE_GEN_RTC))
     static std::vector<type_t> compact_to_raw(const std::vector<type_t>& in) { return in; }
+#endif
 };
 
 template <typename T>

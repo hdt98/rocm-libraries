@@ -875,6 +875,9 @@ struct GridwiseGemmPipeline_v1<1, false, false, ALoadOption, BLoadOption>
             __builtin_amdgcn_s_barrier_signal(-3);
             __builtin_amdgcn_s_barrier_wait(-3);
         }
+#else
+        ignore           = a_cluster_size;
+        ignore           = b_cluster_size;
 #endif
 
         a_blockwise_copy.Run(
@@ -1013,9 +1016,13 @@ struct GridwiseGemmPipeline_v1<1,
         if(isFirst)
             __builtin_amdgcn_s_barrier_signal(-3);
         __builtin_amdgcn_s_barrier_wait(-3);
-#endif
 
         const int wgRank = __builtin_amdgcn_cluster_workgroup_flat_id();
+#else
+        const int wgRank = 0;
+        ignore           = a_cluster_size;
+        ignore           = b_cluster_size;
+#endif
 
         index_t k = 0;
         do
@@ -1147,9 +1154,13 @@ struct GridwiseGemmPipeline_v1<1,
         if(isFirst)
             __builtin_amdgcn_s_barrier_signal(-3);
         __builtin_amdgcn_s_barrier_wait(-3);
-#endif
 
         const int wgRank = __builtin_amdgcn_cluster_workgroup_flat_id();
+#else
+        const int wgRank = 0;
+        ignore           = a_cluster_size;
+        ignore           = b_cluster_size;
+#endif
 
         index_t k = 0;
         do
@@ -1279,9 +1290,13 @@ struct GridwiseGemmPipeline_v1<1,
         if(isFirst)
             __builtin_amdgcn_s_barrier_signal(-3);
         __builtin_amdgcn_s_barrier_wait(-3);
-#endif
 
         const int wgRank = __builtin_amdgcn_cluster_workgroup_flat_id();
+#else
+        const int wgRank = 0;
+        ignore           = a_cluster_size;
+        ignore           = b_cluster_size;
+#endif
 
         index_t k = 0;
         do

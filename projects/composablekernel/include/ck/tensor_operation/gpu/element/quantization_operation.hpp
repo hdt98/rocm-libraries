@@ -1,5 +1,6 @@
 #pragma once
 
+#include <limits>
 #include "ck/utility/data_type.hpp"
 // #include "ck/utility/get_id.hpp"
 
@@ -208,7 +209,7 @@ struct Activation_Mul_Clamp
         activationOp_(y, x);
         y = math::clamp(requantScale_ * y, -128.f, 127.f);
     }
-
+#ifdef CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
     __host__ __device__ constexpr void operator()(int4_t& y, const float& x) const
     {
 
@@ -230,6 +231,7 @@ struct Activation_Mul_Clamp
                              type_convert<float>(ck::NumericLimits<int4_t>::Max()));
         y      = ck::type_convert<int4_t>(y_fp32);
     }
+#endif
 
     float requantScale_;
     Activation activationOp_;

@@ -2419,6 +2419,7 @@ type_convert<MxType_t<MTX_FMT::MTX_FMT_FP8_E5M2>, float>(float x)
     return type_convert<bf8_t, float>(x);
 }
 
+#if !(defined(__HIPCC_RTC__) || defined(CK_CODE_GEN_RTC))
 // currently this function only supported call from host; convert to MX format
 template <typename DstT, typename SrcT>
 __host__ const std::vector<typename DstT::type_t> convert_utils(const std::vector<SrcT>& src_vec)
@@ -2434,4 +2435,5 @@ __host__ const std::vector<typename DstT::type_t> convert_utils(const std::vecto
 
     return DstT::compact_to_raw(dst_vec);
 }
+#endif
 } // namespace ck

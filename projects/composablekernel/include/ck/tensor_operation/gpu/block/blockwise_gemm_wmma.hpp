@@ -1659,6 +1659,9 @@ struct BlockwiseGemmWMMA
         auto b_thread_buf = make_static_buffer<AddressSpaceEnum::Vgpr, FloatB>(
             b_thread_desc_.GetElementSpaceSize());
 
+        ignore = a_share_map_rank_id;
+        ignore = b_share_map_rank_id;
+
         // basic intrinsic to determine loopover direction
         if constexpr(MRepeat < NRepeat)
         {
