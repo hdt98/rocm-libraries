@@ -863,9 +863,13 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
                         else if constexpr((ALoadOption ==
                                            TensorLoadOption::CLUSTER_MULTICAST_LOAD) ||
                                           (ALoadOption == TensorLoadOption::CLUSTER_DDS_LOAD) ||
+                                          (ALoadOption ==
+                                           TensorLoadOption::CLUSTER_ASYNC_MULTICAST_LDS_LOAD) ||
                                           (BLoadOption ==
                                            TensorLoadOption::CLUSTER_MULTICAST_LOAD) ||
-                                          (BLoadOption == TensorLoadOption::CLUSTER_DDS_LOAD))
+                                          (BLoadOption == TensorLoadOption::CLUSTER_DDS_LOAD) ||
+                                          (BLoadOption ==
+                                           TensorLoadOption::CLUSTER_ASYNC_MULTICAST_LDS_LOAD))
                         {
                             /* Cluster MulticastLoad */
                             static_assert(ALoadOption == TensorLoadOption::DEFAULT_LOAD ||
@@ -1215,7 +1219,8 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
             {TensorLoadOption::DEFAULT_LOAD, "default"},
             {TensorLoadOption::CLUSTER_MULTICAST_LOAD, "cluster_multicast"},
             {TensorLoadOption::WGP_MULTICAST_LOAD, "wgp_multicast"},
-            {TensorLoadOption::CLUSTER_DDS_LOAD, "cluster_dds_load"}};
+            {TensorLoadOption::CLUSTER_DDS_LOAD, "cluster_dds_load"},
+            {TensorLoadOption::CLUSTER_ASYNC_MULTICAST_LDS_LOAD, "cluster_async_multicast_load"}};
 
         // clang-format off
         str << "DeviceGemmWmma_GFX13"

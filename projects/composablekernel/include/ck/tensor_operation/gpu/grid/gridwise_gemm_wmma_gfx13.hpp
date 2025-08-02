@@ -1054,7 +1054,9 @@ struct GridwiseGemm_Wmma_GFX13
                       "Invalid tuning param!");
 
         static_assert((ALoadOption != TensorLoadOption::CLUSTER_MULTICAST_LOAD) ||
-                          (BLoadOption != TensorLoadOption::CLUSTER_MULTICAST_LOAD),
+                          (BLoadOption != TensorLoadOption::CLUSTER_MULTICAST_LOAD) ||
+                          (ALoadOption != TensorLoadOption::CLUSTER_ASYNC_MULTICAST_LDS_LOAD) ||
+                          (BLoadOption != TensorLoadOption::CLUSTER_ASYNC_MULTICAST_LDS_LOAD),
                       "Both A and B cannot enable MultiCastLoad at the same time.");
 
         static_assert((ALoadOption != TensorLoadOption::CLUSTER_DDS_LOAD) ||
@@ -1093,6 +1095,15 @@ struct GridwiseGemm_Wmma_GFX13
                 static_assert(EnableWaveGroup == true,
                               "B WGPMultiCastLoad should be used with WaveGroup enabled.");
             }
+        }
+
+        if constexpr(ALoadOption == TensorLoadOption::CLUSTER_ASYNC_MULTICAST_LDS_LOAD)
+        {
+            static_assert(AEnableLds == true, "A use async multicast lds load should enable lds.");
+        }
+        if constexpr(BLoadOption == TensorLoadOption::CLUSTER_ASYNC_MULTICAST_LDS_LOAD)
+        {
+            static_assert(BEnableLds == true, "B use async multicast lds load should enable lds.");
         }
 
         const auto GetAProblemsizeMK = [&]() {
@@ -2106,7 +2117,8 @@ struct GridwiseGemm_Wmma_GFX13
     /* index_t DstVectorDim,                          */         2,
     /* index_t SrcScalarPerVector,                    */         ABlockTransferSrcScalarPerVector,
                                                                 false,
-                                                                true>(
+                                                                true,
+                                                                ALoadOption == TensorLoadOption::CLUSTER_ASYNC_MULTICAST_LDS_LOAD>(
                     a_grid_desc,
                     make_multi_index(m_block_data_idx_on_grid, 0, 0),
                     a_block_desc,
@@ -2439,7 +2451,8 @@ struct GridwiseGemm_Wmma_GFX13
     /* index_t DstVectorDim,                          */         2,
     /* index_t SrcScalarPerVector,                    */         BBlockTransferSrcScalarPerVector,
                                                                 false,
-                                                                true>(
+                                                                true,
+                                                                BLoadOption == TensorLoadOption::CLUSTER_ASYNC_MULTICAST_LDS_LOAD>(
                     b_grid_desc,
                     make_multi_index(n_block_data_idx_on_grid, 0, 0),
                     b_block_desc,

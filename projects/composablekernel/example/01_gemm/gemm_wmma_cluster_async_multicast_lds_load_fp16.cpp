@@ -53,7 +53,7 @@ using DeviceGemmInstance = ck::tensor_operation::device::DeviceGemmWmma_GFX13
            2,
            2,
            false,
-           false,
+           true,   // ABlockLdsAsyncCopy
            false,  // AEnableGlobalTRLoad
            false,  // AEnableGlobalTiledLoad
            ck::TensorLoadOption::CLUSTER_ASYNC_MULTICAST_LDS_LOAD,
@@ -65,7 +65,7 @@ using DeviceGemmInstance = ck::tensor_operation::device::DeviceGemmWmma_GFX13
            2,
            2,
            false,
-           false, // BBlockLdsAsyncCopy
+           true, // BBlockLdsAsyncCopy
            false, // BEnableGlobalTRLoad
            false, // BEnableGlobalTiledLoad
            ck::TensorLoadOption::DEFAULT_LOAD,
@@ -77,7 +77,7 @@ using DeviceGemmInstance = ck::tensor_operation::device::DeviceGemmWmma_GFX13
            false,
            false, //EnableWaveGroup
            ck::LoopScheduler::Default,
-           ck::PipelineVersion::v1>;
+           ck::PipelineVersion::v5>;
 // clang-format on
 
 using ReferenceGemmInstance = ck::tensor_operation::host::

@@ -91,7 +91,7 @@ constexpr auto GridwiseGemmPipeline_Selector()
     }
     else if constexpr(PipelineVer == PipelineVersion::v5)
     {
-        return GridwiseGemmPipeline_v5<NumPrefetch>{};
+        return GridwiseGemmPipeline_v5<NumPrefetch, ALoadOption, BLoadOption>{};
     }
     else if constexpr(PipelineVer == PipelineVersion::weight_only)
     {

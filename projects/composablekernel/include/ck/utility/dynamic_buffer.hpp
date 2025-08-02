@@ -265,7 +265,7 @@ struct DynamicBuffer
 #endif
     }
 
-    template <typename DstBuffer, index_t NumElemsPerThread>
+    template <typename DstBuffer, index_t NumElemsPerThread, bool EnableMcast>
     __host__ __device__ void AsyncCopyToLds(DstBuffer& dst_buf,
                                             index_t src_offset,
                                             index_t dst_offset,
@@ -278,7 +278,7 @@ struct DynamicBuffer
         static_assert(DstBuffer::GetAddressSpace() == AddressSpaceEnum::Lds,
                       "Destination data must be stored in an LDS memory buffer.");
 
-        amd_async_load_global_to_lds<remove_cvref_t<T>, NumElemsPerThread, coherence>(
+        amd_async_load_global_to_lds<remove_cvref_t<T>, NumElemsPerThread, coherence, EnableMcast>(
             p_data_, src_offset, dst_buf.p_data_, dst_offset, is_src_valid, is_dst_valid);
     }
 
