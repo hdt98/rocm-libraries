@@ -88,7 +88,7 @@ template <typename GridwiseGemm,
           typename CElementwiseOperation,
           typename Block2CTileMap,
           bool HasMainKBlockLoop>
-__global__ void __exp_amd_wavegroup_kernel(4, 32, 256, 1, 1)
+__global__ void __exp_amd_wavegroup_kernel(4, 32, 256, 1, 1) __exp_amd_no_rank_specialization__
     kernel_gemm_wmma_wavegroup(const ADataType* __restrict__ p_a_grid,
                                const BDataType* __restrict__ p_b_grid,
                                CDataType* __restrict__ p_c_grid,
@@ -219,7 +219,7 @@ template <typename GridwiseGemm,
           typename CElementwiseOperation,
           typename Block2CTileMap,
           bool HasMainKBlockLoop>
-__global__ void __exp_amd_wavegroup_kernel(4, 32, 256, 1, 1)
+__global__ void __exp_amd_wavegroup_kernel(4, 32, 256, 1, 1) __exp_amd_no_rank_specialization__
     kernel_gemm_mx_wmma_wavegroup(const int32_t* __restrict__ p_a_grid,
                                   const int32_t* __restrict__ p_b_grid,
                                   const int32_t* __restrict__ p_a_scale,

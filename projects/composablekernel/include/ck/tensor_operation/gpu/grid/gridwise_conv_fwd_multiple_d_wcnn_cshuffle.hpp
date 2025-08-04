@@ -126,7 +126,7 @@ template <typename GridwiseOp,
           bool HasMainBlockLoop,
           index_t ClusterSize>
 __attribute__((amdgpu_spatial_cluster_kernel)) __attribute__((cluster_dims(ClusterSize)))
-__global__ void __exp_amd_wavegroup_kernel(4, 32, 256, 1, 1)
+__global__ void __exp_amd_wavegroup_kernel(4, 32, 256, 1, 1) __exp_amd_no_rank_specialization__
     kernel_grouped_conv_fwd_wcnn_wavegroup256_spatial_cluster(
         const InDataType* __restrict__ p_in_grid,
         const WeiDataType* __restrict__ p_wei_grid,
@@ -234,7 +234,7 @@ template <typename GridwiseOp,
           bool HasMainBlockLoop,
           index_t ClusterSize>
 __attribute__((amdgpu_spatial_cluster_kernel)) __attribute__((cluster_dims(ClusterSize)))
-__global__ void __exp_amd_wavegroup_kernel(4, 32, 512, 1, 1)
+__global__ void __exp_amd_wavegroup_kernel(4, 32, 512, 1, 1) __exp_amd_no_rank_specialization__
     kernel_grouped_conv_fwd_wcnn_wavegroup512_spatial_cluster(
         const InDataType* __restrict__ p_in_grid,
         const WeiDataType* __restrict__ p_wei_grid,
@@ -340,7 +340,7 @@ template <typename GridwiseOp,
           typename Block2CTileMap,
           typename ComputePtrOffsetOfBatch,
           bool HasMainBlockLoop>
-__global__ void __exp_amd_wavegroup_kernel(4, 32, 256, 1, 1)
+__global__ void __exp_amd_wavegroup_kernel(4, 32, 256, 1, 1) __exp_amd_no_rank_specialization__
     kernel_grouped_conv_fwd_wcnn_wavegroup256(
         const InDataType* __restrict__ p_in_grid,
         const WeiDataType* __restrict__ p_wei_grid,
@@ -434,7 +434,7 @@ template <typename GridwiseOp,
           typename Block2CTileMap,
           typename ComputePtrOffsetOfBatch,
           bool HasMainBlockLoop>
-__global__ void __exp_amd_wavegroup_kernel(4, 32, 512, 1, 1)
+__global__ void __exp_amd_wavegroup_kernel(4, 32, 512, 1, 1) __exp_amd_no_rank_specialization__
     kernel_grouped_conv_fwd_wcnn_wavegroup512(
         const InDataType* __restrict__ p_in_grid,
         const WeiDataType* __restrict__ p_wei_grid,
