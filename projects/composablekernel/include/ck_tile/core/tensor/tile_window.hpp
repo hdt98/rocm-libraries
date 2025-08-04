@@ -270,8 +270,6 @@ struct tile_window_with_static_distribution
                                 number<i_access_unsupport_>          = {},
                                 bool_constant<oob_conditional_check> = {}) const
     {
-        ignore = dst_tensor;
-#if 0
         using Traits   = typename Base::Traits;
         using vector_t = typename Traits::vector_t;
         using SFC_Ys   = typename Traits::SFC_Ys;
@@ -292,7 +290,7 @@ struct tile_window_with_static_distribution
 
                 // read from bottom tensor
                 const vector_t vec_value =
-                    get_bottom_tensor_view().template get_tr_vectorized_elements<vector_t>(
+                    this->get_bottom_tensor_view().template get_tr_vectorized_elements<vector_t>(
                         bottom_tensor_thread_coord, 0, bool_constant<oob_conditional_check>{});
                 // write into distributed tensor
                 static_for<0, Traits::ScalarPerVector, 1>{}([&](auto j) {
@@ -323,7 +321,6 @@ struct tile_window_with_static_distribution
                 }
             });
         });
-#endif
     }
 
     // TODO: currently async load only implemented in inline asm
@@ -559,8 +556,6 @@ struct tile_window_with_static_distribution
     template <typename DstTileWindow_>
     CK_TILE_DEVICE auto async_load_to_lds(DstTileWindow_&& lds_tile) const
     {
-        ignore = lds_tile;
-#if 0        
         using Traits = typename Base::Traits;
 
         // using vector_type_t = typename Traits::vector_type_t;
@@ -576,8 +571,9 @@ struct tile_window_with_static_distribution
                 constexpr auto iAccess = number<iCoord * NumAccessPerCoord + iCoordAccess>{};
 
                 // write into bottom tensor
-                get_bottom_tensor_view().template async_get_vectorized_elements_to_lds<vector_t>(
-                    window_adaptor_thread_coord, bottom_tensor_thread_coord, lds_tile);
+                this->get_bottom_tensor_view()
+                    .template async_get_vectorized_elements_to_lds<vector_t>(
+                        window_adaptor_thread_coord, bottom_tensor_thread_coord, lds_tile);
 
                 // move thread coordinate
                 if constexpr(iCoordAccess != (NumAccessPerCoord - 1))
@@ -593,7 +589,6 @@ struct tile_window_with_static_distribution
                 }
             });
         });
-#endif
     }
 
     template <index_t i_access_unsupport_ = -1, bool oob_conditional_check = true>

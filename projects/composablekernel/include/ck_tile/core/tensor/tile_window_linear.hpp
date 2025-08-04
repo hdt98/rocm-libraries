@@ -380,7 +380,6 @@ struct tile_window_linear
                                 number<i_access>                     = {},
                                 bool_constant<oob_conditional_check> = {}) const
     {
-#if 0        
         using vector_t = typename Base::Traits::vector_t;
         using SFC_Ys   = typename Base::Traits::SFC_Ys;
 
@@ -399,7 +398,7 @@ struct tile_window_linear
 
             // read from bottom tensor
             const vector_t vec_value =
-                get_bottom_tensor_view().template get_tr_vectorized_elements<vector_t>(
+                this->get_bottom_tensor_view().template get_tr_vectorized_elements<vector_t>(
                     bottom_tensor_thread_coord,
                     linear_offset,
                     bottom_tensor_flag,
@@ -425,7 +424,7 @@ struct tile_window_linear
         };
 
         WINDOW_DISPATCH_ISSUE();
-#endif
+
         return dst_tensor;
     }
 
