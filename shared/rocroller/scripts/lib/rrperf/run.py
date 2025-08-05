@@ -277,7 +277,7 @@ def run(args):
     run_cli(**args.__dict__)
 
 
-def run_cli(
+def run_cli(  # noqa: C901
     token: str = None,
     suite: str = None,
     submit: bool = False,
@@ -342,6 +342,7 @@ def run_cli(
         # XXX if running single token, suite might be None
         submit_directory(suite, rundir, ptsdir)
 
-    kwargs.get("dump_hipblaslt_csv", False) and dump_hipblaslt_csv(suite, rundir)
+    if kwargs.get("dump_hipblaslt_csv", False):
+        dump_hipblaslt_csv(suite, rundir)
 
     return result, rundir
