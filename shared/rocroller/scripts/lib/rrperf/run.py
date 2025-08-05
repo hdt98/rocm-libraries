@@ -138,7 +138,7 @@ def dump_hipblaslt_csv(suite: str, rundir: Path, outdir: Path = None):
     if outdir is None:
         outdir = rundir
     results = []
-    for jpath in rundir.glob("gemm-*.yaml"):
+    for jpath in chain(rundir.glob("gemm-*.yaml"), rundir.glob("codegen-*.yaml")):
         yamldata = yaml.safe_load(jpath.read_text())
         if isinstance(yamldata, dict):
             results.append(merge_types(yamldata))
@@ -342,7 +342,6 @@ def run_cli(
         # XXX if running single token, suite might be None
         submit_directory(suite, rundir, ptsdir)
 
-    if kwargs.get("dump_hipblaslt_csv", False):
-        dump_hipblaslt_csv(suite, rundir)
+    kwargs.get("dump_hipblaslt_csv", False) and dump_hipblaslt_csv(suite, rundir)
 
     return result, rundir
