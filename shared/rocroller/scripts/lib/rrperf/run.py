@@ -298,7 +298,10 @@ def run_cli(  # noqa: C901
         rrperf.rocm_control.pin_clocks(rocm_smi)
 
     if suite is None and token is None:
-        suite = "all_gfx120X" if rrperf.utils.rocm_gfx().startswith("gfx120") else "all"
+        if rrperf.utils.rocm_gfx().startswith("gfx120"):
+            suite = "all_gfx120X"
+        else:
+            suite = "all"
 
     generator = rrperf.utils.empty()
     if suite is not None:
