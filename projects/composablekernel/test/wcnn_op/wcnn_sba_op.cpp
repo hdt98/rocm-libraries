@@ -344,7 +344,6 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
 
     constexpr bool IsInt4 =
         std::is_same<ck::int4_t, InDataType>::value || std::is_same<ck::uint4_t, InDataType>::value;
-    constexpr index_t NumLanePerPair = (WPerWcnn == 2) ? 4 : 2;
     // Output accum data
     constexpr auto accSbaInstance =
         ck::WcnnSba<AccDataType, HPerWcnn, WPerWcnn, activateFunc, scaleBiasPacked, uniformScale>();
@@ -497,9 +496,10 @@ __global__ void __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
 
                         store_out_tensor_data(h, w, k, outVec);
                     }
-#if CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
+#ifdef CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
                     else
                     {
+                        constexpr index_t NumLanePerPair = (WPerWcnn == 2) ? 4 : 2;
                         static_assert(KRepeat % 2 == 0);
                         // int4_t
                         using KernelEDataType =
