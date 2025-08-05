@@ -56,7 +56,7 @@ using DeviceGemmInstance = ck::tensor_operation::device::DeviceGemmWmma_GFX13
            false,
            false,  // AEnableGlobalTRLoad
            true,   // AEnableGlobalTiledLoad
-           ck::TensorLoadOption::DEFAULT_LOAD, // AGlobalMultiCastLoad
+           ck::TensorLoadOption::DEFAULT_LOAD, // ALoadOption
            1,      // A_cluster_size
            S<8, 4, 1>, //S<32, 4, 1>,
            S<0, 1, 2>,
@@ -68,7 +68,7 @@ using DeviceGemmInstance = ck::tensor_operation::device::DeviceGemmWmma_GFX13
            false,
            false, // BEnableGlobalTRLoad
            true,  // BEnableGlobalTiledLoad
-           ck::TensorLoadOption::DEFAULT_LOAD, // BGlobalMultiCastLoad
+           ck::TensorLoadOption::DEFAULT_LOAD, // BLoadOption
            1, // B_cluster_size
            1,     // C shuffle (M Repeat) Per store
            1,     // C shuffle (N Repeat) Per store

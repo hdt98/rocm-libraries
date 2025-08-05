@@ -335,10 +335,11 @@ enum struct AmdBufferCoherenceEnum
 // To do: need refactor as a tuple for combination load
 enum struct TensorLoadOption
 {
-    DEFAULT_LOAD           = 0,
-    CLUSTER_MULTICAST_LOAD = 1,
-    WGP_MULTICAST_LOAD     = 2,
-    CLUSTER_DDS_LOAD       = 3,
+    DEFAULT_LOAD                     = 0,
+    CLUSTER_MULTICAST_LOAD           = 1,
+    WGP_MULTICAST_LOAD               = 2,
+    CLUSTER_DDS_LOAD                 = 3,
+    CLUSTER_ASYNC_MULTICAST_LDS_LOAD = 4,
 };
 
 template <index_t N, AmdBufferCoherenceEnum coherence = AmdBufferCoherenceEnum::DefaultCoherence>
@@ -1097,7 +1098,8 @@ __device__ void amd_direct_load_global_to_lds(const T* global_base_ptr,
 
 template <typename T,
           index_t N,
-          AmdBufferCoherenceEnum coherence = AmdBufferCoherenceEnum::DefaultCoherence>
+          AmdBufferCoherenceEnum coherence = AmdBufferCoherenceEnum::DefaultCoherence,
+          bool multicast                   = false>
 __device__ void amd_async_copy_to_lds_impl_raw(__attribute__((address_space(1))) const T* src_ptr,
                                                __attribute__((address_space(3))) T* dst_ptr)
 {
@@ -1109,8 +1111,16 @@ __device__ void amd_async_copy_to_lds_impl_raw(__attribute__((address_space(1)))
                 reinterpret_cast<const __attribute__((address_space(1))) char*>(src_ptr));
         __attribute__((address_space(3))) char* lds_ptr =
             reinterpret_cast<__attribute__((address_space(3))) char*>(dst_ptr);
-        __builtin_amdgcn_global_load_async_to_lds_b8(
-            global_ptr, lds_ptr, 0, static_cast<index_t>(coherence));
+
+        if constexpr(multicast)
+        {
+            __builtin_amdgcn_cluster_load_async_to_lds_b8(global_ptr, lds_ptr, 0, 0, 0xf);
+        }
+        else
+        {
+            __builtin_amdgcn_global_load_async_to_lds_b8(
+                global_ptr, lds_ptr, 0, static_cast<index_t>(coherence));
+        }
         return;
     }
 
@@ -1121,8 +1131,16 @@ __device__ void amd_async_copy_to_lds_impl_raw(__attribute__((address_space(1)))
                 reinterpret_cast<const __attribute__((address_space(1))) int*>(src_ptr));
         __attribute__((address_space(3))) int* lds_ptr =
             reinterpret_cast<__attribute__((address_space(3))) int*>(dst_ptr);
-        __builtin_amdgcn_global_load_async_to_lds_b32(
-            global_ptr, lds_ptr, 0, static_cast<index_t>(coherence));
+
+        if constexpr(multicast)
+        {
+            __builtin_amdgcn_cluster_load_async_to_lds_b32(global_ptr, lds_ptr, 0, 0, 0xf);
+        }
+        else
+        {
+            __builtin_amdgcn_global_load_async_to_lds_b32(
+                global_ptr, lds_ptr, 0, static_cast<index_t>(coherence));
+        }
         return;
     }
 
@@ -1133,8 +1151,16 @@ __device__ void amd_async_copy_to_lds_impl_raw(__attribute__((address_space(1)))
                 reinterpret_cast<const __attribute__((address_space(1))) int32x2_t*>(src_ptr));
         __attribute__((address_space(3))) int32x2_t* lds_ptr =
             reinterpret_cast<__attribute__((address_space(3))) int32x2_t*>(dst_ptr);
-        __builtin_amdgcn_global_load_async_to_lds_b64(
-            global_ptr, lds_ptr, 0, static_cast<index_t>(coherence));
+
+        if constexpr(multicast)
+        {
+            __builtin_amdgcn_cluster_load_async_to_lds_b64(global_ptr, lds_ptr, 0, 0, 0xf);
+        }
+        else
+        {
+            __builtin_amdgcn_global_load_async_to_lds_b64(
+                global_ptr, lds_ptr, 0, static_cast<index_t>(coherence));
+        }
         return;
     }
 
@@ -1145,8 +1171,15 @@ __device__ void amd_async_copy_to_lds_impl_raw(__attribute__((address_space(1)))
                 reinterpret_cast<const __attribute__((address_space(1))) int32x4_t*>(src_ptr));
         __attribute__((address_space(3))) int32x4_t* lds_ptr =
             reinterpret_cast<__attribute__((address_space(3))) int32x4_t*>(dst_ptr);
-        __builtin_amdgcn_global_load_async_to_lds_b128(
-            global_ptr, lds_ptr, 0, static_cast<index_t>(coherence));
+        if constexpr(multicast)
+        {
+            __builtin_amdgcn_cluster_load_async_to_lds_b128(global_ptr, lds_ptr, 0, 0, 0xf);
+        }
+        else
+        {
+            __builtin_amdgcn_global_load_async_to_lds_b128(
+                global_ptr, lds_ptr, 0, static_cast<index_t>(coherence));
+        }
         return;
     }
 #else
@@ -1218,7 +1251,8 @@ __device__ void amd_async_store_to_global_impl_raw(__attribute__((address_space(
 
 template <typename T,
           index_t N,
-          AmdBufferCoherenceEnum coherence = AmdBufferCoherenceEnum::DefaultCoherence>
+          AmdBufferCoherenceEnum coherence = AmdBufferCoherenceEnum::DefaultCoherence,
+          bool multicast                   = false>
 __device__ void amd_async_copy_to_lds_impl(__attribute__((address_space(1))) const T* src_ptr,
                                            __attribute__((address_space(3))) T* dst_ptr)
 {
@@ -1234,7 +1268,7 @@ __device__ void amd_async_copy_to_lds_impl(__attribute__((address_space(1))) con
                       (is_same<T, uint8_t>::value && (N == 1 || N == 4 || N == 8 || N == 16)),
                   "wrong! not implemented");
 
-    amd_async_copy_to_lds_impl_raw<T, sizeof(T) * N, coherence>(src_ptr, dst_ptr);
+    amd_async_copy_to_lds_impl_raw<T, sizeof(T) * N, coherence, multicast>(src_ptr, dst_ptr);
     return;
 }
 
@@ -1262,7 +1296,8 @@ __device__ void amd_async_store_to_global_impl(__attribute__((address_space(3)))
 
 template <typename T,
           index_t NumElemsPerThread,
-          AmdBufferCoherenceEnum coherence = AmdBufferCoherenceEnum::DefaultCoherence>
+          AmdBufferCoherenceEnum coherence = AmdBufferCoherenceEnum::DefaultCoherence,
+          bool multicast                   = false>
 __device__ void amd_async_load_global_to_lds(const T* global_base_ptr,
                                              const index_t global_offset,
                                              T* lds_base_ptr,
@@ -1280,7 +1315,7 @@ __device__ void amd_async_load_global_to_lds(const T* global_base_ptr,
         __attribute__((address_space(3))) T* lds_ptr =
             reinterpret_cast<__attribute__((address_space(3))) T*>(
                 reinterpret_cast<uintptr_t>(lds_base_ptr + lds_offset));
-        amd_async_copy_to_lds_impl<T, NumElemsPerThread, coherence>(global_ptr, lds_ptr);
+        amd_async_copy_to_lds_impl<T, NumElemsPerThread, coherence, multicast>(global_ptr, lds_ptr);
 #else
         ignore = global_base_ptr;
         ignore = global_offset;

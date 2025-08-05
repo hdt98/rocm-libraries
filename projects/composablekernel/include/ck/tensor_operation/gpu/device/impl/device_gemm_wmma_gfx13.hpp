@@ -55,8 +55,8 @@ template <typename ALayout,
           bool ABlockLdsAsyncCopy,
           bool AEnableGlobalTRLoad,
           bool AEnableGlobalTiledLoad,
-          ck::TensorLoadOption AGlobalMultiCastLoad, // 0x1: cluster_multicast 0x2: wgp_muticast
-          index_t AClusterSize,                      /* Set when ALoadOption == 1*/
+          ck::TensorLoadOption ALoadOption,
+          index_t AClusterSize, /* Set when ALoadOption == 1*/
           typename BBlockTransferThreadClusterLengths_N_K0_K1,
           typename BBlockTransferThreadClusterArrangeOrder,
           typename BBlockTransferSrcAccessOrder,
@@ -67,8 +67,8 @@ template <typename ALayout,
           bool BBlockLdsAsyncCopy,
           bool BEnableGlobalTRLoad,
           bool BEnableGlobalTiledLoad,
-          ck::TensorLoadOption BGlobalMultiCastLoad, // 0x1: cluster_multicast 0x2: wgp_muticast
-          index_t BClusterSize,                      /* Set when BLoadOption == 1*/
+          ck::TensorLoadOption BLoadOption,
+          index_t BClusterSize, /* Set when BLoadOption == 1*/
           index_t CShuffleMRepeatPerShuffle,
           index_t CShuffleNRepeatPerShuffle,
           typename CShuffleBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock,
@@ -126,9 +126,8 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
             ? false
             : (AEnableGlobalTRLoad ? false : !ADisableLds_manu);
     static constexpr auto AEnableLds_auto =
-        (AEnableGlobalTiledLoad ||
-         ((AGlobalMultiCastLoad == TensorLoadOption::CLUSTER_MULTICAST_LOAD) ||
-          (AGlobalMultiCastLoad == TensorLoadOption::WGP_MULTICAST_LOAD)))
+        (AEnableGlobalTiledLoad || ((ALoadOption == TensorLoadOption::CLUSTER_MULTICAST_LOAD) ||
+                                    (ALoadOption == TensorLoadOption::WGP_MULTICAST_LOAD)))
             ? false
             : AEnableLds_auto_tmp;
 
@@ -138,9 +137,8 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
             ? false
             : (BEnableGlobalTRLoad ? false : !BDisableLds_manu);
     static constexpr auto BEnableLds_auto =
-        (BEnableGlobalTiledLoad ||
-         ((BGlobalMultiCastLoad == TensorLoadOption::CLUSTER_MULTICAST_LOAD) ||
-          (BGlobalMultiCastLoad == TensorLoadOption::WGP_MULTICAST_LOAD)))
+        (BEnableGlobalTiledLoad || ((BLoadOption == TensorLoadOption::CLUSTER_MULTICAST_LOAD) ||
+                                    (BLoadOption == TensorLoadOption::WGP_MULTICAST_LOAD)))
             ? false
             : BEnableLds_auto_tmp;
 
@@ -150,10 +148,8 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
     static constexpr auto AEnableLds_manu = ABlockLdsAsyncCopy;
     static constexpr auto BEnableLds_manu = BBlockLdsAsyncCopy;
 
-    static constexpr auto AEnableLds_dds =
-        (AGlobalMultiCastLoad == TensorLoadOption::CLUSTER_DDS_LOAD);
-    static constexpr auto BEnableLds_dds =
-        (BGlobalMultiCastLoad == TensorLoadOption::CLUSTER_DDS_LOAD);
+    static constexpr auto AEnableLds_dds = (ALoadOption == TensorLoadOption::CLUSTER_DDS_LOAD);
+    static constexpr auto BEnableLds_dds = (BLoadOption == TensorLoadOption::CLUSTER_DDS_LOAD);
 
     static constexpr auto AEnableLds =
         AEnableLds_auto || AEnableLds_manu || (NumPrefetch > 1) || AEnableLds_dds;
@@ -535,7 +531,7 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
         ABlockLdsAsyncCopy,
         AEnableTRLoadFromGlobal,
         AEnableGlobalTiledLoad,
-        AGlobalMultiCastLoad,
+        ALoadOption,
         AClusterSize,
         BBlockTransferThreadClusterLengths_N_K0_K1,
         BBlockTransferThreadClusterArrangeOrder,
@@ -549,7 +545,7 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
         BBlockLdsAsyncCopy,
         BEnableTRLoadFromGlobal,
         BEnableGlobalTiledLoad,
-        BGlobalMultiCastLoad,
+        BLoadOption,
         BClusterSize,
         CShuffleMRepeatPerShuffle,
         CShuffleNRepeatPerShuffle,
@@ -864,22 +860,23 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
                                 arg.c_element_op_,
                                 arg.block_2_ctile_map_);
                         }
-                        else if constexpr((AGlobalMultiCastLoad ==
+                        else if constexpr((ALoadOption ==
                                            TensorLoadOption::CLUSTER_MULTICAST_LOAD) ||
-                                          (AGlobalMultiCastLoad ==
-                                           TensorLoadOption::CLUSTER_DDS_LOAD) ||
-                                          (BGlobalMultiCastLoad ==
+                                          (ALoadOption == TensorLoadOption::CLUSTER_DDS_LOAD) ||
+                                          (ALoadOption ==
+                                           TensorLoadOption::CLUSTER_ASYNC_MULTICAST_LDS_LOAD) ||
+                                          (BLoadOption ==
                                            TensorLoadOption::CLUSTER_MULTICAST_LOAD) ||
-                                          (BGlobalMultiCastLoad ==
-                                           TensorLoadOption::CLUSTER_DDS_LOAD))
+                                          (BLoadOption == TensorLoadOption::CLUSTER_DDS_LOAD) ||
+                                          (BLoadOption ==
+                                           TensorLoadOption::CLUSTER_ASYNC_MULTICAST_LDS_LOAD))
                         {
                             /* Cluster MulticastLoad */
-                            static_assert(
-                                AGlobalMultiCastLoad == TensorLoadOption::DEFAULT_LOAD ||
-                                    AGlobalMultiCastLoad == TensorLoadOption::CLUSTER_DDS_LOAD ||
-                                    BGlobalMultiCastLoad == TensorLoadOption::DEFAULT_LOAD ||
-                                    BGlobalMultiCastLoad == TensorLoadOption::CLUSTER_DDS_LOAD,
-                                "Either A or B should not be Cluster MulticastLoad.");
+                            static_assert(ALoadOption == TensorLoadOption::DEFAULT_LOAD ||
+                                              ALoadOption == TensorLoadOption::CLUSTER_DDS_LOAD ||
+                                              BLoadOption == TensorLoadOption::DEFAULT_LOAD ||
+                                              BLoadOption == TensorLoadOption::CLUSTER_DDS_LOAD,
+                                          "Either A or B should not be Cluster MulticastLoad.");
 
                             const auto kernel = kernel_gemm_wmma_cluster<
                                 GridwiseGemm,
@@ -1222,7 +1219,8 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
             {TensorLoadOption::DEFAULT_LOAD, "default"},
             {TensorLoadOption::CLUSTER_MULTICAST_LOAD, "cluster_multicast"},
             {TensorLoadOption::WGP_MULTICAST_LOAD, "wgp_multicast"},
-            {TensorLoadOption::CLUSTER_DDS_LOAD, "cluster_dds_load"}};
+            {TensorLoadOption::CLUSTER_DDS_LOAD, "cluster_dds_load"},
+            {TensorLoadOption::CLUSTER_ASYNC_MULTICAST_LDS_LOAD, "cluster_async_multicast_load"}};
 
         // clang-format off
         str << "DeviceGemmWmma_GFX13"
@@ -1247,13 +1245,13 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
             << "AEnableTiledload: "
             << AEnableGlobalTiledLoad << ", "
             << "ALoadOption: "
-            << LoadMethodToString[AGlobalMultiCastLoad] << ", "
+            << LoadMethodToString[ALoadOption] << ", "
             << "BEnableTRload: "
             << BEnableTRLoadFromGlobal << ", "
             << "BEnableTiledload: "
             << BEnableGlobalTiledLoad << ", "
             << "BLoadOption: "
-            << LoadMethodToString[BGlobalMultiCastLoad] << ", "
+            << LoadMethodToString[BLoadOption] << ", "
             << "CStoreEnableAsync: "
             << CStoreEnableAsync << ", "
             << "EnableWaveGroup: "
