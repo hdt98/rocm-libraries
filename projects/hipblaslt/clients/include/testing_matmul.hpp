@@ -264,7 +264,7 @@ typename std::iterator_traits<it>::value_type median(it begin, it end)
     return (n % 2) ? begin[n2] : (*std::max_element(begin, begin + n2) + begin[n2]) / 2.0;
 }
 
-void remove_outliers(std::vector<float>& v)
+void remove_outliers_iqr(std::vector<float>& v)
 {
     // 1.5x IQR method to detect and remove outliers
     auto n2 = v.size() / 2;
@@ -282,6 +282,7 @@ void remove_outliers(std::vector<float>& v)
  */
 template <typename Op, typename Post>
 void timing_loop(bool         use_gpu_timer,
+                 bool         remove_outliers,
                  int          number_calls,
                  float        bench_time_secs,
                  Op&&         operation,
@@ -307,69 +308,82 @@ void timing_loop(bool         use_gpu_timer,
     }
     else
     {
-        std::vector<hipEvent_t> start_event(2), stop_event(2);
-        for(auto& e : start_event)
+        if(remove_outliers)
         {
-            CHECK_HIP_ERROR(hipEventCreate(&e));
-        }
-        for(auto& e : stop_event)
-        {
-            CHECK_HIP_ERROR(hipEventCreate(&e));
-        }
-        hipEvent_t event0;
-        CHECK_HIP_ERROR(hipEventCreate(&event0));
-        CHECK_HIP_ERROR(hipEventRecord(event0, stream));
-        float              gpu_time = 0.f;
-        std::vector<float> gpu_times;
-        int                i             = 0;
-        const float        bench_time_ms = bench_time_secs * 1000;
-        // run a minimum of number_call iterations and bench_time_secs runtime
-        while(i < number_calls || gpu_time < bench_time_ms)
-        {
-            CHECK_HIP_ERROR(hipEventRecord(start_event[i % 2], stream));
-            operation(i);
-            CHECK_HIP_ERROR(hipEventRecord(stop_event[i % 2], stream));
-            post(i);
-
-            if(i > 0)
+            hipEvent_t start_event[2], stop_event[2], event0;
+            CHECK_HIP_ERROR(hipEventCreate(&start_event[0]));
+            CHECK_HIP_ERROR(hipEventCreate(&start_event[1]));
+            CHECK_HIP_ERROR(hipEventCreate(&stop_event[0]));
+            CHECK_HIP_ERROR(hipEventCreate(&stop_event[1]));
+            CHECK_HIP_ERROR(hipEventCreate(&event0));
+            CHECK_HIP_ERROR(hipEventRecord(event0, stream));
+            float              gpu_time = 0.f;
+            std::vector<float> gpu_times;
+            int                i             = 0;
+            const float        bench_time_ms = bench_time_secs * 1000;
+            // run a minimum of number_call iterations and bench_time_secs runtime
+            while(i < number_calls || gpu_time < bench_time_ms)
             {
-                // while iteration i is ongoing, wait for iteration i-1 to end
-                CHECK_HIP_ERROR(hipEventSynchronize(stop_event[(i - 1) % 2]));
-                CHECK_HIP_ERROR(hipEventElapsedTime(
-                    &gpu_time, start_event[(i - 1) % 2], stop_event[(i - 1) % 2]));
-                // record time for iteration i-1
-                gpu_times.push_back(gpu_time);
-                // if iterations 0 to i-1 took more than the required runtime, we can stop
-                CHECK_HIP_ERROR(hipEventElapsedTime(&gpu_time, event0, stop_event[(i - 1) % 2]));
+                CHECK_HIP_ERROR(hipEventRecord(start_event[i % 2], stream));
+                operation(i);
+                CHECK_HIP_ERROR(hipEventRecord(stop_event[i % 2], stream));
+                post(i);
+
+                if(i > 0)
+                {
+                    // while iteration i is ongoing, wait for iteration i-1 to end
+                    CHECK_HIP_ERROR(hipEventSynchronize(stop_event[(i - 1) % 2]));
+                    CHECK_HIP_ERROR(hipEventElapsedTime(
+                        &gpu_time, start_event[(i - 1) % 2], stop_event[(i - 1) % 2]));
+                    // record time for iteration i-1
+                    gpu_times.push_back(gpu_time);
+                    // if iterations 0 to i-1 took more than the required runtime, we can stop
+                    CHECK_HIP_ERROR(hipEventElapsedTime(&gpu_time, event0, stop_event[(i - 1) % 2]));
+                }
+                i++;
             }
-            i++;
-        }
-        if(!i)
-        {
-            gpu_time_used = 0.;
+            if(!i)
+            {
+                gpu_time_used = 0.;
+            }
+            else
+            {
+                // wait for the final iteration
+                CHECK_HIP_ERROR(hipEventSynchronize(stop_event[(i - 1) % 2]));
+                CHECK_HIP_ERROR(
+                    hipEventElapsedTime(&gpu_time, start_event[(i - 1) % 2], stop_event[(i - 1) % 2]));
+                gpu_times.push_back(gpu_time);
+                // gpu_time_used = median(gpu_times.begin(), gpu_times.end());
+                remove_outliers_iqr(gpu_times);
+                gpu_time_used
+                    = std::accumulate(gpu_times.begin(), gpu_times.end(), 0.) / gpu_times.size();
+                gpu_time_used *= 1000; // ms to us
+            }
+            CHECK_HIP_ERROR(hipEventDestroy(start_event[0]));
+            CHECK_HIP_ERROR(hipEventDestroy(start_event[1]));
+            CHECK_HIP_ERROR(hipEventDestroy(stop_event[0]));
+            CHECK_HIP_ERROR(hipEventDestroy(stop_event[1]));
+            CHECK_HIP_ERROR(hipEventDestroy(event0));
         }
         else
         {
-            // wait for the final iteration
-            CHECK_HIP_ERROR(hipEventSynchronize(stop_event[(i - 1) % 2]));
-            CHECK_HIP_ERROR(
-                hipEventElapsedTime(&gpu_time, start_event[(i - 1) % 2], stop_event[(i - 1) % 2]));
-            gpu_times.push_back(gpu_time);
-            // gpu_time_used = median(gpu_times.begin(), gpu_times.end());
-            remove_outliers(gpu_times);
-            gpu_time_used
-                = std::accumulate(gpu_times.begin(), gpu_times.end(), 0.) / gpu_times.size();
-            gpu_time_used *= 1000; // ms to us
+            hipEvent_t start_event, stop_event;
+            CHECK_HIP_ERROR(hipEventCreate(&start_event));
+            CHECK_HIP_ERROR(hipEventCreate(&stop_event));
+            CHECK_HIP_ERROR(hipEventRecord(start_event, stream));
+            for(int i = 0; i < number_calls; i++)
+            {
+                operation(i);
+                post(i);
+            }
+            CHECK_HIP_ERROR(hipEventRecord(stop_event, stream));
+            CHECK_HIP_ERROR(hipEventSynchronize(stop_event));
+            float gpu_time = 0.f;
+            CHECK_HIP_ERROR(hipEventElapsedTime(&gpu_time, start_event, stop_event));
+            gpu_time_used = gpu_time / number_calls * 1000;
+            CHECK_HIP_ERROR(hipEventDestroy(start_event));
+            CHECK_HIP_ERROR(hipEventDestroy(stop_event));
         }
-        for(auto& e : start_event)
-        {
-            CHECK_HIP_ERROR(hipEventDestroy(e));
-        }
-        for(auto& e : stop_event)
-        {
-            CHECK_HIP_ERROR(hipEventDestroy(e));
-        }
-        CHECK_HIP_ERROR(hipEventDestroy(event0));
     }
 }
 
@@ -3644,7 +3658,7 @@ void testing_matmul_with_bias(const Arguments& arg,
 
         int    flush_iter      = 100000;
         double flush_time_used = 0;
-        if(arg.flush && !arg.use_gpu_timer)
+        if(arg.flush && (!arg.use_gpu_timer || !arg.remove_outliers))
         {
             for(int i = 0; i < flush_iter; i++)
                 hipLaunchKernelGGL(flush_icache, dim3(gpu_block3), dim3(64), 0, stream);
@@ -3699,6 +3713,7 @@ void testing_matmul_with_bias(const Arguments& arg,
                         CHECK_HIPBLASLT_ERROR(gemmVec[i % block_count].run(stream));
                     };
                     timing_loop(arg.use_gpu_timer,
+                                arg.remove_outliers,
                                 number_cold_calls,
                                 arg.cold_bench_time,
                                 op,
@@ -3711,6 +3726,7 @@ void testing_matmul_with_bias(const Arguments& arg,
                     }
                     perf_monitor.start();
                     timing_loop(arg.use_gpu_timer,
+                                arg.remove_outliers,
                                 number_hot_calls,
                                 arg.bench_time,
                                 op,
@@ -3752,6 +3768,7 @@ void testing_matmul_with_bias(const Arguments& arg,
                             HIPBLAS_STATUS_SUCCESS);
                     };
                     timing_loop(arg.use_gpu_timer,
+                                arg.remove_outliers,
                                 number_cold_calls,
                                 arg.cold_bench_time,
                                 op,
@@ -3764,6 +3781,7 @@ void testing_matmul_with_bias(const Arguments& arg,
                     }
                     perf_monitor.start();
                     timing_loop(arg.use_gpu_timer,
+                                arg.remove_outliers,
                                 number_hot_calls,
                                 arg.bench_time,
                                 op,
@@ -3800,6 +3818,7 @@ void testing_matmul_with_bias(const Arguments& arg,
                             d_userArgsVec[i % block_count], stream));
                     };
                     timing_loop(arg.use_gpu_timer,
+                                arg.remove_outliers,
                                 number_cold_calls,
                                 arg.cold_bench_time,
                                 op,
@@ -3813,6 +3832,7 @@ void testing_matmul_with_bias(const Arguments& arg,
                     perf_monitor.start();
                     timing_loop(
                         arg.use_gpu_timer,
+                        arg.remove_outliers,
                         number_hot_calls,
                         arg.bench_time,
                         op,
@@ -3835,6 +3855,7 @@ void testing_matmul_with_bias(const Arguments& arg,
                         CHECK_HIPBLASLT_ERROR(groupedGemmVec[i % block_count].run(stream));
                     };
                     timing_loop(arg.use_gpu_timer,
+                                arg.remove_outliers,
                                 number_cold_calls,
                                 arg.cold_bench_time,
                                 op,
@@ -3848,6 +3869,7 @@ void testing_matmul_with_bias(const Arguments& arg,
                     perf_monitor.start();
                     timing_loop(
                         arg.use_gpu_timer,
+                        arg.remove_outliers,
                         number_hot_calls,
                         arg.bench_time,
                         op,

@@ -466,11 +466,15 @@ try
 
         ("bench_time",
          value<float>(&arg.bench_time)->default_value(0.),
-         "Minimum time to run (with a minimum of iters iterations) inside timing loop (in seconds). Only supported with --use_gpu_timer.")
+         "Minimum time to run (with a minimum of iters iterations) inside timing loop (in seconds). Only supported with --use_gpu_timer --remove_outliers.")
 
         ("cold_bench_time",
          value<float>(&arg.cold_bench_time)->default_value(0.),
-         "Minimum cold time to run (with a minimum of cold_iters iterations) before entering the main timing loop (in seconds). Only supported with --use_gpu_timer.")
+         "Minimum cold time to run (with a minimum of cold_iters iterations) before entering the main timing loop (in seconds). Only supported with --use_gpu_timer --remove_outliers.")
+
+        ("remove_outliers",
+         bool_switch(&arg.remove_outliers)->default_value(false),
+         "Remove timing outliers (only works with --use_gpu_timer). Adds a little bit of timing overhead, but reduces std dev of reported time.")
 
         ("algo_method",
          value<std::string>(&algo_method_str)->default_value("heuristic"),
@@ -737,12 +741,20 @@ try
         return 1;
     }
 
-    if((arg.bench_time > 0. || arg.cold_bench_time > 0.) && !arg.use_gpu_timer)
+    if((arg.bench_time > 0. || arg.cold_bench_time > 0.) && (!arg.use_gpu_timer || !arg.remove_outliers))
     {
-        hipblaslt_cerr << "Use of bench_time and cold_bench_time requires --use_gpu_timer."
+        hipblaslt_cerr << "Use of --bench_time and --cold_bench_time requires --use_gpu_timer --remove_outliers."
                        << std::endl;
         return 1;
     }
+    if(arg.remove_outliers && !arg.use_gpu_timer)
+    {
+        hipblaslt_cerr << "Use of --remove_outliers requires --use_gpu_timer."
+                       << std::endl;
+        return 1;
+    }
+
+
 
     // transfer local variable state
     ArgumentModel_set_log_function_name(log_function_name);

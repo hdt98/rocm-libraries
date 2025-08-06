@@ -70,6 +70,7 @@ void Arguments::init()
 
     bench_time      = 0.f;
     cold_bench_time = 0.f;
+    remove_outliers = false;
 
     algo                   = 0;
     solution_index         = -1;

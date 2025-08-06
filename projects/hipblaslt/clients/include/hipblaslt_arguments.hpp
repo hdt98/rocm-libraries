@@ -95,6 +95,7 @@ struct Arguments
     int32_t cold_iters;
     float   bench_time;
     float   cold_bench_time;
+    bool    remove_outliers;
 
     uint32_t algo;
     int32_t  solution_index;
@@ -221,6 +222,7 @@ struct Arguments
     OPER(cold_iters) SEP             \
     OPER(bench_time) SEP             \
     OPER(cold_bench_time) SEP        \
+    OPER(remove_outliers) SEP        \
     OPER(algo) SEP                   \
     OPER(solution_index) SEP         \
     OPER(requested_solution_num) SEP \

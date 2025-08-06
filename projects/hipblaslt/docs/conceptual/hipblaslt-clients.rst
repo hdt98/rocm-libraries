@@ -97,8 +97,9 @@ For more information, run the command with the ``--help`` option. The output of 
    --verify |-v                       Validate GPU results with CPU?
    --iters |-i <value>                Iterations to run inside timing loop                                                (Default value is: 10)
    --cold_iters |-j <value>           Cold Iterations to run before entering the timing loop                              (Default value is: 2)
-   --bench_time <value>               Minimum time to run (with a minimum of iters iterations) inside timing loop (in seconds). Only supported with --use_gpu_timer.  (Default value is: 0)
-   --cold_bench_time <value>          Minimum cold time to run (with a minimum of cold_iters iterations) before entering the main timing loop (in seconds). Only supported with --use_gpu_timer.  (Default value is: 0)
+   --bench_time <value>               Minimum time to run (with a minimum of iters iterations) inside timing loop (in seconds). Only supported with --use_gpu_timer --remove_outliers.  (Default value is: 0)
+   --cold_bench_time <value>          Minimum cold time to run (with a minimum of cold_iters iterations) before entering the main timing loop (in seconds). Only supported with --use_gpu_timer --remove_outliers.  (Default value is: 0)
+   --remove_outliers                  Remove timing outliers (only works with --use_gpu_timer). Adds a little bit of timing overhead, but reduces std dev of reported time.
    --algo_method <value>              Use different algorithm search API. Options: heuristic, all, index.                 (Default value is: heuristic)
    --solution_index <value>           Used with --algo_method 2.  Specify solution index to use in benchmark.             (Default value is: -1)
    --requested_solution <value>       Requested solution num. Set to -1 to get all solutions. Only valid when algo_method is set to heuristic.  (Default value is: 1)
