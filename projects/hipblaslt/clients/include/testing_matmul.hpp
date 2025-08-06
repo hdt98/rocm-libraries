@@ -1125,6 +1125,7 @@ hipDataType derive_unset_aux_type(const Arguments& arg)
         HIP_R_16BF,
         HIP_R_8F_E4M3_FNUZ,
         HIP_R_8F_E4M3,
+        HIP_R_32F,
     };
 
     hipDataType real_aux_type = arg.aux_type;
@@ -1913,6 +1914,13 @@ void testing_matmul_with_bias(const Arguments& arg,
                                         arg.swizzle_a));
             CHECK_HIP_ERROR(synchronize(hB[i], dB[i]));
             CHECK_HIP_ERROR(synchronize(hC[i], dC[i]));
+
+            if(arg.dump_matrix)
+            {
+                hipblasltDispatchValuesToFile(transA, TiA, M[i], K[i], lda[i], hA[i].buf(), "batch_"+ std::to_string(i)+"_A_input.txt");
+                hipblasltDispatchValuesToFile(transB, TiB, K[i], N[i], ldb[i], hB[i].buf(), "batch_"+ std::to_string(i)+"_B_input.txt");
+                hipblasltDispatchValuesToFile(HIPBLAS_OP_N, To, M[i], N[i], ldc[i], hC[i].buf(), "batch_"+ std::to_string(i)+"_C_input.txt");
+            }
         }
 
         if(arg.swizzle_a && isSwizzleSupported(TiA))
@@ -3886,6 +3894,11 @@ void testing_matmul_with_bias(const Arguments& arg,
             }
             if(arg.unit_check || arg.norm_check || arg.allclose_check)
             {
+                if(arg.dump_matrix)
+                {
+                    hipblasltDispatchValuesToFile(HIPBLAS_OP_N, To, M[0], N[0], ldd[0], hD_1[0].buf(), "batch_0_D_output.txt");
+                    hipblasltDispatchValuesToFile(HIPBLAS_OP_N, To, M[0], N[0], ldd[0], hD_gold[0].buf(), "batch_0_D_Gold_output.txt");
+                }
                 check(stream,
                       arg,
                       gemm_count,

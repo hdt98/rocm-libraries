@@ -553,6 +553,7 @@ Arguments:
   - gradient: c_bool
   - norm_check_assert: c_bool
   - swizzle_a: c_bool
+  - dump_matrix: c_bool
   - scaleABlockRowSize: c_uint32
   - scaleABlockColSize: c_uint32
   - scaleBBlockRowSize: c_uint32
@@ -660,6 +661,7 @@ Defaults:
   grouped_gemm: 0
   norm_check_assert: true
   swizzle_a: false
+  dump_matrix: false
   scaleABlockRowSize: 32
   scaleABlockColSize: 1
   scaleBBlockRowSize: 1

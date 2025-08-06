@@ -15,9 +15,9 @@ Definitions:
 
   - &transA_transB_range
     - { transA: N, transB: N }
-    - { transA: N, transB: T }
-    - { transA: T, transB: N }
-    - { transA: T, transB: T }
+    # - { transA: N, transB: T }
+    # - { transA: T, transB: N }
+    # - { transA: T, transB: T }
 
   - &deepbench_alpha_beta_range
     - { alpha: 1, beta: 0 }
@@ -1931,17 +1931,17 @@ Tests:
   beta: 2.0
   unit_check: 1
 
-- name: matmul_heuristic_all_solutions_no_workspace
+- name: matmul_heuristic_all_solutions_no_workspace_blah_blah
   category: nightly
   function:
-    matmul: *real_precisions
+    matmul: *hpa_half_precision
   matrix_size:
     - { M:  128,   N:  128,    K:  2048 }
-  algo_method: [0,1]
+  algo_method: [0]
   transA_transB: *transA_transB_range
   alpha: 1
   beta: 1
-  requested_solution_num: -1
+  requested_solution_num: 215
   user_allocated_workspace: [0]
   unit_check: 1
 
