@@ -98,7 +98,7 @@ namespace TensileLite
                      Base::template Pair<Predicates::Contraction::GlobalSplitUCheckMinK>(),
                      Base::template Pair<Predicates::Contraction::CDStridesEqual>(),
                      Base::template Pair<Predicates::Contraction::StridedBatchedEqual>(),
-                     Base::template Pair<Predicates::Contraction::GroupedGemmEqual>(),
+                     Base::template Pair<Predicates::Contraction::GroupedGemmCheck>(),
                      Base::template Pair<Predicates::Contraction::CUEfficiency>(),
                      Base::template Pair<Predicates::Contraction::ExperimentalMLP>(),
                      Base::template Pair<Predicates::Contraction::ExperimentalStreamK>(),
@@ -376,8 +376,8 @@ namespace TensileLite
         };
 
         template <typename IO>
-        struct MappingTraits<Predicates::Contraction::GroupedGemmEqual, IO>
-            : public AutoMappingTraits<Predicates::Contraction::GroupedGemmEqual, IO>
+        struct MappingTraits<Predicates::Contraction::GroupedGemmCheck, IO>
+            : public AutoMappingTraits<Predicates::Contraction::GroupedGemmCheck, IO>
         {
         };
 

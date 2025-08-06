@@ -229,7 +229,8 @@ namespace TensileLite
 
                 virtual bool operator()(ContractionProblemGemm const& problem) const override
                 {
-                    int16_t gsu = problem.getParams().gsu() != 0 ? problem.getParams().gsu() : value[5];
+                    int16_t gsu
+                        = problem.getParams().gsu() != 0 ? problem.getParams().gsu() : value[5];
                     if(gsu == -1 || gsu == 1)
                         return 1;
 
@@ -882,7 +883,9 @@ namespace TensileLite
                     // if value is true, then we also need to check gsu
                     // otherwise we just check outputAmaxD
                     if(value)
-                        return amaxDStatusEqual && (problem.getParams().gsu() == 0 || problem.getParams().gsu() == 1);
+                        return amaxDStatusEqual
+                               && (problem.getParams().gsu() == 0
+                                   || problem.getParams().gsu() == 1);
                     else
                         return amaxDStatusEqual;
                 }
@@ -894,8 +897,10 @@ namespace TensileLite
                     {
                         bool rv = (*this)(problem);
 
-                        stream << *this << ": (" << "prob_amaxD " << problem.outputAmaxD() << " == " << "sol_amaxD "
-                               << value << " prob_gsu " << problem.getParams().gsu() << " is either 0 or 1"
+                        stream << *this << ": ("
+                               << "prob_amaxD " << problem.outputAmaxD() << " == "
+                               << "sol_amaxD " << value << " prob_gsu " << problem.getParams().gsu()
+                               << " is either 0 or 1"
                                << ") == " << rv;
 
                         return rv;
@@ -1537,7 +1542,8 @@ namespace TensileLite
                 }
                 virtual bool operator()(ContractionProblemGemm const& problem) const override
                 {
-                    int16_t gsu = problem.getParams().gsu() != 0 ? problem.getParams().gsu() : value[2];
+                    int16_t gsu
+                        = problem.getParams().gsu() != 0 ? problem.getParams().gsu() : value[2];
                     // auto gsu will consider workgroup number, so bypassed
                     if(gsu == -1)
                         return 1;
@@ -1551,12 +1557,14 @@ namespace TensileLite
                 virtual bool debugEval(ContractionProblemGemm const& problem,
                                        std::ostream&                 stream) const override
                 {
-                    int16_t gsu = problem.getParams().gsu() != 0 ? problem.getParams().gsu() : value[2];
+                    int16_t gsu
+                        = problem.getParams().gsu() != 0 ? problem.getParams().gsu() : value[2];
                     if(gsu == -1)
                     {
                         bool rv = (*this)(problem);
 
-                        stream << *this << ": (" << "auto gsu will consider workgroup number, so bypassed"
+                        stream << *this << ": ("
+                               << "auto gsu will consider workgroup number, so bypassed"
                                << ") == " << rv;
 
                         return rv;
@@ -1650,7 +1658,8 @@ namespace TensileLite
                     {
                         bool rv = (*this)(problem);
 
-                        stream << *this << ": (" << "auto gsu will consider MinK, so bypassed"
+                        stream << *this << ": ("
+                               << "auto gsu will consider MinK, so bypassed"
                                << ") == " << rv;
 
                         return rv;
@@ -1730,8 +1739,8 @@ namespace TensileLite
                 }
             };
 
-            struct GroupedGemmEqual
-                : public Predicate_CRTP<GroupedGemmEqual, ContractionProblemGemm>
+            struct GroupedGemmCheck
+                : public Predicate_CRTP<GroupedGemmCheck, ContractionProblemGemm>
             {
                 enum
                 {
@@ -1740,8 +1749,8 @@ namespace TensileLite
                 };
                 bool value;
 
-                GroupedGemmEqual() = default;
-                GroupedGemmEqual(bool value)
+                GroupedGemmCheck() = default;
+                GroupedGemmCheck(bool value)
                     : value(value)
                 {
                 }
@@ -1753,14 +1762,16 @@ namespace TensileLite
 
                 virtual bool operator()(ContractionProblemGemm const& problem) const override
                 {
-                    return problem.groupedGemm() == value;
+                    return !problem.groupedGemm() || value;
                 }
 
                 virtual bool debugEval(ContractionProblemGemm const& problem,
                                        std::ostream&                 stream) const override
                 {
-                    return debugEvalCmp(
-                        problem, stream, "prob", problem.groupedGemm(), "==", "sol", value);
+                    bool rv = (*this)(problem);
+                    stream << *this << ": prob: " << problem.groupedGemm()
+                           << ", Is sol support: " << value << std::endl;
+                    return rv;
                 }
             };
 
@@ -2748,15 +2759,8 @@ namespace TensileLite
                 {
                     size_t XCC  = (problem.getParams().fallbackStatus()) ? 1 : value[0];
                     size_t XCCG = (value[1] == -1) ? cuCount : value[1];
-                    return debugEvalCmp(problem,
-                                        stream,
-                                        "WGMXCCG",
-                                        XCCG,
-                                        "%",
-                                        "WGMXCC",
-                                        XCC,
-                                        "==",
-                                        0);
+                    return debugEvalCmp(
+                        problem, stream, "WGMXCCG", XCCG, "%", "WGMXCC", XCC, "==", 0);
                 }
             };
         } // namespace Contraction

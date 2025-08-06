@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright (C) 2022-2023 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2022-2025 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -31,8 +31,8 @@
 #include <string>
 #include <vector>
 
-#include <Tensile/Tensile.hpp>
 #include <Tensile/Task.hpp>
+#include <Tensile/Tensile.hpp>
 
 namespace TensileLite
 {
@@ -60,8 +60,7 @@ namespace TensileLite
            && solutions.problemType.bType == problem.b().dataType()
            && solutions.problemType.cType == problem.c().dataType()
            && solutions.problemType.dType == problem.d().dataType()
-           && solutions.problemType.computeType == problem.computeType()
-           && solutions.problemType.groupedGemm == problem.groupedGemm())
+           && solutions.problemType.computeType == problem.computeType())
             return true;
         return false;
     }
@@ -133,8 +132,7 @@ namespace TensileLite
    */
         virtual std::shared_ptr<MySolution> getSolutionByIndex(MyProblem const& problem,
                                                                Hardware const&  hardware,
-                                                               const int        index) const
-            = 0;
+                                                               const int        index) const = 0;
 
         virtual std::shared_ptr<MySolution> getSolutionByIndex(const int index) const
         {
@@ -142,7 +140,8 @@ namespace TensileLite
             return std::shared_ptr<MySolution>();
         }
 
-        virtual std::shared_ptr<MySolution> getSolutionByIndex(Hardware const&  hardware, const int index) const
+        virtual std::shared_ptr<MySolution> getSolutionByIndex(Hardware const& hardware,
+                                                               const int       index) const
         {
             throw std::runtime_error("[getSolutionByIndex] You should not reach here.");
             return std::shared_ptr<MySolution>();
@@ -150,8 +149,7 @@ namespace TensileLite
 
         virtual std::shared_ptr<MySolution> findBestSolution(MyProblem const& problem,
                                                              Hardware const&  hardware,
-                                                             double* fitness = nullptr) const
-            = 0;
+                                                             double* fitness = nullptr) const = 0;
 
         virtual std::shared_ptr<MySolution> findBestSolution(std::vector<MyProblem> const& problems,
                                                              Hardware const&               hardware,
@@ -166,18 +164,17 @@ namespace TensileLite
    *
    * May return an empty set if no such object exists.
    */
-        virtual SolutionSet<MySolution> findAllSolutions(MyProblem const&          problem,
-                                                         Hardware const&           hardware,
-                                                         SolutionLibrarySearchType searchType
-                                                         = SolutionLibrarySearchType::DEFAULT) const
-            = 0;
+        virtual SolutionSet<MySolution>
+            findAllSolutions(MyProblem const&          problem,
+                             Hardware const&           hardware,
+                             SolutionLibrarySearchType searchType
+                             = SolutionLibrarySearchType::DEFAULT) const = 0;
 
         virtual SolutionSet<MySolution>
             findAllSolutionsGroupedGemm(std::vector<MyProblem> const& problems,
                                         Hardware const&               hardware,
                                         SolutionLibrarySearchType     searchType
-                                        = SolutionLibrarySearchType::DEFAULT) const
-            = 0;
+                                        = SolutionLibrarySearchType::DEFAULT) const = 0;
 
         virtual std::string type() const        = 0;
         virtual std::string description() const = 0;

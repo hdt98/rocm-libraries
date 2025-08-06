@@ -380,7 +380,6 @@ class ProblemType:
             predicates.append(ProblemPredicate("UseE", value=self.useE))
             predicates.append(ProblemPredicate("DataTypeE", value=self.eType))
             predicates.append(ProblemPredicate("StridedBatched", value=self.stridedBatched))
-            predicates.append(ProblemPredicate("GroupedGemm", value=self.groupedGemm))
             predicates.append(ProblemPredicate("UseScaleAB", value=self.useScaleAB))
             predicates.append(ProblemPredicate("UseScaleCD", value=self.useScaleCD))
             predicates.append(ProblemPredicate("UseScaleAlphaVec", value=self.useScaleAlphaVec))
@@ -541,11 +540,11 @@ class ProblemPredicate(Properties.Predicate):
         if ('WorkGroupMappingXCC' in state) and ('WorkGroupMappingXCCGroup' in state):
             rv += [cls("WorkgroupMappingXCCCheck", value=[state['WorkGroupMappingXCC'], state['WorkGroupMappingXCCGroup']])]
 
-        if state['ProblemType']['SwizzleTensorA']:
-            rv += [cls('SwizzleTensorA', value=state['ProblemType']['SwizzleTensorA'])]
-
-        if state['ProblemType']['SwizzleTensorB']:
-            rv += [cls('SwizzleTensorB', value=state['ProblemType']['SwizzleTensorB'])]
+        #WORKAROUND: From Solution.py, StreamK doesn't support GroupedGemm yet.
+        if (('StreamK' in state) and (state['StreamK'] > 0)):
+            rv += [cls('GroupedGemm', value=False)]
+        else:
+            rv += [cls('GroupedGemm', value=True)]
 
         return rv
 

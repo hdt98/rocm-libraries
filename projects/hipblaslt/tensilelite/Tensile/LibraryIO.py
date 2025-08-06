@@ -437,7 +437,7 @@ def getCUCount() -> int:
     """Return the number of CU Count in current Hardware."""
     CU = os.environ.get("CU", None)
     if CU is None:
-        res = subprocess.run("rocminfo | grep Compute", stdout=subprocess.PIPE, shell=True, env={"ROCR_VISIBLE_DEVICES":"0"})
+        res = subprocess.run("/opt/rocm/bin/rocminfo | grep Compute", stdout=subprocess.PIPE, shell=True, env={"ROCR_VISIBLE_DEVICES":"0"})
         CU_RE = r"Compute Unit:(?P<COMPUTE_UNIT>[\w ]+)"
         match = re.search(CU_RE, res.stdout.decode("utf-8").split('\n')[-2])
         if match:

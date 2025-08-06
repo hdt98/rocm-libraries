@@ -1060,11 +1060,8 @@ class ProblemType(Mapping):
 
     # precision and other
     # name += "_SB" if self["StridedBatched"] else "_GB"
-    if self["GroupedGemm"]:
-      name.append("GG")
-    else:
-      if not self["StridedBatched"]:
-        name.append("GB") # legacy
+    if not self["StridedBatched"]:
+      name.append("GB") # legacy
 
     # Activation Naming
     if self["ActivationType"] != 'none':
