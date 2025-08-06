@@ -197,6 +197,8 @@ set ( rocrand_VERSION ${rocRAND_VERSION} )
 math(EXPR rocrand_VERSION_NUMBER "${rocRAND_VERSION_MAJOR} * 100000 + ${rocRAND_VERSION_MINOR} * 100 + ${rocRAND_VERSION_PATCH}")
 set(rocrand_SOVERSION 1.1)
 
+message("INSIDE PR")
+
 # Print configuration summary
 include(cmake/Summary.cmake)
 print_configuration_summary()

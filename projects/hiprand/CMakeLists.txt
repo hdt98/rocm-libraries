@@ -43,6 +43,8 @@ endif()
 project(hipRAND CXX)
 set(hipRAND_VERSION "3.0.0")
 
+message("INSIDE PR")
+
 # Build options
 option(BUILD_ADDRESS_SANITIZER "Build with address sanitizer enabled" OFF)
 option(BUILD_BENCHMARK "Build benchmarks" OFF)
