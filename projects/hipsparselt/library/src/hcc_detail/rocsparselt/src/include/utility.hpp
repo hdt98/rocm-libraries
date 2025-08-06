@@ -41,22 +41,6 @@
 extern "C" {
 #endif
 hipsparseOperation_t     HCCOperationToHIPOperation(rocsparselt_operation_ op);
-
-inline hipsparseOperation_t HCCOperationToHIPOperation(rocsparselt_operation_ op)
-{
-    switch(op)
-    {
-    case rocsparselt_operation_none:
-        return HIPSPARSE_OPERATION_NON_TRANSPOSE;
-    case rocsparselt_operation_transpose:
-        return HIPSPARSE_OPERATION_TRANSPOSE;
-    case rocsparselt_operation_conjugate_transpose:
-        return HIPSPARSE_OPERATION_CONJUGATE_TRANSPOSE;
-    default:
-        throw HIPSPARSE_STATUS_INVALID_VALUE;
-    }
-}
-
 #ifdef __cplusplus
 }
 #endif

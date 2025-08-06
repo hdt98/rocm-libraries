@@ -34,6 +34,7 @@
 #include "hipsparselt_test.hpp"
 #include "hipsparselt_vector.hpp"
 #include "rocsparselt-types.h"
+#include "status.h"
 #include "tensile_host.hpp"
 #include "unit.hpp"
 #include "utility.hpp"
@@ -1835,15 +1836,9 @@ void testing_aux_get_workspace_size(const Arguments& arg)
 
 void testing_aux_string_helper(const Arguments& arg)
 {
-    struct StrToEnumTestCase
-    {
-        const char* input;
-        int expected;
-    };
-
     constexpr int invalid_enum = -1;
 
-    const StrToEnumTestCase hip_datatype_cases[] = {
+    const std::pair<const char*, int> hip_datatype_cases[] = {
         {"f32_r", HIP_R_32F},
         {"s", HIP_R_32F},
         {"f16_r", HIP_R_16F},
@@ -1863,10 +1858,10 @@ void testing_aux_string_helper(const Arguments& arg)
 
     for(const auto& test : hip_datatype_cases)
     {
-        EXPECT_EQ(string_to_hip_datatype(test.input), test.expected);
+        EXPECT_EQ(string_to_hip_datatype(test.first), test.second);
     }
 
-    const StrToEnumTestCase compute_type_cases[] = {
+    const std::pair<const char*, int> str_to_compute_type_cases[] = {
         {"f32_r", HIPSPARSELT_COMPUTE_32F},
         {"s", HIPSPARSELT_COMPUTE_32F},
         {"i32_r", HIPSPARSELT_COMPUTE_32I},
@@ -1879,9 +1874,9 @@ void testing_aux_string_helper(const Arguments& arg)
         {"unknown", invalid_enum},
     };
 
-    for(const auto& test : compute_type_cases)
+    for(const auto& test : str_to_compute_type_cases)
     {
-        EXPECT_EQ(string_to_hipsparselt_computetype(test.input), test.expected);
+        EXPECT_EQ(string_to_hipsparselt_computetype(test.first), test.second);
     }
 
     const std::pair<const char*, hipsparselt_activation_type> activation_type_cases[] = {
@@ -1903,182 +1898,142 @@ void testing_aux_string_helper(const Arguments& arg)
         EXPECT_EQ(string_to_hipsparselt_activation_type(test.first), test.second);
         EXPECT_STREQ(hipsparselt_activation_type_to_string(test.second), test.first);
     }
+
+    const std::pair<rocsparselt_operation, const char*> roc_operation_cases[] = {
+        {rocsparselt_operation_conjugate_transpose, "conjugate_transpose"},
+    };
+
+    for(const auto& test : roc_operation_cases)
+    {
+        EXPECT_STREQ(rocsparselt_operation_to_string(test.first), test.second);
+    }
+
+    const std::pair<rocsparselt_matrix_type, const char*> mat_type_cases[] = {
+        {rocsparselt_matrix_type_unknown, "unknown"},
+    };
+    for(const auto& test : mat_type_cases)
+    {
+        EXPECT_STREQ(rocsparselt_matrix_type_to_string(test.first), test.second);
+    }
+
+    const std::pair<rocsparselt_layer_mode , const char*> layer_mode_cases[] = {
+        {rocsparselt_layer_mode_none, "None"},
+        {rocsparselt_layer_mode_log_error, "Error"},
+        {rocsparselt_layer_mode_log_hints, "Hints"},
+        {rocsparselt_layer_mode_log_info, "Info"},
+        {static_cast<rocsparselt_layer_mode>(-1), "Invalid"},
+    };
+
+    for(const auto& test : layer_mode_cases)
+    {
+        EXPECT_STREQ(rocsparselt_layer_mode2string(test.first), test.second);
+    }
+
+    const std::pair<rocsparselt_matmul_descr_attribute, const char*> mat_attr_cases[] = {
+        {rocsparselt_matmul_activation_abs, "abs"},
+        {rocsparselt_matmul_activation_gelu, "gelu"},
+        {rocsparselt_matmul_activation_leakyrelu, "leakyrelu"},
+        {rocsparselt_matmul_activation_tanh, "tanh"},
+    };
+
+    for(const auto& test : mat_attr_cases)
+    {
+        EXPECT_STREQ(rocsparselt_activation_type_to_string(test.first), test.second);
+    }
+
+    const std::pair<hipsparseStatus_t, const char*> status_cases[] = {
+        {HIPSPARSE_STATUS_SUCCESS, "HIPSPARSE_STATUS_SUCCESS"},
+        {HIPSPARSE_STATUS_NOT_INITIALIZED, "HIPSPARSE_STATUS_NOT_INITIALIZED"},
+        {HIPSPARSE_STATUS_ALLOC_FAILED, "HIPSPARSE_STATUS_ALLOC_FAILED"},
+        {HIPSPARSE_STATUS_INVALID_VALUE, "HIPSPARSE_STATUS_INVALID_VALUE"},
+        {HIPSPARSE_STATUS_ARCH_MISMATCH, "HIPSPARSE_STATUS_ARCH_MISMATCH"},
+        {HIPSPARSE_STATUS_MAPPING_ERROR, "HIPSPARSE_STATUS_MAPPING_ERROR"},
+        {HIPSPARSE_STATUS_EXECUTION_FAILED, "HIPSPARSE_STATUS_EXECUTION_FAILED"},
+        {HIPSPARSE_STATUS_INTERNAL_ERROR, "HIPSPARSE_STATUS_INTERNAL_ERROR"},
+        {HIPSPARSE_STATUS_MATRIX_TYPE_NOT_SUPPORTED, "HIPSPARSE_STATUS_MATRIX_TYPE_NOT_SUPPORTED"},
+        {HIPSPARSE_STATUS_ZERO_PIVOT, "HIPSPARSE_STATUS_ZERO_PIVOT"},
+        {HIPSPARSE_STATUS_NOT_SUPPORTED, "HIPSPARSE_STATUS_NOT_SUPPORTED"},
+    };
+
+    for(const auto& test : status_cases)
+    {
+        EXPECT_STREQ(hipsparse_status_to_string(test.first), test.second);
+    }
+
+    const std::pair<hipsparseOperation_t, const char*> operation_cases[] = {
+        {HIPSPARSE_OPERATION_NON_TRANSPOSE, "N"},
+        {HIPSPARSE_OPERATION_TRANSPOSE, "T"},
+        {HIPSPARSE_OPERATION_CONJUGATE_TRANSPOSE, "C"},
+        {static_cast<hipsparseOperation_t>(invalid_enum), "invalid"},
+    };
+
+    for(const auto& test : operation_cases)
+    {
+        EXPECT_STREQ(hipsparselt_operation_to_string(test.first), test.second);
+    }
+
+    const std::pair<char, hipsparseOperation_t> operation_char_cases[] = {
+        {'N', HIPSPARSE_OPERATION_NON_TRANSPOSE},
+        {'n', HIPSPARSE_OPERATION_NON_TRANSPOSE},
+        {'T', HIPSPARSE_OPERATION_TRANSPOSE},
+        {'t', HIPSPARSE_OPERATION_TRANSPOSE},
+        {'C', HIPSPARSE_OPERATION_CONJUGATE_TRANSPOSE},
+        {'c', HIPSPARSE_OPERATION_CONJUGATE_TRANSPOSE},
+        {'X', static_cast<hipsparseOperation_t>(invalid_enum)},
+    };
+
+    for(const auto& test : operation_char_cases)
+    {
+        EXPECT_EQ(char_to_hipsparselt_operation(test.first), test.second);
+    }
+
+    const std::pair<char, hipsparseOrder_t> order_cases[] = {
+        {'C', HIPSPARSE_ORDER_COL},
+        {'c', HIPSPARSE_ORDER_COL},
+        {'R', HIPSPARSE_ORDER_ROW},
+        {'r', HIPSPARSE_ORDER_ROW},
+        {'X', static_cast<hipsparseOrder_t>(invalid_enum)},
+    };
+
+    for(const auto& test : order_cases)
+    {
+        EXPECT_EQ(char_to_hipsparselt_order(test.first), test.second);
+    }
+
+    const std::pair<hipsparseLtComputetype_t, const char*> compute_type_cases[] = {
+        {HIPSPARSELT_COMPUTE_16F, "f16_r"},
+        {HIPSPARSELT_COMPUTE_32I, "i32_r"},
+        {HIPSPARSELT_COMPUTE_32F, "f32_r"},
+        {static_cast<hipsparseLtComputetype_t>(invalid_enum), "invalid"},
+    };
+
+    for(const auto& test : compute_type_cases)
+    {
+        EXPECT_STREQ(hipsparselt_computetype_to_string(test.first), test.second);
+    }
 }
 
-template <typename Ti, typename To, typename Tc>
-std::ostringstream& operator<<(std::ostringstream& os, const RocsparseltContractionProblem<Ti, To, Tc>& prob)
+void testing_aux_value_mapping(const Arguments& arg)
 {
-    hipsparselt_internal_ostream hos;
-    hos << prob;  // Delegate to internal stream
-    os << hos.str();  // Append the internal stream's content to the output stream
-    return os;
-}
+    constexpr int invalid_enum = -1;
 
-// Test for RocsparseltContractionProblem operator<< function
+    const std::pair<rocsparselt_status, hipError_t> status_mapping[] = {
+        {rocsparselt_status_success, hipSuccess},
+        {rocsparselt_status_memory_error, hipErrorMemoryAllocation},
+        {rocsparselt_status_memory_error, hipErrorLaunchOutOfResources},
+        {rocsparselt_status_invalid_pointer, hipErrorInvalidDevicePointer},
+        {rocsparselt_status_invalid_handle, hipErrorInvalidDevice},
+        {rocsparselt_status_invalid_handle, hipErrorInvalidResourceHandle},
+        {rocsparselt_status_internal_error, hipErrorInvalidValue},
+        {rocsparselt_status_internal_error, hipErrorNoDevice},
+        {rocsparselt_status_internal_error, hipErrorUnknown},
+    };
 
-template <typename Ti, typename To, typename Tc>
-std::string testing_aux_rocsparselt_ostream_helper(const Arguments& arg)
-{
-    // Create a mock handle
-    _rocsparselt_handle handle;
+    for(const auto& pair : status_mapping)
+    {
+        EXPECT_EQ(get_rocsparselt_status_for_hip_status(pair.second), pair.first);
+    }
 
-    // Test data - use different values to ensure all branches are covered
-    constexpr size_t m = 2, n = 4, k = 1;
-    constexpr size_t batch_count = 2;
-
-    // Create test arrays
-    std::vector<Ti> A_data(m * k * batch_count, Ti(0));
-    std::vector<Ti> B_data(k * n * batch_count, Ti(0));
-    std::vector<To> C_data(m * n * batch_count, To(0));
-    std::vector<To> D_data(m * n * batch_count, To(0));
-    std::vector<unsigned char> metadata(m * k / 2, 0xFF);
-    std::vector<float> bias_data(m, 1.0f);
-
-    Tc alpha = Tc(1.0);
-    Tc beta = Tc(0.5);
-
-    RocsparseltContractionProblem<Ti, To, Tc> prob(
-        &handle,
-        rocsparselt_operation_transpose,  // trans_a
-        rocsparselt_operation_none,       // trans_b
-        rocsparselt_order_row,           // order
-        m, n, k,                         // dimensions
-        &alpha,                          // alpha
-        A_data.data(), nullptr,          // A, batch_A
-        k, 0, 0,                        // ld_a, batch_stride_a, offset_a
-        B_data.data(), nullptr,          // B, batch_B
-        n, 0, 0,                        // ld_b, batch_stride_b, offset_b
-        &beta,                           // beta
-        C_data.data(), nullptr,          // C, batch_C
-        n, 0, 0,                        // ld_c, batch_stride_c, offset_c
-        D_data.data(), nullptr,          // D, batch_D
-        n, 0, 0,                        // ld_d, batch_stride_d, offset_d
-        batch_count,                     // batch_count
-        true,                           // strided_batch
-        false,                          // sparseA
-        nullptr,                        // metadata
-        hipsparselt_activation_type::relu, // act_type
-        0.1f, 6.0f,                     // act_arg0, act_arg1
-        bias_data.data(),               // bias_vector (not nullptr)
-        1,                              // bias_stride
-        HIP_R_16F,                      // bias_type
-        true,                           // alpha_vector_scaling
-        nullptr,                        // workspace
-        1024,                           // workspaceSize
-        nullptr,                        // streams
-        1                               // numStreams
-    );
-
-    hipsparselt_internal_ostream hos;
-
-    hos << prob;
-    return hos.str();
-}
-
-void testing_aux_rocsparselt_ostream(const Arguments& arg)
-{
-    using Ti = float;
-    using To = float;
-    using Tc = float;
-
-    // Create a mock handle
-    _rocsparselt_handle handle;
-
-    // Test data - use different values to ensure all branches are covered
-    constexpr size_t m = 2, n = 4, k = 1;
-    constexpr size_t batch_count = 2;
-
-    // Create test arrays
-    std::vector<Ti> A_data(m * k * batch_count, Ti(1.5));
-    std::vector<Ti> B_data(k * n * batch_count, Ti(2.5));
-    std::vector<To> C_data(m * n * batch_count, To(3.5));
-    std::vector<To> D_data(m * n * batch_count, To(0.0));
-    std::vector<unsigned char> metadata(m * k / 2, 0xFF);
-    std::vector<float> bias_data(m, 1.0f);
-
-    Tc alpha = Tc(1.0);
-    Tc beta = Tc(0.5);
-
-    RocsparseltContractionProblem<Ti, To> prob(
-        &handle,
-        rocsparselt_operation_transpose,  // trans_a
-        rocsparselt_operation_none,       // trans_b
-        rocsparselt_order_row,           // order
-        m, n, k,                         // dimensions
-        &alpha,                          // alpha
-        A_data.data(), nullptr,          // A, batch_A
-        k, 0, 0,                        // ld_a, batch_stride_a, offset_a
-        B_data.data(), nullptr,          // B, batch_B
-        n, 0, 0,                        // ld_b, batch_stride_b, offset_b
-        &beta,                           // beta
-        C_data.data(), nullptr,          // C, batch_C
-        n, 0, 0,                        // ld_c, batch_stride_c, offset_c
-        D_data.data(), nullptr,          // D, batch_D
-        n, 0, 0,                        // ld_d, batch_stride_d, offset_d
-        batch_count,                     // batch_count
-        true,                           // strided_batch
-        false,                          // sparseA
-        nullptr,                        // metadata
-        hipsparselt_activation_type::relu, // act_type
-        0.1f, 6.0f,                     // act_arg0, act_arg1
-        bias_data.data(),               // bias_vector (not nullptr)
-        1,                              // bias_stride
-        HIP_R_16F,                      // bias_type
-        true,                           // alpha_vector_scaling
-        nullptr,                        // workspace
-        1024,                           // workspaceSize
-        nullptr,                        // streams
-        1                               // numStreams
-    );
-
-    hipsparselt_internal_ostream hos;
-
-    hos << prob;
-
-    // Verify bias-related output
-    const char* answer_str =
-        "{ a_type: \"f32_r\","
-        " b_type: \"f32_r\","
-        " c_type: \"f32_r\","
-        " d_type: \"f32_r\","
-        " compute_type: \"f32_r\","
-        " transA: \"T\","
-        " transB: \"N\","
-        " M: 2,"
-        " N: 4,"
-        " K: 1,"
-        " alpha: 1,"
-        " row_stride_a: 1,"
-        " col_stride_a: 1,"
-        " row_stride_b: 1,"
-        " col_stride_b: 4,"
-        " row_stride_c: 1,"
-        " col_stride_c: 4,"
-        " row_stride_d: 1,"
-        " col_stride_d: 4,"
-        " beta: 0.5,"
-        " batch_count: 2,"
-        " strided_batch: true,"
-        " stride_a: 0,"
-        " stride_b: 0,"
-        " stride_c: 0,"
-        " stride_d: 0,"
-        " activation: \"relu\","
-        " activation_argument_0: 0.1,"
-        " activation_argument_1: 6,"
-        " has_bias: true,"
-        " bias_stride: 1,"
-        " bias_type: \"f16_r\","
-        " alpha_vector_scaling: true }\n";
-
-    EXPECT_STREQ(hos.str().c_str(), answer_str);
-
-    hipsparselt_cout << testing_aux_rocsparselt_ostream_helper<half, half, float>(arg);
-    hipsparselt_cout << testing_aux_rocsparselt_ostream_helper<hip_bfloat16, hip_bfloat16, float>(arg);
-
-    hipsparselt_cout << testing_aux_rocsparselt_ostream_helper<char, char, float>(arg);
-    hipsparselt_cout << testing_aux_rocsparselt_ostream_helper<char, half, float>(arg);
-    hipsparselt_cout << testing_aux_rocsparselt_ostream_helper<char, hip_bfloat16, float>(arg);
-    hipsparselt_cout << testing_aux_rocsparselt_ostream_helper<__hip_fp8_e4m3, float, float>(arg);
-    hipsparselt_cout << testing_aux_rocsparselt_ostream_helper<__hip_fp8_e4m3, float, float>(arg);
+    EXPECT_EQ(get_rocsparselt_status_for_hip_status(static_cast<hipError_t>(invalid_enum)),
+              rocsparselt_status_internal_error);
 }

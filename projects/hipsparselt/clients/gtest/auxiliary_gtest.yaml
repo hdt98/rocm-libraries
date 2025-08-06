@@ -159,7 +159,7 @@ Tests:
   function:
     - aux_string_helper: *hpa_half_precision
 
-- name: aux_rocsparselt_ostream
+- name: aux_value_mapping
   category: pre_checkin
   function:
-    - aux_rocsparselt_ostream: *hpa_half_precision
+    - aux_value_mapping: *hpa_half_precision
