@@ -1905,82 +1905,180 @@ void testing_aux_string_helper(const Arguments& arg)
     }
 }
 
-// Test for RocsparseltContractionProblem operator<< function
-void testing_rocsparselt_contraction_problem_ostream(const Arguments& arg)
+template <typename Ti, typename To, typename Tc>
+std::ostringstream& operator<<(std::ostringstream& os, const RocsparseltContractionProblem<Ti, To, Tc>& prob)
 {
-    // using Ti = float;
-    // using To = float;
-    // using Tc = float;
+    hipsparselt_internal_ostream hos;
+    hos << prob;  // Delegate to internal stream
+    os << hos.str();  // Append the internal stream's content to the output stream
+    return os;
+}
 
-    // // Create a mock handle
-    // _rocsparselt_handle handle;
+// Test for RocsparseltContractionProblem operator<< function
 
-    // // Test data - use different values to ensure all branches are covered
-    // constexpr size_t m = 128, n = 64, k = 32;
-    // constexpr size_t batch_count = 2;
+template <typename Ti, typename To, typename Tc>
+std::string testing_aux_rocsparselt_ostream_helper(const Arguments& arg)
+{
+    // Create a mock handle
+    _rocsparselt_handle handle;
 
-    // // Create test arrays
-    // std::vector<Ti> A_data(m * k * batch_count, Ti(1.5));
-    // std::vector<Ti> B_data(k * n * batch_count, Ti(2.5));
-    // std::vector<To> C_data(m * n * batch_count, To(3.5));
-    // std::vector<To> D_data(m * n * batch_count, To(0.0));
-    // std::vector<unsigned char> metadata(m * k / 2, 0xFF);
-    // std::vector<float> bias_data(m, 1.0f);
+    // Test data - use different values to ensure all branches are covered
+    constexpr size_t m = 2, n = 4, k = 1;
+    constexpr size_t batch_count = 2;
 
-    // Tc alpha = Tc(1.0);
-    // Tc beta = Tc(0.5);
+    // Create test arrays
+    std::vector<Ti> A_data(m * k * batch_count, Ti(0));
+    std::vector<Ti> B_data(k * n * batch_count, Ti(0));
+    std::vector<To> C_data(m * n * batch_count, To(0));
+    std::vector<To> D_data(m * n * batch_count, To(0));
+    std::vector<unsigned char> metadata(m * k / 2, 0xFF);
+    std::vector<float> bias_data(m, 1.0f);
 
-    // // Test case 2: Problem with bias and activation to cover different branches
-    // {
-    //     RocsparseltContractionProblem<Ti, To> prob(
-    //         &handle,
-    //         rocsparselt_operation_transpose,  // trans_a
-    //         rocsparselt_operation_none,       // trans_b
-    //         rocsparselt_order_row,           // order
-    //         m, n, k,                         // dimensions
-    //         &alpha,                          // alpha
-    //         A_data.data(), nullptr,          // A, batch_A
-    //         k, 0, 0,                        // ld_a, batch_stride_a, offset_a
-    //         B_data.data(), nullptr,          // B, batch_B
-    //         n, 0, 0,                        // ld_b, batch_stride_b, offset_b
-    //         &beta,                           // beta
-    //         C_data.data(), nullptr,          // C, batch_C
-    //         n, 0, 0,                        // ld_c, batch_stride_c, offset_c
-    //         D_data.data(), nullptr,          // D, batch_D
-    //         n, 0, 0,                        // ld_d, batch_stride_d, offset_d
-    //         batch_count,                     // batch_count
-    //         true,                           // strided_batch
-    //         false,                          // sparseA
-    //         nullptr,                        // metadata
-    //         hipsparselt_activation_type::relu, // act_type
-    //         0.1f, 6.0f,                     // act_arg0, act_arg1
-    //         bias_data.data(),               // bias_vector (not nullptr)
-    //         1,                              // bias_stride
-    //         HIP_R_16F,                      // bias_type
-    //         true,                           // alpha_vector_scaling
-    //         nullptr,                        // workspace
-    //         1024,                           // workspaceSize
-    //         nullptr,                        // streams
-    //         1                               // numStreams
-    //     );
+    Tc alpha = Tc(1.0);
+    Tc beta = Tc(0.5);
 
-    //     hipsparselt_internal_ostream hoss;
+    RocsparseltContractionProblem<Ti, To, Tc> prob(
+        &handle,
+        rocsparselt_operation_transpose,  // trans_a
+        rocsparselt_operation_none,       // trans_b
+        rocsparselt_order_row,           // order
+        m, n, k,                         // dimensions
+        &alpha,                          // alpha
+        A_data.data(), nullptr,          // A, batch_A
+        k, 0, 0,                        // ld_a, batch_stride_a, offset_a
+        B_data.data(), nullptr,          // B, batch_B
+        n, 0, 0,                        // ld_b, batch_stride_b, offset_b
+        &beta,                           // beta
+        C_data.data(), nullptr,          // C, batch_C
+        n, 0, 0,                        // ld_c, batch_stride_c, offset_c
+        D_data.data(), nullptr,          // D, batch_D
+        n, 0, 0,                        // ld_d, batch_stride_d, offset_d
+        batch_count,                     // batch_count
+        true,                           // strided_batch
+        false,                          // sparseA
+        nullptr,                        // metadata
+        hipsparselt_activation_type::relu, // act_type
+        0.1f, 6.0f,                     // act_arg0, act_arg1
+        bias_data.data(),               // bias_vector (not nullptr)
+        1,                              // bias_stride
+        HIP_R_16F,                      // bias_type
+        true,                           // alpha_vector_scaling
+        nullptr,                        // workspace
+        1024,                           // workspaceSize
+        nullptr,                        // streams
+        1                               // numStreams
+    );
 
-    //     // This should cover the bias_vector != nullptr branch
-    //     //hoss << prob;
-    //     printRCP(hoss, prob);
+    hipsparselt_internal_ostream hos;
 
-    //     std::string output = hoss.str();
-
-    //     // Verify bias-related output
-    //     EXPECT_TRUE(output.find("relu") != std::string::npos); // activation type
-    //     EXPECT_TRUE(output.find("true") != std::string::npos);  // has_bias should be true
-    //     EXPECT_TRUE(output.find("0.1") != std::string::npos);   // activation_arg0
-    //     EXPECT_TRUE(output.find("6") != std::string::npos);     // activation_arg1
-    // }
+    hos << prob;
+    return hos.str();
 }
 
 void testing_aux_rocsparselt_ostream(const Arguments& arg)
 {
-    testing_rocsparselt_contraction_problem_ostream(arg);
+    using Ti = float;
+    using To = float;
+    using Tc = float;
+
+    // Create a mock handle
+    _rocsparselt_handle handle;
+
+    // Test data - use different values to ensure all branches are covered
+    constexpr size_t m = 2, n = 4, k = 1;
+    constexpr size_t batch_count = 2;
+
+    // Create test arrays
+    std::vector<Ti> A_data(m * k * batch_count, Ti(1.5));
+    std::vector<Ti> B_data(k * n * batch_count, Ti(2.5));
+    std::vector<To> C_data(m * n * batch_count, To(3.5));
+    std::vector<To> D_data(m * n * batch_count, To(0.0));
+    std::vector<unsigned char> metadata(m * k / 2, 0xFF);
+    std::vector<float> bias_data(m, 1.0f);
+
+    Tc alpha = Tc(1.0);
+    Tc beta = Tc(0.5);
+
+    RocsparseltContractionProblem<Ti, To> prob(
+        &handle,
+        rocsparselt_operation_transpose,  // trans_a
+        rocsparselt_operation_none,       // trans_b
+        rocsparselt_order_row,           // order
+        m, n, k,                         // dimensions
+        &alpha,                          // alpha
+        A_data.data(), nullptr,          // A, batch_A
+        k, 0, 0,                        // ld_a, batch_stride_a, offset_a
+        B_data.data(), nullptr,          // B, batch_B
+        n, 0, 0,                        // ld_b, batch_stride_b, offset_b
+        &beta,                           // beta
+        C_data.data(), nullptr,          // C, batch_C
+        n, 0, 0,                        // ld_c, batch_stride_c, offset_c
+        D_data.data(), nullptr,          // D, batch_D
+        n, 0, 0,                        // ld_d, batch_stride_d, offset_d
+        batch_count,                     // batch_count
+        true,                           // strided_batch
+        false,                          // sparseA
+        nullptr,                        // metadata
+        hipsparselt_activation_type::relu, // act_type
+        0.1f, 6.0f,                     // act_arg0, act_arg1
+        bias_data.data(),               // bias_vector (not nullptr)
+        1,                              // bias_stride
+        HIP_R_16F,                      // bias_type
+        true,                           // alpha_vector_scaling
+        nullptr,                        // workspace
+        1024,                           // workspaceSize
+        nullptr,                        // streams
+        1                               // numStreams
+    );
+
+    hipsparselt_internal_ostream hos;
+
+    hos << prob;
+
+    // Verify bias-related output
+    const char* answer_str =
+        "{ a_type: \"f32_r\","
+        " b_type: \"f32_r\","
+        " c_type: \"f32_r\","
+        " d_type: \"f32_r\","
+        " compute_type: \"f32_r\","
+        " transA: \"T\","
+        " transB: \"N\","
+        " M: 2,"
+        " N: 4,"
+        " K: 1,"
+        " alpha: 1,"
+        " row_stride_a: 1,"
+        " col_stride_a: 1,"
+        " row_stride_b: 1,"
+        " col_stride_b: 4,"
+        " row_stride_c: 1,"
+        " col_stride_c: 4,"
+        " row_stride_d: 1,"
+        " col_stride_d: 4,"
+        " beta: 0.5,"
+        " batch_count: 2,"
+        " strided_batch: true,"
+        " stride_a: 0,"
+        " stride_b: 0,"
+        " stride_c: 0,"
+        " stride_d: 0,"
+        " activation: \"relu\","
+        " activation_argument_0: 0.1,"
+        " activation_argument_1: 6,"
+        " has_bias: true,"
+        " bias_stride: 1,"
+        " bias_type: \"f16_r\","
+        " alpha_vector_scaling: true }\n";
+
+    EXPECT_STREQ(hos.str().c_str(), answer_str);
+
+    hipsparselt_cout << testing_aux_rocsparselt_ostream_helper<half, half, float>(arg);
+    hipsparselt_cout << testing_aux_rocsparselt_ostream_helper<hip_bfloat16, hip_bfloat16, float>(arg);
+
+    hipsparselt_cout << testing_aux_rocsparselt_ostream_helper<char, char, float>(arg);
+    hipsparselt_cout << testing_aux_rocsparselt_ostream_helper<char, half, float>(arg);
+    hipsparselt_cout << testing_aux_rocsparselt_ostream_helper<char, hip_bfloat16, float>(arg);
+    hipsparselt_cout << testing_aux_rocsparselt_ostream_helper<__hip_fp8_e4m3, float, float>(arg);
+    hipsparselt_cout << testing_aux_rocsparselt_ostream_helper<__hip_fp8_e4m3, float, float>(arg);
 }

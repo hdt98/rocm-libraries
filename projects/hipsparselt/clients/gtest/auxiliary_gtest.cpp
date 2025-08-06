@@ -170,7 +170,8 @@ namespace
                    || !strcmp(arg.function, "aux_matmul_plan_destroy_bad_arg")
                    || !strcmp(arg.function, "aux_get_workspace_size_bad_arg")
                    || !strcmp(arg.function, "aux_get_workspace_size")
-                   || !strcmp(arg.function, "aux_string_helper");
+                   || !strcmp(arg.function, "aux_string_helper")
+                   || !strcmp(arg.function, "aux_rocsparselt_ostream");
         }
 
         // Google Test name suffix based on parameters

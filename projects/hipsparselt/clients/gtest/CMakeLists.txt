@@ -44,9 +44,15 @@ target_include_directories( hipsparselt-test
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../library/include>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../library/src/include>
+)
+
+if(BUILD_CODE_COVERAGE)
+target_include_directories( hipsparselt-test
+  PRIVATE
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../library/src/hcc_detail/rocsparselt/src/include>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../library/src/hcc_detail/rocsparselt/include>
 )
+endif()
 
 # External header includes included as system files
 target_include_directories( hipsparselt-test
