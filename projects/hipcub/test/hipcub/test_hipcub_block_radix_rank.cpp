@@ -608,7 +608,7 @@ void rank_with_prefix_sum_kernel(const KeyType* keys_input,
 #if defined(_GLIBCXX_RELEASE) && (GLIBCXX_RELEASE < 9)
 
 template <typename It, typename OutIt, typename T>
-void exclusive_scan(It first, It last, OutIt out, T init)
+void fall_back_exclusive_scan(It first, It last, OutIt out, T init)
 {
     // Fallback implementation for exclusive scan if gcc version is < 9
     for (; first != last; ++first)
@@ -725,7 +725,7 @@ void test_radix_rank_with_prefix_sum_output()
                                         pfs_expected.begin() + pfs_offset,
                                         0);
                 #else
-                    exclusive_scan(histogram.begin(),
+                    fall_back_exclusive_scan(histogram.begin(),
                                         histogram.end(),
                                         pfs_expected.begin() + pfs_offset,
                                         0);
