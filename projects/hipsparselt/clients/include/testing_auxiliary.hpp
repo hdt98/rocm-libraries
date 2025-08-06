@@ -2037,3 +2037,34 @@ void testing_aux_value_mapping(const Arguments& arg)
     EXPECT_EQ(get_rocsparselt_status_for_hip_status(static_cast<hipError_t>(invalid_enum)),
               rocsparselt_status_internal_error);
 }
+
+void testing_aux_math(const Arguments& arg)
+{
+    __half_raw v_raw;
+    v_raw.x = 0x7C01; // NaN
+    EXPECT_TRUE(hipsparselt_isnan(__half(v_raw)));
+
+    v_raw.x = 0x3C00;
+    EXPECT_FALSE(hipsparselt_isnan(__half(v_raw)));
+
+    v_raw.x = 0x7C00; // Inf
+    EXPECT_TRUE(hipsparselt_isinf(__half(v_raw))); // Inf
+
+    __hip_fp8_e4m3 v_fp8_e4m3;
+    v_fp8_e4m3.__x = 0x7E;
+    EXPECT_TRUE(hipsparselt_isnan(v_fp8_e4m3)); // NaN
+
+    v_fp8_e4m3.__x = 0x82;
+    EXPECT_FALSE(hipsparselt_isnan(v_fp8_e4m3));
+
+    __hip_fp8_e5m2 v_fp8_e5m2;
+    v_fp8_e5m2.__x = 0x82;
+    EXPECT_FALSE(hipsparselt_isnan(v_fp8_e5m2));
+}
+
+void testing_aux_misc(const Arguments& arg)
+{
+    std::string arch = "gfx950";
+    std::string_view empty;
+    EXPECT_TRUE(gpu_arch_match(arch, empty));
+}

@@ -124,6 +124,10 @@ namespace
                 testing_aux_string_helper(arg);
             else if(!strcmp(arg.function, "aux_value_mapping"))
                 testing_aux_value_mapping(arg);
+            else if(!strcmp(arg.function, "aux_math"))
+                testing_aux_math(arg);
+            else if(!strcmp(arg.function, "aux_misc"))
+                testing_aux_misc(arg);
             else
                 FAIL() << "Internal error: Test called with unknown function: " << arg.function;
         }
@@ -171,7 +175,9 @@ namespace
                    || !strcmp(arg.function, "aux_get_workspace_size_bad_arg")
                    || !strcmp(arg.function, "aux_get_workspace_size")
                    || !strcmp(arg.function, "aux_string_helper")
-                   || !strcmp(arg.function, "aux_value_mapping");
+                   || !strcmp(arg.function, "aux_value_mapping")
+                   || !strcmp(arg.function, "aux_math")
+                   || !strcmp(arg.function, "aux_misc");
         }
 
         // Google Test name suffix based on parameters

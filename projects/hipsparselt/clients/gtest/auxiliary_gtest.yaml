@@ -163,3 +163,13 @@ Tests:
   category: pre_checkin
   function:
     - aux_value_mapping: *hpa_half_precision
+
+- name: aux_math
+  category: pre_checkin
+  function:
+    - aux_math: *hpa_half_precision
+
+- name: aux_misc
+  category: pre_checkin
+  function:
+    - aux_misc: *hpa_half_precision
