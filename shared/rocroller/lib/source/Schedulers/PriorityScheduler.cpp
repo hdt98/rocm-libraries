@@ -102,11 +102,15 @@ namespace rocRoller
                     if(iterators[idx] == seqs[idx].end())
                         continue;
 
-                    auto cat = iterators[idx]->getCategory();
+                    auto const& instr = *iterators[idx];
 
+                    if(!m_lockstate.isSchedulable(instr, idx))
+                        continue;
+
+                    auto cat = instr.getCategory();
                     categories.set(cat);
 
-                    float myCost = (*m_cost)(iterators[idx]);
+                    float myCost = (*m_cost)(instr);
 
                     comment += fmt::format("{}: {}\n", toString(cat), myCost);
 
@@ -124,18 +128,16 @@ namespace rocRoller
                 {
                     if(categories.count() > 1)
                     {
-                        co_yield yieldFromStream(iterators[minCostIdx])
+                        co_yield yieldFromStream(iterators[minCostIdx], minCostIdx)
                             .map(addCommentToFirst(comment));
                     }
                     else
                     {
-                        co_yield yieldFromStream(iterators[minCostIdx]);
+                        co_yield yieldFromStream(iterators[minCostIdx], minCostIdx);
                     }
                 }
 
             } while(minCostIdx >= 0);
-
-            m_lockstate.isValid(false);
         }
     }
 }

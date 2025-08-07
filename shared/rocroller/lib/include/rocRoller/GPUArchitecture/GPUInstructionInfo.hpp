@@ -223,7 +223,6 @@ namespace rocRoller
         bool                          isBranch() const;
         unsigned int                  maxOffsetValue() const;
 
-
         friend std::ostream& operator<<(std::ostream& os, const GPUInstructionInfo& d);
 
         template <typename T1, typename T2, typename T3>
