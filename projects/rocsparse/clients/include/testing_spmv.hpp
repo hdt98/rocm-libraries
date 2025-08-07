@@ -109,6 +109,8 @@ public:
 
         const bool call_stage_analysis = arg.call_stage_analysis;
 
+        std::cout << "call_stage_analysis: " << call_stage_analysis << std::endl;
+
         // Create rocsparse handle
         rocsparse_local_handle handle(arg);
 
@@ -186,6 +188,9 @@ public:
             rocsparse_spmv(PARAMS(h_alpha, matA, x, h_beta, y, rocsparse_spmv_stage_buffer_size)));
         CHECK_HIP_ERROR(rocsparse_hipMalloc(&dbuffer, buffer_size));
 
+        CHECK_HIP_ERROR(hipDeviceSynchronize());
+        std::cout << "buffer_size: " << buffer_size << std::endl;
+
         if(call_stage_analysis)
         {
             // Run preprocess
@@ -193,14 +198,23 @@ public:
                 PARAMS(h_alpha, matA, x, h_beta, y, rocsparse_spmv_stage_preprocess)));
         }
 
+        CHECK_HIP_ERROR(hipDeviceSynchronize());
+        std::cout << "Made it passed analysis" << std::endl;
+
         if(arg.unit_check)
         {
             // Run solve
             CHECK_ROCSPARSE_ERROR(testing::rocsparse_spmv(
                 PARAMS(h_alpha, matA, x, h_beta, y, rocsparse_spmv_stage_compute)));
 
+            CHECK_HIP_ERROR(hipDeviceSynchronize());
+            std::cout << "Made it passed host mode compute" << std::endl;
+
             host_dense_matrix<Y> hy_copy(hy);
             traits::host_calculation(trans, h_alpha, hA, hx, h_beta, hy, alg, matrix_type);
+
+            CHECK_HIP_ERROR(hipDeviceSynchronize());
+            std::cout << "Made it passed host solution" << std::endl;
 
             hy.near_check(dy);
 
@@ -215,6 +229,9 @@ public:
             CHECK_ROCSPARSE_ERROR(testing::rocsparse_spmv(
                 PARAMS(d_alpha, matA, x, d_beta, y, rocsparse_spmv_stage_compute)));
             CHECK_ROCSPARSE_ERROR(rocsparse_set_pointer_mode(handle, rocsparse_pointer_mode_host));
+
+            CHECK_HIP_ERROR(hipDeviceSynchronize());
+            std::cout << "Made it passed device mode compute" << std::endl;
 
             hy.near_check(dy);
             if(ROCSPARSE_REPRODUCIBILITY)
