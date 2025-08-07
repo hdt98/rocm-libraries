@@ -738,8 +738,10 @@ namespace rocRoller
 
             for(auto const siblingTag : info.siblingOps)
             {
-                for(auto edgeTag :
-                    graph.control.getNeighbours<Graph::Direction::Downstream>(siblingTag))
+                auto edgeTags
+                    = graph.control.getNeighbours<Graph::Direction::Downstream>(siblingTag)
+                          .to<std::vector>();
+                for(auto edgeTag : edgeTags)
                 {
                     auto edge = graph.control.getElement(edgeTag);
                     graph.control.deleteElement(edgeTag);
@@ -777,8 +779,6 @@ namespace rocRoller
 
         KernelGraph LowerTensorContraction::apply(KernelGraph const& graph)
         {
-            TIMER(t, "KernelGraph::lowerTensorContraction");
-
             auto contractions = graph.control.getNodes<TensorContraction>().to<std::vector>();
             AssertFatal(contractions.size() <= 1,
                         "More than one TensorContraction not supported yet.");
@@ -807,6 +807,7 @@ namespace rocRoller
 
         ConstraintStatus NoDanglingJammedNumbers(const KernelGraph& graph)
         {
+            TIMER(t, "Constraint::NoDanglingJammedNumbers");
             using GD = rocRoller::Graph::Direction;
 
             ConstraintStatus retval;

@@ -189,8 +189,8 @@ void testing_spmm_csc(const Arguments& arg)
     host_vector<C> hC_gold(nnz_C);
 
     // Initialize data on CPU
-    rocsparse_init<B>(hB, nnz_B, 1, 1);
-    rocsparse_init<C>(hC_1, nnz_C, 1, 1);
+    rocsparse_init<B>(hB, nnz_B, 1, 1, arg.convert_to_int);
+    rocsparse_init<C>(hC_1, nnz_C, 1, 1, arg.convert_to_int);
 
     hC_2    = hC_1;
     hC_gold = hC_1;
@@ -369,7 +369,7 @@ void testing_spmm_csc(const Arguments& arg)
             = spmm_gflop_count(N, nnz_A, (I)C_m * (I)C_n, hbeta != static_cast<T>(0));
         double gpu_gflops = get_gpu_gflops(gpu_time_used, gflop_count);
 
-        double gbyte_count = cscmm_gbyte_count<T>(
+        double gbyte_count = cscmm_gbyte_count<A, B, C>(
             A_n, nnz_A, (I)B_m * (I)B_n, (I)C_m * (I)C_n, hbeta != static_cast<T>(0));
         double gpu_gbyte = get_gpu_gbyte(gpu_time_used, gbyte_count);
 
