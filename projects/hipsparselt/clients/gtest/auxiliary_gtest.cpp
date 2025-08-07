@@ -128,6 +128,8 @@ namespace
                 testing_aux_math(arg);
             else if(!strcmp(arg.function, "aux_misc"))
                 testing_aux_misc(arg);
+            else if(!strcmp(arg.function, "aux_ostream"))
+                testing_aux_ostream(arg);
             else
                 FAIL() << "Internal error: Test called with unknown function: " << arg.function;
         }
@@ -177,7 +179,8 @@ namespace
                    || !strcmp(arg.function, "aux_string_helper")
                    || !strcmp(arg.function, "aux_value_mapping")
                    || !strcmp(arg.function, "aux_math")
-                   || !strcmp(arg.function, "aux_misc");
+                   || !strcmp(arg.function, "aux_misc")
+                   || !strcmp(arg.function, "aux_ostream");
         }
 
         // Google Test name suffix based on parameters

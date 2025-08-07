@@ -59,19 +59,6 @@ include(src/CMakeLists.txt)
 add_library(hipsparselt ${hipsparselt_source} ${hipsparselt_headers_public})
 add_library(roc::hipsparselt ALIAS hipsparselt)
 
-if( BUILD_CODE_COVERAGE )
-  set(COVERAGE_CXX_FLAGS
-    -fprofile-instr-generate
-    -fcoverage-mapping
-  )
-  set(COVERAGE_LINK_FLAGS
-    -fprofile-instr-generate
-  )
-
-  target_compile_options(hipsparselt PRIVATE ${COVERAGE_CXX_FLAGS})
-  target_link_libraries(hipsparselt PRIVATE ${COVERAGE_LINK_FLAGS})
-endif()
-
 # Target compile definitions
 if(NOT BUILD_CUDA)
   target_compile_options(hipsparselt PRIVATE -Wno-unused-command-line-argument -Wall)

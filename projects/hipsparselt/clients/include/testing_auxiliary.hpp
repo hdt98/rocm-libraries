@@ -2068,3 +2068,112 @@ void testing_aux_misc(const Arguments& arg)
     std::string_view empty;
     EXPECT_TRUE(gpu_arch_match(arch, empty));
 }
+
+template <typename Ti, typename To, typename Tc>
+std::ostringstream& operator<<(std::ostringstream& os, const RocsparseltContractionProblem<Ti, To, Tc>& prob)
+{
+    hipsparselt_internal_ostream hos;
+    hos << prob;
+    os << hos.str();
+    return os;
+}
+
+template <typename Ti, typename To, typename Tc>
+std::string testing_aux_rocsparselt_ostream_helper(const Arguments& arg)
+{
+    _rocsparselt_handle handle;
+
+    // Test data - use different values to ensure all branches are covered
+    constexpr size_t m = 2, n = 4, k = 1;
+    constexpr size_t batch_count = 2;
+
+    // Create test arrays
+    std::vector<Ti> A_data(m * k * batch_count, Ti(1.5));
+    std::vector<Ti> B_data(k * n * batch_count, Ti(2.5));
+    std::vector<To> C_data(m * n * batch_count, To(3.5));
+    std::vector<To> D_data(m * n * batch_count, To(0.0));
+    std::vector<unsigned char> metadata(m * k / 2, 0xFF);
+    std::vector<float> bias_data(m, 1.0f);
+
+    Tc alpha = Tc(1.0);
+    Tc beta = Tc(0.5);
+
+    RocsparseltContractionProblem<Ti, To, Tc> prob(
+        &handle,
+        rocsparselt_operation_transpose, // trans_a
+        rocsparselt_operation_none,      // trans_b
+        rocsparselt_order_row,           // order
+        m, n, k,                         // dimensions
+        &alpha,                          // alpha
+        A_data.data(), nullptr,          // A, batch_A
+        k, 0, 0,                         // ld_a, batch_stride_a, offset_a
+        B_data.data(), nullptr,          // B, batch_B
+        n, 0, 0,                         // ld_b, batch_stride_b, offset_b
+        &beta,                           // beta
+        C_data.data(), nullptr,          // C, batch_C
+        n, 0, 0,                         // ld_c, batch_stride_c, offset_c
+        D_data.data(), nullptr,          // D, batch_D
+        n, 0, 0,                         // ld_d, batch_stride_d, offset_d
+        batch_count,                     // batch_count
+        true,                            // strided_batch
+        false,                           // sparseA
+        nullptr,                         // metadata
+        hipsparselt_activation_type::relu, // act_type
+        0.1f, 6.0f,                      // act_arg0, act_arg1
+        bias_data.data(),                // bias_vector (not nullptr)
+        1,                               // bias_stride
+        HIP_R_32F,                       // bias_type
+        true,                            // alpha_vector_scaling
+        nullptr,                         // workspace
+        1024,                            // workspaceSize
+        nullptr,                         // streams
+        1                                // numStreams
+    );
+
+    hipsparselt_internal_ostream hos;
+
+    hos << prob;
+    return hos.str();
+}
+
+void testing_aux_ostream(const Arguments& arg)
+{
+    const char* expected =
+        "{ a_type: \"f16_r\","
+        " b_type: \"f16_r\","
+        " c_type: \"f16_r\","
+        " d_type: \"f16_r\","
+        " compute_type: \"f32_r\","
+        " transA: \"T\","
+        " transB: \"N\","
+        " M: 2,"
+        " N: 4,"
+        " K: 1,"
+        " alpha: 1,"
+        " row_stride_a: 1,"
+        " col_stride_a: 1,"
+        " row_stride_b: 1,"
+        " col_stride_b: 4,"
+        " row_stride_c: 1,"
+        " col_stride_c: 4,"
+        " row_stride_d: 1,"
+        " col_stride_d: 4,"
+        " beta: 0.5,"
+        " batch_count: 2,"
+        " strided_batch: true,"
+        " stride_a: 0,"
+        " stride_b: 0,"
+        " stride_c: 0,"
+        " stride_d: 0,"
+        " activation: \"relu\","
+        " activation_argument_0: 0.1,"
+        " activation_argument_1: 6,"
+        " has_bias: true,"
+        " bias_stride: 1,"
+        " bias_type: \"f32_r\","
+        " alpha_vector_scaling: true }\n";
+
+    std::string output = testing_aux_rocsparselt_ostream_helper<__half, __half, float>(arg);
+
+    EXPECT_STREQ(output.c_str(), expected);
+}

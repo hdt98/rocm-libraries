@@ -391,13 +391,24 @@ if(BUILD_CODE_COVERAGE)
   find_program(LLVM_PROFDATA_EXECUTABLE llvm-profdata HINTS ${LLVM_COV_BIN_DIR} REQUIRED)
   message(STATUS "using llvm-profdata: ${LLVM_PROFDATA_EXECUTABLE}")
 
-  target_compile_options(hipsparselt PRIVATE
+  set(COVERAGE_CXX_FLAGS
     -fprofile-instr-generate
     -fcoverage-mapping
+    -fvisibility=default
+  )
+  set(COVERAGE_LINK_FLAGS
+    -fprofile-instr-generate
   )
 
-  target_link_options(hipsparselt PUBLIC
-    -fprofile-instr-generate
+  target_compile_options(hipsparselt PRIVATE ${COVERAGE_CXX_FLAGS})
+  target_link_options(hipsparselt PRIVATE ${COVERAGE_LINK_FLAGS})
+
+  target_compile_options(hipsparselt-test PRIVATE ${COVERAGE_CXX_FLAGS})
+  target_link_options(hipsparselt-test PRIVATE ${COVERAGE_LINK_FLAGS})
+  target_include_directories(hipsparselt-test
+    PRIVATE
+      $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/library/src/hcc_detail/rocsparselt/src/include>
+      $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/library/src/hcc_detail/rocsparselt/include>
   )
 
   #
@@ -420,7 +431,7 @@ if(BUILD_CODE_COVERAGE)
   # Generate coverage output using llvm-cov
   #
   set(LLVM_COV_COMMON_ARGS
-    -object ./library/libhipsparselt.so
+    -object $<TARGET_FILE:hipsparselt>
     -instr-profile=./coverage_test.profdata
     --ignore-filename-regex=.*/build/.*
   )

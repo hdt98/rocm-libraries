@@ -173,3 +173,8 @@ Tests:
   category: pre_checkin
   function:
     - aux_misc: *hpa_half_precision
+
+- name: aux_ostream
+  category: pre_checkin
+  function:
+    - aux_ostream: *hpa_half_precision
