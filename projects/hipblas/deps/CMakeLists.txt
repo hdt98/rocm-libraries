@@ -46,7 +46,7 @@ option( BUILD_LAPACK "Download and build lapack library" ON )
 
 # option( BUILD_VERBOSE "Print helpful build debug information" OFF )
 
-# if( BUILD_VERBOSE )
+# if( HIPBLAS_ENABLE_VERBOSE )
 #   message( STATUS "CMAKE_MODULE_PATH: ${CMAKE_MODULE_PATH}" )
 #   message( STATUS "CMAKE_BINARY_DIR: ${CMAKE_BINARY_DIR}" )
 #   message( STATUS "CMAKE_SOURCE_DIR: ${CMAKE_SOURCE_DIR}" )

@@ -19,3 +19,5 @@ if(NOT ROCmCMakeBuildTools_FOUND)
     find_package(ROCmCMakeBuildTools CONFIG REQUIRED NO_DEFAULT_PATH PATHS "${rocm-cmake_SOURCE_DIR}")
   endif()
 endif()
+
+#fetchrocmcmake file

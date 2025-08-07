@@ -24,12 +24,12 @@ set( hipblas_SOVERSION 3.0 )
 
 list( APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake )
 
-# This option only works for make/nmake and the ninja generators, but no reason it shouldn't be on all the time
-# This tells cmake to create a compile_commands.json file that can be used with clang tooling or vim
+# # This option only works for make/nmake and the ninja generators, but no reason it shouldn't be on all the time
+# # This tells cmake to create a compile_commands.json file that can be used with clang tooling or vim
 set( CMAKE_EXPORT_COMPILE_COMMANDS ON )
 
-# Print out compiler flags for viewing/debug
-# if( HIPBLAS_BUILD_VERBOSE )
+# # Print out compiler flags for viewing/debug
+# if( HIPBLAS_ENABLE_VERBOSE )
 #   message( STATUS "hipblas_VERSION: ${hipblas_VERSION}" )
 #   message( STATUS "\t==>CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}" )
 #   message( STATUS "\t==>BUILD_SHARED_LIBS: ${BUILD_SHARED_LIBS}" )
@@ -44,7 +44,7 @@ set( CMAKE_EXPORT_COMPILE_COMMANDS ON )
 #   message( STATUS "\t==>CMAKE_EXE_LINKER link flags: " ${CMAKE_EXE_LINKER_FLAGS} )
 # endif( )
 
-# Get the git hash of the hipBLAS branch
+# Get the git hash of the hipBLAS branch (CONSIDER DELETING)
 find_package(Git REQUIRED)
 
 execute_process(COMMAND "${GIT_EXECUTABLE}" rev-parse HEAD
@@ -63,16 +63,15 @@ configure_file( "${CMAKE_CURRENT_SOURCE_DIR}/include/hipblas-version.h.in" "${PR
 # Copy Public Headers to Build Dir
 configure_file( "${CMAKE_CURRENT_SOURCE_DIR}/include/hipblas.h" "${PROJECT_BINARY_DIR}/include/hipblas/hipblas.h" COPYONLY)
 
-set( hipblas_headers_public
-  include/hipblas.h
-  ${PROJECT_BINARY_DIR}/include/hipblas/hipblas-version.h
-)
+# set( hipblas_headers_public
+#   include/hipblas.h
+#   ${PROJECT_BINARY_DIR}/include/hipblas/hipblas-version.h
+# )
 
-source_group( "Header Files\\Public" FILES ${hipblas_headers_public} )
+# source_group( "Header Files\\Public" FILES ${hipblas_headers_public} )
 
-if (NOT WIN32)
+if (HIPBLAS_ENABLE_FORTRAN)
     set(CMAKE_Fortran_MODULE_DIRECTORY ${PROJECT_BINARY_DIR}/include)
 endif()
 
-# Build into subdirectories
-add_subdirectory( src )
+add_subdirectory(src)

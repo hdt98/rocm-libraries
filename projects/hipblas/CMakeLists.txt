@@ -30,59 +30,60 @@ endif()
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
-# Set cpack license file here to avoid rocm-cmake warning
 set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE.md")
 
-
-include(dependencies)
+include(FetchROCmCMake)
+include(CMakeDependentOption)
 
 rocm_setup_version(VERSION ${PROJECT_VERSION})
 
 # We use C++14 features, this will add compile option: -std=c++14
 # set( CMAKE_CXX_STANDARD 17 )
 
-# Build documentation
-# option(BUILD_DOCS "Build documentation" OFF)
-
-# Consider removing this in the future
-# This should appear before the project command, because it does not use FORCE
-if(WIN32)
-  set(CMAKE_INSTALL_PREFIX "${PROJECT_BINARY_DIR}/package" CACHE PATH "Install path prefix." FORCE)
-else( )
-  set(CMAKE_INSTALL_PREFIX "/opt/rocm" CACHE PATH "Install path prefix." FORCE)
-endif( )
+if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+  if(WIN32)
+    set(CMAKE_INSTALL_PREFIX "C:/hipSDK" CACHE PATH "Install path prefix." FORCE)
+  else()
+    set(CMAKE_INSTALL_PREFIX "/opt/rocm" CACHE PATH "Install path prefix." FORCE)
+  endif()
+endif()
 
 # ============================================================================
 # Build Options and Validation
 # ============================================================================
 option(HIPBLAS_ENABLE_CUDA "Build hipBLAS with CUDA backend." OFF)
-# not needed:
-# cmake_dependent_option(
-#   HIPBLAS_ENABLE_HIP "Build hipSPARSELt with HIP backend." ON "NOT HIPSPARSELT_ENABLE_CUDA" OFF
-# )
+cmake_dependent_option(
+  HIPBLAS_ENABLE_HIP "Build hipSPARSELt with HIP backend." ON "NOT HIPSPARSELT_ENABLE_CUDA" OFF
+)
 
 option(HIPBLAS_BUILD_SHARED_LIBS "Build hipBLAS as a shared library." ON)
-option(HIPBLAS_BUILD_CLIENTS "Build hipBLAS clients (tests, benchmarks, samples)." ON)
-if(HIPBLAS_BUILD_CLIENTS)
-  option(HIPBLAS_BUILD_TESTS "Build test clients." ON)
-  option(HIPBLAS_BUILD_BENCHMARKS "Build benchmark clients." ON)
-  option(HIPBLAS_BUILD_SAMPLES "Build sample clients." ON)
+option(HIPBLAS_ENABLE_CLIENTS "Build hipBLAS clients (tests, benchmarks, samples)." ON)
+
+if(HIPBLAS_ENABLE_CLIENTS)
+  option(HIPBLAS_BUILD_TESTING "Build test clients." ON) # TESTING and whenever theres an if u need to put OR BUILD_TESTING
+  option(HIPBLAS_ENABLE_BENCHMARKS "Build benchmark clients." ON) 
+  option(HIPBLAS_ENABLE_SAMPLES "Build sample clients." ON) 
   option(HIPBLAS_ENABLE_FORTRAN "Build Fortran clients." ON) 
 endif()
 
-option(HIPBLAS_BUILD_SOLVER "Build with rocSOLVER integration." ON)
-option(HIPBLAS_BUILD_COVERAGE "Build with code coverage enabled." OFF)
-option(HIPBLAS_BUILD_ASAN "Build with address sanitizer enabled." OFF)
-option(HIPBLAS_BUILD_DOCS "Build documentation." OFF)
-option(HIPBLAS_BUILD_VERBOSE "Output additional build information." OFF)
+option(HIPBLAS_ENABLE_ROCSOLVER "Build with rocSOLVER integration." ON)
+option(HIPBLAS_BUILD_COVERAGE "Build with code coverage enabled." OFF) 
+option(HIPBLAS_ENABLE_ASAN "Build with address sanitizer enabled." OFF) # doesnt work, test in develop
+option(HIPBLAS_ENABLE_DOCS "Build documentation." OFF) 
+option(HIPBLAS_ENABLE_VERBOSE "Output additional build information." OFF) #e probably not needed
 
 # CXX_STANDARD?
 
-# ENABLE HIP?
+if(HIPBLAS_ENABLE_CUDA AND HIPBLAS_ENABLE_HIP)
+  message(STATUS "HIPBLAS_ENABLE_CUDA: ${HIPBLAS_ENABLE_CUDA}")
+  message(STATUS "HIPBLAS_ENABLE_HIP: ${HIPBLAS_ENABLE_HIP}")
+  message(FATAL_ERROR "Cannot enable CUDA and HIP support simultaneously.")
+endif()
 
 if(HIPBLAS_ENABLE_FORTRAN AND HIPBLAS_ENABLE_ASAN)
-  message(FATAL_ERROR "Cannot enable fortran clients and address sanitizers.")
-endif()
+  # message(FATAL_ERROR "Cannot enable fortran clients and address sanitizers.")
+endif() #test this. also need to test ASAN ON, fortran off.
+# FORTRAN OFF doesnt work. ASAN
 
 if(HIPBLAS_BUILD_COVERAGE AND NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
     message(FATAL_ERROR "Code coverage is only supported for CMAKE_BUILD_TYPE=Debug.")
@@ -95,62 +96,39 @@ endif()
 # =====================================
 # Dependency Setup
 # =======================================
-find_package(Python3 REQUIRED COMPONENTS Interpreter)
+find_package(Python3 REQUIRED COMPONENTS Interpreter) # move to client/tests
 find_package(hip REQUIRED)
 
-if(HIPBLAS_BUILD_SOLVER)
-    add_definitions( -D__HIP_PLATFORM_SOLVER__ )
-endif( )
-
-if(HIPBLAS_ENABLE_CUDA)
-  set(ENV{HIP_PLATFORM} nvidia)
-  message(DEPRECATED "USE_CUDA is deprecated (use environment variable HIP_PLATFORM=nvidia)")
-else()
-  set(ENV{HIP_PLATFORM} amd)
-  message(DEPRECATION "USE_CUDA is deprecated (use environment variable HIP_PLATFORM=amd)")
-endif()
-
-# if(NOT hip_FOUND)
-#     find_package( HIP MODULE REQUIRED )
-#     list( APPEND HIP_INCLUDE_DIRS "${HIP_ROOT_DIR}/include" )
-#     set(ENV{HIP_PLATFORM} nvidia)
-#     if (NOT HIP_PLATFORM)
-#       set(HIP_PLATFORM nvidia)
-#     endif()
-# else()
-#     if (NOT HIP_PLATFORM)
-#       set(HIP_PLATFORM amd)
-#     endif()
-# endif()
 # Should be linked to a target:
-if(HIP_PLATFORM STREQUAL nvidia)
+if(HIPBLAS_ENABLE_CUDA)
   find_package(CUDA REQUIRED)
-  set( HIPBLAS_HIP_PLATFORM_COMPILER_DEFINES __HIP_PLATFORM_NVCC__ __HIP_PLATFORM_NVIDIA__ )
+  # set( HIPBLAS_HIP_PLATFORM_COMPILER_DEFINES __HIP_PLATFORM_NVCC__ __HIP_PLATFORM_NVIDIA__ )
 endif()
-# needs to happen before library add_sub:
-if(HIPBLAS_BUILD_ASAN)
+# needs to happen before library add_sub (well move it inside):
+if(HIPBLAS_ENABLE_ASAN)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -shared-libasan")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address -shared-libasan")
 endif()
 
 include( clients/cmake/build-options.cmake ) # can we put this logic here?
+
 # ============================================================================
 # Project Configuration and Build
 # ============================================================================
 add_subdirectory(library)
 
-# if(HIPBLAS_BUILD_CLIENTS)
-#   add_subdirectory(clients)
-# endif()
+if(HIPBLAS_ENABLE_CLIENTS)
+  add_subdirectory(clients)
+endif()
 
-if(HIPBLAS_BUILD_DOCS)
+if(HIPBLAS_ENABLE_DOCS)
   add_subdirectory(docs)
 endif()
 
 # ============================================================================
 # Packaging and Installation
 # ============================================================================
-if(HIPBLAS_BUILD_CLIENTS)
+if(HIPBLAS_ENABLE_CLIENTS)
   rocm_set_os_id(CLIENTS_OS)
   string(TOLOWER "${CLIENTS_OS}" CLIENTS_OS)
   rocm_read_os_release(CLIENTS_OS_VERSION VERSION_ID)
@@ -170,7 +148,7 @@ if(HIPBLAS_BUILD_CLIENTS)
 
   rocm_package_setup_component(clients)
   rocm_package_setup_client_component(clients-common)
-  if(HIPBLAS_BUILD_TESTS)
+  if(HIPBLAS_BUILD_TESTING)
     rocm_package_setup_client_component(
       tests
       DEPENDS
@@ -178,7 +156,7 @@ if(HIPBLAS_BUILD_CLIENTS)
         DEB "${GFORTRAN_DEB}"
         RPM "${GFORTRAN_RPM}")
   endif()
-  if(HIPBLAS_BUILD_BENCHMARKS)
+  if(HIPBLAS_ENABLE_BENCHMARKS)
     rocm_package_setup_client_component(
       benchmarks
       DEPENDS
@@ -186,7 +164,7 @@ if(HIPBLAS_BUILD_CLIENTS)
         DEB "${GFORTRAN_DEB}"
         RPM "${GFORTRAN_RPM}")
   endif()
-  if(HIPBLAS_BUILD_SAMPLES)
+  if(HIPBLAS_ENABLE_SAMPLES)
     rocm_package_setup_client_component(
       samples
       DEPENDS
@@ -194,10 +172,9 @@ if(HIPBLAS_BUILD_CLIENTS)
         DEB "${GFORTRAN_DEB}"
         RPM "${GFORTRAN_RPM}")
   endif()
-  add_subdirectory(clients)
 endif( )
 
-if(HIP_PLATFORM STREQUAL amd)
+if(HIPBLAS_ENABLE_HIP)
   set(rocblas_minimum 5.1.0)
   set(rocsolver_minimum 3.31.0)
   rocm_package_add_dependencies(SHARED_DEPENDS "rocblas >= ${rocblas_minimum}" "rocsolver >= ${rocsolver_minimum}")
@@ -214,6 +191,24 @@ else()
   rocm_package_add_deb_dependencies(COMPONENT devel DEPENDS "hipblas-common-static-dev >= ${hipblas_common_minimum}")
   rocm_package_add_rpm_dependencies(COMPONENT devel DEPENDS "hipblas-common-static-devel >= ${hipblas_common_minimum}")
 endif()
+
+set( CPACK_RPM_EXCLUDE_FROM_AUTO_FILELIST_ADDITION "\${CPACK_PACKAGING_INSTALL_PREFIX}" )
+# check if can del (cuda in general):
+if(HIPBLAS_ENABLE_CUDA)
+  set(package_name "hipblas-alt")
+else()
+  set(package_name "hipblas")
+endif()
+
+set( HIPBLAS_CONFIG_DIR "\${CPACK_PACKAGING_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}" CACHE PATH "Path placed into ldconfig file" )
+
+rocm_create_package(
+    NAME ${package_name}
+    DESCRIPTION "ROCm BLAS marshalling library"
+    MAINTAINER "hipBLAS Maintainer <hipblas-maintainer@amd.com>"
+    LDCONFIG
+    LDCONFIG_DIR ${HIPBLAS_CONFIG_DIR}
+)
 
 # This has to be initialized before the project() command appears
 # Set the default of CMAKE_BUILD_TYPE to be release, unless user specifies with -D.  MSVC_IDE does not use CMAKE_BUILD_TYPE
@@ -394,45 +389,45 @@ endif()
 # set( CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE.md" )
 # set( CPACK_RPM_PACKAGE_LICENSE "MIT")
 # this can be changed to what hipsparselt has
-if (WIN32)
-  if( CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT )
-    SET( CMAKE_INSTALL_PREFIX "C:/hipSDK" CACHE PATH "Install path" FORCE )
-  endif()
-  SET( INSTALL_PREFIX "C:/hipSDK" )
-  SET( CPACK_SET_DESTDIR FALSE )
-  SET( CPACK_PACKAGE_INSTALL_DIRECTORY "C:/hipSDK" )
-  SET( CPACK_PACKAGING_INSTALL_PREFIX "" )
-  set( CPACK_INCLUDE_TOPLEVEL_DIRECTORY OFF )
-else()
-  if( NOT CPACK_PACKAGING_INSTALL_PREFIX )
-    set( CPACK_PACKAGING_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}" )
-  endif()
-endif( )
+# if (WIN32)
+#   if( CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT )
+#     SET( CMAKE_INSTALL_PREFIX "C:/hipSDK" CACHE PATH "Install path" FORCE )
+#   endif()
+#   SET( INSTALL_PREFIX "C:/hipSDK" )
+#   SET( CPACK_SET_DESTDIR FALSE )
+#   SET( CPACK_PACKAGE_INSTALL_DIRECTORY "C:/hipSDK" )
+#   SET( CPACK_PACKAGING_INSTALL_PREFIX "" )
+#   set( CPACK_INCLUDE_TOPLEVEL_DIRECTORY OFF )
+# else()
+#   if( NOT CPACK_PACKAGING_INSTALL_PREFIX )
+#     set( CPACK_PACKAGING_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}" )
+#   endif()
+# endif( )
 # is this needed?
-set( CPACK_RPM_EXCLUDE_FROM_AUTO_FILELIST_ADDITION "\${CPACK_PACKAGING_INSTALL_PREFIX}" )
+# set( CPACK_RPM_EXCLUDE_FROM_AUTO_FILELIST_ADDITION "\${CPACK_PACKAGING_INSTALL_PREFIX}" )
 
 # Give hipblas compiled for CUDA backend a different name
-if(HIP_PLATFORM STREQUAL amd)
-    set( package_name hipblas )
-else( )
-    set( package_name hipblas-alt )
-endif( )
+# if(HIP_PLATFORM STREQUAL amd)
+#     set( package_name hipblas )
+# else( )
+#     set( package_name hipblas-alt )
+# endif( )
 
-set( HIPBLAS_CONFIG_DIR "\${CPACK_PACKAGING_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}" CACHE PATH "Path placed into ldconfig file" )
+# set( HIPBLAS_CONFIG_DIR "\${CPACK_PACKAGING_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}" CACHE PATH "Path placed into ldconfig file" )
 
-rocm_create_package(
-    NAME ${package_name}
-    DESCRIPTION "ROCm BLAS marshalling library"
-    MAINTAINER "hipBLAS Maintainer <hipblas-maintainer@amd.com>"
-    LDCONFIG
-    LDCONFIG_DIR ${HIPBLAS_CONFIG_DIR}
-)
+# rocm_create_package(
+#     NAME ${package_name}
+#     DESCRIPTION "ROCm BLAS marshalling library"
+#     MAINTAINER "hipBLAS Maintainer <hipblas-maintainer@amd.com>"
+#     LDCONFIG
+#     LDCONFIG_DIR ${HIPBLAS_CONFIG_DIR}
+# )
 
 
 # DO THIS LATER:
 # ADDITIONAL TARGETS FOR CODE COVERAGE
 #
-if(BUILD_CODE_COVERAGE)
+if(HIPBLAS_BUILD_COVERAGE)
   #
   # > make coverage_cleanup (clean coverage related files.)
   # > make coverage GTEST_FILTER=<>

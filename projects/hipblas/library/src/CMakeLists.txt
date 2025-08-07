@@ -22,112 +22,214 @@
 # ########################################################################
 # A helper function to prefix a source list of files with a common path into a new list (non-destructive)
 # ########################################################################
-function( prepend_path prefix source_list_of_files return_list_of_files )
-  foreach( file ${${source_list_of_files}} )
-    if(IS_ABSOLUTE ${file} )
-      list( APPEND new_list ${file} )
-    else( )
-      list( APPEND new_list ${prefix}/${file} )
-    endif( )
-  endforeach( )
-  set( ${return_list_of_files} ${new_list} PARENT_SCOPE )
-endfunction( )
+# function( prepend_path prefix source_list_of_files return_list_of_files )
+#   foreach( file ${${source_list_of_files}} )
+#     if(IS_ABSOLUTE ${file} )
+#       list( APPEND new_list ${file} )
+#     else( )
+#       list( APPEND new_list ${prefix}/${file} )
+#     endif( )
+#   endforeach( )
+#   set( ${return_list_of_files} ${new_list} PARENT_SCOPE )
+# endfunction( )
 
 # ########################################################################
 # Main
 # ########################################################################
-prepend_path( ".." hipblas_headers_public relative_hipblas_headers_public )
+# prepend_path( ".." hipblas_headers_public relative_hipblas_headers_public )
+include( GenerateExportHeader )
 
-if(HIP_PLATFORM STREQUAL amd)
-  set( hipblas_source "${CMAKE_CURRENT_SOURCE_DIR}/amd_detail/hipblas.cpp" )
+find_package(hipblas-common REQUIRED CONFIG PATHS ${ROCM_PATH})
 
-  message(STATUS "** NOTE: amd_detail/hipblas.cpp is compiled with the verbose flag -v for QC purposes.")
-  SET_SOURCE_FILES_PROPERTIES( ${CMAKE_CURRENT_SOURCE_DIR}/amd_detail/hipblas.cpp PROPERTIES COMPILE_FLAGS "-v" )
-else( )
-  set( hipblas_source "${CMAKE_CURRENT_SOURCE_DIR}/nvidia_detail/hipblas.cpp" )
-endif( )
-
-set (hipblas_f90_source
-  hipblas_module.f90
-)
-
-# Create hipBLAS Fortran module
-if(NOT WIN32)
-    add_library(hipblas_fortran ${hipblas_f90_source})
+if(HIPBLAS_BUILD_SHARED_LIBS OR BUILD_SHARED_LIBS)
+  add_library(hipblas SHARED)
+  #${relative_hipblas_headers_public}
+else()
+  add_library(hipblas STATIC)
 endif()
 
-if(HIPBLAS_BUILD_ASAN)
-    add_link_options(-fuse-ld=lld)
+add_library(roc::hipblas ALIAS hipblas)
+
+# target_compile_features(hipblas PUBLIC cxx_std_${HIPBLAS_CXX_STANDARD}) # placeholder
+set_target_properties(hipblas PROPERTIES
+  CXX_EXTENSIONS OFF
+)
+
+target_sources(hipblas PRIVATE
+  "hipblas_auxiliary.cpp"
+)
+
+if(HIPBLAS_ENABLE_HIP)
+  target_sources(hipblas PRIVATE "amd_detail/hipblas.cpp")
+else() # HIPBLAS_ENABLE_CUDA
+  target_sources(hipblas PRIVATE "nvidia_detail/hipblas.cpp")
 endif()
 
-add_library( hipblas
-  ${hipblas_source}
-  ${CMAKE_CURRENT_SOURCE_DIR}/hipblas_auxiliary.cpp
-  ${relative_hipblas_headers_public}
-)
-add_library( roc::hipblas ALIAS hipblas )
+if(HIPBLAS_ENABLE_FORTRAN)
+  add_library(hipblas_fortran
+    "hipblas_module.f90"
+  )
+endif()
 
-set(static_depends)
+if(HIPBLAS_ENABLE_ASAN)
+  # add_link_options(-fuse-ld=lld)
+  # target_link_options(hipblas PRIVATE -fuse-ld=lld)
+  target_compile_options(hipblas PRIVATE -fsanitize=address)
+  target_link_options(hipblas PRIVATE -fsanitize=address)
+endif()
 
-find_package( hipblas-common REQUIRED CONFIG PATHS ${ROCM_PATH})
-target_link_libraries( hipblas PUBLIC roc::hipblas-common )
+target_link_libraries( hipblas PUBLIC roc::hipblas-common)
+# BIG FUNC THAT NEEDS TO BE SPLIT UP?:
+if(HIPBLAS_ENABLE_HIP)
+  # if( NOT TARGET rocblas )
+  #   if( CUSTOM_ROCBLAS )
+  #     set ( ENV{rocblas_DIR} ${CUSTOM_ROCBLAS})
+  #     find_package( rocblas REQUIRED CONFIG NO_CMAKE_PATH )
+  #   elseif( WIN32 )
+  #     find_package( rocblas REQUIRED CONFIG PATHS ${ROCBLAS_PATH} ${ROCM_PATH})
+  #   else()
+  #     find_package( rocblas REQUIRED CONFIG PATHS ${ROCM_PATH} /opt/rocm /opt/rocm/rocblas /usr/local/rocblas )
+  #   endif( )
+  # endif( )
 
-# Build hipblas from source on AMD platform
-if(HIP_PLATFORM STREQUAL amd)
-  if( NOT TARGET rocblas )
-    if( CUSTOM_ROCBLAS )
-      set ( ENV{rocblas_DIR} ${CUSTOM_ROCBLAS})
-      find_package( rocblas REQUIRED CONFIG NO_CMAKE_PATH )
-    elseif( WIN32 )
-      find_package( rocblas REQUIRED CONFIG PATHS ${ROCBLAS_PATH} ${ROCM_PATH})
-    else()
-      find_package( rocblas REQUIRED CONFIG PATHS ${ROCM_PATH} /opt/rocm /opt/rocm/rocblas /usr/local/rocblas )
-    endif( )
-  endif( )
+  find_package(rocblas REQUIRED)
 
-  list(APPEND static_depends PACKAGE rocblas)
+  # list(APPEND static_depends PACKAGE rocblas)
   target_link_libraries( hipblas PRIVATE roc::rocblas )
   target_link_libraries( hipblas PUBLIC hip::host )
 
   # Add rocSOLVER as a dependency if BUILD_WITH_SOLVER is on
-  if( HIPBLAS_BUILD_SOLVER )
-    if( NOT TARGET rocsolver )
-      if( CUSTOM_ROCSOLVER)
-        set ( ENV{rocsolver_DIR} ${CUSTOM_ROCSOLVER})
-        find_package( rocsolver REQUIRED CONFIG NO_CMAKE_PATH )
+  if( HIPBLAS_BUILD_ROCSOLVER )
+    # if( NOT TARGET rocsolver )
+    #   if( CUSTOM_ROCSOLVER)
+    #     set ( ENV{rocsolver_DIR} ${CUSTOM_ROCSOLVER})
+    #     find_package( rocsolver REQUIRED CONFIG NO_CMAKE_PATH )
 
-        # in case of using custom rocsolver and not custom rocblas, we need to have
-        # custom rocsolver include directories before rocblas/hip include directories
-        # in case there is a rocsolver installed on the system.
-        target_include_directories( hipblas
-          SYSTEM PRIVATE $<BUILD_INTERFACE:${ROCSOLVER_INCLUDE_DIRS}> )
-      elseif(WIN32)
-        find_package( rocsolver REQUIRED CONFIG PATHS ${ROCSOLVER_PATH} ${ROCM_PATH})
-      else()
-        find_package( rocsolver REQUIRED CONFIG PATHS ${ROCM_PATH} /opt/rocm /opt/rocm/rocsolver /usr/local/rocsolver )
-      endif()
-    endif( )
-    list(APPEND static_depends PACKAGE rocsolver)
+    #     # in case of using custom rocsolver and not custom rocblas, we need to have
+    #     # custom rocsolver include directories before rocblas/hip include directories
+    #     # in case there is a rocsolver installed on the system.
+    #     target_include_directories( hipblas
+    #       SYSTEM PRIVATE $<BUILD_INTERFACE:${ROCSOLVER_INCLUDE_DIRS}> )
+    #   elseif(WIN32)
+    #     find_package( rocsolver REQUIRED CONFIG PATHS ${ROCSOLVER_PATH} ${ROCM_PATH})
+    #   else()
+    #     find_package( rocsolver REQUIRED CONFIG PATHS ${ROCM_PATH} /opt/rocm /opt/rocm/rocsolver /usr/local/rocsolver )
+    #   endif()
+    # endif( )
+    find_package(rocsolver REQUIRED)
+    # target_include_directories( hipblas
+    #   SYSTEM PRIVATE $<BUILD_INTERFACE:${ROCSOLVER_INCLUDE_DIRS}> )
+
+    # list(APPEND static_depends PACKAGE rocsolver)
     target_link_libraries( hipblas PRIVATE roc::rocsolver )
+    target_compile_definitions(hipblas PUBLIC __HIP_PLATFORM_SOLVER__)
   endif( )
 
-  if( CUSTOM_TARGET )
-    target_link_libraries( hipblas PRIVATE hip::${CUSTOM_TARGET} )
-  endif( )
+  # if( CUSTOM_TARGET )
+  #   target_link_libraries( hipblas PRIVATE hip::${CUSTOM_TARGET} )
+  # endif( )
+endif( )
 
-else( )
-  target_compile_definitions( hipblas PRIVATE ${HIPBLAS_HIP_PLATFORM_COMPILER_DEFINES} )
+if(HIPBLAS_ENABLE_CUDA)
+  target_compile_definitions( hipblas PRIVATE ${HIPBLAS_HIP_PLATFORM_COMPILER_DEFINES} __HIP_PLATFORM_NVCC__ __HIP_PLATFORM_NVIDIA__)
 
-  target_link_libraries( hipblas PRIVATE ${CUDA_CUBLAS_LIBRARIES} )
+  target_link_libraries( hipblas PRIVATE ${CUDA_CUBLAS_LIBRARIES} ) # check if hipblas builds with cuda
 
   # External header includes included as system files
   target_include_directories( hipblas
     SYSTEM PRIVATE
       $<BUILD_INTERFACE:${CUDA_INCLUDE_DIRS}>
   )
-endif( )
+endif()
+# if(HIP_PLATFORM STREQUAL amd)
+#   set( hipblas_source "${CMAKE_CURRENT_SOURCE_DIR}/amd_detail/hipblas.cpp" )
 
-# External header includes included as system files
+#   message(STATUS "** NOTE: amd_detail/hipblas.cpp is compiled with the verbose flag -v for QC purposes.")
+#   SET_SOURCE_FILES_PROPERTIES( ${CMAKE_CURRENT_SOURCE_DIR}/amd_detail/hipblas.cpp PROPERTIES COMPILE_FLAGS "-v" )
+# else( )
+#   set( hipblas_source "${CMAKE_CURRENT_SOURCE_DIR}/nvidia_detail/hipblas.cpp" )
+# endif( )
+
+# set (hipblas_f90_source
+#   hipblas_module.f90
+# )
+
+# # Create hipBLAS Fortran module
+# if(NOT WIN32)
+#     add_library(hipblas_fortran ${hipblas_f90_source})
+# endif()
+
+# if(HIPBLAS_BUILD_ASAN)
+#     add_link_options(-fuse-ld=lld)
+# endif()
+
+# add_library( hipblas
+#   ${hipblas_source}
+#   ${CMAKE_CURRENT_SOURCE_DIR}/hipblas_auxiliary.cpp
+#   ${relative_hipblas_headers_public} # how to get headers??
+# )
+# add_library( roc::hipblas ALIAS hipblas )
+
+# set(static_depends)
+
+# find_package(hipblas-common REQUIRED CONFIG PATHS ${ROCM_PATH})
+# target_link_libraries( hipblas PUBLIC roc::hipblas-common)
+
+# Build hipblas from source on AMD platform
+# if(HIPBLAS_ENABLE_HIP)
+#   if( NOT TARGET rocblas )
+#     if( CUSTOM_ROCBLAS )
+#       set ( ENV{rocblas_DIR} ${CUSTOM_ROCBLAS})
+#       find_package( rocblas REQUIRED CONFIG NO_CMAKE_PATH )
+#     elseif( WIN32 )
+#       find_package( rocblas REQUIRED CONFIG PATHS ${ROCBLAS_PATH} ${ROCM_PATH})
+#     else()
+#       find_package( rocblas REQUIRED CONFIG PATHS ${ROCM_PATH} /opt/rocm /opt/rocm/rocblas /usr/local/rocblas )
+#     endif( )
+#   endif( )
+
+#   list(APPEND static_depends PACKAGE rocblas)
+#   target_link_libraries( hipblas PRIVATE roc::rocblas )
+#   target_link_libraries( hipblas PUBLIC hip::host )
+
+#   # Add rocSOLVER as a dependency if BUILD_WITH_SOLVER is on
+#   if( HIPBLAS_BUILD_SOLVER )
+#     if( NOT TARGET rocsolver )
+#       if( CUSTOM_ROCSOLVER)
+#         set ( ENV{rocsolver_DIR} ${CUSTOM_ROCSOLVER})
+#         find_package( rocsolver REQUIRED CONFIG NO_CMAKE_PATH )
+
+#         # in case of using custom rocsolver and not custom rocblas, we need to have
+#         # custom rocsolver include directories before rocblas/hip include directories
+#         # in case there is a rocsolver installed on the system.
+#         target_include_directories( hipblas
+#           SYSTEM PRIVATE $<BUILD_INTERFACE:${ROCSOLVER_INCLUDE_DIRS}> )
+#       elseif(WIN32)
+#         find_package( rocsolver REQUIRED CONFIG PATHS ${ROCSOLVER_PATH} ${ROCM_PATH})
+#       else()
+#         find_package( rocsolver REQUIRED CONFIG PATHS ${ROCM_PATH} /opt/rocm /opt/rocm/rocsolver /usr/local/rocsolver )
+#       endif()
+#     endif( )
+#     list(APPEND static_depends PACKAGE rocsolver)
+#     target_link_libraries( hipblas PRIVATE roc::rocsolver )
+#   endif( )
+
+#   if( CUSTOM_TARGET )
+#     target_link_libraries( hipblas PRIVATE hip::${CUSTOM_TARGET} )
+#   endif( )
+# endif( )
+# if(HIPBLAS_ENABLE_CUDA)
+#   target_compile_definitions( hipblas PRIVATE ${HIPBLAS_HIP_PLATFORM_COMPILER_DEFINES} )
+
+#   target_link_libraries( hipblas PRIVATE ${CUDA_CUBLAS_LIBRARIES} )
+
+#   # External header includes included as system files
+#   target_include_directories( hipblas
+#     SYSTEM PRIVATE
+#       $<BUILD_INTERFACE:${CUDA_INCLUDE_DIRS}>
+#   )
+
+# install needs to be in root cmake
 target_include_directories( hipblas
   SYSTEM PRIVATE
     $<BUILD_INTERFACE:${ROCBLAS_INCLUDE_DIRS}>
@@ -148,7 +250,7 @@ target_include_directories( hipblas
 )
 
 rocm_set_soversion( hipblas ${hipblas_SOVERSION} )
-set_target_properties( hipblas PROPERTIES CXX_EXTENSIONS NO )
+# set_target_properties( hipblas PROPERTIES CXX_EXTENSIONS NO )
 set_target_properties( hipblas PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/staging" )
 
 if (WIN32)
@@ -159,20 +261,18 @@ if (WIN32)
 endif()
 
 if(HIPBLAS_BUILD_COVERAGE)
-  #target_compile_options(-fprofile-instr-generate -fcoverage-mapping)
   target_compile_options( hipblas PRIVATE -fprofile-arcs -ftest-coverage )
   target_link_libraries( hipblas PRIVATE --coverage -lgcov)
 endif()
 
 # Package that helps me set visibility for function names exported from shared library
-include( GenerateExportHeader )
 set_target_properties( hipblas PROPERTIES CXX_VISIBILITY_PRESET "hidden" VISIBILITY_INLINES_HIDDEN ON )
 generate_export_header( hipblas EXPORT_FILE_NAME ${PROJECT_BINARY_DIR}/include/hipblas/hipblas-export.h )
 
 # Following Boost conventions of prefixing 'lib' on static built libraries, across all platforms
-if( NOT BUILD_SHARED_LIBS )
+if(NOT HIPBLAS_BUILD_SHARED_LIBS)
   set_target_properties( hipblas PROPERTIES PREFIX "lib" )
-endif( )
+endif()
 
 ############################################################
 # Installation
@@ -182,14 +282,14 @@ rocm_install_targets(
   INCLUDE
     ${CMAKE_BINARY_DIR}/include
 )
-#         PERMISSIONS OWNER_EXECUTE OWNER_WRITE OWNER_READ GROUP_EXECUTE GROUP_READ WORLD_EXECUTE WORLD_READ
 
-if(HIP_PLATFORM STREQUAL amd )
+if(HIPBLAS_ENABLE_HIP)
   rocm_export_targets(
     TARGETS roc::hipblas
     DEPENDS PACKAGE hip
     DEPENDS PACKAGE hipblas-common
-    STATIC_DEPENDS ${static_depends}
+    STATIC_DEPENDS PACKAGE rocblas
+    STATIC_DEPENDS PACKAGE rocsolver
     NAMESPACE roc::
   )
 else( )

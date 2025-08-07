@@ -111,9 +111,9 @@ if( NOT WIN32 )
     )
 endif()
 
-if(HIPBLAS_BUILD_CLIENTS)
+if(HIPBLAS_ENABLE_CLIENTS)
   if( NOT WIN32 )
-    if( HIPBLAS_BUILD_SOLVER )
+    if( HIPBLAS_BUILD_ROCSOLVER )
       add_library(hipblas_fortran_client STATIC ${hipblas_f90_source_clients_solver})
     else()
       add_library(hipblas_fortran_client STATIC ${hipblas_f90_source_clients_no_solver})
@@ -124,11 +124,11 @@ if(HIPBLAS_BUILD_CLIENTS)
   include_directories(${CMAKE_BINARY_DIR}/include)
 endif( )
 
-if( HIPBLAS_BUILD_SAMPLES )
+if( HIPBLAS_ENABLE_SAMPLES )
   add_subdirectory( samples )
 endif( )
 
-if( HIPBLAS_BUILD_BENCHMARKS OR HIPBLAS_BUILD_TESTS)
+if( HIPBLAS_ENABLE_BENCHMARKS OR HIPBLAS_BUILD_TESTS)
 
   set(THREADS_PREFER_PTHREAD_FLAG ON)
   find_package(Threads REQUIRED)
@@ -223,11 +223,11 @@ if( HIPBLAS_BUILD_BENCHMARKS OR HIPBLAS_BUILD_TESTS)
   message(STATUS "Build Dir: ${BUILD_DIR}")
   message(STATUS "Linking Ref. Libs: ${BLAS_LIBRARY}")
 
-  if( HIPBLAS_BUILD_TESTS )
+  if( HIPBLAS_BUILD_TESTING )
     add_subdirectory( gtest )
   endif( )
 
-  if( HIPBLAS_BUILD_BENCHMARKS )
+  if( HIPBLAS_ENABLE_BENCHMARKS )
     add_subdirectory( benchmarks )
   endif( )
 
@@ -266,7 +266,7 @@ add_custom_command( OUTPUT "${HIPBLAS_CLIENTS_README}"
 
 add_custom_target( hipblas-clients-common DEPENDS "${HIPBLAS_COMMON}" "${HIPBLAS_TEMPLATE}" "${HIPBLAS_SMOKE}" "${HIPBLAS_GENTEST}" "${HIPBLAS_CLIENTS_README}" )
 
-if( HIPBLAS_BUILD_TESTS OR HIPBLAS_BUILD_BENCHMARKS )
+if( HIPBLAS_BUILD_TESTING OR HIPBLAS_ENABLE_BENCHMARKS )
   rocm_install(
     FILES ${HIPBLAS_COMMON} ${HIPBLAS_TEMPLATE} ${HIPBLAS_SMOKE}
     DESTINATION "${CMAKE_INSTALL_BINDIR}"
