@@ -410,6 +410,7 @@ defaultBenchmarkCommonParameters = [
     {"StreamKAtomic": [0]},
     {"StreamKXCCMapping": [0]},
     {"DebugStreamK": [0]},
+    {"DebugTrace": [1]},
     {"ActivationFused": [True]},
     {"ActivationFuncCall": [True]},
     {"ActivationAlt": [False]},

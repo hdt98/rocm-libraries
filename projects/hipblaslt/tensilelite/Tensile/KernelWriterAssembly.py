@@ -58,7 +58,8 @@ from rocisa.instruction import BranchInstruction, BufferLoadB128, BufferLoadB32,
   SLShiftRightB64, SLoadB32, SLoadB64, SMFMAInstruction, SMemLoadInstruction, SMinI32, \
   SMinU32, SMovB32, SMovB64, SMulHIU32, SMulI32, SNop, SOrB32, SOrSaveExecB32, \
   SOrSaveExecB64, SSExtI16toI32, SSetPCB64, SSetRegIMM32B32, SSetPrior, SSubBU32, SSubI32, SSubU32, \
-  SWaitCnt, SWaitAlu, SXorB32, VAShiftRightI32, VAccvgprReadB32, VAccvgprWrite, VAccvgprWriteB32, \
+  SWaitCnt, SWaitAlu, SXorB32, SMemRealTime, STTraceData, \
+  VAShiftRightI32, VAccvgprReadB32, VAccvgprWrite, VAccvgprWriteB32, \
   VAdd3U32, VAddCCOU32, VAddCOU32, VAddF32, VAddF64, VAddLShiftLeftU32, VAddU32, VAndB32, \
   VBfeU32, VCmpEQI32, VCmpEQU32, VCmpGEI32, VCmpGEU32, VCmpGtU32, VCmpLeI32, VCmpLtI32, \
   VCmpLtU32, VCmpUF32, VCmpXGeU32, VCmpXLtU32, VCmpXLtU64, VCndMaskB32, VCvtF16toF32, \
@@ -1623,6 +1624,24 @@ class KernelWriterAssembly(KernelWriter):
         module.add(label_nonEarlyStop)
     return module
 
+  def TraceNow(self):
+    module = Module("TraceNow")
+    tmpSgpr = self.sgprPool.checkOut(1, preventOverflow=False)
+    traceSgpr = self.sgprPool.checkOutAligned(2, 2, preventOverflow=False)
+
+    module.add(SMovB32(dst=sgpr(tmpSgpr), src=mgpr(0), comment="Backup data"))
+    module.add(SMemRealTime(dst=sgpr(traceSgpr, 2), comment="Timer"))
+    module.add(SWaitCnt(kmcnt=0, comment="Wait for timer"))
+    module.add(SMovB32(dst=mgpr(0), src=sgpr(traceSgpr+1), comment="Store timer data"))
+    module.add(SNop(waitState=0, comment=""))
+    module.add(STTraceData(comment=""))
+    module.add(SMovB32(dst=mgpr(0), src=sgpr(tmpSgpr), comment="Restore data"))
+
+
+    self.sgprPool.checkIn(traceSgpr)
+    self.sgprPool.checkIn(tmpSgpr)
+    return module
+
   def defineAndResources(self, kernel, tPA, tPB, tPM):
     module = Module("allocateResources")
     module.add(self.macroAndSet(kernel, tPA, tPB))
@@ -1718,6 +1737,9 @@ class KernelWriterAssembly(KernelWriter):
         for i in range(64 - total_inst_dwords):
           moduleArgs.add(SNop(waitState=0, comment=""))
         moduleArgs.add(Label("Preload_Offset_Start", ""))
+        # Trace start of kernel
+        if kernel["DebugTrace"]:
+          moduleArgs.add(self.TraceNow())
         # Common args preload
         preloadSgprStartIdx = self.states.rpga
         moduleArgs.add(SAndB32(dst=sgpr(sgprNumsOfGemm), src0=hex(0x3FFFFFFF), src1=sgpr(preloadSgprStartIdx), comment="Get nums of gemm"))
@@ -13509,6 +13531,8 @@ class KernelWriterAssembly(KernelWriter):
       if kernel["ProblemType"]["OutputAmaxD"]:
         imod.add(self.insertAmaxD(kernel))
 
+    if kernel["DebugTrace"]:
+      imod.add(self.TraceNow())
     imod.add(SEndpgm(comment="Kernel End"))
     return imod
 

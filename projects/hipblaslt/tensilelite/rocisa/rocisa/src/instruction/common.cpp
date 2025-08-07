@@ -609,6 +609,22 @@ void common_inst(nb::module_ m_common)
         .def("__deepcopy__",
              [](const rocisa::SNop& self, nb::dict&) { return new rocisa::SNop(self); });
 
+    nb::class_<rocisa::SMemRealTime, rocisa::CommonInstruction>(m_common, "SMemRealTime")
+        .def(nb::init<const std::shared_ptr<rocisa::Container>&,
+                      const std::string&>(),
+             nb::arg("dst"),
+             nb::arg("comment") = "")
+        .def("__deepcopy__", [](const rocisa::SMemRealTime& self, nb::dict&) {
+            return new rocisa::SMemRealTime(self);
+        });
+
+    nb::class_<rocisa::STTraceData, rocisa::Instruction>(m_common, "STTraceData")
+        .def(nb::init<const std::string&>(), nb::arg("comment") = "")
+        .def("getParams", &rocisa::STTraceData::getParams)
+        .def("__str__", &rocisa::STTraceData::toString)
+        .def("__deepcopy__",
+             [](const rocisa::STTraceData& self, nb::dict&) { return new rocisa::STTraceData(self); });
+
     nb::class_<rocisa::SEndpgm, rocisa::Instruction>(m_common, "SEndpgm")
         .def(nb::init<const std::string&>(), nb::arg("comment") = "")
         .def("getParams", &rocisa::SEndpgm::getParams)

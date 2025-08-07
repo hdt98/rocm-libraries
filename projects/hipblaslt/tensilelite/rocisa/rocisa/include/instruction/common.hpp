@@ -1344,6 +1344,56 @@ namespace rocisa
         int waitState;
     };
 
+    struct SMemRealTime : public CommonInstruction
+    {
+        SMemRealTime(const std::shared_ptr<Container>& dst,
+                     const std::string&                comment = "")
+            : CommonInstruction(
+                InstType::INST_B64, dst, {}, std::nullopt, std::nullopt, std::nullopt, comment)
+        {
+            setInst("s_memrealtime");
+        }
+
+        SMemRealTime(const SMemRealTime& other)
+            : CommonInstruction(other)
+        {
+        }
+
+        std::shared_ptr<Item> clone() const override
+        {
+            return std::make_shared<SMemRealTime>(*this);
+        }
+    };
+
+    struct STTraceData : public Instruction
+    {
+        STTraceData(const std::string& comment = "")
+            : Instruction(InstType::INST_NOTYPE, comment)
+        {
+            setInst("s_ttracedata");
+        }
+
+        STTraceData(const STTraceData& other)
+            : Instruction(other)
+        {
+        }
+
+        std::shared_ptr<Item> clone() const override
+        {
+            return std::make_shared<STTraceData>(*this);
+        }
+
+        std::vector<InstructionInput> getParams() const override
+        {
+            return {};
+        }
+
+        std::string toString() const override
+        {
+            return formatWithComment(instStr);
+        }
+    };
+
     struct SEndpgm : public Instruction
     {
         SEndpgm(const std::string& comment = "")
