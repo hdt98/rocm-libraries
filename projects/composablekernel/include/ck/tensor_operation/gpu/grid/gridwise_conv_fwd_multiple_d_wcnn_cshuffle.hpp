@@ -1809,35 +1809,60 @@ struct GridwiseConvMultipleD_Wcnn_CShuffle
         return GridwiseConvPipe::CalculateHasMainLoop(num_loop);
     }
 
+    static constexpr auto in_block_desc                = MakeInBlockDescriptor();
+    static constexpr auto wei_block_desc               = MakeWeiBlockDescriptor();
+    static constexpr auto in_cluster_border_block_desc = MakeInClusterBorderBlockDescriptor<true>();
+    static constexpr auto in_wavegroup_border_block_desc =
+        MakeInClusterBorderBlockDescriptor<false>();
+    static constexpr index_t max_lane_shared_align = 4;
+
+    static constexpr index_t in_border_block_space_size_aligned =
+        EnableWaveGroup
+            ? math::integer_least_multiple(in_wavegroup_border_block_desc.GetElementSpaceSize() *
+                                               sizeof(int32_t),
+                                           max_lane_shared_align)
+            : 0;
+    static constexpr index_t in_cluster_block_space_size_aligned =
+        EnableWaveGroup
+            ? math::integer_least_multiple(in_cluster_border_block_desc.GetElementSpaceSize() *
+                                               sizeof(InDataType),
+                                           max_lane_shared_align)
+            : 0;
+
     template <bool HasMainBlockLoop>
     struct LaneSharedMemTrait
     {
         static constexpr index_t mem_count =
             BlockwiseConv::template GetLaneSharedMemCount<HasMainBlockLoop>();
         static constexpr index_t in_block_space_offset = 0;
+
         static constexpr index_t pre_in_block_space_offset =
             EnableSpatialCluster
                 ? (in_block_space_offset +
                    BlockwiseConv::LaneSharedMemTrait::in_block_space_size_aligned * mem_count)
                 : in_block_space_offset;
+
+        static constexpr index_t pre_cluster_in_block_space_offset = pre_in_block_space_offset;
+
+        static constexpr index_t pre_offset = math::max(
+            pre_in_block_space_offset + in_border_block_space_size_aligned * mem_count,
+            pre_cluster_in_block_space_offset + in_cluster_block_space_size_aligned * mem_count);
+
         static constexpr index_t next_in_block_space_offset =
-            EnableSpatialCluster
-                ? (pre_in_block_space_offset +
-                   BlockwiseConv::LaneSharedMemTrait::in_block_space_size_aligned * mem_count)
-                : in_block_space_offset;
-        static constexpr index_t pre_cluster_in_block_space_offset =
-            EnableSpatialCluster
-                ? (next_in_block_space_offset +
-                   BlockwiseConv::LaneSharedMemTrait::in_block_space_size_aligned * mem_count)
-                : in_block_space_offset;
-        static constexpr index_t next_cluster_in_block_space_offset =
-            EnableSpatialCluster
-                ? (pre_cluster_in_block_space_offset +
-                   BlockwiseConv::LaneSharedMemTrait::in_block_space_size_aligned * mem_count)
-                : in_block_space_offset;
+            EnableSpatialCluster ? pre_offset : in_block_space_offset;
+
+        static constexpr index_t next_cluster_in_block_space_offset = next_in_block_space_offset;
+
+        static constexpr index_t next_offset = math::max(
+            next_in_block_space_offset + in_border_block_space_size_aligned * mem_count,
+            next_cluster_in_block_space_offset + in_cluster_block_space_size_aligned * mem_count);
+
         static constexpr index_t wei_block_space_offset =
-            next_cluster_in_block_space_offset +
-            BlockwiseConv::LaneSharedMemTrait::in_block_space_size_aligned * mem_count;
+            EnableSpatialCluster
+                ? next_offset
+                : (in_block_space_offset +
+                   BlockwiseConv::LaneSharedMemTrait::in_block_space_size_aligned * mem_count);
+
         static constexpr index_t ds_base_offset =
             wei_block_space_offset +
             BlockwiseConv::LaneSharedMemTrait::wei_block_space_size_aligned * mem_count;
@@ -1879,12 +1904,6 @@ struct GridwiseConvMultipleD_Wcnn_CShuffle
 
     using DefaultBlock2CTileMap =
         remove_cvref_t<decltype(MakeDefaultBlock2CTileMap(EGridDesc{}, 1, 1))>;
-
-    static constexpr auto in_block_desc                = MakeInBlockDescriptor();
-    static constexpr auto wei_block_desc               = MakeWeiBlockDescriptor();
-    static constexpr auto in_cluster_border_block_desc = MakeInClusterBorderBlockDescriptor<true>();
-    static constexpr auto in_wavegroup_border_block_desc =
-        MakeInClusterBorderBlockDescriptor<false>();
 
     template <bool HasMainBlockLoop, typename Block2CTileMap = DefaultBlock2CTileMap>
     __device__ static void Run(const InDataType* __restrict__ p_in_grid,
