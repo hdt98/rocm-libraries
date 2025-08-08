@@ -1623,7 +1623,7 @@ namespace TensileLite
         std::string name = concatenate(
             "C", problem.cNames(), "_", DataTypeInfo::Get(problem.d().dataType()).abbrev);
 
-        if(problemType.groupedGemm)
+        if(problem.groupedGemm())
         {
             name += "_GG";
         }
@@ -2112,7 +2112,7 @@ namespace TensileLite
                                        inputTypeStr,
                                        DataTypeInfo::Get(problem.d().dataType()).abbrev);
 
-        if(problemType.groupedGemm)
+        if(problem.groupedGemm())
         {
             name += "_GG";
         }
