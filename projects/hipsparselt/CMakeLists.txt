@@ -405,11 +405,6 @@ if(BUILD_CODE_COVERAGE)
 
   target_compile_options(hipsparselt-test PRIVATE ${COVERAGE_CXX_FLAGS})
   target_link_options(hipsparselt-test PRIVATE ${COVERAGE_LINK_FLAGS})
-  target_include_directories(hipsparselt-test
-    PRIVATE
-      $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/library/src/hcc_detail/rocsparselt/src/include>
-      $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/library/src/hcc_detail/rocsparselt/include>
-  )
 
   #
   # Run coverage analysis
