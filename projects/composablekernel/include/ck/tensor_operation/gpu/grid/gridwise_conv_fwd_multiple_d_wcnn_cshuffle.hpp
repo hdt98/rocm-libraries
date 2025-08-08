@@ -1841,24 +1841,25 @@ struct GridwiseConvMultipleD_Wcnn_CShuffle
                 ? (in_block_space_offset +
                    BlockwiseConv::LaneSharedMemTrait::in_block_space_size_aligned * mem_count)
                 : in_block_space_offset;
-        static constexpr index_t next_in_block_space_offset =
-            EnableSpatialCluster
-                ? (pre_in_block_space_offset + in_border_block_space_size_aligned * mem_count)
-                : in_block_space_offset;
 
-        static constexpr index_t pre_cluster_in_block_space_offset =
-            EnableSpatialCluster
-                ? (next_in_block_space_offset + in_border_block_space_size_aligned * mem_count)
-                : in_block_space_offset;
-        static constexpr index_t next_cluster_in_block_space_offset =
-            EnableSpatialCluster ? (pre_cluster_in_block_space_offset +
-                                    in_cluster_block_space_size_aligned * mem_count)
-                                 : in_block_space_offset;
+        static constexpr index_t pre_cluster_in_block_space_offset = pre_in_block_space_offset;
+
+        static constexpr index_t pre_offset = math::max(
+            pre_in_block_space_offset + in_border_block_space_size_aligned * mem_count,
+            pre_cluster_in_block_space_offset + in_cluster_block_space_size_aligned * mem_count);
+
+        static constexpr index_t next_in_block_space_offset =
+            EnableSpatialCluster ? pre_offset : in_block_space_offset;
+
+        static constexpr index_t next_cluster_in_block_space_offset = next_in_block_space_offset;
+
+        static constexpr index_t next_offset = math::max(
+            next_in_block_space_offset + in_border_block_space_size_aligned * mem_count,
+            next_cluster_in_block_space_offset + in_cluster_block_space_size_aligned * mem_count);
 
         static constexpr index_t wei_block_space_offset =
             EnableSpatialCluster
-                ? (next_cluster_in_block_space_offset +
-                   in_cluster_block_space_size_aligned * mem_count)
+                ? next_offset
                 : (in_block_space_offset +
                    BlockwiseConv::LaneSharedMemTrait::in_block_space_size_aligned * mem_count);
 
