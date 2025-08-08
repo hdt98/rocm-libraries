@@ -125,7 +125,7 @@ def merge_types(data):
     mac_n = rec.get("mac_n")
     mac_k = rec.get("mac_k")
     if mac_m is not None and mac_n is not None and mac_k is not None:
-        rec["macro_tile"] = f"{mac_m},{mac_n},{mac_k}"
+        rec["macro_tile"] = f"{mac_m}x{mac_n}x{mac_k}"
     return rec
 
 
