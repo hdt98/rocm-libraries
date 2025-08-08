@@ -83,7 +83,8 @@ static auto GetDirectSolvers()
                                            miopen::solver::conv::ConvOclDirectFwd,
                                            miopen::solver::conv::ConvDirectNaiveConvFwd,
                                            miopen::solver::conv::ConvDirectNaiveConvBwd,
-                                           miopen::solver::conv::ConvDirectNaiveConvWrw>{};
+                                           miopen::solver::conv::ConvDirectNaiveConvWrw,
+                                           miopen::solver::conv::ConvDepthwiseFwd>{};
 }
 
 static auto GetImplicitGemmSolvers()
