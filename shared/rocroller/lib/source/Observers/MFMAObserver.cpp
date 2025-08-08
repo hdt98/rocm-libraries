@@ -58,8 +58,8 @@ namespace rocRoller
             {
                 // rv.stallCycles = m_remainingCycles;
 
-                bs anything = {CoexecCategory::NotAnInstruction};
-                auto nothing = ~anything;
+                bs   anything = {CoexecCategory::NotAnInstruction};
+                auto nothing  = ~anything;
 
                 rv.disallowedCoexec = {{1, nothing},
                                        {2,
@@ -84,7 +84,8 @@ namespace rocRoller
 
             do
             {
-                auto iter = m_disallowedOps.find(m_programCycle + inst.numExecutedInstructions() + rv.stallCycles);
+                auto iter = m_disallowedOps.find(m_programCycle + inst.numExecutedInstructions()
+                                                 + rv.stallCycles);
                 if(iter == m_disallowedOps.end() || !iter->second[category])
                     break;
 
@@ -117,7 +118,8 @@ namespace rocRoller
 
             // for(auto iter = m_disallowedOps.begin(); iter != m_disallowedOps.end() && iter->first < )
 
-            combineCoexec(m_disallowedOps, inst.peekedStatus().disallowedCoexec, m_programCycle-1);
+            combineCoexec(
+                m_disallowedOps, inst.peekedStatus().disallowedCoexec, m_programCycle - 1);
 #else
             const static std::unordered_set<std::string> variableCycleInsts
                 = {"v_mfma_f32_16x16x128_f8f6f4",

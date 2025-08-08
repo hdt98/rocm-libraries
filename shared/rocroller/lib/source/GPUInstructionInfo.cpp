@@ -121,7 +121,7 @@ namespace rocRoller
 
     bool GPUInstructionInfo::isVMEM(std::string const& opCode)
     {
-        return opCode.starts_with("buffer_");
+        return opCode.starts_with("buffer_") || opCode.starts_with("global_");
     }
 
     bool GPUInstructionInfo::isVMEMRead(std::string const& opCode)

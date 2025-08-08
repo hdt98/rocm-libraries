@@ -53,7 +53,6 @@ TEST_CASE("AddComment works", "[codegen][utility]")
         CHECK_THAT(inst.comments(), Contains("foo"));
 
     auto generatorTwo = [&]() -> Generator<Instruction> {
-        //
         co_yield generatorOne().map(AddComment("bar"));
     };
 
@@ -80,7 +79,6 @@ TEST_CASE("AddControlOp works", "[codegen][utility]")
         CHECK(inst.controlOps() == std::vector{3});
 
     auto generatorTwo = [&]() -> Generator<Instruction> {
-        //
         co_yield generatorOne().map(AddControlOp(9));
     };
 
@@ -89,6 +87,36 @@ TEST_CASE("AddControlOp works", "[codegen][utility]")
 
     for(auto inst : generatorTwo().map(AddControlOp(4)))
         CHECK(inst.controlOps() == std::vector({9, 4}));
+}
+
+TEST_CASE("AddLocation works", "[codegen][utility]")
+{
+    using namespace rocRoller;
+    using namespace Catch::Matchers;
+
+    CHECK(AddLocation().comment() == "97");
+    CHECK(AddLocation({SourceLocationPart::File}).comment()
+          == "shared/rocroller/test/catch/AnnotateInstructionsTest.cpp");
+
+    CHECK_THAT(AddLocation(EnumBitset<SourceLocationPart>::All()).comment(),
+               ContainsSubstring("void CATCH2")
+                   && ContainsSubstring(
+                       "shared/rocroller/test/catch/AnnotateInstructionsTest.cpp:104:90"));
+
+    auto generatorOne = []() -> Generator<Instruction> {
+        co_yield_(Instruction("v_add_u32", {}, {}, {}, ""));
+        co_yield_(Instruction("v_sub_u32", {}, {}, {}, ""));
+        co_yield_(Instruction("v_mul_u32", {}, {}, {}, ""));
+        co_yield_(Instruction("v_add_f32", {}, {}, {}, ""));
+    };
+
+    for(auto inst : generatorOne().map(AddLocation()))
+        CHECK_THAT(inst.comments(), Contains("113"));
+
+    for(auto inst :
+        generatorOne().map(AddLocation({SourceLocationPart::File, SourceLocationPart::Line})))
+        CHECK_THAT(inst.comments(),
+                   Contains("shared/rocroller/test/catch/AnnotateInstructionsTest.cpp:117"));
 }
 
 TEST_CASE("combineCoexec function works", "[scheduling]")
@@ -129,34 +157,4 @@ TEST_CASE("combineCoexec function works", "[scheduling]")
 
         CHECK(newB == expectedB);
     }
-}
-
-TEST_CASE("AddLocation works", "[codegen][utility]")
-{
-    using namespace rocRoller;
-    using namespace Catch::Matchers;
-
-    CHECK(AddLocation().comment() == "97");
-    CHECK(AddLocation({SourceLocationPart::File}).comment()
-          == "shared/rocroller/test/catch/AnnotateInstructionsTest.cpp");
-
-    CHECK_THAT(AddLocation(EnumBitset<SourceLocationPart>::All()).comment(),
-               ContainsSubstring("void CATCH2")
-                   && ContainsSubstring(
-                       "shared/rocroller/test/catch/AnnotateInstructionsTest.cpp:104:90"));
-
-    auto generatorOne = []() -> Generator<Instruction> {
-        co_yield_(Instruction("v_add_u32", {}, {}, {}, ""));
-        co_yield_(Instruction("v_sub_u32", {}, {}, {}, ""));
-        co_yield_(Instruction("v_mul_u32", {}, {}, {}, ""));
-        co_yield_(Instruction("v_add_f32", {}, {}, {}, ""));
-    };
-
-    for(auto inst : generatorOne().map(AddLocation()))
-        CHECK_THAT(inst.comments(), Contains("113"));
-
-    for(auto inst :
-        generatorOne().map(AddLocation({SourceLocationPart::File, SourceLocationPart::Line})))
-        CHECK_THAT(inst.comments(),
-                   Contains("shared/rocroller/test/catch/AnnotateInstructionsTest.cpp:117"));
 }

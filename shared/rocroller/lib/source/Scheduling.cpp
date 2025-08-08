@@ -45,7 +45,10 @@ namespace rocRoller
             }
             else
             {
-                AssertFatal(dstIter->first == cycle, ShowValue(bakSrc), ShowValue(bakDst), ShowValue(offset));
+                AssertFatal(dstIter->first == cycle,
+                            ShowValue(bakSrc),
+                            ShowValue(bakDst),
+                            ShowValue(offset));
                 dstIter->second |= srcIter->second;
             }
         }

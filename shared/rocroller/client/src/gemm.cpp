@@ -340,6 +340,10 @@ namespace rocRoller::Client::GEMMClient
                   << (double)problemParams.m * problemParams.n * problemParams.k * 2.0 / averageTime
                          * 1.e-9
                   << std::endl;
+        std::cerr << "Average GFLOPS:      "
+                  << (double)problemParams.m * problemParams.n * problemParams.k * 2.0 / averageTime
+                         * 1.e-9
+                  << std::endl;
 
         result.kernelAssemble = TimerPool::nanoseconds("Assembler::assembleMachineCode");
         result.kernelGenerate = TimerPool::nanoseconds("CommandKernel::generateKernel");
@@ -1253,7 +1257,7 @@ int main(int argc, const char* argv[])
     app.add_flag(
         "--visualize", run.visualize, "Dump out volumes describing memory access patterns.");
 
-    app.add_flag("--no-check", noCheckResult, "Do not verify GEMM results against OpenBLAS.");
+    app.add_flag("--noCheck", noCheckResult, "Do not verify GEMM results against OpenBLAS.");
 
     app.add_option("--yaml", io.resultsPath, "Save results to file.");
 

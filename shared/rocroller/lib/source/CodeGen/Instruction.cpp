@@ -48,6 +48,11 @@ namespace rocRoller
 
     void Instruction::codaString(std::ostream& os, LogLevel level) const
     {
+        if(m_lockOp != Scheduling::LockOperation::None)
+        {
+            os << "// " << m_lockOp << " " << m_dependency << std::endl;
+        }
+
         if(level >= LogLevel::Terse && m_comments.size() > 1)
         {
             // Only include everything but the first comment in the coda string.

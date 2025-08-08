@@ -559,7 +559,7 @@ namespace rocRollerTest
     Generator<Instruction> noComments()
     {
         for(int i = 0; i < 100; i++)
-            co_yield_(Inst(concatenate("I", i)));
+            co_yield_(Inst(concatenate("s_add_u32 ", i)));
     }
 
     TEST_P(RandomSchedulerTest, RandomScheduler)
