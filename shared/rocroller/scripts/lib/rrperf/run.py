@@ -113,21 +113,43 @@ def submit_directory(suite: str, wrkdir: Path, ptsdir: Path) -> None:
     # TODO: add call to SOMEWHERE to submit
 
 
+def merge_types(data):
+    rec = dict(data)
+    if "types" in rec and isinstance(rec["types"], dict):
+        rec.update(rec["types"])
+        del rec["types"]
+    kernel_exec = rec.get("kernelExecute")
+    if isinstance(kernel_exec, list) and kernel_exec:
+        rec["us"] = sum(kernel_exec) / len(kernel_exec)
+    mac_m = rec.get("mac_m")
+    mac_n = rec.get("mac_n")
+    mac_k = rec.get("mac_k")
+    if mac_m is not None and mac_n is not None and mac_k is not None:
+        rec["macro_tile"] = f"{mac_m}x{mac_n}x{mac_k}"
+    return rec
+
+
 def dump_hipblaslt_csv(suite: str, rundir: Path, outdir: Path = None):
     """
-    Consolidate performance data and dump a hipblaslt-bench-compatible CSV.
+    Consolidate performance data and dump a hipblaslt bench compatible CSV.
     Only the specified columns (included_headers) are included,
     with empty fields for missing data.
     """
     if outdir is None:
         outdir = rundir
     results = []
-    for jpath in rundir.glob(f"gemm-*.yaml"):
+    for jpath in chain(rundir.glob("gemm-*.yaml"), rundir.glob("codegen-*.yaml")):
         yamldata = yaml.safe_load(jpath.read_text())
         if isinstance(yamldata, dict):
-            results.append(yamldata)
+            results.append(merge_types(yamldata))
         elif isinstance(yamldata, list):
-            results.extend(yamldata)
+            for entry in yamldata:
+                results.append(merge_types(entry))
+
+    for rec in results:
+        rec["batch_count"] = rec.get("batch_count", 1)
+        rec["compute_type"] = rec.get("compute_type", "f32")
+
     df = pd.DataFrame(results)
     df = df.rename(columns=renames)
     for col in included_headers:
@@ -244,7 +266,7 @@ def get_args(parser: argparse.ArgumentParser):
     )
     parser.add_argument(
         "--dump_hipblaslt_csv",
-        help="Dump hipblaslt-bench compatible CSV with included headers.",
+        help="Dump hipblaslt bench compatible CSV with included headers.",
         action="store_true",
         default=False,
     )
@@ -255,7 +277,7 @@ def run(args):
     run_cli(**args.__dict__)
 
 
-def run_cli(
+def run_cli(  # noqa: C901
     token: str = None,
     suite: str = None,
     submit: bool = False,
@@ -276,7 +298,10 @@ def run_cli(
         rrperf.rocm_control.pin_clocks(rocm_smi)
 
     if suite is None and token is None:
-        suite = "all_gfx120X" if rrperf.utils.rocm_gfx().startswith("gfx120") else "all"
+        if rrperf.utils.rocm_gfx().startswith("gfx120"):
+            suite = "all_gfx120X"
+        else:
+            suite = "all"
 
     generator = rrperf.utils.empty()
     if suite is not None:
