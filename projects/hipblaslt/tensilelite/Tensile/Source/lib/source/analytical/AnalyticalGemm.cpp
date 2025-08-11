@@ -799,7 +799,7 @@ namespace TensileLite
                 //If this is the case, we assume we're going to try and get an even split that fills the most CUs.
                 split = std::floor(hardware.N_CU/active_cu);
                 //We are not going to split more than 8 times though.
-                size_t max_split = 8;
+                size_t max_split = 16;
                 split = std::min(split,max_split);
             }
             hardware.log_debug("split",split);
