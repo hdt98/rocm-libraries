@@ -1659,6 +1659,13 @@ class KernelWriterAssembly(KernelWriter):
       tmpSgprNumWorkGroups = self.sgprPool.checkOut(1, preventOverflow=False)
       commonArgs.addComment1("Load num of WGs")
       commonArgs.add(self.argLoader.loadKernArg(tmpSgprNumWorkGroups, "KernArgAddress", 12, dword=1))
+
+      if self.states.archCaps["WorkGroupIdFromTTM"]:
+          commonArgs.addComment1("init workgroup id ")
+          commonArgs.add(SMovB32(dst=sgpr("WorkGroup0"), src="ttmp9", comment="workaround"))
+          commonArgs.add(SAndB32(dst=sgpr("WorkGroup1"), src0=hex(0xFFFF), src1="ttmp7", comment="workaround"))
+          commonArgs.add(SLShiftRightB32(dst=sgpr("WorkGroup2"), shiftHex=hex(0x10), src="ttmp7"))
+
       ########################################
       # kernel args parameters
       load = self.states.numSgprToLoad
