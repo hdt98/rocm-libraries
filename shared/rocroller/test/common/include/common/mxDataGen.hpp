@@ -123,43 +123,42 @@ namespace rocRoller
 
         if constexpr(std::is_same_v<rrDT, FP4>)
         {
-	    if(hasScale)
-	    {
+            if(hasScale)
+            {
                 auto dataByte = dgen.getDataBytes();
-		return reinterpret_cast<std::vector<UDT>&>(dataByte);
-	    }
-	    else
-	    {
-		auto refF = dgen.getReferenceFloat();
-		auto ret = f32_to_fp4x8(refF);
-		return reinterpret_cast<std::vector<UDT>&>(ret);
-	    }
+                return reinterpret_cast<std::vector<UDT>&>(dataByte);
+            }
+            else
+            {
+                auto refF = dgen.getReferenceFloat();
+                auto ret  = f32_to_fp4x8(refF);
+                return reinterpret_cast<std::vector<UDT>&>(ret);
+            }
         }
 
-        if constexpr(std::is_same_v<rrDT,
-                                    FP6> || std::is_same_v<rrDT, BF6>)
+        if constexpr(std::is_same_v<rrDT, FP6> || std::is_same_v<rrDT, BF6>)
         {
-	    if(hasScale)
-	    {
+            if(hasScale)
+            {
                 auto dataByte = dgen.getDataBytes();
-		return reinterpret_cast<std::vector<UDT>&>(dataByte);
-	    }
-	    else
-	    {
-		auto refF = dgen.getReferenceFloat();
-		std::vector<uint8_t> data;
-		data.reserve(refF.size());
-		for(auto value: refF)
-		{
-		    if constexpr (std::is_same_v<rrDT, FP6>)
-			data.push_back(FP6(value).data);
-		    else
-			data.push_back(BF6(value).data);
-		}
+                return reinterpret_cast<std::vector<UDT>&>(dataByte);
+            }
+            else
+            {
+                auto                 refF = dgen.getReferenceFloat();
+                std::vector<uint8_t> data;
+                data.reserve(refF.size());
+                for(auto value : refF)
+                {
+                    if constexpr(std::is_same_v<rrDT, FP6>)
+                        data.push_back(FP6(value).data);
+                    else
+                        data.push_back(BF6(value).data);
+                }
 
-		auto dataByte = packF6x16(data);
-		return reinterpret_cast<std::vector<UDT>&>(dataByte);
-	    }
+                auto dataByte = packF6x16(data);
+                return reinterpret_cast<std::vector<UDT>&>(dataByte);
+            }
         }
 
         if constexpr(std::is_same_v<rrDT, FP8> || std::is_same_v<rrDT, BF8>)
@@ -186,7 +185,7 @@ namespace rocRoller
                          float> || std::is_same_v<rrDT, Half> || std::is_same_v<rrDT, BFloat16>)
         {
             std::vector<uint8_t> dataByte = dgen.getDataBytes();
-            std::vector<rrDT>& rrData = reinterpret_cast<std::vector<rrDT>&>(dataByte);
+            std::vector<rrDT>&   rrData   = reinterpret_cast<std::vector<rrDT>&>(dataByte);
             return rrData;
         }
 
