@@ -572,11 +572,9 @@ struct GridwiseGroupedConv2DFwdDlV4
         // init lds 0
         auto init_pading = [&](auto* share_vec, auto count) {
             static_for<0, math::integer_divide_ceil(count, BlockSize), 1>{}([&](auto i) {
-                if(threadIdx.x + i * BlockSize <
-                   count) // NOLINT (readability-static-accessed-through-instance)
+                if(threadIdx.x + i * BlockSize < count) // NOLINT
                 {
-                    share_vec[threadIdx.x + i * BlockSize] =
-                        {}; // NOLINT (readability-static-accessed-through-instance)
+                    share_vec[threadIdx.x + i * BlockSize] = {}; // NOLINT
                 }
             });
         };
@@ -584,11 +582,10 @@ struct GridwiseGroupedConv2DFwdDlV4
             [&](auto* share_vec, auto element_count, auto array_count, index_t stride) {
                 static_for<0, math::integer_divide_ceil(array_count, BlockSize), 1>{}([&](auto i) {
                     static_for<0, element_count, 1>{}([&](auto j) {
-                        if(threadIdx.x + i * BlockSize <
-                           array_count) // NOLINT (readability-static-accessed-through-instance)
+                        if(threadIdx.x + i * BlockSize < array_count) // NOLINT
                         {
-                            auto p = share_vec + (threadIdx.x + i * BlockSize) * stride +
-                                     j; // NOLINT (readability-static-accessed-through-instance)
+                            auto p =
+                                share_vec + (threadIdx.x + i * BlockSize) * stride + j; // NOLINT
                             *p = {};
                         }
                     });

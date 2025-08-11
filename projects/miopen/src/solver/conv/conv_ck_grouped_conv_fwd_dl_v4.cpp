@@ -577,6 +577,7 @@ ConvSolution ConvDepthwiseFwd::GetSolution(const ExecutionContext& ctx,
                                            const miopen::conv::ProblemDescription& problem,
                                            const PerformanceConfigConvDepthwiseFwd& config) const
 {
+    (void)ctx; // Unused, as we use the config directly
     ConvSolution sol;
 #if MIOPEN_BACKEND_HIP && MIOPEN_USE_COMPOSABLEKERNEL
     const auto& ck_args = CKArgs{problem};
