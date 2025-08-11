@@ -799,7 +799,7 @@ namespace TensileLite
                 //If this is the case, we assume we're going to try and get an even split that fills the most CUs.
                 split = std::floor(hardware.N_CU/active_cu);
                 //We are not going to split more than 8 times though.
-                size_t max_split = 8;
+                size_t max_split = 16;
                 split = std::min(split,max_split);
             }
             hardware.log_debug("split",split);
@@ -979,25 +979,6 @@ namespace TensileLite
                 if(((MT_M >= 32) || MT_N >= 32) && (element_size_A == 16))
                 {
                     total_latency = total_latency * 0.9;
-                }
-
-                //Bias towards having enough K iterations, penalize tiles with too few K iterations.
-                size_t K_iters = safe_ceil_div(K,MT_K);
-                if(K_iters == 1)
-                {
-                    total_latency = total_latency * 16;
-                }
-                else if(K_iters == 2)
-                {
-                    total_latency = total_latency * 8;
-                }
-                else if(K_iters <= 4)
-                {
-                    total_latency = total_latency * 4;
-                }
-                else if(K_iters <= 8)
-                {
-                    total_latency = total_latency * 2;
                 }
 
                 //Bias towards minimizing tile quantization in Each Dimension
