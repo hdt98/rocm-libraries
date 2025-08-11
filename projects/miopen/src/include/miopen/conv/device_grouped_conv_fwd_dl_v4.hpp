@@ -168,7 +168,8 @@ struct GridwiseGroupedConv2DFwdDlV4
         (TileOut_H % SubTileH != 0 || TileOut_W % SubTileW != 0);
 
     static constexpr index_t ShareMemInTileSize = TileIn_Align_H * TileIn_Stride;
-    static constexpr index_t ShareMemInSize = ShareMemInTileSize * TilePerWave * sizeof(InDataType);
+    static constexpr index_t ShareMemInSize     = static_cast<index_t>(
+        static_cast<unsigned long>(ShareMemInTileSize) * TilePerWave * sizeof(InDataType));
     static constexpr index_t ShareMemOutTileSize = TileOut_Align_H * TileOut_Stride;
 #if defined(DISABLE_OUTPUT_LDS)
     static constexpr index_t ShareMemOutSize = 4;
@@ -528,8 +529,10 @@ struct GridwiseGroupedConv2DFwdDlV4
     template <typename Argument>
     static void __device__ Run(Argument arg, char* p_share_in, char* p_share_out)
     {
-        const index_t g_idx   = __builtin_amdgcn_readfirstlane(blockIdx.x);
-        const index_t g_n_idx = __builtin_amdgcn_readfirstlane(blockIdx.y);
+        const index_t g_idx = __builtin_amdgcn_readfirstlane(
+            blockIdx.x); // NOLINT (readability-static-accessed-through-instance)
+        const index_t g_n_idx = __builtin_amdgcn_readfirstlane(
+            blockIdx.y); // NOLINT (readability-static-accessed-through-instance)
         const index_t lane_id = __lane_id();
 
         // to support unaligned N
@@ -569,9 +572,11 @@ struct GridwiseGroupedConv2DFwdDlV4
         // init lds 0
         auto init_pading = [&](auto* share_vec, auto count) {
             static_for<0, math::integer_divide_ceil(count, BlockSize), 1>{}([&](auto i) {
-                if(threadIdx.x + i * BlockSize < count)
+                if(threadIdx.x + i * BlockSize <
+                   count) // NOLINT (readability-static-accessed-through-instance)
                 {
-                    share_vec[threadIdx.x + i * BlockSize] = {};
+                    share_vec[threadIdx.x + i * BlockSize] =
+                        {}; // NOLINT (readability-static-accessed-through-instance)
                 }
             });
         };
@@ -579,10 +584,12 @@ struct GridwiseGroupedConv2DFwdDlV4
             [&](auto* share_vec, auto element_count, auto array_count, index_t stride) {
                 static_for<0, math::integer_divide_ceil(array_count, BlockSize), 1>{}([&](auto i) {
                     static_for<0, element_count, 1>{}([&](auto j) {
-                        if(threadIdx.x + i * BlockSize < array_count)
+                        if(threadIdx.x + i * BlockSize <
+                           array_count) // NOLINT (readability-static-accessed-through-instance)
                         {
-                            auto p = share_vec + (threadIdx.x + i * BlockSize) * stride + j;
-                            *p     = {};
+                            auto p = share_vec + (threadIdx.x + i * BlockSize) * stride +
+                                     j; // NOLINT (readability-static-accessed-through-instance)
+                            *p = {};
                         }
                     });
                 });
@@ -923,8 +930,7 @@ struct DeviceGroupedConvFwdDlV4 : public DeviceGroupedConvFwdMultipleABD<NDimSpa
             return ave_time;
         }
 
-        float Run(const BaseArgument* p_arg,
-                  const StreamConfig& stream_config = StreamConfig{}) override
+        float Run(const BaseArgument* p_arg, const StreamConfig& stream_config) override
         {
             return Run(*dynamic_cast<const Argument*>(p_arg), stream_config);
         }

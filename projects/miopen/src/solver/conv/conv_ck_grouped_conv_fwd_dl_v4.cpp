@@ -28,7 +28,6 @@
 #include <miopen/check_numerics.hpp>
 #include <miopen/env.hpp>
 #include <miopen/fusion/solvers.hpp>
-#include <miopen/generic_search.hpp>
 #include <miopen/conv/data_invoke_params.hpp>
 #include <miopen/solver/problem_description_interpreter.hpp>
 #if MIOPEN_BACKEND_HIP && MIOPEN_USE_COMPOSABLEKERNEL
@@ -331,18 +330,11 @@ struct CKArgs
         bias_strides  = {K, 0, 1, 0, 0};
 
         const std::string layout = problem.GetInLayout();
-        if(layout == "NCHW")
-        {
-            in_strides  = {Hi * Wi * C, G * Hi * Wi * C, 1, Wi * C, C};
-            out_strides = {Ho * Wo * K, G * Ho * Wo * K, 1, Wo * K, K};
-            wei_strides = {Y * X * C, G * Y * X * C, 1, X * C, C};
-        }
-        else
-        {
-            in_strides  = {Hi * Wi * C, G * Hi * Wi * C, 1, Wi * C, C};
-            out_strides = {Ho * Wo * K, G * Ho * Wo * K, 1, Wo * K, K};
-            wei_strides = {Y * X * C, G * Y * X * C, 1, X * C, C};
-        }
+
+        in_strides  = {Hi * Wi * C, G * Hi * Wi * C, 1, Wi * C, C};
+        out_strides = {Ho * Wo * K, G * Ho * Wo * K, 1, Wo * K, K};
+        wei_strides = {Y * X * C, G * Y * X * C, 1, X * C, C};
+
         filter_stride   = {ProblemInterpreter::GetAdjustedConvolutionStrideH(problem),
                          ProblemInterpreter::GetAdjustedConvolutionStrideW(problem)};
         filter_dilation = {ProblemInterpreter::GetAdjustedConvolutionDilationH(problem),
@@ -448,8 +440,8 @@ void PerformanceConfigConvDepthwiseFwd::HeuristicInit(
     {
     case miopenInt8: break;
     case miopenHalf: Init<ck::half_t>(problem); break;
-    case miopenFloat: break;
-    case miopenBFloat16: break;
+    case miopenFloat:
+    case miopenBFloat16:
     case miopenFloat8_fnuz:
     case miopenBFloat8_fnuz:
     case miopenInt64:
@@ -535,7 +527,7 @@ bool ConvDepthwiseFwd::IsApplicable(const ExecutionContext& ctx,
 }
 
 uint32_t
-ConvDepthwiseFwd::GetSupportedSolutionCount(const ExecutionContext& ctx,
+ConvDepthwiseFwd::GetSupportedSolutionCount([[maybe_unused]] const ExecutionContext& ctx,
                                             const miopen::conv::ProblemDescription& problem) const
 {
     uint32_t solutionCount = 0;
@@ -557,7 +549,7 @@ ConvDepthwiseFwd::GetSupportedSolutionCount(const ExecutionContext& ctx,
 }
 
 PerformanceConfigConvDepthwiseFwd
-ConvDepthwiseFwd::GetDefaultPerformanceConfig(const ExecutionContext& ctx,
+ConvDepthwiseFwd::GetDefaultPerformanceConfig([[maybe_unused]] const ExecutionContext& ctx,
                                               const miopen::conv::ProblemDescription& problem) const
 {
     PerformanceConfigConvDepthwiseFwd pp;
@@ -600,6 +592,7 @@ ConvSolution ConvDepthwiseFwd::GetSolution(const ExecutionContext& ctx,
             MIOPEN_LOG_I("Run conv : " << conv_ptr->GetTypeString());
             sol.invoker_factory = [conv_ptr = std::move(conv_ptr),
                                    problem](const std::vector<Kernel>& kernels) {
+                (void)kernels; // Unused, as we use the conv_ptr directly
                 return [conv_ptr = std::move(conv_ptr),
                         problem](const Handle& handle, const AnyInvokeParams& primitive_params) {
                     const auto& fwd_ctx = primitive_params.CastTo<miopen::conv::DataInvokeParams>();
