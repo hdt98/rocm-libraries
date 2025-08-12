@@ -1834,6 +1834,7 @@ void testing_aux_get_workspace_size(const Arguments& arg)
                             HIPSPARSE_STATUS_SUCCESS);
 }
 
+#ifdef CODE_COVERAGE
 void testing_aux_string_helper(const Arguments& arg)
 {
     constexpr int invalid_enum = -1;
@@ -2177,3 +2178,4 @@ void testing_aux_ostream(const Arguments& arg)
 
     EXPECT_STREQ(output.c_str(), expected);
 }
+#endif

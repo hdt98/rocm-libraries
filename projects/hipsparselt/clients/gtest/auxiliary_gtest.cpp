@@ -120,6 +120,7 @@ namespace
                 testing_aux_get_workspace_size_bad_arg(arg);
             else if(!strcmp(arg.function, "aux_get_workspace_size"))
                 testing_aux_get_workspace_size(arg);
+        #ifdef CODE_COVERAGE
             else if(!strcmp(arg.function, "aux_string_helper"))
                 testing_aux_string_helper(arg);
             else if(!strcmp(arg.function, "aux_value_mapping"))
@@ -130,6 +131,7 @@ namespace
                 testing_aux_misc(arg);
             else if(!strcmp(arg.function, "aux_ostream"))
                 testing_aux_ostream(arg);
+        #endif
             else
                 FAIL() << "Internal error: Test called with unknown function: " << arg.function;
         }
