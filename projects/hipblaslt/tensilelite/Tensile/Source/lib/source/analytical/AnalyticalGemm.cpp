@@ -981,25 +981,6 @@ namespace TensileLite
                     total_latency = total_latency * 0.9;
                 }
 
-                //Bias towards having enough K iterations, penalize tiles with too few K iterations.
-                size_t K_iters = safe_ceil_div(K,MT_K);
-                if(K_iters == 1)
-                {
-                    total_latency = total_latency * 16;
-                }
-                else if(K_iters == 2)
-                {
-                    total_latency = total_latency * 8;
-                }
-                else if(K_iters <= 4)
-                {
-                    total_latency = total_latency * 4;
-                }
-                else if(K_iters <= 8)
-                {
-                    total_latency = total_latency * 2;
-                }
-
                 //Bias towards minimizing tile quantization in Each Dimension
                 if(K < MI_K && MT_K != MI_K)
                 {
