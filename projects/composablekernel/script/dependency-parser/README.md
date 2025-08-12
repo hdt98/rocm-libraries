@@ -2,7 +2,7 @@
 
 ## Overview
 
-This tool provides advanced dependency-based selective test filtering and build optimization for large C++ super-repos using static parsing of Ninja build files. By analyzing both source and header dependencies, it enables precise identification of which tests and executables are affected by code changes, allowing for efficient CI/CD workflows and faster incremental builds.
+This tool provides advanced dependency-based selective test filtering and build optimization for large C++ monorepos using static parsing of Ninja build files. By analyzing both source and header dependencies, it enables precise identification of which tests and executables are affected by code changes, allowing for efficient CI/CD workflows and faster incremental builds.
 
 The parser:
 - Identifies all executables in the Ninja build.

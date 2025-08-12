@@ -175,7 +175,7 @@ def resolve_patch_author(client: GitHubCLIClient, repo: str, pr: int) -> tuple[s
     name, email = client.get_user(username)
     return name or username, email
 
-def apply_patch_to_subrepo(entry: RepoEntry, super_repo_url: str, monorepo_pr: int,
+def apply_patch_to_subrepo(entry: RepoEntry, super_repo_url: str, super_repo_pr: int,
                             patch_path: Path, author_name: str, author_email: str,
                             merge_sha: str, dry_run: bool = False) -> None:
     """Clone the subrepo, apply the patch, and attribute to the original author with commit message annotations."""
@@ -189,7 +189,7 @@ def apply_patch_to_subrepo(entry: RepoEntry, super_repo_url: str, monorepo_pr: i
         _apply_patch(subrepo_path, patch_path)
         _stage_changes(subrepo_path)
         original_commit_msg = _extract_commit_message_from_patch(patch_path)
-        commit_msg = _format_commit_message(super_repo_url, monorepo_pr, merge_sha, original_commit_msg)
+        commit_msg = _format_commit_message(super_repo_url, super_repo_pr, merge_sha, original_commit_msg)
         _commit_changes(subrepo_path, commit_msg, author_name, author_email)
         _set_authenticated_remote(subrepo_path, entry.url)
         _push_changes(subrepo_path, entry.branch)
