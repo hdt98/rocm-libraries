@@ -59,7 +59,7 @@ jobs:
           pip install pydantic requests
 
     # # For our "rocPRIM" MVP, there are no patches to apply. This will be un-commented and used later!
-    #   - name: Patch monorepo
+    #   - name: Patch super-repo
     #     run: |
     #       python TheRock/build_tools/github_actions/patch_monorepo.py \
     #         --repo rocm-libraries

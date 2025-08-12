@@ -4,14 +4,14 @@
 Sync Patches to Subrepositories
 -------------------------------
 
-This script is part of the monorepo synchronization system. It runs after a monorepo pull request
+This script is part of the super-repo synchronization system. It runs after a super-repo pull request
 is merged and applies relevant changes to the corresponding sub-repositories using Git patches.
 
-- Uses the merge commit of the monorepo PR to extract subtree changes.
+- Uses the merge commit of the super-repo PR to extract subtree changes.
 - Generates patch files per changed subtree.
 - Applies each patch to its respective sub-repository, adjusting for subtree prefix.
 - Uses the repos-config.json file to map subtrees to sub-repos.
-- Assumes this script is run from the root of the monorepo.
+- Assumes this script is run from the root of the super-repo.
 
 Arguments:
     --repo      : Full repository name (e.g., org/repo)

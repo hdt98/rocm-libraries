@@ -1,14 +1,14 @@
 # ROCm Libraries
 
-Welcome to the ROCm Libraries monorepo. This repository consolidates multiple ROCm-related libraries and shared components into a single repository to streamline development, CI, and integration. The first set of libraries focuses on components required for building PyTorch.
+Welcome to the ROCm Libraries super-repo. This repository consolidates multiple ROCm-related libraries and shared components into a single repository to streamline development, CI, and integration. The first set of libraries focuses on components required for building PyTorch.
 
-# Monorepo Status and CI Health
+# Super-repo Status and CI Health
 
 This table provides the current status of the migration of specific ROCm libraries as well as a pointer to their current CI health.
 
 **Key:**
-- **Completed**: Fully migrated and integrated. This monorepo should be considered the source of truth for this project. The old repo may still be used for release activities.
-- **In Progress**: Ongoing migration, tests, or integration. Please refrain from submitting new pull requests on the individual repo of the project, and develop on the monorepo.
+- **Completed**: Fully migrated and integrated. This super-repo should be considered the source of truth for this project. The old repo may still be used for release activities.
+- **In Progress**: Ongoing migration, tests, or integration. Please refrain from submitting new pull requests on the individual repo of the project, and develop on the super-repo.
 - **Pending**: Not yet started or in the early planning stages. The individual repo should be considered the source of truth for this project.
 
 | Component           | Migration Status | Azure CI Status                       | Math CI Status                        |
@@ -104,7 +104,7 @@ To begin contributing or building, see the [CONTRIBUTING.md](./CONTRIBUTING.md) 
 
 ## License
 
-This monorepo contains multiple subprojects, each of which retains the license under which it was originally published.
+This super-repo contains multiple subprojects, each of which retains the license under which it was originally published.
 
 📁 Refer to the `LICENSE`, `LICENSE.md`, or `LICENSE.txt` file within each `projects/` or `shared/` directory for specific license terms.
 
