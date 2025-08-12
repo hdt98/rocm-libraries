@@ -41,6 +41,16 @@ import yaml
 
 import rrperf
 
+TYPE_SIZE_BYTES = {
+    "fp4": 0.5,
+    "fp6": 0.75,
+    "fp8": 1.0,
+    "half": 2.0,
+    "float": 4.0,
+    "bf6": 0.75,
+    "bf8": 1.0,
+}
+
 renames = {
     "hipblaslt-Gflops": "gflops",
     "hipblaslt-GB/s": "gbs",
@@ -98,21 +108,6 @@ included_headers = [
 ]
 
 
-def submit_directory(suite: str, wrkdir: Path, ptsdir: Path) -> None:
-    """Consolidate performance data and submit it to SOMEWHERE.
-
-    Performance data is read from .yaml files in the work directory
-    for the given suite.  Consolidated data is written to a SOMEWHERE
-    directory and submitted.
-    """
-    results = []
-    for jpath in wrkdir.glob(f"{suite}-*.yaml"):
-        results.extend(yaml.load(jpath.read_text()))
-    df = pd.DataFrame(results)
-    df.to_csv(f"{str(ptsdir)}/{suite}-benchmark.csv", index=False)
-    # TODO: add call to SOMEWHERE to submit
-
-
 def compute_gflops(m, n, k, runtime_ns):
     flo = 2 * m * n * k
     gflops = flo / (runtime_ns)
@@ -120,6 +115,9 @@ def compute_gflops(m, n, k, runtime_ns):
 
 
 def compute_gbs(m, n, k, runtime_ns, element_size):
+    print(f"element_size = {element_size}")
+    element_size = float(TYPE_SIZE_BYTES.get(element_size.lower(), 4.0))
+    print(f"element_size = {element_size}\n")
     data_movement_bytes = (m * k + k * n + m * n) * element_size
     gbs = data_movement_bytes / runtime_ns
     return gbs
@@ -163,12 +161,19 @@ def dump_hipblaslt_csv(suite: str, rundir: Path, outdir: Path = None):
     for rec in results:
         rec["batch_count"] = rec.get("batch_count", 1)
         rec["compute_type"] = rec.get("compute_type", "f32")
-        rec["gflops"] = compute_gflops(
+        rec["gflops"] = round(compute_gflops(
             rec.get("M", 0),
             rec.get("N", 0),
             rec.get("K", 0),
             rec.get("us", 0)
-        )
+        ), 4)
+        rec["gbs"] = round(compute_gbs(
+            rec.get("M", 0),
+            rec.get("N", 0),
+            rec.get("K", 0),
+            rec.get("us", 0),
+            rec.get("type_A", 4.0)
+        ), 4)
 
     df = pd.DataFrame(results)
     df = df.rename(columns=renames)
@@ -180,6 +185,21 @@ def dump_hipblaslt_csv(suite: str, rundir: Path, outdir: Path = None):
     print(f"Outpath: {outpath}")
     df.to_csv(outpath, index=False)
     print(f"Wrote hipBLASLt CSV: {outpath.resolve()}")
+
+
+def submit_directory(suite: str, wrkdir: Path, ptsdir: Path) -> None:
+    """Consolidate performance data and submit it to SOMEWHERE.
+
+    Performance data is read from .yaml files in the work directory
+    for the given suite.  Consolidated data is written to a SOMEWHERE
+    directory and submitted.
+    """
+    results = []
+    for jpath in wrkdir.glob(f"{suite}-*.yaml"):
+        results.extend(yaml.load(jpath.read_text()))
+    df = pd.DataFrame(results)
+    df.to_csv(f"{str(ptsdir)}/{suite}-benchmark.csv", index=False)
+    # TODO: add call to SOMEWHERE to submit
 
 
 def from_token(token: str):
