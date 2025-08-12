@@ -207,15 +207,15 @@ def autoperf(
     if no_fail is None:
         no_fail = []
 
-    monorepo_dir = git.top()
+    super_repo_dir = git.top()
 
-    targets = [git.short_hash(monorepo_dir, x) for x in commits]
+    targets = [git.short_hash(super_repo_dir, x) for x in commits]
     no_fail_targets = frozenset(
-        [git.short_hash(monorepo_dir, x) for x in no_fail if x != "current"]
+        [git.short_hash(super_repo_dir, x) for x in no_fail if x != "current"]
     )
 
     if len(targets) + (current) <= 1:
-        targets.append(git.short_hash(monorepo_dir))  # HEAD
+        targets.append(git.short_hash(super_repo_dir))  # HEAD
 
     if ancestral:
         targets = ancestral_targets(targets)
@@ -234,10 +234,10 @@ def autoperf(
     for target in targets:
         checkout_dir = top / f"build_{target}"
         if target == "current":
-            checkout_dir = monorepo_dir
+            checkout_dir = super_repo_dir
 
         build_dir: Path = build_rocroller(
-            monorepo_dir,
+            super_repo_dir,
             checkout_dir,
             checkout_dir / "shared" / "rocroller",
             target,
