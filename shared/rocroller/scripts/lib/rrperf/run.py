@@ -113,14 +113,28 @@ def submit_directory(suite: str, wrkdir: Path, ptsdir: Path) -> None:
     # TODO: add call to SOMEWHERE to submit
 
 
+def compute_gflops(m, n, k, runtime_ns):
+    flo = 2 * m * n * k
+    gflops = flo / (runtime_ns)
+    return gflops
+
+
+def compute_gbs(m, n, k, runtime_ns, element_size):
+    data_movement_bytes = (m * k + k * n + m * n) * element_size
+    gbs = data_movement_bytes / runtime_ns
+    return gbs
+
+
 def merge_types(data):
     rec = dict(data)
     if "types" in rec and isinstance(rec["types"], dict):
         rec.update(rec["types"])
         del rec["types"]
+
     kernel_exec = rec.get("kernelExecute")
     if isinstance(kernel_exec, list) and kernel_exec:
-        rec["us"] = sum(kernel_exec) / len(kernel_exec)
+        rec["us"] = (sum(kernel_exec) / len(kernel_exec)) / 1e3
+
     mac_m = rec.get("mac_m")
     mac_n = rec.get("mac_n")
     mac_k = rec.get("mac_k")
@@ -149,6 +163,12 @@ def dump_hipblaslt_csv(suite: str, rundir: Path, outdir: Path = None):
     for rec in results:
         rec["batch_count"] = rec.get("batch_count", 1)
         rec["compute_type"] = rec.get("compute_type", "f32")
+        rec["gflops"] = compute_gflops(
+            rec.get("M", 0),
+            rec.get("N", 0),
+            rec.get("K", 0),
+            rec.get("us", 0)
+        )
 
     df = pd.DataFrame(results)
     df = df.rename(columns=renames)
@@ -195,6 +215,7 @@ def run_problems(
             print(f"# env: {rr_env_str}", file=f, flush=True)
             print(f"# command: {scmd}", file=f, flush=True)
             print(f"# token: {repr(problem)}", file=f, flush=True)
+            
             print("running:")
             print(f"  command: {scmd}")
             print(f"  wrkdir:  {work_dir.resolve()}")
