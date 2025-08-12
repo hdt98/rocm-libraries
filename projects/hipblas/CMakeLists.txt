@@ -117,7 +117,7 @@ endif()
 #     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address -shared-libasan")
 # endif()
 
-include( clients/cmake/build-options.cmake ) # can we put this logic here?
+include(clients/cmake/build-options.cmake) # can we put this logic here?
 
 # ============================================================================
 # Project Configuration and Build
@@ -213,6 +213,34 @@ else()
 endif()
 
 set( HIPBLAS_CONFIG_DIR "\${CPACK_PACKAGING_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}" CACHE PATH "Path placed into ldconfig file" )
+
+rocm_install_targets(
+  TARGETS hipblas
+  INCLUDE
+    ${CMAKE_BINARY_DIR}/include
+)
+
+if(HIPBLAS_ENABLE_HIP)
+  rocm_export_targets(
+    TARGETS roc::hipblas
+    DEPENDS PACKAGE hip
+    DEPENDS PACKAGE hipblas-common
+    STATIC_DEPENDS PACKAGE rocblas
+    STATIC_DEPENDS PACKAGE rocsolver
+    NAMESPACE roc::
+  )
+else( )
+  rocm_export_targets(
+    TARGETS roc::hipblas
+    DEPENDS PACKAGE HIP
+    DEPENDS PACKAGE hipblas-common
+    NAMESPACE roc::
+  )
+endif( )
+
+# Force installation of .f90 module files
+rocm_install(FILES "hipblas_module.f90"
+        DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/hipblas")
 
 rocm_create_package(
     NAME ${package_name}

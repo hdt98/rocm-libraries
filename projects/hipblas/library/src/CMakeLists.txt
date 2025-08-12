@@ -106,8 +106,6 @@ else()
   )
 endif( )
 
-# INSTALLATION:
-
 # install needs to be in root cmake
 target_include_directories( hipblas
   SYSTEM PRIVATE
@@ -147,35 +145,4 @@ generate_export_header( hipblas EXPORT_FILE_NAME ${PROJECT_BINARY_DIR}/include/h
 if(NOT HIPBLAS_BUILD_SHARED_LIBS)
   set_target_properties( hipblas PROPERTIES PREFIX "lib" )
 endif()
-
-############################################################
-# Installation
-
-rocm_install_targets(
-  TARGETS hipblas
-  INCLUDE
-    ${CMAKE_BINARY_DIR}/include
-)
-
-if(HIPBLAS_ENABLE_HIP)
-  rocm_export_targets(
-    TARGETS roc::hipblas
-    DEPENDS PACKAGE hip
-    DEPENDS PACKAGE hipblas-common
-    STATIC_DEPENDS PACKAGE rocblas
-    STATIC_DEPENDS PACKAGE rocsolver
-    NAMESPACE roc::
-  )
-else( )
-  rocm_export_targets(
-    TARGETS roc::hipblas
-    DEPENDS PACKAGE HIP
-    DEPENDS PACKAGE hipblas-common
-    NAMESPACE roc::
-  )
-endif( )
-
-# Force installation of .f90 module files
-rocm_install(FILES "hipblas_module.f90"
-        DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/hipblas")
 
