@@ -131,6 +131,7 @@ if(ROCROLLER_ENABLE_TEST_DISCOVERY)
         DISCOVERY_MODE PRE_TEST
         PROPERTIES
             ENVIRONMENT "${asan_opts}"
+            RESOURCE_LOCK "openmp_lock"
     )
     gtest_discover_tests(
         rocroller-tests
@@ -140,6 +141,7 @@ if(ROCROLLER_ENABLE_TEST_DISCOVERY)
         DISCOVERY_MODE PRE_TEST
         PROPERTIES
             ENVIRONMENT "${asan_opts}"
+            RESOURCE_LOCK "openmp_lock"
     )
     gtest_discover_tests(
         arch-gen-tests
@@ -147,6 +149,7 @@ if(ROCROLLER_ENABLE_TEST_DISCOVERY)
         DISCOVERY_MODE PRE_TEST
         PROPERTIES
             ENVIRONMENT "${asan_opts}"
+            RESOURCE_LOCK "openmp_lock"
     )
 
     if(ROCROLLER_ENABLE_CATCH)
@@ -168,6 +171,7 @@ if(ROCROLLER_ENABLE_TEST_DISCOVERY)
             PROPERTIES "LABELS" "CATCH"
                        "LABELS" "GPU"
                        "ENVIRONMENT" "${asan_opts}"
+                       "RESOURCE_LOCK" "openmp_lock"
             SKIP_REGULAR_EXPRESSION "[1-9][0-9]* skipped" "[1-9][0-9]* SKIPPED"
         )
         catch_discover_tests(
@@ -180,6 +184,7 @@ if(ROCROLLER_ENABLE_TEST_DISCOVERY)
             TEST_SPEC "~[gpu]"
             PROPERTIES "LABELS" "CATCH"
                        "ENVIRONMENT" "${asan_opts}"
+                       "RESOURCE_LOCK" "openmp_lock"
             SKIP_REGULAR_EXPRESSION "[1-9][0-9]* skipped" "[1-9][0-9]* SKIPPED"
         )
     endif()
