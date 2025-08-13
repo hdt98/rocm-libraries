@@ -929,20 +929,7 @@ namespace TensileLite
     inline void ContractionSolution::calculateAutoGSU(Problem const&  problem,
                                                       Hardware const* hardware) const
     {
-        if(problem.groupedGemm())
-        {
-            autoGSU = 1;
-            return;
-        }
-
-        // Temporal remove until the cache mechanism is fixed
-        // autoGSU is already calculated
-        // if(autoGSU != 0)
-        // {
-        //     return;
-        // }
-
-        // original GSU is not -1
+        // if original GSU is not -1
         if(sizeMapping.globalSplitU != -1)
         {
             autoGSU = sizeMapping.globalSplitU;
@@ -953,6 +940,12 @@ namespace TensileLite
         assert(pAMDGPU);
         uint32_t numCUs       = pAMDGPU->computeUnitCount;
         uint32_t numWGs       = getNumWorkGroups(problem, sizeMapping);
+        // avoid zero division
+        if (numWGs == 0)
+        {
+            autoGSU = 1;
+            return;
+        }
         uint32_t MT0          = sizeMapping.macroTile.x;
         uint32_t MT1          = sizeMapping.macroTile.y;
         uint32_t MT2          = sizeMapping.depthU;
@@ -3174,7 +3167,7 @@ namespace TensileLite
             // Max splitting is currently constant, but should be dependant on K dimension
             else if (tiles < cuCount)
             {
-                const std::vector<int> tileFractions = {8, 6, 4, 3, 2, 1};
+                const std::vector<int> tileFractions = {16, 12, 8, 6, 4, 3, 2, 1};
                 for(int frac: tileFractions)
                 {
                     size_t splitGrid = tiles * frac;

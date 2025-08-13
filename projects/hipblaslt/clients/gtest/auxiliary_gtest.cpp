@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright (C) 2022-2024 Advanced Micro Devices, Inc.
+ * Copyright (C) 2022-2025 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -38,7 +38,7 @@ namespace
     // aux
     // ----------------------------------------------------------------------------
 
-    struct aux_testing: hipblaslt_test_valid
+    struct aux_testing : hipblaslt_test_valid
     {
         void operator()(const Arguments& arg)
         {
@@ -93,6 +93,8 @@ namespace
             else if(!strcmp(arg.function, "aux_matmul_alg_null_matmul"))
                 testing_aux_matmul_alg_null_matmul(arg);
 #ifdef HIPBLASLT_CODE_COVERAGE
+            else if(!strcmp(arg.function, "aux_matmul_bad_ws_size"))
+                testing_aux_matmul_bad_ws_size(arg);
             else if(!strcmp(arg.function, "aux_auxiliary_func"))
                 testing_aux_auxiliary_func(arg);
             else if(!strcmp(arg.function, "aux_float8_func"))
@@ -159,6 +161,7 @@ namespace
                    || !strcmp(arg.function, "aux_matmul_plan_init_bad_arg")
                    || !strcmp(arg.function, "aux_matmul_plan_init")
                    || !strcmp(arg.function, "aux_matmul_alg_null_matmul")
+                   || !strcmp(arg.function, "aux_matmul_bad_ws_size")
                    || !strcmp(arg.function, "aux_matmul_pref_get_attr_bad_arg")
                    || !strcmp(arg.function, "aux_matmul_pref_get_attr")
 #ifdef HIPBLASLT_CODE_COVERAGE
