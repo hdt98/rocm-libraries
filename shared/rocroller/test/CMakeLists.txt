@@ -131,6 +131,15 @@ if(ROCROLLER_ENABLE_TEST_DISCOVERY)
         DISCOVERY_MODE PRE_TEST
         PROPERTIES
             ENVIRONMENT "${asan_opts}"
+    )
+    # Add resource lock for CPU tests that use OpenMP (like ScaledMM*CPU tests)
+    gtest_discover_tests(
+        rocroller-tests
+        XML_OUTPUT_DIR ${TEST_REPORT_DIR}
+        TEST_FILTER "*CPU*"
+        DISCOVERY_MODE PRE_TEST
+        PROPERTIES
+            ENVIRONMENT "${asan_opts}"
             RESOURCE_LOCK "openmp_lock"
     )
     gtest_discover_tests(
@@ -141,7 +150,6 @@ if(ROCROLLER_ENABLE_TEST_DISCOVERY)
         DISCOVERY_MODE PRE_TEST
         PROPERTIES
             ENVIRONMENT "${asan_opts}"
-            RESOURCE_LOCK "openmp_lock"
     )
     gtest_discover_tests(
         arch-gen-tests
@@ -149,7 +157,6 @@ if(ROCROLLER_ENABLE_TEST_DISCOVERY)
         DISCOVERY_MODE PRE_TEST
         PROPERTIES
             ENVIRONMENT "${asan_opts}"
-            RESOURCE_LOCK "openmp_lock"
     )
 
     if(ROCROLLER_ENABLE_CATCH)
@@ -171,7 +178,6 @@ if(ROCROLLER_ENABLE_TEST_DISCOVERY)
             PROPERTIES "LABELS" "CATCH"
                        "LABELS" "GPU"
                        "ENVIRONMENT" "${asan_opts}"
-                       "RESOURCE_LOCK" "openmp_lock"
             SKIP_REGULAR_EXPRESSION "[1-9][0-9]* skipped" "[1-9][0-9]* SKIPPED"
         )
         catch_discover_tests(
@@ -182,6 +188,19 @@ if(ROCROLLER_ENABLE_TEST_DISCOVERY)
             DISCOVERY_MODE PRE_TEST
             EXTRA_ARGS "--reporter console::out=-::colour-mode=ansi"
             TEST_SPEC "~[gpu]"
+            PROPERTIES "LABELS" "CATCH"
+                       "ENVIRONMENT" "${asan_opts}"
+            SKIP_REGULAR_EXPRESSION "[1-9][0-9]* skipped" "[1-9][0-9]* SKIPPED"
+        )
+        # Add resource lock for settings tests that use OpenMP (thread-safe test)
+        catch_discover_tests(
+            rocroller-tests-catch
+            REPORTER JUnit
+            OUTPUT_DIR ${TEST_REPORT_DIR}
+            OUTPUT_SUFFIX ".xml"
+            DISCOVERY_MODE PRE_TEST
+            EXTRA_ARGS "--reporter console::out=-::colour-mode=ansi"
+            TEST_SPEC "[settings]"
             PROPERTIES "LABELS" "CATCH"
                        "ENVIRONMENT" "${asan_opts}"
                        "RESOURCE_LOCK" "openmp_lock"
