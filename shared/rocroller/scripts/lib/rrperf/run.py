@@ -115,9 +115,7 @@ def compute_gflops(m, n, k, runtime_ns):
 
 
 def compute_gbs(m, n, k, runtime_ns, element_size):
-    print(f"element_size = {element_size}")
     element_size = float(TYPE_SIZE_BYTES.get(element_size.lower(), 4.0))
-    print(f"element_size = {element_size}\n")
     data_movement_bytes = (m * k + k * n + m * n) * element_size
     gbs = data_movement_bytes / runtime_ns
     return gbs
@@ -235,7 +233,6 @@ def run_problems(
             print(f"# env: {rr_env_str}", file=f, flush=True)
             print(f"# command: {scmd}", file=f, flush=True)
             print(f"# token: {repr(problem)}", file=f, flush=True)
-            
             print("running:")
             print(f"  command: {scmd}")
             print(f"  wrkdir:  {work_dir.resolve()}")
