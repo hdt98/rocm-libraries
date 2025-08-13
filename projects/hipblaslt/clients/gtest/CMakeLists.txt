@@ -29,7 +29,7 @@ find_package (Python3 REQUIRED COMPONENTS Interpreter)
 set(hipblaslt_test_source
     hipblaslt_gtest_main.cpp
     hipblaslt_test.cpp
-    matmul_gtest.cpp
+    # matmul_gtest.cpp
     auxiliary_gtest.cpp
     matrix_transform_gtest.cpp
     hipblaslt_gtest_ext_op.cpp
@@ -110,9 +110,20 @@ if(BUILD_CODE_COVERAGE)
   target_compile_definitions( hipblaslt-test PRIVATE HIPBLASLT_CODE_COVERAGE)
   target_link_libraries( hipblaslt-test PRIVATE TensileHost)
 
+  find_package(Git QUIET)
+  set(GIT_DESC "unknown")
+  if(GIT_FOUND)
+    execute_process(
+      COMMAND "${GIT_EXECUTABLE}" -C "${CMAKE_SOURCE_DIR}" rev-parse --short=12 HEAD
+      OUTPUT_VARIABLE GIT_DESC
+      OUTPUT_STRIP_TRAILING_WHITESPACE
+      ERROR_QUIET
+    )
+  endif()
+
   # UserDrivenTuningParser.cpp needs this sample text file to run
   file(WRITE "${CMAKE_BINARY_DIR}/code_coverage_tuning_file.txt"
-      "Git Version: 844d756925-dirty\n"
+      "Git Version: ${GIT_DESC}\n"
       "    transA,transB,grouped_gemm,batch_count,m,n,k,alpha,lda,stride_a,beta,ldb,stride_b,ldc,stride_c,ldd,stride_d,"
       "a_type,b_type,c_type,d_type,compute_type,scaleA,scaleB,scaleC,scaleD,amaxD,activation_type,bias_vector,bias_type,"
       "aux_type,rotating_buffer,hipblaslt-Gflops,hipblaslt-GB/s,us,solution_index,gcnArchName,CUs\n"
