@@ -14,6 +14,10 @@ if(NOT GTest_FOUND)
     endif()
 endif()
 
+if(ROCROLLER_ENABLE_GEMM_CLIENT_TESTS OR ROCROLLER_ENABLE_TEST_DISCOVERY)
+    find_package(Pytest REQUIRED) # requires pip install -r requirements.txt
+endif()
+
 find_package(mxDataGenerator QUIET)
 if(NOT mxDataGenerator_FOUND)
     if(ROCROLLER_ENABLE_FETCH)
@@ -84,7 +88,6 @@ if(ROCROLLER_ENABLE_GEMM_CLIENT_TESTS)
             set(rocroller_skip_regex "key = amdhsa.version")
         endif()
     endif()
-    find_package(Pytest REQUIRED) # requires pip install -r requirements.txt
     pytest_discover_tests(
         GEMMClientTests
         WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}/client"
@@ -184,9 +187,28 @@ if(ROCROLLER_ENABLE_TEST_DISCOVERY)
         )
     endif()
 
+    file(GLOB_RECURSE RRPERF_TEST_FILES "${PROJECT_SOURCE_DIR}/scripts/rrperf/test/*.py")
+    file(GLOB_RECURSE MATRIX_UTILS_TEST_FILES "${PROJECT_SOURCE_DIR}/scripts/matrix_utils/test/*.py")
     if(NOT ROCROLLER_ENABLE_SLOW_TESTS)
         set(PYTHON_TEST_SKIP "-m not slow")
     endif()
+    pytest_discover_tests(
+        PythonTest
+        WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}/scripts"
+        REPORTER JUnit
+        OUTPUT_DIR ${TEST_REPORT_DIR}
+        OUTPUT_SUFFIX ".xml"
+        DISCOVERY_MODE PRE_TEST
+        PYTHON_PATH_PREPEND ${PROJECT_SOURCE_DIR}/scripts/lib
+        ENVIRONMENT "ROCROLLER_BUILD_DIR=${PROJECT_BINARY_DIR}"
+        PROPERTIES
+            "LABELS" "PYTHON"
+        DISCOVERY_EXTRA_ARGS ${PYTHON_TEST_SKIP} "--config-file=${PROJECT_SOURCE_DIR}/pytest.ini"
+        DEPENDS
+            rocroller-gemm
+            ${RRPERF_TEST_FILES}
+            ${MATRIX_UTILS_TEST_FILES}
+    )
 
     add_test(
         NAME PythonLint
@@ -197,20 +219,6 @@ if(ROCROLLER_ENABLE_TEST_DISCOVERY)
         PythonLint
         PROPERTIES ENVIRONMENT "ROCROLLER_BUILD_DIR=${PROJECT_BINARY_DIR}"
                    "LABELS" "PYTHON"
-    )
-    add_test(
-        NAME PythonTest
-        COMMAND
-            pytest -s --cov-report html:python_cov_html --cov=rrperf scripts
-            ${PYTHON_TEST_SKIP} --junit-xml=${TEST_REPORT_DIR}/python_tests.xml
-        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
-    )
-    set_tests_properties(
-        PythonTest
-        PROPERTIES
-            ENVIRONMENT
-            "ROCROLLER_BUILD_DIR=${PROJECT_BINARY_DIR};PYTHONPATH=${PROJECT_SOURCE_DIR}/scripts/lib"
-            "LABELS" "PYTHON"
     )
 endif()
 

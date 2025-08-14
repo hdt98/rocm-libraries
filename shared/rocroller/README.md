@@ -152,15 +152,18 @@ make -j$(nproc)
 
 #### CMake Options
 
+Run `cmake -LH` for a full list of options.
+
 - `ROCROLLER_ENABLE_CLIENT`: Build the rocRoller client (default ON)
 - `ROCROLLER_ENABLE_YAML_CPP`: Enable yaml-cpp backend (default ON)
 - `ROCROLLER_ENABLE_LLVM`: Enable llvm yaml backend (default OFF)
 - `ROCROLLER_BUILD_TESTING`: Build rocRoller testing (default ON)
 - `ROCROLLER_ENABLE_CATCH`: Build rocRoller catch unit tests (default ON)
 - `ROCROLLER_ENABLE_ARCH_GEN_TEST`: Build rocRoller architecture generator test (default ON)
-- `ROCROLLER_ENABLE_TEST_DISCOVERY`: Use gtest and catch2 test discovery functions (default ON)
+- `ROCROLLER_ENABLE_GEMM_CLIENT_TESTS`: Use pytest test discovery to add gemm client tests (requires pytest-cmake) (default ON)
+- `ROCROLLER_ENABLE_TEST_DISCOVERY`: Use gtest, catch2, and pytest test discovery functions (default ON)
 - `ROCROLLER_ENABLE_COVERAGE`: Build code coverage (default OFF)
-- `ROCROLLER_TESTS_SKIP_SLOW`: Disable slow running tests (default OFF)
+- `ROCROLLER_ENABLE_SLOW_TESTS`: Enable slow running tests (default ON)
 - `ROCROLLER_EMBED_ARCH_DEF`: Embed msgpack architecture data in library (default ON)
 - `ROCROLLER_BUILD_SHARED_LIBS`: Build rocRoller as a shared library (default ON)
 - `ROCROLLER_ENABLE_FETCH`: Enable fetch content for dependencies if find_package fails (default OFF)
@@ -168,6 +171,7 @@ make -j$(nproc)
 - `ROCROLLER_ENABLE_TIMERS`: Enable rocRoller timer code (default OFF)
 - `ROCROLLER_ENABLE_CPPCHECK`: Enable cppcheck (default OFF)
 - `ROCROLLER_MRISAS_DIR`: Path to directory containing MRISA XML files (default `<build dir>/GPUArchitectureGenerator/amd-mrisa`)
+- `ROCROLLER_ENABLE_ASAN`: Enable addresss sanitizers (default OFF)
 - `ROCROLLER_ENABLE_PREGENERATED_ARCH_DEF`: Use the pregenerates GPU architecture definition YAML file(s) in the repository (default ON)
 - `MXDATAGENERATOR_GIT_TAG`: mxDataGenerator tag/commit hash to checkout (default see root CMakeLists.txt)
 - `MXDATAGENERATOR_GIT_URL`: Base Git URL to fetch mxDataGenerator from (default https://github.com/ROCm/mxDataGenerator.git)
