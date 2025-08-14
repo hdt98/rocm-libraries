@@ -496,6 +496,12 @@ namespace rocsparse
             {
                 switch(ctype)
                 {
+                case rocsparse_datatype_f16_r:
+                {
+                    RETURN_IF_ROCSPARSE_ERROR(
+                        (rocsparse::spgemm_template<int32_t, int32_t, _Float16>(params...)));
+                    return rocsparse_status_success;
+                }
                 case rocsparse_datatype_f32_r:
                 {
                     RETURN_IF_ROCSPARSE_ERROR(
@@ -526,7 +532,6 @@ namespace rocsparse
                 case rocsparse_datatype_u8_r:
                 case rocsparse_datatype_i32_r:
                 case rocsparse_datatype_u32_r:
-                case rocsparse_datatype_f16_r:
                 case rocsparse_datatype_bf16_r:
                 {
                     RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_not_implemented);
@@ -547,6 +552,12 @@ namespace rocsparse
             {
                 switch(ctype)
                 {
+                case rocsparse_datatype_f16_r:
+                {
+                    RETURN_IF_ROCSPARSE_ERROR(
+                        (rocsparse::spgemm_template<int64_t, int32_t, _Float16>(params...)));
+                    return rocsparse_status_success;
+                }
                 case rocsparse_datatype_f32_r:
                 {
                     RETURN_IF_ROCSPARSE_ERROR(
@@ -577,7 +588,6 @@ namespace rocsparse
                 case rocsparse_datatype_u8_r:
                 case rocsparse_datatype_i32_r:
                 case rocsparse_datatype_u32_r:
-                case rocsparse_datatype_f16_r:
                 case rocsparse_datatype_bf16_r:
                 {
                     RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_not_implemented);
@@ -588,6 +598,12 @@ namespace rocsparse
             {
                 switch(ctype)
                 {
+                case rocsparse_datatype_f16_r:
+                {
+                    RETURN_IF_ROCSPARSE_ERROR(
+                        (rocsparse::spgemm_template<int64_t, int64_t, _Float16>(params...)));
+                    return rocsparse_status_success;
+                }
                 case rocsparse_datatype_f32_r:
                 {
                     RETURN_IF_ROCSPARSE_ERROR(
@@ -618,7 +634,6 @@ namespace rocsparse
                 case rocsparse_datatype_u8_r:
                 case rocsparse_datatype_i32_r:
                 case rocsparse_datatype_u32_r:
-                case rocsparse_datatype_f16_r:
                 case rocsparse_datatype_bf16_r:
                 {
                     RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_not_implemented);

@@ -88,21 +88,25 @@ rocsparse_status rocsparse::csrgemm_scal_buffer_size_core(rocsparse_handle      
         rocsparse_mat_info        info_C,                               \
         size_t*                   buffer_size)
 
+INSTANTIATE(int32_t, int32_t, _Float16);
 INSTANTIATE(int32_t, int32_t, float);
 INSTANTIATE(int32_t, int32_t, double);
 INSTANTIATE(int32_t, int32_t, rocsparse_float_complex);
 INSTANTIATE(int32_t, int32_t, rocsparse_double_complex);
 
+INSTANTIATE(int64_t, int32_t, _Float16);
 INSTANTIATE(int64_t, int32_t, float);
 INSTANTIATE(int64_t, int32_t, double);
 INSTANTIATE(int64_t, int32_t, rocsparse_float_complex);
 INSTANTIATE(int64_t, int32_t, rocsparse_double_complex);
 
+INSTANTIATE(int32_t, int64_t, _Float16);
 INSTANTIATE(int32_t, int64_t, float);
 INSTANTIATE(int32_t, int64_t, double);
 INSTANTIATE(int32_t, int64_t, rocsparse_float_complex);
 INSTANTIATE(int32_t, int64_t, rocsparse_double_complex);
 
+INSTANTIATE(int64_t, int64_t, _Float16);
 INSTANTIATE(int64_t, int64_t, float);
 INSTANTIATE(int64_t, int64_t, double);
 INSTANTIATE(int64_t, int64_t, rocsparse_float_complex);
