@@ -15,6 +15,7 @@ if(NOT GTest_FOUND)
 endif()
 
 if(ROCROLLER_ENABLE_GEMM_CLIENT_TESTS OR ROCROLLER_ENABLE_TEST_DISCOVERY)
+    set(TEST_REPORT_DIR "${PROJECT_BINARY_DIR}/test_report")
     find_package(Pytest REQUIRED) # requires pip install -r requirements.txt
 endif()
 
@@ -91,9 +92,18 @@ if(ROCROLLER_ENABLE_GEMM_CLIENT_TESTS)
     pytest_discover_tests(
         GEMMClientTests
         WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}/client"
+        REPORTER JUnit
+        OUTPUT_DIR ${TEST_REPORT_DIR}
+        OUTPUT_SUFFIX ".xml"
+        DISCOVERY_MODE PRE_TEST
         ENVIRONMENT "ROCROLLER_BUILD_DIR=${PROJECT_BINARY_DIR}" "LD_PRELOAD=${ASAN_LIB_PATH}" "ASAN_OPTIONS=detect_leaks=0"
         PROPERTIES
+            "LABELS" "PYTHON"
+            "LABELS" "CLIENT"
             SKIP_REGULAR_EXPRESSION ${rocroller_skip_regex}
+        DEPENDS
+            rocroller-gemm
+            ${PROJECT_SOURCE_DIR}/client/test_gemm_client.py
     )
 endif()
 
@@ -124,8 +134,6 @@ add_subdirectory(standalone)
 add_subdirectory(unit)
 
 if(ROCROLLER_ENABLE_TEST_DISCOVERY)
-    set(TEST_REPORT_DIR "${PROJECT_BINARY_DIR}/test_report")
-
     include(GoogleTest)
     gtest_discover_tests(
         rocroller-tests
