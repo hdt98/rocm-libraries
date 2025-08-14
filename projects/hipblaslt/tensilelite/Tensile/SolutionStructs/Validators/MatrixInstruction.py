@@ -55,8 +55,8 @@ def matrixInstructionToMIParameters(
     """
     print2(f">> Converting MatrixInstruction {mi} to MI parameters")
 
-    if len(mi) != 9:
-      raise ValueError(f"MatrixInstruction must be 9 items long to convert into MI"
+    if len(mi) != 9 and len(mi) != 10:
+      raise ValueError(f"MatrixInstruction must be 9 or 10 items long to convert into MI"
                        f" Parameters, found {mi} with length {len(mi)}")
 
     result = {}
@@ -133,6 +133,9 @@ def matrixInstructionToMIParameters(
     result['MIInputPerThreadA'] = result['MIInputPerThread'] if not sparseA else result['MIInputPerThread'] // 2
     result['MIInputPerThreadB'] = result['MIInputPerThread'] if not sparseB else result['MIInputPerThread'] // 2
     result['MIInputPerThreadMetadata'] = result['MIInputPerThread'] if not isSparse else result['MIInputPerThread'] // 8
+
+    if len(mi) == 10:
+        result['LocalSplitU'] = mi[9]
 
     print2(f">> MI Parameters: {pprint.pformat(result)}")
     return result

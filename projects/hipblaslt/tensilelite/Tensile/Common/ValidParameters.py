@@ -121,6 +121,7 @@ def makeValidMFMA():
     validMFMA["F8B8N"] = validMFMA["F8N"]
     validMFMA["B8F8N"] = validMFMA["F8N"]
     validMFMA["_format9"] = []
+    validMFMA["_format10"] = []
 
     for MFMA in [
         validMFMA["H"],
@@ -140,6 +141,10 @@ def makeValidMFMA():
                                 validMFMA["_format9"].append(
                                     [MI[0], MI[1], MI[2], MI[3], 2**bm, tt0, tt1, 2**wave_m, 2**wave_n]
                                 )
+                                for lsu in range(4):
+                                    validMFMA["_format10"].append(
+                                    [MI[0], MI[1], MI[2], MI[3], 2**bm, tt0, tt1, 2**wave_m, 2**wave_n, 2**lsu]
+                                    )
     return validMFMA
 
 @lru_cache
@@ -186,7 +191,7 @@ def makeValidMatrixInstructions():
         + smfma["B"]
         + smfma["4xi8"]
     )
-    return validMatrixInstructions + mfma["_format9"] + smfma["_format9"]
+    return validMatrixInstructions + mfma["_format9"] + smfma["_format9"] + mfma["_format10"]
 
 
 validParameters = { # we need to make sure this matches develop
@@ -257,6 +262,9 @@ validParameters = { # we need to make sure this matches develop
     # Set to 0 to disable GSU, kernel code will be generated without GSU support
     # Set to -1 to choose GSU automatically in runtime, determined by function calculateAutoGSU
     "GlobalSplitU": list(range(-1, 1024 + 1)),
+    # Split the unroll summation into multiple sections and combine the sections by LDS
+    # LSU applies only to the unroll summation dimension
+    "LocalSplitU": [1,2,4,8],
     # choose how to do GlobalSplitU
     # 1: use atomic operation to accumulate on one buffer
     # 2: each GSU group write to each own buffer and accumulate by another kernel
