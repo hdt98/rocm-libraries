@@ -39,3 +39,10 @@ def test_run_suite_unit():
         result, rundir = rrperf.run.run_cli(suite="unit", rundir="performance_unit")
 
     assert result
+
+
+def test_failure():
+    """
+    TODO: REMOVE
+    """
+    assert False
