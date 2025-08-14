@@ -189,6 +189,44 @@ __forceinline__ __device__ __host__ void
     hi = 0;
 }
 
+template<typename T, typename = void>
+struct has_data : std::false_type
+{};
+
+template<typename T>
+struct has_data<T, decltype(std::declval<T>().data, void())> : std::true_type
+{};
+
+template<typename T>
+static constexpr bool has_data_v = has_data<T>::value;
+
+/// This is an accessor utility for HIP vector types (eg. int2, float4, etc.).
+/// Prior to HIP 7.0, individual elements could be accessed through the
+/// data member:
+///   int2 vec;
+///   vec.data[0] = 1;
+///
+/// Beginning with HIP 7.0, the data member is hidden, and individual
+/// elements can instead be accessed through the underlaying native vector.
+template<typename V, typename Index>
+__forceinline__ __device__ __host__
+auto get_element_at(V vector, Index i)
+{
+#if defined(__HIP_PLATFORM_AMD__)
+    if constexpr(has_data_v<V>)
+    {
+        return vector.data[i];
+    }
+    else
+    {
+        return get_native_vector(vector)[i];
+    }
+#else
+    return (&vector.x)[i];
+#endif
+}
+
+
 } // end namespace detail
 } // end namespace rocrand_device
 
