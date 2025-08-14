@@ -20,10 +20,13 @@
  * THE SOFTWARE.
  *
  * ************************************************************************ */
+#include <map>
+#include <sstream>
 
 #include "internal/generic/rocsparse_spitsv.h"
 #include "rocsparse_control.hpp"
 #include "rocsparse_csritsv.hpp"
+#include "rocsparse_determine_indextype.hpp"
 #include "rocsparse_handle.hpp"
 #include "rocsparse_utility.hpp"
 
@@ -91,7 +94,7 @@ bool rocsparse::enum_utils::is_invalid(rocsparse_spitsv_stage value_)
 
 namespace rocsparse
 {
-    template <typename I, typename J, typename T>
+    template <typename T, typename I, typename J>
     rocsparse_status spitsv_template(rocsparse_handle            handle,
                                      rocsparse_int*              host_nmaxiter,
                                      const void*                 host_tol,
@@ -182,89 +185,98 @@ namespace rocsparse
         // LCOV_EXCL_STOP
     }
 
-    template <typename... Ts>
-    rocsparse_status spitsv_dynamic_dispatch(rocsparse_indextype itype,
-                                             rocsparse_indextype jtype,
-                                             rocsparse_datatype  ctype,
-                                             Ts&&... ts)
-    {
-        ROCSPARSE_ROUTINE_TRACE;
+    typedef rocsparse_status (*spitsv_template_t)(rocsparse_handle            handle,
+                                                  rocsparse_int*              host_nmaxiter,
+                                                  const void*                 host_tol,
+                                                  void*                       host_history,
+                                                  rocsparse_operation         trans,
+                                                  const void*                 alpha,
+                                                  const rocsparse_spmat_descr mat,
+                                                  const rocsparse_dnvec_descr x,
+                                                  rocsparse_dnvec_descr       y,
+                                                  rocsparse_spitsv_alg        alg,
+                                                  rocsparse_spitsv_stage      stage,
+                                                  size_t*                     buffer_size,
+                                                  void*                       temp_buffer);
 
-        switch(ctype)
-        {
-
-#define DATATYPE_CASE(ENUMVAL, TYPE)                                              \
-    case ENUMVAL:                                                                 \
-    {                                                                             \
-        switch(itype)                                                             \
-        {                                                                         \
-        case rocsparse_indextype_u16:                                             \
-        {                                                                         \
-            RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_not_implemented);          \
-        }                                                                         \
-        case rocsparse_indextype_i32:                                             \
-        {                                                                         \
-            switch(jtype)                                                         \
-            {                                                                     \
-            case rocsparse_indextype_u16:                                         \
-            case rocsparse_indextype_i64:                                         \
-            {                                                                     \
-                RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_not_implemented);      \
-            }                                                                     \
-            case rocsparse_indextype_i32:                                         \
-            {                                                                     \
-                RETURN_IF_ROCSPARSE_ERROR(                                        \
-                    (rocsparse::spitsv_template<int32_t, int32_t, TYPE>)(ts...)); \
-                return rocsparse_status_success;                                  \
-            }                                                                     \
-            }                                                                     \
-        }                                                                         \
-        case rocsparse_indextype_i64:                                             \
-        {                                                                         \
-            switch(jtype)                                                         \
-            {                                                                     \
-            case rocsparse_indextype_u16:                                         \
-            {                                                                     \
-                RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_not_implemented);      \
-            }                                                                     \
-            case rocsparse_indextype_i32:                                         \
-            {                                                                     \
-                RETURN_IF_ROCSPARSE_ERROR(                                        \
-                    (rocsparse::spitsv_template<int64_t, int32_t, TYPE>)(ts...)); \
-                return rocsparse_status_success;                                  \
-            }                                                                     \
-            case rocsparse_indextype_i64:                                         \
-            {                                                                     \
-                RETURN_IF_ROCSPARSE_ERROR(                                        \
-                    (rocsparse::spitsv_template<int64_t, int64_t, TYPE>)(ts...)); \
-                return rocsparse_status_success;                                  \
-            }                                                                     \
-            }                                                                     \
-        }                                                                         \
-        }                                                                         \
+    using spitsv_template_tuple
+        = std::tuple<rocsparse_datatype, rocsparse_indextype, rocsparse_indextype>;
+    // clang-format off
+#define SPITSV_TEMPLATE_CONFIG(T_, I_, J_)                                    \
+    {                                                                         \
+        spitsv_template_tuple(T_, I_, J_),                                    \
+            spitsv_template<typename rocsparse::datatype_traits<T_>::type_t,  \
+                            typename rocsparse::indextype_traits<I_>::type_t, \
+                            typename rocsparse::indextype_traits<J_>::type_t> \
     }
+    // clang-format on
 
-            DATATYPE_CASE(rocsparse_datatype_f32_r, float);
-            DATATYPE_CASE(rocsparse_datatype_f64_r, double);
-            DATATYPE_CASE(rocsparse_datatype_f32_c, rocsparse_float_complex);
-            DATATYPE_CASE(rocsparse_datatype_f64_c, rocsparse_double_complex);
+    static const std::map<spitsv_template_tuple, spitsv_template_t> s_spitsv_template_dispatch{{
 
-#undef DATATYPE_CASE
-        case rocsparse_datatype_i8_r:
-        case rocsparse_datatype_u8_r:
-        case rocsparse_datatype_i32_r:
-        case rocsparse_datatype_u32_r:
-        case rocsparse_datatype_f16_r:
-        case rocsparse_datatype_bf16_r:
+        // Uniform precisions
+        SPITSV_TEMPLATE_CONFIG(
+            rocsparse_datatype_f32_r, rocsparse_indextype_i32, rocsparse_indextype_i32),
+
+        SPITSV_TEMPLATE_CONFIG(
+            rocsparse_datatype_f32_r, rocsparse_indextype_i64, rocsparse_indextype_i32),
+
+        SPITSV_TEMPLATE_CONFIG(
+            rocsparse_datatype_f32_r, rocsparse_indextype_i64, rocsparse_indextype_i64),
+
+        SPITSV_TEMPLATE_CONFIG(
+            rocsparse_datatype_f64_r, rocsparse_indextype_i32, rocsparse_indextype_i32),
+
+        SPITSV_TEMPLATE_CONFIG(
+            rocsparse_datatype_f64_r, rocsparse_indextype_i64, rocsparse_indextype_i32),
+
+        SPITSV_TEMPLATE_CONFIG(
+            rocsparse_datatype_f64_r, rocsparse_indextype_i64, rocsparse_indextype_i64),
+
+        SPITSV_TEMPLATE_CONFIG(
+            rocsparse_datatype_f64_c, rocsparse_indextype_i32, rocsparse_indextype_i32),
+
+        SPITSV_TEMPLATE_CONFIG(
+            rocsparse_datatype_f64_c, rocsparse_indextype_i64, rocsparse_indextype_i32),
+
+        SPITSV_TEMPLATE_CONFIG(
+            rocsparse_datatype_f64_c, rocsparse_indextype_i64, rocsparse_indextype_i64),
+
+        SPITSV_TEMPLATE_CONFIG(
+            rocsparse_datatype_f32_c, rocsparse_indextype_i32, rocsparse_indextype_i32),
+
+        SPITSV_TEMPLATE_CONFIG(
+            rocsparse_datatype_f32_c, rocsparse_indextype_i64, rocsparse_indextype_i32),
+
+        SPITSV_TEMPLATE_CONFIG(
+            rocsparse_datatype_f32_c, rocsparse_indextype_i64, rocsparse_indextype_i64)}};
+
+    static rocsparse_status spitsv_template_find(spitsv_template_t*  spitsv_function_,
+                                                 rocsparse_datatype  compute_type_,
+                                                 rocsparse_indextype i_type_,
+                                                 rocsparse_indextype j_type_)
+    {
+        const auto& it = rocsparse::s_spitsv_template_dispatch.find(
+            rocsparse::spitsv_template_tuple(compute_type_, i_type_, j_type_));
+
+        if(it != rocsparse::s_spitsv_template_dispatch.end())
         {
-            // LCOV_EXCL_START
-            RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_not_implemented);
-            // LCOV_EXCL_STOP
-        }
+            spitsv_function_[0] = it->second;
         }
         // LCOV_EXCL_START
-        RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_invalid_value);
+        else
+        {
+            std::stringstream sstr;
+            sstr << "invalid precision configuration: "
+                 << "compute_type: " << rocsparse::enum_utils::to_string(compute_type_)
+                 << ", i_type: " << rocsparse::enum_utils::to_string(i_type_)
+                 << ", j_type: " << rocsparse::enum_utils::to_string(j_type_);
+
+            RETURN_WITH_MESSAGE_IF_ROCSPARSE_ERROR(rocsparse_status_invalid_value,
+                                                   sstr.str().c_str());
+        }
         // LCOV_EXCL_STOP
+
+        return rocsparse_status_success;
     }
 }
 
@@ -351,22 +363,27 @@ try
         // LCOV_EXCL_STOP
     }
 
-    RETURN_IF_ROCSPARSE_ERROR(rocsparse::spitsv_dynamic_dispatch(mat->row_type,
-                                                                 mat->col_type,
-                                                                 compute_type,
-                                                                 handle,
-                                                                 host_nmaxiter,
-                                                                 host_tol,
-                                                                 host_history,
-                                                                 trans,
-                                                                 alpha,
-                                                                 mat,
-                                                                 x,
-                                                                 y,
-                                                                 alg,
-                                                                 stage,
-                                                                 buffer_size,
-                                                                 temp_buffer));
+    rocsparse::spitsv_template_t spitsv_function;
+    RETURN_IF_ROCSPARSE_ERROR(
+        rocsparse::spitsv_template_find(&spitsv_function,
+                                        compute_type,
+                                        rocsparse::determine_I_indextype(mat),
+                                        rocsparse::determine_J_indextype(mat)));
+
+    RETURN_IF_ROCSPARSE_ERROR(spitsv_function(handle,
+                                              host_nmaxiter,
+                                              host_tol,
+                                              host_history,
+                                              trans,
+                                              alpha,
+                                              mat,
+                                              x,
+                                              y,
+                                              alg,
+                                              stage,
+                                              buffer_size,
+                                              temp_buffer));
+
     return rocsparse_status_success;
     // LCOV_EXCL_START
 }

@@ -20,6 +20,8 @@
  * THE SOFTWARE.
  *
  * ************************************************************************ */
+#include <map>
+#include <sstream>
 
 #include "internal/generic/rocsparse_spgemm.h"
 #include "rocsparse_control.hpp"
@@ -29,6 +31,7 @@
 #include "rocsparse_csrgemm.hpp"
 #include "rocsparse_csrgemm_numeric.hpp"
 #include "rocsparse_csrgemm_symbolic.hpp"
+#include "rocsparse_determine_indextype.hpp"
 
 template <>
 const char* rocsparse::enum_utils::to_string(rocsparse_spgemm_alg value_)
@@ -98,7 +101,7 @@ bool rocsparse::enum_utils::is_invalid(rocsparse_spgemm_stage value_)
 
 namespace rocsparse
 {
-    template <typename I, typename J, typename T>
+    template <typename T, typename I, typename J>
     static rocsparse_status spgemm_template(rocsparse_handle            handle,
                                             rocsparse_operation         trans_A,
                                             rocsparse_operation         trans_B,
@@ -469,170 +472,6 @@ namespace rocsparse
         RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_not_implemented);
     }
 
-    template <typename... Ts>
-    static rocsparse_status spgemm_template_dispatch(rocsparse_indextype itype,
-                                                     rocsparse_indextype jtype,
-                                                     rocsparse_datatype  ctype,
-                                                     Ts&&... params)
-    {
-        ROCSPARSE_ROUTINE_TRACE;
-
-        switch(itype)
-        {
-        case rocsparse_indextype_u16:
-        {
-            RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_not_implemented);
-        }
-        case rocsparse_indextype_i32:
-        {
-            switch(jtype)
-            {
-            case rocsparse_indextype_i64:
-            case rocsparse_indextype_u16:
-            {
-                RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_not_implemented);
-            }
-            case rocsparse_indextype_i32:
-            {
-                switch(ctype)
-                {
-                case rocsparse_datatype_f32_r:
-                {
-                    RETURN_IF_ROCSPARSE_ERROR(
-                        (rocsparse::spgemm_template<int32_t, int32_t, float>(params...)));
-                    return rocsparse_status_success;
-                }
-                case rocsparse_datatype_f64_r:
-                {
-                    RETURN_IF_ROCSPARSE_ERROR(
-                        (rocsparse::spgemm_template<int32_t, int32_t, double>(params...)));
-                    return rocsparse_status_success;
-                }
-                case rocsparse_datatype_f32_c:
-                {
-                    RETURN_IF_ROCSPARSE_ERROR(
-                        (rocsparse::spgemm_template<int32_t, int32_t, rocsparse_float_complex>(
-                            params...)));
-                    return rocsparse_status_success;
-                }
-                case rocsparse_datatype_f64_c:
-                {
-                    RETURN_IF_ROCSPARSE_ERROR(
-                        (rocsparse::spgemm_template<int32_t, int32_t, rocsparse_double_complex>(
-                            params...)));
-                    return rocsparse_status_success;
-                }
-                case rocsparse_datatype_i8_r:
-                case rocsparse_datatype_u8_r:
-                case rocsparse_datatype_i32_r:
-                case rocsparse_datatype_u32_r:
-                case rocsparse_datatype_f16_r:
-                case rocsparse_datatype_bf16_r:
-                {
-                    RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_not_implemented);
-                }
-                }
-            }
-            }
-        }
-        case rocsparse_indextype_i64:
-        {
-            switch(jtype)
-            {
-            case rocsparse_indextype_u16:
-            {
-                RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_not_implemented);
-            }
-            case rocsparse_indextype_i32:
-            {
-                switch(ctype)
-                {
-                case rocsparse_datatype_f32_r:
-                {
-                    RETURN_IF_ROCSPARSE_ERROR(
-                        (rocsparse::spgemm_template<int64_t, int32_t, float>(params...)));
-                    return rocsparse_status_success;
-                }
-                case rocsparse_datatype_f64_r:
-                {
-                    RETURN_IF_ROCSPARSE_ERROR(
-                        (rocsparse::spgemm_template<int64_t, int32_t, double>(params...)));
-                    return rocsparse_status_success;
-                }
-                case rocsparse_datatype_f32_c:
-                {
-                    RETURN_IF_ROCSPARSE_ERROR(
-                        (rocsparse::spgemm_template<int64_t, int32_t, rocsparse_float_complex>(
-                            params...)));
-                    return rocsparse_status_success;
-                }
-                case rocsparse_datatype_f64_c:
-                {
-                    RETURN_IF_ROCSPARSE_ERROR(
-                        (rocsparse::spgemm_template<int64_t, int32_t, rocsparse_double_complex>(
-                            params...)));
-                    return rocsparse_status_success;
-                }
-                case rocsparse_datatype_i8_r:
-                case rocsparse_datatype_u8_r:
-                case rocsparse_datatype_i32_r:
-                case rocsparse_datatype_u32_r:
-                case rocsparse_datatype_f16_r:
-                case rocsparse_datatype_bf16_r:
-                {
-                    RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_not_implemented);
-                }
-                }
-            }
-            case rocsparse_indextype_i64:
-            {
-                switch(ctype)
-                {
-                case rocsparse_datatype_f32_r:
-                {
-                    RETURN_IF_ROCSPARSE_ERROR(
-                        (rocsparse::spgemm_template<int64_t, int64_t, float>(params...)));
-                    return rocsparse_status_success;
-                }
-                case rocsparse_datatype_f64_r:
-                {
-                    RETURN_IF_ROCSPARSE_ERROR(
-                        (rocsparse::spgemm_template<int64_t, int64_t, double>(params...)));
-                    return rocsparse_status_success;
-                }
-                case rocsparse_datatype_f32_c:
-                {
-                    RETURN_IF_ROCSPARSE_ERROR(
-                        (rocsparse::spgemm_template<int64_t, int64_t, rocsparse_float_complex>(
-                            params...)));
-                    return rocsparse_status_success;
-                }
-                case rocsparse_datatype_f64_c:
-                {
-                    RETURN_IF_ROCSPARSE_ERROR(
-                        (rocsparse::spgemm_template<int64_t, int64_t, rocsparse_double_complex>(
-                            params...)));
-                    return rocsparse_status_success;
-                }
-                case rocsparse_datatype_i8_r:
-                case rocsparse_datatype_u8_r:
-                case rocsparse_datatype_i32_r:
-                case rocsparse_datatype_u32_r:
-                case rocsparse_datatype_f16_r:
-                case rocsparse_datatype_bf16_r:
-                {
-                    RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_not_implemented);
-                }
-                }
-            }
-            }
-        }
-        }
-        // LCOV_EXCL_START
-        return rocsparse_status_invalid_value;
-        // LCOV_EXCL_STOP
-    }
-
     static rocsparse_status spgemm_checkarg(rocsparse_handle            handle, //0
                                             rocsparse_operation         trans_A, //1
                                             rocsparse_operation         trans_B, //2
@@ -709,6 +548,100 @@ namespace rocsparse
 
         return rocsparse_status_continue;
     }
+
+    typedef rocsparse_status (*spgemm_template_t)(rocsparse_handle            handle,
+                                                  rocsparse_operation         trans_A,
+                                                  rocsparse_operation         trans_B,
+                                                  const void*                 alpha,
+                                                  rocsparse_const_spmat_descr mat_A,
+                                                  rocsparse_const_spmat_descr mat_B,
+                                                  const void*                 beta,
+                                                  rocsparse_const_spmat_descr mat_D,
+                                                  rocsparse_spmat_descr       mat_C,
+                                                  rocsparse_spgemm_alg        alg,
+                                                  rocsparse_spgemm_stage      stage,
+                                                  size_t*                     buffer_size,
+                                                  void*                       temp_buffer);
+
+    using spgemm_template_tuple
+        = std::tuple<rocsparse_datatype, rocsparse_indextype, rocsparse_indextype>;
+    // clang-format off
+#define SPGEMM_TEMPLATE_CONFIG(T_, I_, J_)                                    \
+    {                                                                         \
+        spgemm_template_tuple(T_, I_, J_),                                    \
+            spgemm_template<typename rocsparse::datatype_traits<T_>::type_t,  \
+                            typename rocsparse::indextype_traits<I_>::type_t, \
+                            typename rocsparse::indextype_traits<J_>::type_t> \
+    }
+    // clang-format on
+
+    static const std::map<spgemm_template_tuple, spgemm_template_t> s_spgemm_template_dispatch{{
+
+        // Uniform precisions
+        SPGEMM_TEMPLATE_CONFIG(
+            rocsparse_datatype_f32_r, rocsparse_indextype_i32, rocsparse_indextype_i32),
+
+        SPGEMM_TEMPLATE_CONFIG(
+            rocsparse_datatype_f32_r, rocsparse_indextype_i64, rocsparse_indextype_i32),
+
+        SPGEMM_TEMPLATE_CONFIG(
+            rocsparse_datatype_f32_r, rocsparse_indextype_i64, rocsparse_indextype_i64),
+
+        SPGEMM_TEMPLATE_CONFIG(
+            rocsparse_datatype_f64_r, rocsparse_indextype_i32, rocsparse_indextype_i32),
+
+        SPGEMM_TEMPLATE_CONFIG(
+            rocsparse_datatype_f64_r, rocsparse_indextype_i64, rocsparse_indextype_i32),
+
+        SPGEMM_TEMPLATE_CONFIG(
+            rocsparse_datatype_f64_r, rocsparse_indextype_i64, rocsparse_indextype_i64),
+
+        SPGEMM_TEMPLATE_CONFIG(
+            rocsparse_datatype_f64_c, rocsparse_indextype_i32, rocsparse_indextype_i32),
+
+        SPGEMM_TEMPLATE_CONFIG(
+            rocsparse_datatype_f64_c, rocsparse_indextype_i64, rocsparse_indextype_i32),
+
+        SPGEMM_TEMPLATE_CONFIG(
+            rocsparse_datatype_f64_c, rocsparse_indextype_i64, rocsparse_indextype_i64),
+
+        SPGEMM_TEMPLATE_CONFIG(
+            rocsparse_datatype_f32_c, rocsparse_indextype_i32, rocsparse_indextype_i32),
+
+        SPGEMM_TEMPLATE_CONFIG(
+            rocsparse_datatype_f32_c, rocsparse_indextype_i64, rocsparse_indextype_i32),
+
+        SPGEMM_TEMPLATE_CONFIG(
+            rocsparse_datatype_f32_c, rocsparse_indextype_i64, rocsparse_indextype_i64)}};
+
+    static rocsparse_status spgemm_template_find(spgemm_template_t*  spgemm_function_,
+                                                 rocsparse_datatype  compute_type_,
+                                                 rocsparse_indextype i_type_,
+                                                 rocsparse_indextype j_type_)
+    {
+        const auto& it = rocsparse::s_spgemm_template_dispatch.find(
+            rocsparse::spgemm_template_tuple(compute_type_, i_type_, j_type_));
+
+        if(it != rocsparse::s_spgemm_template_dispatch.end())
+        {
+            spgemm_function_[0] = it->second;
+        }
+        // LCOV_EXCL_START
+        else
+        {
+            std::stringstream sstr;
+            sstr << "invalid precision configuration: "
+                 << "compute_type: " << rocsparse::enum_utils::to_string(compute_type_)
+                 << ", i_type: " << rocsparse::enum_utils::to_string(i_type_)
+                 << ", j_type: " << rocsparse::enum_utils::to_string(j_type_);
+
+            RETURN_WITH_MESSAGE_IF_ROCSPARSE_ERROR(rocsparse_status_invalid_value,
+                                                   sstr.str().c_str());
+        }
+        // LCOV_EXCL_STOP
+
+        return rocsparse_status_success;
+    }
 }
 
 extern "C" rocsparse_status rocsparse_spgemm(rocsparse_handle            handle,
@@ -765,24 +698,14 @@ try
         return rocsparse_status_success;
     }
 
-    RETURN_IF_ROCSPARSE_ERROR(rocsparse::spgemm_template_dispatch(A->row_type,
-                                                                  A->col_type,
-                                                                  compute_type,
+    rocsparse::spgemm_template_t spgemm_function;
+    RETURN_IF_ROCSPARSE_ERROR(rocsparse::spgemm_template_find(&spgemm_function,
+                                                              compute_type,
+                                                              rocsparse::determine_I_indextype(A),
+                                                              rocsparse::determine_J_indextype(A)));
 
-                                                                  handle,
-                                                                  trans_A,
-                                                                  trans_B,
-                                                                  alpha,
-                                                                  A,
-                                                                  B,
-                                                                  beta,
-                                                                  D,
-                                                                  C,
-                                                                  alg,
-                                                                  stage,
-                                                                  buffer_size,
-                                                                  temp_buffer));
-
+    RETURN_IF_ROCSPARSE_ERROR(spgemm_function(
+        handle, trans_A, trans_B, alpha, A, B, beta, D, C, alg, stage, buffer_size, temp_buffer));
     return rocsparse_status_success;
     // LCOV_EXCL_START
 }
