@@ -92,9 +92,9 @@ namespace
                 testing_aux_matmul_pref_init(arg);
             else if(!strcmp(arg.function, "aux_matmul_alg_null_matmul"))
                 testing_aux_matmul_alg_null_matmul(arg);
-#ifdef HIPBLASLT_CODE_COVERAGE
             else if(!strcmp(arg.function, "aux_matmul_bad_ws_size"))
                 testing_aux_matmul_bad_ws_size(arg);
+#ifdef HIPBLASLT_CODE_COVERAGE
             else if(!strcmp(arg.function, "aux_auxiliary_func"))
                 testing_aux_auxiliary_func(arg);
             else if(!strcmp(arg.function, "aux_float8_func"))
