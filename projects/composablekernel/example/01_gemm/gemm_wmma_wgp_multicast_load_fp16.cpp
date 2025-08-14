@@ -37,14 +37,14 @@ using DeviceGemmInstance = ck::tensor_operation::device::DeviceGemmWmma_GFX13
            1,      // Prefetch stage
            256,    // BlockSize
            32, //64,     // MPerBlock
-           32, //128,    // NPerBlock
+           128,          // NPerBlock
            16, //64,     // KPerBlock
            2,            // K1
            16,           // MPerWmma
            16,           // NPerWmma
            16,           // KPerWmma
            1, //2,       // M-Repeat // M-PerWmma / M-Repeat = M-Wave
-           1, //4,       // N-Repeat // N-PerWmma / N-Repeat = N-Wave
+           4,            // N-Repeat // N-PerWmma / N-Repeat = N-Wave
            S<16, 4, 1>, //S<32, 4, 1>,
            S<0, 1, 2>,
            S<0, 1, 2>,

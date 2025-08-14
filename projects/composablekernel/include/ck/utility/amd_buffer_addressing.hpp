@@ -1603,6 +1603,11 @@ amd_wgp_multicast_load_to_vgpr(__attribute__((address_space(1))) const T* in_ptr
             // To add for other types.
         }
     }
+    else
+    {
+        using vector_t = typename vector_type<remove_cvref_t<T>, N>::type;
+        out            = vector_t{0};
+    }
 #else
     ignore = in_ptr;
     ignore = out;
