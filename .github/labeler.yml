@@ -3,7 +3,7 @@
   - any-glob-to-any-file: 'projects/composablekernel/**/*'
 
 "project: hipblas":
-- changed-files:
+- changed-files: 
   - any-glob-to-any-file: 'projects/hipblas/**/*'
 
 "project: hipblas-common":
