@@ -172,6 +172,8 @@ namespace rocRoller
 
             PartiallyActiveWaveSize,
 
+            HasVGPRIndexing,
+
             Count,
         };
 

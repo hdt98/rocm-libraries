@@ -1112,6 +1112,12 @@ namespace rocRoller
                         concatenate("Allocation options: ", allocOptions));
                 }
 
+                if(arch.HasCapability(GPUCapability::HasVGPRIndexing)
+                   and isScaleType(varTypeInfo.variableType.dataType))
+                {
+                    allocOptions.forceReservedRegion = true;
+                }
+
                 auto tmpl = Register::Value::Placeholder(
                     m_context, Register::Type::Vector, info.varType, info.m * info.n, allocOptions);
                 tmpl->setName("tmpl");

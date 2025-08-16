@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <rocRoller/GPUArchitecture/GPUArchitecture.hpp>
 #include <rocRoller/InstructionValues/Register_fwd.hpp>
 
 #include <string>
@@ -56,7 +57,9 @@ namespace rocRoller
 
             bool canAllocate(std::shared_ptr<const Allocation> alloc) const;
 
-            std::vector<int> findFree(int count, AllocationOptions const& options) const;
+            std::vector<int> findFree(int                      count,
+                                      AllocationOptions const& options,
+                                      GPUArchitecture const&   arch) const;
 
             /**
              * @brief Returns the first free range matching the criteria as index and block size. Returns {-1, 0} if no such range exists.
@@ -70,6 +73,7 @@ namespace rocRoller
             std::pair<int, int> findContiguousRange(int                      start,
                                                     int                      regCount,
                                                     AllocationOptions const& options,
+                                                    GPUArchitecture const&   arch,
                                                     std::vector<int> const&  reservedIndices
                                                     = {}) const;
 
@@ -92,22 +96,13 @@ namespace rocRoller
             //> Allocate these specific registers.
             void allocate(AllocationPtr alloc, std::vector<int>&& registers);
 
-            std::vector<int> findFreeFirstFit(int count, AllocationOptions const& options) const;
+            std::vector<int> findFreeFirstFit(int                      count,
+                                              AllocationOptions const& options,
+                                              GPUArchitecture const&   arch) const;
 
-            /**
-             * @brief Find free registers using the PerfectFit strategy.
-             *
-             * Priority order:
-             * 1. Perfect fit: a hole exactly matching the required size
-             * 2. Perfect alignment: start or end of a hole where no gap is created
-             * 3. Start of a hole (may create alignment gap)
-             * 4. End of register space (last resort)
-             *
-             * @param count Number of registers to allocate
-             * @param options Allocation options (alignment, contiguity)
-             * @return Vector of register indices, or empty if allocation failed
-             */
-            std::vector<int> findFreePerfectFit(int count, AllocationOptions const& options) const;
+            std::vector<int> findFreePerfectFit(int                      count,
+                                                AllocationOptions const& options,
+                                                GPUArchitecture const&   arch) const;
 
             AllocatorScheme m_scheme;
 

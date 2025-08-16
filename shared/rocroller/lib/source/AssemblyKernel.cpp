@@ -16,23 +16,12 @@ namespace rocRoller
     {
         auto ctx = m_context.lock();
 
-        auto argLoader = ctx->argLoader();
+        VariableType rawPointer{DataType::Raw32, PointerType::PointerGlobal};
 
-        if(argLoader->anyManuallyLoadedArguments())
-        {
-            VariableType rawPointer{DataType::Raw32, PointerType::PointerGlobal};
-            m_argumentPointer
-                = std::make_shared<Register::Value>(ctx, Register::Type::Scalar, rawPointer, 1);
-            m_argumentPointer->setName("Kernel argument pointer");
-            co_yield m_argumentPointer->allocate();
-        }
-        else
-        {
-            co_yield Instruction::Comment("No kernel argument pointer needed");
-        }
-
-        co_yield ctx->argLoader()->allocatePreloadedRegisters(m_preloadedRegOffset,
-                                                              m_numPreloadedRegs);
+        m_argumentPointer
+            = std::make_shared<Register::Value>(ctx, Register::Type::Scalar, rawPointer, 1);
+        m_argumentPointer->setName("Kernel argument pointer");
+        co_yield m_argumentPointer->allocate();
 
         if(ctx->targetArchitecture().HasCapability(GPUCapability::WorkgroupIdxViaTTMP))
         {
@@ -62,35 +51,40 @@ namespace rocRoller
             co_yield m_workgroupIndex[2]->allocate();
         }
 
+        Register::AllocationOptions allocOptions = {};
+
+        if(ctx->targetArchitecture().HasCapability(GPUCapability::HasVGPRIndexing))
+            allocOptions.forceReservedRegion = true;
+
         bool packedWorkitem
             = m_kernelDimensions > 1
               && ctx->targetArchitecture().HasCapability(GPUCapability::PackedWorkitemIDs);
 
         if(packedWorkitem)
         {
-            m_packedWorkitemIndex
-                = Register::Value::Placeholder(ctx, Register::Type::Vector, DataType::Raw32, 1);
+            m_packedWorkitemIndex = Register::Value::Placeholder(
+                ctx, Register::Type::Vector, DataType::Raw32, 1, allocOptions);
             m_packedWorkitemIndex->setName("Packed Workitem Index");
             co_yield m_packedWorkitemIndex->allocate();
         }
 
-        m_workitemIndex[0]
-            = Register::Value::Placeholder(ctx, Register::Type::Vector, DataType::UInt32, 1);
+        m_workitemIndex[0] = Register::Value::Placeholder(
+            ctx, Register::Type::Vector, DataType::UInt32, 1, allocOptions);
         m_workitemIndex[0]->setName("Workitem Index X");
         co_yield m_workitemIndex[0]->allocate();
 
         if(m_kernelDimensions > 1)
         {
-            m_workitemIndex[1]
-                = Register::Value::Placeholder(ctx, Register::Type::Vector, DataType::UInt32, 1);
+            m_workitemIndex[1] = Register::Value::Placeholder(
+                ctx, Register::Type::Vector, DataType::UInt32, 1, allocOptions);
             m_workitemIndex[1]->setName("Workitem Index Y");
             co_yield m_workitemIndex[1]->allocate();
         }
 
         if(m_kernelDimensions > 2)
         {
-            m_workitemIndex[2]
-                = Register::Value::Placeholder(ctx, Register::Type::Vector, DataType::UInt32, 1);
+            m_workitemIndex[2] = Register::Value::Placeholder(
+                ctx, Register::Type::Vector, DataType::UInt32, 1, allocOptions);
             m_workitemIndex[2]->setName("Workitem Index Z");
             co_yield m_workitemIndex[2]->allocate();
         }
