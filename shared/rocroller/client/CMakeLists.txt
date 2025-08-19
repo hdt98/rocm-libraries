@@ -54,6 +54,16 @@ if(ROCROLLER_ENABLE_ASAN)
     rocroller_target_configure_sanitizers(rocroller-gemm PRIVATE)
 endif()
 
+add_executable(rrexplorer rrexplorer.cpp)
+
+target_compile_options(rrexplorer PUBLIC ${EXTRA_COMPILE_OPTIONS})
+target_link_options(rrexplorer PUBLIC ${EXTRA_LINK_OPTIONS})
+target_link_libraries(
+  rrexplorer
+  PUBLIC
+  roc::rocroller-interface
+)
+
 add_executable(rocroller-codegen-stress "${CMAKE_CURRENT_SOURCE_DIR}/src/codegen_stress_test.cpp")
 target_link_libraries(rocroller-codegen-stress
     PUBLIC
