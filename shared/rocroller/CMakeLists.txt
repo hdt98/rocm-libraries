@@ -41,6 +41,7 @@ option(ROCROLLER_EMBED_ARCH_DEF "Embed msgpack architecture data in library." ON
 option(ROCROLLER_BUILD_SHARED_LIBS "Build rocRoller as a shared library." ON)
 option(ROCROLLER_ENABLE_FETCH "Enable fetch content for dependencies if find_package fails." OFF)
 option(ROCROLLER_ENABLE_TIMERS "Enable rocRoller timer code." OFF)
+option(ROCROLLER_ENABLE_IMGUI "Enable rocRoller Dear ImGUI visualizer." OFF)
 option(ROCROLLER_ENABLE_CPPCHECK "Enable cppcheck." OFF)
 option(ROCROLLER_ENABLE_ASAN "Enable addresss sanitizers." OFF)
 option(ROCROLLER_ENABLE_PREGENERATED_ARCH_DEF "Use the pregenerates GPU architecture definition YAML file(s) in the repository." ON)
