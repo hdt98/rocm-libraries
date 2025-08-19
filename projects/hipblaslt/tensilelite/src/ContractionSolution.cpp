@@ -34,8 +34,8 @@
 #include <Tensile/Utils.hpp>
 #include <Tensile/hip/HipHardware.hpp>
 
-#include <Tensile/analytical/StreamK.hpp>
-#include <Tensile/analytical/Utils.hpp>
+#include <origami/StreamK.hpp>
+#include <origami/Utils.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -1239,7 +1239,7 @@ namespace TensileLite
                             = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
                         size_t elementSize = GetElementSize(problemType.aType);
                         double H_L2        = 0.0; // TODO
-                        auto   bestWGM     = analytical::select_best_wgm(sizes[0],
+                        auto   bestWGM     = origami::select_best_wgm(sizes[0],
                                                                    sizes[1],
                                                                    sizes[3],
                                                                    sizes[2],
@@ -3050,7 +3050,7 @@ namespace TensileLite
                 batch *= problem.batchSize(i);
             }
 
-            return analytical::streamk::best_predicted_grid_size(sizeMapping.macroTile.x,
+            return origami::streamk::best_predicted_grid_size(sizeMapping.macroTile.x,
                                                                  sizeMapping.macroTile.y,
                                                                  sizeMapping.depthU,
                                                                  x,
@@ -3080,7 +3080,7 @@ namespace TensileLite
                 batch *= problem.batchSize(i);
             }
 
-            return analytical::streamk::number_of_output_tiles(
+            return origami::streamk::number_of_output_tiles(
                 sizeMapping.macroTile.x, sizeMapping.macroTile.y, x, y, batch);
         }
         else if(pAMDGPU->skDynamicGrid == 5)
@@ -3108,8 +3108,8 @@ namespace TensileLite
                 = problem.b().elementBytes() * 8; // TODO update for A/B different types
             size_t elementSizeC_bits
                 = problem.c().elementBytes() * 8; // TODO update for A/B different types
-            analytical::DataType miDataType = static_cast<analytical::DataType>(problem.computeInputType());
-            return analytical::select_best_grid_size(x,
+            origami::DataType miDataType = static_cast<origami::DataType>(problem.computeInputType());
+            return origami::select_best_grid_size(x,
                                                      y,
                                                      z,
                                                      batch,
