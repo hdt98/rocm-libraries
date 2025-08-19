@@ -2,7 +2,6 @@
 # SPDX-License-Identifier:  MIT
 
 add_subdirectory(rocisa)
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../../../shared/origami origami)
 
 if(TENSILELITE_ENABLE_AUTOBUILD)
     list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
@@ -45,7 +44,7 @@ if(TENSILELITE_ENABLE_HOST)
     target_link_libraries(tensilelite-host 
         PUBLIC
             $<BUILD_INTERFACE:rocisa::rocisa-cpp>
-            origami::origami # test PUBLIC vs PRIVATE (hipblaslt)
+            origami::origami
         PRIVATE
             hip::device
     )
