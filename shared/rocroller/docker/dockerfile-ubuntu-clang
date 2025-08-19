@@ -105,6 +105,10 @@ RUN apt-get update && apt-get install -y \
     libboost-filesystem-dev \
     kmod
 
+# ImGUI dependencies
+RUN apt-get update && apt-get install -y \
+   libsdl2-dev libgraphviz-dev
+
 ##
 ## Specific to this Dockerfile.  Put faster-changing-things last.
 ##
