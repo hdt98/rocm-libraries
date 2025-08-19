@@ -190,7 +190,7 @@ namespace rocRoller
         struct ArgumentInfo
         {
             // Kernel arguments
-            std::vector<Expression::ExpressionPtr> numTiles, numTileArgExprs;
+            std::vector<Expression::ExpressionPtr> numTileArgExprs;
             Expression::ExpressionPtr              numSKTiles, numDPTiles;
             Expression::ExpressionPtr              numWGs, numSKTilesPerWG, numDPTilesPerWG;
         };
@@ -853,7 +853,7 @@ namespace rocRoller
                     continue;
 
                 auto tileNumber = graph.coordinates.addElement(
-                    MacroTileNumber(d, argInfo.numTiles[d], nullptr));
+                    MacroTileNumber(d, argInfo.numTileArgExprs[d], nullptr));
 
                 for(auto tileNumTag : accumInfo.tileNumberCoords.at(d))
                 {
@@ -1028,7 +1028,7 @@ namespace rocRoller
             auto numAccumTiles = argInfo.numTileArgExprs.back();
             auto numTotalTiles = numAccumTiles;
             for(auto d : loopInfo.dimensionIndices)
-                numTotalTiles = numTotalTiles * argInfo.numTiles.at(d);
+                numTotalTiles = numTotalTiles * argInfo.numTileArgExprs.at(d);
             numTotalTiles = simplify(numTotalTiles);
             enableDivideBy(numTotalTiles, context);
 
@@ -1523,23 +1523,6 @@ namespace rocRoller
             //   for basic StreamK:   0
             //   fro 2-tile StreamK:  ((numTiles0 * numTiles1) / numWGs - 1) * numTilesAcc
             //
-            for(auto d : loopInfo.dimensionIndices)
-            {
-                if(argInfo.numTileArgExprs[d] == nullptr)
-                    continue;
-
-                argInfo.numTiles.push_back(k->addArgument({concatenate("numTiles", d),
-                                                           numTilesDT,
-                                                           DataDirection::ReadOnly,
-                                                           argInfo.numTileArgExprs[d]}));
-                if(d > 0)
-                    enableDivideBy(argInfo.numTiles.back(), context);
-            }
-
-            argInfo.numTiles.push_back(k->addArgument({"numTilesAcc",
-                                                       numTilesDT,
-                                                       DataDirection::ReadOnly,
-                                                       argInfo.numTileArgExprs.back()}));
 
             ExpressionPtr numSKTilesArgExpr, numDPTilesArgExpr;
             ExpressionPtr numSKTilesPerWGArgExpr, numDPTilesPerWGArgExpr;
