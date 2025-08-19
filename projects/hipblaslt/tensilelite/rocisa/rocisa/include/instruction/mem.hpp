@@ -176,6 +176,16 @@ namespace rocisa
             return {dst, vaddr};
         }
 
+        std::vector<InstructionInput> getDstParams() const override
+        {
+            return {dst};
+        }
+
+        std::vector<InstructionInput> getSrcParams() const override
+        {
+            return {vaddr};
+        }
+
         virtual std::string getArgStr() const
         {
             return dst->toString() + ", " + vaddr->toString();
@@ -228,6 +238,16 @@ namespace rocisa
         std::vector<InstructionInput> getParams() const override
         {
             return {dst, vaddr, saddr, soffset};
+        }
+
+        std::vector<InstructionInput> getDstParams() const override
+        {
+            return {dst};
+        }
+
+        std::vector<InstructionInput> getSrcParams() const override
+        {
+            return {vaddr, saddr, soffset};
         }
 
         std::string getArgStr() const
@@ -316,6 +336,16 @@ namespace rocisa
             return {dst, base};
         }
 
+        std::vector<InstructionInput> getDstParams() const override
+        {
+            return {dst};
+        }
+
+        std::vector<InstructionInput> getSrcParams() const override
+        {
+            return {base};
+        }
+
         std::string getArgStr() const
         {
             return dst->toString() + ", " + base->toString();
@@ -364,6 +394,16 @@ namespace rocisa
         std::vector<InstructionInput> getParams() const override
         {
             return {dst, base, soffset};
+        }
+
+        std::vector<InstructionInput> getDstParams() const override
+        {
+            return {dst};
+        }
+
+        std::vector<InstructionInput> getSrcParams() const override
+        {
+            return {base, soffset};
         }
 
         std::string getArgStr() const
@@ -436,6 +476,16 @@ namespace rocisa
             return {srcData, base, soffset};
         }
 
+        std::vector<InstructionInput> getDstParams() const override
+        {
+            return {};
+        }
+
+        std::vector<InstructionInput> getSrcParams() const override
+        {
+            return {srcData, base, soffset};
+        }
+
         std::string getArgStr() const
         {
             return srcData->toString() + ", " + base->toString() + ", "
@@ -479,6 +529,16 @@ namespace rocisa
         }
 
         std::vector<InstructionInput> getParams() const override
+        {
+            return {vaddr, srcData};
+        }
+
+        std::vector<InstructionInput> getDstParams() const override
+        {
+            return {};
+        }
+
+        std::vector<InstructionInput> getSrcParams() const override
         {
             return {vaddr, srcData};
         }
@@ -533,6 +593,16 @@ namespace rocisa
         }
 
         std::vector<InstructionInput> getParams() const override
+        {
+            return {srcData, vaddr, saddr, soffset};
+        }
+
+        std::vector<InstructionInput> getDstParams() const override
+        {
+            return {};
+        }
+
+        std::vector<InstructionInput> getSrcParams() const override
         {
             return {srcData, vaddr, saddr, soffset};
         }
@@ -620,6 +690,16 @@ namespace rocisa
             return {dst, srcs};
         }
 
+        std::vector<InstructionInput> getDstParams() const override
+        {
+            return {dst};
+        }
+
+        std::vector<InstructionInput> getSrcParams() const override
+        {
+            return {srcs};
+        }
+
         std::string preStr() const override
         {
             if(kernel().isaVersion[0] < 11)
@@ -702,6 +782,16 @@ namespace rocisa
 
         // TODO: Not returning ds
         std::vector<InstructionInput> getParams() const override
+        {
+            return {dstAddr, src0, src1};
+        }
+
+        std::vector<InstructionInput> getDstParams() const override
+        {
+            return {};
+        }
+
+        std::vector<InstructionInput> getSrcParams() const override
         {
             return {dstAddr, src0, src1};
         }

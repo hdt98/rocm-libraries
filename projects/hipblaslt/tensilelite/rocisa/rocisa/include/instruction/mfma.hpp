@@ -162,6 +162,16 @@ namespace rocisa
             return {acc, a, b, acc2, negStr};
         }
 
+        std::vector<InstructionInput> getDstParams() const override
+        {
+            return {acc};
+        }
+
+        std::vector<InstructionInput> getSrcParams() const override
+        {
+            return {a, b, acc2};
+        }
+
         std::string preStr() const override
         {
             std::string variantStr = std::to_string(variant[0]) + "x" + std::to_string(variant[1])
@@ -305,6 +315,16 @@ namespace rocisa
         std::vector<InstructionInput> getParams() const override
         {
             return {acc, a, b, metadata};
+        }
+
+        std::vector<InstructionInput> getDstParams() const override
+        {
+            return {acc};
+        }
+
+        std::vector<InstructionInput> getSrcParams() const override
+        {
+            return {a, b, metadata};
         }
 
         std::string preStr() const override

@@ -187,6 +187,9 @@ namespace rocisa
 
         virtual std::vector<InstructionInput> getParams() const = 0;
 
+        virtual std::vector<InstructionInput> getDstParams() const = 0;
+        virtual std::vector<InstructionInput> getSrcParams() const = 0;
+
         virtual int getIssueLatency() const
         {
             return 1; // Default issue latency is 1, should be overridden in derived classes
@@ -259,6 +262,21 @@ namespace rocisa
                 plist.insert(plist.end(), srcs.begin(), srcs.end());
             }
             return plist;
+        }
+
+        std::vector<InstructionInput> getDstParams() const override
+        {
+            std::vector<InstructionInput> dsts;
+            if(dst)
+            {
+                dsts.push_back(dst);
+            }
+            return dsts;
+        }
+
+        std::vector<InstructionInput> getSrcParams() const override
+        {
+            return srcs;
         }
 
         std::string toString() const override
@@ -382,6 +400,25 @@ namespace rocisa
             return l;
         }
 
+        std::vector<InstructionInput> getDstParams() const override
+        {
+            std::vector<InstructionInput> dsts;
+            if(dst)
+            {
+                dsts.push_back(dst);
+            }
+            if(dst1)
+            {
+                dsts.push_back(dst1);
+            }
+            return dsts;
+        }
+
+        std::vector<InstructionInput> getSrcParams() const override
+        {
+            return srcs;
+        }
+
         std::string toString() const override
         {
             auto        newInstStr = preStr();
@@ -448,6 +485,18 @@ namespace rocisa
         std::vector<InstructionInput> getParams() const override
         {
             return args;
+        }
+
+        std::vector<InstructionInput> getDstParams() const override
+        {
+            throw std::runtime_error("MacroInstruction does not have destination parameters");
+            return {}; // Macro instructions do not have destination parameters
+        }
+
+        std::vector<InstructionInput> getSrcParams() const override
+        {
+            throw std::runtime_error("MacroInstruction does not have source parameters");
+            return args; // All arguments are treated as source parameters
         }
 
         std::string getArgStr() const

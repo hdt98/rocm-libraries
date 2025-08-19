@@ -1236,6 +1236,16 @@ namespace rocisa
             return {prior};
         }
 
+        std::vector<InstructionInput> getDstParams() const override
+        {
+            return {};
+        }
+
+        std::vector<InstructionInput> getSrcParams() const override
+        {
+            return {prior};
+        }
+
         std::string toString() const override
         {
             return formatWithComment(instStr + " " + std::to_string(prior));
@@ -1275,6 +1285,16 @@ namespace rocisa
             return {};
         }
 
+        std::vector<InstructionInput> getDstParams() const override
+        {
+            return {};
+        }
+
+        std::vector<InstructionInput> getSrcParams() const override
+        {
+            return {};
+        }
+
         std::string toString() const override
         {
             return formatWithComment(instStr);
@@ -1300,6 +1320,16 @@ namespace rocisa
         }
 
         std::vector<InstructionInput> getParams() const override
+        {
+            return {};
+        }
+
+        std::vector<InstructionInput> getDstParams() const override
+        {
+            return {};
+        }
+
+        std::vector<InstructionInput> getSrcParams() const override
         {
             return {};
         }
@@ -1331,6 +1361,16 @@ namespace rocisa
         }
 
         std::vector<InstructionInput> getParams() const override
+        {
+            return {waitState};
+        }
+
+        std::vector<InstructionInput> getDstParams() const override
+        {
+            return {};
+        }
+
+        std::vector<InstructionInput> getSrcParams() const override
         {
             return {waitState};
         }
@@ -1367,6 +1407,16 @@ namespace rocisa
             return {};
         }
 
+        std::vector<InstructionInput> getDstParams() const override
+        {
+            return {};
+        }
+
+        std::vector<InstructionInput> getSrcParams() const override
+        {
+            return {};
+        }
+
         std::string toString() const override
         {
             return formatWithComment(instStr);
@@ -1394,6 +1444,16 @@ namespace rocisa
         }
 
         std::vector<InstructionInput> getParams() const override
+        {
+            return {simm16};
+        }
+
+        std::vector<InstructionInput> getDstParams() const override
+        {
+            return {};
+        }
+
+        std::vector<InstructionInput> getSrcParams() const override
         {
             return {simm16};
         }
@@ -1499,6 +1559,16 @@ namespace rocisa
             return {lgkmcnt, vmcnt};
         }
 
+        std::vector<InstructionInput> getDstParams() const override
+        {
+            return {};
+        }
+
+        std::vector<InstructionInput> getSrcParams() const override
+        {
+            return {lgkmcnt, vmcnt};
+        }
+
         std::string toString() const override
         {
             std::string waitStr;
@@ -1552,10 +1622,21 @@ namespace rocisa
             return {vscnt};
         }
 
+        std::vector<InstructionInput> getDstParams() const override
+        {
+            return {};
+        }
+
+        std::vector<InstructionInput> getSrcParams() const override
+        {
+            return {vscnt};
+        }
+
         std::string toString() const override
         {
             int maxVscnt = getAsmCaps()["MaxVscnt"];
-            return formatWithComment("s_waitcnt_vscnt null " + std::to_string(std::min(vscnt, maxVscnt)));
+            return formatWithComment("s_waitcnt_vscnt null "
+                                     + std::to_string(std::min(vscnt, maxVscnt)));
         }
 
     private:
@@ -1586,10 +1667,21 @@ namespace rocisa
             return {storecnt};
         }
 
+        std::vector<InstructionInput> getDstParams() const override
+        {
+            return {};
+        }
+
+        std::vector<InstructionInput> getSrcParams() const override
+        {
+            return {storecnt};
+        }
+
         std::string toString() const override
         {
             int maxStorecnt = getAsmCaps()["MaxStorecnt"];
-            return formatWithComment("s_wait_storecnt " + std::to_string(std::min(storecnt, maxStorecnt)));
+            return formatWithComment("s_wait_storecnt "
+                                     + std::to_string(std::min(storecnt, maxStorecnt)));
         }
 
     private:
@@ -1620,10 +1712,21 @@ namespace rocisa
             return {loadcnt};
         }
 
+        std::vector<InstructionInput> getDstParams() const override
+        {
+            return {};
+        }
+
+        std::vector<InstructionInput> getSrcParams() const override
+        {
+            return {loadcnt};
+        }
+
         std::string toString() const override
         {
             int maxLoadcnt = getAsmCaps()["MaxLoadcnt"];
-            return formatWithComment("s_wait_loadcnt " + std::to_string(std::min(loadcnt, maxLoadcnt)));
+            return formatWithComment("s_wait_loadcnt "
+                                     + std::to_string(std::min(loadcnt, maxLoadcnt)));
         }
 
     private:
@@ -1650,6 +1753,16 @@ namespace rocisa
         }
 
         std::vector<InstructionInput> getParams() const override
+        {
+            return {kmcnt};
+        }
+
+        std::vector<InstructionInput> getDstParams() const override
+        {
+            return {};
+        }
+
+        std::vector<InstructionInput> getSrcParams() const override
         {
             return {kmcnt};
         }
@@ -1688,6 +1801,16 @@ namespace rocisa
             return {dscnt};
         }
 
+        std::vector<InstructionInput> getDstParams() const override
+        {
+            return {};
+        }
+
+        std::vector<InstructionInput> getSrcParams() const override
+        {
+            return {dscnt};
+        }
+
         std::string toString() const override
         {
             int maxDscnt = getAsmCaps()["MaxDscnt"];
@@ -1706,7 +1829,7 @@ namespace rocisa
         dscnt: Number of LDS instructions issued but not yet completed.
         kmcnt: Number of constant-fetch (scalar memory read), and message instructions issued but not yet completed.
 
-        In some ISA, VMEM load/store share the same counter(vmcnt). LDS, scalar memory read and message share 
+        In some ISA, VMEM load/store share the same counter(vmcnt). LDS, scalar memory read and message share
         the same counter(lgkmcnt). These counters are combined from the 4 counters above as:
             vmcnt   = vlcnt + vscnt
             lgkmcnt = dscnt + kmcnt
@@ -1715,7 +1838,7 @@ namespace rocisa
 
             If the target ISA has separate counters for load and store, use SWaitCnt(vlcnt=1),
             which means vl_2 is not completed yet.
-            
+
             If the target ISA has a single counter for load and store, use SWaitCnt(vlcnt=1, vscnt=1),
             which means vs_0, vl_2 are not completed yet.
         */
@@ -1759,6 +1882,16 @@ namespace rocisa
             return {};
         }
 
+        std::vector<InstructionInput> getDstParams() const override
+        {
+            return {};
+        }
+
+        std::vector<InstructionInput> getSrcParams() const override
+        {
+            return {};
+        }
+
         std::vector<std::shared_ptr<Instruction>> setupInstructions() const override
         {
             int         vlcnt   = this->vlcnt;
@@ -1782,8 +1915,10 @@ namespace rocisa
             std::vector<std::shared_ptr<Instruction>> instructions;
 
             if(getAsmCaps()["SeparateVscnt"])
-            {  
-                int lgkmcnt = (dscnt != -1 || kmcnt != -1)? (dscnt != -1 ? dscnt : 0) + (kmcnt != -1 ? kmcnt : 0) : -1;
+            {
+                int lgkmcnt = (dscnt != -1 || kmcnt != -1)
+                                  ? (dscnt != -1 ? dscnt : 0) + (kmcnt != -1 ? kmcnt : 0)
+                                  : -1;
                 int vmcnt   = vlcnt; // With SeparateVscnt, vmcnt only counts load instructions
                 if(vlcnt != -1 || lgkmcnt != -1)
                 {
@@ -1815,8 +1950,12 @@ namespace rocisa
             }
             else
             {
-                int lgkmcnt = (dscnt != -1 || kmcnt != -1)? (dscnt != -1 ? dscnt : 0) + (kmcnt != -1 ? kmcnt : 0) : -1;
-                int vmcnt   = (vscnt != -1 || vlcnt != -1)? (vscnt != -1 ? vscnt : 0) + (vlcnt != -1 ? vlcnt : 0) : -1;
+                int lgkmcnt = (dscnt != -1 || kmcnt != -1)
+                                  ? (dscnt != -1 ? dscnt : 0) + (kmcnt != -1 ? kmcnt : 0)
+                                  : -1;
+                int vmcnt   = (vscnt != -1 || vlcnt != -1)
+                                  ? (vscnt != -1 ? vscnt : 0) + (vlcnt != -1 ? vlcnt : 0)
+                                  : -1;
                 if(vmcnt != -1 || lgkmcnt != -1)
                 {
                     instructions.push_back(std::make_shared<_SWaitCnt>(lgkmcnt, vmcnt, comment));
@@ -1884,6 +2023,16 @@ namespace rocisa
         }
 
         std::vector<InstructionInput> getParams() const override
+        {
+            return {va_vdst, va_sdst, va_ssrc, hold_cnt, vm_vsrc, va_vcc, sa_sdst};
+        }
+
+        std::vector<InstructionInput> getDstParams() const override
+        {
+            return {};
+        }
+
+        std::vector<InstructionInput> getSrcParams() const override
         {
             return {va_vdst, va_sdst, va_ssrc, hold_cnt, vm_vsrc, va_vcc, sa_sdst};
         }
@@ -1980,6 +2129,16 @@ namespace rocisa
         }
 
         std::vector<InstructionInput> getParams() const override
+        {
+            return getSrcParams();
+        }
+
+        std::vector<InstructionInput> getDstParams() const override
+        {
+            return {};
+        }
+
+        std::vector<InstructionInput> getSrcParams() const override
         {
             if(hasInstID1())
             {
@@ -4580,9 +4739,9 @@ namespace rocisa
     struct VSwapB32 : public CommonInstruction
     {
         VSwapB32(const std::shared_ptr<Container>&   dst,
-                const InstructionInput&             src,
-                const std::optional<SDWAModifiers>& sdwa    = std::nullopt,
-                const std::string&                  comment = "")
+                 const InstructionInput&             src,
+                 const std::optional<SDWAModifiers>& sdwa    = std::nullopt,
+                 const std::string&                  comment = "")
             : CommonInstruction(
                 InstType::INST_B32, dst, {src}, std::nullopt, sdwa, std::nullopt, comment)
         {
