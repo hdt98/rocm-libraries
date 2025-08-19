@@ -47,7 +47,20 @@ find_package( Boost REQUIRED)
 
 set( Boost_USE_STATIC_LIBS OFF )
 
+# fftw
+#message(FATAL_ERROR "PROJECT_SOURCE_DIR: ${PROJECT_SOURCE_DIR}")
+#list( APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/../cmake )
+#list( APPEND CMAKE_PREFIX_PATH ${PROJECT_SOURCE_DIR}/clients/cmake )
+
 find_package( FFTW 3.0 REQUIRED MODULE COMPONENTS FLOAT DOUBLE )
+#find_package( FFTW 3.0 REQUIRED )
+message(STATUS "FFTW_LIBRARIES: ${FFTW_LIBRARIES}")
+message(STATUS "FFTW_INCLUDE_DIRS: ${FFTW_INCLUDE_DIRS}")
+message(STATUS "FFTW_FOUND: ${FFTW_FOUND}")
+message(STATUS "FFTW3_LIBRARIES: ${FFTW3_LIBRARIES}")
+message(STATUS "FFTW3_INCLUDE_DIRS: ${FFTW3_INCLUDE_DIRS}")
+message(STATUS "FFTW3_FOUND: ${FFTW3_FOUND}")
+message(STATUS "FFTW3f_FOUND: ${FFTW3f_FOUND}")
 
 set( THREADS_PREFER_PTHREAD_FLAG ON )
 find_package( Threads REQUIRED )
@@ -65,6 +78,7 @@ set( hipfft-test_source
   )
 
 add_executable( hipfft-test ${hipfft-test_source} ${hipfft-test_includes} )
+#target_include_directories( hipfft-test ${FFTW3_INCLUDE_DIRS} )
 
 set( TEST_TARGETS hipfft-test )
 
@@ -104,6 +118,7 @@ foreach( target ${TEST_TARGETS} )
     CXX_STANDARD 17
     CXX_STANDARD_REQUIRED ON
     )
+
 
   if( BUILD_WITH_LIB STREQUAL "ROCM" )
     target_compile_options( ${target} PRIVATE ${WARNING_FLAGS} )
@@ -158,7 +173,7 @@ foreach( target ${TEST_TARGETS} )
   target_include_directories( ${target}
     PRIVATE
     $<BUILD_INTERFACE:${Boost_INCLUDE_DIRS}>
-    $<BUILD_INTERFACE:${FFTW_INCLUDE_DIRS}>
+    $<BUILD_INTERFACE:${FFTW3_INCLUDE_DIRS}>
     $<BUILD_INTERFACE:${hip_INCLUDE_DIRS}>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../library/include>
   )
@@ -166,7 +181,8 @@ foreach( target ${TEST_TARGETS} )
   target_link_libraries( ${target}
     PRIVATE
     hip::hipfft
-    ${FFTW_LIBRARIES}
+    FFTW3::fftw3
+    FFTW3::fftw3f
   )
 
   if( HIPFFT_MPI_ENABLE )
@@ -183,6 +199,11 @@ foreach( target ${TEST_TARGETS} )
 
   rocm_install(TARGETS ${target} COMPONENT tests)
 endforeach()
+
+link_directories(${FFTW3_LIBRARY_DIRS})
+message(STATUS "GTEST_LIBRARIES: ${GTEST_LIBRARIES}")
+message(STATUS "FFTW3_LIBRARY_DIRS: ${FFTW3_LIBRARY_DIRS}")
+
 
 if( GTEST_FOUND )
   target_include_directories( hipfft-test PRIVATE $<BUILD_INTERFACE:${GTEST_INCLUDE_DIRS}> )

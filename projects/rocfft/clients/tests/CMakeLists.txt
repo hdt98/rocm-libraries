@@ -108,8 +108,12 @@ option( BUILD_FFTW "Download and build FFTW" OFF )
 
 # look for installed FFTW if we weren't asked to build it
 if( NOT BUILD_FFTW )
-  find_package( FFTW 3.0 MODULE COMPONENTS FLOAT DOUBLE )
+  #find_package( FFTW 3.0 MODULE COMPONENTS FLOAT DOUBLE )
+  find_package( FFTW 3.0 REQUIRED MODULE COMPONENTS FLOAT DOUBLE )
 endif()
+message(STATUS "FFTW3_FOUND: ${FFTW3_FOUND}")
+message(STATUS "FFTW3f_FOUND: ${FFTW3f_FOUND}")
+
 
 include( ExternalProject )
 if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.24)
@@ -175,7 +179,7 @@ if( BUILD_FFTW OR NOT FFTW_FOUND )
     COMPONENT clients-common
   )
 else()
-  include_directories(${FFTW_INCLUDE_DIRS})
+  include_directories(${FFTW3_INCLUDE_DIRS})
 endif()
 
 set( rocfft-test_include_dirs
@@ -186,7 +190,7 @@ set( rocfft-test_include_dirs
   )
 
 set( rocfft-test_link_libs
-  ${FFTW_LIBRARIES} OpenMP::OpenMP_CXX
+  FFTW3::fftw3 FFTW3::fftw3f OpenMP::OpenMP_CXX
   )
 
 include( ../cmake/build-gtest.cmake )
@@ -353,7 +357,8 @@ if( ROCFFT_MPI_ENABLE )
       hip::hiprand
       hip::device
       MPI::MPI_CXX
-      ${FFTW_LIBRARIES}
+      FFTW3::fftw3
+      FFTW3::fftw3f
       "mpi_gtl_hsa"
     )
       get_filename_component( MPI_LIBDIR ${MPI_LIBRARY} DIRECTORY )
@@ -366,7 +371,8 @@ if( ROCFFT_MPI_ENABLE )
       hip::hiprand
       hip::device
       MPI::MPI_CXX
-      ${FFTW_LIBRARIES}
+      FFTW3::fftw3
+      FFTW3::fftw3f
     )    
     endif()
     set_target_properties(${worker}

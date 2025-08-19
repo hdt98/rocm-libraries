@@ -39,8 +39,8 @@ endif()
 
 
 # Workarounds..
-list( APPEND CMAKE_PREFIX_PATH /opt/rocm/llvm /opt/rocm )
-list( APPEND CMAKE_MODULE_PATH ${ROCM_PATH}/lib/cmake/hip /opt/rocm/lib/cmake/hip /opt/rocm/hip/cmake )
+#list( APPEND CMAKE_PREFIX_PATH /opt/rocm/llvm /opt/rocm )
+#list( APPEND CMAKE_MODULE_PATH ${ROCM_PATH}/lib/cmake/hip /opt/rocm/lib/cmake/hip /opt/rocm/hip/cmake )
 
 # This has to be initialized before the project() command appears
 # Set the default of CMAKE_BUILD_TYPE to be release, unless user specifies with -D.
@@ -52,6 +52,16 @@ endif()
 set( HIPFFT_BUILD_SCOPE ON )
 
 project( hipfft LANGUAGES CXX )
+
+# fftw
+list( APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/clients/cmake )
+list( APPEND THEROCK_PACKAGE_DIR ${PROJECT_SOURCE_DIR}/clients/cmake )
+message(STATUS "CMAKE_MODULE_PATH: ${CMAKE_MODULE_PATH}")
+message(STATUS "THEROCK_PACKAGE_DIR: ${THEROCK_PACKAGE_DIR}")
+message(STATUS "PROJECT_SOURCE_DIR: ${PROJECT_SOURCE_DIR}")
+find_package( GTest REQUIRED )
+#find_package( FFTW3 REQUIRED )
+find_package( FFTW 3.0 REQUIRED MODULE COMPONENTS FLOAT DOUBLE )
 
 # Build options
 option( BUILD_SHARED_LIBS "Build ${PROJECT_NAME} as a shared library" ON )
