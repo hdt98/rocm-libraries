@@ -535,6 +535,45 @@ namespace rocsparse
         return atomicAdd(ptr, val);
     }
 
+
+    
+    /*template <>
+    __device__ __forceinline__ double atomic_add<double>(double* ptr, double val)
+    {
+	unsigned long long int* ptr_as_ull = 
+        (unsigned long long int*)ptr;
+    	unsigned long long int old, new_val_as_ull, assumed;
+
+    	// Read the current value from memory and store it as a long long int
+    	old = *ptr_as_ull;
+
+    	do {
+            // Assume the old value is the current value for the CAS attempt
+            assumed = old;
+        
+            // Convert the assumed integer value back to a double to perform the addition
+            double assumed_as_double = __longlong_as_double(assumed);
+        
+            // Perform the addition on the double
+            double new_val_as_double = assumed_as_double + val;
+        
+            // Convert the new double value back to a long long int for the CAS
+            new_val_as_ull = __double_as_longlong(new_val_as_double);
+
+            // Perform the atomic compare-and-swap
+            old = atomicCAS(ptr_as_ull, assumed, new_val_as_ull);
+
+        // If the CAS failed (another thread modified the value), old will be
+        // the value written by the other thread. Loop to try again with the new value.
+        } while (assumed != old);
+
+        // Return the original value before the successful addition
+        return __longlong_as_double(old);
+    }*/
+
+
+
+
     template <typename T>
     __device__ __forceinline__ T atomic_cas(T* ptr, T cmp, T val)
     {
