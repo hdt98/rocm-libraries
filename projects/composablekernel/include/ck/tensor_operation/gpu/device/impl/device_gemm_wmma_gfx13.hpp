@@ -915,7 +915,7 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
                         }
                         else
                         {
-                            const auto kernel = kernel_gemm_wmma<
+                            const auto kernel = kernel_gemm_wmma_gfx13<
                                 GridwiseGemm,
                                 ADataType,
                                 BDataType,
@@ -985,13 +985,13 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
             if constexpr(!(is_same_v<AccDataType, float> || is_same_v<AccDataType, ck::half_t> ||
                            is_same_v<AccDataType, int32_t>))
             {
-                printf("DeviceOp err: AccDataType");
+                printf("DeviceOp err: AccDataType\n");
                 return false;
             }
         }
         else
         {
-            printf("DeviceOp err: Arch");
+            printf("DeviceOp err: Arch\n");
             return false;
         }
 
@@ -1058,10 +1058,11 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
             }
         }
 
-        return GridwiseGemm::CheckValidity(arg.a_grid_desc_,
-                                           arg.b_grid_desc_k0_n_k1_,
-                                           arg.c_grid_desc_m_n_,
-                                           arg.block_2_ctile_map_);
+        bool validresult = GridwiseGemm::CheckValidity(arg.a_grid_desc_,
+                                                       arg.b_grid_desc_k0_n_k1_,
+                                                       arg.c_grid_desc_m_n_,
+                                                       arg.block_2_ctile_map_);
+        return validresult;
     }
 
     // polymorphic
