@@ -82,6 +82,8 @@ CI | Main primary contact | Team
 Math CI | eidenyoshida | [ROCm/rocm-math-lib-ci-team](https://github.com/orgs/ROCm/teams/rocm-math-lib-ci-team)
 External (Azure) CI | jayhawk-commits | [ROCm/external-ci](https://github.com/orgs/ROCm/teams/external-ci)
 TheRock CI | geomin12 | [ROCm/therockinfra](https://github.com/orgs/ROCm/teams/therockinfra)
+Windows Libraries CI | jharryma | 
+ReadTheDocs CI | alexxu-amd | [ROCm/rocm-documentation] https://github.com/orgs/ROCm/teams/rocm-documentation
 
 ## Gardener Rotation
 
