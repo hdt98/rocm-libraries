@@ -39,8 +39,15 @@ endif()
 
 
 # Workarounds..
-list( APPEND CMAKE_PREFIX_PATH /opt/rocm/llvm /opt/rocm )
-list( APPEND CMAKE_MODULE_PATH ${ROCM_PATH}/lib/cmake/hip /opt/rocm/lib/cmake/hip /opt/rocm/hip/cmake )
+if (DEFINED ENV{ROCM_PATH})
+  list( APPEND CMAKE_PREFIX_PATH ${ROCM_PATH}/llvm ${ROCM_PATH} )
+  list( APPEND CMAKE_MODULE_PATH ${ROCM_PATH}/lib/cmake/hip ${ROCM_PATH}/lib/cmake/hip ${ROCM_PATH}/hip/cmake )
+else()
+  if(EXISTS "/opt/rocm")
+    list( APPEND CMAKE_PREFIX_PATH /opt/rocm/llvm /opt/rocm )
+    list( APPEND CMAKE_MODULE_PATH /opt/rocm/lib/cmake/hip /opt/rocm/hip/cmake )
+  endif()
+endif()
 
 # This has to be initialized before the project() command appears
 # Set the default of CMAKE_BUILD_TYPE to be release, unless user specifies with -D.
