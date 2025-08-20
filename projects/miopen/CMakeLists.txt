@@ -23,7 +23,7 @@
 # SOFTWARE.
 #
 ################################################################################
-cmake_minimum_required( VERSION 3.15 )
+cmake_minimum_required( VERSION 3.25 )
 
 if (POLICY CMP0074)
   cmake_policy(SET CMP0074 NEW)
