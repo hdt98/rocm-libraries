@@ -217,7 +217,7 @@ int main()
     for(int i = 0; i < m; i++)
     {
         int start = hcsr_row_ptr[i];
-        int end = hcsr_row_ptr[i + 1];
+        int end   = hcsr_row_ptr[i + 1];
 
         std::vector<double> temp(n, 0.0);
         for(int j = start; j < end; j++)
