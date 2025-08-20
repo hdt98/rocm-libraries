@@ -20,7 +20,6 @@
  * THE SOFTWARE.
  *
  * ************************************************************************ */
-#include <hip/hip_runtime.h>
 #include <iostream>
 #include <rocsparse/rocsparse.h>
 #include <vector>

@@ -20,7 +20,6 @@
  * THE SOFTWARE.
  *
  * ************************************************************************ */
-
 #include <iostream>
 #include <rocsparse/rocsparse.h>
 #include <vector>
