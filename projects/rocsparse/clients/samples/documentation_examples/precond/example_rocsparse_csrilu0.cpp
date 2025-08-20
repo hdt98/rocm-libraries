@@ -222,7 +222,7 @@ int main()
         std::vector<double> temp(n, 0.0);
         for(int j = start; j < end; j++)
         {
-            temp[hcsr_col_ind[j]] = hcsr_val[i];
+            temp[hcsr_col_ind[j]] = hcsr_val[j];
         }
 
         for(int j = 0; j < n; j++)
