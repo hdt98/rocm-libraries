@@ -121,17 +121,19 @@ int main()
     // Copy to host
     std::vector<rocsparse_int> hcsr_row_ptr(m + 1);
     std::vector<rocsparse_int> hcsr_col_ind(nnz);
-    std::vector<float> hcsr_val(nnz);
-    HIP_CHECK(hipMemcpy(hcsr_row_ptr.data(), dcsr_row_ptr, sizeof(rocsparse_int) * (m + 1), hipMemcpyDeviceToHost));
-    HIP_CHECK(hipMemcpy(hcsr_col_ind.data(), dcsr_col_ind, sizeof(rocsparse_int) * nnz, hipMemcpyDeviceToHost));
+    std::vector<float>         hcsr_val(nnz);
+    HIP_CHECK(hipMemcpy(
+        hcsr_row_ptr.data(), dcsr_row_ptr, sizeof(rocsparse_int) * (m + 1), hipMemcpyDeviceToHost));
+    HIP_CHECK(hipMemcpy(
+        hcsr_col_ind.data(), dcsr_col_ind, sizeof(rocsparse_int) * nnz, hipMemcpyDeviceToHost));
     HIP_CHECK(hipMemcpy(hcsr_val.data(), dcsr_val, sizeof(float) * nnz, hipMemcpyDeviceToHost));
 
     std::cout << "CSR" << std::endl;
     for(rocsparse_int i = 0; i < m; i++)
     {
         rocsparse_int start = hcsr_row_ptr[i];
-        rocsparse_int end = hcsr_row_ptr[i + 1];
-        
+        rocsparse_int end   = hcsr_row_ptr[i + 1];
+
         std::vector<float> temp(n, 0.0f);
         for(rocsparse_int j = start; j < end; j++)
         {
