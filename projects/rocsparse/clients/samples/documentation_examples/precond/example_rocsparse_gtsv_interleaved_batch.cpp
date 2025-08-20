@@ -147,6 +147,13 @@ int main()
     // Copy right-hand side to host
     HIP_CHECK(hipMemcpy(hx.data(), dx, sizeof(float) * m * batch_stride, hipMemcpyDeviceToHost));
 
+    std::cout << "hx" << std::endl;
+    for(size_t i = 0; i < hx.size(); i++)
+    {
+        std::cout << hx[i] << " ";
+    }
+    std::cout << "" << std::endl;
+
     // Clear rocSPARSE
     ROCSPARSE_CHECK(rocsparse_destroy_handle(handle));
 

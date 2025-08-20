@@ -22,7 +22,6 @@
  * ************************************************************************ */
 
 #include <iostream>
-#include <vector>
 
 #include <rocsparse/rocsparse.h>
 
@@ -113,6 +112,13 @@ int main()
 
     // Copy result back to host
     HIP_CHECK(hipMemcpy(hy, dy, sizeof(double) * m, hipMemcpyDeviceToHost));
+
+    std::cout << "hy" << std::endl;
+    for(size_t i = 0; i < m; i++)
+    {
+        std::cout << hy[i] << " ";
+    }
+    std::cout << "" << std::endl;
 
     // Clear rocSPARSE
     ROCSPARSE_CHECK(rocsparse_destroy_handle(handle));

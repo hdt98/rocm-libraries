@@ -134,6 +134,13 @@ int main()
     std::vector<float> hilu0(nnz);
     HIP_CHECK(hipMemcpy(hilu0.data(), dilu0, sizeof(float) * nnz, hipMemcpyDeviceToHost));
 
+    std::cout << "hilu0" << std::endl;
+    for(size_t i = 0; i < hilu0.size(); i++)
+    {
+        std::cout << hilu0[i] << " ";
+    }
+    std::cout << "" << std::endl;
+
     ROCSPARSE_CHECK(rocsparse_destroy_handle(handle));
 
     HIP_CHECK(hipFree(dbuffer));

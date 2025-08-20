@@ -181,6 +181,15 @@ int main()
                                            temp_buffer));
 
     // No zero pivot should be found, with L having unit diagonal
+    // Copy result back to host
+    HIP_CHECK(hipMemcpy(hB.data(), dB, sizeof(double) * ldb * nrhs, hipMemcpyDeviceToHost));
+
+    std::cout << "hB" << std::endl;
+    for(size_t i = 0; i < hB.size(); i++)
+    {
+        std::cout << hB[i] << " ";
+    }
+    std::cout << "" << std::endl;
 
     // Clean up
     HIP_CHECK(hipFree(temp_buffer));

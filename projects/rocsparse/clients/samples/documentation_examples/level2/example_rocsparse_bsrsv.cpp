@@ -22,7 +22,6 @@
  * ************************************************************************ */
 
 #include <iostream>
-#include <vector>
 
 #include <rocsparse/rocsparse.h>
 

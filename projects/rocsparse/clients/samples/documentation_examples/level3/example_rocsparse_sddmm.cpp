@@ -171,6 +171,27 @@ int main()
         hipMemcpy(hcsr_col_indC.data(), dcsr_col_indC, sizeof(int) * nnzC, hipMemcpyDeviceToHost));
     HIP_CHECK(hipMemcpy(hcsr_valC.data(), dcsr_valC, sizeof(float) * nnzC, hipMemcpyDeviceToHost));
 
+    std::cout << "hcsr_row_ptrC" << std::endl;
+    for(size_t i = 0; i < hcsr_row_ptrC.size(); i++)
+    {
+        std::cout << hcsr_row_ptrC[i] << " ";
+    }
+    std::cout << "" << std::endl;
+
+    std::cout << "hcsr_col_indC" << std::endl;
+    for(size_t i = 0; i < hcsr_col_indC.size(); i++)
+    {
+        std::cout << hcsr_col_indC[i] << " ";
+    }
+    std::cout << "" << std::endl;
+
+    std::cout << "hcsr_valC" << std::endl;
+    for(size_t i = 0; i < hcsr_valC.size(); i++)
+    {
+        std::cout << hcsr_valC[i] << " ";
+    }
+    std::cout << "" << std::endl;
+
     ROCSPARSE_CHECK(rocsparse_destroy_dnmat_descr(matA));
     ROCSPARSE_CHECK(rocsparse_destroy_dnmat_descr(matB));
     ROCSPARSE_CHECK(rocsparse_destroy_spmat_descr(matC));

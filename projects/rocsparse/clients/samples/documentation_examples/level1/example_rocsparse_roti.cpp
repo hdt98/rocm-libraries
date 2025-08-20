@@ -22,7 +22,6 @@
  * ************************************************************************ */
 
 #include <iostream>
-#include <vector>
 
 #include <rocsparse/rocsparse.h>
 
@@ -49,16 +48,19 @@
 int main()
 {
     // Number of non-zeros of the sparse vector
-    rocsparse_int nnz = 3;
+    const rocsparse_int nnz = 3;
+
+    // Number of entries in the dense vector
+    const rocsparse_int size = 9;
 
     // Sparse index vector
-    rocsparse_int hx_ind[3] = {0, 3, 5};
+    rocsparse_int hx_ind[nnz] = {0, 3, 5};
 
     // Sparse value vector
-    float hx_val[3] = {1.0f, 2.0f, 3.0f};
+    float hx_val[nnz] = {1.0f, 2.0f, 3.0f};
 
     // Dense vector
-    float hy[9] = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f, 9.0f};
+    float hy[size] = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f, 9.0f};
 
     // c and s
     float c = 3.7;
@@ -74,11 +76,11 @@ int main()
 
     HIP_CHECK(hipMalloc(&dx_ind, sizeof(rocsparse_int) * nnz));
     HIP_CHECK(hipMalloc(&dx_val, sizeof(float) * nnz));
-    HIP_CHECK(hipMalloc(&dy, sizeof(float) * 9));
+    HIP_CHECK(hipMalloc(&dy, sizeof(float) * size));
 
     HIP_CHECK(hipMemcpy(dx_ind, hx_ind, sizeof(rocsparse_int) * nnz, hipMemcpyHostToDevice));
     HIP_CHECK(hipMemcpy(dx_val, hx_val, sizeof(float) * nnz, hipMemcpyHostToDevice));
-    HIP_CHECK(hipMemcpy(dy, hy, sizeof(float) * 9, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(dy, hy, sizeof(float) * size, hipMemcpyHostToDevice));
 
     // rocSPARSE handle
     rocsparse_handle handle;
@@ -89,7 +91,21 @@ int main()
 
     // Copy result back to host
     HIP_CHECK(hipMemcpy(hx_val, dx_val, sizeof(float) * nnz, hipMemcpyDeviceToHost));
-    HIP_CHECK(hipMemcpy(hy, dy, sizeof(float) * 9, hipMemcpyDeviceToHost));
+    HIP_CHECK(hipMemcpy(hy, dy, sizeof(float) * size, hipMemcpyDeviceToHost));
+
+    std::cout << "hx_val" << std::endl;
+    for(rocsparse_int i = 0; i < nnz; i++)
+    {
+        std::cout << hx_val[i] << " ";
+    }
+    std::cout << "" << std::endl;
+
+    std::cout << "hy" << std::endl;
+    for(rocsparse_int i = 0; i < size; i++)
+    {
+        std::cout << hy[i] << " ";
+    }
+    std::cout << "" << std::endl;
 
     // Clear rocSPARSE
     ROCSPARSE_CHECK(rocsparse_destroy_handle(handle));

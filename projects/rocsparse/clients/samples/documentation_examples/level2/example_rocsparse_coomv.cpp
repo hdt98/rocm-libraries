@@ -22,7 +22,6 @@
  * ************************************************************************ */
 
 #include <iostream>
-#include <vector>
 
 #include <rocsparse/rocsparse.h>
 
@@ -110,6 +109,13 @@ int main()
     // Copy back to host
     double hy[4];
     HIP_CHECK(hipMemcpy(hy, dy, sizeof(double) * m, hipMemcpyDeviceToHost));
+
+    std::cout << "hy" << std::endl;
+    for(size_t i = 0; i < 4; i++)
+    {
+        std::cout << hy[i] << " ";
+    }
+    std::cout << "" << std::endl;
 
     // Clear up on device
     HIP_CHECK(hipFree(dArow));

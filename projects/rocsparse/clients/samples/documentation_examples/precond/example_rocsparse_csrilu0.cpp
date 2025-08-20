@@ -206,6 +206,33 @@ int main()
         printf("U has structural and/or numerical zero at U(%d,%d)\n", position, position);
     }
 
+    // Copy incomplete LU factorization to host
+    HIP_CHECK(
+        hipMemcpy(hcsr_row_ptr.data(), dcsr_row_ptr, sizeof(int) * (m + 1), hipMemcpyDeviceToHost));
+    HIP_CHECK(
+        hipMemcpy(hcsr_col_ind.data(), dcsr_col_ind, sizeof(int) * nnz, hipMemcpyDeviceToHost));
+    HIP_CHECK(hipMemcpy(hcsr_val.data(), dcsr_val, sizeof(double) * nnz, hipMemcpyDeviceToHost));
+
+    std::cout << "LU" << std::endl;
+    for(int i = 0; i < m; i++)
+    {
+        int start = hcsr_row_ptr[i];
+        int end = hcsr_row_ptr[i + 1];
+
+        std::vector<double> temp(n, 0.0);
+        for(int j = start; j < end; j++)
+        {
+            temp[hcsr_col_ind[j]] = hcsr_val[i];
+        }
+
+        for(int j = 0; j < n; j++)
+        {
+            std::cout << temp[j] << " ";
+        }
+        std::cout << "" << std::endl;
+    }
+    std::cout << "" << std::endl;
+
     // Solve Lz = x
     ROCSPARSE_CHECK(rocsparse_dcsrsv_solve(handle,
                                            rocsparse_operation_none,
