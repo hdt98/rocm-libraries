@@ -463,6 +463,9 @@ def config_cmd():
         cmake_options.append(f"-DTensile_CODE_OBJECT_VERSION=default")
         if args.tensile_logic:
             cmake_options.append(f"-DTensile_LOGIC={args.tensile_logic}")
+        # Default to rocm-libraries shared Tensile if not otherwise specified
+        if not (args.tensile_fork or args.tensile_tag or args.tensile_test_local_path or args.tensile_version):
+            cmake_options.append(f"-DTensile_TEST_LOCAL_PATH='../../../../shared/tensile'")
         if args.tensile_fork:
             cmake_options.append(f"-Dtensile_fork={args.tensile_fork}")
         if args.tensile_tag:
