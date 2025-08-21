@@ -60,7 +60,7 @@ options:
   3. CMAKE_CXX_COMPILER: "/opt/rocm/bin/amdclang++"
   4. CMAKE_BUILD_TYPE: "Release"
   5. ROCROLLER_ENABLE_FETCH: "ON"
-  6. ROCROLLER_TESTS_SKIP_SLOW: "OFF"
+  6. ROCROLLER_ENABLE_SLOW_TESTS: "ON"
   7. CMAKE_PREFIX_PATH: "/opt/rocm;/opt/rocm/llvm"
 3. asan (See CMakePresets.json for details)
 4. amd-mrisa (See CMakePresets.json for details)

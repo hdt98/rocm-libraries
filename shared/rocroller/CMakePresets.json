@@ -29,7 +29,7 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
         "ROCROLLER_ENABLE_YAML_CPP": "OFF",
-        "ROCROLLER_TESTS_SKIP_SLOW": "OFF"
+        "ROCROLLER_ENABLE_SLOW_TESTS": "ON"
       }
     },
     {
