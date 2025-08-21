@@ -173,4 +173,3 @@ foreach(file ${DOCUMENTATION_EXAMPLES})
     message(STATUS "Found .cpp file: ${file}")
     add_rocsparse_example(${file})
 endforeach()
-
