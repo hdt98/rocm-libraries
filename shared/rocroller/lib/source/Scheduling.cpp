@@ -54,28 +54,6 @@ namespace rocRoller
         }
     }
 
-    std::string makeAString(EnumBitset<CoexecCategory> const& set)
-    {
-        std::string rv = "{";
-
-        bool first = true;
-        for(int i = 0; i < static_cast<int>(CoexecCategory::Count); i++)
-        {
-            auto enumValue = static_cast<CoexecCategory>(i);
-
-            if(set[enumValue])
-            {
-                if(!first)
-                    rv += ", ";
-
-                rv += toString(enumValue);
-                first = false;
-            }
-        }
-
-        return rv + "}";
-    }
-
     std::string toString(DisallowedCycles const& vals)
     {
         std::string rv = "{";
@@ -87,7 +65,7 @@ namespace rocRoller
             if(!first)
                 rv += ", ";
 
-            rv += fmt::format("[+{}: {}]", cycle, makeAString(categories));
+            rv += fmt::format("[+{}: {}]", cycle, shortString(categories));
 
             first = false;
         }

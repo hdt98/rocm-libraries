@@ -40,7 +40,6 @@ namespace rocRoller
     using DisallowedCycles = std::map<int, EnumBitset<CoexecCategory>>;
     void        combineCoexec(DisallowedCycles& dst, DisallowedCycles const& src, int offset);
     std::string toString(DisallowedCycles const& cycles);
-    std::string makeAString(EnumBitset<CoexecCategory> const& set);
 
     namespace Scheduling
     {

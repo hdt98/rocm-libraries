@@ -235,7 +235,8 @@ namespace rocRoller
         if(dependency == Scheduling::Dependency::SCC)
         {
             co_yield m_context->copier()->copy(dst, m_context->getSCC(), "");
-            co_yield Instruction::Unlock(Scheduling::Dependency::SCC, "End Compare writing to non-SCC dest");
+            co_yield Instruction::Unlock(Scheduling::Dependency::SCC,
+                                         "End Compare writing to non-SCC dest");
         }
     }
 

@@ -135,15 +135,14 @@ namespace rocRoller
         co_yield get2DwordsScalar(l0, l1, lhs);
         co_yield get2DwordsScalar(r0, r1, rhs);
 
-        co_yield (
-            Instruction::Lock(Scheduling::Dependency::SCC, "Start of Int64 sub, locking SCC"));
+        co_yield(Instruction::Lock(Scheduling::Dependency::SCC, "Start of Int64 sub, locking SCC"));
 
         co_yield ScalarSubUInt32(
             m_context, dest->subset({0}), l0, r0, "least significant half; sets scc");
         co_yield ScalarSubUInt32CarryInOut(
             m_context, dest->subset({1}), l1, r1, "most significant half; uses scc");
 
-        co_yield (Instruction::Unlock("End of Int64 sub, unlocking SCC"));
+        co_yield(Instruction::Unlock("End of Int64 sub, unlocking SCC"));
     }
 
     template <>
