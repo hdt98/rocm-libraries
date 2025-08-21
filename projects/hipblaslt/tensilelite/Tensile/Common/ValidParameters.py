@@ -70,6 +70,13 @@ for i in validMacroTileSides:
         validMacroTiles.append([i, j])
 validTT = 32
 
+maxWGsInCluster = 16
+validClusterDimensions = []
+for i in range(1, maxWGsInCluster + 1):
+  for j in range(1, maxWGsInCluster + 1):
+    if i * j <= maxWGsInCluster:
+      validClusterDimensions.append([i, j])
+
 @lru_cache
 def makeValidWorkGroups():
     validWorkGroups = []
@@ -983,6 +990,9 @@ validParameters = { # we need to make sure this matches develop
     # 3: Use TDM for both A and B
     "TDMInst": [0, 1, 2, 3],
     "TDMSplit": [False, True],
+    # Cluster dimension. Clusters have up to 16 work-groups in a cluster, but each work-group in a
+    # cluster runs on a separate WGP.
+    "ClusterDim": validClusterDimensions
 }
 
 newMIValidParameters = {

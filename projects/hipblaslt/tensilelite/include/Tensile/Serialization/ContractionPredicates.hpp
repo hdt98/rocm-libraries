@@ -136,7 +136,8 @@ namespace TensileLite
                      Base::template Pair<Predicates::Contraction::MXBlockA>(),
                      Base::template Pair<Predicates::Contraction::MXBlockB>(),
                      Base::template Pair<Predicates::Contraction::DataTypeMXSA>(),
-                     Base::template Pair<Predicates::Contraction::DataTypeMXSB>()});
+                     Base::template Pair<Predicates::Contraction::DataTypeMXSB>(),
+                     Base::template Pair<Predicates::Contraction::ClusterDimCheck>()});
 
                 auto gmap = Generic::GetSubclasses();
                 rv.insert(gmap.begin(), gmap.end());
@@ -604,6 +605,11 @@ namespace TensileLite
         template <typename IO>
         struct MappingTraits<Predicates::Contraction::DataTypeMXSB, IO>
             : public AutoMappingTraits<Predicates::Contraction::DataTypeMXSB, IO>
+        {
+        };
+        template <typename IO>
+        struct MappingTraits<Predicates::Contraction::ClusterDimCheck, IO>
+            : public AutoMappingTraits<Predicates::Contraction::ClusterDimCheck, IO>
         {
         };
     } // namespace Serialization
