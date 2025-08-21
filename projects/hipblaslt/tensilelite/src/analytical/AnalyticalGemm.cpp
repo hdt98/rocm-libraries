@@ -80,6 +80,69 @@ namespace TensileLite
             return numerator / denominator;
         }
 
+        static inline double compute_cvt_overhead(
+            const Hardware& hardware,
+            size_t MT_M, size_t MT_N, size_t MT_K,
+            size_t MI_M, size_t MI_N, size_t MI_K,
+            size_t element_size_A, size_t element_size_B,
+            bool   debug)
+        {
+            // Wave tile sizes
+            // TODO: Use kernel's actual wavetiles.
+            const double wave_tile_m = MT_M / 2.0;
+            const double wave_tile_n = MT_N / 2.0;
+            const double wave_tile_k = MT_K / MI_K;
+
+            // MFMA count and cycles
+            const double N_MI = (wave_tile_m / MI_M) * (wave_tile_n / MI_N) * wave_tile_k;
+
+            // TF32 emu: 3× BF16 MI issue slots
+            const double num_mfma = 3.0 * static_cast<double>(N_MI);
+
+            // Cycle scale per MI (use BF16 MI latency as the basic timing quantum)
+            const double L_MI_bf16 = hardware.get_MI_latency(MI_M, MI_N, MI_K, DataType::BFloat16);
+            const double mfma_cycles = num_mfma * L_MI_bf16;
+
+            // 2) Bytes (per K-slice), using ceil-div to whole bytes
+            const double bytesA = static_cast<double>(wave_tile_m) * MT_K * safe_ceil_div(element_size_A, 8);
+            const double bytesB = static_cast<double>(wave_tile_n) * MT_K * safe_ceil_div(element_size_B, 8);
+
+            const double mt_bytesA = static_cast<double>(MT_M) * MT_K * safe_ceil_div(element_size_A, 8);
+
+            // 3) Modeled transfer quanta (128B lines)
+            //      dsA = bytesA / (128 * MI_M)
+            //      dsB = bytesB / (128 * MI_N)
+            //      GR  = dsA  (global->LDS modeled equal to A-side DS)
+            const double dsA = (bytesA / 128.0) / static_cast<double>(MI_M); // LDS->VGPR for A
+            const double dsB = (bytesB / 128.0) / static_cast<double>(MI_N); // LDS->VGPR for B
+            const double GR  = dsA;                                          // Global->LDS reads
+            const double LR  = dsA + dsB;                                    // total DS->VGPR
+
+            // 4) Heuristic cycle weights (scaled to MI latency).
+            //    Preserves your A=104, B=8, C=4 when L_MI_bf16 == 16.
+            // 24 vector instructions per 2 ds_reads (16x16x32)
+            // 24 vector instructions per 2 ds_reads for A and for B.
+            // 3 instructions per fp32 value read; number ds_read * size
+            const double A = (104.0 / 16.0) * L_MI_bf16; // CVT per LR-sized chunk (DS->VGPR)
+            const double B = (  8.0 / 16.0) * L_MI_bf16; // hidden per spare MFMA slot  
+            // MI16: 16 - 4 (12 cycles), for those 4 cycles, VGPRs are locked. 8 cycles to do anything. 
+            const double C = (  4.0 / 16.0) * L_MI_bf16; // hidden per (LR+GR) slot     // MI16
+            // 32 cycles (mfma), 4 cycles, 28, 4 vgpr lock, 24 cycles left.
+            // 24: 6 conv instructions, 3 ds_reads, ~6 grs
+
+            // 5) Exposed vs hidden CVT
+            const double spare_mfma = std::max(0.0, num_mfma - LR - GR);
+            const double cvt        = A * dsA;                                  // only DS->VGPR contributes CVT
+            const double H          = B * spare_mfma + C * (LR + GR);           // hidden cycles
+            const double overhead   = std::max(cvt - H, 0.0);
+
+            // 6) Efficiency
+            const double denom = mfma_cycles + overhead;
+            const double eff   = (denom > 0.0) ? (mfma_cycles / denom) : 1;
+
+            return overhead;
+        }
+
         // Determine the compute latency per MT_MxMT_NxMT_K Macro Tile (L_MT).
         size_t compute_mt_compute_latency(const Hardware& hardware,
                                           size_t          M,
@@ -526,8 +589,21 @@ namespace TensileLite
                 L_epilogue += L_reduce * 1;
             }
 
+            double L_cvt = 0.0f;
+            bool tf32_emu = ((miDataType == DataType::XFloat32 || miDataType == DataType::Float) &&
+                (hardware.arch == Hardware::Architecture::gfx950));
+
+            if(tf32_emu && !(MT_M == 256 && MT_N == 256))
+            {
+                L_cvt = compute_cvt_overhead(hardware,
+                    MT_M, MT_N, MT_K,
+                    MI_M, MI_N, MI_K,
+                    element_size_A, element_size_B,
+                    debug);
+            }
+
             // 5) Single-tile latency (always additive)
-            double L_tile_single = std::max(L_compute, L_mem);
+            double L_tile_single = std::max(L_compute, L_mem) + L_cvt;
 
             // 6) Number of K-iterations (excluding epilogue), at least 1
             long num_iter = static_cast<long>(((K + MT_K - 1) / MT_K)) - 1;
@@ -553,9 +629,12 @@ namespace TensileLite
                                        + std::to_string(int(MT_K)));
                 hardware.log_debug("L_compute", L_compute);
                 hardware.log_debug("L_mem", L_mem);
+                hardware.log_debug("L_cvt", L_cvt);
                 hardware.log_debug("L_prologue", L_prologue);
                 hardware.log_debug("L_epilogue", L_epilogue);
+                hardware.log_debug("L_tile_single", L_tile_single);
                 hardware.log_debug("num_iter", num_iter);
+                hardware.log_debug("L_tile_total", L_tile_total);
             }
 
             return L_tile_total;
@@ -833,7 +912,8 @@ namespace TensileLite
                                                  mx_block_size,
                                                  debug);
 
-
+            bool tf32_emu = ((miDataType == DataType::XFloat32 || miDataType == DataType::Float) &&
+                (hardware.arch == Hardware::Architecture::gfx950));
 
             //Short circuit conditions for tiles.
             if(enable_heuristics)
@@ -845,9 +925,6 @@ namespace TensileLite
                     || (MT_N > N && MT_N != MI_N && edge_waste_n > 0.5) || (MT_K > K && !(MT_K<= MI_K)))
                    )
                 {
-                    
-
-
                     hardware.log_debug("Edge Waste Invalidated","True");
                     if(Hardware::is_debug_enabled())
                     {
@@ -897,7 +974,18 @@ namespace TensileLite
 
             //TODO These are quantifying effects that don't work in the current math. 
             //TODO THESE SHOULD BE TEMPORARY FIXES AND BE MORE SOLIDLY INTEGRATED LATER
-            if(enable_heuristics)
+
+            //TODO TF32-based Heuristics
+            if (enable_heuristics && tf32_emu) {
+                // Prefer Custom 256x256x32 kernel for TF32
+                if((MT_M == 256 && MT_N == 256 && MT_K == 32))
+                {
+                    total_latency = total_latency * 0.3;
+                }
+            }
+
+            //TODO need a better system for these specializations
+            if(enable_heuristics && !tf32_emu)
             {
                 //Pick perfect "stationary style" tiles more often.
                 if(M == MT_M || N == MT_N || K == MT_K)
