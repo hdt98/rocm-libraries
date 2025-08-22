@@ -92,11 +92,9 @@ if(ROCROLLER_ENABLE_GEMM_CLIENT_TESTS)
     pytest_discover_tests(
         GEMMClientTests
         WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}/client"
-        REPORTER JUnit
-        OUTPUT_DIR ${TEST_REPORT_DIR}
-        OUTPUT_SUFFIX ".xml"
         DISCOVERY_MODE PRE_TEST
         ENVIRONMENT "ROCROLLER_BUILD_DIR=${PROJECT_BINARY_DIR}" "LD_PRELOAD=${ASAN_LIB_PATH}" "ASAN_OPTIONS=detect_leaks=0"
+        EXTRA_ARGS "--junit-xml=${TEST_REPORT_DIR}/GEMMClientTests.xml"
         PROPERTIES
             "LABELS" "PYTHON"
             "LABELS" "CLIENT"
@@ -203,14 +201,12 @@ if(ROCROLLER_ENABLE_TEST_DISCOVERY)
     pytest_discover_tests(
         PythonTest
         WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}/scripts"
-        REPORTER JUnit
-        OUTPUT_DIR ${TEST_REPORT_DIR}
-        OUTPUT_SUFFIX ".xml"
         DISCOVERY_MODE PRE_TEST
         PYTHON_PATH_PREPEND ${PROJECT_SOURCE_DIR}/scripts/lib
         ENVIRONMENT "ROCROLLER_BUILD_DIR=${PROJECT_BINARY_DIR}"
         PROPERTIES
             "LABELS" "PYTHON"
+        EXTRA_ARGS "--junit-xml=${TEST_REPORT_DIR}/PythonTest.xml"
         DISCOVERY_EXTRA_ARGS ${PYTHON_TEST_SKIP} "--config-file=${PROJECT_SOURCE_DIR}/pytest.ini"
         DEPENDS
             rocroller-gemm

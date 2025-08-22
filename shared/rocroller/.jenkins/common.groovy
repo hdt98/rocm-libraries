@@ -54,6 +54,7 @@ def runCompileCommand(platform, project, jobName, mxDataGeneratorGitURL, mxDataG
 
                 ${sshBlock}
 
+                export BUNDLE_PYTHON_TESTS=1
                 mkdir -p build
                 cd build
                 # Check that all tests are included.
@@ -66,7 +67,7 @@ def runCompileCommand(platform, project, jobName, mxDataGeneratorGitURL, mxDataG
                     -DROCROLLER_ENABLE_FETCH=ON \\
                     -DCMAKE_PREFIX_PATH="/opt/rocm;/opt/rocm/llvm"
                 ccache --print-stats
-                make -j ${target}
+                cmake --build . -j ${target}
                 ccache --print-stats
                 """
 
