@@ -450,7 +450,8 @@ struct AnySolver
                                   std::true_type,
                                   std::true_type) const
         {
-            MIOPEN_THROW("No GenericSearch for Legacy Solvers.");
+            auto config = value.Search(ctx, problem, invoke_ctx, perf_sols);
+            return config.ToString();
         }
 
         // tunable solver

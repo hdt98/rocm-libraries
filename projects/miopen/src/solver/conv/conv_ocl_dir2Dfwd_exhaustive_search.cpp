@@ -215,19 +215,20 @@ static int MeasurePerfConfig(const Handle& handle,
 LegacyPerformanceConfig
 ConvOclDirectFwdLegacyExhaustiveSearch::Search(const ExecutionContext& ctx,
                                                const ProblemDescription& problem,
-                                               const AnyInvokeParams& invoke_ctx) const
+                                               const AnyInvokeParams& invoke_ctx,
+                                               std::vector<SolutionPerf>* perf_sols = nullptr) const
 {
     if(problem.IsFp16())
     {
-        return SearchImpl<half_float::half>(ctx, problem, invoke_ctx);
+        return SearchImpl<half_float::half>(ctx, problem, invoke_ctx, perf_sols);
     }
     else if(problem.IsFp32())
     {
-        return SearchImpl<float>(ctx, problem, invoke_ctx);
+        return SearchImpl<float>(ctx, problem, invoke_ctx, perf_sols);
     }
     else if(problem.IsBfp16())
     {
-        return SearchImpl<bfloat16>(ctx, problem, invoke_ctx);
+        return SearchImpl<bfloat16>(ctx, problem, invoke_ctx, perf_sols);
     }
     else
     {
@@ -239,12 +240,19 @@ template <typename Tgpu>
 LegacyPerformanceConfig
 ConvOclDirectFwdLegacyExhaustiveSearch::SearchImpl(const ExecutionContext& ctx,
                                                    const ProblemDescription& problem,
-                                                   const AnyInvokeParams& invoke_ctx) const
+                                                   const AnyInvokeParams& invoke_ctx,
+                                                   std::vector<SolutionPerf>* perf_sols = nullptr) const
 {
     LegacyPerformanceConfig result;
     bool is_passed = false;
 
     double processing_time = std::numeric_limits<double>::max();
+
+    // list of sampled solutions
+    if(perf_sols)
+    {
+        perf_sols->erase(perf_sols->begin(), perf_sols->end());
+    }
 
     LegacyPerformanceConfig candidate;
     candidate.grp_tile0       = 16;
@@ -456,6 +464,10 @@ ConvOclDirectFwdLegacyExhaustiveSearch::SearchImpl(const ExecutionContext& ctx,
                             min_proc_time = processing_time;
                             candidate     = result;
                         }
+                        if(perf_sols)
+                        {
+                            perf_sols->push_back({result.ToString(), processing_time});
+                        }
 
                         if(run_counter % report_inteval == 0)
                         {
@@ -610,6 +622,10 @@ ConvOclDirectFwdLegacyExhaustiveSearch::SearchImpl(const ExecutionContext& ctx,
                                         min_proc_time = processing_time;
                                         candidate     = result;
                                     }
+                                    if(perf_sols)
+                                    {
+                                        perf_sols->push_back({result.ToString(), processing_time});
+                                    }
 
                                     if(run_counter % report_inteval == 0)
                                     {
@@ -684,10 +700,18 @@ ConvOclDirectFwdLegacyExhaustiveSearch::SearchImpl(const ExecutionContext& ctx,
                 min_proc_time = default_time;
                 candidate     = default_config;
             }
+            if(perf_sols)
+            {
+                perf_sols->push_back({default_config.ToString(), default_time});
+            }
         }
         MIOPEN_LOG_W("...Score: " << (default_time / min_proc_time));
     }
     result = candidate;
+    if(perf_sols)
+        std::sort(perf_sols->begin(), perf_sols->end(), [](SolutionPerf a, SolutionPerf b) {
+            return a.time < b.time;
+        });
 
     if(!is_passed)
         MIOPEN_THROW("Search failed for ConvOclDirectFwdLegacyExhaustiveSearch");
