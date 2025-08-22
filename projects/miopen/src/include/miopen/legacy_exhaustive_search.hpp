@@ -27,6 +27,7 @@
 #ifndef GUARD_MIOPEN_LEGACY_EXHAUSTIVE_SEARCH_HPP
 #define GUARD_MIOPEN_LEGACY_EXHAUSTIVE_SEARCH_HPP
 
+#include <miopen/conv/solvers.hpp>
 #include <miopen/config.h>
 #include <miopen/performance_config.hpp>
 #include <iostream>
@@ -74,6 +75,21 @@ struct LegacyPerformanceConfig : PerfConfigBase<LegacyPerformanceConfig>
         f(self.n_stacks, "temp.n_stacks");
     }
 };
+
+struct SolutionPerf
+{
+    std::string params;
+    float time;
+};
+
+namespace conv {
+LegacyPerformanceConfig
+ConvOclDirectFwdLegacyExhaustiveSearch::LegacySearch(const ExecutionContext&,
+                                               const miopen::conv::ProblemDescription&,
+                                               const miopen::AnyInvokeParams&,
+                                               std::vector<SolutionPerf>*) const;
+} // namespace conv
+
 } // namespace solver
 } // namespace miopen
 

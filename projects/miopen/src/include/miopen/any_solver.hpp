@@ -32,7 +32,6 @@
 #include <miopen/find_solution.hpp>
 #include <miopen/mlo_internal.hpp>
 #include <miopen/legacy_exhaustive_search.hpp>
-
 #include <miopen/generic_search.hpp>
 
 #include <cassert>
@@ -443,14 +442,14 @@ struct AnySolver
         }
 
         // tunable legacy solver
-        std::string GenericSearch(const ExecutionContext&,
-                                  const miopen::conv::ProblemDescription&,
-                                  const miopen::AnyInvokeParams&,
-                                  std::vector<miopen::solver::SolutionPerf>*,
+        std::string GenericSearch(const ExecutionContext& ctx,
+                                  const miopen::conv::ProblemDescription& problem,
+                                  const miopen::AnyInvokeParams& invoke_ctx,
+                                  std::vector<miopen::solver::SolutionPerf>* perf_sols,
                                   std::true_type,
                                   std::true_type) const
         {
-            auto config = value.Search(ctx, problem, invoke_ctx, perf_sols);
+            auto config = conv::LegacySearch(ctx, problem, invoke_ctx, perf_sols);
             return config.ToString();
         }
 

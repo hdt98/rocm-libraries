@@ -213,7 +213,7 @@ static int MeasurePerfConfig(const Handle& handle,
 }
 
 LegacyPerformanceConfig
-ConvOclDirectFwdLegacyExhaustiveSearch::Search(const ExecutionContext& ctx,
+ConvOclDirectFwdLegacyExhaustiveSearch::LegacySearch(const ExecutionContext& ctx,
                                                const ProblemDescription& problem,
                                                const AnyInvokeParams& invoke_ctx,
                                                std::vector<SolutionPerf>* perf_sols = nullptr) const
@@ -229,6 +229,29 @@ ConvOclDirectFwdLegacyExhaustiveSearch::Search(const ExecutionContext& ctx,
     else if(problem.IsBfp16())
     {
         return SearchImpl<bfloat16>(ctx, problem, invoke_ctx, perf_sols);
+    }
+    else
+    {
+        MIOPEN_THROW("Unsupported float_size");
+    }
+} 
+
+LegacyPerformanceConfig
+ConvOclDirectFwdLegacyExhaustiveSearch::Search(const ExecutionContext& ctx,
+                                               const ProblemDescription& problem,
+                                               const AnyInvokeParams& invoke_ctx) const
+{
+    if(problem.IsFp16())
+    {
+        return SearchImpl<half_float::half>(ctx, problem, invoke_ctx);
+    }
+    else if(problem.IsFp32())
+    {
+        return SearchImpl<float>(ctx, problem, invoke_ctx);
+    }
+    else if(problem.IsBfp16())
+    {
+        return SearchImpl<bfloat16>(ctx, problem, invoke_ctx);
     }
     else
     {
