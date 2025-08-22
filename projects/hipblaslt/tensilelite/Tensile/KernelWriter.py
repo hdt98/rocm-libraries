@@ -624,6 +624,13 @@ class KernelWriter(metaclass=abc.ABCMeta):
       for item in readItems:
         iterCode.add(item)
 
+      if kernel["1LDSBuffer"]:
+          barrier = Module()
+          barrier.addComment0("1 LDS buffer: read-sync-write")
+          barrier.add(SWaitCnt(dscnt=0, comment=""))
+          barrier.add(SBarrier())
+          iterCode.add(barrier)
+
       #move down write to be the last
       iterCode.add(localWriteCode)
       # tack on the pointer and mac code:
