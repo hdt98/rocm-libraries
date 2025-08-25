@@ -215,6 +215,14 @@ namespace rocRollerTest
                      FatalError);
     }
 
+    TEST_F(CostTest, LinearWeightedSimple)
+    {
+        Component::ComponentFactoryBase::ClearAllCaches();
+        EXPECT_NE(Component::Get<Scheduling::Cost>(Scheduling::CostFunction::LinearWeightedSimple,
+                                                   m_context),
+                  nullptr);
+    }
+
     TEST_F(CostTest, NonexistentSchedulerWeightsFile)
     {
         Component::ComponentFactoryBase::ClearAllCaches();

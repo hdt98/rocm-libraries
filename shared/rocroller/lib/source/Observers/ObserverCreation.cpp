@@ -71,7 +71,7 @@ namespace rocRoller
             PotentialObservers< // Always present
                 AllocatingObserver,
                 WaitcntObserver,
-                // MFMAObserver,
+                MFMAObserver,
                 MFMACoexecObserver,
                 VMEMObserver,
                 DSMEMObserver,

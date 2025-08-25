@@ -88,70 +88,71 @@ namespace rocRoller
 
     namespace Scheduling
     {
-        constexpr Weights GFX950_WEIGHTS = {.nops               = 10000.,
-                                            .vmcnt              = 0,
-                                            .lgkmcnt            = 0,
-                                            .vmQueueLen         = 0,
-                                            .vectorQueueSat     = 0,
-                                            .ldsQueueSat        = 0,
-                                            .lgkmQueueLen       = 0,
+        constexpr Weights GFX950_SIMPLIFIED_WEIGHTS = {.nops               = 10000.,
+                                                       .vmcnt              = 0,
+                                                       .lgkmcnt            = 0,
+                                                       .vmQueueLen         = 0,
+                                                       .vectorQueueSat     = 0,
+                                                       .ldsQueueSat        = 0,
+                                                       .lgkmQueueLen       = 0,
+                                                       .stallCycles        = 1000.0,
+                                                       .notMFMA            = 0,
+                                                       .isMFMA             = 0,
+                                                       .isSMEM             = 0,
+                                                       .isSControl         = 0,
+                                                       .isSALU             = 10,
+                                                       .isVMEMRead         = 0,
+                                                       .isVMEMWrite        = 0,
+                                                       .isLDSRead          = 0,
+                                                       .isLDSWrite         = 0,
+                                                       .isVALU             = 10,
+                                                       .isACCVGPRWrite     = 0,
+                                                       .isACCVGPRRead      = 0,
+                                                       .newSGPRs           = 0,
+                                                       .newVGPRs           = 0,
+                                                       .highWaterMarkSGPRs = 0,
+                                                       .highWaterMarkVGPRs = 0,
+                                                       .fractionOfSGPRs    = 0,
+                                                       .fractionOfVGPRs    = 0,
+                                                       .outOfRegisters     = 1000000000.0,
+                                                       .zeroFreeBarriers   = true,
+                                                       .vmemCycles         = 63,
+                                                       .vmemQueueSize      = 1,
+                                                       .dsmemCycles        = 38,
+                                                       .dsmemQueueSize     = 1};
+
+        constexpr Weights GFX950_WEIGHTS = {.nops               = 1001.4279088984798,
+                                            .vmcnt              = 526.093932290615,
+                                            .lgkmcnt            = 885.6074246484375,
+                                            .vmQueueLen         = 35,
+                                            .vectorQueueSat     = 1435.1211330900899,
+                                            .ldsQueueSat        = 134.22254126254612,
+                                            .lgkmQueueLen       = 35,
                                             .stallCycles        = 1000.0,
-                                            .notMFMA            = 0,
-                                            .isMFMA             = 0,
-                                            .isSMEM             = 0,
-                                            .isSControl         = 0,
-                                            .isSALU             = 10,
-                                            .isVMEMRead         = 0,
-                                            .isVMEMWrite        = 0,
-                                            .isLDSRead          = 0,
-                                            .isLDSWrite         = 0,
-                                            .isVALU             = 10,
-                                            .isACCVGPRWrite     = 0,
-                                            .isACCVGPRRead      = 0,
-                                            .newSGPRs           = 0,
-                                            .newVGPRs           = 0,
-                                            .highWaterMarkSGPRs = 0,
-                                            .highWaterMarkVGPRs = 0,
-                                            .fractionOfSGPRs    = 0,
-                                            .fractionOfVGPRs    = 0,
+                                            .notMFMA            = 10986.395913365237,
+                                            .isMFMA             = 81.12435660463446,
+                                            .isSMEM             = 199.72403310006476,
+                                            .isSControl         = 137.84120970739187,
+                                            .isSALU             = 30.872084606099698,
+                                            .isVMEMRead         = 85.9588364354184,
+                                            .isVMEMWrite        = 251.36047887498077,
+                                            .isLDSRead          = 48.2195248263684,
+                                            .isLDSWrite         = 84.55911735600286,
+                                            .isVALU             = 89.04421879077165,
+                                            .isACCVGPRWrite     = 71.32846565329866,
+                                            .isACCVGPRRead      = 58.89401902273831,
+                                            .newSGPRs           = 94.44006642730224,
+                                            .newVGPRs           = 49.879984390857786,
+                                            .highWaterMarkSGPRs = 265.4234682031597,
+                                            .highWaterMarkVGPRs = 113.2530825463529,
+                                            .fractionOfSGPRs    = 45.527998466975674,
+                                            .fractionOfVGPRs    = 258.19016732766454,
                                             .outOfRegisters     = 1000000000.0,
                                             .zeroFreeBarriers   = true,
-                                            .vmemCycles         = 63,
-                                            .vmemQueueSize      = 1,
-                                            .dsmemCycles        = 38,
-                                            .dsmemQueueSize     = 1};
-        // constexpr Weights GFX950_WEIGHTS = {.nops               = 1001.4279088984798,
-        //                                     .vmcnt              = 526.093932290615,
-        //                                     .lgkmcnt            = 885.6074246484375,
-        //                                     .vmQueueLen         = 35,
-        //                                     .vectorQueueSat     = 1435.1211330900899,
-        //                                     .ldsQueueSat        = 134.22254126254612,
-        //                                     .lgkmQueueLen       = 35,
-        //                                     .stallCycles        = 1000.0,
-        //                                     .notMFMA            = 10986.395913365237,
-        //                                     .isMFMA             = 81.12435660463446,
-        //                                     .isSMEM             = 199.72403310006476,
-        //                                     .isSControl         = 137.84120970739187,
-        //                                     .isSALU             = 30.872084606099698,
-        //                                     .isVMEMRead         = 85.9588364354184,
-        //                                     .isVMEMWrite        = 251.36047887498077,
-        //                                     .isLDSRead          = 48.2195248263684,
-        //                                     .isLDSWrite         = 84.55911735600286,
-        //                                     .isVALU             = 89.04421879077165,
-        //                                     .isACCVGPRWrite     = 71.32846565329866,
-        //                                     .isACCVGPRRead      = 58.89401902273831,
-        //                                     .newSGPRs           = 94.44006642730224,
-        //                                     .newVGPRs           = 49.879984390857786,
-        //                                     .highWaterMarkSGPRs = 265.4234682031597,
-        //                                     .highWaterMarkVGPRs = 113.2530825463529,
-        //                                     .fractionOfSGPRs    = 45.527998466975674,
-        //                                     .fractionOfVGPRs    = 258.19016732766454,
-        //                                     .outOfRegisters     = 1000000000.0,
-        //                                     .zeroFreeBarriers   = true,
-        //                                     .vmemCycles         = 480,
-        //                                     .vmemQueueSize      = 3,
-        //                                     .dsmemCycles        = 95,
-        //                                     .dsmemQueueSize     = 3};
+                                            .vmemCycles         = 480,
+                                            .vmemQueueSize      = 3,
+                                            .dsmemCycles        = 95,
+                                            .dsmemQueueSize     = 3};
         constexpr Weights GFX942_WEIGHTS = {.nops               = 194.43894526982916,
                                             .vmcnt              = 71.87967451224605,
                                             .lgkmcnt            = 57.99317255314543,
@@ -240,13 +241,13 @@ namespace rocRoller
         RegisterComponent(LinearWeightedCost);
         static_assert(Component::Component<LinearWeightedCost>);
 
-        inline LinearWeightedCost::LinearWeightedCost(ContextPtr ctx)
+        inline LinearWeightedCost::LinearWeightedCost(ContextPtr ctx, CostFunction fn)
             : Cost{ctx}
-            , m_weights(loadWeights(ctx))
+            , m_weights(loadWeights(ctx, fn))
         {
         }
 
-        Weights LinearWeightedCost::loadWeights(ContextPtr ctx) const
+        Weights LinearWeightedCost::loadWeights(ContextPtr ctx, CostFunction fn) const
         {
             auto settingsFile = Settings::getInstance()->get(Settings::SchedulerWeights);
             if(!settingsFile.empty())
@@ -267,6 +268,15 @@ namespace rocRoller
             else
             {
                 auto const& arch = ctx->targetArchitecture().target();
+
+                if(fn == CostFunction::LinearWeightedSimple)
+                {
+                    if(!arch.isCDNA35GPU())
+                        Log::warn("Architecture {} not tested for simplifed weights.",
+                                  arch.toString());
+
+                    return GFX950_SIMPLIFIED_WEIGHTS;
+                }
 
                 if(arch.isCDNA1GPU())
                     return GFX908_WEIGHTS;
@@ -293,7 +303,9 @@ namespace rocRoller
 
         inline bool LinearWeightedCost::Match(Argument arg)
         {
-            return std::get<0>(arg) == CostFunction::LinearWeighted;
+            auto [costFn, ctx] = arg;
+            return costFn == CostFunction::LinearWeighted
+                   || costFn == CostFunction::LinearWeightedSimple;
         }
 
         inline std::shared_ptr<Cost> LinearWeightedCost::Build(Argument arg)
@@ -301,7 +313,9 @@ namespace rocRoller
             if(!Match(arg))
                 return nullptr;
 
-            return std::make_shared<LinearWeightedCost>(std::get<1>(arg));
+            auto [costFn, ctx] = arg;
+
+            return std::make_shared<LinearWeightedCost>(ctx, costFn);
         }
 
         inline std::string LinearWeightedCost::name() const

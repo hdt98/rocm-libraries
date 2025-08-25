@@ -121,7 +121,6 @@ namespace rocRoller
         return rv + "}";
     }
 
-
     template <CCountedEnum Enum>
     std::ostream& operator<<(std::ostream& stream, EnumBitset<Enum> const& bs)
     {

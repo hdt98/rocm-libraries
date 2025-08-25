@@ -31,17 +31,6 @@ namespace rocRoller
 {
     namespace Scheduling
     {
-        auto addCommentToFirst(std::string comment)
-        {
-            // bool first = true;
-            return [comment](Instruction inst) {
-                if(!inst.isCommentOnly())
-                    inst.addComment(comment);
-
-                // first = false;
-                return inst;
-            };
-        }
 
         RegisterComponent(PriorityScheduler);
         static_assert(Component::Component<PriorityScheduler>);
@@ -95,7 +84,6 @@ namespace rocRoller
                 minCostIdx    = -1;
 
                 EnumBitset<CoexecCategory> categories;
-                std::string                comment;
 
                 for(size_t idx = 0; idx < numSeqs; idx++)
                 {
@@ -112,8 +100,6 @@ namespace rocRoller
 
                     float myCost = (*m_cost)(instr);
 
-                    comment += fmt::format("{}: {}\n", toString(cat), myCost);
-
                     if(myCost < minCost)
                     {
                         minCost    = myCost;
@@ -128,8 +114,7 @@ namespace rocRoller
                 {
                     if(categories.count() > 1)
                     {
-                        co_yield yieldFromStream(iterators[minCostIdx], minCostIdx)
-                            .map(addCommentToFirst(comment));
+                        co_yield yieldFromStream(iterators[minCostIdx], minCostIdx);
                     }
                     else
                     {

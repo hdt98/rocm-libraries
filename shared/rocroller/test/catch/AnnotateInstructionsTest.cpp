@@ -52,9 +52,8 @@ TEST_CASE("AddComment works", "[codegen][utility]")
     for(auto inst : generatorOne().map(AddComment("foo")))
         CHECK_THAT(inst.comments(), Contains("foo"));
 
-    auto generatorTwo = [&]() -> Generator<Instruction> {
-        co_yield generatorOne().map(AddComment("bar"));
-    };
+    auto generatorTwo
+        = [&]() -> Generator<Instruction> { co_yield generatorOne().map(AddComment("bar")); };
 
     for(auto inst : generatorTwo())
         CHECK_THAT(inst.comments(), Contains("bar"));
@@ -78,9 +77,8 @@ TEST_CASE("AddControlOp works", "[codegen][utility]")
     for(auto inst : generatorOne().map(AddControlOp(3)))
         CHECK(inst.controlOps() == std::vector{3});
 
-    auto generatorTwo = [&]() -> Generator<Instruction> {
-        co_yield generatorOne().map(AddControlOp(9));
-    };
+    auto generatorTwo
+        = [&]() -> Generator<Instruction> { co_yield generatorOne().map(AddControlOp(9)); };
 
     for(auto inst : generatorTwo())
         CHECK(inst.controlOps() == std::vector{9});

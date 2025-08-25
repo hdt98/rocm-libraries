@@ -26,6 +26,7 @@
 
 #include <rocRoller/GPUArchitecture/GPUInstructionInfo.hpp>
 #include <rocRoller/Utilities/Error.hpp>
+#include <rocRoller/Utilities/Settings.hpp>
 
 namespace rocRoller
 {
@@ -243,19 +244,29 @@ namespace rocRoller
             return CoexecCategory::XDL;
         }
 
+        if(isDLOP(opCode))
+            return CoexecCategory::XDL;
+
         if(isVALUTrans(opCode))
             return CoexecCategory::VALU_Trans;
 
         if(isVALU(opCode))
             return CoexecCategory::VALU;
 
-        if(isVMEM(opCode))
+        if(isVMEM(opCode) || isFlat(opCode))
             return CoexecCategory::VMEM;
 
         if(isLDS(opCode))
             return CoexecCategory::LDS;
 
-        AssertFatal(false, "Unknown category for ", ShowValue(opCode));
+        if(Settings::Get(Settings::AllowUnknownInstructions))
+        {
+            return CoexecCategory::NotAnInstruction;
+        }
+        else
+        {
+            AssertFatal(false, "Unknown category for ", ShowValue(opCode));
+        }
 
         return CoexecCategory::Count;
     }

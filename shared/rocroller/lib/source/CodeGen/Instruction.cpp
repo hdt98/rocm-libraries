@@ -48,9 +48,9 @@ namespace rocRoller
 
     void Instruction::codaString(std::ostream& os, LogLevel level) const
     {
-        if(m_lockOp != Scheduling::LockOperation::None)
+        if(m_lockOp != Scheduling::LockOperation::None && level >= LogLevel::Verbose)
         {
-            os << "// " << m_lockOp << " " << m_dependency << std::endl;
+            os << " // " << m_lockOp << " " << m_dependency << std::endl;
         }
 
         if(level >= LogLevel::Terse && m_comments.size() > 1)
@@ -101,26 +101,15 @@ namespace rocRoller
             if(ctx)
             {
                 auto status = ctx->observer()->peek(*this);
-                for(auto const& line : EscapeComment(status.toString()))
+                for(auto const& line : EscapeComment(m_peekedStatus.toString()))
                     os << line;
                 os << "\n";
-            }
-        }
 
-        if(!isCommentOnly())
-        {
-            auto ctx = findContextFromOperands();
-            if(ctx)
-            {
                 auto category = GPUInstructionInfo::getCoexecCategory(m_opcode);
                 for(auto const& line : EscapeComment("Category: " + rocRoller::toString(category)))
                     os << line;
                 os << "\n";
             }
-
-            for(auto const& line : EscapeComment(m_peekedStatus.toString()))
-                os << line;
-            os << "\n";
         }
     }
 

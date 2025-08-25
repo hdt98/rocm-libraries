@@ -45,15 +45,16 @@ namespace rocRoller
         {
         }
 
-        bool MFMAObserver::isMFMAInstruction(Instruction const& inst) const
+        bool MFMAObserver::isTargetedInstruction(Instruction const& inst)
         {
-            return GPUInstructionInfo::isMFMA(inst.getOpCode());
+            return GPUInstructionInfo::isMFMA(inst.getOpCode())
+                   && !MFMACoexecObserver::isTargetedInstruction(inst);
         }
 
         InstructionStatus MFMAObserver::peek(Instruction const& inst) const
         {
             InstructionStatus rv;
-            if(isMFMAInstruction(inst))
+            if(isTargetedInstruction(inst))
             {
                 rv.stallCycles = m_remainingCycles;
 
@@ -83,7 +84,7 @@ namespace rocRoller
                    "v_mfma_f32_32x32x64_f8f6f4",
                    "v_mfma_scale_f32_32x32x64_f8f6f4"};
 
-            if(isMFMAInstruction(inst))
+            if(isTargetedInstruction(inst))
             {
                 auto info
                     = m_context.lock()->targetArchitecture().GetInstructionInfo(inst.getOpCode());
@@ -131,16 +132,18 @@ namespace rocRoller
         {
         }
 
-        bool MFMACoexecObserver::isMFMAInstruction(Instruction const& inst) const
+        bool MFMACoexecObserver::isTargetedInstruction(Instruction const& inst)
         {
-            return GPUInstructionInfo::isMFMA(inst.getOpCode());
+            return GPUInstructionInfo::isMFMA(inst.getOpCode())
+                   && inst.getOpCode().find("f8f6f4") != std::string::npos
+                   && inst.getOpCode().find("scale") == std::string::npos;
         }
 
         InstructionStatus MFMACoexecObserver::peek(Instruction const& inst) const
         {
             using bs = EnumBitset<CoexecCategory>;
             InstructionStatus rv;
-            if(isMFMAInstruction(inst))
+            if(isTargetedInstruction(inst))
             {
                 bs   anything = {CoexecCategory::NotAnInstruction};
                 auto nothing  = ~anything;
@@ -182,7 +185,7 @@ namespace rocRoller
         void MFMACoexecObserver::modify(Instruction& inst) const
         {
             if(!inst.isCommentOnly() && !m_disallowedOps.empty()
-               && Settings::Get(Settings::LogLvl) >= LogLevel::Info)
+               && Settings::Get(Settings::LogLvl) >= LogLevel::Debug)
             {
                 auto lastCycle = m_disallowedOps.rbegin()->first;
                 inst.addComment(

@@ -54,9 +54,9 @@ namespace rocRoller
                 return true;
             }
 
-        private:
-            bool isMFMAInstruction(Instruction const& inst) const;
+            static bool isTargetedInstruction(Instruction const& inst);
 
+        private:
             int m_remainingCycles = 0;
 
             std::vector<Register::RegisterId> m_aOperands;
@@ -82,9 +82,9 @@ namespace rocRoller
                 return true;
             }
 
-        private:
-            bool isMFMAInstruction(Instruction const& inst) const;
+            static bool isTargetedInstruction(Instruction const& inst);
 
+        private:
             int m_programCycle = 0;
 
             std::map<int, EnumBitset<CoexecCategory>> m_disallowedOps;
