@@ -23,7 +23,6 @@
  * SOFTWARE.
  *
  *******************************************************************************/
-// ...existing code...
 #include <rocRoller/Utilities/Error.hpp>
 #include <fstream>
 #include <sstream>
