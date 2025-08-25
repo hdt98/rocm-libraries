@@ -3012,9 +3012,13 @@ namespace TensileLite
         assert(pAMDGPU != nullptr && pAMDGPU->computeUnitCount != 0);
         size_t cuCount = pAMDGPU->computeUnitCount;
 
-        // User-specified grid size for Stream-K kernel.
-        if(pAMDGPU->skFixedGrid > 0)
+        if(problem.getParams().skgrid() > 0){
+            // sk grid set via hipblaslt-bench given precedence over ENV FLAG.
+            skGrid =  static_cast<size_t>(problem.getParams().skgrid());
+        }
+        else if(pAMDGPU->skFixedGrid > 0)
         {
+            // User-specified grid size for Stream-K kernel.
             skGrid = pAMDGPU->skFixedGrid;
         }
         else if (pAMDGPU->skDynamicGrid > 0)
