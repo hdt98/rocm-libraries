@@ -28,7 +28,7 @@
 #include <sstream>
 #include <vector>
 
-#include <amd_comgr.h>
+#include <amd_comgr/amd_comgr.h>
 
 using namespace rocRoller;
 
@@ -52,7 +52,6 @@ std::string rocRoller::readMetaDataFromCodeObject(std::string const& fileName)
     }
     file.close();
     
-    // Create comgr data object
     amd_comgr_data_t dataIn;
     amd_comgr_status_t status = amd_comgr_create_data(AMD_COMGR_DATA_KIND_RELOCATABLE, &dataIn);
     if(status != AMD_COMGR_STATUS_SUCCESS)
@@ -62,7 +61,6 @@ std::string rocRoller::readMetaDataFromCodeObject(std::string const& fileName)
         Throw<FatalError>("Failed to create data object: ", statusString);
     }
     
-    // Set the data
     status = amd_comgr_set_data(dataIn, size, buffer.data());
     if(status != AMD_COMGR_STATUS_SUCCESS)
     {
