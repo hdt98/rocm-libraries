@@ -9892,6 +9892,9 @@ class KernelWriterAssembly(KernelWriter):
     gsuComponent = Component.GSU.find(self)
     module.add(gsuComponent.computeStoreSrdStart(self, kernel))
 
+    skComponent = Component.StreamK.find(self)
+    module.add(skComponent.computeStoreSrdStart(self, kernel))
+
     for cdir in (0,1):
       indices = kernel["PackedC%uIndicesX"%cdir]
       packedSizes = "PackedSize%u"%cdir
@@ -10647,7 +10650,7 @@ class KernelWriterAssembly(KernelWriter):
     vectorWidths   = [fullVw, edgeVw]
     vectorWidths_1 = [fullVw, edgeVw_1]
 
-    noGSUBranch = (kernel["GlobalSplitU"] == 0)
+    noGSUBranch = (kernel["GlobalSplitU"] == 0 and kernel["StreamK"] != 3)
     module = Module("notLocalSplitUGlobalWrite")
     module.add(self.globalWriteElements(kernel, tPA, tPB, vectorWidths, vectorWidths_1, elements, elements_1, noGSUBranch=noGSUBranch))
 
@@ -10691,7 +10694,7 @@ class KernelWriterAssembly(KernelWriter):
     vectorWidths   = [fullVw, edgeVw]
     vectorWidths_1 = [fullVw_1, edgeVw_1]
 
-    noGSUBranch = (kernel["GlobalSplitU"] == 0)
+    noGSUBranch = (kernel["GlobalSplitU"] == 0 and kernel["StreamK"] != 3)
     module = Module("localSplitUGlobalWrite")
     module.add(self.globalWriteElements(kernel, tPA, tPB, vectorWidths, vectorWidths_1, elements_f0, elements_f1, noGSUBranch=noGSUBranch))
     self.cleanupGlobalWrite(kernel)
@@ -10880,6 +10883,7 @@ class KernelWriterAssembly(KernelWriter):
     if self.states.numStoreSgprToLoad or self.states.numStoreSgprToLoad2: # Wait for kernel args
       module.add(SWaitCnt(kmcnt=0, comment="wait for %u bytes of kern args."%((self.states.numStoreSgprToLoad+self.states.numStoreSgprToLoad2) * 4)))
 
+    skBackup           = kernel["StreamK"]
     gsuBackup          = kernel["GlobalSplitU"]
     gsuAccumBackup     = kernel["_GlobalAccumulation"]
     bpeCexternalBackup = self.states.bpeCexternal
@@ -10890,18 +10894,25 @@ class KernelWriterAssembly(KernelWriter):
     gsuLimit = 1 if noGSUBranch or self.debugConfig.splitGSU else 2
     if gsuLimit > 1:
       gsuLabel = Label(label=self.labels.getNameInc("GSU"), comment="")
-      skipSrdTDLabel = Label(label=self.labels.getNameInc("Skip_SrdTD"), comment="")
-      with self.allocTmpSgpr(1) as tmpSgprGSU:
-        module.add(SAndB32(dst=sgpr(tmpSgprGSU.idx), src0=sgpr("GSU"), src1=hex(0x3FFF), comment="Restore GSU"))
-        module.add(SCmpEQU32(src0=sgpr(tmpSgprGSU.idx), src1=1, comment="GSU == 1 ?"))
-      if (kernel["_GlobalAccumulation"] == 'MultipleBufferSingleKernel'):
-        module.add(self.longBranchScc1(label=gsuLabel, posNeg=1, comment="long branch if GSU == 1"))
-        # module.add(SCBranchSCC1(labelName=skipSrdTDLabel.getLabelName(), comment="branch if GSU == 1"))
-        module.add(self.SrdTDInit(kernel))
-        module.add(skipSrdTDLabel)
+      if kernel["StreamK"]:
+        module.add(SCmpEQU64(src0=sgpr("AddressFlags", 2), src1=hex(0), comment="Check for synchronizer"))
+        module.add(SCBranchSCC0(labelName=gsuLabel.getLabelName(), comment="Branch to stream-k store code"))
+        module.add(SCmpEQU32(src0=sgpr("skTiles"), src1=1, comment="split == 1 ?"))
+        # TODO May need long branch??
+        module.add(SCBranchSCC1(labelName=gsuLabel.getLabelName(), comment="branch if split == 1"))
       else:
-        module.add(SCBranchSCC1(labelName=gsuLabel.getLabelName(), comment="branch if GSU == 1"))
-
+        skipSrdTDLabel = Label(label=self.labels.getNameInc("Skip_SrdTD"), comment="")
+        with self.allocTmpSgpr(1) as tmpSgprGSU:
+          module.add(SAndB32(dst=sgpr(tmpSgprGSU.idx), src0=sgpr("GSU"), src1=hex(0x3FFF), comment="Restore GSU"))
+          module.add(SCmpEQU32(src0=sgpr(tmpSgprGSU.idx), src1=1, comment="GSU == 1 ?"))
+        if (kernel["_GlobalAccumulation"] == 'MultipleBufferSingleKernel'):
+          module.add(self.longBranchScc1(label=gsuLabel, posNeg=1, comment="long branch if GSU == 1"))
+          # module.add(SCBranchSCC1(labelName=skipSrdTDLabel.getLabelName(), comment="branch if GSU == 1"))
+          module.add(self.SrdTDInit(kernel))
+          module.add(skipSrdTDLabel)
+        else:
+          module.add(SCBranchSCC1(labelName=gsuLabel.getLabelName(), comment="branch if GSU == 1"))
+ 
     gsuLimitRange = range(0, gsuLimit) # generate GSU1 and GSUM label
     # TODO: generate only GSUM label for MBSK
     # if (kernel["_GlobalAccumulation"] == 'MultipleBufferSingleKernel'):
@@ -10922,6 +10933,9 @@ class KernelWriterAssembly(KernelWriter):
             kernel["ActivationFuncCall"] = False
           kernel["GlobalSplitU"] = 2
           kernel["_GlobalAccumulation"] = kernel["_GlobalAccumulation"]
+          if kernel["StreamK"]:
+            kernel["StreamK"] = 0
+            kernel["_GlobalAccumulation"] = "MultipleBuffer"
           vectorWidths = vectorWidths_2
           elements     = elements_2
         else:
@@ -10932,6 +10946,10 @@ class KernelWriterAssembly(KernelWriter):
           kernel["ActivationFuncCall"] = afcBackup
           kernel["GlobalSplitU"] = 1
           kernel["_GlobalAccumulation"] = None
+          kernel["StreamK"] = skBackup
+          if kernel["StreamK"]:
+            kernel["GlobalSplitU"] = gsuBackup
+            kernel["_GlobalAccumulation"] = gsuAccumBackup
           vectorWidths = vectorWidths_1
           elements     = elements_1
       else:

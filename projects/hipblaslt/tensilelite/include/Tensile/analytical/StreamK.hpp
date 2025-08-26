@@ -35,6 +35,25 @@ namespace TensileLite
     {
         namespace streamk
         {
+            enum class ReductionType
+            {
+                // BasicReduction,
+                Tree,
+                Parallel,
+                // AtomicReduction,
+            };
+
+            ReductionType select_streamk_reduction(
+                size_t x,
+                size_t y,
+                size_t z,
+                size_t batch,
+                size_t mt_m,
+                size_t mt_n,
+                size_t mt_k,
+                const Hardware& analytical_hardware,
+                int dynamic_grid_version);
+
             size_t select_streamk_grid(size_t x,
                             size_t y,
                             size_t z,
@@ -56,7 +75,10 @@ namespace TensileLite
                             size_t          workspace_size_per_elem_c,
                             int             occupancy,
                             const Hardware& analytical_hardware,
-                            int dynamic_grid_version);
+                            int dynamic_grid_version,
+                            ReductionType reduction_strategy);
+                            // max workspace
+                            // max cus
 
         } // namespace streamk
     }
