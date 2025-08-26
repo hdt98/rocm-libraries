@@ -515,6 +515,7 @@ struct PerformanceConfigConvCKIgemmGrpBwdActivFused
     : PerfConfigBaseCK<PerformanceConfigConvCKIgemmGrpBwdActivFused>
 {
     int index;
+    int split_k;
     std::string kernel_id;
     std::vector<std::string> valid_kernels;
     PerformanceConfigConvCKIgemmGrpBwdActivFused(int idx, std::string kernl_id)
