@@ -85,8 +85,8 @@ std::string rocRoller::readMetaDataFromCodeObject(std::string const& fileName)
     {
         std::ostringstream yamlStream;
 
-        std::function<void(amd_comgr_metadata_node_t, int)> metadataToYaml;
-        metadataToYaml = [&](amd_comgr_metadata_node_t node, int indent) {
+        std::function<void(amd_comgr_metadata_node_t, int, bool)> metadataToYaml;
+        metadataToYaml = [&](amd_comgr_metadata_node_t node, int indent, bool isListItem) {
             amd_comgr_metadata_kind_t kind;
             if(amd_comgr_get_metadata_kind(node, &kind) != AMD_COMGR_STATUS_SUCCESS)
                 return;
@@ -109,12 +109,13 @@ std::string rocRoller::readMetaDataFromCodeObject(std::string const& fileName)
                 struct MapContext
                 {
                     std::ostringstream*                                  stream;
-                    std::function<void(amd_comgr_metadata_node_t, int)>* converter;
+                    std::function<void(amd_comgr_metadata_node_t, int, bool)>* converter;
                     int                                                  indent;
                     bool                                                 first;
+                    bool                                                 isListItem;
                 };
 
-                MapContext ctx = {&yamlStream, &metadataToYaml, indent, true};
+                MapContext ctx = {&yamlStream, &metadataToYaml, indent, true, isListItem};
 
                 amd_comgr_iterate_map_metadata(
                     node,
@@ -123,18 +124,23 @@ std::string rocRoller::readMetaDataFromCodeObject(std::string const& fileName)
                        void*                     user_data) -> amd_comgr_status_t {
                         MapContext* ctx = static_cast<MapContext*>(user_data);
 
-                        if(!ctx->first)
+                        if(!ctx->first && !ctx->isListItem)
                             *(ctx->stream) << "\n";
+                        
                         ctx->first = false;
 
-                        std::string indentStr(ctx->indent * 2, ' ');
-                        *(ctx->stream) << indentStr;
+                        if(!ctx->isListItem)
+                        {
+                            std::string indentStr(ctx->indent * 2, ' ');
+                            *(ctx->stream) << indentStr;
+                        }
+                        ctx->isListItem = false;
 
                         size_t keySize = 0;
                         amd_comgr_get_metadata_string(key, &keySize, nullptr);
                         std::vector<char> keyStr(keySize);
                         amd_comgr_get_metadata_string(key, &keySize, keyStr.data());
-                        *(ctx->stream) << keyStr.data() << ": ";
+                        *(ctx->stream) << keyStr.data() << ":";
 
                         amd_comgr_metadata_kind_t valueKind;
                         amd_comgr_get_metadata_kind(value, &valueKind);
@@ -143,11 +149,12 @@ std::string rocRoller::readMetaDataFromCodeObject(std::string const& fileName)
                            || valueKind == AMD_COMGR_METADATA_KIND_LIST)
                         {
                             *(ctx->stream) << "\n";
-                            (*ctx->converter)(value, ctx->indent + 1);
+                            (*ctx->converter)(value, ctx->indent + 1, false);
                         }
                         else
                         {
-                            (*ctx->converter)(value, 0);
+                            *(ctx->stream) << " ";
+                            (*ctx->converter)(value, 0, false);
                         }
 
                         return AMD_COMGR_STATUS_SUCCESS;
@@ -162,6 +169,9 @@ std::string rocRoller::readMetaDataFromCodeObject(std::string const& fileName)
 
                 for(size_t i = 0; i < listSize; ++i)
                 {
+                    if(i > 0)
+                        yamlStream << "\n";
+                        
                     yamlStream << indentStr << "- ";
 
                     amd_comgr_metadata_node_t item;
@@ -170,22 +180,22 @@ std::string rocRoller::readMetaDataFromCodeObject(std::string const& fileName)
                         amd_comgr_metadata_kind_t itemKind;
                         amd_comgr_get_metadata_kind(item, &itemKind);
 
-                        if(itemKind == AMD_COMGR_METADATA_KIND_MAP
-                           || itemKind == AMD_COMGR_METADATA_KIND_LIST)
+                        if(itemKind == AMD_COMGR_METADATA_KIND_MAP)
+                        {
+                            metadataToYaml(item, indent + 1, true);
+                        }
+                        else if(itemKind == AMD_COMGR_METADATA_KIND_LIST)
                         {
                             yamlStream << "\n";
-                            metadataToYaml(item, indent + 1);
+                            metadataToYaml(item, indent + 1, false);
                         }
                         else
                         {
-                            metadataToYaml(item, 0);
+                            metadataToYaml(item, 0, false);
                         }
 
                         amd_comgr_destroy_metadata(item);
                     }
-
-                    if(i < listSize - 1)
-                        yamlStream << "\n";
                 }
                 break;
             }
@@ -196,7 +206,7 @@ std::string rocRoller::readMetaDataFromCodeObject(std::string const& fileName)
 
         if(mkind == AMD_COMGR_METADATA_KIND_MAP)
         {
-            metadataToYaml(meta, 0);
+            metadataToYaml(meta, 0, false);
             yaml = yamlStream.str();
         }
     }
