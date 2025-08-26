@@ -47,6 +47,28 @@
 #include <numeric>
 #include <sstream>
 #include <vector>
+#include <stdexcept>
+
+// Helper function to load vector data from files
+template<typename T>
+void LoadVectorFromFile(const std::string& filename, std::vector<T>& vec)
+{
+    std::ifstream infile(filename);
+    if(!infile)
+        throw std::runtime_error("Could not open file: " + filename);
+    
+    T val;
+    size_t idx = 0;
+    while(infile >> val && idx < vec.size())
+    {
+        vec[idx++] = val;
+    }
+    
+    if(idx != vec.size())
+        throw std::runtime_error("File size mismatch for " + filename + 
+                                ", expected " + std::to_string(vec.size()) + 
+                                ", got " + std::to_string(idx));
+}
 
 template <typename Tgpu, typename Tref = Tgpu>
 class CTCDriver : public Driver
@@ -66,7 +88,6 @@ public:
     InputFlags& GetInputFlags() override { return inflags; }
 
     int GetandSetData() override;
-    std::vector<int> GetInputLengthsFromCmdLine(std::string input_str);
     std::vector<int> GetProbabilityTensorLengthsFromCmdLine();
 
     int SetCTCLossDescriptorFromCmdLineArgs();
@@ -116,8 +137,11 @@ private:
     int max_time_step;
     int num_class;
     int blank_lb;
+    int verbose;
     bool apply_softmax;
     miopenCTCLossAlgo_t ctc_algo;
+
+    void _Log_Losses_And_Gradients();
 };
 
 template <typename Tgpu, typename Tref>
@@ -135,10 +159,23 @@ int CTCDriver<Tgpu, Tref>::ParseCmdLineArgs(int argc, char* argv[])
 template <typename Tgpu, typename Tref>
 int CTCDriver<Tgpu, Tref>::GetandSetData()
 {
+    verbose       = inflags.GetValueInt("verbose");
     batch_size    = inflags.GetValueInt("batchsize");
     num_class     = inflags.GetValueInt("num_class");
-    labelLengths  = GetInputLengthsFromCmdLine(inflags.GetValueStr("label_len"));
-    inputLengths  = GetInputLengthsFromCmdLine(inflags.GetValueStr("input_len"));
+
+    inputLengths = std::vector<int>(batch_size, 0);
+    labelLengths = std::vector<int>(batch_size, 0);
+
+    std::string input_lengths_file = inflags.GetValueStr("input_lengths_file");
+    if(input_lengths_file.empty())
+        throw std::runtime_error("input_lengths_file is required. Please specify --input_lengths_file");
+    LoadVectorFromFile(input_lengths_file, inputLengths);
+
+    std::string label_lengths_file = inflags.GetValueStr("label_lengths_file");
+    if(label_lengths_file.empty())
+        throw std::runtime_error("label_lengths_file is required. Please specify --label_lengths_file");
+    LoadVectorFromFile(label_lengths_file, labelLengths);
+
     max_time_step = *std::max_element(inputLengths.begin(), inputLengths.end());
     ctc_algo      = miopenCTCLossAlgo_t(inflags.GetValueInt("ctcalgo"));
     blank_lb      = inflags.GetValueInt("blank_label_id");
@@ -161,9 +198,6 @@ int CTCDriver<Tgpu, Tref>::AddCmdLineArgs()
         "apply_softmax_layer", 'm', "1", "Apply == 1, Not apply == 0 (Default=1)", "int");
     inflags.AddInputFlag("blank_label_id", 'b', "0", "Index of blank label (Default=0)", "int");
     inflags.AddInputFlag(
-        "input_len", 'k', "20", "Number of time steps in each batch (Default=20)", "vector");
-    inflags.AddInputFlag("label_len", 'l', "5", "Number of labels (Default=5)", "vector");
-    inflags.AddInputFlag(
         "num_class", 'c', "9", "Number of classes without blank (Default=9)", "int");
     inflags.AddInputFlag("batchsize", 'n', "4", "Mini-batch size (Default=4)", "int");
     inflags.AddInputFlag("iter", 'i', "1", "Number of Iterations (Default=1)", "int");
@@ -183,52 +217,23 @@ int CTCDriver<Tgpu, Tref>::AddCmdLineArgs()
         "0",
         "MIOPEN_CTC_LOSS_ALGO_DETERMINISTIC or MIOPEN_CTC_LOSS_ALGO_NON_DETERMINISTIC (Default=0)",
         "int");
+    
+    // Add file input flags
+    inflags.AddInputFlag("probs_file", 'P', "", "Path to input probs file", "string");
+    inflags.AddInputFlag("grads_file", 'G', "", "Path to input grads file", "string");
+    inflags.AddInputFlag("labels_file", 'L', "", "Path to input labels file", "string");
+    inflags.AddInputFlag("label_lengths_file", 'Q', "", "Path to input label lengths file", "string");
+    inflags.AddInputFlag("input_lengths_file", 'R', "", "Path to input input lengths file", "string");
+
+    inflags.AddInputFlag("verbose", 'k', "0", "Verbose GPU and CPU Gradients (Default=0)", "int");
 
     return 0;
 }
 
 template <typename Tgpu, typename Tref>
-std::vector<int> CTCDriver<Tgpu, Tref>::GetInputLengthsFromCmdLine(std::string input_str)
-{
-    int batch_sz = inflags.GetValueInt("batchsize");
-    std::vector<int> in_len(batch_sz, 0);
-
-    std::stringstream ss(input_str);
-    int cont = 0;
-    int element;
-    while(ss >> element)
-    {
-        /// ignore inputs longer than batch size
-        if(cont >= batch_sz)
-        {
-            break;
-        }
-
-        if(ss.peek() == ',' || ss.peek() == ' ')
-        {
-            ss.ignore();
-        }
-
-        in_len[cont] = element;
-        cont++;
-    }
-
-    if(batch_sz > cont)
-    {
-        /// padding empty batches with last value of timestep
-        for(int i = cont; i < batch_sz; i++)
-        {
-            in_len[i] = in_len[cont - 1];
-        }
-    }
-
-    return in_len;
-}
-
-template <typename Tgpu, typename Tref>
 std::vector<int> CTCDriver<Tgpu, Tref>::GetProbabilityTensorLengthsFromCmdLine()
 {
-    std::vector<int> in_len = GetInputLengthsFromCmdLine(inflags.GetValueStr("input_len"));
+    std::vector<int> in_len = inputLengths;
     int batch_sz            = inflags.GetValueInt("batchsize");
     int class_sz            = inflags.GetValueInt("num_class") + 1;
     int time_step           = *std::max_element(in_len.begin(), in_len.end());
@@ -248,25 +253,19 @@ int CTCDriver<Tgpu, Tref>::SetCTCLossDescriptorFromCmdLineArgs()
 
 template <typename Tgpu, typename Tref>
 int CTCDriver<Tgpu, Tref>::AllocateBuffersAndCopy()
-{
+{    
     size_t probs_sz  = batch_size * (num_class + 1) * max_time_step;
     size_t labels_sz = std::accumulate(labelLengths.begin(), labelLengths.end(), 0ULL);
     size_t workSpaceSize;
     size_t workSpaceSizeCPU;
 
-    // initialize labels
-    labels = std::vector<int>(labels_sz);
+    // Get file paths from command line flags - all files are required
+    std::string probs_file = inflags.GetValueStr("probs_file");
+    std::string grads_file = inflags.GetValueStr("grads_file");
+    std::string labels_file = inflags.GetValueStr("labels_file");
 
-    for(int i = 0; i < labels_sz; i++)
-    {
-        labels[i] = prng::gen_off_range(1, num_class);
-        if(blank_lb > num_class)
-            labels[i] = labels[i] == num_class ? num_class - 1 : labels[i];
-        else if(blank_lb < 0)
-            labels[i] = labels[i] == 0 ? 1 : labels[i];
-        else if(labels[i] == blank_lb)
-            labels[i] = blank_lb - 1 >= 0 ? (blank_lb - 1) : blank_lb + 1;
-    }
+    // Initialize vectors with proper sizes
+    labels = std::vector<int>(labels_sz, 0);
 
     miopenGetCTCLossWorkspaceSize(GetHandle(),
                                   probsDesc,
@@ -304,24 +303,18 @@ int CTCDriver<Tgpu, Tref>::AllocateBuffersAndCopy()
     workspace      = std::vector<Tgpu>(workSpaceSize / sizeof(Tgpu), 0);
     workspace_host = std::vector<Tref>(workSpaceSizeCPU / sizeof(Tref), 0);
 
-    double scale = 0.01;
+    // Load data from files - all files are required
+    if(probs_file.empty())
+        throw std::runtime_error("probs_file is required. Please specify --probs_file");
+    LoadVectorFromFile(probs_file, probs);
 
-    for(int i = 0; i < probs_sz; i++)
-    {
-        probs[i] = static_cast<Tgpu>(prng::gen_0_to_B(scale));
-    }
-    if(apply_softmax)
-    {
-        for(int j = 0; j < batch_size * max_time_step; j++)
-        {
-            Tgpu sum = 0.;
-            for(int i = 0; i < num_class + 1; i++)
-                sum += probs[j * (num_class + 1) + i];
+    if(grads_file.empty())
+        throw std::runtime_error("grads_file is required. Please specify --grads_file");
+    LoadVectorFromFile(grads_file, gradients);
 
-            for(int i = 0; i < num_class + 1; i++)
-                probs[j * (num_class + 1) + i] /= sum;
-        }
-    }
+    if(labels_file.empty())
+        throw std::runtime_error("labels_file is required. Please specify --labels_file");
+    LoadVectorFromFile(labels_file, labels);
 
     if(inflags.GetValueInt("dump_output"))
     {
@@ -391,6 +384,12 @@ int CTCDriver<Tgpu, Tref>::RunForwardGPU()
     gradients_dev->FromGPU(GetStream(), gradients.data());
     workspace_dev->FromGPU(GetStream(), workspace.data());
 
+    if(inflags.GetValueInt("dump_output"))
+    {
+        dumpBufferToFile("dump_losses_gpu.bin", losses.data(), losses.size());
+        dumpBufferToFile("dump_gradients_gpu.bin", gradients.data(), gradients.size());
+    }
+
     return miopenStatusSuccess;
 }
 
@@ -432,6 +431,8 @@ int CTCDriver<Tgpu, Tref>::VerifyForward()
     auto error1 = miopen::rms_range(losses_host, losses);
     auto error2 = miopen::rms_range(gradients_host, gradients);
 
+    if(verbose) _Log_Losses_And_Gradients();
+
     const double tolerance1 = 1e-5;
     const double tolerance2 = 1e-3;
     if(!std::isfinite(error1) || error1 > tolerance1)
@@ -464,4 +465,26 @@ template <typename Tgpu, typename Tref>
 int CTCDriver<Tgpu, Tref>::VerifyBackward()
 {
     return miopenStatusSuccess;
+}
+
+template <typename Tgpu, typename Tref>
+void CTCDriver<Tgpu, Tref>::_Log_Losses_And_Gradients()
+{
+    std::cout << "Losses GPU: ";
+    for(int i = 0; i < losses.size(); i++)
+        std::cout << losses[i] << " ";
+    std::cout << std::endl;
+    std::cout << "Losses CPU: ";
+    for(int i = 0; i < losses_host.size(); i++)
+        std::cout << losses_host[i] << " ";
+    std::cout << std::endl;
+
+    std::cout << "Gradient GPU: ";
+    for(auto v : gradients)
+        std::cout << v << " ";
+    std::cout << std::endl;
+    std::cout << "Gradient CPU: ";
+    for(auto v : gradients_host)
+        std::cout << v << " ";
+    std::cout << std::endl;
 }
