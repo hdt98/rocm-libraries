@@ -511,6 +511,79 @@ struct BnBwdTrgActivationFused final : FusionSolverBase
     GetSolution(const FusionContext& context, const FusionDescription& problem) const override;
 };
 
+struct PerformanceConfigConvCKIgemmGrpBwdActivFused
+    : PerfConfigBaseCK<PerformanceConfigConvCKIgemmGrpBwdActivFused>
+{
+    int index;
+    std::string kernel_id;
+    std::vector<std::string> valid_kernels;
+    PerformanceConfigConvCKIgemmGrpBwdActivFused(int idx, std::string kernl_id)
+        : index(idx), kernel_id(kernl_id)
+    {
+    }
+    PerformanceConfigConvCKIgemmGrpBwdActivFused()
+        : PerformanceConfigConvCKIgemmGrpBwdActivFused(0, "")
+    {
+    }
+    PerformanceConfigConvCKIgemmGrpBwdActivFused(bool)
+        : PerformanceConfigConvCKIgemmGrpBwdActivFused(0, "")
+    {
+    }
+    MIOPEN_INTERNALS_EXPORT void HeuristicInit(const FusionDescription& fdesc_problem);
+    MIOPEN_INTERNALS_EXPORT bool SetNextValue(const FusionDescription& fdesc_problem);
+    MIOPEN_INTERNALS_EXPORT bool IsValidValue() const;
+    MIOPEN_INTERNALS_EXPORT bool IsValid(const FusionContext&,
+                                         const FusionDescription& fdesc_problem) const;
+
+    template <typename Self, typename F>
+    static void Visit(Self&& s, F f)
+    {
+        f(s.kernel_id, "kernel_id");
+    }
+    MIOPEN_INTERNALS_EXPORT bool
+    operator==(const PerformanceConfigConvCKIgemmGrpBwdActivFused& other) const;
+
+private:
+    template <typename DataType>
+    void Init(const miopen::conv::ProblemDescription&);
+    template <typename DataType>
+    bool CheckIsSupportCKArgs(const miopen::conv::ProblemDescription&) const;
+};
+
+struct ConvCKIgemmGrpBwdActivFused final
+    : FusionTunableSolver<PerformanceConfigConvCKIgemmGrpBwdActivFused>
+{
+    const std::string& SolverDbId() const override
+    {
+        return GetSolverDbId<ConvCKIgemmGrpBwdActivFused>();
+    }
+
+    MIOPEN_INTERNALS_EXPORT PerformanceConfigConvCKIgemmGrpBwdActivFused
+    GetDefaultPerformanceConfig(const FusionContext& ctx,
+                                const FusionDescription& fdesc_problem) const override;
+    MIOPEN_INTERNALS_EXPORT bool IsValidPerformanceConfig(
+        const FusionContext& ctx,
+        const FusionDescription& fdesc_problem,
+        const PerformanceConfigConvCKIgemmGrpBwdActivFused& config) const override;
+    MIOPEN_INTERNALS_EXPORT PerformanceConfigConvCKIgemmGrpBwdActivFused
+    Search(const FusionContext& ctx,
+           const FusionDescription& fdesc_problem,
+           const AnyInvokeParams& invoke_ctx) const override;
+    MIOPEN_INTERNALS_EXPORT bool
+    IsApplicable(const FusionContext& ctx, const FusionDescription& fdesc_problem) const override;
+    MIOPEN_INTERNALS_EXPORT ConvSolution
+    GetSolution(const FusionContext& ctx,
+                const FusionDescription& fdesc_problem,
+                const PerformanceConfigConvCKIgemmGrpBwdActivFused& config) const override;
+    bool MayNeedWorkspace() const override { return true; }
+    MIOPEN_INTERNALS_EXPORT size_t GetWorkspaceSize(const FusionContext&,
+                                                    const FusionDescription&) const override;
+
+private:
+    template <typename DataType>
+    bool CheckCKApplicability(const miopen::conv::ProblemDescription&) const;
+};
+
 } // namespace fusion
 } // namespace solver
 } // namespace miopen
