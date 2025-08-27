@@ -103,6 +103,8 @@ namespace
                 testing_aux_hipblaslt_ext_op_func(arg);
             else if(!strcmp(arg.function, "aux_rocblaslt_utility_func"))
                 testing_aux_rocblaslt_utility_func(arg);
+            else if(!strcmp(arg.function, "aux_rocblaslt_mat_utils_func"))
+                testing_aux_rocblaslt_mat_utils_func(arg);
             else if(!strcmp(arg.function, "aux_status_func"))
                 testing_aux_status_func(arg);
             else if(!strcmp(arg.function, "aux_hipblaslt_func"))
@@ -113,6 +115,10 @@ namespace
                 testing_aux_tuple_helper_equal_func(arg);
             else if(!strcmp(arg.function, "aux_rocblaslt_rocroller_host_func"))
                 testing_aux_rocblaslt_rocroller_host_func(arg);
+            else if(!strcmp(arg.function, "aux_hipblaslt_ostream_func"))
+                testing_aux_hipblaslt_ostream_func(arg);
+            else if(!strcmp(arg.function, "aux_handle_func"))
+                testing_aux_handle_func(arg);
 #endif
             else if(!strcmp(arg.function, "aux_mat_copy"))
                 testing_aux_mat_copy(arg);
@@ -163,11 +169,14 @@ namespace
                    || !strcmp(arg.function, "aux_float8_func")
                    || !strcmp(arg.function, "aux_hipblaslt_ext_op_func")
                    || !strcmp(arg.function, "aux_rocblaslt_utility_func")
+                   || !strcmp(arg.function, "aux_rocblaslt_mat_utils_func")
                    || !strcmp(arg.function, "aux_status_func")
                    || !strcmp(arg.function, "aux_hipblaslt_func")
                    || !strcmp(arg.function, "aux_tensile_host_func")
                    || !strcmp(arg.function, "aux_tuple_helper_equal_func")
                    || !strcmp(arg.function, "aux_rocblaslt_rocroller_host_func")
+                   || !strcmp(arg.function, "aux_hipblaslt_ostream_func")
+                   || !strcmp(arg.function, "aux_handle_func")
 #endif
                    || !strcmp(arg.function, "aux_mat_copy");
         }
