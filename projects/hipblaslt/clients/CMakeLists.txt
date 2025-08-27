@@ -14,6 +14,24 @@ target_include_directories(hipblaslt-clients-common
         "${CMAKE_CURRENT_SOURCE_DIR}/../../tensilelite"
 )
 
+if(HIPBLASLT_ENABLE_COVERAGE)
+    target_include_directories(hipblaslt-clients-common 
+    PUBLIC
+        $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/library/src/amd_detail>
+        $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/library/src/amd_detail/rocblaslt/include>
+        $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/library/src/amd_detail/rocblaslt/src/include>
+    )
+
+    file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/code_coverage_tuning_file.txt"
+                "Git Version: ${GIT_DESC}\n"
+                "    transA,transB,grouped_gemm,batch_count,m,n,k,alpha,lda,stride_a,beta,ldb,stride_b,ldc,stride_c,ldd,stride_d,"
+                "a_type,b_type,c_type,d_type,compute_type,scaleA,scaleB,scaleC,scaleD,amaxD,activation_type,bias_vector,bias_type,"
+                "aux_type,rotating_buffer,hipblaslt-Gflops,hipblaslt-GB/s,us,solution_index,gcnArchName,CUs\n"
+                "    T,N,0,1,512,1024,13,1,13,6656,0,13,13312,512,524288,512,524288,f32_r,f32_r,f32_r,f32_r,xf32_r,0,0,0,0,0,none,"
+                "1,f32_r,f32_r,512,464.651,69.1759,29.3371,532705,gfx942:sramecc+:xnack-,304"
+    )
+endif()
+
 add_library(hipblaslt::hipblaslt-clients-common ALIAS hipblaslt-clients-common)
 
 if(HIPBLASLT_ENABLE_BLIS)
@@ -108,7 +126,11 @@ if(BUILD_TESTING OR HIPBLASLT_BUILD_TESTING)
             OpenMP::OpenMP_CXX
             ${CMAKE_DL_LIBS}
     )
-    target_compile_definitions(hipblaslt-test PRIVATE GOOGLE_TEST)
+    target_include_directories(hipblaslt-test
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/../tensilelite/rocisa
+    )
+    target_compile_definitions(hipblaslt-test PRIVATE GOOGLE_TEST TENSILE_USE_HIP)
     if(HIPBLASLT_ENABLE_ROCROLLER)
         target_compile_definitions(hipblaslt-test PRIVATE HIPBLASLT_USE_ROCROLLER)
     endif()
