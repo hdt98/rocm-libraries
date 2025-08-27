@@ -2882,7 +2882,7 @@ namespace TensileLite
             auto       tiles     = problem.getNumTiles(sizeMapping, gsu);
             if(tiles > 0) // Grouped GEMM reports 0 tiles
             {
-                ReductionType reductionStrat = ReductionType::Tree;
+                ReductionType reductionStrat = getSKReduction(problem, hardware);
                 size_t skGrid = getSKGrid(problem, hardware, tiles, reductionStrat);
                 // Get space required for partial tiles=
                 if(skGrid > 0 && (reductionStrat == ReductionType::Parallel || (tiles % skGrid != 0 && !streamKDP)))

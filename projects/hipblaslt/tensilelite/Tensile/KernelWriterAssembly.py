@@ -9968,11 +9968,38 @@ class KernelWriterAssembly(KernelWriter):
       module.add(self.allocPostLoopSrd("D"))
       module.add(self.allocPostLoopSrd("C"))
       sgprBpeList = ["GSULog2BpeC", "GSULog2BpeD"] if kernel["GlobalSplitU"] != 0 else []
+
+      # Set BPE based on reduction algorithm
+      if kernel["StreamK"] == 3:
+        sgprLog2BpeC = self.sgprPool.checkOut(1, preventOverflow=False)
+        sgprLog2BpeD = self.sgprPool.checkOut(1, preventOverflow=False)
+
+        module.add(SMovB32(dst=sgpr(sgprLog2BpeC), src=log2(self.states.bpeCexternalGSU1)))
+        module.add(SMovB32(dst=sgpr(sgprLog2BpeD), src=log2(self.states.bpeCexternalGSU1)))
+
+        bpeDoneLabel = Label(label=self.labels.getNameInc("BPEDone"), comment="")
+
+        module.add(SCmpEQU64(src0=sgpr("AddressFlags", 2), src1=hex(0), comment="Check for synchronizer"))
+        module.add(SCBranchSCC0(labelName=bpeDoneLabel.getLabelName(), comment="If synchronizer, use regular output BPE"))
+        module.add(SCmpEQU32(src0=sgpr("skTiles"), src1=1, comment="split == 1 ?"))
+        module.add(SCBranchSCC1(labelName=bpeDoneLabel.getLabelName(), comment="If split == 1, use reguler output BPE"))
+
+        # BPE for parallel reduction
+        module.add(SMovB32(dst=sgpr(sgprLog2BpeC), src=log2(int(self.states.bpr * kernel["ProblemType"]["DestDataType"].numRegisters()))))
+        module.add(SMovB32(dst=sgpr(sgprLog2BpeD), src=log2(self.states.bpeCinternal)))
+
+        module.add(bpeDoneLabel)
+        sgprBpeList = [sgprLog2BpeC, sgprLog2BpeD]
+
       module.add(self.computeStoreSrdStart(kernel, ["C", "D"], sgprBpeList=sgprBpeList))
       if kernel["GlobalSplitU"] != 0:
         module.add(self.undefineSgpr("GSULog2BpeC"))
       if kernel["StreamK"] == 0:
         module.add(self.undefineSgpr("AddressC"))
+
+      if kernel["StreamK"] == 3:
+        self.sgprPool.checkIn(sgprLog2BpeD)
+        self.sgprPool.checkIn(sgprLog2BpeC)
     return module
 
   ##############################################################################
