@@ -22,6 +22,16 @@ if(HIPBLASLT_ENABLE_COVERAGE)
         $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/library/src/amd_detail/rocblaslt/src/include>
     )
 
+    set(GIT_DESC "unknown")
+    if(GIT_FOUND)
+      execute_process(
+        COMMAND "${GIT_EXECUTABLE}" -C "${CMAKE_SOURCE_DIR}" rev-parse --short=12 HEAD
+        OUTPUT_VARIABLE GIT_DESC
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+      )
+    endif()
+
     file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/code_coverage_tuning_file.txt"
                 "Git Version: ${GIT_DESC}\n"
                 "    transA,transB,grouped_gemm,batch_count,m,n,k,alpha,lda,stride_a,beta,ldb,stride_b,ldc,stride_c,ldd,stride_d,"
