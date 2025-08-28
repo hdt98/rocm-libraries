@@ -732,12 +732,14 @@ namespace TensileLite
             {
                 if(sk.reduction == ReductionType::Parallel)
                 {
-                    uint32_t skItersPerWG = CeilDivide(totalIters, sk.grid);
-                    uint32_t skTiles = sk.grid / tiles; // skTiles is skSplit in parallel reduction path
-                    uint32_t skExtraIters = 0;
+                    uint32_t skSplit = sk.grid / tiles; // skTiles is skSplit in parallel reduction path
+                    // uint32_t skItersPerWG = CeilDivide(totalIters, sk.grid);
+                    // uint32_t skItersPerWG = totalIters / sk.grid;
+                    uint32_t skItersPerWG = itersPerTile / skSplit;
+                    uint32_t skExtraIters = itersPerTile % skSplit;
                     args.template append<uint32_t>("SKItersPerWG", skItersPerWG);
                     args.template append<uint32_t>("skGrid",       sk.grid);
-                    args.template append<uint32_t>("skTiles",      skTiles);
+                    args.template append<uint32_t>("skTiles",      skSplit);
                     args.template append<uint32_t>("skExtraIters", skExtraIters);
                 }
                 else
