@@ -43,6 +43,16 @@ namespace TensileLite
                 // AtomicReduction,
             };
 
+            size_t get_streamk_workspace(
+                size_t x,
+                size_t y,
+                size_t mt_m,
+                size_t mt_n,
+                size_t bpe_c,
+                size_t grid,
+                size_t tiles,
+                ReductionType reduction);
+
             ReductionType select_streamk_reduction(
                 size_t x,
                 size_t y,

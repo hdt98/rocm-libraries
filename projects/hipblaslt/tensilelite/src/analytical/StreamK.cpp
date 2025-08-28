@@ -228,6 +228,34 @@ namespace TensileLite
                 return min_grid_runtime_v2.first;
             }
 
+            size_t get_streamk_workspace(
+                size_t x,
+                size_t y,
+                size_t mt_m,
+                size_t mt_n,
+                size_t bpe_c,
+                size_t grid,
+                size_t tiles,
+                ReductionType reduction)
+            {
+                size_t size = 0;
+                if(reduction == ReductionType::Tree)
+                {
+                    if(tiles % grid == 0)
+                    {
+                        size_t tileSize = mt_m * mt_n * bpe_c;
+                        size += tileSize * grid;
+                    }
+                }
+                else if(reduction == ReductionType::Parallel)
+                {
+                    size_t splitSize = x * y * bpe_c;
+                    size_t splitCount = grid / tiles;
+                    size += splitSize * splitCount;
+                }
+                return size;
+            }
+
             ReductionType select_streamk_reduction(
                 size_t x,
                 size_t y,

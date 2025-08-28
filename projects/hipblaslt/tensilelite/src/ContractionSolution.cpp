@@ -2499,6 +2499,19 @@ namespace TensileLite
             sk.reduction = getSKReduction(problem, hardware);
             auto tiles = problem.getNumTiles(sizeMapping, 1);
             sk.grid = getSKGrid(problem, hardware, tiles, sk.reduction);
+            const bool streamKDP = Debug::Instance().useStreamKDataParrallel();
+            if(sk.grid > 0 && (sk.reduction == ReductionType::Parallel || (tiles % sk.grid != 0 && !streamKDP)))
+            {
+                // Check ideal amount of workspace for optimal performance
+                size_t idealWorkspace = partialTileSize(sk.grid);
+                // If given workspace is less than ideal, we can fall back to DP mode
+                // Performance will likely be lower, but the kernel can run if workspace is unavailable
+                if(idealWorkspace > problem.workspaceSize())
+                {
+                    sk.reduction = ReductionType::Tree;
+                    sk.grid = tiles;
+                }
+            }
         }
 
         if(debug)
@@ -2888,7 +2901,14 @@ namespace TensileLite
                 size_t skGrid = getSKGrid(problem, hardware, tiles, reductionStrat);
                 // Get space required for partial tiles=
                 if(skGrid > 0 && (reductionStrat == ReductionType::Parallel || (tiles % skGrid != 0 && !streamKDP)))
-                    size += partialTileSize(skGrid);
+                {
+                    // Check ideal amount of workspace for optimal performance
+                    size_t idealWorkspace = partialTileSize(skGrid);
+                    // If given workspace is less than ideal, we can fall back to DP mode
+                    // Performance will likely be lower, but the kernel can run if workspace is unavailable
+                    if(idealWorkspace <= problem.workspaceSize())
+                        size += idealWorkspace;
+                }
             }
         }
         else
