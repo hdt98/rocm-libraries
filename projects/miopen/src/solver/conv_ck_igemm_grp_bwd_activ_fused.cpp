@@ -587,6 +587,113 @@ bool PerformanceConfigConvCKIgemmGrpBwdActivFused::IsValid(
     return false;
 }
 
+bool PerformanceConfigConvCKIgemmGrpBwdActivFused::operator==(
+    const PerformanceConfigConvCKIgemmGrpBwdActivFused& other) const
+{
+    return this->kernel_id == other.kernel_id;
+}
+
+PerformanceConfigConvCKIgemmGrpBwdActivFused
+ConvCKIgemmGrpBwdActivFused::GetDefaultPerformanceConfig(
+    const FusionContext&, const FusionDescription& fdesc_problem) const
+{
+    PerformanceConfigConvCKIgemmGrpBwdActivFused pp;
+    pp.HeuristicInit(fdesc_problem);
+    MIOPEN_LOG_I(pp.ToString());
+    return pp;
+}
+
+bool ConvCKIgemmGrpBwdActivFused::IsValidPerformanceConfig(
+    const FusionContext& ctx,
+    const FusionDescription& fdesc_problem,
+    const PerformanceConfigConvCKIgemmGrpBwdActivFused& config) const
+{
+    return config.IsValid(ctx, fdesc_problem);
+}
+
+size_t ConvCKIgemmGrpBwdActivFused::GetWorkspaceSize(const FusionContext&,
+                                                     const FusionDescription& fdesc_problem) const
+{
+#if MIOPEN_BACKEND_HIP && MIOPEN_USE_COMPOSABLEKERNEL
+    const auto conv_problem = fdesc_problem.GetConvProblem(0, miopen::conv::Direction::Forward);
+    return GetWorkspaceSizeLayoutTransformConv(conv_problem);
+#else
+    std::ignore = fdesc_problem;
+    return 0;
+#endif
+}
+
+PerformanceConfigConvCKIgemmGrpBwdActivFused
+ConvCKIgemmGrpBwdActivFused::Search(const FusionContext& ctx,
+                                    const FusionDescription& fdesc_problem,
+                                    const AnyInvokeParams& invoke_ctx) const
+{
+    return GenericSearch(*this, ctx, fdesc_problem, invoke_ctx);
+}
+
+bool ConvCKIgemmGrpBwdActivFused::IsApplicable(const FusionContext& ctx,
+                                               const FusionDescription& fdesc_problem) const
+{
+#if !MIOPEN_BACKEND_HIP || !MIOPEN_USE_COMPOSABLEKERNEL
+    std::ignore = ctx;
+    std::ignore = fdesc_problem;
+    return false;
+#else
+    const auto& desc = *fdesc_problem.fusion_plan_desc;
+    if(desc.op_map.empty())
+    {
+        MIOPEN_THROW(miopenStatusInternalError, "desc.op_map.empty()");
+    }
+    if(desc.op_map.size() != 2)
+        return false;
+    if(desc.op_map[0]->kind() != miopenFusionOpConvForward) // should add fusion conv backward in fusion_ops
+        return false;
+    if(desc.op_map[1]->kind() != miopenFusionOpActivBackward) // is this only for backward data?
+        return false;
+    const auto& activationType =
+        dynamic_cast<ActivFwdFusionOpDescriptor&>(*desc.op_map[1]).activMode;
+    if(activationType != miopenActivationRELU && activationType != miopenActivationCLIPPEDRELU &&
+       activationType != miopenActivationCLAMP)
+        return false;
+    const auto conv_problem = fdesc_problem.GetConvProblem(0, miopen::conv::Direction::BackwardData);
+    if(env::disabled(MIOPEN_DEBUG_CONV_CK_IGEMM_GRP_BWD_ACTIV))
+        return false;
+    if(!conv_problem.IsBfp16() && !conv_problem.IsFp16() && !conv_problem.IsFp32())
+        return false;
+    if(conv_problem.IsTensorsCasted())
+        return false;
+    if(conv_problem.GetConv().attribute.deterministic)
+        return false;
+    if(conv_problem.HasNonPackedTensors())
+        return false;
+    if(!conv_problem.AllTensorsDimsFitIntoInt())
+        return false;
+    if(conv_problem.HasMixedDataTypes())
+        return false;
+    if(!(conv_problem.Is2d() || conv_problem.Is3d()))
+        return false;
+    if(!ck_utility::is_ck_whitelist(ctx.GetStream().GetDeviceName()))
+        return false;
+    if(!conv_problem.IsLayoutNHWC() && !conv_problem.IsLayoutDefault())
+        return false;
+
+    switch(conv_problem.GetInDataType())
+    {
+    case miopenBFloat16: return CheckCKApplicability<ck::bhalf_t>(conv_problem);
+    case miopenHalf: return CheckCKApplicability<ck::half_t>(conv_problem);
+    case miopenFloat: return CheckCKApplicability<float>(conv_problem);
+    case miopenFloat8_fnuz:
+    case miopenBFloat8_fnuz:
+    case miopenInt8:
+    case miopenInt32:
+    case miopenInt64:
+    case miopenDouble:
+    default: MIOPEN_THROW("Unsupported datatype");
+    }
+    return false;
+#endif
+}
+
 } // namespace fusion
 } // namespace solver
 } // namespace miopen
