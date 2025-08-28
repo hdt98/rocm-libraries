@@ -35,6 +35,7 @@
 #include <miopen/solver/ck_utility_common.hpp>
 #if MIOPEN_BACKEND_HIP && MIOPEN_USE_COMPOSABLEKERNEL
 #include <miopen/solver/implicitgemm_ck_util.hpp>
+#include <miopen/solver/implicitgemm_util.hpp>
 /*
     The following header needs to be replaced by the new bwd header from CK
 */
@@ -517,7 +518,74 @@ void PerformanceConfigConvCKIgemmGrpBwdActivFused::HeuristicInit(
 #endif
 }
 
+bool PerformanceConfigConvCKIgemmGrpBwdActivFused::SetNextValue(
+    const FusionDescription& fdesc_problem)
+{
+#if MIOPEN_USE_COMPOSABLEKERNEL
+    if(valid_kernels.empty())
+    {
+        const auto conv_problem = fdesc_problem.GetConvProblem(0, miopen::conv::Direction::BackwardData);
+        switch(conv_problem.GetInDataType())
+        {
+        case miopenBFloat16: Init<ck::bhalf_t>(conv_problem); break;
+        case miopenHalf: Init<ck::half_t>(conv_problem); break;
+        case miopenFloat: Init<float>(conv_problem); break;
+        case miopenInt8:
+        case miopenInt64:
+        case miopenInt32:
+        case miopenFloat8_fnuz:
+        case miopenBFloat8_fnuz:
+        case miopenDouble: break;
+        }
+        assert(!valid_kernels.empty());
+        return true;
+    }
+    do
+    {
+        bool flag = NextTwoPower<1, 128>(split_k);
+        if(!flag)
+        {
+            kernel_id = valid_kernels[index] + "+" + std::to_string(split_k);
+            break;
+        }
 
+        if(!NextLinear(0, valid_kernels.size() - 1, index))
+        {
+            kernel_id = valid_kernels[index] + "+" + std::to_string(split_k);
+            break;
+        }
+        // All split_k and index values were iterated
+        return false;
+    } while(false);
+#endif
+    return true;
+}
+
+bool PerformanceConfigConvCKIgemmGrpBwdActivFused::IsValidValue() const
+{
+    return index < valid_kernels.size();
+}
+
+bool PerformanceConfigConvCKIgemmGrpBwdActivFused::IsValid(
+    const FusionContext&, const FusionDescription& fdesc_problem) const
+{
+#if MIOPEN_BACKEND_HIP && MIOPEN_USE_COMPOSABLEKERNEL
+    const auto conv_problem = fdesc_problem.GetConvProblem(0, miopen::conv::Direction::BackwardData);
+    switch(conv_problem.GetInDataType())
+    {
+    case miopenBFloat16: return CheckIsSupportCKArgs<ck::bhalf_t>(conv_problem);
+    case miopenHalf: return CheckIsSupportCKArgs<ck::half_t>(conv_problem);
+    case miopenFloat: return CheckIsSupportCKArgs<float>(conv_problem);
+    case miopenInt8:
+    case miopenInt64:
+    case miopenInt32:
+    case miopenFloat8_fnuz:
+    case miopenBFloat8_fnuz:
+    case miopenDouble: break;
+    }
+#endif
+    return false;
+}
 
 } // namespace fusion
 } // namespace solver
