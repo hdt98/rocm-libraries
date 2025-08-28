@@ -53,6 +53,16 @@ struct CheckNumericsResult
     int hasInf  = 0;
 };
 
+struct CallbackData
+{
+    CheckNumericsResult abnormal;
+    int mode;
+    bool isInput;
+    int numElements;
+    ConstData_t ptr;
+    std::string tensorStr;
+};
+
 std::string GetKernelName(miopenDataType_t data_type)
 {
     switch(data_type)
@@ -70,14 +80,60 @@ std::string GetKernelName(miopenDataType_t data_type)
     }
 }
 
+void initCheckNumericsResult(void* args)
+{
+    CheckNumericsResult* args_h = static_cast<CheckNumericsResult*>(args);
+    CheckNumericsResult blank{};
+    *args_h = blank;
+}
+
+void checkNumericsCallback(void* data)
+{
+    CallbackData* cd = static_cast<CallbackData*>(data);
+
+    auto* abnormal_h      = &cd->abnormal;
+    auto mode             = cd->mode;
+    auto isInput          = cd->isInput;
+    auto numElements      = cd->numElements;
+    auto ptr              = cd->ptr;
+    std::string tensorStr = cd->tensorStr;
+
+    const int computeStats = (mode & CheckNumerics::ComputeStats);
+
+    bool isAbnormal = (abnormal_h->hasNan != 0) || (abnormal_h->hasInf != 0);
+
+    if(((mode & CheckNumerics::Info) != 0) || (((mode & CheckNumerics::Warn) != 0) && isAbnormal))
+    {
+        MIOPEN_LOG((isAbnormal ? miopen::LoggingLevel::Warning : miopen::LoggingLevel::Info),
+                   (isInput ? "INPUT " : "OUTPUT")
+                       << " ptr=" << ptr << " zeros=" << abnormal_h->hasZero
+                       << " nans=" << abnormal_h->hasNan << " infs=" << abnormal_h->hasInf << "  {"
+                       << tensorStr << "}");
+        if(computeStats != 0)
+        {
+            assert(numElements != 0);
+            MIOPEN_LOG((isAbnormal ? miopen::LoggingLevel::Warning : miopen::LoggingLevel::Info),
+                       "Stats: mean=" << (abnormal_h->sum / numElements)
+                                      << " absmean=" << (abnormal_h->absSum / numElements)
+                                      << " min=" << abnormal_h->min << " max=" << abnormal_h->max);
+        }
+    }
+}
+
 bool checkNumericsImpl(
     const Handle& handle, int mode, const TensorDescriptor& dDesc, ConstData_t data, bool isInput)
 {
     int numElements = dDesc.GetElementSize();
-    CheckNumericsResult abnormal_h;
-    auto abnormal_d =
-        handle.Create(sizeof(CheckNumericsResult)); // TODO - someday avoid slow malloc/free here
-    handle.WriteTo(&abnormal_h, abnormal_d, sizeof(CheckNumericsResult));
+    std::stringstream descStr;
+    descStr << dDesc;
+    CallbackData* callbackData =
+        new CallbackData{{}, mode, isInput, numElements, data, descStr.str()};
+    CheckNumericsResult* abnormal_h = &callbackData->abnormal;
+    auto abnormal_d                 = handle.Create(sizeof(CheckNumericsResult), true /* async */);
+    // we could potentially use hipMemsetAsync instead of the host launch followed by the WriteTo,
+    // but hipMemsetAsync does not work with hip graph capture
+    handle.LaunchHostFunction(initCheckNumericsResult, abnormal_h);
+    handle.WriteTo(abnormal_h, abnormal_d, sizeof(CheckNumericsResult), true /* async */);
     const size_t threadsPerBlock = 256;
     const size_t numBlocks       = handle.GetMaxComputeUnits() * 6;
     const int computeStats       = (mode & CheckNumerics::ComputeStats);
@@ -90,26 +146,15 @@ bool checkNumericsImpl(
         "MIOpenCheckNumerics", "MIOpenCheckNumerics", program_name, kernel_name, vld, vgd, "")(
         data, numElements, abnormal_d.get(), computeStats);
 
-    handle.ReadTo(&abnormal_h, abnormal_d, sizeof(CheckNumericsResult));
+    handle.ReadTo(abnormal_h, abnormal_d, sizeof(CheckNumericsResult), true /* async */);
+    handle.LaunchHostFunction(checkNumericsCallback, callbackData);
 
-    bool isAbnormal = (abnormal_h.hasNan != 0) || (abnormal_h.hasInf != 0);
+    if(handle.InGraphCapture())
+        return false;
 
-    if(((mode & CheckNumerics::Info) != 0) || (((mode & CheckNumerics::Warn) != 0) && isAbnormal))
-    {
-        MIOPEN_LOG((isAbnormal ? miopen::LoggingLevel::Warning : miopen::LoggingLevel::Info),
-                   (isInput ? "INPUT " : "OUTPUT")
-                       << " ptr=" << data << " zeros=" << abnormal_h.hasZero
-                       << " nans=" << abnormal_h.hasNan << " infs=" << abnormal_h.hasInf << "  {"
-                       << dDesc << "}");
-        if(computeStats != 0)
-        {
-            assert(numElements != 0);
-            MIOPEN_LOG((isAbnormal ? miopen::LoggingLevel::Warning : miopen::LoggingLevel::Info),
-                       "Stats: mean=" << (abnormal_h.sum / numElements)
-                                      << " absmean=" << (abnormal_h.absSum / numElements)
-                                      << " min=" << abnormal_h.min << " max=" << abnormal_h.max);
-        }
-    }
+    handle.Finish(); // not capturing hip graph, need to synchronize
+
+    bool isAbnormal = (abnormal_h->hasNan != 0) || (abnormal_h->hasInf != 0);
 
     if(isAbnormal)
     {
@@ -133,6 +178,8 @@ bool checkNumericsImpl(
         }
     }
 
+    delete callbackData;
+
     return isAbnormal;
 };
 
@@ -147,7 +194,6 @@ bool checkNumericsInput(const Handle& handle, const TensorDescriptor& dDesc, Con
 // Returns: 1 if abnormal value (inf or nan) detected in specified data, 0 otherwise
 bool checkNumericsOutput(const Handle& handle, const TensorDescriptor& dDesc, ConstData_t data)
 {
-    handle.Finish();
     return checkNumericsImpl(handle, env::value(MIOPEN_CHECK_NUMERICS), dDesc, data, false);
 }
 

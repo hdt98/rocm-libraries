@@ -84,21 +84,36 @@ void Handle::EnableProfiling(bool enable) const { this->impl->enable_profiling =
 
 float Handle::GetKernelTime() const { return this->impl->profiling_result; }
 
-Allocator::ManageDataPtr Handle::Create(std::size_t sz) const { return this->impl->allocator(sz); }
+Allocator::ManageDataPtr Handle::Create(std::size_t sz, bool /* async */) const
+{
+    return this->impl->allocator(sz);
+}
 
-Allocator::ManageDataPtr&
-Handle::WriteTo(const void* /* data */, Allocator::ManageDataPtr& ddata, std::size_t /* sz */) const
+Allocator::ManageDataPtr& Handle::WriteTo(const void* /* data */,
+                                          Allocator::ManageDataPtr& ddata,
+                                          std::size_t /* sz */,
+                                          bool /* async */) const
 {
     return ddata;
 }
 
 void Handle::ReadTo(void* /* data */,
                     const Allocator::ManageDataPtr& /* ddata */,
-                    std::size_t /* sz */) const
+                    std::size_t /* sz */,
+                    bool /* async */) const
 {
 }
 
-void Handle::ReadTo(void* /* data */, ConstData_t /* ddata */, std::size_t /* sz */) const {}
+void Handle::ReadTo(void* /* data */,
+                    ConstData_t /* ddata */,
+                    std::size_t /* sz */,
+                    bool /* async */) const
+{
+}
+
+void Handle::LaunchHostFunction(miopenHostFunction_t /* func */, void* /* user_data */) const {}
+
+bool Handle::InGraphCapture() const { return false; }
 
 void Handle::Copy(ConstData_t /* src */, Data_t /* dest */, std::size_t /* size */) const {}
 

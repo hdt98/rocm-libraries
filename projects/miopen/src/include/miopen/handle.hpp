@@ -82,6 +82,8 @@ using rocblas_handle_ptr = MIOPEN_MANAGE_PTR(rocblas_handle, rocblas_destroy_han
 using hipblasLt_handle_ptr = MIOPEN_MANAGE_PTR(hipblasLtHandle_t, hipblasLtDestroy);
 #endif
 
+typedef void (*miopenHostFunction_t)(void* userData);
+
 struct MIOPEN_EXPORT Handle : miopenHandle
 {
     friend struct TargetProperties;
@@ -183,11 +185,18 @@ struct MIOPEN_EXPORT Handle : miopenHandle
     std::ostream& Print(std::ostream& os) const;
     void Copy(ConstData_t src, Data_t dest, std::size_t size) const;
 
-    Allocator::ManageDataPtr Create(std::size_t sz) const;
-    Allocator::ManageDataPtr&
-    WriteTo(const void* data, Allocator::ManageDataPtr& ddata, std::size_t sz) const;
-    void ReadTo(void* data, const Allocator::ManageDataPtr& ddata, std::size_t sz) const;
-    void ReadTo(void* data, ConstData_t ddata, std::size_t sz) const;
+    Allocator::ManageDataPtr Create(std::size_t sz, bool async = false) const;
+    Allocator::ManageDataPtr& WriteTo(const void* data,
+                                      Allocator::ManageDataPtr& ddata,
+                                      std::size_t sz,
+                                      bool async = false) const;
+    void ReadTo(void* data,
+                const Allocator::ManageDataPtr& ddata,
+                std::size_t sz,
+                bool async = false) const;
+    void ReadTo(void* data, ConstData_t ddata, std::size_t sz, bool async = false) const;
+    void LaunchHostFunction(miopenHostFunction_t func, void* user_data) const;
+    bool InGraphCapture() const;
     shared<Data_t> CreateSubBuffer(Data_t data, std::size_t offset, std::size_t size) const;
 #if MIOPEN_BACKEND_HIP
     shared<ConstData_t>

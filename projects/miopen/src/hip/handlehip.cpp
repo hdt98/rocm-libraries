@@ -417,37 +417,118 @@ void Handle::EnableProfiling(bool enable) const { this->impl->enable_profiling =
 
 float Handle::GetKernelTime() const { return this->impl->profiling_result; }
 
-Allocator::ManageDataPtr Handle::Create(std::size_t sz) const
+void* async_allocator(void* context, size_t sz)
+{
+    const auto available = GetAvailableMemory();
+    MIOPEN_LOG_I2("GetAvailableMemory " << available);
+    if(sz > available)
+        MIOPEN_LOG_I("GetAvailableMemory reports unsufficient memory to allocate " << sz);
+
+    void* ptr;
+    miopenAcceleratorQueue_t stream = static_cast<miopenAcceleratorQueue_t>(context);
+    const auto status               = hipMallocAsync(&ptr, sz, stream);
+    if(status == hipSuccess)
+    {
+        MIOPEN_LOG_I2("hipMallocAsync " << sz << " at " << ptr << " Ok");
+        return ptr;
+    }
+
+    MIOPEN_LOG_W("hipMallocAsync " << sz << " status: " << status);
+    MIOPEN_THROW_HIP_STATUS(status, "hipMallocAsync " + std::to_string(sz));
+}
+
+void async_deallocator(void* context, void* mem)
+{
+    size_t size = 0;
+    auto status = hipMemPtrGetInfo(mem, &size);
+    if(status != hipSuccess)
+        MIOPEN_LOG_W("hipMemPtrGetInfo at " << mem << " status: " << status);
+
+    miopenAcceleratorQueue_t stream = static_cast<miopenAcceleratorQueue_t>(context);
+    status                          = hipFreeAsync(mem, stream);
+    if(status != hipSuccess)
+    {
+        MIOPEN_THROW_HIP_STATUS(status,
+                                "hipFreeAsync " + std::to_string(size) + " at " + to_string(mem));
+    }
+
+    MIOPEN_LOG_I2("hipFreeAsync " << size << " at " << mem << " Ok");
+}
+
+Allocator::ManageDataPtr Handle::Create(std::size_t sz, bool async) const
 {
     MIOPEN_HANDLE_LOCK
+    if(async)
+    {
+        Allocator allocator{async_allocator, async_deallocator, this->GetStream()};
+        return allocator(sz);
+    }
+
     this->Finish();
     return this->impl->allocator(sz);
 }
 
 Allocator::ManageDataPtr&
-Handle::WriteTo(const void* data, Allocator::ManageDataPtr& ddata, std::size_t sz) const
+Handle::WriteTo(const void* data, Allocator::ManageDataPtr& ddata, std::size_t sz, bool async) const
 {
     MIOPEN_HANDLE_LOCK
-    this->Finish();
-    auto status =
-        hipMemcpyWithStream(ddata.get(), data, sz, hipMemcpyHostToDevice, this->GetStream());
+    hipError_t status;
+
+    if(async)
+    {
+        status = hipMemcpyAsync(ddata.get(), data, sz, hipMemcpyHostToDevice, this->GetStream());
+    }
+    else
+    {
+        this->Finish();
+        status =
+            hipMemcpyWithStream(ddata.get(), data, sz, hipMemcpyHostToDevice, this->GetStream());
+    }
+
     if(status != hipSuccess)
         MIOPEN_THROW_HIP_STATUS(status, "Hip error writing to buffer: ");
     return ddata;
 }
 
-void Handle::ReadTo(void* data, const Allocator::ManageDataPtr& ddata, std::size_t sz) const
+void Handle::ReadTo(void* data,
+                    const Allocator::ManageDataPtr& ddata,
+                    std::size_t sz,
+                    bool async) const
 {
-    ReadTo(data, ddata.get(), sz);
+    ReadTo(data, ddata.get(), sz, async);
 }
 
-void Handle::ReadTo(void* data, ConstData_t ddata, std::size_t sz) const
+void Handle::ReadTo(void* data, ConstData_t ddata, std::size_t sz, bool async) const
 {
     MIOPEN_HANDLE_LOCK
-    this->Finish();
-    auto status = hipMemcpyWithStream(data, ddata, sz, hipMemcpyDeviceToHost, this->GetStream());
+    hipError_t status;
+
+    if(async)
+    {
+        status = hipMemcpyAsync(data, ddata, sz, hipMemcpyDeviceToHost, this->GetStream());
+    }
+    else
+    {
+        this->Finish();
+        status = hipMemcpyWithStream(data, ddata, sz, hipMemcpyDeviceToHost, this->GetStream());
+    }
+
     if(status != hipSuccess)
         MIOPEN_THROW_HIP_STATUS(status, "Hip error reading from buffer: ");
+}
+
+void Handle::LaunchHostFunction(miopenHostFunction_t func, void* user_data) const
+{
+    auto status = hipLaunchHostFunc(this->GetStream(), func, user_data);
+    if(status != hipSuccess)
+        MIOPEN_THROW_HIP_STATUS(status, "Hip error launching host function: ");
+}
+
+bool Handle::InGraphCapture() const
+{
+    hipStreamCaptureStatus captureStatus;
+    hipStreamIsCapturing(this->GetStream(), &captureStatus);
+    return (captureStatus == hipStreamCaptureStatusActive);
 }
 
 void Handle::Copy(ConstData_t src, Data_t dest, std::size_t size) const

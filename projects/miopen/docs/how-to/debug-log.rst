@@ -311,9 +311,9 @@ settings to help with debugging:
 * ``MIOPEN_CHECK_NUMERICS=0x02``: Warning information. Prints results only if an abnormality is
   detected.
 * ``MIOPEN_CHECK_NUMERICS=0x04``: Throw error on detection. MIOpen runs ``MIOPEN_THROW``
-  upon an abnormal result.
+  upon an abnormal result. This setting is not supported with hip graph capture.
 * ``MIOPEN_CHECK_NUMERICS=0x08``: Abort upon an abnormal result. Lets you drop into a
-  debugging session.
+  debugging session. This setting is not supported with hip graph capture.
 * ``MIOPEN_CHECK_NUMERICS=0x10``: Print stats. Computes and prints mean/absmean/min/max
   (note that this is slow).
 

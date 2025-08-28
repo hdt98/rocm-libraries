@@ -507,15 +507,17 @@ std::size_t Handle::GetWavefrontWidth() const
         miopen::GetDevice(this->GetStream()));
 }
 
-Allocator::ManageDataPtr Handle::Create(std::size_t sz) const
+Allocator::ManageDataPtr Handle::Create(std::size_t sz, bool /* async */) const
 {
     MIOPEN_HANDLE_LOCK
     this->Finish();
     return this->impl->allocator(sz);
 }
 
-Allocator::ManageDataPtr&
-Handle::WriteTo(const void* data, Allocator::ManageDataPtr& ddata, std::size_t sz) const
+Allocator::ManageDataPtr& Handle::WriteTo(const void* data,
+                                          Allocator::ManageDataPtr& ddata,
+                                          std::size_t sz,
+                                          bool /* async */) const
 {
     MIOPEN_HANDLE_LOCK
     this->Finish();
@@ -528,12 +530,15 @@ Handle::WriteTo(const void* data, Allocator::ManageDataPtr& ddata, std::size_t s
     return ddata;
 }
 
-void Handle::ReadTo(void* data, const Allocator::ManageDataPtr& ddata, std::size_t sz) const
+void Handle::ReadTo(void* data,
+                    const Allocator::ManageDataPtr& ddata,
+                    std::size_t sz,
+                    bool /* async */) const
 {
     ReadTo(data, ddata.get(), sz);
 }
 
-void Handle::ReadTo(void* data, ConstData_t ddata, std::size_t sz) const
+void Handle::ReadTo(void* data, ConstData_t ddata, std::size_t sz, bool /* async */) const
 {
     MIOPEN_HANDLE_LOCK
     this->Finish();
@@ -544,6 +549,10 @@ void Handle::ReadTo(void* data, ConstData_t ddata, std::size_t sz) const
         MIOPEN_THROW_CL_STATUS(status, "OpenCL error reading from buffer: " + std::to_string(sz));
     }
 }
+
+void Handle::LaunchHostFunction(miopenHostFunction_t /* func */, void* /* user_data */) const {}
+
+bool Handle::InGraphCapture() const { return false; }
 
 void Handle::Copy(ConstData_t src, Data_t dest, std::size_t size) const
 {
