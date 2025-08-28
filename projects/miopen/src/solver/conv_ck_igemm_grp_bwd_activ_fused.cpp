@@ -112,7 +112,7 @@ template <ck::index_t NumDimSpatial,
           typename WeiLayout    = ck::tensor_layout::convolution::GKYXC,
           typename OutLayout    = ck::tensor_layout::convolution::NHWGK>
 using DeviceOpGBwdAct =
-    ck::tensor_operation::device::DeviceGroupedConvFwdMultipleABD<NumDimSpatial,
+    ck::tensor_operation::device::DeviceGroupedConvFwdMultipleABD<NumDimSpatial, // Fwd -> Bwd ???
                                                                   InLayout,
                                                                   WeiLayout,
                                                                   ck::Tuple<>, // diff
@@ -262,8 +262,8 @@ struct CKArgs
                                                  rPadding,
                                                  in_element_op,
                                                  wei_element_op,
-                                                 clampOp,
-                                                 split_k);
+                                                 clampOp);
+                                                 //split_k
         }
         else
         {
@@ -313,8 +313,8 @@ struct CKArgs
                                                  adjusted_rPadding,
                                                  in_element_op,
                                                  wei_element_op,
-                                                 clampOp,
-                                                 split_k);
+                                                 clampOp);
+                                                 //split_k // split_k is needed for bwd make arg pointer function
         }
     }
 
@@ -433,7 +433,90 @@ void PerformanceConfigConvCKIgemmGrpBwdActivFused::Init(
     kernel_id = valid_kernels[index] + "+" + std::to_string(split_k);
 }
 
+template <typename DataType>
+bool PerformanceConfigConvCKIgemmGrpBwdActivFused::CheckIsSupportCKArgs(
+    const miopen::conv::ProblemDescription& problem) const
+{
+    bool supported = false;
+    if(problem.Is3d())
+    {
+        using Layouts = decltype(Get3DLayouts());
+        supported     = IsCKArgsSupported<DeviceOpGBwdActPtrs<3,
+                                                          DataType,
+                                                          Layouts::InLayout,
+                                                          Layouts::WeiLayout,
+                                                          Layouts::OutLayout>,
+                                      CKArgs<3, DataType>>(problem, kernel_id);
+    }
+    else
+    {
+        using Layouts = decltype(Get2DLayouts());
+        supported     = IsCKArgsSupported<DeviceOpGBwdActPtrs<2,
+                                                          DataType,
+                                                          Layouts::InLayout,
+                                                          Layouts::WeiLayout,
+                                                          Layouts::OutLayout>,
+                                      CKArgs<2, DataType>>(problem, kernel_id);
+    }
+    return supported;
+}
+
+template <typename DataType>
+bool ConvCKIgemmGrpBwdActivFused::CheckCKApplicability(
+    const miopen::conv::ProblemDescription& problem) const
+{
+    bool applicable = false;
+    if(problem.Is3d())
+    {
+        using Layouts = decltype(Get3DLayouts());
+        applicable    = IsCKApplicable<DeviceOpGBwdActPtrs<3,
+                                                        DataType,
+                                                        Layouts::InLayout,
+                                                        Layouts::WeiLayout,
+                                                        Layouts::OutLayout>,
+                                    CKArgs<3, DataType>>(problem);
+    }
+    else
+    {
+        using Layouts = decltype(Get2DLayouts());
+        applicable    = IsCKApplicable<DeviceOpGBwdActPtrs<2,
+                                                        DataType,
+                                                        Layouts::InLayout,
+                                                        Layouts::WeiLayout,
+                                                        Layouts::OutLayout>,
+                                    CKArgs<2, DataType>>(problem);
+    }
+    return applicable;
+}
 #endif
+
+/*
+    The current fusion problem only support forward direction. 
+*/ 
+void PerformanceConfigConvCKIgemmGrpBwdActivFused::HeuristicInit(
+    const FusionDescription& fdesc_problem)
+{
+#if !MIOPEN_BACKEND_HIP || !MIOPEN_USE_COMPOSABLEKERNEL
+    std::ignore = fdesc_problem;
+#else
+    const auto conv_problem = fdesc_problem.GetConvProblem(0, miopen::conv::Direction::BackwardData);
+    switch(conv_problem.GetInDataType())
+    {
+    case miopenBFloat16: Init<ck::bhalf_t>(conv_problem); break;
+    case miopenHalf: Init<ck::half_t>(conv_problem); break;
+    case miopenFloat: Init<float>(conv_problem); break;
+    case miopenFloat8_fnuz:
+    case miopenBFloat8_fnuz:
+    case miopenInt8:
+    case miopenInt32:
+    case miopenInt64:
+    case miopenDouble:
+    default: MIOPEN_THROW("Unsupported datatype");
+    }
+
+#endif
+}
+
 
 
 } // namespace fusion
