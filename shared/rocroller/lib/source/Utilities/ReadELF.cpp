@@ -32,6 +32,17 @@
 
 using namespace rocRoller;
 
+#define COMGR_CHECK(status, cleanup_code, error_msg) \
+    do { \
+        if(status != AMD_COMGR_STATUS_SUCCESS) \
+        { \
+            const char* statusString; \
+            amd_comgr_status_string(status, &statusString); \
+            cleanup_code; \
+            Throw<FatalError>(error_msg, statusString); \
+        } \
+    } while(0)
+
 std::string rocRoller::readMetaDataFromCodeObject(std::string const& fileName)
 {
     std::string   yaml;
@@ -53,31 +64,14 @@ std::string rocRoller::readMetaDataFromCodeObject(std::string const& fileName)
 
     amd_comgr_data_t   dataIn;
     amd_comgr_status_t status = amd_comgr_create_data(AMD_COMGR_DATA_KIND_RELOCATABLE, &dataIn);
-    if(status != AMD_COMGR_STATUS_SUCCESS)
-    {
-        const char* statusString;
-        amd_comgr_status_string(status, &statusString);
-        Throw<FatalError>("Failed to create data object: ", statusString);
-    }
+    COMGR_CHECK(status, , "Failed to create data object: ");
 
     status = amd_comgr_set_data(dataIn, size, buffer.data());
-    if(status != AMD_COMGR_STATUS_SUCCESS)
-    {
-        const char* statusString;
-        amd_comgr_status_string(status, &statusString);
-        amd_comgr_release_data(dataIn);
-        Throw<FatalError>("Failed to set data: ", statusString);
-    }
+    COMGR_CHECK(status, amd_comgr_release_data(dataIn), "Failed to set data: ");
 
     amd_comgr_metadata_node_t meta;
     status = amd_comgr_get_data_metadata(dataIn, &meta);
-    if(status != AMD_COMGR_STATUS_SUCCESS)
-    {
-        const char* statusString;
-        amd_comgr_status_string(status, &statusString);
-        amd_comgr_release_data(dataIn);
-        Throw<FatalError>("Failed to get metadata: ", statusString);
-    }
+    COMGR_CHECK(status, amd_comgr_release_data(dataIn), "Failed to get metadata: ");
 
     amd_comgr_metadata_kind_t mkind;
     status = amd_comgr_get_metadata_kind(meta, &mkind);
