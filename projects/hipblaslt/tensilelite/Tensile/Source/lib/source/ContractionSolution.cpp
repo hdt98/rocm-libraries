@@ -2935,7 +2935,8 @@ namespace TensileLite
     size_t ContractionSolution::requiredHostSizeGroupedGemmSingle(Problem const&  problem,
                                                                   Hardware const& hardware) const
     {
-        if(!problemType.groupedGemm)
+        //Don't need to calculate ws size since SK doesn't support GG yet
+        if(sizeMapping.streamK)
             return 0;
 
         std::vector<Problem> tmpProblem;
