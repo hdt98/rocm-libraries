@@ -98,6 +98,51 @@ using OutElementOp = ck::tensor_operation::element_wise::Clamp;
 const auto in_element_op  = InElementOp{};
 const auto wei_element_op = WeiElementOp{};
 
+/*
+    The following kernel arguments are only for debug purpose and should be replaced once
+    CK added new bwd fused kernels. 
+*/
+template <ck::index_t NumDimSpatial,
+          typename InDataType,
+          typename WeiDataType,
+          typename OutDataType,
+          typename AComputeType = InDataType,
+          typename BComputeType = AComputeType,
+          typename InLayout     = ck::tensor_layout::convolution::NHWGC,
+          typename WeiLayout    = ck::tensor_layout::convolution::GKYXC,
+          typename OutLayout    = ck::tensor_layout::convolution::NHWGK>
+using DeviceOpGBwdAct =
+    ck::tensor_operation::device::DeviceGroupedConvFwdMultipleABD<NumDimSpatial,
+                                                                  InLayout,
+                                                                  WeiLayout,
+                                                                  ck::Tuple<>, // diff
+                                                                  OutLayout,
+                                                                  InDataType,
+                                                                  WeiDataType,
+                                                                  ck::Tuple<>, // diff
+                                                                  OutDataType,
+                                                                  InElementOp,
+                                                                  WeiElementOp,
+                                                                  OutElementOp,
+                                                                  AComputeType,
+                                                                  BComputeType>;
+
+template <ck::index_t NumDimSpatial,
+          typename DataType,
+          typename InLayout,
+          typename WeiLayout,
+          typename OutLayout>
+using DeviceOpGBwdActPtrs = ck::tensor_operation::device::instance::DeviceOperationInstanceFactory<
+    DeviceOpGBwdAct<NumDimSpatial,
+                    DataType,
+                    DataType,
+                    DataType,
+                    DataType,
+                    DataType,
+                    InLayout,
+                    WeiLayout,
+                    OutLayout>>;
+
 namespace {
 
 template <int NDimSpatial, typename DataType>
@@ -340,6 +385,8 @@ struct CKArgs
     int Di = 0; // Depth for 3D
     int Do = 0; // Depth for 3D
     int Z  = 0; // Filter depth for 3D
+    miopenDataType_t data_type;
+    miopenAlphaBetaCase_t alpha_beta_case;
     std::array<ck::index_t, 6> in_lens;
     std::array<ck::index_t, 6> in_strides;
     std::array<ck::index_t, 6> out_lens;
@@ -353,6 +400,38 @@ struct CKArgs
 };
 
 } // namespace
+
+template <typename DataType>
+void PerformanceConfigConvCKIgemmGrpBwdActivFused::Init(
+    const miopen::conv::ProblemDescription& problem)
+{
+    if(valid_kernels.empty())
+    {
+        if(problem.Is3d())
+        {
+            using Layouts = decltype(Get3DLayouts());
+            valid_kernels = FillValidKernelsIDs<DeviceOpGBwdActPtrs<3,
+                                                                    DataType,
+                                                                    Layouts::InLayout,
+                                                                    Layouts::WeiLayout,
+                                                                    Layouts::OutLayout>,
+                                                CKArgs<3, DataType>>(problem);
+        }
+        else
+        {
+            using Layouts = decltype(Get2DLayouts());
+            valid_kernels = FillValidKernelsIDs<DeviceOpGBwdActPtrs<2,
+                                                                    DataType,
+                                                                    Layouts::InLayout,
+                                                                    Layouts::WeiLayout,
+                                                                    Layouts::OutLayout>,
+                                                CKArgs<2, DataType>>(problem);
+        }
+    }
+    index     = 0;
+    split_k   = 1;
+    kernel_id = valid_kernels[index] + "+" + std::to_string(split_k);
+}
 
 #endif
 
