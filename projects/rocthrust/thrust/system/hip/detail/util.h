@@ -287,7 +287,7 @@ THRUST_HOST_DEVICE inline void throw_on_error(hipError_t status)
 #if _THRUST_HAS_DEVICE_SYSTEM_STD
                   _THRUST_STD::terminate();
 #else
-                  ::std::abort();
+                  __builtin_trap();
                   __builtin_unreachable();
 #endif
                   ));
@@ -328,7 +328,7 @@ THRUST_HOST_DEVICE inline void throw_on_error(hipError_t status, char const* msg
 #if _THRUST_HAS_DEVICE_SYSTEM_STD
                   _THRUST_STD::terminate();
 #else
-                  ::std::abort();
+                  __builtin_trap();
                   __builtin_unreachable();
 #endif
                   ));

@@ -61,7 +61,7 @@ inline THRUST_HOST_DEVICE void terminate_with_message(const char* message)
 #if _THRUST_HAS_DEVICE_SYSTEM_STD
   _THRUST_STD::terminate();
 #else
-  NV_IF_TARGET(NV_IS_HOST, (::std::exit(-1);), (::std::abort();));
+  NV_IF_TARGET(NV_IS_HOST, (::std::exit(-1);), (__builtin_trap();));
   __builtin_unreachable();
 #endif
 }
