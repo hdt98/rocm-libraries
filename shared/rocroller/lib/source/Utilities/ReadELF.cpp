@@ -101,9 +101,6 @@ std::string rocRoller::readMetaDataFromCodeObject(std::string const& fileName)
                 amd_comgr_get_metadata_string(node, &size, nullptr);
                 std::vector<char> str(size);
                 amd_comgr_get_metadata_string(node, &size, str.data());
-
-                // Check if this is a special case for is-null key
-                // We need to handle this at the parent level, so just output the string
                 yamlStream << str.data();
                 break;
             }
@@ -143,10 +140,14 @@ std::string rocRoller::readMetaDataFromCodeObject(std::string const& fileName)
                         amd_comgr_get_metadata_string(key, &keySize, nullptr);
                         std::vector<char> keyStr(keySize);
                         amd_comgr_get_metadata_string(key, &keySize, keyStr.data());
+                        *(ctx->stream) << keyStr.data() << ":";
 
-                        // Check if this is the "is-null" key
                         std::string keyName(keyStr.data());
-                        *(ctx->stream) << keyName << ":";
+
+                        if(keyName == ".kernel_graph_dot")
+                        {
+                            return AMD_COMGR_STATUS_SUCCESS;
+                        }
 
                         amd_comgr_metadata_kind_t valueKind;
                         amd_comgr_get_metadata_kind(value, &valueKind);
@@ -160,28 +161,7 @@ std::string rocRoller::readMetaDataFromCodeObject(std::string const& fileName)
                         else
                         {
                             *(ctx->stream) << " ";
-
-                            // Special handling for is-null key to convert 1 to true
-                            if(keyName == "is-null"
-                               || keyName == "sync" && valueKind == AMD_COMGR_METADATA_KIND_STRING)
-                            {
-                                size_t valueSize = 0;
-                                amd_comgr_get_metadata_string(value, &valueSize, nullptr);
-                                std::vector<char> valueStr(valueSize);
-                                amd_comgr_get_metadata_string(value, &valueSize, valueStr.data());
-                                std::string val(valueStr.data());
-
-                                if(val == "1")
-                                    *(ctx->stream) << "true";
-                                else if(val == "0")
-                                    *(ctx->stream) << "false";
-                                else
-                                    *(ctx->stream) << val;
-                            }
-                            else
-                            {
-                                (*ctx->converter)(value, 0, false);
-                            }
+                            (*ctx->converter)(value, 0, false);
                         }
 
                         return AMD_COMGR_STATUS_SUCCESS;

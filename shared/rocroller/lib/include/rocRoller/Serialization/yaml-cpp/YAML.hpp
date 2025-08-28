@@ -285,6 +285,22 @@ namespace rocRoller
         }
 
         template <>
+        inline void nodeInputHelper(YAML::Node& n, bool& val)
+        {
+            try
+            {
+                val = n.as<bool>();
+            }
+            catch(YAML::TypedBadConversion<bool> err)
+            {
+                // Sometimes boolean YAMLs are truthy integers
+                int intVal;
+                nodeInputHelper(n, intVal);
+                val = static_cast<bool>(intVal);
+            }
+        }
+
+        template <>
         inline void nodeInputHelper(YAML::Node& n, Half& val)
         {
             float floatVal;
