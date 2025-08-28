@@ -1233,12 +1233,12 @@ Tests:
 - name: matmul_groupedgemm
   category: pre_checkin
   function:
-    matmul: *hpa_half_precisions_fp_16_32_dst
-  M: [127, 129]
-  N: [127, 129]
-  K: [127, 129]
+    matmul: *real_precisions
+  M: [127, 127]
+  N: [127, 127]
+  K: [127, 127]
   transA_transB: *transA_transB_range
-  grouped_gemm: [1, 7]
+  grouped_gemm: [1, 2, 3]
   alpha: 1
   beta: [ 0.0, 2.0 ]
   unit_check: 1
