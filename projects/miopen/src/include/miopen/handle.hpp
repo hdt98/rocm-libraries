@@ -82,7 +82,7 @@ using rocblas_handle_ptr = MIOPEN_MANAGE_PTR(rocblas_handle, rocblas_destroy_han
 using hipblasLt_handle_ptr = MIOPEN_MANAGE_PTR(hipblasLtHandle_t, hipblasLtDestroy);
 #endif
 
-typedef void (*miopenHostFunction_t)(void* userData);
+using miopenHostFunction_t = void(void* userData);
 
 struct MIOPEN_EXPORT Handle : miopenHandle
 {
