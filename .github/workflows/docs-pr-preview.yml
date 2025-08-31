@@ -8,7 +8,7 @@
 # 3. Build the documentation using sphinx and doxygen
 # 4. Deploy the page onto github-pages 
 #
-# This blocks changes that can potentially broke the docs build, also provide a look
+# This blocks changes that can potentially broke the docs build, also provides a look
 # and feel to the reviewer.
 
 name: Docs Preview
