@@ -28,8 +28,16 @@ on:
     types: [created]
 
 jobs:
-  detect:
+  build:
     runs-on: ubuntu-latest
+    # Only run if either:
+    # 1. PR modifies docs files
+    # 2. A comment "/docs-check" is made on a PR
+    if: |
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'issue_comment' &&
+       github.event.issue.pull_request != null &&
+       startsWith(github.event.comment.body, '/docs-check'))
     outputs:
       projects: ${{ steps.detect.outputs.projects }}
     steps:
