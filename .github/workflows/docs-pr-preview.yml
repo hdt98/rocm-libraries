@@ -1,24 +1,24 @@
-# Update documentation on Read the docs
-# -----------------------------------
-# This GitHub Actions workflow runs on push commits. It detects commit's target branch and project,
-# then triggers the corresponding build on Read the Docs.
+# Create a documentation preview in the pull request 
+# --------------------------------------------------
+# This GitHub Actions workflow triggers by openning/updating a PR. If the PR changes any
+# docs content, it will build the change and display the preview.
 # Key Steps:
-# 1. Compare the current commit to the last commit and obtain the path of changed files
-# 2. Extract a set of project names from changed file path
-# 3. Obtain the target branch name and convert it into Read the Docs format
-# 4. Use Read the Docs V3 API to trigger the build for the corresponding docs:
-#    Github project name -> Read the docs project name
-#    Github branch name -> Read the docs version
+# 1. Use the script (.github/scripts/pr_detect_changed_subtrees.py) to detect changed project
+# 2. Build the environment and dependencies using project's requirements.txt
+# 3. Build the documentation using sphinx and doxygen
+# 4. Deploy the page onto github-pages 
 #
-# This ensures live documentation is synchronized with the latest change.
+# This blocks changes that can potentially broke the docs build, also provide a look
+# and feel to the reviewer.
 
-name: Docs Check
+name: Docs Preview
 
 on:
   # Trigger when PR is opened, or new commits are pushed
   pull_request:
     branches:
-      - 'users/alexxu12/docs-pr-preview'
+      - 'develop'
+      - 'docs/**'
     paths:
       - 'projects/**/docs/**'
       - 'shared/**/docs/**'
@@ -97,6 +97,7 @@ jobs:
           token: ${{ steps.generate-token.outputs.token }}
           fetch-depth: 0
 
+      # Setup dependencies and build the docs
       - name: Install Python dependencies and build docs
         run: |
           REQ_FILE="${{ steps.detect.outputs.subtrees }}/docs/sphinx/requirements.txt"
@@ -114,8 +115,8 @@ jobs:
         uses: actions/upload-pages-artifact@v4
         with:
           path: ${{ steps.detect.outputs.subtrees }}/docs/_build/html
-      
-  # Deployment job
+  
+  # Deploy the content onto github-pages
   deploy:
     environment:
       name: github-pages
