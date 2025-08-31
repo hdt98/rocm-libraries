@@ -73,7 +73,6 @@ jobs:
 
       - name: Detect changed subtrees from merged PR
         id: detect
-        if: steps.pr-check.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ steps.generate-token.outputs.token }}
         run: |
@@ -92,3 +91,30 @@ jobs:
             ${{ steps.detect.outputs.subtrees }}
           token: ${{ steps.generate-token.outputs.token }}
           fetch-depth: 0
+
+      - name: Install Python dependencies and build docs
+        run: |
+          REQ_FILE="${{ steps.detect.outputs.subtrees }}/docs/sphinx/requirements.txt"
+          if [ -f "$REQ_FILE" ]; then
+            echo "Installing requirements from $REQ_FILE"
+            pip install -r "$REQ_FILE"
+            python -m sphinx -T -b html -d _build/doctrees -D language=en . _build/html
+          else
+            echo "No requirements.txt found at $REQ_FILE, skipping."
+          fi
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: _build/html
+      
+    # Deployment job
+    deploy:
+      environment:
+        name: github-pages
+        url: ${{ steps.deployment.outputs.page_url }}
+      runs-on: ubuntu-latest
+      needs: build
+      steps:
+        - name: Deploy to GitHub Pages
+          id: deployment
+          uses: actions/deploy-pages@v4
