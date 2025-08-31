@@ -98,6 +98,8 @@ jobs:
           if [ -f "$REQ_FILE" ]; then
             echo "Installing requirements from $REQ_FILE"
             pip install -r "$REQ_FILE"
+            sudo apt-get update
+            sudo apt-get install -y doxygen graphviz
             cd ${{ steps.detect.outputs.subtrees }}/docs
             python -m sphinx -T -b html -d _build/doctrees -D language=en . _build/html
           else
