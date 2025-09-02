@@ -24,6 +24,7 @@
 #include <iterator>
 #include <cstddef>
 #include <type_traits>
+#include <cstring>
 
 #include "../config.hpp"
 #include "../detail/various.hpp"
