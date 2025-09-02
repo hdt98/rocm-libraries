@@ -41,6 +41,10 @@
 #include <ck/library/tensor_operation_instance/gpu/grouped_convolution_backward_weight_bilinear.hpp>
 #include <ck/library/tensor_operation_instance/gpu/grouped_convolution_backward_weight_scale.hpp>
 #include <ck/library/tensor_operation_instance/gpu/grouped_convolution_backward_data.hpp>
+/*
+    The following header needs to be replaced by the new bwd header from CK
+*/
+#include "ck/library/tensor_operation_instance/gpu/grouped_convolution_forward_clamp.hpp"
 #endif // MIOPEN_USE_COMPOSABLEKERNEL
 
 namespace miopen {
@@ -153,6 +157,63 @@ using DeviceOpGBwdWeightScalePtrs =
         DeviceOpGBwdWeightScale<DataType>>;
 
 } // namespace conv
+
+namespace fusion {
+
+
+using InElementOpBwd  = ck::tensor_operation::element_wise::PassThrough;
+using WeiElementOpBwd = ck::tensor_operation::element_wise::PassThrough;
+using OutElementOpBwd = ck::tensor_operation::element_wise::Clamp;
+
+const auto in_element_op_bwd  = InElementOpBwd{};
+const auto wei_element_op_bwd = WeiElementOpBwd{};
+
+/*
+    The following kernel arguments are only for debug purpose and should be replaced once
+    CK added new bwd fused kernels. 
+*/
+template <ck::index_t NumDimSpatial,
+          typename InDataType,
+          typename WeiDataType,
+          typename OutDataType,
+          typename AComputeType = InDataType,
+          typename BComputeType = AComputeType,
+          typename InLayout     = ck::tensor_layout::convolution::NHWGC,
+          typename WeiLayout    = ck::tensor_layout::convolution::GKYXC,
+          typename OutLayout    = ck::tensor_layout::convolution::NHWGK>
+using DeviceOpGBwdAct =
+    ck::tensor_operation::device::DeviceGroupedConvFwdMultipleABD<NumDimSpatial, // Fwd -> Bwd ???
+                                                                  InLayout,
+                                                                  WeiLayout,
+                                                                  ck::Tuple<>, // diff
+                                                                  OutLayout,
+                                                                  InDataType,
+                                                                  WeiDataType,
+                                                                  ck::Tuple<>, // diff
+                                                                  OutDataType,
+                                                                  InElementOpBwd,
+                                                                  WeiElementOpBwd,
+                                                                  OutElementOpBwd,
+                                                                  AComputeType,
+                                                                  BComputeType>;
+
+template <ck::index_t NumDimSpatial,
+          typename DataType,
+          typename InLayout,
+          typename WeiLayout,
+          typename OutLayout>
+using DeviceOpGBwdActPtrs = ck::tensor_operation::device::instance::DeviceOperationInstanceFactory<
+    DeviceOpGBwdAct<NumDimSpatial,
+                    DataType,
+                    DataType,
+                    DataType,
+                    DataType,
+                    DataType,
+                    InLayout,
+                    WeiLayout,
+                    OutLayout>>;
+
+} // namespace fusion
 
 #endif
 

@@ -92,64 +92,12 @@ inline auto Get3DLayouts()
     return Layouts{};
 }
 
-using InElementOp  = ck::tensor_operation::element_wise::PassThrough;
-using WeiElementOp = ck::tensor_operation::element_wise::PassThrough;
-using OutElementOp = ck::tensor_operation::element_wise::Clamp;
-
-const auto in_element_op  = InElementOp{};
-const auto wei_element_op = WeiElementOp{};
-
-/*
-    The following kernel arguments are only for debug purpose and should be replaced once
-    CK added new bwd fused kernels. 
-*/
-template <ck::index_t NumDimSpatial,
-          typename InDataType,
-          typename WeiDataType,
-          typename OutDataType,
-          typename AComputeType = InDataType,
-          typename BComputeType = AComputeType,
-          typename InLayout     = ck::tensor_layout::convolution::NHWGC,
-          typename WeiLayout    = ck::tensor_layout::convolution::GKYXC,
-          typename OutLayout    = ck::tensor_layout::convolution::NHWGK>
-using DeviceOpGBwdAct =
-    ck::tensor_operation::device::DeviceGroupedConvFwdMultipleABD<NumDimSpatial, // Fwd -> Bwd ???
-                                                                  InLayout,
-                                                                  WeiLayout,
-                                                                  ck::Tuple<>, // diff
-                                                                  OutLayout,
-                                                                  InDataType,
-                                                                  WeiDataType,
-                                                                  ck::Tuple<>, // diff
-                                                                  OutDataType,
-                                                                  InElementOp,
-                                                                  WeiElementOp,
-                                                                  OutElementOp,
-                                                                  AComputeType,
-                                                                  BComputeType>;
-
-template <ck::index_t NumDimSpatial,
-          typename DataType,
-          typename InLayout,
-          typename WeiLayout,
-          typename OutLayout>
-using DeviceOpGBwdActPtrs = ck::tensor_operation::device::instance::DeviceOperationInstanceFactory<
-    DeviceOpGBwdAct<NumDimSpatial,
-                    DataType,
-                    DataType,
-                    DataType,
-                    DataType,
-                    DataType,
-                    InLayout,
-                    WeiLayout,
-                    OutLayout>>;
-
 namespace {
 
 template <int NDimSpatial, typename DataType>
 struct CKArgs
 {
-    using OutputElementOpType = OutElementOp;
+    using OutputElementOpType = OutElementOpBwd;
     using OutputDataType      = DataType;
 
     CKArgs(const ProblemDescription& problem)
@@ -235,7 +183,7 @@ struct CKArgs
                     ConstData_t out,
                     float alpha,
                     float beta,
-                    OutElementOp clampOp,
+                    OutElementOpBwd clampOp,
                     int split_k) const
     {
         (void)alpha;
@@ -261,8 +209,8 @@ struct CKArgs
                                                  filter_dilation,
                                                  lPadding,
                                                  rPadding,
-                                                 in_element_op,
-                                                 wei_element_op,
+                                                 in_element_op_bwd,
+                                                 wei_element_op_bwd,
                                                  clampOp);
                                                  //split_k
         }
@@ -312,8 +260,8 @@ struct CKArgs
                                                  adjusted_filter_dilation,
                                                  adjusted_lPadding,
                                                  adjusted_rPadding,
-                                                 in_element_op,
-                                                 wei_element_op,
+                                                 in_element_op_bwd,
+                                                 wei_element_op_bwd,
                                                  clampOp);
                                                  //split_k // split_k is needed for bwd make arg pointer function
         }
@@ -338,7 +286,7 @@ struct CKArgs
                           data_ctx.in,
                           conv_param.alpha,
                           conv_param.beta,
-                          GetOutElementOp<DataType, OutElementOp>(activ_param),
+                          GetOutElementOp<DataType, OutElementOpBwd>(activ_param),
                           split_k);
     }
 
@@ -352,7 +300,7 @@ struct CKArgs
                                   nullptr,
                                   1.0f,
                                   0.0f,
-                                  OutElementOp{0, std::numeric_limits<DataType>::max()},
+                                  OutElementOpBwd{0, std::numeric_limits<DataType>::max()},
                                   1);
         return conv_ptr->IsSupportedArgument(arg_ptr.get());
     }
@@ -694,6 +642,86 @@ bool ConvCKIgemmGrpBwdActivFused::IsApplicable(const FusionContext& ctx,
 #endif
 }
 
+/*
+#if MIOPEN_BACKEND_HIP && MIOPEN_USE_COMPOSABLEKERNEL
+template <ck::index_t NDimSpatial, typename DataType>
+ConvSolution
+GetSolutionForDimensionality(const FusionContext& ctx,
+                             const miopen::conv::ProblemDescription& conv_problem,
+                             const PerformanceConfigConvCKIgemmGrpBwdActivFused& config)
+{
+    using Layouts = LayoutsSelector<NDimSpatial>;
+    return MakeSolutionGroupConvImplicitGemmXdlops(
+        conv_problem,
+        [&](auto data_type_val) {
+            (void)data_type_val;
+            return InitInvokerFactoryFwdNCHW<NDimSpatial,
+                                             false,
+                                             DeviceOpGBwdActPtrs<NDimSpatial,
+                                                                 DataType,
+                                                                 typename Layouts::InLayout,
+                                                                 typename Layouts::WeiLayout,
+                                                                 typename Layouts::OutLayout>,
+                                             CKArgs<NDimSpatial, DataType>,
+                                             miopen::fusion::FusionInvokeParams>(
+                ctx, conv_problem, config.kernel_id);
+        },
+        [&](auto data_type_val) {
+            (void)data_type_val;
+            return InitInvokerFactoryNHWC<false,
+                                          DeviceOpBwdActPtrs<NDimSpatial,
+                                                              DataType,
+                                                              typename Layouts::InLayout,
+                                                              typename Layouts::WeiLayout,
+                                                              typename Layouts::OutLayout>,
+                                          CKArgs<NDimSpatial, DataType>,
+                                          miopen::fusion::FusionInvokeParams>(
+                ctx, conv_problem, config.kernel_id);
+        });
+}
+
+template <ck::index_t NDim>
+ConvSolution GetSolutionWithDim(const FusionContext& ctx,
+                                const FusionDescription& fdesc_problem,
+                                const PerformanceConfigConvCKIgemmGrpBwdActivFused& config)
+{
+    const auto conv_problem = fdesc_problem.GetConvProblem(0, miopen::conv::Direction::Forward);
+
+    switch(conv_problem.GetInDataType())
+    {
+    case miopenBFloat16:
+        return GetSolutionForDimensionality<NDim, ck::bhalf_t>(ctx, conv_problem, config);
+    case miopenHalf:
+        return GetSolutionForDimensionality<NDim, ck::half_t>(ctx, conv_problem, config);
+    case miopenFloat: return GetSolutionForDimensionality<NDim, float>(ctx, conv_problem, config);
+    case miopenInt8:
+    case miopenInt64:
+    case miopenInt32:
+    case miopenFloat8_fnuz:
+    case miopenBFloat8_fnuz:
+    case miopenDouble:
+    default: MIOPEN_THROW("Unsupported datatype");
+    }
+}
+#endif
+
+ConvSolution ConvCKIgemmGrpBwdActivFused::GetSolution(
+    const FusionContext& ctx,
+    const FusionDescription& fdesc_problem,
+    const PerformanceConfigConvCKIgemmGrpBwdActivFused& config) const
+{
+#if MIOPEN_BACKEND_HIP && MIOPEN_USE_COMPOSABLEKERNEL
+    const auto conv_problem = fdesc_problem.GetConvProblem(0, miopen::conv::Direction::Forward);
+
+    if(conv_problem.Is3d())
+        return GetSolutionWithDim<3>(ctx, fdesc_problem, config);
+    else
+        return GetSolutionWithDim<2>(ctx, fdesc_problem, config);
+#else
+    return {};
+#endif
+}
+*/
 } // namespace fusion
 } // namespace solver
 } // namespace miopen
