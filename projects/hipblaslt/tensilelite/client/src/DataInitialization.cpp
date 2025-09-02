@@ -936,8 +936,11 @@ namespace TensileLite
                         auto numAllocatedElements = problem.tensors()[i].totalAllocatedElements();
                         auto numAllocatedBytes    = problem.tensors()[i].totalAllocatedBytes();
 
-                        if((problem.swizzleTensorA() && i == ContractionProblemGemm::TENSOR::A)
-                           || (problem.swizzleTensorB() && i == ContractionProblemGemm::TENSOR::B))
+                        bool needSwizzle
+                            = (problem.swizzleTensorA() && i == ContractionProblemGemm::TENSOR::A)
+                              || (problem.swizzleTensorB()
+                                  && i == ContractionProblemGemm::TENSOR::B);
+                        if(needSwizzle)
                         {
                             //TODO: support more swizzle types,
                             //      currently, if A then it means MiM = 16, if B then it means MiN = 16
@@ -947,6 +950,9 @@ namespace TensileLite
                                 problem.tensors()[i], MiM_N, MiK, PackK);
                             numAllocatedBytes
                                 = numAllocatedElements * rocisa::GetElementSize(dataType);
+
+                            // std::cout << "DataInitialization- needSwizzle: numAllocatedElements:"
+                            //           << numAllocatedElements << std::endl;
                         }
 
                         pristine.maxElements = std::max(pristine.maxElements, numAllocatedElements);
@@ -1492,8 +1498,10 @@ namespace TensileLite
                 {
                     padding = pUnit.maxElements - problem.tensors()[i].totalAllocatedElements();
 
-                    if((problem.swizzleTensorA() && i == ContractionProblemGemm::TENSOR::A)
-                       || (problem.swizzleTensorB() && i == ContractionProblemGemm::TENSOR::B))
+                    bool needSwizzle
+                        = (problem.swizzleTensorA() && i == ContractionProblemGemm::TENSOR::A)
+                          || (problem.swizzleTensorB() && i == ContractionProblemGemm::TENSOR::B);
+                    if(needSwizzle)
                     {
                         //TODO: support more swizzle types,
                         //      currently, if A then it means MiM = 16, if B then it means MiN = 16
@@ -2055,7 +2063,8 @@ namespace TensileLite
 
                 void* ptr{};
 
-                if(needSwizzle)
+                // When needSwizzle, if no need to do validation, we can save the time doing data-relayout
+                if(needSwizzle && m_elementsToValidate)
                 {
                     using Tensor = Tensor::Manipulation::Tensor;
                     // currently, if A then it means MiM = 16, if B then it means MiN = 16
@@ -2070,6 +2079,7 @@ namespace TensileLite
                     auto swizzleKey
                         = std::make_tuple(toBitWidth(desc.dataType()), unrolledSize, tiledSize);
 
+                    // Cache-hit
                     if(g_swizzleCache.count(swizzleKey))
                     {
                         if(swizzleKey != g_swizzleCache.back())
@@ -2086,6 +2096,7 @@ namespace TensileLite
                             ptr = p.gpuInput.valid.get();
                         }
                     }
+                    // No Cache-hit, do pre-shuffle...
                     else
                     {
                         auto tmpTensor = Tensor({tiledSize, unrolledSize}, desc.elementBytes());
@@ -2108,6 +2119,8 @@ namespace TensileLite
                                                permuted.getDesc().flattenSize(),
                                                hipMemcpyHostToDevice);
                         g_swizzleCache.emplace(swizzleKey, std::move(permuted));
+                        // std::cout << "needSwizzle and do permute- Copied elems:"
+                        //           << paddedTensor.getDesc().flattenSize() << std::endl;
                     }
                 }
                 else
@@ -2117,6 +2130,10 @@ namespace TensileLite
                                            p.cpuInput.valid.get(),
                                            p.maxElements,
                                            hipMemcpyHostToDevice);
+                    // if(needSwizzle)
+                    //     std::cout
+                    //         << "needSwizzle but no validation- don't do pre-shuffle: Copied elems:"
+                    //         << p.maxElements << std::endl;
                 }
 
                 if(ptr == nullptr)

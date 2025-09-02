@@ -1987,14 +1987,17 @@ void testing_matmul_with_bias(const Arguments& arg,
             CHECK_HIP_ERROR(synchronize(hC[i], dC[i]));
         }
 
-        if(do_swizzle_a)
+        // if we are not going to do verify / validation, we don't need to do extra swizzle (pre-shuffle).
+        // In customers' real case, they will do the swizzle (pre-shuffle) in advance.
+        // In order to reduce the overhead of doing the pre-shuffle, we can choose not to do it when no --verify / -v
+        if(do_swizzle_a && (arg.unit_check || arg.norm_check || arg.allclose_check))
         {
             HipHostBuffer tmp(TiA, size_dA[i]);
             swizzle_tensor_type(tmp, hA[i], TiA, arg, num_batches[i], M[i], K[i], lda[i], false);
             CHECK_HIP_ERROR(synchronize(dA[i], tmp, block_count));
         }
 
-        if(do_swizzle_b)
+        if(do_swizzle_b && (arg.unit_check || arg.norm_check || arg.allclose_check))
         {
             HipHostBuffer tmp(TiB, size_dB[i]);
             swizzle_tensor_type(tmp, hB[i], TiB, arg, num_batches[i], N[i], K[i], ldb[i], false);
