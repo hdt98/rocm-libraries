@@ -272,12 +272,11 @@ struct CKArgs
                     const miopen::fusion::FusionInvokeParams& data_ctx,
                     int split_k) const
     {
-        const auto& conv_param =
-            dynamic_cast<miopen::fusion::ConvolutionOpInvokeParam&>(*data_ctx.op_args.params[0]);
-        assert(&conv_param);
-
         const auto& activ_param =
-            dynamic_cast<miopen::fusion::ActivationOpInvokeParam&>(*data_ctx.op_args.params[1]);
+            dynamic_cast<miopen::fusion::ActivationOpInvokeParam&>(*data_ctx.op_args.params[0]);
+        const auto& conv_param =
+            dynamic_cast<miopen::fusion::ConvolutionOpInvokeParam&>(*data_ctx.op_args.params[1]);
+        assert(&conv_param);
         // switch the in and out for backward     
         return MakeArgPtr(op_ptr,
                           data_ctx.out,
