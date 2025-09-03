@@ -302,6 +302,37 @@ inline constexpr bool IsSplitKNeeded()
            std::is_same_v<DeviceOpType, conv::DeviceOpGBwdWeightScalePtrs<int8_t>> ||
            std::is_same_v<DeviceOpType, conv::DeviceOpGBwdWeightScalePtrs<ck::bhalf_t>>;
 }
+
+using InLayout2d    = ck::tensor_layout::convolution::NHWGC;
+using WeiLayout2d   = ck::tensor_layout::convolution::GKYXC;
+using OutLayout2d   = ck::tensor_layout::convolution::NHWGK;
+using InLayout3d    = ck::tensor_layout::convolution::NDHWGC;
+using WeiLayout3d   = ck::tensor_layout::convolution::GKZYXC;
+using OutLayout3d   = ck::tensor_layout::convolution::NDHWGK;
+
+using InLayout2dNCHW    = ck::tensor_layout::convolution::NGCHW;
+using WeiLayout2dNCHW   = ck::tensor_layout::convolution::GKYXC;
+using OutLayout2dNCHW   = ck::tensor_layout::convolution::NGKHW;
+using InLayout3dNCHW    = ck::tensor_layout::convolution::NGCDHW;
+using WeiLayout3dNCHW   = ck::tensor_layout::convolution::GKZYXC;
+using OutLayout3dNCHW   = ck::tensor_layout::convolution::NGKDHW;
+
+template <typename DeviceOpType>
+inline constexpr bool IsConvFusionSplitKNeeded()
+{
+    return std::is_same_v<DeviceOpType, fusion::DeviceOpGBwdActPtrs<2, ck::half_t, InLayout2d, WeiLayout2d, OutLayout2d>> ||
+           std::is_same_v<DeviceOpType, fusion::DeviceOpGBwdActPtrs<2, float, InLayout2d, WeiLayout2d, OutLayout2d>> ||
+           std::is_same_v<DeviceOpType, fusion::DeviceOpGBwdActPtrs<2, ck::bhalf_t, InLayout2d, WeiLayout2d, OutLayout2d>> ||
+           std::is_same_v<DeviceOpType, fusion::DeviceOpGBwdActPtrs<3, ck::half_t, InLayout3d, WeiLayout3d, OutLayout3d>> ||
+           std::is_same_v<DeviceOpType, fusion::DeviceOpGBwdActPtrs<3, float, InLayout3d, WeiLayout3d, OutLayout3d>> ||
+           std::is_same_v<DeviceOpType, fusion::DeviceOpGBwdActPtrs<3, ck::bhalf_t, InLayout3d, WeiLayout3d, OutLayout3d>> ||
+           std::is_same_v<DeviceOpType, fusion::DeviceOpGBwdActPtrs<2, ck::half_t, InLayout2dNCHW, WeiLayout2dNCHW, OutLayout2dNCHW>> ||
+           std::is_same_v<DeviceOpType, fusion::DeviceOpGBwdActPtrs<2, float, InLayout2dNCHW, WeiLayout2dNCHW, OutLayout2dNCHW>> ||
+           std::is_same_v<DeviceOpType, fusion::DeviceOpGBwdActPtrs<2, ck::bhalf_t, InLayout2dNCHW, WeiLayout2dNCHW, OutLayout2dNCHW>> ||
+           std::is_same_v<DeviceOpType, fusion::DeviceOpGBwdActPtrs<3, ck::half_t, InLayout3dNCHW, WeiLayout3dNCHW, OutLayout3dNCHW>> ||
+           std::is_same_v<DeviceOpType, fusion::DeviceOpGBwdActPtrs<3, float, InLayout3dNCHW, WeiLayout3dNCHW, OutLayout3dNCHW>> ||
+           std::is_same_v<DeviceOpType, fusion::DeviceOpGBwdActPtrs<3, ck::bhalf_t, InLayout3dNCHW, WeiLayout3dNCHW, OutLayout3dNCHW>>;
+}
 #endif
 
 template <typename DeviceOpType,
@@ -970,17 +1001,41 @@ MakeNCHWCKArgPtr(const CKArgsType& ck_args,
                                     "Unsupported number of parameters for FusionInvokeParams: " +
                                         std::to_string(data_ctx.op_args.params.size()));
         }
+        if constexpr(IsConvFusionSplitKNeeded<DeviceOpType>())
+        {
+            std::cout<<" in splitk needed function"<<std::endl;
+            if(split_k.has_value())
+            {
+                argument_ptr = ck_args.MakeArgPtr(
+                    sh_conv_ptr,
+                    tr_ptrs[0]->GetBufferPtr(),
+                    tr_ptrs[1]->GetBufferPtr(),
+                    bias_buf,
+                    tr_ptrs[2]->GetBufferPtr(),
+                    conv_param.alpha,
+                    conv_param.beta,
+                    GetOutElementOp<typename CKArgsType::OutputDataType,
+                                    typename CKArgsType::OutputElementOpType>(*activ_param_ptr),
+                    split_k.value());
+            }
+            else
+            {
+                MIOPEN_THROW(miopenStatusInvalidValue, "split_k is required but not provided");
+            }
 
-        argument_ptr = ck_args.MakeArgPtr(
-            sh_conv_ptr,
-            tr_ptrs[0]->GetBufferPtr(),
-            tr_ptrs[1]->GetBufferPtr(),
-            bias_buf,
-            tr_ptrs[2]->GetBufferPtr(),
-            conv_param.alpha,
-            conv_param.beta,
-            GetOutElementOp<typename CKArgsType::OutputDataType,
-                            typename CKArgsType::OutputElementOpType>(*activ_param_ptr));
+        }
+        else{
+                argument_ptr = ck_args.MakeArgPtr(
+                    sh_conv_ptr,
+                    tr_ptrs[0]->GetBufferPtr(),
+                    tr_ptrs[1]->GetBufferPtr(),
+                    bias_buf,
+                    tr_ptrs[2]->GetBufferPtr(),
+                    conv_param.alpha,
+                    conv_param.beta,
+                    GetOutElementOp<typename CKArgsType::OutputDataType,
+                                    typename CKArgsType::OutputElementOpType>(*activ_param_ptr));
+        }
     }
     else
     {
@@ -1062,6 +1117,28 @@ MakeNHWCCKArgPtr(const std::shared_ptr<DeviceOpType>& sh_conv_ptr,
 
         ConstData_t weight_buf = conv_param.weights;
 
+        if constexpr(IsConvFusionSplitKNeeded<DeviceOpType>())
+        {
+            if(split_k.has_value())
+            {
+                argument_ptr = ck_args.MakeArgPtr(
+                    sh_conv_ptr,
+                    data_ctx.in,
+                    weight_buf,
+                    bias_buf,
+                    data_ctx.out,
+                    conv_param.alpha,
+                    conv_param.beta,
+                    GetOutElementOp<typename CKArgsType::OutputDataType,
+                                    typename CKArgsType::OutputElementOpType>(*activ_param_ptr),
+                    split_k.value());
+            }
+            else
+            {
+                MIOPEN_THROW(miopenStatusInvalidValue, "split_k is required but not provided");
+            }
+        }
+        else{
         argument_ptr = ck_args.MakeArgPtr(
             sh_conv_ptr,
             data_ctx.in,
@@ -1072,6 +1149,7 @@ MakeNHWCCKArgPtr(const std::shared_ptr<DeviceOpType>& sh_conv_ptr,
             conv_param.beta,
             GetOutElementOp<typename CKArgsType::OutputDataType,
                             typename CKArgsType::OutputElementOpType>(*activ_param_ptr));
+        }
     }
     else
     {
