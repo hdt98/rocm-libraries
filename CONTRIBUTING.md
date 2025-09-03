@@ -103,7 +103,7 @@ During this period, a high priority will be placed on keeping the `develop` bran
 
 ### 1. Branch Naming and Forks
 
-When creating a branch for your work, use the following convention to make branch names informative and consistent: `users/<github-husername>/<branch-name>`.
+When creating a branch for your work, use the following convention to make branch names informative and consistent: `users/<github-username>/<branch-name>`.
 
 For component specific feature branches, use the following convention: `<component>/<feature-branch-name>`.
 
