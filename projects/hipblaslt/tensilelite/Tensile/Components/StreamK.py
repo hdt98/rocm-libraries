@@ -2016,8 +2016,8 @@ class StreamKTwoTileDPFirst(StreamK):
         module.add(BranchIfNotZero("Alpha", kernel["ProblemType"]["ComputeDataType"].toEnum(), alphaLabel))
         # Skip to end if not doing the global write
         module.add(SCmpEQU32(src0=sgpr("StreamKLocalStart"), src1=0, comment="does wg start tile?"))
-        endLabel = Label("GW_End", "")
-        module.add(writer.longBranchScc0(endLabel, posNeg=1))
+        skCloseLoopLabel = Label("SK_CloseLoop", "")
+        module.add(writer.longBranchScc0(skCloseLoopLabel, posNeg=1))
         module.add(SMovB32(dst=sgpr("StreamKLocalEnd"), src=sgpr("ItersPerTile"), comment="Skip iterations"))
         module.add(alphaLabel)
 
