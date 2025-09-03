@@ -1,4 +1,6 @@
-# setup.py
+# Copyright © Advanced Micro Devices, Inc., or its affiliates.
+# SPDX-License-Identifier: MIT
+
 from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext
 import pybind11
