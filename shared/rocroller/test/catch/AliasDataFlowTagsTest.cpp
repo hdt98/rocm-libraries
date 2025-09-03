@@ -90,7 +90,8 @@ namespace AliasDataFlowTagsTest
 
         graph = transform<ConstantPropagation>(graph);
         graph = transform<FuseExpressions>(graph);
-        graph = transform<ConnectWorkgroups>(graph, params, context.get());
+        graph = transform<ConnectWorkgroups>(
+            graph, context.get(), params->workgroupMappingDim, params->workgroupRemapXCC);
         graph = transform<UnrollLoops>(graph, params, context.get());
         graph = transform<FuseLoops>(graph);
         graph = transform<RemoveDuplicates>(graph);
@@ -102,7 +103,7 @@ namespace AliasDataFlowTagsTest
         graph = transform<UpdateWavefrontParameters>(graph, params);
         graph = transform<LoadPacked>(graph, context.get());
         graph = transform<AddConvert>(graph);
-        graph = transform<AddDeallocate>(graph);
+        graph = transform<AddDeallocateDataFlow>(graph);
         graph = transform<InlineIncrements>(graph);
         graph = transform<Simplify>(graph);
 

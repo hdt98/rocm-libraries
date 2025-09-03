@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2024, Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (c) 2018-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #include "fmha_fwd.hpp"
 #include "ck_tile/host.hpp"
@@ -7,6 +7,7 @@
 #include "mask.hpp"
 #include "rotary.hpp"
 #include "utils.hpp"
+#include "json_dump.hpp"
 
 #include <array>
 #include <cstring>
@@ -138,7 +139,9 @@ auto create_args(int argc, char* argv[])
         .insert("page_block_size", "0", "paged-kvcache block size. 0 means not use paged-kvcahe")
         .insert("cache_batch_idx", "0", "whether to use index map to the kvcache")
         .insert("warmup", "5", "number of iterations before benchmark the kernel")
-        .insert("repeat", "20", "number of iterations to benchmark the kernel");
+        .insert("repeat", "20", "number of iterations to benchmark the kernel")
+        .insert("json", "0", "0: No Json, 1: Dump Results in Json format")
+        .insert("jsonfile", "fmha_fwd.json", "json file name to dump results");
 
     bool result = arg_parser.parse(argc, argv);
     return std::make_tuple(result, arg_parser);
@@ -178,50 +181,30 @@ auto get_elimit<FmhaFwdFp8>(std::string init_method)
     }
 }
 
-int num_splits_heuristic(int batch_nhead_mblocks, int num_SMs, int num_n_blocks, int max_splits)
+int num_splits_heuristic(int batch_nhead_mblocks, int num_SMs, int max_splits)
 {
     // If we have enough to almost fill the SMs, then just use 1 split
     if(batch_nhead_mblocks >= 0.8f * num_SMs)
     {
         return 1;
     }
-    max_splits           = std::min({max_splits, num_SMs, num_n_blocks});
+    max_splits           = std::min({max_splits, num_SMs});
     float max_efficiency = 0.f;
     std::vector<float> efficiency;
     efficiency.reserve(max_splits);
-    auto ceildiv = [](int a, int b) { return (a + b - 1) / b; };
-    // Some splits are not eligible. For example, if we have 64 blocks and choose 11 splits,
-    // we'll have 6 * 10 + 4 blocks. If we choose 12 splits, we'll have 6 * 11 + (-2) blocks
-    // (i.e. it's 11 splits anyway).
-    // So we check if the number of blocks per split is the same as the previous num_splits.
-    auto is_split_eligible = [&ceildiv, &num_n_blocks](int num_splits) {
-        return num_splits == 1 ||
-               ceildiv(num_n_blocks, num_splits) != ceildiv(num_n_blocks, num_splits - 1);
-    };
     for(int num_splits = 1; num_splits <= max_splits; num_splits++)
     {
-        if(!is_split_eligible(num_splits))
+        float n_waves = float(batch_nhead_mblocks * num_splits) / num_SMs;
+        float eff     = n_waves / ceil(n_waves);
+        // printf("num_splits = %d, eff = %f\n", num_splits, eff);
+        if(eff > max_efficiency)
         {
-            efficiency.push_back(0.f);
+            max_efficiency = eff;
         }
-        else
-        {
-            float n_waves = float(batch_nhead_mblocks * num_splits) / num_SMs;
-            float eff     = n_waves / ceil(n_waves);
-            // printf("num_splits = %d, eff = %f\n", num_splits, eff);
-            if(eff > max_efficiency)
-            {
-                max_efficiency = eff;
-            }
-            efficiency.push_back(eff);
-        }
+        efficiency.push_back(eff);
     }
     for(int num_splits = 1; num_splits <= max_splits; num_splits++)
     {
-        if(!is_split_eligible(num_splits))
-        {
-            continue;
-        }
         if(efficiency[num_splits - 1] >= 0.85 * max_efficiency)
         {
             // printf("num_splits chosen = %d\n", num_splits);
@@ -234,6 +217,7 @@ int num_splits_heuristic(int batch_nhead_mblocks, int num_SMs, int num_n_blocks,
 int override_num_splits_if_necessary(
     int batch, int nhead, int max_seqlen_q, int hdim_v, float p_drop, int num_splits)
 {
+    (void)hdim_v;
     int device;
     auto status = hipGetDevice(&device);
     if(status != hipSuccess)
@@ -250,15 +234,13 @@ int override_num_splits_if_necessary(
 
     // tile size should match the generate.py
     const int kM0 = 64;
-    const int kN1 = hdim_v;
 
     const int num_m_blocks = ck_tile::integer_divide_ceil(max_seqlen_q, kM0);
-    const int num_n_blocks = ck_tile::integer_divide_ceil(hdim_v, kN1);
 
     if(num_splits < 1 && p_drop == 0.0f)
     {
         return num_splits_heuristic(
-            batch * nhead * num_m_blocks, props.multiProcessorCount * 2, num_n_blocks, 128);
+            batch * nhead * num_m_blocks, props.multiProcessorCount * 2, 128);
     }
 
     return num_splits;
@@ -344,7 +326,8 @@ bool run(const ck_tile::ArgParser& arg_parser)
     }
 
     ck_tile::index_t page_block_size = arg_parser.get_int("page_block_size");
-#if !CK_TILE_FMHA_FWD_APPENDKV_API && !CK_TILE_FMHA_FWD_SPLITKV_API
+#if(!(CK_TILE_FMHA_FWD_APPENDKV_API || CK_TILE_FMHA_FWD_SPLITKV_API || \
+      CK_TILE_FMHA_FWD_PAGEDKV_API))
     if(0 < page_block_size)
     {
         std::cerr << "paged-kvcache is not supported. ignoring the 'page_block_size' option"
@@ -360,7 +343,7 @@ bool run(const ck_tile::ArgParser& arg_parser)
     }
 
     bool use_cache_batch_idx = arg_parser.get_bool("cache_batch_idx");
-#if !CK_TILE_FMHA_FWD_APPENDKV_API && !CK_TILE_FMHA_FWD_SPLITKV_API
+#if !(CK_TILE_FMHA_FWD_APPENDKV_API || CK_TILE_FMHA_FWD_SPLITKV_API || CK_TILE_FMHA_FWD_PAGEDKV_API)
     if(use_cache_batch_idx)
     {
         std::cerr << "split-kv is not supported. ignoring the 'cache_batch_idx' option"
@@ -542,13 +525,13 @@ bool run(const ck_tile::ArgParser& arg_parser)
                 max_seqlen_k = real_seqlen_k;
             }
 
-            flop += nhead * (static_cast<std::size_t>(2) * real_seqlen_q * real_seqlen_k * hdim_q +
-                             static_cast<std::size_t>(2) * real_seqlen_q * hdim_v * real_seqlen_k);
+            flop += nhead * (static_cast<std::size_t>(2) * mask.get_unmaskarea() * hdim_q +
+                             static_cast<std::size_t>(2) * mask.get_unmaskarea() * hdim_v);
 
             num_byte += nhead * (sizeof(QDataType) * real_seqlen_q * hdim_q +
-                                 sizeof(KDataType) * real_seqlen_k * hdim_q +
-                                 sizeof(VDataType) * hdim_v * real_seqlen_k +
                                  sizeof(ODataType) * real_seqlen_q * hdim_v);
+            num_byte += nhead_k * (sizeof(KDataType) * real_seqlen_k * hdim_q +
+                                   sizeof(VDataType) * hdim_v * real_seqlen_k);
         }
     }
 
@@ -568,7 +551,7 @@ bool run(const ck_tile::ArgParser& arg_parser)
         std::cerr << "num_splits greater than 128 is not supported" << std::endl;
         return false;
     }
-#if CK_TILE_FMHA_FWD_SPLITKV_API
+#if CK_TILE_FMHA_FWD_SPLITKV_API || CK_TILE_FMHA_FWD_PAGEDKV_API
     if(0 < p_drop && (1 < num_splits || use_kvcache))
     {
         std::cerr << "dropout is not supoprted by split-kv kernels. ignoring the 'p_drop' option"
@@ -823,7 +806,7 @@ bool run(const ck_tile::ArgParser& arg_parser)
                   << (is_rotary_interleaved ? "inter" : "half") << ")";
     }
 #endif
-#if CK_TILE_FMHA_FWD_SPLITKV_API
+#if CK_TILE_FMHA_FWD_SPLITKV_API || CK_TILE_FMHA_FWD_PAGEDKV_API
     if(1 < num_splits)
     {
         std::cout << ", num_splits:" << num_splits;
@@ -863,6 +846,11 @@ bool run(const ck_tile::ArgParser& arg_parser)
             if constexpr(std::is_same_v<fmha_fwd_traits, std::decay_t<decltype(traits)>>)
             {
                 traits.has_dropout = (p_drop > 0.0f);
+            }
+            else if constexpr(std::is_same_v<fmha_fwd_pagedkv_traits,
+                                             std::decay_t<decltype(traits)>>)
+            {
+                traits.use_pagedkv = use_kvcache;
             }
         }
     };
@@ -1072,6 +1060,17 @@ bool run(const ck_tile::ArgParser& arg_parser)
                 args.split_stride_lse_acc = split_stride_lse_acc;
                 args.split_stride_o_acc   = split_stride_o_acc;
             }
+            else if constexpr(std::is_same_v<fmha_fwd_pagedkv_args, std::decay_t<decltype(args)>>)
+            {
+                args.block_table_ptr =
+                    (0 < page_block_size ? block_table_buf.GetDeviceBuffer() : nullptr);
+                args.batch_stride_block_table = batch_stride_block_table;
+                args.page_block_size          = page_block_size;
+                args.is_gappy = false; // use 'false' for flash-attention integration
+
+                args.cache_batch_idx =
+                    (use_cache_batch_idx ? cache_batch_idx_buf.GetDeviceBuffer() : nullptr);
+            }
         }
     };
 
@@ -1093,7 +1092,7 @@ bool run(const ck_tile::ArgParser& arg_parser)
 
     const float fwd_ave_time = [&] {
 #if CK_TILE_FMHA_FWD_SPLITKV_API
-        if(1 < num_splits || use_kvcache)
+        if(1 < num_splits && use_kvcache)
         {
             fmha_fwd_splitkv_traits fmha_splitkv_traits;
             init_traits(fmha_splitkv_traits);
@@ -1102,6 +1101,18 @@ bool run(const ck_tile::ArgParser& arg_parser)
             init_args(fmha_splitkv_args);
 
             return fmha_fwd_splitkv(fmha_splitkv_traits, fmha_splitkv_args, stream_config);
+        }
+#endif
+#if CK_TILE_FMHA_FWD_PAGEDKV_API
+        if(use_kvcache)
+        {
+            fmha_fwd_pagedkv_traits fmha_pagedkv_traits;
+            init_traits(fmha_pagedkv_traits);
+
+            fmha_fwd_pagedkv_args fmha_pagedkv_args;
+            init_args(fmha_pagedkv_args);
+
+            return fmha_fwd_pagedkv(fmha_pagedkv_traits, fmha_pagedkv_args, stream_config);
         }
 #endif
         fmha_fwd_traits fmha_traits;
@@ -1127,14 +1138,14 @@ bool run(const ck_tile::ArgParser& arg_parser)
 
     std::cout << std::fixed << ", " << std::setprecision(3) << ave_time << " ms, "
               << std::setprecision(2) << tflops << " TFlops, " << std::setprecision(2) << gb_per_sec
-              << " GB/s" << std::flush;
+              << " GB/s" << std::flush << std::endl;
 
+    bool pass = true;
     if(do_validation == 0)
     {
         std::cout << std::flush << std::endl;
-        return true;
     }
-    if(do_validation == 2)
+    else if(do_validation == 2)
     {
         // NOTE: use gpu to do validation
         ck_tile::naive_attention_fwd_traits naive_t;
@@ -1180,64 +1191,67 @@ bool run(const ck_tile::ArgParser& arg_parser)
         o_buf.FromDevice(o_host.data()); // TODO: ugly
 
         auto [rtol_, atol_] = get_elimit<DataTypeConfig>(init_method);
-        bool pass_          = ck_tile::check_err(
+        pass                = ck_tile::check_err(
             o_host, o_naive_ref, std::string("OUT Error: Incorrect results!"), rtol_, atol_);
-        std::cout << ", valid:" << (pass_ ? "y" : "n") << std::flush << std::endl;
-        return pass_;
+        std::cout << ", valid:" << (pass ? "y" : "n") << std::flush << std::endl;
     }
-
-    o_buf.FromDevice(o_host.data());
-    lse_buf.FromDevice(lse_host.data());
-    randval_buf.FromDevice(randval_host.data());
-
-    auto p_compute_element_func = [&]() {
-        if constexpr(std::is_same_v<DataTypeConfig, ck_tile::fp8_t>)
-            return ck_tile::scales{scale_p};
-        else
-            return ck_tile::identity{};
-    }();
-
-    auto oacc_element_func = [&]() {
-        if constexpr(std::is_same_v<DataTypeConfig, ck_tile::fp8_t>)
-            return ck_tile::composes(ck_tile::saturates<ck_tile::fp8_t>{},
-                                     ck_tile::scales{scale_o});
-        else
-            return ck_tile::identity{};
-    }();
-
-    float p_undrop = 1.0 - p_drop;
-    uint8_t p_undrop_in_uint8_t =
-        uint8_t(std::floor(p_undrop * std::numeric_limits<uint8_t>::max()));
-    float rp_undrop = 1.0 / p_undrop;
-
-    bool pass = true;
-    for(ck_tile::index_t wb = 0; wb < batch; ++wb)
+    else
     {
-        const ck_tile::index_t real_seqlen_q = seqstart_q_host[wb + 1] - seqstart_q_host[wb];
-        const ck_tile::index_t real_seqlen_k = seqstart_k_host[wb + 1] - seqstart_k_host[wb];
 
-        // adjust matrix index according to the mode
-        const ck_tile::index_t b_idx = (mode == mode_enum::batch ? wb : 0);
-        const ck_tile::index_t cache_b_idx =
-            (use_cache_batch_idx ? cache_batch_idx_host(b_idx) : b_idx);
-        const ck_tile::index_t query_offset = (mode == mode_enum::batch ? 0 : seqstart_q_host[wb]);
-        const ck_tile::index_t key_offset =
-            (mode == mode_enum::batch
-                 ? 0
-                 : (seqlen_kpads[0] < 0 ? seqstart_k_host[wb] : seqstart_k_with_padding_host[wb]));
+        o_buf.FromDevice(o_host.data());
+        lse_buf.FromDevice(lse_host.data());
+        randval_buf.FromDevice(randval_host.data());
 
-        ck_tile::HostTensor<QDataType> q_host_ref({nhead, real_seqlen_q, hdim_q});
-        ck_tile::HostTensor<KDataType> k_host_ref({nhead, real_seqlen_k, hdim_q});
-        ck_tile::HostTensor<VDataType> v_host_ref({nhead, hdim_v, real_seqlen_k});
-        ck_tile::HostTensor<ODataType> o_host_ref({nhead, real_seqlen_q, hdim_v});
+        auto p_compute_element_func = [&]() {
+            if constexpr(std::is_same_v<DataTypeConfig, ck_tile::fp8_t>)
+                return ck_tile::scales{scale_p};
+            else
+                return ck_tile::identity{};
+        }();
 
-        ck_tile::HostTensor<SMPLComputeDataType> s_host_ref({nhead, real_seqlen_q, real_seqlen_k});
-        ck_tile::HostTensor<PDataType> p_host_ref({nhead, real_seqlen_q, real_seqlen_k});
-        ck_tile::HostTensor<SMPLComputeDataType> lse_host_ref({nhead, real_seqlen_q});
+        auto oacc_element_func = [&]() {
+            if constexpr(std::is_same_v<DataTypeConfig, ck_tile::fp8_t>)
+                return ck_tile::composes(ck_tile::saturates<ck_tile::fp8_t>{},
+                                         ck_tile::scales{scale_o});
+            else
+                return ck_tile::identity{};
+        }();
 
-        ck_tile::index_t nr = nhead / nhead_k;
+        float p_undrop = 1.0 - p_drop;
+        uint8_t p_undrop_in_uint8_t =
+            uint8_t(std::floor(p_undrop * std::numeric_limits<uint8_t>::max()));
+        float rp_undrop = 1.0 / p_undrop;
 
-        // clang-format off
+        for(ck_tile::index_t wb = 0; wb < batch; ++wb)
+        {
+            const ck_tile::index_t real_seqlen_q = seqstart_q_host[wb + 1] - seqstart_q_host[wb];
+            const ck_tile::index_t real_seqlen_k = seqstart_k_host[wb + 1] - seqstart_k_host[wb];
+
+            // adjust matrix index according to the mode
+            const ck_tile::index_t b_idx = (mode == mode_enum::batch ? wb : 0);
+            const ck_tile::index_t cache_b_idx =
+                (use_cache_batch_idx ? cache_batch_idx_host(b_idx) : b_idx);
+            const ck_tile::index_t query_offset =
+                (mode == mode_enum::batch ? 0 : seqstart_q_host[wb]);
+            const ck_tile::index_t key_offset =
+                (mode == mode_enum::batch
+                     ? 0
+                     : (seqlen_kpads[0] < 0 ? seqstart_k_host[wb]
+                                            : seqstart_k_with_padding_host[wb]));
+
+            ck_tile::HostTensor<QDataType> q_host_ref({nhead, real_seqlen_q, hdim_q});
+            ck_tile::HostTensor<KDataType> k_host_ref({nhead, real_seqlen_k, hdim_q});
+            ck_tile::HostTensor<VDataType> v_host_ref({nhead, hdim_v, real_seqlen_k});
+            ck_tile::HostTensor<ODataType> o_host_ref({nhead, real_seqlen_q, hdim_v});
+
+            ck_tile::HostTensor<SMPLComputeDataType> s_host_ref(
+                {nhead, real_seqlen_q, real_seqlen_k});
+            ck_tile::HostTensor<PDataType> p_host_ref({nhead, real_seqlen_q, real_seqlen_k});
+            ck_tile::HostTensor<SMPLComputeDataType> lse_host_ref({nhead, real_seqlen_q});
+
+            ck_tile::index_t nr = nhead / nhead_k;
+
+            // clang-format off
         // permute
         if(i_perm) q_host_ref.ForEach([&](auto& self, auto i) { self(i) = q_host(b_idx, i[0], i[1] + query_offset, i[2]); });
         else       q_host_ref.ForEach([&](auto& self, auto i) { self(i) = q_host(b_idx, i[1] + query_offset, i[0], i[2]); });
@@ -1258,7 +1272,7 @@ bool run(const ck_tile::ArgParser& arg_parser)
             q_host_ref.ForEach([&](auto& self, auto i) { self(i) = q_host_ref_ro(i); });
         }
 #endif
-#if CK_TILE_FMHA_FWD_SPLITKV_API
+#if CK_TILE_FMHA_FWD_SPLITKV_API || CK_TILE_FMHA_FWD_PAGEDKV_API
         if(0 < page_block_size) {
             if(i_perm) {
                 k_host_ref.ForEach([&](auto& self, auto i) {
@@ -1309,7 +1323,7 @@ bool run(const ck_tile::ArgParser& arg_parser)
             });
         }
 #endif
-#if CK_TILE_FMHA_FWD_SPLITKV_API
+#if CK_TILE_FMHA_FWD_SPLITKV_API || CK_TILE_FMHA_FWD_PAGEDKV_API
         if(0 < page_block_size) {
             if(is_v_rowmajor) {
                 if(i_perm) {
@@ -1371,198 +1385,179 @@ bool run(const ck_tile::ArgParser& arg_parser)
             });
         }
 #endif
-        // clang-format on
-
-        // reference
-        ck_tile::reference_batched_gemm<QDataType, KDataType, SaccDataType, SMPLComputeDataType>(
-            q_host_ref,
-            k_host_ref,
-            s_host_ref,
-            ck_tile::identity{},
-            ck_tile::identity{},
-            ck_tile::scales(scale_s));
-
-        if(0.f < logits_soft_cap)
-        {
-            ck_tile::reference_unary_elementwise<SaccDataType, SaccDataType, SaccDataType>(
-                s_host_ref, s_host_ref, [logits_soft_cap](SaccDataType logits) {
-                    return ck_tile::type_convert<SaccDataType>(
-                        logits_soft_cap *
-                        std::tanhf(ck_tile::type_convert<float>(logits / logits_soft_cap)));
-                });
-        }
-
-        if(bias.type == bias_enum::elementwise_bias)
-        {
-            // elementwise bias
-            ck_tile::HostTensor<BiasDataType> bias_host_ref({1, real_seqlen_q, real_seqlen_k});
-            // clang-format off
-            if(i_perm)
-                bias_host_ref.ForEach([&](auto& self, auto i) { self(i) = bias_host(0, 0, i[1] + query_offset, i[2]); });
-            else
-                bias_host_ref.ForEach([&](auto& self, auto i) { self(i) = bias_host(0, i[1] + query_offset, 0, i[2]); });
             // clang-format on
 
-            // broadcast from [1, real_seqlen_q, real_seqlen_k] to [nhead, real_seqlen_q,
-            // real_seqlen_k]
-            ck_tile::reference_batched_elementwise<SMPLComputeDataType,
-                                                   BiasDataType,
-                                                   SMPLComputeDataType,
-                                                   SMPLComputeDataType>(
-                s_host_ref, bias_host_ref, s_host_ref);
-        }
-        else if(bias.type == bias_enum::alibi)
-        {
-            // alibi construct elementwise bias to verify
-            auto alibi_host = [&]() {
-                if(mask.type != mask_enum::no_mask)
-                {
-                    return ck_tile::make_alibi_from_lr_mask<SaccDataType, true>(
-                        0,
-                        mask.left,
-                        mask.right,
-                        real_seqlen_q,
-                        real_seqlen_k,
-                        static_cast<ck_tile::GenericAttentionMaskEnum>(mask.type));
-                }
-                else
-                {
-                    return ck_tile::Alibi<SaccDataType, true>{
-                        0, real_seqlen_q, real_seqlen_k, ck_tile::AlibiMode::FROM_BOTTOM_RIGHT};
-                }
-            }();
+            // reference
+            ck_tile::
+                reference_batched_gemm<QDataType, KDataType, SaccDataType, SMPLComputeDataType>(
+                    q_host_ref,
+                    k_host_ref,
+                    s_host_ref,
+                    ck_tile::identity{},
+                    ck_tile::identity{},
+                    ck_tile::scales(scale_s));
 
-            ck_tile::HostTensor<SaccDataType> alibi_bias_host_ref(
-                {nhead, real_seqlen_q, real_seqlen_k});
-            auto i_b_slope = bias.rank_info == 0 ? 0 : wb;
-            for(auto i_h = 0; i_h < nhead; i_h++)
+            if(0.f < logits_soft_cap)
             {
-                SaccDataType current_slope = alibi_slope_host(i_b_slope, i_h);
-                alibi_host.slope = alibi_host.mode == ck_tile::AlibiMode::VERTICAL ? current_slope
-                                                                                   : -current_slope;
-                for(auto i_r = 0; i_r < real_seqlen_q; i_r++)
-                {
-                    for(auto i_c = 0; i_c < real_seqlen_k; i_c++)
+                ck_tile::reference_unary_elementwise<SaccDataType, SaccDataType, SaccDataType>(
+                    s_host_ref, s_host_ref, [logits_soft_cap](SaccDataType logits) {
+                        return ck_tile::type_convert<SaccDataType>(
+                            logits_soft_cap *
+                            std::tanhf(ck_tile::type_convert<float>(logits / logits_soft_cap)));
+                    });
+            }
+
+            if(bias.type == bias_enum::elementwise_bias)
+            {
+                // elementwise bias
+                ck_tile::HostTensor<BiasDataType> bias_host_ref({1, real_seqlen_q, real_seqlen_k});
+                // clang-format off
+                if(i_perm)
+                    bias_host_ref.ForEach([&](auto& self, auto i) { self(i) = bias_host(0, 0, i[1] + query_offset, i[2]); });
+                else
+                    bias_host_ref.ForEach([&](auto& self, auto i) { self(i) = bias_host(0, i[1] + query_offset, 0, i[2]); });
+                // clang-format on
+
+                // broadcast from [1, real_seqlen_q, real_seqlen_k] to [nhead, real_seqlen_q,
+                // real_seqlen_k]
+                ck_tile::reference_batched_elementwise<SMPLComputeDataType,
+                                                       BiasDataType,
+                                                       SMPLComputeDataType,
+                                                       SMPLComputeDataType>(
+                    s_host_ref, bias_host_ref, s_host_ref);
+            }
+            else if(bias.type == bias_enum::alibi)
+            {
+                // alibi construct elementwise bias to verify
+                auto alibi_host = [&]() {
+                    if(mask.type != mask_enum::no_mask)
                     {
-                        SaccDataType pixel = 0;
-                        alibi_host.update(pixel, i_r, i_c);
-                        alibi_bias_host_ref(i_h, i_r, i_c) = pixel;
+                        return ck_tile::make_alibi_from_lr_mask<SaccDataType, true>(
+                            0,
+                            mask.left,
+                            mask.right,
+                            real_seqlen_q,
+                            real_seqlen_k,
+                            static_cast<ck_tile::GenericAttentionMaskEnum>(mask.type));
+                    }
+                    else
+                    {
+                        return ck_tile::Alibi<SaccDataType, true>{
+                            0, real_seqlen_q, real_seqlen_k, ck_tile::AlibiMode::FROM_BOTTOM_RIGHT};
+                    }
+                }();
+
+                ck_tile::HostTensor<SaccDataType> alibi_bias_host_ref(
+                    {nhead, real_seqlen_q, real_seqlen_k});
+                auto i_b_slope = bias.rank_info == 0 ? 0 : wb;
+                for(auto i_h = 0; i_h < nhead; i_h++)
+                {
+                    SaccDataType current_slope = alibi_slope_host(i_b_slope, i_h);
+                    alibi_host.slope           = alibi_host.mode == ck_tile::AlibiMode::VERTICAL
+                                                     ? current_slope
+                                                     : -current_slope;
+                    for(auto i_r = 0; i_r < real_seqlen_q; i_r++)
+                    {
+                        for(auto i_c = 0; i_c < real_seqlen_k; i_c++)
+                        {
+                            SaccDataType pixel = 0;
+                            alibi_host.update(pixel, i_r, i_c);
+                            alibi_bias_host_ref(i_h, i_r, i_c) = pixel;
+                        }
                     }
                 }
+                // [nhead, real_seqlen_q, real_seqlen_k]
+                ck_tile::reference_batched_elementwise<SMPLComputeDataType,
+                                                       SaccDataType,
+                                                       SMPLComputeDataType,
+                                                       SMPLComputeDataType>(
+                    s_host_ref, alibi_bias_host_ref, s_host_ref);
             }
-            // [nhead, real_seqlen_q, real_seqlen_k]
-            ck_tile::reference_batched_elementwise<SMPLComputeDataType,
-                                                   SaccDataType,
-                                                   SMPLComputeDataType,
-                                                   SMPLComputeDataType>(
-                s_host_ref, alibi_bias_host_ref, s_host_ref);
-        }
 
-        if(mask.type == mask_enum::no_mask)
-        {
-            ck_tile::reference_batched_masking<SaccDataType>(
-                s_host_ref, FmhaMasks::NoMask{real_seqlen_q, real_seqlen_k});
-        }
-        else if(mask.type == mask_enum::window_generic)
-        {
-            ck_tile::reference_batched_masking<SaccDataType>(
-                s_host_ref,
-                ck_tile::make_generic_attention_mask_from_lr_window<FmhaMasks::GenericMask>(
-                    mask.left, mask.right, real_seqlen_q, real_seqlen_k));
-        }
-        else
-        {
-            // if left window size is negative, means causal
-            // else means generic (for current batch)
-            if(mask.left < 0)
+            if(mask.type == mask_enum::no_mask)
+            {
                 ck_tile::reference_batched_masking<SaccDataType>(
-                    s_host_ref,
-                    ck_tile::make_generic_attention_mask_from_lr_window<FmhaMasks::CausalMask>(
-                        mask.left,
-                        mask.right,
-                        real_seqlen_q,
-                        real_seqlen_k,
-                        mask.type == mask_enum::mask_top_left));
-            else
+                    s_host_ref, FmhaMasks::NoMask{real_seqlen_q, real_seqlen_k});
+            }
+            else if(mask.type == mask_enum::window_generic)
+            {
                 ck_tile::reference_batched_masking<SaccDataType>(
                     s_host_ref,
                     ck_tile::make_generic_attention_mask_from_lr_window<FmhaMasks::GenericMask>(
-                        mask.left,
-                        mask.right,
-                        real_seqlen_q,
-                        real_seqlen_k,
-                        mask.type == mask_enum::mask_top_left));
-        }
-        if(lse)
-        {
-            ck_tile::reference_batched_softmax<SMPLComputeDataType, SMPLComputeDataType, PDataType>(
-                s_host_ref, p_host_ref, p_compute_element_func, lse_host_ref);
-        }
-        else
-        {
-            ck_tile::reference_batched_softmax<SMPLComputeDataType, SMPLComputeDataType, PDataType>(
-                s_host_ref, p_host_ref, p_compute_element_func);
-        }
+                        mask.left, mask.right, real_seqlen_q, real_seqlen_k));
+            }
+            else
+            {
+                // if left window size is negative, means causal
+                // else means generic (for current batch)
+                if(mask.left < 0)
+                    ck_tile::reference_batched_masking<SaccDataType>(
+                        s_host_ref,
+                        ck_tile::make_generic_attention_mask_from_lr_window<FmhaMasks::CausalMask>(
+                            mask.left,
+                            mask.right,
+                            real_seqlen_q,
+                            real_seqlen_k,
+                            mask.type == mask_enum::mask_top_left));
+                else
+                    ck_tile::reference_batched_masking<SaccDataType>(
+                        s_host_ref,
+                        ck_tile::make_generic_attention_mask_from_lr_window<FmhaMasks::GenericMask>(
+                            mask.left,
+                            mask.right,
+                            real_seqlen_q,
+                            real_seqlen_k,
+                            mask.type == mask_enum::mask_top_left));
+            }
+            if(lse)
+            {
+                ck_tile::
+                    reference_batched_softmax<SMPLComputeDataType, SMPLComputeDataType, PDataType>(
+                        s_host_ref, p_host_ref, p_compute_element_func, lse_host_ref);
+            }
+            else
+            {
+                ck_tile::
+                    reference_batched_softmax<SMPLComputeDataType, SMPLComputeDataType, PDataType>(
+                        s_host_ref, p_host_ref, p_compute_element_func);
+            }
 
-        if(p_drop > 0)
-        {
-            ck_tile::HostTensor<RandValOutputDataType> randval_host_ref(
-                {nhead, real_seqlen_q, real_seqlen_k});
-            randval_host_ref.ForEach([&](auto& self, auto idx) {
-                self(idx) = randval_host(b_idx, idx[0], idx[1] + query_offset, idx[2]);
-            });
-            ck_tile::reference_batched_dropout(
-                p_host_ref, randval_host_ref, p_undrop_in_uint8_t, rp_undrop);
-        }
+            if(p_drop > 0)
+            {
+                ck_tile::HostTensor<RandValOutputDataType> randval_host_ref(
+                    {nhead, real_seqlen_q, real_seqlen_k});
+                randval_host_ref.ForEach([&](auto& self, auto idx) {
+                    self(idx) = randval_host(b_idx, idx[0], idx[1] + query_offset, idx[2]);
+                });
+                ck_tile::reference_batched_dropout(
+                    p_host_ref, randval_host_ref, p_undrop_in_uint8_t, rp_undrop);
+            }
 
-        ck_tile::reference_batched_gemm<PDataType, VDataType, OaccDataType, ODataType>(
-            p_host_ref,
-            v_host_ref,
-            o_host_ref,
-            ck_tile::identity{},
-            ck_tile::identity{},
-            oacc_element_func);
+            ck_tile::reference_batched_gemm<PDataType, VDataType, OaccDataType, ODataType>(
+                p_host_ref,
+                v_host_ref,
+                o_host_ref,
+                ck_tile::identity{},
+                ck_tile::identity{},
+                oacc_element_func);
 
-        ck_tile::HostTensor<ODataType> o_host_result({nhead, real_seqlen_q, hdim_v});
-        // clang-format off
+            ck_tile::HostTensor<ODataType> o_host_result({nhead, real_seqlen_q, hdim_v});
+            // clang-format off
         // permute
         if(o_perm) o_host_result.ForEach([&](auto& self, auto idx) { self(idx) = o_host(b_idx, idx[0], idx[1] + query_offset, idx[2]); });
         else       o_host_result.ForEach([&](auto& self, auto idx) { self(idx) = o_host(b_idx, idx[1] + query_offset, idx[0], idx[2]); });
-        // clang-format on
+            // clang-format on
 
-        auto [rtol, atol] = get_elimit<DataTypeConfig>(init_method);
-        bool cur_pass     = ck_tile::check_err(
-            o_host_result, o_host_ref, std::string("OUT Error: Incorrect results!"), rtol, atol);
-        pass &= cur_pass;
-        if(!cur_pass)
-        {
-            std::cerr << "OUT mismatch found at batch: " << wb << std::endl
-                      << "\tseqlen_q: " << real_seqlen_q << std::endl
-                      << "\tseqlen_k: " << real_seqlen_k << std::endl
-                      << "\tseqstart_q: " << seqstart_q_host << std::endl
-                      << "\tseqstart_k: " << seqstart_k_host << std::endl;
-
-            break;
-        }
-
-        if(lse)
-        {
-            ck_tile::HostTensor<SMPLComputeDataType> lse_host_result({nhead, real_seqlen_q});
-            lse_host_result.ForEach([&](auto& self, auto idx) {
-                self(idx) = lse_host(b_idx, idx[0], idx[1] + query_offset);
-            });
-
-            cur_pass = ck_tile::check_err(lse_host_result,
-                                          lse_host_ref,
-                                          "LSE Error: Incorrect results!",
-                                          rtol,
-                                          atol,
-                                          /* allow_infinity_ref = */ true);
-
+            auto [rtol, atol] = get_elimit<DataTypeConfig>(init_method);
+            bool cur_pass     = ck_tile::check_err(o_host_result,
+                                               o_host_ref,
+                                               std::string("OUT Error: Incorrect results!"),
+                                               rtol,
+                                               atol);
             pass &= cur_pass;
             if(!cur_pass)
             {
-                std::cerr << "LSE mismatch found at batch: " << wb << std::endl
+                std::cerr << "OUT mismatch found at batch: " << wb << std::endl
                           << "\tseqlen_q: " << real_seqlen_q << std::endl
                           << "\tseqlen_k: " << real_seqlen_k << std::endl
                           << "\tseqstart_q: " << seqstart_q_host << std::endl
@@ -1570,10 +1565,65 @@ bool run(const ck_tile::ArgParser& arg_parser)
 
                 break;
             }
+
+            if(lse)
+            {
+                ck_tile::HostTensor<SMPLComputeDataType> lse_host_result({nhead, real_seqlen_q});
+                lse_host_result.ForEach([&](auto& self, auto idx) {
+                    self(idx) = lse_host(b_idx, idx[0], idx[1] + query_offset);
+                });
+
+                cur_pass = ck_tile::check_err(lse_host_result,
+                                              lse_host_ref,
+                                              "LSE Error: Incorrect results!",
+                                              rtol,
+                                              atol,
+                                              /* allow_infinity_ref = */ true);
+
+                pass &= cur_pass;
+                if(!cur_pass)
+                {
+                    std::cerr << "LSE mismatch found at batch: " << wb << std::endl
+                              << "\tseqlen_q: " << real_seqlen_q << std::endl
+                              << "\tseqlen_k: " << real_seqlen_k << std::endl
+                              << "\tseqstart_q: " << seqstart_q_host << std::endl
+                              << "\tseqstart_k: " << seqstart_k_host << std::endl;
+
+                    break;
+                }
+            }
         }
+
+        std::cout << ", valid:" << (pass ? "y" : "n") << std::flush << std::endl;
     }
 
-    std::cout << ", valid:" << (pass ? "y" : "n") << std::flush << std::endl;
+    if(arg_parser.get_int("json") == 1)
+    {
+        dump_fmha_fwd_json_results(arg_parser.get_str("jsonfile"),
+                                   prec,
+                                   mode == mode_enum::batch ? "batch" : "group",
+                                   io_layout(i_perm, o_perm),
+                                   batch,
+                                   nhead,
+                                   nhead_k,
+                                   seqlen_qs[0],
+                                   seqlen_ks[0],
+                                   seqlen_kpads[0],
+                                   hdim_q,
+                                   hdim_v,
+                                   scale_s,
+                                   p_drop,
+                                   lse,
+                                   squant,
+                                   bias.type == bias_enum::elementwise_bias
+                                       ? "elementwise_bias"
+                                       : (bias.type == bias_enum::alibi ? "alibi" : "no_bias"),
+                                   vlayout,
+                                   pass,
+                                   ave_time,
+                                   tflops,
+                                   gb_per_sec);
+    }
 
     return pass;
 }
