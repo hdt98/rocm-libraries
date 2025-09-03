@@ -37,10 +37,6 @@ target_link_libraries(rocroller-tests
         ${msgpack_libs}
 )
 
-if(ROCROLLER_ENABLE_LLD)
-    target_link_libraries(rocroller-tests PRIVATE lldELF)
-endif()
-
 target_sources(rocroller-tests
     PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/ContextFixture.cpp"
