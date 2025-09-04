@@ -426,7 +426,7 @@ auto GenericSearch(const Solver s,
                    const Context& context_,
                    const Problem& problem,
                    const AnyInvokeParams& invoke_ctx_,
-                   std::vector<SolutionPerf>* perf_sols = nullptr)
+                   std::vector<SolutionPerf>* perf_solsp = nullptr)
     -> decltype(s.GetDefaultPerformanceConfig(context_, problem))
 {
     auto context                  = context_;
@@ -443,10 +443,7 @@ auto GenericSearch(const Solver s,
     }();
 
     // list of sampled solutions
-    if(perf_sols)
-    {
-        perf_sols->erase(perf_sols->begin(), perf_sols->end());
-    }
+    std::vector<SolutionPerf> perf_sols;
 
     auto& profile_h = context.GetStream();
     const AutoEnableProfiling enableProfiling{profile_h};
@@ -595,6 +592,16 @@ auto GenericSearch(const Solver s,
 
             if(ret == 0)
             {
+                // If 1st probe of 1st successful config is worse than the cutoff time abort the
+                // search
+                if(perf_sols.empty() && elapsed_time > context.generic_search_cutoff_time)
+                {
+                    MIOPEN_LOG_E("Measured time: " << elapsed_time << " was greater than cutoff: "
+                                                   << context.generic_search_cutoff_time
+                                                   << " aborting search...");
+                    return current_config;
+                }
+
                 // Smooth the jitter of measurements:
                 // If the 1st probe is NOT too bad (measured time <= 1.10 * worst sample of the best
                 // config), then gather 9 more samples, and remove positive z-score outliers. Use
@@ -646,13 +653,9 @@ auto GenericSearch(const Solver s,
                             MIOPEN_LOG_I2("Mean is not better: " << elapsed_time
                                                                  << " >= " << best_time);
                         }
-
                     }
                 }
-                if(perf_sols)
-                {
-                    perf_sols->push_back({current_config.ToString(), elapsed_time});
-                }
+                perf_sols.push_back({current_config.ToString(), elapsed_time});
             }
 
             // Banchmarked kernels will not be used anymore.
@@ -692,10 +695,20 @@ auto GenericSearch(const Solver s,
     if(!is_passed)
         MIOPEN_THROW("Search failed");
 
-    if(perf_sols)
-        std::sort(perf_sols->begin(), perf_sols->end(), [](SolutionPerf a, SolutionPerf b) {
-            return a.time < b.time;
-        });
+    std::sort(perf_sols.begin(), perf_sols.end(), [](SolutionPerf a, SolutionPerf b) {
+        return a.time < b.time;
+    });
+
+    // if using cutoff time for search and new cutoff is shorter, update
+    if(context.search_cutoff)
+    {
+        float new_cutoff = perf_sols.end().time * 2;
+        if(new_cutoff < context.generic_search_cutoff_time)
+            context_.generic_search_cutoff_time = new_cutoff;
+    }
+
+    if(perf_solsp)
+        *perf_solsp = std::move(perf_sols);
 
     // Run once with the default config and show score.
     const auto& invoker = profile_h.PrepareInvoker(*default_solution.invoker_factory,

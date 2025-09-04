@@ -137,6 +137,9 @@ auto FindSolutionImpl(rank<1>,
 
         if(context.do_search || enforce.IsSearch(context)) // TODO: Make it a customization point
         {
+            if(enforce.IsSearchCutoff(context))
+                context.search_cutoff = true;
+
             MIOPEN_LOG_I("Starting search: " << s.SolverDbId() << ", enforce: " << enforce);
             try
             {

@@ -54,6 +54,7 @@ enum class FindEnforceAction
     DbUpdate,
     Search,
     SearchDbUpdate,
+    SearchCutoffDbUpdate,
     DbClean,
     Last_          = DbClean,
     Default_       = None,
@@ -88,6 +89,12 @@ public:
         return IsEnabled(context) && (action == FindEnforceAction::Search ||
                                       action == FindEnforceAction::SearchDbUpdate ||
                                       action == FindEnforceAction::DbUpdate);
+    }
+
+    template <class Context>
+    bool IsSearchCutoff(const Context& context) const
+    {
+        return IsEnabled(context) && (action == FindEnforceAction::SearchCutoffDbUpdate);
     }
 
     template <class Context>
