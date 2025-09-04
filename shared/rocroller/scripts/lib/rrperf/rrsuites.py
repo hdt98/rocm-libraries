@@ -1304,6 +1304,8 @@ def fp4_no_scale_target_d2lds_mi16x16x128_pf4x1():
             type_C="half",
             type_D="half",
             type_acc="float",
+            scale_A="None",
+            scale_B="None",
         ),
         numOuter=1,
         numWarmUp=1000,
@@ -1312,7 +1314,7 @@ def fp4_no_scale_target_d2lds_mi16x16x128_pf4x1():
 
 
 def fp4_no_scale_target_d2lds_mi16x16x128_pf4x1_wgm():
-    yield from add_wgm((0, 2), fp4_target_d2lds_mi16x16x128_pf4x1())
+    yield from add_wgm((0, 2), fp4_no_scale_target_d2lds_mi16x16x128_pf4x1())
 
 
 def fp4_kernels_no_wgm():
@@ -1332,6 +1334,10 @@ def fp4_kernels_wgm():
 
 def fp4_16x16x128_scale_options():
     yield from fp4_target_d2lds_mi16x16x128_pf4x1_wgm()
+    yield from addSkipPermlane(fp4_target_d2lds_mi16x16x128_pf4x1_wgm())
+
+
+def fp4_target_d2lds_skip_mi16x16x128_pf4x1_wgm():
     yield from addSkipPermlane(fp4_target_d2lds_mi16x16x128_pf4x1_wgm())
 
 
