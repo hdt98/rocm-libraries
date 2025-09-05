@@ -902,7 +902,7 @@ bool ConvHipImplicitGemmBwdDataV4R1Xdlops::IsValidPerformanceConfig(
 }
 
 PerformanceImplicitGemmBwdDataV4R1Xdlops
-ConvHipImplicitGemmBwdDataV4R1Xdlops::Search(const ExecutionContext& ctx,
+ConvHipImplicitGemmBwdDataV4R1Xdlops::Search(ExecutionContext& ctx,
                                              const ProblemDescription& problem,
                                              const AnyInvokeParams& invoke_ctx) const
 {

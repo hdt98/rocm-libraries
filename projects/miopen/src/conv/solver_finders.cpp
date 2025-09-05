@@ -66,7 +66,7 @@ protected:
         return !parameters.use_winograd_only && !env::disabled(MIOPEN_DEBUG_CONV_DIRECT);
     }
 
-    std::vector<solver::ConvSolution> FindImpl(const ExecutionContext& ctx,
+    std::vector<solver::ConvSolution> FindImpl(ExecutionContext& ctx,
                                                const ProblemDescription& problem,
                                                const AnyInvokeParams& invoke_ctx,
                                                const ConvFindParameters&,
@@ -95,7 +95,7 @@ protected:
         return !parameters.use_winograd_only && !env::disabled(MIOPEN_DEBUG_CONV_IMPLICIT_GEMM);
     }
 
-    std::vector<solver::ConvSolution> FindImpl(const ExecutionContext& ctx,
+    std::vector<solver::ConvSolution> FindImpl(ExecutionContext& ctx,
                                                const ProblemDescription& problem,
                                                const AnyInvokeParams& invoke_ctx,
                                                const ConvFindParameters&,
@@ -126,7 +126,7 @@ protected:
                !env::disabled(MIOPEN_DEBUG_CONV_FFT);
     }
 
-    std::vector<solver::ConvSolution> FindImpl(const ExecutionContext& ctx,
+    std::vector<solver::ConvSolution> FindImpl(ExecutionContext& ctx,
                                                const ProblemDescription& problem,
                                                const AnyInvokeParams& invoke_ctx,
                                                const ConvFindParameters&,
@@ -153,7 +153,7 @@ protected:
         return !parameters.use_winograd_only && !env::disabled(MIOPEN_DEBUG_CONV_GEMM);
     }
 
-    std::vector<solver::ConvSolution> FindImpl(const ExecutionContext& ctx,
+    std::vector<solver::ConvSolution> FindImpl(ExecutionContext& ctx,
                                                const ProblemDescription& problem,
                                                const AnyInvokeParams& invoke_ctx,
                                                const ConvFindParameters&,
@@ -180,7 +180,7 @@ protected:
         return !env::disabled(MIOPEN_DEBUG_CONV_WINOGRAD);
     }
 
-    std::vector<solver::ConvSolution> FindImpl(const ExecutionContext& ctx,
+    std::vector<solver::ConvSolution> FindImpl(ExecutionContext& ctx,
                                                const ProblemDescription& problem,
                                                const AnyInvokeParams& invoke_ctx,
                                                const ConvFindParameters& parameters,
@@ -334,7 +334,7 @@ std::vector<Solution> EvaluateInvokers(const Handle& handle,
 }
 
 FindCoreResult FindCore(const AnyInvokeParams& invoke_ctx,
-                        const ExecutionContext& ctx,
+                        ExecutionContext& ctx,
                         const ProblemDescriptionBase& problem,
                         const PrimitiveFindParameters& parameters,
                         const std::vector<std::unique_ptr<ISolversFinder>>& finders,

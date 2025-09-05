@@ -561,7 +561,7 @@ ConvHipImplicitGemm3DGroupFwdXdlops::GetWorkspaceSize(const ExecutionContext&,
 }
 
 PerformanceConfigHipImplicitGemm3DGroupFwdXdlops
-ConvHipImplicitGemm3DGroupFwdXdlops::Search(const ExecutionContext& ctx,
+ConvHipImplicitGemm3DGroupFwdXdlops::Search(ExecutionContext& ctx,
                                             const ProblemDescription& problem,
                                             const AnyInvokeParams& invoke_ctx) const
 {

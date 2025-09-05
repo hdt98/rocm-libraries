@@ -770,7 +770,7 @@ ConvSolution ConvOclBwdWrW2<N_BATCH_LOOPS>::GetSolution(
 
 template <int N_BATCH_LOOPS>
 PerformanceConfigConvOclBwdWrw2<N_BATCH_LOOPS>
-ConvOclBwdWrW2<N_BATCH_LOOPS>::Search(const ExecutionContext& ctx,
+ConvOclBwdWrW2<N_BATCH_LOOPS>::Search(ExecutionContext& ctx,
                                       const ProblemDescription& problem,
                                       const AnyInvokeParams& invoke_ctx) const
 {

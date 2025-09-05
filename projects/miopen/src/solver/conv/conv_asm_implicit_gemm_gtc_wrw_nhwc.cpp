@@ -850,7 +850,7 @@ bool ConvAsmImplicitGemmGTCDynamicWrwXdlopsNHWC::IsValidPerformanceConfig(
 }
 
 PerformanceConfigAsmImplicitGemmGTCWrwXdlopsNHWC
-ConvAsmImplicitGemmGTCDynamicWrwXdlopsNHWC::Search(const ExecutionContext& ctx,
+ConvAsmImplicitGemmGTCDynamicWrwXdlopsNHWC::Search(ExecutionContext& ctx,
                                                    const ProblemDescription& problem,
                                                    const AnyInvokeParams& invoke_ctx) const
 {

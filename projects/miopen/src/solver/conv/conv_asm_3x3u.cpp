@@ -320,7 +320,7 @@ ConvSolution ConvAsm3x3U::GetSolution(const ExecutionContext& ctx,
     return result;
 }
 
-PerformanceConfigConvAsm3x3U ConvAsm3x3U::Search(const ExecutionContext& ctx,
+PerformanceConfigConvAsm3x3U ConvAsm3x3U::Search(ExecutionContext& ctx,
                                                  const ProblemDescription& problem,
                                                  const AnyInvokeParams& invoke_ctx) const
 {

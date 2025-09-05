@@ -130,7 +130,7 @@ struct BnBwdTrainingSpatial final : BatchNormTunableSolver<PerformanceConfigBnBw
                              const PerformanceConfigBnBwdBackward& config) const override;
 
     MIOPEN_INTERNALS_EXPORT PerformanceConfigBnBwdBackward
-    Search(const ExecutionContext& ctx,
+    Search(ExecutionContext& ctx,
            const miopen::batchnorm::ProblemDescription& problem,
            const AnyInvokeParams& invoke_ctx) const override;
 
@@ -157,7 +157,7 @@ struct BnFwdTrainingSpatial final : BatchNormTunableSolver<PerformanceConfigBnFw
                              const PerformanceConfigBnFwdTraining& config) const override;
 
     MIOPEN_INTERNALS_EXPORT PerformanceConfigBnFwdTraining
-    Search(const ExecutionContext& ctx,
+    Search(ExecutionContext& ctx,
            const miopen::batchnorm::ProblemDescription& problem,
            const AnyInvokeParams& invoke_ctx) const override;
 

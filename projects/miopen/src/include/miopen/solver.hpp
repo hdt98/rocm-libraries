@@ -206,7 +206,7 @@ struct SolverBaseTunable : SolverInterfaceTunable<Context, Problem>, TunableSolv
 
     /// Search
     virtual PerformanceConfig
-    Search(const Context& ctx, const Problem& problem, const AnyInvokeParams& invoke_ctx) const = 0;
+    Search(Context& ctx, const Problem& problem, const AnyInvokeParams& invoke_ctx) const = 0;
 
     /// Tunable solvers provide a GetSolution that takes a Context and PerformanceConfig
     virtual ConvSolution GetSolution(const Context& ctx,

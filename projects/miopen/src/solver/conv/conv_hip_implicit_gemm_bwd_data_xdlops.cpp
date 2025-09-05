@@ -261,7 +261,7 @@ bool ConvHipImplicitGemmBwdXdlops::IsValidPerformanceConfig(
 }
 
 PerformanceConfigHipImplicitGemmBwdXdlops
-ConvHipImplicitGemmBwdXdlops::Search(const ExecutionContext& ctx,
+ConvHipImplicitGemmBwdXdlops::Search(ExecutionContext& ctx,
                                      const ProblemDescription& problem,
                                      const AnyInvokeParams& invoke_ctx) const
 {

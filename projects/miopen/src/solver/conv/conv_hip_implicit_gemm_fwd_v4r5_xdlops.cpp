@@ -1090,7 +1090,7 @@ bool ConvHipImplicitGemmForwardV4R5Xdlops::IsApplicable(const ExecutionContext& 
 }
 
 PerformanceImplicitGemmForwardV4R5Xdlops
-ConvHipImplicitGemmForwardV4R5Xdlops::Search(const ExecutionContext& ctx,
+ConvHipImplicitGemmForwardV4R5Xdlops::Search(ExecutionContext& ctx,
                                              const ProblemDescription& problem,
                                              const AnyInvokeParams& invoke_ctx) const
 {

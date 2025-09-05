@@ -213,7 +213,7 @@ static int MeasurePerfConfig(const Handle& handle,
 }
 
 LegacyPerformanceConfig
-ConvOclDirectFwdLegacyExhaustiveSearch::Search(const ExecutionContext& ctx,
+ConvOclDirectFwdLegacyExhaustiveSearch::Search(ExecutionContext& ctx,
                                                const ProblemDescription& problem,
                                                const AnyInvokeParams& invoke_ctx) const
 {

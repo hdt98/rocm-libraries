@@ -592,7 +592,7 @@ ConvCKIgemmGrpFwdBiasActivFused::GetWorkspaceSize(const FusionContext&,
 }
 
 PerformanceConfigConvCKIgemmGrpFwdBiasActivFused
-ConvCKIgemmGrpFwdBiasActivFused::Search(const FusionContext& ctx,
+ConvCKIgemmGrpFwdBiasActivFused::Search(FusionContext& ctx,
                                         const FusionDescription& fdesc_problem,
                                         const AnyInvokeParams& invoke_ctx) const
 {

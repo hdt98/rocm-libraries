@@ -88,7 +88,7 @@ bool ConvMlirIgemmWrWXdlops::IsValidPerformanceConfig(
 }
 
 PerformanceConvMlirIgemmXdlops
-ConvMlirIgemmWrWXdlops::Search(const ExecutionContext& ctx,
+ConvMlirIgemmWrWXdlops::Search(ExecutionContext& ctx,
                                const ProblemDescription& problem,
                                const AnyInvokeParams& invoke_ctx) const
 {

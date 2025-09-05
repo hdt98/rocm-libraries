@@ -429,7 +429,7 @@ bool ConvBinWinoRxS<Winodata, Winofilter>::IsValidPerformanceConfig(
 
 template <int Winodata, int Winofilter>
 PerformanceConfigConvBinWinogradRxS
-ConvBinWinoRxS<Winodata, Winofilter>::Search(const ExecutionContext& ctx,
+ConvBinWinoRxS<Winodata, Winofilter>::Search(ExecutionContext& ctx,
                                              const ProblemDescription& problem,
                                              const AnyInvokeParams& invoke_ctx) const
 {

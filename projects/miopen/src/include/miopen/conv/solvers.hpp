@@ -123,7 +123,7 @@ struct ConvAsm3x3U final : ConvTunableSolver<PerformanceConfigConvAsm3x3U>
                              const miopen::conv::ProblemDescription&,
                              const PerformanceConfigConvAsm3x3U&) const override;
     MIOPEN_INTERNALS_EXPORT PerformanceConfigConvAsm3x3U
-    Search(const ExecutionContext&,
+    Search(ExecutionContext&,
            const miopen::conv::ProblemDescription&,
            const AnyInvokeParams& invoke_ctx) const override;
     MIOPEN_INTERNALS_EXPORT ConvSolution
@@ -229,7 +229,7 @@ struct ConvAsm1x1U final : ConvTunableSolver<PerformanceConfigConvAsm1x1U>
                              const miopen::conv::ProblemDescription&,
                              const PerformanceConfigConvAsm1x1U&) const override;
     MIOPEN_INTERNALS_EXPORT PerformanceConfigConvAsm1x1U
-    Search(const ExecutionContext&,
+    Search(ExecutionContext&,
            const miopen::conv::ProblemDescription&,
            const AnyInvokeParams& invoke_ctx) const override;
     MIOPEN_INTERNALS_EXPORT bool
@@ -320,7 +320,7 @@ struct ConvAsm1x1UV2 final : ConvTunableSolver<PerformanceConfigConvAsm1x1UV2>
                              const miopen::conv::ProblemDescription&,
                              const PerformanceConfigConvAsm1x1UV2&) const override;
     MIOPEN_INTERNALS_EXPORT PerformanceConfigConvAsm1x1UV2
-    Search(const ExecutionContext&,
+    Search(ExecutionContext&,
            const miopen::conv::ProblemDescription&,
            const AnyInvokeParams& invoke_ctx) const override;
     MIOPEN_INTERNALS_EXPORT bool
@@ -822,7 +822,7 @@ struct ConvHipImplicitGemmV4R1Fwd final : ConvTunableSolver<PerformanceImplicitG
                 const miopen::conv::ProblemDescription&,
                 const PerformanceImplicitGemmV4R1&) const override;
     MIOPEN_INTERNALS_EXPORT PerformanceImplicitGemmV4R1
-    Search(const ExecutionContext&,
+    Search(ExecutionContext&,
            const miopen::conv::ProblemDescription&,
            const AnyInvokeParams& invoke_ctx) const override;
 };
@@ -843,7 +843,7 @@ struct ConvHipImplicitGemmV4R4Fwd final : ConvTunableSolver<PerformanceImplicitG
                              const miopen::conv::ProblemDescription&,
                              const PerformanceImplicitGemmV4R4Fwd&) const override;
     MIOPEN_INTERNALS_EXPORT PerformanceImplicitGemmV4R4Fwd
-    Search(const ExecutionContext&,
+    Search(ExecutionContext&,
            const miopen::conv::ProblemDescription&,
            const AnyInvokeParams& invoke_ctx) const override;
     MIOPEN_INTERNALS_EXPORT ConvSolution
@@ -920,7 +920,7 @@ struct ConvMlirIgemmFwd final : ConvTunableSolver<PerformanceConvMlirIgemm>
                              const miopen::conv::ProblemDescription&,
                              const PerformanceConvMlirIgemm&) const override;
     MIOPEN_INTERNALS_EXPORT PerformanceConvMlirIgemm
-    Search(const ExecutionContext&,
+    Search(ExecutionContext&,
            const miopen::conv::ProblemDescription&,
            const AnyInvokeParams& invoke_ctx) const override;
     MIOPEN_INTERNALS_EXPORT ConvSolution
@@ -1001,7 +1001,7 @@ struct ConvMlirIgemmFwdXdlops final : ConvTunableSolver<PerformanceConvMlirIgemm
                              const miopen::conv::ProblemDescription&,
                              const PerformanceConvMlirIgemmXdlops&) const override;
     MIOPEN_INTERNALS_EXPORT PerformanceConvMlirIgemmXdlops
-    Search(const ExecutionContext&,
+    Search(ExecutionContext&,
            const miopen::conv::ProblemDescription&,
            const AnyInvokeParams& invoke_ctx) const override;
     MIOPEN_INTERNALS_EXPORT ConvSolution
@@ -1026,7 +1026,7 @@ struct ConvHipImplicitGemmV4R4WrW final : ConvTunableSolver<PerformanceImplicitG
                              const miopen::conv::ProblemDescription&,
                              const PerformanceImplicitGemmV4R4WrW&) const override;
     MIOPEN_INTERNALS_EXPORT PerformanceImplicitGemmV4R4WrW
-    Search(const ExecutionContext&,
+    Search(ExecutionContext&,
            const miopen::conv::ProblemDescription&,
            const AnyInvokeParams& invoke_ctx) const override;
     MIOPEN_INTERNALS_EXPORT ConvSolution
@@ -1053,7 +1053,7 @@ struct ConvMlirIgemmWrW final : ConvTunableSolver<PerformanceConvMlirIgemm>
                              const miopen::conv::ProblemDescription&,
                              const PerformanceConvMlirIgemm&) const override;
     MIOPEN_INTERNALS_EXPORT PerformanceConvMlirIgemm
-    Search(const ExecutionContext&,
+    Search(ExecutionContext&,
            const miopen::conv::ProblemDescription&,
            const AnyInvokeParams& invoke_ctx) const override;
     MIOPEN_INTERNALS_EXPORT ConvSolution
@@ -1078,7 +1078,7 @@ struct ConvMlirIgemmWrWXdlops final : ConvTunableSolver<PerformanceConvMlirIgemm
                              const miopen::conv::ProblemDescription&,
                              const PerformanceConvMlirIgemmXdlops&) const override;
     MIOPEN_INTERNALS_EXPORT PerformanceConvMlirIgemmXdlops
-    Search(const ExecutionContext&,
+    Search(ExecutionContext&,
            const miopen::conv::ProblemDescription&,
            const AnyInvokeParams& invoke_ctx) const override;
     MIOPEN_INTERNALS_EXPORT size_t GetWorkspaceSize(
@@ -1349,7 +1349,7 @@ struct ConvHipImplicitGemmForwardV4R4Xdlops final
                 const miopen::conv::ProblemDescription&,
                 const PerformanceImplicitGemmForwardV4R4Xdlops&) const override;
     MIOPEN_INTERNALS_EXPORT PerformanceImplicitGemmForwardV4R4Xdlops
-    Search(const ExecutionContext&,
+    Search(ExecutionContext&,
            const miopen::conv::ProblemDescription&,
            const AnyInvokeParams& invoke_ctx) const override;
 
@@ -1382,7 +1382,7 @@ struct ConvHipImplicitGemmForwardV4R4Xdlops_Padded_Gemm final
                 const miopen::conv::ProblemDescription&,
                 const PerformanceImplicitGemmForwardV4R4Xdlops_Padded_Gemm&) const override;
     MIOPEN_INTERNALS_EXPORT PerformanceImplicitGemmForwardV4R4Xdlops_Padded_Gemm
-    Search(const ExecutionContext&,
+    Search(ExecutionContext&,
            const miopen::conv::ProblemDescription&,
            const AnyInvokeParams& invoke_ctx) const override;
 
@@ -1414,7 +1414,7 @@ struct ConvHipImplicitGemmForwardV4R5Xdlops final
                 const miopen::conv::ProblemDescription&,
                 const PerformanceImplicitGemmForwardV4R5Xdlops&) const override;
     MIOPEN_INTERNALS_EXPORT PerformanceImplicitGemmForwardV4R5Xdlops
-    Search(const ExecutionContext&,
+    Search(ExecutionContext&,
            const miopen::conv::ProblemDescription&,
            const AnyInvokeParams& invoke_ctx) const override;
 };
@@ -1439,7 +1439,7 @@ struct ConvHipImplicitGemmV4R1WrW final : ConvTunableSolver<PerformanceImplicitG
                 const miopen::conv::ProblemDescription&,
                 const PerformanceImplicitGemmV4R1&) const override;
     MIOPEN_INTERNALS_EXPORT PerformanceImplicitGemmV4R1
-    Search(const ExecutionContext&,
+    Search(ExecutionContext&,
            const miopen::conv::ProblemDescription&,
            const AnyInvokeParams& invoke_ctx) const override;
 };
@@ -1460,7 +1460,7 @@ struct ConvHipImplicitGemmBwdDataV1R1 final : ConvTunableSolver<PerformanceImpli
                              const miopen::conv::ProblemDescription&,
                              const PerformanceImplicitGemmBwdDataV1R1&) const override;
     MIOPEN_INTERNALS_EXPORT PerformanceImplicitGemmBwdDataV1R1
-    Search(const ExecutionContext&,
+    Search(ExecutionContext&,
            const miopen::conv::ProblemDescription&,
            const AnyInvokeParams& invoke_ctx) const override;
     MIOPEN_INTERNALS_EXPORT ConvSolution
@@ -1491,7 +1491,7 @@ struct ConvMlirIgemmBwd final : ConvTunableSolver<PerformanceConvMlirIgemm>
                              const miopen::conv::ProblemDescription&,
                              const PerformanceConvMlirIgemm&) const override;
     MIOPEN_INTERNALS_EXPORT PerformanceConvMlirIgemm
-    Search(const ExecutionContext&,
+    Search(ExecutionContext&,
            const miopen::conv::ProblemDescription&,
            const AnyInvokeParams& invoke_ctx) const override;
     MIOPEN_INTERNALS_EXPORT ConvSolution
@@ -1516,7 +1516,7 @@ struct ConvMlirIgemmBwdXdlops final : ConvTunableSolver<PerformanceConvMlirIgemm
                              const miopen::conv::ProblemDescription&,
                              const PerformanceConvMlirIgemmXdlops&) const override;
     MIOPEN_INTERNALS_EXPORT PerformanceConvMlirIgemmXdlops
-    Search(const ExecutionContext&,
+    Search(ExecutionContext&,
            const miopen::conv::ProblemDescription&,
            const AnyInvokeParams& invoke_ctx) const override;
     MIOPEN_INTERNALS_EXPORT ConvSolution
@@ -1541,7 +1541,7 @@ struct ConvHipImplicitGemmBwdDataV4R1 final : ConvTunableSolver<PerformanceImpli
                              const miopen::conv::ProblemDescription&,
                              const PerformanceImplicitGemmBwdDataV4R1&) const override;
     MIOPEN_INTERNALS_EXPORT PerformanceImplicitGemmBwdDataV4R1
-    Search(const ExecutionContext&,
+    Search(ExecutionContext&,
            const miopen::conv::ProblemDescription&,
            const AnyInvokeParams& invoke_ctx) const override;
     MIOPEN_INTERNALS_EXPORT ConvSolution
@@ -1578,7 +1578,7 @@ struct ConvHipImplicitGemmBwdDataV4R1Xdlops final
                 const miopen::conv::ProblemDescription&,
                 const PerformanceImplicitGemmBwdDataV4R1Xdlops&) const override;
     MIOPEN_INTERNALS_EXPORT PerformanceImplicitGemmBwdDataV4R1Xdlops
-    Search(const ExecutionContext&,
+    Search(ExecutionContext&,
            const miopen::conv::ProblemDescription&,
            const AnyInvokeParams& invoke_ctx) const override;
 
@@ -1610,7 +1610,7 @@ struct ConvHipImplicitGemmBwdDataV1R1Xdlops final
         const ExecutionContext&, const miopen::conv::ProblemDescription&) const override;
     bool MayNeedWorkspace() const override { return true; }
     MIOPEN_INTERNALS_EXPORT PerformanceImplicitGemmBwdV1R1Xdlops
-    Search(const ExecutionContext&,
+    Search(ExecutionContext&,
            const miopen::conv::ProblemDescription&,
            const AnyInvokeParams& invoke_ctx) const override;
     MIOPEN_INTERNALS_EXPORT ConvSolution
@@ -1754,7 +1754,7 @@ struct ConvOclDirectFwdLegacyExhaustiveSearch : ConvTunableSolver<LegacyPerforma
     LegacyPerformanceConfig
     GetDefaultPerformanceConfig(const ExecutionContext&,
                                 const miopen::conv::ProblemDescription&) const override;
-    LegacyPerformanceConfig Search(const ExecutionContext&,
+    LegacyPerformanceConfig Search(ExecutionContext&,
                                    const miopen::conv::ProblemDescription&,
                                    const AnyInvokeParams& invoke_ctx) const override;
 
@@ -1877,7 +1877,7 @@ struct ConvBinWinoRxS final : ConvTunableSolver<PerformanceConfigConvBinWinograd
                              const miopen::conv::ProblemDescription&,
                              const PerformanceConfigConvBinWinogradRxS&) const override;
     MIOPEN_INTERNALS_EXPORT PerformanceConfigConvBinWinogradRxS
-    Search(const ExecutionContext&,
+    Search(ExecutionContext&,
            const miopen::conv::ProblemDescription&,
            const AnyInvokeParams& invoke_ctx) const override;
     MIOPEN_INTERNALS_EXPORT bool
@@ -2033,7 +2033,7 @@ struct ConvMPBidirectWinograd_xdlops final
     bool MayNeedWorkspace() const override { return true; }
 
     MIOPEN_INTERNALS_EXPORT PerformanceImplicitGemmForwardV4R4Xdlops
-    Search(const ExecutionContext&,
+    Search(ExecutionContext&,
            const miopen::conv::ProblemDescription&,
            const AnyInvokeParams& invoke_ctx) const override;
     MIOPEN_INTERNALS_EXPORT ConvSolution
@@ -2223,7 +2223,7 @@ struct ConvAsmBwdWrW3x3 final : ConvTunableSolver<PerformanceConfigAsmDirect3x3W
                              const miopen::conv::ProblemDescription&,
                              const PerformanceConfigAsmDirect3x3WrW&) const override;
     MIOPEN_INTERNALS_EXPORT PerformanceConfigAsmDirect3x3WrW
-    Search(const ExecutionContext&,
+    Search(ExecutionContext&,
            const miopen::conv::ProblemDescription&,
            const AnyInvokeParams& invoke_ctx) const override;
     MIOPEN_INTERNALS_EXPORT bool
@@ -2386,7 +2386,7 @@ struct ConvAsmBwdWrW1x1 final : ConvTunableSolver<PerformanceConfigConvAsmBwdWrW
                              const miopen::conv::ProblemDescription&,
                              const PerformanceConfigConvAsmBwdWrW1x1&) const override;
     MIOPEN_INTERNALS_EXPORT PerformanceConfigConvAsmBwdWrW1x1
-    Search(const ExecutionContext&,
+    Search(ExecutionContext&,
            const miopen::conv::ProblemDescription&,
            const AnyInvokeParams& invoke_ctx) const override;
     MIOPEN_INTERNALS_EXPORT bool
@@ -2475,7 +2475,7 @@ struct ConvOclBwdWrW2 final : ConvTunableSolver<PerformanceConfigConvOclBwdWrw2<
                              const miopen::conv::ProblemDescription&,
                              const PerformanceConfigConvOclBwdWrw2<N_BATCH_LOOPS>&) const override;
     MIOPEN_INTERNALS_EXPORT PerformanceConfigConvOclBwdWrw2<N_BATCH_LOOPS>
-    Search(const ExecutionContext&,
+    Search(ExecutionContext&,
            const miopen::conv::ProblemDescription&,
            const AnyInvokeParams& invoke_ctx) const override;
     MIOPEN_INTERNALS_EXPORT bool
@@ -2664,7 +2664,7 @@ struct ConvHipImplicitGemmWrwV4R4Xdlops final
                 const miopen::conv::ProblemDescription&,
                 const PerformanceImplicitGemmWrwV4R4Xdlops&) const override;
     MIOPEN_INTERNALS_EXPORT PerformanceImplicitGemmWrwV4R4Xdlops
-    Search(const ExecutionContext&,
+    Search(ExecutionContext&,
            const miopen::conv::ProblemDescription&,
            const AnyInvokeParams& invoke_ctx) const override;
 };
@@ -2761,7 +2761,7 @@ struct ConvHipImplicitGemmWrwV4R4Xdlops_Padded_Gemm final
                 const miopen::conv::ProblemDescription&,
                 const PerformanceImplicitGemmWrwV4R4Xdlops_Padded_Gemm&) const override;
     MIOPEN_INTERNALS_EXPORT PerformanceImplicitGemmWrwV4R4Xdlops_Padded_Gemm
-    Search(const ExecutionContext&,
+    Search(ExecutionContext&,
            const miopen::conv::ProblemDescription&,
            const AnyInvokeParams& invoke_ctx) const override;
 };
@@ -2814,7 +2814,7 @@ struct ConvCkIgemmFwdV6r1DlopsNchw final : ConvTunableSolver<PerformanceConvCkIg
                              const miopen::conv::ProblemDescription&,
                              const PerformanceConvCkIgemmFwdV6r1DlopsNchw&) const override;
     MIOPEN_INTERNALS_EXPORT PerformanceConvCkIgemmFwdV6r1DlopsNchw
-    Search(const ExecutionContext&,
+    Search(ExecutionContext&,
            const miopen::conv::ProblemDescription&,
            const AnyInvokeParams& invoke_ctx) const override;
     MIOPEN_INTERNALS_EXPORT ConvSolution
@@ -3469,7 +3469,7 @@ struct ConvAsmImplicitGemmGTCDynamicFwdXdlopsNHWC final
         const miopen::conv::ProblemDescription&,
         const PerformanceConfigAsmImplicitGemmGTCFwdXdlopsNHWC&) const override;
     MIOPEN_INTERNALS_EXPORT PerformanceConfigAsmImplicitGemmGTCFwdXdlopsNHWC
-    Search(const ExecutionContext&,
+    Search(ExecutionContext&,
            const miopen::conv::ProblemDescription&,
            const AnyInvokeParams& invoke_ctx) const override;
     MIOPEN_INTERNALS_EXPORT size_t GetWorkspaceSize(
@@ -3673,7 +3673,7 @@ struct ConvAsmImplicitGemmGTCDynamicBwdXdlopsNHWC final
         const miopen::conv::ProblemDescription&,
         const PerformanceConfigAsmImplicitGemmGTCBwdXdlopsNHWC&) const override;
     MIOPEN_INTERNALS_EXPORT PerformanceConfigAsmImplicitGemmGTCBwdXdlopsNHWC
-    Search(const ExecutionContext&,
+    Search(ExecutionContext&,
            const miopen::conv::ProblemDescription&,
            const AnyInvokeParams& invoke_ctx) const override;
     MIOPEN_INTERNALS_EXPORT size_t GetWorkspaceSize(
@@ -3883,7 +3883,7 @@ struct ConvAsmImplicitGemmGTCDynamicWrwXdlopsNHWC final
         const miopen::conv::ProblemDescription&,
         const PerformanceConfigAsmImplicitGemmGTCWrwXdlopsNHWC&) const override;
     MIOPEN_INTERNALS_EXPORT PerformanceConfigAsmImplicitGemmGTCWrwXdlopsNHWC
-    Search(const ExecutionContext&,
+    Search(ExecutionContext&,
            const miopen::conv::ProblemDescription&,
            const AnyInvokeParams& invoke_ctx) const override;
     MIOPEN_INTERNALS_EXPORT size_t GetWorkspaceSize(
@@ -4238,7 +4238,7 @@ struct ConvAsmImplicitGemmGTCDynamicFwdDlopsNCHWC final
         const miopen::conv::ProblemDescription&,
         const PerformanceConfigAsmImplicitGemmGTCFwdDlopsNCHWC&) const override;
     MIOPEN_INTERNALS_EXPORT PerformanceConfigAsmImplicitGemmGTCFwdDlopsNCHWC
-    Search(const ExecutionContext&,
+    Search(ExecutionContext&,
            const miopen::conv::ProblemDescription&,
            const AnyInvokeParams& invoke_ctx) const override;
     MIOPEN_INTERNALS_EXPORT bool
@@ -4301,7 +4301,7 @@ struct ConvHipImplicitGemmFwdXdlops final
                              const miopen::conv::ProblemDescription&,
                              const PerformanceConfigHipImplicitGemmFwdXdlops&) const override;
     MIOPEN_INTERNALS_EXPORT PerformanceConfigHipImplicitGemmFwdXdlops
-    Search(const ExecutionContext&,
+    Search(ExecutionContext&,
            const miopen::conv::ProblemDescription&,
            const AnyInvokeParams& invoke_ctx) const override;
     MIOPEN_INTERNALS_EXPORT bool
@@ -4383,7 +4383,7 @@ struct ConvHipImplicitGemmBwdXdlops final
                              const miopen::conv::ProblemDescription&,
                              const PerformanceConfigHipImplicitGemmBwdXdlops&) const override;
     MIOPEN_INTERNALS_EXPORT PerformanceConfigHipImplicitGemmBwdXdlops
-    Search(const ExecutionContext&,
+    Search(ExecutionContext&,
            const miopen::conv::ProblemDescription&,
            const AnyInvokeParams& invoke_ctx) const override;
     MIOPEN_INTERNALS_EXPORT bool
@@ -4469,7 +4469,7 @@ struct ConvHipImplicitGemmGroupFwdXdlops final
                              const miopen::conv::ProblemDescription&,
                              const PerformanceConfigHipImplicitGemmGroupFwdXdlops&) const override;
     MIOPEN_INTERNALS_EXPORT PerformanceConfigHipImplicitGemmGroupFwdXdlops
-    Search(const ExecutionContext&,
+    Search(ExecutionContext&,
            const miopen::conv::ProblemDescription&,
            const AnyInvokeParams& invoke_ctx) const override;
     MIOPEN_INTERNALS_EXPORT bool
@@ -4546,7 +4546,7 @@ struct ConvHipImplicitGemm3DGroupFwdXdlops final
         const miopen::conv::ProblemDescription&,
         const PerformanceConfigHipImplicitGemm3DGroupFwdXdlops&) const override;
     MIOPEN_INTERNALS_EXPORT PerformanceConfigHipImplicitGemm3DGroupFwdXdlops
-    Search(const ExecutionContext&,
+    Search(ExecutionContext&,
            const miopen::conv::ProblemDescription&,
            const AnyInvokeParams& invoke_ctx) const override;
     MIOPEN_INTERNALS_EXPORT bool
@@ -4621,7 +4621,7 @@ struct ConvHipImplicitGemm3DGroupWrwXdlops final
         const miopen::conv::ProblemDescription&,
         const PerformanceConfigHipImplicitGemm3DGroupWrwXdlops&) const override;
     MIOPEN_INTERNALS_EXPORT PerformanceConfigHipImplicitGemm3DGroupWrwXdlops
-    Search(const ExecutionContext&,
+    Search(ExecutionContext&,
            const miopen::conv::ProblemDescription&,
            const AnyInvokeParams& invoke_ctx) const override;
     MIOPEN_INTERNALS_EXPORT bool
@@ -4698,7 +4698,7 @@ struct ConvHipImplicitGemm3DGroupBwdXdlops final
         const miopen::conv::ProblemDescription&,
         const PerformanceConfigHipImplicitGemm3DGroupBwdXdlops&) const override;
     MIOPEN_INTERNALS_EXPORT PerformanceConfigHipImplicitGemm3DGroupBwdXdlops
-    Search(const ExecutionContext&,
+    Search(ExecutionContext&,
            const miopen::conv::ProblemDescription&,
            const AnyInvokeParams& invoke_ctx) const override;
     MIOPEN_INTERNALS_EXPORT bool
@@ -4793,7 +4793,7 @@ struct ConvHipImplicitGemmGroupBwdXdlops final
                              const miopen::conv::ProblemDescription&,
                              const PerformanceConfigHipImplicitGemmGroupBwdXdlops&) const override;
     MIOPEN_INTERNALS_EXPORT PerformanceConfigHipImplicitGemmGroupBwdXdlops
-    Search(const ExecutionContext&,
+    Search(ExecutionContext&,
            const miopen::conv::ProblemDescription&,
            const AnyInvokeParams& invoke_ctx) const override;
     MIOPEN_INTERNALS_EXPORT bool
@@ -4887,7 +4887,7 @@ struct ConvHipImplicitGemmGroupWrwXdlops final
                              const miopen::conv::ProblemDescription&,
                              const PerformanceConfigHipImplicitGemmGroupWrwXdlops&) const override;
     MIOPEN_INTERNALS_EXPORT PerformanceConfigHipImplicitGemmGroupWrwXdlops
-    Search(const ExecutionContext&,
+    Search(ExecutionContext&,
            const miopen::conv::ProblemDescription&,
            const AnyInvokeParams& invoke_ctx) const override;
     MIOPEN_INTERNALS_EXPORT bool

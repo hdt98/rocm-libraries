@@ -268,7 +268,7 @@ std::size_t ConvCkIgemmFwdV6r1DlopsNchw::GetWorkspaceSize(const ExecutionContext
 }
 
 PerformanceConvCkIgemmFwdV6r1DlopsNchw
-ConvCkIgemmFwdV6r1DlopsNchw::Search(const ExecutionContext& ctx,
+ConvCkIgemmFwdV6r1DlopsNchw::Search(ExecutionContext& ctx,
                                     const ProblemDescription& problem,
                                     const AnyInvokeParams& invoke_ctx) const
 {

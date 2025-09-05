@@ -197,14 +197,14 @@ bool ConvHipImplicitGemmV4R1WrW::IsValidPerformanceConfig(
 }
 
 PerformanceImplicitGemmV4R1
-ConvHipImplicitGemmV4R1Fwd::Search(const ExecutionContext& ctx,
+ConvHipImplicitGemmV4R1Fwd::Search(ExecutionContext& ctx,
                                    const ProblemDescription& problem,
                                    const AnyInvokeParams& invoke_ctx) const
 {
     return GenericSearch(*this, ctx, problem, invoke_ctx);
 }
 PerformanceImplicitGemmV4R1
-ConvHipImplicitGemmV4R1WrW::Search(const ExecutionContext& ctx,
+ConvHipImplicitGemmV4R1WrW::Search(ExecutionContext& ctx,
                                    const ProblemDescription& problem,
                                    const AnyInvokeParams& invoke_ctx) const
 {

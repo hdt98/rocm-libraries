@@ -819,7 +819,7 @@ bool ConvHipImplicitGemmBwdDataV4R1::IsValidPerformanceConfig(
 }
 
 PerformanceImplicitGemmBwdDataV4R1
-ConvHipImplicitGemmBwdDataV4R1::Search(const ExecutionContext& ctx,
+ConvHipImplicitGemmBwdDataV4R1::Search(ExecutionContext& ctx,
                                        const ProblemDescription& problem,
                                        const AnyInvokeParams& invoke_ctx) const
 {

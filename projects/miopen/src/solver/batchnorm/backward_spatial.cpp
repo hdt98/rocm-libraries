@@ -184,7 +184,7 @@ bool BnBwdTrainingSpatial::IsValidPerformanceConfig(
 }
 
 PerformanceConfigBnBwdBackward
-BnBwdTrainingSpatial::Search(const ExecutionContext& ctx,
+BnBwdTrainingSpatial::Search(ExecutionContext& ctx,
                              const miopen::batchnorm::ProblemDescription& problem,
                              const AnyInvokeParams& invoke_ctx) const
 {

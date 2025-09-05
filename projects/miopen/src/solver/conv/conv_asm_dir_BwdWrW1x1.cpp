@@ -853,7 +853,7 @@ ConvSolution ConvAsmBwdWrW1x1::GetSolution(const ExecutionContext& ctx,
     return result;
 }
 
-PerformanceConfigConvAsmBwdWrW1x1 ConvAsmBwdWrW1x1::Search(const ExecutionContext& ctx,
+PerformanceConfigConvAsmBwdWrW1x1 ConvAsmBwdWrW1x1::Search(ExecutionContext& ctx,
                                                            const ProblemDescription& problem,
                                                            const AnyInvokeParams& invoke_ctx) const
 {

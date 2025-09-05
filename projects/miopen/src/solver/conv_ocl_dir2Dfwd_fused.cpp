@@ -43,7 +43,7 @@ namespace solver {
 namespace fusion {
 
 PerformanceConfigConvOclDirectFwdFused
-ConvOclDirectFwdFused::Search(const FusionContext& context,
+ConvOclDirectFwdFused::Search(FusionContext& context,
                               const FusionDescription& problem,
                               const AnyInvokeParams& invoke_params) const
 {

@@ -76,7 +76,7 @@ struct ConvBiasActivAsm1x1U : FusionTunableSolver<PerformanceConfigConvBiasActiv
     MIOPEN_INTERNALS_EXPORT PerformanceConfigConvBiasActivAsm1x1U
     GetDefaultPerformanceConfig(const FusionContext&, const FusionDescription&) const override;
     MIOPEN_INTERNALS_EXPORT PerformanceConfigConvBiasActivAsm1x1U
-    Search(const FusionContext& context,
+    Search(FusionContext& context,
            const FusionDescription& problem,
            const AnyInvokeParams& invoke_params) const override;
     MIOPEN_INTERNALS_EXPORT bool
@@ -104,7 +104,7 @@ struct ConvOclDirectFwdFused final : FusionTunableSolver<LegacyPerformanceConfig
     MIOPEN_INTERNALS_EXPORT PerformanceConfigConvOclDirectFwdFused
     GetDefaultPerformanceConfig(const FusionContext&, const FusionDescription&) const override;
     MIOPEN_INTERNALS_EXPORT PerformanceConfigConvOclDirectFwdFused
-    Search(const FusionContext&,
+    Search(FusionContext&,
            const FusionDescription&,
            const AnyInvokeParams& invoke_params) const override;
     MIOPEN_INTERNALS_EXPORT bool
@@ -170,7 +170,7 @@ struct ConvCKIgemmFwdBiasActivFused final
         const FusionDescription& fdesc_problem,
         const PerformanceConfigConvCKIgemmFwdBiasActivFused& config) const override;
     MIOPEN_INTERNALS_EXPORT PerformanceConfigConvCKIgemmFwdBiasActivFused
-    Search(const FusionContext& ctx,
+    Search(FusionContext& ctx,
            const FusionDescription& fdesc_problem,
            const AnyInvokeParams& invoke_ctx) const override;
     MIOPEN_INTERNALS_EXPORT bool
@@ -240,7 +240,7 @@ struct ConvCKIgemmGrpFwdActivFused final
         const FusionDescription& fdesc_problem,
         const PerformanceConfigConvCKIgemmGrpFwdActivFused& config) const override;
     MIOPEN_INTERNALS_EXPORT PerformanceConfigConvCKIgemmGrpFwdActivFused
-    Search(const FusionContext& ctx,
+    Search(FusionContext& ctx,
            const FusionDescription& fdesc_problem,
            const AnyInvokeParams& invoke_ctx) const override;
     MIOPEN_INTERNALS_EXPORT bool
@@ -313,7 +313,7 @@ struct ConvCKIgemmGrpFwdBiasActivFused final
         const FusionDescription& fdesc_problem,
         const PerformanceConfigConvCKIgemmGrpFwdBiasActivFused& config) const override;
     MIOPEN_INTERNALS_EXPORT PerformanceConfigConvCKIgemmGrpFwdBiasActivFused
-    Search(const FusionContext& ctx,
+    Search(FusionContext& ctx,
            const FusionDescription& fdesc_problem,
            const AnyInvokeParams& invoke_ctx) const override;
     MIOPEN_INTERNALS_EXPORT bool
@@ -386,7 +386,7 @@ struct ConvCKIgemmFwdBiasResAddActivFused final
         const FusionDescription& fdesc_problem,
         const PerfConfigConvCKIgemmFwdBiasResAddActivFused& config) const override;
     MIOPEN_INTERNALS_EXPORT PerfConfigConvCKIgemmFwdBiasResAddActivFused
-    Search(const FusionContext& ctx,
+    Search(FusionContext& ctx,
            const FusionDescription& fdesc_problem,
            const AnyInvokeParams& invoke_ctx) const override;
     MIOPEN_INTERNALS_EXPORT bool

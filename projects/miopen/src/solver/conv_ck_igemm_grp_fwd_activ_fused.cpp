@@ -581,7 +581,7 @@ size_t ConvCKIgemmGrpFwdActivFused::GetWorkspaceSize(const FusionContext&,
 }
 
 PerformanceConfigConvCKIgemmGrpFwdActivFused
-ConvCKIgemmGrpFwdActivFused::Search(const FusionContext& ctx,
+ConvCKIgemmGrpFwdActivFused::Search(FusionContext& ctx,
                                     const FusionDescription& fdesc_problem,
                                     const AnyInvokeParams& invoke_ctx) const
 {

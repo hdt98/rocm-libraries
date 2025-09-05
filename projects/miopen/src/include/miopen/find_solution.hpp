@@ -285,7 +285,7 @@ struct SolverContainer
     // Search for all applicable solutions among many solvers
     template <class Context, class Problem, class Db, class Solution = miopen::solver::ConvSolution>
     std::vector<Solution>
-    SearchForAllSolutions(const Context& ctx,
+    SearchForAllSolutions(Context& ctx,
                           const Problem& problem,
                           Db&& db,
                           const AnyInvokeParams& invoke_ctx,
