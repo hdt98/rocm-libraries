@@ -52,7 +52,7 @@ namespace solver {
 template <class Solver, class Context, class Problem, class Db>
 auto FindSolutionImpl(rank<1>,
                       const Solver& s,
-                      const Context& context,
+                      Context& context,
                       const Problem& problem,
                       Db&& db,
                       const AnyInvokeParams& invoke_ctx,
@@ -161,7 +161,7 @@ auto FindSolutionImpl(rank<1>,
 template <class Solver, class Context, class Problem, class Db>
 auto FindSolutionImpl(rank<0>,
                       const Solver& s,
-                      const Context& context,
+                      Context& context,
                       const Problem& problem,
                       Db&&,
                       const AnyInvokeParams&,
@@ -213,7 +213,7 @@ auto GetInvokeFactoryImpl(
 /// May read/write perfDb.
 template <class Solver, class Context, class Problem, class Db>
 ConvSolution FindSolution(const Solver& s,
-                          const Context& context,
+                          Context& context,
                           const Problem& problem,
                           Db&& db,
                           const AnyInvokeParams& invoke_ctx,
@@ -343,7 +343,7 @@ struct SolverContainer
     // Search for all applicable solutions among many solvers
     template <class Problem, class Solution = miopen::solver::ConvSolution>
     std::vector<Solution>
-    SearchForSolutions(const ExecutionContext& ctx,
+    SearchForSolutions(ExecutionContext& ctx,
                        const Problem& problem,
                        std::size_t limit = std::numeric_limits<std::size_t>::max(),
                        const AnyInvokeParams& invoke_params = {}) const
@@ -451,7 +451,7 @@ struct SolverContainer
     }
 
     template <class Problem>
-    void ExecutePrimitive(const ExecutionContext& ctx,
+    void ExecutePrimitive(ExecutionContext& ctx,
                           const Problem& problem,
                           const AlgorithmName& algo,
                           const AnyInvokeParams& invoke_params) const
@@ -480,7 +480,7 @@ struct SolverContainer
     }
 
     template <class Problem>
-    void ExecutePrimitive(const Handle& handle,
+    void ExecutePrimitive(Handle& handle,
                           const Problem& problem,
                           const AlgorithmName& algo,
                           const AnyInvokeParams& invoke_params) const

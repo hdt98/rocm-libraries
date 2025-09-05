@@ -291,7 +291,7 @@ FindAllWinogradSolutions(miopen::ExecutionContext& ctx,
 }
 
 std::vector<miopen::solver::ConvSolution>
-FindWinogradWrWAllSolutions(const miopen::ExecutionContext& ctx,
+FindWinogradWrWAllSolutions(miopen::ExecutionContext& ctx,
                             const miopen::conv::ProblemDescription& problem,
                             const miopen::AnyInvokeParams& invoke_ctx)
 {
@@ -314,7 +314,7 @@ FindImplicitGemmWrWWorkspaceSizes(const miopen::ExecutionContext& ctx,
 }
 
 std::vector<miopen::solver::ConvSolution>
-FindImplicitGemmWrWAllSolutions(const miopen::ExecutionContext& ctx,
+FindImplicitGemmWrWAllSolutions(miopen::ExecutionContext& ctx,
                                 const miopen::conv::ProblemDescription& problem,
                                 const miopen::AnyInvokeParams& invoke_ctx)
 {

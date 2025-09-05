@@ -62,6 +62,8 @@ static_assert(FindEnforceAction::Search ==
               static_cast<FindEnforceAction>(miopenTuningPolicySearch));
 static_assert(FindEnforceAction::SearchDbUpdate ==
               static_cast<FindEnforceAction>(miopenTuningPolicySearchDbUpdate));
+static_assert(FindEnforceAction::SearchCutoffDbUpdate ==
+              static_cast<FindEnforceAction>(miopenTuningPolicySearchCutoffDbUpdate));
 static_assert(FindEnforceAction::DbClean ==
               static_cast<FindEnforceAction>(miopenTuningPolicyDbClean));
 
@@ -75,6 +77,7 @@ const char* ToCString(const FindEnforceAction mode)
     case FindEnforceAction::DbUpdate: return "DB_UPDATE";
     case FindEnforceAction::Search: return "SEARCH";
     case FindEnforceAction::SearchDbUpdate: return "SEARCH_DB_UPDATE";
+    case FindEnforceAction::SearchCutoffDbUpdate: return "SEARCH_CUTOFF_DB_UPDATE";
     case FindEnforceAction::DbClean: return "CLEAN";
     }
     return "<Unknown>";
@@ -102,6 +105,10 @@ FindEnforceAction GetFindEnforceActionImpl()
     else if(str == "SEARCH_DB_UPDATE")
     {
         return FindEnforceAction::SearchDbUpdate;
+    }
+    else if(str == "SEARCH_CUTOFF_DB_UPDATE")
+    {
+        return FindEnforceAction::SearchCutoffDbUpdate;
     }
     else if(str == "DB_CLEAN")
     {

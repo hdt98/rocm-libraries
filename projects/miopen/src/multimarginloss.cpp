@@ -55,7 +55,7 @@ std::size_t GetMultiMarginLossForwardWorkspaceSize(const Handle& handle,
     return pair_size_vector.empty() ? static_cast<size_t>(-1) : pair_size_vector.front().second;
 }
 
-miopenStatus_t MultiMarginLossForward(const Handle& handle,
+miopenStatus_t MultiMarginLossForward(Handle& handle,
                                       Data_t workspace,
                                       size_t workspaceSizeInBytes,
                                       const TensorDescriptor& iDesc,

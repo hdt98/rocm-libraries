@@ -257,7 +257,7 @@ miopenStatus_t ReducAddBias(const miopen::Handle& handle,
 
 } // namespace
 
-void RNNDescriptor::RNNForwardMS(const Handle& handle,
+void RNNDescriptor::RNNForwardMS(Handle& handle,
                                  std::vector<int>& seq_array,
                                  const TensorDescriptor& xDesc,
                                  ConstData_t x,
@@ -1177,7 +1177,7 @@ void RNNDescriptor::RNNForwardMS(const Handle& handle,
 }
 
 // Assuming sequence length is set to > 0 otherwise throw exception.
-void RNNDescriptor::RNNForwardInference(const Handle& handle,
+void RNNDescriptor::RNNForwardInference(Handle& handle,
                                         const int seqLen,
                                         c_array_view<const miopenTensorDescriptor_t> xDesc,
                                         ConstData_t x,
@@ -1310,7 +1310,7 @@ void RNNDescriptor::RNNForwardInference(const Handle& handle,
     }
 #endif
 }
-void RNNDescriptor::RNNForwardInferencePacked(const Handle& handle,
+void RNNDescriptor::RNNForwardInferencePacked(Handle& handle,
                                               const int seqLen,
                                               c_array_view<const miopenTensorDescriptor_t> xDesc,
                                               ConstData_t x,
@@ -2563,7 +2563,7 @@ void RNNDescriptor::RNNForwardInferencePacked(const Handle& handle,
 #endif
 }
 
-void RNNDescriptor::RNNForwardTraining(const Handle& handle,
+void RNNDescriptor::RNNForwardTraining(Handle& handle,
                                        const int seqLen,
                                        c_array_view<const miopenTensorDescriptor_t> xDesc,
                                        ConstData_t x,
@@ -2708,7 +2708,7 @@ void RNNDescriptor::RNNForwardTraining(const Handle& handle,
 };
 
 void RNNDescriptor::RNNForwardTrainingPackedTensors(
-    const Handle& handle,
+    Handle& handle,
     const int seqLen,
     c_array_view<const miopenTensorDescriptor_t> xDesc,
     ConstData_t x,
@@ -4080,7 +4080,7 @@ void RNNDescriptor::RNNForwardTrainingPackedTensors(
 #endif
 };
 
-void RNNDescriptor::RNNBackwardData(const Handle& handle,
+void RNNDescriptor::RNNBackwardData(Handle& handle,
                                     const int seqLen,
                                     c_array_view<const miopenTensorDescriptor_t> yDesc,
                                     ConstData_t y,
@@ -4223,7 +4223,7 @@ void RNNDescriptor::RNNBackwardData(const Handle& handle,
 }
 
 void RNNDescriptor::RNNBackwardDataPackedTensors(
-    const Handle& handle,
+    Handle& handle,
     const int seqLen,
     c_array_view<const miopenTensorDescriptor_t> dyDesc,
     ConstData_t dy,
@@ -5810,7 +5810,7 @@ void RNNDescriptor::RNNBackwardDataPackedTensors(
 #endif
 };
 
-void RNNDescriptor::RNNBackwardWeights(const Handle& handle,
+void RNNDescriptor::RNNBackwardWeights(Handle& handle,
                                        const int seqLen,
                                        c_array_view<const miopenTensorDescriptor_t> xDesc,
                                        ConstData_t x,
@@ -5910,7 +5910,7 @@ void RNNDescriptor::RNNBackwardWeights(const Handle& handle,
 }
 
 void RNNDescriptor::RNNBackwardWeightsPackedTensors(
-    const Handle& handle,
+    Handle& handle,
     const int seqLen,
     c_array_view<const miopenTensorDescriptor_t> xDesc,
     ConstData_t x,

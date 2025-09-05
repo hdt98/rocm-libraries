@@ -50,7 +50,7 @@ std::size_t GetSoftMarginLossForwardWorkspaceSize(const Handle& handle,
     return pair_size_vector.empty() ? static_cast<size_t>(-1) : pair_size_vector.front().second;
 }
 
-miopenStatus_t SoftMarginLossForward(const Handle& handle,
+miopenStatus_t SoftMarginLossForward(Handle& handle,
                                      Data_t workspace,
                                      size_t workspaceSizeInBytes,
                                      const TensorDescriptor& iDesc,
@@ -84,7 +84,7 @@ miopenStatus_t SoftMarginLossForward(const Handle& handle,
     return miopenStatusSuccess;
 }
 
-miopenStatus_t SoftMarginLossBackward(const Handle& handle,
+miopenStatus_t SoftMarginLossBackward(Handle& handle,
                                       const TensorDescriptor& iDesc,
                                       ConstData_t i,
                                       const TensorDescriptor& tDesc,

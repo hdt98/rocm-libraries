@@ -71,7 +71,7 @@ std::size_t GetReduceCalculationWorkspaceSize(const Handle& handle,
     return static_cast<size_t>(-1);
 }
 
-miopenStatus_t ReduceCalculationForward(const Handle& handle,
+miopenStatus_t ReduceCalculationForward(Handle& handle,
                                         Data_t workspace,
                                         size_t workspaceSizeInBytes,
                                         const TensorDescriptor& xDesc,

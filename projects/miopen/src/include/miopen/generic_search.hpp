@@ -423,7 +423,7 @@ struct SolutionPerf
 
 template <class Solver, class Context, class Problem>
 auto GenericSearch(const Solver s,
-                   const Context& context_,
+                   Context& context_,
                    const Problem& problem,
                    const AnyInvokeParams& invoke_ctx_,
                    std::vector<SolutionPerf>* perf_solsp = nullptr)
@@ -702,7 +702,7 @@ auto GenericSearch(const Solver s,
     // if using cutoff time for search and new cutoff is shorter, update
     if(context.search_cutoff)
     {
-        float new_cutoff = perf_sols.end().time * 2;
+        float new_cutoff = perf_sols.end()->time * 2;
         if(new_cutoff < context.generic_search_cutoff_time)
             context_.generic_search_cutoff_time = new_cutoff;
     }

@@ -44,7 +44,7 @@
 
 namespace miopen {
 
-void profileRNNkernels(const Handle& handle, unsigned char select, float& ctime)
+void profileRNNkernels(Handle& handle, unsigned char select, float& ctime)
 {
 
     float ktime = 0.;
@@ -1207,7 +1207,7 @@ void RNNDescriptor::SeqTensorToTensorDescArray(const SeqTensorDescriptor& desc,
     });
 }
 
-void RNNDescriptor::RNNVanillaForward(const Handle& handle,
+void RNNDescriptor::RNNVanillaForward(Handle& handle,
                                       miopenRNNFWDMode_t fwdMode,
                                       ConstData_t w,
                                       const SeqTensorDescriptor& xDesc,
@@ -1284,7 +1284,7 @@ void RNNDescriptor::RNNVanillaForward(const Handle& handle,
     }
 }
 
-void RNNDescriptor::RNNVanillaBackwardData(const Handle& handle,
+void RNNDescriptor::RNNVanillaBackwardData(Handle& handle,
                                            const SeqTensorDescriptor& yDesc,
                                            ConstData_t dy,
                                            const TensorDescriptor& hDesc,
@@ -1335,7 +1335,7 @@ void RNNDescriptor::RNNVanillaBackwardData(const Handle& handle,
                                         reserveSpaceSize);
 }
 
-void RNNDescriptor::RNNVanillaBackwardWeights(const Handle& handle,
+void RNNDescriptor::RNNVanillaBackwardWeights(Handle& handle,
                                               const SeqTensorDescriptor& xDesc,
                                               ConstData_t x,
                                               const TensorDescriptor& hDesc,
@@ -1374,7 +1374,7 @@ void RNNDescriptor::RNNVanillaBackwardWeights(const Handle& handle,
                                            reserveSpaceSize);
 }
 
-void RNNDescriptor::RNNForward(const Handle& handle,
+void RNNDescriptor::RNNForward(Handle& handle,
                                miopenRNNFWDMode_t fwdMode,
                                const SeqTensorDescriptor& xDesc,
                                ConstData_t x,
@@ -1476,7 +1476,7 @@ void RNNDescriptor::RNNForward(const Handle& handle,
 #endif
 }
 
-void RNNDescriptor::RNNBackwardData(const Handle& handle,
+void RNNDescriptor::RNNBackwardData(Handle& handle,
                                     const SeqTensorDescriptor& yDesc,
                                     ConstData_t,
                                     ConstData_t dy,
@@ -1584,7 +1584,7 @@ void RNNDescriptor::RNNBackwardData(const Handle& handle,
 #endif
 }
 
-void RNNDescriptor::RNNBackwardWeights(const Handle& handle,
+void RNNDescriptor::RNNBackwardWeights(Handle& handle,
                                        const SeqTensorDescriptor& xDesc,
                                        ConstData_t x,
                                        const TensorDescriptor& hDesc,

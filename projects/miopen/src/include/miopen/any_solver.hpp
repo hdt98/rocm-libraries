@@ -98,7 +98,7 @@ struct AnySolver
     bool IsEmpty() const { return ptr_value == nullptr; };
 
 #if defined(FIN_ANY_SOLVER_FIND_SOLUTION_COMPAT)
-    ConvSolution FindSolution(const ExecutionContext& ctx,
+    ConvSolution FindSolution(ExecutionContext& ctx,
                               const miopen::conv::ProblemDescription& problem,
                               PerformanceDb& db,
                               const miopen::AnyInvokeParams& invoke_ctx,
@@ -109,7 +109,7 @@ struct AnySolver
     }
 #endif
 
-    ConvSolution FindSolution(const ExecutionContext& ctx,
+    ConvSolution FindSolution(ExecutionContext& ctx,
                               const miopen::conv::ProblemDescription& problem,
                               std::function<PerformanceDb&()>& db_getter,
                               const miopen::AnyInvokeParams& invoke_ctx,
@@ -119,7 +119,7 @@ struct AnySolver
         return ptr_value->FindSolution(ctx, problem, db_getter, invoke_ctx, perf_cfg);
     }
 
-    ConvSolution FindSolution(const ExecutionContext& ctx,
+    ConvSolution FindSolution(ExecutionContext& ctx,
                               const miopen::conv::ProblemDescription& problem,
                               DbGetter& db_getter,
                               const miopen::AnyInvokeParams& invoke_ctx,
@@ -194,17 +194,17 @@ struct AnySolver
                              const miopen::conv::ProblemDescription& problem) const = 0;
         virtual const std::type_info& Type() const                                  = 0;
         virtual std::string GetSolverDbId() const                                   = 0;
-        virtual ConvSolution FindSolution(const ExecutionContext& ctx,
+        virtual ConvSolution FindSolution(ExecutionContext& ctx,
                                           const miopen::conv::ProblemDescription& problem,
                                           PerformanceDb& db,
                                           const miopen::AnyInvokeParams& invoke_ctx,
                                           const std::string& perf_cfg) const        = 0;
-        virtual ConvSolution FindSolution(const ExecutionContext& ctx,
+        virtual ConvSolution FindSolution(ExecutionContext& ctx,
                                           const miopen::conv::ProblemDescription& problem,
                                           std::function<PerformanceDb&()>& db_getter,
                                           const miopen::AnyInvokeParams& invoke_ctx,
                                           const std::string& perf_cfg) const        = 0;
-        virtual ConvSolution FindSolution(const ExecutionContext& ctx,
+        virtual ConvSolution FindSolution(ExecutionContext& ctx,
                                           const miopen::conv::ProblemDescription& problem,
                                           DbGetter& db_getter,
                                           const miopen::AnyInvokeParams& invoke_ctx,
@@ -413,7 +413,7 @@ struct AnySolver
             return value.GetWti(ctx, problem);
         }
 
-        ConvSolution FindSolution(const ExecutionContext& ctx,
+        ConvSolution FindSolution(ExecutionContext& ctx,
                                   const miopen::conv::ProblemDescription& problem,
                                   PerformanceDb& db,
                                   const miopen::AnyInvokeParams& invoke_ctx,
@@ -422,7 +422,7 @@ struct AnySolver
             return miopen::solver::FindSolution(value, ctx, problem, db, invoke_ctx, perf_cfg);
         }
 
-        ConvSolution FindSolution(const ExecutionContext& ctx,
+        ConvSolution FindSolution(ExecutionContext& ctx,
                                   const miopen::conv::ProblemDescription& problem,
                                   std::function<PerformanceDb&()>& db_getter,
                                   const miopen::AnyInvokeParams& invoke_ctx,
@@ -432,7 +432,7 @@ struct AnySolver
                 value, ctx, problem, db_getter, invoke_ctx, perf_cfg);
         }
 
-        ConvSolution FindSolution(const ExecutionContext& ctx,
+        ConvSolution FindSolution(ExecutionContext& ctx,
                                   const miopen::conv::ProblemDescription& problem,
                                   DbGetter& db_getter,
                                   const miopen::AnyInvokeParams& invoke_ctx,
