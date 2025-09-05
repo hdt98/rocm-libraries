@@ -24,9 +24,11 @@
  *
  *******************************************************************************/
 #include <fstream>
-#include <rocRoller/Utilities/Error.hpp>
+#include <functional>
 #include <sstream>
 #include <vector>
+
+#include <rocRoller/Utilities/Error.hpp>
 
 #include <amd_comgr/amd_comgr.h>
 
@@ -147,11 +149,25 @@ std::string rocRoller::readMetaDataFromCodeObject(std::string const& fileName)
                         amd_comgr_metadata_kind_t valueKind;
                         amd_comgr_get_metadata_kind(value, &valueKind);
 
-                        if(valueKind == AMD_COMGR_METADATA_KIND_MAP
-                           || valueKind == AMD_COMGR_METADATA_KIND_LIST)
+                        if(valueKind == AMD_COMGR_METADATA_KIND_MAP)
                         {
                             *(ctx->stream) << "\n";
                             (*ctx->converter)(value, ctx->indent + 1, false);
+                        }
+                        else if(valueKind == AMD_COMGR_METADATA_KIND_LIST)
+                        {
+                            size_t listSize = 0;
+                            amd_comgr_get_metadata_list_size(value, &listSize);
+
+                            if(listSize > 0)
+                            {
+                                *(ctx->stream) << "\n";
+                                (*ctx->converter)(value, ctx->indent + 1, false);
+                            }
+                            else
+                            {
+                                *(ctx->stream) << " []";
+                            }
                         }
                         else
                         {
