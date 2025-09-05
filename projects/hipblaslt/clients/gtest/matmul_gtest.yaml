@@ -1215,7 +1215,7 @@ Tests:
 - name: matmul_groupedgemm_specific_sizes
   category: pre_checkin
   function:
-    matmul: *hpa_half_precisions_fp_16_32_dst
+    matmul: *real_precisions
   matrix_size:
     - { M:  4096, N:  4096, K:  40 }
     - { M:  1024, N:  1024, K:  80 }
@@ -1228,22 +1228,22 @@ Tests:
   beta: [ 0.0, 2.0 ]
   unit_check: 1
   algo_method: [2]
-  gpu_arch_exclude: '1[1-2]\d{2}'
+  gpu_arch_exclude: '950'
 
 - name: matmul_groupedgemm
   category: pre_checkin
   function:
     matmul: *real_precisions
-  M: [127, 127]
-  N: [127, 127]
-  K: [127, 127]
+  M: [127, 129]
+  N: [127, 129]
+  K: [127, 129]
   transA_transB: *transA_transB_range
-  grouped_gemm: [1, 2, 3]
+  grouped_gemm: [1, 7]
   alpha: 1
   beta: [ 0.0, 2.0 ]
   unit_check: 1
   algo_method: [0, 2]
-  gpu_arch_exclude: '1[1-2]\d{2}'
+  gpu_arch_exclude: '950'
 
 - name: matmul_groupedgemm_f8_fnuz
   category: pre_checkin
@@ -1254,21 +1254,6 @@ Tests:
   K: [127, 129]
   transA_transB:
     - { transA: T, transB: N }
-  grouped_gemm: [2]
-  alpha: 1
-  beta: [ 0.0, 2.0 ]
-  unit_check: 1
-  algo_method: [2]
-  gpu_arch: '942'
-
-- name: matmul_groupedgemm_bf16
-  category: pre_checkin
-  function:
-    matmul: *hpa_bf16_precision
-  M: [127, 129]
-  N: [127, 129]
-  K: [127, 129]
-  transA_transB: *transA_transB_range
   grouped_gemm: [2]
   alpha: 1
   beta: [ 0.0, 2.0 ]
@@ -1294,7 +1279,7 @@ Tests:
 - name: matmul_groupedgemm_zero_n
   category: pre_checkin
   function:
-    matmul: *hpa_half_precision
+    matmul: *real_precisions
   M: [127, 129]
   N: [127, 0]
   K: [127, 129]
@@ -1304,7 +1289,7 @@ Tests:
   beta: [ 0.0, 2.0 ]
   unit_check: 1
   algo_method: [2]
-  gpu_arch_exclude: '1[1-2]\d{2}'
+  gpu_arch_exclude: '950'
 
 - name: matmul_extapi_groupedgemm
   category: pre_checkin
@@ -1320,12 +1305,12 @@ Tests:
   alpha: 1
   beta: [ 0.0, 2.0 ]
   unit_check: 1
-  gpu_arch_exclude: '1[1-2]\d{2}'
+  gpu_arch_exclude: '950'
 
 - name: matmul_extapi_groupedgemm
   category: pre_checkin
   function:
-    matmul: *hpa_half_precision
+    matmul: *real_precisions
   M: [127, 129]
   N: [127, 129]
   K: [127, 129]
@@ -1337,7 +1322,7 @@ Tests:
   alpha: 1
   beta: [ 0.0, 2.0 ]
   unit_check: 1
-  gpu_arch_exclude: '1[1-2]\d{2}'
+  gpu_arch_exclude: '950'
 
 - name: matmul_bias_gelu_aux_fp16
   category: pre_checkin
