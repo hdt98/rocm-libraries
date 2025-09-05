@@ -32,15 +32,16 @@
 
 using namespace rocRoller;
 
-#define COMGR_CHECK(status, cleanup_code, error_msg) \
-    do { \
-        if(status != AMD_COMGR_STATUS_SUCCESS) \
-        { \
-            const char* statusString; \
+#define COMGR_CHECK(status, cleanup_code, error_msg)        \
+    do                                                      \
+    {                                                       \
+        if(status != AMD_COMGR_STATUS_SUCCESS)              \
+        {                                                   \
+            const char* statusString;                       \
             amd_comgr_status_string(status, &statusString); \
-            cleanup_code; \
-            Throw<FatalError>(error_msg, statusString); \
-        } \
+            cleanup_code;                                   \
+            Throw<FatalError>(error_msg, statusString);     \
+        }                                                   \
     } while(0)
 
 std::string rocRoller::readMetaDataFromCodeObject(std::string const& fileName)

@@ -144,7 +144,7 @@ namespace rocRoller
             {
                 iot::mapRequired(io, "tag", op.m_tag);
                 iot::mapRequired(io, "dataTag", op.m_data);
-                iot::mapRequired(io, "strides", op.m_strides);
+                //iot::mapRequired(io, "strides", op.m_strides);
 
                 // XXX Put this somewhere that can be re-used by others
                 if(iot::outputting(io))
