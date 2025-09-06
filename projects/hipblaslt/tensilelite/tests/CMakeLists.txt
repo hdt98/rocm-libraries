@@ -30,22 +30,19 @@ target_sources(tensilelite-tests
         "${CMAKE_CURRENT_SOURCE_DIR}/include/RunGEMMKernelTest_impl.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/include/TestData.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/include/TestUtils.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/llvm/LibraryPerformance_test.cpp"
 )
 
 target_include_directories(tensilelite-tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include")
 
-if(HIPBLASLT_ENABLE_LLVM OR HIPBLASLT_ENABLE_MSGPACK)
-    target_sources(tensilelite-tests
-        PRIVATE
-            "${CMAKE_CURRENT_SOURCE_DIR}/RangeLibrary_test.cpp"
-    )
+if(HIPBLASLT_ENABLE_LLVM)
+    target_link_libraries(tensilelite-tests PRIVATE LLVMObjectYAML)
 endif()
 
 target_link_libraries(tensilelite-tests
-    PUBLIC
+    PRIVATE
         tensilelite::tensilelite-host
         Boost::filesystem
-    PRIVATE
         hip::device
 )
 
