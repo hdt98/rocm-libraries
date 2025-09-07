@@ -90,9 +90,8 @@ void rocsolver_syevd_heevd_getMemorySize(rocblas_handle handle,
     if(alg_mode != rocsolver_alg_mode_hybrid || evect == rocblas_evect_original)
     {
         // extra requirements for computing eigenvalues and vectors (stedc)
-        rocsolver_stedc_getMemorySize<BATCHED, T, S>(rocblas_evect_tridiagonal, n, batch_count,
-                                                     &w31, &w22, &w12, size_tmpz, size_splits,
-                                                     size_workArr);
+        rocsolver_stedc_getMemorySize<BATCHED, T, S>(rocblas_evect_tridiagonal, n, batch_count, &w31,
+                                                     &w22, &w12, size_tmpz, size_splits, &unused);
     }
     else
     {
@@ -121,7 +120,9 @@ void rocsolver_syevd_heevd_getMemorySize(rocblas_handle handle,
 
     // size of array of pointers to workspace
     if(BATCHED)
-        *size_workArr = std::max(*size_workArr, 2 * sizeof(T*) * batch_count);
+        *size_workArr = 2 * sizeof(T*) * batch_count;
+    else
+        *size_workArr = 0;
 }
 
 template <bool BATCHED, bool STRIDED, typename T, typename S>
@@ -179,7 +180,7 @@ void rocsolver_syevd_heevd_getMemorySize(rocblas_handle handle,
     {
         // extra requirements for computing eigenvalues and vectors (stedc)
         rocsolver_stedc_getMemorySize<BATCHED, T, S>(rocblas_evect_tridiagonal, n, batch_count,
-                                                     &w31, &w22, &w12, &z1, &s1, size_workArr);
+                                                     &w31, &w22, &w12, &z1, &s1, &unused);
     }
 
     if(evect == rocblas_evect_original)
@@ -206,7 +207,9 @@ void rocsolver_syevd_heevd_getMemorySize(rocblas_handle handle,
 
     // size of array of pointers to workspace
     if(BATCHED)
-        *size_workArr = std::max(*size_workArr, 2 * sizeof(T*) * batch_count);
+        *size_workArr = 2 * sizeof(T*) * batch_count;
+    else
+        *size_workArr = 0;
 }
 
 template <bool BATCHED, bool STRIDED, typename T, typename S, typename W>
