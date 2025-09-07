@@ -413,14 +413,21 @@ namespace TensileLite
                                size_t          MT_N,
                                size_t          MT_K,
                                size_t          element_size,
+                               size_t          cu_per_split,
                                int             WGM)
         {
             // Compute grid dimensions
             int grid_m = static_cast<int>(safe_ceil_div(M, MT_M));
             int grid_n = static_cast<int>(safe_ceil_div(N, MT_N));
 
+            // 256/32 = 8
+            // 256/64 = 4
+            
+            // 32x64 = 8 x 4; 8
+            // 32x32 = 4 x 4; 4
+
             // Distribute CUs per XCD
-            int cu_per_xcd = safe_ceil_div(grid_m * grid_n, hardware.NUM_XCD);
+            int cu_per_xcd = safe_ceil_div(cu_per_split, hardware.NUM_XCD);
 
             // N dimension of mem1 tile is divided by whichever is smaller between WGM and grid
             int l2_n = cu_per_xcd / std::min(WGM, grid_m);
@@ -438,6 +445,14 @@ namespace TensileLite
             // Clamp mem1 tile dimensions to at least 1 and at most grid size
             l2_m = std::max(std::min(grid_m, l2_m), 1);
             l2_n = std::max(std::min(grid_n, l2_n), 1);
+
+            while((l2_m * l2_n) > cu_per_xcd) 
+            {
+                if (l2_m > 1) 
+                    l2_m--;
+                else if (l2_n > 1)
+                    l2_n--;
+            }
 
             // Compute "uncached" reads based on mem1 tile dimensions
             long long l2_A_uncached_reads = static_cast<long long>(l2_m) * MT_M * MT_K;
@@ -479,6 +494,14 @@ namespace TensileLite
                           << "cu_per_xcd:  " << cu_per_xcd << "\n"
                           << "l2_m: " << l2_m << ", l2_n: " << l2_n << ", l2_hit: " << l2_hit
                           << "\n";
+            }
+
+            if(Hardware::is_debug_enabled())
+            {
+                hardware.log_debug("l2_m (L2 Tile M)", l2_m);
+                hardware.log_debug("l2_n (L2 Tile N)", l2_n);
+                hardware.log_debug("cu_per_xcd", cu_per_xcd);
+                hardware.log_debug("L2 WGM", WGM);
             }
 
             return l2_hit;
@@ -534,6 +557,13 @@ namespace TensileLite
 
             double mall_hit = static_cast<double>(cached_reads) / static_cast<double>(total_reads);
 
+            if(Hardware::is_debug_enabled())
+            {
+                hardware.log_debug("mall_m (MALL Tile M)", mall_m);
+                hardware.log_debug("mall_n (MALL Tile N)", mall_n);
+                hardware.log_debug("MALL WGM", WGM);
+            }
+
             return mall_hit;
         }
 
@@ -558,11 +588,11 @@ namespace TensileLite
         {
             // 1) Estimate L2 hit-rate
             double H_mem1
-                = estimate_l2_hit(hardware, M, N, K, batch, MT_M, MT_N, MT_K, element_size_A, WGM);
+                = estimate_l2_hit(hardware, M, N, K, batch, MT_M, MT_N, MT_K, element_size_A, size_t(numActiveCUs/splittingFactor), WGM);
 
             // 2) Estimate mall hit-rate
             double H_mem2
-                = estimate_mall_hit(hardware, M, N, K, batch, MT_M, MT_N, MT_K, /*WGM = */1, numActiveCUs, splittingFactor);
+                = estimate_mall_hit(hardware, M, N, K, batch, MT_M, MT_N, MT_K, WGM, numActiveCUs, splittingFactor);
 
             // 3) Total loads are loads from A and loads from B
             size_t Ld_A_value  = compute_A_loads(MT_M, MT_K, debug);
@@ -606,8 +636,8 @@ namespace TensileLite
             if(numActiveCUs < hardware.N_CU)
             {
                 double min_load
-                    = static_cast<double>(M * MT_K * safe_ceil_div(element_size_A, 8)
-                                          + N * MT_K * safe_ceil_div(element_size_B, 8));
+                    = static_cast<double>(M * MT_K * splittingFactor * safe_ceil_div(element_size_A, 8)
+                                          + N * MT_K * splittingFactor  * safe_ceil_div(element_size_B, 8));
                 Ld_MEM  = std::max(Ld_MEM, min_load) * batch;
                 Ld_mem2 = std::max(Ld_mem2, min_load) * batch;
             }
@@ -674,8 +704,8 @@ namespace TensileLite
 
             if(debug || Hardware::is_debug_enabled())
             {
-                hardware.log_debug("H_mem1 (mem1 hit ratio)", H_mem1);
-                hardware.log_debug("H_mem2 (mem2 hit ratio)", H_mem2);
+                hardware.log_debug("H_mem1 (L2 Tile M)", H_mem1);
+                hardware.log_debug("H_mem2 (L2 Tile N)", H_mem2);
                 hardware.log_debug("Ld_mem1 (bytes)", Ld_mem2);
                 hardware.log_debug("Total Load (bytes)", total_Ld);
                 hardware.log_debug("L_mem_mem1 (cycles)", L_mem_mem1);
@@ -719,7 +749,7 @@ namespace TensileLite
                                     size_t          numActiveCUs,
                                     size_t          splittingFactor,
                                     bool            debug)
-        {
+        {            
             // 1) Compute per-tile latencies
             double L_compute = compute_mt_compute_latency(hardware,
                                                           M,
@@ -776,10 +806,23 @@ namespace TensileLite
             // 4') K-split reductions are globally coherent, we need to write and read split-1 MT_M*MT_N tiles to coherent memory
             if(splittingFactor > 1)
             {
-                size_t n_partials              = splittingFactor - 1;
-                double partial_readwrite_bytes = (2 * numActiveCUs
-                                                  * MT_M * MT_N * safe_ceil_div(element_size_out, 8)
-                                                  * n_partials);
+                size_t n_partials         = splittingFactor - 1;
+
+                // Only the reduction CU reads from all splits.
+                double partial_read_bytes = n_partials * 
+                                            MT_M * MT_N *       
+                                            safe_ceil_div(element_size_out, 8);
+
+                // All CUs write (once for each partial, and once by the reduction CU for the output.)
+                double partial_write_bytes = numActiveCUs
+                                            * MT_M * MT_N * safe_ceil_div(element_size_out, 8);
+
+                double partial_readwrite_bytes = partial_read_bytes + partial_write_bytes;
+
+                // double partial_readwrite_bytes = (2 * numActiveCUs
+                //                                   * MT_M * MT_N * safe_ceil_div(element_size_out, 8)
+                //                                   * n_partials);
+
                 double L_reduce = partial_readwrite_bytes / (hardware.mem3_perf_ratio);
                 L_epilogue += L_reduce * 1;
             }
