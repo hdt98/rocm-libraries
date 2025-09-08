@@ -59,12 +59,6 @@ if(BUILD_CLIENTS_BENCHMARKS OR BUILD_CLIENTS_TESTS)
   endif()
   FetchContent_MakeAvailable(LAPACK)
 
-  if(LAPACK_populated)
-    message(STATUS "Using pre-installed LAPACK")
-  else()
-    message(STATUS "Building LAPACK from source")
-  endif()
-
   if(NOT LAPACK_LIBRARIES)
     set(LAPACK_LIBRARIES
       ${LAPACK_blas_LIBRARIES}
