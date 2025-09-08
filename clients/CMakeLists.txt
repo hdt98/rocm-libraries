@@ -49,7 +49,8 @@ if(BUILD_CLIENTS_BENCHMARKS OR BUILD_CLIENTS_TESTS)
   if (ROCSOLVER_USE_FETCHCONTENT_FOR_LAPACK)
     FetchContent_Declare(LAPACK
       GIT_REPOSITORY https://github.com/Reference-LAPACK/lapack.git
-      GIT_TAG v3.9.1
+      GIT_TAG v3.7.1
+      FIND_PACKAGE_ARGS
     )
     FetchContent_MakeAvailable(LAPACK)
   else()

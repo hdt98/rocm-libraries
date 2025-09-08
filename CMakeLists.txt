@@ -81,6 +81,7 @@ if (ROCSOLVER_USE_FETCHCONTENT_FOR_FMT)
   FetchContent_Declare(fmt
     GIT_REPOSITORY https://github.com/fmtlib/fmt.git
     GIT_TAG 7.1.3
+    FIND_PACKAGE_ARGS
   )
   FetchContent_MakeAvailable(fmt)
 else()

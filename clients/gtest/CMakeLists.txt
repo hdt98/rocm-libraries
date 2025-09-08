@@ -29,6 +29,7 @@ if (ROCSOLVER_USE_FETCHCONTENT_FOR_GTEST)
   FetchContent_Declare(googletest
     GIT_REPOSITORY https://github.com/google/googletest.git
     GIT_TAG release-1.11.0
+    FIND_PACKAGE_ARGS NAMES GTest
   )
   FetchContent_MakeAvailable(googletest)
 else()
@@ -218,7 +219,7 @@ endif()
 
 target_link_libraries(rocsolver-test PRIVATE
   # $<IF:$<TARGET_EXISTS:googletest::gtest>,googletest::gtest,googletest::googletest>
-  gtest_main
+  GTest::gtest_main
   hip::host
   rocsolver-common
   clients-common
