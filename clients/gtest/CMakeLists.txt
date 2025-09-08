@@ -25,12 +25,15 @@
 # SUCH DAMAGE.
 # ##########################################################################
 
-#find_package(GTest REQUIRED)
-FetchContent_Declare(googletest
-  GIT_REPOSITORY https://github.com/google/googletest.git
-  GIT_TAG release-1.11.0
-)
-FetchContent_MakeAvailable(googletest)
+if (ROCSOLVER_USE_FETCHCONTENT_FOR_GTEST)
+  FetchContent_Declare(googletest
+    GIT_REPOSITORY https://github.com/google/googletest.git
+    GIT_TAG release-1.11.0
+  )
+  FetchContent_MakeAvailable(googletest)
+else()
+  find_package(GTest REQUIRED)
+endif()
 
 set(roclapack_test_source
   # linear systems solvers
