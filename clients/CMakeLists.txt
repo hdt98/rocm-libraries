@@ -46,16 +46,16 @@ if(BUILD_CLIENTS_BENCHMARKS OR BUILD_CLIENTS_TESTS)
   # else()
   #   find_package(LAPACK 3.7 REQUIRED)
   # endif()
-  if (ROCSOLVER_USE_FETCHCONTENT_FOR_LAPACK)
-    FetchContent_Declare(LAPACK
-      GIT_REPOSITORY https://github.com/Reference-LAPACK/lapack.git
-      GIT_TAG v3.7.1
-      FIND_PACKAGE_ARGS
-    )
-    FetchContent_MakeAvailable(LAPACK)
-  else()
-    find_package(LAPACK REQUIRED)
-  endif()
+  FetchContent_Declare(LAPACK
+    GIT_REPOSITORY https://github.com/Reference-LAPACK/lapack.git
+    GIT_TAG v3.7.1
+    FIND_PACKAGE_ARGS
+  )
+  FetchContent_MakeAvailable(LAPACK)
+  # if (ROCSOLVER_USE_FETCHCONTENT_FOR_LAPACK)
+  # else()
+  #   find_package(LAPACK REQUIRED)
+  # endif()
 
   if(NOT LAPACK_LIBRARIES)
     set(LAPACK_LIBRARIES
