@@ -62,15 +62,9 @@ option(OPTIMAL "Build specialized kernels for small matrix sizes" ON)
 option(ROCSOLVER_FIND_PACKAGE_LAPACK_CONFIG "Skip module mode search for LAPACK" ON)
 option(ROCSOLVER_USE_INTERNAL_BLAS "Use internal implementation of GEMM and TRSM for debugging." OFF)
 option(ROCSOLVER_USE_REFERENCE_SECULAR_EQUATIONS_SOLVER "Use LAPACK like implementation of secular equations solver" ON)
-# option(ROCSOLVER_USE_FETCHCONTENT_FOR_FMT "Use FetchContent to get fmt library" ON)
-# option(ROCSOLVER_USE_FETCHCONTENT_FOR_LAPACK "Use FetchContent to get LAPACK library" ON)
-# option(ROCSOLVER_USE_FETCHCONTENT_FOR_GTEST "Use FetchContent to get GTest library" ON)
 
 # Include CMake modules
 include(FetchContent)
-# if (ROCSOLVER_USE_FETCHCONTENT_FOR_FMT OR ROCSOLVER_USE_FETCHCONTENT_FOR_GTEST OR ROCSOLVER_USE_FETCHCONTENT_FOR_LAPACK)
-#   include(FetchContent)
-# endif()
 
 # Add our CMake helper files to the lookup path
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
@@ -78,16 +72,14 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
+# Fetch fmt library
+  # Look for a pre-installed version (using find_package), and build from source if not available
 FetchContent_Declare(fmt
   GIT_REPOSITORY https://github.com/fmtlib/fmt.git
   GIT_TAG 7.1.3
   FIND_PACKAGE_ARGS
 )
 FetchContent_MakeAvailable(fmt)
-# if (ROCSOLVER_USE_FETCHCONTENT_FOR_FMT)
-# else()
-#   find_package(fmt REQUIRED)
-# endif()
 
 # ########################################################################
 # Main

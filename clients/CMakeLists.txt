@@ -41,21 +41,14 @@ if(NOT TARGET rocsolver)
 endif()
 
 if(BUILD_CLIENTS_BENCHMARKS OR BUILD_CLIENTS_TESTS)
-  # if(ROCSOLVER_FIND_PACKAGE_LAPACK_CONFIG)
-  #   find_package(LAPACK 3.7 REQUIRED CONFIG)
-  # else()
-  #   find_package(LAPACK 3.7 REQUIRED)
-  # endif()
+  # Fetch LAPACK library
+    # Look for a pre-installed version (using find_package), and build from source if not available
   FetchContent_Declare(LAPACK
     GIT_REPOSITORY https://github.com/Reference-LAPACK/lapack.git
     GIT_TAG v3.7.1
     FIND_PACKAGE_ARGS
   )
   FetchContent_MakeAvailable(LAPACK)
-  # if (ROCSOLVER_USE_FETCHCONTENT_FOR_LAPACK)
-  # else()
-  #   find_package(LAPACK REQUIRED)
-  # endif()
 
   if(NOT LAPACK_LIBRARIES)
     set(LAPACK_LIBRARIES

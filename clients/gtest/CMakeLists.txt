@@ -25,16 +25,15 @@
 # SUCH DAMAGE.
 # ##########################################################################
 
+# Fetch GoogleTest library
+  # Look for a pre-installed version (using find_package), and build from source if not available
+    # find_package searches for GoogleTest under the name GTest
 FetchContent_Declare(googletest
   GIT_REPOSITORY https://github.com/google/googletest.git
   GIT_TAG release-1.11.0
   FIND_PACKAGE_ARGS NAMES GTest
 )
 FetchContent_MakeAvailable(googletest)
-# if (ROCSOLVER_USE_FETCHCONTENT_FOR_GTEST)
-# else()
-#   find_package(GTest REQUIRED)
-# endif()
 
 set(roclapack_test_source
   # linear systems solvers
@@ -218,7 +217,6 @@ if(WIN32)
 endif()
 
 target_link_libraries(rocsolver-test PRIVATE
-  # $<IF:$<TARGET_EXISTS:googletest::gtest>,googletest::gtest,googletest::googletest>
   GTest::gtest_main
   hip::host
   rocsolver-common
