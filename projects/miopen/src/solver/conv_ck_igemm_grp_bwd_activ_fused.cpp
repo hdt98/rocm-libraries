@@ -36,10 +36,6 @@
 #if MIOPEN_BACKEND_HIP && MIOPEN_USE_COMPOSABLEKERNEL
 #include <miopen/solver/implicitgemm_ck_util.hpp>
 #include <miopen/solver/implicitgemm_util.hpp>
-/*
-    The following header needs to be replaced by the new bwd header from CK
-*/
-#include "ck/library/tensor_operation_instance/gpu/grouped_convolution_forward_clamp.hpp"
 #endif
 MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_CONV_CK_IGEMM_GRP_BWD_ACTIV)
 
@@ -211,8 +207,8 @@ struct CKArgs
                                                  rPadding,
                                                  in_element_op_bwd,
                                                  wei_element_op_bwd,
-                                                 clampOp);
-                                                 //split_k
+                                                 clampOp,
+                                                 split_k)
         }
         else
         {
@@ -262,8 +258,8 @@ struct CKArgs
                                                  adjusted_rPadding,
                                                  in_element_op_bwd,
                                                  wei_element_op_bwd,
-                                                 clampOp);
-                                                 //split_k // split_k is needed for bwd make arg pointer function
+                                                 clampOp,
+                                                 split_k);
         }
     }
 
@@ -309,6 +305,7 @@ struct CKArgs
     {
         auto arg_ptr = MakeArgPtr(conv_ptr, nullptr, nullptr, nullptr, 1.0f, 0.0f, split_k);
 
+        // the following check about the workspace may/maynot need. Check with CK for clarification.
         if(CKWrwRequireWorkspace(G, C1, K1, data_type, alpha_beta_case))
         {
             // Creat dummy workspace to pass the ck IsSupportedArgument check.
@@ -641,7 +638,7 @@ bool ConvCKIgemmGrpBwdActivFused::IsApplicable(const FusionContext& ctx,
 #endif
 }
 
-/*
+
 #if MIOPEN_BACKEND_HIP && MIOPEN_USE_COMPOSABLEKERNEL
 template <ck::index_t NDimSpatial, typename DataType>
 ConvSolution
@@ -720,7 +717,7 @@ ConvSolution ConvCKIgemmGrpBwdActivFused::GetSolution(
     return {};
 #endif
 }
-*/
+
 } // namespace fusion
 } // namespace solver
 } // namespace miopen

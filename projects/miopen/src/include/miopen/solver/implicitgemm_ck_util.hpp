@@ -169,8 +169,8 @@ const auto in_element_op_bwd  = InElementOpBwd{};
 const auto wei_element_op_bwd = WeiElementOpBwd{};
 
 /*
-    The following kernel arguments are only for debug purpose and should be replaced once
-    CK added new bwd fused kernels. 
+    The following kernel arguments might be different from the real CK APIs.
+    Please check and do the proper modification 
 */
 template <ck::index_t NumDimSpatial,
           typename InDataType,
@@ -182,7 +182,7 @@ template <ck::index_t NumDimSpatial,
           typename WeiLayout    = ck::tensor_layout::convolution::GKYXC,
           typename OutLayout    = ck::tensor_layout::convolution::NHWGK>
 using DeviceOpGBwdAct =
-    ck::tensor_operation::device::DeviceGroupedConvFwdMultipleABD<NumDimSpatial, // Fwd -> Bwd ???
+    ck::tensor_operation::device::DeviceGroupedConvBwdMultipleABD<NumDimSpatial, // Please check the arguments.
                                                                   InLayout,
                                                                   WeiLayout,
                                                                   ck::Tuple<>, // diff
@@ -317,21 +317,14 @@ using InLayout3dNCHW    = ck::tensor_layout::convolution::NGCDHW;
 using WeiLayout3dNCHW   = ck::tensor_layout::convolution::GKZYXC;
 using OutLayout3dNCHW   = ck::tensor_layout::convolution::NGKDHW;
 
+/*
+
+*/
 template <typename DeviceOpType>
 inline constexpr bool IsConvFusionSplitKNeeded()
-{
-    return std::is_same_v<DeviceOpType, fusion::DeviceOpGBwdActPtrs<2, ck::half_t, InLayout2d, WeiLayout2d, OutLayout2d>> ||
-           std::is_same_v<DeviceOpType, fusion::DeviceOpGBwdActPtrs<2, float, InLayout2d, WeiLayout2d, OutLayout2d>> ||
-           std::is_same_v<DeviceOpType, fusion::DeviceOpGBwdActPtrs<2, ck::bhalf_t, InLayout2d, WeiLayout2d, OutLayout2d>> ||
-           std::is_same_v<DeviceOpType, fusion::DeviceOpGBwdActPtrs<3, ck::half_t, InLayout3d, WeiLayout3d, OutLayout3d>> ||
-           std::is_same_v<DeviceOpType, fusion::DeviceOpGBwdActPtrs<3, float, InLayout3d, WeiLayout3d, OutLayout3d>> ||
-           std::is_same_v<DeviceOpType, fusion::DeviceOpGBwdActPtrs<3, ck::bhalf_t, InLayout3d, WeiLayout3d, OutLayout3d>> ||
-           std::is_same_v<DeviceOpType, fusion::DeviceOpGBwdActPtrs<2, ck::half_t, InLayout2dNCHW, WeiLayout2dNCHW, OutLayout2dNCHW>> ||
-           std::is_same_v<DeviceOpType, fusion::DeviceOpGBwdActPtrs<2, float, InLayout2dNCHW, WeiLayout2dNCHW, OutLayout2dNCHW>> ||
-           std::is_same_v<DeviceOpType, fusion::DeviceOpGBwdActPtrs<2, ck::bhalf_t, InLayout2dNCHW, WeiLayout2dNCHW, OutLayout2dNCHW>> ||
-           std::is_same_v<DeviceOpType, fusion::DeviceOpGBwdActPtrs<3, ck::half_t, InLayout3dNCHW, WeiLayout3dNCHW, OutLayout3dNCHW>> ||
-           std::is_same_v<DeviceOpType, fusion::DeviceOpGBwdActPtrs<3, float, InLayout3dNCHW, WeiLayout3dNCHW, OutLayout3dNCHW>> ||
-           std::is_same_v<DeviceOpType, fusion::DeviceOpGBwdActPtrs<3, ck::bhalf_t, InLayout3dNCHW, WeiLayout3dNCHW, OutLayout3dNCHW>>;
+{  
+    // need to add the conditions when the real bwd kernels and apis are ready.
+    return false;
 }
 #endif
 
