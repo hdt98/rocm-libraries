@@ -50,7 +50,7 @@ std::size_t GetGetitemWorkspaceSize(const Handle& handle,
     return pair_size_vector.empty() ? static_cast<size_t>(0) : pair_size_vector.front().second;
 }
 
-miopenStatus_t GetitemBackward(Handle& handle,
+miopenStatus_t GetitemBackward(const Handle& handle,
                                Data_t workspace,
                                size_t workspaceSizeInBytes,
                                const TensorDescriptor& dyDesc,

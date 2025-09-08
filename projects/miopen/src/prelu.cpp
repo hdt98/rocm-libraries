@@ -48,7 +48,7 @@ size_t GetPReLUBackwardWorkspaceSize(const Handle& handle,
     return pair_size_vector.empty() ? static_cast<size_t>(-1) : pair_size_vector.front().second;
 }
 
-miopenStatus_t PReLUBackward(Handle& handle,
+miopenStatus_t PReLUBackward(const Handle& handle,
                              Data_t workspace,
                              size_t workspaceSizeInBytes,
                              const TensorDescriptor& inputDesc,

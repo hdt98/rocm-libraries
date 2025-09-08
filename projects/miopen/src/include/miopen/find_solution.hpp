@@ -451,7 +451,7 @@ struct SolverContainer
     }
 
     template <class Problem>
-    void ExecutePrimitive(ExecutionContext& ctx,
+    void ExecutePrimitive(const ExecutionContext& ctx,
                           const Problem& problem,
                           const AlgorithmName& algo,
                           const AnyInvokeParams& invoke_params) const
@@ -465,7 +465,8 @@ struct SolverContainer
             return;
         }
 
-        const auto slns = SearchForSolutions(ctx, problem, 1, invoke_params);
+	auto ctx_cpy = ctx;
+        const auto slns = SearchForSolutions(ctx_cpy, problem, 1, invoke_params);
 
         if(slns.empty())
             MIOPEN_THROW(miopenStatusNotImplemented, "No solver found.");
@@ -480,7 +481,7 @@ struct SolverContainer
     }
 
     template <class Problem>
-    void ExecutePrimitive(Handle& handle,
+    void ExecutePrimitive(const Handle& handle,
                           const Problem& problem,
                           const AlgorithmName& algo,
                           const AnyInvokeParams& invoke_params) const

@@ -34,7 +34,7 @@
 
 namespace miopen {
 
-miopenStatus_t LayerNormForward(Handle& handle,
+miopenStatus_t LayerNormForward(const Handle& handle,
                                 const TensorDescriptor& xDesc,
                                 ConstData_t x,
                                 const TensorDescriptor& weightDesc,
@@ -105,7 +105,7 @@ std::size_t GetLayerNormBackwardWorkspaceSize(const Handle& handle,
     return pair_size_vector.empty() ? static_cast<size_t>(0) : pair_size_vector.front().second;
 }
 
-miopenStatus_t LayerNormBackward(Handle& handle,
+miopenStatus_t LayerNormBackward(const Handle& handle,
                                  Data_t workspace,
                                  size_t workspaceSizeInBytes,
                                  const TensorDescriptor& dyDesc,
