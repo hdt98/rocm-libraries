@@ -25,7 +25,12 @@
 # SUCH DAMAGE.
 # ##########################################################################
 
-find_package(GTest REQUIRED)
+#find_package(GTest REQUIRED)
+FetchContent_Declare(googletest
+  GIT_REPOSITORY https://github.com/google/googletest.git
+  GIT_TAG release-1.11.0
+)
+FetchContent_MakeAvailable(googletest)
 
 set(roclapack_test_source
   # linear systems solvers
@@ -209,7 +214,8 @@ if(WIN32)
 endif()
 
 target_link_libraries(rocsolver-test PRIVATE
-  $<IF:$<TARGET_EXISTS:GTest::gtest>,GTest::gtest,GTest::GTest>
+  # $<IF:$<TARGET_EXISTS:googletest::gtest>,googletest::gtest,googletest::googletest>
+  gtest_main
   hip::host
   rocsolver-common
   clients-common
