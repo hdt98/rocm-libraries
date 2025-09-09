@@ -202,10 +202,10 @@ const std::vector<std::unique_ptr<ISolversFinder>>& GetConvSolverFinders()
 {
     static const auto finders = []() {
         auto tmp = std::vector<std::unique_ptr<ISolversFinder>>{};
-        tmp.emplace_back(std::make_unique<WinogradSolverFinder>());
-        tmp.emplace_back(std::make_unique<DirectSolverFinder>());
         tmp.emplace_back(std::make_unique<ImplicitGemmSolverFinder>());
         tmp.emplace_back(std::make_unique<GemmSolverFinder>());
+        tmp.emplace_back(std::make_unique<WinogradSolverFinder>());
+        tmp.emplace_back(std::make_unique<DirectSolverFinder>());
         tmp.emplace_back(std::make_unique<FftSolverFinder>());
         return tmp;
     }();

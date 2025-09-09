@@ -1046,7 +1046,7 @@ miopenStatus_t FusionPlanDescriptor::Compile(const Handle& handle)
             const auto id = solver::Id{sol->solution_id};
 
             GetAllFusionSolvers().FindById(id, [&](auto solver) {
-                auto ctx      = FusionContext{handle};
+                auto ctx            = FusionContext{handle};
                 auto db_getter      = MakeConvDbGetter(ctx);
                 const auto solution = solver::FindSolution(
                     solver, ctx, fusion_problem, db_getter, {}); // auto tune is not expected here

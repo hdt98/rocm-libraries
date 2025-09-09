@@ -596,8 +596,9 @@ auto GenericSearch(const Solver s,
                 // If config is worse than the cutoff time abort the search
                 if(elapsed_time > context.generic_search_cutoff_time)
                 {
-                    MIOPEN_LOG_I2("Ending Search, measured time: " << elapsed_time << " was greater than cutoff: "
-                                                   << context.generic_search_cutoff_time);
+                    MIOPEN_LOG_I2("Ending Search, measured time: "
+                                  << elapsed_time << " was greater than cutoff: "
+                                  << context.generic_search_cutoff_time);
                     perf_cutoff = true;
                     for(const auto& kernelInfo : current_solution.construction_params)
                         profile_h.ClearProgram(kernelInfo.kernel_file, kernelInfo.comp_options);
@@ -707,12 +708,12 @@ auto GenericSearch(const Solver s,
     if(context.search_cutoff && !perf_cutoff)
     {
         // cutoff based on worst performing config
-        float new_cutoff = (perf_sols.end()-1)->time * 1.1f;
+        float new_cutoff = (perf_sols.end() - 1)->time * 1.1f;
         if(new_cutoff > 0.0f && new_cutoff < context.generic_search_cutoff_time)
-	{
+        {
             context_.generic_search_cutoff_time = new_cutoff;
             MIOPEN_LOG_I2("Cutoff time updated: " << new_cutoff);
-	}
+        }
     }
 
     if(perf_solsp)

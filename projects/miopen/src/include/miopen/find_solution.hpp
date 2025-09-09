@@ -465,7 +465,7 @@ struct SolverContainer
             return;
         }
 
-        auto ctx_cpy = ctx;
+        auto ctx_cpy    = ctx;
         const auto slns = SearchForSolutions(ctx_cpy, problem, 1, invoke_params);
 
         if(slns.empty())
