@@ -2350,26 +2350,6 @@ namespace TensileLite
                                              size_t                    hipHostMemorySize,
                                              hipStream_t               stream) const
     {
-        // Since we now use universal args, we block globalSplitU here if using UserArgs
-        if((sizeMapping.globalSplitU > 1 || sizeMapping.globalSplitU == -1)
-           && sizeMapping.globalAccumulation != 3)
-        {
-            KernelInvocation dummyrv;
-            dummyrv.kernelName = "";
-
-            dummyrv.args = KernelArguments(false);
-
-            dummyrv.workGroupSize.x = 1;
-            dummyrv.workGroupSize.y = 1;
-            dummyrv.workGroupSize.z = 1;
-
-            dummyrv.numWorkItems.x = 1;
-            dummyrv.numWorkItems.y = 1;
-            dummyrv.numWorkItems.z = 1;
-
-            dummyrv.sharedMemBytes = 0;
-            return {dummyrv};
-        }
         if(auto groupedProblem = dynamic_cast<ContractionProblemGroupedGemm const*>(&problem))
         {
             auto& gemms         = groupedProblem->gemms;

@@ -263,7 +263,9 @@ class ProblemType:
 
         rv.f32XdlMathOp = DataType(d['F32XdlMathOp']) if 'F32XdlMathOp' in d else DataType(0)
 
-        rv.supportDeviceUserArguments = False
+        #Some logic yamls didn't set SupportUserArgs.
+        #Set supportDeviceUserArguments as True if SupportUserArgs is unset.
+        rv.supportDeviceUserArguments = True
         if 'SupportUserArgs' in d:
             rv.supportDeviceUserArguments = d['SupportUserArgs']
 
@@ -385,7 +387,6 @@ class ProblemType:
             predicates.append(ProblemPredicate("UseScaleAlphaVec", value=self.useScaleAlphaVec))
             predicates.append(ProblemPredicate("Sparse", value=self.sparse))
             predicates.append(ProblemPredicate("F32XdlMathOp", value=self.f32XdlMathOp))
-            predicates.append(ProblemPredicate("SupportDeviceUserArguments", value=self.supportDeviceUserArguments))
             predicates.append(ProblemPredicate("SwizzleTensorA", value=self.swizzleTensorA))
             predicates.append(ProblemPredicate("SwizzleTensorB", value=self.swizzleTensorB))
 
@@ -545,6 +546,18 @@ class ProblemPredicate(Properties.Predicate):
             rv += [cls('GroupedGemm', value=False)]
         else:
             rv += [cls('GroupedGemm', value=True)]
+
+        if ('SupportUserArgs' in state['ProblemType']) and (state['ProblemType']['SupportUserArgs']):
+            if (('GlobalSplitU' in state) and (state['GlobalSplitU'] > 1 or state['GlobalSplitU'] == -1)) and \
+                (('_GlobalAccumulation' in state) and (state['_GlobalAccumulation'] == 'MultipleBuffer')):
+                #TODO: support Device user Arguement by MultipleBuffer GSU
+                #Only modify SupportDeviceUserArguments predicate for MB GSU!=1 solution,
+                #since MB GSU=1 and MB GSU!=1 share the same kernel.
+                rv += [cls('SupportDeviceUserArguments', value=False)]
+            else:
+                rv += [cls('SupportDeviceUserArguments', value=True)]
+        else:
+                rv += [cls('SupportDeviceUserArguments', value=False)]
 
         return rv
 
