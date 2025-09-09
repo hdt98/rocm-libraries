@@ -139,6 +139,9 @@
 #cmakedefine CK_USE_NATIVE_MX_SUPPORT @CK_USE_NATIVE_MX_SUPPORT@
 #endif
 
+#ifndef CK_USE_WCNN
+#cmakedefine CK_USE_WCNN @CK_USE_WCNN@
+#endif
 // clang-format on
 
 #endif // CK_CONFIG_H_IN

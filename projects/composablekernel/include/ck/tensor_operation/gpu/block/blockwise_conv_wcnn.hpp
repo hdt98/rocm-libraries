@@ -635,10 +635,11 @@ struct BlockwiseConvWcnn
         static_assert(ThisThreadBlock::GetNumOfThread() == HWaves * WWaves * KWaves * WaveSize,
                       "ThisThreadBlock::GetNumOfThread() != MWaves * NWaves * WaveSize\n");
 
-        static_assert(HPerBlock % (HPerWcnn * HRepeat) == 0 &&
-                          WPerBlock % (WPerWcnn * WRepeat) == 0 &&
-                          KPerBlock % (KPerWcnn * KRepeat) == 0,
-                      "wrong!");
+        static_assert(HPerBlock % (HPerWcnn * HRepeat) == 0, "wrong!");
+
+        static_assert(WPerBlock % (WPerWcnn * WRepeat) == 0, "wrong!");
+
+        static_assert(KPerBlock % (KPerWcnn * KRepeat) == 0, "wrong!");
 
         static_assert(!(Transposed && (FilterSize != 2)),
                       "Only support strided conv2x2 transpose conv");

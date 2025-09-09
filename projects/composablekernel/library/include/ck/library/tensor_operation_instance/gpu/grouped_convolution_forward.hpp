@@ -26,6 +26,9 @@
 #ifdef CK_USE_WMMA
 #include "grouped_convolution_forward_wmma.inc"
 #endif
+#ifdef CK_USE_WCNN
+#include "grouped_convolution_forward_wcnn.inc"
+#endif
 
 namespace ck {
 namespace tensor_operation {
@@ -76,7 +79,6 @@ struct DeviceOperationInstanceFactory<ck::tensor_operation::device::DeviceGroupe
     static auto GetInstances()
     {
         std::vector<std::unique_ptr<DeviceOp>> op_ptrs;
-
 #ifdef DL_KERNELS
         if constexpr(NumDimSpatial == 2 && is_same_v<InLayout, GNHWC> &&
                      is_same_v<WeiLayout, GKYXC> && is_same_v<OutLayout, GNHWK>)
@@ -717,6 +719,19 @@ struct DeviceOperationInstanceFactory<ck::tensor_operation::device::DeviceGroupe
         }
 #endif // CK_USE_WMMA
 
+#ifdef CK_USE_WCNN
+        if constexpr(NumDimSpatial == 2 && is_same_v<InLayout, GNHWC> &&
+                     is_same_v<WeiLayout, GKYXC> && is_same_v<OutLayout, GNHWK>)
+        {
+            if constexpr(is_same_v<InDataType, half_t> && is_same_v<WeiDataType, half_t> &&
+                         is_same_v<OutDataType, half_t> && is_same_v<AComputeType, half_t> &&
+                         is_same_v<BComputeType, half_t>)
+            {
+                add_device_grouped_conv2d_fwd_wcnn_gnhwc_gkyxc_gnhwk_f16_1x1_instances(op_ptrs);
+                add_device_grouped_conv2d_fwd_wcnn_gnhwc_gkyxc_gnhwk_f16_3x3_instances(op_ptrs);
+            }
+        }
+#endif
         return op_ptrs;
     }
 };
