@@ -32,6 +32,24 @@
         }
       },
       {
+        "name": "custom",
+        "displayName": "CustomTensile",
+        "description": "Configures just tensilelite host and client",
+        "inherits": "opt-rocm",
+        "cacheVariables": {
+          "HIPBLASLT_BUILD_TESTING": "OFF",
+          "HIPBLASLT_ENABLE_CLIENT": "OFF",
+          "HIPBLASLT_ENABLE_DEVICE": "OFF",
+          "HIPBLASLT_ENABLE_HOST": "OFF",
+          "HIPBLASLT_ENABLE_MSGPACK": "ON",
+          "HIPBLASLT_ENABLE_LLVM": "ON",
+          "TENSILELITE_ENABLE_CLIENT": "OFF",
+          "TENSILELITE_BUILD_TESTING": "OFF",
+          "TENSILELITE_ENABLE_AUTOBUILD": "ON",
+          "HIPBLASLT_ENABLE_ROCROLLER": "OFF"
+        }
+      },
+      {
         "name": "rocisa",
         "displayName": "rocisa",
         "description": "Configures just rocisa",
