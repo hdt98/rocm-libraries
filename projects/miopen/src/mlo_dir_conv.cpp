@@ -252,7 +252,7 @@ AllDirectForwardBackwardDataWorkspaceSize(const miopen::ExecutionContext& ctx,
 }
 
 std::vector<std::pair<std::string, size_t>>
-FindAllWinogradWorkspaceSizes(miopen::ExecutionContext& ctx,
+FindAllWinogradWorkspaceSizes(const miopen::ExecutionContext& ctx,
                               const miopen::conv::ProblemDescription& problem)
 {
     return GetWindogradSolvers().GetWorkspaceSizes(ctx, problem);
@@ -266,7 +266,7 @@ FindWinogradWrWWorkspaceSizes(const miopen::ExecutionContext& ctx,
 }
 
 std::vector<std::pair<std::string, size_t>>
-FindAllImplicitGemmWorkspaceSizes(miopen::ExecutionContext& ctx,
+FindAllImplicitGemmWorkspaceSizes(const miopen::ExecutionContext& ctx,
                                   const miopen::conv::ProblemDescription& problem)
 {
     return GetImplicitGemmSolvers().GetWorkspaceSizes(ctx, problem);

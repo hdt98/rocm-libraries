@@ -172,7 +172,7 @@ std::vector<Solution> EvaluateInvokers(const Handle& handle,
                                        bool force_attach_binary);
 
 FindCoreResult FindCore(const AnyInvokeParams& invoke_ctx,
-                        const ExecutionContext& ctx,
+                        ExecutionContext& ctx,
                         const ProblemDescriptionBase& problem,
                         const PrimitiveFindParameters& parameters,
                         const std::vector<std::unique_ptr<ISolversFinder>>& finders,

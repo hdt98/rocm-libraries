@@ -867,7 +867,7 @@ static const std::vector<std::unique_ptr<ISolversFinder>>& GetFusionSolverFinder
 }
 
 static std::vector<Solution>
-FindFusion(const ExecutionContext& ctx,
+FindFusion(ExecutionContext& ctx,
            const FusionDescription& fusion_problem,
            const std::function<fusion::FusionInvokeParams()>& invoke_params,
            const std::optional<FindOptions>& options = std::nullopt)

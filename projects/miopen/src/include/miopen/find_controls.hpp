@@ -88,7 +88,8 @@ public:
     {
         return IsEnabled(context) && (action == FindEnforceAction::Search ||
                                       action == FindEnforceAction::SearchDbUpdate ||
-                                      action == FindEnforceAction::DbUpdate);
+                                      action == FindEnforceAction::DbUpdate ||
+                                      action == FindEnforceAction::SearchCutoffDbUpdate);
     }
 
     template <class Context>
@@ -101,7 +102,8 @@ public:
     bool IsDbUpdate(const Context& context) const
     {
         return IsEnabled(context) && (action == FindEnforceAction::DbUpdate ||
-                                      action == FindEnforceAction::SearchDbUpdate);
+                                      action == FindEnforceAction::SearchDbUpdate ||
+                                      action == FindEnforceAction::SearchCutoffDbUpdate);
     }
 
     template <class Context>

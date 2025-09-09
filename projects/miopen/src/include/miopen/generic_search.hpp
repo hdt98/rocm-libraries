@@ -482,6 +482,7 @@ auto GenericSearch(const Solver s,
     float worst_time = std::numeric_limits<float>::max();
     size_t n_failed  = 0;
     size_t n_best    = 0;
+    bool perf_cutoff = false;
     HeartBeat<PerformanceConfig> heartbeat;
     heartbeat.Start();
 
@@ -592,14 +593,17 @@ auto GenericSearch(const Solver s,
 
             if(ret == 0)
             {
-                // If 1st probe of 1st successful config is worse than the cutoff time abort the
-                // search
-                if(perf_sols.empty() && elapsed_time > context.generic_search_cutoff_time)
+                // If config is worse than the cutoff time abort the search
+                if(elapsed_time > context.generic_search_cutoff_time)
                 {
-                    MIOPEN_LOG_E("Measured time: " << elapsed_time << " was greater than cutoff: "
-                                                   << context.generic_search_cutoff_time
-                                                   << " aborting search...");
-                    return current_config;
+                    MIOPEN_LOG_I2("Ending Search, measured time: " << elapsed_time << " was greater than cutoff: "
+                                                   << context.generic_search_cutoff_time);
+                    perf_cutoff = true;
+                    for(const auto& kernelInfo : current_solution.construction_params)
+                        profile_h.ClearProgram(kernelInfo.kernel_file, kernelInfo.comp_options);
+                    if(perf_sols.empty())
+                        best_config = current_config;
+                    break;
                 }
 
                 // Smooth the jitter of measurements:
@@ -700,11 +704,15 @@ auto GenericSearch(const Solver s,
     });
 
     // if using cutoff time for search and new cutoff is shorter, update
-    if(context.search_cutoff)
+    if(context.search_cutoff && !perf_cutoff)
     {
-        float new_cutoff = perf_sols.end()->time * 2;
-        if(new_cutoff < context.generic_search_cutoff_time)
+        // cutoff based on worst performing config
+        float new_cutoff = (perf_sols.end()-1)->time * 1.1f;
+        if(new_cutoff > 0.0f && new_cutoff < context.generic_search_cutoff_time)
+	{
             context_.generic_search_cutoff_time = new_cutoff;
+            MIOPEN_LOG_I2("Cutoff time updated: " << new_cutoff);
+	}
     }
 
     if(perf_solsp)
