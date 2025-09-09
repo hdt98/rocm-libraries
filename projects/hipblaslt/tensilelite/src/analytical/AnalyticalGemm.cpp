@@ -1050,7 +1050,37 @@ namespace TensileLite
             // TODO These are quantifying effects that don't work in the current math.
             // TODO THESE SHOULD BE TEMPORARY FIXES AND BE MORE SOLIDLY INTEGRATED LATER
             bool heuristics = Hardware::is_heuristics_enabled();
-            if(heuristics)
+
+            // Heuristics for TF32
+            bool tf32_emu = ((miDataType == DataType::XFloat32)
+                            && (hardware.arch == Hardware::Architecture::gfx950));
+            if(tf32_emu && heuristics)
+            {
+                // The kernel for this is more optimized (Custom kernel)
+                if((!transA && transB) && MT_M == 256 && MT_N == 256 && MT_K == 32)
+                {
+                    total_latency = total_latency * 0.8;
+                }
+
+                if((!transA && !transB) && MT_M == 256 && MT_N == 256 && MT_K == 32)
+                {
+                    total_latency = total_latency * 0.8;
+                }
+
+                if((transA && !transB) && MT_M == 256 && MT_N == 256 && MT_K == 32)
+                {
+                    total_latency = total_latency * 0.8;
+                }
+
+                // Bias large DU where K-dimension is large and M and N are small.
+                if((K >= (M * 16) && K >= (N * 16)) && (MT_K >= 128))
+                {
+                    total_latency = total_latency * 0.5;
+                }
+
+            }
+
+            if(heuristics && !tf32_emu)
             {
                 // Pick perfect "stationary style" tiles more often
                 if(M == MT_M || N == MT_N || K == MT_K)
@@ -1190,18 +1220,6 @@ namespace TensileLite
                     if(MT_M == M || MT_K == K)
                     {
                         total_latency = total_latency * 0.8;
-                    }
-                }
-
-                // Heuristics for TF32
-                bool tf32_emu = ((miDataType == DataType::XFloat32)
-                             && (hardware.arch == Hardware::Architecture::gfx950));
-                if(tf32_emu)
-                {
-                    // The kernel for this is more optimized (Custom kernel)
-                    if(!transA && transB && MT_M == 256 && MT_N == 256 && MT_K == 32)
-                    {
-                        total_latency = total_latency * 0.3;
                     }
                 }
 
