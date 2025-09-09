@@ -180,7 +180,7 @@ int main(int argc, char* argv[])
     pass &= run_test<ck::half_t,  ck::half_t,  ck::half_t,  ck::half_t >();
     //# wmma_op crash on gfx12 CI for unknown reason. it looks it is a regression in clang,
     // disable it temporarily
-    //pass &= run_test<ck::bhalf_t, ck::bhalf_t, ck::bhalf_t, float      >();
+    pass &= run_test<ck::bhalf_t, ck::bhalf_t, ck::bhalf_t, float      >();
     pass &= run_test<int8_t,      int8_t,      int32_t,     int32_t    >();
     // the below are gfx13 only
     //               |SrcAType    |SrcBType,     |DstType     |GPUAccType  |CPUAccType      |KMultiplier
