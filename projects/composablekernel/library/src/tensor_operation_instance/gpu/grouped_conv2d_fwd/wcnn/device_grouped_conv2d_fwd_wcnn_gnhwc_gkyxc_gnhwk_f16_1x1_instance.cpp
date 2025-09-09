@@ -23,32 +23,15 @@ void add_device_grouped_conv2d_fwd_wcnn_gnhwc_gkyxc_gnhwk_f16_1x1_instances(
                                                                 PassThrough,
                                                                 PassThrough>>>& instances)
 {
-    add_device_operation_instances(
-        instances,
-        device_grouped_conv_fwd_wcnn_f16_1x1_instances<2,
-                                                       GNHWC,
-                                                       GKYXC,
-                                                       Empty_Tuple,
-                                                       GNHWK,
-                                                       Empty_Tuple,
-                                                       PassThrough,
-                                                       false, // wavegroup
-                                                       0,     // clustersize
-                                                       ConvFwd1x1P0>{});
-
-#if 0
     add_device_operation_instances(instances,
                                    device_grouped_conv_fwd_wcnn_f16_1x1_instances<2,
-                                                                                GNHWC,
-                                                                                GKYXC,
-                                                                                Empty_Tuple,
-                                                                                GNHWK,
-                                                                                Empty_Tuple,
-                                                                                PassThrough,
-                                                                                true,
-                                                                                0,
-                                                                                ConvFwd1x1P0>{});
-#endif
+                                                                                  GNHWC,
+                                                                                  GKYXC,
+                                                                                  Empty_Tuple,
+                                                                                  GNHWK,
+                                                                                  Empty_Tuple,
+                                                                                  PassThrough,
+                                                                                  ConvFwd1x1P0>{});
 }
 
 } // namespace instance

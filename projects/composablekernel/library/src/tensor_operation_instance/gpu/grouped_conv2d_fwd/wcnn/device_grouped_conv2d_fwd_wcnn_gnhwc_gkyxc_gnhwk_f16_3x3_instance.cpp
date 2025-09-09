@@ -23,31 +23,15 @@ void add_device_grouped_conv2d_fwd_wcnn_gnhwc_gkyxc_gnhwk_f16_3x3_instances(
                                                                 PassThrough,
                                                                 PassThrough>>>& instances)
 {
-    add_device_operation_instances(
-        instances,
-        device_grouped_conv_fwd_wcnn_f16_3x3_instances<2,
-                                                       GNHWC,
-                                                       GKYXC,
-                                                       Empty_Tuple,
-                                                       GNHWK,
-                                                       Empty_Tuple,
-                                                       PassThrough,
-                                                       false, // EnableWaveGroup
-                                                       0,     // ClusterSize
-                                                       ConvFwd3x3P0>{});
-#if 0 // Need to enable this when build wavegroup case successfully
     add_device_operation_instances(instances,
                                    device_grouped_conv_fwd_wcnn_f16_3x3_instances<2,
-                                                                                GNHWC,
-                                                                                GKYXC,
-                                                                                Empty_Tuple,
-                                                                                GNHWK,
-                                                                                Empty_Tuple,
-                                                                                PassThrough,
-                                                                                true, //EnableWaveGroup
-                                                                                0, //ClusterSize
-                                                                                ConvFwd3x3P0>{});
-#endif
+                                                                                  GNHWC,
+                                                                                  GKYXC,
+                                                                                  Empty_Tuple,
+                                                                                  GNHWK,
+                                                                                  Empty_Tuple,
+                                                                                  PassThrough,
+                                                                                  ConvFwd3x3P0>{});
 }
 
 } // namespace instance

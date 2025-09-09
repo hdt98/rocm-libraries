@@ -1058,11 +1058,10 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
             }
         }
 
-        bool validresult = GridwiseGemm::CheckValidity(arg.a_grid_desc_,
-                                                       arg.b_grid_desc_k0_n_k1_,
-                                                       arg.c_grid_desc_m_n_,
-                                                       arg.block_2_ctile_map_);
-        return validresult;
+        return GridwiseGemm::CheckValidity(arg.a_grid_desc_,
+                                           arg.b_grid_desc_k0_n_k1_,
+                                           arg.c_grid_desc_m_n_,
+                                           arg.block_2_ctile_map_);
     }
 
     // polymorphic
