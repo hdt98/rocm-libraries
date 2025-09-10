@@ -172,7 +172,7 @@ extern const int BDSQR_ITERS_PER_SYNC;
     \details When a m-by-n matrix A is passed to GESVD, if m >= THIN_SVD_SWITCH*n or
     n >= THIN_SVD_SWITCH*m, then the thin SVD is computed.*/
 #ifndef THIN_SVD_SWITCH
-#define THIN_SVD_SWITCH 1.6
+extern const double THIN_SVD_SWITCH;
 #endif
 
 /******************* sytd2/sytrd and hetd2/hetrd *******************************
@@ -181,22 +181,15 @@ extern const int BDSQR_ITERS_PER_SYNC;
     when using the blocked algorithm (SYTRD/HETRD). It also applies to the
     corresponding batched and strided-batched routines.*/
 #ifndef xxTRD_BLOCKSIZE
-#define xxTRD_BLOCKSIZE 64
+extern const int xxTRD_BLOCKSIZE;
 #endif
 
-/*! \brief Determines the size at which rocSOLVER switches from
-    the unblocked to the blocked algorithm when executing SYTRD/HETRD. It also applies to the
-    corresponding batched and strided-batched routines.
-
-    \details SYTRD/HETRD will use LATRD to reduce blocks of xxTRD_BLOCKSIZE rows and columns at a time until
-    the rest of the matrix has no more than xxTRD_xxTD2_SWITCHSIZE rows or columns; at this point the last block,
-    if any, will be reduced with the unblocked algorithm (SYTD2/HETD2).*/
 #ifndef xxTRD_xxTD2_SWITCHSIZE
-#define xxTRD_xxTD2_SWITCHSIZE 256
+extern const int xxTRD_xxTD2_SWITCHSIZE;
 #endif
 
 #ifndef xxTD2_SSKER_MAX_N
-#define xxTD2_SSKER_MAX_N 192
+extern const int xxTD2_SSKER_MAX_N;
 #endif
 
 /***************** sygs2/sygst and hegs2/hegst ********************************
@@ -209,7 +202,7 @@ extern const int BDSQR_ITERS_PER_SYNC;
     SYGST/HEGST will directly call the unblocked routines (SYGS2/HEGS2). However, when n is not a
     multiple of xxGST_BLOCKSIZE, the last block reduced in the blocked process is allowed to be smaller than xxGST_BLOCKSIZE.*/
 #ifndef xxGST_BLOCKSIZE
-#define xxGST_BLOCKSIZE 64
+extern const int xxGST_BLOCKSIZE;
 #endif
 
 /****************************** stedc ******************************************
@@ -220,13 +213,11 @@ extern const int BDSQR_ITERS_PER_SYNC;
     \details If the size of the block is smaller than STEDC_MIN_DC_SIZE (bs < STEDC_MIN_DC_SIZE),
     the eigenvectors are computed with the normal QR algorithm. */
 #ifndef STEDC_MIN_DC_SIZE
-#define STEDC_MIN_DC_SIZE 16
+extern const int STEDC_MIN_DC_SIZE;
 #endif
 
-/*! \brief Determines the number of split blocks (independent blocks) of a tridiagonal matrix that
-    are analyzed in parallel with the divide & conquer method. */
 #ifndef STEDC_NUM_SPLIT_BLKS
-#define STEDC_NUM_SPLIT_BLKS 8
+extern const int STEDC_NUM_SPLIT_BLKS;
 #endif
 
 /************************** potf2/potrf ***************************************
@@ -267,7 +258,7 @@ extern const int BDSQR_ITERS_PER_SYNC;
     \details If the size of the matrix is not greater than SYEVJ_BLOCKED_SWITCH, the eigenvalues
     and eigenvectors will be computed with a single kernel call. */
 #ifndef SYEVJ_BLOCKED_SWITCH
-#define SYEVJ_BLOCKED_SWITCH 58
+extern const int SYEVJ_BLOCKED_SWITCH;
 #endif
 
 /*************************** sytf2/sytrf **************************************
@@ -276,7 +267,7 @@ extern const int BDSQR_ITERS_PER_SYNC;
     when using the blocked algorithm (SYTRF). It also applies to the
     corresponding batched and strided-batched routines.*/
 #ifndef SYTRF_BLOCKSIZE
-#define SYTRF_BLOCKSIZE 64
+extern const int SYTRF_BLOCKSIZE;
 #endif
 
 /*! \brief Determines the size at which rocSOLVER switches from
@@ -287,7 +278,7 @@ extern const int BDSQR_ITERS_PER_SYNC;
     the rest of the matrix has no more than SYTRF_SYTF2_SWITCHSIZE columns; at this point the last block,
     if any, will be factorized with the unblocked algorithm (SYTF2).*/
 #ifndef SYTRF_SYTF2_SWITCHSIZE
-#define SYTRF_SYTF2_SWITCHSIZE 128
+extern const int SYTRF_SYTF2_SWITCHSIZE;
 #endif
 
 /****************************** syevdj ******************************************
@@ -297,7 +288,7 @@ extern const int BDSQR_ITERS_PER_SYNC;
     \details If the size of the block is smaller than SYEVDJ_MIN_DC_SIZE,
     the eigenvectors are computed with the normal Jacobi algorithm. */
 #ifndef SYEVDJ_MIN_DC_SIZE
-#define SYEVDJ_MIN_DC_SIZE 16
+extern const int SYEVDJ_MIN_DC_SIZE;
 #endif
 
 /****************************** syevdx ******************************************
@@ -307,29 +298,29 @@ extern const int BDSQR_ITERS_PER_SYNC;
     \details If the size of the block is smaller than SYEVDX_MIN_DC_SIZE,
     the eigenvectors are computed with the normal inverse iteration algorithm. */
 #ifndef SYEVDX_MIN_DC_SIZE
-#define SYEVDX_MIN_DC_SIZE 16
+extern const int SYEVDX_MIN_DC_SIZE;
 #endif
 
 /**************************** getf2/getfr *************************************
 *******************************************************************************/
 #ifndef GETF2_SPKER_MAX_M
-#define GETF2_SPKER_MAX_M 1024 //always <= 1024
+extern const int GETF2_SPKER_MAX_M;
 #endif
 #ifndef GETF2_SPKER_MAX_N
-#define GETF2_SPKER_MAX_N 256 //always <= 256
+extern const int GETF2_SPKER_MAX_N;
 #endif
 #ifndef GETF2_SSKER_MAX_M
-#define GETF2_SSKER_MAX_M 512 //always <= 512 and <= GETF2_SPKER_MAX_M
+extern const int GETF2_SSKER_MAX_M;
 #endif
 #ifndef GETF2_SSKER_MAX_N
-#define GETF2_SSKER_MAX_N 64 //always <= wavefront and <= GETF2_SPKER_MAX_N
+extern const int GETF2_SSKER_MAX_N;
 #endif
 #ifndef GETF2_OPTIM_NGRP
 #define GETF2_OPTIM_NGRP \
     16, 15, 8, 8, 8, 8, 8, 8, 6, 6, 4, 4, 4, 4, 4, 4, 3, 3, 3, 3, 3, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2
 #endif
 #ifndef GETRF_NUM_INTERVALS_REAL
-#define GETRF_NUM_INTERVALS_REAL 4
+extern const int GETRF_NUM_INTERVALS_REAL;
 #endif
 #ifndef GETRF_INTERVALS_REAL
 #define GETRF_INTERVALS_REAL 64, 512, 1856, 2944
@@ -338,7 +329,7 @@ extern const int BDSQR_ITERS_PER_SYNC;
 #define GETRF_BLKSIZES_REAL 0, 1, 32, 256, 512
 #endif
 #ifndef GETRF_BATCH_NUM_INTERVALS_REAL
-#define GETRF_BATCH_NUM_INTERVALS_REAL 9
+extern const int GETRF_BATCH_NUM_INTERVALS_REAL;
 #endif
 #ifndef GETRF_BATCH_INTERVALS_REAL
 #define GETRF_BATCH_INTERVALS_REAL 40, 42, 46, 49, 52, 58, 112, 800, 1024
@@ -347,7 +338,7 @@ extern const int BDSQR_ITERS_PER_SYNC;
 #define GETRF_BATCH_BLKSIZES_REAL 0, 32, 0, 16, 0, 32, 1, 32, 64, 160
 #endif
 #ifndef GETRF_NPVT_NUM_INTERVALS_REAL
-#define GETRF_NPVT_NUM_INTERVALS_REAL 2
+extern const int GETRF_NPVT_NUM_INTERVALS_REAL;
 #endif
 #ifndef GETRF_NPVT_INTERVALS_REAL
 #define GETRF_NPVT_INTERVALS_REAL 64, 512
@@ -356,7 +347,7 @@ extern const int BDSQR_ITERS_PER_SYNC;
 #define GETRF_NPVT_BLKSIZES_REAL 0, -1, 512
 #endif
 #ifndef GETRF_NPVT_BATCH_NUM_INTERVALS_REAL
-#define GETRF_NPVT_BATCH_NUM_INTERVALS_REAL 6
+extern const int GETRF_NPVT_BATCH_NUM_INTERVALS_REAL;
 #endif
 #ifndef GETRF_NPVT_BATCH_INTERVALS_REAL
 #define GETRF_NPVT_BATCH_INTERVALS_REAL 40, 168, 448, 512, 896, 1408
@@ -366,7 +357,7 @@ extern const int BDSQR_ITERS_PER_SYNC;
 #endif
 
 #ifndef GETRF_NUM_INTERVALS_COMPLEX
-#define GETRF_NUM_INTERVALS_COMPLEX 4
+extern const int GETRF_NUM_INTERVALS_COMPLEX;
 #endif
 #ifndef GETRF_INTERVALS_COMPLEX
 #define GETRF_INTERVALS_COMPLEX 64, 512, 1024, 2944
@@ -375,7 +366,7 @@ extern const int BDSQR_ITERS_PER_SYNC;
 #define GETRF_BLKSIZES_COMPLEX 0, 1, 32, 96, 512
 #endif
 #ifndef GETRF_BATCH_NUM_INTERVALS_COMPLEX
-#define GETRF_BATCH_NUM_INTERVALS_COMPLEX 10
+extern const int GETRF_BATCH_NUM_INTERVALS_COMPLEX;
 #endif
 #ifndef GETRF_BATCH_INTERVALS_COMPLEX
 #define GETRF_BATCH_INTERVALS_COMPLEX 23, 28, 30, 32, 40, 48, 56, 64, 768, 1024
@@ -384,7 +375,7 @@ extern const int BDSQR_ITERS_PER_SYNC;
 #define GETRF_BATCH_BLKSIZES_COMPLEX 0, 16, 0, 1, 24, 16, 24, 16, 48, 64, 160
 #endif
 #ifndef GETRF_NPVT_NUM_INTERVALS_COMPLEX
-#define GETRF_NPVT_NUM_INTERVALS_COMPLEX 2
+extern const int GETRF_NPVT_NUM_INTERVALS_COMPLEX;
 #endif
 #ifndef GETRF_NPVT_INTERVALS_COMPLEX
 #define GETRF_NPVT_INTERVALS_COMPLEX 64, 512
@@ -393,7 +384,7 @@ extern const int BDSQR_ITERS_PER_SYNC;
 #define GETRF_NPVT_BLKSIZES_COMPLEX 0, -1, 512
 #endif
 #ifndef GETRF_NPVT_BATCH_NUM_INTERVALS_COMPLEX
-#define GETRF_NPVT_BATCH_NUM_INTERVALS_COMPLEX 5
+extern const int GETRF_NPVT_BATCH_NUM_INTERVALS_COMPLEX;
 #endif
 #ifndef GETRF_NPVT_BATCH_INTERVALS_COMPLEX
 #define GETRF_NPVT_BATCH_INTERVALS_COMPLEX 20, 32, 42, 512, 1408
@@ -405,25 +396,25 @@ extern const int BDSQR_ITERS_PER_SYNC;
 /****************************** getri *****************************************
 *******************************************************************************/
 #ifndef GETRI_MAX_COLS
-#define GETRI_MAX_COLS 64 //always <= wavefront size
+extern const int GETRI_MAX_COLS; //always <= wavefront size
 #endif
 #ifndef GETRI_TINY_SIZE
-#define GETRI_TINY_SIZE 43
+extern const int GETRI_TINY_SIZE;
 #endif
 #ifndef GETRI_NUM_INTERVALS
-#define GETRI_NUM_INTERVALS 1
+extern const int GETRI_NUM_INTERVALS;
 #endif
 #ifndef GETRI_INTERVALS
-#define GETRI_INTERVALS 1185
+extern const int GETRI_INTERVALS;
 #endif
 #ifndef GETRI_BLKSIZES
 #define GETRI_BLKSIZES 0, 256
 #endif
 #ifndef GETRI_BATCH_TINY_SIZE
-#define GETRI_BATCH_TINY_SIZE 35
+extern const int GETRI_BATCH_TINY_SIZE;
 #endif
 #ifndef GETRI_BATCH_NUM_INTERVALS
-#define GETRI_BATCH_NUM_INTERVALS 2
+extern const int GETRI_BATCH_NUM_INTERVALS;
 #endif
 #ifndef GETRI_BATCH_INTERVALS
 #define GETRI_BATCH_INTERVALS 505, 2049
@@ -435,19 +426,19 @@ extern const int BDSQR_ITERS_PER_SYNC;
 /***************************** trtri ******************************************
 *******************************************************************************/
 #ifndef TRTRI_MAX_COLS
-#define TRTRI_MAX_COLS 64 //always <= wavefront size
+extern const int TRTRI_MAX_COLS;
 #endif
 #ifndef TRTRI_NUM_INTERVALS
-#define TRTRI_NUM_INTERVALS 1
+extern const int TRTRI_NUM_INTERVALS;
 #endif
 #ifndef TRTRI_INTERVALS
-#define TRTRI_INTERVALS 0
+extern const int TRTRI_INTERVALS;
 #endif
 #ifndef TRTRI_BLKSIZES
 #define TRTRI_BLKSIZES 0, 0
 #endif
 #ifndef TRTRI_BATCH_NUM_INTERVALS
-#define TRTRI_BATCH_NUM_INTERVALS 3
+extern const int TRTRI_BATCH_NUM_INTERVALS;
 #endif
 #ifndef TRTRI_BATCH_INTERVALS
 #define TRTRI_BATCH_INTERVALS 32, 245, 1009
@@ -462,5 +453,5 @@ extern const int BDSQR_ITERS_PER_SYNC;
     the kernel using a single thread block or using faster algorithm using rocPRIM */
 
 #ifndef SPLITLU_SWITCH_SIZE
-#define SPLITLU_SWITCH_SIZE 64
+extern const int SPLITLU_SWITCH_SIZE;
 #endif
