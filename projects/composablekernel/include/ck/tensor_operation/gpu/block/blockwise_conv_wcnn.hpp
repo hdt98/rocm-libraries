@@ -1650,6 +1650,7 @@ struct BlockwiseConvWcnn
                                                   LaneShareData& dataFromNext,
                                                   WaveGroupSemaphores& semFromNext)
     {
+#if defined(__gfx13__)
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wold-style-cast"
         auto* pSemPrev = (__attribute__((address_space(3))) WavegroupSemaphore<0>*)(&semFromPrev);
@@ -1727,6 +1728,16 @@ struct BlockwiseConvWcnn
                 });
             });
         });
+#else
+        ignore = in_grid_desc;
+        ignore = indata_block_buf;
+        ignore = prev_block_buf;
+        ignore = next_block_buf;
+        ignore = dataFromPrev;
+        ignore = semFromPrev;
+        ignore = dataFromNext;
+        ignore = semFromNext;
+#endif
     };
 
     protected:

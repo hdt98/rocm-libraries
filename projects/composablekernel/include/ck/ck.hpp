@@ -281,12 +281,14 @@
 // set flag to 1 to build deprecated instances
 #define CK_BUILD_DEPRECATED 1
 
+#if defined(__gfx13__)
 #define __exp_amd_wavegroup_kernel(num_wavegroups, wave_size, block_x, block_y, block_z) \
     __attribute__((amdgpu_wavegroup_kernel(num_wavegroups, wave_size, block_x, block_y, block_z)))
 
 #define __exp_amd_no_rank_specialization__ __attribute__((amdgpu_no_rank_specialization))
 
 #define __exp_amd_laneshared__ __attribute__((exp_amd_laneshared))
+#endif
 
 namespace ck {
 

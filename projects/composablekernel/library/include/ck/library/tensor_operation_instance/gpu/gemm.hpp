@@ -186,25 +186,51 @@ struct DeviceOperationInstanceFactory<
         if constexpr(is_same_v<ADataType, half_t> && is_same_v<BDataType, half_t> &&
                      is_same_v<CDataType, half_t>)
         {
-            if constexpr(is_same_v<ALayout, Row> && is_same_v<BLayout, Row> &&
-                         is_same_v<CLayout, Row>)
+            if(ck::is_gfx13_supported())
             {
-                add_device_gemm_wmma_f16_f16_f16_mk_kn_mn_instances(op_ptrs);
+                if constexpr(is_same_v<ALayout, Row> && is_same_v<BLayout, Row> &&
+                             is_same_v<CLayout, Row>)
+                {
+                    add_device_gemm_wmma_f16_f16_f16_mk_kn_mn_gfx13_instances(op_ptrs);
+                }
+                else if constexpr(is_same_v<ALayout, Row> && is_same_v<BLayout, Col> &&
+                                  is_same_v<CLayout, Row>)
+                {
+                    add_device_gemm_wmma_f16_f16_f16_mk_nk_mn_gfx13_instances(op_ptrs);
+                }
+                else if constexpr(is_same_v<ALayout, Col> && is_same_v<BLayout, Row> &&
+                                  is_same_v<CLayout, Row>)
+                {
+                    add_device_gemm_wmma_f16_f16_f16_km_kn_mn_gfx13_instances(op_ptrs);
+                }
+                else if constexpr(is_same_v<ALayout, Col> && is_same_v<BLayout, Col> &&
+                                  is_same_v<CLayout, Row>)
+                {
+                    add_device_gemm_wmma_f16_f16_f16_km_nk_mn_gfx13_instances(op_ptrs);
+                }
             }
-            else if constexpr(is_same_v<ALayout, Row> && is_same_v<BLayout, Col> &&
-                              is_same_v<CLayout, Row>)
+            else
             {
-                add_device_gemm_wmma_f16_f16_f16_mk_nk_mn_instances(op_ptrs);
-            }
-            else if constexpr(is_same_v<ALayout, Col> && is_same_v<BLayout, Row> &&
-                              is_same_v<CLayout, Row>)
-            {
-                add_device_gemm_wmma_f16_f16_f16_km_kn_mn_instances(op_ptrs);
-            }
-            else if constexpr(is_same_v<ALayout, Col> && is_same_v<BLayout, Col> &&
-                              is_same_v<CLayout, Row>)
-            {
-                add_device_gemm_wmma_f16_f16_f16_km_nk_mn_instances(op_ptrs);
+                if constexpr(is_same_v<ALayout, Row> && is_same_v<BLayout, Row> &&
+                             is_same_v<CLayout, Row>)
+                {
+                    add_device_gemm_wmma_f16_f16_f16_mk_kn_mn_instances(op_ptrs);
+                }
+                else if constexpr(is_same_v<ALayout, Row> && is_same_v<BLayout, Col> &&
+                                  is_same_v<CLayout, Row>)
+                {
+                    add_device_gemm_wmma_f16_f16_f16_mk_nk_mn_instances(op_ptrs);
+                }
+                else if constexpr(is_same_v<ALayout, Col> && is_same_v<BLayout, Row> &&
+                                  is_same_v<CLayout, Row>)
+                {
+                    add_device_gemm_wmma_f16_f16_f16_km_kn_mn_instances(op_ptrs);
+                }
+                else if constexpr(is_same_v<ALayout, Col> && is_same_v<BLayout, Col> &&
+                                  is_same_v<CLayout, Row>)
+                {
+                    add_device_gemm_wmma_f16_f16_f16_km_nk_mn_instances(op_ptrs);
+                }
             }
         }
 #endif

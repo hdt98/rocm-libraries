@@ -87,6 +87,7 @@ struct GridwiseConvPipeline_v2
                                OutThreadBuffer& out_thread_buf,
                                index_t num_loop)
     {
+#if defined(__gfx13__)
         constexpr auto wei_block_copy_step = to_multi_index(WeiDataBlockTransferStep{});
         constexpr auto in_block_copy_step  = to_multi_index(InDataBlockTransferStep{});
 
@@ -524,6 +525,34 @@ struct GridwiseConvPipeline_v2
                                    Number<true>{});
             }
         }
+#else
+        ignore = in_grid_desc;
+        ignore = in_block_desc;
+        ignore = in_cluster_border_desc;
+        ignore = in_blockwise_copy;
+        ignore = in_grid_buf;
+        ignore = in_block_buf;
+        ignore = prev_block_buf;
+        ignore = pre_cluster_buf;
+        ignore = pre_blockwise_copy;
+        ignore = next_block_buf;
+        ignore = next_cluster_buf;
+        ignore = next_blockwise_copy;
+        ignore = wei_grid_desc;
+        ignore = wei_block_desc;
+        ignore = wei_blockwise_copy;
+        ignore = wei_grid_buf;
+        ignore = wei_block_buf;
+        ignore = ds_grid_desc;
+        ignore = ds_block_desc;
+        ignore = ds_blockwise_copy;
+        ignore = ds_grid_buf;
+        ignore = ds_block_buf;
+        ignore = blockwise_conv;
+        ignore = accum_thread_buf;
+        ignore = out_thread_buf;
+        ignore = num_loop;
+#endif
     }
 };
 
@@ -594,6 +623,7 @@ struct GridwiseConvPipeline_v2<1, false, false, false, EnableAsync, EnableSpatia
                                OutThreadBuffer& out_thread_buf,
                                index_t num_loop)
     {
+#if defined(__gfx13__)
         constexpr auto wei_block_copy_step = to_multi_index(WeiDataBlockTransferStep{});
         constexpr auto in_block_copy_step  = to_multi_index(InDataBlockTransferStep{});
 
@@ -876,6 +906,34 @@ struct GridwiseConvPipeline_v2<1, false, false, false, EnableAsync, EnableSpatia
                                    Number<true>{});
             }
         }
+#else
+        ignore = in_grid_desc;
+        ignore = in_block_desc;
+        ignore = in_cluster_border_desc;
+        ignore = in_blockwise_copy;
+        ignore = in_grid_buf;
+        ignore = in_block_buf;
+        ignore = prev_block_buf;
+        ignore = pre_cluster_buf;
+        ignore = pre_blockwise_copy;
+        ignore = next_block_buf;
+        ignore = next_cluster_buf;
+        ignore = next_blockwise_copy;
+        ignore = wei_grid_desc;
+        ignore = wei_block_desc;
+        ignore = wei_blockwise_copy;
+        ignore = wei_grid_buf;
+        ignore = wei_block_buf;
+        ignore = ds_grid_desc;
+        ignore = ds_block_desc;
+        ignore = ds_blockwise_copy;
+        ignore = ds_grid_buf;
+        ignore = ds_block_buf;
+        ignore = blockwise_conv;
+        ignore = accum_thread_buf;
+        ignore = out_thread_buf;
+        ignore = num_loop;
+#endif
     }
 };
 
@@ -946,6 +1004,7 @@ struct GridwiseConvPipeline_v2<1, true, true, true, EnableAsync, EnableSpatialCl
                                OutThreadBuffer& out_thread_buf,
                                index_t num_loop)
     {
+#if defined(__gfx13__)
         constexpr auto wei_block_copy_step = to_multi_index(WeiDataBlockTransferStep{});
         constexpr auto in_block_copy_step  = to_multi_index(InDataBlockTransferStep{});
 
@@ -1174,6 +1233,34 @@ struct GridwiseConvPipeline_v2<1, true, true, true, EnableAsync, EnableSpatialCl
                                    Number<true>{});
             }
         }
+#else
+        ignore = in_grid_desc;
+        ignore = in_block_desc;
+        ignore = in_cluster_border_desc;
+        ignore = in_blockwise_copy;
+        ignore = in_grid_buf;
+        ignore = in_block_buf;
+        ignore = prev_block_buf;
+        ignore = pre_cluster_buf;
+        ignore = pre_blockwise_copy;
+        ignore = next_block_buf;
+        ignore = next_cluster_buf;
+        ignore = next_blockwise_copy;
+        ignore = wei_grid_desc;
+        ignore = wei_block_desc;
+        ignore = wei_blockwise_copy;
+        ignore = wei_grid_buf;
+        ignore = wei_block_buf;
+        ignore = ds_grid_desc;
+        ignore = ds_block_desc;
+        ignore = ds_blockwise_copy;
+        ignore = ds_grid_buf;
+        ignore = ds_block_buf;
+        ignore = blockwise_conv;
+        ignore = accum_thread_buf;
+        ignore = out_thread_buf;
+        ignore = num_loop;
+#endif
     }
 };
 
