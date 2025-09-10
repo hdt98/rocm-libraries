@@ -244,18 +244,9 @@ if(HIPBLASLT_ENABLE_HOST)
         target_compile_definitions(hipblaslt PUBLIC LEGACY_HIPBLAS_DIRECT)
     endif()
 
-<<<<<<< HEAD
     target_compile_definitions(hipblaslt PRIVATE
         ROCBLASLT_TENSILE_LAZY_LOAD=$<BOOL:${HIPBLASLT_ENABLE_LAZY_LOAD}>
     )
-=======
-    if(HIPBLASLT_ENABLE_LAZY_LOAD)
-        target_compile_definitions(hipblaslt
-            PRIVATE
-                ROCBLASLT_TENSILE_LAZY_LOAD=$<BOOL:${HIPBLASLT_ENABLE_LAZY_LOAD}>
-        )
-    endif()
->>>>>>> Clean up build system options related to device-library
 
     if(HIPBLASLT_ENABLE_MARKER)
         target_compile_definitions(hipblaslt PRIVATE HIPBLASLT_ENABLE_MARKER)
