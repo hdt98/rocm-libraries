@@ -191,12 +191,10 @@ class StreamK(Component):
 
         # Check for parallel reduction
         # Paralell reduction stores to SrdD in split format, fixup happens in post kernel
+        # Alpha/Beta will be applied in post kernel if necessary
         skSplitSrd = Label("SK_SplitSrd", "")
         module.add(SCmpEQU64(src0=sgpr("AddressFlags", 2), src1=hex(0), comment="Check for synchronizer"))
         module.add(SCBranchSCC0(labelName=skSplitSrd.getLabelName(), comment="Skip this block if using single-kernel stream-k fixup"))
-        # Alpha/Beta will be applied in post kernel if necessary
-        # module.add(SMovB32(dst=sgpr("Alpha"), src=1.0, comment="For parallel reduction, alpha applied in post kernel"))
-        # module.add(SMovB32(dst=sgpr("Beta"), src=0.0, comment="For parallel reduction, beta applied in post kernel"))
 
         indices = list(range(0, kernel["ProblemType"]["NumIndicesC"]))
         numDim = len(indices)
@@ -337,16 +335,11 @@ class StreamK(Component):
         skStoreLabel = Label(label=writer.labels.getNameInc("SK_Store"), comment="")
 
         # StreamK store branches
-        # if we're doing parallel reduction, jump to global write
-        # module.add(SCmpEQU64(src0=sgpr("AddressFlags", 2), src1=hex(0), comment="Check for synchronizer"))
-        # module.add(SCBranchSCC1(labelName=skStoreLabel.getLabelName(), comment="Branch if using parallel reduction, go to regular store code"))
-
         tmpSgpr = writer.sgprPool.checkOut(4, "globalWriteElements", preventOverflow=False)
         # if we did not start the tile, store partials
         # branch to beta == 0 store path
         module.add(SCmpEQU32(src0=sgpr("StreamKLocalStart"), src1=0, comment="does wg start tile?"))
         module.add(writer.longBranchScc0(skPartialsLabel, posNeg=1))
-        # module.add(SCBranchSCC0(labelName=skPartialsLabel.getLabelName(), comment="Branch if not start tile, store partials"))
 
         if kernel["DebugStreamK"] & 1 == 0:
             # if we started and finished the tile, regular store code
@@ -777,8 +770,6 @@ class StreamK(Component):
         for elementIdx in range(len(batchElements)):
             for vi in range(gwvw):
                 sumIdxV = ss.elementSumIdx[elementIdx] + vi
-                # TODO STREAM-K is start value needed now?
-                # TODO KUPO!!!!!!!!!!!!!!!!
                 # newSumIdxV = sumIdxV - writer.states.c.startVgprValu
                 # covers sgemm, gemm_ex(HHS/HSS/BBS/BSS (HPA=T)), int8 (int8x4?)
                 if kernel["ProblemType"]["ComputeDataType"].isInt32() or kernel["ProblemType"]["ComputeDataType"].isSingle():
@@ -794,14 +785,6 @@ class StreamK(Component):
 
         module.addComment1("apply mask, calc new C and issue writes")
 
-        # if kernel["ProblemType"]["DestDataType"].isBFloat16() and kernel["ProblemType"]["HighPrecisionAccumulate"]:
-        #     vgprBf16Temp = tmpCVTVgpr
-        #     vgprBf16Mask = vgprBf16Temp + 1
-        #     vgprFp32Nan = vgprBf16Temp + 2
-        #     vgprBf16Inc = vgprBf16Temp + 3
-        #     kStr += inst("v_mov_b32", vgpr(vgprBf16Mask), "0xffff0000", comment="mask for pack two bfloat16 element to 32bit" )
-        #     kStr += inst("v_mov_b32", vgpr(vgprFp32Nan), "0x7fff0000", comment="fp32 Nan" )
-        #     kStr += inst("v_mov_b32", vgpr(vgprBf16Inc), "0x7fff", comment="rounding bias for bfloat16" )
         if kernel["ProblemType"]["DestDataType"].isBFloat16() and kernel["ProblemType"]["HighPrecisionAccumulate"]:
             module.add(VMovB32(vgpr(cvtVgprStruct.vgprBf16Mask), "0xffff0000", comment="mask for pack two bfloat16 element to 32bit" ))
             module.add(VMovB32(vgpr(cvtVgprStruct.vgprFp32Nan), "0x7fff0000", comment="fp32 Nan" ))
@@ -842,14 +825,6 @@ class StreamK(Component):
                 increment = (kernel["WavefrontSize"] * WaveNum) * storeWidth * writer.states.bpeCinternal
                 # module.addComment1("WavefrontSize={}, WaveNum={}, storeWidth={}, bpeC={}".format(kernel["WavefrontSize"], WaveNum, storeWidth, writer.states.bpeCinternal))
                 module.add(SAddU32(dst=sgpr(tmpS01), src0=sgpr(tmpS01), src1=increment, comment="Inc sgpr offset"))
-
-            # TODO StreamK need this packing code???
-            # if self.asmCaps["HasWMMA"] and kernel["EnableMatrixInstructionStore"] and kernel["ProblemType"]["DestDataType"].isHalf() and (not kernel["ProblemType"]["HighPrecisionAccumulate"]):
-            #     for vi in range(0, gwvw):
-            #         sumIdxV = ss.elementSumIdx[elementIdx] + vi
-            #         if vi%2 == 1:
-            #             d = ss.elementSumIdx[elementIdx] + vi//2
-            #             kStr += inst("v_pack_b32_f16", vgpr(d), vgpr("ValuC+%u"%(sumIdxV-1)), vgpr("ValuC+%u"%sumIdxV), "Pack with neighbor" )
 
             # if not kernel["StoreRemapVectorWidth"]:
             tmpStoreCode = writer.addStore(kernel, ss, 'WS', addrCalc, sumIdx, tmpS01, edge, wsOffset=sgpr(tmpS01))
@@ -1278,14 +1253,6 @@ class StreamK(Component):
 
         module.addComment1("apply mask, calc new C and issue writes")
 
-        # if kernel["ProblemType"]["DestDataType"].isBFloat16() and kernel["ProblemType"]["HighPrecisionAccumulate"]:
-        #     vgprBf16Temp = tmpCVTVgpr
-        #     vgprBf16Mask = vgprBf16Temp + 1
-        #     vgprFp32Nan = vgprBf16Temp + 2
-        #     vgprBf16Inc = vgprBf16Temp + 3
-        #     kStr += inst("v_mov_b32", vgpr(vgprBf16Mask), "0xffff0000", comment="mask for pack two bfloat16 element to 32bit" )
-        #     kStr += inst("v_mov_b32", vgpr(vgprFp32Nan), "0x7fff0000", comment="fp32 Nan" )
-        #     kStr += inst("v_mov_b32", vgpr(vgprBf16Inc), "0x7fff", comment="rounding bias for bfloat16" )
         if kernel["ProblemType"]["DestDataType"].isBFloat16() and kernel["ProblemType"]["HighPrecisionAccumulate"]:
             module.add(VMovB32(vgpr(cvtVgprStruct.vgprBf16Mask), "0xffff0000", comment="mask for pack two bfloat16 element to 32bit" ))
             module.add(VMovB32(vgpr(cvtVgprStruct.vgprFp32Nan), "0x7fff0000", comment="fp32 Nan" ))
@@ -1463,54 +1430,6 @@ class StreamK(Component):
             if not kernel["MIArchVgpr"]:
                 module.add(SNop(1, "2 wait states required before reading vgpr"))
 
-        # if self.db["CheckStoreC"]>=0:
-        #     useBuffer = kernel["BufferStore"]
-        #     # Note - CheckStoreC won't work for EDGE store cases since they load 0 for OOB, would need more sophisticated check
-        #     # Note - TODO- CheckStoreC also won't work for StoreRemap
-        #     kStr += inst("s_waitcnt", "vmcnt(0)", "CheckStoreC, wait for stores to complete" )
-        #     if self.archCaps["SeparateVscnt"]:
-        #         kStr += inst("s_waitcnt_vscnt", -2, "0", "writes")
-        #     for elementIdx in range(0, len(batchElements)):
-        #         addr = ss.elementAddr[elementIdx].addrDVgpr
-        #         sumIdx = ss.elementSumIdx[elementIdx]
-
-        #         bps = kernel["ProblemType"]["DestDataType"].numBytes() * gwvw
-        #         if kernel["BufferStore"]:
-        #             addr0 = vgpr(addr)
-        #             addr1 = sgpr("SrdC", 4)
-        #         else:
-        #             addr0 = vgpr(addr,2)
-        #             addr1 = ""
-
-        #         if kernel["ProblemType"]["DestDataType"].isHalf() or kernel["ProblemType"]["DestDataType"].isBFloat16():
-        #             if not kernel["ProblemType"]["HighPrecisionAccumulate"]:
-        #                 kStr += self.chooseGlobalRead(useBuffer, bps, sumIdx//2, \
-        #                                     addr0, addr1, soffset=0, offset=0, extraFields="", dtlNoDestVgpr=False, hi16=sumIdx%2).toStr()
-        #             else:
-        #                 kStr += self.chooseGlobalRead(useBuffer, bps, sumIdx, \
-        #                                     addr0, addr1, soffset=0, offset=0, extraFields="", dtlNoDestVgpr=False, hi16=0).toStr()
-        #         elif kernel["ProblemType"]["DestDataType"].isInt32() or kernel["ProblemType"]["DestDataType"].isSingle():
-        #             kStr += self.chooseGlobalRead(useBuffer, bps, sumIdx, \
-        #                                 addr0, addr1, soffset=0, offset=0, extraFields="", dtlNoDestVgpr=False).toStr()
-        #         elif kernel["ProblemType"]["DestDataType"].isDouble() or kernel["ProblemType"]["DestDataType"].isSingleComplex() :
-        #             kStr += self.chooseGlobalRead(useBuffer, bps, sumIdx*2, \
-        #                                 addr0, addr1, soffset=0, offset=0, extraFields="", dtlNoDestVgpr=False).toStr()
-        #         elif kernel["ProblemType"]["DestDataType"].isDoubleComplex():
-        #             kStr += self.chooseGlobalRead(useBuffer, bps, sumIdx*4, \
-        #                                 addr0, addr1, soffset=0, offset=0, extraFields="", dtlNoDestVgpr=False).toStr()
-        #     kStr += inst("s_waitcnt", "vmcnt(0)", "CheckStoreC, wait for stores to complete" )
-        #     if self.archCaps["SeparateVscnt"]:
-        #         kStr += inst("s_waitcnt_vscnt", -2, "0", "writes")
-
-        #     # Add checks for expected values:
-        #     kStr += inst("s_mov_b32", sgpr(tmpS01), self.db["CheckStoreC"], "expected value")
-        #     for elementIdx in range(0, len(batchElements)):
-        #         sumIdx = ss.elementSumIdx[elementIdx]
-        #         # Need to fix for other types:
-        #         assert (kernel["ProblemType"]["DestDataType"].isSingle() or kernel["ProblemType"]["DestDataType"].isInt32())
-        #         kStr += self.assert_eq(vgpr(sumIdx), sgpr(tmpS01))
-
-
         if edge and (not kernel["BufferStore"]): # atomic or
             # subsequent batch must start with full exec mask
             # BufferStore doesn't need exec since it used buffer range checking when
@@ -1647,14 +1566,10 @@ class StreamKBasic(StreamK):
 
         # StreamK workgroup mapping
         sTmp = writer.sgprPool.checkOutAligned(4, 2, "SKMappingTemp", preventOverflow=False)
-
         module.add(self.skTileIndex(writer, kernel, sTmp, tPA, tPB))
-
         # Increment StreamK iteration
         module.add(SMovB32(dst=sgpr("StreamKIter"), src=sgpr(sTmp+2), comment="Increment StreamK Iteration"))
-
         module.add(self.skIndexToWG(writer, kernel, sTmp))
-
         writer.sgprPool.checkIn(sTmp)
 
         return module
@@ -1877,26 +1792,6 @@ class StreamKTwoTileDPFirst(StreamK):
         # Done init
         module.add(SBranch(labelName=skInitDone.getLabelName(), comment="Done init for parallel reduction"))
 
-        # # Save PratialIdx for later, skExtraIters is unused for partial reduction
-        # module.add(SMovB32(dst=sgpr("skExtraIters"), src=sgpr(stmpPartialIdx), comment="Save partial idx for SrdD calculation"))
-        # # StreamKIter = tile * itersPerTile + itersPerWG * partialIndex
-        # module.add(SMulI32(dst=sgpr("StreamKIter"), src0=sgpr(stmpTileIdx), src1=sgpr("ItersPerTile"), comment="Tile offset = tilesIdx * itersPerTile"))
-        # module.add(SMulI32(dst=sgpr(stmpPartialIdx), src0=sgpr("SKItersPerWG"), src1=sgpr(stmpPartialIdx), comment="Offset within tile = itersPerWG * partialIdx"))
-        # module.add(SAddU32(dst=sgpr("StreamKIter"), src0=sgpr("StreamKIter"), src1=sgpr(stmpPartialIdx), comment="StreamKIter = tileIdx * itersPerTile + partialIdx * itersPerWG"))
-        # # if itersPerWG * partialIndex > itersPerTile jump to end
-        # module.add(SCmpLtU32(src0=sgpr(stmpPartialIdx), src1=sgpr("ItersPerTile"), comment="Make sure there's work to do"))
-        # module.add(writer.longBranchScc0(Label("KernelEnd", ""), posNeg=1))
-        # # StreamKIterEnd = StreamKIter + itersPerWG
-        # module.add(SAddU32(dst=sgpr("StreamKIterEnd"), src0=sgpr("StreamKIter"), src1=sgpr("SKItersPerWG"), comment="StreamKIterEnd = StreamKIter + itersPerWG"))
-        # # tileEnd = (tile + 1) * itersPerTile
-        # module.add(SAddU32(dst=sgpr(stmpTileIdx), src0=sgpr(stmpTileIdx), src1=1, comment="Find end of tile"))
-        # module.add(SMulI32(dst=sgpr(stmpTileIdx), src0=sgpr(stmpTileIdx), src1=sgpr("ItersPerTile"), comment="Find end of tile"))
-        # # StreamKIterEnd = min(StreamKIterEnd, tileEnd)
-        # # TODO SMin instruciton
-        # module.add(SCmpLtU32(src0=sgpr("StreamKIterEnd"), src1=sgpr(stmpTileIdx), comment="StreamKIterEnd = min(StreamKIterEnd, tileEnd)"))
-        # module.add(SCSelectB32(dst=sgpr("StreamKIterEnd"), src0=sgpr("StreamKIterEnd"), src1=sgpr(stmpTileIdx), comment="Set start iter"))
-        # # Done init
-        # module.add(SBranch(labelName=skInitDone.getLabelName(), comment="Done init for parallel reduction"))
         module.add(skSplitInit)
         writer.sgprPool.checkIn(stmpPartialIdx)
         writer.sgprPool.checkIn(stmpTileIdx)
