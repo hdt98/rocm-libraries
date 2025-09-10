@@ -100,7 +100,7 @@ function(fetch_dep method repo_name repo_path download_branch)
     message(STATUS "Searching for ${repo_name} package")
 
     # Add default install location for WIN32 and non-WIN32 as hint
-    find_package(${repo_name} ${MIN_ROCPRIM_PACKAGE_VERSION} CONFIG QUIET PATHS "${ROCM_ROOT}/lib/cmake/rocprim")
+    find_package(${repo_name} ${MIN_ROCPRIM_PACKAGE_VERSION} CONFIG QUIET PATHS "${ROCM_ROOT_DIR}/lib/cmake/rocprim")
 
     if(NOT ${${repo_name}_FOUND})
       message(STATUS "No existing ${repo_name} package meeting the minimum version requirement (${MIN_ROCPRIM_PACKAGE_VERSION}) was found. Falling back to downloading it.")
@@ -269,14 +269,14 @@ if(BUILD_TEST OR BUILD_HIPSTDPAR_TEST)
 
   if(NOT TARGET GTest::GTest AND NOT TARGET GTest::gtest)
     message(STATUS "GTest not found or force download GTest on. Downloading and building GTest.")
-    set(GTEST_ROOT ${CMAKE_CURRENT_BINARY_DIR}/deps/gtest CACHE PATH "")
+    set(GTEST_ROOT_DIR ${CMAKE_CURRENT_BINARY_DIR}/deps/gtest CACHE PATH "")
 
     download_project(
       PROJ                googletest
       GIT_REPOSITORY      https://github.com/google/googletest.git
       GIT_TAG             release-1.11.0
       GIT_SHALLOW         TRUE
-      INSTALL_DIR         ${GTEST_ROOT}
+      INSTALL_DIR         ${GTEST_ROOT_DIR}
       CMAKE_ARGS          -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} -DBUILD_GTEST=ON -DINSTALL_GTEST=ON -Dgtest_force_shared_crt=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
       LOG_DOWNLOAD        TRUE
       LOG_CONFIGURE       TRUE
@@ -285,18 +285,18 @@ if(BUILD_TEST OR BUILD_HIPSTDPAR_TEST)
       BUILD_PROJECT       TRUE
       UPDATE_DISCONNECTED TRUE
     )
-    find_package(GTest REQUIRED CONFIG PATHS ${GTEST_ROOT})
+    find_package(GTest REQUIRED CONFIG PATHS ${GTEST_ROOT_DIR})
   endif()
 
   if (NOT TARGET TBB::tbb AND NOT TARGET tbb AND BUILD_HIPSTDPAR_TEST_WITH_TBB)
     message(STATUS "TBB not found or force download TBB on. Downloading and building TBB.")
-    set(TBB_ROOT ${CMAKE_CURRENT_BINARY_DIR}/deps/tbb CACHE PATH "" FORCE)
+    set(TBB_ROOT_DIR ${CMAKE_CURRENT_BINARY_DIR}/deps/tbb CACHE PATH "" FORCE)
 
     download_project(
       PROJ  TBB
       GIT_REPOSITORY      https://github.com/oneapi-src/oneTBB.git
       GIT_TAG             1c4c93fc5398c4a1acb3492c02db4699f3048dea # v2021.13.0
-      INSTALL_DIR         ${TBB_ROOT}
+      INSTALL_DIR         ${TBB_ROOT_DIR}
       CMAKE_ARGS          -DCMAKE_CXX_COMPILER=g++ -DTBB_TEST=OFF -DTBB_BUILD=ON -DTBB_INSTALL=ON -DTBBMALLOC_PROXY_BUILD=OFF -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
       LOG_DOWNLOAD        TRUE
       LOG_CONFIGURE       TRUE
@@ -305,7 +305,7 @@ if(BUILD_TEST OR BUILD_HIPSTDPAR_TEST)
       BUILD_PROJECT       TRUE
       UPDATE_DISCONNECTED TRUE
     )
-    find_package(TBB REQUIRED CONFIG PATHS ${TBB_ROOT})
+    find_package(TBB REQUIRED CONFIG PATHS ${TBB_ROOT_DIR})
   
   endif()
 
@@ -376,7 +376,7 @@ if(BUILD_BENCHMARK)
     if(CMAKE_CONFIGURATION_TYPES)
       message(FATAL_ERROR "DownloadProject.cmake doesn't support multi-configuration generators.")
     endif()
-    set(GOOGLEBENCHMARK_ROOT ${CMAKE_CURRENT_BINARY_DIR}/deps/googlebenchmark CACHE PATH "")
+    set(GOOGLEBENCHMARK_ROOT_DIR ${CMAKE_CURRENT_BINARY_DIR}/deps/googlebenchmark CACHE PATH "")
     if(NOT (CMAKE_CXX_COMPILER_ID STREQUAL "GNU"))
       if(WIN32)
         get_filename_component(CXX_DIRNAME ${CMAKE_CXX_COMPILER} DIRECTORY)
@@ -391,7 +391,7 @@ if(BUILD_BENCHMARK)
       GIT_REPOSITORY      https://github.com/google/benchmark.git
       GIT_TAG             v${BENCHMARK_VERSION}
       GIT_SHALLOW         TRUE
-      INSTALL_DIR         ${GOOGLEBENCHMARK_ROOT}
+      INSTALL_DIR         ${GOOGLEBENCHMARK_ROOT_DIR}
       CMAKE_ARGS          -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} -DBUILD_SHARED_LIBS=OFF -DBENCHMARK_ENABLE_TESTING=OFF -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR> -DCMAKE_CXX_STANDARD=14 ${COMPILER_OVERRIDE}
       LOG_DOWNLOAD        TRUE
       LOG_CONFIGURE       TRUE
@@ -400,7 +400,7 @@ if(BUILD_BENCHMARK)
       BUILD_PROJECT       TRUE
       UPDATE_DISCONNECTED TRUE
     )
-    find_package(benchmark REQUIRED CONFIG PATHS ${GOOGLEBENCHMARK_ROOT} NO_DEFAULT_PATH)
+    find_package(benchmark REQUIRED CONFIG PATHS ${GOOGLEBENCHMARK_ROOT_DIR} NO_DEFAULT_PATH)
   endif()
 
   # rocRAND (https://github.com/ROCm/rocm-libraries)
@@ -410,7 +410,7 @@ if(BUILD_BENCHMARK)
   # The path to the repo will is stored in ${ROCRAND_PATH}.
   if(${ROCRAND_FETCH_METHOD} STREQUAL "MONOREPO" OR ${ROCRAND_FETCH_METHOD} STREQUAL "DOWNLOAD")
     message(STATUS "Downloading and building rocrand.")
-    set(ROCRAND_ROOT ${CMAKE_CURRENT_BINARY_DIR}/deps/rocrand CACHE PATH "")
+    set(ROCRAND_ROOT_DIR ${CMAKE_CURRENT_BINARY_DIR}/deps/rocrand CACHE PATH "")
 
     set(EXTRA_CMAKE_ARGS "-DGPU_TARGETS=${GPU_TARGETS}")
     # CMAKE_ARGS of download_project (or ExternalProject_Add) can't contain ; so another separator
@@ -423,7 +423,7 @@ if(BUILD_BENCHMARK)
     download_project(
       PROJ                  rocrand
       SOURCE_DIR            ${ROCRAND_PATH}
-      INSTALL_DIR           ${ROCRAND_ROOT}
+      INSTALL_DIR           ${ROCRAND_ROOT_DIR}
       LIST_SEPARATOR        |
       CMAKE_ARGS            -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR> -DCMAKE_PREFIX_PATH=/opt/rocm ${EXTRA_CMAKE_ARGS}
       LOG_CONFIGURE         TRUE
@@ -433,6 +433,6 @@ if(BUILD_BENCHMARK)
       BUILD_PROJECT         TRUE
       STATUS_MSG            "Building"
     )
-    find_package(rocrand REQUIRED CONFIG PATHS ${ROCRAND_ROOT})
+    find_package(rocrand REQUIRED CONFIG PATHS ${ROCRAND_ROOT_DIR})
   endif()
 endif()

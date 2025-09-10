@@ -29,9 +29,9 @@ project(hipCUB_package_install_test CXX)
 
 # Set the ROCM install directory.
 if(WIN32)
-  set(ROCM_ROOT "$ENV{HIP_PATH}" CACHE PATH "Root directory of the ROCm installation")
+  set(ROCM_ROOT_DIR "$ENV{HIP_PATH}" CACHE PATH "Root directory of the ROCm installation")
 else()
-  set(ROCM_ROOT "/opt/rocm" CACHE PATH "Root directory of the ROCm installation")
+  set(ROCM_ROOT_DIR "/opt/rocm" CACHE PATH "Root directory of the ROCm installation")
 endif()
 
 # Add hipCUB's CMake modules
@@ -79,7 +79,7 @@ else()
   # rocPRIM (only for ROCm platform)
   if(NOT DEPENDENCIES_FORCE_DOWNLOAD)
     # Add default install location for WIN32 and non-WIN32 as hint
-    find_package(rocprim CONFIG REQUIRED PATHS "${ROCM_ROOT}/lib/cmake/rocprim")
+    find_package(rocprim CONFIG REQUIRED PATHS "${ROCM_ROOT_DIR}/lib/cmake/rocprim")
   endif()
   if(NOT TARGET roc::rocprim)
     message(STATUS "rocPRIM not found. Fetching...")
@@ -98,7 +98,7 @@ else()
 endif()
 
 # Find hipCUB
-find_package(hipcub CONFIG REQUIRED PATHS "${ROCM_ROOT}/lib/cmake/hipcub")
+find_package(hipcub CONFIG REQUIRED PATHS "${ROCM_ROOT_DIR}/lib/cmake/hipcub")
 
 # Build CXX flags
 if (NOT DEFINED CMAKE_CXX_STANDARD)

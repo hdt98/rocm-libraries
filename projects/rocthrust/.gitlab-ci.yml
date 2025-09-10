@@ -261,7 +261,7 @@ test:package:
       -D CMAKE_CXX_COMPILER=hipcc
       -D CMAKE_BUILD_TYPE=Release
       -D GPU_TARGETS=$GPU_TARGETS
-      -D ROCPRIM_ROOT=/opt/rocm/rocprim
+      -D ROCPRIM_ROOT_DIR=/opt/rocm/rocprim
     - cmake --build $CI_PROJECT_DIR/package_test
     - cd $CI_PROJECT_DIR/package_test
     - ctest --output-on-failure

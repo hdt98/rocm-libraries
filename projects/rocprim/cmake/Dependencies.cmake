@@ -41,7 +41,8 @@ if(DEFINED BUILD_SHARED_LIBS)
 endif()
 set(USER_ROCM_WARN_TOOLCHAIN_VAR ${ROCM_WARN_TOOLCHAIN_VAR})
 
-set(ROCM_WARN_TOOLCHAIN_VAR OFF CACHE BOOL "")
+# Force this set, so it works even when the cache var has already been defined.
+set(ROCM_WARN_TOOLCHAIN_VAR OFF CACHE BOOL "" FORCE)
 # Turn off warnings and errors for all warnings in dependencies
 separate_arguments(CXX_FLAGS_LIST NATIVE_COMMAND ${CMAKE_CXX_FLAGS})
 list(REMOVE_ITEM CXX_FLAGS_LIST /WX -Werror -Werror=pendantic -pedantic-errors)
@@ -144,9 +145,9 @@ if(BUILD_BENCHMARK)
 endif(BUILD_BENCHMARK)
 
 if(NOT DEPENDENCIES_FORCE_DOWNLOAD)
-  find_package(ROCM 0.11.0 CONFIG QUIET PATHS "${ROCM_ROOT}") # rocm-cmake
+  find_package(ROCmCMakeBuildTools 0.11.0 CONFIG QUIET PATHS "${ROCM_ROOT_DIR}") # rocm-cmake
 endif()
-if(NOT ROCM_FOUND)
+if(NOT ROCmCMakeBuildTools_FOUND)
   message(STATUS "ROCm CMake not found. Fetching...")
   # We don't really want to consume the build and test targets of ROCm CMake.
   # CMake 3.18 allows omitting them, even though there's a CMakeLists.txt in source root.
@@ -177,9 +178,9 @@ if(NOT ROCM_FOUND)
     )
   endif()
   FetchContent_MakeAvailable(rocm-cmake)
-  find_package(ROCM CONFIG REQUIRED NO_DEFAULT_PATH PATHS "${rocm-cmake_SOURCE_DIR}")
+  find_package(ROCmCMakeBuildTools CONFIG REQUIRED NO_DEFAULT_PATH PATHS "${rocm-cmake_SOURCE_DIR}")
 else()
-  find_package(ROCM 0.11.0 CONFIG REQUIRED PATHS "${ROCM_ROOT}")
+  find_package(ROCmCMakeBuildTools 0.11.0 CONFIG REQUIRED PATHS "${ROCM_ROOT_DIR}")
 endif()
 
 
@@ -189,7 +190,7 @@ if(WITH_ROCRAND)
 endif()
 if(WITH_ROCRAND AND NOT rocrand_FOUND)
   message(STATUS "Downloading and building rocrand.")
-  set(ROCRAND_ROOT ${CMAKE_CURRENT_BINARY_DIR}/deps/rocrand CACHE PATH "")
+  set(ROCRAND_ROOT_DIR ${CMAKE_CURRENT_BINARY_DIR}/deps/rocrand CACHE PATH "")
 
   set(EXTRA_CMAKE_ARGS "-DGPU_TARGETS=${GPU_TARGETS}")
   # CMAKE_ARGS of download_project (or ExternalProject_Add) can't contain ; so another separator
@@ -204,7 +205,7 @@ if(WITH_ROCRAND AND NOT rocrand_FOUND)
     GIT_REPOSITORY        https://github.com/ROCmSoftwarePlatform/rocRAND.git
     GIT_TAG               develop
     GIT_SHALLOW           TRUE
-    INSTALL_DIR           ${ROCRAND_ROOT}
+    INSTALL_DIR           ${ROCRAND_ROOT_DIR}
     LIST_SEPARATOR        |
     CMAKE_ARGS            -DCMAKE_CXX_COMPILER=hipcc -DBUILD_TEST=OFF -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR> -DCMAKE_PREFIX_PATH=/opt/rocm ${EXTRA_CMAKE_ARGS}
     LOG_DOWNLOAD          TRUE
@@ -215,7 +216,7 @@ if(WITH_ROCRAND AND NOT rocrand_FOUND)
     BUILD_PROJECT         TRUE
     UPDATE_DISCONNECTED   TRUE
   )
-  find_package(rocrand REQUIRED CONFIG PATHS ${ROCRAND_ROOT})
+  find_package(rocrand REQUIRED CONFIG PATHS ${ROCRAND_ROOT_DIR})
 endif()
 
 
@@ -227,7 +228,8 @@ if(DEFINED USER_BUILD_SHARED_LIBS)
 else()
   unset(BUILD_SHARED_LIBS CACHE )
 endif()
-set(ROCM_WARN_TOOLCHAIN_VAR ${USER_ROCM_WARN_TOOLCHAIN_VAR} CACHE BOOL "")
+# Force this set, so it works even when the cache var has already been defined.
+set(ROCM_WARN_TOOLCHAIN_VAR ${USER_ROCM_WARN_TOOLCHAIN_VAR} CACHE BOOL "" FORCE)
 
 include(ROCMSetupVersion)
 include(ROCMCreatePackage)

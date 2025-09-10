@@ -53,9 +53,9 @@ endif()
 
 #Adding CMAKE_PREFIX_PATH
 if(WIN32)
-  set(ROCM_ROOT "$ENV{HIP_PATH}" CACHE PATH "Root directory of the ROCm installation")
+  set(ROCM_ROOT_DIR "$ENV{HIP_PATH}" CACHE PATH "Root directory of the ROCm installation")
 else()
-  set(ROCM_ROOT "/opt/rocm" CACHE PATH "Root directory of the ROCm installation")
+  set(ROCM_ROOT_DIR "/opt/rocm" CACHE PATH "Root directory of the ROCm installation")
 endif()
 
 include(CheckLanguage)
@@ -84,7 +84,7 @@ include(CheckCXXCompilerFlag)
 if(BUILD_OFFLOAD_COMPRESS)
   check_cxx_compiler_flag("--offload-compress" CXX_COMPILER_SUPPORTS_OFFLOAD_COMPRESS)
   if(CXX_COMPILER_SUPPORTS_OFFLOAD_COMPRESS)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --offload-compress")
+    add_compile_options("--offload-compress")
   else()
     message(STATUS "Warning: BUILD_OFFLOAD_COMPRESS=ON but flag not supported by compiler. Ignoring option.")
   endif()
@@ -98,15 +98,15 @@ endif()
 
 #Adding CMAKE_PREFIX_PATH
 if(WIN32)
-  set(ROCM_ROOT "$ENV{HIP_PATH}" CACHE PATH "Root directory of the ROCm installation")
+  set(ROCM_ROOT_DIR "$ENV{HIP_PATH}" CACHE PATH "Root directory of the ROCm installation")
 else()
-  set(ROCM_ROOT "/opt/rocm" CACHE PATH "Root directory of the ROCm installation")
+  set(ROCM_ROOT_DIR "/opt/rocm" CACHE PATH "Root directory of the ROCm installation")
 endif()
 
 # CMake modules
 list(APPEND CMAKE_MODULE_PATH
   ${CMAKE_CURRENT_SOURCE_DIR}/cmake
-  ${ROCM_PATH}/lib/cmake/hip ${HIP_PATH}/cmake ${ROCM_ROOT}/lib/cmake/hip ${ROCM_ROOT}/hip/cmake # FindHIP.cmake
+  ${ROCM_PATH}/lib/cmake/hip ${HIP_PATH}/cmake ${ROCM_ROOT_DIR}/lib/cmake/hip ${ROCM_ROOT_DIR}/hip/cmake # FindHIP.cmake
 )
 
 # Set a default build type if none was specified
@@ -180,7 +180,7 @@ endif()
 if (NOT WIN32)
   include(cmake/VerifyCompiler.cmake)
 endif()
-list(APPEND CMAKE_PREFIX_PATH ${ROCM_PATH} ${ROCM_PATH}/hip ${ROCM_PATH}/llvm ${ROCM_ROOT}/llvm ${ROCM_ROOT} ${ROCM_ROOT}/hip)
+list(APPEND CMAKE_PREFIX_PATH ${ROCM_PATH} ${ROCM_PATH}/hip ${ROCM_PATH}/llvm ${ROCM_ROOT_DIR}/llvm ${ROCM_ROOT_DIR} ${ROCM_ROOT_DIR}/hip)
 find_package(hip REQUIRED CONFIG PATHS ${HIP_DIR} ${ROCM_PATH} /opt/rocm)
 
 if(BUILD_CODE_COVERAGE)

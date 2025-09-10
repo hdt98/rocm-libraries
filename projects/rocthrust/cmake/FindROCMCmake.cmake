@@ -17,8 +17,8 @@ if(NOT ROCM_PATH)
   set(ROCM_PATH /opt/rocm)
 endif()
 
-find_package(ROCM 0.7.3 CONFIG QUIET PATHS ${ROCM_PATH} /opt/rocm)
-if(NOT ROCM_FOUND)
+find_package(ROCmCMakeBuildTools 0.7.3 CONFIG QUIET PATHS ${ROCM_PATH} /opt/rocm)
+if(NOT ROCmCMakeBuildTools_FOUND)
   set(rocm_cmake_tag "master" CACHE STRING "rocm-cmake tag to download")
   set(rocm_cmake_url "https://github.com/RadeonOpenCompute/rocm-cmake/archive/${rocm_cmake_tag}.zip")
   set(rocm_cmake_path "${PROJECT_EXTERN_DIR}/rocm-cmake-${rocm_cmake_tag}")
@@ -44,6 +44,6 @@ if(NOT ROCM_FOUND)
   execute_process( COMMAND ${CMAKE_COMMAND} --build rocm-cmake-${rocm_cmake_tag} --target install
     WORKING_DIRECTORY ${PROJECT_EXTERN_DIR})
 
-  find_package( ROCM 0.7.3 REQUIRED CONFIG PATHS ${PROJECT_EXTERN_DIR}/rocm-cmake )
+  find_package( ROCmCMakeBuildTools 0.7.3 REQUIRED CONFIG PATHS ${PROJECT_EXTERN_DIR}/rocm-cmake )
 endif()
 

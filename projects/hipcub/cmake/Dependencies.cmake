@@ -44,7 +44,8 @@ if(DEFINED BUILD_SHARED_LIBS)
 endif()
 set(USER_ROCM_WARN_TOOLCHAIN_VAR ${ROCM_WARN_TOOLCHAIN_VAR})
 
-set(ROCM_WARN_TOOLCHAIN_VAR OFF CACHE BOOL "")
+# Force this set, so it works even when the cache var has already been defined.
+set(ROCM_WARN_TOOLCHAIN_VAR OFF CACHE BOOL "" FORCE)
 # Turn off warnings and errors for all warnings in dependencies
 separate_arguments(CXX_FLAGS_LIST NATIVE_COMMAND ${CMAKE_CXX_FLAGS})
 list(REMOVE_ITEM CXX_FLAGS_LIST /WX -Werror -Werror=pendantic -pedantic-errors)
@@ -150,7 +151,7 @@ function(fetch_dep method repo_name repo_path download_branch)
     message(STATUS "Searching for ${repo_name} package")
 
     # Add default install location for WIN32 and non-WIN32 as hint
-    find_package(${repo_name} ${MIN_ROCPRIM_PACKAGE_VERSION} CONFIG QUIET PATHS "${ROCM_ROOT}/lib/cmake/rocprim")
+    find_package(${repo_name} ${MIN_ROCPRIM_PACKAGE_VERSION} CONFIG QUIET PATHS "${ROCM_ROOT_DIR}/lib/cmake/rocprim")
 
     if(NOT ${${repo_name}_FOUND})
       message(STATUS "No existing ${repo_name} package meeting the minimum version requirement (${MIN_ROCPRIM_PACKAGE_VERSION}) was found. Falling back to downloading it.")
@@ -429,4 +430,5 @@ if(DEFINED USER_BUILD_SHARED_LIBS)
 else()
   unset(BUILD_SHARED_LIBS CACHE )
 endif()
-set(ROCM_WARN_TOOLCHAIN_VAR ${USER_ROCM_WARN_TOOLCHAIN_VAR} CACHE BOOL "")
+# Force this set, so it works even when the cache var has already been defined.
+set(ROCM_WARN_TOOLCHAIN_VAR ${USER_ROCM_WARN_TOOLCHAIN_VAR} CACHE BOOL "" FORCE)

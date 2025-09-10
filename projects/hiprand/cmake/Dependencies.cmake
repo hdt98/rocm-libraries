@@ -45,7 +45,7 @@ if (NOT BUILD_WITH_LIB STREQUAL "CUDA")
                 GIT_REPOSITORY https://github.com/ROCmSoftwarePlatform/rocRAND.git
                 GIT_TAG develop
                 GIT_SHALLOW TRUE
-                INSTALL_DIR ${ROCRAND_ROOT}
+                INSTALL_DIR ${ROCRAND_ROOT_DIR}
                 CMAKE_ARGS -DBUILD_TEST=OFF -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR> -DCMAKE_PREFIX_PATH=/opt/rocm
                 -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
                 LOG_DOWNLOAD TRUE
@@ -56,7 +56,7 @@ if (NOT BUILD_WITH_LIB STREQUAL "CUDA")
                 UPDATE_DISCONNECTED TRUE # Never update automatically from the remote repository
         )
         # search only the install location of the downloaded rocrand
-        find_package(rocrand REQUIRED CONFIG PATHS ${ROCRAND_ROOT} NO_DEFAULT_PATH)
+        find_package(rocrand REQUIRED CONFIG PATHS ${ROCRAND_ROOT_DIR} NO_DEFAULT_PATH)
     else ()
         # If neither alternative is specified, follow default search paths which include the default install location.
         find_package(rocrand REQUIRED CONFIG)
@@ -95,7 +95,7 @@ if(BUILD_TEST)
       PROJ                googletest
       GIT_REPOSITORY      https://github.com/google/googletest.git
       GIT_TAG             release-1.11.0
-      INSTALL_DIR         ${GTEST_ROOT}
+      INSTALL_DIR         ${GTEST_ROOT_DIR}
       CMAKE_ARGS          -DBUILD_GTEST=ON -DINSTALL_GTEST=ON -Dgtest_force_shared_crt=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
       LOG_DOWNLOAD        TRUE
       LOG_CONFIGURE       TRUE
@@ -104,7 +104,7 @@ if(BUILD_TEST)
       BUILD_PROJECT       TRUE
       UPDATE_DISCONNECTED TRUE # Never update automatically from the remote repository
     )
-    list( APPEND CMAKE_PREFIX_PATH ${GTEST_ROOT} )
-    find_package(GTest CONFIG REQUIRED PATHS ${GTEST_ROOT})
+    list( APPEND CMAKE_PREFIX_PATH ${GTEST_ROOT_DIR} )
+    find_package(GTest CONFIG REQUIRED PATHS ${GTEST_ROOT_DIR})
   endif()
 endif()

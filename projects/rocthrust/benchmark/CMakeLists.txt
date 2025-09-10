@@ -5,9 +5,9 @@
 include(Benchmarks)
 
 # Benchmarks directory in project's root
-set(BENCHMARKS_ROOT "${CMAKE_CURRENT_LIST_DIR}")
+set(BENCHMARKS_ROOT_DIR "${CMAKE_CURRENT_LIST_DIR}")
 
-# Subdirectory of BENCHMARKS_ROOT containing all the .cu files grouped in
+# Subdirectory of BENCHMARKS_ROOT_DIR containing all the .cu files grouped in
 # subdirectories accordingly to the functionality benchmarked
 set(BENCHMARKS_DIR "bench")
 
@@ -49,7 +49,7 @@ function(add_bench_dir bench_dir)
   file(GLOB bench_srcs CONFIGURE_DEPENDS "${bench_dir}/*.cu")
   # Set benchmark prefix as its relative path to benchmarks separated
   # by . instead of /
-  file(RELATIVE_PATH bench_prefix "${BENCHMARKS_ROOT}" "${bench_dir}")
+  file(RELATIVE_PATH bench_prefix "${BENCHMARKS_ROOT_DIR}" "${bench_dir}")
   file(TO_CMAKE_PATH "${bench_prefix}" bench_prefix)
   string(REPLACE "/" "." bench_prefix "${bench_prefix}")
 
@@ -68,7 +68,7 @@ endfunction()
 message (STATUS "Configuring benchmarks")
 
 # Get all the subdirectories inside the bench directory
-get_recursive_subdirs(subdirs ${BENCHMARKS_ROOT} ${BENCHMARKS_DIR})
+get_recursive_subdirs(subdirs ${BENCHMARKS_ROOT_DIR} ${BENCHMARKS_DIR})
 
 # Add benchmarks from each subdirectory present in bench
 foreach(subdir IN LISTS subdirs)

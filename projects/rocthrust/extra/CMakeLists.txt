@@ -26,14 +26,14 @@ include(VerifyCompiler)
 include(DownloadProject)
 
 # Download rocPRIM (only for ROCm platform)
-if(NOT DEFINED ROCPRIM_ROOT)
+if(NOT DEFINED ROCPRIM_ROOT_DIR)
   message(STATUS "Downloading and building rocPRIM.")
-  set(ROCPRIM_ROOT "${CMAKE_CURRENT_BINARY_DIR}/rocprim" CACHE PATH "")
+  set(ROCPRIM_ROOT_DIR "${CMAKE_CURRENT_BINARY_DIR}/rocprim" CACHE PATH "")
   download_project(
     PROJ                rocprim
     GIT_REPOSITORY      https://github.com/ROCmSoftwarePlatform/rocPRIM.git
     GIT_TAG             master
-    INSTALL_DIR         ${ROCPRIM_ROOT}
+    INSTALL_DIR         ${ROCPRIM_ROOT_DIR}
     CMAKE_ARGS          -DBUILD_TEST=OFF -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
     LOG_DOWNLOAD        TRUE
     LOG_CONFIGURE       TRUE
@@ -43,7 +43,7 @@ if(NOT DEFINED ROCPRIM_ROOT)
     UPDATE_DISCONNECTED TRUE
   )
 endif()
-find_package(rocprim REQUIRED CONFIG PATHS "${ROCPRIM_ROOT}")
+find_package(rocprim REQUIRED CONFIG PATHS "${ROCPRIM_ROOT_DIR}")
 
 # Find rocThrust
 find_package(rocthrust REQUIRED CONFIG HINTS ${rocthrust_DIR} PATHS "/opt/rocm/rocthrust")
