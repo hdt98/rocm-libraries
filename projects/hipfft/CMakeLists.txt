@@ -38,10 +38,9 @@ else()
 endif()
 
 
-# Workarounds..
 if (DEFINED ENV{ROCM_PATH})
   list( APPEND CMAKE_PREFIX_PATH ${ROCM_PATH}/llvm ${ROCM_PATH} )
-  list( APPEND CMAKE_MODULE_PATH ${ROCM_PATH}/lib/cmake/hip ${ROCM_PATH}/lib/cmake/hip ${ROCM_PATH}/hip/cmake )
+  list( APPEND CMAKE_MODULE_PATH ${ROCM_PATH}/lib/cmake/hip ${ROCM_PATH}/hip/cmake )
 else()
   if(EXISTS "/opt/rocm")
     list( APPEND CMAKE_PREFIX_PATH /opt/rocm/llvm /opt/rocm )
