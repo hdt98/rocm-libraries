@@ -268,6 +268,8 @@ struct CKArgs
                     const miopen::fusion::FusionInvokeParams& data_ctx,
                     int split_k) const
     {
+        // the fusion orders are different for bwd from fwd!!!
+        // fwd -> CA/CBA, bwd -> AC/ABC
         const auto& activ_param =
             dynamic_cast<miopen::fusion::ActivationOpInvokeParam&>(*data_ctx.op_args.params[0]);
         const auto& conv_param =

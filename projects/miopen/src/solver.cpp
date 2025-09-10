@@ -724,6 +724,11 @@ inline SolverRegistrar::SolverRegistrar(IdRegistryData& registry)
              Primitive::Fusion,
              fusion::ConvCKIgemmGrpFwdActivFused{}.SolverDbId(),
              miopenConvolutionAlgoImplicitGEMM);
+    Register(registry,
+             ++id,
+             Primitive::Fusion,
+             fusion::ConvCKIgemmGrpBwdActivFused{}.SolverDbId(),
+             miopenConvolutionAlgoImplicitGEMM);
     // IMPORTANT: New solvers should be added to the end of the function, and don't leave a white
     // space between this comment and the newly registered solver(s)!
 }

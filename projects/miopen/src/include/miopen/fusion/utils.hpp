@@ -116,6 +116,13 @@ inline bool IsCKFusionSolverApplicable(const FusionContext& context,
         return true;
     }
 
+    const auto ck_ca_fusion_solver = miopen::solver::fusion::ConvCKIgemmGrpBwdActivFused{};
+    if(ck_ca_fusion_solver.IsApplicable(context, problem))
+    {
+        MIOPEN_LOG_I("ConvCKIgemmGrpBwdActivFused is applicable, skipping current solver.");
+        return true;
+    }
+
     return false;
 }
 
