@@ -482,7 +482,13 @@ auto GenericSearch(const Solver s,
     float worst_time = std::numeric_limits<float>::max();
     size_t n_failed  = 0;
     size_t n_best    = 0;
-    bool perf_cutoff = false;
+    float cutoff_time = context.generic_search_worst_time;
+    if(cutoff_time < std::numeric_limits<float>::max())
+        cutoff_time *= 10;
+    float overall_best_time = context.generic_search_best_time;
+    if(overall_best_time < std::numeric_limits<float>::max())
+        overall_best_time *= 1.30f;
+
     HeartBeat<PerformanceConfig> heartbeat;
     heartbeat.Start();
 
@@ -594,16 +600,13 @@ auto GenericSearch(const Solver s,
             if(ret == 0)
             {
                 // If config is worse than the cutoff time abort the search
-                if(elapsed_time > context.generic_search_cutoff_time)
+                if(elapsed_time > cutoff_time)
                 {
                     MIOPEN_LOG_I2("Ending Search, measured time: "
                                   << elapsed_time << " was greater than cutoff: "
-                                  << context.generic_search_cutoff_time);
-                    perf_cutoff = true;
+                                  << cutoff_time);
                     for(const auto& kernelInfo : current_solution.construction_params)
                         profile_h.ClearProgram(kernelInfo.kernel_file, kernelInfo.comp_options);
-                    if(perf_sols.empty())
-                        best_config = current_config;
                     break;
                 }
 
@@ -613,7 +616,7 @@ auto GenericSearch(const Solver s,
                 // the mean value with outliers removed for calculating best config.
                 constexpr int N_RUNS = 10;
                 last_imprv++;
-                if(elapsed_time / worst_time < 1.10f)
+                if(elapsed_time < worst_time * 1.10f && elapsed_time < overall_best_time)
                 {
                     MIOPEN_LOG_I2("Finding average for: " << elapsed_time << " / " << best_time
                                                           << " = " << (elapsed_time / best_time));
@@ -704,16 +707,13 @@ auto GenericSearch(const Solver s,
         return a.time < b.time;
     });
 
-    // if using cutoff time for search and new cutoff is shorter, update
-    if(context.search_cutoff && !perf_cutoff)
+    // if using cutoff for search update timing
+    if(context.search_cutoff && best_time < context.generic_search_best_time)
     {
-        // cutoff based on worst performing config
-        float new_cutoff = (perf_sols.end() - 1)->time * 1.1f;
-        if(new_cutoff > 0.0f && new_cutoff < context.generic_search_cutoff_time)
-        {
-            context_.generic_search_cutoff_time = new_cutoff;
-            MIOPEN_LOG_I2("Cutoff time updated: " << new_cutoff);
-        }
+        float new_worst = (perf_sols.end() - 1)->time;
+        context_.generic_search_best_time = best_time;
+        context_.generic_search_worst_time = new_worst;
+        MIOPEN_LOG_I2("Times updated, best: " << best_time << " worst: " << new_worst);
     }
 
     if(perf_solsp)
