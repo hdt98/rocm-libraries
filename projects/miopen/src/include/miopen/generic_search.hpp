@@ -482,12 +482,14 @@ auto GenericSearch(const Solver s,
     float worst_time = std::numeric_limits<float>::max();
     size_t n_failed  = 0;
     size_t n_best    = 0;
+    // terminate search when perf is less than cutoff
     float cutoff_time = context.generic_search_worst_time;
     if(cutoff_time < std::numeric_limits<float>::max())
-        cutoff_time *= 10;
-    float overall_best_time = context.generic_search_best_time;
-    if(overall_best_time < std::numeric_limits<float>::max())
-        overall_best_time *= 1.30f;
+        cutoff_time *= env::value(MIOPEN_SEARCH_CUTOFF_MUL);
+    // skip detailed measurement for configs slower than skip_time 
+    float skip_time = context.generic_search_best_time;
+    if(skip_time < std::numeric_limits<float>::max())
+        skip_time *= env::value(MIOPEN_SEARCH_SKIP_PCT) / 100.0f;
 
     HeartBeat<PerformanceConfig> heartbeat;
     heartbeat.Start();
@@ -616,7 +618,7 @@ auto GenericSearch(const Solver s,
                 // the mean value with outliers removed for calculating best config.
                 constexpr int N_RUNS = 10;
                 last_imprv++;
-                if(elapsed_time < worst_time * 1.10f && elapsed_time < overall_best_time)
+                if(elapsed_time < worst_time * 1.10f && elapsed_time < skip_time)
                 {
                     MIOPEN_LOG_I2("Finding average for: " << elapsed_time << " / " << best_time
                                                           << " = " << (elapsed_time / best_time));
