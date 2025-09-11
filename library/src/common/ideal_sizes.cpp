@@ -26,14 +26,14 @@ const int LARF_SSKER_MIN_DIM = 64;
 const int LARFG_SSKER_THREADS = 256;
 #endif
 #ifndef LARFG_SSKER_MAX_N
-const int LARFG_SSKER_MAX_N = 4096;
+const int LARFG_SSKER_MAX_N = 2048;
 #endif
 
 /******************************* larft ****************************************
 *******************************************************************************/
 
 #ifndef LARFT_SWITCHSIZE
-const int LARFT_SWITCHSIZE = 128;
+const int LARFT_SWITCHSIZE = 64;
 #endif
 
 /***************** geqr2/geqrf and geql2/geqlf ********************************
