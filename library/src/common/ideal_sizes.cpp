@@ -1,36 +1,14 @@
 #include "ideal_sizes.hpp"
 
-//// Thread block sizes
-// (BS1 and BS2 are now macros, not variables)
+/*
+ideal_sizes.hpp and ideal_sizes.cpp gathers all constants that can be tuned for performance.
+We define variables that are used on the host, and not used as compile time constants as const int in ideal_sizes.cpp.
+We define variables that are used on the device, or used as compile time constants as macros in ideal_sizes.hpp.
+*/
 
-#ifndef GETRI_MAX_COLS
-const int GETRI_MAX_COLS = 64;
-#endif
-#ifndef GETRI_TINY_SIZE
-const int GETRI_TINY_SIZE = 43;
-#endif
-#ifndef GETRI_NUM_INTERVALS
-const int GETRI_NUM_INTERVALS = 1;
-#endif
-#ifndef GETRI_INTERVALS
-const int GETRI_INTERVALS = 1185;
-#endif
-#ifndef GETRI_BATCH_TINY_SIZE
-const int GETRI_BATCH_TINY_SIZE = 35;
-#endif
-#ifndef GETRI_BATCH_NUM_INTERVALS
-const int GETRI_BATCH_NUM_INTERVALS = 2;
-#endif
+/******************************* larf ****************************************
+*******************************************************************************/
 
-#ifndef SYEVJ_BLOCKED_SWITCH
-const int SYEVJ_BLOCKED_SWITCH = 58;
-#endif
-
-#ifndef SYTRF_BLOCKSIZE
-const int SYTRF_BLOCKSIZE = 64;
-#endif
-
-// larf
 #ifndef LARF_SSKER_THREADS
 const int LARF_SSKER_THREADS = 256;
 #endif
@@ -41,7 +19,9 @@ const int LARF_SSKER_BLOCKS = 64;
 const int LARF_SSKER_MIN_DIM = 64;
 #endif
 
-// larfg
+/******************************* larfg ****************************************
+*******************************************************************************/
+
 #ifndef LARFG_SSKER_THREADS
 const int LARFG_SSKER_THREADS = 256;
 #endif
@@ -49,12 +29,16 @@ const int LARFG_SSKER_THREADS = 256;
 const int LARFG_SSKER_MAX_N = 4096;
 #endif
 
-// larft
+/******************************* larft ****************************************
+*******************************************************************************/
+
 #ifndef LARFT_SWITCHSIZE
 const int LARFT_SWITCHSIZE = 128;
 #endif
 
-// GEQRF & GEQLF, block sizes
+/***************** geqr2/geqrf and geql2/geqlf ********************************
+*******************************************************************************/
+
 #ifndef GEQxF_BLOCKSIZE
 const int GEQxF_BLOCKSIZE = 64;
 #endif
@@ -62,7 +46,9 @@ const int GEQxF_BLOCKSIZE = 64;
 const int GEQxF_GEQx2_SWITCHSIZE = 128;
 #endif
 
-// GERQF & GELQF, block sizes
+/***************** gerq2/gerqf and gelq2/gelqf ********************************
+*******************************************************************************/
+
 #ifndef GExQF_BLOCKSIZE
 const int GExQF_BLOCKSIZE = 64;
 #endif
@@ -70,7 +56,9 @@ const int GExQF_BLOCKSIZE = 64;
 const int GExQF_GExQ2_SWITCHSIZE = 128;
 #endif
 
-// ORGQR/ORGQL/UNGQR/UNGQL
+/******** org2r/orgqr, org2l/orgql, ung2r/ungqr and ung2l/ungql ***************
+*******************************************************************************/
+
 #ifndef xxGQx_BLOCKSIZE
 const int xxGQx_BLOCKSIZE = 64;
 #endif
@@ -78,7 +66,9 @@ const int xxGQx_BLOCKSIZE = 64;
 const int xxGQx_xxGQx2_SWITCHSIZE = 128;
 #endif
 
-// ORGRQ/ORGLQ/UNGRQ/UNGLQ
+/******** orgr2/orgrq, orgl2/orglq, ungr2/ungrq and ungl2/unglq **************
+*******************************************************************************/
+
 #ifndef xxGxQ_BLOCKSIZE
 const int xxGxQ_BLOCKSIZE = 64;
 #endif
@@ -86,17 +76,23 @@ const int xxGxQ_BLOCKSIZE = 64;
 const int xxGxQ_xxGxQ2_SWITCHSIZE = 128;
 #endif
 
-// ORMQR/ORMQL/UNMQR/UNMQL
+/********* orm2r/ormqr, orm2l/ormql, unm2r/unmqr and unm2l/unmql **************
+*******************************************************************************/
+
 #ifndef xxMQx_BLOCKSIZE
 const int xxMQx_BLOCKSIZE = 64;
 #endif
 
-// ORMRQ/ORMLQ/UNMRQ/UNMLQ
+/********* ormr2/ormrq, orml2/ormlq, unmr2/unmrq and unml2/unmlq ***************
+*******************************************************************************/
+
 #ifndef xxMxQ_BLOCKSIZE
 const int xxMxQ_BLOCKSIZE = 64;
 #endif
 
-// GEBRD, block sizes
+/**************************** gebd2/gebrd *************************************
+*******************************************************************************/
+
 #ifndef GEBRD_BLOCKSIZE
 const int GEBRD_BLOCKSIZE = 32;
 #endif
@@ -104,7 +100,9 @@ const int GEBRD_BLOCKSIZE = 32;
 const int GEBRD_GEBD2_SWITCHSIZE = 64;
 #endif
 
-// BDSQR
+/******************************* bdsqr ****************************************
+*******************************************************************************/
+
 #ifndef BDSQR_SWITCH_SIZE
 const int BDSQR_SWITCH_SIZE = 512;
 #endif
@@ -112,7 +110,16 @@ const int BDSQR_SWITCH_SIZE = 512;
 const int BDSQR_ITERS_PER_SYNC = 10;
 #endif
 
-// SYTRD/HETRD
+/******************************* gesvd ****************************************
+*******************************************************************************/
+
+#ifndef THIN_SVD_SWITCH
+const double THIN_SVD_SWITCH = 1.6;
+#endif
+
+/******************* sytd2/sytrd and hetd2/hetrd *******************************
+*******************************************************************************/
+
 #ifndef xxTRD_BLOCKSIZE
 const int xxTRD_BLOCKSIZE = 64;
 #endif
@@ -123,12 +130,16 @@ const int xxTRD_xxTD2_SWITCHSIZE = 256;
 const int xxTD2_SSKER_MAX_N = 192;
 #endif
 
-// SYGST/HEGST
+/***************** sygs2/sygst and hegs2/hegst ********************************
+*******************************************************************************/
+
 #ifndef xxGST_BLOCKSIZE
 const int xxGST_BLOCKSIZE = 64;
 #endif
 
-// STEDC
+/****************************** stedc ******************************************
+*******************************************************************************/
+
 #ifndef STEDC_MIN_DC_SIZE
 const int STEDC_MIN_DC_SIZE = 16;
 #endif
@@ -136,18 +147,40 @@ const int STEDC_MIN_DC_SIZE = 16;
 const int STEDC_NUM_SPLIT_BLKS = 8;
 #endif
 
-#ifndef THIN_SVD_SWITCH
-const double THIN_SVD_SWITCH = 1.6;
+/************************** syevj/heevj ***************************************
+*******************************************************************************/
+
+#ifndef SYEVJ_BLOCKED_SWITCH
+const int SYEVJ_BLOCKED_SWITCH = 58;
+#endif
+
+/*************************** sytf2/sytrf **************************************
+*******************************************************************************/
+
+#ifndef SYTRF_BLOCKSIZE
+const int SYTRF_BLOCKSIZE = 64;
 #endif
 #ifndef SYTRF_SYTF2_SWITCHSIZE
 const int SYTRF_SYTF2_SWITCHSIZE = 128;
 #endif
+
+/****************************** syevdj ******************************************
+*******************************************************************************/
+
 #ifndef SYEVDJ_MIN_DC_SIZE
 const int SYEVDJ_MIN_DC_SIZE = 16;
 #endif
+
+/****************************** syevdx ******************************************
+*******************************************************************************/
+
 #ifndef SYEVDX_MIN_DC_SIZE
 const int SYEVDX_MIN_DC_SIZE = 16;
 #endif
+
+/**************************** getf2/getfr *************************************
+*******************************************************************************/
+
 #ifndef GETF2_SPKER_MAX_M
 const int GETF2_SPKER_MAX_M = 1024;
 #endif
@@ -184,6 +217,32 @@ const int GETRF_NPVT_NUM_INTERVALS_COMPLEX = 2;
 #ifndef GETRF_NPVT_BATCH_NUM_INTERVALS_COMPLEX
 const int GETRF_NPVT_BATCH_NUM_INTERVALS_COMPLEX = 5;
 #endif
+
+/****************************** getri *****************************************
+*******************************************************************************/
+
+#ifndef GETRI_MAX_COLS
+const int GETRI_MAX_COLS = 64;
+#endif
+#ifndef GETRI_TINY_SIZE
+const int GETRI_TINY_SIZE = 43;
+#endif
+#ifndef GETRI_NUM_INTERVALS
+const int GETRI_NUM_INTERVALS = 1;
+#endif
+#ifndef GETRI_INTERVALS
+const int GETRI_INTERVALS = 1185;
+#endif
+#ifndef GETRI_BATCH_TINY_SIZE
+const int GETRI_BATCH_TINY_SIZE = 35;
+#endif
+#ifndef GETRI_BATCH_NUM_INTERVALS
+const int GETRI_BATCH_NUM_INTERVALS = 2;
+#endif
+
+/***************************** trtri ******************************************
+*******************************************************************************/
+
 #ifndef TRTRI_MAX_COLS
 const int TRTRI_MAX_COLS = 64;
 #endif
@@ -196,6 +255,10 @@ const int TRTRI_INTERVALS = 0;
 #ifndef TRTRI_BATCH_NUM_INTERVALS
 const int TRTRI_BATCH_NUM_INTERVALS = 3;
 #endif
+
+/************************** splitlu ***************************************
+*******************************************************************************/
+
 #ifndef SPLITLU_SWITCH_SIZE
 const int SPLITLU_SWITCH_SIZE = 64;
 #endif
