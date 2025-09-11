@@ -130,7 +130,6 @@ nest-asyncio==1.6.0
 packaging==25.0
     # via
     #   ipykernel
-    #   pydata-sphinx-theme
     #   sphinx
 parso==0.8.5
     # via jedi
@@ -148,7 +147,7 @@ pure-eval==0.2.3
     # via stack-data
 pycparser==2.23
     # via cffi
-pydata-sphinx-theme==0.15.4
+pydata-sphinx-theme==0.16.1
     # via
     #   rocm-docs-core
     #   sphinx-book-theme
@@ -185,7 +184,7 @@ requests==2.32.5
     # via
     #   pygithub
     #   sphinx
-rocm-docs-core==1.20.1
+rocm-docs-core==1.23.0
     # via -r /mnt/nonstandard/hipSPARSE/requirements.in
 rpds-py==0.27.1
     # via
