@@ -1113,7 +1113,7 @@ bool ConvHipImplicitGemmForwardV4R4Xdlops_Padded_Gemm::IsApplicable(
 }
 
 PerformanceImplicitGemmForwardV4R4Xdlops_Padded_Gemm
-ConvHipImplicitGemmForwardV4R4Xdlops_Padded_Gemm::Search(ExecutionContext& ctx,
+ConvHipImplicitGemmForwardV4R4Xdlops_Padded_Gemm::Search(const ExecutionContext& ctx,
                                                          const ProblemDescription& problem,
                                                          const AnyInvokeParams& invoke_ctx) const
 

@@ -541,7 +541,7 @@ bool ConvAsmImplicitGemmGTCDynamicFwdDlopsNCHWC::IsValidPerformanceConfig(
 }
 
 PerformanceConfigAsmImplicitGemmGTCFwdDlopsNCHWC
-ConvAsmImplicitGemmGTCDynamicFwdDlopsNCHWC::Search(ExecutionContext& ctx,
+ConvAsmImplicitGemmGTCDynamicFwdDlopsNCHWC::Search(const ExecutionContext& ctx,
                                                    const ProblemDescription& problem,
                                                    const AnyInvokeParams& invoke_ctx) const
 {

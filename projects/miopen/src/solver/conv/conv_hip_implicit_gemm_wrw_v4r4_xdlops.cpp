@@ -1115,7 +1115,7 @@ bool ConvHipImplicitGemmWrwV4R4Xdlops::IsApplicable(const ExecutionContext& ctx,
 }
 
 PerformanceImplicitGemmWrwV4R4Xdlops
-ConvHipImplicitGemmWrwV4R4Xdlops::Search(ExecutionContext& ctx,
+ConvHipImplicitGemmWrwV4R4Xdlops::Search(const ExecutionContext& ctx,
                                          const ProblemDescription& problem,
                                          const AnyInvokeParams& invoke_ctx) const
 {

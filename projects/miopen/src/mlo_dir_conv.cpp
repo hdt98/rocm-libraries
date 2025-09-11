@@ -220,7 +220,7 @@ auto miopen::MakeConvDbGetter(const ExecutionContext& ctx) -> DbGetter
 }
 
 std::vector<miopen::solver::ConvSolution>
-FindAllGemmSolutions(miopen::ExecutionContext& ctx,
+FindAllGemmSolutions(const miopen::ExecutionContext& ctx,
                      const miopen::conv::ProblemDescription& problem,
                      const miopen::AnyInvokeParams& invoke_ctx)
 {
@@ -236,7 +236,7 @@ AllGemmWorkspaceSize(const miopen::ExecutionContext& ctx,
 }
 
 std::vector<miopen::solver::ConvSolution>
-FindAllDirectSolutions(miopen::ExecutionContext& ctx,
+FindAllDirectSolutions(const miopen::ExecutionContext& ctx,
                        const miopen::conv::ProblemDescription& problem,
                        const miopen::AnyInvokeParams& invoke_ctx)
 {
@@ -273,7 +273,7 @@ FindAllImplicitGemmWorkspaceSizes(const miopen::ExecutionContext& ctx,
 }
 
 std::vector<miopen::solver::ConvSolution>
-FindAllImplicitGemmSolutions(miopen::ExecutionContext& ctx,
+FindAllImplicitGemmSolutions(const miopen::ExecutionContext& ctx,
                              const miopen::conv::ProblemDescription& problem,
                              const miopen::AnyInvokeParams& invoke_ctx)
 {
@@ -282,7 +282,7 @@ FindAllImplicitGemmSolutions(miopen::ExecutionContext& ctx,
 }
 
 std::vector<miopen::solver::ConvSolution>
-FindAllWinogradSolutions(miopen::ExecutionContext& ctx,
+FindAllWinogradSolutions(const miopen::ExecutionContext& ctx,
                          const miopen::conv::ProblemDescription& problem,
                          const miopen::AnyInvokeParams& invoke_ctx)
 {
@@ -291,7 +291,7 @@ FindAllWinogradSolutions(miopen::ExecutionContext& ctx,
 }
 
 std::vector<miopen::solver::ConvSolution>
-FindWinogradWrWAllSolutions(miopen::ExecutionContext& ctx,
+FindWinogradWrWAllSolutions(const miopen::ExecutionContext& ctx,
                             const miopen::conv::ProblemDescription& problem,
                             const miopen::AnyInvokeParams& invoke_ctx)
 {
@@ -314,7 +314,7 @@ FindImplicitGemmWrWWorkspaceSizes(const miopen::ExecutionContext& ctx,
 }
 
 std::vector<miopen::solver::ConvSolution>
-FindImplicitGemmWrWAllSolutions(miopen::ExecutionContext& ctx,
+FindImplicitGemmWrWAllSolutions(const miopen::ExecutionContext& ctx,
                                 const miopen::conv::ProblemDescription& problem,
                                 const miopen::AnyInvokeParams& invoke_ctx)
 {
@@ -323,7 +323,7 @@ FindImplicitGemmWrWAllSolutions(miopen::ExecutionContext& ctx,
 }
 
 std::vector<miopen::solver::ConvSolution>
-FindAllBwdWrW2DSolutions(miopen::ExecutionContext& ctx,
+FindAllBwdWrW2DSolutions(const miopen::ExecutionContext& ctx,
                          const miopen::conv::ProblemDescription& problem,
                          const miopen::AnyInvokeParams& invoke_ctx)
 {
@@ -332,7 +332,7 @@ FindAllBwdWrW2DSolutions(miopen::ExecutionContext& ctx,
 }
 
 std::vector<miopen::solver::ConvSolution>
-FindAllFFTSolutions(miopen::ExecutionContext& ctx,
+FindAllFFTSolutions(const miopen::ExecutionContext& ctx,
                     const miopen::conv::ProblemDescription& problem,
                     const miopen::AnyInvokeParams& invoke_ctx)
 {

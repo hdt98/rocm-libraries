@@ -255,7 +255,7 @@ static void ShrinkToFind10Results(std::vector<Solution>& found)
 
 MIOPEN_INTERNALS_EXPORT
 std::vector<solver::ConvSolution>
-GetConvSolutions(ExecutionContext& ctx,
+GetConvSolutions(const ExecutionContext& ctx,
                  const conv::ProblemDescription& problem,
                  const std::vector<miopenConvSolution_t> solutions)
 {
@@ -352,7 +352,7 @@ bool HasGoodSolution(const std::vector<miopenConvSolution_t> solutions,
     return good_entry;
 }
 
-std::vector<Solution> VerifiedFDBSolution(ExecutionContext& ctx,
+std::vector<Solution> VerifiedFDBSolution(const ExecutionContext& ctx,
                                           const conv::ProblemDescription& problem,
                                           const AnyInvokeParams& invoke_ctx,
                                           bool force_attach_binary,
@@ -362,9 +362,10 @@ std::vector<Solution> VerifiedFDBSolution(ExecutionContext& ctx,
     const auto& conv     = problem.GetConv();
     const auto& findMode = conv.findMode;
     auto results         = UserFindDbRecord::TryLoad(ctx.GetStream(), problem, [&]() {
-        ctx.use_dynamic_solutions_only = findMode.IsDynamicHybrid(ctx);
+        auto ctx_copy                       = ctx;
+        ctx_copy.use_dynamic_solutions_only = findMode.IsDynamicHybrid(ctx);
         const auto params =
-            conv::ConvFindParameters{conv.IsWinograd3x3SupportedAndFast(ctx, problem)};
+            conv::ConvFindParameters{conv.IsWinograd3x3SupportedAndFast(ctx_copy, problem)};
 
         auto conv_sols  = GetConvSolutions(ctx, problem, solutions);
         auto eval_sols  = EvaluateConvSolutions(ctx, problem, invoke_ctx, conv_sols, model_result);
@@ -390,23 +391,26 @@ std::vector<Solution> VerifiedFDBSolution(ExecutionContext& ctx,
         {
             // entry considered bad, trigger tuning
             MIOPEN_LOG_I2("TrustVerify: Regenerate entry for user db");
-            ctx.do_search = true;
-            ctx.db_update = true;
+            ctx_copy.do_search = true;
+            ctx_copy.db_update = true;
 
-            return FindCore(invoke_ctx,
-                            ctx,
+            auto ret = FindCore(invoke_ctx,
+                            ctx_copy,
                             problem,
                             params,
                             conv::GetConvSolverFinders(),
                             std::nullopt,
                             force_attach_binary);
+            ctx.generic_search_worst_time = ctx_copy.generic_search_worst_time;
+            ctx.generic_search_best_time = ctx_copy.generic_search_best_time;
+            return ret;
         }
     });
 
     return results;
 }
 
-std::vector<Solution> FindConvolution(ExecutionContext& ctx,
+std::vector<Solution> FindConvolution(const ExecutionContext& ctx,
                                       const conv::ProblemDescription& problem,
                                       const AnyInvokeParams& invoke_ctx,
                                       int requestAlgoCount,
@@ -475,24 +479,28 @@ std::vector<Solution> FindConvolution(ExecutionContext& ctx,
     else
     {
         results = UserFindDbRecord::TryLoad(ctx.GetStream(), problem, [&]() {
-            ctx.use_dynamic_solutions_only = findMode.IsDynamicHybrid(ctx);
+            auto ctx_copy                       = ctx;
+            ctx_copy.use_dynamic_solutions_only = findMode.IsDynamicHybrid(ctx);
             const auto params =
-                conv::ConvFindParameters{conv.IsWinograd3x3SupportedAndFast(ctx, problem)};
+                conv::ConvFindParameters{conv.IsWinograd3x3SupportedAndFast(ctx_copy, problem)};
 
             if(findMode.IsTrustVerify(ctx))
             {
                 MIOPEN_LOG_I2("TrustVerify: Generate entry for user db");
-                ctx.do_search = true;
-                ctx.db_update = true;
+                ctx_copy.do_search = true;
+                ctx_copy.db_update = true;
             }
 
-            return FindCore(invoke_ctx,
-                            ctx,
+            auto ret = FindCore(invoke_ctx,
+                            ctx_copy,
                             problem,
                             params,
                             conv::GetConvSolverFinders(),
                             std::nullopt,
                             force_attach_binary);
+            ctx.generic_search_worst_time = ctx_copy.generic_search_worst_time;
+            ctx.generic_search_best_time = ctx_copy.generic_search_best_time;
+            return ret;
         });
     }
 
@@ -562,7 +570,7 @@ void ConvolutionDescriptor::FindConvFwdAlgorithm(const Handle& handle,
 
     const auto problem =
         conv::ProblemDescription(xDesc, wDesc, yDesc, *this, conv::Direction::Forward);
-    auto ctx = [&] {
+    const auto ctx = [&] {
         auto tmp = ExecutionContext{&handle};
         problem.SetupFloats(tmp);
         tmp.do_search = exhaustiveSearch;
@@ -1101,7 +1109,7 @@ void ConvolutionDescriptor::FindConvBwdDataAlgorithm(const Handle& handle,
     const auto problem =
         conv::ProblemDescription{dyDesc, wDesc, dxDesc, *this, conv::Direction::BackwardData};
 
-    auto ctx = [&] {
+    const auto ctx = [&] {
         auto tmp = ExecutionContext{&handle};
         problem.SetupFloats(tmp);
         tmp.do_search = exhaustiveSearch;
@@ -1308,7 +1316,7 @@ void ConvolutionDescriptor::FindConvBwdWeightsAlgorithm(const Handle& handle,
 
     const auto problem =
         conv::ProblemDescription{dyDesc, dwDesc, xDesc, *this, conv::Direction::BackwardWeights};
-    auto ctx = [&] {
+    const auto ctx = [&] {
         auto tmp = ExecutionContext{&handle};
         problem.SetupFloats(tmp);
         tmp.do_search = exhaustiveSearch;

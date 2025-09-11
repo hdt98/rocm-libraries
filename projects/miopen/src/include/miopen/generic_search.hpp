@@ -423,7 +423,7 @@ struct SolutionPerf
 
 template <class Solver, class Context, class Problem>
 auto GenericSearch(const Solver s,
-                   Context& context_,
+                   const Context& context_,
                    const Problem& problem,
                    const AnyInvokeParams& invoke_ctx_,
                    std::vector<SolutionPerf>* perf_solsp = nullptr)

@@ -84,7 +84,6 @@ struct MIOPEN_INTERNALS_EXPORT ExecutionContext
 
     // Operation modes & environment
     bool do_search               = false;
-    bool search_cutoff           = false;
     bool db_update               = false;
     bool use_asm_kernels         = false;
     bool use_hip_kernels         = true;
@@ -98,8 +97,9 @@ struct MIOPEN_INTERNALS_EXPORT ExecutionContext
     bool disable_perfdb_access       = false;
     bool use_dynamic_solutions_only  = false;
     bool is_for_generic_search       = false;
-    float generic_search_worst_time  = std::numeric_limits<float>::max();
-    float generic_search_best_time   = std::numeric_limits<float>::max();
+    mutable bool search_cutoff       = false;
+    mutable float generic_search_worst_time  = std::numeric_limits<float>::max();
+    mutable float generic_search_best_time   = std::numeric_limits<float>::max();
 
     inline const Handle& GetStream() const { return *stream; }
     inline void SetStream(const Handle* stream_) { stream = stream_; }

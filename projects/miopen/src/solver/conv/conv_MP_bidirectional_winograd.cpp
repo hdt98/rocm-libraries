@@ -940,7 +940,7 @@ ConvMPBidirectWinograd_xdlops<WinoDataH, WinoFilterH, WinoDataW, WinoFilterW>::G
 template <int WinoDataH, int WinoFilterH, int WinoDataW, int WinoFilterW>
 PerformanceImplicitGemmForwardV4R4Xdlops
 ConvMPBidirectWinograd_xdlops<WinoDataH, WinoFilterH, WinoDataW, WinoFilterW>::Search(
-    ExecutionContext& ctx,
+    const ExecutionContext& ctx,
     const ProblemDescription& problem,
     const AnyInvokeParams& invoke_ctx) const
 {
@@ -948,7 +948,7 @@ ConvMPBidirectWinograd_xdlops<WinoDataH, WinoFilterH, WinoDataW, WinoFilterW>::S
         GetTransformedInvokeContext<WinoDataH, WinoFilterH, WinoDataW, WinoFilterW>(problem,
                                                                                     invoke_ctx);
     const auto xdlops_problem = GetTransformedProblem(problem);
-    auto xdlops_ctx           = GetTransformedConvContext(ctx, xdlops_problem);
+    const auto xdlops_ctx     = GetTransformedConvContext(ctx, xdlops_problem);
 
     return ConvHipImplicitGemmForwardV4R4Xdlops().Search(
         xdlops_ctx, xdlops_problem, xdlops_invoke_ctx);

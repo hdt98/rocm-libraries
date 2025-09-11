@@ -787,7 +787,7 @@ static auto GetAllFusionSolvers()
            GetFusedWinogradSolvers();
 }
 
-solver::ConvSolution MakeFusedSolution(FusionContext& ctx,
+solver::ConvSolution MakeFusedSolution(const FusionContext& ctx,
                                        solver::Id id,
                                        const std::optional<std::string>& perf_cfg_override,
                                        const FusionDescription& problem,
@@ -829,13 +829,13 @@ protected:
     }
 
     std::vector<solver::ConvSolution>
-    FindImpl(ExecutionContext& ctx,
+    FindImpl(const ExecutionContext& ctx,
              const FusionDescription& problem,
              const AnyInvokeParams& invoke_ctx,
              const FusionFindParameters&,
              const std::optional<FindOptions>& options) const override
     {
-        auto fusion_ctx = FusionContext(ctx);
+        const auto fusion_ctx = FusionContext(ctx);
         return solvers.SearchForAllSolutions(fusion_ctx,
                                              problem,
                                              MakeConvDbGetter(ctx),
@@ -867,7 +867,7 @@ static const std::vector<std::unique_ptr<ISolversFinder>>& GetFusionSolverFinder
 }
 
 static std::vector<Solution>
-FindFusion(ExecutionContext& ctx,
+FindFusion(const ExecutionContext& ctx,
            const FusionDescription& fusion_problem,
            const std::function<fusion::FusionInvokeParams()>& invoke_params,
            const std::optional<FindOptions>& options = std::nullopt)
@@ -1046,7 +1046,7 @@ miopenStatus_t FusionPlanDescriptor::Compile(const Handle& handle)
             const auto id = solver::Id{sol->solution_id};
 
             GetAllFusionSolvers().FindById(id, [&](auto solver) {
-                auto ctx            = FusionContext{handle};
+                const auto ctx      = FusionContext{handle};
                 auto db_getter      = MakeConvDbGetter(ctx);
                 const auto solution = solver::FindSolution(
                     solver, ctx, fusion_problem, db_getter, {}); // auto tune is not expected here

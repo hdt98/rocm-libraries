@@ -162,7 +162,7 @@ struct SolverInterfaceTunable : SolverInterface<Context, Problem>
 {
     /// This function is a simplified version of FindSolution(), it does not obey search parameters
     /// from the Context and does not use the database. Intended to be used in unit tests.
-    virtual ConvSolution FindSolutionSimple(Context& ctx,
+    virtual ConvSolution FindSolutionSimple(const Context& ctx,
                                             const Problem& problem,
                                             const AnyInvokeParams& invoke_ctx) const = 0;
 };
@@ -206,14 +206,14 @@ struct SolverBaseTunable : SolverInterfaceTunable<Context, Problem>, TunableSolv
 
     /// Search
     virtual PerformanceConfig
-    Search(Context& ctx, const Problem& problem, const AnyInvokeParams& invoke_ctx) const = 0;
+    Search(const Context& ctx, const Problem& problem, const AnyInvokeParams& invoke_ctx) const = 0;
 
     /// Tunable solvers provide a GetSolution that takes a Context and PerformanceConfig
     virtual ConvSolution GetSolution(const Context& ctx,
                                      const Problem& problem,
                                      const PerformanceConfig& config) const = 0;
 
-    ConvSolution FindSolutionSimple(Context& ctx,
+    ConvSolution FindSolutionSimple(const Context& ctx,
                                     const Problem& problem,
                                     const AnyInvokeParams& invoke_ctx) const final
     {

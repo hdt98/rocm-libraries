@@ -636,7 +636,7 @@ bool ConvHipImplicitGemmV4R4Fwd::IsValidPerformanceConfig(
 }
 
 PerformanceImplicitGemmV4R4Fwd
-ConvHipImplicitGemmV4R4Fwd::Search(ExecutionContext& ctx,
+ConvHipImplicitGemmV4R4Fwd::Search(const ExecutionContext& ctx,
                                    const ProblemDescription& problem,
                                    const AnyInvokeParams& invoke_ctx) const
 {

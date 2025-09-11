@@ -43,12 +43,12 @@ namespace solver {
 namespace fusion {
 
 PerformanceConfigConvOclDirectFwdFused
-ConvOclDirectFwdFused::Search(FusionContext& context,
+ConvOclDirectFwdFused::Search(const FusionContext& context,
                               const FusionDescription& problem,
                               const AnyInvokeParams& invoke_params) const
 {
     const auto conv_problem          = problem.GetConvProblem(0, miopen::conv::Direction::Forward);
-    auto conv_ctx                    = context.GetConvContext(conv_problem);
+    const auto conv_ctx              = context.GetConvContext(conv_problem);
     const auto legacy                = conv::ConvOclDirectFwd{};
     const auto& fusion_invoke_params = invoke_params.CastTo<miopen::fusion::FusionInvokeParams>();
     const auto wei_ocl_ptr           = dynamic_cast<miopen::fusion::ConvolutionOpInvokeParam&>(

@@ -827,7 +827,7 @@ bool ConvHipImplicitGemmBwdDataV1R1Xdlops::IsApplicable(const ExecutionContext& 
 }
 
 PerformanceImplicitGemmBwdV1R1Xdlops
-ConvHipImplicitGemmBwdDataV1R1Xdlops::Search(ExecutionContext& ctx,
+ConvHipImplicitGemmBwdDataV1R1Xdlops::Search(const ExecutionContext& ctx,
                                              const ProblemDescription& problem,
                                              const AnyInvokeParams& invoke_ctx) const
 {

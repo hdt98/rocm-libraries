@@ -52,7 +52,7 @@ namespace solver {
 template <class Solver, class Context, class Problem, class Db>
 auto FindSolutionImpl(rank<1>,
                       const Solver& s,
-                      Context& context,
+                      const Context& context,
                       const Problem& problem,
                       Db&& db,
                       const AnyInvokeParams& invoke_ctx,
@@ -161,7 +161,7 @@ auto FindSolutionImpl(rank<1>,
 template <class Solver, class Context, class Problem, class Db>
 auto FindSolutionImpl(rank<0>,
                       const Solver& s,
-                      Context& context,
+                      const Context& context,
                       const Problem& problem,
                       Db&&,
                       const AnyInvokeParams&,
@@ -213,7 +213,7 @@ auto GetInvokeFactoryImpl(
 /// May read/write perfDb.
 template <class Solver, class Context, class Problem, class Db>
 ConvSolution FindSolution(const Solver& s,
-                          Context& context,
+                          const Context& context,
                           const Problem& problem,
                           Db&& db,
                           const AnyInvokeParams& invoke_ctx,
@@ -285,7 +285,7 @@ struct SolverContainer
     // Search for all applicable solutions among many solvers
     template <class Context, class Problem, class Db, class Solution = miopen::solver::ConvSolution>
     std::vector<Solution>
-    SearchForAllSolutions(Context& ctx,
+    SearchForAllSolutions(const Context& ctx,
                           const Problem& problem,
                           Db&& db,
                           const AnyInvokeParams& invoke_ctx,
@@ -343,7 +343,7 @@ struct SolverContainer
     // Search for all applicable solutions among many solvers
     template <class Problem, class Solution = miopen::solver::ConvSolution>
     std::vector<Solution>
-    SearchForSolutions(ExecutionContext& ctx,
+    SearchForSolutions(const ExecutionContext& ctx,
                        const Problem& problem,
                        std::size_t limit = std::numeric_limits<std::size_t>::max(),
                        const AnyInvokeParams& invoke_params = {}) const
@@ -465,8 +465,7 @@ struct SolverContainer
             return;
         }
 
-        auto ctx_cpy    = ctx;
-        const auto slns = SearchForSolutions(ctx_cpy, problem, 1, invoke_params);
+        const auto slns = SearchForSolutions(ctx, problem, 1, invoke_params);
 
         if(slns.empty())
             MIOPEN_THROW(miopenStatusNotImplemented, "No solver found.");

@@ -91,7 +91,7 @@ bool ConvMlirIgemmBwd::IsValidPerformanceConfig(const ExecutionContext& ctx,
     return config.IsValid(ctx, problem);
 }
 
-PerformanceConvMlirIgemm ConvMlirIgemmBwd::Search(ExecutionContext& ctx,
+PerformanceConvMlirIgemm ConvMlirIgemmBwd::Search(const ExecutionContext& ctx,
                                                   const ProblemDescription& problem,
                                                   const AnyInvokeParams& invoke_ctx) const
 {

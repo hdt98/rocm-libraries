@@ -597,7 +597,7 @@ ConvSolution ConvAsmBwdWrW3x3::GetSolution(const ExecutionContext& ctx,
     return result;
 }
 
-PerformanceConfigAsmDirect3x3WrW ConvAsmBwdWrW3x3::Search(ExecutionContext& ctx,
+PerformanceConfigAsmDirect3x3WrW ConvAsmBwdWrW3x3::Search(const ExecutionContext& ctx,
                                                           const ProblemDescription& problem,
                                                           const AnyInvokeParams& invoke_ctx) const
 {

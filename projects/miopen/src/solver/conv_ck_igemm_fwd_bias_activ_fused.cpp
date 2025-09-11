@@ -387,7 +387,7 @@ bool ConvCKIgemmFwdBiasActivFused::IsValidPerformanceConfig(
 }
 
 PerformanceConfigConvCKIgemmFwdBiasActivFused
-ConvCKIgemmFwdBiasActivFused::Search(FusionContext& ctx,
+ConvCKIgemmFwdBiasActivFused::Search(const FusionContext& ctx,
                                      const FusionDescription& fdesc_problem,
                                      const AnyInvokeParams& invoke_ctx) const
 {

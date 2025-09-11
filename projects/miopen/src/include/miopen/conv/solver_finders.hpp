@@ -64,7 +64,7 @@ public:
     GetAlgorithmName(const ProblemDescriptionBase& problem) const = 0;
 
     [[nodiscard]] inline std::vector<solver::ConvSolution>
-    Find(ExecutionContext& ctx,
+    Find(const ExecutionContext& ctx,
          const ProblemDescriptionBase& problem,
          const AnyInvokeParams& invoke_ctx,
          const PrimitiveFindParameters& parameters,
@@ -93,7 +93,7 @@ protected:
                                          const ProblemDescriptionBase& problem,
                                          const PrimitiveFindParameters& parameters) const = 0;
     [[nodiscard]] virtual std::vector<solver::ConvSolution>
-    FindImpl(ExecutionContext& ctx,
+    FindImpl(const ExecutionContext& ctx,
              const ProblemDescriptionBase& problem,
              const AnyInvokeParams& invoke_ctx,
              const PrimitiveFindParameters& parameters,
@@ -113,7 +113,7 @@ public:
     }
 
     [[nodiscard]] std::vector<solver::ConvSolution>
-    FindImpl(ExecutionContext& ctx,
+    FindImpl(const ExecutionContext& ctx,
              const ProblemDescriptionBase& problem,
              const AnyInvokeParams& invoke_ctx,
              const PrimitiveFindParameters& parameters,
@@ -140,7 +140,7 @@ protected:
     GetAlgorithmName(const ProblemDescription& problem) const = 0;
 
     [[nodiscard]] virtual std::vector<solver::ConvSolution>
-    FindImpl(ExecutionContext& ctx,
+    FindImpl(const ExecutionContext& ctx,
              const ProblemDescription& problem,
              const AnyInvokeParams& invoke_ctx,
              const FindParameters& parameters,
@@ -172,7 +172,7 @@ std::vector<Solution> EvaluateInvokers(const Handle& handle,
                                        bool force_attach_binary);
 
 FindCoreResult FindCore(const AnyInvokeParams& invoke_ctx,
-                        ExecutionContext& ctx,
+                        const ExecutionContext& ctx,
                         const ProblemDescriptionBase& problem,
                         const PrimitiveFindParameters& parameters,
                         const std::vector<std::unique_ptr<ISolversFinder>>& finders,

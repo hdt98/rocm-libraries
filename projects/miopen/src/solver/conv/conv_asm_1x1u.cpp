@@ -911,7 +911,7 @@ ConvSolution ConvAsm1x1U::GetSolution(const ExecutionContext& ctx,
     return result;
 }
 
-PerformanceConfigConvAsm1x1U ConvAsm1x1U::Search(ExecutionContext& ctx,
+PerformanceConfigConvAsm1x1U ConvAsm1x1U::Search(const ExecutionContext& ctx,
                                                  const ProblemDescription& problem,
                                                  const AnyInvokeParams& invoke_ctx) const
 {

@@ -495,7 +495,7 @@ size_t ConvHipImplicitGemmGroupFwdXdlops::GetWorkspaceSize(const ExecutionContex
 }
 
 PerformanceConfigHipImplicitGemmGroupFwdXdlops
-ConvHipImplicitGemmGroupFwdXdlops::Search(ExecutionContext& ctx,
+ConvHipImplicitGemmGroupFwdXdlops::Search(const ExecutionContext& ctx,
                                           const ProblemDescription& problem,
                                           const AnyInvokeParams& invoke_ctx) const
 {
