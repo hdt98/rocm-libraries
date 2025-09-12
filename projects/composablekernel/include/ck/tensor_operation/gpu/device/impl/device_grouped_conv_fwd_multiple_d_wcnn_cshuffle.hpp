@@ -204,9 +204,9 @@ struct DeviceGroupedConvFwdMultipleD_Wcnn_CShuffle
 #endif
         {
             constexpr index_t HPerBlockOut =
-                FilterSize == 2 ? (Transposed ? HPerBlock * 2 : HPerBlock / 2) : HPerBlock;
+                GridFilterSize == 2 ? (Transposed ? HPerBlock * 2 : HPerBlock / 2) : HPerBlock;
             constexpr index_t WPerBlockOut =
-                FilterSize == 2 ? (Transposed ? WPerBlock * 2 : WPerBlock / 2) : WPerBlock;
+                GridFilterSize == 2 ? (Transposed ? WPerBlock * 2 : WPerBlock / 2) : WPerBlock;
             const auto acc_data_desc =
                 PadTensorDescriptor(acc_data_raw_desc,
                                     make_tuple(HPerBlockOut, WPerBlockOut, KPerBlock),

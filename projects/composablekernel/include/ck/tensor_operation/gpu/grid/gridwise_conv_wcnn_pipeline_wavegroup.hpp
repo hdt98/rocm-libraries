@@ -145,9 +145,9 @@ struct GridwiseConvPipeline_v2
 
         semaDataReady.init();
         semaLdsReady.init();
-        semaDataLdsFree.init(1, 1, true);
+        semaDataLdsFree.init(0, 1, true);
         semaAccumReady.init();
-        semaAccumFree.init(1, 1, true);
+        semaAccumFree.init(0, 1, true);
 
         auto semaAccums = make_tuple(&semaAccumReady, &semaAccumFree);
 
@@ -666,9 +666,9 @@ struct GridwiseConvPipeline_v2<1, false, false, false, EnableAsync, EnableSpatia
         }
 
         semaDataReady.init();
-        semaDataFree.init(1, 1, true);
+        semaDataFree.init(0, 1, true);
         semaAccumReady.init();
-        semaAccumFree.init(1, 1, true);
+        semaAccumFree.init(0, 1, true);
 
         auto semaAccums = make_tuple(&semaAccumReady, &semaAccumFree);
         // wait semaphore init
@@ -1053,9 +1053,9 @@ struct GridwiseConvPipeline_v2<1, true, true, true, EnableAsync, EnableSpatialCl
         }
 
         semaLdsReady.init();
-        semaLdsFree.init(1, 1, true);
+        semaLdsFree.init(0, 1, true);
         semaAccumReady.init();
-        semaAccumFree.init(1, 1, true);
+        semaAccumFree.init(0, 1, true);
 
         auto semaAccums = make_tuple(&semaAccumReady, &semaAccumFree);
         // wait semaphore init
