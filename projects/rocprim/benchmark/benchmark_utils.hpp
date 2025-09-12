@@ -1838,27 +1838,33 @@ private:
 
     // IQR stands for Interquartile range.
     // It's used to drop outlier iteration times, in order to reduce noise.
-    std::vector<double> drop_outliers_using_iqr(const std::vector<double>& values) const {
-        if (values.size() < 4) {
+    std::vector<double> drop_outliers_using_iqr(const std::vector<double>& values) const
+    {
+        if(values.size() < 4)
+        {
             return values; // Not enough data to define outliers
         }
 
         std::vector<double> sorted_vals = values;
         std::sort(sorted_vals.begin(), sorted_vals.end());
 
-        auto get_percentile = [&](double p) {
-            double idx = p * (sorted_vals.size() - 1);
-            size_t i = static_cast<size_t>(idx);
+        auto get_percentile = [&](double p)
+        {
+            double idx  = p * (sorted_vals.size() - 1);
+            size_t i    = static_cast<size_t>(idx);
             double frac = idx - i;
-            if (i + 1 < sorted_vals.size()) {
+            if(i + 1 < sorted_vals.size())
+            {
                 return sorted_vals[i] * (1.0 - frac) + sorted_vals[i + 1] * frac;
-            } else {
+            }
+            else
+            {
                 return sorted_vals[i];
             }
         };
 
-        double q1 = get_percentile(0.25);
-        double q3 = get_percentile(0.75);
+        double q1  = get_percentile(0.25);
+        double q3  = get_percentile(0.75);
         double iqr = q3 - q1;
 
         double lower_bound = q1 - m_iteration_times_iqr_multiplier * iqr;
@@ -1867,8 +1873,10 @@ private:
         std::vector<double> filtered;
         filtered.reserve(values.size());
 
-        for (double v : values) {
-            if (v >= lower_bound && v <= upper_bound) {
+        for(double v : values)
+        {
+            if(v >= lower_bound && v <= upper_bound)
+            {
                 filtered.push_back(v);
             }
         }
@@ -2037,7 +2045,10 @@ private:
                                    bool         default_cold,
                                    int          default_trials)
     {
-        parser.set_optional<size_t>("size", "size", default_bytes, "Size of the randomly generated input array in bytes.");
+        parser.set_optional<size_t>("size",
+                                    "size",
+                                    default_bytes,
+                                    "Size of the randomly generated input array in bytes.");
         parser.set_optional<size_t>("batch_iterations",
                                     "batch_iterations",
                                     default_batch_iterations,
@@ -2051,7 +2062,12 @@ private:
                                   !default_cold,
                                   "Don't clear the gpu cache on every batch iteration.");
 
-        parser.set_optional<std::string>("seed", "seed", "random", "Seed for input generation. Either an unsigned integer value for determinisic results, or 'random' for different inputs for each repetition.");
+        parser.set_optional<std::string>(
+            "seed",
+            "seed",
+            "random",
+            "Seed for input generation. Either an unsigned integer value for determinisic results, "
+            "or 'random' for different inputs for each repetition.");
         parser.set_optional<int>("trials", "trials", default_trials, "number of iterations");
         parser.set_optional<std::string>("name_format",
                                          "name_format",
@@ -2072,11 +2088,13 @@ private:
             "iteration_info_out",
             "iteration_info_out",
             "",
-            "optional output path for a JSON file containing iteration info");
-        parser.set_optional<double>("iteration_times_iqr_multiplier",
-                                  "iteration_times_iqr_multiplier",
-                                  1.5,
-                                  "Multiplier for the IQR filter that discards outlier iteration times. A larger multiplier discards less. -1 will discard nothing.");
+            "Optional output path for a JSON file containing iteration info.");
+        parser.set_optional<double>(
+            "iteration_times_iqr_multiplier",
+            "iteration_times_iqr_multiplier",
+            1.5,
+            "Multiplier for the IQR filter that discards outlier iteration times. A larger "
+            "multiplier discards less. -1 discards nothing.");
     }
 
     void parse(cli::Parser& parser)
