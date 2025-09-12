@@ -924,11 +924,11 @@ void CommAllToAll::ExecuteAsync(const rocfft_plan     plan,
     if(subcomm)
     {
         int tmp_num_ranks = 0;
-        MPI_Comm_size(subcomm, &tmp_num_ranks);
+        MPI_Comm_size(*subcomm, &tmp_num_ranks);
         if(tmp_num_ranks < 0)
             throw std::runtime_error("Sub-communicator size is not positive");
         num_ranks = static_cast<size_t>(tmp_num_ranks);
-        MPI_Comm_rank(subcomm, &subcomm_rank);
+        MPI_Comm_rank(*subcomm, &subcomm_rank);
     }
     else
     {
@@ -974,7 +974,7 @@ void CommAllToAll::ExecuteAsync(const rocfft_plan     plan,
                                 recvBuf.get(in_buffer, out_buffer, local_comm_rank),
                                 send_count_bytes,
                                 MPI_CHAR,
-                                subcomm,
+                                *subcomm,
                                 &request);
 
         if(ret != MPI_SUCCESS)
