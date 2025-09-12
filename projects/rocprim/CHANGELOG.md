@@ -23,6 +23,7 @@ Full documentation for rocPRIM is available at [https://rocm.docs.amd.com/projec
 * Improved performance of many algorithms, by updating their tuned configs.
   * 891 specializations have been improved.
   * 399 specializations have been added.
+* Improved benchmark stability by trimming outlier iteration times.
 
 ### Upcoming changes
 

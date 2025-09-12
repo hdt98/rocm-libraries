@@ -1661,7 +1661,8 @@ public:
           benchmark::State&   gbench_state,
           size_t              warmup_iterations,
           bool                cold,
-          std::string         iteration_info_out)
+          std::string         iteration_info_out,
+          double              iteration_times_iqr_multiplier)
         : stream(stream)
         , bytes(bytes)
         , seed(seed)
@@ -1669,6 +1670,7 @@ public:
         , gbench_state(gbench_state)
         , m_warmup_iterations(warmup_iterations)
         , m_cold(cold)
+        , m_iteration_times_iqr_multiplier(iteration_times_iqr_multiplier)
         , m_events(batch_iterations * 2)
         , m_logger(iteration_info_out)
     {
@@ -1794,6 +1796,11 @@ public:
                                        * type_size);
         gbench_state.SetItemsProcessed(m_total_gbench_iterations * batch_iterations * actual_size);
 
+        if(m_iteration_times_iqr_multiplier != -1)
+        {
+            m_times = drop_outliers_using_iqr(m_times);
+        }
+
         output_statistics();
 
         std::string name = get_escaped_name(gbench_state.name());
@@ -1833,6 +1840,46 @@ private:
         }
         escaped_name += "/manual_time";
         return escaped_name;
+    }
+
+    // IQR stands for Interquartile range.
+    // It's used to drop outlier iteration times, in order to reduce noise.
+    std::vector<double> drop_outliers_using_iqr(const std::vector<double>& values) const {
+        if (values.size() < 4) {
+            return values; // Not enough data to define outliers
+        }
+
+        std::vector<double> sorted_vals = values;
+        std::sort(sorted_vals.begin(), sorted_vals.end());
+
+        auto get_percentile = [&](double p) {
+            double idx = p * (sorted_vals.size() - 1);
+            size_t i = static_cast<size_t>(idx);
+            double frac = idx - i;
+            if (i + 1 < sorted_vals.size()) {
+                return sorted_vals[i] * (1.0 - frac) + sorted_vals[i + 1] * frac;
+            } else {
+                return sorted_vals[i];
+            }
+        };
+
+        double q1 = get_percentile(0.25);
+        double q3 = get_percentile(0.75);
+        double iqr = q3 - q1;
+
+        double lower_bound = q1 - m_iteration_times_iqr_multiplier * iqr;
+        double upper_bound = q3 + m_iteration_times_iqr_multiplier * iqr;
+
+        std::vector<double> filtered;
+        filtered.reserve(values.size());
+
+        for (double v : values) {
+            if (v >= lower_bound && v <= upper_bound) {
+                filtered.push_back(v);
+            }
+        }
+
+        return filtered;
     }
 
     void output_statistics() const
@@ -1894,6 +1941,7 @@ private:
 
     size_t m_warmup_iterations;
     bool   m_cold;
+    double m_iteration_times_iqr_multiplier;
 
     std::vector<hipEvent_t> m_events;
     logger                  m_logger;
@@ -2031,6 +2079,10 @@ private:
             "iteration_info_out",
             "",
             "optional output path for a JSON file containing iteration info");
+        parser.set_optional<double>("iteration_times_iqr_multiplier",
+                                  "iteration_times_iqr_multiplier",
+                                  1.5,
+                                  "Multiplier for the IQR filter that discards outlier iteration times. A larger multiplier discards less. -1 will discard nothing.");
     }
 
     void parse(cli::Parser& parser)
@@ -2046,6 +2098,8 @@ private:
         m_cold = !parser.get<bool>("hot");
 
         m_iteration_info_out = parser.get<std::string>("iteration_info_out");
+
+        m_iteration_times_iqr_multiplier = parser.get<double>("iteration_times_iqr_multiplier");
 
         m_trials             = parser.get<int>("trials");
         m_parallel_instance  = parser.get<int>("parallel_instance");
@@ -2177,7 +2231,8 @@ private:
                      gbench_state,
                      m_warmup_iterations,
                      m_cold,
-                     m_iteration_info_out);
+                     m_iteration_info_out,
+                     m_iteration_times_iqr_multiplier);
     }
 
     void apply_settings(benchmark::internal::Benchmark* b)
@@ -2225,6 +2280,7 @@ private:
     size_t       m_warmup_iterations;
     bool         m_cold;
     std::string  m_iteration_info_out;
+    double       m_iteration_times_iqr_multiplier;
 
     int m_trials;
     int m_parallel_instance;
