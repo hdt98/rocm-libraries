@@ -1384,7 +1384,6 @@ struct CommAllToAll : public MultiPlanItem
                  const std::vector<size_t>& _recvCounts,
                  BufferPtr                  _sendBuf,
                  BufferPtr                  _recvBuf,
-                 bool                       uniformCounts,
                  MPI_Comm_wrapper_t         subcomm = {})
         : precision(_precision)
         , arrayType(_arrayType)
@@ -1394,7 +1393,6 @@ struct CommAllToAll : public MultiPlanItem
         , recvCounts(_recvCounts)
         , sendBuf(_sendBuf)
         , recvBuf(_recvBuf)
-        , uniform_counts(uniformCounts)
         , subcomm(std::move(subcomm))
     {
         // Currently MPI interface uses 32-bit signed ints, so assert
@@ -1410,6 +1408,14 @@ struct CommAllToAll : public MultiPlanItem
         checkArray(sendCounts);
         checkArray(recvOffsets);
         checkArray(recvCounts);
+
+        // check if uniform exchange to use MPI_Alltoall
+        uniform_counts = std::all_of(sendCounts.begin(),
+                                     sendCounts.end(),
+                                     [&](size_t c) { return c == sendCounts[0]; })
+                         && std::all_of(recvCounts.begin(), recvCounts.end(), [&](size_t c) {
+                                return c == recvCounts[0];
+                            });
     }
 
     // enum for error handling for different multi-process communication
@@ -1444,16 +1450,6 @@ struct CommAllToAll : public MultiPlanItem
         return true;
     }
 
-    void set_uniform_count_inside_subcomm(size_t val)
-    {
-        uniform_count_inside_subcomm = val;
-    }
-
-    void set_uniform_count(bool val)
-    {
-        uniform_counts = val;
-    }
-
 private:
     const rocfft_precision  precision;
     const rocfft_array_type arrayType;
@@ -1464,9 +1460,6 @@ private:
     const std::vector<size_t> sendCounts;
     const std::vector<size_t> recvOffsets;
     const std::vector<size_t> recvCounts;
-
-    // counts for MPIAlltoall inside a subcommunicator
-    size_t uniform_count_inside_subcomm;
 
     // send/receive buffers
     const BufferPtr sendBuf;

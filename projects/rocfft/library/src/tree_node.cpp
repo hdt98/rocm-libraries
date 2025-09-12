@@ -966,7 +966,7 @@ void CommAllToAll::ExecuteAsync(const rocfft_plan     plan,
         }
 
         // in subcomm: sendCounts, recvCounts, etc are sized for num_ranks, indexed by subcomm_rank
-        const int send_count_bytes = static_cast<int>(uniform_count_inside_subcomm * elem_size);
+        const int send_count_bytes = static_cast<int>(sendCounts.front() * elem_size);
 
         int ret = MPI_Ialltoall(sendBuf.get(in_buffer, out_buffer, local_comm_rank),
                                 send_count_bytes,
@@ -1096,11 +1096,6 @@ void CommAllToAll::Print(rocfft_ostream& os, const int indent) const
             os << val << " ";
         os << "\n";
     };
-
-    // determine whether counts are uniform
-    auto count_matches_first = [&](size_t count) { return count == sendCounts[0]; };
-    bool uniform_counts = std::all_of(sendCounts.begin(), sendCounts.end(), count_matches_first)
-                          && std::all_of(recvCounts.begin(), recvCounts.end(), count_matches_first);
 
     os << indentStr << "CommAllToAll " << precision_name(precision) << " "
        << PrintArrayType(arrayType) << (uniform_counts ? " (MPI_Ialltoall)" : " (MPI_Ialltoallv)")
