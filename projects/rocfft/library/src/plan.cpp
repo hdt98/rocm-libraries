@@ -2172,6 +2172,62 @@ void rocfft_plan_t::GlobalTransposeP2P(size_t                     elem_size,
     }
 }
 
+// Helper to compute disjoint sets of ranks that need to collectively
+// communicate (e.g. during an all-to-all operation).  This
+// information can be used to partition the global communicator into
+// sub-communicators.
+struct ConnectedRanks
+{
+    // Initialize parent array - each rank begins as its own parent
+    ConnectedRanks(int comm_size)
+        : parent(comm_size)
+    {
+        std::iota(parent.begin(), parent.end(), 0);
+    }
+    std::vector<int> parent;
+
+    // Get the root parent of a rank
+    int get_root(int rank)
+    {
+        // If rank is its own parent, that's the root
+        if(parent[rank] == rank)
+            return rank;
+        // Otherwise, follow the links until we get to the root
+        return parent[rank] = get_root(parent[rank]);
+    }
+
+    // Add a connection between rankA and rankB
+    void add_connection(int rankA, int rankB)
+    {
+        // A and B are now part of the same set, so give them the same
+        // root
+        auto rootA = get_root(rankA);
+        auto rootB = get_root(rankB);
+        if(rootA != rootB)
+            parent[rootA] = parent[rootB];
+    }
+
+    // Get the set of ranks that's connected to a specified rank
+    std::set<int> get_connected(int rank)
+    {
+        // Compress the paths in the parent array so that each rank
+        // points to its root parent
+        for(int i = 0; i < static_cast<int>(parent.size()); ++i)
+        {
+            parent[i] = get_root(i);
+        }
+
+        // Return ranks that have the same parent
+        std::set<int> ret;
+        for(int i = 0; i < static_cast<int>(parent.size()); ++i)
+        {
+            if(parent[i] == parent[rank])
+                ret.insert(i);
+        }
+        return ret;
+    }
+};
+
 // global transpose using MPI sub-communicators
 // subcomm is guaranteed to be a valid communicator (not MPI_COMM_NULL) before this call
 void rocfft_plan_t::GlobalTransposeA2ASubcomm(size_t                     elem_size,
