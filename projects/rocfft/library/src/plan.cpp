@@ -380,17 +380,14 @@ try
     case rocfft_comm_none:
     {
 #ifdef ROCFFT_MPI_ENABLE
-        description->mpi_comm.free();
+        description->user_mpi_comm = nullptr;
 #endif
         break;
     }
 #ifdef ROCFFT_MPI_ENABLE
     case rocfft_comm_mpi:
     {
-        description->mpi_comm.duplicate(*static_cast<MPI_Comm*>(comm_handle));
-        auto mpiret = MPI_Comm_set_errhandler(description->mpi_comm, MPI_ERRORS_RETURN);
-        if(mpiret != MPI_SUCCESS)
-            return rocfft_status_failure;
+        description->user_mpi_comm = *static_cast<MPI_Comm*>(comm_handle);
         break;
     }
 #endif
@@ -2947,7 +2944,7 @@ rocfft_status allgather_brick_params_lus_mpi(rocfft_plan&    plan,
                               global_brick_count.data(),
                               1,
                               type_to_mpi_type<typeof(decltype(global_brick_count)::value_type)>(),
-                              plan->desc.mpi_comm);
+                              plan->mpi_comm);
         if(rcmpi != MPI_SUCCESS)
         {
             throw std::runtime_error("MPI_Allgather failed: " + std::to_string(rcmpi));
@@ -3026,7 +3023,7 @@ rocfft_status allgather_brick_params_lus_mpi(rocfft_plan&    plan,
                            recvcount.data(),
                            displacements.data(),
                            type_to_mpi_type<typeof(decltype(global_lowers)::value_type)>(),
-                           plan->desc.mpi_comm);
+                           plan->mpi_comm);
     if(rcmpi != MPI_SUCCESS)
     {
         throw std::runtime_error("MPI_Allgatherv failed: " + std::to_string(rcmpi));
@@ -3043,7 +3040,7 @@ rocfft_status allgather_brick_params_lus_mpi(rocfft_plan&    plan,
                            recvcount.data(),
                            displacements.data(),
                            type_to_mpi_type<typeof(decltype(global_uppers)::value_type)>(),
-                           plan->desc.mpi_comm);
+                           plan->mpi_comm);
     if(rcmpi != MPI_SUCCESS)
     {
         throw std::runtime_error("MPI_Allgatherv failed: " + std::to_string(rcmpi));
@@ -3060,7 +3057,7 @@ rocfft_status allgather_brick_params_lus_mpi(rocfft_plan&    plan,
                            recvcount.data(),
                            displacements.data(),
                            type_to_mpi_type<typeof(decltype(global_strides)::value_type)>(),
-                           plan->desc.mpi_comm);
+                           plan->mpi_comm);
     if(rcmpi != MPI_SUCCESS)
     {
         throw std::runtime_error("MPI_Allgatherv failed: " + std::to_string(rcmpi));
@@ -3077,7 +3074,7 @@ rocfft_status allgather_brick_params_lus_mpi(rocfft_plan&    plan,
                            global_brick_count.data(),
                            scalar_displacements.data(),
                            type_to_mpi_type<typeof(decltype(global_devices)::value_type)>(),
-                           plan->desc.mpi_comm);
+                           plan->mpi_comm);
     if(rcmpi != MPI_SUCCESS)
     {
         throw std::runtime_error("MPI_Allgatherv failed: " + std::to_string(rcmpi));
@@ -3094,7 +3091,7 @@ rocfft_status allgather_brick_params_lus_mpi(rocfft_plan&    plan,
                            global_brick_count.data(),
                            scalar_displacements.data(),
                            type_to_mpi_type<typeof(decltype(global_comm_ranks)::value_type)>(),
-                           plan->desc.mpi_comm);
+                           plan->mpi_comm);
     if(rcmpi != MPI_SUCCESS)
     {
         throw std::runtime_error("MPI_Allgatherv failed: " + std::to_string(rcmpi));
@@ -3156,7 +3153,7 @@ rocfft_status allgather_brick_params_mpi(rocfft_plan& plan)
 #if !defined ROCFFT_MPI_ENABLE
     return rocfft_status_failure;
 #else
-    if(!plan->desc.mpi_comm)
+    if(!plan->mpi_comm)
     {
         // If the comm type is MPI, but the comm pointer is null, then return an error.
         return rocfft_status_failure;
@@ -3220,7 +3217,7 @@ rocfft_status allgather_brick_params_mpi(rocfft_plan& plan)
                               all_brick_lengths.data(),
                               1,
                               type_to_mpi_type<typeof(decltype(all_brick_lengths)::value_type)>(),
-                              plan->desc.mpi_comm);
+                              plan->mpi_comm);
         if(rcmpi != MPI_SUCCESS)
         {
             throw std::runtime_error("MPI_Allgather failed: " + std::to_string(rcmpi));
@@ -3247,9 +3244,9 @@ rocfft_status allgather_brick_params_mpi(rocfft_plan& plan)
     // Verify that all ranks have the same number of input and output fields.
     try
     {
-        if(!all_mpi_ranks_same_scalar(plan->desc.inFields.size(), plan->desc.mpi_comm))
+        if(!all_mpi_ranks_same_scalar(plan->desc.inFields.size(), plan->mpi_comm))
             return rocfft_status_failure;
-        if(!all_mpi_ranks_same_scalar(plan->desc.outFields.size(), plan->desc.mpi_comm))
+        if(!all_mpi_ranks_same_scalar(plan->desc.outFields.size(), plan->mpi_comm))
             return rocfft_status_failure;
     }
     catch(std::exception& e)
@@ -3356,11 +3353,11 @@ void rocfft_plan_t::ValidateFields() const
 int rocfft_plan_t::get_local_comm_rank() const
 {
 #ifdef ROCFFT_MPI_ENABLE
-    if(desc.comm_type == rocfft_comm_none || !desc.mpi_comm)
+    if(desc.comm_type == rocfft_comm_none || !mpi_comm)
         return 0;
 
     int  mpi_rank = 0;
-    auto rcmpi    = MPI_Comm_rank(desc.mpi_comm, &mpi_rank);
+    auto rcmpi    = MPI_Comm_rank(mpi_comm, &mpi_rank);
     if(rcmpi != MPI_SUCCESS)
         throw std::runtime_error("MPI_Comm_rank failed: " + std::to_string(rcmpi));
     return mpi_rank;
@@ -3372,11 +3369,11 @@ int rocfft_plan_t::get_local_comm_rank() const
 int rocfft_plan_t::get_local_comm_size() const
 {
 #ifdef ROCFFT_MPI_ENABLE
-    if(desc.comm_type == rocfft_comm_none || !desc.mpi_comm)
+    if(desc.comm_type == rocfft_comm_none || !mpi_comm)
         return 1;
 
     int  mpi_size = 0;
-    auto rcmpi    = MPI_Comm_size(desc.mpi_comm, &mpi_size);
+    auto rcmpi    = MPI_Comm_size(mpi_comm, &mpi_size);
     if(rcmpi != MPI_SUCCESS)
         throw std::runtime_error("MPI_Comm_rank failed: " + std::to_string(rcmpi));
     return mpi_size;
@@ -3424,14 +3421,26 @@ rocfft_status rocfft_plan_create_internal(rocfft_plan                   plan,
 
         auto rcfft = rocfft_status_success;
 
+#ifdef ROCFFT_MPI_ENABLE
         if(plan->desc.comm_type == rocfft_comm_mpi)
         {
+            // duplicate the user-provided MPI communicator and set
+            // our own error policy on it
+            if(plan->desc.user_mpi_comm)
+            {
+                plan->mpi_comm.duplicate(plan->desc.user_mpi_comm);
+                auto mpiret = MPI_Comm_set_errhandler(plan->mpi_comm, MPI_ERRORS_RETURN);
+                if(mpiret != MPI_SUCCESS)
+                    return rocfft_status_failure;
+            }
+
             // Each rank needs to know the global data distribution for plan generation, so we
             // gather all the brick information here.
             rcfft = allgather_brick_params_mpi(plan);
             if(rcfft != rocfft_status_success)
                 throw std::runtime_error("gather brick params failed");
         }
+#endif
 
         // Sort the parameters to be row major, in case they're not
         plan->sort();

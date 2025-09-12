@@ -149,7 +149,9 @@ struct rocfft_plan_description_t
     // Multi-process communicator info:
     rocfft_comm_type comm_type = rocfft_comm_none;
 #ifdef ROCFFT_MPI_ENABLE
-    MPI_Comm_wrapper_t mpi_comm;
+    // this is the communicator that was directly provided by the user
+    // - we don't own it so it doesn't need to be wrapped or freed
+    MPI_Comm user_mpi_comm = MPI_COMM_NULL;
 #endif
 
     LoadOps  loadOps;
@@ -195,6 +197,9 @@ struct rocfft_plan_description_t
 
 struct rocfft_plan_t
 {
+#ifdef ROCFFT_MPI_ENABLE
+    MPI_Comm_wrapper_t mpi_comm;
+#endif
     size_t rank = 0;
     // input lengths
     std::vector<size_t> lengths;

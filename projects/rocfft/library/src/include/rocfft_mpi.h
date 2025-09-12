@@ -48,16 +48,8 @@ public:
         return mpi_comm;
     }
 
-    // copy, duplicating the communicator
-    MPI_Comm_wrapper_t(const MPI_Comm_wrapper_t& other)
-    {
-        duplicate(other.mpi_comm);
-    }
-    MPI_Comm_wrapper_t& operator=(const MPI_Comm_wrapper_t& other)
-    {
-        duplicate(other.mpi_comm);
-        return *this;
-    }
+    MPI_Comm_wrapper_t(const MPI_Comm_wrapper_t&) = delete;
+    MPI_Comm_wrapper_t& operator=(const MPI_Comm_wrapper_t&) = delete;
 
     // move communicator
     MPI_Comm_wrapper_t(MPI_Comm_wrapper_t&& other)

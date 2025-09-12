@@ -597,7 +597,7 @@ void CommPointToPoint::ExecuteAsync(const rocfft_plan     plan,
                                           rocfft_type_to_mpi_type(precision, arrayType),
                                           destLocation.comm_rank,
                                           multiPlanIdx,
-                                          plan->desc.mpi_comm,
+                                          plan->mpi_comm,
                                           &request);
             if(mpiret != MPI_SUCCESS)
             {
@@ -614,7 +614,7 @@ void CommPointToPoint::ExecuteAsync(const rocfft_plan     plan,
                                           rocfft_type_to_mpi_type(precision, arrayType),
                                           srcLocation.comm_rank,
                                           multiPlanIdx,
-                                          plan->desc.mpi_comm,
+                                          plan->mpi_comm,
                                           &request);
             if(mpiret != MPI_SUCCESS)
             {
@@ -711,7 +711,7 @@ void CommScatter::ExecuteAsync(const rocfft_plan     plan,
                                               rocfft_type_to_mpi_type(precision, arrayType),
                                               op.destLocation.comm_rank,
                                               GetOperationCommTag(multiPlanIdx, opIdx),
-                                              plan->desc.mpi_comm,
+                                              plan->mpi_comm,
                                               &request);
                 if(mpiret != MPI_SUCCESS)
                 {
@@ -728,7 +728,7 @@ void CommScatter::ExecuteAsync(const rocfft_plan     plan,
                                               rocfft_type_to_mpi_type(precision, arrayType),
                                               srcLocation.comm_rank,
                                               GetOperationCommTag(multiPlanIdx, opIdx),
-                                              plan->desc.mpi_comm,
+                                              plan->mpi_comm,
                                               &request);
                 if(mpiret != MPI_SUCCESS)
                 {
@@ -848,7 +848,7 @@ void CommGather::ExecuteAsync(const rocfft_plan     plan,
                                        rocfft_type_to_mpi_type(precision, arrayType),
                                        destLocation.comm_rank,
                                        GetOperationCommTag(multiPlanIdx, opIdx),
-                                       plan->desc.mpi_comm,
+                                       plan->mpi_comm,
                                        &request);
                 if(rcmpi != MPI_SUCCESS)
                     throw std::runtime_error("MPI_Isend failed: " + std::to_string(rcmpi));
@@ -862,7 +862,7 @@ void CommGather::ExecuteAsync(const rocfft_plan     plan,
                                        rocfft_type_to_mpi_type(precision, arrayType),
                                        op.srcLocation.comm_rank,
                                        GetOperationCommTag(multiPlanIdx, opIdx),
-                                       plan->desc.mpi_comm,
+                                       plan->mpi_comm,
                                        &request);
                 if(rcmpi != MPI_SUCCESS)
                     throw std::runtime_error("MPI_Irecv failed: " + std::to_string(rcmpi));
@@ -945,7 +945,7 @@ void CommAllToAll::ExecuteAsync(const rocfft_plan     plan,
                                           recvBuf.get(in_buffer, out_buffer, local_comm_rank),
                                           send_count_bytes,
                                           MPI_CHAR,
-                                          plan->desc.mpi_comm,
+                                          mpi_comm,
                                           &request);
 
         if(mpiret != MPI_SUCCESS)
@@ -991,7 +991,7 @@ void CommAllToAll::ExecuteAsync(const rocfft_plan     plan,
                                            intRecvCounts.data(),
                                            intRecvOffsets.data(),
                                            rocfft_type_to_mpi_type(precision, arrayType),
-                                           plan->desc.mpi_comm,
+                                           mpi_comm,
                                            &request);
 
         if(mpiret != MPI_SUCCESS)
