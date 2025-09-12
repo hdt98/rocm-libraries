@@ -264,9 +264,6 @@ const int GETRI_BATCH_NUM_INTERVALS = 2;
 /***************************** trtri ******************************************
 *******************************************************************************/
 
-#ifndef TRTRI_MAX_COLS
-const int TRTRI_MAX_COLS = 64;
-#endif
 #ifndef TRTRI_NUM_INTERVALS
 const int TRTRI_NUM_INTERVALS = 1;
 #endif
