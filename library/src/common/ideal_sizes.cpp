@@ -214,12 +214,6 @@ const int GETF2_SPKER_MAX_M = 1024;
 #ifndef GETF2_SPKER_MAX_N
 const int GETF2_SPKER_MAX_N = 256;
 #endif
-#ifndef GETF2_SSKER_MAX_M
-const int GETF2_SSKER_MAX_M = 512;
-#endif
-#ifndef GETF2_SSKER_MAX_N
-const int GETF2_SSKER_MAX_N = 64;
-#endif
 #ifndef GETRF_NUM_INTERVALS_REAL
 const int GETRF_NUM_INTERVALS_REAL = 4;
 #endif

@@ -312,10 +312,10 @@ extern const int GETF2_SPKER_MAX_M;
 extern const int GETF2_SPKER_MAX_N;
 #endif
 #ifndef GETF2_SSKER_MAX_M
-extern const int GETF2_SSKER_MAX_M;
+#define GETF2_SSKER_MAX_M 512
 #endif
 #ifndef GETF2_SSKER_MAX_N
-extern const int GETF2_SSKER_MAX_N;
+#define GETF2_SSKER_MAX_N 64
 #endif
 #ifndef GETF2_OPTIM_NGRP
 #define GETF2_OPTIM_NGRP \
