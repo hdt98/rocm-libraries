@@ -2844,6 +2844,9 @@ bool rocfft_plan_t::BuildOptMultiDevicePlan()
         inputFFTBufs.emplace_back(BufferPtr::temp(inputTemp.back().data()));
     }
 
+    std::vector<BufferPtr> outputBufs
+        = GatherUserBuffers(BufferPtr::user_output, desc.outFields.front().bricks);
+
     // plan FFTs along already contiguous dimensions
     std::vector<size_t> inputFFTItems;
     C2CField(
@@ -2918,7 +2921,8 @@ bool rocfft_plan_t::BuildOptMultiDevicePlan()
 
             // create the next field by splitting using a heuristic approach
             rocfft_field_t nextField;
-            if(i == transpose_sequence.size() - 1)
+            bool           writeToUserOutput = i == transpose_sequence.size() - 1;
+            if(writeToUserOutput)
                 nextField = desc.outFields.front();
             else
                 nextField = MakeFieldWithPencilSplit(
@@ -2943,25 +2947,31 @@ bool rocfft_plan_t::BuildOptMultiDevicePlan()
             if(!pencil_comm)
                 throw std::runtime_error("Failed to create a valid Pencil sub-communicator");
 
-            // allocate temp buffers for nextField,
-            // loop over the pencil_neighbors_vec (these are the global ranks in this subcomm)
+            // allocate temp buffers for nextField, though we only
+            // need to do this if we're in the middle of the
+            // transpose sequence (last one will write to output, not
+            // temp)
             std::vector<TempBufferLease> tempLeases;
             std::vector<BufferPtr>       tempBufs(nextField.bricks.size());
-            for(size_t b = 0; b < nextField.bricks.size(); ++b)
+
+            if(!writeToUserOutput)
             {
-                // Allocate a buffer only if this global rank owns the brick.
-                if(nextField.bricks[b].location.comm_rank == local_comm_rank)
+                for(size_t b = 0; b < nextField.bricks.size(); ++b)
                 {
-                    tempLeases.emplace_back(tempBuffers,
-                                            local_comm_rank,
-                                            nextField.bricks[b].location,
-                                            nextField.bricks[b].count_elems(),
-                                            elem_size);
-                    tempBufs[b] = BufferPtr::temp(tempLeases.back().data());
-                }
-                else
-                {
-                    tempBufs[b] = BufferPtr();
+                    // Allocate a buffer only if this global rank owns the brick.
+                    if(nextField.bricks[b].location.comm_rank == local_comm_rank)
+                    {
+                        tempLeases.emplace_back(tempBuffers,
+                                                local_comm_rank,
+                                                nextField.bricks[b].location,
+                                                nextField.bricks[b].count_elems(),
+                                                elem_size);
+                        tempBufs[b] = BufferPtr::temp(tempLeases.back().data());
+                    }
+                    else
+                    {
+                        tempBufs[b] = BufferPtr();
+                    }
                 }
             }
 
@@ -2971,7 +2981,7 @@ bool rocfft_plan_t::BuildOptMultiDevicePlan()
                             currentField,
                             nextField,
                             currentBufs,
-                            tempBufs,
+                            writeToUserOutput ? outputBufs : tempBufs,
                             currentAntecedents,
                             transposeItems,
                             transposeNumber++,
@@ -2987,8 +2997,8 @@ bool rocfft_plan_t::BuildOptMultiDevicePlan()
                 std::vector<size_t> fftItems;
                 C2CField(currentField,
                          {static_cast<size_t>(pencil_axis)},
-                         currentBufs,
-                         currentBufs,
+                         writeToUserOutput ? outputBufs : currentBufs,
+                         writeToUserOutput ? outputBufs : currentBufs,
                          currentAntecedents,
                          fftItems);
                 fft_done[pencil_axis] = 1;
@@ -3053,8 +3063,6 @@ bool rocfft_plan_t::BuildOptMultiDevicePlan()
         }
 
         // transpose data to output layout and transform along remaining dimensions
-        std::vector<BufferPtr> outputBufs
-            = GatherUserBuffers(BufferPtr::user_output, desc.outFields.front().bricks);
         std::vector<size_t> finalTransposeItems;
         std::vector<size_t> finalFFTItems;
         GlobalTranspose(elem_size,
