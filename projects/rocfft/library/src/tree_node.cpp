@@ -529,6 +529,16 @@ void MultiPlanItem::WaitCommRequests()
 #endif
 }
 
+#ifdef ROCFFT_MPI_ENABLE
+MPI_Comm MultiPlanItem::ActiveMPIComm(rocfft_plan plan) const
+{
+    if(subcomm)
+        return *subcomm;
+    else
+        return plan->mpi_comm;
+}
+#endif
+
 void CommPointToPoint::ExecuteAsync(const rocfft_plan     plan,
                                     void*                 in_buffer[],
                                     void*                 out_buffer[],
@@ -916,79 +926,13 @@ void CommAllToAll::ExecuteAsync(const rocfft_plan     plan,
     }
 
 #ifdef ROCFFT_MPI_ENABLE
-
-    // check that we have as many elems in our count/offset buffers as
-    // we have ranks
-    size_t num_ranks;
-    int    subcomm_rank;
-    if(subcomm)
-    {
-        int tmp_num_ranks = 0;
-        MPI_Comm_size(*subcomm, &tmp_num_ranks);
-        if(tmp_num_ranks < 0)
-            throw std::runtime_error("Sub-communicator size is not positive");
-        num_ranks = static_cast<size_t>(tmp_num_ranks);
-        MPI_Comm_rank(*subcomm, &subcomm_rank);
-    }
-    else
-    {
-        num_ranks = plan->get_local_comm_size();
-    }
-
-    if(sendOffsets.size() != num_ranks || sendCounts.size() != num_ranks
-       || recvOffsets.size() != num_ranks || recvCounts.size() != num_ranks)
-    {
-        throw std::runtime_error(
-            "CommAllToAll: number of counts/offsets does not match number of ranks");
-    }
-
-    int global_rank = local_comm_rank;
+    auto mpi_comm = ActiveMPIComm(plan);
 
     const auto  elem_size = element_size(precision, arrayType);
     MPI_Request request;
+    const int   local_comm_rank = plan->get_local_comm_rank();
 
-    if(subcomm)
-    {
-        if(LOG_PLAN_ENABLED())
-            log_plan("Using MPI_Ialltoall with sub-communicators\n");
-
-        // optimization with pencil sub-communicators
-        if(!uniform_counts)
-            throw std::runtime_error(
-                "CommAllToAll::ExecuteAsync: non-uniform counts in pencil subcomm!");
-
-        void* send_ptr = sendBuf.get(in_buffer, out_buffer, local_comm_rank);
-        void* recv_ptr = recvBuf.get(in_buffer, out_buffer, local_comm_rank);
-
-        if(!send_ptr || !recv_ptr)
-        {
-            throw std::runtime_error("Buffer pointer(s) are null!");
-        }
-
-        // in subcomm: sendCounts, recvCounts, etc are sized for num_ranks, indexed by subcomm_rank
-        const int send_count_bytes = static_cast<int>(sendCounts.front() * elem_size);
-
-        int ret = MPI_Ialltoall(sendBuf.get(in_buffer, out_buffer, local_comm_rank),
-                                send_count_bytes,
-                                MPI_CHAR,
-                                recvBuf.get(in_buffer, out_buffer, local_comm_rank),
-                                send_count_bytes,
-                                MPI_CHAR,
-                                *subcomm,
-                                &request);
-
-        if(ret != MPI_SUCCESS)
-        {
-            char errmsg[MPI_MAX_ERROR_STRING];
-            int  errlen = 0;
-            MPI_Error_string(ret, errmsg, &errlen);
-            comm_status   = COMM_MPI_ERROR;
-            error_message = "MPI_Ialltoall (subcomm) failed on global rank "
-                            + std::to_string(global_rank) + ": " + std::string(errmsg);
-            return;
-        }
-    }
-    else if(uniform_counts)
+    if(uniform_counts)
     {
         if(LOG_PLAN_ENABLED())
             log_plan("Using MPI_Ialltoall\n");
@@ -1023,7 +967,6 @@ void CommAllToAll::ExecuteAsync(const rocfft_plan     plan,
             log_plan("Using MPI_Ialltoallv\n");
 
         // non-uniform exchange case (default)
-        const int local_comm_rank = plan->get_local_comm_rank();
 
         // MPI takes ints for everything, convert our size_t elements to int bytes
         auto convertToInt = [](const std::vector<size_t>& src, std::vector<int>& dest) {

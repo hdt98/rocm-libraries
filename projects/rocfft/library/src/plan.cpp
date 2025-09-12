@@ -2243,6 +2243,8 @@ void rocfft_plan_t::GlobalTransposeA2A(size_t                     elem_size,
     // unpack operations after the all-to-all communication
     std::vector<size_t> unpack_ops;
 
+    ConnectedRanks conn(local_comm_size);
+
     // loop over each input brick, finding the intersection of it with
     // every output brick
     for(size_t inBrickIdx = 0; inBrickIdx < inField.bricks.size(); ++inBrickIdx)
@@ -2257,6 +2259,8 @@ void rocfft_plan_t::GlobalTransposeA2A(size_t                     elem_size,
             auto intersection = inBrick.intersect(outBrick);
             if(intersection.empty())
                 continue;
+
+            conn.add_connection(inBrick.location.comm_rank, outBrick.location.comm_rank);
 
             const auto elems = intersection.count_elems();
 
@@ -2375,6 +2379,34 @@ void rocfft_plan_t::GlobalTransposeA2A(size_t                     elem_size,
         }
     }
 
+    // get the set of ranks that this rank needs to communicate with
+    std::set<int> comm_ranks = conn.get_connected(local_comm_rank);
+
+    // if the set of ranks we need to communicate with is a subset,
+    // narrow the AllToAll to just that set
+    std::optional<MPI_Comm_wrapper_t> subcomm;
+#ifdef ROCFFT_MPI_ENABLE
+    if(comm_ranks.size() < static_cast<size_t>(local_comm_size))
+    {
+        // go backwards through the ranks
+        for(int i = local_comm_size - 1; i >= 0; --i)
+        {
+            if(comm_ranks.find(i) == comm_ranks.end())
+            {
+                send_counts.erase(send_counts.begin() + i);
+                send_offsets.erase(send_offsets.begin() + i);
+                recv_counts.erase(recv_counts.begin() + i);
+                recv_offsets.erase(recv_offsets.begin() + i);
+            }
+        }
+
+        // create a subcommunicator with this subset
+        std::vector<int> comm_ranks_vec;
+        std::copy(comm_ranks.begin(), comm_ranks.end(), std::back_inserter(comm_ranks_vec));
+        subcomm = make_subcommunicator(mpi_comm, comm_ranks_vec);
+    }
+#endif
+
     // add the all-to-all op itself, which depends on pack ops
     auto alltoall_ptr = std::make_unique<CommAllToAll>(precision,
                                                        desc.inArrayType,
@@ -2383,7 +2415,8 @@ void rocfft_plan_t::GlobalTransposeA2A(size_t                     elem_size,
                                                        recv_offsets,
                                                        recv_counts,
                                                        BufferPtr::temp(send_buf.data()),
-                                                       BufferPtr::temp(recv_buf.data()));
+                                                       BufferPtr::temp(recv_buf.data()),
+                                                       std::move(subcomm));
 
     auto alltoall_op                    = AddMultiPlanItem(std::move(alltoall_ptr), pack_ops);
     multiPlan[alltoall_op]->group       = itemGroup;
@@ -2753,25 +2786,6 @@ bool rocfft_plan_t::BuildOptMultiDevicePlan()
             else
                 nextField = MakeFieldWithPencilSplit(
                     currentField, lengthsWithBatch, split_axes, split_sizes);
-
-            // determine overlapping ranks (subcommunicator members)
-            std::set<int> pencil_neighbors;
-            for(const auto& out_brick : nextField.bricks)
-            {
-                if(out_brick.location.comm_rank == local_comm_rank)
-                {
-                    for(const auto& in_brick : currentField.bricks)
-                        if(!in_brick.intersect(out_brick).empty())
-                            pencil_neighbors.insert(in_brick.location.comm_rank);
-                }
-            }
-
-            // create subcommunicator using helper (RAII)
-            std::vector<int> pencil_neighbors_vec(pencil_neighbors.begin(), pencil_neighbors.end());
-            MPI_Comm_wrapper_t pencil_comm
-                = make_subcommunicator(desc.mpi_comm, pencil_neighbors_vec);
-            if(!pencil_comm)
-                throw std::runtime_error("Failed to create a valid Pencil sub-communicator");
 
             // allocate temp buffers for nextField, though we only
             // need to do this if we're in the middle of the

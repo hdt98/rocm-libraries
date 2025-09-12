@@ -1097,6 +1097,9 @@ struct MultiPlanItem
     // Sub-communicator for this operation, which is only set if the
     // we know we're only talking to a subset of the ranks
     std::optional<MPI_Comm_wrapper_t> subcomm;
+    // Helper to get the sub-communicator if it's set, or the plan's
+    // communicator.
+    MPI_Comm ActiveMPIComm(const rocfft_plan plan) const;
 };
 
 // Communication operations
@@ -1388,7 +1391,7 @@ struct CommAllToAll : public MultiPlanItem
                  const std::vector<size_t>&          _recvCounts,
                  BufferPtr                           _sendBuf,
                  BufferPtr                           _recvBuf,
-                 std::optional<MPI_Comm_wrapper_t>&& _subcomm = {})
+                 std::optional<MPI_Comm_wrapper_t>&& _subcomm)
         : precision(_precision)
         , arrayType(_arrayType)
         , sendOffsets(_sendOffsets)

@@ -301,11 +301,12 @@ inline MPI_Comm_wrapper_t make_subcommunicator(MPI_Comm parent_comm, const std::
 
 #else
 
+typedef int MPI_Comm;
 class MPI_Comm_wrapper_t
 {
 public:
     MPI_Comm_wrapper_t() {}
-    static MPI_Comm_wrapper_t from_raw(int)
+    static MPI_Comm_wrapper_t from_raw(MPI_Comm)
     {
         return MPI_Comm_wrapper_t{};
     }
