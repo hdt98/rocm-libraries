@@ -70,12 +70,6 @@
 #define TUNING_SHARED_MEMORY_MAX 65536u
 // Support half operators on host side
 
-inline const char* get_seed_message()
-{
-    return "seed for input generation, either an unsigned integer value for determinisic results "
-           "or 'random' for different inputs for each repetition";
-}
-
 /// \brief Provides a sequence of seeds.
 class managed_seed
 {
@@ -2043,36 +2037,36 @@ private:
                                    bool         default_cold,
                                    int          default_trials)
     {
-        parser.set_optional<size_t>("size", "size", default_bytes, "size in bytes");
+        parser.set_optional<size_t>("size", "size", default_bytes, "Size of the randomly generated input array in bytes.");
         parser.set_optional<size_t>("batch_iterations",
                                     "batch_iterations",
                                     default_batch_iterations,
-                                    "number of batch iterations");
+                                    "Number of batch iterations.");
         parser.set_optional<size_t>("warmup_iterations",
                                     "warmup_iterations",
                                     default_warmup_iterations,
-                                    "number of warmup iterations");
+                                    "Number of warmup iterations.");
         parser.set_optional<bool>("hot",
                                   "hot",
                                   !default_cold,
-                                  "don't clear the gpu cache on every batch iteration");
+                                  "Don't clear the gpu cache on every batch iteration.");
 
-        parser.set_optional<std::string>("seed", "seed", "random", get_seed_message());
+        parser.set_optional<std::string>("seed", "seed", "random", "Seed for input generation. Either an unsigned integer value for determinisic results, or 'random' for different inputs for each repetition.");
         parser.set_optional<int>("trials", "trials", default_trials, "number of iterations");
         parser.set_optional<std::string>("name_format",
                                          "name_format",
                                          "json",
-                                         "either json, human, or txt");
+                                         "Either json, human, or txt.");
 
         // Optionally run an evenly split subset of benchmarks for autotuning.
         parser.set_optional<int>("parallel_instance",
                                  "parallel_instance",
                                  0,
-                                 "parallel instance index");
+                                 "Parallel instance index.");
         parser.set_optional<int>("parallel_instances",
                                  "parallel_instances",
                                  1,
-                                 "total parallel instances");
+                                 "Total parallel instances.");
 
         parser.set_optional<std::string>(
             "iteration_info_out",
