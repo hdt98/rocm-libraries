@@ -369,7 +369,6 @@ if(HIPBLASLT_ENABLE_CLIENT)
             hipblaslt-bench-extop-matrixtransform
             hipblaslt-bench-extop-softmax
             hipblaslt-bench-extop-amax
-            hipblaslt-sequence
         COMPONENT benchmarks
     )
     if(HIPBLASLT_ENABLE_LLVM)
