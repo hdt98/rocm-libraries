@@ -372,6 +372,13 @@ if(HIPBLASLT_ENABLE_CLIENT)
             hipblaslt-sequence
         COMPONENT benchmarks
     )
+    if(HIPBLASLT_ENABLE_LLVM)
+        rocm_install(
+            TARGETS
+                hipblaslt-sequence
+            COMPONENT benchmarks
+        )
+    endif()
     rocm_install(
         FILES
             "${CMAKE_CURRENT_SOURCE_DIR}/clients/tests/data/hipblaslt_common.yaml"
