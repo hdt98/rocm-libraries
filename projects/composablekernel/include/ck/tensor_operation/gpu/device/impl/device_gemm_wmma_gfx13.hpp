@@ -915,7 +915,7 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
                         }
                         else
                         {
-                            const auto kernel = kernel_gemm_wmma<
+                            const auto kernel = kernel_gemm_wmma_gfx13<
                                 GridwiseGemm,
                                 ADataType,
                                 BDataType,
@@ -985,13 +985,13 @@ struct DeviceGemmWmma_GFX13 : public DeviceGemm<ALayout,
             if constexpr(!(is_same_v<AccDataType, float> || is_same_v<AccDataType, ck::half_t> ||
                            is_same_v<AccDataType, int32_t>))
             {
-                printf("DeviceOp err: AccDataType");
+                printf("DeviceOp err: AccDataType\n");
                 return false;
             }
         }
         else
         {
-            printf("DeviceOp err: Arch");
+            printf("DeviceOp err: Arch\n");
             return false;
         }
 

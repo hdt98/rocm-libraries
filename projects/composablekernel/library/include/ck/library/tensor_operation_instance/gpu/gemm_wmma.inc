@@ -67,7 +67,6 @@ void add_device_gemm_wmma_int8_int8_int8_mk_nk_mn_instances(
     std::vector<std::unique_ptr<
         DeviceGemm<Row, Col, Row, int8_t, int8_t, int8_t, PassThrough, PassThrough, PassThrough>>>&
         instances);
-
 } // namespace instance
 } // namespace device
 } // namespace tensor_operation

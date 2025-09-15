@@ -204,9 +204,9 @@ struct DeviceGroupedConvFwdMultipleD_Wcnn_CShuffle
 #endif
         {
             constexpr index_t HPerBlockOut =
-                FilterSize == 2 ? (Transposed ? HPerBlock * 2 : HPerBlock / 2) : HPerBlock;
+                GridFilterSize == 2 ? (Transposed ? HPerBlock * 2 : HPerBlock / 2) : HPerBlock;
             constexpr index_t WPerBlockOut =
-                FilterSize == 2 ? (Transposed ? WPerBlock * 2 : WPerBlock / 2) : WPerBlock;
+                GridFilterSize == 2 ? (Transposed ? WPerBlock * 2 : WPerBlock / 2) : WPerBlock;
             const auto acc_data_desc =
                 PadTensorDescriptor(acc_data_raw_desc,
                                     make_tuple(HPerBlockOut, WPerBlockOut, KPerBlock),
@@ -947,13 +947,6 @@ struct DeviceGroupedConvFwdMultipleD_Wcnn_CShuffle
             }
 
             if constexpr(ConvForwardSpecialization ==
-                         ConvolutionForwardSpecialization::Filter3x3Stride1Pad0)
-            {
-                is_compatible &= (arg.a_g_n_c_wis_lengths_[1] == 1);
-                is_compatible &= (arg.e_g_n_k_wos_lengths_[1] == 1);
-            }
-
-            if constexpr(ConvForwardSpecialization ==
                          ConvolutionForwardSpecialization::Filter2x2Stride2Pad0)
             {
                 for(index_t i = 0; i < NDimSpatial; i++)
@@ -1081,6 +1074,7 @@ struct DeviceGroupedConvFwdMultipleD_Wcnn_CShuffle
         bool conv_desc_compatible = IsConvSpecializationCompatible(arg);
         if(conv_desc_compatible == false)
         {
+            printf("conv_desc_compatible is false!\n");
             return false;
         }
 
@@ -1088,6 +1082,11 @@ struct DeviceGroupedConvFwdMultipleD_Wcnn_CShuffle
         if(arg.a_g_n_c_wis_lengths_[0] != arg.b_g_k_c_xs_lengths_[0] ||
            arg.a_g_n_c_wis_lengths_[0] != arg.e_g_n_k_wos_lengths_[0])
         {
+            printf("Group is incorrect:%d %d %d %d!\n",
+                   arg.a_g_n_c_wis_lengths_[0],
+                   arg.b_g_k_c_xs_lengths_[0],
+                   arg.a_g_n_c_wis_lengths_[0],
+                   arg.e_g_n_k_wos_lengths_[0]);
             return false;
         }
 
@@ -1095,6 +1094,10 @@ struct DeviceGroupedConvFwdMultipleD_Wcnn_CShuffle
         {
             if(arg.a_g_n_c_wis_lengths_[0] != arg.ds_g_n_k_wos_lengths_[i][0])
             {
+
+                printf("K is incorrect:%d %d!\n",
+                       arg.a_g_n_c_wis_lengths_[0],
+                       arg.ds_g_n_k_wos_lengths_[i][0]);
                 return false;
             }
         }
@@ -1129,7 +1132,12 @@ struct DeviceGroupedConvFwdMultipleD_Wcnn_CShuffle
             for(index_t i = 0; i < NDimSpatial; i++)
             {
                 if(output_spatial_lengths[i] != arg.e_g_n_k_wos_lengths_[i + 3])
+                {
+                    printf("output is incorrect:%d %d!\n",
+                           output_spatial_lengths[i],
+                           arg.e_g_n_k_wos_lengths_[i + 3]);
                     return false;
+                }
             };
         }
 

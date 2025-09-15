@@ -54,7 +54,7 @@ __global__ void
                                      const Block2CTileMap block_2_ctile_map,
                                      const ComputePtrOffsetOfBatch compute_ptr_offset_of_batch)
 {
-#if(!defined(__HIP_DEVICE_COMPILE__) || defined(__gfx13__))
+#if defined(__gfx13__)
     // offset base pointer for each work-group
     static constexpr index_t NumDTensor = DsGridDesc::Size();
     const index_t num_blocks_per_batch =
@@ -92,15 +92,16 @@ __global__ void
 #else
     ignore = p_in_grid;
     ignore = p_wei_grid;
-    ignore = p_ds_grid_grp;
+    ignore = p_ds_grid;
     ignore = p_e_grid;
-    ignore = in_grid_desc;
-    ignore = wei_grid_desc;
-    ignore = ds_grid_desc;
-    ignore = acc_grid_desc;
     ignore = in_element_op;
     ignore = wei_element_op;
     ignore = acc_element_op;
+    ignore = batch_count;
+    ignore = in_grid_desc;
+    ignore = wei_grid_desc;
+    ignore = ds_grid_desc;
+    ignore = e_grid_desc;
     ignore = compute_ptr_offset_of_batch;
     ignore = block_2_ctile_map;
 #endif
@@ -125,9 +126,11 @@ template <typename GridwiseOp,
           typename ComputePtrOffsetOfBatch,
           bool HasMainBlockLoop,
           index_t ClusterSize>
+#if defined(__gfx13__)
 __attribute__((amdgpu_spatial_cluster_kernel)) __attribute__((cluster_dims(ClusterSize)))
-__global__ void __exp_amd_wavegroup_kernel(4, 32, 256, 1, 1) __exp_amd_no_rank_specialization__
-    kernel_grouped_conv_fwd_wcnn_wavegroup256_spatial_cluster(
+__exp_amd_wavegroup_kernel(4, 32, 256, 1, 1)
+#endif
+    __global__ void kernel_grouped_conv_fwd_wcnn_wavegroup256_spatial_cluster(
         const InDataType* __restrict__ p_in_grid,
         const WeiDataType* __restrict__ p_wei_grid,
         DsPointer p_ds_grid,
@@ -143,7 +146,7 @@ __global__ void __exp_amd_wavegroup_kernel(4, 32, 256, 1, 1) __exp_amd_no_rank_s
         const Block2CTileMap block_2_ctile_map,
         const ComputePtrOffsetOfBatch compute_ptr_offset_of_batch)
 {
-#if(!defined(__HIP_DEVICE_COMPILE__) || defined(__gfx13__))
+#if defined(__gfx13__)
     // offset base pointer for each work-group
     const index_t num_blocks_per_batch =
         __builtin_amdgcn_readfirstlane(get_grid_size() / batch_count);
@@ -200,15 +203,16 @@ __global__ void __exp_amd_wavegroup_kernel(4, 32, 256, 1, 1) __exp_amd_no_rank_s
 #else
     ignore = p_in_grid;
     ignore = p_wei_grid;
-    ignore = p_ds_grid_grp;
+    ignore = p_ds_grid;
     ignore = p_e_grid;
+    ignore = in_element_op;
+    ignore = wei_element_op;
+    ignore = acc_element_op;
+    ignore = batch_count;
     ignore = in_grid_desc;
     ignore = wei_grid_desc;
     ignore = ds_grid_desc;
     ignore = e_grid_desc;
-    ignore = in_element_op;
-    ignore = wei_element_op;
-    ignore = acc_element_op;
     ignore = compute_ptr_offset_of_batch;
     ignore = block_2_ctile_map;
 #endif
@@ -233,9 +237,11 @@ template <typename GridwiseOp,
           typename ComputePtrOffsetOfBatch,
           bool HasMainBlockLoop,
           index_t ClusterSize>
+#if defined(__gfx13__)
 __attribute__((amdgpu_spatial_cluster_kernel)) __attribute__((cluster_dims(ClusterSize)))
-__global__ void __exp_amd_wavegroup_kernel(4, 32, 512, 1, 1) __exp_amd_no_rank_specialization__
-    kernel_grouped_conv_fwd_wcnn_wavegroup512_spatial_cluster(
+__exp_amd_wavegroup_kernel(4, 32, 512, 1, 1)
+#endif
+    __global__ void kernel_grouped_conv_fwd_wcnn_wavegroup512_spatial_cluster(
         const InDataType* __restrict__ p_in_grid,
         const WeiDataType* __restrict__ p_wei_grid,
         DsPointer p_ds_grid,
@@ -251,7 +257,7 @@ __global__ void __exp_amd_wavegroup_kernel(4, 32, 512, 1, 1) __exp_amd_no_rank_s
         const Block2CTileMap block_2_ctile_map,
         const ComputePtrOffsetOfBatch compute_ptr_offset_of_batch)
 {
-#if(!defined(__HIP_DEVICE_COMPILE__) || defined(__gfx13__))
+#if defined(__gfx13__)
     // offset base pointer for each work-group
     const index_t num_blocks_per_batch =
         __builtin_amdgcn_readfirstlane(get_grid_size() / batch_count);
@@ -308,15 +314,16 @@ __global__ void __exp_amd_wavegroup_kernel(4, 32, 512, 1, 1) __exp_amd_no_rank_s
 #else
     ignore = p_in_grid;
     ignore = p_wei_grid;
-    ignore = p_ds_grid_grp;
+    ignore = p_ds_grid;
     ignore = p_e_grid;
+    ignore = in_element_op;
+    ignore = wei_element_op;
+    ignore = acc_element_op;
+    ignore = batch_count;
     ignore = in_grid_desc;
     ignore = wei_grid_desc;
     ignore = ds_grid_desc;
     ignore = e_grid_desc;
-    ignore = in_element_op;
-    ignore = wei_element_op;
-    ignore = acc_element_op;
     ignore = compute_ptr_offset_of_batch;
     ignore = block_2_ctile_map;
 #endif
@@ -340,8 +347,10 @@ template <typename GridwiseOp,
           typename Block2CTileMap,
           typename ComputePtrOffsetOfBatch,
           bool HasMainBlockLoop>
-__global__ void __exp_amd_wavegroup_kernel(4, 32, 256, 1, 1) __exp_amd_no_rank_specialization__
-    kernel_grouped_conv_fwd_wcnn_wavegroup256(
+#if defined(__gfx13__)
+__exp_amd_wavegroup_kernel(4, 32, 256, 1, 1)
+#endif
+    __global__ void kernel_grouped_conv_fwd_wcnn_wavegroup256(
         const InDataType* __restrict__ p_in_grid,
         const WeiDataType* __restrict__ p_wei_grid,
         DsPointer p_ds_grid,
@@ -357,7 +366,7 @@ __global__ void __exp_amd_wavegroup_kernel(4, 32, 256, 1, 1) __exp_amd_no_rank_s
         const Block2CTileMap block_2_ctile_map,
         const ComputePtrOffsetOfBatch compute_ptr_offset_of_batch)
 {
-#if(!defined(__HIP_DEVICE_COMPILE__) || defined(__gfx13__))
+#if defined(__gfx13__)
     // offset base pointer for each work-group
     const index_t num_blocks_per_batch =
         __builtin_amdgcn_readfirstlane(get_grid_size() / batch_count);
@@ -404,15 +413,16 @@ __global__ void __exp_amd_wavegroup_kernel(4, 32, 256, 1, 1) __exp_amd_no_rank_s
 #else
     ignore = p_in_grid;
     ignore = p_wei_grid;
-    ignore = p_ds_grid_grp;
+    ignore = p_ds_grid;
     ignore = p_e_grid;
+    ignore = in_element_op;
+    ignore = wei_element_op;
+    ignore = acc_element_op;
+    ignore = batch_count;
     ignore = in_grid_desc;
     ignore = wei_grid_desc;
     ignore = ds_grid_desc;
     ignore = e_grid_desc;
-    ignore = in_element_op;
-    ignore = wei_element_op;
-    ignore = acc_element_op;
     ignore = compute_ptr_offset_of_batch;
     ignore = block_2_ctile_map;
 #endif
@@ -434,8 +444,10 @@ template <typename GridwiseOp,
           typename Block2CTileMap,
           typename ComputePtrOffsetOfBatch,
           bool HasMainBlockLoop>
-__global__ void __exp_amd_wavegroup_kernel(4, 32, 512, 1, 1) __exp_amd_no_rank_specialization__
-    kernel_grouped_conv_fwd_wcnn_wavegroup512(
+#if defined(__gfx13__)
+__exp_amd_wavegroup_kernel(4, 32, 512, 1, 1)
+#endif
+    __global__ void kernel_grouped_conv_fwd_wcnn_wavegroup512(
         const InDataType* __restrict__ p_in_grid,
         const WeiDataType* __restrict__ p_wei_grid,
         DsPointer p_ds_grid,
@@ -451,7 +463,7 @@ __global__ void __exp_amd_wavegroup_kernel(4, 32, 512, 1, 1) __exp_amd_no_rank_s
         const Block2CTileMap block_2_ctile_map,
         const ComputePtrOffsetOfBatch compute_ptr_offset_of_batch)
 {
-#if(!defined(__HIP_DEVICE_COMPILE__) || defined(__gfx13__))
+#if defined(__gfx13__)
     // offset base pointer for each work-group
     const index_t num_blocks_per_batch =
         __builtin_amdgcn_readfirstlane(get_grid_size() / batch_count);
@@ -495,15 +507,16 @@ __global__ void __exp_amd_wavegroup_kernel(4, 32, 512, 1, 1) __exp_amd_no_rank_s
 #else
     ignore = p_in_grid;
     ignore = p_wei_grid;
-    ignore = p_ds_grid_grp;
+    ignore = p_ds_grid;
     ignore = p_e_grid;
+    ignore = in_element_op;
+    ignore = wei_element_op;
+    ignore = acc_element_op;
+    ignore = batch_count;
     ignore = in_grid_desc;
     ignore = wei_grid_desc;
     ignore = ds_grid_desc;
     ignore = e_grid_desc;
-    ignore = in_element_op;
-    ignore = wei_element_op;
-    ignore = acc_element_op;
     ignore = compute_ptr_offset_of_batch;
     ignore = block_2_ctile_map;
 #endif
@@ -1921,6 +1934,7 @@ struct GridwiseConvMultipleD_Wcnn_CShuffle
                                const AccElementwiseOperation& acc_element_op,
                                const Block2CTileMap& block_2_ctile_map)
     {
+#if defined(__gfx13__)
         /*******************************************************************************/
         // Memory buffer zone.
         const auto in_grid_buf = make_dynamic_buffer<AddressSpaceEnum::Global>(
@@ -2733,6 +2747,22 @@ struct GridwiseConvMultipleD_Wcnn_CShuffle
                                w_out_block_data_idx_on_grid,
                                k_block_data_idx_on_grid);
         }
+#else
+        ignore = p_in_grid;
+        ignore = p_wei_grid;
+        ignore = p_ds_grid;
+        ignore = p_e_grid;
+        ignore = p_shared;
+        ignore = p_lane_shared;
+        ignore = in_element_op;
+        ignore = wei_element_op;
+        ignore = acc_element_op;
+        ignore = in_grid_desc;
+        ignore = wei_grid_desc;
+        ignore = ds_grid_desc;
+        ignore = e_grid_desc;
+        ignore = block_2_ctile_map;
+#endif
     }
 };
 

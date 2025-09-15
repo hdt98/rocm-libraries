@@ -99,6 +99,9 @@ set(GROUPED_CONV2D_FWD
   wmma/device_grouped_conv2d_fwd_wmma_nhwgc_gkyxc_nhwgk_i8_1x1s1p0_instance.cpp
   wmma/device_grouped_conv2d_fwd_wmma_nhwgc_gkyxc_nhwgk_f16_oddc_instance.cpp
   wmma/device_grouped_conv2d_fwd_wmma_nhwgc_gkyxc_nhwgk_i8_oddc_instance.cpp
+  ## NHWC
+  wcnn/device_grouped_conv2d_fwd_wcnn_gnhwc_gkyxc_gnhwk_f16_1x1_instance.cpp
+  wcnn/device_grouped_conv2d_fwd_wcnn_gnhwc_gkyxc_gnhwk_f16_3x3_instance.cpp
 )
 # Add generated files for sharded instantiations.
 include(ShardInstantiation)

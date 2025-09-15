@@ -34,20 +34,19 @@ __global__ void
 #if CK_USE_LAUNCH_BOUNDS
     __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
 #endif
-        kernel_gemm_wmma(const ADataType* __restrict__ p_a_grid,
-                         const BDataType* __restrict__ p_b_grid,
-                         CDataType* __restrict__ p_c_grid,
-                         const AGridDesc a_grid_desc,
-                         const BGridDesc b_grid_desc,
-                         const CGridDescriptor_MBlock_MPerBlock_NBlock_NPerBlock
-                             c_grid_desc_mblock_mperblock_nblock_nperblock,
-                         const AElementwiseOperation a_element_op,
-                         const BElementwiseOperation b_element_op,
-                         const CElementwiseOperation c_element_op,
-                         const Block2CTileMap block_2_ctile_map)
+        kernel_gemm_wmma_gfx13(const ADataType* __restrict__ p_a_grid,
+                               const BDataType* __restrict__ p_b_grid,
+                               CDataType* __restrict__ p_c_grid,
+                               const AGridDesc a_grid_desc,
+                               const BGridDesc b_grid_desc,
+                               const CGridDescriptor_MBlock_MPerBlock_NBlock_NPerBlock
+                                   c_grid_desc_mblock_mperblock_nblock_nperblock,
+                               const AElementwiseOperation a_element_op,
+                               const BElementwiseOperation b_element_op,
+                               const CElementwiseOperation c_element_op,
+                               const Block2CTileMap block_2_ctile_map)
 {
-#if(!defined(__HIP_DEVICE_COMPILE__) || defined(__gfx11__) || defined(__gfx12__) || \
-    defined(__gfx13__))
+#if defined(__gfx13__)
     __shared__ char p_shared[GridwiseGemm::SharedMemTrait::lds_size];
 
     GridwiseGemm::template Run<HasMainKBlockLoop>(p_a_grid,
@@ -88,21 +87,23 @@ template <typename GridwiseGemm,
           typename CElementwiseOperation,
           typename Block2CTileMap,
           bool HasMainKBlockLoop>
-__global__ void __exp_amd_wavegroup_kernel(4, 32, 256, 1, 1) __exp_amd_no_rank_specialization__
-    kernel_gemm_wmma_wavegroup(const ADataType* __restrict__ p_a_grid,
-                               const BDataType* __restrict__ p_b_grid,
-                               CDataType* __restrict__ p_c_grid,
-                               const AGridDesc a_grid_desc,
-                               const BGridDesc b_grid_desc,
-                               const CGridDescriptor_MBlock_MPerBlock_NBlock_NPerBlock
-                                   c_grid_desc_mblock_mperblock_nblock_nperblock,
-                               const AElementwiseOperation a_element_op,
-                               const BElementwiseOperation b_element_op,
-                               const CElementwiseOperation c_element_op,
-                               const Block2CTileMap block_2_ctile_map)
+#if defined(__gfx13__)
+__exp_amd_wavegroup_kernel(4, 32, 256, 1, 1)
+#endif
+    __global__
+    void kernel_gemm_wmma_wavegroup(const ADataType* __restrict__ p_a_grid,
+                                    const BDataType* __restrict__ p_b_grid,
+                                    CDataType* __restrict__ p_c_grid,
+                                    const AGridDesc a_grid_desc,
+                                    const BGridDesc b_grid_desc,
+                                    const CGridDescriptor_MBlock_MPerBlock_NBlock_NPerBlock
+                                        c_grid_desc_mblock_mperblock_nblock_nperblock,
+                                    const AElementwiseOperation a_element_op,
+                                    const BElementwiseOperation b_element_op,
+                                    const CElementwiseOperation c_element_op,
+                                    const Block2CTileMap block_2_ctile_map)
 {
-#if(!defined(__HIP_DEVICE_COMPILE__) || defined(__gfx11__) || defined(__gfx12__) || \
-    defined(__gfx13__))
+#if defined(__gfx13__)
     __shared__ char p_shared[GridwiseGemm::SharedMemTrait::lds_size];
     static constexpr index_t lane_shared_size =
         math::max(GridwiseGemm::LaneSharedMemTrait::lane_shared_size, 4);
@@ -168,7 +169,7 @@ __global__ void
                             const CElementwiseOperation c_element_op,
                             const Block2CTileMap block_2_ctile_map)
 {
-#if(!defined(__HIP_DEVICE_COMPILE__) || defined(__gfx13__))
+#if defined(__gfx13__)
     __shared__ char p_shared[GridwiseGemm::SharedMemTrait::lds_size];
 
     GridwiseGemm::template Run<HasMainKBlockLoop>(p_a_grid,
@@ -219,24 +220,27 @@ template <typename GridwiseGemm,
           typename CElementwiseOperation,
           typename Block2CTileMap,
           bool HasMainKBlockLoop>
-__global__ void __exp_amd_wavegroup_kernel(4, 32, 256, 1, 1) __exp_amd_no_rank_specialization__
-    kernel_gemm_mx_wmma_wavegroup(const int32_t* __restrict__ p_a_grid,
-                                  const int32_t* __restrict__ p_b_grid,
-                                  const int32_t* __restrict__ p_a_scale,
-                                  const int32_t* __restrict__ p_b_scale,
-                                  const AScaleGridDesc a_scale_grid_desc,
-                                  const BScaleGridDesc b_scale_grid_desc,
-                                  CDataType* __restrict__ p_c_grid,
-                                  const AGridDesc a_grid_desc,
-                                  const BGridDesc b_grid_desc,
-                                  const CGridDescriptor_MBlock_MPerBlock_NBlock_NPerBlock
-                                      c_grid_desc_mblock_mperblock_nblock_nperblock,
-                                  const AElementwiseOperation a_element_op,
-                                  const BElementwiseOperation b_element_op,
-                                  const CElementwiseOperation c_element_op,
-                                  const Block2CTileMap block_2_ctile_map)
+#if defined(__gfx13__)
+__exp_amd_wavegroup_kernel(4, 32, 256, 1, 1)
+#endif
+    __global__
+    void kernel_gemm_mx_wmma_wavegroup(const int32_t* __restrict__ p_a_grid,
+                                       const int32_t* __restrict__ p_b_grid,
+                                       const int32_t* __restrict__ p_a_scale,
+                                       const int32_t* __restrict__ p_b_scale,
+                                       const AScaleGridDesc a_scale_grid_desc,
+                                       const BScaleGridDesc b_scale_grid_desc,
+                                       CDataType* __restrict__ p_c_grid,
+                                       const AGridDesc a_grid_desc,
+                                       const BGridDesc b_grid_desc,
+                                       const CGridDescriptor_MBlock_MPerBlock_NBlock_NPerBlock
+                                           c_grid_desc_mblock_mperblock_nblock_nperblock,
+                                       const AElementwiseOperation a_element_op,
+                                       const BElementwiseOperation b_element_op,
+                                       const CElementwiseOperation c_element_op,
+                                       const Block2CTileMap block_2_ctile_map)
 {
-#if(!defined(__HIP_DEVICE_COMPILE__) || defined(__gfx13__))
+#if defined(__gfx13__)
     __shared__ char p_shared[GridwiseGemm::SharedMemTrait::lds_size];
     static constexpr index_t lane_shared_size =
         math::max(GridwiseGemm::LaneSharedMemTrait::lane_shared_size, 4);
@@ -290,20 +294,22 @@ template <typename GridwiseGemm,
           int AClusterSize,
           int BClusterSize,
           bool HasMainKBlockLoop>
-__global__ void __cluster_dims__(AClusterSize* BClusterSize, 1, 1)
-    kernel_gemm_wmma_cluster(const ADataType* __restrict__ p_a_grid,
-                             const BDataType* __restrict__ p_b_grid,
-                             CDataType* __restrict__ p_c_grid,
-                             const AGridDesc a_grid_desc,
-                             const BGridDesc b_grid_desc,
-                             const CGridDescriptor_MBlock_MPerBlock_NBlock_NPerBlock
-                                 c_grid_desc_mblock_mperblock_nblock_nperblock,
-                             const AElementwiseOperation a_element_op,
-                             const BElementwiseOperation b_element_op,
-                             const CElementwiseOperation c_element_op,
-                             const Block2CTileMap block_2_ctile_map)
+#if defined(__gfx13__)
+__cluster_dims__(AClusterSize* BClusterSize, 1, 1)
+#endif
+    __global__ void kernel_gemm_wmma_cluster(const ADataType* __restrict__ p_a_grid,
+                                             const BDataType* __restrict__ p_b_grid,
+                                             CDataType* __restrict__ p_c_grid,
+                                             const AGridDesc a_grid_desc,
+                                             const BGridDesc b_grid_desc,
+                                             const CGridDescriptor_MBlock_MPerBlock_NBlock_NPerBlock
+                                                 c_grid_desc_mblock_mperblock_nblock_nperblock,
+                                             const AElementwiseOperation a_element_op,
+                                             const BElementwiseOperation b_element_op,
+                                             const CElementwiseOperation c_element_op,
+                                             const Block2CTileMap block_2_ctile_map)
 {
-#if(!defined(__HIP_DEVICE_COMPILE__) || defined(__gfx13__))
+#if defined(__gfx13__)
     __shared__ char p_shared[GridwiseGemm::SharedMemTrait::lds_size];
     static constexpr index_t lane_shared_size =
         math::max(GridwiseGemm::LaneSharedMemTrait::lane_shared_size, 4);

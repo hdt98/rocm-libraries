@@ -233,6 +233,10 @@ if (SUPPORTED_GPU_TARGETS MATCHES "gfx11" OR SUPPORTED_GPU_TARGETS MATCHES "gfx1
     add_definitions(-DCK_TILE_USE_WMMA)
     set(CK_TILE_USE_WMMA "ON")
 endif()
+if (SUPPORTED_GPU_TARGETS MATCHES "gfx13")
+    add_definitions(-DCK_USE_WCNN)
+    set(CK_USE_WCNN "ON")
+endif()
 
 if (SUPPORTED_GPU_TARGETS MATCHES "gfx12" OR SUPPORTED_GPU_TARGETS MATCHES "gfx13")
     message(STATUS "Enabling WMMA FP8 gemms on native architectures")
@@ -253,7 +257,6 @@ if (SUPPORTED_GPU_TARGETS MATCHES "gfx950")
     add_definitions(-DCK_USE_NATIVE_MX_SUPPORT)
     set(CK_USE_NATIVE_MX_SUPPORT "ON")
 endif()
-
 if (SUPPORTED_GPU_TARGETS MATCHES "gfx13")
     add_definitions(-DCK_EXTENSION_MX_TYPE)
     set(ENABLE_MX_TYPE "ON")

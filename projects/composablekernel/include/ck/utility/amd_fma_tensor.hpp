@@ -49,6 +49,7 @@ struct intrin_wcnn_fma_from_tensor<4, 2, ChanOff>
     __device__ static void
     Run(const float4_t& inAcc, const int4x8_t& residual0, const float4_t scale, FloatAcc& outAcc)
     {
+#if defined(__gfx13__)
         constexpr bool clamp        = false;
         constexpr index_t aux_data0 = GetChanOff<ChanOff>();
         constexpr index_t aux_data1 = GetChanOff<ChanOff + 2>();
@@ -62,28 +63,48 @@ struct intrin_wcnn_fma_from_tensor<4, 2, ChanOff>
         outAcc.template AsType<float2_t>()(Number<1>{}) =
             __builtin_amdgcn_fma_from_tensor_f32_i4_4x2(
                 inAcc1, bit_cast<uint32_t>(residual0), scale1, aux_data1, clamp);
+#else
+        ignore = inAcc;
+        ignore = residual0;
+        ignore = scale;
+        ignore = outAcc;
+#endif
     }
 
     template <class FloatAcc>
     __device__ static void
     Run(const half4_t& inAcc, const int4x8_t& residual0, const half4_t scale, FloatAcc& outAcc)
     {
+#if defined(__gfx13__)
         constexpr bool clamp       = false;
         constexpr index_t aux_data = GetChanOff<ChanOff>();
         outAcc.template AsType<half4_t>()(Number<0>{}) =
             __builtin_amdgcn_fma_from_tensor_f16_i4_4x2(
                 inAcc, bit_cast<uint32_t>(residual0), scale, aux_data, clamp);
+#else
+        ignore = inAcc;
+        ignore = residual0;
+        ignore = scale;
+        ignore = outAcc;
+#endif
     }
 
     template <class FloatAcc>
     __device__ static void
     Run(const bhalf4_t& inAcc, const int4x8_t& residual0, const bhalf4_t scale, FloatAcc& outAcc)
     {
+#if defined(__gfx13__)
         constexpr index_t aux_data = GetChanOff<ChanOff>();
         constexpr bool clamp       = false;
         outAcc.template AsType<bhalf4_t>()(Number<0>{}) =
             __builtin_amdgcn_fma_from_tensor_bf16_i4_4x2(
                 inAcc, bit_cast<uint32_t>(residual0), scale, aux_data, clamp);
+#else
+        ignore = inAcc;
+        ignore = residual0;
+        ignore = scale;
+        ignore = outAcc;
+#endif
     }
 
     // u4
@@ -91,6 +112,7 @@ struct intrin_wcnn_fma_from_tensor<4, 2, ChanOff>
     __device__ static void
     Run(const float4_t& inAcc, const uint4x8_t& residual0, const float4_t scale, FloatAcc& outAcc)
     {
+#if defined(__gfx13__)
         constexpr index_t aux_data0 = GetChanOff<ChanOff>();
         constexpr index_t aux_data1 = GetChanOff<ChanOff + 2>();
         constexpr bool clamp        = false;
@@ -104,28 +126,48 @@ struct intrin_wcnn_fma_from_tensor<4, 2, ChanOff>
         outAcc.template AsType<float2_t>()(Number<1>{}) =
             __builtin_amdgcn_fma_from_tensor_f32_u4_4x2(
                 inAcc1, bit_cast<uint32_t>(residual0), scale1, aux_data1, clamp);
+#else
+        ignore = inAcc;
+        ignore = residual0;
+        ignore = scale;
+        ignore = outAcc;
+#endif
     }
 
     template <class FloatAcc>
     __device__ static void
     Run(const half4_t& inAcc, const uint4x8_t& residual0, const half4_t scale, FloatAcc& outAcc)
     {
+#if defined(__gfx13__)
         constexpr index_t aux_data = GetChanOff<ChanOff>();
         constexpr bool clamp       = false;
         outAcc.template AsType<half4_t>()(Number<0>{}) =
             __builtin_amdgcn_fma_from_tensor_f16_u4_4x2(
                 inAcc, bit_cast<uint32_t>(residual0), scale, aux_data, clamp);
+#else
+        ignore = inAcc;
+        ignore = residual0;
+        ignore = scale;
+        ignore = outAcc;
+#endif
     }
 
     template <class FloatAcc>
     __device__ static void
     Run(const bhalf4_t& inAcc, const uint4x8_t& residual0, const bhalf4_t scale, FloatAcc& outAcc)
     {
+#if defined(__gfx13__)
         constexpr index_t aux_data = GetChanOff<ChanOff>();
         constexpr bool clamp       = false;
         outAcc.template AsType<bhalf4_t>()(Number<0>{}) =
             __builtin_amdgcn_fma_from_tensor_bf16_u4_4x2(
                 inAcc, bit_cast<uint32_t>(residual0), scale, aux_data, clamp);
+#else
+        ignore = inAcc;
+        ignore = residual0;
+        ignore = scale;
+        ignore = outAcc;
+#endif
     }
 #endif
     // i8
@@ -133,6 +175,7 @@ struct intrin_wcnn_fma_from_tensor<4, 2, ChanOff>
     __device__ static void
     Run(const float4_t& inAcc, const int8x4_t& residual0, const float4_t scale, FloatAcc& outAcc)
     {
+#if defined(__gfx13__)
         constexpr index_t aux_data0 = 0;
         constexpr index_t aux_data1 = GetChanOff<2>();
         constexpr bool clamp        = false;
@@ -146,28 +189,48 @@ struct intrin_wcnn_fma_from_tensor<4, 2, ChanOff>
         outAcc.template AsType<float2_t>()(Number<1>{}) =
             __builtin_amdgcn_fma_from_tensor_f32_i8_4x2(
                 inAcc1, bit_cast<uint32_t>(residual0), scale1, aux_data1, clamp);
+#else
+        ignore = inAcc;
+        ignore = residual0;
+        ignore = scale;
+        ignore = outAcc;
+#endif
     }
 
     template <class FloatAcc>
     __device__ static void
     Run(const half4_t& inAcc, const int8x4_t& residual0, const half4_t scale, FloatAcc& outAcc)
     {
+#if defined(__gfx13__)
         constexpr index_t aux_data = 0;
         constexpr bool clamp       = false;
         outAcc.template AsType<half4_t>()(Number<0>{}) =
             __builtin_amdgcn_fma_from_tensor_f16_i8_4x2(
                 inAcc, bit_cast<uint32_t>(residual0), scale, aux_data, clamp);
+#else
+        ignore = inAcc;
+        ignore = residual0;
+        ignore = scale;
+        ignore = outAcc;
+#endif
     }
 
     template <class FloatAcc>
     __device__ static void
     Run(const bhalf4_t& inAcc, const int8x4_t& residual0, const bhalf4_t scale, FloatAcc& outAcc)
     {
+#if defined(__gfx13__)
         constexpr index_t aux_data = 0;
         constexpr bool clamp       = false;
         outAcc.template AsType<bhalf4_t>()(Number<0>{}) =
             __builtin_amdgcn_fma_from_tensor_bf16_i8_4x2(
                 inAcc, bit_cast<uint32_t>(residual0), scale, aux_data, clamp);
+#else
+        ignore = inAcc;
+        ignore = residual0;
+        ignore = scale;
+        ignore = outAcc;
+#endif
     }
 
     // u8
@@ -175,6 +238,7 @@ struct intrin_wcnn_fma_from_tensor<4, 2, ChanOff>
     __device__ static void
     Run(const float4_t& inAcc, const uint8x4_t& residual0, const float4_t scale, FloatAcc& outAcc)
     {
+#if defined(__gfx13__)
         constexpr index_t aux_data0 = 0;
         constexpr index_t aux_data1 = GetChanOff<2>();
         constexpr bool clamp        = false;
@@ -188,28 +252,48 @@ struct intrin_wcnn_fma_from_tensor<4, 2, ChanOff>
         outAcc.template AsType<float2_t>()(Number<1>{}) =
             __builtin_amdgcn_fma_from_tensor_f32_u8_4x2(
                 inAcc1, bit_cast<uint32_t>(residual0), scale1, aux_data1, clamp);
+#else
+        ignore = inAcc;
+        ignore = residual0;
+        ignore = scale;
+        ignore = outAcc;
+#endif
     }
 
     template <class FloatAcc>
     __device__ static void
     Run(const half4_t& inAcc, const uint8x4_t& residual0, const half4_t scale, FloatAcc& outAcc)
     {
+#if defined(__gfx13__)
         constexpr index_t aux_data = 0;
         constexpr bool clamp       = false;
         outAcc.template AsType<half4_t>()(Number<0>{}) =
             __builtin_amdgcn_fma_from_tensor_f16_u8_4x2(
                 inAcc, bit_cast<uint32_t>(residual0), scale, aux_data, clamp);
+#else
+        ignore = inAcc;
+        ignore = residual0;
+        ignore = scale;
+        ignore = outAcc;
+#endif
     }
 
     template <class FloatAcc>
     __device__ static void
     Run(const bhalf4_t& inAcc, const uint8x4_t& residual0, const bhalf4_t scale, FloatAcc& outAcc)
     {
+#if defined(__gfx13__)
         constexpr index_t aux_data = 0;
         constexpr bool clamp       = false;
         outAcc.template AsType<bhalf4_t>()(Number<0>{}) =
             __builtin_amdgcn_fma_from_tensor_bf16_u8_4x2(
                 inAcc, bit_cast<uint32_t>(residual0), scale, aux_data, clamp);
+#else
+        ignore = inAcc;
+        ignore = residual0;
+        ignore = scale;
+        ignore = outAcc;
+#endif
     }
 
     // f8
@@ -217,6 +301,7 @@ struct intrin_wcnn_fma_from_tensor<4, 2, ChanOff>
     __device__ static void
     Run(const float4_t& inAcc, const f8x4_t& residual0, const float4_t scale, FloatAcc& outAcc)
     {
+#if defined(__gfx13__)
         constexpr index_t aux_data0 = 0;
         constexpr index_t aux_data1 = GetChanOff<2>();
         constexpr bool clamp        = false;
@@ -230,28 +315,48 @@ struct intrin_wcnn_fma_from_tensor<4, 2, ChanOff>
         outAcc.template AsType<float2_t>()(Number<1>{}) =
             __builtin_amdgcn_fma_from_tensor_f32_fp8_4x2(
                 inAcc1, bit_cast<uint32_t>(residual0), scale1, aux_data1, clamp);
+#else
+        ignore = inAcc;
+        ignore = residual0;
+        ignore = scale;
+        ignore = outAcc;
+#endif
     }
 
     template <class FloatAcc>
     __device__ static void
     Run(const half4_t& inAcc, const f8x4_t& residual0, const half4_t scale, FloatAcc& outAcc)
     {
+#if defined(__gfx13__)
         constexpr index_t aux_data = 0;
         constexpr bool clamp       = false;
         outAcc.template AsType<half4_t>()(Number<0>{}) =
             __builtin_amdgcn_fma_from_tensor_f16_fp8_4x2(
                 inAcc, bit_cast<uint32_t>(residual0), scale, aux_data, clamp);
+#else
+        ignore = inAcc;
+        ignore = residual0;
+        ignore = scale;
+        ignore = outAcc;
+#endif
     }
 
     template <class FloatAcc>
     __device__ static void
     Run(const bhalf4_t& inAcc, const f8x4_t& residual0, const bhalf4_t scale, FloatAcc& outAcc)
     {
+#if defined(__gfx13__)
         constexpr index_t aux_data = 0;
         constexpr bool clamp       = false;
         outAcc.template AsType<bhalf4_t>()(Number<0>{}) =
             __builtin_amdgcn_fma_from_tensor_bf16_fp8_4x2(
                 inAcc, bit_cast<uint32_t>(residual0), scale, aux_data, clamp);
+#else
+        ignore = inAcc;
+        ignore = residual0;
+        ignore = scale;
+        ignore = outAcc;
+#endif
     }
 
     // bf8
@@ -259,6 +364,7 @@ struct intrin_wcnn_fma_from_tensor<4, 2, ChanOff>
     __device__ static void
     Run(const float4_t& inAcc, const bf8x4_t& residual0, const float4_t scale, FloatAcc& outAcc)
     {
+#if defined(__gfx13__)
         constexpr index_t aux_data0 = 0;
         constexpr index_t aux_data1 = GetChanOff<2>();
         constexpr bool clamp        = false;
@@ -272,28 +378,48 @@ struct intrin_wcnn_fma_from_tensor<4, 2, ChanOff>
         outAcc.template AsType<float2_t>()(Number<1>{}) =
             __builtin_amdgcn_fma_from_tensor_f32_bf8_4x2(
                 inAcc1, bit_cast<uint32_t>(residual0), scale1, aux_data1, clamp);
+#else
+        ignore = inAcc;
+        ignore = residual0;
+        ignore = scale;
+        ignore = outAcc;
+#endif
     }
 
     template <class FloatAcc>
     __device__ static void
     Run(const half4_t& inAcc, const bf8x4_t& residual0, const half4_t scale, FloatAcc& outAcc)
     {
+#if defined(__gfx13__)
         constexpr index_t aux_data = 0;
         constexpr bool clamp       = false;
         outAcc.template AsType<half4_t>()(Number<0>{}) =
             __builtin_amdgcn_fma_from_tensor_f16_bf8_4x2(
                 inAcc, bit_cast<uint32_t>(residual0), scale, aux_data, clamp);
+#else
+        ignore = inAcc;
+        ignore = residual0;
+        ignore = scale;
+        ignore = outAcc;
+#endif
     }
 
     template <class FloatAcc>
     __device__ static void
     Run(const bhalf4_t& inAcc, const bf8x4_t& residual0, const bhalf4_t scale, FloatAcc& outAcc)
     {
+#if defined(__gfx13__)
         constexpr index_t aux_data = 0;
         constexpr bool clamp       = false;
         outAcc.template AsType<bhalf4_t>()(Number<0>{}) =
             __builtin_amdgcn_fma_from_tensor_bf16_bf8_4x2(
                 inAcc, bit_cast<uint32_t>(residual0), scale, aux_data, clamp);
+#else
+        ignore = inAcc;
+        ignore = residual0;
+        ignore = scale;
+        ignore = outAcc;
+#endif
     }
 
     // f16
@@ -304,6 +430,7 @@ struct intrin_wcnn_fma_from_tensor<4, 2, ChanOff>
                                const float4_t scale,
                                FloatAcc& outAcc)
     {
+#if defined(__gfx13__)
         constexpr index_t aux_data = 0;
         constexpr bool clamp       = false;
         float2_t inAcc0, inAcc1;
@@ -316,6 +443,13 @@ struct intrin_wcnn_fma_from_tensor<4, 2, ChanOff>
         outAcc.template AsType<float2_t>()(Number<1>{}) =
             __builtin_amdgcn_fma_from_tensor_f32_f16_4x2(
                 inAcc1, residual1, scale1, aux_data, clamp);
+#else
+        ignore = inAcc;
+        ignore = residual0;
+        ignore = residual1;
+        ignore = scale;
+        ignore = outAcc;
+#endif
     }
 
     template <class FloatAcc>
@@ -325,11 +459,19 @@ struct intrin_wcnn_fma_from_tensor<4, 2, ChanOff>
                                const half4_t scale,
                                FloatAcc& outAcc)
     {
+#if defined(__gfx13__)
         constexpr index_t aux_data = 0;
         constexpr bool clamp       = false;
         outAcc.template AsType<half4_t>()(Number<0>{}) =
             __builtin_amdgcn_fma_from_tensor_f16_f16_4x2(
                 inAcc, residual0, residual1, scale, aux_data, clamp);
+#else
+        ignore = inAcc;
+        ignore = residual0;
+        ignore = residual1;
+        ignore = scale;
+        ignore = outAcc;
+#endif
     }
 
     // bf16
@@ -340,6 +482,7 @@ struct intrin_wcnn_fma_from_tensor<4, 2, ChanOff>
                                const float4_t scale,
                                FloatAcc& outAcc)
     {
+#if defined(__gfx13__)
         constexpr index_t aux_data = 0;
         constexpr bool clamp       = false;
         float2_t inAcc0, inAcc1;
@@ -352,6 +495,13 @@ struct intrin_wcnn_fma_from_tensor<4, 2, ChanOff>
         outAcc.template AsType<float2_t>()(Number<1>{}) =
             __builtin_amdgcn_fma_from_tensor_f32_bf16_4x2(
                 inAcc1, residual1, scale1, aux_data, clamp);
+#else
+        ignore = inAcc;
+        ignore = residual0;
+        ignore = residual1;
+        ignore = scale;
+        ignore = outAcc;
+#endif
     }
 
     template <class FloatAcc>
@@ -361,11 +511,19 @@ struct intrin_wcnn_fma_from_tensor<4, 2, ChanOff>
                                const bhalf4_t scale,
                                FloatAcc& outAcc)
     {
+#if defined(__gfx13__)
         constexpr index_t aux_data = 0;
         constexpr bool clamp       = false;
         outAcc.template AsType<bhalf4_t>()(Number<0>{}) =
             __builtin_amdgcn_fma_from_tensor_bf16_bf16_4x2(
                 inAcc, residual0, residual1, scale, aux_data, clamp);
+#else
+        ignore = inAcc;
+        ignore = residual0;
+        ignore = residual1;
+        ignore = scale;
+        ignore = outAcc;
+#endif
     }
 };
 
@@ -378,6 +536,7 @@ struct intrin_wcnn_fma_from_tensor<4, 4, ChanOff>
     __device__ static void
     Run(const half8_t& inAcc, const int4x8_t& residual0, const half8_t scale, FloatAcc& outAcc)
     {
+#if defined(__gfx13__)
         constexpr index_t aux_data0 = GetChanOff<ChanOff>();
         constexpr index_t aux_data1 = GetChanOff<ChanOff + 8>();
         constexpr bool clamp        = false;
@@ -391,12 +550,19 @@ struct intrin_wcnn_fma_from_tensor<4, 4, ChanOff>
         outAcc.template AsType<half4_t>()(Number<1>{}) =
             __builtin_amdgcn_fma_from_tensor_f16_i4_4x4(
                 inAcc1, bit_cast<uint32_t>(residual0), scale1, aux_data1, clamp);
+#else
+        ignore = inAcc;
+        ignore = residual0;
+        ignore = scale;
+        ignore = outAcc;
+#endif
     }
 
     template <class FloatAcc>
     __device__ static void
     Run(const bhalf8_t& inAcc, const int4x8_t& residual0, const bhalf8_t scale, FloatAcc& outAcc)
     {
+#if defined(__gfx13__)
         constexpr index_t aux_data0 = GetChanOff<ChanOff>();
         constexpr index_t aux_data1 = GetChanOff<ChanOff + 8>();
         constexpr bool clamp        = false;
@@ -410,6 +576,12 @@ struct intrin_wcnn_fma_from_tensor<4, 4, ChanOff>
         outAcc.template AsType<bhalf4_t>()(Number<1>{}) =
             __builtin_amdgcn_fma_from_tensor_bf16_i4_4x4(
                 inAcc1, bit_cast<uint32_t>(residual0), scale1, aux_data1, clamp);
+#else
+        ignore = inAcc;
+        ignore = residual0;
+        ignore = scale;
+        ignore = outAcc;
+#endif
     }
 
     // u4
@@ -417,6 +589,7 @@ struct intrin_wcnn_fma_from_tensor<4, 4, ChanOff>
     __device__ static void
     Run(const half8_t& inAcc, const uint4x8_t& residual0, const half8_t scale, FloatAcc& outAcc)
     {
+#if defined(__gfx13__)
         constexpr index_t aux_data0 = GetChanOff<ChanOff>();
         constexpr index_t aux_data1 = GetChanOff<ChanOff + 8>();
         constexpr bool clamp        = false;
@@ -430,12 +603,19 @@ struct intrin_wcnn_fma_from_tensor<4, 4, ChanOff>
         outAcc.template AsType<half4_t>()(Number<1>{}) =
             __builtin_amdgcn_fma_from_tensor_f16_u4_4x4(
                 inAcc1, bit_cast<uint32_t>(residual0), scale1, aux_data1, clamp);
+#else
+        ignore = inAcc;
+        ignore = residual0;
+        ignore = scale;
+        ignore = outAcc;
+#endif
     }
 
     template <class FloatAcc>
     __device__ static void
     Run(const bhalf8_t& inAcc, const uint4x8_t& residual0, const bhalf8_t scale, FloatAcc& outAcc)
     {
+#if defined(__gfx13__)
         constexpr index_t aux_data0 = GetChanOff<ChanOff>();
         constexpr index_t aux_data1 = GetChanOff<ChanOff + 8>();
         constexpr bool clamp        = false;
@@ -449,6 +629,12 @@ struct intrin_wcnn_fma_from_tensor<4, 4, ChanOff>
         outAcc.template AsType<bhalf4_t>()(Number<1>{}) =
             __builtin_amdgcn_fma_from_tensor_bf16_u4_4x4(
                 inAcc1, bit_cast<uint32_t>(residual0), scale1, aux_data1, clamp);
+#else
+        ignore = inAcc;
+        ignore = residual0;
+        ignore = scale;
+        ignore = outAcc;
+#endif
     }
 #endif
     // i8
@@ -459,6 +645,7 @@ struct intrin_wcnn_fma_from_tensor<4, 4, ChanOff>
                                const half8_t scale,
                                FloatAcc& outAcc)
     {
+#if defined(__gfx13__)
         constexpr index_t aux_data = 0;
         constexpr bool clamp       = false;
         half4_t inAcc0, inAcc1;
@@ -471,6 +658,13 @@ struct intrin_wcnn_fma_from_tensor<4, 4, ChanOff>
         outAcc.template AsType<half4_t>()(Number<1>{}) =
             __builtin_amdgcn_fma_from_tensor_f16_i8_4x4(
                 inAcc1, bit_cast<uint32_t>(residual1), scale1, aux_data, clamp);
+#else
+        ignore = inAcc;
+        ignore = residual0;
+        ignore = residual1;
+        ignore = scale;
+        ignore = outAcc;
+#endif
     }
 
     template <class FloatAcc>
@@ -480,6 +674,7 @@ struct intrin_wcnn_fma_from_tensor<4, 4, ChanOff>
                                const bhalf8_t scale,
                                FloatAcc& outAcc)
     {
+#if defined(__gfx13__)
         constexpr index_t aux_data = 0;
         constexpr bool clamp       = false;
         bhalf4_t inAcc0, inAcc1;
@@ -492,6 +687,13 @@ struct intrin_wcnn_fma_from_tensor<4, 4, ChanOff>
         outAcc.template AsType<bhalf4_t>()(Number<1>{}) =
             __builtin_amdgcn_fma_from_tensor_bf16_i8_4x4(
                 inAcc1, bit_cast<uint32_t>(residual1), scale1, aux_data, clamp);
+#else
+        ignore = inAcc;
+        ignore = residual0;
+        ignore = residual1;
+        ignore = scale;
+        ignore = outAcc;
+#endif
     }
 
     // u8
@@ -502,6 +704,7 @@ struct intrin_wcnn_fma_from_tensor<4, 4, ChanOff>
                                const half8_t scale,
                                FloatAcc& outAcc)
     {
+#if defined(__gfx13__)
         constexpr index_t aux_data = 0;
         constexpr bool clamp       = false;
         half4_t inAcc0, inAcc1;
@@ -514,6 +717,13 @@ struct intrin_wcnn_fma_from_tensor<4, 4, ChanOff>
         outAcc.template AsType<half4_t>()(Number<1>{}) =
             __builtin_amdgcn_fma_from_tensor_f16_u8_4x4(
                 inAcc1, bit_cast<uint32_t>(residual1), scale1, aux_data, clamp);
+#else
+        ignore = inAcc;
+        ignore = residual0;
+        ignore = residual1;
+        ignore = scale;
+        ignore = outAcc;
+#endif
     }
 
     template <class FloatAcc>
@@ -523,6 +733,7 @@ struct intrin_wcnn_fma_from_tensor<4, 4, ChanOff>
                                const bhalf8_t scale,
                                FloatAcc& outAcc)
     {
+#if defined(__gfx13__)
         constexpr index_t aux_data = 0;
         constexpr bool clamp       = false;
         bhalf4_t inAcc0, inAcc1;
@@ -535,6 +746,13 @@ struct intrin_wcnn_fma_from_tensor<4, 4, ChanOff>
         outAcc.template AsType<bhalf4_t>()(Number<1>{}) =
             __builtin_amdgcn_fma_from_tensor_bf16_u8_4x4(
                 inAcc1, bit_cast<uint32_t>(residual1), scale1, aux_data, clamp);
+#else
+        ignore = inAcc;
+        ignore = residual0;
+        ignore = residual1;
+        ignore = scale;
+        ignore = outAcc;
+#endif
     }
 
     // f8
@@ -545,6 +763,7 @@ struct intrin_wcnn_fma_from_tensor<4, 4, ChanOff>
                                const half8_t scale,
                                FloatAcc& outAcc)
     {
+#if defined(__gfx13__)
         constexpr index_t aux_data = 0;
         constexpr bool clamp       = false;
         half4_t inAcc0, inAcc1;
@@ -557,6 +776,13 @@ struct intrin_wcnn_fma_from_tensor<4, 4, ChanOff>
         outAcc.template AsType<half4_t>()(Number<1>{}) =
             __builtin_amdgcn_fma_from_tensor_f16_fp8_4x4(
                 inAcc1, bit_cast<uint32_t>(residual1), scale1, aux_data, clamp);
+#else
+        ignore = inAcc;
+        ignore = residual0;
+        ignore = residual1;
+        ignore = scale;
+        ignore = outAcc;
+#endif
     }
 
     template <class FloatAcc>
@@ -566,6 +792,7 @@ struct intrin_wcnn_fma_from_tensor<4, 4, ChanOff>
                                const bhalf8_t scale,
                                FloatAcc& outAcc)
     {
+#if defined(__gfx13__)
         constexpr index_t aux_data = 0;
         constexpr bool clamp       = false;
         bhalf4_t inAcc0, inAcc1;
@@ -578,6 +805,13 @@ struct intrin_wcnn_fma_from_tensor<4, 4, ChanOff>
         outAcc.template AsType<bhalf4_t>()(Number<1>{}) =
             __builtin_amdgcn_fma_from_tensor_bf16_fp8_4x4(
                 inAcc1, bit_cast<uint32_t>(residual1), scale1, aux_data, clamp);
+#else
+        ignore = inAcc;
+        ignore = residual0;
+        ignore = residual1;
+        ignore = scale;
+        ignore = outAcc;
+#endif
     }
 
     // bf8
@@ -588,6 +822,7 @@ struct intrin_wcnn_fma_from_tensor<4, 4, ChanOff>
                                const half8_t scale,
                                FloatAcc& outAcc)
     {
+#if defined(__gfx13__)
         constexpr index_t aux_data = 0;
         constexpr bool clamp       = false;
         half4_t inAcc0, inAcc1;
@@ -600,6 +835,13 @@ struct intrin_wcnn_fma_from_tensor<4, 4, ChanOff>
         outAcc.template AsType<half4_t>()(Number<1>{}) =
             __builtin_amdgcn_fma_from_tensor_f16_bf8_4x4(
                 inAcc1, bit_cast<uint32_t>(residual1), scale1, aux_data, clamp);
+#else
+        ignore = inAcc;
+        ignore = residual0;
+        ignore = residual1;
+        ignore = scale;
+        ignore = outAcc;
+#endif
     }
 
     template <class FloatAcc>
@@ -609,6 +851,7 @@ struct intrin_wcnn_fma_from_tensor<4, 4, ChanOff>
                                const bhalf8_t scale,
                                FloatAcc& outAcc)
     {
+#if defined(__gfx13__)
         constexpr index_t aux_data = 0;
         constexpr bool clamp       = false;
         bhalf4_t inAcc0, inAcc1;
@@ -621,6 +864,13 @@ struct intrin_wcnn_fma_from_tensor<4, 4, ChanOff>
         outAcc.template AsType<bhalf4_t>()(Number<1>{}) =
             __builtin_amdgcn_fma_from_tensor_bf16_bf8_4x4(
                 inAcc1, bit_cast<uint32_t>(residual1), scale1, aux_data, clamp);
+#else
+        ignore = inAcc;
+        ignore = residual0;
+        ignore = residual1;
+        ignore = scale;
+        ignore = outAcc;
+#endif
     }
 
     // f16
@@ -633,6 +883,7 @@ struct intrin_wcnn_fma_from_tensor<4, 4, ChanOff>
                                const half8_t scale,
                                FloatAcc& outAcc)
     {
+#if defined(__gfx13__)
         constexpr index_t aux_data = 0;
         constexpr bool clamp       = false;
         half4_t inAcc0, inAcc1;
@@ -646,6 +897,15 @@ struct intrin_wcnn_fma_from_tensor<4, 4, ChanOff>
         outAcc.template AsType<half4_t>()(Number<1>{}) =
             __builtin_amdgcn_fma_from_tensor_f16_f16_4x4(
                 inAcc1, residual2, residual3, scale1, aux_data, clamp);
+#else
+        ignore = inAcc;
+        ignore = residual0;
+        ignore = residual1;
+        ignore = residual2;
+        ignore = residual3;
+        ignore = scale;
+        ignore = outAcc;
+#endif
     }
 
     // bf16
@@ -658,6 +918,7 @@ struct intrin_wcnn_fma_from_tensor<4, 4, ChanOff>
                                const bhalf8_t scale,
                                FloatAcc& outAcc)
     {
+#if defined(__gfx13__)
         constexpr index_t aux_data = 0;
         constexpr bool clamp       = false;
         bhalf4_t inAcc0, inAcc1;
@@ -671,6 +932,15 @@ struct intrin_wcnn_fma_from_tensor<4, 4, ChanOff>
         outAcc.template AsType<bhalf4_t>()(Number<1>{}) =
             __builtin_amdgcn_fma_from_tensor_bf16_bf16_4x4(
                 inAcc1, residual2, residual3, scale1, aux_data, clamp);
+#else
+        ignore = inAcc;
+        ignore = residual0;
+        ignore = residual1;
+        ignore = residual2;
+        ignore = residual3;
+        ignore = scale;
+        ignore = outAcc;
+#endif
     }
 };
 
@@ -683,6 +953,7 @@ struct intrin_wcnn_fma_from_tensor<8, 4, ChanOff>
     __device__ static void
     Run(const half8_t& inAcc, const int4x16_t& residual, const half8_t scale, FloatAcc& outAcc)
     {
+#if defined(__gfx13__)
         constexpr index_t aux_data0 = GetChanOff<ChanOff>();
         constexpr index_t aux_data1 = GetChanOff<ChanOff>();
         constexpr bool clamp        = false;
@@ -698,12 +969,19 @@ struct intrin_wcnn_fma_from_tensor<8, 4, ChanOff>
         outAcc.template AsType<half4_t>()(Number<1>{}) =
             __builtin_amdgcn_fma_from_tensor_f16_i4_8x4(
                 inAcc1, residual1, scale1, aux_data1, clamp);
+#else
+        ignore = inAcc;
+        ignore = residual;
+        ignore = scale;
+        ignore = outAcc;
+#endif
     }
 
     template <class FloatAcc>
     __device__ static void
     Run(const bhalf8_t& inAcc, const int4x16_t& residual, const bhalf8_t scale, FloatAcc& outAcc)
     {
+#if defined(__gfx13__)
         constexpr index_t aux_data0 = GetChanOff<ChanOff>();
         constexpr index_t aux_data1 = GetChanOff<ChanOff>();
         constexpr bool clamp        = false;
@@ -719,6 +997,12 @@ struct intrin_wcnn_fma_from_tensor<8, 4, ChanOff>
         outAcc.template AsType<bhalf4_t>()(Number<1>{}) =
             __builtin_amdgcn_fma_from_tensor_bf16_i4_8x4(
                 inAcc1, residual1, scale1, aux_data1, clamp);
+#else
+        ignore = inAcc;
+        ignore = residual;
+        ignore = scale;
+        ignore = outAcc;
+#endif
     }
 
     // u4
@@ -726,6 +1010,7 @@ struct intrin_wcnn_fma_from_tensor<8, 4, ChanOff>
     __device__ static void
     Run(const half8_t& inAcc, const uint4x16_t& residual, const half8_t scale, FloatAcc& outAcc)
     {
+#if defined(__gfx13__)
         constexpr index_t aux_data0 = GetChanOff<ChanOff>();
         constexpr index_t aux_data1 = GetChanOff<ChanOff>();
         constexpr bool clamp        = false;
@@ -741,12 +1026,19 @@ struct intrin_wcnn_fma_from_tensor<8, 4, ChanOff>
         outAcc.template AsType<half4_t>()(Number<1>{}) =
             __builtin_amdgcn_fma_from_tensor_f16_u4_8x4(
                 inAcc1, residual1, scale1, aux_data1, clamp);
+#else
+        ignore = inAcc;
+        ignore = residual;
+        ignore = scale;
+        ignore = outAcc;
+#endif
     }
 
     template <class FloatAcc>
     __device__ static void
     Run(const bhalf8_t& inAcc, const uint4x16_t& residual, const bhalf8_t scale, FloatAcc& outAcc)
     {
+#if defined(__gfx13__)
         constexpr index_t aux_data0 = GetChanOff<ChanOff>();
         constexpr index_t aux_data1 = GetChanOff<ChanOff>();
         constexpr bool clamp        = false;
@@ -762,6 +1054,12 @@ struct intrin_wcnn_fma_from_tensor<8, 4, ChanOff>
         outAcc.template AsType<bhalf4_t>()(Number<1>{}) =
             __builtin_amdgcn_fma_from_tensor_bf16_u4_8x4(
                 inAcc1, residual1, scale1, aux_data1, clamp);
+#else
+        ignore = inAcc;
+        ignore = residual;
+        ignore = scale;
+        ignore = outAcc;
+#endif
     }
 #endif
 
@@ -770,6 +1068,7 @@ struct intrin_wcnn_fma_from_tensor<8, 4, ChanOff>
     __device__ static void
     Run(const half8_t& inAcc, const int8x8_t& residual, const half8_t scale, FloatAcc& outAcc)
     {
+#if defined(__gfx13__)
         constexpr index_t aux_data = 0;
         constexpr bool clamp       = false;
         half4_t inAcc0, inAcc1;
@@ -782,12 +1081,19 @@ struct intrin_wcnn_fma_from_tensor<8, 4, ChanOff>
             __builtin_amdgcn_fma_from_tensor_f16_i8_8x4(inAcc0, residual0, scale0, aux_data, clamp);
         outAcc.template AsType<half4_t>()(Number<1>{}) =
             __builtin_amdgcn_fma_from_tensor_f16_i8_8x4(inAcc1, residual1, scale1, aux_data, clamp);
+#else
+        ignore = inAcc;
+        ignore = residual;
+        ignore = scale;
+        ignore = outAcc;
+#endif
     }
 
     template <class FloatAcc>
     __device__ static void
     Run(const bhalf8_t& inAcc, const int8x8_t& residual, const bhalf8_t scale, FloatAcc& outAcc)
     {
+#if defined(__gfx13__)
         constexpr index_t aux_data = 0;
         constexpr bool clamp       = false;
         bhalf4_t inAcc0, inAcc1;
@@ -802,6 +1108,12 @@ struct intrin_wcnn_fma_from_tensor<8, 4, ChanOff>
         outAcc.template AsType<bhalf4_t>()(Number<1>{}) =
             __builtin_amdgcn_fma_from_tensor_bf16_i8_8x4(
                 inAcc1, residual1, scale1, aux_data, clamp);
+#else
+        ignore = inAcc;
+        ignore = residual;
+        ignore = scale;
+        ignore = outAcc;
+#endif
     }
 
     // u8
@@ -809,6 +1121,7 @@ struct intrin_wcnn_fma_from_tensor<8, 4, ChanOff>
     __device__ static void
     Run(const half8_t& inAcc, const uint8x8_t& residual, const half8_t scale, FloatAcc& outAcc)
     {
+#if defined(__gfx13__)
         constexpr index_t aux_data = 0;
         constexpr bool clamp       = false;
         half4_t inAcc0, inAcc1;
@@ -821,12 +1134,19 @@ struct intrin_wcnn_fma_from_tensor<8, 4, ChanOff>
             __builtin_amdgcn_fma_from_tensor_f16_u8_8x4(inAcc0, residual0, scale0, aux_data, clamp);
         outAcc.template AsType<half4_t>()(Number<1>{}) =
             __builtin_amdgcn_fma_from_tensor_f16_u8_8x4(inAcc1, residual1, scale1, aux_data, clamp);
+#else
+        ignore = inAcc;
+        ignore = residual;
+        ignore = scale;
+        ignore = outAcc;
+#endif
     }
 
     template <class FloatAcc>
     __device__ static void
     Run(const bhalf8_t& inAcc, const uint8x8_t& residual, const bhalf8_t scale, FloatAcc& outAcc)
     {
+#if defined(__gfx13__)
         constexpr index_t aux_data = 0;
         constexpr bool clamp       = false;
         bhalf4_t inAcc0, inAcc1;
@@ -841,6 +1161,12 @@ struct intrin_wcnn_fma_from_tensor<8, 4, ChanOff>
         outAcc.template AsType<bhalf4_t>()(Number<1>{}) =
             __builtin_amdgcn_fma_from_tensor_bf16_u8_8x4(
                 inAcc1, residual1, scale1, aux_data, clamp);
+#else
+        ignore = inAcc;
+        ignore = residual;
+        ignore = scale;
+        ignore = outAcc;
+#endif
     }
 
     // f8
@@ -848,6 +1174,7 @@ struct intrin_wcnn_fma_from_tensor<8, 4, ChanOff>
     __device__ static void
     Run(const half8_t& inAcc, const f8x8_t& residual, const half8_t scale, FloatAcc& outAcc)
     {
+#if defined(__gfx13__)
         constexpr index_t aux_data = 0;
         constexpr bool clamp       = false;
         half4_t inAcc0, inAcc1;
@@ -862,12 +1189,19 @@ struct intrin_wcnn_fma_from_tensor<8, 4, ChanOff>
         outAcc.template AsType<half4_t>()(Number<1>{}) =
             __builtin_amdgcn_fma_from_tensor_f16_fp8_8x4(
                 inAcc1, residual1, scale1, aux_data, clamp);
+#else
+        ignore = inAcc;
+        ignore = residual;
+        ignore = scale;
+        ignore = outAcc;
+#endif
     }
 
     template <class FloatAcc>
     __device__ static void
     Run(const bhalf8_t& inAcc, const f8x8_t& residual, const bhalf8_t scale, FloatAcc& outAcc)
     {
+#if defined(__gfx13__)
         constexpr index_t aux_data = 0;
         constexpr bool clamp       = false;
         bhalf4_t inAcc0, inAcc1;
@@ -882,6 +1216,12 @@ struct intrin_wcnn_fma_from_tensor<8, 4, ChanOff>
         outAcc.template AsType<bhalf4_t>()(Number<1>{}) =
             __builtin_amdgcn_fma_from_tensor_bf16_fp8_8x4(
                 inAcc0, residual1, scale1, aux_data, clamp);
+#else
+        ignore = inAcc;
+        ignore = residual;
+        ignore = scale;
+        ignore = outAcc;
+#endif
     }
 
     // bf8
@@ -889,6 +1229,7 @@ struct intrin_wcnn_fma_from_tensor<8, 4, ChanOff>
     __device__ static void
     Run(const half8_t& inAcc, const bf8x8_t& residual, const half8_t scale, FloatAcc& outAcc)
     {
+#if defined(__gfx13__)
         constexpr index_t aux_data = 0;
         constexpr bool clamp       = false;
         half4_t inAcc0, inAcc1;
@@ -903,12 +1244,19 @@ struct intrin_wcnn_fma_from_tensor<8, 4, ChanOff>
         outAcc.template AsType<half4_t>()(Number<1>{}) =
             __builtin_amdgcn_fma_from_tensor_f16_bf8_8x4(
                 inAcc1, residual1, scale1, aux_data, clamp);
+#else
+        ignore = inAcc;
+        ignore = residual;
+        ignore = scale;
+        ignore = outAcc;
+#endif
     }
 
     template <class FloatAcc>
     __device__ static void
     Run(const bhalf8_t& inAcc, const bf8x8_t& residual, const bhalf8_t scale, FloatAcc& outAcc)
     {
+#if defined(__gfx13__)
         constexpr index_t aux_data = 0;
         constexpr bool clamp       = false;
         bhalf4_t inAcc0, inAcc1;
@@ -923,6 +1271,12 @@ struct intrin_wcnn_fma_from_tensor<8, 4, ChanOff>
         outAcc.template AsType<bhalf4_t>()(Number<1>{}) =
             __builtin_amdgcn_fma_from_tensor_bf16_bf8_8x4(
                 inAcc1, residual1, scale1, aux_data, clamp);
+#else
+        ignore = inAcc;
+        ignore = residual;
+        ignore = scale;
+        ignore = outAcc;
+#endif
     }
 
     // f16
@@ -933,6 +1287,7 @@ struct intrin_wcnn_fma_from_tensor<8, 4, ChanOff>
                                const half8_t scale,
                                FloatAcc& outAcc)
     {
+#if defined(__gfx13__)
         constexpr index_t aux_data = 0;
         constexpr bool clamp       = false;
         // c0-c7
@@ -963,6 +1318,13 @@ struct intrin_wcnn_fma_from_tensor<8, 4, ChanOff>
                                                          scale1,
                                                          aux_data,
                                                          clamp);
+#else
+        ignore = inAcc;
+        ignore = residual01;
+        ignore = residual23;
+        ignore = scale;
+        ignore = outAcc;
+#endif
     }
 
     // bf16
@@ -973,6 +1335,7 @@ struct intrin_wcnn_fma_from_tensor<8, 4, ChanOff>
                                const bhalf8_t scale,
                                FloatAcc& outAcc)
     {
+#if defined(__gfx13__)
         constexpr index_t aux_data = 0;
         constexpr bool clamp       = false;
         const int32_t residual0    = bit_cast<int32x2_t>(residual01)[0];
@@ -1000,6 +1363,13 @@ struct intrin_wcnn_fma_from_tensor<8, 4, ChanOff>
                                                            scale1,
                                                            aux_data,
                                                            clamp);
+#else
+        ignore = inAcc;
+        ignore = residual01;
+        ignore = residual23;
+        ignore = scale;
+        ignore = outAcc;
+#endif
     }
 };
 
