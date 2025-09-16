@@ -144,7 +144,7 @@ inline std::vector<BN2DTestCase> Network2DLarge()
 template <>
 inline std::vector<BN3DTestCase> Network3DSerialCase()
 {
-    return {{2, 2048, 16, 128, 128, miopen::batchnorm::Direction::Backward, 0, 1}};
+    return {{16, 256, 16, 128, 128, miopen::batchnorm::Direction::Backward, 0, 1}};
 }
 
 template <>
