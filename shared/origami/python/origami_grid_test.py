@@ -1,3 +1,6 @@
+# Copyright Advanced Micro Devices, Inc., or its affiliates.
+# SPDX-License-Identifier:  MIT
+
 #!/usr/bin/env python3
 
 # Copyright © Advanced Micro Devices, Inc., or its affiliates.
@@ -64,12 +67,12 @@ def parseArguments():
 def main():
     args = parseArguments()
 
-    hardware = origami.getHardwareForDevice(args.device)
+    hardware = origami.get_hardware_for_device(args.device)
 
     if args.print:
         hardware.print()
 
-    reduction = origami.select_streamk_reduction(
+    reduction = origami.select_reduction(
         args.m,
         args.n,
         args.k,
@@ -81,7 +84,7 @@ def main():
         args.dynamic_grid_version
     )
 
-    winner_grid = origami.select_streamk_grid(
+    winner_grid = origami.select_grid(
         args.m,
         args.n,
         args.k,

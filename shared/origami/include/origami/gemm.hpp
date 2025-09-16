@@ -1,38 +1,13 @@
-/*******************************************************************************
- *
- * MIT License
- *
- * Copyright (C) 2025 Advanced Micro Devices, Inc. All rights reserved.
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
- *
- *******************************************************************************/
+// Copyright Advanced Micro Devices, Inc., or its affiliates.
+// SPDX-License-Identifier:  MIT
 
 #pragma once
 
-#include <Tensile/analytical/Hardware.hpp>
+#include "origami/hardware.hpp"
 #include <vector>
 
-namespace TensileLite
+namespace origami
 {
-    namespace analytical
-    {
         // Placeholder for compute_reuse_in_block_gemm function.
         // TODO move over L2 hit rate simulation for tie-breaking.
         double compute_reuse_in_block_gemm(size_t                  grid_m,
@@ -53,7 +28,7 @@ namespace TensileLite
         /* Compute-related functions                                                                */
         /* ---------------------------------------------------------------------------------------- */
         // Compute the number of matrix instructions required to compute a single MT_MXMT_NXMT_K tile.
-        size_t compute_number_matrix_instructions(const Hardware& hardware,
+        size_t compute_number_matrix_instructions(const hardware_t& hardware,
                                                   size_t          MT_M,
                                                   size_t          MT_N,
                                                   size_t          MT_K,
@@ -63,7 +38,7 @@ namespace TensileLite
                                                   bool            debug);
 
         // Determine the compute latency per MT_MxMT_NxMT_K Macro Tile (L_MT).
-        size_t compute_mt_compute_latency(const Hardware& hardware,
+        size_t compute_mt_compute_latency(const hardware_t& hardware,
                                           size_t          M,
                                           size_t          N,
                                           size_t          K,
@@ -77,14 +52,14 @@ namespace TensileLite
                                           size_t          MI_K,
                                           size_t          element_size_A, //In bits
                                           size_t          element_size_B, //In bits,
-                                          DataType        miDataType,
+                                          data_type_t     mi_datatype,
                                           bool            debug);
 
         /* ---------------------------------------------------------------------------------------- */
         /* Memory-related functions                                                                 */
         /* ---------------------------------------------------------------------------------------- */
         // Check if MT fits in LDS
-        bool check_LDS_capacity(const Hardware& hardware,
+        bool check_lds_capacity(const hardware_t& hardware,
                                 size_t          MT_M,
                                 size_t          MT_N,
                                 size_t          MT_K,
@@ -99,10 +74,10 @@ namespace TensileLite
 
         // Computes total data loads per CU per MT from A and B
         // Reads happen every MT, Writes happen every K-complete tile.
-        size_t compute_CU_loads(size_t MT_M, size_t MT_N, size_t MT_K, bool debug);
+        size_t compute_cu_loads(size_t MT_M, size_t MT_N, size_t MT_K, bool debug);
 
         // Estimates the l2 hit-rate
-        double estimate_l2_hit(const Hardware& hardware,
+        double estimate_l2_hit(const hardware_t& hardware,
                                size_t          M,
                                size_t          N,
                                size_t          K,
@@ -115,7 +90,7 @@ namespace TensileLite
                                size_t          splittingFactor);
 
         // Estimates the mall hit-rate
-        double estimate_mall_hit(const Hardware& hardware,
+        double estimate_mall_hit(const hardware_t& hardware,
                                  size_t          M,
                                  size_t          N,
                                  size_t          K,
@@ -128,7 +103,7 @@ namespace TensileLite
                                  size_t          splittingFactor);
 
         // Determine the memory latency per MT_MxMT_NxMT_K Macro Tile (L_MT).
-        double compute_memory_latency(const Hardware& hardware,
+        double compute_memory_latency(const hardware_t& hardware,
                                       size_t          M,
                                       size_t          N,
                                       size_t          K,
@@ -148,7 +123,7 @@ namespace TensileLite
         /* Tile-related functions                                                                   */
         /* ---------------------------------------------------------------------------------------- */
         // Computes the latency to compute a K-COMPLETE tile.
-        double compute_tile_latency(const Hardware& hardware,
+        double compute_tile_latency(const hardware_t& hardware,
                                     size_t          M,
                                     size_t          N,
                                     size_t          K,
@@ -164,7 +139,7 @@ namespace TensileLite
                                     size_t          element_size_A, //In bits
                                     size_t          element_size_B, //In bits,
                                     size_t          element_size_out, //In bits
-                                    DataType        miDataType,
+                                    data_type_t     mi_datatype,
                                     size_t          mx_block_size,
                                     int             WGM,
                                     size_t          numActiveCUs,
@@ -173,7 +148,7 @@ namespace TensileLite
 
         // Computes the latency per K-complete MT wave.
         // A wave is defined as : The time it takes for one CU to complete one K-complete output tile
-        double compute_wave_latency(const Hardware& hardware,
+        double compute_wave_latency(const hardware_t& hardware,
                                     size_t          M,
                                     size_t          N,
                                     size_t          K,
@@ -189,7 +164,7 @@ namespace TensileLite
                                     size_t          element_size_A, //In bits
                                     size_t          element_size_B, //In bits,
                                     size_t          element_size_out, //In bits
-                                    DataType        miDataType,
+                                    data_type_t     mi_datatype,
                                     size_t          mx_block_size,
                                     int             WGM,
                                     size_t          numActiveCUs,
@@ -198,7 +173,7 @@ namespace TensileLite
 
         // Compute the total latency of a gemm based on the latency of one wave multiplied by the number of waves
         // A wave is defined as : The time it takes for one CU to complete one K-complete output tile
-        double compute_total_latency(const Hardware& hardware,
+        double compute_total_latency(const hardware_t& hardware,
                                      size_t          M,
                                      size_t          N,
                                      size_t          K,
@@ -214,7 +189,7 @@ namespace TensileLite
                                      size_t          element_size_A, //In bits
                                      size_t          element_size_B, //In bits,
                                      size_t          element_size_out, //In bits
-                                     DataType        miDataType,
+                                     data_type_t     mi_datatype,
                                      size_t          mx_block_size,
                                      int             WGM,
                                      size_t          split = 0,
@@ -224,7 +199,7 @@ namespace TensileLite
         // Compute the performance from the latency.
         // IMPORTANT : This program is NOT meant to be an analytical model for performance, but rather a way to rank different macro tile sizes.
         // These performance values could be wildly inaccurate in absolute terms, but will often result in the correct ranking of MTin relative terms.
-        double compute_perf_gflops(const Hardware& hardware,
+        double compute_perf_gflops(const hardware_t& hardware,
                                    size_t          M,
                                    size_t          N,
                                    size_t          K,
@@ -240,5 +215,4 @@ namespace TensileLite
                                    size_t          element_size_out,
                                    int             WGM,
                                    bool            debug);
-    } // namespace analytical
-} // namespace TensileLite
+} // namespace origami

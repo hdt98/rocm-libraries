@@ -214,7 +214,7 @@ tile_list = [
 def main():
     args = parseArguments()
 
-    hardware = origami.getHardwareForDevice(args.device)
+    hardware = origami.get_hardware_for_device(args.device)
 
     if args.print:
         hardware.print()
@@ -249,3 +249,4 @@ def main():
 
 if __name__ == "__main__":
     exit(main())
+
