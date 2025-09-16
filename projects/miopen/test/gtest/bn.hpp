@@ -33,7 +33,7 @@
 #include "test_operations.hpp"
 
 MIOPEN_DECLARE_ENV_VAR_STR(MIOPEN_FIND_ENFORCE)
-#define WORKAROUND_SWDEV_547301 1
+
 // Define an enum to identify which version of BN api to call
 enum BNApiType
 {
@@ -293,10 +293,6 @@ protected:
                             bn_infer_test_data.out_ref.data,
                             bn_infer_test_data.out_ref.data);
         auto tolerance = 4e-3;
-#if WORKAROUND_SWDEV_547301
-        // Workaround to let BN Infer tests pass on Navi4x,SWDEV-547301
-        tolerance = miopen::StartsWith(handle.GetDeviceName(), "gfx120") ? 8e-3 : 4e-3;
-#endif
         test::CompareTensor<YDataType>(
             bn_infer_test_data.output, bn_infer_test_data.out_ref, tolerance);
     }
