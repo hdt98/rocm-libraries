@@ -107,7 +107,7 @@ supported_distro() {
 
   # First check ID
   case "${ID}" in
-    ubuntu|centos|rhel|fedora|sles|opensuse-leap)
+    ubuntu|debian|centos|rhel|fedora|sles|opensuse-leap)
       supported=true
       matched_by="ID"
       ;;
@@ -116,7 +116,6 @@ supported_distro() {
   # check ID_LIKE as fallback
   if [ "$supported" = false ] && [ -n "${ID_LIKE}" ]; then
     case "${ID_LIKE}" in
-      *debian*)        supported=true; new_id="ubuntu"; matched_by="ID_LIKE";;
       *rhel*)          supported=true; new_id="rhel"; matched_by="ID_LIKE";;
       *fedora*)        supported=true; new_id="fedora"; matched_by="ID_LIKE";;
     esac
@@ -130,7 +129,7 @@ supported_distro() {
     fi
     true
   else
-    printf "This script is currently supported on Ubuntu, CentOS, RHEL, SLES, OpenSUSE-Leap, and Fedora\n"
+    printf "This script is currently supported on Ubuntu, Debian, CentOS, RHEL, SLES, OpenSUSE-Leap, and Fedora\n"
     exit 2
   fi
 }
@@ -267,7 +266,7 @@ install_packages( )
   fi
 
   case "${ID}" in
-    ubuntu)
+    ubuntu|debian)
       elevate_if_not_root apt update
       install_apt_packages "${library_dependencies_ubuntu[@]}"
       ;;
@@ -658,7 +657,7 @@ if [[ "${build_package}" == true ]]; then
 
   if [[ "${install_package}" == true ]]; then
     case "${ID}" in
-      ubuntu)
+      ubuntu|debian)
         elevate_if_not_root dpkg -i rocsolver[-\_]*.deb
         ;;
       centos|rhel)
