@@ -20,6 +20,15 @@ template <typename SrcType,
           ck::index_t AccNum>
 bool run_test()
 {
+    if(!ck::is_gfx12_supported()) // report a warning, but move on. 
+    {
+        fprintf(stderr, "----- WARNING: gfx12 not supported, reporting SUCCESS and skipping test -----\n");
+        return true;
+    }
+    else{
+        fprintf(stderr, "----- INFO: gfx12 supported, running test -----\n");
+    }
+
     using Row         = ck::tensor_layout::gemm::RowMajor;
     using Col         = ck::tensor_layout::gemm::ColumnMajor;
     using PassThrough = ck::tensor_operation::element_wise::PassThrough;
