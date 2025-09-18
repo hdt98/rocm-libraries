@@ -139,7 +139,7 @@ namespace
                 else if(arg.scaleB == hipblaslt_scaling_format::Block_32_UE8M0)
                     name << "_SBMX_32_UE8M0";
                 else if(arg.scaleB == hipblaslt_scaling_format::Block_32_UE8M0_64_4_4)
-                    name << "_SBMX_32_UE8M0";
+                    name << "_SBMX_32_UE8M0_64_4_4";
 
                 if(arg.scaleC)
                     name << "_SC";
