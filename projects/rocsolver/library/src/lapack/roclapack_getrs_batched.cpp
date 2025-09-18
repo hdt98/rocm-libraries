@@ -1,5 +1,5 @@
 /* **************************************************************************
- * Copyright (C) 2019-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2019-2025 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -65,33 +65,26 @@ rocblas_status rocsolver_getrs_batched_impl(rocblas_handle handle,
     rocblas_stride strideB = 0;
 
     // memory workspace sizes:
-    // size of workspace (for calling TRSM)
+    rocsolver_workspace_helper work_helper;
     bool optim_mem;
-    size_t size_work1, size_work2, size_work3, size_work4;
-    rocsolver_getrs_getMemorySize<true, false, T>(trans, n, nrhs, batch_count, &size_work1,
-                                                  &size_work2, &size_work3, &size_work4, &optim_mem,
-                                                  lda, ldb);
+    rocsolver_getrs_getMemorySize<true, false, T>(trans, n, nrhs, batch_count, &work_helper,
+                                                  &optim_mem, lda, ldb);
 
     if(rocblas_is_device_memory_size_query(handle))
-        return rocblas_set_optimal_device_memory_size(handle, size_work1, size_work2, size_work3,
-                                                      size_work4);
+        return rocblas_set_optimal_device_memory_size(handle, work_helper.get_total_size());
 
     // memory workspace allocation
-    void *work1, *work2, *work3, *work4;
-    rocblas_device_malloc mem(handle, size_work1, size_work2, size_work3, size_work4);
+    rocblas_device_malloc mem(handle, work_helper.get_total_size());
 
     if(!mem)
         return rocblas_status_memory_error;
 
-    work1 = mem[0];
-    work2 = mem[1];
-    work3 = mem[2];
-    work4 = mem[3];
+    work_helper.assign_buffer((uint8_t*)mem[0]);
 
     // execution
     return rocsolver_getrs_template<true, false, T>(
         handle, trans, n, nrhs, A, shiftA, inca, lda, strideA, ipiv, strideP, B, shiftB, incb, ldb,
-        strideB, batch_count, work1, work2, work3, work4, optim_mem, true);
+        strideB, batch_count, &work_helper, optim_mem, true);
 }
 
 ROCSOLVER_END_NAMESPACE
