@@ -1701,10 +1701,10 @@ rocblas_status rocsolver_stedcj_template(rocblas_handle handle,
     //-----------------------------
     size_t lmemsize = (n + n % 2) * (sizeof(rocblas_int) + sizeof(S));
 
-    ROCSOLVER_LAUNCH_KERNEL((stedcj_solve_kernel<S>),
-                            dim3(maxblks, STEDC_NUM_SPLIT_BLKS, batch_count), dim3(STEDCJ_BDIM),
-                            lmemsize, stream, n, D, strideD, E, strideE, tempvect, 0, ldt, strideT,
-                            info, static_cast<S*>(work_stack), splits_map, eps, ssfmin, ssfmax, STEDC_NUM_SPLIT_BLKS);
+    ROCSOLVER_LAUNCH_KERNEL(
+        (stedcj_solve_kernel<S>), dim3(maxblks, STEDC_NUM_SPLIT_BLKS, batch_count),
+        dim3(STEDCJ_BDIM), lmemsize, stream, n, D, strideD, E, strideE, tempvect, 0, ldt, strideT,
+        info, static_cast<S*>(work_stack), splits_map, eps, ssfmin, ssfmax, STEDC_NUM_SPLIT_BLKS);
 
     // 3. merge phase
     //----------------
@@ -1721,9 +1721,9 @@ rocblas_status rocsolver_stedcj_template(rocblas_handle handle,
         // a. prepare secular equations
         rocblas_int numgrps2 = 1 << (maxlevs - 1 - k);
         ROCSOLVER_LAUNCH_KERNEL((stedcj_mergePrepare_kernel<S>),
-                                dim3(numgrps2, STEDC_NUM_SPLIT_BLKS, batch_count),
-                                dim3(STEDCJ_BDIM), lmemsize1, stream, k, n, D, strideD, E, strideE,
-                                tempvect, 0, ldt, strideT, tmpz, tempgemm, splits_map, eps, STEDC_NUM_SPLIT_BLKS);
+                                dim3(numgrps2, STEDC_NUM_SPLIT_BLKS, batch_count), dim3(STEDCJ_BDIM),
+                                lmemsize1, stream, k, n, D, strideD, E, strideE, tempvect, 0, ldt,
+                                strideT, tmpz, tempgemm, splits_map, eps, STEDC_NUM_SPLIT_BLKS);
 
         // b. solve to find merged eigen values
         ROCSOLVER_LAUNCH_KERNEL((stedcj_mergeValues_kernel<S>),
@@ -1733,9 +1733,9 @@ rocblas_status rocsolver_stedcj_template(rocblas_handle handle,
 
         // c. find merged eigen vectors
         ROCSOLVER_LAUNCH_KERNEL((stedcj_mergeVectors_kernel<STEDCJ_EXTERNAL_GEMM, S>),
-                                dim3(numgrps3, STEDC_NUM_SPLIT_BLKS, batch_count),
-                                dim3(STEDCJ_BDIM), lmemsize3, stream, k, n, D, strideD, E, strideE,
-                                tempvect, 0, ldt, strideT, tmpz, tempgemm, splits_map, STEDC_NUM_SPLIT_BLKS);
+                                dim3(numgrps3, STEDC_NUM_SPLIT_BLKS, batch_count), dim3(STEDCJ_BDIM),
+                                lmemsize3, stream, k, n, D, strideD, E, strideE, tempvect, 0, ldt,
+                                strideT, tmpz, tempgemm, splits_map, STEDC_NUM_SPLIT_BLKS);
 
         // c. update level
         ROCSOLVER_LAUNCH_KERNEL((stedcj_mergeUpdate_kernel<S>),

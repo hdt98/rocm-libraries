@@ -227,10 +227,12 @@ rocblas_status rocsolver_sytrf_template(rocblas_handle handle,
 
     if(uplo == rocblas_fill_upper)
         ROCSOLVER_LAUNCH_KERNEL(sytrf_kernel_upper<T>, grid, threads, 0, stream, n, A, shiftA, lda,
-                                strideA, ipiv, strideP, info, work, SYTRF_BLOCKSIZE, SYTRF_SYTF2_SWITCHSIZE);
+                                strideA, ipiv, strideP, info, work, SYTRF_BLOCKSIZE,
+                                SYTRF_SYTF2_SWITCHSIZE);
     else
         ROCSOLVER_LAUNCH_KERNEL(sytrf_kernel_lower<T>, grid, threads, 0, stream, n, A, shiftA, lda,
-                                strideA, ipiv, strideP, info, work, SYTRF_BLOCKSIZE, SYTRF_SYTF2_SWITCHSIZE);
+                                strideA, ipiv, strideP, info, work, SYTRF_BLOCKSIZE,
+                                SYTRF_SYTF2_SWITCHSIZE);
 
     return rocblas_status_success;
 }

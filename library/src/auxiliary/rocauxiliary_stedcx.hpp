@@ -1879,9 +1879,9 @@ rocblas_status rocsolver_stedcx_template(rocblas_handle handle,
         // a. prepare secular equations
         rocblas_int numgrps2 = 1 << (maxlevs - 1 - k);
         ROCSOLVER_LAUNCH_KERNEL((stedcx_mergePrepare_kernel<S>),
-                                dim3(numgrps2, STEDC_NUM_SPLIT_BLKS, batch_count),
-                                dim3(STEDCX_BDIM), lmemsize1, stream, k, n, D, strideD, E, strideE,
-                                tempvect, 0, ldt, strideT, tmpz, tempgemm, splits, eps, STEDC_NUM_SPLIT_BLKS);
+                                dim3(numgrps2, STEDC_NUM_SPLIT_BLKS, batch_count), dim3(STEDCX_BDIM),
+                                lmemsize1, stream, k, n, D, strideD, E, strideE, tempvect, 0, ldt,
+                                strideT, tmpz, tempgemm, splits, eps, STEDC_NUM_SPLIT_BLKS);
 
         // b. solve to find merged eigen values
         ROCSOLVER_LAUNCH_KERNEL((stedcx_mergeValues_kernel<S>),
@@ -1891,9 +1891,9 @@ rocblas_status rocsolver_stedcx_template(rocblas_handle handle,
 
         // c. find merged eigen vectors
         ROCSOLVER_LAUNCH_KERNEL((stedcx_mergeVectors_kernel<STEDCX_EXTERNAL_GEMM, S>),
-                                dim3(numgrps3, STEDC_NUM_SPLIT_BLKS, batch_count),
-                                dim3(STEDCX_BDIM), lmemsize3, stream, k, n, D, strideD, E, strideE,
-                                tempvect, 0, ldt, strideT, tmpz, tempgemm, splits, STEDC_NUM_SPLIT_BLKS);
+                                dim3(numgrps3, STEDC_NUM_SPLIT_BLKS, batch_count), dim3(STEDCX_BDIM),
+                                lmemsize3, stream, k, n, D, strideD, E, strideE, tempvect, 0, ldt,
+                                strideT, tmpz, tempgemm, splits, STEDC_NUM_SPLIT_BLKS);
 
         // d. update level
         ROCSOLVER_LAUNCH_KERNEL((stedcx_mergeUpdate_kernel<S>),
