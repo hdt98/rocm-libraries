@@ -95,21 +95,43 @@ main=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # This function is helpful for dockerfiles that do not have sudo installed, but the default user is root
 # true is a system command that completes successfully, function returns success
 # prereq: ${ID} must be defined before calling
-supported_distro( )
-{
-  if [ -z ${ID+foo} ]; then
-    printf "supported_distro(): \$ID must be set\n"
+supported_distro() {
+  if [ -z "${ID+foo}" ] && [ -z "${ID_LIKE+foo}" ]; then
+    printf "supported_distro(): \$ID or \$ID_LIKE must be set\n"
     exit 2
   fi
 
+  local supported=false
+  local matched_by=""
+  local new_id="$ID"
+
+  # First check ID
   case "${ID}" in
-    ubuntu|centos|rhel|fedora|sles|opensuse-leap)
-        true
-        ;;
-    *)  printf "This script is currently supported on Ubuntu, CentOS, RHEL, SLES, OpenSUSE-Leap, and Fedora\n"
-        exit 2
-        ;;
+    ubuntu|debian|centos|rhel|fedora|sles|opensuse-leap)
+      supported=true
+      matched_by="ID"
+      ;;
   esac
+
+  # check ID_LIKE as fallback
+  if [ "$supported" = false ] && [ -n "${ID_LIKE}" ]; then
+    case "${ID_LIKE}" in
+      *rhel*)          supported=true; new_id="rhel"; matched_by="ID_LIKE";;
+      *fedora*)        supported=true; new_id="fedora"; matched_by="ID_LIKE";;
+    esac
+  fi
+
+  if [ "$supported" = true ]; then
+    if [ "$matched_by" = "ID_LIKE" ]; then
+      printf "Warning: matched on ID_LIKE='%s' instead of ID='%s'. Overriding ID to '%s'.\n" \
+             "$ID_LIKE" "$ID" "$new_id" >&2
+      ID="$new_id"   # override ID globally in the script
+    fi
+    true
+  else
+    printf "This script is currently supported on Ubuntu, Debian, CentOS, RHEL, SLES, OpenSUSE-Leap, and Fedora\n"
+    exit 2
+  fi
 }
 
 # This function is helpful for dockerfiles that do not have sudo installed, but the default user is root
@@ -244,7 +266,7 @@ install_packages( )
   fi
 
   case "${ID}" in
-    ubuntu)
+    ubuntu|debian)
       elevate_if_not_root apt update
       install_apt_packages "${library_dependencies_ubuntu[@]}"
       ;;
@@ -635,7 +657,7 @@ if [[ "${build_package}" == true ]]; then
 
   if [[ "${install_package}" == true ]]; then
     case "${ID}" in
-      ubuntu)
+      ubuntu|debian)
         elevate_if_not_root dpkg -i rocsolver[-\_]*.deb
         ;;
       centos|rhel)
