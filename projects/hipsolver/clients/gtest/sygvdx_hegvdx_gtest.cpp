@@ -137,22 +137,22 @@ class HEGVDX_COMPAT : public SYGVDX_HEGVDX<API_COMPAT>
 
 // non-batch tests
 
-TEST_P(SYGVDX, DISABLED__float)
+TEST_P(SYGVDX, __float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(SYGVDX, DISABLED__double)
+TEST_P(SYGVDX, __double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(HEGVDX, DISABLED__float_complex)
+TEST_P(HEGVDX, __float_complex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(HEGVDX, DISABLED__double_complex)
+TEST_P(HEGVDX, __double_complex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
