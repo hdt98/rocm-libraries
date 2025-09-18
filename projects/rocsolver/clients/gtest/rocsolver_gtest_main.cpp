@@ -1,5 +1,5 @@
 /* **************************************************************************
- * Copyright (C) 2020-2022 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2020-2025 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,8 +28,7 @@
 #include <cstdio>
 #include <string>
 
-#include <fmt/core.h>
-#include <fmt/ostream.h>
+#include "rocsolver_utility.hpp"
 #include <gtest/gtest.h>
 #include <rocsolver/rocsolver.h>
 
@@ -55,7 +54,8 @@ static std::string rocsolver_version()
 
 static void print_version_info()
 {
-    fmt::print("rocSOLVER version {} (with rocBLAS {})\n", rocsolver_version(), rocblas_version());
+    rocsolver::formatting::print("rocSOLVER version {} (with rocBLAS {})\n", rocsolver_version(),
+                                 rocblas_version());
     std::fflush(stdout);
 }
 
@@ -67,7 +67,7 @@ int main(int argc, char** argv)
     int device_count = query_device_property();
     if(device_count <= 0)
     {
-        fmt::print(stderr, "Error: No devices found\n");
+        rocsolver::formatting::print(stderr, "Error: No devices found\n");
         return -1;
     }
     set_device(0); // use first device

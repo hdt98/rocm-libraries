@@ -86,6 +86,9 @@ Options:
                                (Default build type is Release)
 
   --cmake-arg <argument>       Forward the given argument to CMake when configuring the build.
+
+  --no-fmt                     Choose to build rocSOLVER without fmt.
+	            		       (Requires an installation of libstdc++ that supports C++23 features)
 EOF
 }
 
@@ -325,6 +328,7 @@ optimal=true
 cleanup=false
 build_sanitizer=false
 build_codecoverage=false
+no_fmt=false
 unset build_with_sparse
 unset architecture
 unset rocblas_path
@@ -340,7 +344,7 @@ declare -a cmake_client_options
 # check if we have a modern version of getopt that can handle whitespace and long parameters
 getopt -T
 if [[ $? -eq 4 ]]; then
-  GETOPT_PARSE=$(getopt --name "${0}" --longoptions help,install,package,clients,clients-only,dependencies,cleanup,debug,hip-clang,codecoverage,relwithdebinfo,build_dir:,build-path:,lib_dir:,lib-path:,install_dir:,install-path:,rocblas_dir:,rocblas-path:,rocsolver_dir:,rocsolver-path:,rocsparse_dir:,rocsparse-path:,architecture:,static,relocatable,no-optimizations,sparse,no-sparse,docs,address-sanitizer,cmake-arg: --options hipcdgsrnka: -- "$@")
+  GETOPT_PARSE=$(getopt --name "${0}" --longoptions help,install,package,clients,clients-only,dependencies,cleanup,debug,hip-clang,codecoverage,relwithdebinfo,build_dir:,build-path:,lib_dir:,lib-path:,install_dir:,install-path:,rocblas_dir:,rocblas-path:,rocsolver_dir:,rocsolver-path:,rocsparse_dir:,rocsparse-path:,architecture:,static,relocatable,no-optimizations,sparse,no-sparse,docs,address-sanitizer,cmake-arg:,no-fmt --options hipcdgsrnka: -- "$@")
 else
   echo "Need a new version of getopt"
   exit 1
@@ -436,6 +440,9 @@ while true; do
     --cmake-arg)
         cmake_common_options+=("${2}")
         shift 2 ;;
+    --no-fmt)
+        no_fmt=true
+        shift ;;
     --) shift ; break ;;
     *)
         echo "Unexpected command line parameter received (${1}); aborting";
@@ -613,6 +620,10 @@ if [[ "${build_codecoverage}" == true ]]; then
         exit 1
     fi
     cmake_common_options+=('-DBUILD_CODE_COVERAGE=ON')
+fi
+
+if [[ "${no_fmt}" == true ]]; then
+    cmake_common_options+=('-DUSE_FMT_LIB=OFF')
 fi
 
 # check exit codes for everything from here onwards

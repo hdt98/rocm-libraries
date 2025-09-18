@@ -1,5 +1,5 @@
 /* **************************************************************************
- * Copyright (C) 2021-2022 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2021-2025 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,20 +27,35 @@
 
 #pragma once
 
-#include <fmt/format.h>
-#include <fmt/ostream.h>
+#include "rocsolver_utility.hpp"
 #include <rocblas/rocblas.h>
 
 /* The format function for user-defined types cannot be const before fmt v8.0
    but must be const in fmt v8.1 if the type is used in a tuple. */
+#ifdef USE_FMT_LIB
+#include <fmt/format.h>
+#include <fmt/ostream.h>
+#define BEGIN_CONDITIONAL_NAMESPACE \
+    namespace fmt                   \
+    {
+#define END_CONDITIONAL_NAMESPACE }
 #if FMT_VERSION < 80000
 #define ROCSOLVER_FMT_CONST
 #else
 #define ROCSOLVER_FMT_CONST const
 #endif
+#else
+#include <format>
+#include <print>
+#define BEGIN_CONDITIONAL_NAMESPACE \
+    namespace std                   \
+    {
+#define END_CONDITIONAL_NAMESPACE }
+#define ROCSOLVER_FMT_CONST const
+#endif
 
-namespace fmt
-{
+BEGIN_CONDITIONAL_NAMESPACE
+
 template <typename T>
 struct formatter<rocblas_complex_num<T>> : formatter<T>
 {
@@ -54,4 +69,5 @@ struct formatter<rocblas_complex_num<T>> : formatter<T>
         return ctx.out();
     }
 };
-}
+
+END_CONDITIONAL_NAMESPACE

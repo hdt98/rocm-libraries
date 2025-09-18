@@ -1,5 +1,5 @@
 /* **************************************************************************
- * Copyright (C) 2021-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2021-2025 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,12 +27,16 @@
 
 #pragma once
 
-#include <fmt/format.h>
-#include <fmt/ostream.h>
+#include "rocsolver_utility.hpp"
 
 #include "fmt_rocblas_types.hpp"
 #include "rocsolver_datatype2string.hpp"
 
+#ifdef USE_FMT_LIB
+#define LIB_NAMESPACE fmt
+#else
+#define LIB_NAMESPACE std
+#endif
 /***************************************************************************
  * Wrapper for types passed to logger, so we can more easily adjust the
  * default way of printing built-in types without doing it globally. (e.g.
@@ -54,7 +58,7 @@ rocsolver_logvalue<T> rocsolver_make_logvalue(T value)
     return rocsolver_logvalue<T>{value};
 }
 
-namespace fmt
+namespace LIB_NAMESPACE
 {
 /* By default, forward log values to the original printer for their type. */
 template <typename T>

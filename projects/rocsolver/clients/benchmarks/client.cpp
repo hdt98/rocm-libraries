@@ -25,11 +25,9 @@
  * SUCH DAMAGE.
  * *************************************************************************/
 
-#include <fmt/core.h>
-#include <fmt/ostream.h>
-
 #include "common/misc/program_options.hpp"
 #include "common/misc/rocsolver_dispatcher.hpp"
+#include "rocsolver_utility.hpp"
 
 using namespace roc;
 
@@ -76,7 +74,8 @@ static std::string rocsolver_version()
 
 static void print_version_info()
 {
-    fmt::print("rocSOLVER version {} (with rocBLAS {})\n", rocsolver_version(), rocblas_version());
+    rocsolver::formatting::print("rocSOLVER version {} (with rocBLAS {})\n", rocsolver_version(),
+                                 rocblas_version());
     std::fflush(stdout);
 }
 
@@ -650,7 +649,7 @@ try
     {
         std::stringstream desc_ss{};
         desc_ss << desc;
-        fmt::print("{}{}\n", help_str, desc_ss.str());
+        rocsolver::formatting::print("{}{}\n", help_str, desc_ss.str());
         return 0;
     }
 
@@ -703,6 +702,6 @@ try
 }
 catch(const std::exception& exp)
 {
-    fmt::print(stderr, "{}\n", exp.what());
+    rocsolver::formatting::print(stderr, "{}\n", exp.what());
     return -1;
 }

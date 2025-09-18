@@ -57,7 +57,6 @@ set(CMAKE_HIP_STANDARD 17)
 set(CMAKE_HIP_EXTENSIONS OFF)
 set(CMAKE_HIP_STANDARD_REQUIRED ON)
 
-option(ROCSOLVER_EMBED_FMT "Hide libfmt symbols" ON)
 option(OPTIMAL "Build specialized kernels for small matrix sizes" ON)
 option(ROCSOLVER_FIND_PACKAGE_LAPACK_CONFIG "Skip module mode search for LAPACK" ON)
 option(ROCSOLVER_USE_INTERNAL_BLAS "Use internal implementation of GEMM and TRSM for debugging." OFF)
@@ -66,9 +65,16 @@ option(ROCSOLVER_USE_REFERENCE_SECULAR_EQUATIONS_SOLVER "Use LAPACK like impleme
 # Add our CMake helper files to the lookup path
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
+# Configure which formatting dependency to use
+
+option(ROCSOLVER_EMBED_FMT "Hide libfmt symbols" ON)
+option(USE_FMT_LIB "Use libfmt for string formatting and printing" ON) # on by default
+if(USE_FMT_LIB)
+  find_package(fmt REQUIRED)
+endif()
+
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
-find_package(fmt REQUIRED)
 
 # ########################################################################
 # Main
