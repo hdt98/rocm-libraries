@@ -43,6 +43,38 @@
 #endif
 #endif
 
+#include <type_traits>
+
+template <typename T>
+static bool is_strided_array(T* A)
+{
+    return (true);
+}
+
+template <typename T>
+static bool is_strided_array(const T* A)
+{
+    return (true);
+}
+
+template <typename T>
+static bool is_strided_array(T* A[])
+{
+    return (false);
+}
+
+template <typename T>
+static bool is_strided_array(const T* A[])
+{
+    return (false);
+}
+
+template <typename T>
+static bool is_strided_array(T* const A[])
+{
+    return (false);
+}
+
 // These function templates help to provide compatibility with older versions
 // of rocblas. We declare these function templates only if rocBLAS does not,
 // and we delete them so that it is a compile-time error if they are used.
@@ -1595,6 +1627,113 @@ rocblas_status rocblasCall_trmm(rocblas_handle handle,
         handle, side, uplo, transA, diag, m, n, alpha, stride_alpha, A, offsetA, lda, strideA,
         cast2constType<T>(workArr), offsetB, ldb, strideB, cast2constPointer<T>(workArr), offsetB,
         ldb, strideB, batch_count);
+}
+
+// -----------------
+// trmm out of place
+// -----------------
+
+template <typename T, typename UA, typename UB, typename UC>
+rocblas_status rocblasCall_trmm(rocblas_handle handle,
+                                rocblas_side side,
+                                rocblas_fill uplo,
+                                rocblas_operation transA,
+                                rocblas_diagonal diag,
+                                rocblas_int m,
+                                rocblas_int n,
+                                const T* alpha,
+                                rocblas_stride stride_alpha,
+                                UA A,
+                                rocblas_stride offsetA,
+                                rocblas_int lda,
+                                rocblas_stride strideA,
+                                UB B,
+                                rocblas_stride offsetB,
+                                rocblas_int ldb,
+                                rocblas_stride strideB,
+                                UC C,
+                                rocblas_stride offsetC,
+                                rocblas_int ldc,
+                                rocblas_stride strideC,
+
+                                rocblas_int batch_count,
+                                T** workArr = nullptr)
+{
+    // TODO: How to get alpha for trace logging
+    ROCBLAS_ENTER("trmm", "side:", side, "uplo:", uplo, "trans:", transA, "diag:", diag, "m:", m,
+                  "n:", n, "shiftA:", offsetA, "lda:", lda, "shiftB:", offsetB, "ldb:", ldb,
+                  "bc:", batch_count);
+
+    bool const is_all_strided = (is_strided_array(A) && is_strided_array(B) && is_strided_array(C));
+    if(is_all_strided)
+    {
+        // clang-format off
+       return rocblas_internal_trmm_template(
+        handle,
+	side, uplo, transA, diag,
+	m, n,
+	alpha, stride_alpha,
+	(const T*) A, offsetA, lda, strideA,
+        (const T*) B, offsetB, ldb, strideB,
+	(T*) C, offsetC, ldc, strideC,
+	batch_count);
+        // clang-format on
+    }
+
+    // -------------------------------
+    // need to setup array of pointers
+    // -------------------------------
+    if(workArr == nullptr)
+    {
+        return (rocblas_status_memory_error);
+    }
+
+    std::byte* pfree = (std::byte*)workArr;
+
+    hipStream_t stream;
+    rocblas_get_stream(handle, &stream);
+
+    T** Ap = (T**)A;
+    T** Bp = (T**)B;
+    T** Cp = (T**)C;
+
+    if(is_strided_array(A))
+    {
+        Ap = (T**)pfree;
+        pfree += sizeof(T*) * batch_count;
+        auto const blocks = (batch_count - 1) / 256 + 1;
+        ROCSOLVER_LAUNCH_KERNEL(get_array<T>, dim3(blocks), dim3(256), 0, stream, Ap, (T*)A,
+                                strideA, batch_count);
+    }
+    if(is_strided_array(B))
+    {
+        Bp = (T**)pfree;
+        pfree += sizeof(T*) * batch_count;
+        auto const blocks = (batch_count - 1) / 256 + 1;
+        ROCSOLVER_LAUNCH_KERNEL(get_array<T>, dim3(blocks), dim3(256), 0, stream, Bp, (T*)B,
+                                strideB, batch_count);
+    }
+
+    if(is_strided_array(C))
+    {
+        Cp = (T**)pfree;
+        pfree += sizeof(T*) * batch_count;
+        auto const blocks = (batch_count - 1) / 256 + 1;
+        ROCSOLVER_LAUNCH_KERNEL(get_array<T>, dim3(blocks), dim3(256), 0, stream, Cp, (T*)C,
+                                strideC, batch_count);
+    }
+
+    // clang-format off
+    return rocblas_internal_trmm_batched_template(
+        handle,
+	side, uplo, transA, diag,
+	m, n,
+	alpha, stride_alpha,
+	(const T* const*) Ap, offsetA, lda, strideA,
+        (const T* const*) Bp, offsetB, ldb, strideB,
+	(T* const*) Cp, offsetC, ldc, strideC,
+	batch_count);
+    // clang-format on
 }
 
 // syr2/her2

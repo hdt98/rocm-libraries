@@ -36,6 +36,7 @@
 #include "auxiliary/rocauxiliary_larft.hpp"
 #include "rocblas.hpp"
 #include "roclapack_geqr2.hpp"
+#include "roclapack_rgeqr3.hpp"
 #include "rocsolver/rocsolver.h"
 
 ROCSOLVER_BEGIN_NAMESPACE
@@ -50,14 +51,26 @@ void rocsolver_geqrf_getMemorySize(const I m,
                                    size_t* size_diag_tmptr,
                                    size_t* size_workArr)
 {
+    *size_scalars = 0;
+    *size_work_workArr = 0;
+    *size_Abyx_norms_trfact = 0;
+    *size_diag_tmptr = 0;
+    *size_workArr = 0;
+
     // if quick return no workspace needed
-    if(m == 0 || n == 0 || batch_count == 0)
+    bool const has_work = (m >= 1) && (n >= 1) && (batch_count >= 1);
+    if(!has_work)
     {
-        *size_scalars = 0;
-        *size_work_workArr = 0;
-        *size_Abyx_norms_trfact = 0;
-        *size_diag_tmptr = 0;
-        *size_workArr = 0;
+        return;
+    }
+
+    bool const use_rgeqrf = (m >= n);
+    if(use_rgeqrf)
+    {
+        size_t size_rgeqrf = 0;
+        rocsolver_rgeqrf_getMemorySize<T, rocblas_int>(m, n, batch_count, &size_rgeqrf);
+
+        *size_work_workArr = size_rgeqrf;
         return;
     }
 
@@ -123,6 +136,28 @@ rocblas_status rocsolver_geqrf_template(rocblas_handle handle,
     hipStream_t stream;
     rocblas_get_stream(handle, &stream);
 
+    // ------------------------------------------
+    // recursive algorithm for tall skinny matrix
+    // ------------------------------------------
+    bool const use_rgeqrf = (m >= n);
+    if(use_rgeqrf)
+    {
+        size_t size_rgeqrf = 0;
+
+        rocsolver_rgeqrf_getMemorySize<T, rocblas_int>(m, n, batch_count, &size_rgeqrf);
+
+        T* tau = static_cast<T*>(ipiv);
+        rocblas_stride const stride_tau = static_cast<rocblas_stride>(strideP);
+
+        I lwork_bytes = size_rgeqrf;
+        rocblas_stride const lshiftA = shiftA;
+
+        void* const work = static_cast<void*>(work_workArr);
+        auto const istat = rocsolver_rgeqrf_template(handle, m, n, A, lshiftA, lda, strideA, tau,
+                                                     stride_tau, batch_count, work, lwork_bytes);
+        return (istat);
+    }
+
     // if the matrix is small, use the unblocked (BLAS-levelII) variant of the
     // algorithm
     if(m <= GEQxF_GEQx2_SWITCHSIZE || n <= GEQxF_GEQx2_SWITCHSIZE)
@@ -143,26 +178,30 @@ rocblas_status rocsolver_geqrf_template(rocblas_handle handle,
     {
         // Factor diagonal and subdiagonal blocks
         jb = std::min(dim - j, nb); // number of columns in the block
-        rocsolver_geqr2_template<T>(handle, m - j, jb, A, shiftA + idx2D(j, j, lda), lda, strideA,
-                                    (ipiv + j), strideP, batch_count, scalars, work_workArr,
-                                    Abyx_norms_trfact, diag_tmptr);
 
-        // apply transformation to the rest of the matrix
-        if(j + jb < n)
         {
-            // compute block reflector
-            rocsolver_larft_template<T>(handle, rocblas_forward_direction, rocblas_column_wise,
-                                        m - j, jb, A, shiftA + idx2D(j, j, lda), lda, strideA,
-                                        (ipiv + j), strideP, Abyx_norms_trfact, ldw, strideW,
-                                        batch_count, scalars, (T*)work_workArr, workArr);
+            rocsolver_geqr2_template<T>(handle, m - j, jb, A, shiftA + idx2D(j, j, lda), lda,
+                                        strideA, (ipiv + j), strideP, batch_count, scalars,
+                                        work_workArr, Abyx_norms_trfact, diag_tmptr);
 
-            // apply the block reflector
-            rocsolver_larfb_template<BATCHED, STRIDED, T>(
-                handle, rocblas_side_left, rocblas_operation_conjugate_transpose,
-                rocblas_forward_direction, rocblas_column_wise, m - j, n - j - jb, jb, A,
-                shiftA + idx2D(j, j, lda), lda, strideA, Abyx_norms_trfact, 0, ldw, strideW, A,
-                shiftA + idx2D(j, j + jb, lda), lda, strideA, batch_count, diag_tmptr, workArr);
+            // apply transformation to the rest of the matrix
+            if(j + jb < n)
+            {
+                // compute block reflector
+                rocsolver_larft_template<T>(handle, rocblas_forward_direction, rocblas_column_wise,
+                                            m - j, jb, A, shiftA + idx2D(j, j, lda), lda, strideA,
+                                            (ipiv + j), strideP, Abyx_norms_trfact, ldw, strideW,
+                                            batch_count, scalars, (T*)work_workArr, workArr);
+
+                // apply the block reflector
+                rocsolver_larfb_template<BATCHED, STRIDED, T>(
+                    handle, rocblas_side_left, rocblas_operation_conjugate_transpose,
+                    rocblas_forward_direction, rocblas_column_wise, m - j, n - j - jb, jb, A,
+                    shiftA + idx2D(j, j, lda), lda, strideA, Abyx_norms_trfact, 0, ldw, strideW, A,
+                    shiftA + idx2D(j, j + jb, lda), lda, strideA, batch_count, diag_tmptr, workArr);
+            }
         }
+
         j += nb;
     }
 
