@@ -168,9 +168,9 @@ endif()
 if(HIPBLASLT_ENABLE_ROCROLLER AND NOT ROCM_LIBS_SUPERBUILD)
     if(HIPBLASLT_ENABLE_FETCH)
         block(SCOPE_FOR VARIABLES)
-            #set(ROCROLLER_ENABLE_FETCH ON)
-            #set(ROCROLLER_BUILD_TESTING OFF)
-            #set(ROCROLLER_ENABLE_CLIENT OFF)
+            set(ROCROLLER_ENABLE_FETCH ON)
+            set(ROCROLLER_BUILD_TESTING OFF)
+            set(ROCROLLER_ENABLE_CLIENT OFF)
             option(YAML_CPP_INSTALL "" ON)
             set(BUILD_TESTING OFF)
             set(BUILD_CLIENTS OFF)
@@ -180,7 +180,7 @@ if(HIPBLASLT_ENABLE_ROCROLLER AND NOT ROCM_LIBS_SUPERBUILD)
             FetchContent_Declare(
                 rocRoller
                 GIT_REPOSITORY https://github.com/ROCm/rocRoller.git
-                GIT_TAG a9cbf901489a27a530a699d1d6a6b765a9c02426
+                GIT_TAG e6a5df6d391dd7c395e7a9cecffe59509042e842
             )
             FetchContent_MakeAvailable(rocRoller)
         endblock()

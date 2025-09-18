@@ -55,7 +55,8 @@ struct Arguments
         None   = 0,
         Scalar = 1,
         Vector = 2,
-        Block  = 3
+        Block_32_UE8M0  = 3,
+        Block_32_UE8M0_SW_64_4_4 = 1000,
     };
 
     /*************************************************************************
@@ -156,11 +157,6 @@ struct Arguments
     bool                     gradient;
     bool                     norm_check_assert;
     bool                     swizzle_a;
-
-    uint32_t scaleABlockRowSize;
-    uint32_t scaleABlockColSize;
-    uint32_t scaleBBlockRowSize;
-    uint32_t scaleBBlockColSize;
 
     // API related
     bool    use_ext;
@@ -264,10 +260,6 @@ struct Arguments
     OPER(gradient) SEP               \
     OPER(norm_check_assert) SEP      \
     OPER(swizzle_a) SEP              \
-    OPER(scaleABlockRowSize) SEP     \
-    OPER(scaleABlockColSize) SEP     \
-    OPER(scaleBBlockRowSize) SEP     \
-    OPER(scaleBBlockColSize) SEP     \
     OPER(use_ext) SEP                \
     OPER(use_ext_setproblem) SEP     \
     OPER(algo_method) SEP            \

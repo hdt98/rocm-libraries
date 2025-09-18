@@ -29,6 +29,8 @@
 
 #include "utility.hpp"
 
+#include <rocRoller/KernelOptions_detail.hpp>
+
 using namespace rocRoller;
 
 /**
@@ -120,9 +122,44 @@ std::string genKernelName(std::shared_ptr<SolutionParameters> gemm)
         rv << toString(t) << "_";
 
     if(gemm->kernelType.scaleAMode != Operations::ScaleMode::None)
-        rv << "SA_" << genScaleModeString(gemm->kernelType.scaleAMode) << "_";
+    {
+        rv << "SA_" << genScaleModeString(gemm->kernelType.scaleAMode);
+        rv << toString(gemm->kernelType.scaleTypeA) <<"_";
+        if (gemm->kernelType.scaleAMode == Operations::ScaleMode::Separate)
+        {
+            rv << gemm->kernelType.scaleABlockRowSize;
+            if (gemm->kernelType.scaleABlockColSize != 1)
+                rv <<"x"<<gemm->kernelType.scaleABlockColSize;
+            rv << "_";
+            if (gemm->kernelType.scaleShuffleTileA.size() == 3)
+            {
+                rv << "SWA" << gemm->kernelType.scaleShuffleTileA[0];
+                rv << "x" << gemm->kernelType.scaleShuffleTileA[1];
+                rv << "x" << gemm->kernelType.scaleShuffleTileA[2];
+                rv << "_";
+            }
+        }
+    }
+    
     if(gemm->kernelType.scaleBMode != Operations::ScaleMode::None)
-        rv << "SB_" << genScaleModeString(gemm->kernelType.scaleBMode) << "_";
+    {
+        rv << "SB_" << genScaleModeString(gemm->kernelType.scaleBMode);
+        rv << toString(gemm->kernelType.scaleTypeB) <<"_";
+        if (gemm->kernelType.scaleBMode == Operations::ScaleMode::Separate)
+        {
+            rv << gemm->kernelType.scaleBBlockColSize;
+            if (gemm->kernelType.scaleBBlockRowSize != 1)
+                rv <<"x"<<gemm->kernelType.scaleBBlockRowSize;
+            rv << "_";
+            if (gemm->kernelType.scaleShuffleTileB.size() == 3)
+            {
+                rv << "SWB" << gemm->kernelType.scaleShuffleTileB[0];
+                rv << "x" << gemm->kernelType.scaleShuffleTileB[1];
+                rv << "x" << gemm->kernelType.scaleShuffleTileB[2];
+                rv << "_";
+            }
+        }
+    }
 
     rv << "WGT_";
     rocRoller::streamJoin(
@@ -187,10 +224,18 @@ std::shared_ptr<GemmKernel> genGemmKernel(std::shared_ptr<SolutionParameters> ge
         tagLoadScaleA
             = command->addOperation(rocRoller::Operations::T_Load_Tiled(*tagTensorScaleA));
 
+        auto scaleInputA = tagLoadScaleA;
+
+        if (gemm->kernelType.scaleShuffleTileA.size() == 3)
+        {
+            scaleInputA = command->addOperation(rocRoller::Operations::SubTileTranspose(
+                                    *tagLoadScaleA, gemm->kernelType.scaleShuffleTileA));
+        }
+
         tagBlockScaleA = mulInputA = command->addOperation(rocRoller::Operations::BlockScale(
             tagLoadA,
             2,
-            tagLoadScaleA,
+            scaleInputA,
             {gemm->kernelType.scaleABlockColSize, gemm->kernelType.scaleABlockRowSize}));
     }
 
@@ -203,10 +248,18 @@ std::shared_ptr<GemmKernel> genGemmKernel(std::shared_ptr<SolutionParameters> ge
         tagLoadScaleB
             = command->addOperation(rocRoller::Operations::T_Load_Tiled(*tagTensorScaleB));
 
+        auto scaleInputB = tagLoadScaleB;
+
+        if (gemm->kernelType.scaleShuffleTileB.size() == 3)
+        {
+            scaleInputB = command->addOperation(rocRoller::Operations::SubTileTranspose(
+                                    *tagLoadScaleB, gemm->kernelType.scaleShuffleTileB));
+        }
+
         tagBlockScaleB = mulInputB = command->addOperation(rocRoller::Operations::BlockScale(
             tagLoadB,
             2,
-            tagLoadScaleB,
+            scaleInputB,
             {gemm->kernelType.scaleBBlockColSize, gemm->kernelType.scaleBBlockRowSize}));
     }
 
@@ -449,7 +502,7 @@ std::shared_ptr<GemmKernel> genGemmKernel(std::shared_ptr<SolutionParameters> ge
             "Only 0 (M) or 1 (N) are supported dimensions for workgroup mapping.",
             ShowValue(dim));
 
-        params->workgroupMapping = {dim, nullptr};
+        params->workgroupMappingDim = dim;
     }
 
     if(gemm->workgroupRemapXCC)
@@ -472,11 +525,15 @@ std::shared_ptr<GemmKernel> genGemmKernel(std::shared_ptr<SolutionParameters> ge
          static_cast<uint>(gemm->workgroupTile.n / gemm->machineInstruction.n
                            / wavetilePerWavefrontN)});
 
+    AssertFatal(gemm->kernelType.scaleShuffleTileA.size()
+                == gemm->kernelType.scaleShuffleTileB.size(),
+                "A and B must have the same shuffle parameter");
+
     // -------------------------------------------------------------
     // Create CommandKernel
 
     std::string kernelName    = genKernelName(gemm);
-    auto        context       = Context::ForDefaultHipDevice(kernelName);
+    auto        context       = Context::ForDefaultHipDevice(kernelName, {{.scaleSkipPermlane = gemm->kernelType.scaleShuffleTileA.size() > 0}});
     auto        commandKernel = std::make_shared<CommandKernel>(command, kernelName);
     commandKernel->setContext(context);
     commandKernel->setCommandParameters(params);
@@ -565,7 +622,7 @@ CommandArguments createCommandArguments(std::shared_ptr<GemmKernel>        gemm,
 
     if(gemm->params->kernelType.scaleAMode == Operations::ScaleMode::Separate)
     {
-        auto const scaleBlockSize = prob.scaleABlockRowSize * prob.scaleABlockColSize;
+        auto const scaleBlockSize = gemm->params->kernelType.scaleABlockRowSize * gemm->params->kernelType.scaleABlockColSize;
         TensorDescriptor descAScale(gemm->params->kernelType.typeA,
                                     {size_t(M), size_t(K / scaleBlockSize)},
                                     gemm->params->kernelType.transA ? "T" : "N");
@@ -573,7 +630,7 @@ CommandArguments createCommandArguments(std::shared_ptr<GemmKernel>        gemm,
     }
     if(gemm->params->kernelType.scaleBMode == Operations::ScaleMode::Separate)
     {
-        auto const scaleBlockSize = prob.scaleBBlockRowSize * prob.scaleBBlockColSize;
+        auto const scaleBlockSize = gemm->params->kernelType.scaleBBlockRowSize * gemm->params->kernelType.scaleBBlockColSize;
         TensorDescriptor descBScale(gemm->params->kernelType.typeB,
                                     {size_t(K / scaleBlockSize), size_t(N)},
                                     gemm->params->kernelType.transB ? "T" : "N");

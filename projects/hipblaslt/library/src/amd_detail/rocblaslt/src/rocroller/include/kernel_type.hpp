@@ -48,8 +48,8 @@ struct KernelType
     bool transA;
     bool transB;
 
-    rocRoller::Operations::ScaleMode scaleAMode;
-    rocRoller::Operations::ScaleMode scaleBMode;
+    rocRoller::Operations::ScaleMode scaleAMode = rocRoller::Operations::ScaleMode::None;
+    rocRoller::Operations::ScaleMode scaleBMode = rocRoller::Operations::ScaleMode::None;
 
     size_t scaleABlockRowSize = 32u;
     size_t scaleABlockColSize = 1u;
@@ -58,6 +58,9 @@ struct KernelType
 
     rocRoller::DataType scaleTypeA = rocRoller::DataType::E8M0;
     rocRoller::DataType scaleTypeB = rocRoller::DataType::E8M0;
+
+    std::vector<size_t> scaleShuffleTileA;
+    std::vector<size_t> scaleShuffleTileB;
 
     auto operator<=>(const KernelType& other) const = default;
 };

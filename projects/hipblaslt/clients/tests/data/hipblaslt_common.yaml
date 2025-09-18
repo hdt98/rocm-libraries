@@ -554,10 +554,6 @@ Arguments:
   - gradient: c_bool
   - norm_check_assert: c_bool
   - swizzle_a: c_bool
-  - scaleABlockRowSize: c_uint32
-  - scaleABlockColSize: c_uint32
-  - scaleBBlockRowSize: c_uint32
-  - scaleBBlockColSize: c_uint32
   - use_ext: c_bool
   - use_ext_setproblem: c_bool
   - algo_method: c_int32
@@ -662,10 +658,6 @@ Defaults:
   grouped_gemm: 0
   norm_check_assert: true
   swizzle_a: false
-  scaleABlockRowSize: 32
-  scaleABlockColSize: 1
-  scaleBBlockRowSize: 1
-  scaleBBlockColSize: 32
   use_ext: false
   use_ext_setproblem: false
   algo_method: 0
