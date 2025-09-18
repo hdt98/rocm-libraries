@@ -354,6 +354,7 @@ set(auxiliaries
   common/rocsolver_handle.cpp
   common/rocsolver_logger.cpp
   common/rocsparse.cpp
+  common/ideal_sizes.cpp
 )
 
 set(common_source

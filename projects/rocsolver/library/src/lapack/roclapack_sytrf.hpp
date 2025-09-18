@@ -4,7 +4,7 @@
  *     Univ. of Tennessee, Univ. of California Berkeley,
  *     Univ. of Colorado Denver and NAG Ltd..
  *     December 2016
- * Copyright (C) 2019-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2019-2025 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -53,7 +53,9 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRF_MAX_THDS)
                        rocblas_int* ipivA,
                        const rocblas_stride strideP,
                        rocblas_int* info,
-                       T* WA)
+                       T* WA,
+                       const int sytrf_blocksize,
+                       const int sytrf_sytf2_switchsize)
 {
     using S = decltype(std::real(T{}));
 
@@ -80,9 +82,9 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRF_MAX_THDS)
 
     while(k >= 0)
     {
-        if(k >= SYTRF_SYTF2_SWITCHSIZE)
+        if(k >= sytrf_sytf2_switchsize)
         {
-            lasyf_device_upper<SYTRF_MAX_THDS>(tid, k + 1, SYTRF_BLOCKSIZE, &kb, A, lda, ipiv,
+            lasyf_device_upper<SYTRF_MAX_THDS>(tid, k + 1, sytrf_blocksize, &kb, A, lda, ipiv,
                                                &iinfo, W, sidx, sval);
             k = k - kb;
         }
@@ -107,7 +109,9 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRF_MAX_THDS)
                        rocblas_int* ipivA,
                        const rocblas_stride strideP,
                        rocblas_int* info,
-                       T* WA)
+                       T* WA,
+                       const int sytrf_blocksize,
+                       const int sytrf_sytf2_switchsize)
 {
     using S = decltype(std::real(T{}));
 
@@ -135,9 +139,9 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRF_MAX_THDS)
 
     while(k < n)
     {
-        if(k < n - SYTRF_SYTF2_SWITCHSIZE)
+        if(k < n - sytrf_sytf2_switchsize)
         {
-            lasyf_device_lower<SYTRF_MAX_THDS>(tid, n - k, SYTRF_BLOCKSIZE, &kb, A + k + k * lda,
+            lasyf_device_lower<SYTRF_MAX_THDS>(tid, n - k, sytrf_blocksize, &kb, A + k + k * lda,
                                                lda, ipiv + k, &iinfo, W, sidx, sval);
             ktemp = k + kb;
         }
@@ -223,10 +227,12 @@ rocblas_status rocsolver_sytrf_template(rocblas_handle handle,
 
     if(uplo == rocblas_fill_upper)
         ROCSOLVER_LAUNCH_KERNEL(sytrf_kernel_upper<T>, grid, threads, 0, stream, n, A, shiftA, lda,
-                                strideA, ipiv, strideP, info, work);
+                                strideA, ipiv, strideP, info, work, SYTRF_BLOCKSIZE,
+                                SYTRF_SYTF2_SWITCHSIZE);
     else
         ROCSOLVER_LAUNCH_KERNEL(sytrf_kernel_lower<T>, grid, threads, 0, stream, n, A, shiftA, lda,
-                                strideA, ipiv, strideP, info, work);
+                                strideA, ipiv, strideP, info, work, SYTRF_BLOCKSIZE,
+                                SYTRF_SYTF2_SWITCHSIZE);
 
     return rocblas_status_success;
 }
