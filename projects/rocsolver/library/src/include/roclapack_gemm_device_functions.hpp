@@ -74,7 +74,29 @@ template <typename T>
 struct mfma_16x16x4
 {
     using RegT = T;
-    using AccT = std::array<T, 4>;
+
+    struct AccT
+    {
+        T data[4];
+
+        __host__ __device__ AccT(T val)
+            : data{val}
+        {
+        }
+        __host__ __device__ AccT(T val0, T val1, T val2, T val3)
+            : data{val0, val1, val2, val3}
+        {
+        }
+
+        __host__ __device__ inline T& operator[](int idx)
+        {
+            return data[idx];
+        }
+        __host__ __device__ inline T operator[](int idx) const
+        {
+            return data[idx];
+        }
+    };
 
     using S = decltype(std::real(T{}));
     using RegS = typename mfma_16x16x4_base<S>::RegT;
