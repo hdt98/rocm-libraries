@@ -311,15 +311,12 @@ __cluster_dims__(AClusterSize* BClusterSize, 1, 1)
 {
 #if defined(__gfx13__)
     __shared__ char p_shared[GridwiseGemm::SharedMemTrait::lds_size];
-    static constexpr index_t lane_shared_size =
-        math::max(GridwiseGemm::LaneSharedMemTrait::lane_shared_size, 4);
-    static __exp_amd_laneshared__ char p_lane_shared[lane_shared_size];
 
     GridwiseGemm::template Run<HasMainKBlockLoop>(p_a_grid,
                                                   p_b_grid,
                                                   p_c_grid,
                                                   p_shared,
-                                                  p_lane_shared,
+                                                  nullptr,
                                                   a_grid_desc,
                                                   b_grid_desc,
                                                   c_grid_desc_mblock_mperblock_nblock_nperblock,
@@ -1272,7 +1269,7 @@ struct GridwiseGemm_Wmma_GFX13
         if constexpr(AClusterSize > 1)
         {
             const auto N = c_grid_desc_m_n.GetLength(I1);
-            if((N / NPerBlock) % AClusterSize == 0)
+            if((N / NPerBlock) % AClusterSize != 0)
             {
                 printf("GridwiseOp err: NBlocks must be multiple of AClusterSize\n");
             }
@@ -1280,7 +1277,7 @@ struct GridwiseGemm_Wmma_GFX13
             if constexpr((BClusterSize > 1) && (BLoadOption == TensorLoadOption::CLUSTER_DDS_LOAD))
             {
                 const auto M = c_grid_desc_m_n.GetLength(I0);
-                if((M / MPerBlock) % BClusterSize == 0)
+                if((M / MPerBlock) % BClusterSize != 0)
                 {
                     printf("GridwiseOp err: MBlocks must be multiple of BClusterSize\n");
                 }
@@ -1296,14 +1293,14 @@ struct GridwiseGemm_Wmma_GFX13
         else if constexpr(BClusterSize > 1)
         {
             const auto M = c_grid_desc_m_n.GetLength(I0);
-            if((M / MPerBlock) % BClusterSize == 0)
+            if((M / MPerBlock) % BClusterSize != 0)
             {
                 printf("GridwiseOp err: MBlocks must be multiple of BClusterSize\n");
             }
             if constexpr((AClusterSize > 1) && (ALoadOption == TensorLoadOption::CLUSTER_DDS_LOAD))
             {
                 const auto N = c_grid_desc_m_n.GetLength(I1);
-                if((N / NPerBlock) % AClusterSize == 0)
+                if((N / NPerBlock) % AClusterSize != 0)
                 {
                     printf("GridwiseOp err: NBlocks must be multiple of AClusterSize\n");
                 }
