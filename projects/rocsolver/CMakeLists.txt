@@ -173,10 +173,7 @@ else()
       gfx950
       gfx10-1-generic
       gfx10-3-generic
-      gfx1100
-      gfx1101
-      gfx1102
-      gfx1151
+      gfx11-generic
       gfx12-generic
     )
     if(BUILD_ADDRESS_SANITIZER)
