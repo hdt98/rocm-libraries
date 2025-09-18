@@ -41,11 +41,23 @@ if(NOT TARGET rocsolver)
 endif()
 
 if(BUILD_CLIENTS_BENCHMARKS OR BUILD_CLIENTS_TESTS)
-  if(ROCSOLVER_FIND_PACKAGE_LAPACK_CONFIG)
-    find_package(LAPACK 3.7 REQUIRED CONFIG)
+  # Fetch LAPACK library
+    # Look for a pre-installed version (using find_package), and build from source if not available
+    # split between two if statements, because generator functions do not work in FetchContent_Declare?
+  if (ROCSOLVER_FIND_PACKAGE_LAPACK_CONFIG)
+    FetchContent_Declare(LAPACK
+      GIT_REPOSITORY https://github.com/Reference-LAPACK/lapack.git
+      GIT_TAG v3.7.1
+      FIND_PACKAGE_ARGS 3.7 CONFIG
+    )
   else()
-    find_package(LAPACK 3.7 REQUIRED)
+    FetchContent_Declare(LAPACK
+      GIT_REPOSITORY https://github.com/Reference-LAPACK/lapack.git
+      GIT_TAG v3.7.1
+      FIND_PACKAGE_ARGS 3.7
+    )
   endif()
+  FetchContent_MakeAvailable(LAPACK)
 
   if(NOT LAPACK_LIBRARIES)
     set(LAPACK_LIBRARIES
