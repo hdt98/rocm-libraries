@@ -122,7 +122,7 @@ if(HIPBLASLT_ENABLE_CLIENT)
     if(HIPBLASLT_ENABLE_BLIS)
         find_package(BLIS REQUIRED)
     endif()
-
+    find_package(cblas REQUIRED)
     # There is an implicit find_package(BLAS) when finding lapack
     find_package(LAPACK REQUIRED)
 endif()
@@ -353,8 +353,10 @@ endif()
 set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE.md")
 set(CPACK_RPM_PACKAGE_LICENSE "MIT")
 
-if(NOT CPACK_PACKAGING_INSTALL_PREFIX)
-    set(CPACK_PACKAGING_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}")
+if(NOT WIN32)
+    if(NOT CPACK_PACKAGING_INSTALL_PREFIX)
+        set(CPACK_PACKAGING_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}")
+    endif()
 endif()
 
 include(ROCMCreatePackage)
