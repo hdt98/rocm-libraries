@@ -1,5 +1,5 @@
 # ########################################################################
-# Copyright (C) 2016-2024 Advanced Micro Devices, Inc. All rights reserved.
+# Copyright (C) 2016-2025 Advanced Micro Devices, Inc. All rights reserved.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -26,6 +26,7 @@ add_executable(example-cpp-basic example_basic.cpp)
 # We test for C99 compatibility in the example-c.c test
 set_source_files_properties(example_basic.c PROPERTIES LANGUAGE CXX)
 set_source_files_properties(example_basic.c PROPERTIES COMPILE_FLAGS "-xc -std=c99")
+target_compile_options(example-c-basic PRIVATE -I${HIP_INCLUDE_DIRS})
 
 # Test for C++11 compatibility in one of the samples
 set_property(TARGET example-cpp-basic PROPERTY CXX_STANDARD 11)
