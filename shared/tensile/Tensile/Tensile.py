@@ -217,6 +217,11 @@ def argUpdatedGlobalParameters(args):
 @profile
 def Tensile(userArgs):
     global globalParameters
+    # region dbpy_attach
+    import debugpy
+    (debugpy.listen(("0.0.0.0", 5678)), debugpy.wait_for_client()) if not debugpy.is_client_connected() else None
+    # endregion
+
 
     # 1st half of splash
     tPrint(1, "")

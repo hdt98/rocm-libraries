@@ -264,7 +264,8 @@ def benchmarkProblemType(problemTypeConfig, problemSizeGroupConfig, problemSizeG
                     c["ParamGroups"] == benchmarkStep.paramGroups and \
                     c["CustomKernels"] == benchmarkStep.customKernels and \
                     c["CustomKernelWildcard"] == benchmarkStep.customKernelWildcard:
-                cacheValid = True
+                # mchirila: commenting out cacheValid
+                # cacheValid = True
                 codeObjectFiles = c["CodeObjectFiles"]
             else:
                 printWarning("Cache data does not match config: redoing solution generation")
