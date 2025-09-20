@@ -1835,7 +1835,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
       tPMRef = tensorParametersB
 
     if kernel["StreamK"] != 0:
-      module.add(self.localReadAddresses(kernel, tensorParametersA, tensorParametersB, tPM))
+      #module.add(self.localReadAddresses(kernel, tensorParametersA, tensorParametersB, tPM))
       module.add(self.localWriteAddresses(kernel, tensorParametersA, tensorParametersB, tPM))
 
     # tile assignments
@@ -2779,6 +2779,12 @@ class KernelWriter(metaclass=abc.ABCMeta):
     # Initialize stream-k loop
     skComponent = Component.StreamK.find(self)
     module.add(skComponent.preLoop(self, kernel))
+
+    if kernel["StreamK"] != 0:
+      pass
+      module.add(self.localReadAddresses(kernel, tensorParametersA, tensorParametersB, tPM))
+      #module.add(self.localWriteAddresses(kernel, tensorParametersA, tensorParametersB, tPM))
+
     # Open persistent loop
     loopComponent = Component.PersistentLoop.find(self)
     module.add(loopComponent.openPersistentLoop(self, kernel))

@@ -1589,7 +1589,7 @@ class KernelWriterAssembly(KernelWriter):
     numXCC = 8
 
     # Apply XCC remap
-    useXCCRemap = False
+    useXCCRemap = kernel["UseGeneralWGM"] < 5
 
     sgprWGID = "WorkGroup0"
     #sgprNumMT0WG = sgpr("NumWorkGroups0")
@@ -1622,7 +1622,7 @@ class KernelWriterAssembly(KernelWriter):
     else:
       module.add(SMovB32(dst=sgpr(tmpSgprCurM), src=sgpr("NumWorkGroups0"), comment=""))
       module.add(SMovB32(dst=sgpr(tmpSgprCurN), src=sgpr("NumWorkGroups1"), comment=""))
-    
+
     if useXCCRemap:
       tmpSgpr = []
       numTmpSgpr = 3 + 2 + 1 + 2
@@ -1714,7 +1714,7 @@ class KernelWriterAssembly(KernelWriter):
     directionNewDir = []
     directionLabels = []
 
-    if kernel["UseGeneralWGM"] == 1:
+    if kernel["UseGeneralWGM"] == 1 or kernel["UseGeneralWGM"] == 5:
       directions = [
         "HilbertWalkNCC",
         "HilbertWalkN",
@@ -1762,33 +1762,179 @@ class KernelWriterAssembly(KernelWriter):
       directions = ["MortonU"]
       directionBlocks = [
         [block0, block1, block3, block2],
-      ]  
-      
+      ]
+
     for i in range(0, len(directions)):
       directionLabels.append(Label((self.labels.getUniqueNamePrefix(directions[i])), comment=""))
 
     for i in range(0, len(directions)):
       module.add(ValueSet(directions[i], i, format=1))
 
+    tmpSgpr = []
+    numTmpSgpr = 3
+    for i in range(0, numTmpSgpr):
+      tmpSgpr.append(self.sgprPool.checkOut(1, preventOverflow=False))
+
+
     module.add(SMovB32(dst=sgpr(tmpSgprSerialIDOrig), src=sgpr(sgprWGID)))
-    #module.add(SMovB32(dst=sgpr(tmpSgprCurM), src=sgpr(sgprNumMT0WG)))
-    #module.add(SMovB32(dst=sgpr(tmpSgprCurN), src=sgpr(sgprNumMT1WG)))
-    module.add(SMovB32(dst=sgpr(tmpSgprCurX), src=0))
-    module.add(SMovB32(dst=sgpr(tmpSgprCurY), src=0))
+
+
+    # 4k = 1, 8k = 2, 16k = 4, 32k = 8, 64k = 16
+
+
+    if kernel["UseGeneralWGM"] == 5:
+
+      blkM = 1
+      blkN = 1
+
+      #xccX = 16
+      #xccY = 2
+
+      #xccX = 8
+      #xccY = 4
+
+      #xccX = 4
+      #xccY = 8
+
+      #xccX = 4
+      #xccY = 8
+
+      xccX = 1
+      xccY = 32
+      
+      scalx = 1
+      scaly = 5
+
+      # tmpSgpr[0] == SID % 8 = XCC ID
+      module.add(SAndB32(dst=sgpr(tmpSgpr[0]), src0=sgpr(tmpSgprSerialIDOrig), src1=7))
+      # tmpSgpr[1] == SID / 8 = CU ID in XCC
+      module.add(SLShiftRightB32(dst=sgpr(tmpSgpr[1]), src=sgpr(tmpSgprSerialIDOrig), shiftHex=3, comment=""))
+
+      group = [1,8]
+      cgroup = [xccX, xccY]
+
+      if group == [2,4]: # 2x4
+        # XCC_ID % 2
+        module.add(SAndB32(dst=sgpr(tmpSgpr[2]), src0=sgpr(tmpSgpr[0]), src1=1))
+        module.add(SMulI32(dst=sgpr(tmpSgprCurX), src0=sgpr(tmpSgpr[2]), src1=xccX * scalx))
+        # XCC_ID / 2
+        module.add(SLShiftRightB32(dst=sgpr(tmpSgpr[2]), src=sgpr(tmpSgpr[0]), shiftHex=1, comment=""))
+        module.add(SMulI32(dst=sgpr(tmpSgprCurY), src0=sgpr(tmpSgpr[2]), src1=xccY * scaly))
+      elif group == [4,2]: # 4x2
+        # XCC_ID % 2
+        module.add(SAndB32(dst=sgpr(tmpSgpr[2]), src0=sgpr(tmpSgpr[0]), src1=1))
+        module.add(SMulI32(dst=sgpr(tmpSgprCurY), src0=sgpr(tmpSgpr[2]), src1=xccY * scaly))
+
+        # XCC_ID / 2
+        module.add(SLShiftRightB32(dst=sgpr(tmpSgpr[2]), src=sgpr(tmpSgpr[0]), shiftHex=1, comment=""))
+        module.add(SMulI32(dst=sgpr(tmpSgprCurX), src0=sgpr(tmpSgpr[2]), src1=xccX * scalx))
+      elif group == [1,8]: # 1x8
+        # XCC_ID / 8
+        #module.add(SLShiftRightB32(dst=sgpr(tmpSgpr[2]), src=sgpr(tmpSgpr[0]), shiftHex=3, comment=""))
+        module.add(SMulI32(dst=sgpr(tmpSgprCurX), src0=0, src1=xccX * scalx))
+        # XCC_ID % 8
+        #module.add(SAndB32(dst=sgpr(tmpSgpr[2]), src0=sgpr(tmpSgpr[0]), src1=7, comment=""))
+        module.add(SMulI32(dst=sgpr(tmpSgprCurY), src0=sgpr(tmpSgpr[0]), src1=xccY * scaly))
+      elif group == [8,1]: # 1x8
+        # XCC_ID / 8
+        #module.add(SLShiftRightB32(dst=sgpr(tmpSgpr[2]), src=sgpr(tmpSgpr[0]), shiftHex=3, comment=""))
+        module.add(SMulI32(dst=sgpr(tmpSgprCurX), src0=sgpr(tmpSgpr[0]), src1=xccX * scalx))
+        # XCC_ID % 8
+        #module.add(SAndB32(dst=sgpr(tmpSgpr[2]), src0=sgpr(tmpSgpr[0]), src1=7, comment=""))
+        module.add(SMulI32(dst=sgpr(tmpSgprCurY), src0=0, src1=xccY * scaly))
+
+
+
+      # tmpSgpr[1] == SID / 32 = CU ID in XCC
+      module.add(SLShiftRightB32(dst=sgpr(sgprWGID), src=sgpr(tmpSgpr[1]), shiftHex=5, comment=""))
+
+      # tmpSgpr[0] == CU_ID % 32
+      module.add(SAndB32(dst=sgpr(tmpSgpr[1]), src0=sgpr(tmpSgpr[1]), src1=31))
+
+      if cgroup == [8,4]:
+        # CU_ID / 4
+        module.add(SLShiftRightB32(dst=sgpr(tmpSgpr[2]), src=sgpr(tmpSgpr[1]), shiftHex=2, comment=""))
+        module.add(SMulI32(dst=sgpr(tmpSgpr[2]), src0=sgpr(tmpSgpr[2]), src1=1 * scalx))
+        module.add(SAddU32(dst=sgpr(tmpSgprCurX), src0=sgpr(tmpSgprCurX), src1=sgpr(tmpSgpr[2])))
+        # CU_ID % 4
+        module.add(SAndB32(dst=sgpr(tmpSgpr[2]), src0=sgpr(tmpSgpr[1]), src1=3))
+        module.add(SMulI32(dst=sgpr(tmpSgpr[2]), src0=sgpr(tmpSgpr[2]), src1=1 * scaly))
+        module.add(SAddU32(dst=sgpr(tmpSgprCurY), src0=sgpr(tmpSgprCurY), src1=sgpr(tmpSgpr[2])))
+      elif cgroup == [4,8]:
+        # CU_ID / 4
+        module.add(SLShiftRightB32(dst=sgpr(tmpSgpr[2]), src=sgpr(tmpSgpr[1]), shiftHex=2, comment=""))
+        module.add(SMulI32(dst=sgpr(tmpSgpr[2]), src0=sgpr(tmpSgpr[2]), src1=1 * scaly))
+        module.add(SAddU32(dst=sgpr(tmpSgprCurY), src0=sgpr(tmpSgprCurY), src1=sgpr(tmpSgpr[2])))
+        # CU_ID % 4
+        module.add(SAndB32(dst=sgpr(tmpSgpr[2]), src0=sgpr(tmpSgpr[1]), src1=3))
+        module.add(SMulI32(dst=sgpr(tmpSgpr[2]), src0=sgpr(tmpSgpr[2]), src1=1 * scalx))
+        module.add(SAddU32(dst=sgpr(tmpSgprCurX), src0=sgpr(tmpSgprCurX), src1=sgpr(tmpSgpr[2])))
+
+      elif cgroup == [16,2]:
+        # CU_ID / 2
+        module.add(SLShiftRightB32(dst=sgpr(tmpSgpr[2]), src=sgpr(tmpSgpr[1]), shiftHex=1, comment=""))
+        module.add(SMulI32(dst=sgpr(tmpSgpr[2]), src0=sgpr(tmpSgpr[2]), src1=1 * scalx))
+        module.add(SAddU32(dst=sgpr(tmpSgprCurX), src0=sgpr(tmpSgprCurX), src1=sgpr(tmpSgpr[2])))
+        # CU_ID % 2
+        module.add(SAndB32(dst=sgpr(tmpSgpr[2]), src0=sgpr(tmpSgpr[1]), src1=1))
+        module.add(SMulI32(dst=sgpr(tmpSgpr[2]), src0=sgpr(tmpSgpr[2]), src1=1 * scaly))
+        module.add(SAddU32(dst=sgpr(tmpSgprCurY), src0=sgpr(tmpSgprCurY), src1=sgpr(tmpSgpr[2])))
+      elif cgroup == [2,16]:
+        # CU_ID / 2
+        module.add(SLShiftRightB32(dst=sgpr(tmpSgpr[2]), src=sgpr(tmpSgpr[1]), shiftHex=1, comment=""))
+        module.add(SMulI32(dst=sgpr(tmpSgpr[2]), src0=sgpr(tmpSgpr[2]), src1=1 * scaly))
+        module.add(SAddU32(dst=sgpr(tmpSgprCurY), src0=sgpr(tmpSgprCurY), src1=sgpr(tmpSgpr[2])))
+
+        # CU_ID % 2
+        module.add(SAndB32(dst=sgpr(tmpSgpr[2]), src0=sgpr(tmpSgpr[1]), src1=1))
+        module.add(SMulI32(dst=sgpr(tmpSgpr[2]), src0=sgpr(tmpSgpr[2]), src1=1 * scalx))
+        module.add(SAddU32(dst=sgpr(tmpSgprCurX), src0=sgpr(tmpSgprCurX), src1=sgpr(tmpSgpr[2])))
+      elif cgroup == [32,1]:
+        # CU_ID / 2
+        module.add(SMulI32(dst=sgpr(tmpSgpr[2]), src0=0, src1=1 * scaly))
+        module.add(SAddU32(dst=sgpr(tmpSgprCurY), src0=sgpr(tmpSgprCurY), src1=sgpr(tmpSgpr[2])))
+
+        # CU_ID % 2
+        module.add(SMulI32(dst=sgpr(tmpSgpr[2]), src0=sgpr(tmpSgpr[1]), src1=1 * scalx))
+        module.add(SAddU32(dst=sgpr(tmpSgprCurX), src0=sgpr(tmpSgprCurX), src1=sgpr(tmpSgpr[2])))
+      elif cgroup == [1,32]:
+        # CU_ID / 2
+        module.add(SMulI32(dst=sgpr(tmpSgpr[2]), src0=0, src1=1 * scalx))
+        module.add(SAddU32(dst=sgpr(tmpSgprCurX), src0=sgpr(tmpSgprCurX), src1=sgpr(tmpSgpr[2])))
+
+        # CU_ID % 2
+        module.add(SMulI32(dst=sgpr(tmpSgpr[2]), src0=sgpr(tmpSgpr[1]), src1=1 * scaly))
+        module.add(SAddU32(dst=sgpr(tmpSgprCurY), src0=sgpr(tmpSgprCurY), src1=sgpr(tmpSgpr[2])))
+
+        
+
+      module.add(SMovB32(dst=sgpr(tmpSgprCurM), src=scalx))
+      module.add(SMovB32(dst=sgpr(tmpSgprCurN), src=scaly))
+
+      #module.add(SLShiftRightB32(dst=sgpr(sgprWGID), src=sgpr(sgprWGID), shiftHex=5, comment=""))
+      module.add(SMovB32(dst=sgpr(tmpSgprSerialIDOrig), src=sgpr(sgprWGID)))
+    else:
+
+      blkM = 8
+      blkN = 4
+
+      #module.add(SMovB32(dst=sgpr(tmpSgprCurM), src=sgpr(sgprNumMT0WG)))
+      #module.add(SMovB32(dst=sgpr(tmpSgprCurN), src=sgpr(sgprNumMT1WG)))
+      module.add(SMovB32(dst=sgpr(tmpSgprCurX), src=0))
+      module.add(SMovB32(dst=sgpr(tmpSgprCurY), src=0))
+
+
     if len(directions) > 1:
       module.add(SMovB32(dst=sgpr(tmpSgprCurDir), src=directions[0]))
-    module.add(SMovB32(dst=sgpr(tmpSgprBlockM), src=16))
-    module.add(SMovB32(dst=sgpr(tmpSgprBlockN), src=16))
+    module.add(SMovB32(dst=sgpr(tmpSgprBlockM), src=blkM))
+    module.add(SMovB32(dst=sgpr(tmpSgprBlockN), src=blkN))
     module.add(SMulI32(dst=sgpr(tmpSgprBlockSz), src0=sgpr(tmpSgprBlockM), src1=sgpr(tmpSgprBlockN)))
     # Begin Hilbert Walk
 
     labelStartWhile = Label(self.labels.getUniqueNamePrefix("GeneralWGMWalkStartWhile"), comment="")
     labelEndWhile = Label(self.labels.getUniqueNamePrefix("GeneralWGMWalkEndWhile"), comment="")
 
-    tmpSgpr = []
-    numTmpSgpr = 3
-    for i in range(0, numTmpSgpr):
-      tmpSgpr.append(self.sgprPool.checkOut(1, preventOverflow=False))
+
 
     module.add(labelStartWhile)
     #module.addComment0("start while")
@@ -1836,7 +1982,7 @@ class KernelWriterAssembly(KernelWriter):
       for j in range(0, 4):
         label = Label((self.labels.getUniqueNamePrefix(directions[i]+"_block%u"%(j+1))), comment="")
         if j < 3:
-          module.add(SCmpLtU32(sgpr("WorkGroup0"), sgpr(tmpSgpr[j]), comment=""))
+          module.add(SCmpLtU32(sgpr(sgprWGID), sgpr(tmpSgpr[j]), comment=""))
           module.add(SCBranchSCC0(labelName=label.getLabelName(), comment=""))
         module.add(SMovB32(dst=sgpr(tmpSgprCurM), src=sgpr(block[j][0]), comment="Update M"))
         module.add(SMovB32(dst=sgpr(tmpSgprCurN), src=sgpr(block[j][1]), comment="Update N"))
@@ -1848,7 +1994,7 @@ class KernelWriterAssembly(KernelWriter):
         if len(directions) > 1:
           module.add(SMovB32(dst=sgpr(tmpSgprCurDir), src=directionNewDir[i][j], comment="Update direction"))
         if j > 0:
-          module.add(SSubU32(dst=sgpr("WorkGroup0"), src0=sgpr("WorkGroup0"), src1=sgpr(tmpSgpr[j-1]), comment="Update serial idx"))
+          module.add(SSubU32(dst=sgpr(sgprWGID), src0=sgpr(sgprWGID), src1=sgpr(tmpSgpr[j-1]), comment="Update serial idx"))
         module.add(SBranch(labelName=labelStartWhile.getLabelName()))
         if j < 3:
           module.add(label)
@@ -1858,7 +2004,7 @@ class KernelWriterAssembly(KernelWriter):
     module.add(labelEndWhile)
     tmpVgpr = self.vgprPool.checkOutAligned(2,2,"tmpVgpr")
     tmpVgprRes = ContinuousRegister(tmpVgpr, 2)
-    module.add(scalarUInt32DivideAndRemainder(qReg=tmpSgpr[0], dReg="WorkGroup0", divReg=tmpSgprCurN, rReg=tmpSgpr[1], tmpVgprRes=tmpVgprRes, wavewidth=kernel["WavefrontSize"], doRemainder=True, comment=""))
+    module.add(scalarUInt32DivideAndRemainder(qReg=tmpSgpr[0], dReg=sgprWGID, divReg=tmpSgprCurN, rReg=tmpSgpr[1], tmpVgprRes=tmpVgprRes, wavewidth=kernel["WavefrontSize"], doRemainder=True, comment=""))
     module.add(SAddU32(dst=sgpr("WorkGroup0"), src0=sgpr(tmpSgprCurX), src1=sgpr(tmpSgpr[0]), comment=""))
     module.add(SAddU32(dst=sgpr("WorkGroup1"), src0=sgpr(tmpSgprCurY), src1=sgpr(tmpSgpr[1]), comment=""))
 
@@ -1885,7 +2031,7 @@ class KernelWriterAssembly(KernelWriter):
     #self.sgprPool.checkIn(sgprWGID)
     #self.sgprPool.checkIn(sgprNumMT0WG)
     #self.sgprPool.checkIn(sgprNumMT1WG)
-    
+
     return module
 
   def remapWgSerial(self, kernel, earlyStop=True):
