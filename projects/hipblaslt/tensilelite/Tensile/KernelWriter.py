@@ -1825,6 +1825,9 @@ class KernelWriter(metaclass=abc.ABCMeta):
     if not forceNoTileCode:
       module.add(self.graWorkGroup(kernel, tensorParametersA, tensorParametersB))
 
+
+    module.add(self.defineGRVariableSgprs(kernel))
+      
     self.dontAppendCode = forceNoTileCode
 
     tPM = tensorParametersA["tpsMetadata"]
@@ -5116,6 +5119,14 @@ class KernelWriter(metaclass=abc.ABCMeta):
   def defineAndResources(self, kernel, tPA, tPB, tPM):
     return ""
 
+  ##############################################################################
+  # Allocate GR Address Resources
+  ##############################################################################
+  @abc.abstractmethod
+  def defineGRVariableSgprs(self, kernel, tPA):
+    return ""
+
+  
   ##############################################################################
   # Check Resources
   ##############################################################################

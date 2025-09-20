@@ -511,15 +511,9 @@ class KernelWriterAssembly(KernelWriter):
     # Must call setSgprToInUseState again before calling setSgprToFreeState.
     return ValueSet(name="sgpr"+name, value="UNDEF", format = -1)
 
-  def defineVariableSgprs(self, kernel):
+  def defineGRVariableSgprs(self, kernel):
     module = Module("DefineVariableSgpr")
-    #------------------------
-    # Registers defined below this point are not available in the post-loop
-    # Post-loop is after tail loop exits, ie the store code.
-    # (we reclaim them to use as temps, typically for execmasks)
-    # Mostly impacts flat kernels and GSU edge since these need SGPR
-    # for conditionals
-
+    
     if kernel["BufferLoad"]:
        # resource descriptor (SRD) A and B, must be aligned on 4-SGPR boundary
       module.add(self.defineSgpr("SrdA", 4, 4))
@@ -547,6 +541,17 @@ class KernelWriterAssembly(KernelWriter):
     module.add(self.defineSgpr("GlobalReadIncsB", self.states.b.numSgprGlobalReadIncs))
     if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]:
       module.add(self.defineSgpr("GlobalReadIncsMetadata", self.states.m.numSgprGlobalReadIncs))
+
+    return module
+      
+  def defineVariableSgprs(self, kernel):
+    module = Module("DefineVariableSgpr")
+    #------------------------
+    # Registers defined below this point are not available in the post-loop
+    # Post-loop is after tail loop exits, ie the store code.
+    # (we reclaim them to use as temps, typically for execmasks)
+    # Mostly impacts flat kernels and GSU edge since these need SGPR
+    # for conditionals
 
     needPackK16  = False
     needPackK8Lw = False
@@ -2821,6 +2826,8 @@ class KernelWriterAssembly(KernelWriter):
     module = Module("graWorkGroup")
     module.addComment0("graWorkGroup mapping")
 
+    #print("Pool size before:", self.sgprPool.size())
+    
     skComponent = Component.StreamK.find(self)
     module.add(skComponent.graWorkGroup(self, kernel, tPA, tPB))
 
@@ -2831,6 +2838,8 @@ class KernelWriterAssembly(KernelWriter):
     # Blocked rows or columns
     # Do branch
 
+    #print("Pool size after:", self.sgprPool.size())
+    
     if not kernel["UseGeneralWGM"]:
       module.add(self.graWGMImpl(kernel))
     else:
