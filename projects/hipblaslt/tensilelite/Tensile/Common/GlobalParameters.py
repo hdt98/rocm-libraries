@@ -421,7 +421,7 @@ defaultBenchmarkCommonParameters = [
     {"WaveSplitK": [ False ]},
     {"MbskPrefetchMethod": [0]},
     {"UseCustomMainLoopSchedule": [1]},
-    {"UseGeneralWGM": [0]}
+    {"UseGeneralWGM": [1]}
 ]
 
 # dictionary of defaults comprised of default option for each parameter

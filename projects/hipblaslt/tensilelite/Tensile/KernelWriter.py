@@ -4829,8 +4829,10 @@ class KernelWriter(metaclass=abc.ABCMeta):
       self.defineSgpr("StreamKIterEnd", 1)
       self.defineSgpr("StreamKLocalStart", 1)
       self.defineSgpr("StreamKLocalEnd", 1)
+      self.defineSgpr("StreamKTileID", 1)  
       if kernel["StreamKAtomic"] == 0:
         self.defineSgpr("SrdWS", 4, 4)
+
 
     #------------------------
     # Registers defined below this point are not available in the post-loop

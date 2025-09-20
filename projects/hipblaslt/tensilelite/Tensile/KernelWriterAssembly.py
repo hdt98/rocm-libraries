@@ -1586,7 +1586,7 @@ class KernelWriterAssembly(KernelWriter):
       module.add(label_skipWGMXCC)
     return module
 
-  def remapGeneralWGMWalk(self, kernel):
+  def remapGeneralWGMWalk(self, kernel, tmpSgprCurM, tmpSgprCurN):
     module = Module("remapGeneralWGMWalk")
 
     # TODO: Query arch specific values instead of hard code
@@ -1600,34 +1600,12 @@ class KernelWriterAssembly(KernelWriter):
     #sgprNumMT0WG = sgpr("NumWorkGroups0")
     #sgprNumMT1WG = sgpr("NumWorkGroups1")
 
-
-    #sgprWGID = self.sgprPool.checkOut(1)
-    tmpSgprCurM = self.sgprPool.checkOut(1, preventOverflow=False)
-    tmpSgprCurN = self.sgprPool.checkOut(1, preventOverflow=False)
-
     if not kernel["StreamK"]:
       module.add(SMovB32(dst=sgpr(sgprWGID), src=sgpr("WorkGroup0"), comment=""))
-
-
-    if kernel["StreamK"]:
-      qReg = self.vgprPool.checkOut(4)
-      dReg = qReg + 1
-      divReg = qReg + 2
-      rReg = qReg + 3
-      module.addComment0("Compute NumWG in M/N dims")
-      module.add(VMovB32(dst=vgpr(divReg), src="MT0", comment="set MT0 into sgpr"))
-      module.add(VMovB32(dst=vgpr(dReg), src=sgpr("SizesFree+0"), comment="set Free0 size"))
-      module.add(vectorUInt32CeilDivideAndRemainder(qReg=qReg, dReg=dReg, divReg=divReg, rReg=rReg, doRemainder=False))
-      module.add(VMovB32(dst=vgpr(divReg), src="MT1", comment="set MT1 into sgpr"))
-      module.add(VMovB32(dst=vgpr(dReg), src=sgpr("SizesFree+1"), comment="set Free1 size"))
-      module.add(VReadfirstlaneB32(dst=sgpr(tmpSgprCurM), src=vgpr(qReg), comment="set back to numWorkGroup0"))
-      module.add(vectorUInt32CeilDivideAndRemainder(qReg=qReg, dReg=dReg, divReg=divReg, rReg=rReg, doRemainder=False))
-      module.add(VReadfirstlaneB32(dst=sgpr(tmpSgprCurN), src=vgpr(qReg), comment="set back to numWorkGroup1"))
-      self.vgprPool.checkIn(qReg)
     else:
-      module.add(SMovB32(dst=sgpr(tmpSgprCurM), src=sgpr("NumWorkGroups0"), comment=""))
-      module.add(SMovB32(dst=sgpr(tmpSgprCurN), src=sgpr("NumWorkGroups1"), comment=""))
+      module.add(SMovB32(dst=sgpr(sgprWGID), src=sgpr("StreamKTileID"), comment=""))
 
+      
     if useXCCRemap:
       tmpSgpr = []
       numTmpSgpr = 3 + 2 + 1 + 2
@@ -2022,8 +2000,6 @@ class KernelWriterAssembly(KernelWriter):
     self.sgprPool.checkIn(tmpSgprBlockM)
     self.sgprPool.checkIn(tmpSgprBlockN)
     self.sgprPool.checkIn(tmpSgprBlockSz)
-    self.sgprPool.checkIn(tmpSgprCurM)
-    self.sgprPool.checkIn(tmpSgprCurN)
     self.sgprPool.checkIn(tmpSgprCurX)
     self.sgprPool.checkIn(tmpSgprCurY)
     self.sgprPool.checkIn(tmpSgprCurDir)
@@ -2839,11 +2815,64 @@ class KernelWriterAssembly(KernelWriter):
     # Do branch
 
     #print("Pool size after:", self.sgprPool.size())
+
+
+    if kernel["UseGeneralWGM"]:
     
-    if not kernel["UseGeneralWGM"]:
+      #sgprWGID = self.sgprPool.checkOut(1)
+      tmpSgprCurM = self.sgprPool.checkOut(1, preventOverflow=False)
+      tmpSgprCurN = self.sgprPool.checkOut(1, preventOverflow=False)
+
+      if kernel["StreamK"]:
+        qReg = self.vgprPool.checkOut(4)
+        dReg = qReg + 1
+        divReg = qReg + 2
+        rReg = qReg + 3
+        module.addComment0("Compute NumWG in M/N dims")
+        module.add(VMovB32(dst=vgpr(divReg), src="MT0", comment="set MT0 into sgpr"))
+        module.add(VMovB32(dst=vgpr(dReg), src=sgpr("SizesFree+0"), comment="set Free0 size"))
+        module.add(vectorUInt32CeilDivideAndRemainder(qReg=qReg, dReg=dReg, divReg=divReg, rReg=rReg, doRemainder=False))
+        module.add(VMovB32(dst=vgpr(divReg), src="MT1", comment="set MT1 into sgpr"))
+        module.add(VMovB32(dst=vgpr(dReg), src=sgpr("SizesFree+1"), comment="set Free1 size"))
+        module.add(VReadfirstlaneB32(dst=sgpr(tmpSgprCurM), src=vgpr(qReg), comment="set back to numWorkGroup0"))
+        module.add(vectorUInt32CeilDivideAndRemainder(qReg=qReg, dReg=dReg, divReg=divReg, rReg=rReg, doRemainder=False))
+        module.add(VReadfirstlaneB32(dst=sgpr(tmpSgprCurN), src=vgpr(qReg), comment="set back to numWorkGroup1"))
+        self.vgprPool.checkIn(qReg)
+      else:
+        module.add(SMovB32(dst=sgpr(tmpSgprCurM), src=sgpr("NumWorkGroups0"), comment=""))
+        module.add(SMovB32(dst=sgpr(tmpSgprCurN), src=sgpr("NumWorkGroups1"), comment=""))
+
+      tmpSgpr = self.sgprPool.checkOut(1, preventOverflow=False)
+
+      labelGWGM = Label(self.labels.getUniqueNamePrefix("GenericWGM"), comment="")
+      labelWGM = Label(self.labels.getUniqueNamePrefix("WGM"), comment="")
+      labelWGMAlgoEnd = Label(self.labels.getUniqueNamePrefix("WGMAlgoEnd"), comment="")
+    
+      module.add(SMulI32(dst=sgpr(tmpSgpr), src0=sgpr(tmpSgprCurM), src1=sgpr(tmpSgprCurN)))
+      module.add(SCmpGtU32(src0=sgpr(tmpSgpr), src1=256, comment="M * N > bkM * bkN"))
+      module.add(SCBranchSCC0(labelName=labelWGM.getLabelName(), comment=""))
+      self.sgprPool.checkIn(tmpSgpr)
+
+      module.add(labelGWGM)
+      module.add(self.remapGeneralWGMWalk(kernel, tmpSgprCurM, tmpSgprCurN))
+      module.add(SBranch(labelName=labelWGMAlgoEnd.getLabelName(), comment=""))
+
+      self.sgprPool.checkIn(tmpSgprCurM)
+      self.sgprPool.checkIn(tmpSgprCurN)
+      
+      module.add(labelWGM)
       module.add(self.graWGMImpl(kernel))
+      
+
+      
+
+      
+      module.add(labelWGMAlgoEnd)
+    
+
     else:
-      module.add(self.remapGeneralWGMWalk(kernel))
+      module.add(self.graWGMImpl(kernel))
+
     return module
 
 
