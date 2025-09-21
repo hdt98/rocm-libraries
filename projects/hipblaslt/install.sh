@@ -34,7 +34,8 @@ function display_help()
   echo "    [-h|--help] prints this help message"
 #  echo "    [--prefix] Specify an alternate CMAKE_INSTALL_PREFIX for cmake"
   echo "    [-i|--install] install after build"
-  echo "    [-d|--dependencies] install build dependencies"
+  echo "    [-d|--dependencies] install build dependencies before building the project"
+  echo "    [--dependencies-only] only install build dependencies"
   echo "    [-t|--test_local_path] Specify a local path for Tensile instead of remote GIT repo"
   echo "    [-a|--architecture] Set GPU architecture target(s), e.g., all, gfx90a:xnack+;gfx90a:xnack-"
   echo "    [--cpu_ref_lib <lib>] specify library to use for CPU reference code in testing (blis or lapack)"
@@ -176,6 +177,12 @@ install_packages( )
   local library_dependencies_sles=( "make" "gcc-c++" "libcxxtools9" "rpm-build" )
   local library_dependencies_mariner=( "make" "rpm-build" )
 
+  library_dependencies_ubuntu+=( "gfortran" )
+  library_dependencies_centos+=( "devtoolset-7-gcc-gfortran" )
+  library_dependencies_centos8+=( "gcc-gfortran" )
+  library_dependencies_fedora+=( "gcc-gfortran" )
+  library_dependencies_sles+=( "gcc-fortran" "pkg-config" "dpkg" )
+
   local client_dependencies_ubuntu=( "python3" "python3-yaml" "libopenblas-dev")
   local client_dependencies_centos=( "python36" "python3-pip")
   local client_dependencies_centos8=( "python39" "python3-virtualenv")
@@ -199,14 +206,6 @@ install_packages( )
   fi
 
   library_dependencies_ubuntu+=("libmsgpack-dev")
-
-  if [[ "${build_clients}" == true ]]; then
-    library_dependencies_ubuntu+=( "gfortran" )
-    library_dependencies_centos+=( "devtoolset-7-gcc-gfortran" )
-    library_dependencies_centos8+=( "gcc-gfortran" )
-    library_dependencies_fedora+=( "gcc-gfortran" )
-    library_dependencies_sles+=( "gcc-fortran" "pkg-config" "dpkg" )
-  fi
 
   if [[ "${use_rocroller}" == true ]]; then
     library_dependencies_ubuntu+=( "rocm-llvm-dev" "libzstd-dev" )
@@ -349,11 +348,14 @@ install_msgpack_from_source( )
 
 install_blis()
 {
+    echo installing blis
+    pwd
     if [[ ! -e "/opt/AMD/aocl/aocl-linux-gcc-4.2.0/gcc/lib_ILP64/libblis-mt.a" ]] &&
         [[ ! -e "/opt/AMD/aocl/aocl-linux-aocc-4.1.0/aocc/lib_ILP64/libblis-mt.a" ]] &&
         [[ ! -e "/opt/AMD/aocl/aocl-linux-aocc-4.0/lib_ILP64/libblis-mt.a"  ]] &&
         [[ ! -e "/usr/local/lib/libblis.a" ]]; then
         pushd .
+        pwd
         #Download prebuilt AMD multithreaded blis
         if [[ ! -e "./blis/lib/libblis.a" ]]; then
           case "${ID}" in
@@ -410,6 +412,7 @@ supported_distro
 # #################################################
 install_package=false
 install_dependencies=false
+dependencies_only=false
 build_clients=false
 build_release=true
 build_hip_clang=true
@@ -463,7 +466,7 @@ fi
 # check if we have a modern version of getopt that can handle whitespace and long parameters
 getopt -T
 if [[ $? -eq 4 ]]; then
-  GETOPT_PARSE=$(getopt --name "${0}" --longoptions help,install,clients,dependencies,debug,hip-clang,static,relocatable,codecoverage,relwithdebinfo,address-sanitizer,no-lazy-library-loading,no_tensile,no-tensile,client-only,msgpack,no-msgpack,logic:,cov:,fork:,branch:,test_local_path:,cpu_ref_lib:,use-system-packages,build_dir:,use-custom-version:,architecture:,tensile-verbose:,gprof,keep-build-tmp,no-compress,experimental,quiet,legacy_hipblas_direct,disable-hipblaslt-marker,enable-tensile-marker,skip_rocroller,logic-yaml-filter: --options hicdgrka:j:o:l:f:b:nu:t: -- "$@")
+  GETOPT_PARSE=$(getopt --name "${0}" --longoptions help,install,clients,dependencies,dependencies-only,debug,hip-clang,static,relocatable,codecoverage,relwithdebinfo,address-sanitizer,no-lazy-library-loading,no_tensile,no-tensile,client-only,msgpack,no-msgpack,logic:,cov:,fork:,branch:,test_local_path:,cpu_ref_lib:,use-system-packages,build_dir:,use-custom-version:,architecture:,tensile-verbose:,gprof,keep-build-tmp,no-compress,experimental,quiet,legacy_hipblas_direct,disable-hipblaslt-marker,enable-tensile-marker,skip_rocroller,logic-yaml-filter: --options hicdgrka:j:o:l:f:b:nu:t: -- "$@")
 else
   echo "Need a new version of getopt"
   exit 1
@@ -486,6 +489,10 @@ while true; do
             install_package=true
             shift ;;
         -d|--dependencies)
+            install_dependencies=true
+            shift ;;
+        --dependencies-only)
+            dependencies_only=true
             install_dependencies=true
             shift ;;
         -c|--clients)
@@ -716,6 +723,21 @@ if [[ "${install_dependencies}" == true ]]; then
   popd
 fi
 
+  # clients
+  if [[ "${build_clients}" == true || "${dependencies_only}" == true ]]; then
+    pushd .
+    mkdir -p ${build_dir}/deps && cd ${build_dir}/deps
+    if [[ "${cpu_ref_lib}" == "blis" ]]; then
+      install_blis
+    fi
+    popd
+  fi
+
+
+if [[ "${dependencies_only}" == true ]]; then
+  exit $?
+fi
+
 if [[ "${build_relocatable}" == true ]]; then
     if ! [ -z ${ROCM_PATH+x} ]; then
         rocm_path=${ROCM_PATH}
@@ -774,16 +796,6 @@ pushd .
   # library type
   if [[ "${build_static}" == true ]]; then
     cmake_common_options="${cmake_common_options} -DHIPBLASLT_BUILD_SHARED_LIBS=OFF"
-  fi
-
-  # clients
-  if [[ "${build_clients}" == true ]]; then
-    pushd .
-    mkdir -p ${build_dir}/deps && cd ${build_dir}/deps
-    if [[ "${cpu_ref_lib}" == "blis" ]]; then
-      install_blis
-    fi
-    popd
   fi
 
   tensile_opt=""
