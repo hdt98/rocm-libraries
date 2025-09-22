@@ -49,7 +49,7 @@ source_group("Header Files\\Public" FILES ${hipsparselt_headers_public})
 # work around code object stripping failure if using /usr/bin/strip
 set(CPACK_RPM_SPEC_MORE_DEFINE "%define __strip /opt/rocm/llvm/bin/llvm-strip") # need to generalize this
 install(
-    FILES ${hipbsparselt_public_headers}
+    FILES ${hipsparselt_headers_public}
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/hipsparselt"
     COMPONENT devel
 )
