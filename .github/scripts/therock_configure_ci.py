@@ -97,12 +97,13 @@ def retrieve_projects(args):
         subtrees = list(subtree_to_project_map.keys())
 
     # If .github/*/therock* were changed, run all subtrees
-    base_ref = args.get("base_ref")
-    modified_paths = get_modified_paths(base_ref)
-    print("modified_paths (max 200):", modified_paths[:200])
-    related_to_therock_ci = check_for_workflow_file_related_to_ci(modified_paths)
-    if related_to_therock_ci:
-        subtrees = list(subtree_to_project_map.keys())
+    if args.get("is_pull_request") or args.get("is_push"):
+        base_ref = args.get("base_ref")
+        modified_paths = get_modified_paths(base_ref)
+        print("modified_paths (max 200):", modified_paths[:200])
+        related_to_therock_ci = check_for_workflow_file_related_to_ci(modified_paths)
+        if related_to_therock_ci:
+            subtrees = list(subtree_to_project_map.keys())
 
     projects = set()
     # collect the associated subtree to project
