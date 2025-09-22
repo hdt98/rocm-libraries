@@ -348,14 +348,11 @@ install_msgpack_from_source( )
 
 install_blis()
 {
-    echo installing blis
-    pwd
     if [[ ! -e "/opt/AMD/aocl/aocl-linux-gcc-4.2.0/gcc/lib_ILP64/libblis-mt.a" ]] &&
         [[ ! -e "/opt/AMD/aocl/aocl-linux-aocc-4.1.0/aocc/lib_ILP64/libblis-mt.a" ]] &&
         [[ ! -e "/opt/AMD/aocl/aocl-linux-aocc-4.0/lib_ILP64/libblis-mt.a"  ]] &&
         [[ ! -e "/usr/local/lib/libblis.a" ]]; then
         pushd .
-        pwd
         #Download prebuilt AMD multithreaded blis
         if [[ ! -e "./blis/lib/libblis.a" ]]; then
           case "${ID}" in
