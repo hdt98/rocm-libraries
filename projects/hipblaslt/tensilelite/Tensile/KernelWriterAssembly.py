@@ -6812,7 +6812,7 @@ class KernelWriterAssembly(KernelWriter):
             ccVgprs = [None]*3 # three terms that can be negated: [real1, imag0, imag1]
             ccInsts = [None]*3
             accImOffset = accVgprImagNumOffset(kernel)
-            accStartSrcImg = accStartSrc+accImOffset
+            accStartSrcImg = accStart+accImOffset
             accEndSrcImg = accStartSrcImg + accs_per_wave - 1
 
             # vgpr A,B setting. In complex case, numRegistersIn does not match. Use numRegistersOut instead
