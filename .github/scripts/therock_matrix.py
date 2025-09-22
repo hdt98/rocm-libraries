@@ -10,7 +10,9 @@ subtree_to_project_map = {
     "projects/rocblas": "blas",
     "projects/rocprim": "prim",
     "projects/rocrand": "rand",
-    "projects/rocthrust": "prim"
+    "projects/rocthrust": "prim",
+    "projects/rocsparse": "sparse",
+    "projects/hipsparse": "sparse"
 }
 
 project_map = {
@@ -28,5 +30,10 @@ project_map = {
         "cmake_options": "-DTHEROCK_ENABLE_BLAS=ON -DTHEROCK_ENABLE_ALL=OFF",
         "project_to_test": "hipblaslt, rocblas",
         "subtree_checkout": "projects/hipblaslt\nprojects/hipblas-common\nprojects/rocblas\nprojects/hipblas\nshared/mxdatagenerator\nshared/rocroller\nshared/tensile",
+    },
+    "sparse": {
+        "cmake_options": "-DTHEROCK_ENABLE_SPARSE=ON -DTHEROCK_ENABLE_ALL=OFF",
+        "project_to_test": "rocsparse, hipsparse",
+        "subtree_checkout": "projects/rocsparse\nprojects/hipsparse\nprojects/rocblas\nprojects/hipblas-common\nprojects/rocprim",
     }
 }
