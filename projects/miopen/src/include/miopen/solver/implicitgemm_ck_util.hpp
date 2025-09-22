@@ -35,6 +35,9 @@
 #include <miopen/fusion/fusion_invoke_params.hpp>
 
 #if MIOPEN_BACKEND_HIP && MIOPEN_USE_COMPOSABLEKERNEL
+asd;
+asd;
+asd;
 #include <ck/utility/data_type.hpp>
 #include <ck/utility/numeric_limits.hpp>
 #include <ck/library/tensor_operation_instance/gpu/grouped_convolution_backward_weight.hpp>
