@@ -376,7 +376,7 @@ if( ROCFFT_MPI_ENABLE )
     target_compile_options( ${worker} PRIVATE ${WARNING_FLAGS} )
 
   if ( ROCFFT_CRAY_MPI_ENABLE )
-    target_link_libraries( ${worker}
+    target_link_libraries( ${worker} PRIVATE
       OpenMP::OpenMP_CXX 
       hip::hiprand
       hip::device
@@ -389,7 +389,7 @@ if( ROCFFT_MPI_ENABLE )
 	PRIVATE
 	${MPI_LIBDIR}/../../../../gtl/lib )
     else()
-    target_link_libraries( ${worker}
+    target_link_libraries( ${worker} PRIVATE
       OpenMP::OpenMP_CXX 
       hip::hiprand
       hip::device
@@ -403,16 +403,24 @@ if( ROCFFT_MPI_ENABLE )
                           ${TESTS_OUT_DIR})
     rocm_install(TARGETS ${worker} COMPONENT tests)
     
+    if( USE_HIPRAND )
+      target_link_libraries( ${worker}
+      PRIVATE
+      hip::hiprand
+      )
+      target_compile_definitions( ${worker} PRIVATE USE_HIPRAND )
+    endif()
+
   endforeach()
 
   # link normal MPI worker against rocFFT
-  target_link_libraries( rocfft_mpi_worker
+  target_link_libraries( rocfft_mpi_worker PRIVATE
     roc::rocfft
   )
 
   # dyna worker only needs to dynamically load libraries
   target_compile_definitions( dyna_rocfft_mpi_worker PRIVATE ROCFFT_DYNA_MPI_WORKER )
-  target_link_libraries( dyna_rocfft_mpi_worker
+  target_link_libraries( dyna_rocfft_mpi_worker PRIVATE
     ${CMAKE_DL_LIBS}
   )
 

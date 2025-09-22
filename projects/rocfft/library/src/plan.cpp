@@ -2257,7 +2257,7 @@ void rocfft_plan_t::GlobalTransposeA2A(size_t                     elem_size,
             if(intersection.empty())
                 continue;
 
-            conn.add_connection(inBrick.location.comm_rank, outBrick.location.comm_rank);
+            conn.add_connection(inRank, outRank);
 
             const auto elems = intersection.count_elems();
 

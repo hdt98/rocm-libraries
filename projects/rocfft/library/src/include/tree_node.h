@@ -1094,7 +1094,7 @@ struct MultiPlanItem
     // This process's rank relative to the plan communicator.
     int local_comm_rank;
 
-    // Sub-communicator for this operation, which is only set if the
+    // Sub-communicator for this operation, which is only set if
     // we know we're only talking to a subset of the ranks
     std::optional<MPI_Comm_wrapper_t> subcomm;
     // Helper to get the sub-communicator if it's set, or the plan's
