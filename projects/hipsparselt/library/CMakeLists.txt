@@ -242,7 +242,7 @@ if ( NOT BUILD_CUDA )
       rocm_install(
         DIRECTORY ${HIPSPARSELT_TENSILE_BUILD_DIR}
         DESTINATION ${HIPSPARSELT_TENSILE_LIBRARY_DIR}
-        COMPONENT runtime) # Use this cmake variable to be compatible with rocm-cmake 0.6 and 0.7
+        COMPONENT runtime)
     endif()
   else()
     if (WIN32)
