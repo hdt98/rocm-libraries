@@ -348,6 +348,8 @@ namespace TensileLite
                                                  hipEvent_t              stopEvent,
                                                  bool                    isKernelLoaded)
         {
+            hipError_t err = hipSuccess;
+
             if(!isKernelLoaded && !kernel.codeObjectFile.empty())
             {
                 FindCodeObject(kernel.codeObjectFile);
@@ -371,7 +373,16 @@ namespace TensileLite
             }
 
             hipFunction_t function;
-            HIP_CHECK_RETURN(getKernel(function, kernel.kernelName));
+            err = (getKernel(function, kernel.kernelName));
+            if (err)
+            {
+                std::cout << "getKernel error = " << err << std::endl;
+                std::cout << "Kernel " << kernel.kernelName << std::endl;
+                std::cout << " l" << kernel.workGroupSize << " x g" << kernel.numWorkGroups << " = "
+                          << kernel.numWorkItems << std::endl;
+                std::cout << kernel.args;
+                assert(false);
+            }
 
             void*  kernelArgs = const_cast<void*>(kernel.args.data());
             size_t argsSize   = kernel.args.size();
@@ -383,8 +394,19 @@ namespace TensileLite
                                        HIP_LAUNCH_PARAM_END};
 
             if(startEvent != nullptr)
-                HIP_CHECK_RETURN(hipEventRecord(startEvent, stream));
-            HIP_CHECK_RETURN(hipExtModuleLaunchKernel(function,
+            {
+                err = (hipEventRecord(startEvent, stream));
+                if (err)
+                {
+                    std::cout << "hipEventRecord error = " << err << std::endl;
+                    std::cout << "Kernel " << kernel.kernelName << std::endl;
+                    std::cout << " l" << kernel.workGroupSize << " x g" << kernel.numWorkGroups << " = "
+                            << kernel.numWorkItems << std::endl;
+                    std::cout << kernel.args;
+                    assert(false);
+                }
+            }
+            err = (hipExtModuleLaunchKernel(function,
                                                       kernel.numWorkItems.x,
                                                       kernel.numWorkItems.y,
                                                       kernel.numWorkItems.z,
@@ -398,8 +420,29 @@ namespace TensileLite
                                                       nullptr, // event
                                                       nullptr // event
                                                       ));
+            if (err)
+            {
+                std::cout << "hipExtModuleLaunchKernel error = " << err << std::endl;
+                std::cout << "Kernel " << kernel.kernelName << std::endl;
+                std::cout << " l" << kernel.workGroupSize << " x g" << kernel.numWorkGroups << " = "
+                          << kernel.numWorkItems << std::endl;
+                std::cout << kernel.args;
+                assert(false);
+            }
+
             if(stopEvent != nullptr)
-                HIP_CHECK_RETURN(hipEventRecord(stopEvent, stream));
+            {
+                err = (hipEventRecord(stopEvent, stream));
+                if (err)
+                {
+                    std::cout << "hipEventRecord error = " << err << std::endl;
+                    std::cout << "Kernel " << kernel.kernelName << std::endl;
+                    std::cout << " l" << kernel.workGroupSize << " x g" << kernel.numWorkGroups << " = "
+                            << kernel.numWorkItems << std::endl;
+                    std::cout << kernel.args;
+                    assert(false);
+                }
+            }
             return hipSuccess;
         }
 
