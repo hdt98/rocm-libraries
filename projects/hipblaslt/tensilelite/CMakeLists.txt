@@ -1,7 +1,8 @@
 # Copyright Advanced Micro Devices, Inc., or its affiliates.
 # SPDX-License-Identifier:  MIT
 
-add_subdirectory(rocisa)
+# Provide an explicit binary directory because source dir is outside this project tree
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../../../shared/rocisa ${CMAKE_CURRENT_BINARY_DIR}/shared/rocisa)
 
 if(TENSILELITE_ENABLE_AUTOBUILD)
     list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")

@@ -1,4 +1,4 @@
 -r ./requirements.txt
-./rocisa
+./../../shared/rocisa
 memory_profiler
 invoke
