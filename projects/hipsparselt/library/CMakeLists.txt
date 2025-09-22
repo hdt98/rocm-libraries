@@ -46,6 +46,14 @@ set(hipsparselt_headers_public
 
 source_group("Header Files\\Public" FILES ${hipsparselt_headers_public})
 
+# work around code object stripping failure if using /usr/bin/strip
+set(CPACK_RPM_SPEC_MORE_DEFINE "%define __strip /opt/rocm/llvm/bin/llvm-strip") # need to generalize this
+install(
+    FILES ${hipbsparselt_public_headers}
+    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/hipsparselt"
+    COMPONENT devel
+)
+
 include(GNUInstallDirs)
 
 set(BIN_INSTALL_DIR ${CMAKE_INSTALL_BINDIR})
@@ -234,7 +242,7 @@ if ( NOT BUILD_CUDA )
       rocm_install(
         DIRECTORY ${HIPSPARSELT_TENSILE_BUILD_DIR}
         DESTINATION ${HIPSPARSELT_TENSILE_LIBRARY_DIR}
-        COMPONENT ${CMAKE_INSTALL_DEFAULT_COMPONENT_NAME}) # Use this cmake variable to be compatible with rocm-cmake 0.6 and 0.7
+        COMPONENT runtime) # Use this cmake variable to be compatible with rocm-cmake 0.6 and 0.7
     endif()
   else()
     if (WIN32)
@@ -247,7 +255,7 @@ if ( NOT BUILD_CUDA )
       rocm_install(
         DIRECTORY ${CMAKE_BINARY_DIR}/SPMM_KERNELS/library
         DESTINATION ${HIPSPARSELT_SPMM_LIBRARY_DIR}
-        COMPONENT ${CMAKE_INSTALL_DEFAULT_COMPONENT})
+        COMPONENT runtime)
     endif()
   endif()
 endif()
