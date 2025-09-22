@@ -95,9 +95,34 @@ builtin_wmma_naive_selector<int4x16_t,
 }
 #endif
 
+//KO TODO:: Add gfx125 WMMAVecType
+template <typename T, index_t kMultiplier, typename = void>
+struct WMMAVecType
+{
+    static_assert(sizeof(T) == 0, "VecType is not specialized for this type");
+};
+
+// fp16
+template <typename T, index_t kMultiplier>
+struct WMMAVecType<T, kMultiplier, std::enable_if_t<std::is_same_v<T, ck::half_t>>>
+{
+    using VecT  = vector_type<T, kMultiplier * 16>;
+    using ViewT = vector_type<T, 16>;
+};
+
+
+//KO TODO:: Add gfx125 macros
+#define CK_WMMA_CALL_INTRIN(dst, src0, src1, ...) \
+    intrin_wmma_##dst##_16x16x32_##src0<16, 16>::Run(__VA_ARGS__)
+
+
+// #if defined (__gfx12__)
+// KO TODO:: if gfx12, or general with refactor to make look like gfx13?
+// KO TODO:: add in WMMA_ACCNumber_traits to support refactor
 template <typename src_t, typename dst_t, typename acc_t, index_t acc_num>
 __global__ void matmul(const src_t* a, const src_t* b, dst_t* c)
 {
+    printf("------ USING LEGACY MATMUL ------ ");
     __shared__ src_t p_shared[16 * 16 * 2];
     const int lIdx = threadIdx.x;
     // a and b fragments are stored in 8 VGPRs each, in packed format, so 16 elements each for a and
@@ -195,6 +220,7 @@ __global__ void matmul(const src_t* a, const src_t* b, dst_t* c)
 template <typename src_t, typename dst_t, typename acc_t, index_t acc_num>
 __global__ void matmul_swizzle_a(const src_t* a, const src_t* b, dst_t* c)
 {
+    printf("------ USING LEGACY MATMUL_SWIZZLE_A ------ ");
     const int lIdx = threadIdx.x;
 
     using src_vec  = typename vector_type<src_t, 16>::type;
@@ -227,6 +253,85 @@ __global__ void matmul_swizzle_a(const src_t* a, const src_t* b, dst_t* c)
             ck::type_convert<dst_t>(c_thread_buf_[Number<ele * acc_num / 8>{}]);
     });
 }
+
+//KO TODO:: disabled/ignore implementations of new matmul and matmul swizzel a for gfx125 signature
+// the below two functions are only used in gfx13
+// template <typename srcA_t, typename srcB_t, typename dst_t, typename acc_t, index_t kMultiplier>
+// __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
+// {
+//     ignore = a;
+//     ignore = b;
+//     ignore = c;
+// }
+
+// template <typename srcA_t, typename srcB_t, typename dst_t, typename acc_t, index_t kMultiplier>
+// __global__ void matmul_swizzle_a(const srcA_t* a, const srcB_t* b, dst_t* c)
+// {
+//     ignore = a;
+//     ignore = b;
+//     ignore = c;
+// }
+
+//KO TODO:: Add gfx125 matmul
+//#else // defined(__gfx1250__) || defined(__gfx1251__)
+template<typename srcA_t, typename srcB_t, typename dst_t, typename acc_t, ck::index_t kMultiplier>
+__global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
+{
+    assert(true==false);
+    ignore = a;
+    ignore = b;
+    ignore = c;
+    printf("---------- Running gfx125 matmul - NOT IMPLEMENTED YET ----------\n");
+}
+
+//KO TODO:: Add gfx125 matmul_swizzle_a
+template <typename srcA_t, typename srcB_t, typename dst_t, typename acc_t, ck::index_t KMultiplier>
+__global__ void matmul_swizzle_a(const srcA_t* a, const srcB_t* b, dst_t* c)
+{
+    ignore = a;
+    ignore = b;
+    ignore = c;
+    printf("---------- Running gfx125 matmul - NOT IMPLEMENTED YET ----------\n");
+}
+
+//KO TODO:: Add gfx1250 disabled base type signatures for matmul, matmul_swizzle_a
+// template <typename src_t, typename dst_t, typename acc_t, index_t acc_num>
+// __global__ void matmul(const src_t* a, const src_t* b, dst_t* c)
+// {
+//     ignore = a;
+//     ignore = b;
+//     ignore = c;
+//     printf("---------- Running gfx1250 matmul - DISABLED original matmul ----------\n");
+// }
+
+// template <typename src_t, typename dst_t, typename acc_t>
+// __global__ void matmul_swizzle_a(const src_t* a, const src_t* b, dst_t* c)
+// {
+//     ignore = a;
+//     ignore = b;
+//     ignore = c;
+//     printf("---------- Running gfx1250 matmul - DISABLED original matmul_swizzle_a ----------\n");
+// }
+
+
+
+//KO TODO:: Add gfx125 builtin_wmma_naive_selector 
+template <typename srcAType, typename srcBType, typename accType, index_t kMultiplier>
+__device__ void builtin_wmma_naive_selector(
+    const typename WMMAVecType<srcAType, kMultiplier>::VecT::type& reg_a,
+    const typename WMMAVecType<srcBType, kMultiplier>::VecT::type& reg_b,
+    StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr, accType, 1, kMultiplier * 16, true>& reg_c)
+{
+    if constexpr(std::is_same_v<srcAType, ck::half_t> && std::is_same_v<srcBType, ck::half_t> && std::is_same_v<accType, ck::half_t>)
+    {
+        CK_WMMA_CALL_INTRIN(f16, f16, f16, 0, reg_a, 0, reg_b, 0, reg_c.GetVectorTypeReference(Number<0>{}));
+    } else {
+        printf("---------- No builtin_wmma_naive_selector implementation for these types ----------\n");
+    }
+}
+
+// #endif
+
 
 struct GemmParams
 {
@@ -297,7 +402,7 @@ template <typename DeviceWmma,
           typename AElementwiseOperation,
           typename BElementwiseOperation,
           typename CElementwiseOperation,
-          index_t CAccNum>
+          index_t KMultiplier>
 struct TestWmma
 {
     auto PrepareGemmTensor(const ck::wmma_op_util::GemmParams& params)
@@ -342,14 +447,16 @@ struct TestWmma
         std::cout << "ALayout = " << ALayout{}.name << ", BLayout = " << BLayout{}.name
                   << ", CLayout = " << CLayout{}.name << std::endl;
 
+        std::cout<<"K Multiplier in testSWMMA operator is: "<< KMultiplier << std::endl;
+
         // Arrange
         ck::wmma_op_util::GemmParams params;
         params.M       = 16;
         params.N       = 16;
         params.K       = 16;
-        params.StrideA = 16;
-        params.StrideB = 16;
-        params.StrideC = 16;
+        params.StrideA = 16;// * KMultiplier;
+        params.StrideB = 16;// * KMultiplier;
+        params.StrideC = 16;// * KMultiplier;
 
         auto host_tensors = PrepareGemmTensor(params);
 
@@ -374,7 +481,7 @@ struct TestWmma
             a, b, c_host, a_element_op, b_element_op, c_element_op);
 
         // Act
-        bool is_supported = ck::is_gfx11_supported() &&
+        bool is_supported = (ck::is_gfx11_supported() || ck::is_gfx12_supported()) &&
                             ck::wmma_op_util::RunDeviceGEMM(wmma_kernel, a, b, c_device);
 
         if(is_supported)
