@@ -36,7 +36,11 @@ ConstantParams:
   ClusterLocalRead: false
   CustomKernelName: ''
   DebugStreamK: 0
+<<<<<<< HEAD
   DepthU: 8
+=======
+  DepthU: -3
+>>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
   DepthULdsDivisor: 1
   DirectToLdsA: false
   DirectToLdsB: false
@@ -45,7 +49,11 @@ ConstantParams:
   DisableAtomicFail: 0
   DisableKernelPieces: 0
   DisableVgprOverlapping: false
+<<<<<<< HEAD
   EdgeType: Branch
+=======
+  EdgeType: ShiftPtr
+>>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
   ExpandPointerSwap: true
   ExtraLatencyForLR: 0
   ExtraMiLatencyLeft: 0
@@ -91,6 +99,10 @@ ConstantParams:
   MacroTileShapeMax: 64
   MacroTileShapeMin: 1
   MagicDivAlg: 2
+<<<<<<< HEAD
+=======
+  MatrixInstruction: []
+>>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
   MaxOccupancy: 40
   MaxVgprNumber: 256
   MemoryModifierFormat: ''
@@ -117,7 +129,11 @@ ConstantParams:
   PersistentKernelAlongBatch: false
   PrefetchAcrossPersistent: 0
   PrefetchAcrossPersistentMode: 0
+<<<<<<< HEAD
   PrefetchGlobalRead: true
+=======
+  PrefetchGlobalRead: false
+>>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
   PrefetchLocalRead: false
   PreloadKernelArguments: 0
   ReplacementKernel: false
@@ -142,7 +158,10 @@ ConstantParams:
   SuppressNoLoadLoop: false
   ThreadSeparateGlobalReadA: 0
   ThreadSeparateGlobalReadB: 0
+<<<<<<< HEAD
   ThreadTile: [4, 4]
+=======
+>>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
   TransposeLDS: 0
   UnrollIncIsDepthU: 0
   UnrollMajorLDSA: false
@@ -159,14 +178,26 @@ ConstantParams:
   WaveSeparateGlobalReadA: 0
   WaveSeparateGlobalReadB: 0
   WavefrontSize: 64
+<<<<<<< HEAD
   WorkGroup: [16, 16, 1]
+=======
+>>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
   WorkGroupMapping: 8
   WorkGroupMappingType: B
 CustomKernelWildcard: false
 CustomKernels: []
 ForkParams:
+<<<<<<< HEAD
   MatrixInstruction:
   - [16, 16, 4, 1, 1, 1, 1, 1, 1]
   - [16, 16, 4, 1, 1, 2, 2, 2, 2]
+=======
+  ThreadTile:
+  - [4, 8]
+  - [8, 8]
+  WorkGroup:
+  - [16, 16, 1]
+  - [8, 8, 1]
+>>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
 ParamGroups: []
 ...

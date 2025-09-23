@@ -1,6 +1,10 @@
 - MinimumRequiredVersion: 4.44.0
 - ProblemSizes:
+<<<<<<< HEAD
   - Exact: [16, 16, 1, 2, 16, 16, 2, 16]
+=======
+  - Range: [ [ 127, 1, 0, 129 ], 0, [ 2, 1, 0, 2 ], [ 63, 1, 0, 64 ], [ 0, 1, 0, 0 ], [ 0, 1, 0, 0 ], [ 0, 1, 0, 0 ], [ 0, 1, 0, 0 ] ]
+>>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
 - 1LDSBuffer: 0
   AggressivePerfMode: 1
   AssertAIGreaterThanEqual: -1
@@ -32,7 +36,11 @@
   CustomKernelName: ''
   DebugStreamK: 0
   DelayRemainingArguments: false
+<<<<<<< HEAD
   DepthU: 8
+=======
+  DepthU: 4
+>>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
   DepthULdsDivisor: 1
   DirectToLdsA: false
   DirectToLdsB: false
@@ -41,11 +49,19 @@
   DisableAtomicFail: 0
   DisableKernelPieces: 0
   DisableVgprOverlapping: false
+<<<<<<< HEAD
   EdgeType: Branch
   EnableF32XdlMathOp: false
   EnableMatrixInstruction: true
   EnableMatrixInstructionStore: true
   ExpandPointerSwap: true
+=======
+  EdgeType: ShiftPtr
+  EnableF32XdlMathOp: false
+  EnableMatrixInstruction: false
+  EnableMatrixInstructionStore: false
+  ExpandPointerSwap: 0
+>>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
   ExtraLatencyForLR: 0
   ExtraMiLatencyLeft: 0
   ForceStoreSC1: false
@@ -76,6 +92,7 @@
   InterleaveAlpha: 0
   Kernel: true
   KernelLanguage: Assembly
+<<<<<<< HEAD
   LSCA: 8
   LSCB: 16
   LSPA: 8
@@ -84,17 +101,32 @@
   LVCB: 16
   LVPA: 8
   LVPB: 4
+=======
+  LSCA: 4
+  LSCB: 128
+  LSPA: 64
+  LSPB: 2
+  LVCA: 4
+  LVCB: 128
+  LVPA: 64
+  LVPB: 2
+>>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
   LdcEqualsLdd: false
   LdsBlockSizePerPadA: 0
   LdsBlockSizePerPadB: 0
   LdsInitCVgprs: false
   LdsNumElements: 784
+<<<<<<< HEAD
   LdsNumElementsAlignedA: 144
   LdsNumElementsAlignedB: 128
   LdsOffsetA: 0
   LdsOffsetA_Blk: 512
   LdsOffsetB: 144
   LdsOffsetB_Blk: 656
+=======
+  LdsOffsetA: 0
+  LdsOffsetB: 272
+>>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
   LdsPadA: 1
   LdsPadB: 0
   LocalDotLayout: 1
@@ -108,6 +140,7 @@
   LocalWriteUseSgprA: false
   LocalWriteUseSgprB: false
   LoopDoWhile: false
+<<<<<<< HEAD
   LoopIters: 2
   LoopTail: true
   LoopUnroll: 8
@@ -136,6 +169,21 @@
   MatrixInstM: 16
   MatrixInstN: 16
   MatrixInstruction: [16, 16, 4, 1]
+=======
+  LoopIters: 4
+  LoopTail: true
+  LoopUnroll: 4
+  MACInstruction: FMA
+  MIArchVgpr: false
+  MacroTile0: 64
+  MacroTile1: 128
+  MacroTileA: 64
+  MacroTileB: 128
+  MacroTileShapeMax: 64
+  MacroTileShapeMin: 1
+  MagicDivAlg: 2
+  MatrixInstruction: []
+>>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
   MaxOccupancy: 40
   MaxVgprNumber: 256
   MemoryModifierFormat: SC0
@@ -148,6 +196,7 @@
   NonTemporalC: 0
   NonTemporalD: 0
   NumElementsPerBatchStore: 0
+<<<<<<< HEAD
   NumElementsPerThread: 4
   NumGlobalWriteVectorsPerThread: 4
   NumLoadsA: 2
@@ -157,6 +206,17 @@
   NumLoadsPerpendicularA: 2
   NumLoadsPerpendicularB: 2
   NumThreads: 64
+=======
+  NumElementsPerThread: 32
+  NumGlobalWriteVectorsPerThread: 32
+  NumLoadsA: 1
+  NumLoadsB: 2
+  NumLoadsCoalescedA: 1
+  NumLoadsCoalescedB: 1
+  NumLoadsPerpendicularA: 1
+  NumLoadsPerpendicularB: 2
+  NumThreads: 256
+>>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
   OptNoLoadLoop: 1
   OptPreLoopVmcnt: 0
   PackBatchDims: 0
@@ -174,7 +234,11 @@
   PersistentKernelAlongBatch: false
   PrefetchAcrossPersistent: 0
   PrefetchAcrossPersistentMode: 0
+<<<<<<< HEAD
   PrefetchGlobalRead: true
+=======
+  PrefetchGlobalRead: false
+>>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
   PrefetchLocalRead: false
   PreloadKernelArguments: 0
   ProblemType:
@@ -253,18 +317,32 @@
   StreamK: 0
   StreamKAtomic: 0
   StreamKXCCMapping: 0
+<<<<<<< HEAD
   SubGroup0: 4
   SubGroup1: 16
   SubGroupA: 4
+=======
+  SubGroup0: 16
+  SubGroup1: 16
+  SubGroupA: 16
+>>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
   SubGroupB: 16
   SuppressNoLoadLoop: false
   ThreadSeparateGlobalReadA: 0
   ThreadSeparateGlobalReadB: 0
+<<<<<<< HEAD
   ThreadTile: [1, 16]
   ThreadTile0: 4
   ThreadTile1: 1
   ThreadTileA: 4
   ThreadTileB: 1
+=======
+  ThreadTile: [4, 8]
+  ThreadTile0: 4
+  ThreadTile1: 8
+  ThreadTileA: 4
+  ThreadTileB: 8
+>>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
   TransposeLDS: 0
   UnrollIncIsDepthU: 0
   UnrollMajorLDSA: false
@@ -283,15 +361,26 @@
   WaveSeparateGlobalReadA: 0
   WaveSeparateGlobalReadB: 0
   WavefrontSize: 64
+<<<<<<< HEAD
   WorkGroup: [16, 4, 1]
   WorkGroupMapping: 8
   WorkGroupMappingType: B
   _DepthULds: 8
+=======
+  WorkGroup: [16, 16, 1]
+  WorkGroupMapping: 8
+  WorkGroupMappingType: B
+  _DepthULds: 4
+>>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
   _GlobalAccumulation: null
   _UseSgprForGRO: 1
   _VectorStore: 1
   _WorkspaceSizePerElemC: 0
+<<<<<<< HEAD
   _staggerStrideShift: 1
+=======
+  _staggerStrideShift: 0
+>>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
 - 1LDSBuffer: 0
   AggressivePerfMode: 1
   AssertAIGreaterThanEqual: -1
@@ -323,7 +412,11 @@
   CustomKernelName: ''
   DebugStreamK: 0
   DelayRemainingArguments: false
+<<<<<<< HEAD
   DepthU: 8
+=======
+  DepthU: 2
+>>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
   DepthULdsDivisor: 1
   DirectToLdsA: false
   DirectToLdsB: false
@@ -332,11 +425,19 @@
   DisableAtomicFail: 0
   DisableKernelPieces: 0
   DisableVgprOverlapping: false
+<<<<<<< HEAD
   EdgeType: Branch
   EnableF32XdlMathOp: false
   EnableMatrixInstruction: true
   EnableMatrixInstructionStore: true
   ExpandPointerSwap: true
+=======
+  EdgeType: ShiftPtr
+  EnableF32XdlMathOp: false
+  EnableMatrixInstruction: false
+  EnableMatrixInstructionStore: false
+  ExpandPointerSwap: 0
+>>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
   ExtraLatencyForLR: 0
   ExtraMiLatencyLeft: 0
   ForceStoreSC1: false
@@ -367,6 +468,7 @@
   InterleaveAlpha: 0
   Kernel: true
   KernelLanguage: Assembly
+<<<<<<< HEAD
   LSCA: 8
   LSCB: 64
   LSPA: 32
@@ -375,10 +477,21 @@
   LVCB: 64
   LVPA: 32
   LVPB: 4
+=======
+  LSCA: 2
+  LSCB: 64
+  LSPA: 32
+  LSPB: 1
+  LVCA: 2
+  LVCB: 64
+  LVPA: 32
+  LVPB: 1
+>>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
   LdcEqualsLdd: false
   LdsBlockSizePerPadA: 0
   LdsBlockSizePerPadB: 0
   LdsInitCVgprs: false
+<<<<<<< HEAD
   LdsNumElements: 3088
   LdsNumElementsAlignedA: 528
   LdsNumElementsAlignedB: 512
@@ -386,6 +499,11 @@
   LdsOffsetA_Blk: 2048
   LdsOffsetB: 528
   LdsOffsetB_Blk: 2576
+=======
+  LdsNumElements: 208
+  LdsOffsetA: 0
+  LdsOffsetB: 80
+>>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
   LdsPadA: 1
   LdsPadB: 0
   LocalDotLayout: 1
@@ -401,6 +519,7 @@
   LoopDoWhile: false
   LoopIters: 2
   LoopTail: true
+<<<<<<< HEAD
   LoopUnroll: 8
   MACInstruction: FMA
   MFMA_BF16_1K: false
@@ -416,10 +535,19 @@
   MacroTile0: 64
   MacroTile1: 64
   MacroTileA: 64
+=======
+  LoopUnroll: 2
+  MACInstruction: FMA
+  MIArchVgpr: false
+  MacroTile0: 32
+  MacroTile1: 64
+  MacroTileA: 32
+>>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
   MacroTileB: 64
   MacroTileShapeMax: 64
   MacroTileShapeMin: 1
   MagicDivAlg: 2
+<<<<<<< HEAD
   MatrixInstB: 1
   MatrixInstBM: 1
   MatrixInstBN: 1
@@ -427,6 +555,9 @@
   MatrixInstM: 16
   MatrixInstN: 16
   MatrixInstruction: [16, 16, 4, 1]
+=======
+  MatrixInstruction: []
+>>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
   MaxOccupancy: 40
   MaxVgprNumber: 256
   MemoryModifierFormat: SC0
@@ -439,6 +570,7 @@
   NonTemporalC: 0
   NonTemporalD: 0
   NumElementsPerBatchStore: 0
+<<<<<<< HEAD
   NumElementsPerThread: 16
   NumGlobalWriteVectorsPerThread: 16
   NumLoadsA: 2
@@ -448,6 +580,17 @@
   NumLoadsPerpendicularA: 2
   NumLoadsPerpendicularB: 2
   NumThreads: 256
+=======
+  NumElementsPerThread: 32
+  NumGlobalWriteVectorsPerThread: 32
+  NumLoadsA: 1
+  NumLoadsB: 2
+  NumLoadsCoalescedA: 1
+  NumLoadsCoalescedB: 1
+  NumLoadsPerpendicularA: 1
+  NumLoadsPerpendicularB: 2
+  NumThreads: 64
+>>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
   OptNoLoadLoop: 1
   OptPreLoopVmcnt: 0
   PackBatchDims: 0
@@ -465,7 +608,11 @@
   PersistentKernelAlongBatch: false
   PrefetchAcrossPersistent: 0
   PrefetchAcrossPersistentMode: 0
+<<<<<<< HEAD
   PrefetchGlobalRead: true
+=======
+  PrefetchGlobalRead: false
+>>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
   PrefetchLocalRead: false
   PreloadKernelArguments: 0
   ProblemType:
@@ -545,6 +692,7 @@
   StreamKAtomic: 0
   StreamKXCCMapping: 0
   SubGroup0: 8
+<<<<<<< HEAD
   SubGroup1: 32
   SubGroupA: 8
   SubGroupB: 32
@@ -556,6 +704,19 @@
   ThreadTile1: 2
   ThreadTileA: 8
   ThreadTileB: 2
+=======
+  SubGroup1: 8
+  SubGroupA: 8
+  SubGroupB: 8
+  SuppressNoLoadLoop: false
+  ThreadSeparateGlobalReadA: 0
+  ThreadSeparateGlobalReadB: 0
+  ThreadTile: [4, 8]
+  ThreadTile0: 4
+  ThreadTile1: 8
+  ThreadTileA: 4
+  ThreadTileB: 8
+>>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
   TransposeLDS: 0
   UnrollIncIsDepthU: 0
   UnrollMajorLDSA: false
@@ -574,12 +735,23 @@
   WaveSeparateGlobalReadA: 0
   WaveSeparateGlobalReadB: 0
   WavefrontSize: 64
+<<<<<<< HEAD
   WorkGroup: [32, 8, 1]
   WorkGroupMapping: 8
   WorkGroupMappingType: B
   _DepthULds: 8
+=======
+  WorkGroup: [8, 8, 1]
+  WorkGroupMapping: 8
+  WorkGroupMappingType: B
+  _DepthULds: 2
+>>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
   _GlobalAccumulation: null
   _UseSgprForGRO: 1
   _VectorStore: 1
   _WorkspaceSizePerElemC: 0
+<<<<<<< HEAD
   _staggerStrideShift: 1
+=======
+  _staggerStrideShift: 0
+>>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)

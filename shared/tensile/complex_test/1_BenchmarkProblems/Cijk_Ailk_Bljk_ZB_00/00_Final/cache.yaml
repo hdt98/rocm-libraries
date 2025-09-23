@@ -36,7 +36,10 @@ ConstantParams:
   ClusterLocalRead: false
   CustomKernelName: ''
   DebugStreamK: 0
+<<<<<<< HEAD
   DepthU: 8
+=======
+>>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
   DepthULdsDivisor: 1
   DirectToLdsA: false
   DirectToLdsB: false
@@ -91,7 +94,11 @@ ConstantParams:
   MacroTileShapeMax: 64
   MacroTileShapeMin: 1
   MagicDivAlg: 2
+<<<<<<< HEAD
   MatrixInstruction: [16, 16, 4, 1, 1, 1, 1, 1, 1]
+=======
+  MatrixInstruction: [16, 16, 4, 1, 1, 2, 2, 2, 2]
+>>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
   MaxOccupancy: 40
   MaxVgprNumber: 256
   MemoryModifierFormat: ''
@@ -165,6 +172,11 @@ ConstantParams:
   WorkGroupMappingType: B
 CustomKernelWildcard: false
 CustomKernels: []
+<<<<<<< HEAD
 ForkParams: {}
+=======
+ForkParams:
+  DepthU: [8, 16, 32]
+>>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
 ParamGroups: []
 ...

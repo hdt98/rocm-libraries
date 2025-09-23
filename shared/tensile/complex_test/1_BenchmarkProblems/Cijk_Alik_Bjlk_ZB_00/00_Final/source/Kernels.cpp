@@ -25,4 +25,8 @@
 **************************************************/
 
 
+<<<<<<< HEAD
 #include "/home/mchirila/rocm-libraries/shared/tensile/complex_test/1_BenchmarkProblems/Cijk_Alik_Bjlk_ZB_00/00_Final/source/Kernels.h"
+=======
+#include "/home/mchirila/rocm-libraries/shared/tensile/Tensile/complex_test/1_BenchmarkProblems/Cijk_Alik_Bjlk_ZB_00/00_Final/source/Kernels.h"
+>>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)

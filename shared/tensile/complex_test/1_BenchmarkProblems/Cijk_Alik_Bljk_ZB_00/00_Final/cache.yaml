@@ -36,7 +36,11 @@ ConstantParams:
   ClusterLocalRead: false
   CustomKernelName: ''
   DebugStreamK: 0
+<<<<<<< HEAD
   DepthU: 8
+=======
+  DepthU: -4
+>>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
   DepthULdsDivisor: 1
   DirectToLdsA: false
   DirectToLdsB: false
@@ -45,7 +49,11 @@ ConstantParams:
   DisableAtomicFail: 0
   DisableKernelPieces: 0
   DisableVgprOverlapping: false
+<<<<<<< HEAD
   EdgeType: Branch
+=======
+  EdgeType: ShiftPtr
+>>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
   ExpandPointerSwap: true
   ExtraLatencyForLR: 0
   ExtraMiLatencyLeft: 0
@@ -63,7 +71,10 @@ ConstantParams:
   GlobalReadCoalesceVectorB: true
   GlobalReadPerMfma: 1
   GlobalReadVectorWidth: -1
+<<<<<<< HEAD
   GlobalSplitU: 1
+=======
+>>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
   GlobalSplitUAlgorithm: SingleBuffer
   GlobalSplitUAtomicAdd: false
   GlobalSplitUSummationAssignmentRoundRobin: true
@@ -91,7 +102,11 @@ ConstantParams:
   MacroTileShapeMax: 64
   MacroTileShapeMin: 1
   MagicDivAlg: 2
+<<<<<<< HEAD
   MatrixInstruction: [16, 16, 4, 1, 1, 1, 1, 1, 1]
+=======
+  MatrixInstruction: []
+>>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
   MaxOccupancy: 40
   MaxVgprNumber: 256
   MemoryModifierFormat: ''
@@ -118,8 +133,13 @@ ConstantParams:
   PersistentKernelAlongBatch: false
   PrefetchAcrossPersistent: 0
   PrefetchAcrossPersistentMode: 0
+<<<<<<< HEAD
   PrefetchGlobalRead: true
   PrefetchLocalRead: false
+=======
+  PrefetchGlobalRead: false
+  PrefetchLocalRead: true
+>>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
   PreloadKernelArguments: 0
   ReplacementKernel: false
   ScheduleGlobalRead: 1
@@ -143,7 +163,10 @@ ConstantParams:
   SuppressNoLoadLoop: false
   ThreadSeparateGlobalReadA: 0
   ThreadSeparateGlobalReadB: 0
+<<<<<<< HEAD
   ThreadTile: [4, 4]
+=======
+>>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
   TransposeLDS: 0
   UnrollIncIsDepthU: 0
   UnrollMajorLDSA: false
@@ -160,11 +183,25 @@ ConstantParams:
   WaveSeparateGlobalReadA: 0
   WaveSeparateGlobalReadB: 0
   WavefrontSize: 64
+<<<<<<< HEAD
   WorkGroup: [16, 16, 1]
+=======
+>>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
   WorkGroupMapping: 8
   WorkGroupMappingType: B
 CustomKernelWildcard: false
 CustomKernels: []
+<<<<<<< HEAD
 ForkParams: {}
+=======
+ForkParams:
+  GlobalSplitU: [1, 3]
+  ThreadTile:
+  - [4, 8]
+  - [8, 8]
+  WorkGroup:
+  - [16, 16, 1]
+  - [32, 4, 1]
+>>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
 ParamGroups: []
 ...

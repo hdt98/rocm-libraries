@@ -11,6 +11,7 @@ GlobalParameters:
   NumElementsToValidate: -1
   ValidationMaxToPrint: 4
   ValidationPrintValids: False
+<<<<<<< HEAD
   # PrintTensorD: 0x3
   # PrintTensorC: 0x3
   # PrintTensorB: 0x3
@@ -22,11 +23,18 @@ GlobalParameters:
   DataInitTypeB: 13 #13 #3
   DataInitTypeC: 12 #3
   DataInitTypeAlpha: 3
+=======
+  # ShortNames: False
+  # MergeFiles: True
+  DataInitTypeAB: 3
+  DataInitTypeC: 3
+>>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
   KernelTime: True
   PrintSolutionRejectionReason: True
 
 BenchmarkProblems:
 
+<<<<<<< HEAD
   # - # zgemm NN
   #   - # ProblemType
   #     OperationType: GEMM
@@ -79,17 +87,26 @@ BenchmarkProblems:
   #         # - Range: [ [127,1,129], 0, [2], [63,1,64] ]
 
   - # zgemm CN
+=======
+  - # zgemm NN
+>>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
     - # ProblemType
       OperationType: GEMM
       DataType: Z
       DestDataType: Z
       ComputeDataType: Z
       TransposeA: False
+<<<<<<< HEAD
       TransposeB: True
       UseBeta: True
       Batched: True
       ComplexConjugateA: False
       ComplexConjugateB: True
+=======
+      TransposeB: False
+      UseBeta: True
+      Batched: True
+>>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
 
     - # BenchmarkProblemSizeGroup - Assembly
       InitialSolutionParameters:
@@ -100,11 +117,17 @@ BenchmarkProblems:
       ForkParameters:
         # - StoreCInUnroll: [False]
         - MatrixInstruction:
+<<<<<<< HEAD
           # - [16, 16, 4, 1, 1, 1, 1, 1, 1]
           - [16, 16, 4, 1, 1, 2, 2, 2, 2]
         # - ScheduleIterAlg: [1]
         - GlobalSplitU: [1] #, 3]
         # - StreamK: [3]
+=======
+          - [16, 16, 4, 1, 1, 2, 2, 2, 2]
+        - ScheduleIterAlg: [1]
+        - GlobalSplitU: [1] #, 3]
+>>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
         - PrefetchLocalRead: [False]
         - PrefetchGlobalRead: [True]
         # - ThreadTile:
@@ -114,13 +137,18 @@ BenchmarkProblems:
         # - WorkGroup:
           # - [ 32,  4,  1 ]
           # - [  4,  4,  2 ]
+<<<<<<< HEAD
         - DepthU: [8] #,16,32]
+=======
+        - DepthU: [8,16,32]
+>>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
         # - VectorWidth: [-1]
       BenchmarkForkParameters:
       JoinParameters:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
+<<<<<<< HEAD
           # - Exact: [32, 32, 1, 8]
           - Exact: [16, 16, 1, 2]
           # - Exact: [64, 64, 1, 16]
@@ -134,3 +162,7 @@ LibraryLogic:
       ScheduleName: "gfx950"
       DeviceNames: ["Device 0049", "Device 0050"]
       ArchitectureName: "gfx950"
+=======
+          - Exact: [4096, 4096, 1, 8192]
+          # - Range: [ [127,1,129], 0, [2], [63,1,64] ]
+>>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
