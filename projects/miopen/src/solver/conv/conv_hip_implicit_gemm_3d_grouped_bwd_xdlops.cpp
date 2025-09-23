@@ -349,28 +349,28 @@ struct CKArgs
     std::array<ck::index_t, 3> lPadding;
     std::array<ck::index_t, 3> rPadding;
 };
+
+template <typename DataType>
+std::vector<std::string> FillValidKernelsByAlphaBeta(const ProblemDescription& problem)
+{
+    switch(problem.GetAlphaBetaCase())
+    {
+    case BILINEAR:
+        return FillValidKernelsIDs<DeviceOpGBwdBilinearPtrs<DataType>, CKArgs<DataType>>(problem);
+    case SCALE:
+        return FillValidKernelsIDs<DeviceOpGBwdScalePtrs<DataType>, CKArgs<DataType>>(problem);
+    default:
+        return FillValidKernelsIDs<DeviceOpGBwdDefaultPtrs<DataType>, CKArgs<DataType>>(problem);
+    }
+}
 } // namespace
 
 template <typename DataType>
 void PerformanceConfigHipImplicitGemm3DGroupBwdXdlops::Init(const ProblemDescription& problem)
 {
-    switch(problem.GetAlphaBetaCase())
-    {
-    case BILINEAR:
-        valid_kernels =
-            FillValidKernelsIDs<DeviceOpGBwdBilinearPtrs<DataType>, CKArgs<DataType>>(problem);
-        break;
-    case SCALE:
-        valid_kernels =
-            FillValidKernelsIDs<DeviceOpGBwdScalePtrs<DataType>, CKArgs<DataType>>(problem);
-        break;
-    default:
-        valid_kernels =
-            FillValidKernelsIDs<DeviceOpGBwdDefaultPtrs<DataType>, CKArgs<DataType>>(problem);
-        break;
-    }
-    index     = 0;
-    kernel_id = valid_kernels[index];
+    valid_kernels = FillValidKernelsByAlphaBeta<DataType>(problem);
+    index         = 0;
+    kernel_id     = valid_kernels[index];
 }
 
 template <typename DataType>
@@ -441,8 +441,7 @@ void PerformanceConfigHipImplicitGemm3DGroupBwdXdlops::HeuristicInit(
             using T = decltype(CKDataType);
             auto fill_valid_kernels =
                 [=](const miopen::conv::ProblemDescription& problem) -> std::vector<std::string> {
-                return miopen::solver::FillValidKernelsIDs<DeviceOpGBwdDefaultPtrs<T>, CKArgs<T>>(
-                    problem);
+                return FillValidKernelsByAlphaBeta<T>(problem);
             };
             return miopen::solver::conv::RunParameterPredictionModel<T>(ctx,
                                                                         problem,

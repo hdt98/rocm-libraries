@@ -345,28 +345,30 @@ struct CKArgs
     miopenAlphaBetaCase_t alpha_beta_case;
 };
 
+template <typename DataType>
+std::vector<std::string> FillValidKernelsByAlphaBeta(const ProblemDescription& problem)
+{
+    switch(problem.GetAlphaBetaCase())
+    {
+    case BILINEAR:
+        return miopen::solver::FillValidKernelsIDs<DeviceOpGFwdBilinearPtrs<DataType>,
+                                                   CKArgs<DataType>>(problem);
+    case SCALE:
+        return miopen::solver::FillValidKernelsIDs<DeviceOpGFwdScalePtrs<DataType>,
+                                                   CKArgs<DataType>>(problem);
+    default:
+        return miopen::solver::FillValidKernelsIDs<DeviceOpGFwdDefaultPtrs<DataType>,
+                                                   CKArgs<DataType>>(problem);
+    }
+}
 } // namespace
 
 template <typename DataType>
 void PerformanceConfigHipImplicitGemm3DGroupFwdXdlops::Init(const ProblemDescription& problem)
 {
-    switch(problem.GetAlphaBetaCase())
-    {
-    case BILINEAR:
-        valid_kernels =
-            FillValidKernelsIDs<DeviceOpGFwdBilinearPtrs<DataType>, CKArgs<DataType>>(problem);
-        break;
-    case SCALE:
-        valid_kernels =
-            FillValidKernelsIDs<DeviceOpGFwdScalePtrs<DataType>, CKArgs<DataType>>(problem);
-        break;
-    default:
-        valid_kernels =
-            FillValidKernelsIDs<DeviceOpGFwdDefaultPtrs<DataType>, CKArgs<DataType>>(problem);
-        break;
-    }
-    index     = 0;
-    kernel_id = valid_kernels[index];
+    valid_kernels = FillValidKernelsByAlphaBeta<DataType>(problem);
+    index         = 0;
+    kernel_id     = valid_kernels[index];
 }
 
 template <typename DataType>
@@ -561,10 +563,10 @@ void PerformanceConfigHipImplicitGemm3DGroupFwdXdlops::HeuristicInit(
 
         auto run_ai_heuristics = [&](auto CKDataType) {
             using T = decltype(CKDataType);
+            MIOPEN_LOG_I2("problem.GetAlphaBetaCase(): " << problem.GetAlphaBetaCase());
             auto fill_valid_kernels =
                 [=](const miopen::conv::ProblemDescription& problem) -> std::vector<std::string> {
-                return miopen::solver::FillValidKernelsIDs<DeviceOpGFwdDefaultPtrs<T>, CKArgs<T>>(
-                    problem);
+                return FillValidKernelsByAlphaBeta<T>(problem);
             };
             return miopen::solver::conv::RunParameterPredictionModel<T>(ctx,
                                                                         problem,
@@ -585,7 +587,6 @@ void PerformanceConfigHipImplicitGemm3DGroupFwdXdlops::HeuristicInit(
         if(ai_success)
         {
             MIOPEN_LOG_I("Step 3: AI heuristics selected kernel: " << kernel_id);
-            return;
         }
         else
         {
