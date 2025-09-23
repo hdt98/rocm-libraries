@@ -21,8 +21,7 @@ static ck::index_t case_id = 0;
 template <typename SrcType,
           typename DstType,
           typename GPUAccType,
-          typename CPUAccType,
-          ck::index_t AccNum>
+          typename CPUAccType>
 bool run_test()
 {
     if(!ck::is_gfx12_supported()) // report a warning, but move on. 
@@ -39,9 +38,9 @@ bool run_test()
     using PassThrough = ck::tensor_operation::element_wise::PassThrough;
     bool pass         = true;
 
-    const auto matmul_default = ck::wmma_op_util::matmul<SrcType, DstType, GPUAccType, AccNum>;
+    const auto matmul_default = ck::wmma_op_util::matmul<SrcType, DstType, GPUAccType>;
     const auto matmul_swizzle_a =
-        ck::wmma_op_util::matmul_swizzle_a<SrcType, DstType, GPUAccType, AccNum>;
+        ck::wmma_op_util::matmul_swizzle_a<SrcType, DstType, GPUAccType>;
 
     const auto wmma_kernel_container = std::make_tuple(matmul_default, matmul_swizzle_a);
     std::cout << "pass before static_for: " << pass << std::endl;
@@ -60,7 +59,7 @@ bool run_test()
                                        PassThrough,
                                        PassThrough,
                                        PassThrough,
-                                       AccNum>{}(std::get<ck::Number<i>{}>(wmma_kernel_container));
+                                       1>{}(std::get<ck::Number<i>{}>(wmma_kernel_container));
         std::cout << "TestWmma for kernel " << i << " finished." << std::endl;
         std::cout << "pass after static_for: " << pass << std::endl;
     });
@@ -135,8 +134,8 @@ int main(int, char*[])
     bool pass = true;
     std::cout << "Before run_test, pass = " << pass << std::endl;
     // // clang-format off
-    // //              |SrcType     |DstType     |GPUAccType  |CPUAccType |AccNum
-    //pass &= run_test<ck::half_t,  ck::half_t,  float,       float,      8        >();
+    // //              |SrcType     |DstType     |GPUAccType  |CPUAccType
+    pass &= run_test<ck::half_t,  ck::half_t,  float,       float   >();
     // pass &= run_test<ck::bhalf_t, ck::bhalf_t, float,       float,      8     >();
     // pass &= run_test<ck::half_t,  ck::half_t,  ck::half_t,  ck::half_t, 16    >();
     // pass &= run_test<ck::bhalf_t, ck::bhalf_t, ck::bhalf_t, float,      16    >();

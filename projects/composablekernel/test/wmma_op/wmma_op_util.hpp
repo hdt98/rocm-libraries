@@ -116,10 +116,28 @@ struct WMMAVecType<T, kMultiplier, std::enable_if_t<std::is_same_v<T, ck::half_t
     intrin_wmma_##dst##_16x16x32_##src0<16, 16>::Run(__VA_ARGS__)
 
 
+template <typename AccType>
+struct WMMA_ACCNumber_traits
+{
+    static constexpr index_t ACC_NUMBER = 8;
+};
+
+template <>
+struct WMMA_ACCNumber_traits<ck::half_t>
+{
+    static constexpr index_t ACC_NUMBER = 16;
+};
+
+template <>
+struct WMMA_ACCNumber_traits<ck::bhalf_t>
+{
+    static constexpr index_t ACC_NUMBER = 16;
+};
+
 // #if defined (__gfx12__)
 // KO TODO:: if gfx12, or general with refactor to make look like gfx13?
 // KO TODO:: add in WMMA_ACCNumber_traits to support refactor
-template <typename src_t, typename dst_t, typename acc_t, index_t acc_num>
+template <typename src_t, typename dst_t, typename acc_t>
 __global__ void matmul(const src_t* a, const src_t* b, dst_t* c)
 {
     printf("------ USING LEGACY MATMUL ------ ");
@@ -129,6 +147,7 @@ __global__ void matmul(const src_t* a, const src_t* b, dst_t* c)
     // b a_frag will store one column of the 16x16 matrix tile b_frag will store one row of the
     // 16x16 matrix tile
     using src_vec  = typename vector_type<src_t, 16>::type;
+    constexpr index_t acc_num = WMMA_ACCNumber_traits<acc_t>::ACC_NUMBER;
     src_vec a_frag = {};
     src_vec b_frag = {};
 
@@ -166,7 +185,7 @@ __global__ void matmul(const src_t* a, const src_t* b, dst_t* c)
         p_shared[8 * 16 * lane_hi + 8 * lane_lo + ele + 16 * 16] = b_temp[ele];
     }
 
-#ifdef __gfx12__
+#if defined(__gfx120__) || defined(__gfx125__)
     asm volatile("\
     s_wait_dscnt 0x0 \n \
     s_barrier_signal -1 \n \
@@ -189,7 +208,7 @@ __global__ void matmul(const src_t* a, const src_t* b, dst_t* c)
         a_frag[ele] = p_shared[(ele / 8) * 16 * 8 + 8 * lane + ele % 8];
     }
 
-#ifdef __gfx12__
+#if defined(__gfx120__) || defined(__gfx125__)
     asm volatile("\
     s_wait_dscnt 0x0 \n \
     s_barrier_signal -1 \n \
@@ -217,13 +236,14 @@ __global__ void matmul(const src_t* a, const src_t* b, dst_t* c)
     });
 }
 
-template <typename src_t, typename dst_t, typename acc_t, index_t acc_num>
+template <typename src_t, typename dst_t, typename acc_t>
 __global__ void matmul_swizzle_a(const src_t* a, const src_t* b, dst_t* c)
 {
     printf("------ USING LEGACY MATMUL_SWIZZLE_A ------ ");
     const int lIdx = threadIdx.x;
 
     using src_vec  = typename vector_type<src_t, 16>::type;
+    constexpr index_t acc_num = WMMA_ACCNumber_traits<acc_t>::ACC_NUMBER;
     src_vec a_frag = {};
     src_vec b_frag = {};
     using acc_vec  = StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr, acc_t, 1, acc_num, true>;
