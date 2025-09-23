@@ -563,7 +563,6 @@ void PerformanceConfigHipImplicitGemm3DGroupFwdXdlops::HeuristicInit(
 
         auto run_ai_heuristics = [&](auto CKDataType) {
             using T = decltype(CKDataType);
-            MIOPEN_LOG_I2("problem.GetAlphaBetaCase(): " << problem.GetAlphaBetaCase());
             auto fill_valid_kernels =
                 [=](const miopen::conv::ProblemDescription& problem) -> std::vector<std::string> {
                 return FillValidKernelsByAlphaBeta<T>(problem);
