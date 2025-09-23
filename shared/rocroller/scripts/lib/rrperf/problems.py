@@ -197,6 +197,7 @@ class GEMMSolution:
     direct2LDS_B: bool = False
 
     scheduler: str = "Priority"
+    schedulerCost: str = "LinearWeighted"
 
     prefetch: bool = True
     prefetchInFlight: int = 2
@@ -228,6 +229,8 @@ class GEMM(GEMMProblem, GEMMSolution):
     numWarmUp: int = 1
     numOuter: int = 1
     numInner: int = 10
+
+    noCheck: bool = False
 
     visualize: bool = False
 
