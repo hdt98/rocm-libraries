@@ -688,7 +688,7 @@ try
         return HIPBLAS_STATUS_INVALID_VALUE;
     }
 
-    static constexpr char v[] = TO_STR(HIPBLASLT_VERSION_TWEAK);
+    static constexpr char v[] = TO_STR(HIPBLASLT_COMMIT);
 
     memcpy(rev, v, sizeof(v));
 
