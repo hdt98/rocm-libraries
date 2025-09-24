@@ -37,6 +37,7 @@
 #define HIPBLASLT_VERSION_MINOR     @hipblaslt_VERSION_MINOR@
 #define HIPBLASLT_VERSION_PATCH     @hipblaslt_VERSION_PATCH@
 #define HIPBLASLT_VERSION_TWEAK     @hipblaslt_VERSION_TWEAK@
+#define HIPBLASLT_COMMIT            @hipblaslt_COMMIT@
 /* clang-format on */
 
 #endif /* _HIPBLASLT_VERSION_H_ */
