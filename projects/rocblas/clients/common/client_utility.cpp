@@ -125,7 +125,7 @@ void print_rocblas_client_commit_hashes()
 #ifdef BUILD_WITH_HIPBLASLT
     rocblas_cout << "hipBLASLt version: " << TOSTR(HIPBLASLT_VERSION_MAJOR) << "."
                  << TOSTR(HIPBLASLT_VERSION_MINOR) << "." << TOSTR(HIPBLASLT_VERSION_PATCH)
-                 << " commit-hash: " << TOSTR(HIPBLASLT_VERSION_TWEAK) << std::endl;
+                 << " commit-hash: " << TOSTR(HIPBLASLT_COMMIT) << std::endl;
 #else
     rocblas_cout << "hipBLASLt: N/A, as rocBLAS was built without hipBLASLt" << std::endl;
 #endif
