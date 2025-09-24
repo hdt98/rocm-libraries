@@ -26,6 +26,7 @@ include(hipblaslt_target_configure_sanitizers)
 include(tensilelite_supported_architectures)
 
 set(HIPBLASLT_PROJECT_VERSION "1.1.0" CACHE STRING "Semantic version string.")
+rocm_get_git_commit_tag(hipblaslt_COMMIT)
 
 set(PROJECT_VERSION "${HIPBLASLT_PROJECT_VERSION}")
 string(REPLACE "." ";" VERSION_LIST ${PROJECT_VERSION})
@@ -36,7 +37,7 @@ list(LENGTH VERSION_LIST list_size)
 if(list_size EQUAL 4)
     list(GET VERSION_LIST 3 PROJECT_VERSION_TWEAK)
 else()
-    rocm_get_git_commit_tag(PROJECT_VERSION_TWEAK)
+    set(PROJECT_VERSION_TWEAK "${hipblaslt_COMMIT}")
 endif()
 
 set(hipblaslt_VERSION_MAJOR "${PROJECT_VERSION_MAJOR}")
