@@ -5,7 +5,9 @@ cmake_minimum_required(VERSION 3.24.4)
 
 option(CMAKE_EXPORT_COMPILE_COMMANDS "Generate compile commands json file." ON)
 
-project(hipblaslt LANGUAGES CXX C ASM)
+set(HIPBLASLT_PROJECT_VERSION "1.1.0" CACHE STRING "Semantic version string.")
+
+project(hipblaslt VERSION ${HIPBLASLT_PROJECT_VERSION} LANGUAGES CXX C ASM)
 
 if("${CMAKE_SOURCE_DIR}" STREQUAL "${PROJECT_SOURCE_DIR}")
     set(HIPBLASLT_IS_SUBPROJECT FALSE)
@@ -25,9 +27,6 @@ include(hipblaslt_python)
 include(hipblaslt_target_configure_sanitizers)
 include(tensilelite_supported_architectures)
 
-set(HIPBLASLT_PROJECT_VERSION "1.1.0" CACHE STRING "Semantic version string.")
-
-set(PROJECT_VERSION "${HIPBLASLT_PROJECT_VERSION}")
 string(REPLACE "." ";" VERSION_LIST ${PROJECT_VERSION})
 list(GET VERSION_LIST 0 PROJECT_VERSION_MAJOR)
 list(GET VERSION_LIST 1 PROJECT_VERSION_MINOR)
