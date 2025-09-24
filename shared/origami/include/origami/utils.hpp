@@ -58,7 +58,7 @@ namespace origami
                                      size_t          biggest_allowable_split = 8);
 
         std::vector<result_tuple> select_best_macro_tile_size(size_t                       M,
-                                                             size_t                        N,
+                                                             size_t
                                                              size_t                        K,
                                                              size_t                        batch,
                                                              bool                          transA,
