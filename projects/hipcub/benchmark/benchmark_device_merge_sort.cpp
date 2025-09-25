@@ -240,6 +240,9 @@ void add_sort_keys_benchmarks(std::vector<benchmark::internal::Benchmark*>& benc
     CREATE_SORT_KEYS_BENCHMARK(int8_t)
     CREATE_SORT_KEYS_BENCHMARK(uint8_t)
     CREATE_SORT_KEYS_BENCHMARK(short)
+
+    CREATE_SORT_KEYS_BENCHMARK(int64_t)
+    CREATE_SORT_KEYS_BENCHMARK(uint64_t)
 }
 
 void add_sort_pairs_benchmarks(std::vector<benchmark::internal::Benchmark*>& benchmarks,

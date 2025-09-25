@@ -448,6 +448,48 @@ void add_sort_pairs_benchmarks(std::vector<benchmark::internal::Benchmark*>& ben
     CREATE_SORT_PAIRS_BENCHMARK(uint8_t, uint8_t)
 
     CREATE_SORT_PAIRS_BENCHMARK(custom_int_t, float)
+
+    CREATE_SORT_PAIRS_BENCHMARK(int64_t, int8_t)
+    CREATE_SORT_PAIRS_BENCHMARK(int64_t, uint8_t)
+    CREATE_SORT_PAIRS_BENCHMARK(int64_t, float)
+    CREATE_SORT_PAIRS_BENCHMARK(int64_t, double)
+    CREATE_SORT_PAIRS_BENCHMARK(int64_t, custom_float2)
+    CREATE_SORT_PAIRS_BENCHMARK(int64_t, custom_double2)
+    CREATE_SORT_PAIRS_BENCHMARK(int64_t, custom_char_double)
+    CREATE_SORT_PAIRS_BENCHMARK(int64_t, custom_double_char)
+    CREATE_SORT_PAIRS_BENCHMARK(int64_t, int64_t)
+
+    CREATE_SORT_PAIRS_BENCHMARK(uint64_t, int8_t)
+    CREATE_SORT_PAIRS_BENCHMARK(uint64_t, uint8_t)
+    CREATE_SORT_PAIRS_BENCHMARK(uint64_t, float)
+    CREATE_SORT_PAIRS_BENCHMARK(uint64_t, double)
+    CREATE_SORT_PAIRS_BENCHMARK(uint64_t, custom_float2)
+    CREATE_SORT_PAIRS_BENCHMARK(uint64_t, custom_double2)
+    CREATE_SORT_PAIRS_BENCHMARK(uint64_t, custom_char_double)
+    CREATE_SORT_PAIRS_BENCHMARK(uint64_t, custom_double_char)
+    CREATE_SORT_PAIRS_BENCHMARK(uint64_t, int64_t)
+    CREATE_SORT_PAIRS_BENCHMARK(uint64_t, uint64_t)
+
+    CREATE_SORT_PAIRS_BENCHMARK(int8_t, int64_t)
+    CREATE_SORT_PAIRS_BENCHMARK(uint8_t, int64_t)
+    CREATE_SORT_PAIRS_BENCHMARK(float, int64_t)
+    CREATE_SORT_PAIRS_BENCHMARK(double, int64_t)
+    CREATE_SORT_PAIRS_BENCHMARK(custom_float2, int64_t)
+    CREATE_SORT_PAIRS_BENCHMARK(custom_double2, int64_t)
+    CREATE_SORT_PAIRS_BENCHMARK(custom_char_double, int64_t)
+    CREATE_SORT_PAIRS_BENCHMARK(custom_double_char, int64_t)
+    CREATE_SORT_PAIRS_BENCHMARK(int64_t, int64_t)
+
+    CREATE_SORT_PAIRS_BENCHMARK(int8_t, uint64_t)
+    CREATE_SORT_PAIRS_BENCHMARK(uint8_t, uint64_t)
+    CREATE_SORT_PAIRS_BENCHMARK(float, uint64_t)
+    CREATE_SORT_PAIRS_BENCHMARK(double, uint64_t)
+    CREATE_SORT_PAIRS_BENCHMARK(custom_float2, uint64_t)
+    CREATE_SORT_PAIRS_BENCHMARK(custom_double2, uint64_t)
+    CREATE_SORT_PAIRS_BENCHMARK(custom_char_double, uint64_t)
+    CREATE_SORT_PAIRS_BENCHMARK(custom_double_char, uint64_t)
+    CREATE_SORT_PAIRS_BENCHMARK(int64_t, uint64_t)
+
 }
 
 int main(int argc, char* argv[])
