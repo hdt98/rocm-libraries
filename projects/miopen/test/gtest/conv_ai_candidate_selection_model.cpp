@@ -224,7 +224,14 @@ TEST_P(CPU_CandidateSelection_NONE, EncodeKernelParamsBadValueThrows_Test)
     CandidateSelectionMetadata meta(params.arch, params.solver);
     std::vector<std::vector<std::string>> bad_params = {
         {params.kernel_name, "nonexistent_value", "nan"}};
-    EXPECT_THROW(EncodeKernelParams(bad_params, meta), std::exception);
+
+    // The function should not throw, but should return empty result due to invalid mapping
+    std::vector<std::vector<float>> result;
+    EXPECT_NO_THROW(result = EncodeKernelParams(bad_params, meta));
+
+    // Verify that the invalid candidate was skipped (empty result)
+    EXPECT_TRUE(result.empty())
+        << "Expected empty result when all candidates have invalid mappings";
 }
 
 TEST_P(CPU_CandidateSelection_NONE, SelectBestCandidateValid_Test)
