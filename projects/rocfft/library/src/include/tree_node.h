@@ -1400,6 +1400,13 @@ struct CommAllToAll : public MultiPlanItem
         , recvCounts(_recvCounts)
         , sendBuf(_sendBuf)
         , recvBuf(_recvBuf)
+        // check if uniform exchange to use MPI_Alltoall
+        , uniform_counts(std::all_of(sendCounts.begin(),
+                                     sendCounts.end(),
+                                     [&](size_t c) { return c == sendCounts[0]; })
+                         && std::all_of(recvCounts.begin(), recvCounts.end(), [&](size_t c) {
+                                return c == recvCounts[0];
+                            }))
     {
         subcomm = std::move(_subcomm);
 
@@ -1416,14 +1423,6 @@ struct CommAllToAll : public MultiPlanItem
         checkArray(sendCounts);
         checkArray(recvOffsets);
         checkArray(recvCounts);
-
-        // check if uniform exchange to use MPI_Alltoall
-        uniform_counts = std::all_of(sendCounts.begin(),
-                                     sendCounts.end(),
-                                     [&](size_t c) { return c == sendCounts[0]; })
-                         && std::all_of(recvCounts.begin(), recvCounts.end(), [&](size_t c) {
-                                return c == recvCounts[0];
-                            });
     }
 
     // enum for error handling for different multi-process communication
@@ -1474,7 +1473,7 @@ private:
     const BufferPtr recvBuf;
 
     // check uniform counts for using AlltoAll instead of AlltoAllv
-    bool uniform_counts = false;
+    const bool uniform_counts = false;
 };
 
 // Tree-structured FFT plan.  This is specific to a single device on
