@@ -35,6 +35,7 @@
 #include <miopen/conv/problem_description.hpp>
 #include <map>
 #include <string>
+#include <iterator>
 
 #if MIOPEN_ENABLE_AI_KERNEL_TUNING
 namespace miopen {
@@ -46,11 +47,11 @@ using ProblemDescription = miopen::conv::ProblemDescription;
 int LayoutStringToCode(const std::string& layout)
 {
     if(layout == "NCDHW")
-        return 0.0;
+        return 0;
     if(layout == "NDHWC")
-        return 1.0;
+        return 1;
     // Add more as needed
-    return -1.0; // Unknown
+    return -1; // Unknown
 }
 
 // Helper: Extract 3D convolution features
@@ -137,9 +138,12 @@ std::vector<std::string> GetKernelAsTokens(const std::string& kernel)
     auto lt_pos = kernel.find('<');
     if(lt_pos != std::string::npos)
     {
-        // Add the entire prefix (before '<') as a single token
-        std::string prefix = kernel.substr(0, lt_pos);
-        prefix.erase(remove_if(prefix.begin(), prefix.end(), isspace), prefix.end());
+        // Add the entire prefix (before '<') as a single token, removing whitespace
+        std::string prefix;
+        std::remove_copy_if(kernel.begin(),
+                            kernel.begin() + lt_pos,
+                            std::back_inserter(prefix),
+                            [](char c) { return std::isspace(c); });
         if(!prefix.empty())
             tokens.push_back(prefix);
 
@@ -152,9 +156,13 @@ std::vector<std::string> GetKernelAsTokens(const std::string& kernel)
             std::string token;
             while(std::getline(ps, token, ','))
             {
-                token.erase(remove_if(token.begin(), token.end(), isspace), token.end());
-                if(!token.empty())
-                    tokens.push_back(token);
+                std::string clean_token;
+                std::remove_copy_if(token.begin(),
+                                    token.end(),
+                                    std::back_inserter(clean_token),
+                                    [](char c) { return std::isspace(c); });
+                if(!clean_token.empty())
+                    tokens.push_back(clean_token);
             }
         }
     }
@@ -227,7 +235,7 @@ bool RunParameterPredictionModel(
         std::map<std::string, float> features =
             GetFeatures3D(problem, ctx.GetStream().GetMaxComputeUnits(), arch);
 
-        bool use_split_k = split_k == 1;
+        bool use_split_k = split_k != 0;
         if(split_k > 1)
         {
             MIOPEN_THROW("Invalid initial split_k value for performing AI Heuristics: " +

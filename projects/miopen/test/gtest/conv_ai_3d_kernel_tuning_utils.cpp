@@ -47,10 +47,10 @@ namespace {
 int LayoutStringToCode(const std::string& layout)
 {
     if(layout == "NCDHW")
-        return 0.0;
+        return 0;
     if(layout == "NDHWC")
-        return 1.0;
-    return -1.0; // Unknown
+        return 1;
+    return -1; // Unknown
 }
 
 // Dummy kernels for testing
