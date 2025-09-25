@@ -380,7 +380,7 @@ try
     case rocfft_comm_none:
     {
 #ifdef ROCFFT_MPI_ENABLE
-        description->user_mpi_comm = nullptr;
+        description->user_mpi_comm = MPI_COMM_NULL;
 #endif
         break;
     }
