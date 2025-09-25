@@ -22,7 +22,7 @@
  *
  * ************************************************************************ */
 
-#include "rocsparse_csrmm_row_split.hpp"
+#include "rocsparse_csrmm_transpose.hpp"
 #include "rocsparse_enum_utils.hpp"
 #include "rocsparse_utility.hpp"
 
@@ -31,7 +31,7 @@
 
 namespace rocsparse
 {
-    typedef rocsparse_status (*csrmm_row_split_t)(rocsparse_handle    handle,
+    typedef rocsparse_status (*csrmm_transpose_t)(rocsparse_handle    handle,
                                                   rocsparse_operation trans_A,
                                                   rocsparse_operation trans_B,
                                                   int64_t             m,
@@ -60,7 +60,7 @@ namespace rocsparse
                                                   void*                     temp_buffer,
                                                   bool                      force_conj_A);
 
-    using csrmm_row_split_tuple = std::tuple<rocsparse_datatype,
+    using csrmm_transpose_tuple = std::tuple<rocsparse_datatype,
                                              rocsparse_indextype,
                                              rocsparse_indextype,
                                              rocsparse_datatype,
@@ -70,8 +70,8 @@ namespace rocsparse
     // clang-format off
 #define CSRMM_ROW_SPLIT_CONFIG(T, I, J, A, B, C)                                      \
     {                                                                       \
-        csrmm_row_split_tuple(T, I, J, A, B, C),                                      \
-            csrmm_row_split_template<typename rocsparse::datatype_traits<T>::type_t,  \
+        csrmm_transpose_tuple(T, I, J, A, B, C),                                      \
+            csrmm_transpose_template<typename rocsparse::datatype_traits<T>::type_t,  \
                            typename rocsparse::indextype_traits<I>::type_t, \
                            typename rocsparse::indextype_traits<J>::type_t, \
                            typename rocsparse::datatype_traits<A>::type_t,  \
@@ -80,7 +80,7 @@ namespace rocsparse
     }
     // clang-format on
 
-    static const std::map<csrmm_row_split_tuple, csrmm_row_split_t> s_csrmm_row_split_dispatch{
+    static const std::map<csrmm_transpose_tuple, csrmm_transpose_t> s_csrmm_transpose_dispatch{
         {// Uniform precision
          CSRMM_ROW_SPLIT_CONFIG(rocsparse_datatype_f32_r,
                                 rocsparse_indextype_i32,
@@ -235,7 +235,7 @@ namespace rocsparse
                                 rocsparse_datatype_bf16_r,
                                 rocsparse_datatype_f32_r)}};
 
-    static rocsparse_status csrmm_row_split_find(csrmm_row_split_t*            function_,
+    static rocsparse_status csrmm_transpose_find(csrmm_transpose_t*            function_,
                                                  rocsparse_datatype  t_type_,
                                                  rocsparse_indextype i_type_,
                                                  rocsparse_indextype j_type_,
@@ -243,10 +243,10 @@ namespace rocsparse
                                                  rocsparse_datatype  b_type_,
                                                  rocsparse_datatype  c_type_)
     {
-        const auto& it = rocsparse::s_csrmm_row_split_dispatch.find(
-            rocsparse::csrmm_row_split_tuple(t_type_, i_type_, j_type_, a_type_, b_type_, c_type_));
+        const auto& it = rocsparse::s_csrmm_transpose_dispatch.find(
+            rocsparse::csrmm_transpose_tuple(t_type_, i_type_, j_type_, a_type_, b_type_, c_type_));
 
-        if(it != rocsparse::s_csrmm_row_split_dispatch.end())
+        if(it != rocsparse::s_csrmm_transpose_dispatch.end())
         {
             function_[0] = it->second;
         }
@@ -263,7 +263,7 @@ namespace rocsparse
                       << ", y_type: " << rocsparse::enum_utils::to_string(c_type_) << std::endl;
 
             std::cout << "available configuration are: " << std::endl;
-            for(const auto& p : rocsparse::s_csrmm_row_split_dispatch)
+            for(const auto& p : rocsparse::s_csrmm_transpose_dispatch)
             {
                 const auto& t      = p.first;
                 const auto  t_type = std::get<0>(t);
@@ -301,7 +301,7 @@ namespace rocsparse
     }
 }
 
-rocsparse_status rocsparse::csrmm_buffer_size_row_split(rocsparse_handle          handle,
+rocsparse_status rocsparse::csrmm_buffer_size_transpose(rocsparse_handle          handle,
                                                         rocsparse_operation       trans_A,
                                                         int64_t                   m,
                                                         int64_t                   n,
@@ -320,7 +320,7 @@ rocsparse_status rocsparse::csrmm_buffer_size_row_split(rocsparse_handle        
 
     ROCSPARSE_ROUTINE_TRACE;
 
-    RETURN_IF_ROCSPARSE_ERROR(csrmm_buffer_size_row_split_template(handle,
+    RETURN_IF_ROCSPARSE_ERROR(csrmm_buffer_size_transpose_template(handle,
                                                                 trans_A,
                                                                 m,
                                                                 n,
@@ -335,7 +335,7 @@ rocsparse_status rocsparse::csrmm_buffer_size_row_split(rocsparse_handle        
     return rocsparse_status_success;
 }
 
-rocsparse_status rocsparse::csrmm_analysis_row_split(rocsparse_handle          handle,
+rocsparse_status rocsparse::csrmm_analysis_transpose(rocsparse_handle          handle,
                                                     rocsparse_operation       trans_A,
                                                     int64_t                   m,
                                                     int64_t                   n,
@@ -353,7 +353,7 @@ rocsparse_status rocsparse::csrmm_analysis_row_split(rocsparse_handle          h
 
     ROCSPARSE_ROUTINE_TRACE;
 
-    RETURN_IF_ROCSPARSE_ERROR(csrmm_analysis_row_split_template(handle,
+    RETURN_IF_ROCSPARSE_ERROR(csrmm_analysis_transpose_template(handle,
                                                                 trans_A,
                                                                 m,
                                                                 n,
@@ -368,7 +368,7 @@ rocsparse_status rocsparse::csrmm_analysis_row_split(rocsparse_handle          h
     return rocsparse_status_success;
 }
 
-rocsparse_status rocsparse::csrmm_row_split(rocsparse_handle          handle,
+rocsparse_status rocsparse::csrmm_transpose(rocsparse_handle          handle,
                                             rocsparse_operation       trans_A,
                                             rocsparse_operation       trans_B,
                                             int64_t                   m,
@@ -407,8 +407,8 @@ rocsparse_status rocsparse::csrmm_row_split(rocsparse_handle          handle,
 
     ROCSPARSE_ROUTINE_TRACE;
 
-    rocsparse::csrmm_row_split_t f;
-    RETURN_IF_ROCSPARSE_ERROR(rocsparse::csrmm_row_split_find(&f,
+    rocsparse::csrmm_transpose_t f;
+    RETURN_IF_ROCSPARSE_ERROR(rocsparse::csrmm_transpose_find(&f,
                                                               alpha_datatype,
                                                               csr_row_ptr_indextype,
                                                               csr_col_ind_indextype,

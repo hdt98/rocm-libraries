@@ -28,14 +28,12 @@
 #include "csrmm/merge_path/kernel_declarations.h"
 #include "csrmm_device_merge.h"
 #include "rocsparse_common.h"
-#include "rocsparse_csrmm.hpp"
 
 namespace rocsparse
 {
     template <typename T, typename I, typename J, typename A>
-    rocsparse_status csrmm_buffer_size_template_merge(rocsparse_handle          handle,
+    rocsparse_status csrmm_buffer_size_merge_path_kernel_dispatch(rocsparse_handle          handle,
                                                       rocsparse_operation       trans_A,
-                                                      rocsparse_csrmm_alg       alg,
                                                       J                         m,
                                                       J                         n,
                                                       J                         k,
@@ -72,9 +70,8 @@ namespace rocsparse
     }
 
     template <typename I, typename J, typename A>
-    rocsparse_status csrmm_analysis_template_merge(rocsparse_handle          handle,
+    rocsparse_status csrmm_analysis_merge_path_kernel_dispatch(rocsparse_handle          handle,
                                                    rocsparse_operation       trans_A,
-                                                   rocsparse_csrmm_alg       alg,
                                                    J                         m,
                                                    J                         n,
                                                    J                         k,
@@ -395,7 +392,7 @@ namespace rocsparse
          temp_buffer);
 
     template <typename T, typename I, typename J, typename A, typename B, typename C>
-    rocsparse_status csrmm_template_merge(rocsparse_handle          handle,
+    rocsparse_status csrmm_merge_path_kernel_dispatch(rocsparse_handle          handle,
                                           rocsparse_operation       trans_A,
                                           rocsparse_operation       trans_B,
                                           J                         m,
@@ -452,10 +449,9 @@ namespace rocsparse
 }
 
 #define INSTANTIATE_BUFFER_SIZE(TTYPE, ITYPE, JTYPE, ATYPE)                       \
-    template rocsparse_status rocsparse::csrmm_buffer_size_template_merge<TTYPE>( \
+    template rocsparse_status rocsparse::csrmm_buffer_size_merge_path_kernel_dispatch<TTYPE>( \
         rocsparse_handle          handle,                                         \
         rocsparse_operation       trans_A,                                        \
-        rocsparse_csrmm_alg       alg,                                            \
         JTYPE                     m,                                              \
         JTYPE                     n,                                              \
         JTYPE                     k,                                              \
@@ -496,10 +492,9 @@ INSTANTIATE_BUFFER_SIZE(float, int64_t, int64_t, rocsparse_bfloat16);
 #undef INSTANTIATE_BUFFER_SIZE
 
 #define INSTANTIATE_ANALYSIS(ITYPE, JTYPE, ATYPE)                       \
-    template rocsparse_status rocsparse::csrmm_analysis_template_merge( \
+    template rocsparse_status rocsparse::csrmm_analysis_merge_path_kernel_dispatch( \
         rocsparse_handle          handle,                               \
         rocsparse_operation       trans_A,                              \
-        rocsparse_csrmm_alg       alg,                                  \
         JTYPE                     m,                                    \
         JTYPE                     n,                                    \
         JTYPE                     k,                                    \
@@ -537,7 +532,7 @@ INSTANTIATE_ANALYSIS(int64_t, int64_t, rocsparse_bfloat16);
 #undef INSTANTIATE_ANALYSIS
 
 #define INSTANTIATE(TTYPE, ITYPE, JTYPE, ATYPE, BTYPE, CTYPE)         \
-    template rocsparse_status rocsparse::csrmm_template_merge<TTYPE>( \
+    template rocsparse_status rocsparse::csrmm_merge_path_kernel_dispatch<TTYPE>( \
         rocsparse_handle          handle,                             \
         rocsparse_operation       trans_A,                            \
         rocsparse_operation       trans_B,                            \

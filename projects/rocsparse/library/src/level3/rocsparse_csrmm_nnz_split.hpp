@@ -28,7 +28,8 @@
 
 namespace rocsparse
 {
-    rocsparse_status csrmm_buffer_size_row_split_template(rocsparse_handle          handle,
+    template <typename T, typename I, typename J, typename A>
+    rocsparse_status csrmm_buffer_size_nnz_split_template(rocsparse_handle          handle,
                                                           rocsparse_operation       trans_A,
                                                           int64_t                   m,
                                                           int64_t                   n,
@@ -40,7 +41,8 @@ namespace rocsparse
                                                           const void*               csr_col_ind,
                                                           size_t*                   buffer_size);
 
-    rocsparse_status csrmm_analysis_row_split_template(rocsparse_handle          handle,
+    template <typename I, typename J, typename A>
+    rocsparse_status csrmm_analysis_nnz_split_template(rocsparse_handle          handle,
                                                        rocsparse_operation       trans_A,
                                                        int64_t                   m,
                                                        int64_t                   n,
@@ -53,7 +55,7 @@ namespace rocsparse
                                                        void*                     temp_buffer);
 
     template <typename T, typename I, typename J, typename A, typename B, typename C>
-    rocsparse_status csrmm_row_split_template(rocsparse_handle    handle,
+    rocsparse_status csrmm_nnz_split_template(rocsparse_handle    handle,
                                               rocsparse_operation trans_A,
                                               rocsparse_operation trans_B,
                                               int64_t             m,
@@ -82,7 +84,7 @@ namespace rocsparse
                                               void*                     temp_buffer,
                                               bool                      force_conj_A);
 
-    rocsparse_status csrmm_buffer_size_row_split(rocsparse_handle          handle,
+    rocsparse_status csrmm_buffer_size_nnz_split(rocsparse_handle          handle,
                                                  rocsparse_operation       trans_A,
                                                  int64_t                   m,
                                                  int64_t                   n,
@@ -98,7 +100,7 @@ namespace rocsparse
                                                  const void*               csr_col_ind,
                                                  size_t*                   buffer_size);
 
-    rocsparse_status csrmm_analysis_row_split(rocsparse_handle          handle,
+    rocsparse_status csrmm_analysis_nnz_split(rocsparse_handle          handle,
                                               rocsparse_operation       trans_A,
                                               int64_t                   m,
                                               int64_t                   n,
@@ -113,7 +115,7 @@ namespace rocsparse
                                               const void*               csr_col_ind,
                                               void*                     temp_buffer);
 
-    rocsparse_status csrmm_row_split(rocsparse_handle          handle,
+    rocsparse_status csrmm_nnz_split(rocsparse_handle          handle,
                                      rocsparse_operation       trans_A,
                                      rocsparse_operation       trans_B,
                                      int64_t                   m,

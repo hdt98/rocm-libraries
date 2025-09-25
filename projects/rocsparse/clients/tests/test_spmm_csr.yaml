@@ -38,6 +38,42 @@ Definitions:
     - { alpha:   1.0, beta:  0.0, alphai:  0.0, betai:  0.0 }
 
 Tests:
+# - name: spmm_csr_file
+#   category: quick
+#   function: spmm_csr
+#   indextype: *i32
+#   precision: *double_only_precisions
+#   M: 1
+#   N: [10, 15, 20, 25, 30]
+#   K: 1
+#   alpha_beta: *alpha_beta_range_quick
+#   transA: [rocsparse_operation_none]
+#   transB: [rocsparse_operation_none, rocsparse_operation_transpose]
+#   baseA: [rocsparse_index_base_one]
+#   matrix: [rocsparse_matrix_file_rocalution]
+#   spmm_alg: [rocsparse_spmm_alg_csr, rocsparse_spmm_alg_csr_nnz_split, rocsparse_spmm_alg_csr_merge_path]
+#   orderB: [rocsparse_order_column, rocsparse_order_row]
+#   orderC: [rocsparse_order_column, rocsparse_order_row]
+#   filename: [nos1,
+#              nos2,
+#              nos3,
+#              nos4,
+#              nos5,
+#              nos6,
+#              nos7,
+#              mplate,
+#              scircuit,
+#              bmwcra_1,
+#              shipsec1,
+#              sme3Dc,
+#              Chevron2,
+#              Chevron3,
+#              Chevron4,
+#              ASIC_320k,
+#              bibd_22_8]
+
+
+
 - name: spmm_csr_bad_arg
   category: pre_checkin
   function: spmm_csr_bad_arg

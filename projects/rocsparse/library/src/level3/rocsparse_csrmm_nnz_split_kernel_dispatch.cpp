@@ -28,16 +28,14 @@
 #include "csrmm/nnz_split/kernel_declarations.h"
 #include "csrmm_device_nnz_split.h"
 #include "rocsparse_common.h"
-#include "rocsparse_csrmm.hpp"
 
 #define NNZ_PER_BLOCK 256
 
 namespace rocsparse
 {
     template <typename T, typename I, typename J, typename A>
-    rocsparse_status csrmm_buffer_size_template_nnz_split(rocsparse_handle          handle,
+    rocsparse_status csrmm_buffer_size_nnz_split_kernel_dispatch(rocsparse_handle          handle,
                                                           rocsparse_operation       trans_A,
-                                                          rocsparse_csrmm_alg       alg,
                                                           J                         m,
                                                           J                         n,
                                                           J                         k,
@@ -73,9 +71,8 @@ namespace rocsparse
     }
 
     template <typename I, typename J, typename A>
-    rocsparse_status csrmm_analysis_template_nnz_split(rocsparse_handle          handle,
+    rocsparse_status csrmm_analysis_nnz_split_kernel_dispatch(rocsparse_handle          handle,
                                                        rocsparse_operation       trans_A,
-                                                       rocsparse_csrmm_alg       alg,
                                                        J                         m,
                                                        J                         n,
                                                        J                         k,
@@ -475,7 +472,7 @@ namespace rocsparse
          temp_buffer);
 
     template <typename T, typename I, typename J, typename A, typename B, typename C>
-    rocsparse_status csrmm_template_nnz_split(rocsparse_handle          handle,
+    rocsparse_status csrmm_nnz_split_kernel_dispatch(rocsparse_handle          handle,
                                               rocsparse_operation       trans_A,
                                               rocsparse_operation       trans_B,
                                               J                         m,
@@ -541,10 +538,9 @@ namespace rocsparse
 }
 
 #define INSTANTIATE_BUFFER_SIZE(TTYPE, ITYPE, JTYPE, ATYPE)                           \
-    template rocsparse_status rocsparse::csrmm_buffer_size_template_nnz_split<TTYPE>( \
+    template rocsparse_status rocsparse::csrmm_buffer_size_nnz_split_kernel_dispatch<TTYPE>( \
         rocsparse_handle          handle,                                             \
         rocsparse_operation       trans_A,                                            \
-        rocsparse_csrmm_alg       alg,                                                \
         JTYPE                     m,                                                  \
         JTYPE                     n,                                                  \
         JTYPE                     k,                                                  \
@@ -585,10 +581,9 @@ INSTANTIATE_BUFFER_SIZE(float, int64_t, int64_t, rocsparse_bfloat16);
 #undef INSTANTIATE_BUFFER_SIZE
 
 #define INSTANTIATE_ANALYSIS(I, J, A)                                       \
-    template rocsparse_status rocsparse::csrmm_analysis_template_nnz_split( \
+    template rocsparse_status rocsparse::csrmm_analysis_nnz_split_kernel_dispatch( \
         rocsparse_handle          handle,                                   \
         rocsparse_operation       trans_A,                                  \
-        rocsparse_csrmm_alg       alg,                                      \
         J                         m,                                        \
         J                         n,                                        \
         J                         k,                                        \
@@ -626,7 +621,7 @@ INSTANTIATE_ANALYSIS(int64_t, int64_t, int8_t);
 #undef INSTANTIATE_ANALYSIS
 
 #define INSTANTIATE(TTYPE, ITYPE, JTYPE, ATYPE, BTYPE, CTYPE)                                        \
-    template rocsparse_status rocsparse::csrmm_template_nnz_split(rocsparse_handle    handle,        \
+    template rocsparse_status rocsparse::csrmm_nnz_split_kernel_dispatch(rocsparse_handle    handle,        \
                                                                   rocsparse_operation trans_A,       \
                                                                   rocsparse_operation trans_B,       \
                                                                   JTYPE               m,             \
