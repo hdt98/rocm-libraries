@@ -375,41 +375,36 @@ if( ROCFFT_MPI_ENABLE )
     )
     target_compile_options( ${worker} PRIVATE ${WARNING_FLAGS} )
 
-  if ( ROCFFT_CRAY_MPI_ENABLE )
-    target_link_libraries( ${worker} PRIVATE
-      OpenMP::OpenMP_CXX 
-      hip::hiprand
-      hip::device
-      MPI::MPI_CXX
-      ${FFTW_LIBRARIES}
-      "mpi_gtl_hsa"
-    )
-      get_filename_component( MPI_LIBDIR ${MPI_LIBRARY} DIRECTORY )
-      target_link_directories( ${worker}
-	PRIVATE
-	${MPI_LIBDIR}/../../../../gtl/lib )
+    if ( ROCFFT_CRAY_MPI_ENABLE )
+      target_link_libraries( ${worker} PRIVATE
+        OpenMP::OpenMP_CXX 
+        hip::hiprand
+        hip::device
+        MPI::MPI_CXX
+        ${FFTW_LIBRARIES}
+        "mpi_gtl_hsa"
+      )
+        get_filename_component( MPI_LIBDIR ${MPI_LIBRARY} DIRECTORY )
+        target_link_directories( ${worker}
+  	PRIVATE
+  	${MPI_LIBDIR}/../../../../gtl/lib )
     else()
-    target_link_libraries( ${worker} PRIVATE
-      OpenMP::OpenMP_CXX 
-      hip::hiprand
-      hip::device
-      MPI::MPI_CXX
-      ${FFTW_LIBRARIES}
-    )    
+      target_link_libraries( ${worker} PRIVATE
+        OpenMP::OpenMP_CXX 
+        hip::hiprand
+        hip::device
+        MPI::MPI_CXX
+        ${FFTW_LIBRARIES}
+      )    
     endif()
+
+    target_compile_definitions( ${worker} PRIVATE USE_HIPRAND )
+
     set_target_properties(${worker}
                           PROPERTIES 
                           RUNTIME_OUTPUT_DIRECTORY 
                           ${TESTS_OUT_DIR})
     rocm_install(TARGETS ${worker} COMPONENT tests)
-    
-    if( USE_HIPRAND )
-      target_link_libraries( ${worker}
-      PRIVATE
-      hip::hiprand
-      )
-      target_compile_definitions( ${worker} PRIVATE USE_HIPRAND )
-    endif()
 
   endforeach()
 
