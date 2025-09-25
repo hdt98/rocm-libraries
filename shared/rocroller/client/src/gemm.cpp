@@ -1084,8 +1084,8 @@ namespace rocRoller::Client::GEMMClient::CLI
         std::make_pair("--workgroupMappingDim", &SolutionParameters::workgroupMappingDim),
         std::make_pair("--workgroupRemapXCC", &SolutionParameters::workgroupRemapXCC),
         std::make_pair("--workgroupRemapXCCValue", &SolutionParameters::workgroupRemapXCCValue),
-        std::make_pair("--loadLDSScale_A", &SolutionParameters::loadLDSScaleA),
-        std::make_pair("--loadLDSScale_B", &SolutionParameters::loadLDSScaleB),
+        std::make_pair("--loadScale_A", &SolutionParameters::loadPathAScale),
+        std::make_pair("--loadScale_B", &SolutionParameters::loadPathBScale),
         std::make_pair("--swizzleScale", &SolutionParameters::swizzleScale),
         std::make_pair("--sts", &SolutionParameters::swizzleTileSize),
         std::make_pair("--prefetchScale", &SolutionParameters::prefetchScale),
@@ -1245,24 +1245,34 @@ namespace rocRoller::Client::GEMMClient::CLI
                 solution.loadPathB = SolutionParams::LoadPath::BufferToLDS;
         }
 
-        update(SN(&SP::loadPathA), solution.loadPathA);
-        update(SN(&SP::loadPathB), solution.loadPathB);
+        update(SN(&SP::loadPathAScale), solution.loadPathAScale);
+        update(SN(&SP::loadPathBScale), solution.loadPathBScale);
 
         if(app.get_option("--mxlds")->count())
         {
             auto arg = app.get_option("--mxlds")->as<std::string>();
 
-            solution.loadLDSScaleA = false;
+            solution.loadPathAScale = SolutionParams::LoadPath::BufferToVGPR;
             if(arg.find('A') != std::string::npos)
-                solution.loadLDSScaleA = true;
+                solution.loadPathAScale = SolutionParams::LoadPath::BufferToLDSViaVGPR;
 
-            solution.loadLDSScaleB = false;
+            solution.loadPathBScale = SolutionParams::LoadPath::BufferToVGPR;
             if(arg.find('B') != std::string::npos)
-                solution.loadLDSScaleB = true;
+                solution.loadPathBScale = SolutionParams::LoadPath::BufferToLDSViaVGPR;
         }
 
-        update(SN(&SP::loadLDSScaleA), solution.loadLDSScaleA);
-        update(SN(&SP::loadLDSScaleB), solution.loadLDSScaleB);
+        if(app.get_option("--mxd2lds")->count())
+        {
+            auto arg = app.get_option("--mxd2lds")->as<std::string>();
+
+            solution.loadPathAScale = SolutionParams::LoadPath::BufferToVGPR;
+            if(arg.find('A') != std::string::npos)
+                solution.loadPathAScale = SolutionParams::LoadPath::BufferToLDS;
+
+            solution.loadPathBScale = SolutionParams::LoadPath::BufferToVGPR;
+            if(arg.find('B') != std::string::npos)
+                solution.loadPathBScale = SolutionParams::LoadPath::BufferToLDS;
+        }
 
         // Swizzling
 
@@ -1333,8 +1343,8 @@ int main(int argc, const char* argv[])
 
                   .scaleBlockSize = -1},
 
-        .loadLDSScaleA = false,
-        .loadLDSScaleB = false,
+        .loadPathAScale = SolutionParams::LoadPath::BufferToVGPR,
+        .loadPathBScale = SolutionParams::LoadPath::BufferToVGPR,
 
         .swizzleScale  = false,
         .prefetchScale = false,
@@ -1554,12 +1564,10 @@ int main(int argc, const char* argv[])
 
     app.add_option(
         SN(&SP::loadPathA),
-        solution.loadPathA,
         "How to load A (BufferToVGPR, BufferToLDSViaVGPR, BufferToLDS). Default: BufferToLDS");
     app.add_option(
         SN(&SP::loadPathB),
-        solution.loadPathB,
-        "How to load A (BufferToVGPR, BufferToLDSViaVGPR, BufferToLDS). Default: BufferToLDS");
+        "How to load B (BufferToVGPR, BufferToLDSViaVGPR, BufferToLDS). Default: BufferToLDS");
     app.add_flag(SN(&SP::storeLDSD), "Use LDS when storing D.");
     app.add_option("--lds", "Use LDS for A/B/D.");
     app.add_option("--d2lds", "Use direct-to-LDS for A/B.");
@@ -1581,9 +1589,14 @@ int main(int argc, const char* argv[])
     app.add_flag(SN(&SP::streamKTwoTileDPFirst),
                  "Execute data-parallel loop first in the two-tile StreamK algorithm.");
 
-    app.add_flag(SN(&SP::loadLDSScaleA), "Use LDS when loading A scale.");
-    app.add_flag(SN(&SP::loadLDSScaleB), "Use LDS when loading B scale.");
+    app.add_option(
+        SN(&SP::loadPathAScale),
+        "How to load AScale (BufferToVGPR, BufferToLDSViaVGPR, BufferToLDS). Default: BufferToLDS");
+    app.add_option(
+        SN(&SP::loadPathBScale),
+        "How to load BScale (BufferToVGPR, BufferToLDSViaVGPR, BufferToLDS). Default: BufferToLDS");
     app.add_option("--mxlds", "Use LDS for A/B scales.");
+    app.add_option("--mxd2lds", "Use direct-to-LDS for A/B scales.");
 
     app.add_flag(SN(&SP::swizzleScale), "Use Swizzle when loading A and B scale.");
     app.add_option(SN(&SP::swizzleTileSize),

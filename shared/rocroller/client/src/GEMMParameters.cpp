@@ -103,8 +103,8 @@ namespace rocRoller
 
                 rv << "_SD" << storeLDSD;
 
-                rv << "_SLDS";
-                rocRoller::streamJoin(rv, std::vector{loadLDSScaleA, loadLDSScaleB}, "");
+                rv << "_LSA" << loadPathAScale;
+                rv << "_LSB" << loadPathBScale;
 
                 rv << "_UNROLL";
                 rocRoller::streamJoin(rv, std::vector{unrollX, unrollY}, "x");
@@ -240,7 +240,8 @@ namespace rocRoller
                 s << "Load A:          " << x.loadPathA << std::endl;
                 s << "Load B:          " << x.loadPathB << std::endl;
                 s << "Store D LDS:     " << x.storeLDSD << std::endl;
-                s << "LSDScale:        " << x.loadLDSScaleA << x.loadLDSScaleB << std::endl;
+                s << "Load AScale:     " << x.loadPathAScale << std::endl;
+                s << "Load BScale:     " << x.loadPathBScale << std::endl;
                 s << "Prefetch:        "
                   << "enabled:" << x.prefetch << " inflight:" << x.prefetchInFlight
                   << " LDS:" << x.prefetchLDSFactor << " mixMemOps: " << x.prefetchMixMemOps
