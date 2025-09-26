@@ -35,6 +35,7 @@
 #include <rocRoller/Parameters/Solution/LoadOption.hpp>
 #include <rocRoller/Utilities/Utils.hpp>
 
+#include "DataGenerator.hpp"
 #include "client/BenchmarkSolution.hpp"
 
 namespace rocRoller
@@ -119,6 +120,8 @@ namespace rocRoller
 
                 // When scaleA/B is ScaleMode::SingleScale
                 float scaleValueA, scaleValueB;
+
+                DGen::DataPattern patternA, patternB, patternC;
 
                 int workgroupMappingDim;
             };
