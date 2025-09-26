@@ -23,6 +23,10 @@ target_link_libraries(rocroller-tests-catch
         ${msgpack_libs}
 )
 
+target_include_directories(rocroller-tests-catch PRIVATE
+  ${PROJECT_SOURCE_DIR}/client/include
+)
+
 target_sources(rocroller-tests-catch
     PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/CustomAssertions.cpp"
@@ -37,6 +41,7 @@ target_sources(rocroller-tests-catch
         "${CMAKE_CURRENT_SOURCE_DIR}/AssignComputeIndexTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/BinaryExpressionTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/BranchGeneratorTest.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/ClientUtilsTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/CommandArgumentValueTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/CommandTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/ConnectWorkgroupsTest.cpp"

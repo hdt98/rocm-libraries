@@ -34,6 +34,7 @@ target_sources(rocroller-gemm
         "${CMAKE_CURRENT_SOURCE_DIR}/include/client/GraphInspector_impl.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/include/client/PreSwizzle.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/include/client/StreamKGEMMSolution.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/include/client/Utils.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/include/client/visualize.hpp"
 )
 target_link_libraries(rocroller-gemm

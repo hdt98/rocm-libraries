@@ -49,6 +49,7 @@
 #include "client/GEMMParameters_serialization.hpp"
 #include "client/PreSwizzle.hpp"
 #include "client/StreamKGEMMSolution.hpp"
+#include "client/Utils.hpp"
 
 #include <CLI/CLI.hpp>
 
@@ -370,20 +371,17 @@ namespace rocRoller::Client::GEMMClient
                 result.kernelExecute.end(), nanoseconds.begin(), nanoseconds.end());
         }
 
-        double totalTime = 0;
+        const double NANO = 1.e9;
+        double totalTimeInSeconds = 0;
         for(auto ke : result.kernelExecute)
-            totalTime += static_cast<double>(ke) / 1.e9;
-        double averageTime = totalTime / (benchmarkParams.numInner * benchmarkParams.numOuter);
+            totalTimeInSeconds += static_cast<double>(ke) / NANO;
+        const double averageTimeInSeconds = totalTimeInSeconds / (benchmarkParams.numInner * benchmarkParams.numOuter);
 
-        std::cout << "Average runtime (s): " << averageTime << std::endl;
-        std::cout << "Average GFLOPS:      "
-                  << (double)problemParams.m * problemParams.n * problemParams.k * 2.0 / averageTime
-                         * 1.e-9
-                  << std::endl;
-        std::cerr << "Average GFLOPS:      "
-                  << (double)problemParams.m * problemParams.n * problemParams.k * 2.0 / averageTime
-                         * 1.e-9
-                  << std::endl;
+        const double gigaFLOPS = gemmSpeedInGigaFLOPS(
+            problemParams.m, problemParams.n, problemParams.k, averageTimeInSeconds);
+
+        std::cout << fmt::format("Average runtime (s): {:e}\n", averageTimeInSeconds);
+        std::cout << fmt::format("Average GFLOPS:      {:e}\n", gigaFLOPS);
 
         result.kernelAssemble = TimerPool::nanoseconds("Assembler::assembleMachineCode");
         result.kernelGenerate = TimerPool::nanoseconds("CommandKernel::generateKernel");
