@@ -384,10 +384,11 @@ set(rocsparse_source
 
 
 
-  src/level3/rocsparse_cscmm_impl.cpp
-  src/level3/rocsparse_cscmm_buffer_size.cpp
-  src/level3/rocsparse_cscmm_analysis.cpp
+  # src/level3/rocsparse_cscmm_impl.cpp
+  # src/level3/rocsparse_cscmm_buffer_size.cpp
+  # src/level3/rocsparse_cscmm_analysis.cpp
   src/level3/rocsparse_cscmm.cpp
+
   src/level3/rocsparse_coomm_buffer_size.cpp
   src/level3/rocsparse_coomm_analysis.cpp
   src/level3/rocsparse_coomm_buffer_size_impl.cpp
