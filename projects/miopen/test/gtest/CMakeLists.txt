@@ -168,7 +168,15 @@ else()
 
   add_gtest(miopen_gtest "${TESTS_CPP}")
 
+  message("INFO: " ${MIOPEN_CK_INCLUDE_DIR})
+  message("INFO: " ${MIOPEN_CK_BUILD_INCLUDE_DIR})
+  message("INFO: " ${MIOPEN_CK_LIBRARY_INCLUDE_DIR})
+
+  message("INFO: " ${MIOPEN_USE_COMPOSABLEKERNEL})
+  message("INFO: " ${MIOPEN_BUILD_CK})
+
   if(MIOPEN_USE_COMPOSABLEKERNEL)
+    message("INFO111")
     if(MIOPEN_BUILD_CK )
         # The include directories also dont propagate correctly when using the non aliased targets.
         # Manually including them fixes this problem for inline builds.
@@ -176,6 +184,7 @@ else()
             ${MIOPEN_CK_INCLUDE_DIR}
             ${MIOPEN_CK_BUILD_INCLUDE_DIR}
             ${MIOPEN_CK_LIBRARY_INCLUDE_DIR})
+	message("INFO222")
     endif()
   endif()
 
