@@ -2,6 +2,16 @@
 
 Full documentation for rocSOLVER is available at the [rocSOLVER documentation](https://rocm.docs.amd.com/projects/rocSOLVER/en/latest/index.html).
 
+## rocSOLVER 3.30.1 for ROCm 7.0.2
+
+### Optimized
+
+* Improved the performance of LARFT and downstream functions such as GEQRF and ORMTR.
+* Improved the performance of LARF and downstream functions such as GEQR2.
+* Improved the performance of ORMTR and downstream functions such as SYEVD.
+* Improved the performance of GEQR2 and downstream functions such as GEQRF.
+
+
 ## rocSOLVER 3.30.0 for ROCm 7.0.0
 
 ### Added
@@ -15,6 +25,9 @@ Full documentation for rocSOLVER is available at the [rocSOLVER documentation](h
 * Improved the performance of STEQR and downstream functions such as SYEV/HEEV
 * Improved the performance of LARFT and downstream functions such as GEQR2 and GEQRF
 
+### Resolved issues
+
+* Fixed corner cases that can produce NaNs in SYEVD, for valid input matrices
 
 
 ## rocSOLVER 3.28.2 for ROCm 6.4.2
