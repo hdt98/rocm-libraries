@@ -124,11 +124,7 @@ def generate_missing_attr_value(run, attr):
             return (wgm_dim, wgm_value)
         case _:
             raise RuntimeError(
-<<<<<<< HEAD
-                f"Cannot handle attribuite missing in previous rrperf version: {attr}"
-=======
                 f"Cannot handle attribute missing in previous rrperf version: {attr}"
->>>>>>> b4b369f98851e30dff6f2fd1f01e2b004298328b
             )
 
 

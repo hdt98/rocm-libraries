@@ -9,10 +9,10 @@
 #include <amd_comgr/amd_comgr.h>
 
 #include <cstddef>
+#include <functional>
+#include <memory>
 #include <string>
 #include <vector>
-#include <memory>
-#include <functional>
 
 namespace rocRoller
 {
@@ -26,14 +26,21 @@ namespace rocRoller
         {
         private:
             amd_comgr_metadata_node_t node;
-            bool owned;
+            bool                      owned;
 
         public:
-            MetadataNodeHandle() : node{0}, owned(false) {}
-            
-            explicit MetadataNodeHandle(amd_comgr_metadata_node_t n, bool take_ownership = true) 
-                : node(n), owned(take_ownership) {}
-            
+            MetadataNodeHandle()
+                : node{0}
+                , owned(false)
+            {
+            }
+
+            explicit MetadataNodeHandle(amd_comgr_metadata_node_t n, bool take_ownership = true)
+                : node(n)
+                , owned(take_ownership)
+            {
+            }
+
             ~MetadataNodeHandle()
             {
                 if(owned && node.handle != 0)
@@ -44,10 +51,11 @@ namespace rocRoller
 
             // Move constructor
             MetadataNodeHandle(MetadataNodeHandle&& other) noexcept
-                : node(other.node), owned(other.owned)
+                : node(other.node)
+                , owned(other.owned)
             {
                 other.node.handle = 0;
-                other.owned = false;
+                other.owned       = false;
             }
 
             // Move assignment
@@ -59,10 +67,10 @@ namespace rocRoller
                     {
                         amd_comgr_destroy_metadata(node);
                     }
-                    node = other.node;
-                    owned = other.owned;
+                    node              = other.node;
+                    owned             = other.owned;
                     other.node.handle = 0;
-                    other.owned = false;
+                    other.owned       = false;
                 }
                 return *this;
             }
@@ -71,23 +79,29 @@ namespace rocRoller
             MetadataNodeHandle(const MetadataNodeHandle&) = delete;
             MetadataNodeHandle& operator=(const MetadataNodeHandle&) = delete;
 
-            amd_comgr_metadata_node_t get() const { return node; }
-            bool isValid() const { return node.handle != 0; }
+            amd_comgr_metadata_node_t get() const
+            {
+                return node;
+            }
+            bool isValid() const
+            {
+                return node.handle != 0;
+            }
         };
 
         // Helper functions for COMGR metadata conversion
         inline std::string getMetadataString(amd_comgr_metadata_node_t node)
         {
-            size_t size = 0;
-            auto status = amd_comgr_get_metadata_string(node, &size, nullptr);
+            size_t size   = 0;
+            auto   status = amd_comgr_get_metadata_string(node, &size, nullptr);
             if(status != AMD_COMGR_STATUS_SUCCESS)
                 return "";
-            
+
             std::string result(size - 1, '\0'); // -1 to exclude null terminator
             status = amd_comgr_get_metadata_string(node, &size, result.data());
             if(status != AMD_COMGR_STATUS_SUCCESS)
                 return "";
-            
+
             return result;
         }
 
@@ -102,7 +116,7 @@ namespace rocRoller
         struct COMGRInput
         {
             amd_comgr_metadata_node_t node;
-            void* context;
+            void*                     context;
 
             COMGRInput(amd_comgr_metadata_node_t n, void* c = nullptr)
                 : node(n)
@@ -114,8 +128,8 @@ namespace rocRoller
             void mapRequired(const char* key, T& obj)
             {
                 auto kind = getMetadataKind(node);
-                AssertFatal(kind == AMD_COMGR_METADATA_KIND_MAP, 
-                    "mapRequired called on non-map metadata node");
+                AssertFatal(kind == AMD_COMGR_METADATA_KIND_MAP,
+                            "mapRequired called on non-map metadata node");
 
                 amd_comgr_metadata_node_t value_node = {0};
                 auto status = amd_comgr_metadata_lookup(node, key, &value_node);
@@ -146,10 +160,10 @@ namespace rocRoller
 
             // Input for mapped types
             template <typename T>
-            requires(CMappedType<T, COMGRInput> || EmptyMappedType<T, COMGRInput>) 
-            void input(amd_comgr_metadata_node_t n, T& obj)
+            requires(CMappedType<T, COMGRInput> || EmptyMappedType<T, COMGRInput>) void input(
+                amd_comgr_metadata_node_t n, T& obj)
             {
-                COMGRInput subInput(n, context);
+                COMGRInput   subInput(n, context);
                 EmptyContext ctx;
                 MappingTraits<T, COMGRInput>::mapping(subInput, obj, ctx);
             }
@@ -174,8 +188,7 @@ namespace rocRoller
             void input(amd_comgr_metadata_node_t n, std::string& obj)
             {
                 auto kind = getMetadataKind(n);
-                AssertFatal(kind == AMD_COMGR_METADATA_KIND_STRING,
-                    "Expected string metadata");
+                AssertFatal(kind == AMD_COMGR_METADATA_KIND_STRING, "Expected string metadata");
                 obj = getMetadataString(n);
             }
 
@@ -185,19 +198,17 @@ namespace rocRoller
             {
                 auto kind = getMetadataKind(n);
                 AssertFatal(kind == AMD_COMGR_METADATA_KIND_LIST,
-                    "Expected list metadata for sequence");
+                            "Expected list metadata for sequence");
 
-                size_t count = 0;
-                auto status = amd_comgr_get_metadata_list_size(n, &count);
-                AssertFatal(status == AMD_COMGR_STATUS_SUCCESS,
-                    "Failed to get metadata list size");
+                size_t count  = 0;
+                auto   status = amd_comgr_get_metadata_list_size(n, &count);
+                AssertFatal(status == AMD_COMGR_STATUS_SUCCESS, "Failed to get metadata list size");
 
                 for(size_t i = 0; i < count; i++)
                 {
                     amd_comgr_metadata_node_t elem_node = {0};
                     status = amd_comgr_index_list_metadata(n, i, &elem_node);
-                    AssertFatal(status == AMD_COMGR_STATUS_SUCCESS,
-                        "Failed to get list element");
+                    AssertFatal(status == AMD_COMGR_STATUS_SUCCESS, "Failed to get list element");
 
                     MetadataNodeHandle elem_handle(elem_node);
                     auto& value = SequenceTraits<T, COMGRInput>::element(*this, obj, i);
@@ -211,32 +222,30 @@ namespace rocRoller
             {
                 auto kind = getMetadataKind(n);
                 AssertFatal(kind == AMD_COMGR_METADATA_KIND_MAP,
-                    "Expected map metadata for custom mapping");
+                            "Expected map metadata for custom mapping");
 
                 COMGRInput subInput(n, context);
-                
+
                 // Iterator callback for map entries
                 struct IteratorContext
                 {
                     COMGRInput* input;
-                    T* obj;
+                    T*          obj;
                 };
-                
+
                 IteratorContext iter_ctx{&subInput, &obj};
-                
-                auto callback = [](amd_comgr_metadata_node_t key, 
-                                 amd_comgr_metadata_node_t value,
-                                 void* user_data) -> amd_comgr_status_t
-                {
-                    auto* ctx = static_cast<IteratorContext*>(user_data);
-                    auto key_str = getMetadataString(key);
+
+                auto callback = [](amd_comgr_metadata_node_t key,
+                                   amd_comgr_metadata_node_t value,
+                                   void*                     user_data) -> amd_comgr_status_t {
+                    auto* ctx     = static_cast<IteratorContext*>(user_data);
+                    auto  key_str = getMetadataString(key);
                     CustomMappingTraits<T, COMGRInput>::inputOne(*ctx->input, key_str, *ctx->obj);
                     return AMD_COMGR_STATUS_SUCCESS;
                 };
 
                 auto status = amd_comgr_iterate_map_metadata(n, callback, &iter_ctx);
-                AssertFatal(status == AMD_COMGR_STATUS_SUCCESS,
-                    "Failed to iterate metadata map");
+                AssertFatal(status == AMD_COMGR_STATUS_SUCCESS, "Failed to iterate metadata map");
             }
 
             // Input for scalar traits
@@ -260,7 +269,7 @@ namespace rocRoller
                 std::istringstream iss(str);
                 iss >> obj;
             }
-/*
+            /*
             void nodeInputHelper(const std::string& str, bool& val)
             {
                 if(str == "true" || str == "1")
