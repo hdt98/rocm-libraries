@@ -1523,7 +1523,9 @@ public:
     // This function doesn't use a JSON library,
     // since it just appends text onto the end of a JSON file.
     // Seeking and writing to the end of a huge file is very fast.
-    void output_specialization_info(const std::string& name) const
+    void output_specialization_info(const std::string& name,
+                                    double             lower_bound,
+                                    double             upper_bound) const
     {
         if(!m_is_active)
             return;
@@ -1577,7 +1579,7 @@ public:
         }
 
         // Append the serialized benchmark
-        outfile << serialize_benchmark(name);
+        outfile << serialize_benchmark(name, lower_bound, upper_bound);
 
         // Close benchmarks array and JSON
         outfile << "]}";
@@ -1594,7 +1596,8 @@ private:
 #endif
     };
 
-    std::string serialize_benchmark(const std::string& name) const
+    std::string
+        serialize_benchmark(const std::string& name, double lower_bound, double upper_bound) const
     {
         std::ostringstream ss;
         ss << "{";
@@ -1602,11 +1605,12 @@ private:
         ss << "\"batches\":[";
         for(size_t i = 0; i < m_batches.size(); i++)
         {
-            if(i != 0)
+            if(i > 0)
                 ss << ",";
 
             ss << "{";
-            ss << "\"iterations_ms\":" << serialize_batch_times(m_batches[i].batch_times);
+            ss << "\"iterations_ms\":"
+               << serialize_batch_times(m_batches[i].batch_times, lower_bound, upper_bound);
 
 #ifdef BENCHMARK_USE_AMDSMI
             ss << ",\"amdsmi_stats_after_iterations\":"
@@ -1620,15 +1624,21 @@ private:
         return ss.str();
     }
 
-    std::string serialize_batch_times(const std::vector<double>& batch_times) const
+    std::string serialize_batch_times(const std::vector<double>& batch_times,
+                                      double                     lower_bound,
+                                      double                     upper_bound) const
     {
         std::ostringstream ss;
         ss << "[";
-        for(size_t i = 0; i < batch_times.size(); i++)
+        size_t output_batches = 0;
+        for(auto t : batch_times)
         {
-            if(i != 0)
+            if(t < lower_bound || t > upper_bound)
+                continue;
+            if(output_batches > 0)
                 ss << ",";
-            ss << batch_times[i];
+            ss << t;
+            output_batches++;
         }
         ss << "]";
         return ss.str();
@@ -1790,15 +1800,19 @@ public:
                                        * type_size);
         gbench_state.SetItemsProcessed(m_total_gbench_iterations * batch_iterations * actual_size);
 
-        if(m_iteration_times_iqr_multiplier != -1)
-        {
-            m_times = drop_outliers_using_iqr(m_times);
-        }
+        struct bounds bounds = get_outlier_bounds_using_iqr(m_times);
+
+        // Remove outliers using bounds
+        m_times.erase(std::remove_if(m_times.begin(),
+                                     m_times.end(),
+                                     [&](double t)
+                                     { return t < bounds.lower_bound || t > bounds.upper_bound; }),
+                      m_times.end());
 
         output_statistics();
 
         std::string name = get_escaped_name(gbench_state.name());
-        m_logger.output_specialization_info(name);
+        m_logger.output_specialization_info(name, bounds.lower_bound, bounds.upper_bound);
     }
 
     // These are directly read by benchmarks.
@@ -1809,6 +1823,12 @@ public:
     benchmark::State& gbench_state;
 
 private:
+    struct bounds
+    {
+        double lower_bound;
+        double upper_bound;
+    };
+
     // Zeros a 256 MiB buffer, used to clear the cache before each kernel call.
     // 256 MiB is the size of the largest cache on any AMD GPU.
     // It is currently not possible to fetch the L3 cache size from the runtime.
@@ -1838,11 +1858,13 @@ private:
 
     // IQR stands for Interquartile range.
     // It's used to drop outlier iteration times, in order to reduce noise.
-    std::vector<double> drop_outliers_using_iqr(const std::vector<double>& values) const
+    bounds get_outlier_bounds_using_iqr(const std::vector<double>& values) const
     {
-        if(values.size() < 4)
+        // If IQR filtering is turned off, or there are not enough values to filter.
+        if(m_iteration_times_iqr_multiplier == -1 || values.size() < 4)
         {
-            return values; // Not enough data to define outliers
+            return {.lower_bound = std::numeric_limits<double>::lowest(),
+                    .upper_bound = std::numeric_limits<double>::max()};
         }
 
         std::vector<double> sorted_vals = values;
@@ -1870,18 +1892,7 @@ private:
         double lower_bound = q1 - m_iteration_times_iqr_multiplier * iqr;
         double upper_bound = q3 + m_iteration_times_iqr_multiplier * iqr;
 
-        std::vector<double> filtered;
-        filtered.reserve(values.size());
-
-        for(double v : values)
-        {
-            if(v >= lower_bound && v <= upper_bound)
-            {
-                filtered.push_back(v);
-            }
-        }
-
-        return filtered;
+        return {.lower_bound = lower_bound, .upper_bound = upper_bound};
     }
 
     void output_statistics() const
