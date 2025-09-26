@@ -371,11 +371,12 @@ namespace rocRoller::Client::GEMMClient
                 result.kernelExecute.end(), nanoseconds.begin(), nanoseconds.end());
         }
 
-        const double NANO = 1.e9;
-        double totalTimeInSeconds = 0;
+        const double NANO               = 1.e9;
+        double       totalTimeInSeconds = 0;
         for(auto ke : result.kernelExecute)
             totalTimeInSeconds += static_cast<double>(ke) / NANO;
-        const double averageTimeInSeconds = totalTimeInSeconds / (benchmarkParams.numInner * benchmarkParams.numOuter);
+        const double averageTimeInSeconds
+            = totalTimeInSeconds / (benchmarkParams.numInner * benchmarkParams.numOuter);
 
         const double gigaFLOPS = gemmSpeedInGigaFLOPS(
             problemParams.m, problemParams.n, problemParams.k, averageTimeInSeconds);
