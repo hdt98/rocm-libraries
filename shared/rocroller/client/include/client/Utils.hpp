@@ -28,15 +28,15 @@
 #include <limits>
 
 inline double
-    gemmSpeedInGigaFLOPS(const int M, const int N, const int K, double executionTimeInSeconds)
+    gemmSpeedInTeraFLOPS(const int M, const int N, const int K, double executionTimeInSeconds)
 {
     if(executionTimeInSeconds <= 0.0)
     {
         return std::numeric_limits<double>::quiet_NaN();
     }
 
-    const double GIGA                 = 1e9;
+    const double TERA                 = 1e12;
     const double numberOfFPOperations = /*multiply & add */ 2.0 * M * N * K;
 
-    return numberOfFPOperations / GIGA / executionTimeInSeconds;
+    return numberOfFPOperations / TERA / executionTimeInSeconds;
 }

@@ -378,11 +378,11 @@ namespace rocRoller::Client::GEMMClient
         const double averageTimeInSeconds
             = totalTimeInSeconds / (benchmarkParams.numInner * benchmarkParams.numOuter);
 
-        const double gigaFLOPS = gemmSpeedInGigaFLOPS(
+        const double teraFLOPS = gemmSpeedInTeraFLOPS(
             problemParams.m, problemParams.n, problemParams.k, averageTimeInSeconds);
 
         std::cout << fmt::format("Average runtime (s): {:e}\n", averageTimeInSeconds);
-        std::cout << fmt::format("Average GFLOPS:      {:e}\n", gigaFLOPS);
+        std::cout << fmt::format("Average TFLOPS:      {:e}\n", teraFLOPS);
 
         result.kernelAssemble = TimerPool::nanoseconds("Assembler::assembleMachineCode");
         result.kernelGenerate = TimerPool::nanoseconds("CommandKernel::generateKernel");

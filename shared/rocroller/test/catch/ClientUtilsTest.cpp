@@ -37,20 +37,20 @@ TEST_CASE("GEMM Speed calculation", "[client][utilities]")
 {
     SECTION("Should be NaN if execution time is <= zero")
     {
-        REQUIRE(std::isnan(gemmSpeedInGigaFLOPS(11, 22, 33, 0)));
+        REQUIRE(std::isnan(gemmSpeedInTeraFLOPS(11, 22, 33, 0)));
 
-        REQUIRE(std::isnan(gemmSpeedInGigaFLOPS(11, 22, 33, -96.024)));
+        REQUIRE(std::isnan(gemmSpeedInTeraFLOPS(11, 22, 33, -96.024)));
     }
 
     SECTION("Speed should be calculated correctly")
     {
-        auto [M, N, K, executionTimeInSeconds, expectedGFLOPS]
-            = GENERATE(std::tuple<int, int, int, double, double>{128, 256, 512, 0.05, 6.71e-01},
-                       std::tuple<int, int, int, double, double>{64, 128, 256, 0.02, 2.10e-01},
-                       std::tuple<int, int, int, double, double>{100, 200, 300, 0.1, 1.20e-01},
-                       std::tuple<int, int, int, double, double>{512, 1024, 2048, 0.5, 4.29e00});
+        auto [M, N, K, executionTimeInSeconds, expectedTFLOPS]
+            = GENERATE(std::tuple<int, int, int, double, double>{128, 256, 512, 0.05, 6.71e-04},
+                       std::tuple<int, int, int, double, double>{64, 128, 256, 0.02, 2.10e-04},
+                       std::tuple<int, int, int, double, double>{100, 200, 300, 0.1, 1.20e-04},
+                       std::tuple<int, int, int, double, double>{512, 1024, 2048, 0.5, 4.29e-03});
 
-        REQUIRE(gemmSpeedInGigaFLOPS(M, N, K, executionTimeInSeconds)
-                == Approx(expectedGFLOPS).margin(0.01));
+        REQUIRE(gemmSpeedInTeraFLOPS(M, N, K, executionTimeInSeconds)
+                == Approx(expectedTFLOPS).margin(1e-04));
     }
 }
