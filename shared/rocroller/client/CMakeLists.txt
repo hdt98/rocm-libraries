@@ -80,3 +80,9 @@ if(ROCROLLER_ENABLE_COVERAGE OR BUILD_CODE_COVERAGE)
     target_compile_options(rocroller-codegen-stress PRIVATE -fprofile-instr-generate -fcoverage-mapping)
     target_link_options(rocroller-codegen-stress PRIVATE -fprofile-instr-generate)
 endif()
+
+add_library(rocroller-client-interface INTERFACE)
+target_include_directories(rocroller-client-interface INTERFACE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+)

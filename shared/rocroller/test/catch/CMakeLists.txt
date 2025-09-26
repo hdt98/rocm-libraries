@@ -23,8 +23,8 @@ target_link_libraries(rocroller-tests-catch
         ${msgpack_libs}
 )
 
-target_include_directories(rocroller-tests-catch PRIVATE
-  ${PROJECT_SOURCE_DIR}/client/include
+target_link_libraries(rocroller-tests-catch PRIVATE
+    rocroller-client-interface
 )
 
 target_sources(rocroller-tests-catch
