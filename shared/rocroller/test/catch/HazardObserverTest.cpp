@@ -785,4 +785,39 @@ namespace HazardObserverTest
         }
     }
 
+    TEST_CASE("M0 Write", "[observer]")
+    {
+        SUPPORTED_ARCH_SECTION(arch)
+        {
+            if(arch.isRDNAGPU())
+            {
+                SKIP("RDNA not supported yet");
+            }
+
+            SECTION("NOP added for S0 write followed by direct to LDS buffer load")
+            {
+                auto context = TestContext::ForTarget(arch);
+                auto v = createRegisters(context, Register::Type::Vector, DataType::Float, 1, 1)[0];
+                auto addr = createRegisters(context, Register::Type::Vector, DataType::Raw32, 1)[0];
+                auto sValue
+                    = createRegisters(context, Register::Type::Scalar, DataType::Int32, 1, 1)[0];
+                auto s = createRegisters(context, Register::Type::Scalar, DataType::Raw32, 1, 4)[0];
+
+                std::vector<Instruction> insts
+                    = {Instruction("s_mov_b32", {context->getM0()}, {sValue}, {}, ""),
+                       Instruction("buffer_store_dwordx4",
+                                   {},
+                                   {v, addr, s, Register::Value::Literal(0)},
+                                   {"lds"},
+                                   ""),
+                       Instruction("s_endpgm", {}, {}, {}, "")};
+
+                peekAndSchedule(context, insts[0]);
+                peekAndSchedule(context, insts[1], 1);
+                peekAndSchedule(context, insts[2]);
+
+                CHECK_THAT(context.output(), ContainsSubstring("s_nop"));
+            }
+        }
+    }
 }

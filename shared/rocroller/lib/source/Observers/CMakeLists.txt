@@ -11,6 +11,7 @@ target_sources(rocroller
         "${CMAKE_CURRENT_SOURCE_DIR}/DGEMM4x4x4Write.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/DLWrite.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/FileWritingObserver.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/M0Write.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/MEMObserver.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/MFMAObserver.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/ObserverCreation.cpp"

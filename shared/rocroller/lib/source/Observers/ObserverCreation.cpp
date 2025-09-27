@@ -50,6 +50,7 @@
 #include <rocRoller/Scheduling/Observers/WaitState/MFMA/XDLWrite94x.hpp>
 
 #include <rocRoller/Scheduling/Observers/WaitState/BufferStoreDwordXXRead.hpp>
+#include <rocRoller/Scheduling/Observers/WaitState/M0Write.hpp>
 #include <rocRoller/Scheduling/Observers/WaitState/OPSEL94x.hpp>
 #include <rocRoller/Scheduling/Observers/WaitState/VALUTransWrite94x.hpp>
 #include <rocRoller/Scheduling/Observers/WaitState/VALUWriteReadlane94x.hpp>
@@ -80,6 +81,7 @@ namespace rocRoller
                 ACCVGPRReadWrite,
                 ACCVGPRWriteWrite,
                 BufferStoreDwordXXRead,
+                M0Write,
                 CMPXWriteExec,
                 DGEMM4x4x4Write,
                 DGEMM16x16x4Write,

@@ -331,6 +331,7 @@ target_sources(rocroller
         "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/FunctionalUnit/WMMAObserver.hpp"
 
         "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitState/BufferStoreDwordXXRead.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitState/M0Write.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitState/OPSEL94x.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitState/VALUTransWrite94x.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitState/VALUWriteReadlane94x.hpp"
