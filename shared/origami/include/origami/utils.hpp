@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include <functional>  // For std::function
+#include <functional>
 #include <set>
 #include <tuple>
 #include <vector>
@@ -104,7 +104,6 @@ std::vector<config_t> select_topk_configs(
     const hardware_t& hardware,
     const std::vector<config_t>& configs,
     std::size_t topk);
-
 
 /**
  * @brief Given a latency (populated in config), compute the achieved 

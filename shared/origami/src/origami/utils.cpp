@@ -7,9 +7,9 @@
 #include "origami/streamk.hpp"
 
 #include <algorithm>
-#include <chrono> // For timing
+#include <chrono>
 #include <cmath>
-#include <iomanip> // For output formatting
+#include <iomanip>
 #include <iostream>
 
 namespace origami

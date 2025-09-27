@@ -105,6 +105,8 @@ namespace origami
                                       size_t          M,
                                       size_t          N,
                                       size_t          K,
+                                      bool            transA,
+                                      bool            transB,                                      
                                       size_t          batch,
                                       size_t          MT_M,
                                       size_t          MT_N,

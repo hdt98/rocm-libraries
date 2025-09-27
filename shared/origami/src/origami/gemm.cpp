@@ -960,7 +960,6 @@ double compute_total_latency(const hardware_t& hardware,
 
   if (hardware_t::is_debug_enabled()) {
     hardware.log_debug("Total_latency (with heuristics)", total_latency);
-
     hardware.print_debug_info();
   }
 
