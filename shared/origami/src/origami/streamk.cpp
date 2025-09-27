@@ -9,18 +9,50 @@
 
 namespace origami {
 namespace streamk {
+
+/**
+ * @brief Returns number of k-iterations.
+ *
+ * @param output_tiles Number of output tiles.
+ * @param iters_per_tile Number of iterations per tile.
+ * @return constexpr size_t Number of total iterations.
+ */
 constexpr size_t num_iters_total(size_t output_tiles, size_t iters_per_tile) {
   return output_tiles * iters_per_tile;
 }
 
+/**
+ * @brief Returns number of k-iterations per tile.
+ *
+ * @param BLK_K K-dimension tile size.
+ * @param k Reduction dimension.
+ * @return constexpr size_t Number of k-iteration per tile.
+ */
 constexpr size_t num_iters_per_tile(size_t BLK_K, size_t k) {
   return math::safe_ceil_div(k, BLK_K);
 }
 
+/**
+ * @brief Number of iterations per workgroup.
+ *
+ * @param iters_total Total number of k-iterations.
+ * @param g Number of workgroups (grid-size).
+ * @return constexpr size_t Number of iterations per workgroup.
+ */
 constexpr size_t num_iters_per_cta(size_t iters_total, int g) {
   return math::safe_ceil_div(iters_total, g);
 }
 
+/**
+ * @brief Number of output tiles.
+ *
+ * @param BLK_M Tile size in M-dimension.
+ * @param BLK_N Tile size in N-dimension.
+ * @param m Matrix's m-dimension.
+ * @param n Matrix's n-dimension.
+ * @param batch Number of batches.
+ * @return constexpr size_t Total number of output tiles.
+ */
 constexpr size_t number_of_output_tiles(size_t BLK_M,
                                         size_t BLK_N,
                                         size_t m,
@@ -31,6 +63,15 @@ constexpr size_t number_of_output_tiles(size_t BLK_M,
   return m_tiles * n_tiles * batch;
 }
 
+/**
+ * @brief Number of workgroups involved in the Stream-K's fixup step.
+ *
+ * @param g Number of total workgroups (grid-size.)
+ * @param iters_total Total number of k-iterations.
+ * @param iters_per_tile K-iterations per tile.
+ * @param iters_per_cta Number of iterations per workgroup.
+ * @return constexpr size_t Number of workgroups involved in fixup.
+ */
 constexpr size_t num_fixup_peers(size_t g,
                                  size_t iters_total,
                                  size_t iters_per_tile,
@@ -193,10 +234,9 @@ std::size_t grid_reduction_cost_aware(const problem_t& problem,
   std::pair<size_t, double> min_grid_runtime;
   min_grid_runtime.second = std::numeric_limits<double>::max();
 
-  
   std::size_t grid_start = 1;
-  std::size_t grid_end = hardware.N_CU;
-  
+  std::size_t grid_end   = hardware.N_CU;
+
   // Predict the number of CTAs to use between 1 and 304
   std::size_t g = grid_start;
   for (; g <= static_cast<size_t>(grid_end); ++g) {

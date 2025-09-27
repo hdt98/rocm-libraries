@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstdlib>
 #include <iomanip>
 #include <iostream>
 #include <set>
@@ -92,11 +93,11 @@ std::tuple<size_t, size_t, size_t> compute_cu_occupancy(const hardware_t& hardwa
   }
 
   if (hardware_t::is_debug_enabled()) {
-    hardware.log_debug("numMTs", numMTs);
-    hardware.log_debug("numWGs", numWGs);
-    hardware.log_debug("numActiveCUs", numActiveCUs);
-    hardware.log_debug("numWaves", numWaves);
-    hardware.log_debug("splitFactor", splitFactor);
+    hardware.log_debug("num_macro_tiles", numMTs);
+    hardware.log_debug("num_workgroups", numWGs);
+    hardware.log_debug("num_active_cus", numActiveCUs);
+    hardware.log_debug("num_waves", numWaves);
+    hardware.log_debug("split_factor", splitFactor);
   }
 
   return std::make_tuple(numActiveCUs, numWaves, splitFactor);
@@ -392,8 +393,8 @@ double estimate_l2_hit(const hardware_t& hardware,
   }
 
   if (hardware_t::is_debug_enabled()) {
-    hardware.log_debug("L2Tile_M", l2_m);
-    hardware.log_debug("L2Tile_N", l2_n);
+    hardware.log_debug("l2_tile_m", l2_m);
+    hardware.log_debug("l2_tile_n", l2_n);
   }
 
   return l2_hit;
@@ -445,8 +446,8 @@ double estimate_mall_hit(const hardware_t& hardware,
   double mall_hit = static_cast<double>(cached_reads) / static_cast<double>(total_reads);
 
   if (hardware_t::is_debug_enabled()) {
-    hardware.log_debug("MallTile_M", mall_m);
-    hardware.log_debug("MallTile_N", mall_n);
+    hardware.log_debug("mall_tile_m", mall_m);
+    hardware.log_debug("mall_tile_n", mall_n);
   }
 
   return mall_hit;
@@ -566,20 +567,17 @@ double compute_memory_latency(const hardware_t& hardware,
     hardware.log_debug("mem1_perf_ratio", hardware.mem1_perf_ratio);
     hardware.log_debug("mem2_perf_ratio", hardware.mem2_perf_ratio);
     hardware.log_debug("mem3_perf_ratio", hardware.mem3_perf_ratio);
-    hardware.log_debug("mem_bw_per_wg_coefficients(0)",
-                       std::get<0>(hardware.mem_bw_per_wg_coefficients));
-    hardware.log_debug("mem_bw_per_wg_coefficients(1)",
-                       std::get<1>(hardware.mem_bw_per_wg_coefficients));
-    hardware.log_debug("mem_bw_per_wg_coefficients(2)",
-                       std::get<2>(hardware.mem_bw_per_wg_coefficients));
-    hardware.log_debug("H_mem1 (mem1 hit ratio)", H_mem1);
-    hardware.log_debug("H_mem2 (mem2 hit ratio)", H_mem2);
-    hardware.log_debug("Total Load (bytes)", total_Ld);
-    hardware.log_debug("Ld_mem2 (bytes)", Ld_mem2);
-    hardware.log_debug("Ld_MEM (bytes)", Ld_MEM);
-    hardware.log_debug("L_mem_mem1 (cycles)", L_mem_mem1);
-    hardware.log_debug("L_mem_mem2 (cycles)", L_mem_mem2);
-    hardware.log_debug("L_mem_MEM (cycles)", L_mem_MEM);
+    hardware.log_debug("mem_bw_per_wg_coeff_0", std::get<0>(hardware.mem_bw_per_wg_coefficients));
+    hardware.log_debug("mem_bw_per_wg_coeff_1", std::get<1>(hardware.mem_bw_per_wg_coefficients));
+    hardware.log_debug("mem_bw_per_wg_coeff_2", std::get<2>(hardware.mem_bw_per_wg_coefficients));
+    hardware.log_debug("mem1_hit_ratio", H_mem1);
+    hardware.log_debug("mem2_hit_ratio", H_mem2);
+    hardware.log_debug("total_load_bytes", total_Ld);
+    hardware.log_debug("load_mem2_bytes", Ld_mem2);
+    hardware.log_debug("load_main_mem_bytes", Ld_MEM);
+    hardware.log_debug("latency_mem1_cycles", L_mem_mem1);
+    hardware.log_debug("latency_mem2_cycles", L_mem_mem2);
+    hardware.log_debug("latency_main_mem_cycles", L_mem_MEM);
   }
 
   return L_mem;
@@ -692,14 +690,14 @@ double compute_tile_latency(const hardware_t& hardware,
       (28 * num_iter);  // 7 instructions (each with 4 cycles) at the end of the loop
 
   if (hardware_t::is_debug_enabled()) {
-    hardware.log_debug("L_compute", L_compute);
-    hardware.log_debug("L_mem", L_mem);
-    hardware.log_debug("L_cvt", L_cvt);
-    hardware.log_debug("L_tile_single", L_tile_single);
-    hardware.log_debug("num_iter", num_iter);
-    hardware.log_debug("L_prologue", L_prologue);
-    hardware.log_debug("L_epilogue", L_epilogue);
-    hardware.log_debug("L_tile_total", L_tile_total);
+    hardware.log_debug("compute_latency", L_compute);
+    hardware.log_debug("memory_latency", L_mem);
+    hardware.log_debug("convert_latency", L_cvt);
+    hardware.log_debug("tile_latency_single", L_tile_single);
+    hardware.log_debug("num_iterations", num_iter);
+    hardware.log_debug("prologue_latency", L_prologue);
+    hardware.log_debug("epilogue_latency", L_epilogue);
+    hardware.log_debug("tile_latency_total", L_tile_total);
   }
 
   return L_tile_total;
@@ -783,13 +781,13 @@ double compute_total_latency(const hardware_t& hardware,
 
   if (hardware_t::is_debug_enabled()) {
     hardware.log_debug(
-        "Problem_Size",
+        "problem_size",
         std::to_string(int(M)) + "x" + std::to_string(int(N)) + "x" + std::to_string(int(K)));
-    hardware.log_debug("Macro_Tile",
+    hardware.log_debug("macro_tile",
                        std::to_string(int(MT_M)) + "x" + std::to_string(int(MT_N)) + "x" +
                            std::to_string(int(MT_K)));
-    hardware.log_debug("Element Size A (bits)", element_size_A);
-    hardware.log_debug("Element Size B (bits)", element_size_B);
+    hardware.log_debug("element_size_a_bits", element_size_A);
+    hardware.log_debug("element_size_b_bits", element_size_B);
   }
 
   // 0) Short-circuit
@@ -959,11 +957,87 @@ double compute_total_latency(const hardware_t& hardware,
   }
 
   if (hardware_t::is_debug_enabled()) {
-    hardware.log_debug("Total_latency (with heuristics)", total_latency);
+    hardware.log_debug("total_latency_with_heuristics", total_latency);
     hardware.print_debug_info();
   }
 
   return total_latency;
+}
+
+// Extract analytical metrics from a GEMM computation and return as map
+std::unordered_map<std::string, std::string> extract_analytical_metrics(const hardware_t& hardware,
+                                                                        const problem_t& problem,
+                                                                        const config_t& config) {
+  // Clear any previous debug info
+  hardware.clear_debug();
+
+  // Enable metrics collection mode to bypass environment variable check
+  hardware.set_metrics_collection_mode(true);
+
+  // Extract basic parameters for forced logging
+  size_t M                = problem.size.m;
+  size_t N                = problem.size.n;
+  size_t K                = problem.size.k;
+  size_t batch            = problem.batch;
+  bool transA             = problem.transpose_a;
+  bool transB             = problem.transpose_b;
+  size_t element_size_A   = data_type_to_bits(problem.a_dtype);
+  size_t element_size_B   = data_type_to_bits(problem.b_dtype);
+  size_t element_size_out = data_type_to_bits(problem.d_dtype);
+  data_type_t mi_datatype = problem.mi_dtype;
+  size_t mx_block_size    = problem.mx_block_size;
+
+  size_t MT_M = config.mt.m;
+  size_t MT_N = config.mt.n;
+  size_t MT_K = config.mt.k;
+  size_t MI_M = config.mi.m;
+  size_t MI_N = config.mi.n;
+  size_t MI_K = config.mi.k;
+  int WGM     = config.workgroup_mapping;
+
+  // Log basic problem and configuration parameters
+  hardware.log_debug(
+      "problem_size",
+      std::to_string(int(M)) + "x" + std::to_string(int(N)) + "x" + std::to_string(int(K)));
+  hardware.log_debug("macro_tile",
+                     std::to_string(int(MT_M)) + "x" + std::to_string(int(MT_N)) + "x" +
+                         std::to_string(int(MT_K)));
+  hardware.log_debug("micro_tile",
+                     std::to_string(int(MI_M)) + "x" + std::to_string(int(MI_N)) + "x" +
+                         std::to_string(int(MI_K)));
+  hardware.log_debug("element_size_a_bits", element_size_A);
+  hardware.log_debug("element_size_b_bits", element_size_B);
+  hardware.log_debug("element_size_out_bits", element_size_out);
+  hardware.log_debug("batch_size", batch);
+  hardware.log_debug("transpose_a", transA ? "true" : "false");
+  hardware.log_debug("transpose_b", transB ? "true" : "false");
+  hardware.log_debug("workgroup_mapping", WGM);
+  hardware.log_debug("mx_block_size", mx_block_size);
+
+  // Run compute_total_latency which will populate debug_info with all intermediate values
+  // since we enabled metrics collection mode
+  double total_latency = compute_total_latency(hardware, problem, config, 0);
+
+  // Disable metrics collection mode
+  hardware.set_metrics_collection_mode(false);
+
+  // Add the final latency to metrics
+  hardware.log_debug_force("final_total_latency", total_latency);
+
+  // Return all collected metrics
+  return hardware.get_analytical_metrics();
+}
+
+// Extract analytical metrics and export to CSV
+void extract_analytical_metrics_csv(const hardware_t& hardware,
+                                    const problem_t& problem,
+                                    const config_t& config,
+                                    const std::string& filename) {
+  // Extract metrics
+  extract_analytical_metrics(hardware, problem, config);
+
+  // Export to CSV
+  hardware.extract_analytical_metrics_csv(filename);
 }
 
 }  // namespace origami

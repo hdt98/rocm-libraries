@@ -5,8 +5,9 @@ namespace origami {
 namespace math {
 
 /**
- * Performs `(n + d - 1) / d`, but is robust against the case where
+ * @brief Performs `(n + d - 1) / d`, but is robust against the case where
  * `(n + d - 1)` would overflow.
+ *
  */
 template <typename N, typename D>
 __device__ __host__ inline constexpr N safe_ceil_div(N n, D d) {
