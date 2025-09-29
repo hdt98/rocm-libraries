@@ -35,11 +35,13 @@ using namespace Catch;
 
 TEST_CASE("GEMM Speed calculation", "[client][utilities]")
 {
+    using namespace rocRoller::Client::Utils;
+
     SECTION("Should be NaN if execution time is <= zero")
     {
-        REQUIRE(std::isnan(gemmSpeedInTeraFLOPS(11, 22, 33, 0)));
+        REQUIRE(std::isnan(GemmThroughputInTeraFLOPS(11, 22, 33, 0)));
 
-        REQUIRE(std::isnan(gemmSpeedInTeraFLOPS(11, 22, 33, -96.024)));
+        REQUIRE(std::isnan(GemmThroughputInTeraFLOPS(11, 22, 33, -96.024)));
     }
 
     SECTION("Speed should be calculated correctly")
@@ -50,7 +52,7 @@ TEST_CASE("GEMM Speed calculation", "[client][utilities]")
                        std::tuple<int, int, int, double, double>{100, 200, 300, 0.1, 1.20e-04},
                        std::tuple<int, int, int, double, double>{512, 1024, 2048, 0.5, 4.29e-03});
 
-        REQUIRE(gemmSpeedInTeraFLOPS(M, N, K, executionTimeInSeconds)
+        REQUIRE(GemmThroughputInTeraFLOPS(M, N, K, executionTimeInSeconds)
                 == Approx(expectedTFLOPS).margin(1e-04));
     }
 }

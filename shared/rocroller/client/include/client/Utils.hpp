@@ -27,16 +27,27 @@
 
 #include <limits>
 
-inline double
-    gemmSpeedInTeraFLOPS(const int M, const int N, const int K, double executionTimeInSeconds)
+namespace rocRoller
 {
-    if(executionTimeInSeconds <= 0.0)
+    namespace Client
     {
-        return std::numeric_limits<double>::quiet_NaN();
-    }
+        namespace Utils
+        {
+            static inline double GemmThroughputInTeraFLOPS(const int M,
+                                                           const int N,
+                                                           const int K,
+                                                           double    executionTimeInSeconds)
+            {
+                if(executionTimeInSeconds <= 0.0)
+                {
+                    return std::numeric_limits<double>::quiet_NaN();
+                }
 
-    const double TERA                 = 1e12;
-    const double numberOfFPOperations = /*multiply & add */ 2.0 * M * N * K;
+                const double TERA                 = 1e12;
+                const double numberOfFPOperations = /*multiply & add */ 2.0 * M * N * K;
 
-    return numberOfFPOperations / TERA / executionTimeInSeconds;
-}
+                return numberOfFPOperations / TERA / executionTimeInSeconds;
+            }
+        } // namespace Utils
+    } // namespace Client
+} // namespace rocRoller

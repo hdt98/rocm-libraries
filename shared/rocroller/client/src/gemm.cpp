@@ -378,7 +378,7 @@ namespace rocRoller::Client::GEMMClient
         const double averageTimeInSeconds
             = totalTimeInSeconds / (benchmarkParams.numInner * benchmarkParams.numOuter);
 
-        const double teraFLOPS = gemmSpeedInTeraFLOPS(
+        const double teraFLOPS = Utils::GemmThroughputInTeraFLOPS(
             problemParams.m, problemParams.n, problemParams.k, averageTimeInSeconds);
 
         std::cout << fmt::format("Average runtime (s): {:e}\n", averageTimeInSeconds);
