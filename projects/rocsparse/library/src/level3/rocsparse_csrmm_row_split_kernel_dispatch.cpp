@@ -609,32 +609,32 @@ namespace rocsparse
 
     template <typename T, typename I, typename J, typename A, typename B, typename C>
     rocsparse_status csrmm_row_split_kernel_dispatch(rocsparse_handle    handle,
-                                              rocsparse_operation trans_A,
-                                              rocsparse_operation trans_B,
-                                              J                   m,
-                                              J                   n,
-                                              J                   k,
-                                              I                   nnz,
-                                              J                   batch_count_A,
-                                              int64_t             offsets_batch_stride_A,
-                                              int64_t             columns_values_batch_stride_A,
-                                              const T*            alpha_device_host,
-                                              const rocsparse_mat_descr descr,
-                                              const A*                  csr_val,
-                                              const I*                  csr_row_ptr,
-                                              const J*                  csr_col_ind,
-                                              const B*                  dense_B,
-                                              int64_t                   ldb,
-                                              J                         batch_count_B,
-                                              int64_t                   batch_stride_B,
-                                              rocsparse_order           order_B,
-                                              const T*                  beta_device_host,
-                                              C*                        dense_C,
-                                              int64_t                   ldc,
-                                              J                         batch_count_C,
-                                              int64_t                   batch_stride_C,
-                                              rocsparse_order           order_C,
-                                              bool                      force_conj_A)
+                                                     rocsparse_operation trans_A,
+                                                     rocsparse_operation trans_B,
+                                                     J                   m,
+                                                     J                   n,
+                                                     J                   k,
+                                                     I                   nnz,
+                                                     J                   batch_count_A,
+                                                     int64_t             offsets_batch_stride_A,
+                                                     int64_t  columns_values_batch_stride_A,
+                                                     const T* alpha_device_host,
+                                                     const rocsparse_mat_descr descr,
+                                                     const A*                  csr_val,
+                                                     const I*                  csr_row_ptr,
+                                                     const J*                  csr_col_ind,
+                                                     const B*                  dense_B,
+                                                     int64_t                   ldb,
+                                                     J                         batch_count_B,
+                                                     int64_t                   batch_stride_B,
+                                                     rocsparse_order           order_B,
+                                                     const T*                  beta_device_host,
+                                                     C*                        dense_C,
+                                                     int64_t                   ldc,
+                                                     J                         batch_count_C,
+                                                     int64_t                   batch_stride_C,
+                                                     rocsparse_order           order_C,
+                                                     bool                      force_conj_A)
     {
         ROCSPARSE_ROUTINE_TRACE;
 
@@ -660,38 +660,38 @@ namespace rocsparse
                     rocsparse::csrmmnt_template_row_split);
             }
         }
-        
+
         RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_not_implemented);
     }
 }
-#define INSTANTIATE(TTYPE, ITYPE, JTYPE, ATYPE, BTYPE, CTYPE)      \
+#define INSTANTIATE(TTYPE, ITYPE, JTYPE, ATYPE, BTYPE, CTYPE)             \
     template rocsparse_status rocsparse::csrmm_row_split_kernel_dispatch( \
-        rocsparse_handle          handle,                          \
-        rocsparse_operation       trans_A,                         \
-        rocsparse_operation       trans_B,                         \
-        JTYPE                     m,                               \
-        JTYPE                     n,                               \
-        JTYPE                     k,                               \
-        ITYPE                     nnz,                             \
-        JTYPE                     batch_count_A,                   \
-        int64_t                   offsets_batch_stride_A,          \
-        int64_t                   columns_values_batch_stride_A,   \
-        const TTYPE*              alpha_device_host,               \
-        const rocsparse_mat_descr descr,                           \
-        const ATYPE*              csr_val,                         \
-        const ITYPE*              csr_row_ptr,                     \
-        const JTYPE*              csr_col_ind,                     \
-        const BTYPE*              dense_B,                         \
-        int64_t                   ldb,                             \
-        JTYPE                     batch_count_B,                   \
-        int64_t                   batch_stride_B,                  \
-        rocsparse_order           order_B,                         \
-        const TTYPE*              beta_device_host,                \
-        CTYPE*                    dense_C,                         \
-        int64_t                   ldc,                             \
-        JTYPE                     batch_count_C,                   \
-        int64_t                   batch_stride_C,                  \
-        rocsparse_order           order_C,                         \
+        rocsparse_handle          handle,                                 \
+        rocsparse_operation       trans_A,                                \
+        rocsparse_operation       trans_B,                                \
+        JTYPE                     m,                                      \
+        JTYPE                     n,                                      \
+        JTYPE                     k,                                      \
+        ITYPE                     nnz,                                    \
+        JTYPE                     batch_count_A,                          \
+        int64_t                   offsets_batch_stride_A,                 \
+        int64_t                   columns_values_batch_stride_A,          \
+        const TTYPE*              alpha_device_host,                      \
+        const rocsparse_mat_descr descr,                                  \
+        const ATYPE*              csr_val,                                \
+        const ITYPE*              csr_row_ptr,                            \
+        const JTYPE*              csr_col_ind,                            \
+        const BTYPE*              dense_B,                                \
+        int64_t                   ldb,                                    \
+        JTYPE                     batch_count_B,                          \
+        int64_t                   batch_stride_B,                         \
+        rocsparse_order           order_B,                                \
+        const TTYPE*              beta_device_host,                       \
+        CTYPE*                    dense_C,                                \
+        int64_t                   ldc,                                    \
+        JTYPE                     batch_count_C,                          \
+        int64_t                   batch_stride_C,                         \
+        rocsparse_order           order_C,                                \
         bool                      force_conj_A)
 
 // Uniform precisions

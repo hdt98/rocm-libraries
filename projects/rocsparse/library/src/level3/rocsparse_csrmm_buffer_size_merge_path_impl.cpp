@@ -31,58 +31,49 @@ namespace rocsparse
 {
     template <typename T, typename I, typename J, typename A>
     rocsparse_status csrmm_buffer_size_merge_path_kernel_dispatch(rocsparse_handle          handle,
-                                                      rocsparse_operation       trans_A,
-                                                      J                         m,
-                                                      J                         n,
-                                                      J                         k,
-                                                      I                         nnz,
-                                                      const rocsparse_mat_descr descr,
-                                                      const A*                  csr_val,
-                                                      const I*                  csr_row_ptr,
-                                                      const J*                  csr_col_ind,
-                                                      size_t*                   buffer_size);
+                                                                  rocsparse_operation       trans_A,
+                                                                  J                         m,
+                                                                  J                         n,
+                                                                  J                         k,
+                                                                  I                         nnz,
+                                                                  const rocsparse_mat_descr descr,
+                                                                  const A*                  csr_val,
+                                                                  const I* csr_row_ptr,
+                                                                  const J* csr_col_ind,
+                                                                  size_t*  buffer_size);
 
     template <typename T, typename I, typename J, typename A>
     static rocsparse_status csrmm_buffer_size_merge_path_core(rocsparse_handle          handle,
-                                                   rocsparse_operation       trans_A,
-                                                   J                         m,
-                                                   J                         n,
-                                                   J                         k,
-                                                   I                         nnz,
-                                                   const rocsparse_mat_descr descr,
-                                                   const A*                  csr_val,
-                                                   const I*                  csr_row_ptr,
-                                                   const J*                  csr_col_ind,
-                                                   size_t*                   buffer_size)
+                                                              rocsparse_operation       trans_A,
+                                                              J                         m,
+                                                              J                         n,
+                                                              J                         k,
+                                                              I                         nnz,
+                                                              const rocsparse_mat_descr descr,
+                                                              const A*                  csr_val,
+                                                              const I*                  csr_row_ptr,
+                                                              const J*                  csr_col_ind,
+                                                              size_t*                   buffer_size)
     {
         ROCSPARSE_ROUTINE_TRACE;
 
-        RETURN_IF_ROCSPARSE_ERROR(
-            rocsparse::csrmm_buffer_size_merge_path_kernel_dispatch<T>(handle,
-                                                                trans_A,
-                                                                m,
-                                                                n,
-                                                                k,
-                                                                nnz,
-                                                                descr,
-                                                                csr_val,
-                                                                csr_row_ptr,
-                                                                csr_col_ind,
-                                                                buffer_size));
+        RETURN_IF_ROCSPARSE_ERROR(rocsparse::csrmm_buffer_size_merge_path_kernel_dispatch<T>(
+            handle, trans_A, m, n, k, nnz, descr, csr_val, csr_row_ptr, csr_col_ind, buffer_size));
         return rocsparse_status_success;
     }
 
-    static rocsparse_status csrmm_buffer_size_merge_path_quickreturn(rocsparse_handle          handle,
-                                                          rocsparse_operation       trans_A,
-                                                          int64_t                         m,
-                                                          int64_t                   n,
-                                                          int64_t                   k,
-                                                          int64_t                   nnz,
-                                                          const rocsparse_mat_descr descr,
-                                                          const void*                  csr_val,
-                                                          const void*                  csr_row_ptr,
-                                                          const void*                  csr_col_ind,
-                                                          size_t*                   buffer_size)
+    static rocsparse_status
+        csrmm_buffer_size_merge_path_quickreturn(rocsparse_handle          handle,
+                                                 rocsparse_operation       trans_A,
+                                                 int64_t                   m,
+                                                 int64_t                   n,
+                                                 int64_t                   k,
+                                                 int64_t                   nnz,
+                                                 const rocsparse_mat_descr descr,
+                                                 const void*               csr_val,
+                                                 const void*               csr_row_ptr,
+                                                 const void*               csr_col_ind,
+                                                 size_t*                   buffer_size)
     {
         ROCSPARSE_ROUTINE_TRACE;
 
@@ -97,31 +88,21 @@ namespace rocsparse
 
 template <typename T, typename I, typename J, typename A>
 rocsparse_status rocsparse::csrmm_buffer_size_merge_path_template(rocsparse_handle          handle,
-                                                       rocsparse_operation       trans_A,
-                                                       int64_t                   m,
-                                                       int64_t                   n,
-                                                       int64_t                   k,
-                                                       int64_t                   nnz,
-                                                       const rocsparse_mat_descr descr,
-                                                       const void*               csr_val,
-                                                       const void*               csr_row_ptr,
-                                                       const void*               csr_col_ind,
-                                                       size_t*                   buffer_size)
+                                                                  rocsparse_operation       trans_A,
+                                                                  int64_t                   m,
+                                                                  int64_t                   n,
+                                                                  int64_t                   k,
+                                                                  int64_t                   nnz,
+                                                                  const rocsparse_mat_descr descr,
+                                                                  const void*               csr_val,
+                                                                  const void* csr_row_ptr,
+                                                                  const void* csr_col_ind,
+                                                                  size_t*     buffer_size)
 {
     ROCSPARSE_ROUTINE_TRACE;
 
-    const rocsparse_status status
-        = rocsparse::csrmm_buffer_size_merge_path_quickreturn(handle,
-                                                               trans_A,
-                                                               m,
-                                                               n,
-                                                               k,
-                                                               nnz,
-                                                               descr,
-                                                               csr_val,
-                                                               csr_row_ptr,
-                                                               csr_col_ind,
-                                                               buffer_size);
+    const rocsparse_status status = rocsparse::csrmm_buffer_size_merge_path_quickreturn(
+        handle, trans_A, m, n, k, nnz, descr, csr_val, csr_row_ptr, csr_col_ind, buffer_size);
 
     if(status != rocsparse_status_continue)
     {
@@ -129,34 +110,34 @@ rocsparse_status rocsparse::csrmm_buffer_size_merge_path_template(rocsparse_hand
         return rocsparse_status_success;
     }
 
-    RETURN_IF_ROCSPARSE_ERROR(
-        (rocsparse::csrmm_buffer_size_merge_path_core<T, I, J, A>(handle,
-                                                       trans_A,
-                                                       m,
-                                                       n,
-                                                       k,
-                                                       nnz,
-                                                       descr,
-                                                       static_cast<const A*>(csr_val),
-                                                       static_cast<const I*>(csr_row_ptr),
-                                                       static_cast<const J*>(csr_col_ind),
-                                                       buffer_size)));
+    RETURN_IF_ROCSPARSE_ERROR((
+        rocsparse::csrmm_buffer_size_merge_path_core<T, I, J, A>(handle,
+                                                                 trans_A,
+                                                                 m,
+                                                                 n,
+                                                                 k,
+                                                                 nnz,
+                                                                 descr,
+                                                                 static_cast<const A*>(csr_val),
+                                                                 static_cast<const I*>(csr_row_ptr),
+                                                                 static_cast<const J*>(csr_col_ind),
+                                                                 buffer_size)));
 
     return rocsparse_status_success;
 }
 
-#define INSTANTIATE_BUFFER_SIZE(T, I, J, A)                                      \
+#define INSTANTIATE_BUFFER_SIZE(T, I, J, A)                                                 \
     template rocsparse_status rocsparse::csrmm_buffer_size_merge_path_template<T, I, J, A>( \
-        rocsparse_handle          handle,                                        \
-        rocsparse_operation       trans_A,                                       \
-        int64_t                   m,                                             \
-        int64_t                   n,                                             \
-        int64_t                   k,                                             \
-        int64_t                   nnz,                                           \
-        const rocsparse_mat_descr descr,                                         \
-        const void*               csr_val,                                       \
-        const void*               csr_row_ptr,                                   \
-        const void*               csr_col_ind,                                   \
+        rocsparse_handle          handle,                                                   \
+        rocsparse_operation       trans_A,                                                  \
+        int64_t                   m,                                                        \
+        int64_t                   n,                                                        \
+        int64_t                   k,                                                        \
+        int64_t                   nnz,                                                      \
+        const rocsparse_mat_descr descr,                                                    \
+        const void*               csr_val,                                                  \
+        const void*               csr_row_ptr,                                              \
+        const void*               csr_col_ind,                                              \
         size_t*                   buffer_size);
 
 // Uniform precisions

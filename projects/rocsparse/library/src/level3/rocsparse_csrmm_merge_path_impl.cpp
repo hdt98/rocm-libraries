@@ -153,28 +153,27 @@ rocsparse_status rocsparse::csrmm_merge_path_template(rocsparse_handle    handle
 {
     ROCSPARSE_ROUTINE_TRACE;
 
-    const rocsparse_status status
-        = rocsparse::csrmm_quickreturn(handle,
-                                                  trans_A,
-                                                  trans_B,
-                                                  m,
-                                                  n,
-                                                  k,
-                                                  nnz,
-                                                  static_cast<const T*>(alpha),
-                                                  descr,
-                                                  csr_val,
-                                                  csr_row_ptr,
-                                                  csr_col_ind,
-                                                  dense_B,
-                                                  ldb,
-                                                  static_cast<const T*>(beta),
-                                                  static_cast<C*>(dense_C),
-                                                  ldc,
-                                                  order_B,
-                                                  order_C,
-                                                  batch_count_C,
-                                                  batch_stride_C);
+    const rocsparse_status status = rocsparse::csrmm_quickreturn(handle,
+                                                                 trans_A,
+                                                                 trans_B,
+                                                                 m,
+                                                                 n,
+                                                                 k,
+                                                                 nnz,
+                                                                 static_cast<const T*>(alpha),
+                                                                 descr,
+                                                                 csr_val,
+                                                                 csr_row_ptr,
+                                                                 csr_col_ind,
+                                                                 dense_B,
+                                                                 ldb,
+                                                                 static_cast<const T*>(beta),
+                                                                 static_cast<C*>(dense_C),
+                                                                 ldc,
+                                                                 order_B,
+                                                                 order_C,
+                                                                 batch_count_C,
+                                                                 batch_stride_C);
 
     if(status != rocsparse_status_continue)
     {

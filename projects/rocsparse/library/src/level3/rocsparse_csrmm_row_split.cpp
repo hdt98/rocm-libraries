@@ -235,7 +235,7 @@ namespace rocsparse
                                 rocsparse_datatype_bf16_r,
                                 rocsparse_datatype_f32_r)}};
 
-    static rocsparse_status csrmm_row_split_find(csrmm_row_split_t*            function_,
+    static rocsparse_status csrmm_row_split_find(csrmm_row_split_t*  function_,
                                                  rocsparse_datatype  t_type_,
                                                  rocsparse_indextype i_type_,
                                                  rocsparse_indextype j_type_,
@@ -320,50 +320,32 @@ rocsparse_status rocsparse::csrmm_buffer_size_row_split(rocsparse_handle        
 
     ROCSPARSE_ROUTINE_TRACE;
 
-    RETURN_IF_ROCSPARSE_ERROR(csrmm_buffer_size_row_split_template(handle,
-                                                                trans_A,
-                                                                m,
-                                                                n,
-                                                                k,
-                                                                nnz,
-                                                                descr,
-                                                                csr_val,
-                                                                csr_row_ptr,
-                                                                csr_col_ind,
-                                                                buffer_size));
+    RETURN_IF_ROCSPARSE_ERROR(csrmm_buffer_size_row_split_template(
+        handle, trans_A, m, n, k, nnz, descr, csr_val, csr_row_ptr, csr_col_ind, buffer_size));
 
     return rocsparse_status_success;
 }
 
 rocsparse_status rocsparse::csrmm_analysis_row_split(rocsparse_handle          handle,
-                                                    rocsparse_operation       trans_A,
-                                                    int64_t                   m,
-                                                    int64_t                   n,
-                                                    int64_t                   k,
-                                                    int64_t                   nnz,
-                                                    const rocsparse_mat_descr descr,
-                                                    rocsparse_datatype        csr_val_datatype,
-                                                    const void*               csr_val,
-                                                    rocsparse_indextype       csr_row_ptr_indextype,
-                                                    const void*               csr_row_ptr,
-                                                    rocsparse_indextype       csr_col_ind_indextype,
-                                                    const void*               csr_col_ind,
-                                                    void*                     temp_buffer)
+                                                     rocsparse_operation       trans_A,
+                                                     int64_t                   m,
+                                                     int64_t                   n,
+                                                     int64_t                   k,
+                                                     int64_t                   nnz,
+                                                     const rocsparse_mat_descr descr,
+                                                     rocsparse_datatype        csr_val_datatype,
+                                                     const void*               csr_val,
+                                                     rocsparse_indextype csr_row_ptr_indextype,
+                                                     const void*         csr_row_ptr,
+                                                     rocsparse_indextype csr_col_ind_indextype,
+                                                     const void*         csr_col_ind,
+                                                     void*               temp_buffer)
 {
 
     ROCSPARSE_ROUTINE_TRACE;
 
-    RETURN_IF_ROCSPARSE_ERROR(csrmm_analysis_row_split_template(handle,
-                                                                trans_A,
-                                                                m,
-                                                                n,
-                                                                k,
-                                                                nnz,
-                                                                descr,
-                                                                csr_val,
-                                                                csr_row_ptr,
-                                                                csr_col_ind,
-                                                                temp_buffer));
+    RETURN_IF_ROCSPARSE_ERROR(csrmm_analysis_row_split_template(
+        handle, trans_A, m, n, k, nnz, descr, csr_val, csr_row_ptr, csr_col_ind, temp_buffer));
 
     return rocsparse_status_success;
 }
