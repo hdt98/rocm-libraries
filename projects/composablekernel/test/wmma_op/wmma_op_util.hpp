@@ -16,6 +16,289 @@
 namespace ck {
 namespace wmma_op_util {
 
+#if defined(__gfx125__)
+
+#define CK_WMMA_CALL_INTRIN(dst, src0) \
+    intrin_wmma_##dst##_16x16x32_##src0<16, 16>::Run(reg_a, reg_b, reg_c.GetVectorTypeReference(Number<0>{}))
+
+template <typename T, index_t kMultiplier, typename = void>
+struct WMMAVecType
+{
+    static_assert(sizeof(T) == 0, "VecType is not specialized for this type");
+};
+
+// fp16 specialization 
+template <typename T, index_t kMultiplier>
+struct WMMAVecType<T,
+                   kMultiplier,
+                   ck::enable_if_t<ck::is_same_v<T, ck::half_t> || ck::is_same_v<T, ck::bhalf_t>>>
+{
+    static constexpr bool layoutTransform = false;
+    static constexpr int ToIntDim         = 2;
+
+    template <typename D>
+    constexpr static bool is_compatible()
+    {
+        return ck::is_same_v<T, D>;
+    }
+
+    using VecT  = vector_type<T, kMultiplier * 16>;
+    using ViewT = vector_type<T, 2>;
+};
+
+template <typename T, index_t kMultiplier>
+struct WMMAVecType<T,
+                   kMultiplier,
+                   ck::enable_if_t<ck::is_same_v<T, float>>>
+{
+    static constexpr bool layoutTransform = false;
+    static constexpr int ToIntDim         = 1;
+
+    template <typename D>
+    constexpr static bool is_compatible()
+    {
+        return ck::is_same_v<T, D>;
+    }
+
+    using VecT  = vector_type<T, kMultiplier * 8>;
+    using ViewT = vector_type<T, 1>;
+};
+
+template <typename T, index_t kMultiplier>
+struct WMMAVecType<T, kMultiplier, ck::enable_if_t<ck::is_same_v<T, ck::f8_t> || ck::is_same_v<T, ck::bf8_t>>>
+{
+    static constexpr bool layoutTransform = false;
+    static constexpr int ToIntDim         = 4; // adjust as needed
+
+    template <typename D>
+    constexpr static bool is_compatible()
+    {
+        return ck::is_same_v<T, D>;
+    }
+
+    // For FP8 input, hardware expects kMultiplier * 32 elements per fragment
+    using VecT  = vector_type<T, kMultiplier * 32>;
+    using ViewT = vector_type<T, 4>;
+};
+
+// gfx125 builtin_wmma_naive_selector 
+template <typename srcAType, typename srcBType, typename dstType, index_t kMultiplier>
+__device__ void builtin_wmma_naive_selector(
+    const typename WMMAVecType<srcAType, kMultiplier>::VecT::type& reg_a,
+    const typename WMMAVecType<srcBType, kMultiplier>::VecT::type& reg_b,
+    StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr, dstType, 1, 8/* * WMMAVecType<dstType, kMultiplier>::ToIntDim*/, true>& reg_c)
+{
+    // if constexpr(std::is_same_v<srcAType, float>)
+    // {
+    //     printf("----- srcAType is float \n");
+    // }
+    // else if constexpr(std::is_same_v<srcAType, ck::half_t>)
+    // {
+    //     printf("----- srcAType is half \n");
+    // }
+    //     if constexpr(std::is_same_v<srcBType, float>)
+    // {
+    //     printf("----- srcBType is float \n");
+    // }
+    // else if constexpr(std::is_same_v<srcBType, ck::half_t>)
+    // {
+    //     printf("----- srcBType is half \n");
+    // }    
+    // if constexpr(std::is_same_v<dstType, float>)
+    // {
+    //     printf("----- dstType is float \n");
+    // }
+    // else if constexpr(std::is_same_v<dstType, ck::half_t>)
+    // {
+    //     printf("----- dstType is half \n");
+    // }
+    if constexpr(std::is_same_v<srcAType, ck::half_t> && std::is_same_v<srcBType, ck::half_t> && std::is_same_v<dstType, ck::half_t>)
+    {        
+        // printf("--------- Calling f16, f16 ---------- \n");
+        CK_WMMA_CALL_INTRIN(f16, f16);
+    } 
+    else if constexpr(std::is_same_v<srcAType, ck::half_t> && std::is_same_v<srcBType, ck::half_t> && std::is_same_v<dstType, float>)    {
+        // printf("--------- Calling f32, f16 UNIMPLEMENTED ---------- \n");
+        CK_WMMA_CALL_INTRIN(f32, f16);
+    } else {
+        printf("---------- No builtin_wmma_naive_selector implementation for these types ----------\n");
+    }
+}
+
+template<typename srcA_t, typename srcB_t, typename dst_t, ck::index_t kMultiplier>
+__global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
+{
+    //printf("---------- Running gfx125 matmul - INCORRECT INDEXING ----------\n");
+    static_assert(WMMAVecType<srcA_t, kMultiplier>::template is_compatible<srcB_t>(),
+                  "the data format for srcA and srcB is unsupported in gfx1250");
+    using srcA_cast_T    = WMMAVecType<srcA_t, kMultiplier>::ViewT;
+    using srcB_cast_T    = WMMAVecType<srcB_t, kMultiplier>::ViewT;
+    using srcA_cast_type = typename srcA_cast_T::type;
+    using srcB_cast_type = typename srcB_cast_T::type;
+
+    //KO TODO:: revisit this. 
+    using srcA_vec      = typename WMMAVecType<srcA_t, kMultiplier>::VecT;
+    using srcB_vec      = typename WMMAVecType<srcB_t, kMultiplier>::VecT;
+    using srcA_vec_type = srcA_vec::type;
+    using srcB_vec_type = srcB_vec::type;
+
+    const srcA_cast_type* a_ptr = reinterpret_cast<const srcA_cast_type*>(a);
+    const srcB_cast_type* b_ptr = reinterpret_cast<const srcB_cast_type*>(b);
+
+    srcA_vec a_frag = {};
+    srcB_vec b_frag = {};
+
+    srcA_vec a_temp = {};
+    srcB_vec b_temp = {};
+
+    using dst_vec = StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr,
+                                              dst_t,
+                                              1,
+                                              8/** WMMAVecType<dst_t, kMultiplier>::ToIntDim*/,
+                                              true>;
+    dst_vec dst_thread_buf_;
+
+    constexpr int ToIntDim    = WMMAVecType<srcA_t, kMultiplier>::ToIntDim;
+    constexpr int SRC_DIM     = 2;//8 * kMultiplier; // KO TODO:: Fix... Number of packed elements per thread
+    constexpr int ROW_SIZE    = SRC_DIM * 2;     // Two threads per block
+    constexpr int LDS_DIM     = ROW_SIZE * 32 * 2 / ToIntDim; // A and B, packed
+    constexpr int LDS_B_START = LDS_DIM / 2;
+    //printf("LDS_DIM = %d\n", LDS_DIM);
+
+    __shared__ srcA_cast_type p_shared[LDS_DIM];
+
+    // strongly-type compile time index value of 0 for template containers
+    static constexpr auto I0          = Number<0>{};
+    
+    // use a directly, as lds_shared allocated with A; A better be bigger than B if mixed
+    const srcA_cast_type* local_a_ptr = p_shared;
+
+    // get pointer as B type given LDS allocated with A
+    const srcB_cast_type* local_b_ptr = reinterpret_cast<const srcB_cast_type*>(p_shared + LDS_B_START);
+    //printf("[LDS_B_START] LDS_B_START = %d\n", LDS_B_START);
+    //printf("[local_b_ptr] start address: %p\n", static_cast<const void*>(local_b_ptr));
+    //printf("[local_b_ptr] address at offset 0: %p\n", static_cast<const void*>(&local_b_ptr[0]));
+    //printf("[local_b_ptr] address at offset 256: %p\n", static_cast<const void*>(&local_b_ptr[256]));
+    //printf("[local_b_ptr] address at offset 512: %p\n", static_cast<const void*>(&local_b_ptr[512]));
+
+    const int lIdx = threadIdx.x;
+    const int lane = lIdx % 32; // wave size
+
+    static_for<0, SRC_DIM, 1>{}([&](auto ele) {
+        // Blocked M, K pattern:
+        // For lanes 0-15: K = ele + 0
+        // For lanes 16-31: K = ele + SRC_DIM
+        int m = lane % 16;
+        int k = (lane < 16) ? ele : ele + SRC_DIM;
+        int a_idx = m * (SRC_DIM * 2) + k; // M x K-major
+        a_temp.template AsType<srcA_cast_type>()(ele) = a_ptr[a_idx];
+    });
+
+    static_for<0, SRC_DIM, 1>{}([&](auto ele) {
+        int n = lane % 16;
+        int kb = (lane < 16) ? ele : ele + SRC_DIM;
+        int b_idx = kb * (SRC_DIM * 2) + n; // K x N-major
+        b_temp.template AsType<srcB_cast_type>()(ele) = b_ptr[b_idx];
+    });
+
+    // __syncthreads(); // KO TODO:: Needed?
+
+    static_for<0, SRC_DIM, 1>{}([&](auto ele) {
+        int lds_a_idx = SRC_DIM * lIdx + ele;
+        //printf("[LDS WRITE] p_shared[%d] = \n", lds_a_idx);
+        p_shared[lds_a_idx] = a_temp.template AsType<srcA_cast_type>()(ele);
+    });
+
+    static_for<0, SRC_DIM, 1>{}([&](auto ele) {
+        int lds_b_idx = SRC_DIM * lIdx + ele + LDS_B_START;
+        //printf("[LDS WRITE] p_shared[%d] = \n", lds_b_idx);
+        p_shared[lds_b_idx] = b_temp.template AsType<srcB_cast_type>()(ele);
+    });
+
+    __syncthreads(); //KO TODO:: move to inline asm
+
+    static_for<0, SRC_DIM, 1>{}([&](auto ele) {
+        int a_idx = SRC_DIM * lIdx + ele;
+        //printf("[LDS READ] local_a_ptr[%d] (p_shared[%d]) \n", a_idx, a_idx);
+        a_frag.template AsType<srcA_cast_type>()(ele) = local_a_ptr[a_idx];
+
+        int b_idx = SRC_DIM * lIdx + ele + LDS_B_START;
+           //printf("[LDS RANGE] p_shared start: %p, end: %p\n", 
+        //    static_cast<void*>(p_shared), 
+        //    static_cast<void*>(p_shared + LDS_DIM - 1));
+        //printf("[LDS READ] local_b_ptr[%d] (p_shared[%d]) \n", b_idx, b_idx);
+        //printf("[LDS ACCESS] local_b_ptr[%d] address: %p\n", 
+        //    b_idx, 
+        //    static_cast<const void*>(&local_b_ptr[b_idx]));
+        b_frag.template AsType<srcB_cast_type>()(ele) = local_b_ptr[0];//local_b_ptr[b_idx];
+    });
+
+    __syncthreads(); //KO TODO:: move to inline asm
+
+    // Call the WMMA intrinsic selector
+    //printf("------- calling builtin_naive_wmma_selector ------- \n");
+    builtin_wmma_naive_selector<srcA_t, srcB_t, dst_t, kMultiplier>(
+        a_frag.template AsType<srcA_vec_type>()(I0),
+        b_frag.template AsType<srcB_vec_type>()(I0),
+        dst_thread_buf_);
+
+    //printf("------- FINISHED builtin_naive_wmma_selector ------- \n");
+
+    // Store results to global memory (row-major, adjust as needed)
+    static_for<0, 8, 1>{}([&](auto ele) {
+        int col = lIdx >> 1;
+        int row = ((ele & 6) << 1) + (ele & 1) + ((lIdx & 1) << 1);
+        c[16 * row + col] = dst_thread_buf_[Number<ele>{}];
+    });
+}
+
+template <typename srcA_t, typename srcB_t, typename dst_t, ck::index_t KMultiplier>
+__global__ void matmul_swizzle_a(const srcA_t* a, const srcB_t* b, dst_t* c)
+{
+    ignore = a;
+    ignore = b;
+    ignore = c;
+    //printf("---------- Running gfx125 matmul_swizzle_a - NOT IMPLEMENTED YET ----------\n");
+}
+
+template <typename src_t, typename dst_t, typename acc_t>
+__global__ void matmul(const src_t* a, const src_t* b, dst_t* c)
+{
+    ignore = a;
+    ignore = b;
+    ignore = c;
+    //printf("---------- Running gfx1250 matmul - DISABLED original matmul ----------\n");
+}
+
+template <typename src_t, typename dst_t, typename acc_t>
+__global__ void matmul_swizzle_a(const src_t* a, const src_t* b, dst_t* c)
+{
+    ignore = a;
+    ignore = b;
+    ignore = c;
+    //printf("---------- Running gfx1250 matmul - DISABLED original matmul_swizzle_a ----------\n");
+}
+
+#else 
+
+template <typename AccType>
+struct WMMA_ACCNumber_traits
+{
+    static constexpr index_t ACC_NUMBER = 8;
+};
+
+template <>
+struct WMMA_ACCNumber_traits<ck::half_t>
+{
+    static constexpr index_t ACC_NUMBER = 16;
+};
+
+template <>
+struct WMMA_ACCNumber_traits<ck::bhalf_t>
+{
+    static constexpr index_t ACC_NUMBER = 16;
+};
+
 template <typename src_vec, typename acc_vec>
 __device__ void builtin_wmma_naive_selector(const src_vec&, const src_vec&, acc_vec&)
 {
@@ -95,52 +378,11 @@ builtin_wmma_naive_selector<int4x16_t,
 }
 #endif
 
-//KO TODO:: Add gfx125 WMMAVecType
-template <typename T, index_t kMultiplier, typename = void>
-struct WMMAVecType
-{
-    static_assert(sizeof(T) == 0, "VecType is not specialized for this type");
-};
 
-// fp16
-template <typename T, index_t kMultiplier>
-struct WMMAVecType<T, kMultiplier, std::enable_if_t<std::is_same_v<T, ck::half_t>>>
-{
-    using VecT  = vector_type<T, kMultiplier * 16>;
-    using ViewT = vector_type<T, 16>;
-};
-
-
-//KO TODO:: Add gfx125 macros
-#define CK_WMMA_CALL_INTRIN(dst, src0, src1, ...) \
-    intrin_wmma_##dst##_16x16x32_##src0<16, 16>::Run(__VA_ARGS__)
-
-
-template <typename AccType>
-struct WMMA_ACCNumber_traits
-{
-    static constexpr index_t ACC_NUMBER = 8;
-};
-
-template <>
-struct WMMA_ACCNumber_traits<ck::half_t>
-{
-    static constexpr index_t ACC_NUMBER = 16;
-};
-
-template <>
-struct WMMA_ACCNumber_traits<ck::bhalf_t>
-{
-    static constexpr index_t ACC_NUMBER = 16;
-};
-
-// #if defined (__gfx12__)
-// KO TODO:: if gfx12, or general with refactor to make look like gfx13?
-// KO TODO:: add in WMMA_ACCNumber_traits to support refactor
 template <typename src_t, typename dst_t, typename acc_t>
 __global__ void matmul(const src_t* a, const src_t* b, dst_t* c)
 {
-    printf("------ USING LEGACY MATMUL ------ ");
+    //printf("------ USING LEGACY MATMUL ------ ");
     __shared__ src_t p_shared[16 * 16 * 2];
     const int lIdx = threadIdx.x;
     // a and b fragments are stored in 8 VGPRs each, in packed format, so 16 elements each for a and
@@ -239,7 +481,7 @@ __global__ void matmul(const src_t* a, const src_t* b, dst_t* c)
 template <typename src_t, typename dst_t, typename acc_t>
 __global__ void matmul_swizzle_a(const src_t* a, const src_t* b, dst_t* c)
 {
-    printf("------ USING LEGACY MATMUL_SWIZZLE_A ------ ");
+    //printf("------ USING LEGACY MATMUL_SWIZZLE_A ------ ");
     const int lIdx = threadIdx.x;
 
     using src_vec  = typename vector_type<src_t, 16>::type;
@@ -274,83 +516,24 @@ __global__ void matmul_swizzle_a(const src_t* a, const src_t* b, dst_t* c)
     });
 }
 
-//KO TODO:: disabled/ignore implementations of new matmul and matmul swizzel a for gfx125 signature
-// the below two functions are only used in gfx13
-// template <typename srcA_t, typename srcB_t, typename dst_t, typename acc_t, index_t kMultiplier>
-// __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
-// {
-//     ignore = a;
-//     ignore = b;
-//     ignore = c;
-// }
-
-// template <typename srcA_t, typename srcB_t, typename dst_t, typename acc_t, index_t kMultiplier>
-// __global__ void matmul_swizzle_a(const srcA_t* a, const srcB_t* b, dst_t* c)
-// {
-//     ignore = a;
-//     ignore = b;
-//     ignore = c;
-// }
-
-//KO TODO:: Add gfx125 matmul
-//#else // defined(__gfx1250__) || defined(__gfx1251__)
-template<typename srcA_t, typename srcB_t, typename dst_t, typename acc_t, ck::index_t kMultiplier>
+template<typename srcA_t, typename srcB_t, typename dst_t, ck::index_t kMultiplier>
 __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
 {
-    assert(true==false);
     ignore = a;
     ignore = b;
     ignore = c;
-    printf("---------- Running gfx125 matmul - NOT IMPLEMENTED YET ----------\n");
 }
 
-//KO TODO:: Add gfx125 matmul_swizzle_a
-template <typename srcA_t, typename srcB_t, typename dst_t, typename acc_t, ck::index_t KMultiplier>
+template <typename srcA_t, typename srcB_t, typename dst_t, ck::index_t KMultiplier>
 __global__ void matmul_swizzle_a(const srcA_t* a, const srcB_t* b, dst_t* c)
 {
     ignore = a;
     ignore = b;
     ignore = c;
-    printf("---------- Running gfx125 matmul - NOT IMPLEMENTED YET ----------\n");
 }
-
-//KO TODO:: Add gfx1250 disabled base type signatures for matmul, matmul_swizzle_a
-// template <typename src_t, typename dst_t, typename acc_t, index_t acc_num>
-// __global__ void matmul(const src_t* a, const src_t* b, dst_t* c)
-// {
-//     ignore = a;
-//     ignore = b;
-//     ignore = c;
-//     printf("---------- Running gfx1250 matmul - DISABLED original matmul ----------\n");
-// }
-
-// template <typename src_t, typename dst_t, typename acc_t>
-// __global__ void matmul_swizzle_a(const src_t* a, const src_t* b, dst_t* c)
-// {
-//     ignore = a;
-//     ignore = b;
-//     ignore = c;
-//     printf("---------- Running gfx1250 matmul - DISABLED original matmul_swizzle_a ----------\n");
-// }
+#endif
 
 
-
-//KO TODO:: Add gfx125 builtin_wmma_naive_selector 
-template <typename srcAType, typename srcBType, typename accType, index_t kMultiplier>
-__device__ void builtin_wmma_naive_selector(
-    const typename WMMAVecType<srcAType, kMultiplier>::VecT::type& reg_a,
-    const typename WMMAVecType<srcBType, kMultiplier>::VecT::type& reg_b,
-    StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr, accType, 1, kMultiplier * 16, true>& reg_c)
-{
-    if constexpr(std::is_same_v<srcAType, ck::half_t> && std::is_same_v<srcBType, ck::half_t> && std::is_same_v<accType, ck::half_t>)
-    {
-        CK_WMMA_CALL_INTRIN(f16, f16, f16, 0, reg_a, 0, reg_b, 0, reg_c.GetVectorTypeReference(Number<0>{}));
-    } else {
-        printf("---------- No builtin_wmma_naive_selector implementation for these types ----------\n");
-    }
-}
-
-// #endif
 
 
 struct GemmParams
@@ -464,19 +647,14 @@ struct TestWmma
 
     auto operator()(const DeviceWmma& wmma_kernel)
     {
-        std::cout << "ALayout = " << ALayout{}.name << ", BLayout = " << BLayout{}.name
-                  << ", CLayout = " << CLayout{}.name << std::endl;
-
-        std::cout<<"K Multiplier in testSWMMA operator is: "<< KMultiplier << std::endl;
-
         // Arrange
         ck::wmma_op_util::GemmParams params;
         params.M       = 16;
         params.N       = 16;
-        params.K       = 16;
-        params.StrideA = 16;// * KMultiplier;
-        params.StrideB = 16;// * KMultiplier;
-        params.StrideC = 16;// * KMultiplier;
+        params.K       = 16 * KMultiplier;
+        params.StrideA = 16;
+        params.StrideB = 16;
+        params.StrideC = 16;
 
         auto host_tensors = PrepareGemmTensor(params);
 

@@ -11,6 +11,7 @@
 #include "ck/ck.hpp"
 #include "ck/tensor_operation/gpu/device/tensor_layout.hpp"
 #include "ck/tensor_operation/gpu/element/element_wise_operation.hpp"
+#include "ck/host_utility/device_prop.hpp"
 #include "test/wmma_op/wmma_op_util.hpp"
 
 static ck::index_t test_case_id = -1;
@@ -78,7 +79,7 @@ template <typename SrcAType,
           ck::index_t KMultiplier = 1>
 bool run_test()
 {
-    if(!ck::is_gfx12_supported()) // report a warning, but move on. 
+    if(!ck::is_gfx125_supported()) // report a warning, but move on. 
     {
         fprintf(stderr, "----- WARNING: gfx1250 not supported, reporting SUCCESS and skipping test -----\n");
         return true;
@@ -101,9 +102,9 @@ bool run_test()
 
     // Pass KMultiplier to both kernels
     const auto matmul_default =
-        ck::wmma_op_util::matmul<SrcAType, SrcBType, DstType, GPUAccType, KMultiplier>;
+        ck::wmma_op_util::matmul<SrcAType, SrcBType, DstType, KMultiplier>;
     const auto matmul_swizzle_a =
-        ck::wmma_op_util::matmul_swizzle_a<SrcAType, SrcBType, DstType, GPUAccType, KMultiplier>;
+        ck::wmma_op_util::matmul_swizzle_a<SrcAType, SrcBType, DstType, KMultiplier>;
 
     const auto wmma_kernel_container = std::make_tuple(matmul_default, matmul_swizzle_a);
 
@@ -135,7 +136,7 @@ int main(int, char*[])
     std::cout << "Before run_test, pass = " << pass << std::endl;
     // // clang-format off
     // //              |SrcType     |DstType     |GPUAccType  |CPUAccType
-    pass &= run_test<ck::half_t,  ck::half_t,  float,       float   >();
+    // pass &= run_test<ck::half_t,  ck::half_t,  float,       float   >();
     // pass &= run_test<ck::bhalf_t, ck::bhalf_t, float,       float,      8     >();
     // pass &= run_test<ck::half_t,  ck::half_t,  ck::half_t,  ck::half_t, 16    >();
     // pass &= run_test<ck::bhalf_t, ck::bhalf_t, ck::bhalf_t, float,      16    >();
@@ -147,6 +148,7 @@ int main(int, char*[])
     // clang-format off
     //               |SrcAType    |SrcBType,     |DstType     |GPUAccType  |CPUAccType      |KMultiplier
     pass &= run_test<ck::half_t,  ck::half_t,   float,       float,       float,              1>(); // V_WMMA_F32_16X16X32_F16
+    // pass &= run_test<ck::half_t,  ck::half_t,   ck::half_t,       ck::half_t,       ck::half_t,              1>(); // V_WMMA_F16_16X16X32_F16
     //clang-format on
 
     std::cout << "TestGemm ..... " << (pass ? "SUCCESS" : "FAILURE") << std::endl;
