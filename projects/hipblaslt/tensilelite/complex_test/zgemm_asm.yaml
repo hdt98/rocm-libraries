@@ -11,6 +11,8 @@ GlobalParameters:
   NumElementsToValidate: -1
   ValidationMaxToPrint: 4
   ValidationPrintValids: False
+  PrintTensorD: 0x3
+  PrintTensorA: 0x1
   # ShortNames: False
   # MergeFiles: True
   DataInitTypeAB: 3
