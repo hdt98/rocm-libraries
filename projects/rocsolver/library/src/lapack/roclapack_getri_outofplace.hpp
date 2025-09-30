@@ -38,19 +38,15 @@ ROCSOLVER_BEGIN_NAMESPACE
 template <bool BATCHED, bool STRIDED, typename T>
 void rocsolver_getri_outofplace_getMemorySize(const rocblas_int n,
                                               const rocblas_int batch_count,
-                                              rocsolver_workspace_helper* work_helper,
-                                              bool* optim_mem)
+                                              rocsolver_workspace_helper* work_helper)
 {
     // if quick return, no need of workspace
     if(n == 0 || batch_count == 0)
-    {
-        *optim_mem = true;
         return;
-    }
 
     // requirements for calling GETRS
     rocsolver_getrs_getMemorySize<BATCHED, STRIDED, T>(rocblas_operation_none, n, n, batch_count,
-                                                       work_helper, optim_mem);
+                                                       work_helper);
 }
 
 template <typename T>
@@ -102,7 +98,6 @@ rocblas_status rocsolver_getri_outofplace_template(rocblas_handle handle,
                                                    rocblas_int* info,
                                                    const rocblas_int batch_count,
                                                    rocsolver_workspace_helper* work_helper,
-                                                   const bool optim_mem,
                                                    const bool pivot)
 {
     ROCSOLVER_ENTER("getri_outofplace", "n:", n, "shiftA:", shiftA, "lda:", lda, "shiftP:", shiftP,
@@ -134,9 +129,9 @@ rocblas_status rocsolver_getri_outofplace_template(rocblas_handle handle,
                             stream, n, n, C, shiftC, ldc, strideC);
 
     // compute inverse
-    rocsolver_getrs_template<BATCHED, STRIDED, T>(
-        handle, rocblas_operation_none, n, n, A, shiftA, 1, lda, strideA, ipiv, strideP, C, shiftC,
-        1, ldc, strideC, batch_count, work_helper, optim_mem, pivot);
+    rocsolver_getrs_template<BATCHED, STRIDED, T>(handle, rocblas_operation_none, n, n, A, shiftA,
+                                                  1, lda, strideA, ipiv, strideP, C, shiftC, 1, ldc,
+                                                  strideC, batch_count, work_helper, pivot);
 
     return rocblas_status_success;
 }

@@ -67,9 +67,8 @@ rocblas_status rocsolver_getrs_strided_batched_impl(rocblas_handle handle,
 
     // memory workspace sizes:
     rocsolver_workspace_helper work_helper;
-    bool optim_mem;
-    rocsolver_getrs_getMemorySize<false, true, T>(trans, n, nrhs, batch_count, &work_helper,
-                                                  &optim_mem, lda, ldb);
+    rocsolver_getrs_getMemorySize<false, true, T>(trans, n, nrhs, batch_count, &work_helper, lda,
+                                                  ldb);
 
     if(rocblas_is_device_memory_size_query(handle))
         return rocblas_set_optimal_device_memory_size(handle, work_helper.get_total_size<T>());
@@ -83,9 +82,9 @@ rocblas_status rocsolver_getrs_strided_batched_impl(rocblas_handle handle,
     ROCBLAS_CHECK(work_helper.assign_buffer<T>(handle, mem[0]));
 
     // execution
-    return rocsolver_getrs_template<false, true, T>(
-        handle, trans, n, nrhs, A, shiftA, inca, lda, strideA, ipiv, strideP, B, shiftB, incb, ldb,
-        strideB, batch_count, &work_helper, optim_mem, true);
+    return rocsolver_getrs_template<false, true, T>(handle, trans, n, nrhs, A, shiftA, inca, lda,
+                                                    strideA, ipiv, strideP, B, shiftB, incb, ldb,
+                                                    strideB, batch_count, &work_helper, true);
 }
 
 ROCSOLVER_END_NAMESPACE

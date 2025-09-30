@@ -80,7 +80,6 @@ void rocsolver_getrs_getMemorySize(rocblas_operation trans,
                                    const I nrhs,
                                    const I batch_count,
                                    rocsolver_workspace_helper* work_helper,
-                                   bool* optim_mem,
                                    const I lda = 1,
                                    const I ldb = 1,
                                    const I inca = 1,
@@ -88,17 +87,16 @@ void rocsolver_getrs_getMemorySize(rocblas_operation trans,
 {
     // if quick return, no workspace is needed
     if(n == 0 || nrhs == 0 || batch_count == 0)
-    {
-        *optim_mem = true;
         return;
-    }
 
     // workspace required for calling TRSM
+    bool optim_mem;
     size_t size_work1, size_work2, size_work3, size_work4;
     rocsolver_trsm_mem<BATCHED, STRIDED, T>(rocblas_side_left, trans, n, nrhs, batch_count,
                                             &size_work1, &size_work2, &size_work3, &size_work4,
-                                            optim_mem, lda, ldb, inca, incb);
+                                            &optim_mem, lda, ldb, inca, incb);
 
+    work_helper->set_optim_mem(optim_mem);
     work_helper->assign_sizes({}, {size_work1, size_work2, size_work3, size_work4});
 }
 
@@ -121,7 +119,6 @@ rocblas_status rocsolver_getrs_template(rocblas_handle handle,
                                         const rocblas_stride strideB,
                                         const I batch_count,
                                         rocsolver_workspace_helper* work_helper,
-                                        const bool optim_mem,
                                         const bool pivot)
 {
     ROCSOLVER_ENTER("getrs", "trans:", trans, "n:", n, "nrhs:", nrhs, "shiftA:", shiftA,
@@ -141,6 +138,7 @@ rocblas_status rocsolver_getrs_template(rocblas_handle handle,
     rocblas_set_pointer_mode(handle, rocblas_pointer_mode_host);
 
     // prepare workspace
+    const bool optim_mem = work_helper->get_optim_mem();
     void* work1 = (void*)(*work_helper)[0];
     void* work2 = (void*)(*work_helper)[1];
     void* work3 = (void*)(*work_helper)[2];

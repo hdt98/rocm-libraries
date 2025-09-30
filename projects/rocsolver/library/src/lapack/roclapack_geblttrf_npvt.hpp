@@ -54,7 +54,6 @@ void rocsolver_geblttrf_npvt_getMemorySize(const rocblas_int nb,
                                            const rocblas_int nblocks,
                                            const rocblas_int batch_count,
                                            rocsolver_workspace_helper* work_helper,
-                                           bool* optim_mem,
                                            const rocblas_int ldb = 1,
                                            const rocblas_int ldc = 1,
                                            const rocblas_int incb = 1,
@@ -62,12 +61,8 @@ void rocsolver_geblttrf_npvt_getMemorySize(const rocblas_int nb,
 {
     // if quick return, no need of workspace
     if(nb == 0 || nblocks == 0 || batch_count == 0)
-    {
-        *optim_mem = true;
         return;
-    }
 
-    bool unused;
     work_helper->set_nested_capacity(2);
 
     // size for temporary info storage
@@ -75,13 +70,13 @@ void rocsolver_geblttrf_npvt_getMemorySize(const rocblas_int nb,
 
     // size requirements for getrf
     rocsolver_workspace_helper* getrf_work = work_helper->add_nested();
-    rocsolver_getrf_getMemorySize<BATCHED, STRIDED, T>(nb, nb, false, batch_count, getrf_work,
-                                                       optim_mem, ldb, incb);
+    rocsolver_getrf_getMemorySize<BATCHED, STRIDED, T>(nb, nb, false, batch_count, getrf_work, ldb,
+                                                       incb);
 
     // size requirements for getrs
     rocsolver_workspace_helper* getrs_work = work_helper->add_nested();
     rocsolver_getrs_getMemorySize<BATCHED, STRIDED, T>(rocblas_operation_none, nb, nb, batch_count,
-                                                       getrs_work, &unused, ldb, ldc, incb, incc);
+                                                       getrs_work, ldb, ldc, incb, incc);
 
     work_helper->assign_sizes({size_iinfo});
 }
@@ -153,8 +148,7 @@ rocblas_status rocsolver_geblttrf_npvt_template(rocblas_handle handle,
                                                 const rocblas_stride strideC,
                                                 rocblas_int* info,
                                                 const rocblas_int batch_count,
-                                                rocsolver_workspace_helper* work_helper,
-                                                bool optim_mem)
+                                                rocsolver_workspace_helper* work_helper)
 {
     ROCSOLVER_ENTER("geblttrf_npvt", "nb:", nb, "nblocks:", nblocks, "shiftA:", shiftA,
                     "inca:", inca, "lda:", lda, "shiftB:", shiftB, "incb:", incb, "ldb:", ldb,
@@ -187,23 +181,23 @@ rocblas_status rocsolver_geblttrf_npvt_template(rocblas_handle handle,
 
     rocsolver_getrf_template<BATCHED, STRIDED, T>(handle, nb, nb, B, shiftB, incb, ldb, strideB,
                                                   (rocblas_int*)nullptr, 0, 0, info, batch_count,
-                                                  getrf_work, optim_mem, false);
+                                                  getrf_work, false);
 
     for(rocblas_int k = 0; k < nblocks - 1; k++)
     {
         rocsolver_getrs_template<BATCHED, STRIDED, T>(
             handle, rocblas_operation_none, nb, nb, B, shiftB + k * bsb, incb, ldb, strideB,
             (rocblas_int*)nullptr, 0, C, shiftC + k * bsc, incc, ldc, strideC, batch_count,
-            getrs_work, optim_mem, false);
+            getrs_work, false);
 
         rocsolver_gemm(handle, rocblas_operation_none, rocblas_operation_none, nb, nb, nb, &minone,
                        A, shiftA + k * bsa, inca, lda, strideA, C, shiftC + k * bsc, incc, ldc,
                        strideC, &one, B, shiftB + (k + 1) * bsb, incb, ldb, strideB, batch_count,
                        (T**)nullptr);
 
-        rocsolver_getrf_template<BATCHED, STRIDED, T>(
-            handle, nb, nb, B, shiftB + (k + 1) * bsb, incb, ldb, strideB, (rocblas_int*)nullptr, 0,
-            0, iinfo, batch_count, getrf_work, optim_mem, false);
+        rocsolver_getrf_template<BATCHED, STRIDED, T>(handle, nb, nb, B, shiftB + (k + 1) * bsb,
+                                                      incb, ldb, strideB, (rocblas_int*)nullptr, 0,
+                                                      0, iinfo, batch_count, getrf_work, false);
 
         ROCSOLVER_LAUNCH_KERNEL(geblttrf_update_info, gridReset, threads, 0, stream, info, iinfo,
                                 (k + 1) * nb, batch_count);

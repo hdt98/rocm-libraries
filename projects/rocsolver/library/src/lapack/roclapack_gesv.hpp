@@ -76,23 +76,18 @@ template <bool BATCHED, bool STRIDED, typename T>
 void rocsolver_gesv_getMemorySize(const rocblas_int n,
                                   const rocblas_int nrhs,
                                   const rocblas_int batch_count,
-                                  rocsolver_workspace_helper* work_helper,
-                                  bool* optim_mem)
+                                  rocsolver_workspace_helper* work_helper)
 {
     // if quick return, no workspace is needed
     if(n == 0 || nrhs == 0 || batch_count == 0)
-    {
-        *optim_mem = true;
         return;
-    }
 
-    bool opt1, opt2;
     work_helper->set_nested_capacity(2);
 
     // PHASE 1
     // workspace required for calling GETRF
     rocsolver_workspace_helper* getrf_work = work_helper->add_nested();
-    rocsolver_getrf_getMemorySize<BATCHED, STRIDED, T>(n, n, true, batch_count, getrf_work, &opt1);
+    rocsolver_getrf_getMemorySize<BATCHED, STRIDED, T>(n, n, true, batch_count, getrf_work);
 
     // PHASE 2
     rocsolver_workspace_helper* phase2_work = work_helper->add_nested();
@@ -101,8 +96,7 @@ void rocsolver_gesv_getMemorySize(const rocblas_int n,
     // workspace required for calling GETRS
     rocsolver_workspace_helper* getrs_work = phase2_work->add_nested();
     rocsolver_getrs_getMemorySize<BATCHED, STRIDED, T>(rocblas_operation_none, n, nrhs, batch_count,
-                                                       getrs_work, &opt2);
-    *optim_mem = opt1 && opt2;
+                                                       getrs_work);
 
     // extra space to copy B
     size_t size_copyB = sizeof(T) * n * nrhs * batch_count;
@@ -126,8 +120,7 @@ rocblas_status rocsolver_gesv_template(rocblas_handle handle,
                                        const rocblas_stride strideB,
                                        rocblas_int* info,
                                        const rocblas_int batch_count,
-                                       rocsolver_workspace_helper* work_helper,
-                                       bool optim_mem)
+                                       rocsolver_workspace_helper* work_helper)
 {
     ROCSOLVER_ENTER("gesv", "n:", n, "nrhs:", nrhs, "shiftA:", shiftA, "lda:", lda,
                     "shiftB:", shiftB, "ldb:", ldb, "bc:", batch_count);
@@ -163,8 +156,7 @@ rocblas_status rocsolver_gesv_template(rocblas_handle handle,
 
     // compute LU factorization of A
     rocsolver_getrf_template<BATCHED, STRIDED, T>(handle, n, n, A, shiftA, 1, lda, strideA, ipiv, 0,
-                                                  strideP, info, batch_count, getrf_work, optim_mem,
-                                                  true);
+                                                  strideP, info, batch_count, getrf_work, true);
 
     // save elements of B that will be overwritten by GETRS for cases where info is nonzero
     ROCSOLVER_LAUNCH_KERNEL(copy_mat<T>, dim3(copyblocksx, copyblocksy, batch_count), dim3(32, 32),
@@ -172,9 +164,9 @@ rocblas_status rocsolver_gesv_template(rocblas_handle handle,
                             (T*)copyB, info_mask(info));
 
     // solve AX = B, overwriting B with X
-    rocsolver_getrs_template<BATCHED, STRIDED, T>(handle, rocblas_operation_none, n, nrhs, A, shiftA,
-                                                  1, lda, strideA, ipiv, strideP, B, shiftB, 1, ldb,
-                                                  strideB, batch_count, getrs_work, optim_mem, true);
+    rocsolver_getrs_template<BATCHED, STRIDED, T>(handle, rocblas_operation_none, n, nrhs, A,
+                                                  shiftA, 1, lda, strideA, ipiv, strideP, B, shiftB,
+                                                  1, ldb, strideB, batch_count, getrs_work, true);
 
     // restore elements of B that were overwritten by GETRS in cases where info is nonzero
     ROCSOLVER_LAUNCH_KERNEL(copy_mat<T>, dim3(copyblocksx, copyblocksy, batch_count), dim3(32, 32),

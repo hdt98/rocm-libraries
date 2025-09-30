@@ -41,7 +41,6 @@ void rocsolver_geblttrs_npvt_getMemorySize(const rocblas_int nb,
                                            const rocblas_int nrhs,
                                            const rocblas_int batch_count,
                                            rocsolver_workspace_helper* work_helper,
-                                           bool* optim_mem,
                                            const rocblas_int ldb = 1,
                                            const rocblas_int ldx = 1,
                                            const rocblas_int incb = 1,
@@ -49,14 +48,11 @@ void rocsolver_geblttrs_npvt_getMemorySize(const rocblas_int nb,
 {
     // if quick return, no need of workspace
     if(nb == 0 || nblocks == 0 || nrhs == 0 || batch_count == 0)
-    {
-        *optim_mem = true;
         return;
-    }
 
     // size requirements for getrs
     rocsolver_getrs_getMemorySize<BATCHED, STRIDED, T>(rocblas_operation_none, nb, nrhs, batch_count,
-                                                       work_helper, optim_mem, ldb, ldx, incb, incx);
+                                                       work_helper, ldb, ldx, incb, incx);
 }
 
 template <typename T>
@@ -136,8 +132,7 @@ rocblas_status rocsolver_geblttrs_npvt_template(rocblas_handle handle,
                                                 const rocblas_int ldx,
                                                 const rocblas_stride strideX,
                                                 const rocblas_int batch_count,
-                                                rocsolver_workspace_helper* work_helper,
-                                                bool optim_mem)
+                                                rocsolver_workspace_helper* work_helper)
 {
     ROCSOLVER_ENTER("geblttrs_npvt", "nb:", nb, "nblocks:", nblocks, "nrhs:", nrhs,
                     "shiftA:", shiftA, "inca:", inca, "lda:", lda, "shiftB:", shiftB, "incb:", incb,
@@ -169,7 +164,7 @@ rocblas_status rocsolver_geblttrs_npvt_template(rocblas_handle handle,
         rocsolver_getrs_template<BATCHED, STRIDED, T>(
             handle, rocblas_operation_none, nb, nrhs, B, shiftB + k * bsb, incb, ldb, strideB,
             (rocblas_int*)nullptr, 0, X, shiftX + k * bsx, incx, ldx, strideX, batch_count,
-            work_helper, optim_mem, false);
+            work_helper, false);
     }
 
     // backward solve

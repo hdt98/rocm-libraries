@@ -75,9 +75,8 @@ rocblas_status rocsolver_geblttrs_npvt_batched_impl(rocblas_handle handle,
 
     // memory workspace sizes:
     rocsolver_workspace_helper work_helper;
-    bool optim_mem;
     rocsolver_geblttrs_npvt_getMemorySize<true, false, T>(nb, nblocks, nrhs, batch_count,
-                                                          &work_helper, &optim_mem);
+                                                          &work_helper);
 
     if(rocblas_is_device_memory_size_query(handle))
         return rocblas_set_optimal_device_memory_size(handle, work_helper.get_total_size<T>());
@@ -93,8 +92,7 @@ rocblas_status rocsolver_geblttrs_npvt_batched_impl(rocblas_handle handle,
     // Execution
     return rocsolver_geblttrs_npvt_template<true, false, T>(
         handle, nb, nblocks, nrhs, A, shiftA, inca, lda, strideA, B, shiftB, incb, ldb, strideB, C,
-        shiftC, incc, ldc, strideC, X, shiftX, incx, ldx, strideX, batch_count, &work_helper,
-        optim_mem);
+        shiftC, incc, ldc, strideC, X, shiftX, incx, ldx, strideX, batch_count, &work_helper);
 }
 
 ROCSOLVER_END_NAMESPACE

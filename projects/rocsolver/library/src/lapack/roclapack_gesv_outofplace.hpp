@@ -77,29 +77,22 @@ template <bool BATCHED, bool STRIDED, typename T>
 void rocsolver_gesv_outofplace_getMemorySize(const rocblas_int n,
                                              const rocblas_int nrhs,
                                              const rocblas_int batch_count,
-                                             rocsolver_workspace_helper* work_helper,
-                                             bool* optim_mem)
+                                             rocsolver_workspace_helper* work_helper)
 {
     // if quick return, no workspace is needed
     if(n == 0 || nrhs == 0 || batch_count == 0)
-    {
-        *optim_mem = true;
         return;
-    }
 
-    bool opt1, opt2;
     work_helper->set_nested_capacity(2);
 
     // workspace required for calling GETRF
     rocsolver_workspace_helper* getrf_work = work_helper->add_nested();
-    rocsolver_getrf_getMemorySize<BATCHED, STRIDED, T>(n, n, true, batch_count, getrf_work, &opt1);
+    rocsolver_getrf_getMemorySize<BATCHED, STRIDED, T>(n, n, true, batch_count, getrf_work);
 
     // workspace required for calling GETRS
     rocsolver_workspace_helper* getrs_work = work_helper->add_nested();
     rocsolver_getrs_getMemorySize<BATCHED, STRIDED, T>(rocblas_operation_none, n, nrhs, batch_count,
-                                                       getrs_work, &opt2);
-
-    *optim_mem = opt1 && opt2;
+                                                       getrs_work);
 }
 
 template <bool BATCHED, bool STRIDED, typename T, typename U>
@@ -122,8 +115,7 @@ rocblas_status rocsolver_gesv_outofplace_template(rocblas_handle handle,
                                                   const rocblas_stride strideX,
                                                   rocblas_int* info,
                                                   const rocblas_int batch_count,
-                                                  rocsolver_workspace_helper* work_helper,
-                                                  bool optim_mem)
+                                                  rocsolver_workspace_helper* work_helper)
 {
     ROCSOLVER_ENTER("gesv_outofplace", "n:", n, "nrhs:", nrhs, "shiftA:", shiftA, "lda:", lda,
                     "shiftB:", shiftB, "ldb:", ldb, "bc:", batch_count);
@@ -157,17 +149,16 @@ rocblas_status rocsolver_gesv_outofplace_template(rocblas_handle handle,
 
     // compute LU factorization of A
     rocsolver_getrf_template<BATCHED, STRIDED, T>(handle, n, n, A, shiftA, 1, lda, strideA, ipiv, 0,
-                                                  strideP, info, batch_count, getrf_work, optim_mem,
-                                                  true);
+                                                  strideP, info, batch_count, getrf_work, true);
 
     // copy B to X
     ROCSOLVER_LAUNCH_KERNEL(copy_mat<T>, dim3(copyblocksx, copyblocksy, batch_count), dim3(32, 32),
                             0, stream, n, nrhs, B, shiftB, ldb, strideB, X, shiftX, ldx, strideX);
 
     // solve AX = B
-    rocsolver_getrs_template<BATCHED, STRIDED, T>(handle, rocblas_operation_none, n, nrhs, A, shiftA,
-                                                  1, lda, strideA, ipiv, strideP, X, shiftX, 1, ldx,
-                                                  strideX, batch_count, getrs_work, optim_mem, true);
+    rocsolver_getrs_template<BATCHED, STRIDED, T>(handle, rocblas_operation_none, n, nrhs, A,
+                                                  shiftA, 1, lda, strideA, ipiv, strideP, X, shiftX,
+                                                  1, ldx, strideX, batch_count, getrs_work, true);
 
     return rocblas_status_success;
 }

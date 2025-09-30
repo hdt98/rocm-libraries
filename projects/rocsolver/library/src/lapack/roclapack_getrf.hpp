@@ -543,7 +543,6 @@ void rocsolver_getrf_getMemorySize(const I m,
                                    const bool pivot,
                                    const I batch_count,
                                    rocsolver_workspace_helper* work_helper,
-                                   bool* optim_mem,
                                    const I lda = 1,
                                    const I inca = 1)
 {
@@ -551,10 +550,7 @@ void rocsolver_getrf_getMemorySize(const I m,
 
     // if quick return, no need of workspace
     if(m == 0 || n == 0 || batch_count == 0)
-    {
-        *optim_mem = true;
         return;
-    }
 
     I dim = std::min(m, n);
     I blk = getrf_get_blksize<ISBATCHED, T>(dim, pivot);
@@ -564,12 +560,12 @@ void rocsolver_getrf_getMemorySize(const I m,
         // requirements for one single GETF2
         rocsolver_getf2_getMemorySize<ISBATCHED, T>(m, n, pivot, batch_count, work_helper, false,
                                                     inca);
-        *optim_mem = true;
         return;
     }
     else
     {
         work_helper->set_nested_capacity(1);
+        bool opt1 = true, opt2 = true;
 
         // largest block panel dimension is 512
         dim = min(dim, I(512));
@@ -587,12 +583,12 @@ void rocsolver_getrf_getMemorySize(const I m,
         size_t size_work1, size_work2, size_work3, size_work4;
         rocsolver_trsm_mem<BATCHED, STRIDED, T>(rocblas_side_left, rocblas_operation_none, dim, n,
                                                 batch_count, &size_work1, &size_work2, &size_work3,
-                                                &size_work4, optim_mem, true, lda, lda, inca, inca);
+                                                &size_work4, &opt1, true, lda, lda, inca, inca);
         if(!pivot)
         {
             size_t w1, w2, w3, w4;
             rocsolver_trsm_mem<BATCHED, STRIDED, T>(rocblas_side_right, rocblas_operation_none, m,
-                                                    dim, batch_count, &w1, &w2, &w3, &w4, optim_mem,
+                                                    dim, batch_count, &w1, &w2, &w3, &w4, &opt2,
                                                     true, lda, lda, inca, inca);
             size_work1 = std::max(size_work1, w1);
             size_work2 = std::max(size_work2, w2);
@@ -600,6 +596,7 @@ void rocsolver_getrf_getMemorySize(const I m,
             size_work4 = std::max(size_work4, w4);
         }
 
+        work_helper->set_optim_mem(opt1 && opt2);
         work_helper->assign_sizes({size_iinfo, size_iipiv},
                                   {size_work1, size_work2, size_work3, size_work4});
     }
@@ -620,7 +617,6 @@ rocblas_status rocsolver_getrf_template(rocblas_handle handle,
                                         INFO* info,
                                         const I batch_count,
                                         rocsolver_workspace_helper* work_helper,
-                                        const bool optim_mem,
                                         const bool pivot)
 {
     ROCSOLVER_ENTER("getrf", "m:", m, "n:", n, "shiftA:", shiftA, "inca:", inca, "lda:", lda,
@@ -664,6 +660,7 @@ rocblas_status rocsolver_getrf_template(rocblas_handle handle,
 
     // prepare workspace
     rocsolver_workspace_helper* getf2_work = work_helper->get_nested(0);
+    const bool optim_mem = work_helper->get_optim_mem();
     INFO* iinfo = (INFO*)(*work_helper)[0];
     I* iipiv = (I*)(*work_helper)[1];
     void* work1 = (void*)(*work_helper)[2];

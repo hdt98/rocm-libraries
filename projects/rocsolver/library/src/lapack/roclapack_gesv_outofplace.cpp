@@ -78,9 +78,7 @@ rocblas_status rocsolver_gesv_outofplace_impl(rocblas_handle handle,
 
     // memory workspace sizes:
     rocsolver_workspace_helper work_helper;
-    bool optim_mem;
-    rocsolver_gesv_outofplace_getMemorySize<false, false, T>(n, nrhs, batch_count, &work_helper,
-                                                             &optim_mem);
+    rocsolver_gesv_outofplace_getMemorySize<false, false, T>(n, nrhs, batch_count, &work_helper);
 
     if(rocblas_is_device_memory_size_query(handle))
         return rocblas_set_optimal_device_memory_size(handle, work_helper.get_total_size<T>());
@@ -97,7 +95,7 @@ rocblas_status rocsolver_gesv_outofplace_impl(rocblas_handle handle,
     // execution
     return rocsolver_gesv_outofplace_template<false, false, T>(
         handle, n, nrhs, A, shiftA, lda, strideA, ipiv, strideP, B, shiftB, ldb, strideB, X, shiftX,
-        ldx, strideX, info, batch_count, &work_helper, optim_mem);
+        ldx, strideX, info, batch_count, &work_helper);
 }
 
 ROCSOLVER_END_NAMESPACE
