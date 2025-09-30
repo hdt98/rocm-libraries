@@ -205,6 +205,57 @@ if( ROCFFT_MPI_ENABLE )
   include_directories(SYSTEM ${MPI_INCLUDE_PATH})
 endif()
 
+# Prefer modern MPI with 64-bit support if provided
+if(TARGET MPI::MPI_C)
+  set(_MPI_C_LINK_TARGET MPI::MPI_C)
+# fall back to classic variables provided by find_package(MPI)
+else()
+  set(_MPI_C_LINK_TARGET ${MPI_C_LIBRARIES})
+endif()
+
+# Create a small test program that attempts to call MPI_Ialltoall_c / MPI_Ialltoallv_c
+set(_check_src "${CMAKE_BINARY_DIR}/CMakeFiles/check_mpi_c_collectives.c")
+file(WRITE "${_check_src}"
+"#include <mpi.h>
+int main(int argc, char** argv)
+{
+  int rc = MPI_Init(&argc, &argv);
+#if defined(MPI_VERSION) && (MPI_VERSION >= 4)
+  /* attempt to reference the _c APIs */
+  /* not executed, only ensures link symbol is present */
+  MPI_Request req;
+  MPI_Ialltoall_c(NULL, (MPI_Count)0, MPI_CHAR, NULL, (MPI_Count)0, MPI_CHAR, MPI_COMM_WORLD, &req);
+  MPI_Ialltoallv_c(NULL, (MPI_Count*)NULL, (MPI_Aint*)NULL, MPI_CHAR, NULL, (MPI_Count*)NULL, (MPI_Aint*)NULL, MPI_CHAR, MPI_COMM_WORLD, &req);
+#endif
+  MPI_Finalize();
+  return rc;
+}
+")
+
+# Try to compile and link the test program. try_compile returns result in variable ENABLE_MPI_IALLTOALL_C
+# Use the proper link target (imported target or libraries)
+if(TARGET MPI::MPI_C)
+  try_compile(ENABLE_MPI_IALLTOALL_C
+              ${CMAKE_BINARY_DIR}
+              "${_check_src}"
+              LINK_LIBRARIES MPI::MPI_C
+              OUTPUT_VARIABLE _try_compile_out)
+else()
+try_compile(ENABLE_MPI_IALLTOALL_C
+            ${CMAKE_BINARY_DIR}
+            "${_check_src}"
+            LINK_LIBRARIES "${_MPI_C_LINK_TARGET}"
+            CMAKE_FLAGS "-DINCLUDE_DIRECTORIES:STRING=${MPI_C_INCLUDE_PATH}"
+            OUTPUT_VARIABLE _try_compile_out)
+endif()
+
+if(ENABLE_MPI_IALLTOALL_C)
+  add_compile_definitions(ENABLE_MPI_C_COLLECTIVES=1)
+  message(STATUS "MPI large-count _c collectives available: enabling ENABLE_MPI_C_COLLECTIVES")
+else()
+  message(STATUS "MPI large-count _c collectives NOT available; building fallback (int-conversion/splitting) path")
+endif()
+
 add_subdirectory( library )
 
 include( clients/cmake/build-options.cmake )
