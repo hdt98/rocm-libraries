@@ -3,8 +3,6 @@
 
 #pragma once
 
-#include <hip/hip_runtime.h>
-
 namespace origami {
 namespace math {
 
@@ -14,7 +12,7 @@ namespace math {
  *
  */
 template <typename N, typename D>
-__device__ __host__ inline constexpr N safe_ceil_div(N n, D d) {
+inline constexpr N safe_ceil_div(N n, D d) {
   // Static cast to undo integral promotion.
   return static_cast<N>(d == 0 ? 0 : (n / d + (n % d != 0 ? 1 : 0)));
 }
