@@ -579,7 +579,7 @@ void rocsolver_getrf_getMemorySize(const I m,
         size_t size_iipiv = pivot ? m * sizeof(I) * batch_count : 0;
 
         // requirements for largest possible GETF2 for the sub blocks
-        rocsolver_workspace_helper* getf2_work = work_helper->add_nested({size_iinfo, size_iipiv});
+        rocsolver_workspace_helper* getf2_work = work_helper->add_nested();
         rocsolver_getf2_getMemorySize<ISBATCHED, T>(m, dim, pivot, batch_count, getf2_work, true,
                                                     inca);
 
@@ -600,8 +600,8 @@ void rocsolver_getrf_getMemorySize(const I m,
             size_work4 = std::max(size_work4, w4);
         }
 
-        work_helper->assign_sizes(
-            {size_iinfo, size_iipiv, size_work1, size_work2, size_work3, size_work4});
+        work_helper->assign_sizes({size_iinfo, size_iipiv},
+                                  {size_work1, size_work2, size_work3, size_work4});
     }
 }
 

@@ -42,7 +42,7 @@ ROCSOLVER_BEGIN_NAMESPACE
 class rocsolver_workspace_helper
 {
 private:
-    size_t reserved;
+    size_t num_excl, size_excl, size_shared;
     std::vector<uint8_t*> pointers;
     std::vector<size_t> sizes;
     std::vector<rocsolver_workspace_helper*> nested;
@@ -50,7 +50,9 @@ private:
 public:
     /* Constructor */
     rocsolver_workspace_helper()
-        : reserved(0)
+        : num_excl(0)
+        , size_excl(0)
+        , size_shared(0)
         , pointers(0)
         , sizes(0)
         , nested(0)
@@ -70,36 +72,43 @@ public:
             delete nested[i];
     }
 
-    /* Assigns the given workspace sizes to the workspace helper. Also rounds the sizes up to the nearest
-       MIN_CHUNK_SIZE for better alignment. */
-    void assign_sizes(std::initializer_list<size_t> sizes)
+    /* Assigns the given workspace sizes to the workspace helper. Workspace sizes are passed in two separate lists:
+       sizes_excl for workspaces that must not be overwritten by nested functions, and sizes_shared for workspaces that
+       may be overwritten by nested functions. Also rounds the sizes up to the nearest MIN_CHUNK_SIZE for better
+       alignment. */
+    void assign_sizes(std::initializer_list<size_t> sizes_excl,
+                      std::initializer_list<size_t> sizes_shared = {})
     {
-        this->sizes.assign(sizes);
+        this->num_excl = sizes_excl.size();
+        this->size_excl = 0;
+        this->size_shared = 0;
+
+        this->sizes.clear();
+        this->sizes.reserve(sizes_excl.size() + sizes_shared.size());
+
+        this->sizes.insert(this->sizes.end(), sizes_excl);
+        this->sizes.insert(this->sizes.end(), sizes_shared);
 
         // round up sizes to nearest MIN_CHUNK_SIZE
         for(int i = 0; i < sizes.size(); i++)
+        {
             this->sizes[i]
                 = ((this->sizes[i] + MIN_CHUNK_SIZE - 1) / MIN_CHUNK_SIZE) * MIN_CHUNK_SIZE;
-    }
-    /* Assigns device memory to the workspace helper, to be partitioned into individual workspace arrays
-       based on the assigned sizes. Only called after assign_sizes (and, if applicable, add_nested). */
-    void assign_buffer(uint8_t* buffer)
-    {
-        pointers.reserve(sizes.size());
 
-        uint8_t* curr_ptr = buffer + reserved;
-        for(int i = 0; i < sizes.size(); i++)
-        {
-            pointers.push_back(curr_ptr);
-            curr_ptr += sizes[i];
+            if(i < this->num_excl)
+                this->size_excl += this->sizes[i];
+            else
+                this->size_shared += this->sizes[i];
         }
-
-        for(int i = 0; i < nested.size(); i++)
-            nested[i]->assign_buffer(buffer + reserved);
+    }
+    /* Gets the size of the workspace array at position i, rounded up to a multiple of MIN_CHUNK_SIZE. */
+    size_t get_size(int i)
+    {
+        return sizes[i];
     }
     /* Gets a pointer to the workspace array at position i, whose size is >= the assigned size at position i.
        Only called after assign_buffer. */
-    uint8_t* operator[](int i)
+    void* operator[](int i)
     {
         return pointers[i];
     }
@@ -111,23 +120,11 @@ public:
         nested.reserve(capacity);
     }
     /* Adds a nested workspace helper to manage workspaces for a nested function. May be called before or
-       after assign_sizes. add_nested accepts a (possibly empty) list of sizes representing the amount of
-       reserved memory that the nested function should not overwrite. In the standard use case, for n reserved
-       sizes, this list should contain the first n sizes passed to assign_sizes.
-
-       For example, suppose a function requires arrays foo, bar, and qux, where foo and qux must not be
-       overwritten by a nested function. Then, we pass {size_foo, size_qux, size_bar} to assign_sizes, and
-       pass {size_foo, size_qux} to add_nested. */
-    rocsolver_workspace_helper* add_nested(std::initializer_list<size_t> reserved_sizes)
+       after assign_sizes. */
+    rocsolver_workspace_helper* add_nested()
     {
-        // round up sizes to nearest MIN_CHUNK_SIZE
-        size_t bytes_reserved = 0;
-        for(size_t const& size : reserved_sizes)
-            bytes_reserved += ((size + MIN_CHUNK_SIZE - 1) / MIN_CHUNK_SIZE) * MIN_CHUNK_SIZE;
-
         rocsolver_workspace_helper* result = new rocsolver_workspace_helper();
         nested.push_back(result);
-        result->reserved = bytes_reserved;
         return result;
     }
     /* Gets a pointer to the nested workspace helper at position i, which was created by the ith call to
@@ -137,41 +134,53 @@ public:
         return nested[i];
     }
 
+    /* Assigns device memory to the workspace helper, to be partitioned into individual workspace arrays
+       based on the assigned sizes. Only called after assign_sizes (and, if applicable, add_nested). */
+    void assign_buffer(void* buffer)
+    {
+        pointers.reserve(sizes.size());
+
+        uint8_t* curr_ptr = (uint8_t*)buffer;
+        uint8_t* nested_ptr = curr_ptr;
+        for(int i = 0; i < sizes.size(); i++)
+        {
+            pointers.push_back(curr_ptr);
+            curr_ptr += sizes[i];
+            if(i < num_excl)
+                nested_ptr = curr_ptr;
+        }
+
+        for(int i = 0; i < nested.size(); i++)
+            nested[i]->assign_buffer(nested_ptr);
+    }
+
     /* Returns the total amount of device memory required by the workspaces assigned to this helper and its
        nested helpers. Only called after assign_sizes (and, if applicable, add_nested). */
     size_t get_total_size()
     {
-        size_t result = 0;
-        for(int i = 0; i < sizes.size(); i++)
-            result += sizes[i];
+        size_t shared = this->size_shared;
 
         for(int i = 0; i < nested.size(); i++)
-            result = std::max(result, nested[i]->get_total_size());
+            shared = std::max(shared, nested[i]->get_total_size());
 
-        return reserved + result;
+        return this->size_excl + shared;
     }
 
     void print_debug()
     {
-        std::cout << "Reserved Bytes: " << reserved << std::endl;
-
-        std::cout << "Num Sizes: " << sizes.size() << std::endl;
+        std::cerr << "Num Sizes: " << sizes.size() << std::endl;
         for(int i = 0; i < sizes.size(); i++)
         {
-            std::cout << sizes[i];
-            if(i < sizes.size() - 1)
-                std::cout << ", ";
+            std::cerr << sizes[i] << " bytes";
+            if(i < pointers.size())
+                std::cerr << " (" << (void*)pointers[i] << ")";
+            if(i >= num_excl)
+                std::cerr << " shared";
+            std::cerr << std::endl;
         }
-        std::cout << std::endl;
-
-        std::cout << "Num Pointers: " << pointers.size() << std::endl;
-        for(int i = 0; i < pointers.size(); i++)
-        {
-            std::cout << pointers[i];
-            if(i < pointers.size() - 1)
-                std::cout << ", ";
-        }
-        std::cout << std::endl;
+        std::cerr << "Total Size (Self): " << size_excl + size_shared << std::endl;
+        if(nested.size() > 0)
+            std::cerr << "Total Size (Self+Nested): " << get_total_size() << std::endl;
     }
 };
 

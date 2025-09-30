@@ -99,7 +99,7 @@ void rocsolver_getrs_getMemorySize(rocblas_operation trans,
                                             &size_work1, &size_work2, &size_work3, &size_work4,
                                             optim_mem, lda, ldb, inca, incb);
 
-    work_helper->assign_sizes({size_work1, size_work2, size_work3, size_work4});
+    work_helper->assign_sizes({}, {size_work1, size_work2, size_work3, size_work4});
 }
 
 template <bool BATCHED, bool STRIDED, typename T, typename I, typename U>
