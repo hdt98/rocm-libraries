@@ -169,6 +169,7 @@ else()
   add_gtest(miopen_gtest "${TESTS_CPP}")
 
   if(MIOPEN_USE_COMPOSABLEKERNEL)
+    message(STATUS "Here1")
     if(MIOPEN_BUILD_CK )
         # The include directories also dont propagate correctly when using the non aliased targets.
         # Manually including them fixes this problem for inline builds.
@@ -176,6 +177,10 @@ else()
             ${MIOPEN_CK_INCLUDE_DIR}
             ${MIOPEN_CK_BUILD_INCLUDE_DIR}
             ${MIOPEN_CK_LIBRARY_INCLUDE_DIR})
+    else()
+        message(STATUS "Here2")
+        find_package(composable_kernel 1.0.0 COMPONENTS utility)
+        target_link_libraries(miopen_gtest composable_kernel::utility)
     endif()
   endif()
 
