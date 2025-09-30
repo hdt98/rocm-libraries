@@ -28,6 +28,7 @@
 #pragma once
 
 #include "common_host_helpers.hpp"
+#include "init_scalars.hpp"
 #include "lib_host_helpers.hpp"
 #include "rocsolver/rocsolver.h"
 
@@ -42,16 +43,21 @@ ROCSOLVER_BEGIN_NAMESPACE
 class rocsolver_workspace_helper
 {
 private:
+    bool has_scalars_r, has_scalars_c;
     size_t num_excl, size_excl, size_shared;
     std::vector<uint8_t*> pointers;
     std::vector<size_t> sizes;
     std::vector<rocsolver_workspace_helper*> nested;
 
-    void assign_buffer(void* buffer)
+    void assign_buffer(uint8_t* scalars_r, uint8_t* scalars_c, uint8_t* curr_ptr)
     {
-        pointers.reserve(sizes.size());
+        pointers.reserve(sizes.size() + has_scalars_r + has_scalars_c);
 
-        uint8_t* curr_ptr = (uint8_t*)buffer;
+        if(has_scalars_r)
+            pointers.push_back(scalars_r);
+        if(has_scalars_c)
+            pointers.push_back(scalars_c);
+
         uint8_t* nested_ptr = curr_ptr;
         for(int i = 0; i < sizes.size(); i++)
         {
@@ -62,13 +68,30 @@ private:
         }
 
         for(int i = 0; i < nested.size(); i++)
-            nested[i]->assign_buffer(nested_ptr);
+            nested[i]->assign_buffer(scalars_r, scalars_c, nested_ptr);
+    }
+
+    size_t get_internal_size(bool* has_scalars_r, bool* has_scalars_c)
+    {
+        if(this->has_scalars_r)
+            *has_scalars_r = 1;
+        if(this->has_scalars_c)
+            *has_scalars_c = 1;
+
+        size_t shared = this->size_shared;
+
+        for(int i = 0; i < nested.size(); i++)
+            shared = std::max(shared, nested[i]->get_internal_size(has_scalars_r, has_scalars_c));
+
+        return this->size_excl + shared;
     }
 
 public:
     /* Constructor */
     rocsolver_workspace_helper()
-        : num_excl(0)
+        : has_scalars_r(0)
+        , has_scalars_c(0)
+        , num_excl(0)
         , size_excl(0)
         , size_shared(0)
         , pointers(0)
@@ -124,12 +147,6 @@ public:
     {
         return sizes[i];
     }
-    /* Gets a pointer to the workspace array at position i, whose size is >= the assigned size at position i.
-       Only called after assign_buffer. */
-    void* operator[](int i)
-    {
-        return pointers[i];
-    }
 
     /* Sets the capacity of the internal vector that holds workspace helpers for nested functions. Optional,
        but should be called before add_nested. */
@@ -154,34 +171,127 @@ public:
 
     /* Assigns device memory to the workspace helper, to be partitioned into individual workspace arrays
        based on the assigned sizes. Only called after assign_sizes (and, if applicable, add_nested). */
+    template <typename T>
     rocblas_status assign_buffer(rocblas_handle handle, void* buffer)
     {
-        // zero the workspace
+        using S = decltype(std::real(T{}));
+
         hipStream_t stream;
         rocblas_get_stream(handle, &stream);
 
-        HIP_CHECK(hipMemsetAsync(buffer, 0, get_total_size(), stream));
+        bool has_scalars_r = 0;
+        bool has_scalars_c = 0;
+        size_t size_scalars_r = 0;
+        size_t size_scalars_c = 0;
+        size_t size_mem = get_internal_size(&has_scalars_r, &has_scalars_c);
+
+        if(has_scalars_r)
+        {
+            size_scalars_r = sizeof(S) * 3;
+            size_scalars_r
+                = ((size_scalars_r + MIN_CHUNK_SIZE - 1) / MIN_CHUNK_SIZE) * MIN_CHUNK_SIZE;
+        }
+        if(has_scalars_c)
+        {
+            size_scalars_c = sizeof(T) * 3;
+            size_scalars_c
+                = ((size_scalars_c + MIN_CHUNK_SIZE - 1) / MIN_CHUNK_SIZE) * MIN_CHUNK_SIZE;
+        }
+
+        // zero the workspace
+        HIP_CHECK(hipMemsetAsync(buffer, 0, size_scalars_r + size_scalars_c + size_mem, stream));
 
         // assign pointers
-        assign_buffer(buffer);
+        uint8_t* scalars_r = (uint8_t*)buffer;
+        uint8_t* scalars_c = scalars_r + size_scalars_r;
+        uint8_t* curr_ptr = scalars_c + size_scalars_c;
+        assign_buffer(scalars_r, scalars_c, curr_ptr);
+
+        // initialize scalars
+        if(has_scalars_r)
+            ROCSOLVER_LAUNCH_KERNEL(iota_n<S>, dim3(1), dim3(IOTA_MAX_THDS), 0, stream,
+                                    (S*)scalars_r, 3, -1);
+        if(has_scalars_c)
+            ROCSOLVER_LAUNCH_KERNEL(iota_n<T>, dim3(1), dim3(IOTA_MAX_THDS), 0, stream,
+                                    (T*)scalars_c, 3, -1);
 
         return rocblas_status_success;
+    }
+    /* Gets a pointer to the workspace array at position i, whose size is >= the assigned size at position i.
+       Only called after assign_buffer. */
+    void* operator[](int i)
+    {
+        return pointers[i + has_scalars_r + has_scalars_c];
+    }
+
+    /* Sets a value indicating that the function requires the device-side scalar array. Only called before
+       assign_buffer. */
+    template <typename T>
+    void add_scalars()
+    {
+        using S = decltype(std::real(T{}));
+
+        if(std::is_same<T, S>::value)
+            this->has_scalars_r = 1;
+        else
+            this->has_scalars_c = 1;
+    }
+    /* Gets a pointer to the device-side scalar array. Only called after assign_buffer. */
+    template <typename T>
+    T* get_scalars()
+    {
+        using S = decltype(std::real(T{}));
+
+        if(std::is_same<T, S>::value)
+        {
+            if(has_scalars_r && pointers.size() > 0)
+                return (T*)pointers[0];
+            else
+                return nullptr;
+        }
+        else
+        {
+            if(has_scalars_c && pointers.size() > has_scalars_r)
+                return (T*)pointers[has_scalars_r];
+            else
+                return nullptr;
+        }
     }
 
     /* Returns the total amount of device memory required by the workspaces assigned to this helper and its
        nested helpers. Only called after assign_sizes (and, if applicable, add_nested). */
+    template <typename T>
     size_t get_total_size()
     {
-        size_t shared = this->size_shared;
+        using S = decltype(std::real(T{}));
 
-        for(int i = 0; i < nested.size(); i++)
-            shared = std::max(shared, nested[i]->get_total_size());
+        bool has_scalars_r = 0;
+        bool has_scalars_c = 0;
+        size_t size_scalars_r = 0;
+        size_t size_scalars_c = 0;
+        size_t size_mem = get_internal_size(&has_scalars_r, &has_scalars_c);
 
-        return this->size_excl + shared;
+        if(has_scalars_r)
+        {
+            size_scalars_r = sizeof(S) * 3;
+            size_scalars_r
+                = ((size_scalars_r + MIN_CHUNK_SIZE - 1) / MIN_CHUNK_SIZE) * MIN_CHUNK_SIZE;
+        }
+        if(has_scalars_c)
+        {
+            size_scalars_c = sizeof(T) * 3;
+            size_scalars_c
+                = ((size_scalars_c + MIN_CHUNK_SIZE - 1) / MIN_CHUNK_SIZE) * MIN_CHUNK_SIZE;
+        }
+
+        return size_scalars_r + size_scalars_c + size_mem;
     }
 
     void print_debug()
     {
+        bool has_scalars_r = 0;
+        bool has_scalars_c = 0;
+
         std::cerr << "Num Sizes: " << sizes.size() << std::endl;
         for(int i = 0; i < sizes.size(); i++)
         {
@@ -194,7 +304,12 @@ public:
         }
         std::cerr << "Total Size (Self): " << size_excl + size_shared << std::endl;
         if(nested.size() > 0)
-            std::cerr << "Total Size (Self+Nested): " << get_total_size() << std::endl;
+            std::cerr << "Total Size (Self+Nested): "
+                      << get_internal_size(&has_scalars_r, &has_scalars_c) << std::endl;
+        if(has_scalars_r)
+            std::cerr << "Scalar array requested" << std::endl;
+        if(has_scalars_c)
+            std::cerr << "Complex scalar array requested" << std::endl;
     }
 };
 

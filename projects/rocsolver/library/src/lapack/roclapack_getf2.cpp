@@ -67,15 +67,15 @@ rocblas_status rocsolver_getf2_impl(rocblas_handle handle,
     rocsolver_getf2_getMemorySize<false, T>(m, n, pivot, batch_count, &work_helper);
 
     if(rocblas_is_device_memory_size_query(handle))
-        return rocblas_set_optimal_device_memory_size(handle, work_helper.get_total_size());
+        return rocblas_set_optimal_device_memory_size(handle, work_helper.get_total_size<T>());
 
     // memory workspace allocation
-    rocblas_device_malloc mem(handle, work_helper.get_total_size());
+    rocblas_device_malloc mem(handle, work_helper.get_total_size<T>());
 
     if(!mem)
         return rocblas_status_memory_error;
 
-    ROCBLAS_CHECK(work_helper.assign_buffer(handle, mem[0]));
+    ROCBLAS_CHECK(work_helper.assign_buffer<T>(handle, mem[0]));
 
     // execution
     return rocsolver_getf2_template<false, T>(handle, m, n, A, shiftA, inca, lda, strideA, ipiv,

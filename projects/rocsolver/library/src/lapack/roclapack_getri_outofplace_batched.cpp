@@ -71,15 +71,15 @@ rocblas_status rocsolver_getri_outofplace_batched_impl(rocblas_handle handle,
                                                              &optim_mem);
 
     if(rocblas_is_device_memory_size_query(handle))
-        return rocblas_set_optimal_device_memory_size(handle, work_helper.get_total_size());
+        return rocblas_set_optimal_device_memory_size(handle, work_helper.get_total_size<T>());
 
     // memory workspace allocation
-    rocblas_device_malloc mem(handle, work_helper.get_total_size());
+    rocblas_device_malloc mem(handle, work_helper.get_total_size<T>());
 
     if(!mem)
         return rocblas_status_memory_error;
 
-    ROCBLAS_CHECK(work_helper.assign_buffer(handle, mem[0]));
+    ROCBLAS_CHECK(work_helper.assign_buffer<T>(handle, mem[0]));
 
     // Execution
     return rocsolver_getri_outofplace_template<true, false, T>(

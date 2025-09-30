@@ -493,16 +493,14 @@ void rocsolver_getf2_getMemorySize(const I m,
 
     // inblocked = true when called from inside blocked algorithms like GETRF.
 
-    // for scalars
-    size_t size_scalars = sizeof(T) * 3;
-
     // for pivot values
     size_t size_pivotval = sizeof(T) * batch_count;
 
     // for pivot indices
     size_t size_pivotidx = pivot ? sizeof(I) * batch_count : 0;
 
-    work_helper->assign_sizes({size_scalars, size_pivotval, size_pivotidx});
+    work_helper->add_scalars<T>();
+    work_helper->assign_sizes({size_pivotval, size_pivotidx});
 }
 
 /** argument checking **/
@@ -616,10 +614,9 @@ rocblas_status rocsolver_getf2_template(rocblas_handle handle,
     rocblas_set_pointer_mode(handle, rocblas_pointer_mode_device);
 
     // prepare workspace
-    T* scalars = (T*)(*work_helper)[0];
-    T* pivotval = (T*)(*work_helper)[1];
-    I* pivotidx = (I*)(*work_helper)[2];
-    init_scalars(handle, scalars);
+    T* scalars = work_helper->get_scalars<T>();
+    T* pivotval = (T*)(*work_helper)[0];
+    I* pivotidx = (I*)(*work_helper)[1];
 
     // prepare kernels
     I singular_thds = getf2_get_checksingularity_blksize(n);
