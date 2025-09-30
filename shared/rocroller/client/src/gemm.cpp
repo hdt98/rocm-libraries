@@ -217,6 +217,8 @@ namespace rocRoller::Client::GEMMClient
                       descB,
                       hostC,
                       descC,
+                      -1.f,
+                      1.f,
                       problemParams.patternA,
                       problemParams.patternB,
                       problemParams.patternC);
