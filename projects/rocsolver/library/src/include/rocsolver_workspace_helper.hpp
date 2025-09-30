@@ -47,6 +47,24 @@ private:
     std::vector<size_t> sizes;
     std::vector<rocsolver_workspace_helper*> nested;
 
+    void assign_buffer(void* buffer)
+    {
+        pointers.reserve(sizes.size());
+
+        uint8_t* curr_ptr = (uint8_t*)buffer;
+        uint8_t* nested_ptr = curr_ptr;
+        for(int i = 0; i < sizes.size(); i++)
+        {
+            pointers.push_back(curr_ptr);
+            curr_ptr += sizes[i];
+            if(i < num_excl)
+                nested_ptr = curr_ptr;
+        }
+
+        for(int i = 0; i < nested.size(); i++)
+            nested[i]->assign_buffer(nested_ptr);
+    }
+
 public:
     /* Constructor */
     rocsolver_workspace_helper()
@@ -136,22 +154,18 @@ public:
 
     /* Assigns device memory to the workspace helper, to be partitioned into individual workspace arrays
        based on the assigned sizes. Only called after assign_sizes (and, if applicable, add_nested). */
-    void assign_buffer(void* buffer)
+    rocblas_status assign_buffer(rocblas_handle handle, void* buffer)
     {
-        pointers.reserve(sizes.size());
+        // zero the workspace
+        hipStream_t stream;
+        rocblas_get_stream(handle, &stream);
 
-        uint8_t* curr_ptr = (uint8_t*)buffer;
-        uint8_t* nested_ptr = curr_ptr;
-        for(int i = 0; i < sizes.size(); i++)
-        {
-            pointers.push_back(curr_ptr);
-            curr_ptr += sizes[i];
-            if(i < num_excl)
-                nested_ptr = curr_ptr;
-        }
+        HIP_CHECK(hipMemsetAsync(buffer, 0, get_total_size(), stream));
 
-        for(int i = 0; i < nested.size(); i++)
-            nested[i]->assign_buffer(nested_ptr);
+        // assign pointers
+        assign_buffer(buffer);
+
+        return rocblas_status_success;
     }
 
     /* Returns the total amount of device memory required by the workspaces assigned to this helper and its

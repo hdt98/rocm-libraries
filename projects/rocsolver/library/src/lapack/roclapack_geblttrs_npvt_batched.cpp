@@ -88,7 +88,7 @@ rocblas_status rocsolver_geblttrs_npvt_batched_impl(rocblas_handle handle,
     if(!mem)
         return rocblas_status_memory_error;
 
-    work_helper.assign_buffer((uint8_t*)mem[0]);
+    ROCBLAS_CHECK(work_helper.assign_buffer(handle, mem[0]));
 
     // Execution
     return rocsolver_geblttrs_npvt_template<true, false, T>(

@@ -92,7 +92,7 @@ rocblas_status rocsolver_gesv_outofplace_impl(rocblas_handle handle,
     if(!mem)
         return rocblas_status_memory_error;
 
-    work_helper.assign_buffer((uint8_t*)mem[0]);
+    ROCBLAS_CHECK(work_helper.assign_buffer(handle, mem[0]));
 
     // execution
     return rocsolver_gesv_outofplace_template<false, false, T>(
