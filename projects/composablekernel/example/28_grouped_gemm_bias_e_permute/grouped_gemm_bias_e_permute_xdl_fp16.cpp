@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2023, Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (c) 2018-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #include <iostream>
 #include <numeric>
@@ -17,6 +17,9 @@
 #include "ck/library/utility/host_tensor.hpp"
 #include "ck/library/utility/host_tensor_generator.hpp"
 #include "ck/library/utility/numeric.hpp"
+
+using Row    = ck::tensor_layout::gemm::RowMajor;
+using Bypass = ck::tensor_layout::BypassLayoutVerification;
 
 template <ck::index_t... Is>
 using S = ck::Sequence<Is...>;
@@ -53,7 +56,7 @@ using DeviceOpInstanceKKNN = ck::tensor_operation::device::
         //############################################|        |        |        |  Type|  Type|    Type| DataType|       Type|  Type|  Elementwise| Elementwise|  Elementwise| Spacialization| Spacialization| Spacialization| Spacialization| Prefetch|  Size| Block| Block| Block|    |    |  XDL|  XDL|  Per|  Per|   ThreadCluster|  ThreadCluster| SrcAccessOrder|   SrcVectorDim|      SrcScalar|      DstScalar| AddExtraM|   ThreadCluster|  ThreadCluster| SrcAccessOrder|  SrcVectorDim|      SrcScalar|      DstScalar| AddExtraN| MXdlPerWave| NXdlPerWave|         _MBlock_MWaveMPerXdl| ScalarPerVector|
         //############################################|        |        |        |      |      |        |         |           |      |    Operation|   Operation|    Operation|               |               |               |               |    Stage|      |      |      |      |    |    |     |     | Wave| Wave| Lengths_K0_M_K1|   ArrangeOrder|               |               |      PerVector|   PerVector_K1|          | Lengths_K0_N_K1|   ArrangeOrder|               |              |      PerVector|   PerVector_K1|          |  PerShuffle|  PerShuffle|         _NBlock_NWaveNPerXdl|   _NWaveNPerXdl|
         //############################################|        |        |        |      |      |        |         |           |      |             |            |             |               |               |               |               |         |      |      |      |      |    |    |     |     |     |     |                |               |               |               |               |               |          |                |               |               |              |               |               |          |            |            |                             |                |
-        DeviceGroupedContractionMultipleD_Xdl_CShuffle< NumDimM, NumDimN, NumDimK,   F16,   F16,     F32,      F16, DsDataType,   F16,   AElementOp,  BElementOp, CDEElementOp,       GemmSpec,         ABSpec,         ABSpec,         DESpec,        1,   256,   256,   128,    32,   8,   8,   32,   32,    4,    2,     S<4, 64, 1>,     S<1, 0, 2>,     S<1, 0, 2>,              2,              8,              8,         1,     S<4, 64, 1>,     S<1, 0, 2>,     S<1, 0, 2>,             2,              8,              8,         1,           1,           1,              S<1, 32, 1, 4>,               8>;
+        DeviceGroupedContractionMultipleD_Xdl_CShuffle< NumDimM, NumDimN, NumDimK,   F16,   F16,     F32,      F16, DsDataType,   F16,   AElementOp,  BElementOp, CDEElementOp,       GemmSpec,         ABSpec,         ABSpec,         DESpec,        1,   256,   256,   128,    32,   8,   8,   16,   16,    8,    4,     S<4, 64, 1>,     S<1, 0, 2>,     S<1, 0, 2>,              2,              8,              8,         1,     S<4, 64, 1>,     S<1, 0, 2>,     S<1, 0, 2>,             2,              8,              8,         1,           1,           1,              S<1, 32, 1, 4>,               4>;
 // clang-format on
 
 // hardcoded for NumDimM == NumDimN == NumDimK == 2
@@ -304,10 +307,10 @@ int main(int argc, char* argv[])
         const auto e_ms_ns_lengths = contraction_descs[i].e_ms_ns_lengths;
         const auto e_ms_ns_strides = contraction_descs[i].e_ms_ns_strides;
 
-        Tensor<ADataType> a_ms_ks(a_ms_ks_lengths, a_ms_ks_strides);
-        Tensor<BDataType> b_ns_ks(b_ns_ks_lengths, b_ns_ks_strides);
-        Tensor<DDataType> d_ms_ns(d_ms_ns_lengths, d_ms_ns_strides);
-        Tensor<EDataType> e_ms_ns_device_result(e_ms_ns_lengths, e_ms_ns_strides);
+        Tensor<ADataType> a_ms_ks(a_ms_ks_lengths, a_ms_ks_strides, Row{});
+        Tensor<BDataType> b_ns_ks(b_ns_ks_lengths, b_ns_ks_strides, Row{});
+        Tensor<DDataType> d_ms_ns(d_ms_ns_lengths, d_ms_ns_strides, Bypass{});
+        Tensor<EDataType> e_ms_ns_device_result(e_ms_ns_lengths, e_ms_ns_strides, Row{});
 
         ck::index_t M_ =
             ck::accumulate_n<ck::index_t>(e_ms_ns_lengths.begin(), NumDimM, 1, std::multiplies<>{});
@@ -416,9 +419,9 @@ int main(int argc, char* argv[])
             const auto e_ms_ns_lengths = contraction_descs[i].e_ms_ns_lengths;
             const auto e_ms_ns_strides = contraction_descs[i].e_ms_ns_strides;
 
-            Tensor<EDataType> c_ms_ns_host_result(e_ms_ns_lengths, e_ms_ns_strides);
+            Tensor<EDataType> c_ms_ns_host_result(e_ms_ns_lengths, e_ms_ns_strides, Row{});
 
-            Tensor<EDataType> e_ms_ns_host_result(e_ms_ns_lengths, e_ms_ns_strides);
+            Tensor<EDataType> e_ms_ns_host_result(e_ms_ns_lengths, e_ms_ns_strides, Row{});
 
             e_tensors_device[i]->FromDevice(e_device_tensors[i].mData.data());
 
