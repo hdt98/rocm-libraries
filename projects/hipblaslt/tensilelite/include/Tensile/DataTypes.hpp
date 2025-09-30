@@ -318,6 +318,7 @@ namespace TensileLite
         T>::type
         constVariantCast(const ConstantVariant& val)
     {
+        // std::cout << val.index() << " -" << static_cast<int>(rocisa::DataType::ComplexDouble) << std::endl;
         switch(val.index())
         {
         case static_cast<int>(rocisa::DataType::Float):
@@ -351,8 +352,11 @@ namespace TensileLite
                             T>::type
         constVariantCast(const ConstantVariant& val)
     {
+        // std::cout << val.index() << " -" << static_cast<int>(rocisa::DataType::ComplexDouble) << std::endl;
         switch(val.index())
         {
+        case static_cast<int>(rocisa::DataType::Float):
+            return static_cast<T>(*std::get_if<float>(&val));
         case static_cast<int>(rocisa::DataType::ComplexFloat):
             return static_cast<T>(*std::get_if<std::complex<float>>(&val));
         case static_cast<int>(rocisa::DataType::ComplexDouble):
