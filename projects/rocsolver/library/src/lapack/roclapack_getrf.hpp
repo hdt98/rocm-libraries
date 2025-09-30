@@ -663,13 +663,13 @@ rocblas_status rocsolver_getrf_template(rocblas_handle handle,
     T minone = -1;
 
     // prepare workspace
+    rocsolver_workspace_helper* getf2_work = work_helper->get_nested(0);
     INFO* iinfo = (INFO*)(*work_helper)[0];
     I* iipiv = (I*)(*work_helper)[1];
     void* work1 = (void*)(*work_helper)[2];
     void* work2 = (void*)(*work_helper)[3];
     void* work3 = (void*)(*work_helper)[4];
     void* work4 = (void*)(*work_helper)[5];
-    rocsolver_workspace_helper* getf2_work = work_helper->get_nested(0);
 
     I jb, dimx, dimy;
     I nextpiv, mm, nn;
