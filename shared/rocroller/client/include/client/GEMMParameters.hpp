@@ -35,8 +35,8 @@
 #include <rocRoller/Parameters/Solution/LoadOption.hpp>
 #include <rocRoller/Utilities/Utils.hpp>
 
-#include "DataGenerator.hpp"
 #include "client/BenchmarkSolution.hpp"
+#include <DataGenerator.hpp>
 
 namespace rocRoller
 {
