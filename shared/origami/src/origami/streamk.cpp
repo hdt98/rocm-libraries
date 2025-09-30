@@ -277,15 +277,6 @@ std::size_t grid_analytical(const problem_t& problem,
   std::size_t N             = problem.size.n;
   std::size_t K             = problem.size.k;
   std::size_t batch         = problem.batch;
-  bool transpose_a          = problem.transpose_a;
-  bool transpose_b          = problem.transpose_b;
-  data_type_t mi_dtype      = problem.mi_dtype;
-  std::size_t mx_block_size = problem.mx_block_size;
-
-  // Calculate element sizes
-  std::size_t element_size_A   = data_type_to_bits(problem.a_dtype);
-  std::size_t element_size_B   = data_type_to_bits(problem.b_dtype);
-  std::size_t element_size_out = data_type_to_bits(problem.d_dtype);
 
   // Extract dimensions for grid calculation
   std::size_t MT_M = config.mt.m;
@@ -302,7 +293,7 @@ std::size_t grid_analytical(const problem_t& problem,
   double best_latency    = std::numeric_limits<double>::infinity();
 
   for (size_t split = 1; split <= MAX_SPLIT; ++split) {
-    double latency = compute_total_latency(hardware, problem, config, split);
+    double latency = compute_total_latency(problem, hardware, config, split);
 
     if (latency < best_latency) {
       best_latency = latency;

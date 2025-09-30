@@ -11,22 +11,12 @@
 #include <tuple>
 
 #include "origami/gemm.hpp"
+#include "origami/math.hpp"
 #include "origami/streamk.hpp"
 #include "origami/types.hpp"
 #include "origami/utils.hpp"
 
 namespace origami {
-
-/* ---------------------------------------------------------------------------------------- */
-/* Misc. functions                                                                          */
-/* ---------------------------------------------------------------------------------------- */
-// Performs `(n + d - 1) / d`, but is robust against the case where `(n + d - 1)` would
-// overflow.
-template <typename N, typename D>
-constexpr N safe_ceil_div(N n, D d) {
-  // Static cast to undo integral promotion.
-  return static_cast<N>(d == 0 ? 0 : (n / d + (n % d != 0 ? 1 : 0)));
-}
 
 // Computes the number of active compute units if there is only one wave and it is partial
 // Otherwise, returns hardware.N_CU
@@ -34,42 +24,42 @@ std::tuple<size_t, size_t, size_t> compute_cu_occupancy(const hardware_t& hardwa
                                                         const problem_t& problem,
                                                         const config_t& config,
                                                         grid_selection_t grid_selection,
-                                                        size_t split) {
+                                                        std::size_t split) {
   // Extract parameters from structured types
-  size_t M                = problem.size.m;
-  size_t N                = problem.size.n;
-  size_t K                = problem.size.k;
-  size_t batch            = problem.batch;
-  bool transA             = problem.transpose_a;
-  bool transB             = problem.transpose_b;
-  size_t element_size_A   = data_type_to_bits(problem.a_dtype);
-  size_t element_size_B   = data_type_to_bits(problem.b_dtype);
-  size_t element_size_out = data_type_to_bits(problem.d_dtype);
-  data_type_t mi_datatype = problem.mi_dtype;
+  std::size_t M                = problem.size.m;
+  std::size_t N                = problem.size.n;
+  std::size_t K                = problem.size.k;
+  std::size_t batch            = problem.batch;
+  bool a_trans                 = problem.a_transpose;
+  bool b_trans                 = problem.b_transpose;
+  std::size_t element_size_A   = data_type_to_bits(problem.a_dtype);
+  std::size_t element_size_B   = data_type_to_bits(problem.b_dtype);
+  std::size_t element_size_out = data_type_to_bits(problem.d_dtype);
+  data_type_t mi_datatype      = problem.mi_dtype;
 
-  size_t MT_M                      = config.mt.m;
-  size_t MT_N                      = config.mt.n;
-  size_t MT_K                      = config.mt.k;
-  size_t MI_M                      = config.mi.m;
-  size_t MI_N                      = config.mi.n;
-  size_t MI_K                      = config.mi.k;
-  int WGM                          = config.workgroup_mapping;
-  size_t workspace_size            = config.workspace_size;
-  size_t workspace_size_per_elem_c = config.workspace_size_per_elem_c;
-  int occupancy                    = config.occupancy;
+  std::size_t MT_M                      = config.mt.m;
+  std::size_t MT_N                      = config.mt.n;
+  std::size_t MT_K                      = config.mt.k;
+  std::size_t MI_M                      = config.mi.m;
+  std::size_t MI_N                      = config.mi.n;
+  std::size_t MI_K                      = config.mi.k;
+  int WGM                               = config.workgroup_mapping;
+  std::size_t workspace_size            = config.workspace_size;
+  std::size_t workspace_size_per_elem_c = config.workspace_size_per_elem_c;
+  int occupancy                         = config.occupancy;
   // Number of output MTs
-  size_t numMT_M = safe_ceil_div(M, MT_M);
-  size_t numMT_N = safe_ceil_div(N, MT_N);
-  size_t numMTs  = numMT_M * numMT_N * batch;
+  std::size_t numMT_M = math::safe_ceil_div(M, MT_M);
+  std::size_t numMT_N = math::safe_ceil_div(N, MT_N);
+  std::size_t numMTs  = numMT_M * numMT_N * batch;
 
-  size_t numWGs, numActiveCUs, numWaves, splitFactor;
+  std::size_t numWGs, num_active_cus, num_waves, splitFactor;
   if (split)  // if it is given
   {
-    split        = split > 1 ? split : 1;
-    numWGs       = numMTs * split;
-    numActiveCUs = numWGs < hardware.N_CU ? numWGs : hardware.N_CU;
-    numWaves     = safe_ceil_div(numWGs, hardware.N_CU);
-    splitFactor  = split;
+    split          = split > 1 ? split : 1;
+    numWGs         = numMTs * split;
+    num_active_cus = numWGs < hardware.N_CU ? numWGs : hardware.N_CU;
+    num_waves      = math::safe_ceil_div(numWGs, hardware.N_CU);
+    splitFactor    = split;
   } else  // as what StreamK predicts
   {
     reduction_t rt =
@@ -79,49 +69,44 @@ std::tuple<size_t, size_t, size_t> compute_cu_occupancy(const hardware_t& hardwa
     numWGs = select_grid_size(problem, hardware, config, grid_selection_t::k_split_aware);
 
     // output variables
-    numActiveCUs = numWGs < hardware.N_CU ? numWGs : hardware.N_CU;
+    num_active_cus = numWGs < hardware.N_CU ? numWGs : hardware.N_CU;
     // There are cases in which StreamK combines multiple output MTs and assigns to 1 WG.
     // That means, we artifically observe one full wave, but that is not what actually happens
     // under the hood. From a theoretical point of view, these distributions change all of the
     // computations in Origami. With current implementation, it is hard to capture that behaviour
     // analytically.
-    // So for now, if the numWGs is less than the numMTs, we calculate numWaves based on the
-    // numMTs. Otherwise, we use numWGs to compute numWaves.
-    numWaves    = numWGs > numMTs ? safe_ceil_div(numWGs, hardware.N_CU)
-                                  : safe_ceil_div(numMTs, hardware.N_CU);
-    splitFactor = safe_ceil_div(numWGs, numMTs);
+    // So for now, if the numWGs is less than the numMTs, we calculate num_waves based on the
+    // numMTs. Otherwise, we use numWGs to compute num_waves.
+    num_waves   = numWGs > numMTs ? math::safe_ceil_div(numWGs, hardware.N_CU)
+                                  : math::safe_ceil_div(numMTs, hardware.N_CU);
+    splitFactor = math::safe_ceil_div(numWGs, numMTs);
   }
 
   if (hardware_t::is_debug_enabled()) {
     hardware.log_debug("num_macro_tiles", numMTs);
     hardware.log_debug("num_workgroups", numWGs);
-    hardware.log_debug("num_active_cus", numActiveCUs);
-    hardware.log_debug("num_waves", numWaves);
+    hardware.log_debug("num_active_cus", num_active_cus);
+    hardware.log_debug("num_waves", num_waves);
     hardware.log_debug("split_factor", splitFactor);
   }
 
-  return std::make_tuple(numActiveCUs, numWaves, splitFactor);
+  return std::make_tuple(num_active_cus, num_waves, splitFactor);
 }
 
 /* ---------------------------------------------------------------------------------------- */
 /* Compute-related functions                                                                */
 /* ---------------------------------------------------------------------------------------- */
-// Compute the number of matrix instructions required to compute a single MT_MXMT_NXMT_K tile.
-size_t compute_number_matrix_instructions(const hardware_t& hardware,
-                                          size_t MT_M,
-                                          size_t MT_N,
-                                          size_t MT_K,
-                                          size_t MI_M,
-                                          size_t MI_N,
-                                          size_t MI_K) {
-  // Compute the number of Matrix Instructions required in each dim
-  size_t N_MI_M = safe_ceil_div(MT_M, MI_M);
-  size_t N_MI_N = safe_ceil_div(MT_N, MI_N);
-  size_t N_MI_K = safe_ceil_div(MT_K, MI_K);
-  // Total number of matrix instructions for MT_MxMT_NxMT_K tile
-  size_t N_MI = N_MI_M * N_MI_N * N_MI_K;
 
-  return N_MI;
+std::size_t compute_number_matrix_instructions(dim3_t mt, dim3_t mi) {
+  // Compute the number of Matrix Instructions required in each dim.
+  std::size_t num_m_instrs = math::safe_ceil_div(mt.m, mi.m);
+  std::size_t num_n_instrs = math::safe_ceil_div(mt.n, mi.n);
+  std::size_t num_k_instrs = math::safe_ceil_div(mt.k, mi.k);
+
+  // Total number of matrix instructions.
+  std::size_t num_matrix_instrs = num_m_instrs * num_n_instrs * num_k_instrs;
+
+  return num_matrix_instrs;
 }
 
 // Compute arithmic intensity
@@ -135,45 +120,43 @@ double arithmetic_intensity(double m, double n, double k, double bytes_per_eleme
 }
 
 // Compute cvt overhead in tf32 emulation
-static inline double compute_cvt_overhead(const hardware_t& hardware,
-                                          size_t MT_M,
-                                          size_t MT_N,
-                                          size_t MT_K,
-                                          size_t MI_M,
-                                          size_t MI_N,
-                                          size_t MI_K,
-                                          size_t element_size_A,
-                                          size_t element_size_B) {
+double compute_cvt_overhead(const problem_t& problem,
+                            const hardware_t& hardware,
+                            const config_t& config) {
   // Wave tile sizes
   // TODO: Use kernel's actual wavetiles.
-  const double wave_tile_m = MT_M / 2.0;
-  const double wave_tile_n = MT_N / 2.0;
-  const double wave_tile_k = MT_K / MI_K;
+  const double wave_tile_m = config.mt.m / 2.0;
+  const double wave_tile_n = config.mt.n / 2.0;
+  const double wave_tile_k = config.mt.k / config.mi.k;
 
   // MFMA count and cycles
-  const double N_MI = (wave_tile_m / MI_M) * (wave_tile_n / MI_N) * wave_tile_k;
+  const double N_MI = (wave_tile_m / config.mi.m) * (wave_tile_n / config.mi.n) * wave_tile_k;
 
   // TF32 emu: 3× BF16 MI issue slots
   const double num_mfma = 3.0 * static_cast<double>(N_MI);
 
   // Cycle scale per MI (use BF16 MI latency as the basic timing quantum)
-  const double L_MI_bf16   = hardware.get_mi_latency(MI_M, MI_N, MI_K, data_type_t::BFloat16);
+  const double L_MI_bf16 =
+      hardware.get_mi_latency(config.mi.m, config.mi.n, config.mi.k, data_type_t::BFloat16);
   const double mfma_cycles = num_mfma * L_MI_bf16;
 
   // 2) Bytes (per K-slice), using ceil-div to whole bytes
-  const double bytesA = static_cast<double>(wave_tile_m) * MT_K * safe_ceil_div(element_size_A, 8);
-  const double bytesB = static_cast<double>(wave_tile_n) * MT_K * safe_ceil_div(element_size_B, 8);
+  int a_bytes = data_type_to_bytes(problem.a_dtype);
+  int b_bytes = data_type_to_bytes(problem.b_dtype);
 
-  const double mt_bytesA = static_cast<double>(MT_M) * MT_K * safe_ceil_div(element_size_A, 8);
+  const double bytesA = static_cast<double>(wave_tile_m) * config.mt.k * a_bytes;
+  const double bytesB = static_cast<double>(wave_tile_n) * config.mt.k * b_bytes;
+
+  const double mt_bytesA = static_cast<double>(config.mt.mk()) * a_bytes;
 
   // 3) Modeled transfer quanta (128B lines)
   //      dsA = bytesA / (128 * MI_M)
   //      dsB = bytesB / (128 * MI_N)
   //      GR  = dsA  (global->LDS modeled equal to A-side DS)
-  const double dsA = (bytesA / 128.0) / static_cast<double>(MI_M);  // LDS->VGPR for A
-  const double dsB = (bytesB / 128.0) / static_cast<double>(MI_N);  // LDS->VGPR for B
-  const double GR  = dsA;                                           // Global->LDS reads
-  const double LR  = dsA + dsB;                                     // total DS->VGPR
+  const double dsA = (bytesA / 128.0) / static_cast<double>(config.mi.m);  // LDS->VGPR for A
+  const double dsB = (bytesB / 128.0) / static_cast<double>(config.mi.n);  // LDS->VGPR for B
+  const double GR  = dsA;                                                  // Global->LDS reads
+  const double LR  = dsA + dsB;                                            // total DS->VGPR
 
   // 4) Heuristic cycle weights (scaled to MI latency).
   //    Preserves your A=104, B=8, C=4 when L_MI_bf16 == 16.
@@ -200,67 +183,53 @@ static inline double compute_cvt_overhead(const hardware_t& hardware,
   return overhead;
 }
 
-// Determine the compute latency per MT_MxMT_NxMT_K Macro Tile (L_MT).
-size_t compute_mt_compute_latency(const hardware_t& hardware,
-                                  size_t M,
-                                  size_t N,
-                                  size_t K,
-                                  bool transA,
-                                  bool transB,
-                                  size_t MT_M,
-                                  size_t MT_N,
-                                  size_t MT_K,
-                                  size_t MI_M,
-                                  size_t MI_N,
-                                  size_t MI_K,
-                                  size_t element_size_A,
-                                  size_t element_size_B,
-                                  data_type_t mi_datatype) {
+double compute_mt_compute_latency(const problem_t& problem,
+                                  const hardware_t& hardware,
+                                  const config_t& config) {
   // Compute the number of matrix instructions
-  size_t N_MI = compute_number_matrix_instructions(hardware, MT_M, MT_N, MT_K, MI_M, MI_N, MI_K);
-  // Latency of a single MT_MxMT_NxMT_k tile is the latency of one MI multiplied by
-  // number of MI per MT_MxMT_NxMT_k.
-  size_t L_MI = hardware.get_mi_latency(MI_M, MI_N, MI_K, mi_datatype);
+  std::size_t N_MI = compute_number_matrix_instructions(config.mt, config.mi);
+  // Latency of a single MT_M x MT_N x MT_K tile is the latency of one
+  // MI multiplied by number of MI per MT_M x MT_N x MT_K.
+  std::size_t L_MI = hardware.get_mi_latency(config.mi.m, config.mi.n, config.mi.k, problem.mi_dtype);
+  std::size_t L_MT = L_MI * N_MI;
 
-  // size_t mt_arith = arithmetic_intensity(MT_M, MT_N, MT_K, 2);
-  // printf("MT_M:%d MT_N:%d MT_K:%d arith:%d\n", MT_M, MT_N, MT_K, mt_arith);
-  // size_t arith = ((M * N * K * 2) / (M * K + N * K + M * N));
-  size_t L_MT = L_MI * N_MI;
+  bool a_trans = problem.a_transpose;
+  bool b_trans = problem.b_transpose;
+
+  int a_bytes = data_type_to_bytes(problem.a_dtype);
+  int b_bytes = data_type_to_bytes(problem.b_dtype);
 
   // TN
-  if (transA && !transB) {
+  if (a_trans && !b_trans) {
     // We want to penalize tiles that can't be coalesced for T,N where K is contiguous dimension.
     // In this case, that's when the K dimension is indivisible by 128 bytes.
-    if (MT_K * safe_ceil_div(element_size_A, 8) % 128 != 0) { L_MT = L_MT * 1.5; }
-    if (MT_K * safe_ceil_div(element_size_B, 8) % 128 != 0) { L_MT = L_MT * 1.5; }
+    if (config.mt.k * a_bytes % 128 != 0) { L_MT *= 1.5; }
+    if (config.mt.k * b_bytes % 128 != 0) { L_MT *= 1.5; }
   }
 
   // NT: A is contiguous in M and B is contiguous in N
-  if (!transA && transB) {
+  if (!a_trans && b_trans) {
     // LDS Load Granularity is 128 Bytes -> If we load an amount indivisible by 128 bytes in either
     // contiguous dimesion from LDS then we will get poor LDS utilization. This actually happens as
     // more like a quantization effect where if either contiguous dimension of the tile is not
     // evenly divisible by 128-bytes We end up with inefficient loads. Multiplication by a value is
     // arbitrary, there is probably a better analytical method to quantify the true impact of this
     // Effect on the efficiency of computation.
-    if ((MT_M * safe_ceil_div(element_size_A, 8)) % (128) != 0) { L_MT = L_MT * 2; }
-
-    if ((MT_N * safe_ceil_div(element_size_B, 8)) % 128 != 0) { L_MT = L_MT * 2; }
+    if ((config.mt.m * a_bytes) % 128 != 0) { L_MT *= 2; }
+    if ((config.mt.n * b_bytes) % 128 != 0) { L_MT *= 2; }
     // NT Transpose Overhead Scales in both.
   }
 
   // TT: A is contiguous in K and B is contiguous in N
-  if (transA && transB) {
-    if (MT_K * safe_ceil_div(element_size_A, 8) < 128) { L_MT = L_MT * 2; }
-
-    if (MT_N * safe_ceil_div(element_size_B, 8) < 128) { L_MT = L_MT * 2; }
+  if (a_trans && b_trans) {
+    if (config.mt.k * a_bytes < 128) { L_MT *= 2; }
+    if (config.mt.n * b_bytes < 128) { L_MT *= 2; }
   }
 
   // NN: A is contiguous in M and B is contiguous in K
-  if (!transA && !transB) {
-    if (MT_M * safe_ceil_div(element_size_A, 8) < 128) { L_MT = L_MT * 2; }
-
-    if (MT_K * safe_ceil_div(element_size_B, 8) < 128) { L_MT = L_MT * 2; }
+  if (!a_trans && !b_trans) {
+    if (config.mt.m * a_bytes < 128) { L_MT *= 2; }
+    if (config.mt.k * b_bytes < 128) { L_MT *= 2; }
   }
 
   return L_MT;
@@ -269,46 +238,30 @@ size_t compute_mt_compute_latency(const hardware_t& hardware,
 /* ---------------------------------------------------------------------------------------- */
 /* Memory-related functions                                                                 */
 /* ---------------------------------------------------------------------------------------- */
-// Check if MT fits in LDS
-bool check_lds_capacity(const hardware_t& hardware,
-                        size_t MT_M,
-                        size_t MT_N,
-                        size_t MT_K,
-                        size_t element_size) {
-  // A and B size
-  size_t Ld_A_value = compute_A_loads(MT_M, MT_K);
-  size_t Ld_B_value = compute_B_loads(MT_N, MT_K);
-  // Size of those in bytes
-  size_t LDS_usage = (Ld_A_value + Ld_B_value) * (element_size / 8);
 
-  if (LDS_usage > hardware.lds_capacity) {
-    return false;  // Exceeds LDS capacity
+bool check_lds_capacity(const hardware_t& hardware,
+                        dim3_t mt,
+                        data_type_t a_dtype,
+                        data_type_t b_dtype) {
+  // A and B loads in bytes.
+  std::size_t a_loads_in_bytes = mt.mk() * data_type_to_bytes(a_dtype);
+  std::size_t b_loads_in_bytes = mt.nk() * data_type_to_bytes(b_dtype);
+
+  // Total A/B loads in bytes is LDS usage.
+  std::size_t lds_usage = a_loads_in_bytes + b_loads_in_bytes;
+
+  if (lds_usage > hardware.lds_capacity) {
+    return false;  // Exceeded available LDS capacity.
   } else {
-    return true;  // Within LDS capacity
+    return true;  // Within available LDS capacity.
   }
 }
 
-// Compute the amount of data loaded from A to produce a MT_MxMT_NxMT_K tile.
-size_t compute_A_loads(size_t MT_M, size_t MT_K) {
-  // Compute the size of loads from A for a single MT_MxMT_NxMT_K tiles
-  size_t Ld_A_value = MT_M * MT_K;
-
-  return Ld_A_value;
-}
-
-// Compute the amount of data loaded from B to produce a MT_MxMT_NxMT_K tile.
-size_t compute_B_loads(size_t MT_N, size_t MT_K) {
-  // Compute the size of loads from B for a single MT_MxMT_NxMT_K tiles
-  size_t Ld_B_value = MT_N * MT_K;
-
-  return Ld_B_value;
-}
-
 // Compute limited achievable memory bandwidth based on active CUs
-double compute_mem_bw_from_occupancy(const hardware_t& hardware, size_t numActiveCUs) {
-  const double CUs = static_cast<double>(numActiveCUs);
+double compute_mem_bw_from_occupancy(const hardware_t& hardware, size_t num_active_cus) {
+  const double CUs = static_cast<double>(num_active_cus);
 
-  if (numActiveCUs > hardware.N_CU) return 1.0;
+  if (num_active_cus > hardware.N_CU) return 1.0;
 
   const double bw_limited = std::get<0>(hardware.mem_bw_per_wg_coefficients) * CUs * CUs +
                             std::get<1>(hardware.mem_bw_per_wg_coefficients) * CUs +
@@ -317,51 +270,43 @@ double compute_mem_bw_from_occupancy(const hardware_t& hardware, size_t numActiv
   return std::min(bw_limited, 1.0);
 }
 
-// Estimate L2 hit-rate
-double estimate_l2_hit(const hardware_t& hardware,
-                       size_t M,
-                       size_t N,
-                       size_t K,
-                       size_t batch,
-                       size_t MT_M,
-                       size_t MT_N,
-                       size_t MT_K,
-                       size_t element_size,
-                       int WGM,
-                       size_t splittingFactor) {
+double estimate_l2_hit(const problem_t& problem,
+                       const hardware_t& hardware,
+                       const config_t& config,
+                       std::size_t splitting_factor) {
   // Compute grid dimensions
-  int grid_m = static_cast<int>(safe_ceil_div(M, MT_M));
-  int grid_n = static_cast<int>(safe_ceil_div(N, MT_N));
+  std::size_t grid_m = math::safe_ceil_div(problem.size.m, config.mt.m);
+  std::size_t grid_n = math::safe_ceil_div(problem.size.n, config.mt.n);
 
   // Distribute CUs per XCD
   // Modify cu_per_xcd to only take into account the CUs that might share same K-tiles
   // This is to factor in the effect of splitting on L2
-  int cu_per_xcd = safe_ceil_div(grid_m * grid_n, hardware.NUM_XCD);
-  cu_per_xcd /= splittingFactor;
+  std::size_t cu_per_xcd = math::safe_ceil_div(grid_m * grid_n, hardware.NUM_XCD);
+  cu_per_xcd /= splitting_factor;
 
   // N dimension of mem1 tile is divided by whichever is smaller between WGM and grid
-  int l2_n = std::min(WGM, grid_n);
-  int l2_m = cu_per_xcd / l2_n;
+  std::size_t l2_n = std::min(std::size_t(config.workgroup_mapping), grid_n);
+  std::size_t l2_m = cu_per_xcd / l2_n;
 
   // If a single mem1 tile is larger than the grid, extend M dimension
   if (l2_m > grid_m) {
     int num_wraps = (l2_m / grid_m) - 1;  // how many times we wrap
-    l2_n += (num_wraps * WGM);
+    l2_n += (num_wraps * config.workgroup_mapping);
     l2_m = grid_m;
   }
 
   // Clamp mem1 tile dimensions to at least 1 and at most grid size
-  l2_m = std::max(std::min(grid_m, l2_m), 1);
-  l2_n = std::max(std::min(grid_n, l2_n), 1);
+  l2_m = std::max(std::min(grid_m, l2_m), std::size_t(1));
+  l2_n = std::max(std::min(grid_n, l2_n), std::size_t(1));
 
   // Compute "uncached" reads based on mem1 tile dimensions
-  long long l2_A_uncached_reads = static_cast<long long>(l2_m) * MT_M * MT_K;
-  long long l2_B_uncached_reads = static_cast<long long>(l2_n) * MT_N * MT_K;
+  long long l2_A_uncached_reads = static_cast<long long>(l2_m) * config.mt.mk();
+  long long l2_B_uncached_reads = static_cast<long long>(l2_n) * config.mt.nk();
   long long uncached_read       = l2_A_uncached_reads + l2_B_uncached_reads;
 
   // If bigger than cache capacity, reduce mem1 tile size and recompute uncached reads
   while (l2_A_uncached_reads + l2_B_uncached_reads >
-         hardware.L2_capacity / safe_ceil_div(element_size, 8)) {
+         hardware.L2_capacity / data_type_to_bytes(problem.a_dtype)) {
     // Reduce M dimension by 1
     l2_m -= 1;
     if (l2_m < 1) {
@@ -369,13 +314,14 @@ double estimate_l2_hit(const hardware_t& hardware,
       l2_m = 1;
       break;
     }
-    l2_A_uncached_reads = static_cast<long long>(l2_m) * MT_M * MT_K;
-    l2_B_uncached_reads = static_cast<long long>(l2_n) * MT_N * MT_K;
+
+    l2_A_uncached_reads = static_cast<long long>(l2_m) * config.mt.mk();
+    l2_B_uncached_reads = static_cast<long long>(l2_n) * config.mt.nk();
   }
 
   // Total reads considering repeated usage
-  long long l2_A_reads = static_cast<long long>(l2_m) * l2_n * MT_M * MT_K;
-  long long l2_B_reads = static_cast<long long>(l2_n) * l2_m * MT_N * MT_K;
+  long long l2_A_reads = static_cast<long long>(l2_m) * l2_n * config.mt.mk();
+  long long l2_B_reads = static_cast<long long>(l2_n) * l2_m * config.mt.nk();
 
   long long total_reads         = std::max(l2_A_reads + l2_B_reads, 1LL);
   long long total_uncached_read = l2_A_uncached_reads + l2_B_uncached_reads;
@@ -386,8 +332,9 @@ double estimate_l2_hit(const hardware_t& hardware,
   // Guard against numeric anomalies
   if (l2_hit > 1.0) {
     std::cerr << "mem1 hit was greater than 1, which isn't possible.\n"
-              << "Problem Size: " << M << "x" << N << "x" << K << "\n"
-              << "Macro-Tile:  " << MT_M << "x" << MT_N << "x" << MT_K << "\n"
+              << "Problem Size: " << problem.size.m << "x" << problem.size.n << "x"
+              << problem.size.k << "\n"
+              << "Macro-Tile:  " << config.mt.m << "x" << config.mt.n << "x" << config.mt.k << "\n"
               << "cu_per_xcd:  " << cu_per_xcd << "\n"
               << "l2_m: " << l2_m << ", l2_n: " << l2_n << ", l2_hit: " << l2_hit << "\n";
   }
@@ -400,44 +347,39 @@ double estimate_l2_hit(const hardware_t& hardware,
   return l2_hit;
 }
 
-// Estimate MALL hit-rate
-double estimate_mall_hit(const hardware_t& hardware,
-                         size_t M,
-                         size_t N,
-                         size_t K,
-                         size_t batch,
-                         size_t MT_M,
-                         size_t MT_N,
-                         size_t MT_K,
-                         int WGM,
-                         size_t numActiveCUs,
-                         size_t splittingFactor) {
-  int grid_m = static_cast<int>(safe_ceil_div(M, MT_M));
-  int grid_n = static_cast<int>(safe_ceil_div(N, MT_N));
+double estimate_mall_hit(const problem_t& problem,
+                         const hardware_t& hardware,
+                         const config_t& config,
+                         std::size_t num_active_cus,
+                         std::size_t splitting_factor) {
+  // Compute grid dimensions
+  std::size_t grid_m = math::safe_ceil_div(problem.size.m, config.mt.m);
+  std::size_t grid_n = math::safe_ceil_div(problem.size.n, config.mt.n);
 
-  // mem2 tile dimensions
-  int mall_m = grid_m * grid_n / WGM;  // M dimension of mem2 tile
-  int mall_n = std::min(WGM, grid_n);  // N dimension of mem2 tile
+  // Tile dimensions in MALL.
+  std::size_t mall_m = grid_m * grid_n / config.workgroup_mapping;  // M dimension of mem2 tile
+  std::size_t mall_n =
+      std::min(std::size_t(config.workgroup_mapping), grid_n);  // N dimension of mem2 tile
 
   // If a single mem2 tile is larger than the grid, extend its M dimension
   if (mall_m > grid_m) {
     int num_wraps = (mall_m / grid_m) - 1;
-    mall_n += (num_wraps * WGM);
+    mall_n += (num_wraps * config.workgroup_mapping);
     mall_m = grid_m;
   }
 
   // Clamp the tile dimensions to valid ranges
-  mall_m = std::max(std::min(grid_m, mall_m), 1);
-  mall_n = std::max(std::min(grid_n, mall_n), 1);
+  mall_m = std::max(std::min(grid_m, mall_m), std::size_t(1));
+  mall_n = std::max(std::min(grid_n, mall_n), std::size_t(1));
 
   // Unique “uncached” entries of A/B for this XCD
-  int mall_A_uncached_reads = mall_m * MT_M * MT_K;
-  int mall_B_uncached_reads = mall_n * MT_N * MT_K;
+  int mall_A_uncached_reads = mall_m * config.mt.mk();
+  int mall_B_uncached_reads = mall_n * config.mt.nk();
   int total_uncached_read   = mall_A_uncached_reads + mall_B_uncached_reads;
 
   // Total A/B reads considering repeated usage
-  long long mall_A_reads = static_cast<long long>(mall_m) * mall_n * MT_M * MT_K;
-  long long mall_B_reads = static_cast<long long>(mall_n) * mall_m * MT_N * MT_K;
+  long long mall_A_reads = static_cast<long long>(mall_m) * mall_n * config.mt.mk();
+  long long mall_B_reads = static_cast<long long>(mall_n) * mall_m * config.mt.nk();
 
   // Avoid division by zero
   long long total_reads  = std::max(mall_A_reads + mall_B_reads, 1LL);
@@ -453,75 +395,68 @@ double estimate_mall_hit(const hardware_t& hardware,
   return mall_hit;
 }
 
-// Determine the memory latency
-double compute_memory_latency(const hardware_t& hardware,
-                              size_t M,
-                              size_t N,
-                              size_t K,
-                              bool transA,
-                              bool transB,
-                              size_t batch,
-                              size_t MT_M,
-                              size_t MT_N,
-                              size_t MT_K,
-                              size_t element_size_A,
-                              size_t element_size_B,
-                              size_t mx_block_size,
-                              int WGM,
-                              size_t numActiveCUs,
-                              size_t splittingFactor) {
+double compute_memory_latency(const problem_t& problem,
+                              const hardware_t& hardware,
+                              const config_t& config,
+                              std::size_t num_active_cus,
+                              std::size_t splitting_factor) {
   // 1) Estimate L2 hit-rate
-  double H_mem1 = estimate_l2_hit(
-      hardware, M, N, K, batch, MT_M, MT_N, MT_K, element_size_A, WGM, splittingFactor);
+  double H_mem1 = estimate_l2_hit(problem, hardware, config, splitting_factor);
 
   // 2) Estimate mall hit-rate
-  double H_mem2 = estimate_mall_hit(
-      hardware, M, N, K, batch, MT_M, MT_N, MT_K, WGM, numActiveCUs, splittingFactor);
+  double H_mem2 = estimate_mall_hit(problem, hardware, config, num_active_cus, splitting_factor);
 
   // 3) Total loads are loads from A and loads from B
-  size_t Ld_A_value  = compute_A_loads(MT_M, MT_K);
-  size_t Ld_B_value  = compute_B_loads(MT_N, MT_K);
-  size_t Ld_CU_bytes = (Ld_A_value * safe_ceil_div(element_size_A, 8))     // A Bytes
-                       + (Ld_B_value * safe_ceil_div(element_size_B, 8));  // B Bytes
+  int a_bytes = data_type_to_bytes(problem.a_dtype);
+  int b_bytes = data_type_to_bytes(problem.b_dtype);
+
+  int a_bits = data_type_to_bits(problem.a_dtype);
+  int b_bits = data_type_to_bits(problem.b_dtype);
+
+  std::size_t Ld_A_value  = config.mt.mk();
+  std::size_t Ld_B_value  = config.mt.nk();
+  std::size_t Ld_CU_bytes = (Ld_A_value * a_bytes)     // A Bytes
+                            + (Ld_B_value * b_bytes);  // B Bytes
 
   // Logic for block scaled datatypes (Assuming BS=32 and 8-bit scales)
   // TODO This is technically wrong, need separate flag to enable MX so we can differentiate FP8 and
-  // MX8
-  if (element_size_A < 8 && mx_block_size != 0) {
+  // TODO MX8, we now have access to a_dtype/b_dtype.
+  if (a_bits < 8 && problem.mx_block_size != 0) {
     // Number of scales per tile
-    size_t num_scales_A = safe_ceil_div(MT_M * MT_K, mx_block_size);
+    std::size_t num_scales_A = math::safe_ceil_div(config.mt.mk(), problem.mx_block_size);
     Ld_CU_bytes += num_scales_A;  // One Byte per scale
   }
-  if (element_size_B < 8 && mx_block_size != 0) {
+  if (b_bits < 8 && problem.mx_block_size != 0) {
     // Number of scales per tile
-    size_t num_scales_B = safe_ceil_div(MT_N * MT_K, mx_block_size);
+    std::size_t num_scales_B = math::safe_ceil_div(config.mt.nk(), problem.mx_block_size);
     Ld_CU_bytes += num_scales_B;  // One Byte per scale
   }
 
   // 4) total loads by all CUs
-  double total_Ld = Ld_CU_bytes * static_cast<double>(numActiveCUs);
+  double total_Ld = Ld_CU_bytes * static_cast<double>(num_active_cus);
 
   // 5) mem1‐limited factor (simple linear model)
-  double mem1_bw_limited = static_cast<double>(numActiveCUs) / static_cast<double>(hardware.N_CU);
+  double mem1_bw_limited = static_cast<double>(num_active_cus) / static_cast<double>(hardware.N_CU);
   double limited_mem1_bw = hardware.mem1_perf_ratio * mem1_bw_limited;
 
   // 6) mem1 latency
   double L_mem_mem1 = (limited_mem1_bw > 0) ? (total_Ld / (limited_mem1_bw)) : 0.0;
 
   // 7) mem2‐limited from occupancy (Can't Issue enough load/stores)
-  double bw_limited = compute_mem_bw_from_occupancy(hardware, numActiveCUs);
+  double bw_limited = compute_mem_bw_from_occupancy(hardware, num_active_cus);
 
   // 8) loads that reach each level
   double Ld_mem2 = (1.0 - H_mem1) * total_Ld;
   double Ld_MEM  = (1.0 - H_mem2) * Ld_mem2;
 
   // 9) enforce whole‐problem minimum loads
-  if (numActiveCUs < hardware.N_CU) {
+  if (num_active_cus < hardware.N_CU) {
+    // TODO: Check if this math is correct:
     double min_load =
-        static_cast<double>(M * MT_K * splittingFactor * safe_ceil_div(element_size_A, 8) +
-                            N * MT_K * splittingFactor * safe_ceil_div(element_size_B, 8));
-    Ld_MEM  = std::max(Ld_MEM, min_load) * batch;
-    Ld_mem2 = std::max(Ld_mem2, min_load) * batch;
+        static_cast<double>(problem.size.m * config.mt.k * splitting_factor * a_bytes +
+                            problem.size.n * config.mt.k * splitting_factor * b_bytes);
+    Ld_MEM  = std::max(Ld_MEM, min_load) * problem.batch;
+    Ld_mem2 = std::max(Ld_mem2, min_load) * problem.batch;
   }
 
   // 10) mem2 latency
@@ -536,31 +471,31 @@ double compute_memory_latency(const hardware_t& hardware,
   // 12) pick the worst‐case bound
   double L_mem = std::max({L_mem_mem1, L_mem_mem2, L_mem_MEM});
 
+  bool a_trans = problem.a_transpose;
+  bool b_trans = problem.b_transpose;
+
   // NT
-  if (!transA && transB) {
+  if (!a_trans && b_trans) {
     // LDS Load Granularity is 128 Bytes -> If we load an amount indivisible by 128 bytes in either
     // contiguous dimesion from LDS then we will get poor LDS utilization. This actually happens as
     // more like a quantization effect where if either contiguous dimension of the tile is not
     // evenly divisible by 128-bytes We end up with inefficient loads. Multiplication by a value is
     // arbitrary, there is probably a better analytical method to quantify the true impact of this
     // Effect on the efficiency of computation.
-    if ((MT_M * safe_ceil_div(element_size_A, 8)) % (128) != 0) { L_mem = L_mem * 2; }
-
-    if ((MT_N * safe_ceil_div(element_size_B, 8)) % (128) != 0) { L_mem = L_mem * 2; }
+    if ((config.mt.m * a_bytes) % 128 != 0) { L_mem = L_mem * 2; }
+    if ((config.mt.n * b_bytes) % 128 != 0) { L_mem = L_mem * 2; }
   }
 
   // TT : A is contiguous in K and B is contiguous in N
-  if (transA && transB) {
-    if (MT_K * safe_ceil_div(element_size_A, 8) < 128) { L_mem = L_mem * 2; }
-
-    if (MT_N * safe_ceil_div(element_size_B, 8) < 128) { L_mem = L_mem * 2; }
+  if (a_trans && b_trans) {
+    if (config.mt.k * a_bytes < 128) { L_mem = L_mem * 2; }
+    if (config.mt.n * b_bytes < 128) { L_mem = L_mem * 2; }
   }
 
   // NN : A is contiguous in M and B is contiguous in K
-  if (!transA && !transB) {
-    if (MT_M * safe_ceil_div(element_size_A, 8) < 128) { L_mem = L_mem * 2; }
-
-    if (MT_K * safe_ceil_div(element_size_B, 8) < 128) { L_mem = L_mem * 2; }
+  if (!a_trans && !b_trans) {
+    if (config.mt.m * a_bytes < 128) { L_mem = L_mem * 2; }
+    if (config.mt.k * b_bytes < 128) { L_mem = L_mem * 2; }
   }
 
   if (hardware_t::is_debug_enabled()) {
@@ -583,63 +518,16 @@ double compute_memory_latency(const hardware_t& hardware,
   return L_mem;
 }
 
-/* ---------------------------------------------------------------------------------------- */
-/* Tile-related functions                                                                   */
-/* ---------------------------------------------------------------------------------------- */
-double compute_tile_latency(const hardware_t& hardware,
-                            size_t M,
-                            size_t N,
-                            size_t K,
-                            size_t batch,
-                            bool transA,
-                            bool transB,
-                            size_t MT_M,
-                            size_t MT_N,
-                            size_t MT_K,
-                            size_t MI_M,
-                            size_t MI_N,
-                            size_t MI_K,
-                            size_t element_size_A,
-                            size_t element_size_B,
-                            size_t element_size_out,
-                            data_type_t mi_datatype,
-                            size_t mx_block_size,
-                            int WGM,
-                            size_t numActiveCUs,
-                            size_t splittingFactor) {
+double compute_tile_latency(const problem_t& problem,
+                            const hardware_t& hardware,
+                            const config_t& config,
+                            std::size_t num_active_cus,
+                            std::size_t splitting_factor) {
   // 1) Compute per-tile latencies
-  double L_compute = compute_mt_compute_latency(hardware,
-                                                M,
-                                                N,
-                                                K,
-                                                transA,
-                                                transB,
-                                                MT_M,
-                                                MT_N,
-                                                MT_K,
-                                                MI_M,
-                                                MI_N,
-                                                MI_K,
-                                                element_size_A,
-                                                element_size_B,
-                                                mi_datatype);
+  double L_compute = compute_mt_compute_latency(problem, hardware, config);
 
-  double L_mem = compute_memory_latency(hardware,
-                                        M,
-                                        N,
-                                        K,
-                                        transA,
-                                        transB,
-                                        batch,
-                                        MT_M,
-                                        MT_N,
-                                        MT_K,
-                                        element_size_A,
-                                        element_size_B,
-                                        mx_block_size,
-                                        WGM,
-                                        numActiveCUs,
-                                        splittingFactor);
+  double L_mem =
+      compute_memory_latency(problem, hardware, config, num_active_cus, splitting_factor);
 
   // 2) Work-group setup & iteration latencies
   double L_WG_setup = 1;  // WG_setup_Latency
@@ -648,41 +536,38 @@ double compute_tile_latency(const hardware_t& hardware,
   double L_prologue = 1.5 * L_mem;  // 1.5 chosen emprically
 
   // 4) Epilogue: writes from all active CUs with limited bandwidth
-  double epilogue_limite = (static_cast<double>(numActiveCUs) / hardware.N_CU);
-  double limited_mem1    = hardware.mem1_perf_ratio * epilogue_limite;
+  double epilogue_limited = (static_cast<double>(num_active_cus) / hardware.N_CU);
+  double limited_mem1     = hardware.mem1_perf_ratio * epilogue_limited;
   if (limited_mem1 < 1) { limited_mem1 = 10; }
   double L_epilogue =
-      (static_cast<double>(numActiveCUs) * MT_M * MT_N * safe_ceil_div(element_size_out, 8)) /
+      (static_cast<double>(num_active_cus) * config.mt.mn() * data_type_to_bytes(problem.d_dtype)) /
       limited_mem1;
 
   // 4') K-split reductions are globally coherent, we need to write and read split-1 MT_M*MT_N tiles
   // to coherent memory
-  if (splittingFactor > 1) {
-    size_t n_partials = splittingFactor - 1;
+  if (splitting_factor > 1) {
+    std::size_t n_partials = splitting_factor - 1;
     double partial_readwrite_bytes =
-        (2 * numActiveCUs * MT_M * MT_N * safe_ceil_div(element_size_out, 8) * n_partials);
+        (2 * num_active_cus * config.mt.mn() * data_type_to_bytes(problem.d_dtype) * n_partials);
     double L_reduce = partial_readwrite_bytes / (hardware.mem3_perf_ratio);
     L_epilogue += L_reduce * 1;
   }
 
   // 4'') tf32 emu has some more overhead
   double L_cvt  = 0;
-  bool tf32_emu = ((mi_datatype == data_type_t::XFloat32) &&
+  bool tf32_emu = ((problem.mi_dtype == data_type_t::XFloat32) &&
                    (hardware.arch == hardware_t::architecture_t::gfx950));
-  if (tf32_emu) {
-    L_cvt = compute_cvt_overhead(
-        hardware, MT_M, MT_N, MT_K, MI_M, MI_N, MI_K, element_size_A, element_size_B);
-  }
+  if (tf32_emu) { L_cvt = compute_cvt_overhead(problem, hardware, config); }
 
   // 5) Single-tile latency (always additive)
   double L_tile_single = std::max(L_compute, L_mem) + L_cvt;
 
   // 6) Number of K-iterations (excluding epilogue), at least 1
   // long num_iter = static_cast<long>(((K + MT_K - 1) / MT_K)) - 1;
-  // num_iter      = std::ceil(num_iter / splittingFactor);
+  // num_iter      = std::ceil(num_iter / splitting_factor);
   // num_iter      = std::max(num_iter, 1L);
-  long splittedK = static_cast<long>(safe_ceil_div(K, splittingFactor));
-  long num_iter  = static_cast<long>(safe_ceil_div(splittedK, MT_K)) - 1;
+  long k_per_splits = static_cast<long>(math::safe_ceil_div(problem.size.k, splitting_factor));
+  long num_iter     = static_cast<long>(math::safe_ceil_div(k_per_splits, config.mt.k)) - 1;
 
   // 7) Total tile latency
   double L_tile_total =
@@ -703,91 +588,33 @@ double compute_tile_latency(const hardware_t& hardware,
   return L_tile_total;
 }
 
-// Computes the latency per K-complete MT wave
-// A wave is defined as : The time it takes for one CU to complete one K-complete output tile
-double compute_wave_latency(const hardware_t& hardware,
-                            size_t M,
-                            size_t N,
-                            size_t K,
-                            size_t batch,
-                            bool transA,
-                            bool transB,
-                            size_t MT_M,
-                            size_t MT_N,
-                            size_t MT_K,
-                            size_t MI_M,
-                            size_t MI_N,
-                            size_t MI_K,
-                            size_t element_size_A,
-                            size_t element_size_B,
-                            size_t element_size_out,
-                            data_type_t mi_datatype,
-                            size_t mx_block_size,
-                            int WGM,
-                            size_t numActiveCUs,
-                            size_t splittingFactor) {
+double compute_wave_latency(const problem_t& problem,
+                            const hardware_t& hardware,
+                            const config_t& config,
+                            std::size_t num_active_cus,
+                            std::size_t splitting_factor) {
   // Assume latency of a wave is latency of a single k-complete output tile.
-  double L_wave = compute_tile_latency(hardware,
-                                       M,
-                                       N,
-                                       K,
-                                       batch,
-                                       transA,
-                                       transB,
-                                       MT_M,
-                                       MT_N,
-                                       MT_K,
-                                       MI_M,
-                                       MI_N,
-                                       MI_K,
-                                       element_size_A,
-                                       element_size_B,
-                                       element_size_out,
-                                       mi_datatype,
-                                       mx_block_size,
-                                       WGM,
-                                       numActiveCUs,
-                                       splittingFactor);
+  double L_wave = compute_tile_latency(problem, hardware, config, num_active_cus, splitting_factor);
 
   return L_wave;
 }
 
 // Compute the total latency of a gemm based on the latency of one wave multiplied by the number of
 // waves A wave is defined as : The time it takes for one CU to complete one K-complete output tile
-double compute_total_latency(const hardware_t& hardware,
-                             const problem_t& problem,
+double compute_total_latency(const problem_t& problem,
+                             const hardware_t& hardware,
                              const config_t& config,
                              size_t split) {
-  // Extract parameters from structured types
-  size_t M                = problem.size.m;
-  size_t N                = problem.size.n;
-  size_t K                = problem.size.k;
-  size_t batch            = problem.batch;
-  bool transA             = problem.transpose_a;
-  bool transB             = problem.transpose_b;
-  size_t element_size_A   = data_type_to_bits(problem.a_dtype);
-  size_t element_size_B   = data_type_to_bits(problem.b_dtype);
-  size_t element_size_out = data_type_to_bits(problem.d_dtype);
-  data_type_t mi_datatype = problem.mi_dtype;
-  size_t mx_block_size    = problem.mx_block_size;
-
-  size_t MT_M = config.mt.m;
-  size_t MT_N = config.mt.n;
-  size_t MT_K = config.mt.k;
-  size_t MI_M = config.mi.m;
-  size_t MI_N = config.mi.n;
-  size_t MI_K = config.mi.k;
-  int WGM     = config.workgroup_mapping;
-
   if (hardware_t::is_debug_enabled()) {
-    hardware.log_debug(
-        "problem_size",
-        std::to_string(int(M)) + "x" + std::to_string(int(N)) + "x" + std::to_string(int(K)));
+    hardware.log_debug("problem_size",
+                       std::to_string(int(problem.size.m)) + "x" +
+                           std::to_string(int(problem.size.n)) + "x" +
+                           std::to_string(int(problem.size.k)));
     hardware.log_debug("macro_tile",
-                       std::to_string(int(MT_M)) + "x" + std::to_string(int(MT_N)) + "x" +
-                           std::to_string(int(MT_K)));
-    hardware.log_debug("element_size_a_bits", element_size_A);
-    hardware.log_debug("element_size_b_bits", element_size_B);
+                       std::to_string(int(config.mt.m)) + "x" + std::to_string(int(config.mt.n)) +
+                           "x" + std::to_string(int(config.mt.k)));
+    // hardware.log_debug("a_dtype", problem.a_dtype);
+    // hardware.log_debug("b_dtype", problem.b_dtype);
   }
 
   // 0) Short-circuit
@@ -797,73 +624,69 @@ double compute_total_latency(const hardware_t& hardware,
     // When problem dimensions are small enough that we can fit them in one tile, we should do so.
     // This short circuit condition also decreases selection latency when problems are very small :)
     // TODO 256 and 256 here should be largest M and N tile dimensions in library
-    if (M <= 256 && N <= 256 && K < 1024 && batch != 1 && (MT_M < M || MT_N < N))
+    if (problem.size.m <= 256 && problem.size.n <= 256 && problem.size.k < 1024 &&
+        problem.batch != 1 && (config.mt.m < problem.size.m || config.mt.n < problem.size.n))
       return std::numeric_limits<double>::max();
 
     // Override dot2 instruction with vector lane widths
-    if (MI_N == 0 && MI_M == 0 && MI_K == 0) {
+    if (config.mi.m == 0 && config.mi.n == 0 && config.mi.k == 0) {
       // We only use Dot2 for NN layout where M < 3
-      if (M > 2 || transA || transB) return std::numeric_limits<double>::max();
-      MI_M = 1;
-      MI_N = 1;
-      MI_K = 64;
+      if (problem.size.m > 2 || problem.a_transpose || problem.b_transpose)
+        return std::numeric_limits<double>::max();
+
+      config.mi.m = 1;
+      config.mi.n = 1;
+      config.mi.k = 64;
     }
   }
 
-  // 1-1) WGM
-  WGM = std::max(WGM, 1);  // WGM can't be less than one.
-
-  // 1-2) Find CU occupancy
-  auto [numActiveCUs, numWaves, splittingFactor] =
+  // 1) Find CU occupancy
+  auto [num_active_cus, num_waves, splitting_factor] =
       compute_cu_occupancy(hardware, problem, config, grid_selection_t::k_split_aware, split);
 
   // 2) Compute latency of a wave
   // Compute latency of a wave
-  double L_wave = compute_wave_latency(hardware,
-                                       M,
-                                       N,
-                                       K,
-                                       batch,
-                                       transA,
-                                       transB,
-                                       MT_M,
-                                       MT_N,
-                                       MT_K,
-                                       MI_M,
-                                       MI_N,
-                                       MI_K,
-                                       element_size_A,
-                                       element_size_B,
-                                       element_size_out,
-                                       mi_datatype,
-                                       mx_block_size,
-                                       WGM,
-                                       numActiveCUs,
-                                       splittingFactor);
+  double L_wave = compute_wave_latency(problem, hardware, config, num_active_cus, splitting_factor);
+
   // Compute latency for all waves and return it as the latency for the MT/problem
-  double total_latency = L_wave * numWaves;
+  double total_latency = L_wave * num_waves;
 
   // 3) Customized heuristics
   // TODO These are quantifying effects that don't work in the current math.
   // TODO THESE SHOULD BE TEMPORARY FIXES AND BE MORE SOLIDLY INTEGRATED LATER
   bool heuristics = hardware_t::is_heuristics_enabled();
 
+  std::size_t M     = problem.size.m;
+  std::size_t N     = problem.size.n;
+  std::size_t K     = problem.size.k;
+  std::size_t batch = problem.batch;
+
+  bool a_trans = problem.a_transpose;
+  bool b_trans = problem.b_transpose;
+
+  std::size_t MT_M = config.mt.m;
+  std::size_t MT_N = config.mt.n;
+  std::size_t MT_K = config.mt.k;
+  std::size_t MI_M = config.mi.m;
+  std::size_t MI_N = config.mi.n;
+  std::size_t MI_K = config.mi.k;
+
   // Heuristics for TF32
-  bool tf32_emu = ((mi_datatype == data_type_t::XFloat32) &&
+  bool tf32_emu = ((problem.mi_dtype == data_type_t::XFloat32) &&
                    (hardware.arch == hardware_t::architecture_t::gfx950));
   if (tf32_emu && heuristics) {
     // The kernel for this is more optimized (Custom kernel NT)
-    if ((!transA && transB) && MT_M == 256 && MT_N == 256 && MT_K == 32) {
+    if ((!a_trans && b_trans) && MT_M == 256 && MT_N == 256 && MT_K == 32) {
       total_latency = total_latency * 0.6;
     }
 
     // The kernel for this is more optimized (Custom kernel NN)
-    if ((!transA && !transB) && MT_M == 256 && MT_N == 256 && MT_K == 32) {
+    if ((!a_trans && !b_trans) && MT_M == 256 && MT_N == 256 && MT_K == 32) {
       total_latency = total_latency * 0.8;
     }
 
     // The kernel for this is more optimized (Custom kernel TN)
-    if ((transA && !transB) && MT_M == 256 && MT_N == 256 && MT_K == 32) {
+    if ((a_trans && !b_trans) && MT_M == 256 && MT_N == 256 && MT_K == 32) {
       total_latency = total_latency * 0.8;
     }
 
@@ -873,8 +696,8 @@ double compute_total_latency(const hardware_t& hardware,
 
   if (heuristics && !tf32_emu) {
     // Penalize tiles that lead to edge waste
-    const size_t numMT_M = safe_ceil_div(M, MT_M);
-    const size_t numMT_N = safe_ceil_div(N, MT_N);
+    const size_t numMT_M = math::safe_ceil_div(M, MT_M);
+    const size_t numMT_N = math::safe_ceil_div(N, MT_N);
     const double waste   = static_cast<double>(numMT_M * MT_M * numMT_N * MT_N) / (M * N);
     double edge_penalty  = std::pow(waste, 0.8);
     if (batch > 10)
@@ -883,7 +706,7 @@ double compute_total_latency(const hardware_t& hardware,
     total_latency = total_latency * edge_penalty;
 
     // Penalize K iterations
-    size_t K_iters = safe_ceil_div(K, MT_K);
+    std::size_t K_iters = math::safe_ceil_div(K, MT_K);
     if (K_iters <= 2) {
       total_latency = total_latency * 8;
     } else if (K_iters <= 4) {
@@ -894,7 +717,7 @@ double compute_total_latency(const hardware_t& hardware,
 
     // Bias toward not splitting for small K values
     // This should actually come from SK grid prediction
-    if (splittingFactor > 1 && K < 2048) { total_latency = total_latency * splittingFactor; }
+    if (splitting_factor > 1 && K < 2048) { total_latency = total_latency * splitting_factor; }
 
     // There is no case where a kernel with MT_K > K wins unless K < MI_K.
     // Unless it is Dot2.
@@ -926,12 +749,12 @@ double compute_total_latency(const hardware_t& hardware,
     }
 
     // Heuristics for FP16
-    if (element_size_A == 16) {
+    if (data_type_to_bits(problem.a_dtype) == 16) {
       // These kernels are more optimized (Custom kernels)
       // All layouts
       if (MT_M == 256 && MT_N == 256 && MT_K == 64) {
         total_latency = total_latency * 0.85;
-        if ((transA && !transB) && (M == MT_M && N > 256 * MT_N && K >= 4 * MT_K)) {
+        if ((a_trans && !b_trans) && (M == MT_M && N > 256 * MT_N && K >= 4 * MT_K)) {
           total_latency = total_latency * 0.3;
         }
       }
@@ -944,9 +767,9 @@ double compute_total_latency(const hardware_t& hardware,
     }
 
     // Heuristics for FP8
-    if (element_size_A == 8) {
+    if (data_type_to_bits(problem.a_dtype) == 8) {
       // The kernel for this is more optimized (Custom kernel)
-      if (transA && !transB && MT_M == 256 && MT_N == 256 && MT_K == 128) {
+      if (a_trans && !b_trans && MT_M == 256 && MT_N == 256 && MT_K == 128) {
         total_latency = total_latency * 0.8;
       }
 
@@ -975,25 +798,25 @@ std::unordered_map<std::string, std::string> extract_analytical_metrics(const ha
   hardware.set_metrics_collection_mode(true);
 
   // Extract basic parameters for forced logging
-  size_t M                = problem.size.m;
-  size_t N                = problem.size.n;
-  size_t K                = problem.size.k;
-  size_t batch            = problem.batch;
-  bool transA             = problem.transpose_a;
-  bool transB             = problem.transpose_b;
-  size_t element_size_A   = data_type_to_bits(problem.a_dtype);
-  size_t element_size_B   = data_type_to_bits(problem.b_dtype);
-  size_t element_size_out = data_type_to_bits(problem.d_dtype);
-  data_type_t mi_datatype = problem.mi_dtype;
-  size_t mx_block_size    = problem.mx_block_size;
+  std::size_t M                = problem.size.m;
+  std::size_t N                = problem.size.n;
+  std::size_t K                = problem.size.k;
+  std::size_t batch            = problem.batch;
+  bool a_trans                 = problem.a_transpose;
+  bool b_trans                 = problem.b_transpose;
+  std::size_t element_size_A   = data_type_to_bits(problem.a_dtype);
+  std::size_t element_size_B   = data_type_to_bits(problem.b_dtype);
+  std::size_t element_size_out = data_type_to_bits(problem.d_dtype);
+  data_type_t mi_datatype      = problem.mi_dtype;
+  std::size_t mx_block_size    = problem.mx_block_size;
 
-  size_t MT_M = config.mt.m;
-  size_t MT_N = config.mt.n;
-  size_t MT_K = config.mt.k;
-  size_t MI_M = config.mi.m;
-  size_t MI_N = config.mi.n;
-  size_t MI_K = config.mi.k;
-  int WGM     = config.workgroup_mapping;
+  std::size_t MT_M = config.mt.m;
+  std::size_t MT_N = config.mt.n;
+  std::size_t MT_K = config.mt.k;
+  std::size_t MI_M = config.mi.m;
+  std::size_t MI_N = config.mi.n;
+  std::size_t MI_K = config.mi.k;
+  int WGM          = config.workgroup_mapping;
 
   // Log basic problem and configuration parameters
   hardware.log_debug(
@@ -1009,14 +832,14 @@ std::unordered_map<std::string, std::string> extract_analytical_metrics(const ha
   hardware.log_debug("element_size_b_bits", element_size_B);
   hardware.log_debug("element_size_out_bits", element_size_out);
   hardware.log_debug("batch_size", batch);
-  hardware.log_debug("transpose_a", transA ? "true" : "false");
-  hardware.log_debug("transpose_b", transB ? "true" : "false");
+  hardware.log_debug("a_transpose", a_trans ? "true" : "false");
+  hardware.log_debug("b_transpose", b_trans ? "true" : "false");
   hardware.log_debug("workgroup_mapping", WGM);
   hardware.log_debug("mx_block_size", mx_block_size);
 
   // Run compute_total_latency which will populate debug_info with all intermediate values
   // since we enabled metrics collection mode
-  double total_latency = compute_total_latency(hardware, problem, config, 0);
+  double total_latency = compute_total_latency(problem, hardware, config, 0);
 
   // Disable metrics collection mode
   hardware.set_metrics_collection_mode(false);

@@ -12,6 +12,8 @@
 
 #include <hip/hip_runtime.h>
 
+#include "origami/math.hpp"
+
 namespace origami {
 enum class data_type_t : int {
   Float,
@@ -68,6 +70,10 @@ inline int data_type_to_bits(data_type_t type) {
     case data_type_t::Float4: return 4;
     default: return -1;  // Invalid type
   }
+}
+
+inline int data_type_to_bytes(data_type_t type) {
+  return math::safe_ceil_div(data_type_to_bits(type), 8);
 }
 
 inline std::string to_string(data_type_t type) {

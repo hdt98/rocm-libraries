@@ -97,7 +97,7 @@ struct dim3_t {
 struct config_t {
   /// Macro tile and matrix-instruction shape.
   dim3_t mt;
-  dim3_t mi;
+  mutable dim3_t mi;
 
   /// Occupancy (number of waves resident per CU).
   std::size_t occupancy;
@@ -136,8 +136,8 @@ struct problem_t {
   std::size_t batch;
 
   /// Transpose types (TT, TN, NT, TT.)
-  bool transpose_a;
-  bool transpose_b;
+  bool a_transpose;
+  bool b_transpose;
 
   /// Data types: A, B, C, D.
   data_type_t a_dtype;

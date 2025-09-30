@@ -105,24 +105,11 @@ std::pair<double, size_t> select_workgroup_mapping(const problem_t& problem,
                                                    const dim3_t mt,
                                                    const dim3_t mi,
                                                    const std::vector<size_t>& wgms) {
-  // Extract values from problem and tile dimensions
-  std::size_t M     = problem.size.m;
-  std::size_t N     = problem.size.n;
-  std::size_t K     = problem.size.k;
-  std::size_t batch = problem.batch;
-
-  // Extract tile dimensions
-  std::size_t MT_M = mt.m;
-  std::size_t MT_N = mt.n;
-  std::size_t MT_K = mt.k;
-  std::size_t MI_M = mi.m;
-  std::size_t MI_N = mi.n;
-  std::size_t MI_K = mi.k;
-
-  // Calculate element size (using output type as approximation)
-  std::size_t element_size = data_type_to_bits(problem.d_dtype) / 8;
-
   using WGMResult = std::pair<double, size_t>;  // (l2_hit_rate, WGM)
+
+  config_t config{};
+  config.mt = mt;  // mt (dim3_t)
+  config.mi = mi;  // mi (dim3_t)
 
   std::vector<WGMResult> valid_results;
   valid_results.reserve(wgms.size());
@@ -134,25 +121,17 @@ std::pair<double, size_t> select_workgroup_mapping(const problem_t& problem,
     // Optionally ensure we do not exceed LDS capacity
     // (If you want to factor in WGM, add it to your check_lds_capacity signature.)
     // For now, let's just check the tile itself:
-    if (!check_lds_capacity(hardware, MT_M, MT_N, MT_K, element_size)) {
+    if (!check_lds_capacity(hardware, mt, problem.a_dtype, problem.b_dtype)) {
       if (hardware_t::is_debug_enabled()) {
         std::cout << "Skipping WGM=" << candidate_wgm << " due to LDS capacity.\n";
       }
       continue;
     }
 
+    config.workgroup_mapping = candidate_wgm;
+
     // Compute L2 hit rate for this WGM
-    double current_hit = estimate_l2_hit(hardware,
-                                         M,
-                                         N,
-                                         K,
-                                         batch,
-                                         MT_M,
-                                         MT_N,
-                                         MT_K,
-                                         element_size,
-                                         static_cast<int>(candidate_wgm),
-                                         1 /* splittingFactor */);
+    double current_hit = estimate_l2_hit(problem, hardware, config, 1 /* splittingFactor */);
 
     valid_results.emplace_back(current_hit, candidate_wgm);
   }
@@ -179,32 +158,15 @@ std::vector<config_t> rank_configs(const problem_t& problem,
                                    const std::vector<config_t>& configs) {
   if (configs.empty()) { throw std::runtime_error("No configurations provided."); }
 
-  // Extract problem data once
-  std::size_t M             = problem.size.m;
-  std::size_t N             = problem.size.n;
-  std::size_t K             = problem.size.k;
-  std::size_t batch         = problem.batch;
-  bool transpose_a          = problem.transpose_a;
-  bool transpose_b          = problem.transpose_b;
-  data_type_t mi_dtype      = problem.mi_dtype;
-  std::size_t mx_block_size = problem.mx_block_size;
-
-  // Calculate element sizes
-  std::size_t element_size_A   = data_type_to_bits(problem.a_dtype);
-  std::size_t element_size_B   = data_type_to_bits(problem.b_dtype);
-  std::size_t element_size_out = data_type_to_bits(problem.d_dtype);
-
   std::vector<config_t> ranked_configs;
   ranked_configs.reserve(configs.size());
 
   for (auto config : configs) {
     // Check LDS capacity - skip invalid configurations
-    if (!check_lds_capacity(hardware, config.mt.m, config.mt.n, config.mt.k, element_size_out)) {
-      continue;
-    }
+    if (!check_lds_capacity(hardware, config.mt, problem.a_dtype, problem.b_dtype)) { continue; }
 
     // Compute predicted latency for this configuration using structured API
-    config.latency = compute_total_latency(hardware, problem, config, 0);
+    config.latency = compute_total_latency(problem, hardware, config, 0);
 
     ranked_configs.push_back(config);
   }
@@ -228,8 +190,8 @@ config_t select_config_mnk(std::size_t M,
   problem.size.n        = N;
   problem.size.k        = K;
   problem.batch         = 1;
-  problem.transpose_a   = true;               // Default to T
-  problem.transpose_b   = false;              // Default to N
+  problem.a_transpose   = true;               // Default to T
+  problem.b_transpose   = false;              // Default to N
   problem.a_dtype       = data_type_t::Half;  // Default to fp16
   problem.b_dtype       = data_type_t::Half;  // Default to fp16
   problem.c_dtype       = data_type_t::Half;  // Default to fp16
