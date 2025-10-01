@@ -51,8 +51,10 @@ target_sources(origami-headers
     INTERFACE
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/origami/gemm.hpp>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/origami/hardware.hpp>
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/origami/utils.hpp>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/origami/math.hpp>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/origami/origami.hpp>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/origami/streamk.hpp>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/origami/types.hpp>
 )
 
 target_link_libraries(origami PUBLIC roc::origami-headers)
@@ -60,7 +62,7 @@ target_link_libraries(origami PUBLIC roc::origami-headers)
 target_sources(origami
     PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/src/origami/gemm.cpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/origami/utils.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/origami/origami.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/src/origami/streamk.cpp"
 )
 

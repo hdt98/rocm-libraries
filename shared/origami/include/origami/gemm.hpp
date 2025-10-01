@@ -154,13 +154,11 @@ double compute_wave_latency(const problem_t& problem,
  * @param problem Problem description (M, N, K, etc.)
  * @param hardware Hardware characteristics (@see origami::hardware_t)
  * @param config Kernel configuration.
- * @param split
  * @return double Latency in cycles.
  */
 double compute_total_latency(const problem_t& problem,
                              const hardware_t& hardware,
-                             const config_t& config,
-                             std::size_t split = 0);
+                             const config_t& config);
 
 /**
  * @brief Compute the performance from the latency.

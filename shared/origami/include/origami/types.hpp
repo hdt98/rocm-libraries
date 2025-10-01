@@ -18,14 +18,16 @@ namespace origami {
  *
  * Different algorithms to select the grid size for kernel execution.
  */
-enum class grid_selection_t : std::uint8_t {
+enum class grid_selection_t : std::uint32_t {
   number_of_cus        = 0,  ///< Use number of compute units
   min_resources        = 1,  ///< Use minimum required resources
   energy_aware         = 2,  ///< Energy-aware selection
   reduction_cost_aware = 3,  ///< Reduction cost-aware selection
   data_parallel        = 4,  ///< Data parallel approach
   analytical           = 5,  ///< Analytical model-based selection
-  k_split_aware        = 6   ///< K-split aware selection
+  k_split_aware        = 6,  ///< K-split aware selection
+  count,                     ///< Count of Grid selection algos
+  none = 0xFFFFFFFFu         ///< Explicitly invalid
 };
 
 /**
@@ -33,13 +35,13 @@ enum class grid_selection_t : std::uint8_t {
  *
  * Different algorithms for reduction operations in StreamK.
  */
-enum class reduction_t {
-  // BasicReduction,
-  Tree,      ///< Tree-based reduction
-  Parallel,  ///< Parallel reduction
-  // AtomicReduction,
-  Count,        ///< Count of reduction types
-  None = Count  ///< No reduction
+enum class reduction_t : std::uint32_t {
+  spinlock = 0,       ///< Spinlock-based reduction
+  tree     = 1,       ///< Tree-based reduction
+  parallel = 2,       ///< Parallel reduction
+  atomic   = 3,       ///< Atomic Add-based reduction
+  count,              ///< Count of reduction types
+  none = 0xFFFFFFFFu  ///< Explicitly invalid / no reduction
 };
 
 /**
@@ -48,7 +50,7 @@ enum class reduction_t {
  * @param rt Integer value to convert
  * @return reduction_t Corresponding reduction type
  */
-inline reduction_t int_to_reduction_t(int rt) { return (reduction_t)rt; }
+inline reduction_t int_to_reduction_t(int rt) { return static_cast<reduction_t>(rt); }
 
 // Forward declaration for data_type_t
 enum class data_type_t : int;
@@ -149,7 +151,8 @@ struct problem_t {
   data_type_t mi_dtype;
 
   /// MX block size.
-  std::size_t mx_block_size;
+  std::size_t a_mx_block_size;
+  std::size_t b_mx_block_size;
 };
 
 }  // namespace origami

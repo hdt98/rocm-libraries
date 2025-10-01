@@ -8,9 +8,7 @@
 #include <tuple>
 #include <vector>
 
-#include "origami/gemm.hpp"
 #include "origami/hardware.hpp"
-#include "origami/streamk.hpp"
 #include "origami/types.hpp"
 
 namespace origami {
@@ -26,21 +24,6 @@ namespace origami {
 config_t select_config(const problem_t& problem,
                        const hardware_t& hardware,
                        const std::vector<config_t>& configs);
-
-/**
- * @brief Based on the provided kernel config, select the best grid dimension.
- *
- * @param problem Problem description (M, N, K, etc.)
- * @param hardware Hardware characteristics (@see origami::hardware_t)
- * @param config Kernel configuration.
- * @param grid_selection_t grid selection algorithm (@see origami::grid_selection_t)
- * @param biggest_allowable_split
- * @return size_t Dimensions of the grid launched.
- */
-size_t select_grid_size(const problem_t& problem,
-                        const hardware_t& hardware,
-                        const config_t& config,
-                        grid_selection_t algorithm);
 
 /**
  * @brief Select best workgroup-mapping for the given tile size.

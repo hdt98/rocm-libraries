@@ -1,11 +1,11 @@
-// Copyright Advanced Micro Devices, Inconfig., or its affiliates.
+// Copyright Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier:  MIT
 
 #include "origami/streamk.hpp"
 #include "origami/hardware.hpp"
 #include "origami/math.hpp"
+#include "origami/origami.hpp"
 #include "origami/types.hpp"
-#include "origami/utils.hpp"
 
 namespace origami {
 namespace streamk {
@@ -46,20 +46,20 @@ constexpr size_t num_iters_per_cta(size_t iters_total, int g) {
 /**
  * @brief Number of output tiles.
  *
- * @param BLK_M Tile size in M-dimension.
- * @param BLK_N Tile size in N-dimension.
+ * @param mt_m Tile size in M-dimension.
+ * @param mt_n Tile size in N-dimension.
  * @param m Matrix's m-dimension.
  * @param n Matrix's n-dimension.
  * @param batch Number of batches.
  * @return constexpr size_t Total number of output tiles.
  */
-constexpr size_t number_of_output_tiles(size_t BLK_M,
-                                        size_t BLK_N,
+constexpr size_t number_of_output_tiles(size_t mt_m,
+                                        size_t mt_n,
                                         size_t m,
                                         size_t n,
                                         size_t batch) {
-  size_t m_tiles = math::safe_ceil_div(m, BLK_M);
-  size_t n_tiles = math::safe_ceil_div(n, BLK_N);
+  size_t m_tiles = math::safe_ceil_div(m, mt_m);
+  size_t n_tiles = math::safe_ceil_div(n, mt_n);
   return m_tiles * n_tiles * batch;
 }
 
@@ -126,6 +126,19 @@ std::tuple<double, size_t, size_t, double> predicted_runtime(size_t BLK_M,
   return std::make_tuple(runtime, iters_per_cta, fixup_peers, cache_penalty);
 }
 
+/**
+ * @brief Calculate workspace size required for StreamK reduction.
+ *
+ * @param x Problem dimension X (M)
+ * @param y Problem dimension Y (N)
+ * @param mt_m Macro-tile size in M dimension
+ * @param mt_n Macro-tile size in N dimension
+ * @param bpe_c Bytes per element of C matrix
+ * @param grid Grid size
+ * @param tiles Number of tiles
+ * @param reduction Reduction strategy
+ * @return std::size_t Workspace size in bytes
+ */
 size_t get_workspace(size_t x,
                      size_t y,
                      size_t mt_m,
@@ -135,12 +148,12 @@ size_t get_workspace(size_t x,
                      size_t tiles,
                      reduction_t reduction) {
   size_t size = 0;
-  if (reduction == reduction_t::Tree) {
+  if (reduction == reduction_t::tree) {
     if (tiles % grid == 0) {
       size_t tileSize = mt_m * mt_n * bpe_c;
       size += tileSize * grid;
     }
-  } else if (reduction == reduction_t::Parallel) {
+  } else if (reduction == reduction_t::parallel) {
     size_t splitSize  = x * y * bpe_c;
     size_t splitCount = grid / tiles;
     size += splitSize * splitCount;
@@ -148,34 +161,28 @@ size_t get_workspace(size_t x,
   return size;
 }
 
-reduction_t select_reduction(size_t x,
-                             size_t y,
-                             size_t z,
-                             size_t batch,
-                             size_t mt_m,
-                             size_t mt_n,
-                             size_t mt_k,
-                             const hardware_t& hardware,
+reduction_t select_reduction(const hardware_t& hardware,
+                             const problem_t& problem,
+                             const config_t& config,
                              grid_selection_t algorithm) {
-  reduction_t reductionStrat = reduction_t::Tree;
+  reduction_t reduction_strategy = reduction_t::tree;
 
   if (algorithm == grid_selection_t::k_split_aware) {
-    size_t tiles    = number_of_output_tiles(mt_m, mt_n, x, y, batch);
-    size_t cu_count = hardware.N_CU;
-    size_t iters_per_tile =
-        num_iters_per_tile(z, mt_k);  // std::max(size_t(1), math::safe_ceil_div(z, mt_k));
+    size_t tiles = number_of_output_tiles(
+        config.mt.m, config.mt.n, problem.size.m, problem.size.n, problem.batch);
+    size_t iters_per_tile = num_iters_per_tile(problem.size.k, config.mt.k);
 
-    if (tiles < cu_count) {
+    if (tiles < hardware.N_CU) {
       // For problems with large k and low number of tiles, use parallel reduction
       // TODO Benchmark to check if limits are correct
       constexpr int MinItersForParallel = 64;
       constexpr int MaxTilesForParallel = 16;
       if (iters_per_tile >= MinItersForParallel && tiles <= MaxTilesForParallel)
-        reductionStrat = reduction_t::Parallel;
+        reduction_strategy = reduction_t::parallel;
     }
   }
 
-  return reductionStrat;
+  return reduction_strategy;
 }
 
 std::size_t grid_min_resources(const problem_t& problem,
@@ -267,45 +274,45 @@ std::size_t grid_data_parallel(const problem_t& problem, const config_t& config)
       config.mt.m, config.mt.n, problem.size.m, problem.size.n, problem.batch);
 }
 
-std::size_t grid_analytical(const problem_t& problem,
-                            const hardware_t& hardware,
-                            const config_t& config) {
-  std::size_t biggest_allowable_split = 8;
+// std::size_t grid_analytical(const problem_t& problem,
+//                             const hardware_t& hardware,
+//                             const config_t& config) {
+//   std::size_t biggest_allowable_split = 8;
 
-  // Extract values from problem and config
-  std::size_t M             = problem.size.m;
-  std::size_t N             = problem.size.n;
-  std::size_t K             = problem.size.k;
-  std::size_t batch         = problem.batch;
+//   // Extract values from problem and config
+//   std::size_t M     = problem.size.m;
+//   std::size_t N     = problem.size.n;
+//   std::size_t K     = problem.size.k;
+//   std::size_t batch = problem.batch;
 
-  // Extract dimensions for grid calculation
-  std::size_t MT_M = config.mt.m;
-  std::size_t MT_N = config.mt.n;
+//   // Extract dimensions for grid calculation
+//   std::size_t MT_M = config.mt.m;
+//   std::size_t MT_N = config.mt.n;
 
-  // compute how many 32×32 tiles are needed in each dim,
-  // then multiply to get total grid size:
-  std::size_t grid = ((M + MT_M - 1) / MT_M) * ((N + MT_N - 1) / MT_N) * batch;
+//   // compute how many 32×32 tiles are needed in each dim,
+//   // then multiply to get total grid size:
+//   std::size_t grid = ((M + MT_M - 1) / MT_M) * ((N + MT_N - 1) / MT_N) * batch;
 
-  std::size_t max_hw_split = std::floor(hardware.N_CU / grid);
-  std::size_t MAX_SPLIT    = std::min(biggest_allowable_split, max_hw_split);
+//   std::size_t max_hw_split = std::floor(hardware.N_CU / grid);
+//   std::size_t MAX_SPLIT    = std::min(biggest_allowable_split, max_hw_split);
 
-  std::size_t best_split = 1;
-  double best_latency    = std::numeric_limits<double>::infinity();
+//   std::size_t best_split = 1;
+//   double best_latency    = std::numeric_limits<double>::infinity();
 
-  for (size_t split = 1; split <= MAX_SPLIT; ++split) {
-    double latency = compute_total_latency(problem, hardware, config, split);
+//   for (size_t split = 1; split <= MAX_SPLIT; ++split) {
+//     double latency = compute_total_latency(problem, hardware, config, split);
 
-    if (latency < best_latency) {
-      best_latency = latency;
-      best_split   = split;
-    }
-  }
-  size_t best_grid = best_split * grid;
+//     if (latency < best_latency) {
+//       best_latency = latency;
+//       best_split   = split;
+//     }
+//   }
+//   size_t best_grid = best_split * grid;
 
-  // you now have both `grid` and `best_split`—
-  // return whichever is appropriate (here we stick with split):
-  return best_grid;
-}
+//   // you now have both `grid` and `best_split`—
+//   // return whichever is appropriate (here we stick with split):
+//   return best_grid;
+// }
 
 std::size_t grid_k_split_aware(const problem_t& problem,
                                const hardware_t& hardware,
@@ -357,7 +364,7 @@ std::size_t grid_k_split_aware(const problem_t& problem,
     // constexpr int MaxTilesForParallel = 16;
     constexpr int MinItersPerCU = 8;
 
-    if (config.reduction_strategy == reduction_t::Parallel) {
+    if (config.reduction_strategy == reduction_t::parallel) {
       std::size_t virt_cu_count = cu_count;
       // TODO check if using occupancy info makes workspace too large
       // if (occupancy > 1)
@@ -387,6 +394,34 @@ std::size_t grid_k_split_aware(const problem_t& problem,
   if (tiles % sk_grid != 0 && tile_size * sk_grid > config.workspace_size) sk_grid = tiles;
 
   return sk_grid;
+}
+
+std::size_t select_grid_size(const problem_t& problem,
+                             const hardware_t& hardware,
+                             const config_t& config,
+                             grid_selection_t algorithm) {
+  switch (algorithm) {
+    case grid_selection_t::min_resources:
+      return streamk::grid_min_resources(problem, hardware, config);
+
+    case grid_selection_t::energy_aware:
+      return streamk::grid_energy_aware(problem, hardware, config);
+
+    case grid_selection_t::reduction_cost_aware:
+      return streamk::grid_reduction_cost_aware(problem, hardware, config);
+
+    case grid_selection_t::data_parallel:
+      return streamk::grid_data_parallel(problem, config);
+
+      // case grid_selection_t::analytical: return streamk::grid_analytical(problem, hardware,
+      // config);
+
+    case grid_selection_t::k_split_aware:
+      return streamk::grid_k_split_aware(problem, hardware, config);
+
+    case grid_selection_t::number_of_cus:
+    default: return hardware.N_CU;
+  }
 }
 
 }  // namespace streamk

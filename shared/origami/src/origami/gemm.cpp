@@ -12,85 +12,51 @@
 
 #include "origami/gemm.hpp"
 #include "origami/math.hpp"
+#include "origami/origami.hpp"
 #include "origami/streamk.hpp"
 #include "origami/types.hpp"
-#include "origami/utils.hpp"
 
 namespace origami {
 
 // Computes the number of active compute units if there is only one wave and it is partial
 // Otherwise, returns hardware.N_CU
-std::tuple<size_t, size_t, size_t> compute_cu_occupancy(const hardware_t& hardware,
-                                                        const problem_t& problem,
+std::tuple<size_t, size_t, size_t> compute_cu_occupancy(const problem_t& problem,
+                                                        const hardware_t& hardware,
                                                         const config_t& config,
-                                                        grid_selection_t grid_selection,
-                                                        std::size_t split) {
-  // Extract parameters from structured types
-  std::size_t M                = problem.size.m;
-  std::size_t N                = problem.size.n;
-  std::size_t K                = problem.size.k;
-  std::size_t batch            = problem.batch;
-  bool a_trans                 = problem.a_transpose;
-  bool b_trans                 = problem.b_transpose;
-  std::size_t element_size_A   = data_type_to_bits(problem.a_dtype);
-  std::size_t element_size_B   = data_type_to_bits(problem.b_dtype);
-  std::size_t element_size_out = data_type_to_bits(problem.d_dtype);
-  data_type_t mi_datatype      = problem.mi_dtype;
-
-  std::size_t MT_M                      = config.mt.m;
-  std::size_t MT_N                      = config.mt.n;
-  std::size_t MT_K                      = config.mt.k;
-  std::size_t MI_M                      = config.mi.m;
-  std::size_t MI_N                      = config.mi.n;
-  std::size_t MI_K                      = config.mi.k;
-  int WGM                               = config.workgroup_mapping;
-  std::size_t workspace_size            = config.workspace_size;
-  std::size_t workspace_size_per_elem_c = config.workspace_size_per_elem_c;
-  int occupancy                         = config.occupancy;
+                                                        grid_selection_t grid_selection) {
   // Number of output MTs
-  std::size_t numMT_M = math::safe_ceil_div(M, MT_M);
-  std::size_t numMT_N = math::safe_ceil_div(N, MT_N);
-  std::size_t numMTs  = numMT_M * numMT_N * batch;
+  std::size_t num_mt_m = math::safe_ceil_div(problem.size.m, config.mt.m);
+  std::size_t num_mt_n = math::safe_ceil_div(problem.size.n, config.mt.n);
+  std::size_t num_mts  = num_mt_m * num_mt_n * problem.batch;
 
-  std::size_t numWGs, num_active_cus, num_waves, splitFactor;
-  if (split)  // if it is given
-  {
-    split          = split > 1 ? split : 1;
-    numWGs         = numMTs * split;
-    num_active_cus = numWGs < hardware.N_CU ? numWGs : hardware.N_CU;
-    num_waves      = math::safe_ceil_div(numWGs, hardware.N_CU);
-    splitFactor    = split;
-  } else  // as what StreamK predicts
-  {
-    reduction_t rt =
-        streamk::select_reduction(M, N, K, batch, MT_M, MT_N, MT_K, hardware, grid_selection);
+  reduction_t rt = streamk::select_reduction(problem, hardware, config, grid_selection);
 
-    // For now, restrict the grid-size algorithm to k_split_aware.
-    numWGs = select_grid_size(problem, hardware, config, grid_selection_t::k_split_aware);
+  // For now, restrict the grid-size algorithm to k_split_aware.
+  std::size_t num_wgs =
+      streamk::select_grid_size(problem, hardware, config, grid_selection_t::k_split_aware);
 
-    // output variables
-    num_active_cus = numWGs < hardware.N_CU ? numWGs : hardware.N_CU;
-    // There are cases in which StreamK combines multiple output MTs and assigns to 1 WG.
-    // That means, we artifically observe one full wave, but that is not what actually happens
-    // under the hood. From a theoretical point of view, these distributions change all of the
-    // computations in Origami. With current implementation, it is hard to capture that behaviour
-    // analytically.
-    // So for now, if the numWGs is less than the numMTs, we calculate num_waves based on the
-    // numMTs. Otherwise, we use numWGs to compute num_waves.
-    num_waves   = numWGs > numMTs ? math::safe_ceil_div(numWGs, hardware.N_CU)
-                                  : math::safe_ceil_div(numMTs, hardware.N_CU);
-    splitFactor = math::safe_ceil_div(numWGs, numMTs);
-  }
+  // output variables
+  std::size_t num_active_cus = num_wgs < hardware.N_CU ? num_wgs : hardware.N_CU;
+  // There are cases in which StreamK combines multiple output MTs and assigns to 1 WG.
+  // That means, we artifically observe one full wave, but that is not what actually happens
+  // under the hood. From a theoretical point of view, these distributions change all of the
+  // computations in Origami. With current implementation, it is hard to capture that behaviour
+  // analytically.
+  // So for now, if the num_wgs is less than the numMTs, we calculate num_waves based on the
+  // numMTs. Otherwise, we use num_wgs to compute num_waves.
+  std::size_t num_waves    = num_wgs > num_mts ? math::safe_ceil_div(num_wgs, hardware.N_CU)
+                                               : math::safe_ceil_div(num_mts, hardware.N_CU);
+  std::size_t split_factor = math::safe_ceil_div(num_wgs, num_mts);
 
   if (hardware_t::is_debug_enabled()) {
-    hardware.log_debug("num_macro_tiles", numMTs);
-    hardware.log_debug("num_workgroups", numWGs);
+    hardware.log_debug("num_macro_tiles", num_mts);
+    hardware.log_debug("num_workgroups", num_wgs);
     hardware.log_debug("num_active_cus", num_active_cus);
     hardware.log_debug("num_waves", num_waves);
-    hardware.log_debug("split_factor", splitFactor);
+    hardware.log_debug("split_factor", split_factor);
   }
 
-  return std::make_tuple(num_active_cus, num_waves, splitFactor);
+  return std::make_tuple(num_active_cus, num_waves, split_factor);
 }
 
 /* ---------------------------------------------------------------------------------------- */
@@ -190,7 +156,8 @@ double compute_mt_compute_latency(const problem_t& problem,
   std::size_t N_MI = compute_number_matrix_instructions(config.mt, config.mi);
   // Latency of a single MT_M x MT_N x MT_K tile is the latency of one
   // MI multiplied by number of MI per MT_M x MT_N x MT_K.
-  std::size_t L_MI = hardware.get_mi_latency(config.mi.m, config.mi.n, config.mi.k, problem.mi_dtype);
+  std::size_t L_MI =
+      hardware.get_mi_latency(config.mi.m, config.mi.n, config.mi.k, problem.mi_dtype);
   std::size_t L_MT = L_MI * N_MI;
 
   bool a_trans = problem.a_transpose;
@@ -421,14 +388,14 @@ double compute_memory_latency(const problem_t& problem,
   // Logic for block scaled datatypes (Assuming BS=32 and 8-bit scales)
   // TODO This is technically wrong, need separate flag to enable MX so we can differentiate FP8 and
   // TODO MX8, we now have access to a_dtype/b_dtype.
-  if (a_bits < 8 && problem.mx_block_size != 0) {
+  if (a_bits < 8 && problem.a_mx_block_size != 0) {
     // Number of scales per tile
-    std::size_t num_scales_A = math::safe_ceil_div(config.mt.mk(), problem.mx_block_size);
+    std::size_t num_scales_A = math::safe_ceil_div(config.mt.mk(), problem.a_mx_block_size);
     Ld_CU_bytes += num_scales_A;  // One Byte per scale
   }
-  if (b_bits < 8 && problem.mx_block_size != 0) {
+  if (b_bits < 8 && problem.b_mx_block_size != 0) {
     // Number of scales per tile
-    std::size_t num_scales_B = math::safe_ceil_div(config.mt.nk(), problem.mx_block_size);
+    std::size_t num_scales_B = math::safe_ceil_div(config.mt.nk(), problem.b_mx_block_size);
     Ld_CU_bytes += num_scales_B;  // One Byte per scale
   }
 
@@ -603,8 +570,7 @@ double compute_wave_latency(const problem_t& problem,
 // waves A wave is defined as : The time it takes for one CU to complete one K-complete output tile
 double compute_total_latency(const problem_t& problem,
                              const hardware_t& hardware,
-                             const config_t& config,
-                             size_t split) {
+                             const config_t& config) {
   if (hardware_t::is_debug_enabled()) {
     hardware.log_debug("problem_size",
                        std::to_string(int(problem.size.m)) + "x" +
@@ -642,7 +608,7 @@ double compute_total_latency(const problem_t& problem,
 
   // 1) Find CU occupancy
   auto [num_active_cus, num_waves, splitting_factor] =
-      compute_cu_occupancy(hardware, problem, config, grid_selection_t::k_split_aware, split);
+      compute_cu_occupancy(problem, hardware, config, grid_selection_t::k_split_aware);
 
   // 2) Compute latency of a wave
   // Compute latency of a wave
@@ -808,7 +774,8 @@ std::unordered_map<std::string, std::string> extract_analytical_metrics(const ha
   std::size_t element_size_B   = data_type_to_bits(problem.b_dtype);
   std::size_t element_size_out = data_type_to_bits(problem.d_dtype);
   data_type_t mi_datatype      = problem.mi_dtype;
-  std::size_t mx_block_size    = problem.mx_block_size;
+  std::size_t a_mx_block_size  = problem.a_mx_block_size;
+  std::size_t b_mx_block_size  = problem.b_mx_block_size;
 
   std::size_t MT_M = config.mt.m;
   std::size_t MT_N = config.mt.n;
@@ -835,11 +802,12 @@ std::unordered_map<std::string, std::string> extract_analytical_metrics(const ha
   hardware.log_debug("a_transpose", a_trans ? "true" : "false");
   hardware.log_debug("b_transpose", b_trans ? "true" : "false");
   hardware.log_debug("workgroup_mapping", WGM);
-  hardware.log_debug("mx_block_size", mx_block_size);
+  hardware.log_debug("a_mx_block_size", a_mx_block_size);
+  hardware.log_debug("b_mx_block_size", b_mx_block_size);
 
   // Run compute_total_latency which will populate debug_info with all intermediate values
   // since we enabled metrics collection mode
-  double total_latency = compute_total_latency(problem, hardware, config, 0);
+  double total_latency = compute_total_latency(problem, hardware, config);
 
   // Disable metrics collection mode
   hardware.set_metrics_collection_mode(false);

@@ -8,36 +8,12 @@
 #include <iostream>
 
 #include "origami/math.hpp"
+#include "origami/origami.hpp"
 #include "origami/streamk.hpp"
 #include "origami/types.hpp"
-#include "origami/utils.hpp"
+#include "origami/gemm.hpp"
 
 namespace origami {
-size_t select_grid_size(const problem_t& problem,
-                        const hardware_t& hardware,
-                        const config_t& config,
-                        grid_selection_t algorithm) {
-  switch (algorithm) {
-    case grid_selection_t::min_resources:
-      return streamk::grid_min_resources(problem, hardware, config);
-
-    case grid_selection_t::energy_aware:
-      return streamk::grid_energy_aware(problem, hardware, config);
-
-    case grid_selection_t::reduction_cost_aware:
-      return streamk::grid_reduction_cost_aware(problem, hardware, config);
-
-    case grid_selection_t::data_parallel: return streamk::grid_data_parallel(problem, config);
-
-    case grid_selection_t::analytical: return streamk::grid_analytical(problem, hardware, config);
-
-    case grid_selection_t::k_split_aware:
-      return streamk::grid_k_split_aware(problem, hardware, config);
-
-    case grid_selection_t::number_of_cus:
-    default: return hardware.N_CU;
-  }
-}
 
 config_t select_config(const problem_t& problem,
                        const hardware_t& hardware,
@@ -166,7 +142,7 @@ std::vector<config_t> rank_configs(const problem_t& problem,
     if (!check_lds_capacity(hardware, config.mt, problem.a_dtype, problem.b_dtype)) { continue; }
 
     // Compute predicted latency for this configuration using structured API
-    config.latency = compute_total_latency(problem, hardware, config, 0);
+    config.latency = compute_total_latency(problem, hardware, config);
 
     ranked_configs.push_back(config);
   }
@@ -186,18 +162,19 @@ config_t select_config_mnk(std::size_t M,
                            const std::vector<config_t>& configs) {
   // Create a default problem_t with the provided M, N, K and reasonable defaults
   problem_t problem;
-  problem.size.m        = M;
-  problem.size.n        = N;
-  problem.size.k        = K;
-  problem.batch         = 1;
-  problem.a_transpose   = true;               // Default to T
-  problem.b_transpose   = false;              // Default to N
-  problem.a_dtype       = data_type_t::Half;  // Default to fp16
-  problem.b_dtype       = data_type_t::Half;  // Default to fp16
-  problem.c_dtype       = data_type_t::Half;  // Default to fp16
-  problem.d_dtype       = data_type_t::Half;  // Default to fp16
-  problem.mi_dtype      = data_type_t::Half;  // Default to fp16
-  problem.mx_block_size = 0;                  // Default MX block size
+  problem.size.m          = M;
+  problem.size.n          = N;
+  problem.size.k          = K;
+  problem.batch           = 1;
+  problem.a_transpose     = true;               // Default to T
+  problem.b_transpose     = false;              // Default to N
+  problem.a_dtype         = data_type_t::Half;  // Default to fp16
+  problem.b_dtype         = data_type_t::Half;  // Default to fp16
+  problem.c_dtype         = data_type_t::Half;  // Default to fp16
+  problem.d_dtype         = data_type_t::Half;  // Default to fp16
+  problem.mi_dtype        = data_type_t::Half;  // Default to fp16
+  problem.a_mx_block_size = 0;                  // Default MX block size
+  problem.b_mx_block_size = 0;                  // Default MX block size
 
   // Use the existing select_config function with the constructed problem
   return select_config(problem, hardware, configs);
