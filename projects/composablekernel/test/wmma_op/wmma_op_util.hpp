@@ -44,6 +44,7 @@ struct WMMAVecType<T,
 
     using VecT  = vector_type<T, kMultiplier * 16>;
     using ViewT = vector_type<T, 2>;
+    static constexpr int size = kMultiplier * 16; // Number of T elements in the vector
 };
 
 template <typename T, index_t kMultiplier>
@@ -62,6 +63,7 @@ struct WMMAVecType<T,
 
     using VecT  = vector_type<T, kMultiplier * 8>;
     using ViewT = vector_type<T, 1>;
+    static constexpr int size = kMultiplier * 8;
 };
 
 template <typename T, index_t kMultiplier>
@@ -79,6 +81,7 @@ struct WMMAVecType<T, kMultiplier, ck::enable_if_t<ck::is_same_v<T, ck::f8_t> ||
     // For FP8 input, hardware expects kMultiplier * 32 elements per fragment
     using VecT  = vector_type<T, kMultiplier * 32>;
     using ViewT = vector_type<T, 4>;
+    static constexpr int size = kMultiplier * 32;
 };
 
 // gfx125 builtin_wmma_naive_selector 
@@ -136,6 +139,10 @@ __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
     using srcA_cast_type = typename srcA_cast_T::type;
     using srcB_cast_type = typename srcB_cast_T::type;
 
+    // Print the size of A and B vectors
+    printf("A vector size: %d\n", WMMAVecType<srcA_t, kMultiplier>::size);
+    printf("B vector size: %d\n", WMMAVecType<srcB_t, kMultiplier>::size);
+
     //KO TODO:: revisit this. 
     using srcA_vec      = typename WMMAVecType<srcA_t, kMultiplier>::VecT;
     using srcB_vec      = typename WMMAVecType<srcB_t, kMultiplier>::VecT;
@@ -175,7 +182,7 @@ __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
     constexpr int SRC_DIM = (16 * kMultiplier) / ToIntDim; //to int dim is 1 for float, 2 for half
         // Exceptions will be when we use f32 or f64 input and K is only size 4. Then we need to do 4*K Multiplier?
         //16*1/2 == 8
-        //16*2/4 == 16 
+        //16*2/4 == 16
 
     // how many threads to do an entire row? 2; each thread loads 2x as much, but still 2 threads
     constexpr int ROW_SIZE = 2 * SRC_DIM;
@@ -222,137 +229,179 @@ __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
     //regs-> LDS --> Reverse quadrant interleaved (back to flat in LDS)
     //LDS->packed fragments -- back to quadrant mode
 
-    //load A to registers -- OK
-    printf("-------- Writing to a_temp -------- \n");
-    static_for<0, QUADRANT_SIZE, 1>{}([&](auto ele) { 
-        int i = ele;
-        int j = ele + QUADRANT_SIZE * 2;
-        int rowIdx = lane % 16;
+    bool use_QUADS = false;
 
-        int offset1 = (rowIdx * ROW_SIZE) + (i + (lowHigh * QUADRANT_SIZE));
-        int offset2 = (rowIdx * ROW_SIZE) + (j + (lowHigh * QUADRANT_SIZE));
+    if (use_QUADS == true)
+    {
 
-        a_temp.template AsType<srcA_cast_type>()(ele) = a_ptr[offset1];
-        a_temp.template AsType<srcA_cast_type>()(Number<ele + QUADRANT_SIZE>{}) = a_ptr[offset2];
-    });
+        //load A to registers using QUADRANTS -- OK
+        printf("-------- Writing to a_temp -------- \n");
+        static_for<0, QUADRANT_SIZE, 1>{}([&](auto ele) { 
+            int i = ele;
+            int j = ele + QUADRANT_SIZE * 2;
+            int rowIdx = lane % 16;
 
-    //load B to registers -- OK
-    printf("-------- Writing to b_temp -------- \n");
-    static_for<0, QUADRANT_SIZE, 1>{}([&](auto ele) {
-        int i = ele;
-        int j = ele + QUADRANT_SIZE * 2;
-        int rowIdx = lane % 16;
+            int offset1 = (rowIdx * ROW_SIZE) + (i + (lowHigh * QUADRANT_SIZE));
+            int offset2 = (rowIdx * ROW_SIZE) + (j + (lowHigh * QUADRANT_SIZE));
 
-        int offset1 = (rowIdx * ROW_SIZE) + (i + (lowHigh * QUADRANT_SIZE));
-        int offset2 = (rowIdx * ROW_SIZE) + (j + (lowHigh * QUADRANT_SIZE));
+            a_temp.template AsType<srcA_cast_type>()(ele) = a_ptr[offset1];
+            a_temp.template AsType<srcA_cast_type>()(Number<ele + QUADRANT_SIZE>{}) = a_ptr[offset2];
+        });
 
-        b_temp.template AsType<srcB_cast_type>()(ele) = b_ptr[offset1];
-        b_temp.template AsType<srcB_cast_type>()(Number<ele + QUADRANT_SIZE>{}) = b_ptr[offset2];
-    });
+        //load B to registers using QUADRANTS -- OK
+        printf("-------- Writing to b_temp -------- \n");
+        static_for<0, QUADRANT_SIZE, 1>{}([&](auto ele) {
+            int i = ele;
+            int j = ele + QUADRANT_SIZE * 2;
+            int rowIdx = lane % 16;
 
+            int offset1 = (rowIdx * ROW_SIZE) + (i + (lowHigh * QUADRANT_SIZE));
+            int offset2 = (rowIdx * ROW_SIZE) + (j + (lowHigh * QUADRANT_SIZE));
 
-    // __syncthreads(); // KO TODO:: Needed?
+            b_temp.template AsType<srcB_cast_type>()(ele) = b_ptr[offset1];
+            b_temp.template AsType<srcB_cast_type>()(Number<ele + QUADRANT_SIZE>{}) = b_ptr[offset2];
+        });
 
-    //KO TODO:: Do we want LDS to store in quadrant order, or do we want quadrants unpacked into a contiguous LDS?
-    //Load A into LDS with quadrants -- OK
-    printf("-------- Writing to p_shared from a_temp -------- \n");
-    constexpr int BLOCK_SIZE = 4 * QUADRANT_SIZE;
-    static_for<0, QUADRANT_SIZE, 1>{}([&](auto ele) {
-        int rowIdx = lIdx % 16;
-        int hi = lIdx / 16;
+        // __syncthreads(); // KO TODO:: Needed?
 
-        // Each thread gets a block based on rowIdx and hi
-        int base = rowIdx * BLOCK_SIZE + hi * QUADRANT_SIZE;
+        //KO TODO:: Do we want LDS to store in quadrant order, or do we want quadrants unpacked into a contiguous LDS?
+        // Load A into LDS with quadrants -- OK
+        printf("-------- Writing to p_shared from a_temp -------- \n");
+        constexpr int BLOCK_SIZE = 4 * QUADRANT_SIZE;
+        static_for<0, QUADRANT_SIZE, 1>{}([&](auto ele) {
+            int rowIdx = lIdx % 16;
+            int hi = lIdx / 16;
 
-        // Write first quadrant
-        p_shared[base + ele]     = a_temp.template AsType<srcA_cast_type>()(ele);
+            // Each thread gets a block based on rowIdx and hi
+            int base = rowIdx * BLOCK_SIZE + hi * QUADRANT_SIZE;
 
-        // Write second quadrant (offset by 2 quad sizes)
-        p_shared[base + ele  + QUADRANT_SIZE * 2] = a_temp.template AsType<srcA_cast_type>()(Number<ele + QUADRANT_SIZE>{});
-    });
+            // Write first quadrant
+            p_shared[base + ele]     = a_temp.template AsType<srcA_cast_type>()(ele);
 
-    //Load B into LDS with quadrants -- OK
-    printf("-------- Writing to p_shared from b_temp -------- \n");
-    static_for<0, QUADRANT_SIZE, 1>{}([&](auto ele) {
-        int rowIdx = lIdx % 16;
-        int hi = lIdx / 16;
+            // Write second quadrant (offset by 2 quad sizes)
+            p_shared[base + ele  + QUADRANT_SIZE * 2] = a_temp.template AsType<srcA_cast_type>()(Number<ele + QUADRANT_SIZE>{});
+        });
 
-        // Each thread gets a block based on rowIdx and hi
-        int base = rowIdx * BLOCK_SIZE + hi * QUADRANT_SIZE + LDS_B_START;
+        // Load B into LDS with quadrants -- OK
+        printf("-------- Writing to p_shared from b_temp -------- \n");
+        static_for<0, QUADRANT_SIZE, 1>{}([&](auto ele) {
+            int rowIdx = lIdx % 16;
+            int hi = lIdx / 16;
 
-        // Write first quadrant
-        int idx1 = base + ele;
-        p_shared[idx1]     = b_temp.template AsType<srcB_cast_type>()(ele);
+            // Each thread gets a block based on rowIdx and hi
+            int base = rowIdx * BLOCK_SIZE + hi * QUADRANT_SIZE + LDS_B_START;
 
-        // Write second quadrant (offset by 2 quad sizes)
-        int idx2 = base + ele + QUADRANT_SIZE * 2;
-        p_shared[idx2] = b_temp.template AsType<srcB_cast_type>()(Number<ele + QUADRANT_SIZE>{});
-    });
+            // Write first quadrant
+            int idx1 = base + ele;
+            p_shared[idx1]     = b_temp.template AsType<srcB_cast_type>()(ele);
 
-    
+            // Write second quadrant (offset by 2 quad sizes)
+            int idx2 = base + ele + QUADRANT_SIZE * 2;
+            p_shared[idx2] = b_temp.template AsType<srcB_cast_type>()(Number<ele + QUADRANT_SIZE>{});
+        });
+
+        __syncthreads(); //KO TODO:: move to inline asm
+
+        
+        // Assumed the VGPR chunk that corresponds to this thread
+        // i.e. 2 quadrants each of QUADRANT_SIZE each.
+        //BLOCK_SIZE = 4 * QUAD_SIZE
+        
+        // Construct a_frag and b_frag for WMMA call -- OK
+        static_for<0, QUADRANT_SIZE, 1>{}([&](auto ele) {
+            int rowIdx = lIdx % 16;
+            int hi = lIdx / 16;
+
+            //base for a
+            int base_a = rowIdx * BLOCK_SIZE + hi * QUADRANT_SIZE;
+            int base_b = rowIdx * BLOCK_SIZE + hi * QUADRANT_SIZE + LDS_B_START;
+
+            int idx1_a = base_a + ele;
+            int idx2_a = base_a + ele + QUADRANT_SIZE * 2;
+            int idx1_b = base_b + ele;
+            int idx2_b = base_b + ele + QUADRANT_SIZE * 2;
+
+            //index for first quadrant access
+            a_frag.template AsType<srcA_cast_type>()(ele) = local_a_ptr[idx1_a];
+            b_frag.template AsType<srcB_cast_type>()(ele) = local_b_ptr[idx1_b];
+
+            //index for second quadrant access
+            a_frag.template AsType<srcA_cast_type>()(Number<ele + QUADRANT_SIZE>{}) = local_a_ptr[idx2_a];
+            b_frag.template AsType<srcB_cast_type>()(Number<ele + QUADRANT_SIZE>{}) = local_b_ptr[idx2_b];
+        });
+    }
+    else // Don't use quads
+    {
+        // Load A to registers without quadrants
+        static_for<0, SRC_DIM, 1>{}([&](auto ele) { 
+            int i = ele;
+            int rowIdx = lane % 16;
+
+            int offset1 = (rowIdx * ROW_SIZE) + (i + (lowHigh * SRC_DIM));
+
+            a_temp.template AsType<srcA_cast_type>()(ele) = a_ptr[offset1];
+        });
+
+        // Load B to registers without quadrants
+        static_for<0, SRC_DIM, 1>{}([&](auto ele) { 
+            int i = ele;
+            int rowIdx = lane % 16;
+
+            int offset1 = (rowIdx * ROW_SIZE) + (i + (lowHigh * SRC_DIM));
+
+            b_temp.template AsType<srcB_cast_type>()(ele) = b_ptr[offset1];
+        });
+
+        // Load A into LDS without quadrants
+        printf("-------- Writing to p_shared from a_temp -------- \n");
+        static_for<0, SRC_DIM, 1>{}([&](auto ele) {
+            int rowIdx = lIdx % 16;
+            int hi = lIdx / 16;
+
+            // Each thread gets a block based on rowIdx and hi
+            int base = rowIdx * ROW_SIZE + hi * SRC_DIM;
+
+            // Write first quadrant
+            p_shared[base + ele]     = a_temp.template AsType<srcA_cast_type>()(ele);
+        });
+
+        // Load B into LDS without quadrants
+        printf("-------- Writing to p_shared from b_temp -------- \n");
+        static_for<0, SRC_DIM, 1>{}([&](auto ele) {
+            int rowIdx = lIdx % 16;
+            int hi = lIdx / 16;
+
+            // Each thread gets a block based on rowIdx and hi
+            int base = rowIdx * ROW_SIZE + hi * SRC_DIM + LDS_B_START;
+
+            // Write first quadrant
+            int idx1 = base + ele;
+            p_shared[idx1]     = b_temp.template AsType<srcB_cast_type>()(ele);
+        });
+
+        static_for<0, SRC_DIM, 1>{}([&](auto ele) {
+            int rowIdx = lIdx % 16;
+            int hi = lIdx / 16;
+
+            //base for a
+            int base_a = rowIdx * ROW_SIZE + hi * SRC_DIM;
+            int base_b = rowIdx * ROW_SIZE + hi * SRC_DIM + LDS_B_START;
+
+            int idx1_a = base_a + ele;
+            int idx1_b = base_b + ele;
+
+            //index for first quadrant access
+            a_frag.template AsType<srcA_cast_type>()(ele) = local_a_ptr[idx1_a];
+            b_frag.template AsType<srcB_cast_type>()(ele) = local_b_ptr[idx1_b];
+        });
+    }
 
     __syncthreads(); //KO TODO:: move to inline asm
 
-    
-    // Assumed the VGPR chunk that corresponds to this thread
-    // i.e. 2 quadrants each of QUADRANT_SIZE each.
-    //BLOCK_SIZE = 4 * QUAD_SIZE
-    
-    // Construct a_frag and b_frag for WMMA call -- OK
-    static_for<0, QUADRANT_SIZE, 1>{}([&](auto ele) {
-        int rowIdx = lIdx % 16;
-        int hi = lIdx / 16;
-
-        //base for a
-        int base_a = rowIdx * BLOCK_SIZE + hi * QUADRANT_SIZE;
-        int base_b = rowIdx * BLOCK_SIZE + hi * QUADRANT_SIZE + LDS_B_START;
-
-        int idx1_a = base_a + ele;
-        int idx2_a = base_a + ele + QUADRANT_SIZE * 2;
-        int idx1_b = base_b + ele;
-        int idx2_b = base_b + ele + QUADRANT_SIZE * 2;
-
-        //index for first quadrant access
-        a_frag.template AsType<srcA_cast_type>()(ele) = local_a_ptr[idx1_a];
-        b_frag.template AsType<srcB_cast_type>()(ele) = local_b_ptr[idx1_b];
-
-        //index for second quadrant access
-        a_frag.template AsType<srcA_cast_type>()(Number<ele + QUADRANT_SIZE>{}) = local_a_ptr[idx2_a];
-        b_frag.template AsType<srcB_cast_type>()(Number<ele + QUADRANT_SIZE>{}) = local_b_ptr[idx2_b];
+    printf("dst_thread_buf_ BEFORE builtin_wmma_naive_selector:\n");
+    static_for<0, 8, 1>{}([&](auto i) {
+        printf("  [%d] = %f\n", static_cast<int>(i), static_cast<float>(dst_thread_buf_[Number<i>{}]));
     });
-
-    // printf("-------- Writing to a_frag and b_frag from local_a and local_b _ptr -------- \n");
-    // static_for<0, QUADRANT_SIZE, 1>{}([&](auto ele) {
-    //     int rowIdx = lIdx % 16;
-    //     int hi = lIdx / 16;
-    //     int base_a = rowIdx * 8 + hi * 2;
-    //     int base_b = rowIdx * 8 + hi * 2 + LDS_B_START;
-
-    //     // Read first quadrant
-    //     a_frag.template AsType<srcA_cast_type>()(ele) = local_a_ptr[base_a + ele * 4 + 0];
-    //     b_frag.template AsType<srcB_cast_type>()(ele) = local_b_ptr[base_b + ele * 4 + 0];
-
-    //     // Read second quadrant
-    //     a_frag.template AsType<srcA_cast_type>()(Number<ele + QUADRANT_SIZE>{}) = local_a_ptr[base_a + ele * 4 + 1];
-    //     b_frag.template AsType<srcB_cast_type>()(Number<ele + QUADRANT_SIZE>{}) = local_b_ptr[base_b + ele * 4 + 1];
-    // });
-
-//     int group_offset = 2 * SRC_DIM;
-// static_for<0, SRC_DIM, 1>{}([&](auto ele) {
-//     int base0 = lIdx * group_offset;
-//     int base1 = base0 + SRC_DIM;
-
-//     int idx0 = base0 + static_cast<int>(ele);
-//     int idx1 = base1 + static_cast<int>(ele);
-
-//     a_frag.template AsType<srcA_cast_type>()(ele) = local_a_ptr[idx0];
-//     a_frag.template AsType<srcA_cast_type>()(Number<ele + SRC_DIM>{}) = local_a_ptr[idx1];
-
-//     b_frag.template AsType<srcB_cast_type>()(ele) = local_b_ptr[idx0];
-//     b_frag.template AsType<srcB_cast_type>()(Number<ele + SRC_DIM>{}) = local_b_ptr[idx1];
-// });
-
-    __syncthreads(); //KO TODO:: move to inline asm
 
     // Call the WMMA intrinsic selector
     printf("------- calling builtin_naive_wmma_selector ------- \n");
@@ -362,6 +411,11 @@ __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
         dst_thread_buf_);
 
     printf("------- FINISHED builtin_naive_wmma_selector ------- \n");
+
+    printf("dst_thread_buf_ AFTER builtin_wmma_naive_selector:\n");
+    static_for<0, 8, 1>{}([&](auto i) {
+        printf("  [%d] = %f\n", static_cast<int>(i), static_cast<float>(dst_thread_buf_[Number<i>{}]));
+    });
 
     // KO TODO:: Changes needed?
     // Store results to global memory (row-major, adjust as needed)
@@ -717,6 +771,10 @@ bool RunDeviceGEMM(KernelType kernel,
     kernel<<<1, 32>>>(static_cast<const ADataType*>(a_m_k_device_buf.GetDeviceBuffer()),
                       static_cast<const BDataType*>(b_n_k_device_buf.GetDeviceBuffer()),
                       static_cast<CDataType*>(c_m_n_device_buf.GetDeviceBuffer()));
+    hipError_t err = hipGetLastError();
+    if (err != hipSuccess) {
+        std::cerr << "HIP kernel launch error: " << hipGetErrorString(err) << std::endl;
+    }
     c_m_n_device_buf.FromDevice(C.mData.data());
 
     return true;
@@ -774,6 +832,25 @@ struct TestWmma
         return std::make_tuple(a_m_k, b_n_k, c_m_n_host_result, c_m_n_device_result);
     }
 
+    template <typename DataType>
+    void dump_tensor(Tensor<DataType> mat)
+    {
+        std::cout << "mat [ " << std::endl;
+
+        auto len = mat.GetLengths();
+        for(uint32_t i = 0; i < len[0]; i++)
+        {
+            std::cout << "    [";
+            for(uint32_t j = 0; j < len[1]; j++)
+            {
+                std::vector<std::size_t> idx({i, j});
+                std::cout << ck::type_convert<float>(mat(idx)) << ", ";
+            }
+            std::cout << "]" << std::endl;
+        }
+        std::cout << "]" << std::endl;
+    }
+
     auto operator()(const DeviceWmma& wmma_kernel)
     {
         std::cout << "ALayout = " << ALayout{}.name << ", BLayout = " << BLayout{}.name
@@ -786,9 +863,9 @@ struct TestWmma
         ck::wmma_op_util::GemmParams params;
         params.M       = 16;
         params.N       = 16;
-        params.K       = 16 * KMultiplier;
-        params.StrideA = 16;
-        params.StrideB = 16;
+        params.K       = 32 * KMultiplier;
+        params.StrideA = 32 * KMultiplier;
+        params.StrideB = 32 * KMultiplier;
         params.StrideC = 16;
 
         auto host_tensors = PrepareGemmTensor(params);
@@ -813,9 +890,21 @@ struct TestWmma
         ck::wmma_op_util::RunHostGEMM<ReferenceGemmInstance>(
             a, b, c_host, a_element_op, b_element_op, c_element_op);
 
+        // std::cout<<"dumping A tensor:"<<std::endl;
+        // dump_tensor(a);
+        // std::cout<<"dumping B tensor:"<<std::endl;
+        // dump_tensor(b);
+        // std::cout<<"dumping c_dev tensor before:"<<std::endl;
+        // dump_tensor(c_device);
+        // std::cout<<"dumping c_host before tensor:"<<std::endl;
+        // dump_tensor(c_host);      
+
         // Act
         bool is_supported = (ck::is_gfx11_supported() || ck::is_gfx12_supported()) &&
                             ck::wmma_op_util::RunDeviceGEMM(wmma_kernel, a, b, c_device);
+
+        // std::cout<<"dumping c_dev tensor AFTER:"<<std::endl;
+        // dump_tensor(c_device);
 
         if(is_supported)
         {
