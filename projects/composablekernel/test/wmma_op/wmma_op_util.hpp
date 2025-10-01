@@ -289,23 +289,64 @@ __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
 
     __syncthreads(); //KO TODO:: move to inline asm
 
-    //KO TODO:: needs generalization
-    // Construct a_frag and b_frag for WMMA call
-    printf("-------- Writing to a_frag and b_frag from local_a and local_b _ptr -------- \n");
+    
+    // Assumed the VGPR chunk that corresponds to this thread
+    // i.e. 2 quadrants each of QUADRANT_SIZE each.
+    //BLOCK_SIZE = 4 * QUAD_SIZE
+    
+    // Construct a_frag and b_frag for WMMA call -- OK
     static_for<0, QUADRANT_SIZE, 1>{}([&](auto ele) {
         int rowIdx = lIdx % 16;
         int hi = lIdx / 16;
-        int base_a = rowIdx * 8 + hi * 2;
-        int base_b = rowIdx * 8 + hi * 2 + LDS_B_START;
 
-        // Read first quadrant
-        a_frag.template AsType<srcA_cast_type>()(ele) = local_a_ptr[base_a + ele * 4 + 0];
-        b_frag.template AsType<srcB_cast_type>()(ele) = local_b_ptr[base_b + ele * 4 + 0];
+        //base for a
+        int base_a = rowIdx * BLOCK_SIZE + hi * QUADRANT_SIZE;
+        int base_b = rowIdx * BLOCK_SIZE + hi * QUADRANT_SIZE + LDS_B_START;
 
-        // Read second quadrant
-        a_frag.template AsType<srcA_cast_type>()(Number<ele + QUADRANT_SIZE>{}) = local_a_ptr[base_a + ele * 4 + 1];
-        b_frag.template AsType<srcB_cast_type>()(Number<ele + QUADRANT_SIZE>{}) = local_b_ptr[base_b + ele * 4 + 1];
+        int idx1_a = base_a + ele;
+        int idx2_a = base_a + ele + QUADRANT_SIZE * 2;
+        int idx1_b = base_b + ele;
+        int idx2_b = base_b + ele + QUADRANT_SIZE * 2;
+
+        //index for first quadrant access
+        a_frag.template AsType<srcA_cast_type>()(ele) = local_a_ptr[idx1_a];
+        b_frag.template AsType<srcB_cast_type>()(ele) = local_b_ptr[idx1_b];
+
+        //index for second quadrant access
+        a_frag.template AsType<srcA_cast_type>()(Number<ele + QUADRANT_SIZE>{}) = local_a_ptr[idx2_a];
+        b_frag.template AsType<srcB_cast_type>()(Number<ele + QUADRANT_SIZE>{}) = local_b_ptr[idx2_b];
     });
+
+    // printf("-------- Writing to a_frag and b_frag from local_a and local_b _ptr -------- \n");
+    // static_for<0, QUADRANT_SIZE, 1>{}([&](auto ele) {
+    //     int rowIdx = lIdx % 16;
+    //     int hi = lIdx / 16;
+    //     int base_a = rowIdx * 8 + hi * 2;
+    //     int base_b = rowIdx * 8 + hi * 2 + LDS_B_START;
+
+    //     // Read first quadrant
+    //     a_frag.template AsType<srcA_cast_type>()(ele) = local_a_ptr[base_a + ele * 4 + 0];
+    //     b_frag.template AsType<srcB_cast_type>()(ele) = local_b_ptr[base_b + ele * 4 + 0];
+
+    //     // Read second quadrant
+    //     a_frag.template AsType<srcA_cast_type>()(Number<ele + QUADRANT_SIZE>{}) = local_a_ptr[base_a + ele * 4 + 1];
+    //     b_frag.template AsType<srcB_cast_type>()(Number<ele + QUADRANT_SIZE>{}) = local_b_ptr[base_b + ele * 4 + 1];
+    // });
+
+//     int group_offset = 2 * SRC_DIM;
+// static_for<0, SRC_DIM, 1>{}([&](auto ele) {
+//     int base0 = lIdx * group_offset;
+//     int base1 = base0 + SRC_DIM;
+
+//     int idx0 = base0 + static_cast<int>(ele);
+//     int idx1 = base1 + static_cast<int>(ele);
+
+//     a_frag.template AsType<srcA_cast_type>()(ele) = local_a_ptr[idx0];
+//     a_frag.template AsType<srcA_cast_type>()(Number<ele + SRC_DIM>{}) = local_a_ptr[idx1];
+
+//     b_frag.template AsType<srcB_cast_type>()(ele) = local_b_ptr[idx0];
+//     b_frag.template AsType<srcB_cast_type>()(Number<ele + SRC_DIM>{}) = local_b_ptr[idx1];
+// });
 
     __syncthreads(); //KO TODO:: move to inline asm
 
@@ -320,10 +361,19 @@ __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
 
     // KO TODO:: Changes needed?
     // Store results to global memory (row-major, adjust as needed)
+
+    //swizzle for row-major style approach
+    // static_for<0, 8, 1>{}([&](auto ele) {
+    //     int col = lIdx >> 1;
+    //     int row = ((ele & 6) << 1) + (ele & 1) + ((lIdx & 1) << 1);
+    //     c[16 * row + col] = dst_thread_buf_[ele];
+    // });
+
+    //column-major 16x16 result matrix, 8 elements per thread
     static_for<0, 8, 1>{}([&](auto ele) {
-        int col = lIdx >> 1;
-        int row = ((ele & 6) << 1) + (ele & 1) + ((lIdx & 1) << 1);
-        c[16 * row + col] = dst_thread_buf_[ele];
+        int col = lIdx % 16;
+        int row = (lIdx / 16) * 8 + static_cast<int>(ele);
+        c[col * 16 + row] = dst_thread_buf_[Number<ele>{}];
     });
 }
 
