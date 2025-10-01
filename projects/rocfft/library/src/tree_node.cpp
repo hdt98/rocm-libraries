@@ -928,23 +928,122 @@ void CommAllToAll::ExecuteAsync(const rocfft_plan     plan,
 #ifdef ROCFFT_MPI_ENABLE
     auto mpi_comm = ActiveMPIComm(plan);
 
-    const auto  elem_size = element_size(precision, arrayType);
-    MPI_Request request;
-    const int   local_comm_rank = plan->get_local_comm_rank();
+    MPI_Request  request;
+    MPI_Datatype mpi_elem_type   = rocfft_type_to_mpi_type(precision, arrayType);
+    const int    local_comm_rank = plan->get_local_comm_rank();
+
+// use MPI-4 large-count _c interfaces when available
+#if defined(MPI_VERSION) && (MPI_VERSION >= 4) && defined(ENABLE_MPI_C_COLLECTIVES)
+    std::cout << "using 64bit" << std::endl;
 
     if(uniform_counts)
     {
         if(LOG_PLAN_ENABLED())
-            log_plan("Using MPI_Ialltoall\n");
+            log_plan("Using MPI_Ialltoall_c (MPI_Count)\n");
 
-        const int send_count_bytes = static_cast<int>(sendCounts[0] * elem_size);
+        std::cout << "going to alan MPI_Ialltoall_c " << std::endl;
+
+        MPI_Count sendcount = static_cast<MPI_Count>(sendCounts[0]); // uses MPI_Count (large)
+
+        const int mpiret = MPI_Ialltoall_c(sendBuf.get(in_buffer, out_buffer, local_comm_rank),
+                                           sendcount,
+                                           mpi_elem_type,
+                                           recvBuf.get(in_buffer, out_buffer, local_comm_rank),
+                                           sendcount,
+                                           mpi_elem_type,
+                                           mpi_comm,
+                                           &request);
+
+        if(mpiret != MPI_SUCCESS)
+        {
+            char errmsg[MPI_MAX_ERROR_STRING];
+            int  errlen = 0;
+            MPI_Error_string(mpiret, errmsg, &errlen);
+
+            comm_status   = COMM_MPI_ERROR;
+            error_message = "MPI_Ialltoall_c failed on rank " + std::to_string(local_comm_rank)
+                            + ": " + std::string(errmsg);
+            return;
+        }
+    }
+    else
+    {
+        if(LOG_PLAN_ENABLED())
+            log_plan("Using MPI_Ialltoallv_c (MPI_Count / MPI_Aint)\n");
+
+        std::cout << "going to alan MPI_Ialltoallv_c " << std::endl;
+
+        // create MPI_Count counts (no truncation)
+        std::vector<MPI_Count> cntSend, cntRecv;
+        cntSend.reserve(sendCounts.size());
+        cntRecv.reserve(recvCounts.size());
+
+        const auto elem_size = element_size(precision, arrayType);
+
+        for(size_t v : sendCounts)
+            cntSend.push_back(static_cast<MPI_Count>(v));
+        for(size_t v : recvCounts)
+            cntRecv.push_back(static_cast<MPI_Count>(v));
+
+        // create MPI_Aint displacements — MPI_Alltoallv_c expects byte displacements
+        std::vector<MPI_Aint> offSend, offRecv;
+        offSend.reserve(sendOffsets.size());
+        offRecv.reserve(recvOffsets.size());
+        for(size_t v : sendOffsets)
+            offSend.push_back(static_cast<MPI_Aint>(v * static_cast<size_t>(elem_size)));
+        for(size_t v : recvOffsets)
+            offRecv.push_back(static_cast<MPI_Aint>(v * static_cast<size_t>(elem_size)));
+
+        const int mpiret = MPI_Ialltoallv_c(sendBuf.get(in_buffer, out_buffer, local_comm_rank),
+                                            cntSend.data(),
+                                            offSend.data(),
+                                            mpi_elem_type,
+                                            recvBuf.get(in_buffer, out_buffer, local_comm_rank),
+                                            cntRecv.data(),
+                                            offRecv.data(),
+                                            mpi_elem_type,
+                                            mpi_comm,
+                                            &request);
+
+        if(mpiret != MPI_SUCCESS)
+        {
+            char errmsg[MPI_MAX_ERROR_STRING];
+            int  errlen = 0;
+            MPI_Error_string(mpiret, errmsg, &errlen);
+
+            comm_status   = COMM_MPI_ERROR;
+            error_message = "MPI_Ialltoallv_c failed on rank " + std::to_string(local_comm_rank)
+                            + ": " + std::string(errmsg);
+            return;
+        }
+    }
+#else
+    std::cout << "NOTTT using 64bit" << std::endl;
+
+    // fallback for older MPI implementations: safe convert to int and use legacy calls
+    if(uniform_counts)
+    {
+        if(LOG_PLAN_ENABLED())
+            log_plan("Using MPI_Ialltoall (fallback, int counts)\n");
+
+        // check that per-destination count fits in int to avoid overflow
+        const size_t send_count_elems = sendCounts[0];
+        if(send_count_elems > static_cast<size_t>(std::numeric_limits<int>::max()))
+        {
+            comm_status   = COMM_MPI_ERROR;
+            error_message = "send count too large to fit in MPI int on rank "
+                            + std::to_string(local_comm_rank)
+                            + " (build/upgrade MPI >= 4 for large-count support)";
+            return;
+        }
+        const int send_count = static_cast<int>(send_count_elems);
 
         const auto mpiret = MPI_Ialltoall(sendBuf.get(in_buffer, out_buffer, local_comm_rank),
-                                          send_count_bytes,
-                                          MPI_CHAR,
+                                          send_count,
+                                          mpi_elem_type,
                                           recvBuf.get(in_buffer, out_buffer, local_comm_rank),
-                                          send_count_bytes,
-                                          MPI_CHAR,
+                                          send_count,
+                                          mpi_elem_type,
                                           mpi_comm,
                                           &request);
 
@@ -957,40 +1056,52 @@ void CommAllToAll::ExecuteAsync(const rocfft_plan     plan,
             comm_status   = COMM_MPI_ERROR;
             error_message = "MPI_Ialltoall failed on rank " + std::to_string(local_comm_rank) + ": "
                             + std::string(errmsg);
-
             return;
         }
     }
     else
     {
         if(LOG_PLAN_ENABLED())
-            log_plan("Using MPI_Ialltoallv\n");
+            log_plan("Using MPI_Ialltoallv (fallback with int conversion)\n");
 
-        // non-uniform exchange case (default)
-
-        // MPI takes ints for everything, convert our size_t elements to int bytes
-        auto convertToInt = [](const std::vector<size_t>& src, std::vector<int>& dest) {
+        // helper: safe convert size_t -> int with overflow detection
+        auto convertToInt = [](const std::vector<size_t>& src, std::vector<int>& dest) -> bool {
+            dest.clear();
             dest.reserve(src.size());
-            std::copy(src.begin(), src.end(), std::back_inserter(dest));
+            for(size_t v : src)
+            {
+                if(v > static_cast<size_t>(std::numeric_limits<int>::max()))
+                    return false; // overflow
+                dest.push_back(static_cast<int>(v));
+            }
+            return true;
         };
 
         std::vector<int> intSendOffsets;
         std::vector<int> intSendCounts;
         std::vector<int> intRecvOffsets;
         std::vector<int> intRecvCounts;
-        convertToInt(sendOffsets, intSendOffsets);
-        convertToInt(sendCounts, intSendCounts);
-        convertToInt(recvOffsets, intRecvOffsets);
-        convertToInt(recvCounts, intRecvCounts);
+
+        // convert counts and offsets to int, with overflow checks
+        if(!convertToInt(sendOffsets, intSendOffsets) || !convertToInt(sendCounts, intSendCounts)
+           || !convertToInt(recvOffsets, intRecvOffsets)
+           || !convertToInt(recvCounts, intRecvCounts))
+        {
+            comm_status   = COMM_MPI_ERROR;
+            error_message = "send/recv counts or offsets too large to fit in MPI int on rank "
+                            + std::to_string(local_comm_rank)
+                            + " (build/upgrade MPI >= 4 for large-count support)";
+            return;
+        }
 
         const auto mpiret = MPI_Ialltoallv(sendBuf.get(in_buffer, out_buffer, local_comm_rank),
                                            intSendCounts.data(),
                                            intSendOffsets.data(),
-                                           rocfft_type_to_mpi_type(precision, arrayType),
+                                           mpi_elem_type,
                                            recvBuf.get(in_buffer, out_buffer, local_comm_rank),
                                            intRecvCounts.data(),
                                            intRecvOffsets.data(),
-                                           rocfft_type_to_mpi_type(precision, arrayType),
+                                           mpi_elem_type,
                                            mpi_comm,
                                            &request);
 
@@ -1003,10 +1114,10 @@ void CommAllToAll::ExecuteAsync(const rocfft_plan     plan,
             comm_status   = COMM_MPI_ERROR;
             error_message = "MPI_Ialltoallv failed on rank " + std::to_string(local_comm_rank)
                             + ": " + std::string(errmsg);
-
             return;
         }
     }
+#endif
 
     comm_requests.push_back(request);
 
