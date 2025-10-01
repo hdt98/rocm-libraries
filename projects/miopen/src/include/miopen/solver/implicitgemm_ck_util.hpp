@@ -728,6 +728,16 @@ inline size_t GetCKAlphaBetaWorkspace(const miopen::conv::ProblemDescription& pr
 
     miopenConvolutionABBackwardWeightsGetWorkSpaceSize(
         problem.GetAlphaBetaCase(), &input, &output, &weights, &conv_desc, &buff_size);
+
+    MIOPEN_LOG_I2("CK wrw workspace size: " << buff_size);
+
+    // TODO: Debug hack.
+    if (buff_size == 0)
+    {
+        // half of the available GPU memory should be enough for any case
+        return 102746816512;
+    }
+
     return buff_size;
 }
 
@@ -1170,13 +1180,36 @@ ConvSolution InitInvokerFactoryNCHW(const ExecutionContext& ctx,
                                  CKArgsType,
                                  CastType>(ck_args, sh_conv_ptr, tr_ptrs, data_ctx, split_k);
 
+            const auto ws_size = sh_conv_ptr->GetWorkSpaceSize(argument_ptr.get());
+            MIOPEN_LOG_I2("Workspace size required by the kernel" << sh_conv_ptr->GetTypeString() << ": " << ws_size);
+
             shared<Data_t> buf_handle{};
             if(ck_buff_des.has_value() && ck_buff_des->ck_size && workspace_ptr)
             {
                 buf_handle = handle.CreateSubBuffer(
                     workspace_ptr, ck_buff_des->ck_offset, ck_buff_des->ck_size);
-                assert(buf_handle.get());
+                MIOPEN_LOG_I2("Workspace size allocated for ck kernel: " << ck_buff_des->ck_size);
+                if (ws_size > 0 && !buf_handle.get())
+                {
+                    MIOPEN_THROW(miopenStatusInvalidValue,
+                                    "Workspace pointer is null but required by the kernel " + sh_conv_ptr->GetTypeString());
+                }
+                // if (ws_size > ck_buff_des->ck_size)
+                // {
+                //     MIOPEN_THROW(miopenStatusInvalidValue,
+                //                     "Workspace size allocated is less than required by the kernel " + sh_conv_ptr->GetTypeString());
+                // }
                 sh_conv_ptr->SetWorkSpacePointer(argument_ptr.get(), buf_handle.get());
+            }
+            else 
+            {
+                if (ws_size > 0)
+                {
+                    MIOPEN_LOG_E("Workspace size allocated for ck kernel: " << ck_buff_des->ck_size);
+                    MIOPEN_LOG_E("Workspace pointer: " << workspace_ptr);
+                    MIOPEN_THROW(miopenStatusInvalidValue,
+                                    "Kernel requires workspace but CK buffer description is undefined for " + sh_conv_ptr->GetTypeString());
+                }
             }
 
             auto invoker_ptr = sh_conv_ptr->MakeInvokerPointer();
@@ -1277,9 +1310,25 @@ ConvSolution InitInvokerFactoryNHWC(const ExecutionContext&,
                 (void)should_allocated_wrw_buffer;
                 assert((should_allocated_wrw_buffer && data_ctx.workSpace != nullptr) ||
                        !(should_allocated_wrw_buffer && data_ctx.workSpace == nullptr));
+                const auto ws_size = sh_conv_ptr->GetWorkSpaceSize(argument_ptr.get());
+                MIOPEN_LOG_I2("Workspace size required by the kernel" << sh_conv_ptr->GetTypeString() << ": " << ws_size);
+                MIOPEN_LOG_I2("Workspace size allocated for ck kernel: " << data_ctx.GetWorkspaceSize());
                 if(data_ctx.workSpace)
                 {
+                    // if (ws_size > data_ctx.GetWorkspaceSize())
+                    // {
+                    //     MIOPEN_THROW(miopenStatusInvalidValue,
+                    //                  "Workspace size allocated is less than required by the kernel " + sh_conv_ptr->GetTypeString());
+                    // }
                     sh_conv_ptr->SetWorkSpacePointer(argument_ptr.get(), data_ctx.workSpace);
+                }
+                else 
+                {
+                    if (ws_size > 0)
+                    {
+                        MIOPEN_THROW(miopenStatusInvalidValue,
+                                     "Workspace pointer is null but required by the kernel " + sh_conv_ptr->GetTypeString());
+                    }
                 }
 
                 auto invoker_ptr = sh_conv_ptr->MakeInvokerPointer();
