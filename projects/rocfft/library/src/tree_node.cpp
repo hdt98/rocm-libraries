@@ -934,8 +934,6 @@ void CommAllToAll::ExecuteAsync(const rocfft_plan     plan,
 
 // use MPI-4 large-count _c interfaces when available
 #if defined(MPI_VERSION) && (MPI_VERSION >= 4) && defined(ENABLE_MPI_C_COLLECTIVES)
-    std::cout << "using 64bit" << std::endl;
-
     if(uniform_counts)
     {
         if(LOG_PLAN_ENABLED())
@@ -1018,8 +1016,6 @@ void CommAllToAll::ExecuteAsync(const rocfft_plan     plan,
         }
     }
 #else
-    std::cout << "NOTTT using 64bit" << std::endl;
-
     // fallback for older MPI implementations: safe convert to int and use legacy calls
     if(uniform_counts)
     {
