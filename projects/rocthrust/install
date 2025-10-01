@@ -120,7 +120,7 @@ fi
 # See README.md under "Build And Install" for options and defaults.
 
 cmake_executable="cmake"
-cmake_common_options="--toolchain=toolchain-linux.cmake"
+cmake_common_options="-DCMAKE_TOOLCHAIN_FILE=toolchain-linux.cmake"
 
 if [[ "${build_clients}" == true ]]; then
     build_test="-DBUILD_TEST=ON"
