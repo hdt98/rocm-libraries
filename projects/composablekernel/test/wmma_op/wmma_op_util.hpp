@@ -218,9 +218,13 @@ __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
     const int lane = lIdx % 32; // wave size
     const int lowHigh = lane / 16;
 
+    //Global to Local Reg --> contiguous global --> quadrant interleaved in regs
+    //regs-> LDS --> Reverse quadrant interleaved (back to flat in LDS)
+    //LDS->packed fragments -- back to quadrant mode
+
     //load A to registers -- OK
     printf("-------- Writing to a_temp -------- \n");
-    static_for<0, QUADRANT_SIZE, 1>{}([&](auto ele) {
+    static_for<0, QUADRANT_SIZE, 1>{}([&](auto ele) { 
         int i = ele;
         int j = ele + QUADRANT_SIZE * 2;
         int rowIdx = lane % 16;
@@ -362,18 +366,12 @@ __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
     // KO TODO:: Changes needed?
     // Store results to global memory (row-major, adjust as needed)
 
-    //swizzle for row-major style approach
-    // static_for<0, 8, 1>{}([&](auto ele) {
-    //     int col = lIdx >> 1;
-    //     int row = ((ele & 6) << 1) + (ele & 1) + ((lIdx & 1) << 1);
-    //     c[16 * row + col] = dst_thread_buf_[ele];
-    // });
-
     //column-major 16x16 result matrix, 8 elements per thread
     static_for<0, 8, 1>{}([&](auto ele) {
+        int lowHi = lIdx / 16;
         int col = lIdx % 16;
-        int row = (lIdx / 16) * 8 + static_cast<int>(ele);
-        c[col * 16 + row] = dst_thread_buf_[Number<ele>{}];
+        int row = (lowHi) * 8 + static_cast<int>(ele);
+        c[col + 16 * row] = dst_thread_buf_[Number<ele>{}]; // idea each thread contiguous along column
     });
 }
 
@@ -784,6 +782,7 @@ struct TestWmma
         std::cout<<"K Multiplier in testSWMMA operator is: "<< KMultiplier << std::endl;
 
         // Arrange
+        // KO TODO:: Generalize this
         ck::wmma_op_util::GemmParams params;
         params.M       = 16;
         params.N       = 16;
