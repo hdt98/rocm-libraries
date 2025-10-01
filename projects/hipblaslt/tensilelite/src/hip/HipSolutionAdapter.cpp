@@ -86,10 +86,12 @@ namespace TensileLite
             Debug::Instance().markerStart("loadCodeObjectFile", path);
             hipModule_t module;
 
+            std::cout << "started loading code object " << path << std::endl;
+
             HIP_CHECK_RETURN(hipModuleLoad(&module, path.c_str()));
 
-            if(m_debug)
-                std::cout << "loaded code object " << path << std::endl;
+            // if(m_debug)
+            std::cout << "done loading code object " << path << std::endl;
 
             {
                 std::lock_guard<std::mutex> guard(m_access);
@@ -247,6 +249,11 @@ namespace TensileLite
             {
                 err = hipModuleGetFunction(&rv, module, name.c_str());
 
+                if(err != hipSuccess)
+                {
+                    std::cout << "hipModuleGetFunction err " << err << " for kernel " << name << std::endl;
+                }
+
                 if(err == hipSuccess)
                 {
                     m_kernels[name] = rv;
@@ -371,7 +378,13 @@ namespace TensileLite
             }
 
             hipFunction_t function;
-            HIP_CHECK_RETURN(getKernel(function, kernel.kernelName));
+            // HIP_CHECK_RETURN(getKernel(function, kernel.kernelName));
+            auto err1 = getKernel(function, kernel.kernelName);
+            if (err1)
+            {
+                std::cout << "Error " << err1 << " getting kernel " << kernel.kernelName << std::endl;
+                return err1;
+            }
 
             void*  kernelArgs = const_cast<void*>(kernel.args.data());
             size_t argsSize   = kernel.args.size();
@@ -384,7 +397,8 @@ namespace TensileLite
 
             if(startEvent != nullptr)
                 HIP_CHECK_RETURN(hipEventRecord(startEvent, stream));
-            HIP_CHECK_RETURN(hipExtModuleLaunchKernel(function,
+            // HIP_CHECK_RETURN(hipExtModuleLaunchKernel(function,
+            auto err2 = (hipExtModuleLaunchKernel(function,
                                                       kernel.numWorkItems.x,
                                                       kernel.numWorkItems.y,
                                                       kernel.numWorkItems.z,
@@ -398,6 +412,15 @@ namespace TensileLite
                                                       nullptr, // event
                                                       nullptr // event
                                                       ));
+            if (err2)
+            {
+                std::cout << "Error " << err2 << " launching kernel " << kernel.kernelName << std::endl;
+                std::cout << "Kernel " << kernel.kernelName << std::endl;
+                std::cout << " l" << kernel.workGroupSize << " x g" << kernel.numWorkGroups << " = "
+                          << kernel.numWorkItems << std::endl;
+                std::cout << kernel.args;
+                return err2;
+            }
             if(stopEvent != nullptr)
                 HIP_CHECK_RETURN(hipEventRecord(stopEvent, stream));
             return hipSuccess;

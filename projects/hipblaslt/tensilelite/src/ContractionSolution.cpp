@@ -1903,6 +1903,10 @@ namespace TensileLite
             // Calculate the splitting factor
             auto tiles = problem.getNumTiles(sizeMapping, 1);
             gsu = sk.grid / tiles;
+            std::cout << "SK with post kernel" << std::endl;
+            std::cout << "sk.grid = " << sk.grid << std::endl;
+            std::cout << "tiles = " << tiles << std::endl;
+            std::cout << "gsu = " << gsu << std::endl;
         }
         rv.kernelName = outputConversionKernelName(problem, inputs, vw, gsu);
 
@@ -2266,6 +2270,19 @@ namespace TensileLite
                 + std::to_string(
                     std::min(static_cast<decltype(sizeMapping.globalSplitUPGR)>(gsuTemp),
                              sizeMapping.globalSplitUPGR));
+
+        auto PostGSUValue = std::min(static_cast<decltype(sizeMapping.globalSplitUPGR)>(gsuTemp),
+                             sizeMapping.globalSplitUPGR));
+        if (PostGSUValue == 1)
+        {
+            std::cout << "Calling PostGSU1: " << std::endl;
+            std::cout << "gsu = " << gsu << std::endl;
+            std::cout << "gsuTemp = " << gsuTemp << std::endl;
+            std::cout << "sizeMapping.globalSplitUPGR = " << sizeMapping.globalSplitUPGR << std::endl;
+            std::cout << "vw = " << vw << std::endl;
+            std::cout << "sizeMapping.streamK = " << sizeMapping.streamK << std::endl;
+        }
+
 
         name += "_VW" + std::to_string(vw);
 
