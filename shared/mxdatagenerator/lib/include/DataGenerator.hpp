@@ -992,10 +992,8 @@ namespace DGen
         const auto dataBias          = static_cast<int32_t>(getDataBias<DTYPE>());
         const auto dataMantissaBits  = getDataMantissaBits<DTYPE>();
         const auto dataExponentBits  = getDataExponentBits<DTYPE>();
-        const auto dataUnbiasedEMin  = getDataUnBiasedEMin<DTYPE>();
         const auto scaleBias         = getScaleBias<DTYPE>();
         const auto scaleUnbiasedEMin = getScaleUnBiasedEMin<DTYPE>();
-        const auto min_exp = scaleUnbiasedEMin + dataUnbiasedEMin - dataMantissaBits /*subnormal*/;
 
         const auto block_size = (isScaled<DTYPE>() ? m_options.blockScaling : 1);
 
