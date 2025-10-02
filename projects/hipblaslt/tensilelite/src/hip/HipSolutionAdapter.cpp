@@ -255,7 +255,10 @@ namespace TensileLite
 
                 if(err != hipSuccess)
                 {
-                    std::cout << "hipModuleGetFunction err " << err << " for kernel " << name << std::endl;
+                    int device;
+                    hipGetDevice(&device);
+                    pid_t pid = getpid();
+                    std::cout << "On " << device << " pid " << pid << " hipModuleGetFunction err " << err << " for kernel " << name << std::endl;
                 }
 
                 if(err == hipSuccess)
