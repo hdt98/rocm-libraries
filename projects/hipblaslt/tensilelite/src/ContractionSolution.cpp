@@ -2272,7 +2272,7 @@ namespace TensileLite
                              sizeMapping.globalSplitUPGR));
 
         auto PostGSUValue = std::min(static_cast<decltype(sizeMapping.globalSplitUPGR)>(gsuTemp),
-                             sizeMapping.globalSplitUPGR));
+                             sizeMapping.globalSplitUPGR);
         if (PostGSUValue == 1)
         {
             std::cout << "Calling PostGSU1: " << std::endl;
