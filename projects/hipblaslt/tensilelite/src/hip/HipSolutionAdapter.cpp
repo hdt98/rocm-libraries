@@ -23,6 +23,7 @@
  * SOFTWARE.
  *
  *******************************************************************************/
+#include <unistd.h>
 
 #include <hip/hip_ext.h>
 #include <hip/hip_runtime.h>
@@ -86,12 +87,15 @@ namespace TensileLite
             Debug::Instance().markerStart("loadCodeObjectFile", path);
             hipModule_t module;
 
-            std::cout << "started loading code object " << path << std::endl;
+            int device;
+            hipGetDevice(&device);
+            pid_t pid = getpid();
+            std::cout << "started loading code object " << path << "on " << device << " pid " << pid << std::endl;
 
             HIP_CHECK_RETURN(hipModuleLoad(&module, path.c_str()));
 
             // if(m_debug)
-            std::cout << "done loading code object " << path << std::endl;
+            std::cout << "done loading code object " << path << "on " << device << std::endl;
 
             {
                 std::lock_guard<std::mutex> guard(m_access);
