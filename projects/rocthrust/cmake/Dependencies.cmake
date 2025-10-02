@@ -295,20 +295,6 @@ if(BUILD_TEST OR BUILD_HIPSTDPAR_TEST)
     message(STATUS "TBB not found or force download TBB on. Downloading and building TBB.")
     set(TBB_ROOT ${CMAKE_CURRENT_BINARY_DIR}/deps/tbb CACHE PATH "" FORCE)
 
-    # download_project(
-    #   PROJ  TBB
-    #   GIT_REPOSITORY      https://github.com/oneapi-src/oneTBB.git
-    #   GIT_TAG             1c4c93fc5398c4a1acb3492c02db4699f3048dea # v2021.13.0
-    #   INSTALL_DIR         ${TBB_ROOT}
-    #   CMAKE_ARGS          -DCMAKE_CXX_COMPILER=g++ -DTBB_TEST=OFF -DTBB_BUILD=ON -DTBB_INSTALL=ON -DTBBMALLOC_PROXY_BUILD=OFF -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
-    #   LOG_DOWNLOAD        TRUE
-    #   LOG_CONFIGURE       TRUE
-    #   LOG_BUILD           TRUE
-    #   LOG_INSTALL         TRUE
-    #   BUILD_PROJECT       TRUE
-    #   UPDATE_DISCONNECTED TRUE
-    # )
-    # find_package(TBB REQUIRED CONFIG PATHS ${TBB_ROOT})
     FetchContent_Declare(
       TBB
       GIT_REPOSITORY      https://github.com/oneapi-src/oneTBB.git
@@ -408,7 +394,7 @@ if(BUILD_BENCHMARK)
     FetchContent_Declare(
       googlebench
       GIT_REPOSITORY https://github.com/google/benchmark.git
-      GIT_TAG        v1.8.0
+      GIT_TAG        v${BENCHMARK_VERSION}
     )
     FetchContent_MakeAvailable(googlebench)
     if(NOT TARGET benchmark::benchmark)
