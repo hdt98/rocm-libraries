@@ -396,13 +396,13 @@ namespace TensileLite
             case rocisa::DataType::XFloat32:
             case rocisa::DataType::ComplexFloat:
             {
-                auto typedPtr = static_cast<std::complex<float>>(dstPtr);
-                typedPtr[pos] = SaturateCast<std::complex<float>(src);
+                auto typedPtr = static_cast<std::complex<float>*>(dstPtr);
+                typedPtr[pos] = SaturateCast<std::complex<float>>(src);
             }
             case rocisa::DataType::ComplexDouble:
             {
-                auto typedPtr = static_cast<std::complex<double>>(dstPtr);
-                typedPtr[pos] = SaturateCast<std::complex<double>(src);
+                auto typedPtr = static_cast<std::complex<double>*>(dstPtr);
+                typedPtr[pos] = SaturateCast<std::complex<double>>(src);
             }
             case rocisa::DataType::Int8x4:
             case rocisa::DataType::Int64:
@@ -754,15 +754,13 @@ namespace TensileLite
             bool aConjugate = false;
             bool bConjugate = false;
 
-            if(DataTypeInfo::Get(problem.a().dataType()).isComplex)
-            {
-                aConjugate = true;
-            }
+            for(auto const& op : problem.aOps())
+                if(op.type == TensorOp::Type::ComplexConjugate)
+                    aConjugate = true;
 
-            if(DataTypeInfo::Get(problem.b().dataType()).isComplex)
-            {
-                bConjugate = true;
-            }
+            for(auto const& op : problem.bOps())
+                if(op.type == TensorOp::Type::ComplexConjugate)
+                    bConjugate = true;
 
             std::vector<size_t> freeASize(freeIndicesA.size());
             std::vector<size_t> freeBSize(freeIndicesB.size());
