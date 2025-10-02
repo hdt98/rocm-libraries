@@ -23,6 +23,7 @@
  * SOFTWARE.
  *
  *******************************************************************************/
+#include <unistd.h>
 
 #include <Tensile/ContractionSolution.hpp>
 
@@ -2280,17 +2281,19 @@ namespace TensileLite
                              sizeMapping.globalSplitUPGR));
 
         auto PostGSUValue = std::min(static_cast<decltype(sizeMapping.globalSplitUPGR)>(gsuTemp),
-                             sizeMapping.globalSplitUPGR));
+                             sizeMapping.globalSplitUPGR);
         if (PostGSUValue == 1)
         {
-            std::cout << "Calling PostGSU1: " << std::endl;
+            int device;
+            hipGetDevice(&device);
+            pid_t pid = getpid();
+            std::cout << "Calling PostGSU1 on: " << device << " pid " << pid << std::endl;
             std::cout << "gsu = " << gsu << std::endl;
             std::cout << "gsuTemp = " << gsuTemp << std::endl;
             std::cout << "sizeMapping.globalSplitUPGR = " << sizeMapping.globalSplitUPGR << std::endl;
             std::cout << "vw = " << vw << std::endl;
             std::cout << "sizeMapping.streamK = " << sizeMapping.streamK << std::endl;
         }
-
 
         name += "_VW" + std::to_string(vw);
 
