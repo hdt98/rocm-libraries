@@ -53,12 +53,18 @@ endif()
 include(TensileSupportedArchitectures)
 set(GPU_TARGETS "" CACHE STRING "AMD GFX targets to cross-compile")
 
-if(NOT GPU_TARGETS OR GPU_TARGETS STREQUAL "all")
-    tensile_get_base_architectures(GPU_TARGETS)
+if (Tensile_ARCHITECTURE)
+    tensile_validate_gpu_targets("${Tensile_ARCHITECTURE}")
+    message(STATUS "Tensile building for Tensile_ARCHITECTURE: ${Tensile_ARCHITECTURE}")
 else()
-    tensile_validate_gpu_targets("${GPU_TARGETS}")
+    if(NOT GPU_TARGETS OR GPU_TARGETS STREQUAL "all")
+        tensile_get_base_architectures(GPU_TARGETS)
+    else()
+        tensile_validate_gpu_targets("${GPU_TARGETS}")
+    endif()
+    message(STATUS "Tensile building for GPU_TARGETS: ${GPU_TARGETS}")
 endif()
-message(STATUS "Building for GPU targets: ${GPU_TARGETS}")
+
 
 include(CMakeDependentOption)
 CMAKE_DEPENDENT_OPTION(TENSILE_BUILD_CLIENT "Build the benchmarking client" ON
