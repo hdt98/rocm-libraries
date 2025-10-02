@@ -609,6 +609,10 @@ namespace TensileLite
         , m_batchIndices(batchIndices)
         , m_boundIndices(boundIndices)
         , m_beta(beta)
+        , m_aOps(aOps)
+        , m_bOps(bOps)
+        , m_cOps(cOps)
+        , m_dOps(dOps)
     {
         TensorOps nop;
         m_aOps = m_bOps = m_cOps = m_dOps = nop;

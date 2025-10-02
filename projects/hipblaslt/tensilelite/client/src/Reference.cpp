@@ -396,13 +396,13 @@ namespace TensileLite
             case rocisa::DataType::XFloat32:
             case rocisa::DataType::ComplexFloat:
             {
-                auto typedPtr = static_cast<std::complex<float>>(dstPtr);
-                typedPtr[pos] = SaturateCast<std::complex<float>(src);
+                auto typedPtr = static_cast<std::complex<float>*>(dstPtr);
+                typedPtr[pos] = SaturateCast<std::complex<float>>(src);
             }
             case rocisa::DataType::ComplexDouble:
             {
-                auto typedPtr = static_cast<std::complex<double>>(dstPtr);
-                typedPtr[pos] = SaturateCast<std::complex<double>(src);
+                auto typedPtr = static_cast<std::complex<double>*>(dstPtr);
+                typedPtr[pos] = SaturateCast<std::complex<double>>(src);
             }
             case rocisa::DataType::Int8x4:
             case rocisa::DataType::Int64:
