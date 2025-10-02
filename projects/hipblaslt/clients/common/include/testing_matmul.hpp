@@ -410,7 +410,7 @@ void epilogue_func(int64_t     m,
     auto in_Tact = static_cast<Tact>(in[pos]) + bias_data;                                    \
     if(e && !gradient)                                                                        \
     {                                                                                         \
-        saturate_cast_to_type(e, in_Tact* scaleE, aux_type, pos);                             \
+        saturate_cast_to_type(e, in_Tact * scaleE, aux_type, pos);                            \
     }                                                                                         \
     Tact in_Tact_act = 0;                                                                     \
     if(gradient)                                                                              \
@@ -556,12 +556,12 @@ void epilogue_func(int64_t     m,
                    bool        gradient,
                    hipDataType To)
 {
-#define CALCULATE_EPILOGUE_BASIC                               \
-    auto pos  = j * ld + i;                                    \
-    Tc   temp = static_cast<Ti>(*(in + pos)) + bias_data;      \
-    if(e)                                                      \
-    {                                                          \
-        saturate_cast_to_type(e, temp* scaleE, aux_type, pos); \
+#define CALCULATE_EPILOGUE_BASIC                                \
+    auto pos  = j * ld + i;                                     \
+    Tc   temp = static_cast<Ti>(*(in + pos)) + bias_data;       \
+    if(e)                                                       \
+    {                                                           \
+        saturate_cast_to_type(e, temp * scaleE, aux_type, pos); \
     }
 
     for(int i = 0; i < m; i++)
@@ -1120,7 +1120,6 @@ hipDataType derive_unset_bias_type(const Arguments& arg)
         throw std::invalid_argument("Invalid bias type "
                                     + std::string(hip_datatype_to_string(real_bias_type)));
 
-
     return real_bias_type;
 }
 
@@ -1203,7 +1202,6 @@ void testing_matmul_with_bias(const Arguments& arg,
 
 void testing_matmul(const Arguments& arg)
 {
-    hipblaslt_cout<<"RK: test matmul1" <<std::endl;
     hipDataType tiA = arg.a_type;
     hipDataType tiB = arg.b_type;
     hipDataType to  = arg.c_type;
@@ -1226,11 +1224,10 @@ void testing_matmul(const Arguments& arg)
     hipblasltSetRotatingBufferSizeValue(arg.rotating);
     hipblasltSetColdIterationsValue(arg.cold_iters);
     hipblasltSetHotIterationsValue(arg.iters);
-    hipblaslt_cout<<"RK : realDataTypeSize(tiA) " << realDataTypeSize(tiA) << "realDataTypeSize(tiB) "<<realDataTypeSize(tiB)  << " to :" << to << std::endl;
+    
     // for all f8/bf8 cases including mix mode
     if((realDataTypeSize(tiA) == 1 || realDataTypeSize(tiB) == 1) && tc != HIP_R_32I)
     {
-        hipblaslt_cout<<"RK: inside cases "<<std::endl;
         if(to == HIP_R_16BF || to == HIP_R_32F)
         {
             if(real_bias_type == HIP_R_16BF)
@@ -1284,13 +1281,13 @@ void testing_matmul(const Arguments& arg)
                 arg_revised, tiA, tiB, to, tc, tciA, tciB, HIP_R_32F, real_aux_type);
         }
     }
-    else if(to == HIP_R_32F || to == HIP_R_32I || to == HIP_R_8I || to == HIP_R_64F || to == HIP_C_32F || to == HIP_C_64F)
+    else if(to == HIP_R_32F || to == HIP_R_32I || to == HIP_R_8I || to == HIP_R_64F
+            || to == HIP_C_32F || to == HIP_C_64F)
     {
         //set Tbias to To
         return testing_matmul_with_bias(
             arg_revised, tiA, tiB, to, tc, tciA, tciB, to, real_aux_type);
     }
-    hipblaslt_cout<<"RK: test error " << std::endl;
     // shouldn't arrive here
     hipblaslt_test_invalid{}(arg);
     return;
@@ -1306,7 +1303,6 @@ void testing_matmul_with_bias(const Arguments& arg,
                               hipDataType      Tbias,
                               hipDataType      Taux)
 {
-    hipblaslt_cout<<"RK: matmul -1 " << std::endl;
     double gpu_time_used, cpu_time_used, gpu_mem_gbytes;
     gpu_time_used = cpu_time_used = gpu_mem_gbytes = 0.0;
     bool                   HMM                     = arg.HMM;
@@ -1396,9 +1392,9 @@ void testing_matmul_with_bias(const Arguments& arg,
         stride_d[i] = do_batched[i] ? arg.stride_c[i] : ldd[i] * N[i];
         stride_e[i] = do_batched[i] ? arg.stride_e[i] : lde[i] * N[i];
 
-        size_A[i]
-            = stride_a[i] == 0 ? lda[i] * A_col[i] * num_batches[i]
-                               : lda[i] <= stride_a[i] ? stride_a[i] * num_batches[i] : lda[i] * A_col[i];
+        size_A[i] = stride_a[i] == 0        ? lda[i] * A_col[i] * num_batches[i]
+                    : lda[i] <= stride_a[i] ? stride_a[i] * num_batches[i]
+                                            : lda[i] * A_col[i];
         // for (!do_swizzle_a) case, we can use size_dA and stride_da instead of size_A and stride_a
         size_dA[i]   = size_A[i];
         stride_da[i] = stride_a[i];
@@ -1421,9 +1417,9 @@ void testing_matmul_with_bias(const Arguments& arg,
             size_dA[i] = num_batches[i] * stride_swizzle;
         }
 
-        size_B[i]
-            = stride_b[i] == 0 ? ldb[i] * B_col[i] * num_batches[i]
-                               : ldb[i] <= stride_b[i] ? stride_b[i] * num_batches[i] : ldb[i] * B_col[i];
+        size_B[i] = stride_b[i] == 0        ? ldb[i] * B_col[i] * num_batches[i]
+                    : ldb[i] <= stride_b[i] ? stride_b[i] * num_batches[i]
+                                            : ldb[i] * B_col[i];
         // for (!do_swizzle_b) case, we can use size_dB and stride_db instead of size_B and stride_b
         size_dB[i]   = size_B[i];
         stride_db[i] = stride_b[i];
@@ -1445,14 +1441,15 @@ void testing_matmul_with_bias(const Arguments& arg,
             }
             size_dB[i] = num_batches[i] * stride_swizzle;
         }
-        size_C[i]
-            = stride_c[i] == 0 ? ldc[i] * N[i] * num_batches[i]
-                               : ldc[i] <= stride_c[i] ? stride_c[i] * num_batches[i] : ldc[i] * N[i];
-        size_D[i]
-            = stride_d[i] == 0 ? ldd[i] * N[i] * num_batches[i]
-                               : ldd[i] <= stride_d[i] ? stride_d[i] * num_batches[i] : ldd[i] * N[i];
-        size_E[i] = arg.use_e ? (stride_e[i] == 0 ? lde[i] * N[i] * num_batches[i]
-                                                  : lde[i] <= stride_e[i] ? stride_e[i] * num_batches[i] : lde[i] * N[i])
+        size_C[i] = stride_c[i] == 0        ? ldc[i] * N[i] * num_batches[i]
+                    : ldc[i] <= stride_c[i] ? stride_c[i] * num_batches[i]
+                                            : ldc[i] * N[i];
+        size_D[i] = stride_d[i] == 0        ? ldd[i] * N[i] * num_batches[i]
+                    : ldd[i] <= stride_d[i] ? stride_d[i] * num_batches[i]
+                                            : ldd[i] * N[i];
+        size_E[i] = arg.use_e ? (stride_e[i] == 0        ? lde[i] * N[i] * num_batches[i]
+                                 : lde[i] <= stride_e[i] ? stride_e[i] * num_batches[i]
+                                                         : lde[i] * N[i])
                               : 0;
         if(arg.c_equal_d)
         {
@@ -1491,7 +1488,6 @@ void testing_matmul_with_bias(const Arguments& arg,
         {
             size_bias[i] = 0;
         }
-        hipblaslt_cout<<"RK: matmul 0 " << std::endl;
         auto    biasSize = size_bias[i] * realDataTypeSize(Tbias);
         int64_t sizeC    = get_computeInterface(h_beta[i], Tc) == 0 ? 0 : size_C[i] * sizeof(To);
         totalRotatingSizeNeeded
@@ -1514,7 +1510,6 @@ void testing_matmul_with_bias(const Arguments& arg,
                        << "Needed block count: " << block_count
                        << " (Capped to max iters: " << max_iters << ")" << std::endl;
     }
-    hipblaslt_cout<<"RK: matmul 1 " << std::endl;
     // Calculating block count end
     matmul.resize(block_count, std::vector<hipblasLtMatmulDesc_t>(gemm_count));
 
@@ -2399,7 +2394,6 @@ void testing_matmul_with_bias(const Arguments& arg,
         }
     }
 
-    hipblaslt_cout<<"RK: matmul 2 " << std::endl;
     // set preference
     size_t                     max_workspace_size = arg.user_allocated_workspace;
     hipblaslt_local_preference pref;
@@ -2437,7 +2431,6 @@ void testing_matmul_with_bias(const Arguments& arg,
     std::vector<std::vector<void*>> db(block_count, std::vector<void*>(gemm_count));
     std::vector<std::vector<void*>> dc(block_count, std::vector<void*>(gemm_count));
     std::vector<std::vector<void*>> dd(block_count, std::vector<void*>(gemm_count));
-hipblaslt_cout<<"RK: matmul 3 " << std::endl;
     for(int32_t b = 0; b < block_count; b++)
     {
         if(!do_grouped_gemm)
@@ -2459,7 +2452,7 @@ hipblaslt_cout<<"RK: matmul 3 " << std::endl;
                                                                 arg.d_type,
                                                                 arg.compute_type));
     }
-hipblaslt_cout<<"RK: matmul 4 " << std::endl;
+
     std::vector<hipblaslt_ext::GemmEpilogue> extepilogue;
     hipblaslt_ext::GemmProblemType           extproblemtype;
     if(arg.use_ext_setproblem)
@@ -2571,7 +2564,7 @@ hipblaslt_cout<<"RK: matmul 4 " << std::endl;
             }
         }
     }
-hipblaslt_cout<<"RK: matmul 5 " << std::endl;
+
     hipblaslt_ext::GemmType gemmType = do_grouped_gemm
                                            ? hipblaslt_ext::GemmType::HIPBLASLT_GROUPED_GEMM
                                            : hipblaslt_ext::GemmType::HIPBLASLT_GEMM;
@@ -2612,7 +2605,7 @@ hipblaslt_cout<<"RK: matmul 5 " << std::endl;
         // C API does not support
         tuningVec.push_back(hipblaslt_ext::GemmTuning());
     }
-hipblaslt_cout<<"RK: matmul 6 , arg.alog_method: "<< arg.algo_method << "use_ext " << arg.use_ext<< " setproblem: " << arg.use_ext_setproblem  << std::endl;
+    
     if(arg.algo_method == 2)
     {
         std::vector<hipblasLtMatmulHeuristicResult_t> tmpAlgo;
@@ -3025,7 +3018,7 @@ hipblaslt_cout<<"RK: matmul 6 , arg.alog_method: "<< arg.algo_method << "use_ext
 
         if(!do_grouped_gemm)
         {
-            hipblaslt_cout<<"RK: non grouped 1  " << std::endl;
+
             if(arg.use_ext)
             {
                 if(arg.use_ext_setproblem)
@@ -3090,7 +3083,7 @@ hipblaslt_cout<<"RK: matmul 6 , arg.alog_method: "<< arg.algo_method << "use_ext
             }
             else
             {
-                hipblaslt_cout<<"RK: T1 " << std::endl;
+                
                 std::vector<hipblasLtMatmulHeuristicResult_t> tmpAlgo(requestAlgoCount);
                 EXPECT_HIPBLAS_STATUS((hipblasLtMatmulAlgoGetHeuristic(handle,
                                                                        matmul[0][0],
@@ -3109,14 +3102,12 @@ hipblaslt_cout<<"RK: matmul 6 , arg.alog_method: "<< arg.algo_method << "use_ext
                     heuristicResult.push_back(tmpAlgo[i]);
                 }
                 heuristicTuningIndex.resize(heuristicResult.size(), 0); // C API not supported yet
-                hipblaslt_cout<<"RK: T2 " << std::endl;
+                
             }
 
             for(int i = 0; i < returnedAlgoCount; i++)
                 workspace_size = std::max(workspace_size, heuristicResult[i].workspaceSize);
             CHECK_RETURNED_WORKSPACE_SIZE(workspace_size, max_workspace_size);
-                        hipblaslt_cout<<"RK: non grouped 2  " << std::endl;
-
         }
         else
         {
@@ -3185,7 +3176,6 @@ hipblaslt_cout<<"RK: matmul 6 , arg.alog_method: "<< arg.algo_method << "use_ext
     }
 
     returnedAlgoCount = heuristicResult.size();
-hipblaslt_cout<<"RK: matmul 7 " << std::endl;
     CHECK_SOLUTION_FOUND(returnedAlgoCount);
 
     dWorkspace = new device_vector<unsigned char>(workspace_size * block_count, 1, HMM);
@@ -3200,7 +3190,6 @@ hipblaslt_cout<<"RK: matmul 7 " << std::endl;
     }
 
     auto ptrs = benchmark_allocation();
-hipblaslt_cout<<"RK: matmul 8 " << std::endl;
     if(arg.print_solution_found)
         hipblaslt_cout << "Is supported " << heuristicResult.size()
                        << " / Total solutions: " << returnedAlgoCount * tuningVec.size()
@@ -3213,7 +3202,6 @@ hipblaslt_cout<<"RK: matmul 8 " << std::endl;
                        << std::endl;
         exit(EXIT_FAILURE);
     }
-hipblaslt_cout<<"RK: matmul 9" << std::endl;
     // get CPU result
     if(arg.unit_check || arg.norm_check || arg.allclose_check)
     {
@@ -3496,13 +3484,13 @@ hipblaslt_cout<<"RK: matmul 9" << std::endl;
                 }
             }
         }
-hipblaslt_cout<<"RK: matmul 10 " << std::endl;
+
         if(arg.timing)
         {
             cpu_time_used = get_time_us_no_sync() - cpu_time_used;
         }
     }
-hipblaslt_cout<<"RK: matmul 11 " << std::endl;
+
     if(!arg.timing)
     {
         for(size_t sol = 0; sol < heuristicResult.size(); sol++)
@@ -4174,7 +4162,7 @@ hipblaslt_cout<<"RK: matmul 11 " << std::endl;
                 best_rtol);
         }
     }
-hipblaslt_cout<<"RK: matmul 12 " << std::endl;
+
     for(auto it : ptrs)
     {
         CHECK_HIP_ERROR(hipFree(it));

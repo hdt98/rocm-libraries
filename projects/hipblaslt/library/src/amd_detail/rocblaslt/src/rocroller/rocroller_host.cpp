@@ -471,7 +471,6 @@ rocblaslt_status
                               size_t                             maxWorkSpaceBytes,
                               int*                               returnAlgoCount)
 {
-    std::cout<<"RK: getRocRollerBestSolutions 1"<<std::endl;
     RocRollerHandle* rocroller_handle = static_cast<RocRollerHandle*>(handle->rocroller_handle);
     auto             kernelType       = genKernelType(prob);
     int              index;

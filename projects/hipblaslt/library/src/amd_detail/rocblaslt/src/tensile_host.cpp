@@ -550,8 +550,6 @@ namespace
                                      bool                   isGroupedGemm,
                                      size_t                 maxWorkspaceBytes)
     {
-        std::cout<<"RK: CreateTensileProblem 1" << std::endl;
-
         auto                          typeATensile = hip2TensileType(typeA);
         auto                          typeBTensile = hip2TensileType(typeB);
         std::vector<rocisa::DataType> biasDataTypeWhiteList; // dummy
@@ -575,8 +573,6 @@ namespace
             biasSrcWhiteList,
             isGroupedGemm,
             maxWorkspaceBytes);
-                    std::cout<<"RK: CreateTensileProblem 2" << std::endl;
-
     }
 
     const char* tensileComputeInputType_to_bench_string(rocisa::DataType typeCompute,
@@ -1671,7 +1667,6 @@ namespace
     void updateTensileProblem(const RocblasltContractionProblem&   prob,
                               TensileLite::ContractionProblemGemm& tensileProblem)
     {
-        std::cout<<"RK : updateTensileProblem 0" << std::endl;
         auto a_type       = hipDataType_to_tensile_type(prob.a_type);
         auto b_type       = hipDataType_to_tensile_type(prob.b_type);
         auto c_type       = hipDataType_to_tensile_type(prob.c_type);
@@ -1688,7 +1683,6 @@ namespace
         freeIndex[1].isA = false;
         freeIndex[0].c = freeIndex[0].d = 0;
         freeIndex[1].c = freeIndex[1].d = 1;
-                std::cout<<"RK : updateTensileProblem 1" << std::endl;
 
         // We set K=0 when alpha==0.
         // This makes alpha==0 a change in the problem, and not just a change in the
@@ -1717,7 +1711,6 @@ namespace
             freeIndex[0].i  = 0;
             boundIndex[0].a = 1;
         }
-                        std::cout<<"RK : updateTensileProblem 2" << std::endl;
 
         // If B is transposed, swap the free and bound dimensions and their ranks
         if(prob.trans_b != HIPBLAS_OP_N)
@@ -1738,7 +1731,6 @@ namespace
             freeIndex[1].i  = 1;
             boundIndex[0].b = 0;
         }
-                        std::cout<<"RK : updateTensileProblem 3" << std::endl;
 
         // clang-format on
 
@@ -1756,29 +1748,24 @@ namespace
 
         double alpha = 0, beta = 0;
         assignAlphaBeta(compute_type, prob.alpha, prob.beta, &alpha, &beta);
-                        std::cout<<"RK : updateTensileProblem 4" << std::endl;
 
         // fallback to f32 for f16 compute type after alpha/beta assignment
         if(prob.compute_type == rocblaslt_compute_f16)
         {
             compute_type = roc2TensileType(prob.compute_type);
         }
-                        std::cout<<"RK : updateTensileProblem 4.1" << std::endl;
 
         tensileProblem.updateProblem(freeIndex, batchIndex, boundIndex, beta, prob.workspaceSize);
-                        std::cout<<"RK : updateTensileProblem 4.2" << std::endl;
 
         tensileProblem.setComputeInputType(
             roc2TensileComputeInputType(a_type, b_type, prob.compute_type));
         tensileProblem.setAlphaType(compute_type);
         tensileProblem.setBetaType(compute_type);
-                        std::cout<<"RK : updateTensileProblem 4.3" << std::endl;
 
         // HPA is active iff sizeof(compute type) > sizeof(input type)
         tensileProblem.setHighPrecisionAccumulate(
             TensileLite::DataTypeInfo::Get(compute_type).elementSize
             > TensileLite::DataTypeInfo::Get(a_type).elementSize);
-                        std::cout<<"RK : updateTensileProblem 4.4" << std::endl;
 
         // set batch mode
         tensileProblem.setStridedBatched(prob.strided_batch);
@@ -1787,7 +1774,6 @@ namespace
             tensileProblem.setUseDeviceUserArguments(true);
         else
             tensileProblem.setUseDeviceUserArguments(false);
-                        std::cout<<"RK : updateTensileProblem 5" << std::endl;
 
         // alpha and beta are stored by value in TensileLite::TypedContractionInputs
         // alpha and beta are copied from host to TensileLite::TypedContractionInputs
@@ -1808,7 +1794,6 @@ namespace
         auto biasSrc  = getBiasSrc(prob.epilogue);
         auto biasSize = (biasSrc == TensileLite::ContractionProblemGemm::TENSOR::B) ? d.sizes()[1]
                                                                                     : d.sizes()[0];
-                        std::cout<<"RK : updateTensileProblem 6" << std::endl;
 
         tensileProblem.setUseBias(prob.bias != nullptr);
         auto biasType = hipDataType_to_tensile_type(prob.bias_type);
@@ -1829,7 +1814,6 @@ namespace
         tensileProblem.setScaleB(compute_type, 1);
         tensileProblem.setScaleC(compute_type);
         tensileProblem.setScaleD(compute_type);
-                        std::cout<<"RK : updateTensileProblem 7" << std::endl;
 
         // set Actvation
         tensileProblem.setActivationType(is_act_enabled(prob.epilogue)
@@ -1849,7 +1833,6 @@ namespace
                                 {prob.row_stride_e, prob.col_stride_e, prob.batch_stride_e},
                                 isOutput);
         }
-                        std::cout<<"RK : updateTensileProblem 8" << std::endl;
 
         // set gradient
         tensileProblem.setUseGradient(is_grad_enabled(prob.epilogue));
@@ -1865,7 +1848,6 @@ namespace
 
         tensileProblem.setSwizzleTensorA(prob.swizzleA);
         tensileProblem.setSwizzleTensorB(prob.swizzleB);
-                std::cout<<"RK : updateTensileProblem 9" << std::endl;
 
     }
 
@@ -2478,14 +2460,10 @@ void initTensileGemmData(rocblaslt_handle       handle,
                          size_t                 maxWorkspaceBytes,
                          std::shared_ptr<void>& gemmData)
 {
-        std::cout<<"RK: initTensileGemmData 1 " << std::endl;
-
     float alpha = 1.0;
     float beta  = 1.0;
     if(gemmType == rocblaslt::RocGemmType::ROCBLASLT_GEMM)
     {
-                    std::cout<<"RK: initTensileGemmData 2" << std::endl;
-
         TensileDataGemm data;
         data.problem = CreateTensileProblem(opA,
                                             opB,
@@ -2503,8 +2481,6 @@ void initTensileGemmData(rocblaslt_handle       handle,
     }
     else if(gemmType == rocblaslt::RocGemmType::ROCBLASLT_GROUPED_GEMM)
     {
-                    std::cout<<"RK: initTensileGemmData 3" << std::endl;
-
         TensileDataGroupedGemm                      data;
         TensileLite::ContractionProblemGroupedGemm& tensile_probs = data.problem;
         TensileLite::ContractionGroupedInputs&      groupedInputs = data.inputs;
@@ -2530,7 +2506,6 @@ void initTensileGemmData(rocblaslt_handle       handle,
         gemmData = std::static_pointer_cast<void>(std::make_shared<TensileDataGroupedGemm>(data));
         return;
     }
-            std::cout<<"RK: initTensileGemmData 4" << std::endl;
 
     throw std::runtime_error("Gemm problem type initialization not implemented.");
 }
@@ -3594,7 +3569,6 @@ rocblaslt_status getBestSolutions(RocblasltContractionProblem const& prob,
                                   int*                               returnAlgoCount,
                                   size_t                             maxWorkSpaceBytes)
 {
-    std::cout<<"RK getBestSolutions 0 " << std::endl; 
 #ifdef HIPBLASLT_USE_ROCROLLER
     if(useRocRoller(handle, prob))
         return getRocRollerBestSolutions(handle,
@@ -3611,26 +3585,21 @@ rocblaslt_status getBestSolutions(RocblasltContractionProblem const& prob,
 
     // auto &adapter =
     static_cast<void>(get_library_and_adapter(&library, &deviceProp, handle->device));
-                std::cout<<"RK getBestSolutions 1 " << std::endl; 
 
     if(!library)
-    {std::cout<<"RK getBestSolutions -1 " << std::endl; 
-        
+    {  
         return rocblaslt_status_invalid_pointer;
     }
 
     hardware = TensileLite::hip::GetDevice(*deviceProp);
-                std::cout<<"RK getBestSolutions test " << std::endl; 
 
     std::shared_ptr<TensileDataGemm> data = std::static_pointer_cast<TensileDataGemm>(gemmData);
     updateTensileProblem(prob, data->problem);
-        std::cout<<"RK getBestSolutions 2 " << std::endl; 
 
     bool enableEpilogue = prob.epilogue == ROCBLASLT_EPILOGUE_DEFAULT ? false : true;
 
     auto solutions
         = getSolutions(prob, library, hardware, data->problem, enableEpilogue, requestedAlgoCount);
-        std::cout<<"RK getBestSolutions 3 " << std::endl; 
 
     // when there is no solution for xfloat32, fallback comput_type to fp32
     if(solutions.size() == 0 && prob.compute_type == rocblaslt_compute_f32_fast_xf32)
@@ -3640,7 +3609,6 @@ rocblaslt_status getBestSolutions(RocblasltContractionProblem const& prob,
         solutions = getSolutions(
             prob, library, hardware, data->problem, enableEpilogue, requestedAlgoCount);
     }
-    std::cout<<"RK getBestSolutions  4" << std::endl; 
 
     memset(
         heuristicResultsArray, 0, sizeof(rocblaslt_matmul_heuristic_result) * requestedAlgoCount);

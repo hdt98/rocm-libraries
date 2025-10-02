@@ -760,17 +760,12 @@ namespace TensileLite
         m_workspaceSize   = workspaceSize;
         m_betaRestriction = toScalarValueEnum(
             m_beta); // Set enum using beta to potentially allow for faster solutions
-        std::cout<<"RK: updateProblem 0 " <<std::endl;
         consistencyCheck();
-        std::cout<<"RK: updateProblem 1" <<std::endl;
         normalize();
-        std::cout<<"RK: updateProblem 2 " <<std::endl;
     }
 
     void ContractionProblemGemm::normalize()
     {
-                std::cout<<"RK: normalize 0 " <<std::endl;
-
         auto& aTensor    = m_tensors[ContractionProblemGemm::TENSOR::A];
         auto& bTensor    = m_tensors[ContractionProblemGemm::TENSOR::B];
         auto& cTensor    = m_tensors[ContractionProblemGemm::TENSOR::C];
@@ -780,7 +775,6 @@ namespace TensileLite
         auto& cNames     = m_names[ContractionProblemGemm::TENSOR::C];
         auto& dNames     = m_names[ContractionProblemGemm::TENSOR::D];
         m_maxProblemSize = 0;
-                std::cout<<"RK: normalize 1 " <<std::endl;
 
         m_batchSizes.resize(m_batchIndices.size());
         m_boundSizes.resize(m_boundIndices.size());
@@ -789,13 +783,10 @@ namespace TensileLite
         m_freeSizesB.clear();
         m_freeSizesA.reserve(m_freeIndices.size());
         m_freeSizesB.reserve(m_freeIndices.size());
-                std::cout<<"RK: normalize 2 " <<std::endl;
-
         m_freeIndicesA.clear();
         m_freeIndicesB.clear();
         m_freeIndicesA.reserve(m_freeIndices.size());
         m_freeIndicesB.reserve(m_freeIndices.size());
-                std::cout<<"RK: normalize 3 " <<std::endl;
 
         for(int i = 0; i < m_freeIndices.size(); i++)
         {
@@ -813,7 +804,6 @@ namespace TensileLite
 
             m_maxProblemSize = std::max(m_maxProblemSize, mySize);
         }
-                std::cout<<"RK: normalize 4" <<std::endl;
 
         for(int i = 0; i < m_batchIndices.size(); i++)
         {
@@ -830,13 +820,10 @@ namespace TensileLite
 
             m_maxProblemSize = std::max(m_maxProblemSize, m_boundSizes[i]);
         }
-                std::cout<<"RK: normalize 5 " <<std::endl;
 
         getIndexNames(aNames, bNames, cNames, dNames, m_sumNames);
-                std::cout<<"RK: normalize 5.1" <<std::endl;
 
         m_operationIdentifier = getOperationIdentifier();
-                std::cout<<"RK: normalize 5.2" <<std::endl;
 
         m_problemSizes.resize(0);
         m_problemSizes.reserve(cTensor.dimensions() + m_boundSizes.size());
@@ -855,7 +842,6 @@ namespace TensileLite
             m_problemStrides.end(), cTensor.strides().begin(), cTensor.strides().end());
         m_problemStrides.insert(
             m_problemStrides.end(), dTensor.strides().begin(), dTensor.strides().end());
-                std::cout<<"RK: normalize 6 " <<std::endl;
 
         m_allocatedElementsNonBatchA = 1;
         for(int idx = 0; idx < a().dimensions(); idx++)
@@ -869,7 +855,6 @@ namespace TensileLite
             if(!isBatch)
                 m_allocatedElementsNonBatchA += aTensor.strides()[idx] * (aTensor.sizes()[idx] - 1);
         }
-                std::cout<<"RK: normalize 7 " <<std::endl;
 
         m_allocatedElementsNonBatchB = 1;
         for(int idx = 0; idx < b().dimensions(); idx++)
@@ -892,7 +877,6 @@ namespace TensileLite
                                          [](const ContractionProblemGemm::FreeIndex& fi) {
                                              return fi.c == 0 /*idx0*/;
                                          });
-                                                        std::cout<<"RK: normalize 8 " <<std::endl;
 
     }
 
@@ -1276,17 +1260,14 @@ namespace TensileLite
         auto& dNames  = m_names[ContractionProblemGemm::TENSOR::D];
 
         std::string rv = "Contraction_";
-        std::cout <<"RK : rv " << rv << std::endl;
         rv += m_sumNames;
         rv += "_A";
         rv += aNames;
-                std::cout <<"RK : rv " << rv << std::endl;
 
         if(DataTypeInfo::Get(aTensor.dataType()).isComplex)
         {
             rv += "C";
         }
-        std::cout <<"RK : rv " << rv << std::endl;
 
         rv += "_B";
         rv += bNames;
@@ -1294,7 +1275,6 @@ namespace TensileLite
         {
             rv += "C";
         }
-        std::cout <<"RK : rv " << rv << std::endl;
 
         rv += "_C";
         rv += cNames;
@@ -1302,7 +1282,6 @@ namespace TensileLite
         {
             rv += "C";
         }
-        std::cout <<"RK : rv " << rv << std::endl;
 
         rv += "_D";
         rv += dNames;
@@ -1310,7 +1289,6 @@ namespace TensileLite
         {
             rv += "C";
         }
-        std::cout <<"RK : rv " << rv << std::endl;
 
         return rv;
     }
@@ -1352,8 +1330,6 @@ namespace TensileLite
         bool                           isGroupedGemm,
         size_t                         maxWorkspaceBytes)
     {
-        std::cout<<"RK: createDefaultProblem 1" << std::endl;
-
         assert(typeBeta == typeCompute);
         // Tensor descriptors for a, b
         TensorDescriptor a, b;
@@ -1484,7 +1460,6 @@ namespace TensileLite
 
         // Add problem predicates for CEqualsD
         problem.setCEqualsD(false);
-                std::cout<<"RK: createDefaultProblem 2" << std::endl;
 
         return problem;
     }
