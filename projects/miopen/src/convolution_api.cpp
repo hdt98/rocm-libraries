@@ -250,13 +250,21 @@ miopenConvolutionABBackwardWeightsGetWorkSpaceSize(const miopenAlphaBetaCase_t a
         case miopenInt64: byte_size = 8; break;
         }
 
-        // TODO: We need the workspace for input and output tensors only for 
-        // NGCW - NGKW, NGCHW - NGKHW, NGCDHW - NGKDHW layouts.
-        // Otherwise, only the weights tensor workspace is needed.
-        const int tensor_sizes = is_workspace_required_in_and_out_tensors
-            ? inputs_tensor_size + weights_tensor_size + outputs_tensor_size
-            : weights_tensor_size;
-        *buffer_size = tensor_sizes* byte_size;
+
+        auto integer_divide_ceil = [](size_t x, size_t y) -> size_t {
+            return (x + y - 1) / y;
+        };  
+
+        // Align to 128B
+        constexpr size_t alignment = 128;
+        size_t tensor_sizes = alignment * integer_divide_ceil(weights_tensor_size * byte_size, alignment);
+        if (is_workspace_required_in_and_out_tensors)
+        {
+            tensor_sizes += alignment * integer_divide_ceil(inputs_tensor_size * byte_size, alignment);
+            tensor_sizes += alignment * integer_divide_ceil(outputs_tensor_size * byte_size, alignment);
+        }
+
+        *buffer_size = tensor_sizes;
 
         MIOPEN_LOG_FUNCTION(alpha_beta_case,
                             data_type,

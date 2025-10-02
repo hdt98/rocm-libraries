@@ -733,20 +733,13 @@ inline size_t GetCKAlphaBetaWorkspace(const miopen::conv::ProblemDescription& pr
     miopenConvolutionABBackwardWeightsGetWorkSpaceSize(
         problem.GetAlphaBetaCase(), is_workspace_required_in_and_out_tensors, &input, &output, &weights, &conv_desc, &buff_size);
 
-    MIOPEN_LOG_I2("CK wrw workspace size: " << buff_size);
     return buff_size;
 }
 
 inline bool CKWrwRequireWorkspace(
-    size_t G, size_t C, size_t K, miopenDataType_t data_type, miopenAlphaBetaCase_t alpha_beta_case)
+    size_t, size_t, size_t, miopenDataType_t, miopenAlphaBetaCase_t)
 {
-    auto is_odd        = [](size_t num) { return num % 2 != 0; };
-    size_t C_per_group = C / G;
-    size_t K_per_group = K / G;
-
-    return (alpha_beta_case == BILINEAR || alpha_beta_case == SCALE) ||
-           ((data_type == miopenHalf || data_type == miopenBFloat16) &&
-            (is_odd(C_per_group) || is_odd(K_per_group)));
+    return true;
 }
 
 /// \todo move to a cpp file
@@ -1309,11 +1302,11 @@ ConvSolution InitInvokerFactoryNHWC(const ExecutionContext&,
                 MIOPEN_LOG_I2("Workspace size allocated for ck kernel: " << data_ctx.GetWorkspaceSize());
                 if(data_ctx.workSpace)
                 {
-                    // if (ws_size > data_ctx.GetWorkspaceSize())
-                    // {
-                    //     MIOPEN_THROW(miopenStatusInvalidValue,
-                    //                  "Workspace size allocated is less than required by the kernel " + sh_conv_ptr->GetTypeString());
-                    // }
+                    if (ws_size > data_ctx.GetWorkspaceSize())
+                    {
+                        MIOPEN_THROW(miopenStatusInvalidValue,
+                                     "Workspace size allocated is less than required by the kernel " + sh_conv_ptr->GetTypeString());
+                    }
                     sh_conv_ptr->SetWorkSpacePointer(argument_ptr.get(), data_ctx.workSpace);
                 }
                 else 
