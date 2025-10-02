@@ -36,22 +36,25 @@ namespace rocRoller
     public:
         static std::shared_ptr<Class> getInstance()
         {
-            if(!m_instance)
-            {
-                m_instance = std::make_shared<Class>();
-            }
-            return m_instance;
+            // function-local static ensures a single shared_ptr instance
+            static std::shared_ptr<Class> instance = std::make_shared<Class>();
+            return instance;
         }
 
+        // Reset the singleton instance
         static void reset()
         {
-            m_instance = nullptr;
+            // Get a reference to the function-local static shared_ptr
+            auto& instance = getRef();
+            instance       = std::make_shared<Class>();
         }
 
     private:
-        static std::shared_ptr<Class> m_instance;
+        // Helper to access the function-local static by reference.
+        static std::shared_ptr<Class>& getRef()
+        {
+            static std::shared_ptr<Class> instance = std::make_shared<Class>();
+            return instance;
+        }
     };
-
-    template <typename Class>
-    std::shared_ptr<Class> LazySingleton<Class>::m_instance = nullptr;
 }
