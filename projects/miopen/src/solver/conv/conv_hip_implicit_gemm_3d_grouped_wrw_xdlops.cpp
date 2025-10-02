@@ -546,12 +546,6 @@ ConvHipImplicitGemm3DGroupWrwXdlops::GetWorkspaceSize(const ExecutionContext&,
 {
     const auto ws_size = GetWorkspaceSizeLayoutTransformConv(problem);
     MIOPEN_LOG_I2("ConvHipImplicitGemm3DGroupWrwXdlops: GetWorkspaceSize returns " << ws_size);
-    // TODO: Debug hack.
-    if (ws_size == 0)
-    {
-        // half of the available GPU memory should be enough for any case
-        return 102746816512;
-    }
     return ws_size;
 }
 

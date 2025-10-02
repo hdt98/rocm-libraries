@@ -50,6 +50,7 @@ extern "C" {
  */
 MIOPEN_EXPORT extern "C" miopenStatus_t
 miopenConvolutionABBackwardWeightsGetWorkSpaceSize(const miopenAlphaBetaCase_t alpha_beta_case,
+                                                   const bool is_workspace_required_in_and_out_tensors,
                                                    const miopenTensorDescriptor_t inputTensorDesc,
                                                    const miopenTensorDescriptor_t outputTensorDesc,
                                                    const miopenTensorDescriptor_t weightsTensorDesc,

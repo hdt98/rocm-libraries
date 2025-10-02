@@ -726,18 +726,14 @@ inline size_t GetCKAlphaBetaWorkspace(const miopen::conv::ProblemDescription& pr
     TensorDescriptor weights        = problem.GetWeights();
     ConvolutionDescriptor conv_desc = problem.GetConv();
 
+    const bool is_workspace_required_in_and_out_tensors = 
+        (problem.GetInLayout() == "NCHW" && problem.GetOutLayout() == "NCHW") ||
+        (problem.GetInLayout() == "NCDHW" && problem.GetOutLayout() == "NCDHW");
+
     miopenConvolutionABBackwardWeightsGetWorkSpaceSize(
-        problem.GetAlphaBetaCase(), &input, &output, &weights, &conv_desc, &buff_size);
+        problem.GetAlphaBetaCase(), is_workspace_required_in_and_out_tensors, &input, &output, &weights, &conv_desc, &buff_size);
 
     MIOPEN_LOG_I2("CK wrw workspace size: " << buff_size);
-
-    // TODO: Debug hack.
-    if (buff_size == 0)
-    {
-        // half of the available GPU memory should be enough for any case
-        return 102746816512;
-    }
-
     return buff_size;
 }
 
@@ -1091,7 +1087,11 @@ ConvSolution InitInvokerFactoryNCHW(const ExecutionContext& ctx,
 
     if(problem.IsDirectionBackwardWrW())
     {
-        _ck_buff_des.emplace(GetCKAlphaBetaWorkspace(problem), 0);
+        // Note: the actual workspace size required by the CK kernel might be different.
+        // With this struct, we only calculate the offset within the workspace.
+        // The actual size is determined when we create the argument pointer for CK.
+        const auto initial_ck_ws_size = GetCKAlphaBetaWorkspace(problem);
+        _ck_buff_des.emplace(initial_ck_ws_size, /*offset*/0);
     }
 
     auto ptr_iter = FindConvPtrByID(conv_ptrs, id_string);
@@ -1180,33 +1180,27 @@ ConvSolution InitInvokerFactoryNCHW(const ExecutionContext& ctx,
                                  CKArgsType,
                                  CastType>(ck_args, sh_conv_ptr, tr_ptrs, data_ctx, split_k);
 
-            const auto ws_size = sh_conv_ptr->GetWorkSpaceSize(argument_ptr.get());
-            MIOPEN_LOG_I2("Workspace size required by the kernel" << sh_conv_ptr->GetTypeString() << ": " << ws_size);
 
             shared<Data_t> buf_handle{};
-            if(ck_buff_des.has_value() && ck_buff_des->ck_size && workspace_ptr)
+            const auto required_ws_size = sh_conv_ptr->GetWorkSpaceSize(argument_ptr.get());
+            MIOPEN_LOG_I2("Workspace size required by the kernel" << sh_conv_ptr->GetTypeString() << ": " << required_ws_size);
+            if(ck_buff_des.has_value() && required_ws_size > 0 && workspace_ptr)
             {
+                // TODO: This requires that we have enough space allocated in the workspace.
+                // The CK buffer is located at the end of the workspace buffer.
                 buf_handle = handle.CreateSubBuffer(
-                    workspace_ptr, ck_buff_des->ck_offset, ck_buff_des->ck_size);
-                MIOPEN_LOG_I2("Workspace size allocated for ck kernel: " << ck_buff_des->ck_size);
-                if (ws_size > 0 && !buf_handle.get())
+                    workspace_ptr, ck_buff_des->ck_offset, required_ws_size);
+                if (required_ws_size > 0 && !buf_handle.get())
                 {
                     MIOPEN_THROW(miopenStatusInvalidValue,
                                     "Workspace pointer is null but required by the kernel " + sh_conv_ptr->GetTypeString());
                 }
-                // if (ws_size > ck_buff_des->ck_size)
-                // {
-                //     MIOPEN_THROW(miopenStatusInvalidValue,
-                //                     "Workspace size allocated is less than required by the kernel " + sh_conv_ptr->GetTypeString());
-                // }
                 sh_conv_ptr->SetWorkSpacePointer(argument_ptr.get(), buf_handle.get());
             }
             else 
             {
-                if (ws_size > 0)
+                if (required_ws_size > 0)
                 {
-                    MIOPEN_LOG_E("Workspace size allocated for ck kernel: " << ck_buff_des->ck_size);
-                    MIOPEN_LOG_E("Workspace pointer: " << workspace_ptr);
                     MIOPEN_THROW(miopenStatusInvalidValue,
                                     "Kernel requires workspace but CK buffer description is undefined for " + sh_conv_ptr->GetTypeString());
                 }

@@ -218,6 +218,7 @@ extern "C" miopenStatus_t miopenGetConvolutionFindMode(const miopenConvolutionDe
 
 MIOPEN_EXPORT extern "C" miopenStatus_t
 miopenConvolutionABBackwardWeightsGetWorkSpaceSize(const miopenAlphaBetaCase_t alpha_beta_case,
+                                                   const bool is_workspace_required_in_and_out_tensors,
                                                    const miopenTensorDescriptor_t inputTensorDesc,
                                                    const miopenTensorDescriptor_t outputTensorDesc,
                                                    const miopenTensorDescriptor_t weightsTensorDesc,
@@ -228,61 +229,40 @@ miopenConvolutionABBackwardWeightsGetWorkSpaceSize(const miopenAlphaBetaCase_t a
 
     return miopen::try_([&] {
         miopenDataType_t data_type = miopen::deref(outputTensorDesc).GetType();
-        size_t spatial_dims        = miopen::deref(convDesc).GetSpatialDimension();
-
-        int G    = miopen::deref(convDesc).GetGroupCount();
-        size_t K = std::get<1>(
-            miopen::GetNCDHW(spatial_dims, miopen::deref(inputTensorDesc).GetLengths()));
-        size_t C = std::get<1>(
-            miopen::GetNCDHW(spatial_dims, miopen::deref(outputTensorDesc).GetLengths()));
-
-        auto CKWrwRequireWorkspace = [&](size_t G,
-                                         size_t C,
-                                         size_t K,
-                                         miopenDataType_t data_type,
-                                         miopenAlphaBetaCase_t alpha_beta_case) {
-            auto is_odd        = [](int num) { return num % 2 != 0; };
-            size_t C_per_group = C / G;
-            size_t K_per_group = K / G;
-
-            return (alpha_beta_case == BILINEAR || alpha_beta_case == SCALE) ||
-                   ((data_type == miopenHalf || data_type == miopenBFloat16) &&
-                    (is_odd(C_per_group) || is_odd(K_per_group)));
-        };
 
         size_t byte_size = 0;
         // CK uses at least 4 bytes per element in the workspace, even for smaller sizes like bfp16,
         // which is why we need to use GetElementSize() and multiply by 4 or 8, and not
         // use GetNumBytes().
         size_t weights_tensor_size = miopen::deref(weightsTensorDesc).GetElementSize();
-        if(CKWrwRequireWorkspace(G, C, K, data_type, alpha_beta_case))
+        size_t inputs_tensor_size  = miopen::deref(inputTensorDesc).GetElementSize();
+        size_t outputs_tensor_size = miopen::deref(outputTensorDesc).GetElementSize();
+        switch(data_type)
         {
-            switch(data_type)
-            {
-            case miopenInt32:
-            case miopenFloat:
-            case miopenHalf:
-            case miopenBFloat16:
-            case miopenInt8:
-            case miopenFloat8_fnuz:
-            case miopenBFloat8_fnuz: byte_size = 4; break;
-            case miopenDouble:
-            case miopenInt64: byte_size = 8; break;
-            }
-            *buffer_size = weights_tensor_size * byte_size;
+        case miopenInt32:
+        case miopenFloat:
+        case miopenHalf:
+        case miopenBFloat16:
+        case miopenInt8:
+        case miopenFloat8_fnuz:
+        case miopenBFloat8_fnuz: byte_size = 4; break;
+        case miopenDouble:
+        case miopenInt64: byte_size = 8; break;
         }
-        else
-        {
-            *buffer_size = 0;
-        }
+
+        // TODO: We need the workspace for input and output tensors only for 
+        // NGCW - NGKW, NGCHW - NGKHW, NGCDHW - NGKDHW layouts.
+        // Otherwise, only the weights tensor workspace is needed.
+        const int tensor_sizes = is_workspace_required_in_and_out_tensors
+            ? inputs_tensor_size + weights_tensor_size + outputs_tensor_size
+            : weights_tensor_size;
+        *buffer_size = tensor_sizes* byte_size;
 
         MIOPEN_LOG_FUNCTION(alpha_beta_case,
                             data_type,
-                            G,
-                            C,
-                            K,
+                            inputs_tensor_size,
+                            outputs_tensor_size,
                             weights_tensor_size,
-                            spatial_dims,
                             byte_size,
                             *buffer_size);
     });
