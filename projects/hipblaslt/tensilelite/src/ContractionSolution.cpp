@@ -1001,7 +1001,7 @@ namespace TensileLite
         {
             std::cout << "if(sizeMapping.globalSplitU != -1)" << std::endl;
             autoGSU = sizeMapping.globalSplitU;
-            std::cout << autoGSU;
+            std::cout << autoGSU << std::endl;
             return;
         }
 
@@ -1012,7 +1012,7 @@ namespace TensileLite
         // avoid zero division
         if (numWGs == 0)
         {
-            std::cout "if (numWGs == 0)" << std::endl;
+            std::cout << "if (numWGs == 0)" << std::endl;
             autoGSU = 1;
             return;
         }
@@ -1028,7 +1028,7 @@ namespace TensileLite
         autoGSU               = min(GSULimit2, max(1, GSULimit1));
 
         std::cout << "MT = " << MT0 << "," << MT1 << "," << MT2 << std::endl;
-        std::cout << "(M,N,B,K) = " << M << "," << N << "," << B << "," << K << std::endl
+        std::cout << "(M,N,B,K) = " << M << "," << N << "," << B << "," << K << std::endl;
         std::cout << "GSULimit1 = " << GSULimit1 << std::endl;
         std::cout << "numCUs = " << numCUs << std::endl;
         std::cout << "numWGs = " << numWGs << std::endl;
