@@ -121,6 +121,7 @@ endif()
 add_subdirectory(common)
 add_subdirectory(standalone)
 add_subdirectory(unit)
+add_subdirectory(api)
 
 if(ROCROLLER_ENABLE_TEST_DISCOVERY)
     set(TEST_REPORT_DIR "${PROJECT_BINARY_DIR}/test_report")
@@ -183,6 +184,15 @@ if(ROCROLLER_ENABLE_TEST_DISCOVERY)
             PROPERTIES "LABELS" "CATCH"
                        "ENVIRONMENT" "${asan_opts}"
             SKIP_REGULAR_EXPRESSION "[1-9][0-9]* skipped" "[1-9][0-9]* SKIPPED"
+        )
+        catch_discover_tests(
+            rocroller-tests-api
+            REPORTER JUnit
+            OUTPUT_DIR ${TEST_REPORT_DIR}
+            OUTPUT_SUFFIX ".xml"
+            DISCOVERY_MODE PRE_TEST
+            TEST_SPEC "[api]"
+            PROPERTIES LABELS "API"
         )
     endif()
 

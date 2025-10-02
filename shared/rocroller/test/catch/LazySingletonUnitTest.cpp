@@ -33,14 +33,14 @@
 #include <thread>
 #include <vector>
 
-TEST_CASE("Unit: Same instance is returned", "[lazy_singleton]")
+TEST_CASE("Unit: Same instance is returned", "[Unit:LazySingleton]")
 {
     auto a = rocRoller::LazySingleton<rocRoller::Settings>::getInstance();
     auto b = rocRoller::LazySingleton<rocRoller::Settings>::getInstance();
     REQUIRE(a == b);
 }
 
-TEST_CASE("Unit: Reset replaces the instance", "[lazy_singleton]")
+TEST_CASE("Unit: Reset replaces the instance", "[Unit:LazySingleton]")
 {
     auto first    = rocRoller::LazySingleton<rocRoller::Settings>::getInstance();
     auto rawFirst = first.get();
@@ -52,7 +52,7 @@ TEST_CASE("Unit: Reset replaces the instance", "[lazy_singleton]")
     REQUIRE(rawFirst != rawSecond);
 }
 
-TEST_CASE("Unit: Different types have independent instances", "[lazy_singleton]")
+TEST_CASE("Unit: Different types have independent instances", "[Unit:LazySingleton]")
 {
     auto settings = rocRoller::LazySingleton<rocRoller::Settings>::getInstance();
     auto gpuLib   = rocRoller::LazySingleton<rocRoller::GPUArchitectureLibrary>::getInstance();
@@ -63,7 +63,7 @@ TEST_CASE("Unit: Different types have independent instances", "[lazy_singleton]"
     REQUIRE(s_addr != g_addr);
 }
 
-TEST_CASE("Unit: Singleton persists across scopes", "[lazy_singleton]")
+TEST_CASE("Unit: Singleton persists across scopes", "[Unit:LazySingleton]")
 {
     auto inst1 = rocRoller::LazySingleton<rocRoller::Settings>::getInstance();
     auto raw1  = inst1.get();
@@ -77,7 +77,7 @@ TEST_CASE("Unit: Singleton persists across scopes", "[lazy_singleton]")
     REQUIRE(inst3.get() == raw1);
 }
 
-TEST_CASE("Unit: Multiple resets always create new instances", "[lazy_singleton]")
+TEST_CASE("Unit: Multiple resets always create new instances", "[Unit:LazySingleton]")
 {
     auto first    = rocRoller::LazySingleton<rocRoller::Settings>::getInstance();
     auto rawFirst = first.get();
@@ -95,7 +95,7 @@ TEST_CASE("Unit: Multiple resets always create new instances", "[lazy_singleton]
     REQUIRE(rawSecond != rawThird);
 }
 
-TEST_CASE("Unit: Thread safety under concurrent access", "[lazy_singleton]")
+TEST_CASE("Unit: Thread safety under concurrent access", "[Unit:LazySingleton]")
 {
     constexpr int                                     N = 32;
     std::vector<std::shared_ptr<rocRoller::Settings>> results(N);
@@ -116,7 +116,7 @@ TEST_CASE("Unit: Thread safety under concurrent access", "[lazy_singleton]")
     }
 }
 
-TEST_CASE("Unit: Reset under concurrent access does not crash", "[lazy_singleton]")
+TEST_CASE("Unit: Reset under concurrent access does not crash", "[Unit:LazySingleton]")
 {
     // Stress test where one thread resets while others read
     constexpr int            N = 16;
