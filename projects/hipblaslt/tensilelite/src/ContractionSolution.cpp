@@ -992,10 +992,16 @@ namespace TensileLite
     void ContractionSolution::calculateAutoGSU(Problem const&  problem,
                                                Hardware const* hardware) const
     {
+        pid_t pid = getpid();
+        std::cout << "START calculateAutoGSU!!! pid = " << pid << std::endl;
+        std::cout << "&autoGSU = " << &autoGSU << std::endl;
+
         // if original GSU is not -1
         if(sizeMapping.globalSplitU != -1)
         {
+            std::cout << "if(sizeMapping.globalSplitU != -1)" << std::endl;
             autoGSU = sizeMapping.globalSplitU;
+            std::cout << autoGSU;
             return;
         }
 
@@ -1006,6 +1012,7 @@ namespace TensileLite
         // avoid zero division
         if (numWGs == 0)
         {
+            std::cout "if (numWGs == 0)" << std::endl;
             autoGSU = 1;
             return;
         }
@@ -1020,23 +1027,36 @@ namespace TensileLite
         uint32_t GSULimit2    = max(1, (uint32_t)std::floor((float)K / (float)MT2 / 3.0));
         autoGSU               = min(GSULimit2, max(1, GSULimit1));
 
+        std::cout << "MT = " << MT0 << "," << MT1 << "," << MT2 << std::endl;
+        std::cout << "(M,N,B,K) = " << M << "," << N << "," << B << "," << K << std::endl
+        std::cout << "GSULimit1 = " << GSULimit1 << std::endl;
+        std::cout << "numCUs = " << numCUs << std::endl;
+        std::cout << "numWGs = " << numWGs << std::endl;
+        std::cout << "GSULimit2 = " << GSULimit2 << std::endl;
+        std::cout << "autoGSU = " << autoGSU << std::endl;
+
         // WorkgroupNumberCheck
 #define MAX_WORKGROUP_NUMBER 16777216
         if(autoGSU > 1)
             autoGSU = min(autoGSU,
                         MAX_WORKGROUP_NUMBER / std::ceil(static_cast<float>(M) / MT0)
                             / std::ceil(static_cast<float>(N) / MT1) / B);
+        std::cout << "WorkgroupNumberCheck autoGSU = " << autoGSU << std::endl;
 
         // GlobalSplitUCheckMinK
         if(autoGSU > 1)
             autoGSU = min(autoGSU, std::ceil(static_cast<float>(K) / MT2));
+        std::cout << "GlobalSplitUCheckMinK autoGSU = " << autoGSU << std::endl;
 
         // SynchronizerSizeCheck
         if(autoGSU > 1)
             autoGSU = min(autoGSU, 409600/(sizeMapping.synchronizerSizePerWG * problem.getNumTiles(sizeMapping, 1) * B));
+        std::cout << "SynchronizerSizeCheck autoGSU = " << autoGSU << std::endl;
+        std::cout << "sizeMapping.synchronizerSizePerWG = " << sizeMapping.synchronizerSizePerWG << std::endl;
 
         // avoid gsu < 1
         autoGSU = max(autoGSU, 1);
+        std::cout << "avoid gsu < 1 autoGSU = " << autoGSU << std::endl;
 
         static const char* envStr = std::getenv("TENSILE_AUTO_GSU_ALGO");
         if(envStr != NULL)
