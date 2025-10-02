@@ -24,12 +24,12 @@ constexpr size_t num_iters_total(size_t output_tiles, size_t iters_per_tile) {
 /**
  * @brief Returns number of k-iterations per tile.
  *
- * @param BLK_K K-dimension tile size.
+ * @param mt_k K-dimension tile size.
  * @param k Reduction dimension.
  * @return constexpr size_t Number of k-iteration per tile.
  */
-constexpr size_t num_iters_per_tile(size_t BLK_K, size_t k) {
-  return math::safe_ceil_div(k, BLK_K);
+constexpr size_t num_iters_per_tile(std::size_t mt_k, std::size_t k) {
+  return math::safe_ceil_div(k, mt_k);
 }
 
 /**
@@ -39,7 +39,7 @@ constexpr size_t num_iters_per_tile(size_t BLK_K, size_t k) {
  * @param g Number of workgroups (grid-size).
  * @return constexpr size_t Number of iterations per workgroup.
  */
-constexpr size_t num_iters_per_cta(size_t iters_total, int g) {
+constexpr size_t num_iters_per_cta(std::size_t iters_total, std::size_t g) {
   return math::safe_ceil_div(iters_total, g);
 }
 
@@ -53,11 +53,11 @@ constexpr size_t num_iters_per_cta(size_t iters_total, int g) {
  * @param batch Number of batches.
  * @return constexpr size_t Total number of output tiles.
  */
-constexpr size_t number_of_output_tiles(size_t mt_m,
-                                        size_t mt_n,
-                                        size_t m,
-                                        size_t n,
-                                        size_t batch) {
+constexpr size_t number_of_output_tiles(std::size_t mt_m,
+                                        std::size_t mt_n,
+                                        std::size_t m,
+                                        std::size_t n,
+                                        std::size_t batch) {
   size_t m_tiles = math::safe_ceil_div(m, mt_m);
   size_t n_tiles = math::safe_ceil_div(n, mt_n);
   return m_tiles * n_tiles * batch;
@@ -72,10 +72,10 @@ constexpr size_t number_of_output_tiles(size_t mt_m,
  * @param iters_per_cta Number of iterations per workgroup.
  * @return constexpr size_t Number of workgroups involved in fixup.
  */
-constexpr size_t num_fixup_peers(size_t g,
-                                 size_t iters_total,
-                                 size_t iters_per_tile,
-                                 size_t iters_per_cta) {
+constexpr size_t num_fixup_peers(std::size_t g,
+                                 std::size_t iters_total,
+                                 std::size_t iters_per_tile,
+                                 std::size_t iters_per_cta) {
   // If tiles don't evenly divide there are always at least 2 fixup peers, and more if
   // iters_per_tile > iters_per_cta
   size_t hasFixup =
@@ -86,26 +86,35 @@ constexpr size_t num_fixup_peers(size_t g,
   return math::safe_ceil_div(iters_per_tile, iters_per_cta) + hasFixup;
 }
 
-std::tuple<double, size_t, size_t, double> predicted_runtime(size_t BLK_M,
-                                                             size_t BLK_N,
-                                                             size_t BLK_K,
-                                                             size_t m,
-                                                             size_t n,
-                                                             size_t k,
-                                                             size_t batch,
-                                                             int g,
-                                                             double a,
-                                                             double b,
-                                                             double c,
-                                                             double d) {
-  size_t output_tiles   = number_of_output_tiles(BLK_M, BLK_N, m, n, batch);
-  size_t iters_per_tile = num_iters_per_tile(BLK_K, k);
-  size_t iters_total    = num_iters_total(output_tiles, iters_per_tile);
-  size_t iters_per_cta  = num_iters_per_cta(iters_total, g);
-  size_t fixup_peers    = num_fixup_peers(g, iters_total, iters_per_tile, iters_per_cta);
+/**
+ * @brief Returns the predicted latency for a given grid-size.
+ *
+ * @param mt BLK_M, BLK_N, BLK_K macro-tile.
+ * @param size M, N, K size.
+ * @param batch Number of batches.
+ * @param g Grid size to test.
+ * @param a alpha (a), fixed-size cost incurred by each workgroup.
+ * @param b Beta (b) incorporates conditional costs of outputting temporary partial.
+ * @param c Represents instruction and stall workload of each MAC-iteration.
+ * @param d Delta (d) is the cost of reading and accumulating the partial sums.
+ * @return double Predicted latency.
+ */
+double predicted_runtime(dim3_t mt,
+                         dim3_t size,
+                         std::size_t batch,
+                         std::size_t g,
+                         double a,
+                         double b,
+                         double c,
+                         double d) {
+  std::size_t output_tiles   = number_of_output_tiles(mt.m, mt.n, size.m, size.n, batch);
+  std::size_t iters_per_tile = num_iters_per_tile(mt.k, size.k);
+  std::size_t iters_total    = num_iters_total(output_tiles, iters_per_tile);
+  std::size_t iters_per_cta  = num_iters_per_cta(iters_total, g);
+  std::size_t fixup_peers    = num_fixup_peers(g, iters_total, iters_per_tile, iters_per_cta);
 
-  size_t remainder_tiles = output_tiles % g;
-  double k_split_ratio   = remainder_tiles / static_cast<double>(g);
+  std::size_t remainder_tiles = output_tiles % g;
+  double k_split_ratio        = remainder_tiles / static_cast<double>(g);
 
   double cache_penalty = 0.0;
   if (fixup_peers >= 1) {
@@ -119,11 +128,11 @@ std::tuple<double, size_t, size_t, double> predicted_runtime(size_t BLK_M,
     cache_penalty = d * imbalance * fixup_peers;
   }
 
-  // Include the cache penalty in the runtime prediction
-  double runtime =
+  // Include the cache penalty in the latency prediction
+  double latency =
       a + (b * (fixup_peers > 1)) + (c * iters_per_cta) + (d * (fixup_peers - 1)) + cache_penalty;
 
-  return std::make_tuple(runtime, iters_per_cta, fixup_peers, cache_penalty);
+  return latency;
 }
 
 /**
@@ -247,22 +256,11 @@ std::size_t grid_reduction_cost_aware(const problem_t& problem,
   // Predict the number of CTAs to use between 1 and 304
   std::size_t g = grid_start;
   for (; g <= static_cast<size_t>(grid_end); ++g) {
-    auto [runtime, iters_per_cta, fixup_peers, cache_penalty] = predicted_runtime(config.mt.m,
-                                                                                  config.mt.n,
-                                                                                  config.mt.k,
-                                                                                  problem.size.m,
-                                                                                  problem.size.n,
-                                                                                  problem.size.k,
-                                                                                  problem.batch,
-                                                                                  g,
-                                                                                  a,
-                                                                                  b,
-                                                                                  c,
-                                                                                  d);
+    double latency = predicted_runtime(config.mt, problem.size, problem.batch, g, a, b, c, d);
 
-    if (min_grid_runtime.second > runtime) {
+    if (min_grid_runtime.second > latency) {
       min_grid_runtime.first  = g;
-      min_grid_runtime.second = runtime;
+      min_grid_runtime.second = latency;
     }
   }
 
