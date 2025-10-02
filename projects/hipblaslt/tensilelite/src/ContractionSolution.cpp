@@ -1897,6 +1897,14 @@ namespace TensileLite
                            ? 1
                            : (problem.getParams().gsu() > 0 ? problem.getParams().gsu() : autoGSU);
 
+        if (gsu == 1)
+        {
+            std::cout << "Where does GSU=1 come from?" << std::endl;
+            std::cout << "sizeMapping.globalAccumulation = " << sizeMapping.globalAccumulation << std::endl;
+            std::cout << "problem.getParams().gsu() = " << problem.getParams().gsu() << std::endl;
+            std::cout << "autoGSU = " << autoGSU << std::endl;
+        }
+
         if(sizeMapping.streamK > 0)
         {
             // If using post kernel with stream-k then it is doing parallel reduciton
