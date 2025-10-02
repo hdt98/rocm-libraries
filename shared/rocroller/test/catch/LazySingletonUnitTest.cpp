@@ -57,7 +57,10 @@ TEST_CASE("Unit: Different types have independent instances", "[lazy_singleton]"
     auto settings = rocRoller::LazySingleton<rocRoller::Settings>::getInstance();
     auto gpuLib   = rocRoller::LazySingleton<rocRoller::GPUArchitectureLibrary>::getInstance();
 
-    REQUIRE(settings.get() != gpuLib.get());
+    // Compare addresses as void* to avoid cross-type pointer comparison
+    const void* s_addr = static_cast<const void*>(settings.get());
+    const void* g_addr = static_cast<const void*>(gpuLib.get());
+    REQUIRE(s_addr != g_addr);
 }
 
 TEST_CASE("Unit: Singleton persists across scopes", "[lazy_singleton]")
@@ -121,7 +124,7 @@ TEST_CASE("Unit: Reset under concurrent access does not crash", "[lazy_singleton
 
     for(int i = 0; i < N; ++i)
     {
-        threads.emplace_back([] {
+        threads.emplace_back([i] {
             // Mix reads and resets
             if(i % 5 == 0)
             {
