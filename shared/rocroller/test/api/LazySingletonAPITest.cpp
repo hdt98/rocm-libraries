@@ -65,9 +65,7 @@ TEST_CASE("API: Reset is safe across threads", "[API:LazySingleton]")
 {
     auto before = rocRoller::Settings::getInstance();
 
-    std::thread t([] {
-        rocRoller::Settings::reset(); // no-op
-    });
+    std::thread t([] { rocRoller::Settings::reset(); });
     t.join();
 
     auto after = rocRoller::Settings::getInstance();
@@ -80,7 +78,7 @@ TEST_CASE("API: Shared_ptr remains valid after reset", "[API:LazySingleton]")
     auto instance = rocRoller::GPUArchitectureLibrary::getInstance();
     REQUIRE(instance != nullptr);
 
-    rocRoller::GPUArchitectureLibrary::reset(); // no-op
+    rocRoller::GPUArchitectureLibrary::reset();
 
     // After reset, pointer should still be valid and identical
     auto instance2 = rocRoller::GPUArchitectureLibrary::getInstance();
@@ -93,8 +91,7 @@ TEST_CASE("API: Different singletons remain independent", "[API:LazySingleton]")
     auto settings = rocRoller::Settings::getInstance();
     auto gpuLib   = rocRoller::GPUArchitectureLibrary::getInstance();
 
-    rocRoller::Settings::reset(); // no-op
-
+    rocRoller::Settings::reset();
     auto settings2 = rocRoller::Settings::getInstance();
     auto gpuLib2   = rocRoller::GPUArchitectureLibrary::getInstance();
 
@@ -102,4 +99,54 @@ TEST_CASE("API: Different singletons remain independent", "[API:LazySingleton]")
     REQUIRE(gpuLib == gpuLib2); // GPUArchitectureLibrary unaffected
     REQUIRE(static_cast<const void*>(settings.get())
             != static_cast<const void*>(gpuLib.get())); // Distinct singletons
+}
+
+TEST_CASE("API: Settings boolean option change is globally visible", "[API:LazySingleton:Settings]")
+{
+    auto settings = rocRoller::Settings::getInstance();
+
+    // Set LogConsole to false (simulate API user program change)
+    settings->set(rocRoller::Settings::LogConsole, false);
+
+    // From "library" code, fetch again through singleton
+    auto settingsAgain = rocRoller::Settings::getInstance();
+    REQUIRE(settingsAgain->get(rocRoller::Settings::LogConsole) == false);
+
+    // Reset to default
+    settingsAgain->set(rocRoller::Settings::LogConsole, true);
+}
+
+TEST_CASE("API: Settings string option change is globally visible", "[API:LazySingleton:Settings]")
+{
+    auto settings = rocRoller::Settings::getInstance();
+
+    std::string customPath = "/tmp/rocm_custom";
+    settings->set(rocRoller::Settings::ROCMPath, customPath);
+
+    auto libView = rocRoller::Settings::getInstance();
+    REQUIRE(libView->get(rocRoller::Settings::ROCMPath) == customPath);
+}
+
+TEST_CASE("API: Static Get reflects changes made via instance set", "[API:LazySingleton:Settings]")
+{
+    auto settings = rocRoller::Settings::getInstance();
+
+    settings->set(rocRoller::Settings::LogConsole, false);
+
+    // Static Get should return updated value
+    REQUIRE(rocRoller::Settings::Get(rocRoller::Settings::LogConsole) == false);
+
+    // Restore
+    settings->set(rocRoller::Settings::LogConsole, true);
+}
+
+TEST_CASE("API: Independent settings options remain independent", "[API:LazySingleton:Settings]")
+{
+    auto settings = rocRoller::Settings::getInstance();
+
+    settings->set(rocRoller::Settings::LogConsole, false);
+    settings->set(rocRoller::Settings::ROCMPath, "/tmp/test_path");
+
+    REQUIRE(settings->get(rocRoller::Settings::LogConsole) == false);
+    REQUIRE(settings->get(rocRoller::Settings::ROCMPath) == "/tmp/test_path");
 }
