@@ -164,7 +164,6 @@ namespace rocRollerTest
             // to clear x here but the current implementation should.
             co_yield std::move(x);
             x.clear();
-            //AssertFatal(x.size() == 0, x.size());
 
             x.push_back(29);
 
@@ -257,21 +256,12 @@ namespace rocRollerTest
     {
         auto fib = fibonacci<int>();
 
-        //EXPECT_EQ(GeneratorState::NoValue, fib.state());
-
         auto iter = fib.begin();
-
-        //EXPECT_EQ(GeneratorState::NoValue, fib.state());
 
         EXPECT_TRUE(iter != fib.end());
 
-        //EXPECT_EQ(GeneratorState::HasValue, fib.state());
-
         EXPECT_EQ(1, *iter);
-        //EXPECT_EQ(GeneratorState::HasValue, fib.state());
         ++iter;
-
-        //EXPECT_EQ(GeneratorState::NoValue, fib.state());
 
         EXPECT_EQ(1, *iter);
         ++iter;
@@ -296,7 +286,7 @@ namespace rocRollerTest
         EXPECT_EQ(3, *iter);
         ++iter;
         EXPECT_TRUE(iter == fib.end());
-        //EXPECT_EQ(GeneratorState::Done, fib.state());
+
         EXPECT_THROW(std::ignore = *iter, std::runtime_error);
     }
 
@@ -322,15 +312,9 @@ namespace rocRollerTest
     {
         auto fibs = fibonacci<int>();
 
-        //EXPECT_EQ(GeneratorState::NoValue, fibs.state());
-
         auto iter1 = fibs.begin();
 
-        //EXPECT_EQ(GeneratorState::NoValue, fibs.state());
-
         EXPECT_EQ(1, *iter1);
-
-        //EXPECT_EQ(GeneratorState::HasValue, fibs.state());
 
         auto iter2 = ++iter1;
         EXPECT_EQ(1, *iter1);
@@ -340,33 +324,8 @@ namespace rocRollerTest
         EXPECT_EQ(2, *iter2);
         EXPECT_EQ(2, *iter1);
 
-        //++iter1;
-        ////EXPECT_EQ(GeneratorState::NoValue, fibs.state());
-
-        //++iter1;
-        //EXPECT_EQ(2, *iter1);
-
-        //// Calling .begin() on the generator should not advance it.
-        //auto iter2 = fibs.begin();
-        //EXPECT_EQ(2, *iter2);
-
-        //iter2 ++;
-        //EXPECT_EQ(3, *iter2);
-        //EXPECT_EQ(3, *iter1);
-
-        //++iter2;
-        //EXPECT_EQ(5, *iter2);
-        //EXPECT_EQ(5, *iter1);
-        //EXPECT_EQ(2, *iter3);
-
-        //auto iter4 = iter3++;
-
-        //EXPECT_EQ(2, *iter3);
-        //EXPECT_EQ(2, *iter4);
-
-        //++iter4;
-
-        //EXPECT_THROW(*iter4, std::runtime_error);
+        ++iter1;
+        EXPECT_EQ(3, *iter1);
     }
 
     /**
