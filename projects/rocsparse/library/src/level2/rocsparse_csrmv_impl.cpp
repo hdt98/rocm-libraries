@@ -130,6 +130,7 @@ rocsparse_status rocsparse::csrmv_template(rocsparse_handle          handle,
                                            bool                      force_conj,
                                            bool                      fallback_algorithm)
 {
+    std::cout << "csrmv_template" << std::endl;
     ROCSPARSE_ROUTINE_TRACE;
 
     const J  m                 = static_cast<J>(m_);

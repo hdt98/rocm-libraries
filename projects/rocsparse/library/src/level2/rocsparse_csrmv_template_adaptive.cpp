@@ -362,11 +362,13 @@ rocsparse_status
                                                          const J*                  csr_col_ind,
                                                          rocsparse_csrmv_info*     p_csrmv_info)
 {
+    std::cout << "csrmv_analysis_adaptive_template_dispatch" << std::endl;
     ROCSPARSE_ROUTINE_TRACE;
 
     p_csrmv_info[0]                 = new _rocsparse_csrmv_info();
     rocsparse_csrmv_info csrmv_info = p_csrmv_info[0];
 
+    std::cout << "11" << std::endl;
     if(trans == rocsparse_operation_none)
     {
         // Stream
@@ -383,6 +385,8 @@ rocsparse_status
         // Wait for host transfer to finish
         RETURN_IF_HIP_ERROR(hipStreamSynchronize(stream));
 
+        std::cout << "22" << std::endl;
+
         // Determine row blocks array size
         ComputeRowBlocks<I, J>((I*)NULL,
                                (J*)NULL,
@@ -393,6 +397,7 @@ rocsparse_status
                                m,
                                false);
 
+        std::cout << "33" << std::endl;
         // Create row blocks and workgroup data structures
         std::vector<I> row_blocks(csrmv_info->adaptive.size, 0);
         std::vector<J> wg_ids(csrmv_info->adaptive.size, 0);
@@ -406,10 +411,13 @@ rocsparse_status
                                m,
                                true);
 
+        std::cout << "44" << std::endl;
         if(descr->type == rocsparse_matrix_type_symmetric)
         {
             csrmv_info->max_rows = maxRowsInABlock(row_blocks.data(), csrmv_info->adaptive.size);
         }
+
+        std::cout << "55" << std::endl;
 
         // Allocate memory on device to hold csrmv info, if required
         if(csrmv_info->adaptive.size > 0)
@@ -445,6 +453,7 @@ rocsparse_status
             // Wait for device transfer to finish
             RETURN_IF_HIP_ERROR(hipStreamSynchronize(stream));
         }
+        std::cout << "66" << std::endl;
     }
     // Store some pointers to verify correct execution
     csrmv_info->trans       = trans;
@@ -458,6 +467,7 @@ rocsparse_status
     csrmv_info->index_type_I = rocsparse::get_indextype<I>();
     csrmv_info->index_type_J = rocsparse::get_indextype<J>();
 
+    std::cout << "77" << std::endl;
     return rocsparse_status_success;
 }
 
@@ -595,6 +605,7 @@ rocsparse_status rocsparse::csrmv_adaptive_template_dispatch(rocsparse_handle   
                                                              Y*       y,
                                                              bool     force_conj)
 {
+    std::cout << "csrmv_adaptive_template_dispatch" << std::endl;
     ROCSPARSE_ROUTINE_TRACE;
 
     ROCSPARSE_CHECKARG_HANDLE(0, handle);
@@ -676,8 +687,10 @@ rocsparse_status rocsparse::csrmv_adaptive_template_dispatch(rocsparse_handle   
     }
     else if(descr->type == rocsparse_matrix_type_symmetric)
     {
+        std::cout << "1111" << std::endl;
         RETURN_IF_ROCSPARSE_ERROR(rocsparse::scale_array(handle, m, beta_device_host, y));
 
+        std::cout << "2222" << std::endl;
         dim3 csrmvn_blocks(info->adaptive.size - 1);
         dim3 csrmvn_threads(WG_SIZE);
 
@@ -690,6 +703,8 @@ rocsparse_status rocsparse::csrmv_adaptive_template_dispatch(rocsparse_handle   
         }
 
         lds_size *= sizeof(T);
+
+        std::cout << "lds_size: " << lds_size << std::endl;
 
         if(lds_size <= 2048 * sizeof(T))
         {
@@ -741,6 +756,9 @@ rocsparse_status rocsparse::csrmv_adaptive_template_dispatch(rocsparse_handle   
         RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_not_implemented);
         // LCOV_EXCL_STOP
     }
+
+    RETURN_IF_HIP_ERROR(hipDeviceSynchronize());
+    std::cout << "3333" << std::endl;
 
     return rocsparse_status_success;
 }

@@ -166,6 +166,7 @@ rocsparse_status rocsparse::csrmv_analysis(rocsparse_handle          handle,
                                            const void*               csr_col_ind,
                                            rocsparse_csrmv_info*     p_csrmv_info)
 {
+    std::cout << "csrmv_analysis" << std::endl;
     ROCSPARSE_ROUTINE_TRACE;
     rocsparse::csrmv_analysis_t f;
     RETURN_IF_ROCSPARSE_ERROR(rocsparse::csrmv_analysis_find(

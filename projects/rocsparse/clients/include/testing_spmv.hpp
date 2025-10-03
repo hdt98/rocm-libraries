@@ -97,6 +97,7 @@ public:
 
     static void testing_spmv(const Arguments& arg)
     {
+        std::cout << "AAAA" << std::endl;
         J                      M           = arg.M;
         J                      N           = arg.N;
         rocsparse_operation    trans       = arg.transA;
@@ -121,6 +122,7 @@ public:
 #define PARAMS(alpha_, A_, x_, beta_, y_, stage) \
     handle, trans, alpha_, A_, x_, beta_, y_, ttype, alg, stage, &buffer_size, dbuffer
 
+        std::cout << "BBBB" << std::endl;
         //
         // INITIALIZATE THE SPARSE MATRIX
         //
@@ -149,6 +151,8 @@ public:
         {
             return;
         }
+
+        std::cout << "CCCC" << std::endl;
 
         device_sparse_matrix<A> dA(hA);
 
@@ -179,19 +183,27 @@ public:
 
         CHECK_ROCSPARSE_ERROR(rocsparse_set_pointer_mode(handle, rocsparse_pointer_mode_host));
 
+        std::cout << "DDDD" << std::endl;
         // Run buffer size
         void*  dbuffer     = nullptr;
         size_t buffer_size = 0;
         CHECK_ROCSPARSE_ERROR(
             rocsparse_spmv(PARAMS(h_alpha, matA, x, h_beta, y, rocsparse_spmv_stage_buffer_size)));
+
+        std::cout << "buffer_size: " << buffer_size << std::endl;
         CHECK_HIP_ERROR(rocsparse_hipMalloc(&dbuffer, buffer_size));
 
+        std::cout << "EEEE" << std::endl;
         if(call_stage_analysis)
         {
+            std::cout << "Before analysis" << std::endl;
             // Run preprocess
             CHECK_ROCSPARSE_ERROR(rocsparse_spmv(
                 PARAMS(h_alpha, matA, x, h_beta, y, rocsparse_spmv_stage_preprocess)));
+            std::cout << "After analysis" << std::endl;
         }
+
+        std::cout << "FFFF" << std::endl;
 
         if(arg.unit_check)
         {
@@ -199,10 +211,13 @@ public:
             CHECK_ROCSPARSE_ERROR(testing::rocsparse_spmv(
                 PARAMS(h_alpha, matA, x, h_beta, y, rocsparse_spmv_stage_compute)));
 
+            std::cout << "GGGG" << std::endl;
             host_dense_matrix<Y> hy_copy(hy);
             traits::host_calculation(trans, h_alpha, hA, hx, h_beta, hy, alg, matrix_type);
 
+            std::cout << "HHHH" << std::endl;
             hy.near_check(dy);
+            std::cout << "IIII" << std::endl;
 
             if(ROCSPARSE_REPRODUCIBILITY)
             {
@@ -216,7 +231,9 @@ public:
                 PARAMS(d_alpha, matA, x, d_beta, y, rocsparse_spmv_stage_compute)));
             CHECK_ROCSPARSE_ERROR(rocsparse_set_pointer_mode(handle, rocsparse_pointer_mode_host));
 
+            std::cout << "JJJJ" << std::endl;
             hy.near_check(dy);
+            std::cout << "KKKK" << std::endl;
             if(ROCSPARSE_REPRODUCIBILITY)
             {
                 rocsparse_reproducibility::save("Y_pointer_mode_device", dy);

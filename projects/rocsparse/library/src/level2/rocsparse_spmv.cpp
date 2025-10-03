@@ -361,6 +361,7 @@ namespace rocsparse
                           size_t*                     buffer_size,
                           void*                       temp_buffer)
     {
+        std::cout << "spmv" << std::endl;
         ROCSPARSE_ROUTINE_TRACE;
         static constexpr bool fallback_algorithm = true;
 
@@ -757,6 +758,7 @@ extern "C" rocsparse_status rocsparse_spmv(rocsparse_handle            handle, /
                                            void*                       temp_buffer) //11
 try
 {
+    std::cout << "rocsparse_spmv" << std::endl;
     ROCSPARSE_ROUTINE_TRACE;
 
     // Logging

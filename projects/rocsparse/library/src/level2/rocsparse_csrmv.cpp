@@ -418,7 +418,7 @@ rocsparse_status rocsparse::csrmv(rocsparse_handle          handle,
                                   void*                     y,
                                   bool                      fallback_algorithm)
 {
-
+    std::cout << "csrmv" << std::endl;
     ROCSPARSE_ROUTINE_TRACE;
     rocsparse::csrmv_t f;
     RETURN_IF_ROCSPARSE_ERROR(rocsparse::csrmv_find(&f,
