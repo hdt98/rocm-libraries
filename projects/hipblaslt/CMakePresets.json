@@ -15,6 +15,16 @@
       }
     },
     {
+      "name": "coverage",
+      "displayName": "Coverage",
+      "description": "Configures for coverage build",
+      "inherits": "default:release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelwithDebInfo",
+        "HIPBLASLT_ENABLE_COVERAGE": "ON"
+      }
+    },
+    {
       "name": "tensilelite",
       "displayName": "TensileLite",
       "description": "Configures just tensilelite host and client",
