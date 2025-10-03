@@ -457,7 +457,6 @@ struct intrin_wmma_f16_16x16x32_f16<16, 16>
         // false: D0.[0:15] = result
         // true : D0.[16:31]= result
 #if defined(__gfx125__)
-        //printf("Running intrin_wmma_f16_16x16x32_f16\n");
         reg_c.template AsType<half8_t>()(Number<0>{}) = __builtin_amdgcn_wmma_f16_16x16x32_f16(
             0, reg_a, 0, reg_b, 0, reg_c.template AsType<half8_t>()[Number<0>{}], false, false);
 #else
@@ -507,9 +506,8 @@ struct intrin_wmma_f32_16x16x32_f16<16, 16>
         // amd_assembly_wmma_f32_16x16x16_f16_w32(
         //     reg_a, reg_b, reg_c.template AsType<float8_t>()(Number<0>{}));
 #if defined(__gfx125__)
-        //printf("Running intrin_wmma_f32_16x16x32_f16\n");
         reg_c.template AsType<float8_t>()(Number<0>{}) = __builtin_amdgcn_wmma_f32_16x16x32_f16(
-            0, reg_a, 0, reg_b, 0, reg_c.template AsType<float8_t>()[Number<0>{}], false, false);
+            0, reg_b, 0, reg_a, 0, reg_c.template AsType<float8_t>()[Number<0>{}], false, false);
 #else
         ignore = reg_a;
         ignore = reg_b;

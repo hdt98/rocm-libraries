@@ -117,21 +117,24 @@ __device__ void builtin_wmma_naive_selector(
     // }
     if constexpr(std::is_same_v<srcAType, ck::half_t> && std::is_same_v<srcBType, ck::half_t> && std::is_same_v<dstType, ck::half_t>)
     {        
-        printf("--------- Calling f16, f16 ---------- \n");
+        // printf("--------- Calling f16, f16 ---------- \n");
+        (threadIdx.x == 0 ? printf("--------- Calling f16, f16 ---------- \n") : 0);
         CK_WMMA_CALL_INTRIN(f16, f16);
     } 
     else if constexpr(std::is_same_v<srcAType, ck::half_t> && std::is_same_v<srcBType, ck::half_t> && std::is_same_v<dstType, float>)    {
-        printf("--------- Calling f32, f16 ---------- \n");
+        // printf("--------- Calling f32, f16 ---------- \n");
+        (threadIdx.x == 0 ? printf("--------- Calling f32, f16 ---------- \n") : 0);
         CK_WMMA_CALL_INTRIN(f32, f16);
     } else {
-        printf("---------- No builtin_wmma_naive_selector implementation for these types ----------\n");
+        // printf("---------- No builtin_wmma_naive_selector implementation for these types ----------\n");
+        (threadIdx.x == 0 ? printf("---------- No builtin_wmma_naive_selector implementation for these types ----------\n") : 0);
     }
 }
 
 template<typename srcA_t, typename srcB_t, typename dst_t, ck::index_t kMultiplier>
 __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
 {
-    printf("---------- Running gfx125 matmul - INCORRECT INDEXING ----------\n");
+    // printf("---------- Running gfx125 matmul ----------\n");
     static_assert(WMMAVecType<srcA_t, kMultiplier>::template is_compatible<srcB_t>(),
                   "the data format for srcA and srcB is unsupported in gfx1250");
     using srcA_cast_T    = WMMAVecType<srcA_t, kMultiplier>::ViewT;
@@ -139,11 +142,35 @@ __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
     using srcA_cast_type = typename srcA_cast_T::type;
     using srcB_cast_type = typename srcB_cast_T::type;
 
-    // Print the size of A and B vectors
-    printf("A vector size: %d\n", WMMAVecType<srcA_t, kMultiplier>::size);
-    printf("B vector size: %d\n", WMMAVecType<srcB_t, kMultiplier>::size);
+    bool debug_prints = false;
 
-    //KO TODO:: revisit this. 
+    if (debug_prints == true) // debug only
+    {
+        if (threadIdx.x == 0)
+        {
+            // Print the size of A and B vectors
+            printf("A vector size: %d\n", WMMAVecType<srcA_t, kMultiplier>::size);
+            printf("B vector size: %d\n", WMMAVecType<srcB_t, kMultiplier>::size);
+
+        
+            printf("---------- printing a at start of matmul with uint32 union--------- \n");
+            for(int i = 0; i < 8; i++)
+            {
+                union { srcA_t val; uint32_t u32;};
+                val = a[i];
+                printf("a[%d] = %f, hex = 0x%08x\n", i, static_cast<float>(val), u32);
+            }
+
+            printf("---------- printing a at start of matmul with uint16 union--------- \n");
+            for(int i = 0; i < 8; i++)
+            {
+                union { srcA_t val; uint16_t u16;};
+                val = a[i];
+                printf("a[%d] = %f, hex = 0x%04x\n", i, static_cast<float>(val), u16);
+            }
+        }
+    }
+ 
     using srcA_vec      = typename WMMAVecType<srcA_t, kMultiplier>::VecT;
     using srcB_vec      = typename WMMAVecType<srcB_t, kMultiplier>::VecT;
     using srcA_vec_type = srcA_vec::type;
@@ -161,49 +188,46 @@ __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
     using dst_vec = StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr,
                                               dst_t,
                                               1,
-                                              8/** WMMAVecType<dst_t, kMultiplier>::ToIntDim*/,
+                                              8,
                                               true>;
     dst_vec dst_thread_buf_;
-
-    // constexpr int ToIntDim    = WMMAVecType<srcA_t, kMultiplier>::ToIntDim; // how many elements packed into 32bits
-    // constexpr int SRC_DIM     = 2;//8 * kMultiplier; // KO TODO:: Fix...Number of packed elements per thread
-    // constexpr int ROW_SIZE    = SRC_DIM * 2;     // Two threads per block
-    // constexpr int LDS_DIM     = ROW_SIZE * 32 * 2 / ToIntDim; // A and B, packed
-    // constexpr int LDS_B_START = LDS_DIM / 2;
     
     // Num elements per 32B packed chunk
     constexpr int ToIntDim    = WMMAVecType<srcA_t, kMultiplier>::ToIntDim;
     
-    //use as a loop for packing the vecT in WMMAVec; i.e. how many we should load per thread?
-    // in 16x16 that's 4 elements of size32 (8 of AType in A), in 16x32 it's 8 (16 in typeA)
-    // with half16_t ==> 16 elements 
-    //When looping with src_dim each iteration will be of size vewT; which matches toIntDim. 
-    //So we want to loop in granularity of ints; so loop size should be 8 for 16x32; 4 for 16x16
-    constexpr int SRC_DIM = (16 * kMultiplier) / ToIntDim; //to int dim is 1 for float, 2 for half
-        // Exceptions will be when we use f32 or f64 input and K is only size 4. Then we need to do 4*K Multiplier?
-        //16*1/2 == 8
-        //16*2/4 == 16
+    // to int dim is 1 for float, 2 for half; base dim assumption is 16
+    constexpr int SRC_DIM = (16 * kMultiplier) / ToIntDim;
+    /* TODO:: Handle exceptions for f32 and f64 input and K dim is only size 4. 
+        Then we need to do 4*K Multiplier? */ 
 
-    // how many threads to do an entire row? 2; each thread loads 2x as much, but still 2 threads
+    // 2 threads per a row
     constexpr int ROW_SIZE = 2 * SRC_DIM;
     
-    //LDS_DIM should then be 2 (one for A and one for B) * 16 * ROW_SIZE? 
+    // 16 is base dim assumption, 2 is for a input and b input both
     constexpr int LDS_DIM = 2 * 16 * ROW_SIZE;
-        // Exceptions will be when we use f32 or f64 input and K is only size 4. Then we need to do 4*K Multiplier?
+    /* TODO:: Handle Exceptions for f32 or f64 input and K is only size 4. 
+        Then we need to do 4*K Multiplier? */
 
     constexpr int LDS_B_START = LDS_DIM / 2;
 
-    //quadrant size (in int32) is 4 for 16x32, 2 for 16x16 in dst size
-    //should be 8 elements of size 16 loaded per quadrant, which means 4 of size 32. 
-    //This matches ROW_SIZE/4?
-    constexpr int QUADRANT_SIZE = ROW_SIZE/4;
+    /* 16x32 example: quadrant size (in int32) is 4 for 16x32, 2 for 16x16 in dst size
+        number of src type elements loaded per qudrant should be 8 elements of size 16 or 4 respectively
+    */
     
-    printf("ToIntDim = %d\n", ToIntDim);
-    printf("SRC_DIM = %d\n", SRC_DIM);
-    printf("ROW_SIZE = %d\n", ROW_SIZE);
-    printf("LDS_DIM = %d\n", LDS_DIM);
-    printf("LDS_B_START = %d\n", LDS_B_START);
-    printf("QUADRANT_SIZE = %d\n", QUADRANT_SIZE);
+    constexpr int QUADRANT_SIZE = ROW_SIZE / 4;
+    
+    if (debug_prints == true) // debug only
+    {
+        if (threadIdx.x == 0)
+        {
+            printf("ToIntDim = %d\n", ToIntDim);
+            printf("SRC_DIM = %d\n", SRC_DIM);
+            printf("ROW_SIZE = %d\n", ROW_SIZE);
+            printf("LDS_DIM = %d\n", LDS_DIM);
+            printf("LDS_B_START = %d\n", LDS_B_START);
+            printf("QUADRANT_SIZE = %d\n", QUADRANT_SIZE);
+        }
+    }
 
     __shared__ srcA_cast_type p_shared[LDS_DIM];
 
@@ -215,27 +239,18 @@ __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
 
     // get pointer as B type given LDS allocated with A
     const srcB_cast_type* local_b_ptr = reinterpret_cast<const srcB_cast_type*>(p_shared);// + LDS_B_START);
-    // printf("[LDS_B_START] LDS_B_START = %d\n", LDS_B_START);
-    // printf("[local_b_ptr] start address: %p\n", static_cast<const void*>(local_b_ptr));
-    // printf("[local_b_ptr] address at offset 0: %p\n", static_cast<const void*>(&local_b_ptr[0]));
-    // printf("[local_b_ptr] address at offset 256: %p\n", static_cast<const void*>(&local_b_ptr[256]));
-    // printf("[local_b_ptr] address at offset 512: %p\n", static_cast<const void*>(&local_b_ptr[512]));
 
     const int lIdx = threadIdx.x;
     const int lane = lIdx % 32; // wave size
     const int lowHigh = lane / 16;
 
-    //Global to Local Reg --> contiguous global --> quadrant interleaved in regs
-    //regs-> LDS --> Reverse quadrant interleaved (back to flat in LDS)
-    //LDS->packed fragments -- back to quadrant mode
-
-    bool use_QUADS = false;
+    bool use_QUADS = true;
 
     if (use_QUADS == true)
     {
 
-        //load A to registers using QUADRANTS -- OK
-        printf("-------- Writing to a_temp -------- \n");
+        // load A to registers using QUADRANTS -- OK
+        // printf("-------- Writing to a_temp -------- \n");
         static_for<0, QUADRANT_SIZE, 1>{}([&](auto ele) { 
             int i = ele;
             int j = ele + QUADRANT_SIZE * 2;
@@ -244,12 +259,33 @@ __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
             int offset1 = (rowIdx * ROW_SIZE) + (i + (lowHigh * QUADRANT_SIZE));
             int offset2 = (rowIdx * ROW_SIZE) + (j + (lowHigh * QUADRANT_SIZE));
 
+            if (debug_prints == true)
+            {
+                auto val_offset1 = a_ptr[offset1];
+                auto val_offset2 = a_ptr[offset2];
+                printf("a_temp[%d][0] = %f, a_temp[%d][1] = %f\n", static_cast<int>(ele), static_cast<float>(val_offset1[0]), static_cast<int>(ele), static_cast<float>(val_offset1[1]));
+                printf("a_temp[%d][0] = %f, a_temp[%d][1] = %f\n", static_cast<int>(ele+QUADRANT_SIZE), static_cast<float>(val_offset2[0]), static_cast<int>(ele+QUADRANT_SIZE), static_cast<float>(val_offset2[1]));
+            }
+
             a_temp.template AsType<srcA_cast_type>()(ele) = a_ptr[offset1];
             a_temp.template AsType<srcA_cast_type>()(Number<ele + QUADRANT_SIZE>{}) = a_ptr[offset2];
         });
 
-        //load B to registers using QUADRANTS -- OK
-        printf("-------- Writing to b_temp -------- \n");
+        // Print a_temp for debug purposes
+        if (debug_prints == true) 
+        {
+            printf("-------- Contents of a_temp for thread %d --------\n", lIdx);
+            static_for<0, QUADRANT_SIZE * 2, 1>{}([&](auto ele) {
+                auto val = a_temp.template AsType<srcA_cast_type>()(ele);
+                printf("thread %d:  a_temp[%d][0] = %f, a_temp[%d][1] = %f\n",
+                    lIdx,
+                    static_cast<int>(ele), static_cast<float>(val[0]),
+                    static_cast<int>(ele), static_cast<float>(val[1]));
+            });
+        }
+
+        // load B to registers using QUADRANTS -- OK
+        // printf("-------- Writing to b_temp -------- \n");
         static_for<0, QUADRANT_SIZE, 1>{}([&](auto ele) {
             int i = ele;
             int j = ele + QUADRANT_SIZE * 2;
@@ -262,11 +298,8 @@ __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
             b_temp.template AsType<srcB_cast_type>()(Number<ele + QUADRANT_SIZE>{}) = b_ptr[offset2];
         });
 
-        // __syncthreads(); // KO TODO:: Needed?
-
-        //KO TODO:: Do we want LDS to store in quadrant order, or do we want quadrants unpacked into a contiguous LDS?
         // Load A into LDS with quadrants -- OK
-        printf("-------- Writing to p_shared from a_temp -------- \n");
+        // printf("-------- Writing to p_shared from a_temp -------- \n");
         constexpr int BLOCK_SIZE = 4 * QUADRANT_SIZE;
         static_for<0, QUADRANT_SIZE, 1>{}([&](auto ele) {
             int rowIdx = lIdx % 16;
@@ -283,7 +316,7 @@ __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
         });
 
         // Load B into LDS with quadrants -- OK
-        printf("-------- Writing to p_shared from b_temp -------- \n");
+        // printf("-------- Writing to p_shared from b_temp -------- \n");
         static_for<0, QUADRANT_SIZE, 1>{}([&](auto ele) {
             int rowIdx = lIdx % 16;
             int hi = lIdx / 16;
@@ -302,10 +335,18 @@ __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
 
         __syncthreads(); //KO TODO:: move to inline asm
 
-        
-        // Assumed the VGPR chunk that corresponds to this thread
-        // i.e. 2 quadrants each of QUADRANT_SIZE each.
-        //BLOCK_SIZE = 4 * QUAD_SIZE
+        if (debug_prints == true) 
+        {
+            if (threadIdx.x == 0)
+            {
+                //after syncthreads, so all threads should see all other threads vals written
+                printf("-------- p_shared[0..255] contents --------\n");
+                for(int i = 0; i < 256; ++i) {
+                    auto val = p_shared[i];
+                    printf("p_shared[%d][0] = %f, p_shared[%d][1] = %f\n", i, static_cast<float>(val[0]), i, static_cast<float>(val[1]));
+                }
+            }
+        }
         
         // Construct a_frag and b_frag for WMMA call -- OK
         static_for<0, QUADRANT_SIZE, 1>{}([&](auto ele) {
@@ -329,6 +370,17 @@ __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
             a_frag.template AsType<srcA_cast_type>()(Number<ele + QUADRANT_SIZE>{}) = local_a_ptr[idx2_a];
             b_frag.template AsType<srcB_cast_type>()(Number<ele + QUADRANT_SIZE>{}) = local_b_ptr[idx2_b];
         });
+
+        if (debug_prints == true) 
+        {
+            // printf("-------- Contents of a_frag for thread %d --------\n", lIdx);
+            static_for<0, QUADRANT_SIZE * 2, 1>{}([&](auto ele) {
+                auto val = a_frag.template AsType<srcA_cast_type>()(ele);
+                printf("thread %d:  a_frag[%d][0] = %f, a_frag[%d][1] = %f\n",
+                        lIdx, static_cast<int>(ele), static_cast<float>(val[0]),
+                        static_cast<int>(ele), static_cast<float>(val[1]));
+            });
+        }
     }
     else // Don't use quads
     {
@@ -353,7 +405,7 @@ __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
         });
 
         // Load A into LDS without quadrants
-        printf("-------- Writing to p_shared from a_temp -------- \n");
+        // printf("------- Writing to p_shared from a_temp -------- \n");
         static_for<0, SRC_DIM, 1>{}([&](auto ele) {
             int rowIdx = lIdx % 16;
             int hi = lIdx / 16;
@@ -366,7 +418,7 @@ __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
         });
 
         // Load B into LDS without quadrants
-        printf("-------- Writing to p_shared from b_temp -------- \n");
+        // printf("-------- Writing to p_shared from b_temp -------- \n");
         static_for<0, SRC_DIM, 1>{}([&](auto ele) {
             int rowIdx = lIdx % 16;
             int hi = lIdx / 16;
@@ -398,34 +450,21 @@ __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
 
     __syncthreads(); //KO TODO:: move to inline asm
 
-    printf("dst_thread_buf_ BEFORE builtin_wmma_naive_selector:\n");
-    static_for<0, 8, 1>{}([&](auto i) {
-        printf("  [%d] = %f\n", static_cast<int>(i), static_cast<float>(dst_thread_buf_[Number<i>{}]));
-    });
-
     // Call the WMMA intrinsic selector
-    printf("------- calling builtin_naive_wmma_selector ------- \n");
+    // printf("------- calling builtin_naive_wmma_selector ------- \n");
     builtin_wmma_naive_selector<srcA_t, srcB_t, dst_t, kMultiplier>(
         a_frag.template AsType<srcA_vec_type>()(I0),
         b_frag.template AsType<srcB_vec_type>()(I0),
         dst_thread_buf_);
 
-    printf("------- FINISHED builtin_naive_wmma_selector ------- \n");
+    // printf("------- FINISHED builtin_naive_wmma_selector ------- \n");
 
-    printf("dst_thread_buf_ AFTER builtin_wmma_naive_selector:\n");
-    static_for<0, 8, 1>{}([&](auto i) {
-        printf("  [%d] = %f\n", static_cast<int>(i), static_cast<float>(dst_thread_buf_[Number<i>{}]));
-    });
-
-    // KO TODO:: Changes needed?
-    // Store results to global memory (row-major, adjust as needed)
-
-    //column-major 16x16 result matrix, 8 elements per thread
+    // column-major 16x16 result matrix, 8 elements per thread
     static_for<0, 8, 1>{}([&](auto ele) {
         int lowHi = lIdx / 16;
         int col = lIdx % 16;
         int row = (lowHi) * 8 + static_cast<int>(ele);
-        c[col + 16 * row] = dst_thread_buf_[Number<ele>{}]; // idea each thread contiguous along column
+        c[col * 16 + row] = dst_thread_buf_[Number<ele>{}]; // idea each thread contiguous along column
     });
 }
 
