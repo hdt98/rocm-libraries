@@ -33,7 +33,7 @@
 #include "hipblaslt_random.hpp"
 #include "hipblaslt_test.hpp"
 #include "hipblaslt_vector.hpp"
-#ifdef CODE_COVERAGE
+#ifdef HIPBLASLT_ENABLE_COVERAGE
 #include "hipblaslt_internal.hpp"
 #include "rocblaslt/rocblaslt_mat_utils.hpp"
 #include "rocblaslt/rocroller_host.hpp"
@@ -1658,7 +1658,7 @@ void testing_aux_mat_copy(const Arguments& arg)
     CHECK_HIPBLASLT_ERROR(hipblasLtMatmulDescDestroy(matmul_dest));
 }
 
-#ifdef CODE_COVERAGE
+#ifdef HIPBLASLT_ENABLE_COVERAGE
 void testing_aux_auxiliary_func(const Arguments& arg)
 {
     // Test gpu_arch_match
@@ -4726,4 +4726,4 @@ void testing_aux_handle_func(const Arguments& arg)
         EXPECT_EQ(retrieved_value, test_value);
     }
 }
-#endif // CODE_COVERAGE
+#endif // HIPBLASLT_ENABLE_COVERAGE

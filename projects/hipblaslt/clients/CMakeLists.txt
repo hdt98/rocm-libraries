@@ -23,7 +23,6 @@ target_link_libraries(hipblaslt-clients-common
         roc::hipblaslt
         OpenMP::OpenMP_CXX
         ${LAPACK_LIBRARIES}
-        tensilelite::tensilelite-host
     PRIVATE
         hip::device
 )
@@ -108,6 +107,7 @@ if(BUILD_TESTING OR HIPBLASLT_BUILD_TESTING)
             GTest::gtest
             OpenMP::OpenMP_CXX
             ${CMAKE_DL_LIBS}
+            tensilelite::tensilelite-host
     )
 
     target_compile_definitions(hipblaslt-test PRIVATE GOOGLE_TEST)

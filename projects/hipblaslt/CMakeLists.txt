@@ -573,7 +573,7 @@ if(HIPBLASLT_ENABLE_COVERAGE)
 
     target_compile_options(hipblaslt-test PRIVATE -g -O0 -fprofile-instr-generate -fcoverage-mapping -fvisibility=default)
     target_link_options(hipblaslt-test PRIVATE -fprofile-instr-generate)
-    target_compile_definitions(hipblaslt-test PRIVATE CODE_COVERAGE)
+    target_compile_definitions(hipblaslt-test PRIVATE HIPBLASLT_ENABLE_COVERAGE)
 
     set(coverage_dir "${CMAKE_CURRENT_BINARY_DIR}/coverage-report")
     add_custom_target(
@@ -585,10 +585,22 @@ if(HIPBLASLT_ENABLE_COVERAGE)
         #                                GTEST_LISTENER=NO_PASS_LINE_IN_LOG
         #                                $<TARGET_FILE:hipblaslt-test>
         #                                --precompile=hipblaslt-test-precompile.db
-        COMMAND ${CMAKE_COMMAND} -E env HIPBLASLT_BENCH_PERF=1 HIPBLASLT_ENABLE_MARKER=2 HIPBLASLT_LOG_MASK=64 LLVM_PROFILE_VERBOSE=1 LLVM_PROFILE_FILE=./hipblaslt-test_perf_64_coverage_%m.profraw $<TARGET_FILE:hipblaslt-test> --output-on-failure
+        COMMAND ${CMAKE_COMMAND} -E env HIPBLASLT_BENCH_PERF=1
+                                        HIPBLASLT_ENABLE_MARKER=2
+                                        HIPBLASLT_LOG_MASK=64
+                                        LLVM_PROFILE_VERBOSE=1
+                                        GTEST_LISTENER=NO_PASS_LINE_IN_LOG
+                                        LLVM_PROFILE_FILE=./hipblaslt-test_perf_64_coverage_%m.profraw
+                                        $<TARGET_FILE:hipblaslt-test>
+                                        --precompile=hipblaslt-test-precompile.db
+                                        --output-on-failure
+        COMMAND ${CMAKE_COMMAND} -E env HIPBLASLT_ENABLE_MARKER=2
+                                        HIPBLASLT_LOG_MASK=128
+                                        LLVM_PROFILE_VERBOSE=1
+                                        LLVM_PROFILE_FILE=./hipblaslt-coverage_sample_hipblaslt_basic_matmul_for_cov_128_%m.profraw
+                                        $<TARGET_FILE:sample_hipblaslt_basic_matmul_for_cov>
+                                        --output-on-failure
       ) 
-      #HIPBLASLT_BENCH_PERF=1 HIPBLASLT_ENABLE_MARKER=2 HIPBLASLT_LOG_MASK=64 LLVM_PROFILE_VERBOSE=1 LLVM_PROFILE_FILE=./hipblaslt-test_perf_64_coverage_%m.profraw ./clients/staging/hipblaslt-test --output-on-failure
-      #HIPBLASLT_ENABLE_MARKER=2 HIPBLASLT_LOG_MASK=128 LLVM_PROFILE_VERBOSE=1 LLVM_PROFILE_FILE=./hipblaslt-coverage_sample_hipblaslt_basic_matmul_for_cov_128_%m.profraw ./clients/staging/sample_hipblaslt_basic_matmul_for_cov --output-on-failure
       find_program(
         LLVM_PROFDATA
         llvm-profdata

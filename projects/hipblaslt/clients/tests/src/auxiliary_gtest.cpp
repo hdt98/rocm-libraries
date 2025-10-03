@@ -94,7 +94,7 @@ namespace
                 testing_aux_matmul_alg_null_matmul(arg);
             else if(!strcmp(arg.function, "aux_matmul_bad_ws_size"))
                 testing_aux_matmul_bad_ws_size(arg);
-#ifdef CODE_COVERAGE
+#ifdef HIPBLASLT_ENABLE_COVERAGE
             else if(!strcmp(arg.function, "aux_auxiliary_func"))
                 testing_aux_auxiliary_func(arg);
             else if(!strcmp(arg.function, "aux_float8_func"))
@@ -164,7 +164,7 @@ namespace
                    || !strcmp(arg.function, "aux_matmul_bad_ws_size")
                    || !strcmp(arg.function, "aux_matmul_pref_get_attr_bad_arg")
                    || !strcmp(arg.function, "aux_matmul_pref_get_attr")
-#ifdef CODE_COVERAGE
+#ifdef HIPBLASLT_ENABLE_COVERAGE
                    || !strcmp(arg.function, "aux_auxiliary_func")
                    || !strcmp(arg.function, "aux_float8_func")
                    || !strcmp(arg.function, "aux_hipblaslt_ext_op_func")
