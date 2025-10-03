@@ -8,7 +8,8 @@ Full documentation for rocSOLVER is available at the [rocSOLVER documentation](h
 
 * Improved the performance of LARF, LARFT, GEQR2, and downstream functions such as GEQRF
 * Improved the performance of STEDC and divide and conquer Eigensolvers
-
+* Graph acceleration support for existing routines:
+    - GEQRF (with batched and strided\_batched versions)
 
 
 ## rocSOLVER 3.30.0 for ROCm 7.0.0
