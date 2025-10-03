@@ -544,6 +544,24 @@ if(ROCM_LIBS_SUPERBUILD OR NOT HIPBLASLT_IS_SUBPROJECT)
 endif()
 
 if(HIPBLASLT_ENABLE_COVERAGE)
+    target_include_directories(hipblaslt-clients-common 
+    PUBLIC
+        $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/library/src/amd_detail>
+        $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/library/src/amd_detail/rocblaslt/include>
+        $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/library/src/amd_detail/rocblaslt/src/include>
+    )
+
+    rocm_get_git_commit_tag(hipblaslt_COMMIT)
+
+    file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/code_coverage_tuning_file.txt"
+                "Git Version: ${hipblaslt_COMMIT}\n"
+                "    transA,transB,grouped_gemm,batch_count,m,n,k,alpha,lda,stride_a,beta,ldb,stride_b,ldc,stride_c,ldd,stride_d,"
+                "a_type,b_type,c_type,d_type,compute_type,scaleA,scaleB,scaleC,scaleD,amaxD,activation_type,bias_vector,bias_type,"
+                "aux_type,rotating_buffer,hipblaslt-Gflops,hipblaslt-GB/s,us,solution_index,gcnArchName,CUs\n"
+                "    T,N,0,1,512,1024,13,1,13,6656,0,13,13312,512,524288,512,524288,f32_r,f32_r,f32_r,f32_r,xf32_r,0,0,0,0,0,none,"
+                "1,f32_r,f32_r,512,464.651,69.1759,29.3371,532705,gfx942:sramecc+:xnack-,304"
+    )
+
     target_compile_options(hipblaslt PRIVATE -g -O0 -fprofile-instr-generate -fcoverage-mapping)
     target_link_options(hipblaslt PRIVATE -fprofile-instr-generate)
 
@@ -560,14 +578,17 @@ if(HIPBLASLT_ENABLE_COVERAGE)
     set(coverage_dir "${CMAKE_CURRENT_BINARY_DIR}/coverage-report")
     add_custom_target(
         code_cov_tests
-        DEPENDS hipblaslt-test
+        DEPENDS hipblaslt hipblaslt-test
         COMMAND ${CMAKE_COMMAND} -E rm -rf "${coverage_dir}"
         COMMAND ${CMAKE_COMMAND} -E make_directory "${coverage_dir}/profraw"
-        COMMAND ${CMAKE_COMMAND} -E env LLVM_PROFILE_FILE="${coverage_dir}/profraw/hipblaslt-coverage_%p.profraw"
-                                        GTEST_LISTENER=NO_PASS_LINE_IN_LOG
-                                        $<TARGET_FILE:hipblaslt-test>
-                                        --precompile=hipblaslt-test-precompile.db
-      )
+        #COMMAND ${CMAKE_COMMAND} -E env LLVM_PROFILE_FILE="${coverage_dir}/profraw/hipblaslt-coverage_%p.profraw"
+        #                                GTEST_LISTENER=NO_PASS_LINE_IN_LOG
+        #                                $<TARGET_FILE:hipblaslt-test>
+        #                                --precompile=hipblaslt-test-precompile.db
+        COMMAND ${CMAKE_COMMAND} -E env HIPBLASLT_BENCH_PERF=1 HIPBLASLT_ENABLE_MARKER=2 HIPBLASLT_LOG_MASK=64 LLVM_PROFILE_VERBOSE=1 LLVM_PROFILE_FILE=./hipblaslt-test_perf_64_coverage_%m.profraw $<TARGET_FILE:hipblaslt-test> --output-on-failure
+      ) 
+      #HIPBLASLT_BENCH_PERF=1 HIPBLASLT_ENABLE_MARKER=2 HIPBLASLT_LOG_MASK=64 LLVM_PROFILE_VERBOSE=1 LLVM_PROFILE_FILE=./hipblaslt-test_perf_64_coverage_%m.profraw ./clients/staging/hipblaslt-test --output-on-failure
+      #HIPBLASLT_ENABLE_MARKER=2 HIPBLASLT_LOG_MASK=128 LLVM_PROFILE_VERBOSE=1 LLVM_PROFILE_FILE=./hipblaslt-coverage_sample_hipblaslt_basic_matmul_for_cov_128_%m.profraw ./clients/staging/sample_hipblaslt_basic_matmul_for_cov --output-on-failure
       find_program(
         LLVM_PROFDATA
         llvm-profdata

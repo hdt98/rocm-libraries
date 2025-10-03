@@ -1,8 +1,8 @@
 # Copyright Advanced Micro Devices, Inc., or its affiliates.
 # SPDX-License-Identifier:  MIT
 
-add_executable(hipblaslt-bench)
 add_library(hipblaslt-clients-common STATIC)
+add_library(hipblaslt::hipblaslt-clients-common ALIAS hipblaslt-clients-common)
 
 target_include_directories(hipblaslt-clients-common
     PUBLIC
@@ -14,44 +14,16 @@ target_include_directories(hipblaslt-clients-common
         "${CMAKE_CURRENT_SOURCE_DIR}/../../tensilelite"
 )
 
-if(HIPBLASLT_ENABLE_COVERAGE)
-    target_include_directories(hipblaslt-clients-common 
-    PUBLIC
-        $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/library/src/amd_detail>
-        $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/library/src/amd_detail/rocblaslt/include>
-        $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/library/src/amd_detail/rocblaslt/src/include>
-    )
-
-    set(GIT_DESC "unknown")
-    if(GIT_FOUND)
-      execute_process(
-        COMMAND "${GIT_EXECUTABLE}" -C "${CMAKE_SOURCE_DIR}" rev-parse --short=12 HEAD
-        OUTPUT_VARIABLE GIT_DESC
-        OUTPUT_STRIP_TRAILING_WHITESPACE
-        ERROR_QUIET
-      )
-    endif()
-
-    file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/code_coverage_tuning_file.txt"
-                "Git Version: ${GIT_DESC}\n"
-                "    transA,transB,grouped_gemm,batch_count,m,n,k,alpha,lda,stride_a,beta,ldb,stride_b,ldc,stride_c,ldd,stride_d,"
-                "a_type,b_type,c_type,d_type,compute_type,scaleA,scaleB,scaleC,scaleD,amaxD,activation_type,bias_vector,bias_type,"
-                "aux_type,rotating_buffer,hipblaslt-Gflops,hipblaslt-GB/s,us,solution_index,gcnArchName,CUs\n"
-                "    T,N,0,1,512,1024,13,1,13,6656,0,13,13312,512,524288,512,524288,f32_r,f32_r,f32_r,f32_r,xf32_r,0,0,0,0,0,none,"
-                "1,f32_r,f32_r,512,464.651,69.1759,29.3371,532705,gfx942:sramecc+:xnack-,304"
-    )
-endif()
-
-add_library(hipblaslt::hipblaslt-clients-common ALIAS hipblaslt-clients-common)
-
 if(HIPBLASLT_ENABLE_BLIS)
     target_link_libraries(hipblaslt-clients-common PUBLIC BLIS::BLIS)
 endif()
+
 target_link_libraries(hipblaslt-clients-common
     PUBLIC
         roc::hipblaslt
         OpenMP::OpenMP_CXX
         ${LAPACK_LIBRARIES}
+        tensilelite::tensilelite-host
     PRIVATE
         hip::device
 )
@@ -73,6 +45,7 @@ if(HIPBLASLT_ENABLE_ASAN)
     hipblaslt_target_configure_sanitizers(hipblaslt-clients-common PUBLIC)
 endif()
 
+add_executable(hipblaslt-bench)
 target_link_libraries(hipblaslt-bench
     PRIVATE
         hip::device
