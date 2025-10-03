@@ -33,14 +33,14 @@
 #include <thread>
 #include <vector>
 
-TEST_CASE("API: Derived singleton works (GPUArchitectureLibrary)", "[API:LazySingleton]")
+TEST_CASE("LazySingletonAPI: Derived singleton works (GPUArchitectureLibrary)", "API:LazySingleton")
 {
     auto gpu1 = rocRoller::LazySingleton<rocRoller::GPUArchitectureLibrary>::getInstance();
     auto gpu2 = rocRoller::LazySingleton<rocRoller::GPUArchitectureLibrary>::getInstance();
     REQUIRE(gpu1 == gpu2);
 }
 
-TEST_CASE("API: Thread safety across dynamic linking boundary", "[API:LazySingleton]")
+TEST_CASE("LazySingletonAPI: Thread safety across dynamic linking boundary", "API:LazySingleton")
 {
     constexpr int                                                   N = 16;
     std::vector<std::shared_ptr<rocRoller::GPUArchitectureLibrary>> results(N);
@@ -61,7 +61,7 @@ TEST_CASE("API: Thread safety across dynamic linking boundary", "[API:LazySingle
     }
 }
 
-TEST_CASE("API: Reset is safe across threads", "[API:LazySingleton]")
+TEST_CASE("LazySingletonAPI: Reset is safe across threads", "API:LazySingleton")
 {
     auto before = rocRoller::Settings::getInstance();
 
@@ -73,7 +73,7 @@ TEST_CASE("API: Reset is safe across threads", "[API:LazySingleton]")
     // In dynamic-linking design, both are the same
     REQUIRE(before == after);
 }
-TEST_CASE("API: Shared_ptr remains valid after reset", "[API:LazySingleton]")
+TEST_CASE("LazySingletonAPI: Shared_ptr remains valid after reset", "API:LazySingleton")
 {
     auto instance = rocRoller::GPUArchitectureLibrary::getInstance();
     REQUIRE(instance != nullptr);
@@ -86,7 +86,7 @@ TEST_CASE("API: Shared_ptr remains valid after reset", "[API:LazySingleton]")
     REQUIRE(instance == instance2);
 }
 
-TEST_CASE("API: Different singletons remain independent", "[API:LazySingleton]")
+TEST_CASE("LazySingletonAPI: Different singletons remain independent", "API:LazySingleton")
 {
     auto settings = rocRoller::Settings::getInstance();
     auto gpuLib   = rocRoller::GPUArchitectureLibrary::getInstance();
@@ -95,17 +95,18 @@ TEST_CASE("API: Different singletons remain independent", "[API:LazySingleton]")
     auto settings2 = rocRoller::Settings::getInstance();
     auto gpuLib2   = rocRoller::GPUArchitectureLibrary::getInstance();
 
-    REQUIRE(settings == settings2); // Reset didn’t change Settings
+    REQUIRE(settings == settings2); // Reset didn't change Settings
     REQUIRE(gpuLib == gpuLib2); // GPUArchitectureLibrary unaffected
     REQUIRE(static_cast<const void*>(settings.get())
             != static_cast<const void*>(gpuLib.get())); // Distinct singletons
 }
 
-TEST_CASE("API: Settings boolean option change is globally visible", "[API:LazySingleton:Settings]")
+TEST_CASE("LazySingletonAPI: Settings boolean option change is globally visible",
+          "API:LazySingleton:Settings")
 {
     auto settings = rocRoller::Settings::getInstance();
 
-    // Set LogConsole to false (simulate API user program change)
+    // Set LogConsole to false, simulate API user program change
     settings->set(rocRoller::Settings::LogConsole, false);
 
     // From "library" code, fetch again through singleton
@@ -116,7 +117,8 @@ TEST_CASE("API: Settings boolean option change is globally visible", "[API:LazyS
     settingsAgain->set(rocRoller::Settings::LogConsole, true);
 }
 
-TEST_CASE("API: Settings string option change is globally visible", "[API:LazySingleton:Settings]")
+TEST_CASE("LazySingletonAPI: Settings string option change is globally visible",
+          "API:LazySingleton:Settings")
 {
     auto settings = rocRoller::Settings::getInstance();
 
@@ -127,7 +129,8 @@ TEST_CASE("API: Settings string option change is globally visible", "[API:LazySi
     REQUIRE(libView->get(rocRoller::Settings::ROCMPath) == customPath);
 }
 
-TEST_CASE("API: Static Get reflects changes made via instance set", "[API:LazySingleton:Settings]")
+TEST_CASE("LazySingletonAPI: Static Get reflects changes made via instance set",
+          "API:LazySingleton:Settings")
 {
     auto settings = rocRoller::Settings::getInstance();
 
@@ -140,7 +143,8 @@ TEST_CASE("API: Static Get reflects changes made via instance set", "[API:LazySi
     settings->set(rocRoller::Settings::LogConsole, true);
 }
 
-TEST_CASE("API: Independent settings options remain independent", "[API:LazySingleton:Settings]")
+TEST_CASE("LazySingletonAPI: Independent settings options remain independent",
+          "API:LazySingleton:Settings")
 {
     auto settings = rocRoller::Settings::getInstance();
 

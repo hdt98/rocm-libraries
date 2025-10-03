@@ -115,14 +115,9 @@ else()
     target_compile_definitions(rocroller-tests PRIVATE ROCROLLER_USE_LLVM)
 endif()
 
-if(ROCROLLER_ENABLE_CATCH)
-    add_subdirectory(catch)
-endif()
-
-
 if(ROCROLLER_ENABLE_TEST_DISCOVERY)
     set(TEST_REPORT_DIR "${PROJECT_BINARY_DIR}/test_report")
-
+    file(MAKE_DIRECTORY ${TEST_REPORT_DIR})
     include(GoogleTest)
     gtest_discover_tests(
         rocroller-tests
@@ -157,6 +152,8 @@ if(ROCROLLER_ENABLE_TEST_DISCOVERY)
         endif()
 
         include(Catch)
+        add_subdirectory(catch)
+        add_subdirectory(api)
         catch_discover_tests(
             rocroller-tests-catch
             REPORTER JUnit
@@ -182,7 +179,7 @@ if(ROCROLLER_ENABLE_TEST_DISCOVERY)
                        "ENVIRONMENT" "${asan_opts}"
             SKIP_REGULAR_EXPRESSION "[1-9][0-9]* skipped" "[1-9][0-9]* SKIPPED"
         )
-        
+
     endif()
 
     if(NOT ROCROLLER_ENABLE_SLOW_TESTS)
@@ -192,8 +189,7 @@ if(ROCROLLER_ENABLE_TEST_DISCOVERY)
     add_subdirectory(common)
     add_subdirectory(standalone)
     add_subdirectory(unit)
-    add_subdirectory(api)
-    
+
     add_test(
         NAME PythonLint
         COMMAND flake8

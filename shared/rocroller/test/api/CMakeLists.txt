@@ -16,6 +16,8 @@ if(NOT Catch2_FOUND)
     endif()
 endif()
 
+include(CTest)
+
 add_executable(rocroller-tests-api
     LazySingletonAPITest.cpp
 )
@@ -35,12 +37,12 @@ target_compile_features(rocroller-tests-api PRIVATE cxx_std_20)
 
 catch_discover_tests(
     rocroller-tests-api
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    TEST_PREFIX "API:"
+    EXTRA_ARGS --reporter console::out=-::colour-mode=ansi
     REPORTER JUnit
     OUTPUT_DIR ${PROJECT_BINARY_DIR}/test_report
     OUTPUT_SUFFIX ".xml"
-    EXTRA_ARGS "--reporter" "console::out=-::colour-mode=ansi"
-    TEST_SPEC "[api]"
     PROPERTIES LABELS "API"
-    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR} 
     DISCOVERY_MODE POST_BUILD
 )
