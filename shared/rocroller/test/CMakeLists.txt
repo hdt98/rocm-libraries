@@ -118,10 +118,7 @@ endif()
 if(ROCROLLER_ENABLE_CATCH)
     add_subdirectory(catch)
 endif()
-add_subdirectory(common)
-add_subdirectory(standalone)
-add_subdirectory(unit)
-add_subdirectory(api)
+
 
 if(ROCROLLER_ENABLE_TEST_DISCOVERY)
     set(TEST_REPORT_DIR "${PROJECT_BINARY_DIR}/test_report")
@@ -185,21 +182,18 @@ if(ROCROLLER_ENABLE_TEST_DISCOVERY)
                        "ENVIRONMENT" "${asan_opts}"
             SKIP_REGULAR_EXPRESSION "[1-9][0-9]* skipped" "[1-9][0-9]* SKIPPED"
         )
-        catch_discover_tests(
-            rocroller-tests-api
-            REPORTER JUnit
-            OUTPUT_DIR ${TEST_REPORT_DIR}
-            OUTPUT_SUFFIX ".xml"
-            DISCOVERY_MODE PRE_TEST
-            TEST_SPEC "[api]"
-            PROPERTIES LABELS "API"
-        )
+        
     endif()
 
     if(NOT ROCROLLER_ENABLE_SLOW_TESTS)
         set(PYTHON_TEST_SKIP "-m not slow")
     endif()
 
+    add_subdirectory(common)
+    add_subdirectory(standalone)
+    add_subdirectory(unit)
+    add_subdirectory(api)
+    
     add_test(
         NAME PythonLint
         COMMAND flake8

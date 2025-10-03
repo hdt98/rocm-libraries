@@ -26,76 +26,80 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <rocRoller/GPUArchitecture/GPUArchitectureLibrary.hpp>
 #include <rocRoller/Utilities/LazySingleton.hpp>
 #include <rocRoller/Utilities/Settings.hpp>
-#include <rocRoller/GPUArchitecture/GPUArchitectureLibrary.hpp>
 
 #include <thread>
 #include <vector>
 
-TEST_CASE("API: Derived singleton works (GPUArchitectureLibrary)", "[API:LazySingleton]") {
+TEST_CASE("API: Derived singleton works (GPUArchitectureLibrary)", "[API:LazySingleton]")
+{
     auto gpu1 = rocRoller::LazySingleton<rocRoller::GPUArchitectureLibrary>::getInstance();
     auto gpu2 = rocRoller::LazySingleton<rocRoller::GPUArchitectureLibrary>::getInstance();
     REQUIRE(gpu1 == gpu2);
 }
 
-TEST_CASE("API: Thread safety across dynamic linking boundary", "[API:LazySingleton]") {
-    constexpr int N = 16;
+TEST_CASE("API: Thread safety across dynamic linking boundary", "[API:LazySingleton]")
+{
+    constexpr int                                                   N = 16;
     std::vector<std::shared_ptr<rocRoller::GPUArchitectureLibrary>> results(N);
 
     std::vector<std::thread> threads;
-    for (int i = 0; i < N; ++i) {
+    for(int i = 0; i < N; ++i)
+    {
         threads.emplace_back([&results, i] {
             results[i] = rocRoller::LazySingleton<rocRoller::GPUArchitectureLibrary>::getInstance();
         });
     }
-    for (auto& t : threads) t.join();
+    for(auto& t : threads)
+        t.join();
 
-    for (int i = 1; i < N; ++i) {
+    for(int i = 1; i < N; ++i)
+    {
         REQUIRE(results[i] == results[0]);
     }
 }
 
-TEST_CASE("API: Reset is globally visible across threads", "[API:LazySingleton]") {
-    auto first = rocRoller::LazySingleton<rocRoller::Settings>::getInstance();
-    auto rawFirst = first.get();
+TEST_CASE("API: Reset is safe across threads", "[API:LazySingleton]")
+{
+    auto before = rocRoller::Settings::getInstance();
 
     std::thread t([] {
-        rocRoller::LazySingleton<rocRoller::Settings>::reset();
+        rocRoller::Settings::reset(); // no-op
     });
     t.join();
 
-    auto second = rocRoller::LazySingleton<rocRoller::Settings>::getInstance();
-    auto rawSecond = second.get();
+    auto after = rocRoller::Settings::getInstance();
 
-    REQUIRE(rawFirst != rawSecond);
+    // In dynamic-linking design, both are the same
+    REQUIRE(before == after);
+}
+TEST_CASE("API: Shared_ptr remains valid after reset", "[API:LazySingleton]")
+{
+    auto instance = rocRoller::GPUArchitectureLibrary::getInstance();
+    REQUIRE(instance != nullptr);
+
+    rocRoller::GPUArchitectureLibrary::reset(); // no-op
+
+    // After reset, pointer should still be valid and identical
+    auto instance2 = rocRoller::GPUArchitectureLibrary::getInstance();
+    REQUIRE(instance2 != nullptr);
+    REQUIRE(instance == instance2);
 }
 
-TEST_CASE("API: Shared_ptr stability across reset", "[API:LazySingleton]") {
-    auto inst1 = rocRoller::LazySingleton<rocRoller::GPUArchitectureLibrary>::getInstance();
-    auto inst2 = rocRoller::LazySingleton<rocRoller::GPUArchitectureLibrary>::getInstance();
+TEST_CASE("API: Different singletons remain independent", "[API:LazySingleton]")
+{
+    auto settings = rocRoller::Settings::getInstance();
+    auto gpuLib   = rocRoller::GPUArchitectureLibrary::getInstance();
 
-    REQUIRE(inst1 == inst2);
+    rocRoller::Settings::reset(); // no-op
 
-    // Reset should not invalidate previously held shared_ptrs
-    rocRoller::LazySingleton<rocRoller::GPUArchitectureLibrary>::reset();
+    auto settings2 = rocRoller::Settings::getInstance();
+    auto gpuLib2   = rocRoller::GPUArchitectureLibrary::getInstance();
 
-    auto inst3 = rocRoller::LazySingleton<rocRoller::GPUArchitectureLibrary>::getInstance();
-    REQUIRE(inst1 != inst3);
-
-    // The old shared_ptr is still valid
-    REQUIRE(inst1 != nullptr);
-}
-
-TEST_CASE("API: Resetting one singleton does not affect another", "[API:LazySingleton]") {
-    auto settings1 = rocRoller::LazySingleton<rocRoller::Settings>::getInstance();
-    auto gpu1      = rocRoller::LazySingleton<rocRoller::GPUArchitectureLibrary>::getInstance();
-
-    rocRoller::LazySingleton<rocRoller::Settings>::reset();
-
-    auto settings2 = rocRoller::LazySingleton<rocRoller::Settings>::getInstance();
-    auto gpu2      = rocRoller::LazySingleton<rocRoller::GPUArchitectureLibrary>::getInstance();
-
-    REQUIRE(settings1 != settings2);  // reset affected only Settings
-    REQUIRE(gpu1 == gpu2);            // GPUArchitectureLibrary unaffected
+    REQUIRE(settings == settings2); // Reset didn’t change Settings
+    REQUIRE(gpuLib == gpuLib2); // GPUArchitectureLibrary unaffected
+    REQUIRE(static_cast<const void*>(settings.get())
+            != static_cast<const void*>(gpuLib.get())); // Distinct singletons
 }

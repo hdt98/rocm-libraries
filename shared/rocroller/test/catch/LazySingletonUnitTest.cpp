@@ -40,16 +40,18 @@ TEST_CASE("Unit: Same instance is returned", "[Unit:LazySingleton]")
     REQUIRE(a == b);
 }
 
-TEST_CASE("Unit: Reset replaces the instance", "[Unit:LazySingleton]")
+TEST_CASE("Unit: Reset does not break singleton instance", "[Unit:LazySingleton]")
 {
-    auto first    = rocRoller::LazySingleton<rocRoller::Settings>::getInstance();
-    auto rawFirst = first.get();
+    auto instance1 = rocRoller::Settings::getInstance();
+    REQUIRE(instance1 != nullptr);
 
-    rocRoller::LazySingleton<rocRoller::Settings>::reset();
-    auto second    = rocRoller::LazySingleton<rocRoller::Settings>::getInstance();
-    auto rawSecond = second.get();
+    rocRoller::Settings::reset(); // no-op in dynamic-linking version
 
-    REQUIRE(rawFirst != rawSecond);
+    auto instance2 = rocRoller::Settings::getInstance();
+    REQUIRE(instance2 != nullptr);
+
+    // In dynamic-linking safe design, reset does not change identity
+    REQUIRE(instance1 == instance2);
 }
 
 TEST_CASE("Unit: Different types have independent instances", "[Unit:LazySingleton]")
@@ -77,22 +79,17 @@ TEST_CASE("Unit: Singleton persists across scopes", "[Unit:LazySingleton]")
     REQUIRE(inst3.get() == raw1);
 }
 
-TEST_CASE("Unit: Multiple resets always create new instances", "[Unit:LazySingleton]")
+TEST_CASE("Unit: Multiple resets keep the same singleton instance", "[Unit:LazySingleton]")
 {
-    auto first    = rocRoller::LazySingleton<rocRoller::Settings>::getInstance();
-    auto rawFirst = first.get();
+    auto instance1 = rocRoller::GPUArchitectureLibrary::getInstance();
 
-    rocRoller::LazySingleton<rocRoller::Settings>::reset();
-    auto second    = rocRoller::LazySingleton<rocRoller::Settings>::getInstance();
-    auto rawSecond = second.get();
-
-    REQUIRE(rawFirst != rawSecond);
-
-    rocRoller::LazySingleton<rocRoller::Settings>::reset();
-    auto third    = rocRoller::LazySingleton<rocRoller::Settings>::getInstance();
-    auto rawThird = third.get();
-
-    REQUIRE(rawSecond != rawThird);
+    for(int i = 0; i < 5; ++i)
+    {
+        rocRoller::GPUArchitectureLibrary::reset();
+        auto instance2 = rocRoller::GPUArchitectureLibrary::getInstance();
+        REQUIRE(instance2 != nullptr);
+        REQUIRE(instance1 == instance2); // Always the same object
+    }
 }
 
 TEST_CASE("Unit: Thread safety under concurrent access", "[Unit:LazySingleton]")
