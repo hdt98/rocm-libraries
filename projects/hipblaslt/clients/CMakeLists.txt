@@ -109,11 +109,9 @@ if(BUILD_TESTING OR HIPBLASLT_BUILD_TESTING)
             OpenMP::OpenMP_CXX
             ${CMAKE_DL_LIBS}
     )
-    target_include_directories(hipblaslt-test
-        PRIVATE
-            ${CMAKE_CURRENT_SOURCE_DIR}/../tensilelite/rocisa
-    )
-    target_compile_definitions(hipblaslt-test PRIVATE GOOGLE_TEST TENSILE_USE_HIP)
+
+    target_compile_definitions(hipblaslt-test PRIVATE GOOGLE_TEST)
+
     if(HIPBLASLT_ENABLE_ROCROLLER)
         target_compile_definitions(hipblaslt-test PRIVATE HIPBLASLT_USE_ROCROLLER)
     endif()
