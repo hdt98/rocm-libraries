@@ -42,9 +42,9 @@ struct WMMAVecType<T,
         return ck::is_same_v<T, D>;
     }
 
-    using VecT  = vector_type<T, kMultiplier * 16>;
+    using VecT  = vector_type<T, kMultiplier * 8>;
     using ViewT = vector_type<T, 2>;
-    static constexpr int size = kMultiplier * 16; // Number of T elements in the vector
+    static constexpr int size = kMultiplier * 8; // Number of T elements in the vector
 };
 
 template <typename T, index_t kMultiplier>
@@ -196,7 +196,7 @@ __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
     constexpr int ToIntDim    = WMMAVecType<srcA_t, kMultiplier>::ToIntDim;
     
     // to int dim is 1 for float, 2 for half; base dim assumption is 16
-    constexpr int SRC_DIM = (16 * kMultiplier) / ToIntDim;
+    constexpr int SRC_DIM = WMMAVecType<srcA_t, kMultiplier>::size / ToIntDim;
     /* TODO:: Handle exceptions for f32 and f64 input and K dim is only size 4. 
         Then we need to do 4*K Multiplier? */ 
 
@@ -902,9 +902,9 @@ struct TestWmma
         ck::wmma_op_util::GemmParams params;
         params.M       = 16;
         params.N       = 16;
-        params.K       = 32 * KMultiplier;
-        params.StrideA = 32 * KMultiplier;
-        params.StrideB = 32 * KMultiplier;
+        params.K       = 16 * KMultiplier;
+        params.StrideA = 16 * KMultiplier;
+        params.StrideB = 16 * KMultiplier;
         params.StrideC = 16;
 
         auto host_tensors = PrepareGemmTensor(params);
