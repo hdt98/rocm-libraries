@@ -4,7 +4,7 @@
 #pragma once
 #include "origami/gemm.hpp"
 #include "origami/hardware.hpp"
-#include "origami/utils.hpp"
+#include "origami/origami.hpp"
 #include <gtest/gtest.h>
 #include <map>
 #include <string>
