@@ -279,7 +279,8 @@ void ComputeTotalLatency(const origami::hardware_t& hardware,
                                     size_t          element_size_out, //In bits
                                     size_t          mx_block_size,
                                     int             WGM,
-                                    size_t          splittingFactor)
+                                    size_t          splittingFactor,
+                                    size_t          max_cus)
 {
     double latency_cycles_small = origami::compute_total_latency(hardware,
                                                                             M,
@@ -300,7 +301,8 @@ void ComputeTotalLatency(const origami::hardware_t& hardware,
                                                                             origami::data_type_t::BFloat16,
                                                                             mx_block_size,
                                                                             WGM,
-                                                                            splittingFactor);
+                                                                            splittingFactor,
+                                                                            max_cus);
 
     double latency_cycles_large = origami::compute_total_latency(hardware,
                                                                             M,
@@ -321,7 +323,8 @@ void ComputeTotalLatency(const origami::hardware_t& hardware,
                                                                             origami::data_type_t::BFloat16,
                                                                             mx_block_size,
                                                                             WGM,
-                                                                            splittingFactor);
+                                                                            splittingFactor,
+                                                                            max_cus);
     EXPECT_LT(latency_cycles_small, latency_cycles_large);
 }
 
@@ -340,7 +343,8 @@ void ComputePerfGflops(size_t          M,
                                     size_t          element_size_A, //In bits
                                     size_t          element_size_B, //In bits,
                                     size_t          element_size_out, //In bits
-                                    int             WGM)
+                                    int             WGM,
+                                    size_t          max_cus)
 {
     auto gfx942arch  = origami::hardware_t::arch_name_to_enum("gfx942");
     auto gfx942_slow = origami::hardware_t(
@@ -364,7 +368,8 @@ void ComputePerfGflops(size_t          M,
                                                                      element_size_B,
                                                                      element_size_out,
                                                                      origami::data_type_t::BFloat16,
-                                                                     WGM);
+                                                                     WGM,
+                                                                     max_cus);
     double flops_fast = origami::compute_perf_gflops(gfx942_fast,
                                                                      M,
                                                                      N,
@@ -382,7 +387,8 @@ void ComputePerfGflops(size_t          M,
                                                                      element_size_B,
                                                                      element_size_out,
                                                                      origami::data_type_t::BFloat16,
-                                                                     WGM);
+                                                                     WGM,
+                                                                     max_cus);
     EXPECT_GT(flops_fast, flops_slow); // faster clock = higher flops
 }
 
@@ -446,6 +452,7 @@ void BestGridSize(const origami::hardware_t& hardware,
                                      double          H_L2,
                                      size_t          WGM,
                                      size_t          biggest_allowable_split,
+                                     size_t          max_cus,
                                      const std::optional<int>                 expected_gt)
 {
     size_t grid_size = origami::select_best_grid_size(M,
@@ -468,7 +475,8 @@ void BestGridSize(const origami::hardware_t& hardware,
                                                                       mx_block_size,
                                                                       H_L2,
                                                                       WGM,
-                                                                      biggest_allowable_split);
+                                                                      biggest_allowable_split,
+                                                                      max_cus);
     EXPECT_GT(grid_size, expected_gt);
 }
 
@@ -478,13 +486,14 @@ void BestMacroTileSize(const origami::hardware_t& hardware,
                        size_t                        K,
                        size_t                        batch,
                        bool                          transA,
-                                                             bool                          transB,
-                                                             size_t element_size_A, //In bits
-                                                             size_t element_size_B, //In bits
-                                                             size_t element_size_out, //In bits
-                                                             size_t mx_block_size,
-                                                             double H_L2,
-                                                             size_t WGM)
+                       bool                          transB,
+                       size_t element_size_A, //In bits
+                       size_t element_size_B, //In bits
+                       size_t element_size_out, //In bits
+                       size_t mx_block_size,
+                       double H_L2,
+                       size_t WGM,
+                       size_t max_cus)
 {
     const std::vector<std::tuple<size_t, // MT_M
                            size_t, // MT_N
@@ -500,7 +509,7 @@ void BestMacroTileSize(const origami::hardware_t& hardware,
         MT_list
         = {{256, 256, 32, 32, 32, 8, 1, 6, 0, 0}, {128, 128, 64, 32, 32, 8, 1, 6, 0, 0}, {64, 64, 64, 32, 32, 8, 1, 6, 0, 0}};
     auto results = select_best_macro_tile_size(
-        M, N, K, batch, transA, transB, hardware, MT_list, element_size_A, element_size_B, element_size_out, origami::data_type_t::BFloat16, mx_block_size, H_L2, false, WGM);
+        M, N, K, batch, transA, transB, hardware, MT_list, element_size_A, element_size_B, element_size_out, origami::data_type_t::BFloat16, mx_block_size, H_L2, false, WGM, max_cus);
 
     EXPECT_EQ(results.size(), MT_list.size());
     for(int i = 0; i < results.size() - 1; i++)

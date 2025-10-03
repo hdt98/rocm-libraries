@@ -136,7 +136,8 @@ namespace origami
                                      size_t          mx_block_size,
                                      double          H_L2,
                                      size_t          WGM,
-                                     size_t          biggest_allowable_split)
+                                     size_t          biggest_allowable_split,
+                                     size_t          max_cus)
         {
 
             // compute how many 32×32 tiles are needed in each dim,
@@ -170,7 +171,8 @@ namespace origami
                                                        mi_datatype,
                                                        mx_block_size,
                                                        WGM,
-                                                       split);
+                                                       split,
+                                                       max_cus);
 
                 if(latency < best_latency)
                 {
@@ -200,7 +202,8 @@ namespace origami
                                                              size_t   mx_block_size,
                                                              double   H_L2,
                                                              bool     print,
-                                                             size_t   defaultWGM)
+                                                             size_t   defaultWGM,
+                                                             size_t   max_cus)
         {
             std::vector<result_tuple> valid_results;
             valid_results.reserve(MT_list.size());
@@ -249,7 +252,8 @@ namespace origami
                                                                  mi_datatype,
                                                                  mx_block_size,
                                                                  WGM,
-                                                                 0); // split will be picked automatically
+                                                                 0, // split will be picked automatically
+                                                                 max_cus);
 
                     valid_results.emplace_back(
                         Total_latency, MT_M, MT_N, MT_K, MI_M, MI_N, MI_K, occupancy, WGM, non_temporal_a, non_temporal_b);
@@ -460,7 +464,8 @@ namespace origami
                 bool                          print,
                 size_t                        WGM,
                 std::function<double(size_t, size_t, size_t, size_t, size_t, size_t, hardware_t&)>
-                    tie_breaker_fn)
+                    tie_breaker_fn,
+                size_t                        max_cus)
         {
             std::vector<std::tuple<double, size_t, size_t, size_t, size_t, size_t, size_t>> results;
 
@@ -506,7 +511,8 @@ namespace origami
                                                 mi_datatype,
                                                 mx_block_size,
                                                 WGM,
-                                                split);
+                                                split,
+                                                max_cus);
 
                     results.push_back(
                         std::make_tuple(Total_latency, MT_M, MT_N, MT_K, MI_M, MI_N, MI_K));

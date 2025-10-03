@@ -96,6 +96,23 @@ NB_MODULE(origami, m)
     m.def("string_to_datatype", &origami::string_to_data_type, "Convert a string representation of a datatype into data_type_t enum");
     m.def("select_best_macro_tile_size",
           &origami::select_best_macro_tile_size,
+          "M"_a,
+          "N"_a,
+          "K"_a,
+          "batch"_a,
+          "transA"_a,
+          "transB"_a,
+          "hardware"_a,
+          "MT_list"_a,
+          "element_size_A"_a,
+          "element_size_B"_a,
+          "element_size_out"_a,
+          "mi_datatype"_a,
+          "mx_block_size"_a,
+          "H_L2"_a,
+          "print"_a,
+          "WGM"_a,
+          "max_cus"_a = 0,
           "Get best macro tile sizes.");
     m.def("select_reduction", &origami::streamk::select_reduction, "Select best StreamK reduction strategy");
     m.def("select_grid", &origami::streamk::select_grid,
@@ -124,6 +141,28 @@ NB_MODULE(origami, m)
           "reduction_strategy"_a,
           "max_cus"_a = 0,
           "Select Best StreamK Grid Size");
-    m.def("compute_total_latency", &origami::compute_total_latency, "compute_total_latency");
+    m.def("compute_total_latency", &origami::compute_total_latency,
+          "hardware"_a,
+          "M"_a,
+          "N"_a,
+          "K"_a,
+          "batch"_a,
+          "transA"_a,
+          "transB"_a,
+          "MT_M"_a,
+          "MT_N"_a,
+          "MT_K"_a,
+          "MI_M"_a,
+          "MI_N"_a,
+          "MI_K"_a,
+          "element_size_A"_a,
+          "element_size_B"_a,
+          "element_size_out"_a,
+          "mi_datatype"_a,
+          "mx_block_size"_a,
+          "WGM"_a,
+          "split"_a = 0,
+          "max_cus"_a = 0,
+          "Compute the total latency of a gemm");
     m.def("select_best_wgm", &origami::select_best_wgm, "Get best workgroup mapping.");
 }

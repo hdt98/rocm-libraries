@@ -55,7 +55,8 @@ namespace origami
                                      size_t          mx_block_size,
                                      double          H_L2,
                                      size_t          WGM,
-                                     size_t          biggest_allowable_split = 8);
+                                     size_t          biggest_allowable_split = 8,
+                                     size_t          max_cus = 0);
 
         std::vector<result_tuple> select_best_macro_tile_size(size_t                        M,
                                                              size_t                        N,
@@ -72,7 +73,8 @@ namespace origami
                                                              size_t mx_block_size,
                                                              double H_L2,
                                                              bool   print,
-                                                             size_t WGM);
+                                                             size_t WGM,
+                                                             size_t max_cus = 0);
 
         std::vector<result_tuple> sweep_macro_tile_sizes(size_t    M,
                                                         size_t    N,

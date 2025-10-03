@@ -396,7 +396,8 @@ namespace origami
                             0,
                             0.0,
                             workgroup_mapping,
-                            10);
+                            10,
+                            max_cus);
             }
             else if(dynamic_grid_version == 6)
             {

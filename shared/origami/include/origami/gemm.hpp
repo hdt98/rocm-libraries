@@ -188,7 +188,8 @@ namespace origami
                                      data_type_t     mi_datatype,
                                      size_t          mx_block_size,
                                      int             WGM,
-                                     size_t          split = 0);
+                                     size_t          split = 0,
+                                     size_t          max_cus = 0);
 
 
         // Compute the performance from the latency.
@@ -211,5 +212,6 @@ namespace origami
                                    size_t          element_size_B,
                                    size_t          element_size_out,
                                    data_type_t     mi_datatype,                                   
-                                   int             WGM);
+                                   int             WGM,
+                                   size_t          max_cus = 0);
 } // namespace origami
