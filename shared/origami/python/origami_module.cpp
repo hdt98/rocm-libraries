@@ -14,6 +14,8 @@
 #include <nanobind/stl/tuple.h>
 
 using hardware_t = origami::hardware_t;
+namespace nb = nanobind;
+using namespace nb::literals;
 
 NB_MODULE(origami, m)
 {
@@ -96,7 +98,32 @@ NB_MODULE(origami, m)
           &origami::select_best_macro_tile_size,
           "Get best macro tile sizes.");
     m.def("select_reduction", &origami::streamk::select_reduction, "Select best StreamK reduction strategy");
-    m.def("select_grid", &origami::streamk::select_grid, "Select Best StreamK Grid Size");
+    m.def("select_grid", &origami::streamk::select_grid,
+          "x"_a,
+          "y"_a,
+          "z"_a,
+          "batch"_a,
+          "trans_a"_a,
+          "trans_b"_a,
+          "element_size_A"_a,
+          "element_size_B"_a,
+          "element_size_out"_a,
+          "mi_datatype"_a,
+          "workspace_size"_a,
+          "mt_m"_a,
+          "mt_n"_a,
+          "mt_k"_a,
+          "mi_m"_a,
+          "mi_n"_a,
+          "mi_k"_a,
+          "workgroup_mapping"_a,
+          "workspace_size_per_elem_c"_a,
+          "occupancy"_a,
+          "analytical_hardware"_a,
+          "dynamic_grid_version"_a,
+          "reduction_strategy"_a,
+          "max_cus"_a = 0,
+          "Select Best StreamK Grid Size");
     m.def("compute_total_latency", &origami::compute_total_latency, "compute_total_latency");
     m.def("select_best_wgm", &origami::select_best_wgm, "Get best workgroup mapping.");
 }
