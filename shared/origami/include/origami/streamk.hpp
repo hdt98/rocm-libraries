@@ -12,6 +12,22 @@ namespace origami {
 namespace streamk {
 
 /**
+ * @brief Number of output tiles.
+ *
+ * @param mt_m Tile size in M-dimension.
+ * @param mt_n Tile size in N-dimension.
+ * @param m Matrix's m-dimension.
+ * @param n Matrix's n-dimension.
+ * @param batch Number of batches.
+ * @return size_t Total number of output tiles.
+ */
+std::size_t compute_number_of_output_tiles(std::size_t mt_m,
+                                           std::size_t mt_n,
+                                           std::size_t m,
+                                           std::size_t n,
+                                           std::size_t batch);
+
+/**
  * @brief Select the best reduction strategy for StreamK.
  *
  * @param problem Problem description (M, N, K, etc.)
@@ -24,7 +40,7 @@ reduction_t select_reduction(const problem_t& problem,
                              const hardware_t& hardware,
                              const config_t& config,
                              grid_selection_t algorithm);
-                             
+
 /**
  * @brief Based on the provided kernel config, select the best grid dimension.
  *

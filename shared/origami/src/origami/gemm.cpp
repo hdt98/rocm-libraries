@@ -10,11 +10,12 @@
 #include <set>
 #include <tuple>
 
-#include "origami/gemm.hpp"
 #include "origami/math.hpp"
-#include "origami/origami.hpp"
-#include "origami/streamk.hpp"
 #include "origami/types.hpp"
+#include "origami/hardware.hpp"
+
+#include "origami/gemm.hpp"
+#include "origami/streamk.hpp"
 
 namespace origami {
 
@@ -25,9 +26,8 @@ std::tuple<size_t, size_t, size_t> compute_cu_occupancy(const problem_t& problem
                                                         const config_t& config,
                                                         grid_selection_t grid_selection) {
   // Number of output MTs
-  std::size_t num_mt_m = math::safe_ceil_div(problem.size.m, config.mt.m);
-  std::size_t num_mt_n = math::safe_ceil_div(problem.size.n, config.mt.n);
-  std::size_t num_mts  = num_mt_m * num_mt_n * problem.batch;
+  std::size_t num_mts = streamk::compute_number_of_output_tiles(
+      config.mt.m, config.mt.n, problem.size.m, problem.size.n, problem.batch);
 
   reduction_t rt = streamk::select_reduction(problem, hardware, config, grid_selection);
 

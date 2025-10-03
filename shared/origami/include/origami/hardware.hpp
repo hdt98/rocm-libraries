@@ -42,7 +42,7 @@ enum class data_type_t : int {
   None = Count
 };
 
-inline data_type_t int_to_data_type(int dt) { return (data_type_t)dt; }
+inline data_type_t int_to_data_type(int dt) { return static_cast<data_type_t>(dt); }
 
 inline int data_type_to_bits(data_type_t type) {
   switch (type) {

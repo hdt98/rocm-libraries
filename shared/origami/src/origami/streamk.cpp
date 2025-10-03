@@ -1,14 +1,24 @@
 // Copyright Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier:  MIT
 
-#include "origami/streamk.hpp"
-#include "origami/hardware.hpp"
 #include "origami/math.hpp"
-#include "origami/origami.hpp"
 #include "origami/types.hpp"
+#include "origami/hardware.hpp"
+
+#include "origami/streamk.hpp"
 
 namespace origami {
 namespace streamk {
+
+std::size_t compute_number_of_output_tiles(std::size_t mt_m,
+                                           std::size_t mt_n,
+                                           std::size_t m,
+                                           std::size_t n,
+                                           std::size_t batch) {
+  std::size_t m_tiles = math::safe_ceil_div(m, mt_m);
+  std::size_t n_tiles = math::safe_ceil_div(n, mt_n);
+  return m_tiles * n_tiles * batch;
+}
 
 /**
  * @brief Returns number of k-iterations.
@@ -39,28 +49,8 @@ constexpr size_t num_iters_per_tile(std::size_t mt_k, std::size_t k) {
  * @param g Number of workgroups (grid-size).
  * @return constexpr size_t Number of iterations per workgroup.
  */
-constexpr size_t num_iters_per_cta(std::size_t iters_total, std::size_t g) {
+constexpr size_t num_iters_per_wgs(std::size_t iters_total, std::size_t g) {
   return math::safe_ceil_div(iters_total, g);
-}
-
-/**
- * @brief Number of output tiles.
- *
- * @param mt_m Tile size in M-dimension.
- * @param mt_n Tile size in N-dimension.
- * @param m Matrix's m-dimension.
- * @param n Matrix's n-dimension.
- * @param batch Number of batches.
- * @return constexpr size_t Total number of output tiles.
- */
-constexpr size_t number_of_output_tiles(std::size_t mt_m,
-                                        std::size_t mt_n,
-                                        std::size_t m,
-                                        std::size_t n,
-                                        std::size_t batch) {
-  size_t m_tiles = math::safe_ceil_div(m, mt_m);
-  size_t n_tiles = math::safe_ceil_div(n, mt_n);
-  return m_tiles * n_tiles * batch;
 }
 
 /**
@@ -107,11 +97,11 @@ double predicted_runtime(dim3_t mt,
                          double b,
                          double c,
                          double d) {
-  std::size_t output_tiles   = number_of_output_tiles(mt.m, mt.n, size.m, size.n, batch);
+  std::size_t output_tiles   = compute_number_of_output_tiles(mt.m, mt.n, size.m, size.n, batch);
   std::size_t iters_per_tile = num_iters_per_tile(mt.k, size.k);
   std::size_t iters_total    = num_iters_total(output_tiles, iters_per_tile);
-  std::size_t iters_per_cta  = num_iters_per_cta(iters_total, g);
-  std::size_t fixup_peers    = num_fixup_peers(g, iters_total, iters_per_tile, iters_per_cta);
+  std::size_t iters_per_wgs  = num_iters_per_wgs(iters_total, g);
+  std::size_t fixup_peers    = num_fixup_peers(g, iters_total, iters_per_tile, iters_per_wgs);
 
   std::size_t remainder_tiles = output_tiles % g;
   double k_split_ratio        = remainder_tiles / static_cast<double>(g);
@@ -130,7 +120,7 @@ double predicted_runtime(dim3_t mt,
 
   // Include the cache penalty in the latency prediction
   double latency =
-      a + (b * (fixup_peers > 1)) + (c * iters_per_cta) + (d * (fixup_peers - 1)) + cache_penalty;
+      a + (b * (fixup_peers > 1)) + (c * iters_per_wgs) + (d * (fixup_peers - 1)) + cache_penalty;
 
   return latency;
 }
@@ -170,14 +160,14 @@ size_t get_workspace(size_t x,
   return size;
 }
 
-reduction_t select_reduction(const hardware_t& hardware,
-                             const problem_t& problem,
+reduction_t select_reduction(const problem_t& problem,
+                             const hardware_t& hardware,
                              const config_t& config,
                              grid_selection_t algorithm) {
   reduction_t reduction_strategy = reduction_t::tree;
 
   if (algorithm == grid_selection_t::k_split_aware) {
-    size_t tiles = number_of_output_tiles(
+    size_t tiles = compute_number_of_output_tiles(
         config.mt.m, config.mt.n, problem.size.m, problem.size.n, problem.batch);
     size_t iters_per_tile = num_iters_per_tile(problem.size.k, config.mt.k);
 
@@ -198,7 +188,7 @@ std::size_t grid_min_resources(const problem_t& problem,
                                const hardware_t& hardware,
                                const config_t& config) {
   std::size_t cu_count = hardware.N_CU;
-  std::size_t tiles    = number_of_output_tiles(
+  std::size_t tiles    = compute_number_of_output_tiles(
       config.mt.m, config.mt.n, problem.size.m, problem.size.n, problem.batch);
   return std::min(cu_count, tiles);
 }
@@ -207,7 +197,7 @@ std::size_t grid_energy_aware(const problem_t& problem,
                               const hardware_t& hardware,
                               const config_t& config) {
   std::size_t cu_count = hardware.N_CU;
-  std::size_t tiles    = number_of_output_tiles(
+  std::size_t tiles    = compute_number_of_output_tiles(
       config.mt.m, config.mt.n, problem.size.m, problem.size.n, problem.batch);
   std::size_t sk_grid = cu_count;
 
@@ -268,7 +258,7 @@ std::size_t grid_reduction_cost_aware(const problem_t& problem,
 }
 
 std::size_t grid_data_parallel(const problem_t& problem, const config_t& config) {
-  return number_of_output_tiles(
+  return compute_number_of_output_tiles(
       config.mt.m, config.mt.n, problem.size.m, problem.size.n, problem.batch);
 }
 
@@ -316,7 +306,7 @@ std::size_t grid_k_split_aware(const problem_t& problem,
                                const hardware_t& hardware,
                                const config_t& config) {
   std::size_t cu_count = hardware.N_CU;
-  std::size_t tiles    = number_of_output_tiles(
+  std::size_t tiles    = compute_number_of_output_tiles(
       config.mt.m, config.mt.n, problem.size.m, problem.size.n, problem.batch);
 
   std::size_t sk_grid = tiles;  // Fallback if no good fractional tile is found
