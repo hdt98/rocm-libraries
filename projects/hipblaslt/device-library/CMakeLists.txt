@@ -1,6 +1,9 @@
 # Copyright Advanced Micro Devices, Inc., or its affiliates.
 # SPDX-License-Identifier:  MIT
 
+add_subdirectory(extops)
+add_subdirectory(matrix-transform)
+
 set(TENSILELITE_BUILD_PARALLEL_LEVEL "" CACHE STRING "Number of CPU cores to use for building device libraries (will use nproc if unset).")
 set(TENSILELITE_KEEP_BUILD_TMP OFF CACHE STRING "Keep temporary build directory for device libraries (turning this ON  bloat the build size).")
 set(TENSILELITE_LIBLOGIC_PATH "" CACHE STRING "Path to library logic files (will use 'library' if unset).")
@@ -81,8 +84,6 @@ block(SCOPE_FOR VARIABLES)
 endblock()
 
 add_custom_target(tensilelite-device-libraries ALL
-    DEPENDS "${output_stamp}"
+    DEPENDS "${output_stamp}" extop-libraries matrix-transform-cp
 )
 
-add_subdirectory(extops)
-add_subdirectory(matrix-transform)

@@ -32,7 +32,7 @@ foreach(arch IN LISTS archs)
     list(APPEND arch_flags "--offload-arch=${arch}")
 endforeach()
 
-set(output_library "${CMAKE_CURRENT_BINARY_DIR}/hipblasltTransform.hsaco")
+set(matrix_transform_output_library "${CMAKE_CURRENT_BINARY_DIR}/hipblasltTransform.hsaco")
 set(matrix_transform_cpp "${CMAKE_CURRENT_SOURCE_DIR}/matrix_transform.cpp")
 
 add_custom_command(
@@ -42,6 +42,6 @@ add_custom_command(
 )
 
 add_custom_target(matrix-transform-cp ALL
-    DEPENDS ${output_library}
-    COMMAND ${CMAKE_COMMAND} -E copy "${output_library}" "${HIPBLASLT_TENSILE_LIBPATH}/library"
+    DEPENDS ${matrix_transform_output_library}
+    COMMAND ${CMAKE_COMMAND} -E copy "${matrix_transform_output_library}" "${HIPBLASLT_TENSILE_LIBPATH}/library"
 )
