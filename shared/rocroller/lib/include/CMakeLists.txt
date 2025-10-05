@@ -1,8 +1,31 @@
 # Copyright Advanced Micro Devices, Inc., or its affiliates.
 # SPDX-License-Identifier: MIT
 
-target_sources(rocroller
-    PRIVATE
+add_library(rocroller_public_headers INTERFACE)
+set_target_properties(rocroller_public_headers PROPERTIES LINKER_LANGUAGE CXX)
+target_compile_features(rocroller_public_headers INTERFACE cxx_std_20)
+target_compile_definitions(rocroller_public_headers
+    INTERFACE
+        ROCROLLER_USE_HIP
+        __HIP_PLATFORM_AMD__
+)
+
+target_link_libraries(rocroller_public_headers
+    INTERFACE
+       hip::host
+       fmt::fmt-header-only
+)
+if(ROCROLLER_ENABLE_YAML_CPP)
+    target_link_libraries(rocroller_public_headers INTERFACE yaml-cpp::yaml-cpp)
+    target_compile_definitions(rocroller_public_headers INTERFACE ROCROLLER_USE_YAML_CPP)
+endif()
+
+target_sources(rocroller_public_headers
+    INTERFACE
+    FILE_SET rocroller_public_headers_file_set
+    TYPE HEADERS
+    BASE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}"
+    FILES
         "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/AssemblyKernel.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/AssemblyKernelArgument.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/AssemblyKernelArgument_fwd.hpp"
@@ -319,47 +342,7 @@ target_sources(rocroller
         "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Costs/WaitCntNopCost.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Costs/WaitCntNopCost_fwd.hpp"
 
-        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/AllocatingObserver.hpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/FileWritingObserver.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/ObserverCreation.hpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/RegisterLivenessObserver.hpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/SupportedInstructionObserver.hpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitcntObserver.hpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitcntObserver_impl.hpp"
-
-        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/FunctionalUnit/MEMObserver.hpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/FunctionalUnit/MEMObserver_impl.hpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/FunctionalUnit/MFMAObserver.hpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/FunctionalUnit/WMMAObserver.hpp"
-
-        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitState/BufferStoreDwordXXRead.hpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitState/OPSEL94x.hpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitState/VALUTransWrite94x.hpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitState/VALUWriteReadlane94x.hpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitState/VALUWriteSGPRVCC.hpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitState/VALUWriteSGPRVMEM.hpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitState/VALUWriteVCCVDIVFMAS.hpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitState/VCMPXWrite94x.hpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitState/WaitStateObserver.hpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitState/WaitStateObserver_impl.hpp"
-
-        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitState/MFMA/ACCVGPRReadWrite.hpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitState/MFMA/ACCVGPRWriteWrite.hpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitState/MFMA/CMPXWriteExec.hpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitState/MFMA/DGEMM16x16x4Write.hpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitState/MFMA/DGEMM4x4x4Write.hpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitState/MFMA/DLWrite.hpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitState/MFMA/VALUWrite.hpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitState/MFMA/XDLReadSrcC908.hpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitState/MFMA/XDLReadSrcC90a.hpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitState/MFMA/XDLReadSrcC94x.hpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitState/MFMA/XDLWrite908.hpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitState/MFMA/XDLWrite90a.hpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitState/MFMA/XDLWrite94x.hpp"
-
-        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitState/WMMA/WMMAReadSrcD.hpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitState/WMMA/WMMAWrite.hpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitState/WMMA/WMMAWriteSrcD.hpp"
 
         "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Serialization/AssemblyKernel.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Serialization/Base.hpp"
@@ -417,3 +400,72 @@ target_sources(rocroller
         "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Utilities/Utils_impl.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Utilities/Version.hpp"
 )
+
+add_library(rocroller_private_headers INTERFACE)
+set_target_properties(rocroller_private_headers PROPERTIES LINKER_LANGUAGE CXX)
+target_compile_features(rocroller_private_headers INTERFACE cxx_std_20)
+target_compile_definitions(rocroller_private_headers
+    INTERFACE
+        ROCROLLER_USE_HIP
+        __HIP_PLATFORM_AMD__
+)
+
+target_link_libraries(rocroller_private_headers
+    INTERFACE
+       hip::host
+       fmt::fmt-header-only
+)
+if(ROCROLLER_ENABLE_YAML_CPP)
+    target_link_libraries(rocroller_private_headers INTERFACE yaml-cpp::yaml-cpp)
+    target_compile_definitions(rocroller_private_headers INTERFACE ROCROLLER_USE_YAML_CPP)
+endif()
+target_sources(rocroller_private_headers
+    INTERFACE
+    FILE_SET HEADERS
+    BASE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}"
+    FILES
+        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/AllocatingObserver.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/FileWritingObserver.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/ObserverCreation.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/RegisterLivenessObserver.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/SupportedInstructionObserver.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitcntObserver.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitcntObserver_impl.hpp"
+
+        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/FunctionalUnit/MEMObserver.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/FunctionalUnit/MEMObserver_impl.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/FunctionalUnit/MFMAObserver.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/FunctionalUnit/WMMAObserver.hpp"
+
+        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitState/BufferStoreDwordXXRead.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitState/OPSEL94x.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitState/VALUTransWrite94x.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitState/VALUWriteReadlane94x.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitState/VALUWriteSGPRVCC.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitState/VALUWriteSGPRVMEM.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitState/VALUWriteVCCVDIVFMAS.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitState/VCMPXWrite94x.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitState/WaitStateObserver.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitState/WaitStateObserver_impl.hpp"
+
+        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitState/MFMA/ACCVGPRReadWrite.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitState/MFMA/ACCVGPRWriteWrite.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitState/MFMA/CMPXWriteExec.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitState/MFMA/DGEMM16x16x4Write.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitState/MFMA/DGEMM4x4x4Write.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitState/MFMA/DLWrite.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitState/MFMA/VALUWrite.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitState/MFMA/XDLReadSrcC908.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitState/MFMA/XDLReadSrcC90a.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitState/MFMA/XDLReadSrcC94x.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitState/MFMA/XDLWrite908.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitState/MFMA/XDLWrite90a.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitState/MFMA/XDLWrite94x.hpp"
+
+        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitState/WMMA/WMMAReadSrcD.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitState/WMMA/WMMAWrite.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/Scheduling/Observers/WaitState/WMMA/WMMAWriteSrcD.hpp"
+)
+
+target_link_libraries(rocroller PUBLIC rocroller_public_headers)
+target_link_libraries(rocroller PRIVATE rocroller_private_headers)

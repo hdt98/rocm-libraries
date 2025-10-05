@@ -250,8 +250,8 @@ configure_file(
 )
 target_sources(rocroller PRIVATE "${PROJECT_BINARY_DIR}/rocRoller/src/Version.cpp")
 
-add_subdirectory(lib/source)
 add_subdirectory(lib/include)
+add_subdirectory(lib/source)
 add_subdirectory(GPUArchitectureGenerator)
 
 if(ROCROLLER_EMBED_ARCH_DEF)
@@ -267,11 +267,10 @@ if(ROCROLLER_ENABLE_CLIENT)
     add_subdirectory(client)
 endif()
 
-rocm_install(
-    TARGETS rocroller rocroller-interface
+install(
+    TARGETS rocroller rocroller-interface rocroller_public_headers
     EXPORT rocroller-targets
-    INCLUDE
-        "${CMAKE_CURRENT_SOURCE_DIR}/lib/include"
+    FILE_SET rocroller_public_headers_file_set
 )
 
 if(ROCROLLER_BUILD_TESTING OR BUILD_TESTING)
