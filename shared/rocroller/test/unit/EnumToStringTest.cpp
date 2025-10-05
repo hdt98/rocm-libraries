@@ -307,14 +307,6 @@ TEST(EnumToStringTest, ALL)
         });
     }
 
-    verify<GeneratorState>({
-        {GeneratorState::NoValue, "NoValue"},
-        {GeneratorState::HasValue, "HasValue"},
-        {GeneratorState::HasRange, "HasRange"},
-        {GeneratorState::HasRangeValue, "HasRangeValue"},
-        {GeneratorState::HasCopiedValue, "HasCopiedValue"},
-    });
-
     verify<LogLevel>({
         {LogLevel::None, "None"},
         {LogLevel::Critical, "Critical"},

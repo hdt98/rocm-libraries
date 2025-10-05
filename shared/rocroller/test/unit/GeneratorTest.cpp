@@ -243,15 +243,6 @@ namespace rocRollerTest
         EXPECT_TRUE(iter == gen.end());
     }
 
-    TEST_F(GeneratorTest, StateEnum)
-    {
-        for(int i = 0; i < static_cast<int>(GeneratorState::Count); i++)
-        {
-            auto enumVal = static_cast<GeneratorState>(i);
-            EXPECT_EQ(enumVal, fromString<GeneratorState>(toString(enumVal)));
-        }
-    }
-
     TEST_F(GeneratorTest, Assignment)
     {
         auto fib = fibonacci<int>();

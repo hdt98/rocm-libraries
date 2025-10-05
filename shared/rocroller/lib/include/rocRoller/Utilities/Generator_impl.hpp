@@ -32,35 +32,6 @@
 
 namespace rocRoller
 {
-    inline std::string toString(GeneratorState s)
-    {
-        switch(s)
-        {
-        case GeneratorState::NoValue:
-            return "NoValue";
-        case GeneratorState::HasValue:
-            return "HasValue";
-        case GeneratorState::HasRange:
-            return "HasRange";
-        case GeneratorState::HasRangeValue:
-            return "HasRangeValue";
-        case GeneratorState::HasCopiedValue:
-            return "HasCopiedValue";
-        case GeneratorState::Done:
-            return "Done";
-
-        case GeneratorState::Count:
-        default:
-            break;
-        }
-        throw std::runtime_error("Invalid GeneratorState");
-    }
-
-    inline std::ostream& operator<<(std::ostream& stream, GeneratorState const& s)
-    {
-        return stream << toString(s);
-    }
-
     template <typename T, CInputRangeOf<T> TheRange>
     template <std::convertible_to<TheRange> ARange>
     ConcreteRange<T, TheRange>::ConcreteRange(ARange&& r)

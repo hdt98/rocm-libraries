@@ -67,32 +67,6 @@
 
 namespace rocRoller
 {
-    enum class GeneratorState
-    {
-        /// Does not have a value.  Will have to resume the coroutine in order to obtain a value.
-        NoValue = 0,
-
-        /// Has a single value.
-        HasValue,
-
-        /// Has a range which may or may not contain at least one more value.
-        HasRange,
-
-        /// Has a value from a range.
-        HasRangeValue,
-
-        /// Has a value which has been copied into the iterator. Only possible for an
-        /// iterator that has been returned from the postfix increment operator.
-        /// e.g. auto x = iter++; -> x will be in the HasCopiedValue state.
-        HasCopiedValue,
-
-        // Has completed the coroutine, and has no value.
-        Done,
-        Count
-    };
-    std::string   toString(GeneratorState s);
-    std::ostream& operator<<(std::ostream&, GeneratorState const&);
-
     /**
      * Range/ConcreteRange wraps a collection object behind a virtual interface,
      * which allows the Generator implementation to store a yielded collection
