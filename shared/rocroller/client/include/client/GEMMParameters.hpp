@@ -105,7 +105,7 @@ namespace rocRoller
                 // When scaleA/B is ScaleMode::SingleScale
                 float scaleValueA, scaleValueB;
 
-                DGen::DataPattern patternA, patternB, patternC;
+                DGen::DataInitMode initModeA, initModeB, initModeC;
 
                 int workgroupMappingDim;
             };
