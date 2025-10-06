@@ -36,7 +36,7 @@ namespace rocRoller
                     const float           min,
                     const float           max,
                     int                   blockScaling,
-                    const DataPattern     pattern);
+                    const DataInitMode    initMode);
 
     template <typename T>
     struct rrDT2DGenDT
@@ -99,13 +99,13 @@ namespace rocRoller
                          const float             max,
                          const uint32_t          seed,
                          const index_t           blockScaling = 1,
-                         const DataPattern       pattern      = DataPattern::Bounded)
+                         const DataInitMode initMode = DataInitMode(RawDataInitMode(Bounded{})))
     {
         auto sizes   = desc.sizes();
         auto strides = desc.strides();
 
         DataGeneratorOptions opts;
-        setOptions(opts, min, max, blockScaling, pattern);
+        setOptions(opts, min, max, blockScaling, initMode);
         using DGenDT = typename rrDT2DGenDT<rrDT>::type;
         DGen::DataGenerator<DGenDT> dgen;
         dgen.setSeed(seed);
@@ -160,18 +160,18 @@ namespace rocRoller
     }
 
     template <typename rrDT>
-    std::vector<typename PackedTypeOf<rrDT>::type> DGenVector(TensorDescriptor& desc,
-                                                              const float       min  = -1.f,
-                                                              const float       max  = 1.f,
-                                                              const uint32_t    seed = 1713573849,
-                                                              bool              hasScale = false,
-                                                              const int         blockScaling = 1,
-                                                              const DataPattern pattern
-                                                              = DataPattern::Bounded)
+    std::vector<typename PackedTypeOf<rrDT>::type>
+        DGenVector(TensorDescriptor&  desc,
+                   const float        min          = -1.f,
+                   const float        max          = 1.f,
+                   const uint32_t     seed         = 1713573849,
+                   bool               hasScale     = false,
+                   const int          blockScaling = 1,
+                   const DataInitMode initMode     = DataInitMode(RawDataInitMode(Bounded{})))
     {
         if(hasScale)
             AssertFatal(blockScaling == 32, "Invalid scale block size: ", ShowValue(blockScaling));
-        auto dgen = getDataGenerator<rrDT>(desc, min, max, seed, blockScaling, pattern);
+        auto dgen = getDataGenerator<rrDT>(desc, min, max, seed, blockScaling, initMode);
         return getRandomVector<rrDT>(dgen, hasScale);
     }
 
@@ -190,9 +190,9 @@ namespace rocRoller
                    float                   min            = -1.f,
                    float                   max            = 1.f,
                    const uint              scaleBlockSize = 32,
-                   DataPattern             patternA       = DataPattern::Bounded,
-                   DataPattern             patternB       = DataPattern::Bounded,
-                   DataPattern             patternC       = DataPattern::Bounded
+                   DataInitMode            initModeA = DataInitMode(RawDataInitMode(Bounded{})),
+                   DataInitMode            initModeB = DataInitMode(RawDataInitMode(Bounded{})),
+                   DataInitMode            initModeC = DataInitMode(RawDataInitMode(Bounded{}))
 
     )
     {
@@ -202,21 +202,21 @@ namespace rocRoller
         using STB          = typename SegmentedTypeOf<TB>::type;
 
         {
-            auto dgenA = getDataGenerator<STA>(descA, min, max, seed + 1, blockScalingA, patternA);
+            auto dgenA = getDataGenerator<STA>(descA, min, max, seed + 1, blockScalingA, initModeA);
             hostA      = getRandomVector<STA>(dgenA, hasScaleA);
             if(hasScaleA)
                 hostScaleA = dgenA.getScaleBytes();
         }
 
         {
-            auto dgenB = getDataGenerator<STB>(descB, min, max, seed + 2, blockScalingB, patternB);
+            auto dgenB = getDataGenerator<STB>(descB, min, max, seed + 2, blockScalingB, initModeB);
             hostB      = getRandomVector<STB>(dgenB, hasScaleB);
             if(hasScaleB)
                 hostScaleB = dgenB.getScaleBytes();
         }
 
         {
-            auto dgenC = getDataGenerator<TC>(descC, min, max, seed, 1, patternC);
+            auto dgenC = getDataGenerator<TC>(descC, min, max, seed, 1, initModeC);
             hostC      = getRandomVector<TC>(dgenC, false);
         }
     }
@@ -229,11 +229,11 @@ namespace rocRoller
                    TensorDescriptor& descB,
                    std::vector<TC>&  hostC,
                    TensorDescriptor& descC,
-                   float             min      = -1.f,
-                   float             max      = 1.f,
-                   DataPattern       patternA = DataPattern::Bounded,
-                   DataPattern       patternB = DataPattern::Bounded,
-                   DataPattern       patternC = DataPattern::Bounded)
+                   float             min       = -1.f,
+                   float             max       = 1.f,
+                   DataInitMode      initModeA = DataInitMode(RawDataInitMode(Bounded{})),
+                   DataInitMode      initModeB = DataInitMode(RawDataInitMode(Bounded{})),
+                   DataInitMode      initModeC = DataInitMode(RawDataInitMode(Bounded{})))
     {
         std::vector<uint8_t> defaultHostScaleA;
         std::vector<uint8_t> defaultHostScaleB;
@@ -251,8 +251,8 @@ namespace rocRoller
                   min,
                   max,
                   32,
-                  patternA,
-                  patternB,
-                  patternC);
+                  initModeA,
+                  initModeB,
+                  initModeC);
     }
 }
