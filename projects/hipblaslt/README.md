@@ -95,6 +95,17 @@ cmake --preset gemm-libs
 cmake --build build --parallel
 ```
 
+
+**Building code coverage**
+
+```bash
+# configure
+cmake --preset coverage -B build -S .
+# build
+cmake --build build --parallel --target coverage
+# coverage report is build/coverage/index.html
+```
+
 #### Using CMake variables directly
 
 **Full build for gfx950**
@@ -185,9 +196,9 @@ Refer to the available build options using `./install.sh --help`:
 > [!NOTE]
 > Refer to the tensilelite [README](./tensilelite/README.md) for instructions on building for the tensile workflow.
 
-## Unit tests
+## Tests
 
-All unit tests are located in `build/release/clients/`. To build these tests, you must build
+All tests are located in `build/release/clients/`. To build these tests, you must build
 hipBLASLt with `--clients`.
 
 You can find more information at the following links:
