@@ -483,8 +483,8 @@ struct intrin_wmma_bf16_16x16x32_bf16<16, 16>
         // true : D0.[16:31]= result
 #if defined(__gfx125__)
         if (threadIdx.x == 0) {printf("Running intrin_wmma_bf16_16x16x32_bf16<16, 16>\n");}
-        reg_c.template AsType<bhalf16_t>()(Number<0>{}) = __builtin_amdgcn_wmma_bf16_16x16x32_bf16(
-            0, reg_a, 0, reg_b, 0, reg_c.template AsType<bhalf16_t>()[Number<0>{}]);
+        reg_c.template AsType<bhalf8_t>()(Number<0>{}) = __builtin_amdgcn_wmma_bf16_16x16x32_bf16(
+            0, reg_b, 0, reg_a, 0, reg_c.template AsType<bhalf8_t>()[Number<0>{}], false, false);
 #else
         ignore = reg_a;
         ignore = reg_b;
