@@ -147,8 +147,10 @@ int main(int, char*[])
     // std::cout << "Before run_test, pass = " << pass << std::endl;
     // clang-format off
     //               |SrcAType    |SrcBType,     |DstType     |GPUAccType  |CPUAccType      |KMultiplier
-    pass &= run_test<ck::half_t,  ck::half_t,   float,       float,       float,              2>(); // V_WMMA_F32_16X16X32_F16
-    pass &= run_test<ck::half_t,  ck::half_t,   ck::half_t,       ck::half_t,       ck::half_t,              2>(); // V_WMMA_F16_16X16X32_F16
+    pass &= run_test<ck::half_t,  ck::half_t,   float,        float,       float,              2>(); // V_WMMA_F32_16X16X32_F16
+    pass &= run_test<ck::half_t,  ck::half_t,   ck::half_t,   ck::half_t,  ck::half_t,         2>(); // V_WMMA_F16_16X16X32_F16
+    pass &= run_test<ck::bhalf_t, ck::bhalf_t,  float,        float,       float,              2>(); // V_WMMA_F32_16X16X32_BF16
+
     //clang-format on
 
     std::cout << "TestGemm ..... " << (pass ? "SUCCESS" : "FAILURE") << std::endl;

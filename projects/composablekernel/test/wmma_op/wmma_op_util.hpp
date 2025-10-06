@@ -125,6 +125,9 @@ __device__ void builtin_wmma_naive_selector(
         // printf("--------- Calling f32, f16 ---------- \n");
         (threadIdx.x == 0 ? printf("--------- Calling f32, f16 ---------- \n") : 0);
         CK_WMMA_CALL_INTRIN(f32, f16);
+    } else if constexpr(std::is_same_v<srcAType, ck::bhalf_t> && std::is_same_v<srcBType, ck::bhalf_t> && std::is_same_v<dstType, float>){
+        (threadIdx.x == 0 ? printf("--------- Calling f32, bf16 ---------- \n") : 0);
+        CK_WMMA_CALL_INTRIN(f32, bf16);
     } else {
         // printf("---------- No builtin_wmma_naive_selector implementation for these types ----------\n");
         (threadIdx.x == 0 ? printf("---------- No builtin_wmma_naive_selector implementation for these types ----------\n") : 0);

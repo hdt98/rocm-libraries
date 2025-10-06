@@ -457,6 +457,7 @@ struct intrin_wmma_f16_16x16x32_f16<16, 16>
         // false: D0.[0:15] = result
         // true : D0.[16:31]= result
 #if defined(__gfx125__)
+        if (threadIdx.x == 0) {printf("Running intrin_wmma_f16_16x16x32_f16<16, 16>\n");}
         reg_c.template AsType<half8_t>()(Number<0>{}) = __builtin_amdgcn_wmma_f16_16x16x32_f16(
             0, reg_b, 0, reg_a, 0, reg_c.template AsType<half8_t>()[Number<0>{}], false, false);
 #else
@@ -481,6 +482,7 @@ struct intrin_wmma_bf16_16x16x32_bf16<16, 16>
         // false: D0.[0:15] = result
         // true : D0.[16:31]= result
 #if defined(__gfx125__)
+        if (threadIdx.x == 0) {printf("Running intrin_wmma_bf16_16x16x32_bf16<16, 16>\n");}
         reg_c.template AsType<bhalf16_t>()(Number<0>{}) = __builtin_amdgcn_wmma_bf16_16x16x32_bf16(
             0, reg_a, 0, reg_b, 0, reg_c.template AsType<bhalf16_t>()[Number<0>{}]);
 #else
@@ -506,6 +508,7 @@ struct intrin_wmma_f32_16x16x32_f16<16, 16>
         // amd_assembly_wmma_f32_16x16x16_f16_w32(
         //     reg_a, reg_b, reg_c.template AsType<float8_t>()(Number<0>{}));
 #if defined(__gfx125__)
+        if (threadIdx.x == 0) {printf("Running intrin_wmma_f32_16x16x32_f16<16, 16>\n");}
         reg_c.template AsType<float8_t>()(Number<0>{}) = __builtin_amdgcn_wmma_f32_16x16x32_f16(
             0, reg_b, 0, reg_a, 0, reg_c.template AsType<float8_t>()[Number<0>{}], false, false);
 #else
@@ -527,8 +530,9 @@ struct intrin_wmma_f32_16x16x32_bf16<16, 16>
     __device__ static void Run(const bhalf16_t& reg_a, const bhalf16_t& reg_b, FloatC& reg_c)
     {
 #if defined(__gfx125__)
+        if (threadIdx.x == 0) {printf("Running intrin_wmma_f32_16x16x32_bf16<16, 16>\n");}
         reg_c.template AsType<float8_t>()(Number<0>{}) = __builtin_amdgcn_wmma_f32_16x16x32_bf16(
-            0, reg_a, 0, reg_b, 0, reg_c.template AsType<float8_t>()[Number<0>{}], false, false);
+            0, reg_b, 0, reg_a, 0, reg_c.template AsType<float8_t>()[Number<0>{}], false, false);
 #else
         ignore = reg_a;
         ignore = reg_b;
@@ -570,6 +574,7 @@ struct intrin_wmma_i32_16x16x64_iu8<16, 16, neg_a, neg_b>
     __device__ static void Run(const int8x32_t& reg_a, const int8x32_t& reg_b, FloatC& reg_c)
     {
 #if defined(__gfx125__)
+        if (threadIdx.x == 0) {printf("Running intrin_wmma_i32_16x16x64_iu8<16, 16>\n");}
         reg_c.template AsType<int32x8_t>()(Number<0>{}) =
             __builtin_amdgcn_wmma_i32_16x16x64_iu8(neg_a,
                                                    bit_cast<int32x8_t>(reg_a),
