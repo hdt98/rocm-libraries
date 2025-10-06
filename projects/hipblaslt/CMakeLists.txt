@@ -552,6 +552,8 @@ if(HIPBLASLT_ENABLE_COVERAGE)
             $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/library/src/amd_detail/rocblaslt/src/include>
     )
     target_compile_definitions(hipblaslt-clients-common PUBLIC HIPBLASLT_ENABLE_COVERAGE)
+    target_compile_definitions(tensilelite-host PRIVATE HIPBLASLT_ENABLE_COVERAGE)
+    target_compile_definitions(hipblaslt PRIVATE HIPBLASLT_ENABLE_COVERAGE)
     
     rocm_get_git_commit_tag(hipblaslt_COMMIT)
 
@@ -567,14 +569,17 @@ if(HIPBLASLT_ENABLE_COVERAGE)
     target_compile_options(hipblaslt PRIVATE -g -O0 -fprofile-instr-generate -fcoverage-mapping)
     target_link_options(hipblaslt PRIVATE -fprofile-instr-generate)
 
+    target_compile_options(hipblaslt-rocroller PRIVATE -g -O0 -fprofile-instr-generate -fcoverage-mapping)
+    target_link_options(hipblaslt-rocroller PRIVATE -fprofile-instr-generate)
+
     target_compile_options(hipblaslt-clients-common PRIVATE -g -O0 -fprofile-instr-generate -fcoverage-mapping)
     target_link_options(hipblaslt-clients-common PRIVATE -fprofile-instr-generate)
 
-    target_compile_options(hipblaslt-bench PRIVATE -g -O0 -fprofile-instr-generate -fcoverage-mapping)
-    target_link_options(hipblaslt-bench PRIVATE -fprofile-instr-generate)
-
     target_compile_options(hipblaslt-test PRIVATE -g -O0 -fprofile-instr-generate -fcoverage-mapping -fvisibility=default)
     target_link_options(hipblaslt-test PRIVATE -fprofile-instr-generate)
+
+    target_compile_options(sample_hipblaslt_basic_matmul_for_cov PRIVATE -g -O0 -fprofile-instr-generate -fcoverage-mapping -fvisibility=default)
+    target_link_options(sample_hipblaslt_basic_matmul_for_cov PRIVATE -fprofile-instr-generate)
 
     set(coverage_dir "${CMAKE_CURRENT_BINARY_DIR}/coverage-report")
     add_custom_command(
@@ -586,11 +591,9 @@ if(HIPBLASLT_ENABLE_COVERAGE)
                                         HIPBLASLT_ENABLE_MARKER=2
                                         HIPBLASLT_LOG_MASK=64
                                         LLVM_PROFILE_VERBOSE=1
-                                        GTEST_LISTENER=NO_PASS_LINE_IN_LOG
                                         LLVM_PROFILE_FILE="${coverage_dir}/profraw/hipblaslt-coverage_test_perf_64_%m.profraw"
                                         $<TARGET_FILE:hipblaslt-test>
-                                        --gtest_filter="-*matmul_test*:*aux_test.conversion/pre_checkin_aux_rocblaslt_rocroller_host_func_f16_r:ExtOpTest*:*MatrixTransformTest*"
-                                        --precompile=hipblaslt-test-precompile.db
+                                        --gtest_filter="-*matmul_test*:*aux_test.conversion/pre_checkin_aux_rocblaslt_rocroller_host_func_f16_r*"
                                         --output-on-failure
         COMMAND ${CMAKE_COMMAND} -E env HIPBLASLT_ENABLE_MARKER=2
                                         HIPBLASLT_LOG_MASK=128
@@ -599,49 +602,62 @@ if(HIPBLASLT_ENABLE_COVERAGE)
                                         $<TARGET_FILE:sample_hipblaslt_basic_matmul_for_cov>
                                         --output-on-failure
         COMMAND ${CMAKE_COMMAND} -E touch "${coverage_dir}/coverage-test.stamp"
-      )
-      add_custom_target(
-          coverage-test
-          DEPENDS "${coverage_dir}/coverage-test.stamp"
-      )
-
-      find_program(
+    )
+    add_custom_target(
+        coverage-test
+        DEPENDS "${coverage_dir}/coverage-test.stamp"
+    )
+    find_program(
         LLVM_PROFDATA
         llvm-profdata
         HINTS llvm/bin
         REQUIRED
-      )
-      find_program(
+    )
+    find_program(
         LLVM_COV
         llvm-cov
         REQUIRED
         HINTS llvm/bin
-      )
-      add_custom_command(
+    )
+    add_custom_command(
         OUTPUT "${coverage_dir}/coverage-merge.stamp"
         DEPENDS "${coverage_dir}/coverage-test.stamp"
         COMMAND ${LLVM_PROFDATA} merge -sparse "${coverage_dir}/profraw/hipblaslt-coverage_*.profraw" -o "${coverage_dir}/hipblaslt.profdata"
         COMMAND ${CMAKE_COMMAND} -E touch "${coverage_dir}/coverage-merge.stamp"
-      )
-      add_custom_target(
+    )
+    add_custom_target(
         coverage-merge
         DEPENDS "${coverage_dir}/coverage-merge.stamp"
-      )
-      add_custom_command(
+    )
+    set(hipblaslt_coverage_ignore_regex "'.*/clients/.*|.*/build/.*|.*/Tensile/Source/.*|.*/llvm/include/.*|.*/hipblaslt/hipblaslt_xfloat32.h|.*/include/rocblaslt/.*|.*tensilelite/.*|.*origami/.*|.*rocroller/.*|.*mxdatagenerator/.*'")
+    add_custom_command(
         OUTPUT "${coverage_dir}/coverage-report.stamp"
         DEPENDS "${coverage_dir}/coverage-merge.stamp"
-        COMMAND ${LLVM_COV} report -object $<TARGET_FILE:hipblaslt> -instr-profile="${coverage_dir}/hipblaslt.profdata"
+        COMMAND ${LLVM_COV} report -object $<TARGET_FILE:hipblaslt> 
+                                   -object $<TARGET_FILE:hipblaslt-test>
+                                   -object $<TARGET_FILE:sample_hipblaslt_basic_matmul_for_cov>
+                                   -instr-profile="${coverage_dir}/hipblaslt.profdata"
+                                   --ignore-filename-regex=${hipblaslt_coverage_ignore_regex}
         COMMAND ${LLVM_COV} show -object $<TARGET_FILE:hipblaslt>
-                                 -object $<TARGET_FILE:hipblaslt>
+                                 -object $<TARGET_FILE:hipblaslt-test>
                                  -object $<TARGET_FILE:sample_hipblaslt_basic_matmul_for_cov>
                                  -instr-profile="${coverage_dir}/hipblaslt.profdata"
                                  -format=html
-                                 -output-dir=${coverage_dir} 
-                                 --ignore-filename-regex=".*/clients/.*|.*/build/.*|.*/Tensile/Source/.*|.*/llvm/include/.*|.*/hipblaslt/hipblaslt_xfloat32.h|.*/include/rocblaslt/.*|.*tensilelite/.*"
+                                 -output-dir=${coverage_dir}
+                                 --ignore-filename-regex=${hipblaslt_coverage_ignore_regex}
         COMMAND ${CMAKE_COMMAND} -E touch "${coverage_dir}/coverage-report.stamp"
-      )
-      add_custom_target(
+    )
+    add_custom_target(
         coverage
         DEPENDS "${coverage_dir}/coverage-report.stamp"
-      )
+    )
+    add_custom_target(
+        show-coverage
+        DEPENDS "${coverage_dir}/hipblaslt.profdata"
+        COMMAND ${LLVM_COV} report -object $<TARGET_FILE:hipblaslt> 
+                                   -object $<TARGET_FILE:hipblaslt-test>
+                                   -object $<TARGET_FILE:sample_hipblaslt_basic_matmul_for_cov>
+                                   -instr-profile="${coverage_dir}/hipblaslt.profdata"
+                                   --ignore-filename-regex${hipblaslt_coverage_ignore_regex}
+    )
 endif()

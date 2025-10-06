@@ -9,7 +9,7 @@ if(TENSILELITE_ENABLE_AUTOBUILD)
 endif()
 
 if(TENSILELITE_ENABLE_HOST)
-    add_library(tensilelite-host STATIC)
+    add_library(tensilelite-host OBJECT)
     add_library(tensilelite::tensilelite-host ALIAS tensilelite-host)
 
     set_target_properties(tensilelite-host

@@ -20,7 +20,7 @@
       "description": "Configures for coverage build",
       "inherits": "default:release",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "RelwithDebInfo",
+        "CMAKE_BUILD_TYPE": "Debug",
         "CMAKE_PROGRAM_PATH": "/opt/rocm/llvm/bin",
         "HIPBLASLT_ENABLE_COVERAGE": "ON"
       }
