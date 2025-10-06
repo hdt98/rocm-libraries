@@ -127,13 +127,16 @@ public:
         // INITIALIZATE THE SPARSE MATRIX
         //
         host_sparse_matrix<A> hA;
+        std::cout << "CCCC" << std::endl;
         {
             int dev;
             CHECK_HIP_ERROR(hipGetDevice(&dev));
 
+            std::cout << "dev: " << dev << std::endl;
             hipDeviceProp_t prop;
             CHECK_HIP_ERROR(hipGetDeviceProperties(&prop, dev));
 
+            std::cout << "DDDD" << std::endl;
             const bool has_datafile = rocsparse_arguments_has_datafile(arg);
             bool       to_int       = false;
             to_int |= (prop.warpSize == 32);
@@ -143,7 +146,9 @@ public:
             static constexpr bool             full_rank = false;
             rocsparse_matrix_factory<A, I, J> matrix_factory(
                 arg, arg.unit_check ? to_int : false, full_rank);
+            std::cout << "EEEE" << std::endl;
             traits::sparse_initialization(matrix_factory, hA, M, N, base);
+            std::cout << "FFFF" << std::endl;
         }
 
         if((matrix_type == rocsparse_matrix_type_symmetric && M != N)
@@ -152,7 +157,7 @@ public:
             return;
         }
 
-        std::cout << "CCCC" << std::endl;
+        std::cout << "GGGG" << std::endl;
 
         device_sparse_matrix<A> dA(hA);
 
@@ -183,7 +188,7 @@ public:
 
         CHECK_ROCSPARSE_ERROR(rocsparse_set_pointer_mode(handle, rocsparse_pointer_mode_host));
 
-        std::cout << "DDDD" << std::endl;
+        std::cout << "HHHH" << std::endl;
         // Run buffer size
         void*  dbuffer     = nullptr;
         size_t buffer_size = 0;
@@ -193,7 +198,7 @@ public:
         std::cout << "buffer_size: " << buffer_size << std::endl;
         CHECK_HIP_ERROR(rocsparse_hipMalloc(&dbuffer, buffer_size));
 
-        std::cout << "EEEE" << std::endl;
+        std::cout << "IIII" << std::endl;
         if(call_stage_analysis)
         {
             std::cout << "Before analysis" << std::endl;
@@ -203,7 +208,7 @@ public:
             std::cout << "After analysis" << std::endl;
         }
 
-        std::cout << "FFFF" << std::endl;
+        std::cout << "JJJJ" << std::endl;
 
         if(arg.unit_check)
         {
@@ -211,13 +216,13 @@ public:
             CHECK_ROCSPARSE_ERROR(testing::rocsparse_spmv(
                 PARAMS(h_alpha, matA, x, h_beta, y, rocsparse_spmv_stage_compute)));
 
-            std::cout << "GGGG" << std::endl;
+            std::cout << "KKKK" << std::endl;
             host_dense_matrix<Y> hy_copy(hy);
             traits::host_calculation(trans, h_alpha, hA, hx, h_beta, hy, alg, matrix_type);
 
-            std::cout << "HHHH" << std::endl;
+            std::cout << "LLLL" << std::endl;
             hy.near_check(dy);
-            std::cout << "IIII" << std::endl;
+            std::cout << "MMMM" << std::endl;
 
             if(ROCSPARSE_REPRODUCIBILITY)
             {
@@ -231,9 +236,9 @@ public:
                 PARAMS(d_alpha, matA, x, d_beta, y, rocsparse_spmv_stage_compute)));
             CHECK_ROCSPARSE_ERROR(rocsparse_set_pointer_mode(handle, rocsparse_pointer_mode_host));
 
-            std::cout << "JJJJ" << std::endl;
+            std::cout << "NNNN" << std::endl;
             hy.near_check(dy);
-            std::cout << "KKKK" << std::endl;
+            std::cout << "OOOO" << std::endl;
             if(ROCSPARSE_REPRODUCIBILITY)
             {
                 rocsparse_reproducibility::save("Y_pointer_mode_device", dy);

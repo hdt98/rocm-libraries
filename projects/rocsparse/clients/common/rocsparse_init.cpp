@@ -1253,11 +1253,13 @@ void rocsparse_init_csr_rocalution(const char*          filename,
                                    I&                   nnz,
                                    rocsparse_index_base base)
 {
+    std::cout << "rocsparse_init_csr_rocalution" << std::endl;
     ROCSPARSE_CLIENTS_ROUTINE_TRACE;
 
     rocsparse_importer_rocalution importer(filename);
     rocsparse_status              status
         = rocsparse_import_sparse_csr(importer, row_ptr, col_ind, val, M, N, nnz, base);
+    std::cout << "status: " << status << std::endl;
     CHECK_ROCSPARSE_THROW_ERROR(status);
 }
 

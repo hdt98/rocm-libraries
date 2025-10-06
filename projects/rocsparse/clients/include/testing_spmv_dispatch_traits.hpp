@@ -56,6 +56,7 @@ struct testing_spmv_dispatch_traits<rocsparse_format_csr, I, J, A, X, Y, T>
                                       J&                                 n,
                                       rocsparse_index_base               base)
     {
+        std::cout << "sparse_initialization" << std::endl;
         matrix_factory.init_csr(hA, m, n, base);
     }
 
