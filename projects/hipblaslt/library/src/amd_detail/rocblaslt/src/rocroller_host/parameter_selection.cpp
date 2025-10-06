@@ -24,7 +24,7 @@
  *
  * ************************************************************************ */
 
-#include "parameter_selection.hpp"
+#include "rocroller_host/parameter_selection.hpp"
 
 const int SWIZZLE_BLOCK_SIZE           = 64;
 

@@ -24,10 +24,10 @@
  *
  * ************************************************************************ */
 
-#include "handle.h"
-#include "definitions.h"
-#include "logging.h"
-#include "rocroller_host.hpp"
+#include "rocblaslt/handle.h"
+#include "rocblaslt/definitions.h"
+#include "rocblaslt/logging.h"
+#include "rocroller_host/rocroller_host.hpp"
 
 #include <hip/hip_runtime.h>
 

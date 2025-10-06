@@ -25,7 +25,7 @@
  *******************************************************************************/
 
 #pragma once
-#include "handle.h"
+#include "rocblaslt/handle.h"
 #ifndef LEGACY_HIPBLAS_DIRECT
 #include <hipblas-common/hipblas-common.h>
 #else

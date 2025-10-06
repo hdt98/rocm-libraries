@@ -40,14 +40,14 @@
 #include <unistd.h>
 #endif
 
-#include "UserDrivenTuningParser.hpp"
-#include "definitions.h"
-#include "handle.h"
+#include "rocblaslt/UserDrivenTuningParser.hpp"
+#include "rocblaslt/definitions.h"
+#include "rocblaslt/handle.h"
 #include "rocblaslt.h"
-#include "rocblaslt_mat_utils.hpp"
-#include "rocroller_host.hpp"
-#include "tensile_host.hpp"
-#include "utility.hpp"
+#include "rocblaslt/rocblaslt_mat_utils.hpp"
+#include "rocroller_host/rocroller_host.hpp"
+#include "rocblaslt/tensile_host.hpp"
+#include "rocblaslt/utility.hpp"
 
 #include <hip/hip_runtime_api.h>
 #include <map>

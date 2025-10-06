@@ -24,7 +24,7 @@
  *
  * ************************************************************************ */
 
-#include "status.h"
+#include "rocblaslt/status.h"
 #include "rocblaslt.h"
 
 #include <hip/hip_runtime_api.h>

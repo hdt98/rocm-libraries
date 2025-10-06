@@ -41,7 +41,7 @@
 #include <rocblaslt-auxiliary.h>
 #include <sstream>
 #include <string>
-#include <tensile_host.hpp>
+#include <rocblaslt/tensile_host.hpp>
 #include <unordered_map>
 #include <vector>
 

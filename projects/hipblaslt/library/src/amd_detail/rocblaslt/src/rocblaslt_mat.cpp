@@ -24,10 +24,10 @@
  *
  * ************************************************************************ */
 
-#include "definitions.h"
-#include "handle.h"
-#include "rocblaslt_mat_utils.hpp"
-#include "tensile_host.hpp"
+#include "rocblaslt/definitions.h"
+#include "rocblaslt/handle.h"
+#include "rocblaslt/rocblaslt_mat_utils.hpp"
+#include "rocblaslt/tensile_host.hpp"
 #include <array>
 
 #include <hip/hip_runtime_api.h>

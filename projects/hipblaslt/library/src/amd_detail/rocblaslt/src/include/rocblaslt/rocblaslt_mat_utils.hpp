@@ -28,8 +28,8 @@
 #ifndef ROCBLASLT_UTILS_HPP
 #define ROCBLASLT_UTILS_HPP
 #include "auxiliary.hpp"
-#include "handle.h"
-#include "utility.hpp"
+#include "rocblaslt/handle.h"
+#include "rocblaslt/utility.hpp"
 
 inline bool isValidOrderForDatatype(hipDataType datatype, hipblasLtOrder_t order)
 {

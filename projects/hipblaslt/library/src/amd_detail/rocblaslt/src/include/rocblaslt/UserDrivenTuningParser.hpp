@@ -28,7 +28,7 @@
 #pragma once
 
 #include "auxiliary.hpp"
-#include "tensile_host.hpp"
+#include "rocblaslt/tensile_host.hpp"
 #include <Tensile/DataTypes.hpp>
 #include <shared_mutex>
 

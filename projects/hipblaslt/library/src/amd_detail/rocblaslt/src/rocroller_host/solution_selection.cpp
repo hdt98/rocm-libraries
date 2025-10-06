@@ -24,10 +24,10 @@
  *
  * ************************************************************************ */
 
-#include "analytical_utils.hpp"
-#include "kernel_type.hpp"
-#include "runtime_args_selection.hpp"
-#include "solution_selection.hpp"
+#include "rocroller_host/analytical_utils.hpp"
+#include "rocroller_host/kernel_type.hpp"
+#include "rocroller_host/runtime_args_selection.hpp"
+#include "rocroller_host/solution_selection.hpp"
 
 #include "origami/origami.hpp"
 

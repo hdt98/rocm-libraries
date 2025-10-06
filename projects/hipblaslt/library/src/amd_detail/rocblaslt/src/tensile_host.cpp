@@ -35,11 +35,11 @@
 
 #include "Debug.hpp"
 #include "rocblaslt-types.h"
-#include "rocblaslt_mat_utils.hpp"
-#include "tensile_host.hpp"
+#include "rocblaslt/rocblaslt_mat_utils.hpp"
+#include "rocblaslt/tensile_host.hpp"
 
 #ifdef HIPBLASLT_USE_ROCROLLER
-#include "rocroller_host.hpp"
+#include "rocroller_host/rocroller_host.hpp"
 #endif
 
 #include <Tensile/Contractions.hpp>

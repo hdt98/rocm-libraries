@@ -23,7 +23,7 @@
  * THE SOFTWARE.
  *
  * ************************************************************************ */
-#include "handle.h"
+#include "rocblaslt/handle.h"
 #include "matrix-transform/matrix_transform.h"
 #include "rocblaslt-auxiliary.h"
 #include "rocblaslt-types.h"

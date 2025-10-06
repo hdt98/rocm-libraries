@@ -24,10 +24,10 @@
  *
  * ************************************************************************ */
 
-#include "gemm.hpp"
-#include "runtime_args_selection.hpp"
+#include "rocroller_host/gemm.hpp"
+#include "rocroller_host/runtime_args_selection.hpp"
 
-#include "utility.hpp"
+#include "rocblaslt/utility.hpp"
 
 using namespace rocRoller;
 

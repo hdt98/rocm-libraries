@@ -25,7 +25,7 @@
  * SPDX-License-Identifier: MIT
  * ************************************************************************ */
 
-#include "UserDrivenTuningParser.hpp"
+#include "rocblaslt/UserDrivenTuningParser.hpp"
 #include <fstream>
 #include <shared_mutex>
 #include <sstream>

@@ -291,7 +291,7 @@ if(HIPBLASLT_ENABLE_HOST)
             "${CMAKE_CURRENT_SOURCE_DIR}/library/src/amd_detail/include"
             "${CMAKE_CURRENT_SOURCE_DIR}/library/src/amd_detail/rocblaslt/include"
             "${CMAKE_CURRENT_SOURCE_DIR}/library/src/amd_detail/rocblaslt/src/include"
-            "${CMAKE_CURRENT_SOURCE_DIR}/library/src/amd_detail/rocblaslt/src/rocroller/include"
+            "${CMAKE_CURRENT_SOURCE_DIR}/library/src/amd_detail/rocblaslt/src/rocroller_host/include"
     )
 
     set_target_properties(hipblaslt
@@ -545,12 +545,6 @@ if(ROCM_LIBS_SUPERBUILD OR NOT HIPBLASLT_IS_SUBPROJECT)
 endif()
 
 if(HIPBLASLT_ENABLE_COVERAGE)
-    target_include_directories(hipblaslt-clients-common
-        PUBLIC
-            $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/library/src/amd_detail>
-            $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/library/src/amd_detail/rocblaslt/include>
-            $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/library/src/amd_detail/rocblaslt/src/include>
-    )
     target_compile_definitions(hipblaslt-clients-common PUBLIC HIPBLASLT_ENABLE_COVERAGE)
     target_compile_definitions(tensilelite-host PRIVATE HIPBLASLT_ENABLE_COVERAGE)
     target_compile_definitions(hipblaslt PRIVATE HIPBLASLT_ENABLE_COVERAGE)

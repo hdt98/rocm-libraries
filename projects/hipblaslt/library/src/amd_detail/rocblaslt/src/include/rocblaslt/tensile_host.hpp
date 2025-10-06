@@ -39,10 +39,10 @@
  * in this file, without referencing any Tensile-specific identifiers here.  *
  *****************************************************************************/
 
-#include "handle.h"
+#include "rocblaslt/handle.h"
 //#include "tuple_helper.hpp"
-#include "UserDrivenTuningParser.hpp"
-#include "utility.hpp"
+#include "rocblaslt/UserDrivenTuningParser.hpp"
+#include "rocblaslt/utility.hpp"
 #include <Tensile/Contractions.hpp>
 #include <Tensile/DataTypes.hpp>
 #include <atomic>

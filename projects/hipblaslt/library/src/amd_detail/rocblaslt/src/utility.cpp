@@ -23,7 +23,7 @@
  * SOFTWARE.
  *
  *******************************************************************************/
-#include "utility.hpp"
+#include "rocblaslt/utility.hpp"
 #include <sys/types.h>
 #include <time.h>
 

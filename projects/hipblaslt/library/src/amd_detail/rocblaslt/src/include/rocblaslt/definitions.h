@@ -28,7 +28,7 @@
 #ifndef DEFINITIONS_H
 #define DEFINITIONS_H
 
-#include "status.h"
+#include "rocblaslt/status.h"
 
 /*******************************************************************************
  * Definitions

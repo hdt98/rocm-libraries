@@ -25,7 +25,7 @@
  *******************************************************************************/
 
 #include "hipblaslt/hipblaslt.h"
-#include "UserDrivenTuningParser.hpp"
+#include "rocblaslt/UserDrivenTuningParser.hpp"
 #include "exceptions.hpp"
 #include "hipblaslt/hipblaslt-ext-op.h"
 #include "hipblaslt_internal.hpp"

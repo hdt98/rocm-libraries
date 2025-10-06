@@ -31,8 +31,8 @@
 #ifndef ROCBLASLT_UTILITY_HPP
 #define ROCBLASLT_UTILITY_HPP
 
-#include "handle.h"
-#include "logging.h"
+#include "rocblaslt/handle.h"
+#include "rocblaslt/logging.h"
 #include <algorithm>
 #include <exception>
 #include <mutex>

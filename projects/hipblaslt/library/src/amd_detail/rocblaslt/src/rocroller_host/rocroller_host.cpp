@@ -28,16 +28,16 @@
  * The implementation of the rocblaslt<->rocRoller interface layer. *
  *********************************************************/
 
-#include "gemm.hpp"
-#include "kernel_type.hpp"
-#include "rocroller_host.hpp"
-#include "runtime_args_selection.hpp"
-#include "parameter_selection.hpp"
-#include "solution_selection.hpp"
+#include "rocroller_host/gemm.hpp"
+#include "rocroller_host/kernel_type.hpp"
+#include "rocroller_host/rocroller_host.hpp"
+#include "rocroller_host/runtime_args_selection.hpp"
+#include "rocroller_host/parameter_selection.hpp"
+#include "rocroller_host/solution_selection.hpp"
 
 #include "Debug.hpp"
-#include "handle.h"
-#include "utility.hpp"
+#include "rocblaslt/handle.h"
+#include "rocblaslt/utility.hpp"
 
 using namespace rocRoller;
 

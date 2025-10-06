@@ -27,7 +27,7 @@
 
 #pragma once
 
-#include "parameter_selection.hpp"
+#include "rocroller_host/parameter_selection.hpp"
 
 #include <rocRoller/CommandSolution.hpp>
 #include <rocRoller/Expression.hpp>

@@ -36,16 +36,16 @@
 #ifdef HIPBLASLT_ENABLE_COVERAGE
 #include "hipblaslt_internal.hpp"
 #include "rocblaslt/rocblaslt_mat_utils.hpp"
-#include "rocblaslt/rocroller_host.hpp"
+#include "rocroller_host/rocroller_host.hpp"
 #include "rocblaslt/status.h"
 #include "rocblaslt/tensile_host.hpp"
 #include "rocblaslt/utility.hpp"
 #endif
 #include "unit.hpp"
 #include "utility.hpp"
-#include <hipblaslt/hipblaslt-ext-op.h>
-#include <hipblaslt/hipblaslt-ext.hpp> // Add check for hipblaslt-ext
-#include <hipblaslt/hipblaslt.h>
+#include "hipblaslt/hipblaslt-ext-op.h"
+#include "hipblaslt/hipblaslt-ext.hpp" // Add check for hipblaslt-ext
+#include "hipblaslt/hipblaslt.h"
 
 void testing_aux_handle_init_bad_arg(const Arguments& arg)
 {
