@@ -66,8 +66,8 @@ def customMainLoopSchedule(writer, kernel, tensorParametersA, tensorParametersB,
 
     globalReadIncACode = removeComments(globalReadIncACode)
     globalReadIncBCode = removeComments(globalReadIncBCode)
-
     numLoopIter = kernel["LoopIters"]
+    ph = -2 # placeholder index
 
     if numLoopIter > 1:
         for uIdx in range(0, numLoopIter):
@@ -162,10 +162,10 @@ def customMainLoopSchedule(writer, kernel, tensorParametersA, tensorParametersB,
 
     lastIter = numLoopIter - 1
 
-    miIndex = 0
-    for mi in mfmaCode:
-        module.addComment0("mfmaIndex:%u"%(miIndex))
-        module.add(mi)
+    for miIndex in range(-1, len(mfmaCode)):
+        if miIndex >= 0:
+            module.addComment0("mfmaIndex:%u"%(miIndex))
+            module.add(mfmaCode[miIndex])
 
         def scheduleInst(indexList, instructionList):
             ret = [None]*len(indexList)
@@ -180,7 +180,7 @@ def customMainLoopSchedule(writer, kernel, tensorParametersA, tensorParametersB,
                             ret[i] = Module()
                         ret[i].add(instructionList[ind])
                         cc += 1
-                        indexList[i][ind] = -1
+                        indexList[i][ind] = ph
             if ret.count(None) == len(ret):
                 return [None]
             else:
@@ -217,9 +217,9 @@ def customMainLoopSchedule(writer, kernel, tensorParametersA, tensorParametersB,
         if needIfMacro:
             for codepath in range(numCodePath):
                 if codepath == 0:
-                    module.add(TextBlock(".if     \ID == %u\n"%codepath))
+                    module.add(TextBlock(".if     \\ID == %u\n"%codepath))
                 else:
-                    module.add(TextBlock(".elseif \ID == %u\n"%codepath))
+                    module.add(TextBlock(".elseif \\ID == %u\n"%codepath))
 
                 def scheduleInst2(instList, macroGuard=""):
                     if len(instList) == numCodePath:
@@ -244,7 +244,6 @@ def customMainLoopSchedule(writer, kernel, tensorParametersA, tensorParametersB,
 
                 if codepath == numCodePath - 1:
                     module.add(TextBlock(".endif\n"))
-        miIndex += 1
 
     module.add(TextBlock(".endm\n"))
     return module, numCodePath
@@ -268,6 +267,7 @@ def hasCustomSchedule(kernel):
     GRVWA, GRVWB = kernel["GlobalReadVectorWidthA"], kernel["GlobalReadVectorWidthB"]
     LRVW = kernel["LocalReadVectorWidth"]
     MI = kernel["MatrixInstruction"]
+    MIWG = kernel["MIWaveGroup"]
     useLDSTr = kernel["LDSTrInst"]
 
     is256x256x64DTL  = [MT0, MT1, DU, PGR, PLR, DTL] == [256, 256, 64, 2, 1, True]
@@ -284,7 +284,7 @@ def hasCustomSchedule(kernel):
     isTN = transA == True and transB == False
 
     # Custom main loop scheduling for 256x256x64 16bit
-    if is256x256x64DTL and is16bit and not isMixed and ([GRVWA, GRVWB, LRVW] == [8,8,8]) and MI == [16,16,32,1]:
+    if is256x256x64DTL and is16bit and not isMixed and ([GRVWA, GRVWB, LRVW] == [8,8,8]) and MI == [16,16,32,1] and MIWG == [2,2]:
 
         kernel["MfmaInitCVgprs"] = True
 
@@ -419,7 +419,7 @@ def hasCustomSchedule(kernel):
         numMfma = 128
         opt1 = ScheduleInfo(2, numMfma, optSchedule, syncCode)
         return True, opt1
-    elif is256x256x128DTL and is8bit and not isMixed and ([GRVWA, GRVWB, LRVW] == [16, 16, 16]) and MI == [16,16,128,1]:
+    elif is256x256x128DTL and is8bit and not isMixed and ([GRVWA, GRVWB, LRVW] == [16, 16, 16]) and MI == [16,16,128,1] and MIWG == [2,2]:
 
         kernel["MfmaInitCVgprs"] = True
 
@@ -461,7 +461,7 @@ def hasCustomSchedule(kernel):
                        36,37,38,39, 44,45,46,47, 52,53,54,55, 60,61,62,63]
         opt1 = ScheduleInfo(1, numMfma, optSchedule, syncCode, mfmaReorder)
         return True, opt1
-    elif is192x256x64DTL and is16bit and not isMixed and ([GRVWA, GRVWB, LRVW] == [8, 8, 8]) and MI == [16,16,32,1]:
+    elif is192x256x64DTL and is16bit and not isMixed and ([GRVWA, GRVWB, LRVW] == [8, 8, 8]) and MI == [16,16,32,1] and MIWG == [2,2]:
 
         kernel["MfmaInitCVgprs"] = True
 
