@@ -407,8 +407,6 @@ namespace rocRoller
             Iterator();
             // cppcheck-suppress noExplicitConstructor
             Iterator(Handle const& coroutine);
-            // cppcheck-suppress noExplicitConstructor
-            Iterator(T value);
 
         private:
             bool isDone() const;

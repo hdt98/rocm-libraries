@@ -284,11 +284,6 @@ namespace rocRoller
     }
 
     template <std::movable T>
-    Generator<T>::Iterator::Iterator(T value)
-    {
-    }
-
-    template <std::movable T>
     Generator<T>::Generator(Handle const& coroutine)
         : m_coroutine{coroutine}
     {
