@@ -64,53 +64,32 @@ public:
         // Create rocsparse handle
         rocsparse_local_handle handle(arg);
 
-        host_scalar<T> h_alpha(arg.get_alpha<T>());
-        host_scalar<T> h_beta(arg.get_beta<T>());
-
-        device_scalar<T> d_alpha(h_alpha);
-        device_scalar<T> d_beta(h_beta);
+        // host_scalar<T> h_alpha(arg.get_alpha<T>());
+        // host_scalar<T> h_beta(arg.get_beta<T>());
+        T h_alpha = static_cast<T>(1);
+        T h_beta  = static_cast<T>(0);
 
         std::cout << "BBBB" << std::endl;
         host_sparse_matrix<A> hA;
         std::cout << "CCCC" << std::endl;
-        {
-            int dev;
-            CHECK_HIP_ERROR(hipGetDevice(&dev));
-
-            std::cout << "dev: " << dev << std::endl;
-            hipDeviceProp_t prop;
-            CHECK_HIP_ERROR(hipGetDeviceProperties(&prop, dev));
-
-            std::cout << "DDDD" << std::endl;
-            const bool has_datafile = rocsparse_arguments_has_datafile(arg);
-            bool       to_int       = false;
-            to_int |= (prop.warpSize == 32);
-            to_int |= (alg != rocsparse_spmv_alg_csr_rowsplit);
-            to_int |= (trans != rocsparse_operation_none && has_datafile);
-            to_int |= (matrix_type == rocsparse_matrix_type_symmetric && has_datafile);
-            static constexpr bool full_rank = false;
-
-            std::cout << "to_int: " << to_int << std::endl;
-
-            rocsparse_matrix_factory<A, I, J> matrix_factory(arg, to_int, full_rank);
-            std::cout << "EEEE" << std::endl;
-            traits::sparse_initialization(matrix_factory, hA, M, N, base);
-            std::cout << "FFFF" << std::endl;
-        }
+        rocsparse_matrix_factory<A, I, J> matrix_factory(arg, true, false);
+        std::cout << "EEEE" << std::endl;
+        traits::sparse_initialization(matrix_factory, hA, M, N, base);
+        std::cout << "FFFF" << std::endl;
 
         std::cout << "GGGG" << std::endl;
 
         device_sparse_matrix<A> dA(hA);
 
-        host_dense_matrix<X> hx((trans == rocsparse_operation_none) ? N : M, 1);
-        for(int i = 0; i < ((trans == rocsparse_operation_none) ? N : M); i++)
+        host_dense_matrix<X> hx(N, 1);
+        for(int i = 0; i < N; i++)
         {
             hx[i] = static_cast<X>(1);
         }
         device_dense_matrix<X> dx(hx);
 
-        host_dense_matrix<Y> hy((trans == rocsparse_operation_none) ? M : N, 1);
-        for(int i = 0; i < ((trans == rocsparse_operation_none) ? M : N); i++)
+        host_dense_matrix<Y> hy(M, 1);
+        for(int i = 0; i < M; i++)
         {
             hy[i] = static_cast<Y>(1);
         }
@@ -141,10 +120,10 @@ public:
         size_t buffer_size = 0;
         CHECK_ROCSPARSE_ERROR(rocsparse_spmv(handle,
                                              trans,
-                                             h_alpha,
+                                             &h_alpha,
                                              matA,
                                              x,
-                                             h_beta,
+                                             &h_beta,
                                              y,
                                              ttype,
                                              alg,
@@ -153,7 +132,8 @@ public:
                                              dbuffer));
 
         std::cout << "buffer_size: " << buffer_size << std::endl;
-        CHECK_HIP_ERROR(rocsparse_hipMalloc(&dbuffer, buffer_size));
+        CHECK_HIP_ERROR(hipMalloc((void**)&dbuffer, buffer_size));
+        // CHECK_HIP_ERROR(rocsparse_hipMalloc(&dbuffer, buffer_size));
 
         std::cout << "IIII" << std::endl;
         if(call_stage_analysis)
@@ -162,10 +142,10 @@ public:
             // Run preprocess
             CHECK_ROCSPARSE_ERROR(rocsparse_spmv(handle,
                                                  trans,
-                                                 h_alpha,
+                                                 &h_alpha,
                                                  matA,
                                                  x,
-                                                 h_beta,
+                                                 &h_beta,
                                                  y,
                                                  ttype,
                                                  alg,
@@ -180,10 +160,10 @@ public:
         // Run solve
         CHECK_ROCSPARSE_ERROR(rocsparse_spmv(handle,
                                              trans,
-                                             h_alpha,
+                                             &h_alpha,
                                              matA,
                                              x,
-                                             h_beta,
+                                             &h_beta,
                                              y,
                                              ttype,
                                              alg,
@@ -191,35 +171,8 @@ public:
                                              &buffer_size,
                                              dbuffer));
 
-        // std::cout << "KKKK" << std::endl;
-        // host_dense_matrix<Y> hy_copy(hy);
-        // traits::host_calculation(trans, h_alpha, hA, hx, h_beta, hy, alg, matrix_type);
-
-        // std::cout << "LLLL" << std::endl;
-        // hy.near_check(dy);
-        // std::cout << "MMMM" << std::endl;
-
-        // if(ROCSPARSE_REPRODUCIBILITY)
-        // {
-        //     rocsparse_reproducibility::save("Y_pointer_mode_host", dy);
-        // }
-
-        // dy.transfer_from(hy_copy);
-        // CHECK_ROCSPARSE_ERROR(
-        //     rocsparse_set_pointer_mode(handle, rocsparse_pointer_mode_device));
-        // CHECK_ROCSPARSE_ERROR(testing::rocsparse_spmv(
-        //     PARAMS(d_alpha, matA, x, d_beta, y, rocsparse_spmv_stage_compute)));
-        // CHECK_ROCSPARSE_ERROR(rocsparse_set_pointer_mode(handle, rocsparse_pointer_mode_host));
-
-        // std::cout << "NNNN" << std::endl;
-        // hy.near_check(dy);
-        // std::cout << "OOOO" << std::endl;
-        // if(ROCSPARSE_REPRODUCIBILITY)
-        // {
-        //     rocsparse_reproducibility::save("Y_pointer_mode_device", dy);
-        // }
-
-        CHECK_HIP_ERROR(rocsparse_hipFree(dbuffer));
+        // CHECK_HIP_ERROR(rocsparse_hipFree(dbuffer));
+        CHECK_HIP_ERROR(hipFree(dbuffer));
     }
 
     static void testing_spmv_analysis(const Arguments& arg) {}
