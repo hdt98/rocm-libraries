@@ -64,8 +64,6 @@ public:
         // Create rocsparse handle
         rocsparse_local_handle handle(arg);
 
-        // host_scalar<T> h_alpha(arg.get_alpha<T>());
-        // host_scalar<T> h_beta(arg.get_beta<T>());
         T h_alpha = static_cast<T>(1);
         T h_beta  = static_cast<T>(0);
 
@@ -73,13 +71,12 @@ public:
         host_sparse_matrix<A> hA;
         std::cout << "CCCC" << std::endl;
         rocsparse_matrix_factory<A, I, J> matrix_factory(arg, true, false);
-        std::cout << "EEEE" << std::endl;
+        std::cout << "DDDD" << std::endl;
         traits::sparse_initialization(matrix_factory, hA, M, N, base);
-        std::cout << "FFFF" << std::endl;
-
-        std::cout << "GGGG" << std::endl;
+        std::cout << "EEEE" << std::endl;
 
         device_sparse_matrix<A> dA(hA);
+        std::cout << "FFFF" << std::endl;
 
         host_dense_matrix<X> hx(N, 1);
         for(int i = 0; i < N; i++)
@@ -87,6 +84,8 @@ public:
             hx[i] = static_cast<X>(1);
         }
         device_dense_matrix<X> dx(hx);
+
+        std::cout << "GGGG" << std::endl;
 
         host_dense_matrix<Y> hy(M, 1);
         for(int i = 0; i < M; i++)
@@ -112,7 +111,7 @@ public:
                                     matA, rocsparse_spmat_storage_mode, &storage, sizeof(storage)),
                                 rocsparse_status_success);
 
-        CHECK_ROCSPARSE_ERROR(rocsparse_set_pointer_mode(handle, rocsparse_pointer_mode_host));
+        //CHECK_ROCSPARSE_ERROR(rocsparse_set_pointer_mode(handle, rocsparse_pointer_mode_host));
 
         std::cout << "HHHH" << std::endl;
         // Run buffer size
@@ -133,31 +132,12 @@ public:
 
         std::cout << "buffer_size: " << buffer_size << std::endl;
         CHECK_HIP_ERROR(hipMalloc((void**)&dbuffer, buffer_size));
-        // CHECK_HIP_ERROR(rocsparse_hipMalloc(&dbuffer, buffer_size));
 
         std::cout << "IIII" << std::endl;
-        if(call_stage_analysis)
-        {
-            std::cout << "Before analysis" << std::endl;
-            // Run preprocess
-            CHECK_ROCSPARSE_ERROR(rocsparse_spmv(handle,
-                                                 trans,
-                                                 &h_alpha,
-                                                 matA,
-                                                 x,
-                                                 &h_beta,
-                                                 y,
-                                                 ttype,
-                                                 alg,
-                                                 rocsparse_spmv_stage_preprocess,
-                                                 &buffer_size,
-                                                 dbuffer));
-            std::cout << "After analysis" << std::endl;
-        }
-
-        std::cout << "JJJJ" << std::endl;
-
-        // Run solve
+        //if(call_stage_analysis)
+        //{
+        std::cout << "Before analysis" << std::endl;
+        // Run preprocess
         CHECK_ROCSPARSE_ERROR(rocsparse_spmv(handle,
                                              trans,
                                              &h_alpha,
@@ -167,11 +147,28 @@ public:
                                              y,
                                              ttype,
                                              alg,
-                                             rocsparse_spmv_stage_compute,
+                                             rocsparse_spmv_stage_preprocess,
                                              &buffer_size,
                                              dbuffer));
+        std::cout << "After analysis" << std::endl;
+        //}
 
-        // CHECK_HIP_ERROR(rocsparse_hipFree(dbuffer));
+        std::cout << "JJJJ" << std::endl;
+
+        // // Run solve
+        // CHECK_ROCSPARSE_ERROR(rocsparse_spmv(handle,
+        //                                      trans,
+        //                                      &h_alpha,
+        //                                      matA,
+        //                                      x,
+        //                                      &h_beta,
+        //                                      y,
+        //                                      ttype,
+        //                                      alg,
+        //                                      rocsparse_spmv_stage_compute,
+        //                                      &buffer_size,
+        //                                      dbuffer));
+
         CHECK_HIP_ERROR(hipFree(dbuffer));
     }
 
