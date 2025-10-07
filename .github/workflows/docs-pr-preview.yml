@@ -111,6 +111,7 @@ jobs:
           else
             echo "No requirements.txt found at $REQ_FILE, skipping."
           fi
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v4
         with:
