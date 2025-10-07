@@ -251,35 +251,67 @@ public:
 
         std::cout << "BBBB" << std::endl;
 
-        J M;
-        J N;
-        host_sparse_matrix<A> hA;
-        {
-            rocsparse_matrix_factory<A, I, J> matrix_factory(arg, true, false);
-            traits::sparse_initialization(matrix_factory, hA, M, N, base);
-        }
+        // J M;
+        // J N;
+        // host_csr_matrix<double> hA;
+        // {
+        //     rocsparse_matrix_factory<double, int64_t, int64_t> matrix_factory(arg, true, false);
+        //     sparse_initialization2(matrix_factory, hA, M, N, base);
+        // }
 
-        std::cout << "M: " << M << " N: " << N << std::endl;
+        std::vector<int64_t> hcsr_row_ptr;
+        std::vector<int64_t> hcsr_col_ind;
+        std::vector<double>  hcsr_val;
+        int64_t                 m   = 0;
+        int64_t                 n   = 0;
+        int64_t                 nnz = 0;
+        rocsparse_init_csr_rocalution(arg.filename, hcsr_row_ptr, hcsr_col_ind, hcsr_val, m, n, nnz, base);
 
         double h_alpha = 1.0;
         double h_beta  = 0.0;
 
-        std::vector<int64_t>    hcsr_row_ptr;
-        std::vector<int64_t>    hcsr_col_ind;
-        std::vector<double> hcsr_val;
-        int64_t                 m   = 0;
-        int64_t                 n   = 0;
-        int64_t                 nnz = 0;
-        if(!load_mtx_file("../../../../../../../mac_econ_fwd500/mac_econ_fwd500.mtx",
-                          hcsr_row_ptr,
-                          hcsr_col_ind,
-                          hcsr_val,
-                          m,
-                          n,
-                          nnz))
-        {
-            std::cout << "Error: Failed to load mac_econ_fwd500.mtx file" << std::endl;
-        }
+        // std::vector<int64_t>    hcsr_row_ptr;
+        // std::vector<int64_t>    hcsr_col_ind;
+        // std::vector<double> hcsr_val;
+        // int64_t                 m   = 0;
+        // int64_t                 n   = 0;
+        // int64_t                 nnz = 0;
+        // if(!load_mtx_file("../../../../../../../mac_econ_fwd500/mac_econ_fwd500.mtx",
+        //                   hcsr_row_ptr,
+        //                   hcsr_col_ind,
+        //                   hcsr_val,
+        //                   m,
+        //                   n,
+        //                   nnz))
+        // {
+        //     std::cout << "Error: Failed to load mac_econ_fwd500.mtx file" << std::endl;
+        // }
+
+
+
+        // int64_t              m   = M;
+        // int64_t              n   = N;
+        // int64_t              nnz = hA.nnz;
+        // std::vector<int64_t> hcsr_row_ptr(m + 1);
+        // std::vector<int64_t> hcsr_col_ind(nnz);
+        // std::vector<double>  hcsr_val(nnz);
+
+        // for(int i = 0; i < m + 1; i++)
+        // {
+        //     hcsr_row_ptr[i] = hA.ptr[i];
+        // }
+        // for(int i = 0; i < nnz; i++)
+        // {
+        //     hcsr_col_ind[i] = hA.ind[i];
+        // }
+        // for(int i = 0; i < nnz; i++)
+        // {
+        //     hcsr_val[i] = hA.val[i];
+        // }
+
+
+
+
         std::cout << "CCCC" << std::endl;
         std::vector<double> hx(n, 1.0);
         std::vector<double> hy(m, 0.0);
