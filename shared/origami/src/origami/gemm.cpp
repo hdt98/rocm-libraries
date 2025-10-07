@@ -1350,6 +1350,55 @@ namespace origami
             }
         }
 
+
+        if(heuristics)
+        {
+            size_t K_mod_128bytes = K * safe_ceil_div(element_size_A, 8) % 128;
+            size_t M_mod_128bytes = M * safe_ceil_div(element_size_A, 8) % 128;
+            size_t N_mod_128bytes = N * safe_ceil_div(element_size_A, 8) % 128;
+            //Partial Cache line sharing due to divisibility by 128 bytes makes nontemporal not worth it.
+            if(transA && !transB && K_mod_128bytes != 0)
+            {
+                if(non_temporal_a || non_temporal_b)
+                {
+                    total_latency = total_latency * 10;
+                }
+            }
+
+            if(!transA && transB)
+            {
+                if(M_mod_128bytes != 0 && non_temporal_a != 0)
+                {
+                    total_latency = total_latency * 10;
+                }
+
+                if(N_mod_128bytes != 0 && non_temporal_b != 0)
+                {
+                    total_latency = total_latency * 10;
+                }
+            }
+
+            if(!transA && !transB)
+            {
+                if(M_mod_128bytes != 0 && non_temporal_a != 0)
+                {
+                    total_latency = total_latency * 10;
+                }
+
+                if(K_mod_128bytes != 0 && non_temporal_b != 0)
+                {
+                    total_latency = total_latency * 10;
+                }
+            }
+
+            //This fallback kernel (32x32x32) is just better optimized for bf16 NN/NT.
+            if((M == 1 || N == 1 && !(MT_M == 32 && MT_N == 32)) && !transA && element_size_A == 16
+               && mi_datatype == data_type_t::BFloat16)
+            {
+                total_latency = total_latency * 2;
+            }
+        }
+
         if(hardware_t::is_debug_enabled())
         {
             hardware.log_debug("Total_latency (with heuristics)", total_latency);
