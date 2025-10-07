@@ -4,13 +4,16 @@
 add_library(common-test-utilities OBJECT)
 add_library(rocroller::common-test-utilities ALIAS common-test-utilities)
 
+find_package(BLAS REQUIRED)
+find_package(OpenMP REQUIRED)
+
 target_link_libraries(common-test-utilities
     PUBLIC
         roc::rocroller-interface
+        rocroller-private-interface # For testing internal functionality
         roc::mxDataGenerator
-        hip::host
         OpenMP::OpenMP_CXX
-        ${CBLAS_LIBRARIES}
+        ${BLAS_LIBRARIES}
 )
 
 if(ROCROLLER_ENABLE_ASAN)
@@ -21,22 +24,5 @@ if(ROCROLLER_ENABLE_TIMERS)
     target_compile_definitions(common-test-utilities PUBLIC ROCROLLER_ENABLE_TIMERS)
 endif()
 
-target_include_directories(common-test-utilities
-    PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-)
-
-target_sources(common-test-utilities
-    PRIVATE
-        "${CMAKE_CURRENT_SOURCE_DIR}/include/common/CommonGraphs.hpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/include/common/CommonGraphs_impl.hpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/include/common/F8Values.hpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/include/common/GEMMProblem.hpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/include/common/mxDataGen.hpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/include/common/SourceMatcher.hpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/include/common/TestValues.hpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/include/common/Utilities.hpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/include/common/WidenAddrExprTo64bit.hpp"
-)
-
+add_subdirectory(include)
 add_subdirectory(src)

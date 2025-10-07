@@ -56,6 +56,10 @@ endif()
 
 # Component stand-alone test
 add_executable(component-test)
+target_link_libraries(component-test
+    PRIVATE
+        roc::rocroller-interface
+)
 
 if(ROCROLLER_ENABLE_ASAN)
     rocroller_target_configure_sanitizers(component-test PRIVATE)
@@ -104,10 +108,6 @@ if(ROCROLLER_ENABLE_ASAN)
             CROSSCOMPILING_EMULATOR "${CMAKE_COMMAND};-E;env;${asan_opts}"
     )
 endif()
-
-find_package(BLAS REQUIRED)
-find_package(cblas)
-find_package(OpenMP REQUIRED)
 
 if(ROCROLLER_ENABLE_YAML_CPP)
     target_compile_definitions(rocroller-tests PRIVATE ROCROLLER_TESTS_USE_YAML_CPP)
@@ -216,7 +216,7 @@ if(ROCROLLER_ENABLE_TEST_DISCOVERY)
     )
 endif()
 
-if(ROCROLLER_ENABLE_COVERAGE OR BUILD_CODE_COVERAGE)
+if(ROCROLLER_ENABLE_COVERAGE)
     target_compile_options(rocroller PRIVATE -fprofile-instr-generate -fcoverage-mapping)
     target_link_options(rocroller PRIVATE -fprofile-instr-generate)
 

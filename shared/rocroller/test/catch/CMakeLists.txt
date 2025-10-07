@@ -19,7 +19,6 @@ target_link_libraries(rocroller-tests-catch
     PRIVATE
         rocroller::common-test-utilities
         Catch2::Catch2WithMain
-        ${BLAS_LIBRARIES}
         ${msgpack_libs}
 )
 

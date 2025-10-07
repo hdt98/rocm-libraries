@@ -141,6 +141,7 @@ else()
     add_library(rocroller STATIC)
     set_target_properties(rocroller PROPERTIES POSITION_INDEPENDENT_CODE ON)
 endif()
+target_compile_features(rocroller PUBLIC cxx_std_20)
 set_target_properties(rocroller
     PROPERTIES
         VERSION ${ROCROLLER_VERSION}
@@ -151,13 +152,21 @@ add_library(roc::rocroller ALIAS rocroller)
 add_library(rocroller-interface INTERFACE)
 add_library(roc::rocroller-interface ALIAS rocroller-interface)
 
-target_compile_options(rocroller PUBLIC $<BUILD_INTERFACE:-fmacro-prefix-map=${PROJECT_SOURCE_DIR}=shared/rocroller>)
+add_library(rocroller-public-interface INTERFACE)
+set_target_properties(rocroller-public-interface
+    PROPERTIES
+        LINKER_LANGUAGE CXX
+)
+target_compile_features(rocroller-public-interface INTERFACE cxx_std_20)
 
-if(ROCROLLER_ENABLE_LLD)
-    find_package(LLD REQUIRED)
-    target_include_directories(rocroller PRIVATE "${LLD_INCLUDES}")
-    target_compile_definitions(rocroller PUBLIC ROCROLLER_USE_LLD)
-endif()
+add_library(rocroller-private-interface INTERFACE)
+set_target_properties(rocroller-private-interface
+    PROPERTIES
+        LINKER_LANGUAGE CXX
+)
+target_compile_features(rocroller-private-interface INTERFACE cxx_std_20)
+
+target_compile_options(rocroller PUBLIC $<BUILD_INTERFACE:-fmacro-prefix-map=${PROJECT_SOURCE_DIR}=shared/rocroller>)
 
 if(ROCROLLER_ENABLE_ASAN AND NOT WIN32)
     rocroller_target_configure_sanitizers(rocroller PRIVATE)
@@ -180,7 +189,7 @@ endif()
 target_link_libraries(rocroller-interface INTERFACE roc::rocroller)
 
 if(ROCROLLER_ENABLE_TIMERS)
-    target_compile_definitions(rocroller PUBLIC ROCROLLER_ENABLE_TIMERS)
+    target_compile_definitions(rocroller-public-interface INTERFACE ROCROLLER_ENABLE_TIMERS)
 endif()
 
 if(ROCROLLER_ENABLE_YAML_CPP)
@@ -201,52 +210,48 @@ if(ROCROLLER_ENABLE_YAML_CPP)
             message(FATAL_ERROR "Failed to find yaml-cpp")
         endif()
     endif()
-    target_link_libraries(rocroller PUBLIC yaml-cpp::yaml-cpp)
-    target_compile_definitions(rocroller PUBLIC ROCROLLER_USE_YAML_CPP)
+    # TODO: Clean headers and move these to rocroller-private-interface
+    target_link_libraries(rocroller-public-interface INTERFACE yaml-cpp::yaml-cpp)
+    target_compile_definitions(rocroller-public-interface INTERFACE ROCROLLER_USE_YAML_CPP)
 endif()
 
-target_compile_definitions(rocroller
-    PUBLIC
+target_compile_definitions(rocroller-public-interface
+    INTERFACE
         ROCROLLER_USE_HIP
         __HIP_PLATFORM_AMD__
 )
 
 if(ROCROLLER_ENABLE_LLVM)
+    # Compile definition ROCROLLER_USE_LLVM enables the llvm yaml API
     llvm_map_components_to_libnames(llvm_yaml_libs objectyaml)
     llvm_map_components_to_libnames(llvm_libs mc support)
+
+    # TODO: Clean headers and change these to rocroller-private-interface
+    target_compile_definitions(rocroller-public-interface INTERFACE ROCROLLER_USE_LLVM)
+    target_include_directories(rocroller-public-interface INTERFACE "${LLVM_INCLUDE_DIRS}")
 endif()
 
-target_link_libraries(rocroller
-    PUBLIC
-       hip::host
-    PRIVATE
-        ${msgpack_libs}
-        amd_comgr
+target_link_libraries(rocroller-public-interface
+    INTERFACE
+        hip::host
+        $<BUILD_INTERFACE:fmt::fmt-header-only> # TODO: Clean headers and move to rocroller-private-interface
+        ${msgpack_libs}  # TODO: Clean headers and move to rocroller-private-interface
 )
-
-if(ROCROLLER_ENABLE_LLVM)
-    # ROCROLLER_USE_LLVM enables the llvm yaml API
-    target_compile_definitions(rocroller PUBLIC ROCROLLER_USE_LLVM)
-    target_include_directories(rocroller PUBLIC "${LLVM_INCLUDE_DIRS}")
-endif()
-
-target_link_libraries(rocroller
-    PUBLIC
-        fmt::fmt-header-only
-    PRIVATE
+target_link_libraries(rocroller-private-interface
+    INTERFACE
+        rocroller-public-interface
+        amd_comgr
         $<BUILD_INTERFACE:spdlog::spdlog_header_only>
         $<BUILD_INTERFACE:libdivide::libdivide>
         ${llvm_yaml_libs}
         ${llvm_libs}
 )
-
-target_include_directories(rocroller
+target_link_libraries(rocroller
     PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lib/include>
+        rocroller-public-interface
+    PRIVATE
+        rocroller-private-interface
 )
-
-
-target_compile_features(rocroller PUBLIC cxx_std_20)
 
 configure_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/lib/source/Utilities/Version.cpp.in"
@@ -254,8 +259,9 @@ configure_file(
 )
 target_sources(rocroller PRIVATE "${PROJECT_BINARY_DIR}/rocRoller/src/Version.cpp")
 
-add_subdirectory(lib/source)
 add_subdirectory(lib/include)
+add_subdirectory(lib/include_internal)
+add_subdirectory(lib/source)
 add_subdirectory(GPUArchitectureGenerator)
 
 if(ROCROLLER_EMBED_ARCH_DEF)
@@ -271,11 +277,10 @@ if(ROCROLLER_ENABLE_CLIENT)
     add_subdirectory(client)
 endif()
 
-rocm_install(
-    TARGETS rocroller rocroller-interface
+install(
+    TARGETS rocroller rocroller-interface rocroller-public-interface
     EXPORT rocroller-targets
-    INCLUDE
-        "${CMAKE_CURRENT_SOURCE_DIR}/lib/include"
+    FILE_SET rocroller_public_headers
 )
 
 if(ROCROLLER_BUILD_TESTING OR BUILD_TESTING)
@@ -295,8 +300,8 @@ rocm_export_targets(
     TARGETS roc::rocroller roc::rocroller-interface
     NAMESPACE roc::
     EXPORT rocroller-targets
-    DEPENDS PACKAGE yaml-cpp
-    DEPENDS PACKAGE fmt
+    DEPENDS PACKAGE yaml-cpp # TODO: Remove
+    DEPENDS PACKAGE fmt # TODO: Remove
     DEPENDS PACKAGE hip
 )
 
