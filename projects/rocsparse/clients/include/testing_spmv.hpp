@@ -175,13 +175,6 @@ public:
             csr_row_ptr[i + 1] += csr_row_ptr[i];
         }
 
-        // std::cout << "csr_row_ptr" << std::endl;
-        // for (size_t i = 0; i < csr_row_ptr.size(); i++)
-        //{
-        //	std::cout << csr_row_ptr[i] << " ";
-        // }
-        // std::cout << "" << std::endl;
-
         csr_col_ind.resize(nnz, -1);
         csr_val.resize(nnz, 0.0);
 
@@ -235,159 +228,163 @@ public:
             }
         }
 
-        // std::cout << "csr_col_ind" << std::endl;
-        // for (size_t i = 0; i < csr_col_ind.size(); i++)
-        //{
-        //	std::cout << csr_col_ind[i] << " ";
-        // }
-        // std::cout << "" << std::endl;
-
-        // std::cout << "csr_val" << std::endl;
-        // for (size_t i = 0; i < csr_val.size(); i++)
-        //{
-        //	std::cout << csr_val[i] << " ";
-        // }
-        // std::cout << "" << std::endl;
-
         return true;
     }
 
     static void testing_spmv(const Arguments& arg)
     {
         std::cout << "AAAA" << std::endl;
-        J                      M           = arg.M;
-        J                      N           = arg.N;
         rocsparse_operation    trans       = arg.transA;
         rocsparse_index_base   base        = arg.baseA;
         rocsparse_spmv_alg     alg         = arg.spmv_alg;
         rocsparse_matrix_type  matrix_type = arg.matrix_type;
         rocsparse_fill_mode    uplo        = arg.uplo;
         rocsparse_storage_mode storage     = arg.storage;
-        rocsparse_datatype     ttype       = get_datatype<T>();
-
-        const bool call_stage_analysis = arg.call_stage_analysis;
+        rocsparse_indextype  row_idx_type = rocsparse_indextype_i32;
+        rocsparse_indextype  col_idx_type = rocsparse_indextype_i32;
+        rocsparse_datatype   data_type    = rocsparse_datatype_f32_r;
+        rocsparse_datatype   compute_type = rocsparse_datatype_f32_r;
 
         // Create rocsparse handle
-        rocsparse_local_handle handle(arg);
+        rocsparse_handle handle;
+        CHECK_ROCSPARSE_ERROR(rocsparse_create_handle(&handle));
 
-        T h_alpha = static_cast<T>(1);
-        T h_beta  = static_cast<T>(0);
+        double h_alpha = 1.0;
+        double h_beta  = 0.0;
 
-        std::vector<int>    hptr;
-        std::vector<int>    hind;
-        std::vector<double> hval;
+        std::vector<int>    hcsr_row_ptr;
+        std::vector<int>    hcsr_col_ind;
+        std::vector<double> hcsr_val;
         int                 m   = 0;
         int                 n   = 0;
         int                 nnz = 0;
-        if(!load_mtx_file("mac_econ_fwd500/mac_econ_fwd500.mtx", hptr, hind, hval, m, n, nnz))
+        if(!load_mtx_file("../../../../../../../mac_econ_fwd500/mac_econ_fwd500.mtx",
+                          hcsr_row_ptr,
+                          hcsr_col_ind,
+                          hcsr_val,
+                          m,
+                          n,
+                          nnz))
         {
             std::cout << "Error: Failed to load mac_econ_fwd500.mtx file" << std::endl;
         }
+        std::vector<double> hx(n, 1.0);
+        std::vector<double> hy(m, 0.0);
         std::cout << "m: " << m << " n: " << n << " nnz: " << nnz << std::endl;
 
-        std::cout << "BBBB" << std::endl;
-        host_sparse_matrix<A> hA;
-        std::cout << "CCCC" << std::endl;
-        rocsparse_matrix_factory<A, I, J> matrix_factory(arg, true, false);
-        std::cout << "DDDD" << std::endl;
-        traits::sparse_initialization(matrix_factory, hA, M, N, base);
-        std::cout << "EEEE" << std::endl;
+        int* dcsr_row_ptr = nullptr;
+        int* dcsr_col_ind = nullptr;
+        double* dcsr_val = nullptr;
+        double* dx = nullptr;
+        double* dy = nullptr;
+        CHECK_HIP_ERROR(hipMalloc((void**)&dcsr_row_ptr, sizeof(int) * (m + 1)));
+        CHECK_HIP_ERROR(hipMalloc((void**)&dcsr_col_ind, sizeof(int) * nnz));
+        CHECK_HIP_ERROR(hipMalloc((void**)&dcsr_val, sizeof(double) * nnz));
+        CHECK_HIP_ERROR(hipMalloc((void**)&dx, sizeof(double) * n));
+        CHECK_HIP_ERROR(hipMalloc((void**)&dy, sizeof(double) * m));
 
-        device_sparse_matrix<A> dA(hA);
-        std::cout << "FFFF" << std::endl;
+        CHECK_HIP_ERROR(
+        hipMemcpy(dcsr_row_ptr, hcsr_row_ptr.data(), sizeof(int) * (m + 1), hipMemcpyHostToDevice));
+        CHECK_HIP_ERROR(
+            hipMemcpy(dcsr_col_ind, hcsr_col_ind.data(), sizeof(int) * nnz, hipMemcpyHostToDevice));
+        CHECK_HIP_ERROR(hipMemcpy(dcsr_val, hcsr_val.data(), sizeof(double) * nnz, hipMemcpyHostToDevice));
+        CHECK_HIP_ERROR(hipMemcpy(dx, hx.data(), sizeof(double) * n, hipMemcpyHostToDevice));
 
-        host_dense_matrix<X> hx(N, 1);
-        for(int i = 0; i < N; i++)
-        {
-            hx[i] = static_cast<X>(1);
-        }
-        device_dense_matrix<X> dx(hx);
+        rocsparse_spmat_descr matA;
+        rocsparse_dnvec_descr vecX;
+        rocsparse_dnvec_descr vecY;
 
-        std::cout << "GGGG" << std::endl;
+        // Create sparse matrix A
+        CHECK_ROCSPARSE_ERROR(rocsparse_create_csr_descr(&matA,
+                                                m,
+                                                n,
+                                                nnz,
+                                                dcsr_row_ptr,
+                                                dcsr_col_ind,
+                                                dcsr_val,
+                                                row_idx_type,
+                                                col_idx_type,
+                                                base,
+                                                data_type));
 
-        host_dense_matrix<Y> hy(M, 1);
-        for(int i = 0; i < M; i++)
-        {
-            hy[i] = static_cast<Y>(1);
-        }
-        device_dense_matrix<Y> dy(hy);
+        // Create dense vector X
+        CHECK_ROCSPARSE_ERROR(rocsparse_create_dnvec_descr(&vecX, n, dx, data_type));
 
-        rocsparse_local_spmat matA(dA);
-        rocsparse_local_dnvec x(dx);
-        rocsparse_local_dnvec y(dy);
+        // Create dense vector Y
+        CHECK_ROCSPARSE_ERROR(rocsparse_create_dnvec_descr(&vecY, m, dy, data_type));
 
-        EXPECT_ROCSPARSE_STATUS(
+        CHECK_ROCSPARSE_ERROR(
             rocsparse_spmat_set_attribute(
-                matA, rocsparse_spmat_matrix_type, &matrix_type, sizeof(matrix_type)),
-            rocsparse_status_success);
+                matA, rocsparse_spmat_matrix_type, &matrix_type, sizeof(matrix_type)));
 
-        EXPECT_ROCSPARSE_STATUS(
-            rocsparse_spmat_set_attribute(matA, rocsparse_spmat_fill_mode, &uplo, sizeof(uplo)),
-            rocsparse_status_success);
+        CHECK_ROCSPARSE_ERROR(
+            rocsparse_spmat_set_attribute(matA, rocsparse_spmat_fill_mode, &uplo, sizeof(uplo)));
 
-        EXPECT_ROCSPARSE_STATUS(rocsparse_spmat_set_attribute(
-                                    matA, rocsparse_spmat_storage_mode, &storage, sizeof(storage)),
-                                rocsparse_status_success);
+        CHECK_ROCSPARSE_ERROR(rocsparse_spmat_set_attribute(
+                                    matA, rocsparse_spmat_storage_mode, &storage, sizeof(storage)));
 
-        //CHECK_ROCSPARSE_ERROR(rocsparse_set_pointer_mode(handle, rocsparse_pointer_mode_host));
-
-        std::cout << "HHHH" << std::endl;
-        // Run buffer size
-        void*  dbuffer     = nullptr;
-        size_t buffer_size = 0;
+        // Call spmv to get buffer size
+        size_t buffer_size;
         CHECK_ROCSPARSE_ERROR(rocsparse_spmv(handle,
-                                             trans,
-                                             &h_alpha,
-                                             matA,
-                                             x,
-                                             &h_beta,
-                                             y,
-                                             ttype,
-                                             alg,
-                                             rocsparse_spmv_stage_buffer_size,
-                                             &buffer_size,
-                                             dbuffer));
+                                    trans,
+                                    &h_alpha,
+                                    matA,
+                                    vecX,
+                                    &h_beta,
+                                    vecY,
+                                    compute_type,
+                                    alg,
+                                    rocsparse_spmv_stage_buffer_size,
+                                    &buffer_size,
+                                    nullptr));
 
-        std::cout << "buffer_size: " << buffer_size << std::endl;
-        CHECK_HIP_ERROR(hipMalloc((void**)&dbuffer, buffer_size));
+        void* temp_buffer;
+        CHECK_HIP_ERROR(hipMalloc(&temp_buffer, buffer_size));
 
-        std::cout << "IIII" << std::endl;
-        //if(call_stage_analysis)
-        //{
-        std::cout << "Before analysis" << std::endl;
-        // Run preprocess
+        // Call spmv to perform analysis
         CHECK_ROCSPARSE_ERROR(rocsparse_spmv(handle,
-                                             trans,
-                                             &h_alpha,
-                                             matA,
-                                             x,
-                                             &h_beta,
-                                             y,
-                                             ttype,
-                                             alg,
-                                             rocsparse_spmv_stage_preprocess,
-                                             &buffer_size,
-                                             dbuffer));
-        std::cout << "After analysis" << std::endl;
-        //}
+                                    trans,
+                                    &h_alpha,
+                                    matA,
+                                    vecX,
+                                    &h_beta,
+                                    vecY,
+                                    compute_type,
+                                    alg,
+                                    rocsparse_spmv_stage_preprocess,
+                                    &buffer_size,
+                                    temp_buffer));
 
-        std::cout << "JJJJ" << std::endl;
-
-        // Run solve
+        // Call spmv to perform computation
         CHECK_ROCSPARSE_ERROR(rocsparse_spmv(handle,
-                                             trans,
-                                             &h_alpha,
-                                             matA,
-                                             x,
-                                             &h_beta,
-                                             y,
-                                             ttype,
-                                             alg,
-                                             rocsparse_spmv_stage_compute,
-                                             &buffer_size,
-                                             dbuffer));
+                                    trans,
+                                    &h_alpha,
+                                    matA,
+                                    vecX,
+                                    &h_beta,
+                                    vecY,
+                                    compute_type,
+                                    alg,
+                                    rocsparse_spmv_stage_compute,
+                                    &buffer_size,
+                                    temp_buffer));
 
-        CHECK_HIP_ERROR(hipFree(dbuffer));
+        // Copy result back to host
+        //CHECK_HIP_ERROR(hipMemcpy(hy.data(), dy, sizeof(double) * m, hipMemcpyDeviceToHost));
+
+        // Clear rocSPARSE
+        CHECK_ROCSPARSE_ERROR(rocsparse_destroy_spmat_descr(matA));
+        CHECK_ROCSPARSE_ERROR(rocsparse_destroy_dnvec_descr(vecX));
+        CHECK_ROCSPARSE_ERROR(rocsparse_destroy_dnvec_descr(vecY));
+        CHECK_ROCSPARSE_ERROR(rocsparse_destroy_handle(handle));
+
+        // Clear device memory
+        CHECK_HIP_ERROR(hipFree(dcsr_row_ptr));
+        CHECK_HIP_ERROR(hipFree(dcsr_col_ind));
+        CHECK_HIP_ERROR(hipFree(dcsr_val));
+        CHECK_HIP_ERROR(hipFree(dx));
+        CHECK_HIP_ERROR(hipFree(dy));
+        CHECK_HIP_ERROR(hipFree(temp_buffer));
     }
 
     static void testing_spmv_analysis(const Arguments& arg) {}
