@@ -595,6 +595,9 @@ public:
         CHECK_ROCSPARSE_ERROR(rocsparse_destroy_dnvec_descr(x));
         CHECK_ROCSPARSE_ERROR(rocsparse_destroy_dnvec_descr(y));
 
+        CHECK_HIP_ERROR(hipFree(dcsr_row_ptr));
+        CHECK_HIP_ERROR(hipFree(dcsr_col_ind));
+        CHECK_HIP_ERROR(hipFree(dcsr_val));
         CHECK_HIP_ERROR(hipFree(dx));
         CHECK_HIP_ERROR(hipFree(dy));
         CHECK_HIP_ERROR(hipFree(dbuffer));
