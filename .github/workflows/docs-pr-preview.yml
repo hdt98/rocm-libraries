@@ -15,14 +15,14 @@ name: Docs Preview
 
 on:
   # Trigger when PR is opened, or new commits are pushed
-  pull_request:
-    branches:
-      - 'develop'
-      - 'docs/**'
-      - 'users/alexxu12/test-docs-preview'
+  pull_request_target:
+    # branches:
+    #   - 'develop'
+    #   - 'docs/**'
     paths:
       - 'projects/**/docs/**'
       - 'shared/**/docs/**'
+    types: [opened, synchronize, reopened]
 
   # Allow manual triggering via comment
   issue_comment:
