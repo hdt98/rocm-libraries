@@ -265,7 +265,7 @@ public:
         int64_t                 m   = 0;
         int64_t                 n   = 0;
         int64_t                 nnz = 0;
-        rocsparse_init_csr_rocalution(arg.filename, hcsr_row_ptr, hcsr_col_ind, hcsr_val, m, n, nnz, base);
+        rocsparse_init_csr_rocalution("../matrices/mac_econ_fwd500.csr", hcsr_row_ptr, hcsr_col_ind, hcsr_val, m, n, nnz, base);
 
         double h_alpha = 1.0;
         double h_beta  = 0.0;
