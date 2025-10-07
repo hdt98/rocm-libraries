@@ -56,6 +56,16 @@ inline reduction_t int_to_reduction_t(int rt) { return static_cast<reduction_t>(
 enum class data_type_t : int;
 
 /**
+ * @brief Indicates whether a matrix is supplied in transposed or not.
+ */
+enum class transpose_t {
+  T,
+  N,
+
+  Count
+};
+
+/**
  * @brief A compact 3-D dimension triple (M, N, K).
  *
  * Provides convenient accessors for common GEMM tiling parameters
@@ -138,8 +148,8 @@ struct problem_t {
   std::size_t batch;
 
   /// Transpose types (TT, TN, NT, TT.)
-  bool a_transpose;
-  bool b_transpose;
+  transpose_t a_transpose;
+  transpose_t b_transpose;
 
   /// Data types: A, B, C, D.
   data_type_t a_dtype;

@@ -10,9 +10,9 @@
 #include <set>
 #include <tuple>
 
+#include "origami/hardware.hpp"
 #include "origami/math.hpp"
 #include "origami/types.hpp"
-#include "origami/hardware.hpp"
 
 #include "origami/gemm.hpp"
 #include "origami/streamk.hpp"
@@ -160,8 +160,8 @@ double compute_mt_compute_latency(const problem_t& problem,
       hardware.get_mi_latency(config.mi.m, config.mi.n, config.mi.k, problem.mi_dtype);
   std::size_t L_MT = L_MI * N_MI;
 
-  bool a_trans = problem.a_transpose;
-  bool b_trans = problem.b_transpose;
+  bool a_trans = problem.a_transpose == transpose_t::T;
+  bool b_trans = problem.b_transpose == transpose_t::T;
 
   int a_bytes = data_type_to_bytes(problem.a_dtype);
   int b_bytes = data_type_to_bytes(problem.b_dtype);
@@ -438,8 +438,8 @@ double compute_memory_latency(const problem_t& problem,
   // 12) pick the worst‐case bound
   double L_mem = std::max({L_mem_mem1, L_mem_mem2, L_mem_MEM});
 
-  bool a_trans = problem.a_transpose;
-  bool b_trans = problem.b_transpose;
+  bool a_trans = problem.a_transpose == transpose_t::T;
+  bool b_trans = problem.b_transpose == transpose_t::T;
 
   // NT
   if (!a_trans && b_trans) {
@@ -597,7 +597,8 @@ double compute_total_latency(const problem_t& problem,
     // Override dot2 instruction with vector lane widths
     if (config.mi.m == 0 && config.mi.n == 0 && config.mi.k == 0) {
       // We only use Dot2 for NN layout where M < 3
-      if (problem.size.m > 2 || problem.a_transpose || problem.b_transpose)
+      if (problem.size.m > 2 || (problem.a_transpose == transpose_t::T) ||
+          (problem.b_transpose == transpose_t::T))
         return std::numeric_limits<double>::max();
 
       config.mi.m = 1;
@@ -627,8 +628,8 @@ double compute_total_latency(const problem_t& problem,
   std::size_t K     = problem.size.k;
   std::size_t batch = problem.batch;
 
-  bool a_trans = problem.a_transpose;
-  bool b_trans = problem.b_transpose;
+  bool a_trans = problem.a_transpose == transpose_t::T;
+  bool b_trans = problem.b_transpose == transpose_t::T;
 
   std::size_t MT_M = config.mt.m;
   std::size_t MT_N = config.mt.n;
@@ -768,8 +769,8 @@ std::unordered_map<std::string, std::string> extract_analytical_metrics(const ha
   std::size_t N                = problem.size.n;
   std::size_t K                = problem.size.k;
   std::size_t batch            = problem.batch;
-  bool a_trans                 = problem.a_transpose;
-  bool b_trans                 = problem.b_transpose;
+  bool a_trans                 = problem.a_transpose == transpose_t::T;
+  bool b_trans                 = problem.b_transpose == transpose_t::T;
   std::size_t element_size_A   = data_type_to_bits(problem.a_dtype);
   std::size_t element_size_B   = data_type_to_bits(problem.b_dtype);
   std::size_t element_size_out = data_type_to_bits(problem.d_dtype);

@@ -15,17 +15,17 @@ inline const std::vector<int> test_architectures = {942, 950};
 inline origami::problem_t make_problem(size_t m,
                                        size_t n,
                                        size_t k,
-                                       bool trans_a      = true,
-                                       bool trans_b      = false,
-                                       size_t batch      = 1,
-                                       int mx_block_size = 0) {
+                                       origami::transpose_t a_trans = origami::transpose_t::T,
+                                       origami::transpose_t b_trans = origami::transpose_t::N,
+                                       size_t batch                 = 1,
+                                       int mx_block_size            = 0) {
   origami::problem_t problem;
   problem.size.m          = m;
   problem.size.n          = n;
   problem.size.k          = k;
   problem.batch           = batch;
-  problem.a_transpose     = trans_a;
-  problem.b_transpose     = trans_b;
+  problem.a_transpose     = a_trans;
+  problem.b_transpose     = b_trans;
   problem.a_dtype         = origami::data_type_t::BFloat16;
   problem.b_dtype         = origami::data_type_t::BFloat16;
   problem.c_dtype         = origami::data_type_t::BFloat16;

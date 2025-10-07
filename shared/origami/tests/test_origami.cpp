@@ -15,7 +15,7 @@ TEST_CASE("Origami: compute_perf_gflops", "[origami]") {
       // TODO: Add support for make_hardware using hipDeviceProperties
       auto hardware_slow = make_hardware(gpu_arch, 304, 65536, 8, 1.0, 1.0, 1.0, 4000000, 1.4);
       auto hardware_fast = make_hardware(gpu_arch, 304, 65536, 8, 1.0, 1.0, 1.0, 4000000, 1.8);
-      auto problem       = make_problem(4096, 4096, 1024, 1, 0, 2);
+      auto problem       = make_problem(4096, 4096, 1024, origami::transpose_t::T, origami::transpose_t::N, 2);
       auto config        = make_config(128, 128, 64, 32, 32, 8, 1);
 
       auto config_slow = config;
@@ -51,7 +51,7 @@ TEST_CASE("Origami: best_grid_size", "[origami]") {
   for (int gpu_arch : test_architectures) {
     DYNAMIC_SECTION("gfx" << gpu_arch << " - grid size selection") {
       auto hardware = make_hardware(gpu_arch);
-      auto problem  = make_problem(1024, 1024, 4096, 1, 0, 1);
+      auto problem  = make_problem(1024, 1024, 4096);
       auto config   = make_config(256, 256, 64, 32, 32, 8, 1);
 
       auto grid_size = origami::streamk::select_grid_size(
@@ -66,7 +66,7 @@ TEST_CASE("Origami: best_macro_tile_size", "[origami]") {
   for (int gpu_arch : test_architectures) {
     DYNAMIC_SECTION("gfx" << gpu_arch << " - rank configs by latency") {
       auto hardware = make_hardware(gpu_arch);
-      auto problem  = make_problem(1024, 1024, 4096, 1, 0, 1);
+      auto problem  = make_problem(1024, 1024, 4096);
 
       std::vector<origami::config_t> configs;
       std::vector<
@@ -105,7 +105,7 @@ TEST_CASE("Origami: select_workgroup_mapping", "[origami]") {
   for (int gpu_arch : test_architectures) {
     DYNAMIC_SECTION("gfx" << gpu_arch << " - workgroup mapping selection") {
       auto hardware = make_hardware(gpu_arch);
-      auto problem  = make_problem(4096, 4096, 8192, 1, 0, 1);
+      auto problem  = make_problem(4096, 4096, 8192);
 
       origami::dim3_t mt{256, 256, 32};
       origami::dim3_t mi{32, 32, 8};

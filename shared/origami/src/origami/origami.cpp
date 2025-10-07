@@ -7,11 +7,11 @@
 #include <iomanip>
 #include <iostream>
 
+#include "origami/gemm.hpp"
 #include "origami/math.hpp"
 #include "origami/origami.hpp"
 #include "origami/streamk.hpp"
 #include "origami/types.hpp"
-#include "origami/gemm.hpp"
 
 namespace origami {
 
@@ -166,8 +166,8 @@ config_t select_config_mnk(std::size_t M,
   problem.size.n          = N;
   problem.size.k          = K;
   problem.batch           = 1;
-  problem.a_transpose     = true;               // Default to T
-  problem.b_transpose     = false;              // Default to N
+  problem.a_transpose     = transpose_t::T;     // Default to T
+  problem.b_transpose     = transpose_t::N;     // Default to N
   problem.a_dtype         = data_type_t::Half;  // Default to fp16
   problem.b_dtype         = data_type_t::Half;  // Default to fp16
   problem.c_dtype         = data_type_t::Half;  // Default to fp16
