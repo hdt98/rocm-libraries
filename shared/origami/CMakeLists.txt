@@ -44,6 +44,8 @@ target_compile_features(origami PUBLIC cxx_std_17)
 add_library(origami-headers INTERFACE)
 add_library(roc::origami-headers ALIAS origami-headers)
 
+target_compile_features(origami-headers INTERFACE cxx_std_17)
+
 target_include_directories(origami-headers
     INTERFACE
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
