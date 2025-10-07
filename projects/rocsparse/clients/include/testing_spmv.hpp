@@ -452,10 +452,10 @@ public:
         rocsparse_matrix_type  matrix_type = arg.matrix_type;
         rocsparse_fill_mode    uplo        = arg.uplo;
         rocsparse_storage_mode storage     = arg.storage;
+        rocsparse_indextype     itype       = get_indextype<I>();
+        rocsparse_indextype     jtype       = get_indextype<J>();
         rocsparse_datatype     ttype       = get_datatype<T>();
 
-        // Create rocsparse handle
-        // rocsparse_local_handle handle(arg);
         // Create rocsparse handle
         rocsparse_handle handle;
         CHECK_ROCSPARSE_ERROR(rocsparse_create_handle(&handle));
@@ -463,32 +463,37 @@ public:
         T h_alpha = static_cast<T>(1);
         T h_beta  = static_cast<T>(0);
 
-        std::cout << "BBBB" << std::endl;
-        host_sparse_matrix<A> hA;
-        std::cout << "CCCC" << std::endl;
+        // std::cout << "BBBB" << std::endl;
+        // host_sparse_matrix<A> hA;
+        // std::cout << "CCCC" << std::endl;
+        // rocsparse_matrix_factory<A, I, J> matrix_factory(arg, true, false);
+        // std::cout << "DDDD" << std::endl;
+        // traits::sparse_initialization(matrix_factory, hA, M, N, base);
+        // std::cout << "EEEE" << std::endl;
+
+        std::vector<I> hcsr_row_ptr;
+        std::vector<J> hcsr_col_ind;
+        std::vector<A> hcsr_val;
+        I nnz;
         rocsparse_matrix_factory<A, I, J> matrix_factory(arg, true, false);
-        std::cout << "DDDD" << std::endl;
-        traits::sparse_initialization(matrix_factory, hA, M, N, base);
-        std::cout << "EEEE" << std::endl;
+        matrix_factory.init_csr(hcsr_row_ptr, hcsr_col_ind, hcsr_val, M, N, nnz, base);
 
-        device_sparse_matrix<A> dA(hA);
-        std::cout << "FFFF" << std::endl;
+        I* dcsr_row_ptr = nullptr;
+        J* dcsr_col_ind = nullptr;
+        A* dcsr_val = nullptr;
+        CHECK_HIP_ERROR(hipMalloc((void**)&dcsr_row_ptr, sizeof(I) * (M + 1)));
+        CHECK_HIP_ERROR(hipMalloc((void**)&dcsr_col_ind, sizeof(J) * nnz));
+        CHECK_HIP_ERROR(hipMalloc((void**)&dcsr_val, sizeof(A) * nnz));
 
-        // host_dense_matrix<X> hx(N, 1);
-        // for(int i = 0; i < N; i++)
-        // {
-        //     hx[i] = static_cast<X>(1);
-        // }
-        // device_dense_matrix<X> dx(hx);
+        CHECK_HIP_ERROR(hipMemcpy(dcsr_row_ptr, hcsr_row_ptr.data(), sizeof(I) * (M + 1), hipMemcpyHostToDevice));
+        CHECK_HIP_ERROR(hipMemcpy(dcsr_col_ind, hcsr_col_ind.data(), sizeof(J) * nnz, hipMemcpyHostToDevice));
+        CHECK_HIP_ERROR(hipMemcpy(dcsr_val, hcsr_val.data(), sizeof(A) * nnz, hipMemcpyHostToDevice));
 
-        // std::cout << "GGGG" << std::endl;
 
-        // host_dense_matrix<Y> hy(M, 1);
-        // for(int i = 0; i < M; i++)
-        // {
-        //     hy[i] = static_cast<Y>(1);
-        // }
-        // device_dense_matrix<Y> dy(hy);
+
+        // device_sparse_matrix<A> dA(hA);
+        // std::cout << "FFFF" << std::endl;
+
         std::vector<X> hx(N, 1);
         std::vector<Y> hy(M, 1);
 
@@ -500,12 +505,19 @@ public:
         CHECK_HIP_ERROR(hipMemcpy(dx, hx.data(), sizeof(X) * N, hipMemcpyHostToDevice));
         CHECK_HIP_ERROR(hipMemcpy(dy, hy.data(), sizeof(Y) * M, hipMemcpyHostToDevice));
 
-
-
-
-        rocsparse_local_spmat matA(dA);
-        // rocsparse_local_dnvec x(dx);
-        // rocsparse_local_dnvec y(dy);
+        // rocsparse_local_spmat matA(dA);
+        rocsparse_spmat_descr matA;
+        CHECK_ROCSPARSE_ERROR(rocsparse_create_csr_descr(&matA,
+                                    M,
+                                    N,
+                                    nnz,
+                                    dcsr_row_ptr,
+                                    dcsr_col_ind,
+                                    dcsr_val,
+                                    itype,
+                                    jtype,
+                                    base,
+                                    ttype));
 
         // Create dense vector X
         rocsparse_dnvec_descr x;
@@ -579,6 +591,7 @@ public:
                                              dbuffer));
 
         CHECK_ROCSPARSE_ERROR(rocsparse_destroy_handle(handle));
+        CHECK_ROCSPARSE_ERROR(rocsparse_destroy_spmat_descr(matA));
         CHECK_ROCSPARSE_ERROR(rocsparse_destroy_dnvec_descr(x));
         CHECK_ROCSPARSE_ERROR(rocsparse_destroy_dnvec_descr(y));
 
