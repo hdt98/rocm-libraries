@@ -251,6 +251,16 @@ public:
 
         std::cout << "BBBB" << std::endl;
 
+        J M;
+        J N;
+        host_sparse_matrix<A> hA;
+        {
+            rocsparse_matrix_factory<A, I, J> matrix_factory(arg, true, false);
+            traits::sparse_initialization(matrix_factory, hA, M, N, base);
+        }
+
+        std::cout << "M: " << M << " N: " << N << std::endl;
+
         double h_alpha = 1.0;
         double h_beta  = 0.0;
 
