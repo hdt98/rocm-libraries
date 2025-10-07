@@ -135,15 +135,8 @@ namespace origami
         }
         else // as what StreamK predicts
         {
-            streamk::reduction_type rt = streamk::select_reduction(M, 
-                                                                   N, 
-                                                                   K, 
-                                                                   batch, 
-                                                                   MT_M, 
-                                                                   MT_N, 
-                                                                   MT_K, 
-                                                                   hardware, 
-                                                                   dynamic_grid_version);
+            streamk::reduction_type rt = streamk::select_reduction(
+                M, N, K, batch, MT_M, MT_N, MT_K, hardware, dynamic_grid_version);
             numWGs = streamk::select_grid(M,
                                           N,
                                           K,
@@ -232,7 +225,8 @@ namespace origami
     }
 
     // Computes Emulated arithmetic intensity for TF32 (assumes 3xBF16).
-    double emulated_tf32_arithmetic_intensity(double m, double n, double k, double bytes_per_element)
+    double
+        emulated_tf32_arithmetic_intensity(double m, double n, double k, double bytes_per_element)
     {
         // Numerator: 3.0 * 2.0 * m * n * k
         // Denominator: (m*n + n*k + m*k) * bytes_per_element
@@ -245,15 +239,15 @@ namespace origami
     // Compute cvt overhead in x1 tf32 emulation
     // TODO: We can generalize the same routine to cover more GEMMs that perform conversion
     static inline double compute_cvt_overhead_x1(const hardware_t& hardware,
-                                                 size_t          MT_M,
-                                                 size_t          MT_N,
-                                                 size_t          MT_K,
-                                                 size_t          MI_M,
-                                                 size_t          MI_N,
-                                                 size_t          MI_K,
-                                                 size_t          element_size_A,
-                                                 size_t          element_size_B,
-                                                 data_type_t     mi_datatype)
+                                                 size_t            MT_M,
+                                                 size_t            MT_N,
+                                                 size_t            MT_K,
+                                                 size_t            MI_M,
+                                                 size_t            MI_N,
+                                                 size_t            MI_K,
+                                                 size_t            element_size_A,
+                                                 size_t            element_size_B,
+                                                 data_type_t       mi_datatype)
     {
         // In X1 TF32 GEMMs, we do:
         // v_cvt_pk_bf16_f32  (convert/pack fp32 to bf16)
@@ -276,10 +270,10 @@ namespace origami
         const double wave_tile_k = MT_K / MI_K;
 
         // MFMA count
-        const double N_MI = (wave_tile_m / MI_M) * (wave_tile_n / MI_N) * wave_tile_k;
+        const double N_MI     = (wave_tile_m / MI_M) * (wave_tile_n / MI_N) * wave_tile_k;
         const double num_mfma = 1.0 * static_cast<double>(N_MI);
         // Cycle scale per MI
-        const double L_MI = hardware.get_mi_latency(MI_M, MI_N, MI_K, mi_datatype);
+        const double L_MI        = hardware.get_mi_latency(MI_M, MI_N, MI_K, mi_datatype);
         const double mfma_cycles = num_mfma * L_MI;
 
         // 2) Bytes (per K-slice), using ceil-div to whole bytes
@@ -304,11 +298,11 @@ namespace origami
         // Each cvt has a latency of four. It is scaled by the MI Latency
         // Note: change 16.0 based on mi_data_type if we want to generalize this for all
         // casting GEMMs.
-        const double cvt        = (2.0 * 4.0 / 16.0 * L_MI) * LR; 
+        const double cvt = (2.0 * 4.0 / 16.0 * L_MI) * LR;
         // cvt ops are interleaved in main loop and don't stall matrix or memory units.
         // Heuristically, we set
-        const double H          = (8.0 / 16.0 * L_MI) * spare_mfma + (4.0 / 16.0) * L_MI * (LR + GR);
-        const double overhead   = std::max(cvt - H, 0.0);
+        const double H        = (8.0 / 16.0 * L_MI) * spare_mfma + (4.0 / 16.0) * L_MI * (LR + GR);
+        const double overhead = std::max(cvt - H, 0.0);
 
         return overhead;
     }
@@ -508,7 +502,7 @@ namespace origami
         // Number of CUs that might share the same K-tiles, adjusted for K-splitting.
         // This affects contention on the L2 cache partitions (XCDs).
         const size_t effective_cus = safe_ceil_div(concurrent_workgroups, splittingFactor);
-        const size_t cu_per_xcd    = std::max(safe_ceil_div(effective_cus, hardware.NUM_XCD), 1UL);
+        const size_t cu_per_xcd    = std::max(safe_ceil_div(effective_cus, hardware.NUM_XCD), 1ULL);
 
         // Initial guess for the L2 tile dimensions (a tile of workgroups).
         size_t l2_tile_n = std::min(static_cast<size_t>(WGM), workgroups_n);
@@ -523,8 +517,8 @@ namespace origami
         }
 
         // Clamp initial tile dimensions to the actual grid size.
-        l2_tile_m = std::max(std::min(workgroups_m, l2_tile_m), 1UL);
-        l2_tile_n = std::max(std::min(workgroups_n, l2_tile_n), 1UL);
+        l2_tile_m = std::max(std::min(workgroups_m, l2_tile_m), 1ULL);
+        l2_tile_n = std::max(std::min(workgroups_n, l2_tile_n), 1ULL);
 
         // Calculate memory footprint in bytes.
         const size_t element_bytes       = safe_ceil_div(element_size, 8);
@@ -615,8 +609,8 @@ namespace origami
         }
 
         // Clamp initial tile dimensions to the actual grid size.
-        mall_tile_m = std::max(std::min(workgroups_m, mall_tile_m), 1UL);
-        mall_tile_n = std::max(std::min(workgroups_n, mall_tile_n), 1UL);
+        mall_tile_m = std::max(std::min(workgroups_m, mall_tile_m), 1ULL);
+        mall_tile_n = std::max(std::min(workgroups_n, mall_tile_n), 1ULL);
 
         // --- CRITICAL: Shrink tile to fit into MALL Capacity ---
         const size_t element_bytes       = safe_ceil_div(element_size, 8);
@@ -846,8 +840,8 @@ namespace origami
             mall_m = grid_m;
         }
         // Clamp tile dimensions
-        mall_m = std::max(std::min(grid_m, mall_m), 1UL);
-        mall_n = std::max(std::min(grid_n, mall_n), 1UL);
+        mall_m = std::max(std::min(grid_m, mall_m), 1ULL);
+        mall_n = std::max(std::min(grid_n, mall_n), 1ULL);
         // This is the minimum unique bytes needed from HBM to feed the concurrent workgroups.
         double min_load
             = static_cast<double>((mall_m * MT_M * MT_K * safe_ceil_div(element_size_A, 8))
@@ -1028,16 +1022,16 @@ namespace origami
             L_epilogue += L_reduce + partial_adds + 10000;
         }
         // 4'') tf32 emu has some more overhead
-        double L_cvt    = 0;
+        double L_cvt = 0;
         if((mi_datatype == data_type_t::XFloat32)
-            && (hardware.arch == hardware_t::architecture_t::gfx950))
+           && (hardware.arch == hardware_t::architecture_t::gfx950))
         {
             L_cvt = compute_cvt_overhead(
                 hardware, MT_M, MT_N, MT_K, MI_M, MI_N, MI_K, element_size_A, element_size_B);
         }
         else if((element_size_A == 32) && (element_size_B == 32)
-                 && (mi_datatype == data_type_t::BFloat16)
-                 && (hardware.arch == hardware_t::architecture_t::gfx950)) // SS_BSS on GFX950
+                && (mi_datatype == data_type_t::BFloat16)
+                && (hardware.arch == hardware_t::architecture_t::gfx950)) // SS_BSS on GFX950
         {
             L_cvt = compute_cvt_overhead_x1(hardware,
                                             MT_M,
@@ -1304,9 +1298,6 @@ namespace origami
         // TODO THESE SHOULD BE TEMPORARY FIXES AND BE MORE SOLIDLY INTEGRATED LATER
         bool heuristics = hardware_t::is_heuristics_enabled();
 
-        const char* env = std::getenv("ANALYTICAL_GEMM_HEURISTICS");
-        heuristics      = !(env && std::string(env) == "0");
-        // heuristics = 0;
         //  Heuristics for TF32
         bool tf32_emu = ((mi_datatype == data_type_t::XFloat32)
                          && (hardware.arch == hardware_t::architecture_t::gfx950));
@@ -1349,7 +1340,6 @@ namespace origami
                 total_latency = total_latency * 0.5;
             }
         }
-
 
         if(heuristics)
         {
