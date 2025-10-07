@@ -154,7 +154,7 @@ struct Arguments
     bool sparsity_pattern_statistics;
     bool call_stage_analysis;
     bool convert_to_int;
-    char filename[128];
+    char filename[192];
     char function[64];
     char name[64];
     char category[32];

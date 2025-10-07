@@ -156,6 +156,8 @@ void testing_bsrmv(const Arguments& arg)
     rocsparse_storage_mode storage             = arg.storage;
     const bool             call_stage_analysis = arg.call_stage_analysis;
 
+    std::cout << "arg.filename: " << arg.filename << std::endl;
+
     host_scalar<T> h_alpha(arg.get_alpha<T>());
     host_scalar<T> h_beta(arg.get_beta<T>());
 
