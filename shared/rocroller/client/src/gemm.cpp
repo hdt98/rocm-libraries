@@ -1287,17 +1287,17 @@ namespace rocRoller::Client::GEMMClient::CLI
 
 static std::string initModeOptions()
 {
-    return "Raw::Bounded"
-           "Raw::BoundedAlternatingSign"
-           "Raw::Unbounded"
-           "Raw::IdentityScale_NormalData(<mean>, <std_dev>)"
-           "Raw::NormalScale_UniformData(<mean>, <std_dev>)"
-           "Raw::Identity"
-           "Raw::Ones"
-           "Raw::Zeros"
-           "Float::Trigonometric"
-           "Float::Normal(<mean>, <std_dev>)"
-           "Default: Raw::Bounded.";
+    return "Bounded"
+           "BoundedAlternatingSign"
+           "Unbounded"
+           "IdentityScaleNormalData(<mean>, <std_dev>)"
+           "NormalScaleUniformData(<mean>, <std_dev>)"
+           "Identity"
+           "Ones"
+           "Zeros"
+           "TrigonometricFromFloat"
+           "NormalFromFloat(<mean>, <std_dev>)"
+           "Default: Bounded.";
 }
 
 static bool parseInitMode(const std::string& arg, DataInitMode& result)
@@ -1309,13 +1309,13 @@ static bool parseInitMode(const std::string& arg, DataInitMode& result)
     std::istringstream iss(arg);
     std::string        token;
 
-    if(arg == "Raw::Bounded")
-        result = DataInitMode(RawDataInitMode(Bounded{}));
-    else if(arg == "Raw::BoundedAlternatingSign")
-        result = DataInitMode(RawDataInitMode(BoundedAlternatingSign{}));
-    else if(arg == "Raw::Unbounded")
-        result = DataInitMode(RawDataInitMode(Unbounded{}));
-    else if(startsWith("Raw::IdentityScale_NormalData", arg.begin(), arg.end()))
+    if(arg == "Bounded")
+        result = DataInitMode(Bounded{});
+    else if(arg == "BoundedAlternatingSign")
+        result = DataInitMode(BoundedAlternatingSign{});
+    else if(arg == "Unbounded")
+        result = DataInitMode(Unbounded{});
+    else if(startsWith("IdentityScaleNormalData", arg.begin(), arg.end()))
     {
         try
         {
@@ -1326,7 +1326,7 @@ static bool parseInitMode(const std::string& arg, DataInitMode& result)
             std::getline(iss, token, ')');
             float std_dev = std::stof(token);
 
-            result = DataInitMode(RawDataInitMode(IdentityScale_NormalData{mean, std_dev}));
+            result = DataInitMode(IdentityScaleNormalData{mean, std_dev});
         }
         catch(const std::invalid_argument&)
         {
@@ -1339,13 +1339,12 @@ static bool parseInitMode(const std::string& arg, DataInitMode& result)
         if(fail)
         {
             std::cerr << "Invalid format for Init Mode." << std::endl;
-            std::cerr << "Expected: Raw::IdentityScale_NormalData(<mean>, <std_dev>)" << std::endl;
-            std::cerr << "For example: --initMode_A=Raw::IdentityScale_NormalData(0.0, 1.0)"
-                      << std::endl;
+            std::cerr << "Expected: IdentityScaleNormalData(<mean>, <std_dev>)" << std::endl;
+            std::cerr << "For example: --initMode_A=IdentityScaleNormalData(0.0, 1.0)" << std::endl;
             return PARSE_FAILURE;
         }
     }
-    else if(startsWith("Raw::NormalScale_UniformData", arg.begin(), arg.end()))
+    else if(startsWith("NormalScaleUniformData", arg.begin(), arg.end()))
     {
         try
         {
@@ -1356,7 +1355,7 @@ static bool parseInitMode(const std::string& arg, DataInitMode& result)
             std::getline(iss, token, ')');
             float std_dev = std::stof(token);
 
-            result = DataInitMode(RawDataInitMode(NormalScale_UniformData{mean, std_dev}));
+            result = DataInitMode(NormalScaleUniformData{mean, std_dev});
         }
         catch(const std::invalid_argument&)
         {
@@ -1369,21 +1368,20 @@ static bool parseInitMode(const std::string& arg, DataInitMode& result)
         if(fail)
         {
             std::cerr << "Invalid format for Init Mode." << std::endl;
-            std::cerr << "Expected: Raw::NormalScale_UniformData(<mean>, <std_dev>)" << std::endl;
-            std::cerr << "For example: --initMode_A=Raw::NormalScale_UniformData(0.0, 1.0)"
-                      << std::endl;
+            std::cerr << "Expected: NormalScaleUniformData(<mean>, <std_dev>)" << std::endl;
+            std::cerr << "For example: --initMode_A=NormalScaleUniformData(0.0, 1.0)" << std::endl;
             return PARSE_FAILURE;
         }
     }
-    else if(arg == "Raw::Identity")
-        result = DataInitMode(RawDataInitMode(Identity{}));
-    else if(arg == "Raw::Ones")
-        result = DataInitMode(RawDataInitMode(Ones{}));
-    else if(arg == "Raw::Zeros")
-        result = DataInitMode(RawDataInitMode(Zeros{}));
-    else if(arg == "Float::Trigonometric")
-        result = DataInitMode(FloatDataInitMode(Trigonometric{}));
-    else if(startsWith("Float::Normal", arg.begin(), arg.end()))
+    else if(arg == "Identity")
+        result = DataInitMode(Identity{});
+    else if(arg == "Ones")
+        result = DataInitMode(Ones{});
+    else if(arg == "Zeros")
+        result = DataInitMode(Zeros{});
+    else if(arg == "TrigonometricFromFloat")
+        result = DataInitMode(TrigonometricFromFloat{});
+    else if(startsWith("NormalFromFloat", arg.begin(), arg.end()))
     {
         try
         {
@@ -1394,7 +1392,7 @@ static bool parseInitMode(const std::string& arg, DataInitMode& result)
             std::getline(iss, token, ')');
             float std_dev = std::stof(token);
 
-            result = DataInitMode(FloatDataInitMode(Normal{mean, std_dev}));
+            result = DataInitMode(NormalFromFloat{mean, std_dev});
         }
         catch(const std::invalid_argument&)
         {
@@ -1407,8 +1405,8 @@ static bool parseInitMode(const std::string& arg, DataInitMode& result)
         if(fail)
         {
             std::cerr << "Invalid format for Init Mode." << std::endl;
-            std::cerr << "Expected: Float::Normal(<mean>, <std_dev>)" << std::endl;
-            std::cerr << "For example: --initMode_A=Float::Normal(0.0, 1.0)" << std::endl;
+            std::cerr << "Expected: NormalFromFloat(<mean>, <std_dev>)" << std::endl;
+            std::cerr << "For example: --initMode_A=NormalFromFloat(0.0, 1.0)" << std::endl;
             return PARSE_FAILURE;
         }
     }
@@ -1496,9 +1494,9 @@ int main(int argc, const char* argv[])
         .scaleValueA = 1.0f,
         .scaleValueB = 1.0f,
 
-        .initModeA = DataInitMode(RawDataInitMode(Bounded{})),
-        .initModeB = DataInitMode(RawDataInitMode(Bounded{})),
-        .initModeC = DataInitMode(RawDataInitMode(Bounded{})),
+        .initModeA = DataInitMode(Bounded{}),
+        .initModeB = DataInitMode(Bounded{}),
+        .initModeC = DataInitMode(Bounded{}),
     };
 
     rocRoller::Client::GEMMClient::TypeParameters types;
@@ -1548,12 +1546,24 @@ int main(int argc, const char* argv[])
     app.add_option(
         "--initMode_A",
         [&problem](auto& args) -> bool { return ParseInitMode(args[0], problem.initModeA); },
-        "Data initialization mode for A [Raw::Bounded | Raw::BoundedAlternatingSign | "
-        "Raw::Unbounded | ",
-        "Raw::IdentityScale_NormalData(<mean>, <std_dev>) | Raw::NormalScale_UniformData(<mean>, "
-        "<std_dev>) | Raw::Identity | Raw::Ones | Raw::Zeros | Float::Trigonometric | "
-        "Float::Normal(<mean>, <std_dev>)]. "
-        "Default: Raw::Bounded.");
+        "Data initialization mode for A [Bounded | BoundedAlternatingSign | Unbounded | "
+        "IdentityScaleNormalData(<mean>, <std_dev>) | NormalScaleUniformData(<mean>, <std_dev>) | "
+        "Identity | Ones | Zeros | TrigonometricFromFloat | NormalFromFloat(<mean>, <std_dev>)]. "
+        "Default: Bounded.");
+    app.add_option(
+        "--initMode_B",
+        [&problem](auto& args) -> bool { return ParseInitMode(args[0], problem.initModeB); },
+        "Data initialization mode for B [Bounded | BoundedAlternatingSign | Unbounded | "
+        "IdentityScaleNormalData(<mean>, <std_dev>) | NormalScaleUniformData(<mean>, <std_dev>) | "
+        "Identity | Ones | Zeros | TrigonometricFromFloat | NormalFromFloat(<mean>, <std_dev>)]. "
+        "Default: Bounded.");
+    app.add_option(
+        "--initMode_C",
+        [&problem](auto& args) -> bool { return ParseInitMode(args[0], problem.initModeC); },
+        "Data initialization mode for C [Bounded | BoundedAlternatingSign | Unbounded | "
+        "IdentityScaleNormalData(<mean>, <std_dev>) | NormalScaleUniformData(<mean>, <std_dev>) | "
+        "Identity | Ones | Zeros | TrigonometricFromFloat | NormalFromFloat(<mean>, <std_dev>)]. "
+        "Default: Bounded.");
 
     //
     // Problem types

@@ -34,7 +34,7 @@ namespace rocRoller
                     int                   blockScaling,
                     const DataInitMode    initMode)
     {
-        opts.init_mode    = initMode;
+        opts.initMode     = initMode;
         opts.min          = min;
         opts.max          = max;
         opts.blockScaling = blockScaling;
