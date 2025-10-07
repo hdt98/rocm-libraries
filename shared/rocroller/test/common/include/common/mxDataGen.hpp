@@ -99,7 +99,7 @@ namespace rocRoller
                          const float             max,
                          const uint32_t          seed,
                          const index_t           blockScaling = 1,
-                         const DataInitMode initMode = DataInitMode(RawDataInitMode(Bounded{})))
+                         const DataInitMode      initMode     = DataInitMode(Bounded{}))
     {
         auto sizes   = desc.sizes();
         auto strides = desc.strides();
@@ -123,8 +123,8 @@ namespace rocRoller
 
         std::vector<uint8_t> dataByte = dgen.getDataBytes();
 
-        if constexpr(std::is_same_v<rrDT,
-                                    FP6> || std::is_same_v<rrDT, BF6> || std::is_same_v<rrDT, FP4>)
+        if constexpr(std::is_same_v<rrDT, FP6> || std::is_same_v<rrDT, BF6>
+                     || std::is_same_v<rrDT, FP4>)
         {
 
             return reinterpret_cast<std::vector<UDT>&>(dataByte);
@@ -146,9 +146,8 @@ namespace rocRoller
             }
         }
 
-        if constexpr(std::is_same_v<
-                         rrDT,
-                         float> || std::is_same_v<rrDT, Half> || std::is_same_v<rrDT, BFloat16>)
+        if constexpr(std::is_same_v<rrDT, float> || std::is_same_v<rrDT, Half>
+                     || std::is_same_v<rrDT, BFloat16>)
         {
             std::vector<rrDT>& rrData = reinterpret_cast<std::vector<rrDT>&>(dataByte);
             return rrData;
@@ -160,14 +159,14 @@ namespace rocRoller
     }
 
     template <typename rrDT>
-    std::vector<typename PackedTypeOf<rrDT>::type>
-        DGenVector(TensorDescriptor&  desc,
-                   const float        min          = -1.f,
-                   const float        max          = 1.f,
-                   const uint32_t     seed         = 1713573849,
-                   bool               hasScale     = false,
-                   const int          blockScaling = 1,
-                   const DataInitMode initMode     = DataInitMode(RawDataInitMode(Bounded{})))
+    std::vector<typename PackedTypeOf<rrDT>::type> DGenVector(TensorDescriptor&  desc,
+                                                              const float        min  = -1.f,
+                                                              const float        max  = 1.f,
+                                                              const uint32_t     seed = 1713573849,
+                                                              bool               hasScale = false,
+                                                              const int          blockScaling = 1,
+                                                              const DataInitMode initMode
+                                                              = DataInitMode(Bounded{}))
     {
         if(hasScale)
             AssertFatal(blockScaling == 32, "Invalid scale block size: ", ShowValue(blockScaling));
@@ -190,9 +189,9 @@ namespace rocRoller
                    float                   min            = -1.f,
                    float                   max            = 1.f,
                    const uint              scaleBlockSize = 32,
-                   DataInitMode            initModeA = DataInitMode(RawDataInitMode(Bounded{})),
-                   DataInitMode            initModeB = DataInitMode(RawDataInitMode(Bounded{})),
-                   DataInitMode            initModeC = DataInitMode(RawDataInitMode(Bounded{}))
+                   DataInitMode            initModeA      = DataInitMode(Bounded{}),
+                   DataInitMode            initModeB      = DataInitMode(Bounded{}),
+                   DataInitMode            initModeC      = DataInitMode(Bounded{})
 
     )
     {
@@ -231,9 +230,9 @@ namespace rocRoller
                    TensorDescriptor& descC,
                    float             min       = -1.f,
                    float             max       = 1.f,
-                   DataInitMode      initModeA = DataInitMode(RawDataInitMode(Bounded{})),
-                   DataInitMode      initModeB = DataInitMode(RawDataInitMode(Bounded{})),
-                   DataInitMode      initModeC = DataInitMode(RawDataInitMode(Bounded{})))
+                   DataInitMode      initModeA = DataInitMode(Bounded{}),
+                   DataInitMode      initModeB = DataInitMode(Bounded{}),
+                   DataInitMode      initModeC = DataInitMode(Bounded{}))
     {
         std::vector<uint8_t> defaultHostScaleA;
         std::vector<uint8_t> defaultHostScaleB;
