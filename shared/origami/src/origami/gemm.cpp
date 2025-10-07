@@ -502,7 +502,7 @@ namespace origami
         // Number of CUs that might share the same K-tiles, adjusted for K-splitting.
         // This affects contention on the L2 cache partitions (XCDs).
         const size_t effective_cus = safe_ceil_div(concurrent_workgroups, splittingFactor);
-        const size_t cu_per_xcd    = std::max(safe_ceil_div(effective_cus, hardware.NUM_XCD), 1ULL);
+        const size_t cu_per_xcd    = std::max(safe_ceil_div(effective_cus, hardware.NUM_XCD), 1UL);
 
         // Initial guess for the L2 tile dimensions (a tile of workgroups).
         size_t l2_tile_n = std::min(static_cast<size_t>(WGM), workgroups_n);
@@ -517,8 +517,8 @@ namespace origami
         }
 
         // Clamp initial tile dimensions to the actual grid size.
-        l2_tile_m = std::max(std::min(workgroups_m, l2_tile_m), 1ULL);
-        l2_tile_n = std::max(std::min(workgroups_n, l2_tile_n), 1ULL);
+        l2_tile_m = std::max(std::min(workgroups_m, l2_tile_m), 1UL);
+        l2_tile_n = std::max(std::min(workgroups_n, l2_tile_n), 1UL);
 
         // Calculate memory footprint in bytes.
         const size_t element_bytes       = safe_ceil_div(element_size, 8);
@@ -609,8 +609,8 @@ namespace origami
         }
 
         // Clamp initial tile dimensions to the actual grid size.
-        mall_tile_m = std::max(std::min(workgroups_m, mall_tile_m), 1ULL);
-        mall_tile_n = std::max(std::min(workgroups_n, mall_tile_n), 1ULL);
+        mall_tile_m = std::max(std::min(workgroups_m, mall_tile_m), 1UL);
+        mall_tile_n = std::max(std::min(workgroups_n, mall_tile_n), 1UL);
 
         // --- CRITICAL: Shrink tile to fit into MALL Capacity ---
         const size_t element_bytes       = safe_ceil_div(element_size, 8);
@@ -840,8 +840,8 @@ namespace origami
             mall_m = grid_m;
         }
         // Clamp tile dimensions
-        mall_m = std::max(std::min(grid_m, mall_m), 1ULL);
-        mall_n = std::max(std::min(grid_n, mall_n), 1ULL);
+        mall_m = std::max(std::min(grid_m, mall_m), 1UL);
+        mall_n = std::max(std::min(grid_n, mall_n), 1UL);
         // This is the minimum unique bytes needed from HBM to feed the concurrent workgroups.
         double min_load
             = static_cast<double>((mall_m * MT_M * MT_K * safe_ceil_div(element_size_A, 8))
@@ -1059,20 +1059,17 @@ namespace origami
         long num_iter
             = std::max(static_cast<long>(safe_ceil_div(splittedK, MT_K) - 1), static_cast<long>(1));
         // Zero Padding in the K dimension on last iteration
-        if(K % MT_K != 0)
-        {
-            double problem_k_quant = ((K % MT_K) / (double)K);
-            L_epilogue
-                += problem_k_quant
-                   * 50000; // Scale by remainder proportion of problem. 50k cycle penalty if have to zero pad all except 1.
-            //(Scale Determined Empirically)
-        }
+
+        double problem_k_quant = ((K % MT_K) / (double)K);
+        // Scale by remainder proportion of problem. 50k cycle penalty if have to zero pad all except 1.
+        L_epilogue += problem_k_quant * 50000;
+        //(Scale Determined Empirically)
+
         //L_epilogue *= output_utilization_penalty;
 
-        // 7) Total tile latency
-        double L_tile_total
-            = (L_tile_single * num_iter) + L_prologue + L_epilogue * 2 + L_WG_setup
-              + (500 * num_iter); // 7 instructions (each with 4 cycles) at the end of the loop
+        // Total Tile Latency, epilogue and iterations determined to be less than theoretical peak,
+        double L_tile_total = (L_tile_single * num_iter) + L_prologue + L_epilogue * 2 + L_WG_setup
+                              + (500 * num_iter);
 
         if(MT_K == 1024)
         {
@@ -1288,11 +1285,6 @@ namespace origami
         // Compute latency for all waves and return it as the latency for the MT/problem
         double total_latency = L_wave * numWaves;
 
-        if(MT_M == 64 && MT_N == 32 && MT_K == 32 && !transB && element_size_A == 16)
-        {
-            total_latency = total_latency * 10;
-        }
-
         // 3) Customized heuristics
         // TODO These are quantifying effects that don't work in the current math.
         // TODO THESE SHOULD BE TEMPORARY FIXES AND BE MORE SOLIDLY INTEGRATED LATER
@@ -1343,6 +1335,14 @@ namespace origami
 
         if(heuristics)
         {
+
+            //Kernel is poorly optimized
+            if(MT_M == 64 && MT_N == 32 && MT_K == 32 && !transB && element_size_A == 16
+               && mi_datatype == data_type_t::BFloat16)
+            {
+                total_latency = total_latency * 10;
+            }
+
             size_t K_mod_128bytes = K * safe_ceil_div(element_size_A, 8) % 128;
             size_t M_mod_128bytes = M * safe_ceil_div(element_size_A, 8) % 128;
             size_t N_mod_128bytes = N * safe_ceil_div(element_size_A, 8) % 128;
