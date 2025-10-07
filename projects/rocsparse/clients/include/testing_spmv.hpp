@@ -463,20 +463,15 @@ public:
         T h_alpha = static_cast<T>(1);
         T h_beta  = static_cast<T>(0);
 
-        // std::cout << "BBBB" << std::endl;
-        // host_sparse_matrix<A> hA;
-        // std::cout << "CCCC" << std::endl;
-        // rocsparse_matrix_factory<A, I, J> matrix_factory(arg, true, false);
-        // std::cout << "DDDD" << std::endl;
-        // traits::sparse_initialization(matrix_factory, hA, M, N, base);
-        // std::cout << "EEEE" << std::endl;
+        std::cout << "arg.filename: " << arg.filename << std::endl;
 
         std::vector<I> hcsr_row_ptr;
         std::vector<J> hcsr_col_ind;
         std::vector<A> hcsr_val;
         I nnz;
-        rocsparse_matrix_factory<A, I, J> matrix_factory(arg, true, false);
-        matrix_factory.init_csr(hcsr_row_ptr, hcsr_col_ind, hcsr_val, M, N, nnz, base);
+        // rocsparse_matrix_factory<A, I, J> matrix_factory(arg, true, false);
+        // matrix_factory.init_csr(hcsr_row_ptr, hcsr_col_ind, hcsr_val, M, N, nnz, base);
+        rocsparse_init_csr_rocalution("../matrices/mac_econ_fwd500.csr", hcsr_row_ptr, hcsr_col_ind, hcsr_val, M, N, nnz, base);
 
         I* dcsr_row_ptr = nullptr;
         J* dcsr_col_ind = nullptr;
@@ -489,11 +484,6 @@ public:
         CHECK_HIP_ERROR(hipMemcpy(dcsr_col_ind, hcsr_col_ind.data(), sizeof(J) * nnz, hipMemcpyHostToDevice));
         CHECK_HIP_ERROR(hipMemcpy(dcsr_val, hcsr_val.data(), sizeof(A) * nnz, hipMemcpyHostToDevice));
 
-
-
-        // device_sparse_matrix<A> dA(hA);
-        // std::cout << "FFFF" << std::endl;
-
         std::vector<X> hx(N, 1);
         std::vector<Y> hy(M, 1);
 
@@ -505,7 +495,6 @@ public:
         CHECK_HIP_ERROR(hipMemcpy(dx, hx.data(), sizeof(X) * N, hipMemcpyHostToDevice));
         CHECK_HIP_ERROR(hipMemcpy(dy, hy.data(), sizeof(Y) * M, hipMemcpyHostToDevice));
 
-        // rocsparse_local_spmat matA(dA);
         rocsparse_spmat_descr matA;
         CHECK_ROCSPARSE_ERROR(rocsparse_create_csr_descr(&matA,
                                     M,
