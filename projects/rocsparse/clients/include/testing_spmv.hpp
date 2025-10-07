@@ -29,7 +29,7 @@
 
 struct col_val
 {
-    int    col_ind;
+    int64_t    col_ind;
     double val;
 };
 
@@ -53,27 +53,27 @@ public:
     static void testing_spmv_bad_arg(const Arguments& arg) {}
 
     static bool load_mtx_file(const std::string&   filename,
-                              std::vector<int>&    csr_row_ptr,
-                              std::vector<int>&    csr_col_ind,
+                              std::vector<int64_t>&    csr_row_ptr,
+                              std::vector<int64_t>&    csr_col_ind,
                               std::vector<double>& csr_val,
-                              int&                 m,
-                              int&                 n,
-                              int&                 nnz)
+                              int64_t&                 m,
+                              int64_t&                 n,
+                              int64_t&                 nnz)
     {
         std::cout << "filename: " << filename << std::endl;
         std::ifstream file;
 
         file.open(filename.c_str());
 
-        std::vector<int>    row_ind;
-        std::vector<int>    col_ind;
+        std::vector<int64_t>    row_ind;
+        std::vector<int64_t>    col_ind;
         std::vector<double> vals;
 
         m   = 0;
         n   = 0;
         nnz = 0;
 
-        int index = 0;
+        int64_t index = 0;
         if(file.is_open())
         {
 
@@ -81,7 +81,7 @@ public:
             std::string space(" ");
             std::string token;
 
-            int currentLine = 0;
+            int64_t currentLine = 0;
 
             // scan through file
             while(!file.eof())
@@ -107,7 +107,7 @@ public:
                         n     = atoi(token.c_str());
                         line.erase(0, line.find(space) + space.length());
                         token                    = line.substr(0, line.find(space));
-                        int lower_triangular_nnz = atoi(token.c_str());
+                        int64_t lower_triangular_nnz = atoi(token.c_str());
 
                         nnz = 2 * (lower_triangular_nnz - m) + m;
 
@@ -121,10 +121,10 @@ public:
                     if(currentLine > 0)
                     {
                         token = line.substr(0, line.find(space));
-                        int r = atoi(token.c_str()) - 1;
+                        int64_t r = atoi(token.c_str()) - 1;
                         line.erase(0, line.find(space) + space.length());
                         token    = line.substr(0, line.find(space));
-                        int    c = atoi(token.c_str()) - 1;
+                        int64_t    c = atoi(token.c_str()) - 1;
                         double v = 1.0;
                         if(line.find(space)
                            != std::string::
@@ -170,7 +170,7 @@ public:
             csr_row_ptr[row_ind[i] + 1]++;
         }
 
-        for(int i = 0; i < m; i++)
+        for(int64_t i = 0; i < m; i++)
         {
             csr_row_ptr[i + 1] += csr_row_ptr[i];
         }
@@ -178,12 +178,12 @@ public:
         csr_col_ind.resize(nnz, -1);
         csr_val.resize(nnz, 0.0);
 
-        for(int i = 0; i < nnz; i++)
+        for(int64_t i = 0; i < nnz; i++)
         {
-            int row_start = csr_row_ptr[row_ind[i]];
-            int row_end   = csr_row_ptr[row_ind[i] + 1];
+            int64_t row_start = csr_row_ptr[row_ind[i]];
+            int64_t row_end   = csr_row_ptr[row_ind[i] + 1];
 
-            for(int j = row_start; j < row_end; j++)
+            for(int64_t j = row_start; j < row_end; j++)
             {
                 if(csr_col_ind[j] == -1)
                 {
@@ -205,13 +205,13 @@ public:
         }
 
         // Sort columns and values
-        for(int i = 0; i < m; i++)
+        for(int64_t i = 0; i < m; i++)
         {
-            int row_start = csr_row_ptr[row_ind[i]];
-            int row_end   = csr_row_ptr[row_ind[i] + 1];
+            int64_t row_start = csr_row_ptr[row_ind[i]];
+            int64_t row_end   = csr_row_ptr[row_ind[i] + 1];
 
             std::vector<col_val> unsorted_col_vals(row_end - row_start);
-            for(int j = row_start; j < row_end; j++)
+            for(int64_t j = row_start; j < row_end; j++)
             {
                 unsorted_col_vals[j - row_start].col_ind = csr_col_ind[j];
                 unsorted_col_vals[j - row_start].val     = csr_val[j];
@@ -221,7 +221,7 @@ public:
                       unsorted_col_vals.end(),
                       [&](col_val t1, col_val t2) { return t1.col_ind < t2.col_ind; });
 
-            for(int j = row_start; j < row_end; j++)
+            for(int64_t j = row_start; j < row_end; j++)
             {
                 csr_col_ind[j] = unsorted_col_vals[j - row_start].col_ind;
                 csr_val[j]     = unsorted_col_vals[j - row_start].val;
@@ -240,8 +240,8 @@ public:
         rocsparse_matrix_type  matrix_type = arg.matrix_type;
         rocsparse_fill_mode    uplo        = arg.uplo;
         rocsparse_storage_mode storage     = arg.storage;
-        rocsparse_indextype  row_idx_type = rocsparse_indextype_i32;
-        rocsparse_indextype  col_idx_type = rocsparse_indextype_i32;
+        rocsparse_indextype  row_idx_type = rocsparse_indextype_i64;
+        rocsparse_indextype  col_idx_type = rocsparse_indextype_i64;
         rocsparse_datatype   data_type    = rocsparse_datatype_f32_r;
         rocsparse_datatype   compute_type = rocsparse_datatype_f32_r;
 
@@ -249,15 +249,17 @@ public:
         rocsparse_handle handle;
         CHECK_ROCSPARSE_ERROR(rocsparse_create_handle(&handle));
 
+        std::cout << "BBBB" << std::endl;
+
         double h_alpha = 1.0;
         double h_beta  = 0.0;
 
-        std::vector<int>    hcsr_row_ptr;
-        std::vector<int>    hcsr_col_ind;
+        std::vector<int64_t>    hcsr_row_ptr;
+        std::vector<int64_t>    hcsr_col_ind;
         std::vector<double> hcsr_val;
-        int                 m   = 0;
-        int                 n   = 0;
-        int                 nnz = 0;
+        int64_t                 m   = 0;
+        int64_t                 n   = 0;
+        int64_t                 nnz = 0;
         if(!load_mtx_file("../../../../../../../mac_econ_fwd500/mac_econ_fwd500.mtx",
                           hcsr_row_ptr,
                           hcsr_col_ind,
@@ -268,28 +270,31 @@ public:
         {
             std::cout << "Error: Failed to load mac_econ_fwd500.mtx file" << std::endl;
         }
+        std::cout << "CCCC" << std::endl;
         std::vector<double> hx(n, 1.0);
         std::vector<double> hy(m, 0.0);
         std::cout << "m: " << m << " n: " << n << " nnz: " << nnz << std::endl;
 
-        int* dcsr_row_ptr = nullptr;
-        int* dcsr_col_ind = nullptr;
+        int64_t* dcsr_row_ptr = nullptr;
+        int64_t* dcsr_col_ind = nullptr;
         double* dcsr_val = nullptr;
         double* dx = nullptr;
         double* dy = nullptr;
-        CHECK_HIP_ERROR(hipMalloc((void**)&dcsr_row_ptr, sizeof(int) * (m + 1)));
-        CHECK_HIP_ERROR(hipMalloc((void**)&dcsr_col_ind, sizeof(int) * nnz));
+        CHECK_HIP_ERROR(hipMalloc((void**)&dcsr_row_ptr, sizeof(int64_t) * (m + 1)));
+        CHECK_HIP_ERROR(hipMalloc((void**)&dcsr_col_ind, sizeof(int64_t) * nnz));
         CHECK_HIP_ERROR(hipMalloc((void**)&dcsr_val, sizeof(double) * nnz));
         CHECK_HIP_ERROR(hipMalloc((void**)&dx, sizeof(double) * n));
         CHECK_HIP_ERROR(hipMalloc((void**)&dy, sizeof(double) * m));
 
+        std::cout << "DDDD" << std::endl;
         CHECK_HIP_ERROR(
-        hipMemcpy(dcsr_row_ptr, hcsr_row_ptr.data(), sizeof(int) * (m + 1), hipMemcpyHostToDevice));
+        hipMemcpy(dcsr_row_ptr, hcsr_row_ptr.data(), sizeof(int64_t) * (m + 1), hipMemcpyHostToDevice));
         CHECK_HIP_ERROR(
-            hipMemcpy(dcsr_col_ind, hcsr_col_ind.data(), sizeof(int) * nnz, hipMemcpyHostToDevice));
+            hipMemcpy(dcsr_col_ind, hcsr_col_ind.data(), sizeof(int64_t) * nnz, hipMemcpyHostToDevice));
         CHECK_HIP_ERROR(hipMemcpy(dcsr_val, hcsr_val.data(), sizeof(double) * nnz, hipMemcpyHostToDevice));
         CHECK_HIP_ERROR(hipMemcpy(dx, hx.data(), sizeof(double) * n, hipMemcpyHostToDevice));
 
+        std::cout << "EEEE" << std::endl;
         rocsparse_spmat_descr matA;
         rocsparse_dnvec_descr vecX;
         rocsparse_dnvec_descr vecY;
@@ -323,6 +328,7 @@ public:
         CHECK_ROCSPARSE_ERROR(rocsparse_spmat_set_attribute(
                                     matA, rocsparse_spmat_storage_mode, &storage, sizeof(storage)));
 
+        std::cout << "EEEE" << std::endl;
         // Call spmv to get buffer size
         size_t buffer_size;
         CHECK_ROCSPARSE_ERROR(rocsparse_spmv(handle,
@@ -338,9 +344,11 @@ public:
                                     &buffer_size,
                                     nullptr));
 
+        std::cout << "buffer_size: " << buffer_size << std::endl;
         void* temp_buffer;
         CHECK_HIP_ERROR(hipMalloc(&temp_buffer, buffer_size));
 
+        std::cout << "FFFF" << std::endl;
         // Call spmv to perform analysis
         CHECK_ROCSPARSE_ERROR(rocsparse_spmv(handle,
                                     trans,
@@ -355,6 +363,7 @@ public:
                                     &buffer_size,
                                     temp_buffer));
 
+        std::cout << "GGGG" << std::endl;
         // Call spmv to perform computation
         CHECK_ROCSPARSE_ERROR(rocsparse_spmv(handle,
                                     trans,
@@ -369,6 +378,7 @@ public:
                                     &buffer_size,
                                     temp_buffer));
 
+        std::cout << "HHHH" << std::endl;
         // Copy result back to host
         //CHECK_HIP_ERROR(hipMemcpy(hy.data(), dy, sizeof(double) * m, hipMemcpyDeviceToHost));
 
@@ -378,6 +388,7 @@ public:
         CHECK_ROCSPARSE_ERROR(rocsparse_destroy_dnvec_descr(vecY));
         CHECK_ROCSPARSE_ERROR(rocsparse_destroy_handle(handle));
 
+        std::cout << "IIII" << std::endl;
         // Clear device memory
         CHECK_HIP_ERROR(hipFree(dcsr_row_ptr));
         CHECK_HIP_ERROR(hipFree(dcsr_col_ind));
@@ -385,6 +396,7 @@ public:
         CHECK_HIP_ERROR(hipFree(dx));
         CHECK_HIP_ERROR(hipFree(dy));
         CHECK_HIP_ERROR(hipFree(temp_buffer));
+        std::cout << "JJJJ" << std::endl;
     }
 
     static void testing_spmv_analysis(const Arguments& arg) {}
