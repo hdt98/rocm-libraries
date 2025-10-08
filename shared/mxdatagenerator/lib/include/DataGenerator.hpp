@@ -205,11 +205,6 @@ namespace DGen
                + std::visit([](const auto& mode) { return mode.toString(); }, initMode) + ")";
     }
 
-    std::ostream& operator<<(std::ostream& os, const DataInitMode& initMode)
-    {
-        return os << toString(initMode);
-    }
-
     enum DataScaling
     {
         Mean
