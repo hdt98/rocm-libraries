@@ -1379,22 +1379,7 @@ namespace rocRoller::Client::GEMMClient::CLI
     }
 }
 
-static std::string initModeOptions()
-{
-    return "Bounded"
-           "BoundedAlternatingSign"
-           "Unbounded"
-           "IdentityScaleNormalData(<mean>, <std_dev>)"
-           "NormalScaleUniformData(<mean>, <std_dev>)"
-           "Identity"
-           "Ones"
-           "Zeros"
-           "TrigonometricFromFloat"
-           "NormalFromFloat(<mean>, <std_dev>)"
-           "Default: Bounded.";
-}
-
-static bool parseInitMode(const std::string& arg, DataInitMode& result)
+static bool ParseInitMode(const std::string& arg, DataInitMode& result)
 {
     if(arg.empty())
         return PARSE_FAILURE;
