@@ -44,6 +44,8 @@ from Tensile.Common.Utilities import printExit, printWarning
 
 from dataclasses import dataclass
 
+# This is a comment
+
 ################################################################################
 # How to add an activation
 # 1. Add a new type in ActivationType
