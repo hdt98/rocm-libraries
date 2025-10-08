@@ -151,10 +151,14 @@ int main(int, char*[])
     pass &= run_test<ck::half_t,  ck::half_t,   ck::half_t,   ck::half_t,  ck::half_t,         2>(); // V_WMMA_F16_16X16X32_F16
     pass &= run_test<ck::bhalf_t, ck::bhalf_t,  float,        float,       float,              2>(); // V_WMMA_F32_16X16X32_BF16
     pass &= run_test<ck::bhalf_t, ck::bhalf_t,  ck::bhalf_t,  ck::bhalf_t, float,              2>(); // V_WMMA_BF16_16X16X32_BF16
-    pass &= run_test<ck::bf8_t,   ck::bf8_t,    float,        float,       float,              4>(); // V_WMMA_F16_16X16X32_BF8_BF8
-    pass &= run_test<ck::bf8_t,   ck::f8_t,     float,        float,       float,              4>(); // V_WMMA_F16_16X16X32_BF8_F8
-    pass &= run_test<ck::f8_t,    ck::bf8_t,    float,        float,       float,              4>(); // V_WMMA_F16_16X16X32_F8_BF8
-    pass &= run_test<ck::f8_t,    ck::f8_t,     float,        float,       float,              4>(); // V_WMMA_F16_16X16X32_F8_F8
+    pass &= run_test<ck::bf8_t,   ck::bf8_t,    float,        float,       float,              4>(); // V_WMMA_F32_16X16X32_BF8_BF8
+    pass &= run_test<ck::bf8_t,   ck::f8_t,     float,        float,       float,              4>(); // V_WMMA_F32_16X16X32_BF8_F8
+    pass &= run_test<ck::f8_t,    ck::bf8_t,    float,        float,       float,              4>(); // V_WMMA_F32_16X16X32_F8_BF8
+    pass &= run_test<ck::f8_t,    ck::f8_t,     float,        float,       float,              4>(); // V_WMMA_F32_16X16X32_F8_F8
+    pass &= run_test<ck::bf8_t,   ck::bf8_t,    ck::half_t,        ck::half_t,       ck::half_t,              4>(); // V_WMMA_F16_16X16X32_BF8_BF8
+    pass &= run_test<ck::bf8_t,   ck::f8_t,     ck::half_t,        ck::half_t,       ck::half_t,              4>(); // V_WMMA_F16_16X16X32_BF8_F8
+    pass &= run_test<ck::f8_t,    ck::bf8_t,    ck::half_t,        ck::half_t,       ck::half_t,              4>(); // V_WMMA_F16_16X16X32_F8_BF8
+    pass &= run_test<ck::f8_t,    ck::f8_t,     ck::half_t,        ck::half_t,       ck::half_t,              4>(); // V_WMMA_F16_16X16X32_F8_F8
 
     //clang-format on
 
