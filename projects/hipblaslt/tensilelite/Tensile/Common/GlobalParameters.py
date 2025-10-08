@@ -619,6 +619,7 @@ def assignGlobalParameters(config, isaInfoMap: Dict[IsaVersion, IsaInfo]):
         "OutputPath",
         "Experimental",
         "GenSolTable",
+        "LogicFilelist",
     ]
     for key in config:
         if key in ignoreKeys:

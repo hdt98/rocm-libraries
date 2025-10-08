@@ -678,31 +678,52 @@ def run():
             "all" in archs or archMatch(load_logic_gfx_arch(p), archs)
         )
 
-    globPattern = os.path.join(
-        arguments["LogicPath"], f"**/{arguments['LogicFilter']}{logicExtFormat}"
-    )
-    print1(f"# LogicFilter:       {globPattern}")
-    logicFiles = [
-        file for file in glob.iglob(globPattern, recursive=True)
-    ]
+    if arguments["LogicFilelist"]:
+        print1(f"# Using logic files from: {arguments['LogicFilelist']}")
+        with open(arguments["LogicFilelist"], "r") as f:
+            lines = f.readlines()
+            logicFiles = []
+            missing = []
+            for line in lines:
+                file = line.strip()
+                if file:  # Skip empty lines
+                    if not Path(file).exists():
+                        missing.append(file)
+                    else:
+                        logicFiles.append(file)
+            if missing:
+                printExit(f"Missing logic files in {arguments['LogicFilelist']}: {', '.join(missing)}")
+    else:
+        globPattern = os.path.join(
+            arguments["LogicPath"], f"**/{arguments['LogicFilter']}{logicExtFormat}"
+        )
+        print1(f"# Globbing logic files from: {globPattern}")
+        logicFiles = [
+            file for file in glob.iglob(globPattern, recursive=True)
+        ]
 
+    numPrior = len(logicFiles)
     logicFiles = [file for file in logicFiles if validLogicFile(Path(file))]
+    if numPrior > len(logicFiles):
+        printWarning(f"Skipped {numPrior - len(logicFiles)} invalid logic files (wrong suffix or architecture)")
 
     print1(f"# Experimental:      {arguments['Experimental']}")
+    numPrior = len(logicFiles)
     if not arguments["Experimental"]:
         logicFiles = [
             file for file in logicFiles if "experimental" not in map(str.lower, Path(file).parts)
         ]
+    if numPrior > len(logicFiles):
+        printWarning(f"Skipped {numPrior - len(logicFiles)} experimental logic files")
 
-    print1("# Archs: " + ' ,'.join(archs))
+    print1("# Archs: " + ', '.join(archs))
     if requestedPredicateMap:
         print1("# Predicates:\n" + "\n".join(f"#   {arch}: {', '.join(v) if v else 'all variants'}" for arch, v in requestedPredicateMap.items()))
         numPrior = len(logicFiles)
         logicFiles = filterLogicFilesByPredicates(logicFiles, requestedPredicateMap)
         print1(f"# Filtered {numPrior - len(logicFiles)} logic files not matching requested predicates")
 
-    print1(f"# LibraryLogicFiles: {len(logicFiles)}")
-
+    print1(f"# Found {len(logicFiles)} library logic files")
     for logicFile in logicFiles:
         print2("#   %s" % logicFile)
 

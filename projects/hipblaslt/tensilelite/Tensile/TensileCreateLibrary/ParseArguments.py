@@ -187,7 +187,15 @@ def parseArguments(input: Optional[List[str]] = None) -> Dict[str, Any]:
         type=str,
         help="Cutomsized logic filter, default is *, i.e. all logics."
         " Example: gfx942/Equality/* for building equality of gfx942 only",
-    )
+    ),
+    argParser.add_argument(
+        "--logic-filelist",
+        dest="LogicFilelist",
+        action="store",
+        default="",
+        type=str,
+        help="Path to a file containing a list of logic files to build for. Paths must be absolute.",
+    ),
 
     args = argParser.parse_args()
 
@@ -228,6 +236,7 @@ def parseArguments(input: Optional[List[str]] = None) -> Dict[str, Any]:
     arguments["Assembler"] = args.Assembler
     arguments["LogicPath"] = args.LogicPath
     arguments["LogicFilter"] = args.LogicFilter
+    arguments["LogicFilelist"] = args.LogicFilelist
     arguments["OutputPath"] = args.OutputPath
     arguments["Experimental"] = args.Experimental
     arguments["GenSolTable"] = args.GenSolTable
