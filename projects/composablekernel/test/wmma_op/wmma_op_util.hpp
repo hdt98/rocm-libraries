@@ -19,7 +19,7 @@ namespace wmma_op_util {
 #if defined(__gfx125__)
 
 #define CK_WMMA_CALL_INTRIN_1(dst_fmt, src0_fmt, size) \
-    intrin_wmma_##dst_fmt##_16x16x32_##src0_fmt<16, 16>::Run( \
+    intrin_wmma_##dst_fmt##_16x16x##size##_##src0_fmt<16, 16>::Run( \
         reg_a, reg_b, reg_d.GetVectorTypeReference(Number<0>{}))
 
 #define CK_WMMA_CALL_INTRIN_2(dst_fmt, src0_fmt, src1_fmt, size) \
@@ -27,12 +27,15 @@ namespace wmma_op_util {
         reg_a, reg_b, reg_d.GetVectorTypeReference(Number<0>{}))
 
 #define CK_WMMA_CALL_INTRIN_3(dst_fmt, acc_fmt, src0_fmt, size) \
-    intrin_wmma_##dst_fmt##acc_fmt##_16x16x32_##src0_fmt<16, 16>::Run( \
+    intrin_wmma_##dst_fmt##acc_fmt##_16x16x##size##_##src0_fmt<16, 16>::Run( \
         reg_a, \
         reg_b, \
         reg_c.GetVectorTypeReference(Number<0>{}), \
         reg_d.GetVectorTypeReference(Number<0>{}))
 
+#define CK_WMMA_CALL_INTRIN_4(dst_fmt, src0_fmt, neg_a, neg_b, size) \
+    intrin_wmma_##dst_fmt##_16x16x##size##_##src0_fmt<16, 16, neg_a, neg_b>::Run( \
+        reg_a, reg_b, reg_d.GetVectorTypeReference(Number<0>{}))
 
 // #define CK_WMMA_CALL_SELECTOR(src0_type, src0_fmt, src1_type, src1_fmt, dst_type, dst_fmt, acc_type, acc_fmt, size) \
 //     if constexpr (!ck::is_same_v<acc_type, dst_type>) { \
@@ -124,6 +127,22 @@ struct WMMAVecType<T, kMultiplier, ck::enable_if_t<ck::is_same_v<T, ck::f8_fnuz_
     }
 
     // For FP8 input, hardware expects kMultiplier * 32 elements per fragment
+    using VecT  = vector_type<T, kMultiplier * 8>;
+    using ViewT = vector_type<T, 4>;
+    static constexpr int size = kMultiplier * 8;
+};
+
+template <typename T, index_t kMultiplier>
+struct WMMAVecType<T, kMultiplier, ck::enable_if_t<ck::is_same_v<T, int8_t>>>
+{
+    static constexpr bool layoutTransform = true;
+    static constexpr int ToIntDim         = 4;
+    template <typename D>
+    constexpr static bool is_compatible()
+    {
+        return ck::is_same_v<T, D>;
+    }
+
     using VecT  = vector_type<T, kMultiplier * 8>;
     using ViewT = vector_type<T, 4>;
     static constexpr int size = kMultiplier * 8;
@@ -244,18 +263,21 @@ __device__ void builtin_wmma_naive_selector(
             {        
                 // printf("--------- Calling f16, f16 ---------- \n");
                 (threadIdx.x == 0 ? printf("--------- Calling CK_WMMA_CALL_INTRIN_1 f16, f16 ---------- \n") : 0);
-                CK_WMMA_CALL_INTRIN_1(f16, f16, size);
+                CK_WMMA_CALL_INTRIN_1(f16, f16, 32);
             } 
             else if constexpr(std::is_same_v<srcAType, ck::half_t> && std::is_same_v<srcBType, ck::half_t> && std::is_same_v<dstType, float>)    {
                 // printf("--------- Calling f32, f16 ---------- \n");
                 (threadIdx.x == 0 ? printf("--------- Calling CK_WMMA_CALL_INTRIN_1 f32, f16 ---------- \n") : 0);
-                CK_WMMA_CALL_INTRIN_1(f32, f16, size);
+                CK_WMMA_CALL_INTRIN_1(f32, f16, 32);
             } else if constexpr(std::is_same_v<srcAType, ck::bhalf_t> && std::is_same_v<srcBType, ck::bhalf_t> && std::is_same_v<dstType, float>){
                 (threadIdx.x == 0 ? printf("--------- Calling CK_WMMA_CALL_INTRIN_1 f32, bf16 ---------- \n") : 0);
-                CK_WMMA_CALL_INTRIN_1(f32, bf16, size);
+                CK_WMMA_CALL_INTRIN_1(f32, bf16, 32);
             } else if constexpr(std::is_same_v<srcAType, ck::bhalf_t> && std::is_same_v<srcBType, ck::bhalf_t> && std::is_same_v<dstType, ck::bhalf_t>){
                 (threadIdx.x == 0 ? printf("--------- Calling CK_WMMA_CALL_INTRIN_1 bf16, bf16 ---------- \n") : 0);
-                CK_WMMA_CALL_INTRIN_1(bf16, bf16, size);
+                CK_WMMA_CALL_INTRIN_1(bf16, bf16, 32);
+            } else if constexpr(std::is_same_v<srcAType, int8_t> && std::is_same_v<srcBType, int8_t> && std::is_same_v<dstType, int32_t>){
+                (threadIdx.x == 0 ? printf("--------- Calling CK_WMMA_CALL_INTRIN_4 int32, int8 ---------- \n") : 0);
+                CK_WMMA_CALL_INTRIN_4(i32, iu8, true, true, 64);
             } else {
                 (threadIdx.x == 0 ? printf("--------- UNSPPORTED DATA TYPES for CK_WMMA_CALL_INTRIN_1 ---------- \n") : 0);            
             }
@@ -264,7 +286,7 @@ __device__ void builtin_wmma_naive_selector(
             if constexpr (std::is_same_v<accType, float> && std::is_same_v<dstType, ck::bhalf_t>)
             {
                 (threadIdx.x == 0 ? printf("--------- Calling CK_WMMA_CALL_INTRIN_3 w/ f32 acc, bhalf ret ---------- \n") : 0);
-                CK_WMMA_CALL_INTRIN_3(bf16, f32, bf16, size);
+                CK_WMMA_CALL_INTRIN_3(bf16, f32, bf16, 32);
             } else {
                 (threadIdx.x == 0 ? printf("--------- UNSPPORTED DATA TYPES for CK_WMMA_CALL_INTRIN_3 ---------- \n") : 0);
             }
@@ -1135,6 +1157,11 @@ struct TestWmma
                 std::cout << (res ? "SUCCESS" : "FAILURE") << std::endl;
             }
             else if(std::is_same<CDataType, double>::value)
+            {
+                res = ck::utils::check_err(c_device.mData, c_host.mData);
+                std::cout << (res ? "SUCCESS" : "FAILURE") << std::endl;
+            }
+            else if(std::is_same<CDataType, int32_t>::value)
             {
                 res = ck::utils::check_err(c_device.mData, c_host.mData);
                 std::cout << (res ? "SUCCESS" : "FAILURE") << std::endl;
