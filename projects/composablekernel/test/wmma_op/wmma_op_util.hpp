@@ -19,13 +19,20 @@ namespace wmma_op_util {
 #if defined(__gfx125__)
 
 #define CK_WMMA_CALL_INTRIN_1(dst_fmt, src0_fmt, size) \
-    intrin_wmma_##dst_fmt##_16x16x32_##src0_fmt<16, 16>::Run(reg_a, reg_b, reg_c.GetVectorTypeReference(Number<0>{}))
+    intrin_wmma_##dst_fmt##_16x16x32_##src0_fmt<16, 16>::Run( \
+        reg_a, reg_b, reg_d.GetVectorTypeReference(Number<0>{}))
 
 #define CK_WMMA_CALL_INTRIN_2(dst_fmt, src0_fmt, src1_fmt, size) \
-    intrin_wmma_##dst_fmt##_16x16x##size##_##src0_fmt##src1_fmt<16, 16>::Run(reg_a, reg_b, reg_c.GetVectorTypeReference(Number<0>{}))
+    intrin_wmma_##dst_fmt##_16x16x##size##_##src0_fmt##src1_fmt<16, 16>::Run( \
+        reg_a, reg_b, reg_d.GetVectorTypeReference(Number<0>{}))
 
 #define CK_WMMA_CALL_INTRIN_3(dst_fmt, acc_fmt, src0_fmt, size) \
-    intrin_wmma_##dst_fmt##acc_fmt##_16x16x32_##src0_fmt<16, 16>::Run(reg_a, reg_b, reg_c.GetVectorTypeReference(Number<0>{}))
+    intrin_wmma_##dst_fmt##acc_fmt##_16x16x32_##src0_fmt<16, 16>::Run( \
+        reg_a, \
+        reg_b, \
+        reg_c.GetVectorTypeReference(Number<0>{}), \
+        reg_d.GetVectorTypeReference(Number<0>{}))
+
 
 // #define CK_WMMA_CALL_SELECTOR(src0_type, src0_fmt, src1_type, src1_fmt, dst_type, dst_fmt, acc_type, acc_fmt, size) \
 //     if constexpr (!ck::is_same_v<acc_type, dst_type>) { \
@@ -132,7 +139,8 @@ template<typename srcAType,
 __device__ void builtin_wmma_naive_selector(
     const typename WMMAVecType<srcAType, kMultiplier>::VecT::type& reg_a,
     const typename WMMAVecType<srcBType, kMultiplier>::VecT::type& reg_b,
-    StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr, dstType, 1, 8, true>& reg_c)
+    StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr, accType, 1, 8, true>& reg_c, 
+    StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr, dstType, 1, 8, true>& reg_d)
 {
     constexpr int size = 2* 8 * kMultiplier;
     //if accType and dstType the same
@@ -253,12 +261,12 @@ __device__ void builtin_wmma_naive_selector(
             }
         }
         } else if constexpr(!std::is_same_v<accType, dstType>){
-            if constexpr (std::is_same_v<accType, float> && std::is_same_v<dstType, ck::half_t>)
+            if constexpr (std::is_same_v<accType, float> && std::is_same_v<dstType, ck::bhalf_t>)
             {
-                printf("--------- Calling CK_WMMA_CALL_INTRIN_3 w/ f32, half ---------- \n");
-                //CK_WMMA_CALL_INTRIN_3(f16, f32, bf16, size);
+                (threadIdx.x == 0 ? printf("--------- Calling CK_WMMA_CALL_INTRIN_3 w/ f32 acc, bhalf ret ---------- \n") : 0);
+                CK_WMMA_CALL_INTRIN_3(bf16, f32, bf16, size);
             } else {
-                printf("--------- UNSPPORTED DATA TYPES for CK_WMMA_CALL_INTRIN_3 ---------- \n");
+                (threadIdx.x == 0 ? printf("--------- UNSPPORTED DATA TYPES for CK_WMMA_CALL_INTRIN_3 ---------- \n") : 0);
             }
         } else {
         (threadIdx.x == 0 ? printf("---------- No builtin_wmma_naive_selector implementation for these types ----------\n") : 0);
@@ -318,6 +326,13 @@ __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
 
     srcA_vec a_temp = {};
     srcB_vec b_temp = {};
+
+    using acc_vec = StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr,
+                                              acc_t,
+                                              1,
+                                              8,
+                                              true>;
+    acc_vec acc_thread_buf_;
 
     using dst_vec = StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr,
                                               dst_t,
@@ -589,6 +604,7 @@ __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
     builtin_wmma_naive_selector<srcA_t, srcB_t, dst_t, acc_t, kMultiplier>(
         a_frag.template AsType<srcA_vec_type>()(I0),
         b_frag.template AsType<srcB_vec_type>()(I0),
+        acc_thread_buf_,
         dst_thread_buf_);
 
     // printf("------- FINISHED builtin_naive_wmma_selector ------- \n");

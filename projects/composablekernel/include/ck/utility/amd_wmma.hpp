@@ -541,24 +541,25 @@ struct intrin_wmma_f32_16x16x32_bf16<16, 16>
     }
 };
 
+// src: bf16, dst: bf16
 template <index_t MPerWave, index_t NPerWave>
 struct intrin_wmma_bf16f32_16x16x32_bf16;
 
 template <>
 struct intrin_wmma_bf16f32_16x16x32_bf16<16, 16>
 {
-    template <class FloatC>
-    __device__ static void
-    Run(const bhalf16_t& reg_a, const bhalf16_t& reg_b, const float8_t& reg_c_in, FloatC& reg_c_out)
+    template <class FloatC, class FloatD> // KO TODO:: revisit
+    __device__ static void Run(const bhalf16_t& reg_a, const bhalf16_t& reg_b, FloatC& reg_c, FloatD& reg_d)
     {
 #if defined(__gfx125__)
-        reg_c_out.template AsType<float8_t>()(Number<0>{}) =
-            __builtin_amdgcn_wmma_f32_16x16x32_bf16(0, reg_a, 0, reg_b, 0, reg_c_in, false, false);
+        if (threadIdx.x == 0) {printf("Running intrin_wmma_bf16f32_16x16x32_bf16<16, 16>\n");}
+        reg_d.template AsType<bhalf8_t>()(Number<0>{}) = __builtin_amdgcn_wmma_bf16f32_16x16x32_bf16(
+            0, reg_b, 0, reg_a, 0, reg_c.template AsType<float8_t>()[Number<0>{}], false, false);
 #else
         ignore = reg_a;
         ignore = reg_b;
-        ignore = reg_c_in;
-        ignore = reg_c_out;
+        ignore = reg_c;
+        ignore = reg_d;
 #endif
     }
 };

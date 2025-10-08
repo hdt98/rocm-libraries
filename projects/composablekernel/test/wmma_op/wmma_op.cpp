@@ -167,6 +167,7 @@ int main(int, char*[])
     pass &= run_test<ck::bf8_t,   ck::f8_t,     ck::half_t,   ck::half_t,  ck::half_t,         8>(); // V_WMMA_F16_16X16X128_BF8_F8
     pass &= run_test<ck::f8_t,    ck::bf8_t,    ck::half_t,   ck::half_t,  ck::half_t,         8>(); // V_WMMA_F16_16X16X128_F8_BF8
     pass &= run_test<ck::f8_t,    ck::f8_t,     ck::half_t,   ck::half_t,  ck::half_t,         8>(); // V_WMMA_F16_16X16X128_F8_F8
+    pass &= run_test<ck::bhalf_t, ck::bhalf_t,  ck::bhalf_t,  float,       float,              2>(); // V_WMMA_BF16F32_16X16X32_BF16
 
     //clang-format on
 
