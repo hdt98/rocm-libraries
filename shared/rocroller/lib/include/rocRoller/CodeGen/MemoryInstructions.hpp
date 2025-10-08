@@ -7,6 +7,7 @@
 #include <rocRoller/CodeGen/BufferInstructionOptions.hpp>
 #include <rocRoller/CodeGen/CopyGenerator.hpp>
 #include <rocRoller/CodeGen/Instruction.hpp>
+#include <rocRoller/CodeGen/TensorDataMover.hpp>
 #include <rocRoller/Context.hpp>
 #include <rocRoller/Utilities/Generator.hpp>
 
@@ -325,11 +326,22 @@ namespace rocRoller
          * @param buffOpts Buffer options
          * @param numBytes The number of bytes to load.
          */
-        Generator<Instruction> bufferLoad2LDS(Register::ValuePtr       data,
-                                              Register::ValuePtr       buffDesc,
-                                              BufferInstructionOptions buffOpts,
-                                              int                      numBytes,
-                                              Register::ValuePtr       soffset);
+        Generator<Instruction> bufferLoad2LDS(Register::ValuePtr                data,
+                                              std::shared_ptr<BufferDescriptor> buffDesc,
+                                              BufferInstructionOptions          buffOpts,
+                                              int                               numBytes,
+                                              Register::ValuePtr                soffset);
+        /**
+         * @brief Generate the instructions required to perform Global into LDS loads using TDM.
+         */
+        Generator<Instruction>
+            loadTensorToLDS(std::shared_ptr<TensorDataMover::TDMDescriptor> tdmDesc);
+
+        /**
+         * @brief Generate the instructions required to perform LDS into Global stores using TDM.
+         */
+        Generator<Instruction>
+            storeTensorFromLDS(std::shared_ptr<TensorDataMover::TDMDescriptor> tdmDesc);
 
         /**
          * @brief Generate the instructions required to add a wave synchronization barrier.

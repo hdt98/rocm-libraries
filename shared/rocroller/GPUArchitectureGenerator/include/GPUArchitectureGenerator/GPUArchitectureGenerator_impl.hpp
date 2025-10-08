@@ -287,6 +287,10 @@ namespace GPUArchitectureGenerator
                 AddCapability(isaVersion, rocRoller::GPUCapability::MaxLgkmcnt, 0);
             }
             AddCapability(isaVersion, rocRoller::GPUCapability::MaxExpcnt, 7);
+            if(HasCapability(isaVersion, rocRoller::GPUCapability::HasTensorcnt))
+            {
+                AddCapability(isaVersion, rocRoller::GPUCapability::MaxTensorcnt, 63);
+            }
             AddCapability(isaVersion, rocRoller::GPUCapability::SupportedSource, 0);
 
             if(HasCapability(isaVersion, rocRoller::GPUCapability::HasWave32))

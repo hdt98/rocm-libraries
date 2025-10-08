@@ -126,6 +126,10 @@ namespace rocRoller
         PointerLocal,
         PointerGlobal,
         Buffer,
+        TDMDescGroup0,
+        TDMDescGroup1,
+        TDMDescGroup2,
+        TDMDescGroup3,
 
         Count,
         None = Count

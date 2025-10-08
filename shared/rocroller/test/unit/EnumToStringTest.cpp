@@ -108,6 +108,10 @@ TEST(EnumToStringTest, ALL)
         {PointerType::PointerLocal, "PointerLocal"},
         {PointerType::PointerGlobal, "PointerGlobal"},
         {PointerType::Buffer, "Buffer"},
+        {PointerType::TDMDescGroup0, "TDMDescGroup0"},
+        {PointerType::TDMDescGroup1, "TDMDescGroup1"},
+        {PointerType::TDMDescGroup2, "TDMDescGroup2"},
+        {PointerType::TDMDescGroup3, "TDMDescGroup3"},
     });
 
     verify<MemoryType>({
