@@ -129,9 +129,16 @@ struct config_t {
 
   /// Reduction strategy.
   reduction_t reduction_strategy{};
+};
 
-  /// Predicted latency.
-  mutable double latency{};
+/**
+ * @brief Latency prediction result given kernel configuration.
+ *
+ * Combines a configuration with its estimated latency.
+ */
+struct prediction_result_t {
+    double latency;
+    config_t config;
 };
 
 /**

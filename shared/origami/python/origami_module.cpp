@@ -93,8 +93,12 @@ NB_MODULE(origami, m)
         .def_rw("cache_hints_b", &origami::config_t::cache_hints_b)
         .def_rw("workspace_size", &origami::config_t::workspace_size)
         .def_rw("workspace_size_per_elem_c", &origami::config_t::workspace_size_per_elem_c)
-        .def_rw("reduction_strategy", &origami::config_t::reduction_strategy)
-        .def_rw("latency", &origami::config_t::latency);
+        .def_rw("reduction_strategy", &origami::config_t::reduction_strategy);
+
+    nanobind::class_<origami::prediction_result_t>(m, "prediction_result_t")
+        .def(nanobind::init<>())
+        .def_rw("latency", &origami::prediction_result_t::latency)
+        .def_rw("config", &origami::prediction_result_t::config);
 
     nanobind::class_<origami::problem_t>(m, "problem_t")
         .def(nanobind::init<>())

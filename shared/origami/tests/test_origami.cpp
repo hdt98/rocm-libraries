@@ -21,11 +21,11 @@ TEST_CASE("Origami: compute_perf_gflops", "[origami]") {
       auto config_slow = config;
       auto config_fast = config;
 
-      config_slow.latency = origami::compute_total_latency(problem, hardware_slow, config_slow);
-      auto flops_slow     = origami::compute_perf_gflops(hardware_slow, problem, config_slow);
+      auto latency_config_slow = origami::compute_total_latency(problem, hardware_slow, config_slow);
+      auto flops_slow          = origami::compute_perf_gflops(hardware_slow, problem, latency_config_slow);
 
-      config_fast.latency = origami::compute_total_latency(problem, hardware_fast, config_fast);
-      auto flops_fast     = origami::compute_perf_gflops(hardware_fast, problem, config_fast);
+      auto latency_config_fast = origami::compute_total_latency(problem, hardware_fast, config_fast);
+      auto flops_fast          = origami::compute_perf_gflops(hardware_fast, problem, latency_config_fast);
 
       REQUIRE(flops_fast > flops_slow);
     }

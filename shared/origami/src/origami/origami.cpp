@@ -6,6 +6,7 @@
 #include <cmath>
 #include <iomanip>
 #include <iostream>
+#include <execution>
 
 #include "origami/gemm.hpp"
 #include "origami/math.hpp"
@@ -15,23 +16,23 @@
 
 namespace origami {
 
-config_t select_config(const problem_t& problem,
-                       const hardware_t& hardware,
-                       const std::vector<config_t>& configs) {
-  // Use rank_configs to get configurations ranked by performance
-  auto ranked_configs = rank_configs(problem, hardware, configs);
+prediction_result_t select_config(const problem_t& problem,
+                                  const hardware_t& hardware,
+                                  const std::vector<config_t>& configs) {
+  // Use rank_configs to get configurations with latencies ranked by performance
+  auto results = rank_configs(problem, hardware, configs);
 
-  if (ranked_configs.empty()) { throw std::runtime_error("No valid configs found."); }
+  if (results.empty()) { throw std::runtime_error("No valid configs found."); }
 
   // Apply tie-breaking logic for configs with similar latency
-  double best_latency = ranked_configs.front().latency;
+  double best_latency = results.front().latency;
   size_t num_the_same = 0;
 
   double tiebreaker_tolerance = 0.01;
 
   // Count configs with similar latency (within 1%)
-  for (const auto& config : ranked_configs) {
-    double diff = std::fabs(config.latency - best_latency);
+  for (const auto& r : results) {
+    double diff = std::fabs(r.latency - best_latency);
     diff /= best_latency;
     if (diff < tiebreaker_tolerance)
       num_the_same++;
@@ -53,16 +54,16 @@ config_t select_config(const problem_t& problem,
       return flops / memory_traffic;
     };
 
-    std::stable_sort(ranked_configs.begin(),
-                     ranked_configs.begin() + num_the_same,
-                     [&](const config_t& a, const config_t& b) {
-                       double ai_a = compute_arithmetic_intensity(a);
-                       double ai_b = compute_arithmetic_intensity(b);
+    std::stable_sort(results.begin(),
+                     results.begin() + num_the_same,
+                     [&](const prediction_result_t& a, const prediction_result_t& b) {
+                       double ai_a = compute_arithmetic_intensity(a.config);
+                       double ai_b = compute_arithmetic_intensity(b.config);
                        return ai_a > ai_b;  // descending
                      });
   }
 
-  return ranked_configs.front();
+  return results.front();
 }
 
 /**
@@ -129,37 +130,47 @@ std::pair<double, size_t> select_workgroup_mapping(const problem_t& problem,
   return std::make_pair(best_l2_hit, best_wgm);
 }
 
-std::vector<config_t> rank_configs(const problem_t& problem,
-                                   const hardware_t& hardware,
-                                   const std::vector<config_t>& configs) {
+std::vector<prediction_result_t> rank_configs(const problem_t& problem,
+                                              const hardware_t& hardware,
+                                              const std::vector<config_t>& configs) {
   if (configs.empty()) { throw std::runtime_error("No configurations provided."); }
 
-  std::vector<config_t> ranked_configs;
-  ranked_configs.reserve(configs.size());
+  std::vector<prediction_result_t> results(configs.size());
 
-  for (auto config : configs) {
-    // Check LDS capacity - skip invalid configurations
-    if (!check_lds_capacity(hardware, config.mt, problem.a_dtype, problem.b_dtype)) { continue; }
+  std::transform(
+      std::execution::par,
+      configs.begin(), configs.end(),
+      results.begin(),
+      [&](const config_t& config) -> prediction_result_t {
+          if (!check_lds_capacity(hardware, config.mt, problem.a_dtype, problem.b_dtype)) {
+              return {std::numeric_limits<double>::max(), config};
+          }
+          double latency = compute_total_latency(problem, hardware, config);
+          return {latency, config};
+      }
+  );
 
-    // Compute predicted latency for this configuration using structured API
-    config.latency = compute_total_latency(problem, hardware, config);
+  results.erase(
+      std::remove_if(results.begin(), results.end(),
+          [](const prediction_result_t& p) {
+              return p.latency == std::numeric_limits<double>::max();
+          }),
+      results.end()
+  );
 
-    ranked_configs.push_back(config);
-  }
+  std::stable_sort(results.begin(), results.end(),
+      [](const prediction_result_t& a, const prediction_result_t& b) {
+          return a.latency < b.latency;
+      });
 
-  // Sort configurations by latency (ascending - best first)
-  std::stable_sort(ranked_configs.begin(),
-                   ranked_configs.end(),
-                   [](const config_t& a, const config_t& b) { return a.latency < b.latency; });
-
-  return ranked_configs;
+  return results;
 }
 
-config_t select_config_mnk(std::size_t M,
-                           std::size_t N,
-                           std::size_t K,
-                           const hardware_t& hardware,
-                           const std::vector<config_t>& configs) {
+prediction_result_t select_config_mnk(std::size_t M,
+                                      std::size_t N,
+                                      std::size_t K,
+                                      const hardware_t& hardware,
+                                      const std::vector<config_t>& configs) {
   // Create a default problem_t with the provided M, N, K and reasonable defaults
   problem_t problem;
   problem.size.m          = M;
@@ -180,24 +191,25 @@ config_t select_config_mnk(std::size_t M,
   return select_config(problem, hardware, configs);
 }
 
-std::vector<config_t> select_topk_configs(const problem_t& problem,
-                                          const hardware_t& hardware,
-                                          const std::vector<config_t>& configs,
-                                          std::size_t topk) {
-  // Get all configurations ranked by performance
+std::vector<prediction_result_t> select_topk_configs(const problem_t& problem,
+                                                     const hardware_t& hardware,
+                                                     const std::vector<config_t>& configs,
+                                                     std::size_t topk) {
   auto ranked_configs = rank_configs(problem, hardware, configs);
 
   // Return only the top K configurations
-  if (ranked_configs.size() <= topk) {
-    return ranked_configs;
-  } else {
-    return std::vector<config_t>(ranked_configs.begin(), ranked_configs.begin() + topk);
-  }
+    std::vector<prediction_result_t> topk_configs;
+    size_t count = std::min(topk, ranked_configs.size());
+    topk_configs.reserve(count);
+    for (size_t i = 0; i < count; ++i) {
+      topk_configs.push_back(ranked_configs[i]);
+    }
+    return topk_configs;
 }
 
 double compute_perf_gflops(const hardware_t& hardware,
                            const problem_t& problem,
-                           const config_t& config) {
+                           const double latency) {
   // Extract parameters from structured types
   size_t M     = problem.size.m;
   size_t N     = problem.size.n;
@@ -209,8 +221,7 @@ double compute_perf_gflops(const hardware_t& hardware,
   // Compute total time in seconds
   double cycles_per_second = hardware.compute_clock_ghz * 1e9;  // 1 GHz = 1e9 cycles per second
 
-  // Assume latency has been populated in the config.
-  double total_time_seconds = config.latency / cycles_per_second;
+  double total_time_seconds = latency / cycles_per_second;
 
   // Compute performance in FLOPS
   double FLOPS = total_FLOPs / total_time_seconds;

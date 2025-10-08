@@ -19,11 +19,11 @@ namespace origami {
  * @param problem Problem description (M, N, K, etc.)
  * @param hardware Hardware characteristics (@see origami::hardware_t)
  * @param configs Vector of all possible valid configurations.
- * @return config_t Predicted best possible configuration.
+ * @return prediction_result_t Predicted best possible configuration with its estimated latency.
  */
-config_t select_config(const problem_t& problem,
-                       const hardware_t& hardware,
-                       const std::vector<config_t>& configs);
+prediction_result_t select_config(const problem_t& problem,
+                                  const hardware_t& hardware,
+                                  const std::vector<config_t>& configs);
 
 /**
  * @brief Select best workgroup-mapping for the given tile size.
@@ -47,11 +47,11 @@ std::pair<double, size_t> select_workgroup_mapping(const problem_t& problem,
  * @param problem Problem description (M, N, K, etc.)
  * @param hardware Hardware characteristics (@see origami::hardware_t)
  * @param configs List of candidate configurations to rank
- * @return std::vector<config_t> Configurations ranked by performance (best first)
+ * @return std::vector<prediction_result_t> Configurations with latencies ranked by performance (best first)
  */
-std::vector<config_t> rank_configs(const problem_t& problem,
-                                   const hardware_t& hardware,
-                                   const std::vector<config_t>& configs);
+std::vector<prediction_result_t> rank_configs(const problem_t& problem,
+                                              const hardware_t& hardware,
+                                              const std::vector<config_t>& configs);
 
 /**
  * @brief Select best configuration based only on M, N, K dimensions with default settings.
@@ -61,13 +61,13 @@ std::vector<config_t> rank_configs(const problem_t& problem,
  * @param K Problem dimension K
  * @param hardware Hardware characteristics (@see origami::hardware_t)
  * @param configs List of candidate configurations
- * @return config_t Best configuration for the given dimensions
+ * @return prediction_result_t Best configuration for the given dimensions with its estimated latency
  */
-config_t select_config_mnk(std::size_t M,
-                           std::size_t N,
-                           std::size_t K,
-                           const hardware_t& hardware,
-                           const std::vector<config_t>& configs);
+prediction_result_t select_config_mnk(std::size_t M,
+                                      std::size_t N,
+                                      std::size_t K,
+                                      const hardware_t& hardware,
+                                      const std::vector<config_t>& configs);
 
 /**
  * @brief Select top K configurations based on performance ranking.
@@ -76,24 +76,23 @@ config_t select_config_mnk(std::size_t M,
  * @param hardware Hardware characteristics (@see origami::hardware_t)
  * @param configs List of candidate configurations to rank
  * @param topk Number of top configurations to return
- * @return std::vector<config_t> Top K configurations ranked by performance
+ * @return std::vector<prediction_result_t> Top K configurations ranked by performance (best first)
  */
-std::vector<config_t> select_topk_configs(const problem_t& problem,
-                                          const hardware_t& hardware,
-                                          const std::vector<config_t>& configs,
-                                          std::size_t topk);
+std::vector<prediction_result_t> select_topk_configs(const problem_t& problem,
+                                                     const hardware_t& hardware,
+                                                     const std::vector<config_t>& configs,
+                                                     std::size_t topk);
 
 /**
- * @brief Given a latency (populated in config), compute the achieved
- * throughput in gflops.
+ * @brief Given a latency, compute the achieved throughput in gflops.
  *
  * @param hardware Hardware characteristics (@see origami::hardware_t)
  * @param problem Problem description (M, N, K, etc.)
- * @param config Kernel configuration/descriptor.
+ * @param latency Kernel latency.
  * @return double Throughput in gflops/s.
  */
 double compute_perf_gflops(const hardware_t& hardware,
                            const problem_t& problem,
-                           const config_t& config);
+                           const double latency);
 
 }  // namespace origami
