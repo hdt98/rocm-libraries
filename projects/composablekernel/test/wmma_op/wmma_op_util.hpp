@@ -19,13 +19,13 @@ namespace wmma_op_util {
 #if defined(__gfx125__)
 
 #define CK_WMMA_CALL_INTRIN_1(dst_fmt, src0_fmt, size) \
-    intrin_wmma_##dst_fmt##_16x16x32_##src0_fmt<16, size>::Run(reg_a, reg_b, reg_c.GetVectorTypeReference(Number<0>{}))
+    intrin_wmma_##dst_fmt##_16x16x32_##src0_fmt<16, 16>::Run(reg_a, reg_b, reg_c.GetVectorTypeReference(Number<0>{}))
 
 #define CK_WMMA_CALL_INTRIN_2(dst_fmt, src0_fmt, src1_fmt, size) \
-    intrin_wmma_##dst_fmt##_16x16x64_##src0_fmt##src1_fmt<16, 16>::Run(reg_a, reg_b, reg_c.GetVectorTypeReference(Number<0>{}))
+    intrin_wmma_##dst_fmt##_16x16x##size##_##src0_fmt##src1_fmt<16, 16>::Run(reg_a, reg_b, reg_c.GetVectorTypeReference(Number<0>{}))
 
 #define CK_WMMA_CALL_INTRIN_3(dst_fmt, acc_fmt, src0_fmt, size) \
-    intrin_wmma_##dst_fmt##acc_fmt##_16x16x32_##src0_fmt<16, size>::Run(reg_a, reg_b, reg_c.GetVectorTypeReference(Number<0>{}))
+    intrin_wmma_##dst_fmt##acc_fmt##_16x16x32_##src0_fmt<16, 16>::Run(reg_a, reg_b, reg_c.GetVectorTypeReference(Number<0>{}))
 
 // #define CK_WMMA_CALL_SELECTOR(src0_type, src0_fmt, src1_type, src1_fmt, dst_type, dst_fmt, acc_type, acc_fmt, size) \
 //     if constexpr (!ck::is_same_v<acc_type, dst_type>) { \
@@ -134,7 +134,7 @@ __device__ void builtin_wmma_naive_selector(
     const typename WMMAVecType<srcBType, kMultiplier>::VecT::type& reg_b,
     StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr, dstType, 1, 8, true>& reg_c)
 {
-    constexpr int size = kMultiplier * 8;
+    constexpr int size = 2* 8 * kMultiplier;
     //if accType and dstType the same
     if constexpr(std::is_same_v<accType, dstType>) {
         if constexpr (
@@ -144,22 +144,42 @@ __device__ void builtin_wmma_naive_selector(
                 if constexpr (ck::is_same_v<srcAType, ck::bf8_t> && ck::is_same_v<srcBType, ck::bf8_t>)
                 {
                     (threadIdx.x == 0 ? printf("--------- Calling CK_WMMA_CALL_INTRIN_2 f16: bf8, bf8 ---------- \n") : 0);
-                    CK_WMMA_CALL_INTRIN_2(f16, bf8, bf8, size);
+                    if constexpr (size == 64)
+                        CK_WMMA_CALL_INTRIN_2(f16, bf8, bf8, 64);
+                    else if constexpr (size == 128)
+                        CK_WMMA_CALL_INTRIN_2(f16, bf8, bf8, 128);
+                    else
+                        (threadIdx.x == 0 ? printf("--------- UNSUPPORTED size for CK_WMMA_CALL_INTRIN_2 f16: bf8, bf8: %d ---------- \n", size) : 0);
                 }
                 else if constexpr (ck::is_same_v<srcAType, ck::bf8_t> && ck::is_same_v<srcBType, ck::f8_t>)
                 {
                     (threadIdx.x == 0 ? printf("--------- Calling CK_WMMA_CALL_INTRIN_2 f16: bf8, f8 ---------- \n") : 0);
-                    CK_WMMA_CALL_INTRIN_2(f16, bf8, f8, size);
+                    if constexpr (size == 64)
+                        CK_WMMA_CALL_INTRIN_2(f16, bf8, f8, 64);
+                    else if constexpr (size == 128)
+                        CK_WMMA_CALL_INTRIN_2(f16, bf8, f8, 128);
+                    else
+                        (threadIdx.x == 0 ? printf("--------- UNSUPPORTED size for CK_WMMA_CALL_INTRIN_2 f16: bf8, f8: %d ---------- \n", size) : 0);
                 }
                 else if constexpr (ck::is_same_v<srcAType, ck::f8_t> && ck::is_same_v<srcBType, ck::bf8_t>)
                 {
                     (threadIdx.x == 0 ? printf("--------- Calling CK_WMMA_CALL_INTRIN_2 f16: f8, bf8 ---------- \n") : 0);
-                    CK_WMMA_CALL_INTRIN_2(f16, f8, bf8, size);
+                    if constexpr (size == 64)
+                        CK_WMMA_CALL_INTRIN_2(f16, f8, bf8, 64);
+                    else if constexpr (size == 128)
+                        CK_WMMA_CALL_INTRIN_2(f16, f8, bf8, 128);
+                    else
+                        (threadIdx.x == 0 ? printf("--------- UNSUPPORTED size for CK_WMMA_CALL_INTRIN_2 f16: f8, bf8: %d ---------- \n", size) : 0);
                 }
                 else if constexpr (ck::is_same_v<srcAType, ck::f8_t> && ck::is_same_v<srcBType, ck::f8_t>)
                 {
                     (threadIdx.x == 0 ? printf("--------- Calling CK_WMMA_CALL_INTRIN_2 f16: f8, f8 ---------- \n") : 0);
-                    CK_WMMA_CALL_INTRIN_2(f16, f8, f8, size);
+                    if constexpr (size == 64)
+                        CK_WMMA_CALL_INTRIN_2(f16, f8, f8, 64);
+                    else if constexpr (size == 128)
+                        CK_WMMA_CALL_INTRIN_2(f16, f8, f8, 128);
+                    else
+                        (threadIdx.x == 0 ? printf("--------- UNSUPPORTED size for CK_WMMA_CALL_INTRIN_2 f16: f8, f8: %d ---------- \n", size) : 0);
                 }
                 else
                 {
@@ -169,22 +189,42 @@ __device__ void builtin_wmma_naive_selector(
                 if constexpr (ck::is_same_v<srcAType, ck::bf8_t> && ck::is_same_v<srcBType, ck::bf8_t>)
                 {
                     (threadIdx.x == 0 ? printf("--------- Calling CK_WMMA_CALL_INTRIN_2 f32: bf8, bf8 ---------- \n") : 0);
-                    CK_WMMA_CALL_INTRIN_2(f32, bf8, bf8, size);
+                    if constexpr (size == 64)
+                        CK_WMMA_CALL_INTRIN_2(f32, bf8, bf8, 64);
+                    else if constexpr (size == 128)
+                        CK_WMMA_CALL_INTRIN_2(f32, bf8, bf8, 128);
+                    else
+                        (threadIdx.x == 0 ? printf("--------- UNSUPPORTED size for CK_WMMA_CALL_INTRIN_2 f32: bf8, bf8: %d ---------- \n", size) : 0);
                 }
                 else if constexpr (ck::is_same_v<srcAType, ck::bf8_t> && ck::is_same_v<srcBType, ck::f8_t>)
                 {
                     (threadIdx.x == 0 ? printf("--------- Calling CK_WMMA_CALL_INTRIN_2 f32: bf8, f8 ---------- \n") : 0);
-                    CK_WMMA_CALL_INTRIN_2(f32, bf8, f8, size);
+                    if constexpr (size == 64)
+                        CK_WMMA_CALL_INTRIN_2(f32, bf8, f8, 64);
+                    else if constexpr (size == 128)
+                        CK_WMMA_CALL_INTRIN_2(f32, bf8, f8, 128);
+                    else
+                        (threadIdx.x == 0 ? printf("--------- UNSUPPORTED size for CK_WMMA_CALL_INTRIN_2 f32: bf8, f8: %d ---------- \n", size) : 0);
                 }
                 else if constexpr (ck::is_same_v<srcAType, ck::f8_t> && ck::is_same_v<srcBType, ck::bf8_t>)
                 {
                     (threadIdx.x == 0 ? printf("--------- Calling CK_WMMA_CALL_INTRIN_2 f32: f8, bf8 ---------- \n") : 0);
-                    CK_WMMA_CALL_INTRIN_2(f32, f8, bf8, size);
+                    if constexpr (size == 64)
+                        CK_WMMA_CALL_INTRIN_2(f32, f8, bf8, 64);
+                    else if constexpr (size == 128)
+                        CK_WMMA_CALL_INTRIN_2(f32, f8, bf8, 128);
+                    else
+                        (threadIdx.x == 0 ? printf("--------- UNSUPPORTED size for CK_WMMA_CALL_INTRIN_2 f32: f8, bf8: %d ---------- \n", size) : 0);
                 }
                 else if constexpr (ck::is_same_v<srcAType, ck::f8_t> && ck::is_same_v<srcBType, ck::f8_t>)
                 {
                     (threadIdx.x == 0 ? printf("--------- Calling CK_WMMA_CALL_INTRIN_2 f32: f8, f8 ---------- \n") : 0);
-                    CK_WMMA_CALL_INTRIN_2(f32, f8, f8, size);
+                    if constexpr (size == 64)
+                        CK_WMMA_CALL_INTRIN_2(f32, f8, f8, 64);
+                    else if constexpr (size == 128)
+                        CK_WMMA_CALL_INTRIN_2(f32, f8, f8, 128);
+                    else
+                        (threadIdx.x == 0 ? printf("--------- UNSUPPORTED size for CK_WMMA_CALL_INTRIN_2 f32: f8, f8: %d ---------- \n", size) : 0);
                 }
                 else
                 {
