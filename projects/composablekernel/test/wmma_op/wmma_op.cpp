@@ -102,9 +102,9 @@ bool run_test()
 
     // Pass KMultiplier to both kernels
     const auto matmul_default =
-        ck::wmma_op_util::matmul<SrcAType, SrcBType, DstType, KMultiplier>;
+        ck::wmma_op_util::matmul<SrcAType, SrcBType, DstType, GPUAccType, KMultiplier>;
     const auto matmul_swizzle_a =
-        ck::wmma_op_util::matmul_swizzle_a<SrcAType, SrcBType, DstType, KMultiplier>;
+        ck::wmma_op_util::matmul_swizzle_a<SrcAType, SrcBType, DstType, GPUAccType, KMultiplier>;
 
     const auto wmma_kernel_container = std::make_tuple(matmul_default, matmul_swizzle_a);
 
@@ -151,6 +151,10 @@ int main(int, char*[])
     pass &= run_test<ck::half_t,  ck::half_t,   ck::half_t,   ck::half_t,  ck::half_t,         2>(); // V_WMMA_F16_16X16X32_F16
     pass &= run_test<ck::bhalf_t, ck::bhalf_t,  float,        float,       float,              2>(); // V_WMMA_F32_16X16X32_BF16
     pass &= run_test<ck::bhalf_t, ck::bhalf_t,  ck::bhalf_t,  ck::bhalf_t, float,              2>(); // V_WMMA_BF16_16X16X32_BF16
+    pass &= run_test<ck::bf8_t,   ck::bf8_t,    float,        float,       float,              4>(); // V_WMMA_F16_16X16X32_BF8_BF8
+    pass &= run_test<ck::bf8_t,   ck::f8_t,     float,        float,       float,              4>(); // V_WMMA_F16_16X16X32_BF8_F8
+    pass &= run_test<ck::f8_t,    ck::bf8_t,    float,        float,       float,              4>(); // V_WMMA_F16_16X16X32_F8_BF8
+    pass &= run_test<ck::f8_t,    ck::f8_t,     float,        float,       float,              4>(); // V_WMMA_F16_16X16X32_F8_F8
 
     //clang-format on
 

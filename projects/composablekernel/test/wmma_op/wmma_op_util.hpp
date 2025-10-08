@@ -18,8 +18,28 @@ namespace wmma_op_util {
 
 #if defined(__gfx125__)
 
-#define CK_WMMA_CALL_INTRIN(dst, src0) \
-    intrin_wmma_##dst##_16x16x32_##src0<16, 16>::Run(reg_a, reg_b, reg_c.GetVectorTypeReference(Number<0>{}))
+#define CK_WMMA_CALL_INTRIN_1(dst_fmt, src0_fmt, size) \
+    intrin_wmma_##dst_fmt##_16x16x32_##src0_fmt<16, size>::Run(reg_a, reg_b, reg_c.GetVectorTypeReference(Number<0>{}))
+
+#define CK_WMMA_CALL_INTRIN_2(dst_fmt, src0_fmt, src1_fmt, size) \
+    intrin_wmma_##dst_fmt##_16x16x64_##src0_fmt##src1_fmt<16, 16>::Run(reg_a, reg_b, reg_c.GetVectorTypeReference(Number<0>{}))
+
+#define CK_WMMA_CALL_INTRIN_3(dst_fmt, acc_fmt, src0_fmt, size) \
+    intrin_wmma_##dst_fmt##acc_fmt##_16x16x32_##src0_fmt<16, size>::Run(reg_a, reg_b, reg_c.GetVectorTypeReference(Number<0>{}))
+
+// #define CK_WMMA_CALL_SELECTOR(src0_type, src0_fmt, src1_type, src1_fmt, dst_type, dst_fmt, acc_type, acc_fmt, size) \
+//     if constexpr (!ck::is_same_v<acc_type, dst_type>) { \
+//         printf("calling intrin_3 case\n"); \
+//         CK_WMMA_CALL_INTRIN_3(dst_fmt, acc_fmt, src0_fmt, size); \
+//     } else if constexpr ( \
+//         (ck::is_same_v<src0_type, ck::bf8_t> || ck::is_same_v<src0_type, ck::f8_t>) && \
+//         (ck::is_same_v<src1_type, ck::bf8_t> || ck::is_same_v<src1_type, ck::f8_t>)) { \
+//         printf("calling intrin_2 case\n"); \
+//         CK_WMMA_CALL_INTRIN_2(dst_fmt, src0_fmt, src1_fmt, size); \
+//     } else { \
+//         printf("calling intrin_1 case\n"); \
+//         CK_WMMA_CALL_INTRIN_1(dst_fmt, src0_fmt, size); \
+//     }
 
 template <typename T, index_t kMultiplier, typename = void>
 struct WMMAVecType
@@ -67,77 +87,145 @@ struct WMMAVecType<T,
 };
 
 template <typename T, index_t kMultiplier>
-struct WMMAVecType<T, kMultiplier, ck::enable_if_t<ck::is_same_v<T, ck::f8_t> || ck::is_same_v<T, ck::bf8_t>>>
+struct WMMAVecType<T, kMultiplier, ck::enable_if_t<ck::is_same_v<T, ck::f8_ocp_t> || ck::is_same_v<T, ck::bf8_ocp_t>>>
 {
-    static constexpr bool layoutTransform = false;
+    static constexpr bool layoutTransform = true;
     static constexpr int ToIntDim         = 4; // adjust as needed
 
     template <typename D>
     constexpr static bool is_compatible()
     {
-        return ck::is_same_v<T, D>;
+        return ck::is_same_v<D, ck::f8_t> || ck::is_same_v<D, ck::bf8_t>;
     }
 
     // For FP8 input, hardware expects kMultiplier * 32 elements per fragment
-    using VecT  = vector_type<T, kMultiplier * 32>;
-    using ViewT = vector_type<T, 4>;
-    static constexpr int size = kMultiplier * 32;
+    using VecT  = vector_type<typename T::data_type, kMultiplier * 8>;
+    using ViewT = vector_type<typename T::data_type, 4>;
+    static constexpr int size = kMultiplier * 8;
 };
 
-// gfx125 builtin_wmma_naive_selector 
-template <typename srcAType, typename srcBType, typename dstType, index_t kMultiplier>
+template <typename T, index_t kMultiplier>
+struct WMMAVecType<T, kMultiplier, ck::enable_if_t<ck::is_same_v<T, ck::f8_fnuz_t> || ck::is_same_v<T, ck::bf8_fnuz_t>>>
+{
+    static constexpr bool layoutTransform = true;
+    static constexpr int ToIntDim         = 4; // adjust as needed
+
+    template <typename D>
+    constexpr static bool is_compatible()
+    {
+        return ck::is_same_v<D, ck::f8_t> || ck::is_same_v<D, ck::bf8_t>;
+    }
+
+    // For FP8 input, hardware expects kMultiplier * 32 elements per fragment
+    using VecT  = vector_type<T, kMultiplier * 8>;
+    using ViewT = vector_type<T, 4>;
+    static constexpr int size = kMultiplier * 8;
+};
+
+
+// gfx1250 builtin_wmma_naive_selector
+template<typename srcAType, 
+         typename srcBType,
+         typename dstType,
+         typename accType, 
+         index_t kMultiplier>
 __device__ void builtin_wmma_naive_selector(
     const typename WMMAVecType<srcAType, kMultiplier>::VecT::type& reg_a,
     const typename WMMAVecType<srcBType, kMultiplier>::VecT::type& reg_b,
-    StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr, dstType, 1, 8/* * WMMAVecType<dstType, kMultiplier>::ToIntDim*/, true>& reg_c)
+    StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr, dstType, 1, 8, true>& reg_c)
 {
-    // if constexpr(std::is_same_v<srcAType, float>)
-    // {
-    //     printf("----- srcAType is float \n");
-    // }
-    // else if constexpr(std::is_same_v<srcAType, ck::half_t>)
-    // {
-    //     printf("----- srcAType is half \n");
-    // }
-    //     if constexpr(std::is_same_v<srcBType, float>)
-    // {
-    //     printf("----- srcBType is float \n");
-    // }
-    // else if constexpr(std::is_same_v<srcBType, ck::half_t>)
-    // {
-    //     printf("----- srcBType is half \n");
-    // }    
-    // if constexpr(std::is_same_v<dstType, float>)
-    // {
-    //     printf("----- dstType is float \n");
-    // }
-    // else if constexpr(std::is_same_v<dstType, ck::half_t>)
-    // {
-    //     printf("----- dstType is half \n");
-    // }
-    if constexpr(std::is_same_v<srcAType, ck::half_t> && std::is_same_v<srcBType, ck::half_t> && std::is_same_v<dstType, ck::half_t>)
-    {        
-        // printf("--------- Calling f16, f16 ---------- \n");
-        (threadIdx.x == 0 ? printf("--------- Calling f16, f16 ---------- \n") : 0);
-        CK_WMMA_CALL_INTRIN(f16, f16);
-    } 
-    else if constexpr(std::is_same_v<srcAType, ck::half_t> && std::is_same_v<srcBType, ck::half_t> && std::is_same_v<dstType, float>)    {
-        // printf("--------- Calling f32, f16 ---------- \n");
-        (threadIdx.x == 0 ? printf("--------- Calling f32, f16 ---------- \n") : 0);
-        CK_WMMA_CALL_INTRIN(f32, f16);
-    } else if constexpr(std::is_same_v<srcAType, ck::bhalf_t> && std::is_same_v<srcBType, ck::bhalf_t> && std::is_same_v<dstType, float>){
-        (threadIdx.x == 0 ? printf("--------- Calling f32, bf16 ---------- \n") : 0);
-        CK_WMMA_CALL_INTRIN(f32, bf16);
-    } else if constexpr(std::is_same_v<srcAType, ck::bhalf_t> && std::is_same_v<srcBType, ck::bhalf_t> && std::is_same_v<dstType, ck::bhalf_t>){
-        (threadIdx.x == 0 ? printf("--------- Calling bf16, bf16 ---------- \n") : 0);
-        CK_WMMA_CALL_INTRIN(bf16, bf16);
-    } else {
-        // printf("---------- No builtin_wmma_naive_selector implementation for these types ----------\n");
+    constexpr int size = kMultiplier * 8;
+    //if accType and dstType the same
+    if constexpr(std::is_same_v<accType, dstType>) {
+        if constexpr (
+        (ck::is_same_v<srcAType, ck::bf8_t> || ck::is_same_v<srcAType, ck::f8_t>) &&
+        (ck::is_same_v<srcBType, ck::bf8_t> || ck::is_same_v<srcBType, ck::f8_t>)) {
+            if constexpr (ck::is_same_v<dstType, ck::half_t>) {
+                // if constexpr (ck::is_same_v<srcAType, ck::bf8_t> && ck::is_same_v<srcBType, ck::bf8_t>)
+                // {
+                //     (threadIdx.x == 0 ? printf("--------- Calling CK_WMMA_CALL_INTRIN_2 f16: bf8, bf8 ---------- \n") : 0);
+                //     CK_WMMA_CALL_INTRIN_2(f16, bf8, bf8, size);
+                // }
+                // else if constexpr (ck::is_same_v<srcAType, ck::bf8_t> && ck::is_same_v<srcBType, ck::f8_t>)
+                // {
+                //     (threadIdx.x == 0 ? printf("--------- Calling CK_WMMA_CALL_INTRIN_2 f16: bf8, f8 ---------- \n") : 0);
+                //     CK_WMMA_CALL_INTRIN_2(f16, bf8, f8, size);
+                // }
+                // else if constexpr (ck::is_same_v<srcAType, ck::f8_t> && ck::is_same_v<srcBType, ck::bf8_t>)
+                // {
+                //     (threadIdx.x == 0 ? printf("--------- Calling CK_WMMA_CALL_INTRIN_2 f16: f8, bf8 ---------- \n") : 0);
+                //     CK_WMMA_CALL_INTRIN_2(f16, f8, bf8, size);
+                // }
+                // else if constexpr (ck::is_same_v<srcAType, ck::f8_t> && ck::is_same_v<srcBType, ck::f8_t>)
+                // {
+                //     (threadIdx.x == 0 ? printf("--------- Calling CK_WMMA_CALL_INTRIN_2 f16: f8, f8 ---------- \n") : 0);
+                //     CK_WMMA_CALL_INTRIN_2(f16, f8, f8, size);
+                // }
+                // else
+                // {
+                    (threadIdx.x == 0 ? printf("--------- UNSUPPORTED bf8/f8 combination with dest f16 ---------- \n") : 0);
+                // }
+            } else if constexpr  (ck::is_same_v<dstType, float>) {
+                if constexpr (ck::is_same_v<srcAType, ck::bf8_t> && ck::is_same_v<srcBType, ck::bf8_t>)
+                {
+                    (threadIdx.x == 0 ? printf("--------- Calling CK_WMMA_CALL_INTRIN_2 f32: bf8, bf8 ---------- \n") : 0);
+                    CK_WMMA_CALL_INTRIN_2(f32, bf8, bf8, size);
+                }
+                else if constexpr (ck::is_same_v<srcAType, ck::bf8_t> && ck::is_same_v<srcBType, ck::f8_t>)
+                {
+                    (threadIdx.x == 0 ? printf("--------- Calling CK_WMMA_CALL_INTRIN_2 f32: bf8, f8 ---------- \n") : 0);
+                    CK_WMMA_CALL_INTRIN_2(f32, bf8, f8, size);
+                }
+                else if constexpr (ck::is_same_v<srcAType, ck::f8_t> && ck::is_same_v<srcBType, ck::bf8_t>)
+                {
+                    (threadIdx.x == 0 ? printf("--------- Calling CK_WMMA_CALL_INTRIN_2 f32: f8, bf8 ---------- \n") : 0);
+                    CK_WMMA_CALL_INTRIN_2(f32, f8, bf8, size);
+                }
+                else if constexpr (ck::is_same_v<srcAType, ck::f8_t> && ck::is_same_v<srcBType, ck::f8_t>)
+                {
+                    (threadIdx.x == 0 ? printf("--------- Calling CK_WMMA_CALL_INTRIN_2 f32: f8, f8 ---------- \n") : 0);
+                    CK_WMMA_CALL_INTRIN_2(f32, f8, f8, size);
+                }
+                else
+                {
+                    (threadIdx.x == 0 ? printf("--------- UNSUPPORTED bf8/f8 combination with dest f32 ---------- \n") : 0);
+                }
+            }
+        } else { // not fp8 or bf8
+            if constexpr(std::is_same_v<srcAType, ck::half_t> && std::is_same_v<srcBType, ck::half_t> && std::is_same_v<dstType, ck::half_t>)
+            {        
+                // printf("--------- Calling f16, f16 ---------- \n");
+                (threadIdx.x == 0 ? printf("--------- Calling CK_WMMA_CALL_INTRIN_1 f16, f16 ---------- \n") : 0);
+                CK_WMMA_CALL_INTRIN_1(f16, f16, size);
+            } 
+            else if constexpr(std::is_same_v<srcAType, ck::half_t> && std::is_same_v<srcBType, ck::half_t> && std::is_same_v<dstType, float>)    {
+                // printf("--------- Calling f32, f16 ---------- \n");
+                (threadIdx.x == 0 ? printf("--------- Calling CK_WMMA_CALL_INTRIN_1 f32, f16 ---------- \n") : 0);
+                CK_WMMA_CALL_INTRIN_1(f32, f16, size);
+            } else if constexpr(std::is_same_v<srcAType, ck::bhalf_t> && std::is_same_v<srcBType, ck::bhalf_t> && std::is_same_v<dstType, float>){
+                (threadIdx.x == 0 ? printf("--------- Calling CK_WMMA_CALL_INTRIN_1 f32, bf16 ---------- \n") : 0);
+                CK_WMMA_CALL_INTRIN_1(f32, bf16, size);
+            } else if constexpr(std::is_same_v<srcAType, ck::bhalf_t> && std::is_same_v<srcBType, ck::bhalf_t> && std::is_same_v<dstType, ck::bhalf_t>){
+                (threadIdx.x == 0 ? printf("--------- Calling CK_WMMA_CALL_INTRIN_1 bf16, bf16 ---------- \n") : 0);
+                CK_WMMA_CALL_INTRIN_1(bf16, bf16, size);
+            } else {
+                (threadIdx.x == 0 ? printf("--------- UNSPPORTED DATA TYPES for CK_WMMA_CALL_INTRIN_1 ---------- \n") : 0);            
+            }
+        }
+        } else if constexpr(!std::is_same_v<accType, dstType>){
+            if constexpr (std::is_same_v<accType, float> && std::is_same_v<dstType, ck::half_t>)
+            {
+                printf("--------- Calling CK_WMMA_CALL_INTRIN_3 w/ f32, half ---------- \n");
+                //CK_WMMA_CALL_INTRIN_3(f16, f32, bf16, size);
+            } else {
+                printf("--------- UNSPPORTED DATA TYPES for CK_WMMA_CALL_INTRIN_3 ---------- \n");
+            }
+        } else {
         (threadIdx.x == 0 ? printf("---------- No builtin_wmma_naive_selector implementation for these types ----------\n") : 0);
     }
 }
 
-template<typename srcA_t, typename srcB_t, typename dst_t, ck::index_t kMultiplier>
+template<typename srcA_t, typename srcB_t, typename dst_t, typename acc_t, ck::index_t kMultiplier>
 __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
 {
     // printf("---------- Running gfx125 matmul ----------\n");
@@ -458,7 +546,7 @@ __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
 
     // Call the WMMA intrinsic selector
     // printf("------- calling builtin_naive_wmma_selector ------- \n");
-    builtin_wmma_naive_selector<srcA_t, srcB_t, dst_t, kMultiplier>(
+    builtin_wmma_naive_selector<srcA_t, srcB_t, dst_t, acc_t, kMultiplier>(
         a_frag.template AsType<srcA_vec_type>()(I0),
         b_frag.template AsType<srcB_vec_type>()(I0),
         dst_thread_buf_);
@@ -466,16 +554,27 @@ __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
     // printf("------- FINISHED builtin_naive_wmma_selector ------- \n");
 
     // column-major 16x16 result matrix, 8 elements per thread
-    static_for<0, 8, 1>{}([&](auto ele) {
-        int lowHi = lIdx / 16;
-        int col = lIdx % 16;
-        int row = (lowHi) * 8 + static_cast<int>(ele);
-        c[col * 16 + row] = dst_thread_buf_[Number<ele>{}]; // idea each thread contiguous along column
-    });
+    if constexpr(WMMAVecType<srcA_t, kMultiplier>::layoutTransform)
+    {
+        static_for<0, 8, 1>{}([&](auto ele) {
+            int lowHi = lIdx / 16;
+            int col = lIdx % 16;
+            int row = (lowHi) * 8 + static_cast<int>(ele);
+            c[col + 16 * row] = dst_thread_buf_[Number<ele>{}]; // idea each thread contiguous along column
+        });
+    } else 
+    {
+        static_for<0, 8, 1>{}([&](auto ele) {
+            int lowHi = lIdx / 16;
+            int col = lIdx % 16;
+            int row = (lowHi) * 8 + static_cast<int>(ele);
+            c[col * 16 + row] = dst_thread_buf_[Number<ele>{}]; // idea each thread contiguous along column
+        });
+    }
 }
 
 //KO TODO:: Add gfx125 matmul_swizzle_a
-template <typename srcA_t, typename srcB_t, typename dst_t, ck::index_t KMultiplier>
+template <typename srcA_t, typename srcB_t, typename dst_t, typename acc_t, ck::index_t KMultiplier>
 __global__ void matmul_swizzle_a(const srcA_t* a, const srcB_t* b, dst_t* c)
 {
     ignore = a;
@@ -744,7 +843,7 @@ __global__ void matmul_swizzle_a(const src_t* a, const src_t* b, dst_t* c)
     });
 }
 
-template<typename srcA_t, typename srcB_t, typename dst_t, ck::index_t kMultiplier>
+template<typename srcA_t, typename srcB_t, typename dst_t, typename acc_t, ck::index_t kMultiplier>
 __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
 {
     ignore = a;
@@ -752,7 +851,7 @@ __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
     ignore = c;
 }
 
-template <typename srcA_t, typename srcB_t, typename dst_t, ck::index_t KMultiplier>
+template <typename srcA_t, typename srcB_t, typename dst_t, typename acc_t, ck::index_t KMultiplier>
 __global__ void matmul_swizzle_a(const srcA_t* a, const srcB_t* b, dst_t* c)
 {
     ignore = a;
