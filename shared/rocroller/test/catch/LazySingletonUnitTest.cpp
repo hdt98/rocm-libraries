@@ -40,18 +40,21 @@ TEST_CASE("LazySingletonUnit: Same instance is returned", "Unit:LazySingleton")
     REQUIRE(a == b);
 }
 
-TEST_CASE("LazySingletonUnit: Reset does not break singleton instance", "Unit:LazySingleton")
+TEST_CASE("LazySingletonUnit: Reset replaces singleton instance safely", "Unit:LazySingleton")
 {
     auto instance1 = rocRoller::Settings::getInstance();
     REQUIRE(instance1 != nullptr);
 
-    rocRoller::Settings::reset(); // no-op in dynamic-linking version
+    rocRoller::Settings::reset(); // Expected to replace instance
 
     auto instance2 = rocRoller::Settings::getInstance();
     REQUIRE(instance2 != nullptr);
 
-    // In dynamic-linking safe design, reset does not change identity
-    REQUIRE(instance1 == instance2);
+    // The reset should produce a new shared_ptr instance
+    REQUIRE(instance1 != instance2);
+
+    // But the old instance remains valid (shared_ptr kept alive)
+    REQUIRE(instance1.use_count() >= 1);
 }
 
 TEST_CASE("LazySingletonUnit: Different types have independent instances", "Unit:LazySingleton")
@@ -79,17 +82,21 @@ TEST_CASE("LazySingletonUnit: Singleton persists across scopes", "Unit:LazySingl
     REQUIRE(inst3.get() == raw1);
 }
 
-TEST_CASE("LazySingletonUnit: Multiple resets keep the same singleton instance",
-          "Unit:LazySingleton")
+TEST_CASE("LazySingletonUnit: Multiple resets create new singleton instances", "Unit:LazySingleton")
 {
-    auto instance1 = rocRoller::GPUArchitectureLibrary::getInstance();
+    auto prevInstance = rocRoller::GPUArchitectureLibrary::getInstance();
+    REQUIRE(prevInstance != nullptr);
 
     for(int i = 0; i < 5; ++i)
     {
         rocRoller::GPUArchitectureLibrary::reset();
-        auto instance2 = rocRoller::GPUArchitectureLibrary::getInstance();
-        REQUIRE(instance2 != nullptr);
-        REQUIRE(instance1 == instance2); // Always the same object
+        auto newInstance = rocRoller::GPUArchitectureLibrary::getInstance();
+        REQUIRE(newInstance != nullptr);
+
+        // Each reset creates a new object -- the pointer should differ
+        REQUIRE(prevInstance != newInstance);
+
+        prevInstance = newInstance;
     }
 }
 

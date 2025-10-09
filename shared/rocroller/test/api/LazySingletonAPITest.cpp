@@ -61,44 +61,70 @@ TEST_CASE("LazySingletonAPI: Thread safety across dynamic linking boundary", "AP
     }
 }
 
-TEST_CASE("LazySingletonAPI: Reset is safe across threads", "API:LazySingleton")
+TEST_CASE("LazySingletonAPI: Reset is safe across threads", "[API:LazySingleton]")
 {
     auto before = rocRoller::Settings::getInstance();
+    REQUIRE(before != nullptr);
 
-    std::thread t([] { rocRoller::Settings::reset(); });
-    t.join();
+    // Perform concurrent resets to stress test thread safety
+    constexpr int            numThreads = 8;
+    std::vector<std::thread> threads;
+    threads.reserve(numThreads);
+
+    for(int i = 0; i < numThreads; ++i)
+    {
+        threads.emplace_back([] { rocRoller::Settings::reset(); });
+    }
+
+    for(auto& t : threads)
+        t.join();
 
     auto after = rocRoller::Settings::getInstance();
+    REQUIRE(after != nullptr);
 
-    // In dynamic-linking design, both are the same
-    REQUIRE(before == after);
+    // Because dynamic linking rebuilds instance, we expect new shared_ptr
+    REQUIRE(before != after);
 }
-TEST_CASE("LazySingletonAPI: Shared_ptr remains valid after reset", "API:LazySingleton")
+
+TEST_CASE("LazySingletonAPI: Shared_ptr after reset points to new instance", "[API:LazySingleton]")
 {
-    auto instance = rocRoller::GPUArchitectureLibrary::getInstance();
-    REQUIRE(instance != nullptr);
+    auto oldInstance = rocRoller::GPUArchitectureLibrary::getInstance();
+    REQUIRE(oldInstance != nullptr);
 
     rocRoller::GPUArchitectureLibrary::reset();
 
-    // After reset, pointer should still be valid and identical
-    auto instance2 = rocRoller::GPUArchitectureLibrary::getInstance();
-    REQUIRE(instance2 != nullptr);
-    REQUIRE(instance == instance2);
+    auto newInstance = rocRoller::GPUArchitectureLibrary::getInstance();
+    REQUIRE(newInstance != nullptr);
+
+    // Since reset() reinitializes, pointers must differ
+    REQUIRE(oldInstance != newInstance);
+
+    // Old pointer is still valid (shared_ptr kept last reference)
+    REQUIRE(oldInstance.use_count() >= 1);
 }
 
-TEST_CASE("LazySingletonAPI: Different singletons remain independent", "API:LazySingleton")
+TEST_CASE("LazySingletonAPI: Different singletons remain independent", "[API:LazySingleton]")
 {
     auto settings = rocRoller::Settings::getInstance();
     auto gpuLib   = rocRoller::GPUArchitectureLibrary::getInstance();
 
+    REQUIRE(settings != nullptr);
+    REQUIRE(gpuLib != nullptr);
+    REQUIRE(static_cast<const void*>(settings.get()) != static_cast<const void*>(gpuLib.get()));
+
+    // Reset both independently -- each should reinitialize its own singleton only
     rocRoller::Settings::reset();
+    rocRoller::GPUArchitectureLibrary::reset();
+
     auto settings2 = rocRoller::Settings::getInstance();
     auto gpuLib2   = rocRoller::GPUArchitectureLibrary::getInstance();
 
-    REQUIRE(settings == settings2); // Reset didn't change Settings
-    REQUIRE(gpuLib == gpuLib2); // GPUArchitectureLibrary unaffected
-    REQUIRE(static_cast<const void*>(settings.get())
-            != static_cast<const void*>(gpuLib.get())); // Distinct singletons
+    // Each reset should have produced a *new* instance of that singleton type
+    REQUIRE(settings != settings2);
+    REQUIRE(gpuLib != gpuLib2);
+
+    // But still distinct from each other (type independence preserved)
+    REQUIRE(static_cast<const void*>(settings2.get()) != static_cast<const void*>(gpuLib2.get()));
 }
 
 TEST_CASE("LazySingletonAPI: Settings boolean option change is globally visible",
