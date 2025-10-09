@@ -48,6 +48,7 @@ endif()
 
 # Component stand-alone test
 add_executable(component-test)
+target_link_libraries(component-test PRIVATE roc::rocroller-interface ${msgpack_libs})
 
 if(ROCROLLER_ENABLE_ASAN)
     rocroller_target_configure_sanitizers(component-test PRIVATE)
