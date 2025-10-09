@@ -139,6 +139,7 @@ else()
     add_library(rocroller STATIC)
     set_target_properties(rocroller PROPERTIES POSITION_INDEPENDENT_CODE ON)
 endif()
+target_compile_features(rocroller PUBLIC cxx_std_20)
 set_target_properties(rocroller
     PROPERTIES
         VERSION ${ROCROLLER_VERSION}
@@ -207,28 +208,20 @@ target_compile_definitions(rocroller
 )
 
 if(ROCROLLER_ENABLE_LLVM)
+    # Compile definition ROCROLLER_USE_LLVM enables the llvm yaml API
     llvm_map_components_to_libnames(llvm_yaml_libs objectyaml)
     llvm_map_components_to_libnames(llvm_libs mc support)
-endif()
-
-target_link_libraries(rocroller
-    PUBLIC
-       hip::host
-    PRIVATE
-        ${msgpack_libs}
-        amd_comgr
-)
-
-if(ROCROLLER_ENABLE_LLVM)
-    # ROCROLLER_USE_LLVM enables the llvm yaml API
     target_compile_definitions(rocroller PUBLIC ROCROLLER_USE_LLVM)
     target_include_directories(rocroller PUBLIC "${LLVM_INCLUDE_DIRS}")
 endif()
 
 target_link_libraries(rocroller
     PUBLIC
-        fmt::fmt-header-only
+        hip::host
+        $<BUILD_INTERFACE:fmt::fmt-header-only>
+        ${msgpack_libs}
     PRIVATE
+        amd_comgr
         $<BUILD_INTERFACE:spdlog::spdlog_header_only>
         $<BUILD_INTERFACE:libdivide::libdivide>
         ${llvm_yaml_libs}
@@ -239,9 +232,6 @@ target_include_directories(rocroller
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lib/include>
 )
-
-
-target_compile_features(rocroller PUBLIC cxx_std_20)
 
 configure_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/lib/source/Utilities/Version.cpp.in"
