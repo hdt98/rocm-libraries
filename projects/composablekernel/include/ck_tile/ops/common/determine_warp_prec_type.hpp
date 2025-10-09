@@ -74,4 +74,20 @@ struct DetermineWarpPrecType<APrecType, ck_tile::pk_fp4_raw_t>
     using a_prec_type = APrecType;
     using b_prec_type = APrecType;
 };
+
+// For fp8 x bf16, use fp8
+template <>
+struct DetermineWarpPrecType<ck_tile::fp8_t, ck_tile::bf16_t>
+{
+    using a_prec_type = ck_tile::fp8_t;
+    using b_prec_type = ck_tile::fp8_t;
+};
+
+// For bf16 x fp8, use bf16
+template <>
+struct DetermineWarpPrecType<ck_tile::bf16_t, ck_tile::fp8_t>
+{
+    using a_prec_type = ck_tile::bf16_t;
+    using b_prec_type = ck_tile::bf16_t;
+};
 }; // namespace ck_tile
