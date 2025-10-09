@@ -89,4 +89,13 @@ target_sources(rocroller-tests-catch
         "${CMAKE_CURRENT_SOURCE_DIR}/WMMAObserverUnitTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/WidenAddrExprTo64bitTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/mxDataGeneratorTest.cpp"
+
+        "${CMAKE_CURRENT_SOURCE_DIR}/CustomMatchers.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/CustomSections.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/ExpressionMatchers.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/SimpleTest.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/TestContext.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/TestContext_impl.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/TestKernels.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/TestKernels_impl.hpp"
 )

@@ -205,7 +205,7 @@ if(ROCROLLER_ENABLE_TEST_DISCOVERY)
     )
 endif()
 
-if(ROCROLLER_ENABLE_COVERAGE OR BUILD_CODE_COVERAGE)
+if(ROCROLLER_ENABLE_COVERAGE)
     target_compile_options(rocroller PRIVATE -fprofile-instr-generate -fcoverage-mapping)
     target_link_options(rocroller PRIVATE -fprofile-instr-generate)
 

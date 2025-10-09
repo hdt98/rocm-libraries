@@ -55,7 +55,6 @@ target_sources(rocroller-tests
         "${CMAKE_CURRENT_SOURCE_DIR}/CommonSubexpressionElimTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/ComponentTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/ControlGraphTest.cpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/ConversionInstructions/Convert_F16_F32.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/ConversionTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/CoordinateGraphTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/CopyGeneratorTest.cpp"
@@ -77,9 +76,6 @@ target_sources(rocroller-tests
         "${CMAKE_CURRENT_SOURCE_DIR}/GeneratorTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/HalfPrecisionTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/KernelGraphTest.cpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/KernelGraphTest/ConstantPropagation.cpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/KernelGraphTest/KernelGraphUtils.cpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/KernelGraphTest/Simplify.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/KernelGraphTest/UpdateParameters.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/KernelIndexTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/KernelOptionsTest.cpp"
@@ -113,4 +109,18 @@ target_sources(rocroller-tests
         "${CMAKE_CURRENT_SOURCE_DIR}/VectorAddBenchmark.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/WaitCountObserverTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/WaitCountTest.cpp"
+
+        "${CMAKE_CURRENT_SOURCE_DIR}/ConversionInstructions/Convert_F16_F32.cpp"
+
+        "${CMAKE_CURRENT_SOURCE_DIR}/KernelGraphTest/ConstantPropagation.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/KernelGraphTest/KernelGraphUtils.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/KernelGraphTest/Simplify.cpp"
+
+        "${CMAKE_CURRENT_SOURCE_DIR}/ContextFixture.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/GEMMF8F6F4.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/GenericContextFixture.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/GPUContextFixture.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/SimpleFixture.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/SourceMatcher.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/Utilities.hpp"
 )
