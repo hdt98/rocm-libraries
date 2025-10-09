@@ -22,7 +22,7 @@
 //
 // undefine NDEBUG so asserts are implemented
 #ifdef NDEBUG
-#    undef NDEBUG
+#undef NDEBUG
 #endif
 
 #include <cstdint>
@@ -36,26 +36,25 @@
 
 // Two waves per SIMD on MI300
 #define DATA_SIZE (304 * 64 * 4 * 2)
-#define HIP_API_CALL(CALL)                                                                         \
-    if((CALL) != hipSuccess)                                                                       \
-    {                                                                                              \
-        abort();                                                                                   \
+#define HIP_API_CALL(CALL)   \
+    if((CALL) != hipSuccess) \
+    {                        \
+        abort();             \
     }
 
 #define LDS_SIZE 1024
 
-__global__ void
-divide_kernel(float* a, const float* b, const float* c, int /* unused */)
+__global__ void divide_kernel(float* a, const float* b, const float* c, int /* unused */)
 {
     int index = blockDim.x * blockIdx.x + threadIdx.x;
 
-    if(index >= DATA_SIZE) return;
+    if(index >= DATA_SIZE)
+        return;
 
     a[index] = (b[index] - c[index]) / abs(c[index] + b[index]) + 1;
 }
 
-__global__ void
-looping_lds_kernel(float* a, const float* b, const float* c, int loopcount)
+__global__ void looping_lds_kernel(float* a, const float* b, const float* c, int loopcount)
 {
     __shared__ float interm[LDS_SIZE];
 
@@ -75,8 +74,7 @@ looping_lds_kernel(float* a, const float* b, const float* c, int loopcount)
     a[index] = interm[threadIdx.x % LDS_SIZE] + c[index];
 }
 
-__global__ void
-fifo_kernel(float* /* a */, const float* /* b */, const float* /* c */, int loops)
+__global__ void fifo_kernel(float* /* a */, const float* /* b */, const float* /* c */, int loops)
 {
     using _float4 = __attribute__((__vector_size__(4 * sizeof(float)))) float;
 
@@ -118,7 +116,8 @@ public:
     }
     ~hipMemory()
     {
-        if(ptr) HIP_API_CALL(hipFree(ptr));
+        if(ptr)
+            HIP_API_CALL(hipFree(ptr));
     }
     hipMemory(hipMemory&& other)
     {
@@ -131,8 +130,14 @@ public:
 class HipStream
 {
 public:
-    HipStream() { HIP_API_CALL(hipStreamCreateWithFlags(&stream, hipStreamNonBlocking)); }
-    ~HipStream() { HIP_API_CALL(hipStreamDestroy(stream)); }
+    HipStream()
+    {
+        HIP_API_CALL(hipStreamCreateWithFlags(&stream, hipStreamNonBlocking));
+    }
+    ~HipStream()
+    {
+        HIP_API_CALL(hipStreamDestroy(stream));
+    }
 
     hipStream_t stream;
 
@@ -141,12 +146,11 @@ public:
     hipMemory dst{};
 };
 
-#define Launch(kernel, stream, arglast)                                                            \
-    hipLaunchKernelGGL(                                                                            \
+#define Launch(kernel, stream, arglast) \
+    hipLaunchKernelGGL(                 \
         kernel, DATA_SIZE / 512, 512, 0, 0, stream.dst.ptr, stream.src1.ptr, stream.src2.ptr, 6);
 
-int
-main(int /*argc*/, char** /*argv*/)
+int main(int /*argc*/, char** /*argv*/)
 {
     std::array<HipStream, 3>              streams{};
     std::vector<decltype(divide_kernel)*> kernels{};
