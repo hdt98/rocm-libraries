@@ -15,7 +15,10 @@ if(NOT CLI11_FOUND)
     endif()
 endif()
 
+add_executable(rocroller-gemm)
 add_subdirectory(gemm)
+
+add_executable(rocroller-codegen-stress)
 add_subdirectory(codegen_stress)
 
 add_custom_target(all_clients)

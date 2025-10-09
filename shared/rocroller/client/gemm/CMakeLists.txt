@@ -1,8 +1,6 @@
 # Copyright Advanced Micro Devices, Inc., or its affiliates.
 # SPDX-License-Identifier:  MIT
 
-add_executable(rocroller-gemm)
-
 add_subdirectory(include)
 add_subdirectory(src)
 

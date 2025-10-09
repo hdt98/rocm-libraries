@@ -1,7 +1,10 @@
 # Copyright Advanced Micro Devices, Inc., or its affiliates.
 # SPDX-License-Identifier:  MIT
 
-add_executable(rocroller-codegen-stress "${CMAKE_CURRENT_SOURCE_DIR}/codegen_stress_test.cpp")
+target_sources(rocroller-codegen-stress
+    PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/codegen_stress_test.cpp"
+)
 target_link_libraries(rocroller-codegen-stress
     PRIVATE
         rocroller::common-test-utilities
