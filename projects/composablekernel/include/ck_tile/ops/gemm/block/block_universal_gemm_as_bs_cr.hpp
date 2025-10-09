@@ -94,13 +94,8 @@ struct BlockUniversalGemmAsBsCr
     using ComputeDataType = remove_cvref_t<typename Traits::ComputeDataType>;
     using CDataType       = remove_cvref_t<typename Traits::CDataType>;
 
-    using ATypeToUse =
-        std::conditional_t<std::is_same_v<ADataType, pk_int4_t>, BDataType, ADataType>;
-    using BTypeToUse = std::conditional_t<std::is_same_v<BDataType, pk_int4_t> ||
-                                              std::is_same_v<BDataType, pk_fp4_t> ||
-                                              sizeof(BDataType) < sizeof(ADataType),
-                                          ADataType,
-                                          BDataType>;
+    using ATypeToUse = typename DetermineWarpPrecType<ADataType, BDataType>::a_prec_type;
+    using BTypeToUse = typename DetermineWarpPrecType<ADataType, BDataType>::b_prec_type;
 
     using WarpGemm = remove_cvref_t<typename Traits::WarpGemm>;
 
