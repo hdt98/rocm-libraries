@@ -16,19 +16,16 @@ target_include_directories(
 target_link_libraries(
     arch-gen-tests
         PRIVATE
-            roc::rocroller-interface
             rocroller::common-test-utilities
             rocroller::isa-spec-manager
             GTest::gtest_main
             GTest::gmock
-            ${BLAS_LIBRARIES}
 )
 
 
 target_link_libraries(rocroller-tests
     PRIVATE
         rocroller::common-test-utilities
-        ${BLAS_LIBRARIES}
         GTest::gtest_main
         GTest::gmock
         libdivide::libdivide

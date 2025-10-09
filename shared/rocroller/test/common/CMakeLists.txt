@@ -4,13 +4,15 @@
 add_library(common-test-utilities OBJECT)
 add_library(rocroller::common-test-utilities ALIAS common-test-utilities)
 
+find_package(BLAS REQUIRED)
+find_package(OpenMP REQUIRED)
+
 target_link_libraries(common-test-utilities
     PUBLIC
         roc::rocroller-interface
         roc::mxDataGenerator
-        hip::host
         OpenMP::OpenMP_CXX
-        ${CBLAS_LIBRARIES}
+        ${BLAS_LIBRARIES}
 )
 
 if(ROCROLLER_ENABLE_ASAN)
