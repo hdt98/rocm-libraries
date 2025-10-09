@@ -693,6 +693,8 @@ def run():
                         logicFiles.append(file)
             if missing:
                 printExit(f"Missing logic files in {arguments['LogicFilelist']}: {', '.join(missing)}")
+            if not logicFiles:
+                printExit(f"No logic files found in {arguments['LogicFilelist']}")
     else:
         globPattern = os.path.join(
             arguments["LogicPath"], f"**/{arguments['LogicFilter']}{logicExtFormat}"
