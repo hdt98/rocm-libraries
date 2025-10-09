@@ -57,6 +57,46 @@ struct WMMAVecType
     static_assert(sizeof(T) == 0, "VecType is not specialized for this type");
 };
 
+// fp64 specialization
+template <typename T, index_t kMultiplier>
+struct WMMAVecType<T,
+                   kMultiplier,
+                   ck::enable_if_t<ck::is_same_v<T, double>>>
+{
+    static constexpr bool layoutTransform = false;
+    static constexpr int ToIntDim         = 1;
+
+    template <typename D>
+    constexpr static bool is_compatible()
+    {
+        return ck::is_same_v<T, D>;
+    }
+
+    using VecT  = vector_type<T, kMultiplier * 2>;
+    using ViewT = vector_type<T, 1>;
+    static constexpr int size = kMultiplier * 2;
+};
+
+// fp32 specialization
+template <typename T, index_t kMultiplier>
+struct WMMAVecType<T,
+                   kMultiplier,
+                   ck::enable_if_t<ck::is_same_v<T, float>>>
+{
+    static constexpr bool layoutTransform = false;
+    static constexpr int ToIntDim         = 1;
+
+    template <typename D>
+    constexpr static bool is_compatible()
+    {
+        return ck::is_same_v<T, D>;
+    }
+
+    using VecT  = vector_type<T, kMultiplier * 2>;
+    using ViewT = vector_type<T, 1>;
+    static constexpr int size = kMultiplier * 2;
+};
+
 // fp16 specialization 
 template <typename T, index_t kMultiplier>
 struct WMMAVecType<T,
@@ -72,28 +112,9 @@ struct WMMAVecType<T,
         return ck::is_same_v<T, D>;
     }
 
-    using VecT  = vector_type<T, kMultiplier * 8>;
+    using VecT  = vector_type<T, kMultiplier * 2>;
     using ViewT = vector_type<T, 2>;
-    static constexpr int size = kMultiplier * 8; // Number of T elements in the vector
-};
-
-template <typename T, index_t kMultiplier>
-struct WMMAVecType<T,
-                   kMultiplier,
-                   ck::enable_if_t<ck::is_same_v<T, float>>>
-{
-    static constexpr bool layoutTransform = false;
-    static constexpr int ToIntDim         = 1;
-
-    template <typename D>
-    constexpr static bool is_compatible()
-    {
-        return ck::is_same_v<T, D>;
-    }
-
-    using VecT  = vector_type<T, kMultiplier * 8>;
-    using ViewT = vector_type<T, 1>;
-    static constexpr int size = kMultiplier * 8;
+    static constexpr int size = kMultiplier * 2;
 };
 
 template <typename T, index_t kMultiplier>
@@ -108,10 +129,9 @@ struct WMMAVecType<T, kMultiplier, ck::enable_if_t<ck::is_same_v<T, ck::f8_ocp_t
         return ck::is_same_v<D, ck::f8_t> || ck::is_same_v<D, ck::bf8_t>;
     }
 
-    // For FP8 input, hardware expects kMultiplier * 32 elements per fragment
-    using VecT  = vector_type<typename T::data_type, kMultiplier * 8>;
+    using VecT  = vector_type<typename T::data_type, kMultiplier * 2>;
     using ViewT = vector_type<typename T::data_type, 4>;
-    static constexpr int size = kMultiplier * 8;
+    static constexpr int size = kMultiplier * 2;
 };
 
 template <typename T, index_t kMultiplier>
@@ -126,10 +146,9 @@ struct WMMAVecType<T, kMultiplier, ck::enable_if_t<ck::is_same_v<T, ck::f8_fnuz_
         return ck::is_same_v<D, ck::f8_t> || ck::is_same_v<D, ck::bf8_t>;
     }
 
-    // For FP8 input, hardware expects kMultiplier * 32 elements per fragment
-    using VecT  = vector_type<T, kMultiplier * 8>;
+    using VecT  = vector_type<T, kMultiplier * 2>;
     using ViewT = vector_type<T, 4>;
-    static constexpr int size = kMultiplier * 8;
+    static constexpr int size = kMultiplier * 2;
 };
 
 template <typename T, index_t kMultiplier>
@@ -143,9 +162,9 @@ struct WMMAVecType<T, kMultiplier, ck::enable_if_t<ck::is_same_v<T, int8_t>>>
         return ck::is_same_v<T, D>;
     }
 
-    using VecT  = vector_type<T, kMultiplier * 8>;
+    using VecT  = vector_type<T, kMultiplier * 2>;
     using ViewT = vector_type<T, 4>;
-    static constexpr int size = kMultiplier * 8;
+    static constexpr int size = kMultiplier * 2;
 };
 
 
@@ -161,7 +180,9 @@ __device__ void builtin_wmma_naive_selector(
     StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr, accType, 1, 8, true>& reg_c, 
     StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr, dstType, 1, 8, true>& reg_d)
 {
-    constexpr int size = 2* 8 * kMultiplier;
+    constexpr int size = 2 * 2 * kMultiplier;
+    (threadIdx.x == 0 ? printf("--------- Size used in wmma_selector is: %d \n", size) : 0);
+
     //if accType and dstType the same
     if constexpr(std::is_same_v<accType, dstType>) {
         if constexpr (
@@ -278,8 +299,14 @@ __device__ void builtin_wmma_naive_selector(
             } else if constexpr(std::is_same_v<srcAType, int8_t> && std::is_same_v<srcBType, int8_t> && std::is_same_v<dstType, int32_t>){
                 (threadIdx.x == 0 ? printf("--------- Calling CK_WMMA_CALL_INTRIN_4 int32, int8 ---------- \n") : 0);
                 CK_WMMA_CALL_INTRIN_4(i32, iu8, true, true, 64);
+            } else if constexpr(std::is_same_v<srcAType, float> && std::is_same_v<srcBType, float> && std::is_same_v<dstType, float>){
+                (threadIdx.x == 0 ? printf("--------- Calling CK_WMMA_CALL_INTRIN_4 f32, f32 ---------- \n") : 0);
+                CK_WMMA_CALL_INTRIN_4(f32, f32, true, true, 4);
+            } else if constexpr(std::is_same_v<srcAType, double> && std::is_same_v<srcBType, double> && std::is_same_v<dstType, double>){
+                (threadIdx.x == 0 ? printf("--------- Calling CK_WMMA_CALL_INTRIN_4 f64, f64 ---------- \n") : 0);
+                CK_WMMA_CALL_INTRIN_4(f64, f64, true, true, 4);
             } else {
-                (threadIdx.x == 0 ? printf("--------- UNSPPORTED DATA TYPES for CK_WMMA_CALL_INTRIN_1 ---------- \n") : 0);            
+                (threadIdx.x == 0 ? printf("--------- UNSPPORTED DATA TYPES for CK_WMMA_CALL_INTRIN_1 or _4 ---------- \n") : 0);            
             }
         }
         } else if constexpr(!std::is_same_v<accType, dstType>){
@@ -368,7 +395,7 @@ __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
     
     // to int dim is 1 for float, 2 for half; base dim assumption is 16
     constexpr int SRC_DIM = WMMAVecType<srcA_t, kMultiplier>::size / ToIntDim;
-    /* TODO:: Handle exceptions for f32 and f64 input and K dim is only size 4. 
+    /* KO TODO:: Handle exceptions for f32 and f64 input and K dim is only size 4. 
         Then we need to do 4*K Multiplier? */ 
 
     // 2 threads per a row
@@ -376,7 +403,7 @@ __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
     
     // 16 is base dim assumption, 2 is for a input and b input both
     constexpr int LDS_DIM = 2 * 16 * ROW_SIZE;
-    /* TODO:: Handle Exceptions for f32 or f64 input and K is only size 4. 
+    /* KO TODO:: Handle Exceptions for f32 or f64 input and K is only size 4. 
         Then we need to do 4*K Multiplier? */
 
     constexpr int LDS_B_START = LDS_DIM / 2;
@@ -430,30 +457,30 @@ __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
             int offset1 = (rowIdx * ROW_SIZE) + (i + (lowHigh * QUADRANT_SIZE));
             int offset2 = (rowIdx * ROW_SIZE) + (j + (lowHigh * QUADRANT_SIZE));
 
-            if (debug_prints == true)
-            {
-                auto val_offset1 = a_ptr[offset1];
-                auto val_offset2 = a_ptr[offset2];
-                printf("a_temp[%d][0] = %f, a_temp[%d][1] = %f\n", static_cast<int>(ele), static_cast<float>(val_offset1[0]), static_cast<int>(ele), static_cast<float>(val_offset1[1]));
-                printf("a_temp[%d][0] = %f, a_temp[%d][1] = %f\n", static_cast<int>(ele+QUADRANT_SIZE), static_cast<float>(val_offset2[0]), static_cast<int>(ele+QUADRANT_SIZE), static_cast<float>(val_offset2[1]));
-            }
+            // if (debug_prints == true && ToIntDim > 1)
+            // {
+            //     auto val_offset1 = a_ptr[offset1];
+            //     auto val_offset2 = a_ptr[offset2];
+            //     printf("a_temp[%d][0] = %f, a_temp[%d][1] = %f\n", static_cast<int>(ele), static_cast<float>(val_offset1[0]), static_cast<int>(ele), static_cast<float>(val_offset1[1]));
+            //     printf("a_temp[%d][0] = %f, a_temp[%d][1] = %f\n", static_cast<int>(ele+QUADRANT_SIZE), static_cast<float>(val_offset2[0]), static_cast<int>(ele+QUADRANT_SIZE), static_cast<float>(val_offset2[1]));
+            // }
 
             a_temp.template AsType<srcA_cast_type>()(ele) = a_ptr[offset1];
             a_temp.template AsType<srcA_cast_type>()(Number<ele + QUADRANT_SIZE>{}) = a_ptr[offset2];
         });
 
-        // Print a_temp for debug purposes
-        if (debug_prints == true) 
-        {
-            printf("-------- Contents of a_temp for thread %d --------\n", lIdx);
-            static_for<0, QUADRANT_SIZE * 2, 1>{}([&](auto ele) {
-                auto val = a_temp.template AsType<srcA_cast_type>()(ele);
-                printf("thread %d:  a_temp[%d][0] = %f, a_temp[%d][1] = %f\n",
-                    lIdx,
-                    static_cast<int>(ele), static_cast<float>(val[0]),
-                    static_cast<int>(ele), static_cast<float>(val[1]));
-            });
-        }
+        // // Print a_temp for debug purposes
+        // if (debug_prints == true && ToIntDim > 1)
+        // {
+        //     printf("-------- Contents of a_temp for thread %d --------\n", lIdx);
+        //     static_for<0, QUADRANT_SIZE * 2, 1>{}([&](auto ele) {
+        //         auto val = a_temp.template AsType<srcA_cast_type>()(ele);
+        //         printf("thread %d:  a_temp[%d][0] = %f, a_temp[%d][1] = %f\n",
+        //             lIdx,
+        //             static_cast<int>(ele), static_cast<float>(val[0]),
+        //             static_cast<int>(ele), static_cast<float>(val[1]));
+        //     });
+        // }
 
         // load B to registers using QUADRANTS -- OK
         // printf("-------- Writing to b_temp -------- \n");
@@ -506,18 +533,18 @@ __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
 
         __syncthreads(); //KO TODO:: move to inline asm
 
-        if (debug_prints == true) 
-        {
-            if (threadIdx.x == 0)
-            {
-                //after syncthreads, so all threads should see all other threads vals written
-                printf("-------- p_shared[0..255] contents --------\n");
-                for(int i = 0; i < 256; ++i) {
-                    auto val = p_shared[i];
-                    printf("p_shared[%d][0] = %f, p_shared[%d][1] = %f\n", i, static_cast<float>(val[0]), i, static_cast<float>(val[1]));
-                }
-            }
-        }
+        // if (debug_prints == true && ToIntDim > 1)
+        // {
+        //     if (threadIdx.x == 0)
+        //     {
+        //         //after syncthreads, so all threads should see all other threads vals written
+        //         printf("-------- p_shared[0..255] contents --------\n");
+        //         for(int i = 0; i < 256; ++i) {
+        //             auto val = p_shared[i];
+        //             printf("p_shared[%d][0] = %f, p_shared[%d][1] = %f\n", i, static_cast<float>(val[0]), i, static_cast<float>(val[1]));
+        //         }
+        //     }
+        // }
         
         // Construct a_frag and b_frag for WMMA call -- OK
         static_for<0, QUADRANT_SIZE, 1>{}([&](auto ele) {
@@ -542,16 +569,16 @@ __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
             b_frag.template AsType<srcB_cast_type>()(Number<ele + QUADRANT_SIZE>{}) = local_b_ptr[idx2_b];
         });
 
-        if (debug_prints == true) 
-        {
-            // printf("-------- Contents of a_frag for thread %d --------\n", lIdx);
-            static_for<0, QUADRANT_SIZE * 2, 1>{}([&](auto ele) {
-                auto val = a_frag.template AsType<srcA_cast_type>()(ele);
-                printf("thread %d:  a_frag[%d][0] = %f, a_frag[%d][1] = %f\n",
-                        lIdx, static_cast<int>(ele), static_cast<float>(val[0]),
-                        static_cast<int>(ele), static_cast<float>(val[1]));
-            });
-        }
+        // if (debug_prints == true && ToIntDim > 1)
+        // {
+        //     // printf("-------- Contents of a_frag for thread %d --------\n", lIdx);
+        //     static_for<0, QUADRANT_SIZE * 2, 1>{}([&](auto ele) {
+        //         auto val = a_frag.template AsType<srcA_cast_type>()(ele);
+        //         printf("thread %d:  a_frag[%d][0] = %f, a_frag[%d][1] = %f\n",
+        //                 lIdx, static_cast<int>(ele), static_cast<float>(val[0]),
+        //                 static_cast<int>(ele), static_cast<float>(val[1]));
+        //     });
+        // }
     }
     else // Don't use quads
     {
@@ -1086,9 +1113,9 @@ struct TestWmma
         ck::wmma_op_util::GemmParams params;
         params.M       = 16;
         params.N       = 16;
-        params.K       = 16 * KMultiplier;
-        params.StrideA = 16 * KMultiplier;
-        params.StrideB = 16 * KMultiplier;
+        params.K       = 4 * KMultiplier;
+        params.StrideA = 4 * KMultiplier;
+        params.StrideB = 4 * KMultiplier;
         params.StrideC = 16;
 
         auto host_tensors = PrepareGemmTensor(params);

@@ -6,6 +6,7 @@
 
 #include "ck/utility/amd_inline_asm.hpp"
 #include "data_type.hpp"
+#include "dtype_fp64.hpp"
 // TODO: Add arch limitation
 namespace ck {
 
@@ -992,19 +993,26 @@ struct intrin_wmma_f16_16x16x128_bf8bf8<16, 16>
     }
 };
 
-// src: f32, f32, dst: fp32
-template <index_t MPerWave, index_t NPerWave>
+template <index_t MPerWave, index_t NPerWave, bool neg_a, bool neg_b>
 struct intrin_wmma_f32_16x16x4_f32;
 
-template <>
-struct intrin_wmma_f32_16x16x4_f32<16, 16>
+template <bool neg_a, bool neg_b>
+struct intrin_wmma_f32_16x16x4_f32<16, 16, neg_a, neg_b>
 {
     template <class FloatC>
     __device__ static void Run(const float2_t& reg_a, const float2_t& reg_b, FloatC& reg_c)
     {
 #if defined(__gfx125__)
+        if (threadIdx.x == 0) {printf("--------- Calling intrin_wmma_f32_16x16x4_f32<16, 16> ---------- \n");}
         reg_c.template AsType<float8_t>()(Number<0>{}) = __builtin_amdgcn_wmma_f32_16x16x4_f32(
-            0, reg_a, 0, reg_b, 0, reg_c.template AsType<float8_t>()[Number<0>{}], false, false);
+            neg_b, 
+            bit_cast<float2_t>(reg_b),
+            neg_a, 
+            bit_cast<float2_t>(reg_a),
+            0,
+            reg_c.template AsType<float8_t>()[Number<0>{}],
+            false,
+            false);
 #else
         ignore = reg_a;
         ignore = reg_b;
@@ -1013,19 +1021,24 @@ struct intrin_wmma_f32_16x16x4_f32<16, 16>
     }
 };
 
-// src: f64, f64, dst: fp64
-template <index_t MPerWave, index_t NPerWave>
+template <index_t MPerWave, index_t NPerWave, bool neg_a, bool neg_b>
 struct intrin_wmma_f64_16x16x4_f64;
 
-template <>
-struct intrin_wmma_f64_16x16x4_f64<16, 16>
+template <bool neg_a, bool neg_b>
+struct intrin_wmma_f64_16x16x4_f64<16, 16, neg_a, neg_b>
 {
     template <class FloatC>
     __device__ static void Run(const double2_t& reg_a, const double2_t& reg_b, FloatC& reg_c)
     {
 #if defined(__gfx1251__)
+        if (threadIdx.x == 0) {printf("--------- Calling wmma_f64_16x16x4_f64<16, 16> ---------- \n");}
         reg_c.template AsType<double8_t>()(Number<0>{}) = __builtin_amdgcn_wmma_f64_16x16x4_f64(
-            0, reg_a, 0, reg_b, 0, reg_c.template AsType<double8_t>()[Number<0>{}]);
+            neg_b, 
+            bit_cast<double2_t>(reg_b),
+            neg_a, 
+            bit_cast<double2_t>(reg_a),
+            0,
+            reg_c.template AsType<double8_t>()[Number<0>{}]);
 #else
         ignore = reg_a;
         ignore = reg_b;
@@ -1033,6 +1046,7 @@ struct intrin_wmma_f64_16x16x4_f64<16, 16>
 #endif
     }
 };
+
 
 template <index_t MPerWave, index_t NPerWave, index_t ScaleOpselA, index_t ScaleOpselB>
 struct intrin_wmma_scale_f32_16x16x128_f8f6f4;
