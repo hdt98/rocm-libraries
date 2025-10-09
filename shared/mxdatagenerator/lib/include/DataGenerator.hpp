@@ -1008,7 +1008,7 @@ namespace DGen
         {
             const auto tid = omp_get_thread_num();
 
-            std::normal_distribution normal_dist(mean, std_dev);
+            std::normal_distribution<> normal_dist{mean, std_dev};
 
             int32_t max_exp = std::numeric_limits<int32_t>::min();
             int32_t min_exp = std::numeric_limits<int32_t>::max();
@@ -1058,7 +1058,7 @@ namespace DGen
                 if(isScaled<DTYPE>() && block_i == block_size - 1)
                 {
                     // Scale value is always 1
-                    const auto s = 1;
+                    const int32_t s = 1;
                     std::memcpy(&m_scaleBytes[scale_i], &s, m_scaleDesc.byte_size);
 
                     // reset per block values
@@ -1081,11 +1081,15 @@ namespace DGen
 
         dimension_iterator ditr(size);
 
-        const auto dataBias         = static_cast<int32_t>(getDataBias<DTYPE>());
-        const auto dataMantissaBits = getDataMantissaBits<DTYPE>();
-        const auto dataExponentBits = getDataExponentBits<DTYPE>();
-        const auto dataUnbiasedEMin = getDataUnBiasedEMin<DTYPE>();
-        auto       scaleBias        = getScaleBias<DTYPE>();
+        const auto dataBias          = static_cast<int32_t>(getDataBias<DTYPE>());
+        const auto dataMantissaBits  = getDataMantissaBits<DTYPE>();
+        const auto dataExponentBits  = getDataExponentBits<DTYPE>();
+        const auto dataUnbiasedEMin  = getDataUnBiasedEMin<DTYPE>();
+        auto       scaleBias         = getScaleBias<DTYPE>();
+        const auto scaleBiasedEMax   = getScaleBiasedEMax<DTYPE>();
+        const auto scaleBiasedEMin   = getScaleBiasedEMin<DTYPE>();
+        const auto scaleUnbiasedEMax = getScaleUnBiasedEMax<DTYPE>();
+        const auto scaleUnbiasedEMin = getScaleUnBiasedEMin<DTYPE>();
 
         const int32_t  subnorm_min_exp = dataUnbiasedEMin - dataMantissaBits;
         const uint64_t max             = (ONE << m_dataDesc.bit_size) - 1;
@@ -1145,9 +1149,20 @@ namespace DGen
                 //
                 if(isScaled<DTYPE>() && block_i == block_size - 1)
                 {
-                    std::normal_distribution scale_dist(mean, std_dev);
+                    std::normal_distribution<> scale_dist{mean, std_dev};
+                    int32_t                    s = scale_dist(m_gen[tid]);
 
-                    const auto s = scale_dist(m_gen[tid]);
+                    int32_t scaleMax = scaleBiasedEMax;
+                    int32_t scaleMin = scaleBiasedEMin;
+
+                    if(m_options.clampToF32)
+                    {
+                        scaleMax = std::min(F32MAXEXP - max_exp, scaleUnbiasedEMax) + scaleBias;
+                        scaleMin = std::max(F32MINEXP - min_exp, scaleUnbiasedEMin) + scaleBias;
+                    }
+                    s = std::min(s, scaleMax);
+                    s = std::max(s, scaleMin);
+
                     std::memcpy(&m_scaleBytes[scale_i], &s, m_scaleDesc.byte_size);
 
                     // reset per block values
