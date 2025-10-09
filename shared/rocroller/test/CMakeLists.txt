@@ -113,6 +113,7 @@ endif()
 add_subdirectory(common)
 add_subdirectory(standalone)
 add_subdirectory(unit)
+add_subdirectory(rocprofiler)
 
 if(ROCROLLER_ENABLE_TEST_DISCOVERY)
     set(TEST_REPORT_DIR "${PROJECT_BINARY_DIR}/test_report")
