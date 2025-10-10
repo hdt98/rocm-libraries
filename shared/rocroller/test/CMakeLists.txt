@@ -16,10 +16,8 @@ endif()
 
 if(NOT ROCM_LIBS_SUPERBUILD)
     if(ROCROLLER_ENABLE_THEROCK)
-        # develop branch logic -- required when building TheRock variant
         find_package(mxDataGenerator REQUIRED)
     else()
-        # your branch logic -- non-fatal fallback for local or static builds
         find_package(mxDataGenerator QUIET)
         if(NOT mxDataGenerator_FOUND)
             if(ROCROLLER_ENABLE_FETCH)
