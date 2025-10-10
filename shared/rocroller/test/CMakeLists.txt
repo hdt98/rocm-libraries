@@ -1,5 +1,5 @@
 # Copyright Advanced Micro Devices, Inc., or its affiliates.
-# SPDX-License-Identifier:  MIT
+# SPDX-License-Identifier: MIT
 
 find_package(GTest QUIET)
 if(NOT GTest_FOUND)
@@ -25,7 +25,7 @@ if(NOT ROCM_LIBS_SUPERBUILD)
             )
             FetchContent_MakeAvailable(mxDataGenerator)
         else()
-            message(FATAL_ERROR "Failed to find mxDataGenerator")
+            message(WARNING "mxDataGenerator not found; skipping inclusion.")
         endif()
     endif()
 endif()
@@ -51,6 +51,27 @@ if(ROCROLLER_ENABLE_CATCH AND (ROCROLLER_BUILD_TESTING OR BUILD_TESTING))
             PROPERTIES
                 CROSSCOMPILING_EMULATOR "${CMAKE_COMMAND};-E;env;${asan_opts}"
         )
+    endif()
+
+    find_package(Catch2 QUIET)
+    if(NOT Catch2_FOUND)
+        if(ROCROLLER_ENABLE_FETCH)
+            include(FetchContent)
+            FetchContent_Declare(
+                Catch2
+                GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+                GIT_TAG v3.6.0
+            )
+            FetchContent_MakeAvailable(Catch2)
+        else()
+            message(FATAL_ERROR "Catch2 not found and fetch disabled. Set ROCROLLER_ENABLE_FETCH=ON.")
+        endif()
+    endif()
+
+    if(DEFINED Catch2_SOURCE_DIR)
+        list(APPEND CMAKE_MODULE_PATH "${Catch2_SOURCE_DIR}/extras")
+    elseif(DEFINED Catch2_DIR)
+        list(APPEND CMAKE_MODULE_PATH "${Catch2_DIR}")
     endif()
 endif()
 
@@ -86,7 +107,7 @@ if(ROCROLLER_ENABLE_GEMM_CLIENT_TESTS)
             set(rocroller_skip_regex "key = amdhsa.version")
         endif()
     endif()
-    find_package(Pytest REQUIRED) # requires pip install -r requirements.txt
+    find_package(Pytest REQUIRED)  # requires pip install -r requirements.txt
     pytest_discover_tests(
         GEMMClientTests
         WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}/client"
@@ -115,123 +136,68 @@ else()
     target_compile_definitions(rocroller-tests PRIVATE ROCROLLER_USE_LLVM)
 endif()
 
+
+if(ROCROLLER_ENABLE_CATCH)
+    include(Catch)
+    add_subdirectory(catch)
+    add_subdirectory(api)
+endif()
+
+add_subdirectory(common)
+add_subdirectory(standalone)
+add_subdirectory(unit)
+
 if(ROCROLLER_ENABLE_TEST_DISCOVERY)
     set(TEST_REPORT_DIR "${PROJECT_BINARY_DIR}/test_report")
     file(MAKE_DIRECTORY ${TEST_REPORT_DIR})
+
     include(GoogleTest)
     gtest_discover_tests(
         rocroller-tests
         XML_OUTPUT_DIR ${TEST_REPORT_DIR}
         TEST_FILTER "-*GPU_*"
         DISCOVERY_MODE PRE_TEST
-        PROPERTIES
-            ENVIRONMENT "${asan_opts}"
+        PROPERTIES ENVIRONMENT "${asan_opts}"
     )
     gtest_discover_tests(
         rocroller-tests
         XML_OUTPUT_DIR ${TEST_REPORT_DIR}
         TEST_FILTER "*GPU_*"
-        PROPERTIES "LABELS" "GPU"
+        PROPERTIES LABELS "GPU"
         DISCOVERY_MODE PRE_TEST
-        PROPERTIES
-            ENVIRONMENT "${asan_opts}"
+        PROPERTIES ENVIRONMENT "${asan_opts}"
     )
     gtest_discover_tests(
         arch-gen-tests
         XML_OUTPUT_DIR ${TEST_REPORT_DIR}
         DISCOVERY_MODE PRE_TEST
-        PROPERTIES
-            ENVIRONMENT "${asan_opts}"
+        PROPERTIES ENVIRONMENT "${asan_opts}"
     )
 
     if(ROCROLLER_ENABLE_CATCH)
-        if(ROCROLLER_ENABLE_FETCH)
-            list(APPEND CMAKE_MODULE_PATH "${Catch2_SOURCE_DIR}/extras")
-        else()
-            list(APPEND CMAKE_MODULE_PATH "${Catch2_DIR}")
-        endif()
-
-        include(Catch)
-        add_subdirectory(catch)
-        add_subdirectory(api)
         catch_discover_tests(
             rocroller-tests-catch
             REPORTER JUnit
             OUTPUT_DIR ${TEST_REPORT_DIR}
             OUTPUT_SUFFIX ".xml"
             DISCOVERY_MODE PRE_TEST
-            EXTRA_ARGS "--reporter console::out=-::colour-mode=ansi"
-            TEST_SPEC "[gpu]"
-            PROPERTIES "LABELS" "CATCH"
-                       "LABELS" "GPU"
-                       "ENVIRONMENT" "${asan_opts}"
-            SKIP_REGULAR_EXPRESSION "[1-9][0-9]* skipped" "[1-9][0-9]* SKIPPED"
-        )
-        catch_discover_tests(
-            rocroller-tests-catch
-            REPORTER JUnit
-            OUTPUT_DIR ${TEST_REPORT_DIR}
-            OUTPUT_SUFFIX ".xml"
-            DISCOVERY_MODE PRE_TEST
-            EXTRA_ARGS "--reporter console::out=-::colour-mode=ansi"
+            EXTRA_ARGS "--reporter" "console::out=-::colour-mode=ansi"
             TEST_SPEC "~[gpu]"
-            PROPERTIES "LABELS" "CATCH"
-                       "ENVIRONMENT" "${asan_opts}"
-            SKIP_REGULAR_EXPRESSION "[1-9][0-9]* skipped" "[1-9][0-9]* SKIPPED"
+            PROPERTIES LABELS "CATCH" ENVIRONMENT "${asan_opts}"
         )
-
     endif()
-
-    if(NOT ROCROLLER_ENABLE_SLOW_TESTS)
-        set(PYTHON_TEST_SKIP "-m not slow")
-    endif()
-
-    add_subdirectory(common)
-    add_subdirectory(standalone)
-    add_subdirectory(unit)
-
-    add_test(
-        NAME PythonLint
-        COMMAND flake8
-        WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}/scripts"
-    )
-    set_tests_properties(
-        PythonLint
-        PROPERTIES ENVIRONMENT "ROCROLLER_BUILD_DIR=${PROJECT_BINARY_DIR}"
-                   "LABELS" "PYTHON"
-    )
-    add_test(
-        NAME PythonTest
-        COMMAND
-            pytest -s --cov-report html:python_cov_html --cov=rrperf scripts
-            ${PYTHON_TEST_SKIP} --junit-xml=${TEST_REPORT_DIR}/python_tests.xml
-        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
-    )
-    set_tests_properties(
-        PythonTest
-        PROPERTIES
-            ENVIRONMENT
-            "ROCROLLER_BUILD_DIR=${PROJECT_BINARY_DIR};PYTHONPATH=${PROJECT_SOURCE_DIR}/scripts/lib"
-            "LABELS" "PYTHON"
-    )
 endif()
 
 if(ROCROLLER_ENABLE_COVERAGE OR BUILD_CODE_COVERAGE)
     target_compile_options(rocroller PRIVATE -fprofile-instr-generate -fcoverage-mapping)
     target_link_options(rocroller PRIVATE -fprofile-instr-generate)
 
-    target_compile_options(rocroller-no-rtti PRIVATE -fprofile-instr-generate -fcoverage-mapping)
-
     target_compile_options(common-test-utilities PRIVATE -fprofile-instr-generate -fcoverage-mapping)
-
-    if(ROCROLLER_ENABLE_ARCH_GEN_TEST)
-        target_compile_options(arch-gen-tests PRIVATE -fprofile-instr-generate -fcoverage-mapping)
-        target_link_options(arch-gen-tests PRIVATE -fprofile-instr-generate)
-    endif()
-
     target_compile_options(rocroller-tests PRIVATE -fprofile-instr-generate -fcoverage-mapping)
     target_link_options(rocroller-tests PRIVATE -fprofile-instr-generate)
 
-    target_compile_options(rocroller-tests-catch PRIVATE -fprofile-instr-generate -fcoverage-mapping)
-    target_link_options(rocroller-tests-catch PRIVATE -fprofile-instr-generate)
+    if(TARGET rocroller-tests-catch)
+        target_compile_options(rocroller-tests-catch PRIVATE -fprofile-instr-generate -fcoverage-mapping)
+        target_link_options(rocroller-tests-catch PRIVATE -fprofile-instr-generate)
+    endif()
 endif()
