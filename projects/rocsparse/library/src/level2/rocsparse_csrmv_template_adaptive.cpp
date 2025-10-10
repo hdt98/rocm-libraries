@@ -758,8 +758,6 @@ rocsparse_status rocsparse::csrmv_adaptive_template_dispatch(rocsparse_handle   
     }
 
     std::cout << "3333" << std::endl;
-    RETURN_IF_HIP_ERROR(hipDeviceSynchronize());
-    std::cout << "4444" << std::endl;
 
     return rocsparse_status_success;
 }
