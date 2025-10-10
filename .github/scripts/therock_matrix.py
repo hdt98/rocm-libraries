@@ -12,7 +12,9 @@ subtree_to_project_map = {
     "projects/rocrand": "rand",
     "projects/rocthrust": "prim",
     "projects/rocsparse": "sparse",
-    "projects/hipsparse": "sparse"
+    "projects/hipsparse": "sparse",
+    "shared/mxdatagenerator": "blas",
+    "shared/origami": "blas",
     "shared/rocroller": "blas",
     "shared/tensile": "blas"
 }
@@ -21,12 +23,10 @@ project_map = {
     "prim": {
         "cmake_options": "-DTHEROCK_ENABLE_PRIM=ON -DTHEROCK_ENABLE_ALL=OFF",
         "project_to_test": "rocprim, rocthrust, hipcub",
-        "subtree_checkout": "projects/rocprim\nprojects/hipcub\nprojects/rocthrust",
     },
     "rand": {
         "cmake_options": "-DTHEROCK_ENABLE_RAND=ON -DTHEROCK_ENABLE_ALL=OFF",
         "project_to_test": "rocrand, hiprand",
-        "subtree_checkout": "projects/rocrand\nprojects/hiprand",
     },
     "blas": {
         "cmake_options": "-DTHEROCK_ENABLE_BLAS=ON -DTHEROCK_ENABLE_ALL=OFF",
