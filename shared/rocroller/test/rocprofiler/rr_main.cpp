@@ -40,10 +40,12 @@
 #include <rocRoller/CodeGen/ArgumentLoader.hpp>
 #include <rocRoller/CodeGen/CopyGenerator.hpp>
 #include <rocRoller/CodeGen/MemoryInstructions.hpp>
+#include <rocRoller/CommandSolution.hpp>
 #include <rocRoller/Context.hpp>
 #include <rocRoller/ExecutableKernel.hpp>
 #include <rocRoller/GPUArchitecture/GPUArchitectureLibrary.hpp>
 #include <rocRoller/KernelArguments.hpp>
+#include <rocRoller/Operations/Command.hpp>
 #include <rocRoller/Utilities/Generator.hpp>
 
 using namespace rocRoller;
@@ -54,17 +56,39 @@ using namespace rocRoller;
         abort();             \
     }
 
-std::shared_ptr<ExecutableKernel> createRocRollerKernel()
+int main(int /*argc*/, char** /*argv*/)
 {
+    // Follows GPU_WholeKernel from KernelTest.cpp
     auto context = Context::ForDefaultHipDevice("hello_world");
+
+    // Create command
+    auto command = std::make_shared<Command>();
+
+    // Define variable types
+    VariableType floatPtr{DataType::Float, PointerType::PointerGlobal};
+    VariableType floatVal{DataType::Float, PointerType::Value};
+
+    // Allocate tags and arguments
+    auto ptrTag  = command->allocateTag();
+    auto ptr_arg = command->allocateArgument(floatPtr, ptrTag, ArgumentType::Value);
+    auto valTag  = command->allocateTag();
+    auto val_arg = command->allocateArgument(floatVal, valTag, ArgumentType::Value);
+
+    // Create expressions for the arguments
+    auto ptr_exp = std::make_shared<Expression::Expression>(ptr_arg);
+    auto val_exp = std::make_shared<Expression::Expression>(val_arg);
 
     auto k = context->kernel();
 
     k->setKernelDimensions(1);
 
+    const auto one = std::make_shared<Expression::Expression>(1u);
+    k->setWorkgroupSize({256, 1, 1});
+    k->setWorkitemCount({std::make_shared<Expression::Expression>(256 * 256), one, one});
+
     k->addArgument(
-        {"ptr", {DataType::Float, PointerType::PointerGlobal}, DataDirection::WriteOnly});
-    k->addArgument({"val", {DataType::Float}});
+        {"ptr", {DataType::Float, PointerType::PointerGlobal}, DataDirection::WriteOnly, ptr_exp});
+    k->addArgument({"val", {DataType::Float}, DataDirection::ReadOnly, val_exp});
 
     context->schedule(k->preamble());
     context->schedule(k->prolog());
@@ -93,13 +117,10 @@ std::shared_ptr<ExecutableKernel> createRocRollerKernel()
     context->schedule(k->postamble());
     context->schedule(k->amdgpu_metadata());
 
-    return context->instructions()->getExecutableKernel();
-}
-
-int main(int /*argc*/, char** /*argv*/)
-{
-    // Follows GPU_WholeKernel from KernelTest.cpp
-    auto kernel = createRocRollerKernel();
+    // Create CommandKernel
+    CommandKernel commandKernel;
+    commandKernel.setContext(context);
+    commandKernel.generateKernel();
 
     float* d_ptr = nullptr;
     HIP_API_CALL(hipMalloc(&d_ptr, sizeof(float)));
@@ -108,12 +129,12 @@ int main(int /*argc*/, char** /*argv*/)
 
     roctxProfilerResume(0);
 
-    KernelArguments kargs;
-    kargs.append("ptr", static_cast<void*>(d_ptr));
-    kargs.append("val", 6.0f);
+    // Create command arguments and launch kernel
+    CommandArguments commandArgs = command->createArguments();
+    commandArgs.setArgument(ptrTag, ArgumentType::Value, d_ptr);
+    commandArgs.setArgument(valTag, ArgumentType::Value, 6.0f);
 
-    KernelInvocation invocation;
-    kernel->executeKernel(kargs, invocation);
+    commandKernel.launchKernel(commandArgs.runtimeArguments());
 
     HIP_API_CALL(hipDeviceSynchronize());
 
@@ -121,21 +142,6 @@ int main(int /*argc*/, char** /*argv*/)
     HIP_API_CALL(hipMemcpy(&h_result, d_ptr, sizeof(float), hipMemcpyDeviceToHost));
 
     std::cout << "rocRoller kernel first execution result: " << h_result << " (expected: 6.0)"
-              << std::endl;
-
-    KernelArguments kargs2;
-    kargs2.append("ptr", static_cast<void*>(d_ptr));
-    kargs2.append("val", 7.5f);
-
-    kernel->executeKernel(kargs2, invocation);
-
-    HIP_API_CALL(hipDeviceSynchronize());
-
-    roctxProfilerPause(0);
-
-    HIP_API_CALL(hipMemcpy(&h_result, d_ptr, sizeof(float), hipMemcpyDeviceToHost));
-
-    std::cout << "rocRoller kernel second execution result: " << h_result << " (expected: 7.5)"
               << std::endl;
 
     HIP_API_CALL(hipFree(d_ptr));
