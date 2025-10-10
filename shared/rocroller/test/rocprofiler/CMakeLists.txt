@@ -6,21 +6,9 @@ enable_language(HIP)
 # rocprofiler-sdk dependencies
 find_package(rocprofiler-sdk REQUIRED)
 find_package(rocprofiler-sdk-roctx REQUIRED)
-find_package(
-    amd_comgr
-    REQUIRED
-    CONFIG
-    HINTS
-    ${rocm_version_DIR}
-    ${ROCM_PATH}
-    PATHS
-    ${rocm_version_DIR}
-    ${ROCM_PATH})
+find_package(amd_comgr REQUIRED)
 
 add_executable(rocprofiler-thread-trace)
-
-set_source_files_properties(
-    main.cpp PROPERTIES LANGUAGE HIP)
 
 target_sources(rocprofiler-thread-trace
     PRIVATE
