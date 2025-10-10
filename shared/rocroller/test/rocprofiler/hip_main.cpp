@@ -28,7 +28,6 @@
 #include <cstdint>
 #include <cstdlib>
 #include <iostream>
-#include <vector>
 
 #include <rocprofiler-sdk-roctx/roctx.h>
 
@@ -42,8 +41,6 @@
         abort();             \
     }
 
-#define LDS_SIZE 1024
-
 __global__ void divide_kernel(float* a, const float* b, const float* c, int /* unused */)
 {
     int index = blockDim.x * blockIdx.x + threadIdx.x;
@@ -54,129 +51,42 @@ __global__ void divide_kernel(float* a, const float* b, const float* c, int /* u
     a[index] = (b[index] - c[index]) / abs(c[index] + b[index]) + 1;
 }
 
-__global__ void looping_lds_kernel(float* a, const float* b, const float* c, int loopcount)
-{
-    __shared__ float interm[LDS_SIZE];
-
-    size_t index = blockDim.x * blockIdx.x + threadIdx.x;
-
-    for(size_t i = index; i < DATA_SIZE; i += blockDim.x * gridDim.x)
-        interm[threadIdx.x % LDS_SIZE] = b[index] + threadIdx.x;
-
-    for(int it = 0; it < loopcount; it++)
-    {
-        __syncthreads();
-        float value = interm[(it + threadIdx.x + LDS_SIZE / 2) % LDS_SIZE];
-        __syncthreads();
-        interm[threadIdx.x % LDS_SIZE] += value;
-    }
-
-    a[index] = interm[threadIdx.x % LDS_SIZE] + c[index];
-}
-
-__global__ void fifo_kernel(float* /* a */, const float* /* b */, const float* /* c */, int loops)
-{
-    using _float4 = __attribute__((__vector_size__(4 * sizeof(float)))) float;
-
-    __shared__ _float4 lds[LDS_SIZE];
-    lds[threadIdx.x]       = _float4{float(threadIdx.x)};
-    lds[threadIdx.x + 512] = _float4{float(threadIdx.x)};
-
-    __syncthreads();
-
-    _float4 dst[16];
-
-    float res1 = 0, res2 = 0;
-
-    for(int l = 0; l < loops; l++)
-    {
-#pragma unroll 16
-        for(int i = 0; i < 16; i++)
-            dst[i] = lds[threadIdx.x + i * 8];
-
-        __syncthreads();
-
-#pragma unroll 16
-        for(int i = 0; i < 16; i++)
-        {
-            res1 += dst[i][0] + dst[i][1];
-            res2 += dst[i][2] + dst[i][3];
-        }
-        asm volatile("v_add_f32 %0, %1, %2" : "=v"(res1) : "v"(res1), "v"(res2));
-    }
-};
-
-class hipMemory
-{
-public:
-    hipMemory(size_t size = DATA_SIZE)
-    {
-        HIP_API_CALL(hipMalloc(&ptr, size * sizeof(float)));
-        HIP_API_CALL(hipMemset(ptr, 0, size * sizeof(float)));
-    }
-    ~hipMemory()
-    {
-        if(ptr)
-            HIP_API_CALL(hipFree(ptr));
-    }
-    hipMemory(hipMemory&& other)
-    {
-        ptr       = other.ptr;
-        other.ptr = nullptr;
-    }
-    float* ptr = nullptr;
-};
-
-class HipStream
-{
-public:
-    HipStream()
-    {
-        HIP_API_CALL(hipStreamCreateWithFlags(&stream, hipStreamNonBlocking));
-    }
-    ~HipStream()
-    {
-        HIP_API_CALL(hipStreamDestroy(stream));
-    }
-
-    hipStream_t stream;
-
-    hipMemory src1{};
-    hipMemory src2{};
-    hipMemory dst{};
-};
-
-#define Launch(kernel, stream, arglast) \
-    hipLaunchKernelGGL(                 \
-        kernel, DATA_SIZE / 512, 512, 0, 0, stream.dst.ptr, stream.src1.ptr, stream.src2.ptr, 6);
-
 int main(int /*argc*/, char** /*argv*/)
 {
-    std::array<HipStream, 3>              streams{};
-    std::vector<decltype(divide_kernel)*> kernels{};
+    // Allocate device memory
+    float* d_a = nullptr;
+    float* d_b = nullptr;
+    float* d_c = nullptr;
 
-    kernels.push_back(divide_kernel);
-    kernels.push_back(looping_lds_kernel);
-    kernels.push_back(fifo_kernel);
+    HIP_API_CALL(hipMalloc(&d_a, DATA_SIZE * sizeof(float)));
+    HIP_API_CALL(hipMalloc(&d_b, DATA_SIZE * sizeof(float)));
+    HIP_API_CALL(hipMalloc(&d_c, DATA_SIZE * sizeof(float)));
 
-    for(size_t i = 0; i < streams.size() * kernels.size(); i++)
-    {
-        // Warmup then start
-        if(i == streams.size())
-        {
-            HIP_API_CALL(hipDeviceSynchronize());
-            roctxProfilerResume(0);
-        }
+    // Initialize memory
+    HIP_API_CALL(hipMemset(d_a, 0, DATA_SIZE * sizeof(float)));
+    HIP_API_CALL(hipMemset(d_b, 1, DATA_SIZE * sizeof(float)));
+    HIP_API_CALL(hipMemset(d_c, 2, DATA_SIZE * sizeof(float)));
 
-        auto& stream = streams.at(i % streams.size());
-        auto& kernel = kernels.at(i % kernels.size());
+    // Start profiling
+    roctxProfilerResume(0);
 
-        Launch(kernel, stream, 3);
-        HIP_API_CALL(hipGetLastError());
-    }
+    // Launch kernel
+    dim3 blockSize(512);
+    dim3 gridSize((DATA_SIZE + blockSize.x - 1) / blockSize.x);
 
+    hipLaunchKernelGGL(divide_kernel, gridSize, blockSize, 0, 0, d_a, d_b, d_c, 0);
+    HIP_API_CALL(hipGetLastError());
+
+    // Wait for kernel to complete
     HIP_API_CALL(hipDeviceSynchronize());
+
+    // Stop profiling
     roctxProfilerPause(0);
+
+    // Free memory
+    HIP_API_CALL(hipFree(d_a));
+    HIP_API_CALL(hipFree(d_b));
+    HIP_API_CALL(hipFree(d_c));
 
     return 0;
 }
