@@ -15,17 +15,30 @@ if(NOT GTest_FOUND)
 endif()
 
 if(NOT ROCM_LIBS_SUPERBUILD)
-    find_package(mxDataGenerator QUIET)
-    if(NOT mxDataGenerator_FOUND)
-        if(ROCROLLER_ENABLE_FETCH)
-            FetchContent_Declare(
-                mxDataGenerator
-                GIT_REPOSITORY ${MXDATAGENERATOR_GIT_URL}
-                GIT_TAG ${MXDATAGENERATOR_GIT_TAG}
-            )
-            FetchContent_MakeAvailable(mxDataGenerator)
-        else()
-            message(WARNING "mxDataGenerator not found; skipping inclusion.")
+    if(ROCROLLER_ENABLE_THEROCK)
+        # develop branch logic -- required when building TheRock variant
+        find_package(mxDataGenerator REQUIRED)
+    else()
+        # your branch logic -- non-fatal fallback for local or static builds
+        find_package(mxDataGenerator QUIET)
+        if(NOT mxDataGenerator_FOUND)
+            if(ROCROLLER_ENABLE_FETCH)
+                FetchContent_Declare(
+                    mxDataGenerator
+                    GIT_REPOSITORY ${MXDATAGENERATOR_GIT_URL}
+                    GIT_TAG ${MXDATAGENERATOR_GIT_TAG}
+                )
+                FetchContent_MakeAvailable(mxDataGenerator)
+            else()
+                if(EXISTS "${PROJECT_SOURCE_DIR}/shared/mxdatagenerator/CMakeLists.txt")
+                    add_subdirectory(
+                        "${PROJECT_SOURCE_DIR}/shared/mxdatagenerator"
+                        "${PROJECT_BINARY_DIR}/mxdatagenerator"
+                    )
+                else()
+                    message(WARNING "mxDataGenerator not found; skipping inclusion.")
+                endif()
+            endif()
         endif()
     endif()
 endif()
