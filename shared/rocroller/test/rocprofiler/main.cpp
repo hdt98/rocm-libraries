@@ -28,131 +28,155 @@
 #include <cstdint>
 #include <cstdlib>
 #include <iostream>
-#include <memory>
 #include <vector>
 
 #include <rocprofiler-sdk-roctx/roctx.h>
 
 #include "hip/hip_runtime.h"
 
-// rocRoller includes
-#include <rocRoller/AssemblyKernel.hpp>
-#include <rocRoller/CodeGen/ArgumentLoader.hpp>
-#include <rocRoller/CodeGen/CopyGenerator.hpp>
-#include <rocRoller/CodeGen/MemoryInstructions.hpp>
-#include <rocRoller/Context.hpp>
-#include <rocRoller/ExecutableKernel.hpp>
-#include <rocRoller/GPUArchitecture/GPUArchitectureLibrary.hpp>
-#include <rocRoller/KernelArguments.hpp>
-#include <rocRoller/Utilities/Generator.hpp>
-
-using namespace rocRoller;
-
+// Two waves per SIMD on MI300
+#define DATA_SIZE (304 * 64 * 4 * 2)
 #define HIP_API_CALL(CALL)   \
     if((CALL) != hipSuccess) \
     {                        \
         abort();             \
     }
 
-std::shared_ptr<ExecutableKernel> createRocRollerKernel()
+#define LDS_SIZE 1024
+
+__global__ void divide_kernel(float* a, const float* b, const float* c, int /* unused */)
 {
-    // Create a context for the current GPU architecture
-    auto context = Context::ForDefaultHipDevice("hello_world");
+    int index = blockDim.x * blockIdx.x + threadIdx.x;
 
-    // Get the kernel object
-    auto k = context->kernel();
+    if(index >= DATA_SIZE)
+        return;
 
-    k->setKernelDimensions(1);
-
-    // Add kernel arguments: pointer to write to and value to write
-    k->addArgument(
-        {"ptr", {DataType::Float, PointerType::PointerGlobal}, DataDirection::WriteOnly});
-    k->addArgument({"val", {DataType::Float}});
-
-    context->schedule(k->preamble());
-    context->schedule(k->prolog());
-
-    // Kernel body - similar to GPU_WholeKernel from KernelTest.cpp
-    auto kb = [&]() -> Generator<Instruction> {
-        Register::ValuePtr s_ptr, s_value;
-        co_yield context->argLoader()->getValue("ptr", s_ptr);
-        co_yield context->argLoader()->getValue("val", s_value);
-
-        auto v_ptr = Register::Value::Placeholder(
-            context, Register::Type::Vector, {DataType::Float, PointerType::PointerGlobal}, 1);
-        auto v_value
-            = Register::Value::Placeholder(context, Register::Type::Vector, DataType::Float, 1);
-
-        co_yield v_ptr->allocate();
-        co_yield context->copier()->copy(v_ptr, s_ptr, "Move pointer");
-
-        co_yield v_value->allocate();
-        co_yield context->copier()->copy(v_value, s_value, "Move value");
-
-        co_yield context->mem()->storeGlobal(v_ptr, v_value, 0, 4);
-    };
-
-    context->schedule(kb());
-
-    context->schedule(k->postamble());
-    context->schedule(k->amdgpu_metadata());
-
-    // Get the executable kernel
-    return context->instructions()->getExecutableKernel();
+    a[index] = (b[index] - c[index]) / abs(c[index] + b[index]) + 1;
 }
+
+__global__ void looping_lds_kernel(float* a, const float* b, const float* c, int loopcount)
+{
+    __shared__ float interm[LDS_SIZE];
+
+    size_t index = blockDim.x * blockIdx.x + threadIdx.x;
+
+    for(size_t i = index; i < DATA_SIZE; i += blockDim.x * gridDim.x)
+        interm[threadIdx.x % LDS_SIZE] = b[index] + threadIdx.x;
+
+    for(int it = 0; it < loopcount; it++)
+    {
+        __syncthreads();
+        float value = interm[(it + threadIdx.x + LDS_SIZE / 2) % LDS_SIZE];
+        __syncthreads();
+        interm[threadIdx.x % LDS_SIZE] += value;
+    }
+
+    a[index] = interm[threadIdx.x % LDS_SIZE] + c[index];
+}
+
+__global__ void fifo_kernel(float* /* a */, const float* /* b */, const float* /* c */, int loops)
+{
+    using _float4 = __attribute__((__vector_size__(4 * sizeof(float)))) float;
+
+    __shared__ _float4 lds[LDS_SIZE];
+    lds[threadIdx.x]       = _float4{float(threadIdx.x)};
+    lds[threadIdx.x + 512] = _float4{float(threadIdx.x)};
+
+    __syncthreads();
+
+    _float4 dst[16];
+
+    float res1 = 0, res2 = 0;
+
+    for(int l = 0; l < loops; l++)
+    {
+#pragma unroll 16
+        for(int i = 0; i < 16; i++)
+            dst[i] = lds[threadIdx.x + i * 8];
+
+        __syncthreads();
+
+#pragma unroll 16
+        for(int i = 0; i < 16; i++)
+        {
+            res1 += dst[i][0] + dst[i][1];
+            res2 += dst[i][2] + dst[i][3];
+        }
+        asm volatile("v_add_f32 %0, %1, %2" : "=v"(res1) : "v"(res1), "v"(res2));
+    }
+};
+
+class hipMemory
+{
+public:
+    hipMemory(size_t size = DATA_SIZE)
+    {
+        HIP_API_CALL(hipMalloc(&ptr, size * sizeof(float)));
+        HIP_API_CALL(hipMemset(ptr, 0, size * sizeof(float)));
+    }
+    ~hipMemory()
+    {
+        if(ptr)
+            HIP_API_CALL(hipFree(ptr));
+    }
+    hipMemory(hipMemory&& other)
+    {
+        ptr       = other.ptr;
+        other.ptr = nullptr;
+    }
+    float* ptr = nullptr;
+};
+
+class HipStream
+{
+public:
+    HipStream()
+    {
+        HIP_API_CALL(hipStreamCreateWithFlags(&stream, hipStreamNonBlocking));
+    }
+    ~HipStream()
+    {
+        HIP_API_CALL(hipStreamDestroy(stream));
+    }
+
+    hipStream_t stream;
+
+    hipMemory src1{};
+    hipMemory src2{};
+    hipMemory dst{};
+};
+
+#define Launch(kernel, stream, arglast) \
+    hipLaunchKernelGGL(                 \
+        kernel, DATA_SIZE / 512, 512, 0, 0, stream.dst.ptr, stream.src1.ptr, stream.src2.ptr, 6);
 
 int main(int /*argc*/, char** /*argv*/)
 {
-    // Create the rocRoller kernel
-    auto kernel = createRocRollerKernel();
+    std::array<HipStream, 3>              streams{};
+    std::vector<decltype(divide_kernel)*> kernels{};
 
-    // Allocate device memory
-    float* d_ptr = nullptr;
-    HIP_API_CALL(hipMalloc(&d_ptr, sizeof(float)));
+    kernels.push_back(divide_kernel);
+    kernels.push_back(looping_lds_kernel);
+    kernels.push_back(fifo_kernel);
 
-    // Initialize memory to zero
-    HIP_API_CALL(hipMemset(d_ptr, 0, sizeof(float)));
+    for(size_t i = 0; i < streams.size() * kernels.size(); i++)
+    {
+        // Warmup then start
+        if(i == streams.size())
+        {
+            HIP_API_CALL(hipDeviceSynchronize());
+            roctxProfilerResume(0);
+        }
 
-    // Start profiling
-    roctxProfilerResume(0);
+        auto& stream = streams.at(i % streams.size());
+        auto& kernel = kernels.at(i % kernels.size());
 
-    // Execute kernel with profiling enabled - first execution with 6.0f
-    KernelArguments kargs;
-    kargs.append("ptr", static_cast<void*>(d_ptr));
-    kargs.append("val", 6.0f);
-
-    KernelInvocation invocation;
-    kernel->executeKernel(kargs, invocation);
-
-    HIP_API_CALL(hipDeviceSynchronize());
-
-    // Verify first execution results
-    float h_result = 0.0f;
-    HIP_API_CALL(hipMemcpy(&h_result, d_ptr, sizeof(float), hipMemcpyDeviceToHost));
-
-    std::cout << "rocRoller kernel first execution result: " << h_result << " (expected: 6.0)"
-              << std::endl;
-
-    // Execute kernel a second time with different input (7.5f)
-    KernelArguments kargs2;
-    kargs2.append("ptr", static_cast<void*>(d_ptr));
-    kargs2.append("val", 7.5f);
-
-    kernel->executeKernel(kargs2, invocation);
+        Launch(kernel, stream, 3);
+        HIP_API_CALL(hipGetLastError());
+    }
 
     HIP_API_CALL(hipDeviceSynchronize());
-
-    // Stop profiling
     roctxProfilerPause(0);
-
-    // Verify second execution results
-    HIP_API_CALL(hipMemcpy(&h_result, d_ptr, sizeof(float), hipMemcpyDeviceToHost));
-
-    std::cout << "rocRoller kernel second execution result: " << h_result << " (expected: 7.5)"
-              << std::endl;
-
-    // Free device memory
-    HIP_API_CALL(hipFree(d_ptr));
 
     return 0;
 }
