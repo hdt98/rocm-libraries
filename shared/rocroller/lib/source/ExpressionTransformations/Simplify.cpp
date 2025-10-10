@@ -147,6 +147,19 @@ namespace rocRoller
             {
                 if(rhs == 0)
                     return lhs;
+
+                if(CIsAnyOf<ShiftType, ShiftL, LogicalShiftR>)
+                {
+                    auto const elementSize = resultVarType.getElementSize();
+                    //
+                    // Literal 0 can only accept Int32/UInt32/Int64/UInt64/Half/Float/Double
+                    //
+                    if((elementSize == 4u or elementSize == 8u) and (rhs >= elementSize * 8u))
+                    {
+                        return literal(0, resultVarType);
+                    }
+                }
+
                 return nullptr;
             }
 
@@ -400,10 +413,7 @@ namespace rocRoller
                 }
 
                 Expr cpy = expr;
-                if(expr.arg)
-                {
-                    cpy.arg = call(expr.arg);
-                }
+                cpy.arg  = call(expr.arg);
                 return std::make_shared<Expression>(cpy);
             }
 
@@ -459,29 +469,23 @@ namespace rocRoller
                 return std::make_shared<Expression>(Expr({lhs, rhs, expr.comment}));
             }
 
+            ExpressionPtr operator()(BitfieldCombine const& expr) const
+            {
+                auto cpy = expr;
+                cpy.lhs  = call(expr.lhs);
+                cpy.rhs  = call(expr.rhs);
+
+                return std::make_shared<Expression>(cpy);
+            }
+
             ExpressionPtr operator()(ScaledMatrixMultiply const& expr) const
             {
                 ScaledMatrixMultiply cpy = expr;
-                if(expr.matA)
-                {
-                    cpy.matA = call(expr.matA);
-                }
-                if(expr.matB)
-                {
-                    cpy.matB = call(expr.matB);
-                }
-                if(expr.matC)
-                {
-                    cpy.matC = call(expr.matC);
-                }
-                if(expr.scaleA)
-                {
-                    cpy.scaleA = call(expr.scaleA);
-                }
-                if(expr.scaleB)
-                {
-                    cpy.scaleB = call(expr.scaleB);
-                }
+                cpy.matA                 = call(expr.matA);
+                cpy.matB                 = call(expr.matB);
+                cpy.matC                 = call(expr.matC);
+                cpy.scaleA               = call(expr.scaleA);
+                cpy.scaleB               = call(expr.scaleB);
                 return std::make_shared<Expression>(cpy);
             }
 
@@ -489,19 +493,18 @@ namespace rocRoller
             ExpressionPtr operator()(Expr const& expr) const
             {
                 Expr cpy = expr;
-                if(expr.lhs)
-                {
-                    cpy.lhs = call(expr.lhs);
-                }
-                if(expr.r1hs)
-                {
-                    cpy.r1hs = call(expr.r1hs);
-                }
-                if(expr.r2hs)
-                {
-                    cpy.r2hs = call(expr.r2hs);
-                }
+                cpy.lhs  = call(expr.lhs);
+                cpy.r1hs = call(expr.r1hs);
+                cpy.r2hs = call(expr.r2hs);
                 return std::make_shared<Expression>(cpy);
+            }
+
+            template <CNary Expr>
+            ExpressionPtr operator()(Expr const& expr) const
+            {
+                auto cpy = expr;
+                std::ranges::for_each(cpy.operands, [this](auto& op) { op = call(op); });
+                return std::make_shared<Expression>(std::move(cpy));
             }
 
             template <CValue Value>

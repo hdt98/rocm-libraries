@@ -69,6 +69,8 @@ inline uint32_t RoundUpNearestPower2Positive(uint32_t v)
 bool PoolingForwardNaive::IsApplicable(const ExecutionContext&,
                                        const miopen::pooling::ProblemDescription& problem) const
 {
+    static const auto strict = TensorDescriptor::LayoutValidationMode::StrictDecreasingStrides;
+
     return problem.GetDirection() == miopen::pooling::Direction::Forward           //
            && problem.GetXDesc().GetType() == problem.GetYDesc().GetType()         //
            && (problem.GetXDesc().GetType() == miopenFloat                         //
@@ -78,12 +80,12 @@ bool PoolingForwardNaive::IsApplicable(const ExecutionContext&,
                || problem.GetPooling().GetMode() == miopenPoolingAverageInclusive) //
            && (                                                                    //
                   (problem.GetXDesc().GetNumDims() == 5                            //
-                   && problem.GetXDesc().IsPossibleLayout4D5D("NCDHW")             //
-                   && problem.GetYDesc().IsPossibleLayout4D5D("NCDHW"))            //
+                   && problem.GetXDesc().IsPossibleLayout4D5D("NCDHW", strict)     //
+                   && problem.GetYDesc().IsPossibleLayout4D5D("NCDHW", strict))    //
                   ||                                                               //
                   (problem.GetXDesc().GetNumDims() == 4                            //
-                   && problem.GetXDesc().IsPossibleLayout4D5D("NCHW")              //
-                   && problem.GetYDesc().IsPossibleLayout4D5D("NCHW"))             //
+                   && problem.GetXDesc().IsPossibleLayout4D5D("NCHW", strict)      //
+                   && problem.GetYDesc().IsPossibleLayout4D5D("NCHW", strict))     //
               );
 }
 
@@ -209,7 +211,7 @@ PoolingForwardNaive::GetSolution(const ExecutionContext& context,
     {
         auto kernel = KernelInfo{};
 
-        kernel.kernel_file = "MIOpenPoolingForwardNaive.cl";
+        kernel.kernel_file = "MIOpenPoolingForwardNaive.cpp";
         kernel.kernel_name = "mloPoolingForwardNaive";
 
         auto build_params = KernelBuildParameters{
@@ -219,7 +221,7 @@ PoolingForwardNaive::GetSolution(const ExecutionContext& context,
             {"MLO_POOLING_IS2D_KERNEL", static_cast<int>(is2d_kernel)},
         };
         build_params << GetDataTypeKBP(bot.GetType());
-        kernel.comp_options = build_params.GenerateFor(kbp::OpenCL{});
+        kernel.comp_options = build_params.GenerateFor(kbp::HIP{});
 
         // [Informative] The total number of kernels required to cover the whole
         // forward pooling problem space is 3*4*2*2 = 48. The solver is dynamic.

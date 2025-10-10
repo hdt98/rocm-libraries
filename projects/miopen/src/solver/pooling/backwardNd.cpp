@@ -43,6 +43,8 @@ namespace pooling {
 bool PoolingBackwardNd::IsApplicable(const ExecutionContext&,
                                      const miopen::pooling::ProblemDescription& problem) const
 {
+    static const auto strict = TensorDescriptor::LayoutValidationMode::StrictDecreasingStrides;
+
     return problem.GetDirection() == miopen::pooling::Direction::Backward          //
            && problem.GetXDesc().GetType() == problem.GetYDesc().GetType()         //
            && (problem.GetXDesc().GetType() == miopenFloat                         //
@@ -52,12 +54,12 @@ bool PoolingBackwardNd::IsApplicable(const ExecutionContext&,
                || problem.GetPooling().GetMode() == miopenPoolingAverageInclusive) //
            && (                                                                    //
                   (problem.GetXDesc().GetNumDims() == 5                            //
-                   && problem.GetXDesc().IsPossibleLayout4D5D("NCDHW")             //
-                   && problem.GetYDesc().IsPossibleLayout4D5D("NCDHW"))            //
+                   && problem.GetXDesc().IsPossibleLayout4D5D("NCDHW", strict)     //
+                   && problem.GetYDesc().IsPossibleLayout4D5D("NCDHW", strict))    //
                   ||                                                               //
                   (problem.GetXDesc().GetNumDims() == 4                            //
-                   && problem.GetXDesc().IsPossibleLayout4D5D("NCHW")              //
-                   && problem.GetYDesc().IsPossibleLayout4D5D("NCHW"))             //
+                   && problem.GetXDesc().IsPossibleLayout4D5D("NCHW", strict)      //
+                   && problem.GetYDesc().IsPossibleLayout4D5D("NCHW", strict))     //
                   )                                                                //
            /// \todo This solver does not support workspace index mask mode yet.
            && !(problem.GetPooling().GetMode() == miopenPoolingMax //
@@ -71,7 +73,7 @@ PoolingBackwardNd::GetSolution(const ExecutionContext&,
     auto result = ConvSolution{miopenStatusSuccess};
 
     auto kernel        = KernelInfo{};
-    kernel.kernel_file = "MIOpenPoolingBwdND.cl";
+    kernel.kernel_file = "MIOpenPoolingBwdND.cpp";
     kernel.kernel_name = "mloPoolingND";
 
     if(problem.GetPooling().GetMode() == miopenPoolingMax)
@@ -163,12 +165,10 @@ PoolingBackwardNd::GetSolution(const ExecutionContext&,
             {"TERRITORY_OVERLAP", static_cast<int>(territory_overlap)},
             {"MLO_POOLING_INDEX_TYPE",
              get_pooling_index_type_name(problem.GetPooling().GetIndexType())},
-            {"MLO_POOLING_INDEX_MAX",
-             get_pooling_index_type_max_name(problem.GetPooling().GetIndexType())},
         }
         << GetDataTypeKBP(problem.GetDYDesc().GetType());
 
-    kernel.comp_options = build_params.GenerateFor(kbp::OpenCL{});
+    kernel.comp_options = build_params.GenerateFor(kbp::HIP{});
 
     kernel.l_wk = {wavesize, 1, 1};
     kernel.g_wk = {wavesize * grp_num, 1, 1};

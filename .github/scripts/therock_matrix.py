@@ -1,9 +1,33 @@
 """
 This dictionary is used to map specific file directory changes to the corresponding build flag and tests
 """
-monorepo_map = {
-    "projects/rocprim": {
+subtree_to_project_map = {
+    "projects/hipblas": "blas",
+    "projects/hipblas-common": "blas",
+    "projects/hipblaslt": "blas",
+    "projects/hipcub": "prim",
+    "projects/hiprand": "rand",
+    "projects/rocblas": "blas",
+    "projects/rocprim": "prim",
+    "projects/rocrand": "rand",
+    "projects/rocthrust": "prim",
+    "shared/mxdatagenerator": "blas",
+    "shared/origami": "blas",
+    "shared/rocroller": "blas",
+    "shared/tensile": "blas"
+}
+
+project_map = {
+    "prim": {
         "cmake_options": "-DTHEROCK_ENABLE_PRIM=ON -DTHEROCK_ENABLE_ALL=OFF",
-        "project_to_test": "test_rocprim",
+        "project_to_test": "rocprim, rocthrust, hipcub",
+    },
+    "rand": {
+        "cmake_options": "-DTHEROCK_ENABLE_RAND=ON -DTHEROCK_ENABLE_ALL=OFF",
+        "project_to_test": "rocrand, hiprand",
+    },
+    "blas": {
+        "cmake_options": "-DTHEROCK_ENABLE_BLAS=ON -DTHEROCK_ENABLE_ALL=OFF",
+        "project_to_test": "hipblaslt, rocblas, hipblas",
     }
 }

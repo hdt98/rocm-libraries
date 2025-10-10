@@ -26,6 +26,9 @@
 
 #include <rocRoller/Scheduling/Observers/WaitcntObserver.hpp>
 
+#include <rocRoller/KernelOptions_detail.hpp>
+#include <rocRoller/Utilities/Settings.hpp>
+
 namespace rocRoller
 {
     namespace Scheduling
@@ -151,9 +154,7 @@ namespace rocRoller
                             "Either s_barrier or s_barrier_signal must be supported.",
                             ShowValue(architecture.target()));
 
-                m_barrierOpcode = architecture.HasCapability(GPUCapability::s_barrier_signal)
-                                      ? "s_barrier_signal"
-                                      : "s_barrier";
+                m_barrierOpcode = hasBarrierSignal ? "s_barrier_signal" : "s_barrier";
             }
 
             for(uint8_t i = 0; i < static_cast<uint8_t>(GPUWaitQueue::Count); i++)
@@ -181,7 +182,7 @@ namespace rocRoller
             auto const&        architecture = context->targetArchitecture();
             GPUInstructionInfo info         = architecture.GetInstructionInfo(inst.getOpCode());
 
-            if(context->kernelOptions().assertWaitCntState)
+            if(context->kernelOptions()->assertWaitCntState)
             {
                 if(info.isBranch())
                 {
@@ -206,7 +207,7 @@ namespace rocRoller
             {
                 waiting = WaitCount::Zero(context->targetArchitecture());
 
-                if(context->kernelOptions().assertWaitCntState)
+                if(context->kernelOptions()->assertWaitCntState)
                 {
                     assertLabelConsistency();
                 }
@@ -303,7 +304,7 @@ namespace rocRoller
                         "Either s_barrier or s_barrier_signal must be supported");
             if(inst.getOpCode() == m_barrierOpcode)
             {
-                if(context->kernelOptions().alwaysWaitZeroBeforeBarrier)
+                if(context->kernelOptions()->alwaysWaitZeroBeforeBarrier)
                 {
                     if(explanation != nullptr)
                     {

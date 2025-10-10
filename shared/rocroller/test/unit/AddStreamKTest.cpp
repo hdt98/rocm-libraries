@@ -31,11 +31,13 @@
 
 #include <rocRoller/AssemblyKernel.hpp>
 #include <rocRoller/CodeGen/ArgumentLoader.hpp>
+#include <rocRoller/CommandSolution_fwd.hpp>
 #include <rocRoller/Expression.hpp>
 #include <rocRoller/KernelGraph/CoordinateGraph/CoordinateGraph.hpp>
 #include <rocRoller/KernelGraph/KernelGraph.hpp>
 #include <rocRoller/KernelGraph/Transforms/All.hpp>
 #include <rocRoller/KernelGraph/Utils.hpp>
+#include <rocRoller/KernelOptions_detail.hpp>
 #include <rocRoller/Utilities/Error.hpp>
 #include <rocRoller/Utilities/Random.hpp>
 #include <rocRoller/Utilities/Settings.hpp>
@@ -122,7 +124,7 @@ namespace AddStreamKTest
     protected:
         void SetUp() override
         {
-            m_kernelOptions.assertWaitCntState = false;
+            m_kernelOptions->assertWaitCntState = false;
 
             GPUContextFixtureParam<bool>::SetUp();
         }
@@ -226,15 +228,18 @@ namespace AddStreamKTest
         kgraph.control.addElement(Sequence(), {assignWGNumber}, {storeOp});
         kgraph.control.addElement(Sequence(), {storeOp}, {loopWaitOp});
 
-        auto addStreamK = std::make_shared<AddStreamK>(std::vector<int>{0, 1},
-                                                       rocRoller::KLOOP,
-                                                       rocRoller::KLOOP,
-                                                       twoTile,
-                                                       Expression::literal(numWGs),
-                                                       nullptr,
-                                                       m_context);
-        kgraph          = kgraph.transform(addStreamK);
-        auto kg2        = std::make_shared<rocRoller::KernelGraph::KernelGraph>(kgraph);
+        CommandParametersPtr params           = std::make_shared<CommandParameters>();
+        params->loopOverOutputTilesDimensions = {0, 1};
+        params->streamK = twoTile ? StreamKMode::TwoTile : StreamKMode::Standard;
+
+        auto addStreamK = std::make_shared<AddStreamK>(
+            m_context, params, rocRoller::KLOOP, rocRoller::KLOOP, Expression::literal(numWGs));
+
+        kgraph = kgraph.transform(addStreamK);
+        if(m_context->kernelOptions()->removeSetCoordinate)
+            kgraph = kgraph.transform(std::make_shared<RemoveSetCoordinate>());
+
+        auto kg2 = std::make_shared<rocRoller::KernelGraph::KernelGraph>(kgraph);
         k->setKernelGraphMeta(kg2);
 
         m_context->schedule(k->preamble());
@@ -428,15 +433,18 @@ namespace AddStreamKTest
         kgraph.control.addElement(Sequence(), {loopWaitOp}, {addOp});
         kgraph.control.addElement(Sequence(), {forKOp}, {storeOp});
 
-        auto addStreamK = std::make_shared<AddStreamK>(std::vector<int>{0, 1},
-                                                       rocRoller::KLOOP,
-                                                       rocRoller::KLOOP,
-                                                       false,
-                                                       Expression::literal(numWGs),
-                                                       nullptr,
-                                                       m_context);
-        kgraph          = kgraph.transform(addStreamK);
-        auto kg2        = std::make_shared<rocRoller::KernelGraph::KernelGraph>(kgraph);
+        CommandParametersPtr params           = std::make_shared<CommandParameters>();
+        params->loopOverOutputTilesDimensions = {0, 1};
+        params->streamK                       = StreamKMode::Standard;
+
+        auto addStreamK = std::make_shared<AddStreamK>(
+            m_context, params, rocRoller::KLOOP, rocRoller::KLOOP, Expression::literal(numWGs));
+
+        kgraph = kgraph.transform(addStreamK);
+        if(m_context->kernelOptions()->removeSetCoordinate)
+            kgraph = kgraph.transform(std::make_shared<RemoveSetCoordinate>());
+
+        auto kg2 = std::make_shared<rocRoller::KernelGraph::KernelGraph>(kgraph);
         k->setKernelGraphMeta(kg2);
 
         m_context->schedule(k->preamble());

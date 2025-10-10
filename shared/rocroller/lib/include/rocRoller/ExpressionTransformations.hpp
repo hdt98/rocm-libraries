@@ -26,8 +26,10 @@
 
 #pragma once
 
-#include <rocRoller/Context_fwd.hpp>
 #include <rocRoller/Expression_fwd.hpp>
+
+#include <rocRoller/Context_fwd.hpp>
+#include <rocRoller/KernelGraph/RegisterTagManager_fwd.hpp>
 
 namespace rocRoller
 {
@@ -68,9 +70,9 @@ namespace rocRoller
 
         /**
          * Gets expressions which can be used to compute magic division of denominator.
-         * 
+         *
          * Returns [magicMultiple, magicShift, magicSign]
-         * 
+         *
          * If denominator is unsigned, magicSign will be nullptr.
          */
         std::tuple<ExpressionPtr, ExpressionPtr, ExpressionPtr>
@@ -114,6 +116,9 @@ namespace rocRoller
          */
         ExpressionPtr fuseAssociative(ExpressionPtr expr);
 
+        ExpressionPtr dataFlowTagPropagation(ExpressionPtr             expr,
+                                             RegisterTagManager const& tagManager);
+
         /**
          * Resolve all DataFlowTags in the given expression.
          * Each DataFlowTag is transformed into either an expression or a register value.
@@ -139,6 +144,22 @@ namespace rocRoller
          * @return ExpressionPtr Transformed expression
          */
         ExpressionPtr lowerExponential(ExpressionPtr expr);
+
+        /**
+         * @brief Propagate converts to input values
+         *
+         * @param expr Input expression
+         * @return ExpressionPtr Transformed expression
+         */
+        ExpressionPtr convertPropagation(ExpressionPtr expr);
+
+        ExpressionPtr makeScalar(ExpressionPtr expr);
+
+        /**
+         * @brief Replace unsigned ArithmeticShiftR with LogicalShiftR
+         *
+         */
+        ExpressionPtr lowerUnsignedArithmeticShiftR(ExpressionPtr expr);
 
         /**
          * Helper (lambda/transducer) for applying all fast arithmetic transformations.
@@ -179,5 +200,15 @@ namespace rocRoller
          * @return ExpressionPtr Transformed expression
          */
         ExpressionPtr lowerBitfieldValues(ExpressionPtr expr);
+
+        /**
+         * @brief Attempt to replace a BitfieldCombine expr with
+         * a composite expression consisting of shift and bitwise
+         * AND/OR
+         *
+         * @param expr Input expression
+         * @return ExpressionPtr Transformed expression
+         */
+        ExpressionPtr lowerBitfieldCombine(ExpressionPtr expr);
     }
 }

@@ -62,15 +62,9 @@ namespace rocRoller::KernelGraph
             ReadWrite rw;
         };
 
-        ControlFlowRWTracer(KernelGraph const& graph, int start = -1, bool trackConnections = false)
-            : m_graph(graph)
-            , m_trackConnections(trackConnections)
-        {
-            if(start == -1)
-                trace();
-            else
-                trace(start);
-        }
+        ControlFlowRWTracer(KernelGraph const& graph,
+                            int                start            = -1,
+                            bool               trackConnections = false);
 
         /**
          * @brief Get all trace records.
@@ -81,11 +75,6 @@ namespace rocRoller::KernelGraph
          * @brief Get trace records for a specific coordinate.
          */
         std::vector<ReadWriteRecord> coordinatesReadWrite(int coordinate) const;
-
-        /**
-         * @brief Get map of body-parents.
-         */
-        std::unordered_map<int, int> getBodyParents() const;
 
         void operator()(ControlGraph::AssertOp const& op, int tag);
         void operator()(ControlGraph::Assign const& op, int tag);
@@ -121,6 +110,7 @@ namespace rocRoller::KernelGraph
     protected:
         void trackRegister(int control, int coordinate, ReadWrite rw);
         void trackConnections(int control, std::unordered_set<int> const& exclude, ReadWrite rw);
+        void trackOffsetAndStride(int control, ReadWrite rw);
 
         bool hasGeneratedInputs(int const& tag);
         void generate(std::set<int> candidates);
@@ -129,7 +119,6 @@ namespace rocRoller::KernelGraph
         KernelGraph const&           m_graph;
         std::set<int>                m_completedControlNodes;
         std::vector<ReadWriteRecord> m_trace;
-        std::unordered_map<int, int> m_bodyParent;
         bool                         m_trackConnections;
 
     private:

@@ -28,6 +28,7 @@
 
 #include <rocRoller/AssemblyKernel.hpp>
 #include <rocRoller/Expression.hpp>
+#include <rocRoller/KernelOptions_detail.hpp>
 
 template <typename T>
 constexpr auto cast_to_unsigned(T val)
@@ -59,7 +60,7 @@ namespace rocRoller
             LaunchTimeExpressionVisitor(ContextPtr ctx, bool allowNewArgs)
                 : m_context(ctx)
                 , m_allowNewArgs(allowNewArgs)
-                , m_minComplexity(ctx->kernelOptions().minLaunchTimeExpressionComplexity)
+                , m_minComplexity(ctx->kernelOptions()->minLaunchTimeExpressionComplexity)
             {
             }
 
@@ -198,6 +199,22 @@ namespace rocRoller
                 }
             }
 
+            template <CNary Expr>
+            ExpressionPtr operator()(Expr const& expr)
+            {
+                {
+                    auto launchResult = maybeLaunchEval(expr);
+                    if(launchResult)
+                        return launchResult;
+                }
+
+                {
+                    auto cpy = expr;
+                    std::ranges::for_each(cpy.operands, [this](auto& op) { op = call(op); });
+                    return std::make_shared<Expression>(std::move(cpy));
+                }
+            }
+
             ExpressionPtr operator()(CommandArgumentPtr const& expr)
             {
                 // For a Value, if we still have a CommandArgument, we need to
@@ -266,6 +283,8 @@ namespace rocRoller
 
                 AssertFatal(resultVariableType(expr) == resultVariableType(v2),
                             ShowValue(expr),
+                            ShowValue(v0),
+                            ShowValue(v1),
                             ShowValue(v2));
 
                 return v2;

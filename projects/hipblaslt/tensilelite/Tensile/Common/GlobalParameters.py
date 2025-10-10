@@ -409,6 +409,7 @@ defaultBenchmarkCommonParameters = [
     {"StreamK": [0]},
     {"StreamKAtomic": [0]},
     {"StreamKXCCMapping": [0]},
+    {"StreamKFixupTreeReduction": [0]},
     {"DebugStreamK": [0]},
     {"ActivationFused": [True]},
     {"ActivationFuncCall": [True]},
@@ -418,7 +419,8 @@ defaultBenchmarkCommonParameters = [
     {"ForceDisableShadowInit": [False]},
     {"LDSTrInst": [False]},
     {"WaveSplitK": [ False ]},
-    {"MbskPrefetchOpt": [0]},
+    {"MbskPrefetchMethod": [0]},
+    {"UseCustomMainLoopSchedule": [1]}
 ]
 
 # dictionary of defaults comprised of default option for each parameter

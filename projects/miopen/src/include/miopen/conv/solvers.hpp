@@ -4556,11 +4556,8 @@ struct ConvHipImplicitGemm3DGroupFwdXdlops final
     GetSolution(const ExecutionContext&,
                 const miopen::conv::ProblemDescription&,
                 const PerformanceConfigHipImplicitGemm3DGroupFwdXdlops&) const override;
-    /// \ref igemm_get_wti_magic_number
-    float GetWti(const ExecutionContext&, const miopen::conv::ProblemDescription&) const override
-    {
-        return 0.02f;
-    };
+    MIOPEN_INTERNALS_EXPORT float GetWti(const ExecutionContext&,
+                                         const miopen::conv::ProblemDescription&) const override;
 
     MIOPEN_INTERNALS_EXPORT size_t GetWorkspaceSize(
         const ExecutionContext&, const miopen::conv::ProblemDescription&) const override;
@@ -4647,6 +4644,10 @@ struct ConvHipImplicitGemm3DGroupWrwXdlops final
 private:
     template <typename DataType>
     bool CheckCKApplicability(const miopen::conv::ProblemDescription&) const;
+
+    template <typename DataType>
+    std::size_t GetCKMaxWorkspaceSize(const miopen::conv::ProblemDescription&) const;
+    size_t GetCKMaxWorkspaceSize(const miopen::conv::ProblemDescription& problem) const;
 };
 
 struct PerformanceConfigHipImplicitGemm3DGroupBwdXdlops
@@ -4819,6 +4820,8 @@ struct ConvHipImplicitGemmGroupBwdXdlops final
 private:
     template <typename DataType>
     bool CheckCKApplicability(const miopen::conv::ProblemDescription&) const;
+
+    size_t GetCKMaxWorkspaceSize(const miopen::conv::ProblemDescription& problem) const;
 };
 
 struct PerformanceConfigHipImplicitGemmGroupWrwXdlops
@@ -4913,6 +4916,8 @@ struct ConvHipImplicitGemmGroupWrwXdlops final
 private:
     template <typename DataType>
     bool CheckCKApplicability(const miopen::conv::ProblemDescription&) const;
+
+    size_t GetCKMaxWorkspaceSize(const miopen::conv::ProblemDescription& problem) const;
 };
 
 } // namespace conv

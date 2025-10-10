@@ -107,11 +107,12 @@ std::size_t sizeof_private_memory(const miopen::pooling::ProblemDescription& pro
 bool PoolingForwardNd::IsApplicable(const ExecutionContext& context,
                                     const miopen::pooling::ProblemDescription& problem) const
 {
+    static const auto strict = TensorDescriptor::LayoutValidationMode::StrictDecreasingStrides;
 
     return problem.GetDirection() == miopen::pooling::Direction::Forward                      //
            && problem.GetXDesc().GetNumDims() == 5                                            //
-           && problem.GetXDesc().IsPossibleLayout4D5D("NCDHW")                                //
-           && problem.GetYDesc().IsPossibleLayout4D5D("NCDHW")                                //
+           && problem.GetXDesc().IsPossibleLayout4D5D("NCDHW", strict)                        //
+           && problem.GetYDesc().IsPossibleLayout4D5D("NCDHW", strict)                        //
            && problem.GetXDesc().GetType() == problem.GetYDesc().GetType()                    //
            && (problem.GetXDesc().GetType() == miopenFloat                                    //
                || problem.GetXDesc().GetType() == miopenHalf)                                 //
@@ -152,7 +153,7 @@ ConvSolution PoolingForwardNd::GetSolution(const ExecutionContext&,
     {
         auto kernel = KernelInfo{};
 
-        kernel.kernel_file = "MIOpenPoolingND.cl";
+        kernel.kernel_file = "MIOpenPoolingND.cpp";
         kernel.kernel_name = "mloPoolingNDFwd";
 
         int pooling_method = (problem.GetPooling().mode == miopenPoolingMax)
@@ -181,8 +182,6 @@ ConvSolution PoolingForwardNd::GetSolution(const ExecutionContext&,
             {"STRIDE_W", kp.stride_w},
             {"MLO_POOLING_INDEX_TYPE",
              get_pooling_index_type_name(problem.GetPooling().GetIndexType())},
-            {"MLO_POOLING_INDEX_MAX",
-             get_pooling_index_type_max_name(problem.GetPooling().GetIndexType())},
         };
 
         if(problem.SaveIndex())
@@ -194,7 +193,7 @@ ConvSolution PoolingForwardNd::GetSolution(const ExecutionContext&,
 
         build_params << GetDataTypeKBP(problem.GetXDesc().GetType());
 
-        kernel.comp_options = build_params.GenerateFor(kbp::OpenCL{});
+        kernel.comp_options = build_params.GenerateFor(kbp::HIP{});
 
         kernel.l_wk = {lcl_work, 1, 1};
         kernel.g_wk = {lcl_work * grp_num, 1, 1};

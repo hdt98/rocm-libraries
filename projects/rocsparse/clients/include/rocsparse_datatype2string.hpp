@@ -112,6 +112,8 @@ constexpr auto rocsparse_datatype2string(rocsparse_datatype type)
 {
     switch(type)
     {
+    case rocsparse_datatype_f16_r:
+        return "f16_r";
     case rocsparse_datatype_f32_r:
         return "f32_r";
     case rocsparse_datatype_f64_r:
@@ -128,8 +130,6 @@ constexpr auto rocsparse_datatype2string(rocsparse_datatype type)
         return "i32_r";
     case rocsparse_datatype_u32_r:
         return "u32_r";
-    case rocsparse_datatype_f16_r:
-        return "f16_r";
     case rocsparse_datatype_bf16_r:
         return "bf16_r";
     }
@@ -365,6 +365,8 @@ constexpr auto rocsparse_spmvalg2string(rocsparse_spmv_alg alg)
         return "cooatomic";
     case rocsparse_spmv_alg_csr_lrb:
         return "csrlrb";
+    case rocsparse_spmv_alg_csr_nnzsplit:
+        return "csrnnzsplit";
     }
     return "invalid";
 }

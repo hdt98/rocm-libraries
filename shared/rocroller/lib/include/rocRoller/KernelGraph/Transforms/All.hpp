@@ -36,6 +36,7 @@
 #include <rocRoller/KernelGraph/Transforms/AddPrefetch.hpp>
 #include <rocRoller/KernelGraph/Transforms/AddStreamK.hpp>
 #include <rocRoller/KernelGraph/Transforms/AliasDataFlowTags.hpp>
+#include <rocRoller/KernelGraph/Transforms/AssignComputeIndex.hpp>
 #include <rocRoller/KernelGraph/Transforms/CleanArguments.hpp>
 #include <rocRoller/KernelGraph/Transforms/CleanLoops.hpp>
 #include <rocRoller/KernelGraph/Transforms/ConnectWorkgroups.hpp>
@@ -44,16 +45,19 @@
 #include <rocRoller/KernelGraph/Transforms/FuseLoops.hpp>
 #include <rocRoller/KernelGraph/Transforms/IdentifyParallelDimensions.hpp>
 #include <rocRoller/KernelGraph/Transforms/InlineIncrements.hpp>
+#include <rocRoller/KernelGraph/Transforms/InlineInits.hpp>
 #include <rocRoller/KernelGraph/Transforms/LoadPacked.hpp>
 #include <rocRoller/KernelGraph/Transforms/LoopOverTileNumbers.hpp>
 #include <rocRoller/KernelGraph/Transforms/LowerLinear.hpp>
 #include <rocRoller/KernelGraph/Transforms/LowerTensorContraction.hpp>
 #include <rocRoller/KernelGraph/Transforms/LowerTile.hpp>
+#include <rocRoller/KernelGraph/Transforms/NopExtraScopes.hpp>
 #include <rocRoller/KernelGraph/Transforms/OrderEpilogueBlocks.hpp>
 #include <rocRoller/KernelGraph/Transforms/OrderMemory.hpp>
 #include <rocRoller/KernelGraph/Transforms/OrderMultiplyNodes.hpp>
 #include <rocRoller/KernelGraph/Transforms/PrefetchScale.hpp>
 #include <rocRoller/KernelGraph/Transforms/RemoveDuplicates.hpp>
+#include <rocRoller/KernelGraph/Transforms/RemoveSetCoordinate.hpp>
 #include <rocRoller/KernelGraph/Transforms/Simplify.hpp>
 #include <rocRoller/KernelGraph/Transforms/SwizzleScale.hpp>
 #include <rocRoller/KernelGraph/Transforms/UnrollLoops.hpp>

@@ -145,10 +145,34 @@ namespace HypergraphTest
     }
 
     using myHypergraph = Graph::Hypergraph<TestDimension, TestTransform>;
+    using myCalmGraph  = Graph::Hypergraph<TestDimension, TestTransform, false>;
 
-    TEST_CASE("Basic Hypergraph", "[kernel-graph]")
+    TEST_CASE("Calm graph find edge", "[hypergraph][kernel-graph]")
     {
+        myCalmGraph g;
+        auto        n0 = g.addElement(TestUser{});
+        auto        n1 = g.addElement(TestUser{});
+        auto        n2 = g.addElement(TestUser{});
+        auto        n3 = g.addElement(TestUser{});
 
+        auto e0 = g.addElement(TestSplit{}, {n0}, {n1});
+        auto e1 = g.addElement(TestSplit{}, {n0}, {n2});
+        auto e2 = g.addElement(TestSplit{}, {n1}, {n3});
+        auto e3 = g.addElement(TestSplit{}, {n3}, {n0});
+
+        CHECK(g.findEdge(n0, n1) == e0);
+        CHECK(g.findEdge(n0, n2) == e1);
+        CHECK(g.findEdge(n1, n3) == e2);
+        CHECK(g.findEdge(n3, n0) == e3);
+
+        CHECK(g.findEdge(n0, n0) == std::nullopt);
+        CHECK(g.findEdge(n0, n3) == std::nullopt);
+        CHECK(g.findEdge(n1, n2) == std::nullopt);
+        CHECK(g.findEdge(n3, n2) == std::nullopt);
+    }
+
+    TEST_CASE("Basic Hypergraph", "[hypergraph][kernel-graph]")
+    {
         myHypergraph g;
 
         auto u0  = g.addElement(TestUser{});
@@ -242,7 +266,7 @@ namespace HypergraphTest
             CHECK(expectedNodes == nodes);
 
             auto loc = g.getLocation(nodes[0]);
-            CHECK(u0 == loc.index);
+            CHECK(u0 == loc.tag);
             CHECK(std::holds_alternative<TestDimension>(loc.element));
             CHECK(std::holds_alternative<TestUser>(std::get<TestDimension>(loc.element)));
             CHECK(0 == loc.incoming.size());
@@ -256,7 +280,7 @@ namespace HypergraphTest
                 TestSplit0, {u0}, {sd0, sd1}, TestTransform{TestSplit{}}};
             CHECK(expected == loc);
 
-            CHECK(TestSplit0 == loc.index);
+            CHECK(TestSplit0 == loc.tag);
 
             CHECK(myHypergraph::Element{TestTransform{TestSplit{}}} == loc.element);
             CHECK(std::vector<int>{u0} == loc.incoming);
@@ -314,13 +338,13 @@ namespace HypergraphTest
         SECTION("getNeighbours")
         {
             CHECK((std::vector<int>{u0})
-                  == g.getNeighbours<Graph::Direction::Upstream>(TestSplit0).to<std::vector>());
+                  == g.getNeighbours<Graph::Direction::Upstream>(TestSplit0));
             CHECK((std::vector<int>{TestSplit0})
-                  == g.getNeighbours<Graph::Direction::Upstream>(sd0).to<std::vector>());
+                  == g.getNeighbours<Graph::Direction::Upstream>(sd0));
             CHECK((std::vector<int>{TestSplit0})
-                  == g.getNeighbours<Graph::Direction::Upstream>(sd1).to<std::vector>());
+                  == g.getNeighbours<Graph::Direction::Upstream>(sd1));
             CHECK((std::vector<int>{sd0, sd1})
-                  == g.getNeighbours<Graph::Direction::Downstream>(TestSplit0).to<std::vector>());
+                  == g.getNeighbours<Graph::Direction::Downstream>(TestSplit0));
         }
 
         SECTION("Adding a node to the graph")
@@ -405,9 +429,15 @@ namespace HypergraphTest
                 CHECK_THROWS_AS(g.getElement(-1), FatalError);
             }
         }
+
+        SECTION("Adding identical connections only adds the first instance")
+        {
+            CHECK_NOTHROW(g.addElement(TestSplit{}, {u0, u0}, {sd0, sd1}));
+            CHECK_NOTHROW(g.addElement(TestSplit{}, {u0}, {sd1, sd1}));
+        }
     }
 
-    TEST_CASE("Hypergraph pathing", "[kernel-graph]")
+    TEST_CASE("Hypergraph pathing", "[hypergraph][kernel-graph]")
     {
 
         myHypergraph g;
@@ -453,7 +483,7 @@ namespace HypergraphTest
                      .to<std::vector>());
     }
 
-    TEST_CASE("Bad Hypergraph setup", "[kernel-graph]")
+    TEST_CASE("Bad Hypergraph setup", "[hypergraph][kernel-graph]")
     {
         myHypergraph g;
 
@@ -469,15 +499,65 @@ namespace HypergraphTest
         auto TestVGPR1   = g.addElement(TestVGPR{});
         auto TestForget1 = g.addElement(TestForget{}, {sd0, sd1}, {TestVGPR1});
 
-        // Edges to Edges
-        CHECK_THROWS_AS(g.addElement(TestForget{}, {u0}, {TestSplit0}), FatalError);
-        CHECK_THROWS_AS(g.addElement(TestForget{}, {}, {TestSplit0}), FatalError);
+        SECTION("Edges to Edges not allowed")
+        {
+            CHECK_THROWS_AS(g.addElement(TestForget{}, {u0}, {TestSplit0}), FatalError);
+            CHECK_THROWS_AS(g.addElement(TestForget{}, {}, {TestSplit0}), FatalError);
+        }
 
-        // Nodes to nodes
-        CHECK_THROWS_AS(g.addElement(TestSubDimension{}, {u0}, {}), FatalError);
+        SECTION("Nodes to nodes not allowed")
+        {
+            CHECK_THROWS_AS(g.addElement(TestSubDimension{}, {u0}, {}), FatalError);
+        }
+
+        SECTION("Dangling edges not allowed")
+        {
+            CHECK_THROWS_AS(g.addElement(TestSplit{}, {u0}, {}), FatalError);
+            CHECK_THROWS_AS(g.addElement(TestSplit{}, {}, {sd0}), FatalError);
+        }
     }
 
-    TEST_CASE("Hypergraph sorting and visiting", "[kernel-graph]")
+    TEST_CASE("Bad calm graph setup", "[hypergraph][kernel-graph]")
+    {
+        myCalmGraph g;
+
+        auto u0  = g.addElement(TestUser{});
+        auto sd0 = g.addElement(TestSubDimension{});
+        auto sd1 = g.addElement(TestSubDimension{});
+        auto sd2 = g.addElement(TestSubDimension{});
+        auto sd3 = g.addElement(TestSubDimension{});
+
+        auto TestSplit0 = g.addElement(TestSplit{}, {u0}, {sd0});
+        auto TestSplit1 = g.addElement(TestSplit{}, {u0}, {sd1});
+
+        auto TestVGPR0   = g.addElement(TestVGPR{});
+        auto TestForget0 = g.addElement(TestForget{}, {sd0}, {TestVGPR0});
+
+        SECTION("Edges to Edges not allowed")
+        {
+            CHECK_THROWS_AS(g.addElement(TestForget{}, {u0}, {TestSplit0}), FatalError);
+            CHECK_THROWS_AS(g.addElement(TestForget{}, {}, {TestSplit0}), FatalError);
+        }
+
+        SECTION("Nodes to nodes not allowed")
+        {
+            CHECK_THROWS_AS(g.addElement(TestSubDimension{}, {u0}, {}), FatalError);
+        }
+
+        SECTION("Dangling edges not allowed")
+        {
+            CHECK_THROWS_AS(g.addElement(TestSplit{}, {u0}, {}), FatalError);
+            CHECK_THROWS_AS(g.addElement(TestSplit{}, {}, {sd0}), FatalError);
+        }
+
+        SECTION("Hyperedges not allowed in calm graphs")
+        {
+            CHECK_THROWS_AS(g.addElement(TestSplit{}, {u0}, {sd2, sd3}), FatalError);
+            CHECK_THROWS_AS(g.addElement(TestForget{}, {sd2, sd3}, {TestVGPR0}), FatalError);
+        }
+    }
+
+    TEST_CASE("Hypergraph sorting and visiting", "[hypergraph][kernel-graph]")
     {
         myHypergraph g;
 
@@ -535,7 +615,7 @@ namespace HypergraphTest
         }
     }
 
-    TEST_CASE("Hypergraph delete element", "[kernel-graph]")
+    TEST_CASE("Hypergraph delete element", "[hypergraph][kernel-graph]")
     {
         myHypergraph g;
 
@@ -558,7 +638,7 @@ namespace HypergraphTest
         g.deleteElement<TestForget>(std::vector<int>{sd0, sd1}, std::vector<int>{TestVGPR0});
     }
 
-    TEST_CASE("Hypergraph with parallel edges", "[kernel-graph]")
+    TEST_CASE("Hypergraph with parallel edges", "[hypergraph][kernel-graph]")
     {
         myHypergraph g;
 
@@ -576,7 +656,7 @@ namespace HypergraphTest
         CHECK(parentVec == std::vector<int>({1}));
     }
 
-    TEST_CASE("Follow Hypergraph edges", "[kernel-graph]")
+    TEST_CASE("Follow Hypergraph edges", "[hypergraph][kernel-graph]")
     {
         myHypergraph g;
 
@@ -599,7 +679,7 @@ namespace HypergraphTest
         CHECK(g.followEdges<TestForget>({sd2}) == std::set<int>({sd2}));
     }
 
-    TEST_CASE("Hypergraph with reachable nodes", "[kernel-graph]")
+    TEST_CASE("Hypergraph with reachable nodes", "[hypergraph][kernel-graph]")
     {
         myHypergraph g;
 
@@ -651,4 +731,25 @@ namespace HypergraphTest
               == std::set<int>({u0, u2}));
     }
 
+    TEST_CASE("Edge Ordering in Hypergraph", "[hypergraph][kernel-graph]")
+    {
+        myHypergraph g;
+
+        auto u0  = g.addElement(TestUser{});
+        auto sd0 = g.addElement(TestSubDimension{});
+        auto sd1 = g.addElement(TestSubDimension{});
+        auto sd2 = g.addElement(TestSubDimension{});
+        auto sd3 = g.addElement(TestSubDimension{});
+
+        auto TestSplit0 = g.addElement(TestSplit{}, {u0}, {sd0, sd2, sd1});
+        auto TestSplit1 = g.addElement(TestSplit{}, {sd0, sd2, sd1}, {sd3});
+
+        SECTION("Elements are sorted in the order they were added")
+        {
+            CHECK(g.getNeighbours<Graph::Direction::Downstream>(TestSplit0)
+                  == std::vector<int>{sd0, sd2, sd1});
+            CHECK(g.getNeighbours<Graph::Direction::Upstream>(TestSplit1)
+                  == std::vector<int>{sd0, sd2, sd1});
+        }
+    }
 }

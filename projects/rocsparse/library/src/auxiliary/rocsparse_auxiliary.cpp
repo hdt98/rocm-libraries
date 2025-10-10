@@ -1305,6 +1305,14 @@ try
     ROCSPARSE_ROUTINE_TRACE;
 
     ROCSPARSE_CHECKARG_POINTER(0, hyb);
+
+    // Due to the changes in the hipFree introduced in HIP 7.0
+    // https://rocm.docs.amd.com/projects/HIP/en/latest/hip-7-changes.html#update-hipfree
+    // we need to introduce a device synchronize here as the below hipFree calls are now asynchronous.
+    // hipFree() previously had an implicit wait for synchronization purpose which is applicable for all memory allocations.
+    // This wait has been disabled in the HIP 7.0 runtime for allocations made with hipMallocAsync and hipMallocFromPoolAsync.
+    RETURN_IF_HIP_ERROR(hipDeviceSynchronize());
+
     // Clean up ELL part
     if(hyb->ell_col_ind != nullptr)
     {
@@ -4984,6 +4992,13 @@ try
 
     ROCSPARSE_CHECKARG_POINTER(0, descr);
 
+    // Due to the changes in the hipFree introduced in HIP 7.0
+    // https://rocm.docs.amd.com/projects/HIP/en/latest/hip-7-changes.html#update-hipfree
+    // we need to introduce a device synchronize here as the below hipFree calls are now asynchronous.
+    // hipFree() previously had an implicit wait for synchronization purpose which is applicable for all memory allocations.
+    // This wait has been disabled in the HIP 7.0 runtime for allocations made with hipMallocAsync and hipMallocFromPoolAsync.
+    RETURN_IF_HIP_ERROR(hipDeviceSynchronize());
+
     // Clean up row pointer array
     if(descr->csr_row_ptr_C != nullptr)
     {
@@ -5024,6 +5039,25 @@ try
 
     switch(input)
     {
+    case rocsparse_spgeam_input_scalar_alpha:
+    {
+        ROCSPARSE_CHECKARG(4,
+                           data_size_in_bytes,
+                           data_size_in_bytes != sizeof(void*),
+                           rocsparse_status_invalid_size);
+        descr->set_scalar_A(data);
+        return rocsparse_status_success;
+    }
+    case rocsparse_spgeam_input_scalar_beta:
+    {
+        ROCSPARSE_CHECKARG(4,
+                           data_size_in_bytes,
+                           data_size_in_bytes != sizeof(void*),
+                           rocsparse_status_invalid_size);
+        descr->set_scalar_B(data);
+        return rocsparse_status_success;
+    }
+
     case rocsparse_spgeam_input_alg:
     {
         ROCSPARSE_CHECKARG(4,

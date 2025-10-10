@@ -171,13 +171,15 @@ std::size_t sizeof_local_memory(const miopen::pooling::ProblemDescription& probl
 bool PoolingBackward2d::IsApplicable(const ExecutionContext&,
                                      const miopen::pooling::ProblemDescription& problem) const
 {
+    static const auto strict = TensorDescriptor::LayoutValidationMode::StrictDecreasingStrides;
+
     return problem.GetDirection() == miopen::pooling::Direction::Backward &&
            (problem.GetPooling().GetMode() == miopenPoolingMax ||
             problem.GetPooling().GetMode() == miopenPoolingAverage ||
             problem.GetPooling().GetMode() == miopenPoolingAverageInclusive) &&
            problem.GetXDesc().GetNumDims() == 4 &&
-           problem.GetXDesc().IsPossibleLayout4D5D("NCHW") &&
-           problem.GetYDesc().IsPossibleLayout4D5D("NCHW") &&
+           problem.GetXDesc().IsPossibleLayout4D5D("NCHW", strict) &&
+           problem.GetYDesc().IsPossibleLayout4D5D("NCHW", strict) &&
            sizeof_local_memory(problem) <= TargetProperties::GetMaxLocalMemorySize();
 }
 
@@ -192,7 +194,7 @@ PoolingBackward2d::GetSolution(const ExecutionContext&,
     {
         auto kernel = KernelInfo{};
 
-        kernel.kernel_file = "MIOpenPoolingBwd.cl";
+        kernel.kernel_file = "MIOpenPoolingBwd.cpp";
 
         if(problem.GetPooling().GetMode() == miopenPoolingMax)
         {
@@ -228,8 +230,6 @@ PoolingBackward2d::GetSolution(const ExecutionContext&,
                 {"MLO_POOLBWD_GROUP_SZ1", kp.grp_tile1},
                 {"MLO_POOLING_INDEX_TYPE",
                  get_pooling_index_type_name(problem.GetPooling().GetIndexType())},
-                {"MLO_POOLING_INDEX_MAX",
-                 get_pooling_index_type_max_name(problem.GetPooling().GetIndexType())},
                 {"USE_IMG_INDEX",
                  problem.GetPooling().GetWorkspaceIndexMode() == miopenPoolingWorkspaceIndexImage
                      ? 1
@@ -237,7 +237,7 @@ PoolingBackward2d::GetSolution(const ExecutionContext&,
             }
             << GetDataTypeKBP(problem.GetXDesc().GetType());
 
-        kernel.comp_options = build_params.GenerateFor(kbp::OpenCL{});
+        kernel.comp_options = build_params.GenerateFor(kbp::HIP{});
 
         kernel.l_wk = {kp.grp_tile0, kp.grp_tile1, 1};
         kernel.g_wk = {
