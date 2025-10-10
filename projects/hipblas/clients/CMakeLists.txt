@@ -28,10 +28,11 @@ function( get_lapack lapack_lib lapack_inc )
     set( inc "${BUILD_DIR}/deps/deps-install/include" )
     set( ${cblas_inc} ${inc} PARENT_SCOPE )
   else()
-    find_package( lapack REQUIRED CONFIG )
-    set( lib "lapack" )
+    find_package( LAPACK REQUIRED )
+    set( lib "${LAPACK_LIBRARIES}" )
   endif()
   set( ${lapack_lib} ${lib} PARENT_SCOPE )
+  enable_language( Fortran )
 endfunction( )
 
 function( get_cblas cblas_libs cblas_inc )
@@ -52,7 +53,7 @@ function( get_cblas cblas_libs cblas_inc )
       set( ${cblas_inc} ${inc} PARENT_SCOPE )
     else()
       find_package( cblas REQUIRED CONFIG )
-      set( libs cblas blas )
+      set( libs ${CBLAS_LIBRARIES} )
     endif()
   endif()
   set( ${cblas_libs} ${libs} PARENT_SCOPE )
@@ -92,7 +93,13 @@ if( NOT DEFINED CMAKE_CONFIGURATION_TYPES AND NOT DEFINED CMAKE_BUILD_TYPE )
 endif()
 
 # This project may compile dependencies for clients
-project( hipblas-clients LANGUAGES CXX Fortran )
+if ( BUILD_FORTRAN_CLIENTS )
+  if ( NOT DEFINED CMAKE_Fortran_COMPILER AND NOT DEFINED ENV{FC} )
+    set( CMAKE_Fortran_COMPILER  "gfortran" )
+  endif()
+  set( fortran_language "Fortran" )
+endif()
+project( hipblas-clients LANGUAGES CXX ${fortran_language} )
 
 # We use C++14 features, this will add compile option: -std=c++14
 set( CMAKE_CXX_STANDARD 17 )
@@ -101,7 +108,7 @@ list( APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake )
 
 include( build-options )
 
-if( NOT WIN32 )
+if( BUILD_FORTRAN_CLIENTS )
     set(hipblas_f90_source_clients_no_solver
       include/hipblas_fortran_no_solver_module.f90
     )
@@ -109,19 +116,34 @@ if( NOT WIN32 )
     set(hipblas_f90_source_clients_solver
       include/hipblas_fortran_module.f90
     )
+
+    set (hipblas_f90_source
+      ../library/src/hipblas_module.f90
+    )
 endif()
 
 if( BUILD_CLIENTS_TESTS OR BUILD_CLIENTS_BENCHMARKS OR BUILD_CLIENTS_SAMPLES )
-  if( NOT WIN32 )
-    if( BUILD_WITH_SOLVER )
-      add_library(hipblas_fortran_client STATIC ${hipblas_f90_source_clients_solver})
-    else()
-      add_library(hipblas_fortran_client STATIC ${hipblas_f90_source_clients_no_solver})
-    endif()
-    add_dependencies(hipblas_fortran_client hipblas_fortran)
+  # Create hipBLAS Fortran module
+  if( BUILD_FORTRAN_CLIENTS )
+      # Set Fortran module output directory
+      set(CMAKE_Fortran_MODULE_DIRECTORY ${PROJECT_BINARY_DIR}/include/hipblas)
+      add_library(hipblas_fortran OBJECT ${hipblas_f90_source})
   endif()
-  include_directories(${CMAKE_BINARY_DIR}/include/hipblas)
-  include_directories(${CMAKE_BINARY_DIR}/include)
+
+  if( BUILD_FORTRAN_CLIENTS )
+    if( BUILD_WITH_SOLVER )
+      add_library(hipblas_fortran_client STATIC ${hipblas_f90_source_clients_solver} $<TARGET_OBJECTS:hipblas_fortran>)
+    else()
+      add_library(hipblas_fortran_client STATIC ${hipblas_f90_source_clients_no_solver} $<TARGET_OBJECTS:hipblas_fortran>)
+    endif()
+  endif()
+
+  if(SKIP_LIBRARY)
+    include_directories(${HIPBLAS_LIBRARY_DIR}/include/hipblas)
+  else()
+    include_directories(${CMAKE_BINARY_DIR}/include/hipblas)
+    include_directories(${CMAKE_BINARY_DIR}/include)
+  endif()
 endif( )
 
 if( BUILD_CLIENTS_SAMPLES )
@@ -155,6 +177,9 @@ if( BUILD_CLIENTS_BENCHMARKS OR BUILD_CLIENTS_TESTS)
   endif()
 
   set( COMMON_DEFINES HIPBLAS_BFLOAT16_CLASS ROCM_USE_FLOAT16 HIPBLAS_NO_DEPRECATED_WARNINGS ${HIPBLAS_HIP_PLATFORM_COMPILER_DEFINES} )
+  if (BUILD_FORTRAN_CLIENTS)
+    list( APPEND COMMON_DEFINES "HIPBLAS_FORTRAN_CLIENTS" )
+  endif()
 
   message(STATUS "CLIENT COMMON_DEFINES: ${COMMON_DEFINES}")
   message(STATUS "CLIENT COMMON CXX_OPTIONS: ${COMMON_CXX_OPTIONS}")
@@ -204,7 +229,7 @@ if( BUILD_CLIENTS_BENCHMARKS OR BUILD_CLIENTS_TESTS)
                     NO_DEFAULT_PATH
                   )
       if (NOT BLAS_LIBRARY)
-        find_package( OPENBLAS CONFIG REQUIRED )
+        find_package( OpenBLAS CONFIG REQUIRED )
         set( BLAS_LIBRARY OpenBLAS::OpenBLAS )
         set( BLAS_INCLUDE_DIR "" )
       endif()
@@ -221,7 +246,11 @@ if( BUILD_CLIENTS_BENCHMARKS OR BUILD_CLIENTS_TESTS)
   find_package( GTest REQUIRED )
 
   message(STATUS "Build Dir: ${BUILD_DIR}")
-  message(STATUS "Linking Ref. Libs: ${BLAS_LIBRARY}")
+  message(STATUS "Linking Libs: ${BLAS_LIBRARY}")
+
+  if( NOT TARGET hipblas )
+    find_package( hipblas REQUIRED CONFIG PATHS ${HIPBLAS_LIBRARY_DIR} )
+  endif( )
 
   if( BUILD_CLIENTS_TESTS )
     add_subdirectory( gtest )
