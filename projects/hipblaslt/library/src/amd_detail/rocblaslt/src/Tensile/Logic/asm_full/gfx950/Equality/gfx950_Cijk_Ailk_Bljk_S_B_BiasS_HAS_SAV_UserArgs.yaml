@@ -206,7 +206,7 @@
     NonDTLTailLoopA: false
     NonDTLTailLoopB: false
     NonTemporal: -1
-    NonTemporalA: 2
+    NonTemporalA: 0
     NonTemporalB: 0
     NonTemporalC: 1
     NonTemporalD: 1
@@ -435,8 +435,8 @@
     NonDTLTailLoopA: false
     NonDTLTailLoopB: false
     NonTemporal: -1
-    NonTemporalA: 6
-    NonTemporalB: 6
+    NonTemporalA: 4
+    NonTemporalB: 4
     NonTemporalC: 2
     NonTemporalD: 5
     NonTemporalE: 0
@@ -666,8 +666,8 @@
     NonDTLTailLoopA: false
     NonDTLTailLoopB: false
     NonTemporal: -1
-    NonTemporalA: 7
-    NonTemporalB: 5
+    NonTemporalA: 4
+    NonTemporalB: 4
     NonTemporalC: 6
     NonTemporalD: 3
     NonTemporalE: 0
@@ -898,7 +898,7 @@
     NonDTLTailLoopB: false
     NonTemporal: -1
     NonTemporalA: 0
-    NonTemporalB: 1
+    NonTemporalB: 0
     NonTemporalC: 0
     NonTemporalD: 6
     NonTemporalE: 0
@@ -1128,8 +1128,8 @@
     NonDTLTailLoopA: false
     NonDTLTailLoopB: false
     NonTemporal: -1
-    NonTemporalA: 2
-    NonTemporalB: 1
+    NonTemporalA: 0
+    NonTemporalB: 0
     NonTemporalC: 0
     NonTemporalD: 1
     NonTemporalE: 0
@@ -1359,7 +1359,7 @@
     NonDTLTailLoopA: false
     NonDTLTailLoopB: false
     NonTemporal: -1
-    NonTemporalA: 5
+    NonTemporalA: 4
     NonTemporalB: 0
     NonTemporalC: 0
     NonTemporalD: 1
@@ -1590,7 +1590,7 @@
     NonDTLTailLoopA: false
     NonDTLTailLoopB: false
     NonTemporal: -1
-    NonTemporalA: 2
+    NonTemporalA: 0
     NonTemporalB: 0
     NonTemporalC: 1
     NonTemporalD: 1
@@ -1821,8 +1821,8 @@
     NonDTLTailLoopA: false
     NonDTLTailLoopB: false
     NonTemporal: -1
-    NonTemporalA: 1
-    NonTemporalB: 2
+    NonTemporalA: 0
+    NonTemporalB: 0
     NonTemporalC: 1
     NonTemporalD: 6
     NonTemporalE: 0
@@ -2052,8 +2052,8 @@
     NonDTLTailLoopA: false
     NonDTLTailLoopB: false
     NonTemporal: -1
-    NonTemporalA: 1
-    NonTemporalB: 2
+    NonTemporalA: 0
+    NonTemporalB: 0
     NonTemporalC: 1
     NonTemporalD: 0
     NonTemporalE: 0
@@ -2284,7 +2284,7 @@
     NonDTLTailLoopB: false
     NonTemporal: -1
     NonTemporalA: 0
-    NonTemporalB: 3
+    NonTemporalB: 0
     NonTemporalC: 6
     NonTemporalD: 6
     NonTemporalE: 0
@@ -2514,8 +2514,8 @@
     NonDTLTailLoopA: false
     NonDTLTailLoopB: false
     NonTemporal: -1
-    NonTemporalA: 3
-    NonTemporalB: 2
+    NonTemporalA: 0
+    NonTemporalB: 0
     NonTemporalC: 6
     NonTemporalD: 6
     NonTemporalE: 0
@@ -2746,7 +2746,7 @@
     NonDTLTailLoopB: false
     NonTemporal: -1
     NonTemporalA: 4
-    NonTemporalB: 3
+    NonTemporalB: 0
     NonTemporalC: 4
     NonTemporalD: 5
     NonTemporalE: 0
@@ -2976,7 +2976,7 @@
     NonDTLTailLoopA: false
     NonDTLTailLoopB: false
     NonTemporal: -1
-    NonTemporalA: 2
+    NonTemporalA: 0
     NonTemporalB: 0
     NonTemporalC: 4
     NonTemporalD: 7
@@ -3207,8 +3207,8 @@
     NonDTLTailLoopA: false
     NonDTLTailLoopB: false
     NonTemporal: -1
-    NonTemporalA: 2
-    NonTemporalB: 1
+    NonTemporalA: 0
+    NonTemporalB: 0
     NonTemporalC: 6
     NonTemporalD: 7
     NonTemporalE: 0
@@ -3438,7 +3438,7 @@
     NonDTLTailLoopA: false
     NonDTLTailLoopB: false
     NonTemporal: -1
-    NonTemporalA: 1
+    NonTemporalA: 0
     NonTemporalB: 0
     NonTemporalC: 5
     NonTemporalD: 6
@@ -3669,8 +3669,8 @@
     NonDTLTailLoopA: false
     NonDTLTailLoopB: false
     NonTemporal: -1
-    NonTemporalA: 3
-    NonTemporalB: 1
+    NonTemporalA: 0
+    NonTemporalB: 0
     NonTemporalC: 7
     NonTemporalD: 6
     NonTemporalE: 0
@@ -3901,7 +3901,7 @@
     NonDTLTailLoopB: false
     NonTemporal: -1
     NonTemporalA: 0
-    NonTemporalB: 1
+    NonTemporalB: 0
     NonTemporalC: 4
     NonTemporalD: 5
     NonTemporalE: 0
@@ -4131,7 +4131,7 @@
     NonDTLTailLoopA: false
     NonDTLTailLoopB: false
     NonTemporal: -1
-    NonTemporalA: 2
+    NonTemporalA: 0
     NonTemporalB: 0
     NonTemporalC: 5
     NonTemporalD: 6
@@ -4363,7 +4363,7 @@
     NonDTLTailLoopB: false
     NonTemporal: -1
     NonTemporalA: 0
-    NonTemporalB: 2
+    NonTemporalB: 0
     NonTemporalC: 1
     NonTemporalD: 7
     NonTemporalE: 0
@@ -4592,8 +4592,8 @@
     NonDTLTailLoopA: false
     NonDTLTailLoopB: false
     NonTemporal: -1
-    NonTemporalA: 3
-    NonTemporalB: 7
+    NonTemporalA: 0
+    NonTemporalB: 4
     NonTemporalC: 1
     NonTemporalD: 0
     NonTemporalE: 0
@@ -5267,8 +5267,8 @@
     NonDTLTailLoopA: false
     NonDTLTailLoopB: false
     NonTemporal: -1
-    NonTemporalA: 1
-    NonTemporalB: 6
+    NonTemporalA: 0
+    NonTemporalB: 4
     NonTemporalC: 0
     NonTemporalD: 0
     NonTemporalE: 0
@@ -5492,8 +5492,8 @@
     NonDTLTailLoopA: false
     NonDTLTailLoopB: false
     NonTemporal: -1
-    NonTemporalA: 1
-    NonTemporalB: 5
+    NonTemporalA: 0
+    NonTemporalB: 4
     NonTemporalC: 1
     NonTemporalD: 0
     NonTemporalE: 0
@@ -5717,8 +5717,8 @@
     NonDTLTailLoopA: false
     NonDTLTailLoopB: false
     NonTemporal: -1
-    NonTemporalA: 1
-    NonTemporalB: 1
+    NonTemporalA: 0
+    NonTemporalB: 0
     NonTemporalC: 1
     NonTemporalD: 4
     NonTemporalE: 0
@@ -5943,7 +5943,7 @@
     NonDTLTailLoopB: false
     NonTemporal: -1
     NonTemporalA: 0
-    NonTemporalB: 5
+    NonTemporalB: 4
     NonTemporalC: 1
     NonTemporalD: 6
     NonTemporalE: 0
@@ -6167,8 +6167,8 @@
     NonDTLTailLoopA: false
     NonDTLTailLoopB: false
     NonTemporal: -1
-    NonTemporalA: 2
-    NonTemporalB: 6
+    NonTemporalA: 0
+    NonTemporalB: 4
     NonTemporalC: 5
     NonTemporalD: 3
     NonTemporalE: 0
@@ -6393,7 +6393,7 @@
     NonDTLTailLoopB: false
     NonTemporal: -1
     NonTemporalA: 0
-    NonTemporalB: 1
+    NonTemporalB: 0
     NonTemporalC: 6
     NonTemporalD: 3
     NonTemporalE: 0
@@ -6617,7 +6617,7 @@
     NonDTLTailLoopA: false
     NonDTLTailLoopB: false
     NonTemporal: -1
-    NonTemporalA: 3
+    NonTemporalA: 0
     NonTemporalB: 0
     NonTemporalC: 4
     NonTemporalD: 6
@@ -6843,7 +6843,7 @@
     NonDTLTailLoopB: false
     NonTemporal: -1
     NonTemporalA: 0
-    NonTemporalB: 6
+    NonTemporalB: 4
     NonTemporalC: 4
     NonTemporalD: 3
     NonTemporalE: 0
@@ -7292,8 +7292,8 @@
     NonDTLTailLoopA: false
     NonDTLTailLoopB: false
     NonTemporal: -1
-    NonTemporalA: 2
-    NonTemporalB: 2
+    NonTemporalA: 0
+    NonTemporalB: 0
     NonTemporalC: 5
     NonTemporalD: 6
     NonTemporalE: 0
@@ -7517,8 +7517,8 @@
     NonDTLTailLoopA: false
     NonDTLTailLoopB: false
     NonTemporal: -1
-    NonTemporalA: 1
-    NonTemporalB: 2
+    NonTemporalA: 0
+    NonTemporalB: 0
     NonTemporalC: 0
     NonTemporalD: 5
     NonTemporalE: 0
@@ -7742,8 +7742,8 @@
     NonDTLTailLoopA: false
     NonDTLTailLoopB: false
     NonTemporal: -1
-    NonTemporalA: 1
-    NonTemporalB: 2
+    NonTemporalA: 0
+    NonTemporalB: 0
     NonTemporalC: 0
     NonTemporalD: 4
     NonTemporalE: 0
@@ -7967,8 +7967,8 @@
     NonDTLTailLoopA: false
     NonDTLTailLoopB: false
     NonTemporal: -1
-    NonTemporalA: 3
-    NonTemporalB: 3
+    NonTemporalA: 0
+    NonTemporalB: 0
     NonTemporalC: 5
     NonTemporalD: 3
     NonTemporalE: 0
@@ -8192,8 +8192,8 @@
     NonDTLTailLoopA: false
     NonDTLTailLoopB: false
     NonTemporal: -1
-    NonTemporalA: 3
-    NonTemporalB: 1
+    NonTemporalA: 0
+    NonTemporalB: 0
     NonTemporalC: 7
     NonTemporalD: 5
     NonTemporalE: 0
@@ -8417,8 +8417,8 @@
     NonDTLTailLoopA: false
     NonDTLTailLoopB: false
     NonTemporal: -1
-    NonTemporalA: 3
-    NonTemporalB: 1
+    NonTemporalA: 0
+    NonTemporalB: 0
     NonTemporalC: 4
     NonTemporalD: 5
     NonTemporalE: 0
@@ -8642,8 +8642,8 @@
     NonDTLTailLoopA: false
     NonDTLTailLoopB: false
     NonTemporal: -1
-    NonTemporalA: 1
-    NonTemporalB: 2
+    NonTemporalA: 0
+    NonTemporalB: 0
     NonTemporalC: 1
     NonTemporalD: 6
     NonTemporalE: 0
@@ -8868,7 +8868,7 @@
     NonDTLTailLoopB: false
     NonTemporal: -1
     NonTemporalA: 0
-    NonTemporalB: 2
+    NonTemporalB: 0
     NonTemporalC: 1
     NonTemporalD: 5
     NonTemporalE: 0
@@ -9092,7 +9092,7 @@
     NonDTLTailLoopA: false
     NonDTLTailLoopB: false
     NonTemporal: -1
-    NonTemporalA: 1
+    NonTemporalA: 0
     NonTemporalB: 0
     NonTemporalC: 1
     NonTemporalD: 5
@@ -9542,8 +9542,8 @@
     NonDTLTailLoopA: false
     NonDTLTailLoopB: false
     NonTemporal: -1
-    NonTemporalA: 1
-    NonTemporalB: 3
+    NonTemporalA: 0
+    NonTemporalB: 0
     NonTemporalC: 5
     NonTemporalD: 4
     NonTemporalE: 0
@@ -9768,8 +9768,8 @@
     NonDTLTailLoopA: false
     NonDTLTailLoopB: false
     NonTemporal: -1
-    NonTemporalA: 1
-    NonTemporalB: 1
+    NonTemporalA: 0
+    NonTemporalB: 0
     NonTemporalC: 6
     NonTemporalD: 5
     NonTemporalE: 0
@@ -9994,8 +9994,8 @@
     NonDTLTailLoopA: false
     NonDTLTailLoopB: false
     NonTemporal: -1
-    NonTemporalA: 2
-    NonTemporalB: 2
+    NonTemporalA: 0
+    NonTemporalB: 0
     NonTemporalC: 4
     NonTemporalD: 7
     NonTemporalE: 0
@@ -10220,7 +10220,7 @@
     NonDTLTailLoopA: false
     NonDTLTailLoopB: false
     NonTemporal: -1
-    NonTemporalA: 7
+    NonTemporalA: 4
     NonTemporalB: 0
     NonTemporalC: 1
     NonTemporalD: 4
@@ -10446,8 +10446,8 @@
     NonDTLTailLoopA: false
     NonDTLTailLoopB: false
     NonTemporal: -1
-    NonTemporalA: 6
-    NonTemporalB: 3
+    NonTemporalA: 4
+    NonTemporalB: 0
     NonTemporalC: 3
     NonTemporalD: 3
     NonTemporalE: 0
@@ -10672,7 +10672,7 @@
     NonDTLTailLoopA: false
     NonDTLTailLoopB: false
     NonTemporal: -1
-    NonTemporalA: 7
+    NonTemporalA: 4
     NonTemporalB: 0
     NonTemporalC: 1
     NonTemporalD: 2
@@ -10898,8 +10898,8 @@
     NonDTLTailLoopA: false
     NonDTLTailLoopB: false
     NonTemporal: -1
-    NonTemporalA: 6
-    NonTemporalB: 1
+    NonTemporalA: 4
+    NonTemporalB: 0
     NonTemporalC: 3
     NonTemporalD: 3
     NonTemporalE: 0
@@ -11124,8 +11124,8 @@
     NonDTLTailLoopA: false
     NonDTLTailLoopB: false
     NonTemporal: -1
-    NonTemporalA: 6
-    NonTemporalB: 2
+    NonTemporalA: 4
+    NonTemporalB: 0
     NonTemporalC: 3
     NonTemporalD: 2
     NonTemporalE: 0
@@ -11351,7 +11351,7 @@
     NonDTLTailLoopB: false
     NonTemporal: -1
     NonTemporalA: 4
-    NonTemporalB: 3
+    NonTemporalB: 0
     NonTemporalC: 3
     NonTemporalD: 3
     NonTemporalE: 0
@@ -11576,8 +11576,8 @@
     NonDTLTailLoopA: false
     NonDTLTailLoopB: false
     NonTemporal: -1
-    NonTemporalA: 7
-    NonTemporalB: 1
+    NonTemporalA: 4
+    NonTemporalB: 0
     NonTemporalC: 0
     NonTemporalD: 6
     NonTemporalE: 0
@@ -11802,7 +11802,7 @@
     NonDTLTailLoopA: false
     NonDTLTailLoopB: false
     NonTemporal: -1
-    NonTemporalA: 6
+    NonTemporalA: 4
     NonTemporalB: 0
     NonTemporalC: 2
     NonTemporalD: 2
@@ -12028,8 +12028,8 @@
     NonDTLTailLoopA: false
     NonDTLTailLoopB: false
     NonTemporal: -1
-    NonTemporalA: 2
-    NonTemporalB: 1
+    NonTemporalA: 0
+    NonTemporalB: 0
     NonTemporalC: 7
     NonTemporalD: 6
     NonTemporalE: 0
@@ -12254,7 +12254,7 @@
     NonDTLTailLoopA: false
     NonDTLTailLoopB: false
     NonTemporal: -1
-    NonTemporalA: 5
+    NonTemporalA: 4
     NonTemporalB: 0
     NonTemporalC: 2
     NonTemporalD: 2
@@ -12480,8 +12480,8 @@
     NonDTLTailLoopA: false
     NonDTLTailLoopB: false
     NonTemporal: -1
-    NonTemporalA: 6
-    NonTemporalB: 2
+    NonTemporalA: 4
+    NonTemporalB: 0
     NonTemporalC: 2
     NonTemporalD: 3
     NonTemporalE: 0
@@ -12706,8 +12706,8 @@
     NonDTLTailLoopA: false
     NonDTLTailLoopB: false
     NonTemporal: -1
-    NonTemporalA: 1
-    NonTemporalB: 3
+    NonTemporalA: 0
+    NonTemporalB: 0
     NonTemporalC: 0
     NonTemporalD: 2
     NonTemporalE: 0
@@ -12932,7 +12932,7 @@
     NonDTLTailLoopA: false
     NonDTLTailLoopB: false
     NonTemporal: -1
-    NonTemporalA: 7
+    NonTemporalA: 4
     NonTemporalB: 4
     NonTemporalC: 7
     NonTemporalD: 0
@@ -13158,7 +13158,7 @@
     NonDTLTailLoopA: false
     NonDTLTailLoopB: false
     NonTemporal: -1
-    NonTemporalA: 2
+    NonTemporalA: 0
     NonTemporalB: 0
     NonTemporalC: 1
     NonTemporalD: 4
@@ -13386,8 +13386,8 @@
     NonDTLTailLoopA: false
     NonDTLTailLoopB: false
     NonTemporal: -1
-    NonTemporalA: 1
-    NonTemporalB: 1
+    NonTemporalA: 0
+    NonTemporalB: 0
     NonTemporalC: 1
     NonTemporalD: 0
     NonTemporalE: 0
@@ -13615,8 +13615,8 @@
     NonDTLTailLoopA: false
     NonDTLTailLoopB: false
     NonTemporal: -1
-    NonTemporalA: 7
-    NonTemporalB: 2
+    NonTemporalA: 4
+    NonTemporalB: 0
     NonTemporalC: 3
     NonTemporalD: 7
     NonTemporalE: 0
@@ -13846,8 +13846,8 @@
     NonDTLTailLoopA: false
     NonDTLTailLoopB: false
     NonTemporal: -1
-    NonTemporalA: 6
-    NonTemporalB: 2
+    NonTemporalA: 4
+    NonTemporalB: 0
     NonTemporalC: 7
     NonTemporalD: 7
     NonTemporalE: 0
@@ -14309,7 +14309,7 @@
     NonDTLTailLoopB: false
     NonTemporal: -1
     NonTemporalA: 4
-    NonTemporalB: 2
+    NonTemporalB: 0
     NonTemporalC: 0
     NonTemporalD: 3
     NonTemporalE: 0
@@ -14539,7 +14539,7 @@
     NonDTLTailLoopA: false
     NonDTLTailLoopB: false
     NonTemporal: -1
-    NonTemporalA: 2
+    NonTemporalA: 0
     NonTemporalB: 0
     NonTemporalC: 6
     NonTemporalD: 7
@@ -14770,7 +14770,7 @@
     NonDTLTailLoopA: false
     NonDTLTailLoopB: false
     NonTemporal: -1
-    NonTemporalA: 2
+    NonTemporalA: 0
     NonTemporalB: 4
     NonTemporalC: 0
     NonTemporalD: 3
@@ -15002,7 +15002,7 @@
     NonDTLTailLoopB: false
     NonTemporal: -1
     NonTemporalA: 0
-    NonTemporalB: 1
+    NonTemporalB: 0
     NonTemporalC: 4
     NonTemporalD: 7
     NonTemporalE: 0
@@ -15232,8 +15232,8 @@
     NonDTLTailLoopA: false
     NonDTLTailLoopB: false
     NonTemporal: -1
-    NonTemporalA: 6
-    NonTemporalB: 3
+    NonTemporalA: 4
+    NonTemporalB: 0
     NonTemporalC: 3
     NonTemporalD: 3
     NonTemporalE: 0
@@ -15925,8 +15925,8 @@
     NonDTLTailLoopA: false
     NonDTLTailLoopB: false
     NonTemporal: -1
-    NonTemporalA: 3
-    NonTemporalB: 2
+    NonTemporalA: 0
+    NonTemporalB: 0
     NonTemporalC: 2
     NonTemporalD: 2
     NonTemporalE: 0
@@ -16156,8 +16156,8 @@
     NonDTLTailLoopA: false
     NonDTLTailLoopB: false
     NonTemporal: -1
-    NonTemporalA: 7
-    NonTemporalB: 2
+    NonTemporalA: 4
+    NonTemporalB: 0
     NonTemporalC: 0
     NonTemporalD: 2
     NonTemporalE: 0
@@ -16387,8 +16387,8 @@
     NonDTLTailLoopA: false
     NonDTLTailLoopB: false
     NonTemporal: -1
-    NonTemporalA: 6
-    NonTemporalB: 3
+    NonTemporalA: 4
+    NonTemporalB: 0
     NonTemporalC: 1
     NonTemporalD: 2
     NonTemporalE: 0
@@ -16618,8 +16618,8 @@
     NonDTLTailLoopA: false
     NonDTLTailLoopB: false
     NonTemporal: -1
-    NonTemporalA: 5
-    NonTemporalB: 3
+    NonTemporalA: 4
+    NonTemporalB: 0
     NonTemporalC: 1
     NonTemporalD: 3
     NonTemporalE: 0
@@ -16849,7 +16849,7 @@
     NonDTLTailLoopA: false
     NonDTLTailLoopB: false
     NonTemporal: -1
-    NonTemporalA: 3
+    NonTemporalA: 0
     NonTemporalB: 0
     NonTemporalC: 6
     NonTemporalD: 7
@@ -17081,7 +17081,7 @@
     NonDTLTailLoopB: false
     NonTemporal: -1
     NonTemporalA: 0
-    NonTemporalB: 7
+    NonTemporalB: 4
     NonTemporalC: 7
     NonTemporalD: 3
     NonTemporalE: 0
@@ -17312,7 +17312,7 @@
     NonDTLTailLoopB: false
     NonTemporal: -1
     NonTemporalA: 4
-    NonTemporalB: 3
+    NonTemporalB: 0
     NonTemporalC: 0
     NonTemporalD: 6
     NonTemporalE: 0

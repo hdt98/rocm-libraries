@@ -207,7 +207,7 @@
     NonDTLTailLoopA: true
     NonDTLTailLoopB: true
     NonTemporal: -1
-    NonTemporalA: 3
+    NonTemporalA: 0
     NonTemporalB: 4
     NonTemporalC: 4
     NonTemporalD: 5
@@ -438,8 +438,8 @@
     NonDTLTailLoopA: true
     NonDTLTailLoopB: true
     NonTemporal: -1
-    NonTemporalA: 1
-    NonTemporalB: 1
+    NonTemporalA: 0
+    NonTemporalB: 0
     NonTemporalC: 7
     NonTemporalD: 5
     NonTemporalE: 0
