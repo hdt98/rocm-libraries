@@ -48,32 +48,34 @@
 #define END_GRAPH_CAPTURE()
 #endif
 
-#define TESTING_TEMPLATE(NAME_)                                                  \
-    template <typename... P>                                                     \
-    rocsparse_status rocsparse_##NAME_(rocsparse_local_handle& handle, P&&... p) \
-    {                                                                            \
-        rocsparse_status status;                                                 \
-        BEGIN_GRAPH_CAPTURE();                                                   \
-                                                                                 \
-        status = ::rocsparse_##NAME_(handle, std::forward<P>(p)...);             \
-                                                                                 \
-        END_GRAPH_CAPTURE();                                                     \
-                                                                                 \
-        return status;                                                           \
+#define TESTING_TEMPLATE(NAME_)                                                     \
+    template <typename... P>                                                        \
+    rocsparse_status rocsparse_##NAME_(rocsparse_local_handle & handle, P && ... p) \
+    {                                                                               \
+        rocsparse_status status;                                                    \
+        std::cout << "BEGIN CAPTURE NAME_: " << #NAME_ << std::endl;                \
+        BEGIN_GRAPH_CAPTURE();                                                      \
+                                                                                    \
+        status = ::rocsparse_##NAME_(handle, std::forward<P>(p)...);                \
+                                                                                    \
+        std::cout << "END CAPTURE NAME_: " << #NAME_ << std::endl;                  \
+        END_GRAPH_CAPTURE();                                                        \
+                                                                                    \
+        return status;                                                              \
     };
 
-#define TESTING_COMPUTE_TEMPLATE(NAME_)                                          \
-    template <typename T, typename... P>                                         \
-    rocsparse_status rocsparse_##NAME_(rocsparse_local_handle& handle, P&&... p) \
-    {                                                                            \
-        rocsparse_status status;                                                 \
-        BEGIN_GRAPH_CAPTURE();                                                   \
-                                                                                 \
-        status = ::rocsparse_##NAME_<T>(handle, std::forward<P>(p)...);          \
-                                                                                 \
-        END_GRAPH_CAPTURE();                                                     \
-                                                                                 \
-        return status;                                                           \
+#define TESTING_COMPUTE_TEMPLATE(NAME_)                                             \
+    template <typename T, typename... P>                                            \
+    rocsparse_status rocsparse_##NAME_(rocsparse_local_handle & handle, P && ... p) \
+    {                                                                               \
+        rocsparse_status status;                                                    \
+        BEGIN_GRAPH_CAPTURE();                                                      \
+                                                                                    \
+        status = ::rocsparse_##NAME_<T>(handle, std::forward<P>(p)...);             \
+                                                                                    \
+        END_GRAPH_CAPTURE();                                                        \
+                                                                                    \
+        return status;                                                              \
     };
 
 namespace testing

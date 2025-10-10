@@ -46,14 +46,18 @@ void testing_csrmv(const Arguments& arg)
     rocsparse_local_handle handle(arg);
 
     // Create matrix descriptor
-    rocsparse_local_mat_descr descr;
+    rocsparse_mat_descr descr;
+    CHECK_ROCSPARSE_ERROR(rocsparse_create_mat_descr(&descr));
+    // rocsparse_local_mat_descr descr;
 
     // Create matrix info
-    rocsparse_local_mat_info info_ptr;
+    rocsparse_mat_info info;
+    CHECK_ROCSPARSE_ERROR(rocsparse_create_mat_info(&info));
+    // rocsparse_local_mat_info info_ptr;
 
-    rocsparse_mat_info info = (call_stage_analysis)
-                                  ? ((alg == rocsparse_spmv_alg_csr_adaptive) ? info_ptr : nullptr)
-                                  : nullptr;
+    //rocsparse_mat_info info = (call_stage_analysis)
+    //                              ? ((alg == rocsparse_spmv_alg_csr_adaptive) ? info_ptr : nullptr)
+    //                              : nullptr;
 
     rocsparse_matrix_factory<T> matrix_factory(arg, true, false);
 
@@ -61,7 +65,7 @@ void testing_csrmv(const Arguments& arg)
     matrix_factory.init_csr(hA, M, N);
 
     // normalize
-    rocsparse_vector_utils<T>::normalize(hA.val);
+    //rocsparse_vector_utils<T>::normalize(hA.val);
 
     device_csr_matrix<T> dA(hA);
 
@@ -121,6 +125,10 @@ void testing_csrmv(const Arguments& arg)
 
     CHECK_HIP_ERROR(hipFree(dx));
     CHECK_HIP_ERROR(hipFree(dy));
+
+    CHECK_ROCSPARSE_ERROR(rocsparse_destroy_mat_descr(descr));
+    CHECK_ROCSPARSE_ERROR(rocsparse_destroy_mat_info(info));
+
     std::cout << "dddd" << std::endl;
 }
 
