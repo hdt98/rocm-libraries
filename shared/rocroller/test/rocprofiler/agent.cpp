@@ -43,17 +43,6 @@
 #include <string>
 #include <vector>
 
-#ifdef ROCROLLER_USE_HIP
-#include <hip/hip_ext.h>
-#include <hip/hip_runtime.h>
-#endif /* ROCROLLER_USE_HIP */
-
-#include <rocRoller/Context.hpp>
-#include <rocRoller/DataTypes/DataTypes.hpp>
-#include <rocRoller/Expression.hpp>
-#include <rocRoller/KernelGraph/KernelGraph.hpp>
-#include <rocRoller/Operations/Command.hpp>
-
 #define ROCPROFILER_CALL(result, msg)                                                 \
     if(auto ec = (result); ec != ROCPROFILER_STATUS_SUCCESS)                          \
     {                                                                                 \
@@ -320,16 +309,6 @@ namespace ThreadTracer
     {
         Results::latencies = new Results::LatencyTable{};
         Results::table     = new Results::AddressTable{};
-
-        {
-            auto command = std::make_shared<rocRoller::Command>();
-
-            auto expr1 = rocRoller::Expression::literal(42);
-            auto expr2 = rocRoller::Expression::literal(13);
-            auto sum   = expr1 + expr2;
-
-            std::cout << rocRoller::Expression::toString(sum) << std::endl;
-        }
 
         DECODER_CALL(rocprofiler_thread_trace_decoder_create(&Decoder::decoder, "/opt/rocm/lib"));
 
