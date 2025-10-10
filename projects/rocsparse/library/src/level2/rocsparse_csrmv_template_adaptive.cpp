@@ -64,8 +64,8 @@ namespace rocsparse
     {
 #if defined(__INTEL_COMPILER)
         return WG_SIZE >> (_bit_scan_reverse(num_rows - 1) + 1);
-#elif(defined(__clang__) && __has_builtin(__builtin_clz)) \
-    || !defined(__clang) && defined(__GNUG__)             \
+#elif (defined(__clang__) && __has_builtin(__builtin_clz)) \
+    || !defined(__clang) && defined(__GNUG__)              \
            && ((__GNUC__ * 10000 + __GNUC_MINOR__ * 100 + __GNUC_PATCHLEVEL__) > 30202)
         return (WG_SIZE >> (8 * sizeof(int) - __builtin_clz(num_rows - 1)));
 #elif defined(_MSC_VER) && (_MSC_VER >= 1400)
@@ -757,8 +757,9 @@ rocsparse_status rocsparse::csrmv_adaptive_template_dispatch(rocsparse_handle   
         // LCOV_EXCL_STOP
     }
 
-    RETURN_IF_HIP_ERROR(hipDeviceSynchronize());
     std::cout << "3333" << std::endl;
+    RETURN_IF_HIP_ERROR(hipDeviceSynchronize());
+    std::cout << "4444" << std::endl;
 
     return rocsparse_status_success;
 }
