@@ -133,11 +133,11 @@ void packData(std::vector<uint8_t> const& dataBytes, uint8_t* packedData)
  * @return float values of generated MX type data aligned with scale
  */
 template <typename DT>
-std::vector<float> getAlignedFloat(std::vector<uint8_t>&       dataBytes,
-                                   std::vector<uint8_t> const& scaleBytes,
-                                   std::array<DGen::index_t, 2> const    sizes,
-                                   int                         elementsPerMXBlock,
-                                   bool                        isMatrixA)
+std::vector<float> getAlignedFloat(std::vector<uint8_t>&              dataBytes,
+                                   std::vector<uint8_t> const&        scaleBytes,
+                                   std::array<DGen::index_t, 2> const sizes,
+                                   int                                elementsPerMXBlock,
+                                   bool                               isMatrixA)
 {
     std::vector<float>   refFloat(sizes[0] * sizes[1], 0.0);
     std::vector<uint8_t> alignedDataBytes(dataBytes.size());
@@ -295,7 +295,7 @@ std::vector<float> generateMXInput(hipDataType            dataType,
                                    int const              scaleBlockRowSize,
                                    int const              scaleBlockColSize,
                                    bool                   isMatrixA,
-                                   std::string_view const initMethod,
+                                   std::string_view const initMode,
                                    float                  min_val,
                                    float                  max_val)
 {
@@ -303,10 +303,12 @@ std::vector<float> generateMXInput(hipDataType            dataType,
 
     DataGeneratorOptions opt;
     opt.min          = initMethod == "uniform_01" ? 0. : (initMethod == "hpl" ? -.5 : min_val);
-    opt.max          = initMethod == "uniform_01" ? 1. : (initMethod == "hpl" ?  .5 : max_val);
+    opt.max          = initMethod == "uniform_01" ? 1. : (initMethod == "hpl" ? .5 : max_val);
     opt.blockScaling = scaleBlockRowSize * scaleBlockColSize;
-    // TODO initMethod == "hpl" should also be Bounded, but fails some tests
-    opt.pattern      = (initMethod == "Bounded" || initMethod == "uniform_01") ? Bounded : Trigonometric;
+    // TODO initMode == "hpl" should also be Bounded, but fails some tests
+    opt.initMode = (initMode == "Bounded" || initMode == "uniform_01")
+                       ? DataInitMode(Bounded{})
+                       : DataInitMode(TrigonometricFromFloat{});
 
     const uint32_t seed = 1713573849;
 
