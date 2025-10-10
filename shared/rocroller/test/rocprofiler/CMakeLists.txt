@@ -3,7 +3,7 @@
 
 enable_language(HIP)
 
-# Find rocprofiler-sdk dependencies
+# rocprofiler-sdk dependencies
 find_package(rocprofiler-sdk REQUIRED)
 find_package(rocprofiler-sdk-roctx REQUIRED)
 find_package(
@@ -17,21 +17,17 @@ find_package(
     ${rocm_version_DIR}
     ${ROCM_PATH})
 
-# Create standalone executable
 add_executable(rocprofiler-thread-trace)
 
-# Set source files properties for HIP compilation
 set_source_files_properties(
     main.cpp PROPERTIES LANGUAGE HIP)
 
-# Add source files
 target_sources(rocprofiler-thread-trace
     PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/main.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/agent.cpp"
 )
 
-# Find libdw for DWARF support (required by rocprofiler-sdk)
 find_library(
     LIBDW_LIBRARY
     NAMES dw
@@ -49,16 +45,15 @@ target_link_libraries(rocprofiler-thread-trace
         rocprofiler-sdk::rocprofiler-sdk
         rocprofiler-sdk-roctx::rocprofiler-sdk-roctx
         amd_comgr
-        hip::device
         ${LIBDW_LIBRARY}
+        ${BLAS_LIBRARIES}
+        rocroller::common-test-utilities
 )
 
-# Configure sanitizers if enabled
 if(ROCROLLER_ENABLE_ASAN)
     rocroller_target_configure_sanitizers(rocprofiler-thread-trace PRIVATE)
 endif()
 
-# Find the attdecoder library for trace decoding (optional)
 find_library(
     attdecoder_LIBRARY
     NAMES rocprof-trace-decoder
