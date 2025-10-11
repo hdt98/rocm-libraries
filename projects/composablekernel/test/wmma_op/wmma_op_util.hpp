@@ -680,13 +680,192 @@ __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
 }
 
 //KO TODO:: Add gfx125 matmul_swizzle_a
-template <typename srcA_t, typename srcB_t, typename dst_t, typename acc_t, ck::index_t KMultiplier>
+template <typename srcA_t, typename srcB_t, typename dst_t, typename acc_t, ck::index_t kMultiplier>
 __global__ void matmul_swizzle_a(const srcA_t* a, const srcB_t* b, dst_t* c)
 {
-    ignore = a;
-    ignore = b;
-    ignore = c;
-    printf("---------- Running gfx125 matmul_swizzle_a - NOT IMPLEMENTED YET ----------\n");
+    printf("---------- Running gfx125 matmul_swizzle_a ----------\n");
+    static_assert(WMMAVecType<srcA_t, kMultiplier>::template is_compatible<srcB_t>(),
+                  "the data format for srcA and srcB is unsupported in gfx1250");
+    using srcA_cast_T    = WMMAVecType<srcA_t, kMultiplier>::ViewT;
+    using srcB_cast_T    = WMMAVecType<srcB_t, kMultiplier>::ViewT;
+    using srcA_cast_type = typename srcA_cast_T::type;
+    using srcB_cast_type = typename srcB_cast_T::type;
+
+    bool debug_prints = false;
+
+    if (debug_prints == true) // debug only
+    {
+        if (threadIdx.x == 0)
+        {
+            // Print the size of A and B vectors
+            printf("A vector size: %d\n", WMMAVecType<srcA_t, kMultiplier>::size);
+            printf("B vector size: %d\n", WMMAVecType<srcB_t, kMultiplier>::size);
+
+        
+            printf("---------- printing a at start of matmul with uint32 union--------- \n");
+            for(int i = 0; i < 8; i++)
+            {
+                union { srcA_t val; uint32_t u32;};
+                val = a[i];
+                printf("a[%d] = %f, hex = 0x%08x\n", i, static_cast<float>(val), u32);
+            }
+
+            printf("---------- printing a at start of matmul with uint16 union--------- \n");
+            for(int i = 0; i < 8; i++)
+            {
+                union { srcA_t val; uint16_t u16;};
+                val = a[i];
+                printf("a[%d] = %f, hex = 0x%04x\n", i, static_cast<float>(val), u16);
+            }
+        }
+    }
+ 
+    using srcA_vec      = typename WMMAVecType<srcA_t, kMultiplier>::VecT;
+    using srcB_vec      = typename WMMAVecType<srcB_t, kMultiplier>::VecT;
+    using srcA_vec_type = srcA_vec::type;
+    using srcB_vec_type = srcB_vec::type;
+
+    const srcA_cast_type* a_ptr = reinterpret_cast<const srcA_cast_type*>(a);
+    const srcB_cast_type* b_ptr = reinterpret_cast<const srcB_cast_type*>(b);
+
+    srcA_vec a_frag = {};
+    srcB_vec b_frag = {};
+
+    // srcA_vec a_temp = {};
+    // srcB_vec b_temp = {};
+
+    using acc_vec = StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr,
+                                              acc_t,
+                                              1,
+                                              8,
+                                              true>;
+    acc_vec acc_thread_buf_;
+
+    using dst_vec = StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr,
+                                              dst_t,
+                                              1,
+                                              8,
+                                              true>;
+    dst_vec dst_thread_buf_;
+    
+    // Num elements per 32B packed chunk
+    constexpr int ToIntDim    = WMMAVecType<srcA_t, kMultiplier>::ToIntDim;
+    
+    // to int dim is 1 for float, 2 for half; base dim assumption is 16
+    constexpr int SRC_DIM = WMMAVecType<srcA_t, kMultiplier>::size / ToIntDim;
+    /* KO TODO:: Handle exceptions for f32 and f64 input and K dim is only size 4. 
+        Then we need to do 4*K Multiplier? */ 
+
+    // 2 threads per a row
+    constexpr int ROW_SIZE = 2 * SRC_DIM;
+    
+    // 16 is base dim assumption, 2 is for a input and b input both
+    constexpr int LDS_DIM = 2 * 16 * ROW_SIZE;
+    /* KO TODO:: Handle Exceptions for f32 or f64 input and K is only size 4. 
+        Then we need to do 4*K Multiplier? */
+
+    // constexpr int LDS_B_START = LDS_DIM / 2;
+
+    /* 16x32 example: quadrant size (in int32) is 4 for 16x32, 2 for 16x16 in dst size
+        number of src type elements loaded per qudrant should be 8 elements of size 16 or 4 respectively
+    */
+    
+    constexpr int QUADRANT_SIZE = ROW_SIZE / 4;
+    
+    if (debug_prints == true) // debug only
+    {
+        if (threadIdx.x == 0)
+        {
+            printf("ToIntDim = %d\n", ToIntDim);
+            printf("SRC_DIM = %d\n", SRC_DIM);
+            printf("ROW_SIZE = %d\n", ROW_SIZE);
+            printf("LDS_DIM = %d\n", LDS_DIM);
+            // printf("LDS_B_START = %d\n", LDS_B_START);
+            printf("QUADRANT_SIZE = %d\n", QUADRANT_SIZE);
+        }
+    }
+
+    // __shared__ srcA_cast_type p_shared[LDS_DIM];
+
+    // strongly-type compile time index value of 0 for template containers
+    static constexpr auto I0          = Number<0>{};
+    
+    // use a directly, as lds_shared allocated with A; A better be bigger than B if mixed
+    // const srcA_cast_type* local_a_ptr = p_shared;
+
+    // get pointer as B type given LDS allocated with A
+    // const srcB_cast_type* local_b_ptr = reinterpret_cast<const srcB_cast_type*>(p_shared);// + LDS_B_START);
+
+    const int lIdx = threadIdx.x;
+    const int lane = lIdx % 32; // wave size
+    const int lowHigh = lane / 16;
+
+    bool use_QUADS = true;
+
+    if (use_QUADS == true)
+    {
+        static_for<0, QUADRANT_SIZE, 1>{}([&](auto ele) {
+            const int lowHighQuadrant = ele/2;
+            const int iterEvenOdd = ele % 2;
+            int rowIdx = lane % 16;
+            const int offset1 = ((lowHigh)*(ROW_SIZE*QUADRANT_SIZE)) + (ROW_SIZE*lowHighQuadrant*8)+(iterEvenOdd*32)+rowIdx;
+            const int offset2 = ((lowHigh)*(ROW_SIZE*QUADRANT_SIZE)) + (ROW_SIZE*lowHighQuadrant*8)+(iterEvenOdd*32)+rowIdx + ROW_SIZE;
+            
+            
+            a_frag.template AsType<srcA_cast_type>()(ele) = a_ptr[offset1];            
+            a_frag.template AsType<srcA_cast_type>()(Number<ele + QUADRANT_SIZE>{}) = a_ptr[offset2];
+
+            // KO TODO:: solve where to put the offset2 for ele
+            b_frag.template AsType<srcB_cast_type>()(ele) = b_ptr[offset1];
+            b_frag.template AsType<srcB_cast_type>()(Number<ele + QUADRANT_SIZE>{}) = b_ptr[offset2];
+            
+            if (debug_prints == true) // debug only
+            {
+                // printf("threadIdx.x = %u, ele = %d, offset1 = %d, offset2 = %d\n", threadIdx.x, static_cast<int>(ele), offset1, offset2);
+                printf("threadIdx.x = %u, ele = %d, a_frag[%d] = a_ptr[%d], a_frag[%d] = a_ptr[%d]\n",
+                        threadIdx.x,
+                        static_cast<int>(ele),
+                        static_cast<int>(ele), offset1,
+                        static_cast<int>(ele + QUADRANT_SIZE), offset2);
+            }
+        });
+    }
+    else
+    {
+        printf("NOT USING QUADS IN matmul_swizzle_a -- unimplemented \n");
+    }
+
+    __syncthreads(); //KO TODO:: move to inline asm
+
+    // Call the WMMA intrinsic selector
+    // printf("------- calling builtin_naive_wmma_selector ------- \n");
+    builtin_wmma_naive_selector<srcA_t, srcB_t, dst_t, acc_t, kMultiplier>(
+        a_frag.template AsType<srcA_vec_type>()(I0),
+        b_frag.template AsType<srcB_vec_type>()(I0),
+        acc_thread_buf_,
+        dst_thread_buf_);
+
+    // printf("------- FINISHED builtin_naive_wmma_selector ------- \n");
+
+    // column-major 16x16 result matrix, 8 elements per thread
+    // layoutTransform means bf8/f8 and !same means only applied when mixed fp8 and bf8
+    if constexpr(WMMAVecType<srcA_t, kMultiplier>::layoutTransform && !std::is_same_v<srcA_t, srcB_t>)
+    {
+        static_for<0, 8, 1>{}([&](auto ele) {
+            int lowHi = lIdx / 16;
+            int col = lIdx % 16;
+            int row = (lowHi) * 8 + static_cast<int>(ele);
+            c[col + 16 * row] = dst_thread_buf_[Number<ele>{}]; // idea each thread contiguous along column
+        });
+    } else 
+    {
+        static_for<0, 8, 1>{}([&](auto ele) {
+            int lowHi = lIdx / 16;
+            int col = lIdx % 16;
+            int row = (lowHi) * 8 + static_cast<int>(ele);
+            c[col * 16 + row] = dst_thread_buf_[Number<ele>{}]; // idea each thread contiguous along column
+        });
+    }
 }
 
 // template <typename src_t, typename dst_t, typename acc_t, index_t acc_num>
