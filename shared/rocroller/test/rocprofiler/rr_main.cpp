@@ -136,6 +136,8 @@ int main(int /*argc*/, char** /*argv*/)
 
     commandKernel.launchKernel(commandArgs.runtimeArguments());
 
+    roctxProfilerPause(0);
+
     HIP_API_CALL(hipDeviceSynchronize());
 
     float h_result = 0.0f;
