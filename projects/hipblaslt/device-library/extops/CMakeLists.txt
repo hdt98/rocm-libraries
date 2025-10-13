@@ -9,7 +9,6 @@ set(ops_dir "${CMAKE_CURRENT_SOURCE_DIR}/../../tensilelite")
 set(output_dir "${CMAKE_CURRENT_BINARY_DIR}")
 string(REGEX MATCHALL "gfx[a-z0-9]+" archs "${GPU_TARGETS}")
 list(REMOVE_DUPLICATES archs)
-<<<<<<< HEAD
 message(STATUS "Architectures to process: ${archs}")
 
 # Serializing extop-library targets: Generating hipblasltExtOpLibrary.dat
@@ -18,9 +17,6 @@ message(STATUS "Architectures to process: ${archs}")
 # supported on certain file systems or operating systems. Therefore, we
 # serialize by adding dependencies between each target and the previous one.
 set(previous_target "")
-=======
-set(extop_cp_depends "")
->>>>>>> Revert extops cmakelists.txt
 
 foreach(arch IN LISTS archs)
     #  Start of arch configuration
@@ -90,19 +86,11 @@ foreach(arch IN LISTS archs)
         DEPENDS
             "${output_code_object_file}"
             ${HIPBLASLT_PYTHON_DEPS}
-<<<<<<< HEAD
             ${previous_target}
-=======
-            ${extop_cp_depends}
->>>>>>> Revert extops cmakelists.txt
         COMMAND ${HIPBLASLT_PYTHON_COMMAND} "${ops_dir}/ExtOpCreateLibrary.py" --src=${CMAKE_CURRENT_BINARY_DIR} --co=${output_code_object_file} --output=${output_dir} --arch=${arch}
         COMMAND ${CMAKE_COMMAND} -E copy "${output_dir}/hipblasltExtOpLibrary.dat" "${HIPBLASLT_TENSILE_LIBPATH}/library"
         COMMENT "Creating hipblasltExtOpLibrary.dat for ${arch}"
     )
-<<<<<<< HEAD
     # Update previous target for next iteration
     set(previous_target "extop-library-${arch}")
-=======
-    list(APPEND extop_cp_depends "extop-library-${arch}")
->>>>>>> Revert extops cmakelists.txt
 endforeach()

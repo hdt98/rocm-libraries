@@ -1,9 +1,6 @@
 # Copyright Advanced Micro Devices, Inc., or its affiliates.
 # SPDX-License-Identifier:  MIT
 
-add_subdirectory(extops)
-add_subdirectory(matrix-transform)
-
 set(TENSILELITE_BUILD_PARALLEL_LEVEL "" CACHE STRING "Number of CPU cores to use for building device libraries (will use nproc if unset).")
 set(TENSILELITE_KEEP_BUILD_TMP OFF CACHE STRING "Keep temporary build directory for device libraries (turning this ON  bloat the build size).")
 set(TENSILELITE_LIBLOGIC_PATH "" CACHE STRING "Path to library logic files (will use 'library' if unset).")
@@ -16,8 +13,10 @@ set(TENSILELITE_ENABLE_ASM_COMMENTS OFF CACHE STRING "Turn on asm comments when 
 
 set(HIPBLASLT_TENSILE_LIBPATH "${hipblaslt_BINARY_DIR}/Tensile" CACHE STRING "Path to output the device gemm libraries.")
 file(MAKE_DIRECTORY "${HIPBLASLT_TENSILE_LIBPATH}/library")
-
 list(JOIN GPU_TARGETS "$<SEMICOLON>" TENSILELITE_GPU_TARGETS_SEMI_ESCAPED)
+
+add_subdirectory(extops)
+add_subdirectory(matrix-transform)
 
 set(TENSILELITE_BUILD_OPTS ${TENSILELITE_BUILD_OPTS} "--architecture=${TENSILELITE_GPU_TARGETS_SEMI_ESCAPED}")
 set(TENSILELITE_BUILD_OPTS ${TENSILELITE_BUILD_OPTS} "--cxx-compiler=${CMAKE_CXX_COMPILER}")
@@ -84,6 +83,5 @@ block(SCOPE_FOR VARIABLES)
 endblock()
 
 add_custom_target(tensilelite-device-libraries ALL
-    DEPENDS "${output_stamp}" extop-libraries matrix-transform-cp
+    DEPENDS "${output_stamp}" extop-library matrix-transform
 )
-
