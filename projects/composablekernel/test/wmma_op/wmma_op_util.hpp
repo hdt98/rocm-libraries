@@ -683,7 +683,7 @@ __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
 template <typename srcA_t, typename srcB_t, typename dst_t, typename acc_t, ck::index_t kMultiplier>
 __global__ void matmul_swizzle_a(const srcA_t* a, const srcB_t* b, dst_t* c)
 {
-    printf("---------- Running gfx125 matmul_swizzle_a ----------\n");
+    if (threadIdx.x == 0) {printf("---------- Running gfx125 matmul_swizzle_a ----------\n");}
     static_assert(WMMAVecType<srcA_t, kMultiplier>::template is_compatible<srcB_t>(),
                   "the data format for srcA and srcB is unsupported in gfx1250");
     using srcA_cast_T    = WMMAVecType<srcA_t, kMultiplier>::ViewT;
@@ -832,7 +832,14 @@ __global__ void matmul_swizzle_a(const srcA_t* a, const srcB_t* b, dst_t* c)
     }
     else
     {
-        printf("NOT USING QUADS IN matmul_swizzle_a -- unimplemented \n");
+        if (threadIdx.x == 0) {printf("NOT USING QUADS IN matmul_swizzle_a \n");}
+        static_for<0, SRC_DIM, 1>{}([&](auto ele) {
+            int rowIdx = lane %16;
+            const int blk = lIdx / 16;
+            const int offset1 = ((ROW_SIZE * 8 * blk) + ((ele * 16) + rowIdx)); // sub SRC_DIM and ROW_SIZE respectively?
+            a_frag.template AsType<srcA_cast_type>()(ele) = a_ptr[offset1];
+            b_frag.template AsType<srcB_cast_type>()(ele) = b_ptr[offset1];
+       });
     }
 
     __syncthreads(); //KO TODO:: move to inline asm
@@ -851,6 +858,7 @@ __global__ void matmul_swizzle_a(const srcA_t* a, const srcB_t* b, dst_t* c)
     // layoutTransform means bf8/f8 and !same means only applied when mixed fp8 and bf8
     if constexpr(WMMAVecType<srcA_t, kMultiplier>::layoutTransform && !std::is_same_v<srcA_t, srcB_t>)
     {
+        if (threadIdx.x == 0) {printf("Col major output of C in matmul_swizzle_a \n");}
         static_for<0, 8, 1>{}([&](auto ele) {
             int lowHi = lIdx / 16;
             int col = lIdx % 16;
@@ -859,6 +867,7 @@ __global__ void matmul_swizzle_a(const srcA_t* a, const srcB_t* b, dst_t* c)
         });
     } else 
     {
+        if (threadIdx.x == 0) {printf("Row major output of C in matmul_swizzle_a \n");}
         static_for<0, 8, 1>{}([&](auto ele) {
             int lowHi = lIdx / 16;
             int col = lIdx % 16;
