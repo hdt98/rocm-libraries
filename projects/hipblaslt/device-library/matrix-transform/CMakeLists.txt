@@ -16,8 +16,14 @@ set(matrix_transform_output_library "${HIPBLASLT_TENSILE_LIBPATH}/library/hipbla
 set(matrix_transform_stamp "${CMAKE_CURRENT_SOURCE_DIR}/matrix_transform.stamp")
 
 add_custom_command(
+<<<<<<< HEAD
     COMMAND ${CMAKE_CXX_COMPILER} -x hip ${matrix_transform_cpp} ${arch_flags} -c --offload-device-only -Xoffload-linker --build-id=sha1 -O3 -o ${output_library}
     OUTPUT ${output_library}
+=======
+    COMMAND ${CMAKE_CXX_COMPILER} -x hip "${CMAKE_CURRENT_SOURCE_DIR}/matrix_transform.cpp" --offload-arch="${archs}" -c --offload-device-only -Xoffload-linker --build-id=sha1 -O3 -o ${matrix_transform_output_library}
+    COMMAND ${CMAKE_COMMAND} -E touch ${matrix_transform_stamp}
+    OUTPUT ${matrix_transform_output_library} ${matrix_transform_stamp}
+>>>>>>> Add stamp to output
     COMMENT "Building hipblasltTransform.hsaco"
 )
 
