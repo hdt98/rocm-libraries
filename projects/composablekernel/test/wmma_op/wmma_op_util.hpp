@@ -797,7 +797,6 @@ __global__ void matmul_swizzle_a(const srcA_t* a, const srcB_t* b, dst_t* c)
     // const srcB_cast_type* local_b_ptr = reinterpret_cast<const srcB_cast_type*>(p_shared);// + LDS_B_START);
 
     const int lIdx = threadIdx.x;
-    const int lane = lIdx % 32; // wave size
 
     bool use_QUADS = true;
 
@@ -810,7 +809,7 @@ __global__ void matmul_swizzle_a(const srcA_t* a, const srcB_t* b, dst_t* c)
 
             //base for a
             int base_a = rowIdx * BLOCK_SIZE + hi * QUADRANT_SIZE;
-            int base_b = rowIdx * BLOCK_SIZE + hi * QUADRANT_SIZE;// + LDS_B_START;
+            int base_b = rowIdx * BLOCK_SIZE + hi * QUADRANT_SIZE;
 
             int idx1_a = base_a + ele;
             int idx2_a = base_a + ele + QUADRANT_SIZE * 2;
@@ -828,14 +827,18 @@ __global__ void matmul_swizzle_a(const srcA_t* a, const srcB_t* b, dst_t* c)
     }
     else
     {
-        if (threadIdx.x == 0) {printf("NOT USING QUADS IN matmul_swizzle_a \n");}
         static_for<0, SRC_DIM, 1>{}([&](auto ele) {
-            int rowIdx = lane %16;
-            const int blk = lIdx / 16;
-            const int offset1 = ((ROW_SIZE * 8 * blk) + ((ele * 16) + rowIdx)); // sub SRC_DIM and ROW_SIZE respectively?
-            a_frag.template AsType<srcA_cast_type>()(ele) = a_ptr[offset1];
-            b_frag.template AsType<srcB_cast_type>()(ele) = b_ptr[offset1];
-       });
+            int rowIdx = lIdx % 16;
+            int hi = lIdx / 16;
+
+            //base for a
+            int base = rowIdx * ROW_SIZE + hi * SRC_DIM;
+            int idx1 = base + ele;
+
+            //index for first quadrant access
+            a_frag.template AsType<srcA_cast_type>()(ele) = a_ptr[idx1];
+            b_frag.template AsType<srcB_cast_type>()(ele) = b_ptr[idx1];
+        });
     }
 
     __syncthreads(); //KO TODO:: move to inline asm
