@@ -290,6 +290,12 @@ namespace Tensile
                                        reinterpret_cast<BFloat8 const*>(data),
                                        tensor,
                                        reinterpret_cast<BFloat8 const*>(ptrVal));
+                    else if(tensor.dataType() == DataType::ComplexDouble)
+                        logTensorTyped(level,
+                                       name,
+                                       reinterpret_cast<std::complex<double> const*>(data),
+                                       tensor,
+                                       reinterpret_cast<std::complex<double> const*>(ptrVal));
                     else
                         throw std::runtime_error(
                             concatenate("Can't log tensor of type ", tensor.dataType()));
