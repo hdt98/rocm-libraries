@@ -347,6 +347,10 @@ namespace GPUArchitectureGenerator
            {rocRoller::GPUCapability::HasVGPRIndexing,
             {
                 rocRoller::GPUArchitectureTarget{rocRoller::GPUArchitectureGFX::GFX1250},
+            }},
+           {rocRoller::GPUCapability::HasWorkgroupClusters,
+            {
+                rocRoller::GPUArchitectureTarget{rocRoller::GPUArchitectureGFX::GFX1250},
             }}};
 
     inline std::vector<rocRoller::GPUArchitectureTarget> gfx908ISAs()

@@ -1504,6 +1504,9 @@ int main(int argc, const char* argv[])
         .workgroupMappingDim    = -1,
         .workgroupRemapXCC      = false,
         .workgroupRemapXCCValue = -1,
+        .workgroupClusterSizeX  = 0,
+        .workgroupClusterSizeY  = 0,
+        .workgroupClusterSizeZ  = 0,
 
         .types = {.scaleA     = Operations::ScaleMode::None,
                   .scaleTypeA = DataType::None,
@@ -1793,6 +1796,56 @@ int main(int argc, const char* argv[])
                    runParams.workgroupMappingValue,
                    "Workgroup mapping value. Default: -1")
         ->check(CLI::IsMember({-1}) | CLI::PositiveNumber);
+
+    app.add_flag(
+        "--workgroupRemapXCC", solution.workgroupRemapXCC, "Use an XCC-aware workgroup remapping.");
+    app.add_option("--workgroupRemapXCCValue",
+                   solution.workgroupRemapXCCValue,
+                   "Force an XCC-aware workgroup remapping value. (Optional)");
+    app.add_option("--workgroup_cluster_size_x",
+                   solution.workgroupClusterSizeX,
+                   "Workgroup cluster size in the x dimension.");
+    app.add_option("--workgroup_cluster_size_y",
+                   solution.workgroupClusterSizeY,
+                   "Workgroup cluster size in the y dimension.");
+    app.add_option("--workgroup_cluster_size_z",
+                   solution.workgroupClusterSizeZ,
+                   "Workgroup cluster size in the z dimension.");
+    app.add_option("--unroll_x", solution.unrollX, "Unroll size in X.");
+    app.add_option("--unroll_y", solution.unrollY, "Unroll size in Y.");
+    app.add_flag("--loadLDS_A", solution.loadLDSA, "Use LDS when loading A.");
+    app.add_flag("--loadLDS_B", solution.loadLDSB, "Use LDS when loading B.");
+    app.add_flag("--storeLDS_D", solution.storeLDSD, "Use LDS when storing D.");
+    app.add_flag("--direct2LDS_A", solution.direct2LDSA, "Use direct-to-LDS when loading A.");
+    app.add_flag("--direct2LDS_B", solution.direct2LDSB, "Use direct-to-LDS when loading B.");
+    app.add_flag(
+        "--betaInFma", solution.betaInFma, "Use beta in FMA instruction instead of alpha.");
+    app.add_option("--scheduler", solution.scheduler, "Which scheduler to use.");
+    app.add_flag("--matchMemoryAccess",
+                 solution.matchMemoryAccess,
+                 "Match memory access to transpose.  Currently decreases performance.");
+    app.add_flag("--prefetch", solution.prefetch, "Enable prefetching (UnrollK=2 implied).");
+    app.add_option("--prefetchInFlight",
+                   solution.prefetchInFlight,
+                   "Number of prefetches in flight at the same time");
+    app.add_option("--prefetchLDSFactor",
+                   solution.prefetchLDSFactor,
+                   "Prefetch 1/prefetchLDSFactor of MacroTile from LDS");
+    auto prefetchMixMemOpsFlag
+        = app.add_flag("--prefetchMixMemOps",
+                       solution.prefetchMixMemOps,
+                       "Mix global and LDS memory operations during prefetching.");
+    app.add_flag("--streamK", solution.streamK, "Enable StreamK algorithm.");
+    app.add_flag("--streamKTwoTile", solution.streamKTwoTile, "Enable two-tile StreamK algorithm.");
+
+    app.add_flag("--loadLDSScale_A", solution.loadLDSScaleA, "Use LDS when loading A scale.");
+    app.add_flag("--loadLDSScale_B", solution.loadLDSScaleB, "Use LDS when loading B scale.");
+
+    app.add_flag(
+        "--swizzleScale", solution.swizzleScale, "Use Swizzle when loading A and B scale.");
+    app.add_flag("--prefetchScale",
+                 solution.prefetchScale,
+                 "Prefetch scale values with using Swizzled scales.");
 
     //
     // Benchmarking options

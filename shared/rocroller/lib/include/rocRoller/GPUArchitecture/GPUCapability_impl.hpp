@@ -191,5 +191,7 @@ namespace rocRoller
             {"PartiallyActiveWaveSize", Value::PartiallyActiveWaveSize},
 
             {"HasVGPRIndexing", Value::HasVGPRIndexing},
+
+            {"HasWorkgroupClusters", Value::HasWorkgroupClusters},
     };
 }

@@ -174,6 +174,8 @@ namespace rocRoller
 
             HasVGPRIndexing,
 
+            HasWorkgroupClusters,
+
             Count,
         };
 
