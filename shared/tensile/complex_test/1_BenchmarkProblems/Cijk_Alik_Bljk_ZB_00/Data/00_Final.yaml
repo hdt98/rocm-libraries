@@ -1,10 +1,14 @@
 - MinimumRequiredVersion: 4.44.0
 - ProblemSizes:
 <<<<<<< HEAD
+<<<<<<< HEAD
   - Exact: [16, 16, 1, 2, 16, 16, 2, 2]
 =======
   - Range: [ [ 127, 1, 0, 129 ], 0, [ 2, 1, 0, 2 ], [ 63, 1, 0, 64 ], [ 0, 1, 0, 0 ], [ 0, 1, 0, 0 ], [ 0, 1, 0, 0 ], [ 0, 1, 0, 0 ] ]
 >>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
+=======
+  - Exact: [16, 16, 1, 2, 16, 16, 2, 2]
+>>>>>>> 20f15b7814 (Fixed validator bug by removing conjugate code)
 - 1LDSBuffer: 0
   AggressivePerfMode: 1
   AssertAIGreaterThanEqual: -1
@@ -46,11 +50,15 @@
   DisableKernelPieces: 0
   DisableVgprOverlapping: false
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 20f15b7814 (Fixed validator bug by removing conjugate code)
   EdgeType: Branch
   EnableF32XdlMathOp: false
   EnableMatrixInstruction: true
   EnableMatrixInstructionStore: true
   ExpandPointerSwap: true
+<<<<<<< HEAD
 =======
   EdgeType: ShiftPtr
   EnableF32XdlMathOp: false
@@ -58,6 +66,8 @@
   EnableMatrixInstructionStore: false
   ExpandPointerSwap: 0
 >>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
+=======
+>>>>>>> 20f15b7814 (Fixed validator bug by removing conjugate code)
   ExtraLatencyForLR: 0
   ExtraMiLatencyLeft: 0
   ForceStoreSC1: false
@@ -91,12 +101,16 @@
   LSCA: 8
   LSCB: 8
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 20f15b7814 (Fixed validator bug by removing conjugate code)
   LSPA: 8
   LSPB: 8
   LVCA: 8
   LVCB: 8
   LVPA: 8
   LVPB: 8
+<<<<<<< HEAD
 =======
   LSPA: 32
   LSPB: 32
@@ -105,11 +119,16 @@
   LVPA: 32
   LVPB: 32
 >>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
+=======
+>>>>>>> 20f15b7814 (Fixed validator bug by removing conjugate code)
   LdcEqualsLdd: false
   LdsBlockSizePerPadA: 0
   LdsBlockSizePerPadB: 0
   LdsInitCVgprs: false
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 20f15b7814 (Fixed validator bug by removing conjugate code)
   LdsNumElements: 792
   LdsNumElementsAlignedA: 144
   LdsNumElementsAlignedB: 144
@@ -117,11 +136,14 @@
   LdsOffsetA_Blk: 512
   LdsOffsetB: 144
   LdsOffsetB_Blk: 656
+<<<<<<< HEAD
 =======
   LdsNumElements: 1560
   LdsOffsetA: 0
   LdsOffsetB: 528
 >>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
+=======
+>>>>>>> 20f15b7814 (Fixed validator bug by removing conjugate code)
   LdsPadA: 1
   LdsPadB: 1
   LocalDotLayout: 1
@@ -136,6 +158,9 @@
   LocalWriteUseSgprB: false
   LoopDoWhile: false
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 20f15b7814 (Fixed validator bug by removing conjugate code)
   LoopIters: 2
   LoopTail: true
   LoopUnroll: 8
@@ -164,6 +189,7 @@
   MatrixInstM: 16
   MatrixInstN: 16
   MatrixInstruction: [16, 16, 4, 1]
+<<<<<<< HEAD
 =======
   LoopIters: 8
   LoopTail: true
@@ -179,6 +205,8 @@
   MagicDivAlg: 2
   MatrixInstruction: []
 >>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
+=======
+>>>>>>> 20f15b7814 (Fixed validator bug by removing conjugate code)
   MaxOccupancy: 40
   MaxVgprNumber: 256
   MemoryModifierFormat: SC0
@@ -192,6 +220,9 @@
   NonTemporalD: 0
   NumElementsPerBatchStore: 0
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 20f15b7814 (Fixed validator bug by removing conjugate code)
   NumElementsPerThread: 4
   NumGlobalWriteVectorsPerThread: 4
   NumLoadsA: 2
@@ -201,6 +232,7 @@
   NumLoadsPerpendicularA: 2
   NumLoadsPerpendicularB: 2
   NumThreads: 64
+<<<<<<< HEAD
 =======
   NumElementsPerThread: 32
   NumGlobalWriteVectorsPerThread: 32
@@ -212,6 +244,8 @@
   NumLoadsPerpendicularB: 4
   NumThreads: 256
 >>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
+=======
+>>>>>>> 20f15b7814 (Fixed validator bug by removing conjugate code)
   OptNoLoadLoop: 1
   OptPreLoopVmcnt: 0
   PackBatchDims: 0
@@ -230,12 +264,17 @@
   PrefetchAcrossPersistent: 0
   PrefetchAcrossPersistentMode: 0
 <<<<<<< HEAD
+<<<<<<< HEAD
   PrefetchGlobalRead: true
   PrefetchLocalRead: false
 =======
   PrefetchGlobalRead: false
   PrefetchLocalRead: true
 >>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
+=======
+  PrefetchGlobalRead: true
+  PrefetchLocalRead: false
+>>>>>>> 20f15b7814 (Fixed validator bug by removing conjugate code)
   PreloadKernelArguments: 0
   ProblemType:
     AllowNoFreeDims: false
@@ -314,6 +353,7 @@
   StreamKAtomic: 0
   StreamKXCCMapping: 0
 <<<<<<< HEAD
+<<<<<<< HEAD
   SubGroup0: 4
   SubGroup1: 16
   SubGroupA: 4
@@ -322,16 +362,25 @@
   SubGroup1: 16
   SubGroupA: 16
 >>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
+=======
+  SubGroup0: 4
+  SubGroup1: 16
+  SubGroupA: 4
+>>>>>>> 20f15b7814 (Fixed validator bug by removing conjugate code)
   SubGroupB: 16
   SuppressNoLoadLoop: false
   ThreadSeparateGlobalReadA: 0
   ThreadSeparateGlobalReadB: 0
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 20f15b7814 (Fixed validator bug by removing conjugate code)
   ThreadTile: [1, 16]
   ThreadTile0: 4
   ThreadTile1: 1
   ThreadTileA: 4
   ThreadTileB: 1
+<<<<<<< HEAD
 =======
   ThreadTile: [4, 8]
   ThreadTile0: 4
@@ -339,6 +388,8 @@
   ThreadTileA: 4
   ThreadTileB: 8
 >>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
+=======
+>>>>>>> 20f15b7814 (Fixed validator bug by removing conjugate code)
   TransposeLDS: 0
   UnrollIncIsDepthU: 0
   UnrollMajorLDSA: false
@@ -358,10 +409,14 @@
   WaveSeparateGlobalReadB: 0
   WavefrontSize: 64
 <<<<<<< HEAD
+<<<<<<< HEAD
   WorkGroup: [16, 4, 1]
 =======
   WorkGroup: [16, 16, 1]
 >>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
+=======
+  WorkGroup: [16, 4, 1]
+>>>>>>> 20f15b7814 (Fixed validator bug by removing conjugate code)
   WorkGroupMapping: 8
   WorkGroupMappingType: B
   _DepthULds: 8
@@ -369,6 +424,7 @@
   _UseSgprForGRO: 1
   _VectorStore: 1
   _WorkspaceSizePerElemC: 0
+<<<<<<< HEAD
 <<<<<<< HEAD
   _staggerStrideShift: 1
 =======
@@ -646,3 +702,6 @@
   _WorkspaceSizePerElemC: 0
   _staggerStrideShift: 0
 >>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
+=======
+  _staggerStrideShift: 1
+>>>>>>> 20f15b7814 (Fixed validator bug by removing conjugate code)

@@ -64,4 +64,8 @@ BenchmarkProblems:
 LibraryLogic:
   ScheduleName: "gfx950"
   DeviceNames: ["Device 0049"]
+<<<<<<< HEAD
   ArchitectureName: "gfx950"
+=======
+  ArchitectureName: "gfx950"
+>>>>>>> 20f15b7814 (Fixed validator bug by removing conjugate code)

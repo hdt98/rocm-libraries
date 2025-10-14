@@ -1,10 +1,17 @@
 ---
 CodeObjectFiles: [library/Kernels.so-000-gfx1030.hsaco, library/Kernels.so-000-gfx1150.hsaco,
   library/Kernels.so-000-gfx1201.hsaco, library/Kernels.so-000-gfx900.hsaco, library/Kernels.so-000-gfx942.hsaco,
+<<<<<<< HEAD
   library/Kernels.so-000-gfx1032.hsaco, library/Kernels.so-000-gfx1010.hsaco, library/Kernels.so-000-gfx1031.hsaco,
   library/Kernels.so-000-gfx1012.hsaco, library/Kernels.so-000-gfx906-xnack-.hsaco,
   library/Kernels.so-000-gfx1101.hsaco, library/Kernels.so-000-gfx1102.hsaco, library/Kernels.so-000-gfx803.hsaco,
   library/Kernels.so-000-gfx1103.hsaco, library/Kernels.so-000-gfx1200.hsaco, library/Kernels.so-000-gfx90a-xnack+.hsaco,
+=======
+  library/Kernels.so-000-gfx1010.hsaco, library/Kernels.so-000-gfx1031.hsaco, library/Kernels.so-000-gfx1012.hsaco,
+  library/Kernels.so-000-gfx906-xnack-.hsaco, library/Kernels.so-000-gfx1101.hsaco,
+  library/Kernels.so-000-gfx1102.hsaco, library/Kernels.so-000-gfx803.hsaco, library/Kernels.so-000-gfx1103.hsaco,
+  library/Kernels.so-000-gfx1200.hsaco, library/Kernels.so-000-gfx90a-xnack+.hsaco,
+>>>>>>> 20f15b7814 (Fixed validator bug by removing conjugate code)
   library/Kernels.so-000-gfx950.hsaco, library/Kernels.so-000-gfx908-xnack-.hsaco,
   library/Kernels.so-000-gfx1100.hsaco, library/Kernels.so-000-gfx1011.hsaco, library/Kernels.so-000-gfx90a-xnack-.hsaco,
   library/Kernels.so-000-gfx1151.hsaco, library/TensileLibrary_gfx950.co]
@@ -37,9 +44,13 @@ ConstantParams:
   CustomKernelName: ''
   DebugStreamK: 0
 <<<<<<< HEAD
+<<<<<<< HEAD
   DepthU: 8
 =======
 >>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
+=======
+  DepthU: 8
+>>>>>>> 20f15b7814 (Fixed validator bug by removing conjugate code)
   DepthULdsDivisor: 1
   DirectToLdsA: false
   DirectToLdsB: false
@@ -95,10 +106,14 @@ ConstantParams:
   MacroTileShapeMin: 1
   MagicDivAlg: 2
 <<<<<<< HEAD
+<<<<<<< HEAD
   MatrixInstruction: [16, 16, 4, 1, 1, 1, 1, 1, 1]
 =======
   MatrixInstruction: [16, 16, 4, 1, 1, 2, 2, 2, 2]
 >>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
+=======
+  MatrixInstruction: [16, 16, 4, 1, 1, 1, 1, 1, 1]
+>>>>>>> 20f15b7814 (Fixed validator bug by removing conjugate code)
   MaxOccupancy: 40
   MaxVgprNumber: 256
   MemoryModifierFormat: ''
@@ -173,10 +188,14 @@ ConstantParams:
 CustomKernelWildcard: false
 CustomKernels: []
 <<<<<<< HEAD
+<<<<<<< HEAD
 ForkParams: {}
 =======
 ForkParams:
   DepthU: [8, 16, 32]
 >>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
+=======
+ForkParams: {}
+>>>>>>> 20f15b7814 (Fixed validator bug by removing conjugate code)
 ParamGroups: []
 ...

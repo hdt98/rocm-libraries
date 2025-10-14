@@ -37,10 +37,14 @@ ConstantParams:
   CustomKernelName: ''
   DebugStreamK: 0
 <<<<<<< HEAD
+<<<<<<< HEAD
   DepthU: 8
 =======
   DepthU: -4
 >>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
+=======
+  DepthU: 8
+>>>>>>> 20f15b7814 (Fixed validator bug by removing conjugate code)
   DepthULdsDivisor: 1
   DirectToLdsA: false
   DirectToLdsB: false
@@ -50,10 +54,14 @@ ConstantParams:
   DisableKernelPieces: 0
   DisableVgprOverlapping: false
 <<<<<<< HEAD
+<<<<<<< HEAD
   EdgeType: Branch
 =======
   EdgeType: ShiftPtr
 >>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
+=======
+  EdgeType: Branch
+>>>>>>> 20f15b7814 (Fixed validator bug by removing conjugate code)
   ExpandPointerSwap: true
   ExtraLatencyForLR: 0
   ExtraMiLatencyLeft: 0
@@ -72,9 +80,13 @@ ConstantParams:
   GlobalReadPerMfma: 1
   GlobalReadVectorWidth: -1
 <<<<<<< HEAD
+<<<<<<< HEAD
   GlobalSplitU: 1
 =======
 >>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
+=======
+  GlobalSplitU: 1
+>>>>>>> 20f15b7814 (Fixed validator bug by removing conjugate code)
   GlobalSplitUAlgorithm: SingleBuffer
   GlobalSplitUAtomicAdd: false
   GlobalSplitUSummationAssignmentRoundRobin: true
@@ -103,10 +115,14 @@ ConstantParams:
   MacroTileShapeMin: 1
   MagicDivAlg: 2
 <<<<<<< HEAD
+<<<<<<< HEAD
   MatrixInstruction: [16, 16, 4, 1, 1, 1, 1, 1, 1]
 =======
   MatrixInstruction: []
 >>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
+=======
+  MatrixInstruction: [16, 16, 4, 1, 1, 1, 1, 1, 1]
+>>>>>>> 20f15b7814 (Fixed validator bug by removing conjugate code)
   MaxOccupancy: 40
   MaxVgprNumber: 256
   MemoryModifierFormat: ''
@@ -134,12 +150,17 @@ ConstantParams:
   PrefetchAcrossPersistent: 0
   PrefetchAcrossPersistentMode: 0
 <<<<<<< HEAD
+<<<<<<< HEAD
   PrefetchGlobalRead: true
   PrefetchLocalRead: false
 =======
   PrefetchGlobalRead: false
   PrefetchLocalRead: true
 >>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
+=======
+  PrefetchGlobalRead: true
+  PrefetchLocalRead: false
+>>>>>>> 20f15b7814 (Fixed validator bug by removing conjugate code)
   PreloadKernelArguments: 0
   ReplacementKernel: false
   ScheduleGlobalRead: 1
@@ -164,9 +185,13 @@ ConstantParams:
   ThreadSeparateGlobalReadA: 0
   ThreadSeparateGlobalReadB: 0
 <<<<<<< HEAD
+<<<<<<< HEAD
   ThreadTile: [4, 4]
 =======
 >>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
+=======
+  ThreadTile: [4, 4]
+>>>>>>> 20f15b7814 (Fixed validator bug by removing conjugate code)
   TransposeLDS: 0
   UnrollIncIsDepthU: 0
   UnrollMajorLDSA: false
@@ -184,13 +209,18 @@ ConstantParams:
   WaveSeparateGlobalReadB: 0
   WavefrontSize: 64
 <<<<<<< HEAD
+<<<<<<< HEAD
   WorkGroup: [16, 16, 1]
 =======
 >>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
+=======
+  WorkGroup: [16, 16, 1]
+>>>>>>> 20f15b7814 (Fixed validator bug by removing conjugate code)
   WorkGroupMapping: 8
   WorkGroupMappingType: B
 CustomKernelWildcard: false
 CustomKernels: []
+<<<<<<< HEAD
 <<<<<<< HEAD
 ForkParams: {}
 =======
@@ -203,5 +233,8 @@ ForkParams:
   - [16, 16, 1]
   - [32, 4, 1]
 >>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
+=======
+ForkParams: {}
+>>>>>>> 20f15b7814 (Fixed validator bug by removing conjugate code)
 ParamGroups: []
 ...
