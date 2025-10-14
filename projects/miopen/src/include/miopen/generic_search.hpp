@@ -486,7 +486,7 @@ auto GenericSearch(const Solver s,
     float cutoff_time = context.generic_search_worst_time;
     if(cutoff_time < std::numeric_limits<float>::max())
         cutoff_time *= env::value(MIOPEN_SEARCH_CUTOFF_MUL);
-    // skip detailed measurement for configs slower than skip_time 
+    // skip detailed measurement for configs slower than skip_time
     float skip_time = context.generic_search_best_time;
     if(skip_time < std::numeric_limits<float>::max())
         skip_time *= env::value(MIOPEN_SEARCH_SKIP_PCT) / 100.0f;
@@ -593,8 +593,7 @@ auto GenericSearch(const Solver s,
                 if(elapsed_time > cutoff_time)
                 {
                     MIOPEN_LOG_I2("Ending Search, measured time: "
-                                  << elapsed_time << " was greater than cutoff: "
-                                  << cutoff_time);
+                                  << elapsed_time << " was greater than cutoff: " << cutoff_time);
                     for(const auto& kernelInfo : current_solution.construction_params)
                         profile_h.ClearProgram(kernelInfo.kernel_file, kernelInfo.comp_options);
                     break;
@@ -700,8 +699,8 @@ auto GenericSearch(const Solver s,
     // if using cutoff for search update timing
     if(context.search_cutoff && best_time < context.generic_search_best_time)
     {
-        float new_worst = (perf_sols.end() - 1)->time;
-        context_.generic_search_best_time = best_time;
+        float new_worst                    = (perf_sols.end() - 1)->time;
+        context_.generic_search_best_time  = best_time;
         context_.generic_search_worst_time = new_worst;
         MIOPEN_LOG_I2("Times updated, best: " << best_time << " worst: " << new_worst);
     }

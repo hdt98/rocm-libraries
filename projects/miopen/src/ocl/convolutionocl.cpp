@@ -395,14 +395,14 @@ std::vector<Solution> VerifiedFDBSolution(const ExecutionContext& ctx,
             ctx_copy.db_update = true;
 
             auto ret = FindCore(invoke_ctx,
-                            ctx_copy,
-                            problem,
-                            params,
-                            conv::GetConvSolverFinders(),
-                            std::nullopt,
-                            force_attach_binary);
+                                ctx_copy,
+                                problem,
+                                params,
+                                conv::GetConvSolverFinders(),
+                                std::nullopt,
+                                force_attach_binary);
             ctx.generic_search_worst_time = ctx_copy.generic_search_worst_time;
-            ctx.generic_search_best_time = ctx_copy.generic_search_best_time;
+            ctx.generic_search_best_time  = ctx_copy.generic_search_best_time;
             return ret;
         }
     });
@@ -492,14 +492,14 @@ std::vector<Solution> FindConvolution(const ExecutionContext& ctx,
             }
 
             auto ret = FindCore(invoke_ctx,
-                            ctx_copy,
-                            problem,
-                            params,
-                            conv::GetConvSolverFinders(),
-                            std::nullopt,
-                            force_attach_binary);
+                                ctx_copy,
+                                problem,
+                                params,
+                                conv::GetConvSolverFinders(),
+                                std::nullopt,
+                                force_attach_binary);
             ctx.generic_search_worst_time = ctx_copy.generic_search_worst_time;
-            ctx.generic_search_best_time = ctx_copy.generic_search_best_time;
+            ctx.generic_search_best_time  = ctx_copy.generic_search_best_time;
             return ret;
         });
     }
