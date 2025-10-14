@@ -83,6 +83,7 @@ and :doc:`Performance database <../conceptual/perfdb>`.
 
     * - | ``MIOPEN_FIND_MODE``
         | Sets find mode to accelerate find API calls.
+        | **Note**: Some combinations with ``MIOPEN_FIND_ENFORCE`` may be unsafe and will be automatically blocked to prevent incomplete database entries.
       - | "NORMAL" or 1: Full find mode (benchmarks all solvers)
         | "FAST" or 2: Fast find (use FindDb or immediate fallback)
         | "HYBRID" or 3: Hybrid find (FindDb hit or full find)
@@ -91,16 +92,34 @@ and :doc:`Performance database <../conceptual/perfdb>`.
 
     * - | ``MIOPEN_FIND_ENFORCE``
         | Controls auto-tune behavior and database updates.
+        | **Note**: Some combinations with ``MIOPEN_FIND_MODE`` may be unsafe and will be automatically blocked to prevent incomplete database entries.
       - | "NONE" or 1: No change in default behavior
-        | "DB_UPDATE" or 2: Always perform auto-tune and update PerfDb
+        | "DB_UPDATE" or 2: Always perform auto-tune and update PerfDb (unsafe with Fast/Hybrid modes)
         | "SEARCH" or 3: Auto-tune even if not requested via API
-        | "SEARCH_DB_UPDATE" or 4: Combination of DB_UPDATE and SEARCH
-        | "DB_CLEAN" or 5: Remove optimized values from User PerfDb
+        | "SEARCH_DB_UPDATE" or 4: Combination of DB_UPDATE and SEARCH (unsafe with Fast/Hybrid modes)
+        | "DB_CLEAN" or 5: Remove optimized values from User PerfDb (unsafe with Fast/Hybrid modes)
 
     * - | ``MIOPEN_DEBUG_DISABLE_FIND_DB``
         | Disables FindDb functionality.
       - | 1: Disable FindDb
         | 0 or unset: Enable FindDb
+
+.. warning::
+   **Unsafe Mode Combinations**
+   
+   The following combinations of ``MIOPEN_FIND_MODE`` and ``MIOPEN_FIND_ENFORCE`` are automatically blocked because they can lead to incomplete or inconsistent database entries:
+   
+   * Fast/Hybrid modes (2, 3, 5) with database operations (DB_UPDATE=2, SEARCH_DB_UPDATE=4, DB_CLEAN=5)
+   
+   When an unsafe combination is detected, MIOpen automatically falls back to Normal mode and logs a warning message.
+
+.. note::
+   **Safe Combinations**
+   
+   The following combinations are always safe:
+   
+   * Any ``MIOPEN_FIND_MODE`` with ``MIOPEN_FIND_ENFORCE=NONE`` (1) or ``MIOPEN_FIND_ENFORCE=SEARCH`` (3)
+   * Normal ``MIOPEN_FIND_MODE`` (1) with any ``MIOPEN_FIND_ENFORCE`` option
 
 Algorithm control
 =================

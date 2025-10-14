@@ -12,6 +12,7 @@ Full documentation for MIOpen is available [here](https://rocm.docs.amd.com/proj
 ### Changed
 
 * Kernel DBs moved from Git LFS to DVC (Data Version Control).
+* MIOPEN_FIND_ENFORCE no longer forces Normal for MIOPEN_FIND_MODE when using non-database update operations.
 
 ### Optimized
 

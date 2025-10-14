@@ -17,6 +17,15 @@ MIOpen uses the following to decide upon the best solver to be used for a reques
 
 Manual tuning can either be incremental or exhaustive as detailed in the next sections.
 
+.. warning::
+   **Safety Validation**
+   
+   MIOpen automatically validates combinations of ``MIOPEN_FIND_MODE`` and ``MIOPEN_FIND_ENFORCE`` to prevent unsafe configurations that could lead to incomplete database entries. When an unsafe combination is detected:
+   
+   * MIOpen logs a warning message
+   * The find mode is automatically changed to Normal mode
+   * Tuning proceeds safely with the corrected settings
+
 Incremental tuning
 ==========================================================
 
@@ -47,6 +56,7 @@ Enable this feature using these commands:
 
 .. code:: bash
 
+  export MIOPEN_FIND_MODE=1  # Can alternatively use another find mode for faster, but less comprehensive results
   export MIOPEN_FIND_ENFORCE=3
   export MIOPEN_USER_DB_PATH="/user/specified/directory"
   export MIOPEN_SYSTEM_DB_PATH="$MIOPEN_USER_DB_PATH"
@@ -77,6 +87,7 @@ The cache directory defaults to "$HOME/.cache/miopen".
 
 Post tuning
 ==========================================================
+
 Unset ``MIOPEN_FIND_MODE`` and ``MIOPEN_FIND_ENFORCE`` to return to the default behavior. The behavior when these are set is expected
 to be the same as the default when all shapes are tuned, but some first run delay has been observed.
 
@@ -93,3 +104,23 @@ Unset these variables using these commands:
   unset MIOPEN_FIND_MODE
   unset MIOPEN_FIND_ENFORCE
   unset MIOPEN_SYSTEM_DB_PATH
+
+Troubleshooting
+==========================================================
+
+**Warning Messages**
+
+If you see warning messages like:
+
+.. code::
+
+   Unsafe combination: Specified find mode and enforcement may lead to incomplete database entries.
+   MIOPEN_FIND_MODE is set to NORMAL due to unsafe combination with MIOPEN_FIND_ENFORCE
+
+This means MIOpen detected an unsafe combination and automatically corrected it. Your tuning will proceed safely, but you may want to adjust your environment variables to use a recommended safe combination.
+
+**Performance Considerations**
+
+* Fast and Hybrid modes are designed to reduce tuning time but may skip some solvers
+* When combined with database update operations, this can lead to incomplete database entries
+* For comprehensive tuning, use Normal mode with appropriate enforcement options
