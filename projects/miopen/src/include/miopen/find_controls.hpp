@@ -76,6 +76,8 @@ public:
     FindEnforce();
     explicit FindEnforce(FindEnforceAction action_) : action(action_) {}
 
+    FindEnforceAction GetAction() const { return action; }
+
     template <class Context>
     bool IsDbClean(const Context& context) const
     {
@@ -130,14 +132,65 @@ private:
     Values value;
 
     template <class Context>
-    bool IsEnabled(const Context& context) const
+    bool IsValidCombination(const Context& context, const FindEnforce& enforce) const
     {
-        if(FindEnforce{}.IsSomethingEnforced(context))
+        FindEnforceAction action = enforce.GetAction();
+        
+        // Always safe with no enforcement
+        if(action == FindEnforceAction::None)
+            return true;
+
+        // Always safe with Search-only enforcement
+        if(action == FindEnforceAction::Search)
+            return true;
+        
+        // Always safe with Normal mode
+        if(value == Values::Normal)
+            return true;
+        
+        // Unsafe: Fast/Hybrid modes with database operations
+        if((value == Values::Fast || value == Values::Hybrid || 
+            value == Values::DeprecatedFastHybrid || value == Values::DynamicHybrid) &&
+           (action == FindEnforceAction::DbUpdate || 
+            action == FindEnforceAction::SearchDbUpdate ||
+            action == FindEnforceAction::DbClean))
         {
-            MIOPEN_LOG_NQI("MIOPEN_FIND_MODE is set to NORMAL due to MIOPEN_FIND_ENFORCE");
+            MIOPEN_LOG_W("Unsafe combination: Specified find mode and enforcement may lead to incomplete database entries.");
             return false;
         }
-        return true;
+        
+        // Unsafe: Trust modes (not public API accessible) with database operations
+        if((value == Values::TrustVerify || value == Values::TrustVerifyFull) && 
+           (action == FindEnforceAction::DbUpdate || 
+            action == FindEnforceAction::SearchDbUpdate ||
+            action == FindEnforceAction::DbClean))
+        {
+            MIOPEN_LOG_W("Unsafe combination: Specified find mode and enforcement depends on DB completeness and is therefore risky.");
+            return false;
+        }
+        
+        return false;
+    }
+
+    template <class Context>
+    bool IsEnabled(const Context& context) const
+    {
+        FindEnforce enforce{};
+        
+        // If no enforcement is active, always allow
+        if(!enforce.IsSomethingEnforced(context))
+            return true;
+        
+        // Check if the combination is valid/safe
+        if(IsValidCombination(context, enforce))
+        {
+            MIOPEN_LOG_I("Allowing MIOPEN_FIND_MODE with MIOPEN_FIND_ENFORCE combination");
+            return true;
+        }
+        
+        // Unsafe combination - force Normal mode
+        MIOPEN_LOG_NQI("MIOPEN_FIND_MODE is set to NORMAL due to unsafe combination with MIOPEN_FIND_ENFORCE");
+        return false;
     }
 
 public:
@@ -173,7 +226,7 @@ public:
     {
         // TrustVerify uses user db as groud truth, disable if no user db
 #if MIOPEN_DISABLE_USERDB
-        return false
+        return false;
 #else
         return (value == Values::TrustVerify || value == Values::TrustVerifyFull) &&
                IsEnabled(context);
