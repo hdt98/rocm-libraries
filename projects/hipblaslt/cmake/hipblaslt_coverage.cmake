@@ -33,14 +33,8 @@ add_custom_command(
                                     GTEST_LISTENER=NO_PASS_LINE_IN_LOG
                                     LLVM_PROFILE_FILE="${coverage_dir}/profraw/hipblaslt-coverage_test_perf_64_%m.profraw"
                                     $<TARGET_FILE:hipblaslt-test>
-                                    --gtest_filter="-*matmul_test*:*aux_test.conversion/pre_checkin_aux_rocblaslt_rocroller_host_func_f16_r:ExtOpTest*:*MatrixTransformTest*"
+                                    --gtest_filter="-*matmul_test*:*aux_test.conversion/pre_checkin_aux_rocblaslt_rocroller_host_func_f16_r*"
                                     --precompile=hipblaslt-test-precompile.db
-                                    --output-on-failure
-    COMMAND ${CMAKE_COMMAND} -E env HIPBLASLT_ENABLE_MARKER=2
-                                    HIPBLASLT_LOG_MASK=128
-                                    LLVM_PROFILE_VERBOSE=1
-                                    LLVM_PROFILE_FILE="${coverage_dir}/profraw/hipblaslt-coverage_sample_hipblaslt_basic_matmul_for_cov_128_%m.profraw"
-                                    $<TARGET_FILE:sample_hipblaslt_basic_matmul_for_cov>
                                     --output-on-failure
     COMMAND ${CMAKE_COMMAND} -E env HIPBLASLT_ENABLE_MARKER=2
                                     HIPBLASLT_LOG_MASK=128
@@ -275,6 +269,12 @@ add_custom_command(
                                     LLVM_PROFILE_VERBOSE=1
                                     LLVM_PROFILE_FILE="${coverage_dir}/profraw/hipblaslt-coverage_sample_hipblaslt_gemm_swish_bias_128_%m.profraw"
                                     $<TARGET_FILE:sample_hipblaslt_gemm_swish_bias>
+                                    --output-on-failure
+    COMMAND ${CMAKE_COMMAND} -E env HIPBLASLT_ENABLE_MARKER=2
+                                    HIPBLASLT_LOG_MASK=128
+                                    LLVM_PROFILE_VERBOSE=1
+                                    LLVM_PROFILE_FILE="${coverage_dir}/profraw/hipblaslt-coverage_sample_hipblaslt_basic_matmul_for_cov_128_%m.profraw"
+                                    $<TARGET_FILE:sample_hipblaslt_basic_matmul_for_cov>
                                     --output-on-failure
     COMMAND ${CMAKE_COMMAND} -E touch "${coverage_dir}/coverage-test.stamp"
 )
