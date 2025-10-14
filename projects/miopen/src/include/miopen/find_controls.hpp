@@ -140,20 +140,21 @@ private:
     bool IsEnabled(const Context& context) const
     {
         FindEnforce enforce{};
-        
+
         // If no enforcement is active, always allow
         if(!enforce.IsSomethingEnforced(context))
             return true;
-        
+
         // Check if the combination is valid/safe
         if(IsValidCombination(enforce, *this))
         {
             MIOPEN_LOG_I("Allowing MIOPEN_FIND_MODE with MIOPEN_FIND_ENFORCE combination");
             return true;
         }
-        
+
         // Unsafe combination - force Normal mode
-        MIOPEN_LOG_NQI("MIOPEN_FIND_MODE is set to NORMAL due to unsafe combination with MIOPEN_FIND_ENFORCE");
+        MIOPEN_LOG_NQI(
+            "MIOPEN_FIND_MODE is set to NORMAL due to unsafe combination with MIOPEN_FIND_ENFORCE");
         return false;
     }
 
