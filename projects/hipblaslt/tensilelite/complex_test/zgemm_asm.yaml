@@ -60,7 +60,7 @@ BenchmarkProblems:
         # - WorkGroup:
           # - [ 32,  4,  1 ]
           # - [  4,  4,  2 ]
-        - DepthU: [8,16,32]
+        - DepthU: [8] #,16,32]
         # - VectorWidth: [-1]
       BenchmarkForkParameters:
       JoinParameters:
