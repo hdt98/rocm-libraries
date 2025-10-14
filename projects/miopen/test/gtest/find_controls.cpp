@@ -25,13 +25,10 @@ protected:
     void SetUp() override
     {
         original_find_enforce_disable = debug::FindEnforceDisable;
-        debug::FindEnforceDisable = false;
+        debug::FindEnforceDisable     = false;
     }
 
-    void TearDown() override
-    {
-        debug::FindEnforceDisable = original_find_enforce_disable;
-    }
+    void TearDown() override { debug::FindEnforceDisable = original_find_enforce_disable; }
 
     bool original_find_enforce_disable;
     MockContext context;
@@ -66,7 +63,7 @@ TEST_F(CPU_FindControls_NONE, FindEnforceGetAction)
 
     FindEnforce enforce_db_update(FindEnforceAction::DbUpdate);
     EXPECT_EQ(enforce_db_update.GetAction(), FindEnforceAction::DbUpdate);
-    
+
     FindEnforce enforce_search(FindEnforceAction::Search);
     EXPECT_EQ(enforce_search.GetAction(), FindEnforceAction::Search);
 
@@ -222,15 +219,12 @@ TEST_F(CPU_FindControls_NONE, FindModeManualSetting_NoEnforcement)
     FindMode mode_trust_verify_full;
     mode_trust_verify_full.Set(FindMode::Values::TrustVerifyFull);
 
-
     EXPECT_TRUE(mode_fast.IsFast(context));
     EXPECT_FALSE(mode_fast.IsHybrid(context));
 
-    
     EXPECT_TRUE(mode_hybrid.IsHybrid(context));
     EXPECT_FALSE(mode_hybrid.IsFast(context));
 
-    
     EXPECT_FALSE(mode_normal.IsFast(context));
     EXPECT_FALSE(mode_normal.IsHybrid(context));
 }
@@ -250,7 +244,6 @@ TEST_F(CPU_FindControls_NONE, FindModeIsFast)
     mode_trust_verify.Set(FindMode::Values::TrustVerify);
     FindMode mode_trust_verify_full;
     mode_trust_verify_full.Set(FindMode::Values::TrustVerifyFull);
-
 
     EXPECT_FALSE(mode_normal.IsFast(context));
     EXPECT_TRUE(mode_fast.IsFast(context));
@@ -392,7 +385,7 @@ TEST_F(CPU_FindControls_NONE, FindModeGetSet)
     mode_trust_verify.Set(FindMode::Values::TrustVerify);
     FindMode mode_trust_verify_full;
     mode_trust_verify_full.Set(FindMode::Values::TrustVerifyFull);
-    
+
     EXPECT_EQ(mode_normal.Get(), FindMode::Values::Normal);
     EXPECT_EQ(mode_fast.Get(), FindMode::Values::Fast);
     EXPECT_EQ(mode_hybrid.Get(), FindMode::Values::Hybrid);
@@ -407,7 +400,7 @@ TEST_F(CPU_FindControls_NONE, FindModeConstructorPrimitive)
     // Test default constructor (Convolution primitive)
     FindMode mode_default;
     // Just ensure it constructs without crashing
-    
+
     // Test Fusion primitive
     FindMode mode_fusion(solver::Primitive::Fusion);
     // Just ensure it constructs without crashing
@@ -419,7 +412,7 @@ TEST_F(CPU_FindControls_NONE, FindModeEdgeCases)
     // Test deprecated fast hybrid mode
     FindMode mode;
     mode.Set(FindMode::Values::DeprecatedFastHybrid);
-    
+
     // DeprecatedFastHybrid should not be considered as Fast or Hybrid in current implementation
     EXPECT_FALSE(mode.IsFast(context));
     EXPECT_FALSE(mode.IsHybrid(context));
@@ -430,16 +423,15 @@ TEST_F(CPU_FindControls_NONE, StreamOperators)
 {
     FindEnforce enforce(FindEnforceAction::Search);
     FindMode mode;
-    
+
     std::ostringstream oss1, oss2;
     oss1 << enforce;
     oss2 << mode;
-    
+
     // Just ensure they don't crash and produce some output
     EXPECT_FALSE(oss1.str().empty());
     EXPECT_FALSE(oss2.str().empty());
 }
-
 
 // Since we can't test environment variable combinations directly,
 // test the constructor behavior with whatever environment is set
@@ -448,11 +440,11 @@ TEST_F(CPU_FindControls_NONE, ConstructorReadsEnvironment)
     // Test that constructors work and read some value
     FindMode mode_conv; // Default convolution
     FindMode mode_fusion(solver::Primitive::Fusion);
-    
+
     // Just verify they construct and have valid enum values
     EXPECT_GE(static_cast<int>(mode_conv.Get()), static_cast<int>(FindMode::Values::Begin_));
     EXPECT_LT(static_cast<int>(mode_conv.Get()), static_cast<int>(FindMode::Values::End_));
-    
+
     EXPECT_GE(static_cast<int>(mode_fusion.Get()), static_cast<int>(FindMode::Values::Begin_));
     EXPECT_LT(static_cast<int>(mode_fusion.Get()), static_cast<int>(FindMode::Values::End_));
 }
@@ -461,33 +453,38 @@ TEST_F(CPU_FindControls_NONE, ConstructorReadsEnvironment)
 TEST_F(CPU_FindControls_NONE, DefaultConstructorBehavior)
 {
     FindEnforce default_enforce; // Reads from environment
-    
+
     // Verify it constructed and has a valid action value
-    EXPECT_GE(static_cast<int>(default_enforce.GetAction()), static_cast<int>(FindEnforceAction::First_));
-    EXPECT_LE(static_cast<int>(default_enforce.GetAction()), static_cast<int>(FindEnforceAction::Last_));
+    EXPECT_GE(static_cast<int>(default_enforce.GetAction()),
+              static_cast<int>(FindEnforceAction::First_));
+    EXPECT_LE(static_cast<int>(default_enforce.GetAction()),
+              static_cast<int>(FindEnforceAction::Last_));
 }
 
 // Test current environment state (informational)
 TEST_F(CPU_FindControls_NONE, CurrentEnvironmentState)
 {
-    const char* mode_env = std::getenv("MIOPEN_FIND_MODE");
+    const char* mode_env    = std::getenv("MIOPEN_FIND_MODE");
     const char* enforce_env = std::getenv("MIOPEN_FIND_ENFORCE");
-    
+
     // This is informational - shows what environment the tests are running with
-    if(mode_env) {
+    if(mode_env)
+    {
         std::cout << "Test running with MIOPEN_FIND_MODE=" << mode_env << std::endl;
     }
-    if(enforce_env) {
+    if(enforce_env)
+    {
         std::cout << "Test running with MIOPEN_FIND_ENFORCE=" << enforce_env << std::endl;
     }
-    
+
     // Test what the constructors actually produce with current environment
     FindMode mode;
     FindEnforce enforce;
-    
+
     std::cout << "Constructor produced FindMode: " << static_cast<int>(mode.Get()) << std::endl;
-    std::cout << "Constructor produced FindEnforce: " << static_cast<int>(enforce.GetAction()) << std::endl;
-    
+    std::cout << "Constructor produced FindEnforce: " << static_cast<int>(enforce.GetAction())
+              << std::endl;
+
     // Basic sanity checks
     EXPECT_GE(static_cast<int>(mode.Get()), 1);
     EXPECT_LT(static_cast<int>(mode.Get()), 8);
