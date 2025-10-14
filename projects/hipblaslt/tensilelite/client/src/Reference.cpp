@@ -732,12 +732,12 @@ namespace TensileLite
 
             if(DataTypeInfo::Get(problem.a().dataType()).isComplex)
             {
-                aConjugate = true;
+                // aConjugate = true;
             }
 
             if(DataTypeInfo::Get(problem.b().dataType()).isComplex)
             {
-                bConjugate = true;
+                // bConjugate = true;
             }
 
             std::vector<size_t> freeASize(freeIndicesA.size());

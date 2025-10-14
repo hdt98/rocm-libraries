@@ -61,3 +61,7 @@ BenchmarkProblems:
         - ProblemSizes:
           - Exact: [4096, 4096, 1, 8192]
           # - Range: [ [127,1,129], 0, [2], [63,1,64] ]
+LibraryLogic:
+  ScheduleName: "gfx950"
+  DeviceNames: ["Device 0049"]
+  ArchitectureName: "gfx950"
