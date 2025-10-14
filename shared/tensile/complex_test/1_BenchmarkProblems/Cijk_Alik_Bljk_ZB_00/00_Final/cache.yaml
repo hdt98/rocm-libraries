@@ -36,7 +36,7 @@ ConstantParams:
   ClusterLocalRead: false
   CustomKernelName: ''
   DebugStreamK: 0
-  DepthU: -4
+  DepthU: 8
   DepthULdsDivisor: 1
   DirectToLdsA: false
   DirectToLdsB: false
@@ -45,7 +45,7 @@ ConstantParams:
   DisableAtomicFail: 0
   DisableKernelPieces: 0
   DisableVgprOverlapping: false
-  EdgeType: ShiftPtr
+  EdgeType: Branch
   ExpandPointerSwap: true
   ExtraLatencyForLR: 0
   ExtraMiLatencyLeft: 0
@@ -63,6 +63,7 @@ ConstantParams:
   GlobalReadCoalesceVectorB: true
   GlobalReadPerMfma: 1
   GlobalReadVectorWidth: -1
+  GlobalSplitU: 1
   GlobalSplitUAlgorithm: SingleBuffer
   GlobalSplitUAtomicAdd: false
   GlobalSplitUSummationAssignmentRoundRobin: true
@@ -90,7 +91,7 @@ ConstantParams:
   MacroTileShapeMax: 64
   MacroTileShapeMin: 1
   MagicDivAlg: 2
-  MatrixInstruction: []
+  MatrixInstruction: [16, 16, 4, 1, 1, 1, 1, 1, 1]
   MaxOccupancy: 40
   MaxVgprNumber: 256
   MemoryModifierFormat: ''
@@ -117,8 +118,8 @@ ConstantParams:
   PersistentKernelAlongBatch: false
   PrefetchAcrossPersistent: 0
   PrefetchAcrossPersistentMode: 0
-  PrefetchGlobalRead: false
-  PrefetchLocalRead: true
+  PrefetchGlobalRead: true
+  PrefetchLocalRead: false
   PreloadKernelArguments: 0
   ReplacementKernel: false
   ScheduleGlobalRead: 1
@@ -142,6 +143,7 @@ ConstantParams:
   SuppressNoLoadLoop: false
   ThreadSeparateGlobalReadA: 0
   ThreadSeparateGlobalReadB: 0
+  ThreadTile: [4, 4]
   TransposeLDS: 0
   UnrollIncIsDepthU: 0
   UnrollMajorLDSA: false
@@ -158,17 +160,11 @@ ConstantParams:
   WaveSeparateGlobalReadA: 0
   WaveSeparateGlobalReadB: 0
   WavefrontSize: 64
+  WorkGroup: [16, 16, 1]
   WorkGroupMapping: 8
   WorkGroupMappingType: B
 CustomKernelWildcard: false
 CustomKernels: []
-ForkParams:
-  GlobalSplitU: [1, 3]
-  ThreadTile:
-  - [4, 8]
-  - [8, 8]
-  WorkGroup:
-  - [16, 16, 1]
-  - [32, 4, 1]
+ForkParams: {}
 ParamGroups: []
 ...

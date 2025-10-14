@@ -328,6 +328,12 @@ namespace TensileLite
                                        reinterpret_cast<BFloat8_fnuz const*>(data),
                                        tensor,
                                        reinterpret_cast<BFloat8_fnuz const*>(ptrVal));
+                    else if(tensor.dataType() == rocisa::DataType::ComplexDouble)
+                        logTensorTyped(level,
+                                       name,
+                                       reinterpret_cast<std::complex<double> const*>(data),
+                                       tensor,
+                                       reinterpret_cast<std::complex<double> const*>(ptrVal));
                     else
                         throw std::runtime_error(
                             concatenate("Can't log tensor of type ", tensor.dataType()));
