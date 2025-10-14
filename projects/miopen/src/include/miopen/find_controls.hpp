@@ -239,6 +239,15 @@ public:
         return (value == Values::TrustVerifyFull) && IsEnabled(context);
     }
 
+#ifdef MIOPEN_BUILD_TESTING
+    // Only expose for testing builds
+    template <class Context>
+    bool TestIsValidCombination(const Context& context, const FindEnforce& enforce) const
+    {
+        return IsValidCombination(context, enforce);
+    }
+#endif
+
     MIOPEN_INTERNALS_EXPORT friend std::ostream& operator<<(std::ostream&, const FindMode&);
 };
 
