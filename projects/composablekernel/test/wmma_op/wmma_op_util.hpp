@@ -798,36 +798,32 @@ __global__ void matmul_swizzle_a(const srcA_t* a, const srcB_t* b, dst_t* c)
 
     const int lIdx = threadIdx.x;
     const int lane = lIdx % 32; // wave size
-    const int lowHigh = lane / 16;
 
     bool use_QUADS = true;
 
     if (use_QUADS == true)
     {
+        constexpr int BLOCK_SIZE = 4 * QUADRANT_SIZE;
         static_for<0, QUADRANT_SIZE, 1>{}([&](auto ele) {
-            const int lowHighQuadrant = ele/2;
-            const int iterEvenOdd = ele % 2;
-            int rowIdx = lane % 16;
-            const int offset1 = ((lowHigh)*(ROW_SIZE*QUADRANT_SIZE)) + (ROW_SIZE*lowHighQuadrant*8)+(iterEvenOdd*32)+rowIdx;
-            const int offset2 = ((lowHigh)*(ROW_SIZE*QUADRANT_SIZE)) + (ROW_SIZE*lowHighQuadrant*8)+(iterEvenOdd*32)+rowIdx + ROW_SIZE;
-            
-            
-            a_frag.template AsType<srcA_cast_type>()(ele) = a_ptr[offset1];            
-            a_frag.template AsType<srcA_cast_type>()(Number<ele + QUADRANT_SIZE>{}) = a_ptr[offset2];
+            int rowIdx = lIdx % 16;
+            int hi = lIdx / 16;
 
-            // KO TODO:: solve where to put the offset2 for ele
-            b_frag.template AsType<srcB_cast_type>()(ele) = b_ptr[offset1];
-            b_frag.template AsType<srcB_cast_type>()(Number<ele + QUADRANT_SIZE>{}) = b_ptr[offset2];
-            
-            if (debug_prints == true) // debug only
-            {
-                // printf("threadIdx.x = %u, ele = %d, offset1 = %d, offset2 = %d\n", threadIdx.x, static_cast<int>(ele), offset1, offset2);
-                printf("threadIdx.x = %u, ele = %d, a_frag[%d] = a_ptr[%d], a_frag[%d] = a_ptr[%d]\n",
-                        threadIdx.x,
-                        static_cast<int>(ele),
-                        static_cast<int>(ele), offset1,
-                        static_cast<int>(ele + QUADRANT_SIZE), offset2);
-            }
+            //base for a
+            int base_a = rowIdx * BLOCK_SIZE + hi * QUADRANT_SIZE;
+            int base_b = rowIdx * BLOCK_SIZE + hi * QUADRANT_SIZE;// + LDS_B_START;
+
+            int idx1_a = base_a + ele;
+            int idx2_a = base_a + ele + QUADRANT_SIZE * 2;
+            int idx1_b = base_b + ele;
+            int idx2_b = base_b + ele + QUADRANT_SIZE * 2;
+
+            //index for first quadrant access
+            a_frag.template AsType<srcA_cast_type>()(ele) = a_ptr[idx1_a];
+            b_frag.template AsType<srcB_cast_type>()(ele) = b_ptr[idx1_b];
+
+            //index for second quadrant access
+            a_frag.template AsType<srcA_cast_type>()(Number<ele + QUADRANT_SIZE>{}) = a_ptr[idx2_a];
+            b_frag.template AsType<srcB_cast_type>()(Number<ele + QUADRANT_SIZE>{}) = b_ptr[idx2_b];
         });
     }
     else
