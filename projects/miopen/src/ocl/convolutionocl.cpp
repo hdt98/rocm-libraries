@@ -394,7 +394,7 @@ std::vector<Solution> VerifiedFDBSolution(const ExecutionContext& ctx,
             ctx_copy.do_search = true;
             ctx_copy.db_update = true;
 
-            auto ret = FindCore(invoke_ctx,
+            auto ret                      = FindCore(invoke_ctx,
                                 ctx_copy,
                                 problem,
                                 params,
@@ -491,7 +491,7 @@ std::vector<Solution> FindConvolution(const ExecutionContext& ctx,
                 ctx_copy.db_update = true;
             }
 
-            auto ret = FindCore(invoke_ctx,
+            auto ret                      = FindCore(invoke_ctx,
                                 ctx_copy,
                                 problem,
                                 params,
