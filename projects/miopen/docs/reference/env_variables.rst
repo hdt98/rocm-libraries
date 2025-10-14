@@ -83,7 +83,7 @@ and :doc:`Performance database <../conceptual/perfdb>`.
 
     * - | ``MIOPEN_FIND_MODE``
         | Sets find mode to accelerate find API calls.
-        | **Note**: Some combinations with ``MIOPEN_FIND_ENFORCE`` may be unsafe and will be automatically blocked to prevent incomplete database entries.
+        | **Note**: Some combinations with ``MIOPEN_FIND_ENFORCE`` might be unsafe and will be automatically blocked to prevent incomplete database entries.
       - | "NORMAL" or 1: Full find mode (benchmarks all solvers)
         | "FAST" or 2: Fast find (use FindDb or immediate fallback)
         | "HYBRID" or 3: Hybrid find (FindDb hit or full find)
@@ -92,7 +92,7 @@ and :doc:`Performance database <../conceptual/perfdb>`.
 
     * - | ``MIOPEN_FIND_ENFORCE``
         | Controls auto-tune behavior and database updates.
-        | **Note**: Some combinations with ``MIOPEN_FIND_MODE`` may be unsafe and will be automatically blocked to prevent incomplete database entries.
+        | **Note**: Some combinations with ``MIOPEN_FIND_MODE`` might be unsafe and will be automatically blocked to prevent incomplete database entries.
       - | "NONE" or 1: No change in default behavior
         | "DB_UPDATE" or 2: Always perform auto-tune and update PerfDb (unsafe with Fast/Hybrid modes)
         | "SEARCH" or 3: Auto-tune even if not requested via API
@@ -109,7 +109,7 @@ and :doc:`Performance database <../conceptual/perfdb>`.
    
    The following combinations of ``MIOPEN_FIND_MODE`` and ``MIOPEN_FIND_ENFORCE`` are automatically blocked because they can lead to incomplete or inconsistent database entries:
    
-   * Fast/Hybrid modes (2, 3, 5) with database operations (DB_UPDATE=2, SEARCH_DB_UPDATE=4, DB_CLEAN=5)
+   * Fast/Hybrid modes (2, 3, 5) with database operations (``DB_UPDATE=2``, ``SEARCH_DB_UPDATE=4``, ``DB_CLEAN=5``)
    
    When an unsafe combination is detected, MIOpen automatically falls back to Normal mode and logs a warning message.
 

@@ -22,9 +22,9 @@ Manual tuning can either be incremental or exhaustive as detailed in the next se
    
    MIOpen automatically validates combinations of ``MIOPEN_FIND_MODE`` and ``MIOPEN_FIND_ENFORCE`` to prevent unsafe configurations that could lead to incomplete database entries. When an unsafe combination is detected:
    
-   * MIOpen logs a warning message
-   * The find mode is automatically changed to Normal mode
-   * Tuning proceeds safely with the corrected settings
+   * MIOpen logs a warning message.
+   * The find mode is automatically changed to Normal mode.
+   * Tuning proceeds safely with the corrected settings.
 
 Incremental tuning
 ==========================================================
@@ -117,10 +117,10 @@ If you see warning messages like:
    Unsafe combination: Specified find mode and enforcement may lead to incomplete database entries.
    MIOPEN_FIND_MODE is set to NORMAL due to unsafe combination with MIOPEN_FIND_ENFORCE
 
-This means MIOpen detected an unsafe combination and automatically corrected it. Your tuning will proceed safely, but you may want to adjust your environment variables to use a recommended safe combination.
+This means MIOpen detected an unsafe combination and automatically corrected it. Your tuning will proceed safely, but you might want to adjust your environment variables to use a recommended safe combination.
 
 **Performance Considerations**
 
-* Fast and Hybrid modes are designed to reduce tuning time but may skip some solvers
-* When combined with database update operations, this can lead to incomplete database entries
-* For comprehensive tuning, use Normal mode with appropriate enforcement options
+* Fast and Hybrid modes are designed to reduce tuning time but might skip some solvers.
+* When combined with database update operations, this can lead to incomplete database entries.
+* For comprehensive tuning, use Normal mode with appropriate enforcement options.

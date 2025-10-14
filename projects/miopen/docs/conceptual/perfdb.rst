@@ -107,17 +107,17 @@ Common warning messages
 
 **"Unsafe combination: Specified find mode and enforcement may lead to incomplete database entries"**
 
-This warning appears when you try to use Fast or Hybrid find modes (2, 3, 5) with database update operations (DB_UPDATE=2, SEARCH_DB_UPDATE=4, DB_CLEAN=5).
+This warning appears when you try to use Fast or Hybrid find modes (2, 3, 5) with database update operations (``DB_UPDATE=2``, ``SEARCH_DB_UPDATE=4``, or ``DB_CLEAN=5``).
 
 **Resolution**: 
 - Use ``MIOPEN_FIND_ENFORCE=3`` (SEARCH) with Fast/Hybrid modes, or
-- Use ``MIOPEN_FIND_MODE=1`` (NORMAL) with database update operations
+- Use ``MIOPEN_FIND_MODE=1`` (NORMAL) with database update operations.
 
 **"MIOPEN_FIND_MODE is set to NORMAL due to unsafe combination with MIOPEN_FIND_ENFORCE"**
 
 This informational message indicates that MIOpen automatically corrected an unsafe combination by switching to Normal mode.
 
-**Resolution**: No action required - MIOpen handled the correction automatically. Consider updating your environment variables to use a safe combination.
+**Resolution**: No action is required. MIOpen handled the correction automatically. Consider updating your environment variables to use a safe combination.
 
 Safe combination reference
 ----------------------------------------------------------------------------------------------------------
@@ -126,7 +126,7 @@ Safe combination reference
     :header-rows: 1
     :widths: 25,25,50
 
-    * - **Find Mode**
+    * - **Find mode**
       - **Enforcement**
       - **Status**
     * - Any mode (1,2,3,5)
@@ -151,7 +151,7 @@ Safe combination reference
 Best practices
 ----------------------------------------------------------------------------------------------------------
 
-1. **For development and testing**: Use ``MIOPEN_FIND_ENFORCE=3`` (SEARCH) with any find mode
-2. **For comprehensive tuning**: Use ``MIOPEN_FIND_MODE=1`` (NORMAL) with appropriate enforcement
-3. **For production**: Avoid setting these environment variables unless specifically needed
-4. **Always check logs**: MIOpen will warn you about any automatic corrections made
+1. **For development and testing**: Use ``MIOPEN_FIND_ENFORCE=3`` (SEARCH) with any find mode.
+2. **For comprehensive tuning**: Use ``MIOPEN_FIND_MODE=1`` (NORMAL) with appropriate enforcement.
+3. **For production**: Avoid setting these environment variables unless specifically needed.
+4. **Always check the logs**: MIOpen will warn you about any automatic corrections made.
