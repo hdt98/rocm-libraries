@@ -273,7 +273,7 @@ namespace TensileLite
 
         if(identifier.at(end - 1) == 'C')
         {
-            aIsComplex = true;
+            // aIsComplex = true;
             end--;
         }
 
@@ -290,7 +290,7 @@ namespace TensileLite
 
         if(identifier.at(end - 1) == 'C')
         {
-            bIsComplex = true;
+            // bIsComplex = true;
             end--;
         }
 
@@ -307,7 +307,7 @@ namespace TensileLite
 
         if(identifier.at(end - 1) == 'C')
         {
-            cIsComplex = true;
+            // cIsComplex = true;
             end--;
         }
 
@@ -329,7 +329,7 @@ namespace TensileLite
 
         if(identifier.at(end - 1) == 'C')
         {
-            dIsComplex = true;
+            // dIsComplex = true;
             end--;
         }
 
@@ -1265,28 +1265,28 @@ namespace TensileLite
         rv += aNames;
         if(DataTypeInfo::Get(aTensor.dataType()).isComplex)
         {
-            rv += "C";
+            // rv += "C";
         }
 
         rv += "_B";
         rv += bNames;
         if(DataTypeInfo::Get(bTensor.dataType()).isComplex)
         {
-            rv += "C";
+            // rv += "C";
         }
 
         rv += "_C";
         rv += cNames;
         if(DataTypeInfo::Get(cTensor.dataType()).isComplex)
         {
-            rv += "C";
+            // rv += "C";
         }
 
         rv += "_D";
         rv += dNames;
         if(DataTypeInfo::Get(dTensor.dataType()).isComplex)
         {
-            rv += "C";
+            // rv += "C";
         }
 
         return rv;
