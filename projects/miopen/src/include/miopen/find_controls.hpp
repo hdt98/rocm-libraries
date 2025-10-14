@@ -47,6 +47,11 @@ MIOPEN_EXPORT extern bool
 
 } // namespace debug
 
+class FindEnforce;
+class FindMode;
+
+MIOPEN_INTERNALS_EXPORT bool IsValidCombination(const FindEnforce& enforce, const FindMode& mode);
+
 enum class FindEnforceAction
 {
     First_ = 1, // 0 is returned for non-numeric env.vars.
@@ -132,65 +137,23 @@ private:
     Values value;
 
     template <class Context>
-    bool IsValidCombination(const Context& context, const FindEnforce& enforce) const
-    {
-        FindEnforceAction action = enforce.GetAction();
-
-        // Always safe with no enforcement
-        if(action == FindEnforceAction::None)
-            return true;
-
-        // Always safe with Search-only enforcement
-        if(action == FindEnforceAction::Search)
-            return true;
-
-        // Always safe with Normal mode
-        if(value == Values::Normal)
-            return true;
-
-        // Unsafe: Fast/Hybrid modes with database operations
-        if((value == Values::Fast || value == Values::Hybrid ||
-            value == Values::DeprecatedFastHybrid || value == Values::DynamicHybrid) &&
-           (action == FindEnforceAction::DbUpdate || action == FindEnforceAction::SearchDbUpdate ||
-            action == FindEnforceAction::DbClean))
-        {
-            MIOPEN_LOG_W("Unsafe combination: Specified find mode and enforcement may lead to "
-                         "incomplete database entries.");
-            return false;
-        }
-
-        // Unsafe: Trust modes (not public API accessible) with database operations
-        if((value == Values::TrustVerify || value == Values::TrustVerifyFull) &&
-           (action == FindEnforceAction::DbUpdate || action == FindEnforceAction::SearchDbUpdate ||
-            action == FindEnforceAction::DbClean))
-        {
-            MIOPEN_LOG_W("Unsafe combination: Specified find mode and enforcement depends on DB "
-                         "completeness and is therefore risky.");
-            return false;
-        }
-
-        return false;
-    }
-
-    template <class Context>
     bool IsEnabled(const Context& context) const
     {
         FindEnforce enforce{};
-
+        
         // If no enforcement is active, always allow
         if(!enforce.IsSomethingEnforced(context))
             return true;
-
+        
         // Check if the combination is valid/safe
-        if(IsValidCombination(context, enforce))
+        if(IsValidCombination(enforce, *this))
         {
             MIOPEN_LOG_I("Allowing MIOPEN_FIND_MODE with MIOPEN_FIND_ENFORCE combination");
             return true;
         }
-
+        
         // Unsafe combination - force Normal mode
-        MIOPEN_LOG_NQI(
-            "MIOPEN_FIND_MODE is set to NORMAL due to unsafe combination with MIOPEN_FIND_ENFORCE");
+        MIOPEN_LOG_NQI("MIOPEN_FIND_MODE is set to NORMAL due to unsafe combination with MIOPEN_FIND_ENFORCE");
         return false;
     }
 
@@ -239,15 +202,6 @@ public:
     {
         return (value == Values::TrustVerifyFull) && IsEnabled(context);
     }
-
-#ifdef MIOPEN_BUILD_TESTING
-    // Only expose for testing builds
-    template <class Context>
-    bool TestIsValidCombination(const Context& context, const FindEnforce& enforce) const
-    {
-        return IsValidCombination(context, enforce);
-    }
-#endif
 
     MIOPEN_INTERNALS_EXPORT friend std::ostream& operator<<(std::ostream&, const FindMode&);
 };

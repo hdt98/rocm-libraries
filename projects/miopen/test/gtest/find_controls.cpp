@@ -492,7 +492,7 @@ TEST_F(CPU_FindControls_NONE, CurrentEnvironmentState)
     EXPECT_LE(static_cast<int>(enforce.GetAction()), 5);
 }
 
-TEST_F(CPU_FindControls_NONE, TestIsValidCombination_Combinations)
+TEST_F(CPU_FindControls_NONE, IsValidCombination_Combinations)
 {
     FindEnforce enforce_none(FindEnforceAction::None);
     FindEnforce enforce_db_update(FindEnforceAction::DbUpdate);
@@ -513,41 +513,41 @@ TEST_F(CPU_FindControls_NONE, TestIsValidCombination_Combinations)
     FindMode mode_trust_verify_full;
     mode_trust_verify_full.Set(FindMode::Values::TrustVerifyFull);
 
-    EXPECT_TRUE(mode_normal.TestIsValidCombination(context, enforce_none));
-    EXPECT_TRUE(mode_normal.TestIsValidCombination(context, enforce_db_update));
-    EXPECT_TRUE(mode_normal.TestIsValidCombination(context, enforce_search));
-    EXPECT_TRUE(mode_normal.TestIsValidCombination(context, enforce_search_db_update));
-    EXPECT_TRUE(mode_normal.TestIsValidCombination(context, enforce_clean));
+    EXPECT_TRUE(IsValidCombination(enforce_none, mode_normal));
+    EXPECT_TRUE(IsValidCombination(enforce_db_update, mode_normal));
+    EXPECT_TRUE(IsValidCombination(enforce_search, mode_normal));
+    EXPECT_TRUE(IsValidCombination(enforce_search_db_update, mode_normal));
+    EXPECT_TRUE(IsValidCombination(enforce_clean, mode_normal));
 
-    EXPECT_TRUE(mode_fast.TestIsValidCombination(context, enforce_none));
-    EXPECT_FALSE(mode_fast.TestIsValidCombination(context, enforce_db_update));
-    EXPECT_TRUE(mode_fast.TestIsValidCombination(context, enforce_search));
-    EXPECT_FALSE(mode_fast.TestIsValidCombination(context, enforce_search_db_update));
-    EXPECT_FALSE(mode_fast.TestIsValidCombination(context, enforce_clean));
+    EXPECT_TRUE(IsValidCombination(enforce_none, mode_fast));
+    EXPECT_FALSE(IsValidCombination(enforce_db_update, mode_fast));
+    EXPECT_TRUE(IsValidCombination(enforce_search, mode_fast));
+    EXPECT_FALSE(IsValidCombination(enforce_search_db_update, mode_fast));
+    EXPECT_FALSE(IsValidCombination(enforce_clean, mode_fast));
 
-    EXPECT_TRUE(mode_hybrid.TestIsValidCombination(context, enforce_none));
-    EXPECT_FALSE(mode_hybrid.TestIsValidCombination(context, enforce_db_update));
-    EXPECT_TRUE(mode_hybrid.TestIsValidCombination(context, enforce_search));
-    EXPECT_FALSE(mode_hybrid.TestIsValidCombination(context, enforce_search_db_update));
-    EXPECT_FALSE(mode_hybrid.TestIsValidCombination(context, enforce_clean));
+    EXPECT_TRUE(IsValidCombination(enforce_none, mode_hybrid));
+    EXPECT_FALSE(IsValidCombination(enforce_db_update, mode_hybrid));
+    EXPECT_TRUE(IsValidCombination(enforce_search, mode_hybrid));
+    EXPECT_FALSE(IsValidCombination(enforce_search_db_update, mode_hybrid));
+    EXPECT_FALSE(IsValidCombination(enforce_clean, mode_hybrid));
 
-    EXPECT_TRUE(mode_dynamic_hybrid.TestIsValidCombination(context, enforce_none));
-    EXPECT_FALSE(mode_dynamic_hybrid.TestIsValidCombination(context, enforce_db_update));
-    EXPECT_TRUE(mode_dynamic_hybrid.TestIsValidCombination(context, enforce_search));
-    EXPECT_FALSE(mode_dynamic_hybrid.TestIsValidCombination(context, enforce_search_db_update));
-    EXPECT_FALSE(mode_dynamic_hybrid.TestIsValidCombination(context, enforce_clean));
+    EXPECT_TRUE(IsValidCombination(enforce_none, mode_dynamic_hybrid));
+    EXPECT_FALSE(IsValidCombination(enforce_db_update, mode_dynamic_hybrid));
+    EXPECT_TRUE(IsValidCombination(enforce_search, mode_dynamic_hybrid));
+    EXPECT_FALSE(IsValidCombination(enforce_search_db_update, mode_dynamic_hybrid));
+    EXPECT_FALSE(IsValidCombination(enforce_clean, mode_dynamic_hybrid));
 
-    EXPECT_TRUE(mode_trust_verify.TestIsValidCombination(context, enforce_none));
-    EXPECT_FALSE(mode_trust_verify.TestIsValidCombination(context, enforce_db_update));
-    EXPECT_TRUE(mode_trust_verify.TestIsValidCombination(context, enforce_search));
-    EXPECT_FALSE(mode_trust_verify.TestIsValidCombination(context, enforce_search_db_update));
-    EXPECT_FALSE(mode_trust_verify.TestIsValidCombination(context, enforce_clean));
+    EXPECT_TRUE(IsValidCombination(enforce_none, mode_trust_verify));
+    EXPECT_FALSE(IsValidCombination(enforce_db_update, mode_trust_verify));
+    EXPECT_TRUE(IsValidCombination(enforce_search, mode_trust_verify));
+    EXPECT_FALSE(IsValidCombination(enforce_search_db_update, mode_trust_verify));
+    EXPECT_FALSE(IsValidCombination(enforce_clean, mode_trust_verify));
 
-    EXPECT_TRUE(mode_trust_verify_full.TestIsValidCombination(context, enforce_none));
-    EXPECT_FALSE(mode_trust_verify_full.TestIsValidCombination(context, enforce_db_update));
-    EXPECT_TRUE(mode_trust_verify_full.TestIsValidCombination(context, enforce_search));
-    EXPECT_FALSE(mode_trust_verify_full.TestIsValidCombination(context, enforce_search_db_update));
-    EXPECT_FALSE(mode_trust_verify_full.TestIsValidCombination(context, enforce_clean));
+    EXPECT_TRUE(IsValidCombination(enforce_none, mode_trust_verify_full));
+    EXPECT_FALSE(IsValidCombination(enforce_db_update, mode_trust_verify_full));
+    EXPECT_TRUE(IsValidCombination(enforce_search, mode_trust_verify_full));
+    EXPECT_FALSE(IsValidCombination(enforce_search_db_update, mode_trust_verify_full));
+    EXPECT_FALSE(IsValidCombination(enforce_clean, mode_trust_verify_full));
 }
 
 } // namespace test
