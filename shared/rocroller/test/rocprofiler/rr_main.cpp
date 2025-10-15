@@ -112,7 +112,11 @@ int main(int /*argc*/, char** /*argv*/)
         co_yield context->mem()->storeGlobal(v_ptr, v_value, 0, 4);
     };
 
-    context->schedule(kb());
+    for(auto instr : kb())
+    {
+        context->schedule(instr);
+        // TODO: push_back to check InstructionStatus
+    }
 
     context->schedule(k->postamble());
     context->schedule(k->amdgpu_metadata());
@@ -127,16 +131,12 @@ int main(int /*argc*/, char** /*argv*/)
 
     HIP_API_CALL(hipMemset(d_ptr, 0, sizeof(float)));
 
-    roctxProfilerResume(0);
-
     // Create command arguments and launch kernel
     CommandArguments commandArgs = command->createArguments();
     commandArgs.setArgument(ptrTag, ArgumentType::Value, d_ptr);
     commandArgs.setArgument(valTag, ArgumentType::Value, 6.0f);
 
     commandKernel.launchKernel(commandArgs.runtimeArguments());
-
-    roctxProfilerPause(0);
 
     HIP_API_CALL(hipDeviceSynchronize());
 

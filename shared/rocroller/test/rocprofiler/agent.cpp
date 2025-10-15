@@ -67,13 +67,6 @@
         abort();         \
     };
 
-namespace
-{
-    constexpr uint64_t TARGET_CU   = 1; // CU (gfx9) or WGP (gfx10+)
-    constexpr uint64_t SHADER_MASK = 0x1; // Only enable SE=0
-    constexpr uint64_t BUFFER_SIZE = 0x10000000; // 256MB
-}; // namespace
-
 namespace Results
 {
     using pcinfo_t = rocprofiler_thread_trace_decoder_pc_t;
@@ -252,38 +245,52 @@ namespace Decoder
 
 namespace ThreadTracer
 {
-    rocprofiler_client_id_t* client_id   = nullptr;
-    rocprofiler_context_id_t agent_ctx   = {};
-    rocprofiler_context_id_t tracing_ctx = {};
+    rocprofiler_client_id_t* client_id  = nullptr;
+    rocprofiler_context_id_t client_ctx = {};
+
+    // Control flags for thread tracing
+    std::atomic<bool> tracing_enabled{true};
+
+    // Dispatch callback function to control when thread tracing occurs
+    rocprofiler_thread_trace_control_flags_t
+        dispatch_callback(rocprofiler_agent_id_t /* agent */,
+                          rocprofiler_queue_id_t /* queue_id */,
+                          rocprofiler_async_correlation_id_t /* correlation_id */,
+                          rocprofiler_kernel_id_t /* kernel_id */,
+                          rocprofiler_dispatch_id_t /* dispatch_id */,
+                          void* /* userdata  */,
+                          rocprofiler_user_data_t* /* dispatch_userdata */)
+    {
+        // Check if tracing is enabled
+        if(tracing_enabled.load())
+        {
+            return ROCPROFILER_THREAD_TRACE_CONTROL_START_AND_STOP;
+        }
+
+        return ROCPROFILER_THREAD_TRACE_CONTROL_NONE;
+    }
 
     rocprofiler_status_t query_available_agents(rocprofiler_agent_version_t /* version */,
                                                 const void** agents,
                                                 size_t       num_agents,
                                                 void*        user_data)
     {
-        rocprofiler_user_data_t user{};
-        user.ptr = user_data;
-
         for(size_t idx = 0; idx < num_agents; idx++)
         {
             const auto* agent = static_cast<const rocprofiler_agent_v0_t*>(agents[idx]);
             if(agent->type != ROCPROFILER_AGENT_TYPE_GPU)
                 continue;
 
-            auto parameters = std::vector<rocprofiler_thread_trace_parameter_t>{};
-            parameters.push_back({ROCPROFILER_THREAD_TRACE_PARAMETER_TARGET_CU, TARGET_CU});
-            parameters.push_back({ROCPROFILER_THREAD_TRACE_PARAMETER_BUFFER_SIZE, BUFFER_SIZE});
-            parameters.push_back(
-                {ROCPROFILER_THREAD_TRACE_PARAMETER_SHADER_ENGINE_MASK, SHADER_MASK});
-
+            // Configure dispatch thread trace service for this agent
             ROCPROFILER_CALL(
-                rocprofiler_configure_device_thread_trace_service(agent_ctx,
-                                                                  agent->id,
-                                                                  parameters.data(),
-                                                                  parameters.size(),
-                                                                  Decoder::shader_data_callback,
-                                                                  user),
-                "thread trace service configure");
+                rocprofiler_configure_dispatch_thread_trace_service(client_ctx,
+                                                                    agent->id,
+                                                                    nullptr, // parameters
+                                                                    0, // num_parameters
+                                                                    dispatch_callback,
+                                                                    Decoder::shader_data_callback,
+                                                                    user_data),
+                "dispatch thread trace service configure");
         }
         return ROCPROFILER_STATUS_SUCCESS;
     }
@@ -298,12 +305,14 @@ namespace ThreadTracer
         if(record.phase == ROCPROFILER_CALLBACK_PHASE_ENTER
            && record.operation == ROCPROFILER_MARKER_CONTROL_API_ID_roctxProfilerPause)
         {
-            ROCPROFILER_CALL(rocprofiler_stop_context(agent_ctx), "stopping context");
+            // Disable tracing for future dispatches
+            tracing_enabled.store(false);
         }
         else if(record.phase == ROCPROFILER_CALLBACK_PHASE_EXIT
                 && record.operation == ROCPROFILER_MARKER_CONTROL_API_ID_roctxProfilerResume)
         {
-            ROCPROFILER_CALL(rocprofiler_start_context(agent_ctx), "starting context");
+            // Enable tracing for future dispatches
+            tracing_enabled.store(true);
         }
     }
 
@@ -314,11 +323,10 @@ namespace ThreadTracer
 
         DECODER_CALL(rocprofiler_thread_trace_decoder_create(&Decoder::decoder, "/opt/rocm/lib"));
 
-        ROCPROFILER_CALL(rocprofiler_create_context(&tracing_ctx), "context creation");
-        ROCPROFILER_CALL(rocprofiler_create_context(&agent_ctx), "context creation");
+        ROCPROFILER_CALL(rocprofiler_create_context(&client_ctx), "context creation");
 
         ROCPROFILER_CALL(
-            rocprofiler_configure_callback_tracing_service(tracing_ctx,
+            rocprofiler_configure_callback_tracing_service(client_ctx,
                                                            ROCPROFILER_CALLBACK_TRACING_CODE_OBJECT,
                                                            nullptr,
                                                            0,
@@ -327,7 +335,7 @@ namespace ThreadTracer
             "code object tracing service configure");
 
         ROCPROFILER_CALL(rocprofiler_configure_callback_tracing_service(
-                             tracing_ctx,
+                             client_ctx,
                              ROCPROFILER_CALLBACK_TRACING_MARKER_CONTROL_API,
                              nullptr,
                              0,
@@ -342,12 +350,10 @@ namespace ThreadTracer
                          "Failed to find GPU agents");
 
         int valid_ctx = 0;
-        ROCPROFILER_CALL(rocprofiler_context_is_valid(agent_ctx, &valid_ctx), "validity check");
-        assert(valid_ctx != 0);
-        ROCPROFILER_CALL(rocprofiler_context_is_valid(tracing_ctx, &valid_ctx), "validity check");
+        ROCPROFILER_CALL(rocprofiler_context_is_valid(client_ctx, &valid_ctx), "validity check");
         assert(valid_ctx != 0);
 
-        ROCPROFILER_CALL(rocprofiler_start_context(tracing_ctx), "context start");
+        ROCPROFILER_CALL(rocprofiler_start_context(client_ctx), "context start");
 
         // no errors
         return 0;
