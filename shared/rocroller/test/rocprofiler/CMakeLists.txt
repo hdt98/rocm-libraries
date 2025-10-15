@@ -22,27 +22,6 @@ find_library(
     PATHS ${ROCM_PATH} /usr
     PATH_SUFFIXES lib lib64)
 
-# HIP kernel version
-add_executable(hip-kernel)
-
-set_source_files_properties(
-    hip_main.cpp PROPERTIES LANGUAGE HIP)
-
-target_sources(hip-kernel
-    PRIVATE
-        "${CMAKE_CURRENT_SOURCE_DIR}/hip_main.cpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/agent.cpp"
-)
-
-target_link_libraries(hip-kernel
-    PRIVATE
-        rocprofiler-sdk::rocprofiler-sdk
-        rocprofiler-sdk-roctx::rocprofiler-sdk-roctx
-        amd_comgr
-        ${LIBDW_LIBRARY}
-        ${BLAS_LIBRARIES}
-)
-
 # rocRoller version
 add_executable(rr-kernel)
 
