@@ -176,13 +176,14 @@ def main():
                 problem.d_dtype = origami.string_to_datatype(args.type_d)
                 problem.c_dtype = problem.d_dtype
                 problem.mi_dtype = problem.a_dtype
-                problem.mx_block_size = args.scale_block_size
+                problem.a_mx_block_size = args.scale_block_size
+                problem.b_mx_block_size = args.scale_block_size
                 
                 # Select best config
                 best_config = origami.select_config(problem, hardware, configs)
                 
                 # Compute latency
-                latency = origami.compute_total_latency(hardware, problem, best_config, 0)
+                latency = origami.compute_total_latency(hardware, problem, best_config)
                 best_config.latency = latency
                 
                 #MxNxBxK, MT0xMT1xDU, MI0xMI1xMI2, latency/cycles
@@ -194,29 +195,29 @@ def main():
         problem = origami.problem_t()
         problem.size = origami.dim3_t(args.m, args.n, args.k)
         problem.batch = args.b
-        problem.transpose_a = args.trans_a
-        problem.transpose_b = args.trans_b
+        problem.transpose_a =  origami.transpose_t.N
+        problem.transpose_b = origami.transpose_t.T
         problem.a_dtype = origami.string_to_datatype(args.type_a)
         problem.b_dtype = origami.string_to_datatype(args.type_b)
         problem.d_dtype = origami.string_to_datatype(args.type_d)
         problem.c_dtype = problem.d_dtype
         problem.mi_dtype = problem.a_dtype
-        problem.mx_block_size = args.scale_block_size
+        problem.a_mx_block_size = args.scale_block_size
+        problem.b_mx_block_size = args.scale_block_size
         
         # Select best config
         best_config = origami.select_config(problem, hardware, configs)
         
         # Compute latency
-        latency = origami.compute_total_latency(hardware, problem, best_config, 0)
-        best_config.latency = latency
+        latency = best_config.latency
         
-        print(f"The best config for [{args.m}, {args.n}, {args.b}, {args.k}] is: MT=({best_config.mt.m},{best_config.mt.n},{best_config.mt.k}), MI=({best_config.mi.m},{best_config.mi.n},{best_config.mi.k}), latency={latency:0.3f}")
+        print(f"The best config for [{args.m}, {args.n}, {args.b}, {args.k}] is: MT=({best_config.config.mt.m},{best_config.config.mt.n},{best_config.config.mt.k}), MI=({best_config.config.mi.m},{best_config.config.mi.n},{best_config.config.mi.k}), latency={latency:0.3f}")
         
         # Get top configs
         ranked_configs = origami.rank_configs(problem, hardware, configs)
         print(" Top 5 configs: ")
         for i, config in enumerate(ranked_configs[:5]):
-            print(f"  {i+1}. MT=({config.mt.m},{config.mt.n},{config.mt.k}), MI=({config.mi.m},{config.mi.n},{config.mi.k}), latency={config.latency:0.3f}")
+            print(f"  {i+1}. MT=({config.config.mt.m},{config.config.mt.n},{config.config.mt.k}), MI=({config.config.mi.m},{config.config.mi.n},{config.config.mi.k}), latency={config.latency:0.3f}")
 
     if args.print:
         hardware.print()

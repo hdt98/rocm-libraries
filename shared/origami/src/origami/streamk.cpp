@@ -1,9 +1,9 @@
 // Copyright Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier:  MIT
 
+#include "origami/hardware.hpp"
 #include "origami/math.hpp"
 #include "origami/types.hpp"
-#include "origami/hardware.hpp"
 
 #include "origami/streamk.hpp"
 
