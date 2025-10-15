@@ -10,7 +10,6 @@
 #include <cstdlib>
 #include <string>
 
-
 // Mock context for testing
 struct MockContext
 {
@@ -22,8 +21,8 @@ class CPU_FindControls_NONE : public ::testing::Test
 protected:
     void SetUp() override
     {
-        original_find_enforce_disable = miopen::debug::FindEnforceDisable;
-        miopen::debug::FindEnforceDisable     = false;
+        original_find_enforce_disable     = miopen::debug::FindEnforceDisable;
+        miopen::debug::FindEnforceDisable = false;
     }
 
     void TearDown() override { miopen::debug::FindEnforceDisable = original_find_enforce_disable; }
@@ -440,11 +439,14 @@ TEST_F(CPU_FindControls_NONE, ConstructorReadsEnvironment)
     miopen::FindMode mode_fusion(miopen::solver::Primitive::Fusion);
 
     // Just verify they construct and have valid enum values
-    EXPECT_GE(static_cast<int>(mode_conv.Get()), static_cast<int>(miopen::FindMode::Values::Begin_));
+    EXPECT_GE(static_cast<int>(mode_conv.Get()),
+              static_cast<int>(miopen::FindMode::Values::Begin_));
     EXPECT_LT(static_cast<int>(mode_conv.Get()), static_cast<int>(miopen::FindMode::Values::End_));
 
-    EXPECT_GE(static_cast<int>(mode_fusion.Get()), static_cast<int>(miopen::FindMode::Values::Begin_));
-    EXPECT_LT(static_cast<int>(mode_fusion.Get()), static_cast<int>(miopen::FindMode::Values::End_));
+    EXPECT_GE(static_cast<int>(mode_fusion.Get()),
+              static_cast<int>(miopen::FindMode::Values::Begin_));
+    EXPECT_LT(static_cast<int>(mode_fusion.Get()),
+              static_cast<int>(miopen::FindMode::Values::End_));
 }
 
 // Test the default constructor behavior
