@@ -169,6 +169,8 @@ namespace Decoder
             return;
         if(record.operation != ROCPROFILER_CODE_OBJECT_LOAD)
             return;
+        if(record.phase != ROCPROFILER_CALLBACK_PHASE_LOAD)
+            return;
 
         CHECK_NOTNULL(Results::table);
         auto* data
