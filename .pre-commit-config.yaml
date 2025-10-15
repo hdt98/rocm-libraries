@@ -50,6 +50,28 @@ repos:
         entry: clang-format -i -style=file
         files: '\.(c|cpp|cc|h|hpp|m|mm)$'
 
+  - repo: local
+    hooks:
+      - id: clang-tidy-hipdnn
+        name: clang-tidy (hipdnn)
+        entry: clang-tidy-20
+        language: system
+        args:
+          - --config-file=projects/hipdnn/.clang-tidy
+          - -p=projects/hipdnn/build
+        files: ^projects/hipdnn/.*\.(cpp|c|hpp|h)$
+        types: [c++]
+
+  # Save files to /tmp/flatc_hipdnn because it cannot write to /dev/null
+  - repo: local
+    hooks:
+      - id: flatc-hipdnn
+        name: flatc (hipDNN)
+        entry: bash -c 'for file in "$@"; do flatc -I projects/hipdnn/sdk/schemas --cpp --gen-object-api --gen-mutable --gen-compare --defaults-json --scoped-enums -o /tmp/flatc_hipdnn "$file" || exit 1; done' --
+        language: system
+        files: ^projects/hipdnn/sdk/schemas/.*\.fbs$
+        pass_filenames: true
+
   - repo: https://github.com/cheshirekow/cmake-format-precommit
     rev: v0.6.10
     hooks:
