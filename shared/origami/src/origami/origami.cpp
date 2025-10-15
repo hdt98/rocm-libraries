@@ -4,9 +4,9 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <execution>
 #include <iomanip>
 #include <iostream>
-#include <execution>
 
 #include "origami/gemm.hpp"
 #include "origami/math.hpp"
@@ -137,31 +137,30 @@ std::vector<prediction_result_t> rank_configs(const problem_t& problem,
 
   std::vector<prediction_result_t> results(configs.size());
 
-  std::transform(
-      std::execution::par,
-      configs.begin(), configs.end(),
-      results.begin(),
-      [&](const config_t& config) -> prediction_result_t {
-          if (!check_lds_capacity(hardware, config.mt, problem.a_dtype, problem.b_dtype)) {
-              return {std::numeric_limits<double>::max(), config};
-          }
-          double latency = compute_total_latency(problem, hardware, config);
-          return {latency, config};
-      }
-  );
+  std::transform(std::execution::seq,
+                 configs.begin(),
+                 configs.end(),
+                 results.begin(),
+                 [&](const config_t& config) -> prediction_result_t {
+                   if (!check_lds_capacity(hardware, config.mt, problem.a_dtype, problem.b_dtype)) {
+                     return {std::numeric_limits<double>::max(), config};
+                   }
+                   double latency = compute_total_latency(problem, hardware, config);
+                   return {latency, config};
+                 });
 
-  results.erase(
-      std::remove_if(results.begin(), results.end(),
-          [](const prediction_result_t& p) {
-              return p.latency == std::numeric_limits<double>::max();
-          }),
-      results.end()
-  );
+  results.erase(std::remove_if(results.begin(),
+                               results.end(),
+                               [](const prediction_result_t& p) {
+                                 return p.latency == std::numeric_limits<double>::max();
+                               }),
+                results.end());
 
-  std::stable_sort(results.begin(), results.end(),
-      [](const prediction_result_t& a, const prediction_result_t& b) {
-          return a.latency < b.latency;
-      });
+  std::stable_sort(results.begin(),
+                   results.end(),
+                   [](const prediction_result_t& a, const prediction_result_t& b) {
+                     return a.latency < b.latency;
+                   });
 
   return results;
 }
@@ -198,13 +197,11 @@ std::vector<prediction_result_t> select_topk_configs(const problem_t& problem,
   auto ranked_configs = rank_configs(problem, hardware, configs);
 
   // Return only the top K configurations
-    std::vector<prediction_result_t> topk_configs;
-    size_t count = std::min(topk, ranked_configs.size());
-    topk_configs.reserve(count);
-    for (size_t i = 0; i < count; ++i) {
-      topk_configs.push_back(ranked_configs[i]);
-    }
-    return topk_configs;
+  std::vector<prediction_result_t> topk_configs;
+  size_t count = std::min(topk, ranked_configs.size());
+  topk_configs.reserve(count);
+  for (size_t i = 0; i < count; ++i) { topk_configs.push_back(ranked_configs[i]); }
+  return topk_configs;
 }
 
 double compute_perf_gflops(const hardware_t& hardware,
