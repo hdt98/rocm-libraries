@@ -110,21 +110,21 @@ struct CKArgs
         }
 
         filter_strides   = {ProblemInterpreter::GetAdjustedConvolutionStrideD(problem),
-                          ProblemInterpreter::GetAdjustedConvolutionStrideH(problem),
-                          ProblemInterpreter::GetAdjustedConvolutionStrideW(problem)};
+                            ProblemInterpreter::GetAdjustedConvolutionStrideH(problem),
+                            ProblemInterpreter::GetAdjustedConvolutionStrideW(problem)};
         filter_dilations = {ProblemInterpreter::GetAdjustedConvolutionDilationD(problem),
                             ProblemInterpreter::GetAdjustedConvolutionDilationH(problem),
                             ProblemInterpreter::GetAdjustedConvolutionDilationW(problem)};
         lPadding         = {ProblemInterpreter::GetInputLeftPadD(problem),
-                    ProblemInterpreter::GetInputLeftPadH(problem),
-                    ProblemInterpreter::GetInputLeftPadW(problem)};
+                            ProblemInterpreter::GetInputLeftPadH(problem),
+                            ProblemInterpreter::GetInputLeftPadW(problem)};
         rPadding         = {ProblemInterpreter::GetAdjustedInputRightPadD(problem),
-                    ProblemInterpreter::GetAdjustedInputRightPadH(problem),
-                    ProblemInterpreter::GetAdjustedInputRightPadW(problem)};
+                            ProblemInterpreter::GetAdjustedInputRightPadH(problem),
+                            ProblemInterpreter::GetAdjustedInputRightPadW(problem)};
     }
 
-    CKArgs(const CKArgs&) = default;
-    CKArgs(CKArgs&&)      = default;
+    CKArgs(const CKArgs&)            = default;
+    CKArgs(CKArgs&&)                 = default;
     CKArgs& operator=(const CKArgs&) = default;
 
     template <typename ConvPtr>
@@ -265,13 +265,11 @@ struct CKArgs
     template <typename ConvPtr>
     bool IsSupportedBySplitK(const ConvPtr& conv_ptr, int split_k) const
     {
-        auto arg_ptr = MakeArgPtr(conv_ptr, nullptr, nullptr, nullptr, 1.0f, 0.0f, split_k);
-
-        if(CKWrwRequireWorkspace(G, C1, K1, data_type, alpha_beta_case))
+        auto arg_ptr        = MakeArgPtr(conv_ptr, nullptr, nullptr, nullptr, 1.0f, 0.0f, split_k);
+        auto workspace_size = conv_ptr->GetWorkSpaceSize(arg_ptr.get());
+        if(workspace_size != 0)
         {
-            // Creat dummy workspace to pass the ck IsSupportedArgument check.
-            int dummy_var = 1;
-            conv_ptr->SetWorkSpacePointer(arg_ptr.get(), &dummy_var);
+            conv_ptr->SetWorkSpacePointer(arg_ptr.get(), &workspace_size);
         }
         return conv_ptr->IsSupportedArgument(arg_ptr.get());
     }
@@ -398,7 +396,7 @@ bool PerformanceConfigHipImplicitGemm3DGroupBwdXdlops::SetNextValue(
     }
     do
     {
-        bool flag = NextTwoPower<1, 128>(split_k);
+        bool flag = NextCKSplitkValue<1, 128>(split_k);
         if(!flag)
         {
             kernel_id = valid_kernels[index] + "+" + std::to_string(split_k);
