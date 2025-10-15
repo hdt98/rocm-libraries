@@ -22,21 +22,6 @@ find_library(
     PATHS ${ROCM_PATH} /usr
     PATH_SUFFIXES lib lib64)
 
-add_library(rocprofiler-agent SHARED)
-
-target_sources(rocprofiler-agent
-    PRIVATE
-        "${CMAKE_CURRENT_SOURCE_DIR}/agent.cpp"
-)
-
-target_link_libraries(rocprofiler-agent
-    PRIVATE
-        rocprofiler-sdk::rocprofiler-sdk
-        rocprofiler-sdk-roctx::rocprofiler-sdk-roctx
-        amd_comgr
-        ${LIBDW_LIBRARY}
-)
-
 # HIP kernel version
 add_executable(hip-kernel)
 
@@ -46,11 +31,15 @@ set_source_files_properties(
 target_sources(hip-kernel
     PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/hip_main.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/agent.cpp"
 )
 
 target_link_libraries(hip-kernel
     PRIVATE
+        rocprofiler-sdk::rocprofiler-sdk
         rocprofiler-sdk-roctx::rocprofiler-sdk-roctx
+        amd_comgr
+        ${LIBDW_LIBRARY}
         ${BLAS_LIBRARIES}
 )
 
@@ -60,11 +49,15 @@ add_executable(rr-kernel)
 target_sources(rr-kernel
     PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/rr_main.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/agent.cpp"
 )
 
 target_link_libraries(rr-kernel
     PRIVATE
+        rocprofiler-sdk::rocprofiler-sdk
         rocprofiler-sdk-roctx::rocprofiler-sdk-roctx
+        amd_comgr
+        ${LIBDW_LIBRARY}
         ${BLAS_LIBRARIES}
         rocroller::common-test-utilities
 )
