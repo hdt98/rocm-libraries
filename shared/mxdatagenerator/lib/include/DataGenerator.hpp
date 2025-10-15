@@ -54,10 +54,6 @@ namespace DGen
         {
             return "Bounded";
         }
-        friend std::ostream& operator<<(std::ostream& os, const Bounded& b)
-        {
-            return os << b.toString();
-        }
     };
 
     struct BoundedAlternatingSign
@@ -66,10 +62,6 @@ namespace DGen
         {
             return "BoundedAlternatingSign";
         }
-        friend std::ostream& operator<<(std::ostream& os, const BoundedAlternatingSign& bas)
-        {
-            return os << bas.toString();
-        }
     };
 
     struct Unbounded
@@ -77,10 +69,6 @@ namespace DGen
         std::string toString() const
         {
             return "Unbounded";
-        }
-        friend std::ostream& operator<<(std::ostream& os, const Unbounded& u)
-        {
-            return os << u.toString();
         }
     };
 
@@ -94,10 +82,6 @@ namespace DGen
             return "IdentityScale_NormalData(" + std::to_string(mean) + ", "
                    + std::to_string(std_dev) + ")";
         }
-        friend std::ostream& operator<<(std::ostream& os, const IdentityScaleNormalData& isnd)
-        {
-            return os << isnd.toString();
-        }
     };
 
     struct NormalScaleUniformData
@@ -110,10 +94,6 @@ namespace DGen
             return "NormalScale_UniformData(" + std::to_string(mean) + ", "
                    + std::to_string(std_dev) + ")";
         }
-        friend std::ostream& operator<<(std::ostream& os, const NormalScaleUniformData& nsud)
-        {
-            return os << nsud.toString();
-        }
     };
 
     struct Identity
@@ -121,10 +101,6 @@ namespace DGen
         std::string toString() const
         {
             return "Identity";
-        }
-        friend std::ostream& operator<<(std::ostream& os, const Identity& i)
-        {
-            return os << i.toString();
         }
     };
 
@@ -134,10 +110,6 @@ namespace DGen
         {
             return "Ones";
         }
-        friend std::ostream& operator<<(std::ostream& os, const Ones& o)
-        {
-            return os << o.toString();
-        }
     };
 
     struct Zeros
@@ -146,10 +118,6 @@ namespace DGen
         {
             return "Zeros";
         }
-        friend std::ostream& operator<<(std::ostream& os, const Zeros& z)
-        {
-            return os << z.toString();
-        }
     };
 
     struct TrigonometricFromFloat
@@ -157,10 +125,6 @@ namespace DGen
         std::string toString() const
         {
             return "TrigonometricFromFloat";
-        }
-        friend std::ostream& operator<<(std::ostream& os, const TrigonometricFromFloat& t)
-        {
-            return os << t.toString();
         }
     };
 
@@ -172,10 +136,6 @@ namespace DGen
         std::string toString() const
         {
             return "NormalFromFloat(" + std::to_string(mean) + ", " + std::to_string(std_dev) + ")";
-        }
-        friend std::ostream& operator<<(std::ostream& os, const NormalFromFloat& n)
-        {
-            return os << n.toString();
         }
     };
 
@@ -189,15 +149,6 @@ namespace DGen
                                       Zeros,
                                       TrigonometricFromFloat,
                                       NormalFromFloat>;
-
-    template <class... Ts>
-    struct overload : Ts...
-    {
-        using Ts::operator()...;
-    };
-
-    template <class... Ts>
-    overload(Ts...) -> overload<Ts...>;
 
     inline std::string toString(DataInitMode const& initMode)
     {
@@ -311,6 +262,16 @@ namespace DGen
 
         void setGenerator(int numThreads);
     };
+
+    // Helpers for easy visiting of DataInitMode
+    template <class... Ts>
+    struct overload : Ts...
+    {
+        using Ts::operator()...;
+    };
+
+    template <class... Ts>
+    overload(Ts...) -> overload<Ts...>;
 
     template <typename DTYPE>
     inline void DataGenerator<DTYPE>::dispatch_generate_data(const std::vector<index_t>& size,
