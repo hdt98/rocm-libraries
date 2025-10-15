@@ -173,26 +173,36 @@ std::ostream& operator<<(std::ostream& os, const std::vector<index_t>& vec)
     return os;
 }
 
-template <typename T>
-float mean(std::vector<T>& array);
+double getMean(const std::vector<double>& array);
 
-template <typename T>
-float std_dev(std::vector<T>& array);
+double getStdDev(const std::vector<double>& array);
 
-template <typename T>
-float mean(std::vector<T>& array)
+double getMean(const std::vector<double>& array)
 {
-    return std::accumulate(array, array + array.size(), 0.0) / array.size();
+    double sum = 0.0;
+    for(size_t i = 0; i < array.size(); i++)
+    {
+        const double val = array.at(i);
+        if(!std::isnan(val) && !std::isinf(val))
+        {
+            sum += val;
+        }
+    }
+
+    return sum / array.size();
 }
 
-template <typename T>
-float std_dev(std::vector<T>& array)
+double getStdDev(const std::vector<double>& array)
 {
-    float  avg = mean(array);
+    double avg = getMean(array);
     double sum = 0.0;
-    for(int i = 0; i < array.size(); i++)
+    for(size_t i = 0; i < array.size(); i++)
     {
-        sum += (array[i] - avg) * (array[i] + avg);
+        const double val = array.at(i);
+        if(!std::isnan(val) && !std::isinf(val))
+        {
+            sum += (array[i] - avg) * (array[i] + avg);
+        }
     }
     return std::sqrt(sum / array.size());
 }
@@ -680,7 +690,8 @@ public:
 
         // Data values must be normally distributed
         // Since scale values are 1 we can check reference array
-        EXPECT_LE(std::abs(mean(ref_double) - mean), 0.01);
+        EXPECT_LE(std::abs(getMean(ref_double) - mean), 0.01);
+        EXPECT_LE(std::abs(getStdDev(ref_double) - std_dev), 0.01);
 
         if(opts.includeNaN && getDataHasNan<DataType>())
         {
