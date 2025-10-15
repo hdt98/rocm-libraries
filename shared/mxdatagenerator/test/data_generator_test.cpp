@@ -174,8 +174,8 @@ std::ostream& operator<<(std::ostream& os, const std::vector<index_t>& vec)
 }
 
 double getMean(const std::vector<double>& array);
-
 double getStdDev(const std::vector<double>& array);
+void   printHistogram(std::vector<double>& array);
 
 double getMean(const std::vector<double>& array)
 {
@@ -205,6 +205,36 @@ double getStdDev(const std::vector<double>& array)
         }
     }
     return std::sqrt(sum / array.size());
+}
+
+void printHistogram(std::vector<double>& array)
+{
+    std::vector<uint64_t> histogram(11);
+
+    for(T val : array)
+    {
+        const int64_t int_val        = std::round(val);
+        const int64_t int_val_biased = int_val + 5;
+        if(int_val_biased >= 0 && int_val_biased <= 10)
+        {
+            histogram[static_cast<size_t>(int_val_biased)]++;
+        }
+    }
+
+    float scale_val = 100.f / (*std::max_element(histogram.begin(), histogram.end()));
+
+    int label_val = -5;
+    std::cout << "Mean: " << mean(array) << std::endl;
+    std::cout << "Std_dev: " << std_dev(array) << std::endl;
+    for(uint64_t hist_val : histogram)
+    {
+        std::stringstream ss;
+        ss << std::setw(2) << std::setfill(' ') << label_val;
+        std::string label = ss.str();
+        std::cout << label << ": " << std::string(std::round(hist_val * scale_val), '*')
+                  << std::endl;
+        label_val++;
+    }
 }
 
 template <typename DataType>
@@ -691,6 +721,7 @@ public:
         // Data values must be normally distributed
         // Since scale values are 1 we can check reference array
         EXPECT_LE(std::abs(getMean(ref_double) - mean), 0.01);
+        printHistogram(ref_double);
         EXPECT_LE(std::abs(getStdDev(ref_double) - std_dev), 0.01);
 
         if(opts.includeNaN && getDataHasNan<DataType>())
