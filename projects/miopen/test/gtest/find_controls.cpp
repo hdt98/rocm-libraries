@@ -10,8 +10,6 @@
 #include <cstdlib>
 #include <string>
 
-namespace miopen {
-namespace test {
 
 // Mock context for testing
 struct MockContext
@@ -24,11 +22,11 @@ class CPU_FindControls_NONE : public ::testing::Test
 protected:
     void SetUp() override
     {
-        original_find_enforce_disable = debug::FindEnforceDisable;
-        debug::FindEnforceDisable     = false;
+        original_find_enforce_disable = miopen::debug::FindEnforceDisable;
+        miopen::debug::FindEnforceDisable     = false;
     }
 
-    void TearDown() override { debug::FindEnforceDisable = original_find_enforce_disable; }
+    void TearDown() override { miopen::debug::FindEnforceDisable = original_find_enforce_disable; }
 
     bool original_find_enforce_disable;
     MockContext context;
@@ -37,50 +35,50 @@ protected:
 // Test FindEnforceAction basic functionality
 TEST_F(CPU_FindControls_NONE, FindEnforceActionValues)
 {
-    EXPECT_EQ(static_cast<int>(FindEnforceAction::None), 1);
-    EXPECT_EQ(static_cast<int>(FindEnforceAction::DbUpdate), 2);
-    EXPECT_EQ(static_cast<int>(FindEnforceAction::Search), 3);
-    EXPECT_EQ(static_cast<int>(FindEnforceAction::SearchDbUpdate), 4);
-    EXPECT_EQ(static_cast<int>(FindEnforceAction::DbClean), 5);
+    EXPECT_EQ(static_cast<int>(miopen::FindEnforceAction::None), 1);
+    EXPECT_EQ(static_cast<int>(miopen::FindEnforceAction::DbUpdate), 2);
+    EXPECT_EQ(static_cast<int>(miopen::FindEnforceAction::Search), 3);
+    EXPECT_EQ(static_cast<int>(miopen::FindEnforceAction::SearchDbUpdate), 4);
+    EXPECT_EQ(static_cast<int>(miopen::FindEnforceAction::DbClean), 5);
 }
 
 TEST_F(CPU_FindControls_NONE, FindModeValues)
 {
-    EXPECT_EQ(static_cast<int>(FindMode::Values::Normal), 1);
-    EXPECT_EQ(static_cast<int>(FindMode::Values::Fast), 2);
-    EXPECT_EQ(static_cast<int>(FindMode::Values::Hybrid), 3);
-    EXPECT_EQ(static_cast<int>(FindMode::Values::DeprecatedFastHybrid), 4);
-    EXPECT_EQ(static_cast<int>(FindMode::Values::DynamicHybrid), 5);
-    EXPECT_EQ(static_cast<int>(FindMode::Values::TrustVerify), 6);
-    EXPECT_EQ(static_cast<int>(FindMode::Values::TrustVerifyFull), 7);
+    EXPECT_EQ(static_cast<int>(miopen::FindMode::Values::Normal), 1);
+    EXPECT_EQ(static_cast<int>(miopen::FindMode::Values::Fast), 2);
+    EXPECT_EQ(static_cast<int>(miopen::FindMode::Values::Hybrid), 3);
+    EXPECT_EQ(static_cast<int>(miopen::FindMode::Values::DeprecatedFastHybrid), 4);
+    EXPECT_EQ(static_cast<int>(miopen::FindMode::Values::DynamicHybrid), 5);
+    EXPECT_EQ(static_cast<int>(miopen::FindMode::Values::TrustVerify), 6);
+    EXPECT_EQ(static_cast<int>(miopen::FindMode::Values::TrustVerifyFull), 7);
 }
 
 // Test FindEnforce class with explicit constructors
 TEST_F(CPU_FindControls_NONE, FindEnforceGetAction)
 {
-    FindEnforce enforce_none(FindEnforceAction::None);
-    EXPECT_EQ(enforce_none.GetAction(), FindEnforceAction::None);
+    miopen::FindEnforce enforce_none(miopen::FindEnforceAction::None);
+    EXPECT_EQ(enforce_none.GetAction(), miopen::FindEnforceAction::None);
 
-    FindEnforce enforce_db_update(FindEnforceAction::DbUpdate);
-    EXPECT_EQ(enforce_db_update.GetAction(), FindEnforceAction::DbUpdate);
+    miopen::FindEnforce enforce_db_update(miopen::FindEnforceAction::DbUpdate);
+    EXPECT_EQ(enforce_db_update.GetAction(), miopen::FindEnforceAction::DbUpdate);
 
-    FindEnforce enforce_search(FindEnforceAction::Search);
-    EXPECT_EQ(enforce_search.GetAction(), FindEnforceAction::Search);
+    miopen::FindEnforce enforce_search(miopen::FindEnforceAction::Search);
+    EXPECT_EQ(enforce_search.GetAction(), miopen::FindEnforceAction::Search);
 
-    FindEnforce enforce_search_db_update(FindEnforceAction::SearchDbUpdate);
-    EXPECT_EQ(enforce_search_db_update.GetAction(), FindEnforceAction::SearchDbUpdate);
+    miopen::FindEnforce enforce_search_db_update(miopen::FindEnforceAction::SearchDbUpdate);
+    EXPECT_EQ(enforce_search_db_update.GetAction(), miopen::FindEnforceAction::SearchDbUpdate);
 
-    FindEnforce enforce_clean(FindEnforceAction::DbClean);
-    EXPECT_EQ(enforce_clean.GetAction(), FindEnforceAction::DbClean);
+    miopen::FindEnforce enforce_clean(miopen::FindEnforceAction::DbClean);
+    EXPECT_EQ(enforce_clean.GetAction(), miopen::FindEnforceAction::DbClean);
 }
 
 TEST_F(CPU_FindControls_NONE, FindEnforceIsDbClean)
 {
-    FindEnforce enforce_none(FindEnforceAction::None);
-    FindEnforce enforce_db_update(FindEnforceAction::DbUpdate);
-    FindEnforce enforce_search(FindEnforceAction::Search);
-    FindEnforce enforce_search_db_update(FindEnforceAction::SearchDbUpdate);
-    FindEnforce enforce_clean(FindEnforceAction::DbClean);
+    miopen::FindEnforce enforce_none(miopen::FindEnforceAction::None);
+    miopen::FindEnforce enforce_db_update(miopen::FindEnforceAction::DbUpdate);
+    miopen::FindEnforce enforce_search(miopen::FindEnforceAction::Search);
+    miopen::FindEnforce enforce_search_db_update(miopen::FindEnforceAction::SearchDbUpdate);
+    miopen::FindEnforce enforce_clean(miopen::FindEnforceAction::DbClean);
 
     EXPECT_FALSE(enforce_none.IsDbClean(context));
     EXPECT_FALSE(enforce_db_update.IsDbClean(context));
@@ -91,11 +89,11 @@ TEST_F(CPU_FindControls_NONE, FindEnforceIsDbClean)
 
 TEST_F(CPU_FindControls_NONE, FindEnforceIsSearch)
 {
-    FindEnforce enforce_none(FindEnforceAction::None);
-    FindEnforce enforce_db_update(FindEnforceAction::DbUpdate);
-    FindEnforce enforce_search(FindEnforceAction::Search);
-    FindEnforce enforce_search_db_update(FindEnforceAction::SearchDbUpdate);
-    FindEnforce enforce_clean(FindEnforceAction::DbClean);
+    miopen::FindEnforce enforce_none(miopen::FindEnforceAction::None);
+    miopen::FindEnforce enforce_db_update(miopen::FindEnforceAction::DbUpdate);
+    miopen::FindEnforce enforce_search(miopen::FindEnforceAction::Search);
+    miopen::FindEnforce enforce_search_db_update(miopen::FindEnforceAction::SearchDbUpdate);
+    miopen::FindEnforce enforce_clean(miopen::FindEnforceAction::DbClean);
 
     EXPECT_FALSE(enforce_none.IsSearch(context));
     EXPECT_TRUE(enforce_db_update.IsSearch(context));
@@ -106,11 +104,11 @@ TEST_F(CPU_FindControls_NONE, FindEnforceIsSearch)
 
 TEST_F(CPU_FindControls_NONE, FindEnforceIsDbUpdate)
 {
-    FindEnforce enforce_none(FindEnforceAction::None);
-    FindEnforce enforce_db_update(FindEnforceAction::DbUpdate);
-    FindEnforce enforce_search(FindEnforceAction::Search);
-    FindEnforce enforce_search_db_update(FindEnforceAction::SearchDbUpdate);
-    FindEnforce enforce_clean(FindEnforceAction::DbClean);
+    miopen::FindEnforce enforce_none(miopen::FindEnforceAction::None);
+    miopen::FindEnforce enforce_db_update(miopen::FindEnforceAction::DbUpdate);
+    miopen::FindEnforce enforce_search(miopen::FindEnforceAction::Search);
+    miopen::FindEnforce enforce_search_db_update(miopen::FindEnforceAction::SearchDbUpdate);
+    miopen::FindEnforce enforce_clean(miopen::FindEnforceAction::DbClean);
 
     EXPECT_FALSE(enforce_none.IsDbUpdate(context));
     EXPECT_TRUE(enforce_db_update.IsDbUpdate(context));
@@ -121,11 +119,11 @@ TEST_F(CPU_FindControls_NONE, FindEnforceIsDbUpdate)
 
 TEST_F(CPU_FindControls_NONE, FindEnforceIsSomethingEnforced)
 {
-    FindEnforce enforce_none(FindEnforceAction::None);
-    FindEnforce enforce_db_update(FindEnforceAction::DbUpdate);
-    FindEnforce enforce_search(FindEnforceAction::Search);
-    FindEnforce enforce_search_db_update(FindEnforceAction::SearchDbUpdate);
-    FindEnforce enforce_clean(FindEnforceAction::DbClean);
+    miopen::FindEnforce enforce_none(miopen::FindEnforceAction::None);
+    miopen::FindEnforce enforce_db_update(miopen::FindEnforceAction::DbUpdate);
+    miopen::FindEnforce enforce_search(miopen::FindEnforceAction::Search);
+    miopen::FindEnforce enforce_search_db_update(miopen::FindEnforceAction::SearchDbUpdate);
+    miopen::FindEnforce enforce_clean(miopen::FindEnforceAction::DbClean);
 
     EXPECT_FALSE(enforce_none.IsSomethingEnforced(context));
     EXPECT_TRUE(enforce_db_update.IsSomethingEnforced(context));
@@ -137,11 +135,11 @@ TEST_F(CPU_FindControls_NONE, FindEnforceIsSomethingEnforced)
 TEST_F(CPU_FindControls_NONE, FindEnforceDisabledByContext)
 {
     context.disable_search_enforce = true;
-    FindEnforce enforce_none(FindEnforceAction::None);
-    FindEnforce enforce_db_update(FindEnforceAction::DbUpdate);
-    FindEnforce enforce_search(FindEnforceAction::Search);
-    FindEnforce enforce_search_db_update(FindEnforceAction::SearchDbUpdate);
-    FindEnforce enforce_clean(FindEnforceAction::DbClean);
+    miopen::FindEnforce enforce_none(miopen::FindEnforceAction::None);
+    miopen::FindEnforce enforce_db_update(miopen::FindEnforceAction::DbUpdate);
+    miopen::FindEnforce enforce_search(miopen::FindEnforceAction::Search);
+    miopen::FindEnforce enforce_search_db_update(miopen::FindEnforceAction::SearchDbUpdate);
+    miopen::FindEnforce enforce_clean(miopen::FindEnforceAction::DbClean);
 
     EXPECT_FALSE(enforce_none.IsDbClean(context));
     EXPECT_FALSE(enforce_db_update.IsDbClean(context));
@@ -170,12 +168,12 @@ TEST_F(CPU_FindControls_NONE, FindEnforceDisabledByContext)
 
 TEST_F(CPU_FindControls_NONE, FindEnforceDisabledByDebugFlag)
 {
-    debug::FindEnforceDisable = true;
-    FindEnforce enforce_none(FindEnforceAction::None);
-    FindEnforce enforce_db_update(FindEnforceAction::DbUpdate);
-    FindEnforce enforce_search(FindEnforceAction::Search);
-    FindEnforce enforce_search_db_update(FindEnforceAction::SearchDbUpdate);
-    FindEnforce enforce_clean(FindEnforceAction::DbClean);
+    miopen::debug::FindEnforceDisable = true;
+    miopen::FindEnforce enforce_none(miopen::FindEnforceAction::None);
+    miopen::FindEnforce enforce_db_update(miopen::FindEnforceAction::DbUpdate);
+    miopen::FindEnforce enforce_search(miopen::FindEnforceAction::Search);
+    miopen::FindEnforce enforce_search_db_update(miopen::FindEnforceAction::SearchDbUpdate);
+    miopen::FindEnforce enforce_clean(miopen::FindEnforceAction::DbClean);
 
     EXPECT_FALSE(enforce_none.IsDbClean(context));
     EXPECT_FALSE(enforce_db_update.IsDbClean(context));
@@ -206,18 +204,18 @@ TEST_F(CPU_FindControls_NONE, FindEnforceDisabledByDebugFlag)
 TEST_F(CPU_FindControls_NONE, FindModeManualSetting_NoEnforcement)
 {
     // Test all modes work when no enforcement is active
-    FindMode mode_normal;
-    mode_normal.Set(FindMode::Values::Normal);
-    FindMode mode_fast;
-    mode_fast.Set(FindMode::Values::Fast);
-    FindMode mode_hybrid;
-    mode_hybrid.Set(FindMode::Values::Hybrid);
-    FindMode mode_dynamic_hybrid;
-    mode_dynamic_hybrid.Set(FindMode::Values::DynamicHybrid);
-    FindMode mode_trust_verify;
-    mode_trust_verify.Set(FindMode::Values::TrustVerify);
-    FindMode mode_trust_verify_full;
-    mode_trust_verify_full.Set(FindMode::Values::TrustVerifyFull);
+    miopen::FindMode mode_normal;
+    mode_normal.Set(miopen::FindMode::Values::Normal);
+    miopen::FindMode mode_fast;
+    mode_fast.Set(miopen::FindMode::Values::Fast);
+    miopen::FindMode mode_hybrid;
+    mode_hybrid.Set(miopen::FindMode::Values::Hybrid);
+    miopen::FindMode mode_dynamic_hybrid;
+    mode_dynamic_hybrid.Set(miopen::FindMode::Values::DynamicHybrid);
+    miopen::FindMode mode_trust_verify;
+    mode_trust_verify.Set(miopen::FindMode::Values::TrustVerify);
+    miopen::FindMode mode_trust_verify_full;
+    mode_trust_verify_full.Set(miopen::FindMode::Values::TrustVerifyFull);
 
     EXPECT_TRUE(mode_fast.IsFast(context));
     EXPECT_FALSE(mode_fast.IsHybrid(context));
@@ -232,18 +230,18 @@ TEST_F(CPU_FindControls_NONE, FindModeManualSetting_NoEnforcement)
 // Test FindMode specific mode checks
 TEST_F(CPU_FindControls_NONE, FindModeIsFast)
 {
-    FindMode mode_normal;
-    mode_normal.Set(FindMode::Values::Normal);
-    FindMode mode_fast;
-    mode_fast.Set(FindMode::Values::Fast);
-    FindMode mode_hybrid;
-    mode_hybrid.Set(FindMode::Values::Hybrid);
-    FindMode mode_dynamic_hybrid;
-    mode_dynamic_hybrid.Set(FindMode::Values::DynamicHybrid);
-    FindMode mode_trust_verify;
-    mode_trust_verify.Set(FindMode::Values::TrustVerify);
-    FindMode mode_trust_verify_full;
-    mode_trust_verify_full.Set(FindMode::Values::TrustVerifyFull);
+    miopen::FindMode mode_normal;
+    mode_normal.Set(miopen::FindMode::Values::Normal);
+    miopen::FindMode mode_fast;
+    mode_fast.Set(miopen::FindMode::Values::Fast);
+    miopen::FindMode mode_hybrid;
+    mode_hybrid.Set(miopen::FindMode::Values::Hybrid);
+    miopen::FindMode mode_dynamic_hybrid;
+    mode_dynamic_hybrid.Set(miopen::FindMode::Values::DynamicHybrid);
+    miopen::FindMode mode_trust_verify;
+    mode_trust_verify.Set(miopen::FindMode::Values::TrustVerify);
+    miopen::FindMode mode_trust_verify_full;
+    mode_trust_verify_full.Set(miopen::FindMode::Values::TrustVerifyFull);
 
     EXPECT_FALSE(mode_normal.IsFast(context));
     EXPECT_TRUE(mode_fast.IsFast(context));
@@ -255,18 +253,18 @@ TEST_F(CPU_FindControls_NONE, FindModeIsFast)
 
 TEST_F(CPU_FindControls_NONE, FindModeIsHybrid)
 {
-    FindMode mode_normal;
-    mode_normal.Set(FindMode::Values::Normal);
-    FindMode mode_fast;
-    mode_fast.Set(FindMode::Values::Fast);
-    FindMode mode_hybrid;
-    mode_hybrid.Set(FindMode::Values::Hybrid);
-    FindMode mode_dynamic_hybrid;
-    mode_dynamic_hybrid.Set(FindMode::Values::DynamicHybrid);
-    FindMode mode_trust_verify;
-    mode_trust_verify.Set(FindMode::Values::TrustVerify);
-    FindMode mode_trust_verify_full;
-    mode_trust_verify_full.Set(FindMode::Values::TrustVerifyFull);
+    miopen::FindMode mode_normal;
+    mode_normal.Set(miopen::FindMode::Values::Normal);
+    miopen::FindMode mode_fast;
+    mode_fast.Set(miopen::FindMode::Values::Fast);
+    miopen::FindMode mode_hybrid;
+    mode_hybrid.Set(miopen::FindMode::Values::Hybrid);
+    miopen::FindMode mode_dynamic_hybrid;
+    mode_dynamic_hybrid.Set(miopen::FindMode::Values::DynamicHybrid);
+    miopen::FindMode mode_trust_verify;
+    mode_trust_verify.Set(miopen::FindMode::Values::TrustVerify);
+    miopen::FindMode mode_trust_verify_full;
+    mode_trust_verify_full.Set(miopen::FindMode::Values::TrustVerifyFull);
 
     EXPECT_FALSE(mode_normal.IsHybrid(context));
     EXPECT_FALSE(mode_fast.IsHybrid(context));
@@ -278,18 +276,18 @@ TEST_F(CPU_FindControls_NONE, FindModeIsHybrid)
 
 TEST_F(CPU_FindControls_NONE, FindModeIsDynamicHybrid)
 {
-    FindMode mode_normal;
-    mode_normal.Set(FindMode::Values::Normal);
-    FindMode mode_fast;
-    mode_fast.Set(FindMode::Values::Fast);
-    FindMode mode_hybrid;
-    mode_hybrid.Set(FindMode::Values::Hybrid);
-    FindMode mode_dynamic_hybrid;
-    mode_dynamic_hybrid.Set(FindMode::Values::DynamicHybrid);
-    FindMode mode_trust_verify;
-    mode_trust_verify.Set(FindMode::Values::TrustVerify);
-    FindMode mode_trust_verify_full;
-    mode_trust_verify_full.Set(FindMode::Values::TrustVerifyFull);
+    miopen::FindMode mode_normal;
+    mode_normal.Set(miopen::FindMode::Values::Normal);
+    miopen::FindMode mode_fast;
+    mode_fast.Set(miopen::FindMode::Values::Fast);
+    miopen::FindMode mode_hybrid;
+    mode_hybrid.Set(miopen::FindMode::Values::Hybrid);
+    miopen::FindMode mode_dynamic_hybrid;
+    mode_dynamic_hybrid.Set(miopen::FindMode::Values::DynamicHybrid);
+    miopen::FindMode mode_trust_verify;
+    mode_trust_verify.Set(miopen::FindMode::Values::TrustVerify);
+    miopen::FindMode mode_trust_verify_full;
+    mode_trust_verify_full.Set(miopen::FindMode::Values::TrustVerifyFull);
 
     EXPECT_FALSE(mode_normal.IsDynamicHybrid(context));
     EXPECT_FALSE(mode_fast.IsDynamicHybrid(context));
@@ -302,18 +300,18 @@ TEST_F(CPU_FindControls_NONE, FindModeIsDynamicHybrid)
 #if !MIOPEN_DISABLE_USERDB
 TEST_F(CPU_FindControls_NONE, FindModeIsTrustVerify)
 {
-    FindMode mode_normal;
-    mode_normal.Set(FindMode::Values::Normal);
-    FindMode mode_fast;
-    mode_fast.Set(FindMode::Values::Fast);
-    FindMode mode_hybrid;
-    mode_hybrid.Set(FindMode::Values::Hybrid);
-    FindMode mode_dynamic_hybrid;
-    mode_dynamic_hybrid.Set(FindMode::Values::DynamicHybrid);
-    FindMode mode_trust_verify;
-    mode_trust_verify.Set(FindMode::Values::TrustVerify);
-    FindMode mode_trust_verify_full;
-    mode_trust_verify_full.Set(FindMode::Values::TrustVerifyFull);
+    miopen::FindMode mode_normal;
+    mode_normal.Set(miopen::FindMode::Values::Normal);
+    miopen::FindMode mode_fast;
+    mode_fast.Set(miopen::FindMode::Values::Fast);
+    miopen::FindMode mode_hybrid;
+    mode_hybrid.Set(miopen::FindMode::Values::Hybrid);
+    miopen::FindMode mode_dynamic_hybrid;
+    mode_dynamic_hybrid.Set(miopen::FindMode::Values::DynamicHybrid);
+    miopen::FindMode mode_trust_verify;
+    mode_trust_verify.Set(miopen::FindMode::Values::TrustVerify);
+    miopen::FindMode mode_trust_verify_full;
+    mode_trust_verify_full.Set(miopen::FindMode::Values::TrustVerifyFull);
 
     EXPECT_FALSE(mode_normal.IsTrustVerify(context));
     EXPECT_FALSE(mode_fast.IsTrustVerify(context));
@@ -325,18 +323,18 @@ TEST_F(CPU_FindControls_NONE, FindModeIsTrustVerify)
 #else
 TEST_F(CPU_FindControls_NONE, FindModeIsTrustVerifyDisabled)
 {
-    FindMode mode_normal;
-    mode_normal.Set(FindMode::Values::Normal);
-    FindMode mode_fast;
-    mode_fast.Set(FindMode::Values::Fast);
-    FindMode mode_hybrid;
-    mode_hybrid.Set(FindMode::Values::Hybrid);
-    FindMode mode_dynamic_hybrid;
-    mode_dynamic_hybrid.Set(FindMode::Values::DynamicHybrid);
-    FindMode mode_trust_verify;
-    mode_trust_verify.Set(FindMode::Values::TrustVerify);
-    FindMode mode_trust_verify_full;
-    mode_trust_verify_full.Set(FindMode::Values::TrustVerifyFull);
+    miopen::FindMode mode_normal;
+    mode_normal.Set(miopen::FindMode::Values::Normal);
+    miopen::FindMode mode_fast;
+    mode_fast.Set(miopen::FindMode::Values::Fast);
+    miopen::FindMode mode_hybrid;
+    mode_hybrid.Set(miopen::FindMode::Values::Hybrid);
+    miopen::FindMode mode_dynamic_hybrid;
+    mode_dynamic_hybrid.Set(miopen::FindMode::Values::DynamicHybrid);
+    miopen::FindMode mode_trust_verify;
+    mode_trust_verify.Set(miopen::FindMode::Values::TrustVerify);
+    miopen::FindMode mode_trust_verify_full;
+    mode_trust_verify_full.Set(miopen::FindMode::Values::TrustVerifyFull);
 
     EXPECT_FALSE(mode_normal.IsTrustVerify(context));
     EXPECT_FALSE(mode_fast.IsTrustVerify(context));
@@ -349,18 +347,18 @@ TEST_F(CPU_FindControls_NONE, FindModeIsTrustVerifyDisabled)
 
 TEST_F(CPU_FindControls_NONE, FindModeIsExhaustive)
 {
-    FindMode mode_normal;
-    mode_normal.Set(FindMode::Values::Normal);
-    FindMode mode_fast;
-    mode_fast.Set(FindMode::Values::Fast);
-    FindMode mode_hybrid;
-    mode_hybrid.Set(FindMode::Values::Hybrid);
-    FindMode mode_dynamic_hybrid;
-    mode_dynamic_hybrid.Set(FindMode::Values::DynamicHybrid);
-    FindMode mode_trust_verify;
-    mode_trust_verify.Set(FindMode::Values::TrustVerify);
-    FindMode mode_trust_verify_full;
-    mode_trust_verify_full.Set(FindMode::Values::TrustVerifyFull);
+    miopen::FindMode mode_normal;
+    mode_normal.Set(miopen::FindMode::Values::Normal);
+    miopen::FindMode mode_fast;
+    mode_fast.Set(miopen::FindMode::Values::Fast);
+    miopen::FindMode mode_hybrid;
+    mode_hybrid.Set(miopen::FindMode::Values::Hybrid);
+    miopen::FindMode mode_dynamic_hybrid;
+    mode_dynamic_hybrid.Set(miopen::FindMode::Values::DynamicHybrid);
+    miopen::FindMode mode_trust_verify;
+    mode_trust_verify.Set(miopen::FindMode::Values::TrustVerify);
+    miopen::FindMode mode_trust_verify_full;
+    mode_trust_verify_full.Set(miopen::FindMode::Values::TrustVerifyFull);
 
     EXPECT_FALSE(mode_normal.IsExhaustive(context));
     EXPECT_FALSE(mode_fast.IsExhaustive(context));
@@ -373,36 +371,36 @@ TEST_F(CPU_FindControls_NONE, FindModeIsExhaustive)
 // Test GetSet functionality
 TEST_F(CPU_FindControls_NONE, FindModeGetSet)
 {
-    FindMode mode_normal;
-    mode_normal.Set(FindMode::Values::Normal);
-    FindMode mode_fast;
-    mode_fast.Set(FindMode::Values::Fast);
-    FindMode mode_hybrid;
-    mode_hybrid.Set(FindMode::Values::Hybrid);
-    FindMode mode_dynamic_hybrid;
-    mode_dynamic_hybrid.Set(FindMode::Values::DynamicHybrid);
-    FindMode mode_trust_verify;
-    mode_trust_verify.Set(FindMode::Values::TrustVerify);
-    FindMode mode_trust_verify_full;
-    mode_trust_verify_full.Set(FindMode::Values::TrustVerifyFull);
+    miopen::FindMode mode_normal;
+    mode_normal.Set(miopen::FindMode::Values::Normal);
+    miopen::FindMode mode_fast;
+    mode_fast.Set(miopen::FindMode::Values::Fast);
+    miopen::FindMode mode_hybrid;
+    mode_hybrid.Set(miopen::FindMode::Values::Hybrid);
+    miopen::FindMode mode_dynamic_hybrid;
+    mode_dynamic_hybrid.Set(miopen::FindMode::Values::DynamicHybrid);
+    miopen::FindMode mode_trust_verify;
+    mode_trust_verify.Set(miopen::FindMode::Values::TrustVerify);
+    miopen::FindMode mode_trust_verify_full;
+    mode_trust_verify_full.Set(miopen::FindMode::Values::TrustVerifyFull);
 
-    EXPECT_EQ(mode_normal.Get(), FindMode::Values::Normal);
-    EXPECT_EQ(mode_fast.Get(), FindMode::Values::Fast);
-    EXPECT_EQ(mode_hybrid.Get(), FindMode::Values::Hybrid);
-    EXPECT_EQ(mode_dynamic_hybrid.Get(), FindMode::Values::DynamicHybrid);
-    EXPECT_EQ(mode_trust_verify.Get(), FindMode::Values::TrustVerify);
-    EXPECT_EQ(mode_trust_verify_full.Get(), FindMode::Values::TrustVerifyFull);
+    EXPECT_EQ(mode_normal.Get(), miopen::FindMode::Values::Normal);
+    EXPECT_EQ(mode_fast.Get(), miopen::FindMode::Values::Fast);
+    EXPECT_EQ(mode_hybrid.Get(), miopen::FindMode::Values::Hybrid);
+    EXPECT_EQ(mode_dynamic_hybrid.Get(), miopen::FindMode::Values::DynamicHybrid);
+    EXPECT_EQ(mode_trust_verify.Get(), miopen::FindMode::Values::TrustVerify);
+    EXPECT_EQ(mode_trust_verify_full.Get(), miopen::FindMode::Values::TrustVerifyFull);
 }
 
 // Test constructor with different primitives
 TEST_F(CPU_FindControls_NONE, FindModeConstructorPrimitive)
 {
     // Test default constructor (Convolution primitive)
-    FindMode mode_default;
+    miopen::FindMode mode_default;
     // Just ensure it constructs without crashing
 
     // Test Fusion primitive
-    FindMode mode_fusion(solver::Primitive::Fusion);
+    miopen::FindMode mode_fusion(miopen::solver::Primitive::Fusion);
     // Just ensure it constructs without crashing
 }
 
@@ -410,8 +408,8 @@ TEST_F(CPU_FindControls_NONE, FindModeConstructorPrimitive)
 TEST_F(CPU_FindControls_NONE, FindModeEdgeCases)
 {
     // Test deprecated fast hybrid mode
-    FindMode mode;
-    mode.Set(FindMode::Values::DeprecatedFastHybrid);
+    miopen::FindMode mode;
+    mode.Set(miopen::FindMode::Values::DeprecatedFastHybrid);
 
     // DeprecatedFastHybrid should not be considered as Fast or Hybrid in current implementation
     EXPECT_FALSE(mode.IsFast(context));
@@ -421,8 +419,8 @@ TEST_F(CPU_FindControls_NONE, FindModeEdgeCases)
 // Test that stream operators work (compilation test)
 TEST_F(CPU_FindControls_NONE, StreamOperators)
 {
-    FindEnforce enforce(FindEnforceAction::Search);
-    FindMode mode;
+    miopen::FindEnforce enforce(miopen::FindEnforceAction::Search);
+    miopen::FindMode mode;
 
     std::ostringstream oss1, oss2;
     oss1 << enforce;
@@ -438,27 +436,27 @@ TEST_F(CPU_FindControls_NONE, StreamOperators)
 TEST_F(CPU_FindControls_NONE, ConstructorReadsEnvironment)
 {
     // Test that constructors work and read some value
-    FindMode mode_conv; // Default convolution
-    FindMode mode_fusion(solver::Primitive::Fusion);
+    miopen::FindMode mode_conv; // Default convolution
+    miopen::FindMode mode_fusion(miopen::solver::Primitive::Fusion);
 
     // Just verify they construct and have valid enum values
-    EXPECT_GE(static_cast<int>(mode_conv.Get()), static_cast<int>(FindMode::Values::Begin_));
-    EXPECT_LT(static_cast<int>(mode_conv.Get()), static_cast<int>(FindMode::Values::End_));
+    EXPECT_GE(static_cast<int>(mode_conv.Get()), static_cast<int>(miopen::FindMode::Values::Begin_));
+    EXPECT_LT(static_cast<int>(mode_conv.Get()), static_cast<int>(miopen::FindMode::Values::End_));
 
-    EXPECT_GE(static_cast<int>(mode_fusion.Get()), static_cast<int>(FindMode::Values::Begin_));
-    EXPECT_LT(static_cast<int>(mode_fusion.Get()), static_cast<int>(FindMode::Values::End_));
+    EXPECT_GE(static_cast<int>(mode_fusion.Get()), static_cast<int>(miopen::FindMode::Values::Begin_));
+    EXPECT_LT(static_cast<int>(mode_fusion.Get()), static_cast<int>(miopen::FindMode::Values::End_));
 }
 
 // Test the default constructor behavior
 TEST_F(CPU_FindControls_NONE, DefaultConstructorBehavior)
 {
-    FindEnforce default_enforce; // Reads from environment
+    miopen::FindEnforce default_enforce; // Reads from environment
 
     // Verify it constructed and has a valid action value
     EXPECT_GE(static_cast<int>(default_enforce.GetAction()),
-              static_cast<int>(FindEnforceAction::First_));
+              static_cast<int>(miopen::FindEnforceAction::First_));
     EXPECT_LE(static_cast<int>(default_enforce.GetAction()),
-              static_cast<int>(FindEnforceAction::Last_));
+              static_cast<int>(miopen::FindEnforceAction::Last_));
 }
 
 // Test current environment state (informational)
@@ -478,8 +476,8 @@ TEST_F(CPU_FindControls_NONE, CurrentEnvironmentState)
     }
 
     // Test what the constructors actually produce with current environment
-    FindMode mode;
-    FindEnforce enforce;
+    miopen::FindMode mode;
+    miopen::FindEnforce enforce;
 
     std::cout << "Constructor produced FindMode: " << static_cast<int>(mode.Get()) << std::endl;
     std::cout << "Constructor produced FindEnforce: " << static_cast<int>(enforce.GetAction())
@@ -494,24 +492,24 @@ TEST_F(CPU_FindControls_NONE, CurrentEnvironmentState)
 
 TEST_F(CPU_FindControls_NONE, IsValidCombination_Combinations)
 {
-    FindEnforce enforce_none(FindEnforceAction::None);
-    FindEnforce enforce_db_update(FindEnforceAction::DbUpdate);
-    FindEnforce enforce_search(FindEnforceAction::Search);
-    FindEnforce enforce_search_db_update(FindEnforceAction::SearchDbUpdate);
-    FindEnforce enforce_clean(FindEnforceAction::DbClean);
+    miopen::FindEnforce enforce_none(miopen::FindEnforceAction::None);
+    miopen::FindEnforce enforce_db_update(miopen::FindEnforceAction::DbUpdate);
+    miopen::FindEnforce enforce_search(miopen::FindEnforceAction::Search);
+    miopen::FindEnforce enforce_search_db_update(miopen::FindEnforceAction::SearchDbUpdate);
+    miopen::FindEnforce enforce_clean(miopen::FindEnforceAction::DbClean);
 
-    FindMode mode_normal;
-    mode_normal.Set(FindMode::Values::Normal);
-    FindMode mode_fast;
-    mode_fast.Set(FindMode::Values::Fast);
-    FindMode mode_hybrid;
-    mode_hybrid.Set(FindMode::Values::Hybrid);
-    FindMode mode_dynamic_hybrid;
-    mode_dynamic_hybrid.Set(FindMode::Values::DynamicHybrid);
-    FindMode mode_trust_verify;
-    mode_trust_verify.Set(FindMode::Values::TrustVerify);
-    FindMode mode_trust_verify_full;
-    mode_trust_verify_full.Set(FindMode::Values::TrustVerifyFull);
+    miopen::FindMode mode_normal;
+    mode_normal.Set(miopen::FindMode::Values::Normal);
+    miopen::FindMode mode_fast;
+    mode_fast.Set(miopen::FindMode::Values::Fast);
+    miopen::FindMode mode_hybrid;
+    mode_hybrid.Set(miopen::FindMode::Values::Hybrid);
+    miopen::FindMode mode_dynamic_hybrid;
+    mode_dynamic_hybrid.Set(miopen::FindMode::Values::DynamicHybrid);
+    miopen::FindMode mode_trust_verify;
+    mode_trust_verify.Set(miopen::FindMode::Values::TrustVerify);
+    miopen::FindMode mode_trust_verify_full;
+    mode_trust_verify_full.Set(miopen::FindMode::Values::TrustVerifyFull);
 
     EXPECT_TRUE(IsValidCombination(enforce_none, mode_normal));
     EXPECT_TRUE(IsValidCombination(enforce_db_update, mode_normal));
@@ -549,6 +547,3 @@ TEST_F(CPU_FindControls_NONE, IsValidCombination_Combinations)
     EXPECT_FALSE(IsValidCombination(enforce_search_db_update, mode_trust_verify_full));
     EXPECT_FALSE(IsValidCombination(enforce_clean, mode_trust_verify_full));
 }
-
-} // namespace test
-} // namespace miopen
