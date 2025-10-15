@@ -615,6 +615,12 @@ public:
             const index_t scale_i = data_i / opts.blockScaling;
 
             // test
+            if(isScaled<DataType>())
+            {
+                // Scale values must be equal to 1
+                EXPECT_EQ(scale[scale_i], 1);
+            }
+
             const auto ref_value = toDoublePacked<DataType>(&scale[0], &data[0], scale_i, data_i);
             const auto abs_ref_value = std::abs(ref_value);
 
