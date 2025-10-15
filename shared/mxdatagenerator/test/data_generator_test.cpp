@@ -173,6 +173,30 @@ std::ostream& operator<<(std::ostream& os, const std::vector<index_t>& vec)
     return os;
 }
 
+template <typename T>
+float mean(std::vector<T>& array);
+
+template <typename T>
+float std_dev(std::vector<T>& array);
+
+template <typename T>
+float mean(std::vector<T>& array)
+{
+    return std::accumulate(array, array + array.size(), 0.0) / array.size();
+}
+
+template <typename T>
+float std_dev(std::vector<T>& array)
+{
+    float  avg = mean(array);
+    double sum = 0.0;
+    for(int i = 0; i < array.size(); i++)
+    {
+        sum += (array[i] - avg) * (array[i] + avg);
+    }
+    return std::sqrt(sum / array.size());
+}
+
 template <typename DataType>
 class DataGeneratorBoundedTest : public ::TestWithParam<BoundedTupleType>
 {
@@ -578,7 +602,9 @@ public:
         set_options(params, opts, size, stride);
         std::cout << "testing " << opts << " size=" << size << " stride=" << stride << "\n";
 
-        opts.initMode = DataInitMode(IdentityScaleNormalData{0.0, 1.0});
+        float mean    = 0.0;
+        float std_dev = 1.0;
+        opts.initMode = DataInitMode(IdentityScaleNormalData{mean, std_dev});
 
         const auto dgen  = DataGenerator<DataType>().generate(size, stride, opts);
         const auto data  = dgen.getDataBytes();
@@ -651,6 +677,10 @@ public:
             has_inf = has_inf || isInfPacked<DataType>(&scale[0], &data[0], scale_i, data_i);
             has_sbn = has_sbn || isSubnormPacked<DataType>(&data[0], data_i);
         }
+
+        // Data values must be normally distributed
+        // Since scale values are 1 we can check reference array
+        EXPECT_LE(std::abs(mean(ref_double) - mean), 0.01);
 
         if(opts.includeNaN && getDataHasNan<DataType>())
         {
