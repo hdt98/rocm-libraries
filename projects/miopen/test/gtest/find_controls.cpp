@@ -468,11 +468,11 @@ TEST_F(CPU_FindControls_NONE, CurrentEnvironmentState)
     const char* enforce_env = std::getenv("MIOPEN_FIND_ENFORCE");
 
     // This is informational - shows what environment the tests are running with
-    if(mode_env)
+    if(mode_env != nullptr)
     {
         std::cout << "Test running with MIOPEN_FIND_MODE=" << mode_env << std::endl;
     }
-    if(enforce_env)
+    if(enforce_env != nullptr)
     {
         std::cout << "Test running with MIOPEN_FIND_ENFORCE=" << enforce_env << std::endl;
     }

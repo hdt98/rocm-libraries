@@ -83,7 +83,7 @@ and :doc:`Performance database <../conceptual/perfdb>`.
 
     * - | ``MIOPEN_FIND_MODE``
         | Sets find mode to accelerate find API calls.
-        | **Note**: Some combinations with ``MIOPEN_FIND_ENFORCE`` might be unsafe and will be automatically blocked to prevent incomplete database entries.
+        | **Note**: See below for details on safe/unsafe combinations with ``MIOPEN_FIND_ENFORCE``.
       - | "NORMAL" or 1: Full find mode (benchmarks all solvers)
         | "FAST" or 2: Fast find (use FindDb or immediate fallback)
         | "HYBRID" or 3: Hybrid find (FindDb hit or full find)
@@ -92,7 +92,7 @@ and :doc:`Performance database <../conceptual/perfdb>`.
 
     * - | ``MIOPEN_FIND_ENFORCE``
         | Controls auto-tune behavior and database updates.
-        | **Note**: Some combinations with ``MIOPEN_FIND_MODE`` might be unsafe and will be automatically blocked to prevent incomplete database entries.
+        | **Note**: See below for details on safe/unsafe combinations with ``MIOPEN_FIND_MODE``.
       - | "NONE" or 1: No change in default behavior
         | "DB_UPDATE" or 2: Always perform auto-tune and update PerfDb (unsafe with Fast/Hybrid modes)
         | "SEARCH" or 3: Auto-tune even if not requested via API

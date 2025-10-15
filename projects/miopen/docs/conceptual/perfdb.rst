@@ -100,7 +100,7 @@ database. The User PerfDb is named ``miopen.udb`` and can be found at the User P
 Troubleshooting find mode and enforcement combinations
 ==========================================================
 
-MIOpen includes automatic safety validation to prevent unsafe combinations of ``MIOPEN_FIND_MODE`` and ``MIOPEN_FIND_ENFORCE`` that could lead to incomplete or corrupted database entries.
+MIOpen includes automatic safety validation to prevent unsafe combinations of ``MIOPEN_FIND_MODE`` and ``MIOPEN_FIND_ENFORCE`` that could lead to incomplete database entries.
 
 Common warning messages
 ----------------------------------------------------------------------------------------------------------
@@ -153,5 +153,4 @@ Best practices
 
 1. **For development and testing**: Use ``MIOPEN_FIND_ENFORCE=3`` (SEARCH) with any find mode.
 2. **For comprehensive tuning**: Use ``MIOPEN_FIND_MODE=1`` (NORMAL) with appropriate enforcement.
-3. **For production**: Avoid setting these environment variables unless specifically needed.
-4. **Always check the logs**: MIOpen will warn you about any automatic corrections made.
+3. **Always check the logs**: MIOpen will warn you about any automatic corrections made.

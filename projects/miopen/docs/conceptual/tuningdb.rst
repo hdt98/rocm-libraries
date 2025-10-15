@@ -56,7 +56,7 @@ Enable this feature using these commands:
 
 .. code:: bash
 
-  export MIOPEN_FIND_MODE=1  # Can alternatively use another find mode for faster, but less comprehensive results
+  export MIOPEN_FIND_MODE=3  # Hybrid. Can alternatively use Normal (1) for slower, but more comprehensive results or Fast (2) for faster, but less comprehensive results
   export MIOPEN_FIND_ENFORCE=3
   export MIOPEN_USER_DB_PATH="/user/specified/directory"
   export MIOPEN_SYSTEM_DB_PATH="$MIOPEN_USER_DB_PATH"
@@ -123,4 +123,4 @@ This means MIOpen detected an unsafe combination and automatically corrected it.
 
 * Fast and Hybrid modes are designed to reduce tuning time but might skip some solvers.
 * When combined with database update operations, this can lead to incomplete database entries.
-* For comprehensive tuning, use Normal mode with appropriate enforcement options.
+* For comprehensive tuning, use Normal mode with appropriate enforcement options, however this can lead to long tuning times.
