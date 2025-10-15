@@ -20,6 +20,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#include "agent.hpp"
+
 #include <rocprofiler-sdk/buffer.h>
 #include <rocprofiler-sdk/callback_tracing.h>
 #include <rocprofiler-sdk/cxx/codeobj/code_printing.hpp>
@@ -48,29 +50,10 @@ namespace
     rocprofiler_thread_trace_decoder_id_t decoder{};
     rocprofiler_context_id_t              client_ctx{};
 
-    // Maps address to latency and hit count
-    struct InstructionData
-    {
-        uint64_t    latency{0};
-        uint64_t    hitcount{0};
-        std::string instruction;
-    };
-
-    // Comparator for rocprofiler_thread_trace_decoder_pc_t
-    struct pc_comparator
-    {
-        bool operator()(const rocprofiler_thread_trace_decoder_pc_t& a,
-                        const rocprofiler_thread_trace_decoder_pc_t& b) const
-        {
-            if(a.marker_id == b.marker_id)
-                return a.addr < b.addr;
-            return a.marker_id < b.marker_id;
-        }
-    };
-
-    std::map<rocprofiler_thread_trace_decoder_pc_t, InstructionData, pc_comparator>
-                                                                    instruction_latencies;
+    // Use types from the header namespace
+    rocroller_profiler::InstructionLatencyMap                       instruction_latencies;
     rocprofiler::sdk::codeobj::disassembly::CodeobjAddressTranslate address_table;
+    bool                                                            instructions_resolved = false;
 
     // Callback for code object loading
     void codeobj_callback(rocprofiler_callback_tracing_record_t record,
@@ -203,10 +186,12 @@ namespace
         return 0;
     }
 
-    // Tool finalization - output results
-    void tool_fini(void*)
+    // Helper function to resolve instruction names
+    void resolve_instruction_names()
     {
-        // Resolve instruction names
+        if(instructions_resolved)
+            return;
+
         for(auto& [pc, data] : instruction_latencies)
         {
             auto inst = address_table.get(pc.marker_id, pc.addr);
@@ -215,6 +200,14 @@ namespace
                 data.instruction = inst->inst;
             }
         }
+        instructions_resolved = true;
+    }
+
+    // Tool finalization - output results
+    void tool_fini(void*)
+    {
+        // Resolve instruction names
+        resolve_instruction_names();
 
         // Output results
         const char*   OUTPUT_FILE = "thread_trace.log";
@@ -250,3 +243,14 @@ extern "C" rocprofiler_tool_configure_result_t*
 
     return &cfg;
 }
+
+// API implementation
+namespace rocroller_profiler
+{
+    const InstructionLatencyMap& get_instruction_latencies()
+    {
+        // Ensure instruction names are resolved before returning the data
+        resolve_instruction_names();
+        return instruction_latencies;
+    }
+} // namespace rocroller_profiler

@@ -35,6 +35,9 @@
 
 #include "hip/hip_runtime.h"
 
+// Include agent API header
+#include "agent.hpp"
+
 // rocRoller includes
 #include <rocRoller/AssemblyKernel.hpp>
 #include <rocRoller/CodeGen/ArgumentLoader.hpp>
@@ -145,6 +148,28 @@ int main(int /*argc*/, char** /*argv*/)
 
     std::cout << "rocRoller kernel first execution result: " << h_result << " (expected: 6.0)"
               << std::endl;
+
+    std::cout << "\n--- Instruction Latency Data ---" << std::endl;
+    const auto& latencies = rocroller_profiler::get_instruction_latencies();
+
+    if(latencies.empty())
+    {
+        std::cout << "No latency data collected. Make sure profiling is enabled." << std::endl;
+    }
+    else
+    {
+        std::cout << "Collected latency data for " << latencies.size()
+                  << " instructions:" << std::endl;
+        std::cout << "\nInstruction, Total Latency (cycles), Hit Count, Avg Latency (cycles)"
+                  << std::endl;
+
+        for(const auto& [pc, data] : latencies)
+        {
+            uint64_t avg_latency = data.hitcount ? (data.latency / data.hitcount) : 0;
+            std::cout << "\"" << data.instruction << "\", " << data.latency << ", " << data.hitcount
+                      << ", " << avg_latency << std::endl;
+        }
+    }
 
     HIP_API_CALL(hipFree(d_ptr));
 
