@@ -983,7 +983,7 @@ namespace DGen
                 //
                 // generate random block
                 //
-                uint64_t d;
+                int64_t d;
                 do
                 {
                     d = normal_dist(m_gen[tid]);
