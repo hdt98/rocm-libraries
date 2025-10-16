@@ -41,7 +41,7 @@ RUN apt-get update && apt-get install -y \
 # ============================================================================
 # Prebuilt stage - downloads and extracts tarball
 #
-# Example build command for default tarball build (gfx94X, 7.0.0rc20250909): 
+# Example build command for default tarball build (gfx94X, 7.0.0rc20250909):
 # docker build -f Dockerfile.ubuntu24 -t hipdnn:prebuilt .
 #
 # Example build command for overriding tarball build args (gfx950, 7.0.0rc20250908):
@@ -166,6 +166,7 @@ RUN apt-get update && apt-get install -y \
     clang-format-18 \
     clang-tidy-20 \
     llvm-20 \
+    flatbuffers-compiler \
     && rm -rf /var/lib/apt/lists/*
 
 # Use update-alternatives to set default versions
@@ -181,6 +182,21 @@ RUN for tool in /usr/bin/llvm*-20; do \
             echo "Set alternative for $base -> $tool"; \
         fi \
     done
+
+RUN python3 -m pip install --break-system-packages pre-commit
+
+# Display welcome message with reminder
+RUN echo '\n\
+# hipDNN Development Container Welcome Message\n\
+echo ""\n\
+echo "========================================"\n\
+echo "  hipDNN Development Container"\n\
+echo "========================================"\n\
+echo ""\n\
+echo "If you haven\'t already, please run this command in your rocm-libraries repo:"\n\
+echo "   pre-commit install"\n\
+echo ""\n\
+' >> /etc/bash.bashrc
 
 ENV HIP_PLATFORM=amd
 ENV PATH="/opt/rocm/bin:/opt/rocm:${PATH}"
