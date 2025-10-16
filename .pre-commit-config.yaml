@@ -53,12 +53,12 @@ repos:
   - repo: local
     hooks:
       - id: clang-tidy-hipdnn
-        name: clang-tidy (hipdnn)
-        entry: clang-tidy-20
+        name: clang-tidy (hipDNN)
+        entry: |
+          bash -c 'if ! clang-tidy-20 --version &> /dev/null; then echo "ERROR: clang-tidy-20 missing. For hipDNN changes, please run: apt-get install clang-tidy-20" >&2; exit 1; fi; clang-tidy-20 "$@"' --
         language: system
         args:
           - --config-file=projects/hipdnn/.clang-tidy
-          - -p=projects/hipdnn/build
         files: ^projects/hipdnn/.*\.(cpp|c|hpp|h)$
         types: [c++]
 
@@ -67,7 +67,8 @@ repos:
     hooks:
       - id: flatc-hipdnn
         name: flatc (hipDNN)
-        entry: bash -c 'for file in "$@"; do flatc -I projects/hipdnn/sdk/schemas --cpp --gen-object-api --gen-mutable --gen-compare --defaults-json --scoped-enums -o /tmp/flatc_hipdnn "$file" || exit 1; done' --
+        entry: |
+          bash -c 'if ! flatc --version &> /dev/null; then echo "ERROR: flatc missing. For hipDNN changes, please run: apt-get install flatbuffers-compiler" >&2; exit 1; fi; for file in "$@"; do flatc -I projects/hipdnn/sdk/schemas --cpp --gen-object-api --gen-mutable --gen-compare --defaults-json --scoped-enums -o /tmp/flatc_hipdnn "$file" || exit 1; done' --
         language: system
         files: ^projects/hipdnn/sdk/schemas/.*\.fbs$
         pass_filenames: true
