@@ -9,16 +9,14 @@ if(TENSILELITE_ENABLE_AUTOBUILD)
 endif()
 
 if(TENSILELITE_ENABLE_HOST)
-    add_library(tensilelite-host OBJECT)
+    add_library(tensilelite-host STATIC)
     add_library(tensilelite::tensilelite-host ALIAS tensilelite-host)
 
     set_target_properties(tensilelite-host
         PROPERTIES
             POSITION_INDEPENDENT_CODE ON
     )
-    if(NOT HIPBLASLT_ENABLE_COVERAGE)
-        target_compile_options(tensilelite-host PUBLIC -fvisibility=hidden)
-    endif()
+    target_compile_options(tensilelite-host PRIVATE -fvisibility=hidden)
     target_compile_features(tensilelite-host PUBLIC cxx_std_17)
     target_compile_definitions(tensilelite-host
         PUBLIC

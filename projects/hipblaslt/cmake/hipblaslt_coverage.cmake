@@ -2,6 +2,14 @@
 # SPDX-License-Identifier:  MIT
 
 target_compile_definitions(hipblaslt-clients-common PUBLIC HIPBLASLT_ENABLE_COVERAGE)
+target_compile_options(hipblaslt PRIVATE -g -O0 -fprofile-instr-generate -fcoverage-mapping)
+target_link_options(hipblaslt PRIVATE -fprofile-instr-generate)
+target_compile_options(hipblaslt-clients-common PRIVATE -g -O0 -fprofile-instr-generate -fcoverage-mapping)
+target_link_options(hipblaslt-clients-common PRIVATE -fprofile-instr-generate)
+target_compile_options(hipblaslt-bench PRIVATE -g -O0 -fprofile-instr-generate -fcoverage-mapping)
+target_link_options(hipblaslt-bench PRIVATE -fprofile-instr-generate)
+target_compile_options(hipblaslt-test PRIVATE -g -O0 -fprofile-instr-generate -fcoverage-mapping -fvisibility=default)
+target_link_options(hipblaslt-test PRIVATE -fprofile-instr-generate)
 
 rocm_get_git_commit_tag(hipblaslt_COMMIT)
 file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/code_coverage_tuning_file.txt"
@@ -12,14 +20,7 @@ file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/code_coverage_tuning_file.txt"
             "    T,N,0,1,512,1024,13,1,13,6656,0,13,13312,512,524288,512,524288,f32_r,f32_r,f32_r,f32_r,xf32_r,0,0,0,0,0,none,"
             "1,f32_r,f32_r,512,464.651,69.1759,29.3371,532705,gfx942:sramecc+:xnack-,304"
 )
-target_compile_options(hipblaslt PRIVATE -g -O0 -fprofile-instr-generate -fcoverage-mapping)
-target_link_options(hipblaslt PRIVATE -fprofile-instr-generate)
-target_compile_options(hipblaslt-clients-common PRIVATE -g -O0 -fprofile-instr-generate -fcoverage-mapping)
-target_link_options(hipblaslt-clients-common PRIVATE -fprofile-instr-generate)
-target_compile_options(hipblaslt-bench PRIVATE -g -O0 -fprofile-instr-generate -fcoverage-mapping)
-target_link_options(hipblaslt-bench PRIVATE -fprofile-instr-generate)
-target_compile_options(hipblaslt-test PRIVATE -g -O0 -fprofile-instr-generate -fcoverage-mapping -fvisibility=default)
-target_link_options(hipblaslt-test PRIVATE -fprofile-instr-generate)
+
 set(coverage_dir "${CMAKE_CURRENT_BINARY_DIR}/coverage-report")
 add_custom_command(
     OUTPUT "${coverage_dir}/coverage-test.stamp"
