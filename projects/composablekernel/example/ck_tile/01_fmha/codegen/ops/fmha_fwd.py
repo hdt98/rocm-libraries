@@ -118,6 +118,22 @@ float fmha_fwd_<trait_{F_idx}>(const ck_tile::stream_config& s, fmha_fwd_args a)
 """
 
 FMHA_FWD_API_FILENAME="fmha_fwd_api.cpp"
+FMHA_FP16_HDIMV32_HDIMQ32_FWD_API_FILENAME="fmha_fwd_fp16_hdimv32_hdimq32_api.cpp"
+FMHA_FP16_HDIMV64_HDIMQ64_FWD_API_FILENAME="fmha_fwd_fp16_hdimv64_hdimq64_api.cpp"
+FMHA_FP16_HDIMV128_HDIMQ128_FWD_API_FILENAME="fmha_fwd_fp16_hdimv128_hdimq128_api.cpp"
+FMHA_FP16_HDIMV192_HDIMQ128_FWD_API_FILENAME="fmha_fwd_fp16_hdimv192_hdimq128_api.cpp"
+FMHA_FP16_HDIMV256_HDIMQ256_MODETRUE_FWD_API_FILENAME="fmha_fwd_fp16_hdimv256_hdimq256_modetrue_api.cpp"
+FMHA_FP16_HDIMV256_HDIMQ256_MODEFALSE_FWD_API_FILENAME="fmha_fwd_fp16_hdimv256_hdimq256_modefalse_api.cpp"
+
+FMHA_BF16_HDIMV32_HDIMQ32_FWD_API_FILENAME="fmha_fwd_bf16_hdimv32_hdimq32_api.cpp"
+FMHA_BF16_HDIMV64_HDIMQ64_FWD_API_FILENAME="fmha_fwd_bf16_hdimv64_hdimq64_api.cpp"
+FMHA_BF16_HDIMV128_HDIMQ128_FWD_API_FILENAME="fmha_fwd_bf16_hdimv128_hdimq128_api.cpp"
+FMHA_BF16_HDIMV192_HDIMQ128_FWD_API_FILENAME="fmha_fwd_bf16_hdimv192_hdimq128_api.cpp"
+FMHA_BF16_HDIMV256_HDIMQ256_MODETRUE_FWD_API_FILENAME="fmha_fwd_bf16_hdimv256_hdimq256_modetrue_api.cpp"
+FMHA_BF16_HDIMV256_HDIMQ256_MODEFALSE_FWD_API_FILENAME="fmha_fwd_bf16_hdimv256_hdimq256_modefalse_api.cpp"
+
+FMHA_FP8_FWD_API_FILENAME="fmha_fwd_fp8_api.cpp"
+
 FMHA_FWD_API="""
 float fmha_fwd(fmha_fwd_traits t, fmha_fwd_args a, const ck_tile::stream_config& s){{
     float r = -1;
@@ -126,20 +142,155 @@ float fmha_fwd(fmha_fwd_traits t, fmha_fwd_args a, const ck_tile::stream_config&
 }}
 """
 
-FMHA_FWD_API_PER_DTYPE="""    {F_if}(t.data_type.compare(\"{F_dtype}\") == 0){{
-{F_hdim_case}
-    }}
+FMHA_FWD_FP16_HDIMV32_HDIMQ32_API="""
+float fmha_fwd_fp16_hdimq32_hdimv32(fmha_fwd_traits t, fmha_fwd_args a, const ck_tile::stream_config& s){{
+    float r = -1;
+{F_dispatch}
+    return r;
+}}
 """
+
+FMHA_FWD_FP16_HDIMV64_HDIMQ64_API="""
+float fmha_fwd_fp16_hdimq64_hdimv64(fmha_fwd_traits t, fmha_fwd_args a, const ck_tile::stream_config& s){{
+    float r = -1;
+{F_dispatch}
+    return r;
+}}
+"""
+
+FMHA_FWD_FP16_HDIMV128_HDIMQ128_API="""
+float fmha_fwd_fp16_hdimq128_hdimv128(fmha_fwd_traits t, fmha_fwd_args a, const ck_tile::stream_config& s){{
+    float r = -1;
+{F_dispatch}
+    return r;
+}}
+"""
+
+FMHA_FWD_FP16_HDIMV192_HDIMQ128_API="""
+float fmha_fwd_fp16_hdimq192_hdimv128(fmha_fwd_traits t, fmha_fwd_args a, const ck_tile::stream_config& s){{
+    float r = -1;
+{F_dispatch}
+    return r;
+}}
+"""
+
+FMHA_FWD_FP16_HDIMV256_HDIMQ256_FALSE_API="""
+float fmha_fwd_fp16_hdimq256_hdimv256_mode_false(fmha_fwd_traits t, fmha_fwd_args a, const ck_tile::stream_config& s){{
+    float r = -1;
+{F_dispatch}
+    return r;
+}}
+"""
+
+FMHA_FWD_FP16_HDIMV256_HDIMQ256_TRUE_API="""
+float fmha_fwd_fp16_hdimq256_hdimv256_mode_true(fmha_fwd_traits t, fmha_fwd_args a, const ck_tile::stream_config& s){{
+    float r = -1;
+{F_dispatch}
+    return r;
+}}
+"""
+
+FMHA_FWD_BF16_HDIMV32_HDIMQ32_API="""
+float fmha_fwd_bf16_hdimq32_hdimv32(fmha_fwd_traits t, fmha_fwd_args a, const ck_tile::stream_config& s){{
+    float r = -1;
+{F_dispatch}
+    return r;
+}}
+"""
+
+FMHA_FWD_BF16_HDIMV64_HDIMQ64_API="""
+float fmha_fwd_bf16_hdimq64_hdimv64(fmha_fwd_traits t, fmha_fwd_args a, const ck_tile::stream_config& s){{
+    float r = -1;
+{F_dispatch}
+    return r;
+}}
+"""
+
+FMHA_FWD_BF16_HDIMV128_HDIMQ128_API="""
+float fmha_fwd_bf16_hdimq128_hdimv128(fmha_fwd_traits t, fmha_fwd_args a, const ck_tile::stream_config& s){{
+    float r = -1;
+{F_dispatch}
+    return r;
+}}
+"""
+
+FMHA_FWD_BF16_HDIMV192_HDIMQ128_API="""
+float fmha_fwd_bf16_hdimq192_hdimv128(fmha_fwd_traits t, fmha_fwd_args a, const ck_tile::stream_config& s){{
+    float r = -1;
+{F_dispatch}
+    return r;
+}}
+"""
+
+FMHA_FWD_BF16_HDIMV256_HDIMQ256_TRUE_API="""
+float fmha_fwd_bf16_hdimq256_hdimv256_mode_true(fmha_fwd_traits t, fmha_fwd_args a, const ck_tile::stream_config& s){{
+    float r = -1;
+{F_dispatch}
+    return r;
+}}
+"""
+
+FMHA_FWD_BF16_HDIMV256_HDIMQ256_FALSE_API="""
+float fmha_fwd_bf16_hdimq256_hdimv256_mode_false(fmha_fwd_traits t, fmha_fwd_args a, const ck_tile::stream_config& s){{
+    float r = -1;
+{F_dispatch}
+    return r;
+}}
+"""
+
+FMHA_FWD_FP8_API="""
+float fmha_fwd_fp8(fmha_fwd_traits t, fmha_fwd_args a, const ck_tile::stream_config& s){{
+    float r = -1;
+{F_dispatch}
+    return r;
+}}
+"""
+
+FMHA_FWD_API_PER_DTYPE="""    {F_if}(t.data_type.compare(\"{F_dtype}\") == 0){{
+{F_hdim_case}    }}
+"""
+
 FMHA_FWD_API_PER_HDIM_CASE="""        {F_if} (t.hdim_q <= {F_hdim} && t.hdim_v <= {F_hdim_v}) {{
 {F_inner_dispatch}
         }}
 """
 
-FMHA_FWD_API_INNER_DISPATCH="""            {F_if}((t.is_group_mode == {F_mode}) && (t.is_v_rowmajor == {F_vlayout}) && (t.has_logits_soft_cap == {F_logits}) && ({F_mask_check}) && (t.bias_type == {F_bias_check}) && (t.has_lse == {F_lse})  && (t.has_dropout == {F_dropout}) && (t.do_fp8_static_quant == {F_squant}) && (t.skip_min_seqlen_q == {F_skip}) &&
-                        ({F_scheck}) && ({F_skcheck}) && ({F_dcheck}) && ({F_dvcheck})) {{
-                using trait_ = fmha_fwd_traits_<{F_hdim}, {F_dtype}, {F_mode}, {F_bm0}, {F_bn0}, {F_bk0}, {F_bn1}, {F_bk1}, {F_bk0max}, {F_vlayout}, {F_pipeline_enum}, {F_logits}, {F_mask}, {F_bias}, {F_lse}, {F_dropout}, {F_squant}, {F_spad}, {F_skpad}, {F_dpad}, {F_dvpad}, {F_skip}>;
-                return fmha_fwd_<trait_>(s, a);
-            }}
+FMHA_FWD_API_FP16_PER_MODE_CASE="""            if (t.is_group_mode == true){
+                r = fmha_fwd_fp16_hdimq256_hdimv256_mode_true(t, a, s);
+            }
+            else if(t.is_group_mode == false){
+                r = fmha_fwd_fp16_hdimq256_hdimv256_mode_false(t, a, s);
+            }
+"""
+
+FMHA_FWD_API_BF16_PER_MODE_CASE="""            if (t.is_group_mode == true){
+                r = fmha_fwd_bf16_hdimq256_hdimv256_mode_true(t, a, s);
+            }
+            else if(t.is_group_mode == false){
+                r = fmha_fwd_bf16_hdimq256_hdimv256_mode_false(t, a, s);
+            }
+"""
+
+FMHA_FWD_API_FP8_PER_HDIM_CASE="""    {F_if} (t.hdim_q <= {F_hdim} && t.hdim_v <= {F_hdim_v})
+    {{
+    {F_inner_dispatch}
+    }}
+"""
+
+FMHA_FWD_API_INNER_DISPATCH="""    {F_if}((t.is_group_mode == {F_mode}) && (t.is_v_rowmajor == {F_vlayout}) && (t.has_logits_soft_cap == {F_logits}) && ({F_mask_check}) && (t.bias_type == {F_bias_check}) && (t.has_lse == {F_lse})  && (t.has_dropout == {F_dropout}) && (t.do_fp8_static_quant == {F_squant}) && (t.skip_min_seqlen_q == {F_skip}) &&
+                        ({F_scheck}) && ({F_skcheck}) && ({F_dcheck}) && ({F_dvcheck}))
+    {Space}{{
+        {Space}using trait_ = fmha_fwd_traits_<{F_hdim}, {F_dtype}, {F_mode}, {F_bm0}, {F_bn0}, {F_bk0}, {F_bn1}, {F_bk1}, {F_bk0max}, {F_vlayout}, {F_pipeline_enum}, {F_logits}, {F_mask}, {F_bias}, {F_lse}, {F_dropout}, {F_squant}, {F_spad}, {F_skpad}, {F_dpad}, {F_dvpad}, {F_skip}>;
+        {Space}return fmha_fwd_<trait_>(s, a);
+    {Space}}}
+"""
+
+FMHA_FWD_API_INNER_SPLIT_DISPATCH="""    {F_if}((t.is_v_rowmajor == {F_vlayout}) && (t.has_logits_soft_cap == {F_logits}) && ({F_mask_check}) && (t.bias_type == {F_bias_check}) && (t.has_lse == {F_lse})  && (t.has_dropout == {F_dropout}) && (t.do_fp8_static_quant == {F_squant}) && (t.skip_min_seqlen_q == {F_skip}) &&
+                        ({F_scheck}) && ({F_skcheck}) && ({F_dcheck}) && ({F_dvcheck}))
+    {Space}{{
+        {Space}using trait_ = fmha_fwd_traits_<{F_hdim}, {F_dtype}, {F_mode}, {F_bm0}, {F_bn0}, {F_bk0}, {F_bn1}, {F_bk1}, {F_bk0max}, {F_vlayout}, {F_pipeline_enum}, {F_logits}, {F_mask}, {F_bias}, {F_lse}, {F_dropout}, {F_squant}, {F_spad}, {F_skpad}, {F_dpad}, {F_dvpad}, {F_skip}>;
+        {Space}return fmha_fwd_<trait_>(s, a);
+    {Space}}}
 """
 
 @dataclass
@@ -293,28 +444,120 @@ class FmhaFwdApiPool:
 
         self.pool[trait.dtype][hdim].append(copy.copy(trait))
 
+    def api_split_dtype(self, data_type = 'fp16', hdimq = 32, hdimv = 32, trait_mode = "false") -> str:
+        per_hdim_case=str()
+        per_dtype_case=str()
+        per_hdim_split=str()
+        NeedSpace = '    ' if data_type=='fp8' else ''
+        for i, dtype in enumerate(self.pool.keys()):
+            if dtype == data_type:
+                for j, (hdim, hdim_v) in enumerate(self.pool[dtype].keys()):
+                    if_j = 'if' if j == 0 else 'else if'
+                    if (int(hdim) == int(hdimq) and int(hdimv) == int(hdim_v)) or (data_type == 'fp8'):
+                        traits=self.pool[dtype][(hdim, hdim_v)]
+                        inners=str()
+                        inners_split=str()
+                        if_split= 'if'
+                        for k, trait in enumerate(traits):
+                            if_k = 'if' if k == 0 else 'else if'
+                            inners = inners + FMHA_FWD_API_INNER_DISPATCH.format(F_if=if_k, Space=NeedSpace, F_mode=MODE_MAP[trait.mode], F_vlayout=LAYOUT_MAP[trait.vlayout],
+                                        F_pipeline_enum=PIPELINE_ENUM_MAP[trait.pipeline_tag], F_logits=BOOL_MAP[trait.logits], F_mask=get_mask_map(self.mask_impl)[trait.mask],
+                                        F_mask_check=get_mask_check_map(self.mask_impl)[trait.mask], F_bias_check=BIAS_CHECK_MAP[trait.bias], F_bias=BIAS_MAP[trait.bias],
+                                        F_lse=BOOL_MAP[trait.lse], F_dropout=BOOL_MAP[trait.dropout], F_skip=BOOL_MAP[trait.skip],
+                                        F_squant=BOOL_MAP[trait.squant], F_scheck=trait.scheck, F_skcheck=trait.skcheck, F_dcheck=trait.dcheck, F_dvcheck=trait.dvcheck,
+                                        F_spad=BOOL_MAP[trait.spad], F_skpad=BOOL_MAP[trait.skpad], F_dpad=BOOL_MAP[trait.dpad], F_dvpad=BOOL_MAP[trait.dvpad],
+                                        F_bm0=trait.bm0, F_bn0=trait.bn0, F_bk0=trait.bk0, F_bn1=trait.bn1, F_bk1=trait.bk1, F_bk0max=trait.bk0max,
+                                        F_hdim=hdim, F_dtype=FWD_DTYPE_MAP[dtype])
+                            if trait_mode == MODE_MAP[trait.mode]:
+                                inners_split = inners_split + FMHA_FWD_API_INNER_SPLIT_DISPATCH.format(F_if=if_split, Space=NeedSpace, F_mode=MODE_MAP[trait.mode], F_vlayout=LAYOUT_MAP[trait.vlayout],
+                                            F_pipeline_enum=PIPELINE_ENUM_MAP[trait.pipeline_tag], F_logits=BOOL_MAP[trait.logits], F_mask=get_mask_map(self.mask_impl)[trait.mask],
+                                            F_mask_check=get_mask_check_map(self.mask_impl)[trait.mask], F_bias_check=BIAS_CHECK_MAP[trait.bias], F_bias=BIAS_MAP[trait.bias],
+                                            F_lse=BOOL_MAP[trait.lse], F_dropout=BOOL_MAP[trait.dropout], F_skip=BOOL_MAP[trait.skip],
+                                            F_squant=BOOL_MAP[trait.squant], F_scheck=trait.scheck, F_skcheck=trait.skcheck, F_dcheck=trait.dcheck, F_dvcheck=trait.dvcheck,
+                                            F_spad=BOOL_MAP[trait.spad], F_skpad=BOOL_MAP[trait.skpad], F_dpad=BOOL_MAP[trait.dpad], F_dvpad=BOOL_MAP[trait.dvpad],
+                                            F_bm0=trait.bm0, F_bn0=trait.bn0, F_bk0=trait.bk0, F_bn1=trait.bn1, F_bk1=trait.bk1, F_bk0max=trait.bk0max,
+                                            F_hdim=hdim, F_dtype=FWD_DTYPE_MAP[dtype])
+                                if_split= 'else if'
+                        per_hdim_case = per_hdim_case + inners
+                        per_hdim_split = per_hdim_split + inners_split
+                        per_dtype_case = per_dtype_case + FMHA_FWD_API_FP8_PER_HDIM_CASE.format(F_if=if_j, F_hdim=hdim, F_hdim_v=hdim_v, F_inner_dispatch=inners)
+        if data_type == 'fp16':
+            if hdimq == 32 and hdimv == 32:
+                return FMHA_FWD_KERNEL_HEADER + FMHA_FWD_FP16_HDIMV32_HDIMQ32_API.format(F_dispatch = per_hdim_case)
+            elif hdimq == 64 and hdimv == 64:
+                return FMHA_FWD_KERNEL_HEADER + FMHA_FWD_FP16_HDIMV64_HDIMQ64_API.format(F_dispatch = per_hdim_case)
+            elif hdimq == 128 and hdimv == 128:
+                return FMHA_FWD_KERNEL_HEADER + FMHA_FWD_FP16_HDIMV128_HDIMQ128_API.format(F_dispatch = per_hdim_case)
+            elif hdimq == 192 and hdimv == 128:
+                return FMHA_FWD_KERNEL_HEADER + FMHA_FWD_FP16_HDIMV192_HDIMQ128_API.format(F_dispatch = per_hdim_case)
+            elif hdimq == 256 and hdimv == 256:
+                if trait_mode == "false":
+                    return FMHA_FWD_KERNEL_HEADER + FMHA_FWD_FP16_HDIMV256_HDIMQ256_FALSE_API.format(F_dispatch = per_hdim_split)
+                elif trait_mode == "true":
+                    return FMHA_FWD_KERNEL_HEADER + FMHA_FWD_FP16_HDIMV256_HDIMQ256_TRUE_API.format(F_dispatch = per_hdim_split)
+            else:
+                assert False
+        elif data_type == 'bf16':
+            if hdimq == 32 and hdimv == 32:
+                return FMHA_FWD_KERNEL_HEADER + FMHA_FWD_BF16_HDIMV32_HDIMQ32_API.format(F_dispatch = per_hdim_case)
+            elif hdimq == 64 and hdimv == 64:
+                return FMHA_FWD_KERNEL_HEADER + FMHA_FWD_BF16_HDIMV64_HDIMQ64_API.format(F_dispatch = per_hdim_case)
+            elif hdimq == 128 and hdimv == 128:
+                return FMHA_FWD_KERNEL_HEADER + FMHA_FWD_BF16_HDIMV128_HDIMQ128_API.format(F_dispatch = per_hdim_case)
+            elif hdimq == 192 and hdimv == 128:
+                return FMHA_FWD_KERNEL_HEADER + FMHA_FWD_BF16_HDIMV192_HDIMQ128_API.format(F_dispatch = per_hdim_case)
+            elif hdimq == 256 and hdimv == 256:
+                if trait_mode == "false":
+                    return FMHA_FWD_KERNEL_HEADER + FMHA_FWD_BF16_HDIMV256_HDIMQ256_FALSE_API.format(F_dispatch = per_hdim_split)
+                elif trait_mode == "true":
+                    return FMHA_FWD_KERNEL_HEADER + FMHA_FWD_BF16_HDIMV256_HDIMQ256_TRUE_API.format(F_dispatch = per_hdim_split)
+            else:
+                assert False
+        elif data_type == 'fp8':
+            return FMHA_FWD_KERNEL_HEADER + FMHA_FWD_FP8_API.format(F_dispatch = per_dtype_case)
+        else:
+            assert False
+
     @property
     def api(self) -> str:
         per_dtypes=str()
         for i, dtype in enumerate(self.pool.keys()):
-            per_hdim_case=str()
-            for j, (hdim, hdim_v) in enumerate(self.pool[dtype].keys()):
-                traits=self.pool[dtype][(hdim, hdim_v)]
-                inners=str()
-                for k, trait in enumerate(traits):
-                    if_k = 'if' if k == 0 else 'else if'
-                    inners = inners + FMHA_FWD_API_INNER_DISPATCH.format(F_if=if_k, F_mode=MODE_MAP[trait.mode], F_vlayout=LAYOUT_MAP[trait.vlayout],
-                                   F_pipeline_enum=PIPELINE_ENUM_MAP[trait.pipeline_tag], F_logits=BOOL_MAP[trait.logits], F_mask=get_mask_map(self.mask_impl)[trait.mask],
-                                   F_mask_check=get_mask_check_map(self.mask_impl)[trait.mask], F_bias_check=BIAS_CHECK_MAP[trait.bias], F_bias=BIAS_MAP[trait.bias],
-                                   F_lse=BOOL_MAP[trait.lse], F_dropout=BOOL_MAP[trait.dropout], F_skip=BOOL_MAP[trait.skip],
-                                   F_squant=BOOL_MAP[trait.squant], F_scheck=trait.scheck, F_skcheck=trait.skcheck, F_dcheck=trait.dcheck, F_dvcheck=trait.dvcheck,
-                                   F_spad=BOOL_MAP[trait.spad], F_skpad=BOOL_MAP[trait.skpad], F_dpad=BOOL_MAP[trait.dpad], F_dvpad=BOOL_MAP[trait.dvpad],
-                                   F_bm0=trait.bm0, F_bn0=trait.bn0, F_bk0=trait.bk0, F_bn1=trait.bn1, F_bk1=trait.bk1, F_bk0max=trait.bk0max,
-                                   F_hdim=hdim, F_dtype=FWD_DTYPE_MAP[dtype])
-                if_j = 'if' if j == 0 else 'else if'
-                per_hdim_case = per_hdim_case + FMHA_FWD_API_PER_HDIM_CASE.format(F_if=if_j, F_hdim=hdim, F_hdim_v=hdim_v, F_inner_dispatch=inners)
             if_i = 'if' if i == 0 else 'else if'
-            per_dtypes = per_dtypes + FMHA_FWD_API_PER_DTYPE.format(F_if=if_i, F_dtype=dtype, F_hdim_case=per_hdim_case)
+            if dtype == 'fp8':
+                inners = """        r = fmha_fwd_fp8(t, a, s);\n"""
+                per_dtypes = per_dtypes + FMHA_FWD_API_PER_DTYPE.format(F_if=if_i, F_dtype=dtype, F_hdim_case=inners)
+            elif dtype == 'fp16' or dtype == 'bf16':
+                per_hdim_case=str()
+                for j, (hdim, hdim_v) in enumerate(self.pool[dtype].keys()):
+                    traits=self.pool[dtype][(hdim, hdim_v)]
+                    inners=str()
+                    hdim = int(hdim)
+                    hdim_v = int(hdim_v)
+                    if_j = 'if' if j == 0 else 'else if'
+                    if dtype == 'fp16':
+                        if hdim == 32 and hdim_v == 32:
+                            inners = """            r = fmha_fwd_fp16_hdimq32_hdimv32(t, a, s);"""
+                        elif hdim == 64 and hdim_v == 64:
+                            inners = """            r = fmha_fwd_fp16_hdimq64_hdimv64(t, a, s);"""
+                        elif hdim == 128 and hdim_v == 128:
+                            inners = """            r = fmha_fwd_fp16_hdimq128_hdimv128(t, a, s);"""
+                        elif hdim == 192 and hdim_v == 128:
+                            inners = """            r = fmha_fwd_fp16_hdimq192_hdimv128(t, a, s);"""
+                        elif hdim == 256 and hdim_v == 256:
+                            inners = FMHA_FWD_API_FP16_PER_MODE_CASE
+                    elif dtype == 'bf16':
+                        if hdim == 32 and hdim_v == 32:
+                            inners = """            r = fmha_fwd_bf16_hdimq32_hdimv32(t, a, s);"""
+                        elif hdim == 64 and hdim_v == 64:
+                            inners = """            r = fmha_fwd_bf16_hdimq64_hdimv64(t, a, s);"""
+                        elif hdim == 128 and hdim_v == 128:
+                            inners = """            r = fmha_fwd_bf16_hdimq128_hdimv128(t, a, s);"""
+                        elif hdim == 192 and hdim_v == 128:
+                            inners = """            r = fmha_fwd_bf16_hdimq192_hdimv128(t, a, s);"""
+                        elif hdim == 256 and hdim_v == 256:
+                            inners = FMHA_FWD_API_BF16_PER_MODE_CASE
+                    per_hdim_case = per_hdim_case + FMHA_FWD_API_PER_HDIM_CASE.format(F_if=if_j, F_hdim=hdim, F_hdim_v=hdim_v, F_inner_dispatch=inners)
+                per_dtypes = per_dtypes + FMHA_FWD_API_PER_DTYPE.format(F_if=if_i, F_dtype=dtype, F_hdim_case=per_hdim_case)
         if not per_dtypes:
             # empty string we add some ignore to suppress warning in api
             per_dtypes += '    (void)t ; (void)s ; (void)a;'
@@ -615,6 +858,19 @@ def write_single_fwd_kernel(kernel: FmhaFwdKernel, autogen_dir: Path) -> None:
     (autogen_dir / kernel.filename).write_text(kernel.template)
 
 def write_fwd_api(api_pool : FmhaFwdApiPool, autogen_dir: Path) -> None:
+    (autogen_dir / FMHA_FP16_HDIMV32_HDIMQ32_FWD_API_FILENAME).write_text(api_pool.api_split_dtype('fp16', 32, 32))
+    (autogen_dir / FMHA_FP16_HDIMV64_HDIMQ64_FWD_API_FILENAME).write_text(api_pool.api_split_dtype('fp16', 64, 64))
+    (autogen_dir / FMHA_FP16_HDIMV128_HDIMQ128_FWD_API_FILENAME).write_text(api_pool.api_split_dtype('fp16', 128, 128))
+    (autogen_dir / FMHA_FP16_HDIMV192_HDIMQ128_FWD_API_FILENAME).write_text(api_pool.api_split_dtype('fp16', 192, 128))
+    (autogen_dir / FMHA_FP16_HDIMV256_HDIMQ256_MODETRUE_FWD_API_FILENAME).write_text(api_pool.api_split_dtype('fp16', 256, 256, "true"))
+    (autogen_dir / FMHA_FP16_HDIMV256_HDIMQ256_MODEFALSE_FWD_API_FILENAME).write_text(api_pool.api_split_dtype('fp16', 256, 256, "false"))
+    (autogen_dir / FMHA_BF16_HDIMV32_HDIMQ32_FWD_API_FILENAME).write_text(api_pool.api_split_dtype('bf16', 32, 32))
+    (autogen_dir / FMHA_BF16_HDIMV64_HDIMQ64_FWD_API_FILENAME).write_text(api_pool.api_split_dtype('bf16', 64, 64))
+    (autogen_dir / FMHA_BF16_HDIMV128_HDIMQ128_FWD_API_FILENAME).write_text(api_pool.api_split_dtype('bf16', 128, 128))
+    (autogen_dir / FMHA_BF16_HDIMV192_HDIMQ128_FWD_API_FILENAME).write_text(api_pool.api_split_dtype('bf16', 192, 128))
+    (autogen_dir / FMHA_BF16_HDIMV256_HDIMQ256_MODETRUE_FWD_API_FILENAME).write_text(api_pool.api_split_dtype('bf16', 256, 256, "true"))
+    (autogen_dir / FMHA_BF16_HDIMV256_HDIMQ256_MODEFALSE_FWD_API_FILENAME).write_text(api_pool.api_split_dtype('bf16', 256, 256, "false"))
+    (autogen_dir / FMHA_FP8_FWD_API_FILENAME).write_text(api_pool.api_split_dtype('fp8'))
     (autogen_dir / FMHA_FWD_API_FILENAME).write_text(api_pool.api)
 
 def write_blobs(output_dir : Path, kernel_filter : str, receipt, optdim_list, mask_impl) -> None:
@@ -629,3 +885,16 @@ def list_blobs(file_path : Path, kernel_filter : str, receipt, optdim_list, mask
         for kernel in kernels:
             f.write(str(file_path.parent / GEN_DIR / kernel.filename) + "\n")
         f.write(str(file_path.parent / GEN_DIR / FMHA_FWD_API_FILENAME) + "\n")
+        f.write(str(file_path.parent / GEN_DIR / FMHA_FP16_HDIMV32_HDIMQ32_FWD_API_FILENAME) + "\n")
+        f.write(str(file_path.parent / GEN_DIR / FMHA_FP16_HDIMV64_HDIMQ64_FWD_API_FILENAME) + "\n")
+        f.write(str(file_path.parent / GEN_DIR / FMHA_FP16_HDIMV128_HDIMQ128_FWD_API_FILENAME) + "\n")
+        f.write(str(file_path.parent / GEN_DIR / FMHA_FP16_HDIMV192_HDIMQ128_FWD_API_FILENAME) + "\n")
+        f.write(str(file_path.parent / GEN_DIR / FMHA_FP16_HDIMV256_HDIMQ256_MODETRUE_FWD_API_FILENAME) + "\n")
+        f.write(str(file_path.parent / GEN_DIR / FMHA_FP16_HDIMV256_HDIMQ256_MODEFALSE_FWD_API_FILENAME) + "\n")
+        f.write(str(file_path.parent / GEN_DIR / FMHA_BF16_HDIMV32_HDIMQ32_FWD_API_FILENAME) + "\n")
+        f.write(str(file_path.parent / GEN_DIR / FMHA_BF16_HDIMV64_HDIMQ64_FWD_API_FILENAME) + "\n")
+        f.write(str(file_path.parent / GEN_DIR / FMHA_BF16_HDIMV128_HDIMQ128_FWD_API_FILENAME) + "\n")
+        f.write(str(file_path.parent / GEN_DIR / FMHA_BF16_HDIMV192_HDIMQ128_FWD_API_FILENAME) + "\n")
+        f.write(str(file_path.parent / GEN_DIR / FMHA_BF16_HDIMV256_HDIMQ256_MODETRUE_FWD_API_FILENAME) + "\n")
+        f.write(str(file_path.parent / GEN_DIR / FMHA_BF16_HDIMV256_HDIMQ256_MODEFALSE_FWD_API_FILENAME) + "\n")
+        f.write(str(file_path.parent / GEN_DIR / FMHA_FP8_FWD_API_FILENAME) + "\n")

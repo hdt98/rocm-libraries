@@ -26,6 +26,7 @@ add_subdirectory(37_transpose)
 endif()
 
 if (SUPPORTED_GPU_TARGETS MATCHES "gfx13")
+add_subdirectory(01_fmha)
 add_subdirectory(03_gemm)
 add_subdirectory(04_img2col)
 add_subdirectory(05_reduce)
