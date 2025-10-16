@@ -53,12 +53,16 @@ using namespace rocRoller;
 
 namespace RocprofilerTest
 {
-
-    TEST_CASE("RocProfiler kernel execution and latency tracking", "[rocprofiler]")
+    struct KernelSetup
     {
-        // Follows GPU_WholeKernel from KernelTest.cpp
-        auto context = Context::ForDefaultHipDevice("hello_world");
+        CommandKernel            kernel;
+        std::shared_ptr<float>   d_ptr;
+        CommandArguments         commandArgs;
+        std::vector<Instruction> instrs;
+    };
 
+    KernelSetup createKernel(std::shared_ptr<Context> context, float constant)
+    {
         auto command = std::make_shared<Command>();
 
         VariableType floatPtr{DataType::Float, PointerType::PointerGlobal};
@@ -78,9 +82,9 @@ namespace RocprofilerTest
 
         const auto one = std::make_shared<Expression::Expression>(1u);
         k->setWorkgroupSize({256, 1, 1});
-        k->setWorkitemCount({std::make_shared<Expression::Expression>(256 * 256),
-                             one,
-                             one}); // more waves for rocprofiler
+        // more waves for rocprofiler, see Troubleshooting in
+        // https://rocm.docs.amd.com/projects/rocprofiler-sdk/en/amd-mainline/how-to/using-thread-trace.html#troubleshooting
+        k->setWorkitemCount({std::make_shared<Expression::Expression>(256 * 256), one, one});
 
         k->addArgument({"ptr",
                         {DataType::Float, PointerType::PointerGlobal},
@@ -100,8 +104,6 @@ namespace RocprofilerTest
 
         context->schedule(k->preamble());
         captureInstrAndSchedule(k->prolog());
-
-        float const constant = 17.0f;
 
         auto kb = [&]() -> Generator<Instruction> {
             Register::ValuePtr s_ptr, s_value;
@@ -142,12 +144,26 @@ namespace RocprofilerTest
         commandArgs.setArgument(ptrTag, ArgumentType::Value, d_ptr.get());
         commandArgs.setArgument(valTag, ArgumentType::Value, six);
 
-        commandKernel.launchKernel(commandArgs.runtimeArguments());
+        return {std::move(commandKernel), d_ptr, commandArgs, instrs};
+    }
+
+    TEST_CASE("RocProfiler kernel execution and latency tracking", "[rocprofiler]")
+    {
+        // TODO: link in shared/rocroller/test/catch/TestContext.cpp
+        auto context = Context::ForDefaultHipDevice("hello_world");
+
+        float const constant = 17.0f;
+        float const six      = 6.0f;
+
+        auto kernelSetup = createKernel(context, constant);
+
+        kernelSetup.kernel.launchKernel(kernelSetup.commandArgs.runtimeArguments());
 
         HIP_CHECK(hipDeviceSynchronize());
 
         float h_result = 0.0f;
-        HIP_CHECK(hipMemcpy(&h_result, d_ptr.get(), sizeof(float), hipMemcpyDeviceToHost));
+        HIP_CHECK(
+            hipMemcpy(&h_result, kernelSetup.d_ptr.get(), sizeof(float), hipMemcpyDeviceToHost));
 
         CHECK(h_result == six + constant);
 
@@ -162,19 +178,20 @@ namespace RocprofilerTest
                << ", " << avg_latency << std::endl;
         }
 
-        instrs.erase(std::remove_if(instrs.begin(),
-                                    instrs.end(),
-                                    [](const auto& instr) {
-                                        // isCommentOnly() doesn't work
-                                        return instr.toString(LogLevel::Critical).empty();
-                                    }),
-                     instrs.end());
+        kernelSetup.instrs.erase(
+            std::remove_if(kernelSetup.instrs.begin(),
+                           kernelSetup.instrs.end(),
+                           [](const auto& instr) {
+                               // isCommentOnly() doesn't work
+                               return instr.toString(LogLevel::Critical).empty();
+                           }),
+            kernelSetup.instrs.end());
 
         INFO(ss.str());
         CHECK(latencies.size() == 8);
         { // First instruction
             const auto& data  = *(latencies.begin());
-            const auto& instr = *(instrs.begin());
+            const auto& instr = *(kernelSetup.instrs.begin());
             CHECK(data.instruction == "s_load_dwordx2 s[4:5], s[0:1], 0x0");
             CHECK(NormalizedSource(instr.toString(LogLevel::Critical))
                   == NormalizedSource("s_load_dwordx2 s[4:5], s[0:1], 0"));
