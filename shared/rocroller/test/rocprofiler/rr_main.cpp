@@ -39,6 +39,8 @@
 
 #include "../catch/TestContext.hpp"
 
+#include <fmt/format.h>
+
 #include <catch2/catch_all.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
@@ -157,11 +159,7 @@ namespace RocprofilerTest
         DYNAMIC_SECTION("constant: 0x" << std::hex << constant << ", value: " << std::dec
                                        << testValue)
         {
-            std::string const testName = [&]() {
-                std::stringstream ss;
-                ss << "const_0x" << std::hex << constant << "_value_" << std::dec << testValue;
-                return ss.str();
-            }();
+            std::string const testName = fmt::format("const_0x{:x}_value_{}", constant, testValue);
 
             auto context = TestContext::ForTestDevice({}, testName);
 
@@ -197,21 +195,19 @@ namespace RocprofilerTest
             { // Ensure instructions exist in expected quanities in the profile data
                 std::string const instructionsStr = [&]() {
                     std::stringstream ss;
-                    for(const auto& data : latencies)
-                    {
-                        ss << data.instruction << std::endl;
-                    }
+                    streamJoin(ss,
+                               std::views::transform(latencies,
+                                                     [](const auto& d) { return d.instruction; }),
+                               "\n");
                     return ss.str();
                 }();
-                std::string moveInstr = [&]() {
-                    std::stringstream ss;
-                    ss << "v_mov_b32_e32 v1, 0x" << std::hex << constant;
-                    return ss.str();
-                }();
+                INFO("Instructions:\n" << instructionsStr);
                 CHECK(2 == countSubstring(instructionsStr, "s_load_dword"));
                 CHECK(1 == countSubstring(instructionsStr, "global_store_dword"));
                 CHECK(1 == countSubstring(instructionsStr, "s_waitcnt lgkmcnt(0)"));
-                CHECK(1 == countSubstring(instructionsStr, moveInstr));
+                CHECK(1
+                      == countSubstring(instructionsStr,
+                                        fmt::format("v_mov_b32_e32 v1, 0x{:x}", constant)));
             }
         }
     }
