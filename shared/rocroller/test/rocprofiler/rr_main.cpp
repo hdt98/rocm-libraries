@@ -200,4 +200,57 @@ namespace RocprofilerTest
         }
     }
 
+    TEST_CASE("RocProfiler kernel execution and latency tracking 2", "[rocprofiler]")
+    {
+        // TODO: link in shared/rocroller/test/catch/TestContext.cpp
+        auto context = Context::ForDefaultHipDevice("hello_world_2");
+
+        float const constant = 17.0f;
+        float const six      = 6.0f;
+
+        auto kernelSetup = createKernel(context, constant);
+
+        kernelSetup.kernel.launchKernel(kernelSetup.commandArgs.runtimeArguments());
+
+        HIP_CHECK(hipDeviceSynchronize());
+
+        float h_result = 0.0f;
+        HIP_CHECK(
+            hipMemcpy(&h_result, kernelSetup.d_ptr.get(), sizeof(float), hipMemcpyDeviceToHost));
+
+        CHECK(h_result == six + constant);
+
+        const auto latencies = rocroller_profiler::getInstructionData();
+
+        std::stringstream ss;
+        ss << "Instruction, Total Latency, Hit Count, Average Latency" << std::endl;
+        for(const auto& data : latencies)
+        {
+            uint64_t avg_latency = data.hitcount ? (data.latency / data.hitcount) : 0;
+            ss << "\"" << data.instruction << "\", " << data.latency << ", " << data.hitcount
+               << ", " << avg_latency << std::endl;
+        }
+
+        kernelSetup.instrs.erase(
+            std::remove_if(kernelSetup.instrs.begin(),
+                           kernelSetup.instrs.end(),
+                           [](const auto& instr) {
+                               // isCommentOnly() doesn't work
+                               return instr.toString(LogLevel::Critical).empty();
+                           }),
+            kernelSetup.instrs.end());
+
+        INFO(ss.str());
+        CHECK(latencies.size() == 8);
+        { // First instruction
+            const auto& data  = *(latencies.begin());
+            const auto& instr = *(kernelSetup.instrs.begin());
+            CHECK(data.instruction == "s_load_dwordx2 s[4:5], s[0:1], 0x0");
+            CHECK(NormalizedSource(instr.toString(LogLevel::Critical))
+                  == NormalizedSource("s_load_dwordx2 s[4:5], s[0:1], 0"));
+            CHECK(data.hitcount == 4);
+            CHECK(data.latency == data.hitcount * 4);
+        }
+    }
+
 } // namespace RocprofilerTest

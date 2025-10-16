@@ -133,6 +133,7 @@ namespace
                                                                void*,
                                                                rocprofiler_user_data_t*)
     {
+        instruction_latencies.clear();
         return ROCPROFILER_THREAD_TRACE_CONTROL_START_AND_STOP;
     }
 
