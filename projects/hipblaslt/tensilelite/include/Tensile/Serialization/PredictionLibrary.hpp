@@ -83,21 +83,25 @@ namespace TensileLite
                             auto solution = slnIter->second;
                             lib.solutionmap.insert(std::make_pair(index, solution));
 
-                            auto solution_tuple = std::make_tuple(
-                                solution->sizeMapping.macroTile.x,          // MT_M
-                                solution->sizeMapping.macroTile.y,          // MT_N
-                                solution->sizeMapping.depthU,               // MT_K
-                                solution->sizeMapping.matrixInstruction[0], // MI_M
-                                solution->sizeMapping.matrixInstruction[1], // MI_N
-                                solution->sizeMapping.matrixInstruction[2], // MI_K
-                                solution->sizeMapping.CUOccupancy,          // Occupancy
-                                solution->sizeMapping.workGroupMapping,     // WGM
-                                solution->sizeMapping.nonTemporalA,         // Cache flag: A
-                                solution->sizeMapping.nonTemporalB          // Cache flag: B
-                            ); 
+                            origami::config_t config = {
+                                .mt = {
+                                    solution->sizeMapping.macroTile.x,
+                                    solution->sizeMapping.macroTile.y,
+                                    solution->sizeMapping.depthU
+                                },
+                                .mi = {
+                                    static_cast<size_t>(solution->sizeMapping.matrixInstruction[0]),
+                                    static_cast<size_t>(solution->sizeMapping.matrixInstruction[1]),
+                                    static_cast<size_t>(solution->sizeMapping.matrixInstruction[2])
+                                },
+                                .occupancy = static_cast<size_t>(solution->sizeMapping.CUOccupancy),
+                                .workgroup_mapping = solution->sizeMapping.workGroupMapping,
+                                .cache_hints_a = solution->sizeMapping.nonTemporalA,
+                                .cache_hints_b = solution->sizeMapping.nonTemporalB,
+                            };
 
-                            lib.tile_list.emplace_back(solution_tuple);
-                            lib.tile_map.insert(std::make_pair(solution_tuple, index));
+                            lib.origami_config_list.emplace_back(config);
+                            lib.origami_config_map.insert(std::make_pair(config, index));
                         }
                     }
                 }
