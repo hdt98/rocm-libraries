@@ -29,6 +29,7 @@
 #include <cstdint>
 #include <map>
 #include <string>
+#include <vector>
 
 namespace rocroller_profiler
 {
@@ -56,12 +57,12 @@ namespace rocroller_profiler
     /**
      * @brief Get the collected instruction latency data
      * 
-     * This function returns a reference to the map containing instruction latency
-     * information collected during kernel execution. The map uses PC addresses as keys
-     * and contains latency, hit count, and instruction disassembly for each instruction.
+     * This function returns a vector containing instruction latency
+     * information collected during kernel execution. Each element contains
+     * latency, hit count, and instruction disassembly for each instruction.
      * 
-     * @return const reference to the instruction latency map
+     * @return vector of InstructionData
      */
-    const InstructionLatencyMap& get_instruction_latencies();
+    std::vector<InstructionData> getInstructionData();
 
 } // namespace rocroller_profiler

@@ -145,11 +145,11 @@ namespace RocprofilerTest
 
         CHECK(h_result == 6.0f);
 
-        const auto& latencies = rocroller_profiler::get_instruction_latencies();
+        const auto latencies = rocroller_profiler::getInstructionData();
 
         std::stringstream ss;
         ss << "Instruction, Total Latency, Hit Count, Average Latency" << std::endl;
-        for(const auto& [pc, data] : latencies)
+        for(const auto& data : latencies)
         {
             uint64_t avg_latency = data.hitcount ? (data.latency / data.hitcount) : 0;
             ss << "\"" << data.instruction << "\", " << data.latency << ", " << data.hitcount
@@ -167,8 +167,8 @@ namespace RocprofilerTest
         INFO(ss.str());
         CHECK(latencies.size() == 7);
         { // First instruction
-            const auto& [pc, data] = *(latencies.begin());
-            const auto& instr      = *(instrs.begin());
+            const auto& data  = *(latencies.begin());
+            const auto& instr = *(instrs.begin());
             CHECK(data.instruction == "s_load_dwordx2 s[4:5], s[0:1], 0x0");
             CHECK(NormalizedSource(instr.toString(LogLevel::Critical))
                   == NormalizedSource("s_load_dwordx2 s[4:5], s[0:1], 0"));

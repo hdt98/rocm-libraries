@@ -45,6 +45,12 @@
         abort();                                                                    \
     }
 
+/*
+Based on
+- thread trace decoding: https://github.com/ROCm/rocm-systems/tree/develop/projects/rocprofiler-sdk/samples/thread_trace
+- using dispatch: https://github.com/ROCm/rocm-systems/blob/develop/projects/rocprofiler-sdk/tests/thread-trace/single_dispatch.cpp
+*/
+
 namespace
 {
     rocprofiler_thread_trace_decoder_id_t decoder{};
@@ -94,7 +100,6 @@ namespace
         }
     }
 
-    // Callback for shader data processing
     void shader_data_callback(
         rocprofiler_agent_id_t, int64_t, void* se_data, size_t data_size, rocprofiler_user_data_t)
     {
@@ -121,7 +126,6 @@ namespace
         rocprofiler_trace_decode(decoder, parse, se_data, data_size, nullptr);
     }
 
-    // Dispatch callback - always enable tracing
     rocprofiler_thread_trace_control_flags_t dispatch_callback(rocprofiler_agent_id_t,
                                                                rocprofiler_queue_id_t,
                                                                rocprofiler_async_correlation_id_t,
@@ -133,7 +137,6 @@ namespace
         return ROCPROFILER_THREAD_TRACE_CONTROL_START_AND_STOP;
     }
 
-    // Query and configure GPU agents
     rocprofiler_status_t query_agents(rocprofiler_agent_version_t,
                                       const void** agents,
                                       size_t       num_agents,
@@ -158,7 +161,6 @@ namespace
         return ROCPROFILER_STATUS_SUCCESS;
     }
 
-    // Tool initialization
     int tool_init(rocprofiler_client_finalize_t, void*)
     {
         ROCPROFILER_CALL(rocprofiler_thread_trace_decoder_create(&decoder, "/opt/rocm/lib"),
@@ -186,7 +188,6 @@ namespace
         return 0;
     }
 
-    // Helper function to resolve instruction names
     void resolve_instruction_names()
     {
         if(instructions_resolved)
@@ -244,13 +245,20 @@ extern "C" rocprofiler_tool_configure_result_t*
     return &cfg;
 }
 
-// API implementation
 namespace rocroller_profiler
 {
-    const InstructionLatencyMap& get_instruction_latencies()
+    std::vector<InstructionData> getInstructionData()
     {
-        // Ensure instruction names are resolved before returning the data
         resolve_instruction_names();
-        return instruction_latencies;
+
+        std::vector<InstructionData> result;
+        result.reserve(instruction_latencies.size());
+
+        for(const auto& [pc, data] : instruction_latencies)
+        {
+            result.push_back(data);
+        }
+
+        return result;
     }
 } // namespace rocroller_profiler
