@@ -200,29 +200,8 @@ namespace
         }
     }
 
-    // Tool finalization - output results
     void tool_fini(void*)
     {
-        // Resolve instruction names
-        resolve_instruction_names();
-
-        // Output results
-        const char*   OUTPUT_FILE = "thread_trace.log";
-        std::ofstream file(OUTPUT_FILE);
-        std::ostream& output = file.is_open() ? file : std::cout;
-
-        if(file.is_open())
-            std::cout << "Writing results to: " << OUTPUT_FILE << std::endl;
-
-        output << "\"Instruction\", \"Total Latency (cycles)\", \"Hit Count\", \"Avg Latency "
-                  "(cycles)\""
-               << std::endl;
-        for(const auto& [pc, data] : instruction_latencies)
-        {
-            output << "\"" << data.instruction << "\", " << data.latency << ", " << data.hitcount
-                   << ", " << (data.hitcount ? (data.latency / data.hitcount) : 0) << std::endl;
-        }
-
         rocprofiler_thread_trace_decoder_destroy(decoder);
     }
 }
