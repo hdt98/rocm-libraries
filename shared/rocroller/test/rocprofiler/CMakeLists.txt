@@ -45,6 +45,7 @@ target_sources(rr-kernel-catch
     PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/rr_main.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/agent.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../catch/TestContext.cpp"
 )
 
 target_link_libraries(rr-kernel-catch

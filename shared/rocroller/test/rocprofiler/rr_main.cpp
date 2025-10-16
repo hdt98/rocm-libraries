@@ -37,6 +37,8 @@
 #include <rocRoller/Utilities/Generator.hpp>
 #include <rocRoller/Utilities/HipUtils.hpp>
 
+#include "../catch/TestContext.hpp"
+
 #include <catch2/catch_all.hpp>
 #include <catch2/catch_test_macros.hpp>
 
@@ -149,13 +151,12 @@ namespace RocprofilerTest
 
     TEST_CASE("RocProfiler kernel execution and latency tracking", "[rocprofiler]")
     {
-        // TODO: link in shared/rocroller/test/catch/TestContext.cpp
-        auto context = Context::ForDefaultHipDevice("hello_world");
+        auto context = TestContext::ForTestDevice();
 
         float const constant = 17.0f;
         float const six      = 6.0f;
 
-        auto kernelSetup = createKernel(context, constant);
+        auto kernelSetup = createKernel(context.get(), constant);
 
         kernelSetup.kernel.launchKernel(kernelSetup.commandArgs.runtimeArguments());
 
@@ -202,13 +203,12 @@ namespace RocprofilerTest
 
     TEST_CASE("RocProfiler kernel execution and latency tracking 2", "[rocprofiler]")
     {
-        // TODO: link in shared/rocroller/test/catch/TestContext.cpp
-        auto context = Context::ForDefaultHipDevice("hello_world_2");
+        auto context = TestContext::ForTestDevice();
 
         float const constant = 17.0f;
         float const six      = 6.0f;
 
-        auto kernelSetup = createKernel(context, constant);
+        auto kernelSetup = createKernel(context.get(), constant);
 
         kernelSetup.kernel.launchKernel(kernelSetup.commandArgs.runtimeArguments());
 
