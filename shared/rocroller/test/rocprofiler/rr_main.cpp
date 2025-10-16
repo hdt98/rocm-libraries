@@ -153,7 +153,7 @@ namespace RocprofilerTest
     {
         auto context = TestContext::ForTestDevice();
 
-        uint32_t const constant = 17;
+        uint32_t const constant = 0xdeadbeef;
         uint32_t const six      = 6;
 
         auto kernelSetup = createKernel(context.get(), constant);
@@ -199,58 +199,25 @@ namespace RocprofilerTest
             CHECK(data.hitcount == 4);
             CHECK(data.latency == data.hitcount * 4);
         }
-    }
 
-    TEST_CASE("RocProfiler kernel execution and latency tracking 2", "[rocprofiler]")
-    {
-        auto context = TestContext::ForTestDevice();
-
-        uint32_t const constant = 17;
-        uint32_t const six      = 6;
-
-        auto kernelSetup = createKernel(context.get(), constant);
-
-        kernelSetup.kernel.launchKernel(kernelSetup.commandArgs.runtimeArguments());
-
-        HIP_CHECK(hipDeviceSynchronize());
-
-        uint32_t h_result = 0;
-        HIP_CHECK(
-            hipMemcpy(&h_result, kernelSetup.d_ptr.get(), sizeof(uint32_t), hipMemcpyDeviceToHost));
-
-        CHECK(h_result == six + constant);
-
-        const auto latencies = rocroller_profiler::getInstructionData();
-
-        std::stringstream ss;
-        ss << "Instruction, Total Latency, Hit Count, Average Latency" << std::endl;
+        // Expected mov instruction
+        bool        found       = false;
+        std::string constantHex = [&]() {
+            std::stringstream ss;
+            ss << std::hex << constant;
+            return ss.str();
+        }();
         for(const auto& data : latencies)
         {
-            uint64_t avg_latency = data.hitcount ? (data.latency / data.hitcount) : 0;
-            ss << "\"" << data.instruction << "\", " << data.latency << ", " << data.hitcount
-               << ", " << avg_latency << std::endl;
+            if(data.instruction.find("v_mov_b32") != std::string::npos
+               && data.instruction.find(constantHex) != std::string::npos)
+            {
+                CHECK(data.hitcount == 4);
+                CHECK(data.latency == data.hitcount * 4);
+                found = true;
+                break;
+            }
         }
-
-        kernelSetup.instrs.erase(
-            std::remove_if(kernelSetup.instrs.begin(),
-                           kernelSetup.instrs.end(),
-                           [](const auto& instr) {
-                               // isCommentOnly() doesn't work
-                               return instr.toString(LogLevel::Critical).empty();
-                           }),
-            kernelSetup.instrs.end());
-
-        INFO(ss.str());
-        CHECK(latencies.size() == 8);
-        { // First instruction
-            const auto& data  = *(latencies.begin());
-            const auto& instr = *(kernelSetup.instrs.begin());
-            CHECK(data.instruction == "s_load_dwordx2 s[4:5], s[0:1], 0x0");
-            CHECK(NormalizedSource(instr.toString(LogLevel::Critical))
-                  == NormalizedSource("s_load_dwordx2 s[4:5], s[0:1], 0"));
-            CHECK(data.hitcount == 4);
-            CHECK(data.latency == data.hitcount * 4);
-        }
+        CHECK(found);
     }
-
 } // namespace RocprofilerTest
