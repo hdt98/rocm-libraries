@@ -68,7 +68,7 @@ namespace RocprofilerTest
     };
 
     KernelSetup
-        createKernel(std::shared_ptr<Context> context, uint32_t constant, uint32_t currentValue)
+        createKernel(std::shared_ptr<Context> context, uint32_t literal, uint32_t commandArg)
     {
         auto command = std::make_shared<Command>();
 
@@ -126,7 +126,7 @@ namespace RocprofilerTest
             co_yield context->copier()->copy(v_ptr, s_ptr, "Move pointer");
 
             co_yield v_value->allocate();
-            co_yield Expression::generate(v_value, Expression::literal(constant), context);
+            co_yield Expression::generate(v_value, Expression::literal(literal), context);
             co_yield Expression::generate(
                 v_value, v_value->expression() + s_value->expression(), context);
 
@@ -146,26 +146,26 @@ namespace RocprofilerTest
 
         CommandArguments commandArgs = command->createArguments();
         commandArgs.setArgument(ptrTag, ArgumentType::Value, d_ptr.get());
-        commandArgs.setArgument(valTag, ArgumentType::Value, currentValue);
+        commandArgs.setArgument(valTag, ArgumentType::Value, commandArg);
 
         return {std::move(commandKernel), d_ptr, commandArgs, instrs};
     }
 
-    TEST_CASE("rocprofiler multiple kernels", "[rocprofiler]")
+    TEST_CASE("rocprofiler kernels with different literals in assembly", "[rocprofiler]")
     {
-        auto constant  = GENERATE(0xdeadbeef, 0x12345678, 0xabcdef00);
-        auto testValue = GENERATE(7, 21, 331);
+        auto literal    = GENERATE(0xdeadbeef, 0x12345678, 0xabcdef00);
+        auto commandArg = GENERATE(7, 21, 331);
 
-        DYNAMIC_SECTION("constant: 0x" << std::hex << constant << ", value: " << std::dec
-                                       << testValue)
+        DYNAMIC_SECTION("literal: 0x" << std::hex << literal << ", value: " << std::dec
+                                      << commandArg)
         {
-            std::string const testName = fmt::format("const_0x{:x}_value_{}", constant, testValue);
+            std::string const testName = fmt::format("const_0x{:x}_value_{}", literal, commandArg);
 
             auto context = TestContext::ForTestDevice({}, testName);
 
             INFO("Testing " << testName);
 
-            auto kernelSetup = createKernel(context.get(), constant, testValue);
+            auto kernelSetup = createKernel(context.get(), literal, commandArg);
 
             kernelSetup.kernel.launchKernel(kernelSetup.commandArgs.runtimeArguments());
             HIP_CHECK(hipDeviceSynchronize());
@@ -175,7 +175,7 @@ namespace RocprofilerTest
                 HIP_CHECK(hipMemcpy(
                     &h_result, kernelSetup.d_ptr.get(), sizeof(uint32_t), hipMemcpyDeviceToHost));
 
-                uint32_t expectedResult = testValue + constant;
+                uint32_t expectedResult = commandArg + literal;
                 CHECK(h_result == expectedResult);
             }
 
@@ -207,7 +207,7 @@ namespace RocprofilerTest
                 CHECK(1 == countSubstring(instructionsStr, "s_waitcnt lgkmcnt(0)"));
                 CHECK(1
                       == countSubstring(instructionsStr,
-                                        fmt::format("v_mov_b32_e32 v1, 0x{:x}", constant)));
+                                        fmt::format("v_mov_b32_e32 v1, 0x{:x}", literal)));
             }
         }
     }
