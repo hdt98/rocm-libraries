@@ -41,6 +41,8 @@
 
 #include <catch2/catch_all.hpp>
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
+#include <catch2/generators/catch_generators_range.hpp>
 
 #include "hip/hip_runtime.h"
 
@@ -148,44 +150,44 @@ namespace RocprofilerTest
         return {std::move(commandKernel), d_ptr, commandArgs, instrs};
     }
 
-    TEST_CASE("RocProfiler kernel execution and latency tracking", "[rocprofiler]")
+    TEST_CASE("rocprofiler multiple kernels", "[rocprofiler]")
     {
-        // Arrays of test constants and values to loop through
-        std::vector<uint32_t> constants
-            = {0xdeadbeef, 0xcafebabe, 0x12345678, 0xabcdef00, 0xfeedface};
-        std::vector<uint32_t> testValues = {6, 10, 15, 20, 25};
+        auto constant  = GENERATE(0xdeadbeef, 0x12345678, 0xabcdef00);
+        auto testValue = GENERATE(7, 21, 331);
 
-        SECTION("Loop through different constants and pointer values")
+        DYNAMIC_SECTION("constant: 0x" << std::hex << constant << ", value: " << std::dec
+                                       << testValue)
         {
-            for(size_t i = 0; i < constants.size(); i++)
-            {
-                auto context = TestContext::ForTestDevice();
+            std::string const testName = [&]() {
+                std::stringstream ss;
+                ss << "const_0x" << std::hex << constant << "_value_" << std::dec << testValue;
+                return ss.str();
+            }();
 
-                INFO("Testing with constant: 0x" << std::hex << constants[i]
-                                                 << " and value: " << std::dec << testValues[i]);
+            auto context = TestContext::ForTestDevice({}, testName);
 
-                // Create kernel with current constant and value
-                auto kernelSetup = createKernel(context.get(), constants[i], testValues[i]);
+            INFO("Testing " << testName);
 
-                // Launch kernel
-                kernelSetup.kernel.launchKernel(kernelSetup.commandArgs.runtimeArguments());
-                HIP_CHECK(hipDeviceSynchronize());
+            auto kernelSetup = createKernel(context.get(), constant, testValue);
 
-                // Verify result
+            kernelSetup.kernel.launchKernel(kernelSetup.commandArgs.runtimeArguments());
+            HIP_CHECK(hipDeviceSynchronize());
+
+            { // Verify device result
                 uint32_t h_result = 0;
                 HIP_CHECK(hipMemcpy(
                     &h_result, kernelSetup.d_ptr.get(), sizeof(uint32_t), hipMemcpyDeviceToHost));
 
-                uint32_t expectedResult = testValues[i] + constants[i];
+                uint32_t expectedResult = testValue + constant;
                 CHECK(h_result == expectedResult);
                 INFO("Result verified: " << h_result << " == " << expectedResult);
+            }
 
-                // Collect and display profiling data
-                const auto latencies = rocroller_profiler::getInstructionData();
+            const auto latencies = rocroller_profiler::getInstructionData();
 
+            { // Log profiler data
                 std::stringstream ss;
-                ss << "Iteration " << i
-                   << " - Instruction, Total Latency, Hit Count, Average Latency" << std::endl;
+                ss << "Instruction, Total Latency, Hit Count, Average Latency" << std::endl;
                 for(const auto& data : latencies)
                 {
                     uint64_t avg_latency = data.hitcount ? (data.latency / data.hitcount) : 0;
@@ -193,15 +195,15 @@ namespace RocprofilerTest
                        << data.hitcount << ", " << avg_latency << std::endl;
                 }
                 INFO(ss.str());
+            }
 
-                // Verify mov instruction with current constant
+            { // Ensure mov with expected constant exists in the profile data
                 bool        found       = false;
-                std::string constantHex = [&]() {
+                std::string constantHex = [constant]() {
                     std::stringstream ss;
-                    ss << std::hex << constants[i];
+                    ss << std::hex << constant;
                     return ss.str();
                 }();
-
                 for(const auto& data : latencies)
                 {
                     if(data.instruction.find("v_mov_b32") != std::string::npos
