@@ -20,7 +20,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include "agent.hpp"
+#include "Agent.hpp"
 
 #include <common/SourceMatcher.hpp>
 #include <common/Utilities.hpp>
