@@ -22,17 +22,34 @@ find_library(
     PATHS ${ROCM_PATH} /usr
     PATH_SUFFIXES lib lib64)
 
-# rocRoller version
-add_executable(rr-kernel)
+# Find Catch2
+find_package(Catch2 QUIET)
+if(NOT Catch2_FOUND)
+    if(ROCROLLER_ENABLE_FETCH)
+        include(FetchContent)
+        FetchContent_Declare(
+            Catch2
+            GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+            GIT_TAG devel
+        )
+        FetchContent_MakeAvailable(Catch2)
+    else()
+        message(FATAL_ERROR "Failed to find Catch2")
+    endif()
+endif()
 
-target_sources(rr-kernel
+# Catch2 version
+add_executable(rr-kernel-catch)
+
+target_sources(rr-kernel-catch
     PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/rr_main.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/agent.cpp"
 )
 
-target_link_libraries(rr-kernel
+target_link_libraries(rr-kernel-catch
     PRIVATE
+        Catch2::Catch2WithMain
         rocprofiler-sdk::rocprofiler-sdk
         rocprofiler-sdk-roctx::rocprofiler-sdk-roctx
         amd_comgr
