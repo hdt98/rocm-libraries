@@ -458,7 +458,6 @@ struct intrin_wmma_f16_16x16x32_f16<16, 16>
         // false: D0.[0:15] = result
         // true : D0.[16:31]= result
 #if defined(__gfx125__)
-        if (threadIdx.x == 0) {printf("Running intrin_wmma_f16_16x16x32_f16<16, 16>\n");}
         reg_c.template AsType<half8_t>()(Number<0>{}) = __builtin_amdgcn_wmma_f16_16x16x32_f16(
             0, reg_a, 0, reg_b, 0, reg_c.template AsType<half8_t>()[Number<0>{}], false, false);
 #else
@@ -483,7 +482,6 @@ struct intrin_wmma_bf16_16x16x32_bf16<16, 16>
         // false: D0.[0:15] = result
         // true : D0.[16:31]= result
 #if defined(__gfx125__)
-        if (threadIdx.x == 0) {printf("Running intrin_wmma_bf16_16x16x32_bf16<16, 16>\n");}
         reg_c.template AsType<bhalf8_t>()(Number<0>{}) = __builtin_amdgcn_wmma_bf16_16x16x32_bf16(
             0, reg_a, 0, reg_b, 0, reg_c.template AsType<bhalf8_t>()[Number<0>{}], false, false);
 #else
@@ -509,7 +507,6 @@ struct intrin_wmma_f32_16x16x32_f16<16, 16>
         // amd_assembly_wmma_f32_16x16x16_f16_w32(
         //     reg_a, reg_b, reg_c.template AsType<float8_t>()(Number<0>{}));
 #if defined(__gfx125__)
-        if (threadIdx.x == 0) {printf("Running intrin_wmma_f32_16x16x32_f16<16, 16>\n");}
         reg_c.template AsType<float8_t>()(Number<0>{}) = __builtin_amdgcn_wmma_f32_16x16x32_f16(
             0, reg_a, 0, reg_b, 0, reg_c.template AsType<float8_t>()[Number<0>{}], false, false);
 #else
@@ -531,7 +528,6 @@ struct intrin_wmma_f32_16x16x32_bf16<16, 16>
     __device__ static void Run(const bhalf16_t& reg_a, const bhalf16_t& reg_b, FloatC& reg_c)
     {
 #if defined(__gfx125__)
-        if (threadIdx.x == 0) {printf("Running intrin_wmma_f32_16x16x32_bf16<16, 16>\n");}
         reg_c.template AsType<float8_t>()(Number<0>{}) = __builtin_amdgcn_wmma_f32_16x16x32_bf16(
             0, reg_a, 0, reg_b, 0, reg_c.template AsType<float8_t>()[Number<0>{}], false, false);
 #else
@@ -549,11 +545,10 @@ struct intrin_wmma_bf16f32_16x16x32_bf16;
 template <>
 struct intrin_wmma_bf16f32_16x16x32_bf16<16, 16>
 {
-    template <class FloatC, class FloatD> // KO TODO:: revisit
+    template <class FloatC, class FloatD>
     __device__ static void Run(const bhalf16_t& reg_a, const bhalf16_t& reg_b, FloatC& reg_c, FloatD& reg_d)
     {
 #if defined(__gfx125__)
-        if (threadIdx.x == 0) {printf("Running intrin_wmma_bf16f32_16x16x32_bf16<16, 16>\n");}
         reg_d.template AsType<bhalf8_t>()(Number<0>{}) = __builtin_amdgcn_wmma_bf16f32_16x16x32_bf16(
             0, reg_a, 0, reg_b, 0, reg_c.template AsType<float8_t>()[Number<0>{}], false, false);
 #else
@@ -576,7 +571,6 @@ struct intrin_wmma_i32_16x16x64_iu8<16, 16, neg_a, neg_b>
     __device__ static void Run(const int8x32_t& reg_a, const int8x32_t& reg_b, FloatC& reg_c)
     {
 #if defined(__gfx125__)
-        if (threadIdx.x == 0) {printf("Running intrin_wmma_i32_16x16x64_iu8<16, 16>\n");}
         reg_c.template AsType<int32x8_t>()(Number<0>{}) =
             __builtin_amdgcn_wmma_i32_16x16x64_iu8(neg_a,
                                                    bit_cast<int32x8_t>(reg_a),
@@ -602,7 +596,6 @@ struct intrin_wmma_f32_16x16x64_f8f8<16, 16>
     __device__ static void Run(const f8x32_t& reg_a, const f8x32_t& reg_b, FloatC& reg_c)
     {
 #if defined(__gfx125__)
-        if (threadIdx.x == 0) {printf("--------- Calling intrin_wmma_f32_16x16x64_f8f8<16, 16> ---------- \n");}
         reg_c.template AsType<float8_t>()(Number<0>{}) = __builtin_amdgcn_wmma_f32_16x16x64_fp8_fp8(
             bit_cast<int32x8_t>(reg_a),
             bit_cast<int32x8_t>(reg_b),
@@ -627,7 +620,6 @@ struct intrin_wmma_f32_16x16x64_f8bf8<16, 16>
     __device__ static void Run(const f8x32_t& reg_a, const bf8x32_t& reg_b, FloatC& reg_c)
     {
 #if defined(__gfx125__)
-        if (threadIdx.x == 0) {printf("--------- Calling intrin_wmma_f32_16x16x64_f8bf8<16, 16> ---------- \n");}
         reg_c.template AsType<float8_t>()(Number<0>{}) = __builtin_amdgcn_wmma_f32_16x16x64_fp8_bf8(
             bit_cast<int32x8_t>(reg_a),
             bit_cast<int32x8_t>(reg_b),
@@ -652,7 +644,6 @@ struct intrin_wmma_f32_16x16x64_bf8f8<16, 16>
     __device__ static void Run(const bf8x32_t& reg_a, const f8x32_t& reg_b, FloatC& reg_c)
     {
 #if defined(__gfx125__)
-        if (threadIdx.x == 0) {printf("--------- Calling intrin_wmma_f32_16x16x64_bf8f8<16, 16> ---------- \n");}
         reg_c.template AsType<float8_t>()(Number<0>{}) = __builtin_amdgcn_wmma_f32_16x16x64_bf8_fp8(
             bit_cast<int32x8_t>(reg_a),
             bit_cast<int32x8_t>(reg_b),
@@ -677,7 +668,6 @@ struct intrin_wmma_f32_16x16x64_bf8bf8<16, 16>
     __device__ static void Run(const bf8x32_t& reg_a, const bf8x32_t& reg_b, FloatC& reg_c)
     {
 #if defined(__gfx125__)
-        if (threadIdx.x == 0) {printf("--------- Calling intrin_wmma_f32_16x16x64_bf8bf8<16, 16> ---------- \n");}
         reg_c.template AsType<float8_t>()(Number<0>{}) = __builtin_amdgcn_wmma_f32_16x16x64_bf8_bf8(
             bit_cast<int32x8_t>(reg_a),
             bit_cast<int32x8_t>(reg_b),
@@ -702,7 +692,6 @@ struct intrin_wmma_f16_16x16x64_f8f8<16, 16>
     __device__ static void Run(const f8x32_t& reg_a, const f8x32_t& reg_b, FloatC& reg_c)
     {
 #if defined(__gfx125__)
-        if (threadIdx.x == 0) {printf("--------- Calling intrin_wmma_f16_16x16x64_f8f8<16, 16> ---------- \n");}
         reg_c.template AsType<half8_t>()(Number<0>{}) = __builtin_amdgcn_wmma_f16_16x16x64_fp8_fp8(
             bit_cast<int32x8_t>(reg_a),
             bit_cast<int32x8_t>(reg_b),
@@ -727,7 +716,6 @@ struct intrin_wmma_f16_16x16x64_f8bf8<16, 16>
     __device__ static void Run(const f8x32_t& reg_a, const bf8x32_t& reg_b, FloatC& reg_c)
     {
 #if defined(__gfx125__)
-        if (threadIdx.x == 0) {printf("--------- Calling intrin_wmma_f16_16x16x64_f8bf8<16, 16> ---------- \n");}
         reg_c.template AsType<half8_t>()(Number<0>{}) = __builtin_amdgcn_wmma_f16_16x16x64_fp8_bf8(
             bit_cast<int32x8_t>(reg_a),
             bit_cast<int32x8_t>(reg_b),
@@ -752,7 +740,6 @@ struct intrin_wmma_f16_16x16x64_bf8f8<16, 16>
     __device__ static void Run(const bf8x32_t& reg_a, const f8x32_t& reg_b, FloatC& reg_c)
     {
 #if defined(__gfx125__)
-        if (threadIdx.x == 0) {printf("--------- Calling intrin_wmma_f16_16x16x64_bf8f8<16, 16> ---------- \n");}
         reg_c.template AsType<half8_t>()(Number<0>{}) = __builtin_amdgcn_wmma_f16_16x16x64_bf8_fp8(
             bit_cast<int32x8_t>(reg_a),
             bit_cast<int32x8_t>(reg_b),
@@ -777,7 +764,6 @@ struct intrin_wmma_f16_16x16x64_bf8bf8<16, 16>
     __device__ static void Run(const bf8x32_t& reg_a, const bf8x32_t& reg_b, FloatC& reg_c)
     {
 #if defined(__gfx125__)
-        if (threadIdx.x == 0) {printf("--------- Calling intrin_wmma_f16_16x16x64_bf8bf8<16, 16> ---------- \n");}
         reg_c.template AsType<half8_t>()(Number<0>{}) = __builtin_amdgcn_wmma_f16_16x16x64_bf8_bf8(
             bit_cast<int32x8_t>(reg_a),
             bit_cast<int32x8_t>(reg_b),
@@ -802,7 +788,6 @@ struct intrin_wmma_f32_16x16x128_f8f8<16, 16>
     __device__ static void Run(const f8x64_t& reg_a, const f8x64_t& reg_b, FloatC& reg_c)
     {
 #if defined(__gfx125__)
-        if (threadIdx.x == 0) {printf("--------- Calling intrin_wmma_f32_16x16x128_f8f8<16, 16> ---------- \n");}
         reg_c.template AsType<float8_t>()(Number<0>{}) = __builtin_amdgcn_wmma_f32_16x16x128_fp8_fp8(
             bit_cast<int32x16_t>(reg_a),
             bit_cast<int32x16_t>(reg_b),
@@ -827,7 +812,6 @@ struct intrin_wmma_f32_16x16x128_f8bf8<16, 16>
     __device__ static void Run(const f8x64_t& reg_a, const bf8x64_t& reg_b, FloatC& reg_c)
     {
 #if defined(__gfx125__)
-        if (threadIdx.x == 0) {printf("--------- Calling intrin_wmma_f32_16x16x128_f8bf8<16, 16> ---------- \n");}
         reg_c.template AsType<float8_t>()(Number<0>{}) = __builtin_amdgcn_wmma_f32_16x16x128_fp8_bf8(
             bit_cast<int32x16_t>(reg_a),
             bit_cast<int32x16_t>(reg_b),
@@ -852,7 +836,6 @@ struct intrin_wmma_f32_16x16x128_bf8f8<16, 16>
     __device__ static void Run(const bf8x64_t& reg_a, const f8x64_t& reg_b, FloatC& reg_c)
     {
 #if defined(__gfx125__)
-        if (threadIdx.x == 0) {printf("--------- Calling intrin_wmma_f32_16x16x128_bf8f8<16, 16> ---------- \n");}
         reg_c.template AsType<float8_t>()(Number<0>{}) = __builtin_amdgcn_wmma_f32_16x16x128_bf8_fp8(
             bit_cast<int32x16_t>(reg_a),
             bit_cast<int32x16_t>(reg_b),
@@ -877,7 +860,6 @@ struct intrin_wmma_f32_16x16x128_bf8bf8<16, 16>
     __device__ static void Run(const bf8x64_t& reg_a, const bf8x64_t& reg_b, FloatC& reg_c)
     {
 #if defined(__gfx125__)
-        if (threadIdx.x == 0) {printf("--------- Calling intrin_wmma_f32_16x16x128_bf8bf8<16, 16> ---------- \n");}
         reg_c.template AsType<float8_t>()(Number<0>{}) = __builtin_amdgcn_wmma_f32_16x16x128_bf8_bf8(
             bit_cast<int32x16_t>(reg_a),
             bit_cast<int32x16_t>(reg_b),
@@ -902,7 +884,6 @@ struct intrin_wmma_f16_16x16x128_f8f8<16, 16>
     __device__ static void Run(const f8x64_t& reg_a, const f8x64_t& reg_b, FloatC& reg_c)
     {
 #if defined(__gfx125__)
-        if (threadIdx.x == 0) {printf("--------- Calling intrin_wmma_f16_16x16x128_f8f8<16, 16> ---------- \n");}
         reg_c.template AsType<half8_t>()(Number<0>{}) = __builtin_amdgcn_wmma_f16_16x16x128_fp8_fp8(
             bit_cast<int32x16_t>(reg_a),
             bit_cast<int32x16_t>(reg_b),
@@ -927,7 +908,6 @@ struct intrin_wmma_f16_16x16x128_f8bf8<16, 16>
     __device__ static void Run(const f8x64_t& reg_a, const bf8x64_t& reg_b, FloatC& reg_c)
     {
 #if defined(__gfx125__)
-        if (threadIdx.x == 0) {printf("--------- Calling intrin_wmma_f16_16x16x128_f8bf8<16, 16> ---------- \n");}
         reg_c.template AsType<half8_t>()(Number<0>{}) = __builtin_amdgcn_wmma_f16_16x16x128_fp8_bf8(
             bit_cast<int32x16_t>(reg_a),
             bit_cast<int32x16_t>(reg_b),
@@ -952,7 +932,6 @@ struct intrin_wmma_f16_16x16x128_bf8f8<16, 16>
     __device__ static void Run(const bf8x64_t& reg_a, const f8x64_t& reg_b, FloatC& reg_c)
     {
 #if defined(__gfx125__)
-        if (threadIdx.x == 0) {printf("--------- Calling intrin_wmma_f16_16x16x128_bf8f8<16, 16> ---------- \n");}
         reg_c.template AsType<half8_t>()(Number<0>{}) = __builtin_amdgcn_wmma_f16_16x16x128_bf8_fp8(
             bit_cast<int32x16_t>(reg_a),
             bit_cast<int32x16_t>(reg_b),
@@ -977,7 +956,6 @@ struct intrin_wmma_f16_16x16x128_bf8bf8<16, 16>
     __device__ static void Run(const bf8x64_t& reg_a, const bf8x64_t& reg_b, FloatC& reg_c)
     {
 #if defined(__gfx125__)
-        if (threadIdx.x == 0) {printf("--------- Calling intrin_wmma_f16_16x16x128_bf8bf8<16, 16> ---------- \n");}
         reg_c.template AsType<half8_t>()(Number<0>{}) = __builtin_amdgcn_wmma_f16_16x16x128_bf8_bf8(
             bit_cast<int32x16_t>(reg_a),
             bit_cast<int32x16_t>(reg_b),
@@ -1003,7 +981,6 @@ struct intrin_wmma_f32_16x16x4_f32<16, 16, neg_a, neg_b>
     __device__ static void Run(const float2_t& reg_a, const float2_t& reg_b, FloatC& reg_c)
     {
 #if defined(__gfx125__)
-        if (threadIdx.x == 0) {printf("--------- Calling intrin_wmma_f32_16x16x4_f32<16, 16> ---------- \n");}
         reg_c.template AsType<float8_t>()(Number<0>{}) = __builtin_amdgcn_wmma_f32_16x16x4_f32(
             neg_a, 
             bit_cast<float2_t>(reg_a),
@@ -1031,7 +1008,6 @@ struct intrin_wmma_f64_16x16x4_f64<16, 16, neg_a, neg_b>
     __device__ static void Run(const double2_t& reg_a, const double2_t& reg_b, FloatC& reg_c)
     {
 #if defined(__gfx1251__)
-        if (threadIdx.x == 0) {printf("--------- Calling wmma_f64_16x16x4_f64<16, 16> ---------- \n");}
         reg_c.template AsType<double8_t>()(Number<0>{}) = __builtin_amdgcn_wmma_f64_16x16x4_f64(
             neg_b, 
             bit_cast<double2_t>(reg_b),

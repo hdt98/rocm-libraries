@@ -44,9 +44,7 @@ bool run_test()
         ck::wmma_op_util::matmul_swizzle_a<SrcType, DstType, GPUAccType>;
 
     const auto wmma_kernel_container = std::make_tuple(matmul_default, matmul_swizzle_a);
-    std::cout << "pass before static_for: " << pass << std::endl;
     ck::static_for<0, 2, 1>{}([&](auto i) {
-        std::cout << "Calling TestWmma for kernel " << i << std::endl;        
         pass &=
             ck::wmma_op_util::TestWmma<decltype(std::get<ck::Number<i>{}>(wmma_kernel_container)),
                                        SrcType,
@@ -61,11 +59,7 @@ bool run_test()
                                        PassThrough,
                                        PassThrough,
                                        1>{}(std::get<ck::Number<i>{}>(wmma_kernel_container));
-        std::cout << "TestWmma for kernel " << i << " finished." << std::endl;
-        std::cout << "pass after static_for: " << pass << std::endl;
     });
-
-    std::cout << "pass when return: " << pass << std::endl;
 
     return pass ? 1 : 0;
 }
@@ -125,7 +119,6 @@ bool run_test()
                                        KMultiplier>{}(std::get<ck::Number<i>{}>(wmma_kernel_container));
     });
 
-    std::cout << "=========== reaching run_test return pass after calling ck::wmma_op_util::TestWmma. Pass is: " << pass << "===========" << std::flush << std::endl;
     return pass ? 1 : 0;
 }
 
@@ -133,7 +126,6 @@ int main(int, char*[])
 {
     // bool pass = true;
     bool pass = true;
-    std::cout << "Before run_test, pass = " << pass << std::endl;
     // // clang-format off
     // //              |SrcType     |DstType     |GPUAccType  |CPUAccType
     // pass &= run_test<ck::half_t,  ck::half_t,  float,       float   >();
@@ -143,8 +135,6 @@ int main(int, char*[])
     // pass &= run_test<int8_t,      int8_t,      int32_t,     int32_t,    8     >();
     // // clang-format on
 
-    // bool pass = false;
-    // std::cout << "Before run_test, pass = " << pass << std::endl;
     // clang-format off
     //               |SrcAType    |SrcBType,     |DstType     |GPUAccType  |CPUAccType      |KMultiplier
     pass &= run_test<ck::half_t,  ck::half_t,   float,        float,       float,              8>(); // V_WMMA_F32_16X16X32_F16
