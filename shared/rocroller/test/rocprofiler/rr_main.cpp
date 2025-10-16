@@ -57,23 +57,23 @@ namespace RocprofilerTest
 {
     struct KernelSetup
     {
-        CommandKernel            kernel;
-        std::shared_ptr<float>   d_ptr;
-        CommandArguments         commandArgs;
-        std::vector<Instruction> instrs;
+        CommandKernel             kernel;
+        std::shared_ptr<uint32_t> d_ptr;
+        CommandArguments          commandArgs;
+        std::vector<Instruction>  instrs;
     };
 
-    KernelSetup createKernel(std::shared_ptr<Context> context, float constant)
+    KernelSetup createKernel(std::shared_ptr<Context> context, uint32_t constant)
     {
         auto command = std::make_shared<Command>();
 
-        VariableType floatPtr{DataType::Float, PointerType::PointerGlobal};
-        VariableType floatVal{DataType::Float, PointerType::Value};
+        VariableType uintPtr{DataType::UInt32, PointerType::PointerGlobal};
+        VariableType uintVal{DataType::UInt32, PointerType::Value};
 
         auto ptrTag  = command->allocateTag();
-        auto ptr_arg = command->allocateArgument(floatPtr, ptrTag, ArgumentType::Value);
+        auto ptr_arg = command->allocateArgument(uintPtr, ptrTag, ArgumentType::Value);
         auto valTag  = command->allocateTag();
-        auto val_arg = command->allocateArgument(floatVal, valTag, ArgumentType::Value);
+        auto val_arg = command->allocateArgument(uintVal, valTag, ArgumentType::Value);
 
         auto ptr_exp = std::make_shared<Expression::Expression>(ptr_arg);
         auto val_exp = std::make_shared<Expression::Expression>(val_arg);
@@ -89,10 +89,10 @@ namespace RocprofilerTest
         k->setWorkitemCount({std::make_shared<Expression::Expression>(256 * 256), one, one});
 
         k->addArgument({"ptr",
-                        {DataType::Float, PointerType::PointerGlobal},
+                        {DataType::UInt32, PointerType::PointerGlobal},
                         DataDirection::WriteOnly,
                         ptr_exp});
-        k->addArgument({"val", {DataType::Float}, DataDirection::ReadOnly, val_exp});
+        k->addArgument({"val", {DataType::UInt32}, DataDirection::ReadOnly, val_exp});
 
         std::vector<Instruction> instrs;
 
@@ -113,9 +113,9 @@ namespace RocprofilerTest
             co_yield context->argLoader()->getValue("val", s_value);
 
             auto v_ptr = Register::Value::Placeholder(
-                context, Register::Type::Vector, {DataType::Float, PointerType::PointerGlobal}, 1);
-            auto v_value
-                = Register::Value::Placeholder(context, Register::Type::Vector, DataType::Float, 1);
+                context, Register::Type::Vector, {DataType::UInt32, PointerType::PointerGlobal}, 1);
+            auto v_value = Register::Value::Placeholder(
+                context, Register::Type::Vector, DataType::UInt32, 1);
 
             co_yield v_ptr->allocate();
             co_yield context->copier()->copy(v_ptr, s_ptr, "Move pointer");
@@ -138,9 +138,9 @@ namespace RocprofilerTest
         commandKernel.setContext(context);
         commandKernel.generateKernel();
 
-        auto d_ptr = make_shared_device<float>(1, 0.0f);
+        auto d_ptr = make_shared_device<uint32_t>(1, 0);
 
-        float const six = 6.0f;
+        uint32_t const six = 6;
 
         CommandArguments commandArgs = command->createArguments();
         commandArgs.setArgument(ptrTag, ArgumentType::Value, d_ptr.get());
@@ -153,8 +153,8 @@ namespace RocprofilerTest
     {
         auto context = TestContext::ForTestDevice();
 
-        float const constant = 17.0f;
-        float const six      = 6.0f;
+        uint32_t const constant = 17;
+        uint32_t const six      = 6;
 
         auto kernelSetup = createKernel(context.get(), constant);
 
@@ -162,9 +162,9 @@ namespace RocprofilerTest
 
         HIP_CHECK(hipDeviceSynchronize());
 
-        float h_result = 0.0f;
+        uint32_t h_result = 0;
         HIP_CHECK(
-            hipMemcpy(&h_result, kernelSetup.d_ptr.get(), sizeof(float), hipMemcpyDeviceToHost));
+            hipMemcpy(&h_result, kernelSetup.d_ptr.get(), sizeof(uint32_t), hipMemcpyDeviceToHost));
 
         CHECK(h_result == six + constant);
 
@@ -205,8 +205,8 @@ namespace RocprofilerTest
     {
         auto context = TestContext::ForTestDevice();
 
-        float const constant = 17.0f;
-        float const six      = 6.0f;
+        uint32_t const constant = 17;
+        uint32_t const six      = 6;
 
         auto kernelSetup = createKernel(context.get(), constant);
 
@@ -214,9 +214,9 @@ namespace RocprofilerTest
 
         HIP_CHECK(hipDeviceSynchronize());
 
-        float h_result = 0.0f;
+        uint32_t h_result = 0;
         HIP_CHECK(
-            hipMemcpy(&h_result, kernelSetup.d_ptr.get(), sizeof(float), hipMemcpyDeviceToHost));
+            hipMemcpy(&h_result, kernelSetup.d_ptr.get(), sizeof(uint32_t), hipMemcpyDeviceToHost));
 
         CHECK(h_result == six + constant);
 
