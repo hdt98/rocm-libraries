@@ -1,2 +1,0 @@
-GFlops, SizeI, SizeJ, SizeK, SizeL, LDD, LDC, LDA, LDB, WinnerFreq, TotalFlops, WinnerPower, WinnerTemperature, Cijk_Ailk_Bljk_ZB_MT64x64x8_MI16x16x4x1_SN_K1_LPB1, Cijk_Ailk_Bljk_ZB_MT64x64x16_MI16x16x4x1_SN_K1_LPB0
-0, 4096, 4096, 1, 8192, 4096, 4096, 4096, 8192, 0, 274877906944, 0, 0, 11024.8, 12599.7
