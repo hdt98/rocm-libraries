@@ -25,20 +25,8 @@
 #undef NDEBUG
 #endif
 
-#include <cstdint>
-#include <cstdlib>
-#include <iostream>
-#include <memory>
-#include <vector>
-
-#include <rocprofiler-sdk-roctx/roctx.h>
-
-#include "hip/hip_runtime.h"
-
-// Include agent API header
 #include "agent.hpp"
 
-// rocRoller includes
 #include <rocRoller/AssemblyKernel.hpp>
 #include <rocRoller/CodeGen/ArgumentLoader.hpp>
 #include <rocRoller/CodeGen/CopyGenerator.hpp>
@@ -50,6 +38,15 @@
 #include <rocRoller/KernelArguments.hpp>
 #include <rocRoller/Operations/Command.hpp>
 #include <rocRoller/Utilities/Generator.hpp>
+
+#include "hip/hip_runtime.h"
+
+#include <cstdint>
+#include <cstdlib>
+#include <iostream>
+#include <memory>
+#include <ranges>
+#include <vector>
 
 using namespace rocRoller;
 
@@ -93,8 +90,18 @@ int main(int /*argc*/, char** /*argv*/)
         {"ptr", {DataType::Float, PointerType::PointerGlobal}, DataDirection::WriteOnly, ptr_exp});
     k->addArgument({"val", {DataType::Float}, DataDirection::ReadOnly, val_exp});
 
+    std::vector<Instruction> instrs;
+
+    const auto captureInstrAndSchedule = [&](auto gen) {
+        for(auto instr : gen)
+        {
+            context->schedule(instr);
+            instrs.push_back(std::move(instr));
+        }
+    };
+
     context->schedule(k->preamble());
-    context->schedule(k->prolog());
+    captureInstrAndSchedule(k->prolog());
 
     auto kb = [&]() -> Generator<Instruction> {
         Register::ValuePtr s_ptr, s_value;
@@ -115,11 +122,8 @@ int main(int /*argc*/, char** /*argv*/)
         co_yield context->mem()->storeGlobal(v_ptr, v_value, 0, 4);
     };
 
-    for(auto instr : kb())
-    {
-        context->schedule(instr);
-        // TODO: push_back to check InstructionStatus
-    }
+    captureInstrAndSchedule(kb());
+    instrs.push_back({"s_endpgm", {}, {}, {}, ""}); // postamble() too much extra stuff
 
     context->schedule(k->postamble());
     context->schedule(k->amdgpu_metadata());
@@ -129,9 +133,8 @@ int main(int /*argc*/, char** /*argv*/)
     commandKernel.setContext(context);
     commandKernel.generateKernel();
 
-    float* d_ptr = nullptr;
+    float* d_ptr = nullptr; // TODO: use smart pointers
     HIP_API_CALL(hipMalloc(&d_ptr, sizeof(float)));
-
     HIP_API_CALL(hipMemset(d_ptr, 0, sizeof(float)));
 
     // Create command arguments and launch kernel
@@ -145,33 +148,79 @@ int main(int /*argc*/, char** /*argv*/)
 
     float h_result = 0.0f;
     HIP_API_CALL(hipMemcpy(&h_result, d_ptr, sizeof(float), hipMemcpyDeviceToHost));
+    HIP_API_CALL(hipFree(d_ptr));
 
     std::cout << "rocRoller kernel first execution result: " << h_result << " (expected: 6.0)"
               << std::endl;
 
-    std::cout << "\n--- Instruction Latency Data ---" << std::endl;
     const auto& latencies = rocroller_profiler::get_instruction_latencies();
 
-    if(latencies.empty())
+    std::stringstream ss;
+    for(const auto& [pc, data] : latencies)
     {
-        std::cout << "No latency data collected. Make sure profiling is enabled." << std::endl;
+        uint64_t avg_latency = data.hitcount ? (data.latency / data.hitcount) : 0;
+        ss << "\"" << data.instruction << "\", " << data.latency << ", " << data.hitcount << ", "
+           << avg_latency << std::endl;
     }
-    else
-    {
-        std::cout << "Collected latency data for " << latencies.size()
-                  << " instructions:" << std::endl;
-        std::cout << "\nInstruction, Total Latency (cycles), Hit Count, Avg Latency (cycles)"
-                  << std::endl;
 
-        for(const auto& [pc, data] : latencies)
+    instrs.erase(std::remove_if(instrs.begin(),
+                                instrs.end(),
+                                [](const auto& instr) {
+                                    // isCommentOnly() doesn't work
+                                    return instr.toString(LogLevel::Critical).empty();
+                                }),
+                 instrs.end());
+
+    { // Tests
+        AssertFatal(latencies.size() == 7, ss.str());
+        rocroller_profiler::InstructionLatencyMap latenciesNoWaitcnt = latencies;
+        for(auto it = latenciesNoWaitcnt.begin(); it != latenciesNoWaitcnt.end();)
         {
-            uint64_t avg_latency = data.hitcount ? (data.latency / data.hitcount) : 0;
-            std::cout << "\"" << data.instruction << "\", " << data.latency << ", " << data.hitcount
-                      << ", " << avg_latency << std::endl;
+            if(it->second.instruction.find("s_waitcnt") != std::string::npos)
+            {
+                it = latenciesNoWaitcnt.erase(it);
+            }
+            else
+            {
+                ++it;
+            }
+        }
+
+        for(size_t i = 0; i < instrs.size(); ++i)
+        {
+            std::cout << i << ": \"" << instrs[i].toString(LogLevel::Critical) << "\"" << std::endl;
+            std::cout << instrs[i].getWaitCount() << std::endl;
+        }
+
+        for(const auto& [pc, data] : latenciesNoWaitcnt)
+        {
+            std::cout << data.instruction << std::endl;
+        }
+
+        AssertFatal(latenciesNoWaitcnt.size() == instrs.size(),
+                    ShowValue(instrs.size()),
+                    ShowValue(latenciesNoWaitcnt.size()),
+                    ss.str());
+
+        for(size_t i = 0; i < instrs.size(); ++i)
+        {
+            const auto& instr      = instrs[i];
+            const auto& [pc, data] = *std::next(latenciesNoWaitcnt.begin(), i);
+
+            auto other = instr.toString(LogLevel::Critical);
+
+            // delete from last comma onwards
+            auto pos = other.find_last_of(',');
+            if(pos != std::string::npos)
+            {
+                other = other.substr(0, pos); // rocprofiler-sdk uses hex encoding on offsets
+            }
+
+            AssertFatal(data.instruction.find(other) != std::string::npos,
+                        ShowValue(data.instruction),
+                        ShowValue(other));
         }
     }
-
-    HIP_API_CALL(hipFree(d_ptr));
 
     return 0;
 }
