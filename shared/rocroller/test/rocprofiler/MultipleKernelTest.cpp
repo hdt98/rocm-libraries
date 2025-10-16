@@ -153,6 +153,13 @@ namespace RocprofilerTest
 
     TEST_CASE("rocprofiler kernels with different literals in assembly", "[rocprofiler]")
     {
+        /*
+        The rocprofiler agent uses a dispatch system. Due to the callback-based nature of rocprofiler,
+        this test ensures the correct dispatch is matched to the correct kernel when multiple kernels
+        are launched in sequence.
+        Here, kernels with different "v_mov_b32_e32 v1, 0x<literal>" are launch to distinguish them.
+        */
+
         auto literal    = GENERATE(0xdeadbeef, 0x12345678, 0xabcdef00);
         auto commandArg = GENERATE(7, 21, 331);
 
