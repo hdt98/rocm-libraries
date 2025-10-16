@@ -26,7 +26,7 @@ add_executable(rocroller-tests)
 
 if(ROCROLLER_ENABLE_CATCH AND (ROCROLLER_BUILD_TESTING OR BUILD_TESTING))
     add_executable(rocroller-tests-catch)
-    add_executable(rr-kernel-catch)
+    add_executable(rocroller-tests-rocprofiler)
     # When detecting tests gtest and catch test discovery modules run
     # something like:
     # execute_process(COMMAND ${_TEST_EXECUTOR} "${_TEST_EXECUTABLE}" --gtest_list_tests ${filter})
@@ -44,8 +44,8 @@ if(ROCROLLER_ENABLE_CATCH AND (ROCROLLER_BUILD_TESTING OR BUILD_TESTING))
             PROPERTIES
                 CROSSCOMPILING_EMULATOR "${CMAKE_COMMAND};-E;env;${asan_opts}"
         )
-        rocroller_target_configure_sanitizers(rr-kernel-catch PRIVATE)
-        set_target_properties(rr-kernel-catch
+        rocroller_target_configure_sanitizers(rocroller-tests-rocprofiler PRIVATE)
+        set_target_properties(rocroller-tests-rocprofiler
             PROPERTIES
                 CROSSCOMPILING_EMULATOR "${CMAKE_COMMAND};-E;env;${asan_opts}"
         )
@@ -184,7 +184,7 @@ if(ROCROLLER_ENABLE_TEST_DISCOVERY)
             SKIP_REGULAR_EXPRESSION "[1-9][0-9]* skipped" "[1-9][0-9]* SKIPPED"
         )
         catch_discover_tests(
-            rr-kernel-catch
+            rocroller-tests-rocprofiler
             REPORTER JUnit
             OUTPUT_DIR ${TEST_REPORT_DIR}
             OUTPUT_SUFFIX ".xml"
@@ -247,6 +247,6 @@ if(ROCROLLER_ENABLE_COVERAGE OR BUILD_CODE_COVERAGE)
     target_compile_options(rocroller-tests-catch PRIVATE -fprofile-instr-generate -fcoverage-mapping)
     target_link_options(rocroller-tests-catch PRIVATE -fprofile-instr-generate)
 
-    target_compile_options(rr-kernel-catch PRIVATE -fprofile-instr-generate -fcoverage-mapping)
-    target_link_options(rr-kernel-catch PRIVATE -fprofile-instr-generate)
+    target_compile_options(rocroller-tests-rocprofiler PRIVATE -fprofile-instr-generate -fcoverage-mapping)
+    target_link_options(rocroller-tests-rocprofiler PRIVATE -fprofile-instr-generate)
 endif()

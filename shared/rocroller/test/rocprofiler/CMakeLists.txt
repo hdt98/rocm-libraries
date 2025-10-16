@@ -35,7 +35,7 @@ if(NOT Catch2_FOUND)
     endif()
 endif()
 
-target_link_libraries(rr-kernel-catch
+target_link_libraries(rocroller-tests-rocprofiler
     PRIVATE
         Catch2::Catch2WithMain
         rocprofiler-sdk::rocprofiler-sdk
@@ -46,9 +46,9 @@ target_link_libraries(rr-kernel-catch
         rocroller::common-test-utilities
 )
 
-target_sources(rr-kernel-catch
+target_sources(rocroller-tests-rocprofiler
     PRIVATE
-        "${CMAKE_CURRENT_SOURCE_DIR}/rr_main.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/main.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/agent.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/../catch/TestContext.cpp"
 )
