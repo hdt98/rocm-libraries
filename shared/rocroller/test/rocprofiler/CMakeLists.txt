@@ -22,7 +22,6 @@ find_library(
     PATHS ${ROCM_PATH} /usr
     PATH_SUFFIXES lib lib64)
 
-# Find Catch2
 find_package(Catch2 QUIET)
 if(NOT Catch2_FOUND)
     if(ROCROLLER_ENABLE_FETCH)
@@ -38,15 +37,7 @@ if(NOT Catch2_FOUND)
     endif()
 endif()
 
-# Catch2 version
 add_executable(rr-kernel-catch)
-
-target_sources(rr-kernel-catch
-    PRIVATE
-        "${CMAKE_CURRENT_SOURCE_DIR}/rr_main.cpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/agent.cpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/../catch/TestContext.cpp"
-)
 
 target_link_libraries(rr-kernel-catch
     PRIVATE
@@ -57,4 +48,11 @@ target_link_libraries(rr-kernel-catch
         ${LIBDW_LIBRARY}
         ${BLAS_LIBRARIES}
         rocroller::common-test-utilities
+)
+
+target_sources(rr-kernel-catch
+    PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/rr_main.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/agent.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../catch/TestContext.cpp"
 )
