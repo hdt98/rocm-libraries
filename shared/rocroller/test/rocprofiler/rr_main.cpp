@@ -101,6 +101,8 @@ namespace RocprofilerTest
         context->schedule(k->preamble());
         captureInstrAndSchedule(k->prolog());
 
+        float const constant = 17.0f;
+
         auto kb = [&]() -> Generator<Instruction> {
             Register::ValuePtr s_ptr, s_value;
             co_yield context->argLoader()->getValue("ptr", s_ptr);
@@ -115,7 +117,9 @@ namespace RocprofilerTest
             co_yield context->copier()->copy(v_ptr, s_ptr, "Move pointer");
 
             co_yield v_value->allocate();
-            co_yield context->copier()->copy(v_value, s_value, "Move value");
+            co_yield Expression::generate(v_value, Expression::literal(constant), context);
+            co_yield Expression::generate(
+                v_value, v_value->expression() + s_value->expression(), context);
 
             co_yield context->mem()->storeGlobal(v_ptr, v_value, 0, 4);
         };
@@ -132,9 +136,11 @@ namespace RocprofilerTest
 
         auto d_ptr = make_shared_device<float>(1, 0.0f);
 
+        float const six = 6.0f;
+
         CommandArguments commandArgs = command->createArguments();
         commandArgs.setArgument(ptrTag, ArgumentType::Value, d_ptr.get());
-        commandArgs.setArgument(valTag, ArgumentType::Value, 6.0f);
+        commandArgs.setArgument(valTag, ArgumentType::Value, six);
 
         commandKernel.launchKernel(commandArgs.runtimeArguments());
 
@@ -143,7 +149,7 @@ namespace RocprofilerTest
         float h_result = 0.0f;
         HIP_CHECK(hipMemcpy(&h_result, d_ptr.get(), sizeof(float), hipMemcpyDeviceToHost));
 
-        CHECK(h_result == 6.0f);
+        CHECK(h_result == six + constant);
 
         const auto latencies = rocroller_profiler::getInstructionData();
 
@@ -165,7 +171,7 @@ namespace RocprofilerTest
                      instrs.end());
 
         INFO(ss.str());
-        CHECK(latencies.size() == 7);
+        CHECK(latencies.size() == 8);
         { // First instruction
             const auto& data  = *(latencies.begin());
             const auto& instr = *(instrs.begin());
