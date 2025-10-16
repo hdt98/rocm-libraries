@@ -132,7 +132,6 @@ namespace RocprofilerTest
         };
 
         captureInstrAndSchedule(kb());
-        instrs.push_back({"s_endpgm", {}, {}, {}, ""}); // postamble() too much extra stuff
 
         context->schedule(k->postamble());
         context->schedule(k->amdgpu_metadata());
@@ -180,42 +179,39 @@ namespace RocprofilerTest
 
                 uint32_t expectedResult = testValue + constant;
                 CHECK(h_result == expectedResult);
-                INFO("Result verified: " << h_result << " == " << expectedResult);
             }
 
             const auto latencies = rocroller_profiler::getInstructionData();
 
-            { // Log profiler data
-                std::stringstream ss;
-                ss << "Instruction, Total Latency, Hit Count, Average Latency" << std::endl;
-                for(const auto& data : latencies)
-                {
-                    uint64_t avg_latency = data.hitcount ? (data.latency / data.hitcount) : 0;
-                    ss << "\"" << data.instruction << "\", " << data.latency << ", "
-                       << data.hitcount << ", " << avg_latency << std::endl;
-                }
-                INFO(ss.str());
+            std::stringstream ss;
+            ss << "Instruction, Total Latency, Hit Count, Average Latency" << std::endl;
+            for(const auto& data : latencies)
+            {
+                uint64_t avg_latency = data.hitcount ? (data.latency / data.hitcount) : 0;
+                ss << "\"" << data.instruction << "\", " << data.latency << ", " << data.hitcount
+                   << ", " << avg_latency << std::endl;
             }
+            INFO(ss.str());
+            CHECK(latencies.size() == 8);
 
-            { // Ensure mov with expected constant exists in the profile data
-                bool        found       = false;
-                std::string constantHex = [constant]() {
+            { // Ensure instructions exist in expected quanities in the profile data
+                std::string const instructionsStr = [&]() {
                     std::stringstream ss;
-                    ss << std::hex << constant;
+                    for(const auto& data : latencies)
+                    {
+                        ss << data.instruction << std::endl;
+                    }
                     return ss.str();
                 }();
-                for(const auto& data : latencies)
-                {
-                    if(data.instruction.find("v_mov_b32") != std::string::npos
-                       && data.instruction.find(constantHex) != std::string::npos)
-                    {
-                        CHECK(data.hitcount > 0);
-                        CHECK(data.latency > 0);
-                        found = true;
-                        break;
-                    }
-                }
-                CHECK(found);
+                std::string moveInstr = [&]() {
+                    std::stringstream ss;
+                    ss << "v_mov_b32_e32 v1, 0x" << std::hex << constant;
+                    return ss.str();
+                }();
+                CHECK(2 == countSubstring(instructionsStr, "s_load_dword"));
+                CHECK(1 == countSubstring(instructionsStr, "global_store_dword"));
+                CHECK(1 == countSubstring(instructionsStr, "s_waitcnt lgkmcnt(0)"));
+                CHECK(1 == countSubstring(instructionsStr, moveInstr));
             }
         }
     }
