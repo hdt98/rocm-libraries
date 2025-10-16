@@ -335,32 +335,48 @@ __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
 
     bool debug_prints = false;
 
-    if (debug_prints == true) // debug only
-    {
-        if (threadIdx.x == 0)
-        {
-            // Print the size of A and B vectors
-            printf("A vector size: %d\n", WMMAVecType<srcA_t, kMultiplier>::size);
-            printf("B vector size: %d\n", WMMAVecType<srcB_t, kMultiplier>::size);
+    // if (debug_prints == true) // debug only
+    // {
+    //     if (threadIdx.x == 0)
+    //     {
+    //         // Print the size of A and B vectors
+    //         printf("A vector size: %d\n", WMMAVecType<srcA_t, kMultiplier>::size);
+    //         printf("B vector size: %d\n", WMMAVecType<srcB_t, kMultiplier>::size);
 
         
-            printf("---------- printing a at start of matmul with uint32 union--------- \n");
-            for(int i = 0; i < 8; i++)
-            {
-                union { srcA_t val; uint32_t u32;};
-                val = a[i];
-                printf("a[%d] = %f, hex = 0x%08x\n", i, static_cast<float>(val), u32);
-            }
+    //         printf("---------- printing a at start of matmul with uint32 union--------- \n");
+    //         for(int i = 0; i < 256; i++)
+    //         {
+    //             union { srcA_t val; uint32_t u32;};
+    //             val = a[i];
+    //             printf("a[%d] = %f, hex = 0x%08x\n", i, static_cast<float>(val), u32);
+    //         }
 
-            printf("---------- printing a at start of matmul with uint16 union--------- \n");
-            for(int i = 0; i < 8; i++)
-            {
-                union { srcA_t val; uint16_t u16;};
-                val = a[i];
-                printf("a[%d] = %f, hex = 0x%04x\n", i, static_cast<float>(val), u16);
-            }
-        }
-    }
+    //         printf("---------- printing a at start of matmul with uint16 union--------- \n");
+    //         for(int i = 0; i < 256; i++)
+    //         {
+    //             union { srcA_t val; uint16_t u16;};
+    //             val = a[i];
+    //             printf("a[%d] = %f, hex = 0x%04x\n", i, static_cast<float>(val), u16);
+    //         }
+
+    //         printf("---------- printing b at start of matmul with uint32 union--------- \n");
+    //         for(int i = 0; i < 256; i++)
+    //         {
+    //             union { srcB_t val; uint32_t u32;};
+    //             val = b[i];
+    //             printf("b[%d] = %f, hex = 0x%08x\n", i, static_cast<float>(val), u32);
+    //         }
+
+    //         printf("---------- printing b at start of matmul with uint16 union--------- \n");
+    //         for(int i = 0; i < 256; i++)
+    //         {
+    //             union { srcB_t val; uint16_t u16;};
+    //             val = b[i];
+    //             printf("b[%d] = %f, hex = 0x%04x\n", i, static_cast<float>(val), u16);
+    //         }
+    //     }
+    // }
  
     using srcA_vec      = typename WMMAVecType<srcA_t, kMultiplier>::VecT;
     using srcB_vec      = typename WMMAVecType<srcB_t, kMultiplier>::VecT;
@@ -461,9 +477,9 @@ __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
             // {
             //     auto val_offset1 = a_ptr[offset1];
             //     auto val_offset2 = a_ptr[offset2];
-            //     printf("a_temp[%d][0] = %f, a_temp[%d][1] = %f\n", static_cast<int>(ele), static_cast<float>(val_offset1[0]), static_cast<int>(ele), static_cast<float>(val_offset1[1]));
-            //     printf("a_temp[%d][0] = %f, a_temp[%d][1] = %f\n", static_cast<int>(ele+QUADRANT_SIZE), static_cast<float>(val_offset2[0]), static_cast<int>(ele+QUADRANT_SIZE), static_cast<float>(val_offset2[1]));
-            // }
+            //     printf("thread %d: a_temp[%d][0] = %f, a_temp[%d][1] = %f\n", lIdx, static_cast<int>(ele), static_cast<float>(val_offset1[0]), static_cast<int>(ele), static_cast<float>(val_offset1[1]));
+            //     printf("thread %d: a_temp[%d][0] = %f, a_temp[%d][1] = %f\n", lIdx, static_cast<int>(ele+QUADRANT_SIZE), static_cast<float>(val_offset2[0]), static_cast<int>(ele+QUADRANT_SIZE), static_cast<float>(val_offset2[1]));
+            // }            
 
             a_temp.template AsType<srcA_cast_type>()(ele) = a_ptr[offset1];
             a_temp.template AsType<srcA_cast_type>()(Number<ele + QUADRANT_SIZE>{}) = a_ptr[offset2];
@@ -487,10 +503,18 @@ __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
         static_for<0, QUADRANT_SIZE, 1>{}([&](auto ele) {
             int i = ele;
             int j = ele + QUADRANT_SIZE * 2;
-            int rowIdx = lane % 16;
+            int rowIdx = lane % 16; 
 
             int offset1 = (rowIdx * ROW_SIZE) + (i + (lowHigh * QUADRANT_SIZE));
             int offset2 = (rowIdx * ROW_SIZE) + (j + (lowHigh * QUADRANT_SIZE));
+
+            // if (debug_prints == true && ToIntDim > 1)
+            // {
+            //     auto val_offset1 = b_ptr[offset1];
+            //     auto val_offset2 = b_ptr[offset2];
+            //     printf("thread %d: b_temp[%d][0] = %f, b_temp[%d][1] = %f\n", lIdx, static_cast<int>(ele), static_cast<float>(val_offset1[0]), static_cast<int>(ele), static_cast<float>(val_offset1[1]));
+            //     printf("thread %d: b_temp[%d][0] = %f, b_temp[%d][1] = %f\n", lIdx, static_cast<int>(ele+QUADRANT_SIZE), static_cast<float>(val_offset2[0]), static_cast<int>(ele+QUADRANT_SIZE), static_cast<float>(val_offset2[1]));
+            // }
 
             b_temp.template AsType<srcB_cast_type>()(ele) = b_ptr[offset1];
             b_temp.template AsType<srcB_cast_type>()(Number<ele + QUADRANT_SIZE>{}) = b_ptr[offset2];
@@ -660,23 +684,25 @@ __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
 
     // column-major 16x16 result matrix, 8 elements per thread
     // layoutTransform means bf8/f8 and !same means only applied when mixed fp8 and bf8
-    if constexpr(WMMAVecType<srcA_t, kMultiplier>::layoutTransform && !std::is_same_v<srcA_t, srcB_t>)
-    {
-        static_for<0, 8, 1>{}([&](auto ele) {
+    // if(true)//if constexpr(WMMAVecType<srcA_t, kMultiplier>::layoutTransform && !std::is_same_v<srcA_t, srcB_t>)
+    // {
+        if (threadIdx.x == 0) { printf("writing C with row major assumed\n"); }
+        static_for<0, 8, 1>{}([&](auto ele) { // non transposed and wmma call a, b and see it fail then know there's a instruction issue
             int lowHi = lIdx / 16;
             int col = lIdx % 16;
             int row = (lowHi) * 8 + static_cast<int>(ele);
             c[col + 16 * row] = dst_thread_buf_[Number<ele>{}]; // idea each thread contiguous along column
-        });
-    } else 
-    {
-        static_for<0, 8, 1>{}([&](auto ele) {
-            int lowHi = lIdx / 16;
-            int col = lIdx % 16;
-            int row = (lowHi) * 8 + static_cast<int>(ele);
-            c[col * 16 + row] = dst_thread_buf_[Number<ele>{}]; // idea each thread contiguous along column
-        });
-    }
+        }); // when swap and try to use this, should match but doesn't
+    // } else //default case -- matches Lucas code -- col Major output by default 
+    // {
+    //     if (threadIdx.x == 0) { printf("writing C with col major assumed \n"); }
+    //     static_for<0, 8, 1>{}([&](auto ele) { // transposed and wmma call b, a and see it pass, then recreated current result
+    //         int lowHi = lIdx / 16;
+    //         int col = lIdx % 16;
+    //         int row = (lowHi) * 8 + static_cast<int>(ele);
+    //         c[col * 16 + row] = dst_thread_buf_[Number<ele>{}]; // idea each thread contiguous along column
+    //     });
+    // }
 }
 
 //KO TODO:: Add gfx125 matmul_swizzle_a
@@ -855,25 +881,25 @@ __global__ void matmul_swizzle_a(const srcA_t* a, const srcB_t* b, dst_t* c)
 
     // column-major 16x16 result matrix, 8 elements per thread
     // layoutTransform means bf8/f8 and !same means only applied when mixed fp8 and bf8
-    if constexpr(WMMAVecType<srcA_t, kMultiplier>::layoutTransform && !std::is_same_v<srcA_t, srcB_t>)
-    {
-        if (threadIdx.x == 0) {printf("Col major output of C in matmul_swizzle_a \n");}
+    // if (true)//constexpr(WMMAVecType<srcA_t, kMultiplier>::layoutTransform && !std::is_same_v<srcA_t, srcB_t>)
+    // {
+        if (threadIdx.x == 0) { printf("matmul swizzle writing C with row major assumed\n"); }
         static_for<0, 8, 1>{}([&](auto ele) {
             int lowHi = lIdx / 16;
             int col = lIdx % 16;
             int row = (lowHi) * 8 + static_cast<int>(ele);
             c[col + 16 * row] = dst_thread_buf_[Number<ele>{}]; // idea each thread contiguous along column
         });
-    } else 
-    {
-        if (threadIdx.x == 0) {printf("Row major output of C in matmul_swizzle_a \n");}
-        static_for<0, 8, 1>{}([&](auto ele) {
-            int lowHi = lIdx / 16;
-            int col = lIdx % 16;
-            int row = (lowHi) * 8 + static_cast<int>(ele);
-            c[col * 16 + row] = dst_thread_buf_[Number<ele>{}]; // idea each thread contiguous along column
-        });
-    }
+    // } else 
+    // {
+    //     if (threadIdx.x == 0) { printf("matmul swizzle writing C with col major assumed\n"); }
+    //     static_for<0, 8, 1>{}([&](auto ele) {
+    //         int lowHi = lIdx / 16;
+    //         int col = lIdx % 16;
+    //         int row = (lowHi) * 8 + static_cast<int>(ele);
+    //         c[col * 16 + row] = dst_thread_buf_[Number<ele>{}]; // idea each thread contiguous along column
+    //     });
+    // }
 }
 
 // template <typename src_t, typename dst_t, typename acc_t, index_t acc_num>
@@ -1251,7 +1277,7 @@ struct TestWmma
         Tensor<ADataType> a_m_k(
             f_host_tensor_descriptor(params.M, params.K, params.StrideA, ALayout{}));
         Tensor<BDataType> b_n_k(
-            f_host_tensor_descriptor(params.K, params.N, params.StrideB, BLayout{}));
+            f_host_tensor_descriptor(params.K, params.N, params.StrideB, BLayout{}));            
         Tensor<CDataType> c_m_n_host_result(
             f_host_tensor_descriptor(params.M, params.N, params.StrideC, CLayout{}));
         Tensor<CDataType> c_m_n_device_result(
