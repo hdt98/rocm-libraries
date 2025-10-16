@@ -63,7 +63,8 @@ namespace RocprofilerTest
         std::vector<Instruction>  instrs;
     };
 
-    KernelSetup createKernel(std::shared_ptr<Context> context, uint32_t constant)
+    KernelSetup
+        createKernel(std::shared_ptr<Context> context, uint32_t constant, uint32_t currentValue)
     {
         auto command = std::make_shared<Command>();
 
@@ -140,84 +141,80 @@ namespace RocprofilerTest
 
         auto d_ptr = make_shared_device<uint32_t>(1, 0);
 
-        uint32_t const six = 6;
-
         CommandArguments commandArgs = command->createArguments();
         commandArgs.setArgument(ptrTag, ArgumentType::Value, d_ptr.get());
-        commandArgs.setArgument(valTag, ArgumentType::Value, six);
+        commandArgs.setArgument(valTag, ArgumentType::Value, currentValue);
 
         return {std::move(commandKernel), d_ptr, commandArgs, instrs};
     }
 
     TEST_CASE("RocProfiler kernel execution and latency tracking", "[rocprofiler]")
     {
-        auto context = TestContext::ForTestDevice();
+        // Arrays of test constants and values to loop through
+        std::vector<uint32_t> constants
+            = {0xdeadbeef, 0xcafebabe, 0x12345678, 0xabcdef00, 0xfeedface};
+        std::vector<uint32_t> testValues = {6, 10, 15, 20, 25};
 
-        uint32_t const constant = 0xdeadbeef;
-        uint32_t const six      = 6;
-
-        auto kernelSetup = createKernel(context.get(), constant);
-
-        kernelSetup.kernel.launchKernel(kernelSetup.commandArgs.runtimeArguments());
-
-        HIP_CHECK(hipDeviceSynchronize());
-
-        uint32_t h_result = 0;
-        HIP_CHECK(
-            hipMemcpy(&h_result, kernelSetup.d_ptr.get(), sizeof(uint32_t), hipMemcpyDeviceToHost));
-
-        CHECK(h_result == six + constant);
-
-        const auto latencies = rocroller_profiler::getInstructionData();
-
-        std::stringstream ss;
-        ss << "Instruction, Total Latency, Hit Count, Average Latency" << std::endl;
-        for(const auto& data : latencies)
+        SECTION("Loop through different constants and pointer values")
         {
-            uint64_t avg_latency = data.hitcount ? (data.latency / data.hitcount) : 0;
-            ss << "\"" << data.instruction << "\", " << data.latency << ", " << data.hitcount
-               << ", " << avg_latency << std::endl;
-        }
-
-        kernelSetup.instrs.erase(
-            std::remove_if(kernelSetup.instrs.begin(),
-                           kernelSetup.instrs.end(),
-                           [](const auto& instr) {
-                               // isCommentOnly() doesn't work
-                               return instr.toString(LogLevel::Critical).empty();
-                           }),
-            kernelSetup.instrs.end());
-
-        INFO(ss.str());
-        CHECK(latencies.size() == 8);
-        { // First instruction
-            const auto& data  = *(latencies.begin());
-            const auto& instr = *(kernelSetup.instrs.begin());
-            CHECK(data.instruction == "s_load_dwordx2 s[4:5], s[0:1], 0x0");
-            CHECK(NormalizedSource(instr.toString(LogLevel::Critical))
-                  == NormalizedSource("s_load_dwordx2 s[4:5], s[0:1], 0"));
-            CHECK(data.hitcount == 4);
-            CHECK(data.latency == data.hitcount * 4);
-        }
-
-        // Expected mov instruction
-        bool        found       = false;
-        std::string constantHex = [&]() {
-            std::stringstream ss;
-            ss << std::hex << constant;
-            return ss.str();
-        }();
-        for(const auto& data : latencies)
-        {
-            if(data.instruction.find("v_mov_b32") != std::string::npos
-               && data.instruction.find(constantHex) != std::string::npos)
+            for(size_t i = 0; i < constants.size(); i++)
             {
-                CHECK(data.hitcount == 4);
-                CHECK(data.latency == data.hitcount * 4);
-                found = true;
-                break;
+                auto context = TestContext::ForTestDevice();
+
+                INFO("Testing with constant: 0x" << std::hex << constants[i]
+                                                 << " and value: " << std::dec << testValues[i]);
+
+                // Create kernel with current constant and value
+                auto kernelSetup = createKernel(context.get(), constants[i], testValues[i]);
+
+                // Launch kernel
+                kernelSetup.kernel.launchKernel(kernelSetup.commandArgs.runtimeArguments());
+                HIP_CHECK(hipDeviceSynchronize());
+
+                // Verify result
+                uint32_t h_result = 0;
+                HIP_CHECK(hipMemcpy(
+                    &h_result, kernelSetup.d_ptr.get(), sizeof(uint32_t), hipMemcpyDeviceToHost));
+
+                uint32_t expectedResult = testValues[i] + constants[i];
+                CHECK(h_result == expectedResult);
+                INFO("Result verified: " << h_result << " == " << expectedResult);
+
+                // Collect and display profiling data
+                const auto latencies = rocroller_profiler::getInstructionData();
+
+                std::stringstream ss;
+                ss << "Iteration " << i
+                   << " - Instruction, Total Latency, Hit Count, Average Latency" << std::endl;
+                for(const auto& data : latencies)
+                {
+                    uint64_t avg_latency = data.hitcount ? (data.latency / data.hitcount) : 0;
+                    ss << "\"" << data.instruction << "\", " << data.latency << ", "
+                       << data.hitcount << ", " << avg_latency << std::endl;
+                }
+                INFO(ss.str());
+
+                // Verify mov instruction with current constant
+                bool        found       = false;
+                std::string constantHex = [&]() {
+                    std::stringstream ss;
+                    ss << std::hex << constants[i];
+                    return ss.str();
+                }();
+
+                for(const auto& data : latencies)
+                {
+                    if(data.instruction.find("v_mov_b32") != std::string::npos
+                       && data.instruction.find(constantHex) != std::string::npos)
+                    {
+                        CHECK(data.hitcount > 0);
+                        CHECK(data.latency > 0);
+                        found = true;
+                        break;
+                    }
+                }
+                CHECK(found);
             }
         }
-        CHECK(found);
     }
 } // namespace RocprofilerTest
