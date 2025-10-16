@@ -23,6 +23,7 @@
 #include "agent.hpp"
 
 #include <common/SourceMatcher.hpp>
+#include <common/Utilities.hpp>
 #include <rocRoller/AssemblyKernel.hpp>
 #include <rocRoller/CodeGen/ArgumentLoader.hpp>
 #include <rocRoller/CodeGen/CopyGenerator.hpp>
@@ -77,7 +78,9 @@ namespace RocprofilerTest
 
         const auto one = std::make_shared<Expression::Expression>(1u);
         k->setWorkgroupSize({256, 1, 1});
-        k->setWorkitemCount({std::make_shared<Expression::Expression>(256 * 256), one, one});
+        k->setWorkitemCount({std::make_shared<Expression::Expression>(256 * 256),
+                             one,
+                             one}); // more waves for rocprofiler
 
         k->addArgument({"ptr",
                         {DataType::Float, PointerType::PointerGlobal},
@@ -127,12 +130,10 @@ namespace RocprofilerTest
         commandKernel.setContext(context);
         commandKernel.generateKernel();
 
-        float* d_ptr = nullptr; // TODO: use smart pointers
-        HIP_CHECK(hipMalloc(&d_ptr, sizeof(float)));
-        HIP_CHECK(hipMemset(d_ptr, 0, sizeof(float)));
+        auto d_ptr = make_shared_device<float>(1, 0.0f);
 
         CommandArguments commandArgs = command->createArguments();
-        commandArgs.setArgument(ptrTag, ArgumentType::Value, d_ptr);
+        commandArgs.setArgument(ptrTag, ArgumentType::Value, d_ptr.get());
         commandArgs.setArgument(valTag, ArgumentType::Value, 6.0f);
 
         commandKernel.launchKernel(commandArgs.runtimeArguments());
@@ -140,8 +141,7 @@ namespace RocprofilerTest
         HIP_CHECK(hipDeviceSynchronize());
 
         float h_result = 0.0f;
-        HIP_CHECK(hipMemcpy(&h_result, d_ptr, sizeof(float), hipMemcpyDeviceToHost));
-        HIP_CHECK(hipFree(d_ptr));
+        HIP_CHECK(hipMemcpy(&h_result, d_ptr.get(), sizeof(float), hipMemcpyDeviceToHost));
 
         CHECK(h_result == 6.0f);
 
@@ -173,7 +173,7 @@ namespace RocprofilerTest
             CHECK(NormalizedSource(instr.toString(LogLevel::Critical))
                   == NormalizedSource("s_load_dwordx2 s[4:5], s[0:1], 0"));
             CHECK(data.hitcount == 4);
-            CHECK(data.latency >= data.hitcount * 4);
+            CHECK(data.latency == data.hitcount * 4);
         }
     }
 

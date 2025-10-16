@@ -59,7 +59,6 @@ namespace
     // Use types from the header namespace
     rocroller_profiler::InstructionLatencyMap                       instruction_latencies;
     rocprofiler::sdk::codeobj::disassembly::CodeobjAddressTranslate address_table;
-    bool                                                            instructions_resolved = false;
 
     // Callback for code object loading
     void codeobj_callback(rocprofiler_callback_tracing_record_t record,
@@ -190,9 +189,6 @@ namespace
 
     void resolve_instruction_names()
     {
-        if(instructions_resolved)
-            return;
-
         for(auto& [pc, data] : instruction_latencies)
         {
             auto inst = address_table.get(pc.marker_id, pc.addr);
@@ -201,7 +197,6 @@ namespace
                 data.instruction = inst->inst;
             }
         }
-        instructions_resolved = true;
     }
 
     // Tool finalization - output results
