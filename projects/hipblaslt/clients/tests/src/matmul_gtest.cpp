@@ -44,6 +44,10 @@ namespace
     {
         void operator()(const Arguments& arg)
         {
+            if(!check_case_avail(arg)) {
+                GTEST_SKIP() << "Host Memory not sufficeint\n";
+                return;
+            }
             if(!strcmp(arg.function, "matmul"))
                 testing_matmul(arg);
             else if(!strcmp(arg.function, "matmul_bad_arg"))

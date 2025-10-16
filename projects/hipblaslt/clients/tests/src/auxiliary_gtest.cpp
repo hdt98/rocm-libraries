@@ -42,6 +42,10 @@ namespace
     {
         void operator()(const Arguments& arg)
         {
+            if(!check_case_avail(arg)) {
+                GTEST_SKIP() << "Host Memory not sufficeint\n";
+                return;
+            }
             if(!strcmp(arg.function, "aux_handle_init_bad_arg"))
                 testing_aux_handle_init_bad_arg(arg);
             else if(!strcmp(arg.function, "aux_handle_destroy_bad_arg"))

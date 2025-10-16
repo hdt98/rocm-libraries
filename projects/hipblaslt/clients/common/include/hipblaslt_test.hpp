@@ -50,6 +50,11 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
+#if defined(WIN32)
+#include <windows.h>
+#else
+#include <sys/sysinfo.h>
+#endif
 
 #ifdef GOOGLE_TEST
 #define CHECK_SUCCESS(ERROR) ASSERT_EQ((ERROR), true)
@@ -174,6 +179,68 @@ inline void hipblaslt_expect_status(hipblasStatus_t status, hipblasStatus_t expe
 
 #define CHECK_HIPBLASLT_ERROR2(STATUS) EXPECT_HIPBLAS_STATUS(STATUS, HIPBLAS_STATUS_SUCCESS)
 #define CHECK_HIPBLASLT_ERROR(STATUS) CHECK_HIPBLASLT_ERROR2(STATUS)
+
+inline size_t getDataTypeSize(hipDataType type)
+{
+    switch(type)
+    {
+        case HIP_R_32F: return 4;
+        case HIP_R_64F: return 8;
+        case HIP_R_16F:
+        case HIP_R_16BF: return 2;
+        case HIP_R_8I: return 1;
+        case HIP_R_32I: return 4;
+        case HIP_R_8F_E4M3_FNUZ:
+        case HIP_R_8F_E5M2_FNUZ:
+        case HIP_R_8F_E4M3:
+        case HIP_R_8F_E5M2: return 1;
+        case HIP_R_6F_E2M3_EXT:
+        case HIP_R_6F_E3M2_EXT: return 1;
+        case HIP_R_4F_E2M1_EXT: return 1;
+        default: return 0;
+    }
+}
+
+inline double get_avail_mem() {
+    double totalGB = 0.0, freeGB = 0.0;
+#if defined(WIN32)
+    MEMORYSTATUSEX statex;
+    statex.dwLength = sizeof(statex);
+    if (GlobalMemoryStatusEx(&statex)) {
+        totalGB = statex.ullTotalPhys / (1024.0 * 1024.0 * 1024.0);
+        freeGB  = statex.ullAvailPhys / (1024.0 * 1024.0 * 1024.0);
+    } else {
+        std::cerr << "GlobalMemoryStatusEx() failed\n";
+        return -1;
+    }
+
+#else
+    struct sysinfo info;
+    if (sysinfo(&info) == 0) {
+        totalGB = info.totalram * info.mem_unit / (1024.0 * 1024.0 * 1024.0);
+        freeGB  = info.freeram  * info.mem_unit / (1024.0 * 1024.0 * 1024.0);
+    } else {
+        std::cerr << "sysinfo() failed\n";
+        return -1;
+    }
+#endif
+    //hipblaslt_cout << "Host Total RAM: " << totalGB << " GB" << std::endl;
+    //hipblaslt_cout << "Host Free RAM:  " << freeGB  << " GB" << std::endl;
+    return freeGB;
+}
+
+inline bool check_case_avail(const Arguments& arg) {
+    size_t bytesA = arg.M[0] * arg.K[0] * getDataTypeSize(arg.a_type);
+    size_t bytesB = arg.K[0] * arg.N[0] * getDataTypeSize(arg.b_type);
+    size_t bytesC = arg.M[0] * arg.N[0] * getDataTypeSize(arg.c_type);
+    size_t bytesD = arg.M[0] * arg.N[0] * getDataTypeSize(arg.d_type);
+
+    double totalGB = (bytesA + bytesB + bytesC + bytesD) / (1024.0 * 1024.0 * 1024.0);
+
+    if(totalGB > get_avail_mem())
+        return false;
+    return true;
+}
 
 #ifdef GOOGLE_TEST
 
