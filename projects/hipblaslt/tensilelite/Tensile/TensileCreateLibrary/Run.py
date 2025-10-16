@@ -317,15 +317,15 @@ def writeSolutionsAndKernels(
             assemblyTmpPath,
             compress,
         )
-        # buildSourceCodeObjectFiles(
-        #     srcToolchain.compiler,
-        #     srcToolchain.bundler,
-        #     destLibPath,
-        #     objectTmpPath,
-        #     outputPath,
-        #     srcKernelFile,
-        #     cmdlineArchs,
-        # )
+        buildSourceCodeObjectFiles(
+            srcToolchain.compiler,
+            srcToolchain.bundler,
+            destLibPath,
+            objectTmpPath,
+            outputPath,
+            srcKernelFile,
+            cmdlineArchs,
+        )
 
     return codeObjectFiles, numKernels
 
