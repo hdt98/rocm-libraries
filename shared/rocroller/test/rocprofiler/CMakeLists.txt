@@ -1,8 +1,6 @@
 # Copyright Advanced Micro Devices, Inc., or its affiliates.
 # SPDX-License-Identifier: MIT
 
-enable_language(HIP)
-
 find_package(rocprofiler-sdk REQUIRED)
 find_package(rocprofiler-sdk-roctx REQUIRED)
 find_package(
@@ -36,8 +34,6 @@ if(NOT Catch2_FOUND)
         message(FATAL_ERROR "Failed to find Catch2")
     endif()
 endif()
-
-add_executable(rr-kernel-catch)
 
 target_link_libraries(rr-kernel-catch
     PRIVATE
