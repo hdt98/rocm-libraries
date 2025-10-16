@@ -92,7 +92,8 @@ rocsparse_status rocsparse::csritilu0_preprocess_template(rocsparse_handle     h
     }
     if(nnz_ == 0)
     {
-        RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_zero_pivot);
+        // RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_zero_pivot);
+        return rocsparse_status_zero_pivot;
     }
 
     RETURN_IF_ROCSPARSE_ERROR((rocsparse::preprocess_dispatch<I, J>(alg_,

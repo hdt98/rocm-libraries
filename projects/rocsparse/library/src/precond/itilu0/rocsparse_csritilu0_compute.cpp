@@ -95,7 +95,8 @@ namespace rocsparse
         if(nnz_ == 0)
         {
             nmaxiter_[0] = 0;
-            RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_zero_pivot);
+            // RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_zero_pivot);
+            return rocsparse_status_zero_pivot;
         }
         static constexpr J nfreeiter = 0;
         RETURN_IF_ROCSPARSE_ERROR((rocsparse::compute_dispatch<T, I, J>(alg_,

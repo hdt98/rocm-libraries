@@ -70,6 +70,8 @@ namespace rocsparse
         const bool mul = info_C->csrgemm_info->mul;
         const bool add = info_C->csrgemm_info->add;
 
+        std::cout << "mul: " << mul << " add: " << add << " nnz_D: " << nnz_D << std::endl;
+
         if(mul == false && add == true)
         {
             RETURN_IF_ROCSPARSE_ERROR(rocsparse::csrgemm_scal_core(handle,
@@ -192,6 +194,8 @@ rocsparse_status rocsparse::csrgemm_template(rocsparse_handle          handle,
 
     const bool mul = info_C->csrgemm_info->mul;
     const bool add = info_C->csrgemm_info->add;
+
+    std::cout << "csrgemm_template mul: " << mul << " add: " << add << std::endl;
 
     if(mul == false && add == true)
     {

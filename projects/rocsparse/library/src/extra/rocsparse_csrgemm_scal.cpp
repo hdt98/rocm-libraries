@@ -48,6 +48,8 @@ rocsparse_status rocsparse::csrgemm_scal_quickreturn(rocsparse_handle          h
 {
     ROCSPARSE_ROUTINE_TRACE;
 
+    std::cout << "AAAAA" << std::endl;
+
     if(m == 0 || n == 0 || nnz_D == 0)
     {
         return rocsparse_status_success;
@@ -96,6 +98,8 @@ rocsparse_status rocsparse::csrgemm_scal_core(rocsparse_handle          handle,
 #define CSRGEMM_DIM 1024
     dim3 csrgemm_blocks((nnz_D - 1) / CSRGEMM_DIM + 1);
     dim3 csrgemm_threads(CSRGEMM_DIM);
+
+    std::cout << "descr_D->base: " << descr_D->base << " descr_C->base: " << descr_C->base << std::endl;
 
     // Copy column entries, if D != C
     if(csr_col_ind_C != csr_col_ind_D)

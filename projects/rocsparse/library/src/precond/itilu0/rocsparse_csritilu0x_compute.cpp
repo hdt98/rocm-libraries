@@ -109,7 +109,8 @@ rocsparse_status rocsparse::csritilu0x_compute_template(rocsparse_handle     han
 
     if(nnz_ == 0)
     {
-        RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_zero_pivot);
+        // RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_zero_pivot);
+        return rocsparse_status_zero_pivot;
     }
 
     if(ldir_ != rocsparse_direction_row)

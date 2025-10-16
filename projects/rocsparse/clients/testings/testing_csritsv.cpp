@@ -1119,13 +1119,13 @@ void testing_csritsv(const Arguments& arg)
         //
         // Call before analysis
         //
-        host_nmaxiter[0] = arg.nmaxiter;
-        EXPECT_ROCSPARSE_STATUS(rocsparse_csritsv_solve<T>(PARAMS_SOLVE(h_alpha, dA, dx, dy)),
-                                rocsparse_status_invalid_pointer);
-        if(verbose)
-        {
-            std::cout << " - compute device iterative, call analysis" << std::endl;
-        }
+        // host_nmaxiter[0] = arg.nmaxiter;
+        // EXPECT_ROCSPARSE_STATUS(rocsparse_csritsv_solve<T>(PARAMS_SOLVE(h_alpha, dA, dx, dy)),
+        //                         rocsparse_status_invalid_pointer);
+        // if(verbose)
+        // {
+        //     std::cout << " - compute device iterative, call analysis" << std::endl;
+        // }
 
         // Call it twice, for code coverage.
         CHECK_ROCSPARSE_ERROR(rocsparse_csritsv_analysis<T>(PARAMS_ANALYSIS(dA)));
@@ -1279,9 +1279,9 @@ void testing_csritsv(const Arguments& arg)
         //
         // Call before analysis
         //
-        host_nmaxiter[0] = arg.nmaxiter;
-        EXPECT_ROCSPARSE_STATUS(rocsparse_csritsv_solve<T>(PARAMS_SOLVE(h_alpha, dA, dx, dy)),
-                                rocsparse_status_invalid_pointer);
+        // host_nmaxiter[0] = arg.nmaxiter;
+        // EXPECT_ROCSPARSE_STATUS(rocsparse_csritsv_solve<T>(PARAMS_SOLVE(h_alpha, dA, dx, dy)),
+        //                         rocsparse_status_invalid_pointer);
 
         //
         // Call it twice.

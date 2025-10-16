@@ -95,7 +95,8 @@ rocsparse_status rocsparse::csritilu0x_buffer_size_template(rocsparse_handle    
     if(nnz_ == 0)
     {
         *buffer_size_ = 0;
-        RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_zero_pivot);
+        // RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_zero_pivot);
+        return rocsparse_status_zero_pivot;
     }
 
     RETURN_IF_ROCSPARSE_ERROR((rocsparse::buffer_size_dispatch<I, J>(alg_,

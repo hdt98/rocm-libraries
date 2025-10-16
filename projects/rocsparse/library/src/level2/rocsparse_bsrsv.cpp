@@ -95,7 +95,8 @@ try
                                                hipMemcpyDeviceToDevice,
                                                stream));
 
-            RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_zero_pivot);
+            return rocsparse_status_zero_pivot;
+            //RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_zero_pivot);
         }
     }
     else
@@ -115,7 +116,8 @@ try
         }
         else
         {
-            RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_zero_pivot);
+            return rocsparse_status_zero_pivot;
+            //RETURN_IF_ROCSPARSE_ERROR(rocsparse_status_zero_pivot);
         }
     }
 

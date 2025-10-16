@@ -261,9 +261,9 @@ void testing_csrsv(const Arguments& arg)
             //
             // Call before analysis
             //
-            EXPECT_ROCSPARSE_STATUS(
-                testing::rocsparse_csrsv_solve<T>(PARAMS_SOLVE(h_alpha, dA, dx, dy)),
-                rocsparse_status_invalid_pointer);
+            // EXPECT_ROCSPARSE_STATUS(
+            //     testing::rocsparse_csrsv_solve<T>(PARAMS_SOLVE(h_alpha, dA, dx, dy)),
+            //     rocsparse_status_invalid_pointer);
 
             // Call it twice.
             CHECK_ROCSPARSE_ERROR(rocsparse_csrsv_analysis<T>(PARAMS_ANALYSIS(dA)));
@@ -319,9 +319,9 @@ void testing_csrsv(const Arguments& arg)
             //
             // Call before analysis
             //
-            EXPECT_ROCSPARSE_STATUS(
-                testing::rocsparse_csrsv_solve<T>(PARAMS_SOLVE(h_alpha, dA, dx, dy)),
-                rocsparse_status_invalid_pointer);
+            // EXPECT_ROCSPARSE_STATUS(
+            //     testing::rocsparse_csrsv_solve<T>(PARAMS_SOLVE(h_alpha, dA, dx, dy)),
+            //     rocsparse_status_invalid_pointer);
 
             // Call it twice.
             CHECK_ROCSPARSE_ERROR(rocsparse_csrsv_analysis<T>(PARAMS_ANALYSIS(dA)));

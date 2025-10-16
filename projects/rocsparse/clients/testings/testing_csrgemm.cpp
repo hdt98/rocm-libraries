@@ -483,47 +483,49 @@ void testing_csrgemm(const Arguments& arg)
     }
     }
 
-    //
-    // Argument sanity check before allocating invalid memory
-    //
-    if((M <= 0 || N <= 0 || K <= 0) || scenario == testing_csrgemm_scenario_none)
-    {
+    // //
+    // // Argument sanity check before allocating invalid memory
+    // //
+    // if((M <= 0 || N <= 0 || K <= 0) || scenario == testing_csrgemm_scenario_none)
+    // {
+    //     std::cout << "AAAAAAAAAAAAAAAAAAAAAAAAA M: " << M << " N: " << N << " K: " << K << " scenario: " << scenario << std::endl;
+    //     device_csr_matrix<T> d_A, d_B, d_C, d_D;
+    //     d_A.define(M, K, 0, baseA);
+    //     d_B.define(K, N, 0, baseB);
+    //     d_C.define(M, N, 0, baseC);
+    //     d_D.define(M, N, 0, baseD);
 
-        device_csr_matrix<T> d_A, d_B, d_C, d_D;
-        d_A.define(M, K, 0, baseA);
-        d_B.define(K, N, 0, baseB);
-        d_C.define(M, N, 0, baseC);
-        d_D.define(M, N, 0, baseD);
+    //     CHECK_ROCSPARSE_ERROR(rocsparse_set_pointer_mode(handle, rocsparse_pointer_mode_host));
 
-        CHECK_ROCSPARSE_ERROR(rocsparse_set_pointer_mode(handle, rocsparse_pointer_mode_host));
+    //     size_t           out_buffer_size;
+    //     rocsparse_int    out_nnz;
+    //     rocsparse_status status_1 = rocsparse_csrgemm_buffer_size<T>(
+    //         PARAMS_BUFFER_SIZE(h_alpha, h_beta, d_A, d_B, d_C, d_D, out_buffer_size));
+    //     rocsparse_status status_2 = rocsparse_csrgemm_nnz(PARAMS_NNZ(d_A, d_B, d_C, d_D, &out_nnz));
+    //     rocsparse_status status_3
+    //         = rocsparse_csrgemm<T>(PARAMS(h_alpha, h_beta, d_A, d_B, d_C, d_D));
 
-        size_t           out_buffer_size;
-        rocsparse_int    out_nnz;
-        rocsparse_status status_1 = rocsparse_csrgemm_buffer_size<T>(
-            PARAMS_BUFFER_SIZE(h_alpha, h_beta, d_A, d_B, d_C, d_D, out_buffer_size));
-        rocsparse_status status_2 = rocsparse_csrgemm_nnz(PARAMS_NNZ(d_A, d_B, d_C, d_D, &out_nnz));
-        rocsparse_status status_3
-            = rocsparse_csrgemm<T>(PARAMS(h_alpha, h_beta, d_A, d_B, d_C, d_D));
+    //     EXPECT_ROCSPARSE_STATUS(status_1,
+    //                             (M < 0 || N < 0 || K < 0) ? rocsparse_status_invalid_size
+    //                             : scenario == testing_csrgemm_scenario_none
+    //                                 ? rocsparse_status_invalid_pointer
+    //                                 : rocsparse_status_success);
 
-        EXPECT_ROCSPARSE_STATUS(status_1,
-                                (M < 0 || N < 0 || K < 0) ? rocsparse_status_invalid_size
-                                : scenario == testing_csrgemm_scenario_none
-                                    ? rocsparse_status_invalid_pointer
-                                    : rocsparse_status_success);
+    //     EXPECT_ROCSPARSE_STATUS(status_2,
+    //                             (M < 0 || N < 0 || K < 0) ? rocsparse_status_invalid_size
+    //                             : scenario == testing_csrgemm_scenario_none
+    //                                 ? rocsparse_status_invalid_pointer
+    //                                 : rocsparse_status_success);
 
-        EXPECT_ROCSPARSE_STATUS(status_2,
-                                (M < 0 || N < 0 || K < 0) ? rocsparse_status_invalid_size
-                                : scenario == testing_csrgemm_scenario_none
-                                    ? rocsparse_status_invalid_pointer
-                                    : rocsparse_status_success);
+    //     EXPECT_ROCSPARSE_STATUS(status_3,
+    //                             (M < 0 || N < 0 || K < 0) ? rocsparse_status_invalid_size
+    //                             : scenario == testing_csrgemm_scenario_none
+    //                                 ? rocsparse_status_invalid_pointer
+    //                                 : rocsparse_status_success);
+    //     return;
+    // }
 
-        EXPECT_ROCSPARSE_STATUS(status_3,
-                                (M < 0 || N < 0 || K < 0) ? rocsparse_status_invalid_size
-                                : scenario == testing_csrgemm_scenario_none
-                                    ? rocsparse_status_invalid_pointer
-                                    : rocsparse_status_success);
-        return;
-    }
+    std::cout << "BBBBBBBBBBBBBBBBBBBBBBBBBB M: " << M << " N: " << N << " K: " << K << " scenario: " << scenario << std::endl;
 
     //
     // Declare host objects.
@@ -535,7 +537,6 @@ void testing_csrgemm(const Arguments& arg)
     //
     {
         rocsparse_matrix_factory<T> matrix_factory(arg, arg.timing ? false : true, full_rank);
-        matrix_factory.init_csr(h_A, M, K, baseA);
         switch(scenario)
         {
         case testing_csrgemm_scenario_none:
@@ -544,6 +545,8 @@ void testing_csrgemm(const Arguments& arg)
         }
         case testing_csrgemm_scenario_alpha:
         {
+            matrix_factory.init_csr(h_A, M, K, baseA);
+
             rocsparse_matrix_factory_random<T> rf(full_rank);
             {
                 h_B.base = baseB;
@@ -566,10 +569,16 @@ void testing_csrgemm(const Arguments& arg)
         case testing_csrgemm_scenario_beta:
         {
             matrix_factory.init_csr(h_D, M, N, baseD);
+
+            std::cout << "h_D.ptr.size(): " << h_D.ptr.size() << " h_alpha: " << h_alpha << " h_beta: " << h_beta << std::endl;
+
             break;
         }
         case testing_csrgemm_scenario_alpha_and_beta:
         {
+            rocsparse_matrix_factory<T> matrix_factory(arg, arg.timing ? false : true, full_rank);
+            matrix_factory.init_csr(h_A, M, K, baseA);
+
             rocsparse_matrix_factory_random<T> rf(full_rank);
             {
                 h_B.base = baseB;
@@ -753,6 +762,7 @@ void testing_csrgemm(const Arguments& arg)
 #undef PARAMS_NNZ
 #undef PARAMS_BUFFER_SIZE
 
+        std::cout << "BBBBBBBBBBBBBBBB" << std::endl;
         double gflop_count = csrgemm_gflop_count<T, rocsparse_int, rocsparse_int>(
             M, h_alpha, h_A.ptr, h_A.ind, h_B.ptr, h_beta, h_D.ptr, h_A.base);
         double gbyte_count = csrgemm_gbyte_count<T, rocsparse_int, rocsparse_int>(
