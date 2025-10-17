@@ -1,0 +1,88 @@
+# Trigger External Workflow
+#
+# This workflow generates a GitHub App token and triggers a workflow dispatch
+# on an external repository using repository dispatch events.
+
+name: Trigger External Workflow
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr-number:
+        description: "PR number to pass to external workflow"
+        required: true
+        type: string
+
+jobs:
+  trigger:
+    runs-on: azure-vms
+    # Security: Only run on main repository, not forks
+    if: github.repository == 'AMD-ROCm/rocm-libraries'
+    steps:
+      - name: Generate GitHub App token
+        id: generate-token
+        uses: actions/create-github-app-token@v2.1.1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          owner: ${{ secrets.EXTERNAL_ORG }}
+          repositories: ${{ secrets.EXTERNAL_REPO }}
+
+      - name: Generate unique tracking ID
+        id: tracking
+        run: |
+          # Generate unique tracking ID for this trigger
+          tracking_id="${{ github.run_id }}-$(date +%s)-$RANDOM"
+          echo "tracking_id=$tracking_id" >> $GITHUB_OUTPUT
+          echo "📋 Tracking ID: $tracking_id"
+
+      - name: Trigger external workflow
+        env:
+          TARGET_REPO: "${{ secrets.EXTERNAL_ORG }}/${{ secrets.EXTERNAL_REPO }}"
+          GITHUB_TOKEN: ${{ steps.generate-token.outputs.token }}
+          TRACKING_ID: ${{ steps.tracking.outputs.tracking_id }}
+        run: |
+          echo "🚀 Triggering external workflow"
+          echo "📋 PR Number: ${{ github.event.inputs.pr-number }}"
+          echo "🔍 Tracking ID: $TRACKING_ID"
+
+          # Send repository dispatch with unique tracking ID
+          response=$(curl -s -w "%{http_code}" -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            https://api.github.com/repos/$TARGET_REPO/dispatches \
+            -d "{
+              \"event_type\": \"run-external-workflow\",
+              \"client_payload\": {
+                \"tracking_id\": \"$TRACKING_ID\",
+                \"pr_number\": \"${{ github.event.inputs.pr-number }}\",
+                \"source_repo\": \"${{ github.repository }}\",
+                \"source_org\": \"${{ github.repository_owner }}\",
+                \"source_ref\": \"${{ github.ref }}\"
+              }
+            }")
+
+          # Extract HTTP status code
+          http_code="${response: -3}"
+
+          if [ "$http_code" = "204" ]; then
+            echo "✅ Successfully triggered external workflow"
+            echo "🔗 External workflow has been notified"
+          else
+            echo "❌ Failed to trigger external workflow (HTTP $http_code)"
+            exit 1
+          fi
+            exit 1
+          fi
+
+          # Extract HTTP status code
+          http_code="${response: -3}"
+
+          if [ "$http_code" = "204" ]; then
+            echo "✅ Successfully triggered external workflow"
+            echo "🔗 External workflow has been notified"
+          else
+            echo "❌ Failed to trigger external workflow (HTTP $http_code)"
+            exit 1
+          fi
