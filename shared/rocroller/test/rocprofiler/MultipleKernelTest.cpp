@@ -218,4 +218,107 @@ namespace RocprofilerTest
             }
         }
     }
+
+    KernelSetup createSimpleMovKernel(std::shared_ptr<Context> context, uint32_t literal)
+    {
+        auto command = std::make_shared<Command>();
+
+        auto k = context->kernel();
+
+        k->setKernelDimensions(1);
+
+        const auto one = std::make_shared<Expression::Expression>(1u);
+        k->setWorkgroupSize({256, 1, 1});
+        // more waves for rocprofiler, see Troubleshooting in
+        // https://rocm.docs.amd.com/projects/rocprofiler-sdk/en/amd-mainline/how-to/using-thread-trace.html#troubleshooting
+        k->setWorkitemCount({std::make_shared<Expression::Expression>(256 * 256), one, one});
+
+        std::vector<Instruction> instrs;
+
+        const auto captureInstrAndSchedule = [&](auto gen) {
+            for(auto instr : gen)
+            {
+                context->schedule(instr);
+                instrs.push_back(std::move(instr));
+            }
+        };
+
+        context->schedule(k->preamble());
+        captureInstrAndSchedule(k->prolog());
+
+        auto kb = [&]() -> Generator<Instruction> {
+            auto v_value = Register::Value::Placeholder(
+                context, Register::Type::Vector, DataType::UInt32, 1);
+
+            co_yield v_value->allocate();
+            co_yield Expression::generate(v_value, Expression::literal(literal), context);
+        };
+
+        captureInstrAndSchedule(kb());
+
+        context->schedule(k->postamble());
+        context->schedule(k->amdgpu_metadata());
+
+        CommandKernel commandKernel;
+        commandKernel.setContext(context);
+        commandKernel.generateKernel();
+
+        CommandArguments commandArgs = command->createArguments();
+
+        return {std::move(commandKernel), nullptr, commandArgs, instrs};
+    }
+
+    TEST_CASE("rocprofiler agent race conditions", "[rocprofiler]")
+    {
+        /*
+        There were race conditions between the dispatch and shader data callbacks.
+        This test ensures that the fix works as intended.
+        Multiple simple kernels with different literals are launched various orders.
+        Ensures the profiler returns instructions from the last launched kernel.
+        */
+
+        std::vector<uint32_t>    literals = {0xdeadbeef, 0x12345678, 0xabcdef00};
+        std::vector<KernelSetup> kernelSetups;
+
+        for(uint32_t literal : literals)
+        {
+            std::string const testName = fmt::format("simple_mov_0x{:x}", literal);
+            auto              context  = TestContext::ForTestDevice({}, testName);
+            kernelSetups.push_back(createSimpleMovKernel(context.get(), literal));
+        }
+
+        SECTION("Order 1")
+        {
+            std::vector<size_t> order = {0, 1, 2, 1};
+            for(size_t idx : order)
+            {
+                kernelSetups[idx].kernel.launchKernel(
+                    kernelSetups[idx].commandArgs.runtimeArguments());
+            }
+            HIP_CHECK(hipDeviceSynchronize());
+            const auto        latencies  = rocroller_profiler::getInstructionData();
+            std::string const literalHex = fmt::format("0x{:x}", literals[order.back()]);
+            INFO("Expecting literal: " << literalHex);
+            REQUIRE(latencies.size() == 2);
+            CHECK(1 == countSubstring(latencies[0].instruction, literalHex));
+            CHECK(latencies[1].instruction == "s_endpgm");
+        }
+
+        SECTION("Order 2")
+        {
+            std::vector<size_t> order = {1, 2};
+            for(size_t idx : order)
+            {
+                kernelSetups[idx].kernel.launchKernel(
+                    kernelSetups[idx].commandArgs.runtimeArguments());
+            }
+            HIP_CHECK(hipDeviceSynchronize());
+            const auto        latencies  = rocroller_profiler::getInstructionData();
+            std::string const literalHex = fmt::format("0x{:x}", literals[order.back()]);
+            INFO("Expecting literal: " << literalHex);
+            REQUIRE(latencies.size() == 2);
+            CHECK(1 == countSubstring(latencies[0].instruction, literalHex));
+            CHECK(latencies[1].instruction == "s_endpgm");
+        }
+    }
 } // namespace RocprofilerTest
