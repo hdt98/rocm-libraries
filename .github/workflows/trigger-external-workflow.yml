@@ -16,8 +16,6 @@ on:
 jobs:
   trigger:
     runs-on: azure-vms
-    # Security: Only run on main repository, not forks
-    if: github.repository == 'AMD-ROCm/rocm-libraries'
     steps:
       - name: Generate GitHub App token
         id: generate-token
@@ -73,16 +71,5 @@ jobs:
             echo "❌ Failed to trigger external workflow (HTTP $http_code)"
             exit 1
           fi
-            exit 1
-          fi
-
-          # Extract HTTP status code
-          http_code="${response: -3}"
-
-          if [ "$http_code" = "204" ]; then
-            echo "✅ Successfully triggered external workflow"
-            echo "🔗 External workflow has been notified"
-          else
-            echo "❌ Failed to trigger external workflow (HTTP $http_code)"
             exit 1
           fi
