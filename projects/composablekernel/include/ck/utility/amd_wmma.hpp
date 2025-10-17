@@ -977,20 +977,20 @@ struct intrin_wmma_f16_16x16x128_bf8bf8<16, 16>
     }
 };
 
-template <index_t MPerWave, index_t NPerWave, bool neg_a, bool neg_b>
+template <index_t MPerWave, index_t NPerWave>
 struct intrin_wmma_f32_16x16x4_f32;
 
-template <bool neg_a, bool neg_b>
-struct intrin_wmma_f32_16x16x4_f32<16, 16, neg_a, neg_b>
+template <>
+struct intrin_wmma_f32_16x16x4_f32<16, 16>
 {
     template <class FloatC>
     __device__ static void Run(const float2_t& reg_a, const float2_t& reg_b, FloatC& reg_c)
     {
 #if defined(__gfx125__)
         reg_c.template AsType<float8_t>()(Number<0>{}) =
-            __builtin_amdgcn_wmma_f32_16x16x4_f32(neg_a,
+            __builtin_amdgcn_wmma_f32_16x16x4_f32(0,
                                                   bit_cast<float2_t>(reg_a),
-                                                  neg_b,
+                                                  0,
                                                   bit_cast<float2_t>(reg_b),
                                                   0,
                                                   reg_c.template AsType<float8_t>()[Number<0>{}],
@@ -1004,21 +1004,21 @@ struct intrin_wmma_f32_16x16x4_f32<16, 16, neg_a, neg_b>
     }
 };
 
-template <index_t MPerWave, index_t NPerWave, bool neg_a, bool neg_b>
+template <index_t MPerWave, index_t NPerWave>
 struct intrin_wmma_f64_16x16x4_f64;
 
-template <bool neg_a, bool neg_b>
-struct intrin_wmma_f64_16x16x4_f64<16, 16, neg_a, neg_b>
+template <>
+struct intrin_wmma_f64_16x16x4_f64<16, 16>
 {
     template <class FloatC>
     __device__ static void Run(const double2_t& reg_a, const double2_t& reg_b, FloatC& reg_c)
     {
 #if defined(__gfx1251__)
         reg_c.template AsType<double8_t>()(Number<0>{}) =
-            __builtin_amdgcn_wmma_f64_16x16x4_f64(neg_b,
-                                                  bit_cast<double2_t>(reg_b),
-                                                  neg_a,
+            __builtin_amdgcn_wmma_f64_16x16x4_f64(0,
                                                   bit_cast<double2_t>(reg_a),
+                                                  0,
+                                                  bit_cast<double2_t>(reg_b),
                                                   0,
                                                   reg_c.template AsType<double8_t>()[Number<0>{}]);
 #else
