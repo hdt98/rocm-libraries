@@ -58,11 +58,11 @@ struct Batchnorm3dTestCase
     int64_t w;
     unsigned int seed;
 
-    // friend std::ostream& operator<<(std::ostream& ss, const Batchnorm3dTestCase& tc)
-    // {
-    //     return ss << "(n:" << tc.n << " c:" << tc.c << " d:" << tc.d << " h:" << tc.h
-    //               << " w:" << tc.w << " seed:" << tc.seed << ")";
-    // }
+    friend std::ostream& operator<<(std::ostream& ss, const Batchnorm3dTestCase& tc)
+    {
+        return ss << "(n:" << tc.n << " c:" << tc.c << " d:" << tc.d << " h:" << tc.h
+                  << " w:" << tc.w << " seed:" << tc.seed << ")";
+    }
 
     std::vector<int64_t> getDims() const
     {
@@ -83,10 +83,8 @@ class BatchnormForwardTraining : public ::testing::TestWithParam<TestCaseType>
             , yTensor(dims, layout)
             , scaleTensor(derivedDims)
             , biasTensor(derivedDims)
-            , prevRunningMeanTensor(derivedDims)
-            , prevRunningVarianceTensor(derivedDims)
-            , nextRunningMeanTensor(derivedDims)
-            , nextRunningVarianceTensor(derivedDims)
+            , runningMeanTensor(derivedDims)
+            , runningVarianceTensor(derivedDims)
             , meanTensor(derivedDims)
             , invVarianceTensor(derivedDims)
             , momentumTensor({1})
@@ -103,17 +101,19 @@ class BatchnormForwardTraining : public ::testing::TestWithParam<TestCaseType>
             biasTensor.fillWithRandomValues(
                 static_cast<IntermediateType>(0.0f), static_cast<IntermediateType>(1.0f), seed);
 
-            prevRunningMeanTensor.fillWithRandomValues(
+            // Initialize running statistics with random values
+            // These simulate the state from a previous training iteration
+            // In real training, this same buffer is reused across iterations, with MIOpen
+            // updating it in-place: new = (1-momentum)*old + momentum*batch_stat
+            runningMeanTensor.fillWithRandomValues(
                 static_cast<IntermediateType>(0.0f), static_cast<IntermediateType>(1.0f), seed);
 
-            prevRunningVarianceTensor.fillWithRandomValues(
+            runningVarianceTensor.fillWithRandomValues(
                 static_cast<IntermediateType>(0.1f), static_cast<IntermediateType>(1.0f), seed);
 
             // Initialize output tensors with zeros
             meanTensor.fillWithValue(static_cast<IntermediateType>(0.0f));
             invVarianceTensor.fillWithValue(static_cast<IntermediateType>(0.0f));
-            nextRunningMeanTensor.fillWithValue(static_cast<IntermediateType>(0.0f));
-            nextRunningVarianceTensor.fillWithValue(static_cast<IntermediateType>(0.0f));
 
             // Set momentum and epsilon values
             momentumTensor.memory().hostData()[0] = static_cast<IntermediateType>(0.1f);
@@ -125,10 +125,8 @@ class BatchnormForwardTraining : public ::testing::TestWithParam<TestCaseType>
         PinnedTensor<InputType> yTensor;
         PinnedTensor<IntermediateType> scaleTensor;
         PinnedTensor<IntermediateType> biasTensor;
-        PinnedTensor<IntermediateType> prevRunningMeanTensor;
-        PinnedTensor<IntermediateType> prevRunningVarianceTensor;
-        PinnedTensor<IntermediateType> nextRunningMeanTensor;
-        PinnedTensor<IntermediateType> nextRunningVarianceTensor;
+        PinnedTensor<IntermediateType> runningMeanTensor;
+        PinnedTensor<IntermediateType> runningVarianceTensor;
         PinnedTensor<IntermediateType> meanTensor;
         PinnedTensor<IntermediateType> invVarianceTensor;
         PinnedTensor<IntermediateType> momentumTensor;
@@ -193,10 +191,18 @@ protected:
         variantPack[xTensorAttr.get_uid()] = tensorBundle.xTensor.memory().deviceData();
         variantPack[scaleTensorAttr.get_uid()] = tensorBundle.scaleTensor.memory().deviceData();
         variantPack[biasTensorAttr.get_uid()] = tensorBundle.biasTensor.memory().deviceData();
+        
+        // Use the SAME buffer for both prev and next running statistics
+        // This matches real-world usage where the buffer is updated in-place across iterations
         variantPack[prevRunningMeanTensorAttr.get_uid()]
-            = tensorBundle.prevRunningMeanTensor.memory().deviceData();
+            = tensorBundle.runningMeanTensor.memory().deviceData();
         variantPack[prevRunningVarianceTensorAttr.get_uid()]
-            = tensorBundle.prevRunningVarianceTensor.memory().deviceData();
+            = tensorBundle.runningVarianceTensor.memory().deviceData();
+        variantPack[nextRunningMeanTensorAttr.get_uid()]
+            = tensorBundle.runningMeanTensor.memory().deviceData();
+        variantPack[nextRunningVarianceTensorAttr.get_uid()]
+            = tensorBundle.runningVarianceTensor.memory().deviceData();
+            
         variantPack[momentumTensorAttr.get_uid()]
             = tensorBundle.momentumTensor.memory().deviceData();
         variantPack[epsilonTensorAttr.get_uid()]
@@ -205,10 +211,6 @@ protected:
         variantPack[meanTensorAttr.get_uid()] = tensorBundle.meanTensor.memory().deviceData();
         variantPack[invVarianceTensorAttr.get_uid()]
             = tensorBundle.invVarianceTensor.memory().deviceData();
-        variantPack[nextRunningMeanTensorAttr.get_uid()]
-            = tensorBundle.nextRunningMeanTensor.memory().deviceData();
-        variantPack[nextRunningVarianceTensorAttr.get_uid()]
-            = tensorBundle.nextRunningVarianceTensor.memory().deviceData();
 
         return variantPack;
     }
@@ -237,7 +239,7 @@ protected:
         auto biasTensorAttr = std::make_shared<graph::TensorAttributes>(std::move(biasAttr));
 
         auto prevRunningMeanAttr = graph::makeTensorAttributes(
-            "prev_running_mean", intermediateDataType, graphTensorBundle.prevRunningMeanTensor);
+            "prev_running_mean", intermediateDataType, graphTensorBundle.runningMeanTensor);
         prevRunningMeanAttr.set_uid(uid++);
         auto prevRunningMeanTensorAttr
             = std::make_shared<graph::TensorAttributes>(std::move(prevRunningMeanAttr));
@@ -245,7 +247,7 @@ protected:
         auto prevRunningVarianceAttr
             = graph::makeTensorAttributes("prev_running_variance",
                                           intermediateDataType,
-                                          graphTensorBundle.prevRunningVarianceTensor);
+                                          graphTensorBundle.runningVarianceTensor);
         prevRunningVarianceAttr.set_uid(uid++);
         auto prevRunningVarianceTensorAttr
             = std::make_shared<graph::TensorAttributes>(std::move(prevRunningVarianceAttr));
@@ -309,14 +311,12 @@ protected:
         invVarianceTensorAttr->set_stride(graphTensorBundle.invVarianceTensor.strides());
 
         nextRunningMeanTensorAttr->set_data_type(intermediateDataType);
-        nextRunningMeanTensorAttr->set_dim(graphTensorBundle.nextRunningMeanTensor.dims());
-        nextRunningMeanTensorAttr->set_stride(graphTensorBundle.nextRunningMeanTensor.strides());
+        nextRunningMeanTensorAttr->set_dim(graphTensorBundle.runningMeanTensor.dims());
+        nextRunningMeanTensorAttr->set_stride(graphTensorBundle.runningMeanTensor.strides());
 
         nextRunningVarianceTensorAttr->set_data_type(intermediateDataType);
-        nextRunningVarianceTensorAttr->set_dim(
-            graphTensorBundle.nextRunningVarianceTensor.dims());
-        nextRunningVarianceTensorAttr->set_stride(
-            graphTensorBundle.nextRunningVarianceTensor.strides());
+        nextRunningVarianceTensorAttr->set_dim(graphTensorBundle.runningVarianceTensor.dims());
+        nextRunningVarianceTensorAttr->set_stride(graphTensorBundle.runningVarianceTensor.strides());
 
         // Validate and build graph
         auto result = graph->validate();
@@ -358,6 +358,8 @@ protected:
         auto momentum
             = static_cast<IntermediateType>(cpuTensorBundle.momentumTensor.memory().hostData()[0]);
 
+        // For CPU reference, we use the same single buffer for both prev and next
+        // The CPU reference will read the old values and write the updated values in-place
         CpuFpReferenceBatchnormImpl<InputType, IntermediateType>::batchnormFwdTraining(
             cpuTensorBundle.xTensor,
             cpuTensorBundle.scaleTensor,
@@ -367,10 +369,10 @@ protected:
             momentum,
             &cpuTensorBundle.meanTensor,
             &cpuTensorBundle.invVarianceTensor,
-            &cpuTensorBundle.prevRunningMeanTensor,
-            &cpuTensorBundle.prevRunningVarianceTensor,
-            &cpuTensorBundle.nextRunningMeanTensor,
-            &cpuTensorBundle.nextRunningVarianceTensor);
+            &cpuTensorBundle.runningMeanTensor,
+            &cpuTensorBundle.runningVarianceTensor,
+            &cpuTensorBundle.runningMeanTensor,
+            &cpuTensorBundle.runningVarianceTensor);
     }
 
     void runBatchnormTest(InputType tolerance, const TensorLayout& layout = TensorLayout::NCHW)
@@ -390,8 +392,8 @@ protected:
         graphTensorBundle.yTensor.memory().markDeviceModified();
         graphTensorBundle.meanTensor.memory().markDeviceModified();
         graphTensorBundle.invVarianceTensor.memory().markDeviceModified();
-        graphTensorBundle.nextRunningMeanTensor.memory().markDeviceModified();
-        graphTensorBundle.nextRunningVarianceTensor.memory().markDeviceModified();
+        graphTensorBundle.runningMeanTensor.memory().markDeviceModified();
+        graphTensorBundle.runningVarianceTensor.memory().markDeviceModified();
 
         runCpuBatchnormFwd(cpuTensorBundle);
 
@@ -406,11 +408,11 @@ protected:
         EXPECT_TRUE(cpuRefValidationStats.allClose(cpuTensorBundle.invVarianceTensor.memory(),
                                                    graphTensorBundle.invVarianceTensor.memory()));
         EXPECT_TRUE(
-            cpuRefValidationStats.allClose(cpuTensorBundle.nextRunningMeanTensor.memory(),
-                                          graphTensorBundle.nextRunningMeanTensor.memory()));
+            cpuRefValidationStats.allClose(cpuTensorBundle.runningMeanTensor.memory(),
+                                          graphTensorBundle.runningMeanTensor.memory()));
         EXPECT_TRUE(
-            cpuRefValidationStats.allClose(cpuTensorBundle.nextRunningVarianceTensor.memory(),
-                                          graphTensorBundle.nextRunningVarianceTensor.memory()));
+            cpuRefValidationStats.allClose(cpuTensorBundle.runningVarianceTensor.memory(),
+                                          graphTensorBundle.runningVarianceTensor.memory()));
     }
 
 private:
@@ -424,60 +426,60 @@ class IntegrationGpuBatchnormForwardTrainingNchwFp32
 {
 };
 
-// class IntegrationGpuBatchnormForwardTrainingNchwBfp16
-//     : public BatchnormForwardTraining<hip_bfloat16, float, Batchnorm2dTestCase>
-// {
-// };
+class IntegrationGpuBatchnormForwardTrainingNchwBfp16
+    : public BatchnormForwardTraining<hip_bfloat16, float, Batchnorm2dTestCase>
+{
+};
 
-// class IntegrationGpuBatchnormForwardTrainingNchwFp16
-//     : public BatchnormForwardTraining<half, float, Batchnorm2dTestCase>
-// {
-// };
+class IntegrationGpuBatchnormForwardTrainingNchwFp16
+    : public BatchnormForwardTraining<half, float, Batchnorm2dTestCase>
+{
+};
 
-// class IntegrationGpuBatchnormForwardTrainingNhwcFp32
-//     : public BatchnormForwardTraining<float, float, Batchnorm2dTestCase>
-// {
-// };
+class IntegrationGpuBatchnormForwardTrainingNhwcFp32
+    : public BatchnormForwardTraining<float, float, Batchnorm2dTestCase>
+{
+};
 
-// class IntegrationGpuBatchnormForwardTrainingNhwcBfp16
-//     : public BatchnormForwardTraining<hip_bfloat16, float, Batchnorm2dTestCase>
-// {
-// };
+class IntegrationGpuBatchnormForwardTrainingNhwcBfp16
+    : public BatchnormForwardTraining<hip_bfloat16, float, Batchnorm2dTestCase>
+{
+};
 
-// class IntegrationGpuBatchnormForwardTrainingNhwcFp16
-//     : public BatchnormForwardTraining<half, float, Batchnorm2dTestCase>
-// {
-// };
+class IntegrationGpuBatchnormForwardTrainingNhwcFp16
+    : public BatchnormForwardTraining<half, float, Batchnorm2dTestCase>
+{
+};
 
-// class IntegrationGpuBatchnormForwardTrainingNcdhwFp32
-//     : public BatchnormForwardTraining<float, float, Batchnorm3dTestCase>
-// {
-// };
+class IntegrationGpuBatchnormForwardTrainingNcdhwFp32
+    : public BatchnormForwardTraining<float, float, Batchnorm3dTestCase>
+{
+};
 
-// class IntegrationGpuBatchnormForwardTrainingNcdhwBfp16
-//     : public BatchnormForwardTraining<hip_bfloat16, float, Batchnorm3dTestCase>
-// {
-// };
+class IntegrationGpuBatchnormForwardTrainingNcdhwBfp16
+    : public BatchnormForwardTraining<hip_bfloat16, float, Batchnorm3dTestCase>
+{
+};
 
-// class IntegrationGpuBatchnormForwardTrainingNcdhwFp16
-//     : public BatchnormForwardTraining<half, float, Batchnorm3dTestCase>
-// {
-// };
+class IntegrationGpuBatchnormForwardTrainingNcdhwFp16
+    : public BatchnormForwardTraining<half, float, Batchnorm3dTestCase>
+{
+};
 
-// class IntegrationGpuBatchnormForwardTrainingNdhwcFp32
-//     : public BatchnormForwardTraining<float, float, Batchnorm3dTestCase>
-// {
-// };
+class IntegrationGpuBatchnormForwardTrainingNdhwcFp32
+    : public BatchnormForwardTraining<float, float, Batchnorm3dTestCase>
+{
+};
 
-// class IntegrationGpuBatchnormForwardTrainingNdhwcBfp16
-//     : public BatchnormForwardTraining<hip_bfloat16, float, Batchnorm3dTestCase>
-// {
-// };
+class IntegrationGpuBatchnormForwardTrainingNdhwcBfp16
+    : public BatchnormForwardTraining<hip_bfloat16, float, Batchnorm3dTestCase>
+{
+};
 
-// class IntegrationGpuBatchnormForwardTrainingNdhwcFp16
-//     : public BatchnormForwardTraining<half, float, Batchnorm3dTestCase>
-// {
-// };
+class IntegrationGpuBatchnormForwardTrainingNdhwcFp16
+    : public BatchnormForwardTraining<half, float, Batchnorm3dTestCase>
+{
+};
 
 std::vector<Batchnorm2dTestCase> getBnFwdTrainingTestCases()
 {
@@ -495,15 +497,15 @@ std::vector<Batchnorm2dTestCase> getBnFwdTrainingTestCases()
     };
 }
 
-// std::vector<Batchnorm3dTestCase> getBnFwdTraining3dTestCases()
-// {
-//     unsigned int seed = std::random_device{}();
+std::vector<Batchnorm3dTestCase> getBnFwdTraining3dTestCases()
+{
+    unsigned int seed = std::random_device{}();
 
-//     return {
-//         {2, 3, 3, 1, 1, seed},
-//         {16, 3, 8, 14, 14, seed},
-//     };
-// }
+    return {
+        {2, 3, 3, 1, 1, seed},
+        {16, 3, 8, 14, 14, seed},
+    };
+}
 
 } // namespace
 
@@ -516,101 +518,101 @@ INSTANTIATE_TEST_SUITE_P(,
                          IntegrationGpuBatchnormForwardTrainingNchwFp32,
                          testing::ValuesIn(getBnFwdTrainingTestCases()));
 
-// TEST_P(IntegrationGpuBatchnormForwardTrainingNchwBfp16, Correctness)
-// {
-//     runBatchnormTest(batchnorm::getToleranceTraining<hip_bfloat16>(), TensorLayout::NCHW);
-// }
+TEST_P(IntegrationGpuBatchnormForwardTrainingNchwBfp16, Correctness)
+{
+    runBatchnormTest(batchnorm::getToleranceTraining<hip_bfloat16>(), TensorLayout::NCHW);
+}
 
-// INSTANTIATE_TEST_SUITE_P(,
-//                          IntegrationGpuBatchnormForwardTrainingNchwBfp16,
-//                          testing::ValuesIn(getBnFwdTrainingTestCases()));
+INSTANTIATE_TEST_SUITE_P(,
+                         IntegrationGpuBatchnormForwardTrainingNchwBfp16,
+                         testing::ValuesIn(getBnFwdTrainingTestCases()));
 
-// TEST_P(IntegrationGpuBatchnormForwardTrainingNchwFp16, Correctness)
-// {
-//     runBatchnormTest(batchnorm::getToleranceTraining<half>(), TensorLayout::NCHW);
-// }
+TEST_P(IntegrationGpuBatchnormForwardTrainingNchwFp16, Correctness)
+{
+    runBatchnormTest(batchnorm::getToleranceTraining<half>(), TensorLayout::NCHW);
+}
 
-// INSTANTIATE_TEST_SUITE_P(,
-//                          IntegrationGpuBatchnormForwardTrainingNchwFp16,
-//                          testing::ValuesIn(getBnFwdTrainingTestCases()));
+INSTANTIATE_TEST_SUITE_P(,
+                         IntegrationGpuBatchnormForwardTrainingNchwFp16,
+                         testing::ValuesIn(getBnFwdTrainingTestCases()));
 
-// TEST_P(IntegrationGpuBatchnormForwardTrainingNhwcFp32, Correctness)
-// {
-//     runBatchnormTest(batchnorm::getToleranceTraining<float>(), TensorLayout::NHWC);
-// }
+TEST_P(IntegrationGpuBatchnormForwardTrainingNhwcFp32, Correctness)
+{
+    runBatchnormTest(batchnorm::getToleranceTraining<float>(), TensorLayout::NHWC);
+}
 
-// INSTANTIATE_TEST_SUITE_P(,
-//                          IntegrationGpuBatchnormForwardTrainingNhwcFp32,
-//                          testing::ValuesIn(getBnFwdTrainingTestCases()));
+INSTANTIATE_TEST_SUITE_P(,
+                         IntegrationGpuBatchnormForwardTrainingNhwcFp32,
+                         testing::ValuesIn(getBnFwdTrainingTestCases()));
 
-// TEST_P(IntegrationGpuBatchnormForwardTrainingNhwcBfp16, Correctness)
-// {
-//     runBatchnormTest(batchnorm::getToleranceTraining<hip_bfloat16>(), TensorLayout::NHWC);
-// }
+TEST_P(IntegrationGpuBatchnormForwardTrainingNhwcBfp16, Correctness)
+{
+    runBatchnormTest(batchnorm::getToleranceTraining<hip_bfloat16>(), TensorLayout::NHWC);
+}
 
-// INSTANTIATE_TEST_SUITE_P(,
-//                          IntegrationGpuBatchnormForwardTrainingNhwcBfp16,
-//                          testing::ValuesIn(getBnFwdTrainingTestCases()));
+INSTANTIATE_TEST_SUITE_P(,
+                         IntegrationGpuBatchnormForwardTrainingNhwcBfp16,
+                         testing::ValuesIn(getBnFwdTrainingTestCases()));
 
-// TEST_P(IntegrationGpuBatchnormForwardTrainingNhwcFp16, Correctness)
-// {
-//     runBatchnormTest(batchnorm::getToleranceTraining<half>(), TensorLayout::NHWC);
-// }
+TEST_P(IntegrationGpuBatchnormForwardTrainingNhwcFp16, Correctness)
+{
+    runBatchnormTest(batchnorm::getToleranceTraining<half>(), TensorLayout::NHWC);
+}
 
-// INSTANTIATE_TEST_SUITE_P(,
-//                          IntegrationGpuBatchnormForwardTrainingNhwcFp16,
-//                          testing::ValuesIn(getBnFwdTrainingTestCases()));
+INSTANTIATE_TEST_SUITE_P(,
+                         IntegrationGpuBatchnormForwardTrainingNhwcFp16,
+                         testing::ValuesIn(getBnFwdTrainingTestCases()));
 
-// TEST_P(IntegrationGpuBatchnormForwardTrainingNcdhwFp32, Correctness)
-// {
-//     runBatchnormTest(batchnorm::getToleranceTraining<float>(), TensorLayout::NCDHW);
-// }
+TEST_P(IntegrationGpuBatchnormForwardTrainingNcdhwFp32, Correctness)
+{
+    runBatchnormTest(batchnorm::getToleranceTraining<float>(), TensorLayout::NCDHW);
+}
 
-// INSTANTIATE_TEST_SUITE_P(,
-//                          IntegrationGpuBatchnormForwardTrainingNcdhwFp32,
-//                          testing::ValuesIn(getBnFwdTraining3dTestCases()));
+INSTANTIATE_TEST_SUITE_P(,
+                         IntegrationGpuBatchnormForwardTrainingNcdhwFp32,
+                         testing::ValuesIn(getBnFwdTraining3dTestCases()));
 
-// TEST_P(IntegrationGpuBatchnormForwardTrainingNcdhwBfp16, Correctness)
-// {
-//     runBatchnormTest(batchnorm::getToleranceTraining<hip_bfloat16>(), TensorLayout::NCDHW);
-// }
+TEST_P(IntegrationGpuBatchnormForwardTrainingNcdhwBfp16, Correctness)
+{
+    runBatchnormTest(batchnorm::getToleranceTraining<hip_bfloat16>(), TensorLayout::NCDHW);
+}
 
-// INSTANTIATE_TEST_SUITE_P(,
-//                          IntegrationGpuBatchnormForwardTrainingNcdhwBfp16,
-//                          testing::ValuesIn(getBnFwdTraining3dTestCases()));
+INSTANTIATE_TEST_SUITE_P(,
+                         IntegrationGpuBatchnormForwardTrainingNcdhwBfp16,
+                         testing::ValuesIn(getBnFwdTraining3dTestCases()));
 
-// TEST_P(IntegrationGpuBatchnormForwardTrainingNcdhwFp16, Correctness)
-// {
-//     runBatchnormTest(batchnorm::getToleranceTraining<half>(), TensorLayout::NCDHW);
-// }
+TEST_P(IntegrationGpuBatchnormForwardTrainingNcdhwFp16, Correctness)
+{
+    runBatchnormTest(batchnorm::getToleranceTraining<half>(), TensorLayout::NCDHW);
+}
 
-// INSTANTIATE_TEST_SUITE_P(,
-//                          IntegrationGpuBatchnormForwardTrainingNcdhwFp16,
-//                          testing::ValuesIn(getBnFwdTraining3dTestCases()));
+INSTANTIATE_TEST_SUITE_P(,
+                         IntegrationGpuBatchnormForwardTrainingNcdhwFp16,
+                         testing::ValuesIn(getBnFwdTraining3dTestCases()));
 
-// TEST_P(IntegrationGpuBatchnormForwardTrainingNdhwcFp32, Correctness)
-// {
-//     runBatchnormTest(batchnorm::getToleranceTraining<float>(), TensorLayout::NDHWC);
-// }
+TEST_P(IntegrationGpuBatchnormForwardTrainingNdhwcFp32, Correctness)
+{
+    runBatchnormTest(batchnorm::getToleranceTraining<float>(), TensorLayout::NDHWC);
+}
 
-// INSTANTIATE_TEST_SUITE_P(,
-//                          IntegrationGpuBatchnormForwardTrainingNdhwcFp32,
-//                          testing::ValuesIn(getBnFwdTraining3dTestCases()));
+INSTANTIATE_TEST_SUITE_P(,
+                         IntegrationGpuBatchnormForwardTrainingNdhwcFp32,
+                         testing::ValuesIn(getBnFwdTraining3dTestCases()));
 
-// TEST_P(IntegrationGpuBatchnormForwardTrainingNdhwcBfp16, Correctness)
-// {
-//     runBatchnormTest(batchnorm::getToleranceTraining<hip_bfloat16>(), TensorLayout::NDHWC);
-// }
+TEST_P(IntegrationGpuBatchnormForwardTrainingNdhwcBfp16, Correctness)
+{
+    runBatchnormTest(batchnorm::getToleranceTraining<hip_bfloat16>(), TensorLayout::NDHWC);
+}
 
-// INSTANTIATE_TEST_SUITE_P(,
-//                          IntegrationGpuBatchnormForwardTrainingNdhwcBfp16,
-//                          testing::ValuesIn(getBnFwdTraining3dTestCases()));
+INSTANTIATE_TEST_SUITE_P(,
+                         IntegrationGpuBatchnormForwardTrainingNdhwcBfp16,
+                         testing::ValuesIn(getBnFwdTraining3dTestCases()));
 
-// TEST_P(IntegrationGpuBatchnormForwardTrainingNdhwcFp16, Correctness)
-// {
-//     runBatchnormTest(batchnorm::getToleranceTraining<half>(), TensorLayout::NDHWC);
-// }
+TEST_P(IntegrationGpuBatchnormForwardTrainingNdhwcFp16, Correctness)
+{
+    runBatchnormTest(batchnorm::getToleranceTraining<half>(), TensorLayout::NDHWC);
+}
 
-// INSTANTIATE_TEST_SUITE_P(,
-//                          IntegrationGpuBatchnormForwardTrainingNdhwcFp16,
-//                          testing::ValuesIn(getBnFwdTraining3dTestCases()));
+INSTANTIATE_TEST_SUITE_P(,
+                         IntegrationGpuBatchnormForwardTrainingNdhwcFp16,
+                         testing::ValuesIn(getBnFwdTraining3dTestCases()));
