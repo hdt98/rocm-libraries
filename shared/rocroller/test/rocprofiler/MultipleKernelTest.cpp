@@ -151,7 +151,7 @@ namespace RocprofilerTest
         return {std::move(commandKernel), d_ptr, commandArgs, instrs};
     }
 
-    TEST_CASE("rocprofiler kernels with different literals in assembly", "[rocprofiler]")
+    TEST_CASE("Rocprofiler kernels with different literals in assembly", "[rocprofiler]")
     {
         /*
         The rocprofiler agent uses a dispatch system. Due to the callback-based nature of rocprofiler,
@@ -267,7 +267,7 @@ namespace RocprofilerTest
         return {std::move(commandKernel), nullptr, commandArgs, instrs};
     }
 
-    TEST_CASE("rocprofiler agent race conditions", "[rocprofiler]")
+    TEST_CASE("Rocprofiler agent race conditions", "[rocprofiler]")
     {
         /*
         There were race conditions between the dispatch and shader data callbacks.
