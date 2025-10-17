@@ -4273,9 +4273,9 @@ void testing_aux_rocblaslt_rocroller_host_func(const Arguments& arg)
 
     hipblasOperation_t opA     = HIPBLAS_OP_T;
     hipblasOperation_t opB     = HIPBLAS_OP_N;
-    int64_t            m       = 1;
-    int64_t            n       = 1;
-    int64_t            k       = 1;
+    int64_t            m       = 256;
+    int64_t            n       = 256;
+    int64_t            k       = 256;
     float              alpha_v = arg.alpha;
     void*              alpha   = &alpha_v;
     float              beta_v  = arg.beta;
