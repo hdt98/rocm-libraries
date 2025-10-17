@@ -126,7 +126,7 @@ namespace
 
         for(auto& [pc, data] : instruction_latencies)
         {
-            auto inst = address_table.get(pc.marker_id, pc.addr);
+            auto inst = address_table.get(pc.code_object_id, pc.address);
             if(inst)
             {
                 data.instruction = inst->inst;

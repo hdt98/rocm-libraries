@@ -45,9 +45,9 @@ namespace rocroller_profiler
         bool operator()(const rocprofiler_thread_trace_decoder_pc_t& a,
                         const rocprofiler_thread_trace_decoder_pc_t& b) const
         {
-            if(a.marker_id == b.marker_id)
-                return a.addr < b.addr;
-            return a.marker_id < b.marker_id;
+            if(a.code_object_id == b.code_object_id)
+                return a.address < b.address;
+            return a.code_object_id < b.code_object_id;
         }
     };
 
