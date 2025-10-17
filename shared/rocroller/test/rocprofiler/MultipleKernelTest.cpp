@@ -320,5 +320,23 @@ namespace RocprofilerTest
             CHECK(1 == countSubstring(latencies[0].instruction, literalHex));
             CHECK(latencies[1].instruction == "s_endpgm");
         }
+
+        SECTION("With profiler calls")
+        {
+            std::vector<size_t> order = {1, 2};
+            for(size_t idx : order)
+            {
+                kernelSetups[idx].kernel.launchKernel(
+                    kernelSetups[idx].commandArgs.runtimeArguments());
+                rocroller_profiler::getInstructionData();
+            }
+            HIP_CHECK(hipDeviceSynchronize());
+            const auto        latencies  = rocroller_profiler::getInstructionData();
+            std::string const literalHex = fmt::format("0x{:x}", literals[order.back()]);
+            INFO("Expecting literal: " << literalHex);
+            REQUIRE(latencies.size() == 2);
+            CHECK(1 == countSubstring(latencies[0].instruction, literalHex));
+            CHECK(latencies[1].instruction == "s_endpgm");
+        }
     }
 } // namespace RocprofilerTest
