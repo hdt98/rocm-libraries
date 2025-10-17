@@ -83,43 +83,28 @@ and :doc:`Performance database <../conceptual/perfdb>`.
 
     * - | ``MIOPEN_FIND_MODE``
         | Sets find mode to accelerate find API calls.
-        | **Note**: See below for details on safe/unsafe combinations with ``MIOPEN_FIND_ENFORCE``.
+        | **Note**: For details on safe/unsafe combinations with ``MIOPEN_FIND_ENFORCE``, see :ref:`Find mode and enforcement combinations <find_mode_and_enforce_combinations>`.
       - | "NORMAL" or 1: Full find mode (benchmarks all solvers)
         | "FAST" or 2: Fast find (use FindDb or immediate fallback)
         | "HYBRID" or 3: Hybrid find (FindDb hit or full find)
         | 4: Reserved (do not use)
         | "DYNAMIC_HYBRID" or 5: Dynamic hybrid (default, skip non-dynamic kernels)
+        | "TRUST_VERIFY" or 6: Trust verify (use UserFindDb or FindDb fallback or skip non-dynamic kernels fallback with timebox)
+        | "TRUST_VERIFY_FULL" or 7: Trust verify full (same as trust verify without timebox)
 
     * - | ``MIOPEN_FIND_ENFORCE``
         | Controls auto-tune behavior and database updates.
-        | **Note**: See below for details on safe/unsafe combinations with ``MIOPEN_FIND_MODE``.
+        | **Note**: For details on safe/unsafe combinations with ``MIOPEN_FIND_MODE``, see :ref:`Find mode and enforcement combinations <find_mode_and_enforce_combinations>`.
       - | "NONE" or 1: No change in default behavior
-        | "DB_UPDATE" or 2: Always perform auto-tune and update PerfDb (unsafe with Fast/Hybrid modes)
+        | "DB_UPDATE" or 2: Always perform auto-tune and update PerfDb (unsafe with Fast/Hybrid/Trust modes)
         | "SEARCH" or 3: Auto-tune even if not requested via API
-        | "SEARCH_DB_UPDATE" or 4: Combination of DB_UPDATE and SEARCH (unsafe with Fast/Hybrid modes)
-        | "DB_CLEAN" or 5: Remove optimized values from User PerfDb (unsafe with Fast/Hybrid modes)
+        | "SEARCH_DB_UPDATE" or 4: Combination of DB_UPDATE and SEARCH (unsafe with Fast/Hybrid/Trust modes)
+        | "DB_CLEAN" or 5: Remove optimized values from User PerfDb (unsafe with Fast/Hybrid/Trust modes)
 
     * - | ``MIOPEN_DEBUG_DISABLE_FIND_DB``
         | Disables FindDb functionality.
       - | 1: Disable FindDb
         | 0 or unset: Enable FindDb
-
-.. warning::
-   **Unsafe Mode Combinations**
-   
-   The following combinations of ``MIOPEN_FIND_MODE`` and ``MIOPEN_FIND_ENFORCE`` are automatically blocked because they can lead to incomplete or inconsistent database entries:
-   
-   * Fast/Hybrid modes (2, 3, 5) with database operations (``DB_UPDATE=2``, ``SEARCH_DB_UPDATE=4``, ``DB_CLEAN=5``)
-   
-   When an unsafe combination is detected, MIOpen automatically falls back to Normal mode and logs a warning message.
-
-.. note::
-   **Safe Combinations**
-   
-   The following combinations are always safe:
-   
-   * Any ``MIOPEN_FIND_MODE`` with ``MIOPEN_FIND_ENFORCE=NONE`` (1) or ``MIOPEN_FIND_ENFORCE=SEARCH`` (3)
-   * Normal ``MIOPEN_FIND_MODE`` (1) with any ``MIOPEN_FIND_ENFORCE`` option
 
 Algorithm control
 =================
