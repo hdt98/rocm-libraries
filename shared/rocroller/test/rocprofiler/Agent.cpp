@@ -59,6 +59,8 @@ namespace
     rocroller_profiler::InstructionLatencyMap                       instruction_latencies;
     rocprofiler::sdk::codeobj::disassembly::CodeobjAddressTranslate address_table;
 
+    std::mutex dispatch_shader_mutex; // Ensure dispatch and shader callback are in sync
+
     void codeobj_callback(rocprofiler_callback_tracing_record_t record,
                           rocprofiler_user_data_t*,
                           void*)
@@ -134,6 +136,7 @@ namespace
                 data.instruction = "UNKNOWN_INSTRUCTION";
             }
         }
+        dispatch_shader_mutex.unlock();
     }
 
     rocprofiler_thread_trace_control_flags_t dispatch_callback(rocprofiler_agent_id_t,
@@ -144,6 +147,7 @@ namespace
                                                                void*,
                                                                rocprofiler_user_data_t*)
     {
+        dispatch_shader_mutex.lock();
         instruction_latencies.clear();
         return ROCPROFILER_THREAD_TRACE_CONTROL_START_AND_STOP;
     }
@@ -223,6 +227,7 @@ namespace rocroller_profiler
 {
     std::vector<InstructionData> getInstructionData()
     {
+        const std::lock_guard<std::mutex> lock(dispatch_shader_mutex);
 
         std::vector<InstructionData> result;
         result.reserve(instruction_latencies.size());
