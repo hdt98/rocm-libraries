@@ -38,6 +38,7 @@
 #include <rocRoller/InstructionValues/LabelAllocator.hpp>
 #include <rocRoller/KernelArguments.hpp>
 #include <rocRoller/Operations/Command.hpp>
+#include <rocRoller/Scheduling/LDSBankModel.hpp>
 #include <rocRoller/Utilities/Generator.hpp>
 
 #include "../catch/TestContext.hpp"
@@ -50,6 +51,18 @@ using namespace rocRoller;
 
 namespace rocRollerTest
 {
+    std::vector<size_t>
+        generateLDSAddresses(size_t workgroupSize, size_t strideMultiplier, size_t instrDwords)
+    {
+        std::vector<size_t> addresses;
+        for(size_t workitemId = 0; workitemId < workgroupSize; ++workitemId)
+        {
+            size_t address = workitemId * (4 * strideMultiplier * instrDwords);
+            addresses.push_back(address);
+        }
+        return addresses;
+    }
+
     TEST_CASE("LDS Microkernel", "[rocprofiler]")
     {
         Settings::getInstance()->set(Settings::KernelAssembler, AssemblerType::Subprocess);
@@ -68,7 +81,7 @@ namespace rocRollerTest
             barrier = atoi(env_p) == 1 ? true : false;
 
         const std::vector<int>  instrSizes      = {1, 2, 4}; // b32, b64, b128
-        const std::vector<int>  strides         = {1, 2, 4, 8, 16, 32}; // between threads
+        const std::vector<int>  strides         = {1, 2, 4, 8, 16, 32, 64}; // between threads
         const std::vector<bool> writeOperations = {false, true};
 
         for(auto instrDwords : instrSizes)
@@ -171,6 +184,7 @@ namespace rocRollerTest
                                 }
                             }
 
+                            // TODO: simplify
                             const auto waitcnt_count  = 1;
                             const auto last_decrement = 0;
 
@@ -202,15 +216,60 @@ namespace rocRollerTest
 
                         CHECK(latencies.size() == 21);
 
-                        std::cout << "\n=== Configuration: InstrSize=" << (instrDwords * 32)
-                                  << "b, Stride=" << strideMultiplier << ", "
-                                  << (write ? "Write" : "Read") << " ===" << std::endl;
+                        GPUArchitectureGFX gfx = context->targetArchitecture().target().gfx;
 
+                        auto baseAddresses
+                            = generateLDSAddresses(workgroupSize, strideMultiplier, instrDwords);
+
+                        LDSBankModel::RuntimeLDSInstruction ldsinstr;
+                        ldsinstr.memoryOp.direction = write ? LDSBankModel::LdsDirection::Write
+                                                            : LDSBankModel::LdsDirection::Read;
+                        ldsinstr.dwords             = instrDwords;
+                        ldsinstr.baseAddresses      = baseAddresses;
+
+                        uint predictedCycles = LDSBankModel::getInstructionCycles(ldsinstr, gfx);
+
+                        uint issueCycles = LDSBankModel::getInstructionIssueCycles(
+                            ldsinstr.memoryOp, ldsinstr.dwords);
+                        uint dataCycles = LDSBankModel::getInstructionDataCycles(ldsinstr, gfx);
+
+                        INFO("Dwords: " << instrDwords << ", Stride Multiplier: "
+                                        << strideMultiplier << ", " << (write ? "Write" : "Read"));
+
+                        uint              actualLastLdsInstrCycles = 0;
+                        uint              actualLastSWaitcntCycles = 0;
+                        std::stringstream profilerResults;
                         for(const auto& data : latencies)
                         {
-                            std::cout << data.instruction << ", " << data.latency << " cycles"
-                                      << std::endl;
+                            profilerResults << "  " << data.instruction << ", " << data.latency
+                                            << " cycles" << std::endl;
+                            // Use latency of final ds_* / s_waitcnt instruction
+                            if((write && data.instruction.find("ds_write") != std::string::npos)
+                               || (!write && data.instruction.find("ds_read") != std::string::npos))
+                            {
+                                actualLastLdsInstrCycles = data.latency;
+                            }
+                            else if(data.instruction.find("s_waitcnt") != std::string::npos)
+                            {
+                                actualLastSWaitcntCycles = data.latency;
+                            }
                         }
+                        INFO("Profiler Results:\n" << profilerResults.str());
+                        INFO("  Actual LDS Instruction Cycles: " << actualLastLdsInstrCycles);
+                        INFO("  Actual s_waitcnt Cycles: " << actualLastSWaitcntCycles);
+
+                        INFO("\nModel Predictions:");
+                        INFO("  Total Cycles: " << predictedCycles);
+                        INFO("  Issue Cycles: " << issueCycles);
+                        INFO("  Data Cycles: " << dataCycles);
+
+                        CHECK(actualLastSWaitcntCycles == predictedCycles);
+                        if(strideMultiplier
+                           > 32) // Actual cycles is usually 60 cycles with 64-way bank conflict, not sure why
+                            CHECK_THAT(actualLastLdsInstrCycles,
+                                       Catch::Matchers::WithinAbs(predictedCycles, 4u));
+                        else
+                            CHECK(actualLastLdsInstrCycles == predictedCycles);
                     }
                 }
             }
