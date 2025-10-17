@@ -9,10 +9,22 @@
 # presented in the superbuild GUI, but then passed into the ExternalProject as -D
 # parameters, which would already define them.
 
+<<<<<<< HEAD
 #WE CAN EITHER PUT THIS IN ROOT CMAKE OR MOVE IT TO hipBLAS/cmake
 
 if( NOT HIPBLAS_BUILD_TESTS )
   option( HIPBLAS_BUILD_TESTS "Build hipBLAS unit tests" OFF )
+=======
+include(CMakeDependentOption)
+
+# Clients utilize rocblas fortran API and a fortran compiler
+if( NOT BUILD_FORTRAN_CLIENTS )
+  cmake_dependent_option( BUILD_FORTRAN_CLIENTS "Build hipBLAS clients requiring Fortran capabilities" ON "NOT WIN32" OFF )
+endif( )
+
+if( NOT BUILD_CLIENTS_TESTS )
+  option( BUILD_CLIENTS_TESTS "Build hipBLAS unit tests" OFF )
+>>>>>>> upstream/develop
 endif( )
 
 if( NOT HIPBLAS_BUILD_BENCHMARKS )
@@ -28,5 +40,3 @@ if( HIP_PLATFORM STREQUAL nvidia )
 else()
   option( LINK_BLIS "Link AOCL Blis reference library" ON )
 endif()
-
-

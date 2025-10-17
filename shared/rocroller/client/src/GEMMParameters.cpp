@@ -66,7 +66,9 @@ namespace rocRoller
                     rv << "_" << t;
 
                 if(scaleSkipPermlane)
-                    rv << "_PRE_SW";
+                {
+                    rv << "_PreSW_AB";
+                }
 
                 return rv.str();
             }
@@ -82,11 +84,9 @@ namespace rocRoller
                 rv << "_WG";
                 rocRoller::streamJoin(rv, std::vector{workgroupSizeX, workgroupSizeY}, "x");
 
-                if(workgroupMapping.first != -1)
+                if(workgroupMappingDim != -1)
                 {
-                    rv << "_WGM";
-                    rocRoller::streamJoin(
-                        rv, std::vector{workgroupMapping.first, workgroupMapping.second}, "");
+                    rv << "_WGM" << workgroupMappingDim;
                 }
 
                 rv << "_WGMXCC";
@@ -127,10 +127,10 @@ namespace rocRoller
                 if(streamK)
                 {
                     rv << "_SK";
-                    if(streamKTwoTile)
-                    {
+                    if(streamKTwoTileDPFirst)
+                        rv << "2TDPFirst";
+                    else if(streamKTwoTile)
                         rv << "2T";
-                    }
                 }
 
                 return rv.str();
@@ -167,6 +167,7 @@ namespace rocRoller
                 {
                     s << " BlockSize:" << x.scaleBlockSize;
                 }
+                s << std::endl;
                 return s;
             }
 
@@ -182,7 +183,8 @@ namespace rocRoller
                 s << "Arch:      " << x.architecture.toString() << std::endl;
                 if(x.streamK)
                 {
-                    s << "Algorithm: StreamK twoTile:" << x.streamKTwoTile << std::endl;
+                    s << "Algorithm: StreamK twoTile:" << x.streamKTwoTile
+                      << "(DPFirst:" << x.streamKTwoTileDPFirst << ")" << std::endl;
                 }
                 else
                 {
@@ -202,11 +204,11 @@ namespace rocRoller
                 s << "Unroll:    X:" << x.unrollX << " Y:" << x.unrollY << std::endl;
                 s << "Scheduler: " << x.scheduler << std::endl;
                 s << "WG size:   " << x.workgroupSizeX * x.workgroupSizeY << std::endl;
-                if(x.workgroupMapping.first != -1)
+                if(x.workgroupMappingDim != -1)
                 {
-                    s << "WG Mapping: " << x.workgroupMapping.first << ","
-                      << x.workgroupMapping.second << std::endl;
+                    s << "WG Mapping Dim: " << x.workgroupMappingDim << std::endl;
                 }
+
                 s << "WG XCC Remap: " << x.workgroupRemapXCC;
                 if(x.workgroupRemapXCC)
                 {

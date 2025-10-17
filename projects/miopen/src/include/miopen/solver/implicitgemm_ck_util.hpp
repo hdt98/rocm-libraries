@@ -33,6 +33,7 @@
 #include <miopen/tensor_ops.hpp>
 #include <miopen/miopen_internal.h>
 #include <miopen/fusion/fusion_invoke_params.hpp>
+#include <miopen/solver/implicitgemm_util.hpp>
 
 #if MIOPEN_BACKEND_HIP && MIOPEN_USE_COMPOSABLEKERNEL
 #include <ck/utility/data_type.hpp>
@@ -50,7 +51,30 @@ struct ProblemDescription;
 } // namespace conv
 
 namespace solver {
+
+static constexpr int CkSplitkAutoDeduce = -1;
+
+template <int L, int H>
+inline static bool NextCKSplitkValue(int& v)
+{
+    assert((IsTwoPower<L, H>(v) || v == CkSplitkAutoDeduce));
+    if(v == H)
+    {
+        v = CkSplitkAutoDeduce;
+        return false;
+    }
+    if(v == CkSplitkAutoDeduce)
+    {
+        v = L;
+        return true;
+    }
+
+    v *= 2;
+    return false;
+}
+
 #if MIOPEN_BACKEND_HIP && MIOPEN_USE_COMPOSABLEKERNEL
+
 namespace conv {
 template <typename DataType>
 using DeviceOpGWrw = ck::tensor_operation::device::DeviceGroupedConvBwdWeight<
@@ -298,6 +322,33 @@ bool IsCKApplicable(const ProblemDescriptionType& problem)
     const auto ptrs = DeviceOpType::GetInstances();
     return std::any_of(
         ptrs.begin(), ptrs.end(), [&args](auto& ptr) { return args.IsSupportedBy(ptr); });
+}
+
+template <typename DeviceOpType,
+          typename CKArgsType,
+          typename ProblemDescriptionType = miopen::conv::ProblemDescription>
+size_t GetCKSplitkMaxWorkspaceSize(const ProblemDescriptionType& problem)
+{
+    const auto args         = CKArgsType{problem};
+    auto max_workspace_size = 0;
+
+    const auto ptrs = DeviceOpType::GetInstances();
+    for(auto& ptr : ptrs)
+    {
+        auto split_k = CkSplitkAutoDeduce;
+        do
+        {
+            if(args.IsSupportedBySplitK(ptr, split_k))
+            {
+                auto workspace_size = args.GetCKSplitkWorkspaceSize(ptr, split_k);
+                if(workspace_size > max_workspace_size)
+                    max_workspace_size = workspace_size;
+            }
+        } while(!NextCKSplitkValue<1, 128>(split_k));
+    }
+
+    MIOPEN_LOG_I("Max workspace size reported by CK: " << max_workspace_size);
+    return max_workspace_size;
 }
 
 #define WORKAROUND_CK_ISSUE_1184 1
@@ -723,10 +774,11 @@ inline size_t GetCKAlphaBetaWorkspace(const miopen::conv::ProblemDescription& pr
 
     TensorDescriptor input          = problem.GetIn();
     TensorDescriptor output         = problem.GetOut();
+    TensorDescriptor weights        = problem.GetWeights();
     ConvolutionDescriptor conv_desc = problem.GetConv();
 
     miopenConvolutionABBackwardWeightsGetWorkSpaceSize(
-        problem.GetAlphaBetaCase(), &input, &output, &conv_desc, &buff_size);
+        problem.GetAlphaBetaCase(), &input, &output, &weights, &conv_desc, &buff_size);
     return buff_size;
 }
 
@@ -743,13 +795,14 @@ inline bool CKWrwRequireWorkspace(
 }
 
 /// \todo move to a cpp file
-inline size_t GetWorkspaceSizeLayoutTransformConv(const miopen::conv::ProblemDescription& problem)
+inline size_t GetWorkspaceSizeLayoutTransformConv(const miopen::conv::ProblemDescription& problem,
+                                                  size_t ck_ws_size = 0)
 {
     if(problem.IsLayoutNHWC())
     {
         if(problem.GetDirection() == ::miopen::conv::Direction::BackwardWeights)
         {
-            return GetCKAlphaBetaWorkspace(problem);
+            return (ck_ws_size > 0) ? ck_ws_size : GetCKAlphaBetaWorkspace(problem);
         }
         return 0;
     }
@@ -758,10 +811,11 @@ inline size_t GetWorkspaceSizeLayoutTransformConv(const miopen::conv::ProblemDes
 
     if(problem.GetDirection() == ::miopen::conv::Direction::BackwardWeights)
     {
-        MultiBufferWorkspaceTraits wt({GetPackedSize(problem.GetIn()),
-                                       GetPackedSize(problem.GetWeights()),
-                                       GetPackedSize(problem.GetOut()),
-                                       GetCKAlphaBetaWorkspace(problem)});
+        MultiBufferWorkspaceTraits wt(
+            {GetPackedSize(problem.GetIn()),
+             GetPackedSize(problem.GetWeights()),
+             GetPackedSize(problem.GetOut()),
+             (ck_ws_size > 0) ? ck_ws_size : GetCKAlphaBetaWorkspace(problem)});
         return wt.GetSize();
     }
 
@@ -1078,11 +1132,6 @@ ConvSolution InitInvokerFactoryNCHW(const ExecutionContext& ctx,
 
     std::optional<CKBWDWeightBufferDescriptor> _ck_buff_des;
 
-    if(problem.IsDirectionBackwardWrW())
-    {
-        _ck_buff_des.emplace(GetCKAlphaBetaWorkspace(problem), 0);
-    }
-
     auto ptr_iter = FindConvPtrByID(conv_ptrs, id_string);
     if(ptr_iter == conv_ptrs.end())
     {
@@ -1090,11 +1139,23 @@ ConvSolution InitInvokerFactoryNCHW(const ExecutionContext& ctx,
         return {miopenStatusInvalidValue};
     }
 
+    if constexpr(std::is_same_v<CastType, miopen::conv::WrWInvokeParams>)
+    {
+        auto ck_ws_size = ck_args.GetCKSplitkWorkspaceSize(*ptr_iter, split_k.value_or(1));
+        _ck_buff_des.emplace(ck_ws_size, 0);
+        result.workspace_sz = GetWorkspaceSizeLayoutTransformConv(problem, ck_ws_size);
+    }
+    else
+    {
+        result.workspace_sz = GetWorkspaceSizeLayoutTransformConv(problem);
+    }
+
     auto [_input1_tr_inst, _input2_tr_inst, _output_tr_inst, _output_init_tr_inst] =
         internal::MakeTaggedTransposeInstances<CKArgsType>(
             result, ctx, problem, ck_args, input1_op, input2_op, output_op, _ck_buff_des);
 
-    result.invoker_factory = [split_k             = split_k,
+    result.invoker_factory = [kernel_id           = kernel_id,
+                              split_k             = split_k,
                               ck_args             = std::move(ck_args),
                               sh_conv_ptr         = std::shared_ptr{std::move(*ptr_iter)},
                               input1_tr_inst      = std::move(_input1_tr_inst),
@@ -1103,7 +1164,8 @@ ConvSolution InitInvokerFactoryNCHW(const ExecutionContext& ctx,
                               output_init_tr_inst = std::move(_output_init_tr_inst),
                               ck_buff_des =
                                   _ck_buff_des](const std::vector<Kernel>& kernels) mutable {
-        return [split_k = split_k,
+        return [kernel_id = kernel_id,
+                split_k   = split_k,
                 kernels,
                 ck_args             = std::move(ck_args),
                 sh_conv_ptr         = std::move(sh_conv_ptr),
@@ -1167,9 +1229,11 @@ ConvSolution InitInvokerFactoryNCHW(const ExecutionContext& ctx,
                                  CKArgsType,
                                  CastType>(ck_args, sh_conv_ptr, tr_ptrs, data_ctx, split_k);
 
+            shared<Data_t> buf_handle{};
             if(ck_buff_des.has_value() && ck_buff_des->ck_size && workspace_ptr)
             {
-                auto buf_handle = handle.CreateSubBuffer(workspace_ptr, ck_buff_des->ck_offset, 0);
+                buf_handle = handle.CreateSubBuffer(
+                    workspace_ptr, ck_buff_des->ck_offset, ck_buff_des->ck_size);
                 assert(buf_handle.get());
                 sh_conv_ptr->SetWorkSpacePointer(argument_ptr.get(), buf_handle.get());
             }
@@ -1177,6 +1241,7 @@ ConvSolution InitInvokerFactoryNCHW(const ExecutionContext& ctx,
             auto invoker_ptr = sh_conv_ptr->MakeInvokerPointer();
             {
                 WorkAroundHipEventProfiler prf(handle);
+                MIOPEN_LOG_I2("kernel_name = " << kernel_id);
                 invoker_ptr->Run(argument_ptr.get(), {handle.GetStream(), false});
             }
 
@@ -1191,8 +1256,6 @@ ConvSolution InitInvokerFactoryNCHW(const ExecutionContext& ctx,
             output_tr_inst.ConvertTo(handle, kernels, conv_tensors);
         };
     };
-
-    result.workspace_sz = GetWorkspaceSizeLayoutTransformConv(problem);
 #endif
     return result;
 }
@@ -1229,16 +1292,19 @@ ConvSolution InitInvokerFactoryNHWC(const ExecutionContext&,
         ConvSolution result;
 #if MIOPEN_BACKEND_HIP && MIOPEN_USE_COMPOSABLEKERNEL
         miopenAlphaBetaCase_t alpha_beta_case = problem.GetAlphaBetaCase();
-        [[maybe_unused]] bool should_allocated_wrw_buffer =
-            ShouldAllocateWorkSpaceBufferForWRW(problem);
+        auto ck_args                          = CKArgsType{problem};
+        auto ck_ws_size = ck_args.GetCKSplitkWorkspaceSize(*ptr_iter, split_k.value_or(1));
+        [[maybe_unused]] bool should_allocated_wrw_buffer = ck_ws_size > 0;
 
-        result.invoker_factory = [split_k                     = split_k,
+        result.invoker_factory = [kernel_id                   = kernel_id,
+                                  split_k                     = split_k,
                                   ck_args                     = CKArgsType{problem},
                                   alpha_beta_case             = alpha_beta_case,
                                   should_allocated_wrw_buffer = should_allocated_wrw_buffer,
                                   sh_conv_ptr = std::shared_ptr{std::move(*ptr_iter)}](
                                      const std::vector<Kernel>&) mutable {
-            return [split_k                     = split_k,
+            return [kernel_id                   = kernel_id,
+                    split_k                     = split_k,
                     ck_args                     = std::move(ck_args),
                     alpha_beta_case             = alpha_beta_case,
                     should_allocated_wrw_buffer = should_allocated_wrw_buffer,
@@ -1277,6 +1343,7 @@ ConvSolution InitInvokerFactoryNHWC(const ExecutionContext&,
                 auto invoker_ptr = sh_conv_ptr->MakeInvokerPointer();
                 {
                     WorkAroundHipEventProfiler prf(handle);
+                    MIOPEN_LOG_I2("kernel_name = " << kernel_id);
                     invoker_ptr->Run(argument_ptr.get(), {handle.GetStream(), false});
                 }
 
@@ -1288,7 +1355,7 @@ ConvSolution InitInvokerFactoryNHWC(const ExecutionContext&,
                 }
             };
         };
-        result.workspace_sz = GetWorkspaceSizeLayoutTransformConv(problem);
+        result.workspace_sz = GetWorkspaceSizeLayoutTransformConv(problem, ck_ws_size);
 #endif
         return result;
     }
@@ -1296,11 +1363,13 @@ ConvSolution InitInvokerFactoryNHWC(const ExecutionContext&,
     {
         ConvSolution result;
 #if MIOPEN_BACKEND_HIP && MIOPEN_USE_COMPOSABLEKERNEL
-        result.invoker_factory = [split_k     = split_k,
+        result.invoker_factory = [kernel_id   = kernel_id,
+                                  split_k     = split_k,
                                   ck_args     = CKArgsType{problem},
                                   sh_conv_ptr = std::shared_ptr{std::move(*ptr_iter)}](
                                      const std::vector<Kernel>&) mutable {
-            return [split_k     = split_k,
+            return [kernel_id   = kernel_id,
+                    split_k     = split_k,
                     ck_args     = std::move(ck_args),
                     sh_conv_ptr = std::move(sh_conv_ptr)](
                        const Handle& handle, const AnyInvokeParams& primitive_parameters) {
@@ -1330,6 +1399,7 @@ ConvSolution InitInvokerFactoryNHWC(const ExecutionContext&,
 
                 {
                     WorkAroundHipEventProfiler prf(handle);
+                    MIOPEN_LOG_I2("kernel_name = " << kernel_id);
                     invoker_ptr->Run(argument_ptr.get(), {handle.GetStream(), false});
                 }
 

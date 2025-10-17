@@ -141,16 +141,19 @@ if(HIPBLAS_ENABLE_CLIENTS)
   rocm_read_os_release(CLIENTS_OS_VERSION VERSION_ID)
 
   message(STATUS "OS: ${CLIENTS_OS} ${CLIENTS_OS_VERSION}")
-  set(GFORTRAN_RPM "libgfortran4")
-  set(GFORTRAN_DEB "libgfortran4")
-  if(CLIENTS_OS STREQUAL "centos" OR CLIENTS_OS STREQUAL "rhel" OR CLIENTS_OS STREQUAL "almalinux")
-    if(CLIENTS_OS_VERSION VERSION_GREATER_EQUAL "8")
-      set(GFORTRAN_RPM "libgfortran")
+
+  if(BUILD_FORTRAN_CLIENTS)
+    set(GFORTRAN_RPM "libgfortran4")
+    set(GFORTRAN_DEB "libgfortran4")
+    if(CLIENTS_OS STREQUAL "centos" OR CLIENTS_OS STREQUAL "rhel" OR CLIENTS_OS STREQUAL "almalinux")
+      if(CLIENTS_OS_VERSION VERSION_GREATER_EQUAL "8")
+        set(GFORTRAN_RPM "libgfortran")
+      endif()
+    elseif(CLIENTS_OS STREQUAL "ubuntu" AND CLIENTS_OS_VERSION VERSION_GREATER_EQUAL "20.04")
+      set(GFORTRAN_DEB "libgfortran5")
+    elseif(CLIENTS_OS STREQUAL "mariner" OR CLIENTS_OS STREQUAL "azurelinux")
+      set(GFORTRAN_RPM "gfortran")
     endif()
-  elseif(CLIENTS_OS STREQUAL "ubuntu" AND CLIENTS_OS_VERSION VERSION_GREATER_EQUAL "20.04")
-    set(GFORTRAN_DEB "libgfortran5")
-  elseif(CLIENTS_OS STREQUAL "mariner" OR CLIENTS_OS STREQUAL "azurelinux")
-    set(GFORTRAN_RPM "gfortran")
   endif()
 
   rocm_package_setup_component(clients)
@@ -159,25 +162,19 @@ if(HIPBLAS_ENABLE_CLIENTS)
     rocm_package_setup_client_component(
       tests
       DEPENDS
-        COMPONENT clients-common
-        DEB "${GFORTRAN_DEB}"
-        RPM "${GFORTRAN_RPM}")
+        COMPONENT clients-common)
   endif()
   if(HIPBLAS_ENABLE_BENCHMARKS)
     rocm_package_setup_client_component(
       benchmarks
       DEPENDS
-        COMPONENT clients-common
-        DEB "${GFORTRAN_DEB}"
-        RPM "${GFORTRAN_RPM}")
+        COMPONENT clients-common)
   endif()
   if(HIPBLAS_ENABLE_SAMPLES)
     rocm_package_setup_client_component(
       samples
       DEPENDS
-        COMPONENT clients-common
-        DEB "${GFORTRAN_DEB}"
-        RPM "${GFORTRAN_RPM}")
+        COMPONENT clients-common)
   endif()
 endif( )
 
@@ -274,37 +271,37 @@ if(HIPBLAS_BUILD_COVERAGE OR BUILD_COVERAGE)
 
   add_custom_target(coverage_analysis
     COMMAND echo Coverage GTEST_FILTER=\${GTEST_FILTER}
-    COMMAND ${coverage_test} --gtest_filter=\"\${GTEST_FILTER}\"
+    COMMAND ${CMAKE_COMMAND} -E make_directory ./coverage/profraw
+    COMMAND ${CMAKE_COMMAND} -E env LLVM_PROFILE_FILE="./coverage-report/profraw/hipblas-coverage_%m.profraw" ${coverage_test} --gtest_filter=\"\${GTEST_FILTER}\"
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
     )
 
   add_dependencies(coverage_analysis hipblas)
 
-  #
-  # Prepare coverage output
-  # This little script is generated because the option '--gcov-tool <program name>' of lcov cannot take arguments.
-  #
+  find_program(
+    LLVM_PROFDATA
+    llvm-profdata
+    REQUIRED
+    HINTS ${ROCM_PATH}/llvm/bin
+    PATHS /opt/rocm/llvm/bin
+  )
 
-  # source path substitute adjustment only for CI
-  get_filename_component(PARENT_DIR ${CMAKE_SOURCE_DIR} DIRECTORY)
-  get_filename_component(GRANDPARENT_DIR ${PARENT_DIR} DIRECTORY)
-  set(base_path "/var/jenkins_home/library")
-  set(hash_path "${CMAKE_SOURCE_DIR}/library")
-  message(STATUS "BASE ${base_path} to HASHED ${hash_path}")
+  find_program(
+    LLVM_COV
+    llvm-cov
+    REQUIRED
+    HINTS ${ROCM_PATH}/llvm/bin
+    PATHS /opt/rocm/llvm/bin
+  )
 
-  add_custom_target(coverage
+  add_custom_target(
+    coverage
     DEPENDS coverage_analysis
-    COMMAND mkdir -p lcoverage
-    COMMAND echo "\\#!/bin/bash" > llvm-gcov.sh
-    COMMAND echo "\\# THIS FILE HAS BEEN GENERATED" >> llvm-gcov.sh
-    COMMAND printf "exec /opt/rocm/llvm/bin/llvm-cov gcov $$\\@" >> llvm-gcov.sh
-    COMMAND chmod +x llvm-gcov.sh
-    COMMAND lcov --ignore-errors unused --directory . --base-directory "${CMAKE_SOURCE_DIR}" --gcov-tool ./llvm-gcov.sh --capture --substitute "'s#${base_path}#${hash_path}#g'" -o ./lcoverage/raw_main_coverage.info
-    COMMAND lcov --ignore-errors unused --remove ./lcoverage/raw_main_coverage.info "'/opt/*'" "'/usr/*'" -o ./lcoverage/main_coverage.info
-    COMMAND genhtml --ignore-errors source ./lcoverage/main_coverage.info --output-directory ./lcoverage --prefix ${CMAKE_SOURCE_DIR}
+    COMMAND ${LLVM_PROFDATA} merge -sparse ./coverage-report/profraw/hipblas-coverage_*.profraw -o ./coverage-report/hipblas.profdata
+    COMMAND ${LLVM_COV} report -object ./library/src/libhipblas.so -instr-profile=./coverage-report/hipblas.profdata
+    COMMAND ${LLVM_COV} show -object ./library/src/libhipblas.so -instr-profile=./coverage-report/hipblas.profdata -format=html -output-dir=coverage-report
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-    )
-
+  )
 
   #
   # Coverage cleanup

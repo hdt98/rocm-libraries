@@ -137,6 +137,14 @@ if (WIN32)
   endif()
 endif()
 
+<<<<<<< HEAD
+=======
+if(BUILD_CODE_COVERAGE)
+  target_compile_options(hipblas PRIVATE -g -O0 -fprofile-instr-generate -fcoverage-mapping)
+  target_link_options(hipblas PUBLIC -fprofile-instr-generate)
+endif()
+
+>>>>>>> upstream/develop
 # Package that helps me set visibility for function names exported from shared library
 set_target_properties( hipblas PROPERTIES CXX_VISIBILITY_PRESET "hidden" VISIBILITY_INLINES_HIDDEN ON )
 generate_export_header( hipblas EXPORT_FILE_NAME ${PROJECT_BINARY_DIR}/include/hipblas/hipblas-export.h )
@@ -144,5 +152,40 @@ generate_export_header( hipblas EXPORT_FILE_NAME ${PROJECT_BINARY_DIR}/include/h
 # Following Boost conventions of prefixing 'lib' on static built libraries, across all platforms
 if(NOT HIPBLAS_BUILD_SHARED_LIBS)
   set_target_properties( hipblas PROPERTIES PREFIX "lib" )
+<<<<<<< HEAD
 endif()
 
+=======
+endif( )
+
+############################################################
+# Installation
+
+rocm_install_targets(
+  TARGETS hipblas
+  INCLUDE
+    ${CMAKE_BINARY_DIR}/include
+)
+#         PERMISSIONS OWNER_EXECUTE OWNER_WRITE OWNER_READ GROUP_EXECUTE GROUP_READ WORLD_EXECUTE WORLD_READ
+
+if(HIP_PLATFORM STREQUAL amd )
+  rocm_export_targets(
+    TARGETS roc::hipblas
+    DEPENDS PACKAGE hip
+    DEPENDS PACKAGE hipblas-common
+    STATIC_DEPENDS ${static_depends}
+    NAMESPACE roc::
+  )
+else( )
+  rocm_export_targets(
+    TARGETS roc::hipblas
+    DEPENDS PACKAGE HIP
+    DEPENDS PACKAGE hipblas-common
+    NAMESPACE roc::
+  )
+endif( )
+
+# Force installation of .f90 module files
+rocm_install(FILES "hipblas_module.f90"
+        DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/hipblas")
+>>>>>>> upstream/develop
