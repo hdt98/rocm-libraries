@@ -72,30 +72,6 @@ namespace DGen
         }
     };
 
-    struct IdentityScaleNormalData
-    {
-        float mean;
-        float std_dev;
-
-        std::string toString() const
-        {
-            return "IdentityScale_NormalData(" + std::to_string(mean) + ", "
-                   + std::to_string(std_dev) + ")";
-        }
-    };
-
-    struct NormalScaleUniformData
-    {
-        float mean;
-        float std_dev;
-
-        std::string toString() const
-        {
-            return "NormalScale_UniformData(" + std::to_string(mean) + ", "
-                   + std::to_string(std_dev) + ")";
-        }
-    };
-
     struct Identity
     {
         std::string toString() const
@@ -142,8 +118,6 @@ namespace DGen
     using DataInitMode = std::variant<Bounded,
                                       BoundedAlternatingSign,
                                       Unbounded,
-                                      IdentityScaleNormalData,
-                                      NormalScaleUniformData,
                                       Identity,
                                       Ones,
                                       Zeros,
@@ -234,12 +208,6 @@ namespace DGen
         void generate_data_bounded(const std::vector<index_t>& size);
         void generate_data_bounded_alternating_sign(const std::vector<index_t>& size);
         void generate_data_unbounded(const std::vector<index_t>& size);
-        void generate_data_identity_scale_normal_data(const std::vector<index_t>& size,
-                                                      const float                 mean,
-                                                      const float                 std_dev);
-        void generate_data_normal_scale_uniform_data(const std::vector<index_t>& size,
-                                                     const float                 mean,
-                                                     const float                 std_dev);
         void generate_data_identity(const std::vector<index_t>& size,
                                     const std::vector<index_t>& stride);
         void generate_data_ones();
@@ -277,28 +245,21 @@ namespace DGen
     inline void DataGenerator<DTYPE>::dispatch_generate_data(const std::vector<index_t>& size,
                                                              const std::vector<index_t>& stride)
     {
-        std::visit(
-            overload{[&](const Bounded&) { generate_data_bounded(size); },
-                     [&](const BoundedAlternatingSign&) {
-                         generate_data_bounded_alternating_sign(size);
-                     },
-                     [&](const Unbounded&) { generate_data_unbounded(size); },
-                     [&](const IdentityScaleNormalData& isnd) {
-                         generate_data_identity_scale_normal_data(size, isnd.mean, isnd.std_dev);
-                     },
-                     [&](const NormalScaleUniformData& nsud) {
-                         generate_data_normal_scale_uniform_data(size, nsud.mean, nsud.std_dev);
-                     },
-                     [&](const Identity&) { generate_data_identity(size, stride); },
-                     [&](const Ones&) { generate_data_ones(); },
-                     [&](const Zeros&) {},
-                     [&](const TrigonometricFromFloat&) {
-                         generate_data_trigonometric_from_float(size);
-                     },
-                     [&](const NormalFromFloat& n) {
-                         generate_data_normal_from_float(size, n.mean, n.std_dev);
-                     }},
-            m_options.initMode);
+        std::visit(overload{[&](const Bounded&) { generate_data_bounded(size); },
+                            [&](const BoundedAlternatingSign&) {
+                                generate_data_bounded_alternating_sign(size);
+                            },
+                            [&](const Unbounded&) { generate_data_unbounded(size); },
+                            [&](const Identity&) { generate_data_identity(size, stride); },
+                            [&](const Ones&) { generate_data_ones(); },
+                            [&](const Zeros&) {},
+                            [&](const TrigonometricFromFloat&) {
+                                generate_data_trigonometric_from_float(size);
+                            },
+                            [&](const NormalFromFloat& n) {
+                                generate_data_normal_from_float(size, n.mean, n.std_dev);
+                            }},
+                   m_options.initMode);
     }
 
     template <typename DTYPE>
@@ -933,197 +894,6 @@ namespace DGen
                     std::uniform_int_distribution<> scale_dist(scaleMin, scaleMax);
 
                     const auto s = scale_dist(m_gen[tid]);
-                    std::memcpy(&m_scaleBytes[scale_i], &s, m_scaleDesc.byte_size);
-
-                    // reset per block values
-                    max_exp = std::numeric_limits<int32_t>::min();
-                    min_exp = std::numeric_limits<int32_t>::max();
-                }
-            }
-        }
-
-        post_sprinkle(size, isScaled<DTYPE>() ? -F64BIAS : -F32BIAS);
-    }
-
-    template <typename DTYPE>
-    void DataGenerator<DTYPE>::generate_data_identity_scale_normal_data(
-        const std::vector<index_t>& size, const float mean, const float std_dev)
-    {
-        using namespace Constants;
-
-        const auto block_size = (isScaled<DTYPE>() ? m_options.blockScaling : 1);
-
-        dimension_iterator ditr(size);
-
-        const auto dataBias         = static_cast<int32_t>(getDataBias<DTYPE>());
-        const auto dataMantissaBits = getDataMantissaBits<DTYPE>();
-        const auto dataExponentBits = getDataExponentBits<DTYPE>();
-        const auto dataUnbiasedEMin = getDataUnBiasedEMin<DTYPE>();
-        auto       scaleBias        = getScaleBias<DTYPE>();
-
-        const int32_t subnorm_min_exp = dataUnbiasedEMin - dataMantissaBits;
-        const auto    numBlocks       = m_dataDesc.array_size / block_size;
-
-#pragma omp parallel for num_threads(m_num_threads)
-        for(index_t scale_i = 0; scale_i < numBlocks; scale_i++)
-        {
-            const auto tid = omp_get_thread_num();
-
-            std::normal_distribution<> normal_dist{mean, std_dev};
-
-            int32_t max_exp = std::numeric_limits<int32_t>::min();
-            int32_t min_exp = std::numeric_limits<int32_t>::max();
-            for(index_t block_i = 0; block_i < block_size; block_i++)
-            {
-                //
-                // compute index
-                //
-                index_t data_i = scale_i * block_size + block_i;
-
-                //
-                // generate random block
-                //
-                int64_t d;
-                do
-                {
-                    d = normal_dist(m_gen[tid]);
-                } while((!m_options.includeNaN
-                         && isNaN<DTYPE>(reinterpret_cast<uint8_t*>(&scaleBias),
-                                         reinterpret_cast<uint8_t*>(&d),
-                                         0,
-                                         0))
-                        || (!m_options.includeInf
-                            && isInf<DTYPE>(reinterpret_cast<uint8_t*>(&scaleBias),
-                                            reinterpret_cast<uint8_t*>(&d),
-                                            0,
-                                            0)));
-
-                const int32_t exp
-                    = getExponentValue(d, dataMantissaBits, dataExponentBits) - dataBias;
-
-                max_exp = std::max(max_exp, exp);
-
-                if(exp != -dataBias)
-                {
-                    min_exp = std::min(min_exp, exp);
-                }
-                else
-                {
-                    min_exp = std::min(min_exp, subnorm_min_exp);
-                }
-
-                std::memcpy(&m_dataBytes[data_i * m_dataDesc.byte_size], &d, m_dataDesc.byte_size);
-                //
-                // Generate scale
-                //
-                if(isScaled<DTYPE>() && block_i == block_size - 1)
-                {
-                    // Scale value is always 1
-                    const int32_t s = 1;
-                    std::memcpy(&m_scaleBytes[scale_i], &s, m_scaleDesc.byte_size);
-
-                    // reset per block values
-                    max_exp = std::numeric_limits<int32_t>::min();
-                    min_exp = std::numeric_limits<int32_t>::max();
-                }
-            }
-        }
-
-        post_sprinkle(size, isScaled<DTYPE>() ? -F64BIAS : -F32BIAS);
-    }
-
-    template <typename DTYPE>
-    void DataGenerator<DTYPE>::generate_data_normal_scale_uniform_data(
-        const std::vector<index_t>& size, const float mean, const float std_dev)
-    {
-        using namespace Constants;
-
-        const auto block_size = (isScaled<DTYPE>() ? m_options.blockScaling : 1);
-
-        dimension_iterator ditr(size);
-
-        const auto dataBias          = static_cast<int32_t>(getDataBias<DTYPE>());
-        const auto dataMantissaBits  = getDataMantissaBits<DTYPE>();
-        const auto dataExponentBits  = getDataExponentBits<DTYPE>();
-        const auto dataUnbiasedEMin  = getDataUnBiasedEMin<DTYPE>();
-        auto       scaleBias         = getScaleBias<DTYPE>();
-        const auto scaleBiasedEMax   = getScaleBiasedEMax<DTYPE>();
-        const auto scaleBiasedEMin   = getScaleBiasedEMin<DTYPE>();
-        const auto scaleUnbiasedEMax = getScaleUnBiasedEMax<DTYPE>();
-        const auto scaleUnbiasedEMin = getScaleUnBiasedEMin<DTYPE>();
-
-        const int32_t  subnorm_min_exp = dataUnbiasedEMin - dataMantissaBits;
-        const uint64_t max             = (ONE << m_dataDesc.bit_size) - 1;
-        const auto     numBlocks       = m_dataDesc.array_size / block_size;
-
-#pragma omp parallel for num_threads(m_num_threads)
-        for(index_t scale_i = 0; scale_i < numBlocks; scale_i++)
-        {
-            const auto tid = omp_get_thread_num();
-
-            std::uniform_int_distribution<uint64_t> data_dist(0, max);
-
-            int32_t max_exp = std::numeric_limits<int32_t>::min();
-            int32_t min_exp = std::numeric_limits<int32_t>::max();
-            for(index_t block_i = 0; block_i < block_size; block_i++)
-            {
-                //
-                // compute index
-                //
-                index_t data_i = scale_i * block_size + block_i;
-
-                //
-                // generate random block
-                //
-                uint64_t d;
-                do
-                {
-                    d = data_dist(m_gen[tid]);
-                } while((!m_options.includeNaN
-                         && isNaN<DTYPE>(reinterpret_cast<uint8_t*>(&scaleBias),
-                                         reinterpret_cast<uint8_t*>(&d),
-                                         0,
-                                         0))
-                        || (!m_options.includeInf
-                            && isInf<DTYPE>(reinterpret_cast<uint8_t*>(&scaleBias),
-                                            reinterpret_cast<uint8_t*>(&d),
-                                            0,
-                                            0)));
-
-                const int32_t exp
-                    = getExponentValue(d, dataMantissaBits, dataExponentBits) - dataBias;
-
-                max_exp = std::max(max_exp, exp);
-
-                if(exp != -dataBias)
-                {
-                    min_exp = std::min(min_exp, exp);
-                }
-                else
-                {
-                    min_exp = std::min(min_exp, subnorm_min_exp);
-                }
-
-                std::memcpy(&m_dataBytes[data_i * m_dataDesc.byte_size], &d, m_dataDesc.byte_size);
-                //
-                // Generate scale
-                //
-                if(isScaled<DTYPE>() && block_i == block_size - 1)
-                {
-                    std::normal_distribution<> scale_dist{mean, std_dev};
-                    int32_t                    s = scale_dist(m_gen[tid]);
-
-                    int32_t scaleMax = scaleBiasedEMax;
-                    int32_t scaleMin = scaleBiasedEMin;
-
-                    if(m_options.clampToF32)
-                    {
-                        scaleMax = std::min(F32MAXEXP - max_exp, scaleUnbiasedEMax) + scaleBias;
-                        scaleMin = std::max(F32MINEXP - min_exp, scaleUnbiasedEMin) + scaleBias;
-                    }
-                    s = std::min(s, scaleMax);
-                    s = std::max(s, scaleMin);
-
                     std::memcpy(&m_scaleBytes[scale_i], &s, m_scaleDesc.byte_size);
 
                     // reset per block values
