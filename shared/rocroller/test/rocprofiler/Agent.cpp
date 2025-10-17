@@ -56,11 +56,9 @@ namespace
     rocprofiler_thread_trace_decoder_id_t decoder{};
     rocprofiler_context_id_t              client_ctx{};
 
-    // Use types from the header namespace
     rocroller_profiler::InstructionLatencyMap                       instruction_latencies;
     rocprofiler::sdk::codeobj::disassembly::CodeobjAddressTranslate address_table;
 
-    // Callback for code object loading
     void codeobj_callback(rocprofiler_callback_tracing_record_t record,
                           rocprofiler_user_data_t*,
                           void*)
@@ -123,6 +121,19 @@ namespace
         };
 
         rocprofiler_trace_decode(decoder, parse, se_data, data_size, nullptr);
+
+        for(auto& [pc, data] : instruction_latencies)
+        {
+            auto inst = address_table.get(pc.marker_id, pc.addr);
+            if(inst)
+            {
+                data.instruction = inst->inst;
+            }
+            else
+            {
+                data.instruction = "UNKNOWN_INSTRUCTION";
+            }
+        }
     }
 
     rocprofiler_thread_trace_control_flags_t dispatch_callback(rocprofiler_agent_id_t,
@@ -188,18 +199,6 @@ namespace
         return 0;
     }
 
-    void resolve_instruction_names()
-    {
-        for(auto& [pc, data] : instruction_latencies)
-        {
-            auto inst = address_table.get(pc.marker_id, pc.addr);
-            if(inst)
-            {
-                data.instruction = inst->inst;
-            }
-        }
-    }
-
     void tool_fini(void*)
     {
         rocprofiler_thread_trace_decoder_destroy(decoder);
@@ -212,7 +211,7 @@ extern "C" rocprofiler_tool_configure_result_t*
     if(priority > 0)
         return nullptr;
 
-    id->name = "Simple Instruction Latency Tracer";
+    id->name = "rocRoller rocprofiler";
 
     static auto cfg = rocprofiler_tool_configure_result_t{
         sizeof(rocprofiler_tool_configure_result_t), &tool_init, &tool_fini, nullptr};
@@ -224,7 +223,6 @@ namespace rocroller_profiler
 {
     std::vector<InstructionData> getInstructionData()
     {
-        resolve_instruction_names();
 
         std::vector<InstructionData> result;
         result.reserve(instruction_latencies.size());
