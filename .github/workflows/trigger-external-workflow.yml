@@ -32,7 +32,7 @@ jobs:
           # Generate unique tracking ID for this trigger
           tracking_id="${{ github.run_id }}-$(date +%s)-$RANDOM"
           echo "tracking_id=$tracking_id" >> $GITHUB_OUTPUT
-          echo "📋 Tracking ID: $tracking_id"
+          echo "Tracking ID: $tracking_id"
 
       - name: Trigger external workflow
         env:
@@ -40,9 +40,9 @@ jobs:
           GITHUB_TOKEN: ${{ steps.generate-token.outputs.token }}
           TRACKING_ID: ${{ steps.tracking.outputs.tracking_id }}
         run: |
-          echo "🚀 Triggering external workflow"
-          echo "📋 PR Number: ${{ github.event.inputs.pr-number }}"
-          echo "🔍 Tracking ID: $TRACKING_ID"
+          echo "Triggering external workflow"
+          echo "PR Number: ${{ github.event.inputs.pr-number }}"
+          echo "Tracking ID: $TRACKING_ID"
 
           # Send repository dispatch with unique tracking ID
           response=$(curl -s -w "%{http_code}" -X POST \
@@ -65,10 +65,10 @@ jobs:
           http_code="${response: -3}"
 
           if [ "$http_code" = "204" ]; then
-            echo "✅ Successfully triggered external workflow"
-            echo "🔗 External workflow has been notified"
+            echo "Successfully triggered external workflow"
+            echo "External workflow has been notified"
           else
-            echo "❌ Failed to trigger external workflow (HTTP $http_code)"
+            echo "Failed to trigger external workflow (HTTP $http_code)"
             exit 1
           fi
             exit 1
