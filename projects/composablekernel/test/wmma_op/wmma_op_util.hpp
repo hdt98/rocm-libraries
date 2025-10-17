@@ -18,22 +18,22 @@ namespace wmma_op_util {
 
 #if defined(__gfx125__)
 
-#define CK_WMMA_CALL_INTRIN_1(dst_fmt, src0_fmt, size) \
+#define CK_WMMA_CALL_INTRIN_1(dst_fmt, src0_fmt, size)              \
     intrin_wmma_##dst_fmt##_16x16x##size##_##src0_fmt<16, 16>::Run( \
         reg_a, reg_b, reg_d.GetVectorTypeReference(Number<0>{}))
 
-#define CK_WMMA_CALL_INTRIN_2(dst_fmt, src0_fmt, src1_fmt, size) \
+#define CK_WMMA_CALL_INTRIN_2(dst_fmt, src0_fmt, src1_fmt, size)              \
     intrin_wmma_##dst_fmt##_16x16x##size##_##src0_fmt##src1_fmt<16, 16>::Run( \
         reg_a, reg_b, reg_d.GetVectorTypeReference(Number<0>{}))
 
-#define CK_WMMA_CALL_INTRIN_3(dst_fmt, acc_fmt, src0_fmt, size) \
+#define CK_WMMA_CALL_INTRIN_3(dst_fmt, acc_fmt, src0_fmt, size)              \
     intrin_wmma_##dst_fmt##acc_fmt##_16x16x##size##_##src0_fmt<16, 16>::Run( \
-        reg_a, \
-        reg_b, \
-        reg_c.GetVectorTypeReference(Number<0>{}), \
+        reg_a,                                                               \
+        reg_b,                                                               \
+        reg_c.GetVectorTypeReference(Number<0>{}),                           \
         reg_d.GetVectorTypeReference(Number<0>{}))
 
-#define CK_WMMA_CALL_INTRIN_4(dst_fmt, src0_fmt, neg_a, neg_b, size) \
+#define CK_WMMA_CALL_INTRIN_4(dst_fmt, src0_fmt, neg_a, neg_b, size)              \
     intrin_wmma_##dst_fmt##_16x16x##size##_##src0_fmt<16, 16, neg_a, neg_b>::Run( \
         reg_a, reg_b, reg_d.GetVectorTypeReference(Number<0>{}))
 
@@ -45,9 +45,7 @@ struct WMMAVecType
 
 // fp64 specialization
 template <typename T, index_t kMultiplier>
-struct WMMAVecType<T,
-                   kMultiplier,
-                   ck::enable_if_t<ck::is_same_v<T, double>>>
+struct WMMAVecType<T, kMultiplier, ck::enable_if_t<ck::is_same_v<T, double>>>
 {
     static constexpr bool layoutTransform = false;
     static constexpr int ToIntDim         = 1;
@@ -58,16 +56,14 @@ struct WMMAVecType<T,
         return ck::is_same_v<T, D>;
     }
 
-    using VecT  = vector_type<T, kMultiplier * 2>;
-    using ViewT = vector_type<T, 1>;
+    using VecT                = vector_type<T, kMultiplier * 2>;
+    using ViewT               = vector_type<T, 1>;
     static constexpr int size = kMultiplier * 2;
 };
 
 // fp32 specialization
 template <typename T, index_t kMultiplier>
-struct WMMAVecType<T,
-                   kMultiplier,
-                   ck::enable_if_t<ck::is_same_v<T, float>>>
+struct WMMAVecType<T, kMultiplier, ck::enable_if_t<ck::is_same_v<T, float>>>
 {
     static constexpr bool layoutTransform = false;
     static constexpr int ToIntDim         = 1;
@@ -78,12 +74,12 @@ struct WMMAVecType<T,
         return ck::is_same_v<T, D>;
     }
 
-    using VecT  = vector_type<T, kMultiplier * 2>;
-    using ViewT = vector_type<T, 1>;
+    using VecT                = vector_type<T, kMultiplier * 2>;
+    using ViewT               = vector_type<T, 1>;
     static constexpr int size = kMultiplier * 2;
 };
 
-// fp16 specialization 
+// fp16 specialization
 template <typename T, index_t kMultiplier>
 struct WMMAVecType<T,
                    kMultiplier,
@@ -98,14 +94,17 @@ struct WMMAVecType<T,
         return ck::is_same_v<T, D>;
     }
 
-    using VecT  = vector_type<T, kMultiplier * 2>;
-    using ViewT = vector_type<T, 2>;
+    using VecT                = vector_type<T, kMultiplier * 2>;
+    using ViewT               = vector_type<T, 2>;
     static constexpr int size = kMultiplier * 2;
 };
 
 // f8 ocp or bf8 ocp specialization
 template <typename T, index_t kMultiplier>
-struct WMMAVecType<T, kMultiplier, ck::enable_if_t<ck::is_same_v<T, ck::f8_ocp_t> || ck::is_same_v<T, ck::bf8_ocp_t>>>
+struct WMMAVecType<
+    T,
+    kMultiplier,
+    ck::enable_if_t<ck::is_same_v<T, ck::f8_ocp_t> || ck::is_same_v<T, ck::bf8_ocp_t>>>
 {
     static constexpr bool layoutTransform = true;
     static constexpr int ToIntDim         = 4;
@@ -116,14 +115,17 @@ struct WMMAVecType<T, kMultiplier, ck::enable_if_t<ck::is_same_v<T, ck::f8_ocp_t
         return ck::is_same_v<D, ck::f8_t> || ck::is_same_v<D, ck::bf8_t>;
     }
 
-    using VecT  = vector_type<typename T::data_type, kMultiplier * 2>;
-    using ViewT = vector_type<typename T::data_type, 4>;
+    using VecT                = vector_type<typename T::data_type, kMultiplier * 2>;
+    using ViewT               = vector_type<typename T::data_type, 4>;
     static constexpr int size = kMultiplier * 2;
 };
 
 // f8 fnuz or bf8 fnuz specialization
 template <typename T, index_t kMultiplier>
-struct WMMAVecType<T, kMultiplier, ck::enable_if_t<ck::is_same_v<T, ck::f8_fnuz_t> || ck::is_same_v<T, ck::bf8_fnuz_t>>>
+struct WMMAVecType<
+    T,
+    kMultiplier,
+    ck::enable_if_t<ck::is_same_v<T, ck::f8_fnuz_t> || ck::is_same_v<T, ck::bf8_fnuz_t>>>
 {
     static constexpr bool layoutTransform = true;
     static constexpr int ToIntDim         = 4;
@@ -134,8 +136,8 @@ struct WMMAVecType<T, kMultiplier, ck::enable_if_t<ck::is_same_v<T, ck::f8_fnuz_
         return ck::is_same_v<D, ck::f8_t> || ck::is_same_v<D, ck::bf8_t>;
     }
 
-    using VecT  = vector_type<T, kMultiplier * 2>;
-    using ViewT = vector_type<T, 4>;
+    using VecT                = vector_type<T, kMultiplier * 2>;
+    using ViewT               = vector_type<T, 4>;
     static constexpr int size = kMultiplier * 2;
 };
 
@@ -151,148 +153,233 @@ struct WMMAVecType<T, kMultiplier, ck::enable_if_t<ck::is_same_v<T, int8_t>>>
         return ck::is_same_v<T, D>;
     }
 
-    using VecT  = vector_type<T, kMultiplier * 2>;
-    using ViewT = vector_type<T, 4>;
+    using VecT                = vector_type<T, kMultiplier * 2>;
+    using ViewT               = vector_type<T, 4>;
     static constexpr int size = kMultiplier * 2;
 };
 
-
 // gfx1250 builtin_wmma_naive_selector
-template<typename srcAType, 
-         typename srcBType,
-         typename dstType,
-         typename accType, 
-         index_t kMultiplier>
+template <typename srcAType,
+          typename srcBType,
+          typename dstType,
+          typename accType,
+          index_t kMultiplier>
 __device__ void builtin_wmma_naive_selector(
     const typename WMMAVecType<srcAType, kMultiplier>::VecT::type& reg_a,
     const typename WMMAVecType<srcBType, kMultiplier>::VecT::type& reg_b,
-    StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr, accType, 1, 8, true>& reg_c, 
+    StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr, accType, 1, 8, true>& reg_c,
     StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr, dstType, 1, 8, true>& reg_d)
 {
     constexpr int size = 2 * 2 * kMultiplier;
 
     // if accType and dstType the same
-    if constexpr(std::is_same_v<accType, dstType>) {
-        if constexpr (
-        (ck::is_same_v<srcAType, ck::bf8_t> || ck::is_same_v<srcAType, ck::f8_t>) &&
-        (ck::is_same_v<srcBType, ck::bf8_t> || ck::is_same_v<srcBType, ck::f8_t>)) {
-            if constexpr (ck::is_same_v<dstType, ck::half_t>) {
-                if constexpr (ck::is_same_v<srcAType, ck::bf8_t> && ck::is_same_v<srcBType, ck::bf8_t>)
+    if constexpr(std::is_same_v<accType, dstType>)
+    {
+        if constexpr((ck::is_same_v<srcAType, ck::bf8_t> || ck::is_same_v<srcAType, ck::f8_t>) &&
+                     (ck::is_same_v<srcBType, ck::bf8_t> || ck::is_same_v<srcBType, ck::f8_t>))
+        {
+            if constexpr(ck::is_same_v<dstType, ck::half_t>)
+            {
+                if constexpr(ck::is_same_v<srcAType, ck::bf8_t> &&
+                             ck::is_same_v<srcBType, ck::bf8_t>)
                 {
-                    if constexpr (size == 64)
+                    if constexpr(size == 64)
                         CK_WMMA_CALL_INTRIN_2(f16, bf8, bf8, 64);
-                    else if constexpr (size == 128)
+                    else if constexpr(size == 128)
                         CK_WMMA_CALL_INTRIN_2(f16, bf8, bf8, 128);
                     else
-                        (threadIdx.x == 0 ? printf("--------- UNSUPPORTED size for CK_WMMA_CALL_INTRIN_2 f16: bf8, bf8: %d ---------- \n", size) : 0);
+                        (threadIdx.x == 0
+                             ? printf("--------- UNSUPPORTED size for CK_WMMA_CALL_INTRIN_2 f16: "
+                                      "bf8, bf8: %d ---------- \n",
+                                      size)
+                             : 0);
                 }
-                else if constexpr (ck::is_same_v<srcAType, ck::bf8_t> && ck::is_same_v<srcBType, ck::f8_t>)
+                else if constexpr(ck::is_same_v<srcAType, ck::bf8_t> &&
+                                  ck::is_same_v<srcBType, ck::f8_t>)
                 {
-                    if constexpr (size == 64)
+                    if constexpr(size == 64)
                         CK_WMMA_CALL_INTRIN_2(f16, bf8, f8, 64);
-                    else if constexpr (size == 128)
+                    else if constexpr(size == 128)
                         CK_WMMA_CALL_INTRIN_2(f16, bf8, f8, 128);
                     else
-                        (threadIdx.x == 0 ? printf("--------- UNSUPPORTED size for CK_WMMA_CALL_INTRIN_2 f16: bf8, f8: %d ---------- \n", size) : 0);
+                        (threadIdx.x == 0
+                             ? printf("--------- UNSUPPORTED size for CK_WMMA_CALL_INTRIN_2 f16: "
+                                      "bf8, f8: %d ---------- \n",
+                                      size)
+                             : 0);
                 }
-                else if constexpr (ck::is_same_v<srcAType, ck::f8_t> && ck::is_same_v<srcBType, ck::bf8_t>)
+                else if constexpr(ck::is_same_v<srcAType, ck::f8_t> &&
+                                  ck::is_same_v<srcBType, ck::bf8_t>)
                 {
-                    if constexpr (size == 64)
+                    if constexpr(size == 64)
                         CK_WMMA_CALL_INTRIN_2(f16, f8, bf8, 64);
-                    else if constexpr (size == 128)
+                    else if constexpr(size == 128)
                         CK_WMMA_CALL_INTRIN_2(f16, f8, bf8, 128);
                     else
-                        (threadIdx.x == 0 ? printf("--------- UNSUPPORTED size for CK_WMMA_CALL_INTRIN_2 f16: f8, bf8: %d ---------- \n", size) : 0);
+                        (threadIdx.x == 0
+                             ? printf("--------- UNSUPPORTED size for CK_WMMA_CALL_INTRIN_2 f16: "
+                                      "f8, bf8: %d ---------- \n",
+                                      size)
+                             : 0);
                 }
-                else if constexpr (ck::is_same_v<srcAType, ck::f8_t> && ck::is_same_v<srcBType, ck::f8_t>)
+                else if constexpr(ck::is_same_v<srcAType, ck::f8_t> &&
+                                  ck::is_same_v<srcBType, ck::f8_t>)
                 {
-                    if constexpr (size == 64)
+                    if constexpr(size == 64)
                         CK_WMMA_CALL_INTRIN_2(f16, f8, f8, 64);
-                    else if constexpr (size == 128)
+                    else if constexpr(size == 128)
                         CK_WMMA_CALL_INTRIN_2(f16, f8, f8, 128);
                     else
-                        (threadIdx.x == 0 ? printf("--------- UNSUPPORTED size for CK_WMMA_CALL_INTRIN_2 f16: f8, f8: %d ---------- \n", size) : 0);
+                        (threadIdx.x == 0
+                             ? printf("--------- UNSUPPORTED size for CK_WMMA_CALL_INTRIN_2 f16: "
+                                      "f8, f8: %d ---------- \n",
+                                      size)
+                             : 0);
                 }
                 else
                 {
-                    (threadIdx.x == 0 ? printf("--------- UNSUPPORTED bf8/f8 combination with dest f16 ---------- \n") : 0);
+                    (threadIdx.x == 0 ? printf("--------- UNSUPPORTED bf8/f8 combination with dest "
+                                               "f16 ---------- \n")
+                                      : 0);
                 }
-            } else if constexpr  (ck::is_same_v<dstType, float>) {
-                if constexpr (ck::is_same_v<srcAType, ck::bf8_t> && ck::is_same_v<srcBType, ck::bf8_t>)
+            }
+            else if constexpr(ck::is_same_v<dstType, float>)
+            {
+                if constexpr(ck::is_same_v<srcAType, ck::bf8_t> &&
+                             ck::is_same_v<srcBType, ck::bf8_t>)
                 {
-                    if constexpr (size == 64)
+                    if constexpr(size == 64)
                         CK_WMMA_CALL_INTRIN_2(f32, bf8, bf8, 64);
-                    else if constexpr (size == 128)
+                    else if constexpr(size == 128)
                         CK_WMMA_CALL_INTRIN_2(f32, bf8, bf8, 128);
                     else
-                        (threadIdx.x == 0 ? printf("--------- UNSUPPORTED size for CK_WMMA_CALL_INTRIN_2 f32: bf8, bf8: %d ---------- \n", size) : 0);
+                        (threadIdx.x == 0
+                             ? printf("--------- UNSUPPORTED size for CK_WMMA_CALL_INTRIN_2 f32: "
+                                      "bf8, bf8: %d ---------- \n",
+                                      size)
+                             : 0);
                 }
-                else if constexpr (ck::is_same_v<srcAType, ck::bf8_t> && ck::is_same_v<srcBType, ck::f8_t>)
+                else if constexpr(ck::is_same_v<srcAType, ck::bf8_t> &&
+                                  ck::is_same_v<srcBType, ck::f8_t>)
                 {
-                    if constexpr (size == 64)
+                    if constexpr(size == 64)
                         CK_WMMA_CALL_INTRIN_2(f32, bf8, f8, 64);
-                    else if constexpr (size == 128)
+                    else if constexpr(size == 128)
                         CK_WMMA_CALL_INTRIN_2(f32, bf8, f8, 128);
                     else
-                        (threadIdx.x == 0 ? printf("--------- UNSUPPORTED size for CK_WMMA_CALL_INTRIN_2 f32: bf8, f8: %d ---------- \n", size) : 0);
+                        (threadIdx.x == 0
+                             ? printf("--------- UNSUPPORTED size for CK_WMMA_CALL_INTRIN_2 f32: "
+                                      "bf8, f8: %d ---------- \n",
+                                      size)
+                             : 0);
                 }
-                else if constexpr (ck::is_same_v<srcAType, ck::f8_t> && ck::is_same_v<srcBType, ck::bf8_t>)
+                else if constexpr(ck::is_same_v<srcAType, ck::f8_t> &&
+                                  ck::is_same_v<srcBType, ck::bf8_t>)
                 {
-                    if constexpr (size == 64)
+                    if constexpr(size == 64)
                         CK_WMMA_CALL_INTRIN_2(f32, f8, bf8, 64);
-                    else if constexpr (size == 128)
+                    else if constexpr(size == 128)
                         CK_WMMA_CALL_INTRIN_2(f32, f8, bf8, 128);
                     else
-                        (threadIdx.x == 0 ? printf("--------- UNSUPPORTED size for CK_WMMA_CALL_INTRIN_2 f32: f8, bf8: %d ---------- \n", size) : 0);
+                        (threadIdx.x == 0
+                             ? printf("--------- UNSUPPORTED size for CK_WMMA_CALL_INTRIN_2 f32: "
+                                      "f8, bf8: %d ---------- \n",
+                                      size)
+                             : 0);
                 }
-                else if constexpr (ck::is_same_v<srcAType, ck::f8_t> && ck::is_same_v<srcBType, ck::f8_t>)
+                else if constexpr(ck::is_same_v<srcAType, ck::f8_t> &&
+                                  ck::is_same_v<srcBType, ck::f8_t>)
                 {
-                    if constexpr (size == 64)
+                    if constexpr(size == 64)
                         CK_WMMA_CALL_INTRIN_2(f32, f8, f8, 64);
-                    else if constexpr (size == 128)
+                    else if constexpr(size == 128)
                         CK_WMMA_CALL_INTRIN_2(f32, f8, f8, 128);
                     else
-                        (threadIdx.x == 0 ? printf("--------- UNSUPPORTED size for CK_WMMA_CALL_INTRIN_2 f32: f8, f8: %d ---------- \n", size) : 0);
+                        (threadIdx.x == 0
+                             ? printf("--------- UNSUPPORTED size for CK_WMMA_CALL_INTRIN_2 f32: "
+                                      "f8, f8: %d ---------- \n",
+                                      size)
+                             : 0);
                 }
                 else
                 {
-                    (threadIdx.x == 0 ? printf("--------- UNSUPPORTED bf8/f8 combination with dest f32 ---------- \n") : 0);
+                    (threadIdx.x == 0 ? printf("--------- UNSUPPORTED bf8/f8 combination with dest "
+                                               "f32 ---------- \n")
+                                      : 0);
                 }
             }
-        } else { // not fp8 or bf8
-            if constexpr(std::is_same_v<srcAType, ck::half_t> && std::is_same_v<srcBType, ck::half_t> && std::is_same_v<dstType, ck::half_t>)
-            {        
+        }
+        else
+        { // not fp8 or bf8
+            if constexpr(std::is_same_v<srcAType, ck::half_t> &&
+                         std::is_same_v<srcBType, ck::half_t> &&
+                         std::is_same_v<dstType, ck::half_t>)
+            {
                 CK_WMMA_CALL_INTRIN_1(f16, f16, 32);
-            } 
-            else if constexpr(std::is_same_v<srcAType, ck::half_t> && std::is_same_v<srcBType, ck::half_t> && std::is_same_v<dstType, float>)    {
+            }
+            else if constexpr(std::is_same_v<srcAType, ck::half_t> &&
+                              std::is_same_v<srcBType, ck::half_t> &&
+                              std::is_same_v<dstType, float>)
+            {
                 CK_WMMA_CALL_INTRIN_1(f32, f16, 32);
-            } else if constexpr(std::is_same_v<srcAType, ck::bhalf_t> && std::is_same_v<srcBType, ck::bhalf_t> && std::is_same_v<dstType, float>){
+            }
+            else if constexpr(std::is_same_v<srcAType, ck::bhalf_t> &&
+                              std::is_same_v<srcBType, ck::bhalf_t> &&
+                              std::is_same_v<dstType, float>)
+            {
                 CK_WMMA_CALL_INTRIN_1(f32, bf16, 32);
-            } else if constexpr(std::is_same_v<srcAType, ck::bhalf_t> && std::is_same_v<srcBType, ck::bhalf_t> && std::is_same_v<dstType, ck::bhalf_t>){
+            }
+            else if constexpr(std::is_same_v<srcAType, ck::bhalf_t> &&
+                              std::is_same_v<srcBType, ck::bhalf_t> &&
+                              std::is_same_v<dstType, ck::bhalf_t>)
+            {
                 CK_WMMA_CALL_INTRIN_1(bf16, bf16, 32);
-            } else if constexpr(std::is_same_v<srcAType, int8_t> && std::is_same_v<srcBType, int8_t> && std::is_same_v<dstType, int32_t>){
+            }
+            else if constexpr(std::is_same_v<srcAType, int8_t> &&
+                              std::is_same_v<srcBType, int8_t> && std::is_same_v<dstType, int32_t>)
+            {
                 CK_WMMA_CALL_INTRIN_4(i32, iu8, true, true, 64);
-            } else if constexpr(std::is_same_v<srcAType, float> && std::is_same_v<srcBType, float> && std::is_same_v<dstType, float>){
+            }
+            else if constexpr(std::is_same_v<srcAType, float> && std::is_same_v<srcBType, float> &&
+                              std::is_same_v<dstType, float>)
+            {
                 CK_WMMA_CALL_INTRIN_4(f32, f32, true, true, 4);
-            } else if constexpr(std::is_same_v<srcAType, double> && std::is_same_v<srcBType, double> && std::is_same_v<dstType, double>){
+            }
+            else if constexpr(std::is_same_v<srcAType, double> &&
+                              std::is_same_v<srcBType, double> && std::is_same_v<dstType, double>)
+            {
                 CK_WMMA_CALL_INTRIN_4(f64, f64, true, true, 4);
-            } else {
-                (threadIdx.x == 0 ? printf("--------- UNSPPORTED DATA TYPES for CK_WMMA_CALL_INTRIN_1 or _4 ---------- \n") : 0);            
+            }
+            else
+            {
+                (threadIdx.x == 0 ? printf("--------- UNSPPORTED DATA TYPES for "
+                                           "CK_WMMA_CALL_INTRIN_1 or _4 ---------- \n")
+                                  : 0);
             }
         }
-        } else if constexpr(!std::is_same_v<accType, dstType>){
-            if constexpr (std::is_same_v<accType, float> && std::is_same_v<dstType, ck::bhalf_t>)
-            {
-                CK_WMMA_CALL_INTRIN_3(bf16, f32, bf16, 32);
-            } else {
-                (threadIdx.x == 0 ? printf("--------- UNSPPORTED DATA TYPES for CK_WMMA_CALL_INTRIN_3 ---------- \n") : 0);
-            }
-        } else {
-        (threadIdx.x == 0 ? printf("---------- No builtin_wmma_naive_selector implementation for these types ----------\n") : 0);
+    }
+    else if constexpr(!std::is_same_v<accType, dstType>)
+    {
+        if constexpr(std::is_same_v<accType, float> && std::is_same_v<dstType, ck::bhalf_t>)
+        {
+            CK_WMMA_CALL_INTRIN_3(bf16, f32, bf16, 32);
+        }
+        else
+        {
+            (threadIdx.x == 0
+                 ? printf("--------- UNSPPORTED DATA TYPES for CK_WMMA_CALL_INTRIN_3 ---------- \n")
+                 : 0);
+        }
+    }
+    else
+    {
+        (threadIdx.x == 0 ? printf("---------- No builtin_wmma_naive_selector implementation for "
+                                   "these types ----------\n")
+                          : 0);
     }
 }
 
-template<typename srcA_t, typename srcB_t, typename dst_t, typename acc_t, ck::index_t kMultiplier>
+template <typename srcA_t, typename srcB_t, typename dst_t, typename acc_t, ck::index_t kMultiplier>
 __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
 {
     static_assert(WMMAVecType<srcA_t, kMultiplier>::template is_compatible<srcB_t>(),
@@ -301,7 +388,7 @@ __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
     using srcB_cast_T    = WMMAVecType<srcB_t, kMultiplier>::ViewT;
     using srcA_cast_type = typename srcA_cast_T::type;
     using srcB_cast_type = typename srcB_cast_T::type;
- 
+
     using srcA_vec      = typename WMMAVecType<srcA_t, kMultiplier>::VecT;
     using srcB_vec      = typename WMMAVecType<srcB_t, kMultiplier>::VecT;
     using srcA_vec_type = srcA_vec::type;
@@ -316,123 +403,119 @@ __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
     srcA_vec a_temp = {};
     srcB_vec b_temp = {};
 
-    using acc_vec = StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr,
-                                              acc_t,
-                                              1,
-                                              8,
-                                              true>;
+    using acc_vec = StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr, acc_t, 1, 8, true>;
     acc_vec acc_thread_buf_;
 
-    using dst_vec = StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr,
-                                              dst_t,
-                                              1,
-                                              8,
-                                              true>;
+    using dst_vec = StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr, dst_t, 1, 8, true>;
     dst_vec dst_thread_buf_;
-    
+
     // Num elements per 32B packed chunk
-    constexpr int ToIntDim    = WMMAVecType<srcA_t, kMultiplier>::ToIntDim;
-    
+    constexpr int ToIntDim = WMMAVecType<srcA_t, kMultiplier>::ToIntDim;
+
     // to int dim is 1 for float, 2 for half; base dim assumption is 16
     constexpr int SRC_DIM = WMMAVecType<srcA_t, kMultiplier>::size / ToIntDim;
 
     // 2 threads per a row
     constexpr int ROW_SIZE = 2 * SRC_DIM;
-    
+
     // 16 is base dim assumption, 2 is for a input and b input both
     constexpr int LDS_DIM = 2 * 16 * ROW_SIZE;
 
     constexpr int LDS_B_START = LDS_DIM / 2;
-    
+
     constexpr int QUADRANT_SIZE = ROW_SIZE / 4;
 
     __shared__ srcA_cast_type p_shared[LDS_DIM];
 
     // strongly-type compile time index value of 0 for template containers
-    static constexpr auto I0          = Number<0>{};
-    
+    static constexpr auto I0 = Number<0>{};
+
     // use a directly, as lds_shared allocated with A; A better be bigger than B if mixed
     const srcA_cast_type* local_a_ptr = p_shared;
 
     // get pointer as B type given LDS allocated with A
     const srcB_cast_type* local_b_ptr = reinterpret_cast<const srcB_cast_type*>(p_shared);
 
-    const int lIdx = threadIdx.x;
-    const int lane = lIdx % 32; // wave size
+    const int lIdx    = threadIdx.x;
+    const int lane    = lIdx % 32; // wave size
     const int lowHigh = lane / 16;
 
     bool use_QUADS = true;
 
-    if (use_QUADS == true)
+    if(use_QUADS == true)
     {
 
         // load A to registers using QUADRANTS
-        static_for<0, QUADRANT_SIZE, 1>{}([&](auto ele) { 
-            int i = ele;
-            int j = ele + QUADRANT_SIZE * 2;
+        static_for<0, QUADRANT_SIZE, 1>{}([&](auto ele) {
+            int i      = ele;
+            int j      = ele + QUADRANT_SIZE * 2;
             int rowIdx = lane % 16;
 
             int offset1 = (rowIdx * ROW_SIZE) + (i + (lowHigh * QUADRANT_SIZE));
             int offset2 = (rowIdx * ROW_SIZE) + (j + (lowHigh * QUADRANT_SIZE));
 
             a_temp.template AsType<srcA_cast_type>()(ele) = a_ptr[offset1];
-            a_temp.template AsType<srcA_cast_type>()(Number<ele + QUADRANT_SIZE>{}) = a_ptr[offset2];
+            a_temp.template AsType<srcA_cast_type>()(Number<ele + QUADRANT_SIZE>{}) =
+                a_ptr[offset2];
         });
 
         // load B to registers using QUADRANTS
         static_for<0, QUADRANT_SIZE, 1>{}([&](auto ele) {
-            int i = ele;
-            int j = ele + QUADRANT_SIZE * 2;
-            int rowIdx = lane % 16; 
+            int i      = ele;
+            int j      = ele + QUADRANT_SIZE * 2;
+            int rowIdx = lane % 16;
 
             int offset1 = (rowIdx * ROW_SIZE) + (i + (lowHigh * QUADRANT_SIZE));
             int offset2 = (rowIdx * ROW_SIZE) + (j + (lowHigh * QUADRANT_SIZE));
 
             b_temp.template AsType<srcB_cast_type>()(ele) = b_ptr[offset1];
-            b_temp.template AsType<srcB_cast_type>()(Number<ele + QUADRANT_SIZE>{}) = b_ptr[offset2];
+            b_temp.template AsType<srcB_cast_type>()(Number<ele + QUADRANT_SIZE>{}) =
+                b_ptr[offset2];
         });
 
         // Load A into LDS with quadrants
         constexpr int BLOCK_SIZE = 4 * QUADRANT_SIZE;
         static_for<0, QUADRANT_SIZE, 1>{}([&](auto ele) {
             int rowIdx = lIdx % 16;
-            int hi = lIdx / 16;
+            int hi     = lIdx / 16;
 
             // Each thread gets a block based on rowIdx and hi
             int base = rowIdx * BLOCK_SIZE + hi * QUADRANT_SIZE;
 
             // Write first quadrant
-            p_shared[base + ele]     = a_temp.template AsType<srcA_cast_type>()(ele);
+            p_shared[base + ele] = a_temp.template AsType<srcA_cast_type>()(ele);
 
             // Write second quadrant (offset by 2 quad sizes)
-            p_shared[base + ele  + QUADRANT_SIZE * 2] = a_temp.template AsType<srcA_cast_type>()(Number<ele + QUADRANT_SIZE>{});
+            p_shared[base + ele + QUADRANT_SIZE * 2] =
+                a_temp.template AsType<srcA_cast_type>()(Number<ele + QUADRANT_SIZE>{});
         });
 
         // Load B into LDS with quadrants -- OK
         static_for<0, QUADRANT_SIZE, 1>{}([&](auto ele) {
             int rowIdx = lIdx % 16;
-            int hi = lIdx / 16;
+            int hi     = lIdx / 16;
 
             // Each thread gets a block based on rowIdx and hi
             int base = rowIdx * BLOCK_SIZE + hi * QUADRANT_SIZE + LDS_B_START;
 
             // Write first quadrant
-            int idx1 = base + ele;
-            p_shared[idx1]     = b_temp.template AsType<srcB_cast_type>()(ele);
+            int idx1       = base + ele;
+            p_shared[idx1] = b_temp.template AsType<srcB_cast_type>()(ele);
 
             // Write second quadrant (offset by 2 quad sizes)
             int idx2 = base + ele + QUADRANT_SIZE * 2;
-            p_shared[idx2] = b_temp.template AsType<srcB_cast_type>()(Number<ele + QUADRANT_SIZE>{});
+            p_shared[idx2] =
+                b_temp.template AsType<srcB_cast_type>()(Number<ele + QUADRANT_SIZE>{});
         });
 
-        __syncthreads(); //KO TODO:: move to inline asm
-        
+        __syncthreads(); // KO TODO:: move to inline asm
+
         // Construct a_frag and b_frag for WMMA call -- OK
         static_for<0, QUADRANT_SIZE, 1>{}([&](auto ele) {
             int rowIdx = lIdx % 16;
-            int hi = lIdx / 16;
+            int hi     = lIdx / 16;
 
-            //base for a
+            // base for a
             int base_a = rowIdx * BLOCK_SIZE + hi * QUADRANT_SIZE;
             int base_b = rowIdx * BLOCK_SIZE + hi * QUADRANT_SIZE + LDS_B_START;
 
@@ -441,20 +524,22 @@ __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
             int idx1_b = base_b + ele;
             int idx2_b = base_b + ele + QUADRANT_SIZE * 2;
 
-            //index for first quadrant access
+            // index for first quadrant access
             a_frag.template AsType<srcA_cast_type>()(ele) = local_a_ptr[idx1_a];
             b_frag.template AsType<srcB_cast_type>()(ele) = local_b_ptr[idx1_b];
 
-            //index for second quadrant access
-            a_frag.template AsType<srcA_cast_type>()(Number<ele + QUADRANT_SIZE>{}) = local_a_ptr[idx2_a];
-            b_frag.template AsType<srcB_cast_type>()(Number<ele + QUADRANT_SIZE>{}) = local_b_ptr[idx2_b];
+            // index for second quadrant access
+            a_frag.template AsType<srcA_cast_type>()(Number<ele + QUADRANT_SIZE>{}) =
+                local_a_ptr[idx2_a];
+            b_frag.template AsType<srcB_cast_type>()(Number<ele + QUADRANT_SIZE>{}) =
+                local_b_ptr[idx2_b];
         });
     }
     else // Don't use quads
     {
         // Load A to registers without quadrants
-        static_for<0, SRC_DIM, 1>{}([&](auto ele) { 
-            int i = ele;
+        static_for<0, SRC_DIM, 1>{}([&](auto ele) {
+            int i      = ele;
             int rowIdx = lane % 16;
 
             int offset1 = (rowIdx * ROW_SIZE) + (i + (lowHigh * SRC_DIM));
@@ -463,8 +548,8 @@ __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
         });
 
         // Load B to registers without quadrants
-        static_for<0, SRC_DIM, 1>{}([&](auto ele) { 
-            int i = ele;
+        static_for<0, SRC_DIM, 1>{}([&](auto ele) {
+            int i      = ele;
             int rowIdx = lane % 16;
 
             int offset1 = (rowIdx * ROW_SIZE) + (i + (lowHigh * SRC_DIM));
@@ -475,46 +560,46 @@ __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
         // Load A into LDS without quadrants
         static_for<0, SRC_DIM, 1>{}([&](auto ele) {
             int rowIdx = lIdx % 16;
-            int hi = lIdx / 16;
+            int hi     = lIdx / 16;
 
             // Each thread gets a block based on rowIdx and hi
             int base = rowIdx * ROW_SIZE + hi * SRC_DIM;
 
             // Write first quadrant
-            p_shared[base + ele]     = a_temp.template AsType<srcA_cast_type>()(ele);
+            p_shared[base + ele] = a_temp.template AsType<srcA_cast_type>()(ele);
         });
 
         // Load B into LDS without quadrants
         static_for<0, SRC_DIM, 1>{}([&](auto ele) {
             int rowIdx = lIdx % 16;
-            int hi = lIdx / 16;
+            int hi     = lIdx / 16;
 
             // Each thread gets a block based on rowIdx and hi
             int base = rowIdx * ROW_SIZE + hi * SRC_DIM + LDS_B_START;
 
             // Write first quadrant
-            int idx1 = base + ele;
-            p_shared[idx1]     = b_temp.template AsType<srcB_cast_type>()(ele);
+            int idx1       = base + ele;
+            p_shared[idx1] = b_temp.template AsType<srcB_cast_type>()(ele);
         });
 
         static_for<0, SRC_DIM, 1>{}([&](auto ele) {
             int rowIdx = lIdx % 16;
-            int hi = lIdx / 16;
+            int hi     = lIdx / 16;
 
-            //base for a
+            // base for a
             int base_a = rowIdx * ROW_SIZE + hi * SRC_DIM;
             int base_b = rowIdx * ROW_SIZE + hi * SRC_DIM + LDS_B_START;
 
             int idx1_a = base_a + ele;
             int idx1_b = base_b + ele;
 
-            //index for first quadrant access
+            // index for first quadrant access
             a_frag.template AsType<srcA_cast_type>()(ele) = local_a_ptr[idx1_a];
             b_frag.template AsType<srcB_cast_type>()(ele) = local_b_ptr[idx1_b];
         });
     }
 
-    __syncthreads(); //KO TODO:: move to inline asm
+    __syncthreads(); // KO TODO:: move to inline asm
 
     // Call the WMMA intrinsic selector
     builtin_wmma_naive_selector<srcA_t, srcB_t, dst_t, acc_t, kMultiplier>(
@@ -524,9 +609,9 @@ __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
         dst_thread_buf_);
 
     static_for<0, 8, 1>{}([&](auto ele) {
-        int lowHi = lIdx / 16;
-        int col = lIdx % 16;
-        int row = (lowHi) * 8 + static_cast<int>(ele);
+        int lowHi         = lIdx / 16;
+        int col           = lIdx % 16;
+        int row           = (lowHi) * 8 + static_cast<int>(ele);
         c[col + 16 * row] = dst_thread_buf_[Number<ele>{}];
     });
 }
@@ -540,7 +625,7 @@ __global__ void matmul_swizzle_a(const srcA_t* a, const srcB_t* b, dst_t* c)
     using srcB_cast_T    = WMMAVecType<srcB_t, kMultiplier>::ViewT;
     using srcA_cast_type = typename srcA_cast_T::type;
     using srcB_cast_type = typename srcB_cast_T::type;
- 
+
     using srcA_vec      = typename WMMAVecType<srcA_t, kMultiplier>::VecT;
     using srcB_vec      = typename WMMAVecType<srcB_t, kMultiplier>::VecT;
     using srcA_vec_type = srcA_vec::type;
@@ -552,45 +637,37 @@ __global__ void matmul_swizzle_a(const srcA_t* a, const srcB_t* b, dst_t* c)
     srcA_vec a_frag = {};
     srcB_vec b_frag = {};
 
-    using acc_vec = StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr,
-                                              acc_t,
-                                              1,
-                                              8,
-                                              true>;
+    using acc_vec = StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr, acc_t, 1, 8, true>;
     acc_vec acc_thread_buf_;
 
-    using dst_vec = StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr,
-                                              dst_t,
-                                              1,
-                                              8,
-                                              true>;
+    using dst_vec = StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr, dst_t, 1, 8, true>;
     dst_vec dst_thread_buf_;
-    
+
     // Num elements per 32B packed chunk
-    constexpr int ToIntDim    = WMMAVecType<srcA_t, kMultiplier>::ToIntDim;
-    
+    constexpr int ToIntDim = WMMAVecType<srcA_t, kMultiplier>::ToIntDim;
+
     constexpr int SRC_DIM = WMMAVecType<srcA_t, kMultiplier>::size / ToIntDim;
 
     // 2 threads per a row
     constexpr int ROW_SIZE = 2 * SRC_DIM;
-    
+
     constexpr int QUADRANT_SIZE = ROW_SIZE / 4;
 
     // strongly-type compile time index value of 0 for template containers
-    static constexpr auto I0          = Number<0>{};
+    static constexpr auto I0 = Number<0>{};
 
     const int lIdx = threadIdx.x;
 
     bool use_QUADS = true;
 
-    if (use_QUADS == true)
+    if(use_QUADS == true)
     {
         constexpr int BLOCK_SIZE = 4 * QUADRANT_SIZE;
         static_for<0, QUADRANT_SIZE, 1>{}([&](auto ele) {
             int rowIdx = lIdx % 16;
-            int hi = lIdx / 16;
+            int hi     = lIdx / 16;
 
-            //base for a
+            // base for a
             int base_a = rowIdx * BLOCK_SIZE + hi * QUADRANT_SIZE;
             int base_b = rowIdx * BLOCK_SIZE + hi * QUADRANT_SIZE;
 
@@ -599,11 +676,11 @@ __global__ void matmul_swizzle_a(const srcA_t* a, const srcB_t* b, dst_t* c)
             int idx1_b = base_b + ele;
             int idx2_b = base_b + ele + QUADRANT_SIZE * 2;
 
-            //index for first quadrant access
+            // index for first quadrant access
             a_frag.template AsType<srcA_cast_type>()(ele) = a_ptr[idx1_a];
             b_frag.template AsType<srcB_cast_type>()(ele) = b_ptr[idx1_b];
 
-            //index for second quadrant access
+            // index for second quadrant access
             a_frag.template AsType<srcA_cast_type>()(Number<ele + QUADRANT_SIZE>{}) = a_ptr[idx2_a];
             b_frag.template AsType<srcB_cast_type>()(Number<ele + QUADRANT_SIZE>{}) = b_ptr[idx2_b];
         });
@@ -612,19 +689,19 @@ __global__ void matmul_swizzle_a(const srcA_t* a, const srcB_t* b, dst_t* c)
     {
         static_for<0, SRC_DIM, 1>{}([&](auto ele) {
             int rowIdx = lIdx % 16;
-            int hi = lIdx / 16;
+            int hi     = lIdx / 16;
 
-            //base for a
+            // base for a
             int base = rowIdx * ROW_SIZE + hi * SRC_DIM;
             int idx1 = base + ele;
 
-            //index for first quadrant access
+            // index for first quadrant access
             a_frag.template AsType<srcA_cast_type>()(ele) = a_ptr[idx1];
             b_frag.template AsType<srcB_cast_type>()(ele) = b_ptr[idx1];
         });
     }
 
-    __syncthreads(); //KO TODO:: move to inline asm
+    __syncthreads(); // KO TODO:: move to inline asm
 
     builtin_wmma_naive_selector<srcA_t, srcB_t, dst_t, acc_t, kMultiplier>(
         a_frag.template AsType<srcA_vec_type>()(I0),
@@ -634,9 +711,10 @@ __global__ void matmul_swizzle_a(const srcA_t* a, const srcB_t* b, dst_t* c)
 
     static_for<0, 8, 1>{}([&](auto ele) {
         int lowHi = lIdx / 16;
-        int col = lIdx % 16;
-        int row = (lowHi) * 8 + static_cast<int>(ele);
-        c[col + 16 * row] = dst_thread_buf_[Number<ele>{}]; // idea each thread contiguous along column
+        int col   = lIdx % 16;
+        int row   = (lowHi) * 8 + static_cast<int>(ele);
+        c[col + 16 * row] =
+            dst_thread_buf_[Number<ele>{}]; // idea each thread contiguous along column
     });
 }
 
@@ -660,7 +738,7 @@ __global__ void matmul_swizzle_a(const src_t* a, const src_t* b, dst_t* c)
 }
 
 // #endif
-#else 
+#else
 
 template <typename AccType>
 struct WMMA_ACCNumber_traits
@@ -767,10 +845,10 @@ __global__ void matmul(const src_t* a, const src_t* b, dst_t* c)
     // a and b fragments are stored in 8 VGPRs each, in packed format, so 16 elements each for a and
     // b a_frag will store one column of the 16x16 matrix tile b_frag will store one row of the
     // 16x16 matrix tile
-    using src_vec  = typename vector_type<src_t, 16>::type;
+    using src_vec             = typename vector_type<src_t, 16>::type;
     constexpr index_t acc_num = WMMA_ACCNumber_traits<acc_t>::ACC_NUMBER;
-    src_vec a_frag = {};
-    src_vec b_frag = {};
+    src_vec a_frag            = {};
+    src_vec b_frag            = {};
 
     src_vec a_temp = {};
     src_vec b_temp = {};
@@ -862,11 +940,11 @@ __global__ void matmul_swizzle_a(const src_t* a, const src_t* b, dst_t* c)
 {
     const int lIdx = threadIdx.x;
 
-    using src_vec  = typename vector_type<src_t, 16>::type;
+    using src_vec             = typename vector_type<src_t, 16>::type;
     constexpr index_t acc_num = WMMA_ACCNumber_traits<acc_t>::ACC_NUMBER;
-    src_vec a_frag = {};
-    src_vec b_frag = {};
-    using acc_vec  = StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr, acc_t, 1, acc_num, true>;
+    src_vec a_frag            = {};
+    src_vec b_frag            = {};
+    using acc_vec = StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr, acc_t, 1, acc_num, true>;
     acc_vec c_thread_buf_;
 
     const int lane = lIdx % 16;
@@ -894,7 +972,7 @@ __global__ void matmul_swizzle_a(const src_t* a, const src_t* b, dst_t* c)
     });
 }
 
-template<typename srcA_t, typename srcB_t, typename dst_t, typename acc_t, ck::index_t kMultiplier>
+template <typename srcA_t, typename srcB_t, typename dst_t, typename acc_t, ck::index_t kMultiplier>
 __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
 {
     ignore = a;
@@ -910,9 +988,6 @@ __global__ void matmul_swizzle_a(const srcA_t* a, const srcB_t* b, dst_t* c)
     ignore = c;
 }
 #endif
-
-
-
 
 struct GemmParams
 {
@@ -967,7 +1042,8 @@ bool RunDeviceGEMM(KernelType kernel,
                       static_cast<const BDataType*>(b_n_k_device_buf.GetDeviceBuffer()),
                       static_cast<CDataType*>(c_m_n_device_buf.GetDeviceBuffer()));
     hipError_t err = hipGetLastError();
-    if (err != hipSuccess) {
+    if(err != hipSuccess)
+    {
         std::cerr << "HIP kernel launch error: " << hipGetErrorString(err) << std::endl;
     }
     c_m_n_device_buf.FromDevice(C.mData.data());
@@ -1009,7 +1085,7 @@ struct TestWmma
         Tensor<ADataType> a_m_k(
             f_host_tensor_descriptor(params.M, params.K, params.StrideA, ALayout{}));
         Tensor<BDataType> b_n_k(
-            f_host_tensor_descriptor(params.K, params.N, params.StrideB, BLayout{}));            
+            f_host_tensor_descriptor(params.K, params.N, params.StrideB, BLayout{}));
         Tensor<CDataType> c_m_n_host_result(
             f_host_tensor_descriptor(params.M, params.N, params.StrideC, CLayout{}));
         Tensor<CDataType> c_m_n_device_result(

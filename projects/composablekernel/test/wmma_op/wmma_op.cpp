@@ -18,19 +18,18 @@ static ck::index_t test_case_id = -1;
 
 static ck::index_t case_id = 0;
 
-//gfx12
-template <typename SrcType,
-          typename DstType,
-          typename GPUAccType,
-          typename CPUAccType>
+// gfx12
+template <typename SrcType, typename DstType, typename GPUAccType, typename CPUAccType>
 bool run_test()
 {
-    if(!ck::is_gfx12_supported()) // report a warning, but move on. 
+    if(!ck::is_gfx12_supported()) // report a warning, but move on.
     {
-        fprintf(stderr, "----- WARNING: gfx12 not supported, reporting SUCCESS and skipping test -----\n");
+        fprintf(stderr,
+                "----- WARNING: gfx12 not supported, reporting SUCCESS and skipping test -----\n");
         return true;
     }
-    else{
+    else
+    {
         fprintf(stderr, "----- INFO: gfx12 supported, running test -----\n");
     }
 
@@ -39,9 +38,8 @@ bool run_test()
     using PassThrough = ck::tensor_operation::element_wise::PassThrough;
     bool pass         = true;
 
-    const auto matmul_default = ck::wmma_op_util::matmul<SrcType, DstType, GPUAccType>;
-    const auto matmul_swizzle_a =
-        ck::wmma_op_util::matmul_swizzle_a<SrcType, DstType, GPUAccType>;
+    const auto matmul_default   = ck::wmma_op_util::matmul<SrcType, DstType, GPUAccType>;
+    const auto matmul_swizzle_a = ck::wmma_op_util::matmul_swizzle_a<SrcType, DstType, GPUAccType>;
 
     const auto wmma_kernel_container = std::make_tuple(matmul_default, matmul_swizzle_a);
     ck::static_for<0, 2, 1>{}([&](auto i) {
@@ -73,12 +71,15 @@ template <typename SrcAType,
           ck::index_t KMultiplier = 1>
 bool run_test()
 {
-    if(!ck::is_gfx125_supported()) // report a warning, but move on. 
+    if(!ck::is_gfx125_supported()) // report a warning, but move on.
     {
-        fprintf(stderr, "----- WARNING: gfx1250 not supported, reporting SUCCESS and skipping test -----\n");
+        fprintf(
+            stderr,
+            "----- WARNING: gfx1250 not supported, reporting SUCCESS and skipping test -----\n");
         return true;
     }
-    else{
+    else
+    {
         fprintf(stderr, "----- INFO: gfx1250 supported, running test -----\n");
     }
     case_id++;
@@ -116,7 +117,8 @@ bool run_test()
                                        PassThrough,
                                        PassThrough,
                                        PassThrough,
-                                       KMultiplier>{}(std::get<ck::Number<i>{}>(wmma_kernel_container));
+                                       KMultiplier>{}(
+                std::get<ck::Number<i>{}>(wmma_kernel_container));
     });
 
     return pass ? 1 : 0;
