@@ -42,7 +42,29 @@ constexpr T getToleranceInference()
 }
 
 template <typename T>
-constexpr T getToleranceTraining();
+constexpr T getToleranceTraining()
+{
+    if constexpr(std::is_same_v<T, double>)
+    {
+        return 1e-7; // this needs to be changed when double is supported
+    }
+    else if constexpr(std::is_same_v<T, float>)
+    {
+        return 2e-4f;
+    }
+    else if constexpr(std::is_same_v<T, half>)
+    {
+        return 5e-4_h;
+    }
+    else if constexpr(std::is_same_v<T, hip_bfloat16>)
+    {
+        return 5e-3_bf;
+    }
+    else
+    {
+        static_assert(false, "Type not supported");
+    }
+}
 
 template <typename T>
 constexpr T getToleranceBackward()

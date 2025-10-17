@@ -10,6 +10,7 @@
 #include "MiopenBatchnormPlanBuilder.hpp"
 #include "engines/plans/MiopenBatchnormBwdPlan.hpp"
 #include "engines/plans/MiopenBatchnormFwdInferencePlan.hpp"
+#include "engines/plans/MiopenBatchnormFwdTrainingPlan.hpp"
 
 namespace miopen_legacy_plugin
 {
@@ -27,6 +28,7 @@ bool MiopenBatchnormPlanBuilder::isApplicable(
     }
 
     if(!opGraph.hasOnlySupportedAttributes(std::set<hipdnn_sdk::data_objects::NodeAttributes>{
+           hipdnn_sdk::data_objects::NodeAttributes::BatchnormAttributes,
            hipdnn_sdk::data_objects::NodeAttributes::BatchnormInferenceAttributes,
            hipdnn_sdk::data_objects::NodeAttributes::BatchnormBackwardAttributes}))
     {
@@ -72,6 +74,25 @@ void buildPlanInferenceSingleNode([[maybe_unused]] const HipdnnEnginePluginHandl
     executionContext.setPlan(std::move(plan));
 }
 
+void buildPlanFwdTrainingSingleNode([[maybe_unused]] const HipdnnEnginePluginHandle& handle,
+                                    const hipdnn_plugin::IGraph& opGraph,
+                                    const hipdnn_sdk::data_objects::Node& node,
+                                    HipdnnEnginePluginExecutionContext& executionContext)
+{
+    const auto* attr = node.attributes_as_BatchnormAttributes();
+    if(attr == nullptr)
+    {
+        throw hipdnn_plugin::HipdnnPluginException(
+            HIPDNN_PLUGIN_STATUS_BAD_PARAM,
+            "Failed to convert node attributes to BatchnormAttributes for node: "
+                + getNodeName(node));
+    }
+
+    BatchnormFwdTrainingParams params(*attr, opGraph.getTensorMap());
+    auto plan = std::make_unique<BatchnormFwdTrainingPlan>(std::move(params));
+    executionContext.setPlan(std::move(plan));
+}
+
 void buildPlanBwdSingleNode([[maybe_unused]] const HipdnnEnginePluginHandle& handle,
                             const hipdnn_plugin::IGraph& opGraph,
                             const hipdnn_sdk::data_objects::Node& node,
@@ -103,6 +124,10 @@ void MiopenBatchnormPlanBuilder::buildPlan(
     std::string nodeName = getNodeName(node);
     switch(node.attributes_type())
     {
+    case hipdnn_sdk::data_objects::NodeAttributes::BatchnormAttributes:
+        HIPDNN_LOG_INFO("Building batchnorm fwd training plan for node: {}", nodeName);
+        buildPlanFwdTrainingSingleNode(handle, opGraph, node, executionContext);
+        break;
     case hipdnn_sdk::data_objects::NodeAttributes::BatchnormInferenceAttributes:
         HIPDNN_LOG_INFO("Building batchnorm fwd inference plan for node: {}", nodeName);
         buildPlanInferenceSingleNode(handle, opGraph, node, executionContext);
