@@ -103,7 +103,7 @@ Common warning messages
 
 **"Unsafe combination: Specified find mode and enforcement may lead to incomplete database entries"**
 
-This warning appears when you try to use Fast, Hybrid or Trust find modes (2, 3, 5, 6, 7) with database update operations (``DB_UPDATE=2``, ``SEARCH_DB_UPDATE=4``, or ``DB_CLEAN=5``).
+This warning appears when you try to use Fast, Hybrid, or Trust find modes (2, 3, 5, 6, 7) with database update operations (``DB_UPDATE=2``, ``SEARCH_DB_UPDATE=4``, or ``DB_CLEAN=5``).
 
 **Resolution**: 
 - Use ``MIOPEN_FIND_ENFORCE=3`` (SEARCH) with any ``MIOPEN_FIND_MODE`` or
