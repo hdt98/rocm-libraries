@@ -83,7 +83,7 @@ namespace TensileLite
                             auto solution = slnIter->second;
                             lib.solutionmap.insert(std::make_pair(index, solution));
 
-                            origami::config_t config = {
+                            origami::config_t origami_config = {
                                 .mt = {
                                     solution->sizeMapping.macroTile.x,
                                     solution->sizeMapping.macroTile.y,
@@ -100,8 +100,8 @@ namespace TensileLite
                                 .cache_hints_b = solution->sizeMapping.nonTemporalB,
                             };
 
-                            lib.origami_config_list.emplace_back(config);
-                            lib.origami_config_map.insert(std::make_pair(config, index));
+                            lib.origami_config_list.emplace_back(origami_config);
+                            lib.origami_config_map.insert(std::make_pair(origami_config, index));
                         }
                     }
                 }
