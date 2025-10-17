@@ -13,12 +13,6 @@ find_package(
     PATHS
     ${rocm_version_DIR}
     ${ROCM_PATH})
-find_library(
-    LIBDW_LIBRARY
-    NAMES dw
-    HINTS ${ROCM_PATH} /usr
-    PATHS ${ROCM_PATH} /usr
-    PATH_SUFFIXES lib lib64)
 
 find_package(Catch2 QUIET)
 if(NOT Catch2_FOUND)
