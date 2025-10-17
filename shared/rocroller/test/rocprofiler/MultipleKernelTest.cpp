@@ -177,6 +177,8 @@ namespace RocprofilerTest
             kernelSetup.kernel.launchKernel(kernelSetup.commandArgs.runtimeArguments());
             HIP_CHECK(hipDeviceSynchronize());
 
+            const auto latencies = rocroller_profiler::getInstructionData();
+
             { // Verify device result
                 uint32_t h_result = 0;
                 HIP_CHECK(hipMemcpy(
@@ -185,8 +187,6 @@ namespace RocprofilerTest
                 uint32_t expectedResult = commandArg + literal;
                 CHECK(h_result == expectedResult);
             }
-
-            const auto latencies = rocroller_profiler::getInstructionData();
 
             std::stringstream ss;
             ss << "Instruction, Total Latency, Hit Count, Average Latency" << std::endl;
