@@ -41,7 +41,7 @@ jobs:
 
       - name: Trigger internal workflow
         env:
-          TARGET_REPO: "${{ secrets.EXTERNAL_ORG }}/${{ secrets.EXTERNAL_REPO }}"
+          TARGET_REPO: "${{ secrets.INTERNAL_ORG }}/${{ secrets.INTERNAL_REPO }}"
           GITHUB_TOKEN: ${{ steps.generate-token.outputs.token }}
           TRACKING_ID: ${{ steps.tracking.outputs.tracking_id }}
         run: |
