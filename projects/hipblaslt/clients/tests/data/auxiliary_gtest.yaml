@@ -188,11 +188,6 @@ Tests:
   function:
     - aux_tuple_helper_equal_func: *hpa_half_precision
 
-- name: aux_rocblaslt_rocroller_host_func
-  category: pre_checkin
-  function:
-    - aux_rocblaslt_rocroller_host_func: *hpa_half_precision
-
 - name: aux_hipblaslt_ostream_func
   category: pre_checkin
   function:

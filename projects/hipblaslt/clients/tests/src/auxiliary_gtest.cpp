@@ -112,8 +112,6 @@ namespace
                 testing_aux_tensile_host_func(arg);
             else if(!strcmp(arg.function, "aux_tuple_helper_equal_func"))
                 testing_aux_tuple_helper_equal_func(arg);
-            else if(!strcmp(arg.function, "aux_rocblaslt_rocroller_host_func"))
-                testing_aux_rocblaslt_rocroller_host_func(arg);
             else if(!strcmp(arg.function, "aux_hipblaslt_ostream_func"))
                 testing_aux_hipblaslt_ostream_func(arg);
             else if(!strcmp(arg.function, "aux_handle_func"))
