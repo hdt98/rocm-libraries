@@ -50,14 +50,9 @@ BenchmarkProblems:
         - MatrixInstruction:
           # - [16, 16, 4, 1, 1, 1, 1, 1, 1]
           - [16, 16, 4, 1, 1, 2, 2, 2, 2]
-<<<<<<< HEAD
         # - ScheduleIterAlg: [1]
         - GlobalSplitU: [1] #, 3]
         - StreamK: [3]
-=======
-        - ScheduleIterAlg: [1]
-        - GlobalSplitU: [1, 3]
->>>>>>> 98edb26b341b156b64b096789bb6f48523fb7d52
         - PrefetchLocalRead: [False]
         - PrefetchGlobalRead: [True]
         # - ThreadTile:
