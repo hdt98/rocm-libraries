@@ -32,16 +32,6 @@
 
 ROCSOLVER_BEGIN_NAMESPACE
 
-static hipDeviceProp_t static_props;
-const hipDeviceProp_t* rocblas_internal_get_device_prop(rocblas_handle handle)
-{
-    int device;
-    auto stat = hipGetDevice(&device);
-    stat = hipGetDeviceProperties(&static_props, device);
-
-    return &static_props;
-}
-
 rocblas_status rocsolver_set_alg_mode_impl(rocblas_handle handle,
                                            const rocsolver_function func,
                                            const rocsolver_alg_mode mode)

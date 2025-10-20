@@ -32,8 +32,6 @@
 
 ROCSOLVER_BEGIN_NAMESPACE
 
-const hipDeviceProp_t* rocblas_internal_get_device_prop(rocblas_handle handle);
-
 struct rocsolver_handle_data_
 {
     rocblas_int checksum;

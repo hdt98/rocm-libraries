@@ -29,7 +29,6 @@
 
 #include "rocblas/rocblas.h"
 #include "rocsolver/rocsolver.h"
-#include "rocsolver_handle.hpp"
 
 ROCSOLVER_BEGIN_NAMESPACE
 
