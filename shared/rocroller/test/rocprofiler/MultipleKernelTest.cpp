@@ -380,7 +380,6 @@ namespace RocprofilerTest
                << ", " << avg_latency << std::endl;
         }
         INFO(ss.str());
-
         std::this_thread::sleep_for(std::chrono::seconds(1));
         CHECK(latencies.size() == 8);
 

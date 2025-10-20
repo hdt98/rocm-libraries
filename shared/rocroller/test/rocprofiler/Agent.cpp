@@ -173,21 +173,31 @@ namespace
                                       size_t       num_agents,
                                       void*        user_data)
     {
+        constexpr uint64_t TARGET_CU   = 1; // CU (gfx9) or WGP (gfx10+)
+        constexpr uint64_t SHADER_MASK = 0x1; // Only enable SE=0
+        constexpr uint64_t BUFFER_SIZE = 0x10000000; // 256MB
+
         for(size_t idx = 0; idx < num_agents; idx++)
         {
             const auto* agent = static_cast<const rocprofiler_agent_v0_t*>(agents[idx]);
             if(agent->type != ROCPROFILER_AGENT_TYPE_GPU)
                 continue;
 
+            auto parameters = std::vector<rocprofiler_thread_trace_parameter_t>{};
+            parameters.push_back({ROCPROFILER_THREAD_TRACE_PARAMETER_TARGET_CU, TARGET_CU});
+            parameters.push_back({ROCPROFILER_THREAD_TRACE_PARAMETER_BUFFER_SIZE, BUFFER_SIZE});
+            parameters.push_back(
+                {ROCPROFILER_THREAD_TRACE_PARAMETER_SHADER_ENGINE_MASK, SHADER_MASK});
+
             ROCPROFILER_CALL(
                 rocprofiler_configure_dispatch_thread_trace_service(client_ctx,
                                                                     agent->id,
-                                                                    nullptr,
-                                                                    0,
+                                                                    parameters.data(),
+                                                                    parameters.size(),
                                                                     dispatch_callback,
                                                                     shader_data_callback,
                                                                     user_data),
-                "configure thread trace");
+                "configure dispatch thread trace");
         }
         return ROCPROFILER_STATUS_SUCCESS;
     }
