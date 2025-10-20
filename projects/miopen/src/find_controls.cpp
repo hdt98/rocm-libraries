@@ -55,6 +55,16 @@ MIOPEN_EXPORT bool FindEnforceDisable = false;
 
 } // namespace debug
 
+static_assert(FindEnforceAction::None == static_cast<FindEnforceAction>(miopenTuningPolicyNone));
+static_assert(FindEnforceAction::DbUpdate ==
+              static_cast<FindEnforceAction>(miopenTuningPolicyDbUpdate));
+static_assert(FindEnforceAction::Search ==
+              static_cast<FindEnforceAction>(miopenTuningPolicySearch));
+static_assert(FindEnforceAction::SearchDbUpdate ==
+              static_cast<FindEnforceAction>(miopenTuningPolicySearchDbUpdate));
+static_assert(FindEnforceAction::DbClean ==
+              static_cast<FindEnforceAction>(miopenTuningPolicyDbClean));
+
 namespace {
 
 const char* ToCString(const FindEnforceAction mode)
@@ -182,6 +192,8 @@ const char* ToCString(const FindMode::Values mode)
     case FindMode::Values::Hybrid: return "HYBRID";
     case FindMode::Values::DeprecatedFastHybrid: break;
     case FindMode::Values::DynamicHybrid: return "DYNAMIC_HYBRID";
+    case FindMode::Values::TrustVerify: return "TRUST_VERIFY";
+    case FindMode::Values::TrustVerifyFull: return "TRUST_VERIFY_FULL";
     case FindMode::Values::End_: break;
     }
     return "<Unknown>";
@@ -215,6 +227,14 @@ std::optional<FindMode::Values> GetFindModeValueImpl2(Variable variable)
     else if(str == "DYNAMIC_HYBRID")
     {
         return FindMode::Values::DynamicHybrid;
+    }
+    else if(str == "TRUST_VERIFY")
+    {
+        return FindMode::Values::TrustVerify;
+    }
+    else if(str == "TRUST_VERIFY_FULL")
+    {
+        return FindMode::Values::TrustVerifyFull;
     }
     else
     { // Nop. Fall down & try numerics.
@@ -264,5 +284,53 @@ static_assert(miopenConvolutionFindModeHybrid ==
 static_assert(miopenConvolutionFindModeDynamicHybrid ==
                   static_cast<miopenConvolutionFindMode_t>(FindMode::Values::DynamicHybrid),
               "API is not in sync with the implementation.");
+static_assert(miopenConvolutionFindModeTrustVerify ==
+                  static_cast<miopenConvolutionFindMode_t>(FindMode::Values::TrustVerify),
+              "API is not in sync with the implementation.");
+static_assert(miopenConvolutionFindModeTrustVerifyFull ==
+                  static_cast<miopenConvolutionFindMode_t>(FindMode::Values::TrustVerifyFull),
+              "API is not in sync with the implementation.");
+
+bool IsValidCombination(const FindEnforce& enforce, const FindMode& mode)
+{
+    FindEnforceAction action = enforce.GetAction();
+    FindMode::Values value   = mode.Get();
+
+    // Always safe with no enforcement
+    if(action == FindEnforceAction::None)
+        return true;
+
+    // Always safe with Search-only enforcement
+    if(action == FindEnforceAction::Search)
+        return true;
+
+    // Always safe with Normal mode
+    if(value == FindMode::Values::Normal)
+        return true;
+
+    // Unsafe: Fast/Hybrid modes with database operations
+    if((value == FindMode::Values::Fast || value == FindMode::Values::Hybrid ||
+        value == FindMode::Values::DeprecatedFastHybrid ||
+        value == FindMode::Values::DynamicHybrid) &&
+       (action == FindEnforceAction::DbUpdate || action == FindEnforceAction::SearchDbUpdate ||
+        action == FindEnforceAction::DbClean))
+    {
+        MIOPEN_LOG_W("Unsafe combination: Specified find mode and enforcement may lead to "
+                     "incomplete database entries.");
+        return false;
+    }
+
+    // Unsafe: Trust modes (not public API accessible) with database operations
+    if((value == FindMode::Values::TrustVerify || value == FindMode::Values::TrustVerifyFull) &&
+       (action == FindEnforceAction::DbUpdate || action == FindEnforceAction::SearchDbUpdate ||
+        action == FindEnforceAction::DbClean))
+    {
+        MIOPEN_LOG_W("Unsafe combination: Specified find mode and enforcement depends on DB "
+                     "completeness and is therefore risky.");
+        return false;
+    }
+
+    return false;
+}
 
 } // namespace miopen

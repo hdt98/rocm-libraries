@@ -535,7 +535,15 @@ namespace rocRoller
             if(m_regType != Type::Literal)
                 return false;
 
-            return std::visit([](auto const& val) { return val == 0; }, m_literalValue);
+            return std::visit(
+                [](auto const& val) {
+                    using T = std::decay_t<decltype(val)>;
+                    if constexpr(std::is_same_v<T, Raw32>)
+                        return static_cast<uint32_t>(val) == 0;
+                    else
+                        return val == 0;
+                },
+                m_literalValue);
         }
 
         inline constexpr bool Value::isSpecial() const
@@ -972,7 +980,7 @@ namespace rocRoller
             return element<std::initializer_list<T>>(indices);
         }
 
-        inline ValuePtr Value::bitfield(uint8_t bitOffset, uint8_t bitWidth) const
+        inline ValuePtr Value::bitfield(int bitOffset, int bitWidth) const
         {
             AssertFatal(allocationState() != AllocationState::NoAllocation,
                         ShowValue(allocationState()));
@@ -982,7 +990,8 @@ namespace rocRoller
             AssertFatal(!this->isBitfield());
 
             AssertFatal(bitWidth != 0);
-            AssertFatal(bitWidth < bitsPerRegister);
+            AssertFatal(
+                bitWidth < bitsPerRegister, ShowValue(bitWidth), ShowValue(bitsPerRegister));
 
             AssertFatal(bitOffset < registerCount() * bitsPerRegister,
                         "bitOffset is greater than number of bits in this value.");
@@ -1010,7 +1019,8 @@ namespace rocRoller
             auto const info = DataTypeInfo::Get(m_varType);
 
             AssertFatal(info.packing > 1,
-                        "bitfield access by index is only supported for packed types.");
+                        "bitfield access by index is only supported for packed types.",
+                        ShowValue(m_varType));
 
             auto isContiguousRange = [](T v) -> bool {
                 return std::adjacent_find(
@@ -1042,13 +1052,12 @@ namespace rocRoller
             return this->m_bitOffset.has_value();
         }
 
-        inline uint8_t Value::getBitOffset() const
+        inline int Value::getBitOffset() const
         {
-            AssertFatal(this->m_bitOffset.has_value());
-            return this->m_bitOffset.value();
+            return this->m_bitOffset.value_or(0);
         }
 
-        inline uint8_t Value::getBitWidth() const
+        inline int Value::getBitWidth() const
         {
             AssertFatal(this->m_bitWidth.has_value());
             return this->m_bitWidth.value();

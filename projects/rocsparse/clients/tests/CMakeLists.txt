@@ -42,7 +42,7 @@ if(NOT EXISTS "${CMAKE_MATRICES_DIR}")
   set(CMAKE_MATRICES_DIR ${PROJECT_BINARY_DIR}/matrices CACHE STRING "Matrices directory.")
   file(MAKE_DIRECTORY ${CMAKE_MATRICES_DIR})
 
-  if(NOT TARGET rocsparse)
+  if(NOT TARGET rocsparse AND NOT BUILD_CLIENTS_ONLY)
     set(CONVERT_SOURCE ${CMAKE_SOURCE_DIR}/../deps/convert.cpp CACHE STRING "Convert tool mtx2csr.")
     include(${CMAKE_SOURCE_DIR}/../cmake/ClientMatrices.cmake)
   else()
@@ -163,10 +163,14 @@ set(ROCSPARSE_TEST_SOURCES
   test_v2_spmv_csc.cpp
   test_v2_spmv_ell.cpp
   test_spsv_csr.cpp
+  test_sptrsv_csr.cpp
   test_spitsv_csr.cpp
   test_spsv_coo.cpp
+  test_sptrsv_coo.cpp
   test_spsm_csr.cpp
   test_spsm_coo.cpp
+  test_sptrsm_csr.cpp
+  test_sptrsm_coo.cpp
   test_spmm_bsr.cpp
   test_spmm_csr.cpp
   test_spmm_csc.cpp
@@ -305,10 +309,14 @@ set(ROCSPARSE_CLIENTS_TESTINGS
 ../testings/testing_v2_spmv_csc.cpp
 ../testings/testing_v2_spmv_ell.cpp
 ../testings/testing_spsv_csr.cpp
+../testings/testing_sptrsv_csr.cpp
 ../testings/testing_spitsv_csr.cpp
 ../testings/testing_spsv_coo.cpp
+../testings/testing_sptrsv_coo.cpp
 ../testings/testing_spsm_csr.cpp
 ../testings/testing_spsm_coo.cpp
+../testings/testing_sptrsm_csr.cpp
+../testings/testing_sptrsm_coo.cpp
 ../testings/testing_spmm_bsr.cpp
 ../testings/testing_spmm_csr.cpp
 ../testings/testing_spmm_csc.cpp
@@ -348,11 +356,11 @@ set(ROCSPARSE_CLIENTS_TESTINGS
 ../testings/testing_check_matrix_hyb.cpp
 ../testings/testing_check_spmat.cpp
 ../testings/testing_bsrpad_value.cpp
+rocsparse_test_listeners.cpp
   )
 
 
 set(ROCSPARSE_CLIENTS_COMMON
-  ../common/rocsparse.cpp
   ../common/utility.cpp
   ../common/rocsparse_random.cpp
   ../common/rocsparse_reproducibility.cpp
@@ -402,18 +410,15 @@ target_compile_options(rocsparse-test PRIVATE -ffp-contract=on -mfma -Wno-deprec
 
 # Internal common header
 target_include_directories(rocsparse-test PRIVATE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>)
-
-# Target link libraries
-target_link_libraries(rocsparse-test PRIVATE GTest::gtest roc::rocsparse hip::host hip::device)
+if (BUILD_CLIENTS_ONLY)
+  target_include_directories(rocsparse-test PRIVATE ${rocsparse_INCLUDE_DIRS}/rocsparse)
+endif()
 
 # Add OpenMP if available
-if(OPENMP_FOUND)
-if (NOT WIN32)
-   target_link_libraries(rocsparse-test PRIVATE OpenMP::OpenMP_CXX -Wl,-rpath=${HIP_CLANG_ROOT}/lib)
-  else()
-   target_link_libraries(rocsparse-test PRIVATE libomp)
-  endif()
-endif()
+apply_omp_settings(rocsparse-test)
+
+# Target link libraries
+target_link_libraries(rocsparse-test PRIVATE GTest::gtest roc::rocsparse hip::host hip::device ${ROCSPARSE_CLIENT_LIBS})
 
 if (NOT WIN32)
   if (BUILD_WITH_ROCTX)

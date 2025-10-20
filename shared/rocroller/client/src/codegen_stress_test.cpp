@@ -40,8 +40,6 @@ using namespace rocRoller;
 
 struct CodeGenProblem
 {
-    std::string name;
-
     int         instCount;
     std::string instructions;
 
@@ -70,7 +68,7 @@ struct rocRoller::Serialization::
 
     static void mapping(IO& io, CodeGenResult& result)
     {
-        iot::mapRequired(io, "client", result.name);
+        iot::mapRequired(io, "resultType", std::string{"CodeGen"});
         iot::mapRequired(io, "instCount", result.instCount);
         iot::mapRequired(io, "instructions", result.instructions);
         iot::mapRequired(io, "numWarmUp", result.numWarmUp);
@@ -118,7 +116,7 @@ Generator<Instruction> simple_mi(ContextPtr m_context)
     {
         mi_mnemonic = "v_mfma_f32_32x32x1f32";
     }
-    else if(arch.HasCapability(GPUCapability::HasWMMA) && arch.target().isRDNA4GPU())
+    else if(arch.HasCapability(GPUCapability::HasWMMA_f32_16x16x16_f16))
     {
         mi_mnemonic = "v_wmma_f32_16x16x16_f16";
     }
@@ -142,7 +140,7 @@ Generator<Instruction> complex_mi_with_coop(ContextPtr m_context)
     {
         mi_mnemonic = "v_mfma_f32_32x32x1f32";
     }
-    else if(arch.HasCapability(GPUCapability::HasWMMA) && arch.target().isRDNA4GPU())
+    else if(arch.HasCapability(GPUCapability::HasWMMA_f32_16x16x16_f16))
     {
         mi_mnemonic = "v_wmma_f32_16x16x16_f16";
     }
@@ -236,16 +234,18 @@ CodeGenResult CodeGen(CodeGenProblem const& prob)
         }
     };
 
+    const std::string kernelName{"CodeGen"};
+
     for(size_t i = 0; i < prob.numWarmUp; i++)
     {
-        auto m_context = Context::ForDefaultHipDevice(prob.name);
+        auto m_context = Context::ForDefaultHipDevice(kernelName);
         m_context->schedule(Program(m_context));
     }
 
     for(size_t i = 0; i < prob.numRuns; i++)
     {
-        auto  m_context = Context::ForDefaultHipDevice(prob.name);
-        Timer timer("CodeGen");
+        auto  m_context = Context::ForDefaultHipDevice(kernelName);
+        Timer timer(kernelName);
         timer.tic();
         m_context->schedule(Program(m_context));
         timer.toc();
@@ -263,7 +263,6 @@ int main(int argc, const char* argv[])
     std::string    filename;
     CodeGenProblem prob;
 
-    prob.name         = "CodeGenv00";
     prob.instCount    = 40000;
     prob.instructions = "simple_mi";
     prob.numWarmUp    = 2;
@@ -278,8 +277,7 @@ int main(int argc, const char* argv[])
     app.add_option("--yaml", filename, "Results.");
     CLI11_PARSE(app, argc, argv);
 
-    CodeGenResult result(prob);
-    result = CodeGen(prob);
+    CodeGenResult result{CodeGen(prob)};
 
     if(!filename.empty())
     {

@@ -36,21 +36,28 @@ namespace rocRoller
     {
         struct RunParameters
         {
+            int workgroupMappingValue;
+            int numWGs;
+        };
+
+        struct BenchmarkParameters
+        {
             int device;
 
-            int numWarmUp;
-            int numOuter;
-            int numInner;
+            int    numWarmUp;
+            int    numOuter;
+            int    numInner;
+            size_t rotatingBuffSize;
 
             bool check;
             bool visualize;
-
-            int numWGs;
         };
 
         struct BenchmarkResults
         {
-            RunParameters runParams;
+            std::string         resultType{"GEMM"};
+            RunParameters       runParams;
+            BenchmarkParameters benchmarkParams;
 
             size_t              kernelGenerate;
             size_t              kernelAssemble;

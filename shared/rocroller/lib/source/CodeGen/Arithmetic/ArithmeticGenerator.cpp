@@ -41,6 +41,24 @@ namespace rocRoller
         co_yield m_context->copier()->copy(val, tmp, "");
     }
 
+    template <>
+    Generator<Instruction> generateOp<Expression::ToScalar>(Register::ValuePtr          dst,
+                                                            Register::ValuePtr          arg,
+                                                            Expression::ToScalar const& expr)
+    {
+        auto ctx = arg->context();
+        if(!ctx)
+            ctx = dst->context();
+
+        AssertFatal(ctx);
+
+        auto newDst = dst;
+
+        co_yield ctx->copier()->ensureType(newDst, arg, Register::Type::Scalar);
+
+        AssertFatal(newDst == dst, ShowValue(newDst), ShowValue(dst));
+    }
+
     Generator<Instruction> ArithmeticGenerator::signExtendDWord(Register::ValuePtr dst,
                                                                 Register::ValuePtr src)
     {
@@ -207,16 +225,18 @@ namespace rocRoller
         co_yield_(Instruction(instruction, {wfp}, {lhs, tmp}, {}, ""));
 
         auto reduce = m_context->kernel()->wavefront_size() == 64 ? "s_and_b64" : "s_and_b32";
-        if(dst != nullptr && !dst->isSCC())
-        {
-            co_yield(Instruction::Lock(Scheduling::Dependency::SCC,
-                                       "Start Compare writing to non-SCC dest"));
-        }
-        co_yield_(Instruction(reduce, {wfp}, {wfp, m_context->getExec()}, {}, ""));
-        if(dst != nullptr && !dst->isSCC())
+
+        auto dependency = (dst != nullptr && !dst->isSCC()) ? Scheduling::Dependency::SCC
+                                                            : Scheduling::Dependency::Count;
+
+        co_yield Instruction(reduce, {wfp}, {wfp, m_context->getExec()}, {}, "")
+            .lock(Scheduling::Dependency::SCC, "Start Compare writing to non-SCC dest");
+
+        if(dependency == Scheduling::Dependency::SCC)
         {
             co_yield m_context->copier()->copy(dst, m_context->getSCC(), "");
-            co_yield(Instruction::Unlock("End Compare writing to non-SCC dest"));
+            co_yield Instruction::Unlock(Scheduling::Dependency::SCC,
+                                         "End Compare writing to non-SCC dest");
         }
     }
 

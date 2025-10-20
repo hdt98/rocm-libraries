@@ -39,10 +39,10 @@ from typing import Any, List
 import numpy as np
 import pandas as pd
 import rrperf
-import scipy.stats
-from rrperf.specs import MachineSpecs
-from rrperf.problems import GEMMResult
 import rrperf.args as args
+import scipy.stats
+from rrperf.problems import GEMMResult
+from rrperf.specs import MachineSpecs
 
 
 def priority_problems():
@@ -149,6 +149,7 @@ class PerformanceRun:
                     result = rrperf.problems.load_results(path)
                 except Exception as e:
                     print('Error loading results in "{}": {}'.format(path, e))
+                    raise
                 for element in result:
                     if element.run_invariant_token in results:
                         # TODO: Handle result files that have multiple results in
@@ -274,7 +275,7 @@ def significant_changes(summary, threshold=0.05):
     return result_diff
 
 
-def markdown_summary(md, perf_runs):
+def markdown_summary(md, perf_runs, detail=False):
     """Create Markdown report of summary statistics."""
 
     summary = summary_statistics(perf_runs)
@@ -283,12 +284,6 @@ def markdown_summary(md, perf_runs):
         "Problem",
         "Median Diff %",
         "Moods p-val",
-        "Mean A (ns)",
-        "Mean B (ns)",
-        "Median A (ns)",
-        "Median B (ns)",
-        "Run A (ref)",
-        "Run B",
         "Gen A (ns)",
         "Gen B (ns)",
     ]
@@ -296,30 +291,25 @@ def markdown_summary(md, perf_runs):
     result_diff = significant_changes(summary)
 
     result_table = ""
-    for run in summary:
-        for result in summary[run]:
-            token, comparison = summary[run][result]
-            A, B = comparison.results
-            percent = (
-                ((comparison.median[1] - comparison.median[0]) * 100.0)
-                / comparison.median[0]
-                if comparison.median[0] != 0
-                else 0.0
-            )
-            row_str = [
-                f"{token}",
-                f"{(percent):.2f}%",
-                f"{comparison.moods_pval:0.4e}",
-                f"{comparison.mean[0]:,}",
-                f"{comparison.mean[1]:,}",
-                f"{comparison.median[0]:,.0f}",
-                f"{comparison.median[1]:,.0f}",
-                f"{A.path.parent.stem}",
-                f"{B.path.parent.stem}",
-                f"{A.kernelGenerate:,.0f}",
-                f"{B.kernelGenerate:,.0f}",
-            ]
-            result_table += " | ".join(row_str) + "\n"
+    if detail:
+        for run in summary:
+            for result in summary[run]:
+                token, comparison = summary[run][result]
+                A, B = comparison.results
+                percent = (
+                    ((comparison.median[1] - comparison.median[0]) * 100.0)
+                    / comparison.median[0]
+                    if comparison.median[0] != 0
+                    else 0.0
+                )
+                row_str = [
+                    f"{token}",
+                    f"{(percent):.2f}%",
+                    f"{comparison.moods_pval:0.4e}",
+                    f"{A.kernelGenerate:,.0f}",
+                    f"{B.kernelGenerate:,.0f}",
+                ]
+                result_table += " | ".join(row_str) + "\n"
 
     if len(result_diff) > 0:
         print("```diff", file=md)
@@ -336,28 +326,12 @@ def markdown_summary(md, perf_runs):
             file=md,
         )
 
-    print("<details><summary>Full table of results</summary>\n", file=md)
-
-    print(" | ".join(header), file=md)
-    print(" | ".join(["---"] * len(header)), file=md)
-    print(result_table, file=md)
-    print("\n</details>", file=md)
-
-    perf_runs.sort()
-
-    machines = dict()
-    for run in perf_runs:
-        if run.machine_spec not in machines:
-            machines[run.machine_spec] = list()
-        machines[run.machine_spec].append(run.name())
-
-    print("\n\n<details><summary>Machines</summary>\n", file=md)
-    for machine in machines:
-        print("### Machine for {}:\n".format(", ".join(machines[machine])), file=md)
-        print("```", file=md)
-        print(machine.pretty_string(), file=md)
-        print("```", file=md)
-    print("</details>\n", file=md)
+    if detail:
+        print("<details><summary>Full table of results</summary>\n", file=md)
+        print(" | ".join(header), file=md)
+        print(" | ".join(["---"] * len(header)), file=md)
+        print(result_table, file=md)
+        print("\n</details>", file=md)
 
 
 def html_overview_table(html_file, summary, problems):
@@ -532,18 +506,6 @@ def html_summary(  # noqa: C901
                 runs[token].name.append(name)
                 runs[token].kernel.append(ka)
                 runs[token].machine.append(configs.index(run.machine_spec))
-                runs[token].box_data = pd.concat(
-                    [
-                        runs[token].box_data,
-                        pd.DataFrame(
-                            {
-                                "timestamp": run.timestamp,
-                                "commit": run.commit,
-                                "runs": ka,
-                            }
-                        ),
-                    ]
-                )
 
         plot = go.Figure()
         common_args = get_common_args(runs.keys())

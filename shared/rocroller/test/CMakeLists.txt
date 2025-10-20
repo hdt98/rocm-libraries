@@ -1,7 +1,7 @@
 # Copyright Advanced Micro Devices, Inc., or its affiliates.
 # SPDX-License-Identifier:  MIT
 
-find_package(GTest)
+find_package(GTest QUIET)
 if(NOT GTest_FOUND)
     if(ROCROLLER_ENABLE_FETCH)
         FetchContent_Declare(
@@ -14,17 +14,11 @@ if(NOT GTest_FOUND)
     endif()
 endif()
 
-find_package(mxDataGenerator)
-if(NOT mxDataGenerator_FOUND)
-    if(ROCROLLER_ENABLE_FETCH)
-        FetchContent_Declare(
-            mxDataGenerator
-            GIT_REPOSITORY ${MXDATAGENERATOR_GIT_URL}
-            GIT_TAG ${MXDATAGENERATOR_GIT_TAG}
-        )
-        FetchContent_MakeAvailable(mxDataGenerator)
+if(NOT ROCM_LIBS_SUPERBUILD)
+    if(ROCROLLER_ENABLE_THEROCK)
+        find_package(mxDataGenerator REQUIRED)
     else()
-        message(FATAL_ERROR "Failed to find mxDataGenerator")
+        add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../../../shared/mxdatagenerator" "${CMAKE_CURRENT_BINARY_DIR}/mxdatagenerator")
     endif()
 endif()
 
@@ -44,9 +38,9 @@ if(ROCROLLER_ENABLE_CATCH AND (ROCROLLER_BUILD_TESTING OR BUILD_TESTING))
     # to ensure that the command supplied to execute_process is interpreted as a list
     # of strings rather than one white space delimited string.
     if(ROCROLLER_ENABLE_ASAN)
-    rocroller_target_configure_sanitizers(rocroller-test-catch PRIVATE)
+        rocroller_target_configure_sanitizers(rocroller-tests-catch PRIVATE)
         set_target_properties(rocroller-tests-catch
-            PROPERTIES 
+            PROPERTIES
                 CROSSCOMPILING_EMULATOR "${CMAKE_COMMAND};-E;env;${asan_opts}"
         )
     endif()
@@ -58,17 +52,17 @@ add_executable(component-test)
 if(ROCROLLER_ENABLE_ASAN)
     rocroller_target_configure_sanitizers(component-test PRIVATE)
     set_target_properties(component-test
-        PROPERTIES 
+        PROPERTIES
             CROSSCOMPILING_EMULATOR "${CMAKE_COMMAND};-E;env;${asan_opts}"
     )
     rocroller_target_configure_sanitizers(rocroller-tests PRIVATE)
     set_target_properties(rocroller-tests
-        PROPERTIES 
+        PROPERTIES
             CROSSCOMPILING_EMULATOR "${CMAKE_COMMAND};-E;env;${asan_opts}"
     )
 endif()
 
-if(ROCROLLER_ENABLE_ARCH_GEN_TEST)
+if(ROCROLLER_ENABLE_GEMM_CLIENT_TESTS)
     if(NOT ROCROLLER_ENABLE_LLD)
         # There are a few tests that require ReadELF functionality
         # which is disabled by default and on a deprecation path.
@@ -92,14 +86,15 @@ if(ROCROLLER_ENABLE_ARCH_GEN_TEST)
         PROPERTIES
             SKIP_REGULAR_EXPRESSION ${rocroller_skip_regex}
     )
-    add_executable(arch-gen-tests)
-    if(ROCROLLER_ENABLE_ASAN)
-        rocroller_target_configure_sanitizers(arch-gen-tests PRIVATE)
-        set_target_properties(arch-gen-tests
-            PROPERTIES 
-                CROSSCOMPILING_EMULATOR "${CMAKE_COMMAND};-E;env;${asan_opts}"
-        )
-    endif()
+endif()
+
+add_executable(arch-gen-tests)
+if(ROCROLLER_ENABLE_ASAN)
+    rocroller_target_configure_sanitizers(arch-gen-tests PRIVATE)
+    set_target_properties(arch-gen-tests
+        PROPERTIES
+            CROSSCOMPILING_EMULATOR "${CMAKE_COMMAND};-E;env;${asan_opts}"
+    )
 endif()
 
 find_package(BLAS REQUIRED)
@@ -129,7 +124,6 @@ if(ROCROLLER_ENABLE_TEST_DISCOVERY)
         TEST_FILTER "-*GPU_*"
         DISCOVERY_MODE PRE_TEST
         PROPERTIES
-            SKIP_REGULAR_EXPRESSION "test/unit/ErrorTest.cpp:"
             ENVIRONMENT "${asan_opts}"
     )
     gtest_discover_tests(
@@ -139,18 +133,15 @@ if(ROCROLLER_ENABLE_TEST_DISCOVERY)
         PROPERTIES "LABELS" "GPU"
         DISCOVERY_MODE PRE_TEST
         PROPERTIES
-            SKIP_REGULAR_EXPRESSION "test/unit/ErrorTest.cpp:"
             ENVIRONMENT "${asan_opts}"
     )
-    if(ROCROLLER_ENABLE_ARCH_GEN_TEST)
-        gtest_discover_tests(
-            arch-gen-tests
-            XML_OUTPUT_DIR ${TEST_REPORT_DIR}
-            DISCOVERY_MODE PRE_TEST
-            PROPERTIES
-                ENVIRONMENT "${asan_opts}"
-        )
-    endif()
+    gtest_discover_tests(
+        arch-gen-tests
+        XML_OUTPUT_DIR ${TEST_REPORT_DIR}
+        DISCOVERY_MODE PRE_TEST
+        PROPERTIES
+            ENVIRONMENT "${asan_opts}"
+    )
 
     if(ROCROLLER_ENABLE_CATCH)
         if(ROCROLLER_ENABLE_FETCH)

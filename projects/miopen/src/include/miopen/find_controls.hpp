@@ -47,6 +47,11 @@ MIOPEN_EXPORT extern bool
 
 } // namespace debug
 
+class FindEnforce;
+class FindMode;
+
+MIOPEN_INTERNALS_EXPORT bool IsValidCombination(const FindEnforce& enforce, const FindMode& mode);
+
 enum class FindEnforceAction
 {
     First_ = 1, // 0 is returned for non-numeric env.vars.
@@ -76,6 +81,8 @@ public:
     FindEnforce();
     explicit FindEnforce(FindEnforceAction action_) : action(action_) {}
 
+    FindEnforceAction GetAction() const { return action; }
+
     template <class Context>
     bool IsDbClean(const Context& context) const
     {
@@ -85,8 +92,9 @@ public:
     template <class Context>
     bool IsSearch(const Context& context) const
     {
-        return IsEnabled(context) &&
-               (action == FindEnforceAction::Search || action == FindEnforceAction::SearchDbUpdate);
+        return IsEnabled(context) && (action == FindEnforceAction::Search ||
+                                      action == FindEnforceAction::SearchDbUpdate ||
+                                      action == FindEnforceAction::DbUpdate);
     }
 
     template <class Context>
@@ -119,6 +127,8 @@ public:
         Hybrid               = miopenConvolutionFindModeHybrid,
         DeprecatedFastHybrid = 4,
         DynamicHybrid        = miopenConvolutionFindModeDynamicHybrid,
+        TrustVerify          = miopenConvolutionFindModeTrustVerify,
+        TrustVerifyFull      = miopenConvolutionFindModeTrustVerifyFull,
         End_,
         Default_ = miopenConvolutionFindModeDefault,
     };
@@ -129,12 +139,23 @@ private:
     template <class Context>
     bool IsEnabled(const Context& context) const
     {
-        if(FindEnforce{}.IsSomethingEnforced(context))
+        FindEnforce enforce{};
+
+        // If no enforcement is active, always allow
+        if(!enforce.IsSomethingEnforced(context))
+            return true;
+
+        // Check if the combination is valid/safe
+        if(IsValidCombination(enforce, *this))
         {
-            MIOPEN_LOG_NQI("MIOPEN_FIND_MODE is set to NORMAL due to MIOPEN_FIND_ENFORCE");
-            return false;
+            MIOPEN_LOG_I("Allowing MIOPEN_FIND_MODE with MIOPEN_FIND_ENFORCE combination");
+            return true;
         }
-        return true;
+
+        // Unsafe combination - force Normal mode
+        MIOPEN_LOG_NQI(
+            "MIOPEN_FIND_MODE is set to NORMAL due to unsafe combination with MIOPEN_FIND_ENFORCE");
+        return false;
     }
 
 public:
@@ -152,13 +173,35 @@ public:
     template <class Context>
     bool IsHybrid(const Context& context) const
     {
-        return (value == Values::Hybrid || value == Values::DynamicHybrid) && IsEnabled(context);
+        return (value == Values::Hybrid || value == Values::DynamicHybrid ||
+                value == Values::TrustVerify || value == Values::TrustVerifyFull) &&
+               IsEnabled(context);
     }
 
     template <class Context>
     bool IsDynamicHybrid(const Context& context) const
     {
-        return value == Values::DynamicHybrid && IsEnabled(context);
+        return (value == Values::DynamicHybrid || value == Values::TrustVerify ||
+                value == Values::TrustVerifyFull) &&
+               IsEnabled(context);
+    }
+
+    template <class Context>
+    bool IsTrustVerify(const Context& context) const
+    {
+        // TrustVerify uses user db as groud truth, disable if no user db
+#if MIOPEN_DISABLE_USERDB
+        return false;
+#else
+        return (value == Values::TrustVerify || value == Values::TrustVerifyFull) &&
+               IsEnabled(context);
+#endif
+    }
+
+    template <class Context>
+    bool IsExhaustive(const Context& context) const
+    {
+        return (value == Values::TrustVerifyFull) && IsEnabled(context);
     }
 
     MIOPEN_INTERNALS_EXPORT friend std::ostream& operator<<(std::ostream&, const FindMode&);

@@ -70,15 +70,13 @@ namespace rocRoller
                            int                                                       newTag,
                            int                                                       oldTag)
         {
-            auto edgeTags = coordinates.getNeighbours<Dir>(oldTag).template to<std::vector>();
+            auto edgeTags = coordinates.getNeighbours<Dir>(oldTag);
             for(auto edgeTag : edgeTags)
             {
                 auto edge = coordinates.getElement(edgeTag);
 
-                auto upDirTags = coordinates.getNeighbours<Graph::opposite(Dir)>(edgeTag)
-                                     .template to<std::vector>();
-                auto downDirTags
-                    = coordinates.getNeighbours<Dir>(edgeTag).template to<std::vector>();
+                auto upDirTags   = coordinates.getNeighbours<Graph::opposite(Dir)>(edgeTag);
+                auto downDirTags = coordinates.getNeighbours<Dir>(edgeTag);
 
                 std::replace(upDirTags.begin(), upDirTags.end(), oldTag, newTag);
 
@@ -124,8 +122,6 @@ namespace rocRoller
 
         KernelGraph AddLDS::apply(KernelGraph const& original)
         {
-            TIMER(t, "KernelGraph::AddLDS");
-
             auto graph = original;
 
             auto visitor = AddLDSVisitor(m_params, m_context);
@@ -141,6 +137,8 @@ namespace rocRoller
 
         ConstraintStatus NoLDSTiles(const KernelGraph& graph)
         {
+            TIMER(t, "Constraint::NoLDSTiles");
+
             ConstraintStatus retval;
             for(auto tag : graph.coordinates.getNodes<MacroTile>())
             {

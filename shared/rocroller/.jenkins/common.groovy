@@ -33,18 +33,13 @@ def withSSH(platform, pipeline) {
     }
 }
 
-def runCompileCommand(platform, project, jobName, mxDataGeneratorGitURL, mxDataGeneratorGitTag, boolean codeCoverage=false, boolean enableTimers=false, String target='', boolean useYamlCpp=true, boolean staticAnalysis=false)
+def runCompileCommand(platform, project, jobName, boolean codeCoverage=false, boolean enableTimers=false, String target='', boolean useYamlCpp=true, boolean staticAnalysis=false)
 {
     project.paths.construct_build_prefix()
     String codeCovFlag = codeCoverage ? '-DROCROLLER_ENABLE_COVERAGE=ON -DROCROLLER_BUILD_SHARED_LIBS=OFF -DROCROLLER_ENABLE_LLD=ON' : ''
     String timerFlag = enableTimers ? '-DROCROLLER_ENABLE_TIMERS=ON' : ''
     String yamlBackendFlag = useYamlCpp ? '' : '-DROCROLLER_ENABLE_YAML_CPP=OFF'
     String useCppCheck = staticAnalysis ? '-DROCROLLER_ENABLE_CPPCHECK=ON' : ''
-
-    mxDataGeneratorGitURL = mxDataGeneratorGitURL?.trim();
-    mxDataGeneratorGitTag = mxDataGeneratorGitTag?.trim();
-    String mxDataGeneratorGitURLFlag = mxDataGeneratorGitURL ? '-DMXDATAGENERATOR_GIT_URL=' + mxDataGeneratorGitURL : ''
-    String mxDataGeneratorGitTagFlag = mxDataGeneratorGitTag ? '-DMXDATAGENERATOR_GIT_TAG=' + mxDataGeneratorGitTag : ''
 
     withSSH(platform) {
         sshBlock ->
@@ -60,7 +55,6 @@ def runCompileCommand(platform, project, jobName, mxDataGeneratorGitURL, mxDataG
                 ../scripts/check_included_tests.py
                 cmake ../ \\
                     ${codeCovFlag} ${timerFlag} ${yamlBackendFlag} ${useCppCheck}\\
-                    ${mxDataGeneratorGitURLFlag} ${mxDataGeneratorGitTagFlag}\\
                     -DCMAKE_CXX_COMPILER=/opt/rocm/bin/amdclang++ \\
                     -DCMAKE_BUILD_TYPE=Release \\
                     -DROCROLLER_ENABLE_FETCH=ON \\
@@ -85,9 +79,9 @@ def runTestCommand (platform, project)
                 cd ${project.paths.project_build_prefix}
 
                 pushd build
-                echo Using `nproc` threads for testing.
-                OMP_NUM_THREADS=8 ctest -j ${numThreads} --output-on-failure ${testExclude}
-                export ROCROLLER_BUILD_DIR=`pwd`
+                echo Using ${numThreads} out of `nproc` threads for testing.
+                OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=2 ctest -j ${numThreads} --output-on-failure ${testExclude}
+                export ROCROLLER_BUILD_DIR="\$(pwd)"
                 popd
                 scripts/rrperf generate --suite generate_gfx950 --arch gfx950
             """
@@ -217,7 +211,6 @@ def runPerformanceCommand (platform, project)
 {
     String masterURL = env.CHANGE_ID ? env.JOB_URL.replace("PR-${env.CHANGE_ID}", env.CHANGE_TARGET) : env.JOB_URL
 
-
     withSSH(platform){
         sshBlock ->
         def rrperfSuite = platform.jenkinsLabel.contains('gfx12') ? "all_gfx120X" : "all"
@@ -302,7 +295,8 @@ def runPerformanceCommand (platform, project)
                         ${sshBlock}
 
                         #Run Performance Test
-                        export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:${project.paths.project_build_prefix}/build/
+                        export LD_LIBRARY_PATH="\${LD_LIBRARY_PATH}:${project.paths.project_build_prefix}/build/"
+                        export ROCROLLER_BUILD_DIR="\$(pwd)/build"
 
                         ${masterCompareCommand}
 
@@ -365,7 +359,8 @@ def runPerformanceCommand (platform, project)
                         unzip archive.zip
 
                         #Run Performance Test
-                        export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:${project.paths.project_build_prefix}/build/
+                        export LD_LIBRARY_PATH="\${LD_LIBRARY_PATH}:${project.paths.project_build_prefix}/build/"
+                        export ROCROLLER_BUILD_DIR="\$(pwd)/build"
                         ./scripts/rrperf run \\
                             --suite ${rrperfSuite} \\
                             --rundir "./performance_${platform.gpu}"
