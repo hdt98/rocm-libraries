@@ -48,11 +48,13 @@
 
 #include "hip/hip_runtime.h"
 
+#include <chrono>
 #include <cstdint>
 #include <cstdlib>
 #include <iostream>
 #include <memory>
 #include <ranges>
+#include <thread>
 #include <vector>
 
 using namespace rocRoller;
@@ -91,7 +93,7 @@ namespace RocprofilerTest
         k->setWorkgroupSize({256, 1, 1});
         // more waves for rocprofiler, see Troubleshooting in
         // https://rocm.docs.amd.com/projects/rocprofiler-sdk/en/amd-mainline/how-to/using-thread-trace.html#troubleshooting
-        k->setWorkitemCount({std::make_shared<Expression::Expression>(256 * 256), one, one});
+        k->setWorkitemCount({std::make_shared<Expression::Expression>(256 * 256 * 4), one, one});
 
         k->addArgument({"ptr",
                         {DataType::UInt32, PointerType::PointerGlobal},
@@ -329,6 +331,7 @@ namespace RocprofilerTest
                 kernelSetups[idx].kernel.launchKernel(
                     kernelSetups[idx].commandArgs.runtimeArguments());
                 HIP_CHECK(hipDeviceSynchronize());
+                rocroller_profiler::getInstructionData();
             }
             const auto        latencies  = rocroller_profiler::getInstructionData();
             std::string const literalHex = fmt::format("0x{:x}", literals[order.back()]);
@@ -377,7 +380,9 @@ namespace RocprofilerTest
                << ", " << avg_latency << std::endl;
         }
         INFO(ss.str());
-        REQUIRE(latencies.size() == 8);
+
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+        CHECK(latencies.size() == 8);
 
         { // Ensure instructions exist in expected quanities in the profile data
             std::string const instructionsStr = [&]() {

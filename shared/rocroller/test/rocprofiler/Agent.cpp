@@ -30,6 +30,8 @@
 #include <rocprofiler-sdk/registration.h>
 #include <rocprofiler-sdk/rocprofiler.h>
 
+#include <rocRoller/Utilities/Error.hpp>
+
 #include <chrono>
 #include <cstdint>
 #include <cstdlib>
@@ -110,7 +112,10 @@ namespace
         auto parse = [](rocprofiler_thread_trace_decoder_record_type_t record_type_id,
                         void*                                          events,
                         uint64_t                                       num_events,
-                        void*) {
+                        void*                                          userdata) {
+            rocprofiler_user_data_t userdata_casted
+                = *static_cast<rocprofiler_user_data_t*>(userdata);
+
             if(record_type_id != ROCPROFILER_THREAD_TRACE_DECODER_RECORD_WAVE)
                 return;
 
@@ -127,7 +132,7 @@ namespace
             }
         };
 
-        rocprofiler_trace_decode(decoder, parse, data, data_size, nullptr);
+        rocprofiler_trace_decode(decoder, parse, data, data_size, &userdata);
 
         for(auto& [pc, data] : instruction_latencies)
         {
@@ -142,7 +147,7 @@ namespace
             }
         }
 
-        std::cout << "shader_data_callback finished" << std::endl;
+        std::cout << "shader_data_callback finished for dispatch " << userdata.value << std::endl;
 
         dispatch_shader_mutex.unlock();
     }
@@ -157,7 +162,8 @@ namespace
                           rocprofiler_user_data_t*           userdata_shader)
     {
         dispatch_shader_mutex.lock();
-        std::cout << "dispatch_callback" << std::endl;
+        std::cout << "dispatch_callback for dispatch " << dispatch_id << std::endl;
+        userdata_shader->value = dispatch_id;
         instruction_latencies.clear();
         return ROCPROFILER_THREAD_TRACE_CONTROL_START_AND_STOP;
     }
