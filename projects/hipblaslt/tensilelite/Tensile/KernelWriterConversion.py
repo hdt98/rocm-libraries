@@ -467,7 +467,7 @@ class KernelWriterConversion(KernelWriterBase):
       kStr += "  auto idxW_ori = idxW;%s"%self.endLine
     typeStr = "int" if self.state["ProblemType"]["DataType"].isInt8() or self.state["ProblemType"]["DataType"].isInt32() else ("double" if self.state["ProblemType"]["DataType"].isDouble() else "float")
     typeStr2 = "int16_t" if self.state["ProblemType"]["DestDataType"].isInt8() else ("tensile_half" if self.state["ProblemType"]["DestDataType"].isAnyFloat8() else "tensile_bfloat16")
-    if self.state["ProblemType"]["DataType"].isDoubleComplex() or self.state["ProblemType"]["DataType"].isSingleComplex():
+    if self.state["ProblemType"]["DataType"].isComplex():
       loadTypeStr = self.datatype
       storeTypeStr = self.datatype
     else:
