@@ -63,10 +63,8 @@ namespace rocRollerTest
         return addresses;
     }
 
-    TEST_CASE("LDS Microkernel", "[rocprofiler]")
+    TEST_CASE("Rocprofiler LDS Microkernel", "[rocprofiler]")
     {
-        Settings::getInstance()->set(Settings::KernelAssembler, AssemblerType::Subprocess);
-
         // TODO: remove
         int ITERS = 16;
         if(const char* env_p = std::getenv("ITERS"))
@@ -94,6 +92,12 @@ namespace rocRollerTest
                             + std::to_string(strideMultiplier) + ", " + (write ? "Write" : "Read"))
                     {
                         auto context = TestContext::ForTestDevice({}, "lds_microkernel");
+
+                        if(not context->targetArchitecture().target().isCDNA35GPU())
+                        {
+                            SKIP("LDS Bank Model only implemented for CDNA 3.5 GPUs");
+                        }
+
                         auto command = std::make_shared<Command>();
                         auto k       = context->kernel();
 
@@ -264,12 +268,8 @@ namespace rocRollerTest
                         INFO("  Data Cycles: " << dataCycles);
 
                         CHECK(actualLastSWaitcntCycles == predictedCycles);
-                        if(strideMultiplier
-                           > 32) // Actual cycles is usually 60 cycles with 64-way bank conflict, not sure why
-                            CHECK_THAT(actualLastLdsInstrCycles,
-                                       Catch::Matchers::WithinAbs(predictedCycles, 4u));
-                        else
-                            CHECK(actualLastLdsInstrCycles == predictedCycles);
+                        CHECK_THAT(actualLastLdsInstrCycles,
+                                   Catch::Matchers::WithinAbs(predictedCycles, 4u));
                     }
                 }
             }
