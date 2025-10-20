@@ -1825,7 +1825,7 @@
     NoTailLoop: false
     NonTemporal: -1
     NonTemporalA: 0
-    NonTemporalB: 1
+    NonTemporalB: 0
     NonTemporalC: 0
     NonTemporalD: 1
     NonTemporalE: 0
@@ -17943,8 +17943,8 @@
     NoReject: false
     NoTailLoop: false
     NonTemporal: -1
-    NonTemporalA: 3
-    NonTemporalB: 1
+    NonTemporalA: 0
+    NonTemporalB: 0
     NonTemporalC: 4
     NonTemporalD: 4
     NonTemporalE: 0
@@ -18150,8 +18150,8 @@
     NoReject: false
     NoTailLoop: false
     NonTemporal: -1
-    NonTemporalA: 1
-    NonTemporalB: 1
+    NonTemporalA: 0
+    NonTemporalB: 0
     NonTemporalC: 4
     NonTemporalD: 4
     NonTemporalE: 0
@@ -18357,8 +18357,8 @@
     NoReject: false
     NoTailLoop: false
     NonTemporal: -1
-    NonTemporalA: 1
-    NonTemporalB: 1
+    NonTemporalA: 0
+    NonTemporalB: 0
     NonTemporalC: 0
     NonTemporalD: 0
     NonTemporalE: 0
@@ -18564,8 +18564,8 @@
     NoReject: false
     NoTailLoop: false
     NonTemporal: -1
-    NonTemporalA: 1
-    NonTemporalB: 2
+    NonTemporalA: 0
+    NonTemporalB: 0
     NonTemporalC: 6
     NonTemporalD: 6
     NonTemporalE: 0
@@ -18771,8 +18771,8 @@
     NoReject: false
     NoTailLoop: false
     NonTemporal: -1
-    NonTemporalA: 3
-    NonTemporalB: 1
+    NonTemporalA: 0
+    NonTemporalB: 0
     NonTemporalC: 4
     NonTemporalD: 4
     NonTemporalE: 0
@@ -24164,7 +24164,7 @@
     NoReject: false
     NoTailLoop: true
     NonTemporal: -1
-    NonTemporalA: 1
+    NonTemporalA: 0
     NonTemporalB: 0
     NonTemporalC: 7
     NonTemporalD: 4
@@ -24374,7 +24374,7 @@
     NoReject: false
     NoTailLoop: false
     NonTemporal: -1
-    NonTemporalA: 2
+    NonTemporalA: 0
     NonTemporalB: 0
     NonTemporalC: 1
     NonTemporalD: 3
@@ -24584,7 +24584,7 @@
     NoReject: false
     NoTailLoop: false
     NonTemporal: -1
-    NonTemporalA: 1
+    NonTemporalA: 0
     NonTemporalB: 0
     NonTemporalC: 0
     NonTemporalD: 4
@@ -25002,7 +25002,7 @@
     NoReject: false
     NoTailLoop: false
     NonTemporal: -1
-    NonTemporalA: 1
+    NonTemporalA: 0
     NonTemporalB: 4
     NonTemporalC: 3
     NonTemporalD: 1
@@ -33058,7 +33058,7 @@
     NoTailLoop: false
     NonTemporal: -1
     NonTemporalA: 0
-    NonTemporalB: 7
+    NonTemporalB: 4
     NonTemporalC: 0
     NonTemporalD: 7
     NonTemporalE: 0

@@ -1154,8 +1154,8 @@
     NoReject: false
     NoTailLoop: false
     NonTemporal: -1
-    NonTemporalA: 2
-    NonTemporalB: 1
+    NonTemporalA: 0
+    NonTemporalB: 0
     NonTemporalC: 4
     NonTemporalD: 4
     NonTemporalE: 0

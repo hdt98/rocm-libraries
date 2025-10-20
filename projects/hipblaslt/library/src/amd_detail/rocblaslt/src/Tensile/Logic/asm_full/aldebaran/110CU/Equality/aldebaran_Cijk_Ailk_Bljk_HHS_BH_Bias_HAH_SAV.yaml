@@ -2516,7 +2516,7 @@
     NoLdsWriteCode: false
     NoReject: false
     NoTailLoop: false
-    NonTemporalA: 2
+    NonTemporalA: 0
     NonTemporalB: 0
     NonTemporalC: 0
     NonTemporalD: 0
@@ -2673,7 +2673,7 @@
     NoLdsWriteCode: false
     NoReject: false
     NoTailLoop: false
-    NonTemporalA: 2
+    NonTemporalA: 0
     NonTemporalB: 0
     NonTemporalC: 0
     NonTemporalD: 0
@@ -2833,7 +2833,7 @@
     NoReject: false
     NoTailLoop: false
     NonTemporalA: 0
-    NonTemporalB: 3
+    NonTemporalB: 0
     NonTemporalC: 0
     NonTemporalD: 0
     NonTemporalE: 0
@@ -2995,7 +2995,7 @@
     NoReject: false
     NoTailLoop: false
     NonTemporalA: 0
-    NonTemporalB: 3
+    NonTemporalB: 0
     NonTemporalC: 0
     NonTemporalD: 0
     NonTemporalE: 0
@@ -3155,7 +3155,7 @@
     NoLdsWriteCode: false
     NoReject: false
     NoTailLoop: false
-    NonTemporalA: 2
+    NonTemporalA: 0
     NonTemporalB: 0
     NonTemporalC: 0
     NonTemporalD: 0
@@ -3313,7 +3313,7 @@
     NoLdsWriteCode: false
     NoReject: false
     NoTailLoop: false
-    NonTemporalA: 2
+    NonTemporalA: 0
     NonTemporalB: 0
     NonTemporalC: 0
     NonTemporalD: 0
@@ -3471,8 +3471,8 @@
     NoLdsWriteCode: false
     NoReject: false
     NoTailLoop: false
-    NonTemporalA: 2
-    NonTemporalB: 2
+    NonTemporalA: 0
+    NonTemporalB: 0
     NonTemporalC: 0
     NonTemporalD: 0
     NumElementsPerBatchStore: 0
@@ -3945,7 +3945,7 @@
     NoLdsWriteCode: false
     NoReject: false
     NoTailLoop: false
-    NonTemporalA: 2
+    NonTemporalA: 0
     NonTemporalB: 0
     NonTemporalC: 0
     NonTemporalD: 0
@@ -4103,7 +4103,7 @@
     NoLdsWriteCode: false
     NoReject: false
     NoTailLoop: false
-    NonTemporalA: 2
+    NonTemporalA: 0
     NonTemporalB: 0
     NonTemporalC: 0
     NonTemporalD: 0

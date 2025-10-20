@@ -4864,8 +4864,8 @@
     NoReject: false
     NoTailLoop: false
     NonTemporal: -1
-    NonTemporalA: 1
-    NonTemporalB: 1
+    NonTemporalA: 0
+    NonTemporalB: 0
     NonTemporalC: 4
     NonTemporalD: 4
     NonTemporalE: 0
@@ -5058,8 +5058,8 @@
     NoReject: false
     NoTailLoop: false
     NonTemporal: -1
-    NonTemporalA: 1
-    NonTemporalB: 1
+    NonTemporalA: 0
+    NonTemporalB: 0
     NonTemporalC: 0
     NonTemporalD: 0
     NonTemporalE: 0
@@ -5252,8 +5252,8 @@
     NoReject: false
     NoTailLoop: false
     NonTemporal: -1
-    NonTemporalA: 3
-    NonTemporalB: 1
+    NonTemporalA: 0
+    NonTemporalB: 0
     NonTemporalC: 4
     NonTemporalD: 4
     NonTemporalE: 0
@@ -5640,8 +5640,8 @@
     NoReject: false
     NoTailLoop: false
     NonTemporal: -1
-    NonTemporalA: 2
-    NonTemporalB: 2
+    NonTemporalA: 0
+    NonTemporalB: 0
     NonTemporalC: 4
     NonTemporalD: 4
     NonTemporalE: 0
@@ -9679,7 +9679,7 @@
     NoTailLoop: false
     NonTemporal: -1
     NonTemporalA: 0
-    NonTemporalB: 7
+    NonTemporalB: 4
     NonTemporalC: 4
     NonTemporalD: 7
     NonTemporalE: 0
@@ -10705,7 +10705,7 @@
     NoTailLoop: false
     NonTemporal: -1
     NonTemporalA: 0
-    NonTemporalB: 7
+    NonTemporalB: 4
     NonTemporalC: 0
     NonTemporalD: 0
     NonTemporalE: 0
@@ -13167,7 +13167,7 @@
     NoTailLoop: false
     NonTemporal: -1
     NonTemporalA: 0
-    NonTemporalB: 7
+    NonTemporalB: 4
     NonTemporalC: 0
     NonTemporalD: 7
     NonTemporalE: 0
@@ -19324,7 +19324,7 @@
     NoTailLoop: false
     NonTemporal: -1
     NonTemporalA: 0
-    NonTemporalB: 7
+    NonTemporalB: 4
     NonTemporalC: 0
     NonTemporalD: 7
     NonTemporalE: 0
