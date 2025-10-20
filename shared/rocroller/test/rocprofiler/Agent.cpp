@@ -30,12 +30,14 @@
 #include <rocprofiler-sdk/registration.h>
 #include <rocprofiler-sdk/rocprofiler.h>
 
+#include <chrono>
 #include <cstdint>
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <map>
 #include <string>
+#include <thread>
 
 #define ROCPROFILER_CALL(result, msg)                                               \
     if(auto ec = (result); ec != ROCPROFILER_STATUS_SUCCESS)                        \
@@ -99,8 +101,11 @@ namespace
         }
     }
 
-    void shader_data_callback(
-        rocprofiler_agent_id_t, int64_t, void* se_data, size_t data_size, rocprofiler_user_data_t)
+    void shader_data_callback(rocprofiler_agent_id_t  agent,
+                              int64_t                 shader_engine_id,
+                              void*                   data,
+                              size_t                  data_size,
+                              rocprofiler_user_data_t userdata)
     {
         auto parse = [](rocprofiler_thread_trace_decoder_record_type_t record_type_id,
                         void*                                          events,
@@ -122,7 +127,7 @@ namespace
             }
         };
 
-        rocprofiler_trace_decode(decoder, parse, se_data, data_size, nullptr);
+        rocprofiler_trace_decode(decoder, parse, data, data_size, nullptr);
 
         for(auto& [pc, data] : instruction_latencies)
         {
@@ -136,18 +141,23 @@ namespace
                 data.instruction = "UNKNOWN_INSTRUCTION";
             }
         }
+
+        std::cout << "shader_data_callback finished" << std::endl;
+
         dispatch_shader_mutex.unlock();
     }
 
-    rocprofiler_thread_trace_control_flags_t dispatch_callback(rocprofiler_agent_id_t,
-                                                               rocprofiler_queue_id_t,
-                                                               rocprofiler_async_correlation_id_t,
-                                                               rocprofiler_kernel_id_t,
-                                                               rocprofiler_dispatch_id_t,
-                                                               void*,
-                                                               rocprofiler_user_data_t*)
+    rocprofiler_thread_trace_control_flags_t
+        dispatch_callback(rocprofiler_agent_id_t             agent_id,
+                          rocprofiler_queue_id_t             queue_id,
+                          rocprofiler_async_correlation_id_t correlation_id,
+                          rocprofiler_kernel_id_t            kernel_id,
+                          rocprofiler_dispatch_id_t          dispatch_id,
+                          void*                              userdata_config,
+                          rocprofiler_user_data_t*           userdata_shader)
     {
         dispatch_shader_mutex.lock();
+        std::cout << "dispatch_callback" << std::endl;
         instruction_latencies.clear();
         return ROCPROFILER_THREAD_TRACE_CONTROL_START_AND_STOP;
     }
@@ -228,6 +238,9 @@ namespace rocroller_profiler
     std::vector<InstructionData> getInstructionData()
     {
         const std::lock_guard<std::mutex> lock(dispatch_shader_mutex);
+
+        std::cout << "getInstructionData called, size: " << instruction_latencies.size()
+                  << std::endl;
 
         std::vector<InstructionData> result;
         result.reserve(instruction_latencies.size());
