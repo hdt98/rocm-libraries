@@ -51,6 +51,9 @@ project( rocfft-clients LANGUAGES CXX C )
 
 set(CMAKE_CXX_STANDARD 17)
 
+# Enable CTest for testing functionality
+include(CTest)
+
 list( APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake )
 
 if( NOT ROCmCMakeBuildTools_FOUND )

@@ -101,6 +101,9 @@ if ( BUILD_FORTRAN_CLIENTS )
 endif()
 project( hipblas-clients LANGUAGES CXX ${fortran_language} )
 
+# Enable CTest for test discovery and execution
+enable_testing()
+
 # We use C++14 features, this will add compile option: -std=c++14
 set( CMAKE_CXX_STANDARD 17 )
 

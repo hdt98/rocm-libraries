@@ -242,5 +242,88 @@ add_custom_target( hipblas-test-data DEPENDS "${HIPBLAS_TEST_DATA}" )
 
 add_dependencies( hipblas-test hipblas-test-data hipblas-clients-common )
 
+# Add CTest integration - discover individual GTest test cases
+if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.10")
+  include(GoogleTest)
+  gtest_discover_tests(hipblas-test
+    WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/staging
+    TEST_PREFIX "hipblas."
+    PROPERTIES
+      LABELS "unit;hipblas;gtest"
+      TIMEOUT 300
+  )
+   # Add category-specific test runners using GTest filters
+  # These allow running tests by category using ctest -L <category>
+
+  # Auxil tests
+  add_test(
+    NAME hipblas-auxil-suite
+    COMMAND hipblas-test --gtest_filter="*auxiliary*:*set_get*:*auxil*"
+    WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/staging
+  )
+  set_tests_properties(hipblas-auxil-suite PROPERTIES
+    LABELS "auxil;utility;basic;suite"
+    TIMEOUT 120
+  )
+
+  # BLAS1 tests
+  add_test(
+    NAME hipblas-blas1-suite
+    COMMAND hipblas-test --gtest_filter="*asum*:*axpy*:*copy*:*dot*:*nrm2*:*rot*:*scal*:*swap*:*iamax*:*iamin*"
+    WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/staging
+  )
+  set_tests_properties(hipblas-blas1-suite PROPERTIES
+    LABELS "blas1;vector;level1;suite"
+    TIMEOUT 600
+  )
+
+  # BLAS2 tests
+  add_test(
+    NAME hipblas-blas2-suite
+    COMMAND hipblas-test --gtest_filter="*gbmv*:*gemv*:*ger*:*hbmv*:*hemv*:*her*:*hpmv*:*hpr*:*sbmv*:*spmv*:*spr*:*symv*:*syr*:*tbmv*:*tbsv*:*tpmv*:*tpsv*:*trmv*:*trsv*"
+    WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/staging
+  )
+
+  set_tests_properties(hipblas-blas2-suite PROPERTIES
+    LABELS "blas2;matrix-vector;level2;suite"
+    TIMEOUT 900
+  )
+
+  # BLAS3 tests
+  add_test(
+    NAME hipblas-blas3-suite
+    COMMAND hipblas-test --gtest_filter="*dgmm*:*geam*:*gemm*:*hemm*:*herk*:*her2k*:*herkx*:*symm*:*syrk*:*syr2k*:*syrkx*:*trmm*:*trsm*:*trtri*"
+    WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/staging
+  )
+  set_tests_properties(hipblas-blas3-suite PROPERTIES
+    LABELS "blas3;matrix-matrix;level3;suite"
+    TIMEOUT 1200
+  )
+
+  # BLAS_EX tests
+  add_test(
+    NAME hipblas-blas_ex-suite
+    COMMAND hipblas-test --gtest_filter="*_ex*"
+    WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/staging
+  )
+  set_tests_properties(hipblas-blas_ex-suite PROPERTIES
+    LABELS "blas_ex;extended;mixed-precision;suite"
+    TIMEOUT 900
+  )
+  # Solver tests (if enabled)
+  if(BUILD_WITH_SOLVER)
+    add_test(
+      NAME hipblas-solver-suite
+      COMMAND hipblas-test --gtest_filter="*gels*:*geqrf*:*getrf*:*getri*:*getrs*:*solver*"
+      WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/staging
+    )
+    set_tests_properties(hipblas-solver-suite PROPERTIES
+      LABELS "solver;factorization;linear-system;suite"
+      TIMEOUT 1500
+    )
+  endif()
+endif()
+
+
 rocm_install(TARGETS hipblas-test COMPONENT tests)
 rocm_install(FILES ${HIPBLAS_TEST_DATA} DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT tests)
