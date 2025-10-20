@@ -154,8 +154,6 @@ namespace
             }
         }
 
-        std::cout << "shader_data_callback finished for dispatch " << userdata.value << std::endl;
-
         dispatch_shader_mutex.unlock();
     }
 
@@ -169,7 +167,6 @@ namespace
                           rocprofiler_user_data_t*           userdata_shader)
     {
         dispatch_shader_mutex.lock();
-        std::cout << "dispatch_callback for dispatch " << dispatch_id << std::endl;
         userdata_shader->value = dispatch_id;
         return ROCPROFILER_THREAD_TRACE_CONTROL_START_AND_STOP;
     }
@@ -270,9 +267,6 @@ namespace rocroller_profiler
         {
             if(!it->second.empty())
             {
-                std::cout << "getInstructionData returning data from dispatch " << it->first
-                          << ", size: " << it->second.size() << std::endl;
-
                 result.reserve(it->second.size());
 
                 for(const auto& [pc, data] : it->second)
@@ -282,14 +276,12 @@ namespace rocroller_profiler
 
                 return result;
             }
-            std::cout << "had to skip dispatch " << it->first << " with zero data" << std::endl;
+            std::cerr << "had to skip dispatch " << it->first << " with zero data" << std::endl;
         }
 
         // see Troubleshooting section in
         // https://rocm.docs.amd.com/projects/rocprofiler-sdk/en/amd-mainline/how-to/using-thread-trace.html#troubleshooting
-        std::cout
-            << "getInstructionData called but no dispatches with data found, launch more waves"
-            << std::endl;
+        std::cerr << "No dispatches with data found, launch more waves" << std::endl;
 
         return result;
     }
