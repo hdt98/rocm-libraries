@@ -233,7 +233,7 @@ namespace RocprofilerTest
         k->setWorkgroupSize({256, 1, 1});
         // more waves for rocprofiler, see Troubleshooting in
         // https://rocm.docs.amd.com/projects/rocprofiler-sdk/en/amd-mainline/how-to/using-thread-trace.html#troubleshooting
-        k->setWorkitemCount({std::make_shared<Expression::Expression>(256 * 256), one, one});
+        k->setWorkitemCount({std::make_shared<Expression::Expression>(256 * 256 * 16), one, one});
 
         std::vector<Instruction> instrs;
 

@@ -60,7 +60,8 @@ namespace
     rocprofiler_thread_trace_decoder_id_t decoder{};
     rocprofiler_context_id_t              client_ctx{};
 
-    rocroller_profiler::InstructionLatencyMap                       instruction_latencies;
+    std::map<rocprofiler_dispatch_id_t, rocroller_profiler::InstructionLatencyMap>
+                                                                    dispatch_instruction_latencies;
     rocprofiler::sdk::codeobj::disassembly::CodeobjAddressTranslate address_table;
 
     std::mutex dispatch_shader_mutex; // Ensure dispatch and shader callback are in sync
@@ -109,12 +110,18 @@ namespace
                               size_t                  data_size,
                               rocprofiler_user_data_t userdata)
     {
+        rocprofiler_dispatch_id_t dispatch_id
+            = static_cast<rocprofiler_dispatch_id_t>(userdata.value);
+
         auto parse = [](rocprofiler_thread_trace_decoder_record_type_t record_type_id,
                         void*                                          events,
                         uint64_t                                       num_events,
                         void*                                          userdata) {
             rocprofiler_user_data_t userdata_casted
                 = *static_cast<rocprofiler_user_data_t*>(userdata);
+
+            rocprofiler_dispatch_id_t dispatch_id
+                = static_cast<rocprofiler_dispatch_id_t>(userdata_casted.value);
 
             if(record_type_id != ROCPROFILER_THREAD_TRACE_DECODER_RECORD_WAVE)
                 return;
@@ -125,7 +132,7 @@ namespace
                 for(size_t i = 0; i < wave->instructions_size; i++)
                 {
                     auto& inst = wave->instructions_array[i];
-                    auto& data = instruction_latencies[inst.pc];
+                    auto& data = dispatch_instruction_latencies[dispatch_id][inst.pc];
                     data.latency += inst.duration;
                     data.hitcount += 1;
                 }
@@ -134,7 +141,7 @@ namespace
 
         rocprofiler_trace_decode(decoder, parse, data, data_size, &userdata);
 
-        for(auto& [pc, data] : instruction_latencies)
+        for(auto& [pc, data] : dispatch_instruction_latencies[dispatch_id])
         {
             auto inst = address_table.get(pc.code_object_id, pc.address);
             if(inst)
@@ -164,7 +171,6 @@ namespace
         dispatch_shader_mutex.lock();
         std::cout << "dispatch_callback for dispatch " << dispatch_id << std::endl;
         userdata_shader->value = dispatch_id;
-        instruction_latencies.clear();
         return ROCPROFILER_THREAD_TRACE_CONTROL_START_AND_STOP;
     }
 
@@ -255,16 +261,35 @@ namespace rocroller_profiler
     {
         const std::lock_guard<std::mutex> lock(dispatch_shader_mutex);
 
-        std::cout << "getInstructionData called, size: " << instruction_latencies.size()
-                  << std::endl;
-
         std::vector<InstructionData> result;
-        result.reserve(instruction_latencies.size());
 
-        for(const auto& [pc, data] : instruction_latencies)
+        // Search backwards for the last dispatch with non-zero length data
+        for(auto it = dispatch_instruction_latencies.rbegin();
+            it != dispatch_instruction_latencies.rend();
+            ++it)
         {
-            result.push_back(data);
+            if(!it->second.empty())
+            {
+                std::cout << "getInstructionData returning data from dispatch " << it->first
+                          << ", size: " << it->second.size() << std::endl;
+
+                result.reserve(it->second.size());
+
+                for(const auto& [pc, data] : it->second)
+                {
+                    result.push_back(data);
+                }
+
+                return result;
+            }
+            std::cout << "had to skip dispatch " << it->first << " with zero data" << std::endl;
         }
+
+        // see Troubleshooting section in
+        // https://rocm.docs.amd.com/projects/rocprofiler-sdk/en/amd-mainline/how-to/using-thread-trace.html#troubleshooting
+        std::cout
+            << "getInstructionData called but no dispatches with data found, launch more waves"
+            << std::endl;
 
         return result;
     }
