@@ -185,19 +185,6 @@ RUN for tool in /usr/bin/llvm*-20; do \
 
 RUN python3 -m pip install --break-system-packages pre-commit
 
-# Display welcome message with reminder
-RUN echo '\n\
-# hipDNN Development Container Welcome Message\n\
-echo ""\n\
-echo "========================================"\n\
-echo "  hipDNN Development Container"\n\
-echo "========================================"\n\
-echo ""\n\
-echo "If you haven\'t already, please run this command in your rocm-libraries repo:"\n\
-echo "   pre-commit install"\n\
-echo ""\n\
-' >> /etc/bash.bashrc
-
 ENV HIP_PLATFORM=amd
 ENV PATH="/opt/rocm/bin:/opt/rocm:${PATH}"
 ENV CMAKE_GENERATOR="Ninja"
