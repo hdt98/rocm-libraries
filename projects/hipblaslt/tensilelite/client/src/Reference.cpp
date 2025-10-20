@@ -200,8 +200,8 @@ namespace TensileLite
                                     || std::is_same<BFloat16, Accumulator>::value
                                     || std::is_same<int32_t, Accumulator>::value
                                     || std::is_same<int64_t, Accumulator>::value
-                                    || std::is_same<int8_t, Accumulator>::value
-                                    /*|| std::is_same<std::complex<float>, Accumulator>::value
+                                    || std::is_same<int8_t, Accumulator>::value/*
+                                    || std::is_same<std::complex<float>, Accumulator>::value
                                     || std::is_same<std::complex<double>, Accumulator>::value*/,
                                 Accumulator>::type
             GetValue(rocisa::DataType dataType, void const* voidPtr, int pos, bool aConjugate)
@@ -274,12 +274,12 @@ namespace TensileLite
             }
             break;
             case rocisa::DataType::XFloat32:
-            // case rocisa::DataType::ComplexFloat:
+            case rocisa::DataType::ComplexFloat:
             // {
             //     auto typedPtr = static_cast<std::complex<float> const*>(voidPtr);
             //     return cast<Accumulator>(Transform<std::complex<float>>::Input(typedPtr[pos], aConjugate));
             // }
-            // case rocisa::DataType::ComplexDouble:
+            case rocisa::DataType::ComplexDouble:
             // {
             //     auto typedPtr = static_cast<std::complex<double> const*>(voidPtr);
             //     return cast<Accumulator>(Transform<std::complex<double>>::Input(typedPtr[pos], aConjugate));
@@ -325,8 +325,8 @@ namespace TensileLite
                                        || std::is_same<BFloat8_fnuz, Accumulator>::value
                                        || std::is_same<int32_t, Accumulator>::value
                                        || std::is_same<int64_t, Accumulator>::value
-                                       || std::is_same<int8_t, Accumulator>::value
-                                       /*|| std::is_same<std::complex<float>, Accumulator>::value
+                                       || std::is_same<int8_t, Accumulator>::value/*
+                                       || std::is_same<std::complex<float>, Accumulator>::value
                                        || std::is_same<std::complex<double>, Accumulator>::value*/,
                                    bool> = true>
         void SetValue(rocisa::DataType dataType, Accumulator& src, void* dstPtr, size_t pos)
@@ -394,12 +394,12 @@ namespace TensileLite
             }
             break;
             case rocisa::DataType::XFloat32:
-            // case rocisa::DataType::ComplexFloat:
+            case rocisa::DataType::ComplexFloat:
             // {
             //     auto typedPtr = static_cast<std::complex<float>*>(dstPtr);
             //     typedPtr[pos] = SaturateCast<std::complex<float>>(src);
             // }
-            // case rocisa::DataType::ComplexDouble:
+            case rocisa::DataType::ComplexDouble:
             // {
             //     auto typedPtr = static_cast<std::complex<double>*>(dstPtr);
             //     typedPtr[pos] = SaturateCast<std::complex<double>>(src);
@@ -425,8 +425,8 @@ namespace TensileLite
                                        && !std::is_same<Float8, Accumulator>::value
                                        && !std::is_same<BFloat8, Accumulator>::value
                                        && !std::is_same<Float8_fnuz, Accumulator>::value
-                                       && !std::is_same<BFloat8_fnuz, Accumulator>::value
-                                       /*&& !std::is_same<std::complex<float>, Accumulator>::value
+                                       && !std::is_same<BFloat8_fnuz, Accumulator>::value/*
+                                       && !std::is_same<std::complex<float>, Accumulator>::value
                                        && !std::is_same<std::complex<double>, Accumulator>::value*/,
                                    bool> = true>
         void SetValue(rocisa::DataType dataType, Accumulator& src, void* dstPtr, size_t pos)
