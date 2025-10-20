@@ -13,12 +13,9 @@ find_package(
     PATHS
     ${rocm_version_DIR}
     ${ROCM_PATH})
-find_library(
-    LIBDW_LIBRARY
-    NAMES dw
-    HINTS ${ROCM_PATH} /usr
-    PATHS ${ROCM_PATH} /usr
-    PATH_SUFFIXES lib lib64)
+
+list(APPEND CMAKE_MODULE_PATH "${rocprofiler-sdk_DIR}/Modules")
+find_package(libdw REQUIRED)
 
 find_package(Catch2 QUIET)
 if(NOT Catch2_FOUND)
@@ -41,7 +38,7 @@ target_link_libraries(rocroller-tests-rocprofiler
         rocprofiler-sdk::rocprofiler-sdk
         rocprofiler-sdk-roctx::rocprofiler-sdk-roctx
         amd_comgr
-        ${LIBDW_LIBRARY}
+        libdw::libdw
         ${BLAS_LIBRARIES}
         rocroller::common-test-utilities
 )

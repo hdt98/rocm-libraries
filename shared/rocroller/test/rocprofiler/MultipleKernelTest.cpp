@@ -48,11 +48,13 @@
 
 #include "hip/hip_runtime.h"
 
+#include <chrono>
 #include <cstdint>
 #include <cstdlib>
 #include <iostream>
 #include <memory>
 #include <ranges>
+#include <thread>
 #include <vector>
 
 using namespace rocRoller;
@@ -91,7 +93,7 @@ namespace RocprofilerTest
         k->setWorkgroupSize({256, 1, 1});
         // more waves for rocprofiler, see Troubleshooting in
         // https://rocm.docs.amd.com/projects/rocprofiler-sdk/en/amd-mainline/how-to/using-thread-trace.html#troubleshooting
-        k->setWorkitemCount({std::make_shared<Expression::Expression>(256 * 256), one, one});
+        k->setWorkitemCount({std::make_shared<Expression::Expression>(256 * 256 * 4), one, one});
 
         k->addArgument({"ptr",
                         {DataType::UInt32, PointerType::PointerGlobal},
@@ -175,6 +177,7 @@ namespace RocprofilerTest
             auto kernelSetup = createKernel(context.get(), literal, commandArg);
 
             kernelSetup.kernel.launchKernel(kernelSetup.commandArgs.runtimeArguments());
+            HIP_CHECK(hipDeviceSynchronize());
 
             const auto latencies = rocroller_profiler::getInstructionData();
 
@@ -196,7 +199,7 @@ namespace RocprofilerTest
                    << ", " << avg_latency << std::endl;
             }
             INFO(ss.str());
-            CHECK(latencies.size() == 8);
+            REQUIRE(latencies.size() == 8);
 
             { // Ensure instructions exist in expected quanities in the profile data
                 std::string const instructionsStr = [&]() {
@@ -230,7 +233,7 @@ namespace RocprofilerTest
         k->setWorkgroupSize({256, 1, 1});
         // more waves for rocprofiler, see Troubleshooting in
         // https://rocm.docs.amd.com/projects/rocprofiler-sdk/en/amd-mainline/how-to/using-thread-trace.html#troubleshooting
-        k->setWorkitemCount({std::make_shared<Expression::Expression>(256 * 256), one, one});
+        k->setWorkitemCount({std::make_shared<Expression::Expression>(256 * 256 * 16), one, one});
 
         std::vector<Instruction> instrs;
 
@@ -294,6 +297,7 @@ namespace RocprofilerTest
                 kernelSetups[idx].kernel.launchKernel(
                     kernelSetups[idx].commandArgs.runtimeArguments());
             }
+            HIP_CHECK(hipDeviceSynchronize());
             const auto        latencies  = rocroller_profiler::getInstructionData();
             std::string const literalHex = fmt::format("0x{:x}", literals[order.back()]);
             INFO("Expecting literal: " << literalHex);
@@ -310,6 +314,7 @@ namespace RocprofilerTest
                 kernelSetups[idx].kernel.launchKernel(
                     kernelSetups[idx].commandArgs.runtimeArguments());
             }
+            HIP_CHECK(hipDeviceSynchronize());
             const auto        latencies  = rocroller_profiler::getInstructionData();
             std::string const literalHex = fmt::format("0x{:x}", literals[order.back()]);
             INFO("Expecting literal: " << literalHex);
@@ -325,6 +330,7 @@ namespace RocprofilerTest
             {
                 kernelSetups[idx].kernel.launchKernel(
                     kernelSetups[idx].commandArgs.runtimeArguments());
+                HIP_CHECK(hipDeviceSynchronize());
                 rocroller_profiler::getInstructionData();
             }
             const auto        latencies  = rocroller_profiler::getInstructionData();
@@ -333,6 +339,65 @@ namespace RocprofilerTest
             REQUIRE(latencies.size() == 2);
             CHECK(1 == countSubstring(latencies[0].instruction, literalHex));
             CHECK(latencies[1].instruction == "s_endpgm");
+        }
+
+        // FAIL();
+    }
+
+    TEST_CASE("Rocprofiler simple", "[rocprofiler]")
+    {
+        auto literal    = GENERATE(0x11223344);
+        auto commandArg = GENERATE(7);
+
+        std::string const testName = fmt::format("const_0x{:x}_value_{}", literal, commandArg);
+
+        auto context = TestContext::ForTestDevice({}, testName);
+
+        INFO("Testing " << testName);
+
+        auto kernelSetup = createKernel(context.get(), literal, commandArg);
+
+        kernelSetup.kernel.launchKernel(kernelSetup.commandArgs.runtimeArguments());
+        HIP_CHECK(hipDeviceSynchronize());
+
+        const auto latencies = rocroller_profiler::getInstructionData();
+
+        { // Verify device result
+            uint32_t h_result = 0;
+            HIP_CHECK(hipMemcpy(
+                &h_result, kernelSetup.d_ptr.get(), sizeof(uint32_t), hipMemcpyDeviceToHost));
+
+            uint32_t expectedResult = commandArg + literal;
+            CHECK(h_result == expectedResult);
+        }
+
+        std::stringstream ss;
+        ss << "Instruction, Total Latency, Hit Count, Average Latency" << std::endl;
+        for(const auto& data : latencies)
+        {
+            uint64_t avg_latency = data.hitcount ? (data.latency / data.hitcount) : 0;
+            ss << "\"" << data.instruction << "\", " << data.latency << ", " << data.hitcount
+               << ", " << avg_latency << std::endl;
+        }
+        INFO(ss.str());
+        CHECK(latencies.size() == 8);
+
+        { // Ensure instructions exist in expected quanities in the profile data
+            std::string const instructionsStr = [&]() {
+                std::stringstream ss;
+                streamJoin(
+                    ss,
+                    std::views::transform(latencies, [](const auto& d) { return d.instruction; }),
+                    "\n");
+                return ss.str();
+            }();
+            INFO("Instructions:\n" << instructionsStr);
+            CHECK(2 == countSubstring(instructionsStr, "s_load_dword"));
+            CHECK(1 == countSubstring(instructionsStr, "global_store_dword"));
+            CHECK(1 == countSubstring(instructionsStr, "s_waitcnt lgkmcnt(0)"));
+            CHECK(1
+                  == countSubstring(instructionsStr,
+                                    fmt::format("v_mov_b32_e32 v1, 0x{:x}", literal)));
         }
     }
 } // namespace RocprofilerTest
