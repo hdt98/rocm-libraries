@@ -66,8 +66,11 @@ namespace
                                                                     dispatch_instruction_latencies;
     rocprofiler::sdk::codeobj::disassembly::CodeobjAddressTranslate address_table;
 
-    std::mutex dispatch_shader_mutex; // Ensure dispatch and shader callback are in sync
+    // Ensure dispatch and shader callback are in sync
+    // Every dispatch, wait for shader callback to complete
+    std::mutex dispatch_shader_mutex;
 
+    // For waiting for expected number of dispatches
     std::condition_variable dispatch_cv;
     std::mutex              dispatch_count_mutex;
     std::atomic<int>        expected_dispatches{0};
@@ -182,7 +185,6 @@ namespace
                           void*                              userdata_config,
                           rocprofiler_user_data_t*           userdata_shader)
     {
-        std::cout << "Dispatch ID: " << dispatch_id << std::endl;
         dispatch_shader_mutex.lock();
         userdata_shader->value = dispatch_id;
         return ROCPROFILER_THREAD_TRACE_CONTROL_START_AND_STOP;
@@ -254,13 +256,12 @@ namespace
         std::this_thread::sleep_for(std::chrono::seconds(1));
         {
             std::unique_lock<std::mutex> lock(dispatch_count_mutex);
-            if(expected_dispatches != completed_dispatches)
-            {
-                std::cerr << "Warning: Expected dispatches (" << expected_dispatches
-                          << ") != completed dispatches (" << completed_dispatches << ")"
-                          << std::endl;
-                abort();
-            }
+
+            using namespace rocRoller;
+            AssertFatal(expected_dispatches == completed_dispatches,
+                        "Expected dispatches (%d) != completed dispatches (%d)",
+                        expected_dispatches.load(),
+                        completed_dispatches.load());
         }
         rocprofiler_thread_trace_decoder_destroy(decoder);
     }
@@ -282,7 +283,7 @@ extern "C" rocprofiler_tool_configure_result_t*
 
 namespace rocroller_profiler
 {
-    std::vector<InstructionData> getInstructionData()
+    std::vector<InstructionData> getMostRecentDispatchData()
     {
         std::unique_lock<std::mutex> lock(dispatch_count_mutex);
         dispatch_cv.wait(lock, [] {
@@ -309,12 +310,7 @@ namespace rocroller_profiler
 
                 return result;
             }
-            std::cerr << "had to skip dispatch " << it->first << " with zero data" << std::endl;
         }
-
-        // see Troubleshooting section in
-        // https://rocm.docs.amd.com/projects/rocprofiler-sdk/en/amd-mainline/how-to/using-thread-trace.html#troubleshooting
-        std::cerr << "No dispatches with data found, launch more waves" << std::endl;
 
         return result;
     }

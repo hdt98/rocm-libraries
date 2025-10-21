@@ -220,9 +220,9 @@ namespace rocRollerTest
                         commandKernel.launchKernel(commandArgs.runtimeArguments());
                         HIP_CHECK(hipDeviceSynchronize());
 
-                        const auto latencies = rocroller_profiler::getInstructionData();
+                        const auto latencies = rocroller_profiler::getMostRecentDispatchData();
 
-                        CHECK(latencies.size() == 21);
+                        REQUIRE(latencies.size() == 21);
 
                         GPUArchitectureGFX gfx = context->targetArchitecture().target().gfx;
 
