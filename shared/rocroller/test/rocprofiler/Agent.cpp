@@ -71,7 +71,7 @@ namespace rocRoller
         // To wait for expected number of dispatches
         std::condition_variable dispatch_cv;
         std::mutex              dispatch_count_mutex;
-        std::atomic<int>        requested_dispatch_id{1}; // dispatch IDs start at 1
+        std::atomic<int>        requested_dispatch_id{0};
 
         void codeobj_callback(rocprofiler_callback_tracing_record_t record,
                               rocprofiler_user_data_t*,
@@ -117,15 +117,14 @@ namespace rocRoller
                                   size_t                  data_size,
                                   rocprofiler_user_data_t userdata)
         {
+            rocprofiler_dispatch_id_t dispatch_id
+                = static_cast<rocprofiler_dispatch_id_t>(userdata.value);
+
+            Log::info("shader_data_callback: dispatch_id {}, requested_dispatch_id {}",
+                      dispatch_id,
+                      requested_dispatch_id.load());
             try
             {
-                rocprofiler_dispatch_id_t dispatch_id
-                    = static_cast<rocprofiler_dispatch_id_t>(userdata.value);
-
-                Log::info("shader_data_callback: dispatch_id {}, requested_dispatch_id {}",
-                          dispatch_id,
-                          requested_dispatch_id.load());
-
                 auto parse = [](rocprofiler_thread_trace_decoder_record_type_t record_type_id,
                                 void*                                          events,
                                 uint64_t                                       num_events,
@@ -157,21 +156,7 @@ namespace rocRoller
                         }
                     }
                 };
-
                 rocprofiler_trace_decode(decoder, parse, data, data_size, &userdata);
-
-                for(auto& [pc, data] : dispatch_instruction_latencies[dispatch_id])
-                {
-                    auto inst = address_table.get(pc.code_object_id, pc.address);
-                    if(inst)
-                    {
-                        data.instruction = inst->inst;
-                    }
-                    else
-                    {
-                        data.instruction = "UNKNOWN_INSTRUCTION";
-                    }
-                }
             }
             catch(const std::exception& e)
             {
@@ -268,71 +253,56 @@ namespace rocRoller
     {
         std::optional<std::vector<InstructionProfile>> getMostRecentDispatchData()
         {
-            std::optional<std::vector<InstructionProfile>> result
-                = std::vector<InstructionProfile>{};
+            std::optional<std::vector<InstructionProfile>> result;
+
+            std::unique_lock<std::mutex> lock(dispatch_count_mutex);
+            dispatch_cv.wait(lock, [] {
+                return dispatch_instruction_latencies.find(requested_dispatch_id.load())
+                       != dispatch_instruction_latencies.end();
+            });
+
+            auto it = dispatch_instruction_latencies.find(requested_dispatch_id.load());
+            if(it != dispatch_instruction_latencies.end())
             {
-                std::unique_lock<std::mutex> lock(dispatch_count_mutex);
-                dispatch_cv.wait(lock, [] {
-                    // Wait until remaining_dispatches appears in map
-                    return dispatch_instruction_latencies.find(requested_dispatch_id.load() - 1)
-                           != dispatch_instruction_latencies.end();
-                });
-
-                auto it = dispatch_instruction_latencies.rbegin();
-                if(it == dispatch_instruction_latencies.rend())
+                for(auto& [pc, data] : it->second)
                 {
-                    Log::warn("getMostRecentDispatchData: No dispatch instruction latency data "
-                              "available");
-                    result = std::nullopt;
-                }
-
-                Log::info("getMostRecentDispatchData: dispatch_id {}, instruction count {}, "
-                          "map size {}",
-                          it->first,
-                          it->second.size(),
-                          dispatch_instruction_latencies.size());
-
-                if(it->second.size() == 0)
-                {
-                    Log::warn(
-                        "getMostRecentDispatchData: No instruction data found for most recent "
-                        "dispatch id {}",
-                        it->first);
-                    result = std::nullopt;
-                }
-
-                if(result != std::nullopt)
-                {
-                    result->reserve(it->second.size());
-                    for(const auto& [pc, data] : it->second)
+                    auto inst = address_table.get(pc.code_object_id, pc.address);
+                    if(inst)
                     {
-                        result->push_back(data);
+                        data.instruction = inst->inst;
+                    }
+                    else
+                    {
+                        data.instruction = "UNKNOWN_INSTRUCTION";
                     }
                 }
+                result = std::vector<InstructionProfile>{};
+                result->reserve(it->second.size());
+                for(const auto& [pc, data] : it->second)
+                {
+                    result->push_back(data);
+                }
+                Log::info("getMostRecentDispatchData: retrieved {} instructions for dispatch ID {}",
+                          result->size(),
+                          requested_dispatch_id.load());
             }
-
-            if(result == std::nullopt)
-                reset();
-
-            Log::info("getMostRecentDispatchData: returning {} entries",
-                      result ? std::to_string(result->size()) : "nullopt");
-
+            else
+            {
+                Log::warn("getMostRecentDispatchData: no data for dispatch ID {}",
+                          requested_dispatch_id.load());
+            }
             return result;
         }
 
         void expectDispatches(int n)
         {
             requested_dispatch_id += n;
-            dispatch_instruction_latencies.clear();
+            Log::info("expectDispatches: requesting {} more dispatches, now waiting for ID {}",
+                      n,
+                      requested_dispatch_id.load());
         }
 
-        void reset()
-        {
-            // Log::info("Resetting profiler state");
-            // std::this_thread::sleep_for(std::chrono::seconds(1));
-            // requested_dispatch_id = 1;
-            // dispatch_instruction_latencies.clear();
-        }
+        void reset() {}
 
         uint64_t InstructionProfile::meanLatency() const
         {
