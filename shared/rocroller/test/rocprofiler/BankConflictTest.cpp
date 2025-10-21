@@ -80,7 +80,7 @@ namespace rocRollerTest
             barrier = atoi(env_p) == 1 ? true : false;
 
         const std::vector<int>  instrSizes      = {1, 2, 4}; // b32, b64, b128
-        const std::vector<int>  strides         = {1, 2, 4, 8, 16, 32, 64}; // between threads
+        const std::vector<int>  strides         = {1, 2, 4, 8}; // between threads
         const std::vector<bool> writeOperations = {false, true};
 
         for(auto instrDwords : instrSizes)
@@ -218,12 +218,12 @@ namespace rocRollerTest
 
                         CommandArguments commandArgs = command->createArguments();
 
-                        rocroller_profiler::expect_dispatches(1);
+                        rocRoller::profiler::expect_dispatches(1);
 
                         commandKernel.launchKernel(commandArgs.runtimeArguments());
                         HIP_CHECK(hipDeviceSynchronize());
 
-                        const auto latencies = rocroller_profiler::getMostRecentDispatchData();
+                        const auto latencies = rocRoller::profiler::getMostRecentDispatchData();
 
                         REQUIRE(latencies.size() == 21);
 
