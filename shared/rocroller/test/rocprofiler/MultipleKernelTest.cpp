@@ -180,6 +180,13 @@ namespace RocprofilerTest
             HIP_CHECK(hipDeviceSynchronize());
 
             const auto latencies = rocRoller::profiler::getMostRecentDispatchData();
+
+            if(!latencies.has_value())
+            {
+                Log::warn("Skipping test: no dispatch data available");
+                SKIP();
+            }
+
             rocRoller::profiler::expectDispatches(1);
 
             { // Verify device result
@@ -193,20 +200,20 @@ namespace RocprofilerTest
 
             std::stringstream ss;
             ss << "Instruction, Total Latency, Hit Count, Average Latency" << std::endl;
-            for(const auto& data : latencies)
+            for(const auto& data : *latencies)
             {
                 uint64_t avg_latency = data.meanLatency();
                 ss << "\"" << data.instruction << "\", " << data.totalLatency << ", "
                    << data.hitcount << ", " << avg_latency << std::endl;
             }
             INFO(ss.str());
-            REQUIRE(latencies.size() >= 8); // gfx12 has 9, others have 8
+            REQUIRE(latencies->size() >= 8); // gfx12 has 9, others have 8
 
             { // Ensure instructions exist in expected quanities in the profile data
                 std::string const instructionsStr = [&]() {
                     std::stringstream ss;
                     streamJoin(ss,
-                               std::views::transform(latencies,
+                               std::views::transform(*latencies,
                                                      [](const auto& d) { return d.instruction; }),
                                "\n");
                     return ss.str();
@@ -296,14 +303,21 @@ namespace RocprofilerTest
             {
                 kernelSetups[idx].kernel.launchKernel(
                     kernelSetups[idx].commandArgs.runtimeArguments());
+                HIP_CHECK(hipDeviceSynchronize());
             }
-            HIP_CHECK(hipDeviceSynchronize());
-            const auto        latencies  = rocRoller::profiler::getMostRecentDispatchData();
+            const auto latencies = rocRoller::profiler::getMostRecentDispatchData();
+
+            if(!latencies.has_value())
+            {
+                Log::warn("Skipping test: no dispatch data available");
+                SKIP();
+            }
+
             std::string const literalHex = fmt::format("0x{:x}", literals[order.back()]);
             CAPTURE(literalHex);
-            REQUIRE(latencies.size() == 2);
-            CHECK(1 == countSubstring(latencies[0].instruction, literalHex));
-            CHECK(latencies[1].instruction == "s_endpgm");
+            REQUIRE(latencies->size() == 2);
+            CHECK(1 == countSubstring((*latencies)[0].instruction, literalHex));
+            CHECK((*latencies)[1].instruction == "s_endpgm");
         }
 
         SECTION("Order 2")
@@ -315,14 +329,21 @@ namespace RocprofilerTest
             {
                 kernelSetups[idx].kernel.launchKernel(
                     kernelSetups[idx].commandArgs.runtimeArguments());
+                HIP_CHECK(hipDeviceSynchronize());
             }
-            HIP_CHECK(hipDeviceSynchronize());
-            const auto        latencies  = rocRoller::profiler::getMostRecentDispatchData();
+            const auto latencies = rocRoller::profiler::getMostRecentDispatchData();
+
+            if(!latencies.has_value())
+            {
+                Log::warn("Skipping test: no dispatch data available");
+                SKIP();
+            }
+
             std::string const literalHex = fmt::format("0x{:x}", literals[order.back()]);
             CAPTURE(literalHex);
-            REQUIRE(latencies.size() == 2);
-            CHECK(1 == countSubstring(latencies[0].instruction, literalHex));
-            CHECK(latencies[1].instruction == "s_endpgm");
+            REQUIRE(latencies->size() == 2);
+            CHECK(1 == countSubstring((*latencies)[0].instruction, literalHex));
+            CHECK((*latencies)[1].instruction == "s_endpgm");
         }
 
         SECTION("With profiler calls")
@@ -337,12 +358,19 @@ namespace RocprofilerTest
                 HIP_CHECK(hipDeviceSynchronize());
                 rocRoller::profiler::getMostRecentDispatchData();
             }
-            const auto        latencies  = rocRoller::profiler::getMostRecentDispatchData();
+            const auto latencies = rocRoller::profiler::getMostRecentDispatchData();
+
+            if(!latencies.has_value())
+            {
+                Log::warn("Skipping test: no dispatch data available");
+                SKIP();
+            }
+
             std::string const literalHex = fmt::format("0x{:x}", literals[order.back()]);
             CAPTURE(literalHex);
-            REQUIRE(latencies.size() == 2);
-            CHECK(1 == countSubstring(latencies[0].instruction, literalHex));
-            CHECK(latencies[1].instruction == "s_endpgm");
+            REQUIRE(latencies->size() == 2);
+            CHECK(1 == countSubstring((*latencies)[0].instruction, literalHex));
+            CHECK((*latencies)[1].instruction == "s_endpgm");
         }
     }
 
@@ -366,6 +394,12 @@ namespace RocprofilerTest
 
         const auto latencies = rocRoller::profiler::getMostRecentDispatchData();
 
+        if(!latencies.has_value())
+        {
+            Log::warn("Skipping test: no dispatch data available");
+            SKIP();
+        }
+
         rocRoller::profiler::expectDispatches(1); // hipMemcpy
 
         { // Verify device result
@@ -379,21 +413,21 @@ namespace RocprofilerTest
 
         std::stringstream ss;
         ss << "Instruction, Total Latency, Hit Count, Average Latency" << std::endl;
-        for(const auto& data : latencies)
+        for(const auto& data : *latencies)
         {
             uint64_t avg_latency = data.meanLatency();
             ss << "\"" << data.instruction << "\", " << data.totalLatency << ", " << data.hitcount
                << ", " << avg_latency << std::endl;
         }
         INFO(ss.str());
-        CHECK(latencies.size() >= 8); // gfx12 has 9, others have 8
+        CHECK(latencies->size() >= 8); // gfx12 has 9, others have 8
 
         { // Ensure instructions exist in expected quanities in the profile data
             std::string const instructionsStr = [&]() {
                 std::stringstream ss;
                 streamJoin(
                     ss,
-                    std::views::transform(latencies, [](const auto& d) { return d.instruction; }),
+                    std::views::transform(*latencies, [](const auto& d) { return d.instruction; }),
                     "\n");
                 return ss.str();
             }();

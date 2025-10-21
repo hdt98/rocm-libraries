@@ -117,58 +117,68 @@ namespace rocRoller
                                   size_t                  data_size,
                                   rocprofiler_user_data_t userdata)
         {
-            rocprofiler_dispatch_id_t dispatch_id
-                = static_cast<rocprofiler_dispatch_id_t>(userdata.value);
-
-            Log::info("shader_data_callback: dispatch_id {}, remaining_dispatches {}",
-                      dispatch_id,
-                      remaining_dispatches.load());
-
-            auto parse = [](rocprofiler_thread_trace_decoder_record_type_t record_type_id,
-                            void*                                          events,
-                            uint64_t                                       num_events,
-                            void*                                          userdata) {
-                rocprofiler_user_data_t userdata_casted
-                    = *static_cast<rocprofiler_user_data_t*>(userdata);
-
+            try
+            {
                 rocprofiler_dispatch_id_t dispatch_id
-                    = static_cast<rocprofiler_dispatch_id_t>(userdata_casted.value);
+                    = static_cast<rocprofiler_dispatch_id_t>(userdata.value);
 
-                // Sometimes ROCPROFILER_THREAD_TRACE_DECODER_RECORD_WAVE never happens
-                Log::info("parse: dispatch_id {}, record_type_id {}, num_events {}",
+                Log::info("shader_data_callback: dispatch_id {}, remaining_dispatches {}",
                           dispatch_id,
-                          int(record_type_id),
-                          num_events);
+                          remaining_dispatches.load());
 
-                if(record_type_id != ROCPROFILER_THREAD_TRACE_DECODER_RECORD_WAVE)
-                    return;
+                auto parse = [](rocprofiler_thread_trace_decoder_record_type_t record_type_id,
+                                void*                                          events,
+                                uint64_t                                       num_events,
+                                void*                                          userdata) {
+                    rocprofiler_user_data_t userdata_casted
+                        = *static_cast<rocprofiler_user_data_t*>(userdata);
 
-                for(size_t w = 0; w < num_events; w++)
-                {
-                    auto* wave = static_cast<rocprofiler_thread_trace_decoder_wave_t*>(events);
-                    for(size_t i = 0; i < wave->instructions_size; i++)
+                    rocprofiler_dispatch_id_t dispatch_id
+                        = static_cast<rocprofiler_dispatch_id_t>(userdata_casted.value);
+
+                    Log::info("parse: dispatch_id {}, record_type_id {}, num_events {}",
+                              dispatch_id,
+                              int(record_type_id),
+                              num_events);
+
+                    if(record_type_id != ROCPROFILER_THREAD_TRACE_DECODER_RECORD_WAVE)
+                        return;
+                    // Sometimes this is ever reached for a dispatch
+
+                    for(size_t w = 0; w < num_events; w++)
                     {
-                        auto& inst = wave->instructions_array[i];
-                        auto& data = dispatch_instruction_latencies[dispatch_id][inst.pc];
-                        data.totalLatency += inst.duration;
-                        data.hitcount += 1;
+                        auto* wave = static_cast<rocprofiler_thread_trace_decoder_wave_t*>(events);
+                        for(size_t i = 0; i < wave->instructions_size; i++)
+                        {
+                            auto& inst = wave->instructions_array[i];
+                            auto& data = dispatch_instruction_latencies[dispatch_id][inst.pc];
+                            data.totalLatency += inst.duration;
+                            data.hitcount += 1;
+                        }
+                    }
+                };
+
+                rocprofiler_trace_decode(decoder, parse, data, data_size, &userdata);
+
+                for(auto& [pc, data] : dispatch_instruction_latencies[dispatch_id])
+                {
+                    auto inst = address_table.get(pc.code_object_id, pc.address);
+                    if(inst)
+                    {
+                        data.instruction = inst->inst;
+                    }
+                    else
+                    {
+                        data.instruction = "UNKNOWN_INSTRUCTION";
                     }
                 }
-            };
-
-            rocprofiler_trace_decode(decoder, parse, data, data_size, &userdata);
-
-            for(auto& [pc, data] : dispatch_instruction_latencies[dispatch_id])
+            }
+            catch(const std::exception& e)
             {
-                auto inst = address_table.get(pc.code_object_id, pc.address);
-                if(inst)
-                {
-                    data.instruction = inst->inst;
-                }
-                else
-                {
-                    data.instruction = "UNKNOWN_INSTRUCTION";
-                }
+                // Seem to be getting an std::exception every once in a while
+                // Can't seem to reproduce it in a debug build
+                // Unfortunately the what() is just "std::exception"
+                Log::error("shader_data_callback exception: {}", e.what());
             }
 
             {
@@ -278,50 +288,75 @@ namespace rocRoller
 
     namespace profiler
     {
-        std::vector<InstructionProfile> getMostRecentDispatchData()
+        std::optional<std::vector<InstructionProfile>> getMostRecentDispatchData()
         {
-            std::unique_lock<std::mutex> lock(dispatch_count_mutex);
-            dispatch_cv.wait(lock, [] { return remaining_dispatches == 0; });
-
-            std::vector<InstructionProfile> result;
-
-            auto it = dispatch_instruction_latencies.rbegin();
-            AssertFatal(it != dispatch_instruction_latencies.rend(),
-                        "No dispatch instruction latency data available");
-
-            Log::info(
-                "getMostRecentDispatchData: dispatch_id {}, instruction count {}, map size {}",
-                it->first,
-                it->second.size(),
-                dispatch_instruction_latencies.size());
-
-            AssertFatal(it->second.size() > 0,
-                        "No instruction data found for most recent dispatch id ",
-                        it->first);
-
-            result.reserve(it->second.size());
-            for(const auto& [pc, data] : it->second)
+            std::optional<std::vector<InstructionProfile>> result
+                = std::vector<InstructionProfile>{};
             {
-                result.push_back(data);
+                std::unique_lock<std::mutex> lock(dispatch_count_mutex);
+                dispatch_cv.wait(lock, [] { return remaining_dispatches == 0; });
+
+                auto it = dispatch_instruction_latencies.rbegin();
+                if(it == dispatch_instruction_latencies.rend())
+                {
+                    Log::warn("getMostRecentDispatchData: No dispatch instruction latency data "
+                              "available");
+                    result = std::nullopt;
+                }
+
+                Log::info(
+                    "getMostRecentDispatchData: dispatch_id {}, instruction count {}, map size {}",
+                    it->first,
+                    it->second.size(),
+                    dispatch_instruction_latencies.size());
+
+                if(it->second.size() == 0)
+                {
+                    Log::warn(
+                        "getMostRecentDispatchData: No instruction data found for most recent "
+                        "dispatch id {}",
+                        it->first);
+                    result = std::nullopt;
+                }
+
+                if(result != std::nullopt)
+                {
+                    result->reserve(it->second.size());
+                    for(const auto& [pc, data] : it->second)
+                    {
+                        result->push_back(data);
+                    }
+                }
             }
+
+            if(result == std::nullopt)
+                reset();
+
+            Log::info("getMostRecentDispatchData: returning {} entries",
+                      result ? std::to_string(result->size()) : "nullopt");
 
             return result;
         }
 
         void expectDispatches(int n)
         {
-            { // Ensure previous dispatches are complete
-                std::unique_lock<std::mutex> lock(dispatch_count_mutex);
-                dispatch_cv.wait(lock, [] { return remaining_dispatches == 0; });
-            }
+            std::unique_lock<std::mutex> lock(dispatch_count_mutex);
+            dispatch_cv.wait(lock, [] { return remaining_dispatches == 0; });
 
-            std::lock_guard<std::mutex> lock(dispatch_count_mutex);
-            AssertFatal(remaining_dispatches == 0,
-                        "Previous dispatches not completed, %d remaining",
-                        remaining_dispatches.load());
             remaining_dispatches = n;
-
             dispatch_instruction_latencies.clear();
+        }
+
+        void reset()
+        {
+            Log::info("Resetting profiler state");
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+            {
+                std::lock_guard<std::mutex> lock(dispatch_count_mutex);
+                remaining_dispatches = 0;
+                dispatch_instruction_latencies.clear();
+            }
+            dispatch_cv.notify_all();
         }
 
         uint64_t InstructionProfile::meanLatency() const

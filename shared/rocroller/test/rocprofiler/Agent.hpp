@@ -28,6 +28,7 @@
 
 #include <cstdint>
 #include <map>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -61,9 +62,9 @@ namespace rocRoller
         /**
          * @brief Get the instruction latency data from the most recent dispatch
          *  
-         * @return vector of InstructionProfile from the most recent dispatch
+         * @return optional vector of InstructionProfile from the most recent dispatch, or nullopt if no data available
          */
-        std::vector<InstructionProfile> getMostRecentDispatchData();
+        std::optional<std::vector<InstructionProfile>> getMostRecentDispatchData();
 
         /**
          * @brief Prepare to wait for a specific number of dispatch callbacks
@@ -75,6 +76,11 @@ namespace rocRoller
          * @param n Number of dispatches to expect
          */
         void expectDispatches(int n);
+
+        /**
+         * @brief Reset the profiler state, clearing any collected dispatch data
+         */
+        void reset();
 
     } // namespace profiler
 } // namespace rocRoller
