@@ -68,6 +68,8 @@ namespace rocRoller
             dispatch_instruction_latencies;
         rocprofiler::sdk::codeobj::disassembly::CodeobjAddressTranslate address_table;
 
+        std::mutex att_shader_data;
+
         // To wait for expected number of dispatches
         std::condition_variable dispatch_cv;
         std::mutex              dispatch_count_mutex;
@@ -117,6 +119,8 @@ namespace rocRoller
                                   size_t                  data_size,
                                   rocprofiler_user_data_t userdata)
         {
+            std::lock_guard<std::mutex> lock(att_shader_data);
+
             rocprofiler_dispatch_id_t dispatch_id
                 = static_cast<rocprofiler_dispatch_id_t>(userdata.value);
 
