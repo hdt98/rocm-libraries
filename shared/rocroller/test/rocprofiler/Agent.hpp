@@ -80,10 +80,5 @@ namespace rocRoller
          */
         void expectDispatches(int n);
 
-        /**
-         * @brief Reset the profiler state, clearing any collected dispatch data
-         */
-        void reset();
-
     } // namespace profiler
 } // namespace rocRoller

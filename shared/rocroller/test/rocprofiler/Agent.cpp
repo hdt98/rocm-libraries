@@ -323,8 +323,6 @@ namespace rocRoller
                       requested_dispatch_id.load());
         }
 
-        void reset() {}
-
         uint64_t InstructionProfile::meanLatency() const
         {
             if(hitcount == 0)
