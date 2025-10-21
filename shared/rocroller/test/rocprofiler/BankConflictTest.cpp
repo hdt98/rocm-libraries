@@ -80,7 +80,7 @@ namespace rocRollerTest
             barrier = atoi(env_p) == 1 ? true : false;
 
         const std::vector<int>  instrSizes      = {1, 2, 4}; // b32, b64, b128
-        const std::vector<int>  strides         = {1, 2, 4, 8}; // between threads
+        const std::vector<int>  strides         = {1, 2, 4, 8, 16, 32, 64, 128}; // between threads
         const std::vector<bool> writeOperations = {false, true};
 
         for(auto instrDwords : instrSizes)
