@@ -165,6 +165,22 @@ namespace rocRoller
                 // Unfortunately the what() is just "std::exception"
                 Log::error("shader_data_callback exception: {}", e.what());
             }
+
+            if(dispatch_instruction_latencies.find(dispatch_id)
+               != dispatch_instruction_latencies.end())
+            {
+                Log::info("shader_data_callback: collected {} instructions for dispatch_id {}",
+                          dispatch_instruction_latencies[dispatch_id].size(),
+                          dispatch_id);
+            }
+            else
+            {
+                Log::info("shader_data_callback: no instructions collected for dispatch_id {}",
+                          dispatch_id);
+                dispatch_instruction_latencies.insert(
+                    {dispatch_id, profiler::InstructionLatencyMap{}});
+            }
+
             dispatch_cv.notify_all();
         }
 
@@ -262,7 +278,7 @@ namespace rocRoller
             });
 
             auto it = dispatch_instruction_latencies.find(requested_dispatch_id.load());
-            if(it != dispatch_instruction_latencies.end())
+            if(it != dispatch_instruction_latencies.end() && !it->second.empty())
             {
                 for(auto& [pc, data] : it->second)
                 {
@@ -288,6 +304,7 @@ namespace rocRoller
             }
             else
             {
+                result = std::nullopt;
                 Log::warn("getMostRecentDispatchData: no data for dispatch ID {}",
                           requested_dispatch_id.load());
             }
