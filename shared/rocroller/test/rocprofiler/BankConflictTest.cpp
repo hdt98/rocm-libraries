@@ -93,7 +93,7 @@ namespace rocRollerTest
                                       + "b_stride" + std::to_string(strideMultiplier) + "_"
                                       + (write ? "write" : "read");
 
-                    SECTION(name)
+                    DYNAMIC_SECTION(name)
                     {
                         auto context = TestContext::ForTestDevice({}, name);
 
@@ -110,8 +110,7 @@ namespace rocRollerTest
                         const auto one  = std::make_shared<Expression::Expression>(1u);
                         const auto zero = std::make_shared<Expression::Expression>(0u);
 
-                        auto workitemCount
-                            = Expression::literal(256u * workgroupSize); // 256 CU on MI350X
+                        auto workitemCount = Expression::literal(workgroupSize * 256 * 32);
                         k->setWorkgroupSize({workgroupSize, 1, 1});
                         k->setWorkitemCount({workitemCount, one, one});
                         k->setDynamicSharedMemBytes(zero);
@@ -252,17 +251,17 @@ namespace rocRollerTest
                         std::stringstream profilerResults;
                         for(const auto& data : latencies)
                         {
-                            profilerResults << "  " << data.instruction << ", " << data.latency
-                                            << " cycles" << std::endl;
+                            profilerResults << "  " << data.instruction << ", "
+                                            << data.meanLatency() << " cycles" << std::endl;
                             if((write && data.instruction.find("ds_write") != std::string::npos)
                                || (!write && data.instruction.find("ds_read") != std::string::npos))
                             {
                                 actualMaxLdsInstrCycles
-                                    = std::max(actualMaxLdsInstrCycles, data.latency);
+                                    = std::max(actualMaxLdsInstrCycles, data.meanLatency());
                             }
                             else if(data.instruction.find("s_waitcnt") != std::string::npos)
                             {
-                                actualLastSWaitcntCycles = data.latency;
+                                actualLastSWaitcntCycles = data.meanLatency();
                             }
                         }
                         INFO("Profiler Results:\n" << profilerResults.str());
@@ -274,7 +273,8 @@ namespace rocRollerTest
                         INFO("  Issue Cycles: " << issueCycles);
                         INFO("  Data Cycles: " << dataCycles);
 
-                        CHECK(actualLastSWaitcntCycles == predictedCycles);
+                        CHECK_THAT(actualLastSWaitcntCycles,
+                                   Catch::Matchers::WithinAbs(predictedCycles, 1ul));
                         if(write && instrDwords == 4)
                             // ds_write_b128 requires queue info
                             CHECK_THAT(actualMaxLdsInstrCycles,

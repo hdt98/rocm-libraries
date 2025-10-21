@@ -202,10 +202,6 @@ namespace rocRoller
                                           size_t       num_agents,
                                           void*        user_data)
         {
-            constexpr uint64_t TARGET_CU   = 1; // CU (gfx9) or WGP (gfx10+)
-            constexpr uint64_t SHADER_MASK = 0x1; // Only enable SE=0
-            constexpr uint64_t BUFFER_SIZE = 0x40000000;
-
             for(size_t idx = 0; idx < num_agents; idx++)
             {
                 const auto* agent = static_cast<const rocprofiler_agent_v0_t*>(agents[idx]);
@@ -213,10 +209,10 @@ namespace rocRoller
                     continue;
 
                 auto parameters = std::vector<rocprofiler_thread_trace_parameter_t>{};
-                parameters.push_back({ROCPROFILER_THREAD_TRACE_PARAMETER_TARGET_CU, TARGET_CU});
-                parameters.push_back({ROCPROFILER_THREAD_TRACE_PARAMETER_BUFFER_SIZE, BUFFER_SIZE});
+                parameters.push_back({ROCPROFILER_THREAD_TRACE_PARAMETER_TARGET_CU, 1});
+                parameters.push_back({ROCPROFILER_THREAD_TRACE_PARAMETER_SHADER_ENGINE_MASK, 0x1});
                 parameters.push_back(
-                    {ROCPROFILER_THREAD_TRACE_PARAMETER_SHADER_ENGINE_MASK, SHADER_MASK});
+                    {ROCPROFILER_THREAD_TRACE_PARAMETER_BUFFER_SIZE, 1073741824}); // 16GB
 
                 ROCPROFILER_CALL(
                     rocprofiler_configure_dispatch_thread_trace_service(client_ctx,
@@ -319,6 +315,13 @@ namespace rocRoller
             completed_dispatches = 0;
 
             dispatch_instruction_latencies.clear();
+        }
+
+        uint64_t InstructionData::meanLatency() const
+        {
+            if(hitcount == 0)
+                return 0;
+            return latency / hitcount;
         }
 
     } // namespace profiler

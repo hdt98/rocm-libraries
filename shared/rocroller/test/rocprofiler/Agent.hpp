@@ -40,6 +40,8 @@ namespace rocRoller
             uint64_t    latency{0}; // Total latency in cycles
             uint64_t    hitcount{0}; // Number of times instruction was executed
             std::string instruction; // Disassembled instruction text
+
+            uint64_t meanLatency() const;
         };
 
         struct pc_comparator
