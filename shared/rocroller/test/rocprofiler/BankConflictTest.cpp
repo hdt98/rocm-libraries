@@ -217,12 +217,10 @@ namespace rocRollerTest
 
                         CommandArguments commandArgs = command->createArguments();
 
-                        rocRoller::profiler::expectDispatches(1);
-
                         commandKernel.launchKernel(commandArgs.runtimeArguments());
                         HIP_CHECK(hipDeviceSynchronize());
 
-                        const auto latencies = rocRoller::profiler::getMostRecentDispatchData();
+                        const auto latencies = rocRoller::profiler::waitForDispatchData(1);
 
                         if(!latencies.has_value())
                         {
