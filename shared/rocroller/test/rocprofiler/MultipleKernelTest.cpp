@@ -193,8 +193,8 @@ namespace RocprofilerTest
             for(const auto& data : latencies)
             {
                 uint64_t avg_latency = data.meanLatency();
-                ss << "\"" << data.instruction << "\", " << data.latency << ", " << data.hitcount
-                   << ", " << avg_latency << std::endl;
+                ss << "\"" << data.instruction << "\", " << data.totalLatency << ", "
+                   << data.hitcount << ", " << avg_latency << std::endl;
             }
             INFO(ss.str());
             REQUIRE(latencies.size() >= 8); // gfx12 has 9, others have 8
@@ -376,7 +376,7 @@ namespace RocprofilerTest
         for(const auto& data : latencies)
         {
             uint64_t avg_latency = data.meanLatency();
-            ss << "\"" << data.instruction << "\", " << data.latency << ", " << data.hitcount
+            ss << "\"" << data.instruction << "\", " << data.totalLatency << ", " << data.hitcount
                << ", " << avg_latency << std::endl;
         }
         INFO(ss.str());

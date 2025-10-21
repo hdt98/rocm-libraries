@@ -143,7 +143,7 @@ namespace rocRoller
                     {
                         auto& inst = wave->instructions_array[i];
                         auto& data = dispatch_instruction_latencies[dispatch_id][inst.pc];
-                        data.latency += inst.duration;
+                        data.totalLatency += inst.duration;
                         data.hitcount += 1;
                     }
                 }
@@ -266,12 +266,12 @@ namespace rocRoller
 
     namespace profiler
     {
-        std::vector<InstructionData> getMostRecentDispatchData()
+        std::vector<InstructionProfile> getMostRecentDispatchData()
         {
             std::unique_lock<std::mutex> lock(dispatch_count_mutex);
             dispatch_cv.wait(lock, [] { return completed_dispatches == expected_dispatches; });
 
-            std::vector<InstructionData> result;
+            std::vector<InstructionProfile> result;
 
             // Return most-recent dispatch's instruction data
             auto it = dispatch_instruction_latencies.end();
@@ -311,11 +311,11 @@ namespace rocRoller
             dispatch_instruction_latencies.clear();
         }
 
-        uint64_t InstructionData::meanLatency() const
+        uint64_t InstructionProfile::meanLatency() const
         {
             if(hitcount == 0)
                 return 0;
-            return latency / hitcount;
+            return totalLatency / hitcount;
         }
 
     } // namespace profiler

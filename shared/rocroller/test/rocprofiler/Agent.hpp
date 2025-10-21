@@ -35,9 +35,9 @@ namespace rocRoller
 {
     namespace profiler
     {
-        struct InstructionData
+        struct InstructionProfile
         {
-            uint64_t    latency{0}; // Total latency in cycles
+            uint64_t    totalLatency{0}; // Total latency in cycles
             uint64_t    hitcount{0}; // Number of times instruction was executed
             std::string instruction; // Disassembled instruction text
 
@@ -56,14 +56,14 @@ namespace rocRoller
         };
 
         using InstructionLatencyMap
-            = std::map<rocprofiler_thread_trace_decoder_pc_t, InstructionData, pc_comparator>;
+            = std::map<rocprofiler_thread_trace_decoder_pc_t, InstructionProfile, pc_comparator>;
 
         /**
          * @brief Get the instruction latency data from the most recent dispatch
          *  
-         * @return vector of InstructionData from the most recent dispatch
+         * @return vector of InstructionProfile from the most recent dispatch
          */
-        std::vector<InstructionData> getMostRecentDispatchData();
+        std::vector<InstructionProfile> getMostRecentDispatchData();
 
         /**
          * @brief Prepare to wait for a specific number of dispatch callbacks
