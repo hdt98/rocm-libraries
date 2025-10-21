@@ -863,10 +863,12 @@ MIOpenBatchNormFwdTrainSpatial(const __global _FLOAT* __restrict in,
     local _FLOAT_ACCUM lcl_data_y[MIO_BN_LDSGCN_SIZE];
     gcn_reduce2(&mean, &variance, (_FLOAT_ACCUM)INHW, lcl_data_x, lcl_data_y, lid);
 #endif
-    if(MIO_BN_NHW == 1) {
+    if(MIO_BN_NHW == 1)
+    {
         variance = 0;
     }
-    else{
+    else
+    {
         variance = mad(-mean, mean, variance);
     }
     if(variance < 0)
