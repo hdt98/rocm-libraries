@@ -31,8 +31,11 @@
 #include <rocprofiler-sdk/rocprofiler.h>
 
 #include <rocRoller/Utilities/Error.hpp>
+#include <rocRoller/Utilities/Logging.hpp>
 
+#include <atomic>
 #include <chrono>
+#include <condition_variable>
 #include <cstdint>
 #include <cstdlib>
 #include <fstream>
@@ -65,7 +68,15 @@ namespace rocRoller
             dispatch_instruction_latencies;
         rocprofiler::sdk::codeobj::disassembly::CodeobjAddressTranslate address_table;
 
-        std::mutex dispatch_shader_mutex; // Ensure dispatch and shader callback are in sync
+        // Ensure dispatch and shader callback are in sync
+        // Every dispatch, wait for shader callback to complete
+        std::mutex dispatch_shader_mutex;
+
+        // For waiting for expected number of dispatches
+        std::condition_variable dispatch_cv;
+        std::mutex              dispatch_count_mutex;
+        std::atomic<int>        expected_dispatches{0};
+        std::atomic<int>        completed_dispatches{0};
 
         void codeobj_callback(rocprofiler_callback_tracing_record_t record,
                               rocprofiler_user_data_t*,
@@ -156,6 +167,20 @@ namespace rocRoller
             }
 
             dispatch_shader_mutex.unlock();
+
+            {
+                std::lock_guard<std::mutex> lock(dispatch_count_mutex);
+                completed_dispatches++;
+
+                // rocprofiler-sdk catches exceptions in callbacks, so AssertFatal cannot be used here
+                assert(completed_dispatches <= expected_dispatches
+                       && "More completed dispatches than expected in shader callback");
+
+                if(completed_dispatches == expected_dispatches)
+                {
+                    dispatch_cv.notify_all();
+                }
+            }
         }
 
         rocprofiler_thread_trace_control_flags_t
@@ -177,10 +202,6 @@ namespace rocRoller
                                           size_t       num_agents,
                                           void*        user_data)
         {
-            constexpr uint64_t TARGET_CU   = 1; // CU (gfx9) or WGP (gfx10+)
-            constexpr uint64_t SHADER_MASK = 0x1; // Only enable SE=0
-            constexpr uint64_t BUFFER_SIZE = 0x10000000; // 256MB
-
             for(size_t idx = 0; idx < num_agents; idx++)
             {
                 const auto* agent = static_cast<const rocprofiler_agent_v0_t*>(agents[idx]);
@@ -188,10 +209,10 @@ namespace rocRoller
                     continue;
 
                 auto parameters = std::vector<rocprofiler_thread_trace_parameter_t>{};
-                parameters.push_back({ROCPROFILER_THREAD_TRACE_PARAMETER_TARGET_CU, TARGET_CU});
-                parameters.push_back({ROCPROFILER_THREAD_TRACE_PARAMETER_BUFFER_SIZE, BUFFER_SIZE});
+                parameters.push_back({ROCPROFILER_THREAD_TRACE_PARAMETER_TARGET_CU, 1});
+                parameters.push_back({ROCPROFILER_THREAD_TRACE_PARAMETER_SHADER_ENGINE_MASK, 0x1});
                 parameters.push_back(
-                    {ROCPROFILER_THREAD_TRACE_PARAMETER_SHADER_ENGINE_MASK, SHADER_MASK});
+                    {ROCPROFILER_THREAD_TRACE_PARAMETER_BUFFER_SIZE, 0x10000000}); // 256MB
 
                 ROCPROFILER_CALL(
                     rocprofiler_configure_dispatch_thread_trace_service(client_ctx,
@@ -237,42 +258,71 @@ namespace rocRoller
 
     void tool_fini(void*)
     {
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+        { // Ensure all dispatches are accounted for at exit
+            std::unique_lock<std::mutex> lock(dispatch_count_mutex);
+
+            // rocprofiler-sdk catches exceptions in callbacks, so AssertFatal cannot be used here
+            assert(expected_dispatches == completed_dispatches
+                   && "Not all expected dispatches completed before tool_fini");
+        }
         rocprofiler_thread_trace_decoder_destroy(decoder);
     }
 
     namespace profiler
     {
-        std::vector<InstructionData> getInstructionData()
+        std::vector<InstructionData> getMostRecentDispatchData()
         {
-            const std::lock_guard<std::mutex> lock(dispatch_shader_mutex);
+            std::unique_lock<std::mutex> lock(dispatch_count_mutex);
+            dispatch_cv.wait(lock, [] { return completed_dispatches == expected_dispatches; });
+
+            const std::lock_guard<std::mutex> shader_lock(dispatch_shader_mutex);
 
             std::vector<InstructionData> result;
 
-            // Search backwards for the last dispatch with non-zero length data
-            for(auto it = dispatch_instruction_latencies.rbegin();
-                it != dispatch_instruction_latencies.rend();
-                ++it)
+            // Return most-recent dispatch's instruction data
+            auto it = dispatch_instruction_latencies.end();
+            AssertFatal(it != dispatch_instruction_latencies.begin(),
+                        "No dispatch instruction latency data available");
+            --it;
+
+            AssertFatal(it->second.size() > 0,
+                        "No instruction latency data for most recent dispatch");
+
+            result.reserve(it->second.size());
+            for(const auto& [pc, data] : it->second)
             {
-                if(!it->second.empty())
-                {
-                    result.reserve(it->second.size());
-
-                    for(const auto& [pc, data] : it->second)
-                    {
-                        result.push_back(data);
-                    }
-
-                    return result;
-                }
-                std::cerr << "had to skip dispatch " << it->first << " with zero data" << std::endl;
+                result.push_back(data);
             }
-
-            // see Troubleshooting section in
-            // https://rocm.docs.amd.com/projects/rocprofiler-sdk/en/amd-mainline/how-to/using-thread-trace.html#troubleshooting
-            std::cerr << "No dispatches with data found, launch more waves" << std::endl;
 
             return result;
         }
+
+        void expect_dispatches(int n)
+        {
+            { // Ensure previous dispatches are complete
+                std::unique_lock<std::mutex> lock(dispatch_count_mutex);
+                dispatch_cv.wait(lock, [] { return completed_dispatches == expected_dispatches; });
+            }
+
+            std::lock_guard<std::mutex> lock(dispatch_count_mutex);
+            AssertFatal(completed_dispatches == expected_dispatches,
+                        "Previous expected dispatches (%d) != completed dispatches (%d)",
+                        expected_dispatches.load(),
+                        completed_dispatches.load());
+            expected_dispatches  = n;
+            completed_dispatches = 0;
+
+            dispatch_instruction_latencies.clear();
+        }
+
+        uint64_t InstructionData::meanLatency() const
+        {
+            if(hitcount == 0)
+                return 0;
+            return latency / hitcount;
+        }
+
     } // namespace profiler
 } // namespace rocRoller
 
