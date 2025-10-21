@@ -176,10 +176,12 @@ namespace RocprofilerTest
 
             auto kernelSetup = createKernel(context.get(), literal, commandArg);
 
+            rocroller_profiler::expect_dispatches(2);
             kernelSetup.kernel.launchKernel(kernelSetup.commandArgs.runtimeArguments());
             HIP_CHECK(hipDeviceSynchronize());
 
             const auto latencies = rocroller_profiler::getInstructionData();
+            rocroller_profiler::expect_dispatches(1);
 
             { // Verify device result
                 uint32_t h_result = 0;
@@ -292,6 +294,7 @@ namespace RocprofilerTest
         SECTION("Order 1")
         {
             std::vector<size_t> order = {0, 1, 2, 1};
+            rocroller_profiler::expect_dispatches(order.size());
             for(size_t idx : order)
             {
                 kernelSetups[idx].kernel.launchKernel(
@@ -309,6 +312,7 @@ namespace RocprofilerTest
         SECTION("Order 2")
         {
             std::vector<size_t> order = {1, 2};
+            rocroller_profiler::expect_dispatches(order.size());
             for(size_t idx : order)
             {
                 kernelSetups[idx].kernel.launchKernel(
@@ -328,6 +332,7 @@ namespace RocprofilerTest
             std::vector<size_t> order = {1, 2};
             for(size_t idx : order)
             {
+                rocroller_profiler::expect_dispatches(1);
                 kernelSetups[idx].kernel.launchKernel(
                     kernelSetups[idx].commandArgs.runtimeArguments());
                 HIP_CHECK(hipDeviceSynchronize());
@@ -340,12 +345,12 @@ namespace RocprofilerTest
             CHECK(1 == countSubstring(latencies[0].instruction, literalHex));
             CHECK(latencies[1].instruction == "s_endpgm");
         }
-
-        // FAIL();
     }
 
     TEST_CASE("Rocprofiler simple", "[rocprofiler]")
     {
+        rocroller_profiler::expect_dispatches(2); // hipMemset, kernel
+
         auto literal    = GENERATE(0x11223344);
         auto commandArg = GENERATE(7);
 
@@ -361,6 +366,8 @@ namespace RocprofilerTest
         HIP_CHECK(hipDeviceSynchronize());
 
         const auto latencies = rocroller_profiler::getInstructionData();
+
+        rocroller_profiler::expect_dispatches(1); // hipMemcpy
 
         { // Verify device result
             uint32_t h_result = 0;

@@ -65,4 +65,15 @@ namespace rocroller_profiler
      */
     std::vector<InstructionData> getInstructionData();
 
+    /**
+     * @brief Prepare to wait for a specific number of dispatch callbacks
+     * 
+     * This function sets up the profiler to wait for exactly n dispatch
+     * callbacks before getInstructionData() returns. It also clears any
+     * previously collected dispatch data.
+     * 
+     * @param n Number of dispatches to expect
+     */
+    void expect_dispatches(int n);
+
 } // namespace rocroller_profiler

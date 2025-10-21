@@ -32,7 +32,9 @@
 
 #include <rocRoller/Utilities/Error.hpp>
 
+#include <atomic>
 #include <chrono>
+#include <condition_variable>
 #include <cstdint>
 #include <cstdlib>
 #include <fstream>
@@ -65,6 +67,11 @@ namespace
     rocprofiler::sdk::codeobj::disassembly::CodeobjAddressTranslate address_table;
 
     std::mutex dispatch_shader_mutex; // Ensure dispatch and shader callback are in sync
+
+    std::condition_variable dispatch_cv;
+    std::mutex              dispatch_count_mutex;
+    std::atomic<int>        expected_dispatches{0};
+    std::atomic<int>        completed_dispatches{0};
 
     void codeobj_callback(rocprofiler_callback_tracing_record_t record,
                           rocprofiler_user_data_t*,
@@ -155,6 +162,15 @@ namespace
         }
 
         dispatch_shader_mutex.unlock();
+
+        {
+            std::lock_guard<std::mutex> lock(dispatch_count_mutex);
+            completed_dispatches++;
+            if(completed_dispatches >= expected_dispatches && expected_dispatches > 0)
+            {
+                dispatch_cv.notify_all();
+            }
+        }
     }
 
     rocprofiler_thread_trace_control_flags_t
@@ -166,6 +182,7 @@ namespace
                           void*                              userdata_config,
                           rocprofiler_user_data_t*           userdata_shader)
     {
+        std::cout << "Dispatch ID: " << dispatch_id << std::endl;
         dispatch_shader_mutex.lock();
         userdata_shader->value = dispatch_id;
         return ROCPROFILER_THREAD_TRACE_CONTROL_START_AND_STOP;
@@ -234,6 +251,17 @@ namespace
 
     void tool_fini(void*)
     {
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+        {
+            std::unique_lock<std::mutex> lock(dispatch_count_mutex);
+            if(expected_dispatches != completed_dispatches)
+            {
+                std::cerr << "Warning: Expected dispatches (" << expected_dispatches
+                          << ") != completed dispatches (" << completed_dispatches << ")"
+                          << std::endl;
+                abort();
+            }
+        }
         rocprofiler_thread_trace_decoder_destroy(decoder);
     }
 }
@@ -256,7 +284,12 @@ namespace rocroller_profiler
 {
     std::vector<InstructionData> getInstructionData()
     {
-        const std::lock_guard<std::mutex> lock(dispatch_shader_mutex);
+        std::unique_lock<std::mutex> lock(dispatch_count_mutex);
+        dispatch_cv.wait(lock, [] {
+            return completed_dispatches >= expected_dispatches || expected_dispatches == 0;
+        });
+
+        const std::lock_guard<std::mutex> shader_lock(dispatch_shader_mutex);
 
         std::vector<InstructionData> result;
 
@@ -284,5 +317,14 @@ namespace rocroller_profiler
         std::cerr << "No dispatches with data found, launch more waves" << std::endl;
 
         return result;
+    }
+
+    void expect_dispatches(int n)
+    {
+        std::lock_guard<std::mutex> lock(dispatch_count_mutex);
+        expected_dispatches  = n;
+        completed_dispatches = 0;
+
+        dispatch_instruction_latencies.clear();
     }
 } // namespace rocroller_profiler

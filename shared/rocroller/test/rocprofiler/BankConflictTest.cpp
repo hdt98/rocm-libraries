@@ -40,6 +40,7 @@
 #include <rocRoller/Operations/Command.hpp>
 #include <rocRoller/Scheduling/LDSBankModel.hpp>
 #include <rocRoller/Utilities/Generator.hpp>
+#include <rocRoller/Utilities/HipUtils.hpp>
 
 #include "../catch/TestContext.hpp"
 #include "Agent.hpp"
@@ -214,7 +215,10 @@ namespace rocRollerTest
 
                         CommandArguments commandArgs = command->createArguments();
 
+                        rocroller_profiler::expect_dispatches(1);
+
                         commandKernel.launchKernel(commandArgs.runtimeArguments());
+                        HIP_CHECK(hipDeviceSynchronize());
 
                         const auto latencies = rocroller_profiler::getInstructionData();
 
