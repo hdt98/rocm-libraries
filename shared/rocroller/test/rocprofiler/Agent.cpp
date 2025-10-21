@@ -68,10 +68,6 @@ namespace rocRoller
             dispatch_instruction_latencies;
         rocprofiler::sdk::codeobj::disassembly::CodeobjAddressTranslate address_table;
 
-        // Ensure dispatch and shader callback are in sync
-        // Every dispatch, wait for shader callback to complete
-        std::mutex dispatch_shader_mutex;
-
         // For waiting for expected number of dispatches
         std::condition_variable dispatch_cv;
         std::mutex              dispatch_count_mutex;
@@ -166,8 +162,6 @@ namespace rocRoller
                 }
             }
 
-            dispatch_shader_mutex.unlock();
-
             {
                 std::lock_guard<std::mutex> lock(dispatch_count_mutex);
                 completed_dispatches++;
@@ -192,7 +186,6 @@ namespace rocRoller
                               void*                              userdata_config,
                               rocprofiler_user_data_t*           userdata_shader)
         {
-            dispatch_shader_mutex.lock();
             userdata_shader->value = dispatch_id;
             return ROCPROFILER_THREAD_TRACE_CONTROL_START_AND_STOP;
         }
@@ -275,8 +268,6 @@ namespace rocRoller
         {
             std::unique_lock<std::mutex> lock(dispatch_count_mutex);
             dispatch_cv.wait(lock, [] { return completed_dispatches == expected_dispatches; });
-
-            const std::lock_guard<std::mutex> shader_lock(dispatch_shader_mutex);
 
             std::vector<InstructionData> result;
 
