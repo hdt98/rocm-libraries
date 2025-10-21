@@ -346,7 +346,7 @@ namespace RocprofilerTest
 
     TEST_CASE("Rocprofiler simple", "[rocprofiler]")
     {
-        rocRoller::profiler::expect_dispatches(2); // hipMemset, kernel
+        rocRoller::profiler::expect_dispatches(2); // hipMemset, then kernel
 
         auto literal    = GENERATE(0x11223344);
         auto commandArg = GENERATE(7);

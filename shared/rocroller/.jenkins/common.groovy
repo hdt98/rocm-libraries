@@ -49,11 +49,6 @@ def runCompileCommand(platform, project, jobName, boolean codeCoverage=false, bo
 
                 ${sshBlock}
 
-                grep -rnw '/opt/rocm/include/' -e 'struct rocprofiler_thread_trace_decoder_pc_t'
-                
-                grep -rnw '/opt/rocm/include/' -e 'struct rocprofiler_thread_trace_decoder_pc_t' | cut -d':' -f1 | sort -u | xargs -I {} realpath {}
-
-
                 mkdir -p build
                 cd build
                 # Check that all tests are included.

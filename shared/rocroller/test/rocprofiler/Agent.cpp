@@ -171,10 +171,10 @@ namespace rocRoller
             {
                 std::lock_guard<std::mutex> lock(dispatch_count_mutex);
                 completed_dispatches++;
-                AssertFatal(completed_dispatches <= expected_dispatches,
-                            "Completed dispatches (%d) exceeded expected dispatches (%d)",
-                            completed_dispatches.load(),
-                            expected_dispatches.load());
+
+                // rocprofiler-sdk catches exceptions in callbacks, so AssertFatal cannot be used here
+                assert(completed_dispatches <= expected_dispatches
+                       && "More completed dispatches than expected in shader callback");
 
                 if(completed_dispatches == expected_dispatches)
                 {
@@ -212,7 +212,7 @@ namespace rocRoller
                 parameters.push_back({ROCPROFILER_THREAD_TRACE_PARAMETER_TARGET_CU, 1});
                 parameters.push_back({ROCPROFILER_THREAD_TRACE_PARAMETER_SHADER_ENGINE_MASK, 0x1});
                 parameters.push_back(
-                    {ROCPROFILER_THREAD_TRACE_PARAMETER_BUFFER_SIZE, 1073741824}); // 16GB
+                    {ROCPROFILER_THREAD_TRACE_PARAMETER_BUFFER_SIZE, 0x10000000}); // 256MB
 
                 ROCPROFILER_CALL(
                     rocprofiler_configure_dispatch_thread_trace_service(client_ctx,
@@ -259,13 +259,12 @@ namespace rocRoller
     void tool_fini(void*)
     {
         std::this_thread::sleep_for(std::chrono::seconds(1));
-        {
+        { // Ensure all dispatches are accounted for at exit
             std::unique_lock<std::mutex> lock(dispatch_count_mutex);
 
-            AssertFatal(expected_dispatches == completed_dispatches,
-                        "Expected dispatches (%d) != completed dispatches (%d)",
-                        expected_dispatches.load(),
-                        completed_dispatches.load());
+            // rocprofiler-sdk catches exceptions in callbacks, so AssertFatal cannot be used here
+            assert(expected_dispatches == completed_dispatches
+                   && "Not all expected dispatches completed before tool_fini");
         }
         rocprofiler_thread_trace_decoder_destroy(decoder);
     }
