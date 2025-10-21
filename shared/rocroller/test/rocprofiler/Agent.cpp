@@ -271,8 +271,13 @@ namespace rocRoller
 
     namespace profiler
     {
-        std::optional<std::vector<InstructionProfile>> getMostRecentDispatchData()
+        std::optional<std::vector<InstructionProfile>> waitForDispatchData(int n)
         {
+            requested_dispatch_id += n;
+            Log::info("waitForDispatchData: requesting {} more dispatches, now waiting for ID {}",
+                      n,
+                      requested_dispatch_id.load());
+
             std::optional<std::vector<InstructionProfile>> result;
 
             std::unique_lock<std::mutex> lock(dispatch_count_mutex);
@@ -302,25 +307,17 @@ namespace rocRoller
                 {
                     result->push_back(data);
                 }
-                Log::info("getMostRecentDispatchData: retrieved {} instructions for dispatch ID {}",
+                Log::info("waitForDispatchData: retrieved {} instructions for dispatch ID {}",
                           result->size(),
                           requested_dispatch_id.load());
             }
             else
             {
                 result = std::nullopt;
-                Log::warn("getMostRecentDispatchData: no data for dispatch ID {}",
+                Log::warn("waitForDispatchData: no data for dispatch ID {}",
                           requested_dispatch_id.load());
             }
             return result;
-        }
-
-        void expectDispatches(int n)
-        {
-            requested_dispatch_id += n;
-            Log::info("expectDispatches: requesting {} more dispatches, now waiting for ID {}",
-                      n,
-                      requested_dispatch_id.load());
         }
 
         uint64_t InstructionProfile::meanLatency() const

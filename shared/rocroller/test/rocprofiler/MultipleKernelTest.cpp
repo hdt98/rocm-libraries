@@ -175,11 +175,10 @@ namespace RocprofilerTest
             auto context     = TestContext::ForTestDevice({}, testName);
             auto kernelSetup = createKernel(context.get(), literal, commandArg);
 
-            rocRoller::profiler::expectDispatches(2);
             kernelSetup.kernel.launchKernel(kernelSetup.commandArgs.runtimeArguments());
             HIP_CHECK(hipDeviceSynchronize());
 
-            const auto latencies = rocRoller::profiler::getMostRecentDispatchData();
+            const auto latencies = rocRoller::profiler::waitForDispatchData(2);
 
             if(!latencies.has_value())
             {
@@ -187,12 +186,13 @@ namespace RocprofilerTest
                 SKIP();
             }
 
-            rocRoller::profiler::expectDispatches(1);
-
             { // Verify device result
                 uint32_t h_result = 0;
                 HIP_CHECK(hipMemcpy(
                     &h_result, kernelSetup.d_ptr.get(), sizeof(uint32_t), hipMemcpyDeviceToHost));
+
+                // Wait for the hipMemcpy dispatch
+                rocRoller::profiler::waitForDispatchData(1);
 
                 uint32_t expectedResult = commandArg + literal;
                 CHECK(h_result == expectedResult);
@@ -298,14 +298,13 @@ namespace RocprofilerTest
         {
             CAPTURE("Order 1");
             std::vector<size_t> order = {0, 1, 2, 1};
-            rocRoller::profiler::expectDispatches(order.size());
             for(size_t idx : order)
             {
                 kernelSetups[idx].kernel.launchKernel(
                     kernelSetups[idx].commandArgs.runtimeArguments());
                 HIP_CHECK(hipDeviceSynchronize());
             }
-            const auto latencies = rocRoller::profiler::getMostRecentDispatchData();
+            const auto latencies = rocRoller::profiler::waitForDispatchData(order.size());
 
             if(!latencies.has_value())
             {
@@ -315,6 +314,7 @@ namespace RocprofilerTest
 
             std::string const literalHex = fmt::format("0x{:x}", literals[order.back()]);
             CAPTURE(literalHex);
+            INFO(toString(*latencies));
             REQUIRE(latencies->size() == 2);
             CHECK(1 == countSubstring((*latencies)[0].instruction, literalHex));
             CHECK((*latencies)[1].instruction == "s_endpgm");
@@ -324,14 +324,13 @@ namespace RocprofilerTest
         {
             CAPTURE("Order 2");
             std::vector<size_t> order = {1, 2};
-            rocRoller::profiler::expectDispatches(order.size());
             for(size_t idx : order)
             {
                 kernelSetups[idx].kernel.launchKernel(
                     kernelSetups[idx].commandArgs.runtimeArguments());
                 HIP_CHECK(hipDeviceSynchronize());
             }
-            const auto latencies = rocRoller::profiler::getMostRecentDispatchData();
+            const auto latencies = rocRoller::profiler::waitForDispatchData(order.size());
 
             if(!latencies.has_value())
             {
@@ -341,6 +340,7 @@ namespace RocprofilerTest
 
             std::string const literalHex = fmt::format("0x{:x}", literals[order.back()]);
             CAPTURE(literalHex);
+            INFO(toString(*latencies));
             REQUIRE(latencies->size() == 2);
             CHECK(1 == countSubstring((*latencies)[0].instruction, literalHex));
             CHECK((*latencies)[1].instruction == "s_endpgm");
@@ -352,13 +352,14 @@ namespace RocprofilerTest
             std::vector<size_t> order = {1, 2};
             for(size_t idx : order)
             {
-                rocRoller::profiler::expectDispatches(1);
                 kernelSetups[idx].kernel.launchKernel(
                     kernelSetups[idx].commandArgs.runtimeArguments());
                 HIP_CHECK(hipDeviceSynchronize());
-                rocRoller::profiler::getMostRecentDispatchData();
+                rocRoller::profiler::waitForDispatchData(1);
             }
-            const auto latencies = rocRoller::profiler::getMostRecentDispatchData();
+            // The last waitForDispatchData call already got us to the correct dispatch
+            // No need to wait again, the data is already available
+            const auto latencies = rocRoller::profiler::waitForDispatchData(0);
 
             if(!latencies.has_value())
             {
@@ -377,8 +378,6 @@ namespace RocprofilerTest
 
     TEST_CASE("Rocprofiler simple", "[rocprofiler]")
     {
-        rocRoller::profiler::expectDispatches(2); // hipMemset, then kernel
-
         auto literal    = GENERATE(0x11223344);
         auto commandArg = GENERATE(7);
 
@@ -393,7 +392,8 @@ namespace RocprofilerTest
         kernelSetup.kernel.launchKernel(kernelSetup.commandArgs.runtimeArguments());
         HIP_CHECK(hipDeviceSynchronize());
 
-        const auto latencies = rocRoller::profiler::getMostRecentDispatchData();
+        const auto latencies
+            = rocRoller::profiler::waitForDispatchData(2); // hipMemset, then kernel
 
         if(!latencies.has_value())
         {
@@ -401,12 +401,13 @@ namespace RocprofilerTest
             SKIP();
         }
 
-        rocRoller::profiler::expectDispatches(1); // hipMemcpy
-
         { // Verify device result
             uint32_t h_result = 0;
             HIP_CHECK(hipMemcpy(
                 &h_result, kernelSetup.d_ptr.get(), sizeof(uint32_t), hipMemcpyDeviceToHost));
+
+            // Wait for the hipMemcpy dispatch
+            rocRoller::profiler::waitForDispatchData(1);
 
             uint32_t expectedResult = commandArg + literal;
             CHECK(h_result == expectedResult);

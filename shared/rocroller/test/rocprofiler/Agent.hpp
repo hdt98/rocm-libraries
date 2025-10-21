@@ -63,22 +63,15 @@ namespace rocRoller
             = std::map<rocprofiler_thread_trace_decoder_pc_t, InstructionProfile, pc_comparator>;
 
         /**
-         * @brief Get the instruction latency data from the most recent dispatch
-         *  
-         * @return optional vector of InstructionProfile from the most recent dispatch, or nullopt if no data available
-         */
-        std::optional<std::vector<InstructionProfile>> getMostRecentDispatchData();
-
-        /**
-         * @brief Prepare to wait for a specific number of dispatch callbacks
+         * @brief Wait for a specific number of dispatches and get the instruction latency data
          * 
-         * This function sets up the profiler to wait for exactly n dispatch
-         * callbacks before getMostRecentDispatchData() returns. It also clears any
-         * previously collected dispatch data.
+         * This function increments the expected dispatch counter by n and waits for the
+         * dispatch data to be available before returning it.
          * 
-         * @param n Number of dispatches to expect
+         * @param n Number of dispatches to wait for
+         * @return optional vector of InstructionProfile from the dispatch, or nullopt if no data available
          */
-        void expectDispatches(int n);
+        std::optional<std::vector<InstructionProfile>> waitForDispatchData(int n);
 
     } // namespace profiler
 } // namespace rocRoller
