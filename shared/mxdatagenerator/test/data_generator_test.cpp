@@ -24,6 +24,9 @@
  *
  *******************************************************************************/
 
+// #include <random>
+#include <cmath>
+#include <limits>
 #include <tuple>
 #include <vector>
 
@@ -173,7 +176,6 @@ std::ostream& operator<<(std::ostream& os, const std::vector<index_t>& vec)
 
 double getMean(const std::vector<double>& array);
 double getStdDev(const std::vector<double>& array);
-void   printHistogram(std::vector<double>& array);
 
 double getMean(const std::vector<double>& array)
 {
@@ -205,34 +207,105 @@ double getStdDev(const std::vector<double>& array)
     return std::sqrt(sum / array.size());
 }
 
-void printHistogram(std::vector<double>& array)
-{
-    std::vector<uint64_t> histogram(11);
+std::map<double, double> compareHistogram(std::vector<double>& array,
+                                          const float          mean,
+                                          const float          std_dev,
+                                          const float          hist_radius,
+                                          const uint64_t       num_bins);
 
-    for(T val : array)
+std::map<double, double> compareHistogram(std::vector<double>& array,
+                                          const float          mean,
+                                          const float          std_dev,
+                                          const float          hist_radius,
+                                          const uint64_t       num_bins)
+{
+    std::map<double, uint64_t> histogram;
+    std::map<double, uint64_t> ref_histogram;
+
+    std::vector<double> bins;
+    double bin_width = static_cast<double>(hist_radius * 2) / static_cast<double>(num_bins);
+    for(double bin = mean - hist_radius; bin < mean + hist_radius; bin += bin_width)
     {
-        const int64_t int_val        = std::round(val);
-        const int64_t int_val_biased = int_val + 5;
-        if(int_val_biased >= 0 && int_val_biased <= 10)
+        bins.push_back(bin);
+        histogram[bin]     = 0;
+        ref_histogram[bin] = 0;
+    }
+
+    // Populate histogram, as well as generating reference values to populate reference histogram
+    std::vector<double>        ref_array(array.size());
+    std::random_device         rd{};
+    std::mt19937               gen{rd()};
+    std::normal_distribution<> ref_dist{mean, std_dev};
+    uint64_t                   max_hist_val = 0;
+    for(size_t i = 0; i < array.size(); i++)
+    {
+        const double val = array[i];
+        if(!std::isnan(val) && !std::isinf(val))
         {
-            histogram[static_cast<size_t>(int_val_biased)]++;
+            double ref_val;
+            do
+            {
+                ref_val = ref_dist(gen);
+            } while(std::isnan(val) || std::isinf(val));
+            ref_array[i] = ref_val;
+
+            for(const double& bin : bins)
+            {
+                if(val >= bin && val < bin + bin_width)
+                {
+                    histogram[bin]++;
+                    max_hist_val = std::max(max_hist_val, histogram[bin]);
+                }
+                if(ref_val >= bin && ref_val < bin + bin_width)
+                {
+                    ref_histogram[bin]++;
+                }
+            }
         }
     }
+    float hist_scale_val = 100.f / max_hist_val;
 
-    float scale_val = 100.f / (*std::max_element(histogram.begin(), histogram.end()));
-
-    int label_val = -5;
-    std::cout << "Mean: " << mean(array) << std::endl;
-    std::cout << "Std_dev: " << std_dev(array) << std::endl;
-    for(uint64_t hist_val : histogram)
+    std::cout << "Data Histogram:\n";
+    std::cout << "Mean: " << getMean(array) << std::endl;
+    std::cout << "Std Dev: " << getStdDev(array) << std::endl;
+    for(const auto& pair : histogram)
     {
-        std::stringstream ss;
-        ss << std::setw(2) << std::setfill(' ') << label_val;
-        std::string label = ss.str();
-        std::cout << label << ": " << std::string(std::round(hist_val * scale_val), '*')
+        std::cout << "[" << std::setprecision(2) << std::setw(8) << pair.first << ", "
+                  << std::setw(8) << pair.first + bin_width
+                  << "]: " << std::string(std::round(pair.second * hist_scale_val), '*')
                   << std::endl;
-        label_val++;
     }
+
+    // std::cout << "Reference Histogram:\n";
+    // std::cout << "Mean: " << getMean(ref_array) << std::endl;
+    // std::cout << "Std Dev: " << getStdDev(ref_array) << std::endl;
+    // for(const auto& ref_pair : ref_histogram)
+    // {
+    //     std::cout << "[" << std::setprecision(2) << std::setw(8) << ref_pair.first << ", "
+    //               << std::setw(8) << ref_pair.first + bin_width
+    //               << "]: " << std::string(std::round(ref_pair.second * hist_scale_val), '*')
+    //               << std::endl;
+    // }
+
+    std::map<double, double> percent_diffs;
+    for(const double& bin : bins)
+    {
+        const uint64_t val     = histogram[bin];
+        const uint64_t ref_val = ref_histogram[bin];
+
+        uint64_t diff;
+        if(val >= ref_val)
+        {
+            diff = val - ref_val;
+        }
+        else
+        {
+            diff = ref_val - val;
+        }
+        percent_diffs[bin] = 200 * (static_cast<double>(diff) / static_cast<double>(val + ref_val));
+    }
+
+    return percent_diffs;
 }
 
 template <typename DataType>
@@ -845,6 +918,63 @@ public:
 };
 
 template <typename DataType>
+class DataGeneratorNormalFromFloatDistributionTest
+    : public ::TestWithParam<NormalFromFloatTupleType>
+{
+public:
+    void testForDataType()
+    {
+        DataGeneratorOptions opts;
+        vector<index_t>      size, stride;
+
+        opts.clampToF32   = false;
+        opts.includeInf   = false;
+        opts.includeNaN   = false;
+        opts.forceDenorm  = false;
+        opts.scaling      = DataScaling::Mean;
+        opts.blockScaling = 32;
+
+        size   = {opts.blockScaling * 1000000};
+        stride = {1};
+
+        const float mean    = 0.f;
+        const float std_dev = 1.f;
+        opts.initMode       = DataInitMode(NormalFromFloat{mean, std_dev});
+
+        std::cout << "testing " << opts << " size=" << size << " stride=" << stride << "\n";
+
+        const auto dgen = DataGenerator<DataType>().generate(size, stride, opts);
+
+        auto ref_double = dgen.getReferenceDouble();
+
+        EXPECT_LE(std::abs(getMean(ref_double) - mean), 0.1);
+        EXPECT_LE(std::abs(getStdDev(ref_double) - std_dev), 0.3);
+
+        // Collect the data into a histogram and compare it with a reference histogram
+        const float    hist_radius = 6;
+        const uint64_t num_bins    = 100;
+
+        const auto percent_diffs
+            = compareHistogram(ref_double, mean, std_dev, hist_radius, num_bins);
+
+        double sum_percent_diff  = 0.0;
+        double num_percent_diffs = 0;
+        for(auto pair : percent_diffs)
+        {
+            if(pair.first >= mean - std_dev && pair.first <= mean + std_dev)
+            {
+                num_percent_diffs++;
+                sum_percent_diff += pair.second;
+            }
+        }
+
+        // Expect that average percent difference between actual and reference histogram
+        // within one standard deviation is less than 1%
+        EXPECT_LE(sum_percent_diff / num_percent_diffs, 1);
+    }
+};
+
+template <typename DataType>
 class DataGeneratorZerosTest : public ::TestWithParam<ZerosTupleType>
 {
     void set_options(ZerosTupleType        tup,
@@ -1083,6 +1213,7 @@ TYPED_TEST_SUITE(DataGeneratorOnesTest, DataGeneratorTypes);
 TYPED_TEST_SUITE(DataGeneratorIdentityTest, DataGeneratorTypes);
 TYPED_TEST_SUITE(DataGeneratorTrigonometricFromFloatTest, DataGeneratorTypes);
 TYPED_TEST_SUITE(DataGeneratorNormalFromFloatTest, DataGeneratorTypes);
+TYPED_TEST_SUITE(DataGeneratorNormalFromFloatDistributionTest, DataGeneratorTypes);
 
 #define begin_end(container) begin(container), end(container)
 
@@ -1250,4 +1381,9 @@ TYPED_TEST(DataGeneratorNormalFromFloatTest, TestForEachDataType)
     {
         this->testForDataType(v);
     }
+}
+
+TYPED_TEST(DataGeneratorNormalFromFloatDistributionTest, TestForEachDataType)
+{
+    this->testForDataType();
 }
