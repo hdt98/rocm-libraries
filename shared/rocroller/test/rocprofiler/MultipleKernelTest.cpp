@@ -286,6 +286,7 @@ namespace RocprofilerTest
 
         SECTION("Order 1")
         {
+            CAPTURE("Order 1");
             std::vector<size_t> order = {0, 1, 2, 1};
             rocRoller::profiler::expectDispatches(order.size());
             for(size_t idx : order)
@@ -296,7 +297,7 @@ namespace RocprofilerTest
             HIP_CHECK(hipDeviceSynchronize());
             const auto        latencies  = rocRoller::profiler::getMostRecentDispatchData();
             std::string const literalHex = fmt::format("0x{:x}", literals[order.back()]);
-            INFO("Expecting literal: " << literalHex);
+            CAPTURE(literalHex);
             REQUIRE(latencies.size() == 2);
             CHECK(1 == countSubstring(latencies[0].instruction, literalHex));
             CHECK(latencies[1].instruction == "s_endpgm");
@@ -304,6 +305,7 @@ namespace RocprofilerTest
 
         SECTION("Order 2")
         {
+            CAPTURE("Order 2");
             std::vector<size_t> order = {1, 2};
             rocRoller::profiler::expectDispatches(order.size());
             for(size_t idx : order)
@@ -314,7 +316,7 @@ namespace RocprofilerTest
             HIP_CHECK(hipDeviceSynchronize());
             const auto        latencies  = rocRoller::profiler::getMostRecentDispatchData();
             std::string const literalHex = fmt::format("0x{:x}", literals[order.back()]);
-            INFO("Expecting literal: " << literalHex);
+            CAPTURE(literalHex);
             REQUIRE(latencies.size() == 2);
             CHECK(1 == countSubstring(latencies[0].instruction, literalHex));
             CHECK(latencies[1].instruction == "s_endpgm");
@@ -322,6 +324,7 @@ namespace RocprofilerTest
 
         SECTION("With profiler calls")
         {
+            CAPTURE("With profiler calls");
             std::vector<size_t> order = {1, 2};
             for(size_t idx : order)
             {
@@ -333,7 +336,7 @@ namespace RocprofilerTest
             }
             const auto        latencies  = rocRoller::profiler::getMostRecentDispatchData();
             std::string const literalHex = fmt::format("0x{:x}", literals[order.back()]);
-            INFO("Expecting literal: " << literalHex);
+            CAPTURE(literalHex);
             REQUIRE(latencies.size() == 2);
             CHECK(1 == countSubstring(latencies[0].instruction, literalHex));
             CHECK(latencies[1].instruction == "s_endpgm");

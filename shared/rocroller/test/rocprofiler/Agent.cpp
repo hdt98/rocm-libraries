@@ -68,11 +68,10 @@ namespace rocRoller
             dispatch_instruction_latencies;
         rocprofiler::sdk::codeobj::disassembly::CodeobjAddressTranslate address_table;
 
-        // For waiting for expected number of dispatches
+        // To wait for expected number of dispatches
         std::condition_variable dispatch_cv;
         std::mutex              dispatch_count_mutex;
-        std::atomic<int>        expected_dispatches{0};
-        std::atomic<int>        completed_dispatches{0};
+        std::atomic<int> remaining_dispatches{0}; // Unnecessary atomic, but easier for debugging
 
         void codeobj_callback(rocprofiler_callback_tracing_record_t record,
                               rocprofiler_user_data_t*,
@@ -121,7 +120,9 @@ namespace rocRoller
             rocprofiler_dispatch_id_t dispatch_id
                 = static_cast<rocprofiler_dispatch_id_t>(userdata.value);
 
-            std::cout << "shader_data_callback: dispatch_id " << dispatch_id << std::endl;
+            Log::info("shader_data_callback: dispatch_id {}, remaining_dispatches {}",
+                      dispatch_id,
+                      remaining_dispatches.load());
 
             auto parse = [](rocprofiler_thread_trace_decoder_record_type_t record_type_id,
                             void*                                          events,
@@ -166,13 +167,14 @@ namespace rocRoller
 
             {
                 std::lock_guard<std::mutex> lock(dispatch_count_mutex);
-                completed_dispatches++;
+
+                int remaining = remaining_dispatches.fetch_sub(1) - 1;
 
                 // rocprofiler-sdk catches exceptions in callbacks, so AssertFatal cannot be used here
-                assert(completed_dispatches <= expected_dispatches
+                assert(remaining >= 0
                        && "More completed dispatches than expected in shader callback");
 
-                if(completed_dispatches == expected_dispatches)
+                if(remaining == 0)
                 {
                     dispatch_cv.notify_all();
                 }
@@ -188,6 +190,10 @@ namespace rocRoller
                               void*                              userdata_config,
                               rocprofiler_user_data_t*           userdata_shader)
         {
+            Log::info("dispatch_callback: dispatch_id {}, remaining_dispatches {}",
+                      dispatch_id,
+                      remaining_dispatches.load());
+
             userdata_shader->value = dispatch_id;
             return ROCPROFILER_THREAD_TRACE_CONTROL_START_AND_STOP;
         }
@@ -258,7 +264,7 @@ namespace rocRoller
             std::unique_lock<std::mutex> lock(dispatch_count_mutex);
 
             // rocprofiler-sdk catches exceptions in callbacks, so AssertFatal cannot be used here
-            assert(expected_dispatches == completed_dispatches
+            assert(remaining_dispatches == 0
                    && "Not all expected dispatches completed before tool_fini");
         }
         rocprofiler_thread_trace_decoder_destroy(decoder);
@@ -269,20 +275,23 @@ namespace rocRoller
         std::vector<InstructionProfile> getMostRecentDispatchData()
         {
             std::unique_lock<std::mutex> lock(dispatch_count_mutex);
-            dispatch_cv.wait(lock, [] { return completed_dispatches == expected_dispatches; });
+            dispatch_cv.wait(lock, [] { return remaining_dispatches == 0; });
 
             std::vector<InstructionProfile> result;
 
-            // Return most-recent dispatch's instruction data
-            auto it = dispatch_instruction_latencies.end();
-            AssertFatal(it != dispatch_instruction_latencies.begin(),
+            auto it = dispatch_instruction_latencies.rbegin();
+            AssertFatal(it != dispatch_instruction_latencies.rend(),
                         "No dispatch instruction latency data available");
-            --it;
 
-            std::cout << "getMostRecentDispatchData: dispatch_id " << it->first << std::endl;
+            Log::info(
+                "getMostRecentDispatchData: dispatch_id {}, instruction count {}, map size {}",
+                it->first,
+                it->second.size(),
+                dispatch_instruction_latencies.size());
 
             AssertFatal(it->second.size() > 0,
-                        "No instruction latency data for most recent dispatch");
+                        "No instruction data found for most recent dispatch id ",
+                        it->first);
 
             result.reserve(it->second.size());
             for(const auto& [pc, data] : it->second)
@@ -297,16 +306,14 @@ namespace rocRoller
         {
             { // Ensure previous dispatches are complete
                 std::unique_lock<std::mutex> lock(dispatch_count_mutex);
-                dispatch_cv.wait(lock, [] { return completed_dispatches == expected_dispatches; });
+                dispatch_cv.wait(lock, [] { return remaining_dispatches == 0; });
             }
 
             std::lock_guard<std::mutex> lock(dispatch_count_mutex);
-            AssertFatal(completed_dispatches == expected_dispatches,
-                        "Previous expected dispatches (%d) != completed dispatches (%d)",
-                        expected_dispatches.load(),
-                        completed_dispatches.load());
-            expected_dispatches  = n;
-            completed_dispatches = 0;
+            AssertFatal(remaining_dispatches == 0,
+                        "Previous dispatches not completed, %d remaining",
+                        remaining_dispatches.load());
+            remaining_dispatches = n;
 
             dispatch_instruction_latencies.clear();
         }
