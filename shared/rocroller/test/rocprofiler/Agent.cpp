@@ -346,7 +346,7 @@ namespace rocRoller
         std::string InstructionProfile::toString() const
         {
             return fmt::format("'{}', totalLatency: {}, "
-                               "hitcount: {}, meanLatency: {} }}",
+                               "hitcount: {}, meanLatency: {}",
                                instruction,
                                totalLatency,
                                hitcount,
@@ -355,12 +355,12 @@ namespace rocRoller
 
         std::string toString(std::vector<InstructionProfile> const& profiles)
         {
-            std::string result = "[\n";
+            std::string result = "";
             for(const auto& profile : profiles)
             {
-                result += "  " + profile.toString() + "\n";
+                result += profile.toString() + "\n";
             }
-            result += "]";
+            result += "\n";
             return result;
         }
 
