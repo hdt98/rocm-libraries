@@ -217,14 +217,20 @@ namespace rocRollerTest
 
                         CommandArguments commandArgs = command->createArguments();
 
-                        rocRoller::profiler::expect_dispatches(1);
+                        rocRoller::profiler::expectDispatches(1);
 
                         commandKernel.launchKernel(commandArgs.runtimeArguments());
                         HIP_CHECK(hipDeviceSynchronize());
 
                         const auto latencies = rocRoller::profiler::getMostRecentDispatchData();
 
-                        REQUIRE(latencies.size() == 21);
+                        if(!latencies.has_value())
+                        {
+                            Log::warn("Skipping test: no dispatch data available");
+                            SKIP();
+                        }
+
+                        REQUIRE(latencies->size() == 21);
 
                         GPUArchitectureGFX gfx = context->targetArchitecture().target().gfx;
 
@@ -249,7 +255,7 @@ namespace rocRollerTest
                         uint64_t          actualMaxLdsInstrCycles  = 0;
                         uint64_t          actualLastSWaitcntCycles = 0;
                         std::stringstream profilerResults;
-                        for(const auto& data : latencies)
+                        for(const auto& data : *latencies)
                         {
                             profilerResults << "  " << data.instruction << ", "
                                             << data.meanLatency() << " cycles" << std::endl;

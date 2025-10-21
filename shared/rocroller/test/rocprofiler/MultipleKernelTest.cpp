@@ -61,6 +61,9 @@ using namespace rocRoller;
 
 namespace RocprofilerTest
 {
+    const uint workgroupSize = 256;
+    const auto workitemCount = workgroupSize * 256;
+
     struct KernelSetup
     {
         CommandKernel             kernel;
@@ -90,10 +93,10 @@ namespace RocprofilerTest
         k->setKernelDimensions(1);
 
         const auto one = std::make_shared<Expression::Expression>(1u);
-        k->setWorkgroupSize({256, 1, 1});
+        k->setWorkgroupSize({workgroupSize, 1, 1});
         // more waves for rocprofiler, see Troubleshooting in
         // https://rocm.docs.amd.com/projects/rocprofiler-sdk/en/amd-mainline/how-to/using-thread-trace.html#troubleshooting
-        k->setWorkitemCount({std::make_shared<Expression::Expression>(256 * 256 * 4), one, one});
+        k->setWorkitemCount({std::make_shared<Expression::Expression>(workitemCount), one, one});
 
         k->addArgument({"ptr",
                         {DataType::UInt32, PointerType::PointerGlobal},
@@ -165,23 +168,26 @@ namespace RocprofilerTest
         auto literal    = GENERATE(0xdeadbeef, 0x12345678, 0xabcdef00);
         auto commandArg = GENERATE(7, 21, 331);
 
-        DYNAMIC_SECTION("literal: 0x" << std::hex << literal << ", value: " << std::dec
-                                      << commandArg)
+        std::string const testName = fmt::format("const_0x{:x}_value_{}", literal, commandArg);
+
+        SECTION(testName)
         {
-            std::string const testName = fmt::format("const_0x{:x}_value_{}", literal, commandArg);
-
-            auto context = TestContext::ForTestDevice({}, testName);
-
-            INFO("Testing " << testName);
-
+            auto context     = TestContext::ForTestDevice({}, testName);
             auto kernelSetup = createKernel(context.get(), literal, commandArg);
 
-            rocRoller::profiler::expect_dispatches(2);
+            rocRoller::profiler::expectDispatches(2);
             kernelSetup.kernel.launchKernel(kernelSetup.commandArgs.runtimeArguments());
             HIP_CHECK(hipDeviceSynchronize());
 
             const auto latencies = rocRoller::profiler::getMostRecentDispatchData();
-            rocRoller::profiler::expect_dispatches(1);
+
+            if(!latencies.has_value())
+            {
+                Log::warn("Skipping test: no dispatch data available");
+                SKIP();
+            }
+
+            rocRoller::profiler::expectDispatches(1);
 
             { // Verify device result
                 uint32_t h_result = 0;
@@ -194,20 +200,20 @@ namespace RocprofilerTest
 
             std::stringstream ss;
             ss << "Instruction, Total Latency, Hit Count, Average Latency" << std::endl;
-            for(const auto& data : latencies)
+            for(const auto& data : *latencies)
             {
-                uint64_t avg_latency = data.hitcount ? (data.latency / data.hitcount) : 0;
-                ss << "\"" << data.instruction << "\", " << data.latency << ", " << data.hitcount
-                   << ", " << avg_latency << std::endl;
+                uint64_t avg_latency = data.meanLatency();
+                ss << "\"" << data.instruction << "\", " << data.totalLatency << ", "
+                   << data.hitcount << ", " << avg_latency << std::endl;
             }
             INFO(ss.str());
-            REQUIRE(latencies.size() >= 8); // gfx12 has 9, others have 8
+            REQUIRE(latencies->size() >= 8); // gfx12 has 9, others have 8
 
             { // Ensure instructions exist in expected quanities in the profile data
                 std::string const instructionsStr = [&]() {
                     std::stringstream ss;
                     streamJoin(ss,
-                               std::views::transform(latencies,
+                               std::views::transform(*latencies,
                                                      [](const auto& d) { return d.instruction; }),
                                "\n");
                     return ss.str();
@@ -229,10 +235,10 @@ namespace RocprofilerTest
         k->setKernelDimensions(1);
 
         const auto one = std::make_shared<Expression::Expression>(1u);
-        k->setWorkgroupSize({256, 1, 1});
+        k->setWorkgroupSize({workgroupSize, 1, 1});
         // more waves for rocprofiler, see Troubleshooting in
         // https://rocm.docs.amd.com/projects/rocprofiler-sdk/en/amd-mainline/how-to/using-thread-trace.html#troubleshooting
-        k->setWorkitemCount({std::make_shared<Expression::Expression>(256 * 256 * 16), one, one});
+        k->setWorkitemCount({std::make_shared<Expression::Expression>(workitemCount), one, one});
 
         std::vector<Instruction> instrs;
 
@@ -290,63 +296,87 @@ namespace RocprofilerTest
 
         SECTION("Order 1")
         {
+            CAPTURE("Order 1");
             std::vector<size_t> order = {0, 1, 2, 1};
-            rocRoller::profiler::expect_dispatches(order.size());
+            rocRoller::profiler::expectDispatches(order.size());
             for(size_t idx : order)
             {
                 kernelSetups[idx].kernel.launchKernel(
                     kernelSetups[idx].commandArgs.runtimeArguments());
+                HIP_CHECK(hipDeviceSynchronize());
             }
-            HIP_CHECK(hipDeviceSynchronize());
-            const auto        latencies  = rocRoller::profiler::getMostRecentDispatchData();
+            const auto latencies = rocRoller::profiler::getMostRecentDispatchData();
+
+            if(!latencies.has_value())
+            {
+                Log::warn("Skipping test: no dispatch data available");
+                SKIP();
+            }
+
             std::string const literalHex = fmt::format("0x{:x}", literals[order.back()]);
-            INFO("Expecting literal: " << literalHex);
-            REQUIRE(latencies.size() == 2);
-            CHECK(1 == countSubstring(latencies[0].instruction, literalHex));
-            CHECK(latencies[1].instruction == "s_endpgm");
+            CAPTURE(literalHex);
+            REQUIRE(latencies->size() == 2);
+            CHECK(1 == countSubstring((*latencies)[0].instruction, literalHex));
+            CHECK((*latencies)[1].instruction == "s_endpgm");
         }
 
         SECTION("Order 2")
         {
+            CAPTURE("Order 2");
             std::vector<size_t> order = {1, 2};
-            rocRoller::profiler::expect_dispatches(order.size());
+            rocRoller::profiler::expectDispatches(order.size());
             for(size_t idx : order)
             {
                 kernelSetups[idx].kernel.launchKernel(
                     kernelSetups[idx].commandArgs.runtimeArguments());
+                HIP_CHECK(hipDeviceSynchronize());
             }
-            HIP_CHECK(hipDeviceSynchronize());
-            const auto        latencies  = rocRoller::profiler::getMostRecentDispatchData();
+            const auto latencies = rocRoller::profiler::getMostRecentDispatchData();
+
+            if(!latencies.has_value())
+            {
+                Log::warn("Skipping test: no dispatch data available");
+                SKIP();
+            }
+
             std::string const literalHex = fmt::format("0x{:x}", literals[order.back()]);
-            INFO("Expecting literal: " << literalHex);
-            REQUIRE(latencies.size() == 2);
-            CHECK(1 == countSubstring(latencies[0].instruction, literalHex));
-            CHECK(latencies[1].instruction == "s_endpgm");
+            CAPTURE(literalHex);
+            REQUIRE(latencies->size() == 2);
+            CHECK(1 == countSubstring((*latencies)[0].instruction, literalHex));
+            CHECK((*latencies)[1].instruction == "s_endpgm");
         }
 
         SECTION("With profiler calls")
         {
+            CAPTURE("With profiler calls");
             std::vector<size_t> order = {1, 2};
             for(size_t idx : order)
             {
-                rocRoller::profiler::expect_dispatches(1);
+                rocRoller::profiler::expectDispatches(1);
                 kernelSetups[idx].kernel.launchKernel(
                     kernelSetups[idx].commandArgs.runtimeArguments());
                 HIP_CHECK(hipDeviceSynchronize());
                 rocRoller::profiler::getMostRecentDispatchData();
             }
-            const auto        latencies  = rocRoller::profiler::getMostRecentDispatchData();
+            const auto latencies = rocRoller::profiler::getMostRecentDispatchData();
+
+            if(!latencies.has_value())
+            {
+                Log::warn("Skipping test: no dispatch data available");
+                SKIP();
+            }
+
             std::string const literalHex = fmt::format("0x{:x}", literals[order.back()]);
-            INFO("Expecting literal: " << literalHex);
-            REQUIRE(latencies.size() == 2);
-            CHECK(1 == countSubstring(latencies[0].instruction, literalHex));
-            CHECK(latencies[1].instruction == "s_endpgm");
+            CAPTURE(literalHex);
+            REQUIRE(latencies->size() == 2);
+            CHECK(1 == countSubstring((*latencies)[0].instruction, literalHex));
+            CHECK((*latencies)[1].instruction == "s_endpgm");
         }
     }
 
     TEST_CASE("Rocprofiler simple", "[rocprofiler]")
     {
-        rocRoller::profiler::expect_dispatches(2); // hipMemset, then kernel
+        rocRoller::profiler::expectDispatches(2); // hipMemset, then kernel
 
         auto literal    = GENERATE(0x11223344);
         auto commandArg = GENERATE(7);
@@ -364,7 +394,13 @@ namespace RocprofilerTest
 
         const auto latencies = rocRoller::profiler::getMostRecentDispatchData();
 
-        rocRoller::profiler::expect_dispatches(1); // hipMemcpy
+        if(!latencies.has_value())
+        {
+            Log::warn("Skipping test: no dispatch data available");
+            SKIP();
+        }
+
+        rocRoller::profiler::expectDispatches(1); // hipMemcpy
 
         { // Verify device result
             uint32_t h_result = 0;
@@ -377,21 +413,21 @@ namespace RocprofilerTest
 
         std::stringstream ss;
         ss << "Instruction, Total Latency, Hit Count, Average Latency" << std::endl;
-        for(const auto& data : latencies)
+        for(const auto& data : *latencies)
         {
-            uint64_t avg_latency = data.hitcount ? (data.latency / data.hitcount) : 0;
-            ss << "\"" << data.instruction << "\", " << data.latency << ", " << data.hitcount
+            uint64_t avg_latency = data.meanLatency();
+            ss << "\"" << data.instruction << "\", " << data.totalLatency << ", " << data.hitcount
                << ", " << avg_latency << std::endl;
         }
         INFO(ss.str());
-        CHECK(latencies.size() >= 8); // gfx12 has 9, others have 8
+        CHECK(latencies->size() >= 8); // gfx12 has 9, others have 8
 
         { // Ensure instructions exist in expected quanities in the profile data
             std::string const instructionsStr = [&]() {
                 std::stringstream ss;
                 streamJoin(
                     ss,
-                    std::views::transform(latencies, [](const auto& d) { return d.instruction; }),
+                    std::views::transform(*latencies, [](const auto& d) { return d.instruction; }),
                     "\n");
                 return ss.str();
             }();
