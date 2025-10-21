@@ -165,15 +165,11 @@ namespace RocprofilerTest
         auto literal    = GENERATE(0xdeadbeef, 0x12345678, 0xabcdef00);
         auto commandArg = GENERATE(7, 21, 331);
 
-        DYNAMIC_SECTION("literal: 0x" << std::hex << literal << ", value: " << std::dec
-                                      << commandArg)
+        std::string const testName = fmt::format("const_0x{:x}_value_{}", literal, commandArg);
+
+        SECTION(testName)
         {
-            std::string const testName = fmt::format("const_0x{:x}_value_{}", literal, commandArg);
-
-            auto context = TestContext::ForTestDevice({}, testName);
-
-            INFO("Testing " << testName);
-
+            auto context     = TestContext::ForTestDevice({}, testName);
             auto kernelSetup = createKernel(context.get(), literal, commandArg);
 
             rocRoller::profiler::expectDispatches(2);
@@ -196,7 +192,7 @@ namespace RocprofilerTest
             ss << "Instruction, Total Latency, Hit Count, Average Latency" << std::endl;
             for(const auto& data : latencies)
             {
-                uint64_t avg_latency = data.hitcount ? (data.latency / data.hitcount) : 0;
+                uint64_t avg_latency = data.meanLatency();
                 ss << "\"" << data.instruction << "\", " << data.latency << ", " << data.hitcount
                    << ", " << avg_latency << std::endl;
             }
@@ -379,7 +375,7 @@ namespace RocprofilerTest
         ss << "Instruction, Total Latency, Hit Count, Average Latency" << std::endl;
         for(const auto& data : latencies)
         {
-            uint64_t avg_latency = data.hitcount ? (data.latency / data.hitcount) : 0;
+            uint64_t avg_latency = data.meanLatency();
             ss << "\"" << data.instruction << "\", " << data.latency << ", " << data.hitcount
                << ", " << avg_latency << std::endl;
         }

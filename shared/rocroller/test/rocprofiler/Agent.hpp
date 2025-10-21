@@ -60,11 +60,7 @@ namespace rocRoller
 
         /**
          * @brief Get the instruction latency data from the most recent dispatch
-         * 
-         * This function returns a vector containing instruction latency
-         * information from the most recent dispatch. Each element contains
-         * latency, hit count, and instruction disassembly for each instruction.
-         * 
+         *  
          * @return vector of InstructionData from the most recent dispatch
          */
         std::vector<InstructionData> getMostRecentDispatchData();
