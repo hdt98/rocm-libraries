@@ -843,7 +843,7 @@ MIOpenBatchNormFwdTrainSpatial(const __global _FLOAT* __restrict in,
     gcn_reduce2(&mean, &variance, (_FLOAT_ACCUM)INHW, lcl_data_x, lcl_data_y, lid);
 #endif
     if(MIO_BN_NHW == 1) {
-        variance = 0;  // ⭐ Force to exact zero
+        variance = 0;
     }
     else{
         variance = mad(-mean, mean, variance);

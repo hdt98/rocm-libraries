@@ -559,7 +559,7 @@ static inline void running_stash(global _FLOAT_PREC_C* resultRunningMean,
         mean, (_FLOAT_ACCUM)expAvgFactor, pvt_newRunMean); // newMean*factor + tmp
     const _FLOAT_ACCUM_C adjust =
         (_FLOAT_ACCUM_C)((MIO_BN_NHW == 1)
-            ? (_FLOAT_ACCUM_C)0.0  // ⭐ ADD THIS: Force adjust to zero!
+            ? (_FLOAT_ACCUM_C)0.0
             : variance * ((_FLOAT_ACCUM)MIO_BN_NHW /
                           ((_FLOAT_ACCUM)MIO_BN_NHW - (_FLOAT_ACCUM)1.0)));
     resultRunningVariance[channel] =
