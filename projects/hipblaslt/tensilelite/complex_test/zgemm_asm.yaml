@@ -104,7 +104,11 @@ BenchmarkProblems:
           - [16, 16, 4, 1, 1, 2, 2, 2, 2]
         # - ScheduleIterAlg: [1]
         - GlobalSplitU: [1] #, 3]
+<<<<<<< HEAD
         # - StreamK: [3]
+=======
+        - StreamK: [3]
+>>>>>>> c1dec5689768e980199aed601cfd8c0a3f31d3a2
         - PrefetchLocalRead: [False]
         - PrefetchGlobalRead: [True]
         # - ThreadTile:
