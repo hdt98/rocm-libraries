@@ -87,6 +87,8 @@ namespace rocRoller
             auto* data = static_cast<rocprofiler_callback_tracing_code_object_load_data_t*>(
                 record.payload);
 
+            std::lock_guard<std::mutex> att_shader_data_lock(att_shader_data);
+
             if(data->storage_type == ROCPROFILER_CODE_OBJECT_STORAGE_TYPE_FILE)
             {
                 address_table.addDecoder(
@@ -139,11 +141,6 @@ namespace rocRoller
 
                     rocprofiler_dispatch_id_t dispatch_id
                         = static_cast<rocprofiler_dispatch_id_t>(userdata_casted.value);
-
-                    Log::info("parse: dispatch_id {}, record_type_id {}, num_events {}",
-                              dispatch_id,
-                              int(record_type_id),
-                              num_events);
 
                     if(record_type_id != ROCPROFILER_THREAD_TRACE_DECODER_RECORD_WAVE)
                         return;
