@@ -89,10 +89,13 @@ namespace rocRollerTest
             {
                 for(auto write : writeOperations)
                 {
-                    SECTION("InstrSize=" + std::to_string(instrDwords * 32) + "b, Stride="
-                            + std::to_string(strideMultiplier) + ", " + (write ? "Write" : "Read"))
+                    const auto name = "lds_microkernel_" + std::to_string(instrDwords * 32)
+                                      + "b_stride" + std::to_string(strideMultiplier) + "_"
+                                      + (write ? "write" : "read");
+
+                    SECTION(name)
                     {
-                        auto context = TestContext::ForTestDevice({}, "lds_microkernel");
+                        auto context = TestContext::ForTestDevice({}, name);
 
                         if(not context->targetArchitecture().target().isCDNA35GPU())
                         {
@@ -244,18 +247,18 @@ namespace rocRollerTest
                         INFO("Dwords: " << instrDwords << ", Stride Multiplier: "
                                         << strideMultiplier << ", " << (write ? "Write" : "Read"));
 
-                        uint              actualLastLdsInstrCycles = 0;
-                        uint              actualLastSWaitcntCycles = 0;
+                        uint64_t          actualMaxLdsInstrCycles  = 0;
+                        uint64_t          actualLastSWaitcntCycles = 0;
                         std::stringstream profilerResults;
                         for(const auto& data : latencies)
                         {
                             profilerResults << "  " << data.instruction << ", " << data.latency
                                             << " cycles" << std::endl;
-                            // Use latency of final ds_* / s_waitcnt instruction
                             if((write && data.instruction.find("ds_write") != std::string::npos)
                                || (!write && data.instruction.find("ds_read") != std::string::npos))
                             {
-                                actualLastLdsInstrCycles = data.latency;
+                                actualMaxLdsInstrCycles
+                                    = std::max(actualMaxLdsInstrCycles, data.latency);
                             }
                             else if(data.instruction.find("s_waitcnt") != std::string::npos)
                             {
@@ -263,7 +266,7 @@ namespace rocRollerTest
                             }
                         }
                         INFO("Profiler Results:\n" << profilerResults.str());
-                        INFO("  Actual LDS Instruction Cycles: " << actualLastLdsInstrCycles);
+                        INFO("  Actual LDS Instruction Cycles: " << actualMaxLdsInstrCycles);
                         INFO("  Actual s_waitcnt Cycles: " << actualLastSWaitcntCycles);
 
                         INFO("\nModel Predictions:");
@@ -272,8 +275,13 @@ namespace rocRollerTest
                         INFO("  Data Cycles: " << dataCycles);
 
                         CHECK(actualLastSWaitcntCycles == predictedCycles);
-                        CHECK_THAT(actualLastLdsInstrCycles,
-                                   Catch::Matchers::WithinAbs(predictedCycles, 4u));
+                        if(write && instrDwords == 4)
+                            // ds_write_b128 requires queue info
+                            CHECK_THAT(actualMaxLdsInstrCycles,
+                                       Catch::Matchers::WithinAbs(predictedCycles, 12ul));
+                        else
+                            CHECK_THAT(actualMaxLdsInstrCycles,
+                                       Catch::Matchers::WithinAbs(predictedCycles, 4ul));
                     }
                 }
             }
