@@ -78,7 +78,7 @@ namespace rocRoller
          * 
          * @param n Number of dispatches to expect
          */
-        void expect_dispatches(int n);
+        void expectDispatches(int n);
 
     } // namespace profiler
 } // namespace rocRoller

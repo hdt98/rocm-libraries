@@ -68,10 +68,6 @@ namespace rocRoller
             dispatch_instruction_latencies;
         rocprofiler::sdk::codeobj::disassembly::CodeobjAddressTranslate address_table;
 
-        // Ensure dispatch and shader callback are in sync
-        // Every dispatch, wait for shader callback to complete
-        std::mutex dispatch_shader_mutex;
-
         // For waiting for expected number of dispatches
         std::condition_variable dispatch_cv;
         std::mutex              dispatch_count_mutex;
@@ -125,6 +121,8 @@ namespace rocRoller
             rocprofiler_dispatch_id_t dispatch_id
                 = static_cast<rocprofiler_dispatch_id_t>(userdata.value);
 
+            std::cout << "shader_data_callback: dispatch_id " << dispatch_id << std::endl;
+
             auto parse = [](rocprofiler_thread_trace_decoder_record_type_t record_type_id,
                             void*                                          events,
                             uint64_t                                       num_events,
@@ -166,8 +164,6 @@ namespace rocRoller
                 }
             }
 
-            dispatch_shader_mutex.unlock();
-
             {
                 std::lock_guard<std::mutex> lock(dispatch_count_mutex);
                 completed_dispatches++;
@@ -192,7 +188,7 @@ namespace rocRoller
                               void*                              userdata_config,
                               rocprofiler_user_data_t*           userdata_shader)
         {
-            dispatch_shader_mutex.lock();
+            std::cout << "dispatch_callback: dispatch_id " << dispatch_id << std::endl;
             userdata_shader->value = dispatch_id;
             return ROCPROFILER_THREAD_TRACE_CONTROL_START_AND_STOP;
         }
@@ -276,8 +272,6 @@ namespace rocRoller
             std::unique_lock<std::mutex> lock(dispatch_count_mutex);
             dispatch_cv.wait(lock, [] { return completed_dispatches == expected_dispatches; });
 
-            const std::lock_guard<std::mutex> shader_lock(dispatch_shader_mutex);
-
             std::vector<InstructionData> result;
 
             // Return most-recent dispatch's instruction data
@@ -285,6 +279,8 @@ namespace rocRoller
             AssertFatal(it != dispatch_instruction_latencies.begin(),
                         "No dispatch instruction latency data available");
             --it;
+
+            std::cout << "getMostRecentDispatchData: dispatch_id " << it->first << std::endl;
 
             AssertFatal(it->second.size() > 0,
                         "No instruction latency data for most recent dispatch");
@@ -298,7 +294,7 @@ namespace rocRoller
             return result;
         }
 
-        void expect_dispatches(int n)
+        void expectDispatches(int n)
         {
             { // Ensure previous dispatches are complete
                 std::unique_lock<std::mutex> lock(dispatch_count_mutex);
