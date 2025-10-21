@@ -61,6 +61,9 @@ using namespace rocRoller;
 
 namespace RocprofilerTest
 {
+    const uint workgroupSize = 256;
+    const auto workitemCount = workgroupSize * 256;
+
     struct KernelSetup
     {
         CommandKernel             kernel;
@@ -90,10 +93,10 @@ namespace RocprofilerTest
         k->setKernelDimensions(1);
 
         const auto one = std::make_shared<Expression::Expression>(1u);
-        k->setWorkgroupSize({256, 1, 1});
+        k->setWorkgroupSize({workgroupSize, 1, 1});
         // more waves for rocprofiler, see Troubleshooting in
         // https://rocm.docs.amd.com/projects/rocprofiler-sdk/en/amd-mainline/how-to/using-thread-trace.html#troubleshooting
-        k->setWorkitemCount({std::make_shared<Expression::Expression>(256 * 256 * 4), one, one});
+        k->setWorkitemCount({std::make_shared<Expression::Expression>(workitemCount), one, one});
 
         k->addArgument({"ptr",
                         {DataType::UInt32, PointerType::PointerGlobal},
@@ -225,10 +228,10 @@ namespace RocprofilerTest
         k->setKernelDimensions(1);
 
         const auto one = std::make_shared<Expression::Expression>(1u);
-        k->setWorkgroupSize({256, 1, 1});
+        k->setWorkgroupSize({workgroupSize, 1, 1});
         // more waves for rocprofiler, see Troubleshooting in
         // https://rocm.docs.amd.com/projects/rocprofiler-sdk/en/amd-mainline/how-to/using-thread-trace.html#troubleshooting
-        k->setWorkitemCount({std::make_shared<Expression::Expression>(256 * 256 * 16), one, one});
+        k->setWorkitemCount({std::make_shared<Expression::Expression>(workitemCount), one, one});
 
         std::vector<Instruction> instrs;
 

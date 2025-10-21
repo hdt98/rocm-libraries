@@ -134,6 +134,12 @@ namespace rocRoller
                 rocprofiler_dispatch_id_t dispatch_id
                     = static_cast<rocprofiler_dispatch_id_t>(userdata_casted.value);
 
+                // Sometimes ROCPROFILER_THREAD_TRACE_DECODER_RECORD_WAVE never happens
+                Log::info("parse: dispatch_id {}, record_type_id {}, num_events {}",
+                          dispatch_id,
+                          int(record_type_id),
+                          num_events);
+
                 if(record_type_id != ROCPROFILER_THREAD_TRACE_DECODER_RECORD_WAVE)
                     return;
 
