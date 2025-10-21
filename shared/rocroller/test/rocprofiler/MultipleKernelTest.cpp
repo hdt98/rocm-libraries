@@ -179,7 +179,7 @@ namespace RocprofilerTest
             kernelSetup.kernel.launchKernel(kernelSetup.commandArgs.runtimeArguments());
             HIP_CHECK(hipDeviceSynchronize());
 
-            const auto latencies = rocroller_profiler::getInstructionData();
+            const auto latencies = rocRoller::profiler::getInstructionData();
 
             { // Verify device result
                 uint32_t h_result = 0;
@@ -295,7 +295,7 @@ namespace RocprofilerTest
                     kernelSetups[idx].commandArgs.runtimeArguments());
             }
             HIP_CHECK(hipDeviceSynchronize());
-            const auto        latencies  = rocroller_profiler::getInstructionData();
+            const auto        latencies  = rocRoller::profiler::getInstructionData();
             std::string const literalHex = fmt::format("0x{:x}", literals[order.back()]);
             INFO("Expecting literal: " << literalHex);
             REQUIRE(latencies.size() == 2);
@@ -312,7 +312,7 @@ namespace RocprofilerTest
                     kernelSetups[idx].commandArgs.runtimeArguments());
             }
             HIP_CHECK(hipDeviceSynchronize());
-            const auto        latencies  = rocroller_profiler::getInstructionData();
+            const auto        latencies  = rocRoller::profiler::getInstructionData();
             std::string const literalHex = fmt::format("0x{:x}", literals[order.back()]);
             INFO("Expecting literal: " << literalHex);
             REQUIRE(latencies.size() == 2);
@@ -328,9 +328,9 @@ namespace RocprofilerTest
                 kernelSetups[idx].kernel.launchKernel(
                     kernelSetups[idx].commandArgs.runtimeArguments());
                 HIP_CHECK(hipDeviceSynchronize());
-                rocroller_profiler::getInstructionData();
+                rocRoller::profiler::getInstructionData();
             }
-            const auto        latencies  = rocroller_profiler::getInstructionData();
+            const auto        latencies  = rocRoller::profiler::getInstructionData();
             std::string const literalHex = fmt::format("0x{:x}", literals[order.back()]);
             INFO("Expecting literal: " << literalHex);
             REQUIRE(latencies.size() == 2);
@@ -357,7 +357,7 @@ namespace RocprofilerTest
         kernelSetup.kernel.launchKernel(kernelSetup.commandArgs.runtimeArguments());
         HIP_CHECK(hipDeviceSynchronize());
 
-        const auto latencies = rocroller_profiler::getInstructionData();
+        const auto latencies = rocRoller::profiler::getInstructionData();
 
         { // Verify device result
             uint32_t h_result = 0;

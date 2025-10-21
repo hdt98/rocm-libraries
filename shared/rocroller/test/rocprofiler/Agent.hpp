@@ -31,38 +31,41 @@
 #include <string>
 #include <vector>
 
-namespace rocroller_profiler
+namespace rocRoller
 {
-    struct InstructionData
+    namespace profiler
     {
-        uint64_t    latency{0}; // Total latency in cycles
-        uint64_t    hitcount{0}; // Number of times instruction was executed
-        std::string instruction; // Disassembled instruction text
-    };
-
-    struct pc_comparator
-    {
-        bool operator()(const rocprofiler_thread_trace_decoder_pc_t& a,
-                        const rocprofiler_thread_trace_decoder_pc_t& b) const
+        struct InstructionData
         {
-            if(a.code_object_id == b.code_object_id)
-                return a.address < b.address;
-            return a.code_object_id < b.code_object_id;
-        }
-    };
+            uint64_t    latency{0}; // Total latency in cycles
+            uint64_t    hitcount{0}; // Number of times instruction was executed
+            std::string instruction; // Disassembled instruction text
+        };
 
-    using InstructionLatencyMap
-        = std::map<rocprofiler_thread_trace_decoder_pc_t, InstructionData, pc_comparator>;
+        struct pc_comparator
+        {
+            bool operator()(const rocprofiler_thread_trace_decoder_pc_t& a,
+                            const rocprofiler_thread_trace_decoder_pc_t& b) const
+            {
+                if(a.code_object_id == b.code_object_id)
+                    return a.address < b.address;
+                return a.code_object_id < b.code_object_id;
+            }
+        };
 
-    /**
-     * @brief Get the collected instruction latency data
-     * 
-     * This function returns a vector containing instruction latency
-     * information collected during kernel execution. Each element contains
-     * latency, hit count, and instruction disassembly for each instruction.
-     * 
-     * @return vector of InstructionData
-     */
-    std::vector<InstructionData> getInstructionData();
+        using InstructionLatencyMap
+            = std::map<rocprofiler_thread_trace_decoder_pc_t, InstructionData, pc_comparator>;
 
-} // namespace rocroller_profiler
+        /**
+         * @brief Get the collected instruction latency data
+         * 
+         * This function returns a vector containing instruction latency
+         * information collected during kernel execution. Each element contains
+         * latency, hit count, and instruction disassembly for each instruction.
+         * 
+         * @return vector of InstructionData
+         */
+        std::vector<InstructionData> getInstructionData();
+
+    } // namespace profiler
+} // namespace rocRoller
