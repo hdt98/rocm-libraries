@@ -182,6 +182,7 @@ Tests:
   category: pre_checkin
   function:
     - aux_tensile_host_func: *hpa_half_precision
+  gpu_arch_exclude: '1[1-2]0[0-3]'
 
 - name: aux_tuple_helper_equal_func
   category: pre_checkin
