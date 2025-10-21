@@ -141,7 +141,14 @@ MIOpenBatchNormFwdTrainSpatial(const __global _FLOAT* __restrict in,
     gcn_reduce2(&mean, &variance, (_FLOAT_ACCUM)INHW, lcl_data_x, lcl_data_y, lid);
 #endif
 
-    variance = mad(-mean, mean, variance);
+    if(MIO_BN_NHW == 1)
+    {
+        variance = 0;
+    }
+    else
+    {
+        variance = mad(-mean, mean, variance);
+    }
     if(variance < 0)
     {
         variance = 0;
@@ -353,7 +360,14 @@ MIOpenBatchNormFwdTrainSpatial(const __global _FLOAT* __restrict in,
 #endif
 
     // REDUCTION COMPLETE ---------------------------
-    variance = mad(-mean, mean, variance);
+    if(MIO_BN_NHW == 1)
+    {
+        variance = 0;
+    }
+    else
+    {
+        variance = mad(-mean, mean, variance);
+    }
     if(variance < 0)
     {
         variance = 0;
@@ -629,7 +643,14 @@ MIOpenBatchNormFwdTrainSpatialFinalMeanVariance(
     gcn_reduce2(&mean, &variance, INHW, lcl_data_x, lcl_data_y, ylid + zlid * ygrp_sz);
 #endif
 
-    variance    = mad(-mean, mean, variance);
+    if(MIO_BN_NHW == 1)
+    {
+        variance = 0;
+    }
+    else
+    {
+        variance = mad(-mean, mean, variance);
+    }
     variance    = max(variance, (_FLOAT_PREC_C)0.);
     invVariance = rsqrt(variance + (_FLOAT_PREC_C)epsilon);
 
@@ -969,7 +990,14 @@ __kernel void MIOpenBatchNormFwdTrainSpatial(const __global _FLOAT* __restrict i
     gcn_reduce2(&mean, &variance, (_FLOAT_ACCUM)INHW, lcl_data_x, lcl_data_y, lid);
 #endif
 
-    variance    = mad(-mean, mean, variance);
+    if(MIO_BN_NHW == 1)
+    {
+        variance = 0;
+    }
+    else
+    {
+        variance = mad(-mean, mean, variance);
+    }
     variance    = variance > 0. ? variance : 0.;
     invVariance = rsqrt(variance + (_FLOAT_PREC)epsilon);
     pvscale     = lcl_scale;

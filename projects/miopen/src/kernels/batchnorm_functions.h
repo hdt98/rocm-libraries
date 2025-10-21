@@ -559,9 +559,9 @@ static inline void running_stash(global _FLOAT_PREC_C* resultRunningMean,
         mean, (_FLOAT_ACCUM)expAvgFactor, pvt_newRunMean); // newMean*factor + tmp
     const _FLOAT_ACCUM_C adjust =
         (_FLOAT_ACCUM_C)((MIO_BN_NHW == 1)
-            ? (_FLOAT_ACCUM_C)0.0
-            : variance * ((_FLOAT_ACCUM)MIO_BN_NHW /
-                          ((_FLOAT_ACCUM)MIO_BN_NHW - (_FLOAT_ACCUM)1.0)));
+                             ? (_FLOAT_ACCUM_C)0.0
+                             : variance * ((_FLOAT_ACCUM)MIO_BN_NHW /
+                                           ((_FLOAT_ACCUM)MIO_BN_NHW - (_FLOAT_ACCUM)1.0)));
     resultRunningVariance[channel] =
         (_FLOAT_PREC_C)((1 - (_FLOAT_ACCUM)expAvgFactor) *
                             (_FLOAT_ACCUM_C)(*(resultRunningVariance + channel)) +
@@ -585,7 +585,7 @@ static inline void running_stash_pa(global _FLOAT_PREC* resultRunningMean,
                                    (_FLOAT_PREC)expAvgFactor,
                                    pvt_newRunMean); // newMean*factor + tmp
 
-    const _FLOAT_PREC adjust = (MIO_BN_N == 1) ? variance : variance * (N / (N - 1.0));
+    const _FLOAT_PREC adjust = (MIO_BN_N == 1) ? (_FLOAT_PREC)0.0 : variance * (N / (N - 1.0));
     resultRunningVariance[index] =
         (1 - (_FLOAT_PREC)expAvgFactor) * *(resultRunningVariance + index) +
         (_FLOAT_PREC)expAvgFactor * adjust;
@@ -607,7 +607,7 @@ static inline void running_stash_dyn(global _FLOAT_PREC* resultRunningMean,
     resultRunningMean[channel] =
         (_FLOAT_PREC)mad(mean, (_FLOAT_ACCUM)expAvgFactor, pvt_newRunMean); // newMean*factor + tmp
     const _FLOAT_ACCUM adjust =
-        (_FLOAT_ACCUM)((inhw == 1) ? variance : variance * (1. / (1. - inhw)));
+        (_FLOAT_ACCUM)((inhw == 1) ? (_FLOAT_ACCUM)0.0 : variance * (1. / (1. - inhw)));
     resultRunningVariance[channel] =
         (_FLOAT_PREC)((1 - (_FLOAT_ACCUM)expAvgFactor) *
                           (_FLOAT_ACCUM)(*(resultRunningVariance + channel)) +
