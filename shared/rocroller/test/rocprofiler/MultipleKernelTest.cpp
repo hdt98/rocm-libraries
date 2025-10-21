@@ -368,6 +368,7 @@ namespace RocprofilerTest
 
             std::string const literalHex = fmt::format("0x{:x}", literals[order.back()]);
             CAPTURE(literalHex);
+            CAPTURE(toString(*latencies));
             REQUIRE(latencies->size() == 2);
             CHECK(1 == countSubstring((*latencies)[0].instruction, literalHex));
             CHECK((*latencies)[1].instruction == "s_endpgm");

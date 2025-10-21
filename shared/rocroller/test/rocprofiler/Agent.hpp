@@ -42,8 +42,11 @@ namespace rocRoller
             uint64_t    hitcount{0}; // Number of times instruction was executed
             std::string instruction; // Disassembled instruction text
 
-            uint64_t meanLatency() const;
+            uint64_t    meanLatency() const;
+            std::string toString() const;
         };
+
+        std::string toString(std::vector<InstructionProfile> const& profiles);
 
         struct pc_comparator
         {

@@ -341,6 +341,27 @@ namespace rocRoller
             return totalLatency / hitcount;
         }
 
+        std::string InstructionProfile::toString() const
+        {
+            return fmt::format("InstructionProfile{{ instruction: '{}', totalLatency: {}, "
+                               "hitcount: {}, meanLatency: {} }}",
+                               instruction,
+                               totalLatency,
+                               hitcount,
+                               meanLatency());
+        }
+
+        std::string toString(std::vector<InstructionProfile> const& profiles)
+        {
+            std::string result = "InstructionProfiles[\n";
+            for(const auto& profile : profiles)
+            {
+                result += "  " + profile.toString() + "\n";
+            }
+            result += "]";
+            return result;
+        }
+
     } // namespace profiler
 } // namespace rocRoller
 
