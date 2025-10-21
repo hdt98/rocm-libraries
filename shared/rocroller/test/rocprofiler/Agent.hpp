@@ -78,16 +78,5 @@ namespace rocRoller
          */
         void expect_dispatches(int n);
 
-        /**
-         * @brief Get the collected instruction latency data
-         * 
-         * This function returns a vector containing instruction latency
-         * information collected during kernel execution. Each element contains
-         * latency, hit count, and instruction disassembly for each instruction.
-         * 
-         * @return vector of InstructionData
-         */
-        std::vector<InstructionData> getInstructionData();
-
     } // namespace profiler
 } // namespace rocRoller

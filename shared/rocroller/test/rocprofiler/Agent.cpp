@@ -321,37 +321,6 @@ namespace rocRoller
             dispatch_instruction_latencies.clear();
         }
 
-        std::vector<InstructionData> getInstructionData()
-        {
-            const std::lock_guard<std::mutex> lock(dispatch_shader_mutex);
-
-            std::vector<InstructionData> result;
-
-            // Search backwards for the last dispatch with non-zero length data
-            for(auto it = dispatch_instruction_latencies.rbegin();
-                it != dispatch_instruction_latencies.rend();
-                ++it)
-            {
-                if(!it->second.empty())
-                {
-                    result.reserve(it->second.size());
-
-                    for(const auto& [pc, data] : it->second)
-                    {
-                        result.push_back(data);
-                    }
-
-                    return result;
-                }
-                std::cerr << "had to skip dispatch " << it->first << " with zero data" << std::endl;
-            }
-
-            // see Troubleshooting section in
-            // https://rocm.docs.amd.com/projects/rocprofiler-sdk/en/amd-mainline/how-to/using-thread-trace.html#troubleshooting
-            std::cerr << "No dispatches with data found, launch more waves" << std::endl;
-
-            return result;
-        }
     } // namespace profiler
 } // namespace rocRoller
 
