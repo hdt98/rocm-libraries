@@ -188,7 +188,6 @@ namespace rocRoller
                               void*                              userdata_config,
                               rocprofiler_user_data_t*           userdata_shader)
         {
-            std::cout << "dispatch_callback: dispatch_id " << dispatch_id << std::endl;
             userdata_shader->value = dispatch_id;
             return ROCPROFILER_THREAD_TRACE_CONTROL_START_AND_STOP;
         }
