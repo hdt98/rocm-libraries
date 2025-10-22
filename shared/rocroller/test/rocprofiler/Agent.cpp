@@ -68,7 +68,7 @@ namespace rocRoller
             dispatch_instruction_latencies;
         rocprofiler::sdk::codeobj::disassembly::CodeobjAddressTranslate address_table;
 
-        std::mutex att_shader_data;
+        std::mutex everything_mutex;
 
         // To wait for expected number of dispatches
         std::condition_variable dispatch_cv;
@@ -79,6 +79,8 @@ namespace rocRoller
                               rocprofiler_user_data_t*,
                               void*)
         {
+            std::lock_guard<std::mutex> att_shader_data_lock(everything_mutex);
+
             if(record.kind != ROCPROFILER_CALLBACK_TRACING_CODE_OBJECT
                || record.operation != ROCPROFILER_CODE_OBJECT_LOAD
                || record.phase != ROCPROFILER_CALLBACK_PHASE_LOAD)
@@ -87,11 +89,12 @@ namespace rocRoller
             auto* data = static_cast<rocprofiler_callback_tracing_code_object_load_data_t*>(
                 record.payload);
 
-            Log::info("codeobj_callback: code_object_id {}, requested_dispatch_id {}",
-                      data->code_object_id,
-                      requested_dispatch_id.load());
-
-            std::lock_guard<std::mutex> att_shader_data_lock(att_shader_data);
+            Log::info(
+                "codeobj_callback: code_object_id {}, requested_dispatch_id {}, storage_type {}",
+                data->code_object_id,
+                requested_dispatch_id.load(),
+                static_cast<std::underlying_type_t<rocprofiler_code_object_storage_type_t>>(
+                    data->storage_type));
 
             if(data->storage_type == ROCPROFILER_CODE_OBJECT_STORAGE_TYPE_FILE)
             {
@@ -127,7 +130,8 @@ namespace rocRoller
         {
             try
             {
-                rocprofiler_dispatch_id_t dispatch_id
+                std::lock_guard<std::mutex> att_shader_data_lock(everything_mutex);
+                rocprofiler_dispatch_id_t   dispatch_id
                     = static_cast<rocprofiler_dispatch_id_t>(userdata.value);
 
                 Log::info("shader_data_callback: dispatch_id {}, requested_dispatch_id {}",
@@ -144,33 +148,55 @@ namespace rocRoller
                     rocprofiler_dispatch_id_t dispatch_id
                         = static_cast<rocprofiler_dispatch_id_t>(userdata_casted.value);
 
-                    if(record_type_id != ROCPROFILER_THREAD_TRACE_DECODER_RECORD_WAVE)
-                        return;
-                    // Sometimes this is ever reached for a dispatch
-
-                    std::lock_guard<std::mutex> att_shader_data_lock(att_shader_data);
-                    for(size_t w = 0; w < num_events; w++)
+                    switch(record_type_id)
                     {
-                        auto* wave = static_cast<rocprofiler_thread_trace_decoder_wave_t*>(events);
-                        for(size_t i = 0; i < wave->instructions_size; i++)
+                    case ROCPROFILER_THREAD_TRACE_DECODER_RECORD_WAVE:
+                        for(size_t w = 0; w < num_events; w++)
                         {
-                            auto& inst = wave->instructions_array[i];
+                            auto* wave
+                                = static_cast<rocprofiler_thread_trace_decoder_wave_t*>(events);
+                            for(size_t i = 0; i < wave->instructions_size; i++)
+                            {
+                                auto& inst = wave->instructions_array[i];
 
-                            Log::info("parse: dispatch_id {}, code_object_id {}, "
-                                      "requested_dispatch_id {}",
-                                      dispatch_id,
-                                      inst.pc.code_object_id,
-                                      requested_dispatch_id.load());
+                                Log::info("parse: dispatch_id {}, code_object_id {}, "
+                                          "requested_dispatch_id {}",
+                                          dispatch_id,
+                                          inst.pc.code_object_id,
+                                          requested_dispatch_id.load());
 
-                            auto& data = dispatch_instruction_latencies[dispatch_id][inst.pc];
-                            data.totalLatency += inst.duration;
-                            data.hitcount += 1;
+                                auto& data = dispatch_instruction_latencies[dispatch_id][inst.pc];
+                                data.totalLatency += inst.duration;
+                                data.hitcount += 1;
+                            }
                         }
+                        break;
+                    case ROCPROFILER_THREAD_TRACE_DECODER_RECORD_GFXIP:
+                    case ROCPROFILER_THREAD_TRACE_DECODER_RECORD_OCCUPANCY:
+                        break;
+                    case ROCPROFILER_THREAD_TRACE_DECODER_RECORD_INFO:
+                        for(size_t i = 0; i < num_events; i++)
+                        {
+                            auto* info
+                                = static_cast<rocprofiler_thread_trace_decoder_info_t*>(events);
+                            Log::warn("parse: info record: {}",
+                                      static_cast<std::underlying_type_t<
+                                          rocprofiler_thread_trace_decoder_info_t>>(*info));
+                        }
+                        assert(false && "get info record");
+                        break;
+                    default:
+                        Log::warn(
+                            "parse: unhandled record type {}",
+                            static_cast<std::underlying_type_t<
+                                rocprofiler_thread_trace_decoder_record_type_t>>(record_type_id));
+                        assert(false && "unhandled record type");
+                        break;
                     }
                 };
+
                 rocprofiler_trace_decode(decoder, parse, data, data_size, &userdata);
 
-                std::lock_guard<std::mutex> att_shader_data_lock(att_shader_data);
                 if(dispatch_instruction_latencies.find(dispatch_id)
                    != dispatch_instruction_latencies.end())
                 {
@@ -180,12 +206,11 @@ namespace rocRoller
                 }
                 else
                 {
-                    Log::info("shader_data_callback: no instructions collected for dispatch_id {}",
+                    Log::warn("shader_data_callback: no instructions collected for dispatch_id {}",
                               dispatch_id);
                     dispatch_instruction_latencies.insert(
                         {dispatch_id, profiler::InstructionLatencyMap{}});
                 }
-                dispatch_cv.notify_all();
             }
             catch(const std::exception& e)
             {
@@ -194,6 +219,7 @@ namespace rocRoller
                 // Unfortunately the what() is just "std::exception"
                 Log::error("shader_data_callback exception: {}", e.what());
             }
+            dispatch_cv.notify_all();
         }
 
         rocprofiler_thread_trace_control_flags_t
@@ -205,6 +231,7 @@ namespace rocRoller
                               void*                              userdata_config,
                               rocprofiler_user_data_t*           userdata_shader)
         {
+            std::lock_guard<std::mutex> att_shader_data_lock(everything_mutex);
             try
             {
                 Log::info("dispatch_callback: dispatch_id {}, requested_dispatch_id {}",
@@ -234,6 +261,8 @@ namespace rocRoller
                 auto parameters = std::vector<rocprofiler_thread_trace_parameter_t>{};
                 parameters.push_back({ROCPROFILER_THREAD_TRACE_PARAMETER_TARGET_CU, 1});
                 parameters.push_back({ROCPROFILER_THREAD_TRACE_PARAMETER_SHADER_ENGINE_MASK, 0x1});
+                parameters.push_back({ROCPROFILER_THREAD_TRACE_PARAMETER_SIMD_SELECT, 0x1});
+                parameters.push_back({ROCPROFILER_THREAD_TRACE_PARAMETER_SERIALIZE_ALL, 1});
                 parameters.push_back(
                     {ROCPROFILER_THREAD_TRACE_PARAMETER_BUFFER_SIZE, 0x10000000}); // 256MB
 
@@ -299,11 +328,11 @@ namespace rocRoller
 
                 std::unique_lock<std::mutex> lock(dispatch_count_mutex);
                 dispatch_cv.wait(lock, [] {
-                    std::lock_guard<std::mutex> att_shader_data_lock(att_shader_data);
+                    std::lock_guard<std::mutex> att_shader_data_lock(everything_mutex);
                     return dispatch_instruction_latencies.find(requested_dispatch_id.load())
                            != dispatch_instruction_latencies.end();
                 });
-                std::lock_guard<std::mutex> att_shader_data_lock(att_shader_data);
+                std::lock_guard<std::mutex> att_shader_data_lock(everything_mutex);
 
                 auto it = dispatch_instruction_latencies.find(requested_dispatch_id.load());
                 if(it != dispatch_instruction_latencies.end() && !it->second.empty())

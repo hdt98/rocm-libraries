@@ -170,59 +170,56 @@ namespace RocprofilerTest
 
         std::string const testName = fmt::format("const_0x{:x}_value_{}", literal, commandArg);
 
-        SECTION(testName)
+        auto context     = TestContext::ForTestDevice({}, testName);
+        auto kernelSetup = createKernel(context.get(), literal, commandArg);
+
+        kernelSetup.kernel.launchKernel(kernelSetup.commandArgs.runtimeArguments());
+        HIP_CHECK(hipDeviceSynchronize());
+
+        const auto latencies = rocRoller::profiler::waitForDispatchData(2);
+
+        if(!latencies.has_value())
         {
-            auto context     = TestContext::ForTestDevice({}, testName);
-            auto kernelSetup = createKernel(context.get(), literal, commandArg);
+            Log::warn("Skipping test: no dispatch data available");
+            SKIP();
+        }
 
-            kernelSetup.kernel.launchKernel(kernelSetup.commandArgs.runtimeArguments());
-            HIP_CHECK(hipDeviceSynchronize());
+        { // Verify device result
+            uint32_t h_result = 0;
+            HIP_CHECK(hipMemcpy(
+                &h_result, kernelSetup.d_ptr.get(), sizeof(uint32_t), hipMemcpyDeviceToHost));
 
-            const auto latencies = rocRoller::profiler::waitForDispatchData(2);
+            // Wait for the hipMemcpy dispatch
+            rocRoller::profiler::waitForDispatchData(1);
 
-            if(!latencies.has_value())
-            {
-                Log::warn("Skipping test: no dispatch data available");
-                SKIP();
-            }
+            uint32_t expectedResult = commandArg + literal;
+            CHECK(h_result == expectedResult);
+        }
 
-            { // Verify device result
-                uint32_t h_result = 0;
-                HIP_CHECK(hipMemcpy(
-                    &h_result, kernelSetup.d_ptr.get(), sizeof(uint32_t), hipMemcpyDeviceToHost));
+        std::stringstream ss;
+        ss << "Instruction, Total Latency, Hit Count, Average Latency" << std::endl;
+        for(const auto& data : *latencies)
+        {
+            uint64_t avg_latency = data.meanLatency();
+            ss << "\"" << data.instruction << "\", " << data.totalLatency << ", " << data.hitcount
+               << ", " << avg_latency << std::endl;
+        }
+        INFO(ss.str());
+        REQUIRE(latencies->size() >= 8); // gfx12 has 9, others have 8
 
-                // Wait for the hipMemcpy dispatch
-                rocRoller::profiler::waitForDispatchData(1);
-
-                uint32_t expectedResult = commandArg + literal;
-                CHECK(h_result == expectedResult);
-            }
-
-            std::stringstream ss;
-            ss << "Instruction, Total Latency, Hit Count, Average Latency" << std::endl;
-            for(const auto& data : *latencies)
-            {
-                uint64_t avg_latency = data.meanLatency();
-                ss << "\"" << data.instruction << "\", " << data.totalLatency << ", "
-                   << data.hitcount << ", " << avg_latency << std::endl;
-            }
-            INFO(ss.str());
-            REQUIRE(latencies->size() >= 8); // gfx12 has 9, others have 8
-
-            { // Ensure instructions exist in expected quanities in the profile data
-                std::string const instructionsStr = [&]() {
-                    std::stringstream ss;
-                    streamJoin(ss,
-                               std::views::transform(*latencies,
-                                                     [](const auto& d) { return d.instruction; }),
-                               "\n");
-                    return ss.str();
-                }();
-                INFO("Instructions:\n" << instructionsStr);
-                CHECK(1
-                      == countSubstring(instructionsStr,
-                                        fmt::format("v_mov_b32_e32 v1, 0x{:x}", literal)));
-            }
+        { // Ensure instructions exist in expected quanities in the profile data
+            std::string const instructionsStr = [&]() {
+                std::stringstream ss;
+                streamJoin(
+                    ss,
+                    std::views::transform(*latencies, [](const auto& d) { return d.instruction; }),
+                    "\n");
+                return ss.str();
+            }();
+            INFO("Instructions:\n" << instructionsStr);
+            CHECK(1
+                  == countSubstring(instructionsStr,
+                                    fmt::format("v_mov_b32_e32 v1, 0x{:x}", literal)));
         }
     }
 
@@ -275,7 +272,7 @@ namespace RocprofilerTest
         return {std::move(commandKernel), nullptr, commandArgs, instrs};
     }
 
-    TEST_CASE("Rocprofiler agent race conditions", "[rocprofiler]")
+    TEST_CASE("Rocprofiler agent race conditions - Order 1", "[rocprofiler]")
     {
         /*
         There were race conditions between the dispatch and shader data callbacks.
@@ -295,81 +292,111 @@ namespace RocprofilerTest
             kernelSetups.push_back(createSimpleMovKernel(context.get(), literal));
         }
 
-        SECTION("Order 1")
+        std::vector<size_t> order = {0, 1, 2, 1};
+        for(size_t idx : order)
         {
-            std::vector<size_t> order = {0, 1, 2, 1};
-            for(size_t idx : order)
-            {
-                kernelSetups[idx].kernel.launchKernel(
-                    kernelSetups[idx].commandArgs.runtimeArguments());
-                HIP_CHECK(hipDeviceSynchronize());
-            }
-            const auto latencies = rocRoller::profiler::waitForDispatchData(order.size());
+            kernelSetups[idx].kernel.launchKernel(kernelSetups[idx].commandArgs.runtimeArguments());
+            HIP_CHECK(hipDeviceSynchronize());
+        }
+        const auto latencies = rocRoller::profiler::waitForDispatchData(order.size());
 
-            if(!latencies.has_value())
-            {
-                Log::warn("Skipping test: no dispatch data available");
-                SKIP();
-            }
-
-            std::string const literalHex = fmt::format("0x{:x}", literals[order.back()]);
-            CAPTURE(literalHex);
-            INFO(toString(*latencies));
-            REQUIRE(latencies->size() == 2);
-            CHECK(1 == countSubstring((*latencies)[0].instruction, literalHex));
-            CHECK((*latencies)[1].instruction == "s_endpgm");
+        if(!latencies.has_value())
+        {
+            Log::warn("Skipping test: no dispatch data available");
+            SKIP();
         }
 
-        SECTION("Order 2")
+        std::string const literalHex = fmt::format("0x{:x}", literals[order.back()]);
+        CAPTURE(literalHex);
+        INFO(toString(*latencies));
+        REQUIRE(latencies->size() == 2);
+        CHECK(1 == countSubstring((*latencies)[0].instruction, literalHex));
+        CHECK((*latencies)[1].instruction == "s_endpgm");
+    }
+
+    TEST_CASE("Rocprofiler agent race conditions - Order 2", "[rocprofiler]")
+    {
+        /*
+        There were race conditions between the dispatch and shader data callbacks.
+        This test ensures that the fix works as intended.
+        Multiple simple kernels with different literals are launched various orders.
+        Ensures the profiler returns instructions from the last launched kernel.
+        */
+
+        std::vector<uint32_t> literals
+            = {0xbeef0000, 0xbeef0001, 0xbeef0002, 0xbeef0003, 0xbeef0004, 0xbeef0005, 0xbeef0006};
+        std::vector<KernelSetup> kernelSetups;
+
+        for(uint32_t literal : literals)
         {
-            std::vector<size_t> order = {3, 4};
-            for(size_t idx : order)
-            {
-                kernelSetups[idx].kernel.launchKernel(
-                    kernelSetups[idx].commandArgs.runtimeArguments());
-                HIP_CHECK(hipDeviceSynchronize());
-            }
-            const auto latencies = rocRoller::profiler::waitForDispatchData(order.size());
-
-            if(!latencies.has_value())
-            {
-                Log::warn("Skipping test: no dispatch data available");
-                SKIP();
-            }
-
-            std::string const literalHex = fmt::format("0x{:x}", literals[order.back()]);
-            CAPTURE(literalHex);
-            INFO(toString(*latencies));
-            REQUIRE(latencies->size() == 2);
-            CHECK(1 == countSubstring((*latencies)[0].instruction, literalHex));
-            CHECK((*latencies)[1].instruction == "s_endpgm");
+            std::string const testName = fmt::format("simple_mov_0x{:x}", literal);
+            auto              context  = TestContext::ForTestDevice({}, testName);
+            kernelSetups.push_back(createSimpleMovKernel(context.get(), literal));
         }
 
-        SECTION("With profiler calls")
+        std::vector<size_t> order = {3, 4};
+        for(size_t idx : order)
         {
-            std::vector<size_t> order = {5, 6};
-            for(size_t idx : order)
-            {
-                kernelSetups[idx].kernel.launchKernel(
-                    kernelSetups[idx].commandArgs.runtimeArguments());
-                HIP_CHECK(hipDeviceSynchronize());
-                rocRoller::profiler::waitForDispatchData(1);
-            }
-            const auto latencies = rocRoller::profiler::waitForDispatchData(0);
-
-            if(!latencies.has_value())
-            {
-                Log::warn("Skipping test: no dispatch data available");
-                SKIP();
-            }
-
-            std::string const literalHex = fmt::format("0x{:x}", literals[order.back()]);
-            CAPTURE(literalHex);
-            CAPTURE(toString(*latencies));
-            REQUIRE(latencies->size() == 2);
-            CHECK(1 == countSubstring((*latencies)[0].instruction, literalHex));
-            CHECK((*latencies)[1].instruction == "s_endpgm");
+            kernelSetups[idx].kernel.launchKernel(kernelSetups[idx].commandArgs.runtimeArguments());
+            HIP_CHECK(hipDeviceSynchronize());
         }
+        const auto latencies = rocRoller::profiler::waitForDispatchData(order.size());
+
+        if(!latencies.has_value())
+        {
+            Log::warn("Skipping test: no dispatch data available");
+            SKIP();
+        }
+
+        std::string const literalHex = fmt::format("0x{:x}", literals[order.back()]);
+        CAPTURE(literalHex);
+        INFO(toString(*latencies));
+        REQUIRE(latencies->size() == 2);
+        CHECK(1 == countSubstring((*latencies)[0].instruction, literalHex));
+        CHECK((*latencies)[1].instruction == "s_endpgm");
+    }
+
+    TEST_CASE("Rocprofiler agent race conditions - With profiler calls", "[rocprofiler]")
+    {
+        /*
+        There were race conditions between the dispatch and shader data callbacks.
+        This test ensures that the fix works as intended.
+        Multiple simple kernels with different literals are launched various orders.
+        Ensures the profiler returns instructions from the last launched kernel.
+        */
+
+        std::vector<uint32_t> literals
+            = {0xbeef0000, 0xbeef0001, 0xbeef0002, 0xbeef0003, 0xbeef0004, 0xbeef0005, 0xbeef0006};
+        std::vector<KernelSetup> kernelSetups;
+
+        for(uint32_t literal : literals)
+        {
+            std::string const testName = fmt::format("simple_mov_0x{:x}", literal);
+            auto              context  = TestContext::ForTestDevice({}, testName);
+            kernelSetups.push_back(createSimpleMovKernel(context.get(), literal));
+        }
+
+        std::vector<size_t> order = {5, 6};
+        for(size_t idx : order)
+        {
+            kernelSetups[idx].kernel.launchKernel(kernelSetups[idx].commandArgs.runtimeArguments());
+            HIP_CHECK(hipDeviceSynchronize());
+            rocRoller::profiler::waitForDispatchData(1);
+        }
+        const auto latencies = rocRoller::profiler::waitForDispatchData(0);
+
+        if(!latencies.has_value())
+        {
+            Log::warn("Skipping test: no dispatch data available");
+            SKIP();
+        }
+
+        std::string const literalHex = fmt::format("0x{:x}", literals[order.back()]);
+        CAPTURE(literalHex);
+        CAPTURE(toString(*latencies));
+        REQUIRE(latencies->size() == 2);
+        CHECK(1 == countSubstring((*latencies)[0].instruction, literalHex));
+        CHECK((*latencies)[1].instruction == "s_endpgm");
     }
 
     TEST_CASE("Rocprofiler simple", "[rocprofiler]")
