@@ -284,7 +284,8 @@ namespace RocprofilerTest
         Ensures the profiler returns instructions from the last launched kernel.
         */
 
-        std::vector<uint32_t>    literals = {0xdeadbeef, 0x12345678, 0xabcdef00};
+        std::vector<uint32_t> literals
+            = {0xbeef0000, 0xbeef0001, 0xbeef0002, 0xbeef0003, 0xbeef0004, 0xbeef0005, 0xbeef0006};
         std::vector<KernelSetup> kernelSetups;
 
         for(uint32_t literal : literals)
@@ -296,7 +297,6 @@ namespace RocprofilerTest
 
         SECTION("Order 1")
         {
-            CAPTURE("Order 1");
             std::vector<size_t> order = {0, 1, 2, 1};
             for(size_t idx : order)
             {
@@ -322,8 +322,7 @@ namespace RocprofilerTest
 
         SECTION("Order 2")
         {
-            CAPTURE("Order 2");
-            std::vector<size_t> order = {1, 2};
+            std::vector<size_t> order = {3, 4};
             for(size_t idx : order)
             {
                 kernelSetups[idx].kernel.launchKernel(
@@ -348,8 +347,7 @@ namespace RocprofilerTest
 
         SECTION("With profiler calls")
         {
-            CAPTURE("With profiler calls");
-            std::vector<size_t> order = {1, 2};
+            std::vector<size_t> order = {5, 6};
             for(size_t idx : order)
             {
                 kernelSetups[idx].kernel.launchKernel(
@@ -357,8 +355,6 @@ namespace RocprofilerTest
                 HIP_CHECK(hipDeviceSynchronize());
                 rocRoller::profiler::waitForDispatchData(1);
             }
-            // The last waitForDispatchData call already got us to the correct dispatch
-            // No need to wait again, the data is already available
             const auto latencies = rocRoller::profiler::waitForDispatchData(0);
 
             if(!latencies.has_value())

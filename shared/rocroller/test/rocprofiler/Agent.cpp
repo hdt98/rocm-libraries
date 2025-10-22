@@ -123,8 +123,6 @@ namespace rocRoller
         {
             try
             {
-                std::lock_guard<std::mutex> att_shader_data_lock(att_shader_data);
-
                 rocprofiler_dispatch_id_t dispatch_id
                     = static_cast<rocprofiler_dispatch_id_t>(userdata.value);
 
@@ -146,6 +144,7 @@ namespace rocRoller
                         return;
                     // Sometimes this is ever reached for a dispatch
 
+                    std::lock_guard<std::mutex> att_shader_data_lock(att_shader_data);
                     for(size_t w = 0; w < num_events; w++)
                     {
                         auto* wave = static_cast<rocprofiler_thread_trace_decoder_wave_t*>(events);
@@ -160,6 +159,7 @@ namespace rocRoller
                 };
                 rocprofiler_trace_decode(decoder, parse, data, data_size, &userdata);
 
+                std::lock_guard<std::mutex> att_shader_data_lock(att_shader_data);
                 if(dispatch_instruction_latencies.find(dispatch_id)
                    != dispatch_instruction_latencies.end())
                 {
@@ -288,6 +288,7 @@ namespace rocRoller
 
                 std::unique_lock<std::mutex> lock(dispatch_count_mutex);
                 dispatch_cv.wait(lock, [] {
+                    std::lock_guard<std::mutex> att_shader_data_lock(att_shader_data);
                     return dispatch_instruction_latencies.find(requested_dispatch_id.load())
                            != dispatch_instruction_latencies.end();
                 });
@@ -313,6 +314,20 @@ namespace rocRoller
                     for(const auto& [pc, data] : it->second)
                     {
                         result->push_back(data);
+                    }
+                    // Debug output
+                    for(auto const& [dispatch_id, inst_map] : dispatch_instruction_latencies)
+                    {
+                        Log::info("Dispatch ID {}: {} instructions collected",
+                                  dispatch_id,
+                                  inst_map.size());
+                        for(const auto& [pc, data] : inst_map)
+                        {
+                            Log::info("  PC: code_object_id {}, address {:#x} => {}",
+                                      pc.code_object_id,
+                                      pc.address,
+                                      data.toString());
+                        }
                     }
                     Log::info("waitForDispatchData: retrieved {} instructions for dispatch ID {}",
                               result->size(),
@@ -343,7 +358,7 @@ namespace rocRoller
         std::string InstructionProfile::toString() const
         {
             return fmt::format("'{}', totalLatency: {}, "
-                               "hitcount: {}, meanLatency: {} }}",
+                               "hitcount: {}, meanLatency: {}",
                                instruction,
                                totalLatency,
                                hitcount,
@@ -352,12 +367,12 @@ namespace rocRoller
 
         std::string toString(std::vector<InstructionProfile> const& profiles)
         {
-            std::string result = "[\n";
+            std::string result = "";
             for(const auto& profile : profiles)
             {
-                result += "  " + profile.toString() + "\n";
+                result += profile.toString() + "\n";
             }
-            result += "]";
+            result += "\n";
             return result;
         }
 
