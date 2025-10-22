@@ -505,6 +505,15 @@ TEST_CASE("ConvertPropagation", "[expression][expression-transformation]")
                                        Expression::conditional(
                                            cond, convert(Int32, r64[0]), convert(Int32, r64[1])))));
     }
+
+    SECTION("special value types")
+    {
+        using namespace Expression;
+        const auto tag  = dataFlowTag(72, Register::Type::Vector, Int64);
+        const auto expr = convertPropagation(convert(Int32, tag + r64[0]));
+        CHECK_THAT(expr, IdenticalTo(convert(Int32, convert(Int32, tag) + convert(Int32, r64[0]))));
+        CHECK_THAT(simplify(expr), IdenticalTo(convert(Int32, tag) + convert(Int32, r64[0])));
+    }
 }
 
 TEST_CASE("launchTimeSubExpressions works", "[expression][expression-transformation]")

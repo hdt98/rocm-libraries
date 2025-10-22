@@ -134,18 +134,11 @@ namespace rocRoller
             template <CValue Value>
             ExpressionPtr operator()(Value const& value) const
             {
-                if constexpr(std::same_as<Value, Register::ValuePtr>)
+                const auto variableType = resultType(std::make_shared<Expression>(value)).varType;
+                if(variableType != m_destinationType || variableType == DataType::Int64
+                   || variableType == DataType::UInt64)
                 {
-                    if(value->variableType() == m_destinationType)
-                    {
-                        return std::make_shared<Expression>(value);
-                    }
-                    // Only propagate to 64-bit Int
-                    if(value->variableType() == DataType::Int64
-                       || value->variableType() == DataType::UInt64)
-                    {
-                        return convert(m_destinationType, std::make_shared<Expression>(value));
-                    }
+                    return convert(m_destinationType, std::make_shared<Expression>(value));
                 }
                 return std::make_shared<Expression>(value);
             }
