@@ -745,7 +745,6 @@ namespace rocRoller
             std::unordered_set<int> required;
 
             auto [target, direction] = getOperationTarget(tag, graph);
-            Log::debug("{} target: {}", tag, target);
             auto [targetRequired, path] = findRequiredCoordinates(target, direction, graph);
 
             std::copy(targetRequired.cbegin(),
