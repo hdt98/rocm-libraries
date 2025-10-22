@@ -115,7 +115,7 @@ def main():
                         default=1,
                         help='Maximum number of nodes to use')
     parser.add_argument('--wait',
-                        type=boolean,
+                        type=bool,
                         default=False,
                         help='Wait for job to complete')
 
