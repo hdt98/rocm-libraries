@@ -513,6 +513,12 @@ TEST_CASE("ConvertPropagation", "[expression][expression-transformation]")
         const auto expr = convertPropagation(convert(Int32, tag + r64[0]));
         CHECK_THAT(expr, IdenticalTo(convert(Int32, convert(Int32, tag) + convert(Int32, r64[0]))));
         CHECK_THAT(simplify(expr), IdenticalTo(convert(Int32, tag) + convert(Int32, r64[0])));
+
+        CHECK_THAT(convertPropagation(convert(
+                       UInt32, literal(32u, DataType::UInt32) + literal(4u, DataType::UInt64))),
+                   IdenticalTo(convert(UInt32,
+                                       literal(32u, DataType::UInt32)
+                                           + convert(UInt32, literal(4u, DataType::UInt64)))));
     }
 }
 
