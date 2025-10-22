@@ -87,6 +87,10 @@ namespace rocRoller
             auto* data = static_cast<rocprofiler_callback_tracing_code_object_load_data_t*>(
                 record.payload);
 
+            Log::info("codeobj_callback: code_object_id {}, requested_dispatch_id {}",
+                      data->code_object_id,
+                      requested_dispatch_id.load());
+
             std::lock_guard<std::mutex> att_shader_data_lock(att_shader_data);
 
             if(data->storage_type == ROCPROFILER_CODE_OBJECT_STORAGE_TYPE_FILE)
@@ -151,6 +155,13 @@ namespace rocRoller
                         for(size_t i = 0; i < wave->instructions_size; i++)
                         {
                             auto& inst = wave->instructions_array[i];
+
+                            Log::info("parse: dispatch_id {}, code_object_id {}, "
+                                      "requested_dispatch_id {}",
+                                      dispatch_id,
+                                      inst.pc.code_object_id,
+                                      requested_dispatch_id.load());
+
                             auto& data = dispatch_instruction_latencies[dispatch_id][inst.pc];
                             data.totalLatency += inst.duration;
                             data.hitcount += 1;
@@ -301,13 +312,9 @@ namespace rocRoller
                     {
                         auto inst = address_table.get(pc.code_object_id, pc.address);
                         if(inst)
-                        {
                             data.instruction = inst->inst;
-                        }
                         else
-                        {
                             data.instruction = "UNKNOWN_INSTRUCTION";
-                        }
                     }
                     result = std::vector<InstructionProfile>{};
                     result->reserve(it->second.size());
@@ -316,14 +323,21 @@ namespace rocRoller
                         result->push_back(data);
                     }
                     // Debug output
-                    for(auto const& [dispatch_id, inst_map] : dispatch_instruction_latencies)
+                    Log::info("waitForDispatchData resolving:");
+                    for(auto& [dispatch_id, inst_map] : dispatch_instruction_latencies)
                     {
-                        Log::info("Dispatch ID {}: {} instructions collected",
+                        Log::info("  dispatch_id {}: {} instructions collected",
                                   dispatch_id,
                                   inst_map.size());
-                        for(const auto& [pc, data] : inst_map)
+                        for(auto& [pc, data] : inst_map)
                         {
-                            Log::info("  PC: code_object_id {}, address {:#x} => {}",
+                            auto inst = address_table.get(pc.code_object_id, pc.address);
+                            if(inst)
+                                data.instruction = inst->inst;
+                            else
+                                data.instruction = "UNKNOWN_INSTRUCTION";
+
+                            Log::info("    PC: code_object_id {}, address {:#x} => {}",
                                       pc.code_object_id,
                                       pc.address,
                                       data.toString());
