@@ -78,6 +78,11 @@ def runTestCommand (platform, project)
                 set -ex
                 cd ${project.paths.project_build_prefix}
 
+                # Trying to figure out why tests work locally on a gfx1201 machine, but the decoder fails to initialize in CI
+                rocminfo | grep Agent -A5
+                find /opt/ -name "*decoder*"
+                ls /opt/
+
                 pushd build
                 echo Using ${numThreads} out of `nproc` threads for testing.
                 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=2 ctest -j ${numThreads} --output-on-failure ${testExclude}
