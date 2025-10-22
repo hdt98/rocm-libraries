@@ -315,20 +315,6 @@ namespace rocRoller
                     {
                         result->push_back(data);
                     }
-                    // Debug output
-                    for(auto const& [dispatch_id, inst_map] : dispatch_instruction_latencies)
-                    {
-                        Log::info("Dispatch ID {}: {} instructions collected",
-                                  dispatch_id,
-                                  inst_map.size());
-                        for(const auto& [pc, data] : inst_map)
-                        {
-                            Log::info("  PC: code_object_id {}, address {:#x} => {}",
-                                      pc.code_object_id,
-                                      pc.address,
-                                      data.toString());
-                        }
-                    }
                     Log::info("waitForDispatchData: retrieved {} instructions for dispatch ID {}",
                               result->size(),
                               requested_dispatch_id.load());

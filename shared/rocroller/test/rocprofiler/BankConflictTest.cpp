@@ -228,6 +228,9 @@ namespace rocRollerTest
                             SKIP();
                         }
 
+                        INFO(toString(*latencies));
+                        Log::debug(toString(*latencies));
+
                         REQUIRE(latencies->size() == 21);
 
                         GPUArchitectureGFX gfx = context->targetArchitecture().target().gfx;
@@ -247,16 +250,17 @@ namespace rocRollerTest
                             ldsinstr.memoryOp, ldsinstr.dwords);
                         uint dataCycles = LDSBankModel::getInstructionDataCycles(ldsinstr, gfx);
 
-                        INFO("Dwords: " << instrDwords << ", Stride Multiplier: "
-                                        << strideMultiplier << ", " << (write ? "Write" : "Read"));
+                        std::stringstream info;
 
-                        uint64_t          actualMaxLdsInstrCycles  = 0;
-                        uint64_t          actualLastSWaitcntCycles = 0;
-                        std::stringstream profilerResults;
+                        info << fmt::format("dwords {}, stride {}, {}\n",
+                                            instrDwords,
+                                            strideMultiplier,
+                                            write ? "write" : "read");
+
+                        uint64_t actualMaxLdsInstrCycles  = 0;
+                        uint64_t actualLastSWaitcntCycles = 0;
                         for(const auto& data : *latencies)
                         {
-                            profilerResults << "  " << data.instruction << ", "
-                                            << data.meanLatency() << " cycles" << std::endl;
                             if((write && data.instruction.find("ds_write") != std::string::npos)
                                || (!write && data.instruction.find("ds_read") != std::string::npos))
                             {
@@ -268,14 +272,16 @@ namespace rocRollerTest
                                 actualLastSWaitcntCycles = data.meanLatency();
                             }
                         }
-                        INFO("Profiler Results:\n" << profilerResults.str());
-                        INFO("  Actual LDS Instruction Cycles: " << actualMaxLdsInstrCycles);
-                        INFO("  Actual s_waitcnt Cycles: " << actualLastSWaitcntCycles);
+                        info << fmt::format("  Actual s_waitcnt Cycles: {}\n",
+                                            actualLastSWaitcntCycles);
+                        info << fmt::format("  Actual LDS Instruction Cycles: {}\n",
+                                            actualMaxLdsInstrCycles);
+                        info << fmt::format("  Model Predicted Cycles: {}\n", predictedCycles);
+                        info << fmt::format("    Issue Cycles: {}\n", issueCycles);
+                        info << fmt::format("    Data Cycles: {}\n", dataCycles);
 
-                        INFO("\nModel Predictions:");
-                        INFO("  Total Cycles: " << predictedCycles);
-                        INFO("  Issue Cycles: " << issueCycles);
-                        INFO("  Data Cycles: " << dataCycles);
+                        INFO(info.str());
+                        Log::debug(info.str());
 
                         CHECK_THAT(actualLastSWaitcntCycles,
                                    Catch::Matchers::WithinAbs(predictedCycles, 1ul));
