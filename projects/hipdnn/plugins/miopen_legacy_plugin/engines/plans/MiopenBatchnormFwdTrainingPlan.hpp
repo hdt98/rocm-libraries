@@ -32,6 +32,8 @@ public:
     const MiopenTensor& scale() const;
     const MiopenTensor& bias() const;
     const MiopenTensor& epsilon() const;
+    
+    bool hasSaveMeanVariance() const;
     const MiopenTensor& mean() const;
     const MiopenTensor& invVariance() const;
 
@@ -48,8 +50,10 @@ private:
     MiopenTensor _scale;
     MiopenTensor _bias;
     MiopenTensor _epsilon;
-    MiopenTensor _mean;
-    MiopenTensor _invVariance;
+    
+    // Optional save mean/variance
+    std::optional<MiopenTensor> _mean;
+    std::optional<MiopenTensor> _invVariance;
 
     // Optional running statistics
     std::optional<MiopenTensor> _prevRunningMean;

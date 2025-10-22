@@ -115,9 +115,14 @@ class BatchnormForwardTraining : public ::testing::TestWithParam<TestCaseType>
             meanTensor.fillWithValue(static_cast<IntermediateType>(0.0f));
             invVarianceTensor.fillWithValue(static_cast<IntermediateType>(0.0f));
 
-            // Set momentum and epsilon values
-            momentumTensor.memory().hostData()[0] = static_cast<IntermediateType>(0.1f);
-            epsilonTensor.memory().hostData()[0] = static_cast<IntermediateType>(1e-5f);
+            // Set momentum and epsilon values using random generation
+            // This ensures we're testing with varied values rather than just the defaults
+            std::mt19937 gen(seed);
+            std::uniform_real_distribution<float> momentumDist(0.05f, 0.15f);
+            std::uniform_real_distribution<float> epsilonDist(1e-6f, 1e-4f);
+            
+            momentumTensor.memory().hostData()[0] = static_cast<IntermediateType>(momentumDist(gen));
+            epsilonTensor.memory().hostData()[0] = static_cast<IntermediateType>(epsilonDist(gen));
         }
 
         std::vector<int64_t> derivedDims;
@@ -204,9 +209,9 @@ protected:
             = tensorBundle.runningVarianceTensor.memory().deviceData();
             
         variantPack[momentumTensorAttr.get_uid()]
-            = tensorBundle.momentumTensor.memory().deviceData();
+            = tensorBundle.momentumTensor.memory().hostData();
         variantPack[epsilonTensorAttr.get_uid()]
-            = tensorBundle.epsilonTensor.memory().deviceData();
+            = tensorBundle.epsilonTensor.memory().hostData();
         variantPack[yTensorAttr.get_uid()] = tensorBundle.yTensor.memory().deviceData();
         variantPack[meanTensorAttr.get_uid()] = tensorBundle.meanTensor.memory().deviceData();
         variantPack[invVarianceTensorAttr.get_uid()]

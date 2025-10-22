@@ -19,9 +19,18 @@ BatchnormFwdTrainingParams::BatchnormFwdTrainingParams(
     , _scale(miopen_utils::createTensor(tensorMap, attributes.scale_tensor_uid()))
     , _bias(miopen_utils::createTensor(tensorMap, attributes.bias_tensor_uid()))
     , _epsilon(miopen_utils::createTensor(tensorMap, attributes.epsilon_tensor_uid()))
-    , _mean(miopen_utils::createTensor(tensorMap, attributes.mean_tensor_uid().value()))
-    , _invVariance(miopen_utils::createTensor(tensorMap, attributes.inv_variance_tensor_uid().value()))
 {
+    // Save mean and inv_variance are optional (controlled by MIO_SAVE_MEAN_VARIANCE)
+    if(attributes.mean_tensor_uid().has_value())
+    {
+        _mean = miopen_utils::createTensor(tensorMap, attributes.mean_tensor_uid().value());
+    }
+    
+    if(attributes.inv_variance_tensor_uid().has_value())
+    {
+        _invVariance = miopen_utils::createTensor(tensorMap, attributes.inv_variance_tensor_uid().value());
+    }
+    
     // Check if running statistics are provided
     if(attributes.prev_running_mean_tensor_uid().has_value()
        && attributes.prev_running_variance_tensor_uid().has_value()
@@ -67,14 +76,19 @@ const MiopenTensor& BatchnormFwdTrainingParams::epsilon() const
     return _epsilon;
 }
 
+bool BatchnormFwdTrainingParams::hasSaveMeanVariance() const
+{
+    return _mean.has_value() && _invVariance.has_value();
+}
+
 const MiopenTensor& BatchnormFwdTrainingParams::mean() const
 {
-    return _mean;
+    return _mean.value();
 }
 
 const MiopenTensor& BatchnormFwdTrainingParams::invVariance() const
 {
-    return _invVariance;
+    return _invVariance.value();
 }
 
 bool BatchnormFwdTrainingParams::hasRunningStats() const
@@ -128,10 +142,23 @@ void BatchnormFwdTrainingPlan::execute(const HipdnnEnginePluginHandle& handle,
     auto alpha = static_cast<float>(1);
     auto beta = static_cast<float>(0);
     
-    // Hardcoded epsilon and momentum values
-    // Using 1e-5 for epsilon (common for training) and 0.1 for momentum (standard default)
-    double epsilon = 1e-5;
-    double expAvgFactor = 0.1;
+    // Get epsilon from device buffer (points to host memory for scalar pass-by-value tensors)
+    auto epsilonBuffer = miopen_utils::findDeviceBuffer(
+        _trainingParams.epsilon().uid(), deviceBuffers, numDeviceBuffers);
+    double epsilon = static_cast<double>(*static_cast<const float*>(epsilonBuffer.ptr));
+    
+    // Get momentum if running stats exist
+    double expAvgFactor;
+    if(_trainingParams.hasRunningStats())
+    {
+        auto momentumBuffer = miopen_utils::findDeviceBuffer(
+            _trainingParams.momentum().uid(), deviceBuffers, numDeviceBuffers);
+        expAvgFactor = static_cast<double>(*static_cast<const float*>(momentumBuffer.ptr));
+    }
+    else
+    {
+        expAvgFactor = 0.0;
+    }
 
     // Get all required device buffers
     auto xBuffer = miopen_utils::findDeviceBuffer(
@@ -142,10 +169,21 @@ void BatchnormFwdTrainingPlan::execute(const HipdnnEnginePluginHandle& handle,
         _trainingParams.scale().uid(), deviceBuffers, numDeviceBuffers);
     auto biasBuffer = miopen_utils::findDeviceBuffer(
         _trainingParams.bias().uid(), deviceBuffers, numDeviceBuffers);
-    auto meanBuffer = miopen_utils::findDeviceBuffer(
-        _trainingParams.mean().uid(), deviceBuffers, numDeviceBuffers);
-    auto invVarianceBuffer = miopen_utils::findDeviceBuffer(
-        _trainingParams.invVariance().uid(), deviceBuffers, numDeviceBuffers);
+    
+    // Handle save mean/variance if provided (optional)
+    void* resultSaveMeanPtr = nullptr;
+    void* resultSaveInvVariancePtr = nullptr;
+    
+    if(_trainingParams.hasSaveMeanVariance())
+    {
+        auto meanBuffer = miopen_utils::findDeviceBuffer(
+            _trainingParams.mean().uid(), deviceBuffers, numDeviceBuffers);
+        auto invVarianceBuffer = miopen_utils::findDeviceBuffer(
+            _trainingParams.invVariance().uid(), deviceBuffers, numDeviceBuffers);
+        
+        resultSaveMeanPtr = meanBuffer.ptr;
+        resultSaveInvVariancePtr = invVarianceBuffer.ptr;
+    }
 
     // Handle running statistics if provided
     void* resultRunningMeanPtr = nullptr;
@@ -178,8 +216,8 @@ void BatchnormFwdTrainingPlan::execute(const HipdnnEnginePluginHandle& handle,
         resultRunningMeanPtr,
         resultRunningVariancePtr,
         epsilon,
-        meanBuffer.ptr,
-        invVarianceBuffer.ptr));
+        resultSaveMeanPtr,
+        resultSaveInvVariancePtr));
 }
 
 }
