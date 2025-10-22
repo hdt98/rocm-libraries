@@ -115,9 +115,8 @@ def main():
                         default=1,
                         help='Maximum number of nodes to use')
     parser.add_argument('--wait',
-                        type=bool,
-                        default=False,
-                        help='Wait for job to complete')
+                        action='store_true',
+                        help='Wait for job to complete. Default is off')
 
     if args.config_file:
         for k, v in config.items("Defaults"):
