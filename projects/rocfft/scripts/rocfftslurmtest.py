@@ -114,6 +114,10 @@ def main():
                         type=int,
                         default=1,
                         help='Maximum number of nodes to use')
+    parser.add_argument('--wait',
+                        type=boolean,
+                        default=False,
+                        help='Wait for job to complete')
 
     if args.config_file:
         for k, v in config.items("Defaults"):
@@ -215,6 +219,8 @@ def main():
     jobparams.gpuspernode = args.gpuspernode
     jobparams.timelimit = datetime.timedelta(hours=2)
     jobparams.ntaskspernode = jobparams.gpuspernode
+    if args.wait:
+        jobparams.wait = True
     if buildjob != None:
         jobparams.afterok = [buildjob.jobid]
 
