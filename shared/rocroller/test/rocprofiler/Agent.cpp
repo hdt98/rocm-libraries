@@ -61,6 +61,12 @@ namespace rocRoller
 {
     namespace
     {
+        struct TraceDecodeCallbackUserData
+        {
+            rocprofiler_dispatch_id_t dispatch_id;
+            bool                      ok_to_continue;
+        };
+
         rocprofiler_thread_trace_decoder_id_t decoder{};
         rocprofiler_context_id_t              client_ctx{};
 
@@ -127,11 +133,10 @@ namespace rocRoller
                                    uint64_t                                       num_events,
                                    void*                                          userdata)
         {
-            rocprofiler_user_data_t userdata_casted
-                = *static_cast<rocprofiler_user_data_t*>(userdata);
+            TraceDecodeCallbackUserData* info = static_cast<TraceDecodeCallbackUserData*>(userdata);
 
-            rocprofiler_dispatch_id_t dispatch_id
-                = static_cast<rocprofiler_dispatch_id_t>(userdata_casted.value);
+            if(!info->ok_to_continue)
+                return;
 
             switch(record_type_id)
             {
@@ -145,37 +150,44 @@ namespace rocRoller
 
                         Log::info("parse: dispatch_id {}, code_object_id {}, "
                                   "requested_dispatch_id {}",
-                                  dispatch_id,
+                                  info->dispatch_id,
                                   inst.pc.code_object_id,
                                   requested_dispatch_id.load());
 
-                        auto& data = dispatch_instruction_latencies[dispatch_id][inst.pc];
+                        auto& data = dispatch_instruction_latencies[info->dispatch_id][inst.pc];
                         data.totalLatency += inst.duration;
                         data.hitcount += 1;
                     }
                 }
                 break;
+
             case ROCPROFILER_THREAD_TRACE_DECODER_RECORD_GFXIP:
             case ROCPROFILER_THREAD_TRACE_DECODER_RECORD_OCCUPANCY:
+                // Ok to ignore
                 break;
+
             case ROCPROFILER_THREAD_TRACE_DECODER_RECORD_INFO:
+                // Very bad https://rocm.docs.amd.com/projects/rocprofiler-sdk/en/latest/api-reference/thread_trace.html#trace-decoder-info-events
+                // Signal to stop parse parsing, otherwise can be undefined behavior
                 for(size_t i = 0; i < num_events; i++)
                 {
                     auto* info = static_cast<rocprofiler_thread_trace_decoder_info_t*>(events);
-                    Log::warn("parse: info record: {}",
+                    Log::warn("parse: record info {}",
                               static_cast<
                                   std::underlying_type_t<rocprofiler_thread_trace_decoder_info_t>>(
                                   *info));
                 }
-                assert(false && "get info record");
+                info->ok_to_continue = false;
+                assert(dispatch_instruction_latencies[info->dispatch_id].empty()
+                       && "parse: received INFO record but instruction map is not empty");
                 break;
             default:
-                Log::warn(
+                Log::critical(
                     "parse: unhandled record type {}",
                     static_cast<
                         std::underlying_type_t<rocprofiler_thread_trace_decoder_record_type_t>>(
                         record_type_id));
-                assert(false && "unhandled record type");
+                assert(!"parse: unhandled record type");
                 break;
             }
         }
@@ -196,8 +208,11 @@ namespace rocRoller
                           dispatch_id,
                           requested_dispatch_id.load());
 
+                TraceDecodeCallbackUserData callback_user_data{.dispatch_id    = dispatch_id,
+                                                               .ok_to_continue = true};
+
                 rocprofiler_trace_decode(
-                    decoder, trace_decode_callback, data, data_size, &userdata);
+                    decoder, trace_decode_callback, data, data_size, &callback_user_data);
 
                 if(dispatch_instruction_latencies.find(dispatch_id)
                    != dispatch_instruction_latencies.end())
