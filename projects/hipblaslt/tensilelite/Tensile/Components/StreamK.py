@@ -30,7 +30,7 @@ from rocisa.instruction import SAddCU32, SAddI32, SAddU32, SAndB32, SBarrier, \
     SWaitCnt, VAddF32, VAddF64, VAddPKF16, VAddU32, VLShiftRightB32, VMovB32, \
     VReadfirstlaneB32, VCvtBF16toFP32
 from rocisa.functions import scalarStaticDivideAndRemainder, sMagicDiv2, \
-    vectorStaticMultiply, BranchIfNotZero, scalarUInt32DivideAndRemainder
+    vectorStaticMultiply, BranchIfNotZero, scalarUInt24DivideAndRemainder, scalarUInt32DivideAndRemainder
 
 
 from ..Common import print2, ceilDivide, log2
@@ -372,20 +372,20 @@ class StreamK(Component):
             module.add(skFixupTreeLabel)
 
             # Calculate partialIdx
-            tmpVgpr = writer.vgprPool.checkOut(2, "div")
-            tmpVgprRes = ContinuousRegister(idx=tmpVgpr, size=2)
+            tmpVgpr = writer.vgprPool.checkOutAligned(4,2)
+            tmpVgprRes = ContinuousRegister(idx=tmpVgpr, size=4)
 
             # Get Iter of the start of the tile
             tmpSgpr = writer.sgprPool.checkOut(3, "tmpSgpr")
             module.add(SSubU32(dst=sgpr(tmpSgpr+1), src0=sgpr("StreamKIter"), src1=1, comment="StreamKIter-1 to get Iter in current tile"))
-            module.add(sMagicDiv2(sgpr(tmpSgpr+0), sgpr(tmpSgpr+1), sgpr(tmpSgpr+1), sgpr("MagicNumberItersPerTile"), sgpr("MagicShiftItersPerTile"), sgpr(tmpSgpr+2)))
+            module.add(sMagicDiv2(sgpr(tmpSgpr+0), sgpr(tmpSgpr+2), sgpr(tmpSgpr+1), sgpr("MagicNumberItersPerTile"), sgpr("MagicShiftItersPerTile"), sgpr(tmpSgpr+2)))
             module.add(SMulI32(dst=sgpr(tmpSgpr+1), src0=sgpr(tmpSgpr+0), src1=sgpr("ItersPerTile"), comment="tileStart=tileIdx * ItersPerTile"))
             module.add(SAddU32(dst=sgpr(tmpSgpr+0), src0=sgpr("SKItersPerWG"), src1=1, comment="ItersPerWG w/ extraIter"))
-            module.add(scalarUInt32DivideAndRemainder(qReg=tmpSgpr+2, dReg=tmpSgpr+1, divReg=tmpSgpr+0, rReg=-1, tmpVgprRes=tmpVgprRes, wavewidth=kernel["WavefrontSize"], doRemainder=False, comment="wgCount = tileStart / (itersPerWG+1)"))
+            module.add(scalarUInt24DivideAndRemainder(qReg=tmpSgpr+2, dReg=tmpSgpr+1, divReg=tmpSgpr+0, rReg=-1, tmpVgprRes=tmpVgprRes, wavewidth=kernel["WavefrontSize"], doRemainder=False, comment="wgCount = tileStart / (itersPerWG+1)"))
             module.add(SCmpLtU32(src0=sgpr(tmpSgpr+2), src1=sgpr(sSkExtraIters), comment="find co-op group start"))
             module.add(SCBranchSCC1(labelName=skFixupCalcPartialIdx.getLabelName(), comment="All WG have extra iter so far, skip following calcs"))
             module.add(SSubU32(dst=sgpr(tmpSgpr+0), src0=sgpr(tmpSgpr+1), src1=sgpr(sSkExtraIters), comment="tileStart - extraIters"))
-            module.add(scalarUInt32DivideAndRemainder(qReg=tmpSgpr+2, dReg=tmpSgpr+0, divReg="SKItersPerWG", rReg=-1, tmpVgprRes=tmpVgprRes, wavewidth=kernel["WavefrontSize"], doRemainder=False, comment="wgExtraIters = (tileStart - extraIters) / itersPerWG"))
+            module.add(scalarUInt24DivideAndRemainder(qReg=tmpSgpr+2, dReg=tmpSgpr+0, divReg="SKItersPerWG", rReg=-1, tmpVgprRes=tmpVgprRes, wavewidth=kernel["WavefrontSize"], doRemainder=False, comment="wgExtraIters = (tileStart - extraIters) / itersPerWG"))
             module.add(skFixupCalcPartialIdx)
             module.add(SSubU32(dst=sgpr(sPartialIdx), src0=sgpr("StreamKIdx"), src1=sgpr(tmpSgpr+2), comment="partialIdx = streamkidx - coopGroupStart"))
 
