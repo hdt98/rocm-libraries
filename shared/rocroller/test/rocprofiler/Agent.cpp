@@ -122,6 +122,64 @@ namespace rocRoller
             }
         }
 
+        void trace_decode_callback(rocprofiler_thread_trace_decoder_record_type_t record_type_id,
+                                   void*                                          events,
+                                   uint64_t                                       num_events,
+                                   void*                                          userdata)
+        {
+            rocprofiler_user_data_t userdata_casted
+                = *static_cast<rocprofiler_user_data_t*>(userdata);
+
+            rocprofiler_dispatch_id_t dispatch_id
+                = static_cast<rocprofiler_dispatch_id_t>(userdata_casted.value);
+
+            switch(record_type_id)
+            {
+            case ROCPROFILER_THREAD_TRACE_DECODER_RECORD_WAVE:
+                for(size_t w = 0; w < num_events; w++)
+                {
+                    auto* wave = static_cast<rocprofiler_thread_trace_decoder_wave_t*>(events);
+                    for(size_t i = 0; i < wave->instructions_size; i++)
+                    {
+                        auto& inst = wave->instructions_array[i];
+
+                        Log::info("parse: dispatch_id {}, code_object_id {}, "
+                                  "requested_dispatch_id {}",
+                                  dispatch_id,
+                                  inst.pc.code_object_id,
+                                  requested_dispatch_id.load());
+
+                        auto& data = dispatch_instruction_latencies[dispatch_id][inst.pc];
+                        data.totalLatency += inst.duration;
+                        data.hitcount += 1;
+                    }
+                }
+                break;
+            case ROCPROFILER_THREAD_TRACE_DECODER_RECORD_GFXIP:
+            case ROCPROFILER_THREAD_TRACE_DECODER_RECORD_OCCUPANCY:
+                break;
+            case ROCPROFILER_THREAD_TRACE_DECODER_RECORD_INFO:
+                for(size_t i = 0; i < num_events; i++)
+                {
+                    auto* info = static_cast<rocprofiler_thread_trace_decoder_info_t*>(events);
+                    Log::warn("parse: info record: {}",
+                              static_cast<
+                                  std::underlying_type_t<rocprofiler_thread_trace_decoder_info_t>>(
+                                  *info));
+                }
+                assert(false && "get info record");
+                break;
+            default:
+                Log::warn(
+                    "parse: unhandled record type {}",
+                    static_cast<
+                        std::underlying_type_t<rocprofiler_thread_trace_decoder_record_type_t>>(
+                        record_type_id));
+                assert(false && "unhandled record type");
+                break;
+            }
+        }
+
         void shader_data_callback(rocprofiler_agent_id_t  agent,
                                   int64_t                 shader_engine_id,
                                   void*                   data,
@@ -138,64 +196,8 @@ namespace rocRoller
                           dispatch_id,
                           requested_dispatch_id.load());
 
-                auto parse = [](rocprofiler_thread_trace_decoder_record_type_t record_type_id,
-                                void*                                          events,
-                                uint64_t                                       num_events,
-                                void*                                          userdata) {
-                    rocprofiler_user_data_t userdata_casted
-                        = *static_cast<rocprofiler_user_data_t*>(userdata);
-
-                    rocprofiler_dispatch_id_t dispatch_id
-                        = static_cast<rocprofiler_dispatch_id_t>(userdata_casted.value);
-
-                    switch(record_type_id)
-                    {
-                    case ROCPROFILER_THREAD_TRACE_DECODER_RECORD_WAVE:
-                        for(size_t w = 0; w < num_events; w++)
-                        {
-                            auto* wave
-                                = static_cast<rocprofiler_thread_trace_decoder_wave_t*>(events);
-                            for(size_t i = 0; i < wave->instructions_size; i++)
-                            {
-                                auto& inst = wave->instructions_array[i];
-
-                                Log::info("parse: dispatch_id {}, code_object_id {}, "
-                                          "requested_dispatch_id {}",
-                                          dispatch_id,
-                                          inst.pc.code_object_id,
-                                          requested_dispatch_id.load());
-
-                                auto& data = dispatch_instruction_latencies[dispatch_id][inst.pc];
-                                data.totalLatency += inst.duration;
-                                data.hitcount += 1;
-                            }
-                        }
-                        break;
-                    case ROCPROFILER_THREAD_TRACE_DECODER_RECORD_GFXIP:
-                    case ROCPROFILER_THREAD_TRACE_DECODER_RECORD_OCCUPANCY:
-                        break;
-                    case ROCPROFILER_THREAD_TRACE_DECODER_RECORD_INFO:
-                        for(size_t i = 0; i < num_events; i++)
-                        {
-                            auto* info
-                                = static_cast<rocprofiler_thread_trace_decoder_info_t*>(events);
-                            Log::warn("parse: info record: {}",
-                                      static_cast<std::underlying_type_t<
-                                          rocprofiler_thread_trace_decoder_info_t>>(*info));
-                        }
-                        assert(false && "get info record");
-                        break;
-                    default:
-                        Log::warn(
-                            "parse: unhandled record type {}",
-                            static_cast<std::underlying_type_t<
-                                rocprofiler_thread_trace_decoder_record_type_t>>(record_type_id));
-                        assert(false && "unhandled record type");
-                        break;
-                    }
-                };
-
-                rocprofiler_trace_decode(decoder, parse, data, data_size, &userdata);
+                rocprofiler_trace_decode(
+                    decoder, trace_decode_callback, data, data_size, &userdata);
 
                 if(dispatch_instruction_latencies.find(dispatch_id)
                    != dispatch_instruction_latencies.end())
