@@ -233,7 +233,14 @@ struct MIOpenBatchNormFwdTrainSpatialHIPImpl<1, FpType, FpPrecType, FpAccumType>
         }
 
         // REDUCTION COMPLETE ---------------------------
-        variance = fma(-mean, mean, variance);
+        if(mio_bn_config::nhw == 1)
+        {
+            variance = FpPrecType{0};
+        }
+        else
+        {
+            variance = fma(-mean, mean, variance);
+        }
         if(variance < FpPrecType{0})
         {
             variance = FpPrecType{0};
