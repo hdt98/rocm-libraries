@@ -14,9 +14,9 @@ if(NOT GTest_FOUND AND HIPSPARSELT_ENABLE_FETCH)
     # For Windows: Prevent overriding the parent project's compiler/linker settings
     set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
     FetchContent_MakeAvailable(googletest)
-    message(STATUS "Fetched GTest and installed to: ${gtest_SOURCE_DIR}")
+    message(STATUS "Fetched GTest and installed to: ${GTest_DIR}")
 elseif(GTest_FOUND)
-    message(STATUS "Found GTest: ${gtest_SOURCE_DIR}")
+    message(STATUS "Found GTest: ${GTest_DIR}")
 else()
   message(FATAL_ERROR 
     "GTest not found. Install with your package manager (recommended) or "

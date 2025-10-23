@@ -1,20 +1,23 @@
 # Copyright Advanced Micro Devices, Inc., or its affiliates.
 # SPDX-License-Identifier: MIT
 
-include(FetchLAPACK)
-
 find_package(Threads REQUIRED)
 find_package(OpenMP REQUIRED)
-find_package(BLAS REQUIRED)
+
 if(HIPSPARSELT_ENABLE_THEROCK)
-  # This is required to support TheRock's cblas management
-  find_package(cblas REQUIRED)
-endif()
-
-if(HIPSPARSELT_ENABLE_BLIS)
+  # TheRock's cblas package provides OpenBLAS which includes BLAS, CBLAS, and LAPACK
+  # Use NO_*_PATH to prevent finding system packages and rely solely on theRock's packages
+  find_package(cblas REQUIRED CONFIG HINTS ${CMAKE_PREFIX_PATH})
+elseif(HIPSPARSELT_ENABLE_BLIS)
+  # Use BLIS as an AMD optimized BLAS alternative, this may be removed in the future
+  # so as to consolidate the vendoring strategy of BLAS, CBLAS, and LAPACK, but remains
+  # for historical purposes.
   find_package(BLIS QUIET)
+else()
+  # find_package(LAPACK) and conditionally fetch it if not found
+  # There is an implicit find_package(BLAS) when finding lapack
+  include(FetchLAPACK)
 endif()
-
 
 add_library(hipsparselt-clients-common OBJECT)
 
@@ -63,6 +66,9 @@ target_link_libraries(hipsparselt-clients-common PRIVATE Threads::Threads PUBLIC
 if(TARGET OpenMP::OpenMP_CXX)
   target_link_libraries(hipsparselt-clients-common PUBLIC OpenMP::OpenMP_CXX)
 endif()
+
+# Link BLAS libraries to provide include directories for cblas_interface.cpp
+hipsparselt_link_blas_libraries(hipsparselt-clients-common)
 
 # Add subdirectories
 # ============================================================================
