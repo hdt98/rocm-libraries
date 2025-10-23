@@ -145,7 +145,7 @@ void BatchnormFwdTrainingPlan::execute(const HipdnnEnginePluginHandle& handle,
     // Get epsilon from device buffer (points to host memory for scalar pass-by-value tensors)
     auto epsilonBuffer = miopen_utils::findDeviceBuffer(
         _trainingParams.epsilon().uid(), deviceBuffers, numDeviceBuffers);
-    double epsilon = static_cast<double>(*static_cast<const float*>(epsilonBuffer.ptr));
+    auto epsilon = static_cast<double>(*static_cast<const float*>(epsilonBuffer.ptr));
     
     // Get momentum if running stats exist
     double expAvgFactor;
