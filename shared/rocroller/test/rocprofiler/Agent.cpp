@@ -44,6 +44,12 @@
 #include <string>
 #include <thread>
 
+/*
+Based on
+- thread trace decoding: https://github.com/ROCm/rocm-systems/tree/develop/projects/rocprofiler-sdk/samples/thread_trace
+- using dispatch: https://github.com/ROCm/rocm-systems/blob/develop/projects/rocprofiler-sdk/tests/thread-trace/single_dispatch.cpp
+*/
+
 #define ROCPROFILER_CALL(result, msg)                                                   \
     if(auto ec = (result); ec != ROCPROFILER_STATUS_SUCCESS)                            \
     {                                                                                   \
@@ -51,11 +57,9 @@
             "rocprofiler-sdk error: ", rocprofiler_get_status_string(ec), " :: ", msg); \
     }
 
-/*
-Based on
-- thread trace decoding: https://github.com/ROCm/rocm-systems/tree/develop/projects/rocprofiler-sdk/samples/thread_trace
-- using dispatch: https://github.com/ROCm/rocm-systems/blob/develop/projects/rocprofiler-sdk/tests/thread-trace/single_dispatch.cpp
-*/
+// Disable to use rocprofv3
+// Otherwise this agent can be stuck waiting for a dispatch that rocprofv3 already consumed
+constexpr bool ENABLE_AGENT = false;
 
 namespace rocRoller
 {
@@ -317,6 +321,9 @@ namespace rocRoller
     {
         std::optional<std::vector<InstructionProfile>> waitForDispatchData(int n)
         {
+            if constexpr(!ENABLE_AGENT)
+                return std::nullopt;
+
             std::optional<std::vector<InstructionProfile>> result;
             requested_dispatch_id += n;
             Log::info("waitForDispatchData: requesting {} more dispatches, now waiting for ID {}",
@@ -416,6 +423,9 @@ namespace rocRoller
 extern "C" rocprofiler_tool_configure_result_t*
     rocprofiler_configure(uint32_t, const char*, uint32_t priority, rocprofiler_client_id_t* id)
 {
+    if constexpr(!ENABLE_AGENT)
+        return nullptr;
+
     if(priority > 0)
         return nullptr;
 
