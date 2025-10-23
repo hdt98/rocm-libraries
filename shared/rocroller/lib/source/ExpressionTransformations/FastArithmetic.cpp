@@ -45,9 +45,7 @@ namespace rocRoller
             ExpressionPtr orig = x;
 
             x = lowerBitfieldCombine(x);
-            x = convertPropagation(x);
             x = fastDivision(x, m_context);
-            x = simplify(x);
             x = lowerExponential(x);
             x = fastMultiplication(x);
             x = lowerUnsignedArithmeticShiftR(x);
@@ -56,6 +54,7 @@ namespace rocRoller
             x = fuseTernary(x);
             x = launchTimeSubExpressions(x, m_context);
             x = convertPropagation(x);
+            x = simplify(x);
 
             if(!identical(orig, x))
             {

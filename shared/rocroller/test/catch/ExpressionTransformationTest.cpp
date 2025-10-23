@@ -519,6 +519,8 @@ TEST_CASE("ConvertPropagation", "[expression][expression-transformation]")
                    IdenticalTo(convert(UInt32,
                                        literal(32u, DataType::UInt32)
                                            + convert(UInt32, literal(4u, DataType::UInt64)))));
+        CHECK_NOTHROW(evaluate(convertPropagation(
+            convert(UInt32, literal(32u, DataType::UInt32) + literal(4u, DataType::UInt64)))));
     }
 }
 

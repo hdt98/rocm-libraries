@@ -135,8 +135,8 @@ namespace rocRoller
             ExpressionPtr operator()(Value const& value) const
             {
                 const auto variableType = resultType(std::make_shared<Expression>(value)).varType;
-                if(variableType != m_destinationType || variableType == DataType::Int64
-                   || variableType == DataType::UInt64)
+                if(variableType != m_destinationType
+                   && (variableType == DataType::Int64 || variableType == DataType::UInt64))
                 {
                     return convert(m_destinationType, std::make_shared<Expression>(value));
                 }
