@@ -352,10 +352,11 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
     static constexpr auto I5 = Number<5>{};
 
     static constexpr bool isATensorColMajor =
-        (ConvForwardSpecialization == ConvolutionForwardSpecialization::Filter1x1Stride1Pad0) &&
-        (ABlockTransferSrcVectorDim == 1) && (NumGroupsToMerge == 1) &&
-        (is_NGCHW_NGKHW<ALayout, BLayout, ELayout>() ||
-         is_NGCDHW_NGKDHW<ALayout, BLayout, ELayout>());
+        // (ConvForwardSpecialization == ConvolutionForwardSpecialization::Filter1x1Stride1Pad0) &&
+        // (ABlockTransferSrcVectorDim == 1) && (NumGroupsToMerge == 1) &&
+        // (is_NGCHW_NGKHW<ALayout, BLayout, ELayout>() ||
+        //  is_NGCDHW_NGKDHW<ALayout, BLayout, ELayout>());
+        true;
 
     static constexpr bool NeedTransposeKernel =
         (isATensorColMajor == false) && (is_NGCHW_NGKHW<ALayout, BLayout, ELayout>() ||
