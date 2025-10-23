@@ -1,8 +1,8 @@
 # Trigger Internal Workflow
 #
-# This is a workflow that will be used to trigger internal workflows on EMU. 
-# This will be used instead of running the same workflows on public side to maintain confidentiality. 
-# An example workflow that will be triggered with this workflow is a workflow that will check to see 
+# This is a workflow that will be used to trigger internal workflows on EMU.
+# This will be used instead of running the same workflows on public side to maintain confidentiality.
+# An example workflow that will be triggered with this workflow is a workflow that will check to see
 # whether new commits made by developers will raise any conflicts on EMU side.
 
 name: Trigger Internal Workflow
@@ -74,7 +74,5 @@ jobs:
             echo "External workflow has been notified"
           else
             echo "Failed to trigger internal workflow (HTTP $http_code)"
-            exit 1
-          fi
             exit 1
           fi
