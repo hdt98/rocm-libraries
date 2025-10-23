@@ -392,13 +392,19 @@ namespace rocRoller
         std::optional<std::vector<InstructionProfile>>
             loopUntilDispatchData(int n, std::function<void()> dispatch)
         {
-            AssertFatal(n > 0, "loopUntilDispatchData: n must be positive");
+            AssertFatal(
+                n > 0,
+                "N must be positive, as dispatch() is expected to dispatch at least one kernel");
 
             if constexpr(!ENABLE_AGENT)
                 return std::nullopt;
 
-            std::optional<std::vector<InstructionProfile>> result;
             dispatch();
+            waitForDispatchData(n);
+            // User should expect dispatch can be called multiple times
+            // E.g. reset reused global memory within the function body
+            dispatch();
+            std::optional<std::vector<InstructionProfile>> result;
             while(!(result = waitForDispatchData(n)).has_value())
             {
                 Log::info("loopUntilDispatchData: no data yet, invoking dispatch");

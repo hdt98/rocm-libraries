@@ -271,7 +271,7 @@ namespace RocprofilerTest
         return {std::move(testContext), std::move(commandKernel), nullptr, commandArgs, instrs};
     }
 
-    TEST_CASE("Rocprofiler agent race conditions - Order 1", "[rocprofiler]")
+    TEST_CASE("Rocprofiler agent race conditions", "[rocprofiler]")
     {
         /*
         There were race conditions between the dispatch and shader data callbacks.
@@ -291,116 +291,86 @@ namespace RocprofilerTest
                 createSimpleMovKernel(TestContext::ForTestDevice({}, testName), literal));
         }
 
-        std::vector<size_t> order = {0, 1, 2, 1};
-        for(size_t idx : order)
+        SECTION("Order 1")
         {
-            Log::info(kernelSetups[idx].kernel.getInstructions());
-            kernelSetups[idx].kernel.launchKernel(kernelSetups[idx].commandArgs.runtimeArguments());
-            HIP_CHECK(hipDeviceSynchronize());
-        }
-        rocRoller::profiler::waitForDispatchData(order.size());
+            std::vector<size_t> order = {0, 1, 2, 1};
+            for(size_t idx : order)
+            {
+                Log::info(kernelSetups[idx].kernel.getInstructions());
+                kernelSetups[idx].kernel.launchKernel(
+                    kernelSetups[idx].commandArgs.runtimeArguments());
+                HIP_CHECK(hipDeviceSynchronize());
+            }
+            rocRoller::profiler::waitForDispatchData(order.size());
 
-        const auto latencies = rocRoller::profiler::loopUntilDispatchData(1, [&]() {
-            kernelSetups[order.back()].kernel.launchKernel(
-                kernelSetups[order.back()].commandArgs.runtimeArguments());
-        });
+            const auto latencies = rocRoller::profiler::loopUntilDispatchData(1, [&]() {
+                kernelSetups[order.back()].kernel.launchKernel(
+                    kernelSetups[order.back()].commandArgs.runtimeArguments());
+            });
 
-        REQUIRE(latencies.has_value());
+            REQUIRE(latencies.has_value());
 
-        std::string const literalHex = fmt::format("0x{:x}", literals[order.back()]);
-        CAPTURE(literalHex);
-        INFO(toString(*latencies));
-        REQUIRE(latencies->size() == 2);
-        CHECK(1 == countSubstring((*latencies)[0].instruction, literalHex));
-        CHECK((*latencies)[1].instruction == "s_endpgm");
-    }
-
-    TEST_CASE("Rocprofiler agent race conditions - Order 2", "[rocprofiler]")
-    {
-        /*
-        There were race conditions between the dispatch and shader data callbacks.
-        This test ensures that the fix works as intended.
-        Multiple simple kernels with different literals are launched various orders.
-        Ensures the profiler returns instructions from the last launched kernel.
-        */
-
-        std::vector<uint32_t> literals
-            = {0xbeef0000, 0xbeef0001, 0xbeef0002, 0xbeef0003, 0xbeef0004, 0xbeef0005, 0xbeef0006};
-        std::vector<KernelSetup> kernelSetups;
-
-        for(uint32_t literal : literals)
-        {
-            std::string const testName = fmt::format("simple_mov_0x{:x}", literal);
-            kernelSetups.push_back(
-                createSimpleMovKernel(TestContext::ForTestDevice({}, testName), literal));
+            std::string const literalHex = fmt::format("0x{:x}", literals[order.back()]);
+            CAPTURE(literalHex);
+            INFO(toString(*latencies));
+            REQUIRE(latencies->size() == 2);
+            CHECK(1 == countSubstring((*latencies)[0].instruction, literalHex));
+            CHECK((*latencies)[1].instruction == "s_endpgm");
         }
 
-        std::vector<size_t> order = {3, 4};
-        for(size_t idx : order)
+        SECTION("Order 2")
         {
-            Log::info(kernelSetups[idx].kernel.getInstructions());
-            kernelSetups[idx].kernel.launchKernel(kernelSetups[idx].commandArgs.runtimeArguments());
-            HIP_CHECK(hipDeviceSynchronize());
+            std::vector<size_t> order = {3, 4};
+            for(size_t idx : order)
+            {
+                Log::info(kernelSetups[idx].kernel.getInstructions());
+                kernelSetups[idx].kernel.launchKernel(
+                    kernelSetups[idx].commandArgs.runtimeArguments());
+                HIP_CHECK(hipDeviceSynchronize());
+            }
+
+            rocRoller::profiler::waitForDispatchData(order.size());
+
+            const auto latencies = rocRoller::profiler::loopUntilDispatchData(1, [&]() {
+                kernelSetups[order.back()].kernel.launchKernel(
+                    kernelSetups[order.back()].commandArgs.runtimeArguments());
+            });
+
+            REQUIRE(latencies.has_value());
+
+            std::string const literalHex = fmt::format("0x{:x}", literals[order.back()]);
+            CAPTURE(literalHex);
+            INFO(toString(*latencies));
+            REQUIRE(latencies->size() == 2);
+            CHECK(1 == countSubstring((*latencies)[0].instruction, literalHex));
+            CHECK((*latencies)[1].instruction == "s_endpgm");
         }
 
-        rocRoller::profiler::waitForDispatchData(order.size());
-
-        const auto latencies = rocRoller::profiler::loopUntilDispatchData(1, [&]() {
-            kernelSetups[order.back()].kernel.launchKernel(
-                kernelSetups[order.back()].commandArgs.runtimeArguments());
-        });
-
-        REQUIRE(latencies.has_value());
-
-        std::string const literalHex = fmt::format("0x{:x}", literals[order.back()]);
-        CAPTURE(literalHex);
-        INFO(toString(*latencies));
-        REQUIRE(latencies->size() == 2);
-        CHECK(1 == countSubstring((*latencies)[0].instruction, literalHex));
-        CHECK((*latencies)[1].instruction == "s_endpgm");
-    }
-
-    TEST_CASE("Rocprofiler agent race conditions - With profiler calls", "[rocprofiler]")
-    {
-        /*
-        There were race conditions between the dispatch and shader data callbacks.
-        This test ensures that the fix works as intended.
-        Multiple simple kernels with different literals are launched various orders.
-        Ensures the profiler returns instructions from the last launched kernel.
-        */
-
-        std::vector<uint32_t> literals
-            = {0xbeef0000, 0xbeef0001, 0xbeef0002, 0xbeef0003, 0xbeef0004, 0xbeef0005, 0xbeef0006};
-        std::vector<KernelSetup> kernelSetups;
-
-        for(uint32_t literal : literals)
+        SECTION("With profiler calls")
         {
-            std::string const testName = fmt::format("simple_mov_0x{:x}", literal);
-            kernelSetups.push_back(
-                createSimpleMovKernel(TestContext::ForTestDevice({}, testName), literal));
+            std::vector<size_t> order = {5, 6};
+            for(size_t idx : order)
+            {
+                Log::info(kernelSetups[idx].kernel.getInstructions());
+                kernelSetups[idx].kernel.launchKernel(
+                    kernelSetups[idx].commandArgs.runtimeArguments());
+                HIP_CHECK(hipDeviceSynchronize());
+                rocRoller::profiler::waitForDispatchData(1);
+            }
+            const auto latencies = rocRoller::profiler::loopUntilDispatchData(1, [&]() {
+                kernelSetups[order.back()].kernel.launchKernel(
+                    kernelSetups[order.back()].commandArgs.runtimeArguments());
+            });
+
+            REQUIRE(latencies.has_value());
+
+            std::string const literalHex = fmt::format("0x{:x}", literals[order.back()]);
+            CAPTURE(literalHex);
+            CAPTURE(toString(*latencies));
+            REQUIRE(latencies->size() == 2);
+            CHECK(1 == countSubstring((*latencies)[0].instruction, literalHex));
+            CHECK((*latencies)[1].instruction == "s_endpgm");
         }
-
-        std::vector<size_t> order = {5, 6};
-        for(size_t idx : order)
-        {
-            Log::info(kernelSetups[idx].kernel.getInstructions());
-            kernelSetups[idx].kernel.launchKernel(kernelSetups[idx].commandArgs.runtimeArguments());
-            HIP_CHECK(hipDeviceSynchronize());
-            rocRoller::profiler::waitForDispatchData(1);
-        }
-        const auto latencies = rocRoller::profiler::loopUntilDispatchData(1, [&]() {
-            kernelSetups[order.back()].kernel.launchKernel(
-                kernelSetups[order.back()].commandArgs.runtimeArguments());
-        });
-
-        REQUIRE(latencies.has_value());
-
-        std::string const literalHex = fmt::format("0x{:x}", literals[order.back()]);
-        CAPTURE(literalHex);
-        CAPTURE(toString(*latencies));
-        REQUIRE(latencies->size() == 2);
-        CHECK(1 == countSubstring((*latencies)[0].instruction, literalHex));
-        CHECK((*latencies)[1].instruction == "s_endpgm");
     }
 
     TEST_CASE("Rocprofiler simple", "[rocprofiler]")
