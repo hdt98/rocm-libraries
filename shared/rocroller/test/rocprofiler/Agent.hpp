@@ -27,6 +27,7 @@
 #include <rocprofiler-sdk/experimental/thread_trace.h>
 
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <optional>
 #include <string>
@@ -72,6 +73,18 @@ namespace rocRoller
          * @return optional vector of InstructionProfile from the dispatch, or nullopt if no data available
          */
         std::optional<std::vector<InstructionProfile>> waitForDispatchData(int n);
+
+        /**
+         * @brief Call a function that dispatches a kernel and attempts to collect data, if none found,
+         * repeat until data is found.
+         * 
+         * Useful for smaller kernels that are not launched with enough waves.
+         * 
+         * @param n Number of dispatches to wait for
+         * @param dispatch Function that dispatches kernel(s)
+         */
+        std::optional<std::vector<InstructionProfile>>
+            loopUntilDispatchData(int n, std::function<void()> dispatch);
 
     } // namespace profiler
 } // namespace rocRoller

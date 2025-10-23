@@ -59,7 +59,7 @@ Based on
 
 // Disable to use rocprofv3
 // Otherwise this agent can be stuck waiting for a dispatch that rocprofv3 already consumed
-constexpr bool ENABLE_AGENT = false;
+constexpr bool ENABLE_AGENT = true;
 
 namespace rocRoller
 {
@@ -385,6 +385,24 @@ namespace rocRoller
                 result = std::nullopt;
                 Log::warn("waitForDispatchData: no data for dispatch ID {}",
                           requested_dispatch_id.load());
+            }
+            return result;
+        }
+
+        std::optional<std::vector<InstructionProfile>>
+            loopUntilDispatchData(int n, std::function<void()> dispatch)
+        {
+            AssertFatal(n > 0, "loopUntilDispatchData: n must be positive");
+
+            if constexpr(!ENABLE_AGENT)
+                return std::nullopt;
+
+            std::optional<std::vector<InstructionProfile>> result;
+            dispatch();
+            while(!(result = waitForDispatchData(n)).has_value())
+            {
+                Log::info("loopUntilDispatchData: no data yet, invoking dispatch");
+                dispatch();
             }
             return result;
         }

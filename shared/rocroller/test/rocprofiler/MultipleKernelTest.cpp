@@ -62,7 +62,7 @@ using namespace rocRoller;
 namespace RocprofilerTest
 {
     const uint workgroupSize = 256;
-    const auto workitemCount = workgroupSize * 256 * 4;
+    const auto workitemCount = workgroupSize * 256;
 
     struct KernelSetup
     {
@@ -149,6 +149,7 @@ namespace RocprofilerTest
         commandKernel.generateKernel();
 
         auto d_ptr = make_shared_device<uint32_t>(1, 0);
+        rocRoller::profiler::waitForDispatchData(1); // hipMemset
 
         CommandArguments commandArgs = command->createArguments();
         commandArgs.setArgument(ptrTag, ArgumentType::Value, d_ptr.get());
@@ -174,16 +175,12 @@ namespace RocprofilerTest
         auto kernelSetup
             = createKernel(TestContext::ForTestDevice({}, testName), literal, commandArg);
 
-        kernelSetup.kernel.launchKernel(kernelSetup.commandArgs.runtimeArguments());
-        HIP_CHECK(hipDeviceSynchronize());
+        const auto latencies = rocRoller::profiler::loopUntilDispatchData(1, [&]() {
+            kernelSetup.kernel.launchKernel(kernelSetup.commandArgs.runtimeArguments());
+            HIP_CHECK(hipDeviceSynchronize());
+        });
 
-        const auto latencies = rocRoller::profiler::waitForDispatchData(2);
-
-        if(!latencies.has_value())
-        {
-            Log::warn("Skipping test: no dispatch data available");
-            SKIP();
-        }
+        REQUIRE(latencies.has_value());
 
         { // Verify device result
             uint32_t h_result = 0;
@@ -301,13 +298,14 @@ namespace RocprofilerTest
             kernelSetups[idx].kernel.launchKernel(kernelSetups[idx].commandArgs.runtimeArguments());
             HIP_CHECK(hipDeviceSynchronize());
         }
-        const auto latencies = rocRoller::profiler::waitForDispatchData(order.size());
+        rocRoller::profiler::waitForDispatchData(order.size());
 
-        if(!latencies.has_value())
-        {
-            Log::warn("Skipping test: no dispatch data available");
-            SKIP();
-        }
+        const auto latencies = rocRoller::profiler::loopUntilDispatchData(1, [&]() {
+            kernelSetups[order.back()].kernel.launchKernel(
+                kernelSetups[order.back()].commandArgs.runtimeArguments());
+        });
+
+        REQUIRE(latencies.has_value());
 
         std::string const literalHex = fmt::format("0x{:x}", literals[order.back()]);
         CAPTURE(literalHex);
@@ -344,13 +342,15 @@ namespace RocprofilerTest
             kernelSetups[idx].kernel.launchKernel(kernelSetups[idx].commandArgs.runtimeArguments());
             HIP_CHECK(hipDeviceSynchronize());
         }
-        const auto latencies = rocRoller::profiler::waitForDispatchData(order.size());
 
-        if(!latencies.has_value())
-        {
-            Log::warn("Skipping test: no dispatch data available");
-            SKIP();
-        }
+        rocRoller::profiler::waitForDispatchData(order.size());
+
+        const auto latencies = rocRoller::profiler::loopUntilDispatchData(1, [&]() {
+            kernelSetups[order.back()].kernel.launchKernel(
+                kernelSetups[order.back()].commandArgs.runtimeArguments());
+        });
+
+        REQUIRE(latencies.has_value());
 
         std::string const literalHex = fmt::format("0x{:x}", literals[order.back()]);
         CAPTURE(literalHex);
@@ -388,13 +388,12 @@ namespace RocprofilerTest
             HIP_CHECK(hipDeviceSynchronize());
             rocRoller::profiler::waitForDispatchData(1);
         }
-        const auto latencies = rocRoller::profiler::waitForDispatchData(0);
+        const auto latencies = rocRoller::profiler::loopUntilDispatchData(1, [&]() {
+            kernelSetups[order.back()].kernel.launchKernel(
+                kernelSetups[order.back()].commandArgs.runtimeArguments());
+        });
 
-        if(!latencies.has_value())
-        {
-            Log::warn("Skipping test: no dispatch data available");
-            SKIP();
-        }
+        REQUIRE(latencies.has_value());
 
         std::string const literalHex = fmt::format("0x{:x}", literals[order.back()]);
         CAPTURE(literalHex);
@@ -416,17 +415,12 @@ namespace RocprofilerTest
         auto kernelSetup
             = createKernel(TestContext::ForTestDevice({}, testName), literal, commandArg);
 
-        kernelSetup.kernel.launchKernel(kernelSetup.commandArgs.runtimeArguments());
-        HIP_CHECK(hipDeviceSynchronize());
+        const auto latencies = rocRoller::profiler::loopUntilDispatchData(1, [&]() {
+            kernelSetup.kernel.launchKernel(kernelSetup.commandArgs.runtimeArguments());
+            HIP_CHECK(hipDeviceSynchronize());
+        });
 
-        const auto latencies
-            = rocRoller::profiler::waitForDispatchData(2); // hipMemset, then kernel
-
-        if(!latencies.has_value())
-        {
-            Log::warn("Skipping test: no dispatch data available");
-            SKIP();
-        }
+        REQUIRE(latencies.has_value());
 
         { // Verify device result
             uint32_t h_result = 0;
