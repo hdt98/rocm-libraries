@@ -393,11 +393,11 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
     {
         namespace ctc = tensor_layout::convolution;
         using Layout  = std::conditional_t<
-             is_NGCHW_NGKHW<ALayout, BLayout, ELayout>() && NeedTransposeKernel,
-             ctc::NHWGC,
-             std::conditional_t<is_NGCDHW_NGKDHW<ALayout, BLayout, ELayout>() && NeedTransposeKernel,
-                                ctc::NDHWGC,
-                                ALay>>;
+            is_NGCHW_NGKHW<ALayout, BLayout, ELayout>() && NeedTransposeKernel,
+            ctc::NHWGC,
+            std::conditional_t<is_NGCDHW_NGKDHW<ALayout, BLayout, ELayout>() && NeedTransposeKernel,
+                               ctc::NDHWGC,
+                               ALay>>;
 
         const auto in_gemmmraw_gemmkraw_desc =
             conv_to_gemm_transformer.template MakeADescriptor_M_K<Layout>();
@@ -413,11 +413,11 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
     {
         namespace ctc = tensor_layout::convolution;
         using Layout  = std::conditional_t<
-             is_NGCHW_NGKHW<ALayout, BLayout, ELayout>() && NeedTransposeKernel,
-             ctc::GKYXC,
-             std::conditional_t<is_NGCDHW_NGKDHW<ALayout, BLayout, ELayout>() && NeedTransposeKernel,
-                                ctc::GKZYXC,
-                                BLay>>;
+            is_NGCHW_NGKHW<ALayout, BLayout, ELayout>() && NeedTransposeKernel,
+            ctc::GKYXC,
+            std::conditional_t<is_NGCDHW_NGKDHW<ALayout, BLayout, ELayout>() && NeedTransposeKernel,
+                               ctc::GKZYXC,
+                               BLay>>;
 
         const auto wei_gemmnraw_gemmkraw_desc =
             conv_to_gemm_transformer.template MakeBDescriptor_N_K<Layout>();
@@ -433,11 +433,11 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
     {
         namespace ctc = tensor_layout::convolution;
         using Layout  = std::conditional_t<
-             is_NGCHW_NGKHW<ALayout, BLayout, ELayout>() && NeedTransposeKernel,
-             ctc::NHWGK,
-             std::conditional_t<is_NGCDHW_NGKDHW<ALayout, BLayout, ELayout>() && NeedTransposeKernel,
-                                ctc::NDHWGK,
-                                ELay>>;
+            is_NGCHW_NGKHW<ALayout, BLayout, ELayout>() && NeedTransposeKernel,
+            ctc::NHWGK,
+            std::conditional_t<is_NGCDHW_NGKDHW<ALayout, BLayout, ELayout>() && NeedTransposeKernel,
+                               ctc::NDHWGK,
+                               ELay>>;
 
         const auto out_gemmmraw_gemmnraw_desc =
             conv_to_gemm_transformer.template MakeCDescriptor_M_N<Layout>();

@@ -683,9 +683,9 @@ template <
     index_t KPack,
     bool TransposeC = false,
     index_t AMmaKStride =
-        KPack * XdlopsGemm<FloatAB, MPerXDL, NPerXDL, KPack, FloatAB, TransposeC>{}.K0PerXdlops,
+        KPack* XdlopsGemm<FloatAB, MPerXDL, NPerXDL, KPack, FloatAB, TransposeC>{}.K0PerXdlops,
     index_t BMmaKStride =
-        KPack * XdlopsGemm<FloatAB, MPerXDL, NPerXDL, KPack, FloatAB, TransposeC>{}.K0PerXdlops>
+        KPack* XdlopsGemm<FloatAB, MPerXDL, NPerXDL, KPack, FloatAB, TransposeC>{}.K0PerXdlops>
 struct BlockwiseGemmXdlops_v2
 {
     static constexpr auto I0 = Number<0>{};
