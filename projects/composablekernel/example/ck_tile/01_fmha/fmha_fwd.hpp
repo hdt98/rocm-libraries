@@ -1003,6 +1003,35 @@ struct fmha_fwd_traits
     // TODO: padding check is inside this api
 };
 float fmha_fwd(fmha_fwd_traits, fmha_fwd_args, const ck_tile::stream_config&);
+float fmha_fwd_fp16_hdimq32_hdimv32(fmha_fwd_traits, fmha_fwd_args, const ck_tile::stream_config&);
+float fmha_fwd_fp16_hdimq64_hdimv64(fmha_fwd_traits, fmha_fwd_args, const ck_tile::stream_config&);
+float fmha_fwd_fp16_hdimq128_hdimv128(fmha_fwd_traits,
+                                      fmha_fwd_args,
+                                      const ck_tile::stream_config&);
+float fmha_fwd_fp16_hdimq192_hdimv128(fmha_fwd_traits,
+                                      fmha_fwd_args,
+                                      const ck_tile::stream_config&);
+float fmha_fwd_fp16_hdimq256_hdimv256_mode_true(fmha_fwd_traits,
+                                                fmha_fwd_args,
+                                                const ck_tile::stream_config&);
+float fmha_fwd_fp16_hdimq256_hdimv256_mode_false(fmha_fwd_traits,
+                                                 fmha_fwd_args,
+                                                 const ck_tile::stream_config&);
+float fmha_fwd_bf16_hdimq32_hdimv32(fmha_fwd_traits, fmha_fwd_args, const ck_tile::stream_config&);
+float fmha_fwd_bf16_hdimq64_hdimv64(fmha_fwd_traits, fmha_fwd_args, const ck_tile::stream_config&);
+float fmha_fwd_bf16_hdimq128_hdimv128(fmha_fwd_traits,
+                                      fmha_fwd_args,
+                                      const ck_tile::stream_config&);
+float fmha_fwd_bf16_hdimq192_hdimv128(fmha_fwd_traits,
+                                      fmha_fwd_args,
+                                      const ck_tile::stream_config&);
+float fmha_fwd_bf16_hdimq256_hdimv256_mode_true(fmha_fwd_traits,
+                                                fmha_fwd_args,
+                                                const ck_tile::stream_config&);
+float fmha_fwd_bf16_hdimq256_hdimv256_mode_false(fmha_fwd_traits,
+                                                 fmha_fwd_args,
+                                                 const ck_tile::stream_config&);
+float fmha_fwd_fp8(fmha_fwd_traits, fmha_fwd_args, const ck_tile::stream_config&);
 
 struct fmha_fwd_splitkv_traits
 {
