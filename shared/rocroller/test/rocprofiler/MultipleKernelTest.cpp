@@ -62,18 +62,18 @@ using namespace rocRoller;
 namespace RocprofilerTest
 {
     const uint workgroupSize = 256;
-    const auto workitemCount = workgroupSize * 256;
+    const auto workitemCount = workgroupSize * 256 * 4;
 
     struct KernelSetup
     {
+        TestContext               testContext;
         CommandKernel             kernel;
         std::shared_ptr<uint32_t> d_ptr;
         CommandArguments          commandArgs;
         std::vector<Instruction>  instrs;
     };
 
-    KernelSetup
-        createKernel(std::shared_ptr<Context> context, uint32_t literal, uint32_t commandArg)
+    KernelSetup createKernel(TestContext&& testContext, uint32_t literal, uint32_t commandArg)
     {
         auto command = std::make_shared<Command>();
 
@@ -88,7 +88,8 @@ namespace RocprofilerTest
         auto ptr_exp = std::make_shared<Expression::Expression>(ptr_arg);
         auto val_exp = std::make_shared<Expression::Expression>(val_arg);
 
-        auto k = context->kernel();
+        auto context = testContext.get();
+        auto k       = context->kernel();
 
         k->setKernelDimensions(1);
 
@@ -153,7 +154,7 @@ namespace RocprofilerTest
         commandArgs.setArgument(ptrTag, ArgumentType::Value, d_ptr.get());
         commandArgs.setArgument(valTag, ArgumentType::Value, commandArg);
 
-        return {std::move(commandKernel), d_ptr, commandArgs, instrs};
+        return {std::move(testContext), std::move(commandKernel), d_ptr, commandArgs, instrs};
     }
 
     TEST_CASE("Rocprofiler kernels with different literals in assembly", "[rocprofiler]")
@@ -170,8 +171,8 @@ namespace RocprofilerTest
 
         std::string const testName = fmt::format("const_0x{:x}_value_{}", literal, commandArg);
 
-        auto context     = TestContext::ForTestDevice({}, testName);
-        auto kernelSetup = createKernel(context.get(), literal, commandArg);
+        auto kernelSetup
+            = createKernel(TestContext::ForTestDevice({}, testName), literal, commandArg);
 
         kernelSetup.kernel.launchKernel(kernelSetup.commandArgs.runtimeArguments());
         HIP_CHECK(hipDeviceSynchronize());
@@ -223,11 +224,12 @@ namespace RocprofilerTest
         }
     }
 
-    KernelSetup createSimpleMovKernel(std::shared_ptr<Context> context, uint32_t literal)
+    KernelSetup createSimpleMovKernel(TestContext&& testContext, uint32_t literal)
     {
         auto command = std::make_shared<Command>();
 
-        auto k = context->kernel();
+        auto context = testContext.get();
+        auto k       = context->kernel();
 
         k->setKernelDimensions(1);
 
@@ -269,7 +271,7 @@ namespace RocprofilerTest
 
         CommandArguments commandArgs = command->createArguments();
 
-        return {std::move(commandKernel), nullptr, commandArgs, instrs};
+        return {std::move(testContext), std::move(commandKernel), nullptr, commandArgs, instrs};
     }
 
     TEST_CASE("Rocprofiler agent race conditions - Order 1", "[rocprofiler]")
@@ -288,13 +290,14 @@ namespace RocprofilerTest
         for(uint32_t literal : literals)
         {
             std::string const testName = fmt::format("simple_mov_0x{:x}", literal);
-            auto              context  = TestContext::ForTestDevice({}, testName);
-            kernelSetups.push_back(createSimpleMovKernel(context.get(), literal));
+            kernelSetups.push_back(
+                createSimpleMovKernel(TestContext::ForTestDevice({}, testName), literal));
         }
 
         std::vector<size_t> order = {0, 1, 2, 1};
         for(size_t idx : order)
         {
+            Log::info(kernelSetups[idx].kernel.getInstructions());
             kernelSetups[idx].kernel.launchKernel(kernelSetups[idx].commandArgs.runtimeArguments());
             HIP_CHECK(hipDeviceSynchronize());
         }
@@ -330,13 +333,14 @@ namespace RocprofilerTest
         for(uint32_t literal : literals)
         {
             std::string const testName = fmt::format("simple_mov_0x{:x}", literal);
-            auto              context  = TestContext::ForTestDevice({}, testName);
-            kernelSetups.push_back(createSimpleMovKernel(context.get(), literal));
+            kernelSetups.push_back(
+                createSimpleMovKernel(TestContext::ForTestDevice({}, testName), literal));
         }
 
         std::vector<size_t> order = {3, 4};
         for(size_t idx : order)
         {
+            Log::info(kernelSetups[idx].kernel.getInstructions());
             kernelSetups[idx].kernel.launchKernel(kernelSetups[idx].commandArgs.runtimeArguments());
             HIP_CHECK(hipDeviceSynchronize());
         }
@@ -372,13 +376,14 @@ namespace RocprofilerTest
         for(uint32_t literal : literals)
         {
             std::string const testName = fmt::format("simple_mov_0x{:x}", literal);
-            auto              context  = TestContext::ForTestDevice({}, testName);
-            kernelSetups.push_back(createSimpleMovKernel(context.get(), literal));
+            kernelSetups.push_back(
+                createSimpleMovKernel(TestContext::ForTestDevice({}, testName), literal));
         }
 
         std::vector<size_t> order = {5, 6};
         for(size_t idx : order)
         {
+            Log::info(kernelSetups[idx].kernel.getInstructions());
             kernelSetups[idx].kernel.launchKernel(kernelSetups[idx].commandArgs.runtimeArguments());
             HIP_CHECK(hipDeviceSynchronize());
             rocRoller::profiler::waitForDispatchData(1);
@@ -406,11 +411,10 @@ namespace RocprofilerTest
 
         std::string const testName = fmt::format("const_0x{:x}_value_{}", literal, commandArg);
 
-        auto context = TestContext::ForTestDevice({}, testName);
-
         INFO("Testing " << testName);
 
-        auto kernelSetup = createKernel(context.get(), literal, commandArg);
+        auto kernelSetup
+            = createKernel(TestContext::ForTestDevice({}, testName), literal, commandArg);
 
         kernelSetup.kernel.launchKernel(kernelSetup.commandArgs.runtimeArguments());
         HIP_CHECK(hipDeviceSynchronize());

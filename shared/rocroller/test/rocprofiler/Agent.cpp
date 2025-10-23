@@ -198,43 +198,33 @@ namespace rocRoller
                                   size_t                  data_size,
                                   rocprofiler_user_data_t userdata)
         {
-            try
+            std::lock_guard<std::mutex> att_shader_data_lock(everything_mutex);
+            rocprofiler_dispatch_id_t   dispatch_id
+                = static_cast<rocprofiler_dispatch_id_t>(userdata.value);
+
+            Log::info("shader_data_callback: dispatch_id {}, requested_dispatch_id {}",
+                      dispatch_id,
+                      requested_dispatch_id.load());
+
+            TraceDecodeCallbackUserData callback_user_data{.dispatch_id    = dispatch_id,
+                                                           .ok_to_continue = true};
+
+            rocprofiler_trace_decode(
+                decoder, trace_decode_callback, data, data_size, &callback_user_data);
+
+            if(dispatch_instruction_latencies.find(dispatch_id)
+               != dispatch_instruction_latencies.end())
             {
-                std::lock_guard<std::mutex> att_shader_data_lock(everything_mutex);
-                rocprofiler_dispatch_id_t   dispatch_id
-                    = static_cast<rocprofiler_dispatch_id_t>(userdata.value);
-
-                Log::info("shader_data_callback: dispatch_id {}, requested_dispatch_id {}",
-                          dispatch_id,
-                          requested_dispatch_id.load());
-
-                TraceDecodeCallbackUserData callback_user_data{.dispatch_id    = dispatch_id,
-                                                               .ok_to_continue = true};
-
-                rocprofiler_trace_decode(
-                    decoder, trace_decode_callback, data, data_size, &callback_user_data);
-
-                if(dispatch_instruction_latencies.find(dispatch_id)
-                   != dispatch_instruction_latencies.end())
-                {
-                    Log::info("shader_data_callback: collected {} instructions for dispatch_id {}",
-                              dispatch_instruction_latencies[dispatch_id].size(),
-                              dispatch_id);
-                }
-                else
-                {
-                    Log::warn("shader_data_callback: no instructions collected for dispatch_id {}",
-                              dispatch_id);
-                    dispatch_instruction_latencies.insert(
-                        {dispatch_id, profiler::InstructionLatencyMap{}});
-                }
+                Log::info("shader_data_callback: collected {} instructions for dispatch_id {}",
+                          dispatch_instruction_latencies[dispatch_id].size(),
+                          dispatch_id);
             }
-            catch(const std::exception& e)
+            else
             {
-                // Seem to be getting an std::exception every once in a while
-                // Can't seem to reproduce it in a debug build
-                // Unfortunately the what() is just "std::exception"
-                Log::error("shader_data_callback exception: {}", e.what());
+                Log::warn("shader_data_callback: no instructions collected for dispatch_id {}",
+                          dispatch_id);
+                dispatch_instruction_latencies.insert(
+                    {dispatch_id, profiler::InstructionLatencyMap{}});
             }
             dispatch_cv.notify_all();
         }
@@ -249,18 +239,11 @@ namespace rocRoller
                               rocprofiler_user_data_t*           userdata_shader)
         {
             std::lock_guard<std::mutex> att_shader_data_lock(everything_mutex);
-            try
-            {
-                Log::info("dispatch_callback: dispatch_id {}, requested_dispatch_id {}",
-                          dispatch_id,
-                          requested_dispatch_id.load());
+            Log::info("dispatch_callback: dispatch_id {}, requested_dispatch_id {}",
+                      dispatch_id,
+                      requested_dispatch_id.load());
 
-                userdata_shader->value = dispatch_id;
-            }
-            catch(const std::exception& e)
-            {
-                Log::error("dispatch_callback exception: {}", e.what());
-            }
+            userdata_shader->value = dispatch_id;
             return ROCPROFILER_THREAD_TRACE_CONTROL_START_AND_STOP;
         }
 
@@ -334,78 +317,69 @@ namespace rocRoller
     {
         std::optional<std::vector<InstructionProfile>> waitForDispatchData(int n)
         {
-            try
-            {
-                std::optional<std::vector<InstructionProfile>> result;
-                requested_dispatch_id += n;
-                Log::info(
-                    "waitForDispatchData: requesting {} more dispatches, now waiting for ID {}",
-                    n,
-                    requested_dispatch_id.load());
+            std::optional<std::vector<InstructionProfile>> result;
+            requested_dispatch_id += n;
+            Log::info("waitForDispatchData: requesting {} more dispatches, now waiting for ID {}",
+                      n,
+                      requested_dispatch_id.load());
 
-                std::unique_lock<std::mutex> lock(dispatch_count_mutex);
-                dispatch_cv.wait(lock, [] {
-                    std::lock_guard<std::mutex> att_shader_data_lock(everything_mutex);
-                    return dispatch_instruction_latencies.find(requested_dispatch_id.load())
-                           != dispatch_instruction_latencies.end();
-                });
+            std::unique_lock<std::mutex> lock(dispatch_count_mutex);
+            dispatch_cv.wait(lock, [] {
                 std::lock_guard<std::mutex> att_shader_data_lock(everything_mutex);
+                return dispatch_instruction_latencies.find(requested_dispatch_id.load())
+                       != dispatch_instruction_latencies.end();
+            });
+            std::lock_guard<std::mutex> att_shader_data_lock(everything_mutex);
 
-                auto it = dispatch_instruction_latencies.find(requested_dispatch_id.load());
-                if(it != dispatch_instruction_latencies.end() && !it->second.empty())
+            auto it = dispatch_instruction_latencies.find(requested_dispatch_id.load());
+            if(it != dispatch_instruction_latencies.end() && !it->second.empty())
+            {
+                for(auto& [pc, data] : it->second)
                 {
-                    for(auto& [pc, data] : it->second)
+                    auto inst = address_table.get(pc.code_object_id, pc.address);
+                    if(inst)
+                        data.instruction = inst->inst;
+                    else
+                        data.instruction = "UNKNOWN_INSTRUCTION";
+                }
+                result = std::vector<InstructionProfile>{};
+                result->reserve(it->second.size());
+                for(const auto& [pc, data] : it->second)
+                {
+                    result->push_back(data);
+                }
+                // Debug output
+                Log::info("waitForDispatchData resolving:");
+                for(auto& [dispatch_id, inst_map] : dispatch_instruction_latencies)
+                {
+                    Log::info("  dispatch_id {}: {} instructions collected",
+                              dispatch_id,
+                              inst_map.size());
+                    for(auto& [pc, data] : inst_map)
                     {
                         auto inst = address_table.get(pc.code_object_id, pc.address);
                         if(inst)
                             data.instruction = inst->inst;
                         else
                             data.instruction = "UNKNOWN_INSTRUCTION";
-                    }
-                    result = std::vector<InstructionProfile>{};
-                    result->reserve(it->second.size());
-                    for(const auto& [pc, data] : it->second)
-                    {
-                        result->push_back(data);
-                    }
-                    // Debug output
-                    Log::info("waitForDispatchData resolving:");
-                    for(auto& [dispatch_id, inst_map] : dispatch_instruction_latencies)
-                    {
-                        Log::info("  dispatch_id {}: {} instructions collected",
-                                  dispatch_id,
-                                  inst_map.size());
-                        for(auto& [pc, data] : inst_map)
-                        {
-                            auto inst = address_table.get(pc.code_object_id, pc.address);
-                            if(inst)
-                                data.instruction = inst->inst;
-                            else
-                                data.instruction = "UNKNOWN_INSTRUCTION";
 
-                            Log::info("    PC: code_object_id {}, address {:#x} => {}",
-                                      pc.code_object_id,
-                                      pc.address,
-                                      data.toString());
-                        }
+                        Log::info("    PC: code_object_id {}, address {:#x} => {}",
+                                  pc.code_object_id,
+                                  pc.address,
+                                  data.toString());
                     }
-                    Log::info("waitForDispatchData: retrieved {} instructions for dispatch ID {}",
-                              result->size(),
-                              requested_dispatch_id.load());
                 }
-                else
-                {
-                    result = std::nullopt;
-                    Log::warn("waitForDispatchData: no data for dispatch ID {}",
-                              requested_dispatch_id.load());
-                }
-                return result;
+                Log::info("waitForDispatchData: retrieved {} instructions for dispatch ID {}",
+                          result->size(),
+                          requested_dispatch_id.load());
             }
-            catch(const std::exception& e)
+            else
             {
-                Log::error("waitForDispatchData exception: {}", e.what());
-                return std::nullopt;
+                result = std::nullopt;
+                Log::warn("waitForDispatchData: no data for dispatch ID {}",
+                          requested_dispatch_id.load());
             }
+            return result;
         }
 
         uint64_t InstructionProfile::meanLatency() const
