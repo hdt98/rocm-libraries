@@ -1,0 +1,189 @@
+# HipBLAS Test Categories Configuration
+# This file defines test categories for selective test execution with CTest
+
+test_categories:
+  auxil:
+    description: "Auxiliary functions (set/get operations, utility functions)"
+    test_patterns:
+      - "*auxiliary*"
+      - "*set_get*"
+      - "*auxil*"
+    test_files:
+      - "auxil/auxiliary_gtest.cpp"
+      - "auxil/set_get_mode_gtest.cpp" 
+      - "auxil/set_get_matrix_vector_gtest.cpp"
+    labels:
+      - "auxil"
+      - "utility"
+      - "basic"
+
+  blas1:
+    description: "BLAS Level 1 operations (vector-vector operations)"
+    test_patterns:
+      - "*asum*"
+      - "*axpy*"
+      - "*copy*"
+      - "*dot*"
+      - "*nrm2*"
+      - "*rot*"
+      - "*scal*"
+      - "*swap*"
+      - "*iamax*"
+      - "*iamin*"
+    test_files:
+      - "blas1/asum_gtest.cpp"
+      - "blas1/axpy_gtest.cpp"
+      - "blas1/copy_gtest.cpp"
+      - "blas1/dot_gtest.cpp"
+      - "blas1/iamaxmin_gtest.cpp"
+      - "blas1/nrm2_gtest.cpp"
+      - "blas1/rot_gtest.cpp"
+      - "blas1/scal_gtest.cpp"
+      - "blas1/swap_gtest.cpp"
+    labels:
+      - "blas1"
+      - "level1"
+
+  blas2:
+    description: "BLAS Level 2 operations (matrix-vector operations)"
+    test_patterns:
+      - "*gbmv*"
+      - "*gemv*"
+      - "*ger*"
+      - "*hbmv*"
+      - "*hemv*"
+      - "*her*"
+      - "*her2*"
+      - "*hpmv*"
+      - "*hpr*"
+      - "*hpr2*"
+      - "*sbmv*"
+      - "*spmv*"
+      - "*spr*"
+      - "*spr2*"
+      - "*symv*"
+      - "*syr*"
+      - "*syr2*"
+      - "*tbmv*"
+      - "*tbsv*"
+      - "*tpmv*"
+      - "*tpsv*"
+      - "*trmv*"
+      - "*trsv*"
+    test_files:
+      - "blas2/gbmv_gtest.cpp"
+      - "blas2/gemv_gtest.cpp"
+      - "blas2/ger_gtest.cpp"
+      - "blas2/hbmv_gtest.cpp"
+      - "blas2/hemv_gtest.cpp"
+      - "blas2/her_gtest.cpp"
+      - "blas2/her2_gtest.cpp"
+      - "blas2/hpmv_gtest.cpp"
+      - "blas2/hpr_gtest.cpp"
+      - "blas2/hpr2_gtest.cpp"
+      - "blas2/sbmv_gtest.cpp"
+      - "blas2/spmv_gtest.cpp"
+      - "blas2/spr_gtest.cpp"
+      - "blas2/spr2_gtest.cpp"
+      - "blas2/symv_gtest.cpp"
+      - "blas2/syr_gtest.cpp"
+      - "blas2/syr2_gtest.cpp"
+      - "blas2/tbmv_gtest.cpp"
+      - "blas2/tbsv_gtest.cpp"
+      - "blas2/tpmv_gtest.cpp"
+      - "blas2/tpsv_gtest.cpp"
+      - "blas2/trmv_gtest.cpp"
+      - "blas2/trsv_gtest.cpp"
+    labels:
+      - "blas2"
+      - "level2"
+
+  blas3:
+    description: "BLAS Level 3 operations (matrix-matrix operations)"
+    test_patterns:
+      - "*dgmm*"
+      - "*geam*"
+      - "*gemm*"
+      - "*hemm*"
+      - "*herk*"
+      - "*her2k*"
+      - "*herkx*"
+      - "*symm*"
+      - "*syrk*"
+      - "*syr2k*"
+      - "*syrkx*"
+      - "*trmm*"
+      - "*trsm*"
+      - "*trtri*"
+    test_files:
+      - "blas3/dgmm_gtest.cpp"
+      - "blas3/geam_gtest.cpp"
+      - "blas3/gemm_gtest.cpp"
+      - "blas3/hemm_gtest.cpp"
+      - "blas3/herk_gtest.cpp"
+      - "blas3/her2k_gtest.cpp"
+      - "blas3/herkx_gtest.cpp"
+      - "blas3/symm_gtest.cpp"
+      - "blas3/syrk_gtest.cpp"
+      - "blas3/syr2k_gtest.cpp"
+      - "blas3/syrkx_gtest.cpp"
+      - "blas3/trmm_gtest.cpp"
+      - "blas3/trsm_gtest.cpp"
+      - "blas3/trtri_gtest.cpp"
+    labels:
+      - "blas3"
+      - "level3"
+
+  blas_ex:
+    description: "BLAS Extended operations (mixed precision, enhanced functionality)"
+    test_patterns:
+      - "*_ex*"
+      - "*axpy_ex*"
+      - "*dot_ex*"
+      - "*nrm2_ex*"
+      - "*rot_ex*"
+      - "*scal_ex*"
+      - "*gemm_ex*"
+      - "*trsm_ex*"
+    test_files:
+      - "blas_ex/axpy_ex_gtest.cpp"
+      - "blas_ex/dot_ex_gtest.cpp"
+      - "blas_ex/nrm2_ex_gtest.cpp"
+      - "blas_ex/rot_ex_gtest.cpp"
+      - "blas_ex/scal_ex_gtest.cpp"
+      - "blas_ex/gemm_ex_gtest.cpp"
+      - "blas_ex/trsm_ex_gtest.cpp"
+    labels:
+      - "blas_ex"
+      - "extended"
+      - "level4"
+
+  solver:
+    description: "Linear algebra solver operations"
+    test_patterns:
+      - "*gels*"
+      - "*geqrf*"
+      - "*getrf*"
+      - "*getri*"
+      - "*getrs*"
+      - "*solver*"
+    test_files:
+      - "solver/gels_gtest.cpp"
+      - "solver/geqrf_gtest.cpp"
+      - "solver/getrf_gtest.cpp"
+      - "solver/getri_gtest.cpp"
+      - "solver/getrs_gtest.cpp"
+    labels:
+      - "solver"
+      - "level5"
+
+# Test execution settings
+execution_settings:
+  default_timeout: 300  # 5 minutes per test
+  category_timeouts:
+    auxil: 120      # 2 minutes for auxiliary tests
+    blas1: 300      # 5 minutes for BLAS1 tests
+    blas2: 600      # 10 minutes for BLAS2 tests
+    blas3: 900      # 15 minutes for BLAS3 tests (more intensive)
+    blas_ex: 600    # 10 minutes for extended BLAS tests
+    solver: 1200    # 20 minutes for solver tests (most intensive)
