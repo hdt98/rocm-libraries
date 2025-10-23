@@ -46,6 +46,8 @@ namespace rocRoller
 
             x = lowerBitfieldCombine(x);
             x = fastDivision(x, m_context);
+            x = convertPropagation(x); // After fastDivision, as it does not work on mixed types
+            x = simplify(x);
             x = lowerExponential(x);
             x = fastMultiplication(x);
             x = lowerUnsignedArithmeticShiftR(x);
@@ -53,8 +55,6 @@ namespace rocRoller
             x = combineShifts(x);
             x = fuseTernary(x);
             x = launchTimeSubExpressions(x, m_context);
-            x = convertPropagation(x);
-            x = simplify(x);
 
             if(!identical(orig, x))
             {

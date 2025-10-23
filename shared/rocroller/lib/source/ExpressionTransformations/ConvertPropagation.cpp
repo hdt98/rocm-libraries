@@ -134,11 +134,17 @@ namespace rocRoller
             template <CValue Value>
             ExpressionPtr operator()(Value const& value) const
             {
-                const auto variableType = resultType(std::make_shared<Expression>(value)).varType;
-                if(variableType != m_destinationType
-                   && (variableType == DataType::Int64 || variableType == DataType::UInt64))
+                // Operating on CommandArgumentPtr causes more scalar loads at start of kernel
+                // leading to running out of SGPRs
+                if constexpr(not std::is_same_v<Value, CommandArgumentPtr>)
                 {
-                    return convert(m_destinationType, std::make_shared<Expression>(value));
+                    const auto variableType
+                        = resultType(std::make_shared<Expression>(value)).varType;
+                    if(variableType != m_destinationType
+                       && (variableType == DataType::Int64 || variableType == DataType::UInt64))
+                    {
+                        return convert(m_destinationType, std::make_shared<Expression>(value));
+                    }
                 }
                 return std::make_shared<Expression>(value);
             }
