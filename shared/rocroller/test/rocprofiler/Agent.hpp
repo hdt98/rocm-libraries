@@ -83,7 +83,7 @@ namespace rocRoller
          * 
          * @param dispatch Function that dispatches a single kernel
          * @return Vector of InstructionProfile from the dispatch. Returns empty vector if 
-         *         agent is disabled (ENABLE_AGENT is false).
+         *         agent is disabled.
          */
         std::vector<InstructionProfile> loopUntilDispatchData(std::function<void()> dispatch);
 

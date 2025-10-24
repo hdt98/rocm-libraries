@@ -51,9 +51,8 @@
             "rocprofiler-sdk error: ", rocprofiler_get_status_string(ec), " :: ", msg); \
     }
 
-// Disable if want to use rocprofv3 from CLI
-// Otherwise this agent can be stuck waiting for a dispatch that rocprofv3 already consumed
-constexpr bool ENABLE_AGENT = true;
+// Set to false when another profiler (e.g. rocprofv3) is registered first
+bool enable_agent = true;
 
 namespace rocRoller
 {
@@ -335,7 +334,7 @@ namespace rocRoller
     {
         std::optional<std::vector<InstructionProfile>> waitForDispatchData(int n)
         {
-            if constexpr(!ENABLE_AGENT)
+            if(!enable_agent)
                 return std::nullopt;
 
             std::optional<std::vector<InstructionProfile>> result;
@@ -410,7 +409,7 @@ namespace rocRoller
 
         std::vector<InstructionProfile> loopUntilDispatchData(std::function<void()> dispatch)
         {
-            if constexpr(!ENABLE_AGENT)
+            if(!enable_agent)
                 return {};
 
             std::optional<std::vector<InstructionProfile>> data;
@@ -461,11 +460,11 @@ namespace rocRoller
 extern "C" rocprofiler_tool_configure_result_t*
     rocprofiler_configure(uint32_t, const char*, uint32_t priority, rocprofiler_client_id_t* id)
 {
-    if constexpr(!ENABLE_AGENT)
-        return nullptr;
-
     if(priority > 0)
+    {
+        enable_agent = false;
         return nullptr;
+    }
 
     id->name = "rocRoller rocprofiler: I'm a string literal, just do a text search to find me :)";
 
