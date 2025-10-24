@@ -288,6 +288,9 @@ namespace RocprofilerTest
                 createSimpleMovKernel(TestContext::ForTestDevice({}, testName), literal));
         }
 
+        std::vector<rocRoller::profiler::InstructionProfile> latencies;
+        std::string                                          literalHex;
+
         SECTION("Order 1")
         {
             std::vector<size_t> order = {0, 1, 2, 1};
@@ -300,17 +303,12 @@ namespace RocprofilerTest
             }
             rocRoller::profiler::waitForDispatchData(order.size());
 
-            const auto latencies = rocRoller::profiler::loopUntilDispatchData([&]() {
+            latencies = rocRoller::profiler::loopUntilDispatchData([&]() {
                 kernelSetups[order.back()].kernel.launchKernel(
                     kernelSetups[order.back()].commandArgs.runtimeArguments());
             });
 
-            std::string const literalHex = fmt::format("0x{:x}", literals[order.back()]);
-            CAPTURE(literalHex);
-            INFO(toString(latencies));
-            REQUIRE(latencies.size() == 2);
-            CHECK(1 == countSubstring(latencies[0].instruction, literalHex));
-            CHECK(latencies[1].instruction == "s_endpgm");
+            literalHex = fmt::format("0x{:x}", literals[order.back()]);
         }
 
         SECTION("Order 2")
@@ -326,17 +324,12 @@ namespace RocprofilerTest
 
             rocRoller::profiler::waitForDispatchData(order.size());
 
-            const auto latencies = rocRoller::profiler::loopUntilDispatchData([&]() {
+            latencies = rocRoller::profiler::loopUntilDispatchData([&]() {
                 kernelSetups[order.back()].kernel.launchKernel(
                     kernelSetups[order.back()].commandArgs.runtimeArguments());
             });
 
-            std::string const literalHex = fmt::format("0x{:x}", literals[order.back()]);
-            CAPTURE(literalHex);
-            INFO(toString(latencies));
-            REQUIRE(latencies.size() == 2);
-            CHECK(1 == countSubstring(latencies[0].instruction, literalHex));
-            CHECK(latencies[1].instruction == "s_endpgm");
+            literalHex = fmt::format("0x{:x}", literals[order.back()]);
         }
 
         SECTION("With profiler calls")
@@ -350,18 +343,19 @@ namespace RocprofilerTest
                 HIP_CHECK(hipDeviceSynchronize());
                 rocRoller::profiler::waitForDispatchData(1);
             }
-            const auto latencies = rocRoller::profiler::loopUntilDispatchData([&]() {
+            latencies = rocRoller::profiler::loopUntilDispatchData([&]() {
                 kernelSetups[order.back()].kernel.launchKernel(
                     kernelSetups[order.back()].commandArgs.runtimeArguments());
             });
 
-            std::string const literalHex = fmt::format("0x{:x}", literals[order.back()]);
-            CAPTURE(literalHex);
-            CAPTURE(toString(latencies));
-            REQUIRE(latencies.size() == 2);
-            CHECK(1 == countSubstring(latencies[0].instruction, literalHex));
-            CHECK(latencies[1].instruction == "s_endpgm");
+            literalHex = fmt::format("0x{:x}", literals[order.back()]);
         }
+
+        CAPTURE(literalHex);
+        INFO(rocRoller::profiler::toString(latencies));
+        REQUIRE(latencies.size() == 2);
+        CHECK(1 == countSubstring(latencies[0].instruction, literalHex));
+        CHECK(latencies[1].instruction == "s_endpgm");
     }
 
     TEST_CASE("Rocprofiler simple", "[rocprofiler]")
