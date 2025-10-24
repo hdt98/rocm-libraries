@@ -72,9 +72,6 @@ namespace rocRoller
             dispatch_instruction_latencies; // Currently only ever increases in size
         rocprofiler::sdk::codeobj::disassembly::CodeobjAddressTranslate address_table;
 
-        // TODO: investiate which locks are really needed
-        std::mutex everything_mutex;
-
         // To wait for expected number of dispatches
         std::condition_variable dispatch_cv;
         std::mutex              dispatch_count_mutex;
@@ -84,8 +81,6 @@ namespace rocRoller
                               rocprofiler_user_data_t*,
                               void*)
         {
-            std::lock_guard<std::mutex> att_shader_data_lock(everything_mutex);
-
             if(record.kind != ROCPROFILER_CALLBACK_TRACING_CODE_OBJECT
                || record.operation != ROCPROFILER_CODE_OBJECT_LOAD
                || record.phase != ROCPROFILER_CALLBACK_PHASE_LOAD)
@@ -228,8 +223,7 @@ namespace rocRoller
             [2]: https://rocm.docs.amd.com/projects/rocprofiler-sdk/en/latest/api-reference/thread_trace.html#processing-thread-trace-data
             */
 
-            std::lock_guard<std::mutex> att_shader_data_lock(everything_mutex);
-            rocprofiler_dispatch_id_t   dispatch_id
+            rocprofiler_dispatch_id_t dispatch_id
                 = static_cast<rocprofiler_dispatch_id_t>(userdata.value);
 
             Log::info(
@@ -238,10 +232,13 @@ namespace rocRoller
                 requested_dispatch_id.load(),
                 data_size);
 
-            // Store raw data for deferred processing
             std::vector<uint8_t> raw_data(static_cast<uint8_t*>(data),
                                           static_cast<uint8_t*>(data) + data_size);
-            dispatch_instruction_latencies[dispatch_id] = std::move(raw_data);
+
+            {
+                std::lock_guard<std::mutex> lock(dispatch_count_mutex);
+                dispatch_instruction_latencies[dispatch_id] = std::move(raw_data);
+            }
 
             dispatch_cv.notify_all();
         }
@@ -255,7 +252,6 @@ namespace rocRoller
                               void*                              userdata_config,
                               rocprofiler_user_data_t*           userdata_shader)
         {
-            std::lock_guard<std::mutex> att_shader_data_lock(everything_mutex);
             Log::info("dispatch_callback: dispatch_id {}, requested_dispatch_id {}",
                       dispatch_id,
                       requested_dispatch_id.load());
@@ -345,16 +341,18 @@ namespace rocRoller
 
             std::unique_lock<std::mutex> lock(dispatch_count_mutex);
 
-            dispatch_cv.wait(lock, [] {
-                std::lock_guard<std::mutex> att_shader_data_lock(everything_mutex);
+            dispatch_cv.wait_for(lock, std::chrono::seconds(10), [] {
                 return dispatch_instruction_latencies.find(requested_dispatch_id.load())
                        != dispatch_instruction_latencies.end();
             });
 
-            std::lock_guard<std::mutex> att_shader_data_lock(everything_mutex);
-
             auto entry = dispatch_instruction_latencies.find(requested_dispatch_id.load());
-            if(entry != dispatch_instruction_latencies.end() && !entry->second.empty())
+
+            AssertFatal(entry != dispatch_instruction_latencies.end(),
+                        "waitForDispatchData: timed out waiting for dispatch ID {}",
+                        requested_dispatch_id.load());
+
+            if(not entry->second.empty())
             {
                 TraceDecodeCallbackUserData callback_user_data{
                     .dispatch_id = requested_dispatch_id.load(), .ok = true, .instruction_map = {}};
