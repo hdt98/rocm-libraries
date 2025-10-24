@@ -268,6 +268,7 @@ namespace origami
             gfx950,
             gfx1201,
             gfx1100,
+            gfx1101,
             Count
         };
 
@@ -278,7 +279,8 @@ namespace origami
                     {"gfx942", architecture_t::gfx942},
                     {"gfx950", architecture_t::gfx950},
                     {"gfx1201", architecture_t::gfx1201},
-                    {"gfx1100", architecture_t::gfx1100}};
+                    {"gfx1100", architecture_t::gfx1100},
+                    {"gfx1101", architecture_t::gfx1101}};
 
             auto it = str_to_enum_map.find(str);
             if(it != str_to_enum_map.end())
@@ -335,6 +337,9 @@ namespace origami
                 hardware_t::architecture_constants(
                     1, 5.74, 1.21875121875121875122 * 2.41, 0.464, 2, std::make_tuple(0, 0.17, 0), 1.5)},
                {hardware_t::architecture_t::gfx1100,
+                hardware_t::architecture_constants(
+                    1, 7.12, 1.21875121875121875122 * 3.48, 0.732, 2, std::make_tuple(0, 0.11, 0), 1.5)},
+               {hardware_t::architecture_t::gfx1101,
                 hardware_t::architecture_constants(
                     1, 7.12, 1.21875121875121875122 * 3.48, 0.732, 2, std::make_tuple(0, 0.11, 0), 1.5)}};
 
@@ -512,6 +517,17 @@ namespace origami
                     {matrix_instruction(16, 16, 32, data_type_t::Int4), 8}, // v_wmma_i32_16x16x32_iu4
                 }},
                {hardware_t::architecture_t::gfx1100,
+                {
+                    // F16
+                    {matrix_instruction(16, 16, 16, data_type_t::Half), 16}, // v_wmma_f32_16x16x16_f16/v_wmma_f16_16x16x16_f16
+                    // BF16
+                    {matrix_instruction(16, 16, 16, data_type_t::BFloat16), 16}, // v_wmma_f32_16x16x16_bf16/v_wmma_bf16_16x16x16_bf16
+                    // I8
+                    {matrix_instruction(16, 16, 16, data_type_t::Int8), 8}, // v_wmma_i32_16x16x16_iu8
+                    // I4
+                    {matrix_instruction(16, 16, 16, data_type_t::Int4), 8}, // v_wmma_i32_16x16x16_iu4
+                }},
+               {hardware_t::architecture_t::gfx1101,
                 {
                     // F16
                     {matrix_instruction(16, 16, 16, data_type_t::Half), 16}, // v_wmma_f32_16x16x16_f16/v_wmma_f16_16x16x16_f16
