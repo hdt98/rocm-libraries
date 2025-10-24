@@ -144,22 +144,38 @@ namespace rocRoller
             switch(record_type_id)
             {
             case ROCPROFILER_THREAD_TRACE_DECODER_RECORD_WAVE:
+                Log::info(
+                    "trace_decode_callback: decoding {} dispatch_id {}, requested_dispatch_id {}",
+                    num_events,
+                    userdata->dispatch_id,
+                    requested_dispatch_id.load());
                 for(size_t w = 0; w < num_events; w++)
                 {
                     auto* wave = static_cast<rocprofiler_thread_trace_decoder_wave_t*>(events);
+                    Log::info(
+                        "  wave {}: cu {}, simd {}, wave_id {}, contexts {}, instructions_size {}",
+                        w,
+                        wave->cu,
+                        wave->simd,
+                        wave->wave_id,
+                        wave->contexts,
+                        wave->instructions_size);
+
                     for(size_t i = 0; i < wave->instructions_size; i++)
                     {
                         auto& inst = wave->instructions_array[i];
 
-                        Log::info("parse: dispatch_id {}, code_object_id {}, "
-                                  "requested_dispatch_id {}",
-                                  userdata->dispatch_id,
+                        Log::info("    inst {}: code_object_id {}, address 0x{:x}, duration {}",
+                                  i,
                                   inst.pc.code_object_id,
-                                  requested_dispatch_id.load());
+                                  inst.pc.address,
+                                  inst.duration);
 
                         if(inst.pc.code_object_id == 0)
                         {
-                            Log::warn("parse: encountered instruction with code_object_id 0");
+                            Log::warn(
+                                "trace_decode_callback: code_object_id is 0 at dispatch_id {}",
+                                userdata->dispatch_id);
                             userdata->ok = false;
                             userdata->instruction_map.clear();
                             return;
