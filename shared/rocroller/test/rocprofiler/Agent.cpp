@@ -62,14 +62,15 @@ namespace rocRoller
         struct TraceDecodeCallbackUserData
         {
             rocprofiler_dispatch_id_t        dispatch_id;
-            bool                             ok_to_continue;
+            bool                             ok;
             profiler::InstructionLatencyMap* instruction_map;
         };
 
         rocprofiler_thread_trace_decoder_id_t decoder{};
         rocprofiler_context_id_t              client_ctx{};
 
-        std::map<rocprofiler_dispatch_id_t, std::vector<uint8_t>> dispatch_instruction_latencies;
+        std::map<rocprofiler_dispatch_id_t, std::vector<uint8_t>>
+            dispatch_instruction_latencies; // Currently only ever increases in size
         rocprofiler::sdk::codeobj::disassembly::CodeobjAddressTranslate address_table;
 
         // TODO: investiate which locks are really needed
@@ -143,7 +144,7 @@ namespace rocRoller
             TraceDecodeCallbackUserData* userdata
                 = static_cast<TraceDecodeCallbackUserData*>(userdata_raw);
 
-            if(!userdata->ok_to_continue)
+            if(!userdata->ok)
                 return;
 
             switch(record_type_id)
@@ -187,9 +188,8 @@ namespace rocRoller
                     assert(*info == ROCPROFILER_THREAD_TRACE_DECODER_INFO_STITCH_INCOMPLETE
                            && "parse: received INFO record that is not STITCH_INCOMPLETE");
                 }
-                userdata->ok_to_continue = false;
-                assert(userdata->instruction_map->empty()
-                       && "parse: received INFO record but instruction map is not empty");
+                userdata->ok = false;
+                userdata->instruction_map->clear();
                 break;
             default:
                 Log::critical(
@@ -351,7 +351,7 @@ namespace rocRoller
                 InstructionLatencyMap       decoded_instructions;
                 TraceDecodeCallbackUserData callback_user_data{
                     .dispatch_id     = requested_dispatch_id.load(),
-                    .ok_to_continue  = true,
+                    .ok              = true,
                     .instruction_map = &decoded_instructions};
 
                 rocprofiler_trace_decode(decoder,
@@ -360,7 +360,7 @@ namespace rocRoller
                                          entry->second.size(),
                                          &callback_user_data);
 
-                if(!decoded_instructions.empty())
+                if(callback_user_data.ok && !decoded_instructions.empty())
                 {
                     for(auto& [pc, data] : decoded_instructions)
                     {
@@ -383,9 +383,14 @@ namespace rocRoller
                 else
                 {
                     result = std::nullopt;
-                    Log::warn(
-                        "waitForDispatchData: no instructions decoded for requested_dispatch_id {}",
-                        requested_dispatch_id.load());
+                    if(decoded_instructions.empty())
+                        Log::warn("waitForDispatchData: no instructions decoded for "
+                                  "requested_dispatch_id {}",
+                                  requested_dispatch_id.load());
+                    else
+                        Log::warn(
+                            "waitForDispatchData: decoding error for requested_dispatch_id {}",
+                            requested_dispatch_id.load());
                 }
             }
             else
