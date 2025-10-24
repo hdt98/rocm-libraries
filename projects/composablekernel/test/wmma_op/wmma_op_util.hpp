@@ -188,11 +188,7 @@ __device__ void builtin_wmma_naive_selector(
                     else if constexpr(size == 128)
                         CK_WMMA_CALL_INTRIN_2(f16, bf8, bf8, 128);
                     else
-                        (threadIdx.x == 0
-                             ? printf("--------- UNSUPPORTED size for CK_WMMA_CALL_INTRIN_2 f16: "
-                                      "bf8, bf8: %d ---------- \n",
-                                      size)
-                             : 0);
+                        static_assert(false);
                 }
                 else if constexpr(ck::is_same_v<srcAType, ck::bf8_t> &&
                                   ck::is_same_v<srcBType, ck::f8_t>)
@@ -202,11 +198,7 @@ __device__ void builtin_wmma_naive_selector(
                     else if constexpr(size == 128)
                         CK_WMMA_CALL_INTRIN_2(f16, bf8, f8, 128);
                     else
-                        (threadIdx.x == 0
-                             ? printf("--------- UNSUPPORTED size for CK_WMMA_CALL_INTRIN_2 f16: "
-                                      "bf8, f8: %d ---------- \n",
-                                      size)
-                             : 0);
+                        static_assert(false);
                 }
                 else if constexpr(ck::is_same_v<srcAType, ck::f8_t> &&
                                   ck::is_same_v<srcBType, ck::bf8_t>)
@@ -216,11 +208,7 @@ __device__ void builtin_wmma_naive_selector(
                     else if constexpr(size == 128)
                         CK_WMMA_CALL_INTRIN_2(f16, f8, bf8, 128);
                     else
-                        (threadIdx.x == 0
-                             ? printf("--------- UNSUPPORTED size for CK_WMMA_CALL_INTRIN_2 f16: "
-                                      "f8, bf8: %d ---------- \n",
-                                      size)
-                             : 0);
+                        static_assert(false);
                 }
                 else if constexpr(ck::is_same_v<srcAType, ck::f8_t> &&
                                   ck::is_same_v<srcBType, ck::f8_t>)
@@ -230,17 +218,11 @@ __device__ void builtin_wmma_naive_selector(
                     else if constexpr(size == 128)
                         CK_WMMA_CALL_INTRIN_2(f16, f8, f8, 128);
                     else
-                        (threadIdx.x == 0
-                             ? printf("--------- UNSUPPORTED size for CK_WMMA_CALL_INTRIN_2 f16: "
-                                      "f8, f8: %d ---------- \n",
-                                      size)
-                             : 0);
+                        static_assert(false);
                 }
                 else
                 {
-                    (threadIdx.x == 0 ? printf("--------- UNSUPPORTED bf8/f8 combination with dest "
-                                               "f16 ---------- \n")
-                                      : 0);
+                    static_assert(false);
                 }
             }
             else if constexpr(ck::is_same_v<dstType, float>)
@@ -253,11 +235,7 @@ __device__ void builtin_wmma_naive_selector(
                     else if constexpr(size == 128)
                         CK_WMMA_CALL_INTRIN_2(f32, bf8, bf8, 128);
                     else
-                        (threadIdx.x == 0
-                             ? printf("--------- UNSUPPORTED size for CK_WMMA_CALL_INTRIN_2 f32: "
-                                      "bf8, bf8: %d ---------- \n",
-                                      size)
-                             : 0);
+                        static_assert(false);
                 }
                 else if constexpr(ck::is_same_v<srcAType, ck::bf8_t> &&
                                   ck::is_same_v<srcBType, ck::f8_t>)
@@ -267,11 +245,7 @@ __device__ void builtin_wmma_naive_selector(
                     else if constexpr(size == 128)
                         CK_WMMA_CALL_INTRIN_2(f32, bf8, f8, 128);
                     else
-                        (threadIdx.x == 0
-                             ? printf("--------- UNSUPPORTED size for CK_WMMA_CALL_INTRIN_2 f32: "
-                                      "bf8, f8: %d ---------- \n",
-                                      size)
-                             : 0);
+                        static_assert(false);
                 }
                 else if constexpr(ck::is_same_v<srcAType, ck::f8_t> &&
                                   ck::is_same_v<srcBType, ck::bf8_t>)
@@ -281,11 +255,7 @@ __device__ void builtin_wmma_naive_selector(
                     else if constexpr(size == 128)
                         CK_WMMA_CALL_INTRIN_2(f32, f8, bf8, 128);
                     else
-                        (threadIdx.x == 0
-                             ? printf("--------- UNSUPPORTED size for CK_WMMA_CALL_INTRIN_2 f32: "
-                                      "f8, bf8: %d ---------- \n",
-                                      size)
-                             : 0);
+                        static_assert(false);
                 }
                 else if constexpr(ck::is_same_v<srcAType, ck::f8_t> &&
                                   ck::is_same_v<srcBType, ck::f8_t>)
@@ -295,17 +265,11 @@ __device__ void builtin_wmma_naive_selector(
                     else if constexpr(size == 128)
                         CK_WMMA_CALL_INTRIN_2(f32, f8, f8, 128);
                     else
-                        (threadIdx.x == 0
-                             ? printf("--------- UNSUPPORTED size for CK_WMMA_CALL_INTRIN_2 f32: "
-                                      "f8, f8: %d ---------- \n",
-                                      size)
-                             : 0);
+                        static_assert(false);
                 }
                 else
                 {
-                    (threadIdx.x == 0 ? printf("--------- UNSUPPORTED bf8/f8 combination with dest "
-                                               "f32 ---------- \n")
-                                      : 0);
+                    static_assert(false);
                 }
             }
         }
@@ -352,9 +316,7 @@ __device__ void builtin_wmma_naive_selector(
             }
             else
             {
-                (threadIdx.x == 0 ? printf("--------- UNSPPORTED DATA TYPES for "
-                                           "CK_WMMA_CALL_INTRIN_1 or _4 ---------- \n")
-                                  : 0);
+                static_assert(false);
             }
         }
     }
@@ -366,16 +328,12 @@ __device__ void builtin_wmma_naive_selector(
         }
         else
         {
-            (threadIdx.x == 0
-                 ? printf("--------- UNSPPORTED DATA TYPES for CK_WMMA_CALL_INTRIN_3 ---------- \n")
-                 : 0);
+            static_assert(false);
         }
     }
     else
     {
-        (threadIdx.x == 0 ? printf("---------- No builtin_wmma_naive_selector implementation for "
-                                   "these types ----------\n")
-                          : 0);
+        static_assert(false);
     }
 }
 
