@@ -466,7 +466,7 @@ __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
                 b_temp.template AsType<srcB_cast_type>()(Number<ele + QUADRANT_SIZE>{});
         });
 
-        __syncthreads(); // KO TODO:: move to inline asm
+        __syncthreads();
 
         // Construct a_frag and b_frag for WMMA call -- OK
         static_for<0, QUADRANT_SIZE, 1>{}([&](auto ele) {
@@ -557,7 +557,7 @@ __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
         });
     }
 
-    __syncthreads(); // KO TODO:: move to inline asm
+    __syncthreads();
 
     // Call the WMMA intrinsic selector
     builtin_wmma_naive_selector<srcA_t, srcB_t, dst_t, acc_t, kValue>(
@@ -659,7 +659,7 @@ __global__ void matmul_swizzle_a(const srcA_t* a, const srcB_t* b, dst_t* c)
         });
     }
 
-    __syncthreads(); // KO TODO:: move to inline asm
+    __syncthreads();
 
     builtin_wmma_naive_selector<srcA_t, srcB_t, dst_t, acc_t, kValue>(
         a_frag.template AsType<srcA_vec_type>()(I0),
@@ -842,18 +842,7 @@ __global__ void matmul(const src_t* a, const src_t* b, dst_t* c)
         p_shared[8 * 16 * lane_hi + 8 * lane_lo + ele + 16 * 16] = b_temp[ele];
     }
 
-#if defined(__gfx120__) || defined(__gfx125__)
-    asm volatile("\
-    s_wait_dscnt 0x0 \n \
-    s_barrier_signal -1 \n \
-    s_barrier_wait -1 \
-    " ::);
-#else
-    asm volatile("\
-    s_waitcnt lgkmcnt(0) \n \
-    s_barrier \
-    " ::);
-#endif
+    __syncthreads();
 
     for(int ele = 0; ele < 16; ++ele)
     {
@@ -865,18 +854,7 @@ __global__ void matmul(const src_t* a, const src_t* b, dst_t* c)
         a_frag[ele] = p_shared[(ele / 8) * 16 * 8 + 8 * lane + ele % 8];
     }
 
-#if defined(__gfx120__) || defined(__gfx125__)
-    asm volatile("\
-    s_wait_dscnt 0x0 \n \
-    s_barrier_signal -1 \n \
-    s_barrier_wait -1 \
-    " ::);
-#else
-    asm volatile("\
-    s_waitcnt lgkmcnt(0) \n \
-    s_barrier \
-    " ::);
-#endif
+    __syncthreads();
 
     // sync threads, similar to mma_sync
     // __syncthreads();
