@@ -183,4 +183,28 @@ projects/hipblas/clients/
             │            └── CMakeLists.txt                         # Test integration point
             └── /build/release/clients/gtest/test_categories.cmake  #created at build time    
 ```
+## Sample run
+```
+root@dell-rack-13:/dockerx/rocm-libraries/projects/hipblas/build/release/clients# ctest -N
+Test project /dockerx/rocm-libraries/projects/hipblas/build/release/clients
+  Test #1: hipblas-auxil-suite
+  Test #2: hipblas-blas1-suite
+  Test #3: hipblas-blas2-suite
+  Test #4: hipblas-blas3-suite
+  Test #5: hipblas-blas_ex-suite
+  Test #6: hipblas-solver-suite
 
+Total Tests: 6
+root@dell-rack-13:/dockerx/rocm-libraries/projects/hipblas/build/release/clients# ctest -L blas1
+Test project /dockerx/rocm-libraries/projects/hipblas/build/release/clients
+    Start 2: hipblas-blas1-suite
+1/1 Test #2: hipblas-blas1-suite ..............   Passed    4.71 sec
+
+100% tests passed, 0 tests failed out of 1
+
+Label Time Summary:
+blas1     =   4.71 sec*proc (1 test)
+level1    =   4.71 sec*proc (1 test)
+
+Total Test time (real) =   4.71 sec
+```
