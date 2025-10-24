@@ -180,8 +180,6 @@ namespace RocprofilerTest
             HIP_CHECK(hipDeviceSynchronize());
         });
 
-        REQUIRE(latencies.has_value());
-
         { // Verify device result
             uint32_t h_result = 0;
             HIP_CHECK(hipMemcpy(
@@ -196,21 +194,21 @@ namespace RocprofilerTest
 
         std::stringstream ss;
         ss << "Instruction, Total Latency, Hit Count, Average Latency" << std::endl;
-        for(const auto& data : *latencies)
+        for(const auto& data : latencies)
         {
             uint64_t avg_latency = data.meanLatency();
             ss << "\"" << data.instruction << "\", " << data.totalLatency << ", " << data.hitcount
                << ", " << avg_latency << std::endl;
         }
         INFO(ss.str());
-        REQUIRE(latencies->size() >= 8); // gfx12 has 9, others have 8
+        REQUIRE(latencies.size() >= 8); // gfx12 has 9, others have 8
 
         { // Ensure instructions exist in expected quanities in the profile data
             std::string const instructionsStr = [&]() {
                 std::stringstream ss;
                 streamJoin(
                     ss,
-                    std::views::transform(*latencies, [](const auto& d) { return d.instruction; }),
+                    std::views::transform(latencies, [](const auto& d) { return d.instruction; }),
                     "\n");
                 return ss.str();
             }();
@@ -308,14 +306,12 @@ namespace RocprofilerTest
                     kernelSetups[order.back()].commandArgs.runtimeArguments());
             });
 
-            REQUIRE(latencies.has_value());
-
             std::string const literalHex = fmt::format("0x{:x}", literals[order.back()]);
             CAPTURE(literalHex);
-            INFO(toString(*latencies));
-            REQUIRE(latencies->size() == 2);
-            CHECK(1 == countSubstring((*latencies)[0].instruction, literalHex));
-            CHECK((*latencies)[1].instruction == "s_endpgm");
+            INFO(toString(latencies));
+            REQUIRE(latencies.size() == 2);
+            CHECK(1 == countSubstring(latencies[0].instruction, literalHex));
+            CHECK(latencies[1].instruction == "s_endpgm");
         }
 
         SECTION("Order 2")
@@ -336,14 +332,12 @@ namespace RocprofilerTest
                     kernelSetups[order.back()].commandArgs.runtimeArguments());
             });
 
-            REQUIRE(latencies.has_value());
-
             std::string const literalHex = fmt::format("0x{:x}", literals[order.back()]);
             CAPTURE(literalHex);
-            INFO(toString(*latencies));
-            REQUIRE(latencies->size() == 2);
-            CHECK(1 == countSubstring((*latencies)[0].instruction, literalHex));
-            CHECK((*latencies)[1].instruction == "s_endpgm");
+            INFO(toString(latencies));
+            REQUIRE(latencies.size() == 2);
+            CHECK(1 == countSubstring(latencies[0].instruction, literalHex));
+            CHECK(latencies[1].instruction == "s_endpgm");
         }
 
         SECTION("With profiler calls")
@@ -362,14 +356,12 @@ namespace RocprofilerTest
                     kernelSetups[order.back()].commandArgs.runtimeArguments());
             });
 
-            REQUIRE(latencies.has_value());
-
             std::string const literalHex = fmt::format("0x{:x}", literals[order.back()]);
             CAPTURE(literalHex);
-            CAPTURE(toString(*latencies));
-            REQUIRE(latencies->size() == 2);
-            CHECK(1 == countSubstring((*latencies)[0].instruction, literalHex));
-            CHECK((*latencies)[1].instruction == "s_endpgm");
+            CAPTURE(toString(latencies));
+            REQUIRE(latencies.size() == 2);
+            CHECK(1 == countSubstring(latencies[0].instruction, literalHex));
+            CHECK(latencies[1].instruction == "s_endpgm");
         }
     }
 
@@ -390,8 +382,6 @@ namespace RocprofilerTest
             HIP_CHECK(hipDeviceSynchronize());
         });
 
-        REQUIRE(latencies.has_value());
-
         { // Verify device result
             uint32_t h_result = 0;
             HIP_CHECK(hipMemcpy(
@@ -406,21 +396,21 @@ namespace RocprofilerTest
 
         std::stringstream ss;
         ss << "Instruction, Total Latency, Hit Count, Average Latency" << std::endl;
-        for(const auto& data : *latencies)
+        for(const auto& data : latencies)
         {
             uint64_t avg_latency = data.meanLatency();
             ss << "\"" << data.instruction << "\", " << data.totalLatency << ", " << data.hitcount
                << ", " << avg_latency << std::endl;
         }
         INFO(ss.str());
-        CHECK(latencies->size() >= 8); // gfx12 has 9, others have 8
+        CHECK(latencies.size() >= 8); // gfx12 has 9, others have 8
 
         { // Ensure instructions exist in expected quanities in the profile data
             std::string const instructionsStr = [&]() {
                 std::stringstream ss;
                 streamJoin(
                     ss,
-                    std::views::transform(*latencies, [](const auto& d) { return d.instruction; }),
+                    std::views::transform(latencies, [](const auto& d) { return d.instruction; }),
                     "\n");
                 return ss.str();
             }();

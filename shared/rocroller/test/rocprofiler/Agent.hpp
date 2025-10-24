@@ -75,16 +75,19 @@ namespace rocRoller
         std::optional<std::vector<InstructionProfile>> waitForDispatchData(int n);
 
         /**
-         * @brief Call a function that dispatches a kernel and attempts to collect data, if none found,
-         * repeat until data is found.
+         * @brief Call a function that dispatches a kernel and attempts to collect data
          * 
-         * Useful for smaller kernels that are not launched with enough waves.
+         * When the agent is enabled, this function will repeatedly call the dispatch function
+         * until instruction profiling data is successfully collected. This is useful for 
+         * smaller kernels that may not launch with enough waves on the first attempt.
          * 
          * @param n Number of dispatches to wait for
          * @param dispatch Function that dispatches kernel(s)
+         * @return Vector of InstructionProfile from the dispatch. Returns empty vector if 
+         *         agent is disabled (ENABLE_AGENT is false).
          */
-        std::optional<std::vector<InstructionProfile>>
-            loopUntilDispatchData(int n, std::function<void()> dispatch);
+        std::vector<InstructionProfile> loopUntilDispatchData(int                   n,
+                                                              std::function<void()> dispatch);
 
     } // namespace profiler
 } // namespace rocRoller

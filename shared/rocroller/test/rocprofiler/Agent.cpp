@@ -331,86 +331,65 @@ namespace rocRoller
                       requested_dispatch_id.load());
 
             std::unique_lock<std::mutex> lock(dispatch_count_mutex);
+
             dispatch_cv.wait(lock, [] {
                 std::lock_guard<std::mutex> att_shader_data_lock(everything_mutex);
                 return dispatch_instruction_latencies.find(requested_dispatch_id.load())
                        != dispatch_instruction_latencies.end();
             });
+
             std::lock_guard<std::mutex> att_shader_data_lock(everything_mutex);
 
-            auto it = dispatch_instruction_latencies.find(requested_dispatch_id.load());
-            if(it != dispatch_instruction_latencies.end() && !it->second.empty())
+            auto entry = dispatch_instruction_latencies.find(requested_dispatch_id.load());
+            if(entry != dispatch_instruction_latencies.end() && !entry->second.empty())
             {
-                for(auto& [pc, data] : it->second)
+                for(auto& [pc, data] : entry->second)
                 {
                     auto inst = address_table.get(pc.code_object_id, pc.address);
-                    if(inst)
+                    if(inst != nullptr)
                         data.instruction = inst->inst;
-                    else
-                        data.instruction = "UNKNOWN_INSTRUCTION";
                 }
                 result = std::vector<InstructionProfile>{};
-                result->reserve(it->second.size());
-                for(const auto& [pc, data] : it->second)
+                result->reserve(entry->second.size());
+                for(const auto& [pc, data] : entry->second)
                 {
                     result->push_back(data);
                 }
-                // Debug output
-                Log::info("waitForDispatchData resolving:");
-                for(auto& [dispatch_id, inst_map] : dispatch_instruction_latencies)
-                {
-                    Log::info("  dispatch_id {}: {} instructions collected",
-                              dispatch_id,
-                              inst_map.size());
-                    for(auto& [pc, data] : inst_map)
-                    {
-                        auto inst = address_table.get(pc.code_object_id, pc.address);
-                        if(inst)
-                            data.instruction = inst->inst;
-                        else
-                            data.instruction = "UNKNOWN_INSTRUCTION";
-
-                        Log::info("    PC: code_object_id {}, address {:#x} => {}",
-                                  pc.code_object_id,
-                                  pc.address,
-                                  data.toString());
-                    }
-                }
-                Log::info("waitForDispatchData: retrieved {} instructions for dispatch ID {}",
-                          result->size(),
-                          requested_dispatch_id.load());
+                Log::info(
+                    "waitForDispatchData: retrieved {} instructions for requested_dispatch_id {}",
+                    result->size(),
+                    requested_dispatch_id.load());
             }
             else
             {
                 result = std::nullopt;
-                Log::warn("waitForDispatchData: no data for dispatch ID {}",
+                Log::warn("waitForDispatchData: no data for requested_dispatch_id {}",
                           requested_dispatch_id.load());
             }
             return result;
         }
 
-        std::optional<std::vector<InstructionProfile>>
-            loopUntilDispatchData(int n, std::function<void()> dispatch)
+        std::vector<InstructionProfile> loopUntilDispatchData(int n, std::function<void()> dispatch)
         {
             AssertFatal(
                 n > 0,
                 "N must be positive, as dispatch() is expected to dispatch at least one kernel");
 
             if constexpr(!ENABLE_AGENT)
-                return std::nullopt;
+                return {};
 
-            dispatch();
-            waitForDispatchData(n);
-            // User should expect dispatch can be called multiple times
+            // User should expect dispatch to be called multiple times
             // E.g. reset reused global memory within the function body
             dispatch();
-            std::optional<std::vector<InstructionProfile>> result;
-            while(!(result = waitForDispatchData(n)).has_value())
+            auto data = waitForDispatchData(n);
+
+            dispatch();
+            while(!(data = waitForDispatchData(n)).has_value())
             {
                 Log::info("loopUntilDispatchData: no data yet, invoking dispatch");
                 dispatch();
             }
-            return result;
+            return *data;
         }
 
         uint64_t InstructionProfile::meanLatency() const
