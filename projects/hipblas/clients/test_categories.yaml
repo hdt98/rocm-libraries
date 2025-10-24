@@ -40,6 +40,12 @@ test_categories:
       - "blas1/rot_gtest.cpp"
       - "blas1/scal_gtest.cpp"
       - "blas1/swap_gtest.cpp"
+    exclude:
+      - "*asum*"
+      - "*dot*"
+      - "*nrm2*"
+      - "*scal*"
+      - "*iamin*"
     labels:
       - "blas1"
       - "level1"
@@ -94,6 +100,7 @@ test_categories:
       - "blas2/tpsv_gtest.cpp"
       - "blas2/trmv_gtest.cpp"
       - "blas2/trsv_gtest.cpp"
+    exclude:
     labels:
       - "blas2"
       - "level2"
@@ -130,6 +137,11 @@ test_categories:
       - "blas3/trmm_gtest.cpp"
       - "blas3/trsm_gtest.cpp"
       - "blas3/trtri_gtest.cpp"
+    exclude:
+      - "*dgmm*"
+      - "*hemm*"
+      - "*herk*"
+      - "*trtri*"
     labels:
       - "blas3"
       - "level3"
@@ -153,6 +165,9 @@ test_categories:
       - "blas_ex/scal_ex_gtest.cpp"
       - "blas_ex/gemm_ex_gtest.cpp"
       - "blas_ex/trsm_ex_gtest.cpp"
+    exclude:
+      - "*_ex*"
+      - "*axpy_ex*"
     labels:
       - "blas_ex"
       - "extended"

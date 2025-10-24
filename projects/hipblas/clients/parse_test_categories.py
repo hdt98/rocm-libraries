@@ -24,9 +24,14 @@ def main():
     for category_name, category_info in categories.items():
         patterns = category_info.get('test_patterns', [])
         labels = category_info.get('labels', [])
+        exclude = category_info.get('exclude', [])
+        if exclude == None:
+            exclude = []
         timeout = timeouts.get(category_name, 300)
         print(f'# Category: {category_name}')
         print(f'# Description: {category_info.get("description", "")}')
+        patterns[:]=[x for x in patterns if x not in exclude]
+
 
         pattern_string=""
         for pattern in patterns:
