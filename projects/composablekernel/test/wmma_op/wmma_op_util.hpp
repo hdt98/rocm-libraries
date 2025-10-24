@@ -37,15 +37,15 @@ namespace wmma_op_util {
     intrin_wmma_##dst_fmt##_16x16x##size##_##src0_fmt<16, 16, neg_a, neg_b>::Run( \
         reg_a, reg_b, reg_d.GetVectorTypeReference(Number<0>{}))
 
-template <typename T, index_t kMultiplier, typename = void>
+template <typename T, index_t kValue, typename = void>
 struct WMMAVecType
 {
     static_assert(sizeof(T) == 0, "VecType is not specialized for this type");
 };
 
 // fp64 specialization
-template <typename T, index_t kMultiplier>
-struct WMMAVecType<T, kMultiplier, ck::enable_if_t<ck::is_same_v<T, double>>>
+template <typename T, index_t kValue>
+struct WMMAVecType<T, kValue, ck::enable_if_t<ck::is_same_v<T, double>>>
 {
     static constexpr bool layoutTransform = false;
     static constexpr int ToIntDim         = 1;
@@ -56,14 +56,14 @@ struct WMMAVecType<T, kMultiplier, ck::enable_if_t<ck::is_same_v<T, double>>>
         return ck::is_same_v<T, D>;
     }
 
-    using VecT                = vector_type<T, kMultiplier * 2>;
+    using VecT                = vector_type<T, kValue / 2>;
     using ViewT               = vector_type<T, 1>;
-    static constexpr int size = kMultiplier * 2;
+    static constexpr int size = kValue / 2;
 };
 
 // fp32 specialization
-template <typename T, index_t kMultiplier>
-struct WMMAVecType<T, kMultiplier, ck::enable_if_t<ck::is_same_v<T, float>>>
+template <typename T, index_t kValue>
+struct WMMAVecType<T, kValue, ck::enable_if_t<ck::is_same_v<T, float>>>
 {
     static constexpr bool layoutTransform = false;
     static constexpr int ToIntDim         = 1;
@@ -74,15 +74,15 @@ struct WMMAVecType<T, kMultiplier, ck::enable_if_t<ck::is_same_v<T, float>>>
         return ck::is_same_v<T, D>;
     }
 
-    using VecT                = vector_type<T, kMultiplier * 2>;
+    using VecT                = vector_type<T, kValue / 2>;
     using ViewT               = vector_type<T, 1>;
-    static constexpr int size = kMultiplier * 2;
+    static constexpr int size = kValue / 2;
 };
 
 // fp16 specialization
-template <typename T, index_t kMultiplier>
+template <typename T, index_t kValue>
 struct WMMAVecType<T,
-                   kMultiplier,
+                   kValue,
                    ck::enable_if_t<ck::is_same_v<T, ck::half_t> || ck::is_same_v<T, ck::bhalf_t>>>
 {
     static constexpr bool layoutTransform = false;
@@ -94,16 +94,16 @@ struct WMMAVecType<T,
         return ck::is_same_v<T, D>;
     }
 
-    using VecT                = vector_type<T, kMultiplier * 2>;
+    using VecT                = vector_type<T, kValue / 2>;
     using ViewT               = vector_type<T, 2>;
-    static constexpr int size = kMultiplier * 2;
+    static constexpr int size = kValue / 2;
 };
 
 // f8 ocp or bf8 ocp specialization
-template <typename T, index_t kMultiplier>
+template <typename T, index_t kValue>
 struct WMMAVecType<
     T,
-    kMultiplier,
+    kValue,
     ck::enable_if_t<ck::is_same_v<T, ck::f8_ocp_t> || ck::is_same_v<T, ck::bf8_ocp_t>>>
 {
     static constexpr bool layoutTransform = true;
@@ -115,16 +115,16 @@ struct WMMAVecType<
         return ck::is_same_v<D, ck::f8_t> || ck::is_same_v<D, ck::bf8_t>;
     }
 
-    using VecT                = vector_type<typename T::data_type, kMultiplier * 2>;
+    using VecT                = vector_type<typename T::data_type, kValue / 2>;
     using ViewT               = vector_type<typename T::data_type, 4>;
-    static constexpr int size = kMultiplier * 2;
+    static constexpr int size = kValue / 2;
 };
 
 // f8 fnuz or bf8 fnuz specialization
-template <typename T, index_t kMultiplier>
+template <typename T, index_t kValue>
 struct WMMAVecType<
     T,
-    kMultiplier,
+    kValue,
     ck::enable_if_t<ck::is_same_v<T, ck::f8_fnuz_t> || ck::is_same_v<T, ck::bf8_fnuz_t>>>
 {
     static constexpr bool layoutTransform = true;
@@ -136,14 +136,14 @@ struct WMMAVecType<
         return ck::is_same_v<D, ck::f8_t> || ck::is_same_v<D, ck::bf8_t>;
     }
 
-    using VecT                = vector_type<T, kMultiplier * 2>;
+    using VecT                = vector_type<T, kValue / 2>;
     using ViewT               = vector_type<T, 4>;
-    static constexpr int size = kMultiplier * 2;
+    static constexpr int size = kValue / 2;
 };
 
 // int8 specialization
-template <typename T, index_t kMultiplier>
-struct WMMAVecType<T, kMultiplier, ck::enable_if_t<ck::is_same_v<T, int8_t>>>
+template <typename T, index_t kValue>
+struct WMMAVecType<T, kValue, ck::enable_if_t<ck::is_same_v<T, int8_t>>>
 {
     static constexpr bool layoutTransform = true;
     static constexpr int ToIntDim         = 4;
@@ -153,9 +153,9 @@ struct WMMAVecType<T, kMultiplier, ck::enable_if_t<ck::is_same_v<T, int8_t>>>
         return ck::is_same_v<T, D>;
     }
 
-    using VecT                = vector_type<T, kMultiplier * 2>;
+    using VecT                = vector_type<T, kValue / 2>;
     using ViewT               = vector_type<T, 4>;
-    static constexpr int size = kMultiplier * 2;
+    static constexpr int size = kValue / 2;
 };
 
 // gfx1250 builtin_wmma_naive_selector
@@ -163,14 +163,14 @@ template <typename srcAType,
           typename srcBType,
           typename dstType,
           typename accType,
-          index_t kMultiplier>
+          index_t kValue>
 __device__ void builtin_wmma_naive_selector(
-    const typename WMMAVecType<srcAType, kMultiplier>::VecT::type& reg_a,
-    const typename WMMAVecType<srcBType, kMultiplier>::VecT::type& reg_b,
+    const typename WMMAVecType<srcAType, kValue>::VecT::type& reg_a,
+    const typename WMMAVecType<srcBType, kValue>::VecT::type& reg_b,
     StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr, accType, 1, 8, true>& reg_c,
     StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr, dstType, 1, 8, true>& reg_d)
 {
-    constexpr int size = 2 * 2 * kMultiplier;
+    constexpr int size = kValue;
 
     // if accType and dstType the same
     if constexpr(std::is_same_v<accType, dstType>)
@@ -379,18 +379,18 @@ __device__ void builtin_wmma_naive_selector(
     }
 }
 
-template <typename srcA_t, typename srcB_t, typename dst_t, typename acc_t, ck::index_t kMultiplier>
+template <typename srcA_t, typename srcB_t, typename dst_t, typename acc_t, ck::index_t kValue>
 __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
 {
-    static_assert(WMMAVecType<srcA_t, kMultiplier>::template is_compatible<srcB_t>(),
+    static_assert(WMMAVecType<srcA_t, kValue>::template is_compatible<srcB_t>(),
                   "the data format for srcA and srcB is unsupported in gfx1250");
-    using srcA_cast_T    = WMMAVecType<srcA_t, kMultiplier>::ViewT;
-    using srcB_cast_T    = WMMAVecType<srcB_t, kMultiplier>::ViewT;
+    using srcA_cast_T    = WMMAVecType<srcA_t, kValue>::ViewT;
+    using srcB_cast_T    = WMMAVecType<srcB_t, kValue>::ViewT;
     using srcA_cast_type = typename srcA_cast_T::type;
     using srcB_cast_type = typename srcB_cast_T::type;
 
-    using srcA_vec      = typename WMMAVecType<srcA_t, kMultiplier>::VecT;
-    using srcB_vec      = typename WMMAVecType<srcB_t, kMultiplier>::VecT;
+    using srcA_vec      = typename WMMAVecType<srcA_t, kValue>::VecT;
+    using srcB_vec      = typename WMMAVecType<srcB_t, kValue>::VecT;
     using srcA_vec_type = srcA_vec::type;
     using srcB_vec_type = srcB_vec::type;
 
@@ -410,10 +410,10 @@ __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
     dst_vec dst_thread_buf_;
 
     // Num elements per 32B packed chunk
-    constexpr int ToIntDim = WMMAVecType<srcA_t, kMultiplier>::ToIntDim;
+    constexpr int ToIntDim = WMMAVecType<srcA_t, kValue>::ToIntDim;
 
     // to int dim is 1 for float, 2 for half; base dim assumption is 16
-    constexpr int SRC_DIM = WMMAVecType<srcA_t, kMultiplier>::size / ToIntDim;
+    constexpr int SRC_DIM = WMMAVecType<srcA_t, kValue>::size / ToIntDim;
 
     // 2 threads per a row
     constexpr int ROW_SIZE = 2 * SRC_DIM;
@@ -602,7 +602,7 @@ __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
     __syncthreads(); // KO TODO:: move to inline asm
 
     // Call the WMMA intrinsic selector
-    builtin_wmma_naive_selector<srcA_t, srcB_t, dst_t, acc_t, kMultiplier>(
+    builtin_wmma_naive_selector<srcA_t, srcB_t, dst_t, acc_t, kValue>(
         a_frag.template AsType<srcA_vec_type>()(I0),
         b_frag.template AsType<srcB_vec_type>()(I0),
         acc_thread_buf_,
@@ -616,18 +616,18 @@ __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
     });
 }
 
-template <typename srcA_t, typename srcB_t, typename dst_t, typename acc_t, ck::index_t kMultiplier>
+template <typename srcA_t, typename srcB_t, typename dst_t, typename acc_t, ck::index_t kValue>
 __global__ void matmul_swizzle_a(const srcA_t* a, const srcB_t* b, dst_t* c)
 {
-    static_assert(WMMAVecType<srcA_t, kMultiplier>::template is_compatible<srcB_t>(),
+    static_assert(WMMAVecType<srcA_t, kValue>::template is_compatible<srcB_t>(),
                   "the data format for srcA and srcB is unsupported in gfx1250");
-    using srcA_cast_T    = WMMAVecType<srcA_t, kMultiplier>::ViewT;
-    using srcB_cast_T    = WMMAVecType<srcB_t, kMultiplier>::ViewT;
+    using srcA_cast_T    = WMMAVecType<srcA_t, kValue>::ViewT;
+    using srcB_cast_T    = WMMAVecType<srcB_t, kValue>::ViewT;
     using srcA_cast_type = typename srcA_cast_T::type;
     using srcB_cast_type = typename srcB_cast_T::type;
 
-    using srcA_vec      = typename WMMAVecType<srcA_t, kMultiplier>::VecT;
-    using srcB_vec      = typename WMMAVecType<srcB_t, kMultiplier>::VecT;
+    using srcA_vec      = typename WMMAVecType<srcA_t, kValue>::VecT;
+    using srcB_vec      = typename WMMAVecType<srcB_t, kValue>::VecT;
     using srcA_vec_type = srcA_vec::type;
     using srcB_vec_type = srcB_vec::type;
 
@@ -644,9 +644,9 @@ __global__ void matmul_swizzle_a(const srcA_t* a, const srcB_t* b, dst_t* c)
     dst_vec dst_thread_buf_;
 
     // Num elements per 32B packed chunk
-    constexpr int ToIntDim = WMMAVecType<srcA_t, kMultiplier>::ToIntDim;
+    constexpr int ToIntDim = WMMAVecType<srcA_t, kValue>::ToIntDim;
 
-    constexpr int SRC_DIM = WMMAVecType<srcA_t, kMultiplier>::size / ToIntDim;
+    constexpr int SRC_DIM = WMMAVecType<srcA_t, kValue>::size / ToIntDim;
 
     // 2 threads per a row
     constexpr int ROW_SIZE = 2 * SRC_DIM;
@@ -703,7 +703,7 @@ __global__ void matmul_swizzle_a(const srcA_t* a, const srcB_t* b, dst_t* c)
 
     __syncthreads(); // KO TODO:: move to inline asm
 
-    builtin_wmma_naive_selector<srcA_t, srcB_t, dst_t, acc_t, kMultiplier>(
+    builtin_wmma_naive_selector<srcA_t, srcB_t, dst_t, acc_t, kValue>(
         a_frag.template AsType<srcA_vec_type>()(I0),
         b_frag.template AsType<srcB_vec_type>()(I0),
         acc_thread_buf_,
@@ -972,7 +972,7 @@ __global__ void matmul_swizzle_a(const src_t* a, const src_t* b, dst_t* c)
     });
 }
 
-template <typename srcA_t, typename srcB_t, typename dst_t, typename acc_t, ck::index_t kMultiplier>
+template <typename srcA_t, typename srcB_t, typename dst_t, typename acc_t, ck::index_t kValue>
 __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
 {
     ignore = a;
@@ -980,7 +980,7 @@ __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
     ignore = c;
 }
 
-template <typename srcA_t, typename srcB_t, typename dst_t, typename acc_t, ck::index_t KMultiplier>
+template <typename srcA_t, typename srcB_t, typename dst_t, typename acc_t, ck::index_t kValue>
 __global__ void matmul_swizzle_a(const srcA_t* a, const srcB_t* b, dst_t* c)
 {
     ignore = a;
@@ -1063,7 +1063,7 @@ template <typename DeviceWmma,
           typename AElementwiseOperation,
           typename BElementwiseOperation,
           typename CElementwiseOperation,
-          index_t KMultiplier>
+          index_t kValue>
 struct TestWmma
 {
     auto PrepareGemmTensor(const ck::wmma_op_util::GemmParams& params)
@@ -1131,9 +1131,9 @@ struct TestWmma
         ck::wmma_op_util::GemmParams params;
         params.M       = 16;
         params.N       = 16;
-        params.K       = 4 * KMultiplier;
-        params.StrideA = 4 * KMultiplier;
-        params.StrideB = 4 * KMultiplier;
+        params.K       = kValue;
+        params.StrideA = kValue;
+        params.StrideB = kValue;
         params.StrideC = 16;
 
         auto host_tensors = PrepareGemmTensor(params);

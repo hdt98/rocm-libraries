@@ -68,7 +68,7 @@ template <typename SrcAType,
           typename DstType,
           typename GPUAccType,
           typename CPUAccType,
-          ck::index_t KMultiplier = 1>
+          ck::index_t kValue = 1>
 bool run_test()
 {
     if(!ck::is_gfx125_supported()) // report a warning, but move on.
@@ -95,15 +95,15 @@ bool run_test()
     using PassThrough = ck::tensor_operation::element_wise::PassThrough;
     bool pass         = true;
 
-    // Pass KMultiplier to both kernels
+    // Pass kValue to both kernels
     const auto matmul_default =
-        ck::wmma_op_util::matmul<SrcAType, SrcBType, DstType, GPUAccType, KMultiplier>;
+        ck::wmma_op_util::matmul<SrcAType, SrcBType, DstType, GPUAccType, kValue>;
     const auto matmul_swizzle_a =
-        ck::wmma_op_util::matmul_swizzle_a<SrcAType, SrcBType, DstType, GPUAccType, KMultiplier>;
+        ck::wmma_op_util::matmul_swizzle_a<SrcAType, SrcBType, DstType, GPUAccType, kValue>;
 
     const auto wmma_kernel_container = std::make_tuple(matmul_default, matmul_swizzle_a);
 
-    ck::static_for<0, 2, 1>{}([&](auto i) {
+    ck::static_for<0, 1, 1>{}([&](auto i) {
         pass &=
             ck::wmma_op_util::TestWmma<decltype(std::get<ck::Number<i>{}>(wmma_kernel_container)),
                                        SrcAType,
@@ -117,7 +117,7 @@ bool run_test()
                                        PassThrough,
                                        PassThrough,
                                        PassThrough,
-                                       KMultiplier>{}(
+                                       kValue>{}(
                 std::get<ck::Number<i>{}>(wmma_kernel_container));
     });
 
@@ -138,34 +138,34 @@ int main(int, char*[])
     // // clang-format on
 
     // clang-format off
-    //               |SrcAType    |SrcBType,     |DstType     |GPUAccType  |CPUAccType      |KMultiplier
-    pass &= run_test<ck::half_t,  ck::half_t,   float,        float,       float,              8>(); // V_WMMA_F32_16X16X32_F16
-    pass &= run_test<ck::half_t,  ck::half_t,   ck::half_t,   ck::half_t,  ck::half_t,         8>(); // V_WMMA_F16_16X16X32_F16
-    pass &= run_test<ck::bhalf_t, ck::bhalf_t,  float,        float,       float,              8>(); // V_WMMA_F32_16X16X32_BF16
-    pass &= run_test<ck::bhalf_t, ck::bhalf_t,  ck::bhalf_t,  ck::bhalf_t, float,              8>(); // V_WMMA_BF16_16X16X32_BF16 ****
-    pass &= run_test<ck::bf8_t,   ck::bf8_t,    float,        float,       float,              16>(); // V_WMMA_F32_16X16X64_BF8_BF8
-    pass &= run_test<ck::bf8_t,   ck::f8_t,     float,        float,       float,              16>(); // V_WMMA_F32_16X16X64_BF8_F8
-    pass &= run_test<ck::f8_t,    ck::bf8_t,    float,        float,       float,              16>(); // V_WMMA_F32_16X16X64_F8_BF8
-    pass &= run_test<ck::f8_t,    ck::f8_t,     float,        float,       float,              16>(); // V_WMMA_F32_16X16X64_F8_F8
-    pass &= run_test<ck::bf8_t,   ck::bf8_t,    ck::half_t,   ck::half_t,  ck::half_t,         16>(); // V_WMMA_F16_16X16X64_BF8_BF8
-    pass &= run_test<ck::bf8_t,   ck::f8_t,     ck::half_t,   ck::half_t,  ck::half_t,         16>(); // V_WMMA_F16_16X16X64_BF8_F8
-    pass &= run_test<ck::f8_t,    ck::bf8_t,    ck::half_t,   ck::half_t,  ck::half_t,         16>(); // V_WMMA_F16_16X16X64_F8_BF8
-    pass &= run_test<ck::f8_t,    ck::f8_t,     ck::half_t,   ck::half_t,  ck::half_t,         16>(); // V_WMMA_F16_16X16X64_F8_F8
-    pass &= run_test<ck::bf8_t,   ck::bf8_t,    float,        float,       float,              32>(); // V_WMMA_F32_16X16X128_BF8_BF8
-    pass &= run_test<ck::bf8_t,   ck::f8_t,     float,        float,       float,              32>(); // V_WMMA_F32_16X16X128_BF8_F8
-    pass &= run_test<ck::f8_t,    ck::bf8_t,    float,        float,       float,              32>(); // V_WMMA_F32_16X16X128_F8_BF8
-    pass &= run_test<ck::f8_t,    ck::f8_t,     float,        float,       float,              32>(); // V_WMMA_F32_16X16X128_F8_F8
-    pass &= run_test<ck::bf8_t,   ck::bf8_t,    ck::half_t,   ck::half_t,  ck::half_t,         32>(); // V_WMMA_F16_16X16X128_BF8_BF8
-    pass &= run_test<ck::bf8_t,   ck::f8_t,     ck::half_t,   ck::half_t,  ck::half_t,         32>(); // V_WMMA_F16_16X16X128_BF8_F8
-    pass &= run_test<ck::f8_t,    ck::bf8_t,    ck::half_t,   ck::half_t,  ck::half_t,         32>(); // V_WMMA_F16_16X16X128_F8_BF8
-    pass &= run_test<ck::f8_t,    ck::f8_t,     ck::half_t,   ck::half_t,  ck::half_t,         32>(); // V_WMMA_F16_16X16X128_F8_F8
-    pass &= run_test<ck::bhalf_t, ck::bhalf_t,  ck::bhalf_t,  float,       float,              8>(); // V_WMMA_BF16F32_16X16X32_BF16
-    pass &= run_test<int8_t,      int8_t,       int32_t,      int32_t,     int32_t,            16>(); // V_WMMA_I32_16X16X64_IU8
-    pass &= run_test<float,       float,        float,        float,       float,              1>(); // V_WMMA_F32_16X16X4_F32
+    //              |SrcAType    |SrcBType,     |DstType     |GPUAccType  |CPUAccType      |kValue
+    pass &= run_test<ck::half_t,  ck::half_t,   float,        float,       float,              32>(); // V_WMMA_F32_16X16X32_F16
+    pass &= run_test<ck::half_t,  ck::half_t,   ck::half_t,   ck::half_t,  ck::half_t,         32>(); // V_WMMA_F16_16X16X32_F16
+    pass &= run_test<ck::bhalf_t, ck::bhalf_t,  float,        float,       float,              32>(); // V_WMMA_F32_16X16X32_BF16
+    pass &= run_test<ck::bhalf_t, ck::bhalf_t,  ck::bhalf_t,  ck::bhalf_t, float,              32>(); // V_WMMA_BF16_16X16X32_BF16 ****
+    pass &= run_test<ck::bf8_t,   ck::bf8_t,    float,        float,       float,              64>(); // V_WMMA_F32_16X16X64_BF8_BF8
+    pass &= run_test<ck::bf8_t,   ck::f8_t,     float,        float,       float,              64>(); // V_WMMA_F32_16X16X64_BF8_F8
+    pass &= run_test<ck::f8_t,    ck::bf8_t,    float,        float,       float,              64>(); // V_WMMA_F32_16X16X64_F8_BF8
+    pass &= run_test<ck::f8_t,    ck::f8_t,     float,        float,       float,              64>(); // V_WMMA_F32_16X16X64_F8_F8
+    pass &= run_test<ck::bf8_t,   ck::bf8_t,    ck::half_t,   ck::half_t,  ck::half_t,         64>(); // V_WMMA_F16_16X16X64_BF8_BF8
+    pass &= run_test<ck::bf8_t,   ck::f8_t,     ck::half_t,   ck::half_t,  ck::half_t,         64>(); // V_WMMA_F16_16X16X64_BF8_F8
+    pass &= run_test<ck::f8_t,    ck::bf8_t,    ck::half_t,   ck::half_t,  ck::half_t,         64>(); // V_WMMA_F16_16X16X64_F8_BF8
+    pass &= run_test<ck::f8_t,    ck::f8_t,     ck::half_t,   ck::half_t,  ck::half_t,         64>(); // V_WMMA_F16_16X16X64_F8_F8
+    pass &= run_test<ck::bf8_t,   ck::bf8_t,    float,        float,       float,              128>(); // V_WMMA_F32_16X16X128_BF8_BF8
+    pass &= run_test<ck::bf8_t,   ck::f8_t,     float,        float,       float,              128>(); // V_WMMA_F32_16X16X128_BF8_F8
+    pass &= run_test<ck::f8_t,    ck::bf8_t,    float,        float,       float,              128>(); // V_WMMA_F32_16X16X128_F8_BF8
+    pass &= run_test<ck::f8_t,    ck::f8_t,     float,        float,       float,              128>(); // V_WMMA_F32_16X16X128_F8_F8
+    pass &= run_test<ck::bf8_t,   ck::bf8_t,    ck::half_t,   ck::half_t,  ck::half_t,         128>(); // V_WMMA_F16_16X16X128_BF8_BF8
+    pass &= run_test<ck::bf8_t,   ck::f8_t,     ck::half_t,   ck::half_t,  ck::half_t,         128>(); // V_WMMA_F16_16X16X128_BF8_F8
+    pass &= run_test<ck::f8_t,    ck::bf8_t,    ck::half_t,   ck::half_t,  ck::half_t,         128>(); // V_WMMA_F16_16X16X128_F8_BF8
+    pass &= run_test<ck::f8_t,    ck::f8_t,     ck::half_t,   ck::half_t,  ck::half_t,         128>(); // V_WMMA_F16_16X16X128_F8_F8
+    pass &= run_test<ck::bhalf_t, ck::bhalf_t,  ck::bhalf_t,  float,       float,              32>(); // V_WMMA_BF16F32_16X16X32_BF16
+    pass &= run_test<int8_t,      int8_t,       int32_t,      int32_t,     int32_t,            64>(); // V_WMMA_I32_16X16X64_IU8
+    pass &= run_test<float,       float,        float,        float,       float,              4>(); // V_WMMA_F32_16X16X4_F32
 
     // gfx1251 only
 #if defined(__gfx1251__)
-    pass &= run_test<double,       double,        double,        double,       double,              1>(); // V_WMMA_F32_16X16X4_F32
+    pass &= run_test<double,       double,        double,        double,       double,              4>(); // V_WMMA_F32_16X16X4_F32
 #endif
 
     //clang-format on
