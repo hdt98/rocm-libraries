@@ -369,27 +369,24 @@ namespace rocRoller
             return result;
         }
 
-        std::vector<InstructionProfile> loopUntilDispatchData(int n, std::function<void()> dispatch)
+        std::vector<InstructionProfile> loopUntilDispatchData(std::function<void()> dispatch)
         {
-            AssertFatal(
-                n > 0,
-                "N must be positive, as dispatch() is expected to dispatch at least one kernel");
-
             if constexpr(!ENABLE_AGENT)
                 return {};
 
-            // User should expect dispatch to be called multiple times
-            // E.g. reset reused global memory within the function body
-            dispatch();
-            auto data = waitForDispatchData(n);
+            std::optional<std::vector<InstructionProfile>> data;
 
-            dispatch();
-            while(!(data = waitForDispatchData(n)).has_value())
+            // Keep trying to dispatch and collect data for this single kernel
+            while(true)
             {
-                Log::info("loopUntilDispatchData: no data yet, invoking dispatch");
                 dispatch();
+                data = waitForDispatchData(1); // Wait for 1 dispatch
+                if(data.has_value())
+                {
+                    return *data;
+                }
+                Log::info("loopUntilDispatchData: no data yet, invoking dispatch");
             }
-            return *data;
         }
 
         uint64_t InstructionProfile::meanLatency() const

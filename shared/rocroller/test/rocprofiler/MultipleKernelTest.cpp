@@ -175,7 +175,7 @@ namespace RocprofilerTest
         auto kernelSetup
             = createKernel(TestContext::ForTestDevice({}, testName), literal, commandArg);
 
-        const auto latencies = rocRoller::profiler::loopUntilDispatchData(1, [&]() {
+        const auto latencies = rocRoller::profiler::loopUntilDispatchData([&]() {
             kernelSetup.kernel.launchKernel(kernelSetup.commandArgs.runtimeArguments());
             HIP_CHECK(hipDeviceSynchronize());
         });
@@ -301,7 +301,7 @@ namespace RocprofilerTest
             }
             rocRoller::profiler::waitForDispatchData(order.size());
 
-            const auto latencies = rocRoller::profiler::loopUntilDispatchData(1, [&]() {
+            const auto latencies = rocRoller::profiler::loopUntilDispatchData([&]() {
                 kernelSetups[order.back()].kernel.launchKernel(
                     kernelSetups[order.back()].commandArgs.runtimeArguments());
             });
@@ -327,7 +327,7 @@ namespace RocprofilerTest
 
             rocRoller::profiler::waitForDispatchData(order.size());
 
-            const auto latencies = rocRoller::profiler::loopUntilDispatchData(1, [&]() {
+            const auto latencies = rocRoller::profiler::loopUntilDispatchData([&]() {
                 kernelSetups[order.back()].kernel.launchKernel(
                     kernelSetups[order.back()].commandArgs.runtimeArguments());
             });
@@ -351,7 +351,7 @@ namespace RocprofilerTest
                 HIP_CHECK(hipDeviceSynchronize());
                 rocRoller::profiler::waitForDispatchData(1);
             }
-            const auto latencies = rocRoller::profiler::loopUntilDispatchData(1, [&]() {
+            const auto latencies = rocRoller::profiler::loopUntilDispatchData([&]() {
                 kernelSetups[order.back()].kernel.launchKernel(
                     kernelSetups[order.back()].commandArgs.runtimeArguments());
             });
@@ -377,7 +377,7 @@ namespace RocprofilerTest
         auto kernelSetup
             = createKernel(TestContext::ForTestDevice({}, testName), literal, commandArg);
 
-        const auto latencies = rocRoller::profiler::loopUntilDispatchData(1, [&]() {
+        const auto latencies = rocRoller::profiler::loopUntilDispatchData([&]() {
             kernelSetup.kernel.launchKernel(kernelSetup.commandArgs.runtimeArguments());
             HIP_CHECK(hipDeviceSynchronize());
         });
