@@ -269,13 +269,12 @@ namespace RocprofilerTest
         return {std::move(testContext), std::move(commandKernel), nullptr, commandArgs, instrs};
     }
 
-    TEST_CASE("Rocprofiler agent race conditions", "[rocprofiler]")
+    TEST_CASE("Rocprofiler handle callbacks", "[rocprofiler]")
     {
         /*
-        There were race conditions between the dispatch and shader data callbacks.
-        This test ensures that the fix works as intended.
-        Multiple simple kernels with different literals are launched various orders.
-        Ensures the profiler returns instructions from the last launched kernel.
+        Ensure callbacks are properly handled and correctly mapped to a dispatch.
+        Kernels with different literals are launched in various orders.
+        Ensures the profiler returns instructions from the correct kernel.
         */
 
         std::vector<uint32_t> literals
