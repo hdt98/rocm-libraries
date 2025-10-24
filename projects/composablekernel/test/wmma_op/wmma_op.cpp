@@ -103,7 +103,7 @@ bool run_test()
 
     const auto wmma_kernel_container = std::make_tuple(matmul_default, matmul_swizzle_a);
 
-    ck::static_for<0, 1, 1>{}([&](auto i) {
+    ck::static_for<0, 2, 1>{}([&](auto i) {
         pass &=
             ck::wmma_op_util::TestWmma<decltype(std::get<ck::Number<i>{}>(wmma_kernel_container)),
                                        SrcAType,
