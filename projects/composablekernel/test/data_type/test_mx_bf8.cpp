@@ -9,16 +9,18 @@ using ck::bf8_ocp_t;
 using ck::bf8x16_ocp_t;
 using ck::bf8x2_ocp_t;
 using ck::bf8x32_ocp_t;
+using ck::bf8x8_ocp_t;
 using ck::e8m0_bexp_t;
 using ck::float16_t;
 using ck::float2_t;
 using ck::float32_t;
+using ck::float8_t;
 using ck::mxf8_convert_rne;
 using ck::mxf8_convert_sr;
 using ck::scaled_type_convert;
 using ck::type_convert;
 
-constexpr uint64_t test_size = 256 * 256 + 2 + 4 + 6;
+constexpr uint64_t test_size = 256 * 256 + 2 + 4 + 6 + 16;
 
 /**
  * @brief  Tests conversion of BF8 values to float using E8M0 exponent scaling.
@@ -169,6 +171,33 @@ test_mx_bf8_scaled_convert(uint64_t N, float* p_test, uint64_t* p_completed)
     {
         return;
     }
+
+    // test pk8 vector conversion, first /4.0f, then *2.0f
+    float fscale = 4.0f;
+    float8_t v8_float{2.0f,
+                      -4.0f,
+                      65536.0f,
+                      -65536.0f,
+                      std::numeric_limits<float>::quiet_NaN(),
+                      std::numeric_limits<float>::infinity(),
+                      powf(2.0f, -16.0f),
+                      0.04f};
+    // expected {1., -2., 32768., -32768, nan, nan, 0., 0.01953125}
+    auto v8_float_back =
+        scaled_type_convert<float8_t>(scale2, mxf8_convert_rne<bf8x8_ocp_t>(v8_float, fscale));
+
+    for(int ii = 0; ii < 8; ii++)
+    {
+        p_test[i++] = v8_float_back[ii];
+    }
+
+    // expected {1., -2., 32768., -32768, nan, nan,  0./2^-15, 0.01953125/0.0234375}
+    v8_float_back =
+        scaled_type_convert<float8_t>(scale2, mxf8_convert_sr<bf8x8_ocp_t>(v8_float, fscale));
+    for(int ii = 0; ii < 8; ii++)
+    {
+        p_test[i++] = v8_float_back[ii];
+    }
 }
 
 TEST(MXBF8, HostScaledConvert)
@@ -271,6 +300,30 @@ TEST(MXBF8, HostScaledConvert)
     EXPECT_EQ(out[i++], type_convert<float>(ck::NumericLimits<bf8_ocp_t>::Lowest()))
         << "out[i-1]: " << out[i - 1];
     EXPECT_EQ(out[i++], powf(2.0f, 14.0f)) << "out[i-1]: " << out[i - 1];
+
+    // f32x8 <-> bf8x8 PK8 conversion
+    // RNE
+    EXPECT_EQ(out[i++], 1.0f);
+    EXPECT_EQ(out[i++], -2.0f);
+    EXPECT_EQ(out[i++], 32768.0f);
+    EXPECT_EQ(out[i++], -32768.0f);
+    EXPECT_TRUE(std::isnan(out[i++])) << "out[i-1]: " << out[i - 1];
+    EXPECT_EQ(out[i++], type_convert<float>(ck::NumericLimits<bf8_ocp_t>::Max()) * 2.f)
+        << "out[i-1]: " << out[i - 1];
+    EXPECT_EQ(out[i++], 0.0f);
+    EXPECT_EQ(out[i++], 0.01953125f);
+    // SR
+    EXPECT_EQ(out[i++], 1.0f);
+    EXPECT_EQ(out[i++], -2.0f);
+    EXPECT_EQ(out[i++], 32768.0f);
+    EXPECT_EQ(out[i++], -32768.0f);
+    EXPECT_TRUE(std::isnan(out[i++])) << "out[i-1]: " << out[i - 1];
+    EXPECT_EQ(out[i++], type_convert<float>(ck::NumericLimits<bf8_ocp_t>::Max()) * 2.f)
+        << "out[i-1]: " << out[i - 1];
+    EXPECT_TRUE(out[i] == 0.0f || out[i] == powf(2.0f, -15.0f));
+    i++;
+    EXPECT_TRUE(out[i] == 0.01953125f || out[i] == 0.0234375f);
+    i++;
 
     EXPECT_EQ(test_size, completed);
     EXPECT_EQ(test_size, i);
@@ -399,6 +452,28 @@ TEST(MXBF8, DeviceScaledConvert)
         << "out[i-1]: " << out[i - 1];
 #endif
     EXPECT_EQ(out[i++], powf(2.0f, 14.0f)) << "out[i-1]: " << out[i - 1];
+
+    // f32x8 <-> bf8x8 PK8 conversion
+    // RNE
+    EXPECT_EQ(out[i++], 1.0f);
+    EXPECT_EQ(out[i++], -2.0f);
+    EXPECT_EQ(out[i++], 32768.0f);
+    EXPECT_EQ(out[i++], -32768.0f);
+    EXPECT_TRUE(std::isnan(out[i++])) << "out[i-1]: " << out[i - 1];
+    EXPECT_TRUE(std::isinf(out[i++])) << "out[i-1]: " << out[i - 1];
+    EXPECT_EQ(out[i++], 0.0f);
+    EXPECT_EQ(out[i++], 0.01953125f);
+    // SR
+    EXPECT_EQ(out[i++], 1.0f);
+    EXPECT_EQ(out[i++], -2.0f);
+    EXPECT_EQ(out[i++], 32768.0f);
+    EXPECT_EQ(out[i++], -32768.0f);
+    EXPECT_TRUE(std::isnan(out[i++])) << "out[i-1]: " << out[i - 1];
+    EXPECT_TRUE(std::isinf(out[i++])) << "out[i-1]: " << out[i - 1];
+    EXPECT_TRUE(out[i] == 0.0f || out[i] == powf(2.0f, -15.0f));
+    i++;
+    EXPECT_TRUE(out[i] == 0.01953125f || out[i] == 0.0234375f);
+    i++;
 
     EXPECT_EQ(test_size, completed);
     EXPECT_EQ(test_size, i);
@@ -611,7 +686,7 @@ __global__ void test_mx_f32x32_device_scaled_convert(float* p_test, uint64_t* p_
         return;
     }
 
-    auto scale2 = e8m0_bexp_t(4.0f);
+    auto scale4 = e8m0_bexp_t(4.0f);
 
     bf8x32_ocp_t bf8x32{};
     float32_t float32{};
@@ -619,7 +694,7 @@ __global__ void test_mx_f32x32_device_scaled_convert(float* p_test, uint64_t* p_
         bf8x32.AsType<bf8_ocp_t>()(ii) = type_convert<bf8_ocp_t>(vec32_generator(ii) / 16.0f);
     });
 
-    float32 = scaled_type_convert<float32_t>(scale2, bf8x32);
+    float32 = scaled_type_convert<float32_t>(scale4, bf8x32);
 
     ck::static_for<0, N, 1>{}([&](auto ii) { p_test[i++] = float32[static_cast<int>(ii)]; });
 }

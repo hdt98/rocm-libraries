@@ -86,10 +86,12 @@ enum class ck_saturation_t
 namespace fp8_impl {
 
 typedef fp8_storage_t fp8x2_storage_t __attribute__((ext_vector_type(2)));
+typedef fp8_storage_t fp8x8_storage_t __attribute__((ext_vector_type(8)));
 typedef _Float16 half2_t __attribute__((ext_vector_type(2)));
 typedef ushort ushortx2_t __attribute__((ext_vector_type(2)));
 typedef short shortx2_t __attribute__((ext_vector_type(2)));
 typedef float float2_t __attribute__((ext_vector_type(2)));
+typedef uint32_t uint32x2_t __attribute__((ext_vector_type(2)));
 
 __host__ __device__ static inline constexpr bool fnuz_f8_is_nan(f8_fnuz_t a)
 {

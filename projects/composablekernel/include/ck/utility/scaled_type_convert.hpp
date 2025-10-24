@@ -30,7 +30,6 @@ inline __host__ __device__ float scaled_type_convert<float, f8_ocp_t>(e8m0_bexp_
 inline __host__ float scaled_type_convert<float, f8_ocp_t>(e8m0_bexp_t scale, f8_ocp_t x)
 #endif
 {
-
 #if CK_MX_FP8_CVT_FAST_PATH
     return fp8_impl::cast_to_f32_from_f8_scaled<f8_ocp_t::default_interpret>(
         type_convert<float>(scale), x.data);
@@ -70,8 +69,8 @@ inline __host__ float2_t scaled_type_convert<float2_t, f8x2_ocp_t>(e8m0_bexp_t s
     return fp8_impl::cast_to_f32_from_f8_scaled<f8_ocp_t::default_interpret>(
         type_convert<float>(scale), x.AsType<fp8_impl::fp8x2_storage_t>()[Number<0>{}]);
 #else
-    return float2_t{scaled_type_convert<float>(scale, x.AsType<f8_ocp_t>()[Number<0>{}]),
-                    scaled_type_convert<float>(scale, x.AsType<f8_ocp_t>()[Number<1>{}])};
+    auto v_f8x2 = type_convert<float2_t>(x);
+    return float2_t{v_f8x2[0] * type_convert<float>(scale), v_f8x2[1] * type_convert<float>(scale)};
 #endif
 }
 
@@ -89,9 +88,72 @@ inline __host__ float2_t scaled_type_convert<float2_t, bf8x2_ocp_t>(e8m0_bexp_t 
     return fp8_impl::cast_to_f32_from_f8_scaled<bf8_ocp_t::default_interpret>(
         type_convert<float>(scale), x.AsType<fp8_impl::fp8x2_storage_t>()[Number<0>{}]);
 #else
-    return float2_t{scaled_type_convert<float>(scale, x.AsType<bf8_ocp_t>()[Number<0>{}]),
-                    scaled_type_convert<float>(scale, x.AsType<bf8_ocp_t>()[Number<1>{}])};
+    auto v_f8x2 = type_convert<float2_t>(x);
+    return float2_t{v_f8x2[0] * type_convert<float>(scale), v_f8x2[1] * type_convert<float>(scale)};
 #endif
+}
+
+// convert 8 x f8_ocp_t to 8 x fp32
+template <>
+#if CK_USE_OCP_FP8
+inline __host__ __device__ float8_t scaled_type_convert<float8_t, f8x8_ocp_t>(e8m0_bexp_t scale,
+                                                                              f8x8_ocp_t x)
+#else
+inline __host__ float8_t scaled_type_convert<float8_t, f8x8_ocp_t>(e8m0_bexp_t scale, f8x8_ocp_t x)
+#endif
+{
+    union
+    {
+        float8_t vf32_8x1;
+        float2_t vf32_2x4[4];
+        float vf32_1x8[8];
+    } out;
+
+#if CK_MX_FP8_CVT_FAST_PATH
+    out.vf32_8x1 = fp8_impl::cast_to_f32_from_f8_scaled<f8_ocp_t::default_interpret>(
+        type_convert<float>(scale), x.AsType<fp8_impl::fp8x8_storage_t>()[Number<0>{}]);
+#else
+    union
+    {
+        f8x8_ocp_t vf8_8x1;
+        f8x2_ocp_t vf8_2x4[4];
+    } in(x);
+    ck::static_for<0, 4, 1>{}(
+        [&](auto i) { out.vf32_2x4[i] = scaled_type_convert<float2_t>(scale, in.vf8_2x4[i]); });
+#endif
+    return out.vf32_8x1;
+}
+
+// convert 8 x bf8_ocp_t to 8 x fp32
+template <>
+#if CK_USE_OCP_FP8
+inline __host__ __device__ float8_t scaled_type_convert<float8_t, bf8x8_ocp_t>(e8m0_bexp_t scale,
+                                                                               bf8x8_ocp_t x)
+#else
+inline __host__ float8_t scaled_type_convert<float8_t, bf8x8_ocp_t>(e8m0_bexp_t scale,
+                                                                    bf8x8_ocp_t x)
+#endif
+{
+    union
+    {
+        float8_t vf32_8x1;
+        float2_t vf32_2x4[4];
+        float vf32_1x8[8];
+    } out;
+
+#if CK_MX_FP8_CVT_FAST_PATH
+    out.vf32_8x1 = fp8_impl::cast_to_f32_from_f8_scaled<bf8_ocp_t::default_interpret>(
+        type_convert<float>(scale), x.AsType<fp8_impl::fp8x8_storage_t>()[Number<0>{}]);
+#else
+    union
+    {
+        bf8x8_ocp_t vf8_8x1;
+        bf8x2_ocp_t vf8_2x4[4];
+    } in(x);
+    ck::static_for<0, 4, 1>{}(
+        [&](auto i) { out.vf32_2x4[i] = scaled_type_convert<float2_t>(scale, in.vf8_2x4[i]); });
+#endif
+    return out.vf32_8x1;
 }
 
 // convert 16 x f8_ocp_t to 16 x fp32
@@ -107,20 +169,20 @@ inline __host__ float16_t scaled_type_convert<float16_t, f8x16_ocp_t>(e8m0_bexp_
 {
     union
     {
-        f8x16_ocp_t f8_1x16;
-        f8x2_ocp_t f8_2x8[8];
+        f8x16_ocp_t f8_16x1;
+        f8x8_ocp_t f8_8x2[2];
     } in{x};
     union
     {
-        float16_t float_1x16;
-        float2_t float_2x8[8];
+        float16_t float_16x1;
+        float8_t float_8x2[2];
     } out{};
 
-    ck::static_for<0, 8, 1>{}([&](auto i) {
-        out.float_2x8[i] = scaled_type_convert<float2_t, f8x2_ocp_t>(scale, in.f8_2x8[i]);
+    ck::static_for<0, 2, 1>{}([&](auto i) {
+        out.float_8x2[i] = scaled_type_convert<float8_t, f8x8_ocp_t>(scale, in.f8_8x2[i]);
     });
 
-    return out.float_1x16;
+    return out.float_16x1;
 }
 
 // convert 16 x bf8_ocp_t to 16 x fp32
@@ -136,20 +198,20 @@ inline __host__ float16_t scaled_type_convert<float16_t, bf8x16_ocp_t>(e8m0_bexp
 {
     union
     {
-        bf8x16_ocp_t bf8_1x16;
-        bf8x2_ocp_t bf8_2x8[8];
+        bf8x16_ocp_t bf8_16x1;
+        bf8x8_ocp_t bf8_8x2[8];
     } in{x};
     union
     {
-        float16_t float_1x16;
-        float2_t float_2x8[8];
+        float16_t float_16x1;
+        float8_t float_8x2[2];
     } out{};
 
-    ck::static_for<0, 8, 1>{}([&](auto i) {
-        out.float_2x8[i] = scaled_type_convert<float2_t, bf8x2_ocp_t>(scale, in.bf8_2x8[i]);
+    ck::static_for<0, 2, 1>{}([&](auto i) {
+        out.float_8x2[i] = scaled_type_convert<float8_t, bf8x8_ocp_t>(scale, in.bf8_8x2[i]);
     });
 
-    return out.float_1x16;
+    return out.float_16x1;
 }
 
 // convert 32 x f8_ocp_t to 32 x fp32
@@ -165,12 +227,12 @@ inline __host__ float32_t scaled_type_convert<float32_t, f8x32_ocp_t>(e8m0_bexp_
 {
     union
     {
-        f8x32_ocp_t f8_1x32;
+        f8x32_ocp_t f8_32x1;
         f8x16_ocp_t f8_16x2[2];
     } in{x};
     union
     {
-        float32_t float_1x32;
+        float32_t float_32x1;
         float16_t float_16x2[2];
     } out{};
 
@@ -178,7 +240,7 @@ inline __host__ float32_t scaled_type_convert<float32_t, f8x32_ocp_t>(e8m0_bexp_
         out.float_16x2[i] = scaled_type_convert<float16_t, f8x16_ocp_t>(scale, in.f8_16x2[i]);
     });
 
-    return out.float_1x32;
+    return out.float_32x1;
 }
 
 // convert 32 x bf8_ocp_t to 32 x fp32
@@ -194,12 +256,12 @@ inline __host__ float32_t scaled_type_convert<float32_t, bf8x32_ocp_t>(e8m0_bexp
 {
     union
     {
-        bf8x32_ocp_t bf8_1x32;
+        bf8x32_ocp_t bf8_32x1;
         bf8x16_ocp_t bf8_16x2[2];
     } in{x};
     union
     {
-        float32_t float_1x32;
+        float32_t float_32x1;
         float16_t float_16x2[2];
     } out{};
 
@@ -207,7 +269,7 @@ inline __host__ float32_t scaled_type_convert<float32_t, bf8x32_ocp_t>(e8m0_bexp
         out.float_16x2[i] = scaled_type_convert<float16_t, bf8x16_ocp_t>(scale, in.bf8_16x2[i]);
     });
 
-    return out.float_1x32;
+    return out.float_32x1;
 }
 
 // convert fp32 to fp8
@@ -270,6 +332,38 @@ inline __host__ bf8x2_ocp_t scaled_type_convert<bf8x2_ocp_t, float2_t>(e8m0_bexp
     return mxf8_convert_sr<bf8x2_ocp_t>(x, type_convert<float>(scale));
 #else
     return mxf8_convert_rne<bf8x2_ocp_t>(x, type_convert<float>(scale));
+#endif
+}
+
+// convert fp32x8 to fp8x8
+template <>
+#if CK_USE_OCP_FP8
+inline __host__ __device__ f8x8_ocp_t scaled_type_convert<f8x8_ocp_t, float8_t>(e8m0_bexp_t scale,
+                                                                                float8_t x)
+#else
+inline __host__ f8x8_ocp_t scaled_type_convert<f8x8_ocp_t, float8_t>(e8m0_bexp_t scale, float8_t x)
+#endif
+{
+#if CK_USE_SR_F8_CONVERSION
+    return mxf8_convert_sr<f8x8_ocp_t>(x, type_convert<float>(scale));
+#else
+    return mxf8_convert_rne<f8x8_ocp_t>(x, type_convert<float>(scale));
+#endif
+}
+// convert fp32x8 to bf8x8
+template <>
+#if CK_USE_OCP_FP8
+inline __host__ __device__ bf8x8_ocp_t scaled_type_convert<bf8x8_ocp_t, float8_t>(e8m0_bexp_t scale,
+                                                                                  float8_t x)
+#else
+inline __host__ bf8x8_ocp_t scaled_type_convert<bf8x8_ocp_t, float8_t>(e8m0_bexp_t scale,
+                                                                       float8_t x)
+#endif
+{
+#if CK_USE_SR_F8_CONVERSION
+    return mxf8_convert_sr<bf8x8_ocp_t>(x, type_convert<float>(scale));
+#else
+    return mxf8_convert_rne<bf8x8_ocp_t>(x, type_convert<float>(scale));
 #endif
 }
 
