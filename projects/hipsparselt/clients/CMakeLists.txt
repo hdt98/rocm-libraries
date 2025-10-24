@@ -19,7 +19,7 @@ endif()
 # find_package(LAPACK) and conditionally fetch it if not found There is an implicit
 # find_package(BLAS) when finding lapack
 if(NOT HIPSPARSELT_ENABLE_THEROCK)
-    include(FetchLAPACK)
+    include(fetch_lapack)
 endif()
 
 add_library(hipsparselt-clients-common OBJECT)
