@@ -56,6 +56,76 @@ namespace conv {
 
 #if MIOPEN_BACKEND_HIP && MIOPEN_USE_COMPOSABLEKERNEL
 
+using InLayout                             = ck::tensor_layout::convolution::NDHWGC;
+using WeiLayout                            = ck::tensor_layout::convolution::GKZYXC;
+using OutLayout                            = ck::tensor_layout::convolution::NDHWGK;
+using PassThrough                          = ck::tensor_operation::element_wise::PassThrough;
+using Bilinear                             = ck::tensor_operation::element_wise::Bilinear;
+using Scale                                = ck::tensor_operation::element_wise::Scale;
+static constexpr ck::index_t NumDimSpatial = 3;
+
+template <typename DataType>
+using DeviceOpGBwdBilinear =
+    ck::tensor_operation::device::DeviceGroupedConvBwdDataMultipleD<NumDimSpatial,
+                                                                    OutLayout,
+                                                                    WeiLayout,
+                                                                    ck::Tuple<InLayout>,
+                                                                    InLayout,
+                                                                    DataType,
+                                                                    DataType,
+                                                                    ck::Tuple<DataType>,
+                                                                    DataType,
+                                                                    PassThrough,
+                                                                    PassThrough,
+                                                                    Bilinear>;
+
+template <typename DataType>
+using DeviceOpGBwdScale =
+    ck::tensor_operation::device::DeviceGroupedConvBwdDataMultipleD<NumDimSpatial,
+                                                                    OutLayout,
+                                                                    WeiLayout,
+                                                                    ck::Tuple<>,
+                                                                    InLayout,
+                                                                    DataType,
+                                                                    DataType,
+                                                                    ck::Tuple<>,
+                                                                    DataType,
+                                                                    PassThrough,
+                                                                    PassThrough,
+                                                                    Scale>;
+
+template <typename DataType>
+using DeviceOpGBwdDefault =
+    ck::tensor_operation::device::DeviceGroupedConvBwdDataMultipleD<NumDimSpatial,
+                                                                    OutLayout,
+                                                                    WeiLayout,
+                                                                    ck::Tuple<>,
+                                                                    InLayout,
+                                                                    DataType,
+                                                                    DataType,
+                                                                    ck::Tuple<>,
+                                                                    DataType,
+                                                                    PassThrough,
+                                                                    PassThrough,
+                                                                    PassThrough,
+                                                                    DataType,
+                                                                    DataType>;
+
+template <typename DataType>
+using DeviceOpGBwdBilinearPtrs =
+    ck::tensor_operation::device::instance::DeviceOperationInstanceFactory<
+        DeviceOpGBwdBilinear<DataType>>;
+
+template <typename DataType>
+using DeviceOpGBwdScalePtrs =
+    ck::tensor_operation::device::instance::DeviceOperationInstanceFactory<
+        DeviceOpGBwdScale<DataType>>;
+
+template <typename DataType>
+using DeviceOpGBwdDefaultPtrs =
+    ck::tensor_operation::device::instance::DeviceOperationInstanceFactory<
+        DeviceOpGBwdDefault<DataType>>;
+
 namespace {
 
 template <typename DataType>
@@ -322,14 +392,19 @@ FillValidKernelsByAlphaBeta(const ::miopen::conv::ProblemDescription& problem)
     case SCALE:
         return FillValidKernelsIDs<DeviceOpGBwdScalePtrs<DataType>, CKArgs<DataType>>(problem);
     default:
-        valid_kernels =
-            FillValidKernelsIDs<DeviceOpGBwdDefaultPtrs<DataType>, CKArgs<DataType>>(problem);
-        break;
+        return FillValidKernelsIDs<DeviceOpGBwdDefaultPtrs<DataType>, CKArgs<DataType>>(problem);
     }
-    index     = 0;
-    split_k   = 1;
-    kernel_id = valid_kernels[index];
-    +"+" + std::to_string(split_k);
+}
+} // namespace
+
+template <typename DataType>
+void PerformanceConfigHipImplicitGemm3DGroupBwdXdlops::Init(
+    const ::miopen::conv::ProblemDescription& problem)
+{
+    valid_kernels = FillValidKernelsByAlphaBeta<DataType>(problem);
+    index         = 0;
+    split_k       = 1;
+    kernel_id     = valid_kernels[index] + "+" + std::to_string(split_k);
 }
 
 template <typename DataType>
