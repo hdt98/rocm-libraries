@@ -61,7 +61,7 @@ if(HIPSPARSELT_ENABLE_CLIENT)
     option(HIPSPARSELT_ENABLE_BENCHMARKS "Build benchmark client." ON)
     option(HIPSPARSELT_ENABLE_SAMPLES "Build client samples." ON)
     option(HIPSPARSELT_ENABLE_FORTRAN "Build Fortran clients." OFF)
-    option(HIPSPARSELT_ENABLE_BLIS "Enable BLIS support for reference implementations." ON)
+    option(HIPSPARSELT_ENABLE_BLIS "Enable BLIS support for reference implementations." OFF)
 endif()
 
 cmake_dependent_option(HIPSPARSELT_ENABLE_MARKER "Use the marker library." ON "NOT WIN32" OFF)

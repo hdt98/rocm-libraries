@@ -11,13 +11,10 @@ if(HIPSPARSELT_ENABLE_THEROCK)
 elseif(HIPSPARSELT_ENABLE_BLIS)
     # Use BLIS as an AMD optimized BLAS alternative, this may be removed in the future to
     # consolidate the vendoring strategy of BLAS/LAPACK, but remains for historical purposes
-    find_package(BLIS QUIET)
-    if(NOT BLIS_FOUND)
-        message(WARNING "BLIS enabled but not found. Falling back to standard BLAS/LAPACK.")
-    endif()
+    find_package(BLIS REQUIRED)
 endif()
-# find_package(LAPACK) and conditionally fetch it if not found There is an implicit
-# find_package(BLAS) when finding lapack
+# find_package(LAPACK) and conditionally fetch it if not found (there is an implicit
+# find_package(BLAS) when finding lapack)
 if(NOT HIPSPARSELT_ENABLE_THEROCK)
     include(fetch_lapack)
 endif()
