@@ -192,9 +192,10 @@ namespace rocRoller
                               static_cast<
                                   std::underlying_type_t<rocprofiler_thread_trace_decoder_info_t>>(
                                   *info));
-                    // Currently only seen this type of info; investigate if others are encountered
-                    assert(*info == ROCPROFILER_THREAD_TRACE_DECODER_INFO_STITCH_INCOMPLETE
-                           && "parse: received INFO record that is not STITCH_INCOMPLETE");
+                    // Currently only seen these types of info; investigate if others are encountered
+                    assert((*info == ROCPROFILER_THREAD_TRACE_DECODER_INFO_STITCH_INCOMPLETE)
+                           || (*info == ROCPROFILER_THREAD_TRACE_DECODER_INFO_DATA_LOST)
+                                  && "parse: received unexpected INFO record type");
                 }
                 userdata->ok = false;
                 userdata->instruction_map.clear();
