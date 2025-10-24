@@ -163,18 +163,26 @@ namespace rocRoller
                                   inst.pc.code_object_id,
                                   requested_dispatch_id.load());
 
+                        if(inst.pc.code_object_id == 0)
+                        {
+                            Log::warn("parse: encountered instruction with code_object_id 0");
+                            userdata->ok = false;
+                            userdata->instruction_map.clear();
+                            return;
+                        }
+
                         auto& data = userdata->instruction_map[inst.pc];
                         data.totalLatency += inst.duration;
                         data.hitcount += 1;
                     }
                 }
-                break;
+                return;
 
             // Handle if interested in data in `rocprofiler_thread_trace_decoder_occupancy_t`
             case ROCPROFILER_THREAD_TRACE_DECODER_RECORD_OCCUPANCY:
             case ROCPROFILER_THREAD_TRACE_DECODER_RECORD_GFXIP:
                 // Ok to ignore both these
-                break;
+                return;
 
             case ROCPROFILER_THREAD_TRACE_DECODER_RECORD_INFO:
                 for(size_t i = 0; i < num_events; i++)
@@ -190,7 +198,7 @@ namespace rocRoller
                 }
                 userdata->ok = false;
                 userdata->instruction_map.clear();
-                break;
+                return;
             default:
                 Log::critical(
                     "parse: unhandled record type {}",
@@ -198,7 +206,7 @@ namespace rocRoller
                         std::underlying_type_t<rocprofiler_thread_trace_decoder_record_type_t>>(
                         record_type_id));
                 assert(!"parse: unhandled record type");
-                break;
+                return;
             }
         }
 
