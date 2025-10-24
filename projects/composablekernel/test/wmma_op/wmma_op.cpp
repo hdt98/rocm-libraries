@@ -117,8 +117,7 @@ bool run_test()
                                        PassThrough,
                                        PassThrough,
                                        PassThrough,
-                                       kValue>{}(
-                std::get<ck::Number<i>{}>(wmma_kernel_container));
+                                       kValue>{}(std::get<ck::Number<i>{}>(wmma_kernel_container));
     });
 
     return pass ? 1 : 0;

@@ -159,11 +159,7 @@ struct WMMAVecType<T, kValue, ck::enable_if_t<ck::is_same_v<T, int8_t>>>
 };
 
 // gfx1250 builtin_wmma_naive_selector
-template <typename srcAType,
-          typename srcBType,
-          typename dstType,
-          typename accType,
-          index_t kValue>
+template <typename srcAType, typename srcBType, typename dstType, typename accType, index_t kValue>
 __device__ void builtin_wmma_naive_selector(
     const typename WMMAVecType<srcAType, kValue>::VecT::type& reg_a,
     const typename WMMAVecType<srcBType, kValue>::VecT::type& reg_b,
