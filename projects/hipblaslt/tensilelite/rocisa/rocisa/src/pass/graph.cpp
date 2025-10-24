@@ -96,10 +96,12 @@ namespace rocisa
                     _setName2RegNum(regContainer.get(), assignmentDict);
                     if(regContainer->regType == "acc")
                         continue;
+                    // std::cerr << regContainer->regType << ", i:";
                     for(int i = regContainer->regIdx;
                         i < regContainer->regIdx + regContainer->regNum;
                         ++i)
                     {
+                        // std::cerr << i << ' ';
                         auto& gprvec = graph.getGprRef(regContainer->regType);
                         if(i >= gprvec.size())
                         {
@@ -113,6 +115,7 @@ namespace rocisa
                             gprvec[i].push_back(std::make_shared<NoOptItem>(item));
                         else
                             gprvec[i].push_back(item);
+                        // std::cerr << std::endl;
                     }
                 }
             }
