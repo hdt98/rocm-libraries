@@ -135,6 +135,23 @@ inline void visitGraph(INode& root, Func&& visitor)
     }
 }
 
+// Const overload for const INode references
+template <typename Func>
+inline void visitGraph(const INode& root, Func&& visitor)
+{
+    // Visit current node first (pre-order traversal)
+    visitor(root);
+
+    // Then visit all children
+    for(const auto& child : root.getSubNodes())
+    {
+        if(child)
+        {
+            visitGraph(*child, std::forward<Func>(visitor));
+        }
+    }
+}
+
 // Overload for shared_ptr
 template <typename Func>
 inline void visitGraph(const std::shared_ptr<INode>& root, Func&& visitor)

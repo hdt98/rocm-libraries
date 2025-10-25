@@ -1,28 +1,16 @@
 // Copyright © Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier:  MIT
 
-#include <cmath>
 #include <filesystem>
-#include <gtest/gtest.h>
-#include <hip/hip_runtime.h>
-#include <memory>
-#include <optional>
 #include <random>
-#include <vector>
 
-#include <hipdnn_frontend/Graph.hpp>
-#include <hipdnn_frontend/Utilities.hpp>
-#include <hipdnn_frontend/attributes/TensorAttributes.hpp>
-#include <hipdnn_sdk/test_utilities/CpuFpReferenceBatchnorm.hpp>
-#include <hipdnn_sdk/test_utilities/CpuFpReferenceMiopenRmsValidation.hpp>
+#include <hip/hip_runtime.h>
 #include <hipdnn_sdk/test_utilities/CpuFpReferenceValidation.hpp>
-#include <hipdnn_sdk/test_utilities/Seeds.hpp>
 #include <hipdnn_sdk/test_utilities/TestTolerances.hpp>
 #include <hipdnn_sdk/test_utilities/TestUtilities.hpp>
-#include <hipdnn_sdk/utilities/MigratableMemory.hpp>
 #include <hipdnn_sdk/utilities/PlatformUtils.hpp>
-#include <hipdnn_sdk/utilities/ShapeUtilities.hpp>
-#include <hipdnn_sdk/utilities/Tensor.hpp>
+
+#include "IntegrationTestUtils.hpp"
 
 using namespace hipdnn_frontend;
 using namespace hipdnn_sdk::utilities;
@@ -33,10 +21,10 @@ namespace
 
 enum class BatchnormTrainingScenario
 {
-    BASIC_FORWARD,       // No saved stats (Y output only) - MIO: (0,0)
-    WITH_RUNNING_STATS,  // Batch + Running stats, no initial - MIO: (1,1)
-    WITH_BATCH_STATS,    // Batch stats only - MIO: (0,1)  
-    FULL_TRAINING        // All stats with initial - MIO: (1,1)
+    BASIC_FORWARD,      // No saved stats (Y output only)
+    WITH_RUNNING_STATS, // Running stats only
+    WITH_BATCH_STATS,   // Batch stats only
+    FULL_TRAINING       // All stats (batch + running)
 };
 
 struct Batchnorm2dTestCase
@@ -81,208 +69,55 @@ struct Batchnorm3dTestCase
 };
 
 template <typename InputType, typename IntermediateType, typename TestCaseType>
-class BatchnormForwardTraining : public ::testing::Test
+class BatchnormForwardTraining : public GraphVerifierTest<InputType, TestCaseType>
 {
-    struct GraphTensorBundle
-    {
-        GraphTensorBundle(const std::vector<int64_t>& dims,
-                          BatchnormTrainingScenario scenario,
-                          unsigned int seed = getGlobalTestSeed(),
-                          const TensorLayout& layout = TensorLayout::NCHW)
-            : scenario(scenario)
-            , derivedDims(getDerivedShape(dims))
-            , xTensor(dims, layout)
-            , yTensor(dims, layout)
-            , scaleTensor(derivedDims)
-            , biasTensor(derivedDims)
-            , epsilonTensor({1})
-        {
-            xTensor.fillWithRandomValues(
-                static_cast<InputType>(0.0f), static_cast<InputType>(1.0f), seed);
-            yTensor.fillWithRandomValues(
-                static_cast<InputType>(-100.0f), static_cast<InputType>(100.0f), seed);
-
-            scaleTensor.fillWithRandomValues(
-                static_cast<IntermediateType>(0.0f), static_cast<IntermediateType>(1.0f), seed);
-
-            biasTensor.fillWithRandomValues(
-                static_cast<IntermediateType>(0.0f), static_cast<IntermediateType>(1.0f), seed);
-
-            // Set epsilon value using random generation
-            std::mt19937 gen(seed);
-            std::uniform_real_distribution<float> epsilonDist(1e-6f, 1e-4f);
-            epsilonTensor.memory().hostData()[0] = static_cast<IntermediateType>(epsilonDist(gen));
-
-            // Initialize batch statistics for all scenarios except BASIC_FORWARD
-            if(scenario != BatchnormTrainingScenario::BASIC_FORWARD)
-            {
-                meanTensor.emplace(derivedDims);
-                invVarianceTensor.emplace(derivedDims);
-                meanTensor->fillWithValue(static_cast<IntermediateType>(0.0f));
-                invVarianceTensor->fillWithValue(static_cast<IntermediateType>(0.0f));
-            }
-
-            // Initialize running statistics tensors if needed (MIO_RUNNING_RESULT=1)
-            if(scenario == BatchnormTrainingScenario::WITH_RUNNING_STATS
-               || scenario == BatchnormTrainingScenario::FULL_TRAINING)
-            {
-                runningMeanTensor.emplace(derivedDims);
-                runningVarianceTensor.emplace(derivedDims);
-                momentumTensor.emplace(std::vector<int64_t>{1});
-
-                // Initialize with random values simulating state from previous iteration
-                runningMeanTensor->fillWithRandomValues(
-                    static_cast<IntermediateType>(0.0f), static_cast<IntermediateType>(1.0f), seed);
-
-                runningVarianceTensor->fillWithRandomValues(static_cast<IntermediateType>(0.1f),
-                                                            static_cast<IntermediateType>(1.0f),
-                                                            seed);
-
-                std::uniform_real_distribution<float> momentumDist(0.05f, 0.15f);
-                momentumTensor->memory().hostData()[0]
-                    = static_cast<IntermediateType>(momentumDist(gen));
-            }
-        }
-
-        std::unordered_map<int64_t, void*>
-            toDeviceVariantPack(const graph::TensorAttributes& xTensorAttr,
-                                const graph::TensorAttributes& scaleTensorAttr,
-                                const graph::TensorAttributes& biasTensorAttr,
-                                const std::shared_ptr<graph::TensorAttributes>& prevRunningMeanTensorAttr,
-                                const std::shared_ptr<graph::TensorAttributes>& prevRunningVarianceTensorAttr,
-                                const std::shared_ptr<graph::TensorAttributes>& momentumTensorAttr,
-                                const graph::TensorAttributes& epsilonTensorAttr,
-                                const graph::TensorAttributes& yTensorAttr,
-                                const std::shared_ptr<graph::TensorAttributes>& meanTensorAttr,
-                                const std::shared_ptr<graph::TensorAttributes>& invVarianceTensorAttr,
-                                const std::shared_ptr<graph::TensorAttributes>& nextRunningMeanTensorAttr,
-                                const std::shared_ptr<graph::TensorAttributes>& nextRunningVarianceTensorAttr)
-        {
-            std::unordered_map<int64_t, void*> variantPack;
-            variantPack[xTensorAttr.get_uid()] = xTensor.memory().deviceData();
-            variantPack[scaleTensorAttr.get_uid()] = scaleTensor.memory().deviceData();
-            variantPack[biasTensorAttr.get_uid()] = biasTensor.memory().deviceData();
-            variantPack[epsilonTensorAttr.get_uid()] = epsilonTensor.memory().hostData();
-            variantPack[yTensorAttr.get_uid()] = yTensor.memory().deviceData();
-
-            // Add running statistics if both attributes and tensors exist
-            if(prevRunningMeanTensorAttr && prevRunningVarianceTensorAttr && momentumTensorAttr
-               && nextRunningMeanTensorAttr && nextRunningVarianceTensorAttr
-               && runningMeanTensor.has_value() && runningVarianceTensor.has_value()
-               && momentumTensor.has_value())
-            {
-                // Use the SAME buffer for both prev and next running statistics
-                variantPack[prevRunningMeanTensorAttr->get_uid()]
-                    = runningMeanTensor->memory().deviceData();
-                variantPack[prevRunningVarianceTensorAttr->get_uid()]
-                    = runningVarianceTensor->memory().deviceData();
-                variantPack[nextRunningMeanTensorAttr->get_uid()]
-                    = runningMeanTensor->memory().deviceData();
-                variantPack[nextRunningVarianceTensorAttr->get_uid()]
-                    = runningVarianceTensor->memory().deviceData();
-                variantPack[momentumTensorAttr->get_uid()] = momentumTensor->memory().hostData();
-            }
-
-            // Add batch statistics if tensors were actually allocated
-            if(meanTensorAttr && invVarianceTensorAttr && meanTensor.has_value()
-               && invVarianceTensor.has_value())
-            {
-                variantPack[meanTensorAttr->get_uid()] = meanTensor->memory().deviceData();
-                variantPack[invVarianceTensorAttr->get_uid()]
-                    = invVarianceTensor->memory().deviceData();
-            }
-
-            return variantPack;
-        }
-
-        BatchnormTrainingScenario scenario;
-        std::vector<int64_t> derivedDims;
-        PinnedTensor<InputType> xTensor;
-        PinnedTensor<InputType> yTensor;
-        PinnedTensor<IntermediateType> scaleTensor;
-        PinnedTensor<IntermediateType> biasTensor;
-        PinnedTensor<IntermediateType> epsilonTensor;
-
-        // Optional: batch statistics (MIO_SAVE_MEAN_VARIANCE=1)
-        std::optional<PinnedTensor<IntermediateType>> meanTensor;
-        std::optional<PinnedTensor<IntermediateType>> invVarianceTensor;
-
-        // Optional: running statistics (MIO_RUNNING_RESULT=1)
-        std::optional<PinnedTensor<IntermediateType>> runningMeanTensor;
-        std::optional<PinnedTensor<IntermediateType>> runningVarianceTensor;
-        std::optional<PinnedTensor<IntermediateType>> momentumTensor;
-    };
-
 protected:
-    void SetUp() override
+    void runGraphTest(InputType tolerance, const TensorLayout& layout = TensorLayout::NCHW) override
     {
-        SKIP_IF_NO_DEVICES();
-
-        // Uncomment if you want debug logging info.
-        // setenv("HIPDNN_LOG_LEVEL", "info", 1);
-
-        // Initialize HIP
-        ASSERT_EQ(hipInit(0), hipSuccess);
-        ASSERT_EQ(hipGetDevice(&_deviceId), hipSuccess);
-
-        // Note: The plugin paths has to be set before we create the hipdnn handle.
-        auto pluginPath
-            = std::filesystem::weakly_canonical(getCurrentExecutableDirectory() / PLUGIN_PATH);
-        const std::string pluginPathStr = pluginPath.string();
-        const std::array<const char*, 1> paths = {pluginPathStr.c_str()};
-        ASSERT_EQ(hipdnnSetEnginePluginPaths_ext(
-                      paths.size(), paths.data(), HIPDNN_PLUGIN_LOADING_ABSOLUTE),
-                  HIPDNN_STATUS_SUCCESS);
-
-        // Create handle and stream
-        ASSERT_EQ(hipdnnCreate(&_handle), HIPDNN_STATUS_SUCCESS);
-        ASSERT_EQ(hipStreamCreate(&_stream), hipSuccess);
-        ASSERT_EQ(hipdnnSetStream(_handle, _stream), HIPDNN_STATUS_SUCCESS);
+        runGraphTestWithScenario(tolerance, BatchnormTrainingScenario::FULL_TRAINING, layout);
     }
 
-    void TearDown() override
+    void runGraphTestWithScenario(InputType tolerance,
+                                  BatchnormTrainingScenario scenario,
+                                  const TensorLayout& layout = TensorLayout::NCHW)
     {
-        if(_handle != nullptr)
-        {
-            ASSERT_EQ(hipdnnDestroy(_handle), HIPDNN_STATUS_SUCCESS);
-        }
-        if(_stream != nullptr)
-        {
-            ASSERT_EQ(hipStreamDestroy(_stream), hipSuccess);
-        }
-    }
+        const TestCaseType& testCase = this->GetParam();
+        
+        auto inputDataType = getDataTypeEnumFromType<InputType>();
+        auto intermediateDataType = getDataTypeEnumFromType<IntermediateType>();
 
-    void runMiopenBatchnormFwd(GraphTensorBundle& graphTensorBundle,
-                               hipdnn_frontend::DataType inputDataType,
-                               hipdnn_frontend::DataType intermediateDataType,
-                               BatchnormTrainingScenario scenario)
-    {
-        auto graph = std::make_shared<hipdnn_frontend::graph::Graph>();
+        HIPDNN_LOG_INFO("Test is using {} for its random seed", testCase.seed);
 
-        graph->set_name("BatchnormTrainingTest");
+        hipdnn_frontend::graph::Graph graphObj;
+        graphObj.set_name("BatchnormForwardTrainingTest");
+        graphObj.set_compute_data_type(hipdnn_frontend::DataType::FLOAT);
 
         int64_t uid = 1;
-        auto xAttr = graph::makeTensorAttributes("X", inputDataType, graphTensorBundle.xTensor);
+        auto dims = testCase.getDims();
+        auto derivedDims = getDerivedShape(dims);
+
+        // Create input tensor attributes
+        auto xAttr = graph::makeTensorAttributes(
+            "X", inputDataType, dims, generateStrides(dims, layout.strideOrder));
         xAttr.set_uid(uid++);
         auto xTensorAttr = std::make_shared<graph::TensorAttributes>(std::move(xAttr));
 
         auto scaleAttr = graph::makeTensorAttributes(
-            "scale", intermediateDataType, graphTensorBundle.scaleTensor);
+            "scale", intermediateDataType, derivedDims, generateStrides(derivedDims));
         scaleAttr.set_uid(uid++);
         auto scaleTensorAttr = std::make_shared<graph::TensorAttributes>(std::move(scaleAttr));
 
         auto biasAttr = graph::makeTensorAttributes(
-            "bias", intermediateDataType, graphTensorBundle.biasTensor);
+            "bias", intermediateDataType, derivedDims, generateStrides(derivedDims));
         biasAttr.set_uid(uid++);
         auto biasTensorAttr = std::make_shared<graph::TensorAttributes>(std::move(biasAttr));
 
         auto epsilonAttr = graph::makeTensorAttributes(
-            "epsilon", intermediateDataType, graphTensorBundle.epsilonTensor);
+            "epsilon", intermediateDataType, std::vector<int64_t>{1}, std::vector<int64_t>{1});
         epsilonAttr.set_uid(uid++);
-        auto epsilonTensorAttr
-            = std::make_shared<graph::TensorAttributes>(std::move(epsilonAttr));
+        auto epsilonTensorAttr = std::make_shared<graph::TensorAttributes>(std::move(epsilonAttr));
 
-        // Conditionally set up running statistics
+        // Conditionally setup running statistics based on scenario
         std::shared_ptr<graph::TensorAttributes> prevRunningMeanTensorAttr;
         std::shared_ptr<graph::TensorAttributes> prevRunningVarianceTensorAttr;
         std::shared_ptr<graph::TensorAttributes> momentumTensorAttr;
@@ -291,26 +126,25 @@ protected:
            || scenario == BatchnormTrainingScenario::FULL_TRAINING)
         {
             auto prevRunningMeanAttr = graph::makeTensorAttributes(
-                "prev_running_mean", intermediateDataType, *graphTensorBundle.runningMeanTensor);
+                "prev_running_mean", intermediateDataType, derivedDims, generateStrides(derivedDims));
             prevRunningMeanAttr.set_uid(uid++);
-            prevRunningMeanTensorAttr
-                = std::make_shared<graph::TensorAttributes>(std::move(prevRunningMeanAttr));
+            prevRunningMeanTensorAttr =
+                std::make_shared<graph::TensorAttributes>(std::move(prevRunningMeanAttr));
 
-            auto prevRunningVarianceAttr
-                = graph::makeTensorAttributes("prev_running_variance",
-                                              intermediateDataType,
-                                              *graphTensorBundle.runningVarianceTensor);
+            auto prevRunningVarianceAttr = graph::makeTensorAttributes(
+                "prev_running_variance", intermediateDataType, derivedDims, generateStrides(derivedDims));
             prevRunningVarianceAttr.set_uid(uid++);
-            prevRunningVarianceTensorAttr
-                = std::make_shared<graph::TensorAttributes>(std::move(prevRunningVarianceAttr));
+            prevRunningVarianceTensorAttr =
+                std::make_shared<graph::TensorAttributes>(std::move(prevRunningVarianceAttr));
 
             auto momentumAttr = graph::makeTensorAttributes(
-                "momentum", intermediateDataType, *graphTensorBundle.momentumTensor);
+                "momentum", intermediateDataType, std::vector<int64_t>{1}, std::vector<int64_t>{1});
             momentumAttr.set_uid(uid++);
-            momentumTensorAttr
-                = std::make_shared<graph::TensorAttributes>(std::move(momentumAttr));
+            momentumTensorAttr =
+                std::make_shared<graph::TensorAttributes>(std::move(momentumAttr));
         }
 
+        // Create batchnorm attributes
         graph::BatchnormAttributes bnAttrs;
         bnAttrs.set_name("batchnorm_training");
 
@@ -320,7 +154,7 @@ protected:
                 prevRunningMeanTensorAttr, prevRunningVarianceTensorAttr, momentumTensorAttr);
         }
 
-        // Pre-set mean/invVariance to signal Graph.hpp to create these outputs
+        // Conditionally set mean/invVariance based on scenario
         if(scenario != BatchnormTrainingScenario::BASIC_FORWARD)
         {
             auto meanPlaceholder = std::make_shared<graph::TensorAttributes>();
@@ -335,248 +169,156 @@ protected:
               meanTensorAttr,
               invVarianceTensorAttr,
               nextRunningMeanTensorAttr,
-              nextRunningVarianceTensorAttr]
-            = graph->batchnorm(xTensorAttr, scaleTensorAttr, biasTensorAttr, bnAttrs);
+              nextRunningVarianceTensorAttr] =
+            graphObj.batchnorm(xTensorAttr, scaleTensorAttr, biasTensorAttr, bnAttrs);
 
+        // Set output tensor attributes
         if(!yTensorAttr->has_uid())
         {
             yTensorAttr->set_uid(uid++);
         }
-
+        yTensorAttr->set_output(true);
         yTensorAttr->set_data_type(inputDataType);
-        yTensorAttr->set_dim(graphTensorBundle.yTensor.dims());
-        yTensorAttr->set_stride(graphTensorBundle.yTensor.strides());
+        yTensorAttr->set_dim(dims);
+        yTensorAttr->set_stride(generateStrides(dims, layout.strideOrder));
 
-        // Only configure batch stats outputs if memory was allocated for them
-        if(meanTensorAttr && graphTensorBundle.meanTensor.has_value())
+        // Configure batch statistics outputs if they exist
+        if(meanTensorAttr)
         {
             if(!meanTensorAttr->has_uid())
             {
                 meanTensorAttr->set_uid(uid++);
             }
+            meanTensorAttr->set_output(true);
+            meanTensorAttr->set_data_type(intermediateDataType);
+            meanTensorAttr->set_dim(derivedDims);
+            meanTensorAttr->set_stride(generateStrides(derivedDims));
+        }
+
+        if(invVarianceTensorAttr)
+        {
             if(!invVarianceTensorAttr->has_uid())
             {
                 invVarianceTensorAttr->set_uid(uid++);
             }
-            
-            meanTensorAttr->set_data_type(intermediateDataType);
-            meanTensorAttr->set_dim(graphTensorBundle.meanTensor->dims());
-            meanTensorAttr->set_stride(graphTensorBundle.meanTensor->strides());
-            
+            invVarianceTensorAttr->set_output(true);
             invVarianceTensorAttr->set_data_type(intermediateDataType);
-            invVarianceTensorAttr->set_dim(graphTensorBundle.invVarianceTensor->dims());
-            invVarianceTensorAttr->set_stride(graphTensorBundle.invVarianceTensor->strides());
+            invVarianceTensorAttr->set_dim(derivedDims);
+            invVarianceTensorAttr->set_stride(generateStrides(derivedDims));
         }
 
-        // Only configure running stats outputs if memory was allocated for them
-        if(nextRunningMeanTensorAttr && graphTensorBundle.runningMeanTensor.has_value())
+        // Configure running statistics outputs if they exist
+        if(nextRunningMeanTensorAttr)
         {
             if(!nextRunningMeanTensorAttr->has_uid())
             {
                 nextRunningMeanTensorAttr->set_uid(uid++);
             }
+            nextRunningMeanTensorAttr->set_output(true);
+            nextRunningMeanTensorAttr->set_data_type(intermediateDataType);
+            nextRunningMeanTensorAttr->set_dim(derivedDims);
+            nextRunningMeanTensorAttr->set_stride(generateStrides(derivedDims));
+        }
+
+        if(nextRunningVarianceTensorAttr)
+        {
             if(!nextRunningVarianceTensorAttr->has_uid())
             {
                 nextRunningVarianceTensorAttr->set_uid(uid++);
             }
-            
-            nextRunningMeanTensorAttr->set_data_type(intermediateDataType);
-            nextRunningMeanTensorAttr->set_dim(graphTensorBundle.runningMeanTensor->dims());
-            nextRunningMeanTensorAttr->set_stride(graphTensorBundle.runningMeanTensor->strides());
-            
+            nextRunningVarianceTensorAttr->set_output(true);
             nextRunningVarianceTensorAttr->set_data_type(intermediateDataType);
-            nextRunningVarianceTensorAttr->set_dim(graphTensorBundle.runningVarianceTensor->dims());
-            nextRunningVarianceTensorAttr->set_stride(
-                graphTensorBundle.runningVarianceTensor->strides());
+            nextRunningVarianceTensorAttr->set_dim(derivedDims);
+            nextRunningVarianceTensorAttr->set_stride(generateStrides(derivedDims));
         }
 
-        // Validate and build graph
-        auto result = graph->validate();
-        ASSERT_EQ(result.code, ErrorCode::OK) << result.err_msg;
-
-        result = graph->build_operation_graph(_handle);
-        ASSERT_EQ(result.code, ErrorCode::OK) << result.err_msg;
-
-        result = graph->create_execution_plans();
-        ASSERT_EQ(result.code, ErrorCode::OK) << result.err_msg;
-
-        result = graph->check_support();
-        ASSERT_EQ(result.code, ErrorCode::OK) << result.err_msg;
-
-        result = graph->build_plans();
-        ASSERT_EQ(result.code, ErrorCode::OK) << result.err_msg;
-
-        auto variantPack = graphTensorBundle.toDeviceVariantPack(*xTensorAttr,
-                                                                  *scaleTensorAttr,
-                                                                  *biasTensorAttr,
-                                                                  prevRunningMeanTensorAttr,
-                                                                  prevRunningVarianceTensorAttr,
-                                                                  momentumTensorAttr,
-                                                                  *epsilonTensorAttr,
-                                                                  *yTensorAttr,
-                                                                  meanTensorAttr,
-                                                                  invVarianceTensorAttr,
-                                                                  nextRunningMeanTensorAttr,
-                                                                  nextRunningVarianceTensorAttr);
-
-        result = graph->execute(_handle, variantPack, nullptr);
-        ASSERT_EQ(result.code, ErrorCode::OK) << result.err_msg;
+        CpuFpReferenceValidation<InputType> validator(tolerance, tolerance);
+        this->verifyGraph(graphObj, testCase.seed, validator);
     }
 
-    void runCpuBatchnormFwd(GraphTensorBundle& cpuTensorBundle,
-                            [[maybe_unused]] BatchnormTrainingScenario scenario)
+    GraphTensorBundle generateBundle(hipdnn_frontend::graph::Graph& graph) override
     {
-        auto epsilon
-            = static_cast<IntermediateType>(cpuTensorBundle.epsilonTensor.memory().hostData()[0]);
-
-        float momentum = 0.0f;
-        if(cpuTensorBundle.momentumTensor.has_value())
-        {
-            momentum = static_cast<float>(
-                static_cast<IntermediateType>(
-                    cpuTensorBundle.momentumTensor->memory().hostData()[0]));
-        }
-
-        // Prepare pointers for optional outputs
-        PinnedTensor<IntermediateType>* meanPtr
-            = cpuTensorBundle.meanTensor.has_value() ? &(*cpuTensorBundle.meanTensor) : nullptr;
-        PinnedTensor<IntermediateType>* invVariancePtr
-            = cpuTensorBundle.invVarianceTensor.has_value() ? &(*cpuTensorBundle.invVarianceTensor)
-                                                             : nullptr;
-        PinnedTensor<IntermediateType>* runningMeanPtr
-            = cpuTensorBundle.runningMeanTensor.has_value()
-                  ? &(*cpuTensorBundle.runningMeanTensor)
-                  : nullptr;
-        PinnedTensor<IntermediateType>* runningVariancePtr
-            = cpuTensorBundle.runningVarianceTensor.has_value()
-                  ? &(*cpuTensorBundle.runningVarianceTensor)
-                  : nullptr;
-
-        CpuFpReferenceBatchnormImpl<InputType, IntermediateType>::batchnormFwdTraining(
-            cpuTensorBundle.xTensor,
-            cpuTensorBundle.scaleTensor,
-            cpuTensorBundle.biasTensor,
-            cpuTensorBundle.yTensor,
-            epsilon,
-            static_cast<IntermediateType>(momentum),
-            meanPtr,
-            invVariancePtr,
-            runningMeanPtr,
-            runningVariancePtr,
-            runningMeanPtr,  // Use same buffer for prev and next
-            runningVariancePtr);
+        auto bundle = GraphVerifierTest<InputType, TestCaseType>::generateBundle(graph);
+        return bundle;
     }
 
-    void runBatchnormTest(const TestCaseType& testCase,
-                          InputType tolerance,
-                          BatchnormTrainingScenario scenario,
-                          const TensorLayout& layout = TensorLayout::NCHW)
+    void initializeBundle(const hipdnn_frontend::graph::Graph& graph,
+                          GraphTensorBundle& bundle,
+                          unsigned int seed) override
     {
-        auto inputDataType = getDataTypeEnumFromType<InputType>();
-        auto intermediateDataType = getDataTypeEnumFromType<IntermediateType>();
+        // Use random values for most tensors
+        GraphVerifierTest<InputType, TestCaseType>::initializeBundle(graph, bundle, seed);
 
-        HIPDNN_LOG_INFO("Test is using {} for its random seed", testCase.seed);
+        // Apply custom distributions for epsilon and momentum
+        std::mt19937 gen(seed);
 
-        GraphTensorBundle graphTensorBundle(testCase.getDims(), scenario, testCase.seed, layout);
-        GraphTensorBundle cpuTensorBundle(testCase.getDims(), scenario, testCase.seed, layout);
-
-        runMiopenBatchnormFwd(graphTensorBundle, inputDataType, intermediateDataType, scenario);
-
-        // Mark modified tensors based on scenario
-        graphTensorBundle.yTensor.memory().markDeviceModified();
-
-        if(graphTensorBundle.meanTensor.has_value())
+        // Find and set epsilon with custom distribution
+        for(auto& [tensorId, tensorPtr] : bundle.tensors)
         {
-            graphTensorBundle.meanTensor->memory().markDeviceModified();
-        }
-        if(graphTensorBundle.invVarianceTensor.has_value())
-        {
-            graphTensorBundle.invVarianceTensor->memory().markDeviceModified();
-        }
-        if(graphTensorBundle.runningMeanTensor.has_value())
-        {
-            graphTensorBundle.runningMeanTensor->memory().markDeviceModified();
-        }
-        if(graphTensorBundle.runningVarianceTensor.has_value())
-        {
-            graphTensorBundle.runningVarianceTensor->memory().markDeviceModified();
-        }
-
-        runCpuBatchnormFwd(cpuTensorBundle, scenario);
-
-        // Validate outputs based on scenario
-        CpuFpReferenceMiopenRmsValidation<InputType> cpuRefValidation(tolerance);
-        CpuFpReferenceMiopenRmsValidation<IntermediateType> cpuRefValidationStats(
-            static_cast<IntermediateType>(tolerance));
-
-        // Y output is always present
-        EXPECT_TRUE(cpuRefValidation.allClose(cpuTensorBundle.yTensor.memory(),
-                                              graphTensorBundle.yTensor.memory()));
-
-        // Validate batch statistics if present (not for BASIC_FORWARD)
-        if(scenario != BatchnormTrainingScenario::BASIC_FORWARD)
-        {
-            EXPECT_TRUE(cpuRefValidationStats.allClose(cpuTensorBundle.meanTensor->memory(),
-                                                       graphTensorBundle.meanTensor->memory()));
-            EXPECT_TRUE(
-                cpuRefValidationStats.allClose(cpuTensorBundle.invVarianceTensor->memory(),
-                                               graphTensorBundle.invVarianceTensor->memory()));
-        }
-
-        // Validate running statistics if present
-        if(scenario == BatchnormTrainingScenario::WITH_RUNNING_STATS
-           || scenario == BatchnormTrainingScenario::FULL_TRAINING)
-        {
-            EXPECT_TRUE(
-                cpuRefValidationStats.allClose(cpuTensorBundle.runningMeanTensor->memory(),
-                                               graphTensorBundle.runningMeanTensor->memory()));
-            EXPECT_TRUE(
-                cpuRefValidationStats.allClose(cpuTensorBundle.runningVarianceTensor->memory(),
-                                               graphTensorBundle.runningVarianceTensor->memory()));
+            auto name = getTensorName(graph, tensorId);
+            if(name == "epsilon")
+            {
+                std::uniform_real_distribution<float> epsilonDist(1e-6f, 1e-4f);
+                auto* data = static_cast<float*>(tensorPtr->rawHostData());
+                data[0] = epsilonDist(gen);
+            }
+            else if(name == "momentum")
+            {
+                std::uniform_real_distribution<float> momentumDist(0.05f, 0.15f);
+                auto* data = static_cast<float*>(tensorPtr->rawHostData());
+                data[0] = momentumDist(gen);
+            }
         }
     }
 
 private:
-    hipdnnHandle_t _handle = nullptr;
-    hipStream_t _stream = nullptr;
-    int _deviceId = 0;
+    std::string getTensorName(const hipdnn_frontend::graph::Graph& graph, int64_t tensorId) const
+    {
+        // Simple helper to find tensor name by ID
+        std::string result;
+        visitGraph(graph, [&](const hipdnn_frontend::graph::INode& node) {
+            for(const auto& tensorAttr : node.getNodeInputTensorAttributes())
+            {
+                if(tensorAttr->get_uid() == tensorId && !tensorAttr->get_name().empty())
+                {
+                    result = tensorAttr->get_name();
+                    return;
+                }
+            }
+            for(const auto& tensorAttr : node.getNodeOutputTensorAttributes())
+            {
+                if(tensorAttr->get_uid() == tensorId && !tensorAttr->get_name().empty())
+                {
+                    result = tensorAttr->get_name();
+                    return;
+                }
+            }
+        });
+        return result;
+    }
 };
 
-// NCHW 2D - Pure precision
+// NCHW 2D
 using BnFwdTrainNchwFp32 = BatchnormForwardTraining<float, float, Batchnorm2dTestCase>;
-using BnFwdTrainNchwFp16Pure = BatchnormForwardTraining<half, half, Batchnorm2dTestCase>;
-using BnFwdTrainNchwBfp16Pure = BatchnormForwardTraining<hip_bfloat16, hip_bfloat16, Batchnorm2dTestCase>;
-
-// NCHW 2D - Mixed precision
 using BnFwdTrainNchwFp16Mixed = BatchnormForwardTraining<half, float, Batchnorm2dTestCase>;
 using BnFwdTrainNchwBfp16Mixed = BatchnormForwardTraining<hip_bfloat16, float, Batchnorm2dTestCase>;
 
-// NHWC 2D - Pure precision
+// NHWC 2D
 using BnFwdTrainNhwcFp32 = BatchnormForwardTraining<float, float, Batchnorm2dTestCase>;
-using BnFwdTrainNhwcFp16Pure = BatchnormForwardTraining<half, half, Batchnorm2dTestCase>;
-using BnFwdTrainNhwcBfp16Pure = BatchnormForwardTraining<hip_bfloat16, hip_bfloat16, Batchnorm2dTestCase>;
-
-// NHWC 2D - Mixed precision
 using BnFwdTrainNhwcFp16Mixed = BatchnormForwardTraining<half, float, Batchnorm2dTestCase>;
 using BnFwdTrainNhwcBfp16Mixed = BatchnormForwardTraining<hip_bfloat16, float, Batchnorm2dTestCase>;
 
-// NCDHW 3D - Pure precision
+// NCDHW 3D
 using BnFwdTrainNcdhwFp32 = BatchnormForwardTraining<float, float, Batchnorm3dTestCase>;
-using BnFwdTrainNcdhwFp16Pure = BatchnormForwardTraining<half, half, Batchnorm3dTestCase>;
-using BnFwdTrainNcdhwBfp16Pure = BatchnormForwardTraining<hip_bfloat16, hip_bfloat16, Batchnorm3dTestCase>;
-
-// NCDHW 3D - Mixed precision
 using BnFwdTrainNcdhwFp16Mixed = BatchnormForwardTraining<half, float, Batchnorm3dTestCase>;
-using BnFwdTrainNcdhwBfp16Mixed = BatchnormForwardTraining<hip_bfloat16, float, Batchnorm3dTestCase>;
+using BnFwdTrainNcdhwBfp16Mixed =
+    BatchnormForwardTraining<hip_bfloat16, float, Batchnorm3dTestCase>;
 
-// NDHWC 3D - Pure precision
+// NDHWC 3D
 using BnFwdTrainNdhwcFp32 = BatchnormForwardTraining<float, float, Batchnorm3dTestCase>;
-using BnFwdTrainNdhwcFp16Pure = BatchnormForwardTraining<half, half, Batchnorm3dTestCase>;
-using BnFwdTrainNdhwcBfp16Pure = BatchnormForwardTraining<hip_bfloat16, hip_bfloat16, Batchnorm3dTestCase>;
-
-// NDHWC 3D - Mixed precision
 using BnFwdTrainNdhwcFp16Mixed = BatchnormForwardTraining<half, float, Batchnorm3dTestCase>;
-using BnFwdTrainNdhwcBfp16Mixed = BatchnormForwardTraining<hip_bfloat16, float, Batchnorm3dTestCase>;
+using BnFwdTrainNdhwcBfp16Mixed =
+    BatchnormForwardTraining<hip_bfloat16, float, Batchnorm3dTestCase>;
 
 std::vector<Batchnorm2dTestCase> getBnFwdTrainingTestCases()
 {
@@ -610,254 +352,110 @@ std::vector<Batchnorm3dTestCase> getBnFwdTraining3dTestCases()
 // NCHW 2D Tests
 // ============================================================================
 
-TEST_F(BnFwdTrainNchwFp32, Correctness)
+TEST_P(BnFwdTrainNchwFp32, Correctness)
 {
-    auto testCases = getBnFwdTrainingTestCases();
-    for(const auto& testCase : testCases)
-    {
-        this->runBatchnormTest(testCase,
-                               batchnorm::getRmsToleranceTraining<float>(),
-                               BatchnormTrainingScenario::FULL_TRAINING,
-                               TensorLayout::NCHW);
-    }
+    runGraphTest(batchnorm::getRmsToleranceTraining<float>(), TensorLayout::NCHW);
 }
 
-TEST_F(BnFwdTrainNchwFp16Pure, Correctness)
+TEST_P(BnFwdTrainNchwFp16Mixed, Correctness)
 {
-    auto testCases = getBnFwdTrainingTestCases();
-    for(const auto& testCase : testCases)
-    {
-        this->runBatchnormTest(testCase,
-                               batchnorm::getRmsToleranceTraining<half>(),
-                               BatchnormTrainingScenario::FULL_TRAINING,
-                               TensorLayout::NCHW);
-    }
+    runGraphTest(batchnorm::getRmsToleranceTraining<half>(), TensorLayout::NCHW);
 }
 
-TEST_F(BnFwdTrainNchwBfp16Pure, Correctness)
+TEST_P(BnFwdTrainNchwBfp16Mixed, Correctness)
 {
-    auto testCases = getBnFwdTrainingTestCases();
-    for(const auto& testCase : testCases)
-    {
-        this->runBatchnormTest(testCase,
-                               batchnorm::getRmsToleranceTraining<hip_bfloat16>(),
-                               BatchnormTrainingScenario::FULL_TRAINING,
-                               TensorLayout::NCHW);
-    }
-}
-
-TEST_F(BnFwdTrainNchwFp16Mixed, Correctness)
-{
-    auto testCases = getBnFwdTrainingTestCases();
-    for(const auto& testCase : testCases)
-    {
-        this->runBatchnormTest(testCase,
-                               batchnorm::getRmsToleranceTraining<half>(),
-                               BatchnormTrainingScenario::FULL_TRAINING,
-                               TensorLayout::NCHW);
-    }
-}
-
-TEST_F(BnFwdTrainNchwBfp16Mixed, Correctness)
-{
-    auto testCases = getBnFwdTrainingTestCases();
-    for(const auto& testCase : testCases)
-    {
-        this->runBatchnormTest(testCase,
-                               batchnorm::getRmsToleranceTraining<hip_bfloat16>(),
-                               BatchnormTrainingScenario::FULL_TRAINING,
-                               TensorLayout::NCHW);
-    }
+    runGraphTest(batchnorm::getRmsToleranceTraining<hip_bfloat16>(), TensorLayout::NCHW);
 }
 
 // ============================================================================
 // NHWC 2D Tests
 // ============================================================================
 
-TEST_F(BnFwdTrainNhwcFp32, Correctness)
+TEST_P(BnFwdTrainNhwcFp32, Correctness)
 {
-    auto testCases = getBnFwdTrainingTestCases();
-    for(const auto& testCase : testCases)
-    {
-        this->runBatchnormTest(testCase,
-                               batchnorm::getRmsToleranceTraining<float>(),
-                               BatchnormTrainingScenario::FULL_TRAINING,
-                               TensorLayout::NHWC);
-    }
+    runGraphTest(batchnorm::getRmsToleranceTraining<float>(), TensorLayout::NHWC);
 }
 
-TEST_F(BnFwdTrainNhwcFp16Pure, Correctness)
+TEST_P(BnFwdTrainNhwcFp16Mixed, Correctness)
 {
-    auto testCases = getBnFwdTrainingTestCases();
-    for(const auto& testCase : testCases)
-    {
-        this->runBatchnormTest(testCase,
-                               batchnorm::getRmsToleranceTraining<half>(),
-                               BatchnormTrainingScenario::FULL_TRAINING,
-                               TensorLayout::NHWC);
-    }
+    runGraphTest(batchnorm::getRmsToleranceTraining<half>(), TensorLayout::NHWC);
 }
 
-TEST_F(BnFwdTrainNhwcBfp16Pure, Correctness)
+TEST_P(BnFwdTrainNhwcBfp16Mixed, Correctness)
 {
-    auto testCases = getBnFwdTrainingTestCases();
-    for(const auto& testCase : testCases)
-    {
-        this->runBatchnormTest(testCase,
-                               batchnorm::getRmsToleranceTraining<hip_bfloat16>(),
-                               BatchnormTrainingScenario::FULL_TRAINING,
-                               TensorLayout::NHWC);
-    }
-}
-
-TEST_F(BnFwdTrainNhwcFp16Mixed, Correctness)
-{
-    auto testCases = getBnFwdTrainingTestCases();
-    for(const auto& testCase : testCases)
-    {
-        this->runBatchnormTest(testCase,
-                               batchnorm::getRmsToleranceTraining<half>(),
-                               BatchnormTrainingScenario::FULL_TRAINING,
-                               TensorLayout::NHWC);
-    }
-}
-
-TEST_F(BnFwdTrainNhwcBfp16Mixed, Correctness)
-{
-    auto testCases = getBnFwdTrainingTestCases();
-    for(const auto& testCase : testCases)
-    {
-        this->runBatchnormTest(testCase,
-                               batchnorm::getRmsToleranceTraining<hip_bfloat16>(),
-                               BatchnormTrainingScenario::FULL_TRAINING,
-                               TensorLayout::NHWC);
-    }
+    runGraphTest(batchnorm::getRmsToleranceTraining<hip_bfloat16>(), TensorLayout::NHWC);
 }
 
 // ============================================================================
 // NCDHW 3D Tests
 // ============================================================================
 
-TEST_F(BnFwdTrainNcdhwFp32, Correctness)
+TEST_P(BnFwdTrainNcdhwFp32, Correctness)
 {
-    auto testCases = getBnFwdTraining3dTestCases();
-    for(const auto& testCase : testCases)
-    {
-        this->runBatchnormTest(testCase,
-                               batchnorm::getRmsToleranceTraining<float>(),
-                               BatchnormTrainingScenario::FULL_TRAINING,
-                               TensorLayout::NCDHW);
-    }
+    runGraphTest(batchnorm::getRmsToleranceTraining<float>(), TensorLayout::NCDHW);
 }
 
-TEST_F(BnFwdTrainNcdhwFp16Pure, Correctness)
+TEST_P(BnFwdTrainNcdhwFp16Mixed, Correctness)
 {
-    auto testCases = getBnFwdTraining3dTestCases();
-    for(const auto& testCase : testCases)
-    {
-        this->runBatchnormTest(testCase,
-                               batchnorm::getRmsToleranceTraining<half>(),
-                               BatchnormTrainingScenario::FULL_TRAINING,
-                               TensorLayout::NCDHW);
-    }
+    runGraphTest(batchnorm::getRmsToleranceTraining<half>(), TensorLayout::NCDHW);
 }
 
-TEST_F(BnFwdTrainNcdhwBfp16Pure, Correctness)
+TEST_P(BnFwdTrainNcdhwBfp16Mixed, Correctness)
 {
-    auto testCases = getBnFwdTraining3dTestCases();
-    for(const auto& testCase : testCases)
-    {
-        this->runBatchnormTest(testCase,
-                               batchnorm::getRmsToleranceTraining<hip_bfloat16>(),
-                               BatchnormTrainingScenario::FULL_TRAINING,
-                               TensorLayout::NCDHW);
-    }
-}
-
-TEST_F(BnFwdTrainNcdhwFp16Mixed, Correctness)
-{
-    auto testCases = getBnFwdTraining3dTestCases();
-    for(const auto& testCase : testCases)
-    {
-        this->runBatchnormTest(testCase,
-                               batchnorm::getRmsToleranceTraining<half>(),
-                               BatchnormTrainingScenario::FULL_TRAINING,
-                               TensorLayout::NCDHW);
-    }
-}
-
-TEST_F(BnFwdTrainNcdhwBfp16Mixed, Correctness)
-{
-    auto testCases = getBnFwdTraining3dTestCases();
-    for(const auto& testCase : testCases)
-    {
-        this->runBatchnormTest(testCase,
-                               batchnorm::getRmsToleranceTraining<hip_bfloat16>(),
-                               BatchnormTrainingScenario::FULL_TRAINING,
-                               TensorLayout::NCDHW);
-    }
+    runGraphTest(batchnorm::getRmsToleranceTraining<hip_bfloat16>(), TensorLayout::NCDHW);
 }
 
 // ============================================================================
 // NDHWC 3D Tests
 // ============================================================================
 
-TEST_F(BnFwdTrainNdhwcFp32, Correctness)
+TEST_P(BnFwdTrainNdhwcFp32, Correctness)
 {
-    auto testCases = getBnFwdTraining3dTestCases();
-    for(const auto& testCase : testCases)
-    {
-        this->runBatchnormTest(testCase,
-                               batchnorm::getRmsToleranceTraining<float>(),
-                               BatchnormTrainingScenario::FULL_TRAINING,
-                               TensorLayout::NDHWC);
-    }
+    runGraphTest(batchnorm::getRmsToleranceTraining<float>(), TensorLayout::NDHWC);
 }
 
-TEST_F(BnFwdTrainNdhwcFp16Pure, Correctness)
+TEST_P(BnFwdTrainNdhwcFp16Mixed, Correctness)
 {
-    auto testCases = getBnFwdTraining3dTestCases();
-    for(const auto& testCase : testCases)
-    {
-        this->runBatchnormTest(testCase,
-                               batchnorm::getRmsToleranceTraining<half>(),
-                               BatchnormTrainingScenario::FULL_TRAINING,
-                               TensorLayout::NDHWC);
-    }
+    runGraphTest(batchnorm::getRmsToleranceTraining<half>(), TensorLayout::NDHWC);
 }
 
-TEST_F(BnFwdTrainNdhwcBfp16Pure, Correctness)
+TEST_P(BnFwdTrainNdhwcBfp16Mixed, Correctness)
 {
-    auto testCases = getBnFwdTraining3dTestCases();
-    for(const auto& testCase : testCases)
-    {
-        this->runBatchnormTest(testCase,
-                               batchnorm::getRmsToleranceTraining<hip_bfloat16>(),
-                               BatchnormTrainingScenario::FULL_TRAINING,
-                               TensorLayout::NDHWC);
-    }
+    runGraphTest(batchnorm::getRmsToleranceTraining<hip_bfloat16>(), TensorLayout::NDHWC);
 }
 
-TEST_F(BnFwdTrainNdhwcFp16Mixed, Correctness)
-{
-    auto testCases = getBnFwdTraining3dTestCases();
-    for(const auto& testCase : testCases)
-    {
-        this->runBatchnormTest(testCase,
-                               batchnorm::getRmsToleranceTraining<half>(),
-                               BatchnormTrainingScenario::FULL_TRAINING,
-                               TensorLayout::NDHWC);
-    }
-}
+// ============================================================================
+// Test Instantiation
+// ============================================================================
 
-TEST_F(BnFwdTrainNdhwcBfp16Mixed, Correctness)
-{
-    auto testCases = getBnFwdTraining3dTestCases();
-    for(const auto& testCase : testCases)
-    {
-        this->runBatchnormTest(testCase,
-                               batchnorm::getRmsToleranceTraining<hip_bfloat16>(),
-                               BatchnormTrainingScenario::FULL_TRAINING,
-                               TensorLayout::NDHWC);
-    }
-}
+INSTANTIATE_TEST_SUITE_P(, BnFwdTrainNchwFp32, testing::ValuesIn(getBnFwdTrainingTestCases()));
+INSTANTIATE_TEST_SUITE_P(,
+                         BnFwdTrainNchwFp16Mixed,
+                         testing::ValuesIn(getBnFwdTrainingTestCases()));
+INSTANTIATE_TEST_SUITE_P(,
+                         BnFwdTrainNchwBfp16Mixed,
+                         testing::ValuesIn(getBnFwdTrainingTestCases()));
+
+INSTANTIATE_TEST_SUITE_P(, BnFwdTrainNhwcFp32, testing::ValuesIn(getBnFwdTrainingTestCases()));
+INSTANTIATE_TEST_SUITE_P(,
+                         BnFwdTrainNhwcFp16Mixed,
+                         testing::ValuesIn(getBnFwdTrainingTestCases()));
+INSTANTIATE_TEST_SUITE_P(,
+                         BnFwdTrainNhwcBfp16Mixed,
+                         testing::ValuesIn(getBnFwdTrainingTestCases()));
+
+INSTANTIATE_TEST_SUITE_P(, BnFwdTrainNcdhwFp32, testing::ValuesIn(getBnFwdTraining3dTestCases()));
+INSTANTIATE_TEST_SUITE_P(,
+                         BnFwdTrainNcdhwFp16Mixed,
+                         testing::ValuesIn(getBnFwdTraining3dTestCases()));
+INSTANTIATE_TEST_SUITE_P(,
+                         BnFwdTrainNcdhwBfp16Mixed,
+                         testing::ValuesIn(getBnFwdTraining3dTestCases()));
+
+INSTANTIATE_TEST_SUITE_P(, BnFwdTrainNdhwcFp32, testing::ValuesIn(getBnFwdTraining3dTestCases()));
+INSTANTIATE_TEST_SUITE_P(,
+                         BnFwdTrainNdhwcFp16Mixed,
+                         testing::ValuesIn(getBnFwdTraining3dTestCases()));
+INSTANTIATE_TEST_SUITE_P(,
+                         BnFwdTrainNdhwcBfp16Mixed,
+                         testing::ValuesIn(getBnFwdTraining3dTestCases()));
