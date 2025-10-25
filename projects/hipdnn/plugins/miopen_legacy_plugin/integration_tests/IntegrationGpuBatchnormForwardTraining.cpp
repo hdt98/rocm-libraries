@@ -81,7 +81,7 @@ struct Batchnorm3dTestCase
 };
 
 template <typename InputType, typename IntermediateType, typename TestCaseType>
-class BatchnormForwardTraining : public ::testing::TestWithParam<TestCaseType>
+class BatchnormForwardTraining : public ::testing::Test
 {
     struct GraphTensorBundle
     {
@@ -429,10 +429,10 @@ protected:
         auto epsilon
             = static_cast<IntermediateType>(cpuTensorBundle.epsilonTensor.memory().hostData()[0]);
 
-        double momentum = 0.0;
+        float momentum = 0.0f;
         if(cpuTensorBundle.momentumTensor.has_value())
         {
-            momentum = static_cast<double>(
+            momentum = static_cast<float>(
                 static_cast<IntermediateType>(
                     cpuTensorBundle.momentumTensor->memory().hostData()[0]));
         }
@@ -467,12 +467,11 @@ protected:
             runningVariancePtr);
     }
 
-    void runBatchnormTest(InputType tolerance,
+    void runBatchnormTest(const TestCaseType& testCase,
+                          InputType tolerance,
                           BatchnormTrainingScenario scenario,
                           const TensorLayout& layout = TensorLayout::NCHW)
     {
-        TestCaseType testCase = this->GetParam();
-
         auto inputDataType = getDataTypeEnumFromType<InputType>();
         auto intermediateDataType = getDataTypeEnumFromType<IntermediateType>();
 
@@ -543,65 +542,41 @@ private:
     int _deviceId = 0;
 };
 
-class IntegrationGpuBatchnormForwardTrainingNchwFp32
-    : public BatchnormForwardTraining<float, float, Batchnorm2dTestCase>
-{
-};
+// NCHW 2D - Pure precision
+using BnFwdTrainNchwFp32 = BatchnormForwardTraining<float, float, Batchnorm2dTestCase>;
+using BnFwdTrainNchwFp16Pure = BatchnormForwardTraining<half, half, Batchnorm2dTestCase>;
+using BnFwdTrainNchwBfp16Pure = BatchnormForwardTraining<hip_bfloat16, hip_bfloat16, Batchnorm2dTestCase>;
 
-class IntegrationGpuBatchnormForwardTrainingNchwBfp16
-    : public BatchnormForwardTraining<hip_bfloat16, float, Batchnorm2dTestCase>
-{
-};
+// NCHW 2D - Mixed precision
+using BnFwdTrainNchwFp16Mixed = BatchnormForwardTraining<half, float, Batchnorm2dTestCase>;
+using BnFwdTrainNchwBfp16Mixed = BatchnormForwardTraining<hip_bfloat16, float, Batchnorm2dTestCase>;
 
-class IntegrationGpuBatchnormForwardTrainingNchwFp16
-    : public BatchnormForwardTraining<half, float, Batchnorm2dTestCase>
-{
-};
+// NHWC 2D - Pure precision
+using BnFwdTrainNhwcFp32 = BatchnormForwardTraining<float, float, Batchnorm2dTestCase>;
+using BnFwdTrainNhwcFp16Pure = BatchnormForwardTraining<half, half, Batchnorm2dTestCase>;
+using BnFwdTrainNhwcBfp16Pure = BatchnormForwardTraining<hip_bfloat16, hip_bfloat16, Batchnorm2dTestCase>;
 
-class IntegrationGpuBatchnormForwardTrainingNhwcFp32
-    : public BatchnormForwardTraining<float, float, Batchnorm2dTestCase>
-{
-};
+// NHWC 2D - Mixed precision
+using BnFwdTrainNhwcFp16Mixed = BatchnormForwardTraining<half, float, Batchnorm2dTestCase>;
+using BnFwdTrainNhwcBfp16Mixed = BatchnormForwardTraining<hip_bfloat16, float, Batchnorm2dTestCase>;
 
-class IntegrationGpuBatchnormForwardTrainingNhwcBfp16
-    : public BatchnormForwardTraining<hip_bfloat16, float, Batchnorm2dTestCase>
-{
-};
+// NCDHW 3D - Pure precision
+using BnFwdTrainNcdhwFp32 = BatchnormForwardTraining<float, float, Batchnorm3dTestCase>;
+using BnFwdTrainNcdhwFp16Pure = BatchnormForwardTraining<half, half, Batchnorm3dTestCase>;
+using BnFwdTrainNcdhwBfp16Pure = BatchnormForwardTraining<hip_bfloat16, hip_bfloat16, Batchnorm3dTestCase>;
 
-class IntegrationGpuBatchnormForwardTrainingNhwcFp16
-    : public BatchnormForwardTraining<half, float, Batchnorm2dTestCase>
-{
-};
+// NCDHW 3D - Mixed precision
+using BnFwdTrainNcdhwFp16Mixed = BatchnormForwardTraining<half, float, Batchnorm3dTestCase>;
+using BnFwdTrainNcdhwBfp16Mixed = BatchnormForwardTraining<hip_bfloat16, float, Batchnorm3dTestCase>;
 
-class IntegrationGpuBatchnormForwardTrainingNcdhwFp32
-    : public BatchnormForwardTraining<float, float, Batchnorm3dTestCase>
-{
-};
+// NDHWC 3D - Pure precision
+using BnFwdTrainNdhwcFp32 = BatchnormForwardTraining<float, float, Batchnorm3dTestCase>;
+using BnFwdTrainNdhwcFp16Pure = BatchnormForwardTraining<half, half, Batchnorm3dTestCase>;
+using BnFwdTrainNdhwcBfp16Pure = BatchnormForwardTraining<hip_bfloat16, hip_bfloat16, Batchnorm3dTestCase>;
 
-class IntegrationGpuBatchnormForwardTrainingNcdhwBfp16
-    : public BatchnormForwardTraining<hip_bfloat16, float, Batchnorm3dTestCase>
-{
-};
-
-class IntegrationGpuBatchnormForwardTrainingNcdhwFp16
-    : public BatchnormForwardTraining<half, float, Batchnorm3dTestCase>
-{
-};
-
-class IntegrationGpuBatchnormForwardTrainingNdhwcFp32
-    : public BatchnormForwardTraining<float, float, Batchnorm3dTestCase>
-{
-};
-
-class IntegrationGpuBatchnormForwardTrainingNdhwcBfp16
-    : public BatchnormForwardTraining<hip_bfloat16, float, Batchnorm3dTestCase>
-{
-};
-
-class IntegrationGpuBatchnormForwardTrainingNdhwcFp16
-    : public BatchnormForwardTraining<half, float, Batchnorm3dTestCase>
-{
-};
+// NDHWC 3D - Mixed precision
+using BnFwdTrainNdhwcFp16Mixed = BatchnormForwardTraining<half, float, Batchnorm3dTestCase>;
+using BnFwdTrainNdhwcBfp16Mixed = BatchnormForwardTraining<hip_bfloat16, float, Batchnorm3dTestCase>;
 
 std::vector<Batchnorm2dTestCase> getBnFwdTrainingTestCases()
 {
@@ -631,155 +606,258 @@ std::vector<Batchnorm3dTestCase> getBnFwdTraining3dTestCases()
 
 } // namespace
 
-TEST_P(IntegrationGpuBatchnormForwardTrainingNchwFp32, BasicForward)
+// ============================================================================
+// NCHW 2D Tests
+// ============================================================================
+
+TEST_F(BnFwdTrainNchwFp32, Correctness)
 {
-    runBatchnormTest(batchnorm::getRmsToleranceTraining<float>(),
-                     BatchnormTrainingScenario::BASIC_FORWARD,
-                     TensorLayout::NCHW);
+    auto testCases = getBnFwdTrainingTestCases();
+    for(const auto& testCase : testCases)
+    {
+        this->runBatchnormTest(testCase,
+                               batchnorm::getRmsToleranceTraining<float>(),
+                               BatchnormTrainingScenario::FULL_TRAINING,
+                               TensorLayout::NCHW);
+    }
 }
 
-TEST_P(IntegrationGpuBatchnormForwardTrainingNchwFp32, FullTraining)
+TEST_F(BnFwdTrainNchwFp16Pure, Correctness)
 {
-    runBatchnormTest(batchnorm::getRmsToleranceTraining<float>(),
-                     BatchnormTrainingScenario::FULL_TRAINING,
-                     TensorLayout::NCHW);
+    auto testCases = getBnFwdTrainingTestCases();
+    for(const auto& testCase : testCases)
+    {
+        this->runBatchnormTest(testCase,
+                               batchnorm::getRmsToleranceTraining<half>(),
+                               BatchnormTrainingScenario::FULL_TRAINING,
+                               TensorLayout::NCHW);
+    }
 }
 
-TEST_P(IntegrationGpuBatchnormForwardTrainingNchwFp32, WithRunningStats)
+TEST_F(BnFwdTrainNchwBfp16Pure, Correctness)
 {
-    runBatchnormTest(batchnorm::getRmsToleranceTraining<float>(),
-                     BatchnormTrainingScenario::WITH_RUNNING_STATS,
-                     TensorLayout::NCHW);
+    auto testCases = getBnFwdTrainingTestCases();
+    for(const auto& testCase : testCases)
+    {
+        this->runBatchnormTest(testCase,
+                               batchnorm::getRmsToleranceTraining<hip_bfloat16>(),
+                               BatchnormTrainingScenario::FULL_TRAINING,
+                               TensorLayout::NCHW);
+    }
 }
 
-TEST_P(IntegrationGpuBatchnormForwardTrainingNchwFp32, WithBatchStats)
+TEST_F(BnFwdTrainNchwFp16Mixed, Correctness)
 {
-    runBatchnormTest(batchnorm::getRmsToleranceTraining<float>(),
-                     BatchnormTrainingScenario::WITH_BATCH_STATS,
-                     TensorLayout::NCHW);
+    auto testCases = getBnFwdTrainingTestCases();
+    for(const auto& testCase : testCases)
+    {
+        this->runBatchnormTest(testCase,
+                               batchnorm::getRmsToleranceTraining<half>(),
+                               BatchnormTrainingScenario::FULL_TRAINING,
+                               TensorLayout::NCHW);
+    }
 }
 
-INSTANTIATE_TEST_SUITE_P(,
-                         IntegrationGpuBatchnormForwardTrainingNchwFp32,
-                         testing::ValuesIn(getBnFwdTrainingTestCases()));
-
-TEST_P(IntegrationGpuBatchnormForwardTrainingNchwBfp16, FullTraining)
+TEST_F(BnFwdTrainNchwBfp16Mixed, Correctness)
 {
-    runBatchnormTest(batchnorm::getRmsToleranceTraining<hip_bfloat16>(),
-                     BatchnormTrainingScenario::FULL_TRAINING,
-                     TensorLayout::NCHW);
+    auto testCases = getBnFwdTrainingTestCases();
+    for(const auto& testCase : testCases)
+    {
+        this->runBatchnormTest(testCase,
+                               batchnorm::getRmsToleranceTraining<hip_bfloat16>(),
+                               BatchnormTrainingScenario::FULL_TRAINING,
+                               TensorLayout::NCHW);
+    }
 }
 
-INSTANTIATE_TEST_SUITE_P(,
-                         IntegrationGpuBatchnormForwardTrainingNchwBfp16,
-                         testing::ValuesIn(getBnFwdTrainingTestCases()));
+// ============================================================================
+// NHWC 2D Tests
+// ============================================================================
 
-TEST_P(IntegrationGpuBatchnormForwardTrainingNchwFp16, FullTraining)
+TEST_F(BnFwdTrainNhwcFp32, Correctness)
 {
-    runBatchnormTest(batchnorm::getRmsToleranceTraining<half>(),
-                     BatchnormTrainingScenario::FULL_TRAINING,
-                     TensorLayout::NCHW);
+    auto testCases = getBnFwdTrainingTestCases();
+    for(const auto& testCase : testCases)
+    {
+        this->runBatchnormTest(testCase,
+                               batchnorm::getRmsToleranceTraining<float>(),
+                               BatchnormTrainingScenario::FULL_TRAINING,
+                               TensorLayout::NHWC);
+    }
 }
 
-INSTANTIATE_TEST_SUITE_P(,
-                         IntegrationGpuBatchnormForwardTrainingNchwFp16,
-                         testing::ValuesIn(getBnFwdTrainingTestCases()));
-
-TEST_P(IntegrationGpuBatchnormForwardTrainingNhwcFp32, FullTraining)
+TEST_F(BnFwdTrainNhwcFp16Pure, Correctness)
 {
-    runBatchnormTest(batchnorm::getRmsToleranceTraining<float>(),
-                     BatchnormTrainingScenario::FULL_TRAINING,
-                     TensorLayout::NHWC);
+    auto testCases = getBnFwdTrainingTestCases();
+    for(const auto& testCase : testCases)
+    {
+        this->runBatchnormTest(testCase,
+                               batchnorm::getRmsToleranceTraining<half>(),
+                               BatchnormTrainingScenario::FULL_TRAINING,
+                               TensorLayout::NHWC);
+    }
 }
 
-INSTANTIATE_TEST_SUITE_P(,
-                         IntegrationGpuBatchnormForwardTrainingNhwcFp32,
-                         testing::ValuesIn(getBnFwdTrainingTestCases()));
-
-TEST_P(IntegrationGpuBatchnormForwardTrainingNhwcBfp16, FullTraining)
+TEST_F(BnFwdTrainNhwcBfp16Pure, Correctness)
 {
-    runBatchnormTest(batchnorm::getRmsToleranceTraining<hip_bfloat16>(),
-                     BatchnormTrainingScenario::FULL_TRAINING,
-                     TensorLayout::NHWC);
+    auto testCases = getBnFwdTrainingTestCases();
+    for(const auto& testCase : testCases)
+    {
+        this->runBatchnormTest(testCase,
+                               batchnorm::getRmsToleranceTraining<hip_bfloat16>(),
+                               BatchnormTrainingScenario::FULL_TRAINING,
+                               TensorLayout::NHWC);
+    }
 }
 
-INSTANTIATE_TEST_SUITE_P(,
-                         IntegrationGpuBatchnormForwardTrainingNhwcBfp16,
-                         testing::ValuesIn(getBnFwdTrainingTestCases()));
-
-TEST_P(IntegrationGpuBatchnormForwardTrainingNhwcFp16, FullTraining)
+TEST_F(BnFwdTrainNhwcFp16Mixed, Correctness)
 {
-    runBatchnormTest(batchnorm::getRmsToleranceTraining<half>(),
-                     BatchnormTrainingScenario::FULL_TRAINING,
-                     TensorLayout::NHWC);
+    auto testCases = getBnFwdTrainingTestCases();
+    for(const auto& testCase : testCases)
+    {
+        this->runBatchnormTest(testCase,
+                               batchnorm::getRmsToleranceTraining<half>(),
+                               BatchnormTrainingScenario::FULL_TRAINING,
+                               TensorLayout::NHWC);
+    }
 }
 
-INSTANTIATE_TEST_SUITE_P(,
-                         IntegrationGpuBatchnormForwardTrainingNhwcFp16,
-                         testing::ValuesIn(getBnFwdTrainingTestCases()));
-
-TEST_P(IntegrationGpuBatchnormForwardTrainingNcdhwFp32, FullTraining)
+TEST_F(BnFwdTrainNhwcBfp16Mixed, Correctness)
 {
-    runBatchnormTest(batchnorm::getRmsToleranceTraining<float>(),
-                     BatchnormTrainingScenario::FULL_TRAINING,
-                     TensorLayout::NCDHW);
+    auto testCases = getBnFwdTrainingTestCases();
+    for(const auto& testCase : testCases)
+    {
+        this->runBatchnormTest(testCase,
+                               batchnorm::getRmsToleranceTraining<hip_bfloat16>(),
+                               BatchnormTrainingScenario::FULL_TRAINING,
+                               TensorLayout::NHWC);
+    }
 }
 
-INSTANTIATE_TEST_SUITE_P(,
-                         IntegrationGpuBatchnormForwardTrainingNcdhwFp32,
-                         testing::ValuesIn(getBnFwdTraining3dTestCases()));
+// ============================================================================
+// NCDHW 3D Tests
+// ============================================================================
 
-TEST_P(IntegrationGpuBatchnormForwardTrainingNcdhwBfp16, FullTraining)
+TEST_F(BnFwdTrainNcdhwFp32, Correctness)
 {
-    runBatchnormTest(batchnorm::getRmsToleranceTraining<hip_bfloat16>(),
-                     BatchnormTrainingScenario::FULL_TRAINING,
-                     TensorLayout::NCDHW);
+    auto testCases = getBnFwdTraining3dTestCases();
+    for(const auto& testCase : testCases)
+    {
+        this->runBatchnormTest(testCase,
+                               batchnorm::getRmsToleranceTraining<float>(),
+                               BatchnormTrainingScenario::FULL_TRAINING,
+                               TensorLayout::NCDHW);
+    }
 }
 
-INSTANTIATE_TEST_SUITE_P(,
-                         IntegrationGpuBatchnormForwardTrainingNcdhwBfp16,
-                         testing::ValuesIn(getBnFwdTraining3dTestCases()));
-
-TEST_P(IntegrationGpuBatchnormForwardTrainingNcdhwFp16, FullTraining)
+TEST_F(BnFwdTrainNcdhwFp16Pure, Correctness)
 {
-    runBatchnormTest(batchnorm::getRmsToleranceTraining<half>(),
-                     BatchnormTrainingScenario::FULL_TRAINING,
-                     TensorLayout::NCDHW);
+    auto testCases = getBnFwdTraining3dTestCases();
+    for(const auto& testCase : testCases)
+    {
+        this->runBatchnormTest(testCase,
+                               batchnorm::getRmsToleranceTraining<half>(),
+                               BatchnormTrainingScenario::FULL_TRAINING,
+                               TensorLayout::NCDHW);
+    }
 }
 
-INSTANTIATE_TEST_SUITE_P(,
-                         IntegrationGpuBatchnormForwardTrainingNcdhwFp16,
-                         testing::ValuesIn(getBnFwdTraining3dTestCases()));
-
-TEST_P(IntegrationGpuBatchnormForwardTrainingNdhwcFp32, FullTraining)
+TEST_F(BnFwdTrainNcdhwBfp16Pure, Correctness)
 {
-    runBatchnormTest(batchnorm::getRmsToleranceTraining<float>(),
-                     BatchnormTrainingScenario::FULL_TRAINING,
-                     TensorLayout::NDHWC);
+    auto testCases = getBnFwdTraining3dTestCases();
+    for(const auto& testCase : testCases)
+    {
+        this->runBatchnormTest(testCase,
+                               batchnorm::getRmsToleranceTraining<hip_bfloat16>(),
+                               BatchnormTrainingScenario::FULL_TRAINING,
+                               TensorLayout::NCDHW);
+    }
 }
 
-INSTANTIATE_TEST_SUITE_P(,
-                         IntegrationGpuBatchnormForwardTrainingNdhwcFp32,
-                         testing::ValuesIn(getBnFwdTraining3dTestCases()));
-
-TEST_P(IntegrationGpuBatchnormForwardTrainingNdhwcBfp16, FullTraining)
+TEST_F(BnFwdTrainNcdhwFp16Mixed, Correctness)
 {
-    runBatchnormTest(batchnorm::getRmsToleranceTraining<hip_bfloat16>(),
-                     BatchnormTrainingScenario::FULL_TRAINING,
-                     TensorLayout::NDHWC);
+    auto testCases = getBnFwdTraining3dTestCases();
+    for(const auto& testCase : testCases)
+    {
+        this->runBatchnormTest(testCase,
+                               batchnorm::getRmsToleranceTraining<half>(),
+                               BatchnormTrainingScenario::FULL_TRAINING,
+                               TensorLayout::NCDHW);
+    }
 }
 
-INSTANTIATE_TEST_SUITE_P(,
-                         IntegrationGpuBatchnormForwardTrainingNdhwcBfp16,
-                         testing::ValuesIn(getBnFwdTraining3dTestCases()));
-
-TEST_P(IntegrationGpuBatchnormForwardTrainingNdhwcFp16, FullTraining)
+TEST_F(BnFwdTrainNcdhwBfp16Mixed, Correctness)
 {
-    runBatchnormTest(batchnorm::getRmsToleranceTraining<half>(),
-                     BatchnormTrainingScenario::FULL_TRAINING,
-                     TensorLayout::NDHWC);
+    auto testCases = getBnFwdTraining3dTestCases();
+    for(const auto& testCase : testCases)
+    {
+        this->runBatchnormTest(testCase,
+                               batchnorm::getRmsToleranceTraining<hip_bfloat16>(),
+                               BatchnormTrainingScenario::FULL_TRAINING,
+                               TensorLayout::NCDHW);
+    }
 }
 
-INSTANTIATE_TEST_SUITE_P(,
-                         IntegrationGpuBatchnormForwardTrainingNdhwcFp16,
-                         testing::ValuesIn(getBnFwdTraining3dTestCases()));
+// ============================================================================
+// NDHWC 3D Tests
+// ============================================================================
+
+TEST_F(BnFwdTrainNdhwcFp32, Correctness)
+{
+    auto testCases = getBnFwdTraining3dTestCases();
+    for(const auto& testCase : testCases)
+    {
+        this->runBatchnormTest(testCase,
+                               batchnorm::getRmsToleranceTraining<float>(),
+                               BatchnormTrainingScenario::FULL_TRAINING,
+                               TensorLayout::NDHWC);
+    }
+}
+
+TEST_F(BnFwdTrainNdhwcFp16Pure, Correctness)
+{
+    auto testCases = getBnFwdTraining3dTestCases();
+    for(const auto& testCase : testCases)
+    {
+        this->runBatchnormTest(testCase,
+                               batchnorm::getRmsToleranceTraining<half>(),
+                               BatchnormTrainingScenario::FULL_TRAINING,
+                               TensorLayout::NDHWC);
+    }
+}
+
+TEST_F(BnFwdTrainNdhwcBfp16Pure, Correctness)
+{
+    auto testCases = getBnFwdTraining3dTestCases();
+    for(const auto& testCase : testCases)
+    {
+        this->runBatchnormTest(testCase,
+                               batchnorm::getRmsToleranceTraining<hip_bfloat16>(),
+                               BatchnormTrainingScenario::FULL_TRAINING,
+                               TensorLayout::NDHWC);
+    }
+}
+
+TEST_F(BnFwdTrainNdhwcFp16Mixed, Correctness)
+{
+    auto testCases = getBnFwdTraining3dTestCases();
+    for(const auto& testCase : testCases)
+    {
+        this->runBatchnormTest(testCase,
+                               batchnorm::getRmsToleranceTraining<half>(),
+                               BatchnormTrainingScenario::FULL_TRAINING,
+                               TensorLayout::NDHWC);
+    }
+}
+
+TEST_F(BnFwdTrainNdhwcBfp16Mixed, Correctness)
+{
+    auto testCases = getBnFwdTraining3dTestCases();
+    for(const auto& testCase : testCases)
+    {
+        this->runBatchnormTest(testCase,
+                               batchnorm::getRmsToleranceTraining<hip_bfloat16>(),
+                               BatchnormTrainingScenario::FULL_TRAINING,
+                               TensorLayout::NDHWC);
+    }
+}
