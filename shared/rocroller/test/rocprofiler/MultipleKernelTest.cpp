@@ -166,6 +166,8 @@ namespace RocprofilerTest
         Here, kernels with different "v_mov_b32_e32 v1, 0x<literal>" are launch to distinguish them.
         */
 
+        rocRoller::profiler::reset();
+
         auto literal    = GENERATE(0xdeadbeef, 0x12345678, 0xabcdef00);
         auto commandArg = GENERATE(7, 21, 331);
 
@@ -271,6 +273,8 @@ namespace RocprofilerTest
         Ensures the profiler returns instructions from the correct kernel.
         */
 
+        rocRoller::profiler::reset();
+
         std::vector<uint32_t> literals
             = {0xbeef0000, 0xbeef0001, 0xbeef0002, 0xbeef0003, 0xbeef0004, 0xbeef0005, 0xbeef0006};
         std::vector<KernelSetup> kernelSetups;
@@ -290,7 +294,6 @@ namespace RocprofilerTest
             std::vector<size_t> order = {0, 1, 2, 1};
             for(size_t idx : order)
             {
-                Log::info(kernelSetups[idx].kernel.getInstructions());
                 kernelSetups[idx].kernel.launchKernel(
                     kernelSetups[idx].commandArgs.runtimeArguments());
             }
@@ -308,7 +311,6 @@ namespace RocprofilerTest
             std::vector<size_t> order = {3, 4};
             for(size_t idx : order)
             {
-                Log::info(kernelSetups[idx].kernel.getInstructions());
                 kernelSetups[idx].kernel.launchKernel(
                     kernelSetups[idx].commandArgs.runtimeArguments());
             }
@@ -326,7 +328,6 @@ namespace RocprofilerTest
             std::vector<size_t> order = {6, 5, 4, 3, 2, 1, 0};
             for(size_t idx : order)
             {
-                Log::info(kernelSetups[idx].kernel.getInstructions());
                 kernelSetups[idx].kernel.launchKernel(
                     kernelSetups[idx].commandArgs.runtimeArguments());
             }
@@ -344,7 +345,6 @@ namespace RocprofilerTest
             std::vector<size_t> order = {5, 6};
             for(size_t idx : order)
             {
-                Log::info(kernelSetups[idx].kernel.getInstructions());
                 kernelSetups[idx].kernel.launchKernel(
                     kernelSetups[idx].commandArgs.runtimeArguments());
             }
@@ -365,6 +365,8 @@ namespace RocprofilerTest
 
     TEST_CASE("Rocprofiler accidental multiple kernel dispatches")
     {
+        rocRoller::profiler::reset();
+
         auto testContext = TestContext::ForTestDevice({}, "multi_kernel_dispatch_test");
 
         auto kernelSetup1 = createSimpleMovKernel(

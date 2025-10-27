@@ -76,5 +76,7 @@ namespace rocRoller
          */
         std::vector<InstructionProfile> loopUntilDispatchData(std::function<void()> dispatch);
 
+        void reset();
+
     } // namespace profiler
 } // namespace rocRoller

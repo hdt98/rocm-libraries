@@ -75,7 +75,7 @@ namespace rocRoller
         // To wait for dispatch
         std::condition_variable dispatch_cv;
         std::mutex              dispatch_count_mutex;
-        bool                    enable_profiler = false;
+        std::atomic<bool>       enable_profiler = false;
         std::vector<uint8_t>    profile_data;
 
         // Only for invariant checks
@@ -253,7 +253,9 @@ namespace rocRoller
                               void*                              userdata_config,
                               rocprofiler_user_data_t*           userdata_shader)
         {
-            Log::info("dispatch_callback: dispatch_id {}", dispatch_id);
+            Log::info("dispatch_callback: dispatch_id {}, enable_profiler {}",
+                      dispatch_id,
+                      enable_profiler.load());
 
             userdata_shader->value = dispatch_id;
 
@@ -433,6 +435,13 @@ namespace rocRoller
                 }
                 Log::info("loopUntilDispatchData: got no data, invoking another dispatch");
             }
+        }
+
+        void reset()
+        {
+            std::lock_guard<std::mutex> lock(dispatch_count_mutex);
+            profile_data.clear();
+            enable_profiler = false;
         }
 
         uint64_t InstructionProfile::meanLatency() const
