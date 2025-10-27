@@ -321,6 +321,24 @@ namespace RocprofilerTest
             literalHex = fmt::format("0x{:x}", literals[order.back()]);
         }
 
+        SECTION("Order 3")
+        {
+            std::vector<size_t> order = {6, 5, 4, 3, 2, 1, 0};
+            for(size_t idx : order)
+            {
+                Log::info(kernelSetups[idx].kernel.getInstructions());
+                kernelSetups[idx].kernel.launchKernel(
+                    kernelSetups[idx].commandArgs.runtimeArguments());
+            }
+
+            latencies = rocRoller::profiler::loopUntilDispatchData([&]() {
+                kernelSetups[order.back()].kernel.launchKernel(
+                    kernelSetups[order.back()].commandArgs.runtimeArguments());
+            });
+
+            literalHex = fmt::format("0x{:x}", literals[order.back()]);
+        }
+
         SECTION("With profiler calls")
         {
             std::vector<size_t> order = {5, 6};

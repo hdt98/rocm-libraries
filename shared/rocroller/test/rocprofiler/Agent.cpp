@@ -78,6 +78,11 @@ namespace rocRoller
         bool                    enable_profiler = false;
         std::vector<uint8_t>    profile_data;
 
+        // Only for invariant checks
+        std::atomic<int> dispatch_callback_counter;
+        // Only for invariant checks
+        std::atomic<int> shader_callback_counter;
+
         void codeobj_callback(rocprofiler_callback_tracing_record_t record,
                               rocprofiler_user_data_t*,
                               void*)
@@ -221,6 +226,8 @@ namespace rocRoller
             // Based on https://github.com/ROCm/rocm-systems/blob/e9dac39102606ac6f7ab2778f74745e27841fb6c/projects/rocprofiler-sdk/source/lib/rocprofiler-sdk-tool/tool.cpp#L1387-L1408
             // Avoid decoding directly in this function body per https://rocm.docs.amd.com/projects/rocprofiler-sdk/en/latest/api-reference/thread_trace.html#processing-thread-trace-data
 
+            shader_callback_counter++;
+
             rocprofiler_dispatch_id_t dispatch_id
                 = static_cast<rocprofiler_dispatch_id_t>(userdata.value);
 
@@ -249,8 +256,13 @@ namespace rocRoller
             Log::info("dispatch_callback: dispatch_id {}", dispatch_id);
 
             userdata_shader->value = dispatch_id;
-            return enable_profiler ? ROCPROFILER_THREAD_TRACE_CONTROL_START_AND_STOP
-                                   : ROCPROFILER_THREAD_TRACE_CONTROL_NONE;
+
+            if(enable_profiler)
+            {
+                dispatch_callback_counter++;
+                return ROCPROFILER_THREAD_TRACE_CONTROL_START_AND_STOP;
+            }
+            return ROCPROFILER_THREAD_TRACE_CONTROL_NONE;
         }
 
         rocprofiler_status_t query_agents(rocprofiler_agent_version_t,
@@ -321,10 +333,8 @@ namespace rocRoller
 
     namespace profiler
     {
-        std::optional<std::vector<InstructionProfile>> getData()
+        std::optional<std::vector<InstructionProfile>> waitForData()
         {
-            HIP_CHECK(hipDeviceSynchronize());
-
             if(!enable_agent)
                 return std::nullopt;
 
@@ -335,6 +345,16 @@ namespace rocRoller
 
             dispatch_cv.wait_for(
                 lock, std::chrono::seconds(10), [] { return !profile_data.empty(); });
+
+            AssertFatal(dispatch_callback_counter == 1,
+                        "waitForDispatchData: unexpected dispatch callback count {}",
+                        dispatch_callback_counter);
+            AssertFatal(shader_callback_counter == 1,
+                        "waitForDispatchData: unexpected shader callback count {}",
+                        shader_callback_counter);
+
+            dispatch_callback_counter = 0;
+            shader_callback_counter   = 0;
 
             if(!profile_data.empty())
             {
@@ -381,6 +401,22 @@ namespace rocRoller
             return result;
         }
 
+        std::optional<std::vector<InstructionProfile>>
+            getDispatchData(std::function<void()> dispatch)
+        {
+            HIP_CHECK(hipDeviceSynchronize());
+
+            if(!enable_agent)
+                return std::nullopt;
+
+            AssertFatal(profile_data.empty(), "getDispatchData: profile_data not empty");
+            enable_profiler = true;
+            dispatch();
+            auto data       = waitForData();
+            enable_profiler = false;
+            return data;
+        }
+
         std::vector<InstructionProfile> loopUntilDispatchData(std::function<void()> dispatch)
         {
             if(!enable_agent)
@@ -388,17 +424,9 @@ namespace rocRoller
 
             std::optional<std::vector<InstructionProfile>> data;
 
-            AssertFatal(profile_data.empty(), "loopUntilDispatchData: profile_data not empty");
-
             while(true)
             {
-                AssertFatal(!enable_profiler, "loopUntilDispatchData: profiler already enabled");
-                enable_profiler = true;
-                dispatch();
-                data = getData();
-                AssertFatal(enable_profiler,
-                            "loopUntilDispatchData: profiler disabled unexpectedly");
-                enable_profiler = false;
+                data = getDispatchData(dispatch);
                 if(data.has_value())
                 {
                     return *data;
