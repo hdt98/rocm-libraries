@@ -623,20 +623,8 @@ public:
         }
 
         auto y = outputTensor(attributes.get_name() + "::Y");
-        
-        // Check if caller pre-set mean/invVariance (signals they want these outputs)
-        auto mean = attributes.get_mean();
-        auto invVariance = attributes.get_inv_variance();
-
-        std::shared_ptr<TensorAttributes> meanOut;
-        std::shared_ptr<TensorAttributes> invVarianceOut;
-
-        if(mean && invVariance)
-        {
-            // Caller wants batch stats outputs
-            meanOut = outputTensor(attributes.get_name() + "::MEAN");
-            invVarianceOut = outputTensor(attributes.get_name() + "::INV_VARIANCE");
-        }
+        auto meanOut = outputTensor(attributes.get_name() + "::MEAN");
+        auto invVarianceOut = outputTensor(attributes.get_name() + "::INV_VARIANCE");
 
         auto prevRunningMean = attributes.get_prev_running_mean();
         auto prevRunningVariance = attributes.get_prev_running_variance();

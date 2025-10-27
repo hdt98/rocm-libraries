@@ -19,12 +19,17 @@ using namespace hipdnn_sdk::test_utilities;
 namespace
 {
 
+// Note: hipDNN BatchNorm implements Spatial normalization only (miopenBNSpatial).
+// The mode is hardcoded in the MIOpen plugin (see MiopenBatchnormFwdTrainingPlan.cpp).
+// Per-activation normalization would require LayerNorm or InstanceNorm operations.
+//
+// These scenarios test different output combinations in forward training:
+// - WITH_BATCH_STATS: Computes batch statistics (mean/invVariance) without updating running stats
+// - FULL_TRAINING: Computes batch statistics AND updates running mean/variance via EMA
 enum class BatchnormTrainingScenario
 {
-    BASIC_FORWARD,      // No saved stats (Y output only)
-    WITH_RUNNING_STATS, // Running stats only
-    WITH_BATCH_STATS,   // Batch stats only
-    FULL_TRAINING       // All stats (batch + running)
+    WITH_BATCH_STATS,   // Batch stats only (no running stats update)
+    FULL_TRAINING       // Batch stats + running stats update (canonical training)
 };
 
 struct Batchnorm2dTestCase
@@ -122,8 +127,7 @@ protected:
         std::shared_ptr<graph::TensorAttributes> prevRunningVarianceTensorAttr;
         std::shared_ptr<graph::TensorAttributes> momentumTensorAttr;
 
-        if(scenario == BatchnormTrainingScenario::WITH_RUNNING_STATS
-           || scenario == BatchnormTrainingScenario::FULL_TRAINING)
+        if(scenario == BatchnormTrainingScenario::FULL_TRAINING)
         {
             auto prevRunningMeanAttr = graph::makeTensorAttributes(
                 "prev_running_mean", intermediateDataType, derivedDims, generateStrides(derivedDims));
@@ -152,15 +156,6 @@ protected:
         {
             bnAttrs.set_previous_running_stats(
                 prevRunningMeanTensorAttr, prevRunningVarianceTensorAttr, momentumTensorAttr);
-        }
-
-        // Conditionally set mean/invVariance based on scenario
-        if(scenario != BatchnormTrainingScenario::BASIC_FORWARD)
-        {
-            auto meanPlaceholder = std::make_shared<graph::TensorAttributes>();
-            auto invVarPlaceholder = std::make_shared<graph::TensorAttributes>();
-            bnAttrs.set_mean(meanPlaceholder);
-            bnAttrs.set_inv_variance(invVarPlaceholder);
         }
 
         bnAttrs.set_epsilon(epsilonTensorAttr);
@@ -354,29 +349,49 @@ using BnFwdTrainNdhwcFp16Mixed = BatchnormForwardTraining<half, float, Batchnorm
 using BnFwdTrainNdhwcBfp16Mixed =
     BatchnormForwardTraining<hip_bfloat16, float, Batchnorm3dTestCase>;
 
-std::vector<Batchnorm2dTestCase> getBnFwdTrainingTestCases()
+std::vector<Batchnorm2dTestCase> getBnFwdTrainingSmoke2dTestCases()
 {
     unsigned int seed = std::random_device{}();
 
     return {
-    //     {1, 3, 14, 14, seed},
-    //     // {1, 256, 1, 1, seed},
-    //     {2, 3, 1, 1, seed},
-    //     {32, 1, 14, 14, seed},
-        {32, 3, 1, 14, seed}
-        // {32, 3, 14, 1, seed},
-        // {64, 64, 112, 112, seed},
-        // {64, 512, 14, 14, seed},
+        {2, 3, 1, 1, seed},      // Minimal case
+        {32, 3, 1, 14, seed},    // Typical small training case
     };
 }
 
-std::vector<Batchnorm3dTestCase> getBnFwdTraining3dTestCases()
+std::vector<Batchnorm2dTestCase> getBnFwdTrainingFull2dTestCases()
 {
     unsigned int seed = std::random_device{}();
 
     return {
-        {2, 3, 3, 1, 1, seed},
-        // {16, 3, 8, 14, 14, seed},
+        {1, 3, 14, 14, seed},
+        {2, 3, 1, 1, seed},
+        {32, 1, 14, 14, seed},
+        {32, 3, 1, 14, seed},
+        {32, 3, 14, 1, seed},
+        {64, 64, 112, 112, seed},   // Large regression case
+        {64, 512, 14, 14, seed},    // Many channels
+    };
+}
+
+std::vector<Batchnorm3dTestCase> getBnFwdTrainingSmoke3dTestCases()
+{
+    unsigned int seed = std::random_device{}();
+
+    return {
+        {2, 3, 3, 1, 1, seed},   // Minimal 3D case
+        {2, 3, 2, 4, 4, seed},   // Small case with non-1 spatial dims
+    };
+}
+
+std::vector<Batchnorm3dTestCase> getBnFwdTrainingFull3dTestCases()
+{
+    unsigned int seed = std::random_device{}();
+
+    return {
+        {2, 3, 3, 1, 1, seed},      // Minimal case
+        {2, 3, 2, 4, 4, seed},      // Small case
+        {16, 3, 8, 14, 14, seed},   // Larger regression case
     };
 }
 
@@ -386,110 +401,274 @@ std::vector<Batchnorm3dTestCase> getBnFwdTraining3dTestCases()
 // NCHW 2D Tests
 // ============================================================================
 
-TEST_P(BnFwdTrainNchwFp32, Correctness)
+TEST_P(BnFwdTrainNchwFp32, FullTraining)
 {
-    runGraphTest(batchnorm::getRmsToleranceTraining<float>(), TensorLayout::NCHW);
+    runGraphTestWithScenario(batchnorm::getRmsToleranceTraining<float>(),
+                            BatchnormTrainingScenario::FULL_TRAINING,
+                            TensorLayout::NCHW);
 }
 
-TEST_P(BnFwdTrainNchwFp16Mixed, Correctness)
+TEST_P(BnFwdTrainNchwFp32, BatchStatsOnly)
 {
-    runGraphTest(batchnorm::getRmsToleranceTraining<half>(), TensorLayout::NCHW);
+    runGraphTestWithScenario(batchnorm::getRmsToleranceTraining<float>(),
+                            BatchnormTrainingScenario::WITH_BATCH_STATS,
+                            TensorLayout::NCHW);
 }
 
-TEST_P(BnFwdTrainNchwBfp16Mixed, Correctness)
+TEST_P(BnFwdTrainNchwFp16Mixed, FullTraining)
 {
-    runGraphTest(batchnorm::getRmsToleranceTraining<hip_bfloat16>(), TensorLayout::NCHW);
+    runGraphTestWithScenario(batchnorm::getRmsToleranceTraining<half>(),
+                            BatchnormTrainingScenario::FULL_TRAINING,
+                            TensorLayout::NCHW);
+}
+
+TEST_P(BnFwdTrainNchwFp16Mixed, BatchStatsOnly)
+{
+    runGraphTestWithScenario(batchnorm::getRmsToleranceTraining<half>(),
+                            BatchnormTrainingScenario::WITH_BATCH_STATS,
+                            TensorLayout::NCHW);
+}
+
+TEST_P(BnFwdTrainNchwBfp16Mixed, FullTraining)
+{
+    runGraphTestWithScenario(batchnorm::getRmsToleranceTraining<hip_bfloat16>(),
+                            BatchnormTrainingScenario::FULL_TRAINING,
+                            TensorLayout::NCHW);
+}
+
+TEST_P(BnFwdTrainNchwBfp16Mixed, BatchStatsOnly)
+{
+    runGraphTestWithScenario(batchnorm::getRmsToleranceTraining<hip_bfloat16>(),
+                            BatchnormTrainingScenario::WITH_BATCH_STATS,
+                            TensorLayout::NCHW);
 }
 
 // ============================================================================
 // NHWC 2D Tests
 // ============================================================================
 
-TEST_P(BnFwdTrainNhwcFp32, Correctness)
+TEST_P(BnFwdTrainNhwcFp32, FullTraining)
 {
-    runGraphTest(batchnorm::getRmsToleranceTraining<float>(), TensorLayout::NHWC);
+    runGraphTestWithScenario(batchnorm::getRmsToleranceTraining<float>(),
+                            BatchnormTrainingScenario::FULL_TRAINING,
+                            TensorLayout::NHWC);
 }
 
-TEST_P(BnFwdTrainNhwcFp16Mixed, Correctness)
+TEST_P(BnFwdTrainNhwcFp32, BatchStatsOnly)
 {
-    runGraphTest(batchnorm::getRmsToleranceTraining<half>(), TensorLayout::NHWC);
+    runGraphTestWithScenario(batchnorm::getRmsToleranceTraining<float>(),
+                            BatchnormTrainingScenario::WITH_BATCH_STATS,
+                            TensorLayout::NHWC);
 }
 
-TEST_P(BnFwdTrainNhwcBfp16Mixed, Correctness)
+TEST_P(BnFwdTrainNhwcFp16Mixed, FullTraining)
 {
-    runGraphTest(batchnorm::getRmsToleranceTraining<hip_bfloat16>(), TensorLayout::NHWC);
+    runGraphTestWithScenario(batchnorm::getRmsToleranceTraining<half>(),
+                            BatchnormTrainingScenario::FULL_TRAINING,
+                            TensorLayout::NHWC);
+}
+
+TEST_P(BnFwdTrainNhwcFp16Mixed, BatchStatsOnly)
+{
+    runGraphTestWithScenario(batchnorm::getRmsToleranceTraining<half>(),
+                            BatchnormTrainingScenario::WITH_BATCH_STATS,
+                            TensorLayout::NHWC);
+}
+
+TEST_P(BnFwdTrainNhwcBfp16Mixed, FullTraining)
+{
+    runGraphTestWithScenario(batchnorm::getRmsToleranceTraining<hip_bfloat16>(),
+                            BatchnormTrainingScenario::FULL_TRAINING,
+                            TensorLayout::NHWC);
+}
+
+TEST_P(BnFwdTrainNhwcBfp16Mixed, BatchStatsOnly)
+{
+    runGraphTestWithScenario(batchnorm::getRmsToleranceTraining<hip_bfloat16>(),
+                            BatchnormTrainingScenario::WITH_BATCH_STATS,
+                            TensorLayout::NHWC);
 }
 
 // ============================================================================
 // NCDHW 3D Tests
 // ============================================================================
 
-TEST_P(BnFwdTrainNcdhwFp32, Correctness)
+TEST_P(BnFwdTrainNcdhwFp32, FullTraining)
 {
-    runGraphTest(batchnorm::getRmsToleranceTraining<float>(), TensorLayout::NCDHW);
+    runGraphTestWithScenario(batchnorm::getRmsToleranceTraining<float>(),
+                            BatchnormTrainingScenario::FULL_TRAINING,
+                            TensorLayout::NCDHW);
 }
 
-TEST_P(BnFwdTrainNcdhwFp16Mixed, Correctness)
+TEST_P(BnFwdTrainNcdhwFp32, BatchStatsOnly)
 {
-    runGraphTest(batchnorm::getRmsToleranceTraining<half>(), TensorLayout::NCDHW);
+    runGraphTestWithScenario(batchnorm::getRmsToleranceTraining<float>(),
+                            BatchnormTrainingScenario::WITH_BATCH_STATS,
+                            TensorLayout::NCDHW);
 }
 
-TEST_P(BnFwdTrainNcdhwBfp16Mixed, Correctness)
+TEST_P(BnFwdTrainNcdhwFp16Mixed, FullTraining)
 {
-    runGraphTest(batchnorm::getRmsToleranceTraining<hip_bfloat16>(), TensorLayout::NCDHW);
+    runGraphTestWithScenario(batchnorm::getRmsToleranceTraining<half>(),
+                            BatchnormTrainingScenario::FULL_TRAINING,
+                            TensorLayout::NCDHW);
+}
+
+TEST_P(BnFwdTrainNcdhwFp16Mixed, BatchStatsOnly)
+{
+    runGraphTestWithScenario(batchnorm::getRmsToleranceTraining<half>(),
+                            BatchnormTrainingScenario::WITH_BATCH_STATS,
+                            TensorLayout::NCDHW);
+}
+
+TEST_P(BnFwdTrainNcdhwBfp16Mixed, FullTraining)
+{
+    runGraphTestWithScenario(batchnorm::getRmsToleranceTraining<hip_bfloat16>(),
+                            BatchnormTrainingScenario::FULL_TRAINING,
+                            TensorLayout::NCDHW);
+}
+
+TEST_P(BnFwdTrainNcdhwBfp16Mixed, BatchStatsOnly)
+{
+    runGraphTestWithScenario(batchnorm::getRmsToleranceTraining<hip_bfloat16>(),
+                            BatchnormTrainingScenario::WITH_BATCH_STATS,
+                            TensorLayout::NCDHW);
 }
 
 // ============================================================================
 // NDHWC 3D Tests
 // ============================================================================
 
-TEST_P(BnFwdTrainNdhwcFp32, Correctness)
+TEST_P(BnFwdTrainNdhwcFp32, FullTraining)
 {
-    runGraphTest(batchnorm::getRmsToleranceTraining<float>(), TensorLayout::NDHWC);
+    runGraphTestWithScenario(batchnorm::getRmsToleranceTraining<float>(),
+                            BatchnormTrainingScenario::FULL_TRAINING,
+                            TensorLayout::NDHWC);
 }
 
-TEST_P(BnFwdTrainNdhwcFp16Mixed, Correctness)
+TEST_P(BnFwdTrainNdhwcFp32, BatchStatsOnly)
 {
-    runGraphTest(batchnorm::getRmsToleranceTraining<half>(), TensorLayout::NDHWC);
+    runGraphTestWithScenario(batchnorm::getRmsToleranceTraining<float>(),
+                            BatchnormTrainingScenario::WITH_BATCH_STATS,
+                            TensorLayout::NDHWC);
 }
 
-TEST_P(BnFwdTrainNdhwcBfp16Mixed, Correctness)
+TEST_P(BnFwdTrainNdhwcFp16Mixed, FullTraining)
 {
-    runGraphTest(batchnorm::getRmsToleranceTraining<hip_bfloat16>(), TensorLayout::NDHWC);
+    runGraphTestWithScenario(batchnorm::getRmsToleranceTraining<half>(),
+                            BatchnormTrainingScenario::FULL_TRAINING,
+                            TensorLayout::NDHWC);
+}
+
+TEST_P(BnFwdTrainNdhwcFp16Mixed, BatchStatsOnly)
+{
+    runGraphTestWithScenario(batchnorm::getRmsToleranceTraining<half>(),
+                            BatchnormTrainingScenario::WITH_BATCH_STATS,
+                            TensorLayout::NDHWC);
+}
+
+TEST_P(BnFwdTrainNdhwcBfp16Mixed, FullTraining)
+{
+    runGraphTestWithScenario(batchnorm::getRmsToleranceTraining<hip_bfloat16>(),
+                            BatchnormTrainingScenario::FULL_TRAINING,
+                            TensorLayout::NDHWC);
+}
+
+TEST_P(BnFwdTrainNdhwcBfp16Mixed, BatchStatsOnly)
+{
+    runGraphTestWithScenario(batchnorm::getRmsToleranceTraining<hip_bfloat16>(),
+                            BatchnormTrainingScenario::WITH_BATCH_STATS,
+                            TensorLayout::NDHWC);
 }
 
 // ============================================================================
 // Test Instantiation
 // ============================================================================
 
-INSTANTIATE_TEST_SUITE_P(, BnFwdTrainNchwFp32, testing::ValuesIn(getBnFwdTrainingTestCases()));
-INSTANTIATE_TEST_SUITE_P(,
+// 2D NCHW Tests
+INSTANTIATE_TEST_SUITE_P(Smoke,
+                         BnFwdTrainNchwFp32,
+                         testing::ValuesIn(getBnFwdTrainingSmoke2dTestCases()));
+INSTANTIATE_TEST_SUITE_P(Full,
+                         BnFwdTrainNchwFp32,
+                         testing::ValuesIn(getBnFwdTrainingFull2dTestCases()));
+
+INSTANTIATE_TEST_SUITE_P(Smoke,
                          BnFwdTrainNchwFp16Mixed,
-                         testing::ValuesIn(getBnFwdTrainingTestCases()));
-INSTANTIATE_TEST_SUITE_P(,
+                         testing::ValuesIn(getBnFwdTrainingSmoke2dTestCases()));
+INSTANTIATE_TEST_SUITE_P(Full,
+                         BnFwdTrainNchwFp16Mixed,
+                         testing::ValuesIn(getBnFwdTrainingFull2dTestCases()));
+
+INSTANTIATE_TEST_SUITE_P(Smoke,
                          BnFwdTrainNchwBfp16Mixed,
-                         testing::ValuesIn(getBnFwdTrainingTestCases()));
+                         testing::ValuesIn(getBnFwdTrainingSmoke2dTestCases()));
+INSTANTIATE_TEST_SUITE_P(Full,
+                         BnFwdTrainNchwBfp16Mixed,
+                         testing::ValuesIn(getBnFwdTrainingFull2dTestCases()));
 
-INSTANTIATE_TEST_SUITE_P(, BnFwdTrainNhwcFp32, testing::ValuesIn(getBnFwdTrainingTestCases()));
-INSTANTIATE_TEST_SUITE_P(,
+// 2D NHWC Tests
+INSTANTIATE_TEST_SUITE_P(Smoke,
+                         BnFwdTrainNhwcFp32,
+                         testing::ValuesIn(getBnFwdTrainingSmoke2dTestCases()));
+INSTANTIATE_TEST_SUITE_P(Full,
+                         BnFwdTrainNhwcFp32,
+                         testing::ValuesIn(getBnFwdTrainingFull2dTestCases()));
+
+INSTANTIATE_TEST_SUITE_P(Smoke,
                          BnFwdTrainNhwcFp16Mixed,
-                         testing::ValuesIn(getBnFwdTrainingTestCases()));
-INSTANTIATE_TEST_SUITE_P(,
+                         testing::ValuesIn(getBnFwdTrainingSmoke2dTestCases()));
+INSTANTIATE_TEST_SUITE_P(Full,
+                         BnFwdTrainNhwcFp16Mixed,
+                         testing::ValuesIn(getBnFwdTrainingFull2dTestCases()));
+
+INSTANTIATE_TEST_SUITE_P(Smoke,
                          BnFwdTrainNhwcBfp16Mixed,
-                         testing::ValuesIn(getBnFwdTrainingTestCases()));
+                         testing::ValuesIn(getBnFwdTrainingSmoke2dTestCases()));
+INSTANTIATE_TEST_SUITE_P(Full,
+                         BnFwdTrainNhwcBfp16Mixed,
+                         testing::ValuesIn(getBnFwdTrainingFull2dTestCases()));
 
-INSTANTIATE_TEST_SUITE_P(, BnFwdTrainNcdhwFp32, testing::ValuesIn(getBnFwdTraining3dTestCases()));
-INSTANTIATE_TEST_SUITE_P(,
+// 3D NCDHW Tests
+INSTANTIATE_TEST_SUITE_P(Smoke,
+                         BnFwdTrainNcdhwFp32,
+                         testing::ValuesIn(getBnFwdTrainingSmoke3dTestCases()));
+INSTANTIATE_TEST_SUITE_P(Full,
+                         BnFwdTrainNcdhwFp32,
+                         testing::ValuesIn(getBnFwdTrainingFull3dTestCases()));
+
+INSTANTIATE_TEST_SUITE_P(Smoke,
                          BnFwdTrainNcdhwFp16Mixed,
-                         testing::ValuesIn(getBnFwdTraining3dTestCases()));
-INSTANTIATE_TEST_SUITE_P(,
-                         BnFwdTrainNcdhwBfp16Mixed,
-                         testing::ValuesIn(getBnFwdTraining3dTestCases()));
+                         testing::ValuesIn(getBnFwdTrainingSmoke3dTestCases()));
+INSTANTIATE_TEST_SUITE_P(Full,
+                         BnFwdTrainNcdhwFp16Mixed,
+                         testing::ValuesIn(getBnFwdTrainingFull3dTestCases()));
 
-INSTANTIATE_TEST_SUITE_P(, BnFwdTrainNdhwcFp32, testing::ValuesIn(getBnFwdTraining3dTestCases()));
-INSTANTIATE_TEST_SUITE_P(,
+INSTANTIATE_TEST_SUITE_P(Smoke,
+                         BnFwdTrainNcdhwBfp16Mixed,
+                         testing::ValuesIn(getBnFwdTrainingSmoke3dTestCases()));
+INSTANTIATE_TEST_SUITE_P(Full,
+                         BnFwdTrainNcdhwBfp16Mixed,
+                         testing::ValuesIn(getBnFwdTrainingFull3dTestCases()));
+
+// 3D NDHWC Tests
+INSTANTIATE_TEST_SUITE_P(Smoke,
+                         BnFwdTrainNdhwcFp32,
+                         testing::ValuesIn(getBnFwdTrainingSmoke3dTestCases()));
+INSTANTIATE_TEST_SUITE_P(Full,
+                         BnFwdTrainNdhwcFp32,
+                         testing::ValuesIn(getBnFwdTrainingFull3dTestCases()));
+
+INSTANTIATE_TEST_SUITE_P(Smoke,
                          BnFwdTrainNdhwcFp16Mixed,
-                         testing::ValuesIn(getBnFwdTraining3dTestCases()));
-INSTANTIATE_TEST_SUITE_P(,
+                         testing::ValuesIn(getBnFwdTrainingSmoke3dTestCases()));
+INSTANTIATE_TEST_SUITE_P(Full,
+                         BnFwdTrainNdhwcFp16Mixed,
+                         testing::ValuesIn(getBnFwdTrainingFull3dTestCases()));
+
+INSTANTIATE_TEST_SUITE_P(Smoke,
                          BnFwdTrainNdhwcBfp16Mixed,
-                         testing::ValuesIn(getBnFwdTraining3dTestCases()));
+                         testing::ValuesIn(getBnFwdTrainingSmoke3dTestCases()));
+INSTANTIATE_TEST_SUITE_P(Full,
+                         BnFwdTrainNdhwcBfp16Mixed,
+                         testing::ValuesIn(getBnFwdTrainingFull3dTestCases()));
