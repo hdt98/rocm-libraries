@@ -88,7 +88,6 @@ public:
     {
         return IsEnabled(context) && (action == FindEnforceAction::Search ||
                                       action == FindEnforceAction::SearchDbUpdate ||
-                                      action == FindEnforceAction::DbUpdate ||
                                       action == FindEnforceAction::SearchCutoffDbUpdate);
     }
 
