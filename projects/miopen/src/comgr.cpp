@@ -858,6 +858,14 @@ public:
                        [](const std::string& s) { return s.c_str(); });
         comgr::LogOptions(c_options.data(), c_options.size());
 
+        std::cout << "1111111" << std::endl;
+        std::cout << src_name << std::endl;
+
+        for (const char* opt : c_options )
+            std::cout << opt << std::endl;
+
+        std::cout << "22222222" << std::endl;
+
         HIPRTC_CALL_INFO_THROW_MSG(
             hiprtcCompileProgram(prog.get(), c_options.size(), c_options.data()),
             src_name,
@@ -961,7 +969,10 @@ void BuildHip(const std::string& name,
            }))
             opts.push_back("-std=c++17");
 
+        std::cout << "1Rocmpath" << std::endl;
         auto rocm_path = env::value(ROCM_PATH);
+        std::cout << rocm_path << std::endl;
+        std::cout << "2Rocmpath" << std::endl;
 
         if(rocm_path.empty())
         {
