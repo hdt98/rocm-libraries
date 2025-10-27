@@ -348,12 +348,16 @@ namespace rocRoller
             dispatch_cv.wait_for(
                 lock, std::chrono::seconds(10), [] { return !profile_data.empty(); });
 
-            AssertFatal(dispatch_callback_counter == 1,
-                        "unexpected dispatch callback count ",
-                        dispatch_callback_counter);
-            AssertFatal(shader_callback_counter == 1,
-                        "unexpected shader callback count ",
-                        shader_callback_counter);
+            if(dispatch_callback_counter != 1 || shader_callback_counter != 1)
+            {
+                enable_profiler = false;
+                profile_data.clear();
+                Throw<FatalError>(
+                    fmt::format("waitForDispatchData: invariant failed, "
+                                "dispatch_callback_counter {}, shader_callback_counter {}",
+                                dispatch_callback_counter.load(),
+                                shader_callback_counter.load()));
+            }
 
             dispatch_callback_counter = 0;
             shader_callback_counter   = 0;
