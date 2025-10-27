@@ -31,6 +31,7 @@
 #include <rocprofiler-sdk/rocprofiler.h>
 
 #include <rocRoller/Utilities/Error.hpp>
+#include <rocRoller/Utilities/HipUtils.hpp>
 #include <rocRoller/Utilities/Logging.hpp>
 
 #include <atomic>
@@ -43,6 +44,8 @@
 #include <map>
 #include <string>
 #include <thread>
+
+// Based on https://github.com/ROCm/rocm-systems/tree/develop/projects/rocprofiler-sdk/samples/thread_trace
 
 #define ROCPROFILER_CALL(result, msg)                                                   \
     if(auto ec = (result); ec != ROCPROFILER_STATUS_SUCCESS)                            \
@@ -130,9 +133,7 @@ namespace rocRoller
             /*
             Don't use AssertFatal macro, as that is caught as a rocprofiler error and masks the real issue.
 
-            Based on https://github.com/ROCm/rocm-systems/blob/e9dac39102606ac6f7ab2778f74745e27841fb6c/projects/rocprofiler-sdk/samples/thread_trace/agent.cpp#L199
-            
-            Handle other record types based on recommendations in https://rocm.docs.amd.com/projects/rocprofiler-sdk/en/latest/api-reference/thread_trace.html#trace-decoder-info-events
+            Handle other record types https://rocm.docs.amd.com/projects/rocprofiler-sdk/en/latest/api-reference/thread_trace.html#trace-decoder-info-events
             */
 
             TraceDecodeCallbackUserData* userdata
@@ -227,17 +228,8 @@ namespace rocRoller
                                   size_t                  data_size,
                                   rocprofiler_user_data_t userdata)
         {
-            /*
-            Based on to `att_shader_data_callback` for rocprofv3 [0].
-
-            The thread trace sample [1] decodes directly in body of this function, however, the docs say "The rate at which thread trace generates data tends to be higher (GB/s) than the rate at which it can be processed (MB/s). Deferred processing is strongly recommended to avoid performance bottlenecks" [2].
-
-            Therefore, deferring decoding until user requests it.
-
-            [0]: https://github.com/ROCm/rocm-systems/blob/e9dac39102606ac6f7ab2778f74745e27841fb6c/projects/rocprofiler-sdk/source/lib/rocprofiler-sdk-tool/tool.cpp#L1387-L1408
-            [1]: https://github.com/ROCm/rocm-systems/tree/develop/projects/rocprofiler-sdk/samples/thread_trace
-            [2]: https://rocm.docs.amd.com/projects/rocprofiler-sdk/en/latest/api-reference/thread_trace.html#processing-thread-trace-data
-            */
+            // Based on https://github.com/ROCm/rocm-systems/blob/e9dac39102606ac6f7ab2778f74745e27841fb6c/projects/rocprofiler-sdk/source/lib/rocprofiler-sdk-tool/tool.cpp#L1387-L1408
+            // Avoid decoding directly in this function body per https://rocm.docs.amd.com/projects/rocprofiler-sdk/en/latest/api-reference/thread_trace.html#processing-thread-trace-data
 
             rocprofiler_dispatch_id_t dispatch_id
                 = static_cast<rocprofiler_dispatch_id_t>(userdata.value);
@@ -281,7 +273,6 @@ namespace rocRoller
                                           size_t       num_agents,
                                           void*        user_data)
         {
-            // Based on https://github.com/ROCm/rocm-systems/tree/develop/projects/rocprofiler-sdk/samples/thread_trace
             for(size_t idx = 0; idx < num_agents; idx++)
             {
                 const auto* agent = static_cast<const rocprofiler_agent_v0_t*>(agents[idx]);
@@ -347,6 +338,8 @@ namespace rocRoller
     {
         std::optional<std::vector<InstructionProfile>> waitForDispatchData(int n)
         {
+            HIP_CHECK(hipDeviceSynchronize());
+
             if(!enable_agent)
                 return std::nullopt;
 

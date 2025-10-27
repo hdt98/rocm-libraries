@@ -175,10 +175,8 @@ namespace RocprofilerTest
         auto kernelSetup
             = createKernel(TestContext::ForTestDevice({}, testName), literal, commandArg);
 
-        const auto latencies = rocRoller::profiler::loopUntilDispatchData([&]() {
-            kernelSetup.kernel.launchKernel(kernelSetup.commandArgs.runtimeArguments());
-            HIP_CHECK(hipDeviceSynchronize());
-        });
+        const auto latencies = rocRoller::profiler::loopUntilDispatchData(
+            [&]() { kernelSetup.kernel.launchKernel(kernelSetup.commandArgs.runtimeArguments()); });
 
         { // Verify device result
             uint32_t h_result = 0;
@@ -299,7 +297,6 @@ namespace RocprofilerTest
                 Log::info(kernelSetups[idx].kernel.getInstructions());
                 kernelSetups[idx].kernel.launchKernel(
                     kernelSetups[idx].commandArgs.runtimeArguments());
-                HIP_CHECK(hipDeviceSynchronize());
             }
             rocRoller::profiler::waitForDispatchData(order.size());
 
@@ -319,7 +316,6 @@ namespace RocprofilerTest
                 Log::info(kernelSetups[idx].kernel.getInstructions());
                 kernelSetups[idx].kernel.launchKernel(
                     kernelSetups[idx].commandArgs.runtimeArguments());
-                HIP_CHECK(hipDeviceSynchronize());
             }
 
             rocRoller::profiler::waitForDispatchData(order.size());
@@ -340,7 +336,6 @@ namespace RocprofilerTest
                 Log::info(kernelSetups[idx].kernel.getInstructions());
                 kernelSetups[idx].kernel.launchKernel(
                     kernelSetups[idx].commandArgs.runtimeArguments());
-                HIP_CHECK(hipDeviceSynchronize());
                 rocRoller::profiler::waitForDispatchData(1);
             }
             latencies = rocRoller::profiler::loopUntilDispatchData([&]() {
@@ -352,7 +347,7 @@ namespace RocprofilerTest
         }
 
         CAPTURE(literalHex);
-        INFO(rocRoller::profiler::toString(latencies));
+        INFO(toString(latencies));
         REQUIRE(latencies.size() == 2);
         CHECK(1 == countSubstring(latencies[0].instruction, literalHex));
         CHECK(latencies[1].instruction == "s_endpgm");
@@ -370,10 +365,8 @@ namespace RocprofilerTest
         auto kernelSetup
             = createKernel(TestContext::ForTestDevice({}, testName), literal, commandArg);
 
-        const auto latencies = rocRoller::profiler::loopUntilDispatchData([&]() {
-            kernelSetup.kernel.launchKernel(kernelSetup.commandArgs.runtimeArguments());
-            HIP_CHECK(hipDeviceSynchronize());
-        });
+        const auto latencies = rocRoller::profiler::loopUntilDispatchData(
+            [&]() { kernelSetup.kernel.launchKernel(kernelSetup.commandArgs.runtimeArguments()); });
 
         { // Verify device result
             uint32_t h_result = 0;
