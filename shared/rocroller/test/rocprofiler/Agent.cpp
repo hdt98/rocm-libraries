@@ -60,7 +60,7 @@ namespace rocRoller
     {
         struct TraceDecodeCallbackUserData
         {
-            rocprofiler_dispatch_id_t       dispatch_id;
+            rocprofiler_dispatch_id_t       dispatch_id; // for logging purposes
             bool                            ok;
             profiler::InstructionLatencyMap instruction_map;
         };
@@ -281,6 +281,7 @@ namespace rocRoller
                                           size_t       num_agents,
                                           void*        user_data)
         {
+            // Based on https://github.com/ROCm/rocm-systems/tree/develop/projects/rocprofiler-sdk/samples/thread_trace
             for(size_t idx = 0; idx < num_agents; idx++)
             {
                 const auto* agent = static_cast<const rocprofiler_agent_v0_t*>(agents[idx]);
@@ -362,22 +363,22 @@ namespace rocRoller
                        != dispatch_instruction_latencies.end();
             });
 
-            auto entry = dispatch_instruction_latencies.find(requested_dispatch_id.load());
+            const auto it = dispatch_instruction_latencies.find(requested_dispatch_id.load());
 
-            AssertFatal(entry != dispatch_instruction_latencies.end(),
+            AssertFatal(it != dispatch_instruction_latencies.end(),
                         "waitForDispatchData: timed out waiting for dispatch ID {}",
                         requested_dispatch_id.load());
 
-            if(not entry->second.empty())
+            auto data = it->second;
+            lock.unlock();
+
+            if(not data.empty())
             {
                 TraceDecodeCallbackUserData callback_user_data{
                     .dispatch_id = requested_dispatch_id.load(), .ok = true, .instruction_map = {}};
 
-                rocprofiler_trace_decode(decoder,
-                                         trace_decode_callback,
-                                         entry->second.data(),
-                                         entry->second.size(),
-                                         &callback_user_data);
+                rocprofiler_trace_decode(
+                    decoder, trace_decode_callback, data.data(), data.size(), &callback_user_data);
 
                 if(callback_user_data.ok && !callback_user_data.instruction_map.empty())
                 {
