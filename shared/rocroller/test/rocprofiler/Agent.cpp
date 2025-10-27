@@ -59,247 +59,239 @@ bool enable_agent = true;
 
 namespace rocRoller
 {
-    namespace
+    struct TraceDecodeCallbackUserData
     {
-        struct TraceDecodeCallbackUserData
+        bool                            ok;
+        profiler::InstructionLatencyMap instruction_map;
+    };
+
+    rocprofiler_thread_trace_decoder_id_t decoder{};
+    rocprofiler_context_id_t              client_ctx{};
+
+    rocprofiler::sdk::codeobj::disassembly::CodeobjAddressTranslate address_table;
+
+    // To enable waiting for dispatch data
+    std::vector<uint8_t>    profile_data;
+    std::condition_variable profile_data_cv;
+    std::mutex              profile_data_mutex;
+    std::atomic<bool>       enable_profiler = false;
+
+    // Only for invariant checks: ensure dispatch parameter only dispatches a single kernel
+    std::atomic<int> dispatch_callback_counter;
+    // Only for invariant checks: apparently with multiple GPUs, there can be multiple shader callbacks
+    // This agent is written witha single GPU in mind
+    std::atomic<int> shader_callback_counter;
+
+    void codeobj_callback(rocprofiler_callback_tracing_record_t record,
+                          rocprofiler_user_data_t*,
+                          void*)
+    {
+        if(record.kind != ROCPROFILER_CALLBACK_TRACING_CODE_OBJECT
+           || record.operation != ROCPROFILER_CODE_OBJECT_LOAD
+           || record.phase != ROCPROFILER_CALLBACK_PHASE_LOAD)
+            return;
+
+        auto* data
+            = static_cast<rocprofiler_callback_tracing_code_object_load_data_t*>(record.payload);
+
+        Log::info("codeobj_callback: code_object_id {}, storage_type {}",
+                  data->code_object_id,
+                  static_cast<std::underlying_type_t<rocprofiler_code_object_storage_type_t>>(
+                      data->storage_type));
+
+        if(data->storage_type == ROCPROFILER_CODE_OBJECT_STORAGE_TYPE_FILE)
         {
-            bool                            ok;
-            profiler::InstructionLatencyMap instruction_map;
-        };
-
-        rocprofiler_thread_trace_decoder_id_t decoder{};
-        rocprofiler_context_id_t              client_ctx{};
-
-        rocprofiler::sdk::codeobj::disassembly::CodeobjAddressTranslate address_table;
-
-        // To wait for dispatch
-        std::condition_variable dispatch_cv;
-        std::mutex              dispatch_count_mutex;
-        std::atomic<bool>       enable_profiler = false;
-        std::vector<uint8_t>    profile_data;
-
-        // Only for invariant checks
-        std::atomic<int> dispatch_callback_counter;
-        // Only for invariant checks
-        std::atomic<int> shader_callback_counter;
-
-        void codeobj_callback(rocprofiler_callback_tracing_record_t record,
-                              rocprofiler_user_data_t*,
-                              void*)
+            address_table.addDecoder(
+                data->uri, data->code_object_id, data->load_delta, data->load_size);
+        }
+        else
         {
-            if(record.kind != ROCPROFILER_CALLBACK_TRACING_CODE_OBJECT
-               || record.operation != ROCPROFILER_CODE_OBJECT_LOAD
-               || record.phase != ROCPROFILER_CALLBACK_PHASE_LOAD)
-                return;
-
-            auto* data = static_cast<rocprofiler_callback_tracing_code_object_load_data_t*>(
-                record.payload);
-
-            Log::info("codeobj_callback: code_object_id {}, storage_type {}",
-                      data->code_object_id,
-                      static_cast<std::underlying_type_t<rocprofiler_code_object_storage_type_t>>(
-                          data->storage_type));
-
-            if(data->storage_type == ROCPROFILER_CODE_OBJECT_STORAGE_TYPE_FILE)
+            auto* memorybase = reinterpret_cast<const void*>(data->memory_base);
+            if(memorybase)
             {
-                address_table.addDecoder(
-                    data->uri, data->code_object_id, data->load_delta, data->load_size);
-            }
-            else
-            {
-                auto* memorybase = reinterpret_cast<const void*>(data->memory_base);
-                if(memorybase)
-                {
-                    rocprofiler_thread_trace_decoder_codeobj_load(decoder,
-                                                                  data->code_object_id,
-                                                                  data->load_delta,
-                                                                  data->load_size,
-                                                                  memorybase,
-                                                                  data->memory_size);
+                rocprofiler_thread_trace_decoder_codeobj_load(decoder,
+                                                              data->code_object_id,
+                                                              data->load_delta,
+                                                              data->load_size,
+                                                              memorybase,
+                                                              data->memory_size);
 
-                    address_table.addDecoder(memorybase,
-                                             data->memory_size,
-                                             data->code_object_id,
-                                             data->load_delta,
-                                             data->load_size);
-                }
+                address_table.addDecoder(memorybase,
+                                         data->memory_size,
+                                         data->code_object_id,
+                                         data->load_delta,
+                                         data->load_size);
             }
         }
+    }
 
-        void trace_decode_callback(rocprofiler_thread_trace_decoder_record_type_t record_type_id,
-                                   void*                                          events,
-                                   uint64_t                                       num_events,
-                                   void*                                          userdata_raw)
+    void trace_decode_callback(rocprofiler_thread_trace_decoder_record_type_t record_type_id,
+                               void*                                          events,
+                               uint64_t                                       num_events,
+                               void*                                          userdata_raw)
+    {
+        /*
+        Don't use AssertFatal macro, as that is caught as a rocprofiler error and masks the real issue.
+        Handle other record types https://rocm.docs.amd.com/projects/rocprofiler-sdk/en/latest/api-reference/thread_trace.html#trace-decoder-info-events
+        */
+        TraceDecodeCallbackUserData* userdata
+            = static_cast<TraceDecodeCallbackUserData*>(userdata_raw);
+
+        if(!userdata->ok)
+            return;
+
+        switch(record_type_id)
         {
-            /*
-            Don't use AssertFatal macro, as that is caught as a rocprofiler error and masks the real issue.
-
-            Handle other record types https://rocm.docs.amd.com/projects/rocprofiler-sdk/en/latest/api-reference/thread_trace.html#trace-decoder-info-events
-            */
-
-            TraceDecodeCallbackUserData* userdata
-                = static_cast<TraceDecodeCallbackUserData*>(userdata_raw);
-
-            if(!userdata->ok)
-                return;
-
-            switch(record_type_id)
+        case ROCPROFILER_THREAD_TRACE_DECODER_RECORD_WAVE:
+            Log::info("trace_decode_callback: decoding {}", num_events);
+            for(size_t w = 0; w < num_events; w++)
             {
-            case ROCPROFILER_THREAD_TRACE_DECODER_RECORD_WAVE:
-                Log::info("trace_decode_callback: decoding {}", num_events);
-                for(size_t w = 0; w < num_events; w++)
-                {
-                    auto* wave = static_cast<rocprofiler_thread_trace_decoder_wave_t*>(events);
-                    Log::info(
-                        "  wave {}: cu {}, simd {}, wave_id {}, contexts {}, instructions_size {}",
-                        w,
-                        wave->cu,
-                        wave->simd,
-                        wave->wave_id,
-                        wave->contexts,
-                        wave->instructions_size);
+                auto* wave = static_cast<rocprofiler_thread_trace_decoder_wave_t*>(events);
+                Log::info(
+                    "  wave {}: cu {}, simd {}, wave_id {}, contexts {}, instructions_size {}",
+                    w,
+                    wave->cu,
+                    wave->simd,
+                    wave->wave_id,
+                    wave->contexts,
+                    wave->instructions_size);
 
-                    for(size_t i = 0; i < wave->instructions_size; i++)
+                for(size_t i = 0; i < wave->instructions_size; i++)
+                {
+                    auto& inst = wave->instructions_array[i];
+
+                    Log::info("    inst {}: code_object_id {}, address 0x{:x}, duration {}",
+                              i,
+                              inst.pc.code_object_id,
+                              inst.pc.address,
+                              inst.duration);
+
+                    if(inst.pc.code_object_id == 0)
                     {
-                        auto& inst = wave->instructions_array[i];
-
-                        Log::info("    inst {}: code_object_id {}, address 0x{:x}, duration {}",
-                                  i,
-                                  inst.pc.code_object_id,
-                                  inst.pc.address,
-                                  inst.duration);
-
-                        if(inst.pc.code_object_id == 0)
-                        {
-                            Log::warn("trace_decode_callback: code_object_id is 0");
-                            userdata->ok = false;
-                            userdata->instruction_map.clear();
-                            return;
-                        }
-
-                        auto& data = userdata->instruction_map[inst.pc];
-                        data.totalLatency += inst.duration;
-                        data.hitcount += 1;
+                        Log::warn("trace_decode_callback: code_object_id is 0");
+                        assert(
+                            userdata->instruction_map.empty()
+                            && "expected all instructions to have code_object_id of 0 if any do");
+                        userdata->ok = false;
+                        return;
                     }
+                    auto& data = userdata->instruction_map[inst.pc];
+                    data.totalLatency += inst.duration;
+                    data.hitcount += 1;
                 }
-                return;
-
-            // Handle if interested in data in `rocprofiler_thread_trace_decoder_occupancy_t`
-            case ROCPROFILER_THREAD_TRACE_DECODER_RECORD_OCCUPANCY:
-            case ROCPROFILER_THREAD_TRACE_DECODER_RECORD_GFXIP:
-                // Ok to ignore both these
-                return;
-
-            case ROCPROFILER_THREAD_TRACE_DECODER_RECORD_INFO:
-                for(size_t i = 0; i < num_events; i++)
-                {
-                    auto* info = static_cast<rocprofiler_thread_trace_decoder_info_t*>(events);
-                    Log::warn("parse: record info {}",
-                              static_cast<
-                                  std::underlying_type_t<rocprofiler_thread_trace_decoder_info_t>>(
-                                  *info));
-                    // Currently only seen these types of info; investigate if others are encountered
-                    assert((*info == ROCPROFILER_THREAD_TRACE_DECODER_INFO_STITCH_INCOMPLETE)
-                           || (*info == ROCPROFILER_THREAD_TRACE_DECODER_INFO_DATA_LOST)
-                                  && "parse: received unexpected INFO record type");
-                }
-                userdata->ok = false;
-                userdata->instruction_map.clear();
-                return;
-            default:
-                Log::error(
-                    "parse: unhandled record type {}",
-                    static_cast<
-                        std::underlying_type_t<rocprofiler_thread_trace_decoder_record_type_t>>(
-                        record_type_id));
-                assert(!"parse: unhandled record type");
-                return;
             }
-        }
+            return;
 
-        void shader_data_callback(rocprofiler_agent_id_t  agent,
-                                  int64_t                 shader_engine_id,
-                                  void*                   data,
-                                  size_t                  data_size,
-                                  rocprofiler_user_data_t userdata)
-        {
-            // Based on https://github.com/ROCm/rocm-systems/blob/e9dac39102606ac6f7ab2778f74745e27841fb6c/projects/rocprofiler-sdk/source/lib/rocprofiler-sdk-tool/tool.cpp#L1387-L1408
-            // Avoid decoding directly in this function body per https://rocm.docs.amd.com/projects/rocprofiler-sdk/en/latest/api-reference/thread_trace.html#processing-thread-trace-data
+        case ROCPROFILER_THREAD_TRACE_DECODER_RECORD_OCCUPANCY: // `rocprofiler_thread_trace_decoder_occupancy_t`
+        case ROCPROFILER_THREAD_TRACE_DECODER_RECORD_GFXIP:
+            // Ok to ignore both these
+            return;
 
-            shader_callback_counter++;
-
-            rocprofiler_dispatch_id_t dispatch_id
-                = static_cast<rocprofiler_dispatch_id_t>(userdata.value);
-
-            Log::info("shader_data_callback: dispatch_id {}, data_size {}", dispatch_id, data_size);
-
-            std::vector<uint8_t> raw_data(static_cast<uint8_t*>(data),
-                                          static_cast<uint8_t*>(data) + data_size);
-
+        case ROCPROFILER_THREAD_TRACE_DECODER_RECORD_INFO:
+            for(size_t i = 0; i < num_events; i++)
             {
-                std::lock_guard<std::mutex> lock(dispatch_count_mutex);
-                profile_data = std::move(raw_data);
+                auto* info = static_cast<rocprofiler_thread_trace_decoder_info_t*>(events);
+                Log::warn(
+                    "parse: record info {}",
+                    static_cast<std::underlying_type_t<rocprofiler_thread_trace_decoder_info_t>>(
+                        *info));
+                // Only seen these enumerations; investigate if others are encountered
+                assert((*info == ROCPROFILER_THREAD_TRACE_DECODER_INFO_STITCH_INCOMPLETE)
+                       || (*info == ROCPROFILER_THREAD_TRACE_DECODER_INFO_DATA_LOST)
+                              && "received unexpected INFO record type");
             }
-
-            dispatch_cv.notify_all();
+            userdata->ok = false;
+            userdata->instruction_map.clear();
+            return;
+        default:
+            Log::error(
+                "parse: unhandled record type {}",
+                static_cast<std::underlying_type_t<rocprofiler_thread_trace_decoder_record_type_t>>(
+                    record_type_id));
+            assert(!"unhandled record type");
+            return;
         }
+    }
 
-        rocprofiler_thread_trace_control_flags_t
-            dispatch_callback(rocprofiler_agent_id_t             agent_id,
-                              rocprofiler_queue_id_t             queue_id,
-                              rocprofiler_async_correlation_id_t correlation_id,
-                              rocprofiler_kernel_id_t            kernel_id,
-                              rocprofiler_dispatch_id_t          dispatch_id,
-                              void*                              userdata_config,
-                              rocprofiler_user_data_t*           userdata_shader)
+    void shader_data_callback(rocprofiler_agent_id_t  agent,
+                              int64_t                 shader_engine_id,
+                              void*                   data,
+                              size_t                  data_size,
+                              rocprofiler_user_data_t userdata)
+    {
+        // Based on https://github.com/ROCm/rocm-systems/blob/e9dac39102606ac6f7ab2778f74745e27841fb6c/projects/rocprofiler-sdk/source/lib/rocprofiler-sdk-tool/tool.cpp#L1387-L1408
+        // Avoid decoding directly in this function body per https://rocm.docs.amd.com/projects/rocprofiler-sdk/en/latest/api-reference/thread_trace.html#processing-thread-trace-data
+
+        shader_callback_counter++;
+
+        rocprofiler_dispatch_id_t dispatch_id
+            = static_cast<rocprofiler_dispatch_id_t>(userdata.value);
+
+        Log::info("shader_data_callback: dispatch_id {}, data_size {}", dispatch_id, data_size);
+
+        std::vector<uint8_t> raw_data(static_cast<uint8_t*>(data),
+                                      static_cast<uint8_t*>(data) + data_size);
         {
-            Log::info("dispatch_callback: dispatch_id {}, enable_profiler {}",
-                      dispatch_id,
-                      enable_profiler.load());
-
-            userdata_shader->value = dispatch_id;
-
-            if(enable_profiler)
-            {
-                dispatch_callback_counter++;
-                return ROCPROFILER_THREAD_TRACE_CONTROL_START_AND_STOP;
-            }
-            return ROCPROFILER_THREAD_TRACE_CONTROL_NONE;
+            std::lock_guard<std::mutex> lock(profile_data_mutex);
+            profile_data = std::move(raw_data);
         }
+        profile_data_cv.notify_all();
+    }
 
-        rocprofiler_status_t query_agents(rocprofiler_agent_version_t,
-                                          const void** agents,
-                                          size_t       num_agents,
-                                          void*        user_data)
+    rocprofiler_thread_trace_control_flags_t
+        dispatch_callback(rocprofiler_agent_id_t             agent_id,
+                          rocprofiler_queue_id_t             queue_id,
+                          rocprofiler_async_correlation_id_t correlation_id,
+                          rocprofiler_kernel_id_t            kernel_id,
+                          rocprofiler_dispatch_id_t          dispatch_id,
+                          void*                              userdata_config,
+                          rocprofiler_user_data_t*           userdata_shader)
+    {
+        Log::info("dispatch_callback: dispatch_id {}, enable_profiler {}",
+                  dispatch_id,
+                  enable_profiler.load());
+
+        userdata_shader->value = dispatch_id;
+
+        if(enable_profiler)
         {
-            for(size_t idx = 0; idx < num_agents; idx++)
-            {
-                const auto* agent = static_cast<const rocprofiler_agent_v0_t*>(agents[idx]);
-                if(agent->type != ROCPROFILER_AGENT_TYPE_GPU)
-                    continue;
-
-                auto parameters = std::vector<rocprofiler_thread_trace_parameter_t>{};
-                parameters.push_back({ROCPROFILER_THREAD_TRACE_PARAMETER_TARGET_CU, 1});
-                parameters.push_back({ROCPROFILER_THREAD_TRACE_PARAMETER_SHADER_ENGINE_MASK, 0x1});
-                parameters.push_back({ROCPROFILER_THREAD_TRACE_PARAMETER_SIMD_SELECT, 0x1});
-                parameters.push_back({ROCPROFILER_THREAD_TRACE_PARAMETER_SERIALIZE_ALL, 1});
-                parameters.push_back(
-                    {ROCPROFILER_THREAD_TRACE_PARAMETER_BUFFER_SIZE, 0x10000000}); // 256MB
-
-                ROCPROFILER_CALL(
-                    rocprofiler_configure_dispatch_thread_trace_service(client_ctx,
-                                                                        agent->id,
-                                                                        parameters.data(),
-                                                                        parameters.size(),
-                                                                        dispatch_callback,
-                                                                        shader_data_callback,
-                                                                        user_data),
-                    "configure dispatch thread trace");
-            }
-            return ROCPROFILER_STATUS_SUCCESS;
+            dispatch_callback_counter++;
+            return ROCPROFILER_THREAD_TRACE_CONTROL_START_AND_STOP;
         }
+        return ROCPROFILER_THREAD_TRACE_CONTROL_NONE;
+    }
 
-    } // anonymous namespace
+    rocprofiler_status_t query_agents(rocprofiler_agent_version_t,
+                                      const void** agents,
+                                      size_t       num_agents,
+                                      void*        user_data)
+    {
+        for(size_t idx = 0; idx < num_agents; idx++)
+        {
+            const auto* agent = static_cast<const rocprofiler_agent_v0_t*>(agents[idx]);
+            if(agent->type != ROCPROFILER_AGENT_TYPE_GPU)
+                continue;
+
+            auto parameters = std::vector<rocprofiler_thread_trace_parameter_t>{};
+            parameters.push_back({ROCPROFILER_THREAD_TRACE_PARAMETER_TARGET_CU, 1});
+            parameters.push_back({ROCPROFILER_THREAD_TRACE_PARAMETER_SHADER_ENGINE_MASK, 0x1});
+            parameters.push_back({ROCPROFILER_THREAD_TRACE_PARAMETER_SIMD_SELECT, 0x1});
+            parameters.push_back({ROCPROFILER_THREAD_TRACE_PARAMETER_SERIALIZE_ALL, 1});
+            parameters.push_back(
+                {ROCPROFILER_THREAD_TRACE_PARAMETER_BUFFER_SIZE, 0x10000000}); // 256MB
+
+            ROCPROFILER_CALL(
+                rocprofiler_configure_dispatch_thread_trace_service(client_ctx,
+                                                                    agent->id,
+                                                                    parameters.data(),
+                                                                    parameters.size(),
+                                                                    dispatch_callback,
+                                                                    shader_data_callback,
+                                                                    user_data),
+                "configure dispatch thread trace");
+        }
+        return ROCPROFILER_STATUS_SUCCESS;
+    }
 
     int tool_init(rocprofiler_client_finalize_t, void*)
     {
@@ -341,19 +333,18 @@ namespace rocRoller
                 return std::nullopt;
 
             std::optional<std::vector<InstructionProfile>> result;
-            Log::info("waitForDispatchData");
+            Log::info("waitForData");
 
-            std::unique_lock<std::mutex> lock(dispatch_count_mutex);
+            std::unique_lock<std::mutex> lock(profile_data_mutex);
 
-            dispatch_cv.wait_for(
-                lock, std::chrono::seconds(10), [] { return !profile_data.empty(); });
+            profile_data_cv.wait(lock, [] { return !profile_data.empty(); });
 
             if(dispatch_callback_counter != 1 || shader_callback_counter != 1)
             {
                 enable_profiler = false;
                 profile_data.clear();
                 Throw<FatalError>(
-                    fmt::format("waitForDispatchData: invariant failed, "
+                    fmt::format("waitForData: invariant failed, "
                                 "dispatch_callback_counter {}, shader_callback_counter {}",
                                 dispatch_callback_counter.load(),
                                 shader_callback_counter.load()));
@@ -362,47 +353,40 @@ namespace rocRoller
             dispatch_callback_counter = 0;
             shader_callback_counter   = 0;
 
-            if(!profile_data.empty())
+            TraceDecodeCallbackUserData callback_user_data{.ok = true, .instruction_map = {}};
+
+            rocprofiler_trace_decode(decoder,
+                                     trace_decode_callback,
+                                     profile_data.data(),
+                                     profile_data.size(),
+                                     &callback_user_data);
+
+            if(callback_user_data.ok && !callback_user_data.instruction_map.empty())
             {
-                TraceDecodeCallbackUserData callback_user_data{.ok = true, .instruction_map = {}};
-
-                rocprofiler_trace_decode(decoder,
-                                         trace_decode_callback,
-                                         profile_data.data(),
-                                         profile_data.size(),
-                                         &callback_user_data);
-
-                if(callback_user_data.ok && !callback_user_data.instruction_map.empty())
+                for(auto& [pc, data] : callback_user_data.instruction_map)
                 {
-                    for(auto& [pc, data] : callback_user_data.instruction_map)
-                    {
-                        auto inst = address_table.get(pc.code_object_id, pc.address);
-                        if(inst != nullptr)
-                            data.instruction = inst->inst;
-                    }
+                    auto inst = address_table.get(pc.code_object_id, pc.address);
+                    if(inst != nullptr)
+                        data.instruction = inst->inst;
+                }
 
-                    result = std::vector<InstructionProfile>{};
-                    result->reserve(callback_user_data.instruction_map.size());
-                    for(const auto& [pc, data] : callback_user_data.instruction_map)
-                    {
-                        result->push_back(data);
-                    }
-                    Log::info("waitForDispatchData: retrieved {}", result->size());
-                }
-                else
+                result = std::vector<InstructionProfile>{};
+                result->reserve(callback_user_data.instruction_map.size());
+                for(const auto& [pc, data] : callback_user_data.instruction_map)
                 {
-                    result = std::nullopt;
-                    if(callback_user_data.instruction_map.empty())
-                        Log::warn("waitForDispatchData: no instructions decoded");
-                    else
-                        Log::warn("waitForDispatchData: decoding error");
+                    result->push_back(data);
                 }
+                Log::info("waitForData: retrieved {}", result->size());
             }
             else
             {
                 result = std::nullopt;
-                Log::warn("waitForDispatchData: no data received");
+                if(callback_user_data.instruction_map.empty())
+                    Log::warn("waitForData: no instructions decoded");
+                else
+                    Log::warn("waitForData: decoding error");
             }
+
             profile_data.clear();
             return result;
         }
@@ -443,7 +427,7 @@ namespace rocRoller
 
         void reset()
         {
-            std::lock_guard<std::mutex> lock(dispatch_count_mutex);
+            std::lock_guard<std::mutex> lock(profile_data_mutex);
             profile_data.clear();
             enable_profiler = false;
         }
