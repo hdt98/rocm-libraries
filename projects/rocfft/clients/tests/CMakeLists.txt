@@ -389,131 +389,18 @@ rocm_install(TARGETS rocfft-test rtc_helper_crash COMPONENT tests)
 #------------dileep-------------------
 # Register tests with CTest
 if(BUILD_TESTING)
-  # Basic test registration - runs all tests
-  add_test(NAME rocfft_all_tests
-           COMMAND rocfft-test
-           WORKING_DIRECTORY ${TESTS_OUT_DIR})
-
-  # Set test properties
-  set_tests_properties(rocfft_all_tests PROPERTIES
-    TIMEOUT 3600  # 1 hour timeout
-    LABELS "accuracy;rocfft"
-  )
-
-  # Add specific test suites that can be run individually
-  # Power of 2 tests
-  add_test(NAME rocfft_pow2_1D
-           COMMAND rocfft-test --gtest_filter="pow2_1D*"
-           WORKING_DIRECTORY ${TESTS_OUT_DIR})
-
-  set_tests_properties(rocfft_pow2_1D PROPERTIES
-    TIMEOUT 300  # 5 minutes timeout
-    LABELS "rocfft;pow2_1D")
-
-  add_test(NAME rocfft_pow2_2D
-           COMMAND rocfft-test --gtest_filter="pow2_2D*"
-           WORKING_DIRECTORY ${TESTS_OUT_DIR})
-
-  set_tests_properties(rocfft_pow2_2D PROPERTIES
-    TIMEOUT 300  # 5 minutes timeout
-    LABELS "rocfft;pow2_2D")
-
-  add_test(NAME rocfft_pow2_3D
-           COMMAND rocfft-test --gtest_filter="pow2_3D*"
-           WORKING_DIRECTORY ${TESTS_OUT_DIR})
-
-  set_tests_properties(rocfft_pow2_3D PROPERTIES
-    TIMEOUT 300  # 5 minutes timeout
-    LABELS "rocfft;pow2_3D")
-
-  # Prime number tests
-  add_test(NAME rocfft_prime_1D
-           COMMAND rocfft-test --gtest_filter="prime_1D*"
-           WORKING_DIRECTORY ${TESTS_OUT_DIR})
-
-  set_tests_properties(rocfft_prime_1D PROPERTIES
-    TIMEOUT 300  # 5 minutes timeout
-    LABELS "rocfft;prime_1D" )
-
-  # Mixed radix tests
-  add_test(NAME rocfft_mix_1D
-           COMMAND rocfft-test --gtest_filter="mix_1D*"
-           WORKING_DIRECTORY ${TESTS_OUT_DIR})
-
-  set_tests_properties(rocfft_mix_1D PROPERTIES
-    TIMEOUT 300  # 5 minutes timeout
-    LABELS "rocfft;mix_1D" )
-
-  # Callback tests
-  add_test(NAME rocfft_callback_tests
-           COMMAND rocfft-test --gtest_filter="*callback*"
-           WORKING_DIRECTORY ${TESTS_OUT_DIR})
-
-  set_tests_properties(rocfft_callback_tests PROPERTIES
-    TIMEOUT 300  # 5 minutes timeout
-    LABELS "rocfft;callback" )
-
-  # Unit tests
-  add_test(NAME rocfft_unit_tests
-           COMMAND rocfft-test --gtest_filter="unit_test*"
-           WORKING_DIRECTORY ${TESTS_OUT_DIR})
-
-  set_tests_properties(rocfft_unit_tests PROPERTIES
-    TIMEOUT 300  # 5 minutes timeout
-    LABELS "rocfft;unit_test" )
-
-  # Hermitian tests
-  add_test(NAME rocfft_hermitian_tests
-           COMMAND rocfft-test --gtest_filter="hermitian*"
-           WORKING_DIRECTORY ${TESTS_OUT_DIR})
-  set_tests_properties(rocfft_hermitian_tests PROPERTIES
-    TIMEOUT 300  # 5 minutes timeout
-    LABELS "rocfft;hermitian" )
-
-  # Set properties for all individual test suites
-  #set_tests_properties(
-  #  rocfft_pow2_2D rocfft_pow2_3D
-  #  rocfft_prime_1D rocfft_mix_1D rocfft_callback_tests
-  #  rocfft_unit_tests rocfft_hermitian_tests
-  #  PROPERTIES
-  #  TIMEOUT 1800  # 30 minutes timeout for individual suites
-  #  LABELS "rocfft"
-  #)
-
-  # Quick smoke test with limited parameters
-  add_test(NAME rocfft_smoke_test
-           COMMAND rocfft-test --gtest_filter="pow2_1D*"
-           WORKING_DIRECTORY ${TESTS_OUT_DIR})
-
-  set_tests_properties(rocfft_smoke_test PROPERTIES
-    TIMEOUT 300  # 5 minutes timeout
-    LABELS "rocfft;smoke;quick"
-  )
-  # Add MPI tests if MPI is enabled
-  if(ROCFFT_MPI_ENABLE AND MPI_FOUND)
-    # Basic MPI test with 2 processes
-    add_test(NAME rocfft_mpi_test_2proc
-             COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 2
-                     ${MPIEXEC_PREFLAGS} rocfft-test --mp-lib=MPI --mp-ranks=2
-                     --gtest_filter="pow2_1D*" --ntrial=1 --nb=1
-                     ${MPIEXEC_POSTFLAGS}
-             WORKING_DIRECTORY ${TESTS_OUT_DIR})
-
-    # MPI test with 4 processes
-    add_test(NAME rocfft_mpi_test_4proc
-             COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 4
-                     ${MPIEXEC_PREFLAGS} rocfft-test --mp-lib=MPI --mp-ranks=4
-                     --gtest_filter="pow2_1D*" --ntrial=1 --nb=1
-                     ${MPIEXEC_POSTFLAGS}
-             WORKING_DIRECTORY ${TESTS_OUT_DIR})
-
-    set_tests_properties(rocfft_mpi_test_2proc rocfft_mpi_test_4proc PROPERTIES
-      TIMEOUT 600  # 10 minutes timeout for MPI tests
-      LABELS "rocfft;mpi"
-      PROCESSORS 4  # Reserve 4 processors for MPI tests
-    )
+  include(GoogleTest)
+  include(${CMAKE_CURRENT_SOURCE_DIR}/../cmake/TestCategories.cmake)
+  if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../test_categories.yaml")
+          message(STATUS "Using YAML-based test categorization")
+          apply_test_category_labels(hipblas-test "${CMAKE_CURRENT_SOURCE_DIR}/../test_categories.yaml")
+  else()
+          message(STATUS "Using hardcoded test categorization (YAML missing)")
+          apply_hardcoded_test_categories()
   endif()
-endif()  
+
+endif()
+
   #--------------------------------------------------------
 
 
