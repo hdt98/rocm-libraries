@@ -290,6 +290,7 @@ bool VerifyNodeAttributesVector(::flatbuffers::Verifier &verifier, const ::flatb
 struct NodeT : public ::flatbuffers::NativeTable {
   typedef Node TableType;
   std::string name{};
+  hipdnn_sdk::data_objects::DataType compute_type = hipdnn_sdk::data_objects::DataType::UNSET;
   hipdnn_sdk::data_objects::NodeAttributesUnion attributes{};
 };
 
@@ -298,14 +299,21 @@ struct Node FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef NodeBuilder Builder;
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
     VT_NAME = 4,
-    VT_ATTRIBUTES_TYPE = 6,
-    VT_ATTRIBUTES = 8
+    VT_COMPUTE_TYPE = 6,
+    VT_ATTRIBUTES_TYPE = 8,
+    VT_ATTRIBUTES = 10
   };
   const ::flatbuffers::String *name() const {
     return GetPointer<const ::flatbuffers::String *>(VT_NAME);
   }
   ::flatbuffers::String *mutable_name() {
     return GetPointer<::flatbuffers::String *>(VT_NAME);
+  }
+  hipdnn_sdk::data_objects::DataType compute_type() const {
+    return static_cast<hipdnn_sdk::data_objects::DataType>(GetField<int8_t>(VT_COMPUTE_TYPE, 0));
+  }
+  bool mutate_compute_type(hipdnn_sdk::data_objects::DataType _compute_type = static_cast<hipdnn_sdk::data_objects::DataType>(0)) {
+    return SetField<int8_t>(VT_COMPUTE_TYPE, static_cast<int8_t>(_compute_type), 0);
   }
   hipdnn_sdk::data_objects::NodeAttributes attributes_type() const {
     return static_cast<hipdnn_sdk::data_objects::NodeAttributes>(GetField<uint8_t>(VT_ATTRIBUTES_TYPE, 0));
@@ -342,6 +350,7 @@ struct Node FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
     return VerifyTableStart(verifier) &&
            VerifyOffset(verifier, VT_NAME) &&
            verifier.VerifyString(name()) &&
+           VerifyField<int8_t>(verifier, VT_COMPUTE_TYPE, 1) &&
            VerifyField<uint8_t>(verifier, VT_ATTRIBUTES_TYPE, 1) &&
            VerifyOffset(verifier, VT_ATTRIBUTES) &&
            VerifyNodeAttributes(verifier, attributes(), attributes_type()) &&
@@ -387,6 +396,9 @@ struct NodeBuilder {
   void add_name(::flatbuffers::Offset<::flatbuffers::String> name) {
     fbb_.AddOffset(Node::VT_NAME, name);
   }
+  void add_compute_type(hipdnn_sdk::data_objects::DataType compute_type) {
+    fbb_.AddElement<int8_t>(Node::VT_COMPUTE_TYPE, static_cast<int8_t>(compute_type), 0);
+  }
   void add_attributes_type(hipdnn_sdk::data_objects::NodeAttributes attributes_type) {
     fbb_.AddElement<uint8_t>(Node::VT_ATTRIBUTES_TYPE, static_cast<uint8_t>(attributes_type), 0);
   }
@@ -407,24 +419,28 @@ struct NodeBuilder {
 inline ::flatbuffers::Offset<Node> CreateNode(
     ::flatbuffers::FlatBufferBuilder &_fbb,
     ::flatbuffers::Offset<::flatbuffers::String> name = 0,
+    hipdnn_sdk::data_objects::DataType compute_type = hipdnn_sdk::data_objects::DataType::UNSET,
     hipdnn_sdk::data_objects::NodeAttributes attributes_type = hipdnn_sdk::data_objects::NodeAttributes::NONE,
     ::flatbuffers::Offset<void> attributes = 0) {
   NodeBuilder builder_(_fbb);
   builder_.add_attributes(attributes);
   builder_.add_name(name);
   builder_.add_attributes_type(attributes_type);
+  builder_.add_compute_type(compute_type);
   return builder_.Finish();
 }
 
 inline ::flatbuffers::Offset<Node> CreateNodeDirect(
     ::flatbuffers::FlatBufferBuilder &_fbb,
     const char *name = nullptr,
+    hipdnn_sdk::data_objects::DataType compute_type = hipdnn_sdk::data_objects::DataType::UNSET,
     hipdnn_sdk::data_objects::NodeAttributes attributes_type = hipdnn_sdk::data_objects::NodeAttributes::NONE,
     ::flatbuffers::Offset<void> attributes = 0) {
   auto name__ = name ? _fbb.CreateString(name) : 0;
   return hipdnn_sdk::data_objects::CreateNode(
       _fbb,
       name__,
+      compute_type,
       attributes_type,
       attributes);
 }
@@ -590,6 +606,7 @@ inline ::flatbuffers::Offset<Graph> CreateGraphDirect(
 inline bool operator==(const NodeT &lhs, const NodeT &rhs) {
   return
       (lhs.name == rhs.name) &&
+      (lhs.compute_type == rhs.compute_type) &&
       (lhs.attributes == rhs.attributes);
 }
 
@@ -608,6 +625,7 @@ inline void Node::UnPackTo(NodeT *_o, const ::flatbuffers::resolver_function_t *
   (void)_o;
   (void)_resolver;
   { auto _e = name(); if (_e) _o->name = _e->str(); }
+  { auto _e = compute_type(); _o->compute_type = _e; }
   { auto _e = attributes_type(); _o->attributes.type = _e; }
   { auto _e = attributes(); if (_e) _o->attributes.value = hipdnn_sdk::data_objects::NodeAttributesUnion::UnPack(_e, attributes_type(), _resolver); }
 }
@@ -621,11 +639,13 @@ inline ::flatbuffers::Offset<Node> CreateNode(::flatbuffers::FlatBufferBuilder &
   (void)_o;
   struct _VectorArgs { ::flatbuffers::FlatBufferBuilder *__fbb; const NodeT* __o; const ::flatbuffers::rehasher_function_t *__rehasher; } _va = { &_fbb, _o, _rehasher}; (void)_va;
   auto _name = _o->name.empty() ? 0 : _fbb.CreateString(_o->name);
+  auto _compute_type = _o->compute_type;
   auto _attributes_type = _o->attributes.type;
   auto _attributes = _o->attributes.Pack(_fbb);
   return hipdnn_sdk::data_objects::CreateNode(
       _fbb,
       _name,
+      _compute_type,
       _attributes_type,
       _attributes);
 }

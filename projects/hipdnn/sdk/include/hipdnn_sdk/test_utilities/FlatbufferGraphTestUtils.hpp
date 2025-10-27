@@ -96,6 +96,7 @@ inline flatbuffers::FlatBufferBuilder
     auto node = hipdnn_sdk::data_objects::CreateNodeDirect(
         builder,
         "batchnorm",
+        DataType::FLOAT,
         hipdnn_sdk::data_objects::NodeAttributes::BatchnormInferenceAttributes,
         bnormAttributes.Union());
     nodes.push_back(node);
@@ -171,6 +172,7 @@ inline flatbuffers::FlatBufferBuilder createValidBatchnormBwdGraph(
     auto node = hipdnn_sdk::data_objects::CreateNodeDirect(
         builder,
         "batchnorm_bwd",
+        DataType::FLOAT,
         hipdnn_sdk::data_objects::NodeAttributes::BatchnormBackwardAttributes,
         bnormAttributes.Union());
     nodes.push_back(node);
@@ -197,7 +199,7 @@ inline flatbuffers::FlatBufferBuilder createBatchnormGraph()
     auto batchnormNode = CreateBatchnormAttributesDirect(
         builder, 0, 1, 2, 3, &peerStats, 4, 5, 6, 7, 8, 9, 10, 11);
     nodes.push_back(CreateNodeDirect(
-        builder, "Node", NodeAttributes::BatchnormAttributes, batchnormNode.Union()));
+        builder, "Node", DataType::FLOAT, NodeAttributes::BatchnormAttributes, batchnormNode.Union()));
 
     std::array tensorNames = {"x",
                               "scale",
@@ -272,7 +274,7 @@ inline flatbuffers::FlatBufferBuilder
 
     std::vector<::flatbuffers::Offset<Node>> nodes;
     auto node = CreateNodeDirect(
-        builder, "conv_fwd", NodeAttributes::ConvolutionFwdAttributes, convAttributes.Union());
+        builder, "conv_fwd", DataType::FLOAT, NodeAttributes::ConvolutionFwdAttributes, convAttributes.Union());
     nodes.push_back(node);
 
     auto graphOffset = CreateGraphDirect(builder,
@@ -323,7 +325,7 @@ inline flatbuffers::FlatBufferBuilder
 
     std::vector<::flatbuffers::Offset<Node>> nodes;
     auto node = CreateNodeDirect(
-        builder, "conv_bwd", NodeAttributes::ConvolutionBwdAttributes, convAttributes.Union());
+        builder, "conv_bwd", DataType::FLOAT, NodeAttributes::ConvolutionBwdAttributes, convAttributes.Union());
     nodes.push_back(node);
 
     auto graphOffset = CreateGraphDirect(builder,
@@ -374,7 +376,7 @@ inline flatbuffers::FlatBufferBuilder
 
     std::vector<::flatbuffers::Offset<Node>> nodes;
     auto node = CreateNodeDirect(
-        builder, "conv_wrw", NodeAttributes::ConvolutionWrwAttributes, convAttributes.Union());
+        builder, "conv_wrw", DataType::FLOAT, NodeAttributes::ConvolutionWrwAttributes, convAttributes.Union());
     nodes.push_back(node);
 
     auto graphOffset = CreateGraphDirect(builder,
@@ -410,7 +412,7 @@ inline flatbuffers::FlatBufferBuilder createPointwiseGraph()
                                                    6.f); // softplus_beta
 
     nodes.push_back(CreateNodeDirect(
-        builder, "Node", NodeAttributes::PointwiseAttributes, pointwiseNode.Union()));
+        builder, "Node", DataType::FLOAT, NodeAttributes::PointwiseAttributes, pointwiseNode.Union()));
 
     std::array tensorNames = {"axis", "in_0", "in_1", "in_2", "out_0"};
     std::vector<flatbuffers::Offset<TensorAttributes>> tensors;

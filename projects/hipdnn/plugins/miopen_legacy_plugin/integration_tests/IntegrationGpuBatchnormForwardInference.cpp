@@ -182,6 +182,7 @@ protected:
         auto graph = std::make_shared<hipdnn_frontend::graph::Graph>();
 
         graph->set_name("BatchnormInferenceTest");
+        graph->set_compute_data_type(DataType::FLOAT);
 
         int64_t uid = 1;
         auto xAttr = graph::makeTensorAttributes("X", inputDataType, graphTensorBundle.xTensor);

@@ -47,6 +47,7 @@ inline void to_json(nlohmann::json& nodeJson, const data_objects::Node& node)
     }
     nodeJson["name"] = node.name()->c_str();
     nodeJson["type"] = node.attributes_type();
+    nodeJson["compute_type"] = node.compute_type();
 }
 
 // NOLINTNEXTLINE(readability-identifier-naming)
@@ -69,6 +70,7 @@ inline auto to<data_objects::Node>(flatbuffers::FlatBufferBuilder& builder,
 {
     auto type = entry.at("type").get<data_objects::NodeAttributes>();
     auto name = entry.at("name").get<std::string>();
+    auto computeDataType = entry.at("compute_type").get<data_objects::DataType>();
 
     flatbuffers::Offset<void> node = [&]() {
         switch(type)
@@ -88,7 +90,7 @@ inline auto to<data_objects::Node>(flatbuffers::FlatBufferBuilder& builder,
         }
     }();
 
-    return data_objects::CreateNodeDirect(builder, name.c_str(), type, node);
+    return data_objects::CreateNodeDirect(builder, name.c_str(), computeDataType, type, node);
 }
 
 template <>

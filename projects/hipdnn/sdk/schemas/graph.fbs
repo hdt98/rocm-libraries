@@ -17,6 +17,7 @@ union NodeAttributes {BatchnormInferenceAttributes, PointwiseAttributes, Batchno
 
 table Node {
 	name: string;
+	compute_type: DataType;
 	attributes: NodeAttributes;
 }
 
