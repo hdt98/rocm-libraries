@@ -24,7 +24,7 @@ bool MiopenEngine::isApplicable(HipdnnEnginePluginHandle& handle,
 {
     auto& graph = opGraph.getGraph();
     auto hasFloatComputeDataType = [](const hipdnn_sdk::data_objects::Node* node) {
-        return node->compute_type() == hipdnn_sdk::data_objects::DataType::FLOAT;
+        return node->compute_data_type() == hipdnn_sdk::data_objects::DataType::FLOAT;
     };
     if(graph.nodes() != nullptr
        && !std::all_of(graph.nodes()->begin(), graph.nodes()->end(), hasFloatComputeDataType))

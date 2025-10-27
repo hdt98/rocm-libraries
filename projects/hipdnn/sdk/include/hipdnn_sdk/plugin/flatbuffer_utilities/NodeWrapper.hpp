@@ -100,7 +100,7 @@ public:
 
     hipdnn_sdk::data_objects::DataType computeDataType() const override
     {
-        return _shallowNode->compute_type();
+        return _shallowNode->compute_data_type();
     }
 
 private:
