@@ -53,17 +53,46 @@ public:
         {
             return true;
         }
+        
+        // Check if reference and implementation have the same element size
+        if(reference.elementSize() != implementation.elementSize())
+        {
+            return false;
+        }
 
+        // Dispatch to type-specific comparison based on actual element size
+        size_t elemSize = reference.elementSize();
+        
+        if(elemSize == sizeof(T))  // 2 bytes for half or bfp16
+        {
+            return compareTyped<T>(reference, implementation);
+        }
+        if(elemSize == sizeof(float))
+        {
+            return compareTyped<float>(reference, implementation);
+        }
+        if(elemSize == sizeof(double))
+        {
+            return compareTyped<double>(reference, implementation);
+        }
+        
+        return false;
+    }
+
+private:
+    template <typename ActualType>
+    bool compareTyped(ITensor& reference, ITensor& implementation) const
+    {
         std::atomic<double> squareDifference(0.0);
         std::atomic<double> maxRefMagnitude(0.0);
         std::atomic<double> maxImplMagnitude(0.0);
 
-        TensorView<T> refView(reference);
-        TensorView<T> implView(implementation);
+        TensorView<ActualType> refView(reference);
+        TensorView<ActualType> implView(implementation);
 
         auto validateFunc = [&](const std::vector<int64_t>& indices) {
-            T refValueT = refView.getHostValue(indices);
-            T implValueT = implView.getHostValue(indices);
+            ActualType refValueT = refView.getHostValue(indices);
+            ActualType implValueT = implView.getHostValue(indices);
 
             auto refValue = static_cast<double>(refValueT);
             auto implValue = static_cast<double>(implValueT);
@@ -100,25 +129,17 @@ public:
             squareDifference, maxRefMagnitude, maxImplMagnitude, reference.elementCount());
     }
 
-private:
     bool checkRmsError(double squareDifference,
                        double maxRefMagnitude,
                        double maxImplMagnitude,
                        size_t elementCount) const
     {
         // Find the maximum magnitude between reference and implementation
-        double maxMagnitude
-            = std::max({maxRefMagnitude, maxImplMagnitude, std::numeric_limits<double>::min()});
+        // Use a reasonable epsilon (1e-10) instead of min() to prevent division by zero
+        double maxMagnitude = std::max({maxRefMagnitude, maxImplMagnitude, 1e-10});
 
         double relativeRmsError = std::sqrt(squareDifference)
                                   / (std::sqrt(static_cast<double>(elementCount)) * maxMagnitude);
-
-        if(relativeRmsError > _relativeTolerance)
-        {
-            HIPDNN_LOG_ERROR("Validation failed: relative rms error = {}, relative tolerance = {}",
-                             relativeRmsError,
-                             _relativeTolerance);
-        }
 
         return relativeRmsError <= _relativeTolerance;
     }

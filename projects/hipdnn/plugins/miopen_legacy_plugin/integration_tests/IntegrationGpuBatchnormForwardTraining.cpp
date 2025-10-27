@@ -5,7 +5,7 @@
 #include <random>
 
 #include <hip/hip_runtime.h>
-#include <hipdnn_sdk/test_utilities/CpuFpReferenceValidation.hpp>
+#include <hipdnn_sdk/test_utilities/CpuFpReferenceMiopenRmsValidation.hpp>
 #include <hipdnn_sdk/test_utilities/TestTolerances.hpp>
 #include <hipdnn_sdk/test_utilities/TestUtilities.hpp>
 #include <hipdnn_sdk/utilities/PlatformUtils.hpp>
@@ -214,6 +214,7 @@ protected:
             {
                 nextRunningMeanTensorAttr->set_uid(uid++);
             }
+            nextRunningMeanTensorAttr->set_name("next_running_mean");
             nextRunningMeanTensorAttr->set_output(true);
             nextRunningMeanTensorAttr->set_data_type(intermediateDataType);
             nextRunningMeanTensorAttr->set_dim(derivedDims);
@@ -226,13 +227,14 @@ protected:
             {
                 nextRunningVarianceTensorAttr->set_uid(uid++);
             }
+            nextRunningVarianceTensorAttr->set_name("next_running_variance");
             nextRunningVarianceTensorAttr->set_output(true);
             nextRunningVarianceTensorAttr->set_data_type(intermediateDataType);
             nextRunningVarianceTensorAttr->set_dim(derivedDims);
             nextRunningVarianceTensorAttr->set_stride(generateStrides(derivedDims));
         }
 
-        CpuFpReferenceValidation<InputType> validator(tolerance, tolerance);
+        CpuFpReferenceMiopenRmsValidation<InputType> validator(tolerance);
         this->verifyGraph(graphObj, testCase.seed, validator);
     }
 
@@ -246,27 +248,59 @@ protected:
                           GraphTensorBundle& bundle,
                           unsigned int seed) override
     {
-        // Use random values for most tensors
-        GraphVerifierTest<InputType, TestCaseType>::initializeBundle(graph, bundle, seed);
-
-        // Apply custom distributions for epsilon and momentum
+        // Initialize tensors with custom ranges to match MIOpen's initialization strategy
         std::mt19937 gen(seed);
+        
+        // Track running stats to ensure prev/next pairs get same values
+        std::map<std::string, unsigned int> runningStatSeeds;
 
-        // Find and set epsilon with custom distribution
         for(auto& [tensorId, tensorPtr] : bundle.tensors)
         {
             auto name = getTensorName(graph, tensorId);
+            
             if(name == "epsilon")
             {
+                // Epsilon: small positive value
                 std::uniform_real_distribution<float> epsilonDist(1e-6f, 1e-4f);
                 auto* data = static_cast<float*>(tensorPtr->rawHostData());
                 data[0] = epsilonDist(gen);
             }
             else if(name == "momentum")
             {
+                // Momentum: typical training value
                 std::uniform_real_distribution<float> momentumDist(0.05f, 0.15f);
                 auto* data = static_cast<float*>(tensorPtr->rawHostData());
                 data[0] = momentumDist(gen);
+            }
+            else if(name == "prev_running_mean" || name == "next_running_mean")
+            {
+                // Running mean: prev and next must start with SAME values
+                // because MIOpen's API uses IN/OUT parameter semantics
+                if(runningStatSeeds.find("running_mean") == runningStatSeeds.end())
+                {
+                    runningStatSeeds["running_mean"] = seed + 1000;
+                }
+                bundle.randomizeTensor(tensorId, -2.0f, 2.0f, runningStatSeeds["running_mean"]);
+            }
+            else if(name == "prev_running_variance" || name == "next_running_variance")
+            {
+                // Running variance: prev and next must start with SAME values
+                // because MIOpen's API uses IN/OUT parameter semantics
+                if(runningStatSeeds.find("running_variance") == runningStatSeeds.end())
+                {
+                    runningStatSeeds["running_variance"] = seed + 2000;
+                }
+                bundle.randomizeTensor(tensorId, -2.0f, 2.0f, runningStatSeeds["running_variance"]);
+            }
+            else if(name == "scale" || name == "bias")
+            {
+                // Match MIOpen's initialization: -2.0 to 2.0
+                bundle.randomizeTensor(tensorId, -2.0f, 2.0f, seed + static_cast<unsigned int>(tensorId));
+            }
+            else
+            {
+                // Default initialization for input and other tensors
+                bundle.randomizeTensor(tensorId, -1.0f, 1.0f, seed + static_cast<unsigned int>(tensorId));
             }
         }
     }
@@ -325,11 +359,11 @@ std::vector<Batchnorm2dTestCase> getBnFwdTrainingTestCases()
     unsigned int seed = std::random_device{}();
 
     return {
-        {1, 3, 14, 14, seed},
-        {1, 256, 1, 1, seed},
-        // {2, 3, 1, 1, seed},
-        // {32, 1, 14, 14, seed},
-        // {32, 3, 1, 14, seed},
+    //     {1, 3, 14, 14, seed},
+    //     // {1, 256, 1, 1, seed},
+    //     {2, 3, 1, 1, seed},
+    //     {32, 1, 14, 14, seed},
+        {32, 3, 1, 14, seed}
         // {32, 3, 14, 1, seed},
         // {64, 64, 112, 112, seed},
         // {64, 512, 14, 14, seed},

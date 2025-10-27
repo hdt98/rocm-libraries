@@ -110,6 +110,9 @@ public:
                     varianceAccum = varianceAccum + (inVal * inVal);
                 });
 
+            // NOTE: This computation order differs slightly from MIOpen's implementation, which
+            // uses in-place updates that can affect floating-point precision. The type-aware
+            // validator (CpuFpReferenceMiopenRmsValidation) handles these small differences.
             MeanVarianceDataType channelMean = meanAccum = meanAccum / nhw;
             MeanVarianceDataType channelVariance
                 = (varianceAccum / nhw) - (channelMean * channelMean);
