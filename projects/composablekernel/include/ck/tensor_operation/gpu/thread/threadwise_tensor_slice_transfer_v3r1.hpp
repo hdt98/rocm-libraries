@@ -217,6 +217,7 @@ struct ThreadwiseTensorSliceTransfer_v3r1
                     ? 0x100
                     : 0;
 
+            if constexpr(SrcVectorDim == 1)
             {
                 constexpr auto src_vector_end_offset = generate_tuple(
                     [](index_t i) { return i == SrcVectorDim ? (SrcScalarPerVector_ - 1) : 0; },
@@ -229,13 +230,17 @@ struct ThreadwiseTensorSliceTransfer_v3r1
                                    src_desc, src_end_coord_)
                                    ? 0x200
                                    : 0;
+                src_oob_thread_scratch_tuple_(thread_scratch_id)
+                    .template SetAsType<int>(
+                        src_data_idx_seq,
+                        oob_scratch |
+                            (0xff & (src_coord_.GetOffset() / PackedSize + SrcScalarPerVector)));
             }
-
-            src_oob_thread_scratch_tuple_(thread_scratch_id)
-                .template SetAsType<int>(
-                    src_data_idx_seq,
-                    oob_scratch |
-                        (0xff & (src_coord_.GetOffset() / PackedSize + SrcScalarPerVector)));
+            else
+            {
+                src_oob_thread_scratch_tuple_(thread_scratch_id)
+                    .template SetAsType<int>(src_data_idx_seq, oob_scratch);
+            }
 
             using dst_vector_type = vector_type_maker_t<DstData, SrcScalarPerVector>;
             using dst_vector_t    = typename dst_vector_type::type;
@@ -317,18 +322,27 @@ struct ThreadwiseTensorSliceTransfer_v3r1
 
                     const auto src_ele_offset = src_coord_.GetOffset() / PackedSize + LoadOffset;
                     src_vector_container src_vector{0};
-                    if(!oob_scratch) {}
-                    else if(src_ele_offset >= 0 && src_ele_offset < addr_ub)
+                    if constexpr(SrcVectorDim == 1)
                     {
-                        src_vector.template AsType<src_vector_container_t>()(I0) =
-                            src_buf.template Get<src_vector_container_t>(src_ele_offset, true);
+                        if(!oob_scratch) {}
+                        else if(src_ele_offset >= 0 && src_ele_offset < addr_ub)
+                        {
+                            src_vector.template AsType<src_vector_container_t>()(I0) =
+                                src_buf.template Get<src_vector_container_t>(src_ele_offset, true);
+                        }
+                        else
+                        {
+                            static_for<0, VectorLoadSize, 1>{}([&](auto idx) {
+                                src_vector.template AsType<src_elem_op_vec_t>()(idx) =
+                                    src_buf.template Get<src_elem_op_vec_t>(src_ele_offset + idx,
+                                                                            true);
+                            });
+                        }
                     }
                     else
                     {
-                        static_for<0, VectorLoadSize, 1>{}([&](auto idx) {
-                            src_vector.template AsType<src_elem_op_vec_t>()(idx) =
-                                src_buf.template Get<src_elem_op_vec_t>(src_ele_offset + idx, true);
-                        });
+                        src_vector.template AsType<src_vector_container_t>()(I0) =
+                            src_buf.template Get<src_vector_container_t>(src_ele_offset, true);
                     }
 
                     // if(THREAD_IDX_UB(0, 0, 0, 63))
