@@ -28,16 +28,11 @@ target_link_libraries(
 )
 hipsparselt_link_blas_libraries(hipsparselt-test)
 
-if(NOT WIN32)
-    target_link_libraries(hipsparselt-test PRIVATE -lm -lstdc++fs)
-
-    if(HIPSPARSELT_ENABLE_FORTRAN)
-        if(CMAKE_Fortran_COMPILER_ID MATCH "Flang")
-            target_link_libraries(hipsparselt-bench PRIVATE -lflang_rt.runtime lapack)
-        else()
-            target_link_libraries(hipsparselt-bench PRIVATE -lgfortran lapack)
-        endif()
-    endif()
+# Platform-specific link tweaks
+if(WIN32)
+    # No extra math/filesystem libs needed on MSVC; std::filesystem is part of the runtime
+else()
+    target_link_libraries(hipsparselt-test PRIVATE -lm)
 endif()
 
 configure_file(
