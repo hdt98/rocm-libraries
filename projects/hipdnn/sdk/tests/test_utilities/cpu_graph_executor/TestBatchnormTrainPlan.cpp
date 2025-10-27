@@ -57,7 +57,7 @@ TEST_F(TestBatchnormTrainPlan, ExecutePlan)
     // Initialize optional mean and invVariance tensors
     params.meanTensor = TensorAttributesT();
     initTensorValues(params.meanTensor.value(), DataType::FLOAT, planTensorBundle.meanTensor, 6);
-    
+
     params.invVarianceTensor = TensorAttributesT();
     initTensorValues(
         params.invVarianceTensor.value(), DataType::FLOAT, planTensorBundle.invVarianceTensor, 7);

@@ -53,7 +53,7 @@ public:
         {
             return true;
         }
-        
+
         // Check if reference and implementation have the same element size
         if(reference.elementSize() != implementation.elementSize())
         {
@@ -62,8 +62,8 @@ public:
 
         // Dispatch to type-specific comparison based on actual element size
         size_t elemSize = reference.elementSize();
-        
-        if(elemSize == sizeof(T))  // 2 bytes for half or bfp16
+
+        if(elemSize == sizeof(T)) // 2 bytes for half or bfp16
         {
             return compareTyped<T>(reference, implementation);
         }
@@ -75,7 +75,7 @@ public:
         {
             return compareTyped<double>(reference, implementation);
         }
-        
+
         return false;
     }
 

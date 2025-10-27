@@ -25,12 +25,13 @@ BatchnormFwdTrainingParams::BatchnormFwdTrainingParams(
     {
         _mean = miopen_utils::createTensor(tensorMap, attributes.mean_tensor_uid().value());
     }
-    
+
     if(attributes.inv_variance_tensor_uid().has_value())
     {
-        _invVariance = miopen_utils::createTensor(tensorMap, attributes.inv_variance_tensor_uid().value());
+        _invVariance
+            = miopen_utils::createTensor(tensorMap, attributes.inv_variance_tensor_uid().value());
     }
-    
+
     // Check if running statistics are provided
     if(attributes.prev_running_mean_tensor_uid().has_value()
        && attributes.prev_running_variance_tensor_uid().has_value()
@@ -141,12 +142,12 @@ void BatchnormFwdTrainingPlan::execute(const HipdnnEnginePluginHandle& handle,
     // Hardcoded values consistent with the pattern used in inference
     auto alpha = static_cast<float>(1);
     auto beta = static_cast<float>(0);
-    
+
     // Get epsilon from device buffer (points to host memory for scalar pass-by-value tensors)
     auto epsilonBuffer = miopen_utils::findDeviceBuffer(
         _trainingParams.epsilon().uid(), deviceBuffers, numDeviceBuffers);
     auto epsilon = static_cast<double>(*static_cast<const float*>(epsilonBuffer.ptr));
-    
+
     // Get momentum if running stats exist
     double expAvgFactor;
     if(_trainingParams.hasRunningStats())
@@ -169,18 +170,18 @@ void BatchnormFwdTrainingPlan::execute(const HipdnnEnginePluginHandle& handle,
         _trainingParams.scale().uid(), deviceBuffers, numDeviceBuffers);
     auto biasBuffer = miopen_utils::findDeviceBuffer(
         _trainingParams.bias().uid(), deviceBuffers, numDeviceBuffers);
-    
+
     // Handle save mean/variance if provided (optional)
     void* resultSaveMeanPtr = nullptr;
     void* resultSaveInvVariancePtr = nullptr;
-    
+
     if(_trainingParams.hasSaveMeanVariance())
     {
         auto meanBuffer = miopen_utils::findDeviceBuffer(
             _trainingParams.mean().uid(), deviceBuffers, numDeviceBuffers);
         auto invVarianceBuffer = miopen_utils::findDeviceBuffer(
             _trainingParams.invVariance().uid(), deviceBuffers, numDeviceBuffers);
-        
+
         resultSaveMeanPtr = meanBuffer.ptr;
         resultSaveInvVariancePtr = invVarianceBuffer.ptr;
     }
@@ -200,24 +201,24 @@ void BatchnormFwdTrainingPlan::execute(const HipdnnEnginePluginHandle& handle,
         resultRunningVariancePtr = nextRunningVarianceBuffer.ptr;
     }
 
-    THROW_ON_MIOPEN_FAILURE(miopenBatchNormalizationForwardTraining(
-        handle.miopenHandle,
-        MIOPEN_BATCHNORM_MODE_TRAINING,
-        &alpha,
-        &beta,
-        _trainingParams.x().tensorDescriptor(),
-        xBuffer.ptr,
-        _trainingParams.y().tensorDescriptor(),
-        yBuffer.ptr,
-        _trainingParams.scale().tensorDescriptor(),
-        scaleBuffer.ptr,
-        biasBuffer.ptr,
-        expAvgFactor,
-        resultRunningMeanPtr,
-        resultRunningVariancePtr,
-        epsilon,
-        resultSaveMeanPtr,
-        resultSaveInvVariancePtr));
+    THROW_ON_MIOPEN_FAILURE(
+        miopenBatchNormalizationForwardTraining(handle.miopenHandle,
+                                                MIOPEN_BATCHNORM_MODE_TRAINING,
+                                                &alpha,
+                                                &beta,
+                                                _trainingParams.x().tensorDescriptor(),
+                                                xBuffer.ptr,
+                                                _trainingParams.y().tensorDescriptor(),
+                                                yBuffer.ptr,
+                                                _trainingParams.scale().tensorDescriptor(),
+                                                scaleBuffer.ptr,
+                                                biasBuffer.ptr,
+                                                expAvgFactor,
+                                                resultRunningMeanPtr,
+                                                resultRunningVariancePtr,
+                                                epsilon,
+                                                resultSaveMeanPtr,
+                                                resultSaveInvVariancePtr));
 }
 
 }

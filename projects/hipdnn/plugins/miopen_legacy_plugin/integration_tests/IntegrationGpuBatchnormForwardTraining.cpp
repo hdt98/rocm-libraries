@@ -28,8 +28,8 @@ namespace
 // - FULL_TRAINING: Computes batch statistics AND updates running mean/variance via EMA
 enum class BatchnormTrainingScenario
 {
-    WITH_BATCH_STATS,   // Batch stats only (no running stats update)
-    FULL_TRAINING       // Batch stats + running stats update (canonical training)
+    WITH_BATCH_STATS, // Batch stats only (no running stats update)
+    FULL_TRAINING // Batch stats + running stats update (canonical training)
 };
 
 struct Batchnorm2dTestCase
@@ -87,7 +87,7 @@ protected:
                                   const TensorLayout& layout = TensorLayout::NCHW)
     {
         const TestCaseType& testCase = this->GetParam();
-        
+
         auto inputDataType = getDataTypeEnumFromType<InputType>();
         auto intermediateDataType = getDataTypeEnumFromType<IntermediateType>();
 
@@ -129,23 +129,27 @@ protected:
 
         if(scenario == BatchnormTrainingScenario::FULL_TRAINING)
         {
-            auto prevRunningMeanAttr = graph::makeTensorAttributes(
-                "prev_running_mean", intermediateDataType, derivedDims, generateStrides(derivedDims));
+            auto prevRunningMeanAttr = graph::makeTensorAttributes("prev_running_mean",
+                                                                   intermediateDataType,
+                                                                   derivedDims,
+                                                                   generateStrides(derivedDims));
             prevRunningMeanAttr.set_uid(uid++);
-            prevRunningMeanTensorAttr =
-                std::make_shared<graph::TensorAttributes>(std::move(prevRunningMeanAttr));
+            prevRunningMeanTensorAttr
+                = std::make_shared<graph::TensorAttributes>(std::move(prevRunningMeanAttr));
 
-            auto prevRunningVarianceAttr = graph::makeTensorAttributes(
-                "prev_running_variance", intermediateDataType, derivedDims, generateStrides(derivedDims));
+            auto prevRunningVarianceAttr
+                = graph::makeTensorAttributes("prev_running_variance",
+                                              intermediateDataType,
+                                              derivedDims,
+                                              generateStrides(derivedDims));
             prevRunningVarianceAttr.set_uid(uid++);
-            prevRunningVarianceTensorAttr =
-                std::make_shared<graph::TensorAttributes>(std::move(prevRunningVarianceAttr));
+            prevRunningVarianceTensorAttr
+                = std::make_shared<graph::TensorAttributes>(std::move(prevRunningVarianceAttr));
 
             auto momentumAttr = graph::makeTensorAttributes(
                 "momentum", intermediateDataType, std::vector<int64_t>{1}, std::vector<int64_t>{1});
             momentumAttr.set_uid(uid++);
-            momentumTensorAttr =
-                std::make_shared<graph::TensorAttributes>(std::move(momentumAttr));
+            momentumTensorAttr = std::make_shared<graph::TensorAttributes>(std::move(momentumAttr));
         }
 
         // Create batchnorm attributes
@@ -164,8 +168,8 @@ protected:
               meanTensorAttr,
               invVarianceTensorAttr,
               nextRunningMeanTensorAttr,
-              nextRunningVarianceTensorAttr] =
-            graphObj.batchnorm(xTensorAttr, scaleTensorAttr, biasTensorAttr, bnAttrs);
+              nextRunningVarianceTensorAttr]
+            = graphObj.batchnorm(xTensorAttr, scaleTensorAttr, biasTensorAttr, bnAttrs);
 
         // Set output tensor attributes
         if(!yTensorAttr->has_uid())
@@ -245,14 +249,14 @@ protected:
     {
         // Initialize tensors with custom ranges to match MIOpen's initialization strategy
         std::mt19937 gen(seed);
-        
+
         // Track running stats to ensure prev/next pairs get same values
         std::map<std::string, unsigned int> runningStatSeeds;
 
         for(auto& [tensorId, tensorPtr] : bundle.tensors)
         {
             auto name = getTensorName(graph, tensorId);
-            
+
             if(name == "epsilon")
             {
                 // Epsilon: small positive value
@@ -290,12 +294,14 @@ protected:
             else if(name == "scale" || name == "bias")
             {
                 // Match MIOpen's initialization: -2.0 to 2.0
-                bundle.randomizeTensor(tensorId, -2.0f, 2.0f, seed + static_cast<unsigned int>(tensorId));
+                bundle.randomizeTensor(
+                    tensorId, -2.0f, 2.0f, seed + static_cast<unsigned int>(tensorId));
             }
             else
             {
                 // Default initialization for input and other tensors
-                bundle.randomizeTensor(tensorId, -1.0f, 1.0f, seed + static_cast<unsigned int>(tensorId));
+                bundle.randomizeTensor(
+                    tensorId, -1.0f, 1.0f, seed + static_cast<unsigned int>(tensorId));
             }
         }
     }
@@ -340,22 +346,22 @@ using BnFwdTrainNhwcBfp16Mixed = BatchnormForwardTraining<hip_bfloat16, float, B
 // NCDHW 3D
 using BnFwdTrainNcdhwFp32 = BatchnormForwardTraining<float, float, Batchnorm3dTestCase>;
 using BnFwdTrainNcdhwFp16Mixed = BatchnormForwardTraining<half, float, Batchnorm3dTestCase>;
-using BnFwdTrainNcdhwBfp16Mixed =
-    BatchnormForwardTraining<hip_bfloat16, float, Batchnorm3dTestCase>;
+using BnFwdTrainNcdhwBfp16Mixed
+    = BatchnormForwardTraining<hip_bfloat16, float, Batchnorm3dTestCase>;
 
 // NDHWC 3D
 using BnFwdTrainNdhwcFp32 = BatchnormForwardTraining<float, float, Batchnorm3dTestCase>;
 using BnFwdTrainNdhwcFp16Mixed = BatchnormForwardTraining<half, float, Batchnorm3dTestCase>;
-using BnFwdTrainNdhwcBfp16Mixed =
-    BatchnormForwardTraining<hip_bfloat16, float, Batchnorm3dTestCase>;
+using BnFwdTrainNdhwcBfp16Mixed
+    = BatchnormForwardTraining<hip_bfloat16, float, Batchnorm3dTestCase>;
 
 std::vector<Batchnorm2dTestCase> getBnFwdTrainingSmoke2dTestCases()
 {
     unsigned int seed = std::random_device{}();
 
     return {
-        {2, 3, 1, 1, seed},      // Minimal case
-        {32, 3, 1, 14, seed},    // Typical small training case
+        {2, 3, 1, 1, seed}, // Minimal case
+        {32, 3, 1, 14, seed}, // Typical small training case
     };
 }
 
@@ -369,8 +375,8 @@ std::vector<Batchnorm2dTestCase> getBnFwdTrainingFull2dTestCases()
         {32, 1, 14, 14, seed},
         {32, 3, 1, 14, seed},
         {32, 3, 14, 1, seed},
-        {64, 64, 112, 112, seed},   // Large regression case
-        {64, 512, 14, 14, seed},    // Many channels
+        {64, 64, 112, 112, seed}, // Large regression case
+        {64, 512, 14, 14, seed}, // Many channels
     };
 }
 
@@ -379,8 +385,8 @@ std::vector<Batchnorm3dTestCase> getBnFwdTrainingSmoke3dTestCases()
     unsigned int seed = std::random_device{}();
 
     return {
-        {2, 3, 3, 1, 1, seed},   // Minimal 3D case
-        {2, 3, 2, 4, 4, seed},   // Small case with non-1 spatial dims
+        {2, 3, 3, 1, 1, seed}, // Minimal 3D case
+        {2, 3, 2, 4, 4, seed}, // Small case with non-1 spatial dims
     };
 }
 
@@ -389,9 +395,9 @@ std::vector<Batchnorm3dTestCase> getBnFwdTrainingFull3dTestCases()
     unsigned int seed = std::random_device{}();
 
     return {
-        {2, 3, 3, 1, 1, seed},      // Minimal case
-        {2, 3, 2, 4, 4, seed},      // Small case
-        {16, 3, 8, 14, 14, seed},   // Larger regression case
+        {2, 3, 3, 1, 1, seed}, // Minimal case
+        {2, 3, 2, 4, 4, seed}, // Small case
+        {16, 3, 8, 14, 14, seed}, // Larger regression case
     };
 }
 
@@ -404,43 +410,43 @@ std::vector<Batchnorm3dTestCase> getBnFwdTrainingFull3dTestCases()
 TEST_P(BnFwdTrainNchwFp32, FullTraining)
 {
     runGraphTestWithScenario(batchnorm::getRmsToleranceTraining<float>(),
-                            BatchnormTrainingScenario::FULL_TRAINING,
-                            TensorLayout::NCHW);
+                             BatchnormTrainingScenario::FULL_TRAINING,
+                             TensorLayout::NCHW);
 }
 
 TEST_P(BnFwdTrainNchwFp32, BatchStatsOnly)
 {
     runGraphTestWithScenario(batchnorm::getRmsToleranceTraining<float>(),
-                            BatchnormTrainingScenario::WITH_BATCH_STATS,
-                            TensorLayout::NCHW);
+                             BatchnormTrainingScenario::WITH_BATCH_STATS,
+                             TensorLayout::NCHW);
 }
 
 TEST_P(BnFwdTrainNchwFp16Mixed, FullTraining)
 {
     runGraphTestWithScenario(batchnorm::getRmsToleranceTraining<half>(),
-                            BatchnormTrainingScenario::FULL_TRAINING,
-                            TensorLayout::NCHW);
+                             BatchnormTrainingScenario::FULL_TRAINING,
+                             TensorLayout::NCHW);
 }
 
 TEST_P(BnFwdTrainNchwFp16Mixed, BatchStatsOnly)
 {
     runGraphTestWithScenario(batchnorm::getRmsToleranceTraining<half>(),
-                            BatchnormTrainingScenario::WITH_BATCH_STATS,
-                            TensorLayout::NCHW);
+                             BatchnormTrainingScenario::WITH_BATCH_STATS,
+                             TensorLayout::NCHW);
 }
 
 TEST_P(BnFwdTrainNchwBfp16Mixed, FullTraining)
 {
     runGraphTestWithScenario(batchnorm::getRmsToleranceTraining<hip_bfloat16>(),
-                            BatchnormTrainingScenario::FULL_TRAINING,
-                            TensorLayout::NCHW);
+                             BatchnormTrainingScenario::FULL_TRAINING,
+                             TensorLayout::NCHW);
 }
 
 TEST_P(BnFwdTrainNchwBfp16Mixed, BatchStatsOnly)
 {
     runGraphTestWithScenario(batchnorm::getRmsToleranceTraining<hip_bfloat16>(),
-                            BatchnormTrainingScenario::WITH_BATCH_STATS,
-                            TensorLayout::NCHW);
+                             BatchnormTrainingScenario::WITH_BATCH_STATS,
+                             TensorLayout::NCHW);
 }
 
 // ============================================================================
@@ -450,43 +456,43 @@ TEST_P(BnFwdTrainNchwBfp16Mixed, BatchStatsOnly)
 TEST_P(BnFwdTrainNhwcFp32, FullTraining)
 {
     runGraphTestWithScenario(batchnorm::getRmsToleranceTraining<float>(),
-                            BatchnormTrainingScenario::FULL_TRAINING,
-                            TensorLayout::NHWC);
+                             BatchnormTrainingScenario::FULL_TRAINING,
+                             TensorLayout::NHWC);
 }
 
 TEST_P(BnFwdTrainNhwcFp32, BatchStatsOnly)
 {
     runGraphTestWithScenario(batchnorm::getRmsToleranceTraining<float>(),
-                            BatchnormTrainingScenario::WITH_BATCH_STATS,
-                            TensorLayout::NHWC);
+                             BatchnormTrainingScenario::WITH_BATCH_STATS,
+                             TensorLayout::NHWC);
 }
 
 TEST_P(BnFwdTrainNhwcFp16Mixed, FullTraining)
 {
     runGraphTestWithScenario(batchnorm::getRmsToleranceTraining<half>(),
-                            BatchnormTrainingScenario::FULL_TRAINING,
-                            TensorLayout::NHWC);
+                             BatchnormTrainingScenario::FULL_TRAINING,
+                             TensorLayout::NHWC);
 }
 
 TEST_P(BnFwdTrainNhwcFp16Mixed, BatchStatsOnly)
 {
     runGraphTestWithScenario(batchnorm::getRmsToleranceTraining<half>(),
-                            BatchnormTrainingScenario::WITH_BATCH_STATS,
-                            TensorLayout::NHWC);
+                             BatchnormTrainingScenario::WITH_BATCH_STATS,
+                             TensorLayout::NHWC);
 }
 
 TEST_P(BnFwdTrainNhwcBfp16Mixed, FullTraining)
 {
     runGraphTestWithScenario(batchnorm::getRmsToleranceTraining<hip_bfloat16>(),
-                            BatchnormTrainingScenario::FULL_TRAINING,
-                            TensorLayout::NHWC);
+                             BatchnormTrainingScenario::FULL_TRAINING,
+                             TensorLayout::NHWC);
 }
 
 TEST_P(BnFwdTrainNhwcBfp16Mixed, BatchStatsOnly)
 {
     runGraphTestWithScenario(batchnorm::getRmsToleranceTraining<hip_bfloat16>(),
-                            BatchnormTrainingScenario::WITH_BATCH_STATS,
-                            TensorLayout::NHWC);
+                             BatchnormTrainingScenario::WITH_BATCH_STATS,
+                             TensorLayout::NHWC);
 }
 
 // ============================================================================
@@ -496,43 +502,43 @@ TEST_P(BnFwdTrainNhwcBfp16Mixed, BatchStatsOnly)
 TEST_P(BnFwdTrainNcdhwFp32, FullTraining)
 {
     runGraphTestWithScenario(batchnorm::getRmsToleranceTraining<float>(),
-                            BatchnormTrainingScenario::FULL_TRAINING,
-                            TensorLayout::NCDHW);
+                             BatchnormTrainingScenario::FULL_TRAINING,
+                             TensorLayout::NCDHW);
 }
 
 TEST_P(BnFwdTrainNcdhwFp32, BatchStatsOnly)
 {
     runGraphTestWithScenario(batchnorm::getRmsToleranceTraining<float>(),
-                            BatchnormTrainingScenario::WITH_BATCH_STATS,
-                            TensorLayout::NCDHW);
+                             BatchnormTrainingScenario::WITH_BATCH_STATS,
+                             TensorLayout::NCDHW);
 }
 
 TEST_P(BnFwdTrainNcdhwFp16Mixed, FullTraining)
 {
     runGraphTestWithScenario(batchnorm::getRmsToleranceTraining<half>(),
-                            BatchnormTrainingScenario::FULL_TRAINING,
-                            TensorLayout::NCDHW);
+                             BatchnormTrainingScenario::FULL_TRAINING,
+                             TensorLayout::NCDHW);
 }
 
 TEST_P(BnFwdTrainNcdhwFp16Mixed, BatchStatsOnly)
 {
     runGraphTestWithScenario(batchnorm::getRmsToleranceTraining<half>(),
-                            BatchnormTrainingScenario::WITH_BATCH_STATS,
-                            TensorLayout::NCDHW);
+                             BatchnormTrainingScenario::WITH_BATCH_STATS,
+                             TensorLayout::NCDHW);
 }
 
 TEST_P(BnFwdTrainNcdhwBfp16Mixed, FullTraining)
 {
     runGraphTestWithScenario(batchnorm::getRmsToleranceTraining<hip_bfloat16>(),
-                            BatchnormTrainingScenario::FULL_TRAINING,
-                            TensorLayout::NCDHW);
+                             BatchnormTrainingScenario::FULL_TRAINING,
+                             TensorLayout::NCDHW);
 }
 
 TEST_P(BnFwdTrainNcdhwBfp16Mixed, BatchStatsOnly)
 {
     runGraphTestWithScenario(batchnorm::getRmsToleranceTraining<hip_bfloat16>(),
-                            BatchnormTrainingScenario::WITH_BATCH_STATS,
-                            TensorLayout::NCDHW);
+                             BatchnormTrainingScenario::WITH_BATCH_STATS,
+                             TensorLayout::NCDHW);
 }
 
 // ============================================================================
@@ -542,43 +548,43 @@ TEST_P(BnFwdTrainNcdhwBfp16Mixed, BatchStatsOnly)
 TEST_P(BnFwdTrainNdhwcFp32, FullTraining)
 {
     runGraphTestWithScenario(batchnorm::getRmsToleranceTraining<float>(),
-                            BatchnormTrainingScenario::FULL_TRAINING,
-                            TensorLayout::NDHWC);
+                             BatchnormTrainingScenario::FULL_TRAINING,
+                             TensorLayout::NDHWC);
 }
 
 TEST_P(BnFwdTrainNdhwcFp32, BatchStatsOnly)
 {
     runGraphTestWithScenario(batchnorm::getRmsToleranceTraining<float>(),
-                            BatchnormTrainingScenario::WITH_BATCH_STATS,
-                            TensorLayout::NDHWC);
+                             BatchnormTrainingScenario::WITH_BATCH_STATS,
+                             TensorLayout::NDHWC);
 }
 
 TEST_P(BnFwdTrainNdhwcFp16Mixed, FullTraining)
 {
     runGraphTestWithScenario(batchnorm::getRmsToleranceTraining<half>(),
-                            BatchnormTrainingScenario::FULL_TRAINING,
-                            TensorLayout::NDHWC);
+                             BatchnormTrainingScenario::FULL_TRAINING,
+                             TensorLayout::NDHWC);
 }
 
 TEST_P(BnFwdTrainNdhwcFp16Mixed, BatchStatsOnly)
 {
     runGraphTestWithScenario(batchnorm::getRmsToleranceTraining<half>(),
-                            BatchnormTrainingScenario::WITH_BATCH_STATS,
-                            TensorLayout::NDHWC);
+                             BatchnormTrainingScenario::WITH_BATCH_STATS,
+                             TensorLayout::NDHWC);
 }
 
 TEST_P(BnFwdTrainNdhwcBfp16Mixed, FullTraining)
 {
     runGraphTestWithScenario(batchnorm::getRmsToleranceTraining<hip_bfloat16>(),
-                            BatchnormTrainingScenario::FULL_TRAINING,
-                            TensorLayout::NDHWC);
+                             BatchnormTrainingScenario::FULL_TRAINING,
+                             TensorLayout::NDHWC);
 }
 
 TEST_P(BnFwdTrainNdhwcBfp16Mixed, BatchStatsOnly)
 {
     runGraphTestWithScenario(batchnorm::getRmsToleranceTraining<hip_bfloat16>(),
-                            BatchnormTrainingScenario::WITH_BATCH_STATS,
-                            TensorLayout::NDHWC);
+                             BatchnormTrainingScenario::WITH_BATCH_STATS,
+                             TensorLayout::NDHWC);
 }
 
 // ============================================================================
