@@ -4,7 +4,9 @@
 #include <array>
 
 #include <hipdnn_sdk/plugin/PluginException.hpp>
+#include <hipdnn_sdk/utilities/FlatbufferUtils.hpp>
 #include <hipdnn_sdk/utilities/ScopedResource.hpp>
+#include <hipdnn_sdk/utilities/ShapeUtilities.hpp>
 
 #include "HipdnnEnginePluginHandle.hpp"
 #include "MiopenConvFwdPlan.hpp"
@@ -21,8 +23,18 @@ ConvFwdParams::ConvFwdParams(
     , _x(miopen_utils::createTensor(tensorMap, attributes.x_tensor_uid()))
     , _w(miopen_utils::createTensor(tensorMap, attributes.w_tensor_uid()))
     , _y(miopen_utils::createTensor(tensorMap, attributes.y_tensor_uid()))
-    , _conv(_spatialDimCount, attributes)
 {
+    const auto& attrX = miopen_utils::findTensorAttributes(tensorMap, _x.uid());
+    const auto& attrW = miopen_utils::findTensorAttributes(tensorMap, _w.uid());
+    const auto& attrY = miopen_utils::findTensorAttributes(tensorMap, _y.uid());
+
+    const auto inputDims = hipdnn_sdk::utilities::convertFlatBufferVectorToStdVector(attrX.dims());
+    const auto weightDims = hipdnn_sdk::utilities::convertFlatBufferVectorToStdVector(attrW.dims());
+    const auto groupCount = hipdnn_sdk::utilities::calculateGroupCount(inputDims, weightDims);
+
+    _conv = MiopenConvDescriptor(_spatialDimCount, attributes, static_cast<int>(groupCount));
+
+    _tensorsValid = (!attrX.virtual_() && !attrW.virtual_() && !attrY.virtual_());
 }
 
 const MiopenTensor& ConvFwdParams::x() const
@@ -45,6 +57,11 @@ const MiopenConvDescriptor& ConvFwdParams::conv() const
     return _conv;
 }
 
+bool ConvFwdParams::validTensors() const
+{
+    return _tensorsValid;
+}
+
 ConvFwdPlan::ConvFwdPlan(const HipdnnEnginePluginHandle& handle, ConvFwdParams&& params)
     : _params(std::move(params))
 {
@@ -63,9 +80,22 @@ ConvFwdPlan::ConvFwdPlan(const HipdnnEnginePluginHandle& handle, ConvFwdParams&&
         problem, miopenTensorConvolutionY, _params.y().tensorDescriptor()));
 
     size_t numSolutions;
+    miopenSolution_t solution = nullptr;
     // Requesting only the best solution
     THROW_ON_MIOPEN_FAILURE(
-        miopenFindSolutions(handle.miopenHandle, problem, nullptr, &_solution, &numSolutions, 1));
+        miopenFindSolutions(handle.miopenHandle, problem, nullptr, &solution, &numSolutions, 1));
+
+    if(solution != nullptr)
+    {
+        _solution = hipdnn_sdk::utilities::ScopedResource<miopenSolution_t>(
+            solution, [](miopenSolution_t s) {
+                auto status = miopenDestroySolution(s);
+                if(status != miopenStatusSuccess)
+                {
+                    HIPDNN_LOG_ERROR("miopenDestroySolution failed in ConvFwdPlan destructor");
+                }
+            });
+    }
 
     if(numSolutions != 1)
     {
@@ -74,27 +104,14 @@ ConvFwdPlan::ConvFwdPlan(const HipdnnEnginePluginHandle& handle, ConvFwdParams&&
     }
 
     // Get workspace size
-    THROW_ON_MIOPEN_FAILURE(miopenGetSolutionWorkspaceSize(_solution, &_workspaceSize));
-}
-
-ConvFwdPlan::~ConvFwdPlan()
-{
-    if(_solution != nullptr)
-    {
-        auto status = miopenDestroySolution(_solution);
-        if(status != miopenStatusSuccess)
-        {
-            HIPDNN_LOG_ERROR("miopenDestroySolution failed in ConvFwdPlan destructor");
-        }
-    }
+    THROW_ON_MIOPEN_FAILURE(miopenGetSolutionWorkspaceSize(_solution.get(), &_workspaceSize));
 }
 
 ConvFwdPlan::ConvFwdPlan(ConvFwdPlan&& other) noexcept
     : _params(std::move(other._params))
-    , _solution(other._solution)
+    , _solution(std::move(other._solution))
     , _workspaceSize(other._workspaceSize)
 {
-    other._solution = nullptr;
     other._workspaceSize = 0;
 }
 
@@ -102,18 +119,9 @@ ConvFwdPlan& ConvFwdPlan::operator=(ConvFwdPlan&& other) noexcept
 {
     if(this != &other)
     {
-        if(_solution != nullptr)
-        {
-            auto status = miopenDestroySolution(_solution);
-            if(status != miopenStatusSuccess)
-            {
-                HIPDNN_LOG_ERROR("miopenDestroySolution failed in ConvFwdPlan move assignment");
-            }
-        }
         _params = std::move(other._params);
-        _solution = other._solution;
+        _solution = std::move(other._solution);
         _workspaceSize = other._workspaceSize;
-        other._solution = nullptr;
         other._workspaceSize = 0;
     }
     return *this;
@@ -152,8 +160,12 @@ void ConvFwdPlan::execute(const HipdnnEnginePluginHandle& handle,
         workspaceSize = _workspaceSize;
     }
 
-    THROW_ON_MIOPEN_FAILURE(miopenRunSolution(
-        handle.miopenHandle, _solution, tensors.size(), tensors.data(), workspace, workspaceSize));
+    THROW_ON_MIOPEN_FAILURE(miopenRunSolution(handle.miopenHandle,
+                                              _solution.get(),
+                                              tensors.size(),
+                                              tensors.data(),
+                                              workspace,
+                                              workspaceSize));
 }
 
 } // namespace miopen_legacy_plugin
