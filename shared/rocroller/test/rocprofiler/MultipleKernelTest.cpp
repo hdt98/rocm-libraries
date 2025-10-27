@@ -363,54 +363,22 @@ namespace RocprofilerTest
         CHECK(latencies[1].instruction == "s_endpgm");
     }
 
-    TEST_CASE("Rocprofiler simple", "[rocprofiler]")
+    TEST_CASE("Rocprofiler accidental multiple kernel dispatches")
     {
-        auto literal    = GENERATE(0x11223344);
-        auto commandArg = GENERATE(7);
+        auto testContext = TestContext::ForTestDevice({}, "multi_kernel_dispatch_test");
 
-        std::string const testName = fmt::format("const_0x{:x}_value_{}", literal, commandArg);
+        auto kernelSetup1 = createSimpleMovKernel(
+            TestContext::ForTestDevice({}, "multi_kernel_dispatch_test_1"), 0x11111111);
+        auto kernelSetup2 = createSimpleMovKernel(
+            TestContext::ForTestDevice({}, "multi_kernel_dispatch_test_2"), 0x22222222);
 
-        INFO("Testing " << testName);
-
-        auto kernelSetup
-            = createKernel(TestContext::ForTestDevice({}, testName), literal, commandArg);
-
-        const auto latencies = rocRoller::profiler::loopUntilDispatchData(
-            [&]() { kernelSetup.kernel.launchKernel(kernelSetup.commandArgs.runtimeArguments()); });
-
-        { // Verify device result
-            uint32_t h_result = 0;
-            HIP_CHECK(hipMemcpy(
-                &h_result, kernelSetup.d_ptr.get(), sizeof(uint32_t), hipMemcpyDeviceToHost));
-
-            uint32_t expectedResult = commandArg + literal;
-            CHECK(h_result == expectedResult);
-        }
-
-        std::stringstream ss;
-        ss << "Instruction, Total Latency, Hit Count, Average Latency" << std::endl;
-        for(const auto& data : latencies)
-        {
-            uint64_t avg_latency = data.meanLatency();
-            ss << "\"" << data.instruction << "\", " << data.totalLatency << ", " << data.hitcount
-               << ", " << avg_latency << std::endl;
-        }
-        INFO(ss.str());
-        CHECK(latencies.size() >= 8); // gfx12 has 9, others have 8
-
-        { // Ensure instructions exist in expected quanities in the profile data
-            std::string const instructionsStr = [&]() {
-                std::stringstream ss;
-                streamJoin(
-                    ss,
-                    std::views::transform(latencies, [](const auto& d) { return d.instruction; }),
-                    "\n");
-                return ss.str();
-            }();
-            INFO("Instructions:\n" << instructionsStr);
-            CHECK(1
-                  == countSubstring(instructionsStr,
-                                    fmt::format("v_mov_b32_e32 v1, 0x{:x}", literal)));
-        }
+        CHECK_THROWS_MATCHES(
+            rocRoller::profiler::loopUntilDispatchData([&]() {
+                kernelSetup1.kernel.launchKernel(kernelSetup1.commandArgs.runtimeArguments());
+                kernelSetup2.kernel.launchKernel(kernelSetup2.commandArgs.runtimeArguments());
+            }),
+            FatalError,
+            Catch::Matchers::MessageMatches(
+                Catch::Matchers::ContainsSubstring("unexpected dispatch callback count")));
     }
 } // namespace RocprofilerTest

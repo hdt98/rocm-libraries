@@ -347,10 +347,10 @@ namespace rocRoller
                 lock, std::chrono::seconds(10), [] { return !profile_data.empty(); });
 
             AssertFatal(dispatch_callback_counter == 1,
-                        "waitForDispatchData: unexpected dispatch callback count {}",
+                        "unexpected dispatch callback count ",
                         dispatch_callback_counter);
             AssertFatal(shader_callback_counter == 1,
-                        "waitForDispatchData: unexpected shader callback count {}",
+                        "unexpected shader callback count ",
                         shader_callback_counter);
 
             dispatch_callback_counter = 0;
@@ -409,7 +409,7 @@ namespace rocRoller
             if(!enable_agent)
                 return std::nullopt;
 
-            AssertFatal(profile_data.empty(), "getDispatchData: profile_data not empty");
+            AssertFatal(profile_data.empty(), "profile_data not empty");
             enable_profiler = true;
             dispatch();
             auto data       = waitForData();
