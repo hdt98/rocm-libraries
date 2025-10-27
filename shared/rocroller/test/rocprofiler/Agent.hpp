@@ -64,17 +64,6 @@ namespace rocRoller
             = std::map<rocprofiler_thread_trace_decoder_pc_t, InstructionProfile, pc_comparator>;
 
         /**
-         * @brief Wait for a specific number of dispatches and get the instruction latency data
-         * 
-         * This function increments the expected dispatch counter by n and waits for the
-         * dispatch data to be available before returning it.
-         * 
-         * @param n Number of dispatches to wait for
-         * @return optional vector of InstructionProfile from the dispatch, or nullopt if no data available
-         */
-        std::optional<std::vector<InstructionProfile>> waitForDispatchData(int n);
-
-        /**
          * @brief Call a function that dispatches a single kernel and collects data
          * 
          * When the agent is enabled, this function will repeatedly call the dispatch function

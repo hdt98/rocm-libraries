@@ -149,7 +149,6 @@ namespace RocprofilerTest
         commandKernel.generateKernel();
 
         auto d_ptr = make_shared_device<uint32_t>(1, 0);
-        rocRoller::profiler::waitForDispatchData(1); // hipMemset
 
         CommandArguments commandArgs = command->createArguments();
         commandArgs.setArgument(ptrTag, ArgumentType::Value, d_ptr.get());
@@ -182,9 +181,6 @@ namespace RocprofilerTest
             uint32_t h_result = 0;
             HIP_CHECK(hipMemcpy(
                 &h_result, kernelSetup.d_ptr.get(), sizeof(uint32_t), hipMemcpyDeviceToHost));
-
-            // Wait for the hipMemcpy dispatch
-            rocRoller::profiler::waitForDispatchData(1);
 
             uint32_t expectedResult = commandArg + literal;
             CHECK(h_result == expectedResult);
@@ -298,7 +294,6 @@ namespace RocprofilerTest
                 kernelSetups[idx].kernel.launchKernel(
                     kernelSetups[idx].commandArgs.runtimeArguments());
             }
-            rocRoller::profiler::waitForDispatchData(order.size());
 
             latencies = rocRoller::profiler::loopUntilDispatchData([&]() {
                 kernelSetups[order.back()].kernel.launchKernel(
@@ -318,8 +313,6 @@ namespace RocprofilerTest
                     kernelSetups[idx].commandArgs.runtimeArguments());
             }
 
-            rocRoller::profiler::waitForDispatchData(order.size());
-
             latencies = rocRoller::profiler::loopUntilDispatchData([&]() {
                 kernelSetups[order.back()].kernel.launchKernel(
                     kernelSetups[order.back()].commandArgs.runtimeArguments());
@@ -336,7 +329,6 @@ namespace RocprofilerTest
                 Log::info(kernelSetups[idx].kernel.getInstructions());
                 kernelSetups[idx].kernel.launchKernel(
                     kernelSetups[idx].commandArgs.runtimeArguments());
-                rocRoller::profiler::waitForDispatchData(1);
             }
             latencies = rocRoller::profiler::loopUntilDispatchData([&]() {
                 kernelSetups[order.back()].kernel.launchKernel(
@@ -372,9 +364,6 @@ namespace RocprofilerTest
             uint32_t h_result = 0;
             HIP_CHECK(hipMemcpy(
                 &h_result, kernelSetup.d_ptr.get(), sizeof(uint32_t), hipMemcpyDeviceToHost));
-
-            // Wait for the hipMemcpy dispatch
-            rocRoller::profiler::waitForDispatchData(1);
 
             uint32_t expectedResult = commandArg + literal;
             CHECK(h_result == expectedResult);

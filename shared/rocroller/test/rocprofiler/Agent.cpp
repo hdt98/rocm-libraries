@@ -63,7 +63,6 @@ namespace rocRoller
     {
         struct TraceDecodeCallbackUserData
         {
-            rocprofiler_dispatch_id_t       dispatch_id; // for logging purposes
             bool                            ok;
             profiler::InstructionLatencyMap instruction_map;
         };
@@ -71,14 +70,13 @@ namespace rocRoller
         rocprofiler_thread_trace_decoder_id_t decoder{};
         rocprofiler_context_id_t              client_ctx{};
 
-        std::map<rocprofiler_dispatch_id_t, std::vector<uint8_t>>
-            dispatch_instruction_latencies; // Currently only ever increases in size
         rocprofiler::sdk::codeobj::disassembly::CodeobjAddressTranslate address_table;
 
-        // To wait for expected number of dispatches
+        // To wait for dispatch
         std::condition_variable dispatch_cv;
         std::mutex              dispatch_count_mutex;
-        std::atomic<uint64_t>   requested_dispatch_id{0};
+        bool                    enable_profiler = false;
+        std::vector<uint8_t>    profile_data;
 
         void codeobj_callback(rocprofiler_callback_tracing_record_t record,
                               rocprofiler_user_data_t*,
@@ -92,12 +90,10 @@ namespace rocRoller
             auto* data = static_cast<rocprofiler_callback_tracing_code_object_load_data_t*>(
                 record.payload);
 
-            Log::info(
-                "codeobj_callback: code_object_id {}, requested_dispatch_id {}, storage_type {}",
-                data->code_object_id,
-                requested_dispatch_id.load(),
-                static_cast<std::underlying_type_t<rocprofiler_code_object_storage_type_t>>(
-                    data->storage_type));
+            Log::info("codeobj_callback: code_object_id {}, storage_type {}",
+                      data->code_object_id,
+                      static_cast<std::underlying_type_t<rocprofiler_code_object_storage_type_t>>(
+                          data->storage_type));
 
             if(data->storage_type == ROCPROFILER_CODE_OBJECT_STORAGE_TYPE_FILE)
             {
@@ -145,11 +141,7 @@ namespace rocRoller
             switch(record_type_id)
             {
             case ROCPROFILER_THREAD_TRACE_DECODER_RECORD_WAVE:
-                Log::info(
-                    "trace_decode_callback: decoding {} dispatch_id {}, requested_dispatch_id {}",
-                    num_events,
-                    userdata->dispatch_id,
-                    requested_dispatch_id.load());
+                Log::info("trace_decode_callback: decoding {}", num_events);
                 for(size_t w = 0; w < num_events; w++)
                 {
                     auto* wave = static_cast<rocprofiler_thread_trace_decoder_wave_t*>(events);
@@ -174,9 +166,7 @@ namespace rocRoller
 
                         if(inst.pc.code_object_id == 0)
                         {
-                            Log::warn(
-                                "trace_decode_callback: code_object_id is 0 at dispatch_id {}",
-                                userdata->dispatch_id);
+                            Log::warn("trace_decode_callback: code_object_id is 0");
                             userdata->ok = false;
                             userdata->instruction_map.clear();
                             return;
@@ -212,7 +202,7 @@ namespace rocRoller
                 userdata->instruction_map.clear();
                 return;
             default:
-                Log::critical(
+                Log::error(
                     "parse: unhandled record type {}",
                     static_cast<
                         std::underlying_type_t<rocprofiler_thread_trace_decoder_record_type_t>>(
@@ -234,18 +224,14 @@ namespace rocRoller
             rocprofiler_dispatch_id_t dispatch_id
                 = static_cast<rocprofiler_dispatch_id_t>(userdata.value);
 
-            Log::info(
-                "shader_data_callback: dispatch_id {}, requested_dispatch_id {}, data_size {}",
-                dispatch_id,
-                requested_dispatch_id.load(),
-                data_size);
+            Log::info("shader_data_callback: dispatch_id {}, data_size {}", dispatch_id, data_size);
 
             std::vector<uint8_t> raw_data(static_cast<uint8_t*>(data),
                                           static_cast<uint8_t*>(data) + data_size);
 
             {
                 std::lock_guard<std::mutex> lock(dispatch_count_mutex);
-                dispatch_instruction_latencies[dispatch_id] = std::move(raw_data);
+                profile_data = std::move(raw_data);
             }
 
             dispatch_cv.notify_all();
@@ -260,12 +246,11 @@ namespace rocRoller
                               void*                              userdata_config,
                               rocprofiler_user_data_t*           userdata_shader)
         {
-            Log::info("dispatch_callback: dispatch_id {}, requested_dispatch_id {}",
-                      dispatch_id,
-                      requested_dispatch_id.load());
+            Log::info("dispatch_callback: dispatch_id {}", dispatch_id);
 
             userdata_shader->value = dispatch_id;
-            return ROCPROFILER_THREAD_TRACE_CONTROL_START_AND_STOP;
+            return enable_profiler ? ROCPROFILER_THREAD_TRACE_CONTROL_START_AND_STOP
+                                   : ROCPROFILER_THREAD_TRACE_CONTROL_NONE;
         }
 
         rocprofiler_status_t query_agents(rocprofiler_agent_version_t,
@@ -336,7 +321,7 @@ namespace rocRoller
 
     namespace profiler
     {
-        std::optional<std::vector<InstructionProfile>> waitForDispatchData(int n)
+        std::optional<std::vector<InstructionProfile>> getData()
         {
             HIP_CHECK(hipDeviceSynchronize());
 
@@ -344,34 +329,22 @@ namespace rocRoller
                 return std::nullopt;
 
             std::optional<std::vector<InstructionProfile>> result;
-            requested_dispatch_id += n;
-            Log::info("waitForDispatchData: requesting {} more dispatches, now waiting for ID {}",
-                      n,
-                      requested_dispatch_id.load());
+            Log::info("waitForDispatchData");
 
             std::unique_lock<std::mutex> lock(dispatch_count_mutex);
 
-            dispatch_cv.wait_for(lock, std::chrono::seconds(10), [] {
-                return dispatch_instruction_latencies.find(requested_dispatch_id.load())
-                       != dispatch_instruction_latencies.end();
-            });
+            dispatch_cv.wait_for(
+                lock, std::chrono::seconds(10), [] { return !profile_data.empty(); });
 
-            const auto it = dispatch_instruction_latencies.find(requested_dispatch_id.load());
-
-            AssertFatal(it != dispatch_instruction_latencies.end(),
-                        "waitForDispatchData: timed out waiting for dispatch ID {}",
-                        requested_dispatch_id.load());
-
-            auto data = it->second;
-            lock.unlock();
-
-            if(not data.empty())
+            if(!profile_data.empty())
             {
-                TraceDecodeCallbackUserData callback_user_data{
-                    .dispatch_id = requested_dispatch_id.load(), .ok = true, .instruction_map = {}};
+                TraceDecodeCallbackUserData callback_user_data{.ok = true, .instruction_map = {}};
 
-                rocprofiler_trace_decode(
-                    decoder, trace_decode_callback, data.data(), data.size(), &callback_user_data);
+                rocprofiler_trace_decode(decoder,
+                                         trace_decode_callback,
+                                         profile_data.data(),
+                                         profile_data.size(),
+                                         &callback_user_data);
 
                 if(callback_user_data.ok && !callback_user_data.instruction_map.empty())
                 {
@@ -388,30 +361,23 @@ namespace rocRoller
                     {
                         result->push_back(data);
                     }
-                    Log::info("waitForDispatchData: retrieved {} instructions for "
-                              "requested_dispatch_id {}",
-                              result->size(),
-                              requested_dispatch_id.load());
+                    Log::info("waitForDispatchData: retrieved {}", result->size());
                 }
                 else
                 {
                     result = std::nullopt;
                     if(callback_user_data.instruction_map.empty())
-                        Log::warn("waitForDispatchData: no instructions decoded for "
-                                  "requested_dispatch_id {}",
-                                  requested_dispatch_id.load());
+                        Log::warn("waitForDispatchData: no instructions decoded");
                     else
-                        Log::warn(
-                            "waitForDispatchData: decoding error for requested_dispatch_id {}",
-                            requested_dispatch_id.load());
+                        Log::warn("waitForDispatchData: decoding error");
                 }
             }
             else
             {
                 result = std::nullopt;
-                Log::warn("waitForDispatchData: no data for requested_dispatch_id {}",
-                          requested_dispatch_id.load());
+                Log::warn("waitForDispatchData: no data received");
             }
+            profile_data.clear();
             return result;
         }
 
@@ -422,10 +388,17 @@ namespace rocRoller
 
             std::optional<std::vector<InstructionProfile>> data;
 
+            AssertFatal(profile_data.empty(), "loopUntilDispatchData: profile_data not empty");
+
             while(true)
             {
+                AssertFatal(!enable_profiler, "loopUntilDispatchData: profiler already enabled");
+                enable_profiler = true;
                 dispatch();
-                data = waitForDispatchData(1);
+                data = getData();
+                AssertFatal(enable_profiler,
+                            "loopUntilDispatchData: profiler disabled unexpectedly");
+                enable_profiler = false;
                 if(data.has_value())
                 {
                     return *data;
