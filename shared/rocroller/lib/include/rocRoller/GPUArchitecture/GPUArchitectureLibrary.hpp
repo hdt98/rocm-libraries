@@ -33,6 +33,7 @@
 #include <iostream>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -75,8 +76,11 @@ namespace rocRoller
         {
         }
 
+        void reset();
+
     private:
         std::map<GPUArchitectureTarget, GPUArchitecture> m_gpuArchitectures;
+        mutable std::mutex                               m_mutex;
     };
 }
 

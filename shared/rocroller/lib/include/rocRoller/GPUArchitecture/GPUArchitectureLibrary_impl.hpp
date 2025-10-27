@@ -125,4 +125,10 @@ namespace rocRoller
         return result;
     }
 
+    inline void GPUArchitectureLibrary::reset()
+    {
+        std::lock_guard<std::mutex> g(m_mutex);
+        m_gpuArchitectures = LoadLibrary();
+    }
+
 }

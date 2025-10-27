@@ -41,7 +41,7 @@ TestContext::TestContext(rocRoller::ContextPtr context)
 TestContext::~TestContext()
 {
     m_context.reset();
-    rocRoller::Settings::reset();
+    rocRoller::LazySingleton<rocRoller::Settings>::reset();
 }
 
 std::vector<rocRoller::Register::ValuePtr>

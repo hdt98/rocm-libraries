@@ -33,31 +33,30 @@
 #include <thread>
 #include <vector>
 
-TEST_CASE("LazySingletonUnit: Same instance is returned", "Unit:LazySingleton")
+TEST_CASE("LazySingletonUnit: Same instance is returned", "[LazySingletonUnit]")
 {
     auto a = rocRoller::LazySingleton<rocRoller::Settings>::getInstance();
     auto b = rocRoller::LazySingleton<rocRoller::Settings>::getInstance();
-    REQUIRE(a == b);
+    REQUIRE(a == b); // same aliasing shared_ptr
 }
 
-TEST_CASE("LazySingletonUnit: Reset replaces singleton instance safely", "Unit:LazySingleton")
+TEST_CASE("LazySingletonUnit: Reset does not replace singleton instance (in-place)",
+          "[LazySingletonUnit]")
 {
-    auto instance1 = rocRoller::Settings::getInstance();
+    auto instance1 = rocRoller::LazySingleton<rocRoller::Settings>::getInstance();
     REQUIRE(instance1 != nullptr);
 
-    rocRoller::Settings::reset(); // Expected to replace instance
+    // In-place reset (does not change identity)
+    rocRoller::LazySingleton<rocRoller::Settings>::reset();
 
-    auto instance2 = rocRoller::Settings::getInstance();
+    auto instance2 = rocRoller::LazySingleton<rocRoller::Settings>::getInstance();
     REQUIRE(instance2 != nullptr);
 
-    // The reset should produce a new shared_ptr instance
-    REQUIRE(instance1 != instance2);
-
-    // But the old instance remains valid (shared_ptr kept alive)
-    REQUIRE(instance1.use_count() >= 1);
+    // Identity is unchanged; state is reset internally by Settings
+    REQUIRE(instance1 == instance2);
 }
 
-TEST_CASE("LazySingletonUnit: Different types have independent instances", "Unit:LazySingleton")
+TEST_CASE("LazySingletonUnit: Different types have independent instances", "[LazySingletonUnit]")
 {
     auto settings = rocRoller::LazySingleton<rocRoller::Settings>::getInstance();
     auto gpuLib   = rocRoller::LazySingleton<rocRoller::GPUArchitectureLibrary>::getInstance();
@@ -68,7 +67,7 @@ TEST_CASE("LazySingletonUnit: Different types have independent instances", "Unit
     REQUIRE(s_addr != g_addr);
 }
 
-TEST_CASE("LazySingletonUnit: Singleton persists across scopes", "Unit:LazySingleton")
+TEST_CASE("LazySingletonUnit: Singleton persists across scopes", "[LazySingletonUnit]")
 {
     auto inst1 = rocRoller::LazySingleton<rocRoller::Settings>::getInstance();
     auto raw1  = inst1.get();
@@ -82,30 +81,32 @@ TEST_CASE("LazySingletonUnit: Singleton persists across scopes", "Unit:LazySingl
     REQUIRE(inst3.get() == raw1);
 }
 
-TEST_CASE("LazySingletonUnit: Multiple resets create new singleton instances", "Unit:LazySingleton")
+TEST_CASE("LazySingletonUnit: Multiple resets create new singleton instances",
+          "[LazySingletonUnit]")
 {
     auto prevInstance = rocRoller::GPUArchitectureLibrary::getInstance();
     REQUIRE(prevInstance != nullptr);
 
     for(int i = 0; i < 5; ++i)
     {
-        rocRoller::GPUArchitectureLibrary::reset();
+        rocRoller::LazySingleton<rocRoller::GPUArchitectureLibrary>::reset();
         auto newInstance = rocRoller::GPUArchitectureLibrary::getInstance();
         REQUIRE(newInstance != nullptr);
 
-        // Each reset creates a new object -- the pointer should differ
-        REQUIRE(prevInstance != newInstance);
+        // Identity must remain the same with in-place reset
+        REQUIRE(prevInstance == newInstance);
 
         prevInstance = newInstance;
     }
 }
 
-TEST_CASE("LazySingletonUnit: Thread safety under concurrent access", "Unit:LazySingleton")
+TEST_CASE("LazySingletonUnit: Thread safety under concurrent access", "[LazySingletonUnit]")
 {
     constexpr int                                     N = 32;
     std::vector<std::shared_ptr<rocRoller::Settings>> results(N);
 
     std::vector<std::thread> threads;
+    threads.reserve(N);
     for(int i = 0; i < N; ++i)
     {
         threads.emplace_back([&results, i] {
@@ -116,36 +117,46 @@ TEST_CASE("LazySingletonUnit: Thread safety under concurrent access", "Unit:Lazy
         t.join();
 
     for(int i = 1; i < N; ++i)
-    {
-        REQUIRE(results[i] == results[0]);
-    }
+        REQUIRE(results[i] == results[0]); // aliasing the same object
 }
 
-TEST_CASE("LazySingletonUnit: Reset under concurrent access does not crash", "Unit:LazySingleton")
+TEST_CASE("LazySingletonUnit: Reset under concurrent access does not crash", "[LazySingletonUnit]")
 {
-    // Stress test where one thread resets while others read
+    auto baseline = rocRoller::LazySingleton<rocRoller::Settings>::getInstance();
+    REQUIRE(baseline != nullptr);
+
     constexpr int            N = 16;
     std::vector<std::thread> threads;
+    threads.reserve(N);
 
     for(int i = 0; i < N; ++i)
     {
         threads.emplace_back([i] {
-            // Mix reads and resets
             if(i % 5 == 0)
-            {
-                rocRoller::LazySingleton<rocRoller::Settings>::reset();
-            }
+                rocRoller::LazySingleton<rocRoller::Settings>::reset(); // in-place
             else
-            {
                 (void)rocRoller::LazySingleton<rocRoller::Settings>::getInstance();
-            }
         });
     }
 
     for(auto& t : threads)
         t.join();
 
-    // Should still return a valid instance
-    auto inst = rocRoller::LazySingleton<rocRoller::Settings>::getInstance();
-    REQUIRE(inst != nullptr);
+    auto after = rocRoller::LazySingleton<rocRoller::Settings>::getInstance();
+    REQUIRE(after != nullptr);
+    REQUIRE(after == baseline); // identity unchanged
+}
+
+TEST_CASE("LazySingletonUnit: GPUArchitectureLibrary reset keeps identity", "[LazySingletonUnit]")
+{
+    auto gpu1 = rocRoller::LazySingleton<rocRoller::GPUArchitectureLibrary>::getInstance();
+
+    // In-place reset (does not change the singleton object identity)
+    rocRoller::LazySingleton<rocRoller::GPUArchitectureLibrary>::reset();
+
+    auto gpu2 = rocRoller::LazySingleton<rocRoller::GPUArchitectureLibrary>::getInstance();
+
+    REQUIRE(gpu1 != nullptr);
+    REQUIRE(gpu2 != nullptr);
+    REQUIRE(gpu1 == gpu2); // identity must be unchanged
 }

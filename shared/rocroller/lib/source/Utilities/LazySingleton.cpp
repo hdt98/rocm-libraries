@@ -30,13 +30,15 @@
 
 namespace rocRoller
 {
-// Macro for explicit template instantiation
-#define INSTANTIATE_LAZY_SINGLETON(Type) template class LazySingleton<Type>;
+    static_assert(has_reset<Settings>::value,
+                  "Settings must implement void reset() for LazySingleton<Settings>::reset()");
 
-    // Explicit instantiations for non-templated singleton classes
-    INSTANTIATE_LAZY_SINGLETON(GPUArchitectureLibrary)
-    INSTANTIATE_LAZY_SINGLETON(Settings)
-
-// Undefine to avoid leaking the macro outside this file
-#undef INSTANTIATE_LAZY_SINGLETON
+    static_assert(has_reset<GPUArchitectureLibrary>::value,
+                  "GPUArchitectureLibrary must implement void reset() for "
+                  "LazySingleton<GPUArchitectureLibrary>::reset()");
 }
+
+#define INSTANTIATE_LAZY_SINGLETON(T) template class rocRoller::LazySingleton<T>;
+
+INSTANTIATE_LAZY_SINGLETON(rocRoller::Settings)
+INSTANTIATE_LAZY_SINGLETON(rocRoller::GPUArchitectureLibrary)

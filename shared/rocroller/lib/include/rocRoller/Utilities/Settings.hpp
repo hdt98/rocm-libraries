@@ -253,6 +253,9 @@ namespace rocRoller
 
         Settings();
 
+        // Reset all runtime overrides to defaults (env/default)
+        void reset();
+
         /**
          * @brief Gets the value of a SettingsOption.
          *

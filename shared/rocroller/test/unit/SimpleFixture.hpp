@@ -39,7 +39,7 @@ class SimpleFixture : public ::testing::Test
 protected:
     void TearDown() override
     {
-        rocRoller::Settings::reset();
+        rocRoller::LazySingleton<rocRoller::Settings>::reset();
         rocRoller::Component::ComponentFactoryBase::ClearAllCaches();
     }
 };

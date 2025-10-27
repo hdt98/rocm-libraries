@@ -35,7 +35,7 @@ public:
     SimpleTest() = default;
     virtual ~SimpleTest()
     {
-        rocRoller::Settings::reset();
+        rocRoller::LazySingleton<rocRoller::Settings>::reset();
         rocRoller::Component::ComponentFactoryBase::ClearAllCaches();
     }
 };

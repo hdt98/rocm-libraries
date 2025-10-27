@@ -65,7 +65,7 @@ namespace rocRoller
     template <typename Option>
     typename Option::Type Settings::Get(Option const& opt)
     {
-        return getInstance()->get(opt);
+        return LazySingleton<Settings>::get().get(opt);
     }
 
     template <typename T, bool LazyValue>
@@ -337,4 +337,12 @@ namespace rocRoller
                 return std::move(accum) + setting->help() + "\n";
             });
     }
+
+    inline void Settings::reset()
+    {
+        MapWriterLock lk(m_mapLock);
+        m_values.clear();
+        m_setBitOptions.clear();
+    }
+
 }
