@@ -363,24 +363,24 @@ namespace RocprofilerTest
         CHECK(latencies[1].instruction == "s_endpgm");
     }
 
-    // TEST_CASE("Rocprofiler accidental multiple kernel dispatches")
-    // {
-    //     rocRoller::profiler::reset();
+    TEST_CASE("Rocprofiler accidental multiple kernel dispatches")
+    {
+        rocRoller::profiler::reset();
 
-    //     auto testContext = TestContext::ForTestDevice({}, "multi_kernel_dispatch_test");
+        auto testContext = TestContext::ForTestDevice({}, "multi_kernel_dispatch_test");
 
-    //     auto kernelSetup1 = createSimpleMovKernel(
-    //         TestContext::ForTestDevice({}, "multi_kernel_dispatch_test_1"), 0x11111111);
-    //     auto kernelSetup2 = createSimpleMovKernel(
-    //         TestContext::ForTestDevice({}, "multi_kernel_dispatch_test_2"), 0x22222222);
+        auto kernelSetup1 = createSimpleMovKernel(
+            TestContext::ForTestDevice({}, "multi_kernel_dispatch_test_1"), 0x11111111);
+        auto kernelSetup2 = createSimpleMovKernel(
+            TestContext::ForTestDevice({}, "multi_kernel_dispatch_test_2"), 0x22222222);
 
-    //     CHECK_THROWS_MATCHES(
-    //         rocRoller::profiler::loopUntilDispatchData([&]() {
-    //             kernelSetup1.kernel.launchKernel(kernelSetup1.commandArgs.runtimeArguments());
-    //             kernelSetup2.kernel.launchKernel(kernelSetup2.commandArgs.runtimeArguments());
-    //         }),
-    //         FatalError,
-    //         Catch::Matchers::MessageMatches(
-    //             Catch::Matchers::ContainsSubstring("unexpected dispatch callback count")));
-    // }
+        CHECK_THROWS_MATCHES(
+            rocRoller::profiler::loopUntilDispatchData([&]() {
+                kernelSetup1.kernel.launchKernel(kernelSetup1.commandArgs.runtimeArguments());
+                kernelSetup2.kernel.launchKernel(kernelSetup2.commandArgs.runtimeArguments());
+            }),
+            FatalError,
+            Catch::Matchers::MessageMatches(
+                Catch::Matchers::ContainsSubstring("invariant failed")));
+    }
 } // namespace RocprofilerTest

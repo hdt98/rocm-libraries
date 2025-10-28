@@ -71,10 +71,11 @@ namespace rocRoller
     rocprofiler::sdk::codeobj::disassembly::CodeobjAddressTranslate address_table;
 
     // To enable waiting for dispatch data
-    std::vector<uint8_t>    profile_data;
-    std::condition_variable profile_data_cv;
-    std::mutex              profile_data_mutex;
-    std::atomic<bool>       enable_profiler = false;
+    std::vector<uint8_t>                   profile_data;
+    std::condition_variable                profile_data_cv;
+    std::mutex                             profile_data_mutex;
+    std::atomic<bool>                      enable_profiler = false;
+    std::atomic<rocprofiler_dispatch_id_t> requested_dispatch{0};
 
     // Only for invariant checks: ensure dispatch parameter only dispatches a single kernel
     std::atomic<int> dispatch_callback_counter;
@@ -143,11 +144,11 @@ namespace rocRoller
         switch(record_type_id)
         {
         case ROCPROFILER_THREAD_TRACE_DECODER_RECORD_WAVE:
-            Log::info("trace_decode_callback: decoding {}", num_events);
+            Log::debug("trace_decode_callback: decoding {}", num_events);
             for(size_t w = 0; w < num_events; w++)
             {
                 auto* wave = static_cast<rocprofiler_thread_trace_decoder_wave_t*>(events);
-                Log::info(
+                Log::debug(
                     "  wave {}: cu {}, simd {}, wave_id {}, contexts {}, instructions_size {}",
                     w,
                     wave->cu,
@@ -160,11 +161,11 @@ namespace rocRoller
                 {
                     auto& inst = wave->instructions_array[i];
 
-                    Log::info("    inst {}: code_object_id {}, address 0x{:x}, duration {}",
-                              i,
-                              inst.pc.code_object_id,
-                              inst.pc.address,
-                              inst.duration);
+                    Log::debug("    inst {}: code_object_id {}, address 0x{:x}, duration {}",
+                               i,
+                               inst.pc.code_object_id,
+                               inst.pc.address,
+                               inst.duration);
 
                     if(inst.pc.code_object_id == 0)
                     {
@@ -222,20 +223,27 @@ namespace rocRoller
         // Based on https://github.com/ROCm/rocm-systems/blob/e9dac39102606ac6f7ab2778f74745e27841fb6c/projects/rocprofiler-sdk/source/lib/rocprofiler-sdk-tool/tool.cpp#L1387-L1408
         // Avoid decoding directly in this function body per https://rocm.docs.amd.com/projects/rocprofiler-sdk/en/latest/api-reference/thread_trace.html#processing-thread-trace-data
 
-        shader_callback_counter++;
-
         rocprofiler_dispatch_id_t dispatch_id
             = static_cast<rocprofiler_dispatch_id_t>(userdata.value);
 
-        Log::info("shader_data_callback: dispatch_id {}, data_size {}", dispatch_id, data_size);
+        Log::info("shader_data_callback: dispatch_id {}, requested_dispatch {}, "
+                  "shader_callback_counter {}",
+                  dispatch_id,
+                  requested_dispatch.load(),
+                  shader_callback_counter.load());
 
-        std::vector<uint8_t> raw_data(static_cast<uint8_t*>(data),
-                                      static_cast<uint8_t*>(data) + data_size);
+        if(dispatch_id == requested_dispatch.load())
         {
-            std::lock_guard<std::mutex> lock(profile_data_mutex);
-            profile_data = std::move(raw_data);
+            std::vector<uint8_t> raw_data(static_cast<uint8_t*>(data),
+                                          static_cast<uint8_t*>(data) + data_size);
+            shader_callback_counter++;
+            requested_dispatch = 0;
+            {
+                std::lock_guard<std::mutex> lock(profile_data_mutex);
+                profile_data = std::move(raw_data);
+            }
+            profile_data_cv.notify_all();
         }
-        profile_data_cv.notify_all();
     }
 
     rocprofiler_thread_trace_control_flags_t
@@ -247,14 +255,17 @@ namespace rocRoller
                           void*                              userdata_config,
                           rocprofiler_user_data_t*           userdata_shader)
     {
-        Log::info("dispatch_callback: dispatch_id {}, enable_profiler {}",
+        Log::info("dispatch_callback: dispatch_id {}, enable_profiler {}, requested_dispatch {}",
                   dispatch_id,
-                  enable_profiler.load());
-
-        userdata_shader->value = dispatch_id;
+                  enable_profiler.load(),
+                  requested_dispatch.load());
 
         if(enable_profiler)
         {
+            assert(requested_dispatch.load() == 0
+                   && "expected only one dispatch to be requested at a time");
+            userdata_shader->value = dispatch_id;
+            requested_dispatch     = dispatch_id;
             dispatch_callback_counter++;
             return ROCPROFILER_THREAD_TRACE_CONTROL_START_AND_STOP;
         }
@@ -333,25 +344,13 @@ namespace rocRoller
                 return std::nullopt;
 
             std::optional<std::vector<InstructionProfile>> result;
-            Log::info("waitForData");
+            Log::info("waitForData: requested_dispatch {}", requested_dispatch.load());
 
             std::unique_lock<std::mutex> lock(profile_data_mutex);
 
             profile_data_cv.wait(lock, [] { return !profile_data.empty(); });
 
-            if(dispatch_callback_counter != 1 || shader_callback_counter != 1)
-            {
-                enable_profiler = false;
-                profile_data.clear();
-                Throw<FatalError>(
-                    fmt::format("waitForData: invariant failed, "
-                                "dispatch_callback_counter {}, shader_callback_counter {}",
-                                dispatch_callback_counter.load(),
-                                shader_callback_counter.load()));
-            }
-
-            dispatch_callback_counter = 0;
-            shader_callback_counter   = 0;
+            Log::info("waitForData: acquired profile data");
 
             TraceDecodeCallbackUserData callback_user_data{.ok = true, .instruction_map = {}};
 
@@ -386,7 +385,6 @@ namespace rocRoller
                 else
                     Log::warn("waitForData: decoding error");
             }
-
             profile_data.clear();
             return result;
         }
@@ -399,11 +397,32 @@ namespace rocRoller
             if(!enable_agent)
                 return std::nullopt;
 
-            AssertFatal(profile_data.empty(), "profile_data not empty");
-            enable_profiler = true;
+            Log::info("getDispatchData: invoking dispatch");
+            enable_profiler           = true;
+            dispatch_callback_counter = 0;
+            shader_callback_counter   = 0;
             dispatch();
-            auto data       = waitForData();
+            HIP_CHECK(hipDeviceSynchronize());
             enable_profiler = false;
+
+            auto data = waitForData();
+
+            if(dispatch_callback_counter != 1 || shader_callback_counter != 1)
+            {
+                const auto error_msg
+                    = fmt::format("waitForData: invariant failed, "
+                                  "dispatch_callback_counter {}, shader_callback_counter {}, "
+                                  "requested_dispatch {}",
+                                  dispatch_callback_counter.load(),
+                                  shader_callback_counter.load(),
+                                  requested_dispatch.load());
+
+                enable_profiler = false;
+                profile_data.clear();
+
+                Throw<FatalError>(error_msg);
+            }
+
             return data;
         }
 
@@ -411,6 +430,8 @@ namespace rocRoller
         {
             if(!enable_agent)
                 return {};
+
+            Log::info("loopUntilDispatchData: starting loop to get dispatch data");
 
             std::optional<std::vector<InstructionProfile>> data;
 
