@@ -52,7 +52,8 @@ TEST_F(TestBatchnormTrainPlan, ExecutePlan)
     initTensorValues(params.xTensor, DataType::FLOAT, planTensorBundle.xTensor, 1);
     initTensorValues(params.scaleTensor, DataType::FLOAT, planTensorBundle.scaleTensor, 2);
     initTensorValues(params.biasTensor, DataType::FLOAT, planTensorBundle.biasTensor, 3);
-    initTensorValues(params.epsilonTensor, DataType::FLOAT, planTensorBundle.epsilonTensor, 4);
+    initTensorValues(params.epsilonTensor, DataType::DOUBLE, planTensorBundle.epsilonTensor, 4);
+    params.epsilonTensor.value.Set(hipdnn_sdk::data_objects::Float64Value(epsilon));
     initTensorValues(params.yTensor, DataType::FLOAT, planTensorBundle.yTensor, 5);
 
     // Initialize optional mean and invVariance tensors
