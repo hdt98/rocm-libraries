@@ -208,29 +208,28 @@ double getStdDev(const std::vector<double>& array)
             const double square_deviation = (val - mean) * (val - mean);
             sum += square_deviation;
             num++;
-            // if(square_deviation > 100)
-            // {
-            //     std::cout << "val: " << val << ", square deviation: " << square_deviation
-            //               << std::endl;
-            // }
         }
     }
-    // std::cout << "Sum: " << sum << ", Num: " << num << ", variance: " << sum / num
-    //           << ", std_dev: " << std::sqrt(sum / num) << std::endl;
+
     return std::sqrt(sum / num);
 }
 
-std::map<double, double> compareHistogram(std::vector<double>& array,
-                                          const float          mean,
-                                          const float          std_dev,
-                                          const float          hist_radius,
-                                          const uint64_t       num_bins);
+double compareHistogram(std::vector<double>& array,
+                        std::vector<double>& ref_array,
+                        const float          mean,
+                        const float          std_dev,
+                        const float          hist_radius,
+                        const uint64_t       num_bins);
 
-std::map<double, double> compareHistogram(std::vector<double>& array,
-                                          const float          mean,
-                                          const float          std_dev,
-                                          const float          hist_radius,
-                                          const uint64_t       num_bins)
+// Take two arrays of data along with their expected mean and standard deviation,
+// create a histogram for each array in the bounds [mean - hist_radius, mean + hist_radius] with a specified number of bins,
+// and calculate the average percent difference between the two histograms within three standard deviations
+double compareHistogram(std::vector<double>& array,
+                        std::vector<double>& ref_array,
+                        const float          mean,
+                        const float          std_dev,
+                        const float          hist_radius,
+                        const uint64_t       num_bins)
 {
     std::map<double, uint64_t> histogram;
     std::map<double, uint64_t> ref_histogram;
@@ -244,16 +243,6 @@ std::map<double, double> compareHistogram(std::vector<double>& array,
         ref_histogram[bin] = 0;
     }
 
-    // Generate reference values
-    std::vector<double>        ref_array(array.size());
-    std::random_device         rd{};
-    std::mt19937               gen{rd()};
-    std::normal_distribution<> ref_dist{mean, std_dev};
-    for(size_t i = 0; i < ref_array.size(); i++)
-    {
-        ref_array[i] = ref_dist(gen);
-    }
-
     // Sort both arrays in preparation for populating hisograms
     std::sort(array.begin(), array.end());
     std::sort(ref_array.begin(), ref_array.end());
@@ -262,7 +251,6 @@ std::map<double, double> compareHistogram(std::vector<double>& array,
     // Since arrays are already sorted,
     // we don't need to iterate through the entire histogram every time to find the right bin
     double current_bin = bins[0];
-    // uint64_t max_hist_val    = 0;
     for(size_t i = 0; i < array.size(); i++)
     {
         const double val = array[i];
@@ -278,7 +266,6 @@ std::map<double, double> compareHistogram(std::vector<double>& array,
         }
 
         histogram[current_bin]++;
-        // max_hist_val = std::max(max_hist_val, histogram[current_bin]);
     }
     double current_ref_bin = bins[0];
     for(size_t i = 0; i < ref_array.size(); i++)
@@ -297,62 +284,47 @@ std::map<double, double> compareHistogram(std::vector<double>& array,
 
         ref_histogram[current_ref_bin]++;
     }
-    // float hist_scale_val = 100.f / max_hist_val;
 
-    // std::cout << "Data Histogram:\n";
-    // std::cout << "Mean: " << getMean(array) << std::endl;
-    // std::cout << "Std Dev: " << getStdDev(array) << std::endl;
-    // for(const auto& pair : histogram)
-    // {
-    //     std::cout << "[" << std::setprecision(2) << std::setw(8) << pair.first << ", "
-    //               << std::setw(8) << pair.first + bin_width
-    //               << "]: "
-    //               // << pair.second * (hist_scale_val / hist_scale_val)
-    //               << std::string(std::round(pair.second * hist_scale_val), '*') << std::endl;
-    // }
-
-    // std::cout << "Reference Histogram:\n";
-    // std::cout << "Mean: " << getMean(ref_array) << std::endl;
-    // std::cout << "Std Dev: " << getStdDev(ref_array) << std::endl;
-    // for(const auto& ref_pair : ref_histogram)
-    // {
-    //     std::cout << "[" << std::setprecision(2) << std::setw(8) << ref_pair.first << ", "
-    //               << std::setw(8) << ref_pair.first + bin_width
-    //               << "]: " << std::string(std::round(ref_pair.second * hist_scale_val), '*')
-    //               << std::endl;
-    // }
-
-    std::map<double, double> percent_diffs;
+    // Calculate the average percent difference between the two histograms within three standard deviations
+    double   sum_percent_diff  = 0.0;
+    uint64_t num_percent_diffs = 0;
     for(const double& bin : bins)
     {
-        const uint64_t val     = histogram[bin];
-        const uint64_t ref_val = ref_histogram[bin];
+        if(bin >= mean - (std_dev * 3) && bin + bin_width <= mean + (std_dev * 3))
+        {
+            const uint64_t val     = histogram[bin];
+            const uint64_t ref_val = ref_histogram[bin];
 
-        uint64_t diff;
-        if(val >= ref_val)
-        {
-            diff = val - ref_val;
-        }
-        else
-        {
-            diff = ref_val - val;
-        }
+            uint64_t diff;
+            if(val >= ref_val)
+            {
+                diff = val - ref_val;
+            }
+            else
+            {
+                diff = ref_val - val;
+            }
 
-        // To avoid division by zero - if the denominator (val + ref_val) is zero,
-        // both val and ref_val must be themselves zero because they are both unsigned,
-        // meaning that the percent difference is zero
-        if(val + ref_val == 0)
-        {
-            percent_diffs[bin] = 0.0;
-        }
-        else
-        {
-            percent_diffs[bin]
-                = 200 * (static_cast<double>(diff) / static_cast<double>(val + ref_val));
+            // To avoid division by zero - if the denominator (val + ref_val) is zero,
+            // both val and ref_val must be themselves zero because they are both unsigned,
+            // meaning that the percent difference is zero
+            double percent_diff;
+            if(val + ref_val == 0)
+            {
+                percent_diff = 0.0;
+            }
+            else
+            {
+                percent_diff
+                    = 200 * (static_cast<double>(diff) / static_cast<double>(val + ref_val));
+            }
+
+            sum_percent_diff += percent_diff;
+            num_percent_diffs++;
         }
     }
 
-    return percent_diffs;
+    return sum_percent_diff / num_percent_diffs;
 }
 
 template <typename DataType>
@@ -992,65 +964,42 @@ public:
 
         const auto dgen = DataGenerator<DataType>().generate(size, stride, opts);
 
-        auto ref_double = dgen.getReferenceDouble();
+        auto array = dgen.getReferenceDouble();
 
-        EXPECT_LE(std::abs(getMean(ref_double) - mean), 0.1);
-        EXPECT_LE(std::abs(getStdDev(ref_double) - std_dev), 0.3);
+        EXPECT_LE(std::abs(getMean(array) - mean), 0.1);
+        EXPECT_LE(std::abs(getStdDev(array) - std_dev), 0.1);
 
-        // Collect the data into a histogram and compare it with a reference histogram
-        const float    hist_radius = 6;
-        const uint64_t num_bins    = 100;
-
-        const auto percent_diffs
-            = compareHistogram(ref_double, mean, std_dev, hist_radius, num_bins);
-
-        double sum_percent_diff  = 0.0;
-        double num_percent_diffs = 0;
-        for(auto pair : percent_diffs)
+        // Generate reference data
+        const auto bit_size = getDataSignBits<DataType>() + getDataExponentBits<DataType>()
+                              + getDataMantissaBits<DataType>();
+        const auto byte_size   = (bit_size + 7) / 8;
+        const auto buffer_size = byte_size * array.size();
+        // Array for holding DataType data
+        std::vector<uint8_t> buffer;
+        buffer.resize(buffer_size, 0x00);
+        // Array for holding reference doubles
+        std::vector<double>        ref_array(array.size(), 0);
+        std::random_device         rd{};
+        std::mt19937               gen{rd()};
+        std::normal_distribution<> ref_dist{mean, std_dev};
+        for(size_t i = 0; i < ref_array.size(); i++)
         {
-            if(pair.first >= mean - (std_dev * 3) && pair.first <= mean + (std_dev * 3))
-            {
-                num_percent_diffs++;
-                sum_percent_diff += pair.second;
-            }
+            // Generate a float, convert it to a DataType, and then convert it into a double
+            const auto val = DGen::satConvertToType<DataType>(ref_dist(gen));
+            std::memcpy(&buffer[i * byte_size], &val, byte_size);
+            uint8_t tScale[] = {Constants::E8M0_1};
+            ref_array[i]     = toDouble<DataType>(tScale, buffer.data(), 0, i);
         }
-        double avg_percent_diff = sum_percent_diff / num_percent_diffs;
+
+        // Collect both arrays into histograms and compare them
+        const float    hist_radius = 6;
+        const uint64_t num_bins    = 10000;
+        const auto     avg_percent_diff
+            = compareHistogram(array, ref_array, mean, std_dev, hist_radius, num_bins);
 
         // Expect that average percent difference between actual and reference histogram
-        // within one standard deviation is less than a certain value
-        // depending on the precision of the datatype
-        if constexpr(std::is_same_v<DataType, f32>)
-        {
-            EXPECT_LE(avg_percent_diff, 1);
-        }
-        else if constexpr(std::is_same_v<DataType, fp16>)
-        {
-            EXPECT_LE(avg_percent_diff, 1);
-        }
-        else if constexpr(std::is_same_v<DataType, bf16>)
-        {
-            EXPECT_LE(avg_percent_diff, 4);
-        }
-        else if constexpr(std::is_same_v<DataType, ocp_e5m2_mxfp8>)
-        {
-            EXPECT_LE(avg_percent_diff, 110);
-        }
-        else if constexpr(std::is_same_v<DataType, ocp_e4m3_mxfp8>)
-        {
-            EXPECT_LE(avg_percent_diff, 50);
-        }
-        else if constexpr(std::is_same_v<DataType, ocp_e3m2_mxfp6>)
-        {
-            EXPECT_LE(avg_percent_diff, 110);
-        }
-        else if constexpr(std::is_same_v<DataType, ocp_e2m3_mxfp6>)
-        {
-            EXPECT_LE(avg_percent_diff, 50);
-        }
-        else if constexpr(std::is_same_v<DataType, ocp_e2m1_mxfp4>)
-        {
-            EXPECT_LE(avg_percent_diff, 170);
-        }
+        // within three standard deviations is less than 5%
+        EXPECT_LE(avg_percent_diff, 5);
     }
 };
 

@@ -27,6 +27,7 @@
 #pragma once
 
 #include "dataTypeInfo.hpp"
+#include "dataTypeInfo_impl.hpp"
 #include "data_generation_utils.hpp"
 
 #include <cmath>
@@ -1128,11 +1129,11 @@ namespace DGen
         using namespace Constants;
 
         // setup
-        const auto dataBias          = static_cast<int32_t>(getDataBias<DTYPE>());
-        const auto dataMantissaBits  = getDataMantissaBits<DTYPE>();
-        const auto dataExponentBits  = getDataExponentBits<DTYPE>();
-        const auto scaleBias         = getScaleBias<DTYPE>();
-        const auto scaleUnbiasedEMin = getScaleUnBiasedEMin<DTYPE>();
+        // const auto dataBias = static_cast<int32_t>(getDataBias<DTYPE>());
+        // const auto dataMantissaBits  = getDataMantissaBits<DTYPE>();
+        // const auto dataExponentBits  = getDataExponentBits<DTYPE>();
+        const auto scaleBias = getScaleBias<DTYPE>();
+        // const auto scaleUnbiasedEMin = getScaleUnBiasedEMin<DTYPE>();
 
         const auto block_size = (isScaled<DTYPE>() ? m_options.blockScaling : 1);
 
@@ -1164,42 +1165,8 @@ namespace DGen
 
                 value = m_options.clampToF32 ? static_cast<float>(value) : value;
 
-                // split input
-                uint8_t  value_sign;
-                uint32_t value_biased_exp;
-                uint64_t value_mantissa;
-                split_double(value, &value_sign, &value_biased_exp, &value_mantissa);
-
-                const int32_t value_unbiased_exp = value_biased_exp - Constants::F64BIAS;
-
-                uint32_t scale = scaleBias;
-
-                // set sign
-                uint64_t result = value_sign ? (ONE << (dataExponentBits + dataMantissaBits)) : 0;
-
-                int32_t scaled_exp;
-                if(value_unbiased_exp < scaleUnbiasedEMin)
-                {
-                    scale      = scaleUnbiasedEMin + scaleBias;
-                    scaled_exp = value_unbiased_exp - scaleUnbiasedEMin;
-                }
-                else if(value_unbiased_exp < 0)
-                {
-                    scale      = value_unbiased_exp + scaleBias;
-                    scaled_exp = 0;
-                }
-                else
-                {
-                    scale      = scaleBias;
-                    scaled_exp = value_unbiased_exp;
-                }
-
-                // set exponent
-                const uint32_t result_exp = static_cast<uint32_t>(scaled_exp + dataBias);
-                result |= (result_exp & ((ONE << dataExponentBits) - 1)) << dataMantissaBits;
-
-                // set mantissa (round to zero)
-                result |= value_mantissa >> (F64MANTISSABITS - dataMantissaBits);
+                uint64_t result = satConvertToType<DTYPE>(value);
+                uint32_t scale  = scaleBias;
 
                 if constexpr(isScaled<DTYPE>())
                 {
