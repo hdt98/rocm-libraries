@@ -232,18 +232,20 @@ namespace rocRoller
                   requested_dispatch.load(),
                   shader_callback_counter.load());
 
-        if(dispatch_id == requested_dispatch.load())
+        assert(dispatch_id == requested_dispatch.load()
+               || "shader data callback invoked for unexpected dispatch id");
+        assert(shader_callback_counter.load() == 0
+               && "expected only one shader data callback to be invoked at a time");
+
+        std::vector<uint8_t> raw_data(static_cast<uint8_t*>(data),
+                                      static_cast<uint8_t*>(data) + data_size);
+        shader_callback_counter++;
+        requested_dispatch = 0;
         {
-            std::vector<uint8_t> raw_data(static_cast<uint8_t*>(data),
-                                          static_cast<uint8_t*>(data) + data_size);
-            shader_callback_counter++;
-            requested_dispatch = 0;
-            {
-                std::lock_guard<std::mutex> lock(profile_data_mutex);
-                profile_data = std::move(raw_data);
-            }
-            profile_data_cv.notify_all();
+            std::lock_guard<std::mutex> lock(profile_data_mutex);
+            profile_data = std::move(raw_data);
         }
+        profile_data_cv.notify_all();
     }
 
     rocprofiler_thread_trace_control_flags_t
@@ -264,9 +266,14 @@ namespace rocRoller
         {
             assert(requested_dispatch.load() == 0
                    && "expected only one dispatch to be requested at a time");
+            assert(dispatch_callback_counter.load() == 0
+                   && "expected only one dispatch callback to be invoked at a time");
+
             userdata_shader->value = dispatch_id;
             requested_dispatch     = dispatch_id;
             dispatch_callback_counter++;
+            enable_profiler = false;
+
             return ROCPROFILER_THREAD_TRACE_CONTROL_START_AND_STOP;
         }
         return ROCPROFILER_THREAD_TRACE_CONTROL_NONE;
@@ -397,15 +404,18 @@ namespace rocRoller
             if(!enable_agent)
                 return std::nullopt;
 
-            Log::info("getDispatchData: invoking dispatch");
-            enable_profiler           = true;
+            Log::info("getDispatchData: reset and enable");
             dispatch_callback_counter = 0;
             shader_callback_counter   = 0;
-            dispatch();
-            HIP_CHECK(hipDeviceSynchronize());
-            enable_profiler = false;
+            profile_data.clear();
 
-            auto data = waitForData();
+            enable_profiler = true;
+
+            dispatch();
+
+            HIP_CHECK(hipDeviceSynchronize());
+
+            const auto data = waitForData();
 
             if(dispatch_callback_counter != 1 || shader_callback_counter != 1)
             {
@@ -416,9 +426,6 @@ namespace rocRoller
                                   dispatch_callback_counter.load(),
                                   shader_callback_counter.load(),
                                   requested_dispatch.load());
-
-                enable_profiler = false;
-                profile_data.clear();
 
                 Throw<FatalError>(error_msg);
             }
