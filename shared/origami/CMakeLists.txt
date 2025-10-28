@@ -21,7 +21,7 @@ option(ORIGAMI_BUILD_SHARED_LIBS "Build shared libraries." ${ORIGAMI_STANDALONE}
 option(ORIGAMI_ENABLE_PYTHON "Enable Python bindings." OFF)
 option(ORIGAMI_BUILD_TESTING "Enable Python binding tests." OFF)
 option(ORIGAMI_ENABLE_INSTALL "Configure origami installation" ON)
-option(BUILD_TESTING "Enable Python binding tests." OFF)
+set(BUILD_TESTING OFF CACHE BOOL "Build the tests")
 
 find_package(hip REQUIRED)
 
