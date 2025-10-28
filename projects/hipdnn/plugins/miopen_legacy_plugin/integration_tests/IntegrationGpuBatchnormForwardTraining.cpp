@@ -81,10 +81,13 @@ protected:
         biasAttr.set_uid(uid++);
         auto biasTensorAttr = std::make_shared<graph::TensorAttributes>(std::move(biasAttr));
 
-        auto epsilonAttr = graph::makeTensorAttributes(
-            "epsilon", intermediateDataType, std::vector<int64_t>{1}, std::vector<int64_t>{1});
-        epsilonAttr.set_uid(uid++);
-        auto epsilonTensorAttr = std::make_shared<graph::TensorAttributes>(std::move(epsilonAttr));
+        // Epsilon: use pass-by-value with double (matches MIOpen API)
+        auto epsilonTensorAttr = std::make_shared<graph::TensorAttributes>();
+        std::mt19937 gen(testCase.seed);
+        std::uniform_real_distribution<double> epsilonDist(1e-6, 1e-4);
+        epsilonTensorAttr->set_value(epsilonDist(gen))
+            .set_name("epsilon")
+            .set_uid(uid++);
 
         // Store tensor IDs for initialization using enum+map pattern
         _inputTensorIds[graph::BatchnormAttributes::InputNames::X] = xTensorAttr->get_uid();
@@ -117,10 +120,12 @@ protected:
             prevRunningVarianceTensorAttr
                 = std::make_shared<graph::TensorAttributes>(std::move(prevRunningVarianceAttr));
 
-            auto momentumAttr = graph::makeTensorAttributes(
-                "momentum", intermediateDataType, std::vector<int64_t>{1}, std::vector<int64_t>{1});
-            momentumAttr.set_uid(uid++);
-            momentumTensorAttr = std::make_shared<graph::TensorAttributes>(std::move(momentumAttr));
+            // Momentum: use pass-by-value with double (matches MIOpen API)
+            momentumTensorAttr = std::make_shared<graph::TensorAttributes>();
+            std::uniform_real_distribution<double> momentumDist(0.05, 0.15);
+            momentumTensorAttr->set_value(momentumDist(gen))
+                .set_name("momentum")
+                .set_uid(uid++);
 
             // Store running stats tensor IDs
             _inputTensorIds[graph::BatchnormAttributes::InputNames::MOMENTUM]
@@ -245,25 +250,7 @@ protected:
                           GraphTensorBundle& bundle,
                           unsigned int seed) override
     {
-        // Initialize tensors with custom ranges to match MIOpen's initialization strategy
-        std::mt19937 gen(seed);
-
-        // Epsilon: small positive value
-        std::uniform_real_distribution<float> epsilonDist(1e-6f, 1e-4f);
-        auto* epsilonData = static_cast<float*>(
-            bundle.tensors.at(_inputTensorIds.at(graph::BatchnormAttributes::InputNames::EPSILON))
-                ->rawHostData());
-        epsilonData[0] = epsilonDist(gen);
-
-        // Momentum: typical training value (only if present)
-        auto momentumIt = _inputTensorIds.find(graph::BatchnormAttributes::InputNames::MOMENTUM);
-        if(momentumIt != _inputTensorIds.end())
-        {
-            std::uniform_real_distribution<float> momentumDist(0.05f, 0.15f);
-            auto* momentumData
-                = static_cast<float*>(bundle.tensors.at(momentumIt->second)->rawHostData());
-            momentumData[0] = momentumDist(gen);
-        }
+        // Note: Epsilon and momentum are pass-by-value (set via set_value()), not buffers
 
         // Scale and bias: -2.0 to 2.0 to match MIOpen
         bundle.tensors.at(_inputTensorIds.at(graph::BatchnormAttributes::InputNames::SCALE))

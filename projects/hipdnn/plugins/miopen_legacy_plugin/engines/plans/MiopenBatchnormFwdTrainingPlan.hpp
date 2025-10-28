@@ -31,7 +31,7 @@ public:
     const MiopenTensor& y() const;
     const MiopenTensor& scale() const;
     const MiopenTensor& bias() const;
-    const MiopenTensor& epsilon() const;
+    double epsilonValue() const;
 
     bool hasSaveMeanVariance() const;
     const MiopenTensor& mean() const;
@@ -40,7 +40,7 @@ public:
     bool hasRunningStats() const;
     const MiopenTensor& prevRunningMean() const;
     const MiopenTensor& prevRunningVariance() const;
-    const MiopenTensor& momentum() const;
+    double momentumValue() const;
     const MiopenTensor& nextRunningMean() const;
     const MiopenTensor& nextRunningVariance() const;
 
@@ -49,7 +49,7 @@ private:
     MiopenTensor _y;
     MiopenTensor _scale;
     MiopenTensor _bias;
-    MiopenTensor _epsilon;
+    double _epsilonValue;
 
     // Optional save mean/variance
     std::optional<MiopenTensor> _mean;
@@ -58,7 +58,7 @@ private:
     // Optional running statistics
     std::optional<MiopenTensor> _prevRunningMean;
     std::optional<MiopenTensor> _prevRunningVariance;
-    std::optional<MiopenTensor> _momentum;
+    std::optional<double> _momentumValue;
     std::optional<MiopenTensor> _nextRunningMean;
     std::optional<MiopenTensor> _nextRunningVariance;
     bool _hasRunningStats{false};

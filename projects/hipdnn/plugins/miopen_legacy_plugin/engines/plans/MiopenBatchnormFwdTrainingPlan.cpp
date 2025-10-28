@@ -18,8 +18,28 @@ BatchnormFwdTrainingParams::BatchnormFwdTrainingParams(
     , _y(miopen_utils::createTensor(tensorMap, attributes.y_tensor_uid()))
     , _scale(miopen_utils::createTensor(tensorMap, attributes.scale_tensor_uid()))
     , _bias(miopen_utils::createTensor(tensorMap, attributes.bias_tensor_uid()))
-    , _epsilon(miopen_utils::createTensor(tensorMap, attributes.epsilon_tensor_uid()))
 {
+    // Extract and validate epsilon value from pass-by-value tensor (using double for MIOpen)
+    auto epsilonTensorAttr = tensorMap.at(attributes.epsilon_tensor_uid());
+    
+    HIPDNN_LOG_ERROR("DEBUG: Epsilon data_type = {}", 
+                     hipdnn_sdk::data_objects::toString(epsilonTensorAttr->data_type()));
+    HIPDNN_LOG_ERROR("DEBUG: Epsilon has value = {}", 
+                     epsilonTensorAttr->value() != nullptr);
+    HIPDNN_LOG_ERROR("DEBUG: Epsilon value_type = {}", 
+                     static_cast<int>(epsilonTensorAttr->value_type()));
+    
+    if(epsilonTensorAttr->data_type() != hipdnn_sdk::data_objects::DataType::DOUBLE)
+    {
+        throw std::runtime_error("Epsilon tensor must be DOUBLE type for MIOpen compatibility");
+    }
+    auto epsilonValue = epsilonTensorAttr->value_as_Float64Value();
+    if(epsilonValue == nullptr)
+    {
+        throw std::runtime_error("Epsilon must be a pass-by-value Float64 tensor");
+    }
+    _epsilonValue = epsilonValue->value();
+
     // Save mean and inv_variance are optional (controlled by MIO_SAVE_MEAN_VARIANCE)
     if(attributes.mean_tensor_uid().has_value())
     {
@@ -39,11 +59,23 @@ BatchnormFwdTrainingParams::BatchnormFwdTrainingParams(
        && attributes.next_running_mean_tensor_uid().has_value()
        && attributes.next_running_variance_tensor_uid().has_value())
     {
+        // Extract and validate momentum value from pass-by-value tensor (using double for MIOpen)
+        auto momentumTensorAttr = tensorMap.at(attributes.momentum_tensor_uid().value());
+        if(momentumTensorAttr->data_type() != hipdnn_sdk::data_objects::DataType::DOUBLE)
+        {
+            throw std::runtime_error("Momentum tensor must be DOUBLE type for MIOpen compatibility");
+        }
+        auto momentumValue = momentumTensorAttr->value_as_Float64Value();
+        if(momentumValue == nullptr)
+        {
+            throw std::runtime_error("Momentum must be a pass-by-value Float64 tensor");
+        }
+        _momentumValue = momentumValue->value();
+
         _prevRunningMean = miopen_utils::createTensor(
             tensorMap, attributes.prev_running_mean_tensor_uid().value());
         _prevRunningVariance = miopen_utils::createTensor(
             tensorMap, attributes.prev_running_variance_tensor_uid().value());
-        _momentum = miopen_utils::createTensor(tensorMap, attributes.momentum_tensor_uid().value());
         _nextRunningMean = miopen_utils::createTensor(
             tensorMap, attributes.next_running_mean_tensor_uid().value());
         _nextRunningVariance = miopen_utils::createTensor(
@@ -72,9 +104,9 @@ const MiopenTensor& BatchnormFwdTrainingParams::bias() const
     return _bias;
 }
 
-const MiopenTensor& BatchnormFwdTrainingParams::epsilon() const
+double BatchnormFwdTrainingParams::epsilonValue() const
 {
-    return _epsilon;
+    return _epsilonValue;
 }
 
 bool BatchnormFwdTrainingParams::hasSaveMeanVariance() const
@@ -107,9 +139,9 @@ const MiopenTensor& BatchnormFwdTrainingParams::prevRunningVariance() const
     return _prevRunningVariance.value();
 }
 
-const MiopenTensor& BatchnormFwdTrainingParams::momentum() const
+double BatchnormFwdTrainingParams::momentumValue() const
 {
-    return _momentum.value();
+    return _momentumValue.value();
 }
 
 const MiopenTensor& BatchnormFwdTrainingParams::nextRunningMean() const
@@ -142,29 +174,15 @@ void BatchnormFwdTrainingPlan::execute(const HipdnnEnginePluginHandle& handle,
     float alpha = 1.0f;
     float beta = 0.0f;
 
-    // Get epsilon from device buffer (points to host memory for scalar pass-by-value tensors)
-    auto epsilonBuffer = miopen_utils::findDeviceBuffer(
-        _trainingParams.epsilon().uid(), deviceBuffers, numDeviceBuffers);
+    // Extract epsilon from pass-by-value tensor attribute (type-safe, no buffer lookup needed)
+    // Note: Type validation already done in constructor
+    double epsilon = _trainingParams.epsilonValue();
 
-    // Validate epsilon is FP32
-    if(_trainingParams.epsilon().tensorDescriptor() == nullptr)
-    {
-        throw std::runtime_error("Epsilon tensor descriptor is null");
-    }
-    // Note: MIOpen doesn't expose data type from descriptor, so we rely on the contract
-    // that scalar tensors are always FP32
-    auto epsilon = static_cast<double>(*static_cast<const float*>(epsilonBuffer.ptr));
-
-    // Get momentum if running stats exist
+    // Extract momentum from pass-by-value tensor attribute if running stats exist
     double expAvgFactor = 0.0;
     if(_trainingParams.hasRunningStats())
     {
-        auto momentumBuffer = miopen_utils::findDeviceBuffer(
-            _trainingParams.momentum().uid(), deviceBuffers, numDeviceBuffers);
-
-        // Note: MIOpen doesn't expose data type from descriptor, so we rely on the contract
-        // that scalar tensors are always FP32
-        expAvgFactor = static_cast<double>(*static_cast<const float*>(momentumBuffer.ptr));
+        expAvgFactor = _trainingParams.momentumValue();
     }
 
     // Get all required device buffers
@@ -193,6 +211,12 @@ void BatchnormFwdTrainingPlan::execute(const HipdnnEnginePluginHandle& handle,
     }
 
     // Handle running statistics if provided
+    // Note: MIOpen uses IN/OUT parameters (single buffer read+written), but hipDNN's graph
+    // API has separate prev (input) and next (output) tensors. We bridge this by:
+    // 1. Tests initialize NEXT with PREV's values (same seed in initializeBundle)
+    // 2. Pass NEXT buffer to MIOpen as the IN/OUT parameter
+    // 3. MIOpen reads initial values from NEXT, computes EMA, writes results back to NEXT
+    // PREV tensor is unused by the plugin - it exists only for graph API semantics.
     void* resultRunningMeanPtr = nullptr;
     void* resultRunningVariancePtr = nullptr;
 
