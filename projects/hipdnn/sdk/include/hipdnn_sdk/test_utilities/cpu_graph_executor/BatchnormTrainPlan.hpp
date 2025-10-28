@@ -103,8 +103,14 @@ public:
             _params.biasTensor, variantPack.at(_params.biasTensor.uid));
         auto shallowYTensor = createShallowTensor<InputDataType>(
             _params.yTensor, variantPack.at(_params.yTensor.uid));
-        auto shallowEpsilonTensor = createShallowTensor<MeanVarianceDataType>(
-            _params.epsilonTensor, variantPack.at(_params.epsilonTensor.uid));
+
+        // Extract epsilon from pass-by-value (not in variantPack)
+        auto epsilonValue = _params.epsilonTensor.value.AsFloat64Value();
+        if(epsilonValue == nullptr)
+        {
+            throw std::runtime_error("Epsilon must be pass-by-value Float64");
+        }
+        double epsilon = epsilonValue->value();
 
         // Optional batch statistics tensors
         std::unique_ptr<TensorBase<MeanVarianceDataType>> mean;
@@ -138,10 +144,15 @@ public:
         TensorBase<MeanVarianceDataType>* nextRunningMeanPtr = nullptr;
         TensorBase<MeanVarianceDataType>* nextRunningVariancePtr = nullptr;
 
+        // Extract momentum from pass-by-value if present (not in variantPack)
+        double momentumValue = 0.1;
         if(_params.momentumTensor.has_value())
         {
-            momentum = createShallowTensor<MeanVarianceDataType>(
-                _params.momentumTensor.value(), variantPack.at(_params.momentumTensor.value().uid));
+            auto momentumVal = _params.momentumTensor.value().value.AsFloat64Value();
+            if(momentumVal != nullptr)
+            {
+                momentumValue = momentumVal->value();
+            }
         }
 
         if(_params.prevRunningMeanTensor.has_value())
@@ -178,9 +189,8 @@ public:
                                  *shallowScaleTensor,
                                  *shallowBiasTensor,
                                  *shallowYTensor,
-                                 shallowEpsilonTensor->getHostValue(0),
-                                 momentum == nullptr ? static_cast<MeanVarianceDataType>(0.1f)
-                                                     : momentum->getHostValue(0),
+                                 epsilon,
+                                 momentumValue,
                                  meanPtr,
                                  invVariancePtr,
                                  prevRunningMeanPtr,
@@ -225,8 +235,9 @@ public:
         CHECK_TENSOR_TYPE(tensorMap, nodeAttributes->scale_tensor_uid(), ScaleBiasDataTypeEnum);
         CHECK_TENSOR_TYPE(tensorMap, nodeAttributes->bias_tensor_uid(), ScaleBiasDataTypeEnum);
         CHECK_TENSOR_TYPE(tensorMap, nodeAttributes->y_tensor_uid(), InputDataTypeEnum);
-        CHECK_TENSOR_TYPE(
-            tensorMap, nodeAttributes->epsilon_tensor_uid(), MeanVarianceDataTypeEnum);
+        CHECK_TENSOR_TYPE(tensorMap,
+                          nodeAttributes->epsilon_tensor_uid(),
+                          hipdnn_sdk::data_objects::DataType::DOUBLE);
 
         // Optional batch statistics tensors
         if(nodeAttributes->mean_tensor_uid().has_value())
@@ -242,6 +253,15 @@ public:
             CHECK_TENSOR_TYPE(tensorMap,
                               nodeAttributes->inv_variance_tensor_uid().value(),
                               MeanVarianceDataTypeEnum);
+        }
+
+        // Momentum is pass-by-value with DOUBLE type (not MeanVarianceDataType)
+        if(nodeAttributes->momentum_tensor_uid())
+        {
+            CHECK_TENSOR_EXISTS(tensorMap, nodeAttributes->momentum_tensor_uid().value());
+            CHECK_TENSOR_TYPE(tensorMap,
+                              nodeAttributes->momentum_tensor_uid().value(),
+                              hipdnn_sdk::data_objects::DataType::DOUBLE);
         }
 
         // Optional running mean/variance tensors

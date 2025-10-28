@@ -72,8 +72,8 @@ public:
                              const TensorBase<ScaleBiasDataType>& scale,
                              const TensorBase<ScaleBiasDataType>& bias,
                              TensorBase<InputDataType>& y,
-                             MeanVarianceDataType epsilon,
-                             MeanVarianceDataType momentum,
+                             double epsilon,
+                             double momentum,
                              TensorBase<MeanVarianceDataType>* mean = nullptr,
                              TensorBase<MeanVarianceDataType>* invVariance = nullptr,
                              const TensorBase<MeanVarianceDataType>* prevRunningMean = nullptr,
@@ -100,6 +100,10 @@ public:
             auto meanAccum = static_cast<MeanVarianceDataType>(0.0);
             auto varianceAccum = static_cast<MeanVarianceDataType>(0.0);
 
+            // Cast epsilon and momentum to the working type to avoid double-promotion warnings
+            auto epsilonTyped = static_cast<MeanVarianceDataType>(static_cast<float>(epsilon));
+            auto momentumTyped = static_cast<MeanVarianceDataType>(static_cast<float>(momentum));
+
             // Calculate mean and variance for this channel
             iterateAlongDimensions(
                 batchAndSpatial, [&](const std::vector<int64_t>& batchSpatialIndices) {
@@ -117,8 +121,8 @@ public:
             MeanVarianceDataType channelVariance
                 = (varianceAccum / nhw) - (channelMean * channelMean);
 
-            auto invVar
-                = static_cast<MeanVarianceDataType>(1.0) / sqrtInternal(channelVariance + epsilon);
+            auto invVar = static_cast<MeanVarianceDataType>(1.0f)
+                          / sqrtInternal(channelVariance + epsilonTyped);
 
             // Apply normalization with scale and bias
             iterateAlongDimensions(
@@ -152,7 +156,7 @@ public:
             {
                 auto one = static_cast<MeanVarianceDataType>(1.0f);
                 auto currentMean = prevRunningMean->getHostValue(0, cidx);
-                auto newMean = (one - momentum) * currentMean + momentum * channelMean;
+                auto newMean = (one - momentumTyped) * currentMean + momentumTyped * channelMean;
                 nextRunningMean->setHostValue(newMean, 0, cidx);
 
                 auto currentVar = prevRunningVariance->getHostValue(0, cidx);
@@ -160,7 +164,7 @@ public:
                 auto adjustedVariance = (nhw == one) ? channelVariance
                                                      : static_cast<MeanVarianceDataType>(
                                                            (nhw / (nhw - one)) * channelVariance);
-                auto newVar = (one - momentum) * currentVar + momentum * adjustedVariance;
+                auto newVar = (one - momentumTyped) * currentVar + momentumTyped * adjustedVariance;
                 nextRunningVariance->setHostValue(newVar, 0, cidx);
             }
         };

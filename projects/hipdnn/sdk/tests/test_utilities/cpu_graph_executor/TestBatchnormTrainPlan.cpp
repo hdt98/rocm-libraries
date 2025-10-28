@@ -10,6 +10,7 @@
 #include <hipdnn_sdk/test_utilities/CpuFpReferenceBatchnorm.hpp>
 #include <hipdnn_sdk/test_utilities/CpuFpReferenceValidation.hpp>
 #include <hipdnn_sdk/test_utilities/Seeds.hpp>
+#include <hipdnn_sdk/test_utilities/TestTolerances.hpp>
 #include <hipdnn_sdk/test_utilities/cpu_graph_executor/BatchnormTrainPlan.hpp>
 #include <hipdnn_sdk/utilities/Constants.hpp>
 #include <hipdnn_sdk/utilities/ShapeUtilities.hpp>
@@ -78,8 +79,8 @@ TEST_F(TestBatchnormTrainPlan, ExecutePlan)
         directTensorBundle.scaleTensor,
         directTensorBundle.biasTensor,
         directTensorBundle.yTensor,
-        static_cast<float>(epsilon),
-        static_cast<float>(momentum),
+        epsilon,
+        momentum,
         &directTensorBundle.meanTensor,
         &directTensorBundle.invVarianceTensor,
         nullptr,
@@ -89,8 +90,8 @@ TEST_F(TestBatchnormTrainPlan, ExecutePlan)
 
     patient.execute(variantPack);
 
-    CpuFpReferenceValidation<float> cpuRefOutputValidation(static_cast<float>(epsilon),
-                                                           static_cast<float>(epsilon));
+    auto tolerance = batchnorm::getToleranceTraining<float>();
+    CpuFpReferenceValidation<float> cpuRefOutputValidation(tolerance, tolerance);
 
     EXPECT_TRUE(
         cpuRefOutputValidation.allClose(directTensorBundle.yTensor, planTensorBundle.yTensor));

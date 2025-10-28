@@ -85,9 +85,7 @@ protected:
         auto epsilonTensorAttr = std::make_shared<graph::TensorAttributes>();
         std::mt19937 gen(testCase.seed);
         std::uniform_real_distribution<double> epsilonDist(1e-6, 1e-4);
-        epsilonTensorAttr->set_value(epsilonDist(gen))
-            .set_name("epsilon")
-            .set_uid(uid++);
+        epsilonTensorAttr->set_value(epsilonDist(gen)).set_name("epsilon").set_uid(uid++);
 
         // Store tensor IDs for initialization using enum+map pattern
         _inputTensorIds[graph::BatchnormAttributes::InputNames::X] = xTensorAttr->get_uid();
@@ -123,9 +121,7 @@ protected:
             // Momentum: use pass-by-value with double (matches MIOpen API)
             momentumTensorAttr = std::make_shared<graph::TensorAttributes>();
             std::uniform_real_distribution<double> momentumDist(0.05, 0.15);
-            momentumTensorAttr->set_value(momentumDist(gen))
-                .set_name("momentum")
-                .set_uid(uid++);
+            momentumTensorAttr->set_value(momentumDist(gen)).set_name("momentum").set_uid(uid++);
 
             // Store running stats tensor IDs
             _inputTensorIds[graph::BatchnormAttributes::InputNames::MOMENTUM]
