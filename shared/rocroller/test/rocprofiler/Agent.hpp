@@ -76,6 +76,11 @@ namespace rocRoller
          */
         std::vector<InstructionProfile> loopUntilDispatchData(std::function<void()> dispatch);
 
+        /**
+         * @brief Reset the internal state of the profiler agent
+         * 
+         * For unexpected errors causing the agent to be in a bad state.
+         */
         void reset();
 
     } // namespace profiler

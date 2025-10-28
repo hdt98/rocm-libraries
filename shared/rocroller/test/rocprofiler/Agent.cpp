@@ -76,7 +76,7 @@ namespace rocRoller
     std::mutex              profile_data_mutex;
 
     bool       enable_profiler = false;
-    std::mutex dispatch_callback_mutex;
+    std::mutex enable_profiler_mutex;
 
     void codeobj_callback(rocprofiler_callback_tracing_record_t record,
                           rocprofiler_user_data_t*,
@@ -227,7 +227,7 @@ namespace rocRoller
         assert(data != nullptr && data_size > 0 && "invalid shader data callback");
 
         {
-            std::lock_guard<std::mutex> lock(profile_data_mutex);
+            std::lock_guard lock(profile_data_mutex);
             profile_data = std::vector<uint8_t>(static_cast<uint8_t*>(data),
                                                 static_cast<uint8_t*>(data) + data_size);
         }
@@ -244,7 +244,7 @@ namespace rocRoller
                           rocprofiler_user_data_t*           userdata_shader)
     {
         // Protect against multiple dispatches, current behavior is to only profile the first dispatch after enabling
-        std::lock_guard<std::mutex> lock(dispatch_callback_mutex);
+        std::lock_guard lock(enable_profiler_mutex);
 
         Log::info(
             "dispatch_callback: dispatch_id {}, enable_profiler {}", dispatch_id, enable_profiler);
@@ -346,6 +346,8 @@ namespace rocRoller
                                      profile_data.data(),
                                      profile_data.size(),
                                      &callback_user_data);
+            profile_data.clear();
+            lock.unlock();
 
             if(callback_user_data.ok && !callback_user_data.instruction_map.empty())
             {
@@ -372,7 +374,6 @@ namespace rocRoller
                 else
                     Log::warn("waitForData: decoding error");
             }
-            profile_data.clear();
             return result;
         }
 
@@ -382,12 +383,14 @@ namespace rocRoller
             if(!enable_agent)
                 return std::nullopt;
 
-            Log::info("getDispatchData: reset and enable");
-            profile_data.clear();
+            Log::info("getDispatchData");
 
             HIP_CHECK(hipDeviceSynchronize()); // Ensure all prior dispatches finished
 
-            enable_profiler = true;
+            {
+                std::lock_guard lock(enable_profiler_mutex);
+                enable_profiler = true;
+            }
             dispatch();
 
             const auto data = waitForData();
@@ -416,7 +419,7 @@ namespace rocRoller
 
         void reset()
         {
-            std::lock_guard<std::mutex> lock(profile_data_mutex);
+            std::scoped_lock lock{profile_data_mutex, enable_profiler_mutex};
             profile_data.clear();
             enable_profiler = false;
         }
