@@ -12,6 +12,7 @@ subtree_to_project_map = {
     "projects/hipsolver": "solver",
     "projects/hipsparse": "sparse",
     "projects/miopen": "miopen",
+    "projects/hipdnn/plugins/miopen_legacy_plugin" : "miopen_plugin",
     "projects/rocblas": "blas",
     "project/rocfft": "fft",
     "projects/rocprim": "prim",
@@ -49,6 +50,10 @@ project_map = {
     "hipdnn": {
         "cmake_options": "-DTHEROCK_ENABLE_HIPDNN=ON",
         "project_to_test": "hipdnn",
+    },
+    "miopen_plugin": {
+        "cmake_options": "-DTHEROCK_ENABLE_MIOPEN_PLUGIN=ON -DTHEROCK_ENABLE_COMPOSABLE_KERNEL=ON -DTHEROCK_USE_EXTERNAL_COMPOSABLE_KERNEL=ON -DTHEROCK_COMPOSABLE_KERNEL_SOURCE_DIR=../composable_kernel",
+        "project_to_test": "miopen_plugin",
     }
 }
 
