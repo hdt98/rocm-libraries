@@ -48,10 +48,25 @@
 #include <catch2/catch_all.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
+
 using namespace rocRoller;
 
 namespace rocRollerTest
 {
+    const int NUM_RUNS = 5; // Should be odd, as median is used
+
+    template <typename T>
+    T median_of_odd_elements(std::vector<T> values)
+    {
+        AssertFatal(!values.empty(), "median_of_odd_elements: vector must not be empty");
+        AssertFatal(values.size() % 2 == 1, "median_of_odd_elements: vector size must be odd");
+
+        std::sort(values.begin(), values.end());
+
+        return values[values.size() / 2];
+    }
+
     std::vector<size_t>
         generateLDSAddresses(size_t workgroupSize, size_t strideMultiplier, size_t instrDwords)
     {
@@ -66,7 +81,7 @@ namespace rocRollerTest
 
     TEST_CASE("Rocprofiler LDS Microkernel", "[rocprofiler]")
     {
-        // TODO: remove
+        // TODO: remove ENV var stuffs
         int ITERS = 16;
         if(const char* env_p = std::getenv("ITERS"))
             ITERS = atoi(env_p);
@@ -193,7 +208,7 @@ namespace rocRollerTest
                                 }
                             }
 
-                            // TODO: simplify
+                            // TODO: simplify, right now it is exactly two swaitcnts
                             const auto waitcnt_count  = 1;
                             const auto last_decrement = 0;
 
@@ -219,13 +234,23 @@ namespace rocRollerTest
 
                         CommandArguments commandArgs = command->createArguments();
 
-                        const auto latencies = rocRoller::profiler::loopUntilDispatchData(
-                            [&]() { commandKernel.launchKernel(commandArgs.runtimeArguments()); });
+                        std::vector<std::vector<rocRoller::profiler::InstructionProfile>>
+                            allLatencies;
 
-                        INFO(toString(latencies));
-                        Log::debug(toString(latencies));
+                        for(int run = 0; run < NUM_RUNS; ++run)
+                        {
+                            const auto latencies
+                                = rocRoller::profiler::loopUntilDispatchData([&]() {
+                                      commandKernel.launchKernel(commandArgs.runtimeArguments());
+                                  });
+                            allLatencies.push_back(latencies);
 
-                        REQUIRE(latencies.size() == 21);
+                            INFO("Run " << (run + 1) << ": " << toString(latencies));
+                            Log::debug("Run " + std::to_string(run + 1) + ": "
+                                       + toString(latencies));
+
+                            REQUIRE(latencies.size() == 21);
+                        }
 
                         GPUArchitectureGFX gfx = context->targetArchitecture().target().gfx;
 
@@ -251,24 +276,45 @@ namespace rocRollerTest
                                             strideMultiplier,
                                             write ? "write" : "read");
 
-                        uint64_t actualMaxLdsInstrCycles  = 0;
-                        uint64_t actualLastSWaitcntCycles = 0;
-                        for(const auto& data : latencies)
+                        std::vector<uint64_t> ldsInstrCyclesPerRun;
+                        std::vector<uint64_t> sWaitcntCyclesPerRun;
+
+                        for(int run = 0; run < NUM_RUNS; ++run)
                         {
-                            if((write && data.instruction.find("ds_write") != std::string::npos)
-                               || (!write && data.instruction.find("ds_read") != std::string::npos))
+                            uint64_t maxLdsInstrCycles  = 0;
+                            uint64_t lastSWaitcntCycles = 0;
+
+                            for(const auto& data : allLatencies[run])
                             {
-                                actualMaxLdsInstrCycles
-                                    = std::max(actualMaxLdsInstrCycles, data.meanLatency());
+                                if((write && data.instruction.find("ds_write") != std::string::npos)
+                                   || (!write
+                                       && data.instruction.find("ds_read") != std::string::npos))
+                                {
+                                    maxLdsInstrCycles
+                                        = std::max(maxLdsInstrCycles, data.meanLatency());
+                                }
+                                else if(data.instruction.find("s_waitcnt") != std::string::npos)
+                                {
+                                    lastSWaitcntCycles = data.meanLatency();
+                                }
                             }
-                            else if(data.instruction.find("s_waitcnt") != std::string::npos)
-                            {
-                                actualLastSWaitcntCycles = data.meanLatency();
-                            }
+
+                            ldsInstrCyclesPerRun.push_back(maxLdsInstrCycles);
+                            sWaitcntCyclesPerRun.push_back(lastSWaitcntCycles);
+
+                            info << fmt::format("  Run {}: LDS Cycles: {}, s_waitcnt Cycles: {}\n",
+                                                run + 1,
+                                                maxLdsInstrCycles,
+                                                lastSWaitcntCycles);
                         }
-                        info << fmt::format("  Actual s_waitcnt Cycles: {}\n",
+
+                        uint64_t actualMaxLdsInstrCycles
+                            = median_of_odd_elements(ldsInstrCyclesPerRun);
+                        uint64_t actualLastSWaitcntCycles
+                            = median_of_odd_elements(sWaitcntCyclesPerRun);
+                        info << fmt::format("  Median s_waitcnt Cycles: {}\n",
                                             actualLastSWaitcntCycles);
-                        info << fmt::format("  Actual LDS Instruction Cycles: {}\n",
+                        info << fmt::format("  Median LDS Instruction Cycles: {}\n",
                                             actualMaxLdsInstrCycles);
                         info << fmt::format("  Model Predicted Cycles: {}\n", predictedCycles);
                         info << fmt::format("    Issue Cycles: {}\n", issueCycles);
@@ -277,8 +323,7 @@ namespace rocRollerTest
                         INFO(info.str());
                         Log::debug(info.str());
 
-                        CHECK_THAT(actualLastSWaitcntCycles,
-                                   Catch::Matchers::WithinAbs(predictedCycles, 1ul));
+                        CHECK(actualLastSWaitcntCycles == predictedCycles);
                         if(write && instrDwords == 4)
                             // ds_write_b128 requires queue info
                             CHECK_THAT(actualMaxLdsInstrCycles,
