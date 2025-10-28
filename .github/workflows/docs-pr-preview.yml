@@ -80,31 +80,35 @@ jobs:
             --pr "${{ github.event.pull_request.number }}" \
             --config ".github/repos-config.json" \
             --require-auto-push
+
+      - name: Extract first project
+        id: extract
+        run: |
           project=$(echo "${{ steps.detect.outputs.subtrees }}" | head -n1)
           echo "project=$project" >> $GITHUB_OUTPUT
 
       - name: Checkout full repo with changed project
-        if: steps.detect.outputs.project
+        if: steps.extract.outputs.project
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           sparse-checkout: |
             .github
-            ${{ steps.detect.outputs.project }}
+            ${{ steps.extract.outputs.project }}
           token: ${{ steps.generate-token.outputs.token }}
           fetch-depth: 0
 
       # Setup dependencies and build the docs
       - name: Install Python dependencies and build docs
-        if: steps.detect.outputs.project
+        if: steps.extract.outputs.project
         run: |
-          REQ_FILE="${{ steps.detect.outputs.project }}/docs/sphinx/requirements.txt"
+          REQ_FILE="${{ steps.extract.outputs.project }}/docs/sphinx/requirements.txt"
           if [ -f "$REQ_FILE" ]; then
             echo "Installing requirements from $REQ_FILE"
             pip install -r "$REQ_FILE"
             sudo apt-get update
             sudo apt-get install -y doxygen graphviz
-            cd ${{ steps.detect.outputs.project }}/docs
+            cd ${{ steps.extract.outputs.project }}/docs
             python -m sphinx -T -b html -d _build/doctrees -D language=en . _build/html
           else
             echo "No requirements.txt found at $REQ_FILE, skipping."
@@ -113,7 +117,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v4
         with:
-          path: ${{ steps.detect.outputs.project }}/docs/_build/html
+          path: ${{ steps.extract.outputs.project }}/docs/_build/html
   
   # Deploy the content onto github-pages
   deploy:
