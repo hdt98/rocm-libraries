@@ -10,7 +10,7 @@
 #include <hipdnn_sdk/test_utilities/TestUtilities.hpp>
 #include <hipdnn_sdk/utilities/PlatformUtils.hpp>
 
-#include "IntegrationTestUtils.hpp"
+#include "IntegrationGraphVerificationHarness.hpp"
 
 using namespace hipdnn_frontend;
 using namespace hipdnn_sdk::utilities;
@@ -74,7 +74,7 @@ struct Batchnorm3dTestCase
 };
 
 template <typename InputType, typename IntermediateType, typename TestCaseType>
-class BatchnormForwardTraining : public GraphVerifierTest<InputType, TestCaseType>
+class BatchnormForwardTraining : public IntegrationGraphVerificationHarness<InputType, TestCaseType>
 {
 protected:
     void runGraphTest(InputType tolerance, const TensorLayout& layout = TensorLayout::NCHW) override
@@ -233,14 +233,20 @@ protected:
             nextRunningVarianceTensorAttr->set_stride(generateStrides(derivedDims));
         }
 
-        CpuFpReferenceMiopenRmsValidation<InputType> validator(tolerance);
-        this->verifyGraph(graphObj, testCase.seed, validator);
-    }
+        // Register validators for all output tensors
+        this->registerValidator(yTensorAttr, tolerance);
+        this->registerValidator(meanTensorAttr, tolerance);
+        this->registerValidator(invVarianceTensorAttr, tolerance);
+        if(nextRunningMeanTensorAttr)
+        {
+            this->registerValidator(nextRunningMeanTensorAttr, tolerance);
+        }
+        if(nextRunningVarianceTensorAttr)
+        {
+            this->registerValidator(nextRunningVarianceTensorAttr, tolerance);
+        }
 
-    GraphTensorBundle generateBundle(hipdnn_frontend::graph::Graph& graph) override
-    {
-        auto bundle = GraphVerifierTest<InputType, TestCaseType>::generateBundle(graph);
-        return bundle;
+        this->verifyGraph(graphObj, testCase.seed);
     }
 
     void initializeBundle(const hipdnn_frontend::graph::Graph& graph,
@@ -311,7 +317,7 @@ private:
     {
         // Simple helper to find tensor name by ID
         std::string result;
-        visitGraph(graph, [&](const hipdnn_frontend::graph::INode& node) {
+        graph.visit([&](const hipdnn_frontend::graph::INode& node) {
             for(const auto& tensorAttr : node.getNodeInputTensorAttributes())
             {
                 if(tensorAttr->get_uid() == tensorId && !tensorAttr->get_name().empty())
