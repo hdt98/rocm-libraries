@@ -59,7 +59,7 @@ if(TENSILELITE_ENABLE_HOST)
         add_subdirectory(client)
     endif()
 
-    if(TENSILELITE_BUILD_TESTING OR BUILD_TESTING)
+    if(TENSILELITE_BUILD_TESTING)
         add_subdirectory(tests)
     endif()
 endif()
