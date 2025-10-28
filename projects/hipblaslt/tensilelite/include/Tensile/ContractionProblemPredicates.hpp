@@ -1253,7 +1253,7 @@ namespace TensileLite
                 };
                 TypesEqual() = default;
 
-                std::array<rocisa::DataType, 5> value;
+                std::array<rocisa::DataType, 6> value;
 
                 static std::string Type()
                 {
@@ -1265,7 +1265,8 @@ namespace TensileLite
                     return problem.a().dataType() == value[0] && problem.b().dataType() == value[1]
                            && problem.c().dataType() == value[2]
                            && problem.d().dataType() == value[3]
-                           && problem.computeInputType() == value[4];
+                           && problem.computeInputType() == value[4]
+                           && problem.computeType() == value[5];
                 }
 
                 virtual std::string toString() const override
@@ -1280,7 +1281,9 @@ namespace TensileLite
                                        ", d:",
                                        value[3],
                                        ", compute input type:",
-                                       value[4]);
+                                       value[4],
+                                       ", compute type:",
+                                       value[5]);
                 }
 
                 virtual bool debugEval(ContractionProblemGemm const& problem,

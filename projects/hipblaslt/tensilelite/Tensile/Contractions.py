@@ -370,7 +370,7 @@ class ProblemType:
             # predicates.append(ProblemPredicate("GroupedGemm", value=self.groupedGemm))
 
         if includeType:
-            predicates.append(ProblemPredicate("TypesEqual", value=(self.aType, self.bType, self.cType, self.dType, self.computeInputType)))
+            predicates.append(ProblemPredicate("TypesEqual", value=(self.aType, self.bType, self.cType, self.dType, self.computeInputType, self.computeType)))
             predicates.append(ProblemPredicate("HighPrecisionAccumulate", value=self.highPrecisionAccumulate))
             predicates.append(ProblemPredicate("Activation", value=self.activationType))
             predicates.append(ProblemPredicate("ActivationComputeType", value=self.activationComputeDataType))
