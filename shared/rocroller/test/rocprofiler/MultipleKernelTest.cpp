@@ -95,8 +95,6 @@ namespace RocprofilerTest
 
         const auto one = std::make_shared<Expression::Expression>(1u);
         k->setWorkgroupSize({workgroupSize, 1, 1});
-        // more waves for rocprofiler, see Troubleshooting in
-        // https://rocm.docs.amd.com/projects/rocprofiler-sdk/en/amd-mainline/how-to/using-thread-trace.html#troubleshooting
         k->setWorkitemCount({std::make_shared<Expression::Expression>(workitemCount), one, one});
 
         k->addArgument({"ptr",
@@ -157,21 +155,15 @@ namespace RocprofilerTest
         return {std::move(testContext), std::move(commandKernel), d_ptr, commandArgs, instrs};
     }
 
-    TEST_CASE("Rocprofiler kernels with different literals in assembly", "[rocprofiler]")
+    TEST_CASE("Rocprofiler simple kernel", "[rocprofiler]")
     {
-        /*
-        The rocprofiler agent uses a dispatch system. Due to the callback-based nature of rocprofiler,
-        this test ensures the correct dispatch is matched to the correct kernel when multiple kernels
-        are launched in sequence.
-        Here, kernels with different "v_mov_b32_e32 v1, 0x<literal>" are launch to distinguish them.
-        */
-
         rocRoller::profiler::reset();
 
         auto literal    = GENERATE(0xdeadbeef, 0x12345678, 0xabcdef00);
         auto commandArg = GENERATE(7, 21, 331);
 
-        std::string const testName = fmt::format("const_0x{:x}_value_{}", literal, commandArg);
+        std::string const testName
+            = fmt::format("simple_kernel_0x{:x}_value_{}", literal, commandArg);
 
         auto kernelSetup
             = createKernel(TestContext::ForTestDevice({}, testName), literal, commandArg);
@@ -226,8 +218,6 @@ namespace RocprofilerTest
 
         const auto one = std::make_shared<Expression::Expression>(1u);
         k->setWorkgroupSize({workgroupSize, 1, 1});
-        // more waves for rocprofiler, see Troubleshooting in
-        // https://rocm.docs.amd.com/projects/rocprofiler-sdk/en/amd-mainline/how-to/using-thread-trace.html#troubleshooting
         k->setWorkitemCount({std::make_shared<Expression::Expression>(workitemCount), one, one});
 
         std::vector<Instruction> instrs;
@@ -265,7 +255,7 @@ namespace RocprofilerTest
         return {std::move(testContext), std::move(commandKernel), nullptr, commandArgs, instrs};
     }
 
-    TEST_CASE("Rocprofiler handle callbacks", "[rocprofiler]")
+    TEST_CASE("Rocprofiler different literals in assembly", "[rocprofiler]")
     {
         /*
         Ensure callbacks are properly handled and correctly mapped to a dispatch.
@@ -281,7 +271,7 @@ namespace RocprofilerTest
 
         for(uint32_t literal : literals)
         {
-            std::string const testName = fmt::format("simple_mov_0x{:x}", literal);
+            std::string const testName = fmt::format("different_literals_0x{:x}", literal);
             kernelSetups.push_back(
                 createSimpleMovKernel(TestContext::ForTestDevice({}, testName), literal));
         }
@@ -335,23 +325,6 @@ namespace RocprofilerTest
                     kernelSetups[idx].commandArgs.runtimeArguments());
             }
 
-            latencies = rocRoller::profiler::loopUntilDispatchData([&]() {
-                kernelSetups[order.back()].kernel.launchKernel(
-                    kernelSetups[order.back()].commandArgs.runtimeArguments());
-            });
-
-            literalHex = fmt::format("0x{:x}", literals[order.back()]);
-        }
-
-        SECTION("With profiler calls")
-        {
-            INFO("With profiler calls");
-            std::vector<size_t> order = {5, 6};
-            for(size_t idx : order)
-            {
-                kernelSetups[idx].kernel.launchKernel(
-                    kernelSetups[idx].commandArgs.runtimeArguments());
-            }
             latencies = rocRoller::profiler::loopUntilDispatchData([&]() {
                 kernelSetups[order.back()].kernel.launchKernel(
                     kernelSetups[order.back()].commandArgs.runtimeArguments());
