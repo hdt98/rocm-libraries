@@ -22,12 +22,6 @@ BatchnormFwdTrainingParams::BatchnormFwdTrainingParams(
     // Extract and validate epsilon value from pass-by-value tensor (using double for MIOpen)
     auto epsilonTensorAttr = tensorMap.at(attributes.epsilon_tensor_uid());
 
-    HIPDNN_LOG_ERROR("DEBUG: Epsilon data_type = {}",
-                     hipdnn_sdk::data_objects::toString(epsilonTensorAttr->data_type()));
-    HIPDNN_LOG_ERROR("DEBUG: Epsilon has value = {}", epsilonTensorAttr->value() != nullptr);
-    HIPDNN_LOG_ERROR("DEBUG: Epsilon value_type = {}",
-                     static_cast<int>(epsilonTensorAttr->value_type()));
-
     if(epsilonTensorAttr->data_type() != hipdnn_sdk::data_objects::DataType::DOUBLE)
     {
         throw std::runtime_error("Epsilon tensor must be DOUBLE type for MIOpen compatibility");
