@@ -28,12 +28,31 @@
 
 #include "client/GEMMParameters.hpp"
 
+#include <functional>
+
 namespace rocRoller
 {
     namespace Client
     {
         namespace GEMMClient
         {
+            /**
+	     * FNV-1a hash function for generating unique kernel names.
+	     */
+            std::string fnv_1a_hash(std::string const& x)
+            {
+                const uint64_t fnv_prime = 1099511628211ULL;
+                uint64_t       hash      = 14695981039346656037ULL;
+
+                for(char c : x)
+                {
+                    hash ^= static_cast<uint64_t>(c);
+                    hash *= fnv_prime;
+                }
+
+                return fmt::format("{:016x}", hash);
+            }
+
             std::string TypeParameters::kernelNamePart() const
             {
                 std::ostringstream rv;
@@ -135,7 +154,12 @@ namespace rocRoller
                         rv << "2T";
                 }
 
-                return rv.str();
+                // Take first 7 characters of version
+                auto shortVersion = version;
+                if(version.size() > 7)
+                    shortVersion = version.substr(0, 7);
+
+                return fmt::format("GEMM_{}_{}", shortVersion, fnv_1a_hash(rv.str()));
             }
 
             std::string toString(TransposeType trans)
