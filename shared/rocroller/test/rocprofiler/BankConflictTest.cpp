@@ -95,6 +95,8 @@ namespace rocRollerTest
 
                     DYNAMIC_SECTION(name)
                     {
+                        rocRoller::profiler::reset();
+
                         auto context = TestContext::ForTestDevice({}, name);
 
                         if(not context->targetArchitecture().target().isCDNA35GPU())
@@ -216,9 +218,6 @@ namespace rocRollerTest
                         commandKernel.generateKernel();
 
                         CommandArguments commandArgs = command->createArguments();
-
-                        commandKernel.launchKernel(commandArgs.runtimeArguments());
-                        HIP_CHECK(hipDeviceSynchronize());
 
                         const auto latencies = rocRoller::profiler::loopUntilDispatchData(
                             [&]() { commandKernel.launchKernel(commandArgs.runtimeArguments()); });
