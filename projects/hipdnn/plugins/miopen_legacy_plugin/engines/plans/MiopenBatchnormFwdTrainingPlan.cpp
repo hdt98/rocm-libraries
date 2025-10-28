@@ -139,26 +139,32 @@ void BatchnormFwdTrainingPlan::execute(const HipdnnEnginePluginHandle& handle,
                                        uint32_t numDeviceBuffers,
                                        [[maybe_unused]] void* workspace) const
 {
-    // Hardcoded values consistent with the pattern used in inference
-    auto alpha = static_cast<float>(1);
-    auto beta = static_cast<float>(0);
+    float alpha = 1.0f;
+    float beta = 0.0f;
 
     // Get epsilon from device buffer (points to host memory for scalar pass-by-value tensors)
     auto epsilonBuffer = miopen_utils::findDeviceBuffer(
         _trainingParams.epsilon().uid(), deviceBuffers, numDeviceBuffers);
+
+    // Validate epsilon is FP32
+    if(_trainingParams.epsilon().tensorDescriptor() == nullptr)
+    {
+        throw std::runtime_error("Epsilon tensor descriptor is null");
+    }
+    // Note: MIOpen doesn't expose data type from descriptor, so we rely on the contract
+    // that scalar tensors are always FP32
     auto epsilon = static_cast<double>(*static_cast<const float*>(epsilonBuffer.ptr));
 
     // Get momentum if running stats exist
-    double expAvgFactor;
+    double expAvgFactor = 0.0;
     if(_trainingParams.hasRunningStats())
     {
         auto momentumBuffer = miopen_utils::findDeviceBuffer(
             _trainingParams.momentum().uid(), deviceBuffers, numDeviceBuffers);
+
+        // Note: MIOpen doesn't expose data type from descriptor, so we rely on the contract
+        // that scalar tensors are always FP32
         expAvgFactor = static_cast<double>(*static_cast<const float*>(momentumBuffer.ptr));
-    }
-    else
-    {
-        expAvgFactor = 0.0;
     }
 
     // Get all required device buffers
