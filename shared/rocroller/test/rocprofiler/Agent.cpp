@@ -71,17 +71,12 @@ namespace rocRoller
     rocprofiler::sdk::codeobj::disassembly::CodeobjAddressTranslate address_table;
 
     // To enable waiting for dispatch data
-    std::vector<uint8_t>                   profile_data;
-    std::condition_variable                profile_data_cv;
-    std::mutex                             profile_data_mutex;
-    std::atomic<bool>                      enable_profiler = false;
-    std::atomic<rocprofiler_dispatch_id_t> requested_dispatch{0};
+    std::vector<uint8_t>    profile_data;
+    std::condition_variable profile_data_cv;
+    std::mutex              profile_data_mutex;
 
-    // Only for invariant checks: ensure dispatch parameter only dispatches a single kernel
-    std::atomic<int> dispatch_callback_counter;
-    // Only for invariant checks: apparently with multiple GPUs, there can be multiple shader callbacks
-    // This agent is written witha single GPU in mind
-    std::atomic<int> shader_callback_counter;
+    bool       enable_profiler = false;
+    std::mutex dispatch_callback_mutex;
 
     void codeobj_callback(rocprofiler_callback_tracing_record_t record,
                           rocprofiler_user_data_t*,
@@ -226,24 +221,15 @@ namespace rocRoller
         rocprofiler_dispatch_id_t dispatch_id
             = static_cast<rocprofiler_dispatch_id_t>(userdata.value);
 
-        Log::info("shader_data_callback: dispatch_id {}, requested_dispatch {}, "
-                  "shader_callback_counter {}",
-                  dispatch_id,
-                  requested_dispatch.load(),
-                  shader_callback_counter.load());
+        Log::info("shader_data_callback: dispatch_id {}", dispatch_id);
 
-        assert(dispatch_id == requested_dispatch.load()
-               || "shader data callback invoked for unexpected dispatch id");
-        assert(shader_callback_counter.load() == 0
-               && "expected only one shader data callback to be invoked at a time");
+        // Note this exists to also prevent a deadlock, as profile_data.size() is checked under profile_data_cv.wait
+        assert(data != nullptr && data_size > 0 && "invalid shader data callback");
 
-        std::vector<uint8_t> raw_data(static_cast<uint8_t*>(data),
-                                      static_cast<uint8_t*>(data) + data_size);
-        shader_callback_counter++;
-        requested_dispatch = 0;
         {
             std::lock_guard<std::mutex> lock(profile_data_mutex);
-            profile_data = std::move(raw_data);
+            profile_data = std::vector<uint8_t>(static_cast<uint8_t*>(data),
+                                                static_cast<uint8_t*>(data) + data_size);
         }
         profile_data_cv.notify_all();
     }
@@ -257,22 +243,16 @@ namespace rocRoller
                           void*                              userdata_config,
                           rocprofiler_user_data_t*           userdata_shader)
     {
-        Log::info("dispatch_callback: dispatch_id {}, enable_profiler {}, requested_dispatch {}",
-                  dispatch_id,
-                  enable_profiler.load(),
-                  requested_dispatch.load());
+        // Protect against multiple dispatches, current behavior is to only profile the first dispatch after enabling
+        std::lock_guard<std::mutex> lock(dispatch_callback_mutex);
+
+        Log::info(
+            "dispatch_callback: dispatch_id {}, enable_profiler {}", dispatch_id, enable_profiler);
 
         if(enable_profiler)
         {
-            assert(requested_dispatch.load() == 0
-                   && "expected only one dispatch to be requested at a time");
-            assert(dispatch_callback_counter.load() == 0
-                   && "expected only one dispatch callback to be invoked at a time");
-
             userdata_shader->value = dispatch_id;
-            requested_dispatch     = dispatch_id;
-            dispatch_callback_counter++;
-            enable_profiler = false;
+            enable_profiler        = false;
 
             return ROCPROFILER_THREAD_TRACE_CONTROL_START_AND_STOP;
         }
@@ -351,7 +331,7 @@ namespace rocRoller
                 return std::nullopt;
 
             std::optional<std::vector<InstructionProfile>> result;
-            Log::info("waitForData: requested_dispatch {}", requested_dispatch.load());
+            Log::info("waitForData");
 
             std::unique_lock<std::mutex> lock(profile_data_mutex);
 
@@ -399,37 +379,18 @@ namespace rocRoller
         std::optional<std::vector<InstructionProfile>>
             getDispatchData(std::function<void()> dispatch)
         {
-            HIP_CHECK(hipDeviceSynchronize());
-
             if(!enable_agent)
                 return std::nullopt;
 
             Log::info("getDispatchData: reset and enable");
-            dispatch_callback_counter = 0;
-            shader_callback_counter   = 0;
             profile_data.clear();
 
-            enable_profiler = true;
+            HIP_CHECK(hipDeviceSynchronize()); // Ensure all prior dispatches finished
 
+            enable_profiler = true;
             dispatch();
 
-            HIP_CHECK(hipDeviceSynchronize());
-
             const auto data = waitForData();
-
-            if(dispatch_callback_counter != 1 || shader_callback_counter != 1)
-            {
-                const auto error_msg
-                    = fmt::format("waitForData: invariant failed, "
-                                  "dispatch_callback_counter {}, shader_callback_counter {}, "
-                                  "requested_dispatch {}",
-                                  dispatch_callback_counter.load(),
-                                  shader_callback_counter.load(),
-                                  requested_dispatch.load());
-
-                Throw<FatalError>(error_msg);
-            }
-
             return data;
         }
 
