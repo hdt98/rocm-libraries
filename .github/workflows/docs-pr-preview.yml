@@ -9,7 +9,8 @@
 # 4. Deploy the page onto github-pages 
 #
 # This blocks changes that can potentially broke the docs build, also provides a look
-# and feel to the reviewer.
+# and feel to the reviewer. Note if multiple projects are involved in one PR, the workflow
+# will display preview for one of the projects.
 
 name: Docs Preview
 
