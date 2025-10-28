@@ -6,6 +6,7 @@
 
 #include <hip/hip_runtime.h>
 #include <hipdnn_sdk/test_utilities/CpuFpReferenceMiopenRmsValidation.hpp>
+#include <hipdnn_sdk/test_utilities/Seeds.hpp>
 #include <hipdnn_sdk/test_utilities/TestTolerances.hpp>
 #include <hipdnn_sdk/test_utilities/TestUtilities.hpp>
 #include <hipdnn_sdk/utilities/PlatformUtils.hpp>
@@ -122,6 +123,13 @@ protected:
         epsilonAttr.set_uid(uid++);
         auto epsilonTensorAttr = std::make_shared<graph::TensorAttributes>(std::move(epsilonAttr));
 
+        // Store tensor IDs for initialization using enum+map pattern
+        _inputTensorIds[graph::BatchnormAttributes::InputNames::X] = xTensorAttr->get_uid();
+        _inputTensorIds[graph::BatchnormAttributes::InputNames::SCALE] = scaleTensorAttr->get_uid();
+        _inputTensorIds[graph::BatchnormAttributes::InputNames::BIAS] = biasTensorAttr->get_uid();
+        _inputTensorIds[graph::BatchnormAttributes::InputNames::EPSILON]
+            = epsilonTensorAttr->get_uid();
+
         // Conditionally setup running statistics based on scenario
         std::shared_ptr<graph::TensorAttributes> prevRunningMeanTensorAttr;
         std::shared_ptr<graph::TensorAttributes> prevRunningVarianceTensorAttr;
@@ -150,6 +158,14 @@ protected:
                 "momentum", intermediateDataType, std::vector<int64_t>{1}, std::vector<int64_t>{1});
             momentumAttr.set_uid(uid++);
             momentumTensorAttr = std::make_shared<graph::TensorAttributes>(std::move(momentumAttr));
+
+            // Store running stats tensor IDs
+            _inputTensorIds[graph::BatchnormAttributes::InputNames::MOMENTUM]
+                = momentumTensorAttr->get_uid();
+            _inputTensorIds[graph::BatchnormAttributes::InputNames::PREV_RUNNING_MEAN]
+                = prevRunningMeanTensorAttr->get_uid();
+            _inputTensorIds[graph::BatchnormAttributes::InputNames::PREV_RUNNING_VARIANCE]
+                = prevRunningVarianceTensorAttr->get_uid();
         }
 
         // Create batchnorm attributes
@@ -233,6 +249,19 @@ protected:
             nextRunningVarianceTensorAttr->set_stride(generateStrides(derivedDims));
         }
 
+        // Store next running stats tensor IDs if they exist
+        if(nextRunningMeanTensorAttr)
+        {
+            _outputTensorIds[graph::BatchnormAttributes::OutputNames::NEXT_RUNNING_MEAN]
+                = nextRunningMeanTensorAttr->get_uid();
+        }
+
+        if(nextRunningVarianceTensorAttr)
+        {
+            _outputTensorIds[graph::BatchnormAttributes::OutputNames::NEXT_RUNNING_VARIANCE]
+                = nextRunningVarianceTensorAttr->get_uid();
+        }
+
         // Register validators for all output tensors
         this->registerValidator(yTensorAttr, tolerance);
         this->registerValidator(meanTensorAttr, tolerance);
@@ -249,94 +278,73 @@ protected:
         this->verifyGraph(graphObj, testCase.seed);
     }
 
-    void initializeBundle(const hipdnn_frontend::graph::Graph& graph,
+    void initializeBundle([[maybe_unused]] const hipdnn_frontend::graph::Graph& graph,
                           GraphTensorBundle& bundle,
                           unsigned int seed) override
     {
         // Initialize tensors with custom ranges to match MIOpen's initialization strategy
         std::mt19937 gen(seed);
 
-        // Track running stats to ensure prev/next pairs get same values
-        std::map<std::string, unsigned int> runningStatSeeds;
+        // Epsilon: small positive value
+        std::uniform_real_distribution<float> epsilonDist(1e-6f, 1e-4f);
+        auto* epsilonData = static_cast<float*>(
+            bundle.tensors.at(_inputTensorIds.at(graph::BatchnormAttributes::InputNames::EPSILON))
+                ->rawHostData());
+        epsilonData[0] = epsilonDist(gen);
 
-        for(auto& [tensorId, tensorPtr] : bundle.tensors)
+        // Momentum: typical training value (only if present)
+        auto momentumIt = _inputTensorIds.find(graph::BatchnormAttributes::InputNames::MOMENTUM);
+        if(momentumIt != _inputTensorIds.end())
         {
-            auto name = getTensorName(graph, tensorId);
-
-            if(name == "epsilon")
-            {
-                // Epsilon: small positive value
-                std::uniform_real_distribution<float> epsilonDist(1e-6f, 1e-4f);
-                auto* data = static_cast<float*>(tensorPtr->rawHostData());
-                data[0] = epsilonDist(gen);
-            }
-            else if(name == "momentum")
-            {
-                // Momentum: typical training value
-                std::uniform_real_distribution<float> momentumDist(0.05f, 0.15f);
-                auto* data = static_cast<float*>(tensorPtr->rawHostData());
-                data[0] = momentumDist(gen);
-            }
-            else if(name == "prev_running_mean" || name == "next_running_mean")
-            {
-                // Running mean: prev and next must start with SAME values
-                // because MIOpen's API uses IN/OUT parameter semantics
-                if(runningStatSeeds.find("running_mean") == runningStatSeeds.end())
-                {
-                    runningStatSeeds["running_mean"] = seed + 1000;
-                }
-                bundle.randomizeTensor(tensorId, -2.0f, 2.0f, runningStatSeeds["running_mean"]);
-            }
-            else if(name == "prev_running_variance" || name == "next_running_variance")
-            {
-                // Running variance: prev and next must start with SAME values
-                // because MIOpen's API uses IN/OUT parameter semantics
-                if(runningStatSeeds.find("running_variance") == runningStatSeeds.end())
-                {
-                    runningStatSeeds["running_variance"] = seed + 2000;
-                }
-                bundle.randomizeTensor(tensorId, -2.0f, 2.0f, runningStatSeeds["running_variance"]);
-            }
-            else if(name == "scale" || name == "bias")
-            {
-                // Match MIOpen's initialization: -2.0 to 2.0
-                bundle.randomizeTensor(
-                    tensorId, -2.0f, 2.0f, seed + static_cast<unsigned int>(tensorId));
-            }
-            else
-            {
-                // Default initialization for input and other tensors
-                bundle.randomizeTensor(
-                    tensorId, -1.0f, 1.0f, seed + static_cast<unsigned int>(tensorId));
-            }
+            std::uniform_real_distribution<float> momentumDist(0.05f, 0.15f);
+            auto* momentumData
+                = static_cast<float*>(bundle.tensors.at(momentumIt->second)->rawHostData());
+            momentumData[0] = momentumDist(gen);
         }
+
+        // Scale and bias: -2.0 to 2.0 to match MIOpen
+        bundle.tensors.at(_inputTensorIds.at(graph::BatchnormAttributes::InputNames::SCALE))
+            ->fillTensorWithRandomValues(-2.0f, 2.0f, seed + 1);
+        bundle.tensors.at(_inputTensorIds.at(graph::BatchnormAttributes::InputNames::BIAS))
+            ->fillTensorWithRandomValues(-2.0f, 2.0f, seed + 2);
+
+        // Running mean: prev and next must start with SAME values
+        // because MIOpen's API uses IN/OUT parameter semantics
+        auto prevMeanIt
+            = _inputTensorIds.find(graph::BatchnormAttributes::InputNames::PREV_RUNNING_MEAN);
+        auto nextMeanIt
+            = _outputTensorIds.find(graph::BatchnormAttributes::OutputNames::NEXT_RUNNING_MEAN);
+        if(prevMeanIt != _inputTensorIds.end() && nextMeanIt != _outputTensorIds.end())
+        {
+            unsigned runningMeanSeed = seed + 1000;
+            bundle.tensors.at(prevMeanIt->second)
+                ->fillTensorWithRandomValues(-2.0f, 2.0f, runningMeanSeed);
+            bundle.tensors.at(nextMeanIt->second)
+                ->fillTensorWithRandomValues(-2.0f, 2.0f, runningMeanSeed);
+        }
+
+        // Running variance: prev and next must start with SAME values
+        auto prevVarIt
+            = _inputTensorIds.find(graph::BatchnormAttributes::InputNames::PREV_RUNNING_VARIANCE);
+        auto nextVarIt
+            = _outputTensorIds.find(graph::BatchnormAttributes::OutputNames::NEXT_RUNNING_VARIANCE);
+        if(prevVarIt != _inputTensorIds.end() && nextVarIt != _outputTensorIds.end())
+        {
+            unsigned runningVarianceSeed = seed + 2000;
+            bundle.tensors.at(prevVarIt->second)
+                ->fillTensorWithRandomValues(-2.0f, 2.0f, runningVarianceSeed);
+            bundle.tensors.at(nextVarIt->second)
+                ->fillTensorWithRandomValues(-2.0f, 2.0f, runningVarianceSeed);
+        }
+
+        // X input: default range
+        bundle.tensors.at(_inputTensorIds.at(graph::BatchnormAttributes::InputNames::X))
+            ->fillTensorWithRandomValues(-1.0f, 1.0f, seed);
     }
 
 private:
-    std::string getTensorName(const hipdnn_frontend::graph::Graph& graph, int64_t tensorId) const
-    {
-        // Simple helper to find tensor name by ID
-        std::string result;
-        graph.visit([&](const hipdnn_frontend::graph::INode& node) {
-            for(const auto& tensorAttr : node.getNodeInputTensorAttributes())
-            {
-                if(tensorAttr->get_uid() == tensorId && !tensorAttr->get_name().empty())
-                {
-                    result = tensorAttr->get_name();
-                    return;
-                }
-            }
-            for(const auto& tensorAttr : node.getNodeOutputTensorAttributes())
-            {
-                if(tensorAttr->get_uid() == tensorId && !tensorAttr->get_name().empty())
-                {
-                    result = tensorAttr->get_name();
-                    return;
-                }
-            }
-        });
-        return result;
-    }
+    std::unordered_map<graph::BatchnormAttributes::InputNames, int64_t> _inputTensorIds;
+    std::unordered_map<graph::BatchnormAttributes::OutputNames, int64_t> _outputTensorIds;
 };
 
 // NCHW 2D
@@ -373,9 +381,10 @@ using IntegrationGpuBatchnormFwdTrainingNdhwcBfp16
 
 std::vector<Batchnorm2dTestCase> getBnFwdTrainingSmoke2dTestCases()
 {
-    unsigned int seed = std::random_device{}();
+    unsigned seed = getGlobalTestSeed();
 
     return {
+        // {1, 256, 1, 1, seed}, // miopen's driver command for this shape fails. There is a PR in miopen that fixes this issue.
         {2, 3, 1, 1, seed}, // Minimal case
         {32, 3, 1, 14, seed}, // Typical small training case
     };
@@ -383,7 +392,7 @@ std::vector<Batchnorm2dTestCase> getBnFwdTrainingSmoke2dTestCases()
 
 std::vector<Batchnorm2dTestCase> getBnFwdTrainingFull2dTestCases()
 {
-    unsigned int seed = std::random_device{}();
+    unsigned seed = getGlobalTestSeed();
 
     return {
         {1, 3, 14, 14, seed},
@@ -398,7 +407,7 @@ std::vector<Batchnorm2dTestCase> getBnFwdTrainingFull2dTestCases()
 
 std::vector<Batchnorm3dTestCase> getBnFwdTrainingSmoke3dTestCases()
 {
-    unsigned int seed = std::random_device{}();
+    unsigned seed = getGlobalTestSeed();
 
     return {
         {2, 3, 3, 1, 1, seed}, // Minimal 3D case
@@ -408,7 +417,7 @@ std::vector<Batchnorm3dTestCase> getBnFwdTrainingSmoke3dTestCases()
 
 std::vector<Batchnorm3dTestCase> getBnFwdTrainingFull3dTestCases()
 {
-    unsigned int seed = std::random_device{}();
+    unsigned seed = getGlobalTestSeed();
 
     return {
         {2, 3, 3, 1, 1, seed}, // Minimal case
