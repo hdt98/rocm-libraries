@@ -36,7 +36,7 @@ jobs:
 
       # We only want to build MIOpen HEAD against CK HEAD, not applicable for other projects
       - name: Checkout composable_kernel repository
-        if: ${{ contains(inputs.project_to_test, 'miopen') || contains(inputs.project_to_test, 'miopen_plugin') }}
+        if: ${{ contains(inputs.project_to_test, 'miopen') || contains(inputs.project_to_test, 'miopen-plugin') }}
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: "ROCm/composable_kernel"

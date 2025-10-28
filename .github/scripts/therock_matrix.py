@@ -12,7 +12,6 @@ subtree_to_project_map = {
     "projects/hipsolver": "solver",
     "projects/hipsparse": "sparse",
     "projects/miopen": "miopen",
-    "projects/hipdnn/plugins/miopen_legacy_plugin" : "miopen_plugin",
     "projects/rocblas": "blas",
     "project/rocfft": "fft",
     "projects/rocprim": "prim",
@@ -47,14 +46,10 @@ project_map = {
         "cmake_options": "-DTHEROCK_ENABLE_FFT=ON",
         "project_to_test": "hipfft, rocfft",
     },
-    "hipdnn": {
+    "hipdnn": { # due to MIOpen plugin project being inside the hipDNN directory, we cannot have the MIOpen plugin project as a separate project for now https://github.com/ROCm/rocm-libraries/issues/2316
         "cmake_options": "-DTHEROCK_ENABLE_MIOPEN_PLUGIN=ON -DTHEROCK_ENABLE_COMPOSABLE_KERNEL=ON -DTHEROCK_USE_EXTERNAL_COMPOSABLE_KERNEL=ON -DTHEROCK_COMPOSABLE_KERNEL_SOURCE_DIR=../composable_kernel",
         "project_to_test": "hipdnn, miopen-plugin",
-    },
-    "miopen_plugin": {
-        "cmake_options": "-DTHEROCK_ENABLE_MIOPEN_PLUGIN=ON -DTHEROCK_ENABLE_COMPOSABLE_KERNEL=ON -DTHEROCK_USE_EXTERNAL_COMPOSABLE_KERNEL=ON -DTHEROCK_COMPOSABLE_KERNEL_SOURCE_DIR=../composable_kernel",
-        "project_to_test": "miopen-plugin",
-    }
+    } 
 }
 
 # For certain math components, they are optional during building and testing.
