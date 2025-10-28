@@ -49,19 +49,8 @@ namespace rocRoller
 
         std::string toString(std::vector<InstructionProfile> const& profiles);
 
-        struct pc_comparator
-        {
-            bool operator()(const rocprofiler_thread_trace_decoder_pc_t& a,
-                            const rocprofiler_thread_trace_decoder_pc_t& b) const
-            {
-                if(a.code_object_id == b.code_object_id)
-                    return a.address < b.address;
-                return a.code_object_id < b.code_object_id;
-            }
-        };
-
         using InstructionLatencyMap
-            = std::map<rocprofiler_thread_trace_decoder_pc_t, InstructionProfile, pc_comparator>;
+            = std::map<rocprofiler_thread_trace_decoder_pc_t, InstructionProfile>;
 
         /**
          * @brief Call a function that dispatches a single kernel and collects data

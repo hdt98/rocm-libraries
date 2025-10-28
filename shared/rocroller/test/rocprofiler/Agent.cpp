@@ -443,13 +443,13 @@ namespace rocRoller
 
         std::string toString(std::vector<InstructionProfile> const& profiles)
         {
-            std::string result = "";
+            std::ostringstream result;
             for(const auto& profile : profiles)
             {
-                result += profile.toString() + "\n";
+                result << profile.toString() + "\n";
             }
-            result += "\n";
-            return result;
+            result << "\n";
+            return result.str();
         }
 
     } // namespace profiler
