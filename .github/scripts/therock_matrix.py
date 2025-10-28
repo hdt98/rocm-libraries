@@ -40,20 +40,20 @@ project_map = {
         "project_to_test": "hipblaslt, rocblas, hipblas",
     },
     "miopen": {
-        "cmake_options": "-DTHEROCK_ENABLE_MIOPEN=ON -DTHEROCK_ENABLE_COMPOSABLE_KERNEL=ON -DTHEROCK_USE_EXTERNAL_COMPOSABLE_KERNEL=ON -DTHEROCK_COMPOSABLE_KERNEL_SOURCE_DIR=../composable_kernel",
-        "project_to_test": "miopen",
+        "cmake_options": "-DTHEROCK_ENABLE_MIOPEN_PLUGIN=ON -DTHEROCK_ENABLE_COMPOSABLE_KERNEL=ON -DTHEROCK_USE_EXTERNAL_COMPOSABLE_KERNEL=ON -DTHEROCK_COMPOSABLE_KERNEL_SOURCE_DIR=../composable_kernel",
+        "project_to_test": "miopen, miopen-plugin",
     },
     "fft": {
         "cmake_options": "-DTHEROCK_ENABLE_FFT=ON",
         "project_to_test": "hipfft, rocfft",
     },
     "hipdnn": {
-        "cmake_options": "-DTHEROCK_ENABLE_HIPDNN=ON",
-        "project_to_test": "hipdnn",
+        "cmake_options": "-DTHEROCK_ENABLE_MIOPEN_PLUGIN=ON -DTHEROCK_ENABLE_COMPOSABLE_KERNEL=ON -DTHEROCK_USE_EXTERNAL_COMPOSABLE_KERNEL=ON -DTHEROCK_COMPOSABLE_KERNEL_SOURCE_DIR=../composable_kernel",
+        "project_to_test": "hipdnn, miopen-plugin",
     },
     "miopen_plugin": {
         "cmake_options": "-DTHEROCK_ENABLE_MIOPEN_PLUGIN=ON -DTHEROCK_ENABLE_COMPOSABLE_KERNEL=ON -DTHEROCK_USE_EXTERNAL_COMPOSABLE_KERNEL=ON -DTHEROCK_COMPOSABLE_KERNEL_SOURCE_DIR=../composable_kernel",
-        "project_to_test": "miopen_plugin",
+        "project_to_test": "miopen-plugin",
     }
 }
 
