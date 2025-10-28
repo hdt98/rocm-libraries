@@ -291,6 +291,7 @@ namespace RocprofilerTest
 
         SECTION("Order 1")
         {
+            INFO("Order 1");
             std::vector<size_t> order = {0, 1, 2, 1};
             for(size_t idx : order)
             {
@@ -308,6 +309,7 @@ namespace RocprofilerTest
 
         SECTION("Order 2")
         {
+            INFO("Order 2");
             std::vector<size_t> order = {3, 4};
             for(size_t idx : order)
             {
@@ -325,6 +327,7 @@ namespace RocprofilerTest
 
         SECTION("Order 3")
         {
+            INFO("Order 3");
             std::vector<size_t> order = {6, 5, 4, 3, 2, 1, 0};
             for(size_t idx : order)
             {
@@ -342,6 +345,7 @@ namespace RocprofilerTest
 
         SECTION("With profiler calls")
         {
+            INFO("With profiler calls");
             std::vector<size_t> order = {5, 6};
             for(size_t idx : order)
             {
@@ -356,31 +360,21 @@ namespace RocprofilerTest
             literalHex = fmt::format("0x{:x}", literals[order.back()]);
         }
 
+        SECTION("Multiple launches")
+        {
+            INFO("Multiple launches");
+            latencies = rocRoller::profiler::loopUntilDispatchData([&]() {
+                kernelSetups[4].kernel.launchKernel(kernelSetups[4].commandArgs.runtimeArguments());
+                kernelSetups[2].kernel.launchKernel(kernelSetups[2].commandArgs.runtimeArguments());
+            });
+            // Behavior is to use first dispatched kernel's data
+            literalHex = fmt::format("0x{:x}", literals[4]);
+        }
+
         CAPTURE(literalHex);
         INFO(toString(latencies));
         REQUIRE(latencies.size() == 2);
         CHECK(1 == countSubstring(latencies[0].instruction, literalHex));
         CHECK(latencies[1].instruction == "s_endpgm");
-    }
-
-    TEST_CASE("Rocprofiler accidental multiple kernel dispatches")
-    {
-        rocRoller::profiler::reset();
-
-        auto testContext = TestContext::ForTestDevice({}, "multi_kernel_dispatch_test");
-
-        auto kernelSetup1 = createSimpleMovKernel(
-            TestContext::ForTestDevice({}, "multi_kernel_dispatch_test_1"), 0x11111111);
-        auto kernelSetup2 = createSimpleMovKernel(
-            TestContext::ForTestDevice({}, "multi_kernel_dispatch_test_2"), 0x22222222);
-
-        CHECK_THROWS_MATCHES(
-            rocRoller::profiler::loopUntilDispatchData([&]() {
-                kernelSetup1.kernel.launchKernel(kernelSetup1.commandArgs.runtimeArguments());
-                kernelSetup2.kernel.launchKernel(kernelSetup2.commandArgs.runtimeArguments());
-            }),
-            FatalError,
-            Catch::Matchers::MessageMatches(
-                Catch::Matchers::ContainsSubstring("invariant failed")));
     }
 } // namespace RocprofilerTest
