@@ -174,14 +174,17 @@ endif()
 ## File Locations
 
 ```
-projects/hipblas/clients/
-            │       ├── test_categories.yaml                        # Main configuration file
-            │       ├── parse_test_categories.py                    # YAML parser script
-            │       ├── cmake/
-            │       │   └── TestCategories.cmake                    # CMake integration functions
-            │       └── gtest/
-            │            └── CMakeLists.txt                         # Test integration point
-            └── /build/release/clients/gtest/test_categories.cmake  #created at build time    
+                        
+rocm-libraries/shared/ctest
+   │                     └── hipblas
+   │                          ├── TestCategories.cmake                   # CTest integration functions
+   │                          ├── ctest-integration.md                   # documentation file
+   │                          ├── parse_test_categories.py               # YAML parser script
+   │                          └── test_categories.yaml                   # Main configuration file
+   └──projects/hipblas/clients/
+                 │       └── gtest/
+                 │            └── CMakeLists.txt                         # Test integration point
+                 └── /build/release/clients/gtest/test_categories.cmake  #created at build time    
 ```
 ## Sample run
 ```

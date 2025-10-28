@@ -4,7 +4,7 @@
 function(apply_test_category_labels target_name yaml_file)
     # Execute the Python script to generate CMake code
     execute_process(
-        COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../parse_test_categories.py ${CMAKE_CURRENT_SOURCE_DIR}/../test_categories.yaml
+        COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../../../../shared/ctest/hipblas/parse_test_categories.py ${yaml_file}
         OUTPUT_VARIABLE CMAKE_CATEGORY_CODE
         ERROR_VARIABLE PARSE_ERROR
         RESULT_VARIABLE PARSE_RESULT

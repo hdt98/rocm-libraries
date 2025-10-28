@@ -9,6 +9,7 @@
    cd rocm-libraries/projects/rocfft
    mkdir build && cd build
    cmake -DCMAKE_CXX_COMPILER=amdclang++ -DCMAKE_C_COMPILER=amdclang -DBUILD_CLIENTS=on ..
+   make -j
    ```
 
 2. **Ensure Python 3** is available (required for YAML parsing)
