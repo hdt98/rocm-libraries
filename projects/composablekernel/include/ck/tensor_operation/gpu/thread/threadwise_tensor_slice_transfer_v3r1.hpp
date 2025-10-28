@@ -230,11 +230,6 @@ struct ThreadwiseTensorSliceTransfer_v3r1
                                    src_desc, src_end_coord_)
                                    ? 0x200
                                    : 0;
-                src_oob_thread_scratch_tuple_(thread_scratch_id)
-                    .template SetAsType<int>(
-                        src_data_idx_seq,
-                        oob_scratch |
-                            (0xff & (src_coord_.GetOffset() / PackedSize + SrcScalarPerVector)));
             }
             else
             {
@@ -324,8 +319,7 @@ struct ThreadwiseTensorSliceTransfer_v3r1
                     src_vector_container src_vector{0};
                     if constexpr(SrcVectorDim == 1)
                     {
-                        if(!oob_scratch) {}
-                        else if(src_ele_offset >= 0 && src_ele_offset < addr_ub)
+                        if(src_ele_offset >= 0 && src_ele_offset < addr_ub)
                         {
                             src_vector.template AsType<src_vector_container_t>()(I0) =
                                 src_buf.template Get<src_vector_container_t>(src_ele_offset, true);
@@ -338,6 +332,10 @@ struct ThreadwiseTensorSliceTransfer_v3r1
                                                                             true);
                             });
                         }
+                        src_oob_thread_scratch_tuple_(thread_scratch_id)
+                            .template SetAsType<int>(
+                                src_data_idx_seq,
+                                oob_scratch | (0xff & (src_ele_offset + SrcScalarPerVector)));
                     }
                     else
                     {
