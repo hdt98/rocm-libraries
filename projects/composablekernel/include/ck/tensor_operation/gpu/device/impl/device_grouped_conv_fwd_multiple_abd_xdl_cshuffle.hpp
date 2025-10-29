@@ -1485,6 +1485,7 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
                 }
             }
         }
+        std::cout << "ConvSpec OK" << std::endl;
 
         if constexpr(NumGroupsToMerge > 1)
         {
@@ -1549,6 +1550,7 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
         {
             return false;
         }
+        std::cout << "A OK" << std::endl;
 
         // check vector access of B
         // FIXME: layout
@@ -1569,6 +1571,8 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
         {
             return false;
         }
+        std::cout << "B OK" << std::endl;
+
         //  check vector access of Ds
         bool valid = true;
 
@@ -1613,6 +1617,7 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
                 valid = false;
             }
         });
+        std::cout << "D OK" << std::endl;
 
         if constexpr(NeedTransposeKernel)
         {
@@ -1711,9 +1716,12 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
                 return false;
             }
         }
+        std::cout << "E OK" << std::endl;
+
         // check Gridwise GEMM
         if(get_warp_size() == 64)
         {
+            std::cout << "NXdlPerWave64:" << NXdlPerWave64 << std::endl;
             if constexpr(NXdlPerWave64 > 0)
             {
                 if constexpr(isMultiA || isMultiB)
@@ -1789,6 +1797,7 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
                 }
             }
         }
+        std::cout << "GEMM not OK" << std::endl;
 
         if constexpr(is_same_v<AComputeDataType, ck::tf32_t> ||
                      is_same_v<BComputeDataType, ck::tf32_t>)
