@@ -15,6 +15,16 @@
 namespace miopen_legacy_plugin
 {
 
+namespace
+{
+
+std::string getNodeName(const hipdnn_sdk::data_objects::Node& node)
+{
+    return node.name() != nullptr ? node.name()->str() : "";
+}
+
+} // namespace
+
 bool MiopenBatchnormPlanBuilder::isApplicable(
     [[maybe_unused]] const HipdnnEnginePluginHandle& handle,
     const hipdnn_plugin::IGraph& opGraph) const
@@ -36,6 +46,31 @@ bool MiopenBatchnormPlanBuilder::isApplicable(
         return false;
     }
 
+    // Check if batchnorm training node has running statistics
+    // API mismatch: hipDNN graph API uses separate prev/next buffers for running statistics,
+    // but MIOpen requires single IN/OUT buffers. This cannot be correctly bridged without
+    // either updating MIOpen API or implementing buffer copy operations.
+    const auto& node = opGraph.getNode(0);
+
+    // Only batchnorm training (BatchnormAttributes) has running statistics
+    if(node.attributes_type() == hipdnn_sdk::data_objects::NodeAttributes::BatchnormAttributes)
+    {
+        const auto* attr = node.attributes_as_BatchnormAttributes();
+        if(attr != nullptr && attr->prev_running_mean_tensor_uid().has_value()
+           && attr->prev_running_variance_tensor_uid().has_value()
+           && attr->momentum_tensor_uid().has_value()
+           && attr->next_running_mean_tensor_uid().has_value()
+           && attr->next_running_variance_tensor_uid().has_value())
+        {
+            HIPDNN_LOG_INFO(
+                "Batchnorm plan builder does not support running statistics. "
+                "The hipDNN graph API uses separate prev_running_mean/variance (input) and "
+                "next_running_mean/variance (output) buffers, but MIOpen requires IN/OUT buffers. "
+                "MIOpen API updates are needed to support this correctly.");
+            return false;
+        }
+    }
+
     return true;
 }
 
@@ -49,11 +84,6 @@ size_t MiopenBatchnormPlanBuilder::getWorkspaceSize(
 
 namespace
 {
-
-std::string getNodeName(const hipdnn_sdk::data_objects::Node& node)
-{
-    return node.name() != nullptr ? node.name()->str() : "";
-}
 
 void buildPlanInferenceSingleNode([[maybe_unused]] const HipdnnEnginePluginHandle& handle,
                                   const hipdnn_plugin::IGraph& opGraph,

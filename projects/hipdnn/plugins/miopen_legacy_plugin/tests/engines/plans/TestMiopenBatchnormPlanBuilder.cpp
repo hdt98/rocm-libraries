@@ -48,12 +48,10 @@ TEST_F(TestMiopenBatchnormPlanBuilder, IsApplicableReturnsFalseForUnsupportedAtt
 
 TEST_F(TestMiopenBatchnormPlanBuilder, IsApplicableReturnsTrueForSupportedSingleNodeGraph)
 {
-    MockGraph mockGraph;
-    EXPECT_CALL(mockGraph, nodeCount()).WillOnce(::testing::Return(1));
-    EXPECT_CALL(mockGraph, hasOnlySupportedAttributes(::testing::_))
-        .WillOnce(::testing::Return(true));
+    auto builder = hipdnn_sdk::test_utilities::createValidBatchnormInferenceGraph();
+    hipdnn_plugin::GraphWrapper graph(builder.GetBufferPointer(), builder.GetSize());
 
-    bool applicable = _planBuilder.isApplicable(_dummyHandle, mockGraph);
+    bool applicable = _planBuilder.isApplicable(_dummyHandle, graph);
 
     EXPECT_TRUE(applicable);
 }

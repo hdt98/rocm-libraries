@@ -184,26 +184,10 @@ void BatchnormFwdTrainingPlan::execute(const HipdnnEnginePluginHandle& handle,
         resultSaveInvVariancePtr = invVarianceBuffer.ptr;
     }
 
-    // Handle running statistics if provided
-    // Note: MIOpen uses IN/OUT parameters (single buffer read+written), but hipDNN's graph
-    // API has separate prev (input) and next (output) tensors. We bridge this by:
-    // 1. Tests initialize NEXT with PREV's values (same seed in initializeBundle)
-    // 2. Pass NEXT buffer to MIOpen as the IN/OUT parameter
-    // 3. MIOpen reads initial values from NEXT, computes EMA, writes results back to NEXT
-    // PREV tensor is unused by the plugin - it exists only for graph API semantics.
+    // Running statistics are not supported due to API mismatch.
+    // The plan builder will reject graphs with running statistics before reaching this point.
     void* resultRunningMeanPtr = nullptr;
     void* resultRunningVariancePtr = nullptr;
-
-    if(_trainingParams.hasRunningStats())
-    {
-        auto nextRunningMeanBuffer = miopen_utils::findDeviceBuffer(
-            _trainingParams.nextRunningMean().uid(), deviceBuffers, numDeviceBuffers);
-        auto nextRunningVarianceBuffer = miopen_utils::findDeviceBuffer(
-            _trainingParams.nextRunningVariance().uid(), deviceBuffers, numDeviceBuffers);
-
-        resultRunningMeanPtr = nextRunningMeanBuffer.ptr;
-        resultRunningVariancePtr = nextRunningVarianceBuffer.ptr;
-    }
 
     THROW_ON_MIOPEN_FAILURE(
         miopenBatchNormalizationForwardTraining(handle.miopenHandle,
