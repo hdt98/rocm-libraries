@@ -19,19 +19,9 @@ BatchnormFwdTrainingParams::BatchnormFwdTrainingParams(
     , _scale(miopen_utils::createTensor(tensorMap, attributes.scale_tensor_uid()))
     , _bias(miopen_utils::createTensor(tensorMap, attributes.bias_tensor_uid()))
 {
-    // Extract and validate epsilon value from pass-by-value tensor (using double for MIOpen)
+    // Extract epsilon value from pass-by-value tensor (cast to double for MIOpen compatibility)
     auto epsilonTensorAttr = tensorMap.at(attributes.epsilon_tensor_uid());
-
-    if(epsilonTensorAttr->data_type() != hipdnn_sdk::data_objects::DataType::DOUBLE)
-    {
-        throw std::runtime_error("Epsilon tensor must be DOUBLE type for MIOpen compatibility");
-    }
-    auto epsilonValue = epsilonTensorAttr->value_as_Float64Value();
-    if(epsilonValue == nullptr)
-    {
-        throw std::runtime_error("Epsilon must be a pass-by-value Float64 tensor");
-    }
-    _epsilonValue = epsilonValue->value();
+    _epsilonValue = miopen_utils::extractDoubleFromTensorValue(epsilonTensorAttr, "Epsilon");
 
     // Save mean and inv_variance are optional (controlled by MIO_SAVE_MEAN_VARIANCE)
     if(attributes.mean_tensor_uid().has_value())
@@ -52,19 +42,9 @@ BatchnormFwdTrainingParams::BatchnormFwdTrainingParams(
        && attributes.next_running_mean_tensor_uid().has_value()
        && attributes.next_running_variance_tensor_uid().has_value())
     {
-        // Extract and validate momentum value from pass-by-value tensor (using double for MIOpen)
+        // Extract momentum value from pass-by-value tensor (cast to double for MIOpen compatibility)
         auto momentumTensorAttr = tensorMap.at(attributes.momentum_tensor_uid().value());
-        if(momentumTensorAttr->data_type() != hipdnn_sdk::data_objects::DataType::DOUBLE)
-        {
-            throw std::runtime_error(
-                "Momentum tensor must be DOUBLE type for MIOpen compatibility");
-        }
-        auto momentumValue = momentumTensorAttr->value_as_Float64Value();
-        if(momentumValue == nullptr)
-        {
-            throw std::runtime_error("Momentum must be a pass-by-value Float64 tensor");
-        }
-        _momentumValue = momentumValue->value();
+        _momentumValue = miopen_utils::extractDoubleFromTensorValue(momentumTensorAttr, "Momentum");
 
         _prevRunningMean = miopen_utils::createTensor(
             tensorMap, attributes.prev_running_mean_tensor_uid().value());
