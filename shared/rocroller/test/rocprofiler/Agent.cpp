@@ -276,8 +276,7 @@ namespace rocRoller
             parameters.push_back({ROCPROFILER_THREAD_TRACE_PARAMETER_SHADER_ENGINE_MASK, 0x1});
             parameters.push_back({ROCPROFILER_THREAD_TRACE_PARAMETER_SIMD_SELECT, 0x1});
             parameters.push_back({ROCPROFILER_THREAD_TRACE_PARAMETER_SERIALIZE_ALL, 1});
-            parameters.push_back(
-                {ROCPROFILER_THREAD_TRACE_PARAMETER_BUFFER_SIZE, 0x10000000}); // 256MB
+            parameters.push_back({ROCPROFILER_THREAD_TRACE_PARAMETER_BUFFER_SIZE, 0x100000000});
 
             ROCPROFILER_CALL(
                 rocprofiler_configure_dispatch_thread_trace_service(client_ctx,
@@ -333,7 +332,6 @@ namespace rocRoller
             if(!enable_agent)
                 return std::nullopt;
 
-            std::optional<std::vector<InstructionProfile>> result;
             Log::info("waitForData");
 
             std::unique_lock<std::mutex> lock(profile_data_mutex);
@@ -344,39 +342,49 @@ namespace rocRoller
 
             TraceDecodeCallbackUserData callback_user_data{.ok = true, .instruction_map = {}};
 
-            rocprofiler_trace_decode(decoder,
-                                     trace_decode_callback,
-                                     profile_data.data(),
-                                     profile_data.size(),
-                                     &callback_user_data);
+            const auto status = rocprofiler_trace_decode(decoder,
+                                                         trace_decode_callback,
+                                                         profile_data.data(),
+                                                         profile_data.size(),
+                                                         &callback_user_data);
+
             profile_data.clear();
             lock.unlock();
 
-            if(callback_user_data.ok && !callback_user_data.instruction_map.empty())
+            if(status != ROCPROFILER_STATUS_SUCCESS)
             {
-                for(auto& [pc, data] : callback_user_data.instruction_map)
-                {
-                    auto inst = address_table.get(pc.code_object_id, pc.address);
-                    if(inst != nullptr)
-                        data.instruction = inst->inst;
-                }
+                Log::warn("waitForData: decoding error, rocprofiler_trace_decode returned {}",
+                          rocprofiler_get_status_string(status));
+                return std::nullopt;
+            }
 
-                result = std::vector<InstructionProfile>{};
-                result->reserve(callback_user_data.instruction_map.size());
-                for(const auto& [pc, data] : callback_user_data.instruction_map)
-                {
-                    result->push_back(data);
-                }
-                Log::info("waitForData: retrieved {}", result->size());
-            }
-            else
+            if(not callback_user_data.ok)
             {
-                result = std::nullopt;
-                if(callback_user_data.instruction_map.empty())
-                    Log::warn("waitForData: no instructions decoded");
-                else
-                    Log::warn("waitForData: decoding error");
+                Log::warn("waitForData: decoding error in callback, check previous logs");
+                return std::nullopt;
             }
+
+            if(callback_user_data.instruction_map.empty())
+            {
+                Log::warn("waitForData: no instructions decoded");
+                return std::nullopt;
+            }
+
+            for(auto& [pc, data] : callback_user_data.instruction_map)
+            {
+                auto inst = address_table.get(pc.code_object_id, pc.address);
+                if(inst != nullptr)
+                    data.instruction = inst->inst;
+            }
+
+            std::vector<InstructionProfile> result;
+            result.reserve(callback_user_data.instruction_map.size());
+            for(const auto& [pc, data] : callback_user_data.instruction_map)
+            {
+                result.push_back(data);
+            }
+            Log::info("waitForData: retrieved {} instructions", result.size());
+
             return result;
         }
 
