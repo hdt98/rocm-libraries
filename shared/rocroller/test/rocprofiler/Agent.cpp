@@ -33,6 +33,7 @@
 #include <rocRoller/Utilities/Error.hpp>
 #include <rocRoller/Utilities/HipUtils.hpp>
 #include <rocRoller/Utilities/Logging.hpp>
+#include <rocRoller/Utilities/Settings.hpp>
 
 #include <atomic>
 #include <chrono>
@@ -293,8 +294,10 @@ namespace rocRoller
 
     int tool_init(rocprofiler_client_finalize_t, void*)
     {
-        ROCPROFILER_CALL(rocprofiler_thread_trace_decoder_create(&decoder, "/opt/rocm/lib"),
-                         "create decoder");
+        ROCPROFILER_CALL(
+            rocprofiler_thread_trace_decoder_create(
+                &decoder, (Settings::getInstance()->get(Settings::ROCMPath) + "/lib").c_str()),
+            "create decoder");
 
         ROCPROFILER_CALL(rocprofiler_create_context(&client_ctx), "create context");
 
