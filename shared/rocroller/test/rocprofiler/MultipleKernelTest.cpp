@@ -182,7 +182,11 @@ namespace RocprofilerTest
                << ", " << avg_latency << std::endl;
         }
         INFO(ss.str());
-        REQUIRE(latencies.size() >= 8); // gfx12 has 9, others have 8
+
+        if(kernelSetup.testContext.get()->targetArchitecture().target().isCDNAGPU())
+            REQUIRE(latencies.size() == 8);
+        else
+            REQUIRE(latencies.size() == 9);
 
         { // Ensure instructions exist in expected quantities in the profile data
             std::string const instructionsStr = [&]() {
