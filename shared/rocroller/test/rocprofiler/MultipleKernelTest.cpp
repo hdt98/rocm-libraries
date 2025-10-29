@@ -184,7 +184,7 @@ namespace RocprofilerTest
         INFO(ss.str());
         REQUIRE(latencies.size() >= 8); // gfx12 has 9, others have 8
 
-        { // Ensure instructions exist in expected quanities in the profile data
+        { // Ensure instructions exist in expected quantities in the profile data
             std::string const instructionsStr = [&]() {
                 std::stringstream ss;
                 streamJoin(
