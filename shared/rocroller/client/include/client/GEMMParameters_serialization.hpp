@@ -65,6 +65,9 @@ namespace rocRoller::Serialization
 
             iot::mapRequired(io, "scaleBlockSize", params.scaleBlockSize);
             iot::mapRequired(io, "scaleSkipPermlane", params.scaleSkipPermlane);
+
+            iot::mapRequired(io, "scaleShuffleTileA", params.scaleShuffleTileA);
+            iot::mapRequired(io, "scaleShuffleTileB", params.scaleShuffleTileB);
         }
 
         static void mapping(IO& io, Client::GEMMClient::TypeParameters& params, EmptyContext& ctx)
@@ -86,13 +89,10 @@ namespace rocRoller::Serialization
             iot::mapRequired(io, "K", params.k);
             iot::mapRequired(io, "alpha", params.alpha);
             iot::mapRequired(io, "beta", params.beta);
-            iot::mapRequired(io, "beta", params.beta);
             iot::mapRequired(io, "types", params.types);
-            iot::mapRequired(io, "scaleValueA", params.scaleValueA);
-            iot::mapRequired(io, "scaleValueB", params.scaleValueB);
-            iot::mapRequired(io, "workgroupMapping", params.workgroupMapping);
-
-            flatMap(io, params.types);
+            iot::mapRequired(io, "scaleValue_A", params.scaleValueA);
+            iot::mapRequired(io, "scaleValue_B", params.scaleValueB);
+            iot::mapRequired(io, "workgroupMappingDim", params.workgroupMappingDim);
         }
 
         static void
@@ -110,16 +110,17 @@ namespace rocRoller::Serialization
 
         static void mapping(IO& io, Client::GEMMClient::Result& result)
         {
-            iot::mapRequired(io, "device", result.benchmarkResults.runParams.device);
+            iot::mapRequired(io, "resultType", result.benchmarkResults.resultType);
+            iot::mapRequired(io, "device", result.benchmarkResults.benchmarkParams.device);
 
             flatMap(io, result.problemParams);
             flatMap(io, result.solutionParams);
 
             iot::mapRequired(io, "numWGs", result.benchmarkResults.runParams.numWGs);
 
-            iot::mapRequired(io, "numWarmUp", result.benchmarkResults.runParams.numWarmUp);
-            iot::mapRequired(io, "numOuter", result.benchmarkResults.runParams.numOuter);
-            iot::mapRequired(io, "numInner", result.benchmarkResults.runParams.numInner);
+            iot::mapRequired(io, "numWarmUp", result.benchmarkResults.benchmarkParams.numWarmUp);
+            iot::mapRequired(io, "numOuter", result.benchmarkResults.benchmarkParams.numOuter);
+            iot::mapRequired(io, "numInner", result.benchmarkResults.benchmarkParams.numInner);
 
             iot::mapRequired(io, "kernelGenerate", result.benchmarkResults.kernelGenerate);
             iot::mapRequired(io, "kernelAssemble", result.benchmarkResults.kernelAssemble);
@@ -133,6 +134,24 @@ namespace rocRoller::Serialization
         static void mapping(IO& io, Client::GEMMClient::Result& result, EmptyContext& ctx)
         {
             mapping(io, result);
+        }
+    };
+
+    template <typename IO>
+    struct MappingTraits<Client::RunParameters, IO, EmptyContext>
+    {
+        static const bool flow = false;
+        using iot              = IOTraits<IO>;
+
+        static void mapping(IO& io, Client::RunParameters& params)
+        {
+            iot::mapRequired(io, "workgroupMappingValue", params.workgroupMappingValue);
+            iot::mapRequired(io, "numWGs", params.numWGs);
+        }
+
+        static void mapping(IO& io, Client::RunParameters& params, EmptyContext& ctx)
+        {
+            mapping(io, params);
         }
     };
 
@@ -155,33 +174,33 @@ namespace rocRoller::Serialization
             iot::mapRequired(io, "wave_b", params.waveB);
             iot::mapRequired(io, "workgroup_size_x", params.workgroupSizeX);
             iot::mapRequired(io, "workgroup_size_y", params.workgroupSizeY);
-            iot::mapRequired(io, "workgroupMapping", params.workgroupMapping);
+            iot::mapRequired(io, "workgroupMappingDim", params.workgroupMappingDim);
             iot::mapRequired(io, "workgroupRemapXCC", params.workgroupRemapXCC);
             iot::mapRequired(io, "workgroupRemapXCCValue", params.workgroupRemapXCCValue);
             iot::mapRequired(io, "unroll_x", params.unrollX);
             iot::mapRequired(io, "unroll_y", params.unrollY);
-            iot::mapRequired(io, "loadLDS_A", params.loadLDSA);
-            iot::mapRequired(io, "loadLDS_B", params.loadLDSB);
+            iot::mapRequired(io, "load_A", params.loadPathA);
+            iot::mapRequired(io, "load_B", params.loadPathB);
             iot::mapRequired(io, "storeLDS_D", params.storeLDSD);
-            iot::mapRequired(io, "direct2LDS_A", params.direct2LDSA);
-            iot::mapRequired(io, "direct2LDS_B", params.direct2LDSB);
             iot::mapRequired(io, "prefetch", params.prefetch);
             iot::mapRequired(io, "prefetchInFlight", params.prefetchInFlight);
             iot::mapRequired(io, "prefetchLDSFactor", params.prefetchLDSFactor);
             iot::mapRequired(io, "prefetchMixMemOps", params.prefetchMixMemOps);
             iot::mapRequired(io, "betaInFma", params.betaInFma);
             iot::mapRequired(io, "scheduler", params.scheduler);
+            iot::mapRequired(io, "schedulerCost", params.schedulerCost);
             iot::mapRequired(io, "matchMemoryAccess", params.matchMemoryAccess);
 
-            flatMap(io, params.types);
+            iot::mapRequired(io, "types", params.types);
 
-            iot::mapRequired(io, "loadScaleLDS_A", params.loadLDSScaleA);
-            iot::mapRequired(io, "loadScaleLDS_B", params.loadLDSScaleB);
+            iot::mapRequired(io, "loadLDSScale_A", params.loadLDSScaleA);
+            iot::mapRequired(io, "loadLDSScale_B", params.loadLDSScaleB);
             iot::mapRequired(io, "swizzleScale", params.swizzleScale);
             iot::mapRequired(io, "prefetchScale", params.prefetchScale);
 
             iot::mapRequired(io, "streamK", params.streamK);
             iot::mapRequired(io, "streamKTwoTile", params.streamKTwoTile);
+            iot::mapRequired(io, "streamKTwoTileDPFirst", params.streamKTwoTileDPFirst);
 
             iot::mapOptional(io, "version", params.version);
         }

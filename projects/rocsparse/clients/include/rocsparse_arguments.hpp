@@ -111,8 +111,10 @@ struct Arguments
     rocsparse_sddmm_alg            sddmm_alg;
     rocsparse_spmv_alg             spmv_alg;
     rocsparse_spsv_alg             spsv_alg;
+    rocsparse_sptrsv_alg           sptrsv_alg;
     rocsparse_spitsv_alg           spitsv_alg;
     rocsparse_spsm_alg             spsm_alg;
+    rocsparse_sptrsm_alg           sptrsm_alg;
     rocsparse_spmm_alg             spmm_alg;
     rocsparse_spgemm_alg           spgemm_alg;
     rocsparse_spgeam_alg           spgeam_alg;
@@ -153,6 +155,7 @@ struct Arguments
     bool skip_reproducibility;
     bool sparsity_pattern_statistics;
     bool call_stage_analysis;
+    bool convert_to_int;
     char filename[128];
     char function[64];
     char name[64];
@@ -260,8 +263,10 @@ struct Arguments
         ROCSPARSE_FORMAT_CHECK(sddmm_alg);
         ROCSPARSE_FORMAT_CHECK(spmv_alg);
         ROCSPARSE_FORMAT_CHECK(spsv_alg);
+        ROCSPARSE_FORMAT_CHECK(sptrsv_alg);
         ROCSPARSE_FORMAT_CHECK(spitsv_alg);
         ROCSPARSE_FORMAT_CHECK(spsm_alg);
+        ROCSPARSE_FORMAT_CHECK(sptrsm_alg);
         ROCSPARSE_FORMAT_CHECK(spmm_alg);
         ROCSPARSE_FORMAT_CHECK(spgemm_alg);
         ROCSPARSE_FORMAT_CHECK(spgeam_alg);
@@ -295,6 +300,7 @@ struct Arguments
         ROCSPARSE_FORMAT_CHECK(skip_reproducibility);
         ROCSPARSE_FORMAT_CHECK(sparsity_pattern_statistics);
         ROCSPARSE_FORMAT_CHECK(call_stage_analysis);
+        ROCSPARSE_FORMAT_CHECK(convert_to_int);
         ROCSPARSE_FORMAT_CHECK(filename);
         ROCSPARSE_FORMAT_CHECK(function);
         ROCSPARSE_FORMAT_CHECK(name);
@@ -487,8 +493,10 @@ private:
         print("sddmm_alg", rocsparse_sddmmalg2string(arg.sddmm_alg));
         print("spmv_alg", rocsparse_spmvalg2string(arg.spmv_alg));
         print("spsv_alg", rocsparse_spsvalg2string(arg.spsv_alg));
+        print("sptrsv_alg", rocsparse_sptrsvalg2string(arg.sptrsv_alg));
         print("spitsv_alg", rocsparse_spitsvalg2string(arg.spitsv_alg));
         print("spsm_alg", rocsparse_spsmalg2string(arg.spsm_alg));
+        print("sptrsm_alg", rocsparse_sptrsmalg2string(arg.sptrsm_alg));
         print("spmm_alg", rocsparse_spmmalg2string(arg.spmm_alg));
         print("spgemm_alg", rocsparse_spgemmalg2string(arg.spgemm_alg));
         print("spgeam_alg", rocsparse_spgeamalg2string(arg.spgeam_alg));
@@ -510,6 +518,7 @@ private:
         print("skip_reproducibility", arg.skip_reproducibility);
         print("sparsity_pattern_statistics", arg.sparsity_pattern_statistics);
         print("call_stage_analysis", arg.call_stage_analysis);
+        print("convert_to_int", arg.convert_to_int);
         print("name", arg.name);
         print("category", arg.category);
         print("hardware", arg.hardware);

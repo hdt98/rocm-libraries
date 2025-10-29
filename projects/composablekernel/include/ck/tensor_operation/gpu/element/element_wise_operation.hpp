@@ -33,6 +33,8 @@ namespace element_wise {
 
 struct AddReluAdd
 {
+    static constexpr const char* name = "AddReluAdd";
+
     template <typename Y, typename X0, typename X1, typename X2>
     __host__ __device__ constexpr void operator()(Y&, const X0&, const X1&, const X2&) const;
 
@@ -102,6 +104,8 @@ struct AddReluAdd
 
 struct AddHardswishAdd
 {
+    static constexpr const char* name = "AddHardswishAdd";
+
     template <typename Y, typename X0, typename X1, typename X2>
     __host__ __device__ constexpr void operator()(Y&, const X0&, const X1&, const X2&) const;
 
@@ -134,6 +138,8 @@ struct AddHardswishAdd
 // E = C + D0 + D1
 struct AddAdd
 {
+    static constexpr const char* name = "AddAdd";
+
     template <typename E, typename C, typename D0, typename D1>
     __host__ __device__ void operator()(E& e, const C& c, const D0& d0, const D1& d1) const
     {
@@ -163,6 +169,8 @@ struct AddAdd
 // E = (C + D0) x D1
 struct AddMultiply
 {
+    static constexpr const char* name = "AddMultiply";
+
     template <typename E, typename C, typename D0, typename D1>
     __host__ __device__ void operator()(E& e, const C& c, const D0& d0, const D1& d1) const;
 
@@ -199,6 +207,8 @@ struct AddMultiply
 // E = C x D0 + D1
 struct MultiplyAdd
 {
+    static constexpr const char* name = "MultiplyAdd";
+
     template <typename E, typename C, typename D0, typename D1>
     __host__ __device__ void operator()(E& e, const C& c, const D0& d0, const D1& d1) const;
 
@@ -251,6 +261,8 @@ struct MultiplyAdd
 
 struct MultiplyMultiply
 {
+    static constexpr const char* name = "MultiplyMultiply";
+
     template <typename E, typename C, typename D0, typename D1>
     __host__ __device__ constexpr void
     operator()(E& e, const C& c, const D0& d0, const D1& d1) const;
@@ -306,6 +318,8 @@ struct MultiplyMultiply
 
 struct MultiplyAddFastGelu
 {
+    static constexpr const char* name = "MultiplyAddFastGelu";
+
     template <typename E, typename C, typename D0, typename D1>
     __host__ __device__ constexpr void
     operator()(E& e, const C& c, const D0& d0, const D1& d1) const;
@@ -327,6 +341,8 @@ struct MultiplyAddFastGelu
 // E = FastGelu(C + D0 + D1)
 struct AddAddFastGelu
 {
+    static constexpr const char* name = "AddAddFastGelu";
+
     template <typename E, typename C, typename D0, typename D1>
     __host__ __device__ constexpr void
     operator()(E& e, const C& c, const D0& d0, const D1& d1) const;
@@ -398,6 +414,7 @@ struct AddAddFastGelu
 // E = Relu(alpha1 * C + alpha2 * D0 + D1)
 struct ScaleAddScaleAddRelu
 {
+    static constexpr const char* name = "ScaleAddScaleAddRelu";
 
     ScaleAddScaleAddRelu(const float alpha1 = 1.f, const float alpha2 = 1.f)
         : alpha1_(alpha1), alpha2_(alpha2)
@@ -462,6 +479,8 @@ struct ScaleAddScaleAddRelu
 
 struct Normalize
 {
+    static constexpr const char* name = "Normalize";
+
     // FIXME: is double absolutely necessary?
     Normalize(double epsilon = 1e-4) : epsilon_(epsilon) {}
 
@@ -533,6 +552,8 @@ struct Normalize
 // The data type of mean and variance is used as AccDataType
 struct NormalizeInInfer
 {
+    static constexpr const char* name = "NormalizeInInfer";
+
     NormalizeInInfer(double epsilon = 1e-4) : epsilon_(epsilon) {}
 
     template <typename T1, typename T2, typename T3, typename T4>
@@ -562,12 +583,68 @@ struct NormalizeInInfer
     double epsilon_;
 };
 
+// used by Conv+Bias+BatchNorm+Clamp inference
+struct BiasNormalizeInInferClamp
+{
+    static constexpr const char* name = "BiasNormalizeInInferClamp";
+
+    BiasNormalizeInInferClamp(float floor   = 0.f,
+                              float ceil    = NumericLimits<float>::Max(),
+                              float epsilon = 1e-4)
+        : clamp_(floor, ceil), epsilon_(epsilon)
+    {
+    }
+
+    template <typename T>
+    __host__ __device__ constexpr void operator()(T& y,
+                                                  const T& x,
+                                                  const T& bias,
+                                                  const T& mean,
+                                                  const T& variance,
+                                                  const T& gamma,
+                                                  const T& beta) const
+    {
+        using ck::type_convert;
+        using ck::math::sqrt;
+
+        float tmp_x = type_convert<float>(x) + type_convert<float>(bias);
+
+        float tmp_y =
+            ((tmp_x - type_convert<float>(mean)) / sqrt(type_convert<float>(variance) + epsilon_)) *
+                type_convert<float>(gamma) +
+            type_convert<float>(beta);
+        clamp_(tmp_y, tmp_y);
+        y = type_convert<T>(tmp_y);
+    };
+
+    template <>
+    __host__ __device__ constexpr void operator()(float& y,
+                                                  const float& x,
+                                                  const float& bias,
+                                                  const float& mean,
+                                                  const float& variance,
+                                                  const float& gamma,
+                                                  const float& beta) const
+    {
+        using ck::type_convert;
+        using ck::math::sqrt;
+
+        float tmp_y = (((x + bias) - mean) / sqrt(variance + epsilon_)) * gamma + beta;
+        clamp_(y, tmp_y);
+    };
+
+    Clamp clamp_;
+    float epsilon_;
+};
+
 template <typename Y, typename X>
 struct UnaryTypeConvert;
 
 template <>
 struct UnaryTypeConvert<float, ck::bhalf_t>
 {
+    static constexpr const char* name = "UnaryTypeConvert";
+
     __host__ __device__ void operator()(float& y, ck::bhalf_t& x) const
     {
         y = ck::type_convert<float, ck::bhalf_t>(x);
@@ -577,6 +654,8 @@ struct UnaryTypeConvert<float, ck::bhalf_t>
 template <>
 struct UnaryTypeConvert<ck::bhalf_t, float>
 {
+    static constexpr const char* name = "UnaryTypeConvert";
+
     __host__ __device__ void operator()(ck::bhalf_t& y, float& x) const
     {
         y = ck::type_convert<ck::bhalf_t, float>(x);

@@ -32,6 +32,7 @@
 #include <rocRoller/DataTypes/DataTypes.hpp>
 #include <rocRoller/GPUArchitecture/GPUArchitectureTarget.hpp>
 #include <rocRoller/Operations/BlockScale_fwd.hpp>
+#include <rocRoller/Parameters/Solution/LoadOption.hpp>
 #include <rocRoller/Utilities/Utils.hpp>
 
 #include "client/BenchmarkSolution.hpp"
@@ -75,6 +76,10 @@ namespace rocRoller
 
                 bool scaleSkipPermlane = false;
 
+                // Order: M/N, K tile, K subtile
+                std::vector<size_t> scaleShuffleTileA;
+                std::vector<size_t> scaleShuffleTileB;
+
                 std::string kernelNamePart() const;
             };
 
@@ -100,7 +105,7 @@ namespace rocRoller
                 // When scaleA/B is ScaleMode::SingleScale
                 float scaleValueA, scaleValueB;
 
-                std::pair<int, int> workgroupMapping;
+                int workgroupMappingDim;
             };
 
             /**
@@ -125,9 +130,9 @@ namespace rocRoller
                 int workgroupSizeX = 64;
                 int workgroupSizeY = 1;
 
-                std::pair<int, int> workgroupMapping       = {-1, -1};
-                bool                workgroupRemapXCC      = false;
-                int                 workgroupRemapXCCValue = -1;
+                int  workgroupMappingDim    = -1;
+                bool workgroupRemapXCC      = false;
+                int  workgroupRemapXCCValue = -1;
 
                 // Datatype of inputs and outputs
                 TypeParameters types;
@@ -139,12 +144,11 @@ namespace rocRoller
                 bool prefetchScale = false;
 
                 // Other options
-                bool loadLDSA  = true;
-                bool loadLDSB  = true;
+                Parameters::Solution::LoadPath loadPathA{
+                    Parameters::Solution::LoadPath::BufferToLDSViaVGPR};
+                Parameters::Solution::LoadPath loadPathB{
+                    Parameters::Solution::LoadPath::BufferToLDSViaVGPR};
                 bool storeLDSD = true;
-
-                bool direct2LDSA = false;
-                bool direct2LDSB = false;
 
                 bool prefetch          = false;
                 int  prefetchInFlight  = 2;
@@ -157,10 +161,13 @@ namespace rocRoller
                 unsigned int unrollY = 0;
 
                 std::string scheduler;
+                std::string schedulerCost;
                 bool        matchMemoryAccess;
 
-                bool streamK        = false;
-                bool streamKTwoTile = false;
+                // TODO Use StreamKConfig
+                bool streamK               = false;
+                bool streamKTwoTile        = false;
+                bool streamKTwoTileDPFirst = false;
 
                 std::string version;
 
