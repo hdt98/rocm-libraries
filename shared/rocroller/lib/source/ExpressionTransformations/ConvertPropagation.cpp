@@ -136,7 +136,7 @@ namespace rocRoller
             {
                 // Operating on CommandArgumentPtr causes more scalar loads at start of kernel
                 // leading to running out of SGPRs
-                if constexpr(not std::is_same_v<Value, CommandArgumentPtr>)
+                if constexpr(not std::same_as<Value, CommandArgumentPtr>)
                 {
                     const auto variableType
                         = resultType(std::make_shared<Expression>(value)).varType;
