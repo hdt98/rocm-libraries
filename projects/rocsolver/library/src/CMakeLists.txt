@@ -136,6 +136,7 @@ set(rocsolver_lapack_source
   # - Cholesky QR
   lapack/roclapack_cholqr1.cpp
   lapack/roclapack_cholqr1_strided_batched.cpp
+  lapack/roclapack_cholqr1_batched.cpp
   lapack/roclapack_cholqr2.cpp
   lapack/roclapack_cholqr2_strided_batched.cpp
   #### Problem and Matrix Reductions (Diagonalizations) ####
