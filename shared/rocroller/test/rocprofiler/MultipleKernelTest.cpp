@@ -73,10 +73,10 @@ namespace RocprofilerTest
                                            uint32_t      commandArg,
                                            uint          workgroupSize = 256,
                                            uint          workitemCount = 256 * 256);
-        static KernelSetup createSimpleMovKernel(TestContext&& testContext,
-                                                 uint32_t      literal,
-                                                 uint          workgroupSize = 256,
-                                                 uint          workitemCount = 256 * 256);
+        static KernelSetup createMovKernel(TestContext&& testContext,
+                                           uint32_t      literal,
+                                           uint          workgroupSize = 256,
+                                           uint          workitemCount = 256 * 256);
     };
 
     KernelSetup KernelSetup::createAddKernel(TestContext&& testContext,
@@ -155,15 +155,14 @@ namespace RocprofilerTest
         return {std::move(testContext), std::move(commandKernel), d_ptr, commandArgs};
     }
 
-    TEST_CASE("Rocprofiler simple kernel", "[rocprofiler]")
+    TEST_CASE("Rocprofiler add kernel", "[rocprofiler]")
     {
         rocRoller::profiler::reset();
 
         auto literal    = GENERATE(0xdeadbeef, 0x12345678, 0xabcdef00);
         auto commandArg = GENERATE(7, 21, 331);
 
-        std::string const testName
-            = fmt::format("simple_kernel_0x{:x}_value_{}", literal, commandArg);
+        std::string const testName = fmt::format("add_0x{:x}_value_{}", literal, commandArg);
 
         auto kernelSetup = KernelSetup::createAddKernel(
             TestContext::ForTestDevice({}, testName), literal, commandArg);
@@ -207,10 +206,10 @@ namespace RocprofilerTest
         }
     }
 
-    KernelSetup KernelSetup::createSimpleMovKernel(TestContext&& testContext,
-                                                   uint32_t      literal,
-                                                   uint          workgroupSize,
-                                                   uint          workitemCount)
+    KernelSetup KernelSetup::createMovKernel(TestContext&& testContext,
+                                             uint32_t      literal,
+                                             uint          workgroupSize,
+                                             uint          workitemCount)
     {
         auto command = std::make_shared<Command>();
 
@@ -265,8 +264,8 @@ namespace RocprofilerTest
         for(uint32_t literal : literals)
         {
             std::string const testName = fmt::format("different_literals_0x{:x}", literal);
-            kernelSetups.push_back(KernelSetup::createSimpleMovKernel(
-                TestContext::ForTestDevice({}, testName), literal));
+            kernelSetups.push_back(
+                KernelSetup::createMovKernel(TestContext::ForTestDevice({}, testName), literal));
         }
 
         std::vector<rocRoller::profiler::InstructionProfile> latencies;
@@ -336,6 +335,31 @@ namespace RocprofilerTest
             // Behavior is to use first dispatched kernel's data
             literalHex = fmt::format("0x{:x}", literals[4]);
         }
+
+        CAPTURE(literalHex);
+        INFO(toString(latencies));
+        REQUIRE(latencies.size() == 2);
+        CHECK(1 == countSubstring(latencies[0].instruction, literalHex));
+        CHECK(latencies[1].instruction == "s_endpgm");
+    }
+
+    TEST_CASE("Rocprofiler small workgroup count", "[rocprofiler]")
+    {
+        /*
+        With a small workgroup count, the filtered-for SE/CU/SIMD may not be used.
+        Ensure looping the dispatch works as expected.
+        */
+        rocRoller::profiler::reset();
+
+        const auto literal = 0xdead1234;
+
+        auto kernelSetup = KernelSetup::createMovKernel(
+            TestContext::ForTestDevice({}, "small_workgroup_count", literal), literal, 64, 128);
+
+        const auto latencies = rocRoller::profiler::loopUntilDispatchData(
+            [&]() { kernelSetup.kernel.launchKernel(kernelSetup.commandArgs.runtimeArguments()); });
+
+        const auto literalHex = fmt::format("0x{:x}", literal);
 
         CAPTURE(literalHex);
         INFO(toString(latencies));
