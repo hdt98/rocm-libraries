@@ -128,6 +128,17 @@ namespace rocRoller
                     cpy.arg  = call(expr.arg);
                     return std::make_shared<Expression>(cpy);
                 }
+
+                if((m_destinationType == DataType::UInt32 or m_destinationType == DataType::Int32)
+                   and (expr.destinationType == DataType::UInt64
+                        or expr.destinationType == DataType::Int64))
+                {
+                    auto cpy            = expr;
+                    cpy.destinationType = m_destinationType;
+                    cpy.arg             = call(expr.arg);
+                    return std::make_shared<Expression>(cpy);
+                }
+
                 return applyConvertToValues(expr);
             }
 
