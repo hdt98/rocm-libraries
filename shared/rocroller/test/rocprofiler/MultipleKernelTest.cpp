@@ -61,8 +61,8 @@ using namespace rocRoller;
 
 namespace RocprofilerTest
 {
-    const uint workgroupSize = 256;
-    const auto workitemCount = workgroupSize * 256;
+    constexpr uint workgroupSize = 256;
+    constexpr auto workitemCount = workgroupSize * 256;
 
     struct KernelSetup
     {
@@ -70,7 +70,6 @@ namespace RocprofilerTest
         CommandKernel             kernel;
         std::shared_ptr<uint32_t> d_ptr;
         CommandArguments          commandArgs;
-        std::vector<Instruction>  instrs;
     };
 
     KernelSetup createKernel(TestContext&& testContext, uint32_t literal, uint32_t commandArg)
@@ -103,18 +102,8 @@ namespace RocprofilerTest
                         ptr_exp});
         k->addArgument({"val", {DataType::UInt32}, DataDirection::ReadOnly, val_exp});
 
-        std::vector<Instruction> instrs;
-
-        const auto captureInstrAndSchedule = [&](auto gen) {
-            for(auto instr : gen)
-            {
-                context->schedule(instr);
-                instrs.push_back(std::move(instr));
-            }
-        };
-
         context->schedule(k->preamble());
-        captureInstrAndSchedule(k->prolog());
+        context->schedule(k->prolog());
 
         auto kb = [&]() -> Generator<Instruction> {
             Register::ValuePtr s_ptr, s_value;
@@ -137,7 +126,7 @@ namespace RocprofilerTest
             co_yield context->mem()->storeGlobal(v_ptr, v_value, 0, 4);
         };
 
-        captureInstrAndSchedule(kb());
+        context->schedule(kb());
 
         context->schedule(k->postamble());
         context->schedule(k->amdgpu_metadata());
@@ -152,7 +141,7 @@ namespace RocprofilerTest
         commandArgs.setArgument(ptrTag, ArgumentType::Value, d_ptr.get());
         commandArgs.setArgument(valTag, ArgumentType::Value, commandArg);
 
-        return {std::move(testContext), std::move(commandKernel), d_ptr, commandArgs, instrs};
+        return {std::move(testContext), std::move(commandKernel), d_ptr, commandArgs};
     }
 
     TEST_CASE("Rocprofiler simple kernel", "[rocprofiler]")
@@ -220,18 +209,8 @@ namespace RocprofilerTest
         k->setWorkgroupSize({workgroupSize, 1, 1});
         k->setWorkitemCount({std::make_shared<Expression::Expression>(workitemCount), one, one});
 
-        std::vector<Instruction> instrs;
-
-        const auto captureInstrAndSchedule = [&](auto gen) {
-            for(auto instr : gen)
-            {
-                context->schedule(instr);
-                instrs.push_back(std::move(instr));
-            }
-        };
-
         context->schedule(k->preamble());
-        captureInstrAndSchedule(k->prolog());
+        context->schedule(k->prolog());
 
         auto kb = [&]() -> Generator<Instruction> {
             auto v_value = Register::Value::Placeholder(
@@ -241,7 +220,7 @@ namespace RocprofilerTest
             co_yield Expression::generate(v_value, Expression::literal(literal), context);
         };
 
-        captureInstrAndSchedule(kb());
+        context->schedule(kb());
 
         context->schedule(k->postamble());
         context->schedule(k->amdgpu_metadata());
@@ -252,7 +231,7 @@ namespace RocprofilerTest
 
         CommandArguments commandArgs = command->createArguments();
 
-        return {std::move(testContext), std::move(commandKernel), nullptr, commandArgs, instrs};
+        return {std::move(testContext), std::move(commandKernel), nullptr, commandArgs};
     }
 
     TEST_CASE("Rocprofiler different literals in assembly", "[rocprofiler]")
