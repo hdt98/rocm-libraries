@@ -183,10 +183,13 @@ namespace RocprofilerTest
         }
         INFO(ss.str());
 
-        if(kernelSetup.testContext.get()->targetArchitecture().target().isCDNAGPU())
-            REQUIRE(latencies.size() == 8);
-        else
-            REQUIRE(latencies.size() == 9);
+        {
+            const auto target = kernelSetup.testContext.get()->targetArchitecture().target();
+            if(target.isCDNA1GPU() || target.isRDNAGPU())
+                REQUIRE(latencies.size() == 9);
+            else
+                REQUIRE(latencies.size() == 8);
+        }
 
         { // Ensure instructions exist in expected quantities in the profile data
             std::string const instructionsStr = [&]() {
