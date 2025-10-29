@@ -61,18 +61,29 @@ using namespace rocRoller;
 
 namespace RocprofilerTest
 {
-    constexpr uint workgroupSize = 256;
-    constexpr auto workitemCount = workgroupSize * 256;
-
     struct KernelSetup
     {
         TestContext               testContext;
         CommandKernel             kernel;
         std::shared_ptr<uint32_t> d_ptr;
         CommandArguments          commandArgs;
+
+        static KernelSetup createAddKernel(TestContext&& testContext,
+                                           uint32_t      literal,
+                                           uint32_t      commandArg,
+                                           uint          workgroupSize = 256,
+                                           uint          workitemCount = 256 * 256);
+        static KernelSetup createSimpleMovKernel(TestContext&& testContext,
+                                                 uint32_t      literal,
+                                                 uint          workgroupSize = 256,
+                                                 uint          workitemCount = 256 * 256);
     };
 
-    KernelSetup createKernel(TestContext&& testContext, uint32_t literal, uint32_t commandArg)
+    KernelSetup KernelSetup::createAddKernel(TestContext&& testContext,
+                                             uint32_t      literal,
+                                             uint32_t      commandArg,
+                                             uint          workgroupSize,
+                                             uint          workitemCount)
     {
         auto command = std::make_shared<Command>();
 
@@ -154,8 +165,8 @@ namespace RocprofilerTest
         std::string const testName
             = fmt::format("simple_kernel_0x{:x}_value_{}", literal, commandArg);
 
-        auto kernelSetup
-            = createKernel(TestContext::ForTestDevice({}, testName), literal, commandArg);
+        auto kernelSetup = KernelSetup::createAddKernel(
+            TestContext::ForTestDevice({}, testName), literal, commandArg);
 
         const auto latencies = rocRoller::profiler::loopUntilDispatchData(
             [&]() { kernelSetup.kernel.launchKernel(kernelSetup.commandArgs.runtimeArguments()); });
@@ -196,7 +207,10 @@ namespace RocprofilerTest
         }
     }
 
-    KernelSetup createSimpleMovKernel(TestContext&& testContext, uint32_t literal)
+    KernelSetup KernelSetup::createSimpleMovKernel(TestContext&& testContext,
+                                                   uint32_t      literal,
+                                                   uint          workgroupSize,
+                                                   uint          workitemCount)
     {
         auto command = std::make_shared<Command>();
 
@@ -251,8 +265,8 @@ namespace RocprofilerTest
         for(uint32_t literal : literals)
         {
             std::string const testName = fmt::format("different_literals_0x{:x}", literal);
-            kernelSetups.push_back(
-                createSimpleMovKernel(TestContext::ForTestDevice({}, testName), literal));
+            kernelSetups.push_back(KernelSetup::createSimpleMovKernel(
+                TestContext::ForTestDevice({}, testName), literal));
         }
 
         std::vector<rocRoller::profiler::InstructionProfile> latencies;
