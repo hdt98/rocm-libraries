@@ -33,9 +33,6 @@ add_executable(GPUArchitectureGenerator
     "${PROJECT_SOURCE_DIR}/lib/source/Timer.cpp"
 )
 
-target_compile_options(GPUArchitectureGenerator PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/Zc:__cplusplus>)
-
-
 if(ROCROLLER_ENABLE_LLVM)
     target_compile_definitions(GPUArchitectureGenerator PRIVATE ROCROLLER_USE_LLVM)
     target_link_libraries(GPUArchitectureGenerator PRIVATE ${llvm_yaml_libs})

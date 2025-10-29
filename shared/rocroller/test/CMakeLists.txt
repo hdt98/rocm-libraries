@@ -25,12 +25,9 @@ else()
 endif()
 
 add_executable(rocroller-tests)
-target_compile_options(rocroller-tests PRIVATE $<$<BOOL:MSVC>:/Zc:__cplusplus>)
 
 if(ROCROLLER_ENABLE_CATCH AND (ROCROLLER_BUILD_TESTING OR BUILD_TESTING))
     add_executable(rocroller-tests-catch)
-    # Apply only on MSVC frontend
-    target_compile_options(rocroller-tests-catch PRIVATE $<$<BOOL:MSVC>:/Zc:__cplusplus>)
     # When detecting tests gtest and catch test discovery modules run
     # something like:
     # execute_process(COMMAND ${_TEST_EXECUTOR} "${_TEST_EXECUTABLE}" --gtest_list_tests ${filter})
@@ -53,7 +50,6 @@ endif()
 
 # Component stand-alone test
 add_executable(component-test)
-target_compile_options(component-test PRIVATE $<$<BOOL:MSVC>:/Zc:__cplusplus>)
 
 if(ROCROLLER_ENABLE_ASAN)
     rocroller_target_configure_sanitizers(component-test PRIVATE)
@@ -95,8 +91,6 @@ if(ROCROLLER_ENABLE_GEMM_CLIENT_TESTS)
 endif()
 
 add_executable(arch-gen-tests)
-# Ensure MSVC handle __cplusplus
-target_compile_options(arch-gen-tests PRIVATE $<$<BOOL:MSVC>:/Zc:__cplusplus>)
 if(ROCROLLER_ENABLE_ASAN)
     rocroller_target_configure_sanitizers(arch-gen-tests PRIVATE)
     set_target_properties(arch-gen-tests
@@ -232,8 +226,6 @@ if(ROCROLLER_ENABLE_COVERAGE OR BUILD_CODE_COVERAGE)
     target_compile_options(rocroller-tests PRIVATE -fprofile-instr-generate -fcoverage-mapping)
     target_link_options(rocroller-tests PRIVATE -fprofile-instr-generate)
 
-    if(ROCROLLER_ENABLE_CATCH AND (ROCROLLER_BUILD_TESTING OR BUILD_TESTING))
-        target_compile_options(rocroller-tests-catch PRIVATE -fprofile-instr-generate -fcoverage-mapping)
-        target_link_options(rocroller-tests-catch PRIVATE -fprofile-instr-generate)
-    endif()
+    target_compile_options(rocroller-tests-catch PRIVATE -fprofile-instr-generate -fcoverage-mapping)
+    target_link_options(rocroller-tests-catch PRIVATE -fprofile-instr-generate)
 endif()
