@@ -6,6 +6,11 @@ set(ROCROLLER_VERSION 1.0.0)
 set(ROCROLLER_SOVERSION 1)
 project(rocroller VERSION ${ROCROLLER_VERSION} LANGUAGES CXX)
 
+
+if(MSVC)
+  add_compile_options(/Zc:__cplusplus)
+endif()
+
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 include(CMakeRC)
@@ -145,6 +150,8 @@ set_target_properties(rocroller
         SOVERSION ${ROCROLLER_SOVERSION}
 )
 add_library(roc::rocroller ALIAS rocroller)
+target_compile_options(rocroller PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/Zc:__cplusplus>)
+
 
 add_library(rocroller-interface INTERFACE)
 add_library(roc::rocroller-interface ALIAS rocroller-interface)
