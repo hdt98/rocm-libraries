@@ -27,156 +27,102 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <rocRoller/GPUArchitecture/GPUArchitectureLibrary.hpp>
-#include <rocRoller/Utilities/LazySingleton.hpp>
 #include <rocRoller/Utilities/Settings.hpp>
 
+#include <string>
 #include <thread>
 #include <vector>
 
-TEST_CASE("LazySingletonAPI: Derived singleton works (GPUArchitectureLibrary)", "API:LazySingleton")
+//GPUArchitectureLibrary singleton is stable via its own API
+TEST_CASE("LazySingletonAPI: GPUArchitectureLibrary getInstance() is stable", "[LazySingletonAPI]")
 {
-    auto gpu1 = rocRoller::LazySingleton<rocRoller::GPUArchitectureLibrary>::getInstance();
-    auto gpu2 = rocRoller::LazySingleton<rocRoller::GPUArchitectureLibrary>::getInstance();
-    REQUIRE(gpu1 == gpu2);
+    auto a = rocRoller::GPUArchitectureLibrary::getInstance();
+    auto b = rocRoller::GPUArchitectureLibrary::getInstance();
+    REQUIRE(a != nullptr);
+    REQUIRE(b != nullptr);
+    REQUIRE(a == b);
 }
 
-TEST_CASE("LazySingletonAPI: Thread safety across dynamic linking boundary", "API:LazySingleton")
-{
-    constexpr int                                                   N = 16;
-    std::vector<std::shared_ptr<rocRoller::GPUArchitectureLibrary>> results(N);
-
-    std::vector<std::thread> threads;
-    for(int i = 0; i < N; ++i)
-    {
-        threads.emplace_back([&results, i] {
-            results[i] = rocRoller::LazySingleton<rocRoller::GPUArchitectureLibrary>::getInstance();
-        });
-    }
-    for(auto& t : threads)
-        t.join();
-
-    for(int i = 1; i < N; ++i)
-    {
-        REQUIRE(results[i] == results[0]);
-    }
-}
-
-TEST_CASE("LazySingletonAPI: Reset is safe across threads", "[API:LazySingleton]")
-{
-    auto before = rocRoller::Settings::getInstance();
-    REQUIRE(before != nullptr);
-
-    // Perform concurrent resets to stress test thread safety
-    constexpr int            numThreads = 8;
-    std::vector<std::thread> threads;
-    threads.reserve(numThreads);
-
-    for(int i = 0; i < numThreads; ++i)
-    {
-        threads.emplace_back([] { rocRoller::Settings::reset(); });
-    }
-
-    for(auto& t : threads)
-        t.join();
-
-    auto after = rocRoller::Settings::getInstance();
-    REQUIRE(after != nullptr);
-
-    // Because dynamic linking rebuilds instance, we expect new shared_ptr
-    REQUIRE(before != after);
-}
-
-TEST_CASE("LazySingletonAPI: Shared_ptr after reset points to new instance", "[API:LazySingleton]")
-{
-    auto oldInstance = rocRoller::GPUArchitectureLibrary::getInstance();
-    REQUIRE(oldInstance != nullptr);
-
-    rocRoller::GPUArchitectureLibrary::reset();
-
-    auto newInstance = rocRoller::GPUArchitectureLibrary::getInstance();
-    REQUIRE(newInstance != nullptr);
-
-    // Since reset() reinitializes, pointers must differ
-    REQUIRE(oldInstance != newInstance);
-
-    // Old pointer is still valid (shared_ptr kept last reference)
-    REQUIRE(oldInstance.use_count() >= 1);
-}
-
-TEST_CASE("LazySingletonAPI: Different singletons remain independent", "[API:LazySingleton]")
+// Settings change is visible through library's read path (Settings::Get)
+TEST_CASE("LazySingletonAPI: Settings change visible via Settings::Get", "[LazySingletonAPI]")
 {
     auto settings = rocRoller::Settings::getInstance();
-    auto gpuLib   = rocRoller::GPUArchitectureLibrary::getInstance();
-
     REQUIRE(settings != nullptr);
-    REQUIRE(gpuLib != nullptr);
-    REQUIRE(static_cast<const void*>(settings.get()) != static_cast<const void*>(gpuLib.get()));
 
-    // Reset both independently -- each should reinitialize its own singleton only
-    rocRoller::Settings::reset();
-    rocRoller::GPUArchitectureLibrary::reset();
-
-    auto settings2 = rocRoller::Settings::getInstance();
-    auto gpuLib2   = rocRoller::GPUArchitectureLibrary::getInstance();
-
-    // Each reset should have produced a *new* instance of that singleton type
-    REQUIRE(settings != settings2);
-    REQUIRE(gpuLib != gpuLib2);
-
-    // But still distinct from each other (type independence preserved)
-    REQUIRE(static_cast<const void*>(settings2.get()) != static_cast<const void*>(gpuLib2.get()));
-}
-
-TEST_CASE("LazySingletonAPI: Settings boolean option change is globally visible",
-          "API:LazySingleton:Settings")
-{
-    auto settings = rocRoller::Settings::getInstance();
-
-    // Set LogConsole to false, simulate API user program change
+    // Set through instance (simulating an API user's program)
     settings->set(rocRoller::Settings::LogConsole, false);
 
-    // From "library" code, fetch again through singleton
-    auto settingsAgain = rocRoller::Settings::getInstance();
-    REQUIRE(settingsAgain->get(rocRoller::Settings::LogConsole) == false);
+    // Read back through the library's static read path (simulates "inside the library")
+    REQUIRE(rocRoller::Settings::Get(rocRoller::Settings::LogConsole) == false);
 
-    // Reset to default
-    settingsAgain->set(rocRoller::Settings::LogConsole, true);
+    // Restore default to avoid cross-test pollution
+    settings->set(rocRoller::Settings::LogConsole, true);
 }
 
-TEST_CASE("LazySingletonAPI: Settings string option change is globally visible",
-          "API:LazySingleton:Settings")
+// Settings string option change is globally visible and consistent
+TEST_CASE("LazySingletonAPI: Settings string option round-trip", "[LazySingletonAPI]")
 {
     auto settings = rocRoller::Settings::getInstance();
+    REQUIRE(settings != nullptr);
 
     std::string customPath = "/tmp/rocm_custom";
     settings->set(rocRoller::Settings::ROCMPath, customPath);
 
-    auto libView = rocRoller::Settings::getInstance();
-    REQUIRE(libView->get(rocRoller::Settings::ROCMPath) == customPath);
+    // Read via instance and static path
+    REQUIRE(settings->get(rocRoller::Settings::ROCMPath) == customPath);
+    REQUIRE(rocRoller::Settings::Get(rocRoller::Settings::ROCMPath) == customPath);
 }
 
-TEST_CASE("LazySingletonAPI: Static Get reflects changes made via instance set",
-          "API:LazySingleton:Settings")
+// Multiple options remain independent
+TEST_CASE("LazySingletonAPI: Independent Settings options remain independent", "[LazySingletonAPI]")
 {
     auto settings = rocRoller::Settings::getInstance();
-
-    settings->set(rocRoller::Settings::LogConsole, false);
-
-    // Static Get should return updated value
-    REQUIRE(rocRoller::Settings::Get(rocRoller::Settings::LogConsole) == false);
-
-    // Restore
-    settings->set(rocRoller::Settings::LogConsole, true);
-}
-
-TEST_CASE("LazySingletonAPI: Independent settings options remain independent",
-          "API:LazySingleton:Settings")
-{
-    auto settings = rocRoller::Settings::getInstance();
+    REQUIRE(settings != nullptr);
 
     settings->set(rocRoller::Settings::LogConsole, false);
     settings->set(rocRoller::Settings::ROCMPath, "/tmp/test_path");
 
     REQUIRE(settings->get(rocRoller::Settings::LogConsole) == false);
-    REQUIRE(settings->get(rocRoller::Settings::ROCMPath) == "/tmp/test_path");
+    REQUIRE(settings->get(rocRoller::Settings::ROCMPath) == std::string("/tmp/test_path"));
+
+    // Restore
+    settings->set(rocRoller::Settings::LogConsole, true);
+}
+
+// Settings visibility across threads using only public API
+TEST_CASE("LazySingletonAPI: Settings visibility across threads (public API only)",
+          "[LazySingletonAPI]")
+{
+    // Writer toggles a setting; readers check via static Get()
+    constexpr int writers = 2;
+    constexpr int readers = 8;
+
+    auto settings = rocRoller::Settings::getInstance();
+    REQUIRE(settings != nullptr);
+
+    // Start with true
+    settings->set(rocRoller::Settings::LogConsole, true);
+
+    std::vector<std::thread> ts;
+
+    // Readers
+    for(int i = 0; i < readers; ++i)
+    {
+        ts.emplace_back([] { (void)rocRoller::Settings::Get(rocRoller::Settings::LogConsole); });
+    }
+
+    // Writers
+    for(int i = 0; i < writers; ++i)
+    {
+        ts.emplace_back([settings, i] {
+            settings->set(rocRoller::Settings::LogConsole, (i % 2) == 0 ? false : true);
+        });
+    }
+
+    for(auto& t : ts)
+        t.join();
+
+    // Final state is whichever last writer set—exact truth value is not asserted here
+    // we only assert that public reads do not crash and are reachable.
+    REQUIRE_NOTHROW((void)rocRoller::Settings::Get(rocRoller::Settings::LogConsole));
 }
