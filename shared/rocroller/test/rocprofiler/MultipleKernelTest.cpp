@@ -22,6 +22,7 @@
 
 #include "Agent.hpp"
 
+#include "../catch/CustomMatchers.hpp"
 #include <common/SourceMatcher.hpp>
 #include <common/Utilities.hpp>
 #include <rocRoller/AssemblyKernel.hpp>
@@ -170,14 +171,7 @@ namespace RocprofilerTest
         const auto latencies = rocRoller::profiler::loopUntilDispatchData(
             [&]() { kernelSetup.kernel.launchKernel(kernelSetup.commandArgs.runtimeArguments()); });
 
-        { // Verify device result
-            uint32_t h_result = 0;
-            HIP_CHECK(hipMemcpy(
-                &h_result, kernelSetup.d_ptr.get(), sizeof(uint32_t), hipMemcpyDeviceToHost));
-
-            uint32_t expectedResult = commandArg + literal;
-            CHECK(h_result == expectedResult);
-        }
+        CHECK_THAT(kernelSetup.d_ptr, HasDeviceScalarEqualTo(commandArg + literal));
 
         std::stringstream ss;
         ss << "Instruction, Total Latency, Hit Count, Average Latency" << std::endl;
