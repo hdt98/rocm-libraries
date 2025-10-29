@@ -81,18 +81,8 @@ namespace rocRollerTest
 
     TEST_CASE("Rocprofiler LDS Microkernel", "[rocprofiler]")
     {
-        // TODO: remove ENV var stuffs
-        int ITERS = 16;
-        if(const char* env_p = std::getenv("ITERS"))
-            ITERS = atoi(env_p);
-
-        auto workgroupSize = 64u;
-        if(const char* env_p = std::getenv("WORKGROUP_SIZE"))
-            workgroupSize = atoi(env_p);
-
-        bool barrier = true;
-        if(const char* env_p = std::getenv("BARRIER"))
-            barrier = atoi(env_p) == 1 ? true : false;
+        constexpr int  ITERS         = 16;
+        constexpr auto workgroupSize = 64u;
 
         const std::vector<int>  instrSizes      = {1, 2, 4}; // b32, b64, b128
         const std::vector<int>  strides         = {1, 2, 4, 8, 16, 32, 64, 128}; // between threads
@@ -180,10 +170,7 @@ namespace rocRollerTest
                                 return {start, start + m};
                             };
 
-                            if(barrier)
-                            {
-                                co_yield context->mem()->barrier({});
-                            }
+                            co_yield context->mem()->barrier({});
 
                             for(int i = 0; i < ITERS; ++i)
                             {
@@ -207,20 +194,10 @@ namespace rocRollerTest
                                         numBytes);
                                 }
                             }
-
-                            // TODO: simplify, right now it is exactly two swaitcnts
-                            const auto waitcnt_count  = 1;
-                            const auto last_decrement = 0;
-
-                            for(int i = waitcnt_count; i >= 0; --i)
-                            {
-                                if(i == last_decrement + 1)
-                                {
-                                    i -= last_decrement;
-                                }
-                                co_yield Instruction::Wait(
-                                    WaitCount::DSCnt(context->targetArchitecture(), i));
-                            }
+                            co_yield Instruction::Wait(
+                                WaitCount::DSCnt(context->targetArchitecture(), 1));
+                            co_yield Instruction::Wait(
+                                WaitCount::DSCnt(context->targetArchitecture(), 0));
                         };
 
                         context->schedule(kb());
