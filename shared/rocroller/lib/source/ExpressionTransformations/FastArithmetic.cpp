@@ -46,8 +46,8 @@ namespace rocRoller
 
             x = splitBitfieldCombine(x);
             x = lowerBitfieldCombine(x);
-            x = convertPropagation(x);
             x = fastDivision(x, m_context);
+            x = convertPropagation(x);
             x = simplify(x);
             x = lowerExponential(x);
             x = fastMultiplication(x);
