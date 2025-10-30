@@ -500,6 +500,11 @@ void PerformanceConfigHipImplicitGemm3DGroupBwdXdlops::HeuristicInit(
 
         if(ai_success && !result.IsEmpty())
         {
+            // Ensure kernel_id includes split_k suffix
+            if(kernel_id.find('+') == std::string::npos)
+            {
+                kernel_id = kernel_id + "+" + std::to_string(split_k);
+            }
             MIOPEN_LOG_I("Step 1: AI heuristics selected kernel: " << kernel_id);
             return;
         }
@@ -522,10 +527,10 @@ void PerformanceConfigHipImplicitGemm3DGroupBwdXdlops::HeuristicInit(
     InitValidKernels(problem);
     if(!valid_kernels.empty())
     {
-        index     = 0;
-        kernel_id = valid_kernels[index];
-        split_k =
-            1; // This solver now uses split_k so if we do not use heuristics, we should set it here
+        index = 0;
+        // This solver now uses split_k so if we do not use heuristics, we should set it here
+        split_k   = 1;
+        kernel_id = valid_kernels[index] + "+" + std::to_string(split_k);
         MIOPEN_LOG_I("Step 2: Default initialization selected kernel: " << kernel_id
                                                                         << " at index: 0");
     }
