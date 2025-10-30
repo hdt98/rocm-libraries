@@ -66,13 +66,11 @@ namespace TensileLite
 
                 virtual bool operator()(Task const& task) const override
                 {
-                    int16_t gsu = task.problem.getParams().gsu() != 0
-                                      ? task.problem.getParams().gsu()
-                                      : task.solution.sizeMapping.globalSplitU;
-                    if(gsu == -1)
-                        return 1;
+                    size_t gsu = task.problem.getParams().gsu() != 0
+                                     ? task.problem.getParams().gsu()
+                                     : task.solution.calculateAutoGSU(task.problem, &task.hardware);
 
-                    int gsuMultiplier = gsu > 1 ? gsu : 0;
+                    size_t gsuMultiplier = gsu > 1 ? gsu : 0;
 
                     if(task.problem.d().totalLogicalElements()
                            * task.solution.sizeMapping.workspaceSizePerElemC * gsuMultiplier
@@ -89,20 +87,9 @@ namespace TensileLite
 
                 virtual bool debugEval(Task const& task, std::ostream& stream) const override
                 {
-
                     size_t gsu = task.problem.getParams().gsu() != 0
                                      ? task.problem.getParams().gsu()
-                                     : task.solution.sizeMapping.globalSplitU;
-                    if(gsu == -1)
-                    {
-                        bool rv = (*this)(task);
-
-                        stream << *this << ": ("
-                               << "auto gsu will consider workspace size, so bypassed"
-                               << ") == " << rv;
-
-                        return rv;
-                    }
+                                     : task.solution.calculateAutoGSU(task.problem, &task.hardware);
 
                     size_t gsuMultiplier = gsu > 1 ? gsu : 0;
 
