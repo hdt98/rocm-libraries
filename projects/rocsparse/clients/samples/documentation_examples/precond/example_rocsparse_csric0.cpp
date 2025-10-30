@@ -98,12 +98,20 @@ int main()
     rocsparse_mat_descr descr_L;
     ROCSPARSE_CHECK(rocsparse_create_mat_descr(&descr_L));
     ROCSPARSE_CHECK(rocsparse_set_mat_fill_mode(descr_L, rocsparse_fill_mode_lower));
+<<<<<<< HEAD
     ROCSPARSE_CHECK(rocsparse_set_mat_diag_type(descr_L, rocsparse_diag_type_unit));
+=======
+    ROCSPARSE_CHECK(rocsparse_set_mat_diag_type(descr_L, rocsparse_diag_type_non_unit));
+>>>>>>> 622967f785cff17e8b4fd87c5cfa4579fd2bbcf0
 
     // Create matrix descriptor for L'
     rocsparse_mat_descr descr_Lt;
     ROCSPARSE_CHECK(rocsparse_create_mat_descr(&descr_Lt));
+<<<<<<< HEAD
     ROCSPARSE_CHECK(rocsparse_set_mat_fill_mode(descr_Lt, rocsparse_fill_mode_upper));
+=======
+    ROCSPARSE_CHECK(rocsparse_set_mat_fill_mode(descr_Lt, rocsparse_fill_mode_lower));
+>>>>>>> 622967f785cff17e8b4fd87c5cfa4579fd2bbcf0
     ROCSPARSE_CHECK(rocsparse_set_mat_diag_type(descr_Lt, rocsparse_diag_type_non_unit));
 
     // Create matrix info structure
@@ -206,6 +214,36 @@ int main()
         printf("L has structural and/or numerical zero at L(%d,%d)\n", position, position);
     }
 
+<<<<<<< HEAD
+=======
+    // Copy incomplete LL^T factorization to host (note only lower L is stored and is written inplace into the original matrix)
+    HIP_CHECK(
+        hipMemcpy(hcsr_row_ptr.data(), dcsr_row_ptr, sizeof(int) * (m + 1), hipMemcpyDeviceToHost));
+    HIP_CHECK(
+        hipMemcpy(hcsr_col_ind.data(), dcsr_col_ind, sizeof(int) * nnz, hipMemcpyDeviceToHost));
+    HIP_CHECK(hipMemcpy(hcsr_val.data(), dcsr_val, sizeof(double) * nnz, hipMemcpyDeviceToHost));
+
+    std::cout << "LL^T" << std::endl;
+    for(int i = 0; i < m; i++)
+    {
+        int start = hcsr_row_ptr[i];
+        int end   = hcsr_row_ptr[i + 1];
+
+        std::vector<double> temp(n, 0.0);
+        for(int j = start; j < end; j++)
+        {
+            temp[hcsr_col_ind[j]] = hcsr_val[j];
+        }
+
+        for(int j = 0; j < n; j++)
+        {
+            std::cout << temp[j] << " ";
+        }
+        std::cout << std::endl;
+    }
+    std::cout << std::endl;
+
+>>>>>>> 622967f785cff17e8b4fd87c5cfa4579fd2bbcf0
     // Solve Lz = x
     ROCSPARSE_CHECK(rocsparse_dcsrsv_solve(handle,
                                            rocsparse_operation_none,

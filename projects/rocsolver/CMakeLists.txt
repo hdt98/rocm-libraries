@@ -92,7 +92,7 @@ get_os_id(OS_ID)
 message(STATUS "OS detected is ${OS_ID}")
 
 # Versioning via rocm-cmake
-set(VERSION_STRING "3.31.0")
+set(VERSION_STRING "3.32.0")
 rocm_setup_version(VERSION ${VERSION_STRING})
 
 # Workaround until llvm and hip CMake modules fix symlink logic in their config files
@@ -206,7 +206,7 @@ find_package(hip REQUIRED CONFIG PATHS ${ROCM_PATH} /opt/rocm)
 find_package(rocblas REQUIRED CONFIG PATHS ${ROCM_PATH})
 get_imported_target_location(location roc::rocblas)
 message(STATUS "Found rocBLAS: ${location}")
-set(rocblas_minimum 4.4)
+set(rocblas_minimum 5.1)
 rocm_package_add_dependencies(SHARED_DEPENDS "rocblas >= ${rocblas_minimum}")
 rocm_package_add_rpm_dependencies(STATIC_DEPENDS "rocblas-static-devel >= ${rocblas_minimum}")
 rocm_package_add_deb_dependencies(STATIC_DEPENDS "rocblas-static-dev >= ${rocblas_minimum}")
