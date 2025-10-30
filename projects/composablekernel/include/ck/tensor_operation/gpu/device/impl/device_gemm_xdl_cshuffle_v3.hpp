@@ -166,7 +166,8 @@ template <typename ALayout,
           typename ComputeTypeB                       = ComputeTypeA,
           bool PermuteA                               = false,
           bool PermuteB                               = false,
-          index_t MinimumOccupancy                    = 0>
+          index_t MinimumOccupancy                    = 0,
+          bool UsePrefetch                            = false>
 struct DeviceGemm_Xdl_CShuffleV3 : public DeviceGemmV2<ALayout,
                                                        BLayout,
                                                        CLayout,
@@ -233,7 +234,8 @@ struct DeviceGemm_Xdl_CShuffleV3 : public DeviceGemmV2<ALayout,
         PermuteA,
         PermuteB,
         false,
-        MinimumOccupancy>;
+        MinimumOccupancy,
+        UsePrefetch>;
     using GridwiseGemm64 = GridwiseGemmBase<math::max(NXdlPerWave64, 1)>;
     using GridwiseGemm32 = GridwiseGemmBase<NXdlPerWave32>;
 

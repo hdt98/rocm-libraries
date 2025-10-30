@@ -244,7 +244,8 @@ template <typename ALayout,
           bool PermuteA                               = false,
           bool PermuteB                               = false,
           bool DoElementwiseBeforeCShuffle            = false,
-          index_t MinimumOccupancy                    = 0>
+          index_t MinimumOccupancy                    = 0,
+          bool UsePrefetch                            = false>
 struct GridwiseGemm_xdl_cshuffle_v3
 {
     static constexpr auto I0 = Number<0>{};
@@ -1583,7 +1584,8 @@ struct GridwiseGemm_xdl_cshuffle_v3
                  NXdlPerWave,
                  KPack,
                  false,
-                 TransposeC>())>;
+                 TransposeC,
+                 UsePrefetch>())>;
 
     template <typename DeviceArch>
     __device__ __host__ static constexpr index_t GetSharedMemoryNumberOfByte(DeviceArch)

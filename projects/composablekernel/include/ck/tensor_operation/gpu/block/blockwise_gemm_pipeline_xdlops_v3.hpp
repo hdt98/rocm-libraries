@@ -33,7 +33,8 @@ template <BlockGemmPipelineScheduler BlkGemmPipelineVer,
           index_t MRepeat,
           index_t NRepeat,
           index_t KPacks,
-          bool TransposeC = false>
+          bool TransposeC  = false,
+          bool UsePrefetch = false>
 struct BlockwiseGemmXdlops_pipeline_v3
 {
 };
@@ -57,7 +58,8 @@ template <index_t BlockSize,
           index_t MRepeat,
           index_t NRepeat,
           index_t KPack,
-          bool TransposeC>
+          bool TransposeC,
+          bool UsePrefetch>
 struct BlockwiseGemmXdlops_pipeline_v3<BlockGemmPipelineScheduler::Intrawave,
                                        BlockSize,
                                        ADataType,
@@ -78,7 +80,8 @@ struct BlockwiseGemmXdlops_pipeline_v3<BlockGemmPipelineScheduler::Intrawave,
                                        MRepeat,
                                        NRepeat,
                                        KPack,
-                                       TransposeC>
+                                       TransposeC,
+                                       UsePrefetch>
     : BlockwiseGemmXdlops_pipeline_base<BlockSize,
                                         ADataType,
                                         BDataType,
@@ -323,6 +326,13 @@ struct BlockwiseGemmXdlops_pipeline_v3<BlockGemmPipelineScheduler::Intrawave,
         a_blockwise_copy.MoveSrcSliceWindow(a_grid_desc, a_block_copy_step);
         b_blockwise_copy.MoveSrcSliceWindow(b_grid_desc, b_block_copy_step);
 
+        // HW PREFETCH
+        if constexpr(UsePrefetch)
+        {
+            a_blockwise_copy.RunPrefetch(a_grid_desc, a_grid_buf);
+            b_blockwise_copy.RunPrefetch(b_grid_desc, b_grid_buf);
+        }
+
         // Initialize C
         c_thread_buf.Clear();
 
@@ -365,6 +375,17 @@ struct BlockwiseGemmXdlops_pipeline_v3<BlockGemmPipelineScheduler::Intrawave,
 
                 a_blockwise_copy.MoveSrcSliceWindow(a_grid_desc, a_block_copy_step);
                 b_blockwise_copy.MoveSrcSliceWindow(b_grid_desc, b_block_copy_step);
+
+                // HW PREFETCH
+                if constexpr(UsePrefetch)
+                {
+                    // we don't want to prefetch on last iteration, that's why we add + 1
+                    if((i + 1) < (num_loop - 1))
+                    {
+                        a_blockwise_copy.RunPrefetch(a_grid_desc, a_grid_buf);
+                        b_blockwise_copy.RunPrefetch(b_grid_desc, b_grid_buf);
+                    }
+                }
 
                 static_for<0, KRepeat, 1>{}([&](auto k0) {
                     static_for<0, MRepeat, 1>{}([&](auto m0) {

@@ -323,6 +323,11 @@ endif()
 if(SUPPORTED_GPU_TARGETS MATCHES "gfx12")
     add_subdirectory(s_prefetch_op)
 endif()
+
+if(SUPPORTED_GPU_TARGETS MATCHES "gfx125")
+    add_subdirectory(prefetch_op)
+endif()
+
 add_subdirectory(position_embedding)
 add_subdirectory(scatter_gather)
 add_subdirectory(synchronization)
