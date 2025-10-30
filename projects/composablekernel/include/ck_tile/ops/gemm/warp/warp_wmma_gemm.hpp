@@ -43,6 +43,14 @@ using WarpGemmWmma_f32_16x16x16_bf8_f8 =
     WarpGemmImpl<WarpGemmAttributeWmma<WarpGemmAttributeWmmaImpl_f32_16x16x16_bf8_f8, kTransC>>;
 
 template <bool kTransC = false>
+using WarpGemmWmma_i32_16x16x64_i8_i8 =
+    WarpGemmImpl<WarpGemmAttributeWmma<WarpGemmAttributeWmmaImpl_i32_16x16x64_i8_i8, kTransC>>;
+
+template <bool kTransC = false>
+using WarpGemmWmma_i32_16x16x64_u8_u8 =
+    WarpGemmImpl<WarpGemmAttributeWmma<WarpGemmAttributeWmmaImpl_i32_16x16x64_u8_u8, kTransC>>;
+
+template <bool kTransC = false>
 using WarpGemmWmma_f32_16x16x64_f8_f8 =
     WarpGemmImpl<WarpGemmAttributeWmma<WarpGemmAttributeWmmaImpl_f32_16x16x64_f8_f8, kTransC>>;
 

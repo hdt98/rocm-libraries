@@ -136,8 +136,58 @@ struct WmmaTraits<gfx120_t, bf8_t, fp8_t, float, 16, 16, 16>
     }
 };
 
-// fp8/bf8 specialization - GFX125
+// iu8 specialization - GFX125
+template <>
+struct WmmaTraits<gfx125_t, int8_t, int8_t, int32_t, 16, 16, 64>
+    : WmmaTraitsBase<gfx12_t, int8_t, int8_t, int32_t, 64>
+{
+    template <bool clamp = false>
+    CK_TILE_DEVICE static CVecType
+    wmma_intrinsic(const AVecType& a_vec, const BVecType& b_vec, const CVecType& c_vec)
+    {
+#ifdef __gfx125__
+        return __builtin_amdgcn_wmma_i32_16x16x64_iu8(true, // neg_a
+                                                      bit_cast<int32x8_t>(a_vec),
+                                                      true, // neg_b
+                                                      bit_cast<int32x8_t>(b_vec),
+                                                      bit_cast<int32x8_t>(c_vec),
+                                                      false, // matrix_a_reuse
+                                                      clamp);
+#else
+        ck_tile::ignore = a_vec;
+        ck_tile::ignore = b_vec;
+        ck_tile::ignore = c_vec;
+        return CVecType{0};
+#endif
+    }
+};
 
+template <>
+struct WmmaTraits<gfx125_t, uint8_t, uint8_t, uint32_t, 16, 16, 64>
+    : WmmaTraitsBase<gfx12_t, uint8_t, uint8_t, uint32_t, 64>
+{
+    template <bool clamp = false>
+    CK_TILE_DEVICE static CVecType
+    wmma_intrinsic(const AVecType& a_vec, const BVecType& b_vec, const CVecType& c_vec)
+    {
+#ifdef __gfx125__
+        return __builtin_amdgcn_wmma_i32_16x16x64_iu8(false, // neg_a
+                                                      bit_cast<int32x8_t>(a_vec),
+                                                      false, // neg_b
+                                                      bit_cast<int32x8_t>(b_vec),
+                                                      bit_cast<int32x8_t>(c_vec),
+                                                      false, // matrix_a_reuse
+                                                      clamp);
+#else
+        ck_tile::ignore = a_vec;
+        ck_tile::ignore = b_vec;
+        ck_tile::ignore = c_vec;
+        return CVecType{0};
+#endif
+    }
+};
+
+// fp8/bf8 specialization - GFX125
 template <>
 struct WmmaTraits<gfx125_t, fp8_t, fp8_t, float, 16, 16, 64>
     : WmmaTraitsBase<gfx12_t, fp8_t, fp8_t, float, 64>
@@ -151,8 +201,8 @@ struct WmmaTraits<gfx125_t, fp8_t, fp8_t, float, 16, 16, 64>
                                                           bit_cast<int32x8_t>(b_vec),
                                                           0,
                                                           bit_cast<fp32x8_t>(c_vec),
-                                                          false,
-                                                          true);
+                                                          false, // matrix_a_reuse
+                                                          clamp);
 #else
         ck_tile::ignore = a_vec;
         ck_tile::ignore = b_vec;
@@ -175,8 +225,8 @@ struct WmmaTraits<gfx125_t, bf8_t, bf8_t, float, 16, 16, 64>
                                                           bit_cast<int32x8_t>(b_vec),
                                                           0,
                                                           bit_cast<fp32x8_t>(c_vec),
-                                                          false,
-                                                          true);
+                                                          false, // matrix_a_reuse
+                                                          clamp);
 #else
         ck_tile::ignore = a_vec;
         ck_tile::ignore = b_vec;
@@ -199,8 +249,8 @@ struct WmmaTraits<gfx125_t, fp8_t, bf8_t, float, 16, 16, 64>
                                                           bit_cast<int32x8_t>(b_vec),
                                                           0,
                                                           bit_cast<fp32x8_t>(c_vec),
-                                                          false,
-                                                          true);
+                                                          false, // matrix_a_reuse
+                                                          clamp);
 #else
         ck_tile::ignore = a_vec;
         ck_tile::ignore = b_vec;
@@ -223,8 +273,8 @@ struct WmmaTraits<gfx125_t, bf8_t, fp8_t, float, 16, 16, 64>
                                                           bit_cast<int32x8_t>(b_vec),
                                                           0,
                                                           bit_cast<fp32x8_t>(c_vec),
-                                                          false,
-                                                          true);
+                                                          false, // matrix_a_reuse
+                                                          clamp);
 #else
         ck_tile::ignore = a_vec;
         ck_tile::ignore = b_vec;
@@ -247,8 +297,8 @@ struct WmmaTraits<gfx125_t, fp8_t, fp8_t, fp16_t, 16, 16, 64>
                                                           bit_cast<int32x8_t>(b_vec),
                                                           0,
                                                           bit_cast<fp16x8_t>(c_vec),
-                                                          false,
-                                                          true);
+                                                          false, // matrix_a_reuse
+                                                          clamp);
 #else
         ck_tile::ignore = a_vec;
         ck_tile::ignore = b_vec;
@@ -271,8 +321,8 @@ struct WmmaTraits<gfx125_t, fp8_t, bf8_t, fp16_t, 16, 16, 64>
                                                           bit_cast<int32x8_t>(b_vec),
                                                           0,
                                                           bit_cast<fp16x8_t>(c_vec),
-                                                          false,
-                                                          true);
+                                                          false, // matrix_a_reuse
+                                                          clamp);
 #else
         ck_tile::ignore = a_vec;
         ck_tile::ignore = b_vec;
@@ -294,8 +344,8 @@ struct WmmaTraits<gfx125_t, bf8_t, fp8_t, fp16_t, 16, 16, 64>
                                                           bit_cast<int32x8_t>(b_vec),
                                                           0,
                                                           bit_cast<fp16x8_t>(c_vec),
-                                                          false,
-                                                          true);
+                                                          false, // matrix_a_reuse
+                                                          clamp);
 #else
         ck_tile::ignore = a_vec;
         ck_tile::ignore = b_vec;
@@ -318,8 +368,8 @@ struct WmmaTraits<gfx125_t, bf8_t, bf8_t, fp16_t, 16, 16, 64>
                                                           bit_cast<int32x8_t>(b_vec),
                                                           0,
                                                           bit_cast<fp16x8_t>(c_vec),
-                                                          false,
-                                                          true);
+                                                          false, // matrix_a_reuse
+                                                          clamp);
 #else
         ck_tile::ignore = a_vec;
         ck_tile::ignore = b_vec;

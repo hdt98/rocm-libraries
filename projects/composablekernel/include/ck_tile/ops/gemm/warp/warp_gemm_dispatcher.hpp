@@ -180,8 +180,9 @@ template<> struct WarpGemmDispatcher<ck_tile::int8_t, ck_tile::int8_t, ck_tile::
 template<> struct WarpGemmDispatcher<ck_tile::int8_t, ck_tile::int8_t, ck_tile::int32_t, 16, 16,  32, false> { using Type = WarpGemmMfma_i32_16x16x32_i8_i8; };
 template<> struct WarpGemmDispatcher<ck_tile::int8_t, ck_tile::int8_t, ck_tile::int32_t, 16, 16,  32, true>  { using Type = WarpGemmMfma_i32_16x16x32_i8_i8_CTransposed; };
 // WMMA cases
-template<bool TransposeC> struct WarpGemmDispatcher<ck_tile::int8_t, ck_tile::int8_t, int32_t, 16, 16, 16, TransposeC, false> { using Type = WarpGemmWmma_i32_16x16x16_i8_i8<TransposeC>;};
-
+template<bool TransposeC> struct WarpGemmDispatcher<ck_tile::int8_t, ck_tile::int8_t, ck_tile::int32_t, 16, 16, 16, TransposeC, false> { using Type = WarpGemmWmma_i32_16x16x16_i8_i8<TransposeC>; };
+template<bool TransposeC> struct WarpGemmDispatcher<ck_tile::int8_t, ck_tile::int8_t, ck_tile::int32_t, 16, 16, 64, TransposeC, false> { using Type = WarpGemmWmma_i32_16x16x64_i8_i8<TransposeC>; };
+template<bool TransposeC> struct WarpGemmDispatcher<ck_tile::uint8_t, ck_tile::uint8_t, ck_tile::int32_t, 16, 16, 64, TransposeC, false> { using Type = WarpGemmWmma_i32_16x16x64_u8_u8<TransposeC>; };
 // clang-format on
 } // namespace impl
 
