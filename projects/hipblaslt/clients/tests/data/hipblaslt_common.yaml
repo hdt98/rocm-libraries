@@ -487,6 +487,12 @@ Real precisions 1 bytes: &real_precisions_mx
   - &mxf4_mxf4_precision_dst_bfp16
     { a_type: f4_r, b_type: f4_r, c_type: bf16_r, d_type: bf16_r, compute_type: c_f32_r, scaleA: 3, scaleB: 3, scale_type: f32_r}
 
+invalid datatypes for testing: &invalid_precisions
+  - &bad_precision_fp64_fp32
+    { a_type: f64_r, b_type: f64_r, c_type: f64_r, d_type: f64_r, compute_type: c_f32_r, scale_type: f32_r }
+  - &bad_precision_fp32_fp16
+    { a_type: f32_r, b_type: f32_r, c_type: f32_r, d_type: f32_r, compute_type: c_i32_r, scale_type: f32_r }
+
 # rocRoller predicate
 rocRoller predicate: &rocroller_predicate
   - &unrollKPredicate

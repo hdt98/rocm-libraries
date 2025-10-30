@@ -1626,6 +1626,62 @@ void testing_aux_matmul_bad_ws_size(const Arguments& arg)
     CHECK_HIPBLASLT_ERROR(hipblasLtDestroy(handle));
     CHECK_HIP_ERROR(hipStreamDestroy(stream));
 }
+
+void testing_aux_matmul_bad_input_types(const Arguments& arg)
+{
+    hipStream_t        stream;
+    hipblasLtHandle_t  handle;
+    hipblasOperation_t trans_a     = HIPBLAS_OP_N;
+    hipblasOperation_t trans_b     = HIPBLAS_OP_N;
+    int64_t            m           = 128;
+    int64_t            n           = 128;
+    int64_t            k           = 128;
+
+    CHECK_HIP_ERROR(hipStreamCreate(&stream));
+    CHECK_HIPBLASLT_ERROR(hipblasLtCreate(&handle));
+
+    hipblasLtMatrixLayout_t matA, matB, matC, matD;
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatrixLayoutCreate(&matA, arg.a_type, m, k, m));
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatrixLayoutCreate(&matB, arg.b_type, k, n, k));
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatrixLayoutCreate(&matC, arg.c_type, m, n, m));
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatrixLayoutCreate(&matD, arg.d_type, m, n, m));
+
+    hipblasLtMatmulDesc_t matmul;
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatmulDescCreate(&matmul, arg.compute_type, arg.scale_type));
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatmulDescSetAttribute(
+        matmul, HIPBLASLT_MATMUL_DESC_TRANSA, &trans_a, sizeof(int32_t)));
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatmulDescSetAttribute(
+        matmul, HIPBLASLT_MATMUL_DESC_TRANSB, &trans_b, sizeof(int32_t)));
+
+    hipblasLtMatmulPreference_t pref;
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatmulPreferenceCreate(&pref));
+
+    const int                        request_solutions = 50;
+    hipblasLtMatmulHeuristicResult_t heuristicResult[request_solutions];
+    int                              returnedAlgoCount = 0;
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatmulAlgoGetHeuristic(handle,
+                                                          matmul,
+                                                          matA,
+                                                          matB,
+                                                          matC,
+                                                          matD,
+                                                          pref,
+                                                          request_solutions,
+                                                          heuristicResult,
+                                                          &returnedAlgoCount));
+
+    // We are passing in invalid datatype combinations, so we shouldn't get any valid solutions
+    ASSERT_TRUE(returnedAlgoCount == 0);
+
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatmulDescDestroy(matmul));
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatrixLayoutDestroy(matA));
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatrixLayoutDestroy(matB));
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatrixLayoutDestroy(matC));
+    CHECK_HIPBLASLT_ERROR(hipblasLtMatrixLayoutDestroy(matD));
+    CHECK_HIPBLASLT_ERROR(hipblasLtDestroy(handle));
+    CHECK_HIP_ERROR(hipStreamDestroy(stream));
+}
+
 void testing_aux_matmul_pref_init_bad_arg(const Arguments& arg)
 {
     hipblasLtMatmulPreference_t pref;
