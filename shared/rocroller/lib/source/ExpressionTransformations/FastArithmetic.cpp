@@ -41,8 +41,8 @@ namespace rocRoller
             std::vector<ExpressionTransformType> transforms
                 = {splitBitfieldCombine,
                    lowerBitfieldCombine,
-                   convertPropagation,
                    [this](auto e) { return fastDivision(e, m_context); },
+                   convertPropagation,
                    simplify,
                    lowerExponential,
                    fastMultiplication,
