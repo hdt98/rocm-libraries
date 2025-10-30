@@ -355,26 +355,34 @@ bool IsCKArgsSupported(const ProblemDescriptionType& problem, const std::string&
         auto conv_ptrs = DeviceOpType::GetInstances();
         if constexpr(IsSplitKNeeded<DeviceOpType>() || CheckSplitK)
         {
-            auto pos = kernel_id.find_last_of('+');
+            auto pos                   = kernel_id.find_last_of('+');
+            int split_k                = 1; // Default to 1 for backward compatibility
+            std::string base_kernel_id = kernel_id;
+
             if(pos == std::string::npos)
             {
-                MIOPEN_LOG_WE("Unable to parse split_k from kernel_id for wrw: " << kernel_id);
-                return false;
+                // No split_k suffix found - use default split_k = 1 for backward compatibility
+                MIOPEN_LOG_I2("No split_k suffix in kernel_id '"
+                              << kernel_id
+                              << "', defaulting to split_k=1 for backward compatibility");
+            }
+            else
+            {
+                // Parse split_k from suffix
+                try
+                {
+                    split_k        = std::stoi(kernel_id.substr(pos + 1));
+                    base_kernel_id = kernel_id.substr(0, pos);
+                }
+                catch(std::exception& e)
+                {
+                    MIOPEN_LOG_WE("Unable to parse split_k from kernel_id: "
+                                  << kernel_id << " : " << e.what() << ", defaulting to split_k=1");
+                    // Keep split_k = 1 and use full kernel_id as base
+                }
             }
 
-            int split_k = 1;
-            try
-            {
-                split_k = std::stoi(kernel_id.substr(pos + 1));
-            }
-            catch(std::exception& e)
-            {
-                MIOPEN_LOG_WE("Unable to parse split_k from kernel_id for wrw: "
-                              << kernel_id << " : " << e.what());
-                return false;
-            }
-
-            auto ptr_iter = FindConvPtrByID(conv_ptrs, kernel_id.substr(0, pos));
+            auto ptr_iter = FindConvPtrByID(conv_ptrs, base_kernel_id);
             return (ptr_iter != conv_ptrs.end()) &&
                    CKArgsType{problem}.IsSupportedBySplitK(*ptr_iter, split_k);
         }
@@ -1205,6 +1213,13 @@ ConvSolution InitInvokerFactoryNCHW(const ExecutionContext& ctx,
         split_k   = std::stoi(kernel_id.substr(pos + 1));
         id_string = kernel_id.substr(0, pos);
     }
+    else if constexpr(IsSplitKNeeded<DeviceOpType>())
+    {
+        // Backward compatibility: default to split_k = 1 for old database entries
+        split_k = 1;
+        MIOPEN_LOG_I2("No split_k suffix in kernel_id '"
+                      << kernel_id << "', defaulting to split_k=1 for backward compatibility");
+    }
 
     std::optional<CKBWDWeightBufferDescriptor> _ck_buff_des;
 
@@ -1353,6 +1368,13 @@ ConvSolution InitInvokerFactoryNHWC(const ExecutionContext&,
     {
         split_k   = std::stoi(kernel_id.substr(pos + 1));
         id_string = kernel_id.substr(0, pos);
+    }
+    else if constexpr(IsSplitKNeeded<DeviceOpType>())
+    {
+        // Backward compatibility: default to split_k = 1 for old database entries
+        split_k = 1;
+        MIOPEN_LOG_I2("No split_k suffix in kernel_id '"
+                      << kernel_id << "', defaulting to split_k=1 for backward compatibility");
     }
 
     auto ptr_iter = FindConvPtrByID(conv_ptrs, id_string);
