@@ -217,9 +217,6 @@ namespace DGen
                                              const float                 mean,
                                              const float                 std_dev);
 
-        void dispatch_generate_pattern(const std::vector<index_t>& size,
-                                       const std::vector<index_t>& stride);
-
         uint32_t scale_block_mean(const std::vector<uint32_t>& scales,
                                   std::vector<uint64_t>&       data,
                                   index_t                      block_size);
@@ -1129,11 +1126,7 @@ namespace DGen
         using namespace Constants;
 
         // setup
-        // const auto dataBias = static_cast<int32_t>(getDataBias<DTYPE>());
-        // const auto dataMantissaBits  = getDataMantissaBits<DTYPE>();
-        // const auto dataExponentBits  = getDataExponentBits<DTYPE>();
         const auto scaleBias = getScaleBias<DTYPE>();
-        // const auto scaleUnbiasedEMin = getScaleUnBiasedEMin<DTYPE>();
 
         const auto block_size = (isScaled<DTYPE>() ? m_options.blockScaling : 1);
 
