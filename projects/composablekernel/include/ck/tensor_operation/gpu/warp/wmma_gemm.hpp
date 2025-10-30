@@ -764,7 +764,7 @@ struct wmma_type<WmmaInstr::wmma_f32_16x16x64_f8f8_gfx12,
         if constexpr(wave_size == 32)
         {
 #ifdef __gfx125__
-            intrin_wmma_f32_16x16x64_f8f8_w32<MPerWmma, NPerWmma>::Run(a, b, reg_c);
+            intrin_wmma_f32_16x16x64_f8f8<MPerWmma, NPerWmma>::Run(a, b, reg_c);
 #else
             ignore = a;
             ignore = b;
@@ -798,7 +798,7 @@ struct wmma_type<WmmaInstr::wmma_f32_16x16x64_bf8f8_gfx12,
         if constexpr(wave_size == 32)
         {
 #ifdef __gfx125__
-            intrin_wmma_f32_16x16x64_bf8f8_w32<MPerWmma, NPerWmma>::Run(a, b, reg_c);
+            intrin_wmma_f32_16x16x64_bf8f8<MPerWmma, NPerWmma>::Run(a, b, reg_c);
 #else
             ignore = a;
             ignore = b;
@@ -832,7 +832,7 @@ struct wmma_type<WmmaInstr::wmma_f32_16x16x64_bf8bf8_gfx12,
         if constexpr(wave_size == 32)
         {
 #ifdef __gfx125__
-            intrin_wmma_f32_16x16x64_bf8bf8_w32<MPerWmma, NPerWmma>::Run(a, b, reg_c);
+            intrin_wmma_f32_16x16x64_bf8bf8<MPerWmma, NPerWmma>::Run(a, b, reg_c);
 #else
             ignore = a;
             ignore = b;
@@ -867,7 +867,7 @@ struct wmma_type<WmmaInstr::wmma_f32_16x16x64_f8bf8_gfx12,
         if constexpr(wave_size == 32)
         {
 #ifdef __gfx125__
-            intrin_wmma_f32_16x16x64_f8bf8_w32<MPerWmma, NPerWmma>::Run(a, b, reg_c);
+            intrin_wmma_f32_16x16x64_f8bf8<MPerWmma, NPerWmma>::Run(a, b, reg_c);
 #else
             ignore = a;
             ignore = b;

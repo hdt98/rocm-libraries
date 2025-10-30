@@ -1294,7 +1294,7 @@ struct mfma_type<MfmaInstr::wmma_f32_16x16x64_f8f8_gfx125> : public mfma_type_gf
     template <index_t MPerWmma, index_t NPerWmma, class FloatA, class FloatB, class FloatC>
     __device__ void run(const FloatA& a, const FloatB& b, FloatC& reg_c) const
     {
-        intrin_wmma_f32_16x16x64_f8f8_w32<MPerWmma, NPerWmma>::Run(a, b, reg_c);
+        intrin_wmma_f32_16x16x64_f8f8<MPerWmma, NPerWmma>::Run(a, b, reg_c);
     }
 };
 
@@ -1304,7 +1304,7 @@ struct mfma_type<MfmaInstr::wmma_f32_16x16x64_bf8f8_gfx125> : public mfma_type_g
     template <index_t MPerWmma, index_t NPerWmma, class FloatA, class FloatB, class FloatC>
     __device__ void run(const FloatA& a, const FloatB& b, FloatC& reg_c) const
     {
-        intrin_wmma_f32_16x16x64_bf8f8_w32<MPerWmma, NPerWmma>::Run(a, b, reg_c);
+        intrin_wmma_f32_16x16x64_bf8f8<MPerWmma, NPerWmma>::Run(a, b, reg_c);
     }
 };
 
@@ -1314,7 +1314,7 @@ struct mfma_type<MfmaInstr::wmma_f32_16x16x64_f8bf8_gfx125> : public mfma_type_g
     template <index_t MPerWmma, index_t NPerWmma, class FloatA, class FloatB, class FloatC>
     __device__ void run(const FloatA& a, const FloatB& b, FloatC& reg_c) const
     {
-        intrin_wmma_f32_16x16x64_f8bf8_w32<MPerWmma, NPerWmma>::Run(a, b, reg_c);
+        intrin_wmma_f32_16x16x64_f8bf8<MPerWmma, NPerWmma>::Run(a, b, reg_c);
     }
 };
 
@@ -1324,7 +1324,7 @@ struct mfma_type<MfmaInstr::wmma_f32_16x16x64_bf8bf8_gfx125> : public mfma_type_
     template <index_t MPerWmma, index_t NPerWmma, class FloatA, class FloatB, class FloatC>
     __device__ void run(const FloatA& a, const FloatB& b, FloatC& reg_c) const
     {
-        intrin_wmma_f32_16x16x64_bf8bf8_w32<MPerWmma, NPerWmma>::Run(a, b, reg_c);
+        intrin_wmma_f32_16x16x64_bf8bf8<MPerWmma, NPerWmma>::Run(a, b, reg_c);
     }
 };
 

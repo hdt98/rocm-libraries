@@ -290,7 +290,7 @@ add_subdirectory(transpose)
 add_subdirectory(permute_scale)
 add_subdirectory(wrapper)
 add_subdirectory(quantization)
-if(SUPPORTED_GPU_TARGETS MATCHES "gfx11")
+if(SUPPORTED_GPU_TARGETS MATCHES "gfx11" OR SUPPORTED_GPU_TARGETS MATCHES "gfx12")
     add_subdirectory(wmma_op)
 endif()
 if(SUPPORTED_GPU_TARGETS MATCHES "gfx942" OR SUPPORTED_GPU_TARGETS MATCHES "gfx950") # smfmac needs ROCm6.2
