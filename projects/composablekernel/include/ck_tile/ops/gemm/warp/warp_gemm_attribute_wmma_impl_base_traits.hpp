@@ -46,6 +46,11 @@ struct WmmaTraitsBase<gfx11_t, ADType, BDType, CDType, K>
     using kCPs2RHssMinor = sequence<1, 0>;
     using kCYs2RHsMajor  = sequence<1, 1>;
     using kCYs2RHsMinor  = sequence<0, 2>;
+
+    using kCTPs2RHssMajor = sequence<2, 1>;
+    using kCTPs2RHssMinor = sequence<1, 0>;
+    using kCTYs2RHsMajor  = sequence<2, 2>;
+    using kCTYs2RHsMinor  = sequence<0, 2>;
 };
 
 // GFX12 specialization
@@ -84,6 +89,11 @@ struct WmmaTraitsBase<gfx12_t, ADType, BDType, CDType, K>
     using kCPs2RHssMinor = sequence<1, 0>;
     using kCYs2RHsMajor  = sequence<1, 1>;
     using kCYs2RHsMinor  = sequence<0, 2>;
+
+    using kCTPs2RHssMajor = sequence<2, 1>;
+    using kCTPs2RHssMinor = sequence<1, 0>;
+    using kCTYs2RHsMajor  = sequence<2, 2>;
+    using kCTYs2RHsMinor  = sequence<0, 2>;
 
     static constexpr index_t kABInputSize = kK / kABKLane;
     static constexpr index_t kCOutputSize = kM / kCMLane;
