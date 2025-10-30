@@ -236,36 +236,6 @@ def build_compiler(){
 }
 
 def check_arch(){
-    def arch_type = 0
-    sh 'rocminfo | tee rocminfo.log'
-    if ( runShell('grep -n "gfx90a" rocminfo.log') ){
-        arch_type = 1
-    }
-    else if ( runShell('grep -n "gfx942" rocminfo.log') ) {
-        arch_type = 2
-    }
-    else if ( runShell('grep -n "gfx10" rocminfo.log') ) {
-        arch_type = 3
-    }
-    else if ( runShell('grep -n "gfx11" rocminfo.log') ) {
-        arch_type = 4
-    }
-    else if ( runShell('grep -n "gfx120" rocminfo.log') ) {
-        arch_type = 5
-    }
-    else if ( runShell('grep -n "gfx908" rocminfo.log') ) {
-        arch_type = 6
-    }
-    else if ( runShell('grep -n "gfx950" rocminfo.log') ) {
-        arch_type = 7
-    }
-    else if ( runShell('grep -n "gfx125" rocminfo.log') ) {
-        arch_type = 8
-    }
-    return arch_type
-}
-
-def check_arch_name(){
     def arch_name = ""
     sh 'rocminfo | tee rocminfo.log'
     if ( runShell('grep -n "gfx90a" rocminfo.log') ){
@@ -280,8 +250,11 @@ def check_arch_name(){
     else if ( runShell('grep -n "gfx11" rocminfo.log') ) {
         arch_name = "gfx11"
     }
-    else if ( runShell('grep -n "gfx12" rocminfo.log') ) {
-        arch_name = "gfx12"
+    else if ( runShell('grep -n "gfx120" rocminfo.log') ) {
+        arch_name = "gfx120"
+    }
+    else if ( runShell('grep -n "gfx125" rocminfo.log') ) {
+        arch_name = "gfx125"
     }
     else if ( runShell('grep -n "gfx908" rocminfo.log') ) {
         arch_name = "gfx908"
@@ -556,7 +529,7 @@ def cmake_build(Map conf=[:]){
                     if(params.BUILD_PACKAGES){
                         echo "Build ckProfiler packages"
                         sh 'ninja -j64 package'
-                        def arch_name = check_arch_name()
+                        def arch_name = check_arch()
                         sh "mv composablekernel-ckprofiler_*.deb composablekernel-ckprofiler_1.2.0_amd64_${arch_name}.deb"
                         stash includes: "composablekernel-ckprofiler**.deb", name: "profiler_package_${arch_name}"
                     }
@@ -583,7 +556,7 @@ def cmake_build(Map conf=[:]){
                     if(params.BUILD_PACKAGES){
                         echo "Build ckProfiler packages"
                         sh 'ninja -j64 package'
-                        def arch_name = check_arch_name()
+                        def arch_name = check_arch()
                         sh "mv composablekernel-ckprofiler_*.deb composablekernel-ckprofiler_1.2.0_amd64_${arch_name}.deb"
                         stash includes: "composablekernel-ckprofiler**.deb", name: "profiler_package_${arch_name}"
                     }
@@ -597,11 +570,8 @@ def cmake_build(Map conf=[:]){
     if (params.RUN_CK_TILE_FMHA_TESTS){
         try{
             archiveArtifacts "perf_fmha_*.log"
-            if (arch == 1){
-                stash includes: "perf_fmha_**_gfx90a.log", name: "perf_fmha_log_gfx90a"
-            }
-            else if (arch == 2){
-                stash includes: "perf_fmha_**_gfx942.log", name: "perf_fmha_log_gfx942"
+            if (arch == "gfx90a" || arch == "gfx942"){
+                stash includes: "perf_fmha_**_${arch}.log", name: "perf_fmha_log_${arch}"
             }
         }
         catch(Exception err){
@@ -734,7 +704,7 @@ def Build_CK(Map conf=[:]){
                     // Check the architecture
                     def arch = check_arch()
                     cmake_build(conf)
-                    if ( params.RUN_INDUCTOR_TESTS && !params.BUILD_LEGACY_OS && arch == 1 ){
+                    if ( params.RUN_INDUCTOR_TESTS && !params.BUILD_LEGACY_OS && arch == "gfx90a" ){
                             echo "Run inductor codegen tests"
                             sh """
                                   python3 -m venv ${env.WORKSPACE}
@@ -747,103 +717,47 @@ def Build_CK(Map conf=[:]){
                     // run performance tests, stash the logs, results will be processed on the master node
 					dir("script"){
                         if (params.RUN_PERFORMANCE_TESTS){
-                        if (params.RUN_FULL_QA && arch == 1){
-                            // run full tests on gfx90a
+                        if (params.RUN_FULL_QA && (arch == "gfx90a" || arch == "gfx942") ){
+                            // run full tests on gfx90a and gfx942
                             echo "Run full performance tests"
-                            sh "./run_full_performance_tests.sh 0 QA_${params.COMPILER_VERSION} ${env.BRANCH_NAME} ${NODE_NAME} gfx90a"
-                            archiveArtifacts "perf_gemm_gfx90a.log"
-                            archiveArtifacts "perf_resnet50_N256_gfx90a.log"
-                            archiveArtifacts "perf_resnet50_N4_gfx90a.log"
-                            archiveArtifacts "perf_batched_gemm_gfx90a.log"
-                            archiveArtifacts "perf_grouped_gemm_gfx90a.log"
-                            archiveArtifacts "perf_grouped_conv_fwd_gfx90a.log"
-                            archiveArtifacts "perf_grouped_conv_bwd_data_gfx90a.log"
-                            archiveArtifacts "perf_grouped_conv_bwd_weight_gfx90a.log"
-                            archiveArtifacts "perf_gemm_bilinear_gfx90a.log"
-                            archiveArtifacts "perf_reduction_gfx90a.log"
-                            archiveArtifacts "perf_splitK_gemm_gfx90a.log"
-                            archiveArtifacts "perf_onnx_gemm_gfx90a.log"
-                            archiveArtifacts "perf_mixed_gemm_gfx90a.log"
-                            stash includes: "perf_**.log", name: "perf_log_gfx90a"
+                            sh "./run_full_performance_tests.sh 0 QA_${params.COMPILER_VERSION} ${env.BRANCH_NAME} ${NODE_NAME} ${arch}"
+                            archiveArtifacts "perf_gemm_${arch}.log"
+                            archiveArtifacts "perf_resnet50_N256_${arch}.log"
+                            archiveArtifacts "perf_resnet50_N4_${arch}.log"
+                            archiveArtifacts "perf_batched_gemm_${arch}.log"
+                            archiveArtifacts "perf_grouped_gemm_${arch}.log"
+                            archiveArtifacts "perf_grouped_conv_fwd_${arch}.log"
+                            archiveArtifacts "perf_grouped_conv_bwd_data_${arch}.log"
+                            archiveArtifacts "perf_grouped_conv_bwd_weight_${arch}.log"
+                            archiveArtifacts "perf_gemm_bilinear_${arch}.log"
+                            archiveArtifacts "perf_reduction_${arch}.log"
+                            archiveArtifacts "perf_splitK_gemm_${arch}.log"
+                            archiveArtifacts "perf_onnx_gemm_${arch}.log"
+                            archiveArtifacts "perf_mixed_gemm_${arch}.log"
+                            stash includes: "perf_**.log", name: "perf_log_${arch}"
                         }
-                        if (params.RUN_FULL_QA && arch == 2){
-                            // run full tests on gfx942
-                            echo "Run full performance tests"
-                            sh "./run_full_performance_tests.sh 0 QA_${params.COMPILER_VERSION} ${env.BRANCH_NAME} ${NODE_NAME} gfx942"
-                            archiveArtifacts "perf_gemm_gfx942.log"
-                            archiveArtifacts "perf_resnet50_N256_gfx942.log"
-                            archiveArtifacts "perf_resnet50_N4_gfx942.log"
-                            archiveArtifacts "perf_batched_gemm_gfx942.log"
-                            archiveArtifacts "perf_grouped_gemm_gfx942.log"
-                            archiveArtifacts "perf_grouped_conv_fwd_gfx942.log"
-                            archiveArtifacts "perf_grouped_conv_bwd_data_gfx942.log"
-                            archiveArtifacts "perf_grouped_conv_bwd_weight_gfx942.log"
-                            archiveArtifacts "perf_gemm_bilinear_gfx942.log"
-                            archiveArtifacts "perf_reduction_gfx942.log"
-                            archiveArtifacts "perf_splitK_gemm_gfx942.log"
-                            archiveArtifacts "perf_onnx_gemm_gfx942.log"
-                            archiveArtifacts "perf_mixed_gemm_gfx942.log"
-                            stash includes: "perf_**.log", name: "perf_log_gfx942"
-                        }
-                        else if ( arch == 1 ){
-                            // run standard tests on gfx90a
+
+                        else if ( arch == "gfx90a" || arch == "gfx942" ){
+                            // run standard tests on gfx90a and gfx942
                             echo "Run performance tests"
-                            sh "./run_performance_tests.sh 0 CI_${params.COMPILER_VERSION} ${env.BRANCH_NAME} ${NODE_NAME} gfx90a"
-                            archiveArtifacts "perf_gemm_gfx90a.log"
-                            archiveArtifacts "perf_onnx_gemm_gfx90a.log"
-                            archiveArtifacts "perf_resnet50_N256_gfx90a.log"
-                            archiveArtifacts "perf_resnet50_N4_gfx90a.log"
-                            stash includes: "perf_**.log", name: "perf_log_gfx90a"
-                        }
-                        else if ( arch == 2 ){
-                            // run standard tests on gfx942
-                            echo "Run performance tests"
-                            sh "./run_performance_tests.sh 0 CI_${params.COMPILER_VERSION} ${env.BRANCH_NAME} ${NODE_NAME} gfx942"
-                            archiveArtifacts "perf_gemm_gfx942.log"
-                            archiveArtifacts "perf_onnx_gemm_gfx942.log"
-                            archiveArtifacts "perf_resnet50_N256_gfx942.log"
-                            archiveArtifacts "perf_resnet50_N4_gfx942.log"
-                            stash includes: "perf_**.log", name: "perf_log_gfx942"
+                            sh "./run_performance_tests.sh 0 CI_${params.COMPILER_VERSION} ${env.BRANCH_NAME} ${NODE_NAME} ${arch}"
+                            archiveArtifacts "perf_gemm_${arch}.log"
+                            archiveArtifacts "perf_onnx_gemm_${arch}.log"
+                            archiveArtifacts "perf_resnet50_N256_${arch}.log"
+                            archiveArtifacts "perf_resnet50_N4_${arch}.log"
+                            stash includes: "perf_**.log", name: "perf_log_${arch}"
                         }
                         // disable performance tests on gfx1030 for now.
-                        //else if ( arch == 3){
-                            // run basic tests on gfx1030
-                        //    echo "Run gemm performance tests"
-                        //    sh "./run_gemm_performance_tests.sh 0 CI_${params.COMPILER_VERSION} ${env.BRANCH_NAME} ${NODE_NAME} gfx10"
-                        //    archiveArtifacts "perf_onnx_gemm_gfx10.log"
-                        //    stash includes: "perf_onnx_gemm_gfx10.log", name: "perf_log_gfx10"
-                        //}
-                        else if ( arch == 4){
+                        else if ( arch == "gfx11" || arch == "gfx120" || arch == "gfx908" || arch == "gfx950"){
                             // run basic tests on gfx11
                             echo "Run gemm performance tests"
-                            sh "./run_gemm_performance_tests.sh 0 CI_${params.COMPILER_VERSION} ${env.BRANCH_NAME} ${NODE_NAME} gfx11"
-                            archiveArtifacts "perf_onnx_gemm_gfx11.log"
-                            stash includes: "perf_onnx_gemm_gfx11.log", name: "perf_log_gfx11"
-                        }
-                        else if ( arch == 5 ){
-                            // run basic tests on gfx12
-                            echo "Run gemm performance tests"
-                            sh "./run_gemm_performance_tests.sh 0 CI_${params.COMPILER_VERSION} ${env.BRANCH_NAME} ${NODE_NAME} gfx12"
-                            archiveArtifacts "perf_onnx_gemm_gfx12.log"
-                            stash includes: "perf_onnx_gemm_gfx12.log", name: "perf_log_gfx12"
-                        }
-                        else if ( arch == 6 ){
-                            // run basic tests on gfx908
-                            echo "Run performance tests"
-                            sh "./run_gemm_performance_tests.sh 0 CI_${params.COMPILER_VERSION} ${env.BRANCH_NAME} ${NODE_NAME} gfx908"
-                            archiveArtifacts "perf_onnx_gemm_gfx908.log"
-                            stash includes: "perf_onnx_gemm_gfx908.log", name: "perf_log_gfx908"
-                        }
-                        else if ( arch == 7 ){
-                            // run basic tests on gfx950
-                            echo "Run performance tests"
-                            sh "./run_gemm_performance_tests.sh 0 CI_${params.COMPILER_VERSION} ${env.BRANCH_NAME} ${NODE_NAME} gfx950"
-                            archiveArtifacts "perf_onnx_gemm_gfx950.log"
-                            stash includes: "perf_onnx_gemm_gfx950.log", name: "perf_log_gfx950"
+                            sh "./run_gemm_performance_tests.sh 0 CI_${params.COMPILER_VERSION} ${env.BRANCH_NAME} ${NODE_NAME} ${arch}"
+                            archiveArtifacts "perf_onnx_gemm_${arch}.log"
+                            stash includes: "perf_onnx_gemm_${arch}.log", name: "perf_log_${arch}"
                         }
                         }
                     }
-                    if (params.hipTensor_test && arch == 1 ){
+                    if (params.hipTensor_test && arch == "gfx90a" ){
                         // build and test hipTensor on gfx90a node
                         sh """#!/bin/bash
                             rm -rf "${params.hipTensor_branch}".zip
@@ -963,10 +877,10 @@ def process_results(Map conf=[:]){
                             echo "could not locate profiler_package_gfx950."
                         }
                         try{
-                            unstash "profiler_package_gfx12"
+                            unstash "profiler_package_gfx120"
                         }
                         catch(Exception err){
-                            echo "could not locate profiler_package_gfx12."
+                            echo "could not locate profiler_package_gfx120."
                         }
                         sh "sshpass -p ${env.ck_deb_pw} scp -o StrictHostKeyChecking=no composablekernel-ckprofiler*.deb ${env.ck_deb_user}@${env.ck_deb_ip}:/var/www/html/composable_kernel/"
                     }
@@ -1004,7 +918,7 @@ def process_results(Map conf=[:]){
                         }
                         try{
 
-                            unstash "perf_log_gfx12"
+                            unstash "perf_log_gfx120"
                         }
                         catch(Exception err){
                             echo "could not locate the gfx12 performance logs: ${err.getMessage()}."
