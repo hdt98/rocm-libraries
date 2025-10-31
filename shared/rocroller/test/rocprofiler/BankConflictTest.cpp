@@ -453,19 +453,14 @@ namespace rocRollerTest
                                 WaitCount::DSCnt(context->targetArchitecture(), 0));
                         };
 
-                        auto       observer = Scheduling::WeightlessDSMemObserver(context.get());
                         const auto baseAddresses
                             = generateLDSAddresses(workgroupSize, strideMultiplier, instrDwords);
 
                         for(auto instr : kb())
                         {
-                            context->schedule(instr);
                             if(GPUInstructionInfo::isLDS(instr.getOpCode()))
-                            {
                                 instr.setAddresses(baseAddresses);
-                            }
-                            observer.modify(instr); // Right now this observer is not included
-                            observer.observe(instr);
+                            context->schedule(instr);
                         }
 
                         context->schedule(k->postamble());

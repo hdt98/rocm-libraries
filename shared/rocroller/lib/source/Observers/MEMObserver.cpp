@@ -38,6 +38,10 @@ namespace rocRoller
 {
     namespace Scheduling
     {
+        bool useWeightlessObserver(Instruction const& inst)
+        {
+            return inst.getAddresses().has_value();
+        }
 
         VMEMObserver::VMEMObserver(ContextPtr ctx)
             : MEMObserver(ctx,
@@ -67,7 +71,7 @@ namespace rocRoller
 
         bool DSMEMObserver::isMEMInstruction(Instruction const& inst) const
         {
-            return GPUInstructionInfo::isLDS(inst.getOpCode());
+            return GPUInstructionInfo::isLDS(inst.getOpCode()) && !useWeightlessObserver(inst);
         }
 
         int DSMEMObserver::getWait(Instruction const& inst) const
@@ -77,14 +81,22 @@ namespace rocRoller
 
         std::pair<LDSBankModel::LdsDirection, int> getLdsInfoFromOpcode(const std::string& opCode)
         {
-            int dwords = 1;
-
-            if(opCode.find("_b64") != std::string::npos)
+            AssertFatal(opCode.find("ds_write") != std::string::npos
+                            || opCode.find("ds_read") != std::string::npos,
+                        "WeightlessDSMemObserver: Opcode is not an LDS operation: " + opCode);
+            int dwords;
+            if(opCode.find("_b32") != std::string::npos)
+                dwords = 1;
+            else if(opCode.find("_b64") != std::string::npos)
                 dwords = 2;
             else if(opCode.find("_b96") != std::string::npos)
                 dwords = 3;
             else if(opCode.find("_b128") != std::string::npos)
                 dwords = 4;
+            else
+                Throw<FatalError>(
+                    "WeightlessDSMemObserver: Unable to determine LDS data size from opcode: "
+                    + opCode);
 
             LDSBankModel::LdsDirection direction = opCode.find("ds_write") != std::string::npos
                                                        ? LDSBankModel::LdsDirection::Write
@@ -113,7 +125,7 @@ namespace rocRoller
         {
             InstructionStatus status;
 
-            if(GPUInstructionInfo::isLDS(inst.getOpCode()))
+            if(GPUInstructionInfo::isLDS(inst.getOpCode()) && useWeightlessObserver(inst))
             {
                 auto [direction, dwords] = getLdsInfoFromOpcode(inst.getOpCode());
                 int requiredSlots        = queueSlots(direction, dwords);
@@ -175,7 +187,7 @@ namespace rocRoller
 
             int instCycles = inst.numExecutedInstructions();
 
-            if(GPUInstructionInfo::isLDS(inst.getOpCode()))
+            if(GPUInstructionInfo::isLDS(inst.getOpCode()) && useWeightlessObserver(inst))
             {
                 auto [direction, dwords] = getLdsInfoFromOpcode(inst.getOpCode());
                 int requiredSlots        = queueSlots(direction, dwords);
