@@ -140,66 +140,61 @@ namespace rocRoller
         switch(record_type_id)
         {
         case ROCPROFILER_THREAD_TRACE_DECODER_RECORD_WAVE:
+        {
             Log::debug("trace_decode_callback: decoding {}", num_events);
-            for(size_t w = 0; w < num_events; w++)
+            assert(num_events == 1 && "expected one event for WAVE record type");
+            auto* wave = static_cast<rocprofiler_thread_trace_decoder_wave_t*>(events);
+            Log::debug("  wave : cu {}, simd {}, wave_id {}, contexts {}, instructions_size {}",
+                       wave->cu,
+                       wave->simd,
+                       wave->wave_id,
+                       wave->contexts,
+                       wave->instructions_size);
+
+            for(size_t i = 0; i < wave->instructions_size; i++)
             {
-                auto* wave = static_cast<rocprofiler_thread_trace_decoder_wave_t*>(events);
-                Log::debug(
-                    "  wave {}: cu {}, simd {}, wave_id {}, contexts {}, instructions_size {}",
-                    w,
-                    wave->cu,
-                    wave->simd,
-                    wave->wave_id,
-                    wave->contexts,
-                    wave->instructions_size);
+                auto& inst = wave->instructions_array[i];
 
-                for(size_t i = 0; i < wave->instructions_size; i++)
+                Log::debug("    inst {}: code_object_id {}, address 0x{:x}, duration {}",
+                           i,
+                           inst.pc.code_object_id,
+                           inst.pc.address,
+                           inst.duration);
+
+                if(inst.pc.code_object_id == 0)
                 {
-                    auto& inst = wave->instructions_array[i];
-
-                    Log::debug("    inst {}: code_object_id {}, address 0x{:x}, duration {}",
-                               i,
-                               inst.pc.code_object_id,
-                               inst.pc.address,
-                               inst.duration);
-
-                    if(inst.pc.code_object_id == 0)
-                    {
-                        Log::warn("trace_decode_callback: code_object_id is 0");
-                        assert(
-                            userdata->instruction_map.empty()
-                            && "expected all instructions to have code_object_id of 0 if any do");
-                        userdata->ok = false;
-                        return;
-                    }
-                    auto& data = userdata->instruction_map[inst.pc];
-                    data.totalLatency += inst.duration;
-                    data.hitcount += 1;
+                    Log::warn("trace_decode_callback: code_object_id is 0");
+                    assert(userdata->instruction_map.empty()
+                           && "expected all instructions to have code_object_id of 0 if any do");
+                    userdata->ok = false;
+                    return;
                 }
+                auto& data = userdata->instruction_map[inst.pc];
+                data.totalLatency += inst.duration;
+                data.hitcount += 1;
             }
             return;
-
+        }
         case ROCPROFILER_THREAD_TRACE_DECODER_RECORD_OCCUPANCY: // `rocprofiler_thread_trace_decoder_occupancy_t`
         case ROCPROFILER_THREAD_TRACE_DECODER_RECORD_GFXIP:
             // Ok to ignore both these
             return;
 
         case ROCPROFILER_THREAD_TRACE_DECODER_RECORD_INFO:
-            for(size_t i = 0; i < num_events; i++)
-            {
-                auto* info = static_cast<rocprofiler_thread_trace_decoder_info_t*>(events);
-                Log::warn(
-                    "parse: record info {}",
-                    static_cast<std::underlying_type_t<rocprofiler_thread_trace_decoder_info_t>>(
-                        *info));
-                // Only seen these enumerations; investigate if others are encountered
-                assert((*info == ROCPROFILER_THREAD_TRACE_DECODER_INFO_STITCH_INCOMPLETE)
-                       || (*info == ROCPROFILER_THREAD_TRACE_DECODER_INFO_DATA_LOST)
-                              && "received unexpected INFO record type");
-            }
+        {
+            assert(num_events == 1 && "expected one event for INFO record type");
+            auto* info = static_cast<rocprofiler_thread_trace_decoder_info_t*>(events);
+            Log::warn("parse: record info {}",
+                      static_cast<std::underlying_type_t<rocprofiler_thread_trace_decoder_info_t>>(
+                          *info));
+            // Only seen these enumerations; investigate if others are encountered
+            assert((*info == ROCPROFILER_THREAD_TRACE_DECODER_INFO_STITCH_INCOMPLETE)
+                   || (*info == ROCPROFILER_THREAD_TRACE_DECODER_INFO_DATA_LOST)
+                          && "received unexpected INFO record type");
             userdata->ok = false;
             userdata->instruction_map.clear();
             return;
+        }
         default:
             Log::error(
                 "parse: unhandled record type {}",
