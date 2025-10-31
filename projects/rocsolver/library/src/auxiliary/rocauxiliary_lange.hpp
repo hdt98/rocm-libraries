@@ -44,14 +44,14 @@ ROCSOLVER_BEGIN_NAMESPACE
     the library size.
 *************************************************************/
 
-template <int MAX_THDS, typename T, typename U>
+template <int MAX_THDS, typename T, typename I, typename N, typename U>
 ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) lange_max_kernel(const rocblas_int m,
                                                                    const rocblas_int n,
                                                                    const U A,
                                                                    const rocblas_int lda,
                                                                    const rocblas_int shiftA,
                                                                    const rocblas_int strideA,
-                                                                   T* final_norm)
+                                                                   N* final_norm)
 {
     I bid = blockIdx.z;
     I tid = threadIdx.x;
@@ -60,10 +60,10 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) lange_max_kernel(const rocblas
     T* a = load_ptr_batch<T>(A, bid, shiftA, strideA);
 
     // shared variables
-    __shared__ T sval[MAX_THDS / WarpSize];
+    __shared__ N sval[MAX_THDS / WarpSize];
 
     // dot
-    T norm_max = 0;
+    N norm_max = 0;
     for(I i = tid; i < m * n; i += MAX_THDS)
     {
         int row = i % m;
@@ -101,14 +101,14 @@ void rocsolver_lange_getMemorySize(const rocsolver_norm_type norm_type,
     *size_work = 0;
 }
 
-template <typename T, typename I, typename U>
+template <typename T, typename I, typename N>
 rocblas_status rocsolver_lange_argCheck(rocblas_handle handle,
                                         const rocsolver_norm_type norm_type,
                                         const I m,
                                         const I n,
                                         const I lda,
                                         T A,
-                                        U norm)
+                                        N norm)
 {
     // order is important for unit tests:
 
@@ -132,7 +132,7 @@ rocblas_status rocsolver_lange_argCheck(rocblas_handle handle,
     return rocblas_status_continue;
 }
 
-template <typename T, typename I, typename U>
+template <typename T, typename I, typename N, typename U>
 rocblas_status rocsolver_lange_template(rocblas_handle handle,
                                         const rocsolver_norm_type norm_type,
                                         const I m,
@@ -142,7 +142,7 @@ rocblas_status rocsolver_lange_template(rocblas_handle handle,
                                         const I lda,
                                         const rocblas_stride strideA,
                                         const I batch_count,
-                                        T* norm)
+                                        N* norm)
 {
     ROCSOLVER_ENTER("lange", "norm_type:", norm_type, "m:", m, "n:", n, "shiftA:", shiftA,
                     "lda:", lda, "bc:", batch_count);
@@ -161,7 +161,7 @@ rocblas_status rocsolver_lange_template(rocblas_handle handle,
     {
         // Launch max kernel
         constexpr int MAX_THDS = 1024;
-        ROCSOLVER_LAUNCH_KERNEL((lange_max_kernel<MAX_THDS, T>), dim3(1, 1, batch_count),
+        ROCSOLVER_LAUNCH_KERNEL((lange_max_kernel<MAX_THDS, T, I, N>), dim3(1, 1, batch_count),
                                 dim3(MAX_THDS), 0, stream, m, n, A, lda, shiftA, strideA, norm);
         break;
     }
