@@ -36,7 +36,7 @@
 #include <rocRoller/DataTypes/DataTypes.hpp>
 #include <rocRoller/GPUArchitecture/GPUArchitectureTarget.hpp>
 
-namespace rocRoller::LDSBankModel
+namespace rocRoller::Scheduling::LDSBankModel
 {
     enum class LdsDirection
     {
