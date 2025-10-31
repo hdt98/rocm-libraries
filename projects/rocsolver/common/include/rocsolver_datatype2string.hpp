@@ -475,6 +475,21 @@ constexpr rocsolver_rfinfo_mode char2rocsolver_rfinfo_mode(char value)
     }
 }
 
+constexpr rocsolver_norm_type char2rocsolver_norm_type(char value)
+{
+    switch(value)
+    {
+    case '1': return rocsolver_norm_type_one;
+    case 'F':
+    case 'f': return rocsolver_norm_type_frobenius;
+    case 'I':
+    case 'i': return rocsolver_norm_type_infinity;
+    case 'M':
+    case 'm': return rocsolver_norm_type_max;
+    default: return static_cast<rocsolver_norm_type>(0);
+    }
+}
+
 #undef ROCSOLVER_ROCBLAS_HAS_F8_DATATYPES
 
 #ifdef ROCSOLVER_LIBRARY
