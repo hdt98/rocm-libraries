@@ -112,6 +112,34 @@ namespace rocRoller
 
         static_assert(CObserverConst<VMEMObserver>);
         static_assert(CObserverConst<DSMEMObserver>);
+
+        struct QueueEntry
+        {
+            int dwords;
+        };
+
+        struct WeightlessDSMemObserver
+        {
+            WeightlessDSMemObserver(ContextPtr ctx);
+
+            InstructionStatus peek(Instruction const& inst) const;
+
+            void modify(Instruction& inst) const;
+
+            void observe(Instruction const& inst);
+
+            constexpr static bool required(GPUArchitectureTarget const& target)
+            {
+                return true;
+            }
+
+        private:
+            const int queueSize = 10; // For MI250 to MI350
+
+            std::deque<QueueEntry> m_queue;
+            uint                   m_remainingSlots;
+            std::weak_ptr<Context> m_context;
+        };
     }
 }
 

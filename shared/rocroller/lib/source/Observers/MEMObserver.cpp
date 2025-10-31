@@ -73,5 +73,28 @@ namespace rocRoller
         {
             return inst.getWaitCount().dscnt();
         }
+
+        int queueSlots(int dwords, bool isWrite)
+        {
+            // 1 slot for addresses
+            if(isWrite)
+                return dwords + 1;
+            return 1;
+        }
+
+        WeightlessDSMemObserver::WeightlessDSMemObserver(ContextPtr ctx)
+            : m_context(ctx)
+            , m_remainingSlots(WeightlessDSMemObserver::queueSize)
+        {
+        }
+
+        InstructionStatus WeightlessDSMemObserver::peek(Instruction const& inst) const
+        {
+            return {};
+        }
+
+        void WeightlessDSMemObserver::modify(Instruction& inst) const {}
+
+        void WeightlessDSMemObserver::observe(Instruction const& inst) {}
     }
 }
