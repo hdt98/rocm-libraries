@@ -24,7 +24,6 @@
  *
  *******************************************************************************/
 
-#include "DataGenerator.hpp"
 #include <filesystem>
 #include <string>
 
@@ -43,7 +42,6 @@
 #include <rocRoller/Utilities/Utils.hpp>
 #include <rocRoller/Utilities/Version.hpp>
 
-#include <common/SourceMatcher.hpp>
 #include <common/Utilities.hpp>
 #include <common/mxDataGen.hpp>
 
@@ -1061,165 +1059,6 @@ namespace rocRoller::Client::GEMMClient
 
 namespace rocRoller::Client::GEMMClient::CLI
 {
-    constexpr bool PARSE_SUCCESS = true;
-    constexpr bool PARSE_FAILURE = false;
-
-    static bool ParseMI(const std::string&                                 arg,
-                        rocRoller::Client::GEMMClient::SolutionParameters& solution)
-    {
-        if(arg.empty())
-            return PARSE_FAILURE;
-
-        solution.waveB = 1;
-
-        bool fail = false;
-        bool isB  = false;
-        try
-        {
-            std::istringstream iss(arg);
-            std::string        token;
-
-            iss.exceptions(std::ios_base::eofbit | std::ios_base::failbit | std::ios_base::badbit);
-            std::getline(iss, token, 'x');
-            solution.waveM = std::stoi(token);
-            std::getline(iss, token, 'x');
-            solution.waveN = std::stoi(token);
-
-            iss.exceptions(std::ios_base::failbit | std::ios_base::badbit);
-            std::getline(iss, token, 'x');
-            solution.waveK = std::stoi(token);
-
-            isB = true;
-            std::getline(iss, token, 'x');
-            solution.waveB = std::stoi(token);
-        }
-        catch(const std::invalid_argument&)
-        {
-            if(!isB)
-                fail = true;
-        }
-        catch(const std::ios_base::failure&)
-        {
-            if(!isB)
-                fail = true;
-        }
-
-        fail |= (solution.waveM < 1) || (solution.waveN < 1) || (solution.waveK < 1)
-                || (solution.waveB < 1);
-
-        if(fail)
-        {
-            std::cerr << "Invalid format for Matrix Instruction." << std::endl;
-            std::cerr << std::endl;
-            std::cerr << "The MI argument should be formatted like:" << std::endl;
-            std::cerr << std::endl;
-            std::cerr << "    --mi=MxNxKxB" << std::endl;
-            std::cerr << std::endl;
-            std::cerr << "For example: --mi=32x32x2x1" << std::endl;
-
-            return PARSE_FAILURE;
-        }
-
-        return PARSE_SUCCESS;
-    }
-
-    static bool ParseMNK(const std::string& arg, rocRoller::Client::GEMMClient::MNKTuple& mnk)
-    {
-        if(arg.empty())
-            return PARSE_FAILURE;
-
-        bool fail = false;
-        try
-        {
-            std::istringstream iss(arg);
-            std::string        token;
-
-            iss.exceptions(std::ios_base::eofbit | std::ios_base::failbit | std::ios_base::badbit);
-            std::getline(iss, token, 'x');
-            mnk.m = std::stoi(token);
-            std::getline(iss, token, 'x');
-            mnk.n = std::stoi(token);
-            iss.exceptions(std::ios_base::failbit | std::ios_base::badbit);
-            std::getline(iss, token, 'x');
-            mnk.k = std::stoi(token);
-        }
-        catch(const std::invalid_argument&)
-        {
-            fail = true;
-        }
-        catch(const std::ios_base::failure&)
-        {
-            fail = true;
-        }
-
-        fail |= (mnk.m < 1) || (mnk.n < 1) || (mnk.k < 1);
-
-        if(fail)
-        {
-            std::cerr << "Invalid format for M/N/K tuple." << std::endl;
-            return PARSE_FAILURE;
-        }
-
-        return PARSE_SUCCESS;
-    }
-
-    static bool ParseInitMode(const std::string& arg, DataInitMode& result)
-    {
-        if(arg.empty())
-            return PARSE_FAILURE;
-
-        bool               fail = false;
-        std::istringstream iss(arg);
-        std::string        token;
-
-        if(arg == "Bounded")
-            result = DataInitMode(Bounded{});
-        else if(arg == "BoundedAlternatingSign")
-            result = DataInitMode(BoundedAlternatingSign{});
-        else if(arg == "Unbounded")
-            result = DataInitMode(Unbounded{});
-        else if(arg == "Identity")
-            result = DataInitMode(Identity{});
-        else if(arg == "Ones")
-            result = DataInitMode(Ones{});
-        else if(arg == "Zeros")
-            result = DataInitMode(Zeros{});
-        else if(arg == "TrigonometricFromFloat")
-            result = DataInitMode(TrigonometricFromFloat{});
-        else if(startsWith("NormalFromFloat", arg.begin(), arg.end()))
-        {
-            try
-            {
-                iss.exceptions(std::ifstream::eofbit | std::ifstream::failbit
-                               | std::ifstream::badbit);
-                std::getline(iss, token, '(');
-                std::getline(iss, token, ',');
-                float mean = std::stof(token);
-                std::getline(iss, token, ')');
-                float std_dev = std::stof(token);
-
-                result = DataInitMode(NormalFromFloat{mean, std_dev});
-            }
-            catch(const std::invalid_argument&)
-            {
-                fail = true;
-            }
-            catch(const std::ios_base::failure&)
-            {
-                fail = true;
-            }
-            if(fail)
-            {
-                std::cerr << "Invalid format for Init Mode." << std::endl;
-                std::cerr << "Expected: NormalFromFloat(<mean>, <std_dev>)" << std::endl;
-                std::cerr << "For example: --initMode_A=NormalFromFloat(0.0, 1.0)" << std::endl;
-                return PARSE_FAILURE;
-            }
-        }
-
-        return PARSE_SUCCESS;
-    }
-
     constexpr auto SolutionParameterArguments = std::make_tuple(
         std::make_pair("--arch", &SolutionParameters::architecture),
         std::make_pair("--mac_m", &SolutionParameters::macM),
@@ -1577,19 +1416,22 @@ int main(int argc, const char* argv[])
         "--initMode_A",
         [&problem](auto& args) -> bool { return ParseInitMode(args[0], problem.initModeA); },
         "Data initialization mode for A [Bounded | BoundedAlternatingSign | Unbounded | "
-        "Identity | Ones | Zeros | TrigonometricFromFloat | NormalFromFloat(<mean>, <std_dev>)]. "
+        "Identity | Ones | Zeros | TrigonometricFromFloat | \"NormalFromFloat(<mean>, "
+        "<std_dev>)\"]. "
         "Default: Bounded.");
     app.add_option(
         "--initMode_B",
         [&problem](auto& args) -> bool { return ParseInitMode(args[0], problem.initModeB); },
         "Data initialization mode for B [Bounded | BoundedAlternatingSign | Unbounded | "
-        "Identity | Ones | Zeros | TrigonometricFromFloat | NormalFromFloat(<mean>, <std_dev>)]. "
+        "Identity | Ones | Zeros | TrigonometricFromFloat | \"NormalFromFloat(<mean>, "
+        "<std_dev>)\"]. "
         "Default: Bounded.");
     app.add_option(
         "--initMode_C",
         [&problem](auto& args) -> bool { return ParseInitMode(args[0], problem.initModeC); },
         "Data initialization mode for C [Bounded | BoundedAlternatingSign | Unbounded | "
-        "Identity | Ones | Zeros | TrigonometricFromFloat | NormalFromFloat(<mean>, <std_dev>)]. "
+        "Identity | Ones | Zeros | TrigonometricFromFloat | \"NormalFromFloat(<mean>, "
+        "<std_dev>)\"]. "
         "Default: Bounded.");
 
     //
