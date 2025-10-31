@@ -318,6 +318,18 @@ public:
             throw std::invalid_argument("Invalid value for " + name);
     }
 
+    void validate_norm_type(const std::string name) const
+    {
+        auto val = find(name);
+        if(val == end())
+            return;
+
+        char norm_type = val->second.as<char>();
+        if(norm_type != '1' && norm_type != 'F' && norm_type != 'f' && norm_type != 'I'
+           && norm_type != 'i' && norm_type != 'M' && norm_type != 'm')
+            throw std::invalid_argument("Invalid value for " + name);
+    }
+
     void validate_consumed() const
     {
         if(!to_consume.empty())
