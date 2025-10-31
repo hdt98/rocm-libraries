@@ -147,13 +147,6 @@ namespace rocRoller
 
                     status.stallCycles = cyclesNeeded;
                 }
-
-                Log::info("WeightlessDSMemObserver: LDS instruction requires {} slots. "
-                          "Currently have {}/{} slots. Predicted stall: {} cycles.",
-                          requiredSlots,
-                          queueSize - m_remainingSlots,
-                          queueSize,
-                          status.stallCycles);
             }
             return status;
         }
@@ -161,12 +154,14 @@ namespace rocRoller
         void WeightlessDSMemObserver::modify(Instruction& inst) const
         {
             auto status = peek(inst);
-            if(status.stallCycles > 0)
-            {
-                inst.addComment("WeightlessDSMemObserver: Predicted stall of "
-                                + std::to_string(status.stallCycles)
-                                + " cycles due to LDS queue being full.");
-            }
+            if(GPUInstructionInfo::isLDS(inst.getOpCode()) && useWeightlessObserver(inst))
+                inst.addComment(fmt::format(
+                    "WeightlessDSMemObserver Peek: Program cycle: {}. Total queue cycles: "
+                    "{}. Remaining slots: {}. Stall cycles: {}.",
+                    m_programCycle,
+                    m_totalQueueCycles,
+                    m_remainingSlots,
+                    status.stallCycles));
         }
 
         void WeightlessDSMemObserver::observe(Instruction const& inst)

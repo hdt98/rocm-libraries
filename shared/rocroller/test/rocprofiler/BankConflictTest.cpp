@@ -31,15 +31,19 @@
 
 #include <rocRoller/AssemblyKernel.hpp>
 #include <rocRoller/CodeGen/ArgumentLoader.hpp>
+#include <rocRoller/CodeGen/Arithmetic/ArithmeticGenerator.hpp>
 #include <rocRoller/CodeGen/BranchGenerator.hpp>
 #include <rocRoller/CodeGen/MemoryInstructions.hpp>
 #include <rocRoller/CommandSolution.hpp>
 #include <rocRoller/ExecutableKernel.hpp>
+#include <rocRoller/Expression.hpp>
 #include <rocRoller/InstructionValues/LabelAllocator.hpp>
 #include <rocRoller/KernelArguments.hpp>
 #include <rocRoller/Operations/Command.hpp>
 #include <rocRoller/Scheduling/LDSBankModel.hpp>
 #include <rocRoller/Scheduling/Observers/FunctionalUnit/MEMObserver.hpp>
+#include <rocRoller/Scheduling/RoundRobinScheduler.hpp>
+#include <rocRoller/Utilities/Component.hpp>
 #include <rocRoller/Utilities/Generator.hpp>
 #include <rocRoller/Utilities/HipUtils.hpp>
 
@@ -456,11 +460,13 @@ namespace rocRollerTest
                         const auto baseAddresses
                             = generateLDSAddresses(workgroupSize, strideMultiplier, instrDwords);
 
+                        std::vector<Instruction> instrs;
                         for(auto instr : kb())
                         {
                             if(GPUInstructionInfo::isLDS(instr.getOpCode()))
                                 instr.setAddresses(baseAddresses);
                             context->schedule(instr);
+                            instrs.push_back(instr);
                         }
 
                         context->schedule(k->postamble());
@@ -566,7 +572,6 @@ namespace rocRollerTest
                             }
                         }
 
-                        // Report findings
                         std::stringstream analysis;
                         analysis << "\nLDS Latency Analysis:\n";
                         analysis << "---------------------\n";
@@ -616,5 +621,143 @@ namespace rocRollerTest
                 }
             }
         }
+    }
+
+    TEST_CASE("Scheduler with LDS and ALU instruction streams", "[rocprofiler][scheduler]")
+    {
+        using namespace Scheduling::LDSBankModel;
+
+        Settings::getInstance()->set(Settings::SchedulerCost,
+                                     Scheduling::CostFunction::LinearWeightedSimple);
+
+        constexpr int  ITERS         = 32;
+        constexpr auto workgroupSize = 64u;
+
+        const auto name = "lds_alu_scheduler_test";
+
+        rocRoller::profiler::reset();
+
+        auto context = TestContext::ForTestDevice({}, name);
+
+        if(not context->targetArchitecture().target().isCDNA35GPU())
+        {
+            SKIP("LDS Bank Model only implemented for CDNA 3.5 GPUs");
+        }
+
+        auto command = std::make_shared<Command>();
+        auto k       = context->kernel();
+
+        k->setKernelDimensions(1);
+
+        const auto one  = std::make_shared<Expression::Expression>(1u);
+        const auto zero = std::make_shared<Expression::Expression>(0u);
+
+        auto workitemCount = Expression::literal(workgroupSize * 256 * 32);
+        k->setWorkgroupSize({workgroupSize, 1, 1});
+        k->setWorkitemCount({workitemCount, one, one});
+        k->setDynamicSharedMemBytes(zero);
+
+        context->schedule(k->preamble());
+        context->schedule(k->prolog());
+
+        // ds_read_b64 with stride multiplier of 4
+        const auto instrDwords      = 4;
+        const auto strideMultiplier = 4;
+        const auto baseAddresses
+            = generateLDSAddresses(workgroupSize, strideMultiplier, instrDwords);
+
+        auto ldsData = Register::Value::AllocateLDS(
+            context.get(),
+            DataType::Raw32,
+            context->targetArchitecture().GetCapability(GPUCapability::MaxLdsSize) / 4);
+
+        auto ldsWithOffset = Register::Value::Placeholder(
+            context.get(), Register::Type::Vector, DataType::UInt32, 1);
+        auto workitemIndex = context->kernel()->workitemIndex()[0];
+
+        context->schedule(Expression::generate(
+            ldsWithOffset,
+            Expression::literal(ldsData->getLDSAllocation()->offset())
+                + workitemIndex->expression()
+                      * Expression::literal((4 * strideMultiplier * instrDwords)
+                                            % ldsData->getLDSAllocation()->size()),
+            context.get()));
+
+        auto ldsStream = [&]() -> Generator<Instruction> {
+            auto ldsDst = Register::Value::Placeholder(
+                context.get(),
+                Register::Type::Vector,
+                DataType::Raw32,
+                2 * ITERS,
+                Register::AllocationOptions{.contiguousChunkWidth = Register::FULLY_CONTIGUOUS,
+                                            .alignment            = instrDwords});
+            co_yield ldsDst->allocate();
+
+            co_yield context->mem()->barrier({});
+
+            for(int i = 0; i < ITERS; ++i)
+            {
+                auto dstRegs = ldsDst->subset(Generated(iota(i * 2, (i + 1) * 2)));
+
+                co_yield context->mem()->loadLocal(dstRegs,
+                                                   ldsWithOffset,
+                                                   i * 8, // offset in bytes
+                                                   8 // 64 bits = 8 bytes
+                );
+            }
+        };
+
+        auto aluStream = [&]() -> Generator<Instruction> {
+            auto v0 = Register::Value::Placeholder(
+                context.get(), Register::Type::Vector, DataType::Int32, 1);
+            auto v1 = Register::Value::Placeholder(
+                context.get(), Register::Type::Vector, DataType::Int32, 1);
+
+            co_yield v0->allocate();
+            co_yield v1->allocate();
+
+            for(int i = 0; i < 2 * ITERS; ++i)
+            {
+                co_yield generateOp<Expression::Add>(v0, v0, v1);
+            }
+        };
+
+        auto scheduler = Component::GetNew<Scheduling::Scheduler>(
+            std::make_tuple(Scheduling::SchedulerProcedure::RoundRobin,
+                            Scheduling::CostFunction::None,
+                            context.get()));
+
+        std::vector<Generator<Instruction>> streams;
+        streams.push_back(ldsStream());
+        streams.push_back(aluStream());
+
+        for(auto instr : (*scheduler)(streams))
+        {
+            if(GPUInstructionInfo::isLDS(instr.getOpCode()))
+                instr.setAddresses(baseAddresses);
+            context->schedule(instr);
+        }
+
+        context->schedule(k->postamble());
+        context->schedule(k->amdgpu_metadata());
+
+        CommandKernel commandKernel;
+        commandKernel.setContext(context.get());
+        commandKernel.generateKernel();
+
+        CommandArguments commandArgs = command->createArguments();
+
+        std::vector<std::vector<rocRoller::profiler::InstructionProfile>> allLatencies;
+
+        for(int run = 0; run < NUM_RUNS; ++run)
+        {
+            const auto latencies = rocRoller::profiler::loopUntilDispatchData(
+                [&]() { commandKernel.launchKernel(commandArgs.runtimeArguments()); });
+            allLatencies.push_back(latencies);
+        }
+
+        Log::info(context.output());
+
+        Log::info(toString(allLatencies[0]));
     }
 }
