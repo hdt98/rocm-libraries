@@ -27,7 +27,9 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <string>
+#include <vector>
 
 #include <rocRoller/CodeGen/WaitCount.hpp>
 #include <rocRoller/InstructionValues/Register_fwd.hpp>
@@ -230,6 +232,22 @@ namespace rocRoller
         using AllocationArray = std::array<std::shared_ptr<Register::Allocation>, MaxAllocations>;
         AllocationArray allocations() const;
 
+        /**
+         * Get the addresses for this instruction (if any)
+         */
+        const std::optional<std::vector<size_t>>& getAddresses() const
+        {
+            return m_ldsAddresses;
+        }
+
+        /**
+         * Set the addresses for this instruction
+         */
+        void setAddresses(const std::vector<size_t>& addresses)
+        {
+            m_ldsAddresses = addresses;
+        }
+
     private:
         /**
          * toString = preamble + functional + coda
@@ -298,6 +316,8 @@ namespace rocRoller
         bool m_operandsAreInout = false;
 
         Scheduling::InstructionStatus m_peekedStatus;
+
+        std::optional<std::vector<size_t>> m_ldsAddresses;
     };
 }
 

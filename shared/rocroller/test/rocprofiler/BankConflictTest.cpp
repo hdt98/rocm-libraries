@@ -39,6 +39,7 @@
 #include <rocRoller/KernelArguments.hpp>
 #include <rocRoller/Operations/Command.hpp>
 #include <rocRoller/Scheduling/LDSBankModel.hpp>
+#include <rocRoller/Scheduling/Observers/FunctionalUnit/MEMObserver.hpp>
 #include <rocRoller/Utilities/Generator.hpp>
 #include <rocRoller/Utilities/HipUtils.hpp>
 
@@ -310,6 +311,177 @@ namespace rocRollerTest
                         else
                             CHECK_THAT(actualMaxLdsInstrCycles,
                                        Catch::Matchers::WithinAbs(predictedCycles, 4ul));
+                    }
+                }
+            }
+        }
+    }
+
+    TEST_CASE("Rocprofiler LDS Observer", "[rocprofiler]")
+    {
+        using namespace Scheduling::LDSBankModel;
+
+        constexpr int  ITERS         = 16;
+        constexpr auto workgroupSize = 64u;
+
+        const std::vector<int>  instrSizes      = {4};
+        const std::vector<int>  strides         = {4}; // between threads
+        const std::vector<bool> writeOperations = {false};
+
+        for(auto instrDwords : instrSizes)
+        {
+            for(auto strideMultiplier : strides)
+            {
+                for(auto write : writeOperations)
+                {
+                    const auto name = "lds_microkernel_" + std::to_string(instrDwords * 32)
+                                      + "b_stride" + std::to_string(strideMultiplier) + "_"
+                                      + (write ? "write" : "read");
+
+                    DYNAMIC_SECTION(name)
+                    {
+                        rocRoller::profiler::reset();
+
+                        auto context = TestContext::ForTestDevice({}, name);
+
+                        if(not context->targetArchitecture().target().isCDNA35GPU())
+                        {
+                            SKIP("LDS Bank Model only implemented for CDNA 3.5 GPUs");
+                        }
+
+                        auto command = std::make_shared<Command>();
+                        auto k       = context->kernel();
+
+                        k->setKernelDimensions(1);
+
+                        const auto one  = std::make_shared<Expression::Expression>(1u);
+                        const auto zero = std::make_shared<Expression::Expression>(0u);
+
+                        auto workitemCount = Expression::literal(workgroupSize * 256 * 32);
+                        k->setWorkgroupSize({workgroupSize, 1, 1});
+                        k->setWorkitemCount({workitemCount, one, one});
+                        k->setDynamicSharedMemBytes(zero);
+
+                        context->schedule(k->preamble());
+                        context->schedule(k->prolog());
+
+                        auto kb = [&]() -> Generator<Instruction> {
+                            const auto alignment = instrDwords;
+                            const auto regCount  = 256 - 8; // leave a few
+
+                            auto dst = Register::Value::Placeholder(
+                                context.get(),
+                                Register::Type::Vector,
+                                DataType::Raw32,
+                                regCount,
+                                Register::AllocationOptions{
+                                    .contiguousChunkWidth = Register::FULLY_CONTIGUOUS,
+                                    .alignment            = alignment,
+                                });
+                            co_yield dst->allocate();
+
+                            auto lds = Register::Value::AllocateLDS(
+                                context.get(),
+                                DataType::Raw32,
+                                context->targetArchitecture().GetCapability(
+                                    GPUCapability::MaxLdsSize)
+                                    / 4);
+                            auto ldsWithOffset = Register::Value::Placeholder(
+                                context.get(), Register::Type::Vector, DataType::UInt32, 1);
+                            auto workitemIndex = context->kernel()->workitemIndex()[0];
+                            co_yield Expression::generate(
+                                ldsWithOffset,
+                                Expression::literal(lds->getLDSAllocation()->offset())
+                                    + workitemIndex->expression()
+                                          * Expression::literal((4 * strideMultiplier * alignment)
+                                                                % lds->getLDSAllocation()->size()),
+                                context.get());
+
+                            auto getSubset
+                                = [](size_t n, size_t m, size_t i) -> std::pair<size_t, size_t> {
+                                // If run out of registers, wrap around
+                                size_t num_complete_chunks = n / m;
+                                if(num_complete_chunks == 0)
+                                {
+                                    return {0, 0};
+                                }
+                                size_t chunk_index = i % num_complete_chunks;
+                                size_t start       = chunk_index * m;
+                                return {start, start + m};
+                            };
+
+                            co_yield context->mem()->barrier({});
+
+                            for(int i = 0; i < ITERS; ++i)
+                            {
+                                const auto [start, end] = getSubset(regCount, instrDwords, i);
+                                const auto numBytes     = instrDwords * 4;
+
+                                if(write)
+                                {
+                                    co_yield context->mem()->storeLocal(
+                                        ldsWithOffset,
+                                        dst->subset(Generated(iota(start, end))),
+                                        0,
+                                        numBytes);
+                                }
+                                else
+                                {
+                                    co_yield context->mem()->loadLocal(
+                                        dst->subset(Generated(iota(start, end))),
+                                        ldsWithOffset,
+                                        0,
+                                        numBytes);
+                                }
+                            }
+                            co_yield Instruction::Wait(
+                                WaitCount::DSCnt(context->targetArchitecture(), 1));
+                            co_yield Instruction::Wait(
+                                WaitCount::DSCnt(context->targetArchitecture(), 0));
+                        };
+
+                        auto       observer = Scheduling::WeightlessDSMemObserver(context.get());
+                        const auto baseAddresses
+                            = generateLDSAddresses(workgroupSize, strideMultiplier, instrDwords);
+
+                        for(auto instr : kb())
+                        {
+                            context->schedule(instr);
+                            if(GPUInstructionInfo::isLDS(instr.getOpCode()))
+                            {
+                                instr.setAddresses(baseAddresses);
+                            }
+                            observer.modify(instr); // Right now this observer is not included
+                            observer.observe(instr);
+                        }
+
+                        context->schedule(k->postamble());
+                        context->schedule(k->amdgpu_metadata());
+
+                        CommandKernel commandKernel;
+                        commandKernel.setContext(context.get());
+                        commandKernel.generateKernel();
+
+                        CommandArguments commandArgs = command->createArguments();
+
+                        std::vector<std::vector<rocRoller::profiler::InstructionProfile>>
+                            allLatencies;
+
+                        for(int run = 0; run < NUM_RUNS; ++run)
+                        {
+                            const auto latencies
+                                = rocRoller::profiler::loopUntilDispatchData([&]() {
+                                      commandKernel.launchKernel(commandArgs.runtimeArguments());
+                                  });
+                            allLatencies.push_back(latencies);
+
+                            INFO("Run " << (run + 1) << ": " << toString(latencies));
+                            Log::debug("Run " + std::to_string(run + 1) + ": "
+                                       + toString(latencies));
+
+                            REQUIRE(latencies.size() == 21);
+                        }
+                        Log::info(toString(allLatencies[0]));
                     }
                 }
             }

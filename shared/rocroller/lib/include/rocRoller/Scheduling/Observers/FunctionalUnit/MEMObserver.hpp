@@ -113,9 +113,10 @@ namespace rocRoller
         static_assert(CObserverConst<VMEMObserver>);
         static_assert(CObserverConst<DSMEMObserver>);
 
-        struct QueueEntry
+        struct LDSQueueEntry
         {
-            int dwords;
+            int cycles; // How long this instruction takes
+            int slotsUsed; // How many queue slots it uses
         };
 
         struct WeightlessDSMemObserver
@@ -136,8 +137,12 @@ namespace rocRoller
         private:
             const int queueSize = 10; // For MI250 to MI350
 
-            std::deque<QueueEntry> m_queue;
-            uint                   m_remainingSlots;
+            mutable std::deque<LDSQueueEntry> m_queue;
+            // In hardware, slots are 16 dwords wide,
+            // Here, they groups of 4 (64 dwords) form a single unit for simplicity
+            mutable uint           m_remainingSlots;
+            mutable int            m_totalQueueCycles;
+            int                    m_programCycle;
             std::weak_ptr<Context> m_context;
         };
     }
