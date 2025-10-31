@@ -231,6 +231,104 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zlacgv_64(rocblas_handle handle,
 //! @}
 
 /*! @{
+    \brief LANGE computes the norm of a general m-by-n matrix A.
+
+    \details
+    The norm computed is specified by norm_type as follows:
+
+    - rocsolver_norm_type_one: the 1-norm (maximum column sum),
+    - rocsolver_norm_type_frobenius: the Frobenius norm (square root of sum of squares),
+    - rocsolver_norm_type_infinity: the infinity-norm (maximum row sum), or
+    - rocsolver_norm_type_max: the maximum absolute value of any element.
+
+    @param[in]
+    handle      rocblas_handle.
+    @param[in]
+    norm_type   rocsolver_norm_type.
+                Specifies the type of norm to compute.
+    @param[in]
+    m           rocblas_int. m >= 0.
+                The number of rows of the matrix A.
+    @param[in]
+    n           rocblas_int. n >= 0.
+                The number of columns of the matrix A.
+    @param[in]
+    A           pointer to type. Array on the GPU of dimension lda*n.
+                The m-by-n matrix A.
+    @param[in]
+    lda         rocblas_int. lda >= m.
+                The leading dimension of A.
+    @param[out]
+    norms       pointer to real type. Scalar on the GPU.
+                The computed norm of the matrix A.
+    *************************************************************************/
+
+ROCSOLVER_EXPORT rocblas_status rocsolver_slange(rocblas_handle handle,
+                                                 const rocsolver_norm_type norm_type,
+                                                 const rocblas_int m,
+                                                 const rocblas_int n,
+                                                 float* A,
+                                                 const rocblas_int lda,
+                                                 float* norms);
+
+ROCSOLVER_EXPORT rocblas_status rocsolver_dlange(rocblas_handle handle,
+                                                 const rocsolver_norm_type norm_type,
+                                                 const rocblas_int m,
+                                                 const rocblas_int n,
+                                                 double* A,
+                                                 const rocblas_int lda,
+                                                 double* norms);
+
+ROCSOLVER_EXPORT rocblas_status rocsolver_clange(rocblas_handle handle,
+                                                 const rocsolver_norm_type norm_type,
+                                                 const rocblas_int m,
+                                                 const rocblas_int n,
+                                                 rocblas_float_complex* A,
+                                                 const rocblas_int lda,
+                                                 float* norms);
+
+ROCSOLVER_EXPORT rocblas_status rocsolver_zlange(rocblas_handle handle,
+                                                 const rocsolver_norm_type norm_type,
+                                                 const rocblas_int m,
+                                                 const rocblas_int n,
+                                                 rocblas_double_complex* A,
+                                                 const rocblas_int lda,
+                                                 double* norms);
+
+ROCSOLVER_EXPORT rocblas_status rocsolver_slange_64(rocblas_handle handle,
+                                                    const rocsolver_norm_type norm_type,
+                                                    const int64_t m,
+                                                    const int64_t n,
+                                                    float* A,
+                                                    const int64_t lda,
+                                                    float* norms);
+
+ROCSOLVER_EXPORT rocblas_status rocsolver_dlange_64(rocblas_handle handle,
+                                                    const rocsolver_norm_type norm_type,
+                                                    const int64_t m,
+                                                    const int64_t n,
+                                                    double* A,
+                                                    const int64_t lda,
+                                                    double* norms);
+
+ROCSOLVER_EXPORT rocblas_status rocsolver_clange_64(rocblas_handle handle,
+                                                    const rocsolver_norm_type norm_type,
+                                                    const int64_t m,
+                                                    const int64_t n,
+                                                    rocblas_float_complex* A,
+                                                    const int64_t lda,
+                                                    float* norms);
+
+ROCSOLVER_EXPORT rocblas_status rocsolver_zlange_64(rocblas_handle handle,
+                                                    const rocsolver_norm_type norm_type,
+                                                    const int64_t m,
+                                                    const int64_t n,
+                                                    rocblas_double_complex* A,
+                                                    const int64_t lda,
+                                                    double* norms);
+//! @}
+
+/*! @{
     \brief LASWP performs a series of row interchanges on the matrix A.
 
     \details
