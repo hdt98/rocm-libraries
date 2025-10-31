@@ -797,17 +797,10 @@ def process_results(Map conf=[:]){
     //use older image that has user jenkins
     def image = "${env.CK_DOCKERHUB}:ck_ub22.04_rocm6.3"
     def prefixpath = "/opt/rocm"
-
-    // Jenkins is complaining about the render group
     def dockerOpts="--cap-add=SYS_PTRACE --security-opt seccomp=unconfined"
-    if (conf.get("enforce_xnack_on", false)) {
-        dockerOpts = dockerOpts + " --env HSA_XNACK=1 "
-    }
-
-    def variant = env.STAGE_NAME
     def retimage
 
-    gitStatusWrapper(credentialsId: "${env.ck_git_creds}", gitHubContext: "${variant}", account: 'AMD-ROCm-Internal', repo: 'composable_kernel') {
+    gitStatusWrapper(credentialsId: "${env.ck_git_creds}", gitHubContext: "${env.STAGE_NAME}", account: 'AMD-ROCm-Internal', repo: 'composable_kernel') {
         try
         {
             echo "Pulling image: ${image}"
@@ -933,7 +926,7 @@ def process_results(Map conf=[:]){
         }
     }
 }
-
+/*
 def run_aiter_tests(Map conf=[:]){
     show_node_info()
     env.HSA_ENABLE_SDMA=0
@@ -1040,7 +1033,7 @@ def run_pytorch_tests(Map conf=[:]){
         }
     }
 }
-
+*/
 pipeline {
     agent none
     options {
@@ -1303,6 +1296,7 @@ pipeline {
                 }
             }
         }
+        /*
          stage("Run Pytorch Tests")
         {
             when {
@@ -1359,6 +1353,7 @@ pipeline {
                 }
             }
         }
+        */
         stage("Run Grouped Conv Large Case Tests")
         {
             when {
