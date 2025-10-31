@@ -1,3 +1,49 @@
+/************************************************************************
+ * Derived from the BSD3-licensed
+ * LAPACK routine (version 3.7.0) --
+ *     Univ. of Tennessee, Univ. of California Berkeley,
+ *     Univ. of Colorado Denver and NAG Ltd..
+ *     December 2016
+ * Copyright (C) 2024-2025 Advanced Micro Devices, Inc. All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ * *************************************************************************/
+
+#pragma once
+
+#include "lib_device_helpers.hpp"
+#include "rocblas.hpp"
+#include "rocblas_utility.hpp"
+
+ROCSOLVER_BEGIN_NAMESPACE
+
+/*************************************************************
+    Templated kernels are instantiated in separate cpp
+    files in order to improve compilation times and reduce
+    the library size.
+*************************************************************/
+
 template <int MAX_THDS, typename T, typename U>
 ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) lange_max_kernel(const rocblas_int m,
                                                                    const rocblas_int n,
@@ -44,3 +90,95 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) lange_max_kernel(const rocblas
         final_norm[bid] = norm_max;        
     }
 }
+
+template <typename T, typename I>
+void rocsolver_lange_getMemorySize(const rocsolver_norm_type norm_type,
+                                   const I m,
+                                   const I n,
+                                   const I batch_count,
+                                   size_t* size_work)
+{
+    *size_work = 0;
+}
+
+template <typename T, typename I, typename U>
+rocblas_status rocsolver_lange_argCheck(rocblas_handle handle,
+                                        const rocsolver_norm_type norm_type,
+                                        const I m,
+                                        const I n,
+                                        const I lda,
+                                        T A,
+                                        U norm)
+{
+    // order is important for unit tests:
+
+    // 1. invalid/non-supported values
+    if(norm_type != rocsolver_norm_type_one && norm_type != rocsolver_norm_type_frobenius
+       && norm_type != rocsolver_norm_type_infinity && norm_type != rocsolver_norm_type_max)
+        return rocblas_status_invalid_value;
+
+    // 2. invalid size
+    if(m < 0 || n < 0 || lda < m)
+        return rocblas_status_invalid_size;
+
+    // skip pointer check if querying memory size
+    if(rocblas_is_device_memory_size_query(handle))
+        return rocblas_status_continue;
+
+    // 3. invalid pointers
+    if((m * n && !A) || (m * n && !norm))
+        return rocblas_status_invalid_pointer;
+
+    return rocblas_status_continue;
+}
+
+template <typename T, typename I, typename U>
+rocblas_status rocsolver_lange_template(rocblas_handle handle,
+                                        const rocsolver_norm_type norm_type,
+                                        const I m,
+                                        const I n,
+                                        U A,
+                                        const rocblas_stride shiftA,
+                                        const I lda,
+                                        const rocblas_stride strideA,
+                                        const I batch_count,
+                                        T* norm)
+{
+    ROCSOLVER_ENTER("lange", "norm_type:", norm_type, "m:", m, "n:", n, "shiftA:", shiftA,
+                    "lda:", lda, "bc:", batch_count);
+
+    // quick return
+    if(m == 0 || n == 0 || !batch_count)
+        return rocblas_status_success;
+
+    hipStream_t stream;
+    rocblas_get_stream(handle, &stream);
+
+    // dispatch to appropriate kernel based on norm type
+    switch(norm_type)
+    {
+    case rocsolver_norm_type_max:
+    {
+        // Launch max kernel
+        constexpr int MAX_THDS = 1024;
+        ROCSOLVER_LAUNCH_KERNEL((lange_max_kernel<MAX_THDS, T>), dim3(1, 1, batch_count),
+                                dim3(MAX_THDS), 0, stream, m, n, A, lda, shiftA, strideA, norm);
+        break;
+    }
+    case rocsolver_norm_type_one:
+        // TODO: Implement one-norm kernel
+        return rocblas_status_not_implemented;
+    case rocsolver_norm_type_frobenius:
+        // TODO: Implement Frobenius norm kernel
+        return rocblas_status_not_implemented;
+    case rocsolver_norm_type_infinity:
+        // TODO: Implement infinity-norm kernel
+        return rocblas_status_not_implemented;
+    default:
+        return rocblas_status_invalid_value;
+    }
+
+    return rocblas_status_success;
+}
+
+ROCSOLVER_END_NAMESPACE
