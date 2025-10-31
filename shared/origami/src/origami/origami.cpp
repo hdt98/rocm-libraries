@@ -84,9 +84,7 @@ std::pair<double, size_t> select_workgroup_mapping(const problem_t& problem,
                                                    const std::vector<size_t>& wgms) {
   using WGMResult = std::pair<double, size_t>;  // (l2_hit_rate, WGM)
 
-  config_t config{};
-  config.mt = mt;  // mt (dim3_t)
-  config.mi = mi;  // mi (dim3_t)
+  config_t config{mt, mi};
 
   std::vector<WGMResult> valid_results;
   valid_results.reserve(wgms.size());

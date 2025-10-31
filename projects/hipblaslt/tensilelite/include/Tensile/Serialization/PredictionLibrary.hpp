@@ -83,17 +83,25 @@ namespace TensileLite
                             auto solution = slnIter->second;
                             lib.solutionmap.insert(std::make_pair(index, solution));
 
+                            origami::dim3_t origami_mi;
+                            if (solution->sizeMapping.matrixInstruction[0] == 0 && solution->sizeMapping.matrixInstruction[1] == 0 && solution->sizeMapping.matrixInstruction[2] == 0) {
+                                // Override dot2 instruction with vector lane widths
+                                origami_mi = {1, 1, 64};
+                            } else {
+                                origami_mi = {
+                                    static_cast<size_t>(solution->sizeMapping.matrixInstruction[0]), 
+                                    static_cast<size_t>(solution->sizeMapping.matrixInstruction[1]), 
+                                    static_cast<size_t>(solution->sizeMapping.matrixInstruction[2])
+                                };
+                            }
+
                             origami::config_t origami_config = {
                                 .mt = {
                                     solution->sizeMapping.macroTile.x,
                                     solution->sizeMapping.macroTile.y,
                                     solution->sizeMapping.depthU
                                 },
-                                .mi = {
-                                    static_cast<size_t>(solution->sizeMapping.matrixInstruction[0]),
-                                    static_cast<size_t>(solution->sizeMapping.matrixInstruction[1]),
-                                    static_cast<size_t>(solution->sizeMapping.matrixInstruction[2])
-                                },
+                                .mi = origami_mi,
                                 .occupancy = static_cast<size_t>(solution->sizeMapping.CUOccupancy),
                                 .workgroup_mapping = solution->sizeMapping.workGroupMapping,
                                 .cache_hints_a = solution->sizeMapping.nonTemporalA,
