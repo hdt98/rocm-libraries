@@ -979,6 +979,99 @@ inline rocblas_status rocsolver_laswp(rocblas_handle handle,
 }
 /*****************************************************/
 
+/******************** LANGE ********************/
+inline rocblas_status rocsolver_lange(rocblas_handle handle,
+                                      rocsolver_norm_type norm_type,
+                                      rocblas_int m,
+                                      rocblas_int n,
+                                      float* A,
+                                      const rocblas_int lda,
+                                      float* norms)
+{
+    return rocsolver_slange(handle, norm_type, m, n, A, lda, norms);
+}
+
+
+inline rocblas_status rocsolver_lange(rocblas_handle handle,
+                                      rocsolver_norm_type norm_type,
+                                      rocblas_int m,
+                                      rocblas_int n,
+                                      double* A,
+                                      const rocblas_int lda,
+                                      double* norms)
+{
+    return rocsolver_dlange(handle, norm_type, m, n, A, lda, norms);
+}
+
+inline rocblas_status rocsolver_lange(rocblas_handle handle,
+                                      rocsolver_norm_type norm_type,
+                                      rocblas_int m,
+                                      rocblas_int n,
+                                      rocblas_float_complex* A,
+                                      const rocblas_int lda,
+                                      float* norms)
+{
+    return rocsolver_clange(handle, norm_type, m, n, A, lda, norms);
+}
+
+inline rocblas_status rocsolver_lange(rocblas_handle handle,
+                                      rocsolver_norm_type norm_type,
+                                      rocblas_int m,
+                                      rocblas_int n,
+                                      rocblas_double_complex* A,
+                                      const rocblas_int lda,
+                                      double* norms)
+{
+    return rocsolver_zlange(handle, norm_type, m, n, A, lda, norms);
+}
+
+inline rocblas_status rocsolver_lange(rocblas_handle handle,
+                                      rocsolver_norm_type norm_type,
+                                      int64_t m,
+                                      int64_t n,
+                                      float* A,
+                                      const int64_t lda,
+                                      float* norms)
+{
+    return rocsolver_slange_64(handle, norm_type, m, n, A, lda, norms);
+}
+
+
+inline rocblas_status rocsolver_lange(rocblas_handle handle,
+                                      rocsolver_norm_type norm_type,
+                                      int64_t m,
+                                      int64_t n,
+                                      double* A,
+                                      const int64_t lda,
+                                      double* norms)
+{
+    return rocsolver_dlange_64(handle, norm_type, m, n, A, lda, norms);
+}
+
+inline rocblas_status rocsolver_lange(rocblas_handle handle,
+                                      rocsolver_norm_type norm_type,
+                                      int64_t m,
+                                      int64_t n,
+                                      rocblas_float_complex* A,
+                                      const int64_t lda,
+                                      float* norms)
+{
+    return rocsolver_clange_64(handle, norm_type, m, n, A, lda, norms);
+}
+
+inline rocblas_status rocsolver_lange(rocblas_handle handle,
+                                      rocsolver_norm_type norm_type,
+                                      int64_t m,
+                                      int64_t n,
+                                      rocblas_double_complex* A,
+                                      const int64_t lda,
+                                      double* norms)
+{
+    return rocsolver_zlange_64(handle, norm_type, m, n, A, lda, norms);
+}
+
+/*****************************************************/
+
 /******************** LARFG ********************/
 inline rocblas_status rocsolver_larfg(rocblas_handle handle,
                                       rocblas_int n,
