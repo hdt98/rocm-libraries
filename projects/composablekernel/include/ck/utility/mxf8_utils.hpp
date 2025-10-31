@@ -332,8 +332,7 @@ static __device__ float2_t cast_to_f32_from_f8_scaled(float scale, fp8x2_storage
 template <ck_fp8_interpretation_t interpret, typename Ts, int Opsel>
 static __device__ float8_t cast_to_f32_from_f8_scaled(Ts scale, fp8x8_storage_t v)
 {
-    static_assert(sizeof(Ts) == 4,
-                  "Ts must be float or uint32_t");
+    static_assert(sizeof(Ts) == 4, "Ts must be float or uint32_t");
 
     uint32_t scale4 = (ck::is_same_v<Ts, float>)
                           ? bit_cast<uint32_t>(utils::get_exponent_value(e8m0_bexp_t(scale)))
