@@ -81,6 +81,8 @@ namespace rocRollerTest
 
     TEST_CASE("Rocprofiler LDS Microkernel", "[rocprofiler]")
     {
+        using namespace Scheduling::LDSBankModel;
+
         constexpr int  ITERS         = 16;
         constexpr auto workgroupSize = 64u;
 
@@ -234,17 +236,17 @@ namespace rocRollerTest
                         auto baseAddresses
                             = generateLDSAddresses(workgroupSize, strideMultiplier, instrDwords);
 
-                        LDSBankModel::RuntimeLDSInstruction ldsinstr;
-                        ldsinstr.memoryOp.direction = write ? LDSBankModel::LdsDirection::Write
-                                                            : LDSBankModel::LdsDirection::Read;
-                        ldsinstr.dwords             = instrDwords;
-                        ldsinstr.baseAddresses      = baseAddresses;
+                        RuntimeLDSInstruction ldsinstr;
+                        ldsinstr.memoryOp.direction
+                            = write ? LdsDirection::Write : LdsDirection::Read;
+                        ldsinstr.dwords        = instrDwords;
+                        ldsinstr.baseAddresses = baseAddresses;
 
-                        uint predictedCycles = LDSBankModel::getInstructionCycles(ldsinstr, gfx);
+                        uint predictedCycles = getInstructionCycles(ldsinstr, gfx);
 
-                        uint issueCycles = LDSBankModel::getInstructionIssueCycles(
-                            ldsinstr.memoryOp, ldsinstr.dwords);
-                        uint dataCycles = LDSBankModel::getInstructionDataCycles(ldsinstr, gfx);
+                        uint issueCycles
+                            = getInstructionIssueCycles(ldsinstr.memoryOp, ldsinstr.dwords);
+                        uint dataCycles = getInstructionDataCycles(ldsinstr, gfx);
 
                         std::stringstream info;
 

@@ -38,7 +38,7 @@
 #include <rocRoller/Utilities/Logging.hpp>
 #include <rocRoller/Utilities/Utils.hpp>
 
-namespace rocRoller::LDSBankModel
+namespace rocRoller::Scheduling::LDSBankModel
 {
 
     uint getThreadsPerClock(const MemoryOpLDS& memoryOp, uint dwords, GPUArchitectureGFX gfx)
