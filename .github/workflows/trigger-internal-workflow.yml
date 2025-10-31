@@ -17,10 +17,11 @@ on:
   pull_request:
     types: [opened, ready_for_review, synchronize]
     branches: [users/hsivasun/external-workflow-dispatch]
+  push:
 
 jobs:
   trigger:
-    runs-on: azure-vms
+    runs-on: ubuntu-latest
     steps:
       - name: Generate GitHub App token
         id: generate-token
