@@ -633,6 +633,13 @@ try
             "                           Indicates if matrix B should be transposed.\n"
             "                           ")
 
+        ("norm_type",
+         value<char>()->default_value('M'),
+            "1 = one-norm, F = Frobenius, I = infinity-norm, M = max element.\n"
+            "                           Specifies which matrix norm to compute.\n"
+            "                           Only applicable to lange.\n"
+            "                           ")
+
         ("uplo",
          value<char>()->default_value('U'),
             "U = upper, L = lower.\n"
@@ -687,6 +694,7 @@ try
     argus.validate_eorder("eorder");
     argus.validate_esort("esort");
     argus.validate_itype("itype");
+    argus.validate_norm_type("norm_type");
     argus.validate_rfinfo_mode("rfinfo_mode");
 
     // prepare logging infrastructure and ignore environment variables
