@@ -68,6 +68,19 @@ namespace rocRollerTest
         return values[values.size() / 2];
     }
 
+    // Helper function to calculate deltas (differences) between consecutive latency values
+    std::vector<int64_t> calculateLatencyDeltas(const std::vector<uint64_t>& latencies)
+    {
+        std::vector<int64_t> deltas;
+        for(size_t i = 1; i < latencies.size(); ++i)
+        {
+            int64_t delta
+                = static_cast<int64_t>(latencies[i]) - static_cast<int64_t>(latencies[i - 1]);
+            deltas.push_back(delta);
+        }
+        return deltas;
+    }
+
     std::vector<size_t>
         generateLDSAddresses(size_t workgroupSize, size_t strideMultiplier, size_t instrDwords)
     {
@@ -481,7 +494,129 @@ namespace rocRollerTest
 
                             REQUIRE(latencies.size() == 21);
                         }
-                        Log::info(toString(allLatencies[0]));
+
+                        std::vector<std::vector<uint64_t>> ldsLatenciesPerIteration(ITERS);
+
+                        // Extract LDS latencies for each iteration across all runs
+                        for(const auto& runLatencies : allLatencies)
+                        {
+                            int ldsInstrCount = 0;
+                            for(const auto& profile : runLatencies)
+                            {
+                                if((write
+                                    && profile.instruction.find("ds_write") != std::string::npos)
+                                   || (!write
+                                       && profile.instruction.find("ds_read") != std::string::npos))
+                                {
+                                    if(ldsInstrCount < ITERS)
+                                    {
+                                        ldsLatenciesPerIteration[ldsInstrCount].push_back(
+                                            profile.meanLatency());
+                                        ldsInstrCount++;
+                                    }
+                                }
+                            }
+                        }
+
+                        std::vector<uint64_t> medianLatencyPerIteration;
+                        for(const auto& iterLatencies : ldsLatenciesPerIteration)
+                        {
+                            if(!iterLatencies.empty())
+                            {
+                                auto sortedLatencies = iterLatencies;
+                                std::sort(sortedLatencies.begin(), sortedLatencies.end());
+                                medianLatencyPerIteration.push_back(
+                                    sortedLatencies[sortedLatencies.size() / 2]);
+                            }
+                        }
+
+                        if(medianLatencyPerIteration.empty())
+                        {
+                            INFO("No LDS latency data collected");
+                            continue;
+                        }
+
+                        auto deltas = calculateLatencyDeltas(medianLatencyPerIteration);
+
+                        // Find key metrics
+                        uint64_t baselineLatency = medianLatencyPerIteration[0];
+                        uint64_t maxLatency = *std::max_element(medianLatencyPerIteration.begin(),
+                                                                medianLatencyPerIteration.end());
+
+                        // Find first increase
+                        int firstIncreaseIteration = -1;
+
+                        for(size_t i = 0; i < deltas.size(); ++i)
+                        {
+                            if(deltas[i] > 0)
+                            {
+                                firstIncreaseIteration
+                                    = i + 1; // +1 because deltas[0] is between iter 0 and 1
+                                break;
+                            }
+                        }
+
+                        // Find where latency stabilizes (delta == 0)
+                        int latencyStabilizedIteration = -1;
+
+                        if(firstIncreaseIteration != -1)
+                        {
+                            for(size_t i = firstIncreaseIteration; i < deltas.size(); ++i)
+                            {
+                                if(deltas[i] == 0)
+                                {
+                                    latencyStabilizedIteration = i + 1;
+                                    break;
+                                }
+                            }
+                        }
+
+                        // Report findings
+                        std::stringstream analysis;
+                        analysis << "\nLDS Latency Analysis:\n";
+                        analysis << "---------------------\n";
+                        analysis << "Baseline latency (iteration 0): " << baselineLatency
+                                 << " cycles\n";
+
+                        if(firstIncreaseIteration != -1)
+                        {
+                            int64_t increaseAmount = deltas[firstIncreaseIteration - 1];
+                            analysis
+                                << "First latency increase at iteration: " << firstIncreaseIteration
+                                << " (increased by " << increaseAmount << " cycles)\n";
+                        }
+                        if(latencyStabilizedIteration != -1)
+                        {
+                            analysis
+                                << "Latency stabilized at iteration: " << latencyStabilizedIteration
+                                << "\n";
+                        }
+                        else if(firstIncreaseIteration != -1)
+                        {
+                            analysis << "Latency did not stabilize within the test iterations\n";
+                        }
+
+                        analysis << "Maximum latency reached: " << maxLatency << " cycles\n";
+
+                        // Show per-iteration latencies with deltas
+                        analysis << "\nPer-iteration median latencies:\n";
+                        for(size_t i = 0; i < medianLatencyPerIteration.size(); ++i)
+                        {
+                            analysis << "  Iteration " << i << ": " << medianLatencyPerIteration[i]
+                                     << " cycles";
+                            if(i > 0 && i <= deltas.size())
+                            {
+                                int64_t delta = deltas[i - 1];
+                                if(delta != 0)
+                                {
+                                    analysis << " (" << (delta > 0 ? "+" : "") << delta << ")";
+                                }
+                            }
+                            analysis << "\n";
+                        }
+
+                        INFO(analysis.str());
+                        Log::info(analysis.str());
                     }
                 }
             }
