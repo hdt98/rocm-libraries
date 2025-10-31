@@ -33,6 +33,7 @@
 #include <rocRoller/Utilities/Error.hpp>
 #include <rocRoller/Utilities/HipUtils.hpp>
 #include <rocRoller/Utilities/Logging.hpp>
+#include <rocRoller/Utilities/Settings.hpp>
 
 #include <atomic>
 #include <chrono>
@@ -139,66 +140,61 @@ namespace rocRoller
         switch(record_type_id)
         {
         case ROCPROFILER_THREAD_TRACE_DECODER_RECORD_WAVE:
+        {
             Log::debug("trace_decode_callback: decoding {}", num_events);
-            for(size_t w = 0; w < num_events; w++)
+            assert(num_events == 1 && "expected one event for WAVE record type");
+            auto* wave = static_cast<rocprofiler_thread_trace_decoder_wave_t*>(events);
+            Log::debug("  wave : cu {}, simd {}, wave_id {}, contexts {}, instructions_size {}",
+                       wave->cu,
+                       wave->simd,
+                       wave->wave_id,
+                       wave->contexts,
+                       wave->instructions_size);
+
+            for(size_t i = 0; i < wave->instructions_size; i++)
             {
-                auto* wave = static_cast<rocprofiler_thread_trace_decoder_wave_t*>(events);
-                Log::debug(
-                    "  wave {}: cu {}, simd {}, wave_id {}, contexts {}, instructions_size {}",
-                    w,
-                    wave->cu,
-                    wave->simd,
-                    wave->wave_id,
-                    wave->contexts,
-                    wave->instructions_size);
+                auto& inst = wave->instructions_array[i];
 
-                for(size_t i = 0; i < wave->instructions_size; i++)
+                Log::debug("    inst {}: code_object_id {}, address 0x{:x}, duration {}",
+                           i,
+                           inst.pc.code_object_id,
+                           inst.pc.address,
+                           inst.duration);
+
+                if(inst.pc.code_object_id == 0)
                 {
-                    auto& inst = wave->instructions_array[i];
-
-                    Log::debug("    inst {}: code_object_id {}, address 0x{:x}, duration {}",
-                               i,
-                               inst.pc.code_object_id,
-                               inst.pc.address,
-                               inst.duration);
-
-                    if(inst.pc.code_object_id == 0)
-                    {
-                        Log::warn("trace_decode_callback: code_object_id is 0");
-                        assert(
-                            userdata->instruction_map.empty()
-                            && "expected all instructions to have code_object_id of 0 if any do");
-                        userdata->ok = false;
-                        return;
-                    }
-                    auto& data = userdata->instruction_map[inst.pc];
-                    data.totalLatency += inst.duration;
-                    data.hitcount += 1;
+                    Log::warn("trace_decode_callback: code_object_id is 0");
+                    assert(userdata->instruction_map.empty()
+                           && "expected all instructions to have code_object_id of 0 if any do");
+                    userdata->ok = false;
+                    return;
                 }
+                auto& data = userdata->instruction_map[inst.pc];
+                data.totalLatency += inst.duration;
+                data.hitcount += 1;
             }
             return;
-
+        }
         case ROCPROFILER_THREAD_TRACE_DECODER_RECORD_OCCUPANCY: // `rocprofiler_thread_trace_decoder_occupancy_t`
         case ROCPROFILER_THREAD_TRACE_DECODER_RECORD_GFXIP:
             // Ok to ignore both these
             return;
 
         case ROCPROFILER_THREAD_TRACE_DECODER_RECORD_INFO:
-            for(size_t i = 0; i < num_events; i++)
-            {
-                auto* info = static_cast<rocprofiler_thread_trace_decoder_info_t*>(events);
-                Log::warn(
-                    "parse: record info {}",
-                    static_cast<std::underlying_type_t<rocprofiler_thread_trace_decoder_info_t>>(
-                        *info));
-                // Only seen these enumerations; investigate if others are encountered
-                assert((*info == ROCPROFILER_THREAD_TRACE_DECODER_INFO_STITCH_INCOMPLETE)
-                       || (*info == ROCPROFILER_THREAD_TRACE_DECODER_INFO_DATA_LOST)
-                              && "received unexpected INFO record type");
-            }
+        {
+            assert(num_events == 1 && "expected one event for INFO record type");
+            auto* info = static_cast<rocprofiler_thread_trace_decoder_info_t*>(events);
+            Log::warn("parse: record info {}",
+                      static_cast<std::underlying_type_t<rocprofiler_thread_trace_decoder_info_t>>(
+                          *info));
+            // Only seen these enumerations; investigate if others are encountered
+            assert(((*info == ROCPROFILER_THREAD_TRACE_DECODER_INFO_STITCH_INCOMPLETE)
+                    || (*info == ROCPROFILER_THREAD_TRACE_DECODER_INFO_DATA_LOST))
+                   && "received unexpected INFO record type");
             userdata->ok = false;
             userdata->instruction_map.clear();
             return;
+        }
         default:
             Log::error(
                 "parse: unhandled record type {}",
@@ -275,8 +271,7 @@ namespace rocRoller
             parameters.push_back({ROCPROFILER_THREAD_TRACE_PARAMETER_SHADER_ENGINE_MASK, 0x1});
             parameters.push_back({ROCPROFILER_THREAD_TRACE_PARAMETER_SIMD_SELECT, 0x1});
             parameters.push_back({ROCPROFILER_THREAD_TRACE_PARAMETER_SERIALIZE_ALL, 1});
-            parameters.push_back(
-                {ROCPROFILER_THREAD_TRACE_PARAMETER_BUFFER_SIZE, 0x10000000}); // 256MB
+            parameters.push_back({ROCPROFILER_THREAD_TRACE_PARAMETER_BUFFER_SIZE, 0x100000000});
 
             ROCPROFILER_CALL(
                 rocprofiler_configure_dispatch_thread_trace_service(client_ctx,
@@ -293,8 +288,10 @@ namespace rocRoller
 
     int tool_init(rocprofiler_client_finalize_t, void*)
     {
-        ROCPROFILER_CALL(rocprofiler_thread_trace_decoder_create(&decoder, "/opt/rocm/lib"),
-                         "create decoder");
+        ROCPROFILER_CALL(
+            rocprofiler_thread_trace_decoder_create(
+                &decoder, (Settings::getInstance()->get(Settings::ROCMPath) + "/lib").c_str()),
+            "create decoder");
 
         ROCPROFILER_CALL(rocprofiler_create_context(&client_ctx), "create context");
 
@@ -330,7 +327,6 @@ namespace rocRoller
             if(!enable_agent)
                 return std::nullopt;
 
-            std::optional<std::vector<InstructionProfile>> result;
             Log::info("waitForData");
 
             std::unique_lock<std::mutex> lock(profile_data_mutex);
@@ -341,39 +337,49 @@ namespace rocRoller
 
             TraceDecodeCallbackUserData callback_user_data{.ok = true, .instruction_map = {}};
 
-            rocprofiler_trace_decode(decoder,
-                                     trace_decode_callback,
-                                     profile_data.data(),
-                                     profile_data.size(),
-                                     &callback_user_data);
+            const auto status = rocprofiler_trace_decode(decoder,
+                                                         trace_decode_callback,
+                                                         profile_data.data(),
+                                                         profile_data.size(),
+                                                         &callback_user_data);
+
             profile_data.clear();
             lock.unlock();
 
-            if(callback_user_data.ok && !callback_user_data.instruction_map.empty())
+            if(status != ROCPROFILER_STATUS_SUCCESS)
             {
-                for(auto& [pc, data] : callback_user_data.instruction_map)
-                {
-                    auto inst = address_table.get(pc.code_object_id, pc.address);
-                    if(inst != nullptr)
-                        data.instruction = inst->inst;
-                }
+                Log::warn("waitForData: decoding error, rocprofiler_trace_decode returned {}",
+                          rocprofiler_get_status_string(status));
+                return std::nullopt;
+            }
 
-                result = std::vector<InstructionProfile>{};
-                result->reserve(callback_user_data.instruction_map.size());
-                for(const auto& [pc, data] : callback_user_data.instruction_map)
-                {
-                    result->push_back(data);
-                }
-                Log::info("waitForData: retrieved {}", result->size());
-            }
-            else
+            if(not callback_user_data.ok)
             {
-                result = std::nullopt;
-                if(callback_user_data.instruction_map.empty())
-                    Log::warn("waitForData: no instructions decoded");
-                else
-                    Log::warn("waitForData: decoding error");
+                Log::warn("waitForData: decoding error in callback, check previous logs");
+                return std::nullopt;
             }
+
+            if(callback_user_data.instruction_map.empty())
+            {
+                Log::warn("waitForData: no instructions decoded");
+                return std::nullopt;
+            }
+
+            for(auto& [pc, data] : callback_user_data.instruction_map)
+            {
+                auto inst = address_table.get(pc.code_object_id, pc.address);
+                if(inst != nullptr)
+                    data.instruction = inst->inst;
+            }
+
+            std::vector<InstructionProfile> result;
+            result.reserve(callback_user_data.instruction_map.size());
+            for(const auto& [pc, data] : callback_user_data.instruction_map)
+            {
+                result.push_back(data);
+            }
+            Log::info("waitForData: retrieved {} instructions", result.size());
+
             return result;
         }
 
