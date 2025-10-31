@@ -253,6 +253,18 @@ constexpr auto rocsolver2char_rfinfo_mode(rocsolver_rfinfo_mode value)
     return '\0';
 }
 
+constexpr auto rocsolver2char_norm_type(rocsolver_norm_type value)
+{
+    switch(value)
+    {
+    case rocsolver_norm_type_one: return '1';
+    case rocsolver_norm_type_frobenius: return 'F';
+    case rocsolver_norm_type_infinity: return 'I';
+    case rocsolver_norm_type_max: return 'M';
+    }
+    return '\0';
+}
+
 /* ============================================================================================
  */
 /*  Convert lapack char constants to rocblas type. */
