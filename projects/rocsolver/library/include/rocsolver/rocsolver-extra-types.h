@@ -173,6 +173,16 @@ typedef enum rocblas_pivot_
     rocblas_pivot_bottom = 283, /**< The i-th rotation is applied on plane (i,m) or (i,n). */
 } rocblas_pivot;
 
+/*! \brief Used to specify the type of matrix norm to compute.
+ ********************************************************************************/
+typedef enum rocsolver_norm_type_
+{
+    rocsolver_norm_type_one = 301, /**< One-norm (maximum column sum). */
+    rocsolver_norm_type_frobenius = 302, /**< Frobenius norm (square root of sum of squares). */
+    rocsolver_norm_type_infinity = 303, /**< Infinity-norm (maximum row sum). */
+    rocsolver_norm_type_max = 304, /**< Maximum absolute value of any element. */
+} rocsolver_norm_type;
+
 /*! \brief Used by specific functions to specify the algorithm mode.
  ********************************************************************************/
 typedef enum rocsolver_alg_mode_
