@@ -2599,6 +2599,139 @@ CK_TILE_DEVICE void amd_async_buffer_load_with_oob(CK_TILE_LDS_ADDR T* smem,
                                            bool_constant<oob_conditional_check>{});
 }
 
+// this async_llvm_detail namespace is used to cast data type to llvm accepted type in builtin
+// function
+namespace async_llvm_detail {
+template <index_t N>
+struct async_load_type_traits;
+
+template <>
+struct async_load_type_traits<1>
+{
+    using type = char;
+};
+template <>
+struct async_load_type_traits<4>
+{
+    using type = int;
+};
+template <>
+struct async_load_type_traits<8>
+{
+    using type = int32x2_t;
+};
+template <>
+struct async_load_type_traits<16>
+{
+    using type = int32x4_t;
+};
+
+template <index_t N>
+using async_load_type_t = typename async_load_type_traits<N>::type;
+
+template <typename TargetType, typename SourceType>
+CK_TILE_DEVICE auto make_async_load_ptrs(const CK_TILE_GLOBAL_ADDR SourceType* global_ptr,
+                                         CK_TILE_LDS_ADDR SourceType* smem_ptr)
+{
+    CK_TILE_GLOBAL_ADDR TargetType* glb_ptr = const_cast<CK_TILE_GLOBAL_ADDR TargetType*>(
+        reinterpret_cast<const CK_TILE_GLOBAL_ADDR TargetType*>(global_ptr));
+    CK_TILE_LDS_ADDR TargetType* lds_ptr = reinterpret_cast<CK_TILE_LDS_ADDR TargetType*>(smem_ptr);
+    return ck_tile::make_tuple(glb_ptr, lds_ptr);
+}
+} // namespace async_llvm_detail
+
+template <typename T,
+          index_t N,
+          amd_buffer_coherence_enum coherence = amd_buffer_coherence_enum::coherence_default>
+__device__ void amd_async_global_load_to_lds(CK_TILE_LDS_ADDR T* smem_ptr,
+                                             const CK_TILE_GLOBAL_ADDR T* global_ptr,
+                                             bool is_valid_element)
+{
+    // currently only support to b8, b32, b64, b128 when one async copy
+    static_assert((std::is_same_v<T, double> && (N == 1 || N == 2)) ||
+                      (std::is_same_v<T, float> && (N == 1 || N == 2 || N == 4)) ||
+                      (std::is_same_v<T, int32_t> && (N == 1 || N == 2 || N == 4)) ||
+                      (std::is_same_v<T, half_t> && (N == 2 || N == 4 || N == 8)) ||
+                      (std::is_same_v<T, bf16_t> && (N == 2 || N == 4 || N == 8)) ||
+                      (std::is_same_v<T, fp8_t> && (N == 1 || N == 4 || N == 8 || N == 16)) ||
+                      (std::is_same_v<T, bf8_t> && (N == 1 || N == 4 || N == 8 || N == 16)) ||
+                      (std::is_same_v<T, int8_t> && (N == 1 || N == 4 || N == 8 || N == 16)) ||
+                      (std::is_same_v<T, uint8_t> && (N == 1 || N == 4 || N == 8 || N == 16)),
+                  "wrong! not implemented");
+
+#if defined(__gfx125__)
+    constexpr index_t bytes_in_instr = N * sizeof(T);
+    if constexpr(bytes_in_instr == 1)
+    {
+        auto [glb_ptr, lds_ptr] =
+            async_llvm_detail::make_async_load_ptrs<async_llvm_detail::async_load_type_t<1>>(
+                global_ptr, smem_ptr);
+        if(is_valid_element)
+        {
+            __builtin_amdgcn_global_load_async_to_lds_b8(
+                glb_ptr, lds_ptr, 0, static_cast<index_t>(coherence));
+        }
+        else
+        {
+            *lds_ptr = 0;
+        }
+        return;
+    }
+    else if constexpr(bytes_in_instr == 4)
+    {
+        auto [glb_ptr, lds_ptr] =
+            async_llvm_detail::make_async_load_ptrs<async_llvm_detail::async_load_type_t<4>>(
+                global_ptr, smem_ptr);
+        if(is_valid_element)
+        {
+            __builtin_amdgcn_global_load_async_to_lds_b32(
+                glb_ptr, lds_ptr, 0, static_cast<index_t>(coherence));
+        }
+        else
+        {
+            *lds_ptr = 0;
+        }
+        return;
+    }
+    else if constexpr(bytes_in_instr == 8)
+    {
+        auto [glb_ptr, lds_ptr] =
+            async_llvm_detail::make_async_load_ptrs<async_llvm_detail::async_load_type_t<8>>(
+                global_ptr, smem_ptr);
+        if(is_valid_element)
+        {
+            __builtin_amdgcn_global_load_async_to_lds_b64(
+                glb_ptr, lds_ptr, 0, static_cast<index_t>(coherence));
+        }
+        else
+        {
+            *lds_ptr = 0;
+        }
+        return;
+    }
+    else if constexpr(bytes_in_instr == 16)
+    {
+        auto [glb_ptr, lds_ptr] =
+            async_llvm_detail::make_async_load_ptrs<async_llvm_detail::async_load_type_t<16>>(
+                global_ptr, smem_ptr);
+        if(is_valid_element)
+        {
+            __builtin_amdgcn_global_load_async_to_lds_b128(
+                glb_ptr, lds_ptr, 0, static_cast<index_t>(coherence));
+        }
+        else
+        {
+            *lds_ptr = 0;
+        }
+        return;
+    }
+#else
+    ignore = is_valid_element;
+    ignore = global_ptr;
+    ignore = smem_ptr;
+#endif
+}
+
 // buffer_store requires:
 //   1) p_dst_wave must point to global memory
 //   2) p_dst_wave must be a wavewise pointer.

@@ -360,7 +360,9 @@ class TestCkTileGemmPipeline : public ::testing::Test
         {
             GTEST_SKIP() << "Unsupported data type combination for gemm pipeline test.";
         }
-        if constexpr(PipelineType == GemmPipelineType::CompV4)
+        // for TDM it used tdm_epilogue which don't support split-k
+        if constexpr(PipelineType == GemmPipelineType::CompV4 ||
+                     PipelineType == GemmPipelineType::CompTDM)
         {
             // Only do k_batch = 1 when pipeline is CompV4
             k_batches_ = {1};
@@ -368,7 +370,7 @@ class TestCkTileGemmPipeline : public ::testing::Test
         else
         {
             // Otherwise, use k_batch = 1 and 2
-            k_batches_ = {1};
+            k_batches_ = {1, 2};
         }
     }
 

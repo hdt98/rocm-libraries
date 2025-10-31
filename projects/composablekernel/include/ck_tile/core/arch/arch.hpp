@@ -258,7 +258,16 @@ CK_TILE_DEVICE void s_wait_tensorcnt()
 template <index_t vmcnt = 0>
 CK_TILE_DEVICE void block_sync_lds_direct_load()
 {
+#if defined(__gfx125__)
+    asm volatile("s_wait_asynccnt %0 \n"
+                 "s_barrier_signal -1 \n"
+                 "s_barrier_wait - 1"
+                 :
+                 : "n"(vmcnt)
+                 : "memory");
+#else
     s_waitcnt_barrier<vmcnt, waitcnt_arg::kMaxExpCnt, waitcnt_arg::kMaxLgkmCnt>();
+#endif
 }
 
 CK_TILE_DEVICE void s_nop(index_t cnt = 0)
