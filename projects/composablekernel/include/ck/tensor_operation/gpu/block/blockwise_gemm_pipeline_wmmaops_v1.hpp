@@ -218,195 +218,163 @@ struct BlockwiseGemmWmmaops_pipeline_v1<BlockGemmPipelineScheduler::Intrawave,
                         a_thread_desc_,
                         make_tuple(I0, I0, I0, I0, I0, I0),
                         a_thread_buf);
-                });
-                if constexpr(ck::is_same<BScaleStruct, Empty>::value == true)
-                {
-                    static_for<0, NRepeat, 1>{}([&](auto n0) {
-                        b_thread_copy_.Run(
-                            b_block_desc_k0_n0_n1_n2_k1,
-                            make_tuple(Number<k0 * KPack / B_K1 / B_KRow>{}, n0, I0, I0, I0, I0),
-                            b_block_buf,
-                            b_thread_desc_,
-                            make_tuple(I0, n0, k0, I0, I0, I0),
-                            b_thread_buf);
-                    });
-                }
-                else
-                {
-                    static_for<0, NRepeat, 1>{}([&](auto n0) {
-                        b_thread_copy_.Run(
-                            b_block_desc_k0_n0_n1_n2_k1,
-                            make_tuple(Number<k0 * KPack / B_K1 / B_KRow>{}, n0, I0, I0, I0, I0),
-                            b_block_buf,
-                            b_scale_struct.b_scale_thread_bufs(
-                                I0)[Number<n0 * BScaleStruct::num_scale_k_block +
-                                           k0 / BScaleStruct::num_scale_krepeat>{}],
-                            b_thread_desc_,
-                            make_tuple(I0, n0, k0, I0, I0, I0),
-                            b_thread_buf);
-                    });
-                }
-                __builtin_amdgcn_sched_barrier(0);
 
-                if constexpr(m0 == I0)
-                {
-                    if constexpr(ck::is_same<BScaleStruct, Empty>::value == true)
-                    {
-                        static_for<0, NRepeat, 1>{}([&](auto n0) {
-                            b_thread_copy_.Run(
-                                b_block_desc_k0_n0_n1_n2_k1,
-                                make_tuple(
-                                    Number<k0 * KPack / B_K1 / B_KRow>{}, n0, I0, I0, I0, I0),
-                                b_block_buf,
-                                b_thread_desc_,
-                                make_tuple(I0, n0, I0, I0, I0, I0),
-                                b_thread_buf);
-                        });
-                    }
-                    else
-                    {
-                        static_for<0, NRepeat, 1>{}([&](auto n0) {
-                            b_thread_copy_.Run(
-                                b_block_desc_k0_n0_n1_n2_k1,
-                                make_tuple(
-                                    Number<k0 * KPack / B_K1 / B_KRow>{}, n0, I0, I0, I0, I0),
-                                b_block_buf,
-                                b_scale_struct.b_scale_thread_bufs(
-                                    I0)[Number<n0 * BScaleStruct::num_scale_k_block +
-                                               k0 / BScaleStruct::num_scale_krepeat>{}],
-                                b_thread_desc_,
-                                make_tuple(I0, n0, I0, I0, I0, I0),
-                                b_thread_buf);
-                        });
-                    }
-                }
-
-                static_for<0, NRepeat, 1>{}([&](auto n0) {
-                    vector_type<ComputeTypeA, KPack / A_KRow> a_thread_vec;
-                    vector_type<ComputeTypeB, KPack / B_KRow> b_thread_vec;
-
-                    static_for<0, KPack / A_KRow, 1>{}([&](auto ik) {
-                        a_thread_vec.template AsType<ComputeTypeA>()(ik) =
-                            a_thread_buf[Number<a_thread_desc_.CalculateOffset(make_tuple(
-                                Number<ik / A_K1>{}, I0, I0, I0, I0, Number<ik % A_K1>{}))>{}];
-                    });
-                    static_for<0, KPack / B_KRow, 1>{}([&](auto ik) {
-                        b_thread_vec.template AsType<ComputeTypeB>()(ik) =
-                            b_thread_buf[Number<b_thread_desc_.CalculateOffset(make_tuple(
-                                Number<ik / B_K1>{}, n0, I0, I0, I0, Number<ik % B_K1>{}))>{}];
-                    });
-
-                    using wmma_input_type_a =
-                        typename vector_type<ComputeTypeA, WmmaK / A_KRow>::type;
-                    using wmma_input_type_b =
-                        typename vector_type<ComputeTypeB, WmmaK / B_KRow>::type;
-
-                    constexpr index_t c_offset =
-                        c_thread_desc_.CalculateOffset(make_tuple(m0, n0, I0));
-
-                    __builtin_amdgcn_sched_barrier(0);
-                    wmma_gemm.Run(a_thread_vec.template AsType<wmma_input_type_a>(),
-                                  b_thread_vec.template AsType<wmma_input_type_b>(),
-                                  c_thread_buf.GetVectorTypeReference(Number<c_offset>{}));
-
-                    __builtin_amdgcn_sched_barrier(0);
-                });
-            });
-            });
-    };
-
-    // main body
-    if constexpr(HasMainLoop)
-    {
-        index_t i = 0;
-        do
-        {
-            a_blockwise_copy.RunRead(a_grid_desc, a_grid_buf);
-            b_blockwise_copy.RunRead(b_grid_desc, b_grid_buf);
-
-            a_blockwise_copy.MoveSrcSliceWindow(a_grid_desc, a_block_copy_step);
-            b_blockwise_copy.MoveSrcSliceWindow(b_grid_desc, b_block_copy_step);
-
-            block_sync_lds();
-            blockwise_gemm_func();
-
-            block_sync_lds();
-            b_scale_struct.template GlobalLoad<0>((i + 2) % num_loop_per_scale == 0);
-            a_blockwise_copy.RunWrite(a_block_desc, a_block_buf);
-            b_blockwise_copy.RunWrite(b_block_desc, b_block_buf);
-
-            constexpr index_t num_ds_write_inst =
-                HotLoopInstList::A_LDS_Write_Inst_Num + HotLoopInstList::B_LDS_Write_Inst_Num;
-
-            constexpr index_t num_buffer_load_inst =
-                HotLoopInstList::A_Buffer_Load_Inst_Num + HotLoopInstList::B_Buffer_Load_Inst_Num;
-            static_for<0, num_buffer_load_inst, 1>{}([&](auto) {
-                __builtin_amdgcn_sched_group_barrier(0x020, 1, 0); // VMEM read
-            });
-            static_for<0, KRepeat, 1>{}([&](auto) {
-                static_for<0, MRepeat, 1>{}([&](auto m0) {
-                    __builtin_amdgcn_sched_group_barrier(0x100, 1, 0); // DS read
                     if constexpr(m0 == I0)
                     {
-                        static_for<0, NRepeat, 1>{}([&](auto) {
-                            __builtin_amdgcn_sched_group_barrier(0x100, 1, 0); // DS read
-                        });
+                        if constexpr(ck::is_same<BScaleStruct, Empty>::value == true)
+                        {
+                            static_for<0, NRepeat, 1>{}([&](auto n0) {
+                                b_thread_copy_.Run(
+                                    b_block_desc_k0_n0_n1_n2_k1,
+                                    make_tuple(
+                                        Number<k0 * KPack / B_K1 / B_KRow>{}, n0, I0, I0, I0, I0),
+                                    b_block_buf,
+                                    b_thread_desc_,
+                                    make_tuple(I0, n0, I0, I0, I0, I0),
+                                    b_thread_buf);
+                            });
+                        }
+                        else
+                        {
+                            static_for<0, NRepeat, 1>{}([&](auto n0) {
+                                b_thread_copy_.Run(
+                                    b_block_desc_k0_n0_n1_n2_k1,
+                                    make_tuple(
+                                        Number<k0 * KPack / B_K1 / B_KRow>{}, n0, I0, I0, I0, I0),
+                                    b_block_buf,
+                                    b_scale_struct.b_scale_thread_bufs(
+                                        I0)[Number<n0 * BScaleStruct::num_scale_k_block +
+                                                   k0 / BScaleStruct::num_scale_krepeat>{}],
+                                    b_thread_desc_,
+                                    make_tuple(I0, n0, I0, I0, I0, I0),
+                                    b_thread_buf);
+                            });
+                        }
                     }
-                    static_for<0, NRepeat, 1>{}([&](auto) {
-                        __builtin_amdgcn_sched_group_barrier(0x008, 1, 0); // WMMA
+
+                    static_for<0, NRepeat, 1>{}([&](auto n0) {
+                        vector_type<ComputeTypeA, KPack / A_KRow> a_thread_vec;
+                        vector_type<ComputeTypeB, KPack / B_KRow> b_thread_vec;
+
+                        static_for<0, KPack / A_KRow, 1>{}([&](auto ik) {
+                            a_thread_vec.template AsType<ComputeTypeA>()(ik) =
+                                a_thread_buf[Number<a_thread_desc_.CalculateOffset(make_tuple(
+                                    Number<ik / A_K1>{}, I0, I0, I0, I0, Number<ik % A_K1>{}))>{}];
+                        });
+                        static_for<0, KPack / B_KRow, 1>{}([&](auto ik) {
+                            b_thread_vec.template AsType<ComputeTypeB>()(ik) =
+                                b_thread_buf[Number<b_thread_desc_.CalculateOffset(make_tuple(
+                                    Number<ik / B_K1>{}, n0, I0, I0, I0, Number<ik % B_K1>{}))>{}];
+                        });
+
+                        using wmma_input_type_a =
+                            typename vector_type<ComputeTypeA, WmmaK / A_KRow>::type;
+                        using wmma_input_type_b =
+                            typename vector_type<ComputeTypeB, WmmaK / B_KRow>::type;
+
+                        constexpr index_t c_offset =
+                            c_thread_desc_.CalculateOffset(make_tuple(m0, n0, I0));
+
+                        wmma_gemm.Run(a_thread_vec.template AsType<wmma_input_type_a>(),
+                                      b_thread_vec.template AsType<wmma_input_type_b>(),
+                                      c_thread_buf.GetVectorTypeReference(Number<c_offset>{}));
                     });
                 });
             });
-            static_for<0, num_ds_write_inst, 1>{}([&](auto) {
-                __builtin_amdgcn_sched_group_barrier(0x200, 1, 0); // DS write
-            });
+        };
 
-            i += 1;
-        } while(i < (num_loop - 1));
+        // main body
+        if constexpr(HasMainLoop)
+        {
+            index_t i = 0;
+            do
+            {
+                a_blockwise_copy.RunRead(a_grid_desc, a_grid_buf);
+                b_blockwise_copy.RunRead(b_grid_desc, b_grid_buf);
+
+                a_blockwise_copy.MoveSrcSliceWindow(a_grid_desc, a_block_copy_step);
+                b_blockwise_copy.MoveSrcSliceWindow(b_grid_desc, b_block_copy_step);
+
+                block_sync_lds();
+                blockwise_gemm_func();
+
+                block_sync_lds();
+                b_scale_struct.template GlobalLoad<0>((i + 2) % num_loop_per_scale == 0);
+                a_blockwise_copy.RunWrite(a_block_desc, a_block_buf);
+                b_blockwise_copy.RunWrite(b_block_desc, b_block_buf);
+
+                constexpr index_t num_ds_write_inst =
+                    HotLoopInstList::A_LDS_Write_Inst_Num + HotLoopInstList::B_LDS_Write_Inst_Num;
+
+                constexpr index_t num_buffer_load_inst = HotLoopInstList::A_Buffer_Load_Inst_Num +
+                                                         HotLoopInstList::B_Buffer_Load_Inst_Num;
+                static_for<0, num_buffer_load_inst, 1>{}([&](auto) {
+                    __builtin_amdgcn_sched_group_barrier(0x020, 1, 0); // VMEM read
+                });
+                static_for<0, KRepeat, 1>{}([&](auto) {
+                    static_for<0, MRepeat, 1>{}([&](auto m0) {
+                        __builtin_amdgcn_sched_group_barrier(0x100, 1, 0); // DS read
+                        if constexpr(m0 == I0)
+                        {
+                            static_for<0, NRepeat, 1>{}([&](auto) {
+                                __builtin_amdgcn_sched_group_barrier(0x100, 1, 0); // DS read
+                            });
+                        }
+                        static_for<0, NRepeat, 1>{}([&](auto) {
+                            __builtin_amdgcn_sched_group_barrier(0x008, 1, 0); // WMMA
+                        });
+                    });
+                });
+                static_for<0, num_ds_write_inst, 1>{}([&](auto) {
+                    __builtin_amdgcn_sched_group_barrier(0x200, 1, 0); // DS write
+                });
+
+                i += 1;
+            } while(i < (num_loop - 1));
+        }
+
+        // tail
+        if constexpr(TailNum == TailNumber::Full)
+        {
+            block_sync_lds();
+            blockwise_gemm_func();
+        }
     }
 
-    // tail
-    if constexpr(TailNum == TailNumber::Full)
-    {
-        block_sync_lds();
-        blockwise_gemm_func();
-    }
-}
-
-protected :
+    protected:
     // A[MRepeat, I1, I1, KPack]
     static constexpr auto a_thread_desc_ = make_naive_tensor_descriptor_packed(
         make_tuple(Number<KPack / A_K1 / A_KRow>{}, I1, I1, I1, I1, Number<A_K1>{}));
 
-// B[NRepeat, N1, N2, KPack]
-static constexpr auto b_thread_desc_ = make_naive_tensor_descriptor_packed(
-    make_tuple(Number<KPack / B_K1 / B_KRow>{}, Number<NRepeat>{}, I1, I1, I1, Number<B_K1>{}));
+    // B[NRepeat, N1, N2, KPack]
+    static constexpr auto b_thread_desc_ = make_naive_tensor_descriptor_packed(
+        make_tuple(Number<KPack / B_K1 / B_KRow>{}, Number<NRepeat>{}, I1, I1, I1, Number<B_K1>{}));
 
-using AThreadCopy =
-    ThreadwiseTensorSliceTransfer_v4<ADataType,
-                                     ComputeTypeA,
-                                     decltype(a_block_desc_k0_m0_m1_m2_k1),
-                                     decltype(a_thread_desc_),
-                                     Sequence<KPack / A_K1 / A_KRow, 1, 1, 1, 1, A_K1>,
-                                     Sequence<0, 1, 2, 3, 4, 5>,
-                                     5,
-                                     A_K1,
-                                     A_K1>;
+    using AThreadCopy =
+        ThreadwiseTensorSliceTransfer_v4<ADataType,
+                                         ComputeTypeA,
+                                         decltype(a_block_desc_k0_m0_m1_m2_k1),
+                                         decltype(a_thread_desc_),
+                                         Sequence<KPack / A_K1 / A_KRow, 1, 1, 1, 1, A_K1>,
+                                         Sequence<0, 1, 2, 3, 4, 5>,
+                                         5,
+                                         A_K1,
+                                         A_K1>;
 
-using BThreadCopy =
-    ThreadwiseTensorSliceTransfer_v4<BDataType,
-                                     ComputeTypeB,
-                                     decltype(b_block_desc_k0_n0_n1_n2_k1),
-                                     decltype(b_thread_desc_),
-                                     Sequence<KPack / B_K1 / B_KRow, 1, 1, 1, 1, B_K1>,
-                                     Sequence<0, 1, 2, 3, 4, 5>,
-                                     5,
-                                     B_K1,
-                                     B_K1>;
+    using BThreadCopy =
+        ThreadwiseTensorSliceTransfer_v4<BDataType,
+                                         ComputeTypeB,
+                                         decltype(b_block_desc_k0_n0_n1_n2_k1),
+                                         decltype(b_thread_desc_),
+                                         Sequence<KPack / B_K1 / B_KRow, 1, 1, 1, 1, B_K1>,
+                                         Sequence<0, 1, 2, 3, 4, 5>,
+                                         5,
+                                         B_K1,
+                                         B_K1>;
 
-AThreadCopy a_thread_copy_{Base::CalculateAThreadOriginDataIndex()};
-BThreadCopy b_thread_copy_{Base::CalculateBThreadOriginDataIndex()};
-using Base::c_thread_desc_;
+    AThreadCopy a_thread_copy_{Base::CalculateAThreadOriginDataIndex()};
+    BThreadCopy b_thread_copy_{Base::CalculateBThreadOriginDataIndex()};
+    using Base::c_thread_desc_;
 };
 
 template <index_t BlockSize,
