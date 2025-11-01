@@ -115,7 +115,7 @@ namespace rocRoller
 
         struct LDSQueueEntry
         {
-            int cycles; // How long this instruction takes
+            int completionCycle; // The cycle when this LDS instruction will complete
             int slotsUsed; // How many queue slots it uses
         };
 
@@ -141,7 +141,6 @@ namespace rocRoller
             // In hardware, slots are 16 dwords wide,
             // Here, they groups of 4 (64 dwords) form a single unit for simplicity
             mutable uint           m_remainingSlots;
-            mutable int            m_totalQueueCycles;
             int                    m_programCycle;
             std::weak_ptr<Context> m_context;
         };

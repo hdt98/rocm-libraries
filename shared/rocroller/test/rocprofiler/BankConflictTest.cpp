@@ -699,10 +699,10 @@ namespace rocRollerTest
             {
                 auto dstRegs = ldsDst->subset(Generated(iota(i * 2, (i + 1) * 2)));
 
-                co_yield context->mem()->loadLocal(dstRegs,
-                                                   ldsWithOffset,
-                                                   i * 8, // offset in bytes
-                                                   8 // 64 bits = 8 bytes
+                co_yield context->mem()->storeLocal(ldsWithOffset,
+                                                    dstRegs,
+                                                    i * 8, // offset in bytes
+                                                    8 // 64 bits = 8 bytes
                 );
             }
         };
