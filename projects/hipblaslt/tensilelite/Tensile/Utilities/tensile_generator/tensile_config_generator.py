@@ -134,6 +134,14 @@ elif ArchitectureName == 'gfx90a':
     XCC = 1
     DeviceNames = ["Device 0050", "Device 0051", "Device 0052", "Device 0054", "Device 0062", "Device 7400", "Device 740c"]
     ScheduleName = "aldebaran"
+elif ArchitectureName == 'gfx1100':
+    XCC = 1
+    DeviceNames = ["Device 744a"]
+    ScheduleName = "navi31"
+elif ArchitectureName == 'gfx1101':
+    XCC = 1
+    DeviceNames = ["Device 7461"]
+    ScheduleName = "navi32"
 
 if args.full_mfma:
     fp16_instructions = [[32,32,4,2], [32,32,8,1], [16,16,4,4], [16,16,16,1], [4,4,4,16]]
