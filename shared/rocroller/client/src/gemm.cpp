@@ -24,6 +24,7 @@
  *
  *******************************************************************************/
 
+#include "rocRoller/Serialization/YAML.hpp"
 #include <filesystem>
 #include <string>
 
@@ -2003,7 +2004,11 @@ int main(int argc, const char* argv[])
     if(example->parsed())
     {
         std::ofstream file(examplePath);
-        Serialization::writeYAML(file, solution);
+        std::string   solutionYaml = Serialization::toYAML(solution);
+        std::string   problemYaml  = Serialization::toYAML(problem);
+        std::string   combinedYaml
+            = solutionYaml.substr(0, solutionYaml.length() - 4) + problemYaml.substr(4);
+        file << combinedYaml;
         return 0;
     }
 
