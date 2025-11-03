@@ -28,12 +28,16 @@ add_ck_builder_test(test_ckb_inline_diff test_inline_diff.cpp)
 add_ck_builder_test(test_ckb_get_instance_string
     test_get_instance_string_fwd_grp_conv_v3.cpp
     test_get_instance_string_fwd_grp_conv.cpp
-    test_get_instance_string_fwd_grp_conv_large_tensor.cpp)
+    test_get_instance_string_fwd_grp_conv_large_tensor.cpp
+    test_get_instance_string_fwd_grp_conv_wmma.cpp
+    test_get_instance_string_fwd_grp_conv_dl.cpp)
 
 # Testing the fwd convolution builder requires kernel compilation.
 # To enable parallel compilation, the individual tests are split into separate files.
 add_ck_builder_test(test_ckb_build_fwd_instances
-    conv/test_ckb_conv_fwd_1d_bf16.cpp    
+    conv/test_ckb_conv_fwd_1d_fp16.cpp
+    conv/test_ckb_conv_fwd_1d_bf16.cpp
+    conv/test_ckb_conv_fwd_1d_i8.cpp    
     conv/test_ckb_conv_fwd_2d_bf16.cpp
     conv/test_ckb_conv_fwd_2d_fp16.cpp
     conv/test_ckb_conv_fwd_2d_fp32.cpp
