@@ -43,6 +43,9 @@
 #include <optional>
 #include <vector>
 
+/// Elevate log messages for Search to warnings.
+MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_WARN_SEARCH)
+
 namespace miopen {
 
 struct AnyInvokeParams;
@@ -140,16 +143,27 @@ auto FindSolutionImpl(rank<1>,
             if(enforce.IsSearchCutoff(context))
                 context.search_cutoff = true;
 
-            MIOPEN_LOG_I("Starting search: " << s.SolverDbId() << ", enforce: " << enforce);
+            auto record = DbRecord(DbKinds::PerfDb, problem);
+            if(env::enabled(MIOPEN_WARN_SEARCH))
+                MIOPEN_LOG_W("Search Start: " << record.GetKey() << " : " << s.SolverDbId()
+                                              << ", enforce: " << enforce);
+            else
+                MIOPEN_LOG_I("Search Start: " << record.GetKey() << " : " << s.SolverDbId()
+                                              << ", enforce: " << enforce);
             try
             {
                 auto c = s.Search(context, problem, invoke_ctx);
+                if(env::enabled(MIOPEN_WARN_SEARCH))
+                    MIOPEN_LOG_W("Search Ended: " << record.GetKey() << " : " << s.SolverDbId());
+                else
+                    MIOPEN_LOG_I("Search Ended: " << record.GetKey() << " : " << s.SolverDbId());
                 db().Update(problem, s.SolverDbId(), c);
                 return s.GetSolution(context, problem, c);
             }
             catch(const miopen::Exception& ex)
             {
-                MIOPEN_LOG_E("Search failed for: " << s.SolverDbId() << ": " << ex.what());
+                MIOPEN_LOG_E("Search Failed: " << record.GetKey() << s.SolverDbId() << ": "
+                                               << ex.what());
                 return ConvSolution(miopenStatusInternalError);
             }
         }
