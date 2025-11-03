@@ -1,12 +1,17 @@
 // Copyright © Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier:  MIT
 
+#pragma once
+
 #include <hipdnn_sdk/plugin/flatbuffer_utilities/GraphWrapper.hpp>
 
 #include <hipdnn_sdk/test_utilities/cpu_graph_executor/BatchnormFwdInferencePlan.hpp>
 #include <hipdnn_sdk/test_utilities/cpu_graph_executor/ConvolutionBwdPlan.hpp>
 #include <hipdnn_sdk/test_utilities/cpu_graph_executor/ConvolutionFwdPlan.hpp>
+#include <hipdnn_sdk/test_utilities/cpu_graph_executor/ConvolutionWrwPlan.hpp>
 #include <hipdnn_sdk/test_utilities/cpu_graph_executor/PlanBuilderRegistry.hpp>
+#include <hipdnn_sdk/test_utilities/cpu_graph_executor/PointwisePlan.hpp>
+#include <hipdnn_sdk/utilities/json/Graph.hpp>
 
 namespace hipdnn_sdk::test_utilities
 {
@@ -68,8 +73,7 @@ private:
         buildPlanForNode(const hipdnn_plugin::IGraph& graph,
                          const hipdnn_sdk::data_objects::Node& node)
     {
-        // TODO: Switch this to the node's compute_type
-        auto key = buildSignatureKey(node, graph.getTensorMap(), graph.getGraph().compute_type());
+        auto key = buildSignatureKey(node, graph.getTensorMap(), node.compute_data_type());
 
         const auto& planBuilder = _planRegistry.getPlanBuilder(key);
         if(!planBuilder.isApplicable(node, graph.getTensorMap()))
@@ -91,6 +95,7 @@ private:
         case hipdnn_sdk::data_objects::NodeAttributes::BatchnormInferenceAttributes:
             return BatchnormFwdInferenceSignatureKey(node, tensorMap);
         case hipdnn_sdk::data_objects::NodeAttributes::PointwiseAttributes:
+            return PointwiseSignatureKey(node, tensorMap);
         case hipdnn_sdk::data_objects::NodeAttributes::BatchnormBackwardAttributes:
             return BatchnormBwdSignatureKey(node, tensorMap);
         case hipdnn_sdk::data_objects::NodeAttributes::BatchnormAttributes:
@@ -99,6 +104,8 @@ private:
             return ConvolutionFwdSignatureKey(node, tensorMap, computeType);
         case hipdnn_sdk::data_objects::NodeAttributes::ConvolutionBwdAttributes:
             return ConvolutionBwdSignatureKey(node, tensorMap, computeType);
+        case hipdnn_sdk::data_objects::NodeAttributes::ConvolutionWrwAttributes:
+            return ConvolutionWrwSignatureKey(node, tensorMap, computeType);
         default:
             throw std::runtime_error("Unsupported node type for signature key generation");
         }
