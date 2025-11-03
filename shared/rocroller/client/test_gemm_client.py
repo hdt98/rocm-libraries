@@ -616,10 +616,16 @@ def test_gemm_options(tmp_path):
     """GEMM options."""
 
     example = tmp_path / "example.yaml"
+    example_problem = tmp_path / "example_problem.yaml"
 
     def run_and_load_example_yaml(cmd):
         subprocess.run(cmd, check=True)
         yaml_contents = example.read_text()
+        return yaml.load(yaml_contents, Loader=yaml.Loader)
+
+    def run_and_load_example_problem_yaml(cmd):
+        subprocess.run(cmd, check=True)
+        yaml_contents = example_problem.read_text()
         return yaml.load(yaml_contents, Loader=yaml.Loader)
 
     # fails
@@ -722,15 +728,15 @@ def test_gemm_options(tmp_path):
     assert post["swizzleTileSize"]["l"] == 13
 
     # setting data initialization modes
-    post = run_and_load_example_yaml(
-        [gemm, "example", example, "--arch=gfx950", "--initMode_A=Bounded", "--initMode_B=BoundedAlternatingSign", "--initMode_C=Unbounded"]
+    post = run_and_load_example_problem_yaml(
+        [gemm, "exampleProblem", example_problem, "--arch=gfx950", "--initMode_A=Bounded", "--initMode_B=BoundedAlternatingSign", "--initMode_C=Unbounded"]
     )
     assert post["initMode_A"] == "DataInitMode(Bounded)"
     assert post["initMode_B"] == "DataInitMode(BoundedAlternatingSign)"
     assert post["initMode_C"] == "DataInitMode(Unbounded)"
 
-    post = run_and_load_example_yaml(
-        [gemm, "example", example, "--arch=gfx950", "--initMode_A=Identity", "--initMode_B=Ones", "--initMode_C=Zeros"]
+    post = run_and_load_example_problem_yaml(
+        [gemm, "exampleProblem", example_problem, "--arch=gfx950", "--initMode_A=Identity", "--initMode_B=Ones", "--initMode_C=Zeros"]
     )
     assert post["initMode_A"] == "DataInitMode(Identity)"
     assert post["initMode_B"] == "DataInitMode(Ones)"
@@ -740,8 +746,8 @@ def test_gemm_options(tmp_path):
     std_dev_B = 1.0
     mean_C = 2.0
     std_dev_C = 3.0
-    post = run_and_load_example_yaml(
-        [gemm, "example", example, "--arch=gfx950", "--initMode_A=TrigonometricFromFloat", f"--initMode_B=NormalFromFloat({mean_B}, {std_dev_B})", f"--initMode_C=NormalFromFloat({mean_C}, {std_dev_C})"]
+    post = run_and_load_example_problem_yaml(
+        [gemm, "exampleProblem", example_problem, "--arch=gfx950", "--initMode_A=TrigonometricFromFloat", f"--initMode_B=NormalFromFloat({mean_B}, {std_dev_B})", f"--initMode_C=NormalFromFloat({mean_C}, {std_dev_C})"]
     )
     assert post["initMode_A"] == "DataInitMode(TrigonometricFromFloat)"
     

@@ -26,6 +26,7 @@
 
 #include "rocRoller/Serialization/YAML.hpp"
 #include <filesystem>
+#include <fstream>
 #include <string>
 
 #ifdef ROCROLLER_USE_HIP
@@ -1097,7 +1098,7 @@ namespace rocRoller::Client::GEMMClient::CLI
         std::make_pair("--streamKTwoTileDPFirst", &SolutionParameters::streamKTwoTileDPFirst));
 
     template <typename T, typename U>
-    std::string getSolutionParameterArgumentName(U T::*member_ptr)
+    std::string getSolutionParameterArgumentName(U T::* member_ptr)
     {
         std::optional<std::string> found_name;
 
@@ -1609,7 +1610,7 @@ int main(int argc, const char* argv[])
 
     bool noCheckResult = false;
 
-    std::string loadPath, examplePath;
+    std::string loadPath, examplePath, exampleProblemPath;
 
     app.add_flag(
         "--hgemm",
@@ -1694,6 +1695,16 @@ int main(int argc, const char* argv[])
                        ->fallthrough();
 
     example->add_option("save", examplePath, "Example config path.")->required();
+
+    //
+    // example problem parameters sub-command
+    //
+    auto exampleProblem
+        = app.add_subcommand("exampleProblem", "Save example problem parameters to YAML file.")
+              ->fallthrough();
+
+    exampleProblem->add_option("save", exampleProblemPath, "Example problem config path")
+        ->required();
 
     //
     // Parse and update/validate problem definition
@@ -1902,9 +1913,9 @@ int main(int argc, const char* argv[])
 
     if(arch.target().isRDNA4GPU())
     {
-        // Override default settings for the `example` and `generate` subcommands.
-        if((example->parsed() || generate->parsed()) && typeA == DataType::Float
-           && typeB == DataType::Float)
+        // Override default settings for the `example`, `exampleProblem`, and `generate` subcommands.
+        if((example->parsed() || exampleProblem->parsed() || generate->parsed())
+           && typeA == DataType::Float && typeB == DataType::Float)
         {
             std::cout << "Warning: A and B types and wave sizes have been overridden for RDNA4."
                       << std::endl;
@@ -2004,11 +2015,13 @@ int main(int argc, const char* argv[])
     if(example->parsed())
     {
         std::ofstream file(examplePath);
-        std::string   solutionYaml = Serialization::toYAML(solution);
-        std::string   problemYaml  = Serialization::toYAML(problem);
-        std::string   combinedYaml
-            = solutionYaml.substr(0, solutionYaml.length() - 4) + problemYaml.substr(4);
-        file << combinedYaml;
+        Serialization::writeYAML(file, solution);
+        return 0;
+    }
+    if(exampleProblem->parsed())
+    {
+        std::ofstream file(exampleProblemPath);
+        Serialization::writeYAML(file, problem);
         return 0;
     }
 
