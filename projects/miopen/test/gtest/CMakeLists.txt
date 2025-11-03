@@ -49,6 +49,12 @@ function(add_gtest TEST_NAME TEST_CPP)
     target_compile_definitions(${TEST_NAME} PRIVATE NOMINMAX)
   endif()
 
+  target_include_directories(${TEST_NAME} PUBLIC
+    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+    $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/include>
+    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/src/include>
+    )
+
   add_dependencies(tests ${TEST_NAME})
   add_dependencies(check ${TEST_NAME})
 
@@ -208,7 +214,7 @@ endforeach()
 # Otherwise, all files in ${SOURCES} are rebuilt for each test.
 add_library(miopen_gtest_common STATIC ${SOURCES})
 target_include_directories(miopen_gtest_common PRIVATE ../ ../../src/kernels)
-target_link_libraries(miopen_gtest_common PRIVATE GTest::gtest MIOpen)
+target_link_libraries(miopen_gtest_common PRIVATE GTest::gtest MIOpen_static)
 if(WIN32)
   # Refer to https://en.cppreference.com/w/cpp/language/types for details.
   target_compile_options(miopen_gtest_common PRIVATE $<BUILD_INTERFACE:$<$<CXX_COMPILER_ID:Clang>:-U__LP64__>>)

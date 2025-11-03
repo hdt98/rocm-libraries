@@ -72,7 +72,11 @@ if(WIN32)
 endif()
 add_dependencies(MIOpenDriver generate_kernels)
 target_include_directories(MIOpenDriver PRIVATE ../src/kernels)
-target_link_libraries(MIOpenDriver PRIVATE MIOpen Threads::Threads roc::rocrand nlohmann_json::nlohmann_json )
+# Add compiler flags for function and data sections to enable dead code elimination
+target_compile_options(MIOpenDriver PRIVATE -ffunction-sections -fdata-sections)
+# Add linker flag to remove unused sections
+target_link_options(MIOpenDriver PRIVATE -Wl,--gc-sections)
+target_link_libraries(MIOpenDriver PRIVATE MIOpen_static Threads::Threads roc::rocrand nlohmann_json::nlohmann_json)
 if(NOT MIOPEN_EMBED_DB STREQUAL "")
     target_link_libraries(MIOpenDriver PRIVATE $<BUILD_INTERFACE:miopen_data> )
 endif()
