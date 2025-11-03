@@ -50,13 +50,13 @@ private:
 template <typename DType>
 struct TypedMatrixTransformIO : public MatrixTransformIO
 {
-    TypedMatrixTransformIO(int64_t m, int64_t n, int64_t b, hipblaslt_initialization initMethod)
+    TypedMatrixTransformIO(int64_t m, int64_t n, int64_t b, hipblaslt_initialization initMode)
     {
         auto        hipErr = hipMalloc(&this->a, m * n * b * sizeof(DType));
         hipErr = hipMalloc(&this->b, m * n * b * sizeof(DType));
         hipErr = hipMalloc(&this->c, m * n * b * sizeof(DType));
-        init(this->a, m * n * b, initMethod);
-        init(this->b, m * n * b, initMethod);
+        init(this->a, m * n * b, initMode);
+        init(this->b, m * n * b, initMode);
     }
 
     ~TypedMatrixTransformIO() override
@@ -78,11 +78,11 @@ struct TypedMatrixTransformIO : public MatrixTransformIO
     }
 
 private:
-    void init(DType* buf, size_t len, hipblaslt_initialization initMethod)
+    void init(DType* buf, size_t len, hipblaslt_initialization initMode)
     {
         std::vector<DType> ref(len);
 
-        switch(initMethod)
+        switch(initMode)
         {
         case hipblaslt_initialization::rand_int:
             hipblaslt_init<DType>(ref.data(), ref.size(), 1, 1);

@@ -302,8 +302,8 @@ std::vector<float> generateMXInput(hipDataType            dataType,
     using namespace DGen;
 
     DataGeneratorOptions opt;
-    opt.min          = initMethod == "uniform_01" ? 0. : (initMethod == "hpl" ? -.5 : min_val);
-    opt.max          = initMethod == "uniform_01" ? 1. : (initMethod == "hpl" ? .5 : max_val);
+    opt.min          = initMode == "uniform_01" ? 0. : (initMode == "hpl" ? -.5 : min_val);
+    opt.max          = initMode == "uniform_01" ? 1. : (initMode == "hpl" ? .5 : max_val);
     opt.blockScaling = scaleBlockRowSize * scaleBlockColSize;
     // TODO initMode == "hpl" should also be Bounded, but fails some tests
     opt.initMode = (initMode == "Bounded" || initMode == "uniform_01")
