@@ -152,69 +152,6 @@ std::optional<ActivationParams>
     }
 }
 
-double extractDoubleFromTensorValue(const hipdnn_sdk::data_objects::TensorAttributes* tensorAttr,
-                                    const char* paramName)
-{
-    if(tensorAttr == nullptr)
-    {
-        throw hipdnn_plugin::HipdnnPluginException(HIPDNN_PLUGIN_STATUS_INVALID_VALUE,
-                                                   std::string(paramName)
-                                                       + " tensor attribute is null");
-    }
-
-    switch(tensorAttr->data_type())
-    {
-    case hipdnn_sdk::data_objects::DataType::DOUBLE:
-        if(auto val = tensorAttr->value_as_Float64Value())
-        {
-            return val->value();
-        }
-        break;
-    case hipdnn_sdk::data_objects::DataType::FLOAT:
-        if(auto val = tensorAttr->value_as_Float32Value())
-        {
-            return static_cast<double>(val->value());
-        }
-        break;
-    case hipdnn_sdk::data_objects::DataType::HALF:
-        if(auto val = tensorAttr->value_as_Float16Value())
-        {
-            return static_cast<double>(val->value());
-        }
-        break;
-    case hipdnn_sdk::data_objects::DataType::BFLOAT16:
-        if(auto val = tensorAttr->value_as_BFloat16Value())
-        {
-            return static_cast<double>(val->value());
-        }
-        break;
-    case hipdnn_sdk::data_objects::DataType::INT32:
-        if(auto val = tensorAttr->value_as_Int32Value())
-        {
-            return static_cast<double>(val->value());
-        }
-        break;
-    case hipdnn_sdk::data_objects::DataType::UINT8:
-        if(auto val = tensorAttr->value_as_Float8Value())
-        {
-            return static_cast<double>(val->value());
-        }
-        break;
-    case hipdnn_sdk::data_objects::DataType::UNSET:
-        throw hipdnn_plugin::HipdnnPluginException(HIPDNN_PLUGIN_STATUS_INVALID_VALUE,
-                                                   std::string(paramName)
-                                                       + " tensor has UNSET data type");
-    default:
-        throw hipdnn_plugin::HipdnnPluginException(HIPDNN_PLUGIN_STATUS_INVALID_VALUE,
-                                                   std::string(paramName)
-                                                       + " has unsupported data type");
-    }
-
-    throw hipdnn_plugin::HipdnnPluginException(HIPDNN_PLUGIN_STATUS_INVALID_VALUE,
-                                               std::string(paramName)
-                                                   + " must be a pass-by-value tensor");
-}
-
 }
 
 }

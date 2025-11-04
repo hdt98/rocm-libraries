@@ -35,7 +35,8 @@ BatchnormFwdTrainingParams::BatchnormFwdTrainingParams(
             = miopen_utils::createTensor(tensorMap, attributes.inv_variance_tensor_uid().value());
     }
 
-    // Check if running statistics are provided
+#if 0 // Running statistics not supported - API mismatch between hipDNN and MIOpen
+      // hipDNN uses separate prev/next buffers, MIOpen requires IN/OUT buffers
     if(attributes.prev_running_mean_tensor_uid().has_value()
        && attributes.prev_running_variance_tensor_uid().has_value()
        && attributes.momentum_tensor_uid().has_value()
@@ -56,6 +57,19 @@ BatchnormFwdTrainingParams::BatchnormFwdTrainingParams(
             tensorMap, attributes.next_running_variance_tensor_uid().value());
         _hasRunningStats = true;
     }
+#else
+    // Defensive check: should have been rejected by plan builder
+    if(attributes.prev_running_mean_tensor_uid().has_value()
+       || attributes.prev_running_variance_tensor_uid().has_value()
+       || attributes.momentum_tensor_uid().has_value()
+       || attributes.next_running_mean_tensor_uid().has_value()
+       || attributes.next_running_variance_tensor_uid().has_value())
+    {
+        throw hipdnn_plugin::HipdnnPluginException(
+            HIPDNN_PLUGIN_STATUS_INTERNAL_ERROR,
+            "Running statistics should have been rejected by plan builder");
+    }
+#endif
 }
 
 const MiopenTensor& BatchnormFwdTrainingParams::x() const
@@ -184,8 +198,14 @@ void BatchnormFwdTrainingPlan::execute(const HipdnnEnginePluginHandle& handle,
         resultSaveInvVariancePtr = invVarianceBuffer.ptr;
     }
 
-    // Running statistics are not supported due to API mismatch.
-    // The plan builder will reject graphs with running statistics before reaching this point.
+    // Running statistics should have been rejected by plan builder
+    if(_trainingParams.hasRunningStats())
+    {
+        throw hipdnn_plugin::HipdnnPluginException(
+            HIPDNN_PLUGIN_STATUS_INTERNAL_ERROR,
+            "Running statistics should have been rejected by plan builder");
+    }
+
     void* resultRunningMeanPtr = nullptr;
     void* resultRunningVariancePtr = nullptr;
 

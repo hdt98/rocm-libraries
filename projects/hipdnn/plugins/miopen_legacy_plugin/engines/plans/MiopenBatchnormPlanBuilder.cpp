@@ -62,11 +62,7 @@ bool MiopenBatchnormPlanBuilder::isApplicable(
            && attr->next_running_mean_tensor_uid().has_value()
            && attr->next_running_variance_tensor_uid().has_value())
         {
-            HIPDNN_LOG_INFO(
-                "Batchnorm plan builder does not support running statistics. "
-                "The hipDNN graph API uses separate prev_running_mean/variance (input) and "
-                "next_running_mean/variance (output) buffers, but MIOpen requires IN/OUT buffers. "
-                "MIOpen API updates are needed to support this correctly.");
+            HIPDNN_LOG_INFO("Batchnorm plan builder does not support running statistics");
             return false;
         }
     }

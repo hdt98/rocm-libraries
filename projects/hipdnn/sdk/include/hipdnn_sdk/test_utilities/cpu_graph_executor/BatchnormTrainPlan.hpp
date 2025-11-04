@@ -12,71 +12,12 @@
 #include <hipdnn_sdk/test_utilities/cpu_graph_executor/IGraphNodePlanBuilder.hpp>
 #include <hipdnn_sdk/test_utilities/cpu_graph_executor/IGraphNodePlanExecutor.hpp>
 #include <hipdnn_sdk/test_utilities/cpu_graph_executor/PlanUtils.hpp>
+#include <hipdnn_sdk/utilities/FlatbufferUtils.hpp>
 #include <optional>
 #include <variant>
 
 namespace hipdnn_sdk::test_utilities
 {
-
-namespace
-{
-// Helper function to extract double value from pass-by-value tensor of any type
-inline double
-    extractDoubleFromTensorValue(const hipdnn_sdk::data_objects::TensorAttributesT& tensorAttr,
-                                 const char* paramName)
-{
-    if(tensorAttr.value.value == nullptr)
-    {
-        throw std::runtime_error(std::string(paramName) + " must be a pass-by-value tensor");
-    }
-
-    switch(tensorAttr.data_type)
-    {
-    case hipdnn_sdk::data_objects::DataType::DOUBLE:
-        if(auto val = tensorAttr.value.AsFloat64Value())
-        {
-            return val->value();
-        }
-        break;
-    case hipdnn_sdk::data_objects::DataType::FLOAT:
-        if(auto val = tensorAttr.value.AsFloat32Value())
-        {
-            return static_cast<double>(val->value());
-        }
-        break;
-    case hipdnn_sdk::data_objects::DataType::HALF:
-        if(auto val = tensorAttr.value.AsFloat16Value())
-        {
-            return static_cast<double>(val->value());
-        }
-        break;
-    case hipdnn_sdk::data_objects::DataType::BFLOAT16:
-        if(auto val = tensorAttr.value.AsBFloat16Value())
-        {
-            return static_cast<double>(val->value());
-        }
-        break;
-    case hipdnn_sdk::data_objects::DataType::INT32:
-        if(auto val = tensorAttr.value.AsInt32Value())
-        {
-            return static_cast<double>(val->value());
-        }
-        break;
-    case hipdnn_sdk::data_objects::DataType::UINT8:
-        if(auto val = tensorAttr.value.AsFloat8Value())
-        {
-            return static_cast<double>(val->value());
-        }
-        break;
-    case hipdnn_sdk::data_objects::DataType::UNSET:
-        throw std::runtime_error(std::string(paramName) + " tensor has UNSET data type");
-    default:
-        throw std::runtime_error(std::string(paramName) + " has unsupported data type");
-    }
-
-    throw std::runtime_error(std::string(paramName) + " must be a pass-by-value tensor");
-}
-} // anonymous namespace
 
 template <typename MeanVarianceDataType>
 struct BatchnormTrainParams
@@ -165,7 +106,7 @@ public:
             _params.yTensor, variantPack.at(_params.yTensor.uid));
 
         // Extract epsilon from pass-by-value tensor (cast to double)
-        double epsilon = extractDoubleFromTensorValue(_params.epsilonTensor, "Epsilon");
+        double epsilon = hipdnn_sdk::utilities::extractDoubleFromTensorValue(_params.epsilonTensor, "Epsilon");
 
         // Optional batch statistics tensors
         std::unique_ptr<TensorBase<MeanVarianceDataType>> mean;
@@ -204,7 +145,7 @@ public:
         if(_params.momentumTensor.has_value())
         {
             momentumValue
-                = extractDoubleFromTensorValue(_params.momentumTensor.value(), "Momentum");
+                = hipdnn_sdk::utilities::extractDoubleFromTensorValue(_params.momentumTensor.value(), "Momentum");
         }
 
         if(_params.prevRunningMeanTensor.has_value())
