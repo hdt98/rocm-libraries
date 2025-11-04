@@ -764,6 +764,16 @@ def test_gemm_options(tmp_path):
     assert float(std_dev) == std_dev_C
 
 
+def test_gemm_generate_from_example(tmp_path):
+    """GEMM 'generate' from the output of 'example'."""
+
+    example = tmp_path / "example.yaml"
+    subprocess.run([gemm, "example", example], check=True)
+
+    # We should be able to generate a kernel from the config file
+    subprocess.run([gemm, "generate", "--config", example], check=True)
+
+
 def test_gemm_config(tmp_path):
     """GEMM load from config file."""
 
