@@ -168,12 +168,23 @@ class TestCkTileGemmPipeline : public ::testing::Test
     static constexpr bool Persistent =
         ck_tile::tuple_element_or_default_t<Tuple, 14, std::false_type>::value;
 
+    static constexpr bool ClusterLaunch =
+        ck_tile::tuple_element_or_default_t<Tuple, 15, std::false_type>::value;
+
     template <bool PadM, bool PadN, bool PadK, bool Preshuffle>
     void invoke_gemm(const ck_tile::GemmHostArgs& args, const ck_tile::stream_config& s)
     {
         constexpr ck_tile::index_t M_Warp = 2;
         constexpr ck_tile::index_t N_Warp = 2;
         constexpr ck_tile::index_t K_Warp = 1;
+
+        // if cluster launch is enabled, set cluster dim to 2x2x1
+        constexpr ck_tile::index_t kClusterSizeM =
+            std::conditional_t<ClusterLaunch, ck_tile::number<2>, ck_tile::number<1>>{};
+        constexpr ck_tile::index_t kClusterSizeN =
+            std::conditional_t<ClusterLaunch, ck_tile::number<2>, ck_tile::number<1>>{};
+        constexpr ck_tile::index_t kClusterSizeK =
+            std::conditional_t<ClusterLaunch, ck_tile::number<1>, ck_tile::number<1>>{};
 
         constexpr bool kPadM      = PadM;
         constexpr bool kPadN      = PadN;
@@ -193,12 +204,23 @@ class TestCkTileGemmPipeline : public ::testing::Test
 
         // ===============================================
 
-        using GemmShape =
+        using GemmShape = std::conditional_t<
+            ClusterLaunch,
+            ck_tile::ClusterTileGemmShape<
+                ck_tile::sequence<kClusterSizeM, kClusterSizeN, kClusterSizeK>,
+                ck_tile::sequence<M_Tile, N_Tile, K_Tile>,
+                ck_tile::sequence<M_Warp, N_Warp, K_Warp>,
+                ck_tile::sequence<M_Warp_Tile, N_Warp_Tile, K_Warp_Tile>>,
             ck_tile::TileGemmShape<ck_tile::sequence<M_Tile, N_Tile, K_Tile>,
                                    ck_tile::sequence<M_Warp, N_Warp, K_Warp>,
-                                   ck_tile::sequence<M_Warp_Tile, N_Warp_Tile, K_Warp_Tile>>;
-        using TilePartitioner = ck_tile::
-            GemmSpatiallyLocalTilePartitioner<GemmShape, TileParitionerGroupNum, TileParitionerM01>;
+                                   ck_tile::sequence<M_Warp_Tile, N_Warp_Tile, K_Warp_Tile>>>;
+
+        using TilePartitioner =
+            std::conditional_t<ClusterLaunch,
+                               ck_tile::GemmClusterTilePartitioner<GemmShape>,
+                               ck_tile::GemmSpatiallyLocalTilePartitioner<GemmShape,
+                                                                          TileParitionerGroupNum,
+                                                                          TileParitionerM01>>;
 
         using Traits = ck_tile::TileGemmTraits<kPadM, kPadN, kPadK, ALayout, BLayout, CLayout>;
         static constexpr bool StructuredSparsity = false;
@@ -294,8 +316,18 @@ class TestCkTileGemmPipeline : public ::testing::Test
                           << blocks.y << ", " << blocks.z << "}" << std::endl;
             }
 
-            ck_tile::launch_kernel(
-                s, ck_tile::make_kernel<kBlockPerCu>(Kernel{}, grids, blocks, 0, kargs));
+            if constexpr(ClusterLaunch)
+            {
+                dim3 clusters = Kernel::ClusterSize();
+                ck_tile::launch_kernel(
+                    s,
+                    ck_tile::make_kernel<kBlockPerCu>(Kernel{}, clusters, grids, blocks, 0, kargs));
+            }
+            else
+            {
+                ck_tile::launch_kernel(
+                    s, ck_tile::make_kernel<kBlockPerCu>(Kernel{}, grids, blocks, 0, kargs));
+            }
         };
 
         const auto RunSplitk = [&](const auto has_hot_loop_, const auto tail_number_) {

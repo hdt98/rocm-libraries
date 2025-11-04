@@ -551,9 +551,12 @@ struct tile_window_with_static_distribution
             // Calculate SMEM address using base pointer
             CK_TILE_LDS_ADDR LdsDataType* smem = smem_base_ptr + lds_coord.get_offset();
 
-            const auto& tensor_dims = to_array<index_t, Base::NDimBottomTensor>(
-                tuple_reverse(glb_tensor_descriptor.get_lengths() - this->get_window_origin() -
-                              window_adaptor_thread_coord.get_bottom_index()));
+            // Calculate remaining tensor dimensions, clamping negative values to 0
+            // This prevents out-of-bounds access when window_origin + bottom_index > tensor_length
+            const auto& tensor_dims = to_array<index_t, Base::NDimBottomTensor>(tuple_reverse(
+                transform_tuples([](auto x) { return max(index_t{0}, x); },
+                                 glb_tensor_descriptor.get_lengths() - this->get_window_origin() -
+                                     window_adaptor_thread_coord.get_bottom_index())));
             // Assert that both window origins have the same dimensionality
             static_assert(
                 std::is_same<std::remove_cv_t<std::remove_reference_t<decltype(lds_window_origin)>>,
@@ -633,9 +636,12 @@ struct tile_window_with_static_distribution
             auto lds_bottom_tensor_thread_idx =
                 lds_window_origin + window_adaptor_thread_coord.get_bottom_index();
 
-            const auto& tensor_dims = to_array<index_t, Base::NDimBottomTensor>(
-                tuple_reverse(glb_tensor_descriptor.get_lengths() - this->get_window_origin() -
-                              window_adaptor_thread_coord.get_bottom_index()));
+            // Calculate remaining tensor dimensions, clamping negative values to 0
+            // This prevents out-of-bounds access when window_origin + bottom_index > tensor_length
+            const auto& tensor_dims = to_array<index_t, Base::NDimBottomTensor>(tuple_reverse(
+                transform_tuples([](auto x) { return max(index_t{0}, x); },
+                                 glb_tensor_descriptor.get_lengths() - this->get_window_origin() -
+                                     window_adaptor_thread_coord.get_bottom_index())));
 
             constexpr auto box_dim =
                 to_sequence(tile_dstr.get_ys_to_d_descriptor().get_lengths()).reverse();

@@ -197,6 +197,22 @@
 #define CK_TILE_ENABLE_TDM_FEATURE 0
 #endif
 
+#ifndef CK_TILE_ENABLE_CLUSTER_LAUNCH
+#ifdef __HIP_DEVICE_COMPILE__ // for device code
+#if defined(__gfx125__)
+#define CK_TILE_ENABLE_CLUSTER_LAUNCH 1
+#else
+#define CK_TILE_ENABLE_CLUSTER_LAUNCH 0
+#endif
+#else // for host code
+#if defined(CK_USE_GFX1250)
+#define CK_TILE_ENABLE_CLUSTER_LAUNCH 1
+#else
+#define CK_TILE_ENABLE_CLUSTER_LAUNCH 0
+#endif
+#endif
+#endif // CK_TILE_ENABLE_CLUSTER_LAUNCH
+
 // workaround for ROCm 6.2 and later
 #ifndef CK_TILE_WORKAROUND_ROCM_6_2_SCRATCH_MEMORY_ISSUE
 #if(HIP_VERSION_MAJOR == 6 && HIP_VERSION_MINOR == 2 && HIP_VERSION_PATCH >= 41133) ||  \

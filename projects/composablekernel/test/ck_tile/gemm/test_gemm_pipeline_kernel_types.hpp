@@ -35,6 +35,9 @@ using CompTDM   = ck_tile::integral_constant<GemmPipelineType, GemmPipelineType:
 using Persistent    = std::true_type;
 using NonPersistent = std::false_type;
 
+using ClusterEnable  = std::true_type;
+using ClusterDisable = std::false_type;
+
 using I16  = ck_tile::number<16>;
 using I32  = ck_tile::number<32>;
 using I64  = ck_tile::number<64>;
@@ -177,7 +180,8 @@ using KernelTypesCompAsync = ::testing::Types<
 
 
 using KernelTypesCompTDMWmma = ::testing::Types<
-    std::tuple<    Row,     Col,     Row,       F16,       F16,         F32,       F16,        I64,         I64,          I32,        I16,        I16, Intrawave,        CompTDM>
+    std::tuple<    Row,     Col,     Row,       F16,       F16,         F32,       F16,        I64,         I64,          I32,        I16,        I16, Intrawave,        CompTDM>,
+    std::tuple<    Row,     Col,     Row,       F16,       F16,         F32,       F16,        I64,         I64,          I32,        I16,        I16, Intrawave,        CompTDM, NonPersistent, ClusterEnable>
 >;
 
 using KernelTypesCompAsyncWmma = ::testing::Types<
