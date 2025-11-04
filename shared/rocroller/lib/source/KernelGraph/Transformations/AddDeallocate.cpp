@@ -45,36 +45,6 @@ namespace rocRoller::KernelGraph
 
     namespace AddDeallocateDetail
     {
-        void addDownstreamBarrierInLoop(std::set<int>&            dependencies,
-                                        int                       coordinate,
-                                        std::set<int> const&      lastRWOps,
-                                        KernelGraph const&        original,
-                                        TopologicalCompare const& compare)
-        {
-            std::optional<int> maybeForLoop;
-            for(auto control : lastRWOps)
-            {
-                maybeForLoop = findContainingOperation<ForLoopOp>(control, original);
-                if(maybeForLoop)
-                    break;
-            }
-            if(not maybeForLoop)
-                return;
-
-            auto lastDependency = std::ranges::max(lastRWOps, compare);
-
-            auto downstreamBarriers = filter(original.control.isElemType<Barrier>(),
-                                             original.control.depthFirstVisit(lastDependency))
-                                          .to<std::vector>();
-
-            if(downstreamBarriers.empty())
-            {
-                dependencies = {*maybeForLoop};
-                return;
-            }
-
-            dependencies.insert(std::ranges::min(downstreamBarriers, compare));
-        }
 
         std::set<int> getContainingForLoops(std::set<int> controls, KernelGraph const& graph)
         {
@@ -248,12 +218,6 @@ namespace rocRoller::KernelGraph
         for(auto& [coordinate, controls] : locations)
         {
             auto dependencies = controls;
-
-            auto maybeLDS = graph.coordinates.get<LDS>(coordinate);
-            if(maybeLDS)
-            {
-                addDownstreamBarrierInLoop(dependencies, coordinate, controls, graph, topo);
-            }
 
             simplifyDependencies(graph, dependencies);
 
