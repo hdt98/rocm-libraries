@@ -35,8 +35,8 @@ BatchnormFwdTrainingParams::BatchnormFwdTrainingParams(
             = miopen_utils::createTensor(tensorMap, attributes.inv_variance_tensor_uid().value());
     }
 
-#if 0 // Running statistics not supported - API mismatch between hipDNN and MIOpen
-      // hipDNN uses separate prev/next buffers, MIOpen requires IN/OUT buffers
+#if 0 // Running statistics not supported - API mismatch between hipDNN and MIOpen \
+    // hipDNN uses separate prev/next buffers, MIOpen requires IN/OUT buffers
     if(attributes.prev_running_mean_tensor_uid().has_value()
        && attributes.prev_running_variance_tensor_uid().has_value()
        && attributes.momentum_tensor_uid().has_value()

@@ -88,8 +88,9 @@ TargetType extractValueFromTensorValue(const hipdnn_sdk::data_objects::TensorAtt
 
 // Extract value from TensorAttributesT unpacked reference and cast to target type
 template <typename TargetType>
-TargetType extractValueFromTensorValue(const hipdnn_sdk::data_objects::TensorAttributesT& tensorAttr,
-                                       const char* paramName)
+TargetType
+    extractValueFromTensorValue(const hipdnn_sdk::data_objects::TensorAttributesT& tensorAttr,
+                                const char* paramName)
 {
     if(tensorAttr.value.value == nullptr)
     {
@@ -144,9 +145,9 @@ TargetType extractValueFromTensorValue(const hipdnn_sdk::data_objects::TensorAtt
 }
 
 // Convenience function for extracting double values from Flatbuffer pointer
-inline double extractDoubleFromTensorValue(
-    const hipdnn_sdk::data_objects::TensorAttributes* tensorAttr,
-    const char* paramName)
+inline double
+    extractDoubleFromTensorValue(const hipdnn_sdk::data_objects::TensorAttributes* tensorAttr,
+                                 const char* paramName)
 {
     return extractValueFromTensorValue<double>(tensorAttr, paramName);
 }

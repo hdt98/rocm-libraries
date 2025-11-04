@@ -125,9 +125,19 @@ TEST_F(TestMiopenBatchnormPlanBuilder, IsApplicableReturnsFalseForBatchnormWithR
     tensorAttributes.push_back(hipdnn_sdk::data_objects::CreateTensorAttributesDirect(
         builder, 2, "y", hipdnn_sdk::data_objects::DataType::FLOAT, &strides, &dims));
     tensorAttributes.push_back(hipdnn_sdk::data_objects::CreateTensorAttributesDirect(
-        builder, 3, "scale", hipdnn_sdk::data_objects::DataType::FLOAT, &derivedStrides, &derivedDims));
+        builder,
+        3,
+        "scale",
+        hipdnn_sdk::data_objects::DataType::FLOAT,
+        &derivedStrides,
+        &derivedDims));
     tensorAttributes.push_back(hipdnn_sdk::data_objects::CreateTensorAttributesDirect(
-        builder, 4, "bias", hipdnn_sdk::data_objects::DataType::FLOAT, &derivedStrides, &derivedDims));
+        builder,
+        4,
+        "bias",
+        hipdnn_sdk::data_objects::DataType::FLOAT,
+        &derivedStrides,
+        &derivedDims));
 
     // Epsilon (pass-by-value)
     hipdnn_sdk::data_objects::Float32Value epsilonVal(1e-5f);
@@ -144,13 +154,33 @@ TEST_F(TestMiopenBatchnormPlanBuilder, IsApplicableReturnsFalseForBatchnormWithR
 
     // Running statistics tensors
     tensorAttributes.push_back(hipdnn_sdk::data_objects::CreateTensorAttributesDirect(
-        builder, 8, "prev_running_mean", hipdnn_sdk::data_objects::DataType::FLOAT, &derivedStrides, &derivedDims));
+        builder,
+        8,
+        "prev_running_mean",
+        hipdnn_sdk::data_objects::DataType::FLOAT,
+        &derivedStrides,
+        &derivedDims));
     tensorAttributes.push_back(hipdnn_sdk::data_objects::CreateTensorAttributesDirect(
-        builder, 9, "prev_running_variance", hipdnn_sdk::data_objects::DataType::FLOAT, &derivedStrides, &derivedDims));
+        builder,
+        9,
+        "prev_running_variance",
+        hipdnn_sdk::data_objects::DataType::FLOAT,
+        &derivedStrides,
+        &derivedDims));
     tensorAttributes.push_back(hipdnn_sdk::data_objects::CreateTensorAttributesDirect(
-        builder, 10, "next_running_mean", hipdnn_sdk::data_objects::DataType::FLOAT, &derivedStrides, &derivedDims));
+        builder,
+        10,
+        "next_running_mean",
+        hipdnn_sdk::data_objects::DataType::FLOAT,
+        &derivedStrides,
+        &derivedDims));
     tensorAttributes.push_back(hipdnn_sdk::data_objects::CreateTensorAttributesDirect(
-        builder, 11, "next_running_variance", hipdnn_sdk::data_objects::DataType::FLOAT, &derivedStrides, &derivedDims));
+        builder,
+        11,
+        "next_running_variance",
+        hipdnn_sdk::data_objects::DataType::FLOAT,
+        &derivedStrides,
+        &derivedDims));
 
     // Momentum (pass-by-value)
     hipdnn_sdk::data_objects::Float32Value momentumVal(0.1f);
@@ -167,19 +197,19 @@ TEST_F(TestMiopenBatchnormPlanBuilder, IsApplicableReturnsFalseForBatchnormWithR
 
     auto bnormAttributes = hipdnn_sdk::data_objects::CreateBatchnormAttributes(
         builder,
-        1,  // x_tensor_uid
-        3,  // scale_tensor_uid
-        4,  // bias_tensor_uid
-        5,  // epsilon_tensor_uid
-        0,  // peer_stats_tensor_uid (no peer statistics)
-        flatbuffers::Optional<int64_t>(8),  // prev_running_mean_tensor_uid
-        flatbuffers::Optional<int64_t>(9),  // prev_running_variance_tensor_uid
+        1, // x_tensor_uid
+        3, // scale_tensor_uid
+        4, // bias_tensor_uid
+        5, // epsilon_tensor_uid
+        0, // peer_stats_tensor_uid (no peer statistics)
+        flatbuffers::Optional<int64_t>(8), // prev_running_mean_tensor_uid
+        flatbuffers::Optional<int64_t>(9), // prev_running_variance_tensor_uid
         flatbuffers::Optional<int64_t>(12), // momentum_tensor_uid
-        2,  // y_tensor_uid
-        flatbuffers::nullopt,  // mean_tensor_uid
-        flatbuffers::nullopt,  // inv_variance_tensor_uid
+        2, // y_tensor_uid
+        flatbuffers::nullopt, // mean_tensor_uid
+        flatbuffers::nullopt, // inv_variance_tensor_uid
         flatbuffers::Optional<int64_t>(10), // next_running_mean_tensor_uid
-        flatbuffers::Optional<int64_t>(11)  // next_running_variance_tensor_uid
+        flatbuffers::Optional<int64_t>(11) // next_running_variance_tensor_uid
     );
 
     std::vector<::flatbuffers::Offset<hipdnn_sdk::data_objects::Node>> nodes;
@@ -190,13 +220,14 @@ TEST_F(TestMiopenBatchnormPlanBuilder, IsApplicableReturnsFalseForBatchnormWithR
         bnormAttributes.Union());
     nodes.push_back(node);
 
-    auto graphOffset = hipdnn_sdk::data_objects::CreateGraphDirect(builder,
-                                                                   "test",
-                                                                   hipdnn_sdk::data_objects::DataType::FLOAT,
-                                                                   hipdnn_sdk::data_objects::DataType::HALF,
-                                                                   hipdnn_sdk::data_objects::DataType::BFLOAT16,
-                                                                   &tensorAttributes,
-                                                                   &nodes);
+    auto graphOffset
+        = hipdnn_sdk::data_objects::CreateGraphDirect(builder,
+                                                      "test",
+                                                      hipdnn_sdk::data_objects::DataType::FLOAT,
+                                                      hipdnn_sdk::data_objects::DataType::HALF,
+                                                      hipdnn_sdk::data_objects::DataType::BFLOAT16,
+                                                      &tensorAttributes,
+                                                      &nodes);
     builder.Finish(graphOffset);
 
     hipdnn_plugin::GraphWrapper graph(builder.GetBufferPointer(), builder.GetSize());

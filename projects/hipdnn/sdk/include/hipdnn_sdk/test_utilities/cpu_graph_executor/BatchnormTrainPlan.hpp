@@ -106,7 +106,8 @@ public:
             _params.yTensor, variantPack.at(_params.yTensor.uid));
 
         // Extract epsilon from pass-by-value tensor (cast to double)
-        double epsilon = hipdnn_sdk::utilities::extractDoubleFromTensorValue(_params.epsilonTensor, "Epsilon");
+        double epsilon
+            = hipdnn_sdk::utilities::extractDoubleFromTensorValue(_params.epsilonTensor, "Epsilon");
 
         // Optional batch statistics tensors
         std::unique_ptr<TensorBase<MeanVarianceDataType>> mean;
@@ -144,8 +145,8 @@ public:
         double momentumValue = 0.1;
         if(_params.momentumTensor.has_value())
         {
-            momentumValue
-                = hipdnn_sdk::utilities::extractDoubleFromTensorValue(_params.momentumTensor.value(), "Momentum");
+            momentumValue = hipdnn_sdk::utilities::extractDoubleFromTensorValue(
+                _params.momentumTensor.value(), "Momentum");
         }
 
         if(_params.prevRunningMeanTensor.has_value())

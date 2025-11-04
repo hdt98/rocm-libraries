@@ -68,7 +68,6 @@ MiopenTensor createTensor(
 
 size_t getSpatialDimCount(const hipdnn_sdk::data_objects::TensorAttributes& attr);
 
-
 using hipdnn_sdk::utilities::extractDoubleFromTensorValue;
 using hipdnn_sdk::utilities::extractValueFromTensorValue;
 

@@ -150,10 +150,10 @@ inline std::vector<Batchnorm2dTestCase> getBnFwdTrainingFull2dTestCases()
     unsigned seed = hipdnn_sdk::test_utilities::getGlobalTestSeed();
 
     return {
-        {1, 3, 14, 14, seed},      // Small batch
-        {2, 3, 1, 1, seed},        // Edge case: 1x1 spatial
-        {8, 16, 28, 28, seed},     // Medium size
-        {4, 64, 7, 7, seed},       // Many channels, smaller spatial
+        {1, 3, 14, 14, seed}, // Small batch
+        {2, 3, 1, 1, seed}, // Edge case: 1x1 spatial
+        {8, 16, 28, 28, seed}, // Medium size
+        {4, 64, 7, 7, seed}, // Many channels, smaller spatial
     };
 }
 
