@@ -49,6 +49,9 @@ function(add_gtest TEST_NAME TEST_CPP)
     target_compile_definitions(${TEST_NAME} PRIVATE NOMINMAX)
   endif()
 
+    target_compile_definitions(${TEST_NAME} INTERFACE $<BUILD_INTERFACE:MIOPEN_BUILD_TESTING>)
+    target_compile_definitions(${TEST_NAME} PUBLIC $<BUILD_INTERFACE:MIOPEN_BUILD_TESTING>)
+
   target_include_directories(${TEST_NAME} PUBLIC
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
     $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/include>
