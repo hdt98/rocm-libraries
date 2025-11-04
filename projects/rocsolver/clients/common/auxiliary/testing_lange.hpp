@@ -124,6 +124,10 @@ void lange_getError(const rocblas_handle handle,
                     Thn& hnorms_res,
                     double* max_err)
 {
+    // Workspace for CPU lange (max needed is for 1-norm or infinity-norm)
+    size_t size_work = std::max(m, n);
+    std::vector<N> work(size_work);
+
     // initialize data
     lange_initData<true, true, T, I, N>(handle, norm_type, m, n, dA, lda, dnorms, hA, hnorms);
 
@@ -133,9 +137,12 @@ void lange_getError(const rocblas_handle handle,
     CHECK_HIP_ERROR(hnorms_res.transfer_from(dnorms));
 
     // CPU lapack
-    // TODO: Implement CPU reference for lange
-    // For now, we'll skip the error check
-    *max_err = 0;
+    char norm = rocsolver2char_norm_type(norm_type);
+    hnorms[0][0] = cpu_lange<T, N>(norm, m, n, hA[0], lda, work.data());
+
+    // error is ||hnorms - hnorms_res|| / ||hnorms||
+    // using absolute value since we only have a single scalar
+    *max_err = std::abs(hnorms[0][0] - hnorms_res[0][0]) / std::abs(hnorms[0][0]);
 }
 
 template <typename T, typename I, typename N, typename Td, typename Tdn, typename Th, typename Thn>
@@ -155,13 +162,19 @@ void lange_getPerfData(const rocblas_handle handle,
                        const bool profile_kernels,
                        const bool perf)
 {
+    // Workspace for CPU lange
+    size_t size_work = std::max(m, n);
+    std::vector<N> work(size_work);
+
     if(!perf)
     {
         lange_initData<true, false, T, I, N>(handle, norm_type, m, n, dA, lda, dnorms, hA, hnorms);
 
         // cpu-lapack performance (only if not in perf mode)
-        // TODO: Implement CPU reference for lange
-        *cpu_time_used = 0;
+        char norm = rocsolver2char_norm_type(norm_type);
+        *cpu_time_used = get_time_us_no_sync();
+        hnorms[0][0] = cpu_lange<T, N>(norm, m, n, hA[0], lda, work.data());
+        *cpu_time_used = get_time_us_no_sync() - *cpu_time_used;
     }
 
     lange_initData<true, false, T, I, N>(handle, norm_type, m, n, dA, lda, dnorms, hA, hnorms);
