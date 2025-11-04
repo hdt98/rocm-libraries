@@ -22,7 +22,6 @@ namespace
 {
 
 using test_bn_common::BatchnormTestCase;
-using test_bn_common::BatchnormTestCase;
 
 // Note: hipDNN BatchNorm implements Spatial normalization only (miopenBNSpatial).
 // The mode is hardcoded in the MIOpen plugin (see MiopenBatchnormFwdTrainingPlan.cpp).

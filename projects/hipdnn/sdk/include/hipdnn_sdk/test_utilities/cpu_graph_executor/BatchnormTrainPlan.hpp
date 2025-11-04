@@ -183,19 +183,18 @@ public:
         CpuFpReferenceBatchnormImpl<InputDataType,
                                     ScaleBiasDataType,
                                     MeanVarianceDataType,
-                                    ComputeDataType>::
-            batchnormFwdTraining(*shallowXTensor,
-                                 *shallowScaleTensor,
-                                 *shallowBiasTensor,
-                                 *shallowYTensor,
-                                 epsilon,
-                                 momentumValue,
-                                 meanPtr,
-                                 invVariancePtr,
-                                 prevRunningMeanPtr,
-                                 prevRunningVariancePtr,
-                                 nextRunningMeanPtr,
-                                 nextRunningVariancePtr);
+                                    ComputeDataType>::batchnormFwdTraining(*shallowXTensor,
+                                                                           *shallowScaleTensor,
+                                                                           *shallowBiasTensor,
+                                                                           *shallowYTensor,
+                                                                           epsilon,
+                                                                           momentumValue,
+                                                                           meanPtr,
+                                                                           invVariancePtr,
+                                                                           prevRunningMeanPtr,
+                                                                           prevRunningVariancePtr,
+                                                                           nextRunningMeanPtr,
+                                                                           nextRunningVariancePtr);
     }
 
 private:

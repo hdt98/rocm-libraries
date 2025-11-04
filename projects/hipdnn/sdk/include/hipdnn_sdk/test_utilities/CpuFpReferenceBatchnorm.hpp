@@ -113,7 +113,7 @@ public:
                     meanAccum = meanAccum + inVal;
                     varianceAccum = varianceAccum + (inVal * inVal);
                 });
-            
+
             // NOTE: Different operation order from MIOpen produces expected FP differences.
             // Both implementations are correct; validated using RMS error tolerance
             ComputeDataType channelMean = meanAccum / nhw;
