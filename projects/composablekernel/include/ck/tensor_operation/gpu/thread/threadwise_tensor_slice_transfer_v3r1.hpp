@@ -546,7 +546,7 @@ struct ThreadwiseTensorSliceTransfer_v3r1
             constexpr auto access_lengths = SliceLengths{} / scalar_per_access;
 
             constexpr auto src_data_first_idx_seq =
-                generate_sequence([](index_t i) { return 0; }, Number<nDim>{});
+                generate_sequence_v2([](index_t i) { return Number<0>{}; }, Number<nDim>{});
             const int oob_scratch = src_oob_thread_scratch_tuple_(thread_scratch_id)
                                         .template GetAsType<int>(src_data_first_idx_seq);
             const int is_src_valid     = oob_scratch & 0x100;
