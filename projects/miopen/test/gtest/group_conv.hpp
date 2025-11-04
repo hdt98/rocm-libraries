@@ -452,12 +452,40 @@ public:
         }
     }
 
+    void RunWmmaSolver()
+    {
+        // For now, only WRW has WMMA implementation
+        if constexpr(CONV_DIR == Direction::BackwardWeights)
+        {
+            if constexpr(NDIM == 2u)
+            {
+                DispatchSolver<
+                    miopen::solver::conv::ConvHipImplicitGemmGroupFwdXdlops, // Placeholder
+                    miopen::solver::conv::ConvHipImplicitGemmGroupBwdXdlops, // Placeholder
+                    miopen::solver::conv::ConvHipImplicitGemmGroupWrwWmma>();
+            }
+            else
+            {
+                DispatchSolver<
+                    miopen::solver::conv::ConvHipImplicitGemm3DGroupFwdXdlops, // Placeholder
+                    miopen::solver::conv::ConvHipImplicitGemm3DGroupBwdXdlops, // Placeholder
+                    miopen::solver::conv::ConvHipImplicitGemm3DGroupWrwWmma>();
+            }
+        }
+        else
+        {
+            test_skipped = true;
+            GTEST_SKIP() << "WMMA solver only supports BackwardWeights";
+        }
+    }
+
 protected:
     void SetUp() override
     {
         if constexpr(CONV_DIR == Direction::BackwardWeights)
         {
-            if(!IsTestSupportedByDevice(Gpu::gfx94X) && std::is_same<T, bfloat16>::value)
+            if(!IsTestSupportedByDevice(Gpu::gfx94X) && !IsTestSupportedByDevice(Gpu::gfx110X) &&
+               !IsTestSupportedByDevice(Gpu::gfx120X) && std::is_same<T, bfloat16>::value)
             {
                 test_skipped = true;
                 GTEST_SKIP() << "bf16 tests skipped on this hardware.";
@@ -630,3 +658,27 @@ std::vector<float> GetBetaValues()
     DEFINE_GROUP_CONV_TEST(2, type, naming_type, dir)
 #define DEFINE_GROUP_CONV3D_TEST(type, naming_type, dir) \
     DEFINE_GROUP_CONV_TEST(3, type, naming_type, dir)
+
+#define DEFINE_GROUP_CONV_WMMA_TEST(ndim, type, naming_type, dir)                       \
+    struct GPU_GroupConvWmma##ndim##D_##dir##_##naming_type                             \
+        : GroupConvTestFix<ndim, type, Direction::dir>                                  \
+    {                                                                                   \
+    };                                                                                  \
+    TEST_P(GPU_GroupConvWmma##ndim##D_##dir##_##naming_type,                            \
+           GroupConvWmma##ndim##D_##dir##_##type##_Test)                                \
+    {                                                                                   \
+        RunWmmaSolver();                                                                \
+    }                                                                                   \
+    INSTANTIATE_TEST_SUITE_P(                                                           \
+        Full,                                                                           \
+        GPU_GroupConvWmma##ndim##D_##dir##_##naming_type,                               \
+        testing::Combine(                                                               \
+            testing::ValuesIn(GroupConvTestConfig<ndim>::GetConfigs<Direction::dir>()), \
+            testing::ValuesIn(GetAlphaValues<ndim>()),                                  \
+            testing::ValuesIn(GetBetaValues<ndim>()),                                   \
+            testing::ValuesIn(GetLayoutValues<ndim>())));
+
+#define DEFINE_GROUP_CONV2D_WMMA_TEST(type, naming_type, dir) \
+    DEFINE_GROUP_CONV_WMMA_TEST(2, type, naming_type, dir)
+#define DEFINE_GROUP_CONV3D_WMMA_TEST(type, naming_type, dir) \
+    DEFINE_GROUP_CONV_WMMA_TEST(3, type, naming_type, dir)
