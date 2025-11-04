@@ -160,6 +160,7 @@ TEST(TestBatchnormFwdTrainingParams, ThrowsWhenRunningStatsProvided)
     auto node = hipdnn_sdk::data_objects::CreateNodeDirect(
         builder,
         "batchnorm_training",
+        hipdnn_sdk::data_objects::DataType::FLOAT,
         hipdnn_sdk::data_objects::NodeAttributes::BatchnormAttributes,
         bnormAttributes.Union());
     nodes.push_back(node);

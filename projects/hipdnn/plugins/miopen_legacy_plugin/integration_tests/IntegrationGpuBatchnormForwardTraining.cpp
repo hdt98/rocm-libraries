@@ -21,8 +21,8 @@ using namespace hipdnn_sdk::test_utilities;
 namespace
 {
 
-using test_bn_common::Batchnorm2dTestCase;
-using test_bn_common::Batchnorm3dTestCase;
+using test_bn_common::BatchnormTestCase;
+using test_bn_common::BatchnormTestCase;
 
 // Note: hipDNN BatchNorm implements Spatial normalization only (miopenBNSpatial).
 // The mode is hardcoded in the MIOpen plugin (see MiopenBatchnormFwdTrainingPlan.cpp).
@@ -62,7 +62,7 @@ protected:
         graphObj.set_compute_data_type(hipdnn_frontend::DataType::FLOAT);
 
         int64_t uid = 1;
-        auto dims = testCase.getDims();
+        auto dims = testCase.dims;
         auto derivedDims = getDerivedShape(dims);
 
         // Create input tensor attributes
@@ -295,35 +295,35 @@ private:
 
 // NCHW 2D
 using IntegrationGpuBatchnormFwdTrainingNchwFp32
-    = BatchnormForwardTraining<float, float, Batchnorm2dTestCase>;
+    = BatchnormForwardTraining<float, float, BatchnormTestCase>;
 using IntegrationGpuBatchnormFwdTrainingNchwFp16
-    = BatchnormForwardTraining<half, float, Batchnorm2dTestCase>;
+    = BatchnormForwardTraining<half, float, BatchnormTestCase>;
 using IntegrationGpuBatchnormFwdTrainingNchwBfp16
-    = BatchnormForwardTraining<hip_bfloat16, float, Batchnorm2dTestCase>;
+    = BatchnormForwardTraining<hip_bfloat16, float, BatchnormTestCase>;
 
 // NHWC 2D
 using IntegrationGpuBatchnormFwdTrainingNhwcFp32
-    = BatchnormForwardTraining<float, float, Batchnorm2dTestCase>;
+    = BatchnormForwardTraining<float, float, BatchnormTestCase>;
 using IntegrationGpuBatchnormFwdTrainingNhwcFp16
-    = BatchnormForwardTraining<half, float, Batchnorm2dTestCase>;
+    = BatchnormForwardTraining<half, float, BatchnormTestCase>;
 using IntegrationGpuBatchnormFwdTrainingNhwcBfp16
-    = BatchnormForwardTraining<hip_bfloat16, float, Batchnorm2dTestCase>;
+    = BatchnormForwardTraining<hip_bfloat16, float, BatchnormTestCase>;
 
 // NCDHW 3D
 using IntegrationGpuBatchnormFwdTrainingNcdhwFp32
-    = BatchnormForwardTraining<float, float, Batchnorm3dTestCase>;
+    = BatchnormForwardTraining<float, float, BatchnormTestCase>;
 using IntegrationGpuBatchnormFwdTrainingNcdhwFp16
-    = BatchnormForwardTraining<half, float, Batchnorm3dTestCase>;
+    = BatchnormForwardTraining<half, float, BatchnormTestCase>;
 using IntegrationGpuBatchnormFwdTrainingNcdhwBfp16
-    = BatchnormForwardTraining<hip_bfloat16, float, Batchnorm3dTestCase>;
+    = BatchnormForwardTraining<hip_bfloat16, float, BatchnormTestCase>;
 
 // NDHWC 3D
 using IntegrationGpuBatchnormFwdTrainingNdhwcFp32
-    = BatchnormForwardTraining<float, float, Batchnorm3dTestCase>;
+    = BatchnormForwardTraining<float, float, BatchnormTestCase>;
 using IntegrationGpuBatchnormFwdTrainingNdhwcFp16
-    = BatchnormForwardTraining<half, float, Batchnorm3dTestCase>;
+    = BatchnormForwardTraining<half, float, BatchnormTestCase>;
 using IntegrationGpuBatchnormFwdTrainingNdhwcBfp16
-    = BatchnormForwardTraining<hip_bfloat16, float, Batchnorm3dTestCase>;
+    = BatchnormForwardTraining<hip_bfloat16, float, BatchnormTestCase>;
 
 } // namespace
 
