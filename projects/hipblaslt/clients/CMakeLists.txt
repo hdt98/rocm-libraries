@@ -24,6 +24,7 @@ target_link_libraries(hipblaslt-clients-common
         roc::hipblaslt
         OpenMP::OpenMP_CXX
         ${LAPACK_LIBRARIES}
+        ${CBLAS_LIBRARIES}
     PRIVATE
         hip::device
 )
