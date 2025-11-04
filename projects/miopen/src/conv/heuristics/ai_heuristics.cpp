@@ -979,8 +979,8 @@ std::shared_ptr<Model> GetModel(const std::string& arch, const std::string& solv
     auto it = models.find(solver);
 
     auto model_arch = arch;
-    if(arch == 'gfx950')
-        model_arch = 'gfx942';
+    if(model_arch == "gfx950")
+        model_arch = "gfx942";
 
     if(it == models.end())
     {
