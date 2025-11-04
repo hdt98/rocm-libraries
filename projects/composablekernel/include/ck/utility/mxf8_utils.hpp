@@ -332,8 +332,7 @@ static __device__ float2_t cast_to_f32_from_f8_scaled(float scale, fp8x2_storage
 template <ck_fp8_interpretation_t interpret, typename Ts, int Opsel>
 static __device__ float8_t cast_to_f32_from_f8_scaled(Ts scale, fp8x8_storage_t v)
 {
-    static_assert(sizeof(Ts) == 4,
-                  "Ts must be float or uint32_t");
+    static_assert(sizeof(Ts) == 4, "Ts must be float or uint32_t");
 
     uint32_t scale4 = (ck::is_same_v<Ts, float>)
                           ? bit_cast<uint32_t>(utils::get_exponent_value(e8m0_bexp_t(scale)))
@@ -453,6 +452,62 @@ static __device__ fp8x8_storage_t cast_to_f8_from_f32_scaled(float8_t v,
     }
 
     return ret.v8f8x1;
+}
+
+// float16
+template <ck_fp8_interpretation_t interpret, index_t Opsel = 0>
+static __device__ half8_t cast_to_f16_from_f8_scaled(uint32_t scale, fp8x8_storage_t v)
+{
+    const auto v_uint2 = bit_cast<uint32x2_t>(v);
+
+    static_assert(interpret == ck_fp8_interpretation_t::CK_E4M3_OCP ||
+                      interpret == ck_fp8_interpretation_t::CK_E5M2_OCP,
+                  "Only OCP interpretations are supported");
+
+    if constexpr(interpret == ck_fp8_interpretation_t::CK_E4M3_OCP)
+    {
+        return __builtin_amdgcn_cvt_scale_pk8_f16_fp8(v_uint2, scale, Opsel);
+    }
+    else
+    {
+        return __builtin_amdgcn_cvt_scale_pk8_f16_bf8(v_uint2, scale, Opsel);
+    }
+}
+
+template <ck_fp8_interpretation_t interpret, bool stochastic_rounding = false>
+static __device__ fp8x8_storage_t cast_to_f8_from_f16_scaled(half8_t v,
+                                                             unsigned int rng = 0,
+                                                             float scale      = 1.0f)
+{
+    union
+    {
+        uint32x2_t ival;
+        fp8x8_storage_t val_f8x8;
+    } ret{};
+
+    if constexpr(stochastic_rounding)
+    {
+        if constexpr(interpret == ck_fp8_interpretation_t::CK_E4M3_OCP)
+        {
+            ret.ival = __builtin_amdgcn_cvt_scalef32_sr_pk8_fp8_f16(v, rng, scale);
+        }
+        else
+        {
+            ret.ival = __builtin_amdgcn_cvt_scalef32_sr_pk8_bf8_f16(v, rng, scale);
+        }
+    }
+    else
+    {
+        if constexpr(interpret == ck_fp8_interpretation_t::CK_E4M3_OCP)
+        {
+            ret.ival = __builtin_amdgcn_cvt_scalef32_pk8_fp8_f16(v, scale);
+        }
+        else
+        {
+            ret.ival = __builtin_amdgcn_cvt_scalef32_pk8_bf8_f16(v, scale);
+        }
+    }
+    return ret.val_f8x8;
 }
 #endif // CK_MX_ARCH_1250
 
@@ -611,6 +666,40 @@ __host__ __device__ static inline fp8x8_storage_t cvt_float_to_fp8_scaled(const 
     }
 #endif // different arch support
     return out.vfp8_8x1;
+}
+
+/**
+ * \brief convert 8xfloat16 to @p 8xfp8_storage_t with scaling
+ *
+ * \tparam interp interpretation of fp8
+ * \param f 8xfloat16
+ * \param scale scaling factor
+ * \return 8xfp8_storage_t
+ */
+template <ck_fp8_interpretation_t interp, bool stochastic_rounding = false>
+__host__ __device__ static inline fp8x8_storage_t cvt_half_to_fp8_scaled(const half8_t f,
+                                                                         float scale)
+{
+#if CK_MX_ARCH_1250
+    __is_interpret_supported(interp);
+    uint32_t rng = 0;
+    if constexpr(stochastic_rounding)
+    {
+        // use HW clock for stochastic input multiply by incremented thread id
+        rng = __builtin_amdgcn_prng_b32(__builtin_readcyclecounter() *
+                                        (get_thread_global_1d_id() + 1));
+    }
+
+    return cast_to_f8_from_f16_scaled<interp, stochastic_rounding>(f, rng, scale);
+#else
+    vector_type<float, 8> vf32x8;
+    auto vf16x8 = vector_type<half_t, 8>(f);
+    ck::static_for<0, 8, 1>{}([&](auto i) {
+        vf32x8.AsType<float>()(i) = type_convert<float>(vf16x8.AsType<half_t>()[i]);
+    });
+    return cvt_float_to_fp8_scaled<interp, stochastic_rounding>(
+        vf32x8.AsType<float8_t>()[Number<0>{}], scale);
+#endif
 }
 
 } // namespace fp8_impl
@@ -900,6 +989,36 @@ inline __host__ __device__ bf8x32_ocp_t mxf8_convert_sr<bf8x32_ocp_t, float32_t>
         [&](auto i) { out.bf8_16x2[i] = mxf8_convert_sr<bf8x16_ocp_t>(in.float_16x2[i], scale); });
 
     return out.bf8_1x32;
+}
+
+// float16x8 convert to fp8x8
+template <>
+inline __host__ __device__ f8x8_ocp_t mxf8_convert_sr<f8x8_ocp_t, half8_t>(half8_t x, float scale)
+{
+    return f8x8_ocp_t{
+        fp8_impl::cvt_half_to_fp8_scaled<f8_ocp_t::default_interpret, true>(x, scale)};
+}
+
+template <>
+inline __host__ __device__ bf8x8_ocp_t mxf8_convert_sr<bf8x8_ocp_t, half8_t>(half8_t x, float scale)
+{
+    return bf8x8_ocp_t{
+        fp8_impl::cvt_half_to_fp8_scaled<bf8_ocp_t::default_interpret, true>(x, scale)};
+}
+
+template <>
+inline __host__ __device__ f8x8_ocp_t mxf8_convert_rne<f8x8_ocp_t, half8_t>(half8_t x, float scale)
+{
+    return f8x8_ocp_t{
+        fp8_impl::cvt_half_to_fp8_scaled<f8_ocp_t::default_interpret, false>(x, scale)};
+}
+
+template <>
+inline __host__ __device__ bf8x8_ocp_t mxf8_convert_rne<bf8x8_ocp_t, half8_t>(half8_t x,
+                                                                              float scale)
+{
+    return bf8x8_ocp_t{
+        fp8_impl::cvt_half_to_fp8_scaled<bf8_ocp_t::default_interpret, false>(x, scale)};
 }
 
 } // namespace ck

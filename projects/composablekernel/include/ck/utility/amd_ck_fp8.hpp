@@ -987,7 +987,100 @@ static __device__ fp8x2_storage_t cast_to_f8_from_bf16(ushortx2_t v, unsigned in
 
     return fp8x2_storage_t{val.i8val[0], val.i8val[1]};
 }
-#endif // defined(__gfx950__)
+#elif defined(__gfx1250__)
+template <ck_fp8_interpretation_t interpret, bool saturate, bool stochastic_rounding = false>
+static __device__ fp8_storage_t cast_to_f8_from_f16(_Float16 v,
+                                                    [[maybe_unused]] unsigned int rng = 0)
+{
+    union
+    {
+        int i32val;
+        half2_t vhalf;
+        _Float16 half_vec[2];
+    } val{};
+    val.half_vec[0] = v;
+
+    if constexpr(saturate)
+    {
+        if((val.i32val & 0x7FFF) != 0x7FFF)
+        {
+            val.half_vec[0] = (interpret == ck_fp8_interpretation_t::CK_E4M3_OCP)
+                                  ? __builtin_amdgcn_fmed3h(val.half_vec[0], 448.0, -448.0)
+                                  : __builtin_amdgcn_fmed3h(val.half_vec[0], 57344.0, -57344.0);
+        }
+    }
+
+    if constexpr(stochastic_rounding)
+    {
+        union
+        {
+            int vi32;
+            fp8_storage_t vf8[4];
+        } out{0};
+        out.vi32 = (interpret == ck_fp8_interpretation_t::CK_E4M3_OCP)
+                       ? __builtin_amdgcn_cvt_sr_fp8_f16(val.half_vec[0], rng, out.vi32, 0)
+                       : __builtin_amdgcn_cvt_sr_bf8_f16(val.half_vec[0], rng, out.vi32, 0);
+        return out.vf8[0];
+    }
+    else
+    {
+        union
+        {
+            short vi16;
+            fp8_storage_t vf8[2];
+        } out{};
+
+        out.vi16 = (interpret == ck_fp8_interpretation_t::CK_E4M3_OCP)
+                       ? __builtin_amdgcn_cvt_pk_fp8_f16(val.vhalf)
+                       : __builtin_amdgcn_cvt_pk_bf8_f16(val.vhalf);
+        return out.vf8[0];
+    }
+}
+template <ck_fp8_interpretation_t interpret, bool saturate, bool stochastic_rounding = false>
+static __device__ fp8x2_storage_t cast_to_f8_from_f16(half2_t v,
+                                                      [[maybe_unused]] unsigned int rng = 0)
+{
+    if constexpr(stochastic_rounding)
+    {
+        return fp8x2_storage_t{
+            cast_to_f8_from_f16<interpret, saturate, stochastic_rounding>(v[0], rng),
+            cast_to_f8_from_f16<interpret, saturate, stochastic_rounding>(v[1], rng)};
+    }
+
+    if constexpr(saturate)
+    {
+        union
+        {
+            shortx2_t i16_vec;
+            half2_t vhalf;
+        } val{.vhalf = v};
+
+        if((val.i16_vec[0] & 0x7FFF) != 0x7FFF)
+        {
+            val.vhalf[0] = (interpret == ck_fp8_interpretation_t::CK_E4M3_OCP)
+                               ? __builtin_amdgcn_fmed3h(val.vhalf[0], 448.0, -448.0)
+                               : __builtin_amdgcn_fmed3h(val.vhalf[0], 57344.0, -57344.0);
+        }
+        if((val.i16_vec[1] & 0x7FFF) != 0x7FFF)
+        {
+            val.vhalf[1] = (interpret == ck_fp8_interpretation_t::CK_E4M3_OCP)
+                               ? __builtin_amdgcn_fmed3h(val.vhalf[1], 448.0, -448.0)
+                               : __builtin_amdgcn_fmed3h(val.vhalf[1], 57344.0, -57344.0);
+        }
+    }
+
+    union
+    {
+        short vi16;
+        fp8x2_storage_t v2f8;
+    } out{};
+
+    out.vi16 = (interpret == ck_fp8_interpretation_t::CK_E4M3_OCP)
+                   ? __builtin_amdgcn_cvt_pk_fp8_f16(v)
+                   : __builtin_amdgcn_cvt_pk_bf8_f16(v);
+    return out.v2f8;
+}
+#endif // defined(__gfx950__) || defined(__gfx1250__)
 
 #if CK_FP8_CVT_FAST_PATH
 // The conversion function is from rocblas
@@ -1587,7 +1680,7 @@ __host__ static inline fp8_storage_t cvt_half_t_to_fp8(const _Float16 x)
 #endif // #ifndef CK_CODE_GEN_RTC
 #endif // #if defined(__gfx950__)
         }
-#if defined(__gfx950__)
+#if defined(__gfx950__) || defined(__gfx1250__)
         return cast_to_f8_from_f16<interp,
                                    sat == ck_saturation_t::CK_SATFINITE,
                                    stochastic_rounding>(x, rng);
@@ -1635,7 +1728,7 @@ __host__ static inline fp8x2_storage_t cvt_half_t_to_fp8(const half2_t x)
 #endif // #ifndef CK_CODE_GEN_RTC
 #endif // #if defined(__gfx950__)
         }
-#if defined(__gfx950__)
+#if defined(__gfx950__) || defined(__gfx1250__)
         return cast_to_f8_from_f16<interp,
                                    sat == ck_saturation_t::CK_SATFINITE,
                                    stochastic_rounding>(x, rng);

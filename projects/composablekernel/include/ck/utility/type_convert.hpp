@@ -1027,6 +1027,14 @@ inline __host__ __device__ half_t type_convert<half_t, f8_ocp_t>(f8_ocp_t x)
     output.half_vec = __builtin_amdgcn_cvt_scalef32_pk_f16_fp8(input.i16val, /*scale*/ 1.f, 0);
 
     return output.half_arr[0];
+#elif defined(__gfx1250__)
+    union
+    {
+        int ival;
+        fp8_storage_t i8val[4];
+    } input;
+    input.i8val[0] = x.data;
+    return __builtin_amdgcn_cvt_f16_fp8(input.ival, 0);
 #else
     return fp8_impl::cast_from_f8<half_t, f8_ocp_t::wm, f8_ocp_t::we, false>(x.data);
 #endif
@@ -1043,6 +1051,8 @@ inline __host__ __device__ half2_t type_convert<half2_t, f8x2_ocp_t>(f8x2_ocp_t 
 {
 #if defined(__gfx950__)
     return __builtin_amdgcn_cvt_scalef32_pk_f16_fp8(bit_cast<uint16_t>(x), /*scale*/ 1.f, 0);
+#elif defined(__gfx1250__)
+    return __builtin_amdgcn_cvt_pk_f16_fp8(bit_cast<uint16_t>(x));
 #else
     return half2_t{type_convert<half_t>(float(x.AsType<f8_ocp_t>()[Number<0>{}])),
                    type_convert<half_t>(float(x.AsType<f8_ocp_t>()[Number<1>{}]))};
@@ -1162,6 +1172,14 @@ inline __host__ __device__ half_t type_convert<half_t, bf8_ocp_t>(bf8_ocp_t x)
     } val;
     val.i8val[0] = x.data;
     return __builtin_amdgcn_cvt_scalef32_pk_f16_bf8(val.i16val, /*scale*/ 1.f, 0)[0];
+#elif defined(__gfx1250__)
+    union
+    {
+        int ival;
+        fp8_storage_t i8val[4];
+    } input;
+    input.i8val[0] = x.data;
+    return __builtin_amdgcn_cvt_f16_bf8(input.ival, 0);
 #else
     return fp8_impl::cast_from_f8<half_t, bf8_ocp_t::wm, bf8_ocp_t::we, false>(x.data);
 #endif
@@ -1178,6 +1196,8 @@ inline __host__ __device__ half2_t type_convert<half2_t, bf8x2_ocp_t>(bf8x2_ocp_
 {
 #if defined(__gfx950__)
     return __builtin_amdgcn_cvt_scalef32_pk_f16_bf8(bit_cast<uint16_t>(x), /*scale*/ 1.f, 0);
+#elif defined(__gfx1250__)
+    return __builtin_amdgcn_cvt_pk_f16_bf8(bit_cast<uint16_t>(x));
 #else
     return half2_t{type_convert<half_t>(float(x.AsType<bf8_ocp_t>()[Number<0>{}])),
                    type_convert<half_t>(float(x.AsType<bf8_ocp_t>()[Number<1>{}]))};
