@@ -881,6 +881,7 @@ function(target_internal_library TARGET)
     target_link_libraries(${TARGET} INTERFACE $<BUILD_INTERFACE:${ARGN}>)
 endfunction()
 
+target_link_libraries(MIOpen_static PRIVATE MIOpen_shared)
 target_include_directories(MIOpen PUBLIC
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/src/include>
 )
