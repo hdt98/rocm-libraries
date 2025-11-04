@@ -182,25 +182,25 @@ using KernelTypesCompV4 = ::testing::Types<
 
 using KernelTypesCompTDMWmma = ::testing::Types<
     std::tuple<    Row,     Col,     Row,       F16,       F16,         F32,       F16,        I64,         I64,          I32,        I16,        I16, Intrawave,        CompTDM>
+>;
 
-    // clang-format on
-
-    template <typename ALayout, typename BLayout, typename CLayout, typename InputType>
-    using CompAsyncConfig = std::tuple<ALayout,
-                                       BLayout,
-                                       CLayout,
-                                       InputType, // AType
-                                       InputType, // BType
-                                       F32,       // AccType
-                                       F16,       // OutputType
-                                       I256,      // MBlockTileSize
-                                       I256,      // NBlockTileSize
-                                       I32,       // KBlockTileSize
-                                       I32,       // MWarpTileSize
-                                       I32,       // NWarpTileSize
-                                       I16,       // KWarpTileSize
-                                       Intrawave,
-                                       CompAsync>;
+// clang-format on
+template <typename ALayout, typename BLayout, typename CLayout, typename InputType>
+using CompAsyncConfig = std::tuple<ALayout,
+                                   BLayout,
+                                   CLayout,
+                                   InputType, // AType
+                                   InputType, // BType
+                                   F32,       // AccType
+                                   F16,       // OutputType
+                                   I256,      // MBlockTileSize
+                                   I256,      // NBlockTileSize
+                                   I32,       // KBlockTileSize
+                                   I32,       // MWarpTileSize
+                                   I32,       // NWarpTileSize
+                                   I16,       // KWarpTileSize
+                                   Intrawave,
+                                   CompAsync>;
 
 using KernelTypesCompAsync = ::testing::Types<CompAsyncConfig<Row, Row, Row, F16>,
                                               CompAsyncConfig<Row, Col, Row, F16>,
