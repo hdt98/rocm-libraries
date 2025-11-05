@@ -27,7 +27,6 @@
 #pragma once
 
 #include "dataTypeInfo.hpp"
-#include "dataTypeInfo_impl.hpp"
 #include "data_generation_utils.hpp"
 
 #include <cmath>
