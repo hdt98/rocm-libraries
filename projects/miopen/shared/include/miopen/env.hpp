@@ -34,6 +34,7 @@
 #include <string_view>
 #include <vector>
 
+#include <miopen/miopen.h>
 #include <miopen/errors.hpp>
 
 namespace miopen::env {

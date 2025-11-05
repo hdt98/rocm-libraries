@@ -337,7 +337,6 @@ set( MIOpen_Source
     solver/tensorOp/OpTensorFwdBias.cpp
     solver/tensorOp/OpTensorLeadingOnes.cpp
     subbuffers.cpp
-    sysinfo_utils.cpp
     t5layernorm_api.cpp
     target_properties.cpp
     temp_file.cpp
@@ -881,7 +880,7 @@ function(target_internal_library TARGET)
     target_link_libraries(${TARGET} INTERFACE $<BUILD_INTERFACE:${ARGN}>)
 endfunction()
 
-target_link_libraries(MIOpen_static PRIVATE MIOpen_shared)
+target_internal_library(MIOpen MIOpen_shared)
 target_include_directories(MIOpen PUBLIC
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/src/include>
 )
@@ -1020,9 +1019,6 @@ MIOPEN_${MIOPEN_BACKEND}_1
 {
 global:
     miopen*;
-    extern \"C++\" {
-        miopen::*;
-    };
 local:
     *boost*;
     extern \"C++\" {
