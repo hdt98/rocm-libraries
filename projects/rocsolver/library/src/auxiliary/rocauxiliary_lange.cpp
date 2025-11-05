@@ -29,14 +29,14 @@
 
 ROCSOLVER_BEGIN_NAMESPACE
 
-template <typename T, typename I, typename N>
+template <typename T, typename I, typename S>
 rocblas_status rocsolver_lange_impl(rocblas_handle handle,
                                     const rocsolver_norm_type norm_type,
                                     const I m,
                                     const I n,
                                     T* A,
                                     const I lda,
-                                    N* norm)
+                                    S* norms)
 {
     ROCSOLVER_ENTER_TOP("lange", "--norm_type", norm_type, "-m", m, "-n", n, "--lda", lda);
 
@@ -44,7 +44,7 @@ rocblas_status rocsolver_lange_impl(rocblas_handle handle,
         return rocblas_status_invalid_handle;
 
     // argument checking
-    rocblas_status st = rocsolver_lange_argCheck(handle, norm_type, m, n, lda, A, norm);
+    rocblas_status st = rocsolver_lange_argCheck(handle, norm_type, m, n, lda, A, norms);
     if(st != rocblas_status_continue)
         return st;
 
@@ -55,13 +55,26 @@ rocblas_status rocsolver_lange_impl(rocblas_handle handle,
     rocblas_stride strideA = 0;
     I batch_count = 1;
 
-    // this function does not require memory work space
+    // memory workspace sizes:
+    // size of workspace (for temporary computations in one-norm and infinity-norm)
+    size_t size_work;
+    rocsolver_lange_getMemorySize<T, I, S>(norm_type, m, n, batch_count, &size_work);
+
     if(rocblas_is_device_memory_size_query(handle))
-        return rocblas_status_size_unchanged;
+        return rocblas_set_optimal_device_memory_size(handle, size_work);
+
+    // memory workspace allocation
+    void* work;
+    rocblas_device_malloc mem(handle, size_work);
+
+    if(!mem)
+        return rocblas_status_memory_error;
+
+    work = mem[0];
 
     // execution
-    return rocsolver_lange_template<T, I, N>(handle, norm_type, m, n, A, shiftA, lda, strideA,
-                                       batch_count, norm);
+    return rocsolver_lange_template<T, I, S>(handle, norm_type, m, n, A, shiftA, lda, strideA,
+                                             batch_count, norms, (S*)work);
 }
 
 ROCSOLVER_END_NAMESPACE
