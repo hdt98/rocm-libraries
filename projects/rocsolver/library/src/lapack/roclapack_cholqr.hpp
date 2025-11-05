@@ -1044,6 +1044,12 @@ rocblas_status rocsolver_cholqr1_template(
                 A_ptr = (T**)pfree;
                 pfree += size_A_ptr;
 
+                bool const is_mem_ok = (pfree <= (pwork + size_work));
+                if(!is_mem_ok)
+                {
+                    return (rocblas_status_memory_error);
+                };
+
                 copy_array_to_ptr<T, I, Istride>(stream, batch_count,
 
                                                  A, shiftA, lda, strideA,
@@ -1062,18 +1068,18 @@ rocblas_status rocsolver_cholqr1_template(
                 B_ptr = (T**)pfree;
                 pfree += size_B_ptr;
 
+                bool const is_mem_ok = (pfree <= (pwork + size_work));
+                if(!is_mem_ok)
+                {
+                    return (rocblas_status_memory_error);
+                };
+
                 copy_array_to_ptr<T, I, Istride>(stream, batch_count,
 
                                                  B, shiftB, ldb, strideB,
 
                                                  B_ptr);
             }
-
-            bool const is_mem_ok = (pfree <= (pwork + size_work));
-            if(!is_mem_ok)
-            {
-                return (rocblas_status_memory_error);
-            };
 
             if(batch_count == 1)
             {
