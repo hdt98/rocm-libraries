@@ -1,5 +1,5 @@
 # Keep in sync with example/ck_tile/01_fmha/CMakeLists.txt
-if(NOT SUPPORTED_GPU_TARGETS MATCHES "gfx9|gfx12")
+if(NOT SUPPORTED_GPU_TARGETS MATCHES "gfx9|gfx120|gfx12-generic")
     return()
 endif()
 
