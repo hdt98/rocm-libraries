@@ -458,7 +458,7 @@ void PerformanceConfigHipImplicitGemm3DGroupBwdXdlops::HeuristicInit(
     index     = 0;
     kernel_id = "None";
     // the heuristics model does not support split_k so we separately define this here
-    int heuristic_split_k = 0;
+    [[maybe_unused]] int heuristic_split_k = 0;
     // Other use of this solver does support it, so init the default value of 1.
     split_k = 1;
 #if MIOPEN_BACKEND_HIP && MIOPEN_USE_COMPOSABLEKERNEL
