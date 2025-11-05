@@ -479,6 +479,7 @@ constexpr rocsolver_norm_type char2rocsolver_norm_type(char value)
 {
     switch(value)
     {
+    case 'O':
     case '1': return rocsolver_norm_type_one;
     case 'F':
     case 'f': return rocsolver_norm_type_frobenius;

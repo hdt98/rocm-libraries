@@ -386,30 +386,35 @@ void rocsolver_lange_getMemorySize(const rocsolver_norm_type norm_type,
         return;
     }
 
-    // size of workspace for column sums (one-norm) or row sums (infinity-norm)
-    if(norm_type == rocsolver_norm_type_one)
+    switch(norm_type)
+    {
+    case rocsolver_norm_type_max:
+    {
+        *size_work = 0;
+        break;
+    }
+    case rocsolver_norm_type_one:
     {
         // need space for column sums (one-norm) or row sums (infinity-norm)
         size_t size_per_batch = n;
         *size_work = sizeof(S) * batch_count * size_per_batch;
+        break;
     }
-    else if(norm_type == rocsolver_norm_type_infinity)
-    {
-        // need space for row sums
-        size_t size_per_batch = m;
-        *size_work = sizeof(S) * batch_count * size_per_batch;
-    }
-    else if(norm_type == rocsolver_norm_type_frobenius)
+    case rocsolver_norm_type_frobenius:
     {
         // need space for row sums
         int blocks = (m * n - 1) / LANGE_FROBENIUS_BDIM + 1;
         size_t size_per_batch = blocks;
         *size_work = sizeof(S) * batch_count * size_per_batch;
+        break;
     }
-    else
+    case rocsolver_norm_type_infinity:
     {
-        // max-norm and Frobenius norm don't need workspace
-        *size_work = 0;
+        // need space for row sums
+        size_t size_per_batch = m;
+        *size_work = sizeof(S) * batch_count * size_per_batch;
+        break;
+    }
     }
 }
 
