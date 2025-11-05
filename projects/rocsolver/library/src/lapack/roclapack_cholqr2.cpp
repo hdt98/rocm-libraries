@@ -29,24 +29,29 @@
 
 ROCSOLVER_BEGIN_NAMESPACE
 
-template <typename T, typename I >
-rocblas_status
-    rocsolver_cholqr2_impl(rocblas_handle handle, const I m, const I n, 
-		    T* A, const I lda, T* R, const I ldr, I * info )
+template <typename T, typename I>
+rocblas_status rocsolver_cholqr2_impl(rocblas_handle handle,
+                                      const I m,
+                                      const I n,
+                                      T* A,
+                                      const I lda,
+                                      T* R,
+                                      const I ldr,
+                                      I* info)
 {
     ROCSOLVER_ENTER_TOP("rocsolver_cholqr2", "-m", m, "-n", n, "--lda", lda);
-
-
 
     if(!handle)
         return rocblas_status_invalid_handle;
 
     // argument checking
     {
-    auto const istat = rocsolver_cholqr2_argCheck( handle, m, n, lda, ldr );
-    bool const isok = (istat == rocblas_status_continue) || 
-	              (istat == rocblas_status_success);
-    if(!isok) { return istat; }
+        auto const istat = rocsolver_cholqr2_argCheck(handle, m, n, lda, ldr);
+        bool const isok = (istat == rocblas_status_continue) || (istat == rocblas_status_success);
+        if(!isok)
+        {
+            return istat;
+        }
     }
 
     // working with unshifted arrays
@@ -61,41 +66,39 @@ rocblas_status
     // memory workspace sizes:
     // size for constants in rocblas calls
     size_t size_lwork = 0;
-    bool constexpr BATCHED = false;
-    bool constexpr STRIDED = false;
-    rocsolver_cholqr2_getMemorySize< BATCHED, STRIDED, T, I >( m, n, batch_count, &size_lwork );
+    rocsolver_cholqr2_getMemorySize<T, I>(m, n, batch_count, &size_lwork);
 
-    if(rocblas_is_device_memory_size_query(handle)) {
-        return rocblas_set_optimal_device_memory_size( handle,  size_lwork );
+    if(rocblas_is_device_memory_size_query(handle))
+    {
+        return rocblas_set_optimal_device_memory_size(handle, size_lwork);
     }
 
     // memory workspace allocation
 
-    rocblas_device_malloc mem(handle, size_lwork );
+    rocblas_device_malloc mem(handle, size_lwork);
 
-    if(!mem) { return rocblas_status_memory_error; }
+    if(!mem)
+    {
+        return rocblas_status_memory_error;
+    }
 
-    void * const work = mem[0];
-
+    void* const work = mem[0];
 
     // execution
 
+    auto const istat = rocsolver_cholqr2_template<T, I, rocblas_stride>(handle, m, n,
 
-    auto const istat = rocsolver_cholqr2_template< BATCHED, STRIDED, T, I, rocblas_stride>(
-		    handle, m, n, 
-		    
-		    A, shiftA, lda, strideA, 
+                                                                        A, shiftA, lda, strideA,
 
-		    R, shiftR, ldr, strideR, 
+                                                                        R, shiftR, ldr, strideR,
 
-		    batch_count,  
-		    
-		    info, 
-		    
-		    work, size_lwork );
+                                                                        batch_count,
 
-    return( istat );
+                                                                        info,
 
+                                                                        work, size_lwork);
+
+    return (istat);
 }
 
 ROCSOLVER_END_NAMESPACE
@@ -108,101 +111,88 @@ ROCSOLVER_END_NAMESPACE
 
 extern "C" {
 
-rocblas_status rocsolver_scholqr2( rocblas_handle handle,
-		const rocblas_int m,
-		const rocblas_int n,
+rocblas_status rocsolver_scholqr2(rocblas_handle handle,
+                                  const rocblas_int m,
+                                  const rocblas_int n,
 
-		float * A, 
-		const rocblas_int lda,
+                                  float* A,
+                                  const rocblas_int lda,
 
-		float *R, 
-		const rocblas_int ldr,  
-	        rocblas_int *info	) 
+                                  float* R,
+                                  const rocblas_int ldr,
+                                  rocblas_int* info)
 {
-
-	return( rocsolver::rocsolver_cholqr2_impl<float>( handle, m, n, A, lda,   R, ldr, info ) );
+    return (rocsolver::rocsolver_cholqr2_impl<float>(handle, m, n, A, lda, R, ldr, info));
 }
 
+rocblas_status rocsolver_dcholqr2(rocblas_handle handle,
+                                  const rocblas_int m,
+                                  const rocblas_int n,
 
-rocblas_status rocsolver_dcholqr2( rocblas_handle handle,
-		const rocblas_int m,
-		const rocblas_int n,
+                                  double* A,
+                                  const rocblas_int lda,
 
-		double * A, 
-		const rocblas_int lda,
-
-		double *R, 
-		const rocblas_int ldr,
-	        rocblas_int *info	) 
+                                  double* R,
+                                  const rocblas_int ldr,
+                                  rocblas_int* info)
 {
-
-	return( rocsolver::rocsolver_cholqr2_impl<double>( handle, m, n, A, lda,   R, ldr, info ) );
+    return (rocsolver::rocsolver_cholqr2_impl<double>(handle, m, n, A, lda, R, ldr, info));
 }
 
+rocblas_status rocsolver_ccholqr2(rocblas_handle handle,
+                                  const rocblas_int m,
+                                  const rocblas_int n,
 
+                                  rocblas_float_complex* A,
+                                  const rocblas_int lda,
 
-
-
-rocblas_status rocsolver_ccholqr2( rocblas_handle handle,
-		const rocblas_int m,
-		const rocblas_int n,
-
-		rocblas_float_complex * A, 
-		const rocblas_int lda,
-
-		rocblas_float_complex *R, 
-		const rocblas_int ldr,
-	        rocblas_int *info	) 
+                                  rocblas_float_complex* R,
+                                  const rocblas_int ldr,
+                                  rocblas_int* info)
 {
-
-	return( rocsolver::rocsolver_cholqr2_impl<rocblas_float_complex>( handle, m, n, A, lda,   R, ldr, info ) );
+    return (rocsolver::rocsolver_cholqr2_impl<rocblas_float_complex>(handle, m, n, A, lda, R, ldr,
+                                                                     info));
 }
 
+rocblas_status rocsolver_zcholqr2(rocblas_handle handle,
+                                  const rocblas_int m,
+                                  const rocblas_int n,
 
+                                  rocblas_double_complex* A,
+                                  const rocblas_int lda,
 
-
-
-rocblas_status rocsolver_zcholqr2( rocblas_handle handle,
-		const rocblas_int m,
-		const rocblas_int n,
-
-		rocblas_double_complex * A, 
-		const rocblas_int lda,
-
-		rocblas_double_complex *R, 
-		const rocblas_int ldr,
-	        rocblas_int *info	) 
+                                  rocblas_double_complex* R,
+                                  const rocblas_int ldr,
+                                  rocblas_int* info)
 {
-
-	return( rocsolver::rocsolver_cholqr2_impl<rocblas_double_complex>( handle, m, n, A, lda,   R, ldr, info ) );
+    return (rocsolver::rocsolver_cholqr2_impl<rocblas_double_complex>(handle, m, n, A, lda, R, ldr,
+                                                                      info));
 }
-
 
 rocblas_status rocsolver_scholqr2_64(rocblas_handle handle,
-                                   const int64_t m,
-                                   const int64_t n,
-                                   float* A,
-                                   const int64_t lda,
-                                   float* R,
-				   const int64_t ldr,
-				   int64_t *info)
+                                     const int64_t m,
+                                     const int64_t n,
+                                     float* A,
+                                     const int64_t lda,
+                                     float* R,
+                                     const int64_t ldr,
+                                     int64_t* info)
 {
 #ifdef HAVE_ROCBLAS_64
-    return rocsolver::rocsolver_cholqr2_impl<float>(handle, m, n, A, lda, R, ldr, info) ;
+    return rocsolver::rocsolver_cholqr2_impl<float>(handle, m, n, A, lda, R, ldr, info);
 #else
     return rocblas_status_not_implemented;
 #endif
 }
 
-
 rocblas_status rocsolver_dcholqr2_64(rocblas_handle handle,
-                                   const int64_t m,
-                                   const int64_t n,
-                                   double* A,
-                                   const int64_t lda,
-                                   double* R,
-				   const int64_t ldr,
-				   int64_t *info)
+                                     const int64_t m,
+                                     const int64_t n,
+                                     double* A,
+                                     const int64_t lda,
+                                     double* R,
+                                     const int64_t ldr,
+                                     int64_t* info)
 {
 #ifdef HAVE_ROCBLAS_64
     return rocsolver::rocsolver_cholqr2_impl<double>(handle, m, n, A, lda, R, ldr, info);
@@ -211,42 +201,38 @@ rocblas_status rocsolver_dcholqr2_64(rocblas_handle handle,
 #endif
 }
 
-
-
-
 rocblas_status rocsolver_ccholqr2_64(rocblas_handle handle,
-                                   const int64_t m,
-                                   const int64_t n,
-                                   rocblas_float_complex* A,
-                                   const int64_t lda,
-                                   rocblas_float_complex* R,
-				   const int64_t ldr,
-				   int64_t *info)
+                                     const int64_t m,
+                                     const int64_t n,
+                                     rocblas_float_complex* A,
+                                     const int64_t lda,
+                                     rocblas_float_complex* R,
+                                     const int64_t ldr,
+                                     int64_t* info)
 {
 #ifdef HAVE_ROCBLAS_64
-    return rocsolver::rocsolver_cholqr2_impl<rocblas_float_complex>(handle, m, n, A, lda, R, ldr, info);
+    return rocsolver::rocsolver_cholqr2_impl<rocblas_float_complex>(handle, m, n, A, lda, R, ldr,
+                                                                    info);
 #else
     return rocblas_status_not_implemented;
 #endif
 }
-
-
 
 rocblas_status rocsolver_zcholqr2_64(rocblas_handle handle,
-                                   const int64_t m,
-                                   const int64_t n,
-                                   rocblas_double_complex* A,
-                                   const int64_t lda,
-                                   rocblas_double_complex* R,
-				   const int64_t ldr,
-				   int64_t *info)
+                                     const int64_t m,
+                                     const int64_t n,
+                                     rocblas_double_complex* A,
+                                     const int64_t lda,
+                                     rocblas_double_complex* R,
+                                     const int64_t ldr,
+                                     int64_t* info)
 {
 #ifdef HAVE_ROCBLAS_64
-    return rocsolver::rocsolver_cholqr2_impl<rocblas_double_complex>(handle, m, n, A, lda, R, ldr, info);
+    return rocsolver::rocsolver_cholqr2_impl<rocblas_double_complex>(handle, m, n, A, lda, R, ldr,
+                                                                     info);
 #else
     return rocblas_status_not_implemented;
 #endif
 }
-
 
 } // extern C

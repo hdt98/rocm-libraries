@@ -66,9 +66,7 @@ rocblas_status rocsolver_cholqr1_impl(rocblas_handle handle,
     // memory workspace sizes:
     // size for constants in rocblas calls
     size_t size_lwork = 0;
-    bool constexpr BATCHED = false;
-    bool constexpr STRIDED = false;
-    rocsolver_cholqr1_getMemorySize<BATCHED, STRIDED, T, I>(m, n, batch_count, &size_lwork);
+    rocsolver_cholqr1_getMemorySize<T, I>(m, n, batch_count, &size_lwork);
 
     if(rocblas_is_device_memory_size_query(handle))
     {
@@ -88,18 +86,17 @@ rocblas_status rocsolver_cholqr1_impl(rocblas_handle handle,
 
     // execution
 
-    auto const istat
-        = rocsolver_cholqr1_template<BATCHED, STRIDED, T, I, rocblas_stride>(handle, m, n,
+    auto const istat = rocsolver_cholqr1_template<T, I, rocblas_stride>(handle, m, n,
 
-                                                                             A, shiftA, lda, strideA,
+                                                                        A, shiftA, lda, strideA,
 
-                                                                             R, shiftR, ldr, strideR,
+                                                                        R, shiftR, ldr, strideR,
 
-                                                                             batch_count,
+                                                                        batch_count,
 
-                                                                             info,
+                                                                        info,
 
-                                                                             work, size_lwork);
+                                                                        work, size_lwork);
 
     return (istat);
 }

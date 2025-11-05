@@ -29,7 +29,7 @@
 
 ROCSOLVER_BEGIN_NAMESPACE
 
-template <typename T, typename I, typename UA, typename UR, typename Istride = rocblas_stride>
+template <typename T, typename I, typename UA, typename Istride = rocblas_stride>
 rocblas_status rocsolver_cholqr1_batched_impl(rocblas_handle handle,
                                               const I m,
                                               const I n,
@@ -37,8 +37,9 @@ rocblas_status rocsolver_cholqr1_batched_impl(rocblas_handle handle,
                                               UA A,
                                               const I lda,
 
-                                              UR R,
+                                              T* const R,
                                               const I ldr,
+                                              Istride const strideR,
 
                                               I* const info,
                                               const I batch_count)
@@ -58,15 +59,11 @@ rocblas_status rocsolver_cholqr1_batched_impl(rocblas_handle handle,
     Istride const shiftA = 0;
     Istride const shiftR = 0;
     Istride const strideA = lda * n;
-    Istride const strideR = ldr * n;
-
-    bool constexpr BATCHED = true;
-    bool constexpr STRIDED = false;
 
     // memory workspace sizes:
 
     size_t size_lwork = 0;
-    rocsolver_cholqr1_getMemorySize<BATCHED, STRIDED, T, I>(m, n, batch_count, &size_lwork);
+    rocsolver_cholqr1_getMemorySize<T, I>(m, n, batch_count, &size_lwork);
 
     if(rocblas_is_device_memory_size_query(handle))
         return rocblas_set_optimal_device_memory_size(handle, size_lwork);
@@ -80,18 +77,17 @@ rocblas_status rocsolver_cholqr1_batched_impl(rocblas_handle handle,
 
     // execution
 
-    auto const istat
-        = rocsolver_cholqr1_template<BATCHED, STRIDED, T, I, rocblas_stride>(handle, m, n,
+    auto const istat = rocsolver_cholqr1_template<T, I, rocblas_stride>(handle, m, n,
 
-                                                                             A, shiftA, lda, strideA,
+                                                                        A, shiftA, lda, strideA,
 
-                                                                             R, shiftR, ldr, strideR,
+                                                                        R, shiftR, ldr, strideR,
 
-                                                                             batch_count,
+                                                                        batch_count,
 
-                                                                             info,
+                                                                        info,
 
-                                                                             work, size_lwork);
+                                                                        work, size_lwork);
 
     return (istat);
 }
@@ -110,11 +106,12 @@ rocblas_status rocsolver_scholqr1_batched(rocblas_handle handle,
                                           const rocblas_int m,
                                           const rocblas_int n,
 
-                                          float* A,
+                                          float** A,
                                           const rocblas_int lda,
 
                                           float* R,
                                           const rocblas_int ldr,
+                                          const rocblas_stride strideR,
 
                                           rocblas_int* info,
                                           const rocblas_int batch_count)
@@ -123,7 +120,7 @@ rocblas_status rocsolver_scholqr1_batched(rocblas_handle handle,
 
                                                             A, lda,
 
-                                                            R, ldr,
+                                                            R, ldr, strideR,
 
                                                             info,
 
@@ -134,11 +131,12 @@ rocblas_status rocsolver_dcholqr1_batched(rocblas_handle handle,
                                           const rocblas_int m,
                                           const rocblas_int n,
 
-                                          double* A,
+                                          double** A,
                                           const rocblas_int lda,
 
                                           double* R,
                                           const rocblas_int ldr,
+                                          const rocblas_stride strideR,
 
                                           rocblas_int* info,
                                           const rocblas_int batch_count)
@@ -147,46 +145,23 @@ rocblas_status rocsolver_dcholqr1_batched(rocblas_handle handle,
 
                                                              A, lda,
 
-                                                             R, ldr,
+                                                             R, ldr, strideR,
 
                                                              info,
 
                                                              batch_count);
 }
 
-rocblas_status rocsolver_zcholqr1_batched(rocblas_handle handle,
-                                          const rocblas_int m,
-                                          const rocblas_int n,
-
-                                          rocblas_double_complex* A,
-                                          const rocblas_int lda,
-
-                                          rocblas_double_complex* R,
-                                          const rocblas_int ldr,
-
-                                          rocblas_int* info,
-                                          const rocblas_int batch_count)
-{
-    return rocsolver::rocsolver_cholqr1_batched_impl<rocblas_double_complex>(handle, m, n,
-
-                                                                             A, lda,
-
-                                                                             R, ldr,
-
-                                                                             info,
-
-                                                                             batch_count);
-}
-
 rocblas_status rocsolver_ccholqr1_batched(rocblas_handle handle,
                                           const rocblas_int m,
                                           const rocblas_int n,
 
-                                          rocblas_float_complex* A,
+                                          rocblas_float_complex** A,
                                           const rocblas_int lda,
 
                                           rocblas_float_complex* R,
                                           const rocblas_int ldr,
+                                          const rocblas_stride strideR,
 
                                           rocblas_int* info,
                                           const rocblas_int batch_count)
@@ -195,22 +170,50 @@ rocblas_status rocsolver_ccholqr1_batched(rocblas_handle handle,
 
                                                                             A, lda,
 
-                                                                            R, ldr,
+                                                                            R, ldr, strideR,
 
                                                                             info,
 
                                                                             batch_count);
 }
 
+rocblas_status rocsolver_zcholqr1_batched(rocblas_handle handle,
+                                          const rocblas_int m,
+                                          const rocblas_int n,
+
+                                          rocblas_double_complex** A,
+                                          const rocblas_int lda,
+
+                                          rocblas_double_complex* R,
+                                          const rocblas_int ldr,
+                                          const rocblas_stride strideR,
+
+                                          rocblas_int* info,
+                                          const rocblas_int batch_count)
+{
+    return rocsolver::rocsolver_cholqr1_batched_impl<rocblas_double_complex>(handle, m, n,
+
+                                                                             A, lda,
+
+                                                                             R, ldr, strideR,
+
+                                                                             info,
+
+                                                                             batch_count);
+}
+
+// -------------
+
 rocblas_status rocsolver_scholqr1_batched_64(rocblas_handle handle,
                                              const int64_t m,
                                              const int64_t n,
 
-                                             float* A,
+                                             float** A,
                                              const int64_t lda,
 
                                              float* R,
                                              const int64_t ldr,
+                                             const rocblas_stride strideR,
 
                                              int64_t* info,
 
@@ -221,7 +224,7 @@ rocblas_status rocsolver_scholqr1_batched_64(rocblas_handle handle,
 
                                                             A, lda,
 
-                                                            R, ldr,
+                                                            R, ldr, strideR,
 
                                                             info, batch_count);
 #else
@@ -233,11 +236,12 @@ rocblas_status rocsolver_dcholqr1_batched_64(rocblas_handle handle,
                                              const int64_t m,
                                              const int64_t n,
 
-                                             double* A,
+                                             double** A,
                                              const int64_t lda,
 
                                              double* R,
                                              const int64_t ldr,
+                                             const rocblas_stride strideR,
 
                                              int64_t* info,
 
@@ -248,7 +252,7 @@ rocblas_status rocsolver_dcholqr1_batched_64(rocblas_handle handle,
 
                                                              A, lda,
 
-                                                             R, ldr,
+                                                             R, ldr, strideR,
 
                                                              info, batch_count);
 #else
@@ -260,11 +264,12 @@ rocblas_status rocsolver_ccholqr1_batched_64(rocblas_handle handle,
                                              const int64_t m,
                                              const int64_t n,
 
-                                             rocblas_float_complex* A,
+                                             rocblas_float_complex** A,
                                              const int64_t lda,
 
                                              rocblas_float_complex* R,
                                              const int64_t ldr,
+                                             const rocblas_stride strideR,
 
                                              int64_t* info,
 
@@ -275,7 +280,7 @@ rocblas_status rocsolver_ccholqr1_batched_64(rocblas_handle handle,
 
                                                                             A, lda,
 
-                                                                            R, ldr,
+                                                                            R, ldr, strideR,
 
                                                                             info, batch_count);
 #else
@@ -287,11 +292,12 @@ rocblas_status rocsolver_zcholqr1_batched_64(rocblas_handle handle,
                                              const int64_t m,
                                              const int64_t n,
 
-                                             rocblas_double_complex* A,
+                                             rocblas_double_complex** A,
                                              const int64_t lda,
 
                                              rocblas_double_complex* R,
                                              const int64_t ldr,
+                                             const rocblas_stride strideR,
 
                                              int64_t* info,
 
@@ -302,12 +308,11 @@ rocblas_status rocsolver_zcholqr1_batched_64(rocblas_handle handle,
 
                                                                              A, lda,
 
-                                                                             R, ldr,
+                                                                             R, ldr, strideR,
 
                                                                              info, batch_count);
 #else
     return rocblas_status_not_implemented;
 #endif
 }
-
 } // extern C
