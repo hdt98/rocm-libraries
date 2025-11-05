@@ -306,6 +306,38 @@ namespace RocprofilerTest
         CHECK(latencies[1].instruction == "s_endpgm");
     }
 
+    TEST_CASE("Rocprofiler two kernels in loopUntilDispatchData", "[rocprofiler][gpu]")
+    {
+        rocRoller::profiler::reset();
+
+        const auto literal1 = 0xbeef1111;
+        const auto literal2 = 0xbeef2222;
+
+        auto          testContext1 = TestContext::ForTestDevice({}, "1");
+        auto          context1     = testContext1.get();
+        MovTestKernel kernel1(context1, literal1);
+
+        auto          testContext2 = TestContext::ForTestDevice({}, "2");
+        auto          context2     = testContext2.get();
+        MovTestKernel kernel2(context2, literal2);
+
+        const auto latencies = rocRoller::profiler::loopUntilDispatchData([&]() {
+            kernel1();
+            kernel2();
+            // Current implementation captures first dispatch
+        });
+
+        const auto literal1Hex = fmt::format("0x{:x}", literal1);
+        const auto literal2Hex = fmt::format("0x{:x}", literal2);
+
+        CAPTURE(literal1Hex, literal2Hex);
+        INFO(toString(latencies));
+        REQUIRE(latencies.size() == 2);
+        CHECK(1 == countSubstring(latencies[0].instruction, literal1Hex));
+        CHECK(0 == countSubstring(latencies[0].instruction, literal2Hex));
+        CHECK(latencies[1].instruction == "s_endpgm");
+    }
+
     TEST_CASE("Rocprofiler small workgroup count", "[rocprofiler][gpu]")
     {
         /*
