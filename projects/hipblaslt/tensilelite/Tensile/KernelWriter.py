@@ -2529,6 +2529,16 @@ class KernelWriter(metaclass=abc.ABCMeta):
     tdmB: bool = kernel["enableTDMB"]
     tdmInited: bool = False
 
+    # Free sgpr that will not be used
+    if kernel["Multicast"] and kernel["TDMInst"] != 0:
+      tdmA: bool = kernel["enableTDMA"]
+      tdmB: bool = kernel["enableTDMB"]
+      if tdmA and tdmB and prod(kernel["MIWaveGroup"]) > 1:
+        module.add(self.undefineSgpr("MulticastMask"))
+      else:
+        module.add(self.undefineSgpr("MulticastMaskA"))
+        module.add(self.undefineSgpr("MulticastMaskB"))
+
     # TODO: This can probably be moved later, after setupnewtile
     if not tdmA:
       module.add(self.removeGRSrdVariableSgprsFromPool(kernel))
@@ -8164,6 +8174,18 @@ class KernelWriter(metaclass=abc.ABCMeta):
       if not isPackedIndex(kernel,idx):
         self.defineSgpr("WorkGroup%u"%wg, 1)
         wg+=1
+
+    if kernel["Multicast"]:
+      tdmA: bool = kernel["enableTDMA"]
+      tdmB: bool = kernel["enableTDMB"]
+      if tdmA and tdmB and prod(kernel["MIWaveGroup"]) > 1:
+        self.defineSgpr("MulticastMask", 1)
+      else:
+        self.defineSgpr("MulticastMaskA", 1)
+        self.defineSgpr("MulticastMaskB", 1)
+
+    if kernel["Multicast"] and kernel["TDMInst"] == 0:
+      self.defineSgpr("M0Backup", 1)
 
     # SGPR above are user SGPR which are set by GPU hardware when the kernel is launched
     self.states.firstInitSgpr = self.sgprPool.size()
