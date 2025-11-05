@@ -325,8 +325,8 @@ public:
             return;
 
         char norm_type = val->second.as<char>();
-        if(norm_type != '1' && norm_type != 'F' && norm_type != 'f' && norm_type != 'I'
-           && norm_type != 'i' && norm_type != 'M' && norm_type != 'm')
+        if(norm_type != 'O' && norm_type != '1' && norm_type != 'F' && norm_type != 'f'
+           && norm_type != 'I' && norm_type != 'i' && norm_type != 'M' && norm_type != 'm')
             throw std::invalid_argument("Invalid value for " + name);
     }
 
