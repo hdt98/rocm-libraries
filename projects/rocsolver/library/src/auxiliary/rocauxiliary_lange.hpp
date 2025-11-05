@@ -38,11 +38,109 @@
 
 ROCSOLVER_BEGIN_NAMESPACE
 
+#define LANGE_FROBENIUS_BDIM 1024 // Number of threads per thread-block used in main stedc kernels
+
 /*************************************************************
     Templated kernels are instantiated in separate cpp
     files in order to improve compilation times and reduce
     the library size.
 *************************************************************/
+
+template <int MAX_THDS, typename T, typename I, typename S, typename U>
+ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) lange_frobenius_kernel(const rocblas_int m,
+                                                                   const rocblas_int n,
+                                                                   const U A,
+                                                                   const rocblas_int lda,
+                                                                   const rocblas_int shiftA,
+                                                                   const rocblas_int strideA,
+                                                                   S* block_sums)
+{
+    I bidz = blockIdx.z;
+    I bid = blockIdx.x;
+    I tid = threadIdx.x;
+    I gridSize = gridDim.x * blockDim.x;
+
+    // select batch instance
+    rocblas_int blocks = (m * n - 1) / LANGE_FROBENIUS_BDIM + 1;
+    T* a = load_ptr_batch<T>(A, bidz, shiftA, strideA);
+    S* block_sums_block = load_ptr_batch<S>(block_sums, bidz, 0, blocks);
+
+    // shared variables
+    __shared__ S sval[MAX_THDS / WarpSize];
+
+    // sum absolute values in row bid
+    S block_sum = 0;
+    for(I i = tid + (bid * blockDim.x); i < n*m; i += gridSize)
+    {
+        int row = i % m;
+        int col = i / m;
+        block_sum += std::pow(rocblas_abs(a[row + col*lda]), 2);
+    }
+
+    // reduce to get row sum
+    block_sum += shift_left(block_sum, 1);
+    block_sum += shift_left(block_sum, 2);
+    block_sum += shift_left(block_sum, 4);
+    block_sum += shift_left(block_sum, 8);
+    block_sum += shift_left(block_sum, 16);
+    if(warpSize > 32)
+        block_sum += shift_left(block_sum, 32);
+    if(tid % warpSize == 0)
+        sval[tid / warpSize] = block_sum;
+    __syncthreads();
+    if(tid == 0)
+    {
+        for(I k = 1; k < MAX_THDS / warpSize; k++)
+            block_sum += sval[k];
+        block_sums_block[bid] = block_sum;        
+    }
+}
+
+template <int MAX_THDS, typename T, typename I, typename S, typename U>
+ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) lange_frobenius_final_kernel(const rocblas_int m,
+                                                                   const rocblas_int n,
+                                                                   const U A,
+                                                                   const rocblas_int lda,
+                                                                   const rocblas_int shiftA,
+                                                                   const rocblas_int strideA,
+                                                                   S* block_sums,
+                                                                   S* final_norms)
+{
+    I bid = blockIdx.z;
+    I tid = threadIdx.x;
+
+    // select batch instance
+    rocblas_int blocks = (m * n - 1) / LANGE_FROBENIUS_BDIM + 1;
+    S* block_sum = load_ptr_batch<S>(block_sums, bid, 0, blocks);
+
+    // shared variables
+    __shared__ S sval[MAX_THDS / WarpSize];
+
+    // find maximum of row sums
+    S norm_frobenius = 0;
+    for(I i = tid; i < blocks; i += MAX_THDS)
+    {
+        norm_frobenius += block_sum[i];
+    }
+
+    // reduce to find max
+    norm_frobenius += shift_left(norm_frobenius, 1);
+    norm_frobenius += shift_left(norm_frobenius, 2);
+    norm_frobenius += shift_left(norm_frobenius, 4);
+    norm_frobenius += shift_left(norm_frobenius, 8);
+    norm_frobenius += shift_left(norm_frobenius, 16);
+    if(warpSize > 32)
+        norm_frobenius += shift_left(norm_frobenius, 32);
+    if(tid % warpSize == 0)
+        sval[tid / warpSize] = norm_frobenius;
+    __syncthreads();
+    if(tid == 0)
+    {
+        for(I k = 1; k < MAX_THDS / warpSize; k++)
+            norm_frobenius += sval[k];
+        final_norms[bid] = sqrt(norm_frobenius);        
+    }
+}
 
 template <int MAX_THDS, typename T, typename I, typename S, typename U>
 ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) lange_inf_rows_kernel(const rocblas_int m,
@@ -297,6 +395,11 @@ void rocsolver_lange_getMemorySize(const rocsolver_norm_type norm_type,
         // need space for row sums 
         size_t size_per_batch = m;
         *size_work = sizeof(S) * batch_count * size_per_batch;
+    } else if (norm_type == rocsolver_norm_type_frobenius){
+        // need space for row sums 
+        int blocks = (m * n - 1) / LANGE_FROBENIUS_BDIM + 1;
+        size_t size_per_batch = blocks;
+        *size_work = sizeof(S) * batch_count * size_per_batch;
     } else
     {
         // max-norm and Frobenius norm don't need workspace
@@ -351,27 +454,12 @@ rocblas_status rocsolver_lange_template(rocblas_handle handle,
     ROCSOLVER_ENTER("lange", "norm_type:", norm_type, "m:", m, "n:", n, "shiftA:", shiftA,
                     "lda:", lda, "bc:", batch_count);
 
-    // std::cout << typeid(T).name() << std::endl;
-    // std::cout << typeid(S).name() << std::endl;
-    // std::vector<S> hostNormVec(batch_count);
-    // std::vector<T> hostA(n * m);
-    // hipMemcpy(hostA.data(), A, sizeof(T) * n * m, hipMemcpyDeviceToHost);
-    // hipDeviceSynchronize();
-    // for (int i = 0; i < n; i++) {
-    //     for (int j = 0; j < m; j++) {
-    //         std::cout << "A[" << j << "][" << i << "] = " << hostA[j + i * lda]
-    //                     << std::endl;
-    //     }
-    // }
-
     // quick return
     if(m == 0 || n == 0 || !batch_count)
         return rocblas_status_success;
 
     hipStream_t stream;
     rocblas_get_stream(handle, &stream);
-
-    std::cout << "m: " << m << ", n: " << n << ", lda: " << lda << ", batch_count: " << batch_count << std::endl;
 
     // dispatch to appropriate kernel based on norm type
     switch(norm_type)
@@ -395,8 +483,15 @@ rocblas_status rocsolver_lange_template(rocblas_handle handle,
         break;
     }
     case rocsolver_norm_type_frobenius:
-        // TODO: Implement Frobenius norm kernel
-        return rocblas_status_not_implemented;
+    {
+        // Launch Frobenius kernels
+        int blocks = (m * n - 1) / LANGE_FROBENIUS_BDIM + 1;
+        ROCSOLVER_LAUNCH_KERNEL((lange_frobenius_kernel<LANGE_FROBENIUS_BDIM, T, I, S>), dim3(blocks, 1, batch_count),
+                                dim3(LANGE_FROBENIUS_BDIM), 0, stream, m, n, A, lda, shiftA, strideA, work);
+        ROCSOLVER_LAUNCH_KERNEL((lange_frobenius_final_kernel<LANGE_FROBENIUS_BDIM, T, I, S>), dim3(1, 1, batch_count),
+                                dim3(LANGE_FROBENIUS_BDIM), 0, stream, m, n, A, lda, shiftA, strideA, work, norms);
+        break;
+    }
     case rocsolver_norm_type_infinity:
     {
         // Launch one-norm kernels
