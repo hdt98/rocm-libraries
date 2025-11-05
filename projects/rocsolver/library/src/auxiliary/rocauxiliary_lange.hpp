@@ -51,7 +51,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) lange_max_kernel(const rocblas
                                                                    const rocblas_int lda,
                                                                    const rocblas_int shiftA,
                                                                    const rocblas_int strideA,
-                                                                   N* final_norm)
+                                                                   S* final_norms)
 {
     I bid = blockIdx.z;
     I tid = threadIdx.x;
@@ -60,10 +60,10 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) lange_max_kernel(const rocblas
     T* a = load_ptr_batch<T>(A, bid, shiftA, strideA);
 
     // shared variables
-    __shared__ N sval[MAX_THDS / WarpSize];
+    __shared__ S sval[MAX_THDS / WarpSize];
 
     // dot
-    N norm_max = 0;
+    S norm_max = 0;
     for(I i = tid; i < m * n; i += MAX_THDS)
     {
         int row = i % m;
@@ -87,28 +87,49 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) lange_max_kernel(const rocblas
     {
         for(I k = 1; k < MAX_THDS / warpSize; k++)
             norm_max = std::max(norm_max, sval[k]);
-        final_norm[bid] = norm_max;        
+        final_norms[bid] = norm_max;        
     }
 }
 
-template <typename T, typename I>
+template <typename T, typename I, typename S>
 void rocsolver_lange_getMemorySize(const rocsolver_norm_type norm_type,
                                    const I m,
                                    const I n,
                                    const I batch_count,
                                    size_t* size_work)
 {
-    *size_work = 0;
+    // if quick return no workspace needed
+    if(m == 0 || n == 0 || !batch_count)
+    {
+        *size_work = 0;
+        return;
+    }
+
+    // size of workspace for column sums (one-norm) or row sums (infinity-norm)
+    if(norm_type == rocsolver_norm_type_one)
+    {
+        // need space for column sums (one-norm) or row sums (infinity-norm)
+        size_t size_per_batch =  n;
+        *size_work = sizeof(S) * batch_count * size_per_batch;
+    } else if (norm_type == rocsolver_norm_type_infinity){
+        // need space for row sums 
+        size_t size_per_batch = m;
+        *size_work = sizeof(S) * batch_count * size_per_batch;
+    } else
+    {
+        // max-norm and Frobenius norm don't need workspace
+        *size_work = 0;
+    }
 }
 
-template <typename T, typename I, typename N>
+template <typename T, typename I, typename S>
 rocblas_status rocsolver_lange_argCheck(rocblas_handle handle,
                                         const rocsolver_norm_type norm_type,
                                         const I m,
                                         const I n,
                                         const I lda,
                                         T A,
-                                        N norm)
+                                        S* norms)
 {
     // order is important for unit tests:
 
@@ -126,13 +147,13 @@ rocblas_status rocsolver_lange_argCheck(rocblas_handle handle,
         return rocblas_status_continue;
 
     // 3. invalid pointers
-    if((m * n && !A) || (m * n && !norm))
+    if((m * n && !A) || (m * n && !norms))
         return rocblas_status_invalid_pointer;
 
     return rocblas_status_continue;
 }
 
-template <typename T, typename I, typename N, typename U>
+template <typename T, typename I, typename S, typename U>
 rocblas_status rocsolver_lange_template(rocblas_handle handle,
                                         const rocsolver_norm_type norm_type,
                                         const I m,
@@ -142,7 +163,8 @@ rocblas_status rocsolver_lange_template(rocblas_handle handle,
                                         const I lda,
                                         const rocblas_stride strideA,
                                         const I batch_count,
-                                        N* norm)
+                                        S* norms,
+                                        S* work)
 {
     ROCSOLVER_ENTER("lange", "norm_type:", norm_type, "m:", m, "n:", n, "shiftA:", shiftA,
                     "lda:", lda, "bc:", batch_count);
@@ -161,13 +183,20 @@ rocblas_status rocsolver_lange_template(rocblas_handle handle,
     {
         // Launch max kernel
         constexpr int MAX_THDS = 1024;
-        ROCSOLVER_LAUNCH_KERNEL((lange_max_kernel<MAX_THDS, T, I, N>), dim3(1, 1, batch_count),
-                                dim3(MAX_THDS), 0, stream, m, n, A, lda, shiftA, strideA, norm);
+        ROCSOLVER_LAUNCH_KERNEL((lange_max_kernel<MAX_THDS, T, I, S>), dim3(1, 1, batch_count),
+                                dim3(MAX_THDS), 0, stream, m, n, A, lda, shiftA, strideA, norms);
         break;
     }
     case rocsolver_norm_type_one:
-        // TODO: Implement one-norm kernel
-        return rocblas_status_not_implemented;
+    {
+        // Launch one-norm kernels
+        constexpr int MAX_THDS = 1024;
+        ROCSOLVER_LAUNCH_KERNEL((lange_one_columns_kernel<MAX_THDS, T, I, S>), dim3(n, 1, batch_count),
+                                dim3(MAX_THDS), 0, stream, m, n, A, lda, shiftA, strideA, work);
+        ROCSOLVER_LAUNCH_KERNEL((lange_one_final_kernel<MAX_THDS, T, I, S>), dim3(1, 1, batch_count),
+                                dim3(MAX_THDS), 0, stream, m, n, A, lda, shiftA, strideA, work, norms);
+        break;
+    }
     case rocsolver_norm_type_frobenius:
         // TODO: Implement Frobenius norm kernel
         return rocblas_status_not_implemented;
