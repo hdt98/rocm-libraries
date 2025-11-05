@@ -40,6 +40,7 @@ target_sources(rocroller-tests-catch
         "${CMAKE_CURRENT_SOURCE_DIR}/CommandArgumentValueTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/CommandTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/ConnectWorkgroupsTest.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/ConvertPropagationTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/CustomAssertionTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/CustomAssertions.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/CustomMatcherTest.cpp"
@@ -90,7 +91,7 @@ target_sources(rocroller-tests-catch
         "${CMAKE_CURRENT_SOURCE_DIR}/WMMAObserverUnitTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/WidenAddrExprTo64bitTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/mxDataGeneratorTest.cpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/RotatingBufferTest.cpp" 
+        "${CMAKE_CURRENT_SOURCE_DIR}/RotatingBufferTest.cpp"
 )
 
 target_include_directories(rocroller-tests-catch PRIVATE
