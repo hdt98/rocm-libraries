@@ -1,10 +1,6 @@
 - MinimumRequiredVersion: 4.44.0
 - ProblemSizes:
-<<<<<<< HEAD
   - Exact: [16, 16, 1, 4, 16, 16, 16, 4]
-=======
-  - Exact: [4096, 4096, 1, 8192, 4096, 4096, 4096, 8192]
->>>>>>> ef5d8c342a (Changed complex test folder name for consistency, and added the files to commit.)
 - 1LDSBuffer: 0
   AggressivePerfMode: 1
   AssertAIGreaterThanEqual: -1

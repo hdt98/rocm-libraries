@@ -1,10 +1,10 @@
 ---
 CodeObjectFiles: [library/Kernels.so-000-gfx1030.hsaco, library/Kernels.so-000-gfx1150.hsaco,
   library/Kernels.so-000-gfx1201.hsaco, library/Kernels.so-000-gfx900.hsaco, library/Kernels.so-000-gfx942.hsaco,
-  library/Kernels.so-000-gfx1010.hsaco, library/Kernels.so-000-gfx1031.hsaco, library/Kernels.so-000-gfx1012.hsaco,
-  library/Kernels.so-000-gfx906-xnack-.hsaco, library/Kernels.so-000-gfx1101.hsaco,
-  library/Kernels.so-000-gfx1102.hsaco, library/Kernels.so-000-gfx803.hsaco, library/Kernels.so-000-gfx1103.hsaco,
-  library/Kernels.so-000-gfx1200.hsaco, library/Kernels.so-000-gfx90a-xnack+.hsaco,
+  library/Kernels.so-000-gfx1032.hsaco, library/Kernels.so-000-gfx1010.hsaco, library/Kernels.so-000-gfx1031.hsaco,
+  library/Kernels.so-000-gfx1012.hsaco, library/Kernels.so-000-gfx906-xnack-.hsaco,
+  library/Kernels.so-000-gfx1101.hsaco, library/Kernels.so-000-gfx1102.hsaco, library/Kernels.so-000-gfx803.hsaco,
+  library/Kernels.so-000-gfx1103.hsaco, library/Kernels.so-000-gfx1200.hsaco, library/Kernels.so-000-gfx90a-xnack+.hsaco,
   library/Kernels.so-000-gfx950.hsaco, library/Kernels.so-000-gfx908-xnack-.hsaco,
   library/Kernels.so-000-gfx1100.hsaco, library/Kernels.so-000-gfx1011.hsaco, library/Kernels.so-000-gfx90a-xnack-.hsaco,
   library/Kernels.so-000-gfx1151.hsaco, library/TensileLibrary_gfx950.co]
