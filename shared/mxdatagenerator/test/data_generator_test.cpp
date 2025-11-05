@@ -218,7 +218,8 @@ double compareHistogram(const std::vector<double>& data1,
     std::map<double, uint64_t> histogram1;
     std::map<double, uint64_t> histogram2;
 
-    assert(num_bins != 0);
+    if(num_bins == 0)
+        throw std::runtime_error("compareHistogram: num_bins cannot equal zero");
     double bin_width = static_cast<double>(hist_radius * 2) / static_cast<double>(num_bins);
     double first_bin = mean - hist_radius;
     double last_bin  = mean + hist_radius - bin_width;
