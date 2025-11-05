@@ -7,6 +7,8 @@
 #include <execution>
 #include <iomanip>
 #include <iostream>
+#include <unordered_map>
+#include <mutex>
 
 #include "origami/gemm.hpp"
 #include "origami/math.hpp"
@@ -133,17 +135,31 @@ std::vector<prediction_result_t> rank_configs(const problem_t& problem,
                                               const std::vector<config_t>& configs) {
   if (configs.empty()) { throw std::runtime_error("No configurations provided."); }
 
+  static std::unordered_map<problem_type_t, std::vector<config_cache_t>> config_cache;
+  static std::mutex cache_mutex;
+  auto problem_type = get_problem_type(problem, hardware);
+  if(!config_cache.count(problem_type))
+  {
+    std::lock_guard<std::mutex> lock(cache_mutex);
+    auto& caches = config_cache[problem_type];
+    for(auto& config : configs)
+      caches.emplace_back(create_config_cache(problem_type, hardware, config));
+  }
+  auto& caches = config_cache[problem_type];
+
   std::vector<prediction_result_t> results(configs.size());
 
   std::transform(std::execution::seq,
                  configs.begin(),
                  configs.end(),
+                 caches.begin(),
                  results.begin(),
-                 [&](const config_t& config) -> prediction_result_t {
-                   if (!check_lds_capacity(hardware, config.mt, problem.a_dtype, problem.b_dtype)) {
+                 [&](const config_t& config, const config_cache_t& cache) -> prediction_result_t {
+                   // if (!check_lds_capacity(hardware, config.mt, problem.a_dtype, problem.b_dtype)) {
+                   if(!cache.fits_lds_capacity) {
                      return {std::numeric_limits<double>::max(), config};
                    }
-                   double latency = compute_total_latency(problem, hardware, config);
+                   double latency = compute_total_latency(problem, hardware, config, cache);
                    return {latency, config};
                  });
 

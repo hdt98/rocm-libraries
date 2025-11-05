@@ -124,14 +124,14 @@ inline data_type_t string_to_data_type(std::string s) {
 }
 
 struct matrix_instruction {
-  size_t MI_M;
-  size_t MI_N;
-  size_t MI_K;
+  std::size_t MI_M;
+  std::size_t MI_N;
+  std::size_t MI_K;
   data_type_t mi_input_type;
 
   matrix_instruction() : MI_M(0), MI_N(0), MI_K(0), mi_input_type(data_type_t::Float) {}
 
-  matrix_instruction(size_t m, size_t n, size_t k, data_type_t mi_input_type)
+  matrix_instruction(std::size_t m, std::size_t n, std::size_t k, data_type_t mi_input_type)
       : MI_M(m), MI_N(n), MI_K(k), mi_input_type(mi_input_type) {}
 
   matrix_instruction(const matrix_instruction& other)
@@ -148,7 +148,7 @@ struct matrix_instruction {
   }
 
   std::size_t hash() const {
-    return std::hash<size_t>()(MI_M) ^ std::hash<size_t>()(MI_N) ^ std::hash<size_t>()(MI_K) ^
+    return std::hash<std::size_t>()(MI_M) ^ std::hash<std::size_t>()(MI_N) ^ std::hash<std::size_t>()(MI_K) ^
            std::hash<data_type_t>()(mi_input_type);
   }
 };
@@ -198,7 +198,6 @@ inline constexpr reduction_t int_to_reduction_t(int rt) { return static_cast<red
 enum class transpose_t {
   T,
   N,
-
   Count
 };
 
@@ -267,6 +266,9 @@ struct config_t {
   /// Reduction strategy.
   reduction_t reduction_strategy{};
 
+  /// Index of original kernel (Optional).
+  int solution_index{};
+  
   constexpr bool operator==(const config_t& o) const noexcept { 
     return mt == o.mt && mi == o.mi && cache_hints_a == o.cache_hints_a && cache_hints_b == o.cache_hints_b; 
   }

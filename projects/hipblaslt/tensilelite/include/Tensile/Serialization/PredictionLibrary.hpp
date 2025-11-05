@@ -95,7 +95,7 @@ namespace TensileLite
                                 };
                             }
 
-                            origami::config_t origami_config = {
+                            lib.origami_config_list.emplace_back(origami::config_t{
                                 .mt = {
                                     solution->sizeMapping.macroTile.x,
                                     solution->sizeMapping.macroTile.y,
@@ -106,10 +106,8 @@ namespace TensileLite
                                 .workgroup_mapping = solution->sizeMapping.workGroupMapping,
                                 .cache_hints_a = solution->sizeMapping.nonTemporalA,
                                 .cache_hints_b = solution->sizeMapping.nonTemporalB,
-                            };
-
-                            lib.origami_config_list.emplace_back(origami_config);
-                            lib.origami_config_map.insert(std::make_pair(origami_config, index));
+                                .solution_index = index,
+                            });
                         }
                     }
                 }

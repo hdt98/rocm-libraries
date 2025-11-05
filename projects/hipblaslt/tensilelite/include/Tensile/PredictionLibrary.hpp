@@ -47,7 +47,6 @@ namespace TensileLite
     {
         std::unordered_map<int, std::shared_ptr<MySolution>> solutionmap;
         std::vector<origami::config_t>                       origami_config_list;
-        std::unordered_map<origami::config_t, int>           origami_config_map;
 
         static std::string Type()
         {
@@ -156,7 +155,7 @@ namespace TensileLite
                 batch *= problem.batchSize(i);
             }
 
-            hip::HipAMDGPU const* pAMDGPU = dynamic_cast<hip::HipAMDGPU const*>(&hardware);
+            hip::HipAMDGPU const* pAMDGPU = reinterpret_cast<hip::HipAMDGPU const*>(&hardware);
 
             const origami::hardware_t& analaytical_hardware = *(pAMDGPU->analyticalHardware);
             if(origami::hardware_t::is_debug_enabled())
@@ -188,16 +187,11 @@ namespace TensileLite
 
             for(const auto& r : prediction_result)
             {
-                auto mapiter  = origami_config_map.find(r.config);
-                auto smapiter = solutionmap.find(mapiter->second);
-                if(mapiter != origami_config_map.end() && smapiter != solutionmap.end())
+                auto solution = solutionmap.find(r.config.solution_index)->second;
+                if((*solution->hardwarePredicate)(hardware)
+                   && (*solution->problemPredicate)(problem))
                 {
-                    auto solution = smapiter->second;
-                    if((*solution->hardwarePredicate)(hardware)
-                       && (*solution->problemPredicate)(problem))
-                    {
-                        rv.emplace_back(solution);
-                    }
+                    rv.emplace_back(solution);
                 }
             }
             return rv;
