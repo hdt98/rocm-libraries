@@ -1,4 +1,4 @@
-#!/bin/sh 
+#!/bin/sh
 # usage: asm-new.sh kernelName(no extension) [--wave32]
 f=$1
 shift
