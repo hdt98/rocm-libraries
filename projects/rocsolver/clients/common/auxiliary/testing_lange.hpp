@@ -232,9 +232,8 @@ void testing_lange(Arguments& argus)
     if(norm_type != rocsolver_norm_type_one && norm_type != rocsolver_norm_type_frobenius
        && norm_type != rocsolver_norm_type_infinity && norm_type != rocsolver_norm_type_max)
     {
-        EXPECT_ROCBLAS_STATUS(
-            rocsolver_lange(handle, norm_type, m, n, (T*)nullptr, lda, (S*)nullptr),
-            rocblas_status_invalid_value);
+        EXPECT_ROCBLAS_STATUS(rocsolver_lange(handle, norm_type, m, n, (T*)nullptr, lda, (S*)nullptr),
+                              rocblas_status_invalid_value);
 
         if(argus.timing)
             rocsolver_bench_inform(inform_invalid_args);
@@ -253,9 +252,8 @@ void testing_lange(Arguments& argus)
     bool invalid_size = (m < 0 || n < 0 || lda < m);
     if(invalid_size)
     {
-        EXPECT_ROCBLAS_STATUS(
-            rocsolver_lange(handle, norm_type, m, n, (T*)nullptr, lda, (S*)nullptr),
-            rocblas_status_invalid_size);
+        EXPECT_ROCBLAS_STATUS(rocsolver_lange(handle, norm_type, m, n, (T*)nullptr, lda, (S*)nullptr),
+                              rocblas_status_invalid_size);
 
         if(argus.timing)
             rocsolver_bench_inform(inform_invalid_size);
@@ -301,13 +299,13 @@ void testing_lange(Arguments& argus)
     // check computations
     if(argus.unit_check || argus.norm_check)
         lange_getError<T, I, S>(handle, norm_type, m, n, dA, lda, dnorms, hA, hnorms, hnorms_res,
-                          &max_error);
+                                &max_error);
 
     // collect performance data
     if(argus.timing)
-        lange_getPerfData<T, I, S>(handle, norm_type, m, n, dA, lda, dnorms, hA, hnorms, &gpu_time_used,
-                             &cpu_time_used, hot_calls, argus.profile, argus.profile_kernels,
-                             argus.perf);
+        lange_getPerfData<T, I, S>(handle, norm_type, m, n, dA, lda, dnorms, hA, hnorms,
+                                   &gpu_time_used, &cpu_time_used, hot_calls, argus.profile,
+                                   argus.profile_kernels, argus.perf);
 
     // validate results for rocsolver-test
     // using m * n * machine_precision as tolerance

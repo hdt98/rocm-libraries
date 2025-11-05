@@ -95,7 +95,8 @@ rocblas_status rocsolver_slange(rocblas_handle handle,
                                 const rocblas_int lda,
                                 float* norm)
 {
-    return rocsolver::rocsolver_lange_impl<float, rocblas_int, float>(handle, norm_type, m, n, A, lda, norm);
+    return rocsolver::rocsolver_lange_impl<float, rocblas_int, float>(handle, norm_type, m, n, A,
+                                                                      lda, norm);
 }
 
 rocblas_status rocsolver_dlange(rocblas_handle handle,
@@ -106,7 +107,8 @@ rocblas_status rocsolver_dlange(rocblas_handle handle,
                                 const rocblas_int lda,
                                 double* norm)
 {
-    return rocsolver::rocsolver_lange_impl<double, rocblas_int, double>(handle, norm_type, m, n, A, lda, norm);
+    return rocsolver::rocsolver_lange_impl<double, rocblas_int, double>(handle, norm_type, m, n, A,
+                                                                        lda, norm);
 }
 
 rocblas_status rocsolver_clange(rocblas_handle handle,
@@ -117,8 +119,8 @@ rocblas_status rocsolver_clange(rocblas_handle handle,
                                 const rocblas_int lda,
                                 float* norm)
 {
-    return rocsolver::rocsolver_lange_impl<rocblas_float_complex, rocblas_int, float>(handle, norm_type, m, n, A, lda,
-                                                                   norm);
+    return rocsolver::rocsolver_lange_impl<rocblas_float_complex, rocblas_int, float>(
+        handle, norm_type, m, n, A, lda, norm);
 }
 
 rocblas_status rocsolver_zlange(rocblas_handle handle,
@@ -129,8 +131,8 @@ rocblas_status rocsolver_zlange(rocblas_handle handle,
                                 const rocblas_int lda,
                                 double* norm)
 {
-    return rocsolver::rocsolver_lange_impl<rocblas_double_complex, rocblas_int, double>(handle, norm_type, m, n, A, lda,
-                                                                    norm);
+    return rocsolver::rocsolver_lange_impl<rocblas_double_complex, rocblas_int, double>(
+        handle, norm_type, m, n, A, lda, norm);
 }
 
 rocblas_status rocsolver_slange_64(rocblas_handle handle,
@@ -142,7 +144,8 @@ rocblas_status rocsolver_slange_64(rocblas_handle handle,
                                    float* norm)
 {
 #ifdef HAVE_ROCBLAS_64
-    return rocsolver::rocsolver_lange_impl<float, int64_t, float>(handle, norm_type, m, n, A, lda, norm);
+    return rocsolver::rocsolver_lange_impl<float, int64_t, float>(handle, norm_type, m, n, A, lda,
+                                                                  norm);
 #else
     return rocblas_status_not_implemented;
 #endif
@@ -157,7 +160,8 @@ rocblas_status rocsolver_dlange_64(rocblas_handle handle,
                                    double* norm)
 {
 #ifdef HAVE_ROCBLAS_64
-    return rocsolver::rocsolver_lange_impl<double, int64_t, double>(handle, norm_type, m, n, A, lda, norm);
+    return rocsolver::rocsolver_lange_impl<double, int64_t, double>(handle, norm_type, m, n, A, lda,
+                                                                    norm);
 #else
     return rocblas_status_not_implemented;
 #endif
@@ -172,8 +176,8 @@ rocblas_status rocsolver_clange_64(rocblas_handle handle,
                                    float* norm)
 {
 #ifdef HAVE_ROCBLAS_64
-    return rocsolver::rocsolver_lange_impl<rocblas_float_complex, int64_t, float>(handle, norm_type, m, n, A, lda,
-                                                                   norm);
+    return rocsolver::rocsolver_lange_impl<rocblas_float_complex, int64_t, float>(
+        handle, norm_type, m, n, A, lda, norm);
 #else
     return rocblas_status_not_implemented;
 #endif
@@ -188,8 +192,8 @@ rocblas_status rocsolver_zlange_64(rocblas_handle handle,
                                    double* norm)
 {
 #ifdef HAVE_ROCBLAS_64
-    return rocsolver::rocsolver_lange_impl<rocblas_double_complex, int64_t, double>(handle, norm_type, m, n, A, lda,
-                                                                    norm);
+    return rocsolver::rocsolver_lange_impl<rocblas_double_complex, int64_t, double>(
+        handle, norm_type, m, n, A, lda, norm);
 #else
     return rocblas_status_not_implemented;
 #endif
