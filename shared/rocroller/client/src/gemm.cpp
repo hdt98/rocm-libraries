@@ -1098,7 +1098,7 @@ namespace rocRoller::Client::GEMMClient::CLI
         std::make_pair("--streamKTwoTileDPFirst", &SolutionParameters::streamKTwoTileDPFirst));
 
     template <typename T, typename U>
-    std::string getSolutionParameterArgumentName(U T::* member_ptr)
+    std::string getSolutionParameterArgumentName(U T::*member_ptr)
     {
         std::optional<std::string> found_name;
 
