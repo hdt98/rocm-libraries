@@ -991,7 +991,6 @@ inline rocblas_status rocsolver_lange(rocblas_handle handle,
     return rocsolver_slange(handle, norm_type, m, n, A, lda, norms);
 }
 
-
 inline rocblas_status rocsolver_lange(rocblas_handle handle,
                                       rocsolver_norm_type norm_type,
                                       rocblas_int m,
@@ -1035,7 +1034,6 @@ inline rocblas_status rocsolver_lange(rocblas_handle handle,
 {
     return rocsolver_slange_64(handle, norm_type, m, n, A, lda, norms);
 }
-
 
 inline rocblas_status rocsolver_lange(rocblas_handle handle,
                                       rocsolver_norm_type norm_type,
