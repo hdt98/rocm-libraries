@@ -212,7 +212,7 @@ namespace ExpressionTest
 
     TEST_CASE("Convert propagation with Division", "[q123][gpu][convert-propagation]")
     {
-        auto context = TestContext::ForTestDevice();
+        auto context = TestContext::ForTestDevice({{.enableFullDivision = true}});
 
         auto expr
             = [](Expression::ExpressionPtr a,

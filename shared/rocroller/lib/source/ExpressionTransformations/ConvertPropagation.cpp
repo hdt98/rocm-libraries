@@ -53,6 +53,16 @@ namespace rocRoller
             template <typename Expr>
             requires CBinary<Expr> &&(!CShift<Expr>)ExpressionPtr operator()(Expr const& expr) const
             {
+                if constexpr(std::same_as<Expr, Divide>)
+                {
+                    auto const resultDataType = resultVariableType(expr).dataType;
+                    if(DataTypeInfo::Get(resultDataType).elementBytes
+                       > DataTypeInfo::Get(m_destinationType).elementBytes)
+                    {
+                        return std::make_shared<Expression>(expr);
+                    }
+                }
+
                 Expr cpy = expr;
                 cpy.lhs  = call(expr.lhs);
                 cpy.rhs  = call(expr.rhs);
@@ -62,6 +72,16 @@ namespace rocRoller
             template <CShift Expr>
             ExpressionPtr operator()(Expr const& expr) const
             {
+                if constexpr(CIsAnyOf<Expr, LogicalShiftR, ArithmeticShiftR>)
+                {
+                    auto const resultDataType = resultVariableType(expr).dataType;
+                    if(DataTypeInfo::Get(resultDataType).elementBytes
+                       > DataTypeInfo::Get(m_destinationType).elementBytes)
+                    {
+                        return std::make_shared<Expression>(expr);
+                    }
+                }
+
                 Expr cpy = expr;
                 cpy.lhs  = call(expr.lhs);
                 return std::make_shared<Expression>(cpy);
