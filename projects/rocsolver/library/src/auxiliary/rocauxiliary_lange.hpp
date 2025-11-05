@@ -44,7 +44,98 @@ ROCSOLVER_BEGIN_NAMESPACE
     the library size.
 *************************************************************/
 
-template <int MAX_THDS, typename T, typename I, typename N, typename U>
+template <int MAX_THDS, typename T, typename I, typename S, typename U>
+ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) lange_one_columns_kernel(const rocblas_int m,
+                                                                   const rocblas_int n,
+                                                                   const U A,
+                                                                   const rocblas_int lda,
+                                                                   const rocblas_int shiftA,
+                                                                   const rocblas_int strideA,
+                                                                   S* col_sums)
+{
+    I bidz = blockIdx.z;
+    I bid = blockIdx.x;
+    I tid = threadIdx.x;
+
+    // select batch instance
+    T* a = load_ptr_batch<T>(A, bidz, shiftA, strideA);
+    S* col_sums_block = load_ptr_batch<S>(col_sums, bidz, 0, n);
+
+    // shared variables
+    __shared__ S sval[MAX_THDS / WarpSize];
+
+    // sum absolute values in column bid
+    S col_sum = 0;
+    for(I i = tid; i < m; i += MAX_THDS)
+    {
+        col_sum += rocblas_abs(a[i + bid * lda]);
+    }
+
+    // reduce to get column sum
+    col_sum += shift_left(col_sum, 1);
+    col_sum += shift_left(col_sum, 2);
+    col_sum += shift_left(col_sum, 4);
+    col_sum += shift_left(col_sum, 8);
+    col_sum += shift_left(col_sum, 16);
+    if(warpSize > 32)
+        col_sum += shift_left(col_sum, 32);
+    if(tid % warpSize == 0)
+        sval[tid / warpSize] = col_sum;
+    __syncthreads();
+    if(tid == 0)
+    {
+        for(I k = 1; k < MAX_THDS / warpSize; k++)
+            col_sum += sval[k];
+        col_sums_block[bid] = col_sum;        
+    }
+}
+
+template <int MAX_THDS, typename T, typename I, typename S, typename U>
+ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) lange_one_final_kernel(const rocblas_int m,
+                                                                   const rocblas_int n,
+                                                                   const U A,
+                                                                   const rocblas_int lda,
+                                                                   const rocblas_int shiftA,
+                                                                   const rocblas_int strideA,
+                                                                   S* col_sums,
+                                                                   S* final_norms)
+{
+    I bid = blockIdx.z;
+    I tid = threadIdx.x;
+
+    // select batch instance
+    S* col_sums_block = load_ptr_batch<S>(col_sums, bid, 0, n);
+
+    // shared variables
+    __shared__ S sval[MAX_THDS / WarpSize];
+
+    // find maximum of column sums
+    S norm_one = 0;
+    for(I i = tid; i < n; i += MAX_THDS)
+    {
+        norm_one = std::max(norm_one, col_sums_block[i]);
+    }
+
+    // reduce to find max
+    norm_one = std::max(norm_one, shift_left(norm_one, 1));
+    norm_one = std::max(norm_one, shift_left(norm_one, 2));
+    norm_one = std::max(norm_one, shift_left(norm_one, 4));
+    norm_one = std::max(norm_one, shift_left(norm_one, 8));
+    norm_one = std::max(norm_one, shift_left(norm_one, 16));
+    if(warpSize > 32)
+        norm_one = std::max(norm_one, shift_left(norm_one, 32));
+    if(tid % warpSize == 0)
+        sval[tid / warpSize] = norm_one;
+    __syncthreads();
+    if(tid == 0)
+    {
+        for(I k = 1; k < MAX_THDS / warpSize; k++)
+            norm_one = std::max(norm_one, sval[k]);
+        final_norms[bid] = norm_one;        
+    }
+}
+
+template <int MAX_THDS, typename T, typename I, typename S, typename U>
 ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) lange_max_kernel(const rocblas_int m,
                                                                    const rocblas_int n,
                                                                    const U A,
@@ -169,12 +260,27 @@ rocblas_status rocsolver_lange_template(rocblas_handle handle,
     ROCSOLVER_ENTER("lange", "norm_type:", norm_type, "m:", m, "n:", n, "shiftA:", shiftA,
                     "lda:", lda, "bc:", batch_count);
 
+    // std::cout << typeid(T).name() << std::endl;
+    // std::cout << typeid(S).name() << std::endl;
+    // std::vector<S> hostNormVec(batch_count);
+    // std::vector<T> hostA(n * m);
+    // hipMemcpy(hostA.data(), A, sizeof(T) * n * m, hipMemcpyDeviceToHost);
+    // hipDeviceSynchronize();
+    // for (int i = 0; i < n; i++) {
+    //     for (int j = 0; j < m; j++) {
+    //         std::cout << "A[" << j << "][" << i << "] = " << hostA[j + i * lda]
+    //                     << std::endl;
+    //     }
+    // }
+
     // quick return
     if(m == 0 || n == 0 || !batch_count)
         return rocblas_status_success;
 
     hipStream_t stream;
     rocblas_get_stream(handle, &stream);
+
+    std::cout << "m: " << m << ", n: " << n << ", lda: " << lda << ", batch_count: " << batch_count << std::endl;
 
     // dispatch to appropriate kernel based on norm type
     switch(norm_type)
