@@ -35,14 +35,14 @@
 #include "common/misc/rocsolver_arguments.hpp"
 #include "common/misc/rocsolver_test.hpp"
 
-template <typename T, typename I, typename N>
+template <typename T, typename I, typename S>
 void lange_checkBadArgs(const rocblas_handle handle,
                         const rocsolver_norm_type norm_type,
                         const I m,
                         const I n,
                         T dA,
                         const I lda,
-                        N dnorms)
+                        S dnorms)
 {
     // handle
     EXPECT_ROCBLAS_STATUS(rocsolver_lange(nullptr, norm_type, m, n, dA, lda, dnorms),
@@ -56,20 +56,20 @@ void lange_checkBadArgs(const rocblas_handle handle,
     // pointers
     EXPECT_ROCBLAS_STATUS(rocsolver_lange(handle, norm_type, m, n, (T) nullptr, lda, dnorms),
                           rocblas_status_invalid_pointer);
-    EXPECT_ROCBLAS_STATUS(rocsolver_lange(handle, norm_type, m, n, dA, lda, (N) nullptr),
+    EXPECT_ROCBLAS_STATUS(rocsolver_lange(handle, norm_type, m, n, dA, lda, (S) nullptr),
                           rocblas_status_invalid_pointer);
 
     // quick return with invalid pointers
-    EXPECT_ROCBLAS_STATUS(rocsolver_lange(handle, norm_type, (I)0, n, (T) nullptr, lda, (N) nullptr),
+    EXPECT_ROCBLAS_STATUS(rocsolver_lange(handle, norm_type, (I)0, n, (T) nullptr, lda, (S) nullptr),
                           rocblas_status_success);
-    EXPECT_ROCBLAS_STATUS(rocsolver_lange(handle, norm_type, m, (I)0, (T) nullptr, lda, (N) nullptr),
+    EXPECT_ROCBLAS_STATUS(rocsolver_lange(handle, norm_type, m, (I)0, (T) nullptr, lda, (S) nullptr),
                           rocblas_status_success);
 }
 
 template <typename T, typename I>
 void testing_lange_bad_arg()
 {
-    using N = real_t<T>;
+    using S = real_t<T>;
 
     // safe arguments
     rocblas_local_handle handle;
@@ -80,7 +80,7 @@ void testing_lange_bad_arg()
 
     // memory allocation
     device_strided_batch_vector<T> dA(1, 1, 1, 1);
-    device_strided_batch_vector<N> dnorms(1, 1, 1, 1);
+    device_strided_batch_vector<S> dnorms(1, 1, 1, 1);
     CHECK_HIP_ERROR(dA.memcheck());
     CHECK_HIP_ERROR(dnorms.memcheck());
 
@@ -88,7 +88,7 @@ void testing_lange_bad_arg()
     lange_checkBadArgs(handle, norm_type, m, n, dA.data(), lda, dnorms.data());
 }
 
-template <bool CPU, bool GPU, typename T, typename I, typename N, typename Td, typename Tdn, typename Th, typename Thn>
+template <bool CPU, bool GPU, typename T, typename I, typename S, typename Td, typename Tdn, typename Th, typename Thn>
 void lange_initData(const rocblas_handle handle,
                     const rocsolver_norm_type norm_type,
                     const I m,
@@ -111,7 +111,7 @@ void lange_initData(const rocblas_handle handle,
     }
 }
 
-template <typename T, typename I, typename N, typename Td, typename Tdn, typename Th, typename Thn>
+template <typename T, typename I, typename S, typename Td, typename Tdn, typename Th, typename Thn>
 void lange_getError(const rocblas_handle handle,
                     const rocsolver_norm_type norm_type,
                     const I m,
@@ -126,10 +126,10 @@ void lange_getError(const rocblas_handle handle,
 {
     // Workspace for CPU lange (max needed is for 1-norm or infinity-norm)
     size_t size_work = std::max(m, n);
-    std::vector<N> work(size_work);
+    std::vector<S> work(size_work);
 
     // initialize data
-    lange_initData<true, true, T, I, N>(handle, norm_type, m, n, dA, lda, dnorms, hA, hnorms);
+    lange_initData<true, true, T, I, S>(handle, norm_type, m, n, dA, lda, dnorms, hA, hnorms);
 
     // execute computations
     // GPU lapack
@@ -138,14 +138,14 @@ void lange_getError(const rocblas_handle handle,
 
     // CPU lapack
     char norm = rocsolver2char_norm_type(norm_type);
-    hnorms[0][0] = cpu_lange<T, N>(norm, m, n, hA[0], lda, work.data());
+    hnorms[0][0] = cpu_lange<T, S>(norm, m, n, hA[0], lda, work.data());
 
     // error is ||hnorms - hnorms_res|| / ||hnorms||
     // using absolute value since we only have a single scalar
     *max_err = std::abs(hnorms[0][0] - hnorms_res[0][0]) / std::abs(hnorms[0][0]);
 }
 
-template <typename T, typename I, typename N, typename Td, typename Tdn, typename Th, typename Thn>
+template <typename T, typename I, typename S, typename Td, typename Tdn, typename Th, typename Thn>
 void lange_getPerfData(const rocblas_handle handle,
                        const rocsolver_norm_type norm_type,
                        const I m,
@@ -164,25 +164,25 @@ void lange_getPerfData(const rocblas_handle handle,
 {
     // Workspace for CPU lange
     size_t size_work = std::max(m, n);
-    std::vector<N> work(size_work);
+    std::vector<S> work(size_work);
 
     if(!perf)
     {
-        lange_initData<true, false, T, I, N>(handle, norm_type, m, n, dA, lda, dnorms, hA, hnorms);
+        lange_initData<true, false, T, I, S>(handle, norm_type, m, n, dA, lda, dnorms, hA, hnorms);
 
         // cpu-lapack performance (only if not in perf mode)
         char norm = rocsolver2char_norm_type(norm_type);
         *cpu_time_used = get_time_us_no_sync();
-        hnorms[0][0] = cpu_lange<T, N>(norm, m, n, hA[0], lda, work.data());
+        hnorms[0][0] = cpu_lange<T, S>(norm, m, n, hA[0], lda, work.data());
         *cpu_time_used = get_time_us_no_sync() - *cpu_time_used;
     }
 
-    lange_initData<true, false, T, I, N>(handle, norm_type, m, n, dA, lda, dnorms, hA, hnorms);
+    lange_initData<true, false, T, I, S>(handle, norm_type, m, n, dA, lda, dnorms, hA, hnorms);
 
     // cold calls
     for(int iter = 0; iter < 2; iter++)
     {
-        lange_initData<false, true, T, I, N>(handle, norm_type, m, n, dA, lda, dnorms, hA, hnorms);
+        lange_initData<false, true, T, I, S>(handle, norm_type, m, n, dA, lda, dnorms, hA, hnorms);
 
         CHECK_ROCBLAS_ERROR(rocsolver_lange(handle, norm_type, m, n, dA.data(), lda, dnorms.data()));
     }
@@ -204,7 +204,7 @@ void lange_getPerfData(const rocblas_handle handle,
 
     for(int iter = 0; iter < hot_calls; iter++)
     {
-        lange_initData<false, true, T, I, N>(handle, norm_type, m, n, dA, lda, dnorms, hA, hnorms);
+        lange_initData<false, true, T, I, S>(handle, norm_type, m, n, dA, lda, dnorms, hA, hnorms);
 
         start = get_time_us_sync(stream);
         rocsolver_lange(handle, norm_type, m, n, dA.data(), lda, dnorms.data());
@@ -216,7 +216,7 @@ void lange_getPerfData(const rocblas_handle handle,
 template <typename T, typename I>
 void testing_lange(Arguments& argus)
 {
-    using N = real_t<T>;
+    using S = real_t<T>;
 
     // get arguments
     rocblas_local_handle handle;
@@ -233,7 +233,7 @@ void testing_lange(Arguments& argus)
        && norm_type != rocsolver_norm_type_infinity && norm_type != rocsolver_norm_type_max)
     {
         EXPECT_ROCBLAS_STATUS(
-            rocsolver_lange(handle, norm_type, m, n, (T*)nullptr, lda, (N*)nullptr),
+            rocsolver_lange(handle, norm_type, m, n, (T*)nullptr, lda, (S*)nullptr),
             rocblas_status_invalid_value);
 
         if(argus.timing)
@@ -254,7 +254,7 @@ void testing_lange(Arguments& argus)
     if(invalid_size)
     {
         EXPECT_ROCBLAS_STATUS(
-            rocsolver_lange(handle, norm_type, m, n, (T*)nullptr, lda, (N*)nullptr),
+            rocsolver_lange(handle, norm_type, m, n, (T*)nullptr, lda, (S*)nullptr),
             rocblas_status_invalid_size);
 
         if(argus.timing)
@@ -267,7 +267,7 @@ void testing_lange(Arguments& argus)
     if(argus.mem_query)
     {
         CHECK_ROCBLAS_ERROR(rocblas_start_device_memory_size_query(handle));
-        CHECK_ALLOC_QUERY(rocsolver_lange(handle, norm_type, m, n, (T*)nullptr, lda, (N*)nullptr));
+        CHECK_ALLOC_QUERY(rocsolver_lange(handle, norm_type, m, n, (T*)nullptr, lda, (S*)nullptr));
 
         size_t size;
         CHECK_ROCBLAS_ERROR(rocblas_stop_device_memory_size_query(handle, &size));
@@ -278,10 +278,10 @@ void testing_lange(Arguments& argus)
 
     // memory allocations
     host_strided_batch_vector<T> hA(size_A, 1, size_A, 1);
-    host_strided_batch_vector<N> hnorms(size_norms, 1, size_norms, 1);
-    host_strided_batch_vector<N> hnorms_res(size_norms_res, 1, size_norms_res, 1);
+    host_strided_batch_vector<S> hnorms(size_norms, 1, size_norms, 1);
+    host_strided_batch_vector<S> hnorms_res(size_norms_res, 1, size_norms_res, 1);
     device_strided_batch_vector<T> dA(size_A, 1, size_A, 1);
-    device_strided_batch_vector<N> dnorms(size_norms, 1, size_norms, 1);
+    device_strided_batch_vector<S> dnorms(size_norms, 1, size_norms, 1);
     if(size_A)
         CHECK_HIP_ERROR(dA.memcheck());
     CHECK_HIP_ERROR(dnorms.memcheck());
@@ -300,12 +300,12 @@ void testing_lange(Arguments& argus)
 
     // check computations
     if(argus.unit_check || argus.norm_check)
-        lange_getError<T, I, N>(handle, norm_type, m, n, dA, lda, dnorms, hA, hnorms, hnorms_res,
+        lange_getError<T, I, S>(handle, norm_type, m, n, dA, lda, dnorms, hA, hnorms, hnorms_res,
                           &max_error);
 
     // collect performance data
     if(argus.timing)
-        lange_getPerfData<T, I, N>(handle, norm_type, m, n, dA, lda, dnorms, hA, hnorms, &gpu_time_used,
+        lange_getPerfData<T, I, S>(handle, norm_type, m, n, dA, lda, dnorms, hA, hnorms, &gpu_time_used,
                              &cpu_time_used, hot_calls, argus.profile, argus.profile_kernels,
                              argus.perf);
 
