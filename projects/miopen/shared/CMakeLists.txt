@@ -7,6 +7,10 @@ add_library(MIOpen_shared STATIC
     env.cpp
     sysinfo_utils.cpp
     logger.cpp
+    tensor.cpp
+    solver.cpp
+    convolution.cpp
+    performance_config.cpp
 )
 
 if(MIOPEN_BACKEND STREQUAL "HIPOC" OR MIOPEN_BACKEND STREQUAL "HIP")

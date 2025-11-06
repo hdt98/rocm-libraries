@@ -42,4 +42,7 @@ else()
     target_compile_definitions(addkernels PRIVATE -DMIOPEN_WORKAROUND_USE_BOOST_FILESYSTEM=0)
 endif()
 
+target_link_libraries(addkernels PRIVATE MIOpen_shared)
+target_link_libraries(addkernels INTERFACE $<BUILD_INTERFACE:MIOpen_shared>)
+
 clang_tidy_check(addkernels)

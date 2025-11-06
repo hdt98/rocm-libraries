@@ -101,7 +101,6 @@ set( MIOpen_Source
     conv/problem_description.cpp
     conv/solver_finders.cpp
     conv_algo_name.cpp
-    convolution.cpp
     convolution_api.cpp
     ctc.cpp
     ctc_api.cpp
@@ -159,7 +158,6 @@ set( MIOpen_Source
     multimarginloss_api.cpp
     op_args.cpp
     operator.cpp
-    performance_config.cpp
     pooling/problem_description.cpp
     pooling_api.cpp
     prelu/problem_description.cpp
@@ -195,7 +193,6 @@ set( MIOpen_Source
     softmax_api.cpp
     softmax/problem_description.cpp
     solution.cpp
-    solver.cpp
     solver/activ/bwd_0.cpp
     solver/activ/bwd_1.cpp
     solver/activ/fwd_0.cpp
@@ -339,7 +336,6 @@ set( MIOpen_Source
     t5layernorm_api.cpp
     target_properties.cpp
     temp_file.cpp
-    tensor.cpp
     tensorOp/problem_description.cpp
     tensor_api.cpp
     transformers_adam_w_api.cpp
@@ -1018,6 +1014,9 @@ MIOPEN_${MIOPEN_BACKEND}_1
 {
 global:
     miopen*;
+extern \"C++\" {
+    miopen::*;
+};
 local:
     *;
 };
