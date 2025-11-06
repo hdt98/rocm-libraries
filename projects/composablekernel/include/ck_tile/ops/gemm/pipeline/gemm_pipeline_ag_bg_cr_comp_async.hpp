@@ -27,7 +27,7 @@ struct BaseGemmPipelineAgBgCrCompAsync
     {
         if(num_loop % PrefetchStages == 1)
         {
-            return TailNumber::Three;
+            return TailNumber::One;
         }
         else
         {
@@ -42,10 +42,10 @@ struct BaseGemmPipelineAgBgCrCompAsync
         // Handle all the valid cases.
         if(has_hot_loop)
         {
-            if(tail_number == TailNumber::Three)
+            if(tail_number == TailNumber::One)
             {
                 return run_func(bool_constant<true>{},
-                                integral_constant<TailNumber, TailNumber::Three>{});
+                                integral_constant<TailNumber, TailNumber::One>{});
             }
             else if(tail_number == TailNumber::Two)
             {
@@ -55,10 +55,10 @@ struct BaseGemmPipelineAgBgCrCompAsync
         }
         else
         {
-            if(tail_number == TailNumber::Three)
+            if(tail_number == TailNumber::One)
             {
                 return run_func(bool_constant<false>{},
-                                integral_constant<TailNumber, TailNumber::Three>{});
+                                integral_constant<TailNumber, TailNumber::One>{});
             }
             else if(tail_number == TailNumber::Two)
             {
@@ -236,8 +236,6 @@ struct GemmPipelineAgBgCrCompAsync : public BaseGemmPipelineAgBgCrCompAsync<Prob
             using BDramBlockWindowTmp =
                 remove_cvref_t<std::tuple_element_t<number<0>{}, BsDramBlockWindowTmp>>;
             // TODO currently fused elementwise are not supported
-            ignore = a_element_func;
-            ignore = b_element_func;
             static_assert(std::is_same_v<remove_cvref_t<decltype(a_element_func)>,
                                          element_wise::PassThrough>);
             static_assert(std::is_same_v<remove_cvref_t<decltype(b_element_func)>,
@@ -398,33 +396,35 @@ struct GemmPipelineAgBgCrCompAsync : public BaseGemmPipelineAgBgCrCompAsync<Prob
             // write to LDS window(0) must complete before the local prefetch
             block_sync_lds_direct_load();
             // read A(0), B(0) from LDS window(0) to pipeline registers(0)
-            Base::LocalPrefetch(a_block_tile0, a_lds_ld_window0, is_a_load_tr_v);
-            Base::LocalPrefetch(b_block_tile0, b_lds_ld_window0, is_b_load_tr_v);
-            // LDS window(0) contents are overwritten below by global prefetch, need to sync
-            block_sync_lds();
-            // read A(2), B(2) from DRAM to LDS window(0)
-            // and advance the DRAM windows
-            Base::GlobalPrefetchAsync(
-                a_copy_lds_window0, a_tile_windows[number<0>{}], a_dram_tile_window_step);
-            Base::GlobalPrefetchAsync(
-                b_copy_lds_window0, b_tile_windows[number<0>{}], b_dram_tile_window_step);
+            Base::LocalPrefetch(a_block_tile0, a_lds_ld_window0);
+            Base::LocalPrefetch(b_block_tile0, b_lds_ld_window0);
 
             if(HasHotLoop)
             {
-                // we have had 3 global prefetches so far, indexed (0, 1, 2).
-                index_t i_global_read = amd_wave_read_first_lane(3);
-                // alternate ping: (read to register tile(1), use register tile(0) as gemm input)
-                //           pong: (read to register tile(0), use register tile(1) as gemm input)
+                index_t i_global_read = amd_wave_read_first_lane(2);
                 do
                 {
                     // ping
                     {
-                        // read A(i-1), B(i-1) from LDS window(1) to pipeline registers(1)
-                        Base::LocalPrefetch(a_block_tile1, a_lds_ld_window1, is_a_load_tr_v);
-                        Base::LocalPrefetch(b_block_tile1, b_lds_ld_window1, is_b_load_tr_v);
-                        // LDS window(1) contents are overwritten by global prefetch, need to sync
                         block_sync_lds();
-                        // read A(i), B(i) from DRAM to LDS window(1)
+                        Base::GlobalPrefetchAsync(a_copy_lds_window0,
+                                                  a_tile_windows[number<0>{}],
+                                                  a_dram_tile_window_step);
+                        Base::GlobalPrefetchAsync(b_copy_lds_window0,
+                                                  b_tile_windows[number<0>{}],
+                                                  b_dram_tile_window_step);
+                        block_gemm(c_block_tile, a_block_tile0, b_block_tile0);
+                    }
+                    // pong
+                    {
+                        // write to LDS window(0) must complete before the local prefetch
+                        block_sync_lds_direct_load();
+                        // read A(i), B(i) from LDS window(0) to pipeline registers(0)
+                        Base::LocalPrefetch(a_block_tile1, a_lds_ld_window1);
+                        Base::LocalPrefetch(b_block_tile1, b_lds_ld_window1);
+                        // LDS window(0) contents are overwritten by global prefetch, need to sync
+                        block_sync_lds();
+                        // read A(i+1), B(i+1) from DRAM to LDS window(0)
                         // and advance the DRAM windows
                         Base::GlobalPrefetchAsync(a_copy_lds_window1,
                                                   a_tile_windows[number<0>{}],
@@ -432,73 +432,33 @@ struct GemmPipelineAgBgCrCompAsync : public BaseGemmPipelineAgBgCrCompAsync<Prob
                         Base::GlobalPrefetchAsync(b_copy_lds_window1,
                                                   b_tile_windows[number<0>{}],
                                                   b_dram_tile_window_step);
-                        // C(i-3) = A(i-3) @ B(i-3)
-                        block_gemm(c_block_tile, a_block_tile0, b_block_tile0);
-                        HotLoopScheduler();
-                    }
-                    // pong
-                    {
-                        // write to LDS window(0) must complete before the local prefetch
-                        block_sync_lds_direct_load();
-                        // read A(i), B(i) from LDS window(0) to pipeline registers(0)
-                        Base::LocalPrefetch(a_block_tile0, a_lds_ld_window0, is_a_load_tr_v);
-                        Base::LocalPrefetch(b_block_tile0, b_lds_ld_window0, is_b_load_tr_v);
-                        // LDS window(0) contents are overwritten by global prefetch, need to sync
-                        block_sync_lds();
-                        // read A(i+1), B(i+1) from DRAM to LDS window(0)
-                        // and advance the DRAM windows
-                        Base::GlobalPrefetchAsync(a_copy_lds_window0,
-                                                  a_tile_windows[number<0>{}],
-                                                  a_dram_tile_window_step);
-                        Base::GlobalPrefetchAsync(b_copy_lds_window0,
-                                                  b_tile_windows[number<0>{}],
-                                                  b_dram_tile_window_step);
-                        // C(i-2) = A(i-2) @ B(i-2)
                         block_gemm(c_block_tile, a_block_tile1, b_block_tile1);
-                        HotLoopScheduler();
+                        Base::LocalPrefetch(a_block_tile0, a_lds_ld_window0);
+                        Base::LocalPrefetch(b_block_tile0, b_lds_ld_window0);
                     }
                     i_global_read += 2;
                 } while(i_global_read < num_loop);
             }
 
-            // 3 block gemms remaining
-            if constexpr(TailNum == TailNumber::Three)
+            // 2 block gemms remaining
+            if constexpr(TailNum == TailNumber::Two)
             {
                 {
-                    // read A(num_loop-1), B(num_loop-1) from LDS window(1) to pipeline registers(1)
-                    Base::LocalPrefetch(a_block_tile1, a_lds_ld_window1, is_a_load_tr_v);
-                    Base::LocalPrefetch(b_block_tile1, b_lds_ld_window1, is_b_load_tr_v);
-                    // C(num_loop-2) = A(num_loop-2) @ B(num_loop-2)
-                    block_gemm(c_block_tile, a_block_tile0, b_block_tile0);
-                }
-                {
-                    // write to LDS window(0) must complete before the local prefetch
                     block_sync_lds_direct_load();
-                    // read A(num_loop), B(num_loop) from LDS window(0) to pipeline registers(0)
-                    Base::LocalPrefetch(a_block_tile0, a_lds_ld_window0, is_a_load_tr_v);
-                    Base::LocalPrefetch(b_block_tile0, b_lds_ld_window0, is_b_load_tr_v);
-                    // C(num_loop-1) = A(num_loop-1) @ B(num_loop-1)
-                    block_gemm(c_block_tile, a_block_tile1, b_block_tile1);
+                    Base::LocalPrefetch(a_block_tile1, a_lds_ld_window1);
+                    Base::LocalPrefetch(b_block_tile1, b_lds_ld_window1);
+                    block_gemm(c_block_tile, a_block_tile0, b_block_tile0);
                 }
                 {
-                    // C(num_loop) = A(num_loop) @ B(num_loop)
-                    block_gemm(c_block_tile, a_block_tile0, b_block_tile0);
+                    block_sync_lds();
+                    block_gemm(c_block_tile, a_block_tile1, b_block_tile1);
                 }
             }
             else
-            // 2 block gemms remaining
+            // 1 block gemms remaining
             {
-                {
-                    // read A(num_loop), B(num_loop) from LDS window(1) to pipeline registers(1)
-                    Base::LocalPrefetch(a_block_tile1, a_lds_ld_window1, is_a_load_tr_v);
-                    Base::LocalPrefetch(b_block_tile1, b_lds_ld_window1, is_b_load_tr_v);
-                    // C(num_loop-1) = A(num_loop-1) @ B(num_loop-1)
-                    block_gemm(c_block_tile, a_block_tile0, b_block_tile0);
-                }
-                {
-                    // C(num_loop) = A(num_loop) @ B(num_loop)
-                    block_gemm(c_block_tile, a_block_tile1, b_block_tile1);
-                }
+                block_sync_lds();
+                block_gemm(c_block_tile, a_block_tile0, b_block_tile0);
             }
             return c_block_tile;
         }

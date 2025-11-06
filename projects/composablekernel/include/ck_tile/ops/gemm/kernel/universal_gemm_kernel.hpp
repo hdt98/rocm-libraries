@@ -216,6 +216,20 @@ struct UniversalGemmKernel
     };
     static constexpr bool PersistentKernel = has_persistent_kernel::value;
 
+    struct has_cluster_launch
+    {
+        template <typename T>
+        using has_cluster_launch_type = decltype(T::UseClusterLaunch);
+
+        static constexpr bool value = []() {
+            if constexpr(is_detected<has_cluster_launch_type, GemmPipeline>{})
+                return GemmPipeline::UseClusterLaunch;
+            else
+                return false;
+        }();
+    };
+    static constexpr bool ClusterLaunch = has_cluster_launch::value;
+
     // Check if TilePartitioner has GetOutputOffset method with kargs and k_id
     struct has_tile_partitioner_output_offset_impl
     {
@@ -266,7 +280,26 @@ struct UniversalGemmKernel
 
     CK_TILE_HOST static constexpr auto GridSize(index_t M, index_t N, index_t KBatch)
     {
-        return dim3(TilePartitioner::GridSize(M, N), 1, KBatch);
+
+        auto grid = TilePartitioner::GridSize(M, N);
+        if constexpr(std::is_same_v<decltype(grid), dim3>)
+        {
+            // GridSize returns dim3: preserve x, y dimensions and add z for batch; used in cluster
+            // launch
+            return dim3(grid.x, grid.y, KBatch);
+        }
+        else
+        {
+            // GridSize returns index_t: use as 1D grid
+            return dim3(grid, 1, KBatch);
+        }
+    }
+
+    CK_TILE_HOST static constexpr auto ClusterSize()
+    {
+        return dim3(TilePartitioner::BlockGemmShape::kclusterM,
+                    TilePartitioner::BlockGemmShape::kclusterN,
+                    TilePartitioner::BlockGemmShape::kclusterK);
     }
 
     /**
@@ -405,7 +438,7 @@ struct UniversalGemmKernel
 
         const auto vectorSizeA = is_wave32() ? GemmPipeline::template GetVectorSizeA<true>()
                                              : GemmPipeline::template GetVectorSizeA<false>();
-        bool AsTesnorIsValid   = {true};
+        bool AsTensorIsValid   = {true};
         static_for<0, NumATensor, 1>{}([&](auto index) {
             using AiLayout = remove_cvref_t<std::tuple_element_t<index.value, AsLayout>>;
             if constexpr(std::is_same_v<AiLayout, tensor_layout::gemm::RowMajor>)
@@ -419,7 +452,7 @@ struct UniversalGemmKernel
                             "Can't support K that is not a multiple of k_batch * KPerBlock "
                             "without padding!");
                     }
-                    AsTesnorIsValid = false;
+                    AsTensorIsValid = false;
                 }
                 if(kargs.K % vectorSizeA != 0)
                 {
@@ -427,7 +460,7 @@ struct UniversalGemmKernel
                     {
                         CK_TILE_ERROR("K is not a multiple of vector load size for A tensor!");
                     }
-                    AsTesnorIsValid = false;
+                    AsTensorIsValid = false;
                 }
             }
             else
@@ -439,7 +472,7 @@ struct UniversalGemmKernel
                         CK_TILE_ERROR(
                             "Can't support M that is not a multiple of MPerBlock without padding!");
                     }
-                    AsTesnorIsValid = false;
+                    AsTensorIsValid = false;
                 }
                 if(kargs.M % vectorSizeA != 0)
                 {
@@ -447,12 +480,12 @@ struct UniversalGemmKernel
                     {
                         CK_TILE_ERROR("M is not a multiple of vector load size for A tensor!");
                     }
-                    AsTesnorIsValid = false;
+                    AsTensorIsValid = false;
                 }
             }
         });
 
-        bool BsTesnorIsValid   = {true};
+        bool BsTensorIsValid   = {true};
         const auto vectorSizeB = is_wave32() ? GemmPipeline::template GetVectorSizeB<true>()
                                              : GemmPipeline::template GetVectorSizeB<false>();
         static_for<0, NumBTensor, 1>{}([&](auto index) {
@@ -466,7 +499,7 @@ struct UniversalGemmKernel
                         CK_TILE_ERROR(
                             "Can't support N that is not a multiple of NPerBlock without padding!");
                     }
-                    BsTesnorIsValid = false;
+                    BsTensorIsValid = false;
                 }
                 if(kargs.N % vectorSizeB != 0)
                 {
@@ -474,7 +507,7 @@ struct UniversalGemmKernel
                     {
                         CK_TILE_ERROR("N is not a multiple of vector load size for B tensor!");
                     }
-                    BsTesnorIsValid = false;
+                    BsTensorIsValid = false;
                 }
             }
             else
@@ -488,7 +521,7 @@ struct UniversalGemmKernel
                             "Can't support K that is not a multiple of k_batch * KPerBlock "
                             "without padding!");
                     }
-                    BsTesnorIsValid = false;
+                    BsTensorIsValid = false;
                 }
                 if(kargs.K % vectorSizeB != 0)
                 {
@@ -496,17 +529,17 @@ struct UniversalGemmKernel
                     {
                         CK_TILE_ERROR("K is not a multiple of vector load size for B tensor!");
                     }
-                    BsTesnorIsValid = false;
+                    BsTensorIsValid = false;
                 }
             }
         });
 
-        bool DTesnorIsValid = {true};
+        bool DTensorIsValid = {true};
         static_for<0, NumDTensor, 1>{}([&](auto index) {
             using DiLayout = remove_cvref_t<std::tuple_element_t<index.value, DsLayout>>;
             if(std::is_same_v<DiLayout, CLayout> == false)
             {
-                DTesnorIsValid = false;
+                DTensorIsValid = false;
             }
             if constexpr(std::is_same_v<DiLayout, tensor_layout::gemm::RowMajor>)
             {
@@ -517,7 +550,7 @@ struct UniversalGemmKernel
                         CK_TILE_ERROR("Can't support N for tensor D that is not a multiple of "
                                       "NPerBlock without padding!");
                     }
-                    DTesnorIsValid = false;
+                    DTensorIsValid = false;
                 }
                 if(kargs.N % EpiloguePipeline::GetVectorSizeD(index) != 0)
                 {
@@ -525,7 +558,7 @@ struct UniversalGemmKernel
                     {
                         CK_TILE_ERROR("N is not a multiple of vector load size for D tensor!");
                     }
-                    DTesnorIsValid = false;
+                    DTensorIsValid = false;
                 }
             }
             else
@@ -537,7 +570,7 @@ struct UniversalGemmKernel
                         CK_TILE_ERROR("Can't support M for tensor D that is not a multiple of "
                                       "MPerBlock without padding!");
                     }
-                    DTesnorIsValid = false;
+                    DTensorIsValid = false;
                 }
                 if(kargs.M % EpiloguePipeline::GetVectorSizeD(index) != 0)
                 {
@@ -545,7 +578,7 @@ struct UniversalGemmKernel
                     {
                         CK_TILE_ERROR("M is not a multiple of vector load size for D tensor!");
                     }
-                    DTesnorIsValid = false;
+                    DTensorIsValid = false;
                 }
             }
         });
@@ -590,7 +623,7 @@ struct UniversalGemmKernel
                 return false;
             }
         }
-        return AsTesnorIsValid && BsTesnorIsValid && DTesnorIsValid;
+        return AsTensorIsValid && BsTensorIsValid && DTensorIsValid;
     }
 
     template <memory_operation_enum DstInMemOp = memory_operation_enum::set>
@@ -1066,14 +1099,94 @@ struct UniversalGemmKernel
         EpiloguePipeline{}(c_block_window, c_block_tile, ds_block_window, smem_ptr_0);
     }
 
+    CK_TILE_DEVICE static auto
+    GetTileCoordinates(const KernelArgs& kargs) -> tuple<index_t, index_t>
+    {
+        index_t iM, iN;
+
+        if constexpr(ClusterLaunch)
+        {
+            // Cluster launch: use 2D block indexing
+            const auto blockIdX = amd_wave_read_first_lane(blockIdx.x);
+            const auto blockIdY = amd_wave_read_first_lane(blockIdx.y);
+            const auto [tile_m, tile_n] =
+                TilePartitioner{kargs.M, kargs.N}.GetOutputTileIndex(blockIdX, blockIdY);
+            iM = tile_m;
+            iN = tile_n;
+        }
+        else
+        {
+            // Regular launch: use 1D block indexing
+            const auto blockId = amd_wave_read_first_lane(blockIdx.x);
+            const auto [tile_m, tile_n] =
+                TilePartitioner{kargs.M, kargs.N}.GetOutputTileIndex(blockId);
+            iM = tile_m;
+            iN = tile_n;
+        }
+
+        const index_t i_m = amd_wave_read_first_lane(iM * TilePartitioner::MPerBlock);
+        const index_t i_n = amd_wave_read_first_lane(iN * TilePartitioner::NPerBlock);
+
+        return make_tuple(i_m, i_n);
+    }
+
+    // Helper functions for persistent kernel with cluster support
+    CK_TILE_DEVICE static auto GetBlockId() -> index_t
+    {
+        if constexpr(ClusterLaunch)
+        {
+            // For 2D cluster launch: convert 2D block index to 1D
+            const auto blockIdX = amd_wave_read_first_lane(blockIdx.x);
+            const auto blockIdY = amd_wave_read_first_lane(blockIdx.y);
+            const auto gridDimX = amd_wave_read_first_lane(gridDim.x);
+            return blockIdY * gridDimX + blockIdX;
+        }
+        else
+        {
+            // For 1D regular launch
+            return amd_wave_read_first_lane(get_block_id());
+        }
+    }
+
+    CK_TILE_DEVICE static auto GetGridSize() -> index_t
+    {
+        if constexpr(ClusterLaunch)
+        {
+            // For 2D cluster launch: total blocks = gridDim.x * gridDim.y
+            return amd_wave_read_first_lane(gridDim.x * gridDim.y);
+        }
+        else
+        {
+            // For 1D regular launch
+            return amd_wave_read_first_lane(get_grid_size());
+        }
+    }
+
+    // Helper to get total number of tiles, handling both dim3 and index_t return types
+    template <typename... Args>
+    CK_TILE_HOST_DEVICE static auto GetNumTiles(Args&&... args) -> index_t
+    {
+        auto grid_size = TilePartitioner::GridSize(std::forward<Args>(args)...);
+
+        using GridSizeType = decltype(grid_size);
+
+        if constexpr(std::is_same_v<GridSizeType, dim3>)
+        {
+            // GridSize returns dim3: compute total tiles as x * y * z
+            return amd_wave_read_first_lane(grid_size.x * grid_size.y * grid_size.z);
+        }
+        else
+        {
+            // GridSize returns scalar (index_t): use directly
+            return amd_wave_read_first_lane(grid_size);
+        }
+    }
+
     // Non-persistent kernel entry point
     template <bool U = !PersistentKernel, typename = std::enable_if_t<U>>
     CK_TILE_DEVICE void operator()(KernelArgs kargs) const
     {
-        const auto blockId  = amd_wave_read_first_lane(blockIdx.x);
-        const auto [iM, iN] = TilePartitioner{kargs.M, kargs.N}.GetOutputTileIndex(blockId);
-        const index_t i_m   = amd_wave_read_first_lane(iM * TilePartitioner::MPerBlock);
-        const index_t i_n   = amd_wave_read_first_lane(iN * TilePartitioner::NPerBlock);
+        const auto [i_m, i_n] = GetTileCoordinates(kargs);
 
         const SplitKBatchOffset splitk_batch_offset(kargs);
 
@@ -1144,11 +1257,10 @@ struct UniversalGemmKernel
     template <bool U = PersistentKernel, typename = std::enable_if_t<U>, typename = void>
     CK_TILE_DEVICE void operator()(KernelArgs kargs) const
     {
-        const auto grid_size = amd_wave_read_first_lane(get_grid_size());
-        const auto num_tiles =
-            amd_wave_read_first_lane(TilePartitioner::GridSize(kargs.M, kargs.N));
-        const auto num_work = amd_wave_read_first_lane(num_tiles * kargs.k_batch);
-        auto block_id       = amd_wave_read_first_lane(get_block_id());
+        const auto grid_size = GetGridSize();
+        const auto num_tiles = GetNumTiles(kargs.M, kargs.N);
+        const auto num_work  = amd_wave_read_first_lane(num_tiles * kargs.k_batch);
+        auto block_id        = GetBlockId();
 
         while(block_id < num_work)
         {

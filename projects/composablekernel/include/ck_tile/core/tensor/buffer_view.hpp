@@ -431,6 +431,10 @@ struct buffer_view<address_space_enum::global,
                       "wrong! X should contain multiple T");
 
         constexpr index_t t_per_x = scalar_per_x_vector / scalar_per_t_vector;
+#if defined(__gfx125__) // for gfx125; there uses another instruction to do async load
+        amd_async_global_load_to_lds<remove_cvref_t<T>, t_per_x, Coherence>(
+            smem, p_data_ + i + linear_offset, is_valid_element);
+#else
         const int32x4_t src_wave_buffer_resource =
             make_wave_buffer_resource(p_data_, (buffer_size_) * sizeof(type));
 
@@ -441,6 +445,7 @@ struct buffer_view<address_space_enum::global,
             linear_offset,
             is_valid_element,
             bool_constant<oob_conditional_check>{});
+#endif
     }
 
     // i is offset of T, not X. i should be aligned to X

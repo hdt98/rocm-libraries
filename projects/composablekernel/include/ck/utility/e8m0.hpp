@@ -35,6 +35,10 @@ struct e8m0_bexp_t
     __host__ __device__ constexpr e8m0_bexp_t(int init) : data{static_cast<type>(init & nan_mask)}
     {
     }
+    __host__ __device__ constexpr e8m0_bexp_t(uint32_t init)
+        : data{static_cast<type>(init & nan_mask)}
+    {
+    }
     __host__ __device__ explicit constexpr e8m0_bexp_t(float scale)
         : data{static_cast<type>((bit_cast<uint32_t>(scale) & (nan_mask << 23)) >> 23)}
     {

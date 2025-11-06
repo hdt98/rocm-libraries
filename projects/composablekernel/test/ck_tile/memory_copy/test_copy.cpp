@@ -73,7 +73,8 @@ class TestCkTileMemoryCopy : public ::testing::TestWithParam<std::tuple<int, int
         using Problem = ck_tile::TileCopyProblem<XDataType, Shape, AsyncCopy>;
         using Kernel  = ck_tile::TileCopy<Problem>;
 
-        constexpr ck_tile::index_t kBlockSize  = 128;
+        ck_tile::index_t kBlockSize =
+            ck_tile::is_wave32() ? Shape::BlockSize / 2 : Shape::BlockSize;
         constexpr ck_tile::index_t kBlockPerCu = 1;
 
         auto ms = launch_kernel(

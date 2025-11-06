@@ -136,6 +136,61 @@ CK_TILE_DEVICE void block_sync_load_raw(index_t cnt = 0)
 #endif
 }
 
+// cluster related builtins
+CK_TILE_DEVICE auto get_cluster_id_x()
+{
+#if CK_TILE_ENABLE_CLUSTER_LAUNCH
+    return __builtin_amdgcn_cluster_id_x();
+#else
+    return 0;
+#endif
+}
+
+CK_TILE_DEVICE auto get_cluster_id_y()
+{
+#if CK_TILE_ENABLE_CLUSTER_LAUNCH
+    return __builtin_amdgcn_cluster_id_y();
+#else
+    return 0;
+#endif
+}
+
+CK_TILE_DEVICE auto get_cluster_id_z()
+{
+#if CK_TILE_ENABLE_CLUSTER_LAUNCH
+    return __builtin_amdgcn_cluster_id_z();
+#else
+    return 0;
+#endif
+}
+
+CK_TILE_DEVICE uint32_t get_cluster_workgroup_id_x()
+{
+#if CK_TILE_ENABLE_CLUSTER_LAUNCH
+    return static_cast<uint32_t>(__builtin_amdgcn_cluster_workgroup_id_x());
+#else
+    return 0;
+#endif
+}
+
+CK_TILE_DEVICE uint32_t get_cluster_workgroup_id_y()
+{
+#if CK_TILE_ENABLE_CLUSTER_LAUNCH
+    return static_cast<uint32_t>(__builtin_amdgcn_cluster_workgroup_id_y());
+#else
+    return 0;
+#endif
+}
+
+CK_TILE_DEVICE uint32_t get_cluster_workgroup_id_z()
+{
+#if CK_TILE_ENABLE_CLUSTER_LAUNCH
+    return static_cast<uint32_t>(__builtin_amdgcn_cluster_workgroup_id_z());
+#else
+    return 0;
+#endif
+}
+
 // https://llvm.org/docs/AMDGPU/gfx9_waitcnt.html
 struct waitcnt_arg
 {
@@ -258,7 +313,16 @@ CK_TILE_DEVICE void s_wait_tensorcnt()
 template <index_t vmcnt = 0>
 CK_TILE_DEVICE void block_sync_lds_direct_load()
 {
+#if defined(__gfx125__)
+    asm volatile("s_wait_asynccnt %0 \n"
+                 "s_barrier_signal -1 \n"
+                 "s_barrier_wait - 1"
+                 :
+                 : "n"(vmcnt)
+                 : "memory");
+#else
     s_waitcnt_barrier<vmcnt, waitcnt_arg::kMaxExpCnt, waitcnt_arg::kMaxLgkmCnt>();
+#endif
 }
 
 CK_TILE_DEVICE void s_nop(index_t cnt = 0)

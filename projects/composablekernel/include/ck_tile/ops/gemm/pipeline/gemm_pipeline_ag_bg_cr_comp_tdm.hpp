@@ -124,6 +124,8 @@ struct GemmPipelineAgBgCrCompTDM : public BaseGemmPipelineAgBgCrCompTDM<Problem>
     static constexpr index_t NPerBlock = BlockGemmShape::kN;
     static constexpr index_t KPerBlock = BlockGemmShape::kK;
 
+    static constexpr bool UseClusterLaunch = Policy::template isClusterLaunch<Problem>();
+
     // for these three functions, we always return 1 since TDM handles vectorization internally
     template <bool IsWave32Host = false>
     static constexpr index_t GetVectorSizeA()
@@ -230,7 +232,21 @@ struct GemmPipelineAgBgCrCompTDM : public BaseGemmPipelineAgBgCrCompTDM<Problem>
                                        void* __restrict__ p_smem_1) const
         {
             // TODO: tdm config will update with problem and policy; currently use default value
-            TDMConfig tdm_config;
+            TDMConfig tdm_config_a;
+            TDMConfig tdm_config_b;
+
+            if constexpr(UseClusterLaunch)
+            {
+                dim3 block_id_in_cluster{amd_wave_read_first_lane(get_cluster_workgroup_id_x()),
+                                         amd_wave_read_first_lane(get_cluster_workgroup_id_y()),
+                                         amd_wave_read_first_lane(get_cluster_workgroup_id_z())};
+                tdm_config_a.workgroup_mask =
+                    Policy::template GetTDMWorkgroupMask<MultiCastDirection::kM, Problem>(
+                        block_id_in_cluster);
+                tdm_config_b.workgroup_mask =
+                    Policy::template GetTDMWorkgroupMask<MultiCastDirection::kN, Problem>(
+                        block_id_in_cluster);
+            }
             // TODO support multi-ABD
             static_assert(1 == std::tuple_size_v<AsDramBlockWindowTmp>);
             static_assert(1 == std::tuple_size_v<BsDramBlockWindowTmp>);
@@ -321,11 +337,11 @@ struct GemmPipelineAgBgCrCompTDM : public BaseGemmPipelineAgBgCrCompTDM<Problem>
 
             // read A(0), B(0) from DRAM to LDS window(0)
             // and advance the DRAM windows
-            Base::GlobalPrefetchTDM(tdm_config,
+            Base::GlobalPrefetchTDM(tdm_config_a,
                                     a_copy_lds_window0,
                                     a_tile_windows[number<0>{}],
                                     a_dram_tile_window_step);
-            Base::GlobalPrefetchTDM(tdm_config,
+            Base::GlobalPrefetchTDM(tdm_config_b,
                                     b_copy_lds_window0,
                                     b_tile_windows[number<0>{}],
                                     b_dram_tile_window_step);
@@ -339,11 +355,11 @@ struct GemmPipelineAgBgCrCompTDM : public BaseGemmPipelineAgBgCrCompTDM<Problem>
 
             // read A(1), B(1) from DRAM to LDS window(1)
             // and advance the DRAM windows
-            Base::GlobalPrefetchTDM(tdm_config,
+            Base::GlobalPrefetchTDM(tdm_config_a,
                                     a_copy_lds_window1,
                                     a_tile_windows[number<0>{}],
                                     a_dram_tile_window_step);
-            Base::GlobalPrefetchTDM(tdm_config,
+            Base::GlobalPrefetchTDM(tdm_config_b,
                                     b_copy_lds_window1,
                                     b_tile_windows[number<0>{}],
                                     b_dram_tile_window_step);
@@ -402,11 +418,11 @@ struct GemmPipelineAgBgCrCompTDM : public BaseGemmPipelineAgBgCrCompTDM<Problem>
             block_sync_lds();
             // read A(2), B(2) from DRAM to LDS window(0)
             // and advance the DRAM windows
-            Base::GlobalPrefetchTDM(tdm_config,
+            Base::GlobalPrefetchTDM(tdm_config_a,
                                     a_copy_lds_window0,
                                     a_tile_windows[number<0>{}],
                                     a_dram_tile_window_step);
-            Base::GlobalPrefetchTDM(tdm_config,
+            Base::GlobalPrefetchTDM(tdm_config_b,
                                     b_copy_lds_window0,
                                     b_tile_windows[number<0>{}],
                                     b_dram_tile_window_step);
@@ -430,17 +446,16 @@ struct GemmPipelineAgBgCrCompTDM : public BaseGemmPipelineAgBgCrCompTDM<Problem>
                         block_sync_lds();
                         // read A(i), B(i) from DRAM to LDS window(1)
                         // and advance the DRAM windows
-                        Base::GlobalPrefetchTDM(tdm_config,
+                        Base::GlobalPrefetchTDM(tdm_config_a,
                                                 a_copy_lds_window1,
                                                 a_tile_windows[number<0>{}],
                                                 a_dram_tile_window_step);
-                        Base::GlobalPrefetchTDM(tdm_config,
+                        Base::GlobalPrefetchTDM(tdm_config_b,
                                                 b_copy_lds_window1,
                                                 b_tile_windows[number<0>{}],
                                                 b_dram_tile_window_step);
                         // C(i-3) = A(i-3) @ B(i-3)
                         block_gemm(c_block_tile, a_block_tile0, b_block_tile0);
-                        HotLoopScheduler();
                     }
                     // pong
                     {
@@ -454,17 +469,16 @@ struct GemmPipelineAgBgCrCompTDM : public BaseGemmPipelineAgBgCrCompTDM<Problem>
                         block_sync_lds();
                         // read A(i+1), B(i+1) from DRAM to LDS window(0)
                         // and advance the DRAM windows
-                        Base::GlobalPrefetchTDM(tdm_config,
+                        Base::GlobalPrefetchTDM(tdm_config_a,
                                                 a_copy_lds_window0,
                                                 a_tile_windows[number<0>{}],
                                                 a_dram_tile_window_step);
-                        Base::GlobalPrefetchTDM(tdm_config,
+                        Base::GlobalPrefetchTDM(tdm_config_b,
                                                 b_copy_lds_window0,
                                                 b_tile_windows[number<0>{}],
                                                 b_dram_tile_window_step);
                         // C(i-2) = A(i-2) @ B(i-2)
                         block_gemm(c_block_tile, a_block_tile1, b_block_tile1);
-                        HotLoopScheduler();
                     }
                     i_global_read += 2;
                 } while(i_global_read < num_loop);

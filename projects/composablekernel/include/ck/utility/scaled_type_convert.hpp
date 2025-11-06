@@ -788,4 +788,197 @@ inline __host__ __device__ bf6x32_t scaled_type_convert<bf6x32_t, float32_t>(e8m
 }
 #endif // #if CK_USE_NATIVE_MX_SUPPORT
 
+/**
+ * @brief Converts a vector of 8 float16 to a vector of 8 8-bit floating-point(fp8) values,
+ * applying the specified scale.
+ * *
+ * @param scale The exponent scale factor (e8m0_bexp_t ).
+ * @param x     The float16 vector to convert.
+ * @return      The converted 8-bit floating-point vector(fp8).
+ */
+template <>
+inline __host__ __device__ f8x8_ocp_t scaled_type_convert<f8x8_ocp_t, half8_t>(e8m0_bexp_t scale,
+                                                                               half8_t x)
+{
+#if CK_USE_SR_F8_CONVERSION
+    return mxf8_convert_sr<f8x8_ocp_t>(x, type_convert<float>(scale));
+#else
+    return mxf8_convert_rne<f8x8_ocp_t>(x, type_convert<float>(scale));
+#endif
+}
+
+/**
+ * @brief Converts a vector of 8 float16s to a vector of 8 8-bit floating-point values(bf8),
+ * applying the specified scale.
+ * *
+ * @param scale The exponent scale factor (e8m0_bexp_t ).
+ * @param x     The float16 vector to convert.
+ * @return      The converted 8-bit floating-point vector(bf8).
+ */
+template <>
+inline __host__ __device__ bf8x8_ocp_t scaled_type_convert<bf8x8_ocp_t, half8_t>(e8m0_bexp_t scale,
+                                                                                 half8_t x)
+{
+#if CK_USE_SR_F8_CONVERSION
+    return mxf8_convert_sr<bf8x8_ocp_t>(x, type_convert<float>(scale));
+#else
+    return mxf8_convert_rne<bf8x8_ocp_t>(x, type_convert<float>(scale));
+#endif
+}
+
+#if CK_MX_ARCH_1250
+// Declare a template function for wave-wise scaled conversion
+/* scale is packed 4 form
+ * Scale_sel: select different scale set and apply to the tensor[16x16] represented by a wave,
+ *            th[0-15]: 16x8 and th[16-31]: 16x8
+ *      Block 32 :
+ *      0: scale[7:0]  -th[0:15]
+ *      1: scale[7:0]  -th[16:31]
+ *      2: scale[23:16]-th[0:15]
+ *      3: scale[23:16]-th[16:31]
+ *      4: scale[15:8] -th[0:15]
+ *      5: scale[15:8] -th[16:31]
+ *      6: scale[31:24]-th[0:15]
+ *      7: scale[31:24]-th[16:31]
+ *      Block 16 : not ready */
+template <typename Y, typename X, int Scale_sel>
+struct pk4scaled_type_convert_impl
+{
+    __device__ static constexpr Y run(uint32_t scale, X x);
+};
+
+template <typename Y, typename X, int Scale_sel = 0>
+__device__ constexpr Y pk4scaled_type_convert(uint32_t scale, X x)
+{
+    return pk4scaled_type_convert_impl<Y, X, Scale_sel>::run(scale, x);
+}
+
+// float16
+template <int Scale_sel>
+struct pk4scaled_type_convert_impl<half8_t, f8x8_ocp_t, Scale_sel>
+{
+    /**
+     * @brief Converts a vector of 8 8-bit floating-point(fp8) values to a vector of 8 float16,
+     * applying a packed-4 scale.
+     * *
+     * @param scale The packed-4 exponent scale factor (uint32_t).
+     * @param x     The floating-point vector(fp8) to convert.
+     * @return      The converted float16 vector.
+     */
+    __device__ static half8_t run(uint32_t scale, f8x8_ocp_t x)
+    {
+        return fp8_impl::cast_to_f16_from_f8_scaled<f8_ocp_t::default_interpret, Scale_sel>(
+            scale, x.AsType<fp8_impl::fp8x8_storage_t>()[Number<0>{}]);
+    }
+};
+
+template <int Scale_sel>
+struct pk4scaled_type_convert_impl<half8_t, bf8x8_ocp_t, Scale_sel>
+{
+    /**
+     * @brief Converts a vector of 8 8-bit floating-point(bf8) values to a vector of 8 float16,
+     * applying a packed-4 scale.
+     * *
+     * @param scale The packed-4 exponent scale factor (uint32_t).
+     * @param x     The floating-point vector(bf8) to convert.
+     * @return      The converted float16 vector.
+     */
+    __device__ static half8_t run(uint32_t scale, bf8x8_ocp_t x)
+    {
+        return fp8_impl::cast_to_f16_from_f8_scaled<bf8_ocp_t::default_interpret, Scale_sel>(
+            scale, x.AsType<fp8_impl::fp8x8_storage_t>()[Number<0>{}]);
+    }
+};
+
+// float32
+template <int Scale_sel>
+struct pk4scaled_type_convert_impl<float8_t, f8x8_ocp_t, Scale_sel>
+{
+    /**
+     * @brief Converts a vector of 8 8-bit floating-point(fp8) values to a vector of 8 float32,
+     * applying a packed-4 scale.
+     * *
+     * @param scale The packed-4 exponent scale factor (uint32_t).
+     * @param x     The floating-point vector(fp8) to convert.
+     * @return      The converted float32 vector.
+     */
+    __device__ static float8_t run(uint32_t scale, f8x8_ocp_t x)
+    {
+        return fp8_impl::
+            cast_to_f32_from_f8_scaled<f8_ocp_t::default_interpret, uint32_t, Scale_sel>(
+                scale, x.AsType<fp8_impl::fp8x8_storage_t>()[Number<0>{}]);
+    }
+};
+
+template <int Scale_sel>
+struct pk4scaled_type_convert_impl<float8_t, bf8x8_ocp_t, Scale_sel>
+{
+    /**
+     * @brief Converts a vector of 8 8-bit floating-point(bfp8) values to a vector of 8 float32,
+     * applying a packed-4 scale.
+     * *
+     * @param scale The packed-4 exponent scale factor (uint32_t).
+     * @param x     The floating-point vector(bfp8) to convert.
+     * @return      The converted float32 vector.
+     */
+    __device__ static float8_t run(uint32_t scale, bf8x8_ocp_t x)
+    {
+        return fp8_impl::
+            cast_to_f32_from_f8_scaled<bf8_ocp_t::default_interpret, uint32_t, Scale_sel>(
+                scale, x.AsType<fp8_impl::fp8x8_storage_t>()[Number<0>{}]);
+    }
+};
+#endif // #if CK_MX_ARCH_1250
+
+// convert 8 x f8_ocp_t to 8 x fp16
+template <>
+#if CK_USE_OCP_FP8
+inline __host__ __device__ half8_t scaled_type_convert<half8_t, f8x8_ocp_t>(e8m0_bexp_t scale,
+                                                                            f8x8_ocp_t x)
+#else
+inline __host__ half8_t scaled_type_convert<half8_t, f8x8_ocp_t>(e8m0_bexp_t scale, f8x8_ocp_t x)
+#endif
+{
+#if CK_MX_ARCH_1250
+    return pk4scaled_type_convert<half8_t>(bit_cast<uint32_t>(utils::get_exponent_value(scale)), x);
+#else
+    union
+    {
+        half8_t vf16_8x1;
+        half_t vf16_1x8[8];
+    } out;
+
+    ck::static_for<0, 8, 1>{}([&](auto i) {
+        out.vf16_1x8[i] =
+            type_convert<half_t>(x.AsType<f8_ocp_t>()[Number<i>{}]) * type_convert<float>(scale);
+    });
+    return out.vf16_8x1;
+#endif
+}
+
+// convert 8 x bf8_ocp_t to 8 x fp16
+template <>
+#if CK_USE_OCP_FP8
+inline __host__ __device__ half8_t scaled_type_convert<half8_t, bf8x8_ocp_t>(e8m0_bexp_t scale,
+                                                                             bf8x8_ocp_t x)
+#else
+inline __host__ half8_t scaled_type_convert<half8_t, bf8x8_ocp_t>(e8m0_bexp_t scale, bf8x8_ocp_t x)
+#endif
+{
+#if CK_MX_ARCH_1250
+    return pk4scaled_type_convert<half8_t>(bit_cast<uint32_t>(utils::get_exponent_value(scale)), x);
+#else
+    union
+    {
+        half8_t vf16_8x1;
+        half_t vf16_1x8[8];
+    } out;
+
+    ck::static_for<0, 8, 1>{}([&](auto i) {
+        out.vf16_1x8[i] =
+            type_convert<half_t>(x.AsType<bf8_ocp_t>()[Number<i>{}]) * type_convert<float>(scale);
+    });
+    return out.vf16_8x1;
+#endif
+}
 } // namespace ck

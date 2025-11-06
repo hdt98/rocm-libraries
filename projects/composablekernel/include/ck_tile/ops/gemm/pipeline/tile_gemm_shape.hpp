@@ -25,6 +25,11 @@ struct TileGemmShape
     static constexpr index_t kN = BlockTile::at(number<1>{});
     static constexpr index_t kK = BlockTile::at(number<2>{});
 
+    // default set cluster size = 1x1x1
+    static constexpr index_t kclusterM = 1;
+    static constexpr index_t kclusterN = 1;
+    static constexpr index_t kclusterK = 1;
+
     static constexpr bool PermuteA = PermuteA_;
     static constexpr bool PermuteB = PermuteB_;
 
@@ -41,6 +46,51 @@ struct TileGemmShape
                       concat('x', (WarpTile::at(number<0>{})), WarpTile::at(number<1>{}), WarpTile::at(number<2>{})));
         // clang-format on
     }
+};
+
+template <typename ClusterTile_,
+          typename BlockTile_,
+          typename BlockWarps_,
+          typename WarpTile_,
+          bool PermuteA_ = false,
+          bool PermuteB_ = false>
+struct ClusterTileGemmShape
+    : public TileGemmShape<BlockTile_, BlockWarps_, WarpTile_, PermuteA_, PermuteB_>
+{
+    using Base        = TileGemmShape<BlockTile_, BlockWarps_, WarpTile_, PermuteA_, PermuteB_>;
+    using ClusterTile = remove_cvref_t<ClusterTile_>;
+
+    static constexpr index_t kclusterM = ClusterTile::at(number<0>{});
+    static constexpr index_t kclusterN = ClusterTile::at(number<1>{});
+    static constexpr index_t kclusterK = ClusterTile::at(number<2>{});
+
+    CK_TILE_HOST static std::string GetName()
+    {
+        // clang-format off
+        return concat('_', "cluster_tile_gemm_shape", 
+                      concat('x', kclusterM, 'x', kclusterN, 'x', kclusterK),
+                      concat('x', Base::kM, Base::kN, Base::kK, Base::NumWarps),
+                      concat('x', Base::BlockWarps::at(number<0>{}), Base::BlockWarps::at(number<1>{}), Base::BlockWarps::at(number<2>{})),
+                      concat('x', (Base::WarpTile::at(number<0>{})), Base::WarpTile::at(number<1>{}), Base::WarpTile::at(number<2>{})));
+        // clang-format on
+    }
+};
+
+template <typename T>
+struct is_cluster_tile_gemm_shape : std::false_type
+{
+};
+
+template <typename ClusterTile_,
+          typename BlockTile_,
+          typename BlockWarps_,
+          typename WarpTile_,
+          bool PermuteA_,
+          bool PermuteB_>
+struct is_cluster_tile_gemm_shape<
+    ClusterTileGemmShape<ClusterTile_, BlockTile_, BlockWarps_, WarpTile_, PermuteA_, PermuteB_>>
+    : std::true_type
+{
 };
 
 } // namespace ck_tile

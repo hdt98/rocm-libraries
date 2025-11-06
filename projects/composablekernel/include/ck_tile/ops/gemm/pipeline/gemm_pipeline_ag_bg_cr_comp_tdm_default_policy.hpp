@@ -4,15 +4,25 @@
 #pragma once
 
 #include "ck_tile/core.hpp"
+#include "ck_tile/ops/gemm/pipeline/tile_gemm_shape.hpp"
 #include "ck_tile/ops/gemm/warp/warp_gemm_dispatcher.hpp"
 #include "ck_tile/ops/common/tensor_layout.hpp"
 #include "ck_tile/ops/gemm/pipeline/gemm_universal_pipeline_ag_bg_cr_policy.hpp"
 
 namespace ck_tile {
+
+enum class MultiCastDirection
+{
+    kM,
+    kN,
+    kMN
+};
+
 // Default policy for GemmPipelineAgBgCrCompTDM
 struct GemmPipelineAgBgCrCompTDMDefaultPolicy
     : public UniversalGemmBasePolicy<GemmPipelineAgBgCrCompTDMDefaultPolicy>
 {
+    static constexpr index_t VecByteSize = 16;
     // currently implement basic situation: the tile is divided into same parts
     template <typename Problem>
     CK_TILE_HOST_DEVICE static constexpr auto MakeADramTileDistribution()
@@ -101,21 +111,74 @@ struct GemmPipelineAgBgCrCompTDMDefaultPolicy
     template <typename Problem>
     CK_TILE_HOST_DEVICE static constexpr auto MakeALdsBlockDescriptor()
     {
-        constexpr index_t MPerBlock = Problem::BlockGemmShape::kM;
-        constexpr index_t KPerBlock = Problem::BlockGemmShape::kK;
-
+        constexpr index_t MPerBlock  = Problem::BlockGemmShape::kM;
+        constexpr index_t KPerBlock  = Problem::BlockGemmShape::kK;
+        constexpr index_t AVectorLen = VecByteSize / sizeof(typename Problem::ADataType);
         return make_naive_tensor_descriptor(make_tuple(number<MPerBlock>{}, number<KPerBlock>{}),
-                                            make_tuple(number<KPerBlock>{}, number<1>{}));
+                                            make_tuple(number<KPerBlock>{}, number<1>{}),
+                                            number<AVectorLen>{},
+                                            number<1>{});
     }
 
     template <typename Problem>
     CK_TILE_HOST_DEVICE static constexpr auto MakeBLdsBlockDescriptor()
     {
-        constexpr index_t NPerBlock = Problem::BlockGemmShape::kN;
-        constexpr index_t KPerBlock = Problem::BlockGemmShape::kK;
-
+        constexpr index_t NPerBlock  = Problem::BlockGemmShape::kN;
+        constexpr index_t KPerBlock  = Problem::BlockGemmShape::kK;
+        constexpr index_t BVectorLen = VecByteSize / sizeof(typename Problem::BDataType);
         return make_naive_tensor_descriptor(make_tuple(number<NPerBlock>{}, number<KPerBlock>{}),
-                                            make_tuple(number<KPerBlock>{}, number<1>{}));
+                                            make_tuple(number<KPerBlock>{}, number<1>{}),
+                                            number<BVectorLen>{},
+                                            number<1>{});
+    }
+
+    template <typename Problem>
+    CK_TILE_HOST_DEVICE static constexpr bool isClusterLaunch()
+    {
+        constexpr index_t clusterM = Problem::BlockGemmShape::kclusterM;
+        constexpr index_t clusterN = Problem::BlockGemmShape::kclusterN;
+        constexpr index_t clusterK = Problem::BlockGemmShape::kclusterK;
+        // cluster launch is enabled only when TilePartitioner uses cluster tile gemm shape and
+        // cluster size > 1
+        return is_cluster_tile_gemm_shape<typename Problem::BlockGemmShape>::value &&
+               (clusterM * clusterN * clusterK > 1);
+    }
+
+    template <MultiCastDirection Direction, typename Problem>
+    CK_TILE_DEVICE static uint16_t GetTDMWorkgroupMask(dim3 block_id_in_cluster)
+    {
+        constexpr index_t MCluster = Problem::BlockGemmShape::kclusterM;
+        constexpr index_t NCluster = Problem::BlockGemmShape::kclusterN;
+
+        auto is_participant = [&](auto i_m, auto i_n) {
+            if constexpr(Direction == MultiCastDirection::kM)
+            {
+                return i_m == block_id_in_cluster.x;
+            }
+            else if constexpr(Direction == MultiCastDirection::kN)
+            {
+                return (i_n == block_id_in_cluster.y);
+            }
+            else // Direction == MultiCastDirection::kMN
+            {
+                return (i_m == block_id_in_cluster.x) || (i_n == block_id_in_cluster.y);
+            }
+        };
+
+        // Iterate over all possible (m, n) block coordinates in the cluster. If the current (m,
+        // n) block is a participant according to the multicast direction, set the corresponding bit
+        // in the mask. for matmul AxB, A broadcasts from M direction, B broadcasts from N
+        // direction.
+        uint16_t block_id_mask = 0;
+        static_for<0, NCluster, 1>{}([&](auto n) {
+            static_for<0, MCluster, 1>{}([&](auto m) {
+                if(is_participant(m, n))
+                {
+                    block_id_mask |= (1 << (n * MCluster + m));
+                }
+            });
+        });
+        return block_id_mask;
     }
 
     template <typename Problem>

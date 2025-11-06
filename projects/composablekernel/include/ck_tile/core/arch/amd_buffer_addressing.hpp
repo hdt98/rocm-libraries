@@ -8,6 +8,7 @@
 #if !CK_TILE_USE_BUFFER_ADDRESSING_BUILTIN
 
 #include "ck_tile/core/arch/amd_tdm_descriptor.hpp"
+#include "ck_tile/core/arch/amd_wave_read_first_lane.hpp"
 #include "ck_tile/core/numeric/integer.hpp"
 #include "ck_tile/core/numeric/integral_constant.hpp"
 #include "ck_tile/core/numeric/vector_type.hpp"
