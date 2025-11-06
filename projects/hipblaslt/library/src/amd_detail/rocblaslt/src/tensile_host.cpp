@@ -908,9 +908,139 @@ namespace
                                               const int32_t&     rotatingBufferSize,
                                               const int32_t&     coldIterations,
                                               const int32_t&     hotIterations,
-                                              bool               isCpp)
+                                              bool               isCpp,
+                                              float              elapsed_ms = -1.0f)
     {
-        log_profile("matmul",
+        // Calculate performance metrics if timing is available
+        double gflops = -1.0;
+        double bandwidth_gbs = -1.0;
+        double elapsed_us = -1.0;
+
+        //std::cout << "Elapsed time (ms): " << elapsed_ms << std::endl;
+        
+        if(elapsed_ms > 0.0f)
+        {
+            size_t m = problem.c().sizes()[0];
+            size_t n = problem.c().sizes()[1];
+            size_t k = problem.a().sizes()[problem.boundIndices()[0].a];
+            size_t batch = problem.batchSize(0);
+            
+            double flops = 2.0 * m * n * k * batch;
+            gflops = flops / (elapsed_ms * 1e6);
+            
+            size_t a_elem_size = TensileLite::DataTypeInfo::Get(problem.a().dataType()).elementSize;
+            size_t b_elem_size = TensileLite::DataTypeInfo::Get(problem.b().dataType()).elementSize;
+            size_t c_elem_size = TensileLite::DataTypeInfo::Get(problem.c().dataType()).elementSize;
+            size_t d_elem_size = TensileLite::DataTypeInfo::Get(problem.d().dataType()).elementSize;
+            
+            size_t total_bytes = (m * k * batch * a_elem_size) + (k * n * batch * b_elem_size) +
+                                (m * n * batch * c_elem_size) + (m * n * batch * d_elem_size);
+            bandwidth_gbs = (total_bytes / (elapsed_ms * 1e6));
+            elapsed_us = elapsed_ms * 1000.0;
+
+            log_profile("matmul",
+                    "M",
+                    problem.c().sizes()[0],
+                    "N",
+                    problem.c().sizes()[1],
+                    "K",
+                    problem.a().sizes()[problem.boundIndices()[0].a],
+                    "lda",
+                    problem.a().strides()[1],
+                    "ldb",
+                    problem.b().strides()[1],
+                    "ldc",
+                    problem.c().strides()[1],
+                    "ldd",
+                    problem.d().strides()[1],
+                    "stride_a",
+                    problem.a().strides()[2],
+                    "stride_b",
+                    problem.b().strides()[2],
+                    "stride_c",
+                    problem.c().strides()[2],
+                    "stride_d",
+                    problem.d().strides()[2],
+                    "alpha",
+                    ToString(inputs.alpha),
+                    "beta",
+                    ToString(inputs.beta),
+                    "transA",
+                    problem.transA() ? "T" : "N",
+                    "transB",
+                    problem.transB() ? "T" : "N",
+                    "batch_count",
+                    problem.batchSize(0),
+                    "scaleA",
+                    problem.useScaleAB().empty() ? 0 : (problem.useScaleAB() == "Vector" ? 2 : 1),
+                    "scaleB",
+                    problem.useScaleAB().empty() ? 0 : (problem.useScaleAB() == "Vector" ? 2 : 1),
+                    "scaleC",
+                    problem.useScaleCD() ? 1 : 0,
+                    "scaleD",
+                    problem.useScaleCD() ? 1 : 0,
+                    "swizzleA",
+                    problem.swizzleTensorA() ? "true" : "false",
+                    "swizzleB",
+                    problem.swizzleTensorB() ? "true" : "false",
+                    "scaleAlpha_vector",
+                    problem.useScaleAlphaVec() ? "true" : "false",
+                    "gradient",
+                    problem.useGradient() ? "true" : "false",
+                    "use_e",
+                    problem.useE() ? "true" : "false",
+                    "bias_vector",
+                    problem.useBias() ? "true" : "false",
+                    "bias_source",
+                    problem.useBias() ? problem.tensor(problem.biasSrc()).getName() : "d",
+                    "a_type",
+                    hipDataType_to_bench_string(tensile2HipType(problem.a().dataType())),
+                    "b_type",
+                    hipDataType_to_bench_string(tensile2HipType(problem.b().dataType())),
+                    "c_type",
+                    hipDataType_to_bench_string(tensile2HipType(problem.c().dataType())),
+                    "d_type",
+                    hipDataType_to_bench_string(tensile2HipType(problem.d().dataType())),
+                    "scale_type",
+                    hipDataType_to_bench_string(tensile2HipType(problem.alphaType())),
+                    "bias_type",
+                    hipDataType_to_bench_string(tensile2HipType(problem.bias().dataType())),
+                    "aux_type",
+                    hipDataType_to_bench_string(tensile2HipType(problem.e().dataType())),
+                    "compute_type",
+                    tensileComputeInputType_to_profile_string(problem.computeType(),
+                                                              problem.f32XdlMathOp(),
+                                                              problem.computeInputType(),
+                                                              problem.a().dataType(),
+                                                              problem.b().dataType()),
+                    "activation_type",
+                    tensileActivationtType_to_bench_string(problem.getParams().activationEnum()),
+                    "flush",
+                    flush ? "true" : "false",
+                    "any_stride",
+                    "true",
+                    "rotating",
+                    rotatingBufferSize,
+                    "cold_iters",
+                    coldIterations,
+                    "iters",
+                    hotIterations,
+                    "solution_index",
+                    solutionIndex,
+                    "solution_Name",
+                    solutionName,
+                    "kernel_name",
+                    kernelName,
+                    "hipblaslt-Gflops",     // Add performance metrics
+                    gflops,
+                    "hipblaslt-GB/s",
+                    bandwidth_gbs,
+                    "hipblaslt-us",
+                    elapsed_us);
+        }
+        else{
+            std::cout << "Elapsed time not available, skipping performance metrics logging." << std::endl;
+            log_profile("matmul",
                     "M",
                     problem.c().sizes()[0],
                     "N",
@@ -1003,6 +1133,8 @@ namespace
                     solutionName,
                     "kernel_name",
                     kernelName);
+
+        }
     }
 
     inline void
@@ -1437,6 +1569,48 @@ namespace
             kernelName);
     }
 #undef GEN_BENCH_ARG
+
+// Add this helper structure at the top of the file
+struct TimingCallbackData {
+    hipEvent_t start_event;
+    hipEvent_t stop_event;
+    TensileLite::ContractionProblemGemm problem;
+    TensileLite::ContractionInputs inputs;
+    int algoIndex;
+    std::string kernelName;
+    std::string solutionName;
+    bool flush;
+    int32_t rotatingBufferSize;
+    int32_t coldIterations;
+    int32_t hotIterations;
+};
+
+// Add callback function
+static void timingCallback(hipStream_t stream, hipError_t status, void* userData) {
+    TimingCallbackData* data = reinterpret_cast<TimingCallbackData*>(userData);
+    
+    float elapsed_ms = 0;
+    if(status == hipSuccess) {
+        hipEventElapsedTime(&elapsed_ms, data->start_event, data->stop_event);
+        
+        logExtendedProfileFromTensileDataGemm(data->problem,
+                                              data->inputs,
+                                              data->algoIndex,
+                                              data->kernelName,
+                                              data->solutionName,
+                                              data->flush,
+                                              data->rotatingBufferSize,
+                                              data->coldIterations,
+                                              data->hotIterations,
+                                              false,
+                                              elapsed_ms);
+    }
+    
+    hipEventDestroy(data->start_event);
+    hipEventDestroy(data->stop_event);
+    delete data;
+}
+
 
     /****************************************************************
  * Construct a Tensile Problem from a RocblasltContractionProblem *
@@ -2096,6 +2270,7 @@ namespace
             bool enableYaml = false;
             bool staticLib  = false;
             bool lazyLoad   = ROCBLASLT_TENSILE_LAZY_LOAD;
+            //std::cout << "In " << __func__ << std::endl;
 #ifdef TENSILE_YAML
             enableYaml = true;
 #endif
@@ -2521,6 +2696,7 @@ rocblaslt_status runContractionProblem(rocblaslt_handle                   handle
                                        const RocblasltContractionProblem& prob,
                                        std::shared_ptr<void>              gemmData)
 {
+    std::cout << "In " << __func__ << std::endl;
     rocblaslt_status status = rocblaslt_status_internal_error;
     try
     {
@@ -2593,6 +2769,7 @@ rocblaslt_status runContractionProblem(rocblaslt_handle                   handle
 
         if(get_logger_layer_mode() & rocblaslt_layer_mode_log_extended_profile)
         {
+            std::cout << "Logging extended profile info..." << std::endl;
             std::string kernel_name   = getKernelNameFromAlgoIndex(handle, *algo);
             std::string Solution_name = getSolutionNameFromAlgoIndex(handle, *algo);
 
@@ -2605,7 +2782,7 @@ rocblaslt_status runContractionProblem(rocblaslt_handle                   handle
                                                   rotatingBufferSize,
                                                   coldIterations,
                                                   hotIterations,
-                                                  false);
+                                                  false,-1.0f);
         }
 
         auto solution = library->getSolutionByIndex(data->problem, *hardware, *solutionIndex);
@@ -2685,6 +2862,18 @@ rocblaslt_status runContractionProblem(rocblaslt_handle                   handle
             data->problem.setParams().setWGMXCC((isCUFallback ? 1 : 0));
 
             auto kernels = solution->solve(data->problem, GetTensileInputs(prob), *hardware);
+
+            // Create HIP events for timing if extended profile logging is enabled
+            hipEvent_t start_event = nullptr, stop_event = nullptr;
+            bool measure_perf = (get_logger_layer_mode() & rocblaslt_layer_mode_log_extended_profile);
+            
+            if(measure_perf)
+            {
+                HIP_CHECK_EXC(hipEventCreate(&start_event));
+                HIP_CHECK_EXC(hipEventCreate(&stop_event));
+                HIP_CHECK_EXC(hipEventRecord(start_event, prob.stream));
+            }
+
             // Remove this after supports getting comgr buffers from hip.
             bool isPreloaded = false;
             if(rocblaslt::Debug::Instance().preload())
@@ -2718,6 +2907,35 @@ rocblaslt_status runContractionProblem(rocblaslt_handle                   handle
             }
             status = hip2RocStatus(
                 adapter->launchKernels(kernels, prob.stream, nullptr, nullptr, isPreloaded));
+            
+            // Log performance metrics if timing was enabled and kernel launched successfully
+            if(measure_perf && status == rocblaslt_status_success)
+            {
+                HIP_CHECK_EXC(hipEventRecord(stop_event, prob.stream));
+                HIP_CHECK_EXC(hipEventSynchronize(stop_event));
+                
+                float elapsed_ms = 0;
+                HIP_CHECK_EXC(hipEventElapsedTime(&elapsed_ms, start_event, stop_event));
+                
+                // Log with timing information
+                std::string kernel_name   = getKernelNameFromAlgoIndex(handle, *algo);
+                std::string Solution_name = getSolutionNameFromAlgoIndex(handle, *algo);
+                
+                logExtendedProfileFromTensileDataGemm(data->problem,
+                                                      data->inputs,
+                                                      data->algoIndex,
+                                                      kernel_name,
+                                                      Solution_name,
+                                                      flush,
+                                                      rotatingBufferSize,
+                                                      coldIterations,
+                                                      hotIterations,
+                                                      false,
+                                                      elapsed_ms);
+                
+                HIP_CHECK_EXC(hipEventDestroy(start_event));
+                HIP_CHECK_EXC(hipEventDestroy(stop_event));
+            }
         }
     }
     catch(const std::exception& e)
@@ -3099,6 +3317,7 @@ rocblaslt_status runKernelFromInvocation(rocblaslt_handle       handle,
                                          hipEvent_t             start,
                                          hipEvent_t             stop)
 {
+    //std::cout << "In " << __func__ << std::endl;
     rocblaslt_status status = rocblaslt_status_internal_error;
     try
     {
@@ -3123,6 +3342,7 @@ rocblaslt_status runKernelFromInvocation(rocblaslt_handle       handle,
 
         if(gemmType == rocblaslt::RocGemmType::ROCBLASLT_GEMM)
         {
+            //std::cout << "Running ROCBLASLT_GEMM kernel..." << std::endl;
             std::shared_ptr<TensileDataGemm> data
                 = std::static_pointer_cast<TensileDataGemm>(gemmData);
             if((get_logger_layer_mode() & rocblaslt_layer_mode_log_bench)
@@ -3148,10 +3368,61 @@ rocblaslt_status runKernelFromInvocation(rocblaslt_handle       handle,
                                               hotIterations,
                                               true);
             }
-            status = hip2RocStatus(adapter->launchKernels(data->kernels, stream, start, stop));
+            // Create HIP events for timing if extended profile logging is enabled
+            hipEvent_t start_event = nullptr, stop_event = nullptr;
+            bool measure_perf = (get_logger_layer_mode() & rocblaslt_layer_mode_log_extended_profile);
+            
+            if(measure_perf)
+            {
+                auto* callbackData = new TimingCallbackData();
+                auto solution = library->getSolutionByIndex(*hardware, data->algoIndex);
+                HIP_CHECK_EXC(hipEventCreate(&callbackData->start_event));
+                HIP_CHECK_EXC(hipEventCreate(&callbackData->stop_event));
+                HIP_CHECK_EXC(hipEventRecord(callbackData->start_event, stream));
+                
+                // Copy data for callback
+                callbackData->problem = data->problem;
+                callbackData->inputs = data->inputs;
+                callbackData->algoIndex = data->algoIndex;
+                callbackData->kernelName = solution->kernelName;
+                callbackData->solutionName = solution->solutionName;
+                callbackData->flush = flush;
+                callbackData->rotatingBufferSize = rotatingBufferSize;
+                callbackData->coldIterations = coldIterations;
+                callbackData->hotIterations = hotIterations;
+                
+                status = hip2RocStatus(adapter->launchKernels(data->kernels, stream, start, stop));
+                
+                if(status == rocblaslt_status_success)
+                {
+                    HIP_CHECK_EXC(hipEventRecord(callbackData->stop_event, stream));
+                    hipError_t callbackStatus = hipStreamAddCallback(stream, timingCallback, callbackData, 0);
+                    
+                    if(callbackStatus != hipSuccess)
+                    {
+                        // Callback registration failed - clean up manually
+                        hipEventDestroy(callbackData->start_event);
+                        hipEventDestroy(callbackData->stop_event);
+                        delete callbackData;
+                    }
+                    // Otherwise callback will delete it
+                }
+                else
+                {
+                    // Kernel launch failed - clean up manually
+                    hipEventDestroy(callbackData->start_event);
+                    hipEventDestroy(callbackData->stop_event);
+                    delete callbackData;
+                }
+            }
+            else
+            {
+                status = hip2RocStatus(adapter->launchKernels(data->kernels, stream, start, stop));
+            }
         }
         else if(gemmType == rocblaslt::RocGemmType::ROCBLASLT_GROUPED_GEMM)
         {
+            std::cout << "Running ROCBLASLT_GROUPED_GEMM kernel..." << std::endl;
             std::shared_ptr<TensileDataGroupedGemm> data
                 = std::static_pointer_cast<TensileDataGroupedGemm>(gemmData);
             if(data->useUserArgs)
@@ -3176,6 +3447,7 @@ rocblaslt_status runKernelFromInvocation(rocblaslt_handle       handle,
             }
             if((get_logger_layer_mode() & rocblaslt_layer_mode_log_profile))
             {
+                std::cout << "Logging profile info for grouped gemm..." << std::endl;
                 logProfileFromTensileDataGemm(data->problem,
                                               data->inputs,
                                               flush,
@@ -3187,6 +3459,7 @@ rocblaslt_status runKernelFromInvocation(rocblaslt_handle       handle,
             auto solution = library->getSolutionByIndex(*hardware, data->algoIndex);
             if(get_logger_layer_mode() & rocblaslt_layer_mode_log_extended_profile)
             {
+                std::cout << "Logging extended profile info for grouped gemm..." << std::endl;
                 logExtendedProfileFromTensileDataGemm(data->problem,
                                                       data->inputs,
                                                       data->algoIndex,
@@ -3231,6 +3504,7 @@ rocblaslt_status getDeviceUserArgumentsValuesFromContractionProblem(rocblaslt_ha
                                                                     std::shared_ptr<void>  gemmData,
                                                                     void* hostDeviceUserArgs)
 {
+    std::cout << "In " << __func__ << std::endl;
     rocblaslt_status status = rocblaslt_status_internal_error;
     try
     {
@@ -3295,6 +3569,7 @@ rocblaslt_status runKernelFromNewDeviceUserArguments(rocblaslt_handle       hand
                                                      void*                  deviceUserArgs,
                                                      hipStream_t            stream)
 {
+    std::cout << "In " << __func__ << std::endl;
     rocblaslt_status status = rocblaslt_status_internal_error;
     try
     {
@@ -3415,6 +3690,7 @@ rocblaslt_status runKernelFromDeviceUserArguments(rocblaslt_handle             h
                                                   void*                        workspace,
                                                   hipStream_t                  stream)
 {
+    std::cout << "In " << __func__ << std::endl;
     rocblaslt_status status = rocblaslt_status_internal_error;
     try
     {
