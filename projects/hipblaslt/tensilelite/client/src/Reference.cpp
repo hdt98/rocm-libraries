@@ -754,7 +754,6 @@ namespace TensileLite
             bool aConjugate = false;
             bool bConjugate = false;
 
-<<<<<<< HEAD
             for(auto const& op : problem.aOps())
                 if(op.type == TensorOp::Type::ComplexConjugate)
                     aConjugate = true;
@@ -762,17 +761,6 @@ namespace TensileLite
             for(auto const& op : problem.bOps())
                 if(op.type == TensorOp::Type::ComplexConjugate)
                     bConjugate = true;
-=======
-            if(DataTypeInfo::Get(problem.a().dataType()).isComplex)
-            {
-                // aConjugate = true;
-            }
-
-            if(DataTypeInfo::Get(problem.b().dataType()).isComplex)
-            {
-                // bConjugate = true;
-            }
->>>>>>> 1d00ed1eb5 (Fixed validator bug by removing conjugate code)
 
             std::vector<size_t> freeASize(freeIndicesA.size());
             std::vector<size_t> freeBSize(freeIndicesB.size());
