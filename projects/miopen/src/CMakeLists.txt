@@ -152,7 +152,6 @@ set( MIOpen_Source
     layernorm/problem_description.cpp
     load_file.cpp
     lock_file.cpp
-    logger.cpp
     lrn_api.cpp
     mha/mha_descriptor.cpp
     mha/problem_description.cpp
@@ -1020,15 +1019,10 @@ MIOPEN_${MIOPEN_BACKEND}_1
 global:
     miopen*;
 local:
-    *boost*;
-    extern \"C++\" {
-        std::*;
-    };
+    *;
 };
 ")
     target_link_libraries(MIOpen PRIVATE "-Wl,--version-script=${CMAKE_CURRENT_BINARY_DIR}/lib.def")
-    target_link_libraries(MIOpen PRIVATE "-Wl,--exclude-libs,ALL")
-    # set_target_properties(MIOpen PROPERTIES CXX_VISIBILITY_PRESET hidden)
     set_target_properties(MIOpen PROPERTIES VISIBILITY_INLINES_HIDDEN 1)
 endif()
 #######################################

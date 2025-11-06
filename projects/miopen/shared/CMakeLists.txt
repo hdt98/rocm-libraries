@@ -6,6 +6,7 @@ message("### MIOPEN_BACKEND: ${MIOPEN_BACKEND}")
 add_library(MIOpen_shared STATIC
     env.cpp
     sysinfo_utils.cpp
+    logger.cpp
 )
 
 if(MIOPEN_BACKEND STREQUAL "HIPOC" OR MIOPEN_BACKEND STREQUAL "HIP")
