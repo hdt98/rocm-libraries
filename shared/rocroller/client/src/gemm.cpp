@@ -2003,25 +2003,6 @@ int main(int argc, const char* argv[])
     problem.types  = types;
     solution.types = types;
 
-    // Set default prefetchMixMemOps
-    if(app.get_option("--prefetchMixMemOps")->count() == 0)
-    {
-        solution.prefetchMixMemOps = false;
-        if(solution.prefetchLDSFactor != 0)
-            solution.prefetchMixMemOps = true;
-
-        if(types.scaleB == Operations::ScaleMode::Separate && !solution.loadLDSScaleB)
-            solution.prefetchMixMemOps = false;
-
-        if(types.scaleA == Operations::ScaleMode::Separate && !solution.loadLDSScaleA)
-            solution.prefetchMixMemOps = false;
-
-        // TODO: enable (prefetchMixMemOps == true && prefetchLDSFactor == 2 && direct2LDSA/B = true)
-        if(solution.prefetchLDSFactor == 2
-           && (IsBufferToLDS(solution.loadPathA) || IsBufferToLDS(solution.loadPathB)))
-            solution.prefetchMixMemOps = false;
-    }
-
     //
     // Run!
     //
