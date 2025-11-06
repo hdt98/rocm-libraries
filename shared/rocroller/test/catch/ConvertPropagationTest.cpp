@@ -217,30 +217,30 @@ namespace ExpressionTest
         auto expr
             = [](Expression::ExpressionPtr a,
                  Expression::ExpressionPtr b,
-                 Expression::ExpressionPtr c) { return convert(DataType::UInt32, (a / b) + c); };
+                 Expression::ExpressionPtr c) { return convert(DataType::Int32, (a / b) + c); };
 
         ConvertExpressionKernel kernel(context.get(),
                                        expr,
-                                       DataType::UInt32,
-                                       DataType::UInt64,
-                                       DataType::UInt64,
-                                       DataType::UInt64);
+                                       DataType::Int32,
+                                       DataType::Int64,
+                                       DataType::Int64,
+                                       DataType::Int64);
 
-        auto d_result = make_shared_device<uint32_t>();
+        auto d_result = make_shared_device<int32_t>();
 
-        uint64_t a = (uint64_t(std::numeric_limits<uint32_t>::max()) << 2) + uint64_t(0xffff);
-        uint64_t b = 10;
-        uint32_t c = 1;
+        int64_t a = (int64_t(std::numeric_limits<int32_t>::max()) << 2) + int64_t(0xffff);
+        int64_t b = 10;
+        int32_t c = 1;
 
         std::cout << a << std::endl;
 
-        uint32_t r = uint32_t(uint64_t(a / b) + c);
+        int32_t r = int32_t(int64_t(a / b) + c);
 
         kernel({}, d_result.get(), a, b, c);
 
-        uint32_t result;
+        int32_t result;
 
-        hipMemcpy(&result, d_result.get(), sizeof(uint32_t), hipMemcpyDefault);
+        hipMemcpy(&result, d_result.get(), sizeof(int32_t), hipMemcpyDefault);
 
         std::cout << r << " / " << result << "\n";
 
