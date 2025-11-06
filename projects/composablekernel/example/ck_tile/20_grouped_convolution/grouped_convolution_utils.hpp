@@ -11,6 +11,11 @@
 #include "ck_tile/ops/epilogue.hpp"
 #include "ck_tile/ops/gemm.hpp"
 #include "ck_tile/ops/grouped_convolution.hpp"
+#include "conv_configs.hpp"
+using MemoryOpSet =
+    std::integral_constant<ck_tile::memory_operation_enum, ck_tile::memory_operation_enum::set>;
+using MemoryOpAtomicAdd = std::integral_constant<ck_tile::memory_operation_enum,
+                                                 ck_tile::memory_operation_enum::atomic_add>;
 
 template <typename PrecType, ck_tile::index_t M_Warp_Tile>
 constexpr ck_tile::index_t get_k_warp_tile()
