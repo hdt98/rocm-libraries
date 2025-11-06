@@ -381,7 +381,7 @@ def writeSolutionsAndKernelsTCL(
         return result
 
     outOptions = rocisa.rocIsa.getInstance().getOutputOptions()
-    outOptions.outputNoComment = not disableAsmComments
+    outOptions.outputNoComment = disableAsmComments
 
     unaryProcessKernelSource = functools.partial(
         processKernelSource,
