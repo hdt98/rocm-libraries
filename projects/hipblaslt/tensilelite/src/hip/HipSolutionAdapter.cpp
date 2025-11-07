@@ -371,7 +371,16 @@ namespace TensileLite
             }
 
             hipFunction_t function;
-            HIP_CHECK_RETURN(getKernel(function, kernel.kernelName));
+            hipError_t e1 = getKernel(function, kernel.kernelName);
+            if(e1)
+            {
+                std::cout << "Error " << e1 << " calling getKernel:" << std::endl;
+                std::cout << "Kernel " << kernel.kernelName << std::endl;
+                std::cout << " l" << kernel.workGroupSize << " x g" << kernel.numWorkGroups << " = "
+                          << kernel.numWorkItems << std::endl;
+                std::cout << kernel.args;
+                return e1;
+            }
 
             void*  kernelArgs = const_cast<void*>(kernel.args.data());
             size_t argsSize   = kernel.args.size();
@@ -384,7 +393,7 @@ namespace TensileLite
 
             if(startEvent != nullptr)
                 HIP_CHECK_RETURN(hipEventRecord(startEvent, stream));
-            HIP_CHECK_RETURN(hipExtModuleLaunchKernel(function,
+            hipError_t e2 = hipExtModuleLaunchKernel(function,
                                                       kernel.numWorkItems.x,
                                                       kernel.numWorkItems.y,
                                                       kernel.numWorkItems.z,
@@ -397,7 +406,16 @@ namespace TensileLite
                                                       (void**)&hipLaunchParams,
                                                       nullptr, // event
                                                       nullptr // event
-                                                      ));
+                                                      );
+            if(e2)
+            {
+                std::cout << "Error " << e2 << " calling hipExtModuleLaunchKernel:" << std::endl;
+                std::cout << "Kernel " << kernel.kernelName << std::endl;
+                std::cout << " l" << kernel.workGroupSize << " x g" << kernel.numWorkGroups << " = "
+                          << kernel.numWorkItems << std::endl;
+                std::cout << kernel.args;
+                return e2;
+            }
             if(stopEvent != nullptr)
                 HIP_CHECK_RETURN(hipEventRecord(stopEvent, stream));
             return hipSuccess;
