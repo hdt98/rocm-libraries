@@ -3,9 +3,6 @@
 
 #pragma once
 
-#ifndef TEST_GEMM_PIPELINE_UT_CASES_INC
-#define TEST_GEMM_PIPELINE_UT_CASES_INC
-
 TYPED_TEST(TEST_SUITE_NAME, SmallM)
 {
     std::vector<int> Ms{1, 2, 3, 4, 5, 6};
@@ -133,5 +130,3 @@ TYPED_TEST(TEST_SUITE_NAME, NotSupportedArgument)
 #undef STRINGIFY
 #undef XSTRINGIFY
 }
-
-#endif
