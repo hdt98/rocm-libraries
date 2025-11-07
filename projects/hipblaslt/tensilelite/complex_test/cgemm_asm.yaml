@@ -38,7 +38,7 @@ BenchmarkProblems:
       UseBeta: True
       Batched: True
       TransposeA: False
-      TransposeB: True
+      TransposeB: False
       ComplexConjugateA: False
       ComplexConjugateB: False
 
