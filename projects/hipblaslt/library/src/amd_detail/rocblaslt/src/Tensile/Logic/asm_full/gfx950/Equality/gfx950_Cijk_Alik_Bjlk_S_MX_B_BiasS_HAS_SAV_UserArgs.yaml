@@ -2,7 +2,7 @@
 - gfx950
 - gfx950
 - [Device 75a0]
-- Activation: true
+- Activation: false
   ActivationComputeDataType: 0
   ActivationNoGuard: false
   ActivationType: hipblaslt_all
