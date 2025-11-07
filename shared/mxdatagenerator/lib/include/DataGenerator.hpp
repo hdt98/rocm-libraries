@@ -1180,23 +1180,19 @@ namespace DGen
                 //
                 // Compute block scale and adjust data values
                 //
-                if constexpr(isScaled<DTYPE>())
+                if constexpr(isScaled<DTYPE>() && block_i == block_size - 1)
                 {
-                    if(block_i == block_size - 1)
-                    {
-                        const uint32_t block_scale
-                            = dispatch_scale_block(temp_scale, temp_data, block_size);
+                    const uint32_t block_scale
+                        = dispatch_scale_block(temp_scale, temp_data, block_size);
 
-                        // Write to array
-                        for(index_t i = 0; i < block_size; i++)
-                        {
-                            std::memcpy(
-                                &m_dataBytes[(scale_i * block_size + i) * m_dataDesc.byte_size],
-                                &temp_data[i],
-                                m_dataDesc.byte_size);
-                        }
-                        std::memcpy(&m_scaleBytes[scale_i], &block_scale, m_scaleDesc.byte_size);
+                    // Write to array
+                    for(index_t i = 0; i < block_size; i++)
+                    {
+                        std::memcpy(&m_dataBytes[(scale_i * block_size + i) * m_dataDesc.byte_size],
+                                    &temp_data[i],
+                                    m_dataDesc.byte_size);
                     }
+                    std::memcpy(&m_scaleBytes[scale_i], &block_scale, m_scaleDesc.byte_size);
                 }
             }
         }

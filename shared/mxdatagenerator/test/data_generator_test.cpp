@@ -58,8 +58,8 @@ typedef std::tuple<bool, bool, bool, bool, DataScaling, vector<index_t>> Unbound
 typedef std::tuple<bool, DataScaling, vector<index_t>>                   ZerosTupleType;
 typedef ZerosTupleType                                                   OnesTupleType;
 typedef ZerosTupleType                                                   IdentityTupleType;
-typedef UnboundedTupleType TrigonometricFromFloatTupleType;
-typedef UnboundedTupleType NormalFromFloatTupleType;
+typedef UnboundedTupleType                                               TrigonometricFromFloatTupleType;
+typedef UnboundedTupleType                                               NormalFromFloatTupleType;
 
 // clampToF32
 const vector<bool> clamp_params = {false, true};
@@ -237,7 +237,7 @@ double compareHistogram(const std::vector<double>& data1,
 
     // Populate histograms
     double current_bin = first_bin;
-    for(const double& val : data1_copy)
+    for(const double val : data1_copy)
     {
         if(std::isnan(val) || std::isinf(val) || val < first_bin || val >= last_bin + bin_width)
         {
@@ -252,7 +252,7 @@ double compareHistogram(const std::vector<double>& data1,
         histogram1[current_bin]++;
     }
     current_bin = first_bin;
-    for(const double& val : data2_copy)
+    for(const double val : data2_copy)
     {
         if(std::isnan(val) || std::isinf(val) || val < first_bin || val >= last_bin + bin_width)
         {
@@ -273,8 +273,10 @@ double compareHistogram(const std::vector<double>& data1,
     uint64_t num_percent_diffs = 0;
     for(auto const& [bin, val1] : histogram1)
     {
-        if(bin >= mean - (std_dev * num_std_devs)
-           && bin + bin_width <= mean + (std_dev * num_std_devs))
+        // We only care about diffs within the given number of standard deviations
+        const double lower_bound = mean - (std_dev * num_std_devs);
+        const double upper_bound = mean + (std_dev * num_std_devs);
+        if(bin >= lower_bound && bin + bin_width <= upper_bound)
         {
             const uint64_t val2 = histogram2[bin];
 
@@ -932,8 +934,8 @@ public:
         opts.scaling      = DataScaling::Mean;
         opts.blockScaling = 32;
 
-        const float mean    = 0.f;
-        const float std_dev = 1.f;
+        const double mean    = 0.f;
+        const double std_dev = 1.f;
         opts.initMode       = DataInitMode(NormalFromFloat{mean, std_dev});
 
         size   = {opts.blockScaling * 1000000};
