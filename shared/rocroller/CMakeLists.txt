@@ -274,17 +274,18 @@ rocm_install(
         "${CMAKE_CURRENT_SOURCE_DIR}/lib/include"
 )
 
-if(ROCROLLER_BUILD_TESTING OR BUILD_TESTING)
+if(TARGET rocroller-tests)
     rocm_install(
         TARGETS rocroller-tests
         COMPONENT tests
     )
-    if(ROCROLLER_ENABLE_CATCH)
-        rocm_install(
-            TARGETS rocroller-tests-catch
-            COMPONENT tests
-        )
-    endif()
+endif()
+
+if(TARGET rocroller-tests-catch)
+    rocm_install(
+        TARGETS rocroller-tests-catch
+        COMPONENT tests
+    )
 endif()
 
 rocm_export_targets(

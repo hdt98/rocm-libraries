@@ -17,6 +17,23 @@ if(NOT CLI11_FOUND)
     endif()
 endif()
 
+if(NOT TARGET common-test-utilities)
+    # If tests are disabled, then the common test utilities are not created.
+    # To fix this, we manually add the dependencies and include the directory to create it anyways
+    # In the future we probably want to remove this dependency so the client can be independent
+    if(NOT ROCM_LIBS_SUPERBUILD)
+        if(ROCROLLER_ENABLE_THEROCK)
+            find_package(mxDataGenerator REQUIRED)
+        else()
+            add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../../../shared/mxdatagenerator" "${CMAKE_CURRENT_BINARY_DIR}/mxdatagenerator")
+        endif()
+    endif()
+    find_package(cblas)
+    find_package(OpenMP REQUIRED)
+
+    add_subdirectory("../test/common" "${CMAKE_CURRENT_BINARY_DIR}/test-common")
+endif()
+
 add_executable(rocroller-gemm
     "${CMAKE_CURRENT_SOURCE_DIR}/src/gemm.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/GEMMParameters.cpp"
