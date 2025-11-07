@@ -383,9 +383,9 @@ namespace rocRoller::Client::GEMMClient::CLI
                                | std::ifstream::badbit);
                 std::getline(iss, token, '(');
                 std::getline(iss, token, ',');
-                float mean = std::stof(token);
+                double mean = std::stod(token);
                 std::getline(iss, token, ')');
-                float std_dev = std::stof(token);
+                double std_dev = std::stod(token);
 
                 result = DGen::DataInitMode(DGen::NormalFromFloat{mean, std_dev});
             }
