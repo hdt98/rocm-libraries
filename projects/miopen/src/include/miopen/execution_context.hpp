@@ -97,7 +97,6 @@ struct MIOPEN_INTERNALS_EXPORT ExecutionContext
     bool disable_perfdb_access              = false;
     bool use_dynamic_solutions_only         = false;
     bool is_for_generic_search              = false;
-    mutable bool search_cutoff              = false;
     mutable float generic_search_worst_time = std::numeric_limits<float>::max();
     mutable float generic_search_best_time  = std::numeric_limits<float>::max();
 

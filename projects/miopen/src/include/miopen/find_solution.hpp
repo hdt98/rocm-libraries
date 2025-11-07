@@ -140,9 +140,6 @@ auto FindSolutionImpl(rank<1>,
 
         if(context.do_search || enforce.IsSearch(context)) // TODO: Make it a customization point
         {
-            if(enforce.IsSearchCutoff(context))
-                context.search_cutoff = true;
-
             auto record = DbRecord(DbKinds::PerfDb, problem);
             if(env::enabled(MIOPEN_WARN_SEARCH))
                 MIOPEN_LOG_W("Search Start: " << record.GetKey() << " : " << s.SolverDbId()

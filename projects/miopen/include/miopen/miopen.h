@@ -8523,8 +8523,7 @@ MIOPEN_EXPORT miopenStatus_t miopenMultiMarginLossForward(miopenHandle_t handle,
  * 2. DbUpdate: Do not skip auto-tune even if PerfDb already contains optimized values.
  * 3. Search: Search the database first; if no record is found, tune and update the database.
  * 4. SearchDbUpdate: Combination of Search and DbUpdate.
- * 5. SearchCutoffDbUpdate: Search with tuning perf cutoff and DbUpdate.
- * 6. DbClean: Remove existing entry, do not tune.
+ * 5. DbClean: Remove existing entry, do not tune.
  * Note: TuningPolicy has higher priority over MIOPEN_FIND_ENFORCE.
  */
 typedef enum
@@ -8533,8 +8532,7 @@ typedef enum
     miopenTuningPolicyDbUpdate             = 2, /*!< tune and update the db  */
     miopenTuningPolicySearch               = 3, /*!< search db first, if record not found tune but do not update the db */
     miopenTuningPolicySearchDbUpdate       = 4, /*!< combination of Search and DbUpdate */
-    miopenTuningPolicySearchCutoffDbUpdate = 5, /*!< combination of Search and DbUpdate with early exit strategy*/
-    miopenTuningPolicyDbClean              = 6, /*!< remove existing entry, do not tune */
+    miopenTuningPolicyDbClean              = 5, /*!< remove existing entry, do not tune */
 } miopenTuningPolicy_t;
 
 /*! @ingroup handle

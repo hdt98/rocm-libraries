@@ -482,6 +482,8 @@ auto GenericSearch(const Solver s,
     float worst_time = std::numeric_limits<float>::max();
     size_t n_failed  = 0;
     size_t n_best    = 0;
+    // enable early search termination
+    bool using_search_cutoff = env::value(MIOPEN_SEARCH_CUTOFF);
     // terminate search when perf is less than cutoff
     float cutoff_time = context.generic_search_worst_time;
     if(cutoff_time < std::numeric_limits<float>::max())
@@ -697,7 +699,7 @@ auto GenericSearch(const Solver s,
     });
 
     // if using cutoff for search update timing
-    if(context.search_cutoff && best_time < context.generic_search_best_time)
+    if(using_search_cutoff == true && best_time < context.generic_search_best_time)
     {
         float new_worst                    = (perf_sols.end() - 1)->time;
         context_.generic_search_best_time  = best_time;

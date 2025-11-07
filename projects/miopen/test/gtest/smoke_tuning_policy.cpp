@@ -53,12 +53,6 @@ TEST_F(CPU_TuningPolicy_NONE, TestTuningPolicyGetterAndSetterValidValues)
     EXPECT_EQ(miopenGetTuningPolicy(&handle, &test_tuning_policy), miopenStatusSuccess);
     EXPECT_EQ(test_tuning_policy, miopenTuningPolicy_t::miopenTuningPolicySearchDbUpdate);
 
-    EXPECT_EQ(miopenSetTuningPolicy(&handle,
-                                    miopenTuningPolicy_t::miopenTuningPolicySearchCutoffDbUpdate),
-              miopenStatusSuccess);
-    EXPECT_EQ(miopenGetTuningPolicy(&handle, &test_tuning_policy), miopenStatusSuccess);
-    EXPECT_EQ(test_tuning_policy, miopenTuningPolicy_t::miopenTuningPolicySearchCutoffDbUpdate);
-
     EXPECT_EQ(miopenSetTuningPolicy(&handle, miopenTuningPolicy_t::miopenTuningPolicyDbClean),
               miopenStatusSuccess);
     EXPECT_EQ(miopenGetTuningPolicy(&handle, &test_tuning_policy), miopenStatusSuccess);
@@ -74,7 +68,7 @@ TEST_F(CPU_TuningPolicy_NONE, TestTuningPolicyGetterAndSetterErrorHandling)
 {
     testSetInvalidValue(miopenTuningPolicy_t::miopenTuningPolicyDbUpdate, -1);
     testSetInvalidValue(miopenTuningPolicy_t::miopenTuningPolicySearch, 0);
-    testSetInvalidValue(miopenTuningPolicy_t::miopenTuningPolicySearchDbUpdate, 7);
+    testSetInvalidValue(miopenTuningPolicy_t::miopenTuningPolicySearchDbUpdate, 6);
     testSetInvalidValue(miopenTuningPolicy_t::miopenTuningPolicyDbClean, 1000);
 }
 
