@@ -34,10 +34,12 @@ BenchmarkProblems:
       DataType: C
       DestDataType: C
       ComputeDataType: C
-      TransposeA: False
-      TransposeB: False
       UseBeta: True
       Batched: True
+      TransposeA: False
+      TransposeB: True
+      ComplexConjugateA: False
+      ComplexConjugateB: False
 
     - # BenchmarkProblemSizeGroup - Assembly
       InitialSolutionParameters:
@@ -78,8 +80,6 @@ BenchmarkProblems:
           # - Exact: [64, 64, 1, 128]
           # - Exact: [4096, 4096, 1, 8192]
 
-<<<<<<< HEAD
-<<<<<<< HEAD
           # - Range: [[16,37, 512],[16,57,512],[1],[1,1,64]]
           # - Range: [ [127,1,129], 0, [2], [63,1,64] ]
 
@@ -90,8 +90,7 @@ BenchmarkProblems:
       DestDataType: C
       ComputeDataType: C
       UseBeta: True
-      Batched: True
-      
+      Batched: True      
       TransposeA: False
       TransposeB: True
       ComplexConjugateA: False
@@ -123,8 +122,7 @@ BenchmarkProblems:
       DestDataType: C
       ComputeDataType: C
       UseBeta: True
-      Batched: True
-      
+      Batched: True      
       TransposeA: True
       TransposeB: False
       ComplexConjugateA: False
@@ -156,8 +154,7 @@ BenchmarkProblems:
       DestDataType: C
       ComputeDataType: C
       UseBeta: True
-      Batched: True
-      
+      Batched: True      
       TransposeA: True
       TransposeB: True
       ComplexConjugateA: False
@@ -189,8 +186,7 @@ BenchmarkProblems:
       DestDataType: C
       ComputeDataType: C
       UseBeta: True
-      Batched: True
-      
+      Batched: True      
       TransposeA: False
       TransposeB: True
       ComplexConjugateA: False
@@ -222,8 +218,7 @@ BenchmarkProblems:
       DestDataType: C
       ComputeDataType: C
       UseBeta: True
-      Batched: True
-      
+      Batched: True      
       TransposeA: True
       TransposeB: False
       ComplexConjugateA: True
@@ -255,8 +250,7 @@ BenchmarkProblems:
       DestDataType: C
       ComputeDataType: C
       UseBeta: True
-      Batched: True
-      
+      Batched: True      
       TransposeA: True
       TransposeB: True
       ComplexConjugateA: False
@@ -288,8 +282,7 @@ BenchmarkProblems:
       DestDataType: C
       ComputeDataType: C
       UseBeta: True
-      Batched: True
-      
+      Batched: True      
       TransposeA: True
       TransposeB: True
       ComplexConjugateA: True
@@ -321,8 +314,7 @@ BenchmarkProblems:
       DestDataType: C
       ComputeDataType: C
       UseBeta: True
-      Batched: True
-      
+      Batched: True      
       TransposeA: True
       TransposeB: True
       ComplexConjugateA: True
@@ -346,13 +338,7 @@ BenchmarkProblems:
       BenchmarkFinalParameters:
         - ProblemSizes:
           - Exact: [16, 16, 1, 2]
-=======
-          - Range: [[16,37, 512],[16,57,512],[1],[1,1,64]]
-=======
-          # - Range: [[16,37, 512],[16,57,512],[1],[1,1,64]]
->>>>>>> 589e7eeb75 (updated yaml file for streamK)
           # - Range: [ [127,1,129], 0, [2], [63,1,64] ]
->>>>>>> 84f69b7bc3 (Added Complex Float support, and partly implemented TensorOps for Complex Conjugate.)
   
 LibraryLogic:
       ScheduleName: "gfx950"
