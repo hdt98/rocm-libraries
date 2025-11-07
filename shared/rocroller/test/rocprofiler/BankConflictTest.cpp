@@ -202,7 +202,7 @@ namespace rocRollerTest
         bool     m_write;
     };
 
-    TEST_CASE("Rocprofiler LDS Microkernel", "[rocprofiler][gpu]")
+    TEST_CASE("LDS bank model with bank conflicts", "[rocprofiler][gpu]")
     {
         using namespace Scheduling::LDSBankModel;
 
