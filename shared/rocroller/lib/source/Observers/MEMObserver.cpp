@@ -211,10 +211,11 @@ namespace rocRoller
                 m_queue.push_back(entry);
 
                 std::stringstream queueStatus;
+                queueStatus << fmt::format("this takes {} cycles", cycles);
                 for(const auto& e : m_queue)
                 {
                     queueStatus << fmt::format(
-                        "[cycles {}, slots {}] ", e.completionCycle, e.slotsUsed);
+                        "[cycle {}, slots {}] ", e.completionCycle, e.slotsUsed);
                 }
                 const_cast<Instruction&>(inst).addComment(
                     fmt::format("WeightlessDSMemObserver: queued LDS instruction, remaining slots "

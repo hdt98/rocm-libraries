@@ -151,6 +151,9 @@ namespace rocRoller
                        wave->contexts,
                        wave->instructions_size);
 
+            assert(wave->instructions_size >= 1 && "expected at least one instruction in wave");
+            uint32_t prev_time    = wave->instructions_array[0].time;
+            uint32_t prev_latency = 0;
             for(size_t i = 0; i < wave->instructions_size; i++)
             {
                 auto& inst = wave->instructions_array[i];
@@ -169,9 +172,18 @@ namespace rocRoller
                     userdata->ok = false;
                     return;
                 }
-                auto& data = userdata->instruction_map[inst.pc];
-                data.totalLatency += inst.duration;
+                auto&    data = userdata->instruction_map[inst.pc];
+                uint32_t latency
+                    = inst.time - prev_time - prev_latency + inst.duration + inst.stall;
+                data.totalLatency += latency;
+                prev_time    = inst.time;
+                prev_latency = inst.duration + inst.stall;
                 data.hitcount += 1;
+                Log::debug("trace_decode_callback: duration {}, stall {}, time {}, latency {}",
+                           inst.duration,
+                           static_cast<uint32_t>(inst.stall),
+                           inst.time,
+                           latency);
             }
             return;
         }
