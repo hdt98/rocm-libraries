@@ -493,6 +493,8 @@ auto GenericSearch(const Solver s,
     if(skip_time < std::numeric_limits<float>::max())
         skip_time *= env::value(MIOPEN_SEARCH_SKIP_PCT) / 100.0f;
 
+    bool rec_results = perf_solsp || using_search_cutoff;
+
     HeartBeat<PerformanceConfig> heartbeat;
     heartbeat.Start();
 
@@ -654,7 +656,8 @@ auto GenericSearch(const Solver s,
                         }
                     }
                 }
-                perf_sols.push_back({current_config.ToString(), elapsed_time});
+                if(rec_results)
+                    perf_sols.push_back({current_config.ToString(), elapsed_time});
             }
 
             // Banchmarked kernels will not be used anymore.
