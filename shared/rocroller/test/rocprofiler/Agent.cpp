@@ -172,7 +172,6 @@ namespace rocRoller
                 auto& data = userdata->instruction_map[inst.pc];
                 data.totalLatency += inst.duration;
                 data.hitcount += 1;
-                data.latencies.push_back(inst.duration);
             }
             return;
         }
@@ -438,51 +437,14 @@ namespace rocRoller
             return totalLatency / hitcount;
         }
 
-        uint64_t InstructionProfile::minLatency() const
-        {
-            if(latencies.empty())
-                return 0;
-            return *std::min_element(latencies.begin(), latencies.end());
-        }
-
-        uint64_t InstructionProfile::maxLatency() const
-        {
-            if(latencies.empty())
-                return 0;
-            return *std::max_element(latencies.begin(), latencies.end());
-        }
-
-        double InstructionProfile::stdDevLatency() const
-        {
-            if(latencies.size() <= 1)
-                return 0.0;
-
-            double mean     = static_cast<double>(meanLatency());
-            double variance = 0.0;
-
-            for(const auto& latency : latencies)
-            {
-                double diff = static_cast<double>(latency) - mean;
-                variance += diff * diff;
-            }
-
-            variance /= static_cast<double>(latencies.size());
-            return std::sqrt(variance);
-        }
-
         std::string InstructionProfile::toString() const
         {
             return fmt::format("'{}', totalLatency: {}, "
-                               "hitcount: {}, meanLatency: {}, "
-                               "minLatency: {}, maxLatency: {}, "
-                               "stdDev: {:.2f}",
+                               "hitcount: {}, meanLatency: {}",
                                instruction,
                                totalLatency,
                                hitcount,
-                               meanLatency(),
-                               minLatency(),
-                               maxLatency(),
-                               stdDevLatency());
+                               meanLatency());
         }
 
         std::string toString(std::vector<InstructionProfile> const& profiles)

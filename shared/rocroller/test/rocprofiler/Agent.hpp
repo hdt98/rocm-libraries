@@ -26,12 +26,9 @@
 #include <rocprofiler-sdk/experimental/thread-trace/dispatch.h>
 #include <rocprofiler-sdk/experimental/thread_trace.h>
 
-#include <algorithm>
-#include <cmath>
 #include <cstdint>
 #include <functional>
 #include <map>
-#include <numeric>
 #include <optional>
 #include <string>
 #include <vector>
@@ -42,15 +39,11 @@ namespace rocRoller
     {
         struct InstructionProfile
         {
-            uint64_t              totalLatency{0}; // Total latency in cycles
-            uint64_t              hitcount{0}; // Number of times instruction was executed
-            std::string           instruction; // Disassembled instruction text
-            std::vector<uint64_t> latencies; // Individual latency measurements
+            uint64_t    totalLatency{0}; // Total latency in cycles
+            uint64_t    hitcount{0}; // Number of times instruction was executed
+            std::string instruction; // Disassembled instruction text
 
             uint64_t    meanLatency() const;
-            uint64_t    minLatency() const;
-            uint64_t    maxLatency() const;
-            double      stdDevLatency() const;
             std::string toString() const;
         };
 
