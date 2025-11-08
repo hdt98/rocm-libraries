@@ -386,9 +386,6 @@ namespace rocRoller
         std::optional<std::vector<InstructionProfile>>
             getDispatchData(std::function<void()> dispatch)
         {
-            if(!enable_agent)
-                return std::nullopt;
-
             Log::info("getDispatchData");
 
             HIP_CHECK(hipDeviceSynchronize()); // Ensure all prior dispatches finished
@@ -405,9 +402,6 @@ namespace rocRoller
 
         std::vector<InstructionProfile> loopUntilDispatchData(std::function<void()> dispatch)
         {
-            if(!enable_agent)
-                return {};
-
             Log::info("loopUntilDispatchData: starting loop to get dispatch data");
 
             std::optional<std::vector<InstructionProfile>> data;
@@ -418,6 +412,11 @@ namespace rocRoller
                 if(data.has_value())
                 {
                     return *data;
+                }
+                if(!enable_agent)
+                {
+                    Log::info("loopUntilDispatchData: profiler disabled, returning empty data set");
+                    return {};
                 }
                 Log::info("loopUntilDispatchData: got no data, invoking another dispatch");
             }
