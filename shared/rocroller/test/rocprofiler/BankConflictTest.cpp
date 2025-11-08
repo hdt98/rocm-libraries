@@ -496,6 +496,11 @@ namespace rocRollerTest
                             REQUIRE(latencies.size() == 21);
                         }
 
+                        for(const auto& latency : allLatencies)
+                        {
+                            Log::info(toString(latency));
+                        }
+
                         std::vector<std::vector<uint64_t>> ldsLatenciesPerIteration(ITERS);
 
                         // Extract LDS latencies for each iteration across all runs
@@ -668,15 +673,15 @@ namespace rocRollerTest
             context.get(), Register::Type::Vector, DataType::UInt32, 1);
         auto workitemIndex = context->kernel()->workitemIndex()[0];
 
-        context->schedule(Expression::generate(
-            ldsWithOffset,
-            Expression::literal(ldsData->getLDSAllocation()->offset())
-                + workitemIndex->expression()
-                      * Expression::literal((4 * strideMultiplier * instrDwords)
-                                            % ldsData->getLDSAllocation()->size()),
-            context.get()));
-
         auto ldsStream = [&]() -> Generator<Instruction> {
+            co_yield Expression::generate(
+                ldsWithOffset,
+                Expression::literal(ldsData->getLDSAllocation()->offset())
+                    + workitemIndex->expression()
+                          * Expression::literal((4 * strideMultiplier * instrDwords)
+                                                % ldsData->getLDSAllocation()->size()),
+                context.get());
+
             auto ldsDst = Register::Value::Placeholder(
                 context.get(),
                 Register::Type::Vector,
@@ -724,11 +729,13 @@ namespace rocRollerTest
         streams.push_back(ldsStream());
         streams.push_back(aluStream());
 
+        std::vector<Instruction> instructions;
         for(auto inst : (*scheduler)(streams))
         {
             if(GPUInstructionInfo::isLDS(inst.getOpCode()))
                 inst.setAddresses(baseAddresses);
             context->schedule(inst);
+            instructions.push_back(inst);
         }
 
         context->schedule(k->postamble());
@@ -751,6 +758,25 @@ namespace rocRollerTest
 
         Log::info(context.output());
 
-        Log::info(toString(allLatencies[0]));
+        // Filter for instructions with opcodes
+        std::vector<Instruction> filteredInstructions;
+        for(const auto& inst : instructions)
+        {
+            if(not inst.toString(LogLevel::Terse).empty())
+                filteredInstructions.push_back(inst);
+        }
+
+        // Show weaved together
+        for(size_t i = 0; i < std::min(filteredInstructions.size(), allLatencies[0].size()); ++i)
+        {
+            const auto& inst    = filteredInstructions[i];
+            const auto& profile = allLatencies[0][i];
+
+            Log::info(fmt::format("{}: model {}, profiler {}",
+                                  inst.getOpCode(),
+                                  (inst.peekedStatus().stallCycles + 1)
+                                      * 4, // +1 for issue cycle then *4 for quadcycle
+                                  profile.meanLatency()));
+        }
     }
 }
