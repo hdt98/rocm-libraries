@@ -327,10 +327,10 @@ namespace rocRoller::Scheduling::LDSBankModel
 
             uint operationTotalClocks = 0;
 
-            for(const auto& instr : opAccesses.instructions)
+            for(const auto& inst : opAccesses.instructions)
             {
-                auto [instrStr, instructionClocks] = stringifyInstructionAnalysis(instr, gfx);
-                ss << instrStr;
+                auto [instStr, instructionClocks] = stringifyInstructionAnalysis(inst, gfx);
+                ss << instStr;
                 operationTotalClocks += instructionClocks;
             }
             ss << fmt::format("  Operation cycles: {}\n", operationTotalClocks);

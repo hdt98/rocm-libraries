@@ -343,7 +343,7 @@ namespace rocRollerTest
 
         const std::vector<int>  instrSizes      = {4};
         const std::vector<int>  strides         = {4}; // between threads
-        const std::vector<bool> writeOperations = {false};
+        const std::vector<bool> writeOperations = {true};
 
         for(auto instrDwords : instrSizes)
         {
@@ -460,13 +460,13 @@ namespace rocRollerTest
                         const auto baseAddresses
                             = generateLDSAddresses(workgroupSize, strideMultiplier, instrDwords);
 
-                        std::vector<Instruction> instrs;
-                        for(auto instr : kb())
+                        std::vector<Instruction> instructions;
+                        for(auto inst : kb())
                         {
-                            if(GPUInstructionInfo::isLDS(instr.getOpCode()))
-                                instr.setAddresses(baseAddresses);
-                            context->schedule(instr);
-                            instrs.push_back(instr);
+                            if(GPUInstructionInfo::isLDS(inst.getOpCode()))
+                                inst.setAddresses(baseAddresses);
+                            context->schedule(inst);
+                            instructions.push_back(inst);
                         }
 
                         context->schedule(k->postamble());
@@ -539,11 +539,6 @@ namespace rocRollerTest
 
                         auto deltas = calculateLatencyDeltas(medianLatencyPerIteration);
 
-                        // Find key metrics
-                        uint64_t baselineLatency = medianLatencyPerIteration[0];
-                        uint64_t maxLatency = *std::max_element(medianLatencyPerIteration.begin(),
-                                                                medianLatencyPerIteration.end());
-
                         // Find first increase
                         int firstIncreaseIteration = -1;
 
@@ -574,9 +569,6 @@ namespace rocRollerTest
 
                         std::stringstream analysis;
                         analysis << "\nLDS Latency Analysis:\n";
-                        analysis << "---------------------\n";
-                        analysis << "Baseline latency (iteration 0): " << baselineLatency
-                                 << " cycles\n";
 
                         if(firstIncreaseIteration != -1)
                         {
@@ -591,14 +583,7 @@ namespace rocRollerTest
                                 << "Latency stabilized at iteration: " << latencyStabilizedIteration
                                 << "\n";
                         }
-                        else if(firstIncreaseIteration != -1)
-                        {
-                            analysis << "Latency did not stabilize within the test iterations\n";
-                        }
 
-                        analysis << "Maximum latency reached: " << maxLatency << " cycles\n";
-
-                        // Show per-iteration latencies with deltas
                         analysis << "\nPer-iteration median latencies:\n";
                         for(size_t i = 0; i < medianLatencyPerIteration.size(); ++i)
                         {
@@ -615,8 +600,16 @@ namespace rocRollerTest
                             analysis << "\n";
                         }
 
-                        INFO(analysis.str());
                         Log::info(analysis.str());
+
+                        std::stringstream instructionsInfo;
+                        for(const auto& inst : instructions)
+                        {
+                            if(GPUInstructionInfo::isLDS(inst.getOpCode()))
+                                instructionsInfo << inst.toString(LogLevel::Terse)
+                                                 << inst.peekedStatus().toString() << "\n";
+                        }
+                        Log::info("Instructions:\n" + instructionsInfo.str());
                     }
                 }
             }
@@ -731,11 +724,11 @@ namespace rocRollerTest
         streams.push_back(ldsStream());
         streams.push_back(aluStream());
 
-        for(auto instr : (*scheduler)(streams))
+        for(auto inst : (*scheduler)(streams))
         {
-            if(GPUInstructionInfo::isLDS(instr.getOpCode()))
-                instr.setAddresses(baseAddresses);
-            context->schedule(instr);
+            if(GPUInstructionInfo::isLDS(inst.getOpCode()))
+                inst.setAddresses(baseAddresses);
+            context->schedule(inst);
         }
 
         context->schedule(k->postamble());
