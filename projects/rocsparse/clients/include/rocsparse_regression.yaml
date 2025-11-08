@@ -102,7 +102,7 @@ Tests:
   transA: [rocsparse_operation_none]
   alpha_beta: *alpha_beta
   spmv_alg: [rocsparse_spmv_alg_csr_adaptive]
-  filename: [nos4]
+  filename: [nos4, ASIC_320k, bibd_22_8]
 
 - name: level2_v2_spmv_csr_complex
   category: pre_checkin
@@ -156,6 +156,16 @@ Tests:
   uplo: [rocsparse_fill_mode_lower, rocsparse_fill_mode_upper]
   filename: [Chevron2]
 
+- name: level2_spsv_csr_real
+  category: pre_checkin
+  function: spsv_csr
+  indextype: *i32
+  precision: *double_only_precisions
+  <<: *common
+  alpha_alphai: *alpha_beta
+  uplo: [rocsparse_fill_mode_lower, rocsparse_fill_mode_upper]
+  filename: [shipsec1, scircuit, bmwcra_1, webbase-1M, ASIC_320k]
+
 #################################################################################
 # SpGEMM in CSR format                                                          #
 #################################################################################
@@ -181,6 +191,16 @@ Tests:
   N: [21, 719]
   alpha_beta: *alpha_beta
   filename: [Chevron2]
+
+- name: extra_spgemm_csr_real
+  category: pre_checkin
+  function: spgemm_csr
+  indextype: *i32
+  precision: *double_only_precisions
+  <<: *common
+  N: [243]
+  alpha_beta: *alpha_beta
+  filename: [qc2534, shipsec1, webbase-1M, bmwcra_1]
 
 #################################################################################
 # SpGEAM in CSR format                                                          #
