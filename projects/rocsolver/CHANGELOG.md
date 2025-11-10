@@ -12,6 +12,12 @@ Full documentation for rocSOLVER is available at the [rocSOLVER documentation](h
 
 ## rocSOLVER 3.31.0 for ROCm 7.1.0
 
+### Added
+
+* Implemented LAPACK auxiliary routine LANGE to compute norm of matrix
+
+## rocSOLVER 3.31.0 for ROCm 7.1.0
+
 ### Optimized
 
 * Improved the performance of LARF, LARFT, GEQR2, and downstream functions such as GEQRF
