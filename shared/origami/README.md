@@ -36,6 +36,27 @@ cmake -S . -B build/ -DCMAKE_PREFIX_PATH=/opt/rocm -DCMAKE_CXX_COMPILER=/opt/roc
 cmake --build build/ --parallel
 ```
 
+### Building Origami with Python and ATen Support
+
+You must have torch installed to successfully build the ATen bindings for
+Origami.  If you normally work out of a virtual/conda environment, be sure
+you've activated that environment before building.
+
+Then, from the repository root, run:
+
+```bash
+# configure
+cmake -S . -B build/ -DCMAKE_PREFIX_PATH=/opt/rocm -DCMAKE_CXX_COMPILER=/opt/rocm/bin/amdclang++ -DCMAKE_INSTALL_PREFIX=/opt/rocm -DORIGAMI_ENABLE_PYTHON=ON -DORIGAMI_ENABLE_ATEN=ON
+# build
+cmake --build build/ --parallel
+```
+
+The resulting Python library placed in `build/python`.  To install it, run:
+
+```bash
+pip install build/python/.
+```
+
 ### Installing Origami
 
 After configuring and building, run the following command to install:
@@ -51,7 +72,7 @@ To test the origami Python bindings:
 
 ```bash
 # configure with python bindings and tests enabled 
-cmake -S . -B build/ -DCMAKE_PREFIX_PATH=/opt/rocm -DCMAKE_CXX_COMPILER=/opt/rocm/bin/amdclang++ -DCMAKE_INSTALL_PREFIX=/opt/rocm -D ORIGAMI ENABLE_PYTHON=ON -D ORIGAMI_BUILD_TESTING=ON
+cmake -S . -B build/ -DCMAKE_PREFIX_PATH=/opt/rocm -DCMAKE_CXX_COMPILER=/opt/rocm/bin/amdclang++ -DCMAKE_INSTALL_PREFIX=/opt/rocm -DORIGAMI_ENABLE_PYTHON=ON -DORIGAMI_BUILD_TESTING=ON
 
 # build 
 cmake --build build/ --parallel
@@ -63,7 +84,8 @@ ctest --output-on-failure
 
 ### Options
 * `ORIGAMI_BUILD_SHARED_LIBS`: Enables building of shared libraries (default: `ON`)
-* `ORIGAMI_ENABLE_PYTHON`: Enables generation of origami Python bindings (default: `OFF`)
+* `ORIGAMI_ENABLE_PYTHON`: Enables generation of Origami Python bindings (default: `OFF`)
+* `ORIGAMI_ENABLE_ATEN`: Enables generation of Origami ATen bindings (requires `ORIGAMI_ENABLE_PYTHON`, default: `OFF`)
 * `ORIGAMI_BUILD_TESTING`: Build the Python binding tests (default: `OFF`)
 
 
@@ -86,3 +108,4 @@ Once the build completes, navigate to the test directory and run the test suite:
 cd build/tests/
 ./origami-tests
 ```
+

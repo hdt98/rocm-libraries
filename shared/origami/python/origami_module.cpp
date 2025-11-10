@@ -16,7 +16,7 @@
 
 using hardware_t = origami::hardware_t;
 
-NB_MODULE(origami, m) {
+NB_MODULE(_core, m) {
   nanobind::enum_<hardware_t::architecture_t>(m, "architecture_t")
       .value("gfx942", hardware_t::architecture_t::gfx942)
       .value("gfx950", hardware_t::architecture_t::gfx950)

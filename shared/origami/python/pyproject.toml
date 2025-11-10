@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "origami"
+dynamic = ["version"]
+description = "Python bindings for Origami GPU performance modeling library"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+authors = [
+    {name = "AMD", email = "help@amd.com"},
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: C++",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Software Development :: Libraries",
+]
+
+[project.optional-dependencies]
+torch = ["torch>=2.0.0"]
+
+[project.urls]
+Homepage = "https://github.com/ROCm/rocm-libraries"
+Repository = "https://github.com/ROCm/rocm-libraries"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["origami*"]
+
+[tool.setuptools.package-data]
+origami = ["*.so", "*.pyd"]

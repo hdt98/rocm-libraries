@@ -1,124 +1,132 @@
-# Copyright © Advanced Micro Devices, Inc., or its affiliates.
+#!/usr/bin/env python3
+# Copyright Advanced Micro Devices, Inc., or its affiliates.
 # SPDX-License-Identifier: MIT
 
-from setuptools import setup, Extension
-from setuptools.command.build_ext import build_ext
-import nanobind
-import glob
-import sys
-import argparse
+"""
+Setup script for installing pre-built Origami Python bindings.
+
+This setup.py is designed to work with binaries already built by CMake.
+The typical workflow is:
+    1. Build with CMake: cd build && cmake .. && make
+    2. Install with pip: cd build/python && pip install .
+"""
+
 import os
+import subprocess
 from pathlib import Path
+from setuptools import setup, find_packages
+from setuptools.dist import Distribution
 
-# Get ROCM_PATH from environment or use default
-ROCM_PATH = os.environ.get("ROCM_PATH", "/opt/rocm")
-HIPCC_PATH = os.path.join(ROCM_PATH, "bin", "hipcc")
+class BinaryDistribution(Distribution):
+    """Distribution which always forces a binary package with platform name"""
+    def has_ext_modules(self):
+        return True
 
-def parse_args():
-    parser = argparse.ArgumentParser(description="Origami Python Bindings Setup Script")
-    parser.add_argument(
-        "--source", "-s",
-        type=str,
-        default=Path(__file__).parent.parent.resolve() / "src",
-        help="Path to origami source directory.",
-    )
-    args, unknown = parser.parse_known_args()
-    return args, unknown
+def get_version():
+    """Get version from git tags, fallback to dev version."""
+    try:
+        # Try to get version from git describe
+        result = subprocess.run(
+            ['git', 'describe', '--tags', '--always', '--dirty'],
+            capture_output=True,
+            text=True,
+            check=True,
+            cwd=Path(__file__).parent.parent  # Go to repo root
+        )
+        version = result.stdout.strip()
+        
+        # Clean up git version for PEP 440 compliance
+        # v1.2.3 -> 1.2.3
+        # v1.2.3-5-gabcdef -> 1.2.3.dev5+gabcdef
+        # therock-7-g309 -> 0.0.0+therock.7.g309
+        # abcdef (no tags) -> 0.0.0+abcdef
+        
+        if version.startswith('v'):
+            version = version[1:]
+        
+        # Check if version starts with a valid semantic version pattern (digit.digit)
+        # This distinguishes real version tags from branch/tag names like "therock"
+        has_valid_version = version and version[0].isdigit() and '.' in version.split('-')[0]
+        
+        if '-' in version and has_valid_version:
+            # Handle commits after a valid version tag: 1.2.3-5-gabcdef
+            parts = version.split('-')
+            if len(parts) >= 3:
+                # parts = ['1.2.3', '5', 'gabcdef'] or ['1.2.3', '5', 'gabcdef', 'dirty']
+                base_version = parts[0]
+                commit_count = parts[1]
+                commit_hash = parts[2]
+                dirty = '-dirty' in version
+                version = f"{base_version}.dev{commit_count}+{commit_hash}"
+                if dirty:
+                    version += ".dirty"
+        elif not has_valid_version:
+            # No valid version tag, treat everything as local version identifier
+            # Replace - with . for PEP 440 compliance
+            version = f"0.0.0+{version.replace('-', '.')}"
+        
+        return version
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        # Git not available or not in a git repo
+        return "0.0.0+dev"
 
-def existing_dirs(paths):
-    return [p for p in paths if p and os.path.isdir(p)]
+def get_long_description():
+    """Read long description from README if available."""
+    readme_path = Path(__file__).parent / "README.md"
+    if readme_path.exists():
+        return readme_path.read_text(encoding='utf-8')
+    return "Origami: Performance modeling and optimization library for AMD GPUs"
 
-class HIPCCBuildExt(build_ext):
-    def build_extensions(self):
-        # Use hipcc for compile AND link; force shared link so Python symbols
-        # can remain undefined and be resolved at import time.
-        if hasattr(self.compiler, "compiler_so"):
-            self.compiler.set_executable("compiler_so", HIPCC_PATH)
-        if hasattr(self.compiler, "compiler_cxx"):
-            self.compiler.set_executable("compiler_cxx", HIPCC_PATH)
-
-        # Distutils/setuptools normally passes -shared, but since we override the linker,
-        # make it explicit for hipcc/clang-lld.
-        if hasattr(self.compiler, "linker_so"):
-            # linker_so can be a list of argv
-            self.compiler.linker_so = [HIPCC_PATH, "-shared"]
-
-        super().build_extensions()
-
-if __name__ == "__main__":
-    args, unknown = parse_args()
-    # Preserve unrecognized args for setuptools
-    sys.argv = [sys.argv[0]] + unknown
-
-    project_root = Path(__file__).parent.parent.resolve()
-    source_dir = Path(args.source)
-    include_dir = project_root / "include"
-    cpp_files = sorted(glob.glob(str(source_dir / "origami" / "*.cpp")))
-
-    # nanobind runtime source (required)
-    nb_base = os.path.dirname(nanobind.include_dir())
-    nb_runtime = os.path.join(nb_base, "src", "nb_combined.cpp")
-
-    # Build list: your module first, then nanobind runtime, then project sources
-    cpp_files = ["origami_module.cpp", nb_runtime] + cpp_files
-
-    # Likely TBB locations
-    conda_prefix = os.environ.get("CONDA_PREFIX", "")
-    tbb_dirs = existing_dirs([
-        "/usr/lib/x86_64-linux-gnu",            # Debian/Ubuntu oneTBB (libtbb.so.12)
-        "/usr/local/lib",
-        os.path.join(conda_prefix, "lib") if conda_prefix else "",
-        os.path.join(ROCM_PATH, "lib"),
-    ])
-
-    # RPATHs so import can find libs without LD_LIBRARY_PATH
-    rpaths = ["-Wl,-rpath,'$ORIGIN'"]
-    rpaths += [f"-Wl,-rpath,'{d}'" for d in tbb_dirs]
-    rpaths.append(f"-Wl,-rpath,'{os.path.join(ROCM_PATH, 'lib')}'")
-
-    print("Include dir:", include_dir)
-    print("ROCm include:", os.path.join(ROCM_PATH, "include"))
-    if conda_prefix:
-        print("Conda prefix:", conda_prefix)
-    print("TBB lib dirs considered:", tbb_dirs)
-
-    ext_modules = [
-        Extension(
-            "origami",
-            sources=cpp_files,
-            include_dirs=[
-                nanobind.include_dir(),
-                str(include_dir),
-                os.path.join(ROCM_PATH, "include"),
-                os.path.join(nb_base, "ext", "robin_map", "include"),
-            ],
-            language="c++",
-            extra_compile_args=[
-                "-D__HIP_PLATFORM_AMD__",
-                "-fPIC",
-                "-std=c++17",
-                "-O3",
-                "-Wall",
-                "-DNB_SHARED",
-                "-fvisibility=hidden",
-            ],
-            # List tbb here, but also force it via extra_link_args for hipcc
-            libraries=["tbb"],
-            library_dirs=tbb_dirs + [os.path.join(ROCM_PATH, "lib")],
-            extra_link_args=[
-                f"-L{os.path.join(ROCM_PATH, 'lib')}",
-                "-pthread",
-                "-Wl,--no-as-needed",
-                "-ltbb",                 # ensure TBB is pulled in
-                *rpaths,
-            ],
-        ),
-    ]
-
-    setup(
-        name="origami",
-        ext_modules=ext_modules,
-        cmdclass={"build_ext": HIPCCBuildExt},
-        setup_requires=["nanobind>=2.0.0"],
-        install_requires=["nanobind>=2.0.0"],
-    )
+setup(
+    name="origami",
+    version=get_version(),
+    author="AMD",
+    description="Python bindings for Origami GPU performance modeling library",
+    long_description=get_long_description(),
+    long_description_content_type="text/markdown",
+    url="https://github.com/ROCm/rocm-libraries",
+    
+    # Force binary distribution (platform-specific wheel)
+    distclass=BinaryDistribution,
+    
+    # Package discovery - explicitly list packages
+    packages=["origami"],
+    
+    # Include all .so files and other package data
+    package_data={
+        "origami": ["*.so", "*.pyd", "*.dylib"],  # Include all binary extensions
+    },
+    include_package_data=True,
+    
+    # Python version requirement
+    python_requires=">=3.8",
+    
+    # No build-time dependencies (binaries are pre-built)
+    # Runtime dependencies are optional
+    install_requires=[],
+    
+    # Optional dependencies
+    extras_require={
+        "torch": ["torch>=2.0.0"],  # For PyTorch ATen ops
+    },
+    
+    # Metadata
+    classifiers=[
+        "Development Status :: 4 - Beta",
+        "Intended Audience :: Developers",
+        "Intended Audience :: Science/Research",
+        "License :: OSI Approved :: MIT License",
+        "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
+        "Programming Language :: C++",
+        "Topic :: Scientific/Engineering",
+        "Topic :: Software Development :: Libraries",
+    ],
+    
+    # This is important: we're installing pre-built binaries
+    zip_safe=False,
+)
