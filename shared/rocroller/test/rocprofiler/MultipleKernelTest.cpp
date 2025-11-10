@@ -22,7 +22,6 @@
 
 #include "Agent.hpp"
 
-#include "../catch/CustomMatchers.hpp"
 #include <common/SourceMatcher.hpp>
 #include <common/Utilities.hpp>
 #include <rocRoller/AssemblyKernel.hpp>
@@ -35,10 +34,13 @@
 #include <rocRoller/GPUArchitecture/GPUArchitectureLibrary.hpp>
 #include <rocRoller/KernelArguments.hpp>
 #include <rocRoller/Operations/Command.hpp>
+#include <rocRoller/Operations/CommandArgument.hpp>
 #include <rocRoller/Utilities/Generator.hpp>
 #include <rocRoller/Utilities/HipUtils.hpp>
 
+#include "../catch/CustomMatchers.hpp"
 #include "../catch/TestContext.hpp"
+#include "../catch/TestKernels.hpp"
 
 #include <fmt/format.h>
 
@@ -62,101 +64,131 @@ using namespace rocRoller;
 
 namespace RocprofilerTest
 {
-    struct KernelSetup
+    class RocprofilerTestKernel : public AssemblyTestKernel
     {
-        TestContext               testContext;
-        CommandKernel             kernel;
-        std::shared_ptr<uint32_t> d_ptr;
-        CommandArguments          commandArgs;
+        KernelInvocation m_invocation;
 
-        static KernelSetup createAddKernel(TestContext&& testContext,
-                                           uint32_t      literal,
-                                           uint32_t      commandArg,
-                                           uint          workgroupSize = 256,
-                                           uint          workitemCount = 256 * 256);
-        static KernelSetup createMovKernel(TestContext&& testContext,
-                                           uint32_t      literal,
-                                           uint          workgroupSize = 256,
-                                           uint          workitemCount = 256 * 256);
+    public:
+        RocprofilerTestKernel(ContextPtr context, KernelInvocation invocation)
+            : AssemblyTestKernel(context)
+            , m_invocation(invocation)
+        {
+            auto k = m_context->kernel();
+            k->setKernelDimensions(1);
+            k->setWorkgroupSize(m_invocation.workgroupSize);
+
+            k->setWorkitemCount(
+                {std::make_shared<Expression::Expression>(m_invocation.workitemCount[0]),
+                 std::make_shared<Expression::Expression>(m_invocation.workitemCount[1]),
+                 std::make_shared<Expression::Expression>(m_invocation.workitemCount[2])});
+        }
+
+        template <typename... Args>
+        void operator()(Args const&... args)
+        {
+            AssemblyTestKernel::operator()(m_invocation, args...);
+        }
     };
 
-    KernelSetup KernelSetup::createAddKernel(TestContext&& testContext,
-                                             uint32_t      literal,
-                                             uint32_t      commandArg,
-                                             uint          workgroupSize,
-                                             uint          workitemCount)
+    class AddTestKernel : public RocprofilerTestKernel
     {
-        auto command = std::make_shared<Command>();
+    public:
+        AddTestKernel(ContextPtr context,
+                      uint32_t   literal,
+                      uint       workgroupSize = 256,
+                      uint       workitemCount = 256 * 256)
+            : RocprofilerTestKernel(
+                context, KernelInvocation{{workitemCount, 1, 1}, {workgroupSize, 1, 1}, 0})
+            , m_literal(literal)
+        {
+        }
 
-        VariableType uintPtr{DataType::UInt32, PointerType::PointerGlobal};
-        VariableType uintVal{DataType::UInt32, PointerType::Value};
+    protected:
+        void generate() override
+        {
+            auto k = m_context->kernel();
 
-        auto ptrTag  = command->allocateTag();
-        auto ptr_arg = command->allocateArgument(uintPtr, ptrTag, ArgumentType::Value);
-        auto valTag  = command->allocateTag();
-        auto val_arg = command->allocateArgument(uintVal, valTag, ArgumentType::Value);
+            k->addArgument(
+                {"ptr", {DataType::UInt32, PointerType::PointerGlobal}, DataDirection::WriteOnly});
+            k->addArgument({"val", {DataType::UInt32}, DataDirection::ReadOnly});
 
-        auto ptr_exp = std::make_shared<Expression::Expression>(ptr_arg);
-        auto val_exp = std::make_shared<Expression::Expression>(val_arg);
+            m_context->schedule(k->preamble());
+            m_context->schedule(k->prolog());
 
-        auto context = testContext.get();
-        auto k       = context->kernel();
+            auto kb = [&]() -> Generator<Instruction> {
+                Register::ValuePtr s_ptr, s_value;
+                co_yield m_context->argLoader()->getValue("ptr", s_ptr);
+                co_yield m_context->argLoader()->getValue("val", s_value);
 
-        k->setKernelDimensions(1);
+                auto v_ptr
+                    = Register::Value::Placeholder(m_context,
+                                                   Register::Type::Vector,
+                                                   {DataType::UInt32, PointerType::PointerGlobal},
+                                                   1);
+                auto v_value = Register::Value::Placeholder(
+                    m_context, Register::Type::Vector, DataType::UInt32, 1);
 
-        const auto one = std::make_shared<Expression::Expression>(1u);
-        k->setWorkgroupSize({workgroupSize, 1, 1});
-        k->setWorkitemCount({std::make_shared<Expression::Expression>(workitemCount), one, one});
+                co_yield v_ptr->allocate();
+                co_yield m_context->copier()->copy(v_ptr, s_ptr, "Move pointer");
 
-        k->addArgument({"ptr",
-                        {DataType::UInt32, PointerType::PointerGlobal},
-                        DataDirection::WriteOnly,
-                        ptr_exp});
-        k->addArgument({"val", {DataType::UInt32}, DataDirection::ReadOnly, val_exp});
+                co_yield v_value->allocate();
+                co_yield Expression::generate(v_value, Expression::literal(m_literal), m_context);
+                co_yield Expression::generate(
+                    v_value, v_value->expression() + s_value->expression(), m_context);
 
-        context->schedule(k->preamble());
-        context->schedule(k->prolog());
+                co_yield m_context->mem()->storeGlobal(v_ptr, v_value, 0, 4);
+            };
 
-        auto kb = [&]() -> Generator<Instruction> {
-            Register::ValuePtr s_ptr, s_value;
-            co_yield context->argLoader()->getValue("ptr", s_ptr);
-            co_yield context->argLoader()->getValue("val", s_value);
+            m_context->schedule(kb());
 
-            auto v_ptr = Register::Value::Placeholder(
-                context, Register::Type::Vector, {DataType::UInt32, PointerType::PointerGlobal}, 1);
-            auto v_value = Register::Value::Placeholder(
-                context, Register::Type::Vector, DataType::UInt32, 1);
+            m_context->schedule(k->postamble());
+            m_context->schedule(k->amdgpu_metadata());
+        }
 
-            co_yield v_ptr->allocate();
-            co_yield context->copier()->copy(v_ptr, s_ptr, "Move pointer");
+    private:
+        uint32_t m_literal;
+    };
 
-            co_yield v_value->allocate();
-            co_yield Expression::generate(v_value, Expression::literal(literal), context);
-            co_yield Expression::generate(
-                v_value, v_value->expression() + s_value->expression(), context);
+    class MovTestKernel : public RocprofilerTestKernel
+    {
+    public:
+        MovTestKernel(ContextPtr context,
+                      uint32_t   literal,
+                      uint       workgroupSize = 256,
+                      uint       workitemCount = 256 * 256)
+            : RocprofilerTestKernel(
+                context, KernelInvocation{{workitemCount, 1, 1}, {workgroupSize, 1, 1}, 0})
+            , m_literal(literal)
+        {
+        }
 
-            co_yield context->mem()->storeGlobal(v_ptr, v_value, 0, 4);
-        };
+    protected:
+        void generate() override
+        {
+            auto k = m_context->kernel();
 
-        context->schedule(kb());
+            m_context->schedule(k->preamble());
+            m_context->schedule(k->prolog());
 
-        context->schedule(k->postamble());
-        context->schedule(k->amdgpu_metadata());
+            auto kb = [&]() -> Generator<Instruction> {
+                auto v_value = Register::Value::Placeholder(
+                    m_context, Register::Type::Vector, DataType::UInt32, 1);
 
-        CommandKernel commandKernel;
-        commandKernel.setContext(context);
-        commandKernel.generateKernel();
+                co_yield v_value->allocate();
+                co_yield Expression::generate(v_value, Expression::literal(m_literal), m_context);
+            };
 
-        auto d_ptr = make_shared_device<uint32_t>(1, 0);
+            m_context->schedule(kb());
 
-        CommandArguments commandArgs = command->createArguments();
-        commandArgs.setArgument(ptrTag, ArgumentType::Value, d_ptr.get());
-        commandArgs.setArgument(valTag, ArgumentType::Value, commandArg);
+            m_context->schedule(k->postamble());
+            m_context->schedule(k->amdgpu_metadata());
+        }
 
-        return {std::move(testContext), std::move(commandKernel), d_ptr, commandArgs};
-    }
+    private:
+        uint32_t m_literal;
+    };
 
-    TEST_CASE("Rocprofiler add kernel", "[rocprofiler]")
+    TEST_CASE("Rocprofiler add kernel", "[rocprofiler][gpu]")
     {
         rocRoller::profiler::reset();
 
@@ -165,13 +197,16 @@ namespace RocprofilerTest
 
         std::string const testName = fmt::format("add_0x{:x}_value_{}", literal, commandArg);
 
-        auto kernelSetup = KernelSetup::createAddKernel(
-            TestContext::ForTestDevice({}, testName), literal, commandArg);
+        auto testContext = TestContext::ForTestDevice({}, testName);
+        auto context     = testContext.get();
+
+        AddTestKernel kernel(context, literal);
+        auto          d_ptr = make_shared_device<uint32_t>(1, 0);
 
         const auto latencies = rocRoller::profiler::loopUntilDispatchData(
-            [&]() { kernelSetup.kernel.launchKernel(kernelSetup.commandArgs.runtimeArguments()); });
+            [&]() { kernel(d_ptr.get(), commandArg); });
 
-        CHECK_THAT(kernelSetup.d_ptr, HasDeviceScalarEqualTo(commandArg + literal));
+        CHECK_THAT(d_ptr, HasDeviceScalarEqualTo(commandArg + literal));
 
         std::stringstream ss;
         ss << "Instruction, Total Latency, Hit Count, Average Latency" << std::endl;
@@ -184,7 +219,7 @@ namespace RocprofilerTest
         INFO(ss.str());
 
         {
-            const auto target = kernelSetup.testContext.get()->targetArchitecture().target();
+            const auto target = context->targetArchitecture().target();
             if(target.isCDNA1GPU() || target.isRDNAGPU())
                 REQUIRE(latencies.size() == 9);
             else
@@ -207,135 +242,62 @@ namespace RocprofilerTest
         }
     }
 
-    KernelSetup KernelSetup::createMovKernel(TestContext&& testContext,
-                                             uint32_t      literal,
-                                             uint          workgroupSize,
-                                             uint          workitemCount)
-    {
-        auto command = std::make_shared<Command>();
-
-        auto context = testContext.get();
-        auto k       = context->kernel();
-
-        k->setKernelDimensions(1);
-
-        const auto one = std::make_shared<Expression::Expression>(1u);
-        k->setWorkgroupSize({workgroupSize, 1, 1});
-        k->setWorkitemCount({std::make_shared<Expression::Expression>(workitemCount), one, one});
-
-        context->schedule(k->preamble());
-        context->schedule(k->prolog());
-
-        auto kb = [&]() -> Generator<Instruction> {
-            auto v_value = Register::Value::Placeholder(
-                context, Register::Type::Vector, DataType::UInt32, 1);
-
-            co_yield v_value->allocate();
-            co_yield Expression::generate(v_value, Expression::literal(literal), context);
-        };
-
-        context->schedule(kb());
-
-        context->schedule(k->postamble());
-        context->schedule(k->amdgpu_metadata());
-
-        CommandKernel commandKernel;
-        commandKernel.setContext(context);
-        commandKernel.generateKernel();
-
-        CommandArguments commandArgs = command->createArguments();
-
-        return {std::move(testContext), std::move(commandKernel), nullptr, commandArgs};
-    }
-
-    TEST_CASE("Rocprofiler different literals in assembly", "[rocprofiler]")
+    TEST_CASE("Rocprofiler different literals in assembly", "[rocprofiler][gpu]")
     {
         /*
         Ensure callbacks are properly handled and correctly mapped to a dispatch.
         Kernels with different literals are launched in various orders.
         Ensures the profiler returns instructions from the correct kernel.
         */
-
         rocRoller::profiler::reset();
 
         std::vector<uint32_t> literals
             = {0xbeef0000, 0xbeef0001, 0xbeef0002, 0xbeef0003, 0xbeef0004, 0xbeef0005, 0xbeef0006};
-        std::vector<KernelSetup> kernelSetups;
 
-        for(uint32_t literal : literals)
-        {
-            std::string const testName = fmt::format("different_literals_0x{:x}", literal);
-            kernelSetups.push_back(
-                KernelSetup::createMovKernel(TestContext::ForTestDevice({}, testName), literal));
-        }
-
-        std::vector<rocRoller::profiler::InstructionProfile> latencies;
-        std::string                                          literalHex;
+        std::vector<size_t> order;
+        std::string         sectionName;
 
         SECTION("Order 1")
         {
-            INFO("Order 1");
-            std::vector<size_t> order = {0, 1, 2, 1};
-            for(size_t idx : order)
-            {
-                kernelSetups[idx].kernel.launchKernel(
-                    kernelSetups[idx].commandArgs.runtimeArguments());
-            }
-
-            latencies = rocRoller::profiler::loopUntilDispatchData([&]() {
-                kernelSetups[order.back()].kernel.launchKernel(
-                    kernelSetups[order.back()].commandArgs.runtimeArguments());
-            });
-
-            literalHex = fmt::format("0x{:x}", literals[order.back()]);
+            order       = {0, 1, 2, 1};
+            sectionName = "order_1";
         }
 
         SECTION("Order 2")
         {
-            INFO("Order 2");
-            std::vector<size_t> order = {3, 4};
-            for(size_t idx : order)
-            {
-                kernelSetups[idx].kernel.launchKernel(
-                    kernelSetups[idx].commandArgs.runtimeArguments());
-            }
-
-            latencies = rocRoller::profiler::loopUntilDispatchData([&]() {
-                kernelSetups[order.back()].kernel.launchKernel(
-                    kernelSetups[order.back()].commandArgs.runtimeArguments());
-            });
-
-            literalHex = fmt::format("0x{:x}", literals[order.back()]);
+            order       = {3, 4};
+            sectionName = "order_2";
         }
 
         SECTION("Order 3")
         {
-            INFO("Order 3");
-            std::vector<size_t> order = {6, 5, 4, 3, 2, 1, 0};
-            for(size_t idx : order)
-            {
-                kernelSetups[idx].kernel.launchKernel(
-                    kernelSetups[idx].commandArgs.runtimeArguments());
-            }
-
-            latencies = rocRoller::profiler::loopUntilDispatchData([&]() {
-                kernelSetups[order.back()].kernel.launchKernel(
-                    kernelSetups[order.back()].commandArgs.runtimeArguments());
-            });
-
-            literalHex = fmt::format("0x{:x}", literals[order.back()]);
+            order       = {6, 5, 4, 3, 2, 1, 0};
+            sectionName = "order_3";
         }
 
-        SECTION("Multiple launches")
+        INFO(sectionName);
+
+        std::vector<MovTestKernel> kernels;
+        kernels.reserve(literals.size());
+
+        for(size_t i = 0; i < literals.size(); ++i)
         {
-            INFO("Multiple launches");
-            latencies = rocRoller::profiler::loopUntilDispatchData([&]() {
-                kernelSetups[4].kernel.launchKernel(kernelSetups[4].commandArgs.runtimeArguments());
-                kernelSetups[2].kernel.launchKernel(kernelSetups[2].commandArgs.runtimeArguments());
-            });
-            // Behavior is to use first dispatched kernel's data
-            literalHex = fmt::format("0x{:x}", literals[4]);
+            std::string const testName
+                = fmt::format("{}_literal_0x{:x}_kernel_{}", sectionName, literals[i], i);
+            auto testContext = TestContext::ForTestDevice({}, testName);
+            auto context     = testContext.get();
+            kernels.emplace_back(context, literals[i]);
         }
+
+        for(size_t i = 0; i < order.size() - 1; ++i)
+        {
+            kernels[order[i]]();
+        }
+
+        auto latencies
+            = rocRoller::profiler::loopUntilDispatchData([&]() { kernels[order.back()](); });
+
+        auto literalHex = fmt::format("0x{:x}", literals[order.back()]);
 
         CAPTURE(literalHex);
         INFO(toString(latencies));
@@ -344,7 +306,39 @@ namespace RocprofilerTest
         CHECK(latencies[1].instruction == "s_endpgm");
     }
 
-    TEST_CASE("Rocprofiler small workgroup count", "[rocprofiler]")
+    TEST_CASE("Rocprofiler two kernels in loopUntilDispatchData", "[rocprofiler][gpu]")
+    {
+        rocRoller::profiler::reset();
+
+        const auto literal1 = 0xbeef1111;
+        const auto literal2 = 0xbeef2222;
+
+        auto          testContext1 = TestContext::ForTestDevice({}, "1");
+        auto          context1     = testContext1.get();
+        MovTestKernel kernel1(context1, literal1);
+
+        auto          testContext2 = TestContext::ForTestDevice({}, "2");
+        auto          context2     = testContext2.get();
+        MovTestKernel kernel2(context2, literal2);
+
+        const auto latencies = rocRoller::profiler::loopUntilDispatchData([&]() {
+            kernel1();
+            kernel2();
+            // Current implementation captures first dispatch
+        });
+
+        const auto literal1Hex = fmt::format("0x{:x}", literal1);
+        const auto literal2Hex = fmt::format("0x{:x}", literal2);
+
+        CAPTURE(literal1Hex, literal2Hex);
+        INFO(toString(latencies));
+        REQUIRE(latencies.size() == 2);
+        CHECK(1 == countSubstring(latencies[0].instruction, literal1Hex));
+        CHECK(0 == countSubstring(latencies[0].instruction, literal2Hex));
+        CHECK(latencies[1].instruction == "s_endpgm");
+    }
+
+    TEST_CASE("Rocprofiler small workgroup count", "[rocprofiler][gpu]")
     {
         /*
         With a small workgroup count, the filtered-for SE/CU/SIMD may not be used.
@@ -354,11 +348,12 @@ namespace RocprofilerTest
 
         const auto literal = 0xdead1234;
 
-        auto kernelSetup = KernelSetup::createMovKernel(
-            TestContext::ForTestDevice({}, "small_workgroup_count", literal), literal, 64, 128);
+        auto testContext = TestContext::ForTestDevice({}, "small_workgroup_count");
+        auto context     = testContext.get();
 
-        const auto latencies = rocRoller::profiler::loopUntilDispatchData(
-            [&]() { kernelSetup.kernel.launchKernel(kernelSetup.commandArgs.runtimeArguments()); });
+        MovTestKernel kernel(context, literal, 64, 64 * 64);
+
+        const auto latencies = rocRoller::profiler::loopUntilDispatchData([&]() { kernel(); });
 
         const auto literalHex = fmt::format("0x{:x}", literal);
 

@@ -89,30 +89,30 @@ namespace origami
 
     // Computes the number of active compute units if there is only one wave and it is partial
     // Otherwise, returns hardware.N_CU
-    std::tuple<size_t, size_t, size_t> compute_CU_occupancy(const hardware_t& hardware,
-                                                            size_t            M,
-                                                            size_t            N,
-                                                            size_t            K,
-                                                            size_t            batch,
-                                                            bool              transA,
-                                                            bool              transB,
-                                                            size_t            MT_M,
-                                                            size_t            MT_N,
-                                                            size_t            MT_K,
-                                                            size_t            MI_M,
-                                                            size_t            MI_N,
-                                                            size_t            MI_K,
-                                                            size_t            element_size_A,
-                                                            size_t            element_size_B,
-                                                            size_t            element_size_out,
-                                                            data_type_t       mi_datatype,
-                                                            int               WGM,
-                                                            size_t            workspace_size,
-                                                            size_t workspace_size_per_elem_c,
-                                                            int    occupancy,
-                                                            int    dynamic_grid_version,
-                                                            size_t split,
-                                                            size_t max_cus = 0)
+    std::tuple<size_t, size_t, size_t, size_t> compute_CU_occupancy(const hardware_t& hardware,
+                                                                    size_t            M,
+                                                                    size_t            N,
+                                                                    size_t            K,
+                                                                    size_t            batch,
+                                                                    bool              transA,
+                                                                    bool              transB,
+                                                                    size_t            MT_M,
+                                                                    size_t            MT_N,
+                                                                    size_t            MT_K,
+                                                                    size_t            MI_M,
+                                                                    size_t            MI_N,
+                                                                    size_t            MI_K,
+                                                                    size_t            element_size_A,
+                                                                    size_t            element_size_B,
+                                                                    size_t            element_size_out,
+                                                                    data_type_t       mi_datatype,
+                                                                    int               WGM,
+                                                                    size_t            workspace_size,
+                                                                    size_t workspace_size_per_elem_c,
+                                                                    int    occupancy,
+                                                                    int    dynamic_grid_version,
+                                                                    size_t split,
+                                                                    size_t max_cus)
     {
         // Number of output MTs
         size_t numMT_M = safe_ceil_div(M, MT_M);
@@ -198,7 +198,7 @@ namespace origami
             hardware.log_debug("max_cus", max_cus);
         }
 
-        return std::make_tuple(numActiveCUs, numWaves, splitFactor);
+        return std::make_tuple(numWGs, numActiveCUs, numWaves, splitFactor);
     }
 
     /* ---------------------------------------------------------------------------------------- */
@@ -932,7 +932,7 @@ namespace origami
                                 data_type_t       mi_datatype,
                                 size_t            mx_block_size,
                                 int               WGM,
-                                size_t            occupancy,
+                                int               occupancy,
                                 size_t            numActiveCUs,
                                 size_t            splittingFactor)
     {
@@ -1000,8 +1000,8 @@ namespace origami
         int grid_m         = static_cast<int>(safe_ceil_div(M, MT_M));
         int grid_n         = static_cast<int>(safe_ceil_div(N, MT_N));
         int real_occupancy = std::min(occupancy,
-                                      safe_ceil_div(grid_m * grid_n * batch * splittingFactor,
-                                                    hardware.N_CU)); // Number of WGs per CU.
+                                      static_cast<int>(safe_ceil_div(grid_m * grid_n * batch * splittingFactor,
+                                                       hardware.N_CU))); // Number of WGs per CU.
         L_prologue         = L_prologue * pow(0.95, real_occupancy); // Factor chosen empirically
         L_epilogue         = L_epilogue * pow(0.95, real_occupancy); // Factor chosen empirically
         // 4') K-split reductions are globally coherent, we need to write and read split-1 MT_M*MT_N
@@ -1147,7 +1147,7 @@ namespace origami
                                 data_type_t       mi_datatype,
                                 size_t            mx_block_size,
                                 int               WGM,
-                                size_t            occupancy,
+                                int               occupancy,
                                 size_t            numActiveCUs,
                                 size_t            splittingFactor)
     {
@@ -1199,9 +1199,9 @@ namespace origami
                                  data_type_t       mi_datatype,
                                  size_t            mx_block_size,
                                  int               WGM,
-                                 size_t            non_temporal_a,
-                                 size_t            non_temporal_b,
-                                 size_t            occupancy,
+                                 int               non_temporal_a,
+                                 int               non_temporal_b,
+                                 int               occupancy,
                                  size_t            split,
                                  size_t            max_cus)
     {
@@ -1239,13 +1239,62 @@ namespace origami
                 MI_N = 1;
                 MI_K = 64;
             }
+
+
+
+
+            if(batch == 1)
+            {
+
+
+
+            size_t K_mod_128bytes    = K * safe_ceil_div(element_size_A, 8) % 128;
+            size_t MT_K_mod_128bytes = MT_K * safe_ceil_div(element_size_A, 8) % 128;
+            if(K_mod_128bytes == 0 && MT_K_mod_128bytes == 0 && batch == 1)
+            {
+                // avoid division by 0 if K == 0
+                if(M <= MT_M *2 && !transB && ((N * element_size_B)/(M * element_size_A) > 5))
+                {
+                    //Use nontemporal B
+                    if(!(non_temporal_b == 4))
+                    {
+                        return std::numeric_limits<double>::max();
+                    }
+                }
+                else if(N <= MT_N *2 && transA && ((M * element_size_A)/(N * element_size_B) > 5))
+                {
+                    //Use Non Temporal A
+                    if(!(non_temporal_a == 4))
+                    {
+                        return std::numeric_limits<double>::max();
+                    }
+                }
+                else
+                {
+                    //Never use Non Temporal
+                    if(non_temporal_a || non_temporal_b)
+                    {
+                        return std::numeric_limits<double>::max();
+                    }
+                }
+            }
+            else if(non_temporal_a || non_temporal_b)
+            {
+                    return std::numeric_limits<double>::max();
+            }
+    
+        }
+
+
+
         }
 
         // 1-1) WGM
         WGM = std::max(WGM, 1); // WGM can't be less than one.
+        occupancy = std::max(occupancy, 1); // occupancy can't be less than one.
 
         // 1-2) Find CU occupancy
-        auto [numActiveCUs, numWaves, splittingFactor]
+        auto [numWGs, numActiveCUs, numWaves, splittingFactor]
             = compute_CU_occupancy(hardware,
                                    M,
                                    N,
@@ -1311,6 +1360,9 @@ namespace origami
 
         const char* env = std::getenv("ANALYTICAL_GEMM_HEURISTICS");
         heuristics      = !(env && std::string(env) == "0");
+
+
+
         // heuristics = 0;
         //  Heuristics for TF32
         bool tf32_emu = ((mi_datatype == data_type_t::XFloat32)

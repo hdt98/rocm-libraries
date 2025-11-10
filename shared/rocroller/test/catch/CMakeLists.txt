@@ -64,6 +64,7 @@ target_sources(rocroller-tests-catch
         "${CMAKE_CURRENT_SOURCE_DIR}/KernelGraphRemoveDuplicatesTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/KernelGraphSimplifyTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/LDSAllocationTest.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/LDSBankModelTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/LargerLDSTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/LoadPackedTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/MEMObserverTest.cpp"
@@ -74,6 +75,7 @@ target_sources(rocroller-tests-catch
         "${CMAKE_CURRENT_SOURCE_DIR}/RandomNumberGenerationTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/RegisterTagManagerTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/RegisterTest.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/RemapOutputTilesTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/ScalarExpressionTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/ScaleUtilsTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/SettingsTest.cpp"
@@ -89,6 +91,7 @@ target_sources(rocroller-tests-catch
         "${CMAKE_CURRENT_SOURCE_DIR}/WMMAHazardObserverTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/WMMAObserverUnitTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/WidenAddrExprTo64bitTest.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/WorkgroupRemapXCCTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/mxDataGeneratorTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/RotatingBufferTest.cpp" 
 )

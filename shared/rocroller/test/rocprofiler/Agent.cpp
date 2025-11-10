@@ -131,6 +131,12 @@ namespace rocRoller
         Don't use AssertFatal macro, as that is caught as a rocprofiler error and masks the real issue.
         Handle other record types https://rocm.docs.amd.com/projects/rocprofiler-sdk/en/latest/api-reference/thread_trace.html#trace-decoder-info-events
         */
+        Log::info(
+            "trace_decode_callback: record_type_id {}, num_events {}",
+            static_cast<std::underlying_type_t<rocprofiler_thread_trace_decoder_record_type_t>>(
+                record_type_id),
+            num_events);
+
         TraceDecodeCallbackUserData* userdata
             = static_cast<TraceDecodeCallbackUserData*>(userdata_raw);
 
@@ -141,7 +147,6 @@ namespace rocRoller
         {
         case ROCPROFILER_THREAD_TRACE_DECODER_RECORD_WAVE:
         {
-            Log::debug("trace_decode_callback: decoding {}", num_events);
             assert(num_events == 1 && "expected one event for WAVE record type");
             auto* wave = static_cast<rocprofiler_thread_trace_decoder_wave_t*>(events);
             Log::debug("  wave : cu {}, simd {}, wave_id {}, contexts {}, instructions_size {}",
@@ -229,7 +234,7 @@ namespace rocRoller
         rocprofiler_dispatch_id_t dispatch_id
             = static_cast<rocprofiler_dispatch_id_t>(userdata.value);
 
-        Log::info("shader_data_callback: dispatch_id {}", dispatch_id);
+        Log::info("shader_data_callback: dispatch_id {}, data_size {}", dispatch_id, data_size);
 
         // Note this exists to also prevent a deadlock, as profile_data.size() is checked under profile_data_cv.wait
         assert(data != nullptr && data_size > 0 && "invalid shader data callback");
@@ -281,7 +286,6 @@ namespace rocRoller
             auto parameters = std::vector<rocprofiler_thread_trace_parameter_t>{};
             parameters.push_back({ROCPROFILER_THREAD_TRACE_PARAMETER_TARGET_CU, 1});
             parameters.push_back({ROCPROFILER_THREAD_TRACE_PARAMETER_SHADER_ENGINE_MASK, 0x1});
-            parameters.push_back({ROCPROFILER_THREAD_TRACE_PARAMETER_SIMD_SELECT, 0x1});
             parameters.push_back({ROCPROFILER_THREAD_TRACE_PARAMETER_SERIALIZE_ALL, 1});
             parameters.push_back({ROCPROFILER_THREAD_TRACE_PARAMETER_BUFFER_SIZE, 0x100000000});
 
@@ -345,7 +349,7 @@ namespace rocRoller
 
             profile_data_cv.wait(lock, [] { return !profile_data.empty(); });
 
-            Log::info("waitForData: acquired profile data");
+            Log::info("waitForData: acquired profile data, decoding {} bytes", profile_data.size());
 
             TraceDecodeCallbackUserData callback_user_data{.ok = true, .instruction_map = {}};
 
@@ -354,6 +358,9 @@ namespace rocRoller
                                                          profile_data.data(),
                                                          profile_data.size(),
                                                          &callback_user_data);
+
+            Log::info("waitForData: decoding complete, clearing {} bytes of profile data",
+                      profile_data.size());
 
             profile_data.clear();
             lock.unlock();
