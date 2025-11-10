@@ -32,6 +32,7 @@
 #include "TestContext.hpp"
 #include "TestKernels.hpp"
 
+#include <common/Scheduling.hpp>
 #include <common/SourceMatcher.hpp>
 #include <common/TestValues.hpp>
 
@@ -254,6 +255,45 @@ namespace MEMObserverTest
 
                 CHECK_THAT(context.output(), ContainsSubstring("s_waitcnt vmcnt(2)"));
             }
+        }
+    }
+
+    TEST_CASE("WeightlessDSMemObserver", "[observer]")
+    {
+        auto context = TestContext::ForTestDevice({});
+        auto v       = context.createRegisters(Register::Type::Vector, DataType::UInt32, 32);
+        auto zero    = Register::Value::Literal(0);
+
+        Scheduling::WeightlessDSMemObserver observer(context.get());
+
+        SECTION("Basic read operations without stalls")
+        {
+            const auto createDsRead = [&](auto src, auto dst) {
+                auto inst = Instruction("ds_write_b64", {src}, {dst, zero}, {}, "");
+                inst.setAddresses(generateLDSAddresses(64, 4, 4));
+                return inst;
+            };
+
+            std::vector<Instruction> insts;
+            for(int i = 0; i < 16; ++i)
+            {
+                insts.push_back(createDsRead(v[i], v[i]));
+                for(int j = 0; j < 4; ++j)
+                {
+                    insts.push_back(Instruction{"v_add_i32", {v[i * 2]}, {v[i * 2], zero}, {}, ""});
+                }
+            }
+
+            for(size_t i = 0; i < insts.size(); ++i)
+            {
+                CAPTURE(i);
+                auto inst = insts[i];
+
+                const auto status = context->observer()->peek(inst);
+                context->schedule(inst);
+            }
+
+            Log::info(context.output());
         }
     }
 }

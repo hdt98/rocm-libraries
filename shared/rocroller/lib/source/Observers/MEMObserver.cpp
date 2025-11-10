@@ -123,7 +123,6 @@ namespace rocRoller
         InstructionStatus WeightlessDSMemObserver::peek(Instruction const& inst) const
         {
             InstructionStatus status;
-
             if(GPUInstructionInfo::isLDS(inst.getOpCode()) && useWeightlessObserver(inst))
             {
                 auto [direction, dwords] = getLdsInfoFromOpcode(inst.getOpCode());
@@ -150,27 +149,36 @@ namespace rocRoller
             return status;
         }
 
-        void WeightlessDSMemObserver::modify(Instruction& inst) const {}
+        void WeightlessDSMemObserver::modify(Instruction& inst) const
+        {
+            if(GPUInstructionInfo::isLDS(inst.getOpCode()) && useWeightlessObserver(inst))
+            {
+                const auto status = peek(inst);
+                inst.addComment(fmt::format("WeightlessDSMemObserver {}: stall cycles {}",
+                                            m_programCycle,
+                                            status.stallCycles));
+            }
+        }
 
         void WeightlessDSMemObserver::observe(Instruction const& inst)
         {
             int wait = inst.getWaitCount().dscnt();
-            if(wait >= 0)
-            {
-                while(m_queue.size() > wait)
-                {
-                    auto& front    = m_queue.front();
-                    m_programCycle = std::max(m_programCycle, front.completionCycle);
-                    m_remainingSlots += front.slotsUsed;
-                    m_queue.pop_front();
-                    const_cast<Instruction&>(inst).addComment(
-                        fmt::format("WeightlessDSMemObserver: waited for wait count, remaining "
-                                    "slots {}",
-                                    m_remainingSlots));
-                }
-            }
+            // TODO: handle waitcount
 
             int instCycles = inst.numExecutedInstructions();
+
+            m_programCycle += instCycles + inst.peekedStatus().stallCycles;
+            while(!m_queue.empty() && m_programCycle >= m_queue.front().completionCycle)
+            {
+                auto& front = m_queue.front();
+                m_remainingSlots += front.slotsUsed;
+                const_cast<Instruction&>(inst).addComment(
+                    fmt::format("WeightlessDSMemObserver {}: freed {} slots, remaining slots {}",
+                                m_programCycle,
+                                front.slotsUsed,
+                                m_remainingSlots));
+                m_queue.pop_front();
+            }
 
             if(GPUInstructionInfo::isLDS(inst.getOpCode()) && useWeightlessObserver(inst))
             {
@@ -184,16 +192,15 @@ namespace rocRoller
                     m_programCycle = std::max(m_programCycle, front.completionCycle);
                     m_remainingSlots += front.slotsUsed;
                     m_queue.pop_front();
-                    const_cast<Instruction&>(inst).addComment(
-                        fmt::format("WeightlessDSMemObserver: waited for slots, remaining slots {}",
-                                    m_remainingSlots));
+                    const_cast<Instruction&>(inst).addComment(fmt::format(
+                        "WeightlessDSMemObserver {}: waiting for {} slots, remaining slots {}",
+                        m_programCycle,
+                        requiredSlots,
+                        m_remainingSlots));
                 }
 
                 LDSBankModel::MemoryOpLDS memOp{direction};
 
-                AssertFatal(inst.getAddresses().has_value(),
-                            "WeightlessDSMemObserver: LDS instruction missing addresses for cycle "
-                            "calculation.");
                 std::vector<size_t> addresses = inst.getAddresses().value();
 
                 LDSBankModel::RuntimeLDSInstruction ldsInst{memOp, dwords, addresses};
@@ -207,36 +214,25 @@ namespace rocRoller
                 m_remainingSlots -= requiredSlots;
                 m_programCycle += instCycles;
 
-                LDSQueueEntry entry{m_programCycle + cycles, requiredSlots};
+                const auto completionCycle
+                    = cycles + (m_queue.empty() ? m_programCycle : m_queue.back().completionCycle);
+                LDSQueueEntry entry{completionCycle, requiredSlots};
                 m_queue.push_back(entry);
 
                 std::stringstream queueStatus;
-                queueStatus << fmt::format("this takes {} cycles", cycles);
                 for(const auto& e : m_queue)
                 {
                     queueStatus << fmt::format(
                         "[cycle {}, slots {}] ", e.completionCycle, e.slotsUsed);
                 }
                 const_cast<Instruction&>(inst).addComment(
-                    fmt::format("WeightlessDSMemObserver: queued LDS instruction, remaining slots "
-                                "{}, program cycle {}, stall cycles {}, queue: {}",
-                                m_remainingSlots,
+                    fmt::format("WeightlessDSMemObserver {}: queued instruction taking {} cycles "
+                                "using {} slots, remaining slots {}, queue status: {}",
                                 m_programCycle,
-                                inst.peekedStatus().stallCycles,
+                                cycles,
+                                requiredSlots,
+                                m_remainingSlots,
                                 queueStatus.str()));
-            }
-            else
-            {
-                m_programCycle += instCycles + inst.peekedStatus().stallCycles;
-                while(!m_queue.empty() && m_programCycle >= m_queue.front().completionCycle)
-                {
-                    auto& front = m_queue.front();
-                    m_remainingSlots += front.slotsUsed;
-                    m_queue.pop_front();
-                    const_cast<Instruction&>(inst).addComment(
-                        fmt::format("WeightlessDSMemObserver: freed slots, remaining slots {}",
-                                    m_remainingSlots));
-                }
             }
         }
     }
