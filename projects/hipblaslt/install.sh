@@ -453,7 +453,7 @@ quiet=false
 enable_asm_comments=false
 
 
-rocm_path=/opt/rocm
+rocm_path=/opt/gfx13
 if ! [ -z ${ROCM_PATH+x} ]; then
     rocm_path=${ROCM_PATH}
 fi

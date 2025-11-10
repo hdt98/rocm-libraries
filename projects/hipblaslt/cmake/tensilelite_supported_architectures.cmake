@@ -14,6 +14,7 @@ set(SUPPORTED_ARCHITECTURES
     "gfx1151"
     "gfx1200"
     "gfx1201"
+    "gfx1300"
     "gfx908:xnack+"
     "gfx908:xnack-"
     "gfx90a:xnack+"
@@ -52,7 +53,8 @@ else()
         "gfx1150"
         "gfx1151"
         "gfx1200"
-        "gfx1201")
+        "gfx1201"
+        "gfx1300")
 endif()
 
 # Validate that all BASE_ARCHITECTURES are in the SUPPORTED_ARCHITECTURES list

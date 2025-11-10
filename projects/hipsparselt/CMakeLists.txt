@@ -15,6 +15,21 @@ if(POLICY CMP0077)
     cmake_policy(SET CMP0077 NEW) # option() honors normal variables
 endif()
 
+# OpenMP
+set(OpenMP_CXX_FLAGS "-fopenmp")
+set(OpenMP_CXX_LIB_NAMES "omp")
+set(OpenMP_C_FLAGS "-fopenmp")
+set(OpenMP_C_LIB_NAMES "omp")
+set(OpenMP_omp_LIBRARY /opt/rocm/llvm/lib/libomp.so)
+include_directories(/opt/rocm/llvm/include)
+
+# ROCTX
+find_library(ROCTX64_LIBRARY
+    NAMES roctx64 libroctx64
+    PATHS /opt/rocm/lib
+    REQUIRED
+)
+
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 # Set cpack license file here to avoid rocm-cmake warning

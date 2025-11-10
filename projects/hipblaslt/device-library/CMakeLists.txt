@@ -84,5 +84,5 @@ add_custom_target(tensilelite-device-libraries ALL
     DEPENDS "${output_stamp}"
 )
 
-add_subdirectory(extops)
+# add_subdirectory(extops)
 add_subdirectory(matrix-transform)

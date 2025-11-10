@@ -389,8 +389,8 @@ inline std::map<std::string, int> initArchCaps(const IsaVersion& isaVersion)
     if(checkInList(isaVersion, {{9, 5, 0}}))
         deviceLDS = 163840;
     rv["DeviceLDS"]          = deviceLDS;
-    rv["CMPXWritesSGPR"]     = checkNotInList(isaVersion[0], {10, 11, 12});
-    rv["HasWave32"]          = checkInList(isaVersion[0], {10, 11, 12});
+    rv["CMPXWritesSGPR"]     = checkNotInList(isaVersion[0], {10, 11, 12, 13});
+    rv["HasWave32"]          = checkInList(isaVersion[0], {10, 11, 12, 13});
     rv["HasSchedMode"]       = checkInList(isaVersion[0], {12});
     rv["HasAccCD"]           = checkInList(isaVersion, {{9, 0, 10}, {9, 4, 2}, {9, 5, 0}});
     rv["ArchAccUnifiedRegs"] = checkInList(isaVersion, {{9, 0, 10}, {9, 4, 2}, {9, 5, 0}});
@@ -427,6 +427,8 @@ inline std::map<std::string, int> initRegisterCaps(const IsaVersion&           i
             rv["PhysicalMaxVgprCU"] = 1536 * 32;
     else if(isaVersion[0] == 12)
         rv["PhysicalMaxVgprCU"] = 1536 * 32;
+    else if(isaVersion[0] == 13)
+        rv["PhysicalMaxVgprCU"] = 1024 * 32;
     else if(isaVersion[0] == 9)
         if(archCaps["ArchAccUnifiedRegs"])
             rv["PhysicalMaxVgprCU"] = 2048 * 64;

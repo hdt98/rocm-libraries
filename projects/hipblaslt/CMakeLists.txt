@@ -7,6 +7,14 @@ option(CMAKE_EXPORT_COMPILE_COMMANDS "Generate compile commands json file." ON)
 
 project(hipblaslt LANGUAGES CXX C ASM)
 
+# OpenMP
+set(OpenMP_CXX_FLAGS "-fopenmp")
+set(OpenMP_CXX_LIB_NAMES "omp")
+set(OpenMP_C_FLAGS "-fopenmp")
+set(OpenMP_C_LIB_NAMES "omp")
+set(OpenMP_omp_LIBRARY /opt/rocm/llvm/lib/libomp.so)
+include_directories(/opt/rocm/llvm/include)
+
 if("${CMAKE_SOURCE_DIR}" STREQUAL "${PROJECT_SOURCE_DIR}")
     set(HIPBLASLT_IS_SUBPROJECT FALSE)
 else()
@@ -49,7 +57,7 @@ if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
     endif()
 endif()
 
-option(HIPBLASLT_ENABLE_DEVICE "Build hipBLASLt device libraries." ON)
+option(HIPBLASLT_ENABLE_DEVICE "Build hipBLASLt device libraries." OFF)
 option(HIPBLASLT_ENABLE_CLIENT "Build hipBLASLt client apps." ON)
 option(HIPBLASLT_ENABLE_HOST "Build hipBLASLt host library." ON)
 option(HIPBLASLT_ENABLE_FETCH "Fetch dependencies using fetch content" OFF)
