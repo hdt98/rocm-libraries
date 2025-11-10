@@ -8,6 +8,6 @@
 
 // Test each combination of GEMM config and precision type tuple by forming a cartesian product
 using PrecTypes      = ::testing::Types<std::tuple<BF16, BF16, BF16>, std::tuple<BF16, I4, BF16>>;
-using BasicTestTypes = CartesianProduct_t<GemmConfigs, PrecTypes>;
+using BasicTestTypes = CartesianProduct_t<GemmConfigs<BF16>, PrecTypes>;
 
 #include "test_gemm_pipeline_basic_cases.hpp"

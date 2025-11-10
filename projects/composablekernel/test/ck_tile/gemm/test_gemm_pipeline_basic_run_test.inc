@@ -44,9 +44,11 @@ struct GemmConfig_Wmma : public GemmConfigBase
 };
 
 #if CK_TILE_USE_WMMA
-using GemmConfigs = ::testing::Types<GemmConfig_Wmma>;
+template <typename PrecType>
+using GemmConfigs = ::testing::Types<GemmConfig_Wmma<PrecType>>;
 #else
-using GemmConfigs = ::testing::Types<GemmConfig_Mfma>;
+template <typename PrecType>
+using GemmConfigs = ::testing::Types<GemmConfig_Mfma<PrecType>>;
 #endif
 
 template <typename GemmConfig,
@@ -204,99 +206,11 @@ class TestCkTileGemmPipelineBasic : public ::testing::Test
             bool is_success = true;
             std::cout << "-m=" << m << " -n=" << n << " -k=" << k << std::endl;
 
-template <typename GemmConfig, typename APrecType, typename BPrecType, typename CPrecType>
-bool run_gemm_test(int argc, char* argv[])
-{
-    auto [result, arg_parser] = create_args(argc, argv);
-    if(!result)
-        return false;
-
-    std::string a_layout = arg_parser.get_str("a_layout");
-    std::string b_layout = arg_parser.get_str("b_layout");
-
-    return run_gemm_test_prec_type<GemmConfig, APrecType, BPrecType, CPrecType>(
-        a_layout, b_layout, arg_parser);
-}
-
-template <typename APrecType, typename BPrecType = APrecType, typename CPrecType = APrecType>
-bool run_gemm_combinations()
-{
-    // Define possible values for each parameter
-    std::vector<std::string> m_values = {"128"};
-    std::vector<std::string> n_values = {"128"};
-    std::vector<std::string> k_values = {"64"};
-
-    // We'll store all our arguments as strings first
-    std::vector<std::string> arg_strings = {"./bin/tile_example_gemm_basic",
-                                            "", // m placeholder
-                                            "", // n placeholder
-                                            "", // k placeholder
-                                            "-stride_a=0",
-                                            "-stride_b=0",
-                                            "-stride_c=0",
-                                            "-v=2",
-                                            "-warmup=0",
-                                            "-repeat=1"};
-
-    // Create an array of const char pointers for argv
-    constexpr size_t ARG_COUNT   = 10;
-    constexpr size_t ARG_MAX_LEN = 64;
-    char args[ARG_COUNT][ARG_MAX_LEN];
-    char* argv[ARG_COUNT];
-
-    // Run all combinations
-    bool is_success = true;
-    for(const auto& m : m_values)
-    {
-        arg_strings[1] = "-m=" + m;
-
-        for(const auto& n : n_values)
-        {
-            arg_strings[2] = "-n=" + n;
-
-            for(const auto& k : k_values)
+            // Call the function with the current configuration
+            try
             {
-                arg_strings[3] = "-k=" + k;
-
-                // Set up the argv array with pointers to the string data
-                for(size_t i = 0; i < ARG_COUNT; i++)
-                {
-                    strncpy(args[i], arg_strings[i].c_str(), ARG_MAX_LEN);
-                    argv[i] = args[i];
-                }
-
-                std::cout << "Arguments received: ";
-                for(size_t i = 1; i < ARG_COUNT; ++i)
-                {
-                    std::cout << argv[i] << " ";
-                }
-                std::cout << std::endl;
-
-                // Call the function with the current configuration
-                try
-                {
-#if CK_TILE_USE_WMMA
-                    is_success =
-                        run_gemm_test<GemmConfig_Wmma<APrecType>, APrecType, BPrecType, CPrecType>(
-                            ARG_COUNT, argv) &&
-                        is_success;
-#else
-                    is_success =
-                        run_gemm_test<GemmConfig_Mfma<APrecType>, APrecType, BPrecType, CPrecType>(
-                            ARG_COUNT, argv) &&
-                        is_success;
-#endif
-                }
-                catch(const ArgumentsNotSupportedException& e)
-                {
-                    std::cerr << "Caught ArgumentsNotSupportedException: " << e.what() << '\n';
-                    // ArgumentsNotSupportedException  is not an error. Do not change is_success
-                }
-                catch(const std::runtime_error& e)
-                {
-                    std::cerr << "Caught runtime error: " << e.what() << '\n';
-                    is_success = false;
-                }
+                is_success =
+                    run_gemm_test_prec_type<GemmConfig, APrecType, BPrecType, CPrecType>(m, n, k);
             }
             catch(const ArgumentsNotSupportedException& e)
             {
