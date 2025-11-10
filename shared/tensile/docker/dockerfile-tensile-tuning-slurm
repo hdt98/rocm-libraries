@@ -73,6 +73,7 @@ ARG tensile_branch=develop
 ARG tensile_commit=HEAD
 
 # Check out desired Tensile code
+# TODO: Fix the tensile path as per the structure of rocm/rocm-libraries repo.
 RUN bash -xc \
 " \
     echo \"Tensile Fork: ${tensile_fork}\"; \

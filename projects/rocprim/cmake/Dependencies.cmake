@@ -159,7 +159,7 @@ else()
 endif()
 
 
-# rocRAND (https://github.com/ROCmSoftwarePlatform/rocRAND)
+# rocRAND (https://github.com/ROCm/rocm-libraries/tree/develop/projects/rocrand)
 if(WITH_ROCRAND)
   find_package(rocrand QUIET)
 endif()
@@ -175,9 +175,11 @@ if(WITH_ROCRAND AND NOT rocrand_FOUND)
   if(CMAKE_CXX_COMPILER_LAUNCHER)
     set(EXTRA_CMAKE_ARGS "${EXTRA_CMAKE_ARGS} -DCMAKE_CXX_COMPILER_LAUNCHER=${CMAKE_CXX_COMPILER_LAUNCHER}")
   endif()
+  # TODO: Fix GIT_REPOSITORY url and other relevant fields as per the structure
+  # of rocm/rocm-libraries repo.
   download_project(
     PROJ                  rocrand
-    GIT_REPOSITORY        https://github.com/ROCmSoftwarePlatform/rocRAND.git
+    GIT_REPOSITORY        https://github.com/ROCm/rocm-libraries.git
     GIT_TAG               develop
     GIT_SHALLOW           TRUE
     INSTALL_DIR           ${ROCRAND_ROOT}
