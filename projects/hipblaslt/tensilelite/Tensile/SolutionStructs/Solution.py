@@ -2017,6 +2017,9 @@ class Solution(collections.abc.Mapping):
         reject(state, printRejectionReason, "GRVWB * DataTypeB.numBytes() > 16")
 
       disableGNLC = False # Set to true to disable GNLC if needed
+      # Temporary hack, if usesgprforgro is set to 1 to save vgprs, disable GNLC
+      if state["UseSgprForGRO"] == 1:
+        disableGNLC = True
       isMixedPrec = (state["ProblemType"]["DataTypeA"].numBytes() != state["ProblemType"]["DataTypeB"].numBytes())
       if state["DirectToLds"] and state["LocalSplitU"] == 1 \
          and not isMixedPrec and not state["ProblemType"]["Sparse"] \
