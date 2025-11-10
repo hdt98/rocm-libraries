@@ -172,6 +172,29 @@ struct GridwiseGemm_wmma_cshuffle_v3_base
             return 1;
     }();
 
+    static constexpr index_t WaveSize =
+        WmmaSelector<ComputeTypeA, ComputeTypeB, AccDataType, MPerWmma, NPerWmma>::selected_wmma
+            .wave_size;
+    using ATransferWaveTiles = ABTransferWaveTiles<ALayout,
+                                                   tensor_layout::gemm::RowMajor,
+                                                   LDSTypeA,
+                                                   BlockSize,
+                                                   MPerBlock,
+                                                   KPerBlock,
+                                                   MPerWmma,
+                                                   KPack,
+                                                   AK1Value,
+                                                   WaveSize>;
+    using BTransferWaveTiles = ABTransferWaveTiles<BLayout,
+                                                   tensor_layout::gemm::ColumnMajor,
+                                                   LDSTypeB,
+                                                   BlockSize,
+                                                   NPerBlock,
+                                                   KPerBlock,
+                                                   NPerWmma,
+                                                   KPack,
+                                                   BK1Value,
+                                                   WaveSize>;
     // Limitations of the current implementation:
     //  - no multiAB
     //  - GemmSpecialization Default
@@ -182,34 +205,24 @@ struct GridwiseGemm_wmma_cshuffle_v3_base
     static constexpr bool IsAWaveTransferApplicable =
         !ForceThreadTileTransfer && NumATensor == 1 && APackedSize == 1 &&
         GemmSpec == tensor_operation::device::GemmSpecialization::Default &&
-        BlkGemmPipelineVer == BlockGemmPipelineVersion::v1 && AK1Value == 8;
+        BlkGemmPipelineVer == BlockGemmPipelineVersion::v1 && AK1Value == 8 &&
+        ATransferWaveTiles::KRepeat_ > 0 && ATransferWaveTiles::MNRepeat_ > 0;
 
     static constexpr bool IsBWaveTransferApplicable =
         !ForceThreadTileTransfer && NumBTensor == 1 && BPackedSize == 1 &&
         GemmSpec == tensor_operation::device::GemmSpecialization::Default &&
-        BlkGemmPipelineVer == BlockGemmPipelineVersion::v1 && BK1Value == 8;
+        BlkGemmPipelineVer == BlockGemmPipelineVersion::v1 && BK1Value == 8 &&
+        BTransferWaveTiles::KRepeat_ > 0 && BTransferWaveTiles::MNRepeat_ > 0;
 #else
     static constexpr bool IsAWaveTransferApplicable = false;
     static constexpr bool IsBWaveTransferApplicable = false;
 #endif
 
-    static constexpr index_t WaveSize =
-        WmmaSelector<ComputeTypeA, ComputeTypeB, AccDataType, MPerWmma, NPerWmma>::selected_wmma
-            .wave_size;
     static constexpr bool UseBlockPaddingA =
         ABlockLdsExtraM || BlkGemmPipelineVer == BlockGemmPipelineVersion::v4;
     using ATransfer = typename std::conditional<
         IsAWaveTransferApplicable,
-        ABTransferWaveTiles<ALayout,
-                            tensor_layout::gemm::RowMajor,
-                            LDSTypeA,
-                            BlockSize,
-                            MPerBlock,
-                            KPerBlock,
-                            MPerWmma,
-                            KPack,
-                            AK1Value,
-                            WaveSize>,
+        ATransferWaveTiles,
         ABTransferThreadTiles<ALayout,
                               tensor_layout::gemm::RowMajor,
                               LDSTypeA,
@@ -233,16 +246,7 @@ struct GridwiseGemm_wmma_cshuffle_v3_base
 
     using BTransfer = typename std::conditional<
         IsBWaveTransferApplicable,
-        ABTransferWaveTiles<BLayout,
-                            tensor_layout::gemm::ColumnMajor,
-                            LDSTypeB,
-                            BlockSize,
-                            NPerBlock,
-                            KPerBlock,
-                            NPerWmma,
-                            KPack,
-                            BK1Value,
-                            WaveSize>,
+        BTransferWaveTiles,
         ABTransferThreadTiles<BLayout,
                               tensor_layout::gemm::ColumnMajor,
                               LDSTypeB,
