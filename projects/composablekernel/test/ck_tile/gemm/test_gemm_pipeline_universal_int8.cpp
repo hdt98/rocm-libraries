@@ -9,7 +9,7 @@
 #include "test_gemm_pipeline_type_param_product.hpp"
 
 // Test each combination of GEMM config and precision type tuple by forming a cartesian product
-using GemmConfigs        = GemmConfigsTemplate<INT32>;
+using GemmConfigs        = GemmConfigsTemplate<INT8>;
 using PrecTypes          = ::testing::Types<std::tuple<INT8, INT8, INT32>>;
 using UniversalTestTypes = CartesianProduct_t<GemmConfigs, PrecTypes>;
 
