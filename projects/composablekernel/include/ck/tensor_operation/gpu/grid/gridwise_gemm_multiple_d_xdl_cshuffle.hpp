@@ -509,6 +509,7 @@ struct GridwiseGemmMultipleD_xdl_cshuffle
 
     template <bool HasMainKBlockLoop,
               InMemoryDataOperationEnum EGlobalMemoryDataOperation,
+              bool BValidateOnTranspose = false,
               typename AGridDesc_AK0_M_AK1,
               typename BGridDesc_BK0_N_BK1,
               typename DsGridDesc_MBlock_MPerBlock_NBlock_NPerBlock,
@@ -635,7 +636,8 @@ struct GridwiseGemmMultipleD_xdl_cshuffle
                                                 1,
                                                 BThreadTransferSrcResetCoordinateAfterRun,
                                                 true,
-                                                NumGemmKPrefetchStage>(
+                                                NumGemmKPrefetchStage,
+                                                BValidateOnTranspose>(
                 b_grid_desc_bk0_n_bk1,
                 make_multi_index(num_bk0_per_block * k_idx, n_block_data_idx_on_grid, 0),
                 b_element_op,

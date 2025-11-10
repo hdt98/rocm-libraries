@@ -78,7 +78,8 @@ template <typename GridwiseGemm,
           bool HasMainKBlockLoop,
           bool isMultiA,
           bool isMultiB,
-          bool CTranspose>
+          bool CTranspose,
+          bool BValidateOnTranspose = false>
 __global__ void
 #if CK_USE_LAUNCH_BOUNDS
 __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
@@ -365,6 +366,11 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
     static constexpr bool CTranspose = (NeedTransposeKernel == false) && (isMultiAB == false) &&
                                        (is_same_v<ELayout, tensor_layout::convolution::NGKHW> ||
                                         is_same_v<ELayout, tensor_layout::convolution::NGKDHW>);
+
+    static constexpr bool BValidateOnTranspose =
+        (NeedTransposeKernel == false) && (isMultiAB == false) &&
+        (is_same_v<ELayout, tensor_layout::convolution::NGKHW> ||
+         is_same_v<ELayout, tensor_layout::convolution::NGKDHW>);
 
     using ConvToGemmFwdTransformer = TransformConvFwdToGemm<NDimSpatial,
                                                             ConvForwardSpecialization,
