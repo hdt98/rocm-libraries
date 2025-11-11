@@ -25,6 +25,10 @@ struct BaseGemmPipelineAgBgCrCompAsync
 
     CK_TILE_HOST static constexpr TailNumber GetBlockLoopTailNum(index_t num_loop)
     {
+        if(num_loop == 1)
+        {
+            return TailNumber::One;
+        }
         if(num_loop % PrefetchStages == 1)
         {
             return TailNumber::One;
@@ -64,6 +68,11 @@ struct BaseGemmPipelineAgBgCrCompAsync
             {
                 return run_func(bool_constant<false>{},
                                 integral_constant<TailNumber, TailNumber::Two>{});
+            }
+            else
+            {
+                return (run_func(bool_constant<false>{},
+                                 integral_constant<TailNumber, TailNumber::One>{}));
             }
         }
         // If execution reaches here, it's an invalid tail_number because it wasn't handled above.
@@ -454,11 +463,17 @@ struct GemmPipelineAgBgCrCompAsync : public BaseGemmPipelineAgBgCrCompAsync<Prob
                     block_gemm(c_block_tile, a_block_tile1, b_block_tile1);
                 }
             }
-            else
-            // 1 block gemms remaining
+            else if(TailNum == TailNumber::Two)
+            // 2 block gemms remaining
             {
                 block_sync_lds();
                 block_gemm(c_block_tile, a_block_tile0, b_block_tile0);
+            }
+            else if(TailNum == TailNumber::One)
+            {
+                block_sync_lds();
+                block_gemm(c_block_tile, a_block_tile0, b_block_tile0);
+                __builtin_amdgcn_sched_barrier(0);
             }
             return c_block_tile;
         }
