@@ -7286,6 +7286,10 @@ class KernelWriterAssembly(KernelWriter):
       module.addComment0("endSummation: add vgpr [%u...%u) to pool" % \
                         (vbegin, vbegin+vsize))
 
+    keptSgprs = []
+    # FP32 to FP8 SR without v_prng_b32 needs RNDSeed sgpr preserved
+    if kernel["ProblemType"]["DestDataType"].is8bitFloat() and kernel["ProblemType"]["StochasticRounding"] and not self.states.asmCaps["v_prng_b32"]:
+      keptSgprs.append("RNDSeed")
     lastRegTag=None
 
     spool = self.sgprPool.getPool()
@@ -7293,6 +7297,8 @@ class KernelWriterAssembly(KernelWriter):
       regTag = spool[i].tag
       if regTag != lastRegTag:
         lastRegTag = regTag
+        if lastRegTag in keptSgprs:
+          continue
         if (lastRegTag not in self.states.nonPostLoopSgpr) and (spool[i].status == RegisterPool.Status.InUse):
           if label == "Summation_End_OptNLL":
             self.undefineSgpr(regTag)
