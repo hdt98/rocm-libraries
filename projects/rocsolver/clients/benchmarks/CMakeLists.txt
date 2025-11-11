@@ -1,65 +1,43 @@
-# ##########################################################################
-# Copyright (C) 2016-2024 Advanced Micro Devices, Inc. All rights reserved.
-#
-# Redistribution and use in source and binary forms, with or without
-# modification, are permitted provided that the following conditions
-# are met:
-#
-# 1. Redistributions of source code must retain the above copyright
-#    notice, this list of conditions and the following disclaimer.
-#
-# 2. Redistributions in binary form must reproduce the above copyright
-#    notice, this list of conditions and the following disclaimer in the
-#    documentation and/or other materials provided with the distribution.
-#
-# THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
-# ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-# ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
-# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
-# OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
-# HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
-# LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
-# OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
-# SUCH DAMAGE.
-# ##########################################################################
+# Copyright Advanced Micro Devices, Inc., or its affiliates.
+# SPDX-License-Identifier: MIT
 
-set(rocsolver_bench_common_source
-  ${PROJECT_SOURCE_DIR}/common/src/common_host_helpers.cpp
+add_executable(rocsolver-bench)
+
+target_sources(rocsolver-bench PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/client.cpp"
+    "${PROJECT_SOURCE_DIR}/common/src/common_host_helpers.cpp"
 )
 
-add_executable(rocsolver-bench
-  client.cpp
-  ${common_source_paths}
-  ${rocsolver_bench_common_source}
-)
-if(USE_HIPCXX)
-  set_source_files_properties(
-    client.cpp
-    ${common_source_paths}
-    ${rocsolver_bench_common_source}
-    PROPERTIES
-      LANGUAGE HIP
-  )
-endif()
+target_compile_features(rocsolver-bench PRIVATE cxx_std_17)
 
 add_armor_flags(rocsolver-bench "${ARMOR_LEVEL}")
 
-target_link_libraries(rocsolver-bench PRIVATE
-  Threads::Threads
-  hip::host
-  rocsolver-common
-  clients-common
-  roc::rocsolver
+target_compile_definitions(rocsolver-bench PRIVATE
+    ROCM_USE_FLOAT16
+    ROCSOLVER_CLIENTS_BENCH
 )
+
+# Explicit dependencies - no INTERFACE library
+target_link_libraries(rocsolver-bench PRIVATE
+    roc::rocsolver
+    rocsolver-test-common
+    rocsolver-common
+    hip::host
+    Threads::Threads
+    ${LAPACK_LIBRARIES}
+    fmt::fmt-header-only
+    $<$<PLATFORM_ID:Linux>:stdc++fs>
+    $<$<PLATFORM_ID:Linux>:m>
+)
+
 if(NOT USE_HIPCXX)
-  target_link_libraries(rocsolver-bench PRIVATE hip::device)
+    target_link_libraries(rocsolver-bench PRIVATE hip::device)
 endif()
 
-target_compile_definitions(rocsolver-bench PRIVATE
-  ROCM_USE_FLOAT16
-  ROCSOLVER_CLIENTS_BENCH
-)
+if(LAPACK_LINKER_FLAGS)
+    target_link_options(rocsolver-bench PRIVATE
+        ${LAPACK_LINKER_FLAGS}
+    )
+endif()
 
 rocm_install(TARGETS rocsolver-bench COMPONENT benchmarks)

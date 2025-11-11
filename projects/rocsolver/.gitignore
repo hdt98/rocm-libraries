@@ -39,6 +39,9 @@ tags
 build/
 docBin/
 
+# cmake refactoring temporary files
+cmake-refactor/
+
 # emacs temporary/backup files
 .\#*
 \#*\#
