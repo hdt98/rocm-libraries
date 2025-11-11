@@ -192,7 +192,9 @@ __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
                 CTranspose ? 0
                            : amd_wave_read_first_lane(compute_ptr_offset_of_n.GetAPtrOffset(n_idx));
 
-            GridwiseGemm::template Run<HasMainKBlockLoop, InMemoryDataOperationEnum::Set>(
+            GridwiseGemm::template Run<HasMainKBlockLoop,
+                                       InMemoryDataOperationEnum::Set,
+                                       BValidateOnTranspose>(
                 p_as_grid + a_group_offset + a_n_offset,
                 p_bs_grid + b_group_offset + b_n_offset,
                 p_ds_grid_grp,
@@ -367,10 +369,7 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
                                        (is_same_v<ELayout, tensor_layout::convolution::NGKHW> ||
                                         is_same_v<ELayout, tensor_layout::convolution::NGKDHW>);
 
-    static constexpr bool BValidateOnTranspose =
-        (NeedTransposeKernel == false) && (isMultiAB == false) &&
-        (is_same_v<ELayout, tensor_layout::convolution::NGKHW> ||
-         is_same_v<ELayout, tensor_layout::convolution::NGKDHW>);
+    static constexpr bool BValidateOnTranspose = isATensorColMajor;
 
     using ConvToGemmFwdTransformer = TransformConvFwdToGemm<NDimSpatial,
                                                             ConvForwardSpecialization,
@@ -1213,7 +1212,8 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
                             has_main_loop,
                             isMultiA,
                             isMultiB,
-                            CTranspose>;
+                            CTranspose,
+                            BValidateOnTranspose>;
                         return launch_and_time_kernel(
                             stream_config,
                             kernel,

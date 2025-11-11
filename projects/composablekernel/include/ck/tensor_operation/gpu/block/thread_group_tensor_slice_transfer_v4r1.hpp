@@ -8,6 +8,7 @@
 #include "ck/tensor_description/tensor_descriptor_helper.hpp"
 #include "ck/tensor_description/cluster_descriptor.hpp"
 #include "ck/tensor_operation/gpu/thread/threadwise_tensor_slice_transfer_v3r1.hpp"
+#include "ck/tensor_operation/gpu/thread/threadwise_tensor_slice_transfer_v3r1_VldOnTrans.hpp"
 
 namespace ck {
 
@@ -173,7 +174,27 @@ struct ThreadGroupTensorSliceTransfer_v4r1
     static constexpr auto thread_cluster_desc_ =
         make_cluster_descriptor(ThreadClusterLengths{}, ThreadClusterArrangeOrder{});
 
-    using ThreadwiseTransfer =
+    using ThreadwiseTransfer = ck::conditional_t<
+        ValidateOnTranspose,
+        ThreadwiseTensorSliceTransfer_v3r1_VldOnTrans<decltype(thread_slice_lengths),
+                                                      SrcElementwiseOperation,
+                                                      DstElementwiseOperation,
+                                                      DstInMemOp,
+                                                      SrcData,
+                                                      DstData,
+                                                      SrcDesc,
+                                                      DstDesc,
+                                                      SrcDimAccessOrder,
+                                                      DstDimAccessOrder,
+                                                      SrcVectorDim,
+                                                      DstVectorDim,
+                                                      SrcScalarPerVector,
+                                                      DstScalarPerVector,
+                                                      SrcScalarStrideInVector,
+                                                      DstScalarStrideInVector,
+                                                      ThreadTransferSrcResetCoordinateAfterRun,
+                                                      ThreadTransferDstResetCoordinateAfterRun,
+                                                      NumThreadScratch>,
         ThreadwiseTensorSliceTransfer_v3r1<decltype(thread_slice_lengths),
                                            SrcElementwiseOperation,
                                            DstElementwiseOperation,
@@ -192,8 +213,7 @@ struct ThreadGroupTensorSliceTransfer_v4r1
                                            DstScalarStrideInVector,
                                            ThreadTransferSrcResetCoordinateAfterRun,
                                            ThreadTransferDstResetCoordinateAfterRun,
-                                           NumThreadScratch,
-                                           ValidateOnTranspose>;
+                                           NumThreadScratch>>;
 
     ThreadwiseTransfer threadwise_transfer_;
 };
