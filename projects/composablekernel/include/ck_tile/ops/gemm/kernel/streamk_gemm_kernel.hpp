@@ -851,8 +851,8 @@ struct StreamKKernel
     {
         hipDeviceProp_t dev_prop;
         hipDevice_t dev;
-        hip_check_error(hipGetDevice(&dev));
-        hip_check_error(hipGetDeviceProperties(&dev_prop, dev));
+        ck_tile::hip_check_error(hipGetDevice(&dev));
+        ck_tile::hip_check_error(hipGetDeviceProperties(&dev_prop, dev));
         int num_cu = dev_prop.multiProcessorCount;
 
         return num_cu;
