@@ -8,6 +8,7 @@
 #include <vector>
 
 #include <torch/torch.h>
+#include <c10/util/Logging.h>
 
 #include "origami/origami.hpp"
 
@@ -163,17 +164,17 @@ std::array<size_t, 3> infer_mi_dimensions(size_t element_bitsize_A,
 }
 
 std::vector<config_t> build_configs(const c10::optional<c10::List<c10::Dict<std::string, int64_t>>>& config_dicts,
-                                    const std::array<size_t, 3> mi_dim) {
+                                    const std::array<size_t, 3> mi_dim_infer) {
     std::vector<config_t> configs;
 
     // Extract matrix instruction sizes
-    int64_t mi_m = mi_dim[0];
-    int64_t mi_n = mi_dim[1];
-    int64_t mi_k = mi_dim[2];
+    int64_t mi_m_infer = mi_dim_infer[0];
+    int64_t mi_n_infer = mi_dim_infer[1];
+    int64_t mi_k_infer = mi_dim_infer[2];
 
     //TODO: support a default set of configs - for now error on no configs
     if(!config_dicts.has_value()) {
-        TORCH_CHECK(false, "Default configs not yet implemented");
+        TORCH_CHECK(false, "No configs were provided and default configs not yet implemented");
     }
 
     // It's now safe to unwrap the optional
@@ -183,23 +184,86 @@ std::vector<config_t> build_configs(const c10::optional<c10::List<c10::Dict<std:
     for(const c10::Dict<std::string, int64_t>& dict : unwrapped_dicts) {
         config_t new_config;
 
+        // Required values (BLK_M, BLK_N, BLK_K, OCCUPANCY)
+        TORCH_CHECK(dict.contains("BLK_M"), "Missing 'BLK_M' key in at least 1 config dict");
+        TORCH_CHECK(dict.contains("BLK_N"), "Missing 'BLK_N' key in at least 1 config dict");
+        TORCH_CHECK(dict.contains("BLK_K"), "Missing 'BLK_K' key in at least 1 config dict");
+        TORCH_CHECK(dict.contains("OCCUPANCY"), "Missing 'OCCUPANCY' key in at least 1 config dict");
+
         dim3_t mt;
         mt.m = dict.at("BLK_M");
         mt.n = dict.at("BLK_N");
         mt.k = dict.at("BLK_K");
         new_config.mt = mt;
 
-        dim3_t mi;
-        mi.m = mi_m;
-        mi.n = mi_n;
-        mi.k = mi_k;
-        new_config.mi = mi;
-
-        new_config.workgroup_mapping = dict.at("GSIZE_M");
-
         new_config.occupancy = dict.at("OCCUPANCY");
 
-        //TODO: Add other config_t parameters here as we add support for them
+        // We want to warn the user if there are keys present in the configs
+        // that we didn't use, so we'll decrement this counter each time we use
+        // one.  Subtract 4 to start because we wouldn't be at this line if we
+        // didn't already use the required keys.
+        size_t remaining_key_count = dict.size() - 4;
+
+        // Required values we'll infer from the hardware if not provided
+        // (MI_DIM_M, MI_DIM_N, MI_DIM_K)
+        dim3_t mi;
+        if(dict.contains("MI_DIM_M")) {
+            mi.m = dict.at("MI_DIM_M");
+            remaining_key_count--;
+        } else {
+            mi.m = mi_m_infer;
+        }
+        if(dict.contains("MI_DIM_N")) {
+            mi.n = dict.at("MI_DIM_N");
+            remaining_key_count--;
+        } else {
+            mi.n = mi_n_infer;
+        }
+        if(dict.contains("MI_DIM_K")) {
+            mi.k = dict.at("MI_DIM_K");
+            remaining_key_count--;
+        } else {
+            mi.k = mi_k_infer;
+        }
+        new_config.mi = mi;
+
+        // Optional values (WG_MAPPING, WORKSPACE_SIZE, WORKSPACE_SIZE_PER_C,
+        //                  REDUCTION_STRATEGY)
+        if(dict.contains("WG_MAPPING")) {
+            new_config.workgroup_mapping = dict.at("WG_MAPPING");
+            remaining_key_count--;
+        }
+        if(dict.contains("WORKSPACE_SIZE")) {
+            new_config.workspace_size = dict.at("WORKSPACE_SIZE");
+            remaining_key_count--;
+        }
+        if(dict.contains("WORKSPACE_SIZE_PER_C")) {
+            new_config.workspace_size_per_elem_c = dict.at("WORKSPACE_SIZE_PER_C");
+            remaining_key_count--;
+        }
+        if(dict.contains("REDUCTION_STRATEGY")) {
+            new_config.reduction_strategy = int_to_reduction_t(dict.at("REDUCTION_STRATEGY"));
+            remaining_key_count--;
+        }
+
+        // Currently unsupported optional values - will warn once if we see
+        // these, set them, and then keep going (CACHE_HINTS_A, CACHE_HINTS_B)
+        if(dict.contains("CACHE_HINTS_A")) {
+            TORCH_WARN_ONCE("[ORIGAMI] CACHE_HINTS_A are not used in this version of Origami - ignoring");
+            new_config.cache_hints_a = dict.at("CACHE_HINTS_A");
+            remaining_key_count--;
+        }
+        if(dict.contains("CACHE_HINTS_B")) {
+            TORCH_WARN_ONCE("[ORIGAMI] CACHE_HINTS_B are not used in this version of Origami - ignoring");
+            new_config.cache_hints_b = dict.at("CACHE_HINTS_B");
+            remaining_key_count--;
+        }
+
+        // By this point we should have touched every key we recognize, so if
+        // there's any remaining we'll warn the user to help them debug
+        if(remaining_key_count != 0) {
+            TORCH_WARN_ONCE("[ORIGAMI] At least one config dict contained unrecognized key(s) - these will be ignored");
+        }
 
         configs.push_back(new_config);
     }
@@ -210,7 +274,7 @@ std::vector<config_t> build_configs(const c10::optional<c10::List<c10::Dict<std:
     return configs;
 }
 
-std::tuple<int64_t, int64_t, int64_t, int64_t> at_select_config(
+std::tuple<int64_t, int64_t, int64_t, int64_t> aten_select_config(
     const at::Tensor& a,
     const at::Tensor& b,
     const at::Tensor& c,
@@ -245,14 +309,14 @@ std::tuple<int64_t, int64_t, int64_t, int64_t> at_select_config(
     );
 }
 
-std::tuple<int64_t, int64_t, int64_t, int64_t> at_select_config_meta(
+std::tuple<int64_t, int64_t, int64_t, int64_t> aten_select_config_meta(
     const at::Tensor& a,
     const at::Tensor& b,
     const at::Tensor& c,
     const c10::optional<c10::List<c10::Dict<std::string, int64_t>>>& config_dicts) {
     // For meta tensors, we still need to compute the sizes
     // The meta implementation has the same logic as the real one
-    return at_select_config(a, b, c, config_dicts);
+    return aten_select_config(a, b, c, config_dicts);
 }
 }  //namespace origami
 
@@ -261,11 +325,11 @@ TORCH_LIBRARY(origami, m) {
 }
 
 TORCH_LIBRARY_IMPL(origami, CUDA, m) {
-    m.impl("select_config", origami::at_select_config);
+    m.impl("select_config", origami::aten_select_config);
 }
 
 TORCH_LIBRARY_IMPL(origami, Meta, m) {
-    m.impl("select_config", origami::at_select_config_meta);
+    m.impl("select_config", origami::aten_select_config_meta);
 }
 
 // Python module initialization for proper import support
@@ -286,4 +350,3 @@ PyMODINIT_FUNC PyInit__aten(void) {
     // Create and return the module (torch ops are already registered via TORCH_LIBRARY)
     return PyModule_Create(&aten_module);
 }
-
