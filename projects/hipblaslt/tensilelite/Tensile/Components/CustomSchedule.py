@@ -273,6 +273,7 @@ def hasCustomSchedule(kernel):
     is256x256x64DTL  = [MT0, MT1, DU, PGR, PLR, DTL] == [256, 256, 64, 2, 1, True]
     is192x256x64DTL  = [MT0, MT1, DU, PGR, PLR, DTL] == [192, 256, 64, 2, 1, True]
     is256x256x128DTL = [MT0, MT1, DU, PGR, PLR, DTL] == [256, 256, 128, 2, 0, True]
+    is240x256x64DTL  = [MT0, MT1, DU, PGR, PLR, DTL] == [240, 256, 64, 2, 1, False]
 
 
     transA = kernel["ProblemType"]["TransposeA"]
@@ -518,5 +519,63 @@ def hasCustomSchedule(kernel):
         numMfma = 96
         opt1 = ScheduleInfo(2, numMfma, optSchedule, syncCode)
         return True, opt1
+
+    elif is240x256x64DTL and is16bit and not isMixed and ([GRVWA, GRVWB, LRVW] == [4,8,8]) and MI == [16,16,32,1] and MIWG == [1,4]:
+        kernel["MfmaInitCVgprs"] = True
+        optSchedule = dict()
+        syncCode = []
+        if isTN and TLDS==1:
+            optSchedule = {
+                'SYNC': [[-1,14,25,25,26,29,32,35,38,41,44,47,51,54,57,59,60,63,66,69,72,76,79,82,85,88,91,94,97,97]],
+                'GRA':[ [27,30,33,36,39,42,45,48,52,55,58,61,64,67,70]],
+                'GRB':[ [73,77,80,83,86,89,92,95]],
+                'GRIncA':[ [0,0,0,1,1,1,2,2,2]],
+                'GRIncB':[ [3,3,3,4,4,4,5,5,5]],
+                'LRA0':[ [0,2,3,4,5,6,7,8,9,10,11,12,13,14,15]],
+                'LRA1':[ [98,100,101,102,103,104,105,106,107,108,109,110,111,112,113]],
+                'LRB0':[ [1,16,17,18]],
+                'LRB1':[ [99,114,115,116]],
+                'LWA':[ [26,29,32,35,38,41,44,47,51,54,57,60,63,66,69]],
+                'LWB':[ [72,76,79,82,85,88,91,94]],
+                'LCC': [[119, 119]],
+            }
+
+            syncCode = [
+                SWaitCnt(dscnt=3, vlcnt=-1, vscnt=-1, comment="wait for prior local read local write old=0, new=3 newLW=0 newLR=3 for iteration == 0"),
+                SWaitCnt(dscnt=15, vlcnt=-1, vscnt=-1, comment="wait for prior local read local write"),
+                SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment=""),
+                SBarrier(comment=""),
+                SWaitCnt(dscnt=-1, vlcnt=22, vscnt=-1, comment="wait for global read before writing to local"),
+                SWaitCnt(dscnt=-1, vlcnt=22, vscnt=-1, comment="wait for global read before writing to local"),
+                SWaitCnt(dscnt=-1, vlcnt=22, vscnt=-1, comment="wait for global read before writing to local"),
+                SWaitCnt(dscnt=-1, vlcnt=22, vscnt=-1, comment="wait for global read before writing to local"),
+                SWaitCnt(dscnt=-1, vlcnt=22, vscnt=-1, comment="wait for global read before writing to local"),
+                SWaitCnt(dscnt=-1, vlcnt=22, vscnt=-1, comment="wait for global read before writing to local"),
+                SWaitCnt(dscnt=-1, vlcnt=22, vscnt=-1, comment="wait for global read before writing to local"),
+                SWaitCnt(dscnt=-1, vlcnt=22, vscnt=-1, comment="wait for global read before writing to local"),
+                SWaitCnt(dscnt=-1, vlcnt=22, vscnt=-1, comment="wait for global read before writing to local"),
+                SWaitCnt(dscnt=-1, vlcnt=22, vscnt=-1, comment="wait for global read before writing to local"),
+                SWaitCnt(dscnt=-1, vlcnt=22, vscnt=-1, comment="wait for global read before writing to local"),
+                SWaitCnt(dscnt=11, vlcnt=-1, vscnt=-1, comment="wait for prior local read local write old=0, new=11 newLW=11 newLR=0"),
+                SWaitCnt(dscnt=-1, vlcnt=22, vscnt=-1, comment="wait for global read before writing to local"),
+                SWaitCnt(dscnt=-1, vlcnt=22, vscnt=-1, comment="wait for global read before writing to local"),
+                SWaitCnt(dscnt=-1, vlcnt=22, vscnt=-1, comment="wait for global read before writing to local"),
+                SWaitCnt(dscnt=-1, vlcnt=22, vscnt=-1, comment="wait for global read before writing to local"),
+                SWaitCnt(dscnt=-1, vlcnt=22, vscnt=-1, comment="wait for global read before writing to local"),
+                SWaitCnt(dscnt=-1, vlcnt=22, vscnt=-1, comment="wait for global read before writing to local"),
+                SWaitCnt(dscnt=-1, vlcnt=22, vscnt=-1, comment="wait for global read before writing to local"),
+                SWaitCnt(dscnt=-1, vlcnt=22, vscnt=-1, comment="wait for global read before writing to local"),
+                SWaitCnt(dscnt=-1, vlcnt=22, vscnt=-1, comment="wait for global read before writing to local"),
+                SWaitCnt(dscnt=-1, vlcnt=22, vscnt=-1, comment="wait for global read before writing to local"),
+                SWaitCnt(dscnt=-1, vlcnt=22, vscnt=-1, comment="wait for global read before writing to local"),
+                SWaitCnt(dscnt=-1, vlcnt=22, vscnt=-1, comment="wait for global read before writing to local"),
+                SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="3wait for local write"),
+                SBarrier(comment="")
+            ]
+            numMfma = 120
+            opt1 = ScheduleInfo(1, numMfma, optSchedule, syncCode)
+            return True, opt1
+        else:
+            return False, None
 
     return False, None
