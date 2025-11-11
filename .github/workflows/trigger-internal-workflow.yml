@@ -34,8 +34,6 @@ jobs:
 
       - name: Determine PR number
         id: pr-info
-        env:
-          GITHUB_TOKEN: ${{ steps.generate-token.outputs.token }}
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             # Use the PR number from the pull_request event
@@ -46,19 +44,9 @@ jobs:
             pr_number="${{ github.event.inputs.pr-number }}"
             echo "Using PR number from workflow_dispatch input: $pr_number"
           elif [ "${{ github.event_name }}" = "push" ]; then
-            # For push events, try to find associated PR or skip
-            echo "Push event detected. Checking if this is a PR branch..."
-            
-            # Try to find PR associated with this push
-            pr_number=$(gh pr list --head "${{ github.ref_name }}" --json number --jq '.[0].number // empty')
-            
-            if [ -n "$pr_number" ]; then
-              echo "Found associated PR number: $pr_number"
-            else
-              echo "No PR associated with this push. Skipping workflow."
-              echo "skip_workflow=true" >> $GITHUB_OUTPUT
-              exit 0
-            fi
+            # For push events, use hardcoded PR number for testing
+            pr_number="2160"
+            echo "Push event detected - using hardcoded PR number for testing: $pr_number"
           else
             echo "Unknown event type: ${{ github.event_name }}"
             exit 1
