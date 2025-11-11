@@ -75,20 +75,127 @@ __global__ void
     static_for<0, NumDTensor, 1>{}(
         [&](auto i) { p_ds_grid_grp(i) = p_ds_grid[i] + ds_batch_offset[i]; });
 
-    GridwiseOp::template Run<HasMainBlockLoop>(p_in_grid + in_batch_offset,
-                                               p_wei_grid + wei_batch_offset,
-                                               p_ds_grid_grp,
-                                               p_e_grid + e_batch_offset,
-                                               p_shared,
-                                               nullptr,
-                                               in_grid_desc,
-                                               wei_grid_desc,
-                                               ds_grid_desc,
-                                               e_grid_desc,
-                                               in_element_op,
-                                               wei_element_op,
-                                               acc_element_op,
-                                               block_2_ctile_map);
+    bool canUseInTiledLoad = [&]() {
+        if constexpr(GridwiseOp::hasInTileLoad)
+        {
+            constexpr auto I0 = Number<0>{};
+            constexpr auto I1 = Number<1>{};
+            constexpr auto I2 = Number<2>{};
+
+            const auto block_work_idx =
+                block_2_ctile_map.CalculateBottomIndex(make_multi_index(get_block_1d_id()));
+            const index_t h_block_data_idx_on_grid =
+                __builtin_amdgcn_readfirstlane(block_work_idx[I1] * GridwiseOp::TileHPerBlock);
+            const index_t w_block_data_idx_on_grid =
+                __builtin_amdgcn_readfirstlane(block_work_idx[I2] * GridwiseOp::TileWPerBlock);
+            const index_t h_block_end = in_grid_desc.GetLength(I0);
+            const index_t w_block_end = in_grid_desc.GetLength(I1);
+
+            if(h_block_data_idx_on_grid == 0 || w_block_data_idx_on_grid == 0 ||
+               h_block_data_idx_on_grid >= (h_block_end - GridwiseOp::TileHPerBlock) ||
+               w_block_data_idx_on_grid >= (w_block_end - GridwiseOp::TileWPerBlock))
+            {
+                return false;
+            }
+        }
+        return true;
+    }();
+
+    bool canUseWeiTiledLoad = [&]() {
+        if constexpr(GridwiseOp::hasWeiTileLoad)
+        {
+            constexpr auto I0 = Number<0>{};
+            const auto block_work_idx =
+                block_2_ctile_map.CalculateBottomIndex(make_multi_index(get_block_1d_id()));
+            const index_t k_block_data_idx_on_grid = __builtin_amdgcn_readfirstlane(
+                (block_work_idx[I0] + 1) * GridwiseOp::TileKPerBlock - 1);
+            // const index_t k_block_data_idx_on_grid = wei_grid_desc.GetLength(I0);
+
+            auto src_slice_origin_idx = make_multi_index(k_block_data_idx_on_grid, I0, 0);
+            auto src_coord_           = make_tensor_coordinate(wei_grid_desc, src_slice_origin_idx);
+
+            const bool is_src_valid = coordinate_has_valid_offset_assuming_visible_index_is_valid(
+                wei_grid_desc, src_coord_);
+
+            if(!is_src_valid)
+            {
+                return false;
+            }
+        }
+        return true;
+    }();
+
+    if(canUseInTiledLoad && canUseWeiTiledLoad)
+    {
+        GridwiseOp::template Run<HasMainBlockLoop, 0x3 /* canUseInTileLoad + canUseWeiTileLoad */>(
+            p_in_grid + in_batch_offset,
+            p_wei_grid + wei_batch_offset,
+            p_ds_grid_grp,
+            p_e_grid + e_batch_offset,
+            p_shared,
+            nullptr,
+            in_grid_desc,
+            wei_grid_desc,
+            ds_grid_desc,
+            e_grid_desc,
+            in_element_op,
+            wei_element_op,
+            acc_element_op,
+            block_2_ctile_map);
+    }
+    else if(canUseInTiledLoad)
+    {
+        GridwiseOp::template Run<HasMainBlockLoop, 0x1 /* canUseInTileLoad */>(
+            p_in_grid + in_batch_offset,
+            p_wei_grid + wei_batch_offset,
+            p_ds_grid_grp,
+            p_e_grid + e_batch_offset,
+            p_shared,
+            nullptr,
+            in_grid_desc,
+            wei_grid_desc,
+            ds_grid_desc,
+            e_grid_desc,
+            in_element_op,
+            wei_element_op,
+            acc_element_op,
+            block_2_ctile_map);
+    }
+    else if(canUseWeiTiledLoad)
+    {
+        GridwiseOp::template Run<HasMainBlockLoop, 0x2 /* canUseWeiTileLoad */>(
+            p_in_grid + in_batch_offset,
+            p_wei_grid + wei_batch_offset,
+            p_ds_grid_grp,
+            p_e_grid + e_batch_offset,
+            p_shared,
+            nullptr,
+            in_grid_desc,
+            wei_grid_desc,
+            ds_grid_desc,
+            e_grid_desc,
+            in_element_op,
+            wei_element_op,
+            acc_element_op,
+            block_2_ctile_map);
+    }
+    else
+    {
+        GridwiseOp::template Run<HasMainBlockLoop>(p_in_grid + in_batch_offset,
+                                                   p_wei_grid + wei_batch_offset,
+                                                   p_ds_grid_grp,
+                                                   p_e_grid + e_batch_offset,
+                                                   p_shared,
+                                                   nullptr,
+                                                   in_grid_desc,
+                                                   wei_grid_desc,
+                                                   ds_grid_desc,
+                                                   e_grid_desc,
+                                                   in_element_op,
+                                                   wei_element_op,
+                                                   acc_element_op,
+                                                   block_2_ctile_map);
+    }
 #else
     ignore = p_in_grid;
     ignore = p_wei_grid;
@@ -589,8 +696,9 @@ struct GridwiseConvMultipleD_Wcnn_CShuffle
     static constexpr index_t WaveSize      = 32;
     static constexpr index_t NumWaveGroup  = EnableWaveGroup ? 4 : 0;
     static constexpr bool EnableWaveGroup4 = EnableWaveGroup && (BlockSize == 512);
-
-    static constexpr index_t NumDTensor = DsDataType::Size();
+    static constexpr bool hasInTileLoad    = InTileLoad;
+    static constexpr bool hasWeiTileLoad   = WeiTileLoad;
+    static constexpr index_t NumDTensor    = DsDataType::Size();
 
     static_assert((EnableWaveGroup == false) || (BlockSize % (WaveSize * 4) == 0), "");
     static_assert((EnableWaveGroup == true) || (EnableSpatialCluster == false), "");
@@ -637,14 +745,17 @@ struct GridwiseConvMultipleD_Wcnn_CShuffle
     static constexpr index_t DataTileHeight = 4;
     static constexpr index_t H_Pad          = (FilterSize == 3) ? DataTileHeight : 0;
     static constexpr index_t W_Pad = ((FilterSize == 3) && !EnableSpatialCluster) ? WPerWcnn : 0;
-    static constexpr index_t HPerBlockIn = HPerBlock + H_Pad * 2;
-    static constexpr index_t WPerBlockIn = WPerBlock + W_Pad * 2;
-    static constexpr index_t HPerWave    = HRepeat * HPerWcnn;
-    static constexpr index_t WPerWave    = WRepeat * WPerWcnn;
-    static constexpr index_t CPerWave    = CPerBlock;
-    static constexpr index_t KPerWave    = KPerBlock;
-    static constexpr index_t HPerWaveIn  = HPerWave + H_Pad * 2;
-    static constexpr index_t WPerWaveIn  = WPerWave + W_Pad * 2;
+    static constexpr index_t TileWPerBlock = WPerBlock;
+    static constexpr index_t TileHPerBlock = HPerBlock;
+    static constexpr index_t TileKPerBlock = KPerBlock;
+    static constexpr index_t HPerBlockIn   = HPerBlock + H_Pad * 2;
+    static constexpr index_t WPerBlockIn   = WPerBlock + W_Pad * 2;
+    static constexpr index_t HPerWave      = HRepeat * HPerWcnn;
+    static constexpr index_t WPerWave      = WRepeat * WPerWcnn;
+    static constexpr index_t CPerWave      = CPerBlock;
+    static constexpr index_t KPerWave      = KPerBlock;
+    static constexpr index_t HPerWaveIn    = HPerWave + H_Pad * 2;
+    static constexpr index_t WPerWaveIn    = WPerWave + W_Pad * 2;
 
     template <typename DLayout>
     static constexpr bool IsGNHWKLayout()
@@ -1918,7 +2029,9 @@ struct GridwiseConvMultipleD_Wcnn_CShuffle
     using DefaultBlock2CTileMap =
         remove_cvref_t<decltype(MakeDefaultBlock2CTileMap(EGridDesc{}, 1, 1))>;
 
-    template <bool HasMainBlockLoop, typename Block2CTileMap = DefaultBlock2CTileMap>
+    template <bool HasMainBlockLoop,
+              index_t CanUseTiledLoad = 0,
+              typename Block2CTileMap = DefaultBlock2CTileMap>
     __device__ static void Run(const InDataType* __restrict__ p_in_grid,
                                const WeiDataType* __restrict__ p_wei_grid,
                                DsGridPointer p_ds_grid,
@@ -1952,6 +2065,8 @@ struct GridwiseConvMultipleD_Wcnn_CShuffle
         const auto wei_grid_block_desc = BlockwiseConv::MakeWeiGridBlockDescriptor(wei_grid_desc);
 
         const auto ds_grid_block_desc = BlockwiseConv::MakeDsGridBlockDescriptor(ds_grid_desc);
+
+        constexpr bool UseInTileLoad = InTileLoad && ((CanUseTiledLoad & 0x1) == 0x1);
 
         /*******************************************************************************/
         // BlockIdx.x -> [BlockId.k, BlockId.h, BlockId.w]
@@ -2063,7 +2178,7 @@ struct GridwiseConvMultipleD_Wcnn_CShuffle
             else
             {
                 auto indata_slice_origin_idx =
-                    wcnn_conv.template CalculateInDataThreadOriginDataIndex<InTileLoad>();
+                    wcnn_conv.template CalculateInDataThreadOriginDataIndex<UseInTileLoad>();
                 auto h0 = (h_block_data_idx_on_grid + wave_idx[I0] * HPerWave) / HPerWcnn;
                 auto w0 = (w_block_data_idx_on_grid + wave_idx[I1] * WPerWave) / WPerWcnn;
                 constexpr index_t threadsPerTensorTile = (WPerWcnn == 4) ? 2 : 4;
@@ -2083,7 +2198,7 @@ struct GridwiseConvMultipleD_Wcnn_CShuffle
                                                      false,
                                                      false,
                                                      false,
-                                                     InTileLoad,
+                                                     UseInTileLoad,
                                                      threadsPerTensorTile,
                                                      vgprPerTensorTile>(
                         in_grid_block_desc,
@@ -2205,7 +2320,7 @@ struct GridwiseConvMultipleD_Wcnn_CShuffle
             else
             {
                 auto indata_slice_origin_idx =
-                    wcnn_conv.template CalculateInDataThreadOriginDataIndex<InTileLoad>();
+                    wcnn_conv.template CalculateInDataThreadOriginDataIndex<UseInTileLoad>();
                 auto h0 = (h_block_data_idx_on_grid + wave_idx[I0] * HPerWave) / HPerWcnn;
                 auto w0 = (w_block_data_idx_on_grid + wave_idx[I1] * WPerWave) / WPerWcnn;
                 constexpr index_t threadsPerTensorTile = (WPerWcnn == 4) ? 2 : 4;
@@ -2226,7 +2341,7 @@ struct GridwiseConvMultipleD_Wcnn_CShuffle
                     false,
                     false,
                     false,
-                    InTileLoad,
+                    UseInTileLoad,
                     threadsPerTensorTile,
                     vgprPerTensorTile>(in_grid_block_desc,
                                        make_multi_index(w0 - 1,
@@ -2311,7 +2426,7 @@ struct GridwiseConvMultipleD_Wcnn_CShuffle
             else
             {
                 auto indata_slice_origin_idx =
-                    wcnn_conv.template CalculateInDataThreadOriginDataIndex<InTileLoad>();
+                    wcnn_conv.template CalculateInDataThreadOriginDataIndex<UseInTileLoad>();
                 auto h0 = (h_block_data_idx_on_grid + wave_idx[I0] * HPerWave) / HPerWcnn;
                 auto w0 = (w_block_data_idx_on_grid + (wave_idx[I1] + 1) * WPerWave) / WPerWcnn;
                 constexpr index_t threadsPerTensorTile = (WPerWcnn == 4) ? 2 : 4;
@@ -2331,7 +2446,7 @@ struct GridwiseConvMultipleD_Wcnn_CShuffle
                     false,
                     false,
                     false,
-                    InTileLoad,
+                    UseInTileLoad,
                     threadsPerTensorTile,
                     vgprPerTensorTile>(in_grid_block_desc,
                                        make_multi_index(w0,
@@ -2434,8 +2549,9 @@ struct GridwiseConvMultipleD_Wcnn_CShuffle
             }
             else
             {
+                constexpr bool UseWeiTileLoad = WeiTileLoad && ((CanUseTiledLoad & 0x2) == 0x2);
                 auto wei_slice_origin_idx =
-                    wcnn_conv.template CalculateWeiDataThreadOriginDataIndex<WeiTileLoad>();
+                    wcnn_conv.template CalculateWeiDataThreadOriginDataIndex<UseWeiTileLoad>();
                 auto k0 = (k_block_data_idx_on_grid + wave_idx[I2] * KPerWave) / KPerWcnn;
 
                 constexpr index_t threadsPerSubWeiTile = 2;
@@ -2455,7 +2571,7 @@ struct GridwiseConvMultipleD_Wcnn_CShuffle
                     false,
                     false,
                     false,
-                    WeiTileLoad,
+                    UseWeiTileLoad,
                     threadsPerSubWeiTile,
                     vgprPerSubWeiTile>;
 
