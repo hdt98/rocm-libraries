@@ -649,7 +649,6 @@ namespace rocRollerTest
         Settings::getInstance()->set(Settings::SchedulerCost,
                                      Scheduling::CostFunction::LinearWeightedSimple);
 
-        constexpr int  ITERS         = 32;
         constexpr auto workgroupSize = 64u;
 
         const auto name = "lds_alu_scheduler_test";
@@ -694,7 +693,14 @@ namespace rocRollerTest
             context.get(), Register::Type::Vector, DataType::UInt32, 1);
         auto workitemIndex = context->kernel()->workitemIndex()[0];
 
-        auto ldsStream = [&]() -> Generator<Instruction> {
+        auto kb = [&]() -> Generator<Instruction> {
+            auto v0 = Register::Value::Placeholder(
+                context.get(), Register::Type::Vector, DataType::Int32, 1);
+            auto v1 = Register::Value::Placeholder(
+                context.get(), Register::Type::Vector, DataType::Int32, 1);
+            co_yield v0->allocate();
+            co_yield v1->allocate();
+
             co_yield Expression::generate(
                 ldsWithOffset,
                 Expression::literal(ldsData->getLDSAllocation()->offset())
@@ -707,17 +713,31 @@ namespace rocRollerTest
                 context.get(),
                 Register::Type::Vector,
                 DataType::Raw32,
-                2 * ITERS,
+                64,
                 Register::AllocationOptions{.contiguousChunkWidth = Register::FULLY_CONTIGUOUS,
                                             .alignment            = instrDwords});
             co_yield ldsDst->allocate();
 
             co_yield context->mem()->barrier({});
 
-            for(int i = 0; i < ITERS; ++i)
+            for(int i = 0; i < 12; ++i)
             {
                 auto dstRegs = ldsDst->subset(Generated(iota(i * 2, (i + 1) * 2)));
+                co_yield context->mem()->storeLocal(ldsWithOffset,
+                                                    dstRegs,
+                                                    i * 8, // offset in bytes
+                                                    8 // 64 bits = 8 bytes
+                );
+            }
 
+            // Weave more and more ALU instructions
+            for(int i = 1; i < 16; ++i)
+            {
+                for(int j = 0; j < i; ++j)
+                {
+                    co_yield generateOp<Expression::Add>(v0, v0, v1);
+                }
+                auto dstRegs = ldsDst->subset(Generated(iota(i * 2, (i + 1) * 2)));
                 co_yield context->mem()->storeLocal(ldsWithOffset,
                                                     dstRegs,
                                                     i * 8, // offset in bytes
@@ -726,32 +746,13 @@ namespace rocRollerTest
             }
         };
 
-        auto aluStream = [&]() -> Generator<Instruction> {
-            auto v0 = Register::Value::Placeholder(
-                context.get(), Register::Type::Vector, DataType::Int32, 1);
-            auto v1 = Register::Value::Placeholder(
-                context.get(), Register::Type::Vector, DataType::Int32, 1);
-
-            co_yield v0->allocate();
-            co_yield v1->allocate();
-
-            for(int i = 0; i < 2 * ITERS; ++i)
-            {
-                co_yield generateOp<Expression::Add>(v0, v0, v1);
-            }
-        };
-
         auto scheduler = Component::GetNew<Scheduling::Scheduler>(
             std::make_tuple(Scheduling::SchedulerProcedure::RoundRobin,
                             Scheduling::CostFunction::None,
                             context.get()));
 
-        std::vector<Generator<Instruction>> streams;
-        streams.push_back(ldsStream());
-        streams.push_back(aluStream());
-
         std::vector<Instruction> instructions;
-        for(auto inst : (*scheduler)(streams))
+        for(auto inst : kb())
         {
             if(GPUInstructionInfo::isLDS(inst.getOpCode()))
                 inst.setAddresses(baseAddresses);
@@ -794,7 +795,7 @@ namespace rocRollerTest
             const auto& profile = allLatencies[0][i];
 
             Log::info(fmt::format("{}: model {}, profiler {}",
-                                  inst.getOpCode(),
+                                  profile.instruction,
                                   (inst.peekedStatus().stallCycles + 1)
                                       * 4, // +1 for issue cycle then *4 for quadcycle
                                   profile.meanLatency()));

@@ -128,6 +128,10 @@ namespace rocRoller
                 auto [direction, dwords] = getLdsInfoFromOpcode(inst.getOpCode());
                 int requiredSlots        = queueSlots(direction, dwords);
 
+                LDSBankModel::MemoryOpLDS memOp{direction};
+                // Currently treating stallCycles as any extraneous cycles beyond the 1 issue cycle
+                status.stallCycles = LDSBankModel::getInstructionIssueCycles(memOp, dwords) / 4 - 1;
+
                 if(requiredSlots > m_remainingSlots)
                 {
                     // Calculate how many cycles until we have enough slots
@@ -143,7 +147,7 @@ namespace rocRoller
                         slotsFreed += entry.slotsUsed;
                     }
 
-                    status.stallCycles = cyclesNeeded - m_programCycle;
+                    status.stallCycles += cyclesNeeded - m_programCycle;
                 }
             }
             return status;
@@ -165,9 +169,7 @@ namespace rocRoller
             int wait = inst.getWaitCount().dscnt();
             // TODO: handle waitcount
 
-            int instCycles = inst.numExecutedInstructions();
-
-            m_programCycle += instCycles + inst.peekedStatus().stallCycles;
+            m_programCycle += inst.numExecutedInstructions() + inst.peekedStatus().stallCycles;
             while(!m_queue.empty() && m_programCycle >= m_queue.front().completionCycle)
             {
                 auto& front = m_queue.front();
@@ -209,10 +211,9 @@ namespace rocRoller
                 auto gfx = ctx->targetArchitecture().target().gfx;
 
                 // Here a cycle means an issue cycle (so a quadcycle)
-                int cycles = LDSBankModel::getInstructionCycles(ldsInst, gfx) / 4;
+                int cycles = LDSBankModel::getInstructionDataCycles(ldsInst, gfx) / 4;
 
                 m_remainingSlots -= requiredSlots;
-                m_programCycle += instCycles;
 
                 const auto completionCycle
                     = cycles + (m_queue.empty() ? m_programCycle : m_queue.back().completionCycle);
