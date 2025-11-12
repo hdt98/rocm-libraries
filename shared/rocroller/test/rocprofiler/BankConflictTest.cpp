@@ -670,7 +670,7 @@ namespace rocRollerTest
         const auto one  = std::make_shared<Expression::Expression>(1u);
         const auto zero = std::make_shared<Expression::Expression>(0u);
 
-        auto workitemCount = Expression::literal(workgroupSize * 256 * 32);
+        auto workitemCount = Expression::literal(workgroupSize * 256);
         k->setWorkgroupSize({workgroupSize, 1, 1});
         k->setWorkitemCount({workitemCount, one, one});
         k->setDynamicSharedMemBytes(zero);
@@ -731,8 +731,25 @@ namespace rocRollerTest
             }
 
             // Weave more and more ALU instructions
-            for(int i = 1; i < 16; ++i)
+            int        counter = 0;
+            const auto nextReg = [&]() {
+                const auto width = 2; // ds_*_b64
+                const auto base  = (counter + width - 1) % ldsDst->registerCount();
+                counter += width;
+                return ldsDst->subset(Generated(iota(base, base + width - 1)));
+            };
+
+            for(int i = 1; i < 12; ++i)
             {
+                for(int k = 0; k < 4; ++k)
+                {
+                    auto dstRegs = ldsDst->subset(Generated(iota(k * 2, (k + 1) * 2)));
+                    co_yield context->mem()->storeLocal(ldsWithOffset,
+                                                        dstRegs,
+                                                        k * 8, // offset in bytes
+                                                        8 // 64 bits = 8 bytes
+                    );
+                }
                 for(int j = 0; j < i; ++j)
                 {
                     co_yield generateOp<Expression::Add>(v0, v0, v1);
