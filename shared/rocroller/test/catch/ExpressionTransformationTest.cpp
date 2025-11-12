@@ -570,9 +570,11 @@ TEST_CASE("ConvertPropagation", "[expression][expression-transformation]")
         // Do not propagate existing converts to larger types
         // Int32(r64 + Int64(r64 * r64)) -> Int32(Int32(r64) + Int64(r64 * r64))
         auto expr = convertPropagation(convert(Int32, r64[0] + convert(Int64, r64[1] * r64[2])));
-        CHECK_THAT(
-            expr,
-            IdenticalTo(convert(Int32, convert(Int32, r64[0]) + convert(Int64, r64[1] * r64[2]))));
+        CHECK_THAT(expr,
+                   IdenticalTo(convert(
+                       Int32,
+                       convert(Int32, r64[0])
+                           + convert(Int32, convert(Int32, r64[1]) * convert(Int32, r64[2])))));
     }
 
     SECTION("conditional")
@@ -602,6 +604,19 @@ TEST_CASE("ConvertPropagation", "[expression][expression-transformation]")
                                            + convert(UInt32, literal(4u, DataType::UInt64)))));
         CHECK_NOTHROW(evaluate(convertPropagation(
             convert(UInt32, literal(32u, DataType::UInt32) + literal(4u, DataType::UInt64)))));
+    }
+
+    SECTION(
+        "Propagation stops on Div/ArithmeticShiftR/LogicalShiftR when converting 64-bit to 32-bit")
+    {
+        CHECK_THAT(convertPropagation(convert(Int32, logicalShiftR(r64[0], r32[0]))),
+                   IdenticalTo(convert(Int32, convert(Int32, logicalShiftR(r64[0], r32[0])))));
+
+        CHECK_THAT(convertPropagation(convert(Int32, (r64[0] >> r32[0]))),
+                   IdenticalTo(convert(Int32, convert(Int32, (r64[0] >> r32[0])))));
+
+        CHECK_THAT(convertPropagation(convert(Int32, (r64[0] / r64[1]))),
+                   IdenticalTo(convert(Int32, convert(Int32, (r64[0] / r64[1])))));
     }
 }
 

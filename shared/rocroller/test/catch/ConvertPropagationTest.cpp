@@ -136,6 +136,50 @@ namespace ExpressionTest
         DataType       m_resultType, m_aType, m_bType, m_cType;
     };
 
+    TEST_CASE("Convert propagation with Subtraction", "[b123][gpu][convert-propagation]")
+    {
+        auto context = TestContext::ForTestDevice();
+
+        auto expr
+            = [](Expression::ExpressionPtr a,
+                 Expression::ExpressionPtr b,
+                 Expression::ExpressionPtr c) { return convert(DataType::Int32, (a - b) + c); };
+
+        ConvertExpressionKernel kernel(context.get(),
+                                       expr,
+                                       DataType::Int32,
+                                       DataType::Int64,
+                                       DataType::Int64,
+                                       DataType::Int64);
+
+        auto d_result = make_shared_device<int32_t>();
+
+        // A borrow occurs when doing (a-b) in 64-bit
+        int64_t a = 0x0000'0001'6fff'ffff;
+        int64_t b = 0x0000'0000'7fff'ffff;
+        int32_t c = 0;
+
+        std::cout << a << std::endl;
+
+        int32_t r = int32_t(int64_t(a - b) + c);
+
+        kernel({}, d_result.get(), a, b, c);
+
+        int32_t result;
+
+        hipMemcpy(&result, d_result.get(), sizeof(int32_t), hipMemcpyDefault);
+
+        std::cout << r << " / " << result << "\n";
+
+        CHECK_THAT(d_result, HasDeviceScalarEqualTo(r));
+
+        auto const assembly = NormalizedSource(context.output());
+
+        // Should use a 32-bit subtraction instruction and then 32-bit addition
+        CHECK_THAT(assembly, Catch::Matchers::ContainsSubstring("v_sub_i32"));
+        CHECK_THAT(assembly, Catch::Matchers::ContainsSubstring("v_add_i32"));
+    }
+
     TEST_CASE("Convert propagation with ArithmeticShiftR", "[x123][gpu][convert-propagation]")
     {
         auto context = TestContext::ForTestDevice();
@@ -171,6 +215,14 @@ namespace ExpressionTest
         std::cout << r << " / " << result << "\n";
 
         CHECK_THAT(d_result, HasDeviceScalarEqualTo(r));
+
+        auto const assembly = NormalizedSource(context.output());
+
+        // Should use a 64-bit arithmetic shift instruction and then 32-bit addition
+        CHECK_THAT(assembly, Catch::Matchers::ContainsSubstring("v_ashrrev_i64"));
+        CHECK_THAT(assembly, Catch::Matchers::ContainsSubstring("v_add_i32"));
+
+        CHECK_THAT(assembly, not Catch::Matchers::ContainsSubstring("v_addc_co_u32"));
     }
 
     TEST_CASE("Convert propagation with LogicalShiftR", "[r123][gpu][convert-propagation]")
@@ -209,6 +261,13 @@ namespace ExpressionTest
         std::cout << r << " / " << result << "\n";
 
         CHECK_THAT(d_result, HasDeviceScalarEqualTo(r));
+
+        // Should use a 64-bit logical shift instruction and then 32-bit addition
+        auto const assembly = NormalizedSource(context.output());
+        CHECK_THAT(assembly, Catch::Matchers::ContainsSubstring("v_lshrrev_b64"));
+        CHECK_THAT(assembly, Catch::Matchers::ContainsSubstring("v_add_u32"));
+
+        CHECK_THAT(assembly, not Catch::Matchers::ContainsSubstring("v_addc_co_u32"));
     }
 
     TEST_CASE("Convert propagation with Division", "[q123][gpu][convert-propagation]")
@@ -246,5 +305,11 @@ namespace ExpressionTest
         std::cout << r << " / " << result << "\n";
 
         CHECK_THAT(d_result, HasDeviceScalarEqualTo(r));
+
+        auto const assembly = NormalizedSource(context.output());
+
+        // Should not do sign extension and should do 32-bit addition
+        CHECK_THAT(assembly, Catch::Matchers::ContainsSubstring("v_ashrrev_i32"));
+        CHECK_THAT(assembly, Catch::Matchers::ContainsSubstring("v_add_i32"));
     }
 }
