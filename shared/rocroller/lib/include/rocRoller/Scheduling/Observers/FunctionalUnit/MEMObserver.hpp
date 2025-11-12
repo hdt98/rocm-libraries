@@ -140,8 +140,8 @@ namespace rocRoller
             const int queueSize = 10;
 
             mutable std::deque<LDSQueueEntry> m_queue;
-            // In hardware, slots are 16 dwords wide,
-            // Here, they groups of 4 (64 dwords) form a single unit for simplicity
+
+            // Invariant: m_remainingSlots === queueSize - sum of slotsUsed in m_queue
             mutable uint           m_remainingSlots;
             int                    m_programCycle;
             std::weak_ptr<Context> m_context;

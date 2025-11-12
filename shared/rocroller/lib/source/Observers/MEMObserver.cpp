@@ -128,13 +128,8 @@ namespace rocRoller
                 auto [direction, dwords] = getLdsInfoFromOpcode(inst.getOpCode());
                 int requiredSlots        = queueSlots(direction, dwords);
 
-                LDSBankModel::MemoryOpLDS memOp{direction};
-                // Currently treating stallCycles as any extraneous cycles beyond the 1 issue cycle
-                status.stallCycles = LDSBankModel::getInstructionIssueCycles(memOp, dwords) / 4 - 1;
-
                 if(requiredSlots > m_remainingSlots)
                 {
-                    // Calculate how many cycles until we have enough slots
                     int cyclesNeeded = 0;
                     int slotsToFree  = requiredSlots - m_remainingSlots;
                     int slotsFreed   = 0;
@@ -147,9 +142,13 @@ namespace rocRoller
                         slotsFreed += entry.slotsUsed;
                     }
 
-                    status.stallCycles += cyclesNeeded - m_programCycle;
+                    status.stallCycles = cyclesNeeded - m_programCycle;
                 }
             }
+            // TODO: there should be a way to report issue cycles of this instruction
+            // otherwise other observers, e.g. mfma observer's use of
+            // `inst.numExecutedInstructions() + inst.peekedStatus().stallCycles` is not accurate
+            // as this ds_writes may take more than a single (quadcycle) to issue
             return status;
         }
 
@@ -170,6 +169,18 @@ namespace rocRoller
             // TODO: handle waitcount
 
             m_programCycle += inst.numExecutedInstructions() + inst.peekedStatus().stallCycles;
+
+            if(GPUInstructionInfo::isLDS(inst.getOpCode()))
+            {
+                auto [direction, dwords] = getLdsInfoFromOpcode(inst.getOpCode());
+                LDSBankModel::MemoryOpLDS memOp{direction};
+                // Adjust m_programCycle to account for issue cycles
+                // Unfortunately other observers have no way of knowing this rignt now
+                // TODO: to-be-discussed best way to do this
+                m_programCycle += LDSBankModel::getInstructionIssueCycles(memOp, dwords) / 4
+                                  - 1; // -1 because above += includes it
+            }
+
             while(!m_queue.empty() && m_programCycle >= m_queue.front().completionCycle)
             {
                 auto& front = m_queue.front();
@@ -187,9 +198,10 @@ namespace rocRoller
                 auto [direction, dwords] = getLdsInfoFromOpcode(inst.getOpCode());
                 int requiredSlots        = queueSlots(direction, dwords);
 
-                // Wait for enough slots if needed
-                while(requiredSlots > m_remainingSlots && !m_queue.empty())
+                while(requiredSlots > m_remainingSlots)
                 {
+                    AssertFatal(!m_queue.empty(),
+                                "WeightlessDSMemObserver: Not enough slots and queue is empty");
                     auto& front    = m_queue.front();
                     m_programCycle = std::max(m_programCycle, front.completionCycle);
                     m_remainingSlots += front.slotsUsed;
@@ -210,7 +222,7 @@ namespace rocRoller
                 auto ctx = m_context.lock();
                 auto gfx = ctx->targetArchitecture().target().gfx;
 
-                // Here a cycle means an issue cycle (so a quadcycle)
+                // Here a cycle means an issue cycle (a quadcycle)
                 int cycles = LDSBankModel::getInstructionDataCycles(ldsInst, gfx) / 4;
 
                 m_remainingSlots -= requiredSlots;
