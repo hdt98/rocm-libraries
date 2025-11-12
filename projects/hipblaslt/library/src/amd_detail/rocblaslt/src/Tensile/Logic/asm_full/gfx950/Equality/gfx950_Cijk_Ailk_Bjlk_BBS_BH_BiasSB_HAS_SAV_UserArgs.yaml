@@ -98925,7 +98925,7 @@
     LdsPadB: 32
     LdsPadMetadata: 0
     LocalReadVectorWidth: 8
-    LocalSplitU: 2
+    LocalSplitU: 1
     LocalSplitUReuseLDS: 1
     LocalWritePerMfma: -1
     LocalWriteUseSgprA: true
@@ -99058,7 +99058,7 @@
     WaveSeparateGlobalReadMetadata: 0
     WaveSplitK: false
     WavefrontSize: 64
-    WorkGroup: [32, 4, 2]
+    WorkGroup: [32, 4, 1]
     WorkGroupMapping: 16
     WorkGroupMappingXCC: 32
     WorkGroupMappingXCCGroup: -1
