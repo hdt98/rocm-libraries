@@ -465,7 +465,7 @@ namespace rocisa
                 CvtType::CVT_SR_F32_to_FP8, dst, {src0, src1}, std::nullopt, VOP3PModifiers(), std::vector<int>({}), comment)
         {
             setInst("v_cvt_sr_fp8_f32");
-            if(sels.size() == 0) return;
+            if(sels.empty()) return;
 
             if(kernel().isaVersion[0] < 11)
             {
@@ -516,7 +516,7 @@ namespace rocisa
                 CvtType::CVT_SR_F32_to_BF8, dst, {src0, src1}, std::nullopt, VOP3PModifiers(), std::vector<int>({}), comment)
         {
             setInst("v_cvt_sr_bf8_f32");
-            if(sels.size() == 0) return;
+            if(sels.empty()) return;
 
             if(kernel().isaVersion[0] < 11)
             {

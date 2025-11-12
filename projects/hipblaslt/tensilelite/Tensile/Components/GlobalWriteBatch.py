@@ -2595,7 +2595,7 @@ def stochasticRoundingCvt(self, gwvw, destIdx, elementSumIdx, fp8CVTVgprStruct, 
     if self.parentWriter.states.asmCaps["v_prng_b32"]:
       # NOTE: Current PRNG seed implementation simply uses the value to be converted directly as seed.
       # For thread ID-based seed design, see the legacy PRND_GENERATOR approach in tensilelite/rocisa/rocisa/include/macro.hpp
-      module.add(VPrngB32(dst=vgpr(vRand),src=vgpr(formatVgpr),comment="Psudo Random Number Generator"))
+      module.add(VPrngB32(dst=vgpr(vRand),src=vgpr(formatVgpr),comment="Pseudo Random Number Generator"))
     else:
       if self.parentWriter.states.asmCaps["HasVgprMSB"]:
         module.add(PseudoRandomGeneratorModule(vRand, vgprFp8Temp, vTemp0, vTemp1))
