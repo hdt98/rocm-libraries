@@ -1422,7 +1422,7 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
         const index_t K                  = arg.b_g_k_c_xs_lengths_[I1];
         const index_t C                  = arg.b_g_k_c_xs_lengths_[I2];
         const index_t input_spatial_acum = ck::accumulate_n<index_t>(
-            arg.a_g_n_c_wis_lengths_.begin() + I2, NDimSpatial, 1, std::multiplies<>());
+            arg.a_g_n_c_wis_lengths_.begin() + I3, NDimSpatial, 1, std::multiplies<>());
 
         // check device
         if(get_device_name() == "gfx908")
@@ -1691,7 +1691,7 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
             else
             {
                 const index_t output_spatial_acum = ck::accumulate_n<index_t>(
-                    arg.e_g_n_k_wos_lengths_.begin() + I2, NDimSpatial, 1, std::multiplies<>());
+                    arg.e_g_n_k_wos_lengths_.begin() + I3, NDimSpatial, 1, std::multiplies<>());
 
                 if(output_spatial_acum % CDEBlockTransferScalarPerVector_NPerBlock != 0)
                 {
