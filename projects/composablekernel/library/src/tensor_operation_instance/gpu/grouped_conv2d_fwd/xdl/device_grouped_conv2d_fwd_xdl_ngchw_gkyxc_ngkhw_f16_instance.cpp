@@ -38,7 +38,8 @@ void add_device_grouped_conv2d_fwd_xdl_ngchw_gkyxc_ngkhw_f16_instances(
                                                        GKYXC,
                                                        Empty_Tuple,
                                                        NGKHW,
-                                                       ConvFwd1x1S1P0>{});
+                                                       // ConvFwd1x1S1P0
+                                                       ConvFwdDefault>{});
 }
 
 } // namespace instance
