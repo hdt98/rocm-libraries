@@ -1,5 +1,5 @@
 # #############################################################################
-# Copyright (C) 2016 - 2022 Advanced Micro Devices, Inc. All rights reserved.
+# Copyright (C) 2016 - 2025 Advanced Micro Devices, Inc. All rights reserved.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -85,6 +85,7 @@ set( rocfft-test_source
   callback_change_type.cpp
   default_callbacks_test.cpp
   unit_test.cpp
+  jit_callback_tests.cpp
   buffer_hash_test.cpp
   validate_length_stride.cpp
   random.cpp
@@ -316,6 +317,11 @@ if ( USE_HIPRAND )
   )
   target_compile_definitions( rocfft-test PRIVATE USE_HIPRAND )
 endif()
+
+target_link_libraries( rocfft-test
+  PRIVATE
+  hiprtc
+)
 
 if( ROCFFT_MPI_ENABLE )
   target_link_libraries( rocfft-test
