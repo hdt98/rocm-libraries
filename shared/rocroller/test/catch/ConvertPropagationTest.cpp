@@ -107,6 +107,7 @@ namespace ExpressionTest
                 auto b    = v_b->expression();
                 auto c    = v_c->expression();
                 auto expr = m_func(a, b, c);
+                Log::info("Original expr = {}", toString(expr));
 
                 co_yield v_a->allocate();
                 co_yield v_b->allocate();

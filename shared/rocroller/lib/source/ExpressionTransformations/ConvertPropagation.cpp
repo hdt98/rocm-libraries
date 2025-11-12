@@ -59,7 +59,7 @@ namespace rocRoller
                     if(DataTypeInfo::Get(resultDataType).elementBytes
                        > DataTypeInfo::Get(m_destinationType).elementBytes)
                     {
-                        return std::make_shared<Expression>(expr);
+                        return convert(m_destinationType, std::make_shared<Expression>(expr));
                     }
                 }
 
@@ -78,7 +78,7 @@ namespace rocRoller
                     if(DataTypeInfo::Get(resultDataType).elementBytes
                        > DataTypeInfo::Get(m_destinationType).elementBytes)
                     {
-                        return std::make_shared<Expression>(expr);
+                        return convert(m_destinationType, std::make_shared<Expression>(expr));
                     }
                 }
 
