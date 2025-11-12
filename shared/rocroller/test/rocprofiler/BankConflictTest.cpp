@@ -893,17 +893,25 @@ TEST_CASE("Scheduling LDS", "[rocprofiler][scheduler]")
 
     auto scheduler = Component::GetNew<Scheduling::Scheduler>(
         std::make_tuple(Scheduling::SchedulerProcedure::Priority,
-                        Scheduling::CostFunction::LinearWeighted,
+                        Scheduling::CostFunction::LinearWeightedSimple,
                         context.get()));
+
+    auto withAddresses = [&](Generator<Instruction> stream) -> Generator<Instruction> {
+        for(auto inst : stream)
+        {
+            if(GPUInstructionInfo::isLDS(inst.getOpCode()))
+                inst.setAddresses(baseAddresses);
+            co_yield inst;
+        }
+    };
+
     std::vector<Generator<Instruction>> streams;
-    streams.push_back(ldsStream());
+    streams.push_back(withAddresses(ldsStream()));
     streams.push_back(aluStream());
 
     std::vector<Instruction> instructions;
     for(auto inst : (*scheduler)(streams))
     {
-        if(GPUInstructionInfo::isLDS(inst.getOpCode()))
-            inst.setAddresses(baseAddresses);
         context->schedule(inst);
         instructions.push_back(inst);
     }
@@ -943,10 +951,11 @@ TEST_CASE("Scheduling LDS", "[rocprofiler][scheduler]")
         const auto& profile = allLatencies[0][i];
 
         Log::info(
-            fmt::format("{}: model {}, profiler mean {}, with NONE {}",
+            fmt::format("{}: model {}, profiler mean {}, with NONE {}, stall {}",
                         profile.instruction,
                         (inst.peekedStatus().stallCycles + inst.numExecutedInstructions()) * 4,
                         profile.meanLatency(),
-                        profile.meanLatencyWithPrecedingNone()));
+                        profile.meanLatencyWithPrecedingNone(),
+                        inst.peekedStatus().stallCycles));
     }
 }
