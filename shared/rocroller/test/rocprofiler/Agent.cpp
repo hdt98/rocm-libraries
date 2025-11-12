@@ -181,10 +181,10 @@ namespace rocRoller
                     = inst.time - prev_time - prev_latency + inst.duration + inst.stall;
                 prev_time    = inst.time;
                 prev_latency = inst.duration + inst.stall;
-                (void)latencyWithPrecedingNone; // May be useful for future
 
                 auto& data = userdata->instruction_map[inst.pc];
                 data.totalLatency += inst.duration + inst.stall;
+                data.totalLatencyWithPrecedingNone += latencyWithPrecedingNone;
                 data.hitcount += 1;
                 Log::debug("trace_decode_callback: duration {}, stall {}, time {}, "
                            "latencyWithPrecedingNone {}",
@@ -458,14 +458,23 @@ namespace rocRoller
             return totalLatency / hitcount;
         }
 
+        uint64_t InstructionProfile::meanLatencyWithPrecedingNone() const
+        {
+            if(hitcount == 0)
+                return 0;
+            return totalLatencyWithPrecedingNone / hitcount;
+        }
+
         std::string InstructionProfile::toString() const
         {
-            return fmt::format("'{}', totalLatency: {}, "
-                               "hitcount: {}, meanLatency: {}",
+            return fmt::format("'{}', totalLatency: {}, totalLatencyWithPrecedingNone: {}, "
+                               "hitcount: {}, meanLatency: {}, meanLatencyWithPrecedingNone: {}",
                                instruction,
                                totalLatency,
+                               totalLatencyWithPrecedingNone,
                                hitcount,
-                               meanLatency());
+                               meanLatency(),
+                               meanLatencyWithPrecedingNone());
         }
 
         std::string toString(std::vector<InstructionProfile> const& profiles)

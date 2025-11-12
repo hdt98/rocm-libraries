@@ -817,10 +817,11 @@ namespace rocRollerTest
             const auto& profile = allLatencies[0][i];
 
             Log::info(
-                fmt::format("{}: model {}, profiler {}",
+                fmt::format("{}: model {}, profiler mean {}, with NONE {}",
                             profile.instruction,
                             (inst.peekedStatus().stallCycles + inst.numExecutedInstructions()) * 4,
-                            profile.meanLatency()));
+                            profile.meanLatency(),
+                            profile.meanLatencyWithPrecedingNone()));
         }
     }
 }
