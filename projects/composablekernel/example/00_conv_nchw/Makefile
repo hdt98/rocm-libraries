@@ -85,33 +85,11 @@ prof_mio_ttrace:
 # 	rocprofv3 --att -d ttrace_${prof_name}_${timestamp}.out ${att_opt} --kernel-include-regex .*conv.* -- ${mio_cmd}
 
 # ck profiler setting
-data_type = 1
-indexing = 0
-verify = 1
-init = 2
-print = 0
-time = 1
+# kernel config   | op_name         | dtype | layout | index | verify | init | print | time |
+kernel_config_0 =   grouped_conv_fwd  1       2        0       1        2      0       1
 
-dim = 2
-G = 32
-N = 256
-K = $(shell expr 256 / ${G})
-C = $(shell expr 256 / ${G})
+# shape          | dim | G  | N   | K/G | C/G | f_len | i_len | f_stride | f_dilation | i_lpads | i_rpads |
+shape_config_0 =   2     32   256   8     8     3 3     56 56   1 1        1 1          1 1       1 1
 
-filter_lengths = 3 3
-input_lengths = 56 56
-filter_strides = 1 1
-filter_dilations = 1 1
-input_left_pads = 1 1
-input_right_pads = 1 1
-
-# config
-# layout = 0
-# layout = 1
-layout = 2
-
-run_ck_profiler:
-	../../build/bin/ckProfiler grouped_conv_fwd ${data_type} ${layout} ${indexing} \
-		${verify} ${init} ${print} ${time} ${dim} ${G} ${N} ${K} ${C} ${filter_lengths} \
-		${input_lengths} ${filter_strides} ${filter_dilations} ${input_left_pads} \
-		${input_right_pads} > layout_${layout}.log
+run_ckprof:
+	../../build/bin/ckProfiler ${kernel_config_0} ${shape_config_0} > ckprof_1.out 2>&1
