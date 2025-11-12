@@ -162,9 +162,9 @@ void compare(const char* title, const std::vector<T>& cpuOutput, const std::vect
 }
 
 template <typename DType>
-void initData(DType* data, std::size_t numElements, hipblaslt_initialization initMode)
+void initData(DType* data, std::size_t numElements, hipblaslt_initialization initMethod)
 {
-    switch(initMode)
+    switch(initMethod)
     {
     case hipblaslt_initialization::rand_int:
         hipblaslt_init<DType>(data, numElements, 1, 1);
