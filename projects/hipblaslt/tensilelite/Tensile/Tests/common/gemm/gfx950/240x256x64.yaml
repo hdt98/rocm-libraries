@@ -1,0 +1,219 @@
+BenchmarkProblems:
+- - Activation: true
+    ActivationFuncCall: false
+    ActivationType: hipblaslt_all
+    Batched: true
+    BiasDataTypeList:
+    - s
+    - b
+    ComputeDataType: S
+    DataType: B
+    DestDataType: B
+    HighPrecisionAccumulate: true
+    OperationType: GEMM
+    TransposeA: 1
+    TransposeB: 0
+    UseBeta: true
+    UseBias: 1
+    UseScaleAB: Scaler
+    UseScaleAlphaVec: 1
+  - BenchmarkCommonParameters:
+    - KernelLanguage:
+      - Assembly
+    BenchmarkFinalParameters:
+    - ProblemSizes:
+      - Exact:
+        - 3840
+        - 4096
+        - 1
+        - 8192
+    - BiasTypeArgs:
+      - b
+    BenchmarkJoinParameters: null
+    ForkParameters:
+    - 1LDSBuffer:
+      - 0
+      ActivationFuncCall:
+      - false
+      AssertFree0ElementMultiple:
+      - 1
+      AssertSummationElementMultiple:
+      - 1
+      ClusterLocalRead:
+      - 1
+      ConvertAfterDS:
+      - false
+      DirectToVgprA:
+      - false
+      DirectToVgprB:
+      - false
+      ExpandPointerSwap:
+      - false
+      ForceDisableShadowInit:
+      - false
+      GlobalReadPerMfma:
+      - 1
+      GlobalReadVectorWidthA:
+      - 2
+      GlobalReadVectorWidthB:
+      - 8
+      GlobalSplitU:
+      - 0
+      GlobalSplitUAlgorithm:
+      - MultipleBuffer
+      GlobalSplitUCoalesced:
+      - false
+      GlobalSplitUWorkGroupMappingRoundRobin:
+      - false
+      GroupLoadStore:
+      - false
+      InnerUnroll:
+      - 1
+      LDSTrInst:
+      - false
+      LdsBlockSizePerPadA:
+      - -1
+      LdsBlockSizePerPadB:
+      - -1
+      LdsBlockSizePerPadMetadata:
+      - -1
+      LdsPadA:
+      - -1
+      LdsPadB:
+      - -1
+      LdsPadMetadata:
+      - -1
+      LocalReadVectorWidth:
+      - 8
+      LocalWritePerMfma:
+      - -1
+      MIArchVgpr:
+      - false
+      MatrixInstruction:
+      - - 16
+        - 16
+        - 32
+        - 1
+        - 1
+        - 15
+        - 4
+        - 1
+        - 4
+      DepthU: [64]
+      UseCustomMainLoopSchedule: [1]
+      DirectToLds: [1]
+      MaxOccupancy:
+      - 40
+      NonTemporal:
+      - -1
+      NonTemporalA:
+      - 0
+      NonTemporalB:
+      - 0
+      NonTemporalC:
+      - 0
+      NonTemporalD:
+      - 0
+      NonTemporalMetadata:
+      - 0
+      NumElementsPerBatchStore:
+      - 0
+      NumLoadsCoalescedA:
+      - 1
+      NumLoadsCoalescedB:
+      - 1
+      OptNoLoadLoop:
+      - 1
+      PrefetchGlobalRead:
+      - 2
+      PrefetchLocalRead:
+      - 1
+      PreloadKernArgs:
+      - true
+      ScheduleIterAlg:
+      - 3
+      SourceSwap:
+      - true
+      StaggerU:
+      - 0
+      StaggerUMapping:
+      - 0
+      StaggerUStride:
+      - 128
+      StorePriorityOpt:
+      - false
+      StoreRemapVectorWidth:
+      - 0
+      StoreSyncOpt:
+      - 0
+      StoreVectorWidth:
+      - 1
+      StreamK:
+      - 3
+      StreamKFixupTreeReduction:
+      - 0
+      StreamKXCCMapping:
+      - 0
+      TransposeLDS:
+      - 1
+      UnrollLoopSwapGlobalReadOrder:
+      - 0
+      Use64bShadowLimit:
+      - true
+      UseInstOffsetForGRO:
+      - 0
+      # UseSgprForGRO:
+      # - 0
+      VectorStore:
+      - -1
+      # VectorWidthA:
+      # - 1
+      # VectorWidthB:
+      # - 4
+      WaveSeparateGlobalReadA:
+      - 0
+      WaveSeparateGlobalReadB:
+      - 0
+      WavefrontSize:
+      - 64
+      WorkGroup:
+      - - 16
+        - 16
+        - 1
+      WorkGroupMapping:
+      - 0
+      WorkGroupMappingXCC:
+      - -1
+      WorkGroupMappingXCCGroup:
+      - -1
+    InitialSolutionParameters: null
+GlobalParameters:
+  CSVExportWinner: 1
+  CSVMergeSameProblemID: 1
+  DataInitTypeA: 12
+  DataInitTypeAlpha: 1
+  DataInitTypeB: 13
+  DataInitTypeBeta: 0
+  Device: 0
+  DeviceLDS: 163840
+  EnqueuesPerSync: 100
+  ForceGenerateKernel: 1
+  KeepBuildTmp: true
+  MaxLDS: 163840
+  NewClient: 2
+  NumElementsToValidate: 0
+  NumWarmups: 100
+  PrintSolutionRejectionReason: true
+  RotatingBufferSize: 512
+  SleepPercent: 50
+  AsmDebug: True
+LibraryLogic:
+  ArchitectureName: gfx950
+  DeviceNames:
+  - Device 0049
+  ScheduleName: gfx950
+TestParameters:
+  marks:
+  - skip-gfx1100
+  - skip-gfx1101
+  - skip-gfx1102
