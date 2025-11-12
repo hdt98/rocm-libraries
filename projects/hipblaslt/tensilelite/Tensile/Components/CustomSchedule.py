@@ -298,6 +298,383 @@ def isTT(kernel):
 def isTN(kernel):
     return kernel["ProblemType"]["TransposeA"] and not kernel["ProblemType"]["TransposeB"]
 
+def _get_schedule_256x96x64_16bit(kernel, useLDSTr, TLDS):
+
+    optSchedule = dict()
+    syncCode = []
+    nglshift = nllshift = 0 # vmcnt shift for ngl and nll
+
+    if isTN(kernel) and TLDS == 1:
+
+        nglshift = nllshift = 16
+        """
+          WORKS v1 
+          optSchedule = {
+            'SYNC'   : [[4,17,17,24,33,33]],
+            'GRIncA' : [[1,1,1,2,2,2,3,3,3]],
+            'GRIncB' : [[4,4,4,5,5,5,6,6,6]],
+            #'LRA0'   : [[34,36,37,38]],
+            #'LRB0'   : [[35,39,40,41,42,43]],
+            'LRA1'   : [[34,36,37,38]],  # these reference vgprs A X0
+            'LRB1'   : [[35,39,40,41,42,43]], # these reference vgprs A X0
+            #'GRA'    : [[28,28,30,30,31,31]],
+            #'GRB'    : [[17,17,18,18,19,19,21,21,22,22,24,24,25,25,27,27]],
+            'GRB'    : [[28,28,30,30,31,31]],
+            'GRA'    : [[17,17,18,18,19,19,21,21,22,22,24,24,25,25,27,27]],
+            #'LRA1'   : [[1,3,4,5]],
+            #'LRB1'   : [[2,6,7,8,9,10]],
+            'LRA0'   : [[1,3,4,5]], # these reference vgprs A X1
+            'LRB0'   : [[2,6,7,8,9,10]], # these reference vgprs A X0
+            'LRSA'   : [[23]],
+            'LRSB'   : [[23]],
+            'LWSA'   : [[31]],
+            'LWSB'   : [[31]],
+            'LCC'   : [[47, 47]],
+        }"""
+
+
+        """#pass nov 11
+        optSchedule = {
+            'SYNC'   : [[4,17,17,24,33,33]],
+            'GRIncA' : [[0,1,2,3,4,5,6,7,8]],
+            'GRIncB' : [[9,10,11,12,13,14,15,16,17]],
+            #'LRA0'   : [[34,36,37,38]],
+            #'LRB0'   : [[35,39,40,41,42,43]],
+            'LRA0'   : [[1,3,4,5]], # these reference vgprs A X1
+            'LRB0'   : [[2,6,7,8,9,10]], # these reference vgprs A X0
+            #'GRA'    : [[28,28,30,30,31,31]],
+            #'GRB'    : [[17,17,18,18,19,19,21,21,22,22,24,24,25,25,27,27]],
+            'GRB'    : [[28,28,30,30,31,31]],
+            'GRA'    : [[17,17,18,18,19,19,21,21,22,22,24,24,25,25,27,27]],
+            #'LRA1'   : [[1,3,4,5]],
+            #'LRB1'   : [[2,6,7,8,9,10]],
+            'LRA1'   : [[34,36,37,38]],  # these reference vgprs A X0
+            'LRB1'   : [[35,39,40,41,42,43]], # these reference vgprs A X0
+            'LRSA'   : [[23]],
+            'LRSB'   : [[23]],
+            'LWSA'   : [[31]],
+            'LWSB'   : [[31]],
+            'LCC'   : [[47, 47]],
+        }"""
+
+
+        """works 2 nov 11
+        optSchedule = {
+            'SYNC'   : [[4,17,17,24,33,33]],
+            'GRIncA' : [[0,1,2,3,4,5,6,7,8]],
+            'GRIncB' : [[9,10,11,12,13,14,15,16,17]],
+            #'LRA0'   : [[34,36,37,38]],
+            #'LRB0'   : [[35,39,40,41,42,43]],
+            'LRA0'   : [[1,3,5,7]], # these reference vgprs A X1
+            'LRB0'   : [[2,4,6,8,9,10]], # these reference vgprs B X1
+            #'GRA'    : [[28,28,30,30,31,31]],
+            #'GRB'    : [[17,17,18,18,19,19,21,21,22,22,24,24,25,25,27,27]],
+            'GRB'    : [[28,28,30,30,31,31]],
+            'GRA'    : [[17,17,18,18,19,19,21,21,22,22,24,24,25,25,27,27]],
+            #'LRA1'   : [[1,3,4,5]],
+            #'LRB1'   : [[2,6,7,8,9,10]],
+            'LRA1'   : [[34,36,37,38]],  # these reference vgprs A X0
+            'LRB1'   : [[35,39,40,41,42,43]], # these reference vgprs B X0
+            'LRSA'   : [[23]],
+            'LRSB'   : [[23]],
+            'LWSA'   : [[31]],
+            'LWSB'   : [[31]],
+            'LCC'   : [[47, 47]],
+        }"""
+
+        """ works 3 nov 11
+        optSchedule = {
+            'SYNC'   : [[4,16,16,24,33,33]],
+            'GRIncA' : [[0,1,2,3,4,5,6,7,8]],
+            'GRIncB' : [[9,10,11,12,13,14,15,16,17]],
+            #'LRA0'   : [[34,36,37,38]],
+            #'LRB0'   : [[35,39,40,41,42,43]],
+            'LRA0'   : [[1,3,5,7]], # these reference vgprs A X1
+            'LRB0'   : [[2,4,6,8,9,10]], # these reference vgprs B X1
+            #'GRA'    : [[28,28,30,30,31,31]],
+            #'GRB'    : [[17,17,18,18,19,19,21,21,22,22,24,24,25,25,27,27]],
+            #'GRB'    : [[28,29, 30,30, 32,32]],
+            'GRB'    : [[28,28,30,30,31,31]],
+            #'GRA'    : [[17,17,18,18,19,19,21,21,22,22,24,24,25,25,27,27]],
+            #'GRA'    : [[17,18, 19,20, 21,22, 23,24, 25,26, 27,28, 29,29, 31,31]],
+            'GRA'    : [[17,17,18,18,19,19,21,21,22,22,24,24,25,25,27,27]],
+            #'LRA1'   : [[1,3,4,5]],
+            #'LRB1'   : [[2,6,7,8,9,10]],
+            'LRA1'   : [[34,36,37,41]],  # these reference vgprs A X0
+            'LRB1'   : [[35,39,40,43,45,47]], # these reference vgprs B X0
+            'LRSA'   : [[23]],
+            'LRSB'   : [[23]],
+            'LWSA'   : [[31]],
+            'LWSB'   : [[31]],
+            'LCC'   : [[47, 47]],
+        }"""
+
+        # works 3 v 2nov 11 -
+        """optSchedule = {
+            'SYNC'   : [[4,17,17,24,33,33]],
+            'GRIncA' : [[0,1,2,3,4,5,6,7,8]],
+            'GRIncB' : [[9,10,11,12,13,14,15,16,17]],
+            'LRA0'   : [[1,3,5,7]], # these reference vgprs A X1
+            'LRB0'   : [[2,4,6,8,9,10]], # these reference vgprs B X1
+            'GRB'    : [[28,28,30,30,31,31]],
+            'GRA'    : [[17,17,18,18,19,19,21,21,22,22,24,24,25,25,27,27]],
+            'LRA1'   : [[34,36,37,41]],  # these reference vgprs A X0
+            'LRB1'   : [[35,39,40,43,45,47]], # these reference vgprs B X0
+            'LRSA'   : [[23]],
+            'LRSB'   : [[23]],
+            'LWSA'   : [[31]],
+            'LWSB'   : [[31]],
+            'LCC'   : [[47, 47]],
+        }"""
+        # works 3 v 2nov 11 - za01
+        """syncTable = [4, SWaitCnt(dscnt=4, vlcnt=-1, vscnt=-1, comment="Wait "),
+                    17, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment=""),
+                    17, SBarrier(comment=""),
+                    24, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment=""),
+                    33, SWaitCnt(dscnt=-1, vlcnt=15, vscnt=-1, comment="Wait for previous set of global reads"),
+                    33, SBarrier(comment="")]
+ 
+        syncCode = syncTable[1::2]
+        optSchedule = {
+            'SYNC'   : [syncTable[::2]],
+            'GRIncA' : [[0,1,2,3,4,5,6,7,8]],
+            'GRIncB' : [[9,10,11,12,13,14,15,16,17]],
+            'LRA0'   : [[1,3,5,7]], # these reference vgprs A X1
+            'LRB0'   : [[2,4,6,8,9,10]], # these reference vgprs B X1
+            'GRB'    : [[28,28,30,30,31,31]],
+            'GRA'    : [[17,17,18,18,19,19,21,21,22,22,24,24,25,25,27,27]],
+            'LRA1'   : [[34,36,37,41]],  # these reference vgprs A X0
+            'LRB1'   : [[35,39,40,43,45,47]], # these reference vgprs B X0
+            'LRSA'   : [[23]],
+            'LRSB'   : [[23]],
+            'LWSA'   : [[31]],
+            'LWSB'   : [[31]],
+            'LCC'   : [[47, 47]],
+        }"""
+
+        # works 3 v 2nov 11 - za02
+        """syncTable = [4, SWaitCnt(dscnt=4, vlcnt=-1, vscnt=-1, comment="Wait "),
+                    13, SWaitCnt(dscnt=6, vlcnt=-1, vscnt=-1, comment="Make sure read of A X1 is done"),
+                    17, SWaitCnt(dscnt=-1, vlcnt=3, vscnt=-1, comment=""),
+                    17, SBarrier(comment=""),
+                    24, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment=""),
+                    33, SWaitCnt(dscnt=-1, vlcnt=15, vscnt=-1, comment="Wait for previous set of global reads"),
+                    33, SBarrier(comment="")]
+ 
+        syncCode = syncTable[1::2]
+        optSchedule = {
+            'SYNC'   : [syncTable[::2]],
+            'GRIncA' : [[0,1,2,3,4,5,6,7,8]],
+            'GRIncB' : [[9,10,11,12,13,14,15,16,17]],
+            'LRA0'   : [[1,2,3,4]], # these reference vgprs A X1
+            'LRB0'   : [[5,6,7,8,9,10]], # these reference vgprs B X1
+            'GRB'    : [[28,28,30,30,31,31]],
+            'GRA'    : [[14,14,15,15,16,16,18,18,19,19,21,21,23,23,25,25]],
+            #'GRA'    : [[17,17,18,18,19,19,21,21,22,22,24,24,25,25,27,27]],
+            'LRA1'   : [[34,36,37,41]],  # these reference vgprs A X0
+            'LRB1'   : [[35,39,40,43,45,47]], # these reference vgprs B X0
+            'LRSA'   : [[23]], # this must come before next reads of A X0 - so the LRA1 
+            'LRSB'   : [[23]],
+            'LWSA'   : [[31]],
+            'LWSB'   : [[31]],
+            'LCC'   : [[47, 47]],
+        }"""
+
+        # works 3 v 2nov 11 - za03
+        """syncTable = [4, SWaitCnt(dscnt=4, vlcnt=-1, vscnt=-1, comment="Wait "),
+                    11, SWaitCnt(dscnt=6, vlcnt=-1, vscnt=-1, comment="Make sure read of A X1 is done"),
+                    17, SWaitCnt(dscnt=-1, vlcnt=4, vscnt=-1, comment=""),
+                    17, SBarrier(comment=""),
+                    24, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment=""),
+                    33, SWaitCnt(dscnt=-1, vlcnt=15, vscnt=-1, comment="Wait for previous set of global reads"),
+                    33, SBarrier(comment="")]
+ 
+        syncCode = syncTable[1::2]
+        optSchedule = {
+            'SYNC'   : [syncTable[::2]],
+            'GRIncA' : [[0,1,2,3,4,5,6,7,8]],
+            'GRIncB' : [[9,10,11,12,13,14,15,16,17]],
+            'LRA0'   : [[1,2,3,4]], # these reference vgprs A X1
+            'LRB0'   : [[5,6,7,8,9,10]], # these reference vgprs B X1
+            'GRB'    : [[28,28,30,30,31,31]],
+            'GRA'    : [[12,12,13,13,14,14,15,15,19,19,21,21,23,23,25,25]],
+            #'GRA'    : [[17,17,18,18,19,19,21,21,22,22,24,24,25,25,27,27]],
+            'LRA1'   : [[34,36,37,41]],  # these reference vgprs A X0
+            'LRB1'   : [[35,39,40,43,45,47]], # these reference vgprs B X0
+            'LRSA'   : [[23]], # this must come before next reads of A X0 - so the LRA1 
+            'LRSB'   : [[23]],
+            'LWSA'   : [[31]],
+            'LWSB'   : [[31]],
+            'LCC'   : [[47, 47]],
+        }"""
+
+        # works 3 v 2nov 11 - za04
+        """syncTable = [4, SWaitCnt(dscnt=4, vlcnt=-1, vscnt=-1, comment="Wait "),
+                    11, SWaitCnt(dscnt=6, vlcnt=-1, vscnt=-1, comment="Make sure read of A X1 is done"),
+                    17, SWaitCnt(dscnt=-1, vlcnt=5, vscnt=-1, comment=""),
+                    17, SBarrier(comment=""),
+                    24, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment=""),
+                    33, SWaitCnt(dscnt=-1, vlcnt=15, vscnt=-1, comment="Wait for previous set of global reads"),
+                    33, SBarrier(comment="")]
+ 
+        syncCode = syncTable[1::2]
+        optSchedule = {
+            'SYNC'   : [syncTable[::2]],
+            'GRIncA' : [[0,1,2,3,4,5,6,7,8]],
+            'GRIncB' : [[9,10,11,12,13,14,15,16,17]],
+            'LRA0'   : [[1,2,3,4]], # these reference vgprs A X1
+            'LRB0'   : [[5,6,7,8,9,10]], # these reference vgprs B X1
+            'GRB'    : [[28,28,30,30,31,31]],
+            'GRA'    : [[12,12,13,13,14,14,15,15,16,16,18,18,19,19,20,20]],
+            #'GRA'    : [[17,17,18,18,19,19,21,21,22,22,24,24,25,25,27,27]],
+            'LRA1'   : [[34,36,37,41]],  # these reference vgprs A X0
+            'LRB1'   : [[35,39,40,43,45,47]], # these reference vgprs B X0
+            'LRSA'   : [[23]], # this must come before next reads of A X0 - so the LRA1 
+            'LRSB'   : [[23]],
+            'LWSA'   : [[31]],
+            'LWSB'   : [[31]],
+            'LCC'   : [[47, 47]],
+        }"""
+
+        # ov 11 - za05
+        syncTable = [4, SWaitCnt(dscnt=4, vlcnt=-1, vscnt=-1, comment="Wait "),
+                    11, SWaitCnt(dscnt=6, vlcnt=-1, vscnt=-1, comment="Make sure read of A X1 is done"),
+                    21, SWaitCnt(dscnt=-1, vlcnt=8, vscnt=-1, comment=""),
+                    21, SBarrier(comment=""),
+                    24, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment=""),
+                    33, SWaitCnt(dscnt=-1, vlcnt=15, vscnt=-1, comment="Wait for previous set of global reads"),
+                    33, SBarrier(comment="")]
+ 
+        syncCode = syncTable[1::2]
+        optSchedule = {
+            'SYNC'   : [syncTable[::2]],
+            'GRIncA' : [[0,1,2,3,4,5,6,7,8]],
+            'GRIncB' : [[9,10,11,12,13,14,15,16,17]],
+            'LRA0'   : [[1,2,3,4]], # these reference vgprs A X1
+            'LRB0'   : [[5,6,7,8,9,10]], # these reference vgprs B X1
+            'GRB'    : [[28,28,30,30,31,31]],
+            'GRA'    : [[12,12,13,13,14,14,15,15,16,16,18,18,19,19,20,20]],
+            #'GRA'    : [[17,17,18,18,19,19,21,21,22,22,24,24,25,25,27,27]],
+            'LRA1'   : [[34,36,37,41]],  # these reference vgprs A X0
+            'LRB1'   : [[35,39,40,43,45,47]], # these reference vgprs B X0
+            'LRSA'   : [[23]], # this must come before next reads of A X0 - so the LRA1 
+            'LRSB'   : [[23]],
+            'LWSA'   : [[31]],
+            'LWSB'   : [[31]],
+            'LCC'   : [[47, 47]],
+        }
+
+
+
+        """optSchedule = {
+            'SYNC'   : [[4,16,16,24,33,33]],
+            'GRIncA' : [[0,1,2,3,4,5,6,7,8]],
+            'GRIncB' : [[9,10,11,12,13,14,15,16,17]],
+            #'LRA0'   : [[34,36,37,38]],
+            #'LRB0'   : [[35,39,40,41,42,43]],
+            'LRA0'   : [[1,3,5,7],
+                        [2,4,6,8]], # these reference vgprs A X1
+            'LRB0'   : [[9,10,11,12,13,14]], # these reference vgprs B X1
+            #'GRA'    : [[28,28,30,30,31,31]],
+            #'GRB'    : [[17,17,18,18,19,19,21,21,22,22,24,24,25,25,27,27]],
+            #'GRB'    : [[28,29, 30,30, 32,32]],
+            #'GRB'    : [[28,28,30,30,31,31]],
+            #'GRA'    : [[17,17,18,18,19,19,21,21,22,22,24,24,25,25,27,27]],
+            #'GRA'    : [[17,18, 19,20, 21,22, 23,24, 25,26, 27,28, 29,29, 31,31]],
+            #'GRA'    : [[17,17,18,18,19,19,21,21,22,22,24,24,25,25,27,27]],
+            #'LRA1'   : [[1,3,4,5]],
+            #'LRB1'   : [[2,6,7,8,9,10]],
+            'LRA1'   : [[34,36,37,41]],  # these reference vgprs A X0
+            'LRB1'   : [[35,39,40,43,45,47]], # these reference vgprs B X0
+            'LRSA'   : [[23]],
+            'LRSB'   : [[23]],
+            'LWSA'   : [[31]],
+            'LWSB'   : [[31]],
+            'LCC'   : [[47, 47]],
+        }"""
+
+        """optSchedule = {
+            'SYNC'   : [[4,17,17,24,33,33]],
+            'GRIncA' : [[0,1,2,3,4,5,6,7,8]],
+            'GRIncB' : [[9,10,11,12,13,14,15,16,17]],
+            #'LRA0'   : [[34,36,37,38]],
+            #'LRB0'   : [[35,39,40,41,42,43]],
+            'LRA0'   : [[1,4,5,8],
+                        [1,4,5,8]], # these reference vgprs A X1
+            'LRB0'   : [[3,5,7,9,10,11],
+                        [3,5,7,9,10,11]],
+            #'GRA'    : [[28,28,30,30,31,31]],
+            #'GRB'    : [[17,17,18,18,19,19,21,21,22,22,24,24,25,25,27,27]],
+            #'GRB'    : [[28,29, 30,30, 32,32]],
+            'GRB'    : [[28,28,30,30,31,31],
+                        [28,28,30,30,31,31]],
+            #'GRA'    : [[17,17,18,18,19,19,21,21,22,22,24,24,25,25,27,27]],
+            #'GRA'    : [[17,18, 19,20, 21,22, 23,24, 25,26, 27,28, 29,29, 31,31]],
+            'GRA'    : [[17,17,18,18,19,19,21,21,22,22,24,24,25,25,27,27],
+                        [17,18,18,19,19,19,21,21,22,22,24,24,25,26,28,28]],
+            #           ],
+            #           ],
+            #'LRA1'   : [[1,3,4,5]],
+            #'LRB1'   : [[2,6,7,8,9,10]],
+            # we issues all of the global reads for the next chunk and then set a barrier
+            # but I think the ds_reads here don't have to be connected.
+            'LRA1'   : [[34,36,37,41],
+                        [34,36,37,41]], # these reference vgprs A X0
+            'LRB1'   : [[35,39,40,43,45,47],
+                        [35,39,40,43,45,47]], # these reference vgprs B X0
+            'LRSA'   : [[23]], # this must come before next reads of A X0 - so the LRA1 
+            'LRSB'   : [[23]],
+            'LWSA'   : [[31]],
+            'LWSB'   : [[31]],
+            'LCC'   : [[47, 47]],
+        }"""
+
+        """optSchedule = {
+            'SYNC'   : [[4,17,17,24,33,33]],
+            'GRIncA' : [[0,1,2,3,4,5,6,7,8]],
+            'GRIncB' : [[9,10,11,12,13,14,15,16,17]],
+            #'LRA0'   : [[34,36,37,38]],
+            #'LRB0'   : [[35,39,40,41,42,43]],
+            'LRA0'   : [[1,4,5,8]],
+            'LRB0'   : [[3,5,7,9,10,11]],
+            #'GRA'    : [[28,28,30,30,31,31]],
+            #'GRB'    : [[17,17,18,18,19,19,21,21,22,22,24,24,25,25,27,27]],
+            #'GRB'    : [[28,29, 30,30, 32,32]],
+            'GRB'    : [[28,28,30,30,31,31]],
+            #'GRA'    : [[17,17,18,18,19,19,21,21,22,22,24,24,25,25,27,27]],
+            #'GRA'    : [[17,18, 19,20, 21,22, 23,24, 25,26, 27,28, 29,29, 31,31]],
+            'GRA'    : [[17,17,18,18,19,19,21,21,22,22,24,24,25,25,27,27]],
+            #           ],
+            #           ],
+            #'LRA1'   : [[1,3,4,5]],
+            #'LRB1'   : [[2,6,7,8,9,10]],
+            # we issues all of the global reads for the next chunk and then set a barrier
+            # but I think the ds_reads here don't have to be connected.
+            'LRA1'   : [[34,36,37,41]],
+            'LRB1'   : [[35,39,40,43,45,47]],
+            'LRSA'   : [[23]], # this must come before next reads of A X0 - so the LRA1 
+            'LRSB'   : [[23]],
+            'LWSA'   : [[31]],
+            'LWSB'   : [[31]],
+            'LCC'   : [[47, 47]],
+        }"""
+
+
+
+        """syncCode = [SWaitCnt(dscnt=4, vlcnt=-1, vscnt=-1, comment="Wait "),
+                    SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment=""),
+                    SBarrier(comment=""),
+                    SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment=""),
+                    SWaitCnt(dscnt=-1, vlcnt=15, vscnt=-1, comment="Wait for previous set of global reads"),
+                    SBarrier(comment="")]"""
+    else:
+        return False, None
+
+
+    numMfma = 48
+    opt1 = ScheduleInfo(2, numMfma, optSchedule, syncCode, nglshift, nllshift)
+    return True, opt1
+
 def _get_schedule_192x256x64_16bit(kernel, useLDSTr, TLDS):
     kernel["MfmaInitCVgprs"] = True
 
@@ -562,6 +939,7 @@ def hasCustomSchedule(kernel):
     is256x256x64DTL  = [MT0, MT1, DU, PGR, PLR, DTL] == [256, 256, 64, 2, 1, True]
     is192x256x64DTL  = [MT0, MT1, DU, PGR, PLR, DTL] == [192, 256, 64, 2, 1, True]
     is256x256x128DTL = [MT0, MT1, DU, PGR, PLR, DTL] == [256, 256, 128, 2, 0, True]
+    is256x96x64DTL = [MT0, MT1, DU, PGR, PLR, DTL] == [256, 96, 64, 2, 1, True]
 
     if is256x256x64DTL and is16bit and not isMixed and ([GRVWA, GRVWB, LRVW] == [8,8,8]) and MI == [16,16,32,1] and MIWG == [2,2]:
         return _get_schedule_256x256x64_16bit(kernel, useLDSTr, TLDS)
@@ -569,5 +947,7 @@ def hasCustomSchedule(kernel):
         return _get_schedule_256x256x128_8bit(kernel, useLDSTr, TLDS)
     elif is192x256x64DTL and is16bit and not isMixed and ([GRVWA, GRVWB, LRVW] == [8, 8, 8]) and MI == [16,16,32,1] and MIWG == [2,2]:
         return _get_schedule_192x256x64_16bit(kernel, useLDSTr, TLDS)
+    elif is256x96x64DTL and is16bit and not isMixed and ([GRVWA, GRVWB, LRVW] == [8, 8, 8]) and MI == [16,16,32,1] and MIWG == [4,1]:
+        return _get_schedule_256x96x64_16bit(kernel, useLDSTr, TLDS)
 
     return False, None
