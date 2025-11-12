@@ -502,7 +502,8 @@ def hasCustomSchedule(kernel):
                            36,37,38,39, 44,45,46,47, 52,53,54,55, 60,61,62,63]
         opt1 = ScheduleInfo(1, numMfma, optSchedule, syncCode, nglshift, nllshift, mfmaReorder)
         return True, opt1
-    elif is192x256x64DTL and is16bit and not isMixed and ([GRVWA, GRVWB, LRVW] == [8, 8, 8]) and MI == [16,16,32,1] and MIWG == [2,2]:
+    elif is192x256x64DTL and is16bit and not isMixed and ([GRVWA, GRVWB, LRVW] == [8, 8, 8]) and MI == [16,16,32,1] \
+         and MIWG == [2,2] and kernel["UseSgprForGRO"] == False:
 
         kernel["MfmaInitCVgprs"] = True
 
