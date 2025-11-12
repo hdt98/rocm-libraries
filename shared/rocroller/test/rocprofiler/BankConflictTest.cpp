@@ -754,6 +754,11 @@ namespace rocRollerTest
                 {
                     co_yield generateOp<Expression::Add>(v0, v0, v1);
                 }
+
+                // For some reason, 8 cycles of NONE exists here
+                // Observer needs this to properly credit/debit the LDS queue
+                co_yield Instruction::Nop(2);
+
                 auto dstRegs = ldsDst->subset(Generated(iota(i * 2, (i + 1) * 2)));
                 co_yield context->mem()->storeLocal(ldsWithOffset,
                                                     dstRegs,
@@ -811,11 +816,11 @@ namespace rocRollerTest
             const auto& inst    = filteredInstructions[i];
             const auto& profile = allLatencies[0][i];
 
-            Log::info(fmt::format("{}: model {}, profiler {}",
-                                  profile.instruction,
-                                  (inst.peekedStatus().stallCycles + 1)
-                                      * 4, // +1 for issue cycle then *4 for quadcycle
-                                  profile.meanLatency()));
+            Log::info(
+                fmt::format("{}: model {}, profiler {}",
+                            profile.instruction,
+                            (inst.peekedStatus().stallCycles + inst.numExecutedInstructions()) * 4,
+                            profile.meanLatency()));
         }
     }
 }

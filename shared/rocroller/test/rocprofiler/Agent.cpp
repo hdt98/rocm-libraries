@@ -177,18 +177,21 @@ namespace rocRoller
                     userdata->ok = false;
                     return;
                 }
-                auto&    data = userdata->instruction_map[inst.pc];
-                uint32_t latency
+                uint32_t latencyWithPrecedingNone
                     = inst.time - prev_time - prev_latency + inst.duration + inst.stall;
-                data.totalLatency += latency;
                 prev_time    = inst.time;
                 prev_latency = inst.duration + inst.stall;
+                (void)latencyWithPrecedingNone; // May be useful for future
+
+                auto& data = userdata->instruction_map[inst.pc];
+                data.totalLatency += inst.duration + inst.stall;
                 data.hitcount += 1;
-                Log::debug("trace_decode_callback: duration {}, stall {}, time {}, latency {}",
+                Log::debug("trace_decode_callback: duration {}, stall {}, time {}, "
+                           "latencyWithPrecedingNone {}",
                            inst.duration,
                            static_cast<uint32_t>(inst.stall),
                            inst.time,
-                           latency);
+                           latencyWithPrecedingNone);
             }
             return;
         }

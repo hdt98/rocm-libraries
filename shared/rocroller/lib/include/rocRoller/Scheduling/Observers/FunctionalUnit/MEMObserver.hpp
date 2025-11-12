@@ -135,7 +135,9 @@ namespace rocRoller
             }
 
         private:
-            const int queueSize = 10; // For MI250 to MI350
+            // Queue size in hardware is depth 40 width of 16 dwords from MI250 to MI350
+            // This simplifies to depth 10 width of 64 dwords
+            const int queueSize = 10;
 
             mutable std::deque<LDSQueueEntry> m_queue;
             // In hardware, slots are 16 dwords wide,
