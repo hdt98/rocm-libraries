@@ -1729,7 +1729,8 @@ rocblas_status rocblasCall_syrk_herk(rocblas_handle handle,
                                      rocblas_stride offsetC,
                                      rocblas_int ldc,
                                      rocblas_stride strideC,
-                                     rocblas_int batch_count)
+                                     rocblas_int batch_count,
+                                     T** work = nullptr)
 {
     // TODO: How to get alpha and beta for trace logging
     ROCBLAS_ENTER("syrk", "uplo:", uplo, "trans:", transA, "n:", n, "k:", k, "shiftA:", offsetA,
@@ -1764,7 +1765,8 @@ rocblas_status rocblasCall_syrk_herk(rocblas_handle handle,
                                      rocblas_stride offsetC,
                                      rocblas_int ldc,
                                      rocblas_stride strideC,
-                                     rocblas_int batch_count)
+                                     rocblas_int batch_count,
+                                     T** work = nullptr)
 {
     // TODO: How to get alpha and beta for trace logging
     ROCBLAS_ENTER("herk", "uplo:", uplo, "trans:", transA, "n:", n, "k:", k, "shiftA:", offsetA,
@@ -1781,6 +1783,173 @@ rocblas_status rocblasCall_syrk_herk(rocblas_handle handle,
             handle, uplo, transA, n, k, cast2constType<S>(alpha), cast2constType<T>(A), offsetA,
             lda, strideA, cast2constType<S>(beta), C, offsetC, ldc, strideC, batch_count);
 }
+
+#if(0)
+// A_ptr is pointer batched
+// C is strided batched
+template <bool BATCHED, typename T>
+rocblas_status rocblasCall_syrk_herk(rocblas_handle handle,
+                                     rocblas_fill uplo,
+                                     rocblas_operation transA,
+                                     rocblas_int n,
+                                     rocblas_int k,
+                                     U alpha,
+                                     T const* const A_ptr,
+                                     rocblas_stride offsetA,
+                                     rocblas_int lda,
+                                     rocblas_stride strideA,
+                                     U beta,
+                                     T* const C,
+                                     rocblas_stride offsetC,
+                                     rocblas_int ldc,
+                                     rocblas_stride strideC,
+                                     rocblas_int batch_count,
+                                     T** work = nullptr)
+{
+    bool constexpr is_complex = rocblas_is_complex<T>;
+
+    // TODO: How to get alpha and beta for trace logging
+    ROCBLAS_ENTER(is_complex ? "herk" : "syrk", "uplo:", uplo, "trans:", transA, "n:", n, "k:", k,
+                  "shiftA:", offsetA, "lda:", lda, "shiftC:", offsetC, "ldc:", ldc,
+                  "bc:", batch_count);
+
+    using S = decltype(std::real(T{}));
+
+    hipStream_t stream;
+    rocblas_get_stream(handle, &stream);
+
+    // ---------------------------------------------------
+    // assume array work is sizeof(T*) * batch_count bytes
+    // ---------------------------------------------------
+    if(work == nullptr)
+    {
+        return (rocblas_internal_error);
+    }
+    T** const C_ptr = (T**)work;
+
+    I blocks = (batch_count - 1) / 256 + 1;
+    ROCSOLVER_LAUNCH_KERNEL(get_array, dim3(blocks), dim3(256), 0, stream, work, C_ptr, strideC,
+                            batch_count);
+
+    if constexpr(BATCHED)
+    {
+        if constexpr(is_complex)
+        {
+            return rocblas_internal_herk_batched_template(
+                handle, uplo, transA, n, k, cast2constType<S>(alpha), cast2constType<T>(A), offsetA,
+                lda, strideA, cast2constType<S>(beta), C_ptr, offsetC, ldc, strideC, batch_count);
+        }
+        else
+        {
+            return rocblas_internal_syrk_batched_template(
+                handle, uplo, transA, n, k, cast2constType<S>(alpha), cast2constType<T>(A), offsetA,
+                lda, strideA, cast2constType<S>(beta), C_ptr, offsetC, ldc, strideC, batch_count);
+        }
+    }
+    else
+    {
+        if constexpr(is_complex)
+        {
+            return rocblas_internal_herk_template(
+                handle, uplo, transA, n, k, cast2constType<S>(alpha), cast2constType<T>(A), offsetA,
+                lda, strideA, cast2constType<S>(beta), C, offsetC, ldc, strideC, batch_count);
+        }
+        else
+        {
+            return rocblas_internal_syrk_template(
+                handle, uplo, transA, n, k, cast2constType<S>(alpha), cast2constType<T>(A), offsetA,
+                lda, strideA, cast2constType<S>(beta), C, offsetC, ldc, strideC, batch_count);
+        }
+    }
+}
+
+#endif
+
+#if(0)
+
+// A is strided batched
+// C_ptr is pointer batched
+template <bool BATCHED, typename T>
+rocblas_status rocblasCall_syrk_herk(rocblas_handle handle,
+                                     rocblas_fill uplo,
+                                     rocblas_operation transA,
+                                     rocblas_int n,
+                                     rocblas_int k,
+                                     U alpha,
+                                     T const* const A,
+                                     rocblas_stride offsetA,
+                                     rocblas_int lda,
+                                     rocblas_stride strideA,
+                                     U beta,
+                                     T** const C_ptr,
+                                     rocblas_stride offsetC,
+                                     rocblas_int ldc,
+                                     rocblas_stride strideC,
+                                     rocblas_int batch_count,
+                                     T** const work = nullptr)
+{
+    bool constexpr is_complex = rocblas_is_complex<T>;
+
+    // TODO: How to get alpha and beta for trace logging
+    ROCBLAS_ENTER(is_complex ? "herk" : "syrk", "uplo:", uplo, "trans:", transA, "n:", n, "k:", k,
+                  "shiftA:", offsetA, "lda:", lda, "shiftC:", offsetC, "ldc:", ldc,
+                  "bc:", batch_count);
+
+    using S = decltype(std::real(T{}));
+
+    hipStream_t stream;
+    rocblas_get_stream(handle, &stream);
+
+    // ---------------------------------------------------
+    // assume array work is sizeof(T*) * batch_count bytes
+    // ---------------------------------------------------
+    if(work == nullptr)
+    {
+        return (rocblas_internal_error);
+    }
+    T** const A_ptr = (T**)work;
+
+    I blocks = (batch_count - 1) / 256 + 1;
+    ROCSOLVER_LAUNCH_KERNEL(get_array, dim3(blocks), dim3(256), 0, stream, work, A_ptr, strideA,
+                            batch_count);
+
+    if constexpr(BATCHED)
+    {
+        if constexpr(is_complex)
+        {
+            return rocblas_internal_herk_batched_template(
+                handle, uplo, transA, n, k, cast2constType<S>(alpha), cast2constType<T*>(A_ptr),
+                offsetA, lda, strideA, cast2constType<S>(beta), C_ptr, offsetC, ldc, strideC,
+                batch_count);
+        }
+        else
+        {
+            return rocblas_internal_syrk_batched_template(
+                handle, uplo, transA, n, k, cast2constType<S>(alpha), cast2constType<T*>(A_ptr),
+                offsetA, lda, strideA, cast2constType<S>(beta), C_ptr, offsetC, ldc, strideC,
+                batch_count);
+        }
+    }
+    else
+    {
+        if constexpr(is_complex)
+        {
+            return rocblas_internal_herk_template(handle, uplo, transA, n, k,
+                                                  cast2constType<S>(alpha), cast2constType<T*>(A_ptr),
+                                                  offsetA, lda, strideA, cast2constType<S>(beta),
+                                                  C_ptr, offsetC, ldc, strideC, batch_count);
+        }
+        else
+        {
+            return rocblas_internal_syrk_template(handle, uplo, transA, n, k,
+                                                  cast2constType<S>(alpha), cast2constType<T*>(A_ptr),
+                                                  offsetA, lda, strideA, cast2constType<S>(beta),
+                                                  C_ptr, offsetC, ldc, strideC, batch_count);
+        }
+    }
+}
+
+#endif
 
 // syr2k
 template <bool BATCHED,
