@@ -118,6 +118,7 @@ def customMainLoopSchedule(writer, kernel, tensorParametersA, tensorParametersB,
     assert opt1.numMfma == len(mfmaCode)
 
     for _, indexList in opt1.optSchedule.items():
+        print (f"### RAHUL {len(indexList)} {opt1.numCodePaths}")
         assert len(indexList) <= opt1.numCodePaths
 
     if len(opt1.mfmaReorder) > 0:
@@ -306,6 +307,7 @@ def hasCustomSchedule(kernel):
     is256x256x64DTL  = [MT0, MT1, DU, PGR, PLR, DTL] == [256, 256, 64, 2, 1, True]
     is192x256x64DTL  = [MT0, MT1, DU, PGR, PLR, DTL] == [192, 256, 64, 2, 1, True]
     is256x256x128DTL = [MT0, MT1, DU, PGR, PLR, DTL] == [256, 256, 128, 2, 0, True]
+    is240x256x64DTL  = [MT0, MT1, DU, PGR, PLR, DTL] == [240, 256, 64, 2, 1, True]
 
 
     transA = kernel["ProblemType"]["TransposeA"]
@@ -315,6 +317,8 @@ def hasCustomSchedule(kernel):
     isNT = transA == False and transB == True
     isTT = transA == True and transB == True
     isTN = transA == True and transB == False
+
+    print ("#### RAHUL {} {} {} {}".format(is240x256x64DTL, GRVWA, GRVWB, LRVW))
 
     # Custom main loop scheduling for 256x256x64 16bit
     if is256x256x64DTL and is16bit and not isMixed and ([GRVWA, GRVWB, LRVW] == [8,8,8]) and MI == [16,16,32,1] and MIWG == [2,2]:
@@ -556,5 +560,50 @@ def hasCustomSchedule(kernel):
         numMfma = 96
         opt1 = ScheduleInfo(2, numMfma, optSchedule, syncCode, nglshift, nllshift)
         return True, opt1
+    elif is240x256x64DTL and is16bit and not isMixed and ([GRVWA, GRVWB, LRVW] == [2,8,8]) and MI == [16,16,32,1] and MIWG == [1,4]:
+        kernel["MfmaInitCVgprs"] = True
+        optSchedule = dict()
+        syncCode = []
+        if isTN and TLDS==1:
+            optSchedule = {
+                # 'SYNC': [[-1,14,26,26,59,97,97]],
+                'SYNC': [[-1,26,26,59,97,97]],
+                'GRIncA': [[0,0,0,1,1,1,2,2,2]],
+                # 'GRA': [[26,26,29,29,33,33,37,37,41,41,44,44,48,48,52,52,56,56,59,59,63,63,67,67,71,71,75,75,78,78],
+                #         [27,27,31,31,35,35,39,39,42,42,46,46,50,50,54,54,58,58,61,61,65,65,69,69,73,73,76,76,80,80]],
+                'GRA': [[26,26,27,27,29,29,31,31,33,33,35,35,37,37,39,39,41,41,42,42,44,44,46,46,48,48,50,50,52,52,54,54,56,56,58,58,59,59,61,61,63,63,65,65,67,67,69,69,71,71,73,73,75,75,76,76,78,78,80,80]],
+                # 'LRA0': [[0,2,3,4,5,6,7,8,9,10,11,12,13,14,15]],
+                'LRA0': [[0,2,3,4,5,6,8,10,12,14,  18,20,22,24,26],
+                         [0,2,3,4,5,7,9,11,13,15,  17,19,21,23,25]],
+                # [0,2,3,4,5,6,8,10,12,14,  18,20,21,23,25]],
+                # 'LRB0': [[1,16,17,18]],
+                'LRA1': [[98,100,101,102,103,104,105,106,107,108,109,110,111,112,113]],
+                'GRIncB': [[3,3,3,4,4,4,5,5,5]],
+                'GRB': [[82,82,84,84,86,86,88,88,90,90,92,92,93,93,95,95]],
+                'LRB0': [[1,16,19,25],
+                         [1,16,20,26]],
+                'LRB1': [[99,114,115,116]],
+                'LRSA': [[58]],
+                'LRSB': [[58]],
+                'LWSA': [[95]],
+                'LWSB': [[95]],
+                'LCC': [[119, 119]]
+            }
+ 
+            syncCode = [
+                SWaitCnt(dscnt=3, vlcnt=-1, vscnt=-1, comment="wait for prior local read local write old=0, new=3 newLW=0 newLR=3 for iteration == 0"),
+                # SWaitCnt(dscnt=15, vlcnt=-1, vscnt=-1, comment="wait for prior local read local write"),
+                SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment=""),
+                SBarrier(comment=""),
+                SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="wait for prior local read local write old=0, new=0 newLW=0 newLR=0"),
+                SWaitCnt(dscnt=-1, vlcnt=38, vscnt=-1, comment="wait for previous set of global reads"),
+                SBarrier(comment="")
+            ]   
+            numMfma = 120
+            nglshift = nllshift = len(optSchedule["GRA"][0])/2 + len(optSchedule["GRB"][0])/2
+            opt1 = ScheduleInfo(2, numMfma, optSchedule, syncCode, nglshift, nllshift)
+            return True, opt1
+        else:
+            return False, None
 
     return False, None
