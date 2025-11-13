@@ -1,4 +1,4 @@
-name: "hipDNN Pre-commit Checks"
+name: "pre-commit checks"
 on:
   pull_request:
     branches:
@@ -8,8 +8,11 @@ on:
       - '.pre-commit-config.yaml'
 
 jobs:
-  hipdnn-precommit:
+  pre-commit:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        project: [hipdnn]
     steps:
       - name: Checkout code
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
@@ -36,14 +39,14 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Get list of changed files
+      - name: Get list of changed files for ${{ matrix.project }}
         id: changed-files
         shell: bash
         run: |
           git fetch origin ${{ github.event.pull_request.base.ref }} --depth=1
-          changed=$(git diff --name-only FETCH_HEAD HEAD | grep '^projects/hipdnn/' || true)
+          changed=$(git diff --name-only FETCH_HEAD HEAD | grep "^projects/${{ matrix.project }}/" || true)
           if [ -z "$changed" ]; then
-            echo "No hipDNN files changed"
+            echo "No ${{ matrix.project }} files changed"
             echo "files_found=false" >> $GITHUB_OUTPUT
           else
             files=$(echo "$changed" | tr '\n' ' ' | sed 's/ *$//')
@@ -51,33 +54,32 @@ jobs:
             echo "files_found=true" >> $GITHUB_OUTPUT
           fi
 
-      - name: Show changed files
+      - name: Show changed files for ${{ matrix.project }}
         if: steps.changed-files.outputs.files_found == 'true'
         run: |
-          echo "Changed hipDNN files:"
+          echo "Changed ${{ matrix.project }} files:"
           echo "${{ steps.changed-files.outputs.all_modified_files }}" | tr ' ' '\n'
 
       - name: Disable submodule recursion
         run: git config submodule.recurse false
 
-      - name: Run pre-commit checks
+      - name: Run pre-commit checks for ${{ matrix.project }}
         if: steps.changed-files.outputs.files_found == 'true'
         run: |
           var="${{ steps.changed-files.outputs.all_modified_files }}"
           read -r -a files <<<"$var"
           
           echo "================================================"
-          echo "Running pre-commit checks on hipDNN files..."
+          echo "Running pre-commit checks for ${{ matrix.project }}..."
           echo "================================================"
           printf "  %s\n" "${files[@]}"
           echo ""
           
-          # Run pre-commit and capture the exit code
-          # Use --show-diff-on-failure to show what needs to be fixed
+          # Run with --show-diff-on-failure to show what needs to be fixed
           if ! pre-commit run --files "${files[@]}" --show-diff-on-failure; then
             echo ""
             echo "================================================"
-            echo "❌ Pre-commit checks FAILED"
+            echo "❌ Pre-commit checks FAILED for ${{ matrix.project }}"
             echo "================================================"
             echo ""
             echo "Please fix the issues above and commit the changes."
@@ -93,5 +95,5 @@ jobs:
           
           echo ""
           echo "================================================"
-          echo "✅ All pre-commit checks passed!"
+          echo "✅ All pre-commit checks passed for ${{ matrix.project }}!"
           echo "================================================"
