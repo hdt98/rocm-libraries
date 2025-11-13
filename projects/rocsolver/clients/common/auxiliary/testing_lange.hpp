@@ -69,7 +69,7 @@ void lange_checkBadArgs(const rocblas_handle handle,
 template <typename T, typename I>
 void testing_lange_bad_arg()
 {
-    using S = real_t<T>;
+    using S = decltype(std::real(T{}));
 
     // safe arguments
     rocblas_local_handle handle;
