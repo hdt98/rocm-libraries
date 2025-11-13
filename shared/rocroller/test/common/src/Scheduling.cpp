@@ -25,11 +25,10 @@
 
 #include "common/Scheduling.hpp"
 
-std::vector<size_t>
-    generateLDSAddresses(size_t workgroupSize, size_t strideMultiplier, size_t instrDwords)
+std::vector<size_t> generateLDSAddresses(size_t count, size_t strideMultiplier, size_t instrDwords)
 {
     std::vector<size_t> addresses;
-    for(size_t workitemId = 0; workitemId < workgroupSize; ++workitemId)
+    for(size_t workitemId = 0; workitemId < count; ++workitemId)
     {
         size_t address = workitemId * (4 * strideMultiplier * instrDwords);
         addresses.push_back(address);

@@ -107,11 +107,12 @@ namespace rocRoller
 
         int queueSlots(LDSBankModel::LdsDirection direction, int dwords)
         {
-            // 1 slot for addresses
             if(direction == LDSBankModel::LdsDirection::Write)
                 return dwords + 1;
             return 1;
         }
+
+        const int WeightlessDSMemObserver::queueSize = 10;
 
         WeightlessDSMemObserver::WeightlessDSMemObserver(ContextPtr ctx)
             : m_context(ctx)

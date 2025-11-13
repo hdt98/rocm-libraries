@@ -665,13 +665,6 @@ TEST_CASE("Weave LDS and ALU operations", "[rocprofiler][scheduler]")
     auto workitemIndex = context->kernel()->workitemIndex()[0];
 
     auto kb = [&]() -> Generator<Instruction> {
-        auto v0 = Register::Value::Placeholder(
-            context.get(), Register::Type::Vector, DataType::Int32, 1);
-        auto v1 = Register::Value::Placeholder(
-            context.get(), Register::Type::Vector, DataType::Int32, 1);
-        co_yield v0->allocate();
-        co_yield v1->allocate();
-
         co_yield Expression::generate(
             ldsWithOffset,
             Expression::literal(ldsData->getLDSAllocation()->offset())
@@ -721,14 +714,7 @@ TEST_CASE("Weave LDS and ALU operations", "[rocprofiler][scheduler]")
                                                     8 // 64 bits = 8 bytes
                 );
             }
-            for(int j = 0; j < i; ++j)
-            {
-                co_yield generateOp<Expression::Add>(v0, v0, v1);
-            }
-
-            // For some reason, 8 cycles of NONE exists here
-            // Observer needs this to properly credit/debit the LDS queue
-            co_yield Instruction::Nop(2);
+            co_yield Instruction::Nop(i + 1);
 
             auto dstRegs = ldsDst->subset(Generated(iota(i * 2, (i + 1) * 2)));
             co_yield context->mem()->storeLocal(ldsWithOffset,
@@ -787,12 +773,11 @@ TEST_CASE("Weave LDS and ALU operations", "[rocprofiler][scheduler]")
         const auto& inst    = filteredInstructions[i];
         const auto& profile = allLatencies[0][i];
 
-        Log::info(
-            fmt::format("{}: model {}, profiler mean {}, with NONE {}",
-                        profile.instruction,
-                        (inst.peekedStatus().stallCycles + inst.numExecutedInstructions()) * 4,
-                        profile.meanLatency(),
-                        profile.meanLatencyWithPrecedingNone()));
+        Log::info(fmt::format("{}: model {}, profiler mean {}, with NONE {}",
+                              profile.instruction,
+                              inst.peekedStatus().stallCycles * 4,
+                              profile.meanLatency(),
+                              profile.meanLatencyWithPrecedingNone()));
     }
 }
 
@@ -802,8 +787,6 @@ TEST_CASE("Scheduling LDS", "[rocprofiler][scheduler]")
 
     Settings::getInstance()->set(Settings::SchedulerCost,
                                  Scheduling::CostFunction::LinearWeightedSimple);
-
-    constexpr auto workgroupSize = 64u;
 
     const auto name = "lds_alu_scheduler_test";
 
@@ -824,7 +807,8 @@ TEST_CASE("Scheduling LDS", "[rocprofiler][scheduler]")
     const auto one  = std::make_shared<Expression::Expression>(1u);
     const auto zero = std::make_shared<Expression::Expression>(0u);
 
-    auto workitemCount = Expression::literal(workgroupSize * 256);
+    constexpr auto workgroupSize = 64u;
+    auto           workitemCount = Expression::literal(workgroupSize * 256);
     k->setWorkgroupSize({workgroupSize, 1, 1});
     k->setWorkitemCount({workitemCount, one, one});
     k->setDynamicSharedMemBytes(zero);
@@ -835,7 +819,7 @@ TEST_CASE("Scheduling LDS", "[rocprofiler][scheduler]")
     // ds_read_b64 with stride multiplier of 4
     const auto instrDwords      = 4;
     const auto strideMultiplier = 4;
-    const auto baseAddresses = generateLDSAddresses(workgroupSize, strideMultiplier, instrDwords);
+    const auto baseAddresses    = generateLDSAddresses(64, strideMultiplier, instrDwords);
 
     auto ldsData = Register::Value::AllocateLDS(
         context.get(),
@@ -950,12 +934,10 @@ TEST_CASE("Scheduling LDS", "[rocprofiler][scheduler]")
         const auto& inst    = filteredInstructions[i];
         const auto& profile = allLatencies[0][i];
 
-        Log::info(
-            fmt::format("{}: model {}, profiler mean {}, with NONE {}, stall {}",
-                        profile.instruction,
-                        (inst.peekedStatus().stallCycles + inst.numExecutedInstructions()) * 4,
-                        profile.meanLatency(),
-                        profile.meanLatencyWithPrecedingNone(),
-                        inst.peekedStatus().stallCycles));
+        Log::info(fmt::format("{}: model {}, profiler mean {}, with NONE {}",
+                              profile.instruction,
+                              inst.peekedStatus().stallCycles * 4,
+                              profile.meanLatency(),
+                              profile.meanLatencyWithPrecedingNone()));
     }
 }
