@@ -172,6 +172,8 @@ struct GemmPipelineAgBgCrCompV4 : public BaseGemmPipelineAgBgCrCompV4<Problem>
     static constexpr auto is_a_load_tr_v = bool_constant<PipelineImplBase::is_a_load_tr>{};
     static constexpr auto is_b_load_tr_v = bool_constant<PipelineImplBase::is_b_load_tr>{};
 
+    static_assert(DoubleSmemBuffer == true, "pipeline requires double smem buffer");
+
     [[nodiscard]] CK_TILE_HOST static const std::string GetName()
     {
         // clang-format off
@@ -184,7 +186,8 @@ struct GemmPipelineAgBgCrCompV4 : public BaseGemmPipelineAgBgCrCompV4<Problem>
 
     CK_TILE_HOST_DEVICE static constexpr index_t GetSmemSize()
     {
-        return Policy::template GetSmemSize<Problem>();
+        constexpr index_t smem_size = Policy::template GetSmemSize<Problem>();
+        return 2 * smem_size;
     }
 
     CK_TILE_HOST_DEVICE static constexpr auto IsTransposeC()
@@ -274,8 +277,7 @@ struct GemmPipelineAgBgCrCompV4 : public BaseGemmPipelineAgBgCrCompV4<Problem>
                                        const BsDramBlockWindowTmp& b_dram_block_window_tmp,
                                        const BElementFunction& b_element_func,
                                        index_t num_loop,
-                                       void* __restrict__ p_smem_0,
-                                       void* __restrict__ p_smem_1) const
+                                       void* __restrict__ p_smem) const
         {
             using ADramBlockWindowTmp =
                 remove_cvref_t<std::tuple_element_t<number<0>{}, AsDramBlockWindowTmp>>;
@@ -317,8 +319,10 @@ struct GemmPipelineAgBgCrCompV4 : public BaseGemmPipelineAgBgCrCompV4<Problem>
             // global read 0
 
             ////////////// LDS desc, window & register /////////////////
-            auto&& [a_lds_block0, b_lds_block0] = Base::GetABLdsTensorViews(p_smem_0);
-            auto&& [a_lds_block1, b_lds_block1] = Base::GetABLdsTensorViews(p_smem_1);
+            constexpr index_t smem_size         = Policy::template GetSmemSize<Problem>();
+            auto&& [a_lds_block0, b_lds_block0] = Base::GetABLdsTensorViews(p_smem);
+            auto&& [a_lds_block1, b_lds_block1] =
+                Base::GetABLdsTensorViews(static_cast<char*>(p_smem) + smem_size);
 
             constexpr auto a_lds_shape = []() {
                 if constexpr(is_a_load_tr_v())
@@ -673,8 +677,7 @@ struct GemmPipelineAgBgCrCompV4 : public BaseGemmPipelineAgBgCrCompV4<Problem>
                                    const BsDramBlockWindowTmp& b_dram_block_window_tmp,
                                    const BElementFunction& b_element_func,
                                    index_t num_loop,
-                                   void* p_smem_0,
-                                   void* p_smem_1) const
+                                   void* p_smem) const
     {
         return PipelineImpl<Scheduler>{}.template operator()<HasHotLoop, TailNum>(
             a_dram_block_window_tmp,
@@ -682,8 +685,7 @@ struct GemmPipelineAgBgCrCompV4 : public BaseGemmPipelineAgBgCrCompV4<Problem>
             b_dram_block_window_tmp,
             b_element_func,
             num_loop,
-            p_smem_0,
-            p_smem_1);
+            p_smem);
     }
 
     template <typename AsDramBlockWindowTmp,
@@ -694,8 +696,7 @@ struct GemmPipelineAgBgCrCompV4 : public BaseGemmPipelineAgBgCrCompV4<Problem>
     CK_TILE_DEVICE auto operator()(const AsDramBlockWindowTmp& a_dram_block_window_tmp,
                                    const BsDramBlockWindowTmp& b_dram_block_window_tmp,
                                    const index_t num_loop,
-                                   void* __restrict__ p_smem_0,
-                                   void* __restrict__ p_smem_1) const
+                                   void* __restrict__ p_smem) const
     {
         return PipelineImpl<Scheduler>{}.template operator()<HasHotLoop, TailNum>(
             a_dram_block_window_tmp,
@@ -703,8 +704,7 @@ struct GemmPipelineAgBgCrCompV4 : public BaseGemmPipelineAgBgCrCompV4<Problem>
             b_dram_block_window_tmp,
             [](auto& e, const BDataType& b) { e = b; },
             num_loop,
-            p_smem_0,
-            p_smem_1);
+            p_smem);
     }
 
     template <typename AsDramBlockWindowTmp,
@@ -717,8 +717,7 @@ struct GemmPipelineAgBgCrCompV4 : public BaseGemmPipelineAgBgCrCompV4<Problem>
                                    index_t num_loop,
                                    bool has_hot_loop,
                                    TailNumber tail_number,
-                                   void* __restrict__ p_smem_0,
-                                   void* __restrict__ p_smem_1) const
+                                   void* __restrict__ p_smem) const
     {
         const auto RunPipeline = [&](auto hot_loop_, auto tail_num_) {
             constexpr bool hot_loop    = hot_loop_.value;
@@ -730,8 +729,7 @@ struct GemmPipelineAgBgCrCompV4 : public BaseGemmPipelineAgBgCrCompV4<Problem>
                 b_dram_block_window_tmp,
                 PassThrough,
                 num_loop,
-                p_smem_0,
-                p_smem_1);
+                p_smem);
         };
         return Base::TailHandler(RunPipeline, has_hot_loop, tail_number);
     }
@@ -748,16 +746,14 @@ struct GemmPipelineAgBgCrCompV4 : public BaseGemmPipelineAgBgCrCompV4<Problem>
                                    const BDramBlockWindowTmp& b_dram_block_window_tmp,
                                    const BElementFunction& b_element_func,
                                    index_t num_loop,
-                                   void* p_smem_0,
-                                   void* p_smem_1) const
+                                   void* p_smem) const
     {
         return operator()(ck_tile::make_tuple(a_dram_block_window_tmp),
                           a_element_func,
                           ck_tile::make_tuple(b_dram_block_window_tmp),
                           b_element_func,
                           num_loop,
-                          p_smem_0,
-                          p_smem_1);
+                          p_smem);
     }
 
     template <typename ADramBlockWindowTmp,
@@ -768,14 +764,12 @@ struct GemmPipelineAgBgCrCompV4 : public BaseGemmPipelineAgBgCrCompV4<Problem>
     CK_TILE_DEVICE auto operator()(const ADramBlockWindowTmp& a_dram_block_window_tmp,
                                    const BDramBlockWindowTmp& b_dram_block_window_tmp,
                                    const index_t num_loop,
-                                   void* __restrict__ p_smem_0,
-                                   void* __restrict__ p_smem_1) const
+                                   void* __restrict__ p_smem) const
     {
         return operator()(ck_tile::make_tuple(a_dram_block_window_tmp),
                           ck_tile::make_tuple(b_dram_block_window_tmp),
                           num_loop,
-                          p_smem_0,
-                          p_smem_1);
+                          p_smem);
     }
 
     template <typename ADramBlockWindowTmp,
@@ -788,16 +782,14 @@ struct GemmPipelineAgBgCrCompV4 : public BaseGemmPipelineAgBgCrCompV4<Problem>
                                    index_t num_loop,
                                    bool has_hot_loop,
                                    TailNumber tail_number,
-                                   void* __restrict__ p_smem_0,
-                                   void* __restrict__ p_smem_1) const
+                                   void* __restrict__ p_smem) const
     {
         return operator()(ck_tile::make_tuple(a_dram_block_window_tmp),
                           ck_tile::make_tuple(b_dram_block_window_tmp),
                           num_loop,
                           has_hot_loop,
                           tail_number,
-                          p_smem_0,
-                          p_smem_1);
+                          p_smem);
     }
 };
 } // namespace ck_tile

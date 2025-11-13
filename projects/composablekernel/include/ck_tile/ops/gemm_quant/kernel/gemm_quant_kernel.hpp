@@ -939,7 +939,7 @@ struct QuantGemmKernel
      * @param aq_ptr input AQ pointer
      * @param bq_ptr input BQ pointer
      * @param c_ptr output C pointer
-     * @param smem_ptr_0 The start memory pointer of the shared memory block.
+     * @param smem_ptr The start memory pointer of the shared memory block.
      * @param kargs GEMM kernel arguments
      * @param splitk_batch_offset splitk_batch_offset Utility structure used to calculate k batch.
      * @param block_idx_m The GEMM's output M dimension tile index processed by this workgroup.
@@ -953,7 +953,7 @@ struct QuantGemmKernel
                                        const AQDataType* aq_ptr,
                                        const BQDataType* bq_ptr,
                                        CDataType* c_ptr,
-                                       void* smem_ptr_0,
+                                       void* smem_ptr,
                                        const QuantGemmKernelArgs& kargs,
                                        const SplitKBatchOffset& splitk_batch_offset,
                                        const index_t block_idx_m,
@@ -978,19 +978,19 @@ struct QuantGemmKernel
             {
                 const auto& aq_block_window = gemm_tile_windows.at(I1);
                 return GemmPipeline{}.template operator()(
-                    a_block_window, b_block_window, aq_block_window, kargs.M, num_loop, smem_ptr_0);
+                    a_block_window, b_block_window, aq_block_window, kargs.M, num_loop, smem_ptr);
             }
             else if constexpr(kQuantType == QuantType::BQuantGrouped)
             {
                 const auto& bq_block_window = gemm_tile_windows.at(I3);
                 return GemmPipeline{}.template operator()(
-                    a_block_window, b_block_window, bq_block_window, num_loop, smem_ptr_0);
+                    a_block_window, b_block_window, bq_block_window, num_loop, smem_ptr);
             }
             else if constexpr(kQuantType == QuantType::RowColQuant ||
                               kQuantType == QuantType::TensorQuant)
             {
                 return GemmPipeline{}.template operator()(
-                    a_block_window, b_block_window, num_loop, smem_ptr_0);
+                    a_block_window, b_block_window, num_loop, smem_ptr);
             }
         }();
 
@@ -1000,7 +1000,7 @@ struct QuantGemmKernel
         if constexpr(kQuantType == QuantType::AQuantGrouped ||
                      kQuantType == QuantType::BQuantGrouped)
         {
-            EpiloguePipeline{}(c_block_window, c_block_tile, c_block_window, smem_ptr_0);
+            EpiloguePipeline{}(c_block_window, c_block_tile, c_block_window, smem_ptr);
         }
         else if constexpr(kQuantType == QuantType::RowColQuant)
         {
@@ -1009,7 +1009,7 @@ struct QuantGemmKernel
             EpiloguePipeline{}(c_block_window,
                                c_block_tile,
                                c_block_window,
-                               smem_ptr_0,
+                               smem_ptr,
                                aq_block_window,
                                bq_block_window);
         }
@@ -1023,81 +1023,7 @@ struct QuantGemmKernel
             const AccDataType aq_scale = type_convert<AccDataType>(*aq_ptr);
             const AccDataType bq_scale = type_convert<AccDataType>(*bq_ptr);
             EpiloguePipeline{}(
-                c_block_window, c_block_tile, c_block_window, smem_ptr_0, aq_scale, bq_scale);
-        }
-    }
-    /**
-     * @brief Runs single GEMM problem cooperatively by whole workgroup.
-     *
-     * @param a_ptr input A pointer
-     * @param b_ptr input B pointer
-     * @param aq_ptr input AQ pointer
-     * @param c_ptr output C pointer
-     * @param smem_ptr_0 The start memory pointer of the shared memory block.
-     * @param kargs GEMM kernel arguments
-     * @param splitk_batch_offset splitk_batch_offset Utility structure used to calculate k batch.
-     * @param block_idx_m The GEMM's output M dimension tile index processed by this workgroup.
-     * @param block_idx_n The GEMM's output N dimension tile index processed by this workgroup.
-     *
-     * @tparam DstInMemOp Destination memory operation (default: set).
-     */
-    template <memory_operation_enum DstInMemOp = memory_operation_enum::set>
-    CK_TILE_DEVICE static void RunGemm2LDS(const ADataType* a_ptr,
-                                           const BDataType* b_ptr,
-                                           const AQDataType* aq_ptr,
-                                           const BQDataType* bq_ptr,
-                                           CDataType* c_ptr,
-                                           void* smem_ptr_0,
-                                           void* smem_ptr_1,
-                                           const QuantGemmKernelArgs& kargs,
-                                           const SplitKBatchOffset& splitk_batch_offset,
-                                           const index_t block_idx_m,
-                                           const index_t block_idx_n)
-    {
-        // Create Gemm tensor views, pad views and tile windows
-        const auto& gemm_tensor_views_tuple = MakeGemmTensorViews<DstInMemOp>(
-            a_ptr, b_ptr, aq_ptr, bq_ptr, c_ptr, kargs, splitk_batch_offset);
-
-        const auto& gemm_pad_views = MakeGemmPadViews(gemm_tensor_views_tuple);
-        auto gemm_tile_windows     = MakeGemmTileWindows(gemm_pad_views, block_idx_m, block_idx_n);
-
-        const index_t num_loop = __builtin_amdgcn_readfirstlane(
-            TilePartitioner::GetLoopNum(splitk_batch_offset.splitted_k));
-
-        // Run GEMM cooperatively by whole workgroup.
-        const auto& a_block_window = gemm_tile_windows.at(I0);
-        const auto& b_block_window = gemm_tile_windows.at(I2);
-
-        const auto& c_block_tile = [&]() {
-            if constexpr(kQuantType == QuantType::BQuantGrouped)
-            {
-                const auto& bq_block_window = gemm_tile_windows.at(I3);
-                return GemmPipeline{}.template operator()(a_block_window,
-                                                          b_block_window,
-                                                          bq_block_window,
-                                                          num_loop,
-                                                          smem_ptr_0,
-                                                          smem_ptr_1);
-            }
-            else
-            {
-                return nullptr;
-            }
-        }();
-
-        // Run Epilogue Pipeline
-        auto& c_block_window = gemm_tile_windows.at(I4);
-
-        if constexpr(kQuantType == QuantType::BQuantGrouped)
-        {
-            EpiloguePipeline{}(c_block_window, c_block_tile, c_block_window, smem_ptr_0);
-        }
-        else
-        {
-            return;
-            // throw std::runtime_error("DoubleSmemBuffer Not implemented for AQuantGrouped or
-            // RowColQuant"); static_assert(kQuantType == QuantType::BQuantGrouped,
-            // "DoubleSmemBuffer Not implemented");
+                c_block_window, c_block_tile, c_block_window, smem_ptr, aq_scale, bq_scale);
         }
     }
 
@@ -1117,37 +1043,11 @@ struct QuantGemmKernel
         CDataType* c_ptr         = static_cast<CDataType*>(kargs.c_ptr);
 
         // allocate LDS
-        __shared__ char smem_ptr_0[GetSmemSize()];
+        __shared__ char smem_ptr[GetSmemSize()];
         assert(kargs.k_batch == 1);
-        if constexpr(GemmPipeline::DoubleSmemBuffer == true)
-        {
-            __shared__ char smem_ptr_1[GetSmemSize()];
 
-            RunGemm2LDS(a_ptr,
-                        b_ptr,
-                        aq_ptr,
-                        bq_ptr,
-                        c_ptr,
-                        smem_ptr_0,
-                        smem_ptr_1,
-                        kargs,
-                        splitk_batch_offset,
-                        i_m,
-                        i_n);
-        }
-        else
-        {
-            RunGemm(a_ptr,
-                    b_ptr,
-                    aq_ptr,
-                    bq_ptr,
-                    c_ptr,
-                    smem_ptr_0,
-                    kargs,
-                    splitk_batch_offset,
-                    i_m,
-                    i_n);
-        }
+        RunGemm(
+            a_ptr, b_ptr, aq_ptr, bq_ptr, c_ptr, smem_ptr, kargs, splitk_batch_offset, i_m, i_n);
     }
 };
 

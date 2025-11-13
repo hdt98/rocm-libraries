@@ -318,21 +318,18 @@ struct QuantGroupedGemmKernel
         CDataType* c_ptr         = static_cast<CDataType*>(kargs.c_ptr);
 
         // allocate LDS
-        __shared__ char smem_ptr_0[GetSmemSize()];
+        __shared__ char smem_ptr[GetSmemSize()];
 
         // Only for BQuantGrouped DoubleSmemBuffer is supported
         if constexpr(GemmPipeline::DoubleSmemBuffer == true &&
                      kQuantType == QuantType::BQuantGrouped)
         {
-
-            __shared__ char smem_ptr_1[GetSmemSize()];
             RunGemmWithPipelineSelection2LDS(a_ptr,
                                              b_ptr,
                                              aq_ptr,
                                              bq_ptr,
                                              c_ptr,
-                                             smem_ptr_0,
-                                             smem_ptr_1,
+                                             smem_ptr,
                                              kargs,
                                              splitk_batch_offset,
                                              i_m,
@@ -346,7 +343,7 @@ struct QuantGroupedGemmKernel
                                          aq_ptr,
                                          bq_ptr,
                                          c_ptr,
-                                         smem_ptr_0,
+                                         smem_ptr,
                                          kargs,
                                          splitk_batch_offset,
                                          i_m,
@@ -361,8 +358,7 @@ struct QuantGroupedGemmKernel
                                      const AQDataType* aq_ptr,
                                      const BQDataType* bq_ptr,
                                      CDataType* c_ptr,
-                                     void* smem_ptr_0,
-                                     void* smem_ptr_1,
+                                     void* smem_ptr,
                                      const QuantGroupedGemmKernelArgs& kargs,
                                      const typename Base::SplitKBatchOffset& splitk_batch_offset,
                                      const index_t block_idx_m,
@@ -387,18 +383,13 @@ struct QuantGroupedGemmKernel
         const auto& b_block_window = gemm_tile_windows.at(Base::I2);
 
         const auto& bq_block_window = gemm_tile_windows.at(Base::I3);
-        const auto& c_block_tile    = GemmPipeline{}.template operator()(a_block_window,
-                                                                      b_block_window,
-                                                                      bq_block_window,
-                                                                      num_loop,
-                                                                      tail_num,
-                                                                      smem_ptr_0,
-                                                                      smem_ptr_1);
+        const auto& c_block_tile    = GemmPipeline{}.template operator()(
+            a_block_window, b_block_window, bq_block_window, num_loop, tail_num, smem_ptr);
 
         // Run Epilogue Pipeline
         auto& c_block_window = gemm_tile_windows.at(Base::I4);
 
-        EpiloguePipeline{}(c_block_window, c_block_tile, c_block_window, smem_ptr_0);
+        EpiloguePipeline{}(c_block_window, c_block_tile, c_block_window, smem_ptr);
     }
 
     /**
@@ -413,7 +404,7 @@ struct QuantGroupedGemmKernel
      * @param aq_ptr input AQ pointer
      * @param bq_ptr input BQ pointer
      * @param c_ptr output C pointer
-     * @param smem_ptr_0 The start memory pointer of the shared memory block.
+     * @param smem_ptr The start memory pointer of the shared memory block.
      * @param kargs GEMM kernel arguments
      * @param splitk_batch_offset splitk_batch_offset Utility structure used to calculate k
      * batch.
@@ -427,7 +418,7 @@ struct QuantGroupedGemmKernel
                                  const AQDataType* aq_ptr,
                                  const BQDataType* bq_ptr,
                                  CDataType* c_ptr,
-                                 void* smem_ptr_0,
+                                 void* smem_ptr,
                                  const QuantGroupedGemmKernelArgs& kargs,
                                  const typename Base::SplitKBatchOffset& splitk_batch_offset,
                                  const index_t block_idx_m,
@@ -460,18 +451,18 @@ struct QuantGroupedGemmKernel
                                                                           num_loop,
                                                                           has_hot_loop,
                                                                           tail_num,
-                                                                          smem_ptr_0);
+                                                                          smem_ptr);
 
             auto& c_block_window = gemm_tile_windows.at(Base::I4);
 
             // Run Epilogue Pipeline
-            EpiloguePipeline{}(c_block_window, c_block_tile, c_block_window, smem_ptr_0);
+            EpiloguePipeline{}(c_block_window, c_block_tile, c_block_window, smem_ptr);
         }
         else
         {
             // Run GEMM pipeline
             const auto& c_block_tile = GemmPipeline{}.template operator()(
-                a_block_window, b_block_window, num_loop, has_hot_loop, tail_num, smem_ptr_0);
+                a_block_window, b_block_window, num_loop, has_hot_loop, tail_num, smem_ptr);
             // Run Epilogue Pipeline
             auto& c_block_window = gemm_tile_windows.at(Base::I4);
             if constexpr(kQuantType == QuantType::RowColQuant)
@@ -481,7 +472,7 @@ struct QuantGroupedGemmKernel
                 EpiloguePipeline{}(c_block_window,
                                    c_block_tile,
                                    c_block_window,
-                                   smem_ptr_0,
+                                   smem_ptr,
                                    aq_block_window,
                                    bq_block_window);
             }
@@ -490,7 +481,7 @@ struct QuantGroupedGemmKernel
                 const AccDataType aq_scale = type_convert<AccDataType>(*aq_ptr);
                 const AccDataType bq_scale = type_convert<AccDataType>(*bq_ptr);
                 EpiloguePipeline{}(
-                    c_block_window, c_block_tile, c_block_window, smem_ptr_0, aq_scale, bq_scale);
+                    c_block_window, c_block_tile, c_block_window, smem_ptr, aq_scale, bq_scale);
             }
         }
     }

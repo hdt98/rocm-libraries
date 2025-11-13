@@ -307,24 +307,15 @@ struct GroupedGemmKernel
         CDataType* c_ptr = static_cast<CDataType*>(kargs.e_ptr);
 
         // allocate LDS
-        __shared__ char smem_ptr_0[GetSmemSize()];
+        __shared__ char smem_ptr[GetSmemSize()];
 
         // TO DO:
         // Can we simplify this branching logic?
         if constexpr(GemmPipeline::DoubleSmemBuffer == true)
         {
 
-            __shared__ char smem_ptr_1[GetSmemSize()];
-            RunGemmWithPipelineSelection2LDS(a_ptr,
-                                             b_ptr,
-                                             c_ptr,
-                                             kargs.ds_ptr,
-                                             smem_ptr_0,
-                                             smem_ptr_1,
-                                             kargs,
-                                             splitk_batch_offset,
-                                             i_m,
-                                             i_n);
+            RunGemmWithPipelineSelection2LDS(
+                a_ptr, b_ptr, c_ptr, kargs.ds_ptr, smem_ptr, kargs, splitk_batch_offset, i_m, i_n);
         }
         else // SingleSmemBuffer
         {
@@ -335,7 +326,7 @@ struct GroupedGemmKernel
                                              b_ptr,
                                              kargs.ds_ptr,
                                              c_ptr,
-                                             smem_ptr_0,
+                                             smem_ptr,
                                              kargs,
                                              splitk_batch_offset,
                                              i_m,
@@ -347,7 +338,7 @@ struct GroupedGemmKernel
                               {b_ptr},
                               kargs.ds_ptr,
                               c_ptr,
-                              smem_ptr_0,
+                              smem_ptr,
                               kargs,
                               splitk_batch_offset,
                               i_m,
@@ -423,8 +414,7 @@ struct GroupedGemmKernel
      * @param a_ptr input A pointer
      * @param b_ptr input B pointer
      * @param c_ptr output C pointer
-     * @param smem_ptr_0 The start memory pointer of the shared memory block.
-     * @param smem_ptr_1 The second start memory pointer of the shared memory block.
+     * @param smem_ptr The start memory pointer of the shared memory block.
      * @param kargs GEMM kernel arguments
      * @param splitk_batch_offset splitk_batch_offset Utility structure used to calculate k
      * batch.
@@ -437,8 +427,7 @@ struct GroupedGemmKernel
                                      const BDataType* b_ptr,
                                      CDataType* c_ptr,
                                      const std::array<const void*, NumDTensor_>& ds_ptr,
-                                     void* __restrict__ smem_ptr_0,
-                                     void* __restrict__ smem_ptr_1,
+                                     void* __restrict__ smem_ptr,
                                      const UniversalGemmKernelArgs<1, 1, NumDTensor_>& kargs,
                                      const typename Base::SplitKBatchOffset& splitk_batch_offset,
                                      const index_t block_idx_m,
@@ -470,8 +459,7 @@ struct GroupedGemmKernel
                                                           b_block_window[Base::I0],
                                                           num_loop,
                                                           tail_num,
-                                                          smem_ptr_0,
-                                                          smem_ptr_1);
+                                                          smem_ptr);
             }
             else
             {
@@ -482,8 +470,7 @@ struct GroupedGemmKernel
                                                           num_loop,
                                                           has_hot_loop,
                                                           tail_num,
-                                                          smem_ptr_0,
-                                                          smem_ptr_1);
+                                                          smem_ptr);
             }
         }();
 
@@ -491,7 +478,7 @@ struct GroupedGemmKernel
         auto& c_block_window = gemm_tile_windows.at(Base::I3);
         EpiloguePipeline{}.template
         operator()<decltype(c_block_window), decltype(c_block_tile), decltype(d_block_window)>(
-            c_block_window, c_block_tile, d_block_window, smem_ptr_0);
+            c_block_window, c_block_tile, d_block_window, smem_ptr);
     }
 
     CK_TILE_DEVICE index_t FindGroupId(const GemmTransKernelArg<NumDTensor_>* gemm_desc_ptr,
