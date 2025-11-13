@@ -2,3 +2,5 @@ __pycache__
 
 # Build directories
 _build/
+
+/.cline_storage
