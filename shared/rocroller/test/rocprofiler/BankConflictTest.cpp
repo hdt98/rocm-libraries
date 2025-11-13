@@ -85,6 +85,19 @@ std::vector<int64_t> calculateLatencyDeltas(const std::vector<uint64_t>& latenci
     return deltas;
 }
 
+const auto getAlignedSubset
+    = [](size_t totalRegs, size_t requestedRegCount, size_t position) -> std::pair<size_t, size_t> {
+    // If run out of registers, wrap around
+    size_t num_complete_chunks = totalRegs / requestedRegCount;
+    if(num_complete_chunks == 0)
+    {
+        return {0, 0};
+    }
+    size_t chunk_index = position % num_complete_chunks;
+    size_t start       = chunk_index * requestedRegCount;
+    return {start, start + requestedRegCount};
+};
+
 class LDSBankConflictTestKernel : public AssemblyTestKernel
 {
 public:
@@ -156,23 +169,11 @@ protected:
                                                 resultType(workitemIndex->expression()).varType),
                 m_context);
 
-            auto getSubset = [](size_t n, size_t m, size_t i) -> std::pair<size_t, size_t> {
-                // If run out of registers, wrap around
-                size_t num_complete_chunks = n / m;
-                if(num_complete_chunks == 0)
-                {
-                    return {0, 0};
-                }
-                size_t chunk_index = i % num_complete_chunks;
-                size_t start       = chunk_index * m;
-                return {start, start + m};
-            };
-
             co_yield m_context->mem()->barrier({});
 
             for(int i = 0; i < ITERS; ++i)
             {
-                const auto [start, end] = getSubset(regCount, m_instrDwords, i);
+                const auto [start, end] = getAlignedSubset(regCount, m_instrDwords, i);
                 const auto numBytes     = m_instrDwords * 4;
 
                 if(m_write)
@@ -614,7 +615,7 @@ TEST_CASE("Rocprofiler LDS Observer", "[rocprofiler]")
     }
 }
 
-TEST_CASE("Weave LDS and ALU operations", "[rocprofiler][scheduler]")
+TEST_CASE("Weave LDS and nops", "[rocprofiler][scheduler]")
 {
     using namespace Scheduling::LDSBankModel;
 
@@ -650,9 +651,8 @@ TEST_CASE("Weave LDS and ALU operations", "[rocprofiler][scheduler]")
     context->schedule(k->preamble());
     context->schedule(k->prolog());
 
-    // ds_read_b64 with stride multiplier of 4
-    const auto instrDwords      = 4;
-    const auto strideMultiplier = 4;
+    const auto instrDwords      = 2;
+    const auto strideMultiplier = 8;
     const auto baseAddresses = generateLDSAddresses(workgroupSize, strideMultiplier, instrDwords);
 
     auto ldsData = Register::Value::AllocateLDS(
@@ -684,13 +684,14 @@ TEST_CASE("Weave LDS and ALU operations", "[rocprofiler][scheduler]")
 
         co_yield context->mem()->barrier({});
 
-        for(int i = 0; i < 12; ++i)
+        for(int i = 0; i < 8; ++i)
         {
-            auto dstRegs = ldsDst->subset(Generated(iota(i * 2, (i + 1) * 2)));
+            const auto [start, end] = getAlignedSubset(ldsDst->registerCount(), instrDwords, i);
+            auto dstRegs            = ldsDst->subset(Generated(iota(start, end)));
             co_yield context->mem()->storeLocal(ldsWithOffset,
                                                 dstRegs,
                                                 i * 8, // offset in bytes
-                                                8 // 64 bits = 8 bytes
+                                                4 * instrDwords // bytes
             );
         }
 
@@ -707,21 +708,15 @@ TEST_CASE("Weave LDS and ALU operations", "[rocprofiler][scheduler]")
         {
             for(int k = 0; k < 4; ++k)
             {
-                auto dstRegs = ldsDst->subset(Generated(iota(k * 2, (k + 1) * 2)));
+                const auto [start, end] = getAlignedSubset(ldsDst->registerCount(), instrDwords, k);
+                auto dstRegs            = ldsDst->subset(Generated(iota(start, end)));
                 co_yield context->mem()->storeLocal(ldsWithOffset,
                                                     dstRegs,
                                                     k * 8, // offset in bytes
-                                                    8 // 64 bits = 8 bytes
+                                                    4 * instrDwords // bytes
                 );
             }
-            co_yield Instruction::Nop(i + 1);
-
-            auto dstRegs = ldsDst->subset(Generated(iota(i * 2, (i + 1) * 2)));
-            co_yield context->mem()->storeLocal(ldsWithOffset,
-                                                dstRegs,
-                                                i * 8, // offset in bytes
-                                                8 // 64 bits = 8 bytes
-            );
+            co_yield Instruction::Nop(i);
         }
     };
 
@@ -738,6 +733,8 @@ TEST_CASE("Weave LDS and ALU operations", "[rocprofiler][scheduler]")
         context->schedule(inst);
         instructions.push_back(inst);
     }
+    instructions.push_back(
+        Instruction("s_endpgm", {}, {}, {}, "")); // postamble too much other stuff
 
     context->schedule(k->postamble());
     context->schedule(k->amdgpu_metadata());
@@ -763,21 +760,25 @@ TEST_CASE("Weave LDS and ALU operations", "[rocprofiler][scheduler]")
     std::vector<Instruction> filteredInstructions;
     for(const auto& inst : instructions)
     {
-        if(not inst.toString(LogLevel::Terse).empty())
+        if(not inst.toString(LogLevel::Terse).empty()) // isCommentOnly did not work
             filteredInstructions.push_back(inst);
     }
+    REQUIRE(filteredInstructions.size() == allLatencies[0].size());
 
-    // Show weaved together
     for(size_t i = 0; i < std::min(filteredInstructions.size(), allLatencies[0].size()); ++i)
     {
         const auto& inst    = filteredInstructions[i];
         const auto& profile = allLatencies[0][i];
 
-        Log::info(fmt::format("{}: model {}, profiler mean {}, with NONE {}",
+        using namespace Scheduling::LDSBankModel;
+        const int modelLatency
+            = getInstructionIssueCycles(MemoryOpLDS{LdsDirection::Write}, instrDwords)
+              + inst.peekedStatus().stallCycles * 4;
+        Log::info(fmt::format("{}: model {}, profiler mean {}, delta {}",
                               profile.instruction,
-                              inst.peekedStatus().stallCycles * 4,
+                              modelLatency,
                               profile.meanLatency(),
-                              profile.meanLatencyWithPrecedingNone()));
+                              static_cast<int>(profile.meanLatency()) - modelLatency));
     }
 }
 
