@@ -1457,7 +1457,7 @@ class GlobalWriteBatchWriter:
           module.add(VMovB32(vgpr(dataV+2), vgpr(atomicDestVgpr), "dataV+2 = tmp (new original C)" ))
           module.add(VMovB32(vgpr(dataV+3), vgpr(atomicDestVgpr+1), "dataV+3 = tmp (new original C)" ))
         else:
-          module.add(VMovB32(vgpr(dataV+1), vgpr(atomicDestVgpr), "dataV+1 = tmp (new original C)" ))
+          module.add(VMovB32(dst=vgpr(dataV+1), src=vgpr(atomicDestVgpr), comment="dataV+1 = tmp (new original C)" ))
         module.add(self._chooseAddForAtomic(self.kernel, \
                         vgpr(dataV+0,vgprCnt), vgpr(dataV+1*vgprIdx,vgprCnt), vgpr("ValuC+%u"%newSumIdxV,vgprCnt), \
                         "newC = rC + originalC"))
