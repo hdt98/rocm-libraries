@@ -88,16 +88,16 @@ void testing_lange_bad_arg()
     lange_checkBadArgs(handle, norm_type, m, n, dA.data(), lda, dnorms.data());
 }
 
-template <bool CPU, bool GPU, typename T, typename I, typename S, typename Td, typename Tdn, typename Th, typename Thn>
+template <bool CPU, bool GPU, typename T, typename I, typename S, typename Td, typename Sd, typename Th, typename Sh>
 void lange_initData(const rocblas_handle handle,
                     const rocsolver_norm_type norm_type,
                     const I m,
                     const I n,
                     Td& dA,
                     const I lda,
-                    Tdn& dnorms,
+                    Sd& dnorms,
                     Th& hA,
-                    Thn& hnorms)
+                    Sh& hnorms)
 {
     if(CPU)
     {
@@ -111,17 +111,17 @@ void lange_initData(const rocblas_handle handle,
     }
 }
 
-template <typename T, typename I, typename S, typename Td, typename Tdn, typename Th, typename Thn>
+template <typename T, typename I, typename S, typename Td, typename Sd, typename Th, typename Sh>
 void lange_getError(const rocblas_handle handle,
                     const rocsolver_norm_type norm_type,
                     const I m,
                     const I n,
                     Td& dA,
                     const I lda,
-                    Tdn& dnorms,
+                    Sd& dnorms,
                     Th& hA,
-                    Thn& hnorms,
-                    Thn& hnorms_res,
+                    Sh& hnorms,
+                    Sh& hnorms_res,
                     double* max_err)
 {
     // Workspace for CPU lange (max needed is for 1-norm or infinity-norm)
@@ -145,16 +145,16 @@ void lange_getError(const rocblas_handle handle,
     *max_err = std::abs(hnorms[0][0] - hnorms_res[0][0]) / std::abs(hnorms[0][0]);
 }
 
-template <typename T, typename I, typename S, typename Td, typename Tdn, typename Th, typename Thn>
+template <typename T, typename I, typename S, typename Td, typename Sd, typename Th, typename Sh>
 void lange_getPerfData(const rocblas_handle handle,
                        const rocsolver_norm_type norm_type,
                        const I m,
                        const I n,
                        Td& dA,
                        const I lda,
-                       Tdn& dnorms,
+                       Sd& dnorms,
                        Th& hA,
-                       Thn& hnorms,
+                       Sh& hnorms,
                        double* gpu_time_used,
                        double* cpu_time_used,
                        const rocblas_int hot_calls,
