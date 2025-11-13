@@ -554,3 +554,4 @@ rocm_export_targets(
     ${static_depends}
   NAMESPACE roc::
 )
+
