@@ -74,6 +74,20 @@ rocblas_status rocsolver_cholqr1_batched_impl(rocblas_handle handle,
         return rocblas_status_memory_error;
 
     void* const work = (void*)mem[0];
+    {
+        // initialize  scratch memory
+        hipStream_t stream;
+        rocblas_get_stream(handle, &stream);
+
+        int const value = 0;
+        void* const dst = (void*)work;
+        size_t sizeBytes = size_lwork;
+        auto const istat_hip = hipMemsetAsync(dst, value, sizeBytes, stream);
+        if(istat_hip != hipSuccess)
+        {
+            return (rocblas_status_internal_error);
+        }
+    }
 
     // execution
 

@@ -29,16 +29,16 @@
 
 ROCSOLVER_BEGIN_NAMESPACE
 
-template <typename T, typename I, typename UA, typename UR, typename Istride = rocblas_stride>
+template <typename T, typename I, typename Istride = rocblas_stride>
 rocblas_status rocsolver_cholqr1_strided_batched_impl(rocblas_handle handle,
                                                       const I m,
                                                       const I n,
 
-                                                      UA A,
+                                                      T* const A,
                                                       const I lda,
                                                       const Istride strideA,
 
-                                                      UR R,
+                                                      T* const R,
                                                       const I ldr,
                                                       const Istride strideR,
 
@@ -53,7 +53,7 @@ rocblas_status rocsolver_cholqr1_strided_batched_impl(rocblas_handle handle,
 
     // argument checking
     rocblas_status st
-        = rocsolver_cholqr1_strided_batched_argCheck(handle, m, n, lda, ldr, A, R, batch_count);
+        = rocsolver_cholqr1_strided_batched_argCheck<T>(handle, m, n, lda, ldr, A, R, batch_count);
     if(st != rocblas_status_continue)
         return st;
 

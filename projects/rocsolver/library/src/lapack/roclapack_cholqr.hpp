@@ -613,7 +613,7 @@ rocblas_status
     return (isok ? rocblas_status_continue : rocblas_status_invalid_value);
 }
 
-template <typename I, typename UA, typename UR>
+template <typename T, typename I>
 rocblas_status rocsolver_cholqr1_strided_batched_argCheck(rocblas_handle handle,
 
                                                           I const m,
@@ -621,8 +621,8 @@ rocblas_status rocsolver_cholqr1_strided_batched_argCheck(rocblas_handle handle,
                                                           I const lda,
                                                           I const ldr,
 
-                                                          UA A,
-                                                          UR R,
+                                                          T* const A,
+                                                          T* const R,
 
                                                           I const batch_count)
 {
@@ -641,7 +641,7 @@ rocblas_status rocsolver_cholqr1_strided_batched_argCheck(rocblas_handle handle,
     return (rocblas_status_continue);
 }
 
-template <typename I, typename UA, typename UR>
+template <typename T, typename I>
 rocblas_status rocsolver_cholqr2_strided_batched_argCheck(rocblas_handle handle,
 
                                                           I const m,
@@ -649,8 +649,8 @@ rocblas_status rocsolver_cholqr2_strided_batched_argCheck(rocblas_handle handle,
                                                           I const lda,
                                                           I const ldr,
 
-                                                          UA A,
-                                                          UR R,
+                                                          T* const A,
+                                                          T* const R,
 
                                                           I const batch_count)
 {
