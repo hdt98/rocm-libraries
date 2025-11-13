@@ -66,10 +66,10 @@ void testing_csru2csr_bad_arg(const Arguments& argus)
     auto buffer_managed
         = hipsparse_unique_ptr{device_malloc(sizeof(char) * safe_size), device_free};
 
-    int*   csr_row_ptr = (int*)csr_row_ptr_managed.get();
-    int*   csr_col_ind = (int*)csr_col_ind_managed.get();
-    float* csr_val     = (float*)csr_val_managed.get();
-    void*  buffer      = (void*)buffer_managed.get();
+    int*   csr_row_ptr = static_cast<int*>(csr_row_ptr_managed.get());
+    int*   csr_col_ind = static_cast<int*>(csr_col_ind_managed.get());
+    float* csr_val     = static_cast<float*>(csr_val_managed.get());
+    void*  buffer      = static_cast<void*>(buffer_managed.get());
 
     // Testing csru2csr_bufferSizeExt for bad args
 #ifndef __HIP_PLATFORM_NVIDIA__
@@ -78,7 +78,7 @@ void testing_csru2csr_bad_arg(const Arguments& argus)
         nullptr, m, n, nnz, csr_val, csr_row_ptr, csr_col_ind, info, &bufferSize));
     verify_hipsparse_status_invalid_pointer(
         hipsparseXcsru2csr_bufferSizeExt(
-            handle, m, n, nnz, (float*)nullptr, csr_row_ptr, csr_col_ind, info, &bufferSize),
+            handle, m, n, nnz, static_cast<float*>(nullptr), csr_row_ptr, csr_col_ind, info, &bufferSize),
         "Error: csr_val is nullptr");
     verify_hipsparse_status_invalid_pointer(
         hipsparseXcsru2csr_bufferSizeExt(
@@ -113,19 +113,19 @@ void testing_csru2csr_bad_arg(const Arguments& argus)
     // cusparse seem to not have any error checking for some parts
     verify_hipsparse_status_success(
         hipsparseXcsru2csr_bufferSizeExt(
-            handle, 0, n, 0, (float*)nullptr, nullptr, nullptr, nullptr, &bufferSize),
+            handle, 0, n, 0, static_cast<float*>(nullptr), nullptr, nullptr, nullptr, &bufferSize),
         "Success");
     verify_hipsparse_status_success(
         hipsparseXcsru2csr_bufferSizeExt(
-            handle, m, 0, 0, (float*)nullptr, nullptr, nullptr, nullptr, &bufferSize),
+            handle, m, 0, 0, static_cast<float*>(nullptr), nullptr, nullptr, nullptr, &bufferSize),
         "Success");
     verify_hipsparse_status_invalid_size(
         hipsparseXcsru2csr_bufferSizeExt(
-            handle, 0, n, nnz, (float*)nullptr, nullptr, nullptr, nullptr, &bufferSize),
+            handle, 0, n, nnz, static_cast<float*>(nullptr), nullptr, nullptr, nullptr, &bufferSize),
         "Error: nnz is invalid");
     verify_hipsparse_status_invalid_pointer(
         hipsparseXcsru2csr_bufferSizeExt(
-            handle, 0, n, 0, (float*)nullptr, nullptr, nullptr, nullptr, nullptr),
+            handle, 0, n, 0, static_cast<float*>(nullptr), nullptr, nullptr, nullptr, nullptr),
         "Error: bufferSize is invalid");
 #endif
 
@@ -145,7 +145,7 @@ void testing_csru2csr_bad_arg(const Arguments& argus)
         "Error: descr is nullptr");
     verify_hipsparse_status_invalid_pointer(
         hipsparseXcsru2csr(
-            handle, m, n, nnz, descr, (float*)nullptr, csr_row_ptr, csr_col_ind, info, buffer),
+            handle, m, n, nnz, descr, static_cast<float*>(nullptr), csr_row_ptr, csr_col_ind, info, buffer),
         "Error: csr_val is nullptr");
     verify_hipsparse_status_invalid_pointer(
         hipsparseXcsru2csr(handle, m, n, nnz, descr, csr_val, nullptr, csr_col_ind, info, buffer),
@@ -173,15 +173,15 @@ void testing_csru2csr_bad_arg(const Arguments& argus)
     // cusparse seem to not have any error checking for some parts
     verify_hipsparse_status_success(
         hipsparseXcsru2csr(
-            handle, 0, n, 0, nullptr, (float*)nullptr, nullptr, nullptr, nullptr, &bufferSize),
+            handle, 0, n, 0, nullptr, static_cast<float*>(nullptr), nullptr, nullptr, nullptr, &bufferSize),
         "Success");
     verify_hipsparse_status_success(
         hipsparseXcsru2csr(
-            handle, m, 0, 0, nullptr, (float*)nullptr, nullptr, nullptr, nullptr, &bufferSize),
+            handle, m, 0, 0, nullptr, static_cast<float*>(nullptr), nullptr, nullptr, nullptr, &bufferSize),
         "Success");
     verify_hipsparse_status_invalid_size(
         hipsparseXcsru2csr(
-            handle, 0, n, nnz, nullptr, (float*)nullptr, nullptr, nullptr, nullptr, &bufferSize),
+            handle, 0, n, nnz, nullptr, static_cast<float*>(nullptr), nullptr, nullptr, nullptr, &bufferSize),
         "Error: nnz is invalid");
 #endif
 
@@ -201,7 +201,7 @@ void testing_csru2csr_bad_arg(const Arguments& argus)
         "Error: descr is nullptr");
     verify_hipsparse_status_invalid_pointer(
         hipsparseXcsr2csru(
-            handle, m, n, nnz, descr, (float*)nullptr, csr_row_ptr, csr_col_ind, info, buffer),
+            handle, m, n, nnz, descr, static_cast<float*>(nullptr), csr_row_ptr, csr_col_ind, info, buffer),
         "Error: csr_val is nullptr");
     verify_hipsparse_status_invalid_pointer(
         hipsparseXcsr2csru(handle, m, n, nnz, descr, csr_val, nullptr, csr_col_ind, info, buffer),
@@ -229,15 +229,15 @@ void testing_csru2csr_bad_arg(const Arguments& argus)
     // cusparse seem to not have any error checking for some parts
     verify_hipsparse_status_success(
         hipsparseXcsr2csru(
-            handle, 0, n, 0, nullptr, (float*)nullptr, nullptr, nullptr, nullptr, &bufferSize),
+            handle, 0, n, 0, nullptr, static_cast<float*>(nullptr), nullptr, nullptr, nullptr, &bufferSize),
         "Success");
     verify_hipsparse_status_success(
         hipsparseXcsr2csru(
-            handle, m, 0, 0, nullptr, (float*)nullptr, nullptr, nullptr, nullptr, &bufferSize),
+            handle, m, 0, 0, nullptr, static_cast<float*>(nullptr), nullptr, nullptr, nullptr, &bufferSize),
         "Success");
     verify_hipsparse_status_invalid_size(
         hipsparseXcsr2csru(
-            handle, 0, n, nnz, nullptr, (float*)nullptr, nullptr, nullptr, nullptr, &bufferSize),
+            handle, 0, n, nnz, nullptr, static_cast<float*>(nullptr), nullptr, nullptr, nullptr, &bufferSize),
         "Error: nnz is invalid");
 #endif
 #endif
@@ -315,9 +315,9 @@ hipsparseStatus_t testing_csru2csr(Arguments argus)
     auto dcsr_col_ind_managed = hipsparse_unique_ptr{device_malloc(sizeof(int) * nnz), device_free};
     auto dcsr_val_managed     = hipsparse_unique_ptr{device_malloc(sizeof(T) * nnz), device_free};
 
-    int* dcsr_row_ptr = (int*)dcsr_row_ptr_managed.get();
-    int* dcsr_col_ind = (int*)dcsr_col_ind_managed.get();
-    T*   dcsr_val     = (T*)dcsr_val_managed.get();
+    int* dcsr_row_ptr = static_cast<int*>(dcsr_row_ptr_managed.get());
+    int* dcsr_col_ind = static_cast<int*>(dcsr_col_ind_managed.get());
+    T*   dcsr_val     = static_cast<T*>(dcsr_val_managed.get());
 
     // Copy data from host to device
     CHECK_HIP_ERROR(
@@ -337,7 +337,7 @@ hipsparseStatus_t testing_csru2csr(Arguments argus)
     auto dbuffer_managed
         = hipsparse_unique_ptr{device_malloc(sizeof(char) * buffer_size), device_free};
 
-    void* dbuffer = (void*)dbuffer_managed.get();
+    void* dbuffer = static_cast<void*>(dbuffer_managed.get());
 
     if(argus.unit_check)
     {

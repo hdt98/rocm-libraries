@@ -65,47 +65,47 @@ void testing_csrsort_bad_arg(void)
     auto buffer_managed
         = hipsparse_unique_ptr{device_malloc(sizeof(char) * safe_size), device_free};
 
-    int*  csr_row_ptr = (int*)csr_row_ptr_managed.get();
-    int*  csr_col_ind = (int*)csr_col_ind_managed.get();
-    int*  perm        = (int*)perm_managed.get();
-    void* buffer      = (void*)buffer_managed.get();
+    int*  csr_row_ptr = static_cast<int*>(csr_row_ptr_managed.get());
+    int*  csr_col_ind = static_cast<int*>(csr_col_ind_managed.get());
+    int*  perm        = static_cast<int*>(perm_managed.get());
+    void* buffer      = static_cast<void*>(buffer_managed.get());
 
     verify_hipsparse_status_invalid_pointer(
         hipsparseXcsrsort_bufferSizeExt(
-            handle, m, n, nnz, (int*)nullptr, csr_col_ind, &buffer_size),
+            handle, m, n, nnz, static_cast<int*>(nullptr), csr_col_ind, &buffer_size),
         "Error: csr_row_ptr is nullptr");
     verify_hipsparse_status_invalid_pointer(
         hipsparseXcsrsort_bufferSizeExt(
-            handle, m, n, nnz, csr_row_ptr, (int*)nullptr, &buffer_size),
+            handle, m, n, nnz, csr_row_ptr, static_cast<int*>(nullptr), &buffer_size),
         "Error: csr_col_ind is nullptr");
     verify_hipsparse_status_invalid_pointer(
         hipsparseXcsrsort_bufferSizeExt(
-            handle, m, n, nnz, csr_row_ptr, csr_col_ind, (size_t*)nullptr),
+            handle, m, n, nnz, csr_row_ptr, csr_col_ind, static_cast<size_t*>(nullptr)),
         "Error: buffer_size is nullptr");
     verify_hipsparse_status_invalid_handle(hipsparseXcsrsort_bufferSizeExt(
-        (hipsparseHandle_t) nullptr, m, n, nnz, csr_row_ptr, csr_col_ind, &buffer_size));
+        static_cast<hipsparseHandle_t>(nullptr), m, n, nnz, csr_row_ptr, csr_col_ind, &buffer_size));
 
     verify_hipsparse_status_invalid_pointer(
-        hipsparseXcsrsort(handle, m, n, nnz, descr, (int*)nullptr, csr_col_ind, perm, buffer),
+        hipsparseXcsrsort(handle, m, n, nnz, descr, static_cast<int*>(nullptr), csr_col_ind, perm, buffer),
         "Error: csr_row_ptr is nullptr");
     verify_hipsparse_status_invalid_pointer(
-        hipsparseXcsrsort(handle, m, n, nnz, descr, csr_row_ptr, (int*)nullptr, perm, buffer),
+        hipsparseXcsrsort(handle, m, n, nnz, descr, csr_row_ptr, static_cast<int*>(nullptr), perm, buffer),
         "Error: csr_col_ind is nullptr");
     verify_hipsparse_status_invalid_pointer(
-        hipsparseXcsrsort(handle, m, n, nnz, descr, csr_row_ptr, csr_col_ind, perm, (int*)nullptr),
+        hipsparseXcsrsort(handle, m, n, nnz, descr, csr_row_ptr, csr_col_ind, perm, static_cast<int*>(nullptr)),
         "Error: buffer is nullptr");
     verify_hipsparse_status_invalid_pointer(hipsparseXcsrsort(handle,
                                                               m,
                                                               n,
                                                               nnz,
-                                                              (hipsparseMatDescr_t) nullptr,
+                                                              static_cast<hipsparseMatDescr_t>(nullptr),
                                                               csr_row_ptr,
                                                               csr_col_ind,
                                                               perm,
                                                               buffer),
                                             "Error: descr is nullptr");
     verify_hipsparse_status_invalid_handle(hipsparseXcsrsort(
-        (hipsparseHandle_t) nullptr, m, n, nnz, descr, csr_row_ptr, csr_col_ind, perm, buffer));
+        static_cast<hipsparseHandle_t>(nullptr), m, n, nnz, descr, csr_row_ptr, csr_col_ind, perm, buffer));
 #endif
 }
 
@@ -180,13 +180,13 @@ hipsparseStatus_t testing_csrsort(Arguments argus)
         = hipsparse_unique_ptr{device_malloc(sizeof(float) * nnz), device_free};
     auto dperm_managed = hipsparse_unique_ptr{device_malloc(sizeof(int) * nnz), device_free};
 
-    int*   dcsr_row_ptr    = (int*)dcsr_row_ptr_managed.get();
-    int*   dcsr_col_ind    = (int*)dcsr_col_ind_managed.get();
-    float* dcsr_val        = (float*)dcsr_val_managed.get();
-    float* dcsr_val_sorted = (float*)dcsr_val_sorted_managed.get();
+    int*   dcsr_row_ptr    = static_cast<int*>(dcsr_row_ptr_managed.get());
+    int*   dcsr_col_ind    = static_cast<int*>(dcsr_col_ind_managed.get());
+    float* dcsr_val        = static_cast<float*>(dcsr_val_managed.get());
+    float* dcsr_val_sorted = static_cast<float*>(dcsr_val_sorted_managed.get());
 
     // Set permutation vector, if asked for
-    int* dperm = permute ? (int*)dperm_managed.get() : nullptr;
+    int* dperm = permute ? static_cast<int*>(dperm_managed.get()) : nullptr;
 
     // Copy data from host to device
     CHECK_HIP_ERROR(
@@ -205,7 +205,7 @@ hipsparseStatus_t testing_csrsort(Arguments argus)
     auto dbuffer_managed
         = hipsparse_unique_ptr{device_malloc(sizeof(char) * bufferSize), device_free};
 
-    void* dbuffer = (void*)dbuffer_managed.get();
+    void* dbuffer = static_cast<void*>(dbuffer_managed.get());
 
     if(permute)
     {
@@ -252,23 +252,11 @@ hipsparseStatus_t testing_csrsort(Arguments argus)
         int number_cold_calls = 2;
         int number_hot_calls  = argus.iters;
 
-        // Warm up
-        for(int iter = 0; iter < number_cold_calls; ++iter)
-        {
-            CHECK_HIPSPARSE_ERROR(hipsparseXcsrsort(
-                handle, m, n, nnz, descr, dcsr_row_ptr, dcsr_col_ind, dperm, dbuffer));
-        }
-
-        double gpu_time_used = get_time_us();
-
-        // Performance run
-        for(int iter = 0; iter < number_hot_calls; ++iter)
-        {
-            CHECK_HIPSPARSE_ERROR(hipsparseXcsrsort(
-                handle, m, n, nnz, descr, dcsr_row_ptr, dcsr_col_ind, dperm, dbuffer));
-        }
-
-        gpu_time_used = (get_time_us() - gpu_time_used) / number_hot_calls;
+        double gpu_time_used = benchmark_kernel(
+            [&]() { CHECK_HIPSPARSE_ERROR(hipsparseXcsrsort(
+                handle, m, n, nnz, descr, dcsr_row_ptr, dcsr_col_ind, dperm, dbuffer)); return HIPSPARSE_STATUS_SUCCESS; },
+            number_cold_calls,
+            number_hot_calls);
 
         double gbyte_count = csrsort_gbyte_count(m, nnz, permute);
         double gpu_gbyte   = get_gpu_gbyte(gpu_time_used, gbyte_count);

@@ -71,11 +71,11 @@ void testing_prune_dense2csr_bad_arg(const Arguments& argus)
     auto temp_buffer_managed
         = hipsparse_unique_ptr{device_malloc(sizeof(T) * safe_size), device_free};
 
-    int* csr_row_ptr = (int*)csr_row_ptr_managed.get();
-    int* csr_col_ind = (int*)csr_col_ind_managed.get();
-    T*   csr_val     = (T*)csr_val_managed.get();
-    T*   A           = (T*)A_managed.get();
-    T*   temp_buffer = (T*)temp_buffer_managed.get();
+    int* csr_row_ptr = static_cast<int*>(csr_row_ptr_managed.get());
+    int* csr_col_ind = static_cast<int*>(csr_col_ind_managed.get());
+    T*   csr_val     = static_cast<T*>(csr_val_managed.get());
+    T*   A           = static_cast<T*>(A_managed.get());
+    T*   temp_buffer = static_cast<T*>(temp_buffer_managed.get());
 
     int local_ptr[2] = {0, 1};
     CHECK_HIP_ERROR(
@@ -229,7 +229,7 @@ void testing_prune_dense2csr_bad_arg(const Arguments& argus)
                                       LDA,
                                       &threshold,
                                       descr,
-                                      (T*)nullptr,
+                                      static_cast<T*>(nullptr),
                                       csr_row_ptr,
                                       csr_col_ind,
                                       temp_buffer);
@@ -272,41 +272,41 @@ hipsparseStatus_t testing_prune_dense2csr(Arguments argus)
     }
 
     // Allocate host memory
-    std::vector<T>   h_A(LDA * N);
+    std::vector<T>   hA(LDA * N);
     std::vector<int> h_nnz_total_dev_host_ptr(1);
 
     // Allocate device memory
-    auto d_A_managed = hipsparse_unique_ptr{device_malloc(sizeof(T) * LDA * N), device_free};
+    auto dA_managed = hipsparse_unique_ptr{device_malloc(sizeof(T) * LDA * N), device_free};
     auto d_nnz_total_dev_host_ptr_managed
         = hipsparse_unique_ptr{device_malloc(sizeof(int)), device_free};
     auto d_csr_row_ptr_managed
         = hipsparse_unique_ptr{device_malloc(sizeof(int) * (M + 1)), device_free};
 
-    T*   d_A                      = (T*)d_A_managed.get();
-    int* d_nnz_total_dev_host_ptr = (int*)d_nnz_total_dev_host_ptr_managed.get();
-    int* d_csr_row_ptr            = (int*)d_csr_row_ptr_managed.get();
+    T*   dA                      = static_cast<T*>(dA_managed.get());
+    int* d_nnz_total_dev_host_ptr = static_cast<int*>(d_nnz_total_dev_host_ptr_managed.get());
+    int* d_csr_row_ptr            = static_cast<int*>(d_csr_row_ptr_managed.get());
 
     // Initialize the entire allocated memory.
     for(int i = 0; i < LDA; ++i)
     {
         for(int j = 0; j < N; ++j)
         {
-            h_A[j * LDA + i] = make_DataType<T>(-1);
+            hA[j * LDA + i] = make_DataType<T>(-1);
         }
     }
 
     // Initialize a random dense matrix.
     srand(0);
-    gen_dense_random_sparsity_pattern(M, N, h_A.data(), LDA, HIPSPARSE_ORDER_COL, 0.2);
+    gen_dense_random_sparsity_pattern(M, N, hA.data(), LDA, HIPSPARSE_ORDER_COL, 0.2);
 
     // Transfer.
-    CHECK_HIP_ERROR(hipMemcpy(d_A, h_A.data(), sizeof(T) * LDA * N, hipMemcpyHostToDevice));
+    CHECK_HIP_ERROR(hipMemcpy(dA, hA.data(), sizeof(T) * LDA * N, hipMemcpyHostToDevice));
 
     size_t buffer_size = 512;
     CHECK_HIPSPARSE_ERROR(hipsparseXpruneDense2csr_bufferSize(handle,
                                                               M,
                                                               N,
-                                                              d_A,
+                                                              dA,
                                                               LDA,
                                                               &threshold,
                                                               descr,
@@ -317,11 +317,11 @@ hipsparseStatus_t testing_prune_dense2csr(Arguments argus)
 
     auto d_temp_buffer_managed = hipsparse_unique_ptr{device_malloc(buffer_size), device_free};
 
-    T* d_temp_buffer = (T*)d_temp_buffer_managed.get();
+    T* d_temp_buffer = static_cast<T*>(d_temp_buffer_managed.get());
 
     auto d_threshold_managed = hipsparse_unique_ptr{device_malloc(sizeof(T)), device_free};
 
-    T* d_threshold = (T*)d_threshold_managed.get();
+    T* d_threshold = static_cast<T*>(d_threshold_managed.get());
 
     CHECK_HIP_ERROR(hipMemcpy(d_threshold, &threshold, sizeof(T), hipMemcpyHostToDevice));
 
@@ -329,7 +329,7 @@ hipsparseStatus_t testing_prune_dense2csr(Arguments argus)
     CHECK_HIPSPARSE_ERROR(hipsparseXpruneDense2csrNnz(handle,
                                                       M,
                                                       N,
-                                                      d_A,
+                                                      dA,
                                                       LDA,
                                                       &threshold,
                                                       descr,
@@ -341,7 +341,7 @@ hipsparseStatus_t testing_prune_dense2csr(Arguments argus)
     CHECK_HIPSPARSE_ERROR(hipsparseXpruneDense2csrNnz(handle,
                                                       M,
                                                       N,
-                                                      d_A,
+                                                      dA,
                                                       LDA,
                                                       d_threshold,
                                                       descr,
@@ -366,8 +366,8 @@ hipsparseStatus_t testing_prune_dense2csr(Arguments argus)
     auto d_csr_val_managed
         = hipsparse_unique_ptr{device_malloc(sizeof(T) * h_nnz_total_dev_host_ptr[0]), device_free};
 
-    int* d_csr_col_ind = (int*)d_csr_col_ind_managed.get();
-    T*   d_csr_val     = (T*)d_csr_val_managed.get();
+    int* d_csr_col_ind = static_cast<int*>(d_csr_col_ind_managed.get());
+    T*   d_csr_val     = static_cast<T*>(d_csr_val_managed.get());
 
     if(argus.unit_check)
     {
@@ -375,7 +375,7 @@ hipsparseStatus_t testing_prune_dense2csr(Arguments argus)
         CHECK_HIPSPARSE_ERROR(hipsparseXpruneDense2csr(handle,
                                                        M,
                                                        N,
-                                                       d_A,
+                                                       dA,
                                                        LDA,
                                                        &threshold,
                                                        descr,
@@ -384,18 +384,18 @@ hipsparseStatus_t testing_prune_dense2csr(Arguments argus)
                                                        d_csr_col_ind,
                                                        d_temp_buffer));
 
-        std::vector<int> h_csr_row_ptr(M + 1);
-        std::vector<int> h_csr_col_ind(h_nnz_total_dev_host_ptr[0]);
-        std::vector<T>   h_csr_val(h_nnz_total_dev_host_ptr[0]);
+        std::vector<int> hcsr_row_ptr(M + 1);
+        std::vector<int> hcsr_col_ind(h_nnz_total_dev_host_ptr[0]);
+        std::vector<T>   hcsr_val(h_nnz_total_dev_host_ptr[0]);
 
         CHECK_HIP_ERROR(hipMemcpy(
-            h_csr_row_ptr.data(), d_csr_row_ptr, sizeof(int) * (M + 1), hipMemcpyDeviceToHost));
+            hcsr_row_ptr.data(), d_csr_row_ptr, sizeof(int) * (M + 1), hipMemcpyDeviceToHost));
 
-        CHECK_HIP_ERROR(hipMemcpy(h_csr_col_ind.data(),
+        CHECK_HIP_ERROR(hipMemcpy(hcsr_col_ind.data(),
                                   d_csr_col_ind,
                                   sizeof(int) * h_nnz_total_dev_host_ptr[0],
                                   hipMemcpyDeviceToHost));
-        CHECK_HIP_ERROR(hipMemcpy(h_csr_val.data(),
+        CHECK_HIP_ERROR(hipMemcpy(hcsr_val.data(),
                                   d_csr_val,
                                   sizeof(T) * h_nnz_total_dev_host_ptr[0],
                                   hipMemcpyDeviceToHost));
@@ -408,7 +408,7 @@ hipsparseStatus_t testing_prune_dense2csr(Arguments argus)
 
         host_prune_dense2csr(M,
                              N,
-                             h_A,
+                             hA,
                              LDA,
                              idx_base,
                              threshold,
@@ -418,11 +418,11 @@ hipsparseStatus_t testing_prune_dense2csr(Arguments argus)
                              h_csr_col_ind_cpu);
 
         unit_check_general<int>(1, 1, 1, h_nnz_cpu.data(), h_nnz_total_dev_host_ptr.data());
-        unit_check_general<int>(1, (M + 1), 1, h_csr_row_ptr_cpu.data(), h_csr_row_ptr.data());
+        unit_check_general<int>(1, (M + 1), 1, h_csr_row_ptr_cpu.data(), hcsr_row_ptr.data());
         unit_check_general<int>(
-            1, h_nnz_total_dev_host_ptr[0], 1, h_csr_col_ind_cpu.data(), h_csr_col_ind.data());
+            1, h_nnz_total_dev_host_ptr[0], 1, h_csr_col_ind_cpu.data(), hcsr_col_ind.data());
         unit_check_general<T>(
-            1, h_nnz_total_dev_host_ptr[0], 1, h_csr_val_cpu.data(), h_csr_val.data());
+            1, h_nnz_total_dev_host_ptr[0], 1, h_csr_val_cpu.data(), hcsr_val.data());
     }
 
     if(argus.timing)
@@ -432,41 +432,20 @@ hipsparseStatus_t testing_prune_dense2csr(Arguments argus)
 
         CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_HOST));
 
-        // Warm up
-        for(int iter = 0; iter < number_cold_calls; ++iter)
-        {
-            CHECK_HIPSPARSE_ERROR(hipsparseXpruneDense2csr(handle,
+        double gpu_time_used = benchmark_kernel(
+            [&]() { CHECK_HIPSPARSE_ERROR(hipsparseXpruneDense2csr(handle,
                                                            M,
                                                            N,
-                                                           d_A,
+                                                           dA,
                                                            LDA,
                                                            &threshold,
                                                            descr,
                                                            d_csr_val,
                                                            d_csr_row_ptr,
                                                            d_csr_col_ind,
-                                                           d_temp_buffer));
-        }
-
-        double gpu_time_used = get_time_us();
-
-        // Performance run
-        for(int iter = 0; iter < number_hot_calls; ++iter)
-        {
-            CHECK_HIPSPARSE_ERROR(hipsparseXpruneDense2csr(handle,
-                                                           M,
-                                                           N,
-                                                           d_A,
-                                                           LDA,
-                                                           &threshold,
-                                                           descr,
-                                                           d_csr_val,
-                                                           d_csr_row_ptr,
-                                                           d_csr_col_ind,
-                                                           d_temp_buffer));
-        }
-
-        gpu_time_used = (get_time_us() - gpu_time_used) / number_hot_calls;
+                                                           d_temp_buffer)); return HIPSPARSE_STATUS_SUCCESS; },
+            number_cold_calls,
+            number_hot_calls);
 
         double gbyte_count = prune_dense2csr_gbyte_count<T>(M, N, h_nnz_total_dev_host_ptr[0]);
         double gpu_gbyte   = get_gpu_gbyte(gpu_time_used, gbyte_count);

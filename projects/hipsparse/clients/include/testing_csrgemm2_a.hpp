@@ -83,16 +83,16 @@ void testing_csrgemm2_a_bad_arg(void)
     auto dbuffer_managed
         = hipsparse_unique_ptr{device_malloc(sizeof(char) * safe_size), device_free};
 
-    int*  dAptr   = (int*)dAptr_managed.get();
-    int*  dAcol   = (int*)dAcol_managed.get();
-    T*    dAval   = (T*)dAval_managed.get();
-    int*  dBptr   = (int*)dBptr_managed.get();
-    int*  dBcol   = (int*)dBcol_managed.get();
-    T*    dBval   = (T*)dBval_managed.get();
-    int*  dCptr   = (int*)dCptr_managed.get();
-    int*  dCcol   = (int*)dCcol_managed.get();
-    T*    dCval   = (T*)dCval_managed.get();
-    void* dbuffer = (void*)dbuffer_managed.get();
+    int*  dAptr   = static_cast<int*>(dAptr_managed.get());
+    int*  dAcol   = static_cast<int*>(dAcol_managed.get());
+    T*    dAval   = static_cast<T*>(dAval_managed.get());
+    int*  dBptr   = static_cast<int*>(dBptr_managed.get());
+    int*  dBcol   = static_cast<int*>(dBcol_managed.get());
+    T*    dBval   = static_cast<T*>(dBval_managed.get());
+    int*  dCptr   = static_cast<int*>(dCptr_managed.get());
+    int*  dCcol   = static_cast<int*>(dCcol_managed.get());
+    T*    dCval   = static_cast<T*>(dCval_managed.get());
+    void* dbuffer = static_cast<void*>(dbuffer_managed.get());
 
     std::vector<int> hcsr_row_ptr_C(M + 1);
     hcsr_row_ptr_C[0] = 0;
@@ -103,7 +103,7 @@ void testing_csrgemm2_a_bad_arg(void)
 
     // Scenario: alpha != 0 and beta == 0
     verify_hipsparse_status_invalid_handle(
-        hipsparseXcsrgemm2_bufferSizeExt((hipsparseHandle_t) nullptr,
+        hipsparseXcsrgemm2_bufferSizeExt(static_cast<hipsparseHandle_t>(nullptr),
                                          M,
                                          N,
                                          K,
@@ -116,11 +116,11 @@ void testing_csrgemm2_a_bad_arg(void)
                                          nnz_B,
                                          dBptr,
                                          dBcol,
-                                         (T*)nullptr,
-                                         (hipsparseMatDescr_t) nullptr,
+                                         static_cast<T*>(nullptr),
+                                         static_cast<hipsparseMatDescr_t>(nullptr),
                                          0,
-                                         (int*)nullptr,
-                                         (int*)nullptr,
+                                         static_cast<int*>(nullptr),
+                                         static_cast<int*>(nullptr),
                                          info,
                                          &size));
     verify_hipsparse_status_invalid_pointer(
@@ -128,7 +128,7 @@ void testing_csrgemm2_a_bad_arg(void)
                                          M,
                                          N,
                                          K,
-                                         (T*)nullptr,
+                                         static_cast<T*>(nullptr),
                                          descr_A,
                                          nnz_A,
                                          dAptr,
@@ -137,11 +137,11 @@ void testing_csrgemm2_a_bad_arg(void)
                                          nnz_B,
                                          dBptr,
                                          dBcol,
-                                         (T*)nullptr,
-                                         (hipsparseMatDescr_t) nullptr,
+                                         static_cast<T*>(nullptr),
+                                         static_cast<hipsparseMatDescr_t>(nullptr),
                                          0,
-                                         (int*)nullptr,
-                                         (int*)nullptr,
+                                         static_cast<int*>(nullptr),
+                                         static_cast<int*>(nullptr),
                                          info,
                                          &size),
         "Error: alpha is nullptr");
@@ -151,7 +151,7 @@ void testing_csrgemm2_a_bad_arg(void)
                                          N,
                                          K,
                                          &alpha,
-                                         (hipsparseMatDescr_t) nullptr,
+                                         static_cast<hipsparseMatDescr_t>(nullptr),
                                          nnz_A,
                                          dAptr,
                                          dAcol,
@@ -159,11 +159,11 @@ void testing_csrgemm2_a_bad_arg(void)
                                          nnz_B,
                                          dBptr,
                                          dBcol,
-                                         (T*)nullptr,
-                                         (hipsparseMatDescr_t) nullptr,
+                                         static_cast<T*>(nullptr),
+                                         static_cast<hipsparseMatDescr_t>(nullptr),
                                          0,
-                                         (int*)nullptr,
-                                         (int*)nullptr,
+                                         static_cast<int*>(nullptr),
+                                         static_cast<int*>(nullptr),
                                          info,
                                          &size),
         "Error: descr_A is nullptr");
@@ -175,17 +175,17 @@ void testing_csrgemm2_a_bad_arg(void)
                                          &alpha,
                                          descr_A,
                                          nnz_A,
-                                         (int*)nullptr,
+                                         static_cast<int*>(nullptr),
                                          dAcol,
                                          descr_B,
                                          nnz_B,
                                          dBptr,
                                          dBcol,
-                                         (T*)nullptr,
-                                         (hipsparseMatDescr_t) nullptr,
+                                         static_cast<T*>(nullptr),
+                                         static_cast<hipsparseMatDescr_t>(nullptr),
                                          0,
-                                         (int*)nullptr,
-                                         (int*)nullptr,
+                                         static_cast<int*>(nullptr),
+                                         static_cast<int*>(nullptr),
                                          info,
                                          &size),
         "Error: dAptr is nullptr");
@@ -198,16 +198,16 @@ void testing_csrgemm2_a_bad_arg(void)
                                          descr_A,
                                          nnz_A,
                                          dAptr,
-                                         (int*)nullptr,
+                                         static_cast<int*>(nullptr),
                                          descr_B,
                                          nnz_B,
                                          dBptr,
                                          dBcol,
-                                         (T*)nullptr,
-                                         (hipsparseMatDescr_t) nullptr,
+                                         static_cast<T*>(nullptr),
+                                         static_cast<hipsparseMatDescr_t>(nullptr),
                                          0,
-                                         (int*)nullptr,
-                                         (int*)nullptr,
+                                         static_cast<int*>(nullptr),
+                                         static_cast<int*>(nullptr),
                                          info,
                                          &size),
         "Error: dAcol is nullptr");
@@ -221,15 +221,15 @@ void testing_csrgemm2_a_bad_arg(void)
                                          nnz_A,
                                          dAptr,
                                          dAcol,
-                                         (hipsparseMatDescr_t) nullptr,
+                                         static_cast<hipsparseMatDescr_t>(nullptr),
                                          nnz_B,
                                          dBptr,
                                          dBcol,
-                                         (T*)nullptr,
-                                         (hipsparseMatDescr_t) nullptr,
+                                         static_cast<T*>(nullptr),
+                                         static_cast<hipsparseMatDescr_t>(nullptr),
                                          0,
-                                         (int*)nullptr,
-                                         (int*)nullptr,
+                                         static_cast<int*>(nullptr),
+                                         static_cast<int*>(nullptr),
                                          info,
                                          &size),
         "Error: descr_B is nullptr");
@@ -245,13 +245,13 @@ void testing_csrgemm2_a_bad_arg(void)
                                          dAcol,
                                          descr_B,
                                          nnz_B,
-                                         (int*)nullptr,
+                                         static_cast<int*>(nullptr),
                                          dBcol,
-                                         (T*)nullptr,
-                                         (hipsparseMatDescr_t) nullptr,
+                                         static_cast<T*>(nullptr),
+                                         static_cast<hipsparseMatDescr_t>(nullptr),
                                          0,
-                                         (int*)nullptr,
-                                         (int*)nullptr,
+                                         static_cast<int*>(nullptr),
+                                         static_cast<int*>(nullptr),
                                          info,
                                          &size),
         "Error: dBptr is nullptr");
@@ -268,12 +268,12 @@ void testing_csrgemm2_a_bad_arg(void)
                                          descr_B,
                                          nnz_B,
                                          dBptr,
-                                         (int*)nullptr,
-                                         (T*)nullptr,
-                                         (hipsparseMatDescr_t) nullptr,
+                                         static_cast<int*>(nullptr),
+                                         static_cast<T*>(nullptr),
+                                         static_cast<hipsparseMatDescr_t>(nullptr),
                                          0,
-                                         (int*)nullptr,
-                                         (int*)nullptr,
+                                         static_cast<int*>(nullptr),
+                                         static_cast<int*>(nullptr),
                                          info,
                                          &size),
         "Error: dBcol is nullptr");
@@ -291,11 +291,11 @@ void testing_csrgemm2_a_bad_arg(void)
                                          nnz_B,
                                          dBptr,
                                          dBcol,
-                                         (T*)nullptr,
-                                         (hipsparseMatDescr_t) nullptr,
+                                         static_cast<T*>(nullptr),
+                                         static_cast<hipsparseMatDescr_t>(nullptr),
                                          0,
-                                         (int*)nullptr,
-                                         (int*)nullptr,
+                                         static_cast<int*>(nullptr),
+                                         static_cast<int*>(nullptr),
                                          (csrgemm2Info_t) nullptr,
                                          &size),
         "Error: info is nullptr");
@@ -313,16 +313,16 @@ void testing_csrgemm2_a_bad_arg(void)
                                          nnz_B,
                                          dBptr,
                                          dBcol,
-                                         (T*)nullptr,
-                                         (hipsparseMatDescr_t) nullptr,
+                                         static_cast<T*>(nullptr),
+                                         static_cast<hipsparseMatDescr_t>(nullptr),
                                          0,
-                                         (int*)nullptr,
-                                         (int*)nullptr,
+                                         static_cast<int*>(nullptr),
+                                         static_cast<int*>(nullptr),
                                          info,
-                                         (size_t*)nullptr),
+                                         static_cast<size_t*>(nullptr)),
         "Error: size is nullptr");
 
-    verify_hipsparse_status_invalid_handle(hipsparseXcsrgemm2Nnz((hipsparseHandle_t) nullptr,
+    verify_hipsparse_status_invalid_handle(hipsparseXcsrgemm2Nnz(static_cast<hipsparseHandle_t>(nullptr),
                                                                  M,
                                                                  N,
                                                                  K,
@@ -347,7 +347,7 @@ void testing_csrgemm2_a_bad_arg(void)
                                                                   M,
                                                                   N,
                                                                   K,
-                                                                  (hipsparseMatDescr_t) nullptr,
+                                                                  static_cast<hipsparseMatDescr_t>(nullptr),
                                                                   nnz_A,
                                                                   dAptr,
                                                                   dAcol,
@@ -371,7 +371,7 @@ void testing_csrgemm2_a_bad_arg(void)
                                                                   K,
                                                                   descr_A,
                                                                   nnz_A,
-                                                                  (int*)nullptr,
+                                                                  static_cast<int*>(nullptr),
                                                                   dAcol,
                                                                   descr_B,
                                                                   nnz_B,
@@ -394,7 +394,7 @@ void testing_csrgemm2_a_bad_arg(void)
                                                                   descr_A,
                                                                   nnz_A,
                                                                   dAptr,
-                                                                  (int*)nullptr,
+                                                                  static_cast<int*>(nullptr),
                                                                   descr_B,
                                                                   nnz_B,
                                                                   dBptr,
@@ -417,7 +417,7 @@ void testing_csrgemm2_a_bad_arg(void)
                                                                   nnz_A,
                                                                   dAptr,
                                                                   dAcol,
-                                                                  (hipsparseMatDescr_t) nullptr,
+                                                                  static_cast<hipsparseMatDescr_t>(nullptr),
                                                                   nnz_B,
                                                                   dBptr,
                                                                   dBcol,
@@ -441,7 +441,7 @@ void testing_csrgemm2_a_bad_arg(void)
                                                                   dAcol,
                                                                   descr_B,
                                                                   nnz_B,
-                                                                  (int*)nullptr,
+                                                                  static_cast<int*>(nullptr),
                                                                   dBcol,
                                                                   nullptr,
                                                                   0,
@@ -464,7 +464,7 @@ void testing_csrgemm2_a_bad_arg(void)
                                                                   descr_B,
                                                                   nnz_B,
                                                                   dBptr,
-                                                                  (int*)nullptr,
+                                                                  static_cast<int*>(nullptr),
                                                                   nullptr,
                                                                   0,
                                                                   nullptr,
@@ -491,7 +491,7 @@ void testing_csrgemm2_a_bad_arg(void)
                                                                   0,
                                                                   nullptr,
                                                                   nullptr,
-                                                                  (hipsparseMatDescr_t) nullptr,
+                                                                  static_cast<hipsparseMatDescr_t>(nullptr),
                                                                   dCptr,
                                                                   &nnz_C,
                                                                   info,
@@ -514,7 +514,7 @@ void testing_csrgemm2_a_bad_arg(void)
                                                                   nullptr,
                                                                   nullptr,
                                                                   descr_C,
-                                                                  (int*)nullptr,
+                                                                  static_cast<int*>(nullptr),
                                                                   &nnz_C,
                                                                   info,
                                                                   dbuffer),
@@ -537,7 +537,7 @@ void testing_csrgemm2_a_bad_arg(void)
                                                                   nullptr,
                                                                   descr_C,
                                                                   dCptr,
-                                                                  (int*)nullptr,
+                                                                  static_cast<int*>(nullptr),
                                                                   info,
                                                                   dbuffer),
                                             "Error: nnz_C is nullptr");
@@ -583,10 +583,10 @@ void testing_csrgemm2_a_bad_arg(void)
                                                                   dCptr,
                                                                   &nnz_C,
                                                                   info,
-                                                                  (void*)nullptr),
+                                                                  static_cast<void*>(nullptr)),
                                             "Error: dbuffer is nullptr");
 
-    verify_hipsparse_status_invalid_handle(hipsparseXcsrgemm2((hipsparseHandle_t) nullptr,
+    verify_hipsparse_status_invalid_handle(hipsparseXcsrgemm2(static_cast<hipsparseHandle_t>(nullptr),
                                                               M,
                                                               N,
                                                               K,
@@ -601,12 +601,12 @@ void testing_csrgemm2_a_bad_arg(void)
                                                               dBval,
                                                               dBptr,
                                                               dBcol,
-                                                              (T*)nullptr,
-                                                              (hipsparseMatDescr_t) nullptr,
+                                                              static_cast<T*>(nullptr),
+                                                              static_cast<hipsparseMatDescr_t>(nullptr),
                                                               0,
-                                                              (T*)nullptr,
-                                                              (int*)nullptr,
-                                                              (int*)nullptr,
+                                                              static_cast<T*>(nullptr),
+                                                              static_cast<int*>(nullptr),
+                                                              static_cast<int*>(nullptr),
                                                               descr_C,
                                                               dCval,
                                                               dCptr,
@@ -617,7 +617,7 @@ void testing_csrgemm2_a_bad_arg(void)
                                                                M,
                                                                N,
                                                                K,
-                                                               (T*)nullptr,
+                                                               static_cast<T*>(nullptr),
                                                                descr_A,
                                                                nnz_A,
                                                                dAval,
@@ -628,12 +628,12 @@ void testing_csrgemm2_a_bad_arg(void)
                                                                dBval,
                                                                dBptr,
                                                                dBcol,
-                                                               (T*)nullptr,
-                                                               (hipsparseMatDescr_t) nullptr,
+                                                               static_cast<T*>(nullptr),
+                                                               static_cast<hipsparseMatDescr_t>(nullptr),
                                                                0,
-                                                               (T*)nullptr,
-                                                               (int*)nullptr,
-                                                               (int*)nullptr,
+                                                               static_cast<T*>(nullptr),
+                                                               static_cast<int*>(nullptr),
+                                                               static_cast<int*>(nullptr),
                                                                descr_C,
                                                                dCval,
                                                                dCptr,
@@ -647,7 +647,7 @@ void testing_csrgemm2_a_bad_arg(void)
                                                                N,
                                                                K,
                                                                &alpha,
-                                                               (hipsparseMatDescr_t) nullptr,
+                                                               static_cast<hipsparseMatDescr_t>(nullptr),
                                                                nnz_A,
                                                                dAval,
                                                                dAptr,
@@ -657,12 +657,12 @@ void testing_csrgemm2_a_bad_arg(void)
                                                                dBval,
                                                                dBptr,
                                                                dBcol,
-                                                               (T*)nullptr,
-                                                               (hipsparseMatDescr_t) nullptr,
+                                                               static_cast<T*>(nullptr),
+                                                               static_cast<hipsparseMatDescr_t>(nullptr),
                                                                0,
-                                                               (T*)nullptr,
-                                                               (int*)nullptr,
-                                                               (int*)nullptr,
+                                                               static_cast<T*>(nullptr),
+                                                               static_cast<int*>(nullptr),
+                                                               static_cast<int*>(nullptr),
                                                                descr_C,
                                                                dCval,
                                                                dCptr,
@@ -677,7 +677,7 @@ void testing_csrgemm2_a_bad_arg(void)
                                                                &alpha,
                                                                descr_A,
                                                                nnz_A,
-                                                               (T*)nullptr,
+                                                               static_cast<T*>(nullptr),
                                                                dAptr,
                                                                dAcol,
                                                                descr_B,
@@ -685,12 +685,12 @@ void testing_csrgemm2_a_bad_arg(void)
                                                                dBval,
                                                                dBptr,
                                                                dBcol,
-                                                               (T*)nullptr,
-                                                               (hipsparseMatDescr_t) nullptr,
+                                                               static_cast<T*>(nullptr),
+                                                               static_cast<hipsparseMatDescr_t>(nullptr),
                                                                0,
-                                                               (T*)nullptr,
-                                                               (int*)nullptr,
-                                                               (int*)nullptr,
+                                                               static_cast<T*>(nullptr),
+                                                               static_cast<int*>(nullptr),
+                                                               static_cast<int*>(nullptr),
                                                                descr_C,
                                                                dCval,
                                                                dCptr,
@@ -706,19 +706,19 @@ void testing_csrgemm2_a_bad_arg(void)
                                                                descr_A,
                                                                nnz_A,
                                                                dAval,
-                                                               (int*)nullptr,
+                                                               static_cast<int*>(nullptr),
                                                                dAcol,
                                                                descr_B,
                                                                nnz_B,
                                                                dBval,
                                                                dBptr,
                                                                dBcol,
-                                                               (T*)nullptr,
-                                                               (hipsparseMatDescr_t) nullptr,
+                                                               static_cast<T*>(nullptr),
+                                                               static_cast<hipsparseMatDescr_t>(nullptr),
                                                                0,
-                                                               (T*)nullptr,
-                                                               (int*)nullptr,
-                                                               (int*)nullptr,
+                                                               static_cast<T*>(nullptr),
+                                                               static_cast<int*>(nullptr),
+                                                               static_cast<int*>(nullptr),
                                                                descr_C,
                                                                dCval,
                                                                dCptr,
@@ -735,18 +735,18 @@ void testing_csrgemm2_a_bad_arg(void)
                                                                nnz_A,
                                                                dAval,
                                                                dAptr,
-                                                               (int*)nullptr,
+                                                               static_cast<int*>(nullptr),
                                                                descr_B,
                                                                nnz_B,
                                                                dBval,
                                                                dBptr,
                                                                dBcol,
-                                                               (T*)nullptr,
-                                                               (hipsparseMatDescr_t) nullptr,
+                                                               static_cast<T*>(nullptr),
+                                                               static_cast<hipsparseMatDescr_t>(nullptr),
                                                                0,
-                                                               (T*)nullptr,
-                                                               (int*)nullptr,
-                                                               (int*)nullptr,
+                                                               static_cast<T*>(nullptr),
+                                                               static_cast<int*>(nullptr),
+                                                               static_cast<int*>(nullptr),
                                                                descr_C,
                                                                dCval,
                                                                dCptr,
@@ -764,17 +764,17 @@ void testing_csrgemm2_a_bad_arg(void)
                                                                dAval,
                                                                dAptr,
                                                                dAcol,
-                                                               (hipsparseMatDescr_t) nullptr,
+                                                               static_cast<hipsparseMatDescr_t>(nullptr),
                                                                nnz_B,
                                                                dBval,
                                                                dBptr,
                                                                dBcol,
-                                                               (T*)nullptr,
-                                                               (hipsparseMatDescr_t) nullptr,
+                                                               static_cast<T*>(nullptr),
+                                                               static_cast<hipsparseMatDescr_t>(nullptr),
                                                                0,
-                                                               (T*)nullptr,
-                                                               (int*)nullptr,
-                                                               (int*)nullptr,
+                                                               static_cast<T*>(nullptr),
+                                                               static_cast<int*>(nullptr),
+                                                               static_cast<int*>(nullptr),
                                                                descr_C,
                                                                dCval,
                                                                dCptr,
@@ -794,15 +794,15 @@ void testing_csrgemm2_a_bad_arg(void)
                                                                dAcol,
                                                                descr_B,
                                                                nnz_B,
-                                                               (T*)nullptr,
+                                                               static_cast<T*>(nullptr),
                                                                dBptr,
                                                                dBcol,
-                                                               (T*)nullptr,
-                                                               (hipsparseMatDescr_t) nullptr,
+                                                               static_cast<T*>(nullptr),
+                                                               static_cast<hipsparseMatDescr_t>(nullptr),
                                                                0,
-                                                               (T*)nullptr,
-                                                               (int*)nullptr,
-                                                               (int*)nullptr,
+                                                               static_cast<T*>(nullptr),
+                                                               static_cast<int*>(nullptr),
+                                                               static_cast<int*>(nullptr),
                                                                descr_C,
                                                                dCval,
                                                                dCptr,
@@ -823,14 +823,14 @@ void testing_csrgemm2_a_bad_arg(void)
                                                                descr_B,
                                                                nnz_B,
                                                                dBval,
-                                                               (int*)nullptr,
+                                                               static_cast<int*>(nullptr),
                                                                dBcol,
-                                                               (T*)nullptr,
-                                                               (hipsparseMatDescr_t) nullptr,
+                                                               static_cast<T*>(nullptr),
+                                                               static_cast<hipsparseMatDescr_t>(nullptr),
                                                                0,
-                                                               (T*)nullptr,
-                                                               (int*)nullptr,
-                                                               (int*)nullptr,
+                                                               static_cast<T*>(nullptr),
+                                                               static_cast<int*>(nullptr),
+                                                               static_cast<int*>(nullptr),
                                                                descr_C,
                                                                dCval,
                                                                dCptr,
@@ -852,13 +852,13 @@ void testing_csrgemm2_a_bad_arg(void)
                                                                nnz_B,
                                                                dBval,
                                                                dBptr,
-                                                               (int*)nullptr,
-                                                               (T*)nullptr,
-                                                               (hipsparseMatDescr_t) nullptr,
+                                                               static_cast<int*>(nullptr),
+                                                               static_cast<T*>(nullptr),
+                                                               static_cast<hipsparseMatDescr_t>(nullptr),
                                                                0,
-                                                               (T*)nullptr,
-                                                               (int*)nullptr,
-                                                               (int*)nullptr,
+                                                               static_cast<T*>(nullptr),
+                                                               static_cast<int*>(nullptr),
+                                                               static_cast<int*>(nullptr),
                                                                descr_C,
                                                                dCval,
                                                                dCptr,
@@ -881,13 +881,13 @@ void testing_csrgemm2_a_bad_arg(void)
                                                                dBval,
                                                                dBptr,
                                                                dBcol,
-                                                               (T*)nullptr,
-                                                               (hipsparseMatDescr_t) nullptr,
+                                                               static_cast<T*>(nullptr),
+                                                               static_cast<hipsparseMatDescr_t>(nullptr),
                                                                0,
-                                                               (T*)nullptr,
-                                                               (int*)nullptr,
-                                                               (int*)nullptr,
-                                                               (hipsparseMatDescr_t) nullptr,
+                                                               static_cast<T*>(nullptr),
+                                                               static_cast<int*>(nullptr),
+                                                               static_cast<int*>(nullptr),
+                                                               static_cast<hipsparseMatDescr_t>(nullptr),
                                                                dCval,
                                                                dCptr,
                                                                dCcol,
@@ -909,14 +909,14 @@ void testing_csrgemm2_a_bad_arg(void)
                                                                dBval,
                                                                dBptr,
                                                                dBcol,
-                                                               (T*)nullptr,
-                                                               (hipsparseMatDescr_t) nullptr,
+                                                               static_cast<T*>(nullptr),
+                                                               static_cast<hipsparseMatDescr_t>(nullptr),
                                                                0,
-                                                               (T*)nullptr,
-                                                               (int*)nullptr,
-                                                               (int*)nullptr,
+                                                               static_cast<T*>(nullptr),
+                                                               static_cast<int*>(nullptr),
+                                                               static_cast<int*>(nullptr),
                                                                descr_C,
-                                                               (T*)nullptr,
+                                                               static_cast<T*>(nullptr),
                                                                dCptr,
                                                                dCcol,
                                                                info,
@@ -937,15 +937,15 @@ void testing_csrgemm2_a_bad_arg(void)
                                                                dBval,
                                                                dBptr,
                                                                dBcol,
-                                                               (T*)nullptr,
-                                                               (hipsparseMatDescr_t) nullptr,
+                                                               static_cast<T*>(nullptr),
+                                                               static_cast<hipsparseMatDescr_t>(nullptr),
                                                                0,
-                                                               (T*)nullptr,
-                                                               (int*)nullptr,
-                                                               (int*)nullptr,
+                                                               static_cast<T*>(nullptr),
+                                                               static_cast<int*>(nullptr),
+                                                               static_cast<int*>(nullptr),
                                                                descr_C,
                                                                dCval,
-                                                               (int*)nullptr,
+                                                               static_cast<int*>(nullptr),
                                                                dCcol,
                                                                info,
                                                                dbuffer),
@@ -965,16 +965,16 @@ void testing_csrgemm2_a_bad_arg(void)
                                                                dBval,
                                                                dBptr,
                                                                dBcol,
-                                                               (T*)nullptr,
-                                                               (hipsparseMatDescr_t) nullptr,
+                                                               static_cast<T*>(nullptr),
+                                                               static_cast<hipsparseMatDescr_t>(nullptr),
                                                                0,
-                                                               (T*)nullptr,
-                                                               (int*)nullptr,
-                                                               (int*)nullptr,
+                                                               static_cast<T*>(nullptr),
+                                                               static_cast<int*>(nullptr),
+                                                               static_cast<int*>(nullptr),
                                                                descr_C,
                                                                dCval,
                                                                dCptr,
-                                                               (int*)nullptr,
+                                                               static_cast<int*>(nullptr),
                                                                info,
                                                                dbuffer),
                                             "Error: dCcol is nullptr");
@@ -993,12 +993,12 @@ void testing_csrgemm2_a_bad_arg(void)
                                                                dBval,
                                                                dBptr,
                                                                dBcol,
-                                                               (T*)nullptr,
-                                                               (hipsparseMatDescr_t) nullptr,
+                                                               static_cast<T*>(nullptr),
+                                                               static_cast<hipsparseMatDescr_t>(nullptr),
                                                                0,
-                                                               (T*)nullptr,
-                                                               (int*)nullptr,
-                                                               (int*)nullptr,
+                                                               static_cast<T*>(nullptr),
+                                                               static_cast<int*>(nullptr),
+                                                               static_cast<int*>(nullptr),
                                                                descr_C,
                                                                dCval,
                                                                dCptr,
@@ -1021,18 +1021,18 @@ void testing_csrgemm2_a_bad_arg(void)
                                                                dBval,
                                                                dBptr,
                                                                dBcol,
-                                                               (T*)nullptr,
-                                                               (hipsparseMatDescr_t) nullptr,
+                                                               static_cast<T*>(nullptr),
+                                                               static_cast<hipsparseMatDescr_t>(nullptr),
                                                                0,
-                                                               (T*)nullptr,
-                                                               (int*)nullptr,
-                                                               (int*)nullptr,
+                                                               static_cast<T*>(nullptr),
+                                                               static_cast<int*>(nullptr),
+                                                               static_cast<int*>(nullptr),
                                                                descr_C,
                                                                dCval,
                                                                dCptr,
                                                                dCcol,
                                                                info,
-                                                               (void*)nullptr),
+                                                               static_cast<void*>(nullptr)),
                                             "Error: dbuffer is nullptr");
 #endif
 }
@@ -1086,20 +1086,20 @@ hipsparseStatus_t testing_csrgemm2_a(Arguments argus)
 
     // Host structures
     std::vector<int> hcsr_row_ptr_A;
-    std::vector<int> hcsr_col_ind_A;
+    std::vector<int> hcsr_col_indA;
     std::vector<T>   hcsr_val_A;
 
     // Read or construct CSR matrix
     int nnz_A = 0;
     if(!generate_csr_matrix(
-           filename, M, K, nnz_A, hcsr_row_ptr_A, hcsr_col_ind_A, hcsr_val_A, idx_base_A))
+           filename, M, K, nnz_A, hcsr_row_ptr_A, hcsr_col_indA, hcsr_val_A, idx_base_A))
     {
         fprintf(stderr, "Cannot open [read] %s\ncol", filename.c_str());
         return HIPSPARSE_STATUS_INTERNAL_ERROR;
     }
 
     std::vector<int> hcsr_row_ptr_B;
-    std::vector<int> hcsr_col_ind_B;
+    std::vector<int> hcsr_col_indB;
     std::vector<T>   hcsr_val_B;
     std::vector<int> hcsr_row_ptr_D;
     std::vector<int> hcsr_col_ind_D;
@@ -1110,7 +1110,7 @@ hipsparseStatus_t testing_csrgemm2_a(Arguments argus)
     int nnz_B = nnz_A;
 
     hcsr_row_ptr_B.resize(K + 1, 0);
-    hcsr_col_ind_B.resize(nnz_B);
+    hcsr_col_indB.resize(nnz_B);
     hcsr_val_B.resize(nnz_B);
 
     // B = A^T
@@ -1118,10 +1118,10 @@ hipsparseStatus_t testing_csrgemm2_a(Arguments argus)
                   K,
                   nnz_A,
                   hcsr_row_ptr_A.data(),
-                  hcsr_col_ind_A.data(),
+                  hcsr_col_indA.data(),
                   hcsr_val_A.data(),
                   hcsr_row_ptr_B.data(),
-                  hcsr_col_ind_B.data(),
+                  hcsr_col_indB.data(),
                   hcsr_val_B.data(),
                   idx_base_A,
                   idx_base_B);
@@ -1142,25 +1142,25 @@ hipsparseStatus_t testing_csrgemm2_a(Arguments argus)
     auto dCptr_managed = hipsparse_unique_ptr{device_malloc(sizeof(int) * (M + 1)), device_free};
     auto dalpha_managed = hipsparse_unique_ptr{device_malloc(sizeof(T)), device_free};
 
-    int* dAptr  = (int*)dAptr_managed.get();
-    int* dAcol  = (int*)dAcol_managed.get();
-    T*   dAval  = (T*)dAval_managed.get();
-    int* dBptr  = (int*)dBptr_managed.get();
-    int* dBcol  = (int*)dBcol_managed.get();
-    T*   dBval  = (T*)dBval_managed.get();
-    int* dCptr  = (int*)dCptr_managed.get();
-    T*   dalpha = (T*)dalpha_managed.get();
+    int* dAptr  = static_cast<int*>(dAptr_managed.get());
+    int* dAcol  = static_cast<int*>(dAcol_managed.get());
+    T*   dAval  = static_cast<T*>(dAval_managed.get());
+    int* dBptr  = static_cast<int*>(dBptr_managed.get());
+    int* dBcol  = static_cast<int*>(dBcol_managed.get());
+    T*   dBval  = static_cast<T*>(dBval_managed.get());
+    int* dCptr  = static_cast<int*>(dCptr_managed.get());
+    T*   dalpha = static_cast<T*>(dalpha_managed.get());
 
     // copy data from CPU to device
     CHECK_HIP_ERROR(
         hipMemcpy(dAptr, hcsr_row_ptr_A.data(), sizeof(int) * (M + 1), hipMemcpyHostToDevice));
     CHECK_HIP_ERROR(
-        hipMemcpy(dAcol, hcsr_col_ind_A.data(), sizeof(int) * nnz_A, hipMemcpyHostToDevice));
+        hipMemcpy(dAcol, hcsr_col_indA.data(), sizeof(int) * nnz_A, hipMemcpyHostToDevice));
     CHECK_HIP_ERROR(hipMemcpy(dAval, hcsr_val_A.data(), sizeof(T) * nnz_A, hipMemcpyHostToDevice));
     CHECK_HIP_ERROR(
         hipMemcpy(dBptr, hcsr_row_ptr_B.data(), sizeof(int) * (K + 1), hipMemcpyHostToDevice));
     CHECK_HIP_ERROR(
-        hipMemcpy(dBcol, hcsr_col_ind_B.data(), sizeof(int) * nnz_B, hipMemcpyHostToDevice));
+        hipMemcpy(dBcol, hcsr_col_indB.data(), sizeof(int) * nnz_B, hipMemcpyHostToDevice));
     CHECK_HIP_ERROR(hipMemcpy(dBval, hcsr_val_B.data(), sizeof(T) * nnz_B, hipMemcpyHostToDevice));
     CHECK_HIP_ERROR(hipMemcpy(dalpha, h_alpha, sizeof(T), hipMemcpyHostToDevice));
 
@@ -1180,7 +1180,7 @@ hipsparseStatus_t testing_csrgemm2_a(Arguments argus)
                                                            nnz_B,
                                                            dBptr,
                                                            dBcol,
-                                                           (T*)nullptr,
+                                                           static_cast<T*>(nullptr),
                                                            descr_D,
                                                            0,
                                                            nullptr,
@@ -1192,7 +1192,7 @@ hipsparseStatus_t testing_csrgemm2_a(Arguments argus)
     auto dbuffer_managed
         = hipsparse_unique_ptr{device_malloc(sizeof(char) * bufferSize), device_free};
 
-    void* dbuffer = (void*)dbuffer_managed.get();
+    void* dbuffer = static_cast<void*>(dbuffer_managed.get());
 
     // csrgemm2 nnz
 
@@ -1228,14 +1228,14 @@ hipsparseStatus_t testing_csrgemm2_a(Arguments argus)
     auto dCcol_managed = hipsparse_unique_ptr{device_malloc(sizeof(int) * safe_nnz_C), device_free};
     auto dCval_managed = hipsparse_unique_ptr{device_malloc(sizeof(T) * safe_nnz_C), device_free};
 
-    int* dCcol = (int*)dCcol_managed.get();
-    T*   dCval = (T*)dCval_managed.get();
+    int* dCcol = static_cast<int*>(dCcol_managed.get());
+    T*   dCval = static_cast<T*>(dCval_managed.get());
 
     if(argus.unit_check)
     {
         // hipsparse pointer mode device
         auto dnnz_C_managed = hipsparse_unique_ptr{device_malloc(sizeof(int)), device_free};
-        int* dnnz_C         = (int*)dnnz_C_managed.get();
+        int* dnnz_C         = static_cast<int*>(dnnz_C_managed.get());
 
         CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_DEVICE));
         CHECK_HIPSPARSE_ERROR(hipsparseXcsrgemm2Nnz(handle,
@@ -1270,10 +1270,10 @@ hipsparseStatus_t testing_csrgemm2_a(Arguments argus)
                                            K,
                                            h_alpha,
                                            hcsr_row_ptr_A.data(),
-                                           hcsr_col_ind_A.data(),
+                                           hcsr_col_indA.data(),
                                            hcsr_row_ptr_B.data(),
-                                           hcsr_col_ind_B.data(),
-                                           (T*)nullptr,
+                                           hcsr_col_indB.data(),
+                                           static_cast<T*>(nullptr),
                                            hcsr_row_ptr_D.data(),
                                            hcsr_col_ind_D.data(),
                                            hcsr_row_ptr_C_gold.data(),
@@ -1296,12 +1296,12 @@ hipsparseStatus_t testing_csrgemm2_a(Arguments argus)
                       K,
                       h_alpha,
                       hcsr_row_ptr_A.data(),
-                      hcsr_col_ind_A.data(),
+                      hcsr_col_indA.data(),
                       hcsr_val_A.data(),
                       hcsr_row_ptr_B.data(),
-                      hcsr_col_ind_B.data(),
+                      hcsr_col_indB.data(),
                       hcsr_val_B.data(),
-                      (T*)nullptr,
+                      static_cast<T*>(nullptr),
                       hcsr_row_ptr_D.data(),
                       hcsr_col_ind_D.data(),
                       hcsr_val_D.data(),
@@ -1340,10 +1340,10 @@ hipsparseStatus_t testing_csrgemm2_a(Arguments argus)
                                                  dBval,
                                                  dBptr,
                                                  dBcol,
-                                                 (T*)nullptr,
+                                                 static_cast<T*>(nullptr),
                                                  descr_D,
                                                  0,
-                                                 (T*)nullptr,
+                                                 static_cast<T*>(nullptr),
                                                  nullptr,
                                                  nullptr,
                                                  descr_C,
@@ -1355,14 +1355,14 @@ hipsparseStatus_t testing_csrgemm2_a(Arguments argus)
 
         // Copy output from device to CPU
         std::vector<int> hcsr_row_ptr_C(M + 1);
-        std::vector<int> hcsr_col_ind_C(nnz_C_gold);
+        std::vector<int> hcsr_col_indC(nnz_C_gold);
         std::vector<T>   hcsr_val_C_1(nnz_C_gold);
         std::vector<T>   hcsr_val_C_2(nnz_C_gold);
 
         CHECK_HIP_ERROR(
             hipMemcpy(hcsr_row_ptr_C.data(), dCptr, sizeof(int) * (M + 1), hipMemcpyDeviceToHost));
         CHECK_HIP_ERROR(hipMemcpy(
-            hcsr_col_ind_C.data(), dCcol, sizeof(int) * nnz_C_gold, hipMemcpyDeviceToHost));
+            hcsr_col_indC.data(), dCcol, sizeof(int) * nnz_C_gold, hipMemcpyDeviceToHost));
         CHECK_HIP_ERROR(
             hipMemcpy(hcsr_val_C_1.data(), dCval, sizeof(T) * nnz_C_gold, hipMemcpyDeviceToHost));
 
@@ -1370,7 +1370,7 @@ hipsparseStatus_t testing_csrgemm2_a(Arguments argus)
 
         // Check structure and entries of C
         unit_check_general(1, M + 1, 1, hcsr_row_ptr_C_gold.data(), hcsr_row_ptr_C.data());
-        unit_check_general(1, nnz_C_gold, 1, hcsr_col_ind_C_gold.data(), hcsr_col_ind_C.data());
+        unit_check_general(1, nnz_C_gold, 1, hcsr_col_ind_C_gold.data(), hcsr_col_indC.data());
         unit_check_near(1, nnz_C_gold, 1, hcsr_val_C_gold.data(), hcsr_val_C_1.data());
 
 #ifdef __HIP_PLATFORM_AMD__
@@ -1391,10 +1391,10 @@ hipsparseStatus_t testing_csrgemm2_a(Arguments argus)
                                                  dBval,
                                                  dBptr,
                                                  dBcol,
-                                                 (T*)nullptr,
+                                                 static_cast<T*>(nullptr),
                                                  descr_D,
                                                  0,
-                                                 (T*)nullptr,
+                                                 static_cast<T*>(nullptr),
                                                  nullptr,
                                                  nullptr,
                                                  descr_C,

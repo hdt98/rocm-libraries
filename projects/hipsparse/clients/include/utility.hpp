@@ -6744,6 +6744,36 @@ struct testhyb
     void*                   coo_val;
 };
 
+/*! \brief Benchmark a kernel with warmup iterations
+ *
+ *  \details Helper function to reduce code duplication in timing tests.
+ *  Performs warmup iterations, then times the actual kernel execution.
+ *
+ *  @param[in] kernel Lambda or callable to execute
+ *  @param[in] warmup_iters Number of warmup iterations
+ *  @param[in] timing_iters Number of timed iterations
+ *  @return Average execution time in microseconds
+ */
+template <typename Func>
+inline double benchmark_kernel(Func kernel, int warmup_iters, int timing_iters)
+{
+    // Warm up
+    for(int iter = 0; iter < warmup_iters; ++iter)
+    {
+        kernel();
+    }
+
+    double gpu_time_used = get_time_us();
+
+    // Performance run
+    for(int iter = 0; iter < timing_iters; ++iter)
+    {
+        kernel();
+    }
+
+    return (get_time_us() - gpu_time_used) / timing_iters;
+}
+
 template <typename I>
 hipsparseIndexType_t getIndexType()
 {

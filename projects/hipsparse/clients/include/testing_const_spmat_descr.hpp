@@ -55,9 +55,9 @@ void testing_const_spmat_descr_bad_arg(void)
     auto col_data_managed = hipsparse_unique_ptr{device_malloc(sizeof(int) * nnz), device_free};
     auto val_data_managed = hipsparse_unique_ptr{device_malloc(sizeof(float) * nnz), device_free};
 
-    const int*   row_data = (int*)row_data_managed.get();
-    const int*   col_data = (int*)col_data_managed.get();
-    const float* val_data = (float*)val_data_managed.get();
+    const int*   row_data = static_cast<int*>(row_data_managed.get());
+    const int*   col_data = static_cast<int*>(col_data_managed.get());
+    const float* val_data = static_cast<float*>(val_data_managed.get());
 
     hipsparseConstSpMatDescr_t A;
 

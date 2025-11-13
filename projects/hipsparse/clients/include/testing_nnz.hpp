@@ -62,19 +62,19 @@ void testing_nnz_bad_arg(void)
     auto nnzTotalDevHostPtr_managed
         = hipsparse_unique_ptr{device_malloc(sizeof(int) * 1), device_free};
 
-    T*   d_A                  = (T*)A_managed.get();
-    int* d_nnzPerRowColumn    = (int*)nnzPerRowColumn_managed.get();
-    int* d_nnzTotalDevHostPtr = (int*)nnzTotalDevHostPtr_managed.get();
+    T*   dA                  = static_cast<T*>(A_managed.get());
+    int* d_nnzPerRowColumn    = static_cast<int*>(nnzPerRowColumn_managed.get());
+    int* d_nnzTotalDevHostPtr = static_cast<int*>(nnzTotalDevHostPtr_managed.get());
 
 #if(!defined(CUDART_VERSION))
     verify_hipsparse_status_invalid_handle(hipsparseXnnz(
-        nullptr, dirA, M, N, descrA, (const T*)d_A, lda, d_nnzPerRowColumn, d_nnzTotalDevHostPtr));
+        nullptr, dirA, M, N, descrA, (const T*)dA, lda, d_nnzPerRowColumn, d_nnzTotalDevHostPtr));
     verify_hipsparse_status_invalid_pointer(hipsparseXnnz(handle,
                                                           dirA,
                                                           M,
                                                           N,
                                                           nullptr,
-                                                          (const T*)d_A,
+                                                          (const T*)dA,
                                                           lda,
                                                           d_nnzPerRowColumn,
                                                           d_nnzTotalDevHostPtr),
@@ -91,10 +91,10 @@ void testing_nnz_bad_arg(void)
                                             "Error: A as invalid pointer must be detected.");
     verify_hipsparse_status_invalid_pointer(
         hipsparseXnnz(
-            handle, dirA, M, N, descrA, (const T*)d_A, lda, nullptr, d_nnzTotalDevHostPtr),
+            handle, dirA, M, N, descrA, (const T*)dA, lda, nullptr, d_nnzTotalDevHostPtr),
         "Error: nnzPerRowColumn as invalid pointer must be detected.");
     verify_hipsparse_status_invalid_pointer(
-        hipsparseXnnz(handle, dirA, M, N, descrA, (const T*)d_A, lda, d_nnzPerRowColumn, nullptr),
+        hipsparseXnnz(handle, dirA, M, N, descrA, (const T*)dA, lda, d_nnzPerRowColumn, nullptr),
         "Error: nnzTotalDevHostPtr as invalid pointer must be detected.");
 #endif
 
@@ -125,7 +125,7 @@ void testing_nnz_bad_arg(void)
                                                        -1,
                                                        N,
                                                        descrA,
-                                                       (const T*)d_A,
+                                                       (const T*)dA,
                                                        lda,
                                                        d_nnzPerRowColumn,
                                                        d_nnzTotalDevHostPtr),
@@ -135,7 +135,7 @@ void testing_nnz_bad_arg(void)
                                                        M,
                                                        -1,
                                                        descrA,
-                                                       (const T*)d_A,
+                                                       (const T*)dA,
                                                        lda,
                                                        d_nnzPerRowColumn,
                                                        d_nnzTotalDevHostPtr),
@@ -145,7 +145,7 @@ void testing_nnz_bad_arg(void)
                                                        M,
                                                        N,
                                                        descrA,
-                                                       (const T*)d_A,
+                                                       (const T*)dA,
                                                        M - 1,
                                                        d_nnzPerRowColumn,
                                                        d_nnzTotalDevHostPtr),
@@ -181,11 +181,11 @@ hipsparseStatus_t testing_nnz(Arguments argus)
     auto nnzTotalDevHostPtr_managed
         = hipsparse_unique_ptr{device_malloc(sizeof(int) * 1), device_free};
 
-    T*   d_A                  = (T*)A_managed.get();
-    int* d_nnzPerRowColumn    = (int*)nnzPerRowColumn_managed.get();
-    int* d_nnzTotalDevHostPtr = (int*)nnzTotalDevHostPtr_managed.get();
+    T*   dA                  = static_cast<T*>(A_managed.get());
+    int* d_nnzPerRowColumn    = static_cast<int*>(nnzPerRowColumn_managed.get());
+    int* d_nnzTotalDevHostPtr = static_cast<int*>(nnzTotalDevHostPtr_managed.get());
 
-    std::vector<T>   h_A(lda * N);
+    std::vector<T>   hA(lda * N);
     std::vector<int> h_nnzPerRowColumn(MN);
     std::vector<int> hd_nnzPerRowColumn(MN);
     std::vector<int> h_nnzTotalDevHostPtr(1);
@@ -196,16 +196,16 @@ hipsparseStatus_t testing_nnz(Arguments argus)
     {
         for(int j = 0; j < N; ++j)
         {
-            h_A[j * lda + i] = make_DataType<T>(-1);
+            hA[j * lda + i] = make_DataType<T>(-1);
         }
     }
 
     // Initialize a random dense matrix.
     srand(0);
-    gen_dense_random_sparsity_pattern(M, N, h_A.data(), lda, HIPSPARSE_ORDER_COL, 0.2);
+    gen_dense_random_sparsity_pattern(M, N, hA.data(), lda, HIPSPARSE_ORDER_COL, 0.2);
 
     // Transfer.
-    CHECK_HIP_ERROR(hipMemcpy(d_A, h_A.data(), sizeof(T) * lda * N, hipMemcpyHostToDevice));
+    CHECK_HIP_ERROR(hipMemcpy(dA, hA.data(), sizeof(T) * lda * N, hipMemcpyHostToDevice));
 
     if(argus.unit_check)
     {
@@ -214,7 +214,7 @@ hipsparseStatus_t testing_nnz(Arguments argus)
                     M,
                     N,
                     descrA,
-                    h_A.data(),
+                    hA.data(),
                     lda,
                     h_nnzPerRowColumn.data(),
                     h_nnzTotalDevHostPtr.data());
@@ -226,7 +226,7 @@ hipsparseStatus_t testing_nnz(Arguments argus)
                                             M,
                                             N,
                                             descrA,
-                                            (const T*)d_A,
+                                            (const T*)dA,
                                             lda,
                                             d_nnzPerRowColumn,
                                             d_nnzTotalDevHostPtr));
@@ -247,7 +247,7 @@ hipsparseStatus_t testing_nnz(Arguments argus)
         int dh_nnz;
         CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_HOST));
         CHECK_HIPSPARSE_ERROR(hipsparseXnnz(
-            handle, dirA, M, N, descrA, (const T*)d_A, lda, d_nnzPerRowColumn, &dh_nnz));
+            handle, dirA, M, N, descrA, (const T*)dA, lda, d_nnzPerRowColumn, &dh_nnz));
 
         // Transfer.
         CHECK_HIP_ERROR(hipMemcpy(
@@ -270,7 +270,7 @@ hipsparseStatus_t testing_nnz(Arguments argus)
         for(int iter = 0; iter < number_cold_calls; ++iter)
         {
             CHECK_HIPSPARSE_ERROR(hipsparseXnnz(
-                handle, dirA, M, N, descrA, (const T*)d_A, lda, d_nnzPerRowColumn, &h_nnz));
+                handle, dirA, M, N, descrA, (const T*)dA, lda, d_nnzPerRowColumn, &h_nnz));
         }
 
         double gpu_time_used = get_time_us();
@@ -279,7 +279,7 @@ hipsparseStatus_t testing_nnz(Arguments argus)
         for(int iter = 0; iter < number_hot_calls; ++iter)
         {
             CHECK_HIPSPARSE_ERROR(hipsparseXnnz(
-                handle, dirA, M, N, descrA, (const T*)d_A, lda, d_nnzPerRowColumn, &h_nnz));
+                handle, dirA, M, N, descrA, (const T*)dA, lda, d_nnzPerRowColumn, &h_nnz));
         }
 
         gpu_time_used = (get_time_us() - gpu_time_used) / number_hot_calls;

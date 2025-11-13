@@ -62,18 +62,18 @@ void testing_dense2csx_bad_arg(FUNC& dense2csx)
         = hipsparse_unique_ptr{device_malloc(sizeof(int) * (1 + 1)), device_free};
     auto m_csx_row_col_ind = hipsparse_unique_ptr{device_malloc(sizeof(int) * 1), device_free};
 
-    T*   d_dense_val       = (T*)m_dense_val.get();
-    T*   d_csx_val         = (T*)m_csx_val.get();
-    int* d_nnzPerRowColumn = (int*)m_nnzPerRowColumn.get();
-    int* d_csx_row_col_ptr = (int*)m_csx_row_col_ptr.get();
-    int* d_csx_col_row_ind = (int*)m_csx_row_col_ind.get();
+    T*   d_dense_val       = static_cast<T*>(m_dense_val.get());
+    T*   d_csx_val         = static_cast<T*>(m_csx_val.get());
+    int* d_nnzPerRowColumn = static_cast<int*>(m_nnzPerRowColumn.get());
+    int* d_csx_row_col_ptr = static_cast<int*>(m_csx_row_col_ptr.get());
+    int* d_csx_col_row_ind = static_cast<int*>(m_csx_row_col_ind.get());
 
     int local_ptr[2] = {0, 1};
     CHECK_HIP_ERROR(
         hipMemcpy(d_csx_row_col_ptr, local_ptr, sizeof(int) * (1 + 1), hipMemcpyHostToDevice));
 
     verify_hipsparse_status_invalid_handle(dense2csx(
-        nullptr, 0, 0, nullptr, (const T*)nullptr, 0, nullptr, (T*)nullptr, nullptr, nullptr));
+        nullptr, 0, 0, nullptr, (const T*)nullptr, 0, nullptr, static_cast<T*>(nullptr), nullptr, nullptr));
     verify_hipsparse_status_invalid_pointer(dense2csx(handle,
                                                       M,
                                                       N,
@@ -209,8 +209,8 @@ hipsparseStatus_t testing_dense2csx(const Arguments& argus, FUNC& dense2csx)
     auto nnzTotalDevHostPtr_managed
         = hipsparse_unique_ptr{device_malloc(sizeof(int) * 1), device_free};
 
-    T*   d_dense_val       = (T*)m_dense_val.get();
-    int* d_nnzPerRowColumn = (int*)nnzPerRowColumn_managed.get();
+    T*   d_dense_val       = static_cast<T*>(m_dense_val.get());
+    int* d_nnzPerRowColumn = static_cast<int*>(nnzPerRowColumn_managed.get());
 
     // Initialize the entire allocated memory.
     for(int i = 0; i < LD; ++i)
@@ -243,9 +243,9 @@ hipsparseStatus_t testing_dense2csx(const Arguments& argus, FUNC& dense2csx)
     auto m_csx_val         = hipsparse_unique_ptr{device_malloc(sizeof(T) * nnz), device_free};
     auto m_csx_col_row_ind = hipsparse_unique_ptr{device_malloc(sizeof(int) * nnz), device_free};
 
-    int* d_csx_row_col_ptr = (int*)m_csx_row_col_ptr.get();
-    int* d_csx_col_row_ind = (int*)m_csx_col_row_ind.get();
-    T*   d_csx_val         = (T*)m_csx_val.get();
+    int* d_csx_row_col_ptr = static_cast<int*>(m_csx_row_col_ptr.get());
+    int* d_csx_col_row_ind = static_cast<int*>(m_csx_col_row_ind.get());
+    T*   d_csx_val         = static_cast<T*>(m_csx_val.get());
 
     std::vector<int> cpu_csx_row_col_ptr(DIMDIR + 1);
     std::vector<T>   cpu_csx_val(nnz);

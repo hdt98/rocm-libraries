@@ -54,20 +54,20 @@ void testing_rot_bad_arg(void)
     std::unique_ptr<handle_struct> unique_ptr_handle(new handle_struct);
     hipsparseHandle_t              handle = unique_ptr_handle->handle;
 
-    auto dx_val_managed = hipsparse_unique_ptr{device_malloc(sizeof(float) * nnz), device_free};
-    auto dx_ind_managed = hipsparse_unique_ptr{device_malloc(sizeof(int) * nnz), device_free};
+    auto dxVal_managed = hipsparse_unique_ptr{device_malloc(sizeof(float) * nnz), device_free};
+    auto dxInd_managed = hipsparse_unique_ptr{device_malloc(sizeof(int) * nnz), device_free};
     auto dy_managed     = hipsparse_unique_ptr{device_malloc(sizeof(float) * size), device_free};
 
-    float* dx_val = (float*)dx_val_managed.get();
-    int*   dx_ind = (int*)dx_ind_managed.get();
-    float* dy     = (float*)dy_managed.get();
+    float* dxVal = static_cast<float*>(dxVal_managed.get());
+    int*   dxInd = static_cast<int*>(dxInd_managed.get());
+    float* dy     = static_cast<float*>(dy_managed.get());
 
     // Structures
     hipsparseSpVecDescr_t x;
     hipsparseDnVecDescr_t y;
 
     verify_hipsparse_status_success(
-        hipsparseCreateSpVec(&x, size, nnz, dx_ind, dx_val, idxType, idxBase, dataType), "Success");
+        hipsparseCreateSpVec(&x, size, nnz, dxInd, dxVal, idxType, idxBase, dataType), "Success");
     verify_hipsparse_status_success(hipsparseCreateDnVec(&y, size, dy, dataType), "Success");
 
     // Rot
@@ -108,7 +108,7 @@ hipsparseStatus_t testing_rot(Arguments argus)
     hipsparseHandle_t              handle = unique_ptr_handle->handle;
 
     // Host structures
-    std::vector<I> hx_ind(nnz);
+    std::vector<I> hxInd(nnz);
     std::vector<T> hx_val_1(nnz);
     std::vector<T> hx_val_2(nnz);
     std::vector<T> hx_val_gold(nnz);
@@ -118,7 +118,7 @@ hipsparseStatus_t testing_rot(Arguments argus)
 
     // Initial Data on CPU
     srand(12345ULL);
-    hipsparseInitIndex(hx_ind.data(), nnz, 1, size);
+    hipsparseInitIndex(hxInd.data(), nnz, 1, size);
     hipsparseInit<T>(hx_val_1, 1, nnz);
     hipsparseInit<T>(hy_1, 1, size);
 
@@ -128,7 +128,7 @@ hipsparseStatus_t testing_rot(Arguments argus)
     hy_gold     = hy_1;
 
     // Allocate memory on device
-    auto dx_ind_managed   = hipsparse_unique_ptr{device_malloc(sizeof(I) * nnz), device_free};
+    auto dxInd_managed   = hipsparse_unique_ptr{device_malloc(sizeof(I) * nnz), device_free};
     auto dx_val_1_managed = hipsparse_unique_ptr{device_malloc(sizeof(T) * nnz), device_free};
     auto dx_val_2_managed = hipsparse_unique_ptr{device_malloc(sizeof(T) * nnz), device_free};
     auto dy_1_managed     = hipsparse_unique_ptr{device_malloc(sizeof(T) * size), device_free};
@@ -136,16 +136,16 @@ hipsparseStatus_t testing_rot(Arguments argus)
     auto dc_coeff_managed = hipsparse_unique_ptr{device_malloc(sizeof(T)), device_free};
     auto ds_coeff_managed = hipsparse_unique_ptr{device_malloc(sizeof(T)), device_free};
 
-    I* dx_ind   = (I*)dx_ind_managed.get();
-    T* dx_val_1 = (T*)dx_val_1_managed.get();
-    T* dx_val_2 = (T*)dx_val_2_managed.get();
-    T* dy_1     = (T*)dy_1_managed.get();
-    T* dy_2     = (T*)dy_2_managed.get();
-    T* dc_coeff = (T*)dc_coeff_managed.get();
-    T* ds_coeff = (T*)ds_coeff_managed.get();
+    I* dxInd   = static_cast<I*>(dxInd_managed.get());
+    T* dx_val_1 = static_cast<T*>(dx_val_1_managed.get());
+    T* dx_val_2 = static_cast<T*>(dx_val_2_managed.get());
+    T* dy_1     = static_cast<T*>(dy_1_managed.get());
+    T* dy_2     = static_cast<T*>(dy_2_managed.get());
+    T* dc_coeff = static_cast<T*>(dc_coeff_managed.get());
+    T* ds_coeff = static_cast<T*>(ds_coeff_managed.get());
 
     // copy data from CPU to device
-    CHECK_HIP_ERROR(hipMemcpy(dx_ind, hx_ind.data(), sizeof(I) * nnz, hipMemcpyHostToDevice));
+    CHECK_HIP_ERROR(hipMemcpy(dxInd, hxInd.data(), sizeof(I) * nnz, hipMemcpyHostToDevice));
     CHECK_HIP_ERROR(hipMemcpy(dx_val_1, hx_val_1.data(), sizeof(T) * nnz, hipMemcpyHostToDevice));
     CHECK_HIP_ERROR(hipMemcpy(dx_val_2, hx_val_2.data(), sizeof(T) * nnz, hipMemcpyHostToDevice));
     CHECK_HIP_ERROR(hipMemcpy(dy_1, hy_1.data(), sizeof(T) * size, hipMemcpyHostToDevice));
@@ -158,9 +158,9 @@ hipsparseStatus_t testing_rot(Arguments argus)
     hipsparseDnVecDescr_t y1, y2;
 
     CHECK_HIPSPARSE_ERROR(
-        hipsparseCreateSpVec(&x1, size, nnz, dx_ind, dx_val_1, idxType, idxBase, dataType));
+        hipsparseCreateSpVec(&x1, size, nnz, dxInd, dx_val_1, idxType, idxBase, dataType));
     CHECK_HIPSPARSE_ERROR(
-        hipsparseCreateSpVec(&x2, size, nnz, dx_ind, dx_val_2, idxType, idxBase, dataType));
+        hipsparseCreateSpVec(&x2, size, nnz, dxInd, dx_val_2, idxType, idxBase, dataType));
     CHECK_HIPSPARSE_ERROR(hipsparseCreateDnVec(&y1, size, dy_1, dataType));
     CHECK_HIPSPARSE_ERROR(hipsparseCreateDnVec(&y2, size, dy_2, dataType));
 
@@ -185,7 +185,7 @@ hipsparseStatus_t testing_rot(Arguments argus)
         // CPU
         for(int64_t i = 0; i < nnz; ++i)
         {
-            I idx = hx_ind[i] - idxBase;
+            I idx = hxInd[i] - idxBase;
 
             T x = hx_val_gold[i];
             T y = hy_gold[idx];
@@ -208,21 +208,10 @@ hipsparseStatus_t testing_rot(Arguments argus)
 
         CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_HOST));
 
-        // Warm up
-        for(int iter = 0; iter < number_cold_calls; ++iter)
-        {
-            CHECK_HIPSPARSE_ERROR(hipsparseRot(handle, &hc_coeff, &hs_coeff, x1, y1));
-        }
-
-        double gpu_time_used = get_time_us();
-
-        // Performance run
-        for(int iter = 0; iter < number_hot_calls; ++iter)
-        {
-            CHECK_HIPSPARSE_ERROR(hipsparseRot(handle, &hc_coeff, &hs_coeff, x1, y1));
-        }
-
-        gpu_time_used = (get_time_us() - gpu_time_used) / number_hot_calls;
+        double gpu_time_used = benchmark_kernel(
+            [&]() { CHECK_HIPSPARSE_ERROR(hipsparseRot(handle, &hc_coeff, &hs_coeff, x1, y1)); return HIPSPARSE_STATUS_SUCCESS; },
+            number_cold_calls,
+            number_hot_calls);
 
         double gflop_count = roti_gflop_count<I>(nnz);
         double gbyte_count = roti_gbyte_count<T>(nnz);

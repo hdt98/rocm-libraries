@@ -60,10 +60,10 @@ void testing_spmat_descr_bad_arg(void)
     auto ind_data_managed = hipsparse_unique_ptr{device_malloc(sizeof(int) * 2 * nnz), device_free};
     auto val_data_managed = hipsparse_unique_ptr{device_malloc(sizeof(float) * nnz), device_free};
 
-    int*   row_data = (int*)row_data_managed.get();
-    int*   col_data = (int*)col_data_managed.get();
-    int*   ind_data = (int*)ind_data_managed.get();
-    float* val_data = (float*)val_data_managed.get();
+    int*   row_data = static_cast<int*>(row_data_managed.get());
+    int*   col_data = static_cast<int*>(col_data_managed.get());
+    int*   ind_data = static_cast<int*>(ind_data_managed.get());
+    float* val_data = static_cast<float*>(val_data_managed.get());
 
     hipsparseSpMatDescr_t A;
 
@@ -253,7 +253,7 @@ void testing_spmat_descr_bad_arg(void)
 
     void* row_ptr;
     void* col_ptr;
-    void* ind_ptr;
+    void* indptr;
     void* val_ptr;
 
     // hipsparseCooGet
@@ -315,39 +315,39 @@ void testing_spmat_descr_bad_arg(void)
     // hipsparseCooAoSGet
     verify_hipsparse_status_invalid_pointer(
         hipsparseCooAoSGet(
-            nullptr, &rows, &cols, &nnz, &ind_ptr, &val_ptr, &cooType, &idxBase, &dataType),
+            nullptr, &rows, &cols, &nnz, &indptr, &val_ptr, &cooType, &idxBase, &dataType),
         "Error: A is nullptr");
     verify_hipsparse_status_invalid_pointer(
         hipsparseCooAoSGet(
-            coo_aos, nullptr, &cols, &nnz, &ind_ptr, &val_ptr, &cooType, &idxBase, &dataType),
+            coo_aos, nullptr, &cols, &nnz, &indptr, &val_ptr, &cooType, &idxBase, &dataType),
         "Error: rows is nullptr");
     verify_hipsparse_status_invalid_pointer(
         hipsparseCooAoSGet(
-            coo_aos, &rows, nullptr, &nnz, &ind_ptr, &val_ptr, &cooType, &idxBase, &dataType),
+            coo_aos, &rows, nullptr, &nnz, &indptr, &val_ptr, &cooType, &idxBase, &dataType),
         "Error: cols is nullptr");
     verify_hipsparse_status_invalid_pointer(
         hipsparseCooAoSGet(
-            coo_aos, &rows, &cols, nullptr, &ind_ptr, &val_ptr, &cooType, &idxBase, &dataType),
+            coo_aos, &rows, &cols, nullptr, &indptr, &val_ptr, &cooType, &idxBase, &dataType),
         "Error: nnz is nullptr");
     verify_hipsparse_status_invalid_pointer(
         hipsparseCooAoSGet(
             coo_aos, &rows, &cols, &nnz, nullptr, &val_ptr, &cooType, &idxBase, &dataType),
-        "Error: ind_ptr is nullptr");
+        "Error: indptr is nullptr");
     verify_hipsparse_status_invalid_pointer(
         hipsparseCooAoSGet(
-            coo_aos, &rows, &cols, &nnz, &ind_ptr, nullptr, &cooType, &idxBase, &dataType),
+            coo_aos, &rows, &cols, &nnz, &indptr, nullptr, &cooType, &idxBase, &dataType),
         "Error: val_ptr is nullptr");
     verify_hipsparse_status_invalid_pointer(
         hipsparseCooAoSGet(
-            coo_aos, &rows, &cols, &nnz, &ind_ptr, &val_ptr, nullptr, &idxBase, &dataType),
+            coo_aos, &rows, &cols, &nnz, &indptr, &val_ptr, nullptr, &idxBase, &dataType),
         "Error: cooType is nullptr");
     verify_hipsparse_status_invalid_pointer(
         hipsparseCooAoSGet(
-            coo_aos, &rows, &cols, &nnz, &ind_ptr, &val_ptr, &cooType, nullptr, &dataType),
+            coo_aos, &rows, &cols, &nnz, &indptr, &val_ptr, &cooType, nullptr, &dataType),
         "Error: idxBase is nullptr");
     verify_hipsparse_status_invalid_pointer(
         hipsparseCooAoSGet(
-            coo_aos, &rows, &cols, &nnz, &ind_ptr, &val_ptr, &cooType, &idxBase, nullptr),
+            coo_aos, &rows, &cols, &nnz, &indptr, &val_ptr, &cooType, &idxBase, nullptr),
         "Error: dataType is nullptr");
 
     // hipsparseCsrGet

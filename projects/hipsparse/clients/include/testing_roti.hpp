@@ -52,36 +52,36 @@ void testing_roti_bad_arg(const Arguments& argus)
     std::unique_ptr<handle_struct> unique_ptr_handle(new handle_struct);
     hipsparseHandle_t              handle = unique_ptr_handle->handle;
 
-    auto dx_val_managed = hipsparse_unique_ptr{device_malloc(sizeof(T) * safe_size), device_free};
-    auto dx_ind_managed = hipsparse_unique_ptr{device_malloc(sizeof(int) * safe_size), device_free};
+    auto dxVal_managed = hipsparse_unique_ptr{device_malloc(sizeof(T) * safe_size), device_free};
+    auto dxInd_managed = hipsparse_unique_ptr{device_malloc(sizeof(int) * safe_size), device_free};
     auto dy_managed     = hipsparse_unique_ptr{device_malloc(sizeof(T) * safe_size), device_free};
 
-    T*   dx_val = (T*)dx_val_managed.get();
-    int* dx_ind = (int*)dx_ind_managed.get();
-    T*   dy     = (T*)dy_managed.get();
+    T*   dxVal = static_cast<T*>(dxVal_managed.get());
+    int* dxInd = static_cast<int*>(dxInd_managed.get());
+    T*   dy     = static_cast<T*>(dy_managed.get());
 
     verify_hipsparse_status_invalid_value(
-        hipsparseXroti(handle, -1, dx_val, dx_ind, dy, &c, &s, idx_base), "Error: nnz is invalid");
+        hipsparseXroti(handle, -1, dxVal, dxInd, dy, &c, &s, idx_base), "Error: nnz is invalid");
 
     // cusparse returns success when passed nullptrs
 #if(!defined(CUDART_VERSION))
     verify_hipsparse_status_invalid_pointer(
-        hipsparseXroti(handle, nnz, dx_val, (int*)nullptr, dy, &c, &s, idx_base),
+        hipsparseXroti(handle, nnz, dxVal, static_cast<int*>(nullptr), dy, &c, &s, idx_base),
         "Error: x_ind is nullptr");
     verify_hipsparse_status_invalid_pointer(
-        hipsparseXroti(handle, nnz, (T*)nullptr, dx_ind, dy, &c, &s, idx_base),
+        hipsparseXroti(handle, nnz, static_cast<T*>(nullptr), dxInd, dy, &c, &s, idx_base),
         "Error: x_val is nullptr");
     verify_hipsparse_status_invalid_pointer(
-        hipsparseXroti(handle, nnz, dx_val, dx_ind, (T*)nullptr, &c, &s, idx_base),
+        hipsparseXroti(handle, nnz, dxVal, dxInd, static_cast<T*>(nullptr), &c, &s, idx_base),
         "Error: y is nullptr");
     verify_hipsparse_status_invalid_pointer(
-        hipsparseXroti(handle, nnz, dx_val, dx_ind, dy, (T*)nullptr, &s, idx_base),
+        hipsparseXroti(handle, nnz, dxVal, dxInd, dy, static_cast<T*>(nullptr), &s, idx_base),
         "Error: c is nullptr");
     verify_hipsparse_status_invalid_pointer(
-        hipsparseXroti(handle, nnz, dx_val, dx_ind, dy, &c, (T*)nullptr, idx_base),
+        hipsparseXroti(handle, nnz, dxVal, dxInd, dy, &c, static_cast<T*>(nullptr), idx_base),
         "Error: s is nullptr");
     verify_hipsparse_status_invalid_handle(
-        hipsparseXroti(nullptr, nnz, dx_val, dx_ind, dy, &c, &s, idx_base));
+        hipsparseXroti(nullptr, nnz, dxVal, dxInd, dy, &c, &s, idx_base));
 #endif
 }
 
@@ -99,7 +99,7 @@ hipsparseStatus_t testing_roti(Arguments argus)
     hipsparseHandle_t              handle = unique_ptr_handle->handle;
 
     // Host structures
-    std::vector<int> hx_ind(nnz);
+    std::vector<int> hxInd(nnz);
     std::vector<T>   hx_val_1(nnz);
     std::vector<T>   hx_val_2(nnz);
     std::vector<T>   hx_val_gold(nnz);
@@ -109,7 +109,7 @@ hipsparseStatus_t testing_roti(Arguments argus)
 
     // Initial Data on CPU
     srand(12345ULL);
-    hipsparseInitIndex(hx_ind.data(), nnz, 1, N);
+    hipsparseInitIndex(hxInd.data(), nnz, 1, N);
     hipsparseInit<T>(hx_val_1, 1, nnz);
     hipsparseInit<T>(hy_1, 1, N);
 
@@ -119,7 +119,7 @@ hipsparseStatus_t testing_roti(Arguments argus)
     hy_gold     = hy_1;
 
     // allocate memory on device
-    auto dx_ind_managed   = hipsparse_unique_ptr{device_malloc(sizeof(int) * nnz), device_free};
+    auto dxInd_managed   = hipsparse_unique_ptr{device_malloc(sizeof(int) * nnz), device_free};
     auto dx_val_1_managed = hipsparse_unique_ptr{device_malloc(sizeof(T) * nnz), device_free};
     auto dx_val_2_managed = hipsparse_unique_ptr{device_malloc(sizeof(T) * nnz), device_free};
     auto dy_1_managed     = hipsparse_unique_ptr{device_malloc(sizeof(T) * N), device_free};
@@ -127,16 +127,16 @@ hipsparseStatus_t testing_roti(Arguments argus)
     auto dc_managed       = hipsparse_unique_ptr{device_malloc(sizeof(T)), device_free};
     auto ds_managed       = hipsparse_unique_ptr{device_malloc(sizeof(T)), device_free};
 
-    int* dx_ind   = (int*)dx_ind_managed.get();
-    T*   dx_val_1 = (T*)dx_val_1_managed.get();
-    T*   dx_val_2 = (T*)dx_val_2_managed.get();
-    T*   dy_1     = (T*)dy_1_managed.get();
-    T*   dy_2     = (T*)dy_2_managed.get();
-    T*   dc       = (T*)dc_managed.get();
-    T*   ds       = (T*)ds_managed.get();
+    int* dxInd   = static_cast<int*>(dxInd_managed.get());
+    T*   dx_val_1 = static_cast<T*>(dx_val_1_managed.get());
+    T*   dx_val_2 = static_cast<T*>(dx_val_2_managed.get());
+    T*   dy_1     = static_cast<T*>(dy_1_managed.get());
+    T*   dy_2     = static_cast<T*>(dy_2_managed.get());
+    T*   dc       = static_cast<T*>(dc_managed.get());
+    T*   ds       = static_cast<T*>(ds_managed.get());
 
     // copy data from CPU to device
-    CHECK_HIP_ERROR(hipMemcpy(dx_ind, hx_ind.data(), sizeof(int) * nnz, hipMemcpyHostToDevice));
+    CHECK_HIP_ERROR(hipMemcpy(dxInd, hxInd.data(), sizeof(int) * nnz, hipMemcpyHostToDevice));
     CHECK_HIP_ERROR(hipMemcpy(dx_val_1, hx_val_1.data(), sizeof(T) * nnz, hipMemcpyHostToDevice));
     CHECK_HIP_ERROR(hipMemcpy(dy_1, hy_1.data(), sizeof(T) * N, hipMemcpyHostToDevice));
 
@@ -151,12 +151,12 @@ hipsparseStatus_t testing_roti(Arguments argus)
         // HIPSPARSE pointer mode host
         CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_HOST));
         CHECK_HIPSPARSE_ERROR(
-            hipsparseXroti(handle, nnz, dx_val_1, dx_ind, dy_1, &c, &s, idx_base));
+            hipsparseXroti(handle, nnz, dx_val_1, dxInd, dy_1, &c, &s, idx_base));
 
         // HIPSPARSE pointer mode device
         CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_DEVICE));
         CHECK_HIPSPARSE_ERROR(
-            hipsparseXroti(handle, nnz, dx_val_2, dx_ind, dy_2, dc, ds, idx_base));
+            hipsparseXroti(handle, nnz, dx_val_2, dxInd, dy_2, dc, ds, idx_base));
 
         // copy output from device to CPU
         CHECK_HIP_ERROR(
@@ -169,7 +169,7 @@ hipsparseStatus_t testing_roti(Arguments argus)
         // CPU
         for(int i = 0; i < nnz; ++i)
         {
-            int idx = hx_ind[i] - idx_base;
+            int idx = hxInd[i] - idx_base;
 
             T x = hx_val_gold[i];
             T y = hy_gold[idx];
@@ -193,23 +193,11 @@ hipsparseStatus_t testing_roti(Arguments argus)
 
         CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_HOST));
 
-        // Warm up
-        for(int iter = 0; iter < number_cold_calls; ++iter)
-        {
-            CHECK_HIPSPARSE_ERROR(
-                hipsparseXroti(handle, nnz, dx_val_1, dx_ind, dy_1, &c, &s, idx_base));
-        }
-
-        double gpu_time_used = get_time_us();
-
-        // Performance run
-        for(int iter = 0; iter < number_hot_calls; ++iter)
-        {
-            CHECK_HIPSPARSE_ERROR(
-                hipsparseXroti(handle, nnz, dx_val_1, dx_ind, dy_1, &c, &s, idx_base));
-        }
-
-        gpu_time_used = (get_time_us() - gpu_time_used) / number_hot_calls;
+        double gpu_time_used = benchmark_kernel(
+            [&]() { CHECK_HIPSPARSE_ERROR(
+                hipsparseXroti(handle, nnz, dx_val_1, dxInd, dy_1, &c, &s, idx_base)); return HIPSPARSE_STATUS_SUCCESS; },
+            number_cold_calls,
+            number_hot_calls);
 
         double gflop_count = roti_gflop_count(nnz);
         double gbyte_count = roti_gbyte_count<T>(nnz);

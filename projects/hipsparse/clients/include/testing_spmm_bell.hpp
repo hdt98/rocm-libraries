@@ -67,11 +67,11 @@ void testing_spmm_bell_bad_arg(void)
     auto dC_managed   = hipsparse_unique_ptr{device_malloc(sizeof(float) * safe_size), device_free};
     auto dbuf_managed = hipsparse_unique_ptr{device_malloc(sizeof(char) * safe_size), device_free};
 
-    int32_t* dind = (int32_t*)dind_managed.get();
-    float*   dval = (float*)dval_managed.get();
-    float*   dB   = (float*)dB_managed.get();
-    float*   dC   = (float*)dC_managed.get();
-    void*    dbuf = (void*)dbuf_managed.get();
+    int32_t* dind = static_cast<int32_t*>(dind_managed.get());
+    float*   dval = static_cast<float*>(dval_managed.get());
+    float*   dB   = static_cast<float*>(dB_managed.get());
+    float*   dC   = static_cast<float*>(dC_managed.get());
+    void*    dbuf = static_cast<void*>(dbuf_managed.get());
 
     // SpMM structures
     hipsparseSpMatDescr_t A;
@@ -295,16 +295,16 @@ hipsparseStatus_t testing_spmm_bell()
     auto d_alpha_managed = hipsparse_unique_ptr{device_malloc(sizeof(T)), device_free};
     auto d_beta_managed  = hipsparse_unique_ptr{device_malloc(sizeof(T)), device_free};
 
-    I* drow_ptr  = (I*)drow_ptr_managed.get();
-    I* dcol_ind  = (I*)dcol_ind_managed.get();
-    T* dval      = (T*)dval_managed.get();
-    T* dB        = (T*)dB_managed.get();
-    T* dC_1      = (T*)dC_1_managed.get();
-    T* dC_2      = (T*)dC_2_managed.get();
-    T* d_alpha   = (T*)d_alpha_managed.get();
-    T* d_beta    = (T*)d_beta_managed.get();
-    I* dbell_ind = (I*)dbell_ind_managed.get();
-    T* dbell_val = (T*)dbell_val_managed.get();
+    I* drow_ptr  = static_cast<I*>(drow_ptr_managed.get());
+    I* dcol_ind  = static_cast<I*>(dcol_ind_managed.get());
+    T* dval      = static_cast<T*>(dval_managed.get());
+    T* dB        = static_cast<T*>(dB_managed.get());
+    T* dC_1      = static_cast<T*>(dC_1_managed.get());
+    T* dC_2      = static_cast<T*>(dC_2_managed.get());
+    T* d_alpha   = static_cast<T*>(d_alpha_managed.get());
+    T* d_beta    = static_cast<T*>(d_beta_managed.get());
+    I* dbell_ind = static_cast<I*>(dbell_ind_managed.get());
+    T* dbell_val = static_cast<T*>(dbell_val_managed.get());
 
     // copy data from CPU to device
     CHECK_HIP_ERROR(

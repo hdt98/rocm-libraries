@@ -51,20 +51,20 @@ void testing_gather_bad_arg(void)
     std::unique_ptr<handle_struct> unique_ptr_handle(new handle_struct);
     hipsparseHandle_t              handle = unique_ptr_handle->handle;
 
-    auto dx_val_managed = hipsparse_unique_ptr{device_malloc(sizeof(float) * nnz), device_free};
-    auto dx_ind_managed = hipsparse_unique_ptr{device_malloc(sizeof(int) * nnz), device_free};
+    auto dxVal_managed = hipsparse_unique_ptr{device_malloc(sizeof(float) * nnz), device_free};
+    auto dxInd_managed = hipsparse_unique_ptr{device_malloc(sizeof(int) * nnz), device_free};
     auto dy_managed     = hipsparse_unique_ptr{device_malloc(sizeof(float) * size), device_free};
 
-    float* dx_val = (float*)dx_val_managed.get();
-    int*   dx_ind = (int*)dx_ind_managed.get();
-    float* dy     = (float*)dy_managed.get();
+    float* dxVal = static_cast<float*>(dxVal_managed.get());
+    int*   dxInd = static_cast<int*>(dxInd_managed.get());
+    float* dy     = static_cast<float*>(dy_managed.get());
 
     // Structures
     hipsparseSpVecDescr_t x;
     hipsparseDnVecDescr_t y;
 
     verify_hipsparse_status_success(
-        hipsparseCreateSpVec(&x, size, nnz, dx_ind, dx_val, idxType, idxBase, dataType), "Success");
+        hipsparseCreateSpVec(&x, size, nnz, dxInd, dxVal, idxType, idxBase, dataType), "Success");
     verify_hipsparse_status_success(hipsparseCreateDnVec(&y, size, dy, dataType), "Success");
 
     // Gather
@@ -97,27 +97,27 @@ hipsparseStatus_t testing_gather(Arguments argus)
     hipsparseHandle_t              handle = unique_ptr_handle->handle;
 
     // Host structures
-    std::vector<I> hx_ind(nnz);
-    std::vector<T> hx_val(nnz);
+    std::vector<I> hxInd(nnz);
+    std::vector<T> hxVal(nnz);
     std::vector<T> hx_val_gold(nnz);
     std::vector<T> hy(size);
 
     // Initial Data on CPU
     srand(12345ULL);
-    hipsparseInitIndex(hx_ind.data(), nnz, 1, size);
+    hipsparseInitIndex(hxInd.data(), nnz, 1, size);
     hipsparseInit<T>(hy, 1, size);
 
     // Allocate memory on device
-    auto dx_ind_managed = hipsparse_unique_ptr{device_malloc(sizeof(I) * nnz), device_free};
-    auto dx_val_managed = hipsparse_unique_ptr{device_malloc(sizeof(T) * nnz), device_free};
+    auto dxInd_managed = hipsparse_unique_ptr{device_malloc(sizeof(I) * nnz), device_free};
+    auto dxVal_managed = hipsparse_unique_ptr{device_malloc(sizeof(T) * nnz), device_free};
     auto dy_managed     = hipsparse_unique_ptr{device_malloc(sizeof(T) * size), device_free};
 
-    I* dx_ind = (I*)dx_ind_managed.get();
-    T* dx_val = (T*)dx_val_managed.get();
-    T* dy     = (T*)dy_managed.get();
+    I* dxInd = static_cast<I*>(dxInd_managed.get());
+    T* dxVal = static_cast<T*>(dxVal_managed.get());
+    T* dy     = static_cast<T*>(dy_managed.get());
 
     // copy data from CPU to device
-    CHECK_HIP_ERROR(hipMemcpy(dx_ind, hx_ind.data(), sizeof(I) * nnz, hipMemcpyHostToDevice));
+    CHECK_HIP_ERROR(hipMemcpy(dxInd, hxInd.data(), sizeof(I) * nnz, hipMemcpyHostToDevice));
     CHECK_HIP_ERROR(hipMemcpy(dy, hy.data(), sizeof(T) * size, hipMemcpyHostToDevice));
 
     // Create structures
@@ -125,7 +125,7 @@ hipsparseStatus_t testing_gather(Arguments argus)
     hipsparseDnVecDescr_t y;
 
     CHECK_HIPSPARSE_ERROR(
-        hipsparseCreateSpVec(&x, size, nnz, dx_ind, dx_val, idxType, idxBase, dataType));
+        hipsparseCreateSpVec(&x, size, nnz, dxInd, dxVal, idxType, idxBase, dataType));
     CHECK_HIPSPARSE_ERROR(hipsparseCreateDnVec(&y, size, dy, dataType));
 
     if(argus.unit_check)
@@ -134,16 +134,16 @@ hipsparseStatus_t testing_gather(Arguments argus)
         CHECK_HIPSPARSE_ERROR(hipsparseGather(handle, y, x));
 
         // Copy output from device to CPU
-        CHECK_HIP_ERROR(hipMemcpy(hx_val.data(), dx_val, sizeof(T) * nnz, hipMemcpyDeviceToHost));
+        CHECK_HIP_ERROR(hipMemcpy(hxVal.data(), dxVal, sizeof(T) * nnz, hipMemcpyDeviceToHost));
 
         // CPU
         for(int64_t i = 0; i < nnz; ++i)
         {
-            hx_val_gold[i] = hy[hx_ind[i] - idxBase];
+            hx_val_gold[i] = hy[hxInd[i] - idxBase];
         }
 
         // Verify results against host
-        unit_check_general(1, nnz, 1, hx_val_gold.data(), hx_val.data());
+        unit_check_general(1, nnz, 1, hx_val_gold.data(), hxVal.data());
     }
 
     if(argus.timing)
@@ -151,21 +151,10 @@ hipsparseStatus_t testing_gather(Arguments argus)
         int number_cold_calls = 2;
         int number_hot_calls  = argus.iters;
 
-        // Warm up
-        for(int iter = 0; iter < number_cold_calls; ++iter)
-        {
-            CHECK_HIPSPARSE_ERROR(hipsparseGather(handle, y, x));
-        }
-
-        double gpu_time_used = get_time_us();
-
-        // Performance run
-        for(int iter = 0; iter < number_hot_calls; ++iter)
-        {
-            CHECK_HIPSPARSE_ERROR(hipsparseGather(handle, y, x));
-        }
-
-        gpu_time_used = (get_time_us() - gpu_time_used) / number_hot_calls;
+        double gpu_time_used = benchmark_kernel(
+            [&]() { CHECK_HIPSPARSE_ERROR(hipsparseGather(handle, y, x)); return HIPSPARSE_STATUS_SUCCESS; },
+            number_cold_calls,
+            number_hot_calls);
 
         double gbyte_count = gthr_gbyte_count<T>(nnz);
         double gpu_gbyte   = get_gpu_gbyte(gpu_time_used, gbyte_count);

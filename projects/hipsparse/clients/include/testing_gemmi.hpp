@@ -57,11 +57,11 @@ void testing_gemmi_bad_arg(const Arguments& argus)
     auto dA_managed   = hipsparse_unique_ptr{device_malloc(sizeof(T) * safe_size), device_free};
     auto dC_managed   = hipsparse_unique_ptr{device_malloc(sizeof(T) * safe_size), device_free};
 
-    int* dptr = (int*)dptr_managed.get();
-    int* drow = (int*)drow_managed.get();
-    T*   dval = (T*)dval_managed.get();
-    T*   dA   = (T*)dA_managed.get();
-    T*   dC   = (T*)dC_managed.get();
+    int* dptr = static_cast<int*>(dptr_managed.get());
+    int* drow = static_cast<int*>(drow_managed.get());
+    T*   dval = static_cast<T*>(dval_managed.get());
+    T*   dA   = static_cast<T*>(dA_managed.get());
+    T*   dC   = static_cast<T*>(dC_managed.get());
 
     verify_hipsparse_status_invalid_handle(hipsparseXgemmi<T>(nullptr,
                                                               safe_size,
@@ -339,14 +339,14 @@ hipsparseStatus_t testing_gemmi(Arguments argus)
     auto d_alpha_managed   = hipsparse_unique_ptr{device_malloc(sizeof(T)), device_free};
     auto d_beta_managed    = hipsparse_unique_ptr{device_malloc(sizeof(T)), device_free};
 
-    int* dcsc_col_ptrB = (int*)dcsc_col_ptrB_managed.get();
-    int* dcsc_row_indB = (int*)dcsc_row_indB_managed.get();
-    T*   dcsc_valB     = (T*)dcsc_valB_managed.get();
-    T*   dA            = (T*)dA_managed.get();
-    T*   dC_1          = (T*)dC_1_managed.get();
-    T*   dC_2          = (T*)dC_2_managed.get();
-    T*   d_alpha       = (T*)d_alpha_managed.get();
-    T*   d_beta        = (T*)d_beta_managed.get();
+    int* dcsc_col_ptrB = static_cast<int*>(dcsc_col_ptrB_managed.get());
+    int* dcsc_row_indB = static_cast<int*>(dcsc_row_indB_managed.get());
+    T*   dcsc_valB     = static_cast<T*>(dcsc_valB_managed.get());
+    T*   dA            = static_cast<T*>(dA_managed.get());
+    T*   dC_1          = static_cast<T*>(dC_1_managed.get());
+    T*   dC_2          = static_cast<T*>(dC_2_managed.get());
+    T*   d_alpha       = static_cast<T*>(d_alpha_managed.get());
+    T*   d_beta        = static_cast<T*>(d_beta_managed.get());
 
     // copy data from CPU to device
     CHECK_HIP_ERROR(hipMemcpy(
@@ -436,10 +436,8 @@ hipsparseStatus_t testing_gemmi(Arguments argus)
 
         CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_HOST));
 
-        // Warm up
-        for(int iter = 0; iter < number_cold_calls; ++iter)
-        {
-            CHECK_HIPSPARSE_ERROR(hipsparseXgemmi(handle,
+        double gpu_time_used = benchmark_kernel(
+            [&]() { CHECK_HIPSPARSE_ERROR(hipsparseXgemmi(handle,
                                                   M,
                                                   N,
                                                   K,
@@ -452,31 +450,9 @@ hipsparseStatus_t testing_gemmi(Arguments argus)
                                                   dcsc_row_indB,
                                                   &h_beta,
                                                   dC_1,
-                                                  ldc));
-        }
-
-        double gpu_time_used = get_time_us();
-
-        // Performance run
-        for(int iter = 0; iter < number_hot_calls; ++iter)
-        {
-            CHECK_HIPSPARSE_ERROR(hipsparseXgemmi(handle,
-                                                  M,
-                                                  N,
-                                                  K,
-                                                  nnz,
-                                                  &h_alpha,
-                                                  dA,
-                                                  lda,
-                                                  dcsc_valB,
-                                                  dcsc_col_ptrB,
-                                                  dcsc_row_indB,
-                                                  &h_beta,
-                                                  dC_1,
-                                                  ldc));
-        }
-
-        gpu_time_used = (get_time_us() - gpu_time_used) / number_hot_calls;
+                                                  ldc)); return HIPSPARSE_STATUS_SUCCESS; },
+            number_cold_calls,
+            number_hot_calls);
 
         double gflop_count = gemmi_gflop_count(M, nnz, M * N, h_beta != make_DataType<T>(0.0));
         double gbyte_count

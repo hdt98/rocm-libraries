@@ -73,13 +73,13 @@ void testing_bsrmm_bad_arg(const Arguments& argus)
     auto dB_managed       = hipsparse_unique_ptr{device_malloc(sizeof(T) * safe_size), device_free};
     auto dC_managed       = hipsparse_unique_ptr{device_malloc(sizeof(T) * safe_size), device_free};
 
-    int* dbsr_row_ptr = (int*)dbsr_row_ptr_managed.get();
-    int* dbsr_col_ind = (int*)dbsr_col_ind_managed.get();
-    T*   dbsr_val     = (T*)dbsr_val_managed.get();
-    T*   dB           = (T*)dB_managed.get();
-    T*   dC           = (T*)dC_managed.get();
+    int* dbsr_row_ptr = static_cast<int*>(dbsr_row_ptr_managed.get());
+    int* dbsr_col_ind = static_cast<int*>(dbsr_col_ind_managed.get());
+    T*   dbsr_val     = static_cast<T*>(dbsr_val_managed.get());
+    T*   dB           = static_cast<T*>(dB_managed.get());
+    T*   dC           = static_cast<T*>(dC_managed.get());
 
-    verify_hipsparse_status_invalid_handle(hipsparseXbsrmm((hipsparseHandle_t) nullptr,
+    verify_hipsparse_status_invalid_handle(hipsparseXbsrmm(static_cast<hipsparseHandle_t>(nullptr),
                                                            dirA,
                                                            transA,
                                                            transB,
@@ -106,7 +106,7 @@ void testing_bsrmm_bad_arg(const Arguments& argus)
                                                             n,
                                                             kb,
                                                             nnzb,
-                                                            (T*)nullptr,
+                                                            static_cast<T*>(nullptr),
                                                             descr,
                                                             dbsr_val,
                                                             dbsr_row_ptr,
@@ -127,7 +127,7 @@ void testing_bsrmm_bad_arg(const Arguments& argus)
                                                             kb,
                                                             nnzb,
                                                             &alpha,
-                                                            (hipsparseMatDescr_t) nullptr,
+                                                            static_cast<hipsparseMatDescr_t>(nullptr),
                                                             dbsr_val,
                                                             dbsr_row_ptr,
                                                             dbsr_col_ind,
@@ -148,7 +148,7 @@ void testing_bsrmm_bad_arg(const Arguments& argus)
                                                             nnzb,
                                                             &alpha,
                                                             descr,
-                                                            (T*)nullptr,
+                                                            static_cast<T*>(nullptr),
                                                             dbsr_row_ptr,
                                                             dbsr_col_ind,
                                                             block_dim,
@@ -169,7 +169,7 @@ void testing_bsrmm_bad_arg(const Arguments& argus)
                                                             &alpha,
                                                             descr,
                                                             dbsr_val,
-                                                            (int*)nullptr,
+                                                            static_cast<int*>(nullptr),
                                                             dbsr_col_ind,
                                                             block_dim,
                                                             dB,
@@ -190,7 +190,7 @@ void testing_bsrmm_bad_arg(const Arguments& argus)
                                                             descr,
                                                             dbsr_val,
                                                             dbsr_row_ptr,
-                                                            (int*)nullptr,
+                                                            static_cast<int*>(nullptr),
                                                             block_dim,
                                                             dB,
                                                             ldb,
@@ -212,7 +212,7 @@ void testing_bsrmm_bad_arg(const Arguments& argus)
                                                             dbsr_row_ptr,
                                                             dbsr_col_ind,
                                                             block_dim,
-                                                            (T*)nullptr,
+                                                            static_cast<T*>(nullptr),
                                                             ldb,
                                                             &beta,
                                                             dC,
@@ -234,7 +234,7 @@ void testing_bsrmm_bad_arg(const Arguments& argus)
                                                             block_dim,
                                                             dB,
                                                             ldb,
-                                                            (T*)nullptr,
+                                                            static_cast<T*>(nullptr),
                                                             dC,
                                                             ldc),
                                             "Error: beta is nullptr");
@@ -255,7 +255,7 @@ void testing_bsrmm_bad_arg(const Arguments& argus)
                                                             dB,
                                                             ldb,
                                                             &beta,
-                                                            (T*)nullptr,
+                                                            static_cast<T*>(nullptr),
                                                             ldc),
                                             "Error: dC is nullptr");
     verify_hipsparse_status_invalid_size(hipsparseXbsrmm(handle,
@@ -463,10 +463,10 @@ hipsparseStatus_t testing_bsrmm(const Arguments& argus)
     auto dbsr_row_ptrA_managed
         = hipsparse_unique_ptr{device_malloc(sizeof(int) * (mb + 1)), device_free};
 
-    int* dcsr_row_ptrA = (int*)dcsr_row_ptrA_managed.get();
-    int* dcsr_col_indA = (int*)dcsr_col_indA_managed.get();
-    T*   dcsr_valA     = (T*)dcsr_valA_managed.get();
-    int* dbsr_row_ptrA = (int*)dbsr_row_ptrA_managed.get();
+    int* dcsr_row_ptrA = static_cast<int*>(dcsr_row_ptrA_managed.get());
+    int* dcsr_col_indA = static_cast<int*>(dcsr_col_indA_managed.get());
+    T*   dcsr_valA     = static_cast<T*>(dcsr_valA_managed.get());
+    int* dbsr_row_ptrA = static_cast<int*>(dbsr_row_ptrA_managed.get());
 
     // Copy CSR from host to device
     CHECK_HIP_ERROR(
@@ -495,8 +495,8 @@ hipsparseStatus_t testing_bsrmm(const Arguments& argus)
     auto dbsr_valA_managed = hipsparse_unique_ptr{
         device_malloc(sizeof(T) * nnzb * block_dim * block_dim), device_free};
 
-    int* dbsr_col_indA = (int*)dbsr_col_indA_managed.get();
-    T*   dbsr_valA     = (T*)dbsr_valA_managed.get();
+    int* dbsr_col_indA = static_cast<int*>(dbsr_col_indA_managed.get());
+    T*   dbsr_valA     = static_cast<T*>(dbsr_valA_managed.get());
 
     CHECK_HIPSPARSE_ERROR(hipsparseXcsr2bsr(handle,
                                             dirA,
@@ -559,11 +559,11 @@ hipsparseStatus_t testing_bsrmm(const Arguments& argus)
     auto d_alpha_managed = hipsparse_unique_ptr{device_malloc(sizeof(T)), device_free};
     auto d_beta_managed  = hipsparse_unique_ptr{device_malloc(sizeof(T)), device_free};
 
-    T* dB      = (T*)dB_managed.get();
-    T* dC_1    = (T*)dC_1_managed.get();
-    T* dC_2    = (T*)dC_2_managed.get();
-    T* d_alpha = (T*)d_alpha_managed.get();
-    T* d_beta  = (T*)d_beta_managed.get();
+    T* dB      = static_cast<T*>(dB_managed.get());
+    T* dC_1    = static_cast<T*>(dC_1_managed.get());
+    T* dC_2    = static_cast<T*>(dC_2_managed.get());
+    T* d_alpha = static_cast<T*>(d_alpha_managed.get());
+    T* d_beta  = static_cast<T*>(d_beta_managed.get());
 
     // Copy data from host to device
     CHECK_HIP_ERROR(hipMemcpy(dB, hB.data(), sizeof(T) * nnz_B, hipMemcpyHostToDevice));
@@ -653,10 +653,8 @@ hipsparseStatus_t testing_bsrmm(const Arguments& argus)
 
         CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_HOST));
 
-        // Warm up
-        for(int iter = 0; iter < number_cold_calls; ++iter)
-        {
-            CHECK_HIPSPARSE_ERROR(hipsparseXbsrmm(handle,
+        double gpu_time_used = benchmark_kernel(
+            [&]() { CHECK_HIPSPARSE_ERROR(hipsparseXbsrmm(handle,
                                                   dirA,
                                                   transA,
                                                   transB,
@@ -674,36 +672,9 @@ hipsparseStatus_t testing_bsrmm(const Arguments& argus)
                                                   ldb,
                                                   &h_beta,
                                                   dC_1,
-                                                  ldc));
-        }
-
-        double gpu_time_used = get_time_us();
-
-        // Performance run
-        for(int iter = 0; iter < number_hot_calls; ++iter)
-        {
-            CHECK_HIPSPARSE_ERROR(hipsparseXbsrmm(handle,
-                                                  dirA,
-                                                  transA,
-                                                  transB,
-                                                  mb,
-                                                  n,
-                                                  kb,
-                                                  nnzb,
-                                                  &h_alpha,
-                                                  descr,
-                                                  dbsr_valA,
-                                                  dbsr_row_ptrA,
-                                                  dbsr_col_indA,
-                                                  block_dim,
-                                                  dB,
-                                                  ldb,
-                                                  &h_beta,
-                                                  dC_1,
-                                                  ldc));
-        }
-
-        gpu_time_used = (get_time_us() - gpu_time_used) / number_hot_calls;
+                                                  ldc)); return HIPSPARSE_STATUS_SUCCESS; },
+            number_cold_calls,
+            number_hot_calls);
 
         double gflop_count
             = bsrmm_gflop_count(n, nnzb, block_dim, m * n, h_beta != make_DataType<T>(0.0));

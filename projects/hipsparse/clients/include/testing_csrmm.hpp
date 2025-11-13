@@ -67,11 +67,11 @@ void testing_csrmm_bad_arg(const Arguments& argus)
     auto dval_managed = hipsparse_unique_ptr{device_malloc(sizeof(T) * safe_size), device_free};
     auto dB_managed   = hipsparse_unique_ptr{device_malloc(sizeof(T) * safe_size), device_free};
     auto dC_managed   = hipsparse_unique_ptr{device_malloc(sizeof(T) * safe_size), device_free};
-    int* dptr         = (int*)dptr_managed.get();
-    int* dcol         = (int*)dcol_managed.get();
-    T*   dval         = (T*)dval_managed.get();
-    T*   dB           = (T*)dB_managed.get();
-    T*   dC           = (T*)dC_managed.get();
+    int* dptr         = static_cast<int*>(dptr_managed.get());
+    int* dcol         = static_cast<int*>(dcol_managed.get());
+    T*   dval         = static_cast<T*>(dval_managed.get());
+    T*   dB           = static_cast<T*>(dB_managed.get());
+    T*   dC           = static_cast<T*>(dC_managed.get());
 
     verify_hipsparse_status_invalid_size(hipsparseXcsrmm2(handle,
                                                           transA,
@@ -137,7 +137,7 @@ void testing_csrmm_bad_arg(const Arguments& argus)
                                                              &alpha,
                                                              descr,
                                                              dval,
-                                                             (int*)nullptr,
+                                                             static_cast<int*>(nullptr),
                                                              dcol,
                                                              dB,
                                                              ldb,
@@ -156,7 +156,7 @@ void testing_csrmm_bad_arg(const Arguments& argus)
                                                              descr,
                                                              dval,
                                                              dptr,
-                                                             (int*)nullptr,
+                                                             static_cast<int*>(nullptr),
                                                              dB,
                                                              ldb,
                                                              &beta,
@@ -172,7 +172,7 @@ void testing_csrmm_bad_arg(const Arguments& argus)
                                                              nnz,
                                                              &alpha,
                                                              descr,
-                                                             (T*)nullptr,
+                                                             static_cast<T*>(nullptr),
                                                              dptr,
                                                              dcol,
                                                              dB,
@@ -193,7 +193,7 @@ void testing_csrmm_bad_arg(const Arguments& argus)
                                                              dval,
                                                              dptr,
                                                              dcol,
-                                                             (T*)nullptr,
+                                                             static_cast<T*>(nullptr),
                                                              ldb,
                                                              &beta,
                                                              dC,
@@ -214,7 +214,7 @@ void testing_csrmm_bad_arg(const Arguments& argus)
                                                              dB,
                                                              ldb,
                                                              &beta,
-                                                             (T*)nullptr,
+                                                             static_cast<T*>(nullptr),
                                                              ldc),
                                             "Error: dC is nullptr");
     verify_hipsparse_status_invalid_pointer(hipsparseXcsrmm2(handle,
@@ -224,7 +224,7 @@ void testing_csrmm_bad_arg(const Arguments& argus)
                                                              N,
                                                              K,
                                                              nnz,
-                                                             (T*)nullptr,
+                                                             static_cast<T*>(nullptr),
                                                              descr,
                                                              dval,
                                                              dptr,
@@ -249,7 +249,7 @@ void testing_csrmm_bad_arg(const Arguments& argus)
                                                              dcol,
                                                              dB,
                                                              ldb,
-                                                             (T*)nullptr,
+                                                             static_cast<T*>(nullptr),
                                                              dC,
                                                              ldc),
                                             "Error: beta is nullptr");
@@ -261,7 +261,7 @@ void testing_csrmm_bad_arg(const Arguments& argus)
                                                              K,
                                                              nnz,
                                                              &alpha,
-                                                             (hipsparseMatDescr_t) nullptr,
+                                                             static_cast<hipsparseMatDescr_t>(nullptr),
                                                              dval,
                                                              dptr,
                                                              dcol,
@@ -271,7 +271,7 @@ void testing_csrmm_bad_arg(const Arguments& argus)
                                                              dC,
                                                              ldc),
                                             "Error: descr is nullptr");
-    verify_hipsparse_status_invalid_handle(hipsparseXcsrmm2((hipsparseHandle_t) nullptr,
+    verify_hipsparse_status_invalid_handle(hipsparseXcsrmm2(static_cast<hipsparseHandle_t>(nullptr),
                                                             transA,
                                                             transB,
                                                             M,
@@ -375,14 +375,14 @@ hipsparseStatus_t testing_csrmm(Arguments argus)
     auto d_alpha_managed   = hipsparse_unique_ptr{device_malloc(sizeof(T)), device_free};
     auto d_beta_managed    = hipsparse_unique_ptr{device_malloc(sizeof(T)), device_free};
 
-    int* dcsr_row_ptrA = (int*)dcsr_row_ptrA_managed.get();
-    int* dcsr_col_indA = (int*)dcsr_col_indA_managed.get();
-    T*   dcsr_valA     = (T*)dcsr_valA_managed.get();
-    T*   dB            = (T*)dB_managed.get();
-    T*   dC_1          = (T*)dC_1_managed.get();
-    T*   dC_2          = (T*)dC_2_managed.get();
-    T*   d_alpha       = (T*)d_alpha_managed.get();
-    T*   d_beta        = (T*)d_beta_managed.get();
+    int* dcsr_row_ptrA = static_cast<int*>(dcsr_row_ptrA_managed.get());
+    int* dcsr_col_indA = static_cast<int*>(dcsr_col_indA_managed.get());
+    T*   dcsr_valA     = static_cast<T*>(dcsr_valA_managed.get());
+    T*   dB            = static_cast<T*>(dB_managed.get());
+    T*   dC_1          = static_cast<T*>(dC_1_managed.get());
+    T*   dC_2          = static_cast<T*>(dC_2_managed.get());
+    T*   d_alpha       = static_cast<T*>(d_alpha_managed.get());
+    T*   d_beta        = static_cast<T*>(d_beta_managed.get());
 
     // copy data from CPU to device
     CHECK_HIP_ERROR(hipMemcpy(
@@ -474,10 +474,8 @@ hipsparseStatus_t testing_csrmm(Arguments argus)
 
         CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_HOST));
 
-        // Warm up
-        for(int iter = 0; iter < number_cold_calls; ++iter)
-        {
-            CHECK_HIPSPARSE_ERROR(hipsparseXcsrmm2(handle,
+        double gpu_time_used = benchmark_kernel(
+            [&]() { CHECK_HIPSPARSE_ERROR(hipsparseXcsrmm2(handle,
                                                    transA,
                                                    transB,
                                                    M,
@@ -493,34 +491,9 @@ hipsparseStatus_t testing_csrmm(Arguments argus)
                                                    ldb,
                                                    &h_beta,
                                                    dC_1,
-                                                   ldc));
-        }
-
-        double gpu_time_used = get_time_us();
-
-        // Performance run
-        for(int iter = 0; iter < number_hot_calls; ++iter)
-        {
-            CHECK_HIPSPARSE_ERROR(hipsparseXcsrmm2(handle,
-                                                   transA,
-                                                   transB,
-                                                   M,
-                                                   N,
-                                                   K,
-                                                   nnz,
-                                                   &h_alpha,
-                                                   descr,
-                                                   dcsr_valA,
-                                                   dcsr_row_ptrA,
-                                                   dcsr_col_indA,
-                                                   dB,
-                                                   ldb,
-                                                   &h_beta,
-                                                   dC_1,
-                                                   ldc));
-        }
-
-        gpu_time_used = (get_time_us() - gpu_time_used) / number_hot_calls;
+                                                   ldc)); return HIPSPARSE_STATUS_SUCCESS; },
+            number_cold_calls,
+            number_hot_calls);
 
         double gflop_count
             = csrmm_gflop_count<int, int>(B_m, nnz, C_m * C_n, h_beta != make_DataType<T>(0.0));

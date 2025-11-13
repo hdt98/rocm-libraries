@@ -74,11 +74,11 @@ void testing_spmv_coo_aos_bad_arg(void)
     auto dy_managed   = hipsparse_unique_ptr{device_malloc(sizeof(float) * safe_size), device_free};
     auto dbuf_managed = hipsparse_unique_ptr{device_malloc(sizeof(char) * safe_size), device_free};
 
-    int*   dind = (int*)dind_managed.get();
-    float* dval = (float*)dval_managed.get();
-    float* dx   = (float*)dx_managed.get();
-    float* dy   = (float*)dy_managed.get();
-    void*  dbuf = (void*)dbuf_managed.get();
+    int*   dind = static_cast<int*>(dind_managed.get());
+    float* dval = static_cast<float*>(dval_managed.get());
+    float* dx   = static_cast<float*>(dx_managed.get());
+    float* dy   = static_cast<float*>(dy_managed.get());
+    void*  dbuf = static_cast<void*>(dbuf_managed.get());
 
     // SpMV structures
     hipsparseSpMatDescr_t A;
@@ -215,13 +215,13 @@ hipsparseStatus_t testing_spmv_coo_aos(Arguments argus)
     auto d_alpha_managed = hipsparse_unique_ptr{device_malloc(sizeof(T)), device_free};
     auto d_beta_managed  = hipsparse_unique_ptr{device_malloc(sizeof(T)), device_free};
 
-    I* dind    = (I*)dind_managed.get();
-    T* dval    = (T*)dval_managed.get();
-    T* dx      = (T*)dx_managed.get();
-    T* dy_1    = (T*)dy_1_managed.get();
-    T* dy_2    = (T*)dy_2_managed.get();
-    T* d_alpha = (T*)d_alpha_managed.get();
-    T* d_beta  = (T*)d_beta_managed.get();
+    I* dind    = static_cast<I*>(dind_managed.get());
+    T* dval    = static_cast<T*>(dval_managed.get());
+    T* dx      = static_cast<T*>(dx_managed.get());
+    T* dy_1    = static_cast<T*>(dy_1_managed.get());
+    T* dy_2    = static_cast<T*>(dy_2_managed.get());
+    T* d_alpha = static_cast<T*>(d_alpha_managed.get());
+    T* d_beta  = static_cast<T*>(d_beta_managed.get());
 
     // copy data from CPU to device
     CHECK_HIP_ERROR(hipMemcpy(dind, hind.data(), sizeof(I) * 2 * nnz, hipMemcpyHostToDevice));
@@ -293,23 +293,11 @@ hipsparseStatus_t testing_spmv_coo_aos(Arguments argus)
 
         CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_HOST));
 
-        // Warm up
-        for(int iter = 0; iter < number_cold_calls; ++iter)
-        {
-            CHECK_HIPSPARSE_ERROR(
-                hipsparseSpMV(handle, transA, &h_alpha, A, x, &h_beta, y1, typeT, alg, buffer));
-        }
-
-        double gpu_time_used = get_time_us();
-
-        // Performance run
-        for(int iter = 0; iter < number_hot_calls; ++iter)
-        {
-            CHECK_HIPSPARSE_ERROR(
-                hipsparseSpMV(handle, transA, &h_alpha, A, x, &h_beta, y1, typeT, alg, buffer));
-        }
-
-        gpu_time_used = (get_time_us() - gpu_time_used) / number_hot_calls;
+        double gpu_time_used = benchmark_kernel(
+            [&]() { CHECK_HIPSPARSE_ERROR(
+                hipsparseSpMV(handle, transA, &h_alpha, A, x, &h_beta, y1, typeT, alg, buffer)); return HIPSPARSE_STATUS_SUCCESS; },
+            number_cold_calls,
+            number_hot_calls);
 
         double gflop_count = spmv_gflop_count(m, nnz, h_beta != make_DataType<T>(0.0));
         double gbyte_count = coomv_gbyte_count<T>(m, n, nnz, h_beta != make_DataType<T>(0.0));

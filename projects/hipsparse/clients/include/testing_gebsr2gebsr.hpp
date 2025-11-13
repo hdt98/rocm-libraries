@@ -66,26 +66,26 @@ void testing_gebsr2gebsr_bad_arg(const Arguments& argus)
 
     auto bsr_row_ptr_A_managed
         = hipsparse_unique_ptr{device_malloc(sizeof(int) * (safe_size + 1)), device_free};
-    auto bsr_col_ind_A_managed
+    auto bsr_col_indA_managed
         = hipsparse_unique_ptr{device_malloc(sizeof(int) * safe_size), device_free};
     auto bsr_val_A_managed
         = hipsparse_unique_ptr{device_malloc(sizeof(T) * safe_size), device_free};
     auto bsr_row_ptr_C_managed
         = hipsparse_unique_ptr{device_malloc(sizeof(int) * (safe_size + 1)), device_free};
-    auto bsr_col_ind_C_managed
+    auto bsr_col_indC_managed
         = hipsparse_unique_ptr{device_malloc(sizeof(int) * safe_size), device_free};
     auto bsr_val_C_managed
         = hipsparse_unique_ptr{device_malloc(sizeof(T) * safe_size), device_free};
     auto temp_buffer_managed
         = hipsparse_unique_ptr{device_malloc(sizeof(T) * safe_size), device_free};
-    int* bsr_row_ptr_A = (int*)bsr_row_ptr_A_managed.get();
+    int* bsr_row_ptr_A = static_cast<int*>(bsr_row_ptr_A_managed.get());
 
-    int* bsr_col_ind_A = (int*)bsr_col_ind_A_managed.get();
-    T*   bsr_val_A     = (T*)bsr_val_A_managed.get();
-    int* bsr_row_ptr_C = (int*)bsr_row_ptr_C_managed.get();
-    int* bsr_col_ind_C = (int*)bsr_col_ind_C_managed.get();
-    T*   bsr_val_C     = (T*)bsr_val_C_managed.get();
-    T*   temp_buffer   = (T*)temp_buffer_managed.get();
+    int* bsr_col_indA = static_cast<int*>(bsr_col_indA_managed.get());
+    T*   bsr_val_A     = static_cast<T*>(bsr_val_A_managed.get());
+    int* bsr_row_ptr_C = static_cast<int*>(bsr_row_ptr_C_managed.get());
+    int* bsr_col_indC = static_cast<int*>(bsr_col_indC_managed.get());
+    T*   bsr_val_C     = static_cast<T*>(bsr_val_C_managed.get());
+    T*   temp_buffer   = static_cast<T*>(temp_buffer_managed.get());
 
     int local_ptr[2] = {0, 1};
     CHECK_HIP_ERROR(
@@ -106,7 +106,7 @@ void testing_gebsr2gebsr_bad_arg(const Arguments& argus)
                                               descr_A,
                                               bsr_val_A,
                                               bsr_row_ptr_A,
-                                              bsr_col_ind_A,
+                                              bsr_col_indA,
                                               row_block_dim_A,
                                               col_block_dim_A,
                                               row_block_dim_C,
@@ -123,7 +123,7 @@ void testing_gebsr2gebsr_bad_arg(const Arguments& argus)
                                               nullptr,
                                               bsr_val_A,
                                               bsr_row_ptr_A,
-                                              bsr_col_ind_A,
+                                              bsr_col_indA,
                                               row_block_dim_A,
                                               col_block_dim_A,
                                               row_block_dim_C,
@@ -139,7 +139,7 @@ void testing_gebsr2gebsr_bad_arg(const Arguments& argus)
                                               descr_A,
                                               (const T*)nullptr,
                                               bsr_row_ptr_A,
-                                              bsr_col_ind_A,
+                                              bsr_col_indA,
                                               row_block_dim_A,
                                               col_block_dim_A,
                                               row_block_dim_C,
@@ -155,7 +155,7 @@ void testing_gebsr2gebsr_bad_arg(const Arguments& argus)
                                               descr_A,
                                               bsr_val_A,
                                               nullptr,
-                                              bsr_col_ind_A,
+                                              bsr_col_indA,
                                               row_block_dim_A,
                                               col_block_dim_A,
                                               row_block_dim_C,
@@ -177,7 +177,7 @@ void testing_gebsr2gebsr_bad_arg(const Arguments& argus)
                                               row_block_dim_C,
                                               col_block_dim_C,
                                               &buffer_size);
-    verify_hipsparse_status_invalid_pointer(status, "Error: bsr_col_ind_A is nullptr");
+    verify_hipsparse_status_invalid_pointer(status, "Error: bsr_col_indA is nullptr");
 
     status = hipsparseXgebsr2gebsr_bufferSize(handle,
                                               dir,
@@ -187,7 +187,7 @@ void testing_gebsr2gebsr_bad_arg(const Arguments& argus)
                                               descr_A,
                                               bsr_val_A,
                                               bsr_row_ptr_A,
-                                              bsr_col_ind_A,
+                                              bsr_col_indA,
                                               row_block_dim_A,
                                               col_block_dim_A,
                                               row_block_dim_C,
@@ -204,7 +204,7 @@ void testing_gebsr2gebsr_bad_arg(const Arguments& argus)
                                               descr_A,
                                               bsr_val_A,
                                               bsr_row_ptr_A,
-                                              bsr_col_ind_A,
+                                              bsr_col_indA,
                                               row_block_dim_A,
                                               col_block_dim_A,
                                               row_block_dim_C,
@@ -220,7 +220,7 @@ void testing_gebsr2gebsr_bad_arg(const Arguments& argus)
                                               descr_A,
                                               bsr_val_A,
                                               bsr_row_ptr_A,
-                                              bsr_col_ind_A,
+                                              bsr_col_indA,
                                               row_block_dim_A,
                                               col_block_dim_A,
                                               row_block_dim_C,
@@ -236,7 +236,7 @@ void testing_gebsr2gebsr_bad_arg(const Arguments& argus)
                                               descr_A,
                                               bsr_val_A,
                                               bsr_row_ptr_A,
-                                              bsr_col_ind_A,
+                                              bsr_col_indA,
                                               row_block_dim_A,
                                               col_block_dim_A,
                                               row_block_dim_C,
@@ -252,7 +252,7 @@ void testing_gebsr2gebsr_bad_arg(const Arguments& argus)
                                               descr_A,
                                               bsr_val_A,
                                               bsr_row_ptr_A,
-                                              bsr_col_ind_A,
+                                              bsr_col_indA,
                                               -1,
                                               col_block_dim_A,
                                               row_block_dim_C,
@@ -268,7 +268,7 @@ void testing_gebsr2gebsr_bad_arg(const Arguments& argus)
                                               descr_A,
                                               bsr_val_A,
                                               bsr_row_ptr_A,
-                                              bsr_col_ind_A,
+                                              bsr_col_indA,
                                               row_block_dim_A,
                                               -1,
                                               row_block_dim_C,
@@ -284,7 +284,7 @@ void testing_gebsr2gebsr_bad_arg(const Arguments& argus)
                                               descr_A,
                                               bsr_val_A,
                                               bsr_row_ptr_A,
-                                              bsr_col_ind_A,
+                                              bsr_col_indA,
                                               row_block_dim_A,
                                               col_block_dim_A,
                                               -1,
@@ -300,7 +300,7 @@ void testing_gebsr2gebsr_bad_arg(const Arguments& argus)
                                               descr_A,
                                               bsr_val_A,
                                               bsr_row_ptr_A,
-                                              bsr_col_ind_A,
+                                              bsr_col_indA,
                                               row_block_dim_A,
                                               col_block_dim_A,
                                               row_block_dim_C,
@@ -320,7 +320,7 @@ void testing_gebsr2gebsr_bad_arg(const Arguments& argus)
                                       nnzb,
                                       descr_A,
                                       bsr_row_ptr_A,
-                                      bsr_col_ind_A,
+                                      bsr_col_indA,
                                       row_block_dim_A,
                                       col_block_dim_A,
                                       descr_C,
@@ -339,7 +339,7 @@ void testing_gebsr2gebsr_bad_arg(const Arguments& argus)
                                       nnzb,
                                       nullptr,
                                       bsr_row_ptr_A,
-                                      bsr_col_ind_A,
+                                      bsr_col_indA,
                                       row_block_dim_A,
                                       col_block_dim_A,
                                       descr_C,
@@ -357,7 +357,7 @@ void testing_gebsr2gebsr_bad_arg(const Arguments& argus)
                                       nnzb,
                                       descr_A,
                                       nullptr,
-                                      bsr_col_ind_A,
+                                      bsr_col_indA,
                                       row_block_dim_A,
                                       col_block_dim_A,
                                       descr_C,
@@ -384,7 +384,7 @@ void testing_gebsr2gebsr_bad_arg(const Arguments& argus)
                                       col_block_dim_C,
                                       &nnz_total_dev_host_ptr,
                                       temp_buffer);
-    verify_hipsparse_status_invalid_pointer(status, "Error: bsr_col_ind_A is nullptr");
+    verify_hipsparse_status_invalid_pointer(status, "Error: bsr_col_indA is nullptr");
 
     status = hipsparseXgebsr2gebsrNnz(handle,
                                       dir,
@@ -393,7 +393,7 @@ void testing_gebsr2gebsr_bad_arg(const Arguments& argus)
                                       nnzb,
                                       descr_A,
                                       bsr_row_ptr_A,
-                                      bsr_col_ind_A,
+                                      bsr_col_indA,
                                       row_block_dim_A,
                                       col_block_dim_A,
                                       nullptr,
@@ -411,7 +411,7 @@ void testing_gebsr2gebsr_bad_arg(const Arguments& argus)
                                       nnzb,
                                       descr_A,
                                       bsr_row_ptr_A,
-                                      bsr_col_ind_A,
+                                      bsr_col_indA,
                                       row_block_dim_A,
                                       col_block_dim_A,
                                       descr_C,
@@ -429,7 +429,7 @@ void testing_gebsr2gebsr_bad_arg(const Arguments& argus)
                                       nnzb,
                                       descr_A,
                                       bsr_row_ptr_A,
-                                      bsr_col_ind_A,
+                                      bsr_col_indA,
                                       row_block_dim_A,
                                       col_block_dim_A,
                                       descr_C,
@@ -448,7 +448,7 @@ void testing_gebsr2gebsr_bad_arg(const Arguments& argus)
                                       nnzb,
                                       descr_A,
                                       bsr_row_ptr_A,
-                                      bsr_col_ind_A,
+                                      bsr_col_indA,
                                       row_block_dim_A,
                                       col_block_dim_A,
                                       descr_C,
@@ -466,7 +466,7 @@ void testing_gebsr2gebsr_bad_arg(const Arguments& argus)
                                       nnzb,
                                       descr_A,
                                       bsr_row_ptr_A,
-                                      bsr_col_ind_A,
+                                      bsr_col_indA,
                                       row_block_dim_A,
                                       col_block_dim_A,
                                       descr_C,
@@ -484,7 +484,7 @@ void testing_gebsr2gebsr_bad_arg(const Arguments& argus)
                                       -1,
                                       descr_A,
                                       bsr_row_ptr_A,
-                                      bsr_col_ind_A,
+                                      bsr_col_indA,
                                       row_block_dim_A,
                                       col_block_dim_A,
                                       descr_C,
@@ -502,7 +502,7 @@ void testing_gebsr2gebsr_bad_arg(const Arguments& argus)
                                       nnzb,
                                       descr_A,
                                       bsr_row_ptr_A,
-                                      bsr_col_ind_A,
+                                      bsr_col_indA,
                                       -1,
                                       col_block_dim_A,
                                       descr_C,
@@ -520,7 +520,7 @@ void testing_gebsr2gebsr_bad_arg(const Arguments& argus)
                                       nnzb,
                                       descr_A,
                                       bsr_row_ptr_A,
-                                      bsr_col_ind_A,
+                                      bsr_col_indA,
                                       row_block_dim_A,
                                       -1,
                                       descr_C,
@@ -538,7 +538,7 @@ void testing_gebsr2gebsr_bad_arg(const Arguments& argus)
                                       nnzb,
                                       descr_A,
                                       bsr_row_ptr_A,
-                                      bsr_col_ind_A,
+                                      bsr_col_indA,
                                       row_block_dim_A,
                                       col_block_dim_A,
                                       descr_C,
@@ -556,7 +556,7 @@ void testing_gebsr2gebsr_bad_arg(const Arguments& argus)
                                       nnzb,
                                       descr_A,
                                       bsr_row_ptr_A,
-                                      bsr_col_ind_A,
+                                      bsr_col_indA,
                                       row_block_dim_A,
                                       col_block_dim_A,
                                       descr_C,
@@ -578,13 +578,13 @@ void testing_gebsr2gebsr_bad_arg(const Arguments& argus)
                                    descr_A,
                                    bsr_val_A,
                                    bsr_row_ptr_A,
-                                   bsr_col_ind_A,
+                                   bsr_col_indA,
                                    row_block_dim_A,
                                    col_block_dim_A,
                                    descr_C,
                                    bsr_val_C,
                                    bsr_row_ptr_C,
-                                   bsr_col_ind_C,
+                                   bsr_col_indC,
                                    row_block_dim_C,
                                    col_block_dim_C,
                                    temp_buffer);
@@ -599,13 +599,13 @@ void testing_gebsr2gebsr_bad_arg(const Arguments& argus)
                                    nullptr,
                                    bsr_val_A,
                                    bsr_row_ptr_A,
-                                   bsr_col_ind_A,
+                                   bsr_col_indA,
                                    row_block_dim_A,
                                    col_block_dim_A,
                                    descr_C,
                                    bsr_val_C,
                                    bsr_row_ptr_C,
-                                   bsr_col_ind_C,
+                                   bsr_col_indC,
                                    row_block_dim_C,
                                    col_block_dim_C,
                                    temp_buffer);
@@ -619,13 +619,13 @@ void testing_gebsr2gebsr_bad_arg(const Arguments& argus)
                                    descr_A,
                                    (const T*)nullptr,
                                    bsr_row_ptr_A,
-                                   bsr_col_ind_A,
+                                   bsr_col_indA,
                                    row_block_dim_A,
                                    col_block_dim_A,
                                    descr_C,
                                    bsr_val_C,
                                    bsr_row_ptr_C,
-                                   bsr_col_ind_C,
+                                   bsr_col_indC,
                                    row_block_dim_C,
                                    col_block_dim_C,
                                    temp_buffer);
@@ -639,13 +639,13 @@ void testing_gebsr2gebsr_bad_arg(const Arguments& argus)
                                    descr_A,
                                    bsr_val_A,
                                    nullptr,
-                                   bsr_col_ind_A,
+                                   bsr_col_indA,
                                    row_block_dim_A,
                                    col_block_dim_A,
                                    descr_C,
                                    bsr_val_C,
                                    bsr_row_ptr_C,
-                                   bsr_col_ind_C,
+                                   bsr_col_indC,
                                    row_block_dim_C,
                                    col_block_dim_C,
                                    temp_buffer);
@@ -665,11 +665,11 @@ void testing_gebsr2gebsr_bad_arg(const Arguments& argus)
                                    descr_C,
                                    bsr_val_C,
                                    bsr_row_ptr_C,
-                                   bsr_col_ind_C,
+                                   bsr_col_indC,
                                    row_block_dim_C,
                                    col_block_dim_C,
                                    temp_buffer);
-    verify_hipsparse_status_invalid_pointer(status, "Error: bsr_col_ind_A is nullptr");
+    verify_hipsparse_status_invalid_pointer(status, "Error: bsr_col_indA is nullptr");
 
     status = hipsparseXgebsr2gebsr(handle,
                                    dir,
@@ -679,13 +679,13 @@ void testing_gebsr2gebsr_bad_arg(const Arguments& argus)
                                    descr_A,
                                    bsr_val_A,
                                    bsr_row_ptr_A,
-                                   bsr_col_ind_A,
+                                   bsr_col_indA,
                                    row_block_dim_A,
                                    col_block_dim_A,
                                    nullptr,
                                    bsr_val_C,
                                    bsr_row_ptr_C,
-                                   bsr_col_ind_C,
+                                   bsr_col_indC,
                                    row_block_dim_C,
                                    col_block_dim_C,
                                    temp_buffer);
@@ -699,13 +699,13 @@ void testing_gebsr2gebsr_bad_arg(const Arguments& argus)
                                    descr_A,
                                    bsr_val_A,
                                    bsr_row_ptr_A,
-                                   bsr_col_ind_A,
+                                   bsr_col_indA,
                                    row_block_dim_A,
                                    col_block_dim_A,
                                    descr_C,
-                                   (T*)nullptr,
+                                   static_cast<T*>(nullptr),
                                    bsr_row_ptr_C,
-                                   bsr_col_ind_C,
+                                   bsr_col_indC,
                                    row_block_dim_C,
                                    col_block_dim_C,
                                    temp_buffer);
@@ -720,13 +720,13 @@ void testing_gebsr2gebsr_bad_arg(const Arguments& argus)
                                    descr_A,
                                    bsr_val_A,
                                    bsr_row_ptr_A,
-                                   bsr_col_ind_A,
+                                   bsr_col_indA,
                                    row_block_dim_A,
                                    col_block_dim_A,
                                    descr_C,
                                    bsr_val_C,
                                    nullptr,
-                                   bsr_col_ind_C,
+                                   bsr_col_indC,
                                    row_block_dim_C,
                                    col_block_dim_C,
                                    temp_buffer);
@@ -740,7 +740,7 @@ void testing_gebsr2gebsr_bad_arg(const Arguments& argus)
                                    descr_A,
                                    bsr_val_A,
                                    bsr_row_ptr_A,
-                                   bsr_col_ind_A,
+                                   bsr_col_indA,
                                    row_block_dim_A,
                                    col_block_dim_A,
                                    descr_C,
@@ -750,7 +750,7 @@ void testing_gebsr2gebsr_bad_arg(const Arguments& argus)
                                    row_block_dim_C,
                                    col_block_dim_C,
                                    temp_buffer);
-    verify_hipsparse_status_invalid_pointer(status, "Error: bsr_col_ind_C is nullptr");
+    verify_hipsparse_status_invalid_pointer(status, "Error: bsr_col_indC is nullptr");
 
     // Test invalid sizes
     status = hipsparseXgebsr2gebsr(handle,
@@ -761,13 +761,13 @@ void testing_gebsr2gebsr_bad_arg(const Arguments& argus)
                                    descr_A,
                                    bsr_val_A,
                                    bsr_row_ptr_A,
-                                   bsr_col_ind_A,
+                                   bsr_col_indA,
                                    row_block_dim_A,
                                    col_block_dim_A,
                                    descr_C,
                                    bsr_val_C,
                                    bsr_row_ptr_C,
-                                   bsr_col_ind_C,
+                                   bsr_col_indC,
                                    row_block_dim_C,
                                    col_block_dim_C,
                                    temp_buffer);
@@ -781,13 +781,13 @@ void testing_gebsr2gebsr_bad_arg(const Arguments& argus)
                                    descr_A,
                                    bsr_val_A,
                                    bsr_row_ptr_A,
-                                   bsr_col_ind_A,
+                                   bsr_col_indA,
                                    row_block_dim_A,
                                    col_block_dim_A,
                                    descr_C,
                                    bsr_val_C,
                                    bsr_row_ptr_C,
-                                   bsr_col_ind_C,
+                                   bsr_col_indC,
                                    row_block_dim_C,
                                    col_block_dim_C,
                                    temp_buffer);
@@ -801,13 +801,13 @@ void testing_gebsr2gebsr_bad_arg(const Arguments& argus)
                                    descr_A,
                                    bsr_val_A,
                                    bsr_row_ptr_A,
-                                   bsr_col_ind_A,
+                                   bsr_col_indA,
                                    row_block_dim_A,
                                    col_block_dim_A,
                                    descr_C,
                                    bsr_val_C,
                                    bsr_row_ptr_C,
-                                   bsr_col_ind_C,
+                                   bsr_col_indC,
                                    row_block_dim_C,
                                    col_block_dim_C,
                                    temp_buffer);
@@ -821,13 +821,13 @@ void testing_gebsr2gebsr_bad_arg(const Arguments& argus)
                                    descr_A,
                                    bsr_val_A,
                                    bsr_row_ptr_A,
-                                   bsr_col_ind_A,
+                                   bsr_col_indA,
                                    -1,
                                    col_block_dim_A,
                                    descr_C,
                                    bsr_val_C,
                                    bsr_row_ptr_C,
-                                   bsr_col_ind_C,
+                                   bsr_col_indC,
                                    row_block_dim_C,
                                    col_block_dim_C,
                                    temp_buffer);
@@ -841,13 +841,13 @@ void testing_gebsr2gebsr_bad_arg(const Arguments& argus)
                                    descr_A,
                                    bsr_val_A,
                                    bsr_row_ptr_A,
-                                   bsr_col_ind_A,
+                                   bsr_col_indA,
                                    row_block_dim_A,
                                    -1,
                                    descr_C,
                                    bsr_val_C,
                                    bsr_row_ptr_C,
-                                   bsr_col_ind_C,
+                                   bsr_col_indC,
                                    row_block_dim_C,
                                    col_block_dim_C,
                                    temp_buffer);
@@ -861,13 +861,13 @@ void testing_gebsr2gebsr_bad_arg(const Arguments& argus)
                                    descr_A,
                                    bsr_val_A,
                                    bsr_row_ptr_A,
-                                   bsr_col_ind_A,
+                                   bsr_col_indA,
                                    row_block_dim_A,
                                    col_block_dim_A,
                                    descr_C,
                                    bsr_val_C,
                                    bsr_row_ptr_C,
-                                   bsr_col_ind_C,
+                                   bsr_col_indC,
                                    -1,
                                    col_block_dim_C,
                                    temp_buffer);
@@ -881,13 +881,13 @@ void testing_gebsr2gebsr_bad_arg(const Arguments& argus)
                                    descr_A,
                                    bsr_val_A,
                                    bsr_row_ptr_A,
-                                   bsr_col_ind_A,
+                                   bsr_col_indA,
                                    row_block_dim_A,
                                    col_block_dim_A,
                                    descr_C,
                                    bsr_val_C,
                                    bsr_row_ptr_C,
-                                   bsr_col_ind_C,
+                                   bsr_col_indC,
                                    row_block_dim_C,
                                    -1,
                                    temp_buffer);
@@ -956,10 +956,10 @@ hipsparseStatus_t testing_gebsr2gebsr(Arguments argus)
     auto dbsr_row_ptr_A_managed
         = hipsparse_unique_ptr{device_malloc(sizeof(int) * (mb + 1)), device_free};
 
-    int* dcsr_row_ptr   = (int*)dcsr_row_ptr_managed.get();
-    int* dcsr_col_ind   = (int*)dcsr_col_ind_managed.get();
-    T*   dcsr_val       = (T*)dcsr_val_managed.get();
-    int* dbsr_row_ptr_A = (int*)dbsr_row_ptr_A_managed.get();
+    int* dcsr_row_ptr   = static_cast<int*>(dcsr_row_ptr_managed.get());
+    int* dcsr_col_ind   = static_cast<int*>(dcsr_col_ind_managed.get());
+    T*   dcsr_val       = static_cast<T*>(dcsr_val_managed.get());
+    int* dbsr_row_ptr_A = static_cast<int*>(dbsr_row_ptr_A_managed.get());
 
     // copy data from CPU to device
     CHECK_HIP_ERROR(
@@ -1004,16 +1004,16 @@ hipsparseStatus_t testing_gebsr2gebsr(Arguments argus)
                                                  dbuffer_conversion));
 
     // Allocate memory on the device
-    auto dbsr_col_ind_A_managed
+    auto dbsr_col_indA_managed
         = hipsparse_unique_ptr{device_malloc(sizeof(int) * nnzb), device_free};
     auto dbsr_val_A_managed = hipsparse_unique_ptr{
         device_malloc(sizeof(T) * nnzb * row_block_dim_A * col_block_dim_A), device_free};
     auto dbsr_row_ptr_C_managed
         = hipsparse_unique_ptr{device_malloc(sizeof(int) * (mb_C + 1)), device_free};
 
-    int* dbsr_col_ind_A = (int*)dbsr_col_ind_A_managed.get();
-    T*   dbsr_val_A     = (T*)dbsr_val_A_managed.get();
-    int* dbsr_row_ptr_C = (int*)dbsr_row_ptr_C_managed.get();
+    int* dbsr_col_indA = static_cast<int*>(dbsr_col_indA_managed.get());
+    T*   dbsr_val_A     = static_cast<T*>(dbsr_val_A_managed.get());
+    int* dbsr_row_ptr_C = static_cast<int*>(dbsr_row_ptr_C_managed.get());
 
     CHECK_HIPSPARSE_ERROR(hipsparseXcsr2gebsr(handle,
                                               dir,
@@ -1026,20 +1026,20 @@ hipsparseStatus_t testing_gebsr2gebsr(Arguments argus)
                                               descr_A,
                                               dbsr_val_A,
                                               dbsr_row_ptr_A,
-                                              dbsr_col_ind_A,
+                                              dbsr_col_indA,
                                               row_block_dim_A,
                                               col_block_dim_A,
                                               dbuffer_conversion));
 
     // Copy output from device to host
     std::vector<int> hbsr_row_ptr_A(mb + 1);
-    std::vector<int> hbsr_col_ind_A(nnzb);
+    std::vector<int> hbsr_col_indA(nnzb);
     std::vector<T>   hbsr_val_A(nnzb * row_block_dim_A * col_block_dim_A);
 
     CHECK_HIP_ERROR(hipMemcpy(
         hbsr_row_ptr_A.data(), dbsr_row_ptr_A, sizeof(int) * (mb + 1), hipMemcpyDeviceToHost));
     CHECK_HIP_ERROR(hipMemcpy(
-        hbsr_col_ind_A.data(), dbsr_col_ind_A, sizeof(int) * nnzb, hipMemcpyDeviceToHost));
+        hbsr_col_indA.data(), dbsr_col_indA, sizeof(int) * nnzb, hipMemcpyDeviceToHost));
     CHECK_HIP_ERROR(hipMemcpy(hbsr_val_A.data(),
                               dbsr_val_A,
                               sizeof(T) * nnzb * row_block_dim_A * col_block_dim_A,
@@ -1054,7 +1054,7 @@ hipsparseStatus_t testing_gebsr2gebsr(Arguments argus)
                                                            descr_A,
                                                            dbsr_val_A,
                                                            dbsr_row_ptr_A,
-                                                           dbsr_col_ind_A,
+                                                           dbsr_col_indA,
                                                            row_block_dim_A,
                                                            col_block_dim_A,
                                                            row_block_dim_C,
@@ -1065,7 +1065,7 @@ hipsparseStatus_t testing_gebsr2gebsr(Arguments argus)
     auto dbuffer_managed
         = hipsparse_unique_ptr{device_malloc(sizeof(char) * buffer_size), device_free};
 
-    void* dbuffer = (void*)dbuffer_managed.get();
+    void* dbuffer = static_cast<void*>(dbuffer_managed.get());
 
     // Obtain BSR nnzb first on the host and then using the device and ensure they give the same results
     CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_HOST));
@@ -1078,7 +1078,7 @@ hipsparseStatus_t testing_gebsr2gebsr(Arguments argus)
                                                    nnzb,
                                                    descr_A,
                                                    dbsr_row_ptr_A,
-                                                   dbsr_col_ind_A,
+                                                   dbsr_col_indA,
                                                    row_block_dim_A,
                                                    col_block_dim_A,
                                                    descr_C,
@@ -1091,7 +1091,7 @@ hipsparseStatus_t testing_gebsr2gebsr(Arguments argus)
     CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_DEVICE));
 
     auto dnnzb_C_managed = hipsparse_unique_ptr{device_malloc(sizeof(int)), device_free};
-    int* dnnzb_C         = (int*)dnnzb_C_managed.get();
+    int* dnnzb_C         = static_cast<int*>(dnnzb_C_managed.get());
     CHECK_HIPSPARSE_ERROR(hipsparseXgebsr2gebsrNnz(handle,
                                                    dir,
                                                    mb,
@@ -1099,7 +1099,7 @@ hipsparseStatus_t testing_gebsr2gebsr(Arguments argus)
                                                    nnzb,
                                                    descr_A,
                                                    dbsr_row_ptr_A,
-                                                   dbsr_col_ind_A,
+                                                   dbsr_col_indA,
                                                    row_block_dim_A,
                                                    col_block_dim_A,
                                                    descr_C,
@@ -1120,13 +1120,13 @@ hipsparseStatus_t testing_gebsr2gebsr(Arguments argus)
     }
 
     // Allocate memory on the device
-    auto dbsr_col_ind_C_managed
+    auto dbsr_col_indC_managed
         = hipsparse_unique_ptr{device_malloc(sizeof(int) * hnnzb_C), device_free};
     auto dbsr_val_C_managed = hipsparse_unique_ptr{
         device_malloc(sizeof(T) * hnnzb_C * row_block_dim_C * col_block_dim_C), device_free};
 
-    int* dbsr_col_ind_C = (int*)dbsr_col_ind_C_managed.get();
-    T*   dbsr_val_C     = (T*)dbsr_val_C_managed.get();
+    int* dbsr_col_indC = static_cast<int*>(dbsr_col_indC_managed.get());
+    T*   dbsr_val_C     = static_cast<T*>(dbsr_val_C_managed.get());
 
     if(argus.unit_check)
     {
@@ -1138,20 +1138,20 @@ hipsparseStatus_t testing_gebsr2gebsr(Arguments argus)
                                                     descr_A,
                                                     dbsr_val_A,
                                                     dbsr_row_ptr_A,
-                                                    dbsr_col_ind_A,
+                                                    dbsr_col_indA,
                                                     row_block_dim_A,
                                                     col_block_dim_A,
                                                     descr_C,
                                                     dbsr_val_C,
                                                     dbsr_row_ptr_C,
-                                                    dbsr_col_ind_C,
+                                                    dbsr_col_indC,
                                                     row_block_dim_C,
                                                     col_block_dim_C,
                                                     dbuffer));
 
         // Copy output from device to host
         std::vector<int> hbsr_row_ptr_C(mb_C + 1);
-        std::vector<int> hbsr_col_ind_C(hnnzb_C);
+        std::vector<int> hbsr_col_indC(hnnzb_C);
         std::vector<T>   hbsr_val_C(hnnzb_C * row_block_dim_C * col_block_dim_C);
 
         CHECK_HIP_ERROR(hipMemcpy(hbsr_row_ptr_C.data(),
@@ -1159,7 +1159,7 @@ hipsparseStatus_t testing_gebsr2gebsr(Arguments argus)
                                   sizeof(int) * (mb_C + 1),
                                   hipMemcpyDeviceToHost));
         CHECK_HIP_ERROR(hipMemcpy(
-            hbsr_col_ind_C.data(), dbsr_col_ind_C, sizeof(int) * hnnzb_C, hipMemcpyDeviceToHost));
+            hbsr_col_indC.data(), dbsr_col_indC, sizeof(int) * hnnzb_C, hipMemcpyDeviceToHost));
         CHECK_HIP_ERROR(hipMemcpy(hbsr_val_C.data(),
                                   dbsr_val_C,
                                   sizeof(T) * hnnzb_C * row_block_dim_C * col_block_dim_C,
@@ -1177,7 +1177,7 @@ hipsparseStatus_t testing_gebsr2gebsr(Arguments argus)
                             nnzb,
                             hbsr_val_A,
                             hbsr_row_ptr_A,
-                            hbsr_col_ind_A,
+                            hbsr_col_indA,
                             row_block_dim_A,
                             col_block_dim_A,
                             idx_base_A,
@@ -1193,7 +1193,7 @@ hipsparseStatus_t testing_gebsr2gebsr(Arguments argus)
         // Unit check
         unit_check_general(1, 1, 1, &nnzb_C_gold, &hnnzb_C);
         unit_check_general(1, mb_C + 1, 1, hbsr_row_ptr_C_gold.data(), hbsr_row_ptr_C.data());
-        unit_check_general(1, hnnzb_C, 1, hbsr_col_ind_C_gold.data(), hbsr_col_ind_C.data());
+        unit_check_general(1, hnnzb_C, 1, hbsr_col_ind_C_gold.data(), hbsr_col_indC.data());
         unit_check_general(1,
                            hnnzb_C * row_block_dim_C * col_block_dim_C,
                            1,
@@ -1208,10 +1208,8 @@ hipsparseStatus_t testing_gebsr2gebsr(Arguments argus)
 
         CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_HOST));
 
-        // Warm up
-        for(int iter = 0; iter < number_cold_calls; ++iter)
-        {
-            CHECK_HIPSPARSE_ERROR(hipsparseXgebsr2gebsr(handle,
+        double gpu_time_used = benchmark_kernel(
+            [&]() { CHECK_HIPSPARSE_ERROR(hipsparseXgebsr2gebsr(handle,
                                                         dir,
                                                         mb,
                                                         nb,
@@ -1219,44 +1217,18 @@ hipsparseStatus_t testing_gebsr2gebsr(Arguments argus)
                                                         descr_A,
                                                         dbsr_val_A,
                                                         dbsr_row_ptr_A,
-                                                        dbsr_col_ind_A,
+                                                        dbsr_col_indA,
                                                         row_block_dim_A,
                                                         col_block_dim_A,
                                                         descr_C,
                                                         dbsr_val_C,
                                                         dbsr_row_ptr_C,
-                                                        dbsr_col_ind_C,
+                                                        dbsr_col_indC,
                                                         row_block_dim_C,
                                                         col_block_dim_C,
-                                                        dbuffer));
-        }
-
-        double gpu_time_used = get_time_us();
-
-        // Performance run
-        for(int iter = 0; iter < number_hot_calls; ++iter)
-        {
-            CHECK_HIPSPARSE_ERROR(hipsparseXgebsr2gebsr(handle,
-                                                        dir,
-                                                        mb,
-                                                        nb,
-                                                        nnzb,
-                                                        descr_A,
-                                                        dbsr_val_A,
-                                                        dbsr_row_ptr_A,
-                                                        dbsr_col_ind_A,
-                                                        row_block_dim_A,
-                                                        col_block_dim_A,
-                                                        descr_C,
-                                                        dbsr_val_C,
-                                                        dbsr_row_ptr_C,
-                                                        dbsr_col_ind_C,
-                                                        row_block_dim_C,
-                                                        col_block_dim_C,
-                                                        dbuffer));
-        }
-
-        gpu_time_used = (get_time_us() - gpu_time_used) / number_hot_calls;
+                                                        dbuffer)); return HIPSPARSE_STATUS_SUCCESS; },
+            number_cold_calls,
+            number_hot_calls);
 
         double gbyte_count = gebsr2gebsr_gbyte_count<T>(mb,
                                                         mb_C,

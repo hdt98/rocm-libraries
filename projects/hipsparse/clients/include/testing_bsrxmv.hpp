@@ -58,7 +58,7 @@ void testing_bsrxmv_bad_arg(void)
     hipsparseMatDescr_t           descr = unique_ptr_descr->descr;
 
     auto dptr_managed = hipsparse_unique_ptr{device_malloc(sizeof(int) * safe_size), device_free};
-    auto dend_ptr_managed
+    auto dendptr_managed
         = hipsparse_unique_ptr{device_malloc(sizeof(int) * safe_size), device_free};
     auto dmask_ptr_managed
         = hipsparse_unique_ptr{device_malloc(sizeof(int) * safe_size), device_free};
@@ -67,13 +67,13 @@ void testing_bsrxmv_bad_arg(void)
     auto dx_managed   = hipsparse_unique_ptr{device_malloc(sizeof(T) * safe_size), device_free};
     auto dy_managed   = hipsparse_unique_ptr{device_malloc(sizeof(T) * safe_size), device_free};
 
-    int* dptr      = (int*)dptr_managed.get();
-    int* dend_ptr  = (int*)dend_ptr_managed.get();
-    int* dmask_ptr = (int*)dmask_ptr_managed.get();
-    int* dcol      = (int*)dcol_managed.get();
-    T*   dval      = (T*)dval_managed.get();
-    T*   dx        = (T*)dx_managed.get();
-    T*   dy        = (T*)dy_managed.get();
+    int* dptr      = static_cast<int*>(dptr_managed.get());
+    int* dendptr  = static_cast<int*>(dendptr_managed.get());
+    int* dmask_ptr = static_cast<int*>(dmask_ptr_managed.get());
+    int* dcol      = static_cast<int*>(dcol_managed.get());
+    T*   dval      = static_cast<T*>(dval_managed.get());
+    T*   dx        = static_cast<T*>(dx_managed.get());
+    T*   dy        = static_cast<T*>(dy_managed.get());
 
     // Test hipsparseXbsrxmv
     verify_hipsparse_status_invalid_handle(hipsparseXbsrxmv(nullptr,
@@ -88,7 +88,7 @@ void testing_bsrxmv_bad_arg(void)
                                                             dval,
                                                             dmask_ptr,
                                                             dptr,
-                                                            dend_ptr,
+                                                            dendptr,
                                                             dcol,
                                                             safe_dim,
                                                             dx,
@@ -101,12 +101,12 @@ void testing_bsrxmv_bad_arg(void)
                                                              safe_size,
                                                              safe_size,
                                                              safe_size,
-                                                             (T*)nullptr,
+                                                             static_cast<T*>(nullptr),
                                                              descr,
                                                              dval,
                                                              dmask_ptr,
                                                              dptr,
-                                                             dend_ptr,
+                                                             dendptr,
                                                              dcol,
                                                              safe_dim,
                                                              dx,
@@ -125,7 +125,7 @@ void testing_bsrxmv_bad_arg(void)
                                                              dval,
                                                              dmask_ptr,
                                                              dptr,
-                                                             dend_ptr,
+                                                             dendptr,
                                                              dcol,
                                                              safe_dim,
                                                              dx,
@@ -141,10 +141,10 @@ void testing_bsrxmv_bad_arg(void)
                                                              safe_size,
                                                              &alpha,
                                                              descr,
-                                                             (T*)nullptr,
+                                                             static_cast<T*>(nullptr),
                                                              dmask_ptr,
                                                              dptr,
-                                                             dend_ptr,
+                                                             dendptr,
 
                                                              dcol,
                                                              safe_dim,
@@ -164,7 +164,7 @@ void testing_bsrxmv_bad_arg(void)
                                                              dval,
                                                              nullptr,
                                                              dptr,
-                                                             dend_ptr,
+                                                             dendptr,
                                                              dcol,
                                                              safe_dim,
                                                              dx,
@@ -183,7 +183,7 @@ void testing_bsrxmv_bad_arg(void)
                                                              dval,
                                                              dmask_ptr,
                                                              nullptr,
-                                                             dend_ptr,
+                                                             dendptr,
                                                              dcol,
                                                              safe_dim,
                                                              dx,
@@ -208,7 +208,7 @@ void testing_bsrxmv_bad_arg(void)
                                                              dx,
                                                              &beta,
                                                              dy),
-                                            "Error: bsr_end_ptr is nullptr");
+                                            "Error: bsr_endptr is nullptr");
     verify_hipsparse_status_invalid_pointer(hipsparseXbsrxmv(handle,
                                                              dirA,
                                                              transA,
@@ -221,7 +221,7 @@ void testing_bsrxmv_bad_arg(void)
                                                              dval,
                                                              dmask_ptr,
                                                              dptr,
-                                                             dend_ptr,
+                                                             dendptr,
                                                              nullptr,
                                                              safe_dim,
                                                              dx,
@@ -240,10 +240,10 @@ void testing_bsrxmv_bad_arg(void)
                                                              dval,
                                                              dmask_ptr,
                                                              dptr,
-                                                             dend_ptr,
+                                                             dendptr,
                                                              dcol,
                                                              safe_dim,
-                                                             (T*)nullptr,
+                                                             static_cast<T*>(nullptr),
                                                              &beta,
                                                              dy),
                                             "Error: xy is nullptr");
@@ -259,11 +259,11 @@ void testing_bsrxmv_bad_arg(void)
                                                              dval,
                                                              dmask_ptr,
                                                              dptr,
-                                                             dend_ptr,
+                                                             dendptr,
                                                              dcol,
                                                              safe_dim,
                                                              dx,
-                                                             (T*)nullptr,
+                                                             static_cast<T*>(nullptr),
                                                              dy),
                                             "Error: beta is nullptr");
     verify_hipsparse_status_invalid_pointer(hipsparseXbsrxmv(handle,
@@ -278,12 +278,12 @@ void testing_bsrxmv_bad_arg(void)
                                                              dval,
                                                              dmask_ptr,
                                                              dptr,
-                                                             dend_ptr,
+                                                             dendptr,
                                                              dcol,
                                                              safe_dim,
                                                              dx,
                                                              &beta,
-                                                             (T*)nullptr),
+                                                             static_cast<T*>(nullptr)),
                                             "Error: y is nullptr");
     verify_hipsparse_status_invalid_size(hipsparseXbsrxmv(handle,
                                                           dirA,
@@ -297,7 +297,7 @@ void testing_bsrxmv_bad_arg(void)
                                                           dval,
                                                           dmask_ptr,
                                                           dptr,
-                                                          dend_ptr,
+                                                          dendptr,
                                                           dcol,
                                                           safe_dim,
                                                           dx,
@@ -316,7 +316,7 @@ void testing_bsrxmv_bad_arg(void)
                                                           dval,
                                                           dmask_ptr,
                                                           dptr,
-                                                          dend_ptr,
+                                                          dendptr,
                                                           dcol,
                                                           safe_dim,
                                                           dx,
@@ -335,7 +335,7 @@ void testing_bsrxmv_bad_arg(void)
                                                           dval,
                                                           dmask_ptr,
                                                           dptr,
-                                                          dend_ptr,
+                                                          dendptr,
                                                           dcol,
                                                           safe_dim,
                                                           dx,
@@ -354,7 +354,7 @@ void testing_bsrxmv_bad_arg(void)
                                                           dval,
                                                           dmask_ptr,
                                                           dptr,
-                                                          dend_ptr,
+                                                          dendptr,
                                                           dcol,
                                                           safe_dim,
                                                           dx,
@@ -373,7 +373,7 @@ void testing_bsrxmv_bad_arg(void)
                                                           dval,
                                                           dmask_ptr,
                                                           dptr,
-                                                          dend_ptr,
+                                                          dendptr,
                                                           dcol,
                                                           -1,
                                                           dx,
@@ -409,7 +409,7 @@ hipsparseStatus_t testing_bsrxmv(Arguments argus)
 
     std::vector<int> hbsr_mask_ptr = {2};
     std::vector<int> hbsr_row_ptr  = {1, 4};
-    std::vector<int> hbsr_end_ptr  = {1, 5};
+    std::vector<int> hbsr_endptr  = {1, 5};
     std::vector<int> hbsr_col_ind  = {1, 2, 1, 2, 3};
     std::vector<T>   hx            = {make_DataType<T>(1.0),
                                       make_DataType<T>(1.0),
@@ -430,19 +430,19 @@ hipsparseStatus_t testing_bsrxmv(Arguments argus)
     auto dbsr_mask_ptr_managed
         = hipsparse_unique_ptr{device_malloc(sizeof(int) * size_of_mask), device_free};
     auto dbsr_row_ptr_managed = hipsparse_unique_ptr{device_malloc(sizeof(int) * mb), device_free};
-    auto dbsr_end_ptr_managed = hipsparse_unique_ptr{device_malloc(sizeof(int) * mb), device_free};
+    auto dbsr_endptr_managed = hipsparse_unique_ptr{device_malloc(sizeof(int) * mb), device_free};
     auto dbsr_col_ind_managed
         = hipsparse_unique_ptr{device_malloc(sizeof(int) * nnzb), device_free};
     auto dx_managed = hipsparse_unique_ptr{device_malloc(sizeof(T) * block_dim * nb), device_free};
     auto dy_managed = hipsparse_unique_ptr{device_malloc(sizeof(T) * block_dim * mb), device_free};
 
-    T*   dbsr_val      = (T*)dbsr_val_managed.get();
-    int* dbsr_mask_ptr = (int*)dbsr_mask_ptr_managed.get();
-    int* dbsr_row_ptr  = (int*)dbsr_row_ptr_managed.get();
-    int* dbsr_end_ptr  = (int*)dbsr_end_ptr_managed.get();
-    int* dbsr_col_ind  = (int*)dbsr_col_ind_managed.get();
-    T*   dx            = (T*)dx_managed.get();
-    T*   dy            = (T*)dy_managed.get();
+    T*   dbsr_val      = static_cast<T*>(dbsr_val_managed.get());
+    int* dbsr_mask_ptr = static_cast<int*>(dbsr_mask_ptr_managed.get());
+    int* dbsr_row_ptr  = static_cast<int*>(dbsr_row_ptr_managed.get());
+    int* dbsr_endptr  = static_cast<int*>(dbsr_endptr_managed.get());
+    int* dbsr_col_ind  = static_cast<int*>(dbsr_col_ind_managed.get());
+    T*   dx            = static_cast<T*>(dx_managed.get());
+    T*   dy            = static_cast<T*>(dy_managed.get());
 
     CHECK_HIP_ERROR(hipMemcpy(dbsr_val,
                               hbsr_val.data(),
@@ -453,7 +453,7 @@ hipsparseStatus_t testing_bsrxmv(Arguments argus)
     CHECK_HIP_ERROR(
         hipMemcpy(dbsr_row_ptr, hbsr_row_ptr.data(), sizeof(int) * mb, hipMemcpyHostToDevice));
     CHECK_HIP_ERROR(
-        hipMemcpy(dbsr_end_ptr, hbsr_end_ptr.data(), sizeof(int) * mb, hipMemcpyHostToDevice));
+        hipMemcpy(dbsr_endptr, hbsr_endptr.data(), sizeof(int) * mb, hipMemcpyHostToDevice));
     CHECK_HIP_ERROR(
         hipMemcpy(dbsr_col_ind, hbsr_col_ind.data(), sizeof(int) * nnzb, hipMemcpyHostToDevice));
     CHECK_HIP_ERROR(hipMemcpy(dx, hx.data(), sizeof(T) * nb * block_dim, hipMemcpyHostToDevice));
@@ -481,7 +481,7 @@ hipsparseStatus_t testing_bsrxmv(Arguments argus)
                                                 dbsr_val,
                                                 dbsr_mask_ptr,
                                                 dbsr_row_ptr,
-                                                dbsr_end_ptr,
+                                                dbsr_endptr,
                                                 dbsr_col_ind,
                                                 block_dim,
                                                 dx,

@@ -75,13 +75,13 @@ void testing_csrgemm2_b_bad_arg(void)
     auto dbuffer_managed
         = hipsparse_unique_ptr{device_malloc(sizeof(char) * safe_size), device_free};
 
-    int*  dDptr   = (int*)dDptr_managed.get();
-    int*  dDcol   = (int*)dDcol_managed.get();
-    T*    dDval   = (T*)dDval_managed.get();
-    int*  dCptr   = (int*)dCptr_managed.get();
-    int*  dCcol   = (int*)dCcol_managed.get();
-    T*    dCval   = (T*)dCval_managed.get();
-    void* dbuffer = (void*)dbuffer_managed.get();
+    int*  dDptr   = static_cast<int*>(dDptr_managed.get());
+    int*  dDcol   = static_cast<int*>(dDcol_managed.get());
+    T*    dDval   = static_cast<T*>(dDval_managed.get());
+    int*  dCptr   = static_cast<int*>(dCptr_managed.get());
+    int*  dCcol   = static_cast<int*>(dCcol_managed.get());
+    T*    dCval   = static_cast<T*>(dCval_managed.get());
+    void* dbuffer = static_cast<void*>(dbuffer_managed.get());
 
     std::vector<int> hcsr_row_ptr_C(M + 1);
     hcsr_row_ptr_C[0] = 0;
@@ -100,7 +100,7 @@ void testing_csrgemm2_b_bad_arg(void)
                                                   M,
                                                   N,
                                                   0,
-                                                  (T*)nullptr,
+                                                  static_cast<T*>(nullptr),
                                                   nullptr,
                                                   0,
                                                   nullptr,
@@ -124,7 +124,7 @@ void testing_csrgemm2_b_bad_arg(void)
                                                   M,
                                                   N,
                                                   0,
-                                                  (T*)nullptr,
+                                                  static_cast<T*>(nullptr),
                                                   nullptr,
                                                   0,
                                                   nullptr,
@@ -133,7 +133,7 @@ void testing_csrgemm2_b_bad_arg(void)
                                                   0,
                                                   nullptr,
                                                   nullptr,
-                                                  (T*)nullptr,
+                                                  static_cast<T*>(nullptr),
                                                   descr_D,
                                                   nnz_D,
                                                   dDptr,
@@ -148,7 +148,7 @@ void testing_csrgemm2_b_bad_arg(void)
                                                   M,
                                                   N,
                                                   0,
-                                                  (T*)nullptr,
+                                                  static_cast<T*>(nullptr),
                                                   nullptr,
                                                   0,
                                                   nullptr,
@@ -172,7 +172,7 @@ void testing_csrgemm2_b_bad_arg(void)
                                                   M,
                                                   N,
                                                   0,
-                                                  (T*)nullptr,
+                                                  static_cast<T*>(nullptr),
                                                   nullptr,
                                                   0,
                                                   nullptr,
@@ -196,7 +196,7 @@ void testing_csrgemm2_b_bad_arg(void)
                                                   M,
                                                   N,
                                                   0,
-                                                  (T*)nullptr,
+                                                  static_cast<T*>(nullptr),
                                                   nullptr,
                                                   0,
                                                   nullptr,
@@ -220,7 +220,7 @@ void testing_csrgemm2_b_bad_arg(void)
                                                   M,
                                                   N,
                                                   0,
-                                                  (T*)nullptr,
+                                                  static_cast<T*>(nullptr),
                                                   nullptr,
                                                   0,
                                                   nullptr,
@@ -244,7 +244,7 @@ void testing_csrgemm2_b_bad_arg(void)
                                                   M,
                                                   N,
                                                   0,
-                                                  (T*)nullptr,
+                                                  static_cast<T*>(nullptr),
                                                   nullptr,
                                                   0,
                                                   nullptr,
@@ -474,15 +474,15 @@ void testing_csrgemm2_b_bad_arg(void)
                                     M,
                                     N,
                                     0,
-                                    (T*)nullptr,
+                                    static_cast<T*>(nullptr),
                                     nullptr,
                                     0,
-                                    (T*)nullptr,
+                                    static_cast<T*>(nullptr),
                                     nullptr,
                                     nullptr,
                                     nullptr,
                                     0,
-                                    (T*)nullptr,
+                                    static_cast<T*>(nullptr),
                                     nullptr,
                                     nullptr,
                                     &beta,
@@ -505,18 +505,18 @@ void testing_csrgemm2_b_bad_arg(void)
                                     M,
                                     N,
                                     0,
-                                    (T*)nullptr,
+                                    static_cast<T*>(nullptr),
                                     nullptr,
                                     0,
-                                    (T*)nullptr,
+                                    static_cast<T*>(nullptr),
                                     nullptr,
                                     nullptr,
                                     nullptr,
                                     0,
-                                    (T*)nullptr,
+                                    static_cast<T*>(nullptr),
                                     nullptr,
                                     nullptr,
-                                    (T*)nullptr,
+                                    static_cast<T*>(nullptr),
                                     descr_D,
                                     nnz_D,
                                     dDval,
@@ -536,15 +536,15 @@ void testing_csrgemm2_b_bad_arg(void)
                                     M,
                                     N,
                                     0,
-                                    (T*)nullptr,
+                                    static_cast<T*>(nullptr),
                                     nullptr,
                                     0,
-                                    (T*)nullptr,
+                                    static_cast<T*>(nullptr),
                                     nullptr,
                                     nullptr,
                                     nullptr,
                                     0,
-                                    (T*)nullptr,
+                                    static_cast<T*>(nullptr),
                                     nullptr,
                                     nullptr,
                                     &beta,
@@ -567,21 +567,21 @@ void testing_csrgemm2_b_bad_arg(void)
                                     M,
                                     N,
                                     0,
-                                    (T*)nullptr,
+                                    static_cast<T*>(nullptr),
                                     nullptr,
                                     0,
-                                    (T*)nullptr,
+                                    static_cast<T*>(nullptr),
                                     nullptr,
                                     nullptr,
                                     nullptr,
                                     0,
-                                    (T*)nullptr,
+                                    static_cast<T*>(nullptr),
                                     nullptr,
                                     nullptr,
                                     &beta,
                                     descr_D,
                                     nnz_D,
-                                    (T*)nullptr,
+                                    static_cast<T*>(nullptr),
                                     dDptr,
                                     dDcol,
                                     descr_C,
@@ -598,15 +598,15 @@ void testing_csrgemm2_b_bad_arg(void)
                                     M,
                                     N,
                                     0,
-                                    (T*)nullptr,
+                                    static_cast<T*>(nullptr),
                                     nullptr,
                                     0,
-                                    (T*)nullptr,
+                                    static_cast<T*>(nullptr),
                                     nullptr,
                                     nullptr,
                                     nullptr,
                                     0,
-                                    (T*)nullptr,
+                                    static_cast<T*>(nullptr),
                                     nullptr,
                                     nullptr,
                                     &beta,
@@ -629,15 +629,15 @@ void testing_csrgemm2_b_bad_arg(void)
                                     M,
                                     N,
                                     0,
-                                    (T*)nullptr,
+                                    static_cast<T*>(nullptr),
                                     nullptr,
                                     0,
-                                    (T*)nullptr,
+                                    static_cast<T*>(nullptr),
                                     nullptr,
                                     nullptr,
                                     nullptr,
                                     0,
-                                    (T*)nullptr,
+                                    static_cast<T*>(nullptr),
                                     nullptr,
                                     nullptr,
                                     &beta,
@@ -660,15 +660,15 @@ void testing_csrgemm2_b_bad_arg(void)
                                     M,
                                     N,
                                     0,
-                                    (T*)nullptr,
+                                    static_cast<T*>(nullptr),
                                     nullptr,
                                     0,
-                                    (T*)nullptr,
+                                    static_cast<T*>(nullptr),
                                     nullptr,
                                     nullptr,
                                     nullptr,
                                     0,
-                                    (T*)nullptr,
+                                    static_cast<T*>(nullptr),
                                     nullptr,
                                     nullptr,
                                     &beta,
@@ -691,15 +691,15 @@ void testing_csrgemm2_b_bad_arg(void)
                                     M,
                                     N,
                                     0,
-                                    (T*)nullptr,
+                                    static_cast<T*>(nullptr),
                                     nullptr,
                                     0,
-                                    (T*)nullptr,
+                                    static_cast<T*>(nullptr),
                                     nullptr,
                                     nullptr,
                                     nullptr,
                                     0,
-                                    (T*)nullptr,
+                                    static_cast<T*>(nullptr),
                                     nullptr,
                                     nullptr,
                                     &beta,
@@ -709,7 +709,7 @@ void testing_csrgemm2_b_bad_arg(void)
                                     dDptr,
                                     dDcol,
                                     descr_C,
-                                    (T*)nullptr,
+                                    static_cast<T*>(nullptr),
                                     dCptr,
                                     dCcol,
                                     info,
@@ -722,15 +722,15 @@ void testing_csrgemm2_b_bad_arg(void)
                                     M,
                                     N,
                                     0,
-                                    (T*)nullptr,
+                                    static_cast<T*>(nullptr),
                                     nullptr,
                                     0,
-                                    (T*)nullptr,
+                                    static_cast<T*>(nullptr),
                                     nullptr,
                                     nullptr,
                                     nullptr,
                                     0,
-                                    (T*)nullptr,
+                                    static_cast<T*>(nullptr),
                                     nullptr,
                                     nullptr,
                                     &beta,
@@ -753,15 +753,15 @@ void testing_csrgemm2_b_bad_arg(void)
                                     M,
                                     N,
                                     0,
-                                    (T*)nullptr,
+                                    static_cast<T*>(nullptr),
                                     nullptr,
                                     0,
-                                    (T*)nullptr,
+                                    static_cast<T*>(nullptr),
                                     nullptr,
                                     nullptr,
                                     nullptr,
                                     0,
-                                    (T*)nullptr,
+                                    static_cast<T*>(nullptr),
                                     nullptr,
                                     nullptr,
                                     &beta,
@@ -784,15 +784,15 @@ void testing_csrgemm2_b_bad_arg(void)
                                     M,
                                     N,
                                     0,
-                                    (T*)nullptr,
+                                    static_cast<T*>(nullptr),
                                     nullptr,
                                     0,
-                                    (T*)nullptr,
+                                    static_cast<T*>(nullptr),
                                     nullptr,
                                     nullptr,
                                     nullptr,
                                     0,
-                                    (T*)nullptr,
+                                    static_cast<T*>(nullptr),
                                     nullptr,
                                     nullptr,
                                     &beta,
@@ -864,10 +864,10 @@ hipsparseStatus_t testing_csrgemm2_b(Arguments argus)
     }
 
     std::vector<int> hcsr_row_ptr_A;
-    std::vector<int> hcsr_col_ind_A;
+    std::vector<int> hcsr_col_indA;
     std::vector<T>   hcsr_val_A;
     std::vector<int> hcsr_row_ptr_B;
-    std::vector<int> hcsr_col_ind_B;
+    std::vector<int> hcsr_col_indB;
     std::vector<T>   hcsr_val_B;
 
     // Allocate memory on device
@@ -880,11 +880,11 @@ hipsparseStatus_t testing_csrgemm2_b(Arguments argus)
     auto dCptr_managed = hipsparse_unique_ptr{device_malloc(sizeof(int) * (M + 1)), device_free};
     auto dbeta_managed = hipsparse_unique_ptr{device_malloc(sizeof(T)), device_free};
 
-    int* dDptr = (int*)dDptr_managed.get();
-    int* dDcol = (int*)dDcol_managed.get();
-    T*   dDval = (T*)dDval_managed.get();
-    int* dCptr = (int*)dCptr_managed.get();
-    T*   dbeta = (T*)dbeta_managed.get();
+    int* dDptr = static_cast<int*>(dDptr_managed.get());
+    int* dDcol = static_cast<int*>(dDcol_managed.get());
+    T*   dDval = static_cast<T*>(dDval_managed.get());
+    int* dCptr = static_cast<int*>(dCptr_managed.get());
+    T*   dbeta = static_cast<T*>(dbeta_managed.get());
 
     // copy data from CPU to device
     CHECK_HIP_ERROR(
@@ -901,7 +901,7 @@ hipsparseStatus_t testing_csrgemm2_b(Arguments argus)
                                                            M,
                                                            N,
                                                            0,
-                                                           (T*)nullptr,
+                                                           static_cast<T*>(nullptr),
                                                            descr_A,
                                                            0,
                                                            nullptr,
@@ -922,7 +922,7 @@ hipsparseStatus_t testing_csrgemm2_b(Arguments argus)
     auto dbuffer_managed
         = hipsparse_unique_ptr{device_malloc(sizeof(char) * bufferSize), device_free};
 
-    void* dbuffer = (void*)dbuffer_managed.get();
+    void* dbuffer = static_cast<void*>(dbuffer_managed.get());
 
     // csrgemm2 nnz
 
@@ -958,14 +958,14 @@ hipsparseStatus_t testing_csrgemm2_b(Arguments argus)
     auto dCcol_managed = hipsparse_unique_ptr{device_malloc(sizeof(int) * safe_nnz_C), device_free};
     auto dCval_managed = hipsparse_unique_ptr{device_malloc(sizeof(T) * safe_nnz_C), device_free};
 
-    int* dCcol = (int*)dCcol_managed.get();
-    T*   dCval = (T*)dCval_managed.get();
+    int* dCcol = static_cast<int*>(dCcol_managed.get());
+    T*   dCval = static_cast<T*>(dCval_managed.get());
 
     if(argus.unit_check)
     {
         // hipsparse pointer mode device
         auto dnnz_C_managed = hipsparse_unique_ptr{device_malloc(sizeof(int)), device_free};
-        int* dnnz_C         = (int*)dnnz_C_managed.get();
+        int* dnnz_C         = static_cast<int*>(dnnz_C_managed.get());
 
         CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_DEVICE));
         CHECK_HIPSPARSE_ERROR(hipsparseXcsrgemm2Nnz(handle,
@@ -998,11 +998,11 @@ hipsparseStatus_t testing_csrgemm2_b(Arguments argus)
         int nnz_C_gold = host_csrgemm2_nnz(M,
                                            N,
                                            0,
-                                           (T*)nullptr,
+                                           static_cast<T*>(nullptr),
                                            hcsr_row_ptr_A.data(),
-                                           hcsr_col_ind_A.data(),
+                                           hcsr_col_indA.data(),
                                            hcsr_row_ptr_B.data(),
-                                           hcsr_col_ind_B.data(),
+                                           hcsr_col_indB.data(),
                                            h_beta,
                                            hcsr_row_ptr_D.data(),
                                            hcsr_col_ind_D.data(),
@@ -1024,12 +1024,12 @@ hipsparseStatus_t testing_csrgemm2_b(Arguments argus)
         host_csrgemm2(M,
                       N,
                       0,
-                      (T*)nullptr,
+                      static_cast<T*>(nullptr),
                       hcsr_row_ptr_A.data(),
-                      hcsr_col_ind_A.data(),
+                      hcsr_col_indA.data(),
                       hcsr_val_A.data(),
                       hcsr_row_ptr_B.data(),
-                      hcsr_col_ind_B.data(),
+                      hcsr_col_indB.data(),
                       hcsr_val_B.data(),
                       h_beta,
                       hcsr_row_ptr_D.data(),
@@ -1059,15 +1059,15 @@ hipsparseStatus_t testing_csrgemm2_b(Arguments argus)
                                                  M,
                                                  N,
                                                  0,
-                                                 (T*)nullptr,
+                                                 static_cast<T*>(nullptr),
                                                  descr_A,
                                                  0,
-                                                 (T*)nullptr,
+                                                 static_cast<T*>(nullptr),
                                                  nullptr,
                                                  nullptr,
                                                  descr_B,
                                                  0,
-                                                 (T*)nullptr,
+                                                 static_cast<T*>(nullptr),
                                                  nullptr,
                                                  nullptr,
                                                  h_beta,
@@ -1085,14 +1085,14 @@ hipsparseStatus_t testing_csrgemm2_b(Arguments argus)
 
         // Copy output from device to CPU
         std::vector<int> hcsr_row_ptr_C(M + 1);
-        std::vector<int> hcsr_col_ind_C(nnz_C_gold);
+        std::vector<int> hcsr_col_indC(nnz_C_gold);
         std::vector<T>   hcsr_val_C_1(nnz_C_gold);
         std::vector<T>   hcsr_val_C_2(nnz_C_gold);
 
         CHECK_HIP_ERROR(
             hipMemcpy(hcsr_row_ptr_C.data(), dCptr, sizeof(int) * (M + 1), hipMemcpyDeviceToHost));
         CHECK_HIP_ERROR(hipMemcpy(
-            hcsr_col_ind_C.data(), dCcol, sizeof(int) * nnz_C_gold, hipMemcpyDeviceToHost));
+            hcsr_col_indC.data(), dCcol, sizeof(int) * nnz_C_gold, hipMemcpyDeviceToHost));
         CHECK_HIP_ERROR(
             hipMemcpy(hcsr_val_C_1.data(), dCval, sizeof(T) * nnz_C_gold, hipMemcpyDeviceToHost));
 
@@ -1100,7 +1100,7 @@ hipsparseStatus_t testing_csrgemm2_b(Arguments argus)
 
         // Check structure and entries of C
         unit_check_general(1, M + 1, 1, hcsr_row_ptr_C_gold.data(), hcsr_row_ptr_C.data());
-        unit_check_general(1, nnz_C_gold, 1, hcsr_col_ind_C_gold.data(), hcsr_col_ind_C.data());
+        unit_check_general(1, nnz_C_gold, 1, hcsr_col_ind_C_gold.data(), hcsr_col_indC.data());
         unit_check_near(1, nnz_C_gold, 1, hcsr_val_C_gold.data(), hcsr_val_C_1.data());
 
 #ifdef __HIP_PLATFORM_AMD__
@@ -1110,15 +1110,15 @@ hipsparseStatus_t testing_csrgemm2_b(Arguments argus)
                                                  M,
                                                  N,
                                                  0,
-                                                 (T*)nullptr,
+                                                 static_cast<T*>(nullptr),
                                                  descr_A,
                                                  0,
-                                                 (T*)nullptr,
+                                                 static_cast<T*>(nullptr),
                                                  nullptr,
                                                  nullptr,
                                                  descr_B,
                                                  0,
-                                                 (T*)nullptr,
+                                                 static_cast<T*>(nullptr),
                                                  nullptr,
                                                  nullptr,
                                                  dbeta,

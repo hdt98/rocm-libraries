@@ -71,64 +71,64 @@ void testing_csrsv2_bad_arg(const Arguments& argus)
     auto dbuffer_managed
         = hipsparse_unique_ptr{device_malloc(sizeof(char) * safe_size), device_free};
 
-    int*  dptr    = (int*)dptr_managed.get();
-    int*  dcol    = (int*)dcol_managed.get();
-    T*    dval    = (T*)dval_managed.get();
-    T*    dx      = (T*)dx_managed.get();
-    T*    dy      = (T*)dy_managed.get();
-    void* dbuffer = (void*)dbuffer_managed.get();
+    int*  dptr    = static_cast<int*>(dptr_managed.get());
+    int*  dcol    = static_cast<int*>(dcol_managed.get());
+    T*    dval    = static_cast<T*>(dval_managed.get());
+    T*    dx      = static_cast<T*>(dx_managed.get());
+    T*    dy      = static_cast<T*>(dy_managed.get());
+    void* dbuffer = static_cast<void*>(dbuffer_managed.get());
 
     int size;
     int position;
 
     verify_hipsparse_status_invalid_pointer(
         hipsparseXcsrsv2_bufferSize(
-            handle, transA, m, nnz, descr, dval, (int*)nullptr, dcol, info, &size),
+            handle, transA, m, nnz, descr, dval, static_cast<int*>(nullptr), dcol, info, &size),
         "Error: dptr is nullptr");
     verify_hipsparse_status_invalid_pointer(
         hipsparseXcsrsv2_bufferSize(
-            handle, transA, m, nnz, descr, dval, dptr, (int*)nullptr, info, &size),
+            handle, transA, m, nnz, descr, dval, dptr, static_cast<int*>(nullptr), info, &size),
         "Error: dcol is nullptr");
     verify_hipsparse_status_invalid_pointer(
         hipsparseXcsrsv2_bufferSize(
-            handle, transA, m, nnz, descr, (T*)nullptr, dptr, dcol, info, &size),
+            handle, transA, m, nnz, descr, static_cast<T*>(nullptr), dptr, dcol, info, &size),
         "Error: dval is nullptr");
     verify_hipsparse_status_invalid_pointer(
         hipsparseXcsrsv2_bufferSize(
-            handle, transA, m, nnz, descr, dval, dptr, dcol, info, (int*)nullptr),
+            handle, transA, m, nnz, descr, dval, dptr, dcol, info, static_cast<int*>(nullptr)),
         "Error: size is nullptr");
     verify_hipsparse_status_invalid_pointer(
         hipsparseXcsrsv2_bufferSize(
-            handle, transA, m, nnz, (hipsparseMatDescr_t) nullptr, dval, dptr, dcol, info, &size),
+            handle, transA, m, nnz, static_cast<hipsparseMatDescr_t>(nullptr), dval, dptr, dcol, info, &size),
         "Error: descr is nullptr");
     verify_hipsparse_status_invalid_pointer(
         hipsparseXcsrsv2_bufferSize(
             handle, transA, m, nnz, descr, dval, dptr, dcol, (csrsv2Info_t) nullptr, &size),
         "Error: info is nullptr");
     verify_hipsparse_status_invalid_handle(hipsparseXcsrsv2_bufferSize(
-        (hipsparseHandle_t) nullptr, transA, m, nnz, descr, dval, dptr, dcol, info, &size));
+        static_cast<hipsparseHandle_t>(nullptr), transA, m, nnz, descr, dval, dptr, dcol, info, &size));
 
     verify_hipsparse_status_invalid_pointer(
         hipsparseXcsrsv2_analysis(
-            handle, transA, m, nnz, descr, dval, (int*)nullptr, dcol, info, policy, dbuffer),
+            handle, transA, m, nnz, descr, dval, static_cast<int*>(nullptr), dcol, info, policy, dbuffer),
         "Error: dptr is nullptr");
     verify_hipsparse_status_invalid_pointer(
         hipsparseXcsrsv2_analysis(
-            handle, transA, m, nnz, descr, dval, dptr, (int*)nullptr, info, policy, dbuffer),
+            handle, transA, m, nnz, descr, dval, dptr, static_cast<int*>(nullptr), info, policy, dbuffer),
         "Error: dcol is nullptr");
     verify_hipsparse_status_invalid_pointer(
         hipsparseXcsrsv2_analysis(
-            handle, transA, m, nnz, descr, (T*)nullptr, dptr, dcol, info, policy, dbuffer),
+            handle, transA, m, nnz, descr, static_cast<T*>(nullptr), dptr, dcol, info, policy, dbuffer),
         "Error: dval is nullptr");
     verify_hipsparse_status_invalid_pointer(
         hipsparseXcsrsv2_analysis(
-            handle, transA, m, nnz, descr, dval, dptr, dcol, info, policy, (void*)nullptr),
+            handle, transA, m, nnz, descr, dval, dptr, dcol, info, policy, static_cast<void*>(nullptr)),
         "Error: dbuffer is nullptr");
     verify_hipsparse_status_invalid_pointer(hipsparseXcsrsv2_analysis(handle,
                                                                       transA,
                                                                       m,
                                                                       nnz,
-                                                                      (hipsparseMatDescr_t) nullptr,
+                                                                      static_cast<hipsparseMatDescr_t>(nullptr),
                                                                       dval,
                                                                       dptr,
                                                                       dcol,
@@ -148,7 +148,7 @@ void testing_csrsv2_bad_arg(const Arguments& argus)
                                                                       policy,
                                                                       dbuffer),
                                             "Error: info is nullptr");
-    verify_hipsparse_status_invalid_handle(hipsparseXcsrsv2_analysis((hipsparseHandle_t) nullptr,
+    verify_hipsparse_status_invalid_handle(hipsparseXcsrsv2_analysis(static_cast<hipsparseHandle_t>(nullptr),
                                                                      transA,
                                                                      m,
                                                                      nnz,
@@ -167,7 +167,7 @@ void testing_csrsv2_bad_arg(const Arguments& argus)
                                                                    &h_alpha,
                                                                    descr,
                                                                    dval,
-                                                                   (int*)nullptr,
+                                                                   static_cast<int*>(nullptr),
                                                                    dcol,
                                                                    info,
                                                                    dx,
@@ -183,7 +183,7 @@ void testing_csrsv2_bad_arg(const Arguments& argus)
                                                                    descr,
                                                                    dval,
                                                                    dptr,
-                                                                   (int*)nullptr,
+                                                                   static_cast<int*>(nullptr),
                                                                    info,
                                                                    dx,
                                                                    dy,
@@ -196,7 +196,7 @@ void testing_csrsv2_bad_arg(const Arguments& argus)
                                                                    nnz,
                                                                    &h_alpha,
                                                                    descr,
-                                                                   (T*)nullptr,
+                                                                   static_cast<T*>(nullptr),
                                                                    dptr,
                                                                    dcol,
                                                                    info,
@@ -215,7 +215,7 @@ void testing_csrsv2_bad_arg(const Arguments& argus)
                                                                    dptr,
                                                                    dcol,
                                                                    info,
-                                                                   (T*)nullptr,
+                                                                   static_cast<T*>(nullptr),
                                                                    dy,
                                                                    policy,
                                                                    dbuffer),
@@ -231,7 +231,7 @@ void testing_csrsv2_bad_arg(const Arguments& argus)
                                                                    dcol,
                                                                    info,
                                                                    dx,
-                                                                   (T*)nullptr,
+                                                                   static_cast<T*>(nullptr),
                                                                    policy,
                                                                    dbuffer),
                                             "Error: dy is nullptr");
@@ -239,7 +239,7 @@ void testing_csrsv2_bad_arg(const Arguments& argus)
                                                                    transA,
                                                                    m,
                                                                    nnz,
-                                                                   (T*)nullptr,
+                                                                   static_cast<T*>(nullptr),
                                                                    descr,
                                                                    dval,
                                                                    dptr,
@@ -263,14 +263,14 @@ void testing_csrsv2_bad_arg(const Arguments& argus)
                                                                    dx,
                                                                    dy,
                                                                    policy,
-                                                                   (void*)nullptr),
+                                                                   static_cast<void*>(nullptr)),
                                             "Error: dbuffer is nullptr");
     verify_hipsparse_status_invalid_pointer(hipsparseXcsrsv2_solve(handle,
                                                                    transA,
                                                                    m,
                                                                    nnz,
                                                                    &h_alpha,
-                                                                   (hipsparseMatDescr_t) nullptr,
+                                                                   static_cast<hipsparseMatDescr_t>(nullptr),
                                                                    dval,
                                                                    dptr,
                                                                    dcol,
@@ -295,7 +295,7 @@ void testing_csrsv2_bad_arg(const Arguments& argus)
                                                                    policy,
                                                                    dbuffer),
                                             "Error: info is nullptr");
-    verify_hipsparse_status_invalid_handle(hipsparseXcsrsv2_solve((hipsparseHandle_t) nullptr,
+    verify_hipsparse_status_invalid_handle(hipsparseXcsrsv2_solve(static_cast<hipsparseHandle_t>(nullptr),
                                                                   transA,
                                                                   m,
                                                                   nnz,
@@ -310,13 +310,13 @@ void testing_csrsv2_bad_arg(const Arguments& argus)
                                                                   policy,
                                                                   dbuffer));
 
-    verify_hipsparse_status_invalid_pointer(hipsparseXcsrsv2_zeroPivot(handle, info, (int*)nullptr),
+    verify_hipsparse_status_invalid_pointer(hipsparseXcsrsv2_zeroPivot(handle, info, static_cast<int*>(nullptr)),
                                             "Error: position is nullptr");
     verify_hipsparse_status_invalid_pointer(
         hipsparseXcsrsv2_zeroPivot(handle, (csrsv2Info_t) nullptr, &position),
         "Error: info is nullptr");
     verify_hipsparse_status_invalid_handle(
-        hipsparseXcsrsv2_zeroPivot((hipsparseHandle_t) nullptr, info, &position));
+        hipsparseXcsrsv2_zeroPivot(static_cast<hipsparseHandle_t>(nullptr), info, &position));
 #endif
 }
 
@@ -390,14 +390,14 @@ hipsparseStatus_t testing_csrsv2(Arguments argus)
     auto d_alpha_managed = hipsparse_unique_ptr{device_malloc(sizeof(T)), device_free};
     auto d_position_managed = hipsparse_unique_ptr{device_malloc(sizeof(int)), device_free};
 
-    int* dptr       = (int*)dptr_managed.get();
-    int* dcol       = (int*)dcol_managed.get();
-    T*   dval       = (T*)dval_managed.get();
-    T*   dx         = (T*)dx_managed.get();
-    T*   dy_1       = (T*)dy_1_managed.get();
-    T*   dy_2       = (T*)dy_2_managed.get();
-    T*   d_alpha    = (T*)d_alpha_managed.get();
-    int* d_position = (int*)d_position_managed.get();
+    int* dptr       = static_cast<int*>(dptr_managed.get());
+    int* dcol       = static_cast<int*>(dcol_managed.get());
+    T*   dval       = static_cast<T*>(dval_managed.get());
+    T*   dx         = static_cast<T*>(dx_managed.get());
+    T*   dy_1       = static_cast<T*>(dy_1_managed.get());
+    T*   dy_2       = static_cast<T*>(dy_2_managed.get());
+    T*   d_alpha    = static_cast<T*>(d_alpha_managed.get());
+    int* d_position = static_cast<int*>(d_position_managed.get());
 
     // copy data from CPU to device
     CHECK_HIP_ERROR(
@@ -417,7 +417,7 @@ hipsparseStatus_t testing_csrsv2(Arguments argus)
     auto dbuffer_managed
         = hipsparse_unique_ptr{device_malloc(sizeof(char) * bufferSize), device_free};
 
-    void* dbuffer = (void*)dbuffer_managed.get();
+    void* dbuffer = static_cast<void*>(dbuffer_managed.get());
 
     // csrsv2 analysis
     CHECK_HIPSPARSE_ERROR(hipsparseXcsrsv2_analysis(
@@ -537,10 +537,8 @@ hipsparseStatus_t testing_csrsv2(Arguments argus)
 
         CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_HOST));
 
-        // Warm up
-        for(int iter = 0; iter < number_cold_calls; ++iter)
-        {
-            CHECK_HIPSPARSE_ERROR(hipsparseXcsrsv2_solve(handle,
+        double gpu_time_used = benchmark_kernel(
+            [&]() { CHECK_HIPSPARSE_ERROR(hipsparseXcsrsv2_solve(handle,
                                                          trans,
                                                          m,
                                                          nnz,
@@ -553,31 +551,9 @@ hipsparseStatus_t testing_csrsv2(Arguments argus)
                                                          dx,
                                                          dy_1,
                                                          policy,
-                                                         dbuffer));
-        }
-
-        double gpu_time_used = get_time_us();
-
-        // Performance run
-        for(int iter = 0; iter < number_hot_calls; ++iter)
-        {
-            CHECK_HIPSPARSE_ERROR(hipsparseXcsrsv2_solve(handle,
-                                                         trans,
-                                                         m,
-                                                         nnz,
-                                                         &h_alpha,
-                                                         descr,
-                                                         dval,
-                                                         dptr,
-                                                         dcol,
-                                                         info,
-                                                         dx,
-                                                         dy_1,
-                                                         policy,
-                                                         dbuffer));
-        }
-
-        gpu_time_used = (get_time_us() - gpu_time_used) / number_hot_calls;
+                                                         dbuffer)); return HIPSPARSE_STATUS_SUCCESS; },
+            number_cold_calls,
+            number_hot_calls);
 
         double gflop_count = csrsv_gflop_count(m, nnz, diag_type);
         double gbyte_count = csrsv_gbyte_count<T>(m, nnz);

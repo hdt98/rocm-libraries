@@ -70,11 +70,11 @@ void testing_dense_to_sparse_coo_bad_arg(void)
         = hipsparse_unique_ptr{device_malloc(sizeof(float) * safe_size), device_free};
     auto dbuf_managed = hipsparse_unique_ptr{device_malloc(sizeof(char) * safe_size), device_free};
 
-    float*   ddense_val   = (float*)ddense_val_managed.get();
-    int32_t* dcoo_row_ind = (int32_t*)dcoo_row_ind_managed.get();
-    int32_t* dcoo_col_ind = (int32_t*)dcoo_col_ind_managed.get();
-    float*   dcoo_val     = (float*)dcoo_val_managed.get();
-    void*    dbuf         = (void*)dbuf_managed.get();
+    float*   ddense_val   = static_cast<float*>(ddense_val_managed.get());
+    int32_t* dcoo_row_ind = static_cast<int32_t*>(dcoo_row_ind_managed.get());
+    int32_t* dcoo_col_ind = static_cast<int32_t*>(dcoo_col_ind_managed.get());
+    float*   dcoo_val     = static_cast<float*>(dcoo_val_managed.get());
+    void*    dbuf         = static_cast<void*>(dbuf_managed.get());
 
     // Matrix structures
     hipsparseDnVecDescr_t matA;
@@ -185,7 +185,7 @@ hipsparseStatus_t testing_dense_to_sparse_coo(Arguments argus)
     // allocate memory on device
     auto ddense_managed = hipsparse_unique_ptr{device_malloc(sizeof(T) * nrow * ncol), device_free};
 
-    T* ddense = (T*)ddense_managed.get();
+    T* ddense = static_cast<T*>(ddense_managed.get());
 
     // Copy host dense matrix to device
     CHECK_HIP_ERROR(
@@ -216,9 +216,9 @@ hipsparseStatus_t testing_dense_to_sparse_coo(Arguments argus)
     auto dcol_managed = hipsparse_unique_ptr{device_malloc(sizeof(I) * nnz), device_free};
     auto dval_managed = hipsparse_unique_ptr{device_malloc(sizeof(T) * nnz), device_free};
 
-    I* drow = (I*)drow_managed.get();
-    I* dcol = (I*)dcol_managed.get();
-    T* dval = (T*)dval_managed.get();
+    I* drow = static_cast<I*>(drow_managed.get());
+    I* dcol = static_cast<I*>(dcol_managed.get());
+    T* dval = static_cast<T*>(dval_managed.get());
 
     CHECK_HIPSPARSE_ERROR(hipsparseCooSetPointers(matB, drow, dcol, dval));
 

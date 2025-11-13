@@ -51,10 +51,10 @@ void testing_identity_bad_arg(void)
 
     auto p_managed = hipsparse_unique_ptr{device_malloc(sizeof(int) * safe_size), device_free};
 
-    int* p = (int*)p_managed.get();
+    int* p = static_cast<int*>(p_managed.get());
 
     verify_hipsparse_status_invalid_pointer(
-        hipsparseCreateIdentityPermutation(handle, n, (int*)nullptr), "Error: p is nullptr");
+        hipsparseCreateIdentityPermutation(handle, n, static_cast<int*>(nullptr)), "Error: p is nullptr");
     verify_hipsparse_status_invalid_handle(hipsparseCreateIdentityPermutation(nullptr, n, p));
 #endif
 }
@@ -80,7 +80,7 @@ hipsparseStatus_t testing_identity(Arguments argus)
     // Allocate memory on the device
     auto dp_managed = hipsparse_unique_ptr{device_malloc(sizeof(int) * n), device_free};
 
-    int* dp = (int*)dp_managed.get();
+    int* dp = static_cast<int*>(dp_managed.get());
 
     if(argus.unit_check)
     {
@@ -98,21 +98,10 @@ hipsparseStatus_t testing_identity(Arguments argus)
         int number_cold_calls = 2;
         int number_hot_calls  = argus.iters;
 
-        // Warm up
-        for(int iter = 0; iter < number_cold_calls; ++iter)
-        {
-            CHECK_HIPSPARSE_ERROR(hipsparseCreateIdentityPermutation(handle, n, dp));
-        }
-
-        double gpu_time_used = get_time_us();
-
-        // Performance run
-        for(int iter = 0; iter < number_hot_calls; ++iter)
-        {
-            CHECK_HIPSPARSE_ERROR(hipsparseCreateIdentityPermutation(handle, n, dp));
-        }
-
-        gpu_time_used = (get_time_us() - gpu_time_used) / number_hot_calls;
+        double gpu_time_used = benchmark_kernel(
+            [&]() { CHECK_HIPSPARSE_ERROR(hipsparseCreateIdentityPermutation(handle, n, dp)); return HIPSPARSE_STATUS_SUCCESS; },
+            number_cold_calls,
+            number_hot_calls);
 
         double gbyte_count = identity_gbyte_count(n);
         double gpu_gbyte   = get_gpu_gbyte(gpu_time_used, gbyte_count);

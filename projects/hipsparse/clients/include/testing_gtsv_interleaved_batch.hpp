@@ -61,11 +61,11 @@ void testing_gtsv_interleaved_batch_bad_arg(void)
     auto dx_managed   = hipsparse_unique_ptr{device_malloc(sizeof(T) * safe_size), device_free};
     auto dbuf_managed = hipsparse_unique_ptr{device_malloc(sizeof(char) * safe_size), device_free};
 
-    T*    ddl  = (T*)ddl_managed.get();
-    T*    dd   = (T*)dd_managed.get();
-    T*    ddu  = (T*)ddu_managed.get();
-    T*    dx   = (T*)dx_managed.get();
-    void* dbuf = (void*)dbuf_managed.get();
+    T*    ddl  = static_cast<T*>(ddl_managed.get());
+    T*    dd   = static_cast<T*>(dd_managed.get());
+    T*    ddu  = static_cast<T*>(ddu_managed.get());
+    T*    dx   = static_cast<T*>(dx_managed.get());
+    void* dbuf = static_cast<void*>(dbuf_managed.get());
 
     size_t bsize;
 
@@ -95,19 +95,19 @@ void testing_gtsv_interleaved_batch_bad_arg(void)
         "Error: batch_count is invalid");
     verify_hipsparse_status_invalid_pointer(
         hipsparseXgtsvInterleavedBatch(
-            handle, algo, m, (T*)nullptr, dd, ddu, dx, batch_count, dbuf),
+            handle, algo, m, static_cast<T*>(nullptr), dd, ddu, dx, batch_count, dbuf),
         "Error: ddl is nullptr");
     verify_hipsparse_status_invalid_pointer(
         hipsparseXgtsvInterleavedBatch(
-            handle, algo, m, ddl, (T*)nullptr, ddu, dx, batch_count, dbuf),
+            handle, algo, m, ddl, static_cast<T*>(nullptr), ddu, dx, batch_count, dbuf),
         "Error: dd is nullptr");
     verify_hipsparse_status_invalid_pointer(
         hipsparseXgtsvInterleavedBatch(
-            handle, algo, m, ddl, dd, (T*)nullptr, dx, batch_count, dbuf),
+            handle, algo, m, ddl, dd, static_cast<T*>(nullptr), dx, batch_count, dbuf),
         "Error: ddu is nullptr");
     verify_hipsparse_status_invalid_pointer(
         hipsparseXgtsvInterleavedBatch(
-            handle, algo, m, ddl, dd, ddu, (T*)nullptr, batch_count, dbuf),
+            handle, algo, m, ddl, dd, ddu, static_cast<T*>(nullptr), batch_count, dbuf),
         "Error: dx is nullptr");
     verify_hipsparse_status_invalid_pointer(
         hipsparseXgtsvInterleavedBatch(handle, algo, m, ddl, dd, ddu, dx, batch_count, nullptr),
@@ -148,10 +148,10 @@ hipsparseStatus_t testing_gtsv_interleaved_batch(Arguments argus)
         = hipsparse_unique_ptr{device_malloc(sizeof(T) * m * batch_count), device_free};
     auto dx_managed = hipsparse_unique_ptr{device_malloc(sizeof(T) * m * batch_count), device_free};
 
-    T* ddl = (T*)ddl_managed.get();
-    T* dd  = (T*)dd_managed.get();
-    T* ddu = (T*)ddu_managed.get();
-    T* dx  = (T*)dx_managed.get();
+    T* ddl = static_cast<T*>(ddl_managed.get());
+    T* dd  = static_cast<T*>(dd_managed.get());
+    T* ddu = static_cast<T*>(ddu_managed.get());
+    T* dx  = static_cast<T*>(dx_managed.get());
 
     // copy data from CPU to device
     CHECK_HIP_ERROR(hipMemcpy(ddl, hdl.data(), sizeof(T) * m * batch_count, hipMemcpyHostToDevice));
@@ -205,23 +205,11 @@ hipsparseStatus_t testing_gtsv_interleaved_batch(Arguments argus)
         int number_cold_calls = 2;
         int number_hot_calls  = argus.iters;
 
-        // Warm up
-        for(int iter = 0; iter < number_cold_calls; ++iter)
-        {
-            CHECK_HIPSPARSE_ERROR(hipsparseXgtsvInterleavedBatch(
-                handle, algo, m, ddl, dd, ddu, dx, batch_count, buffer));
-        }
-
-        double gpu_time_used = get_time_us();
-
-        // Performance run
-        for(int iter = 0; iter < number_hot_calls; ++iter)
-        {
-            CHECK_HIPSPARSE_ERROR(hipsparseXgtsvInterleavedBatch(
-                handle, algo, m, ddl, dd, ddu, dx, batch_count, buffer));
-        }
-
-        gpu_time_used = (get_time_us() - gpu_time_used) / number_hot_calls;
+        double gpu_time_used = benchmark_kernel(
+            [&]() { CHECK_HIPSPARSE_ERROR(hipsparseXgtsvInterleavedBatch(
+                handle, algo, m, ddl, dd, ddu, dx, batch_count, buffer)); return HIPSPARSE_STATUS_SUCCESS; },
+            number_cold_calls,
+            number_hot_calls);
 
         double gbyte_count = gtsv_interleaved_batch_gbyte_count<T>(m, batch_count);
         double gpu_gbyte   = get_gpu_gbyte(gpu_time_used, gbyte_count);

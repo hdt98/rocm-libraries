@@ -56,24 +56,24 @@ void testing_axpyi_bad_arg(const Arguments& argus)
     auto dxInd_managed = hipsparse_unique_ptr{device_malloc(sizeof(int) * safe_size), device_free};
     auto dy_managed    = hipsparse_unique_ptr{device_malloc(sizeof(T) * safe_size), device_free};
 
-    T*   dxVal = (T*)dxVal_managed.get();
-    int* dxInd = (int*)dxInd_managed.get();
-    T*   dy    = (T*)dy_managed.get();
+    T*   dxVal = static_cast<T*>(dxVal_managed.get());
+    int* dxInd = static_cast<int*>(dxInd_managed.get());
+    T*   dy    = static_cast<T*>(dy_managed.get());
 
     verify_hipsparse_status_invalid_pointer(
-        hipsparseXaxpyi(handle, nnz, &alpha, dxVal, (int*)nullptr, dy, idx_base),
+        hipsparseXaxpyi(handle, nnz, &alpha, dxVal, static_cast<int*>(nullptr), dy, idx_base),
         "Error: xInd is nullptr");
     verify_hipsparse_status_invalid_pointer(
-        hipsparseXaxpyi(handle, nnz, &alpha, (T*)nullptr, dxInd, dy, idx_base),
+        hipsparseXaxpyi(handle, nnz, &alpha, static_cast<T*>(nullptr), dxInd, dy, idx_base),
         "Error: xVal is nullptr");
     verify_hipsparse_status_invalid_pointer(
-        hipsparseXaxpyi(handle, nnz, &alpha, dxVal, dxInd, (T*)nullptr, idx_base),
+        hipsparseXaxpyi(handle, nnz, &alpha, dxVal, dxInd, static_cast<T*>(nullptr), idx_base),
         "Error: y is nullptr");
     verify_hipsparse_status_invalid_pointer(
-        hipsparseXaxpyi(handle, nnz, (T*)nullptr, dxVal, dxInd, dy, idx_base),
+        hipsparseXaxpyi(handle, nnz, static_cast<T*>(nullptr), dxVal, dxInd, dy, idx_base),
         "Error: alpha is nullptr");
     verify_hipsparse_status_invalid_handle(
-        hipsparseXaxpyi((hipsparseHandle_t) nullptr, nnz, &alpha, dxVal, dxInd, dy, idx_base));
+        hipsparseXaxpyi(static_cast<hipsparseHandle_t>(nullptr), nnz, &alpha, dxVal, dxInd, dy, idx_base));
 #endif
 }
 
@@ -113,11 +113,11 @@ hipsparseStatus_t testing_axpyi(const Arguments& argus)
     auto dy_2_managed    = hipsparse_unique_ptr{device_malloc(sizeof(T) * N), device_free};
     auto d_alpha_managed = hipsparse_unique_ptr{device_malloc(sizeof(T)), device_free};
 
-    int* dxInd   = (int*)dxInd_managed.get();
-    T*   dxVal   = (T*)dxVal_managed.get();
-    T*   dy_1    = (T*)dy_1_managed.get();
-    T*   dy_2    = (T*)dy_2_managed.get();
-    T*   d_alpha = (T*)d_alpha_managed.get();
+    int* dxInd   = static_cast<int*>(dxInd_managed.get());
+    T*   dxVal   = static_cast<T*>(dxVal_managed.get());
+    T*   dy_1    = static_cast<T*>(dy_1_managed.get());
+    T*   dy_2    = static_cast<T*>(dy_2_managed.get());
+    T*   d_alpha = static_cast<T*>(d_alpha_managed.get());
 
     // copy data from CPU to device
     CHECK_HIP_ERROR(hipMemcpy(dxInd, hxInd.data(), sizeof(int) * nnz, hipMemcpyHostToDevice));
@@ -159,23 +159,11 @@ hipsparseStatus_t testing_axpyi(const Arguments& argus)
 
         CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_HOST));
 
-        // Warm up
-        for(int iter = 0; iter < number_cold_calls; ++iter)
-        {
-            CHECK_HIPSPARSE_ERROR(
-                hipsparseXaxpyi(handle, nnz, &h_alpha, dxVal, dxInd, dy_1, idx_base));
-        }
-
-        double gpu_time_used = get_time_us();
-
-        // Performance run
-        for(int iter = 0; iter < number_hot_calls; ++iter)
-        {
-            CHECK_HIPSPARSE_ERROR(
-                hipsparseXaxpyi(handle, nnz, &h_alpha, dxVal, dxInd, dy_1, idx_base));
-        }
-
-        gpu_time_used = (get_time_us() - gpu_time_used) / number_hot_calls;
+        double gpu_time_used = benchmark_kernel(
+            [&]() { CHECK_HIPSPARSE_ERROR(
+                hipsparseXaxpyi(handle, nnz, &h_alpha, dxVal, dxInd, dy_1, idx_base)); return HIPSPARSE_STATUS_SUCCESS; },
+            number_cold_calls,
+            number_hot_calls);
 
         double gflop_count = axpyi_gflop_count(nnz);
         double gbyte_count = axpby_gbyte_count<T>(nnz);

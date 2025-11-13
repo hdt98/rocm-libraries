@@ -50,28 +50,28 @@ void testing_sctr_bad_arg(const Arguments& argus)
     std::unique_ptr<handle_struct> unique_ptr_handle(new handle_struct);
     hipsparseHandle_t              handle = unique_ptr_handle->handle;
 
-    auto dx_val_managed = hipsparse_unique_ptr{device_malloc(sizeof(T) * safe_size), device_free};
-    auto dx_ind_managed = hipsparse_unique_ptr{device_malloc(sizeof(int) * safe_size), device_free};
+    auto dxVal_managed = hipsparse_unique_ptr{device_malloc(sizeof(T) * safe_size), device_free};
+    auto dxInd_managed = hipsparse_unique_ptr{device_malloc(sizeof(int) * safe_size), device_free};
     auto dy_managed     = hipsparse_unique_ptr{device_malloc(sizeof(T) * safe_size), device_free};
 
-    T*   dx_val = (T*)dx_val_managed.get();
-    int* dx_ind = (int*)dx_ind_managed.get();
-    T*   dy     = (T*)dy_managed.get();
+    T*   dxVal = static_cast<T*>(dxVal_managed.get());
+    int* dxInd = static_cast<int*>(dxInd_managed.get());
+    T*   dy     = static_cast<T*>(dy_managed.get());
 
-    verify_hipsparse_status_invalid_value(hipsparseXsctr(handle, -1, dx_val, dx_ind, dy, idx_base),
+    verify_hipsparse_status_invalid_value(hipsparseXsctr(handle, -1, dxVal, dxInd, dy, idx_base),
                                           "Error: nnz is invalid");
 
     // cusparse returns success for these
 #if(!defined(CUDART_VERSION))
     verify_hipsparse_status_invalid_pointer(
-        hipsparseXsctr(handle, nnz, dx_val, (int*)nullptr, dy, idx_base),
+        hipsparseXsctr(handle, nnz, dxVal, static_cast<int*>(nullptr), dy, idx_base),
         "Error: x_ind is nullptr");
     verify_hipsparse_status_invalid_pointer(
-        hipsparseXsctr(handle, nnz, (T*)nullptr, dx_ind, dy, idx_base), "Error: x_val is nullptr");
+        hipsparseXsctr(handle, nnz, static_cast<T*>(nullptr), dxInd, dy, idx_base), "Error: x_val is nullptr");
     verify_hipsparse_status_invalid_pointer(
-        hipsparseXsctr(handle, nnz, dx_val, dx_ind, (T*)nullptr, idx_base), "Error: y is nullptr");
+        hipsparseXsctr(handle, nnz, dxVal, dxInd, static_cast<T*>(nullptr), idx_base), "Error: y is nullptr");
     verify_hipsparse_status_invalid_handle(
-        hipsparseXsctr(nullptr, nnz, dx_val, dx_ind, dy, idx_base));
+        hipsparseXsctr(nullptr, nnz, dxVal, dxInd, dy, idx_base));
 #endif
 }
 
@@ -87,38 +87,38 @@ hipsparseStatus_t testing_sctr(Arguments argus)
     hipsparseHandle_t              handle = unique_ptr_handle->handle;
 
     // Host structures
-    std::vector<int> hx_ind(nnz);
-    std::vector<T>   hx_val(nnz);
+    std::vector<int> hxInd(nnz);
+    std::vector<T>   hxVal(nnz);
     std::vector<T>   hy(N);
     std::vector<T>   hy_gold(N);
 
     // Initial Data on CPU
     srand(12345ULL);
-    hipsparseInitIndex(hx_ind.data(), nnz, 1, N);
-    hipsparseInit<T>(hx_val, 1, nnz);
+    hipsparseInitIndex(hxInd.data(), nnz, 1, N);
+    hipsparseInit<T>(hxVal, 1, nnz);
     hipsparseInit<T>(hy, 1, N);
 
     hy_gold = hy;
 
     // allocate memory on device
-    auto dx_ind_managed = hipsparse_unique_ptr{device_malloc(sizeof(int) * nnz), device_free};
-    auto dx_val_managed = hipsparse_unique_ptr{device_malloc(sizeof(T) * nnz), device_free};
+    auto dxInd_managed = hipsparse_unique_ptr{device_malloc(sizeof(int) * nnz), device_free};
+    auto dxVal_managed = hipsparse_unique_ptr{device_malloc(sizeof(T) * nnz), device_free};
     auto dy_managed     = hipsparse_unique_ptr{device_malloc(sizeof(T) * N), device_free};
 
-    int* dx_ind = (int*)dx_ind_managed.get();
-    T*   dx_val = (T*)dx_val_managed.get();
-    T*   dy     = (T*)dy_managed.get();
+    int* dxInd = static_cast<int*>(dxInd_managed.get());
+    T*   dxVal = static_cast<T*>(dxVal_managed.get());
+    T*   dy     = static_cast<T*>(dy_managed.get());
 
     // copy data from CPU to device
-    CHECK_HIP_ERROR(hipMemcpy(dx_ind, hx_ind.data(), sizeof(int) * nnz, hipMemcpyHostToDevice));
-    CHECK_HIP_ERROR(hipMemcpy(dx_val, hx_val.data(), sizeof(T) * nnz, hipMemcpyHostToDevice));
+    CHECK_HIP_ERROR(hipMemcpy(dxInd, hxInd.data(), sizeof(int) * nnz, hipMemcpyHostToDevice));
+    CHECK_HIP_ERROR(hipMemcpy(dxVal, hxVal.data(), sizeof(T) * nnz, hipMemcpyHostToDevice));
     CHECK_HIP_ERROR(hipMemcpy(dy, hy.data(), sizeof(T) * N, hipMemcpyHostToDevice));
 
     if(argus.unit_check)
     {
         // HIPSPARSE pointer mode host
         CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_HOST));
-        CHECK_HIPSPARSE_ERROR(hipsparseXsctr(handle, nnz, dx_val, dx_ind, dy, idx_base));
+        CHECK_HIPSPARSE_ERROR(hipsparseXsctr(handle, nnz, dxVal, dxInd, dy, idx_base));
 
         // copy output from device to CPU
         CHECK_HIP_ERROR(hipMemcpy(hy.data(), dy, sizeof(T) * N, hipMemcpyDeviceToHost));
@@ -126,7 +126,7 @@ hipsparseStatus_t testing_sctr(Arguments argus)
         // CPU
         for(int i = 0; i < nnz; ++i)
         {
-            hy_gold[hx_ind[i] - idx_base] = hx_val[i];
+            hy_gold[hxInd[i] - idx_base] = hxVal[i];
         }
         // enable unit check, notice unit check is not invasive, but norm check is,
         // unit check and norm check can not be interchanged their order
@@ -140,21 +140,10 @@ hipsparseStatus_t testing_sctr(Arguments argus)
 
         CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_HOST));
 
-        // Warm up
-        for(int iter = 0; iter < number_cold_calls; ++iter)
-        {
-            CHECK_HIPSPARSE_ERROR(hipsparseXsctr(handle, nnz, dx_val, dx_ind, dy, idx_base));
-        }
-
-        double gpu_time_used = get_time_us();
-
-        // Performance run
-        for(int iter = 0; iter < number_hot_calls; ++iter)
-        {
-            CHECK_HIPSPARSE_ERROR(hipsparseXsctr(handle, nnz, dx_val, dx_ind, dy, idx_base));
-        }
-
-        gpu_time_used = (get_time_us() - gpu_time_used) / number_hot_calls;
+        double gpu_time_used = benchmark_kernel(
+            [&]() { CHECK_HIPSPARSE_ERROR(hipsparseXsctr(handle, nnz, dxVal, dxInd, dy, idx_base)); return HIPSPARSE_STATUS_SUCCESS; },
+            number_cold_calls,
+            number_hot_calls);
 
         double gbyte_count = sctr_gbyte_count<T>(nnz);
         double gpu_gbyte   = get_gpu_gbyte(gpu_time_used, gbyte_count);

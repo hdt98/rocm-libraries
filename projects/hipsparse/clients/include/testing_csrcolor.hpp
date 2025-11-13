@@ -60,11 +60,11 @@ void testing_csrcolor_bad_arg(void)
     auto m_csr_val     = hipsparse_unique_ptr{device_malloc(sizeof(T) * 1), device_free};
     auto m_csr_row_ptr = hipsparse_unique_ptr{device_malloc(sizeof(int) * 1), device_free};
     auto m_csr_col_ind = hipsparse_unique_ptr{device_malloc(sizeof(int) * 1), device_free};
-    T*   d_csr_val     = (T*)m_csr_val.get();
-    int* d_coloring    = (int*)m_coloring.get();
-    int* d_reordering  = (int*)m_reordering.get();
-    int* d_csr_row_ptr = (int*)m_csr_row_ptr.get();
-    int* d_csr_col_ind = (int*)m_csr_col_ind.get();
+    T*   d_csr_val     = static_cast<T*>(m_csr_val.get());
+    int* d_coloring    = static_cast<int*>(m_coloring.get());
+    int* d_reordering  = static_cast<int*>(m_reordering.get());
+    int* d_csr_row_ptr = static_cast<int*>(m_csr_row_ptr.get());
+    int* d_csr_col_ind = static_cast<int*>(m_csr_col_ind.get());
     int  ncolors;
 
     hipsparseColorInfo_t colorInfo = (hipsparseColorInfo_t)0x4;
@@ -269,11 +269,11 @@ hipsparseStatus_t testing_csrcolor()
     auto dcoloring_managed   = hipsparse_unique_ptr{device_malloc(sizeof(int) * m), device_free};
     auto dreordering_managed = hipsparse_unique_ptr{device_malloc(sizeof(int) * m), device_free};
 
-    int* drow_ptr    = (int*)drow_ptr_managed.get();
-    int* dcol_ind    = (int*)dcol_ind_managed.get();
-    T*   dval        = (T*)dval_managed.get();
-    int* dcoloring   = (int*)dcoloring_managed.get();
-    int* dreordering = (int*)dreordering_managed.get();
+    int* drow_ptr    = static_cast<int*>(drow_ptr_managed.get());
+    int* dcol_ind    = static_cast<int*>(dcol_ind_managed.get());
+    T*   dval        = static_cast<T*>(dval_managed.get());
+    int* dcoloring   = static_cast<int*>(dcoloring_managed.get());
+    int* dreordering = static_cast<int*>(dreordering_managed.get());
 
     // copy data from CPU to device
     CHECK_HIP_ERROR(

@@ -74,18 +74,18 @@ void testing_bsr2csr_bad_arg(const Arguments& argus)
         = hipsparse_unique_ptr{device_malloc(sizeof(int) * safe_size), device_free};
     auto csr_val_managed = hipsparse_unique_ptr{device_malloc(sizeof(T) * safe_size), device_free};
 
-    int* bsr_row_ptr = (int*)bsr_row_ptr_managed.get();
-    int* bsr_col_ind = (int*)bsr_col_ind_managed.get();
-    T*   bsr_val     = (T*)bsr_val_managed.get();
-    int* csr_row_ptr = (int*)csr_row_ptr_managed.get();
-    int* csr_col_ind = (int*)csr_col_ind_managed.get();
-    T*   csr_val     = (T*)csr_val_managed.get();
+    int* bsr_row_ptr = static_cast<int*>(bsr_row_ptr_managed.get());
+    int* bsr_col_ind = static_cast<int*>(bsr_col_ind_managed.get());
+    T*   bsr_val     = static_cast<T*>(bsr_val_managed.get());
+    int* csr_row_ptr = static_cast<int*>(csr_row_ptr_managed.get());
+    int* csr_col_ind = static_cast<int*>(csr_col_ind_managed.get());
+    T*   csr_val     = static_cast<T*>(csr_val_managed.get());
 
     int local_ptr[2] = {0, 1};
     CHECK_HIP_ERROR(
         hipMemcpy(bsr_row_ptr, local_ptr, sizeof(int) * (1 + 1), hipMemcpyHostToDevice));
 
-    verify_hipsparse_status_invalid_handle(hipsparseXbsr2csr((hipsparseHandle_t) nullptr,
+    verify_hipsparse_status_invalid_handle(hipsparseXbsr2csr(static_cast<hipsparseHandle_t>(nullptr),
                                                              dir,
                                                              m,
                                                              n,
@@ -102,7 +102,7 @@ void testing_bsr2csr_bad_arg(const Arguments& argus)
                                                               dir,
                                                               m,
                                                               n,
-                                                              (hipsparseMatDescr_t) nullptr,
+                                                              static_cast<hipsparseMatDescr_t>(nullptr),
                                                               bsr_val,
                                                               bsr_row_ptr,
                                                               bsr_col_ind,
@@ -117,7 +117,7 @@ void testing_bsr2csr_bad_arg(const Arguments& argus)
                                                               m,
                                                               n,
                                                               bsr_descr,
-                                                              (T*)nullptr,
+                                                              static_cast<T*>(nullptr),
                                                               bsr_row_ptr,
                                                               bsr_col_ind,
                                                               block_dim,
@@ -132,7 +132,7 @@ void testing_bsr2csr_bad_arg(const Arguments& argus)
                                                               n,
                                                               bsr_descr,
                                                               bsr_val,
-                                                              (int*)nullptr,
+                                                              static_cast<int*>(nullptr),
                                                               bsr_col_ind,
                                                               block_dim,
                                                               csr_descr,
@@ -147,7 +147,7 @@ void testing_bsr2csr_bad_arg(const Arguments& argus)
                                                               bsr_descr,
                                                               bsr_val,
                                                               bsr_row_ptr,
-                                                              (int*)nullptr,
+                                                              static_cast<int*>(nullptr),
                                                               block_dim,
                                                               csr_descr,
                                                               csr_val,
@@ -163,7 +163,7 @@ void testing_bsr2csr_bad_arg(const Arguments& argus)
                                                               bsr_row_ptr,
                                                               bsr_col_ind,
                                                               block_dim,
-                                                              (hipsparseMatDescr_t) nullptr,
+                                                              static_cast<hipsparseMatDescr_t>(nullptr),
                                                               csr_val,
                                                               csr_row_ptr,
                                                               csr_col_ind),
@@ -178,7 +178,7 @@ void testing_bsr2csr_bad_arg(const Arguments& argus)
                                                               bsr_col_ind,
                                                               block_dim,
                                                               csr_descr,
-                                                              (T*)nullptr,
+                                                              static_cast<T*>(nullptr),
                                                               csr_row_ptr,
                                                               csr_col_ind),
                                             "Error: csr_val is nullptr");
@@ -193,7 +193,7 @@ void testing_bsr2csr_bad_arg(const Arguments& argus)
                                                               block_dim,
                                                               csr_descr,
                                                               csr_val,
-                                                              (int*)nullptr,
+                                                              static_cast<int*>(nullptr),
                                                               csr_col_ind),
                                             "Error: csr_row_ptr is nullptr");
     verify_hipsparse_status_invalid_pointer(hipsparseXbsr2csr(handle,
@@ -208,7 +208,7 @@ void testing_bsr2csr_bad_arg(const Arguments& argus)
                                                               csr_descr,
                                                               csr_val,
                                                               csr_row_ptr,
-                                                              (int*)nullptr),
+                                                              static_cast<int*>(nullptr)),
                                             "Error: csr_col_ind is nullptr");
 
     verify_hipsparse_status_invalid_size(hipsparseXbsr2csr(handle,
@@ -349,12 +349,12 @@ hipsparseStatus_t testing_bsr2csr(Arguments argus)
     auto dcsr_val_managed = hipsparse_unique_ptr{
         device_malloc(sizeof(T) * nnzb * block_dim * block_dim), device_free};
 
-    int* dbsr_row_ptr = (int*)dbsr_row_ptr_managed.get();
-    int* dbsr_col_ind = (int*)dbsr_col_ind_managed.get();
-    T*   dbsr_val     = (T*)dbsr_val_managed.get();
-    int* dcsr_row_ptr = (int*)dcsr_row_ptr_managed.get();
-    int* dcsr_col_ind = (int*)dcsr_col_ind_managed.get();
-    T*   dcsr_val     = (T*)dcsr_val_managed.get();
+    int* dbsr_row_ptr = static_cast<int*>(dbsr_row_ptr_managed.get());
+    int* dbsr_col_ind = static_cast<int*>(dbsr_col_ind_managed.get());
+    T*   dbsr_val     = static_cast<T*>(dbsr_val_managed.get());
+    int* dcsr_row_ptr = static_cast<int*>(dcsr_row_ptr_managed.get());
+    int* dcsr_col_ind = static_cast<int*>(dcsr_col_ind_managed.get());
+    T*   dcsr_val     = static_cast<T*>(dcsr_val_managed.get());
 
     // Copy data from host to device
     CHECK_HIP_ERROR(hipMemcpy(
@@ -426,10 +426,8 @@ hipsparseStatus_t testing_bsr2csr(Arguments argus)
         int number_cold_calls = 2;
         int number_hot_calls  = argus.iters;
 
-        // Warm up
-        for(int iter = 0; iter < number_cold_calls; ++iter)
-        {
-            CHECK_HIPSPARSE_ERROR(hipsparseXbsr2csr(handle,
+        double gpu_time_used = benchmark_kernel(
+            [&]() { CHECK_HIPSPARSE_ERROR(hipsparseXbsr2csr(handle,
                                                     dir,
                                                     mb,
                                                     nb,
@@ -441,30 +439,9 @@ hipsparseStatus_t testing_bsr2csr(Arguments argus)
                                                     csr_descr,
                                                     dcsr_val,
                                                     dcsr_row_ptr,
-                                                    dcsr_col_ind));
-        }
-
-        double gpu_time_used = get_time_us();
-
-        // Performance run
-        for(int iter = 0; iter < number_hot_calls; ++iter)
-        {
-            CHECK_HIPSPARSE_ERROR(hipsparseXbsr2csr(handle,
-                                                    dir,
-                                                    mb,
-                                                    nb,
-                                                    bsr_descr,
-                                                    dbsr_val,
-                                                    dbsr_row_ptr,
-                                                    dbsr_col_ind,
-                                                    block_dim,
-                                                    csr_descr,
-                                                    dcsr_val,
-                                                    dcsr_row_ptr,
-                                                    dcsr_col_ind));
-        }
-
-        gpu_time_used = (get_time_us() - gpu_time_used) / number_hot_calls;
+                                                    dcsr_col_ind)); return HIPSPARSE_STATUS_SUCCESS; },
+            number_cold_calls,
+            number_hot_calls);
 
         double gbyte_count = bsr2csr_gbyte_count<T>(mb, block_dim, nnzb);
         double gpu_gbyte   = get_gpu_gbyte(gpu_time_used, gbyte_count);

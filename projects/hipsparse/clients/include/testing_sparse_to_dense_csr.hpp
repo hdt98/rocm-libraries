@@ -71,11 +71,11 @@ void testing_sparse_to_dense_csr_bad_arg(void)
         = hipsparse_unique_ptr{device_malloc(sizeof(float) * safe_size), device_free};
     auto dbuf_managed = hipsparse_unique_ptr{device_malloc(sizeof(char) * safe_size), device_free};
 
-    float*   ddense_val   = (float*)ddense_val_managed.get();
-    int32_t* dcsr_row_ptr = (int32_t*)dcsr_row_ptr_managed.get();
-    int32_t* dcsr_col_ind = (int32_t*)dcsr_col_ind_managed.get();
-    float*   dcsr_val     = (float*)dcsr_val_managed.get();
-    void*    dbuf         = (void*)dbuf_managed.get();
+    float*   ddense_val   = static_cast<float*>(ddense_val_managed.get());
+    int32_t* dcsr_row_ptr = static_cast<int32_t*>(dcsr_row_ptr_managed.get());
+    int32_t* dcsr_col_ind = static_cast<int32_t*>(dcsr_col_ind_managed.get());
+    float*   dcsr_val     = static_cast<float*>(dcsr_val_managed.get());
+    void*    dbuf         = static_cast<void*>(dbuf_managed.get());
 
     // Matrix structures
     hipsparseSpMatDescr_t matA;
@@ -175,10 +175,10 @@ hipsparseStatus_t testing_sparse_to_dense_csr(Arguments argus)
     auto ddense_managed
         = hipsparse_unique_ptr{device_malloc(sizeof(T) * nrows * ncols), device_free};
 
-    I* dptr   = (I*)dptr_managed.get();
-    J* dcol   = (J*)dcol_managed.get();
-    T* dval   = (T*)dval_managed.get();
-    T* ddense = (T*)ddense_managed.get();
+    I* dptr   = static_cast<I*>(dptr_managed.get());
+    J* dcol   = static_cast<J*>(dcol_managed.get());
+    T* dval   = static_cast<T*>(dval_managed.get());
+    T* ddense = static_cast<T*>(ddense_managed.get());
 
     // Dense matrix
     std::vector<T> hdense(nrows * ncols);

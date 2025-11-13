@@ -62,10 +62,10 @@ void testing_gemvi_bad_arg(const Arguments& argus)
     auto xInd_managed = hipsparse_unique_ptr{device_malloc(sizeof(int) * nnz), device_free};
     auto y_managed    = hipsparse_unique_ptr{device_malloc(sizeof(T) * m), device_free};
 
-    T*   A    = (T*)A_managed.get();
-    T*   x    = (T*)x_managed.get();
-    int* xInd = (int*)xInd_managed.get();
-    T*   y    = (T*)y_managed.get();
+    T*   A    = static_cast<T*>(A_managed.get());
+    T*   x    = static_cast<T*>(x_managed.get());
+    int* xInd = static_cast<int*>(xInd_managed.get());
+    T*   y    = static_cast<T*>(y_managed.get());
 
     // gemvi
     void* buffer;
@@ -75,14 +75,14 @@ void testing_gemvi_bad_arg(const Arguments& argus)
         nullptr, opType, m, n, &alpha, A, lda, nnz, x, xInd, &beta, y, idxBase, buffer));
     verify_hipsparse_status_invalid_pointer(
         hipsparseXgemvi(
-            handle, opType, m, n, (T*)nullptr, A, lda, nnz, x, xInd, &beta, y, idxBase, buffer),
+            handle, opType, m, n, static_cast<T*>(nullptr), A, lda, nnz, x, xInd, &beta, y, idxBase, buffer),
         "Error: alpha is nullptr");
     verify_hipsparse_status_invalid_pointer(hipsparseXgemvi(handle,
                                                             opType,
                                                             m,
                                                             n,
                                                             &alpha,
-                                                            (T*)nullptr,
+                                                            static_cast<T*>(nullptr),
                                                             lda,
                                                             nnz,
                                                             x,
@@ -100,7 +100,7 @@ void testing_gemvi_bad_arg(const Arguments& argus)
                                                             A,
                                                             lda,
                                                             nnz,
-                                                            (T*)nullptr,
+                                                            static_cast<T*>(nullptr),
                                                             xInd,
                                                             &beta,
                                                             y,
@@ -113,7 +113,7 @@ void testing_gemvi_bad_arg(const Arguments& argus)
         "Error: xInd is nullptr");
     verify_hipsparse_status_invalid_pointer(
         hipsparseXgemvi(
-            handle, opType, m, n, &alpha, A, lda, nnz, x, xInd, (T*)nullptr, y, idxBase, buffer),
+            handle, opType, m, n, &alpha, A, lda, nnz, x, xInd, static_cast<T*>(nullptr), y, idxBase, buffer),
         "Error: beta is nullptr");
     verify_hipsparse_status_invalid_pointer(hipsparseXgemvi(handle,
                                                             opType,
@@ -126,7 +126,7 @@ void testing_gemvi_bad_arg(const Arguments& argus)
                                                             x,
                                                             xInd,
                                                             &beta,
-                                                            (T*)nullptr,
+                                                            static_cast<T*>(nullptr),
                                                             idxBase,
                                                             buffer),
                                             "Error: y is nullptr");
@@ -177,15 +177,15 @@ hipsparseStatus_t testing_gemvi(Arguments argus)
 
     // Host structures
     std::vector<T>   hA(m * n);
-    std::vector<T>   hx_val(nnz);
-    std::vector<int> hx_ind(nnz);
+    std::vector<T>   hxVal(nnz);
+    std::vector<int> hxInd(nnz);
     std::vector<T>   hy(m);
     std::vector<T>   hy_gold(m);
 
     // Initial Data on CPU
     srand(12345ULL);
-    hipsparseInitIndex(hx_ind.data(), nnz, 1, n);
-    hipsparseInit<T>(hx_val, 1, nnz);
+    hipsparseInitIndex(hxInd.data(), nnz, 1, n);
+    hipsparseInit<T>(hxVal, 1, nnz);
     hipsparseInit<T>(hy, 1, m);
     hy_gold = hy;
 
@@ -195,19 +195,19 @@ hipsparseStatus_t testing_gemvi(Arguments argus)
     }
 
     // Allocate memory on device
-    auto dx_ind_managed = hipsparse_unique_ptr{device_malloc(sizeof(int) * nnz), device_free};
-    auto dx_val_managed = hipsparse_unique_ptr{device_malloc(sizeof(T) * nnz), device_free};
+    auto dxInd_managed = hipsparse_unique_ptr{device_malloc(sizeof(int) * nnz), device_free};
+    auto dxVal_managed = hipsparse_unique_ptr{device_malloc(sizeof(T) * nnz), device_free};
     auto dy_managed     = hipsparse_unique_ptr{device_malloc(sizeof(T) * m), device_free};
     auto dA_managed     = hipsparse_unique_ptr{device_malloc(sizeof(T) * m * n), device_free};
 
-    int* dx_ind = (int*)dx_ind_managed.get();
-    T*   dx_val = (T*)dx_val_managed.get();
-    T*   dy     = (T*)dy_managed.get();
-    T*   dA     = (T*)dA_managed.get();
+    int* dxInd = static_cast<int*>(dxInd_managed.get());
+    T*   dxVal = static_cast<T*>(dxVal_managed.get());
+    T*   dy     = static_cast<T*>(dy_managed.get());
+    T*   dA     = static_cast<T*>(dA_managed.get());
 
     // copy data from CPU to device
-    CHECK_HIP_ERROR(hipMemcpy(dx_ind, hx_ind.data(), sizeof(int) * nnz, hipMemcpyHostToDevice));
-    CHECK_HIP_ERROR(hipMemcpy(dx_val, hx_val.data(), sizeof(T) * nnz, hipMemcpyHostToDevice));
+    CHECK_HIP_ERROR(hipMemcpy(dxInd, hxInd.data(), sizeof(int) * nnz, hipMemcpyHostToDevice));
+    CHECK_HIP_ERROR(hipMemcpy(dxVal, hxVal.data(), sizeof(T) * nnz, hipMemcpyHostToDevice));
     CHECK_HIP_ERROR(hipMemcpy(dy, hy.data(), sizeof(T) * m, hipMemcpyHostToDevice));
     CHECK_HIP_ERROR(hipMemcpy(dA, hA.data(), sizeof(T) * m * n, hipMemcpyHostToDevice));
 
@@ -229,8 +229,8 @@ hipsparseStatus_t testing_gemvi(Arguments argus)
                                               dA,
                                               lda,
                                               nnz,
-                                              dx_val,
-                                              dx_ind,
+                                              dxVal,
+                                              dxInd,
                                               &beta,
                                               dy,
                                               idxBase,
@@ -243,7 +243,7 @@ hipsparseStatus_t testing_gemvi(Arguments argus)
 
             for(int j = 0; j < nnz; ++j)
             {
-                sum = testing_fma(hx_val[j], hA[(hx_ind[j] - idxBase) * lda + i], sum);
+                sum = testing_fma(hxVal[j], hA[(hxInd[j] - idxBase) * lda + i], sum);
             }
 
             hy_gold[i] = testing_fma(alpha, sum, testing_mult(beta, hy_gold[i]));
@@ -260,10 +260,8 @@ hipsparseStatus_t testing_gemvi(Arguments argus)
         int number_cold_calls = 2;
         int number_hot_calls  = argus.iters;
 
-        // Warm up
-        for(int iter = 0; iter < number_cold_calls; ++iter)
-        {
-            CHECK_HIPSPARSE_ERROR(hipsparseXgemvi(handle,
+        double gpu_time_used = benchmark_kernel(
+            [&]() { CHECK_HIPSPARSE_ERROR(hipsparseXgemvi(handle,
                                                   trans,
                                                   m,
                                                   n,
@@ -271,36 +269,14 @@ hipsparseStatus_t testing_gemvi(Arguments argus)
                                                   dA,
                                                   lda,
                                                   nnz,
-                                                  dx_val,
-                                                  dx_ind,
+                                                  dxVal,
+                                                  dxInd,
                                                   &beta,
                                                   dy,
                                                   idxBase,
-                                                  externalBuffer));
-        }
-
-        double gpu_time_used = get_time_us();
-
-        // Performance run
-        for(int iter = 0; iter < number_hot_calls; ++iter)
-        {
-            CHECK_HIPSPARSE_ERROR(hipsparseXgemvi(handle,
-                                                  trans,
-                                                  m,
-                                                  n,
-                                                  &alpha,
-                                                  dA,
-                                                  lda,
-                                                  nnz,
-                                                  dx_val,
-                                                  dx_ind,
-                                                  &beta,
-                                                  dy,
-                                                  idxBase,
-                                                  externalBuffer));
-        }
-
-        gpu_time_used = (get_time_us() - gpu_time_used) / number_hot_calls;
+                                                  externalBuffer)); return HIPSPARSE_STATUS_SUCCESS; },
+            number_cold_calls,
+            number_hot_calls);
 
         double gflop_count = gemvi_gflop_count(m, nnz);
         double gbyte_count

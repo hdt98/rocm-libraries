@@ -47,8 +47,8 @@ void testing_spvec_descr_bad_arg(void)
     auto idx_data_managed = hipsparse_unique_ptr{device_malloc(sizeof(int) * nnz), device_free};
     auto val_data_managed = hipsparse_unique_ptr{device_malloc(sizeof(float) * nnz), device_free};
 
-    int*   idx_data = (int*)idx_data_managed.get();
-    float* val_data = (float*)val_data_managed.get();
+    int*   idx_data = static_cast<int*>(idx_data_managed.get());
+    float* val_data = static_cast<float*>(val_data_managed.get());
 
     hipsparseSpVecDescr_t x;
 

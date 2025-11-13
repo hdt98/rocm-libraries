@@ -76,12 +76,12 @@ void testing_gebsr2csr_bad_arg(const Arguments& argus)
         = hipsparse_unique_ptr{device_malloc(sizeof(int) * safe_size), device_free};
     auto csr_val_managed = hipsparse_unique_ptr{device_malloc(sizeof(T) * safe_size), device_free};
 
-    int* bsr_row_ptr = (int*)bsr_row_ptr_managed.get();
-    int* bsr_col_ind = (int*)bsr_col_ind_managed.get();
-    T*   bsr_val     = (T*)bsr_val_managed.get();
-    int* csr_row_ptr = (int*)csr_row_ptr_managed.get();
-    int* csr_col_ind = (int*)csr_col_ind_managed.get();
-    T*   csr_val     = (T*)csr_val_managed.get();
+    int* bsr_row_ptr = static_cast<int*>(bsr_row_ptr_managed.get());
+    int* bsr_col_ind = static_cast<int*>(bsr_col_ind_managed.get());
+    T*   bsr_val     = static_cast<T*>(bsr_val_managed.get());
+    int* csr_row_ptr = static_cast<int*>(csr_row_ptr_managed.get());
+    int* csr_col_ind = static_cast<int*>(csr_col_ind_managed.get());
+    T*   csr_val     = static_cast<T*>(csr_val_managed.get());
 
     int local_ptr[2] = {0, 1};
     CHECK_HIP_ERROR(
@@ -121,7 +121,7 @@ void testing_gebsr2csr_bad_arg(const Arguments& argus)
                                                                 m,
                                                                 n,
                                                                 bsr_descr,
-                                                                (T*)nullptr,
+                                                                static_cast<T*>(nullptr),
                                                                 bsr_row_ptr,
                                                                 bsr_col_ind,
                                                                 row_block_dim,
@@ -187,7 +187,7 @@ void testing_gebsr2csr_bad_arg(const Arguments& argus)
                                                                 row_block_dim,
                                                                 col_block_dim,
                                                                 csr_descr,
-                                                                (T*)nullptr,
+                                                                static_cast<T*>(nullptr),
                                                                 csr_row_ptr,
                                                                 csr_col_ind),
                                             "Error: csr_val is nullptr");
@@ -395,12 +395,12 @@ hipsparseStatus_t testing_gebsr2csr(Arguments argus)
     auto dcsr_col_ind_managed = hipsparse_unique_ptr{device_malloc(sizeof(int) * nnz), device_free};
     auto dcsr_val_managed     = hipsparse_unique_ptr{device_malloc(sizeof(T) * nnz), device_free};
 
-    int* dbsr_row_ptr = (int*)dbsr_row_ptr_managed.get();
-    int* dbsr_col_ind = (int*)dbsr_col_ind_managed.get();
-    T*   dbsr_val     = (T*)dbsr_val_managed.get();
-    int* dcsr_row_ptr = (int*)dcsr_row_ptr_managed.get();
-    int* dcsr_col_ind = (int*)dcsr_col_ind_managed.get();
-    T*   dcsr_val     = (T*)dcsr_val_managed.get();
+    int* dbsr_row_ptr = static_cast<int*>(dbsr_row_ptr_managed.get());
+    int* dbsr_col_ind = static_cast<int*>(dbsr_col_ind_managed.get());
+    T*   dbsr_val     = static_cast<T*>(dbsr_val_managed.get());
+    int* dcsr_row_ptr = static_cast<int*>(dcsr_row_ptr_managed.get());
+    int* dcsr_col_ind = static_cast<int*>(dcsr_col_ind_managed.get());
+    T*   dcsr_val     = static_cast<T*>(dcsr_val_managed.get());
 
     // Copy data from host to device
     CHECK_HIP_ERROR(
@@ -427,22 +427,22 @@ hipsparseStatus_t testing_gebsr2csr(Arguments argus)
                                                   dcsr_col_ind));
 
         // Host CSR matrix
-        std::vector<int> dh_csr_row_ptr(m + 1);
-        std::vector<int> dh_csr_col_ind(nnz);
-        std::vector<T>   dh_csr_val(nnz);
+        std::vector<int> dhcsr_row_ptr(m + 1);
+        std::vector<int> dhcsr_col_ind(nnz);
+        std::vector<T>   dhcsr_val(nnz);
 
         // Copy output from device to host
         CHECK_HIP_ERROR(hipMemcpy(
-            dh_csr_row_ptr.data(), dcsr_row_ptr, sizeof(int) * (m + 1), hipMemcpyDeviceToHost));
+            dhcsr_row_ptr.data(), dcsr_row_ptr, sizeof(int) * (m + 1), hipMemcpyDeviceToHost));
         CHECK_HIP_ERROR(hipMemcpy(
-            dh_csr_col_ind.data(), dcsr_col_ind, sizeof(int) * nnz, hipMemcpyDeviceToHost));
+            dhcsr_col_ind.data(), dcsr_col_ind, sizeof(int) * nnz, hipMemcpyDeviceToHost));
         CHECK_HIP_ERROR(
-            hipMemcpy(dh_csr_val.data(), dcsr_val, sizeof(T) * nnz, hipMemcpyDeviceToHost));
+            hipMemcpy(dhcsr_val.data(), dcsr_val, sizeof(T) * nnz, hipMemcpyDeviceToHost));
 
         // Host CSR matrix
-        std::vector<int> h_csr_row_ptr(m + 1);
-        std::vector<int> h_csr_col_ind(nnz);
-        std::vector<T>   h_csr_val(nnz);
+        std::vector<int> hcsr_row_ptr(m + 1);
+        std::vector<int> hcsr_col_ind(nnz);
+        std::vector<T>   hcsr_val(nnz);
 
         // Host gebsr2csr
         host_gebsr_to_csr<T>(dir,
@@ -455,15 +455,15 @@ hipsparseStatus_t testing_gebsr2csr(Arguments argus)
                              row_block_dim,
                              col_block_dim,
                              bsr_idx_base,
-                             h_csr_val,
-                             h_csr_row_ptr,
-                             h_csr_col_ind,
+                             hcsr_val,
+                             hcsr_row_ptr,
+                             hcsr_col_ind,
                              csr_idx_base);
 
         // Unit check
-        unit_check_general(1, m + 1, 1, dh_csr_row_ptr.data(), h_csr_row_ptr.data());
-        unit_check_general(1, nnz, 1, dh_csr_col_ind.data(), h_csr_col_ind.data());
-        unit_check_general(1, nnz, 1, dh_csr_val.data(), h_csr_val.data());
+        unit_check_general(1, m + 1, 1, dhcsr_row_ptr.data(), hcsr_row_ptr.data());
+        unit_check_general(1, nnz, 1, dhcsr_col_ind.data(), hcsr_col_ind.data());
+        unit_check_general(1, nnz, 1, dhcsr_val.data(), hcsr_val.data());
     }
 
     if(argus.timing)
@@ -471,10 +471,8 @@ hipsparseStatus_t testing_gebsr2csr(Arguments argus)
         int number_cold_calls = 2;
         int number_hot_calls  = argus.iters;
 
-        // Warm up
-        for(int iter = 0; iter < number_cold_calls; ++iter)
-        {
-            CHECK_HIPSPARSE_ERROR(hipsparseXgebsr2csr(handle,
+        double gpu_time_used = benchmark_kernel(
+            [&]() { CHECK_HIPSPARSE_ERROR(hipsparseXgebsr2csr(handle,
                                                       dir,
                                                       mb,
                                                       nb,
@@ -487,31 +485,9 @@ hipsparseStatus_t testing_gebsr2csr(Arguments argus)
                                                       csr_descr,
                                                       dcsr_val,
                                                       dcsr_row_ptr,
-                                                      dcsr_col_ind));
-        }
-
-        double gpu_time_used = get_time_us();
-
-        // Performance run
-        for(int iter = 0; iter < number_hot_calls; ++iter)
-        {
-            CHECK_HIPSPARSE_ERROR(hipsparseXgebsr2csr(handle,
-                                                      dir,
-                                                      mb,
-                                                      nb,
-                                                      bsr_descr,
-                                                      dbsr_val,
-                                                      dbsr_row_ptr,
-                                                      dbsr_col_ind,
-                                                      row_block_dim,
-                                                      col_block_dim,
-                                                      csr_descr,
-                                                      dcsr_val,
-                                                      dcsr_row_ptr,
-                                                      dcsr_col_ind));
-        }
-
-        gpu_time_used = (get_time_us() - gpu_time_used) / number_hot_calls;
+                                                      dcsr_col_ind)); return HIPSPARSE_STATUS_SUCCESS; },
+            number_cold_calls,
+            number_hot_calls);
 
         double gbyte_count = gebsr2csr_gbyte_count<T>(mb, row_block_dim, col_block_dim, nnzb);
         double gpu_gbyte   = get_gpu_gbyte(gpu_time_used, gbyte_count);

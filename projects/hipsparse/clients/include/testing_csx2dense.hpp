@@ -62,18 +62,18 @@ void testing_csx2dense_bad_arg(FUNC& csx2dense)
     auto m_csx_ind = hipsparse_unique_ptr{device_malloc(sizeof(int) * 1), device_free};
 
     int* d_csx_row
-        = (HIPSPARSE_DIRECTION_ROW == DIRA) ? ((int*)m_csx_ptr.get()) : ((int*)m_csx_ind.get());
+        = (HIPSPARSE_DIRECTION_ROW == DIRA) ? (static_cast<int*>(m_csx_ptr.get())) : (static_cast<int*>(m_csx_ind.get()));
     int* d_csx_col
-        = (HIPSPARSE_DIRECTION_ROW == DIRA) ? ((int*)m_csx_ind.get()) : ((int*)m_csx_ptr.get());
-    T* d_dense_val = (T*)m_dense_val.get();
-    T* d_csx_val   = (T*)m_csx_val.get();
+        = (HIPSPARSE_DIRECTION_ROW == DIRA) ? (static_cast<int*>(m_csx_ind.get())) : (static_cast<int*>(m_csx_ptr.get()));
+    T* d_dense_val = static_cast<T*>(m_dense_val.get());
+    T* d_csx_val   = static_cast<T*>(m_csx_val.get());
 
     int local_ptr[2] = {0, 1};
     CHECK_HIP_ERROR(
         hipMemcpy(m_csx_ptr.get(), local_ptr, sizeof(int) * (1 + 1), hipMemcpyHostToDevice));
 
     verify_hipsparse_status_invalid_handle(
-        csx2dense(nullptr, 0, 0, nullptr, (const T*)nullptr, nullptr, nullptr, (T*)nullptr, 0));
+        csx2dense(nullptr, 0, 0, nullptr, (const T*)nullptr, nullptr, nullptr, static_cast<T*>(nullptr), 0));
     verify_hipsparse_status_invalid_pointer(
         csx2dense(handle, M, N, nullptr, d_csx_val, d_csx_row, d_csx_col, d_dense_val, LD),
         "Error: an invalid pointer must be detected.");
@@ -87,7 +87,7 @@ void testing_csx2dense_bad_arg(FUNC& csx2dense)
         csx2dense(handle, M, N, descr, d_csx_val, d_csx_row, nullptr, d_dense_val, LD),
         "Error: an invalid pointer must be detected.");
     verify_hipsparse_status_invalid_pointer(
-        csx2dense(handle, M, N, descr, d_csx_val, d_csx_row, d_csx_col, (T*)nullptr, LD),
+        csx2dense(handle, M, N, descr, d_csx_val, d_csx_row, d_csx_col, static_cast<T*>(nullptr), LD),
         "Error: an invalid pointer must be detected.");
 
     verify_hipsparse_status_invalid_size(
@@ -130,8 +130,8 @@ hipsparseStatus_t testing_csx2dense(const Arguments& argus, FUNC1& csx2dense, FU
     auto nnzTotalDevHostPtr_managed
         = hipsparse_unique_ptr{device_malloc(sizeof(int) * 1), device_free};
 
-    T*   d_dense_val       = (T*)m_dense_val.get();
-    int* d_nnzPerRowColumn = (int*)nnzPerRowColumn_managed.get();
+    T*   d_dense_val       = static_cast<T*>(m_dense_val.get());
+    int* d_nnzPerRowColumn = static_cast<int*>(nnzPerRowColumn_managed.get());
 
     // Initialize the entire allocated memory.
     for(int i = 0; i < LD; ++i)
@@ -164,9 +164,9 @@ hipsparseStatus_t testing_csx2dense(const Arguments& argus, FUNC1& csx2dense, FU
     auto m_csx_val         = hipsparse_unique_ptr{device_malloc(sizeof(T) * nnz), device_free};
     auto m_csx_col_row_ind = hipsparse_unique_ptr{device_malloc(sizeof(int) * nnz), device_free};
 
-    int* d_csx_row_col_ptr = (int*)m_csx_row_col_ptr.get();
-    int* d_csx_col_row_ind = (int*)m_csx_col_row_ind.get();
-    T*   d_csx_val         = (T*)m_csx_val.get();
+    int* d_csx_row_col_ptr = static_cast<int*>(m_csx_row_col_ptr.get());
+    int* d_csx_col_row_ind = static_cast<int*>(m_csx_col_row_ind.get());
+    T*   d_csx_val         = static_cast<T*>(m_csx_val.get());
 
     std::vector<int> cpu_csx_row_col_ptr(DIMDIR + 1);
     std::vector<T>   cpu_csx_val(nnz);

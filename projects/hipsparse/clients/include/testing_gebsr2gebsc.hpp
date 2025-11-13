@@ -58,9 +58,9 @@ void testing_gebsr2gebsc_bad_arg(const Arguments& argus)
         = hipsparse_unique_ptr{device_malloc(sizeof(int) * safe_size), device_free};
     auto bsr_val_managed = hipsparse_unique_ptr{device_malloc(sizeof(T) * safe_size), device_free};
 
-    int* bsr_row_ptr = (int*)bsr_row_ptr_managed.get();
-    int* bsr_col_ind = (int*)bsr_col_ind_managed.get();
-    T*   bsr_val     = (T*)bsr_val_managed.get();
+    int* bsr_row_ptr = static_cast<int*>(bsr_row_ptr_managed.get());
+    int* bsr_col_ind = static_cast<int*>(bsr_col_ind_managed.get());
+    T*   bsr_val     = static_cast<T*>(bsr_val_managed.get());
 
     auto bsc_row_ind_managed
         = hipsparse_unique_ptr{device_malloc(sizeof(int) * safe_size), device_free};
@@ -71,9 +71,9 @@ void testing_gebsr2gebsc_bad_arg(const Arguments& argus)
     auto  buffer_managed = hipsparse_unique_ptr{device_malloc(sizeof(T) * safe_size), device_free};
     void* buffer         = buffer_managed.get();
 
-    int* bsc_row_ind = (int*)bsc_row_ind_managed.get();
-    int* bsc_col_ptr = (int*)bsc_col_ptr_managed.get();
-    T*   bsc_val     = (T*)bsc_val_managed.get();
+    int* bsc_row_ind = static_cast<int*>(bsc_row_ind_managed.get());
+    int* bsc_col_ptr = static_cast<int*>(bsc_col_ptr_managed.get());
+    T*   bsc_val     = static_cast<T*>(bsc_val_managed.get());
 
     int local_ptr[2] = {0, 1};
     CHECK_HIP_ERROR(
@@ -585,10 +585,8 @@ hipsparseStatus_t testing_gebsr2gebsc(Arguments argus)
         int number_cold_calls = 2;
         int number_hot_calls  = argus.iters;
 
-        // Warm up
-        for(int iter = 0; iter < number_cold_calls; ++iter)
-        {
-            CHECK_HIPSPARSE_ERROR(hipsparseXgebsr2gebsc<T>(handle,
+        double gpu_time_used = benchmark_kernel(
+            [&]() { CHECK_HIPSPARSE_ERROR(hipsparseXgebsr2gebsc<T>(handle,
                                                            mb,
                                                            nb,
                                                            nnzb,
@@ -602,32 +600,9 @@ hipsparseStatus_t testing_gebsr2gebsc(Arguments argus)
                                                            dbsc_col_ptr,
                                                            action,
                                                            base,
-                                                           dbuffer));
-        }
-
-        double gpu_time_used = get_time_us();
-
-        // Performance run
-        for(int iter = 0; iter < number_hot_calls; ++iter)
-        {
-            CHECK_HIPSPARSE_ERROR(hipsparseXgebsr2gebsc<T>(handle,
-                                                           mb,
-                                                           nb,
-                                                           nnzb,
-                                                           dbsr_val,
-                                                           dbsr_row_ptr,
-                                                           dbsr_col_ind,
-                                                           row_block_dim,
-                                                           col_block_dim,
-                                                           dbsc_val,
-                                                           dbsc_row_ind,
-                                                           dbsc_col_ptr,
-                                                           action,
-                                                           base,
-                                                           dbuffer));
-        }
-
-        gpu_time_used = (get_time_us() - gpu_time_used) / number_hot_calls;
+                                                           dbuffer)); return HIPSPARSE_STATUS_SUCCESS; },
+            number_cold_calls,
+            number_hot_calls);
 
         double gbyte_count
             = gebsr2gebsc_gbyte_count<T>(mb, nb, nnzb, row_block_dim, col_block_dim, action);

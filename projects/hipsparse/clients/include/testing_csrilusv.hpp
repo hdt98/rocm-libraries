@@ -80,10 +80,10 @@ hipsparseStatus_t testing_csrilusv(Arguments argus)
     auto dval_managed = hipsparse_unique_ptr{device_malloc(sizeof(T) * nnz), device_free};
     auto d_position_managed = hipsparse_unique_ptr{device_malloc(sizeof(int)), device_free};
 
-    int* dptr       = (int*)dptr_managed.get();
-    int* dcol       = (int*)dcol_managed.get();
-    T*   dval       = (T*)dval_managed.get();
-    int* d_position = (int*)d_position_managed.get();
+    int* dptr       = static_cast<int*>(dptr_managed.get());
+    int* dcol       = static_cast<int*>(dcol_managed.get());
+    T*   dval       = static_cast<T*>(dval_managed.get());
+    int* d_position = static_cast<int*>(d_position_managed.get());
 
     // copy data from CPU to device
     CHECK_HIP_ERROR(
@@ -99,7 +99,7 @@ hipsparseStatus_t testing_csrilusv(Arguments argus)
     // Allocate buffer on the device
     auto dbuffer_managed = hipsparse_unique_ptr{device_malloc(sizeof(char) * size), device_free};
 
-    void* dbuffer = (void*)dbuffer_managed.get();
+    void* dbuffer = static_cast<void*>(dbuffer_managed.get());
 
     // csrilu02 analysis
     CHECK_HIPSPARSE_ERROR(hipsparseXcsrilu02_analysis(handle,
@@ -227,7 +227,7 @@ hipsparseStatus_t testing_csrilusv(Arguments argus)
     // Allocate buffer on the device
     auto dbuffer_sv_managed = hipsparse_unique_ptr{device_malloc(sizeof(char) * size), device_free};
 
-    void* dbuffer_sv = (void*)dbuffer_sv_managed.get();
+    void* dbuffer_sv = static_cast<void*>(dbuffer_sv_managed.get());
 
     // csrsv analysis
     CHECK_HIPSPARSE_ERROR(hipsparseXcsrsv2_analysis(handle,
@@ -269,12 +269,12 @@ hipsparseStatus_t testing_csrilusv(Arguments argus)
     auto dz_2_managed    = hipsparse_unique_ptr{device_malloc(sizeof(T) * m), device_free};
     auto d_alpha_managed = hipsparse_unique_ptr{device_malloc(sizeof(T)), device_free};
 
-    T* dx      = (T*)dx_managed.get();
-    T* dy_1    = (T*)dy_1_managed.get();
-    T* dy_2    = (T*)dy_2_managed.get();
-    T* dz_1    = (T*)dz_1_managed.get();
-    T* dz_2    = (T*)dz_2_managed.get();
-    T* d_alpha = (T*)d_alpha_managed.get();
+    T* dx      = static_cast<T*>(dx_managed.get());
+    T* dy_1    = static_cast<T*>(dy_1_managed.get());
+    T* dy_2    = static_cast<T*>(dy_2_managed.get());
+    T* dz_1    = static_cast<T*>(dz_1_managed.get());
+    T* dz_2    = static_cast<T*>(dz_2_managed.get());
+    T* d_alpha = static_cast<T*>(d_alpha_managed.get());
 
     // Copy data from CPU to device
     CHECK_HIP_ERROR(hipMemcpy(dx, hx.data(), sizeof(T) * m, hipMemcpyHostToDevice));

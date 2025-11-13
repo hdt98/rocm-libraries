@@ -43,7 +43,7 @@ void testing_const_dnvec_descr_bad_arg(void)
     // Allocate memory on device
     auto val_data_managed = hipsparse_unique_ptr{device_malloc(sizeof(float) * size), device_free};
 
-    const float* val_data = (float*)val_data_managed.get();
+    const float* val_data = static_cast<float*>(val_data_managed.get());
 
     hipsparseConstDnVecDescr_t x;
 

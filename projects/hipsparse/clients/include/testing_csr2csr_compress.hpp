@@ -62,13 +62,13 @@ void testing_csr2csr_compress_bad_arg(const Arguments& argus)
 
     auto csr_row_ptr_A_managed
         = hipsparse_unique_ptr{device_malloc(sizeof(int) * (safe_size + 1)), device_free};
-    auto csr_col_ind_A_managed
+    auto csr_col_indA_managed
         = hipsparse_unique_ptr{device_malloc(sizeof(int) * safe_size), device_free};
     auto csr_val_A_managed
         = hipsparse_unique_ptr{device_malloc(sizeof(T) * safe_size), device_free};
     auto csr_row_ptr_C_managed
         = hipsparse_unique_ptr{device_malloc(sizeof(int) * (safe_size + 1)), device_free};
-    auto csr_col_ind_C_managed
+    auto csr_col_indC_managed
         = hipsparse_unique_ptr{device_malloc(sizeof(int) * safe_size), device_free};
     auto csr_val_C_managed
         = hipsparse_unique_ptr{device_malloc(sizeof(T) * safe_size), device_free};
@@ -76,14 +76,14 @@ void testing_csr2csr_compress_bad_arg(const Arguments& argus)
         = hipsparse_unique_ptr{device_malloc(sizeof(int) * safe_size), device_free};
     auto nnz_C_managed = hipsparse_unique_ptr{device_malloc(sizeof(int)), device_free};
 
-    int* csr_row_ptr_A = (int*)csr_row_ptr_A_managed.get();
-    int* csr_col_ind_A = (int*)csr_col_ind_A_managed.get();
-    T*   csr_val_A     = (T*)csr_val_A_managed.get();
-    int* csr_row_ptr_C = (int*)csr_row_ptr_C_managed.get();
-    int* csr_col_ind_C = (int*)csr_col_ind_C_managed.get();
-    T*   csr_val_C     = (T*)csr_val_C_managed.get();
-    int* nnz_per_row   = (int*)nnz_per_row_managed.get();
-    int* nnz_C         = (int*)nnz_C_managed.get();
+    int* csr_row_ptr_A = static_cast<int*>(csr_row_ptr_A_managed.get());
+    int* csr_col_indA = static_cast<int*>(csr_col_indA_managed.get());
+    T*   csr_val_A     = static_cast<T*>(csr_val_A_managed.get());
+    int* csr_row_ptr_C = static_cast<int*>(csr_row_ptr_C_managed.get());
+    int* csr_col_indC = static_cast<int*>(csr_col_indC_managed.get());
+    T*   csr_val_C     = static_cast<T*>(csr_val_C_managed.get());
+    int* nnz_per_row   = static_cast<int*>(nnz_per_row_managed.get());
+    int* nnz_C         = static_cast<int*>(nnz_C_managed.get());
 
     int local_ptr[2] = {0, 1};
     CHECK_HIP_ERROR(
@@ -129,12 +129,12 @@ void testing_csr2csr_compress_bad_arg(const Arguments& argus)
                                                                       n,
                                                                       csr_descr,
                                                                       csr_val_A,
-                                                                      csr_col_ind_A,
+                                                                      csr_col_indA,
                                                                       csr_row_ptr_A,
                                                                       nnz_A,
                                                                       nnz_per_row,
                                                                       csr_val_C,
-                                                                      csr_col_ind_C,
+                                                                      csr_col_indC,
                                                                       csr_row_ptr_C,
                                                                       tol));
     verify_hipsparse_status_invalid_pointer(hipsparseXcsr2csr_compress(handle,
@@ -142,12 +142,12 @@ void testing_csr2csr_compress_bad_arg(const Arguments& argus)
                                                                        n,
                                                                        nullptr,
                                                                        csr_val_A,
-                                                                       csr_col_ind_A,
+                                                                       csr_col_indA,
                                                                        csr_row_ptr_A,
                                                                        nnz_A,
                                                                        nnz_per_row,
                                                                        csr_val_C,
-                                                                       csr_col_ind_C,
+                                                                       csr_col_indC,
                                                                        csr_row_ptr_C,
                                                                        tol),
                                             "Error: Matrix descriptor is invalid");
@@ -156,12 +156,12 @@ void testing_csr2csr_compress_bad_arg(const Arguments& argus)
                                                                        n,
                                                                        csr_descr,
                                                                        (const T*)nullptr,
-                                                                       csr_col_ind_A,
+                                                                       csr_col_indA,
                                                                        csr_row_ptr_A,
                                                                        nnz_A,
                                                                        nnz_per_row,
                                                                        csr_val_C,
-                                                                       csr_col_ind_C,
+                                                                       csr_col_indC,
                                                                        csr_row_ptr_C,
                                                                        tol),
                                             "Error: CSR matrix values array is invalid");
@@ -175,7 +175,7 @@ void testing_csr2csr_compress_bad_arg(const Arguments& argus)
                                                                        nnz_A,
                                                                        nnz_per_row,
                                                                        csr_val_C,
-                                                                       csr_col_ind_C,
+                                                                       csr_col_indC,
                                                                        csr_row_ptr_C,
                                                                        tol),
                                             "Error: CSR matrix column indices array is invalid");
@@ -184,12 +184,12 @@ void testing_csr2csr_compress_bad_arg(const Arguments& argus)
                                                                        n,
                                                                        csr_descr,
                                                                        csr_val_A,
-                                                                       csr_col_ind_A,
+                                                                       csr_col_indA,
                                                                        nullptr,
                                                                        nnz_A,
                                                                        nnz_per_row,
                                                                        csr_val_C,
-                                                                       csr_col_ind_C,
+                                                                       csr_col_indC,
                                                                        csr_row_ptr_C,
                                                                        tol),
                                             "Error: CSR matrix row pointer array is invalid");
@@ -198,12 +198,12 @@ void testing_csr2csr_compress_bad_arg(const Arguments& argus)
                                                                        n,
                                                                        csr_descr,
                                                                        csr_val_A,
-                                                                       csr_col_ind_A,
+                                                                       csr_col_indA,
                                                                        csr_row_ptr_A,
                                                                        nnz_A,
                                                                        nullptr,
                                                                        csr_val_C,
-                                                                       csr_col_ind_C,
+                                                                       csr_col_indC,
                                                                        csr_row_ptr_C,
                                                                        tol),
                                             "Error: Number of elements per row array is invalid");
@@ -212,12 +212,12 @@ void testing_csr2csr_compress_bad_arg(const Arguments& argus)
                                                                        n,
                                                                        csr_descr,
                                                                        csr_val_A,
-                                                                       csr_col_ind_A,
+                                                                       csr_col_indA,
                                                                        csr_row_ptr_A,
                                                                        nnz_A,
                                                                        nnz_per_row,
-                                                                       (T*)nullptr,
-                                                                       csr_col_ind_C,
+                                                                       static_cast<T*>(nullptr),
+                                                                       csr_col_indC,
                                                                        csr_row_ptr_C,
                                                                        tol),
                                             "Error: CSR matrix values array is invalid");
@@ -226,7 +226,7 @@ void testing_csr2csr_compress_bad_arg(const Arguments& argus)
                                                                        n,
                                                                        csr_descr,
                                                                        csr_val_A,
-                                                                       csr_col_ind_A,
+                                                                       csr_col_indA,
                                                                        csr_row_ptr_A,
                                                                        nnz_A,
                                                                        nnz_per_row,
@@ -240,12 +240,12 @@ void testing_csr2csr_compress_bad_arg(const Arguments& argus)
                                                                        n,
                                                                        csr_descr,
                                                                        csr_val_A,
-                                                                       csr_col_ind_A,
+                                                                       csr_col_indA,
                                                                        csr_row_ptr_A,
                                                                        nnz_A,
                                                                        nnz_per_row,
                                                                        csr_val_C,
-                                                                       csr_col_ind_C,
+                                                                       csr_col_indC,
                                                                        nullptr,
                                                                        tol),
                                             "Error: CSR matrix row pointer array is invalid");
@@ -254,12 +254,12 @@ void testing_csr2csr_compress_bad_arg(const Arguments& argus)
                                                                     n,
                                                                     csr_descr,
                                                                     csr_val_A,
-                                                                    csr_col_ind_A,
+                                                                    csr_col_indA,
                                                                     csr_row_ptr_A,
                                                                     nnz_A,
                                                                     nnz_per_row,
                                                                     csr_val_C,
-                                                                    csr_col_ind_C,
+                                                                    csr_col_indC,
                                                                     csr_row_ptr_C,
                                                                     tol),
                                          "Error: Matrix size is invalid");
@@ -268,12 +268,12 @@ void testing_csr2csr_compress_bad_arg(const Arguments& argus)
                                                                     -1,
                                                                     csr_descr,
                                                                     csr_val_A,
-                                                                    csr_col_ind_A,
+                                                                    csr_col_indA,
                                                                     csr_row_ptr_A,
                                                                     nnz_A,
                                                                     nnz_per_row,
                                                                     csr_val_C,
-                                                                    csr_col_ind_C,
+                                                                    csr_col_indC,
                                                                     csr_row_ptr_C,
                                                                     tol),
                                          "Error: Matrix size is invalid");
@@ -282,12 +282,12 @@ void testing_csr2csr_compress_bad_arg(const Arguments& argus)
                                                                     n,
                                                                     csr_descr,
                                                                     csr_val_A,
-                                                                    csr_col_ind_A,
+                                                                    csr_col_indA,
                                                                     csr_row_ptr_A,
                                                                     -1,
                                                                     nnz_per_row,
                                                                     csr_val_C,
-                                                                    csr_col_ind_C,
+                                                                    csr_col_indC,
                                                                     csr_row_ptr_C,
                                                                     tol),
                                          "Error: Matrix size is invalid");
@@ -296,12 +296,12 @@ void testing_csr2csr_compress_bad_arg(const Arguments& argus)
                                                                      n,
                                                                      csr_descr,
                                                                      csr_val_A,
-                                                                     csr_col_ind_A,
+                                                                     csr_col_indA,
                                                                      csr_row_ptr_A,
                                                                      nnz_A,
                                                                      nnz_per_row,
                                                                      csr_val_C,
-                                                                     csr_col_ind_C,
+                                                                     csr_col_indC,
                                                                      csr_row_ptr_C,
                                                                      static_cast<T>(-1)),
                                           "Error: Tolerance is invalid");
@@ -330,13 +330,13 @@ hipsparseStatus_t testing_csr2csr_compress(Arguments argus)
 
     // Host structures
     std::vector<int> hcsr_row_ptr_A;
-    std::vector<int> hcsr_col_ind_A;
+    std::vector<int> hcsr_col_indA;
     std::vector<T>   hcsr_val_A;
 
     // Read or construct CSR matrix
     int hnnz_A = 0;
     if(!generate_csr_matrix(
-           filename, m, n, hnnz_A, hcsr_row_ptr_A, hcsr_col_ind_A, hcsr_val_A, idx_base))
+           filename, m, n, hnnz_A, hcsr_row_ptr_A, hcsr_col_indA, hcsr_val_A, idx_base))
     {
         fprintf(stderr, "Cannot open [read] %s\ncol", filename.c_str());
         return HIPSPARSE_STATUS_INTERNAL_ERROR;
@@ -345,24 +345,24 @@ hipsparseStatus_t testing_csr2csr_compress(Arguments argus)
     // Allocate memory on the device
     auto dcsr_row_ptr_A_managed
         = hipsparse_unique_ptr{device_malloc(sizeof(int) * (m + 1)), device_free};
-    auto dcsr_col_ind_A_managed
+    auto dcsr_col_indA_managed
         = hipsparse_unique_ptr{device_malloc(sizeof(int) * hnnz_A), device_free};
     auto dcsr_val_A_managed = hipsparse_unique_ptr{device_malloc(sizeof(T) * hnnz_A), device_free};
     auto dcsr_row_ptr_C_managed
         = hipsparse_unique_ptr{device_malloc(sizeof(int) * (m + 1)), device_free};
     auto dnnz_per_row_managed = hipsparse_unique_ptr{device_malloc(sizeof(int) * m), device_free};
 
-    int* dcsr_row_ptr_A = (int*)dcsr_row_ptr_A_managed.get();
-    int* dcsr_col_ind_A = (int*)dcsr_col_ind_A_managed.get();
-    T*   dcsr_val_A     = (T*)dcsr_val_A_managed.get();
-    int* dcsr_row_ptr_C = (int*)dcsr_row_ptr_C_managed.get();
-    int* dnnz_per_row   = (int*)dnnz_per_row_managed.get();
+    int* dcsr_row_ptr_A = static_cast<int*>(dcsr_row_ptr_A_managed.get());
+    int* dcsr_col_indA = static_cast<int*>(dcsr_col_indA_managed.get());
+    T*   dcsr_val_A     = static_cast<T*>(dcsr_val_A_managed.get());
+    int* dcsr_row_ptr_C = static_cast<int*>(dcsr_row_ptr_C_managed.get());
+    int* dnnz_per_row   = static_cast<int*>(dnnz_per_row_managed.get());
 
     // Copy data from host to device
     CHECK_HIP_ERROR(hipMemcpy(
         dcsr_row_ptr_A, hcsr_row_ptr_A.data(), sizeof(int) * (m + 1), hipMemcpyHostToDevice));
     CHECK_HIP_ERROR(hipMemcpy(
-        dcsr_col_ind_A, hcsr_col_ind_A.data(), sizeof(int) * hnnz_A, hipMemcpyHostToDevice));
+        dcsr_col_indA, hcsr_col_indA.data(), sizeof(int) * hnnz_A, hipMemcpyHostToDevice));
     CHECK_HIP_ERROR(
         hipMemcpy(dcsr_val_A, hcsr_val_A.data(), sizeof(T) * hnnz_A, hipMemcpyHostToDevice));
 
@@ -378,7 +378,7 @@ hipsparseStatus_t testing_csr2csr_compress(Arguments argus)
         CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_DEVICE));
 
         auto dnnz_C_managed = hipsparse_unique_ptr{device_malloc(sizeof(int)), device_free};
-        int* dnnz_C         = (int*)dnnz_C_managed.get();
+        int* dnnz_C         = static_cast<int*>(dnnz_C_managed.get());
         CHECK_HIPSPARSE_ERROR(hipsparseXnnz_compress(
             handle, m, csr_descr, dcsr_val_A, dcsr_row_ptr_A, dnnz_per_row, dnnz_C, tol));
 
@@ -394,37 +394,37 @@ hipsparseStatus_t testing_csr2csr_compress(Arguments argus)
         }
 
         // Allocate device memory for compressed CSR columns indices and values
-        auto dcsr_col_ind_C_managed
+        auto dcsr_col_indC_managed
             = hipsparse_unique_ptr{device_malloc(sizeof(int) * hnnz_C), device_free};
         auto dcsr_val_C_managed
             = hipsparse_unique_ptr{device_malloc(sizeof(T) * hnnz_C), device_free};
 
-        int* dcsr_col_ind_C = (int*)dcsr_col_ind_C_managed.get();
-        T*   dcsr_val_C     = (T*)dcsr_val_C_managed.get();
+        int* dcsr_col_indC = static_cast<int*>(dcsr_col_indC_managed.get());
+        T*   dcsr_val_C     = static_cast<T*>(dcsr_val_C_managed.get());
 
         CHECK_HIPSPARSE_ERROR(hipsparseXcsr2csr_compress(handle,
                                                          m,
                                                          n,
                                                          csr_descr,
                                                          dcsr_val_A,
-                                                         dcsr_col_ind_A,
+                                                         dcsr_col_indA,
                                                          dcsr_row_ptr_A,
                                                          hnnz_A,
                                                          dnnz_per_row,
                                                          dcsr_val_C,
-                                                         dcsr_col_ind_C,
+                                                         dcsr_col_indC,
                                                          dcsr_row_ptr_C,
                                                          tol));
 
         // Copy output from device to host
         std::vector<int> hcsr_row_ptr_C(m + 1);
-        std::vector<int> hcsr_col_ind_C(hnnz_C);
+        std::vector<int> hcsr_col_indC(hnnz_C);
         std::vector<T>   hcsr_val_C(hnnz_C);
 
         CHECK_HIP_ERROR(hipMemcpy(
             hcsr_row_ptr_C.data(), dcsr_row_ptr_C, sizeof(int) * (m + 1), hipMemcpyDeviceToHost));
         CHECK_HIP_ERROR(hipMemcpy(
-            hcsr_col_ind_C.data(), dcsr_col_ind_C, sizeof(int) * hnnz_C, hipMemcpyDeviceToHost));
+            hcsr_col_indC.data(), dcsr_col_indC, sizeof(int) * hnnz_C, hipMemcpyDeviceToHost));
         CHECK_HIP_ERROR(
             hipMemcpy(hcsr_val_C.data(), dcsr_val_C, sizeof(T) * hnnz_C, hipMemcpyDeviceToHost));
 
@@ -437,7 +437,7 @@ hipsparseStatus_t testing_csr2csr_compress(Arguments argus)
         host_csr_to_csr_compress<T>(m,
                                     n,
                                     hcsr_row_ptr_A,
-                                    hcsr_col_ind_A,
+                                    hcsr_col_indA,
                                     hcsr_val_A,
                                     hcsr_row_ptr_C_gold,
                                     hcsr_col_ind_C_gold,
@@ -447,7 +447,7 @@ hipsparseStatus_t testing_csr2csr_compress(Arguments argus)
 
         // Unit check
         unit_check_general(1, m + 1, 1, hcsr_row_ptr_C_gold.data(), hcsr_row_ptr_C.data());
-        unit_check_general(1, hnnz_C, 1, hcsr_col_ind_C_gold.data(), hcsr_col_ind_C.data());
+        unit_check_general(1, hnnz_C, 1, hcsr_col_ind_C_gold.data(), hcsr_col_indC.data());
         unit_check_general(1, hnnz_C, 1, hcsr_val_gold.data(), hcsr_val_C.data());
     }
 
@@ -463,53 +463,30 @@ hipsparseStatus_t testing_csr2csr_compress(Arguments argus)
             handle, m, csr_descr, dcsr_val_A, dcsr_row_ptr_A, dnnz_per_row, &hnnz_C, tol));
 
         // Allocate device memory for compressed CSR columns indices and values
-        auto dcsr_col_ind_C_managed
+        auto dcsr_col_indC_managed
             = hipsparse_unique_ptr{device_malloc(sizeof(int) * hnnz_C), device_free};
         auto dcsr_val_C_managed
             = hipsparse_unique_ptr{device_malloc(sizeof(T) * hnnz_C), device_free};
 
-        int* dcsr_col_ind_C = (int*)dcsr_col_ind_C_managed.get();
-        T*   dcsr_val_C     = (T*)dcsr_val_C_managed.get();
+        int* dcsr_col_indC = static_cast<int*>(dcsr_col_indC_managed.get());
+        T*   dcsr_val_C     = static_cast<T*>(dcsr_val_C_managed.get());
 
-        // Warm up
-        for(int iter = 0; iter < number_cold_calls; ++iter)
-        {
-            CHECK_HIPSPARSE_ERROR(hipsparseXcsr2csr_compress(handle,
+        double gpu_time_used = benchmark_kernel(
+            [&]() { CHECK_HIPSPARSE_ERROR(hipsparseXcsr2csr_compress(handle,
                                                              m,
                                                              n,
                                                              csr_descr,
                                                              dcsr_val_A,
-                                                             dcsr_col_ind_A,
+                                                             dcsr_col_indA,
                                                              dcsr_row_ptr_A,
                                                              hnnz_A,
                                                              dnnz_per_row,
                                                              dcsr_val_C,
-                                                             dcsr_col_ind_C,
+                                                             dcsr_col_indC,
                                                              dcsr_row_ptr_C,
-                                                             tol));
-        }
-
-        double gpu_time_used = get_time_us();
-
-        // Performance run
-        for(int iter = 0; iter < number_hot_calls; ++iter)
-        {
-            CHECK_HIPSPARSE_ERROR(hipsparseXcsr2csr_compress(handle,
-                                                             m,
-                                                             n,
-                                                             csr_descr,
-                                                             dcsr_val_A,
-                                                             dcsr_col_ind_A,
-                                                             dcsr_row_ptr_A,
-                                                             hnnz_A,
-                                                             dnnz_per_row,
-                                                             dcsr_val_C,
-                                                             dcsr_col_ind_C,
-                                                             dcsr_row_ptr_C,
-                                                             tol));
-        }
-
-        gpu_time_used = (get_time_us() - gpu_time_used) / number_hot_calls;
+                                                             tol)); return HIPSPARSE_STATUS_SUCCESS; },
+            number_cold_calls,
+            number_hot_calls);
 
         double gbyte_count = csr2csr_compress_gbyte_count<T>(m, hnnz_A, hnnz_C);
         double gpu_gbyte   = get_gpu_gbyte(gpu_time_used, gbyte_count);

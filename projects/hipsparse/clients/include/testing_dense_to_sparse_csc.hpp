@@ -71,11 +71,11 @@ void testing_dense_to_sparse_csc_bad_arg(void)
         = hipsparse_unique_ptr{device_malloc(sizeof(float) * safe_size), device_free};
     auto dbuf_managed = hipsparse_unique_ptr{device_malloc(sizeof(char) * safe_size), device_free};
 
-    float*   ddense_val   = (float*)ddense_val_managed.get();
-    int32_t* dcsc_col_ptr = (int32_t*)dcsc_col_ptr_managed.get();
-    int32_t* dcsc_row_ind = (int32_t*)dcsc_row_ind_managed.get();
-    float*   dcsc_val     = (float*)dcsc_val_managed.get();
-    void*    dbuf         = (void*)dbuf_managed.get();
+    float*   ddense_val   = static_cast<float*>(ddense_val_managed.get());
+    int32_t* dcsc_col_ptr = static_cast<int32_t*>(dcsc_col_ptr_managed.get());
+    int32_t* dcsc_row_ind = static_cast<int32_t*>(dcsc_row_ind_managed.get());
+    float*   dcsc_val     = static_cast<float*>(dcsc_val_managed.get());
+    void*    dbuf         = static_cast<void*>(dbuf_managed.get());
 
     // Matrix structures
     hipsparseDnVecDescr_t matA;
@@ -196,8 +196,8 @@ hipsparseStatus_t testing_dense_to_sparse_csc(Arguments argus)
     auto dptr_managed   = hipsparse_unique_ptr{device_malloc(sizeof(I) * (n + 1)), device_free};
     auto ddense_managed = hipsparse_unique_ptr{device_malloc(sizeof(T) * nrow * ncol), device_free};
 
-    I* dptr   = (I*)dptr_managed.get();
-    T* ddense = (T*)ddense_managed.get();
+    I* dptr   = static_cast<I*>(dptr_managed.get());
+    T* ddense = static_cast<T*>(ddense_managed.get());
 
     // Copy host dense matrix to device
     CHECK_HIP_ERROR(
@@ -227,8 +227,8 @@ hipsparseStatus_t testing_dense_to_sparse_csc(Arguments argus)
     auto drow_managed = hipsparse_unique_ptr{device_malloc(sizeof(J) * nnz), device_free};
     auto dval_managed = hipsparse_unique_ptr{device_malloc(sizeof(T) * nnz), device_free};
 
-    J* drow = (J*)drow_managed.get();
-    T* dval = (T*)dval_managed.get();
+    J* drow = static_cast<J*>(drow_managed.get());
+    T* dval = static_cast<T*>(dval_managed.get());
 
     CHECK_HIPSPARSE_ERROR(hipsparseCscSetPointers(matB, dptr, drow, dval));
 

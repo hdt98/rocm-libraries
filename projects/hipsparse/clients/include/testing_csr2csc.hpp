@@ -64,19 +64,19 @@ void testing_csr2csc_bad_arg(const Arguments& argus)
         = hipsparse_unique_ptr{device_malloc(sizeof(int) * safe_size), device_free};
     auto csc_val_managed = hipsparse_unique_ptr{device_malloc(sizeof(T) * safe_size), device_free};
 
-    int* csr_row_ptr = (int*)csr_row_ptr_managed.get();
-    int* csr_col_ind = (int*)csr_col_ind_managed.get();
-    T*   csr_val     = (T*)csr_val_managed.get();
-    int* csc_row_ind = (int*)csc_row_ind_managed.get();
-    int* csc_col_ptr = (int*)csc_col_ptr_managed.get();
-    T*   csc_val     = (T*)csc_val_managed.get();
+    int* csr_row_ptr = static_cast<int*>(csr_row_ptr_managed.get());
+    int* csr_col_ind = static_cast<int*>(csr_col_ind_managed.get());
+    T*   csr_val     = static_cast<T*>(csr_val_managed.get());
+    int* csc_row_ind = static_cast<int*>(csc_row_ind_managed.get());
+    int* csc_col_ptr = static_cast<int*>(csc_col_ptr_managed.get());
+    T*   csc_val     = static_cast<T*>(csc_val_managed.get());
 
     verify_hipsparse_status_invalid_pointer(hipsparseXcsr2csc(handle,
                                                               m,
                                                               n,
                                                               nnz,
                                                               csr_val,
-                                                              (int*)nullptr,
+                                                              static_cast<int*>(nullptr),
                                                               csr_col_ind,
                                                               csc_val,
                                                               csc_row_ind,
@@ -90,7 +90,7 @@ void testing_csr2csc_bad_arg(const Arguments& argus)
                                                               nnz,
                                                               csr_val,
                                                               csr_row_ptr,
-                                                              (int*)nullptr,
+                                                              static_cast<int*>(nullptr),
                                                               csc_val,
                                                               csc_row_ind,
                                                               csc_col_ptr,
@@ -101,7 +101,7 @@ void testing_csr2csc_bad_arg(const Arguments& argus)
                                                               m,
                                                               n,
                                                               nnz,
-                                                              (T*)nullptr,
+                                                              static_cast<T*>(nullptr),
                                                               csr_row_ptr,
                                                               csr_col_ind,
                                                               csc_val,
@@ -118,7 +118,7 @@ void testing_csr2csc_bad_arg(const Arguments& argus)
                                                               csr_row_ptr,
                                                               csr_col_ind,
                                                               csc_val,
-                                                              (int*)nullptr,
+                                                              static_cast<int*>(nullptr),
                                                               csc_col_ptr,
                                                               HIPSPARSE_ACTION_NUMERIC,
                                                               HIPSPARSE_INDEX_BASE_ZERO),
@@ -132,7 +132,7 @@ void testing_csr2csc_bad_arg(const Arguments& argus)
                                                               csr_col_ind,
                                                               csc_val,
                                                               csc_row_ind,
-                                                              (int*)nullptr,
+                                                              static_cast<int*>(nullptr),
                                                               HIPSPARSE_ACTION_NUMERIC,
                                                               HIPSPARSE_INDEX_BASE_ZERO),
                                             "Error: csc_col_ptr is nullptr");
@@ -143,13 +143,13 @@ void testing_csr2csc_bad_arg(const Arguments& argus)
                                                               csr_val,
                                                               csr_row_ptr,
                                                               csr_col_ind,
-                                                              (T*)nullptr,
+                                                              static_cast<T*>(nullptr),
                                                               csc_row_ind,
                                                               csc_col_ptr,
                                                               HIPSPARSE_ACTION_NUMERIC,
                                                               HIPSPARSE_INDEX_BASE_ZERO),
                                             "Error: csc_val is nullptr");
-    verify_hipsparse_status_invalid_handle(hipsparseXcsr2csc((hipsparseHandle_t) nullptr,
+    verify_hipsparse_status_invalid_handle(hipsparseXcsr2csc(static_cast<hipsparseHandle_t>(nullptr),
                                                              m,
                                                              n,
                                                              nnz,
@@ -202,12 +202,12 @@ hipsparseStatus_t testing_csr2csc(Arguments argus)
         = hipsparse_unique_ptr{device_malloc(sizeof(int) * (n + 1)), device_free};
     auto dcsc_val_managed = hipsparse_unique_ptr{device_malloc(sizeof(T) * nnz), device_free};
 
-    int* dcsr_row_ptr = (int*)dcsr_row_ptr_managed.get();
-    int* dcsr_col_ind = (int*)dcsr_col_ind_managed.get();
-    T*   dcsr_val     = (T*)dcsr_val_managed.get();
-    int* dcsc_row_ind = (int*)dcsc_row_ind_managed.get();
-    int* dcsc_col_ptr = (int*)dcsc_col_ptr_managed.get();
-    T*   dcsc_val     = (T*)dcsc_val_managed.get();
+    int* dcsr_row_ptr = static_cast<int*>(dcsr_row_ptr_managed.get());
+    int* dcsr_col_ind = static_cast<int*>(dcsr_col_ind_managed.get());
+    T*   dcsr_val     = static_cast<T*>(dcsr_val_managed.get());
+    int* dcsc_row_ind = static_cast<int*>(dcsc_row_ind_managed.get());
+    int* dcsc_col_ptr = static_cast<int*>(dcsc_col_ptr_managed.get());
+    T*   dcsc_val     = static_cast<T*>(dcsc_val_managed.get());
 
     // Reset CSC arrays
     CHECK_HIP_ERROR(hipMemset(dcsc_row_ind, 0, sizeof(int) * nnz));
@@ -304,10 +304,8 @@ hipsparseStatus_t testing_csr2csc(Arguments argus)
         int number_cold_calls = 2;
         int number_hot_calls  = argus.iters;
 
-        // Warm up
-        for(int iter = 0; iter < number_cold_calls; ++iter)
-        {
-            CHECK_HIPSPARSE_ERROR(hipsparseXcsr2csc(handle,
+        double gpu_time_used = benchmark_kernel(
+            [&]() { CHECK_HIPSPARSE_ERROR(hipsparseXcsr2csc(handle,
                                                     m,
                                                     n,
                                                     nnz,
@@ -318,29 +316,9 @@ hipsparseStatus_t testing_csr2csc(Arguments argus)
                                                     dcsc_row_ind,
                                                     dcsc_col_ptr,
                                                     action,
-                                                    idx_base));
-        }
-
-        double gpu_time_used = get_time_us();
-
-        // Performance run
-        for(int iter = 0; iter < number_hot_calls; ++iter)
-        {
-            CHECK_HIPSPARSE_ERROR(hipsparseXcsr2csc(handle,
-                                                    m,
-                                                    n,
-                                                    nnz,
-                                                    dcsr_val,
-                                                    dcsr_row_ptr,
-                                                    dcsr_col_ind,
-                                                    dcsc_val,
-                                                    dcsc_row_ind,
-                                                    dcsc_col_ptr,
-                                                    action,
-                                                    idx_base));
-        }
-
-        gpu_time_used = (get_time_us() - gpu_time_used) / number_hot_calls;
+                                                    idx_base)); return HIPSPARSE_STATUS_SUCCESS; },
+            number_cold_calls,
+            number_hot_calls);
 
         double gbyte_count = csr2csc_gbyte_count<T>(m, n, nnz, action);
         double gpu_gbyte   = get_gpu_gbyte(gpu_time_used, gbyte_count);

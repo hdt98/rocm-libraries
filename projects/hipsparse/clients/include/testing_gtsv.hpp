@@ -61,11 +61,11 @@ void testing_gtsv2_bad_arg(void)
     auto dB_managed   = hipsparse_unique_ptr{device_malloc(sizeof(T) * safe_size), device_free};
     auto dbuf_managed = hipsparse_unique_ptr{device_malloc(sizeof(char) * safe_size), device_free};
 
-    T*    ddl  = (T*)ddl_managed.get();
-    T*    dd   = (T*)dd_managed.get();
-    T*    ddu  = (T*)ddu_managed.get();
-    T*    dB   = (T*)dB_managed.get();
-    void* dbuf = (void*)dbuf_managed.get();
+    T*    ddl  = static_cast<T*>(ddl_managed.get());
+    T*    dd   = static_cast<T*>(dd_managed.get());
+    T*    ddu  = static_cast<T*>(ddu_managed.get());
+    T*    dB   = static_cast<T*>(dB_managed.get());
+    void* dbuf = static_cast<void*>(dbuf_managed.get());
 
     size_t bsize;
 
@@ -104,7 +104,7 @@ void testing_gtsv2_bad_arg(void)
         hipsparseXgtsv2(handle, m, n, ddl, dd, (const T*)nullptr, dB, ldb, dbuf),
         "Error: ddu is nullptr");
     verify_hipsparse_status_invalid_pointer(
-        hipsparseXgtsv2(handle, m, n, ddl, dd, ddu, (T*)nullptr, ldb, dbuf),
+        hipsparseXgtsv2(handle, m, n, ddl, dd, ddu, static_cast<T*>(nullptr), ldb, dbuf),
         "Error: dB is nullptr");
     verify_hipsparse_status_invalid_pointer(
         hipsparseXgtsv2(handle, m, n, ddl, dd, ddu, dB, ldb, nullptr), "Error: bsize is nullptr");
@@ -140,10 +140,10 @@ hipsparseStatus_t testing_gtsv2(Arguments argus)
     auto ddu_managed = hipsparse_unique_ptr{device_malloc(sizeof(T) * m), device_free};
     auto dB_managed  = hipsparse_unique_ptr{device_malloc(sizeof(T) * ldb * n), device_free};
 
-    T* ddl = (T*)ddl_managed.get();
-    T* dd  = (T*)dd_managed.get();
-    T* ddu = (T*)ddu_managed.get();
-    T* dB  = (T*)dB_managed.get();
+    T* ddl = static_cast<T*>(ddl_managed.get());
+    T* dd  = static_cast<T*>(dd_managed.get());
+    T* ddu = static_cast<T*>(ddu_managed.get());
+    T* dB  = static_cast<T*>(dB_managed.get());
 
     // copy data from CPU to device
     CHECK_HIP_ERROR(hipMemcpy(ddl, hdl.data(), sizeof(T) * m, hipMemcpyHostToDevice));
@@ -190,21 +190,10 @@ hipsparseStatus_t testing_gtsv2(Arguments argus)
         int number_cold_calls = 2;
         int number_hot_calls  = argus.iters;
 
-        // Warm up
-        for(int iter = 0; iter < number_cold_calls; ++iter)
-        {
-            CHECK_HIPSPARSE_ERROR(hipsparseXgtsv2(handle, m, n, ddl, dd, ddu, dB, ldb, buffer));
-        }
-
-        double gpu_time_used = get_time_us();
-
-        // Performance run
-        for(int iter = 0; iter < number_hot_calls; ++iter)
-        {
-            CHECK_HIPSPARSE_ERROR(hipsparseXgtsv2(handle, m, n, ddl, dd, ddu, dB, ldb, buffer));
-        }
-
-        gpu_time_used = (get_time_us() - gpu_time_used) / number_hot_calls;
+        double gpu_time_used = benchmark_kernel(
+            [&]() { CHECK_HIPSPARSE_ERROR(hipsparseXgtsv2(handle, m, n, ddl, dd, ddu, dB, ldb, buffer)); return HIPSPARSE_STATUS_SUCCESS; },
+            number_cold_calls,
+            number_hot_calls);
 
         double gbyte_count = gtsv_gbyte_count<T>(m, n);
         double gpu_gbyte   = get_gpu_gbyte(gpu_time_used, gbyte_count);

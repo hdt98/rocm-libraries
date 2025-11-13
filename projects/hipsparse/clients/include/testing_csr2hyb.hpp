@@ -68,16 +68,16 @@ void testing_csr2hyb_bad_arg(const Arguments& argus)
         = hipsparse_unique_ptr{device_malloc(sizeof(int) * safe_size), device_free};
     auto csr_val_managed = hipsparse_unique_ptr{device_malloc(sizeof(T) * safe_size), device_free};
 
-    int* csr_row_ptr = (int*)csr_row_ptr_managed.get();
-    int* csr_col_ind = (int*)csr_col_ind_managed.get();
-    T*   csr_val     = (T*)csr_val_managed.get();
+    int* csr_row_ptr = static_cast<int*>(csr_row_ptr_managed.get());
+    int* csr_col_ind = static_cast<int*>(csr_col_ind_managed.get());
+    T*   csr_val     = static_cast<T*>(csr_val_managed.get());
 
     verify_hipsparse_status_invalid_pointer(hipsparseXcsr2hyb(handle,
                                                               m,
                                                               n,
                                                               descr,
                                                               csr_val,
-                                                              (int*)nullptr,
+                                                              static_cast<int*>(nullptr),
                                                               csr_col_ind,
                                                               hyb,
                                                               0,
@@ -89,7 +89,7 @@ void testing_csr2hyb_bad_arg(const Arguments& argus)
                                                               descr,
                                                               csr_val,
                                                               csr_row_ptr,
-                                                              (int*)nullptr,
+                                                              static_cast<int*>(nullptr),
                                                               hyb,
                                                               0,
                                                               HIPSPARSE_HYB_PARTITION_AUTO),
@@ -98,14 +98,14 @@ void testing_csr2hyb_bad_arg(const Arguments& argus)
                                                               m,
                                                               n,
                                                               descr,
-                                                              (T*)nullptr,
+                                                              static_cast<T*>(nullptr),
                                                               csr_row_ptr,
                                                               csr_col_ind,
                                                               hyb,
                                                               0,
                                                               HIPSPARSE_HYB_PARTITION_AUTO),
                                             "Error: csr_val is nullptr");
-    verify_hipsparse_status_invalid_handle(hipsparseXcsr2hyb((hipsparseHandle_t) nullptr,
+    verify_hipsparse_status_invalid_handle(hipsparseXcsr2hyb(static_cast<hipsparseHandle_t>(nullptr),
                                                              m,
                                                              n,
                                                              descr,
@@ -167,9 +167,9 @@ hipsparseStatus_t testing_csr2hyb(Arguments argus)
     auto dcsr_col_ind_managed = hipsparse_unique_ptr{device_malloc(sizeof(int) * nnz), device_free};
     auto dcsr_val_managed     = hipsparse_unique_ptr{device_malloc(sizeof(T) * nnz), device_free};
 
-    int* dcsr_row_ptr = (int*)dcsr_row_ptr_managed.get();
-    int* dcsr_col_ind = (int*)dcsr_col_ind_managed.get();
-    T*   dcsr_val     = (T*)dcsr_val_managed.get();
+    int* dcsr_row_ptr = static_cast<int*>(dcsr_row_ptr_managed.get());
+    int* dcsr_col_ind = static_cast<int*>(dcsr_col_ind_managed.get());
+    T*   dcsr_val     = static_cast<T*>(dcsr_val_managed.get());
 
     // Copy data from host to device
     CHECK_HIP_ERROR(
@@ -377,10 +377,8 @@ hipsparseStatus_t testing_csr2hyb(Arguments argus)
         int number_cold_calls = 2;
         int number_hot_calls  = argus.iters;
 
-        // Warm up
-        for(int iter = 0; iter < number_cold_calls; ++iter)
-        {
-            CHECK_HIPSPARSE_ERROR(hipsparseXcsr2hyb(handle,
+        double gpu_time_used = benchmark_kernel(
+            [&]() { CHECK_HIPSPARSE_ERROR(hipsparseXcsr2hyb(handle,
                                                     m,
                                                     n,
                                                     descr,
@@ -389,27 +387,9 @@ hipsparseStatus_t testing_csr2hyb(Arguments argus)
                                                     dcsr_col_ind,
                                                     hyb,
                                                     user_ell_width,
-                                                    part));
-        }
-
-        double gpu_time_used = get_time_us();
-
-        // Performance run
-        for(int iter = 0; iter < number_hot_calls; ++iter)
-        {
-            CHECK_HIPSPARSE_ERROR(hipsparseXcsr2hyb(handle,
-                                                    m,
-                                                    n,
-                                                    descr,
-                                                    dcsr_val,
-                                                    dcsr_row_ptr,
-                                                    dcsr_col_ind,
-                                                    hyb,
-                                                    user_ell_width,
-                                                    part));
-        }
-
-        gpu_time_used = (get_time_us() - gpu_time_used) / number_hot_calls;
+                                                    part)); return HIPSPARSE_STATUS_SUCCESS; },
+            number_cold_calls,
+            number_hot_calls);
 
         double gbyte_count = csr2hyb_gbyte_count<T>(m, nnz, ell_nnz, coo_nnz);
         double gpu_gbyte   = get_gpu_gbyte(gpu_time_used, gbyte_count);

@@ -69,38 +69,38 @@ void testing_bsrilu02_bad_arg(void)
     auto dboost_tol_managed = hipsparse_unique_ptr{device_malloc(sizeof(double)), device_free};
     auto dboost_val_managed = hipsparse_unique_ptr{device_malloc(sizeof(T)), device_free};
 
-    int*    dptr       = (int*)dptr_managed.get();
-    int*    dcol       = (int*)dcol_managed.get();
-    T*      dval       = (T*)dval_managed.get();
-    void*   dbuffer    = (void*)dbuffer_managed.get();
-    double* dboost_tol = (double*)dboost_tol_managed.get();
-    T*      dboost_val = (T*)dboost_val_managed.get();
+    int*    dptr       = static_cast<int*>(dptr_managed.get());
+    int*    dcol       = static_cast<int*>(dcol_managed.get());
+    T*      dval       = static_cast<T*>(dval_managed.get());
+    void*   dbuffer    = static_cast<void*>(dbuffer_managed.get());
+    double* dboost_tol = static_cast<double*>(dboost_tol_managed.get());
+    T*      dboost_val = static_cast<T*>(dboost_val_managed.get());
 
     int size;
     int position;
 
     verify_hipsparse_status_invalid_pointer(
         hipsparseXbsrilu02_bufferSize(
-            handle, dirA, mb, nnzb, descr, dval, (int*)nullptr, dcol, block_dim, info, &size),
+            handle, dirA, mb, nnzb, descr, dval, static_cast<int*>(nullptr), dcol, block_dim, info, &size),
         "Error: dptr is nullptr");
     verify_hipsparse_status_invalid_pointer(
         hipsparseXbsrilu02_bufferSize(
-            handle, dirA, mb, nnzb, descr, dval, dptr, (int*)nullptr, block_dim, info, &size),
+            handle, dirA, mb, nnzb, descr, dval, dptr, static_cast<int*>(nullptr), block_dim, info, &size),
         "Error: dcol is nullptr");
     verify_hipsparse_status_invalid_pointer(
         hipsparseXbsrilu02_bufferSize(
-            handle, dirA, mb, nnzb, descr, (T*)nullptr, dptr, dcol, block_dim, info, &size),
+            handle, dirA, mb, nnzb, descr, static_cast<T*>(nullptr), dptr, dcol, block_dim, info, &size),
         "Error: dval is nullptr");
     verify_hipsparse_status_invalid_pointer(
         hipsparseXbsrilu02_bufferSize(
-            handle, dirA, mb, nnzb, descr, dval, dptr, dcol, block_dim, info, (int*)nullptr),
+            handle, dirA, mb, nnzb, descr, dval, dptr, dcol, block_dim, info, static_cast<int*>(nullptr)),
         "Error: size is nullptr");
     verify_hipsparse_status_invalid_pointer(
         hipsparseXbsrilu02_bufferSize(handle,
                                       dirA,
                                       mb,
                                       nnzb,
-                                      (hipsparseMatDescr_t) nullptr,
+                                      static_cast<hipsparseMatDescr_t>(nullptr),
                                       dval,
                                       dptr,
                                       dcol,
@@ -121,7 +121,7 @@ void testing_bsrilu02_bad_arg(void)
                                                                           &size),
                                             "Error: info is nullptr");
     verify_hipsparse_status_invalid_handle(
-        hipsparseXbsrilu02_bufferSize((hipsparseHandle_t) nullptr,
+        hipsparseXbsrilu02_bufferSize(static_cast<hipsparseHandle_t>(nullptr),
                                       dirA,
                                       mb,
                                       nnzb,
@@ -134,16 +134,16 @@ void testing_bsrilu02_bad_arg(void)
                                       &size));
 
     verify_hipsparse_status_invalid_handle(hipsparseXbsrilu02_numericBoost(
-        (hipsparseHandle_t) nullptr, info, 1, dboost_tol, dboost_val));
+        static_cast<hipsparseHandle_t>(nullptr), info, 1, dboost_tol, dboost_val));
     verify_hipsparse_status_invalid_pointer(
         hipsparseXbsrilu02_numericBoost(
             handle, (bsrilu02Info_t) nullptr, 1, dboost_tol, dboost_val),
         "Error: info is nullptr");
     verify_hipsparse_status_invalid_pointer(
-        hipsparseXbsrilu02_numericBoost(handle, info, 1, (double*)nullptr, dboost_val),
+        hipsparseXbsrilu02_numericBoost(handle, info, 1, static_cast<double*>(nullptr), dboost_val),
         "Error: boost_tol is nullptr");
     verify_hipsparse_status_invalid_pointer(
-        hipsparseXbsrilu02_numericBoost(handle, info, 1, dboost_tol, (T*)nullptr),
+        hipsparseXbsrilu02_numericBoost(handle, info, 1, dboost_tol, static_cast<T*>(nullptr)),
         "Error: boost_val is nullptr");
 
     verify_hipsparse_status_invalid_pointer(hipsparseXbsrilu02_analysis(handle,
@@ -152,7 +152,7 @@ void testing_bsrilu02_bad_arg(void)
                                                                         nnzb,
                                                                         descr,
                                                                         dval,
-                                                                        (int*)nullptr,
+                                                                        static_cast<int*>(nullptr),
                                                                         dcol,
                                                                         block_dim,
                                                                         info,
@@ -166,7 +166,7 @@ void testing_bsrilu02_bad_arg(void)
                                                                         descr,
                                                                         dval,
                                                                         dptr,
-                                                                        (int*)nullptr,
+                                                                        static_cast<int*>(nullptr),
                                                                         block_dim,
                                                                         info,
                                                                         policy,
@@ -177,7 +177,7 @@ void testing_bsrilu02_bad_arg(void)
                                                                         mb,
                                                                         nnzb,
                                                                         descr,
-                                                                        (T*)nullptr,
+                                                                        static_cast<T*>(nullptr),
                                                                         dptr,
                                                                         dcol,
                                                                         block_dim,
@@ -196,14 +196,14 @@ void testing_bsrilu02_bad_arg(void)
                                                                         block_dim,
                                                                         info,
                                                                         policy,
-                                                                        (void*)nullptr),
+                                                                        static_cast<void*>(nullptr)),
                                             "Error: dbuffer is nullptr");
     verify_hipsparse_status_invalid_pointer(
         hipsparseXbsrilu02_analysis(handle,
                                     dirA,
                                     mb,
                                     nnzb,
-                                    (hipsparseMatDescr_t) nullptr,
+                                    static_cast<hipsparseMatDescr_t>(nullptr),
                                     dval,
                                     dptr,
                                     dcol,
@@ -225,7 +225,7 @@ void testing_bsrilu02_bad_arg(void)
                                                                         policy,
                                                                         dbuffer),
                                             "Error: info is nullptr");
-    verify_hipsparse_status_invalid_handle(hipsparseXbsrilu02_analysis((hipsparseHandle_t) nullptr,
+    verify_hipsparse_status_invalid_handle(hipsparseXbsrilu02_analysis(static_cast<hipsparseHandle_t>(nullptr),
                                                                        dirA,
                                                                        mb,
                                                                        nnzb,
@@ -244,7 +244,7 @@ void testing_bsrilu02_bad_arg(void)
                                                                nnzb,
                                                                descr,
                                                                dval,
-                                                               (int*)nullptr,
+                                                               static_cast<int*>(nullptr),
                                                                dcol,
                                                                block_dim,
                                                                info,
@@ -258,7 +258,7 @@ void testing_bsrilu02_bad_arg(void)
                                                                descr,
                                                                dval,
                                                                dptr,
-                                                               (int*)nullptr,
+                                                               static_cast<int*>(nullptr),
                                                                block_dim,
                                                                info,
                                                                policy,
@@ -269,7 +269,7 @@ void testing_bsrilu02_bad_arg(void)
                                                                mb,
                                                                nnzb,
                                                                descr,
-                                                               (T*)nullptr,
+                                                               static_cast<T*>(nullptr),
                                                                dptr,
                                                                dcol,
                                                                block_dim,
@@ -288,13 +288,13 @@ void testing_bsrilu02_bad_arg(void)
                                                                block_dim,
                                                                info,
                                                                policy,
-                                                               (void*)nullptr),
+                                                               static_cast<void*>(nullptr)),
                                             "Error: dbuffer is nullptr");
     verify_hipsparse_status_invalid_pointer(hipsparseXbsrilu02(handle,
                                                                dirA,
                                                                mb,
                                                                nnzb,
-                                                               (hipsparseMatDescr_t) nullptr,
+                                                               static_cast<hipsparseMatDescr_t>(nullptr),
                                                                dval,
                                                                dptr,
                                                                dcol,
@@ -316,7 +316,7 @@ void testing_bsrilu02_bad_arg(void)
                                                                policy,
                                                                dbuffer),
                                             "Error: info is nullptr");
-    verify_hipsparse_status_invalid_handle(hipsparseXbsrilu02((hipsparseHandle_t) nullptr,
+    verify_hipsparse_status_invalid_handle(hipsparseXbsrilu02(static_cast<hipsparseHandle_t>(nullptr),
                                                               dirA,
                                                               mb,
                                                               nnzb,
@@ -330,12 +330,12 @@ void testing_bsrilu02_bad_arg(void)
                                                               dbuffer));
 
     verify_hipsparse_status_invalid_pointer(
-        hipsparseXbsrilu02_zeroPivot(handle, info, (int*)nullptr), "Error: position is nullptr");
+        hipsparseXbsrilu02_zeroPivot(handle, info, static_cast<int*>(nullptr)), "Error: position is nullptr");
     verify_hipsparse_status_invalid_pointer(
         hipsparseXbsrilu02_zeroPivot(handle, (bsrilu02Info_t) nullptr, &position),
         "Error: info is nullptr");
     verify_hipsparse_status_invalid_handle(
-        hipsparseXbsrilu02_zeroPivot((hipsparseHandle_t) nullptr, info, &position));
+        hipsparseXbsrilu02_zeroPivot(static_cast<hipsparseHandle_t>(nullptr), info, &position));
 #endif
 }
 
@@ -401,12 +401,12 @@ hipsparseStatus_t testing_bsrilu02(Arguments argus)
     auto boost_tol_managed = hipsparse_unique_ptr{device_malloc(sizeof(double)), device_free};
     auto boost_val_managed = hipsparse_unique_ptr{device_malloc(sizeof(T)), device_free};
 
-    int*    dcsr_row_ptr = (int*)dcsr_row_ptr_managed.get();
-    int*    dcsr_col_ind = (int*)dcsr_col_ind_managed.get();
-    T*      dcsr_val     = (T*)dcsr_val_managed.get();
-    int*    dbsr_row_ptr = (int*)dbsr_row_ptr_managed.get();
-    double* dboost_tol   = (double*)boost_tol_managed.get();
-    T*      dboost_val   = (T*)boost_val_managed.get();
+    int*    dcsr_row_ptr = static_cast<int*>(dcsr_row_ptr_managed.get());
+    int*    dcsr_col_ind = static_cast<int*>(dcsr_col_ind_managed.get());
+    T*      dcsr_val     = static_cast<T*>(dcsr_val_managed.get());
+    int*    dbsr_row_ptr = static_cast<int*>(dbsr_row_ptr_managed.get());
+    double* dboost_tol   = static_cast<double*>(boost_tol_managed.get());
+    T*      dboost_val   = static_cast<T*>(boost_val_managed.get());
 
     // copy data from CPU to device
     CHECK_HIP_ERROR(
@@ -438,11 +438,11 @@ hipsparseStatus_t testing_bsrilu02(Arguments argus)
     auto d_analysis_pivot_2_managed = hipsparse_unique_ptr{device_malloc(sizeof(int)), device_free};
     auto d_solve_pivot_2_managed    = hipsparse_unique_ptr{device_malloc(sizeof(int)), device_free};
 
-    int* dbsr_col_ind       = (int*)dbsr_col_ind_managed.get();
-    T*   dbsr_val_1         = (T*)dbsr_val_1_managed.get();
-    T*   dbsr_val_2         = (T*)dbsr_val_2_managed.get();
-    int* d_analysis_pivot_2 = (int*)d_analysis_pivot_2_managed.get();
-    int* d_solve_pivot_2    = (int*)d_solve_pivot_2_managed.get();
+    int* dbsr_col_ind       = static_cast<int*>(dbsr_col_ind_managed.get());
+    T*   dbsr_val_1         = static_cast<T*>(dbsr_val_1_managed.get());
+    T*   dbsr_val_2         = static_cast<T*>(dbsr_val_2_managed.get());
+    int* d_analysis_pivot_2 = static_cast<int*>(d_analysis_pivot_2_managed.get());
+    int* d_solve_pivot_2    = static_cast<int*>(d_solve_pivot_2_managed.get());
 
     CHECK_HIPSPARSE_ERROR(hipsparseXcsr2bsr(handle,
                                             dir,
@@ -499,7 +499,7 @@ hipsparseStatus_t testing_bsrilu02(Arguments argus)
     auto dbuffer_managed
         = hipsparse_unique_ptr{device_malloc(sizeof(char) * bufferSize), device_free};
 
-    void* dbuffer = (void*)dbuffer_managed.get();
+    void* dbuffer = static_cast<void*>(dbuffer_managed.get());
 
     int h_analysis_pivot_gold;
     int h_analysis_pivot_1;
@@ -683,7 +683,7 @@ hipsparseStatus_t testing_bsrilu02(Arguments argus)
 
         CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_HOST));
         CHECK_HIPSPARSE_ERROR(
-            hipsparseXbsrilu02_numericBoost(handle, info, 0, (double*)nullptr, (T*)nullptr));
+            hipsparseXbsrilu02_numericBoost(handle, info, 0, static_cast<double*>(nullptr), static_cast<T*>(nullptr)));
 
         // Warm up
         for(int iter = 0; iter < number_cold_calls; ++iter)

@@ -50,29 +50,29 @@ void testing_doti_bad_arg(const Arguments& argus)
     std::unique_ptr<handle_struct> unique_ptr_handle(new handle_struct);
     hipsparseHandle_t              handle = unique_ptr_handle->handle;
 
-    auto dx_val_managed = hipsparse_unique_ptr{device_malloc(sizeof(T) * safe_size), device_free};
-    auto dx_ind_managed = hipsparse_unique_ptr{device_malloc(sizeof(int) * safe_size), device_free};
+    auto dxVal_managed = hipsparse_unique_ptr{device_malloc(sizeof(T) * safe_size), device_free};
+    auto dxInd_managed = hipsparse_unique_ptr{device_malloc(sizeof(int) * safe_size), device_free};
     auto dy_managed     = hipsparse_unique_ptr{device_malloc(sizeof(T) * safe_size), device_free};
 
-    T*   dx_val = (T*)dx_val_managed.get();
-    int* dx_ind = (int*)dx_ind_managed.get();
-    T*   dy     = (T*)dy_managed.get();
+    T*   dxVal = static_cast<T*>(dxVal_managed.get());
+    int* dxInd = static_cast<int*>(dxInd_managed.get());
+    T*   dy     = static_cast<T*>(dy_managed.get());
 
     T result;
     verify_hipsparse_status_invalid_pointer(
-        hipsparseXdoti(handle, nnz, (T*)nullptr, dx_ind, dy, &result, idx_base),
+        hipsparseXdoti(handle, nnz, static_cast<T*>(nullptr), dxInd, dy, &result, idx_base),
         "Error: x_val is nullptr");
     verify_hipsparse_status_invalid_pointer(
-        hipsparseXdoti(handle, nnz, dx_val, (int*)nullptr, dy, &result, idx_base),
+        hipsparseXdoti(handle, nnz, dxVal, static_cast<int*>(nullptr), dy, &result, idx_base),
         "Error: x_ind is nullptr");
     verify_hipsparse_status_invalid_pointer(
-        hipsparseXdoti(handle, nnz, dx_val, dx_ind, (T*)nullptr, &result, idx_base),
+        hipsparseXdoti(handle, nnz, dxVal, dxInd, static_cast<T*>(nullptr), &result, idx_base),
         "Error: y is nullptr");
     verify_hipsparse_status_invalid_pointer(
-        hipsparseXdoti(handle, nnz, dx_val, dx_ind, dy, (T*)nullptr, idx_base),
+        hipsparseXdoti(handle, nnz, dxVal, dxInd, dy, static_cast<T*>(nullptr), idx_base),
         "Error: result is nullptr");
     verify_hipsparse_status_invalid_handle(
-        hipsparseXdoti((hipsparseHandle_t) nullptr, nnz, dx_val, dx_ind, dy, &result, idx_base));
+        hipsparseXdoti(static_cast<hipsparseHandle_t>(nullptr), nnz, dxVal, dxInd, dy, &result, idx_base));
 #endif
 }
 
@@ -92,8 +92,8 @@ hipsparseStatus_t testing_doti(Arguments argus)
     CHECK_HIPSPARSE_ERROR(hipsparseGetStream(handle, &stream));
 
     // Host structures
-    std::vector<int> hx_ind(nnz);
-    std::vector<T>   hx_val(nnz);
+    std::vector<int> hxInd(nnz);
+    std::vector<T>   hxVal(nnz);
     std::vector<T>   hy(N);
 
     T hresult_1;
@@ -102,24 +102,24 @@ hipsparseStatus_t testing_doti(Arguments argus)
 
     // Initial Data on CPU
     srand(12345ULL);
-    hipsparseInitIndex(hx_ind.data(), nnz, 1, N);
-    hipsparseInit<T>(hx_val, 1, nnz);
+    hipsparseInitIndex(hxInd.data(), nnz, 1, N);
+    hipsparseInit<T>(hxVal, 1, nnz);
     hipsparseInit<T>(hy, 1, N);
 
     // allocate memory on device
-    auto dx_ind_managed    = hipsparse_unique_ptr{device_malloc(sizeof(int) * nnz), device_free};
-    auto dx_val_managed    = hipsparse_unique_ptr{device_malloc(sizeof(T) * nnz), device_free};
+    auto dxInd_managed    = hipsparse_unique_ptr{device_malloc(sizeof(int) * nnz), device_free};
+    auto dxVal_managed    = hipsparse_unique_ptr{device_malloc(sizeof(T) * nnz), device_free};
     auto dy_managed        = hipsparse_unique_ptr{device_malloc(sizeof(T) * N), device_free};
     auto dresult_2_managed = hipsparse_unique_ptr{device_malloc(sizeof(T)), device_free};
 
-    int* dx_ind    = (int*)dx_ind_managed.get();
-    T*   dx_val    = (T*)dx_val_managed.get();
-    T*   dy        = (T*)dy_managed.get();
-    T*   dresult_2 = (T*)dresult_2_managed.get();
+    int* dxInd    = static_cast<int*>(dxInd_managed.get());
+    T*   dxVal    = static_cast<T*>(dxVal_managed.get());
+    T*   dy        = static_cast<T*>(dy_managed.get());
+    T*   dresult_2 = static_cast<T*>(dresult_2_managed.get());
 
     // copy data from CPU to device
-    CHECK_HIP_ERROR(hipMemcpy(dx_ind, hx_ind.data(), sizeof(int) * nnz, hipMemcpyHostToDevice));
-    CHECK_HIP_ERROR(hipMemcpy(dx_val, hx_val.data(), sizeof(T) * nnz, hipMemcpyHostToDevice));
+    CHECK_HIP_ERROR(hipMemcpy(dxInd, hxInd.data(), sizeof(int) * nnz, hipMemcpyHostToDevice));
+    CHECK_HIP_ERROR(hipMemcpy(dxVal, hxVal.data(), sizeof(T) * nnz, hipMemcpyHostToDevice));
     CHECK_HIP_ERROR(hipMemcpy(dy, hy.data(), sizeof(T) * N, hipMemcpyHostToDevice));
 
     if(argus.unit_check)
@@ -127,11 +127,11 @@ hipsparseStatus_t testing_doti(Arguments argus)
         // HIPSPARSE pointer mode host
         CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_HOST));
         CHECK_HIPSPARSE_ERROR(
-            hipsparseXdoti(handle, nnz, dx_val, dx_ind, dy, &hresult_1, idx_base));
+            hipsparseXdoti(handle, nnz, dxVal, dxInd, dy, &hresult_1, idx_base));
 
         // HIPSPARSE pointer mode device
         CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_DEVICE));
-        CHECK_HIPSPARSE_ERROR(hipsparseXdoti(handle, nnz, dx_val, dx_ind, dy, dresult_2, idx_base));
+        CHECK_HIPSPARSE_ERROR(hipsparseXdoti(handle, nnz, dxVal, dxInd, dy, dresult_2, idx_base));
 
         // copy output from device to CPU^
         CHECK_HIP_ERROR(hipMemcpy(&hresult_2, dresult_2, sizeof(T), hipMemcpyDeviceToHost));
@@ -140,7 +140,7 @@ hipsparseStatus_t testing_doti(Arguments argus)
         hresult_gold = make_DataType<T>(0.0);
         for(int i = 0; i < nnz; ++i)
         {
-            hresult_gold = hresult_gold + testing_mult(hy[hx_ind[i] - idx_base], hx_val[i]);
+            hresult_gold = hresult_gold + testing_mult(hy[hxInd[i] - idx_base], hxVal[i]);
         }
 
         // enable unit check, notice unit check is not invasive, but norm check is,
@@ -156,25 +156,12 @@ hipsparseStatus_t testing_doti(Arguments argus)
 
         CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_HOST));
 
-        // Warm up
-        for(int iter = 0; iter < number_cold_calls; ++iter)
-        {
-            CHECK_HIPSPARSE_ERROR(
-                hipsparseXdoti(handle, nnz, dx_val, dx_ind, dy, &hresult_1, idx_base));
-            CHECK_HIP_ERROR(hipStreamSynchronize(stream));
-        }
-
-        double gpu_time_used = get_time_us();
-
-        // Performance run
-        for(int iter = 0; iter < number_hot_calls; ++iter)
-        {
-            CHECK_HIPSPARSE_ERROR(
-                hipsparseXdoti(handle, nnz, dx_val, dx_ind, dy, &hresult_1, idx_base));
-            CHECK_HIP_ERROR(hipStreamSynchronize(stream));
-        }
-
-        gpu_time_used = (get_time_us() - gpu_time_used) / number_hot_calls;
+        double gpu_time_used = benchmark_kernel(
+            [&]() { CHECK_HIPSPARSE_ERROR(
+                hipsparseXdoti(handle, nnz, dxVal, dxInd, dy, &hresult_1, idx_base));
+            CHECK_HIP_ERROR(hipStreamSynchronize(stream)); return HIPSPARSE_STATUS_SUCCESS; },
+            number_cold_calls,
+            number_hot_calls);
 
         double gflop_count = doti_gflop_count(nnz);
         double gbyte_count = doti_gbyte_count<T, T>(nnz);

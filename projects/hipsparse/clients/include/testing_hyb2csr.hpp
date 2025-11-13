@@ -69,29 +69,29 @@ void testing_hyb2csr_bad_arg(const Arguments& argus)
         = hipsparse_unique_ptr{device_malloc(sizeof(int) * safe_size), device_free};
     auto csr_val_managed = hipsparse_unique_ptr{device_malloc(sizeof(T) * safe_size), device_free};
 
-    int* csr_row_ptr = (int*)csr_row_ptr_managed.get();
-    int* csr_col_ind = (int*)csr_col_ind_managed.get();
-    T*   csr_val     = (T*)csr_val_managed.get();
+    int* csr_row_ptr = static_cast<int*>(csr_row_ptr_managed.get());
+    int* csr_col_ind = static_cast<int*>(csr_col_ind_managed.get());
+    T*   csr_val     = static_cast<T*>(csr_val_managed.get());
 
     verify_hipsparse_status_invalid_pointer(
-        hipsparseXhyb2csr(handle, descr, hyb, csr_val, (int*)nullptr, csr_col_ind),
+        hipsparseXhyb2csr(handle, descr, hyb, csr_val, static_cast<int*>(nullptr), csr_col_ind),
         "Error: csr_row_ptr is nullptr");
     verify_hipsparse_status_invalid_pointer(
-        hipsparseXhyb2csr(handle, descr, hyb, csr_val, csr_row_ptr, (int*)nullptr),
+        hipsparseXhyb2csr(handle, descr, hyb, csr_val, csr_row_ptr, static_cast<int*>(nullptr)),
         "Error: csr_col_ind is nullptr");
     verify_hipsparse_status_invalid_pointer(
-        hipsparseXhyb2csr(handle, descr, hyb, (T*)nullptr, csr_row_ptr, csr_col_ind),
+        hipsparseXhyb2csr(handle, descr, hyb, static_cast<T*>(nullptr), csr_row_ptr, csr_col_ind),
         "Error: csr_val is nullptr");
     verify_hipsparse_status_invalid_pointer(
         hipsparseXhyb2csr(
-            handle, (hipsparseMatDescr_t) nullptr, hyb, csr_val, csr_row_ptr, csr_col_ind),
+            handle, static_cast<hipsparseMatDescr_t>(nullptr), hyb, csr_val, csr_row_ptr, csr_col_ind),
         "Error: csr_val is nullptr");
     verify_hipsparse_status_invalid_pointer(
         hipsparseXhyb2csr(
             handle, descr, (hipsparseHybMat_t) nullptr, csr_val, csr_row_ptr, csr_col_ind),
         "Error: csr_val is nullptr");
     verify_hipsparse_status_invalid_handle(hipsparseXhyb2csr(
-        (hipsparseHandle_t) nullptr, descr, hyb, csr_val, csr_row_ptr, csr_col_ind));
+        static_cast<hipsparseHandle_t>(nullptr), descr, hyb, csr_val, csr_row_ptr, csr_col_ind));
 #endif
 }
 
@@ -137,9 +137,9 @@ hipsparseStatus_t testing_hyb2csr(Arguments argus)
     auto dcsr_col_ind_managed = hipsparse_unique_ptr{device_malloc(sizeof(int) * nnz), device_free};
     auto dcsr_val_managed     = hipsparse_unique_ptr{device_malloc(sizeof(T) * nnz), device_free};
 
-    int* dcsr_row_ptr = (int*)dcsr_row_ptr_managed.get();
-    int* dcsr_col_ind = (int*)dcsr_col_ind_managed.get();
-    T*   dcsr_val     = (T*)dcsr_val_managed.get();
+    int* dcsr_row_ptr = static_cast<int*>(dcsr_row_ptr_managed.get());
+    int* dcsr_col_ind = static_cast<int*>(dcsr_col_ind_managed.get());
+    T*   dcsr_val     = static_cast<T*>(dcsr_val_managed.get());
 
     // Copy data from host to device
     CHECK_HIP_ERROR(hipMemcpy(
@@ -194,23 +194,11 @@ hipsparseStatus_t testing_hyb2csr(Arguments argus)
         int number_cold_calls = 2;
         int number_hot_calls  = argus.iters;
 
-        // Warm up
-        for(int iter = 0; iter < number_cold_calls; ++iter)
-        {
-            CHECK_HIPSPARSE_ERROR(
-                hipsparseXhyb2csr(handle, descr, hyb, dcsr_val, dcsr_row_ptr, dcsr_col_ind));
-        }
-
-        double gpu_time_used = get_time_us();
-
-        // Performance run
-        for(int iter = 0; iter < number_hot_calls; ++iter)
-        {
-            CHECK_HIPSPARSE_ERROR(
-                hipsparseXhyb2csr(handle, descr, hyb, dcsr_val, dcsr_row_ptr, dcsr_col_ind));
-        }
-
-        gpu_time_used = (get_time_us() - gpu_time_used) / number_hot_calls;
+        double gpu_time_used = benchmark_kernel(
+            [&]() { CHECK_HIPSPARSE_ERROR(
+                hipsparseXhyb2csr(handle, descr, hyb, dcsr_val, dcsr_row_ptr, dcsr_col_ind)); return HIPSPARSE_STATUS_SUCCESS; },
+            number_cold_calls,
+            number_hot_calls);
 
         testhyb* dhyb = (testhyb*)hyb;
 

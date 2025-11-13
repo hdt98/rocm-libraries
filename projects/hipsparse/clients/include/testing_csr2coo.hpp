@@ -58,17 +58,17 @@ void testing_csr2coo_bad_arg(const Arguments& argus)
     auto coo_row_ind_managed
         = hipsparse_unique_ptr{device_malloc(sizeof(int) * safe_size), device_free};
 
-    int* csr_row_ptr = (int*)csr_row_ptr_managed.get();
-    int* coo_row_ind = (int*)coo_row_ind_managed.get();
+    int* csr_row_ptr = static_cast<int*>(csr_row_ptr_managed.get());
+    int* coo_row_ind = static_cast<int*>(coo_row_ind_managed.get());
 
     verify_hipsparse_status_invalid_pointer(
-        hipsparseXcsr2coo(handle, (int*)nullptr, nnz, m, coo_row_ind, idx_base),
+        hipsparseXcsr2coo(handle, static_cast<int*>(nullptr), nnz, m, coo_row_ind, idx_base),
         "Error: csr_row_ptr is nullptr");
     verify_hipsparse_status_invalid_pointer(
-        hipsparseXcsr2coo(handle, csr_row_ptr, nnz, m, (int*)nullptr, idx_base),
+        hipsparseXcsr2coo(handle, csr_row_ptr, nnz, m, static_cast<int*>(nullptr), idx_base),
         "Error: coo_row_ind is nullptr");
     verify_hipsparse_status_invalid_handle(
-        hipsparseXcsr2coo((hipsparseHandle_t) nullptr, csr_row_ptr, nnz, m, coo_row_ind, idx_base));
+        hipsparseXcsr2coo(static_cast<hipsparseHandle_t>(nullptr), csr_row_ptr, nnz, m, coo_row_ind, idx_base));
 #endif
 }
 
@@ -103,8 +103,8 @@ hipsparseStatus_t testing_csr2coo(Arguments argus)
         = hipsparse_unique_ptr{device_malloc(sizeof(int) * (m + 1)), device_free};
     auto dcoo_row_ind_managed = hipsparse_unique_ptr{device_malloc(sizeof(int) * nnz), device_free};
 
-    int* dcsr_row_ptr = (int*)dcsr_row_ptr_managed.get();
-    int* dcoo_row_ind = (int*)dcoo_row_ind_managed.get();
+    int* dcsr_row_ptr = static_cast<int*>(dcsr_row_ptr_managed.get());
+    int* dcoo_row_ind = static_cast<int*>(dcoo_row_ind_managed.get());
 
     // Copy data from host to device
     CHECK_HIP_ERROR(
@@ -142,23 +142,11 @@ hipsparseStatus_t testing_csr2coo(Arguments argus)
         int number_cold_calls = 2;
         int number_hot_calls  = argus.iters;
 
-        // Warm up
-        for(int iter = 0; iter < number_cold_calls; ++iter)
-        {
-            CHECK_HIPSPARSE_ERROR(
-                hipsparseXcsr2coo(handle, dcsr_row_ptr, nnz, m, dcoo_row_ind, idx_base));
-        }
-
-        double gpu_time_used = get_time_us();
-
-        // Performance run
-        for(int iter = 0; iter < number_hot_calls; ++iter)
-        {
-            CHECK_HIPSPARSE_ERROR(
-                hipsparseXcsr2coo(handle, dcsr_row_ptr, nnz, m, dcoo_row_ind, idx_base));
-        }
-
-        gpu_time_used = (get_time_us() - gpu_time_used) / number_hot_calls;
+        double gpu_time_used = benchmark_kernel(
+            [&]() { CHECK_HIPSPARSE_ERROR(
+                hipsparseXcsr2coo(handle, dcsr_row_ptr, nnz, m, dcoo_row_ind, idx_base)); return HIPSPARSE_STATUS_SUCCESS; },
+            number_cold_calls,
+            number_hot_calls);
 
         double gbyte_count = csr2coo_gbyte_count<T>(m, nnz);
         double gpu_gbyte   = get_gpu_gbyte(gpu_time_used, gbyte_count);

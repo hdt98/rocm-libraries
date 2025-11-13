@@ -71,29 +71,29 @@ void testing_hybmv_bad_arg(const Arguments& argus)
     auto dx_managed = hipsparse_unique_ptr{device_malloc(sizeof(T) * safe_size), device_free};
     auto dy_managed = hipsparse_unique_ptr{device_malloc(sizeof(T) * safe_size), device_free};
 
-    T* dx = (T*)dx_managed.get();
-    T* dy = (T*)dy_managed.get();
+    T* dx = static_cast<T*>(dx_managed.get());
+    T* dy = static_cast<T*>(dy_managed.get());
 
     verify_hipsparse_status_invalid_pointer(
-        hipsparseXhybmv(handle, transA, &alpha, descr, hyb, (T*)nullptr, &beta, dy),
+        hipsparseXhybmv(handle, transA, &alpha, descr, hyb, static_cast<T*>(nullptr), &beta, dy),
         "Error: dx is nullptr");
     verify_hipsparse_status_invalid_pointer(
-        hipsparseXhybmv(handle, transA, &alpha, descr, hyb, dx, &beta, (T*)nullptr),
+        hipsparseXhybmv(handle, transA, &alpha, descr, hyb, dx, &beta, static_cast<T*>(nullptr)),
         "Error: dy is nullptr");
     verify_hipsparse_status_invalid_pointer(
-        hipsparseXhybmv(handle, transA, (T*)nullptr, descr, hyb, dx, &beta, dy),
+        hipsparseXhybmv(handle, transA, static_cast<T*>(nullptr), descr, hyb, dx, &beta, dy),
         "Error: alpha is nullptr");
     verify_hipsparse_status_invalid_pointer(
-        hipsparseXhybmv(handle, transA, &alpha, descr, hyb, dx, (T*)nullptr, dy),
+        hipsparseXhybmv(handle, transA, &alpha, descr, hyb, dx, static_cast<T*>(nullptr), dy),
         "Error: beta is nullptr");
     verify_hipsparse_status_invalid_pointer(
         hipsparseXhybmv(handle, transA, &alpha, descr, (hipsparseHybMat_t) nullptr, dx, &beta, dy),
         "Error: descr is nullptr");
     verify_hipsparse_status_invalid_pointer(
-        hipsparseXhybmv(handle, transA, &alpha, (hipsparseMatDescr_t) nullptr, hyb, dx, &beta, dy),
+        hipsparseXhybmv(handle, transA, &alpha, static_cast<hipsparseMatDescr_t>(nullptr), hyb, dx, &beta, dy),
         "Error: descr is nullptr");
     verify_hipsparse_status_invalid_handle(
-        hipsparseXhybmv((hipsparseHandle_t) nullptr, transA, &alpha, descr, hyb, dx, &beta, dy));
+        hipsparseXhybmv(static_cast<hipsparseHandle_t>(nullptr), transA, &alpha, descr, hyb, dx, &beta, dy));
 #endif
 }
 
@@ -163,14 +163,14 @@ hipsparseStatus_t testing_hybmv(Arguments argus)
     auto d_alpha_managed = hipsparse_unique_ptr{device_malloc(sizeof(T)), device_free};
     auto d_beta_managed  = hipsparse_unique_ptr{device_malloc(sizeof(T)), device_free};
 
-    int* dptr    = (int*)dptr_managed.get();
-    int* dcol    = (int*)dcol_managed.get();
-    T*   dval    = (T*)dval_managed.get();
-    T*   dx      = (T*)dx_managed.get();
-    T*   dy_1    = (T*)dy_1_managed.get();
-    T*   dy_2    = (T*)dy_2_managed.get();
-    T*   d_alpha = (T*)d_alpha_managed.get();
-    T*   d_beta  = (T*)d_beta_managed.get();
+    int* dptr    = static_cast<int*>(dptr_managed.get());
+    int* dcol    = static_cast<int*>(dcol_managed.get());
+    T*   dval    = static_cast<T*>(dval_managed.get());
+    T*   dx      = static_cast<T*>(dx_managed.get());
+    T*   dy_1    = static_cast<T*>(dy_1_managed.get());
+    T*   dy_2    = static_cast<T*>(dy_2_managed.get());
+    T*   d_alpha = static_cast<T*>(d_alpha_managed.get());
+    T*   d_beta  = static_cast<T*>(d_beta_managed.get());
 
     // copy data from CPU to device
     CHECK_HIP_ERROR(
@@ -324,23 +324,11 @@ hipsparseStatus_t testing_hybmv(Arguments argus)
 
         CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_HOST));
 
-        // Warm up
-        for(int iter = 0; iter < number_cold_calls; ++iter)
-        {
-            CHECK_HIPSPARSE_ERROR(
-                hipsparseXhybmv(handle, transA, &h_alpha, descr, hyb, dx, &h_beta, dy_1));
-        }
-
-        double gpu_time_used = get_time_us();
-
-        // Performance run
-        for(int iter = 0; iter < number_hot_calls; ++iter)
-        {
-            CHECK_HIPSPARSE_ERROR(
-                hipsparseXhybmv(handle, transA, &h_alpha, descr, hyb, dx, &h_beta, dy_1));
-        }
-
-        gpu_time_used = (get_time_us() - gpu_time_used) / number_hot_calls;
+        double gpu_time_used = benchmark_kernel(
+            [&]() { CHECK_HIPSPARSE_ERROR(
+                hipsparseXhybmv(handle, transA, &h_alpha, descr, hyb, dx, &h_beta, dy_1)); return HIPSPARSE_STATUS_SUCCESS; },
+            number_cold_calls,
+            number_hot_calls);
 
         double gflop_count = spmv_gflop_count(m, nnz, h_beta != make_DataType<T>(0.0));
         double gpu_gflops  = get_gpu_gflops(gpu_time_used, gflop_count);

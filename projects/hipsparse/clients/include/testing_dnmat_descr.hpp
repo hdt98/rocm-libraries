@@ -47,7 +47,7 @@ void testing_dnmat_descr_bad_arg(void)
     auto val_data_managed
         = hipsparse_unique_ptr{device_malloc(sizeof(float) * rows * cols), device_free};
 
-    float* val_data = (float*)val_data_managed.get();
+    float* val_data = static_cast<float*>(val_data_managed.get());
 
     hipsparseDnMatDescr_t x;
 

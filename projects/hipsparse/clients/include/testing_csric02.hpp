@@ -65,94 +65,94 @@ void testing_csric02_bad_arg(void)
     auto dbuffer_managed
         = hipsparse_unique_ptr{device_malloc(sizeof(char) * safe_size), device_free};
 
-    int*  dptr    = (int*)dptr_managed.get();
-    int*  dcol    = (int*)dcol_managed.get();
-    T*    dval    = (T*)dval_managed.get();
-    void* dbuffer = (void*)dbuffer_managed.get();
+    int*  dptr    = static_cast<int*>(dptr_managed.get());
+    int*  dcol    = static_cast<int*>(dcol_managed.get());
+    T*    dval    = static_cast<T*>(dval_managed.get());
+    void* dbuffer = static_cast<void*>(dbuffer_managed.get());
 
     int size;
     int position;
 
     verify_hipsparse_status_invalid_pointer(
-        hipsparseXcsric02_bufferSize(handle, m, nnz, descr, dval, (int*)nullptr, dcol, info, &size),
+        hipsparseXcsric02_bufferSize(handle, m, nnz, descr, dval, static_cast<int*>(nullptr), dcol, info, &size),
         "Error: dptr is nullptr");
     verify_hipsparse_status_invalid_pointer(
-        hipsparseXcsric02_bufferSize(handle, m, nnz, descr, dval, dptr, (int*)nullptr, info, &size),
+        hipsparseXcsric02_bufferSize(handle, m, nnz, descr, dval, dptr, static_cast<int*>(nullptr), info, &size),
         "Error: dcol is nullptr");
     verify_hipsparse_status_invalid_pointer(
-        hipsparseXcsric02_bufferSize(handle, m, nnz, descr, (T*)nullptr, dptr, dcol, info, &size),
+        hipsparseXcsric02_bufferSize(handle, m, nnz, descr, static_cast<T*>(nullptr), dptr, dcol, info, &size),
         "Error: dval is nullptr");
     verify_hipsparse_status_invalid_pointer(
-        hipsparseXcsric02_bufferSize(handle, m, nnz, descr, dval, dptr, dcol, info, (int*)nullptr),
+        hipsparseXcsric02_bufferSize(handle, m, nnz, descr, dval, dptr, dcol, info, static_cast<int*>(nullptr)),
         "Error: size is nullptr");
     verify_hipsparse_status_invalid_pointer(
         hipsparseXcsric02_bufferSize(
-            handle, m, nnz, (hipsparseMatDescr_t) nullptr, dval, dptr, dcol, info, &size),
+            handle, m, nnz, static_cast<hipsparseMatDescr_t>(nullptr), dval, dptr, dcol, info, &size),
         "Error: descr is nullptr");
     verify_hipsparse_status_invalid_pointer(
         hipsparseXcsric02_bufferSize(
             handle, m, nnz, descr, dval, dptr, dcol, (csric02Info_t) nullptr, &size),
         "Error: info is nullptr");
     verify_hipsparse_status_invalid_handle(hipsparseXcsric02_bufferSize(
-        (hipsparseHandle_t) nullptr, m, nnz, descr, dval, dptr, dcol, info, &size));
+        static_cast<hipsparseHandle_t>(nullptr), m, nnz, descr, dval, dptr, dcol, info, &size));
 
     verify_hipsparse_status_invalid_pointer(
         hipsparseXcsric02_analysis(
-            handle, m, nnz, descr, dval, (int*)nullptr, dcol, info, policy, dbuffer),
+            handle, m, nnz, descr, dval, static_cast<int*>(nullptr), dcol, info, policy, dbuffer),
         "Error: dptr is nullptr");
     verify_hipsparse_status_invalid_pointer(
         hipsparseXcsric02_analysis(
-            handle, m, nnz, descr, dval, dptr, (int*)nullptr, info, policy, dbuffer),
+            handle, m, nnz, descr, dval, dptr, static_cast<int*>(nullptr), info, policy, dbuffer),
         "Error: dcol is nullptr");
     verify_hipsparse_status_invalid_pointer(
         hipsparseXcsric02_analysis(
-            handle, m, nnz, descr, (T*)nullptr, dptr, dcol, info, policy, dbuffer),
+            handle, m, nnz, descr, static_cast<T*>(nullptr), dptr, dcol, info, policy, dbuffer),
         "Error: dval is nullptr");
     verify_hipsparse_status_invalid_pointer(
         hipsparseXcsric02_analysis(
-            handle, m, nnz, descr, dval, dptr, dcol, info, policy, (void*)nullptr),
+            handle, m, nnz, descr, dval, dptr, dcol, info, policy, static_cast<void*>(nullptr)),
         "Error: dbuffer is nullptr");
     verify_hipsparse_status_invalid_pointer(
         hipsparseXcsric02_analysis(
-            handle, m, nnz, (hipsparseMatDescr_t) nullptr, dval, dptr, dcol, info, policy, dbuffer),
+            handle, m, nnz, static_cast<hipsparseMatDescr_t>(nullptr), dval, dptr, dcol, info, policy, dbuffer),
         "Error: descr is nullptr");
     verify_hipsparse_status_invalid_pointer(
         hipsparseXcsric02_analysis(
             handle, m, nnz, descr, dval, dptr, dcol, (csric02Info_t) nullptr, policy, dbuffer),
         "Error: info is nullptr");
     verify_hipsparse_status_invalid_handle(hipsparseXcsric02_analysis(
-        (hipsparseHandle_t) nullptr, m, nnz, descr, dval, dptr, dcol, info, policy, dbuffer));
+        static_cast<hipsparseHandle_t>(nullptr), m, nnz, descr, dval, dptr, dcol, info, policy, dbuffer));
 
     verify_hipsparse_status_invalid_pointer(
-        hipsparseXcsric02(handle, m, nnz, descr, dval, (int*)nullptr, dcol, info, policy, dbuffer),
+        hipsparseXcsric02(handle, m, nnz, descr, dval, static_cast<int*>(nullptr), dcol, info, policy, dbuffer),
         "Error: dptr is nullptr");
     verify_hipsparse_status_invalid_pointer(
-        hipsparseXcsric02(handle, m, nnz, descr, dval, dptr, (int*)nullptr, info, policy, dbuffer),
+        hipsparseXcsric02(handle, m, nnz, descr, dval, dptr, static_cast<int*>(nullptr), info, policy, dbuffer),
         "Error: dcol is nullptr");
     verify_hipsparse_status_invalid_pointer(
-        hipsparseXcsric02(handle, m, nnz, descr, (T*)nullptr, dptr, dcol, info, policy, dbuffer),
+        hipsparseXcsric02(handle, m, nnz, descr, static_cast<T*>(nullptr), dptr, dcol, info, policy, dbuffer),
         "Error: dval is nullptr");
     verify_hipsparse_status_invalid_pointer(
-        hipsparseXcsric02(handle, m, nnz, descr, dval, dptr, dcol, info, policy, (void*)nullptr),
+        hipsparseXcsric02(handle, m, nnz, descr, dval, dptr, dcol, info, policy, static_cast<void*>(nullptr)),
         "Error: dbuffer is nullptr");
     verify_hipsparse_status_invalid_pointer(
         hipsparseXcsric02(
-            handle, m, nnz, (hipsparseMatDescr_t) nullptr, dval, dptr, dcol, info, policy, dbuffer),
+            handle, m, nnz, static_cast<hipsparseMatDescr_t>(nullptr), dval, dptr, dcol, info, policy, dbuffer),
         "Error: descr is nullptr");
     verify_hipsparse_status_invalid_pointer(
         hipsparseXcsric02(
             handle, m, nnz, descr, dval, dptr, dcol, (csric02Info_t) nullptr, policy, dbuffer),
         "Error: info is nullptr");
     verify_hipsparse_status_invalid_handle(hipsparseXcsric02(
-        (hipsparseHandle_t) nullptr, m, nnz, descr, dval, dptr, dcol, info, policy, dbuffer));
+        static_cast<hipsparseHandle_t>(nullptr), m, nnz, descr, dval, dptr, dcol, info, policy, dbuffer));
 
     verify_hipsparse_status_invalid_pointer(
-        hipsparseXcsric02_zeroPivot(handle, info, (int*)nullptr), "Error: position is nullptr");
+        hipsparseXcsric02_zeroPivot(handle, info, static_cast<int*>(nullptr)), "Error: position is nullptr");
     verify_hipsparse_status_invalid_pointer(
         hipsparseXcsric02_zeroPivot(handle, (csric02Info_t) nullptr, &position),
         "Error: info is nullptr");
     verify_hipsparse_status_invalid_handle(
-        hipsparseXcsric02_zeroPivot((hipsparseHandle_t) nullptr, info, &position));
+        hipsparseXcsric02_zeroPivot(static_cast<hipsparseHandle_t>(nullptr), info, &position));
 #endif
 }
 
@@ -210,12 +210,12 @@ hipsparseStatus_t testing_csric02(Arguments argus)
     auto d_analysis_pivot_2_managed = hipsparse_unique_ptr{device_malloc(sizeof(int)), device_free};
     auto d_solve_pivot_2_managed    = hipsparse_unique_ptr{device_malloc(sizeof(int)), device_free};
 
-    int* dptr               = (int*)dptr_managed.get();
-    int* dcol               = (int*)dcol_managed.get();
-    T*   dval_1             = (T*)dval_1_managed.get();
-    T*   dval_2             = (T*)dval_2_managed.get();
-    int* d_analysis_pivot_2 = (int*)d_analysis_pivot_2_managed.get();
-    int* d_solve_pivot_2    = (int*)d_solve_pivot_2_managed.get();
+    int* dptr               = static_cast<int*>(dptr_managed.get());
+    int* dcol               = static_cast<int*>(dcol_managed.get());
+    T*   dval_1             = static_cast<T*>(dval_1_managed.get());
+    T*   dval_2             = static_cast<T*>(dval_2_managed.get());
+    int* d_analysis_pivot_2 = static_cast<int*>(d_analysis_pivot_2_managed.get());
+    int* d_solve_pivot_2    = static_cast<int*>(d_solve_pivot_2_managed.get());
 
     // copy data from CPU to device
     CHECK_HIP_ERROR(
@@ -232,7 +232,7 @@ hipsparseStatus_t testing_csric02(Arguments argus)
     // Allocate buffer on the device
     auto dbuffer_managed
         = hipsparse_unique_ptr{device_malloc(sizeof(char) * bufferSize), device_free};
-    void* dbuffer = (void*)dbuffer_managed.get();
+    void* dbuffer = static_cast<void*>(dbuffer_managed.get());
 
     int h_analysis_pivot_gold;
     int h_analysis_pivot_1;

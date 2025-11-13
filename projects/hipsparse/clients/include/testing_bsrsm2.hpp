@@ -73,12 +73,12 @@ void testing_bsrsm2_bad_arg(const Arguments& argus)
     auto dX_managed   = hipsparse_unique_ptr{device_malloc(sizeof(float) * safe_size), device_free};
     auto dbuf_managed = hipsparse_unique_ptr{device_malloc(sizeof(char) * safe_size), device_free};
 
-    int*   dptr = (int*)dptr_managed.get();
-    int*   dcol = (int*)dcol_managed.get();
-    float* dval = (float*)dval_managed.get();
-    float* dB   = (float*)dB_managed.get();
-    float* dX   = (float*)dX_managed.get();
-    void*  dbuf = (void*)dbuf_managed.get();
+    int*   dptr = static_cast<int*>(dptr_managed.get());
+    int*   dcol = static_cast<int*>(dcol_managed.get());
+    float* dval = static_cast<float*>(dval_managed.get());
+    float* dB   = static_cast<float*>(dB_managed.get());
+    float* dX   = static_cast<float*>(dX_managed.get());
+    void*  dbuf = static_cast<void*>(dbuf_managed.get());
 
     // testing hipsparseXbsrsm2_bufferSize
     int size;
@@ -120,7 +120,7 @@ void testing_bsrsm2_bad_arg(const Arguments& argus)
                                                                         nrhs,
                                                                         nnzb,
                                                                         descr,
-                                                                        (float*)nullptr,
+                                                                        static_cast<float*>(nullptr),
                                                                         dptr,
                                                                         dcol,
                                                                         block_dim,
@@ -485,7 +485,7 @@ void testing_bsrsm2_bad_arg(const Arguments& argus)
                                                                    info,
                                                                    dB,
                                                                    ldb,
-                                                                   (float*)nullptr,
+                                                                   static_cast<float*>(nullptr),
                                                                    ldx,
                                                                    policy,
                                                                    dbuf),
@@ -594,15 +594,15 @@ hipsparseStatus_t testing_bsrsm2(Arguments argus)
     auto dalpha_managed = hipsparse_unique_ptr{device_malloc(sizeof(T)), device_free};
     auto dpos_managed   = hipsparse_unique_ptr{device_malloc(sizeof(int)), device_free};
 
-    int* dcsr_row_ptr = (int*)dcsr_row_ptr_managed.get();
-    int* dcsr_col_ind = (int*)dcsr_col_ind_managed.get();
-    T*   dcsr_val     = (T*)dcsr_val_managed.get();
-    int* dbsr_row_ptr = (int*)dbsr_row_ptr_managed.get();
-    T*   dB           = (T*)dB_managed.get();
-    T*   dX_1         = (T*)dX_1_managed.get();
-    T*   dX_2         = (T*)dX_2_managed.get();
-    T*   dalpha       = (T*)dalpha_managed.get();
-    int* dposition    = (int*)dpos_managed.get();
+    int* dcsr_row_ptr = static_cast<int*>(dcsr_row_ptr_managed.get());
+    int* dcsr_col_ind = static_cast<int*>(dcsr_col_ind_managed.get());
+    T*   dcsr_val     = static_cast<T*>(dcsr_val_managed.get());
+    int* dbsr_row_ptr = static_cast<int*>(dbsr_row_ptr_managed.get());
+    T*   dB           = static_cast<T*>(dB_managed.get());
+    T*   dX_1         = static_cast<T*>(dX_1_managed.get());
+    T*   dX_2         = static_cast<T*>(dX_2_managed.get());
+    T*   dalpha       = static_cast<T*>(dalpha_managed.get());
+    int* dposition    = static_cast<int*>(dpos_managed.get());
 
     // copy data from CPU to device
     CHECK_HIP_ERROR(
@@ -632,8 +632,8 @@ hipsparseStatus_t testing_bsrsm2(Arguments argus)
     auto dbsr_val_managed = hipsparse_unique_ptr{
         device_malloc(sizeof(T) * nnzb * block_dim * block_dim), device_free};
 
-    int* dbsr_col_ind = (int*)dbsr_col_ind_managed.get();
-    T*   dbsr_val     = (T*)dbsr_val_managed.get();
+    int* dbsr_col_ind = static_cast<int*>(dbsr_col_ind_managed.get());
+    T*   dbsr_val     = static_cast<T*>(dbsr_val_managed.get());
 
     CHECK_HIPSPARSE_ERROR(hipsparseXcsr2bsr(handle,
                                             dir,
@@ -670,7 +670,7 @@ hipsparseStatus_t testing_bsrsm2(Arguments argus)
     auto dbuffer_managed
         = hipsparse_unique_ptr{device_malloc(sizeof(char) * bufferSize), device_free};
 
-    void* dbuffer = (void*)dbuffer_managed.get();
+    void* dbuffer = static_cast<void*>(dbuffer_managed.get());
 
     // bsrsm2 analysis
     CHECK_HIPSPARSE_ERROR(hipsparseXbsrsm2_analysis(handle,
@@ -822,10 +822,8 @@ hipsparseStatus_t testing_bsrsm2(Arguments argus)
 
         CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_HOST));
 
-        // Warm up
-        for(int iter = 0; iter < number_cold_calls; ++iter)
-        {
-            CHECK_HIPSPARSE_ERROR(hipsparseXbsrsm2_solve(handle,
+        double gpu_time_used = benchmark_kernel(
+            [&]() { CHECK_HIPSPARSE_ERROR(hipsparseXbsrsm2_solve(handle,
                                                          dir,
                                                          transA,
                                                          transX,
@@ -844,37 +842,9 @@ hipsparseStatus_t testing_bsrsm2(Arguments argus)
                                                          dX_1,
                                                          ldx,
                                                          HIPSPARSE_SOLVE_POLICY_USE_LEVEL,
-                                                         dbuffer));
-        }
-
-        double gpu_time_used = get_time_us();
-
-        // Performance run
-        for(int iter = 0; iter < number_hot_calls; ++iter)
-        {
-            CHECK_HIPSPARSE_ERROR(hipsparseXbsrsm2_solve(handle,
-                                                         dir,
-                                                         transA,
-                                                         transX,
-                                                         mb,
-                                                         nrhs,
-                                                         nnzb,
-                                                         &h_alpha,
-                                                         descr,
-                                                         dbsr_val,
-                                                         dbsr_row_ptr,
-                                                         dbsr_col_ind,
-                                                         block_dim,
-                                                         info,
-                                                         dB,
-                                                         ldb,
-                                                         dX_1,
-                                                         ldx,
-                                                         HIPSPARSE_SOLVE_POLICY_USE_LEVEL,
-                                                         dbuffer));
-        }
-
-        gpu_time_used = (get_time_us() - gpu_time_used) / number_hot_calls;
+                                                         dbuffer)); return HIPSPARSE_STATUS_SUCCESS; },
+            number_cold_calls,
+            number_hot_calls);
 
         double gflop_count = csrsv_gflop_count(m,
                                                size_t(nnzb) * block_dim * block_dim,

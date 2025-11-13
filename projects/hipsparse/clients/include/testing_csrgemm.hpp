@@ -78,15 +78,15 @@ void testing_csrgemm_bad_arg(void)
     auto dCcol_managed = hipsparse_unique_ptr{device_malloc(sizeof(int) * safe_size), device_free};
     auto dCval_managed = hipsparse_unique_ptr{device_malloc(sizeof(T) * safe_size), device_free};
 
-    int* dAptr = (int*)dAptr_managed.get();
-    int* dAcol = (int*)dAcol_managed.get();
-    T*   dAval = (T*)dAval_managed.get();
-    int* dBptr = (int*)dBptr_managed.get();
-    int* dBcol = (int*)dBcol_managed.get();
-    T*   dBval = (T*)dBval_managed.get();
-    int* dCptr = (int*)dCptr_managed.get();
-    int* dCcol = (int*)dCcol_managed.get();
-    T*   dCval = (T*)dCval_managed.get();
+    int* dAptr = static_cast<int*>(dAptr_managed.get());
+    int* dAcol = static_cast<int*>(dAcol_managed.get());
+    T*   dAval = static_cast<T*>(dAval_managed.get());
+    int* dBptr = static_cast<int*>(dBptr_managed.get());
+    int* dBcol = static_cast<int*>(dBcol_managed.get());
+    T*   dBval = static_cast<T*>(dBval_managed.get());
+    int* dCptr = static_cast<int*>(dCptr_managed.get());
+    int* dCcol = static_cast<int*>(dCcol_managed.get());
+    T*   dCval = static_cast<T*>(dCval_managed.get());
 
     std::vector<int> hcsr_row_ptr_C(M + 1);
     hcsr_row_ptr_C[0] = 0;
@@ -106,7 +106,7 @@ void testing_csrgemm_bad_arg(void)
                                                                  K,
                                                                  descr_A,
                                                                  nnz_A,
-                                                                 (int*)nullptr,
+                                                                 static_cast<int*>(nullptr),
                                                                  dAcol,
                                                                  descr_B,
                                                                  nnz_B,
@@ -125,7 +125,7 @@ void testing_csrgemm_bad_arg(void)
                                                                  descr_A,
                                                                  nnz_A,
                                                                  dAptr,
-                                                                 (int*)nullptr,
+                                                                 static_cast<int*>(nullptr),
                                                                  descr_B,
                                                                  nnz_B,
                                                                  dBptr,
@@ -146,7 +146,7 @@ void testing_csrgemm_bad_arg(void)
                                                                  dAcol,
                                                                  descr_B,
                                                                  nnz_B,
-                                                                 (int*)nullptr,
+                                                                 static_cast<int*>(nullptr),
                                                                  dBcol,
                                                                  descr_C,
                                                                  dCptr,
@@ -165,7 +165,7 @@ void testing_csrgemm_bad_arg(void)
                                                                  descr_B,
                                                                  nnz_B,
                                                                  dBptr,
-                                                                 (int*)nullptr,
+                                                                 static_cast<int*>(nullptr),
                                                                  descr_C,
                                                                  dCptr,
                                                                  &nnz_C),
@@ -185,7 +185,7 @@ void testing_csrgemm_bad_arg(void)
                                                                  dBptr,
                                                                  dBcol,
                                                                  descr_C,
-                                                                 (int*)nullptr,
+                                                                 static_cast<int*>(nullptr),
                                                                  &nnz_C),
                                             "Error: dCptr is nullptr");
     verify_hipsparse_status_invalid_pointer(hipsparseXcsrgemmNnz(handle,
@@ -204,7 +204,7 @@ void testing_csrgemm_bad_arg(void)
                                                                  dBcol,
                                                                  descr_C,
                                                                  dCptr,
-                                                                 (int*)nullptr),
+                                                                 static_cast<int*>(nullptr)),
                                             "Error: nnz_C is nullptr");
     verify_hipsparse_status_invalid_pointer(hipsparseXcsrgemmNnz(handle,
                                                                  trans_A,
@@ -212,7 +212,7 @@ void testing_csrgemm_bad_arg(void)
                                                                  M,
                                                                  N,
                                                                  K,
-                                                                 (hipsparseMatDescr_t) nullptr,
+                                                                 static_cast<hipsparseMatDescr_t>(nullptr),
                                                                  nnz_A,
                                                                  dAptr,
                                                                  dAcol,
@@ -234,7 +234,7 @@ void testing_csrgemm_bad_arg(void)
                                                                  nnz_A,
                                                                  dAptr,
                                                                  dAcol,
-                                                                 (hipsparseMatDescr_t) nullptr,
+                                                                 static_cast<hipsparseMatDescr_t>(nullptr),
                                                                  nnz_B,
                                                                  dBptr,
                                                                  dBcol,
@@ -256,11 +256,11 @@ void testing_csrgemm_bad_arg(void)
                                                                  nnz_B,
                                                                  dBptr,
                                                                  dBcol,
-                                                                 (hipsparseMatDescr_t) nullptr,
+                                                                 static_cast<hipsparseMatDescr_t>(nullptr),
                                                                  dCptr,
                                                                  &nnz_C),
                                             "Error: descr_C is nullptr");
-    verify_hipsparse_status_invalid_handle(hipsparseXcsrgemmNnz((hipsparseHandle_t) nullptr,
+    verify_hipsparse_status_invalid_handle(hipsparseXcsrgemmNnz(static_cast<hipsparseHandle_t>(nullptr),
                                                                 trans_A,
                                                                 trans_B,
                                                                 M,
@@ -285,7 +285,7 @@ void testing_csrgemm_bad_arg(void)
                                                               K,
                                                               descr_A,
                                                               nnz_A,
-                                                              (T*)nullptr,
+                                                              static_cast<T*>(nullptr),
                                                               dAptr,
                                                               dAcol,
                                                               descr_B,
@@ -307,7 +307,7 @@ void testing_csrgemm_bad_arg(void)
                                                               descr_A,
                                                               nnz_A,
                                                               dAval,
-                                                              (int*)nullptr,
+                                                              static_cast<int*>(nullptr),
                                                               dAcol,
                                                               descr_B,
                                                               nnz_B,
@@ -329,7 +329,7 @@ void testing_csrgemm_bad_arg(void)
                                                               nnz_A,
                                                               dAval,
                                                               dAptr,
-                                                              (int*)nullptr,
+                                                              static_cast<int*>(nullptr),
                                                               descr_B,
                                                               nnz_B,
                                                               dBval,
@@ -353,7 +353,7 @@ void testing_csrgemm_bad_arg(void)
                                                               dAcol,
                                                               descr_B,
                                                               nnz_B,
-                                                              (T*)nullptr,
+                                                              static_cast<T*>(nullptr),
                                                               dBptr,
                                                               dBcol,
                                                               descr_C,
@@ -375,7 +375,7 @@ void testing_csrgemm_bad_arg(void)
                                                               descr_B,
                                                               nnz_B,
                                                               dBval,
-                                                              (int*)nullptr,
+                                                              static_cast<int*>(nullptr),
                                                               dBcol,
                                                               descr_C,
                                                               dCval,
@@ -397,7 +397,7 @@ void testing_csrgemm_bad_arg(void)
                                                               nnz_B,
                                                               dBval,
                                                               dBptr,
-                                                              (int*)nullptr,
+                                                              static_cast<int*>(nullptr),
                                                               descr_C,
                                                               dCval,
                                                               dCptr,
@@ -420,7 +420,7 @@ void testing_csrgemm_bad_arg(void)
                                                               dBptr,
                                                               dBcol,
                                                               descr_C,
-                                                              (T*)nullptr,
+                                                              static_cast<T*>(nullptr),
                                                               dCptr,
                                                               dCcol),
                                             "Error: dCval is nullptr");
@@ -442,7 +442,7 @@ void testing_csrgemm_bad_arg(void)
                                                               dBcol,
                                                               descr_C,
                                                               dCval,
-                                                              (int*)nullptr,
+                                                              static_cast<int*>(nullptr),
                                                               dCcol),
                                             "Error: dCptr is nullptr");
     verify_hipsparse_status_invalid_pointer(hipsparseXcsrgemm(handle,
@@ -464,7 +464,7 @@ void testing_csrgemm_bad_arg(void)
                                                               descr_C,
                                                               dCval,
                                                               dCptr,
-                                                              (int*)nullptr),
+                                                              static_cast<int*>(nullptr)),
                                             "Error: dCcol is nullptr");
     verify_hipsparse_status_invalid_pointer(hipsparseXcsrgemm(handle,
                                                               trans_A,
@@ -472,7 +472,7 @@ void testing_csrgemm_bad_arg(void)
                                                               M,
                                                               N,
                                                               K,
-                                                              (hipsparseMatDescr_t) nullptr,
+                                                              static_cast<hipsparseMatDescr_t>(nullptr),
                                                               nnz_A,
                                                               dAval,
                                                               dAptr,
@@ -498,7 +498,7 @@ void testing_csrgemm_bad_arg(void)
                                                               dAval,
                                                               dAptr,
                                                               dAcol,
-                                                              (hipsparseMatDescr_t) nullptr,
+                                                              static_cast<hipsparseMatDescr_t>(nullptr),
                                                               nnz_B,
                                                               dBval,
                                                               dBptr,
@@ -524,12 +524,12 @@ void testing_csrgemm_bad_arg(void)
                                                               dBval,
                                                               dBptr,
                                                               dBcol,
-                                                              (hipsparseMatDescr_t) nullptr,
+                                                              static_cast<hipsparseMatDescr_t>(nullptr),
                                                               dCval,
                                                               dCptr,
                                                               dCcol),
                                             "Error: descr_C is nullptr");
-    verify_hipsparse_status_invalid_handle(hipsparseXcsrgemm((hipsparseHandle_t) nullptr,
+    verify_hipsparse_status_invalid_handle(hipsparseXcsrgemm(static_cast<hipsparseHandle_t>(nullptr),
                                                              trans_A,
                                                              trans_B,
                                                              M,
@@ -556,9 +556,9 @@ static int csrgemm_nnz(int                  m,
                        int                  n,
                        int                  k,
                        const int*           csr_row_ptr_A,
-                       const int*           csr_col_ind_A,
+                       const int*           csr_col_indA,
                        const int*           csr_row_ptr_B,
-                       const int*           csr_col_ind_B,
+                       const int*           csr_col_indB,
                        int*                 csr_row_ptr_C,
                        hipsparseIndexBase_t idx_base_A,
                        hipsparseIndexBase_t idx_base_B,
@@ -576,22 +576,22 @@ static int csrgemm_nnz(int                  m,
         csr_row_ptr_C[i + 1] = csr_row_ptr_C[i];
 
         int row_begin_A = csr_row_ptr_A[i] - idx_base_A;
-        int row_end_A   = csr_row_ptr_A[i + 1] - idx_base_A;
+        int row_endA   = csr_row_ptr_A[i + 1] - idx_base_A;
 
         // Loop over columns of A
-        for(int j = row_begin_A; j < row_end_A; ++j)
+        for(int j = row_begin_A; j < row_endA; ++j)
         {
             // Current column of A
-            int col_A = csr_col_ind_A[j] - idx_base_A;
+            int col_A = csr_col_indA[j] - idx_base_A;
 
             int row_begin_B = csr_row_ptr_B[col_A] - idx_base_B;
-            int row_end_B   = csr_row_ptr_B[col_A + 1] - idx_base_B;
+            int row_endB   = csr_row_ptr_B[col_A + 1] - idx_base_B;
 
             // Loop over columns of B in row col_A
-            for(int l = row_begin_B; l < row_end_B; ++l)
+            for(int l = row_begin_B; l < row_endB; ++l)
             {
                 // Current column of B
-                int col_B = csr_col_ind_B[l] - idx_base_B;
+                int col_B = csr_col_indB[l] - idx_base_B;
 
                 // Check if a new nnz is generated
                 if(nnz[col_B] != i)
@@ -611,13 +611,13 @@ static void csrgemm(int                  m,
                     int                  n,
                     int                  k,
                     const int*           csr_row_ptr_A,
-                    const int*           csr_col_ind_A,
+                    const int*           csr_col_indA,
                     const T*             csr_val_A,
                     const int*           csr_row_ptr_B,
-                    const int*           csr_col_ind_B,
+                    const int*           csr_col_indB,
                     const T*             csr_val_B,
                     const int*           csr_row_ptr_C,
-                    int*                 csr_col_ind_C,
+                    int*                 csr_col_indC,
                     T*                   csr_val_C,
                     hipsparseIndexBase_t idx_base_A,
                     hipsparseIndexBase_t idx_base_B,
@@ -629,37 +629,37 @@ static void csrgemm(int                  m,
     for(int i = 0; i < m; ++i)
     {
         int row_begin_A = csr_row_ptr_A[i] - idx_base_A;
-        int row_end_A   = csr_row_ptr_A[i + 1] - idx_base_A;
+        int row_endA   = csr_row_ptr_A[i + 1] - idx_base_A;
 
         int row_begin_C = csr_row_ptr_C[i] - idx_base_C;
-        int row_end_C   = row_begin_C;
+        int row_endC   = row_begin_C;
 
         // Loop over columns of A
-        for(int j = row_begin_A; j < row_end_A; ++j)
+        for(int j = row_begin_A; j < row_endA; ++j)
         {
             // Current column of A
-            int col_A = csr_col_ind_A[j] - idx_base_A;
+            int col_A = csr_col_indA[j] - idx_base_A;
             // Current value of A
             T val_A = csr_val_A[j];
 
             int row_begin_B = csr_row_ptr_B[col_A] - idx_base_B;
-            int row_end_B   = csr_row_ptr_B[col_A + 1] - idx_base_B;
+            int row_endB   = csr_row_ptr_B[col_A + 1] - idx_base_B;
 
             // Loop over columns of B in row col_A
-            for(int l = row_begin_B; l < row_end_B; ++l)
+            for(int l = row_begin_B; l < row_endB; ++l)
             {
                 // Current column of B
-                int col_B = csr_col_ind_B[l] - idx_base_B;
+                int col_B = csr_col_indB[l] - idx_base_B;
                 // Current value of B
                 T val_B = csr_val_B[l];
 
                 // Check if a new nnz is generated or if the product is appended
                 if(nnz[col_B] < row_begin_C)
                 {
-                    nnz[col_B]               = row_end_C;
-                    csr_col_ind_C[row_end_C] = col_B + idx_base_C;
-                    csr_val_C[row_end_C]     = testing_mult(val_A, val_B);
-                    ++row_end_C;
+                    nnz[col_B]               = row_endC;
+                    csr_col_indC[row_endC] = col_B + idx_base_C;
+                    csr_val_C[row_endC]     = testing_mult(val_A, val_B);
+                    ++row_endC;
                 }
                 else
                 {
@@ -679,16 +679,16 @@ static void csrgemm(int                  m,
         {
             for(int jj = row_begin; jj < row_end - 1; ++jj)
             {
-                if(csr_col_ind_C[jj] > csr_col_ind_C[jj + 1])
+                if(csr_col_indC[jj] > csr_col_indC[jj + 1])
                 {
                     // swap elements
-                    int ind = csr_col_ind_C[jj];
+                    int ind = csr_col_indC[jj];
                     T   val = csr_val_C[jj];
 
-                    csr_col_ind_C[jj] = csr_col_ind_C[jj + 1];
+                    csr_col_indC[jj] = csr_col_indC[jj + 1];
                     csr_val_C[jj]     = csr_val_C[jj + 1];
 
-                    csr_col_ind_C[jj + 1] = ind;
+                    csr_col_indC[jj + 1] = ind;
                     csr_val_C[jj + 1]     = val;
                 }
             }
@@ -731,13 +731,13 @@ hipsparseStatus_t testing_csrgemm(Arguments argus)
 
     // Host structures
     std::vector<int> hcsr_row_ptr_A;
-    std::vector<int> hcsr_col_ind_A;
+    std::vector<int> hcsr_col_indA;
     std::vector<T>   hcsr_val_A;
 
     // Read or construct CSR matrix
     int nnz_A = 0;
     if(!generate_csr_matrix(
-           filename, M, K, nnz_A, hcsr_row_ptr_A, hcsr_col_ind_A, hcsr_val_A, idx_base_A))
+           filename, M, K, nnz_A, hcsr_row_ptr_A, hcsr_col_indA, hcsr_val_A, idx_base_A))
     {
         fprintf(stderr, "Cannot open [read] %s\ncol", filename.c_str());
         return HIPSPARSE_STATUS_INTERNAL_ERROR;
@@ -747,7 +747,7 @@ hipsparseStatus_t testing_csrgemm(Arguments argus)
     N                      = M;
     int              nnz_B = nnz_A;
     std::vector<int> hcsr_row_ptr_B(K + 1, 0);
-    std::vector<int> hcsr_col_ind_B(nnz_B);
+    std::vector<int> hcsr_col_indB(nnz_B);
     std::vector<T>   hcsr_val_B(nnz_B);
 
     // B = A^T
@@ -755,10 +755,10 @@ hipsparseStatus_t testing_csrgemm(Arguments argus)
                   K,
                   nnz_A,
                   hcsr_row_ptr_A.data(),
-                  hcsr_col_ind_A.data(),
+                  hcsr_col_indA.data(),
                   hcsr_val_A.data(),
                   hcsr_row_ptr_B.data(),
-                  hcsr_col_ind_B.data(),
+                  hcsr_col_indB.data(),
                   hcsr_val_B.data(),
                   idx_base_A,
                   idx_base_B);
@@ -772,24 +772,24 @@ hipsparseStatus_t testing_csrgemm(Arguments argus)
     auto dBval_managed = hipsparse_unique_ptr{device_malloc(sizeof(T) * nnz_B), device_free};
     auto dCptr_managed = hipsparse_unique_ptr{device_malloc(sizeof(int) * (M + 1)), device_free};
 
-    int* dAptr = (int*)dAptr_managed.get();
-    int* dAcol = (int*)dAcol_managed.get();
-    T*   dAval = (T*)dAval_managed.get();
-    int* dBptr = (int*)dBptr_managed.get();
-    int* dBcol = (int*)dBcol_managed.get();
-    T*   dBval = (T*)dBval_managed.get();
-    int* dCptr = (int*)dCptr_managed.get();
+    int* dAptr = static_cast<int*>(dAptr_managed.get());
+    int* dAcol = static_cast<int*>(dAcol_managed.get());
+    T*   dAval = static_cast<T*>(dAval_managed.get());
+    int* dBptr = static_cast<int*>(dBptr_managed.get());
+    int* dBcol = static_cast<int*>(dBcol_managed.get());
+    T*   dBval = static_cast<T*>(dBval_managed.get());
+    int* dCptr = static_cast<int*>(dCptr_managed.get());
 
     // copy data from CPU to device
     CHECK_HIP_ERROR(
         hipMemcpy(dAptr, hcsr_row_ptr_A.data(), sizeof(int) * (M + 1), hipMemcpyHostToDevice));
     CHECK_HIP_ERROR(
-        hipMemcpy(dAcol, hcsr_col_ind_A.data(), sizeof(int) * nnz_A, hipMemcpyHostToDevice));
+        hipMemcpy(dAcol, hcsr_col_indA.data(), sizeof(int) * nnz_A, hipMemcpyHostToDevice));
     CHECK_HIP_ERROR(hipMemcpy(dAval, hcsr_val_A.data(), sizeof(T) * nnz_A, hipMemcpyHostToDevice));
     CHECK_HIP_ERROR(
         hipMemcpy(dBptr, hcsr_row_ptr_B.data(), sizeof(int) * (K + 1), hipMemcpyHostToDevice));
     CHECK_HIP_ERROR(
-        hipMemcpy(dBcol, hcsr_col_ind_B.data(), sizeof(int) * nnz_B, hipMemcpyHostToDevice));
+        hipMemcpy(dBcol, hcsr_col_indB.data(), sizeof(int) * nnz_B, hipMemcpyHostToDevice));
     CHECK_HIP_ERROR(hipMemcpy(dBval, hcsr_val_B.data(), sizeof(T) * nnz_B, hipMemcpyHostToDevice));
 
     // csrgemm nnz
@@ -820,12 +820,12 @@ hipsparseStatus_t testing_csrgemm(Arguments argus)
     auto dCcol_managed = hipsparse_unique_ptr{device_malloc(sizeof(int) * hnnz_C_1), device_free};
     auto dCval_managed = hipsparse_unique_ptr{device_malloc(sizeof(T) * hnnz_C_1), device_free};
 
-    int* dCcol = (int*)dCcol_managed.get();
-    T*   dCval = (T*)dCval_managed.get();
+    int* dCcol = static_cast<int*>(dCcol_managed.get());
+    T*   dCval = static_cast<T*>(dCval_managed.get());
 
     // hipsparse pointer mode device
     auto dnnz_C_managed = hipsparse_unique_ptr{device_malloc(sizeof(int)), device_free};
-    int* dnnz_C         = (int*)dnnz_C_managed.get();
+    int* dnnz_C         = static_cast<int*>(dnnz_C_managed.get());
 
     CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_DEVICE));
     CHECK_HIPSPARSE_ERROR(hipsparseXcsrgemmNnz(handle,
@@ -877,13 +877,13 @@ hipsparseStatus_t testing_csrgemm(Arguments argus)
 
         // Copy output from device to CPU
         std::vector<int> hcsr_row_ptr_C(M + 1);
-        std::vector<int> hcsr_col_ind_C(hnnz_C_1);
+        std::vector<int> hcsr_col_indC(hnnz_C_1);
         std::vector<T>   hcsr_val_C(hnnz_C_1);
 
         CHECK_HIP_ERROR(
             hipMemcpy(hcsr_row_ptr_C.data(), dCptr, sizeof(int) * (M + 1), hipMemcpyDeviceToHost));
         CHECK_HIP_ERROR(
-            hipMemcpy(hcsr_col_ind_C.data(), dCcol, sizeof(int) * hnnz_C_1, hipMemcpyDeviceToHost));
+            hipMemcpy(hcsr_col_indC.data(), dCcol, sizeof(int) * hnnz_C_1, hipMemcpyDeviceToHost));
         CHECK_HIP_ERROR(
             hipMemcpy(hcsr_val_C.data(), dCval, sizeof(T) * hnnz_C_1, hipMemcpyDeviceToHost));
 
@@ -894,9 +894,9 @@ hipsparseStatus_t testing_csrgemm(Arguments argus)
                                      N,
                                      K,
                                      hcsr_row_ptr_A.data(),
-                                     hcsr_col_ind_A.data(),
+                                     hcsr_col_indA.data(),
                                      hcsr_row_ptr_B.data(),
-                                     hcsr_col_ind_B.data(),
+                                     hcsr_col_indB.data(),
                                      hcsr_row_ptr_C_gold.data(),
                                      idx_base_A,
                                      idx_base_B,
@@ -909,10 +909,10 @@ hipsparseStatus_t testing_csrgemm(Arguments argus)
                 N,
                 K,
                 hcsr_row_ptr_A.data(),
-                hcsr_col_ind_A.data(),
+                hcsr_col_indA.data(),
                 hcsr_val_A.data(),
                 hcsr_row_ptr_B.data(),
-                hcsr_col_ind_B.data(),
+                hcsr_col_indB.data(),
                 hcsr_val_B.data(),
                 hcsr_row_ptr_C_gold.data(),
                 hcsr_col_ind_C_gold.data(),
@@ -927,7 +927,7 @@ hipsparseStatus_t testing_csrgemm(Arguments argus)
 
         // Check structure and entries of C
         unit_check_general(1, M + 1, 1, hcsr_row_ptr_C_gold.data(), hcsr_row_ptr_C.data());
-        unit_check_general(1, nnz_C_gold, 1, hcsr_col_ind_C_gold.data(), hcsr_col_ind_C.data());
+        unit_check_general(1, nnz_C_gold, 1, hcsr_col_ind_C_gold.data(), hcsr_col_indC.data());
         unit_check_near(1, nnz_C_gold, 1, hcsr_val_C_gold.data(), hcsr_val_C.data());
     }
 
@@ -938,10 +938,8 @@ hipsparseStatus_t testing_csrgemm(Arguments argus)
 
         CHECK_HIPSPARSE_ERROR(hipsparseSetPointerMode(handle, HIPSPARSE_POINTER_MODE_HOST));
 
-        // Warm up
-        for(int iter = 0; iter < number_cold_calls; ++iter)
-        {
-            CHECK_HIPSPARSE_ERROR(hipsparseXcsrgemm(handle,
+        double gpu_time_used = benchmark_kernel(
+            [&]() { CHECK_HIPSPARSE_ERROR(hipsparseXcsrgemm(handle,
                                                     trans_A,
                                                     trans_B,
                                                     M,
@@ -960,40 +958,12 @@ hipsparseStatus_t testing_csrgemm(Arguments argus)
                                                     descr_C,
                                                     dCval,
                                                     dCptr,
-                                                    dCcol));
-        }
-
-        double gpu_time_used = get_time_us();
-
-        // Performance run
-        for(int iter = 0; iter < number_hot_calls; ++iter)
-        {
-            CHECK_HIPSPARSE_ERROR(hipsparseXcsrgemm(handle,
-                                                    trans_A,
-                                                    trans_B,
-                                                    M,
-                                                    N,
-                                                    K,
-                                                    descr_A,
-                                                    nnz_A,
-                                                    dAval,
-                                                    dAptr,
-                                                    dAcol,
-                                                    descr_B,
-                                                    nnz_B,
-                                                    dBval,
-                                                    dBptr,
-                                                    dBcol,
-                                                    descr_C,
-                                                    dCval,
-                                                    dCptr,
-                                                    dCcol));
-        }
-
-        gpu_time_used = (get_time_us() - gpu_time_used) / number_hot_calls;
+                                                    dCcol)); return HIPSPARSE_STATUS_SUCCESS; },
+            number_cold_calls,
+            number_hot_calls);
 
         double gflop_count = csrgemm_gflop_count<T, int, int>(
-            M, hcsr_row_ptr_A.data(), hcsr_col_ind_A.data(), hcsr_row_ptr_B.data(), idx_base_A);
+            M, hcsr_row_ptr_A.data(), hcsr_col_indA.data(), hcsr_row_ptr_B.data(), idx_base_A);
         double gbyte_count = csrgemm_gbyte_count<T, int, int>(M, N, K, nnz_A, nnz_B, hnnz_C_1);
 
         double gpu_gflops = get_gpu_gflops(gpu_time_used, gflop_count);
