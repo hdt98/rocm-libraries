@@ -652,7 +652,7 @@ TEST_CASE("Weave LDS and nops", "[rocprofiler][scheduler]")
     context->schedule(k->prolog());
 
     const auto instrDwords      = 2;
-    const auto strideMultiplier = 8;
+    const auto strideMultiplier = 4;
     const auto baseAddresses = generateLDSAddresses(workgroupSize, strideMultiplier, instrDwords);
 
     auto ldsData = Register::Value::AllocateLDS(
@@ -684,7 +684,7 @@ TEST_CASE("Weave LDS and nops", "[rocprofiler][scheduler]")
 
         co_yield context->mem()->barrier({});
 
-        for(int i = 0; i < 8; ++i)
+        for(int i = 0; i < 10; ++i)
         {
             const auto [start, end] = getAlignedSubset(ldsDst->registerCount(), instrDwords, i);
             auto dstRegs            = ldsDst->subset(Generated(iota(start, end)));
@@ -704,7 +704,7 @@ TEST_CASE("Weave LDS and nops", "[rocprofiler][scheduler]")
             return ldsDst->subset(Generated(iota(base, base + width - 1)));
         };
 
-        for(int i = 1; i < 12; ++i)
+        for(int i = 1; i < 8; ++i)
         {
             for(int k = 0; k < 4; ++k)
             {
@@ -771,14 +771,19 @@ TEST_CASE("Weave LDS and nops", "[rocprofiler][scheduler]")
         const auto& profile = allLatencies[0][i];
 
         using namespace Scheduling::LDSBankModel;
-        const int modelLatency
-            = getInstructionIssueCycles(MemoryOpLDS{LdsDirection::Write}, instrDwords)
-              + inst.peekedStatus().stallCycles * 4;
-        Log::info(fmt::format("{}: model {}, profiler mean {}, delta {}",
-                              profile.instruction,
-                              modelLatency,
-                              profile.meanLatency(),
-                              static_cast<int>(profile.meanLatency()) - modelLatency));
+
+        // Remember that stall cycles does not include issue cycles
+        int modelLatency = (inst.peekedStatus().stallCycles + inst.numExecutedInstructions()) * 4;
+        if(GPUInstructionInfo::isLDS(inst.getOpCode()))
+            modelLatency = getInstructionIssueCycles(MemoryOpLDS{LdsDirection::Write}, instrDwords)
+                           + inst.peekedStatus().stallCycles * 4;
+
+        Log::info(
+            fmt::format("{}: model {}, profiler {}, delta {}",
+                        profile.instruction,
+                        modelLatency,
+                        profile.meanLatencyWithPrecedingNone(),
+                        static_cast<int>(profile.meanLatencyWithPrecedingNone()) - modelLatency));
     }
 }
 
