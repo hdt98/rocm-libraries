@@ -536,8 +536,8 @@ def _get_schedule_256x96x64_16bit(kernel, useLDSTr, TLDS):
             'LCC'   : [[47, 47]],
         }"""
 
-        # ov 11 - za05
-        syncTable = [4, SWaitCnt(dscnt=4, vlcnt=-1, vscnt=-1, comment="Wait "),
+        # nov 11 - za05
+        """syncTable = [4, SWaitCnt(dscnt=4, vlcnt=-1, vscnt=-1, comment="Wait "),
                     11, SWaitCnt(dscnt=6, vlcnt=-1, vscnt=-1, comment="Make sure read of A X1 is done"),
                     21, SWaitCnt(dscnt=-1, vlcnt=8, vscnt=-1, comment=""),
                     21, SBarrier(comment=""),
@@ -562,7 +562,137 @@ def _get_schedule_256x96x64_16bit(kernel, useLDSTr, TLDS):
             'LWSA'   : [[31]],
             'LWSB'   : [[31]],
             'LCC'   : [[47, 47]],
+        }"""
+
+        # nov 11 - za06
+        """syncTable = [4, SWaitCnt(dscnt=4, vlcnt=-1, vscnt=-1, comment="Wait "),
+                    11, SWaitCnt(dscnt=6, vlcnt=-1, vscnt=-1, comment="Make sure read of A X1 is done"),
+                    21, SWaitCnt(dscnt=-1, vlcnt=8, vscnt=-1, comment="Only A global VMEM reads outstanding."),
+                    21, SBarrier(comment=""),
+                    19, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Read of B X1 is done"),
+                    33, SWaitCnt(dscnt=-1, vlcnt=15, vscnt=-1, comment="Wait for previous set of global reads"),
+                    33, SBarrier(comment="")]
+ 
+        syncCode = syncTable[1::2]
+        optSchedule = {
+            'SYNC'   : [syncTable[::2]],
+            'GRIncA' : [[0,1,2,3,4,5,6,7,8]],
+            'GRIncB' : [[9,10,11,12,13,14,15,16,17]],
+            'LRA0'   : [[1,2,3,4]], # these reference vgprs A X1
+            'LRB0'   : [[5,6,7,8,9,10]], # these reference vgprs B X1
+            'GRB'    : [[22,22,25,25,28,28]],
+            'GRA'    : [[12,12,13,13,14,14,15,15,16,16,18,18,19,19,20,20]],
+            #'GRA'    : [[17,17,18,18,19,19,21,21,22,22,24,24,25,25,27,27]],
+            'LRA1'   : [[34,36,37,41]],  # these reference vgprs A X0
+            'LRB1'   : [[35,39,40,43,45,47]], # these reference vgprs B X0
+            'LRSA'   : [[23]], # this must come before next reads of A X0 - so the LRA1 
+            'LRSB'   : [[23]],
+            'LWSA'   : [[31]],
+            'LWSB'   : [[31]],
+            'LCC'   : [[47, 47]],
+        }"""
+
+        # nov 11 - za07
+        """syncTable = [4, SWaitCnt(dscnt=4, vlcnt=-1, vscnt=-1, comment="Wait "),
+                    11, SWaitCnt(dscnt=6, vlcnt=-1, vscnt=-1, comment="Make sure read of A X1 is done"),
+                    21, SWaitCnt(dscnt=-1, vlcnt=8, vscnt=-1, comment="Only A global VMEM reads outstanding."),
+                    21, SBarrier(comment=""),
+                    23, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Read of B X1 is done"),
+                    33, SWaitCnt(dscnt=-1, vlcnt=15, vscnt=-1, comment="Wait for previous set of global reads"),
+                    33, SBarrier(comment="")]
+ 
+        syncCode = syncTable[1::2]
+        optSchedule = {
+            'SYNC'   : [syncTable[::2]],
+            'GRIncA' : [[0,1,2,3,4,5,6,7,8]],
+            'GRIncB' : [[9,10,11,12,13,14,15,16,17]],
+            'LRA0'   : [[1,3,5,7],
+                        [2,4,6,8]], # these reference vgprs A X1
+            'LRB0'   : [[9,11,13,15,17,19],
+                        [10,12,14,16,18,20]], # these reference vgprs B X1
+            'GRB'    : [[22,22,25,25,28,28]],
+            'GRA'    : [[12,12,13,13,14,14,15,15,16,16,18,18,19,19,20,20]],
+            #'GRA'    : [[17,17,18,18,19,19,21,21,22,22,24,24,25,25,27,27]],
+            'LRA1'   : [[24,26,28,30],
+                        [25,27,29,31]],  # these reference vgprs A X0
+            'LRB1'   : [[32,34,36,38,40,42],
+                        [33,35,37,39,41,43]], # these reference vgprs B X0
+            'LRSA'   : [[23]], # this must come before next reads of A X0 - so the LRA1 
+            'LRSB'   : [[23]], # this must come before next reads of A X0 - so the LRB1 
+            'LWSA'   : [[31]],
+            'LWSB'   : [[31]],
+            'LCC'   : [[47, 47]],
+        }"""
+
+
+        # nov 13 - za08
+        """syncTable = [4, SWaitCnt(dscnt=4, vlcnt=-1, vscnt=-1, comment="Wait "),
+                    11, SWaitCnt(dscnt=6, vlcnt=-1, vscnt=-1, comment="Make sure read of A X1 is done"),
+                    21, SWaitCnt(dscnt=-1, vlcnt=8, vscnt=-1, comment="Only A global VMEM reads outstanding."),
+                    21, SBarrier(comment=""),
+                    23, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Read of B X1 is done"),
+                    40, SWaitCnt(dscnt=-1, vlcnt=15, vscnt=-1, comment="Wait for previous set of global reads"),
+                    40, SBarrier(comment="")]
+ 
+        syncCode = syncTable[1::2]
+        optSchedule = {
+            'SYNC'   : [syncTable[::2]],
+            'GRIncA' : [[0,1,2,3,4,5,6,7,8]],
+            'GRIncB' : [[9,10,11,12,13,14,15,16,17]],
+            'LRA0'   : [[1,3,5,7],
+                        [2,4,6,8]], # these reference vgprs A X1
+            'LRB0'   : [[9,11,13,15,17,19],
+                        [10,12,14,16,18,20]], # these reference vgprs B X1
+            'GRB'    : [[28,28,32,32,36,36],
+                        [29,30,31,33,35,37]],
+            'GRA'    : [[12,12,13,13,14,14,15,15,16,16,18,18,19,19,20,20]],
+            #'GRA'    : [[17,17,18,18,19,19,21,21,22,22,24,24,25,25,27,27]],
+            'LRA1'   : [[24,26,28,30],
+                        [25,27,29,31]],  # these reference vgprs A X0
+            'LRB1'   : [[32,34,36,38,40,42],
+                        [33,35,37,39,41,43]], # these reference vgprs B X0
+            'LRSA'   : [[23]], # this must come before next reads of A X0 - so the LRA1 
+            'LRSB'   : [[23]], # this must come before next reads of A X0 - so the LRB1 
+            'LWSA'   : [[31]],
+            'LWSB'   : [[31]],
+            'LCC'   : [[47, 47]],
+        }"""
+
+        # nov 13 - za09
+        syncTable = [4, SWaitCnt(dscnt=4, vlcnt=-1, vscnt=-1, comment="Wait "),
+                    11, SWaitCnt(dscnt=6, vlcnt=-1, vscnt=-1, comment="Make sure read of A X1 is done"),
+                    24, SWaitCnt(dscnt=0, vlcnt=3+6, vscnt=-1, comment="Only B global VMEM reads + new ones outstanding., read of B x1 is done"),
+                    24, SBarrier(comment=""),
+                    33, SWaitCnt(dscnt=-1, vlcnt=10, vscnt=-1, comment="Only global VMEM launched in this iteration are allowed."),
+                    33, SBarrier(comment=""),
+                    40, SWaitCnt(dscnt=-1, vlcnt=11, vscnt=-1, comment="Wait for previous set of global reads"),
+                    40, SBarrier(comment="")]
+ 
+        syncCode = syncTable[1::2]
+        optSchedule = {
+            'SYNC'   : [syncTable[::2]],
+            'GRIncA' : [[0,1,2,3,4,5,6,7,8]],
+            'GRIncB' : [[9,10,11,12,13,14,15,16,17]],
+            'LRA0'   : [[1,3,5,7],
+                        [2,4,6,8]], # these reference vgprs A X1
+            'LRB0'   : [[9,11,13,15,17,19],
+                        [10,12,14,16,18,20]], # these reference vgprs B X1
+            'GRB'    : [[29,29,31,31,  34,34],
+                        [30,30,32,32,  35,35]],
+            'GRA'    : [[12,12,14,14,16,16,18,18,20,20,22,22,  25,25,27,27],
+                        [13,13,15,15,17,17,19,19,21,21,23,23,  26,26,28,28]],
+            #'GRA'    : [[17,17,18,18,19,19,21,21,22,22,24,24,25,25,27,27]],
+            'LRA1'   : [[25,27,29,31],
+                        [26,28,30,32],],  # these reference vgprs A X0 for iter i+1
+            'LRB1'   : [[33,35,37,39,41,43], # these reference vgprs B X0 for iter i+1
+                        [34,36,38,40,42,44]], # these reference vgprs B X0 for iter i+1
+            'LRSA'   : [[23]], # this must come before next reads of A X0 - so the LRA1 
+            'LRSB'   : [[23]], # this must come before next reads of A X0 - so the LRB1 
+            'LWSA'   : [[29]],  # swap after last gr a
+            'LWSB'   : [[36]],  # swap after last gr b
+            'LCC'   : [[47, 47]],
         }
+
 
 
 
