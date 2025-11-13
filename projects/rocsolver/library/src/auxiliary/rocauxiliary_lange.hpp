@@ -38,13 +38,7 @@
 
 ROCSOLVER_BEGIN_NAMESPACE
 
-#define LANGE_FROBENIUS_BDIM 1024 // Number of threads per thread-block used in main stedc kernels
-
-/*************************************************************
-    Templated kernels are instantiated in separate cpp
-    files in order to improve compilation times and reduce
-    the library size.
-*************************************************************/
+#define LANGE_FROBENIUS_BDIM 1024 // Number of threads per thread-block used in main lange kernels for frobenius norm
 
 template <int MAX_THDS, typename T, typename I, typename S, typename U>
 ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) lange_frobenius_kernel(const rocblas_int m,
