@@ -80,10 +80,3 @@ VectorWidth:
 WorkGroupMappingType:
 _DepthULds:
 allowLRVWBforTLUandMI:
-DelayRemainingArguments:
-ExtraLatencyForLR:
-ExtraMiLatencyLeft:
-ForceStoreSC1:
-MinKForGSU:
-PreloadKernelArguments:
-VgprForLocalReadPacking:

@@ -647,6 +647,9 @@ def run():
     print2(HR)
     print2("")
 
+    # import debugpy
+    # (debugpy.listen(("0.0.0.0", 5678)), debugpy.wait_for_client()) if not debugpy.is_client_connected() else None
+
     arguments = parseArguments()
     setVerbosity(arguments["PrintLevel"])
     outputPath = Path(ensurePath(os.path.abspath(arguments["OutputPath"])))
