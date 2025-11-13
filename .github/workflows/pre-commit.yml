@@ -9,7 +9,7 @@ on:
 
 jobs:
   pre-commit:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
         project: [hipdnn]
@@ -32,7 +32,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install pre-commit
           sudo apt-get update
-          sudo apt-get install -y clang-format clang-tidy-20 flatbuffers-compiler
+          # The rest are managed by pre-commit mirror
+          sudo apt-get install -y clang-tidy-20 flatbuffers-compiler
 
       - name: Configure Git
         run: |
@@ -49,8 +50,6 @@ jobs:
             echo "No ${{ matrix.project }} files changed"
             echo "files_found=false" >> $GITHUB_OUTPUT
           else
-            files=$(echo "$changed" | tr '\n' ' ' | sed 's/ *$//')
-            echo "all_modified_files=$files" >> $GITHUB_OUTPUT
             echo "files_found=true" >> $GITHUB_OUTPUT
           fi
 
@@ -58,7 +57,7 @@ jobs:
         if: steps.changed-files.outputs.files_found == 'true'
         run: |
           echo "Changed ${{ matrix.project }} files:"
-          echo "${{ steps.changed-files.outputs.all_modified_files }}" | tr ' ' '\n'
+          git diff --name-only FETCH_HEAD HEAD | grep "^projects/${{ matrix.project }}/"
 
       - name: Disable submodule recursion
         run: git config submodule.recurse false
@@ -66,27 +65,26 @@ jobs:
       - name: Run pre-commit checks for ${{ matrix.project }}
         if: steps.changed-files.outputs.files_found == 'true'
         run: |
-          var="${{ steps.changed-files.outputs.all_modified_files }}"
-          read -r -a files <<<"$var"
-          
           echo "================================================"
           echo "Running pre-commit checks for ${{ matrix.project }}..."
           echo "================================================"
-          printf "  %s\n" "${files[@]}"
           echo ""
           
-          # Run with --show-diff-on-failure to show what needs to be fixed
-          if ! pre-commit run --files "${files[@]}" --show-diff-on-failure; then
+          # Run pre-commit on all changed files in the branch
+          CMD="pre-commit run --from-ref origin/${{ github.event.pull_request.base.ref }} --to-ref HEAD"
+
+          if ! $CMD --show-diff-on-failure; then
             echo ""
             echo "================================================"
             echo "❌ Pre-commit checks FAILED for ${{ matrix.project }}"
             echo "================================================"
             echo ""
             echo "Please fix the issues above and commit the changes."
-            echo "You can run pre-commit locally with:"
-            echo "  pre-commit run --files ${files[*]}"
             echo ""
-            echo "Or install pre-commit hooks to run automatically:"
+            echo "To run pre-commit locally on all changed files:"
+            echo "  $CMD"
+            echo ""
+            echo "Or install pre-commit hooks to run automatically on commits:"
             echo "  pip install pre-commit"
             echo "  pre-commit install"
             echo ""
