@@ -1,0 +1,57 @@
+{
+  "version": 3,
+  "configurePresets": [
+    {
+      "name": "default:release",
+      "displayName": "Configure release build with installation to /opt/rocm",
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": {
+        "CMAKE_CXX_COMPILER": "/opt/rocm/bin/amdclang++",
+        "CMAKE_C_COMPILER": "/opt/rocm/bin/amdclang",
+        "CMAKE_PREFIX_PATH": "/opt/rocm",
+        "CMAKE_INSTALL_PREFIX": "/opt/rocm",
+        "CMAKE_BUILD_TYPE": "Release",
+        "GPU_TARGETS": "all"
+      }
+    },
+    {
+      "name": "debug",
+      "displayName": "Configure debug build",
+      "inherits": "default:release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "ROCPRIM_BUILD_TESTING": "ON",
+        "ROCPRIM_ENABLE_BENCHMARK": "ON",
+        "ROCPRIM_ENABLE_EXAMPLES": "ON"
+      }
+    },
+    {
+      "name": "tests-only",
+      "displayName": "Configure tests only",
+      "inherits": "default:release",
+      "cacheVariables": {
+        "ROCPRIM_BUILD_TESTING": "ON",
+        "ROCPRIM_ENABLE_BENCHMARK": "OFF",
+        "ROCPRIM_ENABLE_EXAMPLES": "OFF"
+      }
+    },
+    {
+      "name": "benchmarks-only",
+      "displayName": "Configure benchmarks only",
+      "inherits": "default:release",
+      "cacheVariables": {
+        "ROCPRIM_BUILD_TESTING": "OFF",
+        "ROCPRIM_ENABLE_BENCHMARK": "ON",
+        "ROCPRIM_ENABLE_EXAMPLES": "OFF"
+      }
+    },
+    {
+      "name": "coverage",
+      "displayName": "Configure coverage build",
+      "inherits": "debug",
+      "cacheVariables": {
+        "ROCPRIM_ENABLE_COVERAGE": "ON"
+      }
+    }
+  ]
+}

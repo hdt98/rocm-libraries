@@ -1,151 +1,122 @@
-# MIT License
-#
-# Copyright (c) 2017-2025 Advanced Micro Devices, Inc. All rights reserved.
-#
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in all
-# copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-# SOFTWARE.
+# Copyright Advanced Micro Devices, Inc., or its affiliates.
+# SPDX-License-Identifier: MIT
 
-option(BENCHMARK_CONFIG_TUNING "Benchmark device-level functions using various configs" OFF)
-option(BENCHMARK_AUTOTUNED_TYPES_ONLY "Benchmark autotuned types only, which lowers the benchmarking runtime" OFF)
+include(ConfigAutotune)
+include(ConfigAutotuneSettings)
 
-include(../cmake/ConfigAutotune.cmake)
-include(ConfigAutotuneSettings.cmake)
+option(ROCPRIM_BENCHMARK_USE_AMDSMI "Let benchmarks use AMD SMI to output more GPU statistics" OFF)
+set(ROCPRIM_BENCHMARK_TUNE_PARAM_NAMES "" CACHE STRING "Tuning parameter names")
+set(ROCPRIM_BENCHMARK_TUNE_PARAMS "" CACHE STRING "Tuning parameters")
 
-option(BENCHMARK_TUNE_PARAM_NAMES "Tuning parameter names" "")
-option(BENCHMARK_TUNE_PARAMS "Tuning parameters" "")
-
-option(BENCHMARK_USE_AMDSMI "Let benchmarks use AMD SMI to output more GPU statistics" OFF)
-
-if(BENCHMARK_CONFIG_TUNING)
-  add_custom_target("benchmark_config_tuning")
+if(ROCPRIM_ENABLE_CONFIG_TUNING)
+    add_custom_target(benchmark_config_tuning)
 endif()
 
 function(add_rocprim_benchmark BENCHMARK_SOURCE)
-  get_filename_component(BENCHMARK_TARGET ${BENCHMARK_SOURCE} NAME_WE)
+    get_filename_component(BENCHMARK_TARGET ${BENCHMARK_SOURCE} NAME_WE)
 
-  if(USE_HIPCXX)
-    set_source_files_properties(${BENCHMARK_SOURCE} PROPERTIES LANGUAGE HIP)
-  endif()
+    if(ROCPRIM_USE_HIPCXX)
+        set_source_files_properties(${BENCHMARK_SOURCE} PROPERTIES LANGUAGE HIP)
+    endif()
 
-  if(BENCHMARK_CONFIG_TUNING)
-    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${BENCHMARK_TARGET}.parallel.cpp.in")
-      message(STATUS "found ${BENCHMARK_TARGET}.parallel.cpp.in file, compiling in parallel.")
-      read_config_autotune_settings(${BENCHMARK_TARGET} list_across_names list_across output_pattern_suffix)
+    if(ROCPRIM_ENABLE_CONFIG_TUNING)
+        if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${BENCHMARK_TARGET}.parallel.cpp.in")
+            message(STATUS "Found ${BENCHMARK_TARGET}.parallel.cpp.in file, compiling in parallel.")
+            read_config_autotune_settings(${BENCHMARK_TARGET} list_across_names list_across output_pattern_suffix)
 
-      if(BENCHMARK_TUNE_PARAM_NAMES AND BENCHMARK_TUNE_PARAMS)
-        set(list_across_names "${BENCHMARK_TUNE_PARAM_NAMES}")
-        set(list_across "${BENCHMARK_TUNE_PARAMS}")
-      endif()
+            if(ROCPRIM_BENCHMARK_TUNE_PARAM_NAMES AND ROCPRIM_BENCHMARK_TUNE_PARAMS)
+                set(list_across_names "${ROCPRIM_BENCHMARK_TUNE_PARAM_NAMES}")
+                set(list_across "${ROCPRIM_BENCHMARK_TUNE_PARAMS}")
+            endif()
 
-      #make sure that variables are not empty, i.e. there actually is an entry for that benchmark in benchmark/ConfigAutotuneSettings.cmake
-      if(list_across_names)
+            if(list_across_names)
+                add_executable(${BENCHMARK_TARGET} ${BENCHMARK_SOURCE})
+                target_compile_definitions(${BENCHMARK_TARGET} PRIVATE BENCHMARK_CONFIG_TUNING)
+                add_matrix(
+                    TARGET ${BENCHMARK_TARGET}
+                    SHARDS 1
+                    CURRENT_SHARD 0
+                    INPUT "${BENCHMARK_TARGET}.parallel.cpp.in"
+                    OUTPUT_PATTERN "${BENCHMARK_TARGET}_${output_pattern_suffix}"
+                    NAMES ${list_across_names}
+                    LISTS ${list_across}
+                )
+                add_dependencies(benchmark_config_tuning ${BENCHMARK_TARGET})
+            else()
+                message(WARNING "No config-tuning entry in benchmark/ConfigAutotuneSettings.cmake for ${BENCHMARK_TARGET}!")
+                return()
+            endif()
+        else()
+            return()
+        endif()
+    else()
         add_executable(${BENCHMARK_TARGET} ${BENCHMARK_SOURCE})
-        target_compile_definitions(${BENCHMARK_TARGET} PRIVATE BENCHMARK_CONFIG_TUNING)
-        add_matrix(TARGET ${BENCHMARK_TARGET}
-                SHARDS 1
-                CURRENT_SHARD 0
-                INPUT "${BENCHMARK_TARGET}.parallel.cpp.in"
-                OUTPUT_PATTERN "${BENCHMARK_TARGET}_${output_pattern_suffix}"
-                NAMES ${list_across_names}
-                LISTS ${list_across})
-        add_dependencies(benchmark_config_tuning ${BENCHMARK_TARGET})
-      else()
-        message(WARNING "No config-tuning entry in benchmark/ConfigAutotuneSettings.cmake for ${BENCHMARK_TARGET}!")
-        return()
-      endif()
-    else()
-      #do nothing if BENCHMARK_CONFIG_TUNING is ON but no ${BENCHMARK_TARGET}.parallel.cpp.in exists
-      return()
     endif()
-  else()
-    add_executable(${BENCHMARK_TARGET} ${BENCHMARK_SOURCE})
-  endif()
 
-  if(BUILD_NAIVE_BENCHMARK)
-    target_compile_definitions(${BENCHMARK_TARGET} PUBLIC BUILD_NAIVE_BENCHMARK)
-  endif()
-
-  if(BENCHMARK_AUTOTUNED_TYPES_ONLY)
-    target_compile_definitions(${BENCHMARK_TARGET} PUBLIC BENCHMARK_AUTOTUNED_TYPES_ONLY)
-  endif()
-
-  target_link_libraries(${BENCHMARK_TARGET}
-    PRIVATE
-      rocprim
-      benchmark::benchmark
-  )
-
-  if(USE_HIPCXX)
-    target_link_libraries(${BENCHMARK_TARGET}
-      PRIVATE
-      $<IF:$<LINK_LANGUAGE:HIP>,hip::host,hip::device>
-    )
-  else()
-    target_link_libraries(${BENCHMARK_TARGET}
-      PRIVATE
-      hip::device)
-  endif()
-
-  if(BENCHMARK_USE_AMDSMI)
-    find_library(AMDSMI_LIB NAMES amd_smi)
-    if(AMDSMI_LIB)
-      target_link_libraries(${BENCHMARK_TARGET} PRIVATE ${AMDSMI_LIB})
-    else()
-      message(FATAL_ERROR "BENCHMARK_USE_AMDSMI was ON, but AMD SMI is not installed")
+    if(ROCPRIM_ENABLE_NAIVE_BENCHMARK)
+        target_compile_definitions(${BENCHMARK_TARGET} PRIVATE BUILD_NAIVE_BENCHMARK)
     endif()
-    target_compile_definitions(${BENCHMARK_TARGET} PRIVATE BENCHMARK_USE_AMDSMI)
-  endif()
 
-  target_compile_options(${BENCHMARK_TARGET}
-    PRIVATE
-      $<$<CXX_COMPILER_ID:MSVC>:
-        /bigobj # number of sections exceeded object file format limit: compile with /bigobj
-      >
-  )
+    if(ROCPRIM_ENABLE_AUTOTUNED_TYPES_ONLY)
+        target_compile_definitions(${BENCHMARK_TARGET} PRIVATE BENCHMARK_AUTOTUNED_TYPES_ONLY)
+    endif()
 
-  set_target_properties(${BENCHMARK_TARGET}
-    PROPERTIES
-      RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/benchmark"
-  )
-
-  if (ROCPRIM_INSTALL)
-    rocm_install(TARGETS ${BENCHMARK_TARGET} COMPONENT benchmarks)
-  endif()
-  if (WIN32 AND NOT DEFINED DLLS_COPIED)
-    set(DLLS_COPIED "YES")
-    set(DLLS_COPIED ${DLLS_COPIED} PARENT_SCOPE)
-    # for now adding in all .dll as dependency chain is not cmake based on win32
-    file( GLOB third_party_dlls
-    LIST_DIRECTORIES ON
-    CONFIGURE_DEPENDS
-    ${HIP_DIR}/bin/*.dll
-    ${CMAKE_SOURCE_DIR}/rtest.*
+    target_link_libraries(${BENCHMARK_TARGET}
+        PRIVATE
+            roc::rocprim
+            benchmark::benchmark
     )
-    foreach( file_i ${third_party_dlls})
-      add_custom_command( TARGET ${BENCHMARK_TARGET} POST_BUILD COMMAND ${CMAKE_COMMAND} ARGS -E copy_if_different ${file_i} ${PROJECT_BINARY_DIR}/benchmark )
-    endforeach( file_i )
-  endif()
+
+    if(ROCPRIM_USE_HIPCXX)
+        target_link_libraries(${BENCHMARK_TARGET}
+            PRIVATE
+                $<IF:$<LINK_LANGUAGE:HIP>,hip::host,hip::device>
+        )
+    else()
+        target_link_libraries(${BENCHMARK_TARGET}
+            PRIVATE
+                hip::device
+        )
+    endif()
+
+    if(ROCPRIM_BENCHMARK_USE_AMDSMI)
+        find_library(AMDSMI_LIB NAMES amd_smi REQUIRED)
+        target_link_libraries(${BENCHMARK_TARGET} PRIVATE ${AMDSMI_LIB})
+        target_compile_definitions(${BENCHMARK_TARGET} PRIVATE BENCHMARK_USE_AMDSMI)
+    endif()
+
+    target_compile_options(${BENCHMARK_TARGET}
+        PRIVATE
+            $<$<CXX_COMPILER_ID:MSVC>:/bigobj>
+    )
+
+    set_target_properties(${BENCHMARK_TARGET}
+        PROPERTIES
+            RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/benchmark"
+    )
+
+    if(ROCPRIM_ENABLE_INSTALL)
+        rocm_install(TARGETS ${BENCHMARK_TARGET} COMPONENT benchmarks)
+    endif()
+
+    if(WIN32 AND NOT DEFINED DLLS_COPIED)
+        set(DLLS_COPIED "YES" PARENT_SCOPE)
+        file(GLOB third_party_dlls
+            LIST_DIRECTORIES ON
+            CONFIGURE_DEPENDS
+            ${HIP_DIR}/bin/*.dll
+            ${CMAKE_SOURCE_DIR}/rtest.*
+        )
+        foreach(file_i ${third_party_dlls})
+            add_custom_command(
+                TARGET ${BENCHMARK_TARGET} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different ${file_i} ${PROJECT_BINARY_DIR}/benchmark
+            )
+        endforeach()
+    endif()
 endfunction()
 
-# ****************************************************************************
 # Benchmarks
-# ****************************************************************************
-
 add_rocprim_benchmark(benchmark_block_adjacent_difference.cpp)
 add_rocprim_benchmark(benchmark_block_discontinuity.cpp)
 add_rocprim_benchmark(benchmark_block_exchange.cpp)
