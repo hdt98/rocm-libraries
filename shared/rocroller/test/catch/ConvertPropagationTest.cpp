@@ -298,7 +298,7 @@ namespace ExpressionTest
 
         int64_t a = (int64_t(std::numeric_limits<int32_t>::max()) << 2) + int64_t(0xffff);
         int64_t b = 10;
-        int32_t c = 1;
+        int64_t c = 1;
 
         std::cout << a << std::endl;
 
@@ -313,8 +313,6 @@ namespace ExpressionTest
         std::cout << r << " / " << result << "\n";
 
         auto const assembly = NormalizedSource(context.output());
-
-        std::cout << "\n" << assembly << "\n";
 
         CHECK_THAT(d_result, HasDeviceScalarEqualTo(r));
 
