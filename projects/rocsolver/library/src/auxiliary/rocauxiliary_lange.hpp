@@ -32,16 +32,15 @@
 
 #pragma once
 
+#include "ideal_sizes.hpp"
 #include "lib_device_helpers.hpp"
 #include "rocblas.hpp"
 #include "rocblas_utility.hpp"
 
 ROCSOLVER_BEGIN_NAMESPACE
 
-#define LANGE_FROBENIUS_BDIM 1024 // Number of threads per thread-block used in main lange kernels for frobenius norm
-
-template <int MAX_THDS, typename T, typename I, typename S, typename U>
-ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) lange_frobenius_kernel(const rocblas_int m,
+template <typename T, typename I, typename S, typename U>
+ROCSOLVER_KERNEL void __launch_bounds__(LANGE_FROBENIUS_BDIM) lange_frobenius_kernel(const rocblas_int m,
                                                                          const rocblas_int n,
                                                                          const U A,
                                                                          const rocblas_int lda,
@@ -60,7 +59,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) lange_frobenius_kernel(const r
     S* block_sums_block = load_ptr_batch<S>(block_sums, bidz, 0, blocks);
 
     // shared variables
-    __shared__ S sval[MAX_THDS / WarpSize];
+    __shared__ S sval[LANGE_FROBENIUS_BDIM / WarpSize];
 
     // sum absolute values in row bid
     S block_sum = 0;
@@ -84,14 +83,14 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) lange_frobenius_kernel(const r
     __syncthreads();
     if(tid == 0)
     {
-        for(I k = 1; k < MAX_THDS / warpSize; k++)
+        for(I k = 1; k < LANGE_FROBENIUS_BDIM / warpSize; k++)
             block_sum += sval[k];
         block_sums_block[bid] = block_sum;
     }
 }
 
-template <int MAX_THDS, typename T, typename I, typename S, typename U>
-ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS)
+template <typename T, typename I, typename S, typename U>
+ROCSOLVER_KERNEL void __launch_bounds__(LANGE_FROBENIUS_BDIM)
     lange_frobenius_final_kernel(const rocblas_int m,
                                  const rocblas_int n,
                                  const U A,
@@ -109,11 +108,11 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS)
     S* block_sum = load_ptr_batch<S>(block_sums, bid, 0, blocks);
 
     // shared variables
-    __shared__ S sval[MAX_THDS / WarpSize];
+    __shared__ S sval[LANGE_FROBENIUS_BDIM / WarpSize];
 
     // find maximum of row sums
     S norm_frobenius = 0;
-    for(I i = tid; i < blocks; i += MAX_THDS)
+    for(I i = tid; i < blocks; i += LANGE_FROBENIUS_BDIM)
     {
         norm_frobenius += block_sum[i];
     }
@@ -131,14 +130,14 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS)
     __syncthreads();
     if(tid == 0)
     {
-        for(I k = 1; k < MAX_THDS / warpSize; k++)
+        for(I k = 1; k < LANGE_FROBENIUS_BDIM / warpSize; k++)
             norm_frobenius += sval[k];
         final_norms[bid] = sqrt(norm_frobenius);
     }
 }
 
-template <int MAX_THDS, typename T, typename I, typename S, typename U>
-ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) lange_inf_rows_kernel(const rocblas_int m,
+template <typename T, typename I, typename S, typename U>
+ROCSOLVER_KERNEL void __launch_bounds__(LANGE_THDS) lange_inf_rows_kernel(const rocblas_int m,
                                                                         const rocblas_int n,
                                                                         const U A,
                                                                         const rocblas_int lda,
@@ -155,11 +154,11 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) lange_inf_rows_kernel(const ro
     S* row_sums_block = load_ptr_batch<S>(row_sums, bidz, 0, m);
 
     // shared variables
-    __shared__ S sval[MAX_THDS / WarpSize];
+    __shared__ S sval[LANGE_THDS / WarpSize];
 
     // sum absolute values in row bid
     S row_sum = 0;
-    for(I i = tid; i < n; i += MAX_THDS)
+    for(I i = tid; i < n; i += LANGE_THDS)
     {
         row_sum += rocblas_abs(a[i * lda + bid]);
     }
@@ -177,14 +176,14 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) lange_inf_rows_kernel(const ro
     __syncthreads();
     if(tid == 0)
     {
-        for(I k = 1; k < MAX_THDS / warpSize; k++)
+        for(I k = 1; k < LANGE_THDS/ warpSize; k++)
             row_sum += sval[k];
         row_sums_block[bid] = row_sum;
     }
 }
 
-template <int MAX_THDS, typename T, typename I, typename S, typename U>
-ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) lange_inf_final_kernel(const rocblas_int m,
+template <typename T, typename I, typename S, typename U>
+ROCSOLVER_KERNEL void __launch_bounds__(LANGE_THDS) lange_inf_final_kernel(const rocblas_int m,
                                                                          const rocblas_int n,
                                                                          const U A,
                                                                          const rocblas_int lda,
@@ -200,11 +199,11 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) lange_inf_final_kernel(const r
     S* row_sums_block = load_ptr_batch<S>(row_sums, bid, 0, m);
 
     // shared variables
-    __shared__ S sval[MAX_THDS / WarpSize];
+    __shared__ S sval[LANGE_THDS / WarpSize];
 
     // find maximum of row sums
     S norm_one = 0;
-    for(I i = tid; i < m; i += MAX_THDS)
+    for(I i = tid; i < m; i += LANGE_THDS)
     {
         norm_one = std::max(norm_one, row_sums_block[i]);
     }
@@ -222,14 +221,14 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) lange_inf_final_kernel(const r
     __syncthreads();
     if(tid == 0)
     {
-        for(I k = 1; k < MAX_THDS / warpSize; k++)
+        for(I k = 1; k < LANGE_THDS / warpSize; k++)
             norm_one = std::max(norm_one, sval[k]);
         final_norms[bid] = norm_one;
     }
 }
 
-template <int MAX_THDS, typename T, typename I, typename S, typename U>
-ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) lange_one_columns_kernel(const rocblas_int m,
+template <typename T, typename I, typename S, typename U>
+ROCSOLVER_KERNEL void __launch_bounds__(LANGE_THDS) lange_one_columns_kernel(const rocblas_int m,
                                                                            const rocblas_int n,
                                                                            const U A,
                                                                            const rocblas_int lda,
@@ -246,11 +245,11 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) lange_one_columns_kernel(const
     S* col_sums_block = load_ptr_batch<S>(col_sums, bidz, 0, n);
 
     // shared variables
-    __shared__ S sval[MAX_THDS / WarpSize];
+    __shared__ S sval[LANGE_THDS / WarpSize];
 
     // sum absolute values in column bid
     S col_sum = 0;
-    for(I i = tid; i < m; i += MAX_THDS)
+    for(I i = tid; i < m; i += LANGE_THDS)
     {
         col_sum += rocblas_abs(a[i + bid * lda]);
     }
@@ -268,14 +267,14 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) lange_one_columns_kernel(const
     __syncthreads();
     if(tid == 0)
     {
-        for(I k = 1; k < MAX_THDS / warpSize; k++)
+        for(I k = 1; k < LANGE_THDS / warpSize; k++)
             col_sum += sval[k];
         col_sums_block[bid] = col_sum;
     }
 }
 
-template <int MAX_THDS, typename T, typename I, typename S, typename U>
-ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) lange_one_final_kernel(const rocblas_int m,
+template <typename T, typename I, typename S, typename U>
+ROCSOLVER_KERNEL void __launch_bounds__(LANGE_THDS) lange_one_final_kernel(const rocblas_int m,
                                                                          const rocblas_int n,
                                                                          const U A,
                                                                          const rocblas_int lda,
@@ -291,11 +290,11 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) lange_one_final_kernel(const r
     S* col_sums_block = load_ptr_batch<S>(col_sums, bid, 0, n);
 
     // shared variables
-    __shared__ S sval[MAX_THDS / WarpSize];
+    __shared__ S sval[LANGE_THDS / WarpSize];
 
     // find maximum of column sums
     S norm_one = 0;
-    for(I i = tid; i < n; i += MAX_THDS)
+    for(I i = tid; i < n; i += LANGE_THDS)
     {
         norm_one = std::max(norm_one, col_sums_block[i]);
     }
@@ -313,14 +312,14 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) lange_one_final_kernel(const r
     __syncthreads();
     if(tid == 0)
     {
-        for(I k = 1; k < MAX_THDS / warpSize; k++)
+        for(I k = 1; k < LANGE_THDS / warpSize; k++)
             norm_one = std::max(norm_one, sval[k]);
         final_norms[bid] = norm_one;
     }
 }
 
-template <int MAX_THDS, typename T, typename I, typename S, typename U>
-ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) lange_max_kernel(const rocblas_int m,
+template <typename T, typename I, typename S, typename U>
+ROCSOLVER_KERNEL void __launch_bounds__(LANGE_THDS) lange_max_kernel(const rocblas_int m,
                                                                    const rocblas_int n,
                                                                    const U A,
                                                                    const rocblas_int lda,
@@ -335,11 +334,11 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) lange_max_kernel(const rocblas
     T* a = load_ptr_batch<T>(A, bid, shiftA, strideA);
 
     // shared variables
-    __shared__ S sval[MAX_THDS / WarpSize];
+    __shared__ S sval[LANGE_THDS / WarpSize];
 
     // dot
     S norm_max = 0;
-    for(I i = tid; i < m * n; i += MAX_THDS)
+    for(I i = tid; i < m * n; i += LANGE_THDS)
     {
         int row = i % m;
         int col = i / m;
@@ -360,7 +359,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) lange_max_kernel(const rocblas
     __syncthreads();
     if(tid == 0)
     {
-        for(I k = 1; k < MAX_THDS / warpSize; k++)
+        for(I k = 1; k < LANGE_THDS / warpSize; k++)
             norm_max = std::max(norm_max, sval[k]);
         final_norms[bid] = norm_max;
     }
@@ -472,20 +471,18 @@ rocblas_status rocsolver_lange_template(rocblas_handle handle,
     case rocsolver_norm_type_max:
     {
         // Launch max kernel
-        constexpr int MAX_THDS = 1024;
-        ROCSOLVER_LAUNCH_KERNEL((lange_max_kernel<MAX_THDS, T, I, S>), dim3(1, 1, batch_count),
-                                dim3(MAX_THDS), 0, stream, m, n, A, lda, shiftA, strideA, norms);
+        ROCSOLVER_LAUNCH_KERNEL((lange_max_kernel<T, I, S>), dim3(1, 1, batch_count),
+                                dim3(LANGE_THDS), 0, stream, m, n, A, lda, shiftA, strideA, norms);
         break;
     }
     case rocsolver_norm_type_one:
     {
         // Launch one-norm kernels
-        constexpr int MAX_THDS = 1024;
-        ROCSOLVER_LAUNCH_KERNEL((lange_one_columns_kernel<MAX_THDS, T, I, S>),
-                                dim3(n, 1, batch_count), dim3(MAX_THDS), 0, stream, m, n, A, lda,
+        ROCSOLVER_LAUNCH_KERNEL((lange_one_columns_kernel<T, I, S>),
+                                dim3(n, 1, batch_count), dim3(LANGE_THDS), 0, stream, m, n, A, lda,
                                 shiftA, strideA, work);
-        ROCSOLVER_LAUNCH_KERNEL((lange_one_final_kernel<MAX_THDS, T, I, S>),
-                                dim3(1, 1, batch_count), dim3(MAX_THDS), 0, stream, m, n, A, lda,
+        ROCSOLVER_LAUNCH_KERNEL((lange_one_final_kernel<T, I, S>),
+                                dim3(1, 1, batch_count), dim3(LANGE_THDS), 0, stream, m, n, A, lda,
                                 shiftA, strideA, work, norms);
         break;
     }
@@ -493,10 +490,10 @@ rocblas_status rocsolver_lange_template(rocblas_handle handle,
     {
         // Launch Frobenius kernels
         int blocks = (m * n - 1) / LANGE_FROBENIUS_BDIM + 1;
-        ROCSOLVER_LAUNCH_KERNEL((lange_frobenius_kernel<LANGE_FROBENIUS_BDIM, T, I, S>),
+        ROCSOLVER_LAUNCH_KERNEL((lange_frobenius_kernel<T, I, S>),
                                 dim3(blocks, 1, batch_count), dim3(LANGE_FROBENIUS_BDIM), 0, stream,
                                 m, n, A, lda, shiftA, strideA, work);
-        ROCSOLVER_LAUNCH_KERNEL((lange_frobenius_final_kernel<LANGE_FROBENIUS_BDIM, T, I, S>),
+        ROCSOLVER_LAUNCH_KERNEL((lange_frobenius_final_kernel<T, I, S>),
                                 dim3(1, 1, batch_count), dim3(LANGE_FROBENIUS_BDIM), 0, stream, m,
                                 n, A, lda, shiftA, strideA, work, norms);
         break;
@@ -504,11 +501,10 @@ rocblas_status rocsolver_lange_template(rocblas_handle handle,
     case rocsolver_norm_type_infinity:
     {
         // Launch one-norm kernels
-        constexpr int MAX_THDS = 1024;
-        ROCSOLVER_LAUNCH_KERNEL((lange_inf_rows_kernel<MAX_THDS, T, I, S>), dim3(m, 1, batch_count),
-                                dim3(MAX_THDS), 0, stream, m, n, A, lda, shiftA, strideA, work);
-        ROCSOLVER_LAUNCH_KERNEL((lange_inf_final_kernel<MAX_THDS, T, I, S>),
-                                dim3(1, 1, batch_count), dim3(MAX_THDS), 0, stream, m, n, A, lda,
+        ROCSOLVER_LAUNCH_KERNEL((lange_inf_rows_kernel<T, I, S>), dim3(m, 1, batch_count),
+                                dim3(LANGE_THDS), 0, stream, m, n, A, lda, shiftA, strideA, work);
+        ROCSOLVER_LAUNCH_KERNEL((lange_inf_final_kernel<T, I, S>),
+                                dim3(1, 1, batch_count), dim3(LANGE_THDS), 0, stream, m, n, A, lda,
                                 shiftA, strideA, work, norms);
         break;
     }
