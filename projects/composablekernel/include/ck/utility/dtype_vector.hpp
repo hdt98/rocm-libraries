@@ -2255,12 +2255,13 @@ using uint8x32_t = typename vector_type<uint8_t, 32>::type;
 using uint8x64_t = typename vector_type<uint8_t, 64>::type;
 
 // f4
-using f4x2_t  = typename vector_type<f4x2_pk_t, 1>::type;
-using f4x4_t  = typename vector_type<f4x2_pk_t, 2>::type;
-using f4x8_t  = typename vector_type<f4x2_pk_t, 4>::type;
-using f4x16_t = typename vector_type<f4x2_pk_t, 8>::type;
-using f4x32_t = typename vector_type<f4x2_pk_t, 16>::type;
-using f4x64_t = typename vector_type<f4x2_pk_t, 32>::type;
+using f4x2_t   = typename vector_type<f4x2_pk_t, 1>::type;
+using f4x4_t   = typename vector_type<f4x2_pk_t, 2>::type;
+using f4x8_t   = typename vector_type<f4x2_pk_t, 4>::type;
+using f4x16_t  = typename vector_type<f4x2_pk_t, 8>::type;
+using f4x32_t  = typename vector_type<f4x2_pk_t, 16>::type;
+using f4x64_t  = typename vector_type<f4x2_pk_t, 32>::type;
+using f4x128_t = typename vector_type<f4x2_pk_t, 64>::type;
 
 // f6
 using f6x16_t   = typename vector_type<f6x16_pk_t, 1>::type;

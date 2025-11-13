@@ -279,6 +279,8 @@ if (SUPPORTED_GPU_TARGETS MATCHES "gfx1250")
     add_definitions(-DCK_USE_GFX1250)
     add_definitions(-DCK_USE_NATIVE_MX_SUPPORT)
     set(CK_USE_NATIVE_MX_SUPPORT "ON")
+    add_definitions(-DCK_GFX1250_SUPPORT)
+    set(CK_GFX1250_SUPPORT "ON")
 endif()
 
 option(CK_USE_FP8_ON_UNSUPPORTED_ARCH "Enable FP8 GEMM instances on older architectures" OFF)
