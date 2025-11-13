@@ -508,7 +508,7 @@ architectureMap = {
     "gfx1103": "gfx1103",
     "gfx1150": "strixpoint",
     "gfx1151": "strixhalo",
-    "gfx1152": "krackan",
+    "gfx1152": "gfx1152",
     "gfx1200": "gfx1200",
     "gfx1201": "gfx1201",
 }
