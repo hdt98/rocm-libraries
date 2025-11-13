@@ -201,52 +201,56 @@ std::ostream& operator<<(std::ostream& os, const FindMode::Values& v)
     return os << ToCString(v) << "(" << static_cast<int>(v) << ')';
 }
 
-FindMode::Values GetFindModeValueImpl2()
-{
-    auto str = env::value(MIOPEN_FIND_MODE);
-    if(str.empty())
-        return FindMode::Values::Default_;
-    for(auto& c : str)
-        c = toupper(static_cast<unsigned char>(c));
-    if(str == "NORMAL")
-    {
-        return FindMode::Values::Normal;
-    }
-    else if(str == "FAST")
-    {
-        return FindMode::Values::Fast;
-    }
-    else if(str == "HYBRID")
-    {
-        return FindMode::Values::Hybrid;
-    }
-    else if(str == "DYNAMIC_HYBRID")
-    {
-        return FindMode::Values::DynamicHybrid;
-    }
-    else if(str == "TRUST_VERIFY")
-    {
-        return FindMode::Values::TrustVerify;
-    }
-    else if(str == "TRUST_VERIFY_FULL")
-    {
-        return FindMode::Values::TrustVerifyFull;
-    }
-    else
-    { // Nop. Fall down & try numerics.
-    }
-    const auto val = static_cast<FindMode::Values>(stoul(str));
-    if(FindMode::Values::Begin_ <= val && val < FindMode::Values::End_)
-        return val;
-    MIOPEN_LOG_NQE("Wrong MIOPEN_FIND_MODE, using default.");
-    return FindMode::Values::Default_;
-}
-
 FindMode::Values GetFindModeValueImpl()
 {
-    auto rv = GetFindModeValueImpl2();
-    MIOPEN_LOG_NQI("MIOPEN_FIND_MODE = " << rv);
-    return rv;
+    FindMode::Values val = FindMode::Values::Default_;
+
+    auto str = env::value(MIOPEN_FIND_MODE);
+    if(!str.empty())
+    {
+        for(auto& c : str)
+            c = toupper(static_cast<unsigned char>(c));
+        if(str == "NORMAL")
+        {
+            val = FindMode::Values::Normal;
+        }
+        else if(str == "FAST")
+        {
+            val = FindMode::Values::Fast;
+        }
+        else if(str == "HYBRID")
+        {
+            val = FindMode::Values::Hybrid;
+        }
+        else if(str == "DYNAMIC_HYBRID")
+        {
+            val = FindMode::Values::DynamicHybrid;
+        }
+        else if(str == "TRUST_VERIFY")
+        {
+            val = FindMode::Values::TrustVerify;
+        }
+        else if(str == "TRUST_VERIFY_FULL")
+        {
+            val = FindMode::Values::TrustVerifyFull;
+        }
+        else
+        { // Fall down & try numerics.
+            const auto castVal = static_cast<FindMode::Values>(stoul(str));
+            if(FindMode::Values::Begin_ <= castVal && castVal < FindMode::Values::End_)
+            {
+                val = castVal;
+            }
+            else
+            {
+                MIOPEN_LOG_NQE("Wrong MIOPEN_FIND_MODE, using default.");
+                val = FindMode::Values::Default_;
+            }
+        }
+    }
+
+    MIOPEN_LOG_NQI("MIOPEN_FIND_MODE = " << val);
+    return val;
 }
 
 FindMode::Values GetFindModeValue()
