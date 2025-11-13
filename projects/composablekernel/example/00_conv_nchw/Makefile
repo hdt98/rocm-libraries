@@ -87,26 +87,21 @@ prof_mio_ttrace:
 # 	rocprofv3 --att -d ttrace_${prof_name}_${timestamp}.out ${att_opt} --kernel-include-regex .*conv.* -- ${mio_cmd}
 
 # ck profiler setting
-# kernel config   | op_name         | dtype | layout | index | verify | init | print | time |
-kernel_config_0 =   grouped_conv_fwd  1       2        0       1        2      0       1
+# conv common | op_name         | dtype | layout | index | verify | init | print | time |
+conv_common =   grouped_conv_fwd  1       2        0       1        2      0       1
 
-# shape          | dim | G  | N   | K/G | C/G | f_len | i_len   | f_stride | f_dilation | i_lpads | i_rpads |
-shape_config_0 =   2     4    16    56    56    3 3     235 368   1 1        1 1          1 1       1 1
-shape_config_1 =   2     1    1024  32    128   3 3     28 28     1 1        1 1          1 1       1 1
-shape_config_2 =   2     32   256   8     8     3 3     56 56     1 1        1 1          1 1       1 1
-shape_config_3 =   2     1    1     16    16    3 3     960 450   1 1        1 1          1 1       1 1
+# shape | common        | dim | G  | N   | K/G | C/G | f_len | i_len   | f_stride | f_dilation | i_lpads | i_rpads |
+conv_0 =  ${conv_common}  2     4    16    56    56    3 3     235 368   1 1        1 1          1 1       1 1
+conv_1 =  ${conv_common}  2     1    1024  32    128   3 3     28 28     1 1        1 1          1 1       1 1
+conv_2 =  ${conv_common}  2     32   256   8     8     3 3     56 56     1 1        1 1          1 1       1 1
+conv_3 =  ${conv_common}  2     1    1     16    16    3 3     960 450   1 1        1 1          1 1       1 1
 
-run_ckprof:
-# 	../../build/bin/ckProfiler ${kernel_config_0} ${shape_config_0} > ckprof_0.out 2>&1
-# 	../../build/bin/ckProfiler ${kernel_config_0} ${shape_config_1} > ckprof_1.out 2>&1
-# 	../../build/bin/ckProfiler ${kernel_config_0} ${shape_config_2} > ckprof_2.out 2>&1
-	../../build/bin/ckProfiler ${kernel_config_0} ${shape_config_3} > ckprof_3.out 2>&1
+# config   | op_name         | dtype | layout | verify | init | print | time | M     | N     | K   | StrideA | StrideB | StrideC | SplitK |
+gemm_0   =   gemm_universal    1       0        1        2      0       1      16      518400  144   0         0         0         0
+gemm_1   =   gemm_universal    1       1        1        2      0       1      16      518400  144   0         0         0         0
+gemm_2   =   gemm_universal    1       0        1        2      0       1      518400  16      144   0         0         0         0 
+gemm_3   =   gemm_universal    1       0        1        2      0       1      32      802816  1152  0         0         0         0
+gemm_4   =   gemm_universal    1       1        1        2      0       1      32      802816  1152  0         0         0         0
 
-# kernel config   | op_name         | dtype | layout | verify | init | print | time | M  | N     | K   | StrideA | StrideB | StrideC | SplitK |
-gemm_config_0   =   gemm_universal    1       0        1        2      0       1      16   518400  144   144       518400    518400    0
-gemm_config_1   =   gemm_universal    1       0        1        2      0       1      32   802816  1152  1152      802816    802816    0
-gemm_config_2   =   gemm_universal    1       1        1        2      0       1      16   518400  144   144       144       518400    0
-
-run_ckprof_g:
-# 	../../build/bin/ckProfiler ${gemm_config_0} > ckprof_g_0.out 2>&1
-	../../build/bin/ckProfiler ${gemm_config_1} > ckprof_g_1.out 2>&1
+ckprof_%:
+	../../build/bin/ckProfiler ${$*} > ckprof_$*.out 2>&1
