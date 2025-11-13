@@ -176,8 +176,12 @@ namespace ExpressionTest
         auto const assembly = NormalizedSource(context.output());
 
         // Should use a 32-bit subtraction instruction and then 32-bit addition
-        CHECK_THAT(assembly, Catch::Matchers::ContainsSubstring("v_sub_i32"));
-        CHECK_THAT(assembly, Catch::Matchers::ContainsSubstring("v_add_i32"));
+        CHECK_THAT(assembly,
+                   Catch::Matchers::ContainsSubstring("v_sub_i32")
+                       or Catch::Matchers::ContainsSubstring("v_sub_nc_i32"));
+        CHECK_THAT(assembly,
+                   Catch::Matchers::ContainsSubstring("v_add_i32")
+                       or Catch::Matchers::ContainsSubstring("v_add_nc_i32"));
     }
 
     TEST_CASE("Convert propagation with ArithmeticShiftR", "[x123][gpu][convert-propagation]")
@@ -220,7 +224,9 @@ namespace ExpressionTest
 
         // Should use a 64-bit arithmetic shift instruction and then 32-bit addition
         CHECK_THAT(assembly, Catch::Matchers::ContainsSubstring("v_ashrrev_i64"));
-        CHECK_THAT(assembly, Catch::Matchers::ContainsSubstring("v_add_i32"));
+        CHECK_THAT(assembly,
+                   Catch::Matchers::ContainsSubstring("v_add_i32")
+                       or Catch::Matchers::ContainsSubstring("v_add_nc_i32"));
 
         CHECK_THAT(assembly, not Catch::Matchers::ContainsSubstring("v_addc_co_u32"));
     }
@@ -265,7 +271,9 @@ namespace ExpressionTest
         // Should use a 64-bit logical shift instruction and then 32-bit addition
         auto const assembly = NormalizedSource(context.output());
         CHECK_THAT(assembly, Catch::Matchers::ContainsSubstring("v_lshrrev_b64"));
-        CHECK_THAT(assembly, Catch::Matchers::ContainsSubstring("v_add_u32"));
+        CHECK_THAT(assembly,
+                   Catch::Matchers::ContainsSubstring("v_add_u32")
+                       or Catch::Matchers::ContainsSubstring("v_add_nc_u32"));
 
         CHECK_THAT(assembly, not Catch::Matchers::ContainsSubstring("v_addc_co_u32"));
     }
@@ -304,12 +312,15 @@ namespace ExpressionTest
 
         std::cout << r << " / " << result << "\n";
 
-        CHECK_THAT(d_result, HasDeviceScalarEqualTo(r));
-
         auto const assembly = NormalizedSource(context.output());
+
+        std::cout << "\n" << assembly << "\n";
+
+        CHECK_THAT(d_result, HasDeviceScalarEqualTo(r));
 
         // Should not do sign extension and should do 32-bit addition
         CHECK_THAT(assembly, Catch::Matchers::ContainsSubstring("v_ashrrev_i32"));
         CHECK_THAT(assembly, Catch::Matchers::ContainsSubstring("v_add_i32"));
     }
+
 }
