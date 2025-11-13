@@ -50,7 +50,13 @@ BenchmarkProblems:
       ForkParameters:
         # - StoreCInUnroll: [False]
         - MatrixInstruction:
-          - [16, 16, 4, 1, 1, 1, 1, 1, 1]
+          - [16, 16, 4, 1, 1, 1, 1, 1, 1] #16x16
+          - [16, 16, 4, 1, 1, 4, 4, 2, 2] #128x128
+          - [16, 16, 4, 1, 1, 2, 2, 2, 2] #64x64
+          - [16, 16, 4, 1, 1, 1, 1, 2, 2] #32x32
+          # - [16, 16, 1, 4, 1, 4, 4, 4, 1] #256x256
+          # - [16, 16, 4, 4, 1, 2, 2, 4, 1] #128x128 not-working
+          # - [16, 16, 4, 4, 4, 4, 4, 1, 4] #256x256 not-working
           # - [16, 16, 4, 1, 1, 2, 2, 2, 2]
         - ScheduleIterAlg: [1]
         - GlobalSplitU: [1] #, 3]
@@ -106,7 +112,10 @@ BenchmarkProblems:
         - KernelLanguage: ["Assembly"]
       ForkParameters:
         - MatrixInstruction:
-          - [16, 16, 4, 1, 1, 1, 1, 1, 1]
+          - [16, 16, 4, 1, 1, 1, 1, 1, 1] #16x16
+          - [16, 16, 4, 1, 1, 4, 4, 2, 2] #128x128
+          - [16, 16, 4, 1, 1, 2, 2, 2, 2] #64x64
+          - [16, 16, 4, 1, 1, 1, 1, 2, 2] #32x32
         - ScheduleIterAlg: [1]
         - GlobalSplitU: [1]
         - PrefetchLocalRead: [False]
@@ -138,7 +147,10 @@ BenchmarkProblems:
         - KernelLanguage: ["Assembly"]
       ForkParameters:
         - MatrixInstruction:
-          - [16, 16, 4, 1, 1, 1, 1, 1, 1]
+          - [16, 16, 4, 1, 1, 1, 1, 1, 1] #16x16
+          - [16, 16, 4, 1, 1, 4, 4, 2, 2] #128x128
+          - [16, 16, 4, 1, 1, 2, 2, 2, 2] #64x64
+          - [16, 16, 4, 1, 1, 1, 1, 2, 2] #32x32
         - ScheduleIterAlg: [1]
         - GlobalSplitU: [1]
         - PrefetchLocalRead: [False]
@@ -170,7 +182,10 @@ BenchmarkProblems:
         - KernelLanguage: ["Assembly"]
       ForkParameters:
         - MatrixInstruction:
-          - [16, 16, 4, 1, 1, 1, 1, 1, 1]
+          - [16, 16, 4, 1, 1, 1, 1, 1, 1] #16x16
+          - [16, 16, 4, 1, 1, 4, 4, 2, 2] #128x128
+          - [16, 16, 4, 1, 1, 2, 2, 2, 2] #64x64
+          - [16, 16, 4, 1, 1, 1, 1, 2, 2] #32x32
         - ScheduleIterAlg: [1]
         - GlobalSplitU: [1]
         - PrefetchLocalRead: [False]
@@ -202,7 +217,10 @@ BenchmarkProblems:
         - KernelLanguage: ["Assembly"]
       ForkParameters:
         - MatrixInstruction:
-          - [16, 16, 4, 1, 1, 1, 1, 1, 1]
+          - [16, 16, 4, 1, 1, 1, 1, 1, 1] #16x16
+          - [16, 16, 4, 1, 1, 4, 4, 2, 2] #128x128
+          - [16, 16, 4, 1, 1, 2, 2, 2, 2] #64x64
+          - [16, 16, 4, 1, 1, 1, 1, 2, 2] #32x32
         - ScheduleIterAlg: [1]
         - GlobalSplitU: [1]
         - PrefetchLocalRead: [False]
@@ -234,7 +252,10 @@ BenchmarkProblems:
         - KernelLanguage: ["Assembly"]
       ForkParameters:
         - MatrixInstruction:
-          - [16, 16, 4, 1, 1, 1, 1, 1, 1]
+          - [16, 16, 4, 1, 1, 1, 1, 1, 1] #16x16
+          - [16, 16, 4, 1, 1, 4, 4, 2, 2] #128x128
+          - [16, 16, 4, 1, 1, 2, 2, 2, 2] #64x64
+          - [16, 16, 4, 1, 1, 1, 1, 2, 2] #32x32
         - ScheduleIterAlg: [1]
         - GlobalSplitU: [1]
         - PrefetchLocalRead: [False]
@@ -266,7 +287,10 @@ BenchmarkProblems:
         - KernelLanguage: ["Assembly"]
       ForkParameters:
         - MatrixInstruction:
-          - [16, 16, 4, 1, 1, 1, 1, 1, 1]
+          - [16, 16, 4, 1, 1, 1, 1, 1, 1] #16x16
+          - [16, 16, 4, 1, 1, 4, 4, 2, 2] #128x128
+          - [16, 16, 4, 1, 1, 2, 2, 2, 2] #64x64
+          - [16, 16, 4, 1, 1, 1, 1, 2, 2] #32x32
         - ScheduleIterAlg: [1]
         - GlobalSplitU: [1]
         - PrefetchLocalRead: [False]
@@ -298,7 +322,10 @@ BenchmarkProblems:
         - KernelLanguage: ["Assembly"]
       ForkParameters:
         - MatrixInstruction:
-          - [16, 16, 4, 1, 1, 1, 1, 1, 1]
+          - [16, 16, 4, 1, 1, 1, 1, 1, 1] #16x16
+          - [16, 16, 4, 1, 1, 4, 4, 2, 2] #128x128
+          - [16, 16, 4, 1, 1, 2, 2, 2, 2] #64x64
+          - [16, 16, 4, 1, 1, 1, 1, 2, 2] #32x32
         - ScheduleIterAlg: [1]
         - GlobalSplitU: [1]
         - PrefetchLocalRead: [False]
@@ -330,7 +357,10 @@ BenchmarkProblems:
         - KernelLanguage: ["Assembly"]
       ForkParameters:
         - MatrixInstruction:
-          - [16, 16, 4, 1, 1, 1, 1, 1, 1]
+          - [16, 16, 4, 1, 1, 1, 1, 1, 1] #16x16
+          - [16, 16, 4, 1, 1, 4, 4, 2, 2] #128x128
+          - [16, 16, 4, 1, 1, 2, 2, 2, 2] #64x64
+          - [16, 16, 4, 1, 1, 1, 1, 2, 2] #32x32
         - ScheduleIterAlg: [1]
         - GlobalSplitU: [1]
         - PrefetchLocalRead: [False]
