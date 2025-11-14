@@ -62,42 +62,6 @@ using namespace rocRoller;
 
 const int NUM_RUNS = 5; // Should be odd, as median is used
 
-template <typename T>
-T median_of_odd_elements(std::vector<T> values)
-{
-    AssertFatal(!values.empty(), "median_of_odd_elements: vector must not be empty");
-    AssertFatal(values.size() % 2 == 1, "median_of_odd_elements: vector size must be odd");
-
-    std::sort(values.begin(), values.end());
-
-    return values[values.size() / 2];
-}
-
-// Helper function to calculate deltas (differences) between consecutive latency values
-std::vector<int64_t> calculateLatencyDeltas(const std::vector<uint64_t>& latencies)
-{
-    std::vector<int64_t> deltas;
-    for(size_t i = 1; i < latencies.size(); ++i)
-    {
-        int64_t delta = static_cast<int64_t>(latencies[i]) - static_cast<int64_t>(latencies[i - 1]);
-        deltas.push_back(delta);
-    }
-    return deltas;
-}
-
-const auto getAlignedSubset
-    = [](size_t totalRegs, size_t requestedRegCount, size_t position) -> std::pair<size_t, size_t> {
-    // If run out of registers, wrap around
-    size_t num_complete_chunks = totalRegs / requestedRegCount;
-    if(num_complete_chunks == 0)
-    {
-        return {0, 0};
-    }
-    size_t chunk_index = position % num_complete_chunks;
-    size_t start       = chunk_index * requestedRegCount;
-    return {start, start + requestedRegCount};
-};
-
 class LDSBankConflictTestKernel : public AssemblyTestKernel
 {
 public:
@@ -651,7 +615,7 @@ TEST_CASE("Weave LDS and nops", "[rocprofiler][scheduler]")
     context->schedule(k->preamble());
     context->schedule(k->prolog());
 
-    const auto instrDwords      = 2;
+    const auto instrDwords      = GENERATE(1, 2);
     const auto strideMultiplier = 4;
     const auto baseAddresses = generateLDSAddresses(workgroupSize, strideMultiplier, instrDwords);
 

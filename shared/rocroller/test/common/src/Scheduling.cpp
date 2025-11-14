@@ -25,13 +25,44 @@
 
 #include "common/Scheduling.hpp"
 
-std::vector<size_t> generateLDSAddresses(size_t count, size_t strideMultiplier, size_t instrDwords)
+namespace rocRoller
 {
-    std::vector<size_t> addresses;
-    for(size_t workitemId = 0; workitemId < count; ++workitemId)
+    std::vector<size_t>
+        generateLDSAddresses(size_t count, size_t strideMultiplier, size_t instrDwords)
     {
-        size_t address = workitemId * (4 * strideMultiplier * instrDwords);
-        addresses.push_back(address);
+        std::vector<size_t> addresses;
+        for(size_t workitemId = 0; workitemId < count; ++workitemId)
+        {
+            size_t address = workitemId * (4 * strideMultiplier * instrDwords);
+            addresses.push_back(address);
+        }
+        return addresses;
     }
-    return addresses;
-}
+
+    std::vector<int64_t> calculateLatencyDeltas(const std::vector<uint64_t>& latencies)
+    {
+        std::vector<int64_t> deltas;
+        for(size_t i = 1; i < latencies.size(); ++i)
+        {
+            int64_t delta
+                = static_cast<int64_t>(latencies[i]) - static_cast<int64_t>(latencies[i - 1]);
+            deltas.push_back(delta);
+        }
+        return deltas;
+    }
+
+    std::pair<size_t, size_t>
+        getAlignedSubset(size_t totalRegs, size_t requestedRegCount, size_t position)
+    {
+        // If run out of registers, wrap around
+        size_t num_complete_chunks = totalRegs / requestedRegCount;
+        if(num_complete_chunks == 0)
+        {
+            return {0, 0};
+        }
+        size_t chunk_index = position % num_complete_chunks;
+        size_t start       = chunk_index * requestedRegCount;
+        return {start, start + requestedRegCount};
+    }
+
+} // namespace rocRoller
