@@ -618,6 +618,7 @@ TEST_CASE("Weave LDS and nops", "[rocprofiler][scheduler]")
     const auto instrDwords      = GENERATE(1, 2);
     const auto strideMultiplier = 4;
     const auto baseAddresses = generateLDSAddresses(workgroupSize, strideMultiplier, instrDwords);
+    const bool write         = GENERATE(true);
 
     auto ldsData = Register::Value::AllocateLDS(
         context.get(),
@@ -652,21 +653,11 @@ TEST_CASE("Weave LDS and nops", "[rocprofiler][scheduler]")
         {
             const auto [start, end] = getAlignedSubset(ldsDst->registerCount(), instrDwords, i);
             auto dstRegs            = ldsDst->subset(Generated(iota(start, end)));
-            co_yield context->mem()->storeLocal(ldsWithOffset,
-                                                dstRegs,
-                                                i * 8, // offset in bytes
-                                                4 * instrDwords // bytes
-            );
+            if(write)
+                co_yield context->mem()->storeLocal(ldsWithOffset, dstRegs, i * 8, 4 * instrDwords);
+            else
+                co_yield context->mem()->loadLocal(dstRegs, ldsWithOffset, i * 8, 4 * instrDwords);
         }
-
-        // Weave more and more ALU instructions
-        int        counter = 0;
-        const auto nextReg = [&]() {
-            const auto width = 2; // ds_*_b64
-            const auto base  = (counter + width - 1) % ldsDst->registerCount();
-            counter += width;
-            return ldsDst->subset(Generated(iota(base, base + width - 1)));
-        };
 
         for(int i = 1; i < 8; ++i)
         {
@@ -674,11 +665,12 @@ TEST_CASE("Weave LDS and nops", "[rocprofiler][scheduler]")
             {
                 const auto [start, end] = getAlignedSubset(ldsDst->registerCount(), instrDwords, k);
                 auto dstRegs            = ldsDst->subset(Generated(iota(start, end)));
-                co_yield context->mem()->storeLocal(ldsWithOffset,
-                                                    dstRegs,
-                                                    k * 8, // offset in bytes
-                                                    4 * instrDwords // bytes
-                );
+                if(write)
+                    co_yield context->mem()->storeLocal(
+                        ldsWithOffset, dstRegs, k * 8, 4 * instrDwords);
+                else
+                    co_yield context->mem()->loadLocal(
+                        dstRegs, ldsWithOffset, k * 8, 4 * instrDwords);
             }
             co_yield Instruction::Nop(i);
         }
@@ -725,7 +717,22 @@ TEST_CASE("Weave LDS and nops", "[rocprofiler][scheduler]")
         if(not inst.toString(LogLevel::Terse).empty()) // isCommentOnly did not work
             filteredInstructions.push_back(inst);
     }
-    REQUIRE(filteredInstructions.size() == allLatencies[0].size());
+    {
+        std::stringstream deltas;
+        for(size_t i = 0; i < std::max(filteredInstructions.size(), allLatencies[0].size()); ++i)
+        {
+            const auto& inst
+                = i < filteredInstructions.size() ? filteredInstructions[i] : Instruction();
+            const auto& profile = i < allLatencies[0].size()
+                                      ? allLatencies[0][i]
+                                      : rocRoller::profiler::InstructionProfile();
+
+            deltas << fmt::format(
+                "{}: filtered {}, profiler {}\n", i, inst.getOpCode(), profile.instruction);
+        }
+        INFO(deltas.str());
+        REQUIRE(filteredInstructions.size() == allLatencies[0].size());
+    }
 
     std::stringstream infoMessage;
     for(size_t i = 0; i < std::min(filteredInstructions.size(), allLatencies[0].size()); ++i)
@@ -741,7 +748,7 @@ TEST_CASE("Weave LDS and nops", "[rocprofiler][scheduler]")
             modelLatency = getInstructionIssueCycles(MemoryOpLDS{LdsDirection::Write}, instrDwords)
                            + inst.peekedStatus().stallCycles * 4;
 
-        infoMessage << fmt::format("{}: model {}, profiler {}, delta {}",
+        infoMessage << fmt::format("{}: model {}, profiler {}, delta {}\n",
                                    profile.instruction,
                                    modelLatency,
                                    profile.meanLatencyWithPrecedingNone(),
@@ -758,8 +765,7 @@ TEST_CASE("Weave LDS and nops", "[rocprofiler][scheduler]")
             }));
     }
 
-    std::vector<size_t> medianLatencies;
-
+    std::vector<std::tuple<std::string, size_t>> medianLatencies;
     for(size_t i = 0; i < filteredInstructions.size(); ++i)
     {
         std::vector<uint64_t> latenciesPerRun;
@@ -767,9 +773,9 @@ TEST_CASE("Weave LDS and nops", "[rocprofiler][scheduler]")
         {
             latenciesPerRun.push_back(runLatencies[i].meanLatencyWithPrecedingNone());
         }
-        auto medianLatency = median_of_odd_elements(latenciesPerRun);
-
-        medianLatencies.push_back(static_cast<uint32_t>(medianLatency));
+        auto       medianLatency = median_of_odd_elements(latenciesPerRun);
+        const auto instrString   = allLatencies[0][i].instruction;
+        medianLatencies.push_back(std::make_tuple(instrString, medianLatency));
     }
 
     // Assert for all LDS instructions, predicted latency matches median profiled latency
@@ -786,8 +792,11 @@ TEST_CASE("Weave LDS and nops", "[rocprofiler][scheduler]")
             modelLatency = getInstructionIssueCycles(MemoryOpLDS{LdsDirection::Write}, instrDwords)
                            + inst.peekedStatus().stallCycles * 4;
 
-            CHECK_THAT(static_cast<int>(medianLatency),
-                       Catch::Matchers::WithinAbs(modelLatency, 4));
+            INFO(fmt::format("{} profiler {} model {}\n",
+                             std::get<0>(medianLatency),
+                             std::get<1>(medianLatency),
+                             modelLatency));
+            CHECK_THAT(std::get<1>(medianLatency), Catch::Matchers::WithinAbs(modelLatency, 4));
         }
     }
 }
