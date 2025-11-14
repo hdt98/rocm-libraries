@@ -416,12 +416,11 @@ def _get_schedule_192x256x64_16bit(kernel, useLDSTr, TLDS):
             'LCC'   : [[95, 95]],
         }
         
-        syncCode = [
-                    SWaitCnt(dscnt=15, vlcnt=-1, vscnt=-1, comment="Wait for LRA0 to complete") ,
+        syncCode = [SWaitCnt(dscnt=15, vlcnt=-1, vscnt=-1, comment="Wait for LRA0 to complete") ,
                     SBarrier(comment="") ,
                     SWaitCnt(dscnt=8, vlcnt=-1, vscnt=-1, comment="Wait for LRB0 to complete") ,
                     SBarrier(comment="") ,
-                    SWaitCnt(dscnt=-1, vlcnt=14, vscnt=-1, comment="wait for previous set of global reads") ,
+                    SWaitCnt(dscnt=-1, vlcnt=14, vscnt=-1, comment="Wait for global reads to complete") ,
                     SBarrier(comment="") ,
         ]
         nglshift = nllshift = 14
