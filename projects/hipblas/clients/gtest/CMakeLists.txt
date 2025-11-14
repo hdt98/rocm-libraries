@@ -254,13 +254,12 @@ if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.10")
 #      TIMEOUT 300
 #  )
 
-  include(${CMAKE_CURRENT_SOURCE_DIR}/../../../../shared/ctest/hipblas/TestCategories.cmake)
-  if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../../../../shared/ctest/hipblas/test_categories.yaml")
-	  message(STATUS "Using YAML-based test categorization")
-	  apply_test_category_labels(hipblas-test "${CMAKE_CURRENT_SOURCE_DIR}/../../../../shared/ctest/hipblas/test_categories.yaml")
+ include(${ROCM_LIBRARIES_ROOT}/shared/ctest/TestCategories.cmake)
+  if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/test_categories.yaml")
+	  message(STATUS "YAML-based test categorization")
+	  apply_test_category_labels(hipblas-test "${CMAKE_CURRENT_SOURCE_DIR}/test_categories.yaml" "${PROJECT_BINARY_DIR}/staging")
   else()
-  	  message(STATUS "Using hardcoded test categorization (YAML missing)")
-	  apply_hardcoded_test_categories()
+	  message(STATUS "No test categorization (YAML missing)")
   endif()
 
 endif()

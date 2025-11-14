@@ -1,13 +1,22 @@
 import yaml
 import sys
 import re
+import platform
+import argparse
 
 def main():
-    if len(sys.argv) != 2:
-        print('Usage: python parse_test_categories.py <yaml_file>')
-        sys.exit(1)
-
-    yaml_file = sys.argv[1]
+    parser = argparse.ArgumentParser(
+        description='Parse test_categories.yaml and generate CMake test definitions'
+    )
+    parser.add_argument('yaml_file', help='Path to the test_categories.yaml file')
+    parser.add_argument('target_name', help='Name of the test target (e.g., hipblas-test)')
+    parser.add_argument('working_dir', help='Working directory for running tests')
+    
+    args = parser.parse_args()
+    
+    yaml_file = args.yaml_file
+    target_name = args.target_name
+    working_dir = args.working_dir
 
     try:
         with open(yaml_file, 'r') as f:
@@ -19,7 +28,12 @@ def main():
     categories = config.get('test_categories', {})
     timeouts = config.get('execution_settings', {}).get('category_timeouts', {})
 
+    # Detect OS
+    is_windows = platform.system() == 'Windows'
+    is_linux = platform.system() == 'Linux'
+
     print('# Generated CMake code for test categories')
+    print(f'# Detected OS: {platform.system()}')
 
     for category_name, category_info in categories.items():
         patterns = category_info.get('test_patterns', [])
@@ -27,6 +41,18 @@ def main():
         exclude = category_info.get('exclude', [])
         if exclude == None:
             exclude = []
+        
+        # Add OS-specific exclusions
+        if is_windows:
+            exclude_windows = category_info.get('exclude_windows', [])
+            if exclude_windows:
+                exclude.extend(exclude_windows)
+        
+        if is_linux:
+            exclude_linux = category_info.get('exclude_linux', [])
+            if exclude_linux:
+                exclude.extend(exclude_linux)
+        
         timeout = timeouts.get(category_name, 300)
         print(f'# Category: {category_name}')
         print(f'# Description: {category_info.get("description", "")}')
@@ -43,16 +69,17 @@ def main():
           label_string = label_string+';'+label
         label_string = '"'+label_string[1:]+'"'
         print("add_test(")
-        print(f'  NAME hipblas-{category_name}-suite')
-        print(f'  COMMAND hipblas-test --gtest_filter={pattern_string}')
-        print( "  WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/staging")
+        print(f'  NAME {target_name}-{category_name}-suite')
+        print(f'  COMMAND {target_name} --gtest_filter={pattern_string}')
+        print( f"  WORKING_DIRECTORY {working_dir}")
         print(")")
 
-        print(f"set_tests_properties(hipblas-{category_name}-suite PROPERTIES")
+        print(f"set_tests_properties({target_name}-{category_name}-suite PROPERTIES")
         print(f"  LABELS {label_string}")
         print(f"  TIMEOUT {timeout}")
         print(")")
         print()
 if __name__ == '__main__':
     main()
+
 

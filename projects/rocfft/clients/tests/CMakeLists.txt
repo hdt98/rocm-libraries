@@ -386,22 +386,19 @@ set_target_properties(rtc_helper_crash
 
 
 rocm_install(TARGETS rocfft-test rtc_helper_crash COMPONENT tests)
-#------------dileep-------------------
 # Register tests with CTest
 if(BUILD_TESTING)
   include(GoogleTest)
-  include(${CMAKE_CURRENT_SOURCE_DIR}/../../../../shared/ctest/rocfft/TestCategories.cmake)
-  if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../../../../shared/ctest/rocfft/test_categories.yaml")
-          message(STATUS "Using YAML-based test categorization")
-          apply_test_category_labels(hipblas-test "${CMAKE_CURRENT_SOURCE_DIR}/../../../../shared/ctest/rocfft/test_categories.yaml")
+  include(${ROCM_LIBRARIES_ROOT}shared/ctest/TestCategories.cmake)
+  if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/test_categories.yaml")
+          message(STATUS "YAML-based test categorization")
+          apply_test_category_labels(rocfft-test "${CMAKE_CURRENT_SOURCE_DIR}/test_categories.yaml" "${PROJECT_BINARY_DIR}/../staging")
   else()
-          message(STATUS "Using hardcoded test categorization (YAML missing)")
-          apply_hardcoded_test_categories()
+          message(STATUS "No test categorization (YAML missing)")
   endif()
 
 endif()
 
-  #--------------------------------------------------------
 
 
 if (WIN32)

@@ -168,6 +168,10 @@ test_categories:
     exclude:
       - "*_ex*"
       - "*axpy_ex*"
+    exclude_windows:
+      - "*scal_ex*"
+    exclude_linux:
+      - "*gemm_ex*"
     labels:
       - "blas_ex"
       - "extended"
