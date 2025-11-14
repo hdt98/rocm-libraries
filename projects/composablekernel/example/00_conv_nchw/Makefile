@@ -15,6 +15,10 @@ dbg_cflags+=-g -O0 -std=gnu++20 -Wno-unused-value \
 timestamp=$(shell date +'%Y%m%d_%H%M%S')
 
 # profiler utils
+stt_opt=--pmc "LdsBankConflict \
+	LdsLatency VALUUtilization" \
+	--output-format csv
+
 att_opt=--att-perfcounter-ctrl 10 \
 	--att-perfcounters "SQ_BUSY_CU_CYCLES \
 		SQ_VALU_MFMA_BUSY_CYCLES \
@@ -24,17 +28,6 @@ att_opt=--att-perfcounter-ctrl 10 \
 		SQ_ACTIVE_INST_FLAT \
 		SQ_ACTIVE_INST_SCA \
 		SQ_ACTIVE_INST_MISC"
-
-prof_cfg=-F 2 -n 24 -c 256 --in_h 5 --in_w 5 \
-	-k 510 -y 3 -x 3 --pad_h 1 --pad_w 1 \
-	-u 1 -v 1 -l 1 -j 1 -g 1 -m conv --spatial_dim 2 -t 1
-
-mio_cmd = MIOpenDriver convfp16 \
-	-F 1 -n 256 -c 256 --in_h 56 --in_w 56 -k 256 -y 3 -x 3 \
-	--pad_h 1 --pad_w 1 -u 1 -v 1 -l 1 -j 1 -g 32 -m conv \
-	--spatial_dim 2 -t 1 -i 5 # win 53 igem 137
-
-prof_name=igemm
 
 # build flow
 % : %.cpp
@@ -64,7 +57,7 @@ test_2 = -F 1 -n 256 -c 8 --in_h 64 --in_w 64 -k 8 -y 3 -x 3 \
 	--pad_h 1 --pad_w 1 -u 1 -v 1 -l 1 -j 1 -g 1 -m conv --spatial_dim 2
 test_3 = -F 1 -n 256 -c 256 --in_h 56 --in_w 56 -k 256 -y 3 -x 3 \
 	--pad_h 1 --pad_w 1 -u 1 -v 1 -l 1 -j 1 -g 32 -m conv --spatial_dim 2
-test_4 = -F 1 -n 1024 -c 128 --in_h 56 --in_w 56 -k 32 -y 3 -x 3 \
+test_4 = -F 1 -n 1024 -c 128 --in_h 28 --in_w 28 -k 32 -y 3 -x 3 \
 	--pad_h 1 --pad_w 1 -u 1 -v 1 -l 1 -j 1 -g 1 -m conv --spatial_dim 2
 test_5 = -F 1 -n 1 -c 16 --in_h 960 --in_w 540 -k 16 -y 3 -x 3 \
 	--pad_h 1 --pad_w 1 -u 1 -v 1 -l 1 -j 1 -g 1 -m conv --spatial_dim 2 -t 1
@@ -72,19 +65,29 @@ test_5 = -F 1 -n 1 -c 16 --in_h 960 --in_w 540 -k 16 -y 3 -x 3 \
 run_%:
 	./igemm.out ${$*} > $*.out 2>&1
 
-prof_%:
-	rocprofv3 --att -d ttrace_$*_${timestamp}.out ${att_opt} -- ./igemm.out ${$*}
+st_%:
+	rocprofv3 ${stt_opt} -d st_$*_${timestamp}.out -- ./igemm.out ${$*}
+
+tt_%:
+	rocprofv3 --att -d tt_$*_${timestamp}.out ${att_opt} -- ./igemm.out ${$*}
+
 
 # mio ref flow
+mio_cmd = MIOpenDriver convfp16 \
+	-F 1 -n 256 -c 256 --in_h 56 --in_w 56 -k 256 -y 3 -x 3 \
+	--pad_h 1 --pad_w 1 -u 1 -v 1 -l 1 -j 1 -g 32 -m conv \
+	--spatial_dim 2 -t 1 -i 5 # win 53 igem 137
+
 run_mio_cmd:
 	${mio_cmd}
 
-prof_mio_strace:
-	rocprofv3 --sys-trace --output-format pftrace -d strace_${prof_name}_${timestamp}.out -- ${mio_cmd}
+mio_st_%:
+	rocprofv3 ${stt_opt} -d mio_st_${timestamp}.out -- MIOpenDriver convfp16 ${$*}
 
-prof_mio_ttrace:
-	rocprofv3 --att -d ttrace_${prof_name}_${timestamp}.out ${att_opt} -- ${mio_cmd}
-# 	rocprofv3 --att -d ttrace_${prof_name}_${timestamp}.out ${att_opt} --kernel-include-regex .*conv.* -- ${mio_cmd}
+mio_tt_%:
+	rocprofv3 --att -d mio_tt_${timestamp}.out ${att_opt} -- MIOpenDriver convfp16 ${$*}
+# 	rocprofv3 --att -d ttrace_mio_${timestamp}.out ${att_opt} --kernel-include-regex .*conv.* -- ${mio_cmd}
+
 
 # ck profiler setting
 # conv common | op_name         | dtype | layout | index | verify | init | print | time |
