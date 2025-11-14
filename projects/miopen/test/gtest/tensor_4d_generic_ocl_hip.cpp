@@ -23,18 +23,17 @@
  * SOFTWARE.
  *
  *******************************************************************************/
-#include "get_handle.hpp"
-#include "random.hpp"
-#include <verify.hpp>
-#include <miopen/miopen.h>
 #include <miopen/datatype.hpp>
 #include <miopen/kernel_build_params.hpp>
+#include <miopen/float_equal.hpp>
 #include <gtest/gtest.h>
 
-#include <tensor_util.hpp>
+#include "../verify.hpp"
+#include "../tensor_util.hpp"
 
+#include "get_handle.hpp"
+#include "random.hpp"
 #include "perf_helper.hpp"
-#include <miopen/float_equal.hpp>
 
 #define MAX_TENSOR_ELEM 17
 #define PERF_ENABLE 0
@@ -565,7 +564,7 @@ protected:
     TensorsConfig tensorsConfig;
     float alpha0, alpha1, beta;
 
-    PerfHelper<T> ph;
+    PerfHelper ph;
 };
 
 struct GPU_Op4dTensorGenericTest_FP32 : Op4DTensorGenericTest<float>

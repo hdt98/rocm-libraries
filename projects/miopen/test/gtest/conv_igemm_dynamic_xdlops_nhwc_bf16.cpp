@@ -24,10 +24,11 @@
  *
  *******************************************************************************/
 #include <tuple>
-#include <miopen/miopen.h>
-#include <gtest/gtest.h>
-#include <gtest/gtest_common.hpp>
+#include <sstream>
+#include <iterator>
+
 #include "../conv2d.hpp"
+#include "gtest_common.hpp"
 #include "get_handle.hpp"
 #include "lib_env_var.hpp"
 

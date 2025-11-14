@@ -113,7 +113,7 @@ def cmake_build(Map conf=[:]){
         def vcache = conf.get(vcache_path,"${remote_root}/.cache/miopen/vcache")
         build_envs = " MIOPEN_VERIFY_CACHE_PATH='${vcache}' " + build_envs
     } else{
-        test_flags = " --disable-verification-cache " + test_flags
+        test_flags = "--disable-verification-cache " + test_flags
     }
 
     if(build_type_debug){
@@ -285,7 +285,6 @@ def getDockerImage(Map conf=[:])
             dockerImage.push()
         }
     }
-
 
     if(params.INSTALL_MIOPEN == 'ON')
     {

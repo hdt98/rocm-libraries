@@ -23,16 +23,16 @@
  * SOFTWARE.
  *
  *******************************************************************************/
-#include <gtest/gtest.h>
 #include <miopen/miopen.h>
 #include <miopen/solver_id.hpp>
-#include <serialize.hpp>
-#include <fusionHost.hpp>
 #include <miopen/fusion.hpp>
 #include <miopen/fusion/solvers.hpp>
 #include <miopen/fusion/fusion_invoke_params.hpp>
 #include <miopen/conv_algo_name.hpp>
 #include <half/half.hpp>
+
+#include "../serialize.hpp"
+#include "../fusionHost.hpp"
 
 #include "tensor_util.hpp"
 #include "get_handle.hpp"

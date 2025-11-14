@@ -24,9 +24,9 @@
  *
  *******************************************************************************/
 #include "../conv2d.hpp"
-#include <miopen/miopen.h>
-#include <gtest/gtest_common.hpp>
-#include <gtest/gtest.h>
+
+#include "gtest_common.hpp"
+
 #include <miopen/env.hpp>
 #include "get_handle.hpp"
 
