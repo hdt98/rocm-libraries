@@ -25,6 +25,8 @@
  *******************************************************************************/
 #pragma once
 
+#include <fusion_plan.hpp>
+
 namespace test {
 template <typename DLModule>
 void ComputeCPUBNInference(DLModule& dl_module)
