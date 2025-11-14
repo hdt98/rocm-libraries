@@ -25,8 +25,8 @@
  *******************************************************************************/
 #pragma once
 
-#include <miopen/miopen.h>
 #include <miopen/solver_id.hpp>
+#include <miopen/fusion_plan.hpp>
 #include <miopen/batchnorm/problem_description.hpp>
 
 #include "../serialize.hpp"

@@ -80,8 +80,8 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 include(CTest)
 
 find_package(Threads REQUIRED)
-find_package(ROCM 0.7.3 REQUIRED PATHS /opt/rocm)
 
+find_package(ROCmCMakeBuildTools)
 include(ROCMInstallTargets)
 include(ROCMPackageConfigHelpers)
 include(ROCMSetupVersion)

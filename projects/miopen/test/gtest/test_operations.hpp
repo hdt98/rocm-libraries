@@ -25,7 +25,13 @@
  *******************************************************************************/
 #pragma once
 
-#include <fusion_plan.hpp>
+#include <iostream>
+#include <cstdlib>
+#include <limits>
+#include <memory>
+#include <string>
+
+#include <miopen/fusion_plan.hpp>
 
 namespace test {
 template <typename DLModule>
