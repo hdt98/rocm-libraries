@@ -34,6 +34,7 @@
 #include "common/misc/rocsolver.hpp"
 #include "common/misc/rocsolver_arguments.hpp"
 #include "common/misc/rocsolver_test.hpp"
+#include "common/misc/rocsolver_timer.hpp"
 
 template <typename T, typename I, typename S>
 void lange_checkBadArgs(const rocblas_handle handle,
@@ -190,7 +191,7 @@ void lange_getPerfData(const rocblas_handle handle,
     // gpu-lapack performance
     hipStream_t stream;
     CHECK_ROCBLAS_ERROR(rocblas_get_stream(handle, &stream));
-    double start;
+    rocsolver_timer timer;
 
     if(profile > 0)
     {
@@ -206,11 +207,11 @@ void lange_getPerfData(const rocblas_handle handle,
     {
         lange_initData<false, true, T, I, S>(handle, norm_type, m, n, dA, lda, dnorms, hA, hnorms);
 
-        start = get_time_us_sync(stream);
+        timer.start(stream);
         rocsolver_lange(handle, norm_type, m, n, dA.data(), lda, dnorms.data());
-        *gpu_time_used += get_time_us_sync(stream) - start;
+        timer.end(stream);
     }
-    *gpu_time_used /= hot_calls;
+    *gpu_time_used = timer.get_combined();
 }
 
 template <typename T, typename I>
@@ -302,10 +303,12 @@ void testing_lange(Arguments& argus)
                                 &max_error);
 
     // collect performance data
-    if(argus.timing)
+    if(argus.timing && hot_calls > 0)
+    {
         lange_getPerfData<T, I, S>(handle, norm_type, m, n, dA, lda, dnorms, hA, hnorms,
                                    &gpu_time_used, &cpu_time_used, hot_calls, argus.profile,
                                    argus.profile_kernels, argus.perf);
+    }
 
     // validate results for rocsolver-test
     // using m * n * machine_precision as tolerance
