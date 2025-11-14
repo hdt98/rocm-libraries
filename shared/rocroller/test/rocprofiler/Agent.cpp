@@ -180,14 +180,14 @@ namespace rocRoller
 
                 uint32_t latencyWithPrecedingNone
                     = inst.time - prev_time - prev_latency + inst.duration + inst.stall;
-                Log::info("trace_decode_callback: duration {}, stall {}, time {}, "
-                          "prev_time {}, prev_latency {}, latencyWithPrecedingNone {}",
-                          inst.duration,
-                          static_cast<uint32_t>(inst.stall),
-                          inst.time,
-                          prev_time,
-                          prev_latency,
-                          latencyWithPrecedingNone);
+                Log::trace("trace_decode_callback: duration {}, stall {}, time {}, "
+                           "prev_time {}, prev_latency {}, latencyWithPrecedingNone {}",
+                           inst.duration,
+                           static_cast<uint32_t>(inst.stall),
+                           inst.time,
+                           prev_time,
+                           prev_latency,
+                           latencyWithPrecedingNone);
                 prev_time    = inst.time;
                 prev_latency = inst.duration;
 

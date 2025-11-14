@@ -754,8 +754,6 @@ TEST_CASE("Weave LDS and nops", "[rocprofiler][scheduler]")
         allLatencies.push_back(latencies);
     }
 
-    Log::info(context.output());
-
     // Filter for instructions with opcodes
     std::vector<Instruction> filteredInstructions;
     for(const auto& inst : instructions)
@@ -765,6 +763,7 @@ TEST_CASE("Weave LDS and nops", "[rocprofiler][scheduler]")
     }
     REQUIRE(filteredInstructions.size() == allLatencies[0].size());
 
+    std::stringstream infoMessage;
     for(size_t i = 0; i < std::min(filteredInstructions.size(), allLatencies[0].size()); ++i)
     {
         const auto& inst    = filteredInstructions[i];
@@ -778,12 +777,54 @@ TEST_CASE("Weave LDS and nops", "[rocprofiler][scheduler]")
             modelLatency = getInstructionIssueCycles(MemoryOpLDS{LdsDirection::Write}, instrDwords)
                            + inst.peekedStatus().stallCycles * 4;
 
-        Log::info(
-            fmt::format("{}: model {}, profiler {}, delta {}",
-                        profile.instruction,
-                        modelLatency,
-                        profile.meanLatencyWithPrecedingNone(),
-                        static_cast<int>(profile.meanLatencyWithPrecedingNone()) - modelLatency));
+        infoMessage << fmt::format("{}: model {}, profiler {}, delta {}",
+                                   profile.instruction,
+                                   modelLatency,
+                                   profile.meanLatencyWithPrecedingNone(),
+                                   static_cast<int>(profile.meanLatencyWithPrecedingNone())
+                                       - modelLatency);
+    }
+    INFO(infoMessage.str());
+
+    { // All latencies have same number of instructions
+        size_t expectedSize = allLatencies[0].size();
+        REQUIRE(std::all_of(
+            allLatencies.begin(), allLatencies.end(), [expectedSize](const auto& latencies) {
+                return latencies.size() == expectedSize;
+            }));
+    }
+
+    std::vector<size_t> medianLatencies;
+
+    for(size_t i = 0; i < filteredInstructions.size(); ++i)
+    {
+        std::vector<uint64_t> latenciesPerRun;
+        for(const auto& runLatencies : allLatencies)
+        {
+            latenciesPerRun.push_back(runLatencies[i].meanLatencyWithPrecedingNone());
+        }
+        auto medianLatency = median_of_odd_elements(latenciesPerRun);
+
+        medianLatencies.push_back(static_cast<uint32_t>(medianLatency));
+    }
+
+    // Assert for all LDS instructions, predicted latency matches median profiled latency
+    for(size_t i = 0; i < filteredInstructions.size(); ++i)
+    {
+        const auto& inst = filteredInstructions[i];
+        if(GPUInstructionInfo::isLDS(inst.getOpCode()))
+        {
+            using namespace Scheduling::LDSBankModel;
+
+            const auto medianLatency = medianLatencies[i];
+            int        modelLatency
+                = (inst.peekedStatus().stallCycles + inst.numExecutedInstructions()) * 4;
+            modelLatency = getInstructionIssueCycles(MemoryOpLDS{LdsDirection::Write}, instrDwords)
+                           + inst.peekedStatus().stallCycles * 4;
+
+            CHECK_THAT(static_cast<int>(medianLatency),
+                       Catch::Matchers::WithinAbs(modelLatency, 4));
+        }
     }
 }
 
