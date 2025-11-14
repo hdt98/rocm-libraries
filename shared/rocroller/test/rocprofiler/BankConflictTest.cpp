@@ -642,17 +642,19 @@ TEST_CASE("Weave LDS and nops", "[rocprofiler][scheduler]")
             context.get(),
             Register::Type::Vector,
             DataType::Raw32,
-            64,
+            128,
             Register::AllocationOptions{.contiguousChunkWidth = Register::FULLY_CONTIGUOUS,
                                         .alignment            = instrDwords});
         co_yield ldsDst->allocate();
 
         co_yield context->mem()->barrier({});
 
-        for(int i = 0; i < 10; ++i)
+        int counter = 0;
+        for(int i = 0; i < 14; ++i)
         {
-            const auto [start, end] = getAlignedSubset(ldsDst->registerCount(), instrDwords, i);
-            auto dstRegs            = ldsDst->subset(Generated(iota(start, end)));
+            const auto [start, end]
+                = getAlignedSubset(ldsDst->registerCount(), instrDwords, counter++);
+            auto dstRegs = ldsDst->subset(Generated(iota(start, end)));
             if(write)
                 co_yield context->mem()->storeLocal(ldsWithOffset, dstRegs, i * 8, 4 * instrDwords);
             else
@@ -663,8 +665,9 @@ TEST_CASE("Weave LDS and nops", "[rocprofiler][scheduler]")
         {
             for(int k = 0; k < 4; ++k)
             {
-                const auto [start, end] = getAlignedSubset(ldsDst->registerCount(), instrDwords, k);
-                auto dstRegs            = ldsDst->subset(Generated(iota(start, end)));
+                const auto [start, end]
+                    = getAlignedSubset(ldsDst->registerCount(), instrDwords, counter++);
+                auto dstRegs = ldsDst->subset(Generated(iota(start, end)));
                 if(write)
                     co_yield context->mem()->storeLocal(
                         ldsWithOffset, dstRegs, k * 8, 4 * instrDwords);
@@ -745,7 +748,9 @@ TEST_CASE("Weave LDS and nops", "[rocprofiler][scheduler]")
         // Remember that stall cycles does not include issue cycles
         int modelLatency = (inst.peekedStatus().stallCycles + inst.numExecutedInstructions()) * 4;
         if(GPUInstructionInfo::isLDS(inst.getOpCode()))
-            modelLatency = getInstructionIssueCycles(MemoryOpLDS{LdsDirection::Write}, instrDwords)
+            modelLatency = getInstructionIssueCycles(write ? MemoryOpLDS{LdsDirection::Write}
+                                                           : MemoryOpLDS{LdsDirection::Read},
+                                                     instrDwords)
                            + inst.peekedStatus().stallCycles * 4;
 
         infoMessage << fmt::format("{}: model {}, profiler {}, delta {}\n",
@@ -789,7 +794,9 @@ TEST_CASE("Weave LDS and nops", "[rocprofiler][scheduler]")
             const auto medianLatency = medianLatencies[i];
             int        modelLatency
                 = (inst.peekedStatus().stallCycles + inst.numExecutedInstructions()) * 4;
-            modelLatency = getInstructionIssueCycles(MemoryOpLDS{LdsDirection::Write}, instrDwords)
+            modelLatency = getInstructionIssueCycles(write ? MemoryOpLDS{LdsDirection::Write}
+                                                           : MemoryOpLDS{LdsDirection::Read},
+                                                     instrDwords)
                            + inst.peekedStatus().stallCycles * 4;
 
             INFO(fmt::format("{} profiler {} model {}\n",
