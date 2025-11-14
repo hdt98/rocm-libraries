@@ -122,6 +122,7 @@ if("rocroller" IN_LIST ROCM_LIBS_ENABLE_COMPONENTS)
     # pip packages:
     #   pip install pytest-cmake
     set(ROCROLLER_ENABLE_FETCH ON)
+    set(ROCROLLER_ENABLE_CLIENT OFF)
     add_subdirectory_with_message(
         COMPONENT rocroller
         PREFIX_PATH shared
@@ -162,36 +163,23 @@ if("rocrand" IN_LIST ROCM_LIBS_ENABLE_COMPONENTS)
     )
 endif()
 
-# --- DNN components (opt-in, not part of default 'all' build) ---
-if("hipdnn" IN_LIST ROCM_LIBS_ENABLE_COMPONENTS)
-    add_subdirectory_with_message(
-        COMPONENT hipdnn
-        PREFIX_PATH projects
-        EXPECT_TARGET hipdnn_backend
-    )
-endif()
-
-if("miopen-provider" IN_LIST ROCM_LIBS_ENABLE_COMPONENTS)
-    add_subdirectory_with_message(
-        COMPONENT miopen-provider
-        PREFIX_PATH dnn-providers
-        EXPECT_TARGET miopen_plugin
-    )
-endif()
-
-if("hipblaslt-provider" IN_LIST ROCM_LIBS_ENABLE_COMPONENTS)
-    add_subdirectory_with_message(
-        COMPONENT hipblaslt-provider
-        PREFIX_PATH dnn-providers
-        EXPECT_TARGET hipblaslt_plugin
-    )
-endif()
+#if("tensile" IN_LIST ROCM_LIBS_ENABLE_COMPONENTS)
+#    add_subdirectory_with_message(
+#        COMPONENT tensile
+#        PREFIX_PATH shared
+#        EXPECT_TARGET tensile-host
+#    )
+#endif()
+#
+#if("rocblas" IN_LIST ROCM_LIBS_ENABLE_COMPONENTS)
+#    add_subdirectory_with_message(
+#        COMPONENT rocblas
+#        PREFIX_PATH projects
+#        EXPECT_TARGET rocblas
+#    )
+#endif()
 
 # --- Projects not yet configured for superbuild ---
-if("tensile" IN_LIST ROCM_LIBS_ENABLE_COMPONENTS)
-    message(FATAL_ERROR "tensile is not yet supported in the superbuild")
-endif()
-
 if("rocsparse" IN_LIST ROCM_LIBS_ENABLE_COMPONENTS)
     message(FATAL_ERROR "rocsparse is not yet supported in the superbuild")
 endif()
@@ -236,10 +224,6 @@ endif()
 
 if("hipsparselt" IN_LIST ROCM_LIBS_ENABLE_COMPONENTS)
     message(FATAL_ERROR "hipsparselt is not yet supported in the superbuild")
-endif()
-
-if("rocblas" IN_LIST ROCM_LIBS_ENABLE_COMPONENTS)
-    message(FATAL_ERROR "rocblas is not yet supported in the superbuild")
 endif()
 
 if("rocsolver" IN_LIST ROCM_LIBS_ENABLE_COMPONENTS)

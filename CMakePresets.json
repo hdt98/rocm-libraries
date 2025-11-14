@@ -45,6 +45,13 @@
             }
         },
         {
+            "name": "rocblas",
+            "inherits": ["default:release"],
+            "cacheVariables": {
+                "ROCM_LIBS_ENABLE_COMPONENTS": "rocblas"
+            }
+        },
+        {
             "name": "rocprim",
             "inherits": ["default:release"],
             "cacheVariables": {
@@ -59,27 +66,10 @@
             }
         },
         {
-            "name": "hipdnn",
-            "description": "Build hipdnn only",
+            "name": "tensile",
             "inherits": ["default:release"],
             "cacheVariables": {
-                "ROCM_LIBS_ENABLE_COMPONENTS": "hipdnn"
-            }
-        },
-        {
-            "name": "miopen-provider",
-            "description": "Build hipdnn and miopen-provider",
-            "inherits": ["default:release"],
-            "cacheVariables": {
-                "ROCM_LIBS_ENABLE_COMPONENTS": "hipdnn;miopen-provider"
-            }
-        },
-        {
-            "name": "hipblaslt-provider",
-            "description": "Build hipdnn and hipblaslt-provider",
-            "inherits": ["default:release"],
-            "cacheVariables": {
-                "ROCM_LIBS_ENABLE_COMPONENTS": "hipdnn;hipblaslt-provider"
+                "ROCM_LIBS_ENABLE_COMPONENTS": "tensile"
             }
         }
     ],
