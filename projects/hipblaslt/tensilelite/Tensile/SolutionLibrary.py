@@ -187,52 +187,24 @@ class FreeSizeLibrary:
 
 class PredictionLibrary:
     Tag = "Prediction"
-    StateKeys = [("type", "tag"), "table", "table_fc"]
+    StateKeys = [("type", "tag"), "table"]
 
     @classmethod
     def FromOriginalState(cls, d, solutions):
-        libType = d["type"]
-        distance = d["distance"]
         origTable = d["table"]
 
-        table_fc = []
         table = []
 
-        # libType = Prediction = Origami pool, save to table
-        if libType == "Prediction":
-            try:
-                indexStart  = origTable[0]
-                indexOffset = origTable[1]
-                for index in range(indexStart, indexStart + indexOffset):
-                    value = IndexSolutionLibrary(solutions[index])
-                    table.append(value)
-                    # TODO- TOGGLE THIS LINE TO DECIDED IF Prediction Logic is also part of FormoCast Pool
-                    # table_fc.append(value)
-            except KeyError:
-                pass
-        # libType == FreeSize or Matching(distance = GridBased), save to table_fc (formocast)
-        else:
-            # Different way to append GridBased logic yaml to FormoCast
-            if distance == "GridBased":
-                for row in origTable:
-                    try:
-                        index = row[1][0]
-                        value = IndexSolutionLibrary(solutions[index])
-                        table_fc.append(value)
-                    except KeyError:
-                        pass
-            # FreeSizes: insert all table directly
-            else:
-                try:
-                    indexStart  = origTable[0]
-                    indexOffset = origTable[1]
-                    for index in range(indexStart, indexStart + indexOffset):
-                        value = IndexSolutionLibrary(solutions[index])
-                        table_fc.append(value)
-                except KeyError:
-                    pass
+        try:
+            indexStart  = origTable[0]
+            indexOffset = origTable[1]
+            for index in range(indexStart, indexStart + indexOffset):
+                value = IndexSolutionLibrary(solutions[index])
+                table.append(value)
+        except KeyError:
+            pass
 
-        return cls(table, table_fc)
+        return cls(table)
 
     @property
     def tag(self):
@@ -242,14 +214,61 @@ class PredictionLibrary:
         assert self.__class__ == other.__class__
 
         self.table += other.table
-        self.table_fc += other.table_fc
 
     def remapSolutionIndices(self, indexMap):
         pass
 
-    def __init__(self, table, table_fc):
+    def __init__(self, table):
         self.table = table
-        self.table_fc = table_fc
+
+class FormoCastLibrary:
+    Tag = "FormoCast"
+    StateKeys = [("type", "tag"), "table"]
+
+    @classmethod
+    def FromOriginalState(cls, d, solutions):
+        distance = d["distance"]
+        origTable = d["table"]
+
+        table = []
+
+        # Different way to append GridBased logic yaml to FormoCast
+        if distance == "GridBased":
+            for row in origTable:
+                try:
+                    index = row[1][0]
+                    value = IndexSolutionLibrary(solutions[index])
+                    table.append(value)
+                except KeyError:
+                    pass
+        # FreeSizes, Prediction: insert all table directly
+        else:
+            try:
+                indexStart  = origTable[0]
+                indexOffset = origTable[1]
+                for index in range(indexStart, indexStart + indexOffset):
+                    value = IndexSolutionLibrary(solutions[index])
+                    table.append(value)
+            except KeyError:
+                pass
+
+        return cls(table)
+
+    @property
+    def tag(self):
+        return self.__class__.Tag
+
+    def merge(self, other):
+        assert self.__class__ == other.__class__
+
+        self.table += other.table
+
+    def remapSolutionIndices(self, indexMap):
+        pass
+
+    def __init__(self, table):
+        self.table = table
+
 
 class MLPClassificationLibrary:
     Tag = "MLPClassification"
@@ -457,8 +476,8 @@ class MasterSolutionLibrary:
 
                 # If not Equality and not Range (GridBased), then it can be used by formocast
                 if d["Library"]["distance"] != "Equality" and d["Library"]["distance"] != "Range":
-                    formocastLib = PredictionLibrary.FromOriginalState(d["Library"], solutions)
-                    formocastPredicate = Properties.Predicate(tag="PredictionMatching")
+                    formocastLib = FormoCastLibrary.FromOriginalState(d["Library"], solutions)
+                    formocastPredicate = Properties.Predicate(tag="FormoCastMatching")
                     library.rows.append({"predicate": formocastPredicate, "library": formocastLib})
 
             elif d["LibraryType"] == "FreeSize":
@@ -469,16 +488,21 @@ class MasterSolutionLibrary:
                 library.rows.append({"predicate": predicate, "library": freesizeLib})
 
                 # FreeSize can be used by formocast as well
-                formocastLib = PredictionLibrary.FromOriginalState(d["Library"], solutions)
-                formocastPredicate = Properties.Predicate(tag="PredictionMatching")
+                formocastLib = FormoCastLibrary.FromOriginalState(d["Library"], solutions)
+                formocastPredicate = Properties.Predicate(tag="FormoCastMatching")
                 library.rows.append({"predicate": formocastPredicate, "library": formocastLib})
 
             elif d["LibraryType"] == "Prediction":
-                predicate = Properties.Predicate(tag="PredictionMatching") # So that FreeSize / Predication can co-exist
+                predicate = Properties.Predicate(tag="OrigamiMatching") # TODO Temp
 
                 predictionLib = PredictionLibrary.FromOriginalState(d["Library"], solutions)
                 library = PredicateLibrary(tag="Problem")
                 library.rows.append({"predicate": predicate, "library": predictionLib})
+
+                # Origami can be used by formocast as well
+                formocastLib = FormoCastLibrary.FromOriginalState(d["Library"], solutions)
+                formocastPredicate = Properties.Predicate(tag="FormoCastMatching")
+                library.rows.append({"predicate": formocastPredicate, "library": formocastLib})
 
             elif d["LibraryType"] == "MLPClassification":
                 predicate = Properties.Predicate(tag="TruePred")

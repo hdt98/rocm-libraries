@@ -170,15 +170,10 @@ namespace TensileLite
         return m_disableStaggerU;
     }
 
-    StringSet Debug::excludedLibFromGetAll() const
-    {
-        return m_excludedFromGetAll;
-    }
-
-    void Debug::setExcludedLibFromGetAll(StringSet& excludedSet)
-    {
-        m_excludedFromGetAll = excludedSet;
-    }
+    // bool Debug::requestSoltionsNeg1() const
+    // {
+    //     return m_request_neg1;
+    // }
 
     Debug::Debug()
         : m_value(DEBUG_SM)

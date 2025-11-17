@@ -56,7 +56,6 @@ namespace TensileLite
     {
         using Row = LibraryRow<MyProblem, MySolution, MyPredicate>;
         std::vector<Row> rows;
-        mutable bool     lastFindTopRetAll;
 
         ExactLogicLibrary() = default;
         ExactLogicLibrary(std::initializer_list<Row> init)
@@ -130,18 +129,14 @@ namespace TensileLite
         {
             SolutionSet<MySolution> rv;
 
-            const bool  streamK = Debug::Instance().useExperimentalSelection() == 2;
+            const bool streamK = Debug::Instance().useExperimentalSelection() == 2;
             // const bool predictionLib = Debug::Instance().usePredictionLibrary();
-            const bool  use_predict   = Debug::Instance().usePredictionSelection() != 2; // origami or formocast
-            const bool  use_gridbased = Debug::Instance().usePredictionSelection() == 2;
-            const auto& excludedLib   = Debug::Instance().excludedLibFromGetAll();
+            const bool use_origami   = Debug::Instance().usePredictionSelection() == 0;
+            const bool use_formocast = Debug::Instance().usePredictionSelection() == 1;
+            const bool use_gridbased = Debug::Instance().usePredictionSelection() == 2;
 
             for(auto const& row : rows)
             {
-                // we want to exclude this lib from getAll
-                if(excludedLib.count(row.first.value->type()))
-                    continue;
-
                 if(row.first.value->type() == "ExperimentalStreamK" && !streamK)
                     continue;
 
@@ -152,41 +147,16 @@ namespace TensileLite
                 //                      || (row.first.value->type() == "RangeMatching")))
                 //     continue;
 
-                if(row.first.value->type() == "PredictionMatching" && !use_predict)
+                if(row.first.value->type() == "OrigamiMatching" && !use_origami)
+                    continue;
+
+                if(row.first.value->type() == "FormoCastMatching" && !use_formocast)
                     continue;
 
                 if(row.first.value->type() == "GridBasedMatching" && !use_gridbased)
                     continue;
 
                 auto rowSolutions = row.second->findAllSolutions(problem, hardware, searchType);
-
-                if(dynamic_cast<Predicates::Contraction::EqualityMatching*>(row.first.value.get()))
-                {
-                    for(auto& sol : rowSolutions)
-                        sol->tag = MySolution::MatchingTag::Equal;
-                }
-                else if(dynamic_cast<Predicates::Contraction::PredictionMatching*>(row.first.value.get()))
-                {
-                    for(auto& sol : rowSolutions)
-                        sol->tag = MySolution::MatchingTag::Prediction;
-                }
-                else if(dynamic_cast<Predicates::Contraction::GridBasedMatching*>(row.first.value.get()))
-                {
-                    for(auto& sol : rowSolutions)
-                        sol->tag = MySolution::MatchingTag::GridBased;
-                }
-                else if(dynamic_cast<Predicates::Contraction::RangeMatching*>(row.first.value.get()))
-                {
-                    for(auto& sol : rowSolutions)
-                        sol->tag = MySolution::MatchingTag::Range;
-                }
-                else if(dynamic_cast<Predicates::Contraction::FreeSizeMatching*>(row.first.value.get()))
-                {
-                    for(auto& sol : rowSolutions)
-                        sol->tag = MySolution::MatchingTag::FreeSize;
-                }
-                // TODO- Experimental?
-
                 rv.insert(rowSolutions.begin(), rowSolutions.end());
             }
 
@@ -227,11 +197,10 @@ namespace TensileLite
 
             const bool streamK       = Debug::Instance().useExperimentalSelection() == 2;
             const bool predictionLib = Debug::Instance().usePredictionLibrary();
-            const bool use_predict   = Debug::Instance().usePredictionSelection() != 2; // origami or formocast
+            const bool use_origami   = Debug::Instance().usePredictionSelection() == 0;
+            const bool use_formocast = Debug::Instance().usePredictionSelection() == 1;
             const bool use_gridbased = Debug::Instance().usePredictionSelection() == 2;
-
-            // false in case of early return;
-            lastFindTopRetAll = false;
+            // const bool request_neg1  = true;
 
             for(auto const& row : rows)
             {
@@ -242,7 +211,10 @@ namespace TensileLite
                                      || (row.first.value->type() == "RangeMatching")))
                     continue;
 
-                if(row.first.value->type() == "PredictionMatching" && !use_predict)
+                if(row.first.value->type() == "OrigamiMatching" && !use_origami)
+                    continue;
+
+                if(row.first.value->type() == "FormoCastMatching" && !use_formocast)
                     continue;
 
                 if(row.first.value->type() == "GridBasedMatching" && !use_gridbased)
@@ -253,48 +225,23 @@ namespace TensileLite
                     solutions
                         = row.second->findTopSolutions(problem, hardware, numSolutions - rv.size());
 
-                    if(dynamic_cast<Predicates::Contraction::EqualityMatching*>(row.first.value.get()))
-                    {
+                    if(dynamic_cast<Predicates::Contraction::EqualityMatching*>(
+                           row.first.value.get()))
                         for(auto& sol : solutions)
                             sol->tag = MySolution::MatchingTag::Equal;
-                    }
-                    else if(dynamic_cast<Predicates::Contraction::PredictionMatching*>(row.first.value.get()))
-                    {
-                        for(auto& sol : solutions)
-                            sol->tag = MySolution::MatchingTag::Prediction;
-                    }
-                    else if(dynamic_cast<Predicates::Contraction::GridBasedMatching*>(row.first.value.get()))
-                    {
-                        for(auto& sol : solutions)
-                            sol->tag = MySolution::MatchingTag::GridBased;
-                    }
-                    else if(dynamic_cast<Predicates::Contraction::RangeMatching*>(row.first.value.get()))
-                    {
-                        for(auto& sol : solutions)
-                            sol->tag = MySolution::MatchingTag::Range;
-                    }
-                    else if(dynamic_cast<Predicates::Contraction::FreeSizeMatching*>(row.first.value.get()))
-                    {
-                        for(auto& sol : solutions)
-                            sol->tag = MySolution::MatchingTag::FreeSize;
-                    }
-                    // TODO- Experimental
 
                     rv.insert(std::end(rv), std::begin(solutions), std::end(solutions));
+
+                    // TODO: Refine this to prevent from go to getAll
+                    // if(request_neg1 && rv.size())
+                    //     return rv;
 
                     if(rv.size() == numSolutions)
                         return rv;
                 }
             }
 
-            // can't reach the requested number, means findTop already done its best
-            lastFindTopRetAll = (rv.size() < numSolutions);
             return rv;
-        }
-
-        virtual bool lastFindTopAlreadyRetAll() const override
-        {
-            return lastFindTopRetAll;
         }
 
         virtual SolutionVector<MySolution>
