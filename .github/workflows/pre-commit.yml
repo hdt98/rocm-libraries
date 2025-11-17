@@ -62,6 +62,21 @@ jobs:
       - name: Disable submodule recursion
         run: git config submodule.recurse false
 
+      - name: Generate minimal compilation database for clang-tidy
+        if: steps.changed-files.outputs.files_found == 'true'
+        run: |
+          echo "Generating compile_commands.json for clang-tidy..."
+          cmake -S projects/hipdnn -B build_precommit \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            -DCMAKE_CXX_COMPILER=clang++-20 \
+            -DBUILD_TESTING=OFF \
+            -DCMAKE_BUILD_TYPE=Debug
+
+          # Copy to root so clang-tidy can find it
+          cp build_precommit/compile_commands.json .
+
+          echo "Compilation database generated successfully"
+
       - name: Run pre-commit checks for ${{ matrix.project }}
         if: steps.changed-files.outputs.files_found == 'true'
         run: |
@@ -69,7 +84,7 @@ jobs:
           echo "Running pre-commit checks for ${{ matrix.project }}..."
           echo "================================================"
           echo ""
-          
+
           # Run pre-commit on all changed files in the branch
           CMD="pre-commit run --from-ref origin/${{ github.event.pull_request.base.ref }} --to-ref HEAD"
 
@@ -90,7 +105,7 @@ jobs:
             echo ""
             exit 1
           fi
-          
+
           echo ""
           echo "================================================"
           echo "✅ All pre-commit checks passed for ${{ matrix.project }}!"

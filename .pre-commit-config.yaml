@@ -50,6 +50,22 @@ repos:
         entry: clang-format -i -style=file
         files: '\.(c|cpp|cc|h|hpp|m|mm)$'
 
+  # - repo: local
+  #   hooks:
+  #     - id: clang-tidy-hipdnn
+  #       name: clang-tidy (hipDNN)
+  #       entry: |
+  #         bash -c 'if ! clang-tidy-20 --version &> /dev/null; then echo "ERROR: clang-tidy-20 missing. Please run: apt-get install clang-tidy-20" >&2; exit 1; fi;
+  #         includes=$(find projects/hipdnn -type d -name "include" | sed "s/^/-I/");
+  #         clang-tidy-20 "$@" -- -std=c++17 -I. $includes' --
+  #       language: system
+  #       args:
+  #         - --config-file=projects/hipdnn/.clang-tidy
+  #       files: ^projects/hipdnn/.*\.(cpp|c|hpp|h)$
+  #       types: [c++]
+
+  #         # bash -c 'if ! clang-tidy-20 --version &> /dev/null; then echo "ERROR: clang-tidy-20 missing. For hipDNN changes, please run: apt-get install clang-tidy-20" >&2; exit 1; fi; clang-tidy-20 --warnings-as-errors="" "$@" -- -std=c++17 -I. -Iprojects/hipdnn/frontend/include -Iprojects/hipdnn/sdk/include -Iprojects/hipdnn/backend/include' --
+
   - repo: local
     hooks:
       - id: clang-tidy-hipdnn
@@ -61,6 +77,7 @@ repos:
           - --config-file=projects/hipdnn/.clang-tidy
         files: ^projects/hipdnn/.*\.(cpp|c|hpp|h)$
         types: [c++]
+
 
   # Save files to /tmp/flatc_hipdnn because it cannot write to /dev/null
   - repo: local
