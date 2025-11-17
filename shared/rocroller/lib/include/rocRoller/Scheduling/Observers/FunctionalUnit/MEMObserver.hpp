@@ -116,6 +116,7 @@ namespace rocRoller
         struct LDSQueueEntry
         {
             int completionCycle; // The cycle when this LDS instruction will complete
+            int queueFreedCycle; // The cycle when queue slots are freed (may be earlier than completion for reads)
             int slotsUsed; // How many queue slots it uses
         };
 
@@ -141,10 +142,10 @@ namespace rocRoller
 
             mutable std::deque<LDSQueueEntry> m_queue;
 
-            // Invariant: m_remainingSlots === queueSize - sum of slotsUsed in m_queue
-            mutable uint           m_remainingSlots;
             int                    m_programCycle;
             std::weak_ptr<Context> m_context;
+
+            int calculateRemainingSlots() const;
         };
     }
 }

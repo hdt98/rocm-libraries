@@ -121,7 +121,6 @@ namespace rocRoller
 
         WeightlessDSMemObserver::WeightlessDSMemObserver(ContextPtr ctx)
             : m_context(ctx)
-            , m_remainingSlots(WeightlessDSMemObserver::queueSize)
             , m_programCycle(0)
         {
         }
@@ -135,21 +134,21 @@ namespace rocRoller
 
                 auto [direction, dwords] = ldsInfo.value();
                 int requiredSlots        = queueSlots(direction, dwords);
+                int remainingSlots       = calculateRemainingSlots();
 
-                if(requiredSlots > m_remainingSlots)
+                if(requiredSlots > remainingSlots)
                 {
-                    int cyclesNeeded = 0;
-                    int slotsToFree  = requiredSlots - m_remainingSlots;
+                    int cyclesNeeded = m_programCycle;
+                    int slotsToFree  = requiredSlots - remainingSlots;
                     int slotsFreed   = 0;
 
                     for(const auto& entry : m_queue)
                     {
                         if(slotsFreed >= slotsToFree)
                             break;
-                        cyclesNeeded = std::max(cyclesNeeded, entry.completionCycle);
+                        cyclesNeeded = std::max(cyclesNeeded, entry.queueFreedCycle);
                         slotsFreed += entry.slotsUsed;
                     }
-
                     status.stallCycles = cyclesNeeded - m_programCycle;
                 }
 
@@ -181,12 +180,11 @@ namespace rocRoller
             while(!m_queue.empty() && m_programCycle >= m_queue.front().completionCycle)
             {
                 auto& front = m_queue.front();
-                m_remainingSlots += front.slotsUsed;
                 const_cast<Instruction&>(inst).addComment(
                     fmt::format("WeightlessDSMemObserver {}: freed {} slots, remaining slots {}",
                                 m_programCycle,
                                 front.slotsUsed,
-                                m_remainingSlots));
+                                calculateRemainingSlots()));
                 m_queue.pop_front();
             }
 
@@ -196,21 +194,6 @@ namespace rocRoller
 
                 auto [direction, dwords] = ldsInfo.value();
                 int requiredSlots        = queueSlots(direction, dwords);
-
-                while(requiredSlots > m_remainingSlots)
-                {
-                    AssertFatal(!m_queue.empty(),
-                                "WeightlessDSMemObserver: Not enough slots and queue is empty");
-                    auto& front    = m_queue.front();
-                    m_programCycle = std::max(m_programCycle, front.completionCycle);
-                    m_remainingSlots += front.slotsUsed;
-                    m_queue.pop_front();
-                    const_cast<Instruction&>(inst).addComment(fmt::format(
-                        "WeightlessDSMemObserver {}: waiting for {} slots, remaining slots {}",
-                        m_programCycle,
-                        requiredSlots,
-                        m_remainingSlots));
-                }
 
                 LDSBankModel::MemoryOpLDS memOp{direction};
 
@@ -224,28 +207,51 @@ namespace rocRoller
                 // Here a cycle means an issue cycle (a quadcycle)
                 int cycles = LDSBankModel::getInstructionDataCycles(ldsInst, gfx) / 4;
 
-                m_remainingSlots -= requiredSlots;
-
                 const auto completionCycle
                     = cycles + (m_queue.empty() ? m_programCycle : m_queue.back().completionCycle);
-                LDSQueueEntry entry{completionCycle, requiredSlots};
+
+                // Adjustment for read instructions: queue slots appear to be freed a bit later
+                int queueFreedCycle;
+                if(direction == LDSBankModel::LdsDirection::Read)
+                    queueFreedCycle = completionCycle + 1;
+                else
+                    queueFreedCycle = completionCycle;
+
+                LDSQueueEntry entry{completionCycle, queueFreedCycle, requiredSlots};
                 m_queue.push_back(entry);
 
                 std::stringstream queueStatus;
                 for(const auto& e : m_queue)
                 {
-                    queueStatus << fmt::format(
-                        "[cycle {}, slots {}] ", e.completionCycle, e.slotsUsed);
+                    queueStatus << fmt::format("[complete {}, freed {}, slots {}] ",
+                                               e.completionCycle,
+                                               e.queueFreedCycle,
+                                               e.slotsUsed);
                 }
-                const_cast<Instruction&>(inst).addComment(
-                    fmt::format("WeightlessDSMemObserver {}: queued instruction taking {} cycles "
-                                "using {} slots, remaining slots {}, queue status: {}",
-                                m_programCycle,
-                                cycles,
-                                requiredSlots,
-                                m_remainingSlots,
-                                queueStatus.str()));
+                const_cast<Instruction&>(inst).addComment(fmt::format(
+                    "WeightlessDSMemObserver {}: queued {} taking {} cycles "
+                    "using {} slots, freed at cycle {}, remaining slots {}, queue status: {}",
+                    m_programCycle,
+                    direction == LDSBankModel::LdsDirection::Read ? "read" : "write",
+                    cycles,
+                    requiredSlots,
+                    queueFreedCycle,
+                    calculateRemainingSlots(),
+                    queueStatus.str()));
             }
+        }
+
+        int WeightlessDSMemObserver::calculateRemainingSlots() const
+        {
+            int usedSlots = 0;
+            for(const auto& entry : m_queue)
+            {
+                if(entry.queueFreedCycle > m_programCycle)
+                {
+                    usedSlots += entry.slotsUsed;
+                }
+            }
+            return queueSize - usedSlots;
         }
     }
 }

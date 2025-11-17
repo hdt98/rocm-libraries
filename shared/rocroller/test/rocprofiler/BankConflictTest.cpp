@@ -305,10 +305,13 @@ TEST_CASE("Weave LDS and nops", "[rocprofiler][scheduler]")
 
     constexpr auto workgroupSize = 64u;
 
+    // const auto instrDwords      = GENERATE(1, 2);
+    // const auto strideMultiplier = GENERATE(1, 2, 4);
+    // const bool write            = GENERATE(true);
     const auto instrDwords      = GENERATE(1, 2);
-    const auto strideMultiplier = 4;
+    const auto strideMultiplier = GENERATE(1, 2, 4);
+    const bool write            = GENERATE(true, false);
     const auto baseAddresses = generateLDSAddresses(workgroupSize, strideMultiplier, instrDwords);
-    const bool write         = GENERATE(true);
 
     const auto name = fmt::format(
         "lds_weave_{}_b{}_stride{}", write ? "write" : "read", instrDwords * 32, strideMultiplier);
@@ -487,12 +490,12 @@ TEST_CASE("Weave LDS and nops", "[rocprofiler][scheduler]")
                                                          instrDwords)
                                + inst.peekedStatus().stallCycles * 4;
 
-            infoMessage << fmt::format("{}: model {}, profiler {}, delta {}\n",
+            infoMessage << fmt::format("{}: model {}, profiler {} {}, delta {}\n",
                                        profile.instruction,
                                        modelLatency,
+                                       profile.meanLatency(),
                                        profile.meanLatencyWithPrecedingNone(),
-                                       static_cast<int>(profile.meanLatencyWithPrecedingNone())
-                                           - modelLatency);
+                                       static_cast<int>(profile.meanLatency()) - modelLatency);
         }
         INFO(infoMessage.str());
 
@@ -510,7 +513,7 @@ TEST_CASE("Weave LDS and nops", "[rocprofiler][scheduler]")
             std::vector<uint64_t> latenciesPerRun;
             for(const auto& runLatencies : allLatencies)
             {
-                latenciesPerRun.push_back(runLatencies[i].meanLatencyWithPrecedingNone());
+                latenciesPerRun.push_back(runLatencies[i].meanLatency());
             }
             auto       medianLatency = median_of_odd_elements(latenciesPerRun);
             const auto instrString   = allLatencies[0][i].instruction;
@@ -540,6 +543,8 @@ TEST_CASE("Weave LDS and nops", "[rocprofiler][scheduler]")
                 CHECK_THAT(std::get<1>(medianLatency), Catch::Matchers::WithinAbs(modelLatency, 4));
             }
         }
+
+        Log::info(context.output());
     }
 }
 
