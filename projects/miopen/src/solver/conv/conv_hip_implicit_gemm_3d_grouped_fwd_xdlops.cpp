@@ -536,7 +536,7 @@ void PerformanceConfigHipImplicitGemm3DGroupFwdXdlops::HeuristicInit(
             {
                 index     = found_index.value();
                 kernel_id = valid_kernels[index];
-                MIOPEN_LOG_I("Step 2: Hard-coded heuristics selected kernel: "
+                MIOPEN_LOG_W("JFL Step 2: Hard-coded heuristics selected kernel: "
                              << kernel_id << " at index: " << index);
                 return;
             }
@@ -606,7 +606,7 @@ void PerformanceConfigHipImplicitGemm3DGroupFwdXdlops::HeuristicInit(
         }
         if(ai_success && !result.IsEmpty())
         {
-            MIOPEN_LOG_I("Step 3: AI heuristics selected kernel: " << kernel_id);
+            MIOPEN_LOG_W("JFL Step 3: AI heuristics selected kernel: " << kernel_id);
             return;
         }
         else
@@ -630,7 +630,7 @@ void PerformanceConfigHipImplicitGemm3DGroupFwdXdlops::HeuristicInit(
     {
         index     = 0;
         kernel_id = valid_kernels[index];
-        MIOPEN_LOG_I("Step 4: Default initialization selected kernel: " << kernel_id
+        MIOPEN_LOG_W("JFL Step 4: Default initialization selected kernel: " << kernel_id
                                                                         << " at index: 0");
     }
     else

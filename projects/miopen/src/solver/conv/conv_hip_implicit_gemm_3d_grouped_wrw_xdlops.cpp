@@ -462,7 +462,7 @@ void PerformanceConfigHipImplicitGemm3DGroupWrwXdlops::HeuristicInit(
 
         if(ai_success && !result.IsEmpty())
         {
-            MIOPEN_LOG_I("Step 1: AI heuristics selected kernel: " << kernel_id);
+            MIOPEN_LOG_W("JFL Step 1: AI heuristics selected kernel: " << kernel_id);
             return;
         }
         else
@@ -491,7 +491,7 @@ void PerformanceConfigHipImplicitGemm3DGroupWrwXdlops::HeuristicInit(
         index     = 0;
         split_k   = 1;
         kernel_id = valid_kernels[index] + "+" + std::to_string(split_k);
-        MIOPEN_LOG_I("Step 2: Default initialization selected kernel: " << kernel_id
+        MIOPEN_LOG_W("JFL Step 2: Default initialization selected kernel: " << kernel_id
                                                                         << " at index: 0");
     }
     else
