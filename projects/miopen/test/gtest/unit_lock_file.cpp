@@ -29,11 +29,10 @@
 #include <gtest/gtest.h>
 
 template <class TDuration>
-static boost::posix_time::ptime ToPTime(TDuration duration)
+static auto ToPTime(TDuration duration)
 {
-    return boost::posix_time::second_clock::universal_time() +
-           boost::posix_time::milliseconds(
-               std::chrono::duration_cast<std::chrono::milliseconds>(duration).count());
+    return std::chrono::steady_clock::now() +
+           std::chrono::duration_cast<std::chrono::milliseconds>(duration);
 }
 
 TEST(CPU_UnitTestLockFile_NONE, TryLock)
