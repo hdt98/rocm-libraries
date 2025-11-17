@@ -48,6 +48,7 @@ if(ORIGAMI_ENABLE_ATEN)
     set_target_properties(origami_aten PROPERTIES
         OUTPUT_NAME "_aten"
         PREFIX ""
+        SUFFIX ".${Python_SOABI}.so"
         LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/origami"
     )
 
