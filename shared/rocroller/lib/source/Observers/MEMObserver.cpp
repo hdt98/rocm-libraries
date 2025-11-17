@@ -25,6 +25,7 @@
  *******************************************************************************/
 
 #include <concepts>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -38,9 +39,39 @@ namespace rocRoller
 {
     namespace Scheduling
     {
+        std::optional<std::pair<LDSBankModel::LdsDirection, int>>
+            getLdsInfoFromOpcode(const std::string& opCode)
+        {
+            // Model does not support sub-dword or special opcodes
+            // e.g. ds_read_u8, ds_read2st64_b32
+
+            LDSBankModel::LdsDirection direction;
+            if(opCode.find("ds_write_") != std::string::npos)
+                direction = LDSBankModel::LdsDirection::Write;
+            else if(opCode.find("ds_read_") != std::string::npos)
+                direction = LDSBankModel::LdsDirection::Read;
+            else
+                return std::nullopt;
+
+            int dwords;
+            if(opCode.find("_b32") != std::string::npos)
+                dwords = 1;
+            else if(opCode.find("_b64") != std::string::npos)
+                dwords = 2;
+            else if(opCode.find("_b96") != std::string::npos)
+                dwords = 3;
+            else if(opCode.find("_b128") != std::string::npos)
+                dwords = 4;
+            else
+                return std::nullopt;
+
+            return std::make_optional(std::make_pair(direction, dwords));
+        }
+
         bool useWeightlessObserver(Instruction const& inst)
         {
-            return inst.getAddresses().has_value();
+            return inst.getAddresses().has_value()
+                   && getLdsInfoFromOpcode(inst.getOpCode()).has_value();
         }
 
         VMEMObserver::VMEMObserver(ContextPtr ctx)
@@ -79,32 +110,6 @@ namespace rocRoller
             return inst.getWaitCount().dscnt();
         }
 
-        std::pair<LDSBankModel::LdsDirection, int> getLdsInfoFromOpcode(const std::string& opCode)
-        {
-            AssertFatal(opCode.find("ds_write") != std::string::npos
-                            || opCode.find("ds_read") != std::string::npos,
-                        "WeightlessDSMemObserver: Opcode is not an LDS operation: " + opCode);
-            int dwords;
-            if(opCode.find("_b32") != std::string::npos)
-                dwords = 1;
-            else if(opCode.find("_b64") != std::string::npos)
-                dwords = 2;
-            else if(opCode.find("_b96") != std::string::npos)
-                dwords = 3;
-            else if(opCode.find("_b128") != std::string::npos)
-                dwords = 4;
-            else
-                Throw<FatalError>(
-                    "WeightlessDSMemObserver: Unable to determine LDS data size from opcode: "
-                    + opCode);
-
-            LDSBankModel::LdsDirection direction = opCode.find("ds_write") != std::string::npos
-                                                       ? LDSBankModel::LdsDirection::Write
-                                                       : LDSBankModel::LdsDirection::Read;
-
-            return {direction, dwords};
-        }
-
         int queueSlots(LDSBankModel::LdsDirection direction, int dwords)
         {
             if(direction == LDSBankModel::LdsDirection::Write)
@@ -126,7 +131,9 @@ namespace rocRoller
             InstructionStatus status;
             if(GPUInstructionInfo::isLDS(inst.getOpCode()) && useWeightlessObserver(inst))
             {
-                auto [direction, dwords] = getLdsInfoFromOpcode(inst.getOpCode());
+                auto ldsInfo = getLdsInfoFromOpcode(inst.getOpCode());
+
+                auto [direction, dwords] = ldsInfo.value();
                 int requiredSlots        = queueSlots(direction, dwords);
 
                 if(requiredSlots > m_remainingSlots)
@@ -185,7 +192,9 @@ namespace rocRoller
 
             if(GPUInstructionInfo::isLDS(inst.getOpCode()) && useWeightlessObserver(inst))
             {
-                auto [direction, dwords] = getLdsInfoFromOpcode(inst.getOpCode());
+                auto ldsInfo = getLdsInfoFromOpcode(inst.getOpCode());
+
+                auto [direction, dwords] = ldsInfo.value();
                 int requiredSlots        = queueSlots(direction, dwords);
 
                 while(requiredSlots > m_remainingSlots)
