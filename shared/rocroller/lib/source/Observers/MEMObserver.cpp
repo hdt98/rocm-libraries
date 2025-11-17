@@ -201,9 +201,9 @@ namespace rocRoller
                 m_instructionQueue.push_back(base + cycles);
 
                 const auto cyclesPerSlot = cycles / requiredSlots;
-                const auto adjustment    = direction == LDSBankModel::LdsDirection::Write
-                                               ? -3
-                                               : 1; // Determined experimentally
+
+                // Determined experimentally
+                const auto adjustment = direction == LDSBankModel::LdsDirection::Write ? -3 : 1;
 
                 for(int i = 1; i <= requiredSlots; ++i)
                 {
@@ -212,11 +212,10 @@ namespace rocRoller
                 }
 
                 const_cast<Instruction&>(inst).addComment(
-                    fmt::format("WeightlessDSMemObserver {}: queued {} taking {} cycles "
-                                "using {} slots, remaining data slots {}, "
-                                "instruction queue size: {}, data queue size: {}",
+                    fmt::format("WeightlessDSMemObserver {}: {} cycles, "
+                                "{} slots, remaining {} slots, "
+                                "instruction queue size {}, data queue size {}",
                                 m_programCycle,
-                                direction == LDSBankModel::LdsDirection::Read ? "read" : "write",
                                 cycles,
                                 requiredSlots,
                                 calculateRemainingSlots(),
