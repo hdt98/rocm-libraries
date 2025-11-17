@@ -324,7 +324,6 @@ TEST_CASE("Weave LDS and nops", "[rocprofiler][scheduler]")
 
     SECTION(name)
     {
-
         auto command = std::make_shared<Command>();
         auto k       = context->kernel();
 

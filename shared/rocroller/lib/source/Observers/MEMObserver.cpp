@@ -169,7 +169,7 @@ namespace rocRoller
             int wait = inst.getWaitCount().dscnt();
             // TODO: handle waitcount
 
-            m_programCycle += inst.numExecutedInstructions() + inst.peekedStatus().stallCycles;
+            m_programCycle += inst.totalCycles();
 
             if(GPUInstructionInfo::isLDS(inst.getOpCode()))
             {

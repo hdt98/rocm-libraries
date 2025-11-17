@@ -227,6 +227,12 @@ namespace rocRoller
          */
         int numExecutedInstructions() const;
 
+        /**
+         * Get the total number of cycles for this instruction.
+         * This includes executed instructions, stall cycles, and additional cycles.
+         */
+        int totalCycles() const;
+
         void allocateNow();
 
         using AllocationArray = std::array<std::shared_ptr<Register::Allocation>, MaxAllocations>;
