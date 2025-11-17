@@ -31,11 +31,11 @@
 #include "dropout_gpu_emulator.hpp"
 #include "mloConvHost.hpp" // ADNN_mm_cpu
 
-#include <../test/rnn_util.hpp>
+#include "../test/rnn_util.hpp"
 
 #include <algorithm>
 #include <cassert>
-#include <math.h>
+#include <cmath>
 
 template <typename Tgpu, typename Tref>
 void RunGRUForwardGEMMCPUVerify(miopenHandle_t handle,

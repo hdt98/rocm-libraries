@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright (c) 2019 Advanced Micro Devices, Inc.
+ * Copyright (c) 2025 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -35,21 +35,13 @@
 #if MIOPEN_EMBED_DB
 #include <miopen_data.hpp>
 #endif
-#include <boost/date_time/posix_time/posix_time_types.hpp>
-#include <boost/none.hpp>
-#include <boost/optional.hpp>
 
 #include <memory>
-#include <algorithm>
-#include <cassert>
-#include <chrono>
-#include <cstdio>
-#include <fstream>
-#include <ios>
-#include <mutex>
-#include <shared_mutex>
-#include <string>
+#include <unordered_map>
 #include <thread>
+#include <functional>
+#include <chrono>
+#include <sstream>
 
 extern "C" {
 int miopen_sqlite3_memvfs_init(sqlite3* db, char** pzErrMsg, const sqlite3_api_routines* pApi);
@@ -328,20 +320,24 @@ SQLite::Statement::Statement(const SQLite& sql, const std::string& query)
     : pImpl{std::make_unique<impl>(sql, query)}
 {
 }
+
 SQLite::Statement::Statement(const SQLite& sql,
                              const std::string& query,
                              const std::vector<std::string>& vals)
     : pImpl{std::make_unique<impl>(sql, query, vals)}
 {
 }
+
 SQLite::Statement::~Statement() = default;
 SQLite::Statement::Statement() : pImpl{nullptr} {}
 SQLite::Statement::Statement(Statement&&) noexcept = default;
 SQLite::Statement& SQLite::Statement::operator=(Statement&&) noexcept = default;
+
 int SQLite::Statement::Step(const SQLite& sql)
 {
     return sql.Retry([&]() { return sqlite3_step(pImpl->ptrStmt.get()); });
 }
+
 std::string SQLite::Statement::ColumnText(int idx)
 {
     size_t bytes = sqlite3_column_bytes(pImpl->ptrStmt.get(), idx);

@@ -26,8 +26,8 @@
 #ifndef GUARD_MIOPEN_T5LAYERNORM_DRIVER_HPP
 #define GUARD_MIOPEN_T5LAYERNORM_DRIVER_HPP
 
-#include <../test/tensor_holder.hpp>
-#include <../test/verify.hpp>
+#include "../test/tensor_holder.hpp"
+#include "../test/verify.hpp"
 #include "InputFlags.hpp"
 #include "driver.hpp"
 #include "random.hpp"
@@ -37,7 +37,6 @@
 #include <cfloat>
 #include <cstdlib>
 #include <memory>
-#include <miopen/tensor.hpp>
 #include <numeric>
 #include <vector>
 

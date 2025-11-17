@@ -30,7 +30,7 @@
 
 #include "dropout_gpu_emulator.hpp"
 
-#include <../test/rnn_util.hpp>
+#include "../test/rnn_util.hpp"
 
 #include <algorithm>
 #include <cassert>

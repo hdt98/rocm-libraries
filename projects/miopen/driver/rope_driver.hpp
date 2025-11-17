@@ -35,12 +35,10 @@
 #include <cfloat>
 #include <cstdlib>
 #include <memory>
-#include <miopen/miopen.h>
-#include <miopen/tensor.hpp>
 #include <numeric>
 #include <vector>
-#include <../test/tensor_holder.hpp>
-#include <../test/verify.hpp>
+#include "../test/tensor_holder.hpp"
+#include "../test/verify.hpp"
 
 template <typename Tgpu, typename Tcheck>
 int32_t mloRoPEForwardRunHost(miopenTensorDescriptor_t xDesc,

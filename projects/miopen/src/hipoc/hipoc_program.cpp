@@ -23,8 +23,6 @@
  * SOFTWARE.
  *
  *******************************************************************************/
-#include <miopen/config.h>
-
 #include <miopen/errors.hpp>
 #include <miopen/gcn_asm_utils.hpp>
 #include <miopen/hip_build_utils.hpp>

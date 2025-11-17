@@ -30,15 +30,16 @@
 #include "tensor_driver.hpp"
 #include "timer.hpp"
 #include "random.hpp"
+
 #include <cstdint>
 #include <cstdlib>
 #include <memory>
-#include <miopen/miopen.h>
-#include <miopen/tensor.hpp>
 #include <vector>
-#include <../test/tensor_holder.hpp>
-#include <../test/verify.hpp>
+
 #include <miopen/tensor_view_utils.hpp>
+
+#include "../test/tensor_holder.hpp"
+#include "../test/verify.hpp"
 
 template <typename Tgpu, typename Tcheck>
 int32_t mloMultiMarginLossForwardRunHost(const miopenTensorDescriptor_t iDesc,

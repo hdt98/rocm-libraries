@@ -35,7 +35,7 @@
 
 #include <miopen/miopen.h>
 
-#include <../test/verify.hpp>
+#include "../test/verify.hpp"
 
 #include <algorithm>
 #include <array>

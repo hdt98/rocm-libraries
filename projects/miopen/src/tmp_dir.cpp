@@ -26,14 +26,11 @@
 
 #include <miopen/tmp_dir.hpp>
 #include <miopen/env.hpp>
-#include <miopen/filesystem.hpp>
-#include <miopen/errors.hpp>
 #include <miopen/logger.hpp>
 #include <miopen/process.hpp>
-#include <boost/filesystem/operations.hpp>
 
 #include <thread>
-#include <string_view>
+#include <random>
 
 MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_SAVE_TEMP_DIR)
 MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_EXIT_STATUS_TEMP_DIR)
@@ -44,8 +41,9 @@ TmpDir::TmpDir(std::string_view prefix) : path{fs::temp_directory_path()}
 {
     std::string p{prefix.empty() ? "" : (prefix[0] == '-' ? "" : "-")};
 
-    path /= boost::filesystem::unique_path("miopen" + p.append(prefix) + "-%%%%-%%%%-%%%%-%%%%")
-                .string();
+    std::mt19937 prng(std::random_device{}());
+    std::uniform_int_distribution<int> rand;
+    path /= fs::temp_directory_path() + "miopen" + p.append(prefix) + std::format("-{:x}", rand(prng));
 
     fs::create_directories(path);
 }

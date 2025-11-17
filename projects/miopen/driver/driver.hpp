@@ -26,29 +26,33 @@
 #ifndef GUARD_MIOPEN_DRIVER_HPP
 #define GUARD_MIOPEN_DRIVER_HPP
 
-#include <half/half.hpp>
-#include "random.hpp"
-
-#include "InputFlags.hpp"
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <cfloat>
 #include <memory>
-#include <miopen/logger.hpp>
-#include <miopen/miopen.h>
-#include <miopen/bfloat16.hpp>
-#include <../test/tensor_holder.hpp>
-#include "util_driver.hpp"
-#include "rocrand_wrapper.hpp"
-using half         = half_float::half;
-using hip_bfloat16 = bfloat16;
-#include <hip_float8.hpp>
-using float16      = half_float::half;
-using float8_fnuz  = miopen_f8::hip_f8<miopen_f8::hip_f8_type::fp8>;
-using bfloat8_fnuz = miopen_f8::hip_f8<miopen_f8::hip_f8_type::bf8>;
 #include <numeric>
 #include <vector>
+
+#include <miopen/miopen.h>
+#include <miopen/logger.hpp>
+
+#include "../test/tensor_holder.hpp"
+#include "util_driver.hpp"
+#include "rocrand_wrapper.hpp"
+#include "random.hpp"
+#include "InputFlags.hpp"
+
+#include <half/half.hpp>
+using half    = half_float::half;
+using float16 = half_float::half;
+
+#include <miopen/bfloat16.hpp>
+using hip_bfloat16 = bfloat16;
+
+#include <hip_float8.hpp>
+using float8_fnuz  = miopen_f8::hip_f8<miopen_f8::hip_f8_type::fp8>;
+using bfloat8_fnuz = miopen_f8::hip_f8<miopen_f8::hip_f8_type::bf8>;
 
 #if MIOPEN_BACKEND_OPENCL
 #if defined(__APPLE__) || defined(__MACOSX)

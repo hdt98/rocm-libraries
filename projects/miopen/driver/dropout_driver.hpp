@@ -34,10 +34,9 @@
 #include "util_driver.hpp"
 #include "util_file.hpp"
 
-#include <../test/verify.hpp>
+#include "../test/verify.hpp"
 
 #include <miopen/dropout.hpp>
-#include <miopen/miopen.h>
 
 #include <algorithm>
 #include <array>

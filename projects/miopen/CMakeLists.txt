@@ -2,7 +2,7 @@
 #
 # MIT License
 #
-# Copyright (c) 2017 Advanced Micro Devices, Inc.
+# Copyright (c) 2025 Advanced Micro Devices, Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -69,15 +69,18 @@ endif()
 # Default installation path
 if(NOT WIN32)
     set(CMAKE_INSTALL_PREFIX "/opt/rocm" CACHE PATH "")
+    list(APPEND CMAKE_PREFIX_PATH ${CMAKE_INSTALL_PREFIX} ${CMAKE_INSTALL_PREFIX}/llvm ${CMAKE_INSTALL_PREFIX}/hip)
 endif()
 
-project ( MIOpen C CXX )
+project(MIOpen CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-include(CTest)
+#include(CTest)
+include(cmake/ClangCheck.cmake)
+list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 
 find_package(Threads REQUIRED)
 
@@ -90,10 +93,11 @@ include(ROCMCreatePackage)
 include(CheckCXXCompilerFlag)
 include(ROCMHeaderWrapper)
 
-include(cmake/ClangCheck.cmake)
-
 # Build library with Beta APIs
 add_definitions("-DMIOPEN_BETA_API=1")
+
+# By default build shared libraries
+option(BUILD_SHARED_LIBS "Create shared libraries" ON)
 
 set(MIOPEN_ENABLE_AI_IMMED_MODE_FALLBACK On CACHE BOOL "Enable AI-based fallback for Immediate Mode")
 set(MIOPEN_ENABLE_AI_KERNEL_TUNING On CACHE BOOL "Enable AI heuristic for kernel tuning")
@@ -101,23 +105,21 @@ set(MIOPEN_ENABLE_SQLITE On CACHE BOOL "")
 # Use SQLITE for compiled kernels, when turned off this will use raw files
 set(MIOPEN_ENABLE_SQLITE_KERN_CACHE On CACHE BOOL "")
 
-# By default build shared libraries
-option(BUILD_SHARED_LIBS "Create shared libraries" ON)
+find_package(nlohmann_json 3.9.1 REQUIRED)
+find_package(BZip2 REQUIRED)
 
 if(MIOPEN_ENABLE_SQLITE)
     # MIOpen now depends on SQLite as well
     find_package(SQLite3 REQUIRED)
 endif()
-find_package(BZip2 REQUIRED)
-find_package(nlohmann_json 3.9.1 REQUIRED)
 if(MIOPEN_ENABLE_SQLITE_KERN_CACHE AND NOT MIOPEN_ENABLE_SQLITE)
     message(FATAL_ERROR "MIOPEN_ENABLE_SQLITE_KERN_CACHE requires MIOPEN_ENABLE_SQLITE")
 endif()
 set(MIOPEN_LOG_FUNC_TIME_ENABLE Off CACHE BOOL "")
 set(MIOPEN_ENABLE_SQLITE_BACKOFF On CACHE BOOL "")
 
-option( BUILD_DEV "Build for development only" OFF)
-option(MIOPEN_ENABLE_FIN "Enable the fin driver for MIOpen"  OFF)
+option(BUILD_DEV "Build for development only" OFF)
+option(MIOPEN_ENABLE_FIN "Enable the fin driver for MIOpen" OFF)
 option(MIOPEN_ENABLE_FIN_INTERFACE "Enable internal interface for the fin" ${MIOPEN_ENABLE_FIN})
 option(MIOPEN_STRIP_SYMBOLS "Strip symbols in release mode" ON)
 
@@ -125,9 +127,6 @@ option(MIOPEN_INCBIN "Include kernels using incbin" OFF)
 if(MIOPEN_INCBIN)
     enable_language(ASM)
 endif()
-
-option(MIOPEN_WORKAROUND_USE_BOOST_FILESYSTEM "Workaround: Use boost::filesystem instead of std::filesystem" OFF)
-message(STATUS "MIOPEN_WORKAROUND_USE_BOOST_FILESYSTEM ${MIOPEN_WORKAROUND_USE_BOOST_FILESYSTEM}")
 
 # Strip symbols for release
 if(MIOPEN_STRIP_SYMBOLS AND NOT WIN32 AND NOT APPLE)
@@ -137,7 +136,6 @@ endif()
 
 rocm_setup_version(VERSION 3.5.1)
 
-list( APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake )
 include(TargetFlags)
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
@@ -156,13 +154,6 @@ if(HAS_HIP)
 else()
     set(MIOPEN_DEFAULT_BACKEND "OpenCL")
 endif()
-
-if(NOT WIN32 AND NOT MIOPEN_WORKAROUND_USE_BOOST_FILESYSTEM)
-    include(CheckCXXLinkerFlag)
-    check_cxx_linker_flag(-lstdc++fs HAS_LIB_STD_FILESYSTEM)
-endif()
-
-list(APPEND CMAKE_PREFIX_PATH ${CMAKE_INSTALL_PREFIX} ${CMAKE_INSTALL_PREFIX}/llvm ${CMAKE_INSTALL_PREFIX}/hip /opt/rocm /opt/rocm/llvm /opt/rocm/hip)
 
 option(ENABLE_HIP_WORKAROUNDS Off)
 set(MIOPEN_INSTALL_CXX_HEADERS Off CACHE BOOL "Install MIOpen's C++ header interface")
@@ -202,10 +193,8 @@ if(MIOPEN_EMBED_BUILD)
     endif()
 endif()
 
-set( MIOPEN_BACKEND ${MIOPEN_DEFAULT_BACKEND} CACHE STRING
-    "Which of MIOpens's backends to use?" )
-set_property( CACHE MIOPEN_BACKEND PROPERTY STRINGS
-    OpenCL HIP HIPOC HIPNOGPU)
+set(MIOPEN_BACKEND ${MIOPEN_DEFAULT_BACKEND} CACHE STRING "Which of MIOpens's backends to use?")
+set_property(CACHE MIOPEN_BACKEND PROPERTY STRINGS OpenCL HIP HIPOC HIPNOGPU)
     
 # On Windows, internal symbols are only exported when BUILD_TESTING=true. As a result, building driver with BUILD_TESTING=false will result in failure.
 set_var_to_condition(MIOPEN_BUILD_DRIVER_DEFAULT (NOT MIOPEN_EMBED_BUILD) AND (NOT (MIOPEN_BACKEND STREQUAL "HIPNOGPU")) AND ((NOT WIN32) OR BUILD_TESTING))  
@@ -215,7 +204,7 @@ message(STATUS "MIOPEN_BUILD_DRIVER: ${MIOPEN_BUILD_DRIVER}" )
 # OpenCL 1.2
 if( MIOPEN_BACKEND STREQUAL "OpenCL")
     set(MIOPEN_BACKEND_OPENCL 1)
-    find_package( OpenCL REQUIRED )
+    find_package(OpenCL REQUIRED)
     find_program(MIOPEN_HIP_COMPILER clang++
         PATH_SUFFIXES bin
         PATHS
@@ -340,7 +329,7 @@ if( MIOPEN_BACKEND STREQUAL "HIP" OR MIOPEN_BACKEND STREQUAL "HIPOC" OR MIOPEN_B
         if(MIOPEN_BUILD_CK)
             include(cmake/Dependencies.cmake)
 
-            execute_process (
+            execute_process(
                 COMMAND bash -c "grep -P -o '^[ \t]*(?<!#)[ \t]*ROCm\/composable_kernel@[a-fA-F0-9]+' ${CMAKE_SOURCE_DIR}/requirements.txt"
                 OUTPUT_VARIABLE _match
             )
@@ -352,7 +341,7 @@ if( MIOPEN_BACKEND STREQUAL "HIP" OR MIOPEN_BACKEND STREQUAL "HIPOC" OR MIOPEN_B
             endif()
             miopen_add_dependency(composable_kernel HASH ${COMPOSABLE_KERNEL_HASH} options NO_LOCAL)
         else()
-            find_package(composable_kernel 1.0.0 COMPONENTS device_conv_operations)
+            find_package(composable_kernel COMPONENTS device_conv_operations)
         endif()
     endif()
     if( MIOPEN_BACKEND STREQUAL "HIPNOGPU")
@@ -457,9 +446,9 @@ endif()
 
 # Update HIP Runtime Package Dependency
 if(ENABLE_ASAN_PACKAGING)
-  set(DEPENDS_HIP_RUNTIME "hip-runtime-amd-asan" )
+  set(DEPENDS_HIP_RUNTIME "hip-runtime-amd-asan")
 else()
-  set(DEPENDS_HIP_RUNTIME "hip-runtime-amd" )
+  set(DEPENDS_HIP_RUNTIME "hip-runtime-amd")
 endif()
 set(MIOPEN_PACKAGE_REQS "${DEPENDS_HIP_RUNTIME}")
 
@@ -493,21 +482,10 @@ if(MIOPEN_USE_HIPRTC)
     message(STATUS "Build with hiprtc ${hiprtc_VERSION} ${hiprtc_DIR}")
 endif()
 
-option(Boost_USE_STATIC_LIBS "Use boost static libraries" ON)
-set(BOOST_COMPONENTS filesystem)
-if(MIOPEN_BUILD_DRIVER)
-    # boost core is a header only component that can't be found by find_package
-    # list(APPEND BOOST_COMPONENTS core)
-endif()
-
-# The FindBoost module has been removed since CMake 3.30. Use the Boost 1.83 configuration file instead.
-add_definitions(-DBOOST_ALL_NO_LIB=1)
-find_package(Boost REQUIRED COMPONENTS ${BOOST_COMPONENTS} CONFIG)
-
 find_path(HALF_INCLUDE_DIR half/half.hpp)
 message(STATUS "HALF_INCLUDE_DIR: ${HALF_INCLUDE_DIR}")
 
-option( MIOPEN_DEBUG_FIND_DB_CACHING "Use system find-db caching" ON)
+option(MIOPEN_DEBUG_FIND_DB_CACHING "Use system find-db caching" ON)
 
 if(WIN32)
     set( DATA_INSTALL_DIR bin )
@@ -612,7 +590,7 @@ file(MAKE_DIRECTORY ${KERNELS_BINARY_DIR})
 
 add_custom_target(generate_kernels ALL)
 
-set(MIOPEN_USE_SQLITE_PERFDB Off CACHE BOOL "Use sqlite perfdb instead of text-based.")
+set(MIOPEN_USE_SQLITE_PERFDB On CACHE BOOL "Use sqlite perfdb instead of text-based.")
 if(MIOPEN_USE_SQLITE_PERFDB)
     set(PERFDB_SUFFIX "")
 else()
@@ -838,7 +816,6 @@ enable_cppcheck(
         CPPCHECK=1
         __linux__=1
 )
-
 
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/lib)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/lib)

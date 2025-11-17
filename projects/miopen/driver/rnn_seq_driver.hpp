@@ -36,11 +36,10 @@
 #include "util_driver.hpp"
 #include "util_file.hpp"
 
-#include <../test/verify.hpp>
+#include "../test/verify.hpp"
 
 #include <miopen/errors.hpp>
 #include <miopen/logger.hpp>
-#include <miopen/miopen.h>
 #include <miopen/rnn.hpp>
 #include <miopen/tensor.hpp>
 #include <miopen/tensor_ops.hpp>

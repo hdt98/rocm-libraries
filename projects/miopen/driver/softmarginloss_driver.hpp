@@ -32,11 +32,9 @@
 #include "random.hpp"
 #include <cstdlib>
 #include <memory>
-#include <miopen/miopen.h>
-#include <miopen/tensor.hpp>
 #include <vector>
-#include <../test/tensor_holder.hpp>
-#include <../test/verify.hpp>
+#include "../test/tensor_holder.hpp"
+#include "../test/verify.hpp"
 #include <miopen/tensor_view_utils.hpp>
 
 template <typename Tgpu, typename Tcheck>
