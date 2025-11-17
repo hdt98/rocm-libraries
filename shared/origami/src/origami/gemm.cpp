@@ -919,17 +919,9 @@ double compute_total_latency(const problem_t& problem,
         problem.batch != 1 && (config.mt.m < problem.size.m || config.mt.n < problem.size.n))
       return std::numeric_limits<double>::max();
 
-    // Override dot2 instruction with vector lane widths
-    if (config.mi.m == 0 && config.mi.n == 0 && config.mi.k == 0) {
-      // We only use Dot2 for NN layout where M < 3
-      if (problem.size.m > 2 || (problem.a_transpose == transpose_t::T) ||
-          (problem.b_transpose == transpose_t::T))
-        return std::numeric_limits<double>::max();
-
-      config.mi.m = 1;
-      config.mi.n = 1;
-      config.mi.k = 64;
-    }
+    // Use Dot2 only for M < 3
+    if (config.mi.m == 1 && config.mi.n == 1 && config.mi.k == 64 && problem.size.m > 2)
+      return std::numeric_limits<double>::max();
   }
 
   // 1) Find CU occupancy

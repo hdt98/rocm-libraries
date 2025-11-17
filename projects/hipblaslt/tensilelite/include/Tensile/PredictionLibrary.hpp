@@ -156,14 +156,8 @@ namespace TensileLite
                 batch *= problem.batchSize(i);
             }
 
-            bool                  debug   = Debug::Instance().printPropertyEvaluation();
             hip::HipAMDGPU const* pAMDGPU = dynamic_cast<hip::HipAMDGPU const*>(&hardware);
-            size_t elementSizeA_bits
-                = problem.a().elementBytes() * 8;
-            size_t elementSizeB_bits
-                = problem.b().elementBytes() * 8;
-            size_t elementSizeC_bits
-                = problem.c().elementBytes() * 8;
+
             const origami::hardware_t& analaytical_hardware = *(pAMDGPU->analyticalHardware);
             if(origami::hardware_t::is_debug_enabled())
             {
@@ -181,8 +175,8 @@ namespace TensileLite
                 .a_dtype = static_cast<origami::data_type_t>(problem.alphaType()),
                 .b_dtype = static_cast<origami::data_type_t>(problem.betaType()),
                 .mi_dtype = miDataType,
-                .a_mx_block_size = 0,
-                .b_mx_block_size = 0,
+                .a_mx_block_size = 0,   // MX Data types come from rocroller
+                .b_mx_block_size = 0,   // MX Data types come from rocroller
             };
 
             auto prediction_result = origami::select_topk_configs(

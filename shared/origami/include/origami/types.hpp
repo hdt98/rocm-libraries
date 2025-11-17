@@ -246,7 +246,7 @@ struct dim3_t {
 struct config_t {
   /// Macro tile and matrix-instruction shape.
   dim3_t mt;
-  mutable dim3_t mi;
+  dim3_t mi;
 
   /// Occupancy (number of waves resident per CU).
   std::size_t occupancy;
