@@ -315,8 +315,8 @@ struct problem_t {
   data_type_t mi_dtype;
 
   /// MX block size.
-  std::size_t a_mx_block_size;
-  std::size_t b_mx_block_size;
+  std::size_t a_mx_block_size{};
+  std::size_t b_mx_block_size{};
 };
 
 }  // namespace origami
