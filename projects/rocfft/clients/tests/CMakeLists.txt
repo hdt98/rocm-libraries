@@ -95,6 +95,129 @@ set( rocfft-test_source
 add_executable( rocfft-test ${rocfft-test_source} ${rocfft-test_includes} )
 add_executable( rtc_helper_crash rtc_helper_crash.cpp )
 
+
+# JIT Callback Infrastructure
+# Locate amdclang++
+find_program(AMDCLANGPP amdclang++
+    HINTS
+        ${ROCM_PATH}/llvm/bin
+        ${ROCM_PATH}/bin
+        /opt/rocm/llvm/bin
+        /opt/rocm/bin
+    DOC "AMD Clang++ compiler for SPIR-V generation"
+)
+
+if(AMDCLANGPP)
+    message(STATUS "Found amdclang++ for JIT SPIR-V callbacks: ${AMDCLANGPP}")
+
+    # Create the SPIR-V extraction script at configure time
+    set(EXTRACT_SPIRV_SCRIPT ${CMAKE_CURRENT_BINARY_DIR}/extract_spirv.py)
+    file(WRITE ${EXTRACT_SPIRV_SCRIPT} "#!/usr/bin/env python3
+    import sys
+    import struct
+
+    def extract_spirv_from_bundle(bundle_path, output_path):
+        '''Extract pure SPIR-V from AMD offload bundle format.'''
+        try:
+            with open(bundle_path, 'rb') as f:
+                data = f.read()
+            if len(data) < 4:
+                print(f'ERROR: Bundle file too small: {len(data)} bytes', file=sys.stderr)
+                return False
+            # Look for SPIR-V magic number (0x07230203 in little-endian)
+            spirv_magic = struct.pack('<I', 0x07230203)
+            pos = data.find(spirv_magic)
+            if pos == -1:
+                print('ERROR: SPIR-V magic number not found in bundle', file=sys.stderr)
+                print(f'First 32 bytes: {data[:32].hex()}', file=sys.stderr)
+                return False
+            print(f'Found SPIR-V magic at offset {pos}')
+            # Extract from magic number to end of file
+            # (may include trailing data, but rocFFT should handle that)
+            spirv_data = data[pos:]
+            # Write extracted SPIR-V
+            with open(output_path, 'wb') as f:
+                f.write(spirv_data)
+            print(f'Extracted {len(spirv_data)} bytes of SPIR-V to {output_path}')
+            # Verify the extracted file has correct magic
+            with open(output_path, 'rb') as f:
+                check_magic = struct.unpack('<I', f.read(4))[0]
+            if check_magic != 0x07230203:
+                print(f'ERROR: Extracted file has wrong magic: 0x{check_magic:08x}', file=sys.stderr)
+                return False
+            print('Extraction successful, SPIR-V magic verified')
+            return True
+        except Exception as e:
+            print(f'ERROR: Exception during extraction: {e}', file=sys.stderr)
+            return False
+    if __name__ == '__main__':
+        if len(sys.argv) != 3:
+            print('Usage: extract_spirv.py <input_bundle> <output_spirv>', file=sys.stderr)
+            sys.exit(1)
+        success = extract_spirv_from_bundle(sys.argv[1], sys.argv[2])
+        sys.exit(0 if success else 1)
+    ")
+
+    # Helper function to compile a callback to SPIR-V
+    function(add_spirv_callback CALLBACK_NAME)
+        set(SOURCE_FILE ${CMAKE_CURRENT_SOURCE_DIR}/${CALLBACK_NAME}.hip)
+        set(BUNDLE_FILE ${CMAKE_CURRENT_BINARY_DIR}/${CALLBACK_NAME}.bundle)
+        set(SPIRV_FILE ${CMAKE_CURRENT_BINARY_DIR}/${CALLBACK_NAME}.spv)
+        # Check if source file exists
+        if(NOT EXISTS ${SOURCE_FILE})
+            message(WARNING "Callback source not found: ${SOURCE_FILE}")
+            return()
+        endif()
+        # Compile to offload bundle
+        add_custom_command(
+            OUTPUT ${BUNDLE_FILE}
+            COMMAND ${AMDCLANGPP}
+                -x hip
+                -D__HIP_PLATFORM_AMD__=1
+                -I${ROCM_PATH}/include
+                -I${ROCM_PATH}/include/hip
+                --offload-arch=amdgcnspirv
+                --offload-device-only
+                -c
+                -o ${BUNDLE_FILE}
+                ${SOURCE_FILE}
+            DEPENDS ${SOURCE_FILE}
+            COMMENT "Compiling ${CALLBACK_NAME} to offload bundle"
+            VERBATIM
+        )
+        # Extract pure SPIR-V from bundle using Python script
+        add_custom_command(
+            OUTPUT ${SPIRV_FILE}
+            COMMAND ${CMAKE_COMMAND} -E env python3 ${EXTRACT_SPIRV_SCRIPT} ${BUNDLE_FILE} ${SPIRV_FILE}
+            DEPENDS ${BUNDLE_FILE} ${EXTRACT_SPIRV_SCRIPT}
+            COMMENT "Extracting SPIR-V from ${CALLBACK_NAME} bundle"
+            VERBATIM
+        )
+        # Add to the list of SPIR-V files
+        list(APPEND SPIRV_CALLBACK_FILES ${SPIRV_FILE})
+        set(SPIRV_CALLBACK_FILES ${SPIRV_CALLBACK_FILES} PARENT_SCOPE)
+        # Copy SPIR-V next to the executable for easy runtime access
+        add_custom_command(
+            TARGET rocfft-test POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                ${SPIRV_FILE}
+                $<TARGET_FILE_DIR:rocfft-test>/${CALLBACK_NAME}.spv
+            COMMENT "Copying ${CALLBACK_NAME}.spv next to rocfft-test"
+            VERBATIM
+        )
+    endfunction()
+    # Build all callback variants
+    add_spirv_callback(load_callback)
+    # Create a target that builds all SPIR-V callbacks
+    if(SPIRV_CALLBACK_FILES)
+        add_custom_target(jit_callback_spirv DEPENDS ${SPIRV_CALLBACK_FILES})
+        add_dependencies(rocfft-test jit_callback_spirv)
+        message(STATUS "JIT callback SPIR-V tests enabled")
+    endif()
+else()
+    message(WARNING "amdclang++ not found; JIT SPIR-V callback tests will be skipped")
+endif()
+
 # rocFFT device code builds with -O3 by default.  rocfft-test
 # contains device code for callback functions, so ensure the device
 # code is built with the same optimization level to minimize chance
