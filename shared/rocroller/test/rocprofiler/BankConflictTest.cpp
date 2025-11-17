@@ -305,11 +305,11 @@ TEST_CASE("Weave LDS and nops", "[rocprofiler][scheduler]")
 
     constexpr auto workgroupSize = 64u;
 
-    // const auto instrDwords      = GENERATE(1, 2);
-    // const auto strideMultiplier = GENERATE(1, 2, 4);
+    // const auto instrDwords      = GENERATE(2);
+    // const auto strideMultiplier = GENERATE(8);
     // const bool write            = GENERATE(true);
     const auto instrDwords      = GENERATE(1, 2);
-    const auto strideMultiplier = GENERATE(1, 2, 4);
+    const auto strideMultiplier = GENERATE(1, 2, 4, 8);
     const bool write            = GENERATE(true, false);
     const auto baseAddresses = generateLDSAddresses(workgroupSize, strideMultiplier, instrDwords);
 
@@ -543,8 +543,6 @@ TEST_CASE("Weave LDS and nops", "[rocprofiler][scheduler]")
                 CHECK_THAT(std::get<1>(medianLatency), Catch::Matchers::WithinAbs(modelLatency, 4));
             }
         }
-
-        Log::info(context.output());
     }
 }
 

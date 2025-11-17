@@ -113,13 +113,6 @@ namespace rocRoller
         static_assert(CObserverConst<VMEMObserver>);
         static_assert(CObserverConst<DSMEMObserver>);
 
-        struct LDSQueueEntry
-        {
-            int completionCycle; // The cycle when this LDS instruction will complete
-            int queueFreedCycle; // The cycle when queue slots are freed (may be earlier than completion for reads)
-            int slotsUsed; // How many queue slots it uses
-        };
-
         struct WeightlessDSMemObserver
         {
             WeightlessDSMemObserver(ContextPtr ctx);
@@ -138,9 +131,10 @@ namespace rocRoller
         private:
             // Queue size in hardware is depth 40 width of 16 dwords from MI250 to MI350
             // This simplifies to depth 10 width of 64 dwords
-            static const int queueSize;
+            static const int dataQueueSize;
 
-            mutable std::deque<LDSQueueEntry> m_queue;
+            mutable std::deque<int> m_instructionQueue; // Stores completion cycles
+            mutable std::deque<int> m_dataQueue; // Stores individual slot freed cycles
 
             int                    m_programCycle;
             std::weak_ptr<Context> m_context;

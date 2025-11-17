@@ -117,7 +117,7 @@ namespace rocRoller
             return 1;
         }
 
-        const int WeightlessDSMemObserver::queueSize = 10;
+        const int WeightlessDSMemObserver::dataQueueSize = 10;
 
         WeightlessDSMemObserver::WeightlessDSMemObserver(ContextPtr ctx)
             : m_context(ctx)
@@ -138,17 +138,7 @@ namespace rocRoller
 
                 if(requiredSlots > remainingSlots)
                 {
-                    int cyclesNeeded = m_programCycle;
-                    int slotsToFree  = requiredSlots - remainingSlots;
-                    int slotsFreed   = 0;
-
-                    for(const auto& entry : m_queue)
-                    {
-                        if(slotsFreed >= slotsToFree)
-                            break;
-                        cyclesNeeded = std::max(cyclesNeeded, entry.queueFreedCycle);
-                        slotsFreed += entry.slotsUsed;
-                    }
+                    int cyclesNeeded   = m_dataQueue[requiredSlots - remainingSlots - 1];
                     status.stallCycles = cyclesNeeded - m_programCycle;
                 }
 
@@ -177,15 +167,13 @@ namespace rocRoller
 
             m_programCycle += inst.totalCycles();
 
-            while(!m_queue.empty() && m_programCycle >= m_queue.front().completionCycle)
+            while(!m_instructionQueue.empty() && m_programCycle >= m_instructionQueue.front())
             {
-                auto& front = m_queue.front();
-                const_cast<Instruction&>(inst).addComment(
-                    fmt::format("WeightlessDSMemObserver {}: freed {} slots, remaining slots {}",
-                                m_programCycle,
-                                front.slotsUsed,
-                                calculateRemainingSlots()));
-                m_queue.pop_front();
+                m_instructionQueue.pop_front();
+            }
+            while(!m_dataQueue.empty() && m_programCycle >= m_dataQueue.front())
+            {
+                m_dataQueue.pop_front();
             }
 
             if(GPUInstructionInfo::isLDS(inst.getOpCode()) && useWeightlessObserver(inst))
@@ -207,51 +195,47 @@ namespace rocRoller
                 // Here a cycle means an issue cycle (a quadcycle)
                 int cycles = LDSBankModel::getInstructionDataCycles(ldsInst, gfx) / 4;
 
-                const auto completionCycle
-                    = cycles + (m_queue.empty() ? m_programCycle : m_queue.back().completionCycle);
+                const auto base
+                    = m_instructionQueue.empty() ? m_programCycle : m_instructionQueue.back();
 
-                // Adjustment for read instructions: queue slots appear to be freed a bit later
-                int queueFreedCycle;
-                if(direction == LDSBankModel::LdsDirection::Read)
-                    queueFreedCycle = completionCycle + 1;
-                else
-                    queueFreedCycle = completionCycle;
+                m_instructionQueue.push_back(base + cycles);
 
-                LDSQueueEntry entry{completionCycle, queueFreedCycle, requiredSlots};
-                m_queue.push_back(entry);
+                const auto cyclesPerSlot = cycles / requiredSlots;
+                const auto adjustment    = direction == LDSBankModel::LdsDirection::Write
+                                               ? -3
+                                               : 1; // Determined experimentally
 
-                std::stringstream queueStatus;
-                for(const auto& e : m_queue)
+                for(int i = 1; i <= requiredSlots; ++i)
                 {
-                    queueStatus << fmt::format("[complete {}, freed {}, slots {}] ",
-                                               e.completionCycle,
-                                               e.queueFreedCycle,
-                                               e.slotsUsed);
+                    const auto queueFreedCycle = base + i * cyclesPerSlot + adjustment;
+                    m_dataQueue.push_back(queueFreedCycle);
                 }
-                const_cast<Instruction&>(inst).addComment(fmt::format(
-                    "WeightlessDSMemObserver {}: queued {} taking {} cycles "
-                    "using {} slots, freed at cycle {}, remaining slots {}, queue status: {}",
-                    m_programCycle,
-                    direction == LDSBankModel::LdsDirection::Read ? "read" : "write",
-                    cycles,
-                    requiredSlots,
-                    queueFreedCycle,
-                    calculateRemainingSlots(),
-                    queueStatus.str()));
+
+                const_cast<Instruction&>(inst).addComment(
+                    fmt::format("WeightlessDSMemObserver {}: queued {} taking {} cycles "
+                                "using {} slots, remaining data slots {}, "
+                                "instruction queue size: {}, data queue size: {}",
+                                m_programCycle,
+                                direction == LDSBankModel::LdsDirection::Read ? "read" : "write",
+                                cycles,
+                                requiredSlots,
+                                calculateRemainingSlots(),
+                                m_instructionQueue.size(),
+                                m_dataQueue.size()));
             }
         }
 
         int WeightlessDSMemObserver::calculateRemainingSlots() const
         {
             int usedSlots = 0;
-            for(const auto& entry : m_queue)
+            for(const auto& slotFreedCycle : m_dataQueue)
             {
-                if(entry.queueFreedCycle > m_programCycle)
+                if(slotFreedCycle > m_programCycle)
                 {
-                    usedSlots += entry.slotsUsed;
+                    usedSlots++;
                 }
             }
-            return queueSize - usedSlots;
+            return dataQueueSize - usedSlots;
         }
     }
 }
