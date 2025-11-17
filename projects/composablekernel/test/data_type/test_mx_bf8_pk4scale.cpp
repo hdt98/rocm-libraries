@@ -7,25 +7,27 @@
 
 using ck::bf8_ocp_t;
 using ck::bf8x8_ocp_t;
+using ck::bhalf8_t;
+using ck::bhalf_t;
 using ck::float8_t;
 using ck::half8_t;
 using ck::half_t;
 using ck::type_convert;
 
 /**
- * @brief Device version of "wave-wise BF8 to FP16 conversion".
+ * @brief Device version of "wave-wise BF8 to T(FP16/BF16) conversion".
  *
- * This function performs packed 8 conversions from BF8 values to float16 values in a wave.
+ * This function performs packed 8 conversions from BF8 values to T values in a wave.
  * One packed scale parameter can hold scale factor for 4 conversion calls.
  * See how template parameter Scale_sel used to select scale in the packed form.
  *
- * @param p_mat Pointer to the output array where the converted float16 values will be stored.
+ * @param p_mat Pointer to the output array where the converted T values will be stored.
  * @param p_scale Pointer to the scale array.
  *
  */
 
-template <int M, int N, float Val>
-__global__ void test_packed_scaled_convert_fp16(half_t* p_mat, uint32_t* p_scale)
+template <int M, int N, float Val, typename T>
+__global__ void test_packed_scaled_convert_fp16(T* p_mat, uint32_t* p_scale)
 {
     if(p_mat == nullptr || p_scale == nullptr)
     {
@@ -33,6 +35,7 @@ __global__ void test_packed_scaled_convert_fp16(half_t* p_mat, uint32_t* p_scale
     }
 
 #if CK_MX_ARCH_1250
+    using T8 = typename ck::vector_type<T, 8>::type;
     // scale_sel = 1, 3, 5, 7 will use p_scale values in lane[16:31]
     ck::index_t lid = __lane_id();
     uint32_t scale  = (lid < 16) ? uint32_t(0) : p_scale[lid - 16];
@@ -44,12 +47,12 @@ __global__ void test_packed_scaled_convert_fp16(half_t* p_mat, uint32_t* p_scale
     // itr-3 use scale [31:24]
     ck::static_for<0, N / 16, 1>{}([&](auto it) {
         bf8x8_ocp_t vf8{type_convert<bf8_ocp_t>(Val)}; // 2.0f
-        auto vhalf8 = ck::pk4scaled_type_convert<half8_t, bf8x8_ocp_t, it * 2 + 1>(scale, vf8);
+        auto vT8 = ck::pk4scaled_type_convert<T8, bf8x8_ocp_t, it * 2 + 1>(scale, vf8);
 
         // write to p_mat
         ck::static_for<0, 8, 1>{}([&](auto ii) {
             p_mat[(lid & 0x0F) * N + it * 16 + ((lid >> 4) & 1) * 8 + ii] =
-                vhalf8[static_cast<int>(ii)];
+                vT8[static_cast<int>(ii)];
         });
     });
 #endif
@@ -61,6 +64,7 @@ static inline float convert_exponent_to_float(uint32_t exp4, int i)
     return ck::bit_cast<float>((exp4 >> (i * 8) & 0xFF) << 23);
 }
 
+/* Float16: "wave-wise BF8 to FP16 conversion" */
 TEST(MXBF8, DevicePackedScaledConvertFP16)
 {
     // matrix shape M x N
@@ -107,6 +111,58 @@ TEST(MXBF8, DevicePackedScaledConvertFP16)
         {
             EXPECT_EQ(out[m * N + n],
                       type_convert<half_t>(convert_exponent_to_float(scale[m], 3) * Val))
+                << "m: " << m << ", n: " << n << std::endl;
+        }
+    }
+}
+
+/* BFloat16: "wave-wise BF8 to BF16 conversion" */
+TEST(MXBF8, DevicePackedScaledConvertBF16)
+{
+    // matrix shape M x N
+    constexpr int M     = 16;
+    constexpr int N     = 64;
+    constexpr float Val = 2.0f;
+    uint32_t v_scal     = (126u << 24) | (127u << 16) | (128u << 8) | (129u); //[0.5|1.|2.|4.]
+    std::vector<bhalf_t> out(M * N, -1.0f);
+    std::vector<uint32_t> scale(M, v_scal);
+
+    DeviceMem device_out(M * N * sizeof(bhalf_t));
+    DeviceMem device_scale(M * sizeof(uint32_t));
+    device_scale.ToDevice(scale.data());
+
+    test_packed_scaled_convert_fp16<M, N, Val>
+        <<<1, 32>>>(static_cast<bhalf_t*>(device_out.GetDeviceBuffer()),
+                    static_cast<uint32_t*>(device_scale.GetDeviceBuffer()));
+
+    device_out.FromDevice(out.data());
+
+    /* n:  [0:15]  [16:31]  [32:47]  [48:63]
+            8.0f     2.0f     4.0f    1.0f  */
+    for(int m = 0; m < M; m++)
+    {
+        for(int n = 0; n < 16; n++)
+        {
+            EXPECT_EQ(out[m * N + n],
+                      type_convert<bhalf_t>(convert_exponent_to_float(scale[m], 0) * Val))
+                << "m: " << m << ", n: " << n << std::endl;
+        }
+        for(int n = 16; n < 32; n++)
+        {
+            EXPECT_EQ(out[m * N + n],
+                      type_convert<bhalf_t>(convert_exponent_to_float(scale[m], 2) * Val))
+                << "m: " << m << ", n: " << n << std::endl;
+        }
+        for(int n = 32; n < 48; n++)
+        {
+            EXPECT_EQ(out[m * N + n],
+                      type_convert<bhalf_t>(convert_exponent_to_float(scale[m], 1) * Val))
+                << "m: " << m << ", n: " << n << std::endl;
+        }
+        for(int n = 48; n < 64; n++)
+        {
+            EXPECT_EQ(out[m * N + n],
+                      type_convert<bhalf_t>(convert_exponent_to_float(scale[m], 3) * Val))
                 << "m: " << m << ", n: " << n << std::endl;
         }
     }

@@ -10,6 +10,8 @@ using ck::bf8x16_ocp_t;
 using ck::bf8x2_ocp_t;
 using ck::bf8x32_ocp_t;
 using ck::bf8x8_ocp_t;
+using ck::bhalf8_t;
+using ck::bhalf_t;
 using ck::e8m0_bexp_t;
 using ck::float16_t;
 using ck::float2_t;
@@ -732,12 +734,14 @@ TEST(MXBF8, DeviceBF8x32ToF32x32ScaledConvert)
 
 // float16
 /**
- * @brief Validation for "FP16 convert from all possible combinations of E8M0 and bf8 values" Test.
+ * @brief Validation for "T(FP16/BF16) convert from all possible combinations of E8M0 and bf8
+ * values" Test.
  *
- * @param out FP16 array converted from bf8 values.
+ * @param out T array converted from bf8 values.
  *
  */
-static inline void validate(half_t* out)
+template <typename T>
+static inline void validate_allcomb(T* out)
 {
     // V = X * P; X - E8M0 scale, P - BF8
 
@@ -777,7 +781,7 @@ static inline void validate(half_t* out)
             }
             else
             {
-                ASSERT_EQ(out[idx], type_convert<float>(bf8_ocp_t{bf8_spec_id}))
+                ASSERT_EQ(out[idx], type_convert<T>(bf8_ocp_t{bf8_spec_id}))
                     << "exp_id: " << exp_id << " bf8_id: " << bf8_spec_id << std::endl
                     << type_convert<float>(e8m0_bexp_t(exp_id)) << " * "
                     << type_convert<float>(bf8_ocp_t{bf8_spec_id})
@@ -799,8 +803,8 @@ static inline void validate(half_t* out)
             uint8_t bf8_uid = static_cast<uint8_t>(bf8_id);
             auto idx        = exp_id * 256 + bf8_uid;
             ASSERT_FLOAT_EQ(out[idx],
-                            type_convert<half_t>(type_convert<float>(e8m0_bexp_t(exp_id)) *
-                                                 type_convert<float>(bf8_ocp_t{bf8_uid})))
+                            type_convert<T>(type_convert<float>(e8m0_bexp_t(exp_id)) *
+                                            type_convert<float>(bf8_ocp_t{bf8_uid})))
                 << "exp_id: " << exp_id << " bf8_id: " << bf8_uid << std::endl
                 << type_convert<float>(e8m0_bexp_t(exp_id)) << " * "
                 << type_convert<float>(bf8_ocp_t{bf8_uid});
@@ -809,19 +813,22 @@ static inline void validate(half_t* out)
 }
 
 /**
- * @brief Host version of "FP16 convert from all possible combinations of E8M0 and BF8 values".
+ * @brief Host version of "T(FP16/BF16) convert from all possible combinations of E8M0 and BF8
+ * values".
  *
- * This function performs packed 8 conversions from BF8 values to float16 values using
+ * This function performs packed 8 conversions from BF8 values to T values using
  * E8M0 exponent scaling. It handles all possible combinations of E8M0 (256) and BF8 (256) values.
  * Each thread in a wave holds 8 bf8 values and the wave hold all representative bf8 values.
  *
  * @param Nfp8 The number of bf8 values.
  * @param Nexp The number of exponents
- * @param p_test Pointer to the output array where the converted float16 values will be stored.
+ * @param p_test Pointer to the output array where the converted T values will be stored.
  *
  */
-__host__ void test_host_scaled_convert_allcomb_fp16(int Nfp8, int Nexp, half_t* p_test)
+template <typename T>
+__host__ void test_host_scaled_convert_allcomb(int Nfp8, int Nexp, T* p_test)
 {
+    using T8 = typename ck::vector_type<T, 8>::type;
     if(p_test == nullptr)
     {
         return;
@@ -838,9 +845,9 @@ __host__ void test_host_scaled_convert_allcomb_fp16(int Nfp8, int Nexp, half_t* 
                 vf8.AsType<bf8_ocp_t>()(ck::Number<ii>{}) =
                     bf8_ocp_t{static_cast<uint8_t>(ii + fp8_id)};
             });
-            auto vhalf8 = scaled_type_convert<half8_t>(e8m0_bexp_t(exp_id), vf8);
+            auto vT8 = scaled_type_convert<T8>(e8m0_bexp_t(exp_id), vf8);
 
-            ck::static_for<0, 8, 1>{}([&](auto ii) { p_test[i++] = vhalf8[static_cast<int>(ii)]; });
+            ck::static_for<0, 8, 1>{}([&](auto ii) { p_test[i++] = vT8[static_cast<int>(ii)]; });
             if(i >= Nfp8 * Nexp)
             {
                 return;
@@ -856,25 +863,28 @@ TEST(MXBF8, HostScaledConvertFP16_AllComb)
     auto N       = test_fp8 * test_exp;
     std::vector<half_t> out(N, -1.0f);
 
-    test_host_scaled_convert_allcomb_fp16(test_fp8, test_exp, out.data());
+    test_host_scaled_convert_allcomb(test_fp8, test_exp, out.data());
 
-    validate(out.data());
+    validate_allcomb(out.data());
 }
 
 /**
- * @brief Device version of "FP16 convert from all possible combinations of E8M0 and BF8 values".
+ * @brief Device version of "T(FP16/BF16) convert from all possible combinations of E8M0 and BF8
+ * values".
  *
- * This function performs packed 8 conversions from BF8 values to float16 values using
+ * This function performs packed 8 conversions from BF8 values to T values using
  * E8M0 exponent scaling. It handles all possible combinations of E8M0 (256) and BF8 (256) values.
  * Each thread in a wave holds 8 bf8 values and the wave hold all representative bf8 values.
  *
  * @param Nfp8 The number of bf8 values.
  * @param Nexp The number of exponents
- * @param p_test Pointer to the output array where the converted float16 values will be stored.
+ * @param p_test Pointer to the output array where the converted T values will be stored.
  *
  */
-__global__ void test_device_scaled_convert_allcomb_fp16(int Nfp8, int Nexp, half_t* p_test)
+template <typename T>
+__global__ void test_device_scaled_convert_allcomb(int Nfp8, int Nexp, T* p_test)
 {
+    using T8 = typename ck::vector_type<T, 8>::type;
     if(p_test == nullptr)
     {
         return;
@@ -888,12 +898,12 @@ __global__ void test_device_scaled_convert_allcomb_fp16(int Nfp8, int Nexp, half
     });
 
     // All possible combinations of E8M0
-    half8_t vhalf8;
+    T8 vT8;
     for(ck::index_t exp_id = 0; exp_id < Nexp; exp_id++)
     {
-        vhalf8 = scaled_type_convert<half8_t, bf8x8_ocp_t>(e8m0_bexp_t{exp_id}, vf8);
+        vT8 = scaled_type_convert<T8, bf8x8_ocp_t>(e8m0_bexp_t{exp_id}, vf8);
         ck::static_for<0, 8, 1>{}(
-            [&](auto ii) { p_test[ii + tid * 8 + exp_id * Nfp8] = vhalf8[static_cast<int>(ii)]; });
+            [&](auto ii) { p_test[ii + tid * 8 + exp_id * Nfp8] = vT8[static_cast<int>(ii)]; });
     }
 }
 
@@ -908,66 +918,143 @@ TEST(MXBF8, DeviceScaledConvertFP16_AllComb)
 
     device_out.SetValue(-21.0f);
 
-    test_device_scaled_convert_allcomb_fp16<<<1, 32>>>(
+    test_device_scaled_convert_allcomb<<<1, 32>>>(
         test_fp8, test_exp, static_cast<half_t*>(device_out.GetDeviceBuffer()));
 
     device_out.FromDevice(out.data());
 
-    validate(out.data());
+    validate_allcomb(out.data());
+}
+
+// All possible BF8 combination test for Bfloat16
+TEST(MXBF8, HostScaledConvertBF16_AllComb)
+{
+    int test_fp8 = 256;
+    int test_exp = 256;
+    auto N       = test_fp8 * test_exp;
+    std::vector<bhalf_t> out(N, -1.0f);
+
+    test_host_scaled_convert_allcomb(test_fp8, test_exp, out.data());
+
+    validate_allcomb(out.data());
+}
+
+TEST(MXBF8, DeviceScaledConvertBF16_AllComb)
+{
+    int test_fp8 = 256;
+    int test_exp = 256;
+    auto N       = test_fp8 * test_exp;
+    std::vector<bhalf_t> out(N, -1.0f);
+
+    DeviceMem device_out(N * sizeof(bhalf_t));
+
+    device_out.SetValue(-21.0f);
+
+    test_device_scaled_convert_allcomb<<<1, 32>>>(
+        test_fp8, test_exp, static_cast<bhalf_t*>(device_out.GetDeviceBuffer()));
+
+    device_out.FromDevice(out.data());
+
+    validate_allcomb(out.data());
 }
 
 /**                                                                                   \
- * @brief Validation for "BF8 to FP16 conversion back and forth" Test.                \
+ * @brief Validation for "BF8 to T(FP16/BF16) conversion back and forth" Test.                \
  *                                                                                    \
- * @param out FP16 array converted from bf8 values which converted from a FP16 array. \
+ * @param out T array converted from bf8 values which converted from a T array. \
  *                                                                                    \
- */                                                                                   \
-#define EXPECT_NEAR_EITHER(val, a, b, tol)                                            \
-    EXPECT_TRUE(fabs((val) - (a)) < (tol) || fabs((val) - (b)) < (tol))
-static inline void validate_2way(uint64_t N, half_t* out, uint64_t completed)
+ */
+template <typename T>
+static inline void validate_2way(uint64_t N, T* out, uint64_t completed, bool device_call)
 {
-    auto i                      = 0;
-    constexpr half_t half_t_tol = 1e-5;
-    // RNE
-    EXPECT_EQ(out[i++], type_convert<half_t>(1.0f));
-    EXPECT_EQ(out[i++], type_convert<half_t>(-2.0f));
-    EXPECT_EQ(out[i++], type_convert<half_t>(28672.0f));
-    EXPECT_TRUE(std::isnan(type_convert<float>(out[i++])));
-    EXPECT_EQ(out[i++], type_convert<half_t>(32768.0f));
-    EXPECT_EQ(out[i++], type_convert<half_t>(powf(2.0f, -15.0f)));
-    EXPECT_EQ(out[i++], type_convert<half_t>(-powf(2.0f, -13.0f)));
-    EXPECT_EQ(out[i++], type_convert<half_t>(0.0f));
-    // SR
-    EXPECT_EQ(out[i++], type_convert<half_t>(1.0f));
-    EXPECT_EQ(out[i++], type_convert<half_t>(-2.0f));
-    EXPECT_EQ(out[i++], type_convert<half_t>(28672.0f));
-    EXPECT_TRUE(std::isnan(type_convert<float>(out[i++])));
-    EXPECT_NEAR_EITHER(
-        out[i], type_convert<half_t>(28672.0f), type_convert<half_t>(32768.0f), half_t_tol);
-    i++;
-    EXPECT_EQ(out[i++], type_convert<half_t>(powf(2.0f, -15.0f)));
-    EXPECT_EQ(out[i++], type_convert<half_t>(-powf(2.0f, -13.0f)));
-    EXPECT_NEAR_EITHER(
-        out[i], type_convert<half_t>(0.0f), type_convert<half_t>(powf(2.0f, -15.0f)), half_t_tol);
-    i++;
-
+    static_assert(std::is_same_v<T, half_t> || std::is_same_v<T, bhalf_t>,
+                  "T must be float16 or bfloat16");
     EXPECT_EQ(N, completed);
+    auto i = 0;
+    for(int iop = 0; iop < 3; iop++)
+    { // single, pk2, pk8 Ops on same test data
+        // RNE
+        EXPECT_EQ(out[i++], type_convert<T>(1.0f));
+        EXPECT_EQ(out[i++], type_convert<T>(-2.0f));
+        EXPECT_EQ(out[i++], type_convert<T>(28672.0f));
+        EXPECT_TRUE(std::isnan(type_convert<float>(out[i++])));
+        if constexpr(std::is_same_v<T, half_t>)
+        {
+            // f16 max 65504 /4.0f = 16376 -> bf8 16384 * 2 -> bf16 32768
+            EXPECT_EQ(out[i++], type_convert<T>(32768.0f));
+        }
+        else if constexpr(std::is_same_v<T, bhalf_t>)
+        {
+            if(device_call)
+            {
+                // device : bf16 max -> bf8 inf * 2 -> bf16 inf
+                EXPECT_TRUE(std::isinf(type_convert<float>(out[i++])));
+            }
+            else
+            {
+                // host : bf16 max -> bf8 max * 2 -> bf16
+                EXPECT_EQ(out[i++],
+                          type_convert<T>(type_convert<float>(ck::NumericLimits<bf8_ocp_t>::Max()) *
+                                          2.f));
+            }
+        }
+        EXPECT_EQ(out[i++], type_convert<T>(powf(2.0f, -15.0f)));
+        EXPECT_EQ(out[i++], type_convert<T>(-powf(2.0f, -13.0f)));
+        EXPECT_EQ(out[i++], type_convert<T>(0.0f));
+        // SR
+        EXPECT_EQ(out[i++], type_convert<T>(1.0f));
+        EXPECT_EQ(out[i++], type_convert<T>(-2.0f));
+        EXPECT_EQ(out[i++], type_convert<T>(28672.0f));
+        EXPECT_TRUE(std::isnan(type_convert<float>(out[i++])));
+        if constexpr(std::is_same_v<T, half_t>)
+        {
+            // f16 max 65504 /4.0f = 16376 in [14336, 16384] bf8 * 2 -> bf16 [28672, 32768]
+            EXPECT_TRUE(ck::bit_cast<uint16_t>(out[i]) ==
+                            ck::bit_cast<uint16_t>(type_convert<T>(28672.0f)) ||
+                        ck::bit_cast<uint16_t>(out[i]) ==
+                            ck::bit_cast<uint16_t>(type_convert<T>(32768.0f)));
+            i++;
+        }
+        else if constexpr(std::is_same_v<T, bhalf_t>)
+        {
+            if(device_call)
+            {
+                // device : bf16 max -> bf8 inf * 2 -> bf16 inf
+                EXPECT_TRUE(std::isinf(type_convert<float>(out[i++])));
+            }
+            else
+            {
+                // host : bf16 max -> bf8 max * 2 -> bf16
+                EXPECT_EQ(out[i++],
+                          type_convert<T>(type_convert<float>(ck::NumericLimits<bf8_ocp_t>::Max()) *
+                                          2.f));
+            }
+        }
+        EXPECT_EQ(out[i++], type_convert<T>(powf(2.0f, -15.0f)));
+        EXPECT_EQ(out[i++], type_convert<T>(-powf(2.0f, -13.0f)));
+        EXPECT_TRUE(ck::bit_cast<uint16_t>(out[i]) == uint16_t{0x0000} ||
+                    ck::bit_cast<uint16_t>(out[i]) ==
+                        ck::bit_cast<uint16_t>(type_convert<T>(powf(2.0f, -15.0f))));
+        i++;
+    }
     EXPECT_EQ(N, i);
 }
 /**
- * @brief Device version of "BF8 to FP16 conversion back and forth".
+ * @brief Device version of "BF8 to T(FP16/BF16) conversion back and forth".
  *
- * This function performs packed 8 scale conversions from FP16 values to BF8 values and back.
- * Both RNE and SR tested.
+ * This function performs packed 8/ pakced 2/ single value scale conversions from T values to BF8
+ * values and back. Both RNE and SR tested.
  *
  * @param N number of value tested.
  * @param p_test Pointer to the output array where the converted float16 values will be stored.
  * @param p_completed Pointer to a variable that tracks the number of completed conversions.
  *
  */
-__host__ __device__ void
-test_pk8_scaled_convert_fp16(uint64_t N, half_t* p_test, uint64_t* p_completed)
+template <typename T>
+__host__ __device__ void test_pk8_scaled_convert(uint64_t N, T* p_test, uint64_t* p_completed)
 {
+    using T8 = typename ck::vector_type<T, 8>::type;
+    using T2 = typename ck::vector_type<T, 2>::type;
     if(p_completed == nullptr)
     {
         return;
@@ -983,62 +1070,121 @@ test_pk8_scaled_convert_fp16(uint64_t N, half_t* p_test, uint64_t* p_completed)
 
     // test pk8 vector conversion, first /4.0f, then *2.0f
     float fscale4 = 4.0f;
-    auto pkscale2 = e8m0_bexp_t(2.0f);
+    auto scale2   = e8m0_bexp_t(2.0f);
 
-    half8_t vhalf_set{
-        type_convert<half_t>(2.0f),
-        type_convert<half_t>(-4.0f),
-        type_convert<half_t>(ck::NumericLimits<bf8_ocp_t>::Max()), // 57344 /4.0f = 14336 (0x73)
-                                                                   //       *2.0f = 28672
-        ck::NumericLimits<half_t>::QuietNaN(),
-        ck::NumericLimits<half_t>::Max(),         // 65504 /4.0f = 16376 in [14336, 16384] bf8,
-                                                  //       *2.0f = [28672, 32768] half_t
-        type_convert<half_t>(pow(2.0f, -14.0f)),  // 2^-16 smallest positive subnorm in bf8
-        type_convert<half_t>(-pow(2.0f, -12.0f)), // -2^-14 smallest negative norm in bf8
-        type_convert<half_t>(pow(2.0f, -16.0f)),  // 2^-18 not representable in bf8
-    };
+    T v_qnan = ck::NumericLimits<T>::QuietNaN();
+    T v_max  = ck::NumericLimits<T>::Max();
+    if constexpr(std::is_same_v<T, bhalf_t>)
+    {
+        v_qnan = bhalf_t{0x7FFF};
+        v_max  = bhalf_t{0x7F7F};
+    }
+    union
+    {
+        T8 v8;
+        T2 v2[4];
+        T v[8];
+    } test_set{T8{
+        type_convert<T>(2.0f),                                // a positive representable
+        type_convert<T>(-4.0f),                               // a negative representable
+        type_convert<T>(ck::NumericLimits<bf8_ocp_t>::Max()), // 57344 /4.0f = 14336 (0x73)
+                                                              //       *2.0f = 28672
+        v_qnan,
+        v_max,
+        type_convert<T>(powf(2.0f, -14.0f)),  // 2^-16 smallest positive subnorm in bf8
+        type_convert<T>(-powf(2.0f, -12.0f)), // -2^-14 smallest negative norm in bf8
+        type_convert<T>(powf(2.0f, -16.0f))   // 2^-18 not representable in bf8
+    }};
 
+    // packed 8 Ops
     // rne
-    auto vhalf_back =
-        scaled_type_convert<half8_t>(pkscale2, mxf8_convert_rne<bf8x8_ocp_t>(vhalf_set, fscale4));
+    auto v8_back =
+        scaled_type_convert<T8>(scale2, mxf8_convert_rne<bf8x8_ocp_t>(test_set.v8, fscale4));
 
-    ck::static_for<0, 8, 1>{}([&](auto ii) { p_test[i++] = vhalf_back[static_cast<int>(ii)]; });
+    ck::static_for<0, 8, 1>{}([&](auto ii) { p_test[i++] = v8_back[static_cast<int>(ii)]; });
     if(i >= N)
     {
         return;
     }
 
     // sr
-    vhalf_back =
-        scaled_type_convert<half8_t>(pkscale2, mxf8_convert_sr<bf8x8_ocp_t>(vhalf_set, fscale4));
+    v8_back = scaled_type_convert<T8>(scale2, mxf8_convert_sr<bf8x8_ocp_t>(test_set.v8, fscale4));
 
-    ck::static_for<0, 8, 1>{}([&](auto ii) { p_test[i++] = vhalf_back[static_cast<int>(ii)]; });
+    ck::static_for<0, 8, 1>{}([&](auto ii) { p_test[i++] = v8_back[static_cast<int>(ii)]; });
     if(i >= N)
     {
         return;
     }
+
+    // packed 2 Ops
+    T2 v2_back[4];
+    ck::static_for<0, 4, 1>{}([&](auto ii) {
+        v2_back[ii] = scaled_type_convert<T2>(
+            scale2, mxf8_convert_rne<bf8x2_ocp_t>(test_set.v2[ck::Number<ii>{}], fscale4));
+        p_test[i++] = v2_back[ii][0];
+        p_test[i++] = v2_back[ii][1];
+        if(i >= N)
+        {
+            return;
+        }
+    });
+
+    // sr
+    ck::static_for<0, 4, 1>{}([&](auto ii) {
+        v2_back[ii] = scaled_type_convert<T2>(
+            scale2, mxf8_convert_sr<bf8x2_ocp_t>(test_set.v2[ck::Number<ii>{}], fscale4));
+        p_test[i++] = v2_back[ii][0];
+        p_test[i++] = v2_back[ii][1];
+        if(i >= N)
+        {
+            return;
+        }
+    });
+
+    // single value Ops
+    T v_back[8];
+    ck::static_for<0, 8, 1>{}([&](auto ii) {
+        v_back[ii] = scaled_type_convert<T>(
+            scale2, mxf8_convert_rne<bf8_ocp_t>(test_set.v[ck::Number<ii>{}], fscale4));
+        p_test[i++] = v_back[ii];
+        if(i >= N)
+        {
+            return;
+        }
+    });
+
+    // sr
+    ck::static_for<0, 8, 1>{}([&](auto ii) {
+        v_back[ii] = scaled_type_convert<T>(
+            scale2, mxf8_convert_sr<bf8_ocp_t>(test_set.v[ck::Number<ii>{}], fscale4));
+        p_test[i++] = v_back[ii];
+        if(i >= N)
+        {
+            return;
+        }
+    });
 }
 
 TEST(MXBF8, HostF16x8_BF8x8ScaledConvert)
 {
-    constexpr uint64_t N = 8 * 2; // test 8 values for RNE and SR
+    constexpr uint64_t N = 8 * 2 * 3; // test 8 values for RNE and SR with single, pk2, pk8 cvt Ops
     uint64_t completed   = 0;
     std::vector<half_t> out(N, -1.0f);
 
-    test_pk8_scaled_convert_fp16(N, out.data(), &completed);
+    test_pk8_scaled_convert(N, out.data(), &completed);
 
-    validate_2way(N, out.data(), completed);
+    validate_2way(N, out.data(), completed, false);
 }
 
-__global__ void
-test_device_pk8_scaled_convert_fp16(uint64_t N, half_t* p_test, uint64_t* p_completed)
+template <typename T>
+__global__ void test_device_pk8_scaled_convert(uint64_t N, T* p_test, uint64_t* p_completed)
 {
-    test_pk8_scaled_convert_fp16(N, p_test, p_completed);
+    test_pk8_scaled_convert(N, p_test, p_completed);
 }
 
 TEST(MXBF8, DeviceF16x8_BF8x8ScaledConvert)
 {
-    constexpr uint64_t N = 8 * 2; // vector size 8 and 1 sets of tests with RNE and SR
+    constexpr uint64_t N = 8 * 2 * 3; // test 8 values for RNE and SR with single, pk2, pk8 cvt Ops
     std::vector<half_t> out(N, -1.0f);
 
     DeviceMem device_out(N * sizeof(half_t));
@@ -1047,7 +1193,7 @@ TEST(MXBF8, DeviceF16x8_BF8x8ScaledConvert)
     device_out.SetValue(-21.0f);
     device_completed.SetValue(-21.0f);
 
-    test_device_pk8_scaled_convert_fp16<<<1, 1>>>(
+    test_device_pk8_scaled_convert<<<1, 1>>>(
         N,
         static_cast<half_t*>(device_out.GetDeviceBuffer()),
         static_cast<uint64_t*>(device_completed.GetDeviceBuffer()));
@@ -1056,5 +1202,40 @@ TEST(MXBF8, DeviceF16x8_BF8x8ScaledConvert)
     device_completed.FromDevice(&completed);
     device_out.FromDevice(out.data());
 
-    validate_2way(N, out.data(), completed);
+    validate_2way(N, out.data(), completed, true);
+}
+
+// bfloat16
+TEST(MXBF8, HostBF16x8_BF8x8ScaledConvert)
+{
+    constexpr uint64_t N = 8 * 2 * 3; // test 8 values for RNE and SR with single, pk2, pk8 cvt Ops
+    uint64_t completed   = 0;
+    std::vector<bhalf_t> out(N, -1.0f);
+
+    test_pk8_scaled_convert(N, out.data(), &completed);
+
+    validate_2way(N, out.data(), completed, false);
+}
+
+TEST(MXBF8, DeviceBF16x8_BF8x8ScaledConvert)
+{
+    constexpr uint64_t N = 8 * 2 * 3; // test 8 values for RNE and SR with single, pk2, pk8 cvt Ops
+    std::vector<bhalf_t> out(N, -1.0f);
+
+    DeviceMem device_out(N * sizeof(bhalf_t));
+    DeviceMem device_completed(sizeof(uint64_t));
+
+    device_out.SetValue(-21.0f);
+    device_completed.SetValue(-21.0f);
+
+    test_device_pk8_scaled_convert<<<1, 1>>>(
+        N,
+        static_cast<bhalf_t*>(device_out.GetDeviceBuffer()),
+        static_cast<uint64_t*>(device_completed.GetDeviceBuffer()));
+
+    uint64_t completed = 0;
+    device_completed.FromDevice(&completed);
+    device_out.FromDevice(out.data());
+
+    validate_2way(N, out.data(), completed, true);
 }
