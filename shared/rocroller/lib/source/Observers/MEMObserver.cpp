@@ -145,11 +145,11 @@ namespace rocRoller
 
                     status.stallCycles = cyclesNeeded - m_programCycle;
                 }
+
+                LDSBankModel::MemoryOpLDS memOp{direction};
+                int issueCycles = LDSBankModel::getInstructionIssueCycles(memOp, dwords) / 4 - 1;
+                status.additionalCycles = issueCycles;
             }
-            // TODO: there should be a way to report issue cycles of this instruction
-            // otherwise other observers, e.g. mfma observer's use of
-            // `inst.numExecutedInstructions() + inst.peekedStatus().stallCycles` is not accurate
-            // as this ds_writes may take more than a single (quadcycle) to issue
             return status;
         }
 
@@ -170,17 +170,6 @@ namespace rocRoller
             // TODO: handle waitcount
 
             m_programCycle += inst.totalCycles();
-
-            if(GPUInstructionInfo::isLDS(inst.getOpCode()))
-            {
-                auto [direction, dwords] = getLdsInfoFromOpcode(inst.getOpCode());
-                LDSBankModel::MemoryOpLDS memOp{direction};
-                // Adjust m_programCycle to account for issue cycles
-                // Unfortunately other observers have no way of knowing this rignt now
-                // TODO: to-be-discussed best way to do this
-                m_programCycle += LDSBankModel::getInstructionIssueCycles(memOp, dwords) / 4
-                                  - 1; // -1 because above += includes it
-            }
 
             while(!m_queue.empty() && m_programCycle >= m_queue.front().completionCycle)
             {
