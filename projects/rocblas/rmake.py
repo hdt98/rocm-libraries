@@ -85,6 +85,9 @@ def parse_args():
     general_opts.add_argument(      '--cmake_install', required=False, default=False, action='store_true',
                         help='Linux only: Handled by install.sh')
 
+    general_opts.add_argument(      '--config-only', dest='config_only', required=False, default=False, action='store_true',
+                        help='Configure the build but do not compile (generates compile_commands.json).')
+
     experimental_opts.add_argument(      '--codecoverage', required=False, default=False, action='store_true',
                         help='Code coverage build. Requires Debug (-g|--debug) or RelWithDebInfo mode (-k|--relwithdebinfo), (optional, default: False)')
 
@@ -390,19 +393,7 @@ def config_cmd():
     if args.cmake_args:
         cmake_options.append(args.cmake_args)
 
-    # Add msgpack install directory to CMAKE_PREFIX_PATH on Windows
-    # Put msgpack FIRST to prioritize our Boost-free build over any vcpkg installation
-    prefix_paths = []
-    msgpack_install = None  # Initialize to avoid undefined variable
-    if os.name == "nt":
-        msgpack_install = os.path.join(src_path, args.build_dir, "deps", "msgpack-c", "install")
-        if os.path.exists(msgpack_install):
-            prefix_paths.append(cmake_path(msgpack_install))
-    prefix_paths.append(raw_rocm_path)  # Use raw_rocm_path (without quotes) for path list
-    
-    # Quote the CMAKE_PREFIX_PATH value to handle spaces in paths
-    prefix_path_value = os.pathsep.join(prefix_paths)
-    cmake_base_options = f'-DROCM_PATH={rocm_path} -DCMAKE_PREFIX_PATH:PATH="{prefix_path_value}"'
+    cmake_base_options = f'-DROCM_PATH={rocm_path} -DCMAKE_PREFIX_PATH:PATH="{rocm_path};{rocm_path}/llvm/lib/cmake"'
     cmake_options.append(cmake_base_options)
     
     # Explicitly tell CMake where to find our Boost-free msgpack (overrides any vcpkg version)
@@ -636,10 +627,13 @@ def main():
     if run_cmd(exe, opts):
         fatal("Configuration failed. Not continuing.")
 
-    # make
-    exe, opts = make_cmd()
-    if run_cmd(exe, opts):
-        fatal("Build failed. Not continuing.")
+    # make (skip if config-only mode)
+    if not args.config_only:
+        exe, opts = make_cmd()
+        if run_cmd(exe, opts):
+            fatal("Build failed. Not continuing.")
+    else:
+        print("Config-only mode: Skipping build step. compile_commands.json should be generated.")
 
     # Linux install and cleanup not supported from rmake yet
 
