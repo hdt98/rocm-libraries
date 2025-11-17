@@ -33,7 +33,13 @@ jobs:
           pip install pre-commit
           sudo apt-get update
           # The rest are managed by pre-commit mirror
-          sudo apt-get install -y clang-tidy-20 flatbuffers-compiler
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            clang-20 \
+            clang++-20 \
+            clang-tidy-20 \
+            flatbuffers-compiler
 
       - name: Configure Git
         run: |
@@ -69,8 +75,10 @@ jobs:
           cmake -S projects/hipdnn -B build_precommit \
             -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
             -DCMAKE_CXX_COMPILER=clang++-20 \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
             -DBUILD_TESTING=OFF \
-            -DCMAKE_BUILD_TYPE=Debug
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DHIPDNN_DISABLE_TOOLCHAIN=ON
 
           # Copy to root so clang-tidy can find it
           cp build_precommit/compile_commands.json .

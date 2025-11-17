@@ -13,9 +13,11 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 add_compile_definitions(__HIP_PLATFORM_AMD__)
 
-set(CMAKE_TOOLCHAIN_FILE "${CMAKE_SOURCE_DIR}/cmake/ClangToolChain.cmake" CACHE STRING
-                                                                                "Toolchain file"
-)
+if(NOT HIPDNN_DISABLE_TOOLCHAIN)
+    set(CMAKE_TOOLCHAIN_FILE "${CMAKE_SOURCE_DIR}/cmake/ClangToolChain.cmake"
+        CACHE STRING "Toolchain file"
+    )
+endif()
 
 set(HIPDNN_VERSION "0.0.1")
 
