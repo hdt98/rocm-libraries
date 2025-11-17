@@ -94,6 +94,9 @@ namespace TensileLite
                              SolutionLibrarySearchType searchType
                              = SolutionLibrarySearchType::DEFAULT) const override
         {
+            // TODO- Temp
+            std::cout << "Entering PredictionLibrary::findAllSolutions()" << std::endl;
+
             bool                    debug = Debug::Instance().printPropertyEvaluation();
             SolutionSet<MySolution> rv;
             if(searchType == SolutionLibrarySearchType::DEFAULT)
@@ -134,6 +137,9 @@ namespace TensileLite
                                                             Hardware const&  hardware,
                                                             int numSolutions) const override
         {
+            // TODO- Temp
+            std::cout << "Entering PredictionLibrary::findTopSolutions()" << std::endl;
+
             SolutionVector<MySolution> rv;
             size_t                     m     = 1;
             size_t                     n     = 1;
