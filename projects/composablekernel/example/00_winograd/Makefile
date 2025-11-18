@@ -51,7 +51,7 @@ clean-tmp:
 	rm -rf *.s *.bc *.hipi *.hipfb *.o *-amdgcn-* *gpucore.* .rocprofv3
 
 # simple test cases
-test_0 = -F 1 -n 1 -c 8 --in_h 4 --in_w 4 -k 1 -y 3 -x 3 \
+test_0 = -F 1 -n 1 -c 12 --in_h 8 --in_w 32 -k 64 -y 3 -x 3 \
 --pad_h 1 --pad_w 1 -u 1 -v 1 -l 1 -j 1 -g 1 -m conv --spatial_dim 2
 
 run_%:
