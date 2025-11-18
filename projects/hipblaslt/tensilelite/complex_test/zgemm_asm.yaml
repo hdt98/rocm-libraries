@@ -11,11 +11,11 @@ GlobalParameters:
   NumElementsToValidate: -1
   ValidationMaxToPrint: 4
   ValidationPrintValids: False
-  # PrintTensorD: 0x3
-  # PrintTensorC: 0x3
-  # PrintTensorB: 0x3
-  # PrintTensorA: 0x3 #0x1
-  # PrintTensorRef: 0x3
+  PrintTensorD: 0x3
+  PrintTensorC: 0x3
+  PrintTensorB: 0x3
+  PrintTensorA: 0x3 #0x1
+  PrintTensorRef: 0x3
   # ShortNames: False
   # MergeFiles: True
   DataInitTypeA: 3 #12 #3
@@ -85,18 +85,18 @@ BenchmarkProblems:
           # - Range: [[16,37, 512],[16,57,512],[1],[1,1,64]]
           # - Range: [ [127,1,129], 0, [2], [63,1,64] ]
 
-  - # zgemm NT
-    - # ProblemType
-      OperationType: GEMM
-      DataType: Z
-      DestDataType: Z
-      ComputeDataType: Z
-      UseBeta: True
-      Batched: True      
-      TransposeA: False
-      TransposeB: True
-      ComplexConjugateA: False
-      ComplexConjugateB: False
+  # - # zgemm NT
+  #   - # ProblemType
+  #     OperationType: GEMM
+  #     DataType: Z
+  #     DestDataType: Z
+  #     ComputeDataType: Z
+  #     UseBeta: True
+  #     Batched: True      
+  #     TransposeA: False
+  #     TransposeB: True
+  #     ComplexConjugateA: False
+  #     ComplexConjugateB: False
 
     - # BenchmarkProblemSizeGroup - Assembly
       InitialSolutionParameters:
@@ -124,18 +124,18 @@ BenchmarkProblems:
           - Exact: [1024, 1024, 1, 64] #64x64(times16)
           - Exact: [512, 512, 1, 32] #32x32
 
-  - # zgemm TN
-    - # ProblemType
-      OperationType: GEMM
-      DataType: Z
-      DestDataType: Z
-      ComputeDataType: Z
-      UseBeta: True
-      Batched: True      
-      TransposeA: True
-      TransposeB: False
-      ComplexConjugateA: False
-      ComplexConjugateB: False
+  # - # zgemm TN
+  #   - # ProblemType
+  #     OperationType: GEMM
+  #     DataType: Z
+  #     DestDataType: Z
+  #     ComputeDataType: Z
+  #     UseBeta: True
+  #     Batched: True      
+  #     TransposeA: True
+  #     TransposeB: False
+  #     ComplexConjugateA: False
+  #     ComplexConjugateB: False
 
     - # BenchmarkProblemSizeGroup - Assembly
       InitialSolutionParameters:
@@ -163,18 +163,18 @@ BenchmarkProblems:
           - Exact: [1024, 1024, 1, 64] #64x64(times16)
           - Exact: [512, 512, 1, 32] #32x32
 
-  - # zgemm TT
-    - # ProblemType
-      OperationType: GEMM
-      DataType: Z
-      DestDataType: Z
-      ComputeDataType: Z
-      UseBeta: True
-      Batched: True      
-      TransposeA: True
-      TransposeB: True
-      ComplexConjugateA: False
-      ComplexConjugateB: False
+  # - # zgemm TT
+  #   - # ProblemType
+  #     OperationType: GEMM
+  #     DataType: Z
+  #     DestDataType: Z
+  #     ComputeDataType: Z
+  #     UseBeta: True
+  #     Batched: True      
+  #     TransposeA: True
+  #     TransposeB: True
+  #     ComplexConjugateA: False
+  #     ComplexConjugateB: False
 
     - # BenchmarkProblemSizeGroup - Assembly
       InitialSolutionParameters:
@@ -202,18 +202,18 @@ BenchmarkProblems:
           - Exact: [1024, 1024, 1, 64] #64x64(times16)
           - Exact: [512, 512, 1, 32] #32x32
 
-  - # zgemm NC
-    - # ProblemType
-      OperationType: GEMM
-      DataType: Z
-      DestDataType: Z
-      ComputeDataType: Z
-      UseBeta: True
-      Batched: True      
-      TransposeA: False
-      TransposeB: True
-      ComplexConjugateA: False
-      ComplexConjugateB: True
+  # - # zgemm NC
+  #   - # ProblemType
+  #     OperationType: GEMM
+  #     DataType: Z
+  #     DestDataType: Z
+  #     ComputeDataType: Z
+  #     UseBeta: True
+  #     Batched: True      
+  #     TransposeA: False
+  #     TransposeB: True
+  #     ComplexConjugateA: False
+  #     ComplexConjugateB: True
 
     - # BenchmarkProblemSizeGroup - Assembly
       InitialSolutionParameters:
@@ -241,18 +241,18 @@ BenchmarkProblems:
           - Exact: [1024, 1024, 1, 64] #64x64(times16)
           - Exact: [512, 512, 1, 32] #32x32
 
-  - # zgemm CN
-    - # ProblemType
-      OperationType: GEMM
-      DataType: Z
-      DestDataType: Z
-      ComputeDataType: Z
-      UseBeta: True
-      Batched: True      
-      TransposeA: True
-      TransposeB: False
-      ComplexConjugateA: True
-      ComplexConjugateB: False
+  # - # zgemm CN
+  #   - # ProblemType
+  #     OperationType: GEMM
+  #     DataType: Z
+  #     DestDataType: Z
+  #     ComputeDataType: Z
+  #     UseBeta: True
+  #     Batched: True      
+  #     TransposeA: True
+  #     TransposeB: False
+  #     ComplexConjugateA: True
+  #     ComplexConjugateB: False
 
     - # BenchmarkProblemSizeGroup - Assembly
       InitialSolutionParameters:
@@ -280,18 +280,18 @@ BenchmarkProblems:
           - Exact: [1024, 1024, 1, 64] #64x64(times16)
           - Exact: [512, 512, 1, 32] #32x32
 
-  - # zgemm TC
-    - # ProblemType
-      OperationType: GEMM
-      DataType: Z
-      DestDataType: Z
-      ComputeDataType: Z
-      UseBeta: True
-      Batched: True      
-      TransposeA: True
-      TransposeB: True
-      ComplexConjugateA: False
-      ComplexConjugateB: True
+  # - # zgemm TC
+  #   - # ProblemType
+  #     OperationType: GEMM
+  #     DataType: Z
+  #     DestDataType: Z
+  #     ComputeDataType: Z
+  #     UseBeta: True
+  #     Batched: True      
+  #     TransposeA: True
+  #     TransposeB: True
+  #     ComplexConjugateA: False
+  #     ComplexConjugateB: True
 
     - # BenchmarkProblemSizeGroup - Assembly
       InitialSolutionParameters:
@@ -319,18 +319,18 @@ BenchmarkProblems:
           - Exact: [1024, 1024, 1, 64] #64x64(times16)
           - Exact: [512, 512, 1, 32] #32x32
 
-  - # zgemm CT
-    - # ProblemType
-      OperationType: GEMM
-      DataType: Z
-      DestDataType: Z
-      ComputeDataType: Z
-      UseBeta: True
-      Batched: True      
-      TransposeA: True
-      TransposeB: True
-      ComplexConjugateA: True
-      ComplexConjugateB: False
+  # - # zgemm CT
+  #   - # ProblemType
+  #     OperationType: GEMM
+  #     DataType: Z
+  #     DestDataType: Z
+  #     ComputeDataType: Z
+  #     UseBeta: True
+  #     Batched: True      
+  #     TransposeA: True
+  #     TransposeB: True
+  #     ComplexConjugateA: True
+  #     ComplexConjugateB: False
 
     - # BenchmarkProblemSizeGroup - Assembly
       InitialSolutionParameters:
@@ -358,18 +358,18 @@ BenchmarkProblems:
           - Exact: [1024, 1024, 1, 64] #64x64(times16)
           - Exact: [512, 512, 1, 32] #32x32
 
-  - # zgemm CC
-    - # ProblemType
-      OperationType: GEMM
-      DataType: Z
-      DestDataType: Z
-      ComputeDataType: Z
-      UseBeta: True
-      Batched: True      
-      TransposeA: True
-      TransposeB: True
-      ComplexConjugateA: True
-      ComplexConjugateB: True
+  # - # zgemm CC
+  #   - # ProblemType
+  #     OperationType: GEMM
+  #     DataType: Z
+  #     DestDataType: Z
+  #     ComputeDataType: Z
+  #     UseBeta: True
+  #     Batched: True      
+  #     TransposeA: True
+  #     TransposeB: True
+  #     ComplexConjugateA: True
+  #     ComplexConjugateB: True
 
     - # BenchmarkProblemSizeGroup - Assembly
       InitialSolutionParameters:
