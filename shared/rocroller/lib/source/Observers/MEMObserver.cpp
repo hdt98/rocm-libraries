@@ -68,10 +68,12 @@ namespace rocRoller
             return std::make_optional(std::make_pair(direction, dwords));
         }
 
-        bool useWeightlessObserver(Instruction const& inst)
+        bool useWeightlessObserver(Instruction const& inst, ContextPtr context)
         {
+            AssertFatal(context != nullptr);
+            const auto target = context->targetArchitecture().target();
             return inst.getAddresses().has_value()
-                   && getLdsInfoFromOpcode(inst.getOpCode()).has_value();
+                   && getLdsInfoFromOpcode(inst.getOpCode()).has_value() && target.isCDNAGPU();
         }
 
         VMEMObserver::VMEMObserver(ContextPtr ctx)
@@ -102,7 +104,8 @@ namespace rocRoller
 
         bool DSMEMObserver::isMEMInstruction(Instruction const& inst) const
         {
-            return GPUInstructionInfo::isLDS(inst.getOpCode()) && !useWeightlessObserver(inst);
+            return GPUInstructionInfo::isLDS(inst.getOpCode())
+                   && !useWeightlessObserver(inst, m_context.lock());
         }
 
         int DSMEMObserver::getWait(Instruction const& inst) const
@@ -128,7 +131,8 @@ namespace rocRoller
         InstructionStatus WeightlessDSMemObserver::peek(Instruction const& inst) const
         {
             InstructionStatus status;
-            if(GPUInstructionInfo::isLDS(inst.getOpCode()) && useWeightlessObserver(inst))
+            if(GPUInstructionInfo::isLDS(inst.getOpCode())
+               && useWeightlessObserver(inst, m_context.lock()))
             {
                 auto ldsInfo = getLdsInfoFromOpcode(inst.getOpCode());
 
@@ -151,12 +155,14 @@ namespace rocRoller
 
         void WeightlessDSMemObserver::modify(Instruction& inst) const
         {
-            if(GPUInstructionInfo::isLDS(inst.getOpCode()) && useWeightlessObserver(inst))
+            if(GPUInstructionInfo::isLDS(inst.getOpCode())
+               && useWeightlessObserver(inst, m_context.lock()))
             {
                 const auto status = peek(inst);
-                inst.addComment(fmt::format("WeightlessDSMemObserver {}: stall cycles {}",
+                inst.addComment(fmt::format("WeightlessDSMemObserver {}: stall {}, additional {}",
                                             m_programCycle,
-                                            status.stallCycles));
+                                            status.stallCycles,
+                                            status.additionalCycles));
             }
         }
 
@@ -176,7 +182,8 @@ namespace rocRoller
                 m_dataQueue.pop_front();
             }
 
-            if(GPUInstructionInfo::isLDS(inst.getOpCode()) && useWeightlessObserver(inst))
+            if(GPUInstructionInfo::isLDS(inst.getOpCode())
+               && useWeightlessObserver(inst, m_context.lock()))
             {
                 auto ldsInfo = getLdsInfoFromOpcode(inst.getOpCode());
 
@@ -200,14 +207,19 @@ namespace rocRoller
 
                 m_instructionQueue.push_back(base + cycles);
 
-                const auto cyclesPerSlot = cycles / requiredSlots;
-
-                // Determined experimentally
-                const auto adjustment = direction == LDSBankModel::LdsDirection::Write ? -3 : 1;
-
-                for(int i = 1; i <= requiredSlots; ++i)
+                if(direction == LDSBankModel::LdsDirection::Write)
                 {
-                    const auto queueFreedCycle = base + i * cyclesPerSlot + adjustment;
+                    const auto cyclesPerSlot = cycles / requiredSlots;
+                    for(int i = 0; i < requiredSlots; ++i)
+                    {
+                        const auto queueFreedCycle = base + i * cyclesPerSlot;
+                        m_dataQueue.push_back(queueFreedCycle);
+                    }
+                }
+                else if(direction == LDSBankModel::LdsDirection::Read)
+                {
+                    AssertFatal(requiredSlots == 1);
+                    const auto queueFreedCycle = base + cycles;
                     m_dataQueue.push_back(queueFreedCycle);
                 }
 

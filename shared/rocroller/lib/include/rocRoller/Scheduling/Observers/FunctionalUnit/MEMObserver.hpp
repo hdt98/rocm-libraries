@@ -133,8 +133,8 @@ namespace rocRoller
             // This simplifies to depth 10 width of 64 dwords
             static const int dataQueueSize;
 
-            mutable std::deque<int> m_instructionQueue; // Stores completion cycles
-            mutable std::deque<int> m_dataQueue; // Stores individual slot freed cycles
+            mutable std::deque<int> m_instructionQueue; // Stores instruction completion cycles
+            mutable std::deque<int> m_dataQueue; // Stores data queue completion cycles
 
             int                    m_programCycle;
             std::weak_ptr<Context> m_context;

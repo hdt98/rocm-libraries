@@ -310,7 +310,7 @@ TEST_CASE("Weave LDS and nops", "[rocprofiler][scheduler]")
     // const auto strideMultiplier = GENERATE(8);
     // const bool write            = GENERATE(false);
     const auto instrDwords      = GENERATE(1, 2, 4);
-    const auto strideMultiplier = GENERATE(1, 2, 4);
+    const auto strideMultiplier = GENERATE(1, 2, 4, 8);
     const bool write            = GENERATE(true, false);
     const auto baseAddresses = generateLDSAddresses(workgroupSize, strideMultiplier, instrDwords);
 
@@ -487,11 +487,10 @@ TEST_CASE("Weave LDS and nops", "[rocprofiler][scheduler]")
                                                          instrDwords)
                                + inst.peekedStatus().stallCycles * 4;
 
-            infoMessage << fmt::format("{}, model {}, profiler {} {}, delta {}\n",
+            infoMessage << fmt::format("{}, model {}, profiler {}, delta {}\n",
                                        profile.instruction,
                                        modelLatency,
                                        profile.meanLatency(),
-                                       profile.meanLatencyWithPrecedingNone(),
                                        static_cast<int>(profile.meanLatency()) - modelLatency);
         }
         INFO(infoMessage.str());
@@ -537,11 +536,19 @@ TEST_CASE("Weave LDS and nops", "[rocprofiler][scheduler]")
                                  modelLatency,
                                  static_cast<int>(std::get<1>(medianLatency)) - modelLatency));
 
-                // Allow error proportional to instruction size
-                CHECK_THAT(std::get<1>(medianLatency),
-                           Catch::Matchers::WithinAbs(modelLatency, instrDwords * 4));
+                if(write && instrDwords == 4)
+                {
+                    CHECK_THAT(std::get<1>(medianLatency),
+                               Catch::Matchers::WithinAbs(modelLatency, 12ul));
+                }
+                else
+                {
+                    CHECK_THAT(std::get<1>(medianLatency),
+                               Catch::Matchers::WithinAbs(modelLatency, 0ul));
+                }
             }
         }
+        Log::trace(context.output());
     }
 }
 
