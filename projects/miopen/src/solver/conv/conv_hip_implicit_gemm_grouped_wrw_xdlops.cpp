@@ -630,7 +630,8 @@ bool ConvHipImplicitGemmGroupWrwXdlops::IsApplicable(
     if(!ck_utility::is_ck_whitelist(ctx.GetStream().GetDeviceName()))
         return false;
     // CK convolution kernels does not support fp32 datatype for Navi4
-    if(problem.GetInDataType() == miopenFloat && StartsWith(ctx.GetStream().GetDeviceName(), "gfx12"))
+    if(problem.GetInDataType() == miopenFloat &&
+       StartsWith(ctx.GetStream().GetDeviceName(), "gfx12"))
         return false;
     switch(problem.GetInDataType())
     {
