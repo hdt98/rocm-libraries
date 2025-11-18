@@ -120,7 +120,8 @@ namespace rocRoller
             return 1;
         }
 
-        const int WeightlessDSMemObserver::dataQueueSize = 10;
+        const int WeightlessDSMemObserver::dataQueueSize        = 10;
+        const int WeightlessDSMemObserver::instructionQueueSize = 8;
 
         WeightlessDSMemObserver::WeightlessDSMemObserver(ContextPtr ctx)
             : m_context(ctx)
@@ -134,21 +135,28 @@ namespace rocRoller
             if(GPUInstructionInfo::isLDS(inst.getOpCode())
                && useWeightlessObserver(inst, m_context.lock()))
             {
-                auto ldsInfo = getLdsInfoFromOpcode(inst.getOpCode());
+                const auto ldsInfo = getLdsInfoFromOpcode(inst.getOpCode());
 
-                auto [direction, dwords] = ldsInfo.value();
-                int requiredSlots        = queueSlots(direction, dwords);
-                int remainingSlots       = calculateRemainingSlots();
+                const auto [direction, dwords] = ldsInfo.value();
+                const auto requiredSlots       = queueSlots(direction, dwords);
+                const auto remainingSlots      = calculateRemainingSlots();
+
+                if(m_instructionQueue.size() >= instructionQueueSize)
+                {
+                    const auto completionCycle = m_instructionQueue.front();
+                    status.stallCycles         = completionCycle - m_programCycle;
+                }
 
                 if(requiredSlots > remainingSlots)
                 {
-                    int cyclesNeeded   = m_dataQueue[requiredSlots - remainingSlots - 1];
-                    status.stallCycles = cyclesNeeded - m_programCycle;
+                    const auto completionCycle = m_dataQueue[requiredSlots - remainingSlots - 1];
+                    status.stallCycles
+                        = std::max(status.stallCycles, completionCycle - m_programCycle);
                 }
 
                 LDSBankModel::MemoryOpLDS memOp{direction};
-                int issueCycles = LDSBankModel::getInstructionIssueCycles(memOp, dwords) / 4 - 1;
-                status.additionalCycles = issueCycles;
+                status.additionalCycles
+                    = LDSBankModel::getInstructionIssueCycles(memOp, dwords) / 4 - 1;
             }
             return status;
         }
@@ -199,8 +207,12 @@ namespace rocRoller
                 auto ctx = m_context.lock();
                 auto gfx = ctx->targetArchitecture().target().gfx;
 
-                // Here a cycle means an issue cycle (a quadcycle)
                 int cycles = LDSBankModel::getInstructionDataCycles(ldsInst, gfx) / 4;
+
+                AssertFatal(calculateRemainingSlots() >= requiredSlots
+                                && m_instructionQueue.size() < instructionQueueSize,
+                            "Expected queue space to be accounted for in peek function and passed "
+                            "through to total cycles calculation.");
 
                 const auto base
                     = m_instructionQueue.empty() ? m_programCycle : m_instructionQueue.back();
@@ -219,7 +231,7 @@ namespace rocRoller
                 else if(direction == LDSBankModel::LdsDirection::Read)
                 {
                     AssertFatal(requiredSlots == 1);
-                    const auto queueFreedCycle = base + cycles;
+                    const auto queueFreedCycle = base;
                     m_dataQueue.push_back(queueFreedCycle);
                 }
 

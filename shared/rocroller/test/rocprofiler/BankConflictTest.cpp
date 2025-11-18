@@ -306,12 +306,24 @@ TEST_CASE("Weave LDS and nops", "[rocprofiler][scheduler]")
 
     constexpr auto workgroupSize = 64u;
 
-    // const auto instrDwords      = GENERATE(4);
-    // const auto strideMultiplier = GENERATE(8);
-    // const bool write            = GENERATE(false);
-    const auto instrDwords      = GENERATE(1, 2, 4);
-    const auto strideMultiplier = GENERATE(1, 2, 4, 8);
-    const bool write            = GENERATE(true, false);
+    int instrDwords;
+    int strideMultiplier;
+    int write;
+
+    constexpr auto testIndividual = false;
+    if(testIndividual)
+    {
+        instrDwords      = GENERATE(1);
+        strideMultiplier = GENERATE(8);
+        write            = GENERATE(false);
+    }
+    else
+    {
+        instrDwords      = GENERATE(1, 2, 4);
+        strideMultiplier = GENERATE(1, 2, 4, 8);
+        write            = GENERATE(true, false);
+    }
+
     const auto baseAddresses = generateLDSAddresses(workgroupSize, strideMultiplier, instrDwords);
 
     const auto name = fmt::format(
@@ -493,7 +505,8 @@ TEST_CASE("Weave LDS and nops", "[rocprofiler][scheduler]")
                                        profile.meanLatency(),
                                        static_cast<int>(profile.meanLatency()) - modelLatency);
         }
-        INFO(infoMessage.str());
+        const auto infoStr = testIndividual ? infoMessage.str() : "";
+        INFO(infoStr);
 
         { // All latencies have same number of instructions
             size_t expectedSize = allLatencies[0].size();
@@ -548,7 +561,8 @@ TEST_CASE("Weave LDS and nops", "[rocprofiler][scheduler]")
                 }
             }
         }
-        Log::trace(context.output());
+        if(testIndividual)
+            Log::trace(context.output());
     }
 }
 
