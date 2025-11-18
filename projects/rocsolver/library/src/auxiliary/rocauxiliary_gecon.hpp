@@ -181,7 +181,7 @@ __device__ inline void lacn2_max_index(const I n, T* local_max, I* local_max_ind
 // }
 
 
-template <int MAX_THDS, typename T, typename S, typename I>
+template <int MAX_THDS, typename T, typename I, typename S>
 ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS)
     lacn2_jump1(T* x, const rocblas_int n, S* norm, I* isgn)
 {
@@ -225,7 +225,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS)
 
 // find index of maximum abosolute value in vector x
 // to be called with only a single block
-template <int MAX_THDS, typename T, typename I>
+template <int MAX_THDS, typename T, typename I, typename S>
 ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) lacn2_jump2(const I n,
                                                                    const T* x,
                                                                    I* max_index)
@@ -293,7 +293,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) lacn2_jump2(const I n,
         // overwrite x with 1/-1
         // overwrite isgn
         // write back kase = 2 and jump = 4
-template <int MAX_THDS, typename T, typename S, typename I>
+template <int MAX_THDS, typename T, typename I, typename S>
 ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) lacn2_jump3(const I n,
                                                                    T* x,
                                                                    T* v,
@@ -496,7 +496,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) lacn2_jump4(const I n,
 }
 
 // compute l1 norm of vector v and compare to temporary value
-template <int MAX_THDS, typename T, typename S, typename I>
+template <int MAX_THDS, typename T, typename I, typename S>
 ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS)
     lacn2_jump5(const T* v, const I n, S* norm)
 {
