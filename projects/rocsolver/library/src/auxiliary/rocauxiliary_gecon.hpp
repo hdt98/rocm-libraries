@@ -86,17 +86,17 @@ ROCSOLVER_KERNEL void gecon_init_vector(T* x, const rocblas_int n, const T value
 //     }
 // }
 
-// reduce within warp using shuffle on both index and value
-// template <typename T, typename I>
-// __device__ inline void lacn2_max_index(const I n, T* local_max, I* local_max_index, rocblas_int offset)
-// {
-//     T compare_local_max = shift_left(local_max, offset);
-//     T compare_local_index = shift_left(local_max_index, offset);
-//     if (compare_local_max > *local_max){
-//         *local_max = compare_local_max;
-//         *local_max_index = compare_local_index;
-//     } 
-// }
+reduce within warp using shuffle on both index and value
+template <typename T, typename I>
+__device__ inline void lacn2_max_index(const I n, T* local_max, I* local_max_index, rocblas_int offset)
+{
+    T compare_local_max = shift_left(local_max, offset);
+    T compare_local_index = shift_left(local_max_index, offset);
+    if (compare_local_max > *local_max){
+        *local_max = compare_local_max;
+        *local_max_index = compare_local_index;
+    } 
+}
 
 // // find index of maximum abosolute value in vector x
 // // to be called with only a single block
@@ -455,7 +455,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(GECON_BLOCKSIZE) lacn2_jump4(const I n,
     __shared__ S sval_indices[GECON_BLOCKSIZE / WarpSize];
 
     // dot
-    S local_max = std::numeric_limits<T>::min();
+    S local_max = std::numeric_limits<S>::min();
     I local_max_index;
     for(I i = tid; i < n; i += GECON_BLOCKSIZE)
     {
@@ -499,7 +499,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(GECON_BLOCKSIZE) lacn2_jump4(const I n,
     __syncthreads();
 
     I local_max_idx = sval_indices[0];
-    if (x[local_max_idx] == x[jlast] || iters == iters_max)
+    if (x[local_max_idx] == x[jlast] || iters == iters_max){
         for(rocblas_int i = tid; i < n; i += GECON_BLOCKSIZE)
         {
             T sign = (i % 2 == 0) ? T(1) : T(-1);
@@ -561,7 +561,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(GECON_BLOCKSIZE)
             sum += sval[k];
         sum = 2 * (sum / (3 * n));
         if (sum > *norm)
-            *norm = (1 / sum) / d_anorm;
+            *norm = (1 / sum) / *d_anorm;
     }
 }
 
@@ -668,6 +668,7 @@ rocblas_status gecon_lacn2(rocblas_handle handle,
             if (*h_jump == 3)
                 *h_iters = *h_iters+1;
 
+            return rocblas_status_success;
             break;
         case 5:
             // afterwards, d_est will contain condition number estimate
@@ -677,6 +678,7 @@ rocblas_status gecon_lacn2(rocblas_handle handle,
             std::swap(x, v);
             *h_kase = 0;
 
+            return rocblas_status_success;
             break;
         default:
             break;
@@ -713,144 +715,175 @@ rocblas_status rocsolver_gecon_template(rocblas_handle handle,
     ROCSOLVER_ENTER("gecon", "norm_type:", norm_type, "n:", n, "shiftA:", shiftA, "lda:", lda,
                     "bc:", batch_count);
 
-    if(m == 0 || n == 0 || !batch_count)
+    if(!batch_count)
         return rocblas_status_success;
 
     hipStream_t stream;
     rocblas_get_stream(handle, &stream);
 
-    // may make sense to iterate batch by batch since convergence and steps may be different for both?
+    // quick return if no dimensions
+    if(n == 0)
+    {
+        rocblas_int blocks = (batch_count - 1) / BS1 + 1;
+        dim3 grid(blocks, 1, 1);
+        dim3 threads(BS1, 1, 1);
+        ROCSOLVER_LAUNCH_KERNEL(reset_info, grid, threads, 0, stream, rcond, batch_count, 0);
+        return rocblas_status_success;
+    }
 
-    // TODO: call arg check
+    // Return not implemented for Frobenius and max norms
+    if(norm_type == rocsolver_norm_type_frobenius || norm_type == rocsolver_norm_type_max)
+        return rocblas_status_not_implemented;
 
+    // iterate over each batch
+    for(I batch = 0; batch < batch_count; batch++)
+    {
+        // if anorm is zero for this batch, rcond is zero
+        if(anorm[batch] == S(0))
+        {
+            S zero = S(0);
+            hipMemcpyAsync(rcond + batch, &zero, sizeof(S), hipMemcpyHostToDevice, stream);
+            continue;
+        }
 
-    ROCSOLVER_LAUNCH_KERNEL(gecon_init_vector<S>, blocks, threads, 0, stream, x, n, S(1) / S(n));
-
-
-    rocblas_int jump = 1;
-
-    // iterate over each batch for now
-    for(I batch = 0; batch < batch_count; batch++){
+        // get workspace pointers for this batch
         T* v = work_v + batch * n;
         T* x = work_x + batch * n;
-        T* isgn = work_isgn + batch * n;
+        I* isgn = work_isgn + batch * n;
         S* d_est = scalars_est + batch;
+        const S* d_anorm = anorm + batch;
         I* d_max_idx = scalars_max_idx + batch;
         rocblas_int* d_kase = scalars_kase + batch;
         rocblas_int* d_jump = scalars_jump + batch;
-        
+
+        // initialize x = (1/n, ..., 1/n)
+        rocblas_int blocks = (n - 1) / GECON_BLOCKSIZE + 1;
+        ROCSOLVER_LAUNCH_KERNEL((gecon_init_vector<T, I>), dim3(blocks), dim3(GECON_BLOCKSIZE), 0,
+                                stream, x, n, T(1) / T(n));
+
+        // initialize state
         rocblas_int h_kase = 1;
         rocblas_int h_jump = 1;
         I h_iters = 1;
-        
-        while(h_kase != 0){
-            gecon_lacn2<T, I, S>(handle, norm_type, n, A,
-                shiftA + batch * strideA, inca, lda, strideA,
-                ipiv + batch * strideP, strideP,
-                v, x, isgn, max_iter, &h_iters,
-                d_max_idx, d_est, d_jump, d_kase,
-                &h_jump, &h_kase);
-            
-            if(h_kase == 0) break;  // converged
-            
-            // determine transpose based on norm_type and kase
+
+        // main LACN2 iteration loop
+        while(h_kase != 0)
+        {
+            // call LACN2 to update state and prepare next vector
+            gecon_lacn2<T, I, S>(handle, norm_type, n, A, shiftA + batch * strideA, inca, lda,
+                                 strideA, ipiv + batch * strideP, strideP, stream, v, x, isgn,
+                                 max_iter, &h_iters, d_max_idx, d_est, d_anorm, d_jump, d_kase,
+                                 &h_jump, &h_kase);
+
+            if(h_kase == 0)
+                break; // converged, d_est contains rcond estimate
+
+            // determine operation based on norm_type and kase
             rocblas_operation opr;
-            if(norm_type == rocsolver_norm_type_one){
+            if(norm_type == rocsolver_norm_type_one)
+            {
                 opr = (h_kase == 1) ? rocblas_operation_none
-                                    : (rocblas_is_complex<T> ? 
-                                       rocblas_operation_conjugate_transpose :
-                                       rocblas_operation_transpose);
-            } else{  // infinity norm
-                opr = (h_kase == 1) ? (rocblas_is_complex<T> ?
-                                       rocblas_operation_conjugate_transpose :
-                                       rocblas_operation_transpose)
+                                    : (rocblas_is_complex<T> ? rocblas_operation_conjugate_transpose
+                                                              : rocblas_operation_transpose);
+            }
+            else
+            { // infinity norm
+                opr = (h_kase == 1) ? (rocblas_is_complex<T> ? rocblas_operation_conjugate_transpose
+                                                              : rocblas_operation_transpose)
                                     : rocblas_operation_none;
             }
-            
-            // T* solve_vec = (h_jump == 1 || h_jump == 3) ? x : v;
+
+            // solve system: x is always the vector being solved
             rocsolver_getrs_template<false, false, T>(
-                handle, opr, n, 1, A,
-                shiftA + batch * strideA, inca, lda, strideA,
-                ipiv + batch * strideP, strideP,
-                (U)x, 0, 1, n, 0, 1,
-                nullptr, nullptr, nullptr, nullptr, true, true);
+                handle, opr, n, 1, A, shiftA + batch * strideA, inca, lda, strideA,
+                ipiv + batch * strideP, strideP, (U)x, 0, 1, n, 0, 1, nullptr, nullptr, nullptr,
+                nullptr, true, true);
         }
-        
+
+        // rcond is computed in jump5 and stored in d_est, which is already rcond[batch]
+        // note: d_est and rcond[batch] point to the same location
     }
-    
+
     return rocblas_status_success;
-    
 }
 
-// /** Memory size calculation **/
-// template <typename T, typename I, typename S>
-// void rocsolver_gecon_getMemorySize(const I n,
-//                                    const I batch_count,
-//                                    size_t* size_work_v,
-//                                    size_t* size_work_x,
-//                                    size_t* size_iwork,
-//                                    size_t* size_work_scalars_s,
-//                                    size_t* size_work_scalars_i)
-// {
-//     // if quick return no workspace needed
-//     if(n == 0 || batch_count == 0)
-//     {
-//         *size_work_v = 0;
-//         *size_work_x = 0;
-//         *size_iwork = 0;
-//         *size_work_scalars_s = 0;
-//         *size_work_scalars_i = 0;
-//         return;
-//     }
+template <typename T, typename I, typename S>
+void rocsolver_gecon_getMemorySize(const I n,
+                                   const I batch_count,
+                                   size_t* size_work_v,
+                                   size_t* size_work_x,
+                                   size_t* size_work_isgn,
+                                   size_t* size_scalars_est,
+                                   size_t* size_scalars_max_idx,
+                                   size_t* size_scalars_kase,
+                                   size_t* size_scalars_jump)
+{
+    // if quick return no workspace needed
+    if(n == 0 || batch_count == 0)
+    {
+        *size_work_v = 0;
+        *size_work_x = 0;
+        *size_work_isgn = 0;
+        *size_scalars_est = 0;
+        *size_scalars_max_idx = 0;
+        *size_scalars_kase = 0;
+        *size_scalars_jump = 0;
+        return;
+    }
 
-//     // Need n reals per batch for v vector
-//     *size_work_v = sizeof(S) * n * batch_count;
+    // need n elements of type T per batch for v vector
+    *size_work_v = sizeof(T) * n * batch_count;
 
-//     // Need n reals per batch for x vector  
-//     *size_work_x = sizeof(S) * n * batch_count;
+    // need n elements of type T per batch for x vector
+    *size_work_x = sizeof(T) * n * batch_count;
 
-//     // Need n integers per batch (index tracking for LACN2)
-//     *size_iwork = sizeof(I) * n * batch_count;
+    // TODO: only needed by real, but how can we do that?
+    *size_work_isgn = sizeof(I) * n * batch_count;
 
-//     // Need scalar workspace for LACN2 state (per batch): d_est, d_estold
-//     *size_work_scalars_s = sizeof(S) * 2 * batch_count;
+    // need S (real) scalar per batch for estimate
+    *size_scalars_est = sizeof(S) * batch_count;
 
-//     // Need integer workspace for LACN2 state (per batch): d_max_idx, d_jlast, d_should_break, d_is_equal
-//     *size_work_scalars_i = sizeof(I) * 4 * batch_count;
-// }
+    // need I scalar per batch for max index
+    *size_scalars_max_idx = sizeof(I) * batch_count;
 
-// /** Argument validation **/
-// template <typename T, typename I, typename S>
-// rocblas_status rocsolver_gecon_argCheck(rocblas_handle handle,
-//                                         const rocsolver_norm_type norm_type,
-//                                         const I n,
-//                                         const I lda,
-//                                         T A,
-//                                         const I* ipiv,
-//                                         const S anorm,
-//                                         S* rcond)
-// {
-//     // order is important for unit tests:
+    // need rocblas_int scalar per batch for kase state
+    *size_scalars_kase = sizeof(rocblas_int) * batch_count;
 
-//     // 1. invalid/non-supported values
-//     if(norm_type != rocsolver_norm_type_one && norm_type != rocsolver_norm_type_infinity
-//        && norm_type != rocsolver_norm_type_frobenius && norm_type != rocsolver_norm_type_max)
-//         return rocblas_status_invalid_value;
+    // need rocblas_int scalar per batch for jump state
+    *size_scalars_jump = sizeof(rocblas_int) * batch_count;
+}
 
-//     // 2. invalid size
-//     if(n < 0 || lda < n || anorm < 0)
-//         return rocblas_status_invalid_size;
+template <typename T, typename I, typename S>
+rocblas_status rocsolver_gecon_argCheck(rocblas_handle handle,
+                                        const rocsolver_norm_type norm_type,
+                                        const I n,
+                                        const I lda,
+                                        T A,
+                                        const I* ipiv,
+                                        const S anorm,
+                                        S* rcond)
+{
+    // order is important for unit tests:
 
-//     // skip pointer check if querying memory size
-//     if(rocblas_is_device_memory_size_query(handle))
-//         return rocblas_status_continue;
+    // 1. invalid/non-supported values
+    if(norm_type != rocsolver_norm_type_one && norm_type != rocsolver_norm_type_infinity
+       && norm_type != rocsolver_norm_type_frobenius && norm_type != rocsolver_norm_type_max)
+        return rocblas_status_invalid_value;
 
-//     // 3. invalid pointers
-//     if((n && !A) || (n && !ipiv) || !rcond)
-//         return rocblas_status_invalid_pointer;
+    // 2. invalid size
+    if(n < 0 || lda < n || anorm < 0)
+        return rocblas_status_invalid_size;
 
-//     return rocblas_status_continue;
-// }
+    // skip pointer check if querying memory size
+    if(rocblas_is_device_memory_size_query(handle))
+        return rocblas_status_continue;
+
+    // 3. invalid pointers
+    if((n && !A) || (n && !ipiv) || !rcond)
+        return rocblas_status_invalid_pointer;
+
+    return rocblas_status_continue;
+}
 
 // /** Main template function **/
 // template <bool BATCHED, bool STRIDED, typename T, typename I, typename S, typename U>
