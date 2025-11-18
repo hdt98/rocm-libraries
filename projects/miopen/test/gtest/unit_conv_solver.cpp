@@ -616,8 +616,12 @@ void RunSolverBwd(const miopen::solver::conv::ConvSolverInterface& solv,
 
     input.data = handle.Read<Tin>(in_dev, input.data.size());
 
-    VerifyData(
-        input.data, ref_in.data, algo, miopen::conv::Direction::BackwardData, params.tolerances);
+    VerifyData(input.data,
+               ref_in.data,
+               algo,
+               miopen::conv::Direction::BackwardData,
+               params.tolerances,
+               problem.UseTF32());
 }
 
 template <typename T, typename Tref>
@@ -734,7 +738,8 @@ void RunSolverWrw(const miopen::solver::conv::ConvSolverInterface& solv,
                ref_weights.data,
                algo,
                miopen::conv::Direction::BackwardWeights,
-               params.tolerances);
+               params.tolerances,
+               problem.UseTF32());
 }
 
 template <typename T, typename Tref>
