@@ -1054,6 +1054,7 @@ std::size_t ConvolutionDescriptor::GetForwardSolutionWorkspaceSize(const Handle&
         conv::ProblemDescription{xDesc, wDesc, yDesc, *this, conv::Direction::Forward};
     auto ctx = ExecutionContext{};
     ctx.SetStream(&handle);
+    problem.SetupComputeType(ctx);
     if(sol.IsApplicable(ctx, problem))
         return sol.GetWorkspaceSize(ctx, problem);
     MIOPEN_THROW(miopenStatusBadParm,
@@ -1092,6 +1093,7 @@ void ConvolutionDescriptor::ConvolutionForwardImmediate(const Handle& handle,
         const auto problem =
             conv::ProblemDescription{xDesc, wDesc, yDesc, *this, conv::Direction::Forward};
         const auto ctx        = ExecutionContext{&handle};
+        problem.SetupComputeType(ctx);
         const auto invoker    = LoadOrPrepareInvoker(ctx, problem, solver_id);
         const auto invoke_ctx = conv::DataInvokeParams{
             tensors, workSpace, workSpaceSize, this->attribute.gfx90aFp16alt.GetFwd()};
@@ -1216,6 +1218,7 @@ void ConvolutionDescriptor::ConvolutionBackwardData(const Handle& handle,
     const auto problem = conv::ProblemDescription{
         dyDesc, wDesc, dxDesc, *this, conv::Direction::BackwardData, 0, alpha_val, beta_val};
     ValidateAlphaBeta(problem);
+    problem.SetupComputeType(ExecutionContext{&handle});
 
     ConvBwdCheckNumerics(handle, tensors, beta, [&]() {
         if(dyDesc.GetLengths()[1] != wDesc.GetLengths()[0])
@@ -1260,6 +1263,7 @@ std::size_t ConvolutionDescriptor::GetBackwardSolutionWorkspaceSize(const Handle
         conv::ProblemDescription{dyDesc, wDesc, dxDesc, *this, conv::Direction::BackwardData};
     auto ctx = ExecutionContext{};
     ctx.SetStream(&handle);
+    problem.SetupComputeType(ctx);
     if(sol.IsApplicable(ctx, problem))
     {
         return sol.GetWorkspaceSize(ctx, problem);
@@ -1300,6 +1304,7 @@ void ConvolutionDescriptor::ConvolutionBackwardImmediate(const Handle& handle,
         const auto problem =
             conv::ProblemDescription{dyDesc, wDesc, dxDesc, *this, conv::Direction::BackwardData};
         const auto ctx        = ExecutionContext{&handle};
+        problem.SetupComputeType(ctx);
         const auto invoker    = LoadOrPrepareInvoker(ctx, problem, solver_id);
         const auto invoke_ctx = conv::DataInvokeParams{
             tensors, workSpace, workSpaceSize, this->attribute.gfx90aFp16alt.GetBwd()};
@@ -1423,6 +1428,7 @@ void ConvolutionDescriptor::ConvolutionBackwardWeights(const Handle& handle,
     decltype(auto) problem =
         conv::ProblemDescription{dyDesc, dwDesc, xDesc, *this, direction, 0, alpha_val, beta_val};
     ValidateAlphaBeta(problem);
+    problem.SetupComputeType(ExecutionContext{&handle});
 
     if(xDesc.GetType() == miopenInt8)
         MIOPEN_THROW(miopenStatusBadParm);
@@ -1465,6 +1471,7 @@ std::size_t ConvolutionDescriptor::GetWrwSolutionWorkspaceSize(const Handle& han
         conv::ProblemDescription{dyDesc, dwDesc, xDesc, *this, conv::Direction::BackwardWeights};
     auto ctx = ExecutionContext{};
     ctx.SetStream(&handle);
+    problem.SetupComputeType(ctx);
     if(sol.IsApplicable(ctx, problem))
     {
         return sol.GetWorkspaceSize(ctx, problem);
@@ -1503,6 +1510,7 @@ void ConvolutionDescriptor::ConvolutionWrwImmediate(const Handle& handle,
         const auto problem = conv::ProblemDescription{
             dyDesc, dwDesc, xDesc, *this, conv::Direction::BackwardWeights};
         const auto ctx        = ExecutionContext{&handle};
+        problem.SetupComputeType(ctx);
         const auto invoker    = LoadOrPrepareInvoker(ctx, problem, solver_id);
         const auto invoke_ctx = conv::WrWInvokeParams{
             tensors, workSpace, workSpaceSize, this->attribute.gfx90aFp16alt.GetWrW()};

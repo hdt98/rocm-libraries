@@ -4603,13 +4603,15 @@ struct PerformanceConfigHipImplicitGemm3DGroupWrwXdlops
     MIOPEN_INTERNALS_EXPORT bool IsValid(const miopen::conv::ProblemDescription&) const;
     MIOPEN_INTERNALS_EXPORT bool
     operator==(const PerformanceConfigHipImplicitGemm3DGroupWrwXdlops& other) const;
+    bool UseTF32() const { return use_tf32; }
 
 private:
-    template <typename DataType>
-    void Init(const miopen::conv::ProblemDescription&);
-    template <typename DataType>
+    template <typename DataType, typename ComputeType = DataType>
+    bool Init(const miopen::conv::ProblemDescription&);
+    template <typename DataType, typename ComputeType = DataType>
     bool CheckIsSupportCKArgs(const miopen::conv::ProblemDescription&) const;
     void InitValidKernels(const miopen::conv::ProblemDescription& problem);
+    mutable bool use_tf32 = false;
 };
 
 struct ConvHipImplicitGemm3DGroupWrwXdlops final
@@ -4649,10 +4651,10 @@ struct ConvHipImplicitGemm3DGroupWrwXdlops final
     bool MayNeedWorkspace() const override { return true; }
 
 private:
-    template <typename DataType>
+    template <typename DataType, typename ComputeType = DataType>
     bool CheckCKApplicability(const miopen::conv::ProblemDescription&) const;
 
-    template <typename DataType>
+    template <typename DataType, typename ComputeType = DataType>
     std::size_t GetCKMaxWorkspaceSize(const miopen::conv::ProblemDescription&) const;
     size_t GetCKMaxWorkspaceSize(const miopen::conv::ProblemDescription& problem) const;
 };
@@ -4687,13 +4689,15 @@ struct PerformanceConfigHipImplicitGemm3DGroupBwdXdlops
     MIOPEN_INTERNALS_EXPORT bool IsValid(const miopen::conv::ProblemDescription&) const;
     MIOPEN_INTERNALS_EXPORT bool
     operator==(const PerformanceConfigHipImplicitGemm3DGroupBwdXdlops& other) const;
+    bool UseTF32() const { return use_tf32; }
 
 private:
-    template <typename DataType>
-    void Init(const miopen::conv::ProblemDescription&);
-    template <typename DataType>
+    template <typename DataType, typename ComputeType = DataType>
+    bool Init(const miopen::conv::ProblemDescription&);
+    template <typename DataType, typename ComputeType = DataType>
     bool CheckIsSupportCKArgs(const miopen::conv::ProblemDescription&) const;
     void InitValidKernels(const miopen::conv::ProblemDescription& problem);
+    mutable bool use_tf32 = false;
 };
 
 struct ConvHipImplicitGemm3DGroupBwdXdlops final
@@ -4733,7 +4737,7 @@ struct ConvHipImplicitGemm3DGroupBwdXdlops final
     bool MayNeedWorkspace() const override { return true; }
 
 private:
-    template <typename DataType>
+    template <typename DataType, typename ComputeType = DataType>
     bool CheckCKApplicability(const miopen::conv::ProblemDescription&) const;
 };
 
