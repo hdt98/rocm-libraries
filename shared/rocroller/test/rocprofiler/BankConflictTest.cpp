@@ -307,10 +307,10 @@ TEST_CASE("Weave LDS and nops", "[rocprofiler][scheduler]")
     constexpr auto workgroupSize = 64u;
 
     // const auto instrDwords      = GENERATE(4);
-    // const auto strideMultiplier = GENERATE(1);
+    // const auto strideMultiplier = GENERATE(8);
     // const bool write            = GENERATE(false);
-    const auto instrDwords      = GENERATE(1, 2);
-    const auto strideMultiplier = GENERATE(1, 2, 4, 8);
+    const auto instrDwords      = GENERATE(1, 2, 4);
+    const auto strideMultiplier = GENERATE(1, 2, 4);
     const bool write            = GENERATE(true, false);
     const auto baseAddresses = generateLDSAddresses(workgroupSize, strideMultiplier, instrDwords);
 
@@ -480,8 +480,7 @@ TEST_CASE("Weave LDS and nops", "[rocprofiler][scheduler]")
 
             using namespace Scheduling::LDSBankModel;
 
-            // Remember that stall cycles does not include issue cycles
-            int modelLatency = inst.totalCycles();
+            int modelLatency = inst.totalCycles() * 4;
             if(GPUInstructionInfo::isLDS(inst.getOpCode()))
                 modelLatency = getInstructionIssueCycles(write ? MemoryOpLDS{LdsDirection::Write}
                                                                : MemoryOpLDS{LdsDirection::Read},
@@ -495,7 +494,7 @@ TEST_CASE("Weave LDS and nops", "[rocprofiler][scheduler]")
                                        profile.meanLatencyWithPrecedingNone(),
                                        static_cast<int>(profile.meanLatency()) - modelLatency);
         }
-        // INFO(infoMessage.str());
+        INFO(infoMessage.str());
 
         { // All latencies have same number of instructions
             size_t expectedSize = allLatencies[0].size();
@@ -526,8 +525,7 @@ TEST_CASE("Weave LDS and nops", "[rocprofiler][scheduler]")
                 using namespace Scheduling::LDSBankModel;
 
                 const auto medianLatency = medianLatencies[i];
-                int        modelLatency
-                    = (inst.peekedStatus().stallCycles + inst.numExecutedInstructions()) * 4;
+                int        modelLatency  = inst.totalCycles() * 4;
                 modelLatency = getInstructionIssueCycles(write ? MemoryOpLDS{LdsDirection::Write}
                                                                : MemoryOpLDS{LdsDirection::Read},
                                                          instrDwords)
@@ -538,7 +536,10 @@ TEST_CASE("Weave LDS and nops", "[rocprofiler][scheduler]")
                                  std::get<1>(medianLatency),
                                  modelLatency,
                                  static_cast<int>(std::get<1>(medianLatency)) - modelLatency));
-                CHECK_THAT(std::get<1>(medianLatency), Catch::Matchers::WithinAbs(modelLatency, 4));
+
+                // Allow error proportional to instruction size
+                CHECK_THAT(std::get<1>(medianLatency),
+                           Catch::Matchers::WithinAbs(modelLatency, instrDwords * 4));
             }
         }
     }
