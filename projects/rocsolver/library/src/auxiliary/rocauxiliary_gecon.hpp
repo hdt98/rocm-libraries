@@ -204,12 +204,22 @@ ROCSOLVER_KERNEL void __launch_bounds__(GECOND_BLOCKSIZE)
     S sum = 0;
     for(I i = tid; i < n; i += GECOND_BLOCKSIZE){
         sum += rocblas_abs(x[i]);
-        if(x[i] >= 0){
-            x[i] = T(1);
-            isgn[i] = T(1);
+
+        if (rocblas_is_complex<T>){
+            S absxi = rocblas_abs(x[i]);
+            if (absxi == 0){
+                x[i] = T(1);
+            } else{
+                x[i] = x[i] / absxi;
+            }
         } else{
-            x[i] = T(-1);
-            isgn[i] = T(-1);
+            if(x[i] >= 0){
+                x[i] = T(1);
+                isgn[i] = T(1);
+            } else{
+                x[i] = T(-1);
+                isgn[i] = T(-1);
+            }
         }
     }
 
@@ -248,7 +258,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(GECOND_BLOCKSIZE) lacn2_jump2(const I n,
     __shared__ S sval_indices[GECOND_BLOCKSIZE / WarpSize];
 
     // dot
-    T local_max = std::numeric_limits<T>::min();
+    S local_max = std::numeric_limits<S>::min();
     I local_max_index;
     for(I i = tid; i < n; i += GECOND_BLOCKSIZE)
     {
@@ -261,13 +271,13 @@ ROCSOLVER_KERNEL void __launch_bounds__(GECOND_BLOCKSIZE) lacn2_jump2(const I n,
     }
 
     // reduce within warp using shuffle on both index and value
-    lacn2_max_index<T, I>(n, &local_max, &local_max_index, 1);
-    lacn2_max_index<T, I>(n, &local_max, &local_max_index, 2);
-    lacn2_max_index<T, I>(n, &local_max, &local_max_index, 4);
-    lacn2_max_index<T, I>(n, &local_max, &local_max_index, 8);
-    lacn2_max_index<T, I>(n, &local_max, &local_max_index, 16);
+    lacn2_max_index<S, I>(n, &local_max, &local_max_index, 1);
+    lacn2_max_index<S, I>(n, &local_max, &local_max_index, 2);
+    lacn2_max_index<S, I>(n, &local_max, &local_max_index, 4);
+    lacn2_max_index<S, I>(n, &local_max, &local_max_index, 8);
+    lacn2_max_index<S, I>(n, &local_max, &local_max_index, 16);
     if (WarpSize > 32)
-        lacn2_max_index<T, I>(n, &local_max, &local_max_index, 32);
+        lacn2_max_index<S, I>(n, &local_max, &local_max_index, 32);
 
     if (tid % WarpSize == 0){
         sval[tid / WarpSize] = local_max;
@@ -323,11 +333,14 @@ ROCSOLVER_KERNEL void __launch_bounds__(GECOND_BLOCKSIZE) lacn2_jump3(const I n,
     // Sum absolute values
     S sum = 0;
     S estold;
-    bool repeated = true;
+    bool repeated = (rocblas_is_complex<T>) ? false : true;
+    // bool repeated = true;
     // we iterate over v, since v contains x from previous step (pointers swapped)
     for(I i = tid; i < n; i += GECOND_BLOCKSIZE)
     {
         sum += rocblas_abs(v[i]);
+        if (rocblas_is_complex<T>)
+            continue;
         if(v[i] >= 0){
             if (isgn[i] <= -1)
                 repeated = false;
@@ -381,7 +394,8 @@ ROCSOLVER_KERNEL void __launch_bounds__(GECOND_BLOCKSIZE) lacn2_jump3(const I n,
         {
             // we write over old x
             T sign = (i % 2 == 0) ? T(1) : T(-1);
-            x[i] = sign * (T(1) + T(i) / T(n-1));
+            x[i] = T(sign * (1 + i / (n-1)));
+            // x[i] = sign * (T(1) + T(i) / T(n-1));
         }
         if(tid == 0){
             *kase = 1;
@@ -391,20 +405,37 @@ ROCSOLVER_KERNEL void __launch_bounds__(GECOND_BLOCKSIZE) lacn2_jump3(const I n,
         return;
     }
 
-    // we iterate over v, since v contains old x (pointers swapped)
-    for(I i = tid; i < n; i += GECOND_BLOCKSIZE)
+    if (rocblas_is_complex<T>)
     {
-        if (v[i] >= 0)
+        // we iterate over v, since v contains old x (pointers swapped)
+        for(I i = tid; i < n; i += GECOND_BLOCKSIZE)
         {
-            x[i] = T(1);
-            isgn[i] = T(1);
+            S absxi = rocblas_abs(v[i]);
+            if (absxi == 0){
+                x[i] = T(1);
+                // isgn[i] = T(1);
+            } else{
+                x[i] = v[i] / absxi;
+                // isgn[i] = T(rocblas_real(x[i]) >= 0 ? 1 : -1);
+            }
         }
-        else{
-            x[i] = T(-1);
-            isgn[i] = T(-1);
+    } else{
+        // we iterate over v, since v contains old x (pointers swapped)
+        for(I i = tid; i < n; i += GECOND_BLOCKSIZE)
+        {
+            if (v[i] >= 0)
+            {
+                x[i] = T(1);
+                isgn[i] = T(1);
+            }
+            else{
+                x[i] = T(-1);
+                isgn[i] = T(-1);
 
+            }
         }
     }
+
 
     if (tid == 0){
         *kase = 2;
@@ -433,7 +464,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(GECOND_BLOCKSIZE) lacn2_jump4(const I n,
     __shared__ S sval_indices[GECOND_BLOCKSIZE / WarpSize];
 
     // dot
-    T local_max = std::numeric_limits<T>::min();
+    S local_max = std::numeric_limits<T>::min();
     I local_max_index;
     for(I i = tid; i < n; i += GECOND_BLOCKSIZE)
     {
@@ -477,12 +508,13 @@ ROCSOLVER_KERNEL void __launch_bounds__(GECOND_BLOCKSIZE) lacn2_jump4(const I n,
     __syncthreads();
 
     I local_max_idx = sval_indices[0];
-    if (local_max_idx == jlast || iters == iters_max){
-        for(rocblas_int i = tid; i < n; i += GECOND_BLOCKSIZE)
+    if (x[local_max_idx] == x[jlast] || iters == iters_max)
+        for(rocblas_int i = tid; i < n; i += GECON_BLOCKSIZE)
         {
             // Alternating pattern that changes each iteration
             T sign = (i % 2 == 0) ? T(1) : T(-1);
-            x[i] = sign * (T(1) + T(i) / T(n-1));
+            x[i] = T(sign * (1 + i / (n-1)));
+            // x[i] = sign * (T(1) + T(i) / T(n-1));
         }
         if(tid == 0){
             // TODO: increment iters???
@@ -493,7 +525,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(GECOND_BLOCKSIZE) lacn2_jump4(const I n,
         return;
     }
 
-    for (I i = tid; i < n; i += GECOND_BLOCKSIZE)
+    for (I i = tid; i < n; i += GECON_BLOCKSIZE)
     {
         x[i] = T(0);
     }
@@ -508,16 +540,16 @@ ROCSOLVER_KERNEL void __launch_bounds__(GECOND_BLOCKSIZE) lacn2_jump4(const I n,
 
 // compute l1 norm of vector v and compare to temporary value
 template <typename T, typename I, typename S>
-ROCSOLVER_KERNEL void __launch_bounds__(GECOND_BLOCKSIZE)
+ROCSOLVER_KERNEL void __launch_bounds__(GECON_BLOCKSIZE)
     lacn2_jump5(const I n, const T* x, S* norm)
 {
     rocblas_int tid = hipThreadIdx_x;
 
-    __shared__ S sval[GECOND_BLOCKSIZE / warpSize];
+    __shared__ S sval[GECON_BLOCKSIZE / warpSize];
 
     // Sum absolute values
     S sum = 0;
-    for(I i = tid; i < n; i += GECOND_BLOCKSIZE)
+    for(I i = tid; i < n; i += GECON_BLOCKSIZE)
         sum += rocblas_abs(x[i]);
 
     // Reduce within warp
@@ -535,7 +567,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(GECOND_BLOCKSIZE)
 
     if(tid == 0)
     {
-        for(I k = 1; k < GECOND_BLOCKSIZE / warpSize; k++)
+        for(I k = 1; k < GECON_BLOCKSIZE / warpSize; k++)
             sum += sval[k];
         if (2*(sum/(3*n)) > *norm)
             *norm = sum;
@@ -592,7 +624,7 @@ rocblas_status gecon_lacn2(rocblas_handle handle,
             ROCSOLVER_LAUNCH_KERNEL((lacn2_jump1<T, I, S>), dim3(1), dim3(GECON_BLOCKSIZE), 0,
                                     stream, x, n, d_est, isgn);
 
-            // ROCSOLVER_LAUNCH_KERNEL((gecon_compute_l1_norm<GECOND_BLOCKSIZE, S>), dim3(1), threads, 0,
+            // ROCSOLVER_LAUNCH_KERNEL((gecon_compute_l1_norm<GECON_BLOCKSIZE, S>), dim3(1), threads, 0,
             //                         stream, x, n, d_est);
 
             // // one of the AI generated kernels might be fine for this :)
@@ -626,7 +658,7 @@ rocblas_status gecon_lacn2(rocblas_handle handle,
             hipMemcpyAsync(h_jump, d_jump, sizeof(rocblas_int), hipMemcpyDeviceToHost, stream);
             hipMemcpyAsync(h_kase, d_kase, sizeof(rocblas_int), hipMemcpyDeviceToHost, stream);
             hipStreamSynchronize(stream);
-            // ROCSOLVER_LAUNCH_KERNEL((gecon_compute_l1_norm<GECOND_BLOCKSIZE, S>), dim3(1), threads, 0,
+            // ROCSOLVER_LAUNCH_KERNEL((gecon_compute_l1_norm<GECON_BLOCKSIZE, S>), dim3(1), threads, 0,
             //                         stream, x, n, d_est);
             // TODO: transfer updated jump and case from device to host
             return rocblas_status_success;
