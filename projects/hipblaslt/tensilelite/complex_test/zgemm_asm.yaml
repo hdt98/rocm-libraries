@@ -11,11 +11,11 @@ GlobalParameters:
   NumElementsToValidate: -1
   ValidationMaxToPrint: 4
   ValidationPrintValids: False
-  # PrintTensorD: 0x3
-  # PrintTensorC: 0x3
-  # PrintTensorB: 0x3
-  # PrintTensorA: 0x3 #0x1
-  # PrintTensorRef: 0x3
+  PrintTensorD: 0x3
+  PrintTensorC: 0x3
+  PrintTensorB: 0x3
+  PrintTensorA: 0x3 #0x1
+  PrintTensorRef: 0x3
   # ShortNames: False
   # MergeFiles: True
   DataInitTypeA: 12 #12 #3
@@ -71,277 +71,269 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          # - Exact: [32, 32, 1, 8]
-          - Exact: [16, 16, 1, 2]
-          # - Exact: [64, 64, 1, 16]
-          # - Exact: [64, 64, 1, 128]
-          # - Exact: [4096, 4096, 1, 8192]
-
-          # - Range: [[16,37, 512],[16,57,512],[1],[1,1,64]]
-          # - Exact: [32, 32, 1, 8]
-          - Exact: [16, 16, 1, 2]
-          # - Exact: [64, 64, 1, 16]
+          # - Exact: [16, 16, 1, 2]
+          - Exact: [64, 64, 1, 16]
           # - Exact: [64, 64, 1, 128]
           # - Exact: [4096, 4096, 1, 8192]
 
           # - Range: [[16,37, 512],[16,57,512],[1],[1,1,64]]
           # - Range: [ [127,1,129], 0, [2], [63,1,64] ]
 
-  - # zgemm NT
-    - # ProblemType
-      OperationType: GEMM
-      DataType: Z
-      DestDataType: Z
-      ComputeDataType: Z
-      UseBeta: True
-      Batched: True      
-      TransposeA: False
-      TransposeB: True
-      ComplexConjugateA: False
-      ComplexConjugateB: False
+  # - # zgemm NT
+  #   - # ProblemType
+  #     OperationType: GEMM
+  #     DataType: Z
+  #     DestDataType: Z
+  #     ComputeDataType: Z
+  #     UseBeta: True
+  #     Batched: True      
+  #     TransposeA: False
+  #     TransposeB: True
+  #     ComplexConjugateA: False
+  #     ComplexConjugateB: False
 
-    - # BenchmarkProblemSizeGroup - Assembly
-      InitialSolutionParameters:
-      BenchmarkCommonParameters:
-        - KernelLanguage: ["Assembly"]
-      ForkParameters:
-        - MatrixInstruction:
-          - [16, 16, 4, 1, 1, 1, 1, 1, 1]
-        - ScheduleIterAlg: [1]
-        - GlobalSplitU: [1]
-        - PrefetchLocalRead: [False]
-        - PrefetchGlobalRead: [True]
-        - DepthU: [8]
-      BenchmarkForkParameters:
-      JoinParameters:
-      BenchmarkJoinParameters:
-      BenchmarkFinalParameters:
-        - ProblemSizes:
-          - Exact: [16, 16, 1, 2]
+  #   - # BenchmarkProblemSizeGroup - Assembly
+  #     InitialSolutionParameters:
+  #     BenchmarkCommonParameters:
+  #       - KernelLanguage: ["Assembly"]
+  #     ForkParameters:
+  #       - MatrixInstruction:
+  #         - [16, 16, 4, 1, 1, 1, 1, 1, 1]
+  #       - ScheduleIterAlg: [1]
+  #       - GlobalSplitU: [1]
+  #       - PrefetchLocalRead: [False]
+  #       - PrefetchGlobalRead: [True]
+  #       - DepthU: [8]
+  #     BenchmarkForkParameters:
+  #     JoinParameters:
+  #     BenchmarkJoinParameters:
+  #     BenchmarkFinalParameters:
+  #       - ProblemSizes:
+  #         - Exact: [16, 16, 1, 2]
 
-  - # zgemm TN
-    - # ProblemType
-      OperationType: GEMM
-      DataType: Z
-      DestDataType: Z
-      ComputeDataType: Z
-      UseBeta: True
-      Batched: True      
-      TransposeA: True
-      TransposeB: False
-      ComplexConjugateA: False
-      ComplexConjugateB: False
+  # - # zgemm TN
+  #   - # ProblemType
+  #     OperationType: GEMM
+  #     DataType: Z
+  #     DestDataType: Z
+  #     ComputeDataType: Z
+  #     UseBeta: True
+  #     Batched: True      
+  #     TransposeA: True
+  #     TransposeB: False
+  #     ComplexConjugateA: False
+  #     ComplexConjugateB: False
 
-    - # BenchmarkProblemSizeGroup - Assembly
-      InitialSolutionParameters:
-      BenchmarkCommonParameters:
-        - KernelLanguage: ["Assembly"]
-      ForkParameters:
-        - MatrixInstruction:
-          - [16, 16, 4, 1, 1, 1, 1, 1, 1]
-        - ScheduleIterAlg: [1]
-        - GlobalSplitU: [1]
-        - PrefetchLocalRead: [False]
-        - PrefetchGlobalRead: [True]
-        - DepthU: [8]
-      BenchmarkForkParameters:
-      JoinParameters:
-      BenchmarkJoinParameters:
-      BenchmarkFinalParameters:
-        - ProblemSizes:
-          - Exact: [16, 16, 1, 2]
+  #   - # BenchmarkProblemSizeGroup - Assembly
+  #     InitialSolutionParameters:
+  #     BenchmarkCommonParameters:
+  #       - KernelLanguage: ["Assembly"]
+  #     ForkParameters:
+  #       - MatrixInstruction:
+  #         - [16, 16, 4, 1, 1, 1, 1, 1, 1]
+  #       - ScheduleIterAlg: [1]
+  #       - GlobalSplitU: [1]
+  #       - PrefetchLocalRead: [False]
+  #       - PrefetchGlobalRead: [True]
+  #       - DepthU: [8]
+  #     BenchmarkForkParameters:
+  #     JoinParameters:
+  #     BenchmarkJoinParameters:
+  #     BenchmarkFinalParameters:
+  #       - ProblemSizes:
+  #         - Exact: [16, 16, 1, 2]
 
-  - # zgemm TT
-    - # ProblemType
-      OperationType: GEMM
-      DataType: Z
-      DestDataType: Z
-      ComputeDataType: Z
-      UseBeta: True
-      Batched: True      
-      TransposeA: True
-      TransposeB: True
-      ComplexConjugateA: False
-      ComplexConjugateB: False
+  # - # zgemm TT
+  #   - # ProblemType
+  #     OperationType: GEMM
+  #     DataType: Z
+  #     DestDataType: Z
+  #     ComputeDataType: Z
+  #     UseBeta: True
+  #     Batched: True      
+  #     TransposeA: True
+  #     TransposeB: True
+  #     ComplexConjugateA: False
+  #     ComplexConjugateB: False
 
-    - # BenchmarkProblemSizeGroup - Assembly
-      InitialSolutionParameters:
-      BenchmarkCommonParameters:
-        - KernelLanguage: ["Assembly"]
-      ForkParameters:
-        - MatrixInstruction:
-          - [16, 16, 4, 1, 1, 1, 1, 1, 1]
-        - ScheduleIterAlg: [1]
-        - GlobalSplitU: [1]
-        - PrefetchLocalRead: [False]
-        - PrefetchGlobalRead: [True]
-        - DepthU: [8]
-      BenchmarkForkParameters:
-      JoinParameters:
-      BenchmarkJoinParameters:
-      BenchmarkFinalParameters:
-        - ProblemSizes:
-          - Exact: [16, 16, 1, 2]
+  #   - # BenchmarkProblemSizeGroup - Assembly
+  #     InitialSolutionParameters:
+  #     BenchmarkCommonParameters:
+  #       - KernelLanguage: ["Assembly"]
+  #     ForkParameters:
+  #       - MatrixInstruction:
+  #         - [16, 16, 4, 1, 1, 1, 1, 1, 1]
+  #       - ScheduleIterAlg: [1]
+  #       - GlobalSplitU: [1]
+  #       - PrefetchLocalRead: [False]
+  #       - PrefetchGlobalRead: [True]
+  #       - DepthU: [8]
+  #     BenchmarkForkParameters:
+  #     JoinParameters:
+  #     BenchmarkJoinParameters:
+  #     BenchmarkFinalParameters:
+  #       - ProblemSizes:
+  #         - Exact: [16, 16, 1, 2]
 
-  - # zgemm NC
-    - # ProblemType
-      OperationType: GEMM
-      DataType: Z
-      DestDataType: Z
-      ComputeDataType: Z
-      UseBeta: True
-      Batched: True      
-      TransposeA: False
-      TransposeB: True
-      ComplexConjugateA: False
-      ComplexConjugateB: True
+  # - # zgemm NC
+  #   - # ProblemType
+  #     OperationType: GEMM
+  #     DataType: Z
+  #     DestDataType: Z
+  #     ComputeDataType: Z
+  #     UseBeta: True
+  #     Batched: True      
+  #     TransposeA: False
+  #     TransposeB: True
+  #     ComplexConjugateA: False
+  #     ComplexConjugateB: True
 
-    - # BenchmarkProblemSizeGroup - Assembly
-      InitialSolutionParameters:
-      BenchmarkCommonParameters:
-        - KernelLanguage: ["Assembly"]
-      ForkParameters:
-        - MatrixInstruction:
-          - [16, 16, 4, 1, 1, 1, 1, 1, 1]
-        - ScheduleIterAlg: [1]
-        - GlobalSplitU: [1]
-        - PrefetchLocalRead: [False]
-        - PrefetchGlobalRead: [True]
-        - DepthU: [8]
-      BenchmarkForkParameters:
-      JoinParameters:
-      BenchmarkJoinParameters:
-      BenchmarkFinalParameters:
-        - ProblemSizes:
-          - Exact: [16, 16, 1, 2]
+  #   - # BenchmarkProblemSizeGroup - Assembly
+  #     InitialSolutionParameters:
+  #     BenchmarkCommonParameters:
+  #       - KernelLanguage: ["Assembly"]
+  #     ForkParameters:
+  #       - MatrixInstruction:
+  #         - [16, 16, 4, 1, 1, 1, 1, 1, 1]
+  #       - ScheduleIterAlg: [1]
+  #       - GlobalSplitU: [1]
+  #       - PrefetchLocalRead: [False]
+  #       - PrefetchGlobalRead: [True]
+  #       - DepthU: [8]
+  #     BenchmarkForkParameters:
+  #     JoinParameters:
+  #     BenchmarkJoinParameters:
+  #     BenchmarkFinalParameters:
+  #       - ProblemSizes:
+  #         - Exact: [16, 16, 1, 2]
 
-  - # zgemm CN
-    - # ProblemType
-      OperationType: GEMM
-      DataType: Z
-      DestDataType: Z
-      ComputeDataType: Z
-      UseBeta: True
-      Batched: True      
-      TransposeA: True
-      TransposeB: False
-      ComplexConjugateA: True
-      ComplexConjugateB: False
+  # - # zgemm CN
+  #   - # ProblemType
+  #     OperationType: GEMM
+  #     DataType: Z
+  #     DestDataType: Z
+  #     ComputeDataType: Z
+  #     UseBeta: True
+  #     Batched: True      
+  #     TransposeA: True
+  #     TransposeB: False
+  #     ComplexConjugateA: True
+  #     ComplexConjugateB: False
 
-    - # BenchmarkProblemSizeGroup - Assembly
-      InitialSolutionParameters:
-      BenchmarkCommonParameters:
-        - KernelLanguage: ["Assembly"]
-      ForkParameters:
-        - MatrixInstruction:
-          - [16, 16, 4, 1, 1, 1, 1, 1, 1]
-        - ScheduleIterAlg: [1]
-        - GlobalSplitU: [1]
-        - PrefetchLocalRead: [False]
-        - PrefetchGlobalRead: [True]
-        - DepthU: [8]
-      BenchmarkForkParameters:
-      JoinParameters:
-      BenchmarkJoinParameters:
-      BenchmarkFinalParameters:
-        - ProblemSizes:
-          - Exact: [16, 16, 1, 2]
+  #   - # BenchmarkProblemSizeGroup - Assembly
+  #     InitialSolutionParameters:
+  #     BenchmarkCommonParameters:
+  #       - KernelLanguage: ["Assembly"]
+  #     ForkParameters:
+  #       - MatrixInstruction:
+  #         - [16, 16, 4, 1, 1, 1, 1, 1, 1]
+  #       - ScheduleIterAlg: [1]
+  #       - GlobalSplitU: [1]
+  #       - PrefetchLocalRead: [False]
+  #       - PrefetchGlobalRead: [True]
+  #       - DepthU: [8]
+  #     BenchmarkForkParameters:
+  #     JoinParameters:
+  #     BenchmarkJoinParameters:
+  #     BenchmarkFinalParameters:
+  #       - ProblemSizes:
+  #         - Exact: [16, 16, 1, 2]
 
-  - # zgemm TC
-    - # ProblemType
-      OperationType: GEMM
-      DataType: Z
-      DestDataType: Z
-      ComputeDataType: Z
-      UseBeta: True
-      Batched: True      
-      TransposeA: True
-      TransposeB: True
-      ComplexConjugateA: False
-      ComplexConjugateB: True
+  # - # zgemm TC
+  #   - # ProblemType
+  #     OperationType: GEMM
+  #     DataType: Z
+  #     DestDataType: Z
+  #     ComputeDataType: Z
+  #     UseBeta: True
+  #     Batched: True      
+  #     TransposeA: True
+  #     TransposeB: True
+  #     ComplexConjugateA: False
+  #     ComplexConjugateB: True
 
-    - # BenchmarkProblemSizeGroup - Assembly
-      InitialSolutionParameters:
-      BenchmarkCommonParameters:
-        - KernelLanguage: ["Assembly"]
-      ForkParameters:
-        - MatrixInstruction:
-          - [16, 16, 4, 1, 1, 1, 1, 1, 1]
-        - ScheduleIterAlg: [1]
-        - GlobalSplitU: [1]
-        - PrefetchLocalRead: [False]
-        - PrefetchGlobalRead: [True]
-        - DepthU: [8]
-      BenchmarkForkParameters:
-      JoinParameters:
-      BenchmarkJoinParameters:
-      BenchmarkFinalParameters:
-        - ProblemSizes:
-          - Exact: [16, 16, 1, 2]
+  #   - # BenchmarkProblemSizeGroup - Assembly
+  #     InitialSolutionParameters:
+  #     BenchmarkCommonParameters:
+  #       - KernelLanguage: ["Assembly"]
+  #     ForkParameters:
+  #       - MatrixInstruction:
+  #         - [16, 16, 4, 1, 1, 1, 1, 1, 1]
+  #       - ScheduleIterAlg: [1]
+  #       - GlobalSplitU: [1]
+  #       - PrefetchLocalRead: [False]
+  #       - PrefetchGlobalRead: [True]
+  #       - DepthU: [8]
+  #     BenchmarkForkParameters:
+  #     JoinParameters:
+  #     BenchmarkJoinParameters:
+  #     BenchmarkFinalParameters:
+  #       - ProblemSizes:
+  #         - Exact: [16, 16, 1, 2]
 
-  - # zgemm CT
-    - # ProblemType
-      OperationType: GEMM
-      DataType: Z
-      DestDataType: Z
-      ComputeDataType: Z
-      UseBeta: True
-      Batched: True      
-      TransposeA: True
-      TransposeB: True
-      ComplexConjugateA: True
-      ComplexConjugateB: False
+  # - # zgemm CT
+  #   - # ProblemType
+  #     OperationType: GEMM
+  #     DataType: Z
+  #     DestDataType: Z
+  #     ComputeDataType: Z
+  #     UseBeta: True
+  #     Batched: True      
+  #     TransposeA: True
+  #     TransposeB: True
+  #     ComplexConjugateA: True
+  #     ComplexConjugateB: False
 
-    - # BenchmarkProblemSizeGroup - Assembly
-      InitialSolutionParameters:
-      BenchmarkCommonParameters:
-        - KernelLanguage: ["Assembly"]
-      ForkParameters:
-        - MatrixInstruction:
-          - [16, 16, 4, 1, 1, 1, 1, 1, 1]
-        - ScheduleIterAlg: [1]
-        - GlobalSplitU: [1]
-        - PrefetchLocalRead: [False]
-        - PrefetchGlobalRead: [True]
-        - DepthU: [8]
-      BenchmarkForkParameters:
-      JoinParameters:
-      BenchmarkJoinParameters:
-      BenchmarkFinalParameters:
-        - ProblemSizes:
-          - Exact: [16, 16, 1, 2]
+  #   - # BenchmarkProblemSizeGroup - Assembly
+  #     InitialSolutionParameters:
+  #     BenchmarkCommonParameters:
+  #       - KernelLanguage: ["Assembly"]
+  #     ForkParameters:
+  #       - MatrixInstruction:
+  #         - [16, 16, 4, 1, 1, 1, 1, 1, 1]
+  #       - ScheduleIterAlg: [1]
+  #       - GlobalSplitU: [1]
+  #       - PrefetchLocalRead: [False]
+  #       - PrefetchGlobalRead: [True]
+  #       - DepthU: [8]
+  #     BenchmarkForkParameters:
+  #     JoinParameters:
+  #     BenchmarkJoinParameters:
+  #     BenchmarkFinalParameters:
+  #       - ProblemSizes:
+  #         - Exact: [16, 16, 1, 2]
 
-  - # zgemm CC
-    - # ProblemType
-      OperationType: GEMM
-      DataType: Z
-      DestDataType: Z
-      ComputeDataType: Z
-      UseBeta: True
-      Batched: True      
-      TransposeA: True
-      TransposeB: True
-      ComplexConjugateA: True
-      ComplexConjugateB: True
+  # - # zgemm CC
+  #   - # ProblemType
+  #     OperationType: GEMM
+  #     DataType: Z
+  #     DestDataType: Z
+  #     ComputeDataType: Z
+  #     UseBeta: True
+  #     Batched: True      
+  #     TransposeA: True
+  #     TransposeB: True
+  #     ComplexConjugateA: True
+  #     ComplexConjugateB: True
 
-    - # BenchmarkProblemSizeGroup - Assembly
-      InitialSolutionParameters:
-      BenchmarkCommonParameters:
-        - KernelLanguage: ["Assembly"]
-      ForkParameters:
-        - MatrixInstruction:
-          - [16, 16, 4, 1, 1, 1, 1, 1, 1]
-        - ScheduleIterAlg: [1]
-        - GlobalSplitU: [1]
-        - PrefetchLocalRead: [False]
-        - PrefetchGlobalRead: [True]
-        - DepthU: [8]
-      BenchmarkForkParameters:
-      JoinParameters:
-      BenchmarkJoinParameters:
-      BenchmarkFinalParameters:
-        - ProblemSizes:
-          - Exact: [16, 16, 1, 2]
+  #   - # BenchmarkProblemSizeGroup - Assembly
+  #     InitialSolutionParameters:
+  #     BenchmarkCommonParameters:
+  #       - KernelLanguage: ["Assembly"]
+  #     ForkParameters:
+  #       - MatrixInstruction:
+  #         - [16, 16, 4, 1, 1, 1, 1, 1, 1]
+  #       - ScheduleIterAlg: [1]
+  #       - GlobalSplitU: [1]
+  #       - PrefetchLocalRead: [False]
+  #       - PrefetchGlobalRead: [True]
+  #       - DepthU: [8]
+  #     BenchmarkForkParameters:
+  #     JoinParameters:
+  #     BenchmarkJoinParameters:
+  #     BenchmarkFinalParameters:
+  #       - ProblemSizes:
+  #         - Exact: [16, 16, 1, 2]
   
 LibraryLogic:
       ScheduleName: "gfx950" #aquavanjaram for 942
