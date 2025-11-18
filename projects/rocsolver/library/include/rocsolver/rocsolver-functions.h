@@ -329,6 +329,124 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zlange_64(rocblas_handle handle,
 //! @}
 
 /*! @{
+    \brief GECON estimates the reciprocal of the condition number of a general n-by-n matrix A
+    in the 1-norm or infinity-norm.
+
+    \details
+    The reciprocal condition number is computed as
+
+    \f[
+        \text{rcond} = \frac{1}{\|A\| \cdot \|A^{-1}\|}
+    \f]
+
+    where A is the matrix in its factorized form as returned by \ref rocsolver_sgetrf "GETRF", and the
+    norm can be the 1-norm or the infinity-norm.
+
+    The computed rcond will be a lower bound on the actual rcond. When rcond is close to zero, the matrix
+    A is poorly conditioned (nearly singular). When rcond is close to 1, the matrix A is well conditioned.
+
+    @param[in]
+    handle      rocblas_handle.
+    @param[in]
+    norm_type   rocsolver_norm_type.
+                Specifies the norm to be used. Only rocsolver_norm_type_one and
+                rocsolver_norm_type_infinity are supported. For other norm types,
+                rocsolver_status_not_implemented is returned.
+    @param[in]
+    n           rocblas_int. n >= 0.
+                The number of rows and columns of the matrix A.
+    @param[in]
+    A           pointer to type. Array on the GPU of dimension lda*n.
+                The factors L and U of the factorization A = P*L*U as returned by \ref rocsolver_sgetrf "GETRF".
+    @param[in]
+    lda         rocblas_int. lda >= n.
+                The leading dimension of A.
+    @param[in]
+    ipiv        pointer to rocblas_int. Array on the GPU of dimension n.
+                The pivot indices as returned by \ref rocsolver_sgetrf "GETRF".
+    @param[in]
+    anorm       real type.
+                The norm of the original matrix A (before factorization). This should be computed
+                separately using \ref rocsolver_slange "LANGE".
+    @param[out]
+    rcond       pointer to real type. Scalar on the GPU.
+                The reciprocal condition number estimate.
+    *************************************************************************/
+
+ROCSOLVER_EXPORT rocblas_status rocsolver_sgecon(rocblas_handle handle,
+                                                 const rocsolver_norm_type norm_type,
+                                                 const rocblas_int n,
+                                                 float* A,
+                                                 const rocblas_int lda,
+                                                 const rocblas_int* ipiv,
+                                                 const float anorm,
+                                                 float* rcond);
+
+ROCSOLVER_EXPORT rocblas_status rocsolver_dgecon(rocblas_handle handle,
+                                                 const rocsolver_norm_type norm_type,
+                                                 const rocblas_int n,
+                                                 double* A,
+                                                 const rocblas_int lda,
+                                                 const rocblas_int* ipiv,
+                                                 const double anorm,
+                                                 double* rcond);
+
+ROCSOLVER_EXPORT rocblas_status rocsolver_cgecon(rocblas_handle handle,
+                                                 const rocsolver_norm_type norm_type,
+                                                 const rocblas_int n,
+                                                 rocblas_float_complex* A,
+                                                 const rocblas_int lda,
+                                                 const rocblas_int* ipiv,
+                                                 const float anorm,
+                                                 float* rcond);
+
+ROCSOLVER_EXPORT rocblas_status rocsolver_zgecon(rocblas_handle handle,
+                                                 const rocsolver_norm_type norm_type,
+                                                 const rocblas_int n,
+                                                 rocblas_double_complex* A,
+                                                 const rocblas_int lda,
+                                                 const rocblas_int* ipiv,
+                                                 const double anorm,
+                                                 double* rcond);
+
+ROCSOLVER_EXPORT rocblas_status rocsolver_sgecon_64(rocblas_handle handle,
+                                                    const rocsolver_norm_type norm_type,
+                                                    const int64_t n,
+                                                    float* A,
+                                                    const int64_t lda,
+                                                    const int64_t* ipiv,
+                                                    const float anorm,
+                                                    float* rcond);
+
+ROCSOLVER_EXPORT rocblas_status rocsolver_dgecon_64(rocblas_handle handle,
+                                                    const rocsolver_norm_type norm_type,
+                                                    const int64_t n,
+                                                    double* A,
+                                                    const int64_t lda,
+                                                    const int64_t* ipiv,
+                                                    const double anorm,
+                                                    double* rcond);
+
+ROCSOLVER_EXPORT rocblas_status rocsolver_cgecon_64(rocblas_handle handle,
+                                                    const rocsolver_norm_type norm_type,
+                                                    const int64_t n,
+                                                    rocblas_float_complex* A,
+                                                    const int64_t lda,
+                                                    const int64_t* ipiv,
+                                                    const float anorm,
+                                                    float* rcond);
+
+ROCSOLVER_EXPORT rocblas_status rocsolver_zgecon_64(rocblas_handle handle,
+                                                    const rocsolver_norm_type norm_type,
+                                                    const int64_t n,
+                                                    rocblas_double_complex* A,
+                                                    const int64_t lda,
+                                                    const int64_t* ipiv,
+                                                    const double anorm,
+                                                    double* rcond);
+//! @}
+
+/*! @{
     \brief LASWP performs a series of row interchanges on the matrix A.
 
     \details
