@@ -61,12 +61,10 @@ __device__ void block_sync_lds_direct_load()
 __device__ void block_sync_lds_async_load()
 {
 #if defined(__gfx125__)
-    asm volatile("\
-    s_wait_asynccnt 0x0 \n \
-    s_barrier_signal -1 \n \
-    s_barrier_wait -1 \
-    " ::);
+    __builtin_amdgcn_s_wait_asynccnt(0);
+    __syncthreads();
 #else
+    // fall back
     block_sync_lds();
 #endif
 }

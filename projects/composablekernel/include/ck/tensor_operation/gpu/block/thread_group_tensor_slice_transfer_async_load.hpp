@@ -18,7 +18,7 @@ template <typename ThreadGroup,
           typename DstDesc,
           index_t SrcVectorDim,
           index_t DstVectorDim,
-          index_t ScalarPerVector>
+          index_t SrcScalarPerVector>
 struct ThreadGroupTensorSliceTransfer_AsyncLoad
 {
     static constexpr index_t nDim = remove_reference_t<SrcDesc>::GetNumOfDimension();
@@ -36,7 +36,7 @@ struct ThreadGroupTensorSliceTransfer_AsyncLoad
     static constexpr auto thread_cluster_lengths = ThreadClusterLengths{};
 
     static constexpr auto thread_single_load_size = generate_sequence(
-        detail::lambda_scalar_per_access<DstVectorDim, ScalarPerVector>{}, Number<nDim>{});
+        detail::lambda_scalar_per_access<DstVectorDim, SrcScalarPerVector>{}, Number<nDim>{});
 
     static constexpr auto thread_steps         = thread_cluster_lengths * thread_single_load_size;
     static constexpr auto thread_slice_lengths = block_slice_lengths / thread_steps;
@@ -56,7 +56,7 @@ struct ThreadGroupTensorSliceTransfer_AsyncLoad
             DstVectorDim == nDim - 1,
             "Async load transfer requires the destination vector dimension to be the last one.");
 
-        static_assert(ScalarPerVector == 1 || SrcVectorDim == DstVectorDim,
+        static_assert(SrcScalarPerVector == 1 || SrcVectorDim == DstVectorDim,
                       "When loading more than one element per thread at once, the contiguous "
                       "dimension must be the same between source and destination.");
 
@@ -129,8 +129,9 @@ struct ThreadGroupTensorSliceTransfer_AsyncLoad
             const bool is_src_valid =
                 coordinate_has_valid_offset_assuming_visible_index_is_valid(src_desc, src_coord_);
 
-            src_buf.template AsyncCopyToLds<remove_cvref_t<decltype(dst_buf)>, ScalarPerVector>(
+            src_buf.template AsyncCopyToLds<remove_cvref_t<decltype(dst_buf)>, SrcScalarPerVector>(
                 dst_buf, src_offset, dst_offset, is_src_valid);
+
             constexpr auto move_on_dim = [&]() constexpr {
                 StaticallyIndexedArray<bool, nDim> move_on_dim_;
 
@@ -208,7 +209,8 @@ struct ThreadGroupTensorSliceTransfer_AsyncLoad
     }
 
     private:
-    static constexpr auto thread_cluster_desc_ = make_cluster_descriptor(ThreadClusterLengths{});
+    static constexpr auto thread_cluster_desc_ =
+        make_cluster_descriptor(ThreadClusterLengths{}, ThreadClusterArrangeOrder{});
 
     SrcCoord src_coord_;
     DstCoord dst_coord_;

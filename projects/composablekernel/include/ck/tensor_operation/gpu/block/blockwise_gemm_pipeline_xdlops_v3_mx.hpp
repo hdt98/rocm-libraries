@@ -444,11 +444,12 @@ struct BlockwiseGemmXdlops_pipeline_v3_mx<BlockGemmPipelineScheduler::Intrawave,
 
 // Local prefetch 1, sync the async load
 #if defined(__gfx125__)
-        // ?
+        block_sync_lds_async_load();
 #else
         __builtin_amdgcn_s_waitcnt(3952); // wait for EXP_CNT, LDS, GDS, Constant and Message
+        block_sync_lds();
 #endif
-        block_sync_lds_async_load();
+
         static_for<0, KRepeat, 1>{}([&](auto k) {
             constexpr auto k_step = k * xdlops_gemm.KPerXdlops * KPack / xdlops_gemm.K1PerXdlops;
             static_for<0, MRepeat, 1>{}([&](auto m0) {
@@ -516,12 +517,12 @@ struct BlockwiseGemmXdlops_pipeline_v3_mx<BlockGemmPipelineScheduler::Intrawave,
             {
                 auto LoopFunc = [&](auto scale_comp_buf, auto scale_mem_buf) {
 #if defined(__gfx125__)
-                // ?
-#else
-                    __builtin_amdgcn_s_waitcnt(
-                        3952); // wait for EXP_CNT, LDS, GDS, Constant and Message
-#endif
                     block_sync_lds_async_load();
+#else
+                    // wait for EXP_CNT, LDS, GDS, Constant and Message
+                    __builtin_amdgcn_s_waitcnt(3952);
+                    block_sync_lds();
+#endif
 
                     a_blockwise_copy.Run(
                         a_grid_desc, a_grid_buf, a_block_desc, a_block_bufs(scale_comp_buf));
@@ -842,11 +843,11 @@ struct BlockwiseGemmXdlops_pipeline_v3_mx<BlockGemmPipelineScheduler::Intrawave,
             });
 
 #if defined(__gfx125__)
-            // ?
+            block_sync_lds_async_load();
 #else
             __builtin_amdgcn_s_waitcnt(3952); // wait for EXP_CNT, LDS, GDS, Constant and Message
+            block_sync_lds();
 #endif
-            block_sync_lds_async_load();
 
             static_for<0, KRepeat, 1>{}([&](auto k) {
                 constexpr auto k_step =

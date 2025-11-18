@@ -15,6 +15,7 @@
 #include "ck/utility/common_header.hpp"
 #include "ck/utility/env.hpp"
 #include "ck/tensor_operation/gpu/block/thread_group_tensor_slice_transfer_direct_load.hpp"
+#include "ck/tensor_operation/gpu/block/thread_group_tensor_slice_transfer_async_load.hpp"
 
 namespace ck {
 
@@ -176,6 +177,8 @@ struct GridwiseGemmMX_xdl_cshuffle_v3
     static constexpr bool is_single_rate_mfma = false;
     static constexpr auto is_scale_mfma       = true;
 
+    // XXX: Redefinition from BlockwiseGemmXdlops_mx_pipeline_base
+    // TODO: Use values from BlockwiseGemmXdlops_mx_pipeline_base
     static constexpr auto MXdlPack = 2;
     static constexpr auto NXdlPack = 2;
     static constexpr auto KXdlPack = 2;
@@ -1351,6 +1354,8 @@ struct GridwiseGemmMX_xdl_cshuffle_v3
     using Block2CTileMap = BlockToCTileMap_Grouped_M00_N0_M01Adapt<8, MPerBlock, NPerBlock>;
     // using Block2CTileMap = BlockToCTileMap_3DGrid_KSplit<MPerBlock, NPerBlock>;
 
+    // XXX: Redefinition from BlockwiseGemmXdlops_mx_pipeline_base
+    // TODO: Use values from BlockwiseGemmXdlops_mx_pipeline_base
     using mx_scale_t                           = e8m0_bexp_t;
     static constexpr index_t scale_pack_size_a = sizeof(AScaleDataType) / sizeof(mx_scale_t);
     static constexpr index_t scale_pack_size_b = sizeof(BScaleDataType) / sizeof(mx_scale_t);
@@ -1435,6 +1440,7 @@ struct GridwiseGemmMX_xdl_cshuffle_v3
         // B matrix in LDS memory, dst of blockwise copy
         constexpr auto b_block_desc_bk0_n_bk1 = GetBBlockDescriptor_BK0PerBlock_NPerBlock_BK1();
 
+#if defined(__gfx950__)
         auto a_blockwise_copy =
             ThreadGroupTensorSliceTransfer_DirectLoad<ThisThreadBlock,
                                                       Sequence<AK0Number, MPerBlock, AK1Number>,
@@ -1471,6 +1477,47 @@ struct GridwiseGemmMX_xdl_cshuffle_v3
                 make_multi_index(0, n_block_data_idx_on_grid, 0),
                 b_block_desc_bk0_n_bk1,
                 make_multi_index(0, 0, 0));
+
+#else
+        // Direct global to LDS load is specific to gfx95x architecture and can not be easily
+        // generalized by substituting device-specific intrinsics with gfx1250 async load
+        // instructions. Therefore, we use separate ThreadGroupTensorSliceTransfer implementations
+        // for gfx95x and gfx1250.
+        auto a_blockwise_copy = ThreadGroupTensorSliceTransfer_AsyncLoad<
+            ThisThreadBlock,
+            Sequence<AK0Number, MPerBlock, AK1Number>,    // typename BlockSliceLengths,
+            ABlockTransferThreadClusterLengths_AK0_M_AK1, // typename ThreadClusterLengths
+            ABlockTransferThreadClusterArrangeOrder,      // ThreadClusterArrangeOrder
+            ADataType,                                    // SrcData
+            ADataType,                                    // DstData
+            decltype(a_grid_desc_ak0_m_ak1),              // SrcDesc
+            decltype(a_block_desc_ak0_m_ak1),             // DstDesc
+            ABlockTransferSrcVectorDim,                   // SrcVectorDim
+            2,                                            // DstVectorDim
+            ABlockTransferSrcScalarPerVector>             // SrcScalarPerVector
+            (a_grid_desc_ak0_m_ak1,
+             make_multi_index(0, m_block_data_idx_on_grid, 0),
+             a_block_desc_ak0_m_ak1,
+             make_multi_index(0, 0, 0));
+
+        // B matrix blockwise copy
+        auto b_blockwise_copy =
+            ThreadGroupTensorSliceTransfer_AsyncLoad<ThisThreadBlock,
+                                                     Sequence<BK0Number, NPerBlock, BK1Number>,
+                                                     BBlockTransferThreadClusterLengths_BK0_N_BK1,
+                                                     BBlockTransferThreadClusterArrangeOrder,
+                                                     BDataType,
+                                                     BDataType,
+                                                     decltype(b_grid_desc_bk0_n_bk1),
+                                                     decltype(b_block_desc_bk0_n_bk1),
+                                                     BBlockTransferSrcVectorDim,
+                                                     2,
+                                                     BBlockTransferSrcScalarPerVector>(
+                b_grid_desc_bk0_n_bk1,
+                make_multi_index(0, n_block_data_idx_on_grid, 0),
+                b_block_desc_bk0_n_bk1,
+                make_multi_index(0, 0, 0));
+#endif
 
         // LDS allocation for A and B: be careful of alignment
         constexpr auto a_block_space_size_aligned = math::integer_least_multiple(
@@ -1830,26 +1877,27 @@ struct GridwiseGemmMX_xdl_cshuffle_v3
         // MNRepeat -> KRepeat -> KThreadPerXdl -> MNThreadPerXdl -> KXdlPack -> MNXdlPack
         const auto Padded_Scale_M =
             math::integer_divide_ceil(problem.M, ScaleBlockSize) * ScaleBlockSize;
+
         const auto a_scale_grid_desc_am_ak = make_naive_tensor_descriptor(
             make_tuple(Padded_Scale_M / (MXdlPack * MPerXdl),
                        math::integer_divide_ceil(problem.K, (ScaleBlockSize / APackedSize)) /
-                           (KXdlPack * 64 / MPerXdl),
-                       64 * KXdlPack * MXdlPack / scale_pack_size_a),
+                           (KXdlPack * BlockwiseGemmPipe::WaveSize / MPerXdl),
+                       BlockwiseGemmPipe::WaveSize * KXdlPack * MXdlPack / scale_pack_size_a),
             make_tuple(math::integer_divide_ceil(problem.K * problem.KBatch,
                                                  (ScaleBlockSize / APackedSize)) *
                            MPerXdl * MXdlPack / scale_pack_size_a,
-                       64 * KXdlPack * MXdlPack / scale_pack_size_a,
+                       BlockwiseGemmPipe::WaveSize * KXdlPack * MXdlPack / scale_pack_size_a,
                        1));
 
         const auto b_scale_grid_desc_bn_ak = make_naive_tensor_descriptor(
             make_tuple(problem.N / (NXdlPack * NPerXdl),
                        math::integer_divide_ceil(problem.K, (ScaleBlockSize / BPackedSize)) /
-                           (KXdlPack * 64 / NPerXdl),
-                       64 * KXdlPack * NXdlPack / scale_pack_size_b),
+                           (KXdlPack * BlockwiseGemmPipe::WaveSize / NPerXdl),
+                       BlockwiseGemmPipe::WaveSize * KXdlPack * NXdlPack / scale_pack_size_b),
             make_tuple(math::integer_divide_ceil(problem.K * problem.KBatch,
                                                  (ScaleBlockSize / BPackedSize)) *
                            NPerXdl * NXdlPack / scale_pack_size_b,
-                       64 * KXdlPack * NXdlPack / scale_pack_size_b,
+                       BlockwiseGemmPipe::WaveSize * KXdlPack * NXdlPack / scale_pack_size_b,
                        1));
 
         Run<decltype(a_grid_desc_ak0_m_ak1),
@@ -1946,6 +1994,7 @@ struct GridwiseGemmMX_xdl_cshuffle_v3
         // B matrix in LDS memory, dst of blockwise copy
         constexpr auto b_block_desc_bk0_n_bk1 = GetBBlockDescriptor_BK0PerBlock_NPerBlock_BK1();
 
+#if defined(__gfx950__)
         auto a_blockwise_copy =
             ThreadGroupTensorSliceTransfer_DirectLoad<ThisThreadBlock,
                                                       Sequence<AK0Number, MPerBlock, AK1Number>,
@@ -1982,7 +2031,46 @@ struct GridwiseGemmMX_xdl_cshuffle_v3
                 make_multi_index(0, n_block_data_idx_on_grid, 0),
                 b_block_desc_bk0_n_bk1,
                 make_multi_index(0, 0, 0));
+#else
+        // Direct global to LDS load is specific to gfx95x architecture and can not be easily
+        // generalized by substituting device-specific intrinsics with gfx1250 async load
+        // instructions. Therefore, we use separate ThreadGroupTensorSliceTransfer implementations
+        // for gfx95x and gfx1250.
+        auto a_blockwise_copy = ThreadGroupTensorSliceTransfer_AsyncLoad<
+            ThisThreadBlock,
+            Sequence<AK0Number, MPerBlock, AK1Number>,    // typename BlockSliceLengths,
+            ABlockTransferThreadClusterLengths_AK0_M_AK1, // typename ThreadClusterLengths
+            ABlockTransferThreadClusterArrangeOrder,      // ThreadClusterArrangeOrder
+            ADataType,                                    // SrcData
+            ADataType,                                    // DstData
+            decltype(a_grid_desc_ak0_m_ak1),              // SrcDesc
+            decltype(a_block_desc_ak0_m_ak1),             // DstDesc
+            ABlockTransferSrcVectorDim,                   // SrcVectorDim
+            2,                                            // DstVectorDim
+            ABlockTransferSrcScalarPerVector>             // SrcScalarPerVector
+            (a_grid_desc_ak0_m_ak1,
+             make_multi_index(0, m_block_data_idx_on_grid, 0),
+             a_block_desc_ak0_m_ak1,
+             make_multi_index(0, 0, 0));
 
+        // B matrix blockwise copy
+        auto b_blockwise_copy =
+            ThreadGroupTensorSliceTransfer_AsyncLoad<ThisThreadBlock,
+                                                     Sequence<BK0Number, NPerBlock, BK1Number>,
+                                                     BBlockTransferThreadClusterLengths_BK0_N_BK1,
+                                                     BBlockTransferThreadClusterArrangeOrder,
+                                                     BDataType,
+                                                     BDataType,
+                                                     decltype(b_grid_desc_bk0_n_bk1),
+                                                     decltype(b_block_desc_bk0_n_bk1),
+                                                     BBlockTransferSrcVectorDim,
+                                                     2,
+                                                     BBlockTransferSrcScalarPerVector>(
+                b_grid_desc_bk0_n_bk1,
+                make_multi_index(0, n_block_data_idx_on_grid, 0),
+                b_block_desc_bk0_n_bk1,
+                make_multi_index(0, 0, 0));
+#endif
         // LDS allocation for A and B: be careful of alignment
         constexpr auto a_block_space_size_aligned = math::integer_least_multiple(
             a_block_desc_ak0_m_ak1.GetElementSpaceSize(), max_lds_align);
@@ -2355,23 +2443,23 @@ struct GridwiseGemmMX_xdl_cshuffle_v3
         const auto a_scale_grid_desc_am_ak = make_naive_tensor_descriptor(
             make_tuple(Padded_Scale_M / (MXdlPack * MPerXdl),
                        math::integer_divide_ceil(problem.K, (ScaleBlockSize / APackedSize)) /
-                           (KXdlPack * 64 / MPerXdl),
-                       64 * KXdlPack * MXdlPack / scale_pack_size_a),
+                           (KXdlPack * BlockwiseGemmPipe::WaveSize / MPerXdl),
+                       BlockwiseGemmPipe::WaveSize * KXdlPack * MXdlPack / scale_pack_size_a),
             make_tuple(math::integer_divide_ceil(problem.K * problem.KBatch,
                                                  (ScaleBlockSize / APackedSize)) *
                            MPerXdl * MXdlPack / scale_pack_size_a,
-                       64 * KXdlPack * MXdlPack / scale_pack_size_a,
+                       BlockwiseGemmPipe::WaveSize * KXdlPack * MXdlPack / scale_pack_size_a,
                        1));
 
         const auto b_scale_grid_desc_bn_ak = make_naive_tensor_descriptor(
             make_tuple(problem.N / (NXdlPack * NPerXdl),
                        math::integer_divide_ceil(problem.K, (ScaleBlockSize / BPackedSize)) /
-                           (KXdlPack * 64 / NPerXdl),
-                       64 * KXdlPack * NXdlPack / scale_pack_size_b),
+                           (KXdlPack * BlockwiseGemmPipe::WaveSize / NPerXdl),
+                       BlockwiseGemmPipe::WaveSize * KXdlPack * NXdlPack / scale_pack_size_b),
             make_tuple(math::integer_divide_ceil(problem.K * problem.KBatch,
                                                  (ScaleBlockSize / BPackedSize)) *
                            NPerXdl * NXdlPack / scale_pack_size_b,
-                       64 * KXdlPack * NXdlPack / scale_pack_size_b,
+                       BlockwiseGemmPipe::WaveSize * KXdlPack * NXdlPack / scale_pack_size_b,
                        1));
 
         Run_2Lds<decltype(a_grid_desc_ak0_m_ak1),

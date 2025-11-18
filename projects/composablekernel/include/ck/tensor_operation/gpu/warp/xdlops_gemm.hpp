@@ -1770,7 +1770,9 @@ struct MfmaSelector
     template <>
     constexpr auto GetMfma<f4_t, 16, 16, f4_t, is_single_rate_mfma, true>()
     {
-#if defined(__gfx12__)
+#if defined(__gfx125__)
+        return MfmaInstr::wmma_scale_f32_16x16x128_f8f6f4_gfx125;
+#elif defined(__gfx120__)
         return MfmaInstr::wmma_unsupport_16x16_gfx12;
 #elif defined(__gfx11__)
         return MfmaInstr::wmma_unsupport_16x16_gfx11;
@@ -2083,6 +2085,10 @@ struct MfmaSelector
                selected_mfma.k_per_blk;
     }
 
+    // VGPR vector dimension per thread
+    //
+    // gfx950: for 16x16x128 16x128/64=32
+    // gfx1250: for 16x16x128 16x128/32=64
     static constexpr index_t GetK1PerXdlops() { return selected_mfma.k_per_blk; }
 };
 
@@ -2474,7 +2480,7 @@ struct XdlopsGemm
 
     static constexpr auto KPerXdlops  = mfma.GetKPerXdlops();
     static constexpr auto K1PerXdlops = mfma.GetK1PerXdlops();
-    static constexpr auto K0PerXdlops = KPerXdlops / K1PerXdlops;
+    static constexpr auto K0PerXdlops = KPerXdlops / K1PerXdlops; // num_input_blks or 1
 
     __host__ __device__ static constexpr auto GetCM0M1M2NThreadBlkLengths()
     {
