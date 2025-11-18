@@ -124,9 +124,43 @@ struct GridwiseGemmMultipleD_xdl_cshuffle
     __host__ __device__ static constexpr auto GetBBlockDescriptor_BK0PerBlock_NPerBlock_BK1()
     {
         // B matrix in LDS memory, dst of blockwise copy
-        return make_naive_tensor_descriptor(
-            make_tuple(BK0PerBlock, Number<NPerBlock>{}, BK1),
-            make_tuple(Number<NPerBlock + BBlockLdsExtraN>{} * BK1, BK1, I1));
+        // return make_naive_tensor_descriptor(
+        //     make_tuple(BK0PerBlock, Number<NPerBlock>{}, BK1),
+        //     make_tuple(Number<NPerBlock + BBlockLdsExtraN>{} * BK1, BK1, I1));
+
+        constexpr auto NLdsLayer =
+            32 * 4 / KPerBlock / sizeof(BDataType) < 1 ? 1 : 32 * 4 / KPerBlock / sizeof(BDataType);
+        ;
+        constexpr auto b_lds_block_desc = make_naive_tensor_descriptor(
+            make_tuple(BK0PerBlock * Number<NLdsLayer>{}, Number<NPerBlock / NLdsLayer>{}, BK1),
+            make_tuple(BK1, Number<KPerBlock * NLdsLayer>{}, I1));
+
+        constexpr auto b_lds_block_desc_permuted = transform_tensor_descriptor(
+            b_lds_block_desc,
+            make_tuple(make_xor_with_modulo_transform(make_tuple(
+                           Number<NPerBlock / NLdsLayer>{}, Number<BK0PerBlock * NLdsLayer>{})),
+                       make_pass_through_transform(BK1)),
+            make_tuple(Sequence<1, 0>{}, Sequence<2>{}),
+            make_tuple(Sequence<1, 0>{}, Sequence<2>{}));
+
+        constexpr auto b_lds_block_desc_bk0_nldslayer_n_bk1 = transform_tensor_descriptor(
+            b_lds_block_desc_permuted,
+            make_tuple(make_unmerge_transform(make_tuple(BK0PerBlock, Number<NLdsLayer>{})),
+                       make_pass_through_transform(Number<NPerBlock / NLdsLayer>{}),
+                       make_pass_through_transform(BK1)),
+            make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}),
+            make_tuple(Sequence<0, 2>{}, Sequence<1>{}, Sequence<3>{}));
+
+        constexpr auto b_lds_block_desc_bk0_n_bk1 = transform_tensor_descriptor(
+            b_lds_block_desc_bk0_nldslayer_n_bk1,
+            make_tuple(make_pass_through_transform(BK0PerBlock),
+                       make_merge_transform_v3_division_mod(
+                           make_tuple(Number<NPerBlock / NLdsLayer>{}, Number<NLdsLayer>{})),
+                       make_pass_through_transform(BK1)),
+            make_tuple(Sequence<0>{}, Sequence<1, 2>{}, Sequence<3>{}),
+            make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}));
+
+        return b_lds_block_desc_bk0_n_bk1;
     }
 
     __host__ __device__ static constexpr auto
