@@ -120,8 +120,8 @@ namespace rocRoller
             return 1;
         }
 
-        const int WeightlessDSMemObserver::dataQueueSize        = 10;
-        const int WeightlessDSMemObserver::instructionQueueSize = 8;
+        const int WeightlessDSMemObserver::dataQueueSize     = 10;
+        const int WeightlessDSMemObserver::commandQueueSize = 8;
 
         WeightlessDSMemObserver::WeightlessDSMemObserver(ContextPtr ctx)
             : m_context(ctx)
@@ -141,9 +141,9 @@ namespace rocRoller
                 const auto requiredSlots       = queueSlots(direction, dwords);
                 const auto remainingSlots      = calculateRemainingSlots();
 
-                if(m_instructionQueue.size() >= instructionQueueSize)
+                if(m_commandQueue.size() >= commandQueueSize)
                 {
-                    const auto completionCycle = m_instructionQueue.front();
+                    const auto completionCycle = m_commandQueue.front();
                     status.stallCycles         = completionCycle - m_programCycle;
                 }
 
@@ -181,9 +181,9 @@ namespace rocRoller
 
             m_programCycle += inst.totalCycles();
 
-            while(!m_instructionQueue.empty() && m_programCycle >= m_instructionQueue.front())
+            while(!m_commandQueue.empty() && m_programCycle >= m_commandQueue.front())
             {
-                m_instructionQueue.pop_front();
+                m_commandQueue.pop_front();
             }
             while(!m_dataQueue.empty() && m_programCycle >= m_dataQueue.front())
             {
@@ -210,14 +210,14 @@ namespace rocRoller
                 int cycles = LDSBankModel::getInstructionDataCycles(ldsInst, gfx) / 4;
 
                 AssertFatal(calculateRemainingSlots() >= requiredSlots
-                                && m_instructionQueue.size() < instructionQueueSize,
+                                && m_commandQueue.size() < commandQueueSize,
                             "Expected queue space to be accounted for in peek function and passed "
                             "through to total cycles calculation.");
 
                 const auto base
-                    = m_instructionQueue.empty() ? m_programCycle : m_instructionQueue.back();
+                    = m_commandQueue.empty() ? m_programCycle : m_commandQueue.back();
 
-                m_instructionQueue.push_back(base + cycles);
+                m_commandQueue.push_back(base + cycles);
 
                 if(direction == LDSBankModel::LdsDirection::Write)
                 {
@@ -238,12 +238,12 @@ namespace rocRoller
                 const_cast<Instruction&>(inst).addComment(
                     fmt::format("WeightlessDSMemObserver {}: {} cycles, "
                                 "{} slots, remaining {} slots, "
-                                "instruction queue size {}, data queue size {}",
+                                "command queue size {}, data queue size {}",
                                 m_programCycle,
                                 cycles,
                                 requiredSlots,
                                 calculateRemainingSlots(),
-                                m_instructionQueue.size(),
+                                m_commandQueue.size(),
                                 m_dataQueue.size()));
             }
         }

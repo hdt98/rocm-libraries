@@ -132,10 +132,10 @@ namespace rocRoller
             // Queue size in hardware is depth 40 width of 16 dwords from MI250 to MI350
             // This simplifies to depth 10 width of 64 dwords
             static const int dataQueueSize;
-            static const int instructionQueueSize;
+            static const int commandQueueSize;
 
-            // Stores instruction completion cycles
-            mutable std::deque<unsigned int> m_instructionQueue;
+            // Stores command completion cycles
+            mutable std::deque<unsigned int> m_commandQueue;
             // Stores data queue completion cycles
             mutable std::deque<unsigned int> m_dataQueue;
 
