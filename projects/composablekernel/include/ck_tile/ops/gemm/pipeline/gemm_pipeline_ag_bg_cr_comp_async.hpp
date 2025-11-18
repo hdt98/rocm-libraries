@@ -467,13 +467,7 @@ struct GemmPipelineAgBgCrCompAsync : public BaseGemmPipelineAgBgCrCompAsync<Prob
                     block_gemm(c_block_tile, a_block_tile1, b_block_tile1);
                 }
             }
-            else if(TailNum == TailNumber::Two)
-            // 2 block gemms remaining
-            {
-                block_sync_lds();
-                block_gemm(c_block_tile, a_block_tile0, b_block_tile0);
-            }
-            else if(TailNum == TailNumber::One)
+            else
             {
                 block_sync_lds();
                 block_gemm(c_block_tile, a_block_tile0, b_block_tile0);

@@ -32,7 +32,7 @@ struct has_b_tile_access_pattern<T, std::void_t<decltype(T::BTileAccessPattern)>
 template <typename Derived>
 struct UniversalGemmBasePolicy
 {
-#if defined(__gfx950__)
+#if defined(__gfx950__) || defined(__gfx125__)
     template <typename Problem>
     static constexpr bool is_a_load_tr =
         std::is_same_v<remove_cvref_t<typename Problem::ALayout>, tensor_layout::gemm::ColumnMajor>;
@@ -81,11 +81,12 @@ struct UniversalGemmBasePolicy
         if constexpr(is_a_load_tr<Problem>)
         {
             // TODO: better lds descriptor for performance
-            constexpr auto a_lds_block_desc_0 = make_naive_tensor_descriptor( //
-                make_tuple(number<KPerBlock>{}, number<MPerBlock>{}),
-                make_tuple(number<MPerBlock>{}, number<1>{}),
-                number<MPerBlock>{},
-                number<1>{});
+            constexpr index_t KPack = GetSmemPackA<Problem>();
+            constexpr auto a_lds_block_desc_0 =
+                make_naive_tensor_descriptor(make_tuple(number<KPerBlock>{}, number<MPerBlock>{}),
+                                             make_tuple(number<MPerBlock>{}, number<1>{}),
+                                             number<KPack>{},
+                                             number<1>{});
             return a_lds_block_desc_0;
         }
         else
@@ -152,11 +153,12 @@ struct UniversalGemmBasePolicy
         if constexpr(is_b_load_tr<Problem>)
         {
             // TODO: better lds descriptor for performance
-            constexpr auto b_lds_block_desc_0 = make_naive_tensor_descriptor( //
-                make_tuple(number<KPerBlock>{}, number<NPerBlock>{}),
-                make_tuple(number<NPerBlock>{}, number<1>{}),
-                number<NPerBlock>{},
-                number<1>{});
+            constexpr index_t KPack = GetSmemPackB<Problem>();
+            constexpr auto b_lds_block_desc_0 =
+                make_naive_tensor_descriptor(make_tuple(number<KPerBlock>{}, number<NPerBlock>{}),
+                                             make_tuple(number<NPerBlock>{}, number<1>{}),
+                                             number<KPack>{},
+                                             number<1>{});
             return b_lds_block_desc_0;
         }
         else
@@ -697,6 +699,7 @@ struct UniversalGemmPipelineAgBgCrPolicy
         using BlockWarps = typename Problem::BlockGemmShape::BlockWarps;
         using WarpTile   = typename Problem::BlockGemmShape::WarpTile;
 
+#if defined(__gfx950__)
         constexpr index_t vector_size =
             DS_READ_TR_SIZE() / sizeof(typename Problem::ComputeDataType);
         constexpr index_t thread_elements = WarpTile::at(I1) * WarpTile::at(I2) / get_warp_size();
@@ -706,7 +709,9 @@ struct UniversalGemmPipelineAgBgCrPolicy
             : vector_size * 2 == thread_elements              ? WGAttrNumAccessEnum::Double
             : vector_size * 4 == thread_elements              ? WGAttrNumAccessEnum::Quad
                                                               : WGAttrNumAccessEnum::Invalid;
-
+#else
+        constexpr auto wg_attr_num_access = WGAttrNumAccessEnum::Single;
+#endif
         using WarpGemm = WarpGemmDispatcher<typename Problem::ComputeDataType,
                                             typename Problem::ComputeDataType,
                                             typename Problem::CDataType,

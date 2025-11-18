@@ -59,7 +59,11 @@ class TestCkTileGroupedGemm : public ::testing::Test
 
         static const ck_tile::index_t M_Warp_Tile = 16;
         static const ck_tile::index_t N_Warp_Tile = 16;
+#if defined(CK_USE_GFX1250)
+        static const ck_tile::index_t K_Warp_Tile = 32;
+#else
         static const ck_tile::index_t K_Warp_Tile = 16;
+#endif
     };
 
     using grouped_gemm_kargs = ck_tile::GroupedGemmHostArgs<>;
