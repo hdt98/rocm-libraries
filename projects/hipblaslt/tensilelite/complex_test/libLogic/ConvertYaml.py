@@ -30,8 +30,8 @@ def write_common_lines_based_on_first_word(file1_path, file2_path, output_file_p
 
 # Example usage
 file1_path = 'Tensilelite_hipblaslt/aquavanjaram_Cijk_Ailk_Bjlk_DB_UserArgs.yaml'
-file2_path = 'Tensile_rocblas/aquavanjaram942_Cijk_Ailk_Bjlk_CB.yaml'
+file2_path = 'Tensile_rocblas/gfx950_Cijk_Ailk_Bjlk_CB.yaml'
 removed_param_path = 'removed.txt'
-output_file_path = 'out.yaml'
+output_file_path = 'gfx950_Cijk_Ailk_Bjlk_CB.yaml'
 
 write_common_lines_based_on_first_word(file1_path, file2_path, output_file_path, removed_param_path)
