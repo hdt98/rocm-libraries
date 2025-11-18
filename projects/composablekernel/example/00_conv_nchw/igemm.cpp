@@ -77,66 +77,66 @@ using DeviceGroupedConvNDFwdInstance =
         ck::tensor_operation::device::GemmSpecialization::MNKPadding,
 
         // NGCHW config 5 - test 5
+        1,              // NumGemmKPrefetchStage
+        128,            // BlockSize
+        128,            // MPerBlock
+        32,             // NPerBlock
+        32,             // KPerBlock
+        8,              // AK1
+        8,              // BK1
+        32,             // MPerXdl
+        32,             // NPerXdl
+        2,              // MXdlPerWave
+        1,              // NXdlPerWave
+        S<4, 32, 1>,    // ABlockTransferThreadClusterLengths_AK0_M_AK1
+        S<0, 2, 1>,     // ABlockTransferThreadClusterArrangeOrder
+        S<0, 2, 1>,     // ABlockTransferSrcAccessOrder
+        1,              // ABlockTransferSrcScalarPerVector
+        4,              // ABlockTransferDstScalarPerVector_AK1
+        8,              // ABlockTransferDstScalarPerVector_AK1
+        1,              // ABlockLdsExtraM
+        S<4, 32, 1>,    // BBlockTransferThreadClusterLengths_BK0_N_BK1
+        S<1, 0, 2>,     // BBlockTransferThreadClusterArrangeOrder
+        S<1, 0, 2>,     // BBlockTransferSrcAccessOrder
+        2,              // BBlockTransferSrcVectorDim
+        4,              // BBlockTransferSrcScalarPerVector
+        8,              // BBlockTransferDstScalarPerVector_BK1
+        1,              // BBlockLdsExtraN
+        1,              // CShuffleMXdlPerWavePerShuffle
+        1,              // CShuffleNXdlPerWavePerShuffle
+        S<1, 16, 1, 8>, // CDEBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock
+        4               // CDEBlockTransferScalarPerVector_NPerBlock
+
+        // NGCHW config 4 - 4.2
         // 1,              // NumGemmKPrefetchStage
-        // 128,            // BlockSize
-        // 64,             // MPerBlock
-        // 64,             // NPerBlock
+        // 64,             // BlockSize
+        // 128,            // MPerBlock
+        // 32,             // NPerBlock
         // 16,             // KPerBlock
         // 4,              // AK1
-        // 4,              // BK1
-        // 16,             // MPerXdl
-        // 16,             // NPerXdl
-        // 2,              // MXdlPerWave
+        // 8,              // BK1
+        // 32,             // MPerXdl
+        // 32,             // NPerXdl
+        // 4,              // MXdlPerWave
         // 1,              // NXdlPerWave
-        // S<4, 32, 1>,    // ABlockTransferThreadClusterLengths_AK0_M_AK1
+        // S<4, 16, 1>,    // ABlockTransferThreadClusterLengths_AK0_M_AK1
         // S<0, 2, 1>,     // ABlockTransferThreadClusterArrangeOrder
         // S<0, 2, 1>,     // ABlockTransferSrcAccessOrder
         // 1,              // ABlockTransferSrcVectorDim
         // 8,              // ABlockTransferSrcScalarPerVector
         // 4,              // ABlockTransferDstScalarPerVector_AK1
         // 1,              // ABlockLdsExtraM
-        // S<4, 32, 1>,    // BBlockTransferThreadClusterLengths_BK0_N_BK1
+        // S<2, 32, 1>,    // BBlockTransferThreadClusterLengths_BK0_N_BK1
         // S<1, 0, 2>,     // BBlockTransferThreadClusterArrangeOrder
         // S<1, 0, 2>,     // BBlockTransferSrcAccessOrder
         // 2,              // BBlockTransferSrcVectorDim
-        // 4,              // BBlockTransferSrcScalarPerVector
-        // 4,              // BBlockTransferDstScalarPerVector_BK1
+        // 8,              // BBlockTransferSrcScalarPerVector
+        // 8,              // BBlockTransferDstScalarPerVector_BK1
         // 1,              // BBlockLdsExtraN
         // 1,              // CShuffleMXdlPerWavePerShuffle
         // 1,              // CShuffleNXdlPerWavePerShuffle
         // S<1, 16, 1, 4>, // CDEBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock
         // 8               // CDEBlockTransferScalarPerVector_NPerBlock
-
-        // NGCHW config 4 - 4.2
-        1,              // NumGemmKPrefetchStage
-        64,             // BlockSize
-        128,            // MPerBlock
-        32,             // NPerBlock
-        16,             // KPerBlock
-        4,              // AK1
-        8,              // BK1
-        32,             // MPerXdl
-        32,             // NPerXdl
-        4,              // MXdlPerWave
-        1,              // NXdlPerWave
-        S<4, 16, 1>,    // ABlockTransferThreadClusterLengths_AK0_M_AK1
-        S<0, 2, 1>,     // ABlockTransferThreadClusterArrangeOrder
-        S<0, 2, 1>,     // ABlockTransferSrcAccessOrder
-        1,              // ABlockTransferSrcVectorDim
-        8,              // ABlockTransferSrcScalarPerVector
-        4,              // ABlockTransferDstScalarPerVector_AK1
-        1,              // ABlockLdsExtraM
-        S<2, 32, 1>,    // BBlockTransferThreadClusterLengths_BK0_N_BK1
-        S<1, 0, 2>,     // BBlockTransferThreadClusterArrangeOrder
-        S<1, 0, 2>,     // BBlockTransferSrcAccessOrder
-        2,              // BBlockTransferSrcVectorDim
-        8,              // BBlockTransferSrcScalarPerVector
-        8,              // BBlockTransferDstScalarPerVector_BK1
-        1,              // BBlockLdsExtraN
-        1,              // CShuffleMXdlPerWavePerShuffle
-        1,              // CShuffleNXdlPerWavePerShuffle
-        S<1, 16, 1, 4>, // CDEBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock
-        8               // CDEBlockTransferScalarPerVector_NPerBlock
 
         // NGCHW config 3 - 5.4
         // 1,              // NumGemmKPrefetchStage

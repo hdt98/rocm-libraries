@@ -71,21 +71,15 @@ st_%:
 tt_%:
 	rocprofv3 --att -d tt_$*_${timestamp}.out ${att_opt} -- ./igemm.out ${$*}
 
-
 # mio ref flow
-mio_cmd = MIOpenDriver convfp16 \
-	-F 1 -n 256 -c 256 --in_h 56 --in_w 56 -k 256 -y 3 -x 3 \
-	--pad_h 1 --pad_w 1 -u 1 -v 1 -l 1 -j 1 -g 32 -m conv \
-	--spatial_dim 2 -t 1 -i 5 # win 53 igem 137
-
-run_mio_cmd:
-	${mio_cmd}
+mio_run_%:
+	MIOpenDriver convfp16 ${$*}
 
 mio_st_%:
-	rocprofv3 ${stt_opt} -d mio_st_${timestamp}.out -- MIOpenDriver convfp16 ${$*}
+	rocprofv3 ${stt_opt} -d mio_st_$*_${timestamp}.out -- MIOpenDriver convfp16 ${$*}
 
 mio_tt_%:
-	rocprofv3 --att -d mio_tt_${timestamp}.out ${att_opt} -- MIOpenDriver convfp16 ${$*}
+	rocprofv3 --att -d mio_tt_$*_${timestamp}.out ${att_opt} -- MIOpenDriver convfp16 ${$*}
 # 	rocprofv3 --att -d ttrace_mio_${timestamp}.out ${att_opt} --kernel-include-regex .*conv.* -- ${mio_cmd}
 
 
@@ -98,6 +92,7 @@ conv_0 =  ${conv_common}  2     4    16    56    56    3 3     235 368   1 1    
 conv_1 =  ${conv_common}  2     1    1024  32    128   3 3     28 28     1 1        1 1          1 1       1 1
 conv_2 =  ${conv_common}  2     32   256   8     8     3 3     56 56     1 1        1 1          1 1       1 1
 conv_3 =  ${conv_common}  2     1    1     16    16    3 3     960 450   1 1        1 1          1 1       1 1
+conv_4 =  ${conv_common}  2     1    32    32    128   3 3     28 28     1 1        1 1          1 1       1 1
 
 # config   | op_name         | dtype | layout | verify | init | print | time | M     | N     | K   | StrideA | StrideB | StrideC | SplitK |
 gemm_0   =   gemm_universal    1       0        1        2      0       1      16      518400  144   0         0         0         0
@@ -105,6 +100,8 @@ gemm_1   =   gemm_universal    1       1        1        2      0       1      1
 gemm_2   =   gemm_universal    1       0        1        2      0       1      518400  16      144   0         0         0         0 
 gemm_3   =   gemm_universal    1       0        1        2      0       1      32      802816  1152  0         0         0         0
 gemm_4   =   gemm_universal    1       1        1        2      0       1      32      802816  1152  0         0         0         0
+# config   | op_name                    | dtype | layout | verify | init | print | time | M     | N     | K   | StrideA | StrideB | StrideC | SplitK |
+gemm_5   =   gemm_universal_preshuffle    1       1        1        2      0       1      32      802816  2304  0         0         0         0
 
 ckprof_%:
 	../../build/bin/ckProfiler ${$*} > ckprof_$*.out 2>&1
