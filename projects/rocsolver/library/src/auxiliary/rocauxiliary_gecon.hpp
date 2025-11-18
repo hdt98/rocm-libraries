@@ -591,7 +591,7 @@ rocblas_status gecon_lacn2(rocblas_handle handle,
                  T* x,
                  I* isgn,
                 //  I* isave,       // just preserve elements as individual variables (on host?)
-                 const I* max_iters,
+                 const I max_iters,
                  I* h_iters,
                  I* d_max_idx,
                 //  const I d_iters, // on host, just maintain iters as they will be incremented within the kernels // if kernel behaviour could change, then maintain device iters as well
@@ -668,7 +668,7 @@ rocblas_status gecon_lacn2(rocblas_handle handle,
             // hipMemcpyAsync(jlast, d_max_idx, sizeof(I), hipMemcpyDeviceToHost, stream);
             // hipStreamSynchronize(stream);
             ROCSOLVER_LAUNCH_KERNEL((lacn2_jump4<T, I, S>), dim3(1), dim3(GECON_BLOCKSIZE), 0,
-                                    stream, n, x, isgn, d_kase, d_jump, d_max_idx, *h_iters, *max_iters);
+                                    stream, n, x, isgn, d_kase, d_jump, d_max_idx, *h_iters, max_iters);
 
             hipMemcpyAsync(h_jump, d_jump, sizeof(rocblas_int), hipMemcpyDeviceToHost, stream);
             hipMemcpyAsync(h_kase, d_kase, sizeof(rocblas_int), hipMemcpyDeviceToHost, stream);
