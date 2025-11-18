@@ -1294,15 +1294,19 @@ struct TransformConvFwdToGemm
 
         // first let's do NCHW
         const auto in_n_c_hi_wi_desc = make_naive_tensor_descriptor(
-            make_tuple(N_, C_, Hi_, Wi_),
-            make_tuple(NStrideTensorA_, CStrideTensorA_, HiStride_, WiStride_));
+            // make_tuple(N_, C_, Hi_, Wi_),
+            // make_tuple(NStrideTensorA_, CStrideTensorA_, HiStride_, WiStride_));
+            make_tuple(Number<1024>{}, Number<128>{}, Number<28>{}, Number<28>{}),
+            make_tuple(Number<100352>{}, Number<784>{}, Number<28>{}, Number<1>{}));
 
         const auto in_n_c_hip_wip_desc = transform_tensor_descriptor(
             in_n_c_hi_wi_desc,
             make_tuple(make_pass_through_transform(N_),
                        make_pass_through_transform(C_),
-                       make_pad_transform(Hi_, InLeftPadH_, InRightPadH_),
-                       make_pad_transform(Wi_, InLeftPadW_, InRightPadW_)),
+                       //    make_pad_transform(Hi_, InLeftPadH_, InRightPadH_),
+                       //    make_pad_transform(Wi_, InLeftPadW_, InRightPadW_)),
+                       make_pad_transform(Hi_, Number<1>{}, Number<1>{}),
+                       make_pad_transform(Wi_, Number<1>{}, Number<1>{})),
             make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}, Sequence<3>{}),
             make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}, Sequence<3>{}));
 
@@ -1310,17 +1314,23 @@ struct TransformConvFwdToGemm
             in_n_c_hip_wip_desc,
             make_tuple(make_pass_through_transform(N_),
                        make_pass_through_transform(C_),
-                       make_embed_transform(make_tuple(Number<3>{}, Ho_),
-                                            make_tuple(ConvDilationH_, ConvStrideH_)),
-                       make_embed_transform(make_tuple(Number<3>{}, Wo_),
-                                            make_tuple(ConvDilationW_, ConvStrideW_))),
+                       //    make_embed_transform(make_tuple(Number<3>{}, Ho_),
+                       //                         make_tuple(ConvDilationH_, ConvStrideH_)),
+                       make_embed_transform(make_tuple(Number<3>{}, Number<28>{}),
+                                            make_tuple(Number<1>{}, Number<1>{})),
+                       //    make_embed_transform(make_tuple(Number<3>{}, Wo_),
+                       //                         make_tuple(ConvDilationW_, ConvStrideW_))),
+                       make_embed_transform(make_tuple(Number<3>{}, Number<28>{}),
+                                            make_tuple(Number<1>{}, Number<1>{}))),
             make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}, Sequence<3>{}),
             make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2, 3>{}, Sequence<4, 5>{}));
 
         return transform_tensor_descriptor(
             in_n_c_y_ho_x_wo_desc,
-            make_tuple(make_merge_transform(make_tuple(N_, Ho_, Wo_)),
-                       make_merge_transform(make_tuple(Number<3>{}, Number<3>{}, C_))),
+            // make_tuple(make_merge_transform(make_tuple(N_, Ho_, Wo_)),
+            //            make_merge_transform(make_tuple(Number<3>{}, Number<3>{}, C_))),
+            make_tuple(make_merge_transform(make_tuple(Number<1024>{}, Number<28>{}, Number<28>{})),
+                       make_merge_transform(make_tuple(Number<3>{}, Number<3>{}, Number<128>{}))),
             make_tuple(Sequence<0, 3, 5>{}, Sequence<2, 4, 1>{}),
             make_tuple(Sequence<0>{}, Sequence<1>{}));
 
