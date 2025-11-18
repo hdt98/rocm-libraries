@@ -562,11 +562,14 @@ namespace GEMMDriverTest
                             fmt::format("waveK: {} must be a multiple of the scale block size: {}",
                                         gemm.waveK,
                                         gemm.scaleBlockSize));
+                AssertFatal(gemm.loadScalePathA != SolutionParams::LoadPath::BufferToLDS
+                                || gemm.swizzleScale,
+                            "If loadScalePathA is BufferToLDS, swizzleScale must be enabled");
                 auto macTileAScale = KernelGraph::CoordinateGraph::MacroTile(
                     {gemm.macM, gemm.macK / gemm.scaleBlockSize},
                     LayoutType::MATRIX_A,
                     {gemm.waveM, gemm.waveN, gemm.waveK / gemm.scaleBlockSize, gemm.waveB},
-                    gemm.loadLDSScaleA ? MemoryType::LDS : MemoryType::WAVE,
+                    GetMemoryType(gemm.loadScalePathA),
                     {gemm.waveM, gemm.waveN, gemm.waveK / gemm.scaleBlockSize, gemm.waveB},
                     {gemm.swizzleM, gemm.swizzleN, gemm.swizzleK, gemm.swizzleB});
                 params->setDimensionInfo(*tagLoadScaleA, macTileAScale);
@@ -587,11 +590,14 @@ namespace GEMMDriverTest
                             fmt::format("waveK: {} must be a multiple of the scale block size: {}",
                                         gemm.waveK,
                                         gemm.scaleBlockSize));
+                AssertFatal(gemm.loadScalePathB != SolutionParams::LoadPath::BufferToLDS
+                                || gemm.swizzleScale,
+                            "If loadScalePathB is BufferToLDS, swizzleScale must be enabled");
                 auto macTileBScale = KernelGraph::CoordinateGraph::MacroTile(
                     {gemm.macK / gemm.scaleBlockSize, gemm.macN},
                     LayoutType::MATRIX_B,
                     {gemm.waveM, gemm.waveN, gemm.waveK / gemm.scaleBlockSize, gemm.waveB},
-                    gemm.loadLDSScaleB ? MemoryType::LDS : MemoryType::WAVE,
+                    GetMemoryType(gemm.loadScalePathB),
                     {gemm.waveM, gemm.waveN, gemm.waveK / gemm.scaleBlockSize, gemm.waveB},
                     {gemm.swizzleM, gemm.swizzleN, gemm.swizzleK, gemm.swizzleB});
                 params->setDimensionInfo(*tagLoadScaleB, macTileBScale);
@@ -902,6 +908,13 @@ namespace GEMMDriverTest
     {
     };
 
+    // Params are: waveK, loadScalePathA, loadScalePathB, unrollK
+    class SwizzleScaledGEMMMXF4TNTestGPU
+        : public BaseGEMMContextFixture<
+              std::tuple<int, SolutionParams::LoadPath, SolutionParams::LoadPath, int>>
+    {
+    };
+
     class GEMMF8TestGPU : public BaseGEMMContextFixture<>
     {
     };
@@ -915,15 +928,15 @@ namespace GEMMDriverTest
     {
     };
 
-    // Params are: A type, B type, K tile size, Load A scale though LDS, Load B scale through LDS, (transA, transB)
+    // Params are: A type, B type, K tile size, Load A scale path, Load B scale path, (transA, transB)
     class ScaledMixedGEMMF8F6F4TestGPU
         : public BaseGEMMContextFixture<std::tuple<rocRoller::DataType,
                                                    rocRoller::DataType,
                                                    int,
                                                    rocRoller::Operations::ScaleMode,
                                                    rocRoller::Operations::ScaleMode,
-                                                   bool,
-                                                   bool,
+                                                   SolutionParams::LoadPath,
+                                                   SolutionParams::LoadPath,
                                                    std::pair<std::string, std::string>>>
     {
     };
@@ -2008,10 +2021,10 @@ namespace GEMMDriverTest
         gemm.workgroupSizeX = 1 * gemm.wavefrontSize;
         gemm.workgroupSizeY = 4;
 
-        gemm.loadPathA     = SolutionParams::LoadPath::BufferToLDSViaVGPR;
-        gemm.loadPathB     = SolutionParams::LoadPath::BufferToLDSViaVGPR;
-        gemm.loadLDSScaleA = false;
-        gemm.loadLDSScaleB = false;
+        gemm.loadPathA      = SolutionParams::LoadPath::BufferToLDSViaVGPR;
+        gemm.loadPathB      = SolutionParams::LoadPath::BufferToLDSViaVGPR;
+        gemm.loadScalePathA = SolutionParams::LoadPath::BufferToVGPR;
+        gemm.loadScalePathB = SolutionParams::LoadPath::BufferToVGPR;
 
         gemm.unrollK           = 2;
         gemm.prefetch          = true;
@@ -2265,64 +2278,57 @@ namespace GEMMDriverTest
         }
     }
 
-    TEST_P(GEMMTestGPU, GPU_SwizzleScaledGEMMMXF4TN)
+    TEST_P(SwizzleScaledGEMMMXF4TNTestGPU, GPU_SwizzleScaledGEMMMXF4TN)
     {
         REQUIRE_ARCH_CAP(GPUCapability::HasMFMA_scale_f8f6f4);
         REQUIRE_ARCH_CAP(GPUCapability::HasBlockScaling32);
 
-        for(auto waveK : {64, 128})
-        {
-            int waveM = (waveK == 128) ? 16 : 32;
-            int waveN = (waveK == 128) ? 16 : 32;
+        auto [waveK, loadScalePathA, loadScalePathB, unrollK] = std::get<1>(GetParam());
 
-            auto gemm = setup_GEMMF8F6F4(waveM, waveN, waveK);
+        int waveM = (waveK == 128) ? 16 : 32;
+        int waveN = (waveK == 128) ? 16 : 32;
 
-            gemm.macM = 256;
-            gemm.macN = 256;
-            gemm.macK = 128;
-            gemm.m    = 2 * gemm.macM;
-            gemm.n    = 3 * gemm.macN;
-            gemm.k    = 4 * gemm.macK;
+        auto gemm = setup_GEMMF8F6F4(waveM, waveN, waveK);
 
-            gemm.workgroupSizeX = 1 * gemm.wavefrontSize;
-            gemm.workgroupSizeY = 4;
+        gemm.macM = 256;
+        gemm.macN = 256;
+        gemm.macK = 128;
+        gemm.m    = 2 * gemm.macM;
+        gemm.n    = 3 * gemm.macN;
+        gemm.k    = 4 * gemm.macK;
 
-            gemm.loadPathA = SolutionParams::LoadPath::BufferToVGPR;
-            gemm.loadPathB = SolutionParams::LoadPath::BufferToVGPR;
+        gemm.workgroupSizeX = 1 * gemm.wavefrontSize;
+        gemm.workgroupSizeY = 4;
 
-            gemm.scaleAMode = Operations::ScaleMode::Separate;
-            gemm.scaleBMode = Operations::ScaleMode::Separate;
+        gemm.loadPathA = SolutionParams::LoadPath::BufferToVGPR;
+        gemm.loadPathB = SolutionParams::LoadPath::BufferToVGPR;
 
-            gemm.scaleTypeA = DataType::E8M0;
-            gemm.scaleTypeB = DataType::E8M0;
+        gemm.scaleAMode = Operations::ScaleMode::Separate;
+        gemm.scaleBMode = Operations::ScaleMode::Separate;
 
-            gemm.swizzleScale = true;
+        gemm.scaleTypeA = DataType::E8M0;
+        gemm.scaleTypeB = DataType::E8M0;
 
-            gemm.scaleBlockSize = m_context->targetArchitecture().GetCapability(
-                GPUCapability::DefaultScaleBlockSize);
+        gemm.swizzleScale = true;
 
-            for(auto loadLDSScaleA : {false, true})
-            {
-                gemm.loadLDSScaleA = loadLDSScaleA;
-                for(auto loadLDSScaleB : {false, true})
-                {
-                    gemm.loadLDSScaleB = loadLDSScaleB;
-                    for(auto unrollK : {0, 2})
-                    {
-                        gemm.unrollK = unrollK;
-                        basicGEMM<FP4, FP4, float>(gemm);
+        gemm.scaleBlockSize
+            = m_context->targetArchitecture().GetCapability(GPUCapability::DefaultScaleBlockSize);
 
-                        std::string generatedCode = m_context->instructions()->toString();
-                        // when both the scales are loaded directly from buffer into VGPRs
-                        if(!loadLDSScaleA && !loadLDSScaleB)
-                            EXPECT_EQ(countSubstring(generatedCode, "buffer_load_ubyte "), 0);
-                        // when either scale is loaded via LDS -- no swizzle applied
-                        if(loadLDSScaleA || loadLDSScaleB)
-                            EXPECT_GT(countSubstring(generatedCode, "ds_read_u8 "), 0);
-                    }
-                }
-            }
-        }
+        gemm.loadScalePathA = loadScalePathA;
+        gemm.loadScalePathB = loadScalePathB;
+        gemm.unrollK        = unrollK;
+
+        basicGEMM<FP4, FP4, float>(gemm);
+
+        std::string generatedCode = m_context->instructions()->toString();
+        // when both scales are loaded directly from buffer into VGPRs
+        if(loadScalePathA == SolutionParams::LoadPath::BufferToVGPR
+           && loadScalePathB == SolutionParams::LoadPath::BufferToVGPR)
+            EXPECT_EQ(countSubstring(generatedCode, "buffer_load_ubyte "), 0);
+        // when both scales are loaded directly from buffer into LDS
+        if(loadScalePathA == SolutionParams::LoadPath::BufferToLDS
+           && loadScalePathB == SolutionParams::LoadPath::BufferToLDS)
+            EXPECT_EQ(countSubstring(generatedCode, "ds_write"), 0);
     }
 
     TEST_P(GEMMMXFP4TNSwizzleScaledUnrollTestGPU, GPU_GEMMMXFP4TNSwizzleScaled64x4Unroll)
@@ -2349,10 +2355,10 @@ namespace GEMMDriverTest
         gemm.workgroupSizeX = 2 * gemm.wavefrontSize;
         gemm.workgroupSizeY = 2;
 
-        gemm.loadPathA     = SolutionParams::LoadPath::BufferToLDSViaVGPR;
-        gemm.loadPathB     = SolutionParams::LoadPath::BufferToLDSViaVGPR;
-        gemm.loadLDSScaleA = false;
-        gemm.loadLDSScaleB = false;
+        gemm.loadPathA      = SolutionParams::LoadPath::BufferToLDSViaVGPR;
+        gemm.loadPathB      = SolutionParams::LoadPath::BufferToLDSViaVGPR;
+        gemm.loadScalePathA = SolutionParams::LoadPath::BufferToVGPR;
+        gemm.loadScalePathB = SolutionParams::LoadPath::BufferToVGPR;
 
         gemm.scaleAMode = Operations::ScaleMode::Separate;
         gemm.scaleBMode = Operations::ScaleMode::Separate;
@@ -2417,10 +2423,10 @@ namespace GEMMDriverTest
         gemm.workgroupSizeX = 2 * gemm.wavefrontSize;
         gemm.workgroupSizeY = 2;
 
-        gemm.loadPathA     = SolutionParams::LoadPath::BufferToLDSViaVGPR;
-        gemm.loadPathB     = SolutionParams::LoadPath::BufferToLDSViaVGPR;
-        gemm.loadLDSScaleA = false;
-        gemm.loadLDSScaleB = false;
+        gemm.loadPathA      = SolutionParams::LoadPath::BufferToLDSViaVGPR;
+        gemm.loadPathB      = SolutionParams::LoadPath::BufferToLDSViaVGPR;
+        gemm.loadScalePathA = SolutionParams::LoadPath::BufferToVGPR;
+        gemm.loadScalePathB = SolutionParams::LoadPath::BufferToVGPR;
 
         gemm.scaleAMode = Operations::ScaleMode::Separate;
         gemm.scaleBMode = Operations::ScaleMode::Separate;
@@ -2478,10 +2484,10 @@ namespace GEMMDriverTest
             gemm.workgroupSizeX = 1 * gemm.wavefrontSize;
             gemm.workgroupSizeY = 4;
 
-            gemm.loadPathA     = SolutionParams::LoadPath::BufferToLDSViaVGPR;
-            gemm.loadPathB     = SolutionParams::LoadPath::BufferToLDSViaVGPR;
-            gemm.loadLDSScaleA = false;
-            gemm.loadLDSScaleB = false;
+            gemm.loadPathA      = SolutionParams::LoadPath::BufferToLDSViaVGPR;
+            gemm.loadPathB      = SolutionParams::LoadPath::BufferToLDSViaVGPR;
+            gemm.loadScalePathA = SolutionParams::LoadPath::BufferToVGPR;
+            gemm.loadScalePathB = SolutionParams::LoadPath::BufferToVGPR;
 
             gemm.unrollK           = 2;
             gemm.prefetch          = true;
@@ -2532,10 +2538,10 @@ namespace GEMMDriverTest
         gemm.workgroupSizeX = 1 * gemm.wavefrontSize;
         gemm.workgroupSizeY = 4;
 
-        gemm.loadPathA     = SolutionParams::LoadPath::BufferToLDSViaVGPR;
-        gemm.loadPathB     = SolutionParams::LoadPath::BufferToLDSViaVGPR;
-        gemm.loadLDSScaleA = true;
-        gemm.loadLDSScaleB = true;
+        gemm.loadPathA      = SolutionParams::LoadPath::BufferToLDSViaVGPR;
+        gemm.loadPathB      = SolutionParams::LoadPath::BufferToLDSViaVGPR;
+        gemm.loadScalePathA = SolutionParams::LoadPath::BufferToLDSViaVGPR;
+        gemm.loadScalePathB = SolutionParams::LoadPath::BufferToLDSViaVGPR;
 
         gemm.unrollK           = 2;
         gemm.prefetch          = true;
@@ -2579,10 +2585,10 @@ namespace GEMMDriverTest
         gemm.workgroupSizeX = 1 * gemm.wavefrontSize;
         gemm.workgroupSizeY = 4;
 
-        gemm.loadLDSScaleA = false;
-        gemm.loadLDSScaleB = false;
-        gemm.loadPathA     = SolutionParams::LoadPath::BufferToLDS;
-        gemm.loadPathB     = SolutionParams::LoadPath::BufferToLDS;
+        gemm.loadScalePathA = SolutionParams::LoadPath::BufferToVGPR;
+        gemm.loadScalePathB = SolutionParams::LoadPath::BufferToVGPR;
+        gemm.loadPathA      = SolutionParams::LoadPath::BufferToLDS;
+        gemm.loadPathB      = SolutionParams::LoadPath::BufferToLDS;
 
         gemm.unrollK           = 2;
         gemm.prefetch          = true;
@@ -2637,10 +2643,10 @@ namespace GEMMDriverTest
         gemm.workgroupSizeX = 1 * gemm.wavefrontSize;
         gemm.workgroupSizeY = 4;
 
-        gemm.loadLDSScaleA = false;
-        gemm.loadLDSScaleB = false;
-        gemm.loadPathA     = SolutionParams::LoadPath::BufferToLDS;
-        gemm.loadPathB     = SolutionParams::LoadPath::BufferToLDS;
+        gemm.loadScalePathA = SolutionParams::LoadPath::BufferToVGPR;
+        gemm.loadScalePathB = SolutionParams::LoadPath::BufferToVGPR;
+        gemm.loadPathA      = SolutionParams::LoadPath::BufferToLDS;
+        gemm.loadPathB      = SolutionParams::LoadPath::BufferToLDS;
 
         gemm.unrollK           = 2;
         gemm.prefetch          = true;
@@ -2711,10 +2717,10 @@ namespace GEMMDriverTest
         gemm.workgroupSizeX = 1 * gemm.wavefrontSize;
         gemm.workgroupSizeY = 4;
 
-        gemm.loadPathA     = SolutionParams::LoadPath::BufferToLDSViaVGPR;
-        gemm.loadPathB     = SolutionParams::LoadPath::BufferToLDSViaVGPR;
-        gemm.loadLDSScaleA = false;
-        gemm.loadLDSScaleB = false;
+        gemm.loadPathA      = SolutionParams::LoadPath::BufferToLDSViaVGPR;
+        gemm.loadPathB      = SolutionParams::LoadPath::BufferToLDSViaVGPR;
+        gemm.loadScalePathA = SolutionParams::LoadPath::BufferToVGPR;
+        gemm.loadScalePathB = SolutionParams::LoadPath::BufferToVGPR;
 
         gemm.unrollK           = 2;
         gemm.prefetch          = true;
@@ -2783,10 +2789,10 @@ namespace GEMMDriverTest
         gemm.workgroupSizeX = 1 * gemm.wavefrontSize;
         gemm.workgroupSizeY = 4;
 
-        gemm.loadPathA     = SolutionParams::LoadPath::BufferToVGPR;
-        gemm.loadPathB     = SolutionParams::LoadPath::BufferToVGPR;
-        gemm.loadLDSScaleA = false;
-        gemm.loadLDSScaleB = false;
+        gemm.loadPathA      = SolutionParams::LoadPath::BufferToVGPR;
+        gemm.loadPathB      = SolutionParams::LoadPath::BufferToVGPR;
+        gemm.loadScalePathA = SolutionParams::LoadPath::BufferToVGPR;
+        gemm.loadScalePathB = SolutionParams::LoadPath::BufferToVGPR;
 
         gemm.scaleAMode = Operations::ScaleMode::Separate;
         gemm.scaleBMode = Operations::ScaleMode::Separate;
@@ -2830,10 +2836,10 @@ namespace GEMMDriverTest
         gemm.n    = 3 * gemm.macN;
         gemm.k    = 4 * gemm.macK;
 
-        gemm.loadPathA     = SolutionParams::LoadPath::BufferToLDSViaVGPR;
-        gemm.loadPathB     = SolutionParams::LoadPath::BufferToLDSViaVGPR;
-        gemm.loadLDSScaleA = true;
-        gemm.loadLDSScaleB = true;
+        gemm.loadPathA      = SolutionParams::LoadPath::BufferToLDSViaVGPR;
+        gemm.loadPathB      = SolutionParams::LoadPath::BufferToLDSViaVGPR;
+        gemm.loadScalePathA = SolutionParams::LoadPath::BufferToLDSViaVGPR;
+        gemm.loadScalePathB = SolutionParams::LoadPath::BufferToLDSViaVGPR;
 
         gemm.scaleBlockSize
             = m_context->targetArchitecture().GetCapability(GPUCapability::DefaultScaleBlockSize);
@@ -2916,10 +2922,10 @@ namespace GEMMDriverTest
         problem.scaleTypeA = DataType::E8M0;
         problem.scaleTypeB = DataType::E8M0;
 
-        problem.loadPathA     = SolutionParams::LoadPath::BufferToLDSViaVGPR;
-        problem.loadPathB     = SolutionParams::LoadPath::BufferToLDSViaVGPR;
-        problem.loadLDSScaleA = true;
-        problem.loadLDSScaleB = true;
+        problem.loadPathA      = SolutionParams::LoadPath::BufferToLDSViaVGPR;
+        problem.loadPathB      = SolutionParams::LoadPath::BufferToLDSViaVGPR;
+        problem.loadScalePathA = SolutionParams::LoadPath::BufferToLDSViaVGPR;
+        problem.loadScalePathB = SolutionParams::LoadPath::BufferToLDSViaVGPR;
 
         problem.scaleBlockSize
             = m_context->targetArchitecture().GetCapability(GPUCapability::DefaultScaleBlockSize);
@@ -3836,10 +3842,10 @@ namespace GEMMDriverTest
         gemm.workgroupSizeX = 1 * gemm.wavefrontSize;
         gemm.workgroupSizeY = 4;
 
-        gemm.loadPathA     = SolutionParams::LoadPath::BufferToVGPR;
-        gemm.loadPathB     = SolutionParams::LoadPath::BufferToVGPR;
-        gemm.loadLDSScaleA = true;
-        gemm.loadLDSScaleB = true;
+        gemm.loadPathA      = SolutionParams::LoadPath::BufferToVGPR;
+        gemm.loadPathB      = SolutionParams::LoadPath::BufferToVGPR;
+        gemm.loadScalePathA = SolutionParams::LoadPath::BufferToLDSViaVGPR;
+        gemm.loadScalePathB = SolutionParams::LoadPath::BufferToLDSViaVGPR;
 
         gemm.scaleAMode = Operations::ScaleMode::Separate;
         gemm.scaleBMode = Operations::ScaleMode::Separate;
@@ -3910,7 +3916,7 @@ namespace GEMMDriverTest
     {
         REQUIRE_ARCH_CAP(GPUCapability::HasMFMA_scale_f8f6f4);
 
-        auto [typeA, typeB, MFMAK, scaleAMode, scaleBMode, loadLDSScaleA, loadLDSScaleB, transOp]
+        auto [typeA, typeB, MFMAK, scaleAMode, scaleBMode, loadScalePathA, loadScalePathB, transOp]
             = std::get<1>(GetParam());
 
         int waveM = (MFMAK == 128) ? 16 : 32;
@@ -3931,17 +3937,17 @@ namespace GEMMDriverTest
         problem.scaleTypeA = DataType::E8M0;
         problem.scaleTypeB = DataType::E8M0;
 
-        problem.loadLDSScaleA = loadLDSScaleA;
-        problem.loadLDSScaleB = loadLDSScaleB;
+        problem.loadScalePathA = loadScalePathA;
+        problem.loadScalePathB = loadScalePathB;
 
-        if(loadLDSScaleA
+        if(loadScalePathA != SolutionParams::LoadPath::BufferToVGPR
            && (scaleAMode == rocRoller::Operations::ScaleMode::None
                || scaleAMode == rocRoller::Operations::ScaleMode::SingleScale))
-            GTEST_SKIP() << "Meaningless combination of LoadLDSScaleA and ScaleA";
-        if(loadLDSScaleB
+            GTEST_SKIP() << "Meaningless combination of loadScalePathA and ScaleA";
+        if(loadScalePathB != SolutionParams::LoadPath::BufferToVGPR
            && (scaleBMode == rocRoller::Operations::ScaleMode::None
                || scaleBMode == rocRoller::Operations::ScaleMode::SingleScale))
-            GTEST_SKIP() << "Meaningless combination of LoadLDSScaleB and ScaleB";
+            GTEST_SKIP() << "Meaningless combination of loadScalePathB and ScaleB";
 
         if(scaleAMode == rocRoller::Operations::ScaleMode::Separate
            || scaleBMode == rocRoller::Operations::ScaleMode::Separate)
@@ -4147,6 +4153,20 @@ namespace GEMMDriverTest
                                                 ::testing::Combine(::testing::Values(64, 128),
                                                                    ::testing::Values(0, 2, 4))));
 
+    INSTANTIATE_TEST_SUITE_P(
+        SwizzleScaledGEMMMXF4TNTest,
+        SwizzleScaledGEMMMXF4TNTestGPU,
+        ::testing::Combine(
+            currentGPUISA(),
+            ::testing::Combine(::testing::Values(64, 128),
+                               ::testing::Values(SolutionParams::LoadPath::BufferToVGPR,
+                                                 SolutionParams::LoadPath::BufferToLDSViaVGPR,
+                                                 SolutionParams::LoadPath::BufferToLDS),
+                               ::testing::Values(SolutionParams::LoadPath::BufferToVGPR,
+                                                 SolutionParams::LoadPath::BufferToLDSViaVGPR,
+                                                 SolutionParams::LoadPath::BufferToLDS),
+                               ::testing::Values(0, 2))));
+
     INSTANTIATE_TEST_SUITE_P(GEMMF8Test, GEMMF8TestGPU, currentGPUISA());
 
     INSTANTIATE_TEST_SUITE_P(GEMMJammedTest, GEMMJammedTestGPU, currentGPUISA());
@@ -4192,8 +4212,12 @@ namespace GEMMDriverTest
                                                  rocRoller::Operations::ScaleMode::Separate),
                                ::testing::Values(rocRoller::Operations::ScaleMode::SingleScale,
                                                  rocRoller::Operations::ScaleMode::Separate),
-                               ::testing::Values(false, true),
-                               ::testing::Values(false, true),
+                               ::testing::Values(SolutionParams::LoadPath::BufferToVGPR,
+                                                 SolutionParams::LoadPath::BufferToLDSViaVGPR,
+                                                 SolutionParams::LoadPath::BufferToLDS),
+                               ::testing::Values(SolutionParams::LoadPath::BufferToVGPR,
+                                                 SolutionParams::LoadPath::BufferToLDSViaVGPR,
+                                                 SolutionParams::LoadPath::BufferToLDS),
                                ::testing::Values(std::pair<std::string, std::string>("N", "N"),
                                                  std::pair<std::string, std::string>("N", "T"),
                                                  std::pair<std::string, std::string>("T", "N"),
