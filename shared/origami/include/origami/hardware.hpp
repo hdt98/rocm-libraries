@@ -328,6 +328,15 @@ namespace origami
                {hardware_t::architecture_t::gfx942,
                 hardware_t::architecture_constants(
                     8, 17, 1.21875121875121875122 * 6, 4, 4, std::make_tuple(0, 0.015, 0), 1.5)},
+            //    {hardware_t::architecture_t::gfx942_spx, //NPS1
+            //     hardware_t::architecture_constants(
+            //         1, 14.1, 1.21875121875121875122 * 6.19, 4.07, 4, std::make_tuple(0, 0.007, 0), 1.5)},
+            //    {hardware_t::architecture_t::gfx942_cpx, //NPS1
+            //     hardware_t::architecture_constants(
+            //         1, 3.1, 1.21875121875121875122 * 1.15, 1.09, 4, std::make_tuple(0, 0.002, 0), 1.5)},
+            //    {hardware_t::architecture_t::gfx942_cpx, //NPS4
+            //     hardware_t::architecture_constants(
+            //         1, 3.1, 1.21875121875121875122 * 1, 0.92, 4, std::make_tuple(0, 0.0027, 0), 1.5)},
                {hardware_t::architecture_t::gfx950,
                 // hardware_t::architecture_constants(
                 //     8, 17, 1.21875121875121875122 * 7, 6, 4, std::make_tuple(-0.000013, 0.007070, 0.027355), 1.5)}};
