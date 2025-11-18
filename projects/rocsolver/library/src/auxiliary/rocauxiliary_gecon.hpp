@@ -183,7 +183,7 @@ __device__ inline void lacn2_max_index(const I n, T* local_max, I* local_max_ind
 
 template <int MAX_THDS, typename T, typename I, typename S>
 ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS)
-    lacn2_jump1(T* x, const rocblas_int n, S* norm, I* isgn)
+    lacn2_jump1(T* x, const I n, S* norm, I* isgn)
 {
     rocblas_int tid = hipThreadIdx_x;
 
@@ -227,7 +227,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS)
 // to be called with only a single block
 template <int MAX_THDS, typename T, typename I, typename S>
 ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) lacn2_jump2(const I n,
-                                                                   const T* x,
+                                                                   T* x,
                                                                    I* max_index)
 {
     I tid = threadIdx.x;
@@ -404,7 +404,6 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) lacn2_jump3(const I n,
 template <int MAX_THDS, typename T, typename I, typename S>
 ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) lacn2_jump4(const I n,
                                                                    T* x,
-                                                                   T* v,
                                                                    I* isgn,
                                                                    rocblas_int* kase,
                                                                    rocblas_int* jump,
@@ -473,6 +472,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) lacn2_jump4(const I n,
             x[i] = sign * (T(1) + T(i) / T(n-1));
         }
         if(tid == 0){
+            // TODO: increment iters???
             *kase = 1;
             *jump = 5; 
         }
@@ -496,7 +496,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) lacn2_jump4(const I n,
 // compute l1 norm of vector v and compare to temporary value
 template <int MAX_THDS, typename T, typename I, typename S>
 ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS)
-    lacn2_jump5(const T* v, const I n, S* norm)
+    lacn2_jump5(const T* x, const I n, S* norm)
 {
     rocblas_int tid = hipThreadIdx_x;
 
@@ -505,7 +505,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS)
     // Sum absolute values
     S sum = 0;
     for(I i = tid; i < n; i += MAX_THDS)
-        sum += rocblas_abs(v[i]);
+        sum += rocblas_abs(x[i]);
 
     // Reduce within warp
     sum += shift_left(sum, 1);
@@ -627,6 +627,8 @@ rocblas_status gecon_lacn2(rocblas_handle handle,
         case 5:
             ROCSOLVER_LAUNCH_KERNEL((lacn2_jump5<MAX_THDS, T, I, S>), dim3(1), threads, 0,
                                     stream, x, n, d_est);
+            // copy x onto v
+            std::swap(x, v);
             *h_kase = 0;
 
             break;
