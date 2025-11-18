@@ -264,7 +264,9 @@ namespace origami
         enum class architecture_t
         {
             gfx90a,
-            gfx942,
+            gfx942_a_spx,
+            gfx942_x_spx,
+            gfx942_cpx,
             gfx950,
             gfx1201,
             gfx1100,
@@ -272,15 +274,27 @@ namespace origami
             Count
         };
 
-        static architecture_t arch_name_to_enum(const std::string& str)
+        static architecture_t arch_name_to_enum(const std::string& str, size_t cu_count = 0)
         {
             static const std::unordered_map<std::string, architecture_t> str_to_enum_map
                 = {{"gfx90a", architecture_t::gfx90a},
-                    {"gfx942", architecture_t::gfx942},
                     {"gfx950", architecture_t::gfx950},
                     {"gfx1201", architecture_t::gfx1201},
                     {"gfx1100", architecture_t::gfx1100},
                     {"gfx1151", architecture_t::gfx1151}};
+
+            // Special handling for gfx942
+            if(str == "gfx942")
+            {
+                // Use CU count to determine A vs X vs SPX vs CPX
+                if(cu_count == 38)
+                    return architecture_t::gfx942_cpx
+                else if(cu_count == 228)
+                    return architecture_t::gfx942_a_spx
+                else //default 
+                    return architecture_t::gfx942_x_spx
+
+            }
 
             auto it = str_to_enum_map.find(str);
             if(it != str_to_enum_map.end())
@@ -325,7 +339,7 @@ namespace origami
             = {{hardware_t::architecture_t::gfx90a,
                 hardware_t::architecture_constants(
                     1, 5.5, 1.21875121875121875122 * 1.2, 1.2, 4, std::make_tuple(0, 0.03, 0), 1.5)},
-               {hardware_t::architecture_t::gfx942,
+               {hardware_t::architecture_t::gfx942_x_spx,
                 hardware_t::architecture_constants(
                     8, 17, 1.21875121875121875122 * 6, 4, 4, std::make_tuple(0, 0.015, 0), 1.5)},
                {hardware_t::architecture_t::gfx950,
@@ -382,7 +396,54 @@ namespace origami
                     {matrix_instruction(16, 16, 16, data_type_t::XFloat32), 48}, // v_mfma_f32_16x16x16_bf16 * 3
                     {matrix_instruction(16, 16, 32, data_type_t::XFloat32), 48}, // v_mfma_f32_16x16x16_bf16 * 3
                 }},
-               {hardware_t::architecture_t::gfx942,
+               {hardware_t::architecture_t::gfx942_x_spx,
+                {
+                    // F32
+                    {matrix_instruction(32, 32, 2, data_type_t::Float), 64}, // v_mfma_f32_32x32x2_f32
+                    {matrix_instruction(32, 32, 1, data_type_t::Float), 64}, // v_mfma_f32_32x32x1_2b_f32
+                    {matrix_instruction(16, 16, 4, data_type_t::Float), 32}, // v_mfma_f32_16x16x4_f32
+                    {matrix_instruction(16, 16, 1, data_type_t::Float), 32}, // v_mfma_f32_16x16x1_4b_f32
+                    {matrix_instruction(4, 4, 1, data_type_t::Float), 8}, // v_mfma_f32_4x4x1_16b_f32
+                    // F64
+                    {matrix_instruction(16, 16, 4, data_type_t::Double), 32}, // v_mfma_f64_16x16x4_f64
+                    {matrix_instruction(4, 4, 4, data_type_t::Double), 16}, // v_mfma_f64_4x4x4_4b_f64
+                    // TODO ComplexFloat
+                    // TODO ComplexDouble
+                    // F16
+                    {matrix_instruction(32, 32, 4, data_type_t::Half), 64}, // v_mfma_f32_32x32x4_2b_f16
+                    {matrix_instruction(32, 32, 8, data_type_t::Half), 32}, // v_mfma_f32_32x32x8_f16
+                    {matrix_instruction(16, 16, 4, data_type_t::Half), 32}, // v_mfma_f32_16x16x4_4b_f16
+                    {matrix_instruction(16, 16, 16, data_type_t::Half), 16}, // v_mfma_f32_16x16x16_f16
+                    {matrix_instruction(4, 4, 4, data_type_t::Half), 8}, // v_mfma_f32_4x4x4_16b_f16
+                    // BF16
+                    {matrix_instruction(32, 32, 4, data_type_t::BFloat16), 64}, // v_mfma_f32_32x32x4_2b_bf16
+                    {matrix_instruction(32, 32, 8, data_type_t::BFloat16), 32}, // v_mfma_f32_32x32x8_bf16
+                    {matrix_instruction(16, 16, 4, data_type_t::BFloat16), 32}, // v_mfma_f32_16x16x4_4b_bf16
+                    {matrix_instruction(16, 16, 16, data_type_t::BFloat16), 16}, // v_mfma_f32_16x16x16_bf16
+                    {matrix_instruction(4, 4, 4, data_type_t::BFloat16), 8}, // v_mfma_f32_4x4x4_16b_bf16
+                    // F8
+                    {matrix_instruction(32, 32, 16, data_type_t::Float8_fnuz), 32}, // v_mfma_f32_32x32x16_f8
+                    {matrix_instruction(16, 16, 32, data_type_t::Float8_fnuz), 16}, // v_mfma_f32_16x16x32_f8
+                    // BF8
+                    {matrix_instruction(32, 32, 16, data_type_t::BFloat8_fnuz), 32}, // v_mfma_f32_32x32x16_bf8
+                    {matrix_instruction(16, 16, 32, data_type_t::BFloat8_fnuz), 16}, // v_mfma_f32_16x16x32_bf8
+                    // F8B8
+                    {matrix_instruction(32, 32, 16, data_type_t::Float8BFloat8_fnuz), 32}, // v_mfma_f32_32x32x16_f8_bf8
+                    {matrix_instruction(16, 16, 32, data_type_t::Float8BFloat8_fnuz), 16}, // v_mfma_f32_16x16x32_f8_bf8
+                    // B8F8
+                    {matrix_instruction(32, 32, 16, data_type_t::BFloat8Float8_fnuz), 32}, // v_mfma_f32_32x32x16_bf8_f8
+                    {matrix_instruction(16, 16, 32, data_type_t::BFloat8Float8_fnuz), 16}, // v_mfma_f32_16x16x32_bf8_f8
+                    // I8
+                    {matrix_instruction(32, 32, 16, data_type_t::Int8), 32}, // v_mfma_f32_32x32x16_f8
+                    {matrix_instruction(32, 32, 4, data_type_t::Int8), 64}, // v_mfma_i32_32x32x4_2b_i8
+                    {matrix_instruction(16, 16, 32, data_type_t::Int8), 16}, // v_mfma_f32_16x16x32_i8
+                    {matrix_instruction(16, 16, 4, data_type_t::Int8), 32}, // v_mfma_i32_16x16x4_4b_i8
+                    {matrix_instruction(4, 4, 4, data_type_t::Int8), 8}, // v_mfma_i32_4x4x4_16b_i8
+                    // XF32
+                    {matrix_instruction(32, 32, 4, data_type_t::XFloat32), 32}, // v_mfma_f32_32x32x4_xf32
+                    {matrix_instruction(16, 16, 32, data_type_t::XFloat32), 16}, // v_mfma_f32_16x16x8_xf32
+                }},
+               {hardware_t::architecture_t::gfx942_cpx,
                 {
                     // F32
                     {matrix_instruction(32, 32, 2, data_type_t::Float), 64}, // v_mfma_f32_32x32x2_f32
@@ -602,7 +663,7 @@ namespace origami
         static hardware_t get_hardware_for_properties(hipDeviceProp_t properties)
         {
             auto arch_name = get_before_first_colon(properties.gcnArchName);
-            auto arch_enum = arch_name_to_enum(arch_name);
+            auto arch_enum = arch_name_to_enum(arch_name, properties.multiProcessorCount);
             auto it       = ARCH_CONSTANT_MAP.find(arch_enum);
             if(it == ARCH_CONSTANT_MAP.end())
             {
@@ -639,7 +700,7 @@ namespace origami
         static bool is_hardware_supported(hipDeviceProp_t properties)
         {
             auto arch_name = get_before_first_colon(properties.gcnArchName);
-            auto arch_enum = arch_name_to_enum(arch_name);
+            auto arch_enum = arch_name_to_enum(arch_name, properties.multiProcessorCount);
             auto it       = ARCH_CONSTANT_MAP.find(arch_enum);
             return it != ARCH_CONSTANT_MAP.end();
         }

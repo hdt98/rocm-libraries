@@ -483,7 +483,7 @@ void CheckLDSCapacity(
 void HardwareArchEnum(const std::string gpuArchNumber)
 {
     auto gpuArchEnum = origami::hardware_t::arch_name_to_enum("gfx" + gpuArchNumber);
-    EXPECT_EQ(gpuArchEnum, origami::hardware_t::architecture_t::gfx942);
+    EXPECT_EQ(gpuArchEnum, origami::hardware_t::architecture_t::gfx942_x_spx);
 }
 
 // Utils
