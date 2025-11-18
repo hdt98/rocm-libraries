@@ -393,14 +393,8 @@ def config_cmd():
     if args.cmake_args:
         cmake_options.append(args.cmake_args)
 
-    cmake_base_options = f'-DROCM_PATH={rocm_path} -DCMAKE_PREFIX_PATH:PATH="{rocm_path};{rocm_path}/llvm/lib/cmake"'
-    cmake_options.append(cmake_base_options)
-    
-    # Explicitly tell CMake where to find our Boost-free msgpack (overrides any vcpkg version)
-    if os.name == "nt" and msgpack_install:
-        msgpack_config_dir = os.path.join(msgpack_install, "lib", "cmake", "msgpack-cxx")
-        if os.path.exists(msgpack_config_dir):
-            cmake_options.append(f"-Dmsgpackc-cxx_DIR={cmake_path(msgpack_config_dir)}")
+    cmake_options.append(f"-DROCM_PATH={rocm_path}")
+    cmake_options.append(f'-DCMAKE_PREFIX_PATH:PATH="{rocm_path};{rocm_path}/llvm/lib/cmake"')
 
     # packaging options
     cmake_pack_options = f"-DCPACK_SET_DESTDIR=OFF"
