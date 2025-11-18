@@ -311,36 +311,36 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) lacn2_jump3(const I n,
 
     // Sum absolute values
     S sum = 0;
-    bool repeated = false;
+    bool repeated = true;
+    // we iterate over v, since v contains x from previous step (pointers swapped)
     for(I i = tid; i < n; i += MAX_THDS)
     {
-        sum += rocblas_abs(x[i]);
-        if(x[i] >= 0){
+        sum += rocblas_abs(v[i]);
+        if(v[i] >= 0){
             if (isgn[i] <= -1)
-                repeated = true;
+                repeated = false;
         }
         else{
             if(isgn[i] >= 1)
-                repeated = true;
-
+                repeated = false;
         }
 
     }
 
     // Reduce within warp
     sum += shift_left(sum, 1);
-    repeated = repeated || __shfl_down(repeated, 1);
+    repeated = repeated && __shfl_down(repeated, 1);
     sum += shift_left(sum, 2);
-    repeated = repeated || __shfl_down(repeated, 2);
+    repeated = repeated && __shfl_down(repeated, 2);
     sum += shift_left(sum, 4);
-    repeated = repeated || __shfl_down(repeated, 4);
+    repeated = repeated && __shfl_down(repeated, 4);
     sum += shift_left(sum, 8);
-    repeated = repeated || __shfl_down(repeated, 8);
+    repeated = repeated && __shfl_down(repeated, 8);
     sum += shift_left(sum, 16);
-    repeated = repeated || __shfl_down(repeated, 16);
+    repeated = repeated && __shfl_down(repeated, 16);
     if(warpSize > 32){
         sum += shift_left(sum, 32);
-        repeated = repeated || __shfl_down(repeated, 32);
+        repeated = repeated && __shfl_down(repeated, 32);
     }
 
     if(tid % warpSize == 0)
@@ -353,7 +353,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) lacn2_jump3(const I n,
         for(I k = 1; k < MAX_THDS / warpSize; k++)
         {
             sum += sval[k];
-            repeated = repeated || sval_repeated[k];
+            repeated = repeated && sval_repeated[k];
         }
         *est_old = *est;
         *est = sum;
@@ -367,7 +367,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) lacn2_jump3(const I n,
     if (repeated || (*est <= *est_old)){
         for(I i = tid; i < n; i += MAX_THDS)
         {
-            // Alternating pattern that changes each iteration
+            // we write over old x
             T sign = (i % 2 == 0) ? T(1) : T(-1);
             x[i] = sign * (T(1) + T(i) / T(n-1));
         }
@@ -379,9 +379,10 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) lacn2_jump3(const I n,
         return;
     }
 
+    // we iterate over v, since v contains old x (pointers swapped)
     for(I i = tid; i < n; i += MAX_THDS)
     {
-        if (x[i] >= 0)
+        if (v[i] >= 0)
         {
             x[i] = T(1);
             isgn[i] = T(1);
@@ -391,9 +392,6 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) lacn2_jump3(const I n,
             isgn[i] = T(-1);
 
         }
-        // Alternating pattern that changes each iteration
-        T sign = (i % 2 == 0) ? T(1) : T(-1);
-        x[i] = sign * (T(1) + T(i) / T(n-1)); // TODO: most likely changes with complex numbers
     }
 
     if (tid == 0){
@@ -575,7 +573,7 @@ rocblas_status gecon_lacn2(rocblas_handle handle,
             }
 
             
-            ROCSOLVER_LAUNCH_KERNEL((lacn2_jump1<MAX_THDS, T, S>), dim3(1), threads, 0,
+            ROCSOLVER_LAUNCH_KERNEL((lacn2_jump1<MAX_THDS, T, I, S>), dim3(1), threads, 0,
                                     stream, x, n, d_est, isgn);
 
             // ROCSOLVER_LAUNCH_KERNEL((gecon_compute_l1_norm<MAX_THDS, S>), dim3(1), threads, 0,
@@ -592,7 +590,7 @@ rocblas_status gecon_lacn2(rocblas_handle handle,
         case 2:
             // ROCSOLVER_LAUNCH_KERNEL(lacn2_max_index_kernel<T, I>, blocks, threads, 0, stream, n, x, d_max_idx);
             // ROCSOLVER_LAUNCH_KERNEL(lacn2_zero_and_set_max_index_kernel<T, I>, blocks, threads, 0, stream, n, x, d_max_idx);
-            ROCSOLVER_LAUNCH_KERNEL(lacn2_jump2<MAX_THDS, T, I>, blocks, threads, 0, stream, n, x, d_max_idx);
+            ROCSOLVER_LAUNCH_KERNEL(lacn2_jump2<MAX_THDS, T, I, S>, blocks, threads, 0, stream, n, x, d_max_idx);
 
             // isave(2) = 3?????
             // TODO: how to reflect this
@@ -603,7 +601,8 @@ rocblas_status gecon_lacn2(rocblas_handle handle,
             return rocblas_status_success;
             break;
         case 3:
-            ROCSOLVER_LAUNCH_KERNEL((lacn2_jump3<MAX_THDS, T, S, I>), dim3(1), threads, 0,
+            std::swap(x, v);
+            ROCSOLVER_LAUNCH_KERNEL((lacn2_jump3<MAX_THDS, T, I, S>), dim3(1), threads, 0,
                                     stream, x, n, isgn, d_is_equal);
 
             hipMemcpyAsync(h_jump, d_jump, sizeof(rocblas_int), hipMemcpyDeviceToHost, stream);
@@ -618,7 +617,7 @@ rocblas_status gecon_lacn2(rocblas_handle handle,
             // int jlast; 
             // hipMemcpyAsync(jlast, d_max_idx, sizeof(I), hipMemcpyDeviceToHost, stream);
             // hipStreamSynchronize(stream);
-            ROCSOLVER_LAUNCH_KERNEL((lacn2_jump4<MAX_THDS, S>), dim3(1), threads, 0,
+            ROCSOLVER_LAUNCH_KERNEL((lacn2_jump4<MAX_THDS, T, I, S>), dim3(1), threads, 0,
                                     stream, x, n, isgn, d_is_equal);
             hipMemcpyAsync(h_jump, d_jump, sizeof(rocblas_int), hipMemcpyDeviceToHost, stream);
             hipMemcpyAsync(h_kase, d_kase, sizeof(rocblas_int), hipMemcpyDeviceToHost, stream);
@@ -626,7 +625,7 @@ rocblas_status gecon_lacn2(rocblas_handle handle,
 
             break;
         case 5:
-            ROCSOLVER_LAUNCH_KERNEL((lacn2_jump5<MAX_THDS, S>), dim3(1), threads, 0,
+            ROCSOLVER_LAUNCH_KERNEL((lacn2_jump5<MAX_THDS, T, I, S>), dim3(1), threads, 0,
                                     stream, x, n, d_est);
             *h_kase = 0;
 
