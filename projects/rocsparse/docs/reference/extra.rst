@@ -30,6 +30,24 @@ rocsparse_bsrgeam()
   :outline:
 .. doxygenfunction:: rocsparse_zbsrgeam
 
+.. tabs::
+
+   .. tab:: C++
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/extra/example_rocsparse_bsrgeam.cpp
+         :language: cpp
+         :start-after: //! [doc example]
+         :end-before: //! [doc example]
+         :linenos:
+
+   .. tab:: C
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/extra/example_rocsparse_bsrgeam_c.c
+         :language: c
+         :start-after: /*! [doc example] */
+         :end-before: /*! [doc example] */
+         :linenos:
+
 rocsparse_bsrgemm_buffer_size()
 -------------------------------
 
@@ -57,6 +75,24 @@ rocsparse_bsrgemm()
   :outline:
 .. doxygenfunction:: rocsparse_zbsrgemm
 
+.. tabs::
+
+   .. tab:: C++
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/extra/example_rocsparse_bsrgemm.cpp
+         :language: cpp
+         :start-after: //! [doc example]
+         :end-before: //! [doc example]
+         :linenos:
+
+   .. tab:: C
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/extra/example_rocsparse_bsrgemm_c.c
+         :language: c
+         :start-after: /*! [doc example] */
+         :end-before: /*! [doc example] */
+         :linenos:
+
 rocsparse_csrgeam_nnz()
 -----------------------
 
@@ -72,6 +108,32 @@ rocsparse_csrgeam()
 .. doxygenfunction:: rocsparse_ccsrgeam
   :outline:
 .. doxygenfunction:: rocsparse_zcsrgeam
+
+.. tabs::
+
+   .. tab:: Fortran
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/extra/example_rocsparse_csrgeam_fortran.f90
+         :language: fortran
+         :start-after: ! [doc example start]
+         :end-before: ! [doc example end]
+         :linenos:
+
+   .. tab:: C++
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/extra/example_rocsparse_csrgeam.cpp
+         :language: cpp
+         :start-after: //! [doc example]
+         :end-before: //! [doc example]
+         :linenos:
+
+   .. tab:: C
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/extra/example_rocsparse_csrgeam_c.c
+         :language: c
+         :start-after: /*! [doc example] */
+         :end-before: /*! [doc example] */
+         :linenos:
 
 rocsparse_csrgemm_buffer_size()
 -------------------------------
@@ -104,6 +166,32 @@ rocsparse_csrgemm()
 .. doxygenfunction:: rocsparse_ccsrgemm
   :outline:
 .. doxygenfunction:: rocsparse_zcsrgemm
+
+.. tabs::
+
+   .. tab:: Fortran
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/extra/example_rocsparse_csrgemm_fortran.f90
+         :language: fortran
+         :start-after: ! [doc example start]
+         :end-before: ! [doc example end]
+         :linenos:
+
+   .. tab:: C++
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/extra/example_rocsparse_csrgemm.cpp
+         :language: cpp
+         :start-after: //! [doc example]
+         :end-before: //! [doc example]
+         :linenos:
+
+   .. tab:: C
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/extra/example_rocsparse_csrgemm_c.c
+         :language: c
+         :start-after: /*! [doc example] */
+         :end-before: /*! [doc example] */
+         :linenos:
 
 rocsparse_csrgemm_numeric()
 ---------------------------

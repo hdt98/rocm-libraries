@@ -34,6 +34,32 @@ rocsparse_bsrmv()
   :outline:
 .. doxygenfunction:: rocsparse_zbsrmv
 
+.. tabs::
+
+   .. tab:: Fortran
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/level2/example_rocsparse_bsrmv_fortran.f90
+         :language: fortran
+         :start-after: ! [doc example start]
+         :end-before: ! [doc example end]
+         :linenos:
+
+   .. tab:: C++
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/level2/example_rocsparse_bsrmv.cpp
+         :language: cpp
+         :start-after: //! [doc example]
+         :end-before: //! [doc example]
+         :linenos:
+
+   .. tab:: C
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/level2/example_rocsparse_bsrmv_c.c
+         :language: c
+         :start-after: /*! [doc example] */
+         :end-before: /*! [doc example] */
+         :linenos:
+
 rocsparse_bsrmv_clear()
 -----------------------
 
@@ -104,6 +130,32 @@ rocsparse_coomv()
   :outline:
 .. doxygenfunction:: rocsparse_zcoomv
 
+.. tabs::
+
+   .. tab:: Fortran
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/level2/example_rocsparse_coomv_fortran.f90
+         :language: fortran
+         :start-after: ! [doc example start]
+         :end-before: ! [doc example end]
+         :linenos:
+
+   .. tab:: C++
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/level2/example_rocsparse_coomv.cpp
+         :language: cpp
+         :start-after: //! [doc example]
+         :end-before: //! [doc example]
+         :linenos:
+
+   .. tab:: C
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/level2/example_rocsparse_coomv_c.c
+         :language: c
+         :start-after: /*! [doc example] */
+         :end-before: /*! [doc example] */
+         :linenos:
+
 rocsparse_csrmv_analysis()
 --------------------------
 
@@ -125,6 +177,32 @@ rocsparse_csrmv()
 .. doxygenfunction:: rocsparse_ccsrmv
   :outline:
 .. doxygenfunction:: rocsparse_zcsrmv
+
+.. tabs::
+
+   .. tab:: C++
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/level2/example_rocsparse_csrmv.cpp
+         :language: cpp
+         :start-after: //! [doc example]
+         :end-before: //! [doc example]
+         :linenos:
+
+   .. tab:: C
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/level2/example_rocsparse_csrmv_c.c
+         :language: c
+         :start-after: /*! [doc example] */
+         :end-before: /*! [doc example] */
+         :linenos:
+
+   .. tab:: Fortran
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/level2/example_rocsparse_csrmv_fortran.f90
+         :language: fortran
+         :start-after: ! [doc example]
+         :end-before: ! [doc example]
+         :linenos:
 
 rocsparse_csrmv_analysis_clear()
 --------------------------------
@@ -240,20 +318,80 @@ rocsparse_ellmv()
   :outline:
 .. doxygenfunction:: rocsparse_zellmv
 
+.. tabs::
+
+   .. tab:: Fortran
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/level2/example_rocsparse_ellmv_fortran.f90
+         :language: fortran
+         :start-after: ! [doc example start]
+         :end-before: ! [doc example end]
+         :linenos:
+
+   .. tab:: C++
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/level2/example_rocsparse_ellmv.cpp
+         :language: cpp
+         :start-after: //! [doc example]
+         :end-before: //! [doc example]
+         :linenos:
+
+   .. tab:: C
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/level2/example_rocsparse_ellmv_c.c
+         :language: c
+         :start-after: /*! [doc example] */
+         :end-before: /*! [doc example] */
+         :linenos:
+
 rocsparse_hybmv()
 -----------------
 
 .. doxygenfunction:: rocsparse_shybmv
+
   :outline:
+   .. tab:: Fortran
 .. doxygenfunction:: rocsparse_dhybmv
+
   :outline:
+      .. literalinclude:: ../../clients/samples/documentation_examples/level2/example_rocsparse_hybmv_fortran.f90
 .. doxygenfunction:: rocsparse_chybmv
+         :language: fortran
   :outline:
+         :start-after: ! [doc example start]
 .. doxygenfunction:: rocsparse_zhybmv
+         :end-before: ! [doc example end]
 
+         :linenos:
+.. tabs::
+
+   .. tab:: C++
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/level2/example_rocsparse_hybmv.cpp
+         :language: cpp
+         :start-after: //! [doc example]
+         :end-before: //! [doc example]
+         :linenos:
+
+   .. tab:: C
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/level2/example_rocsparse_hybmv_c.c
+         :language: c
+
+         :start-after: /*! [doc example] */
+   .. tab:: Fortran
+         :end-before: /*! [doc example] */
+
+         :linenos:
+      .. literalinclude:: ../../clients/samples/documentation_examples/level2/example_rocsparse_gebsrmv_fortran.f90
+
+         :language: fortran
 rocsparse_gebsrmv()
+         :start-after: ! [doc example start]
 -------------------
+         :end-before: ! [doc example end]
 
+         :linenos:
 .. doxygenfunction:: rocsparse_sgebsrmv
   :outline:
 .. doxygenfunction:: rocsparse_dgebsrmv
@@ -261,6 +399,32 @@ rocsparse_gebsrmv()
 .. doxygenfunction:: rocsparse_cgebsrmv
   :outline:
 .. doxygenfunction:: rocsparse_zgebsrmv
+
+.. tabs::
+
+   .. tab:: Fortran
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/level2/example_rocsparse_gebsrmv_fortran.f90
+         :language: fortran
+         :start-after: ! [doc example start]
+         :end-before: ! [doc example end]
+         :linenos:
+
+   .. tab:: C++
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/level2/example_rocsparse_gebsrmv.cpp
+         :language: cpp
+         :start-after: //! [doc example]
+         :end-before: //! [doc example]
+         :linenos:
+
+   .. tab:: C
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/level2/example_rocsparse_gebsrmv_c.c
+         :language: c
+         :start-after: /*! [doc example] */
+         :end-before: /*! [doc example] */
+         :linenos:
 
 rocsparse_gemvi_buffer_size()
 -----------------------------
@@ -283,3 +447,21 @@ rocsparse_gemvi()
 .. doxygenfunction:: rocsparse_cgemvi
   :outline:
 .. doxygenfunction:: rocsparse_zgemvi
+
+.. tabs::
+
+   .. tab:: C++
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/level2/example_rocsparse_gemvi.cpp
+         :language: cpp
+         :start-after: //! [doc example]
+         :end-before: //! [doc example]
+         :linenos:
+
+   .. tab:: C
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/level2/example_rocsparse_gemvi_c.c
+         :language: c
+         :start-after: /*! [doc example] */
+         :end-before: /*! [doc example] */
+         :linenos:

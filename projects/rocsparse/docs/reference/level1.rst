@@ -22,6 +22,32 @@ rocsparse_axpyi()
   :outline:
 .. doxygenfunction:: rocsparse_zaxpyi
 
+.. tabs::
+
+   .. tab:: C++
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/level1/example_rocsparse_axpyi.cpp
+         :language: cpp
+         :start-after: //! [doc example]
+         :end-before: //! [doc example]
+         :linenos:
+
+   .. tab:: C
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/level1/example_rocsparse_axpyi_c.c
+         :language: c
+         :start-after: /*! [doc example] */
+         :end-before: /*! [doc example] */
+         :linenos:
+
+   .. tab:: Fortran
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/level1/example_rocsparse_axpyi_fortran.f90
+         :language: fortran
+         :start-after: ! [doc example]
+         :end-before: ! [doc example]
+         :linenos:
+
 rocsparse_doti()
 ----------------
 
@@ -32,6 +58,32 @@ rocsparse_doti()
 .. doxygenfunction:: rocsparse_cdoti
   :outline:
 .. doxygenfunction:: rocsparse_zdoti
+
+.. tabs::
+
+   .. tab:: C++
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/level1/example_rocsparse_doti.cpp
+         :language: cpp
+         :start-after: //! [doc example]
+         :end-before: //! [doc example]
+         :linenos:
+
+   .. tab:: C
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/level1/example_rocsparse_doti_c.c
+         :language: c
+         :start-after: /*! [doc example] */
+         :end-before: /*! [doc example] */
+         :linenos:
+
+   .. tab:: Fortran
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/level1/example_rocsparse_doti_fortran.f90
+         :language: fortran
+         :start-after: ! [doc example]
+         :end-before: ! [doc example]
+         :linenos:
 
 rocsparse_dotci()
 -----------------
@@ -51,6 +103,32 @@ rocsparse_gthr()
   :outline:
 .. doxygenfunction:: rocsparse_zgthr
 
+.. tabs::
+
+   .. tab:: C++
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/level1/example_rocsparse_gthr.cpp
+         :language: cpp
+         :start-after: //! [doc example]
+         :end-before: //! [doc example]
+         :linenos:
+
+   .. tab:: C
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/level1/example_rocsparse_gthr_c.c
+         :language: c
+         :start-after: /*! [doc example] */
+         :end-before: /*! [doc example] */
+         :linenos:
+
+   .. tab:: Fortran
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/level1/example_rocsparse_gthr_fortran.f90
+         :language: fortran
+         :start-after: ! [doc example]
+         :end-before: ! [doc example]
+         :linenos:
+
 rocsparse_gthrz()
 -----------------
 
@@ -69,6 +147,32 @@ rocsparse_roti()
   :outline:
 .. doxygenfunction:: rocsparse_droti
 
+.. tabs::
+
+   .. tab:: C++
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/level1/example_rocsparse_roti.cpp
+         :language: cpp
+         :start-after: //! [doc example]
+         :end-before: //! [doc example]
+         :linenos:
+
+   .. tab:: C
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/level1/example_rocsparse_roti_c.c
+         :language: c
+         :start-after: /*! [doc example] */
+         :end-before: /*! [doc example] */
+         :linenos:
+
+   .. tab:: Fortran
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/level1/example_rocsparse_roti_fortran.f90
+         :language: fortran
+         :start-after: ! [doc example]
+         :end-before: ! [doc example]
+         :linenos:
+
 rocsparse_sctr()
 ----------------
 
@@ -79,3 +183,29 @@ rocsparse_sctr()
 .. doxygenfunction:: rocsparse_csctr
   :outline:
 .. doxygenfunction:: rocsparse_zsctr
+
+.. tabs::
+
+   .. tab:: C++
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/level1/example_rocsparse_sctr.cpp
+         :language: cpp
+         :start-after: //! [doc example]
+         :end-before: //! [doc example]
+         :linenos:
+
+   .. tab:: C
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/level1/example_rocsparse_sctr_c.c
+         :language: c
+         :start-after: /*! [doc example] */
+         :end-before: /*! [doc example] */
+         :linenos:
+
+   .. tab:: Fortran
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/level1/example_rocsparse_sctr_fortran.f90
+         :language: fortran
+         :start-after: ! [doc example]
+         :end-before: ! [doc example]
+         :linenos:

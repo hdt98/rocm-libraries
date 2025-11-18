@@ -24,6 +24,32 @@ rocsparse_bsrmm()
   :outline:
 .. doxygenfunction:: rocsparse_zbsrmm
 
+.. tabs::
+
+   .. tab:: Fortran
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/level3/example_rocsparse_bsrmm_fortran.f90
+         :language: fortran
+         :start-after: ! [doc example start]
+         :end-before: ! [doc example end]
+         :linenos:
+
+   .. tab:: C++
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/level3/example_rocsparse_bsrmm.cpp
+         :language: cpp
+         :start-after: //! [doc example]
+         :end-before: //! [doc example]
+         :linenos:
+
+   .. tab:: C
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/level3/example_rocsparse_bsrmm_c.c
+         :language: c
+         :start-after: /*! [doc example] */
+         :end-before: /*! [doc example] */
+         :linenos:
+
 
 rocsparse_gebsrmm()
 -------------------
@@ -36,6 +62,24 @@ rocsparse_gebsrmm()
   :outline:
 .. doxygenfunction:: rocsparse_zgebsrmm
 
+.. tabs::
+
+   .. tab:: C++
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/level3/example_rocsparse_gebsrmm.cpp
+         :language: cpp
+         :start-after: //! [doc example]
+         :end-before: //! [doc example]
+         :linenos:
+
+   .. tab:: C
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/level3/example_rocsparse_gebsrmm_c.c
+         :language: c
+         :start-after: /*! [doc example] */
+         :end-before: /*! [doc example] */
+         :linenos:
+
 
 rocsparse_csrmm()
 -----------------
@@ -47,6 +91,32 @@ rocsparse_csrmm()
 .. doxygenfunction:: rocsparse_ccsrmm
   :outline:
 .. doxygenfunction:: rocsparse_zcsrmm
+
+.. tabs::
+
+   .. tab:: Fortran
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/level3/example_rocsparse_csrmm_fortran.f90
+         :language: fortran
+         :start-after: ! [doc example start]
+         :end-before: ! [doc example end]
+         :linenos:
+
+   .. tab:: C++
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/level3/example_rocsparse_csrmm.cpp
+         :language: cpp
+         :start-after: //! [doc example]
+         :end-before: //! [doc example]
+         :linenos:
+
+   .. tab:: C
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/level3/example_rocsparse_csrmm_c.c
+         :language: c
+         :start-after: /*! [doc example] */
+         :end-before: /*! [doc example] */
+         :linenos:
 
 rocsparse_csrsm_zero_pivot()
 ----------------------------
@@ -144,3 +214,29 @@ rocsparse_gemmi()
 .. doxygenfunction:: rocsparse_cgemmi
   :outline:
 .. doxygenfunction:: rocsparse_zgemmi
+
+.. tabs::
+
+   .. tab:: Fortran
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/level3/example_rocsparse_gemmi_fortran.f90
+         :language: fortran
+         :start-after: ! [doc example start]
+         :end-before: ! [doc example end]
+         :linenos:
+
+   .. tab:: C++
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/level3/example_rocsparse_gemmi.cpp
+         :language: cpp
+         :start-after: //! [doc example]
+         :end-before: //! [doc example]
+         :linenos:
+
+   .. tab:: C
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/level3/example_rocsparse_gemmi_c.c
+         :language: c
+         :start-after: /*! [doc example] */
+         :end-before: /*! [doc example] */
+         :linenos:

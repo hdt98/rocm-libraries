@@ -50,6 +50,32 @@ rocsparse_bsric0()
   :outline:
 .. doxygenfunction:: rocsparse_zbsric0
 
+.. tabs::
+
+   .. tab:: Fortran
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/precond/example_rocsparse_bsric0_fortran.f90
+         :language: fortran
+         :start-after: ! [doc example start]
+         :end-before: ! [doc example end]
+         :linenos:
+
+   .. tab:: C++
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/precond/example_rocsparse_bsric0.cpp
+         :language: cpp
+         :start-after: //! [doc example]
+         :end-before: //! [doc example]
+         :linenos:
+
+   .. tab:: C
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/precond/example_rocsparse_bsric0_c.c
+         :language: c
+         :start-after: /*! [doc example] */
+         :end-before: /*! [doc example] */
+         :linenos:
+
 rocsparse_bsric0_clear()
 ------------------------
 
@@ -103,6 +129,32 @@ rocsparse_bsrilu0()
 .. doxygenfunction:: rocsparse_cbsrilu0
   :outline:
 .. doxygenfunction:: rocsparse_zbsrilu0
+
+.. tabs::
+
+   .. tab:: Fortran
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/precond/example_rocsparse_bsrilu0_fortran.f90
+         :language: fortran
+         :start-after: ! [doc example start]
+         :end-before: ! [doc example end]
+         :linenos:
+
+   .. tab:: C++
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/precond/example_rocsparse_bsrilu0.cpp
+         :language: cpp
+         :start-after: //! [doc example]
+         :end-before: //! [doc example]
+         :linenos:
+
+   .. tab:: C
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/precond/example_rocsparse_bsrilu0_c.c
+         :language: c
+         :start-after: /*! [doc example] */
+         :end-before: /*! [doc example] */
+         :linenos:
 
 rocsparse_bsrilu0_clear()
 -------------------------
@@ -161,6 +213,32 @@ rocsparse_csric0()
 .. doxygenfunction:: rocsparse_ccsric0
   :outline:
 .. doxygenfunction:: rocsparse_zcsric0
+
+.. tabs::
+
+   .. tab:: Fortran
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/precond/example_rocsparse_csric0_fortran.f90
+         :language: fortran
+         :start-after: ! [doc example start]
+         :end-before: ! [doc example end]
+         :linenos:
+
+   .. tab:: C++
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/precond/example_rocsparse_csric0.cpp
+         :language: cpp
+         :start-after: //! [doc example]
+         :end-before: //! [doc example]
+         :linenos:
+
+   .. tab:: C
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/precond/example_rocsparse_csric0_c.c
+         :language: c
+         :start-after: /*! [doc example] */
+         :end-before: /*! [doc example] */
+         :linenos:
 
 rocsparse_csric0_clear()
 ------------------------
@@ -270,12 +348,46 @@ rocsparse_csrilu0()
 -------------------
 
 .. doxygenfunction:: rocsparse_scsrilu0
+
   :outline:
+   .. tab:: Fortran
 .. doxygenfunction:: rocsparse_dcsrilu0
+
   :outline:
+      .. literalinclude:: ../../clients/samples/documentation_examples/precond/example_rocsparse_csrilu0_fortran.f90
 .. doxygenfunction:: rocsparse_ccsrilu0
+         :language: fortran
   :outline:
+         :start-after: ! [doc example start]
 .. doxygenfunction:: rocsparse_zcsrilu0
+         :end-before: ! [doc example end]
+
+         :linenos:
+.. tabs::
+
+   .. tab:: Fortran
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/precond/example_rocsparse_csrilu0_fortran.f90
+         :language: fortran
+         :start-after: ! [doc example start]
+         :end-before: ! [doc example end]
+         :linenos:
+
+   .. tab:: C++
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/precond/example_rocsparse_csrilu0.cpp
+         :language: cpp
+         :start-after: //! [doc example]
+         :end-before: //! [doc example]
+         :linenos:
+
+   .. tab:: C
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/precond/example_rocsparse_csrilu0_c.c
+         :language: c
+         :start-after: /*! [doc example] */
+         :end-before: /*! [doc example] */
+         :linenos:
 
 rocsparse_csrilu0_clear()
 -------------------------
@@ -304,6 +416,32 @@ rocsparse_gtsv()
   :outline:
 .. doxygenfunction:: rocsparse_zgtsv
 
+.. tabs::
+
+   .. tab:: C++
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/precond/example_rocsparse_gtsv.cpp
+         :language: cpp
+         :start-after: //! [doc example]
+         :end-before: //! [doc example]
+         :linenos:
+
+   .. tab:: C
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/precond/example_rocsparse_gtsv_c.c
+         :language: c
+         :start-after: /*! [doc example] */
+         :end-before: /*! [doc example] */
+         :linenos:
+
+   .. tab:: Fortran
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/precond/example_rocsparse_gtsv_fortran.f90
+         :language: fortran
+         :start-after: ! [doc example]
+         :end-before: ! [doc example]
+         :linenos:
+
 rocsparse_gtsv_no_pivot_buffer_size()
 -------------------------------------
 
@@ -311,13 +449,21 @@ rocsparse_gtsv_no_pivot_buffer_size()
   :outline:
 .. doxygenfunction:: rocsparse_dgtsv_no_pivot_buffer_size
   :outline:
+
 .. doxygenfunction:: rocsparse_cgtsv_no_pivot_buffer_size
+   .. tab:: Fortran
   :outline:
+
 .. doxygenfunction:: rocsparse_zgtsv_no_pivot_buffer_size
+      .. literalinclude:: ../../clients/samples/documentation_examples/precond/example_rocsparse_gtsv_no_pivot_fortran.f90
 
+         :language: fortran
 rocsparse_gtsv_no_pivot()
+         :start-after: ! [doc example start]
 -------------------------
+         :end-before: ! [doc example end]
 
+         :linenos:
 .. doxygenfunction:: rocsparse_sgtsv_no_pivot
   :outline:
 .. doxygenfunction:: rocsparse_dgtsv_no_pivot
@@ -326,12 +472,38 @@ rocsparse_gtsv_no_pivot()
   :outline:
 .. doxygenfunction:: rocsparse_zgtsv_no_pivot
 
-rocsparse_gtsv_no_pivot_strided_batch_buffer_size()
----------------------------------------------------
+.. tabs::
 
+   .. tab:: C++
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/precond/example_rocsparse_gtsv_no_pivot.cpp
+         :language: cpp
+         :start-after: //! [doc example]
+         :end-before: //! [doc example]
+         :linenos:
+
+   .. tab:: C
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/precond/example_rocsparse_gtsv_no_pivot_c.c
+         :language: c
+         :start-after: /*! [doc example] */
+         :end-before: /*! [doc example] */
+         :linenos:
+
+
+   .. tab:: Fortran
+rocsparse_gtsv_no_pivot_strided_batch_buffer_size()
+
+---------------------------------------------------
+      .. literalinclude:: ../../clients/samples/documentation_examples/precond/example_rocsparse_gtsv_no_pivot_strided_batch_fortran.f90
+
+         :language: fortran
 .. doxygenfunction:: rocsparse_sgtsv_no_pivot_strided_batch_buffer_size
+         :start-after: ! [doc example start]
   :outline:
+         :end-before: ! [doc example end]
 .. doxygenfunction:: rocsparse_dgtsv_no_pivot_strided_batch_buffer_size
+         :linenos:
   :outline:
 .. doxygenfunction:: rocsparse_cgtsv_no_pivot_strided_batch_buffer_size
   :outline:
@@ -347,6 +519,32 @@ rocsparse_gtsv_no_pivot_strided_batch()
 .. doxygenfunction:: rocsparse_cgtsv_no_pivot_strided_batch
   :outline:
 .. doxygenfunction:: rocsparse_zgtsv_no_pivot_strided_batch
+
+.. tabs::
+
+   .. tab:: Fortran
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/precond/example_rocsparse_gtsv_no_pivot_strided_batch_fortran.f90
+         :language: fortran
+         :start-after: ! [doc example start]
+         :end-before: ! [doc example end]
+         :linenos:
+
+   .. tab:: C++
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/precond/example_rocsparse_gtsv_no_pivot_strided_batch.cpp
+         :language: cpp
+         :start-after: //! [doc example]
+         :end-before: //! [doc example]
+         :linenos:
+
+   .. tab:: C
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/precond/example_rocsparse_gtsv_no_pivot_strided_batch_c.c
+         :language: c
+         :start-after: /*! [doc example] */
+         :end-before: /*! [doc example] */
+         :linenos:
 
 rocsparse_gtsv_interleaved_batch_buffer_size()
 ----------------------------------------------
@@ -369,6 +567,24 @@ rocsparse_gtsv_interleaved_batch()
 .. doxygenfunction:: rocsparse_cgtsv_interleaved_batch
   :outline:
 .. doxygenfunction:: rocsparse_zgtsv_interleaved_batch
+
+.. tabs::
+
+   .. tab:: C++
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/precond/example_rocsparse_gtsv_interleaved_batch.cpp
+         :language: cpp
+         :start-after: //! [doc example]
+         :end-before: //! [doc example]
+         :linenos:
+
+   .. tab:: C
+
+      .. literalinclude:: ../../clients/samples/documentation_examples/precond/example_rocsparse_gtsv_interleaved_batch_c.c
+         :language: c
+         :start-after: /*! [doc example] */
+         :end-before: /*! [doc example] */
+         :linenos:
 
 rocsparse_gpsv_interleaved_batch_buffer_size()
 ----------------------------------------------
