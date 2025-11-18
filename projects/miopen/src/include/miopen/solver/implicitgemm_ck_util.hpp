@@ -88,7 +88,6 @@ using DeviceOpGWrw = ck::tensor_operation::device::DeviceGroupedConvBwdWeight<
     ck::tensor_operation::element_wise::PassThrough,
     ck::tensor_operation::element_wise::PassThrough,
     ck::tensor_operation::element_wise::PassThrough,
-    ComputeType,
     ComputeType>;
 template <typename DataType, typename ComputeType = DataType>
 using DeviceOpGWrwPtrs = ck::tensor_operation::device::instance::DeviceOperationInstanceFactory<
@@ -108,7 +107,6 @@ using DeviceOpGBwd = ck::tensor_operation::device::DeviceGroupedConvBwdDataMulti
     ck::tensor_operation::element_wise::PassThrough,
     ck::tensor_operation::element_wise::PassThrough,
     ck::tensor_operation::element_wise::PassThrough,
-    ComputeType,
     ComputeType>;
 
 template <typename DataType, typename ComputeType = DataType>
@@ -134,7 +132,6 @@ using DeviceOpGBwdWeightDefault =
                                                              PassThrough,
                                                              PassThrough,
                                                              PassThrough,
-                                                             ComputeType,
                                                              ComputeType>;
 
 template <typename DataType, typename ComputeType = DataType>
@@ -151,7 +148,6 @@ using DeviceOpGBwdWeightBilinear =
                                                                       PassThrough,
                                                                       Bilinear,
                                                                       PassThrough,
-                                                                      ComputeType,
                                                                       ComputeType>;
 
 template <typename DataType, typename ComputeType = DataType>
@@ -168,7 +164,6 @@ using DeviceOpGBwdWeightScale =
                                                                       PassThrough,
                                                                       Scale,
                                                                       PassThrough,
-                                                                      ComputeType,
                                                                       ComputeType>;
 
 template <typename DataType, typename ComputeType = DataType>

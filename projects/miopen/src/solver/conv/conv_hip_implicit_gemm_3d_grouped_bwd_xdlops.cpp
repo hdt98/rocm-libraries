@@ -77,7 +77,6 @@ using DeviceOpGBwdBilinear =
                                                                     PassThrough,
                                                                     PassThrough,
                                                                     Bilinear,
-                                                                    ComputeType,
                                                                     ComputeType>;
 
 template <typename DataType, typename ComputeType = DataType>
@@ -94,7 +93,6 @@ using DeviceOpGBwdScale =
                                                                     PassThrough,
                                                                     PassThrough,
                                                                     Scale,
-                                                                    ComputeType,
                                                                     ComputeType>;
 
 template <typename DataType, typename ComputeType = DataType>
@@ -111,7 +109,6 @@ using DeviceOpGBwdDefault =
                                                                     PassThrough,
                                                                     PassThrough,
                                                                     PassThrough,
-                                                                    ComputeType,
                                                                     ComputeType>;
 
 template <typename DataType, typename ComputeType = DataType>
