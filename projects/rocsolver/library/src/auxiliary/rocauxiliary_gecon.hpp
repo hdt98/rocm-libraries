@@ -248,9 +248,9 @@ ROCSOLVER_KERNEL void __launch_bounds__(GECOND_BLOCKSIZE) lacn2_jump2(const I n,
     __shared__ S sval_indices[GECOND_BLOCKSIZE / WarpSize];
 
     // dot
-    T local_max = std::numeric_limits<T>::min()
+    T local_max = std::numeric_limits<T>::min();
     I local_max_index;
-    for(I i = tid; i < m * n; i += GECOND_BLOCKSIZE)
+    for(I i = tid; i < n; i += GECOND_BLOCKSIZE)
     {
         if (rocblas_abs(x[i]) > local_max)
         {
@@ -269,9 +269,10 @@ ROCSOLVER_KERNEL void __launch_bounds__(GECOND_BLOCKSIZE) lacn2_jump2(const I n,
     if (WarpSize > 32)
         lacn2_max_index<T, I>(n, &local_max, &local_max_index, 32);
 
-    if (tid % WarpSize == 0)
+    if (tid % WarpSize == 0){
         sval[tid / WarpSize] = local_max;
         sval_indices[tid / WarpSize] = local_max_index;
+    }
     __syncthreads();
 
 
@@ -432,9 +433,9 @@ ROCSOLVER_KERNEL void __launch_bounds__(GECOND_BLOCKSIZE) lacn2_jump4(const I n,
     __shared__ S sval_indices[GECOND_BLOCKSIZE / WarpSize];
 
     // dot
-    T local_max = std::numeric_limits<T>::min()
+    T local_max = std::numeric_limits<T>::min();
     I local_max_index;
-    for(I i = tid; i < m * n; i += GECOND_BLOCKSIZE)
+    for(I i = tid; i < n; i += GECOND_BLOCKSIZE)
     {
         if (rocblas_abs(x[i]) > local_max)
         {
@@ -452,9 +453,10 @@ ROCSOLVER_KERNEL void __launch_bounds__(GECOND_BLOCKSIZE) lacn2_jump4(const I n,
     if (WarpSize > 32)
         lacn2_max_index<T, I>(n, &local_max, &local_max_index, 32);
 
-    if (tid % WarpSize == 0)
+    if (tid % WarpSize == 0){
         sval[tid / WarpSize] = local_max;
         sval_indices[tid / WarpSize] = local_max_index;
+    }
     __syncthreads();
 
 
