@@ -180,10 +180,20 @@ __device__ inline void lacn2_max_index(const I n, T* local_max, I* local_max_ind
 
 // }
 
+template <int MAX_THDS, typename T, typename I, typename S>
+ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS)
+    lacn2_jump1_n_equals_one(const I n, T* x, S* norm, I* isgn)
+{
+    rocblas_int tid = hipThreadIdx_x;
+
+    if (tid == 0){
+        *norm = rocblas_abs(x[0]);
+    }
+}
 
 template <int MAX_THDS, typename T, typename I, typename S>
 ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS)
-    lacn2_jump1(T* x, const I n, S* norm, I* isgn)
+    lacn2_jump1(const I n, T* x, S* norm, I* isgn)
 {
     rocblas_int tid = hipThreadIdx_x;
 
@@ -300,7 +310,6 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) lacn2_jump3(const I n,
                                                                    I* isgn,
                                                                    rocblas_int* kase,
                                                                    rocblas_int* jump,
-                                                                   S* est_old,
                                                                    S* est)
 {
 
@@ -311,6 +320,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) lacn2_jump3(const I n,
 
     // Sum absolute values
     S sum = 0;
+    S estold;
     bool repeated = true;
     // we iterate over v, since v contains x from previous step (pointers swapped)
     for(I i = tid; i < n; i += MAX_THDS)
@@ -355,7 +365,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) lacn2_jump3(const I n,
             sum += sval[k];
             repeated = repeated && sval_repeated[k];
         }
-        *est_old = *est;
+        estold = *est;
         *est = sum;
         sval_repeated[0] = repeated;
     }
@@ -364,7 +374,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) lacn2_jump3(const I n,
 
     repeated = sval_repeated[0];
 
-    if (repeated || (*est <= *est_old)){
+    if (repeated || (*est <= estold)){
         for(I i = tid; i < n; i += MAX_THDS)
         {
             // we write over old x
@@ -407,14 +417,14 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) lacn2_jump4(const I n,
                                                                    I* isgn,
                                                                    rocblas_int* kase,
                                                                    rocblas_int* jump,
-                                                                   const I* max_index,
+                                                                   const I* max_idx,
                                                                    const S* est,
                                                                    const I iters,
                                                                    const I iters_max)
 {
     I tid = threadIdx.x;
 
-    int jlast = *max_index;
+    int jlast = *max_idx;
 
     // shared variables
     __shared__ S sval[MAX_THDS / WarpSize];
@@ -458,13 +468,13 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) lacn2_jump4(const I n,
             }
         }
         sval_indices[0] = local_max_index;
-        *max_index = local_max_index;
+        *max_idx = local_max_index;
     }
 
     __syncthreads();
 
-    I max_idx = sval_indices[0];
-    if (max_idx == jlast || iters == iters_max){
+    I local_max_idx = sval_indices[0];
+    if (local_max_idx == jlast || iters == iters_max){
         for(rocblas_int i = tid; i < n; i += MAX_THDS)
         {
             // Alternating pattern that changes each iteration
@@ -487,7 +497,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) lacn2_jump4(const I n,
 
     if (tid == 0)
     {
-        x[max_idx] = T(1);
+        x[local_max_idx] = T(1);
         *kase = 1;
         *jump = 3;
     }
@@ -496,7 +506,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) lacn2_jump4(const I n,
 // compute l1 norm of vector v and compare to temporary value
 template <int MAX_THDS, typename T, typename I, typename S>
 ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS)
-    lacn2_jump5(const T* x, const I n, S* norm)
+    lacn2_jump5(const I n, const T* x, S* norm)
 {
     rocblas_int tid = hipThreadIdx_x;
 
@@ -543,14 +553,14 @@ rocblas_status gecon_lacn2(rocblas_handle handle,
                  const rocblas_stride strideP,
                  T* v, // same type as A
                  T* x,
+                 I* isgn,
                 //  I* isave,       // just preserve elements as individual variables (on host?)
-                 S* est,
                  const I* max_iters,
                  I* h_iters,
+                 I* d_max_idx,
                 //  const I d_iters, // on host, just maintain iters as they will be incremented within the kernels // if kernel behaviour could change, then maintain device iters as well
                  S* d_est,
-                 S* d_estold,
-                 I* d_max_idx,
+                //  S* d_estold,
                 //  I* d_jlast,
                 //  I* d_should_break,
                 //  I* d_is_equal,
@@ -565,9 +575,11 @@ rocblas_status gecon_lacn2(rocblas_handle handle,
         case 1:
             if (n == 1)
             {
-                hipMemcpyAsync(est, x, sizeof(S), hipMemcpyDeviceToHost, stream);
-                hipStreamSynchronize(stream);
-                *est = rocblas_abs(*est);
+                // hipMemcpyAsync(est, x, sizeof(S), hipMemcpyDeviceToHost, stream);
+                // hipStreamSynchronize(stream);
+                // *est = rocblas_abs(*est);
+                ROCSOLVER_LAUNCH_KERNEL((lacn2_jump1_n_equals_one<MAX_THDS, T, I, S>), dim3(1), threads, 0,
+                                    stream, x, n, d_est, isgn);
                 *kase = 0; // signal to exit
                 return rocblas_status_success;
             }
@@ -605,7 +617,7 @@ rocblas_status gecon_lacn2(rocblas_handle handle,
         case 3:
             std::swap(x, v);
             ROCSOLVER_LAUNCH_KERNEL((lacn2_jump3<MAX_THDS, T, I, S>), dim3(1), threads, 0,
-                                    stream, x, n, isgn, d_is_equal);
+                                    stream, n, x, v, isgn, d_kase, d_jump, d_est);
 
             hipMemcpyAsync(h_jump, d_jump, sizeof(rocblas_int), hipMemcpyDeviceToHost, stream);
             hipMemcpyAsync(h_kase, d_kase, sizeof(rocblas_int), hipMemcpyDeviceToHost, stream);
@@ -620,7 +632,7 @@ rocblas_status gecon_lacn2(rocblas_handle handle,
             // hipMemcpyAsync(jlast, d_max_idx, sizeof(I), hipMemcpyDeviceToHost, stream);
             // hipStreamSynchronize(stream);
             ROCSOLVER_LAUNCH_KERNEL((lacn2_jump4<MAX_THDS, T, I, S>), dim3(1), threads, 0,
-                                    stream, x, n, isgn, d_is_equal, *h_iters, *max_iters);
+                                    stream, n, x, isgn, d_kase, d_jump, d_max_idx, *h_iters, *max_iters);
 
             hipMemcpyAsync(h_jump, d_jump, sizeof(rocblas_int), hipMemcpyDeviceToHost, stream);
             hipMemcpyAsync(h_kase, d_kase, sizeof(rocblas_int), hipMemcpyDeviceToHost, stream);
@@ -632,7 +644,7 @@ rocblas_status gecon_lacn2(rocblas_handle handle,
             break;
         case 5:
             ROCSOLVER_LAUNCH_KERNEL((lacn2_jump5<MAX_THDS, T, I, S>), dim3(1), threads, 0,
-                                    stream, x, n, d_est);
+                                    stream, n, x, d_est);
             // copy x onto v
             std::swap(x, v);
             *h_kase = 0;
