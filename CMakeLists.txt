@@ -138,6 +138,8 @@ if("origami" IN_LIST ROCM_LIBS_ENABLE_COMPONENTS)
 endif()
 
 if("tensile" IN_LIST ROCM_LIBS_ENABLE_COMPONENTS)
+    set(TENSILE_BUILD_SHARED_LIBS OFF)
+    set(TENSILE_NO_ENUMERATE ON)
     add_subdirectory_with_message(
         COMPONENT tensile
         PREFIX_PATH shared
@@ -164,11 +166,11 @@ if("hipblaslt" IN_LIST ROCM_LIBS_ENABLE_COMPONENTS)
 endif()
 
 if("rocblas" IN_LIST ROCM_LIBS_ENABLE_COMPONENTS)
-   add_subdirectory_with_message(
-       COMPONENT rocblas
-       PREFIX_PATH projects
-       EXPECT_TARGET roc::rocblas
-   )
+    add_subdirectory_with_message(
+        COMPONENT rocblas
+        PREFIX_PATH projects
+        EXPECT_TARGET roc::rocblas
+    )
 endif()
 
 if("rocprim" IN_LIST ROCM_LIBS_ENABLE_COMPONENTS)
