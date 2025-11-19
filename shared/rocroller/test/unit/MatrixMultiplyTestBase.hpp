@@ -99,16 +99,24 @@ namespace MatrixMultiplyTest
             if constexpr(isF8<TA> || isF8<TB>)
             {
                 REQUIRE_ANY_OF_ARCH_CAP(GPUCapability::HasMFMA_fp8,
-                                        GPUCapability::HasWMMA_f32_16x16x16_f8);
+                                        GPUCapability::HasWMMA_f32_16x16x16_f8,
+                                        GPUCapability::HasWMMA_f32_16x16x64_f8);
             }
             if constexpr(isF6F4<TA> || isF6F4<TB>)
             {
-                REQUIRE_ANY_OF_ARCH_CAP(GPUCapability::HasMFMA_f8f6f4);
+                REQUIRE_ANY_OF_ARCH_CAP(GPUCapability::HasMFMA_f8f6f4,
+                                        GPUCapability::HasWMMA_f8f6f4);
+            }
+
+            if constexpr(isF32<TA> || isF32<TB>)
+            {
+                REQUIRE_ARCH_CAP(GPUCapability::HasWMMA_f32_16x16x4_f32);
             }
 
             if((isF8<TA> || isF8<TB>)&&(wave_k >= 64))
             {
-                REQUIRE_ANY_OF_ARCH_CAP(GPUCapability::HasMFMA_f8f6f4);
+                REQUIRE_ANY_OF_ARCH_CAP(GPUCapability::HasMFMA_f8f6f4,
+                                        GPUCapability::HasWMMA_f8f6f4);
             }
 
             const bool scaleA         = scaleParams.scaleTypeA != DataType::None;
@@ -119,7 +127,9 @@ namespace MatrixMultiplyTest
 
             if(scaleA || scaleB)
             {
-                REQUIRE_ANY_OF_ARCH_CAP(GPUCapability::HasMFMA_scale_f8f6f4);
+                REQUIRE_ANY_OF_ARCH_CAP(GPUCapability::HasMFMA_scale_f8f6f4,
+                                        GPUCapability::HasWMMA_scale_f8f6f4,
+                                        GPUCapability::HasWMMA_scale16_f8f6f4);
                 const auto& arch = m_context->targetArchitecture();
                 AssertFatal(!scaleA || arch.isSupportedScaleType(scaleTypeA),
                             fmt::format("Scale A set but target {} does not support scale type {}.",
@@ -511,11 +521,16 @@ namespace MatrixMultiplyTest
             if constexpr(isF8<TA> || isF8<TB>)
             {
                 REQUIRE_ANY_OF_ARCH_CAP(GPUCapability::HasMFMA_fp8,
-                                        GPUCapability::HasWMMA_f32_16x16x16_f8);
+                                        GPUCapability::HasWMMA_f32_16x16x16_f8,
+                                        GPUCapability::HasWMMA_f32_16x16x64_f8);
             }
             if constexpr(isF6F4<TA> || isF6F4<TB>)
             {
                 REQUIRE_ARCH_CAP(GPUCapability::HasMFMA_f8f6f4);
+            }
+            if constexpr(isF32<TA> || isF32<TB>)
+            {
+                REQUIRE_ARCH_CAP(GPUCapability::HasWMMA_f32_16x16x4_f32);
             }
 
             auto dataTypeA   = TypeInfo<TA>::Var.dataType;
