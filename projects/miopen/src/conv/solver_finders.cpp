@@ -45,6 +45,9 @@ MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_COMPILE_ONLY)
 
 MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_FIND_CONV_INSUFFICIENT_WORKSPACE_ALLOW_FINDDB_UPDATE)
 
+MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_SEARCH_CUTOFF, false)
+MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_SEARCH_SKIP_PCT, 130)
+
 namespace miopen {
 
 namespace conv {
@@ -205,8 +208,8 @@ const std::vector<std::unique_ptr<ISolversFinder>>& GetConvSolverFinders()
         tmp.emplace_back(std::make_unique<ImplicitGemmSolverFinder>());
         tmp.emplace_back(std::make_unique<GemmSolverFinder>());
         tmp.emplace_back(std::make_unique<WinogradSolverFinder>());
-        tmp.emplace_back(std::make_unique<DirectSolverFinder>());
         tmp.emplace_back(std::make_unique<FftSolverFinder>());
+        tmp.emplace_back(std::make_unique<DirectSolverFinder>());
         return tmp;
     }();
 
@@ -221,13 +224,14 @@ std::vector<Solution> EvaluateInvokers(const Handle& handle,
                                        const AlgorithmName& algorithm_name,
                                        const NetworkConfig& network_config,
                                        const AnyInvokeParams& invoke_ctx,
-                                       bool& is_result_optimal,
+                                       FindCoreResult& core_result,
                                        bool force_attach_binary)
 {
     const auto arch = env::value(MIOPEN_DEVICE_ARCH);
     if(!arch.empty())
         return {};
 
+    bool using_search_cutoff = env::value(MIOPEN_SEARCH_CUTOFF);
     auto selected     = miopen::solver::ConvSolution{miopenStatusUnknownError};
     auto best         = std::numeric_limits<float>::max();
     auto best_invoker = Invoker{};
@@ -250,12 +254,26 @@ std::vector<Solution> EvaluateInvokers(const Handle& handle,
             // That is why we do not write sub-optimal results into persistent find-db (on disk)
             // unless this is explicitly enabled via environment setting.
             if(!env::enabled(MIOPEN_FIND_CONV_INSUFFICIENT_WORKSPACE_ALLOW_FINDDB_UPDATE))
-                is_result_optimal = false;
+                core_result.is_optimal = false;
             continue;
         }
 
         if(!sol.invoker_factory)
             MIOPEN_THROW("Invoker is not provided by solver " + sol.solver_id);
+
+        float skip_time = core_result.find_search_best_time;
+        if(skip_time < std::numeric_limits<float>::max())
+        {
+            skip_time *= env::value(MIOPEN_SEARCH_SKIP_PCT) / 100.0f;
+            // skip Naive if another solver has been timed.
+            if(sol.solver_id.find("Naive") != std::string::npos)
+            {
+                //s.SolverDbId()
+                MIOPEN_LOG_I("Skipping Naive solver: " << sol.solver_id);
+                continue;
+            }
+        }
+        MIOPEN_LOG_I("Evaluating solver: " << algorithm_name.ToString() << ":"<< sol.solver_id);
 
         std::vector<Program> programs;
         const auto invoker = handle.PrepareInvoker(*sol.invoker_factory,
@@ -272,6 +290,7 @@ std::vector<Solution> EvaluateInvokers(const Handle& handle,
             auto first_elapsed              = static_cast<elapsed_t>(0);
             int i                           = 0;
             samples.clear();
+
             while(i < N_RUNS_MAX && elapsed < TIME_MS_MAX)
             {
                 invoker(handle, invoke_ctx);
@@ -280,6 +299,8 @@ std::vector<Solution> EvaluateInvokers(const Handle& handle,
                 if(i > 0)
                 {
                     samples.push_back(handle.GetKernelTime());
+                    if(i == 1 && using_search_cutoff && samples.front() > skip_time)
+                        break;
                 }
                 else
                 {
@@ -308,6 +329,7 @@ std::vector<Solution> EvaluateInvokers(const Handle& handle,
                 best         = elapsed;
                 selected     = sol;
                 best_invoker = invoker;
+                core_result.find_search_best_time = best;
             }
 
             auto solution = Solution{solver::Id{sol.solver_id}, elapsed, sol.workspace_sz};
@@ -355,6 +377,7 @@ FindCoreResult FindCore(const AnyInvokeParams& invoke_ctx,
 
     for(auto it = solutions.begin(); it != solutions.end();)
     {
+        MIOPEN_LOG_I("testing alg: " << it->first.ToString()); 
         if(it->second.empty())
         {
             it = solutions.erase(it);
@@ -392,12 +415,13 @@ FindCoreResult FindCore(const AnyInvokeParams& invoke_ctx,
 
     for(const auto& ss : solutions)
     {
+        MIOPEN_LOG_I("Eval alg: " << ss.first.ToString()); 
         auto evaluated = EvaluateInvokers(handle,
                                           ss.second,
                                           ss.first,
                                           network_config,
                                           invoke_ctx,
-                                          ret.is_optimal,
+                                          ret,
                                           force_attach_binary);
 
         ret.solutions.insert(ret.solutions.end(),
