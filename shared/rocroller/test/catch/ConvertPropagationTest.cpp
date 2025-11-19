@@ -40,6 +40,7 @@
 #include <rocRoller/CodeGen/CopyGenerator.hpp>
 #include <rocRoller/CodeGen/Instruction.hpp>
 #include <rocRoller/CodeGen/MemoryInstructions.hpp>
+#include <rocRoller/CommandSolution.hpp>
 #include <rocRoller/Expression.hpp>
 #include <rocRoller/ExpressionTransformations.hpp>
 
@@ -301,25 +302,32 @@ namespace ExpressionTest
 
         auto d_result = make_shared_device<int32_t>();
 
-        int64_t a = (int64_t(std::numeric_limits<int32_t>::max()) << 2) + int64_t(0xffff);
-        int64_t b = 10;
-        int64_t c = 1;
+        //int64_t a = (int64_t(std::numeric_limits<int32_t>::max()) << 2) + int64_t(0xffff);
+        //int64_t b = 10;
+        //int64_t c = 1;
 
-        std::cout << a << std::endl;
+        //std::cout << a << std::endl;
 
-        int32_t r = int32_t(int64_t(a / b) + c);
+        for(auto const a : TestValues::int64Values)
+        {
+            for(auto const b : TestValues::int64Values)
+            {
+                if(b == 0) // cannot divide by 0
+                    continue;
 
-        kernel({}, d_result.get(), a, b, c);
+                int64_t c = 0;
 
-        int32_t result;
+                int32_t r = int32_t(int64_t(a / b) + c);
 
-        hipMemcpy(&result, d_result.get(), sizeof(int32_t), hipMemcpyDefault);
+                kernel({}, d_result.get(), a, b, c);
 
-        std::cout << r << " / " << result << "\n";
+                int32_t result;
+
+                CHECK_THAT(d_result, HasDeviceScalarEqualTo(r));
+            }
+        }
 
         auto const assembly = NormalizedSource(context.output());
-
-        CHECK_THAT(d_result, HasDeviceScalarEqualTo(r));
 
         // Should not do sign extension and should do 32-bit addition
         CHECK_THAT(assembly, Catch::Matchers::ContainsSubstring("v_ashrrev_i32"));
@@ -408,6 +416,7 @@ namespace ExpressionTest
             kernel->addArgument(
                 {"result", {m_resultType, PointerType::PointerGlobal}, DataDirection::WriteOnly});
 
+            // what this kernel does:  convert(Int32, A/B + C). A, B and C are 64-bit
             auto opA  = m_command->addOperation(rocRoller::Operations::Scalar(m_aType));
             auto argA = m_command->allocateArgument(
                 m_aType, opA, rocRoller::ArgumentType::Value, rocRoller::DataDirection::ReadOnly);
@@ -473,4 +482,139 @@ namespace ExpressionTest
         CHECK_THAT(d_result, HasDeviceScalarEqualTo(r));
     }
 
+    TEST_CASE("enableDivideBy", "[z456][gpu][convert-propagation]")
+    {
+        using namespace rocRoller::Expression;
+        using namespace rocRoller::KernelGraph;
+        using namespace rocRoller::KernelGraph::CoordinateGraph;
+
+        // What this kernel does:  result = convert(Int32, A/B + C). A, B and C are 64-bit
+        auto typeResult = DataType::Int32;
+
+        DataType typeA, typeB, typeC;
+        typeA = typeB = typeC = DataType::Int64;
+
+        auto command = std::make_shared<rocRoller::Command>();
+
+        auto allocateTagAndArg = [&](DataType const d, PointerType const p, ArgumentType const a) {
+            auto tag = command->allocateTag();
+            auto arg = command->allocateArgument({d, p}, tag, a);
+            return std::make_pair(tag, arg);
+        };
+
+        auto [tagResult, argResult]
+            = allocateTagAndArg(typeResult, PointerType::PointerGlobal, ArgumentType::Value);
+        auto [tagA, argA] = allocateTagAndArg(typeA, PointerType::Value, ArgumentType::Value);
+        auto [tagB, argB] = allocateTagAndArg(typeB, PointerType::Value, ArgumentType::Value);
+        auto [tagC, argC] = allocateTagAndArg(typeC, PointerType::Value, ArgumentType::Value);
+
+        auto context = TestContext::ForTestDevice({{.enableFullDivision = true}});
+        auto kernel  = context->kernel();
+        kernel->addArgument({argResult->name(),
+                             {typeResult, PointerType::PointerGlobal},
+                             DataDirection::WriteOnly,
+                             std::make_shared<rocRoller::Expression::Expression>(argResult)});
+        auto exprA = kernel->addCommandArgument(argA);
+        auto exprB = kernel->addCommandArgument(argB);
+        auto exprC = kernel->addCommandArgument(argC);
+
+        auto expr = convert(DataType::Int32, exprA / exprB + exprC);
+        enableDivideBy(exprB, context.get());
+
+        auto one  = std::make_shared<rocRoller::Expression::Expression>(1u);
+        auto zero = std::make_shared<rocRoller::Expression::Expression>(0u);
+        kernel->setWorkgroupSize({1, 1, 1});
+        kernel->setWorkitemCount({one, one, one});
+        kernel->setDynamicSharedMemBytes(zero);
+
+        context->schedule(kernel->preamble());
+        context->schedule(kernel->prolog());
+
+        auto kb = [&]() -> Generator<Instruction> {
+            Register::ValuePtr s_result, s_a, s_b, s_c;
+            co_yield context->argLoader()->getValue(argResult->name(), s_result);
+            //co_yield context->argLoader()->getValue(argA->name(), s_a);
+            //co_yield context->argLoader()->getValue(argC->name(), s_c);
+
+            auto v_result = Register::Value::Placeholder(
+                context.get(), Register::Type::Vector, {typeResult, PointerType::PointerGlobal}, 1);
+
+            //auto v_a = s_a->placeholder(Register::Type::Vector, {});
+            //auto v_c = s_c->placeholder(Register::Type::Vector, {});
+
+            Log::info("Original expr = {}", toString(expr));
+
+            co_yield v_result->allocate();
+            //co_yield v_a->allocate();
+            //co_yield v_c->allocate();
+
+            co_yield context->copier()->copy(v_result, s_result, "Move pointer result");
+            //co_yield context->copier()->copy(v_a, s_a, "Move A");
+            //co_yield context->copier()->copy(v_c, s_c, "Move C");
+
+            Register::ValuePtr s_d;
+            // Generate the target expression
+            co_yield rocRoller::Expression::generate(s_d, expr, context.get());
+
+            auto v_tmp = Register::Value::Placeholder(
+                context.get(), Register::Type::Vector, typeResult, 1);
+            co_yield context->copier()->copy(
+                v_tmp, s_d, "Move result to a temporary VGPR to store.");
+
+            co_yield context->mem()->storeGlobal(
+                v_result, v_tmp, 0, DataTypeInfo::Get(typeResult).elementBytes);
+        };
+
+        context->schedule(kb());
+        context->schedule(kernel->postamble());
+        context->schedule(kernel->amdgpu_metadata());
+
+        std::shared_ptr<rocRoller::ExecutableKernel> executableKernel
+            = context->instructions()->getExecutableKernel();
+
+        CommandKernel commandKernel;
+        commandKernel.setContext(context.get());
+        commandKernel.generateKernel();
+
+        //int64_t a = (int64_t(std::numeric_limits<int32_t>::max()) << 2) + int64_t(0xffff);
+        //int64_t b = 10;
+        //int64_t c = 0;
+        //int32_t r = int32_t(int64_t(a / b) + c);
+
+        //auto commandArgs = command->createArguments();
+
+        //auto d_result = make_shared_device<int32_t>();
+        //commandArgs.setArgument(tagResult, ArgumentType::Value, d_result.get());
+        //commandArgs.setArgument(tagA, ArgumentType::Value, a);
+        //commandArgs.setArgument(tagB, ArgumentType::Value, b);
+        //commandArgs.setArgument(tagC, ArgumentType::Value, c);
+
+        //commandKernel.launchKernel(commandArgs.runtimeArguments());
+
+        //CHECK_THAT(d_result, HasDeviceScalarEqualTo(r));
+
+        auto d_result = make_shared_device<int32_t>();
+        for(auto const a : TestValues::int64Values)
+        {
+            for(auto const b : TestValues::int64Values)
+            {
+                if(b == 0)
+                    continue;
+
+                int64_t c = 0;
+                int32_t r = int32_t(int64_t(a / b) + c);
+
+                auto commandArgs = command->createArguments();
+
+                commandArgs.setArgument(tagResult, ArgumentType::Value, d_result.get());
+                commandArgs.setArgument(tagA, ArgumentType::Value, a);
+                commandArgs.setArgument(tagB, ArgumentType::Value, b);
+                commandArgs.setArgument(tagC, ArgumentType::Value, c);
+
+                commandKernel.launchKernel(commandArgs.runtimeArguments());
+
+                CHECK_THAT(d_result, HasDeviceScalarEqualTo(r));
+            }
+        }
+    }
 }
