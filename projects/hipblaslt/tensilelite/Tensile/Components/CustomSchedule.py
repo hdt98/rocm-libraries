@@ -688,7 +688,6 @@ def _get_schedule_256x160x64_16bit(kernel, useLDSTr, TLDS):
     return True, opt1
 
 def _get_schedule_240x256x64_16bit(kernel, useLDSTr, TLDS):
-    print ("In here")
     kernel["MfmaInitCVgprs"] = True
     optSchedule = dict()
     syncCode = []
