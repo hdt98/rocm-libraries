@@ -30,11 +30,20 @@
 #undef DEVICE_GRID_YZ_16BIT
 #endif
 
-#if defined(__HIP_DEVICE_COMPILE__) && defined(__GFX12__)
+#if defined(__HIP_DEVICE_COMPILE__) && (defined(__SPIRV__) || defined(__GFX12__))
+// for SPIRV we have to assume this limitation for initial compile
 #define DEVICE_GRID_YZ_16BIT 1
 #else
 #define DEVICE_GRID_YZ_16BIT 0
 #endif
+
+#define DEVICE_GRID_SETUP                                                                    \
+    uint32_t dc_YZ_grid_launch_limit = (int)0x7fffffff;                                      \
+    if(__builtin_amdgcn_processor_is("gfx1200") || __builtin_amdgcn_processor_is("gfx1201")) \
+        dc_YZ_grid_launch_limit = c_YZ_grid_launch_limit;
+
+#define DEVICE_GRID_CONTINUE \
+    (__builtin_amdgcn_processor_is("gfx1200") || __builtin_amdgcn_processor_is("gfx1201"))
 
 #define WARP_32 32
 #define WARP_64 64

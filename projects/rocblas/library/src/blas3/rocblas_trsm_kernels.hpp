@@ -161,7 +161,8 @@ rocblas_copy_matrix_trsm(rocblas_int    rows,
     uint32_t batch = blockIdx.z;
 
 #if DEVICE_GRID_YZ_16BIT
-    for(; batch < batch_count; batch += c_YZ_grid_launch_limit)
+    DEVICE_GRID_SETUP
+    do
     {
 #endif
 
@@ -174,7 +175,7 @@ rocblas_copy_matrix_trsm(rocblas_int    rows,
             xb[tx + size_t(ldb) * ty] = xa[tx + size_t(lda) * ty];
 
 #if DEVICE_GRID_YZ_16BIT
-    }
+    } while((batch += dc_YZ_grid_launch_limit) < batch_count);
 #endif
 }
 
@@ -244,7 +245,8 @@ rocblas_set_matrix_trsm(int64_t        rows,
     uint32_t batch = blockIdx.z;
 
 #if DEVICE_GRID_YZ_16BIT
-    for(; batch < batch_count; batch += c_YZ_grid_launch_limit)
+    DEVICE_GRID_SETUP
+    do
     {
 #endif
 
@@ -254,7 +256,7 @@ rocblas_set_matrix_trsm(int64_t        rows,
             xa[tx + lda * ty] = T(0.0);
 
 #if DEVICE_GRID_YZ_16BIT
-    }
+    } while((batch += dc_YZ_grid_launch_limit) < batch_count);
 #endif
 }
 
@@ -2013,15 +2015,16 @@ rocblas_trsm_small_right_device(rocblas_fill      uplo,
 {
     auto alpha = load_scalar(alpha_dev_host);
 
-    uint32_t batchid = blockIdx.z;
+    uint32_t batch = blockIdx.z;
 
 #if DEVICE_GRID_YZ_16BIT
-    for(; batchid < batch_count; batchid += c_YZ_grid_launch_limit)
+    DEVICE_GRID_SETUP
+    do
     {
 #endif
 
-        auto A = load_ptr_batch(Aa, batchid, offset_A, stride_A);
-        auto B = load_ptr_batch(Ba, batchid, offset_B, stride_B);
+        auto A = load_ptr_batch(Aa, batch, offset_A, stride_A);
+        auto B = load_ptr_batch(Ba, batch, offset_B, stride_B);
 
         bool      LOWER = uplo == rocblas_fill_lower;
         bool      CONJ  = transA == rocblas_operation_conjugate_transpose;
@@ -2268,7 +2271,7 @@ rocblas_trsm_small_right_device(rocblas_fill      uplo,
         }
 
 #if DEVICE_GRID_YZ_16BIT
-    }
+    } while((batch += dc_YZ_grid_launch_limit) < batch_count);
 #endif
 }
 
@@ -2297,15 +2300,16 @@ rocblas_trsm_small_64_right_device(rocblas_fill      uplo,
 {
     auto alpha = load_scalar(alpha_dev_host);
 
-    uint32_t batchid = blockIdx.z;
+    uint32_t batch = blockIdx.z;
 
 #if DEVICE_GRID_YZ_16BIT
-    for(; batchid < batch_count; batchid += c_YZ_grid_launch_limit)
+    DEVICE_GRID_SETUP
+    do
     {
 #endif
 
-        auto A = load_ptr_batch(Aa, batchid, offset_A, stride_A);
-        auto B = load_ptr_batch(Ba, batchid, offset_B, stride_B);
+        auto A = load_ptr_batch(Aa, batch, offset_A, stride_A);
+        auto B = load_ptr_batch(Ba, batch, offset_B, stride_B);
 
         bool      LOWER = uplo == rocblas_fill_lower;
         bool      CONJ  = transA == rocblas_operation_conjugate_transpose;
@@ -2403,7 +2407,7 @@ rocblas_trsm_small_64_right_device(rocblas_fill      uplo,
         }
 
 #if DEVICE_GRID_YZ_16BIT
-    }
+    } while((batch += dc_YZ_grid_launch_limit) < batch_count);
 #endif
 }
 
@@ -2441,14 +2445,15 @@ rocblas_trsm_small_left_device(rocblas_fill      uplo,
     bool CONJ  = transA == rocblas_operation_conjugate_transpose;
     auto alpha = load_scalar(alpha_dev_host);
 
-    uint32_t batchid = blockIdx.z;
+    uint32_t batch = blockIdx.z;
 
 #if DEVICE_GRID_YZ_16BIT
-    for(; batchid < batch_count; batchid += c_YZ_grid_launch_limit)
+    DEVICE_GRID_SETUP
+    do
     {
 #endif
-        auto A = load_ptr_batch(Aa, batchid, offset_A, stride_A);
-        auto B = load_ptr_batch(Ba, batchid, offset_B, stride_B);
+        auto A = load_ptr_batch(Aa, batch, offset_A, stride_A);
+        auto B = load_ptr_batch(Ba, batch, offset_B, stride_B);
 
         const int tx = threadIdx.x;
         const int bx = blockIdx.x;
@@ -2625,7 +2630,7 @@ rocblas_trsm_small_left_device(rocblas_fill      uplo,
         }
 
 #if DEVICE_GRID_YZ_16BIT
-    }
+    } while((batch += dc_YZ_grid_launch_limit) < batch_count);
 #endif
 }
 
@@ -2656,14 +2661,15 @@ rocblas_trsm_small_left_device_sharedB(rocblas_fill      uplo,
     bool CONJ  = transA == rocblas_operation_conjugate_transpose;
     auto alpha = load_scalar(alpha_dev_host);
 
-    uint32_t batchid = blockIdx.z;
+    uint32_t batch = blockIdx.z;
 
 #if DEVICE_GRID_YZ_16BIT
-    for(; batchid < batch_count; batchid += c_YZ_grid_launch_limit)
+    DEVICE_GRID_SETUP
+    do
     {
 #endif
-        auto A = load_ptr_batch(Aa, batchid, offset_A, stride_A);
-        auto B = load_ptr_batch(Ba, batchid, offset_B, stride_B);
+        auto A = load_ptr_batch(Aa, batch, offset_A, stride_A);
+        auto B = load_ptr_batch(Ba, batch, offset_B, stride_B);
 
         const int tx = threadIdx.x;
         const int bx = blockIdx.x;
@@ -2852,7 +2858,7 @@ rocblas_trsm_small_left_device_sharedB(rocblas_fill      uplo,
         }
 
 #if DEVICE_GRID_YZ_16BIT
-    }
+    } while((batch += dc_YZ_grid_launch_limit) < batch_count);
 #endif
 }
 
@@ -2881,15 +2887,16 @@ rocblas_trsm_small_64_left_device(rocblas_fill      uplo,
 {
     auto alpha = load_scalar(alpha_dev_host);
 
-    uint32_t batchid = blockIdx.z;
+    uint32_t batch = blockIdx.z;
 
 #if DEVICE_GRID_YZ_16BIT
-    for(; batchid < batch_count; batchid += c_YZ_grid_launch_limit)
+    DEVICE_GRID_SETUP
+    do
     {
 #endif
 
-        auto A = load_ptr_batch(Aa, batchid, offset_A, stride_A);
-        auto B = load_ptr_batch(Ba, batchid, offset_B, stride_B);
+        auto A = load_ptr_batch(Aa, batch, offset_A, stride_A);
+        auto B = load_ptr_batch(Ba, batch, offset_B, stride_B);
 
         bool      LOWER = uplo == rocblas_fill_lower;
         bool      CONJ  = transA == rocblas_operation_conjugate_transpose;
@@ -2988,7 +2995,7 @@ rocblas_trsm_small_64_left_device(rocblas_fill      uplo,
         }
 
 #if DEVICE_GRID_YZ_16BIT
-    }
+    } while((batch += dc_YZ_grid_launch_limit) < batch_count);
 #endif
 }
 
@@ -3180,14 +3187,15 @@ ROCBLAS_KERNEL_NO_BOUNDS rocblas_trsm_block_backward_substitution(rocblas_operat
     const bool CONJ  = transA == rocblas_operation_conjugate_transpose;
     auto       alpha = load_scalar(alpha_dev_host);
 
-    uint32_t batchid = blockIdx.z;
+    uint32_t batch = blockIdx.z;
 
 #if DEVICE_GRID_YZ_16BIT
-    for(; batchid < batch_count; batchid += c_YZ_grid_launch_limit)
+    DEVICE_GRID_SETUP
+    do
     {
 #endif
-        auto A = load_ptr_batch(Aa, batchid, offset_A, stride_A);
-        auto B = load_ptr_batch(Ba, batchid, offset_B, stride_B);
+        auto A = load_ptr_batch(Aa, batch, offset_A, stride_A);
+        auto B = load_ptr_batch(Ba, batch, offset_B, stride_B);
 
         int64_t       lda_norm  = TRANSA ? lda : 1;
         int64_t       lda_trans = TRANSA ? 1 : lda;
@@ -3267,7 +3275,7 @@ ROCBLAS_KERNEL_NO_BOUNDS rocblas_trsm_block_backward_substitution(rocblas_operat
         }
 
 #if DEVICE_GRID_YZ_16BIT
-    }
+    } while((batch += dc_YZ_grid_launch_limit) < batch_count);
 #endif
 }
 
@@ -3301,14 +3309,15 @@ ROCBLAS_KERNEL_NO_BOUNDS rocblas_trsm_block_forward_substitution(rocblas_operati
     const int64_t ldb_norm  = TRANSB ? 1 : ldb;
     const int64_t ldb_trans = TRANSB ? ldb : 1;
 
-    uint32_t batchid = blockIdx.z;
+    uint32_t batch = blockIdx.z;
 
 #if DEVICE_GRID_YZ_16BIT
-    for(; batchid < batch_count; batchid += c_YZ_grid_launch_limit)
+    DEVICE_GRID_SETUP
+    do
     {
 #endif
-        auto A = load_ptr_batch(Aa, batchid, offset_A, stride_A);
-        auto B = load_ptr_batch(Ba, batchid, offset_B, stride_B);
+        auto A = load_ptr_batch(Aa, batch, offset_A, stride_A);
+        auto B = load_ptr_batch(Ba, batch, offset_B, stride_B);
 
         const int     tx   = threadIdx.x;
         const int     ty   = threadIdx.y;
@@ -3378,7 +3387,7 @@ ROCBLAS_KERNEL_NO_BOUNDS rocblas_trsm_block_forward_substitution(rocblas_operati
         }
 
 #if DEVICE_GRID_YZ_16BIT
-    }
+    } while((batch += dc_YZ_grid_launch_limit) < batch_count);
 #endif
 }
 

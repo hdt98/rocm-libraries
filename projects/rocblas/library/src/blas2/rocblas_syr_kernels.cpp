@@ -41,7 +41,8 @@ rocblas_syr_kernel_inc1(rocblas_int    n,
     uint32_t batch = blockIdx.z;
 
 #if DEVICE_GRID_YZ_16BIT
-    for(; batch < batch_count; batch += c_YZ_grid_launch_limit)
+    DEVICE_GRID_SETUP
+    do
     {
 #endif
         auto alpha = load_scalar(alpha_device_host, batch, stride_alpha);
@@ -87,7 +88,7 @@ rocblas_syr_kernel_inc1(rocblas_int    n,
         // if(uplo == rocblas_fill_lower ? tx < n && ty <= tx : ty < n && tx <= ty)
         // A[tx + size_t(lda) * ty] += alpha * x[tx] * x[ty];
 #if DEVICE_GRID_YZ_16BIT
-    }
+    } while((batch += dc_YZ_grid_launch_limit) < batch_count);
 #endif
 }
 
@@ -110,7 +111,8 @@ rocblas_syr_kernel(rocblas_int    n,
     uint32_t batch = blockIdx.z;
 
 #if DEVICE_GRID_YZ_16BIT
-    for(; batch < batch_count; batch += c_YZ_grid_launch_limit)
+    DEVICE_GRID_SETUP
+    do
     {
 #endif
         auto alpha = load_scalar(alpha_device_host, batch, stride_alpha);
@@ -153,7 +155,7 @@ rocblas_syr_kernel(rocblas_int    n,
         A[tx + lda * ty] += alpha * x[tx * incx] * x[ty * incx];
 
 #if DEVICE_GRID_YZ_16BIT
-    }
+    } while((batch += dc_YZ_grid_launch_limit) < batch_count);
 #endif
 }
 
