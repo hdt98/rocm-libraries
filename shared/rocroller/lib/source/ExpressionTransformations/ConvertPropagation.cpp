@@ -53,7 +53,7 @@ namespace rocRoller
             template <typename Expr>
             requires CBinary<Expr> &&(!CShift<Expr>)ExpressionPtr operator()(Expr const& expr) const
             {
-                if constexpr(std::same_as<Expr, Divide>)
+                if constexpr(std::same_as<Expr, Divide> or std::same_as<Expr, Modulo>)
                 {
                     auto const resultDataType = resultVariableType(expr).dataType;
                     if(DataTypeInfo::Get(resultDataType).elementBytes

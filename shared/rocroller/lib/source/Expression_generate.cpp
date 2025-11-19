@@ -1290,8 +1290,6 @@ namespace rocRoller
                     dest = v.resultPlaceholder(resType, false);
             }
 
-            Log::info("After expr = {}", toString(expr));
-
             ExpressionTree tree;
             tree = consolidateSubExpressions(expr, context);
 
