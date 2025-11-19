@@ -29,15 +29,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install pre-commit
           sudo apt-get update
-          # The rest are managed by pre-commit mirror
+          # Others are managed by pre-commit mirror
           sudo apt-get install -y \
-            clang-format-18 \
             flatbuffers-compiler
-
-      - name: Configure Git
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Run pre-commit checks
         run: |
@@ -69,5 +63,5 @@ jobs:
 
           echo ""
           echo "================================================"
-          echo "✅ All pre-commit checks passed
+          echo "✅ All pre-commit checks passed"
           echo "================================================"
