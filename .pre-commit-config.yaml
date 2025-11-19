@@ -55,7 +55,7 @@ repos:
       - id: flatc-hipdnn
         name: flatc (hipDNN)
         entry: |
-          bash -c 'if ! flatc --version &> /dev/null; then echo "ERROR: flatc missing. For hipDNN changes, please run: apt-get install flatbuffers-compiler" >&2; exit 1; fi; for file in "$@"; do flatc -I projects/hipdnn/sdk/schemas --cpp --gen-object-api --gen-mutable --gen-compare --defaults-json --scoped-enums -o projects/hipdnn/sdk/include/hipdnn_sdk/data_objects "$file" || exit 1; done' --
+          bash -c 'if ! flatc --version &> /dev/null; then echo "ERROR: flatc missing. Please run: apt-get install flatbuffers-compiler" >&2; exit 1; fi; for file in "$@"; do flatc -I projects/hipdnn/sdk/schemas --cpp --gen-object-api --gen-mutable --gen-compare --defaults-json --scoped-enums -o projects/hipdnn/sdk/include/hipdnn_sdk/data_objects "$file" || exit 1; done' --
         language: system
         files: ^projects/hipdnn/sdk/schemas/.*\.fbs$
         pass_filenames: true
