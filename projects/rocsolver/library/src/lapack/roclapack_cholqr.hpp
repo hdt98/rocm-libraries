@@ -38,6 +38,8 @@
 
 ROCSOLVER_BEGIN_NAMESPACE
 
+bool constexpr use_syrk = true;
+
 static inline void adjust_for_alignment(size_t& size_work)
 {
     constexpr int ialign = 256;
@@ -152,8 +154,7 @@ static void copy_array_to_ptr(hipStream_t stream,
     // -----------------------------------------------
     // convert from strided batched to pointer batched
     // -----------------------------------------------
-    auto const warp_size = get_warp_size();
-    auto const nx = warp_size;
+    auto const nx = 64;
     auto const nbx = ceil(batch_count, nx);
 
     copy_array_to_ptrs_kernel<T, I, Istride><<<dim3(nbx, 1, 1), dim3(nx, 1, 1), 0, stream>>>(
@@ -477,6 +478,8 @@ static rocblas_status rocblasCall_syrk_herk_alt(rocblas_handle handle,
     }
     else
     {
+        auto const pfree_saved = pfree;
+
         T** A_ptr = nullptr;
         T** B_ptr = nullptr;
 
@@ -530,7 +533,17 @@ static rocblas_status rocblasCall_syrk_herk_alt(rocblas_handle handle,
                                              B_ptr);
         }
 
-        T** const work_arr = nullptr;
+        size_t size_work_arr = sizeof(T*) * batch_count;
+        adjust_for_alignment(size_work_arr);
+
+        T** const work_arr = (T**)pfree;
+        pfree += size_work_arr;
+
+        bool const isok_mem = (pfree <= (pwork + size_work));
+        if(!isok_mem)
+        {
+            return (rocblas_status_memory_error);
+        }
 
         bool constexpr LBATCHED = true;
         istat = rocblasCall_syrk_herk<LBATCHED, T>(handle, uplo, trans, m, n, alpha,
@@ -542,6 +555,7 @@ static rocblas_status rocblasCall_syrk_herk_alt(rocblas_handle handle,
                                                    B_ptr, shiftB, ldb, strideB,
 
                                                    batch_count, work_arr);
+        pfree = pfree_saved;
     }
     return (istat);
 }
@@ -1282,7 +1296,9 @@ static rocblas_status
     // storage for computing  B = A' * A
     // ----------------------------------
 
+    size_t size_gemm = 0;
     size_t size_syrk_herk = 0;
+    if constexpr(use_syrk)
     {
         auto const istat_syrk_mem = rocblasCall_syrk_herk_mem<T>(n, m, batch_count, &size_syrk_herk);
         adjust_for_alignment(size_syrk_herk);
@@ -1293,6 +1309,15 @@ static rocblas_status
         {
             return (istat_syrk_mem);
         }
+
+        size_t size_work_arr = sizeof(T*) * batch_count;
+        adjust_for_alignment(size_work_arr);
+        size_syrk_herk += size_work_arr;
+    }
+    else
+    {
+        size_gemm = sizeof(T*) * batch_count;
+        adjust_for_alignment(size_gemm);
     }
 
     // ----------------------------------------------
@@ -1337,7 +1362,7 @@ static rocblas_status
         }
     }
 
-    size_work = std::max(size_work, size_syrk_herk);
+    size_work = std::max(size_work, (use_syrk) ? size_syrk_herk : size_gemm);
     size_work = std::max(size_work, size_potrf);
     size_work = std::max(size_work, size_trsm);
 
@@ -1533,19 +1558,6 @@ rocblas_status rocsolver_cholqr1_template(
         auto const pfree_saved = pfree;
         size_t const size_remain = (pwork + size_work) - pfree;
 
-        rocblas_operation const trans1
-            = (is_complex) ? rocblas_operation_conjugate_transpose : rocblas_operation_transpose;
-
-        // -------------------------------
-        // Note output  matrix for SYRK is nn by nn
-        // -------------------------------
-        I const nn = n;
-        I const kk = m;
-        rocblas_fill const uplo = rocblas_fill_upper;
-
-        S alpha = 1;
-        S beta = 0;
-
         if(idebug >= 1)
         {
             std::cout << "before SYRK" << std::endl;
@@ -1556,23 +1568,75 @@ rocblas_status rocsolver_cholqr1_template(
         // compute B = A' * A
         // ------------------
 
+        rocblas_status istat = rocblas_status_success;
+        if constexpr(use_syrk)
         {
-            rocblas_status istat
-                = rocblasCall_syrk_herk_alt<T>(handle, uplo, trans1, nn, kk,
+            // -------------------------------
+            // Note output  matrix for SYRK is nn by nn
+            // -------------------------------
+            I const nn = n;
+            I const kk = m;
+            rocblas_fill const uplo = rocblas_fill_upper;
+            S alpha = 1;
+            S beta = 0;
 
-                                               &alpha,
+            rocblas_operation const trans1 = (is_complex) ? rocblas_operation_conjugate_transpose
+                                                          : rocblas_operation_transpose;
 
-                                               A, shiftA, lda, strideA,
+            istat = rocblasCall_syrk_herk_alt<T>(handle, uplo, trans1, nn, kk,
 
-                                               &beta,
+                                                 &alpha,
 
-                                               B, shiftB, ldb, strideB,
+                                                 A, shiftA, lda, strideA,
 
-                                               batch_count, (void*)pfree, size_remain);
-            if(istat != rocblas_status_success)
+                                                 &beta,
+
+                                                 B, shiftB, ldb, strideB,
+
+                                                 batch_count, (void*)pfree, size_remain);
+        }
+        else
+        {
+            I const mm = n;
+            I const nn = n;
+            I const kk = m;
+            rocblas_operation const trans1 = (is_complex) ? rocblas_operation_conjugate_transpose
+                                                          : rocblas_operation_transpose;
+            rocblas_operation const trans2 = rocblas_operation_none;
+
+            T alpha = 1;
+            T beta = 0;
+
+            size_t size_workArr = sizeof(T*) * batch_count;
+
             {
-                return (istat);
+                size_t const size_remain = (pwork + size_work) - pfree;
+                bool const isok_mem = (size_remain >= size_workArr);
+                if(!isok_mem)
+                {
+                    return (rocblas_status_memory_error);
+                }
             }
+
+            T** workArr = (T**)pfree;
+            istat = rocblasCall_gemm<T>(handle, trans1, trans2, mm, nn, kk,
+
+                                        &alpha,
+
+                                        A, shiftA, lda, strideA,
+
+                                        A, shiftA, lda, strideA,
+
+                                        &beta,
+
+                                        B, shiftB, ldb, strideB,
+
+                                        batch_count, workArr);
+        }
+
+        if(istat != rocblas_status_success)
+        {
+            return (istat);
         }
 
         pfree = pfree_saved;
