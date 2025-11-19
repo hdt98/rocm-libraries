@@ -1092,7 +1092,7 @@ void ConvolutionDescriptor::ConvolutionForwardImmediate(const Handle& handle,
     ConvForwardCheckNumerics(handle, tensors, [&]() {
         const auto problem =
             conv::ProblemDescription{xDesc, wDesc, yDesc, *this, conv::Direction::Forward};
-        const auto ctx        = ExecutionContext{&handle};
+        const auto ctx = ExecutionContext{&handle};
         problem.SetupComputeType(ctx);
         const auto invoker    = LoadOrPrepareInvoker(ctx, problem, solver_id);
         const auto invoke_ctx = conv::DataInvokeParams{
@@ -1303,7 +1303,7 @@ void ConvolutionDescriptor::ConvolutionBackwardImmediate(const Handle& handle,
 
         const auto problem =
             conv::ProblemDescription{dyDesc, wDesc, dxDesc, *this, conv::Direction::BackwardData};
-        const auto ctx        = ExecutionContext{&handle};
+        const auto ctx = ExecutionContext{&handle};
         problem.SetupComputeType(ctx);
         const auto invoker    = LoadOrPrepareInvoker(ctx, problem, solver_id);
         const auto invoke_ctx = conv::DataInvokeParams{
@@ -1509,7 +1509,7 @@ void ConvolutionDescriptor::ConvolutionWrwImmediate(const Handle& handle,
 
         const auto problem = conv::ProblemDescription{
             dyDesc, dwDesc, xDesc, *this, conv::Direction::BackwardWeights};
-        const auto ctx        = ExecutionContext{&handle};
+        const auto ctx = ExecutionContext{&handle};
         problem.SetupComputeType(ctx);
         const auto invoker    = LoadOrPrepareInvoker(ctx, problem, solver_id);
         const auto invoke_ctx = conv::WrWInvokeParams{

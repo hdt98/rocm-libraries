@@ -378,8 +378,8 @@ bool PerformanceConfigHipImplicitGemm3DGroupBwdXdlops::Init(
     valid_kernels = FillValidKernelsByAlphaBeta<DataType, ComputeType>(problem);
     if(valid_kernels.empty())
         return false;
-    index         = 0;
-    kernel_id     = valid_kernels[index];
+    index     = 0;
+    kernel_id = valid_kernels[index];
     return true;
 }
 

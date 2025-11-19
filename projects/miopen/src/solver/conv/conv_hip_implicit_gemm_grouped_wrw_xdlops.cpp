@@ -118,8 +118,8 @@ struct CKArgs
         rPadding = {ProblemInterpreter::GetAdjustedInputRightPadH(problem),
                     ProblemInterpreter::GetAdjustedInputRightPadW(problem)};
     }
-    CKArgs(const CKArgs&) = default;
-    CKArgs(CKArgs&&)      = default;
+    CKArgs(const CKArgs&)            = default;
+    CKArgs(CKArgs&&)                 = default;
     CKArgs& operator=(const CKArgs&) = default;
 
     template <typename ConvPtr>
@@ -238,9 +238,9 @@ void PerformanceConfigHipImplicitGemmGroupWrwXdlops::Init(const ProblemDescripti
     {
         valid_kernels = FillValidKernelsIDs<DeviceOpGWrwPtrs<DataType>, CKArgs>(problem);
     }
-    index         = 0;
-    split_k       = 1;
-    kernel_id     = valid_kernels[index] + "+" + std::to_string(split_k);
+    index     = 0;
+    split_k   = 1;
+    kernel_id = valid_kernels[index] + "+" + std::to_string(split_k);
 }
 
 template <typename DataType>
