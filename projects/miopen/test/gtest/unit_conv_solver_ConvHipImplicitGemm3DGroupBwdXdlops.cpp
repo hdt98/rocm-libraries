@@ -86,7 +86,7 @@ auto GetConvFullTestCases(const std::string& compute_type_str)
     // using datatype = miopenDataType_t::miopenFloat;
     if(compute_type_str != "TF32")
     {
-        throw std::runtime_error("Unsupported compute_type in smoke tests");
+        throw std::runtime_error("Unsupported compute_type in full tests");
     }
 
     return std::vector{
