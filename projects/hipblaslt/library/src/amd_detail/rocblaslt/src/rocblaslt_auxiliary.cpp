@@ -1855,7 +1855,7 @@ rocblaslt_status
         const bool use_formocast = TensileLite::Debug::Instance().usePredictionSelection() == 1;
 
         // Try to get size independent solutions from getAllSolutions()
-        if(requestedAlgoCount > *returnAlgoCount)
+        if((requestedAlgoCount > *returnAlgoCount) && !real_requested_count_neg1)
         {
             // set excluded lib here: if the #-returned < #-requested, we'll call getAll.
             // But in that case, we don't need to get GridBased or Prediction which are already returned here
@@ -2116,7 +2116,7 @@ rocblaslt_status
         const bool use_formocast = TensileLite::Debug::Instance().usePredictionSelection() == 1;
 
         // Try to get size independent solutions from getAllSolutions()
-        if(requestedAlgoCount > results.size())
+        if((requestedAlgoCount > results.size()) && !real_requested_count_neg1)
         {
             // set excluded lib here: if the #-returned < #-requested, we'll call getAll.
             // But in that case, we don't need to get GridBased or Prediction which are already returned here
