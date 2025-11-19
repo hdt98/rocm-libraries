@@ -4436,6 +4436,7 @@ struct PerformanceConfigHipImplicitGemmGroupFwdXdlops
     MIOPEN_INTERNALS_EXPORT bool
     IsModelApplicable(const ExecutionContext& ctx,
                       const miopen::conv::ProblemDescription& problem) const;
+    bool UseTF32() const { return use_tf32; }
 
 private:
 #if MIOPEN_ENABLE_AI_KERNEL_TUNING
@@ -4451,6 +4452,7 @@ private:
     void Init(const miopen::conv::ProblemDescription&);
     template <typename DataType>
     bool CheckIsSupportCKArgs(const miopen::conv::ProblemDescription&) const;
+    mutable bool use_tf32 = false;
 };
 
 struct ConvHipImplicitGemmGroupFwdXdlops final
@@ -4775,6 +4777,7 @@ struct PerformanceConfigHipImplicitGemmGroupBwdXdlops
     MIOPEN_INTERNALS_EXPORT bool
     IsModelApplicable(const ExecutionContext& ctx,
                       const miopen::conv::ProblemDescription& problem) const;
+    bool UseTF32() const { return use_tf32; }
 
 private:
 #if MIOPEN_ENABLE_AI_KERNEL_TUNING
@@ -4793,6 +4796,7 @@ private:
     void Init(const miopen::conv::ProblemDescription&);
     template <typename DataType>
     bool CheckIsSupportCKArgs(const miopen::conv::ProblemDescription&) const;
+    mutable bool use_tf32 = false;
 };
 
 struct ConvHipImplicitGemmGroupBwdXdlops final
@@ -4871,6 +4875,7 @@ struct PerformanceConfigHipImplicitGemmGroupWrwXdlops
     MIOPEN_INTERNALS_EXPORT bool
     IsModelApplicable(const ExecutionContext& ctx,
                       const miopen::conv::ProblemDescription& problem) const;
+    bool UseTF32() const { return use_tf32; }
 
 private:
 #if MIOPEN_ENABLE_AI_KERNEL_TUNING
@@ -4889,6 +4894,7 @@ private:
     void Init(const miopen::conv::ProblemDescription&);
     template <typename DataType>
     bool CheckIsSupportCKArgs(const miopen::conv::ProblemDescription&) const;
+    mutable bool use_tf32 = false;
 };
 
 struct ConvHipImplicitGemmGroupWrwXdlops final
