@@ -52,19 +52,6 @@ repos:
 
   - repo: local
     hooks:
-      - id: clang-tidy-hipdnn
-        name: clang-tidy (hipDNN)
-        entry: |
-          bash -c 'if ! clang-tidy-20 --version &> /dev/null; then echo "ERROR: clang-tidy-20 missing. For hipDNN changes, please run: apt-get install clang-tidy-20" >&2; exit 1; fi; clang-tidy-20 "$@"' --
-        language: system
-        args:
-          - --config-file=projects/hipdnn/.clang-tidy
-        files: ^projects/hipdnn/.*\.(cpp|c|hpp|h)$
-        types: [c++]
-
-  # Save files to /tmp/flatc_hipdnn because it cannot write to /dev/null
-  - repo: local
-    hooks:
       - id: flatc-hipdnn
         name: flatc (hipDNN)
         entry: |
