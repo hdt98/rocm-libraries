@@ -365,7 +365,7 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zlange_64(rocblas_handle handle,
     ipiv        pointer to rocblas_int. Array on the GPU of dimension n.
                 The pivot indices as returned by \ref rocsolver_sgetrf "GETRF".
     @param[in]
-    anorm       real type.
+    anorm       pointer to real type. Scalar on the GPU.
                 The norm of the original matrix A (before factorization). This should be computed
                 separately using \ref rocsolver_slange "LANGE".
     @param[out]
@@ -379,7 +379,7 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_sgecon(rocblas_handle handle,
                                                  float* A,
                                                  const rocblas_int lda,
                                                  const rocblas_int* ipiv,
-                                                 const float anorm,
+                                                 const float* anorm,
                                                  float* rcond);
 
 ROCSOLVER_EXPORT rocblas_status rocsolver_dgecon(rocblas_handle handle,
@@ -388,7 +388,7 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_dgecon(rocblas_handle handle,
                                                  double* A,
                                                  const rocblas_int lda,
                                                  const rocblas_int* ipiv,
-                                                 const double anorm,
+                                                 const double* anorm,
                                                  double* rcond);
 
 ROCSOLVER_EXPORT rocblas_status rocsolver_cgecon(rocblas_handle handle,
@@ -397,7 +397,7 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_cgecon(rocblas_handle handle,
                                                  rocblas_float_complex* A,
                                                  const rocblas_int lda,
                                                  const rocblas_int* ipiv,
-                                                 const float anorm,
+                                                 const float* anorm,
                                                  float* rcond);
 
 ROCSOLVER_EXPORT rocblas_status rocsolver_zgecon(rocblas_handle handle,
@@ -406,7 +406,7 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zgecon(rocblas_handle handle,
                                                  rocblas_double_complex* A,
                                                  const rocblas_int lda,
                                                  const rocblas_int* ipiv,
-                                                 const double anorm,
+                                                 const double* anorm,
                                                  double* rcond);
 
 ROCSOLVER_EXPORT rocblas_status rocsolver_sgecon_64(rocblas_handle handle,
@@ -415,7 +415,7 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_sgecon_64(rocblas_handle handle,
                                                     float* A,
                                                     const int64_t lda,
                                                     const int64_t* ipiv,
-                                                    const float anorm,
+                                                    const float* anorm,
                                                     float* rcond);
 
 ROCSOLVER_EXPORT rocblas_status rocsolver_dgecon_64(rocblas_handle handle,
@@ -424,7 +424,7 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_dgecon_64(rocblas_handle handle,
                                                     double* A,
                                                     const int64_t lda,
                                                     const int64_t* ipiv,
-                                                    const double anorm,
+                                                    const double* anorm,
                                                     double* rcond);
 
 ROCSOLVER_EXPORT rocblas_status rocsolver_cgecon_64(rocblas_handle handle,
@@ -433,7 +433,7 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_cgecon_64(rocblas_handle handle,
                                                     rocblas_float_complex* A,
                                                     const int64_t lda,
                                                     const int64_t* ipiv,
-                                                    const float anorm,
+                                                    const float* anorm,
                                                     float* rcond);
 
 ROCSOLVER_EXPORT rocblas_status rocsolver_zgecon_64(rocblas_handle handle,
@@ -442,7 +442,7 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zgecon_64(rocblas_handle handle,
                                                     rocblas_double_complex* A,
                                                     const int64_t lda,
                                                     const int64_t* ipiv,
-                                                    const double anorm,
+                                                    const double* anorm,
                                                     double* rcond);
 //! @}
 
