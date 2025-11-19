@@ -158,6 +158,8 @@ inline std::vector<BN2DTestCase> Network2DSmall()
         {192, 2, 8, 8, miopen::batchnorm::Direction::Backward, 1, 0},
         {16, 8, 56, 56, miopen::batchnorm::Direction::Backward, 1, 0},
         {16, 8, 128, 256, miopen::batchnorm::Direction::ForwardTraining, 1, 0},
+        // edge cases
+        {1, 256, 1, 1, miopen::batchnorm::Direction::ForwardTraining, 0, 1},
     };
     // clang-format on
 }
