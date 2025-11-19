@@ -120,7 +120,7 @@ namespace rocRoller
             return 1;
         }
 
-        const int WeightlessDSMemObserver::dataQueueSize     = 10;
+        const int WeightlessDSMemObserver::dataQueueSize    = 10;
         const int WeightlessDSMemObserver::commandQueueSize = 8;
 
         WeightlessDSMemObserver::WeightlessDSMemObserver(ContextPtr ctx)
@@ -214,8 +214,7 @@ namespace rocRoller
                             "Expected queue space to be accounted for in peek function and passed "
                             "through to total cycles calculation.");
 
-                const auto base
-                    = m_commandQueue.empty() ? m_programCycle : m_commandQueue.back();
+                const auto base = m_commandQueue.empty() ? m_programCycle : m_commandQueue.back();
 
                 m_commandQueue.push_back(base + cycles);
 
