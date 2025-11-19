@@ -35,18 +35,16 @@
 #include "common/misc/rocsolver_arguments.hpp"
 #include "common/misc/rocsolver_test.hpp"
 
-template <typename T, typename I>
+template <typename T, typename I, typename S>
 void gecon_checkBadArgs(const rocblas_handle handle,
                         const rocsolver_norm_type norm_type,
                         const I n,
                         T dA,
                         const I lda,
                         I* dipiv,
-                        const real_t<T>* danorm,
-                        real_t<T>* drcond)
+                        const S* danorm,
+                        S* drcond)
 {
-    using S = real_t<T>;
-
     // handle
     EXPECT_ROCBLAS_STATUS(rocsolver_gecon(nullptr, norm_type, n, dA, lda, dipiv, danorm, drcond),
                           rocblas_status_invalid_handle);
@@ -80,7 +78,7 @@ void gecon_checkBadArgs(const rocblas_handle handle,
 template <typename T, typename I>
 void testing_gecon_bad_arg()
 {
-    using S = real_t<T>;
+    using S = decltype(std::real(T{}));
 
     // safe arguments
     rocblas_local_handle handle;
@@ -121,8 +119,6 @@ void gecon_initData(const rocblas_handle handle,
 {
     if(CPU)
     {
-        using S = real_t<T>;
-
         rocblas_init<T>(hA, true);
 
         // make matrix non-singular by adding to diagonal if needed
@@ -294,7 +290,7 @@ void gecon_getPerfData(const rocblas_handle handle,
 template <typename T, typename I>
 void testing_gecon(Arguments& argus)
 {
-    using S = real_t<T>;
+    using S = decltype(std::real(T{}));
 
     // get arguments
     rocblas_local_handle handle;
