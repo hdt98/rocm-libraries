@@ -86,12 +86,12 @@ ROCSOLVER_KERNEL void gecon_init_vector(T* x, const rocblas_int n, const T value
 //     }
 // }
 
-reduce within warp using shuffle on both index and value
+// reduce within warp using shuffle on both index and value
 template <typename T, typename I>
 __device__ inline void lacn2_max_index(const I n, T* local_max, I* local_max_index, rocblas_int offset)
 {
-    T compare_local_max = shift_left(local_max, offset);
-    T compare_local_index = shift_left(local_max_index, offset);
+    T compare_local_max = shift_left(*local_max, *offset);
+    T compare_local_index = shift_left(*local_max_index, *offset);
     if (compare_local_max > *local_max){
         *local_max = compare_local_max;
         *local_max_index = compare_local_index;
@@ -442,7 +442,6 @@ ROCSOLVER_KERNEL void __launch_bounds__(GECON_BLOCKSIZE) lacn2_jump4(const I n,
                                                                    rocblas_int* kase,
                                                                    rocblas_int* jump,
                                                                    const I* max_idx,
-                                                                   const S* est,
                                                                    const I iters,
                                                                    const I iters_max)
 {
@@ -467,13 +466,13 @@ ROCSOLVER_KERNEL void __launch_bounds__(GECON_BLOCKSIZE) lacn2_jump4(const I n,
     }
 
     // reduce within warp using shuffle on both index and value
-    lacn2_max_index<T, I>(n, &local_max, &local_max_index, 1);
-    lacn2_max_index<T, I>(n, &local_max, &local_max_index, 2);
-    lacn2_max_index<T, I>(n, &local_max, &local_max_index, 4);
-    lacn2_max_index<T, I>(n, &local_max, &local_max_index, 8);
-    lacn2_max_index<T, I>(n, &local_max, &local_max_index, 16);
+    lacn2_max_index<S, I>(n, &local_max, &local_max_index, 1);
+    lacn2_max_index<S, I>(n, &local_max, &local_max_index, 2);
+    lacn2_max_index<S, I>(n, &local_max, &local_max_index, 4);
+    lacn2_max_index<S, I>(n, &local_max, &local_max_index, 8);
+    lacn2_max_index<S, I>(n, &local_max, &local_max_index, 16);
     if (WarpSize > 32)
-        lacn2_max_index<T, I>(n, &local_max, &local_max_index, 32);
+        lacn2_max_index<S, I>(n, &local_max, &local_max_index, 32);
 
     if (tid % WarpSize == 0){
         sval[tid / WarpSize] = local_max;
@@ -607,14 +606,14 @@ rocblas_status gecon_lacn2(rocblas_handle handle,
                 // hipStreamSynchronize(stream);
                 // *est = rocblas_abs(*est);
                 ROCSOLVER_LAUNCH_KERNEL((lacn2_jump1_n_equals_one<T, I, S>), dim3(1), dim3(GECON_BLOCKSIZE), 0,
-                                    stream, x, n, d_est, isgn);
+                                    stream, n, x, d_est, isgn);
                 *kase = 0; // signal to exit
                 return rocblas_status_success;
             }
 
             
             ROCSOLVER_LAUNCH_KERNEL((lacn2_jump1<T, I, S>), dim3(1), dim3(GECON_BLOCKSIZE), 0,
-                                    stream, x, n, d_est, isgn);
+                                    stream, n, x, d_est, isgn);
 
             // ROCSOLVER_LAUNCH_KERNEL((gecon_compute_l1_norm<GECON_BLOCKSIZE, S>), dim3(1), threads, 0,
             //                         stream, x, n, d_est);
