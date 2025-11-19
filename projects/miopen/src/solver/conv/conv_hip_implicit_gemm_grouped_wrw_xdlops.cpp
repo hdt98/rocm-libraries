@@ -110,7 +110,7 @@ struct CKArgs
         }
 
         strides  = {ProblemInterpreter::GetAdjustedConvolutionStrideH(problem),
-                    ProblemInterpreter::GetAdjustedConvolutionStrideW(problem)};
+                   ProblemInterpreter::GetAdjustedConvolutionStrideW(problem)};
         dilation = {ProblemInterpreter::GetAdjustedConvolutionDilationH(problem),
                     ProblemInterpreter::GetAdjustedConvolutionDilationW(problem)};
         lPadding = {ProblemInterpreter::GetInputLeftPadH(problem),
