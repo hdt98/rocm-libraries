@@ -36,7 +36,7 @@ rocblas_status rocsolver_gecon_impl(rocblas_handle handle,
                                     T* A,
                                     const I lda,
                                     const I* ipiv,
-                                    const S anorm,
+                                    const S* anorm,
                                     S* rcond,
                                     const I max_iter = 5)
 {
@@ -87,15 +87,9 @@ rocblas_status rocsolver_gecon_impl(rocblas_handle handle,
     scalars_kase = mem[5];
     scalars_jump = mem[6];
 
-    // anorm needs to be on device - copy to scalars_est temporarily or allocate separately
-    S* d_anorm = (S*)scalars_est; // reuse part of scalars_est for anorm
-    hipStream_t stream;
-    rocblas_get_stream(handle, &stream);
-    hipMemcpyAsync(d_anorm, &anorm, sizeof(S), hipMemcpyHostToDevice, stream);
-
     // execution
     return rocsolver_gecon_template<false, false, T>(
-        handle, norm_type, n, A, shiftA, 1, lda, strideA, ipiv, strideP, d_anorm, rcond,
+        handle, norm_type, n, A, shiftA, 1, lda, strideA, ipiv, strideP, anorm, rcond,
         batch_count, (T*)work_v, (T*)work_x, (I*)work_isgn, (S*)scalars_est,
         (I*)scalars_max_idx, (rocblas_int*)scalars_kase, (rocblas_int*)scalars_jump, max_iter);
 }
@@ -116,7 +110,7 @@ rocblas_status rocsolver_sgecon(rocblas_handle handle,
                                 float* A,
                                 const rocblas_int lda,
                                 const rocblas_int* ipiv,
-                                const float anorm,
+                                const float* anorm,
                                 float* rcond)
 {
     return rocsolver::rocsolver_gecon_impl<float, rocblas_int, float>(handle, norm_type, n, A, lda,
@@ -129,7 +123,7 @@ rocblas_status rocsolver_dgecon(rocblas_handle handle,
                                 double* A,
                                 const rocblas_int lda,
                                 const rocblas_int* ipiv,
-                                const double anorm,
+                                const double* anorm,
                                 double* rcond)
 {
     return rocsolver::rocsolver_gecon_impl<double, rocblas_int, double>(handle, norm_type, n, A,
@@ -142,7 +136,7 @@ rocblas_status rocsolver_cgecon(rocblas_handle handle,
                                 rocblas_float_complex* A,
                                 const rocblas_int lda,
                                 const rocblas_int* ipiv,
-                                const float anorm,
+                                const float* anorm,
                                 float* rcond)
 {
     return rocsolver::rocsolver_gecon_impl<rocblas_float_complex, rocblas_int, float>(
@@ -155,7 +149,7 @@ rocblas_status rocsolver_zgecon(rocblas_handle handle,
                                 rocblas_double_complex* A,
                                 const rocblas_int lda,
                                 const rocblas_int* ipiv,
-                                const double anorm,
+                                const double* anorm,
                                 double* rcond)
 {
     return rocsolver::rocsolver_gecon_impl<rocblas_double_complex, rocblas_int, double>(
@@ -168,7 +162,7 @@ rocblas_status rocsolver_sgecon_64(rocblas_handle handle,
                                    float* A,
                                    const int64_t lda,
                                    const int64_t* ipiv,
-                                   const float anorm,
+                                   const float* anorm,
                                    float* rcond)
 {
 #ifdef HAVE_ROCBLAS_64
@@ -185,7 +179,7 @@ rocblas_status rocsolver_dgecon_64(rocblas_handle handle,
                                    double* A,
                                    const int64_t lda,
                                    const int64_t* ipiv,
-                                   const double anorm,
+                                   const double* anorm,
                                    double* rcond)
 {
 #ifdef HAVE_ROCBLAS_64
@@ -202,7 +196,7 @@ rocblas_status rocsolver_cgecon_64(rocblas_handle handle,
                                    rocblas_float_complex* A,
                                    const int64_t lda,
                                    const int64_t* ipiv,
-                                   const float anorm,
+                                   const float* anorm,
                                    float* rcond)
 {
 #ifdef HAVE_ROCBLAS_64
@@ -219,7 +213,7 @@ rocblas_status rocsolver_zgecon_64(rocblas_handle handle,
                                    rocblas_double_complex* A,
                                    const int64_t lda,
                                    const int64_t* ipiv,
-                                   const double anorm,
+                                   const double* anorm,
                                    double* rcond)
 {
 #ifdef HAVE_ROCBLAS_64

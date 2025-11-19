@@ -860,7 +860,7 @@ rocblas_status rocsolver_gecon_argCheck(rocblas_handle handle,
                                         const I lda,
                                         T A,
                                         const I* ipiv,
-                                        const S anorm,
+                                        const S* anorm,
                                         S* rcond)
 {
     // order is important for unit tests:
@@ -871,7 +871,7 @@ rocblas_status rocsolver_gecon_argCheck(rocblas_handle handle,
         return rocblas_status_invalid_value;
 
     // 2. invalid size
-    if(n < 0 || lda < n || anorm < 0)
+    if(n < 0 || lda < n)
         return rocblas_status_invalid_size;
 
     // skip pointer check if querying memory size
@@ -879,7 +879,7 @@ rocblas_status rocsolver_gecon_argCheck(rocblas_handle handle,
         return rocblas_status_continue;
 
     // 3. invalid pointers
-    if((n && !A) || (n && !ipiv) || !rcond)
+    if((n && !A) || (n && !ipiv) || !anorm || !rcond)
         return rocblas_status_invalid_pointer;
 
     return rocblas_status_continue;
