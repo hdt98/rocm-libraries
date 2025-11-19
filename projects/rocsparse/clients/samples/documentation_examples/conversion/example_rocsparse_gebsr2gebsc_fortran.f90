@@ -56,24 +56,123 @@ program example_fortran_gebsr2gebsc
 
     implicit none
 
+    interface
+        function hipMalloc(ptr, size) bind(c, name = 'hipMalloc')
+            use iso_c_binding
+            implicit none
+            integer :: hipMalloc
+            type(c_ptr) :: ptr
+            integer(c_size_t), value :: size
+        end function hipMalloc
+
+        function hipFree(ptr) bind(c, name = 'hipFree')
+            use iso_c_binding
+            implicit none
+            integer :: hipFree
+            type(c_ptr), value :: ptr
+        end function hipFree
+
+        function hipMemcpy(dst, src, size, kind) bind(c, name = 'hipMemcpy')
+            use iso_c_binding
+            implicit none
+            integer :: hipMemcpy
+            type(c_ptr), value :: dst
+            type(c_ptr), intent(in), value :: src
+            integer(c_size_t), value :: size
+            integer(c_int), value :: kind
+        end function hipMemcpy
+    end interface
+
+    integer, parameter :: hipMemcpyHostToDevice = 1
+
+    ! Matrix dimensions
+    integer(c_int) :: mb_A, nb_A, nnzb_A, row_block_dim, col_block_dim
+    integer(c_int) :: mb_T, nb_T, nnzb_T
+    
+    ! Host arrays
+    integer, dimension(3), target :: hbsr_row_ptr_A
+    integer, dimension(4), target :: hbsr_col_ind_A
+    real(c_float), dimension(16), target :: hbsr_val_A
+    
+    ! Device pointers
+    type(c_ptr) :: dbsr_row_ptr_A, dbsr_col_ind_A, dbsr_val_A
+    type(c_ptr) :: dbsr_row_ptr_T, dbsr_col_ind_T, dbsr_val_T
+    type(c_ptr) :: temp_buffer
+    
+    ! rocSPARSE handle
     type(c_ptr) :: handle
-    integer :: version
+    
+    ! Buffer size
+    integer(c_size_t), target :: buffer_size
+
+    ! Initialize dimensions
+    mb_A = 2
+    nb_A = 2
+    nnzb_A = 4
+    row_block_dim = 2
+    col_block_dim = 2
+    
+    ! Initialize host data
+    hbsr_row_ptr_A = (/0, 2, 4/)
+    hbsr_col_ind_A = (/0, 1, 0, 1/)
+    hbsr_val_A = (/1.0, 2.0, 0.0, 4.0, 0.0, 3.0, 5.0, 0.0, &
+                   6.0, 0.0, 1.0, 2.0, 0.0, 7.0, 3.0, 4.0/)
+
+    ! Allocate device memory for input BSR matrix
+    call HIP_CHECK(hipMalloc(dbsr_row_ptr_A, int(mb_A + 1, c_size_t) * 4))
+    call HIP_CHECK(hipMalloc(dbsr_col_ind_A, int(nnzb_A, c_size_t) * 4))
+    call HIP_CHECK(hipMalloc(dbsr_val_A, &
+                             int(nnzb_A * row_block_dim * col_block_dim, c_size_t) * 4))
+
+    ! Copy data to device
+    call HIP_CHECK(hipMemcpy(dbsr_row_ptr_A, c_loc(hbsr_row_ptr_A), int(mb_A + 1, c_size_t) * 4, &
+                             hipMemcpyHostToDevice))
+    call HIP_CHECK(hipMemcpy(dbsr_col_ind_A, c_loc(hbsr_col_ind_A), int(nnzb_A, c_size_t) * 4, &
+                             hipMemcpyHostToDevice))
+    call HIP_CHECK(hipMemcpy(dbsr_val_A, c_loc(hbsr_val_A), &
+                             int(nnzb_A * row_block_dim * col_block_dim, c_size_t) * 4, &
+                             hipMemcpyHostToDevice))
+
+    ! Allocate memory for transposed BSR matrix
+    mb_T = nb_A
+    nb_T = mb_A
+    nnzb_T = nnzb_A
+
+    call HIP_CHECK(hipMalloc(dbsr_row_ptr_T, int(mb_T + 1, c_size_t) * 4))
+    call HIP_CHECK(hipMalloc(dbsr_col_ind_T, int(nnzb_T, c_size_t) * 4))
+    call HIP_CHECK(hipMalloc(dbsr_val_T, &
+                             int(nnzb_A * row_block_dim * col_block_dim, c_size_t) * 4))
 
     ! Create rocSPARSE handle
     call ROCSPARSE_CHECK(rocsparse_create_handle(handle))
 
-    ! Get rocSPARSE version
-    call ROCSPARSE_CHECK(rocsparse_get_version(handle, version))
+    ! Obtain the temporary buffer size
+    call ROCSPARSE_CHECK(rocsparse_sgebsr2gebsc_buffer_size(handle, mb_A, nb_A, nnzb_A, &
+                                                             dbsr_val_A, dbsr_row_ptr_A, &
+                                                             dbsr_col_ind_A, row_block_dim, &
+                                                             col_block_dim, c_loc(buffer_size)))
 
-    ! Print version on screen
-    write(*,fmt='(A,I0,A,I0,A,I0)') 'rocSPARSE version: ', version / 100000, '.', &
-        mod(version / 100, 1000), '.', mod(version, 100)
+    ! Allocate temporary buffer
+    call HIP_CHECK(hipMalloc(temp_buffer, buffer_size))
 
-    ! TODO: Add gebsr2gebsc example implementation
-    write(*,*) 'Fortran example for rocsparse_gebsr2gebsc - implementation pending'
+    ! Perform transpose
+    call ROCSPARSE_CHECK(rocsparse_sgebsr2gebsc(handle, mb_A, nb_A, nnzb_A, dbsr_val_A, &
+                                                 dbsr_row_ptr_A, dbsr_col_ind_A, row_block_dim, &
+                                                 col_block_dim, dbsr_val_T, dbsr_col_ind_T, &
+                                                 dbsr_row_ptr_T, rocsparse_action_numeric, &
+                                                 rocsparse_index_base_zero, temp_buffer))
 
     ! Clear rocSPARSE handle
     call ROCSPARSE_CHECK(rocsparse_destroy_handle(handle))
+
+    ! Clean up device memory
+    call HIP_CHECK(hipFree(temp_buffer))
+    call HIP_CHECK(hipFree(dbsr_row_ptr_A))
+    call HIP_CHECK(hipFree(dbsr_col_ind_A))
+    call HIP_CHECK(hipFree(dbsr_val_A))
+    call HIP_CHECK(hipFree(dbsr_row_ptr_T))
+    call HIP_CHECK(hipFree(dbsr_col_ind_T))
+    call HIP_CHECK(hipFree(dbsr_val_T))
 
 end program example_fortran_gebsr2gebsc
 ! [doc example end]

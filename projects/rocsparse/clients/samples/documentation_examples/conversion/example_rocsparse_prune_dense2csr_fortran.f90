@@ -56,24 +56,113 @@ program example_fortran_prune_dense2csr
 
     implicit none
 
-    type(c_ptr) :: handle
-    integer :: version
+    interface
+        function hipMalloc(ptr, size) bind(c, name = 'hipMalloc')
+            use iso_c_binding
+            implicit none
+            integer :: hipMalloc
+            type(c_ptr) :: ptr
+            integer(c_size_t), value :: size
+        end function hipMalloc
+
+        function hipFree(ptr) bind(c, name = 'hipFree')
+            use iso_c_binding
+            implicit none
+            integer :: hipFree
+            type(c_ptr), value :: ptr
+        end function hipFree
+
+        function hipMemcpy(dst, src, size, kind) bind(c, name = 'hipMemcpy')
+            use iso_c_binding
+            implicit none
+            integer :: hipMemcpy
+            type(c_ptr), value :: dst
+            type(c_ptr), intent(in), value :: src
+            integer(c_size_t), value :: size
+            integer(c_int), value :: kind
+        end function hipMemcpy
+    end interface
+
+    integer, parameter :: hipMemcpyHostToDevice = 1
+
+    ! Matrix dimensions
+    integer(c_int) :: m, n, lda
+    integer(c_int), target :: nnz
+    real(c_float), target :: threshold
+    
+    ! Host array
+    real(c_float), dimension(16), target :: hdense
+    
+    ! Device pointers
+    type(c_ptr) :: ddense
+    type(c_ptr) :: dcsr_row_ptr, dcsr_col_ind, dcsr_val
+    type(c_ptr) :: temp_buffer
+    
+    ! rocSPARSE handles
+    type(c_ptr) :: handle, descr, info
+    
+    ! Buffer size
+    integer(c_size_t), target :: buffer_size
+
+    ! Initialize dimensions
+    m = 4
+    n = 4
+    lda = m
+    threshold = 3.0
+    
+    ! Initialize host data (column-major order)
+    hdense = (/1.0, 3.0, 5.0, 0.0, 2.0, 0.0, 6.0, 4.0, &
+               0.0, 0.0, 0.0, 2.0, 7.0, 4.0, 4.0, 5.0/)
 
     ! Create rocSPARSE handle
     call ROCSPARSE_CHECK(rocsparse_create_handle(handle))
 
-    ! Get rocSPARSE version
-    call ROCSPARSE_CHECK(rocsparse_get_version(handle, version))
+    ! Create matrix descriptor
+    call ROCSPARSE_CHECK(rocsparse_create_mat_descr(descr))
+    call ROCSPARSE_CHECK(rocsparse_create_mat_info(info))
 
-    ! Print version on screen
-    write(*,fmt='(A,I0,A,I0,A,I0)') 'rocSPARSE version: ', version / 100000, '.', &
-        mod(version / 100, 1000), '.', mod(version, 100)
+    ! Allocate device memory for dense matrix
+    call HIP_CHECK(hipMalloc(ddense, int(lda * n, c_size_t) * 4))
+    call HIP_CHECK(hipMemcpy(ddense, c_loc(hdense), int(lda * n, c_size_t) * 4, &
+                             hipMemcpyHostToDevice))
 
-    ! TODO: Add prune_dense2csr example implementation
-    write(*,*) 'Fortran example for rocsparse_prune_dense2csr - implementation pending'
+    ! Allocate device memory for CSR row pointer
+    call HIP_CHECK(hipMalloc(dcsr_row_ptr, int(m + 1, c_size_t) * 4))
 
-    ! Clear rocSPARSE handle
+    ! Obtain the temporary buffer size
+    call ROCSPARSE_CHECK(rocsparse_sprune_dense2csr_buffer_size(handle, m, n, ddense, lda, &
+                                                                 c_loc(threshold), descr, &
+                                                                 c_null_ptr, dcsr_row_ptr, &
+                                                                 c_null_ptr, c_loc(buffer_size)))
+
+    ! Allocate temporary buffer
+    call HIP_CHECK(hipMalloc(temp_buffer, buffer_size))
+
+    ! Compute nnz
+    call ROCSPARSE_CHECK(rocsparse_sprune_dense2csr_nnz(handle, m, n, ddense, lda, &
+                                                         c_loc(threshold), descr, dcsr_row_ptr, &
+                                                         c_loc(nnz), temp_buffer))
+
+    ! Allocate device memory for CSR matrix
+    call HIP_CHECK(hipMalloc(dcsr_col_ind, int(nnz, c_size_t) * 4))
+    call HIP_CHECK(hipMalloc(dcsr_val, int(nnz, c_size_t) * 4))
+
+    ! Perform pruning
+    call ROCSPARSE_CHECK(rocsparse_sprune_dense2csr(handle, m, n, ddense, lda, c_loc(threshold), &
+                                                     descr, dcsr_val, dcsr_row_ptr, dcsr_col_ind, &
+                                                     temp_buffer))
+
+    ! Destroy rocSPARSE handles
     call ROCSPARSE_CHECK(rocsparse_destroy_handle(handle))
+    call ROCSPARSE_CHECK(rocsparse_destroy_mat_descr(descr))
+    call ROCSPARSE_CHECK(rocsparse_destroy_mat_info(info))
+
+    ! Clean up device memory
+    call HIP_CHECK(hipFree(temp_buffer))
+    call HIP_CHECK(hipFree(ddense))
+    call HIP_CHECK(hipFree(dcsr_row_ptr))
+    call HIP_CHECK(hipFree(dcsr_col_ind))
+    call HIP_CHECK(hipFree(dcsr_val))
 
 end program example_fortran_prune_dense2csr
 ! [doc example end]
