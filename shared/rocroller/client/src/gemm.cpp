@@ -1427,21 +1427,27 @@ int main(int argc, const char* argv[])
         "--initMode_A",
         [&problem](auto& args) -> bool { return ParseInitMode(args[0], problem.initModeA); },
         "Data initialization mode for A [Bounded | BoundedAlternatingSign | Unbounded | "
-        "Identity | Ones | Zeros | TrigonometricFromFloat | \"NormalFromFloat(<mean>, "
+        "\"IdentityScaleNormalData(<mean>, <std_dev>)\" | \"NormalScaleUniformData(<mean>, "
+        "<std_dev>)\" | Identity | Ones | Zeros | TrigonometricFromFloat | "
+        "\"NormalFromFloat(<mean>, "
         "<std_dev>)\"]. "
         "Default: Bounded.");
     app.add_option(
         "--initMode_B",
         [&problem](auto& args) -> bool { return ParseInitMode(args[0], problem.initModeB); },
         "Data initialization mode for B [Bounded | BoundedAlternatingSign | Unbounded | "
-        "Identity | Ones | Zeros | TrigonometricFromFloat | \"NormalFromFloat(<mean>, "
+        "\"IdentityScaleNormalData(<mean>, <std_dev>)\" | \"NormalScaleUniformData(<mean>, "
+        "<std_dev>)\" | Identity | Ones | Zeros | TrigonometricFromFloat | "
+        "\"NormalFromFloat(<mean>, "
         "<std_dev>)\"]. "
         "Default: Bounded.");
     app.add_option(
         "--initMode_C",
         [&problem](auto& args) -> bool { return ParseInitMode(args[0], problem.initModeC); },
         "Data initialization mode for C [Bounded | BoundedAlternatingSign | Unbounded | "
-        "Identity | Ones | Zeros | TrigonometricFromFloat | \"NormalFromFloat(<mean>, "
+        "\"IdentityScaleNormalData(<mean>, <std_dev>)\" | \"NormalScaleUniformData(<mean>, "
+        "<std_dev>)\" | Identity | Ones | Zeros | TrigonometricFromFloat | "
+        "\"NormalFromFloat(<mean>, "
         "<std_dev>)\"]. "
         "Default: Bounded.");
 

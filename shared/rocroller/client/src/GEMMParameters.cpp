@@ -367,6 +367,68 @@ namespace rocRoller::Client::GEMMClient::CLI
             result = DGen::DataInitMode(DGen::BoundedAlternatingSign{});
         else if(arg == "Unbounded")
             result = DGen::DataInitMode(DGen::Unbounded{});
+        else if(startsWith("IdentityScaleNormalData", arg.begin(), arg.end()))
+        {
+            try
+            {
+                iss.exceptions(std::ifstream::eofbit | std::ifstream::failbit
+                               | std::ifstream::badbit);
+                std::getline(iss, token, '(');
+                std::getline(iss, token, ',');
+                double mean = std::stod(token);
+                std::getline(iss, token, ')');
+                double std_dev = std::stod(token);
+
+                result = DGen::DataInitMode(DGen::IdentityScaleNormalData{mean, std_dev});
+            }
+            catch(const std::invalid_argument&)
+            {
+                fail = true;
+            }
+            catch(const std::ios_base::failure&)
+            {
+                fail = true;
+            }
+            if(fail)
+            {
+                std::cerr << "Invalid format for Init Mode." << std::endl;
+                std::cerr << "Expected: IdentityScaleNormalData(<mean>, <std_dev>)" << std::endl;
+                std::cerr << "For example: --initMode_A=\"IdentityScaleNormalData(0.0, 1.0)\""
+                          << std::endl;
+                return PARSE_FAILURE;
+            }
+        }
+        else if(startsWith("NormalScaleUniformData", arg.begin(), arg.end()))
+        {
+            try
+            {
+                iss.exceptions(std::ifstream::eofbit | std::ifstream::failbit
+                               | std::ifstream::badbit);
+                std::getline(iss, token, '(');
+                std::getline(iss, token, ',');
+                double mean = std::stod(token);
+                std::getline(iss, token, ')');
+                double std_dev = std::stod(token);
+
+                result = DGen::DataInitMode(DGen::NormalScaleUniformData{mean, std_dev});
+            }
+            catch(const std::invalid_argument&)
+            {
+                fail = true;
+            }
+            catch(const std::ios_base::failure&)
+            {
+                fail = true;
+            }
+            if(fail)
+            {
+                std::cerr << "Invalid format for Init Mode." << std::endl;
+                std::cerr << "Expected: NormalScaleUniformData(<mean>, <std_dev>)" << std::endl;
+                std::cerr << "For example: --initMode_A=\"NormalScaleUniformData(0.0, 1.0)\""
+                          << std::endl;
+                return PARSE_FAILURE;
+            }
+        }
         else if(arg == "Identity")
             result = DGen::DataInitMode(DGen::Identity{});
         else if(arg == "Ones")
