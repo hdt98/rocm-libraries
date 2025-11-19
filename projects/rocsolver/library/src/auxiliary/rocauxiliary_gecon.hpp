@@ -240,7 +240,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(GECON_BLOCKSIZE)
 template <typename T, typename I, typename S>
 ROCSOLVER_KERNEL void __launch_bounds__(GECON_BLOCKSIZE) lacn2_jump2(const I n,
                                                                    T* x,
-                                                                   I* max_index)
+                                                                   I* max_idx)
 {
     I tid = threadIdx.x;
 
@@ -287,7 +287,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(GECON_BLOCKSIZE) lacn2_jump2(const I n,
                 local_max_index = sval_indices[k];
             }
         }
-        *max_index = local_max_index;
+        *max_idx = local_max_index;
         x[local_max_index] = T(1);
     }
 }
@@ -441,7 +441,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(GECON_BLOCKSIZE) lacn2_jump4(const I n,
                                                                    I* isgn,
                                                                    rocblas_int* kase,
                                                                    rocblas_int* jump,
-                                                                   const I* max_idx,
+                                                                   I* max_idx,
                                                                    const I iters,
                                                                    const I iters_max)
 {
