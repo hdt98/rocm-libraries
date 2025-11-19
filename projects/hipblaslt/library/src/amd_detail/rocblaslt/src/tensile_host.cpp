@@ -2008,14 +2008,6 @@ namespace
         {
             return TensileLite::LazyLoadingInit::gfx1151;
         }
-        else if(deviceString.find("gfx1152") != std::string::npos)
-        {
-            return TensileLite::LazyLoadingInit::gfx1152;
-        }
-        else if(deviceString.find("gfx1153") != std::string::npos)
-        {
-            return TensileLite::LazyLoadingInit::gfx1153;
-        }
         else if(deviceString.find("gfx1200") != std::string::npos)
         {
             return TensileLite::LazyLoadingInit::gfx1200;
@@ -3628,14 +3620,6 @@ rocblaslt_status getBestSolutions(RocblasltContractionProblem const& prob,
 
     auto algoCount = min(static_cast<size_t>(requestedAlgoCount), solutions.size());
     memset(heuristicResultsArray, 0, sizeof(rocblaslt_matmul_heuristic_result) * algoCount);
-
-    // // debug
-    // for(size_t i = 0; i < algoCount; ++i)
-    // {
-    //     auto& solution = solutions[i];
-    //     std::cout << "getBestSolutions(): sol-idx = " << solution->index << ", sol-tag = " << solution->matchingTag() << std::endl;
-    // }
-
     _convertToHeuristicResultArray(solutions,
                                    requestedAlgoCount,
                                    heuristicResultsArray,
