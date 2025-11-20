@@ -114,7 +114,7 @@ BenchmarkProblems:
       BenchmarkFinalParameters:
         - ProblemSizes:
           - Exact: [16, 16, 1, 2]
-          - Exact: [2048, 2048, 1, 512] #128x128(times16)
+          - Exact: [2048, 2048, 1, 256] #128x128(times16)
           - Exact: [1024, 1024, 1, 64] #64x64(times16)
           - Exact: [512, 512, 1, 32] #32x32
 
@@ -152,7 +152,7 @@ BenchmarkProblems:
       BenchmarkFinalParameters:
         - ProblemSizes:
           - Exact: [16, 16, 1, 2]
-          - Exact: [2048, 2048, 1, 512] #128x128(times16)
+          - Exact: [2048, 2048, 1, 256] #128x128(times16)
           - Exact: [1024, 1024, 1, 64] #64x64(times16)
           - Exact: [512, 512, 1, 32] #32x32
 
@@ -190,7 +190,7 @@ BenchmarkProblems:
       BenchmarkFinalParameters:
         - ProblemSizes:
           - Exact: [16, 16, 1, 2]
-          - Exact: [2048, 2048, 1, 512] #128x128(times16)
+          - Exact: [2048, 2048, 1, 256] #128x128(times16)
           - Exact: [1024, 1024, 1, 64] #64x64(times16)
           - Exact: [512, 512, 1, 32] #32x32
 
@@ -228,7 +228,7 @@ BenchmarkProblems:
       BenchmarkFinalParameters:
         - ProblemSizes:
           - Exact: [16, 16, 1, 2]
-          - Exact: [2048, 2048, 1, 512] #128x128(times16)
+          - Exact: [2048, 2048, 1, 256] #128x128(times16)
           - Exact: [1024, 1024, 1, 64] #64x64(times16)
           - Exact: [512, 512, 1, 32] #32x32
 
@@ -266,7 +266,7 @@ BenchmarkProblems:
       BenchmarkFinalParameters:
         - ProblemSizes:
           - Exact: [16, 16, 1, 2]
-          - Exact: [2048, 2048, 1, 512] #128x128(times16)
+          - Exact: [2048, 2048, 1, 256] #128x128(times16)
           - Exact: [1024, 1024, 1, 64] #64x64(times16)
           - Exact: [512, 512, 1, 32] #32x32
 
@@ -304,7 +304,7 @@ BenchmarkProblems:
       BenchmarkFinalParameters:
         - ProblemSizes:
           - Exact: [16, 16, 1, 2]
-          - Exact: [2048, 2048, 1, 512] #128x128(times16)
+          - Exact: [2048, 2048, 1, 256] #128x128(times16)
           - Exact: [1024, 1024, 1, 64] #64x64(times16)
           - Exact: [512, 512, 1, 32] #32x32
 
@@ -342,7 +342,7 @@ BenchmarkProblems:
       BenchmarkFinalParameters:
         - ProblemSizes:
           - Exact: [16, 16, 1, 2]
-          - Exact: [2048, 2048, 1, 512] #128x128(times16)
+          - Exact: [2048, 2048, 1, 256] #128x128(times16)
           - Exact: [1024, 1024, 1, 64] #64x64(times16)
           - Exact: [512, 512, 1, 32] #32x32
 
@@ -383,9 +383,9 @@ BenchmarkProblems:
           # - Range: [ [127,1,129], 0, [2], [63,1,64] ]
   
 LibraryLogic:
-    # ScheduleName: "gfx950" #aquavanjaram for 942
-    # DeviceNames: ["Device 0049", "Device 0050"]
-    # ArchitectureName: "gfx950"
-  ScheduleName: aquavanjaram
-  DeviceNames: [Device 0049, Device 0050]
-  ArchitectureName: gfx942
+    ScheduleName: "gfx950" #aquavanjaram for 942
+    DeviceNames: ["Device 0049", "Device 0050"]
+    ArchitectureName: "gfx950"
+  # ScheduleName: aquavanjaram
+  # DeviceNames: [Device 0049, Device 0050]
+  # ArchitectureName: gfx942
