@@ -11,11 +11,11 @@ GlobalParameters:
   NumElementsToValidate: -1
   ValidationMaxToPrint: 4
   ValidationPrintValids: False
-  PrintTensorD: 0x3
-  PrintTensorC: 0x3
-  PrintTensorB: 0x3
-  PrintTensorA: 0x3 #0x1
-  PrintTensorRef: 0x3
+  # PrintTensorD: 0x3
+  # PrintTensorC: 0x3
+  # PrintTensorB: 0x3
+  # PrintTensorA: 0x3 #0x1
+  # PrintTensorRef: 0x3
   # ShortNames: False
   # MergeFiles: True
   DataInitTypeA: 3 #12 #3
@@ -404,9 +404,9 @@ BenchmarkProblems:
           - Exact: [512, 512, 1, 32] #32x32
   
 LibraryLogic:
-      # ScheduleName: "gfx950" #aquavanjaram for 942
-      # DeviceNames: ["Device 0049", "Device 0050"]
-      # ArchitectureName: "gfx950"
-  ScheduleName: aquavanjaram
-  DeviceNames: [Device 0049, Device 0050]
-  ArchitectureName: gfx942
+  ScheduleName: "gfx950" #aquavanjaram for 942
+  DeviceNames: ["Device 0049", "Device 0050"]
+  ArchitectureName: "gfx950"
+  # ScheduleName: aquavanjaram
+  # DeviceNames: [Device 0049, Device 0050]
+  # ArchitectureName: gfx942
