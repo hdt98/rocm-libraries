@@ -1013,6 +1013,15 @@ struct UniversalGemmKernel
                                        const index_t block_idx_m,
                                        const index_t block_idx_n)
     {
+        // cluster launch GridDim is aligned to clusterDim, need to skip out-of-bound blocks
+        if constexpr(ClusterLaunch && (TilePartitioner::BlockGemmShape::kclusterM *
+                                           TilePartitioner::BlockGemmShape::kclusterN *
+                                           TilePartitioner::BlockGemmShape::kclusterK >
+                                       1))
+        {
+            if(block_idx_m >= kargs.M || block_idx_n >= kargs.N)
+                return;
+        }
         // Create Gemm tensor views, pad views and tile windows
         const auto& gemm_tensor_views_tuple =
             MakeGemmTensorViews<EpiloguePipeline::MemoryOperation>(

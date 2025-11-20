@@ -20,14 +20,14 @@ struct BaseGemmPipelineAgBgCrCompTDM
 
     CK_TILE_HOST static constexpr bool BlockHasHotloop(index_t num_loop)
     {
-        return num_loop > (PrefetchStages + 1); // prefetch (2 + 1) stages
+        return num_loop > PrefetchStages; // prefetch stages
     }
 
     CK_TILE_HOST static constexpr TailNumber GetBlockLoopTailNum(index_t num_loop)
     {
         if(num_loop % PrefetchStages == 1)
         {
-            return TailNumber::Three;
+            return TailNumber::One;
         }
         else
         {
@@ -42,10 +42,10 @@ struct BaseGemmPipelineAgBgCrCompTDM
         // Handle all the valid cases.
         if(has_hot_loop)
         {
-            if(tail_number == TailNumber::Three)
+            if(tail_number == TailNumber::One)
             {
                 return run_func(bool_constant<true>{},
-                                integral_constant<TailNumber, TailNumber::Three>{});
+                                integral_constant<TailNumber, TailNumber::One>{});
             }
             else if(tail_number == TailNumber::Two)
             {
@@ -55,10 +55,10 @@ struct BaseGemmPipelineAgBgCrCompTDM
         }
         else
         {
-            if(tail_number == TailNumber::Three)
+            if(tail_number == TailNumber::One)
             {
                 return run_func(bool_constant<false>{},
-                                integral_constant<TailNumber, TailNumber::Three>{});
+                                integral_constant<TailNumber, TailNumber::One>{});
             }
             else if(tail_number == TailNumber::Two)
             {
@@ -82,8 +82,8 @@ struct BaseGemmPipelineAgBgCrCompTDM
  * This pipeline introduces load from global memory to LDS using TDM,
  * skipping the intermediate loading into pipeline registers.
  */
-template <typename Problem, typename Policy = GemmPipelineAgBgCrCompTDMDefaultPolicy>
-struct GemmPipelineAgBgCrCompTDM : public BaseGemmPipelineAgBgCrCompTDM<Problem>
+template <typename Problem, typename Policy = GemmPipelineAgBgCrCompTDMDefaultPolicy<false>>
+struct GemmPipelineAgBgCrCompTDMV1 : public BaseGemmPipelineAgBgCrCompTDM<Problem>
 {
     using Base             = BaseGemmPipelineAgBgCrCompTDM<Problem>;
     using PipelineImplBase = GemmPipelineAgBgCrImplBase<Problem, Policy>;
@@ -413,42 +413,39 @@ struct GemmPipelineAgBgCrCompTDM : public BaseGemmPipelineAgBgCrCompTDM<Problem>
                               !(is_tile_window_linear_v<decltype(b_lds_ld_window1)>),
                           "LDS windows must not be linear");
 
-            s_wait_tensorcnt<2>();
-            block_sync_lds();
+            s_wait_tensorcnt_barrier<2>();
             // read A(0), B(0) from LDS window(0) to pipeline registers(0)
             Base::LocalPrefetch(a_block_tile0, a_lds_ld_window0);
             Base::LocalPrefetch(b_block_tile0, b_lds_ld_window0);
-            // LDS window(0) contents are overwritten below by global prefetch, need to sync
-            block_sync_lds();
-            // read A(2), B(2) from DRAM to LDS window(0)
-            // and advance the DRAM windows
-            Base::GlobalPrefetchTDM(tdm_config_a,
-                                    a_copy_lds_window0,
-                                    a_tile_windows[number<0>{}],
-                                    a_dram_tile_window_step);
-            Base::GlobalPrefetchTDM(tdm_config_b,
-                                    b_copy_lds_window0,
-                                    b_tile_windows[number<0>{}],
-                                    b_dram_tile_window_step);
 
             if constexpr(HasHotLoop)
             {
-                // we have had 3 global prefetches so far, indexed (0, 1, 2).
-                index_t i_global_read = amd_wave_read_first_lane(3);
-                // alternate ping: (read to register tile(1), use register tile(0) as gemm input)
-                //           pong: (read to register tile(0), use register tile(1) as gemm input)
+                index_t i_global_read = amd_wave_read_first_lane(2);
                 do
                 {
                     // ping
                     {
-                        s_wait_tensorcnt<2>();
                         block_sync_lds();
-                        // read A(i-1), B(i-1) from LDS window(1) to pipeline registers(1)
+                        Base::GlobalPrefetchTDM(tdm_config_a,
+                                                a_copy_lds_window0,
+                                                a_tile_windows[number<0>{}],
+                                                a_dram_tile_window_step);
+                        Base::GlobalPrefetchTDM(tdm_config_b,
+                                                b_copy_lds_window0,
+                                                b_tile_windows[number<0>{}],
+                                                b_dram_tile_window_step);
+                        block_gemm(c_block_tile, a_block_tile0, b_block_tile0);
+                    }
+                    // pong
+                    {
+                        // write to LDS window(0) must complete before the local prefetch
+                        s_wait_tensorcnt_barrier<2>();
+                        // read A(i), B(i) from LDS window(0) to pipeline registers(0)
                         Base::LocalPrefetch(a_block_tile1, a_lds_ld_window1);
                         Base::LocalPrefetch(b_block_tile1, b_lds_ld_window1);
-                        // LDS window(1) contents are overwritten by global prefetch, need to sync
+                        // LDS window(0) contents are overwritten by global prefetch, need to sync
                         block_sync_lds();
-                        // read A(i), B(i) from DRAM to LDS window(1)
+                        // read A(i+1), B(i+1) from DRAM to LDS window(0)
                         // and advance the DRAM windows
                         Base::GlobalPrefetchTDM(tdm_config_a,
                                                 a_copy_lds_window1,
@@ -458,69 +455,22 @@ struct GemmPipelineAgBgCrCompTDM : public BaseGemmPipelineAgBgCrCompTDM<Problem>
                                                 b_copy_lds_window1,
                                                 b_tile_windows[number<0>{}],
                                                 b_dram_tile_window_step);
-                        // C(i-3) = A(i-3) @ B(i-3)
-                        block_gemm(c_block_tile, a_block_tile0, b_block_tile0);
-                    }
-                    // pong
-                    {
-                        // write to LDS window(0) must complete before the local prefetch
-                        s_wait_tensorcnt<2>();
-                        block_sync_lds();
-                        // read A(i), B(i) from LDS window(0) to pipeline registers(0)
-                        Base::LocalPrefetch(a_block_tile0, a_lds_ld_window0);
-                        Base::LocalPrefetch(b_block_tile0, b_lds_ld_window0);
-                        // LDS window(0) contents are overwritten by global prefetch, need to sync
-                        block_sync_lds();
-                        // read A(i+1), B(i+1) from DRAM to LDS window(0)
-                        // and advance the DRAM windows
-                        Base::GlobalPrefetchTDM(tdm_config_a,
-                                                a_copy_lds_window0,
-                                                a_tile_windows[number<0>{}],
-                                                a_dram_tile_window_step);
-                        Base::GlobalPrefetchTDM(tdm_config_b,
-                                                b_copy_lds_window0,
-                                                b_tile_windows[number<0>{}],
-                                                b_dram_tile_window_step);
                         // C(i-2) = A(i-2) @ B(i-2)
                         block_gemm(c_block_tile, a_block_tile1, b_block_tile1);
+                        s_wait_tensorcnt_barrier<2>();
+                        Base::LocalPrefetch(a_block_tile0, a_lds_ld_window0);
+                        Base::LocalPrefetch(b_block_tile0, b_lds_ld_window0);
                     }
                     i_global_read += 2;
                 } while(i_global_read < num_loop);
             }
 
-            // 3 block gemms remaining
-            if constexpr(TailNum == TailNumber::Three)
-            {
-                {
-                    // read A(num_loop-1), B(num_loop-1) from LDS window(1) to pipeline registers(1)
-                    s_wait_tensorcnt<2>();
-                    block_sync_lds();
-                    Base::LocalPrefetch(a_block_tile1, a_lds_ld_window1);
-                    Base::LocalPrefetch(b_block_tile1, b_lds_ld_window1);
-                    // C(num_loop-2) = A(num_loop-2) @ B(num_loop-2)
-                    block_gemm(c_block_tile, a_block_tile0, b_block_tile0);
-                }
-                {
-                    // read A(num_loop), B(num_loop) from LDS window(0) to pipeline registers(0)
-                    s_wait_tensorcnt<0>();
-                    block_sync_lds();
-                    Base::LocalPrefetch(a_block_tile0, a_lds_ld_window0);
-                    Base::LocalPrefetch(b_block_tile0, b_lds_ld_window0);
-                    // C(num_loop-1) = A(num_loop-1) @ B(num_loop-1)
-                    block_gemm(c_block_tile, a_block_tile1, b_block_tile1);
-                }
-                {
-                    // C(num_loop) = A(num_loop) @ B(num_loop)
-                    block_gemm(c_block_tile, a_block_tile0, b_block_tile0);
-                }
-            }
-            else
             // 2 block gemms remaining
+            if constexpr(TailNum == TailNumber::Two)
             {
                 {
                     // read A(num_loop), B(num_loop) from LDS window(1) to pipeline registers(1)
-                    s_wait_tensorcnt<0>();
-                    block_sync_lds();
+                    s_wait_tensorcnt_barrier<0>();
                     Base::LocalPrefetch(a_block_tile1, a_lds_ld_window1);
                     Base::LocalPrefetch(b_block_tile1, b_lds_ld_window1);
                     // C(num_loop-1) = A(num_loop-1) @ B(num_loop-1)
@@ -530,6 +480,11 @@ struct GemmPipelineAgBgCrCompTDM : public BaseGemmPipelineAgBgCrCompTDM<Problem>
                     // C(num_loop) = A(num_loop) @ B(num_loop)
                     block_gemm(c_block_tile, a_block_tile1, b_block_tile1);
                 }
+            }
+            else
+            {
+                block_sync_lds();
+                block_gemm(c_block_tile, a_block_tile0, b_block_tile0);
             }
             return c_block_tile;
         }

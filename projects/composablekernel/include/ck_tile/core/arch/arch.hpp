@@ -291,6 +291,14 @@ struct waitcnt_arg
     }
 };
 
+#if defined(__gfx12__)
+extern "C" CK_TILE_DEVICE_EXTERN void
+llvm_amdgcn_s_wait_dscnt(unsigned short count) asm("llvm.amdgcn.s.wait.dscnt");
+
+extern "C" CK_TILE_DEVICE_EXTERN void
+llvm_amdgcn_s_wait_loadcnt(unsigned short count) asm("llvm.amdgcn.s.wait.loadcnt");
+#endif
+
 template <index_t vmcnt   = waitcnt_arg::kMaxVmCnt,
           index_t expcnt  = waitcnt_arg::kMaxExpCnt,
           index_t lgkmcnt = waitcnt_arg::kMaxLgkmCnt>
@@ -298,11 +306,10 @@ CK_TILE_DEVICE void s_waitcnt()
 {
 #if defined(__gfx12__)
     // GFX12 do't use __builtin_amdgcn_s_waitcnt
-    constexpr index_t wait_mask = waitcnt_arg::from_vmcnt<vmcnt>() |
-                                  waitcnt_arg::from_expcnt<expcnt>() |
-                                  waitcnt_arg::from_lgkmcnt<lgkmcnt>();
-
-    asm volatile("s_wait_loadcnt_dscnt %0" : : "n"(wait_mask) : "memory");
+    constexpr index_t dscnt_val   = waitcnt_arg::from_lgkmcnt<lgkmcnt>();
+    constexpr index_t loadcnt_val = waitcnt_arg::from_vmcnt<vmcnt>();
+    llvm_amdgcn_s_wait_dscnt(dscnt_val);
+    llvm_amdgcn_s_wait_loadcnt(loadcnt_val);
 #else
     __builtin_amdgcn_s_waitcnt(waitcnt_arg::from_vmcnt<vmcnt>() |
                                waitcnt_arg::from_expcnt<expcnt>() |
@@ -318,16 +325,13 @@ CK_TILE_DEVICE void s_waitcnt_barrier()
 #if defined(__gfx12__)
     // GFX12 optimization: Manual barrier implementation avoids performance penalty
     // from __builtin_amdgcn_s_barrier which inserts extra s_wait_loadcnt_dscnt 0x0
-    constexpr index_t wait_mask = waitcnt_arg::from_vmcnt<vmcnt>() |
-                                  waitcnt_arg::from_expcnt<expcnt>() |
-                                  waitcnt_arg::from_lgkmcnt<lgkmcnt>();
+    constexpr index_t dscnt_val   = waitcnt_arg::from_lgkmcnt<lgkmcnt>();
+    constexpr index_t loadcnt_val = waitcnt_arg::from_vmcnt<vmcnt>();
 
-    asm volatile("s_wait_loadcnt_dscnt %0\n"
-                 "s_barrier_signal -1\n"
-                 "s_barrier_wait -1"
-                 :
-                 : "n"(wait_mask)
-                 : "memory");
+    llvm_amdgcn_s_wait_dscnt(dscnt_val);
+    llvm_amdgcn_s_wait_loadcnt(loadcnt_val);
+    __builtin_amdgcn_s_barrier_signal(-1);
+    __builtin_amdgcn_s_barrier_wait(-1);
 #else
     s_waitcnt<vmcnt, expcnt, lgkmcnt>();
     __builtin_amdgcn_s_barrier();
@@ -348,16 +352,25 @@ CK_TILE_DEVICE void s_wait_tensorcnt()
 #endif
 }
 
+template <index_t tensorcnt = 0>
+CK_TILE_DEVICE void s_wait_tensorcnt_barrier()
+{
+    s_wait_tensorcnt<tensorcnt>();
+#if defined(__gfx12__)
+    __builtin_amdgcn_s_barrier_signal(-1);
+    __builtin_amdgcn_s_barrier_wait(-1);
+#else
+    __builtin_amdgcn_s_barrier();
+#endif
+}
+
 template <index_t vmcnt = 0>
 CK_TILE_DEVICE void block_sync_lds_direct_load()
 {
 #if defined(__gfx125__)
-    asm volatile("s_wait_asynccnt %0 \n"
-                 "s_barrier_signal -1 \n"
-                 "s_barrier_wait - 1"
-                 :
-                 : "n"(vmcnt)
-                 : "memory");
+    __builtin_amdgcn_s_wait_asynccnt(vmcnt);
+    __builtin_amdgcn_s_barrier_signal(-1);
+    __builtin_amdgcn_s_barrier_wait(-1);
 #else
     s_waitcnt_barrier<vmcnt, waitcnt_arg::kMaxExpCnt, waitcnt_arg::kMaxLgkmCnt>();
 #endif

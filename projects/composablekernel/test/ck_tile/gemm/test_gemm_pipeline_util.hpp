@@ -60,7 +60,8 @@ enum struct GemmPipelineType
     CompV4,
     CompV6,
     CompAsync,
-    CompTDM
+    CompTDMV1,
+    CompTDMV2
 };
 
 template <GemmPipelineType PT, typename Problem>
@@ -112,27 +113,39 @@ struct GemmPipelineTypeSelector<GemmPipelineType::CompAsync, Problem>
 };
 
 template <typename Problem>
-struct GemmPipelineTypeSelector<GemmPipelineType::CompTDM, Problem>
+struct GemmPipelineTypeSelector<GemmPipelineType::CompTDMV1, Problem>
 {
     using base_pipeline = ck_tile::BaseGemmPipelineAgBgCrCompTDM<Problem>;
-    using pipeline      = ck_tile::GemmPipelineAgBgCrCompTDM<Problem>;
+    using pipeline      = ck_tile::GemmPipelineAgBgCrCompTDMV1<Problem>;
 
-    static constexpr auto GetName() { return "GemmPipelineAgBgCrCompTDM"; }
+    static constexpr auto GetName() { return "GemmPipelineAgBgCrCompTDMV1"; }
 };
 
-template <GemmPipelineType PT, typename Problem>
+template <typename Problem>
+struct GemmPipelineTypeSelector<GemmPipelineType::CompTDMV2, Problem>
+{
+    using base_pipeline = ck_tile::BaseGemmPipelineAgBgCrCompTDM<Problem>;
+    using pipeline      = ck_tile::GemmPipelineAgBgCrCompTDMV2<Problem>;
+
+    static constexpr auto GetName() { return "GemmPipelineAgBgCrCompTDMV2"; }
+};
+
+template <GemmPipelineType PT, typename Problem, typename Enable = void>
 struct GemmEpilogueTypeSelector
 {
     using epilogue = ck_tile::CShuffleEpilogue<Problem>;
 };
 
-template <typename Problem>
-struct GemmEpilogueTypeSelector<GemmPipelineType::CompTDM, Problem>
+template <GemmPipelineType PT, typename Problem>
+struct GemmEpilogueTypeSelector<
+    PT,
+    Problem,
+    std::enable_if_t<PT == GemmPipelineType::CompTDMV1 || PT == GemmPipelineType::CompTDMV2>>
 {
     using epilogue = ck_tile::TdmEpilogue<Problem>;
 };
 
-template <GemmPipelineType PT>
+template <GemmPipelineType PT, typename Enable = void>
 struct PipelineDefaultParams
 {
     static constexpr bool PadM       = true;
@@ -141,8 +154,10 @@ struct PipelineDefaultParams
     static constexpr bool Preshuffle = false;
 };
 
-template <>
-struct PipelineDefaultParams<GemmPipelineType::CompTDM>
+template <GemmPipelineType PT>
+struct PipelineDefaultParams<
+    PT,
+    std::enable_if_t<PT == GemmPipelineType::CompTDMV1 || PT == GemmPipelineType::CompTDMV2>>
 {
     static constexpr bool PadM       = false;
     static constexpr bool PadN       = false;
@@ -203,7 +218,8 @@ class TestCkTileGemmPipeline : public ::testing::Test
 
         constexpr bool DoubleSmemBuffer = (PipelineType == GemmPipelineType::CompV4 ||
                                            PipelineType == GemmPipelineType::CompAsync ||
-                                           PipelineType == GemmPipelineType::CompTDM);
+                                           PipelineType == GemmPipelineType::CompTDMV1 ||
+                                           PipelineType == GemmPipelineType::CompTDMV2);
 
         constexpr bool TransposeC                = false;
         static constexpr bool StructuredSparsity = false;
@@ -405,7 +421,8 @@ class TestCkTileGemmPipeline : public ::testing::Test
         }
         // for TDM it used tdm_epilogue which don't support split-k
         if constexpr(PipelineType == GemmPipelineType::CompV4 ||
-                     PipelineType == GemmPipelineType::CompTDM)
+                     PipelineType == GemmPipelineType::CompTDMV1 ||
+                     PipelineType == GemmPipelineType::CompTDMV2)
         {
             // Only do k_batch = 1 when pipeline is CompV4
             k_batches_ = {1};

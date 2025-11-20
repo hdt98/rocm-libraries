@@ -22,7 +22,8 @@ using CompV3    = ck_tile::integral_constant<GemmPipelineType, GemmPipelineType:
 using CompV4    = ck_tile::integral_constant<GemmPipelineType, GemmPipelineType::CompV4>;
 using CompV6    = ck_tile::integral_constant<GemmPipelineType, GemmPipelineType::CompV6>;
 using CompAsync = ck_tile::integral_constant<GemmPipelineType, GemmPipelineType::CompAsync>;
-using CompTDM   = ck_tile::integral_constant<GemmPipelineType, GemmPipelineType::CompTDM>;
+using CompTDMV1 = ck_tile::integral_constant<GemmPipelineType, GemmPipelineType::CompTDMV1>;
+using CompTDMV2 = ck_tile::integral_constant<GemmPipelineType, GemmPipelineType::CompTDMV2>;
 
 using Persistent    = std::true_type;
 using NonPersistent = std::false_type;
@@ -176,8 +177,10 @@ using KernelTypesCompV4 = ::testing::Types<
 
 
 using KernelTypesCompTDMWmma = ::testing::Types<
-    std::tuple<    Row,     Col,     Row,       F16,       F16,         F32,       F16,        I64,         I64,          I32,        I16,        I16, Intrawave,        CompTDM>,
-    std::tuple<    Row,     Col,     Row,       F16,       F16,         F32,       F16,        I64,         I64,          I32,        I16,        I16, Intrawave,        CompTDM, NonPersistent, ClusterEnable>
+    std::tuple<    Row,     Col,     Row,       F16,       F16,         F32,       F16,        I64,         I64,          I32,        I16,        I16, Intrawave,        CompTDMV1>,
+    std::tuple<    Row,     Col,     Row,       F16,       F16,         F32,       F16,        I64,         I64,          I32,        I16,        I16, Intrawave,        CompTDMV1, NonPersistent, ClusterEnable>,
+    std::tuple<    Row,     Col,     Row,       F16,       F16,         F32,       F16,        I64,         I64,          I32,        I16,        I16, Intrawave,        CompTDMV2>,
+    std::tuple<    Row,     Col,     Row,       F16,       F16,         F32,       F16,        I64,         I64,          I32,        I16,        I16, Intrawave,        CompTDMV2, NonPersistent, ClusterEnable>
 >;
 
 using KernelTypesCompAsyncWmma = ::testing::Types<
