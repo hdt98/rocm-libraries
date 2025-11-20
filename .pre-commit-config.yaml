@@ -55,7 +55,37 @@ repos:
       - id: flatc-hipdnn
         name: flatc (hipDNN)
         entry: |
-          bash -c 'if ! flatc --version &> /dev/null; then echo "ERROR: flatc missing. Please run: apt-get install flatbuffers-compiler" >&2; exit 1; fi; for file in "$@"; do flatc -I projects/hipdnn/sdk/schemas --cpp --gen-object-api --gen-mutable --gen-compare --defaults-json --scoped-enums -o projects/hipdnn/sdk/include/hipdnn_sdk/data_objects "$file" || exit 1; done' --
+          python -c "
+          import sys, subprocess, shutil
+
+          REQUIRED_VER = '25.9.23'
+          current_ver = ''
+
+          if shutil.which('flatc'):
+              try:
+                  current_ver = subprocess.check_output([flatc, '--version'], text=True).strip()
+              except subprocess.CalledProcessError:
+                  pass
+
+          if REQUIRED_VER not in current_ver:
+              print(f'ERROR: flatc version {REQUIRED_VER} required. Found: {current_ver or \"None\"}', file=sys.stderr)
+              print('Download the following and include the executable in PATH:', file=sys.stderr)
+              print(f'  Windows: Download https://github.com/google/flatbuffers/releases/download/v{REQUIRED_VER}/Windows.flatc.binary.zip', file=sys.stderr)
+              print(f'  Linux:   wget https://github.com/google/flatbuffers/releases/download/v{REQUIRED_VER}/Linux.flatc.binary.g++-10.zip', file=sys.stderr)
+              sys.exit(1)
+
+          for f in sys.argv[1:]:
+              result = subprocess.run([
+                  flatc,
+                  '-I', 'projects/hipdnn/sdk/schemas',
+                  '--cpp', '--gen-object-api', '--gen-mutable',
+                  '--gen-compare', '--defaults-json', '--scoped-enums',
+                  '-o', 'projects/hipdnn/sdk/include/hipdnn_sdk/data_objects',
+                  f
+              ])
+              if result.returncode != 0:
+                  sys.exit(1)
+          "
         language: system
         files: ^projects/hipdnn/sdk/schemas/.*\.fbs$
         pass_filenames: true

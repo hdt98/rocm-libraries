@@ -179,8 +179,13 @@ RUN apt-get update && apt-get install -y \
     clang-format-18 \
     clang-tidy-20 \
     llvm-20 \
-    flatbuffers-compiler \
     && rm -rf /var/lib/apt/lists/*
+
+# Install flatc version 25.9.23
+RUN wget -q https://github.com/google/flatbuffers/releases/download/v25.9.23/Linux.flatc.binary.g++-13.zip -O /tmp/flatc.zip \
+    && unzip /tmp/flatc.zip -d /usr/local/bin \
+    && chmod +x /usr/local/bin/flatc \
+    && rm /tmp/flatc.zip
 
 # Use update-alternatives to set default versions
 RUN update-alternatives --install /usr/bin/clang-format clang-format /usr/bin/clang-format-18 100
