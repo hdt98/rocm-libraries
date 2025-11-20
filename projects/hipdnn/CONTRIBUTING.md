@@ -112,6 +112,7 @@ wget https://github.com/google/flatbuffers/releases/download/v25.9.23/Linux.flat
 unzip Linux.flatc.binary.g++-13.zip
 sudo mv flatc /usr/local/bin/
 sudo chmod +x /usr/local/bin/flatc
+rm Linux.flatc.binary.g++-13.zip
 ```
 
 **Windows:**
