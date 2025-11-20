@@ -45,7 +45,7 @@ jobs:
             echo "Skipping pre-commit checks"
             echo "================================================"
             echo ""
-            echo "Only changes in non-opted-in projects found."
+            echo "No change found in projects using pre-commit"
             echo "Opted-in projects: ${OPTED_IN_PROJECTS[*]}"
             echo ""
             echo "should_run=false" >> $GITHUB_OUTPUT
