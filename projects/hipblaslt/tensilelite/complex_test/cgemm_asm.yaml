@@ -114,6 +114,9 @@ BenchmarkProblems:
       BenchmarkFinalParameters:
         - ProblemSizes:
           - Exact: [16, 16, 1, 2]
+          - Exact: [2048, 2048, 1, 512] #128x128(times16)
+          - Exact: [1024, 1024, 1, 64] #64x64(times16)
+          - Exact: [512, 512, 1, 32] #32x32
 
   - # cgemm TN
     - # ProblemType
@@ -134,7 +137,10 @@ BenchmarkProblems:
         - KernelLanguage: ["Assembly"]
       ForkParameters:
         - MatrixInstruction:
-          - [16, 16, 4, 1, 1, 1, 1, 1, 1]
+          - [16, 16, 4, 1, 1, 1, 1, 1, 1] #16x16
+          - [16, 16, 4, 1, 1, 4, 4, 2, 2] #128x128
+          - [16, 16, 4, 1, 1, 2, 2, 2, 2] #64x64
+          - [16, 16, 4, 1, 1, 1, 1, 2, 2] #32x32
         - ScheduleIterAlg: [1]
         - GlobalSplitU: [1]
         - PrefetchLocalRead: [False]
@@ -146,6 +152,9 @@ BenchmarkProblems:
       BenchmarkFinalParameters:
         - ProblemSizes:
           - Exact: [16, 16, 1, 2]
+          - Exact: [2048, 2048, 1, 512] #128x128(times16)
+          - Exact: [1024, 1024, 1, 64] #64x64(times16)
+          - Exact: [512, 512, 1, 32] #32x32
 
   - # cgemm TT
     - # ProblemType
@@ -166,7 +175,10 @@ BenchmarkProblems:
         - KernelLanguage: ["Assembly"]
       ForkParameters:
         - MatrixInstruction:
-          - [16, 16, 4, 1, 1, 1, 1, 1, 1]
+          - [16, 16, 4, 1, 1, 1, 1, 1, 1] #16x16
+          - [16, 16, 4, 1, 1, 4, 4, 2, 2] #128x128
+          - [16, 16, 4, 1, 1, 2, 2, 2, 2] #64x64
+          - [16, 16, 4, 1, 1, 1, 1, 2, 2] #32x32
         - ScheduleIterAlg: [1]
         - GlobalSplitU: [1]
         - PrefetchLocalRead: [False]
@@ -178,6 +190,9 @@ BenchmarkProblems:
       BenchmarkFinalParameters:
         - ProblemSizes:
           - Exact: [16, 16, 1, 2]
+          - Exact: [2048, 2048, 1, 512] #128x128(times16)
+          - Exact: [1024, 1024, 1, 64] #64x64(times16)
+          - Exact: [512, 512, 1, 32] #32x32
 
   - # cgemm NC
     - # ProblemType
@@ -198,7 +213,10 @@ BenchmarkProblems:
         - KernelLanguage: ["Assembly"]
       ForkParameters:
         - MatrixInstruction:
-          - [16, 16, 4, 1, 1, 1, 1, 1, 1]
+          - [16, 16, 4, 1, 1, 1, 1, 1, 1] #16x16
+          - [16, 16, 4, 1, 1, 4, 4, 2, 2] #128x128
+          - [16, 16, 4, 1, 1, 2, 2, 2, 2] #64x64
+          - [16, 16, 4, 1, 1, 1, 1, 2, 2] #32x32
         - ScheduleIterAlg: [1]
         - GlobalSplitU: [1]
         - PrefetchLocalRead: [False]
@@ -210,6 +228,9 @@ BenchmarkProblems:
       BenchmarkFinalParameters:
         - ProblemSizes:
           - Exact: [16, 16, 1, 2]
+          - Exact: [2048, 2048, 1, 512] #128x128(times16)
+          - Exact: [1024, 1024, 1, 64] #64x64(times16)
+          - Exact: [512, 512, 1, 32] #32x32
 
   - # cgemm CN
     - # ProblemType
@@ -230,7 +251,10 @@ BenchmarkProblems:
         - KernelLanguage: ["Assembly"]
       ForkParameters:
         - MatrixInstruction:
-          - [16, 16, 4, 1, 1, 1, 1, 1, 1]
+          - [16, 16, 4, 1, 1, 1, 1, 1, 1] #16x16
+          - [16, 16, 4, 1, 1, 4, 4, 2, 2] #128x128
+          - [16, 16, 4, 1, 1, 2, 2, 2, 2] #64x64
+          - [16, 16, 4, 1, 1, 1, 1, 2, 2] #32x32
         - ScheduleIterAlg: [1]
         - GlobalSplitU: [1]
         - PrefetchLocalRead: [False]
@@ -242,6 +266,9 @@ BenchmarkProblems:
       BenchmarkFinalParameters:
         - ProblemSizes:
           - Exact: [16, 16, 1, 2]
+          - Exact: [2048, 2048, 1, 512] #128x128(times16)
+          - Exact: [1024, 1024, 1, 64] #64x64(times16)
+          - Exact: [512, 512, 1, 32] #32x32
 
   - # cgemm TC
     - # ProblemType
@@ -262,7 +289,10 @@ BenchmarkProblems:
         - KernelLanguage: ["Assembly"]
       ForkParameters:
         - MatrixInstruction:
-          - [16, 16, 4, 1, 1, 1, 1, 1, 1]
+          - [16, 16, 4, 1, 1, 1, 1, 1, 1] #16x16
+          - [16, 16, 4, 1, 1, 4, 4, 2, 2] #128x128
+          - [16, 16, 4, 1, 1, 2, 2, 2, 2] #64x64
+          - [16, 16, 4, 1, 1, 1, 1, 2, 2] #32x32
         - ScheduleIterAlg: [1]
         - GlobalSplitU: [1]
         - PrefetchLocalRead: [False]
@@ -274,6 +304,9 @@ BenchmarkProblems:
       BenchmarkFinalParameters:
         - ProblemSizes:
           - Exact: [16, 16, 1, 2]
+          - Exact: [2048, 2048, 1, 512] #128x128(times16)
+          - Exact: [1024, 1024, 1, 64] #64x64(times16)
+          - Exact: [512, 512, 1, 32] #32x32
 
   - # cgemm CT
     - # ProblemType
@@ -294,7 +327,10 @@ BenchmarkProblems:
         - KernelLanguage: ["Assembly"]
       ForkParameters:
         - MatrixInstruction:
-          - [16, 16, 4, 1, 1, 1, 1, 1, 1]
+          - [16, 16, 4, 1, 1, 1, 1, 1, 1] #16x16
+          - [16, 16, 4, 1, 1, 4, 4, 2, 2] #128x128
+          - [16, 16, 4, 1, 1, 2, 2, 2, 2] #64x64
+          - [16, 16, 4, 1, 1, 1, 1, 2, 2] #32x32
         - ScheduleIterAlg: [1]
         - GlobalSplitU: [1]
         - PrefetchLocalRead: [False]
@@ -306,6 +342,9 @@ BenchmarkProblems:
       BenchmarkFinalParameters:
         - ProblemSizes:
           - Exact: [16, 16, 1, 2]
+          - Exact: [2048, 2048, 1, 512] #128x128(times16)
+          - Exact: [1024, 1024, 1, 64] #64x64(times16)
+          - Exact: [512, 512, 1, 32] #32x32
 
   - # cgemm CC
     - # ProblemType
@@ -326,7 +365,10 @@ BenchmarkProblems:
         - KernelLanguage: ["Assembly"]
       ForkParameters:
         - MatrixInstruction:
-          - [16, 16, 4, 1, 1, 1, 1, 1, 1]
+          - [16, 16, 4, 1, 1, 1, 1, 1, 1] #16x16
+          - [16, 16, 4, 1, 1, 4, 4, 2, 2] #128x128
+          - [16, 16, 4, 1, 1, 2, 2, 2, 2] #64x64
+          - [16, 16, 4, 1, 1, 1, 1, 2, 2] #32x32
         - ScheduleIterAlg: [1]
         - GlobalSplitU: [1]
         - PrefetchLocalRead: [False]
@@ -341,6 +383,9 @@ BenchmarkProblems:
           # - Range: [ [127,1,129], 0, [2], [63,1,64] ]
   
 LibraryLogic:
-      ScheduleName: "gfx950"
-      DeviceNames: ["Device 0049", "Device 0050"]
-      ArchitectureName: "gfx950"
+    # ScheduleName: "gfx950" #aquavanjaram for 942
+    # DeviceNames: ["Device 0049", "Device 0050"]
+    # ArchitectureName: "gfx950"
+  ScheduleName: aquavanjaram
+  DeviceNames: [Device 0049, Device 0050]
+  ArchitectureName: gfx942

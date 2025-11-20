@@ -9,12 +9,20 @@ GlobalParameters:
   EnqueuesPerSync: 1
   SyncsPerBenchmark: 1
   NumElementsToValidate: -1
-  ValidationMaxToPrint: 4
+  ValidationMaxToPrint: -1 #4
   ValidationPrintValids: False
+  PrintTensorD: 0x3
+  # PrintTensorC: 0x3
+  # PrintTensorB: 0x3
+  # PrintTensorA: 0x3 #0x1
+  # PrintTensorRef: 0x3
   # ShortNames: False
   # MergeFiles: True
-  DataInitTypeAB: 3
-  DataInitTypeC: 3
+  DataInitTypeA: 12
+  DataInitTypeB: 13
+  DataInitTypeC: 12
+  DataInitTypeAlpha: 3
+  DataInitTypeBeta: 0
   KernelTime: True
   PrintSolutionRejectionReason: True
 
@@ -23,9 +31,9 @@ BenchmarkProblems:
   - # zgemm NN
     - # ProblemType
       OperationType: GEMM
-      DataType: Z
-      DestDataType: Z
-      ComputeDataType: Z
+      DataType: C #Z
+      DestDataType: C #Z
+      ComputeDataType: C #Z
       TransposeA: False
       TransposeB: False
       UseBeta: True
@@ -52,20 +60,17 @@ BenchmarkProblems:
         # - WorkGroup:
           # - [ 32,  4,  1 ]
           # - [  4,  4,  2 ]
-        - DepthU: [8,16,32]
+        - DepthU: [8] #,16,32]
         # - VectorWidth: [-1]
       BenchmarkForkParameters:
       JoinParameters:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Exact: [4096, 4096, 1, 8192]
+          # - Exact: [4096, 4096, 1, 8192]
+          - Exact: [1024, 1024, 1, 512]
           # - Range: [ [127,1,129], 0, [2], [63,1,64] ]
 LibraryLogic:
   ScheduleName: "gfx950"
   DeviceNames: ["Device 0049"]
-<<<<<<< HEAD
   ArchitectureName: "gfx950"
-=======
-  ArchitectureName: "gfx950"
->>>>>>> 20f15b7814 (Fixed validator bug by removing conjugate code)
