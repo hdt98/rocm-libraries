@@ -300,7 +300,7 @@ TEST_CASE("LDS bank model with bank conflicts", "[rocprofiler][gpu]")
     }
 }
 
-TEST_CASE("Weave LDS and nops", "[rocprofiler][scheduler]")
+TEST_CASE("Weave LDS and s_add", "[rocprofiler][scheduler]")
 {
     using namespace Scheduling::LDSBankModel;
 
@@ -310,12 +310,12 @@ TEST_CASE("Weave LDS and nops", "[rocprofiler][scheduler]")
     int strideMultiplier;
     int write;
 
-    constexpr auto testIndividual = false;
+    constexpr auto testIndividual = false; // for debugging a single configuration
     if(testIndividual)
     {
-        instrDwords      = GENERATE(1);
-        strideMultiplier = GENERATE(8);
-        write            = GENERATE(false);
+        instrDwords      = GENERATE(4);
+        strideMultiplier = GENERATE(2);
+        write            = GENERATE(true);
     }
     else
     {
@@ -552,21 +552,32 @@ TEST_CASE("Weave LDS and nops", "[rocprofiler][scheduler]")
                 totalAbsoluteDelta += std::abs(delta);
                 ldsInstructionCount++;
 
-                if((write && instrDwords == 4 && std::abs(delta) > 12)
-                   || (!(write && instrDwords == 4) && delta != 0))
+                if(write && instrDwords == 4)
+                {
+                    if(std::abs(delta) > 12)
+                        incorrectPredictionCount++;
+                }
+                else if(delta != 0)
                 {
                     incorrectPredictionCount++;
                 }
             }
         }
-
         INFO(fmt::format("Total absolute delta: {}, Incorrect predictions: {}/{}",
                          totalAbsoluteDelta,
                          incorrectPredictionCount,
                          ldsInstructionCount));
 
-        // CHECK(totalAbsoluteDelta == 0);
+        if(write && instrDwords == 4)
+            CHECK(totalAbsoluteDelta <= 6 * ldsInstructionCount);
+        else
+            // Average of half a cycle of error per LDS instruction
+            CHECK(totalAbsoluteDelta * 2 <= ldsInstructionCount);
+
+        // Generally the wrong predictions while the stalls cycles are increasing to a steady value
+        // I expect this to be reduced if the model has a period granularity beyond a quadcycle
         CHECK(incorrectPredictionCount <= 4);
+
         if(testIndividual)
             Log::trace(context.output());
     }
