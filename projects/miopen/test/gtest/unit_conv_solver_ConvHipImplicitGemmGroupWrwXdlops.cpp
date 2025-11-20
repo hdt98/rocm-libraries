@@ -106,12 +106,16 @@ auto GetConvFullTestCases(const std::string& compute_type_str)
     };
 }
 
-const auto& GetTestParams()
+const auto& GetTestParams(const std::string& compute_type_str)
 {
-    static const auto params = [] {
+    static const auto params = [&compute_type_str] {
 // If MIOpen is built without CK these tests will fail, skip them to avoid failing
 #if MIOPEN_BACKEND_HIP && MIOPEN_USE_COMPOSABLEKERNEL
         Gpu supportedDevices = Gpu::gfx908 | Gpu::gfx90A | Gpu::gfx94X | Gpu::gfx950;
+        if(compute_type_str == "TF32" || compute_type_str == "BF16")
+        {
+            supportedDevices = Gpu::gfx94X | Gpu::gfx950;
+        }
 #else
         Gpu supportedDevices = Gpu::None;
 #endif
@@ -158,56 +162,56 @@ TEST_P(CPU_UnitTestConvSolverHipImplicitGemmGroupWrwXdlopsDevApplicability_NONE,
 // Smoke tests
 INSTANTIATE_TEST_SUITE_P(Smoke,
                          GPU_UnitTestConvSolverHipImplicitGemmGroupWrwXdlops_FP16,
-                         testing::Combine(testing::Values(GetTestParams()),
+                         testing::Combine(testing::Values(GetTestParams("FP16")),
                                           testing::Values(miopenConvolutionAlgoImplicitGEMM),
                                           testing::ValuesIn(GetConvSmokeTestCases(miopenHalf))));
 
 INSTANTIATE_TEST_SUITE_P(
     Smoke,
     GPU_UnitTestConvSolverHipImplicitGemmGroupWrwXdlops_BFP16,
-    testing::Combine(testing::Values(GetTestParams()),
+    testing::Combine(testing::Values(GetTestParams("BF16")),
                      testing::Values(miopenConvolutionAlgoImplicitGEMM),
                      testing::ValuesIn(GetConvSmokeTestCases(miopenBFloat16))));
 
 INSTANTIATE_TEST_SUITE_P(Smoke,
                          GPU_UnitTestConvSolverHipImplicitGemmGroupWrwXdlops_FP32,
-                         testing::Combine(testing::Values(GetTestParams()),
+                         testing::Combine(testing::Values(GetTestParams("FP32")),
                                           testing::Values(miopenConvolutionAlgoImplicitGEMM),
                                           testing::ValuesIn(GetConvSmokeTestCases(miopenFloat))));
 
 INSTANTIATE_TEST_SUITE_P(Smoke,
                          GPU_UnitTestConvSolverHipImplicitGemmGroupWrwXdlops_TF32,
-                         testing::Combine(testing::Values(GetTestParams()),
+                         testing::Combine(testing::Values(GetTestParams("TF32")),
                                           testing::Values(miopenConvolutionAlgoImplicitGEMM),
                                           testing::ValuesIn(GetConvSmokeTestCases("TF32"))));
 
 // Full tests
 INSTANTIATE_TEST_SUITE_P(Full,
                          GPU_UnitTestConvSolverHipImplicitGemmGroupWrwXdlops_FP16,
-                         testing::Combine(testing::Values(GetTestParams()),
+                         testing::Combine(testing::Values(GetTestParams("FP16")),
                                           testing::Values(miopenConvolutionAlgoImplicitGEMM),
                                           testing::ValuesIn(GetConvFullTestCases(miopenHalf))));
 
 INSTANTIATE_TEST_SUITE_P(Full,
                          GPU_UnitTestConvSolverHipImplicitGemmGroupWrwXdlops_BFP16,
-                         testing::Combine(testing::Values(GetTestParams()),
+                         testing::Combine(testing::Values(GetTestParams("BF16")),
                                           testing::Values(miopenConvolutionAlgoImplicitGEMM),
                                           testing::ValuesIn(GetConvFullTestCases(miopenBFloat16))));
 
 INSTANTIATE_TEST_SUITE_P(Full,
                          GPU_UnitTestConvSolverHipImplicitGemmGroupWrwXdlops_FP32,
-                         testing::Combine(testing::Values(GetTestParams()),
+                         testing::Combine(testing::Values(GetTestParams("FP32")),
                                           testing::Values(miopenConvolutionAlgoImplicitGEMM),
                                           testing::ValuesIn(GetConvFullTestCases(miopenFloat))));
 
 INSTANTIATE_TEST_SUITE_P(Full,
                          GPU_UnitTestConvSolverHipImplicitGemmGroupWrwXdlops_TF32,
-                         testing::Combine(testing::Values(GetTestParams()),
+                         testing::Combine(testing::Values(GetTestParams("TF32")),
                                           testing::Values(miopenConvolutionAlgoImplicitGEMM),
                                           testing::ValuesIn(GetConvFullTestCases("TF32"))));
 
 // Device applicability test
 INSTANTIATE_TEST_SUITE_P(Smoke,
                          CPU_UnitTestConvSolverHipImplicitGemmGroupWrwXdlopsDevApplicability_NONE,
-                         testing::Combine(testing::Values(GetTestParams()),
+                         testing::Combine(testing::Values(GetTestParams("FP16")),
                                           testing::Values(GetConvSmokeTestCases(miopenHalf)[0])));
