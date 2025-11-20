@@ -364,6 +364,7 @@ globalParameters["SupportedISA"] = [
     (11, 5, 0),
     (11, 5, 1),
     (11, 5, 2),
+    (11, 5, 3),
     (12, 0, 0),
     (12, 0, 1),
 ]  # assembly kernels writer supports these architectures
@@ -509,6 +510,7 @@ architectureMap = {
     "gfx1150": "strixpoint",
     "gfx1151": "strixhalo",
     "gfx1152": "gfx1152",
+    "gfx1153": "gfx1153",
     "gfx1200": "gfx1200",
     "gfx1201": "gfx1201",
 }
@@ -2830,6 +2832,7 @@ def assignGlobalParameters(config, capabilitiesCache: Optional[dict] = None):
         (11, 5, 0),
         (11, 5, 1),
         (11, 5, 2),
+        (11, 5, 3),
         (12, 0, 0),
         (12, 0, 1),
     )
