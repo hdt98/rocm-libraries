@@ -32,13 +32,9 @@ struct has_b_tile_access_pattern<T, std::void_t<decltype(T::BTileAccessPattern)>
 template <typename Derived>
 struct UniversalGemmBasePolicy
 {
-<<<<<<< HEAD
 #if defined(__gfx950__) || defined(__gfx125__)
-=======
-#if defined(__gfx950__)
     // The combination of pk_int4_t and transposed loading causes numerical errors.
     // Therefore do not use transposed loading in this case.
->>>>>>> develop
     template <typename Problem>
     static constexpr bool is_a_load_tr = []() {
         using BDataType = remove_cvref_t<typename Problem::BDataType>;

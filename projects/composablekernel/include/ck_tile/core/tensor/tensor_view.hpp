@@ -516,11 +516,6 @@ struct tensor_view
     TensorDesc desc_;
 };
 
-// placeholder type if we want to opt-out a tile view parameter
-struct null_tensor_view
-{
-};
-
 template <typename T>
 struct is_tensor_view : std::false_type
 {
