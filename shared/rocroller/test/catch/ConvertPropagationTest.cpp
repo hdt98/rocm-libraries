@@ -141,7 +141,7 @@ namespace ExpressionTest
         DataType       m_resultType, m_aType, m_bType, m_cType;
     };
 
-    TEST_CASE("Convert propagation with Subtraction", "[b123][gpu][convert-propagation]")
+    TEST_CASE("Convert propagation with Subtraction", "[gpu][convert-propagation]")
     {
         auto context = TestContext::ForTestDevice();
 
@@ -182,7 +182,7 @@ namespace ExpressionTest
                        or Catch::Matchers::ContainsSubstring("v_add_nc_i32"));
     }
 
-    TEST_CASE("Convert propagation with ArithmeticShiftR", "[x123][gpu][convert-propagation]")
+    TEST_CASE("Convert propagation with ArithmeticShiftR", "[gpu][convert-propagation]")
     {
         auto context = TestContext::ForTestDevice();
 
@@ -223,7 +223,7 @@ namespace ExpressionTest
         CHECK_THAT(assembly, not Catch::Matchers::ContainsSubstring("v_addc_co_u32"));
     }
 
-    TEST_CASE("Convert propagation with LogicalShiftR", "[r123][gpu][convert-propagation]")
+    TEST_CASE("Convert propagation with LogicalShiftR", "[gpu][convert-propagation]")
     {
         auto context = TestContext::ForTestDevice();
 
@@ -264,7 +264,7 @@ namespace ExpressionTest
         CHECK_THAT(assembly, not Catch::Matchers::ContainsSubstring("v_addc_co_u32"));
     }
 
-    TEST_CASE("Convert propagation with Division/Modulo", "[q123][gpu][convert-propagation]")
+    TEST_CASE("Convert propagation with Division/Modulo", "[gpu][convert-propagation]")
     {
         enum class TestOperation
         {
@@ -323,7 +323,7 @@ namespace ExpressionTest
         }
     }
 
-    TEST_CASE("Convert propagation with enableDivideBy", "[z456][gpu][convert-propagation]")
+    TEST_CASE("Convert propagation with enableDivideBy", "[gpu][convert-propagation]")
     {
         using namespace rocRoller::Expression;
         using namespace rocRoller::KernelGraph;
