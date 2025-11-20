@@ -1,0 +1,4 @@
+add_example_executable(example_fasternet50_conv_conv_conv fasternet50_conv_conv_add_relu_conv_add_wcnn_fp16.cpp)
+#target_compile_definitions(example_fasternet50_conv_conv_conv PRIVATE CASCADE_1X_OUT=1)
+#target_compile_definitions(example_fasternet50_conv_conv_conv PRIVATE CASCADE_2X_OUT=1)
+target_compile_options(example_fasternet50_conv_conv_conv PRIVATE -v --save-temps -Wno-gnu-line-marker)
